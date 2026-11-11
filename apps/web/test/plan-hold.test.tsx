@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { AgentBrain, AiAccounts, AiComputer, BrainOption, ComputerSetup, OrgStanding } from "@agenteschat/client";
-import { PLAN_CHOICES, type PlanChoice, planTitle } from "@agenteschat/client/lib/no-ai";
+import { PLAN_CHOICES, type PlanChoice, planLabel, planTitle } from "@agenteschat/client/lib/no-ai";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -96,9 +96,34 @@ async function connect(who: Who, accounts: AiAccounts["accounts"] = []) {
   return { ...opened, dialog: screen().getByRole("dialog", { name: /Conectar uma IA/ }) };
 }
 
+/** The narrow dialog under the sky: Connect for the team (ADR 0160, addendum), its AIs as cards. */
+const inBand = (dialog: HTMLElement) => dialog.querySelector(".arrival-hero") !== null;
+
+/** A card of the team's Connect, from its first screen ("Other plan" opens the rest). */
+async function pickCard(dialog: HTMLElement, title: string) {
+  const back = within(dialog).queryByRole("button", { name: "Voltar" });
+  if (back) await click(back);
+  const card = () => within(dialog).queryByRole("button", { name: new RegExp(`^${title}`) });
+  if (!card()) await click(within(dialog).getByRole("button", { name: /^Outro plano/ }));
+  await click(card() as Element);
+}
+
+/** Each plan's card title in Portuguese; a coding plan's is its own name (`planLabel`). */
+const CARD: Partial<Record<PlanChoice, string>> = {
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  cursor: "Cursor",
+  grok: "Grok",
+  gemini: "Gemini",
+  zen: "Começar grátis",
+};
+
 async function planPanel(dialog: HTMLElement, choice: PlanChoice) {
-  const rows = await openAiSelect(dialog);
-  await click(rows[PLAN_CHOICES.indexOf(choice)] as Element);
+  if (inBand(dialog)) await pickCard(dialog, CARD[choice] ?? planLabel(i18next.t, choice));
+  else {
+    const rows = await openAiSelect(dialog);
+    await click(rows[PLAN_CHOICES.indexOf(choice)] as Element);
+  }
   await settle(2);
   return within(dialog).getAllByRole("region", { name: planTitle(i18next.t, choice) })[0] as HTMLElement;
 }
@@ -142,7 +167,7 @@ describe("a plan with no agentes.chat plan in force", () => {
       expect(shownText(panel)).not.toContain("agentes.chat");
       expect(buttonNamed(panel, PAY)).toBeNull();
     }
-    await click(payWith(dialog, "Com chave de API"));
+    await pickCard(dialog, "Chave de API");
     expect(shownText(dialog)).not.toContain(HELD);
     expect(shownText(dialog)).toContain("Todo agente sem plano pensa com ela.");
   });
@@ -265,7 +290,7 @@ describe("what a plan's panel never says on the Cloud", () => {
     await renderApp(`/org/${ORG_ID}?connect=ai`, { api });
     await settle(8);
     const dialog = screen().getByRole("dialog", { name: /Conectar uma IA/ });
-    if (within(dialog).queryByRole("combobox", { name: "Plano" }) === null)
+    if (!inBand(dialog) && within(dialog).queryByRole("combobox", { name: "Plano" }) === null)
       await click(payWith(dialog, "Com um plano"));
     return planPanel(dialog, "chatgpt");
   }

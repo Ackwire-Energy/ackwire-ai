@@ -1,53 +1,315 @@
+import type { PlanUsage } from "@agenteschat/client";
 import { accountAbout, accountTitle, type ExistingAi } from "@agenteschat/client/lib/ai-accounts";
 import { namesText } from "@agenteschat/client/lib/format";
 import { type PlanChoice, planOfAccount } from "@agenteschat/client/lib/no-ai";
 import { keyLine } from "@agenteschat/client/lib/providers";
 import { Icon, ProviderLogo, planState, Radio, RadioGroup } from "@agenteschat/ui";
-import { type CSSProperties, Fragment, useId, useState } from "react";
+import type { TFunction } from "i18next";
+import { type CSSProperties, Fragment, type ReactNode, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { planWord } from "@/lib/plan-usage";
 
 /** A row's id in the list: an account's or a key's. */
 export const haveId = (r: ExistingAi) => (r.kind === "key" ? `key:${r.key.id}` : `account:${r.choice.login.id}`);
 
-/** How much of its plan an account has used, and whether it is near or at its limit; null where nothing says. */
-const room = (r: ExistingAi) => (r.kind === "account" && r.choice.login.usage ? planState(r.choice.login.usage) : null);
+/**
+ * One row of what the person already has, as the list draws it: an account, a key, or (the agent's "Quem pensa") any
+ * other way it thinks. The list orders and groups these; the row puts the radio, the mark, the name and how full the
+ * plan is on one line, then a line about it and its state in words.
+ */
+export interface HaveItem {
+  id: string;
+  title: string;
+  /** In its owner's group: who else thinks with it, its email or its key's end. */
+  about?: string;
+  /** In a list of mixed owners: whose it is ("Sua", "De Hélio", "Chave do workspace"). */
+  whose: string;
+  /** Its group, by owner: `mine`, `keys`, or another owner's key. */
+  group: { key: string; label: string };
+  mark: ReactNode;
+  /** Its plan's limits; null where nothing says (a key). */
+  usage: PlanUsage | null;
+  /** It can't be picked. */
+  off?: boolean;
+  /** Picking it asks for a sign-in: after those used in one click. */
+  signIn?: boolean;
+  /** A workspace key: after the plans. */
+  isKey?: boolean;
+}
 
-/** A row the person can't pick: someone else's they may not use, or a plan that can't run on that computer now. */
-const offOf = (r: ExistingAi, dims: (choice: PlanChoice) => boolean) =>
-  r.kind === "account" && (r.act === "locked" || dims(planOfAccount(r.choice.login)));
+/** How much of its plan an item has used, and whether it is near or at its limit; null where nothing says. */
+const roomOf = (usage: PlanUsage | null) => (usage ? planState(usage) : null);
+const limited = (i: Pick<HaveItem, "usage">) => roomOf(i.usage)?.state === "limited";
 
-const limited = (r: ExistingAi) => room(r)?.state === "limited";
+type Rankable = Pick<HaveItem, "usage" | "off" | "signIn" | "isKey">;
 
 /**
  * A plan that is used in one click first, the one with most room on top (one that doesn't say counts as half used);
  * then one that asks for a sign-in, the workspace's keys, a plan at its limit, and last what can't be picked.
  */
-function sorted(rows: readonly ExistingAi[], dims: (choice: PlanChoice) => boolean) {
-  const rank = (r: ExistingAi) => {
-    const s = room(r);
-    const signIn = r.kind === "account" && r.act !== "use" && r.act !== "move";
+export function sortHave<T extends Rankable>(items: readonly T[]): T[] {
+  const rank = (i: Rankable) => {
+    const s = roomOf(i.usage);
     return (
-      (offOf(r, dims) ? 8000 : 0) +
+      (i.off ? 8000 : 0) +
       (s?.state === "limited" ? 4000 : 0) +
-      (r.kind === "key" ? 2000 : 0) +
-      (signIn ? 1000 : 0) +
+      (i.isKey ? 2000 : 0) +
+      (i.signIn ? 1000 : 0) +
       (s?.used ?? 50)
     );
   };
-  return [...rows].sort((a, b) => rank(a) - rank(b));
+  return [...items].sort((a, b) => rank(a) - rank(b));
 }
+
+/** A row the person can't pick: someone else's they may not use, or a plan that can't run on that computer now. */
+const offOf = (r: ExistingAi, dims: (choice: PlanChoice) => boolean) =>
+  r.kind === "account" && (r.act === "locked" || dims(planOfAccount(r.choice.login)));
+
+const rankOf = (r: ExistingAi, dims: (choice: PlanChoice) => boolean): Rankable => ({
+  usage: r.kind === "account" ? r.choice.login.usage : null,
+  off: offOf(r, dims),
+  signIn: r.kind === "account" && r.act !== "use" && r.act !== "move",
+  isKey: r.kind === "key",
+});
 
 /** The row a list opens on: the usable one with most room, never one at its limit while another has room. */
 export function bestHave(rows: readonly ExistingAi[], dims: (choice: PlanChoice) => boolean): string | undefined {
-  const first = sorted(rows, dims).find((r) => !offOf(r, dims));
-  return first ? haveId(first) : undefined;
+  const first = sortHave(rows.map((r) => ({ r, ...rankOf(r, dims) }))).find((x) => !x.off);
+  return first ? haveId(first.r) : undefined;
 }
 
 /** Up to this many rows the list shows them all, in groups; past it, this many with most room and a way to the rest. */
 export const HAVE_SHOWN = 3;
 
 const firstName = (name: string | null | undefined) => name?.split(" ")[0] ?? "";
+
+/** What the person already has (`ExistingAi`), as the list's rows. */
+function itemOf(t: TFunction, r: ExistingAi, agentName: string, dims: (choice: PlanChoice) => boolean): HaveItem {
+  if (r.kind === "key") {
+    return {
+      id: haveId(r),
+      title: r.key.label,
+      about: keyLine(t, r.key),
+      whose: t("connectAi.chat.keys"),
+      group: { key: "keys", label: t("connectAi.chat.keys") },
+      mark: <Icon name="key" size={16} className="arrival-have__mark" />,
+      usage: null,
+      isKey: true,
+    };
+  }
+  const a = r.choice.login;
+  const others = [...new Set(a.usedBy)].filter((n) => n !== agentName);
+  const whose = a.mine
+    ? t("connectAi.chat.yours")
+    : t("agentPage.work.brain.accountOf", { name: firstName(a.ownerName) });
+  return {
+    id: haveId(r),
+    title: accountTitle(a),
+    // In its owner's group, who else thinks with it; someone else's says nothing more there.
+    about: !a.mine
+      ? undefined
+      : others.length > 0 && a.shared === true
+        ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
+        : accountAbout(t, r.choice, agentName),
+    whose,
+    group: a.mine ? { key: "mine", label: t("connectAi.chat.mine") } : { key: `owner:${a.ownerId}`, label: whose },
+    mark: <ProviderLogo id={a.provider ?? a.kind} size="xs" />,
+    ...rankOf(r, dims),
+  };
+}
+
+/**
+ * One row. In a list (`RadioGroup`) its radio picks it; `still`: the one in use, shown alone with its dot, nothing to
+ * pick. `whose`: it says whose it is instead of the line about it (a list of mixed owners).
+ */
+export function HaveRow({
+  item,
+  checked,
+  whose = false,
+  disabled = false,
+  still = false,
+  word,
+}: {
+  item: HaveItem;
+  checked: boolean;
+  whose?: boolean;
+  disabled?: boolean;
+  still?: boolean;
+  /** Its state in words, over the plan's own ("Quase no limite"). */
+  word?: string | null;
+}) {
+  const { t, i18n } = useTranslation();
+  const dom = useId();
+  const off = disabled || item.off === true;
+  const state = roomOf(item.usage);
+  const about = whose ? item.whose : item.about;
+  const shownWord = word !== undefined ? word : item.usage ? planWord(t, i18n.language, item.usage) : null;
+  const used = state ? Math.min(100, Math.round(state.used)) : 0;
+  const body = (
+    <>
+      {item.mark}
+      <span className="arrival-have__text">
+        <span className="arrival-have__title">{item.title}</span>
+        {about && <span className="arrival-have__line">{about}</span>}
+        {shownWord && (
+          <span className="arrival-have__line" data-plan={state?.state}>
+            {shownWord}
+          </span>
+        )}
+      </span>
+      {state && (
+        <span className="arrival-have__room" data-plan={state.state} aria-hidden="true">
+          <span className="arrival-have__meter">
+            <i style={{ "--used": `${used}%` } as CSSProperties} />
+          </span>
+          <span className="arrival-have__pct">
+            {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(used / 100)}
+          </span>
+        </span>
+      )}
+    </>
+  );
+  if (still) {
+    return (
+      <div className="arrival-have__row" data-state="checked" data-still="">
+        <span className="ac-radio" data-state="checked" aria-hidden="true">
+          <span className="ac-radio__dot" data-state="checked" />
+        </span>
+        {body}
+      </div>
+    );
+  }
+  return (
+    <label
+      htmlFor={`${dom}-row`}
+      className="arrival-have__row"
+      data-state={checked ? "checked" : "unchecked"}
+      data-disabled={off ? "" : undefined}
+    >
+      <Radio value={item.id} id={`${dom}-row`} disabled={off} />
+      {body}
+    </label>
+  );
+}
+
+/**
+ * Rows to pick one from (`HaveItem`): few are grouped (the person's, the workspace's keys, each other owner's); many
+ * show the three with most room, each saying whose it is, and `all` lists every one under a search, by owner, those at
+ * their limit last. `pinned`: a group over the rest whatever their number (the one in use), never in `all`.
+ */
+export function HaveList({
+  items,
+  value,
+  onChange,
+  all = false,
+  onAll,
+  disabled = false,
+  pinned,
+  label,
+}: {
+  items: readonly HaveItem[];
+  value: string | undefined;
+  onChange: (id: string) => void;
+  all?: boolean;
+  onAll?: () => void;
+  disabled?: boolean;
+  pinned?: { label: string; items: readonly HaveItem[] };
+  label: string;
+}) {
+  const { t } = useTranslation();
+  const [query, setQuery] = useState("");
+  const list = sortHave(items);
+  const many = items.length > HAVE_SHOWN;
+  const row = (i: HaveItem, whose: boolean) => (
+    <HaveRow key={i.id} item={i} checked={i.id === value} whose={whose} disabled={disabled} />
+  );
+
+  /** By owner: the person's, the workspace's keys, each other owner's; in `all`, those at their limit last. */
+  const groups = () => {
+    const out: { key: string; label: string; rows: HaveItem[] }[] = [];
+    const into = (key: string, label: string, i: HaveItem) => {
+      const group = out.find((g) => g.key === key);
+      if (group) group.rows.push(i);
+      else out.push({ key, label, rows: [i] });
+    };
+    const open = all ? list.filter((i) => !limited(i)) : list;
+    for (const i of open) if (i.group.key === "mine") into(i.group.key, i.group.label, i);
+    for (const i of open) if (i.group.key === "keys") into(i.group.key, i.group.label, i);
+    for (const i of open) if (i.group.key !== "mine" && i.group.key !== "keys") into(i.group.key, i.group.label, i);
+    if (all) for (const i of list.filter(limited)) into("limit", t("connectAi.chat.atLimit"), i);
+    return out;
+  };
+  const grouped = (
+    <>
+      {groups().map((g) => (
+        <Fragment key={g.key}>
+          <p className="arrival-opts__label">{g.label}</p>
+          {g.rows.map((i) => row(i, g.key === "limit"))}
+        </Fragment>
+      ))}
+    </>
+  );
+  const top = pinned && pinned.items.length > 0 && !all && (
+    <>
+      <p className="arrival-opts__label">{pinned.label}</p>
+      {pinned.items.map((i) => row(i, false))}
+    </>
+  );
+
+  const found = query.trim()
+    ? list.filter((i) => `${i.title} ${i.whose}`.toLowerCase().includes(query.trim().toLowerCase()))
+    : null;
+  return (
+    <RadioGroup className="arrival-have" aria-label={label} value={value ?? ""} onValueChange={onChange}>
+      {all ? (
+        <>
+          <label className="arrival-have__search">
+            <Icon name="search" size={16} />
+            <input
+              type="search"
+              value={query}
+              placeholder={t("connectAi.chat.search")}
+              aria-label={t("connectAi.chat.search")}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+          <div className="arrival-have__scroll">
+            {found ? (
+              found.length > 0 ? (
+                found.map((i) => row(i, true))
+              ) : (
+                <p className="arrival-have__none">{t("connectAi.chat.none")}</p>
+              )
+            ) : (
+              grouped
+            )}
+          </div>
+        </>
+      ) : many ? (
+        <>
+          {top}
+          <p className="arrival-opts__label">{t("connectAi.chat.best")}</p>
+          {list.slice(0, HAVE_SHOWN).map((i) => row(i, true))}
+          {/* The one picked in the full list stays in sight when it isn't among the three. */}
+          {list
+            .slice(HAVE_SHOWN)
+            .filter((i) => i.id === value)
+            .map((i) => row(i, true))}
+          <button type="button" className="arrival-have__link" onClick={onAll}>
+            <Icon name="layers" size={16} />
+            <span>{t("connectAi.chat.seeAll", { count: items.length })}</span>
+            <Icon name="chevronRight" size={16} />
+          </button>
+        </>
+      ) : (
+        <>
+          {top}
+          {grouped}
+        </>
+      )}
+    </RadioGroup>
+  );
+}
 
 /**
  * What the person already has for the agent, to pick one and confirm it at the dialog's foot (ADR 0160, addendum). A
@@ -78,154 +340,16 @@ export function ConnectHave({
   onAll?: () => void;
   disabled?: boolean;
 }) {
-  const { t, i18n } = useTranslation();
-  const dom = useId();
-  const [query, setQuery] = useState("");
-  const list = sorted(rows, dims);
-  const many = rows.length > HAVE_SHOWN;
-  const ownerOf = (r: ExistingAi) =>
-    r.kind === "key"
-      ? t("connectAi.chat.keys")
-      : r.choice.login.mine
-        ? t("connectAi.chat.yours")
-        : t("agentPage.work.brain.accountOf", { name: firstName(r.choice.login.ownerName) });
-  const titleOf = (r: ExistingAi) => (r.kind === "key" ? r.key.label : accountTitle(r.choice.login));
-
-  const row = (r: ExistingAi, whose: boolean) => {
-    const id = haveId(r);
-    const off = disabled || offOf(r, dims);
-    const state = room(r);
-    const a = r.kind === "account" ? r.choice.login : undefined;
-    const others = a ? [...new Set(a.usedBy)].filter((n) => n !== agentName) : [];
-    // In a list of mixed owners a row says whose it is; in its owner's group, who else thinks with it.
-    const about = whose
-      ? ownerOf(r)
-      : r.kind === "key"
-        ? keyLine(t, r.key)
-        : !r.choice.login.mine
-          ? undefined
-          : others.length > 0 && r.choice.login.shared === true
-            ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
-            : accountAbout(t, r.choice, agentName);
-    const word = a ? planWord(t, i18n.language, a.usage) : null;
-    const used = state ? Math.min(100, Math.round(state.used)) : 0;
-    return (
-      <label
-        key={id}
-        htmlFor={`${dom}-${id}`}
-        className="arrival-have__row"
-        data-state={id === value ? "checked" : "unchecked"}
-        data-disabled={off ? "" : undefined}
-      >
-        <Radio value={id} id={`${dom}-${id}`} disabled={off} />
-        {r.kind === "key" ? (
-          <Icon name="key" size={16} className="arrival-have__mark" />
-        ) : (
-          <ProviderLogo id={r.choice.login.provider ?? r.choice.login.kind} size="xs" />
-        )}
-        <span className="arrival-have__text">
-          <span className="arrival-have__title">{titleOf(r)}</span>
-          {about && <span className="arrival-have__line">{about}</span>}
-          {word && (
-            <span className="arrival-have__line" data-plan={state?.state}>
-              {word}
-            </span>
-          )}
-        </span>
-        {state && (
-          <span className="arrival-have__room" data-plan={state.state} aria-hidden="true">
-            <span className="arrival-have__meter">
-              <i style={{ "--used": `${used}%` } as CSSProperties} />
-            </span>
-            <span className="arrival-have__pct">
-              {new Intl.NumberFormat(i18n.language, { style: "percent" }).format(used / 100)}
-            </span>
-          </span>
-        )}
-      </label>
-    );
-  };
-
-  /** By owner: the person's, the workspace's keys, each other owner's; in `all`, those at their limit last. */
-  const groups = () => {
-    const out: { key: string; label: string; rows: ExistingAi[] }[] = [];
-    const into = (key: string, label: string, r: ExistingAi) => {
-      const group = out.find((g) => g.key === key);
-      if (group) group.rows.push(r);
-      else out.push({ key, label, rows: [r] });
-    };
-    const open = all ? list.filter((r) => !limited(r)) : list;
-    for (const r of open) if (r.kind === "account" && r.choice.login.mine) into("mine", t("connectAi.chat.mine"), r);
-    for (const r of open) if (r.kind === "key") into("keys", t("connectAi.chat.keys"), r);
-    for (const r of open) {
-      if (r.kind === "account" && !r.choice.login.mine) into(`owner:${r.choice.login.ownerId}`, ownerOf(r), r);
-    }
-    if (all) for (const r of list.filter(limited)) into("limit", t("connectAi.chat.atLimit"), r);
-    return out;
-  };
-  const grouped = (
-    <>
-      {groups().map((g) => (
-        <Fragment key={g.key}>
-          <p className="arrival-opts__label">{g.label}</p>
-          {g.rows.map((r) => row(r, g.key === "limit"))}
-        </Fragment>
-      ))}
-    </>
-  );
-
-  const found = query.trim()
-    ? list.filter((r) => `${titleOf(r)} ${ownerOf(r)}`.toLowerCase().includes(query.trim().toLowerCase()))
-    : null;
+  const { t } = useTranslation();
   return (
-    <RadioGroup
-      className="arrival-have"
-      aria-label={t("connectAi.have.title")}
-      value={value ?? ""}
-      onValueChange={onChange}
-    >
-      {all ? (
-        <>
-          <label className="arrival-have__search">
-            <Icon name="search" size={16} />
-            <input
-              type="search"
-              value={query}
-              placeholder={t("connectAi.chat.search")}
-              aria-label={t("connectAi.chat.search")}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </label>
-          <div className="arrival-have__scroll">
-            {found ? (
-              found.length > 0 ? (
-                found.map((r) => row(r, true))
-              ) : (
-                <p className="arrival-have__none">{t("connectAi.chat.none")}</p>
-              )
-            ) : (
-              grouped
-            )}
-          </div>
-        </>
-      ) : many ? (
-        <>
-          <p className="arrival-opts__label">{t("connectAi.chat.best")}</p>
-          {list.slice(0, HAVE_SHOWN).map((r) => row(r, true))}
-          {/* The one picked in the full list stays in sight when it isn't among the three. */}
-          {list
-            .slice(HAVE_SHOWN)
-            .filter((r) => haveId(r) === value)
-            .map((r) => row(r, true))}
-          <button type="button" className="arrival-have__link" onClick={onAll}>
-            <Icon name="layers" size={16} />
-            <span>{t("connectAi.chat.seeAll", { count: rows.length })}</span>
-            <Icon name="chevronRight" size={16} />
-          </button>
-        </>
-      ) : (
-        grouped
-      )}
-    </RadioGroup>
+    <HaveList
+      items={rows.map((r) => itemOf(t, r, agentName, dims))}
+      value={value}
+      onChange={onChange}
+      all={all}
+      onAll={onAll}
+      disabled={disabled}
+      label={t("connectAi.have.title")}
+    />
   );
 }

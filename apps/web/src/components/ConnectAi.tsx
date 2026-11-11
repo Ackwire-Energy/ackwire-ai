@@ -18,6 +18,7 @@ import { stepPermissions } from "@agenteschat/client/lib/home";
 import {
   type AgentAi,
   type AiChoice,
+  ALL_AGENTS,
   agentAi,
   agentPlan,
   aiStateOf,
@@ -27,20 +28,25 @@ import {
   type ExistingSignIn,
   freePlanAccount,
   gateDims,
+  kindOf,
   mayConnectAi,
   type PlanChoice,
   type PlanGate,
+  planLabel,
   planMark,
   planOfAccount,
   planTitle,
   signsInOnce,
+  signsInPerAgent,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
+import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { providerGuess, providerLabel } from "@agenteschat/client/lib/providers";
 import { isRightHand, rightHandOf, rightHandOnKey, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import {
   AvatarStack,
   Button,
+  Checkbox,
   Dialog,
   DialogBody,
   DialogFooter,
@@ -59,7 +65,9 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
@@ -69,8 +77,10 @@ import {
   ExistingRows,
   ExistingThinks,
   type ExistingUsed,
+  FaceStrip,
   type KeyDraft,
   KeyPanel,
+  PlanAudience,
   PlanHold,
   PlanPanel,
   PlanWithoutAgent,
@@ -82,7 +92,7 @@ import {
 import { EndpointForm } from "@/components/ai/EndpointForm";
 import { ConnectChoices } from "@/components/arrival/ConnectChoices";
 import { bestHave, ConnectHave, haveId } from "@/components/arrival/ConnectHave";
-import { sceneTeam, TeamScene, useDawn } from "@/components/arrival/TeamScene";
+import { type SceneAgent, sceneTeam, TeamScene, useDawn } from "@/components/arrival/TeamScene";
 import { useOrg } from "@/components/org-context";
 import { KeyRefused, ProviderKeySelect } from "@/components/ProviderKey";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -97,6 +107,8 @@ import "./no-ai.css";
  * step: the plans first (Claude chosen), each signing in on the agent's computer, then the workspace's API key; a
  * message that asked for one of them opens on it. For one agent with no AI, what the person already has comes before
  * them (`ExistingRows`). Connected from a card or a message, the agent then answers it by itself.
+ * Opened from an agent's own conversation, or for the whole team, it is the narrow dialog under the sky instead
+ * (ADR 0160, addendum: `BandDialog`).
  */
 
 export interface ConnectAiRequest {
@@ -225,6 +237,129 @@ export function ConnectAiProvider({ children }: { children: ReactNode }) {
 const stepTitle = (t: TFunction, choice: AiChoice) =>
   choice === "key" ? t("connectAi.title.api_key") : planTitle(t, choice);
 
+/** The sky over the narrow dialog: who wakes (four drawn, the rest as "+N"), and the AI's mark at the end of a trail. */
+interface BandScene {
+  agents: readonly SceneAgent[];
+  lead?: string;
+  awake: boolean;
+  day: number;
+  more?: number;
+  mark?: AiChoice;
+  trail?: "walk" | "done";
+}
+
+/** How many names a line of who stayed without an AI says before "and N more". */
+const NAMES_TEAM = 3;
+
+/** How deep each screen of the narrow dialog is: a deeper one comes in from the end, a shallower one from the start. */
+const DEPTH: Record<string, number> = { loading: 0, pick: 0, other: 1, all: 1, agents: 1, steps: 2, used: 3, done: 3 };
+
+/**
+ * The narrow dialog under the sky (ADR 0160, addendum), for the conversation's Connect and the team's: the sky with
+ * who wakes, the title with the way back on its line, one thing in the middle, a plan's own actions when it has any,
+ * and the footer. A screen that changes slides in from the side it comes from, its title with it; no motion for
+ * whoever asked for less (arrival.css).
+ */
+function BandDialog({
+  title,
+  scene,
+  screen,
+  onBack,
+  onClose,
+  actsRef,
+  footer,
+  children,
+}: {
+  title: string;
+  scene: BandScene;
+  /** Which screen it shows (`DEPTH`): a change is what slides. */
+  screen: string;
+  onBack?: () => void;
+  onClose: () => void;
+  /** Where a plan's panel puts its own actions: a footer row shown only while it holds any. */
+  actsRef?: (el: HTMLElement | null) => void;
+  footer?: ReactNode;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
+  // The first screen comes with the dialog's own entrance; only a change slides.
+  const last = useRef<{ screen: string; dir?: "fwd" | "back" }>({ screen });
+  if (last.current.screen !== screen)
+    last.current = {
+      screen,
+      dir: (DEPTH[screen] ?? 0) < (DEPTH[last.current.screen] ?? 0) ? "back" : "fwd",
+    };
+  const { dir } = last.current;
+  const { mark } = scene;
+  return (
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={title}
+      closeLabel={t("common.close")}
+      width={520}
+      bare
+      className="arrival arrival-chat"
+    >
+      <div className="arrival-hero">
+        <TeamScene
+          agents={scene.agents}
+          lead={scene.lead}
+          asleep={!scene.awake}
+          day={scene.day}
+          expression={scene.awake ? "happy" : undefined}
+        >
+          {scene.more ? <span className="team-scene__more">{`+${scene.more}`}</span> : null}
+          {mark && (
+            <>
+              <span className="team-scene__trail" data-state={scene.trail}>
+                {[0, 1, 2, 3, 4].map((n) => (
+                  <i key={n} style={{ "--n": n } as CSSProperties} />
+                ))}
+              </span>
+              <span className="team-scene__mark">
+                {mark === "key" ? <Icon name="key" /> : <ProviderLogo id={planMark(mark)} size="tile" />}
+              </span>
+            </>
+          )}
+        </TeamScene>
+        <Button
+          variant="ghost"
+          size="sm"
+          iconOnly
+          icon="close"
+          className="arrival-hero__close"
+          aria-label={t("common.close")}
+          onClick={onClose}
+        />
+      </div>
+      {/* The dialog's name is its hidden title; this is the same sentence, drawn. */}
+      <div className="arrival-lede arrival-lede--row">
+        {onBack && (
+          <Button
+            variant="ghost"
+            size="sm"
+            iconOnly
+            icon="chevronLeft"
+            aria-label={t("common.back")}
+            onClick={onBack}
+          />
+        )}
+        <p key={screen} className="arrival-lede__title arrival-swap" data-dir={dir} aria-hidden="true">
+          {title}
+        </p>
+      </div>
+      <DialogBody>
+        <div key={screen} className="arrival-swap" data-dir={dir}>
+          {children}
+        </div>
+      </DialogBody>
+      {actsRef && <div className="ac-dialog__foot arrival-chat__acts" ref={actsRef} />}
+      {footer}
+    </Dialog>
+  );
+}
+
 function ConnectAiDialog({
   request,
   onClose,
@@ -288,18 +423,62 @@ function ConnectAiDialog({
         : [],
   };
   const [chatKept, setChatKept] = useState<typeof chatNow>();
+  // Opened for several agents or none (the channel's notice, Settings › AI accounts, the first-run list, a team just
+  // made, a receipt or a card for several agents): the narrow dialog under the sky, for every agent of the person's
+  // that can't think, on the computer of the first of them since a plan signs in on one computer (ADR 0160, addendum).
+  // The plain dialog stays for every way in that names one thing or has its own: someone else's agent (locked), one
+  // agent alone (the right hand's own AI among them), a plan to sign in to again (`plan`), a key asked for or pasted,
+  // an agent still being made (`forNewAgent`), a billing hold (its notice is the whole dialog), and nobody to wake (no
+  // agent of theirs yet, or every one of them already thinks).
+  const teamAsk =
+    hold === null &&
+    !request.arrival &&
+    !request.chat &&
+    request.plan === undefined &&
+    request.apiKey === undefined &&
+    !request.forNewAgent &&
+    request.intent !== "api_key" &&
+    (named ? named.length >= 2 : request.agentId === undefined);
+  const teamNow = (() => {
+    if (!teamAsk) return [];
+    const ids = (named ?? mine.map((a) => a.id)).filter((id) => mine.some((a) => a.id === id) && asleep(id));
+    const where = ids[0] === undefined ? null : (machineOf(ids[0]) ?? null);
+    return ids.filter((id) => (machineOf(id) ?? null) === where);
+  })();
+  const [teamKept, setTeamKept] = useState<string[]>();
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the agents and their AI load
   useEffect(() => {
-    if (loaded) setChatKept((kept) => kept ?? chatNow);
+    if (!loaded) return;
+    setChatKept((kept) => kept ?? chatNow);
+    setTeamKept((kept) => kept ?? teamNow);
   }, [loaded]);
   const chat = chatKept ?? chatNow;
+  const teamIds = teamKept ?? teamNow;
+  const team = teamAsk && (!loaded || teamIds.length > 0);
+  // Whom of them it is for ("Choose": all of them until the person narrows it), the list being edited meanwhile, and
+  // each new start for those a round left without an AI ("Connect Lia").
+  const [teamPick, setTeamPick] = useState<string[]>();
+  const forTeam = teamPick ?? teamIds;
+  const [draftPick, setDraftPick] = useState<string[] | null>(null);
+  const [round, setRound] = useState(0);
+  const dom = useId();
   const [scope, setScope] = useState<"all" | "one">();
   const several = chat.set.length >= 2;
   const wide = chat.on && several && scope !== "one";
-  const only = wide ? undefined : named ? (named.length === 1 ? named[0] : undefined) : request.agentId;
+  const only = team
+    ? forTeam.length === 1
+      ? forTeam[0]
+      : undefined
+    : wide
+      ? undefined
+      : named
+        ? named.length === 1
+          ? named[0]
+          : undefined
+        : request.agentId;
   const one = only ? dir.agentById.get(only) : undefined;
   const rightHand = isRightHand(one);
-  const pool = request.forNewAgent ? [] : one ? [one.id] : wide ? chat.set : named;
+  const pool = request.forNewAgent ? [] : one ? [one.id] : team ? forTeam : wide ? chat.set : named;
   // In the order asked for: the conversation's agent leads "All agents", so its computer is the one a plan signs in on.
   const pooled = pool
     ? pool.flatMap((id) => {
@@ -318,7 +497,7 @@ function ConnectAiDialog({
   // From a conversation an agent that can't think has no AI, whatever it is set to (a plan nobody is signed in to):
   // "All agents" on the first screen and in a plan's panel are then the same agents.
   const aiOf = (id: string): AgentAi =>
-    linked[id] ?? (chat.on && asleep(id) ? null : agentAi(dir.agentById.get(id), aiStateOf(status.data, id)));
+    linked[id] ?? ((chat.on || team) && asleep(id) ? null : agentAi(dir.agentById.get(id), aiStateOf(status.data, id)));
   const hasAi = (id: string) => aiOf(id) !== null;
   // By the AI status, as its "Sem IA" chip: an agent on a plan whose sign-in is gone has none either.
   const noAi = (id: string) => !linked[id] && (aiStateOf(status.data, id) ?? "no_ai") === "no_ai";
@@ -345,8 +524,9 @@ function ConnectAiDialog({
   const aimed = {
     agents,
     hasAi,
-    picked: pickedTarget,
-    ...(wide ? { host: request.agentId } : { asked: request.agentId }),
+    // For the team, its plan's panel is for all of them whenever the plan may sign in for more than one.
+    picked: pickedTarget ?? (team ? ALL_AGENTS : undefined),
+    ...(wide || team ? { host: request.agentId } : { asked: request.agentId }),
   };
   // With no set, the agent whose computer the panel reads, "All agents" too (they're on that one's computer).
   const reader = heldReader ?? defaultTarget({ ...aimed, set: [] });
@@ -359,7 +539,7 @@ function ConnectAiDialog({
   const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined));
   const credentials = useCredentials(org.id, mayUseKeys && forId !== undefined);
   // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
-  const bare = agents.length === 0 && !theirs && !named;
+  const bare = agents.length === 0 && !theirs && !named && !team;
   const bareGates = useGatesWithoutAgent(org.id, bare);
   const gateOf = (c: PlanChoice): PlanGate =>
     agents.length > 0 ? gates.gateOf(c) : bare ? bareGates.at(c).gate : { state: "loading" };
@@ -389,7 +569,8 @@ function ConnectAiDialog({
   // The arrival's stage: never over a billing hold, whose notice is the whole dialog.
   const stage = request.arrival === true && !hold;
   // Its first screen is the cards; a pick moves on to that plan's steps, and Back returns to the cards.
-  const [chosen, setChosen] = useState(false);
+  // For the team, a message that asked for Claude or ChatGPT opens on its steps.
+  const [chosen, setChosen] = useState(teamAsk && (request.intent === "claude" || request.intent === "chatgpt"));
   // From a conversation: the sky as a band over a narrow dialog.
   const band = chat.on && !hold;
   // An account picked for every agent: its plan's panel uses it at once.
@@ -401,7 +582,7 @@ function ConnectAiDialog({
   const [allOpen, setAllOpen] = useState(false);
   // Where a plan's panel puts its own two actions (an account to use, another sign-in): the dialog's footer.
   const [footAt, setFootAt] = useState<HTMLElement | null>(null);
-  const day = useDawn((stage || band) && connected);
+  const day = useDawn((stage || band || team) && connected);
   const [keySaved, setKeySaved] = useState(false);
   const [keyNote, setKeyNote] = useState<string>();
   const [refused, setRefused] = useState<ReturnType<typeof keyRefusal>>(null);
@@ -416,7 +597,7 @@ function ConnectAiDialog({
   // workspace's AI, so its DM answers with it too.
   const hand = rightHand
     ? one
-    : named?.flatMap((id) => {
+    : (team ? forTeam : named)?.flatMap((id) => {
         const a = dir.agentById.get(id);
         return a && isRightHand(a) && noAi(a.id) ? [a] : [];
       })[0];
@@ -523,7 +704,7 @@ function ConnectAiDialog({
       />
     ) : (
       <PlanPanel
-        key={choice}
+        key={`${choice}:${round}`}
         choice={choice}
         gates={gates}
         justReady={request.ready}
@@ -541,7 +722,7 @@ function ConnectAiDialog({
         locked={locked}
         {...(login?.choice === choice ? { login } : {})}
         {...(use && planOfAccount(use) === choice ? { use } : {})}
-        plain={band}
+        plain={band || team}
         actionsAt={footAt}
         onKey={() => {
           setPicked("key");
@@ -557,7 +738,8 @@ function ConnectAiDialog({
       />
     );
   const freeDone = bare && choice !== "key" && freePlanAccount(bareGates.accounts, choice);
-  const askedAgent = agents.find((a) => a.id === asked?.id) ?? { id: "", name: "" };
+  // What the person already has is read for the agent whose computer the panel reads (the team's first).
+  const askedAgent = agents.find((a) => a.id === (team ? reader : asked?.id)) ?? { id: "", name: "" };
   const have = useExistingAi({
     gates,
     agent: askedAgent,
@@ -569,6 +751,294 @@ function ConnectAiDialog({
       done();
     },
   });
+  if (team) {
+    // For the whole team (ADR 0160, addendum): which AI under one line saying for whom, whom of them, then the plan's
+    // steps (one login per agent in turn where it can't share one sign-in there), and who woke.
+    const ready = loaded;
+    const stepping = chosen && !connected;
+    const dims = (c: PlanChoice) => agents.length > 0 && gateDims(gateOf(c));
+    // Only what thinks for all of them at once: the person's own accounts there, signed in, shared with all their agents.
+    const rows = (have.rows ?? []).filter(
+      (r) =>
+        r.kind === "account" &&
+        r.act === "use" &&
+        r.choice.login.shared === true &&
+        r.choice.login.mine &&
+        r.choice.login.status === "active",
+    );
+    const choosing = draftPick !== null;
+    const draft = draftPick ?? [];
+    const picking = ready && !chosen && !used && rows.length > 0 && !adding && !choosing;
+    const selected = picking ? rows.find((r) => haveId(r) === (haveSel ?? bestHave(rows, dims))) : undefined;
+    const account = selected?.kind === "account" ? selected.choice.login : undefined;
+    const pick = (next: AiChoice, a?: MachineAccount) => {
+      setPicked(next);
+      setLogin(null);
+      setUse(a);
+      setChosen(true);
+      if (next !== choice) setHeldReader(undefined);
+    };
+    const listing = picking && allOpen;
+    const rowsOf = (ids: readonly string[]) =>
+      ids.flatMap((id) => {
+        const a = dir.agentById.get(id);
+        return a ? [a] : [];
+      });
+    const faces = (ids: readonly string[]) =>
+      rowsOf(ids).map((a) => ({ id: a.id, name: a.name, appearance: lookOf(a), initials: dir.agentInitials(a.id) }));
+    const nameOf = (id: string | undefined) => (id ? (dir.agentById.get(id)?.name ?? "") : "");
+    const woke = forTeam.filter((id) => linked[id] !== undefined);
+    const stayed = forTeam.filter((id) => linked[id] === undefined);
+    // Done with a plan: who woke, who didn't and why, and whom they answer. A key's own panel says it is saved.
+    const finished = connected && choice !== "key" && woke.length > 0;
+    const plan = choice === "key" ? "" : planLabel(t, choice);
+    const screen = !ready
+      ? "loading"
+      : choosing
+        ? "agents"
+        : finished
+          ? "done"
+          : chosen
+            ? "steps"
+            : listing
+              ? "all"
+              : adding && rows.length > 0
+                ? "other"
+                : "pick";
+    const title =
+      screen === "agents"
+        ? t("connectAi.team.pickTitle")
+        : finished
+          ? teamIds.every((id) => linked[id] !== undefined)
+            ? t("connectAi.team.wokeAll")
+            : t("connectAi.team.woke", { count: woke.length })
+          : chosen
+            ? stepTitle(t, choice)
+            : listing
+              ? t("connectAi.chat.allTitle")
+              : adding && rows.length > 0
+                ? t("connectAi.chat.other")
+                : t("connectAi.team.title");
+    const back = choosing || stepping || listing || (adding && rows.length > 0 && !chosen);
+    // The sky shows whom it is for: the list as it is being ticked, then those who woke.
+    const cast = rowsOf(choosing ? teamIds.filter((id) => draft.includes(id)) : finished ? woke : forTeam);
+    const drawn = sceneTeam(
+      cast,
+      cast.find((a) => isRightHand(a)),
+    );
+    const mark = chosen ? choice : account ? planOfAccount(account) : undefined;
+    // A plan that will ask for one login per agent on their computer says so on its card (ADR 0059 §2).
+    const computer = accounts.data?.computers.find((m) => m.machineId === machineOf(forTeam[0] ?? ""));
+    const perAgent = (c: PlanChoice) =>
+      forTeam.length >= 2 && !isPlanId(c) && signsInPerAgent(c) && !signsInOnce(c, computer);
+    const applyPick = () => {
+      setTeamPick(teamIds.filter((id) => draft.includes(id)));
+      setDraftPick(null);
+      setHaveSel(undefined);
+      setPickedTarget(undefined);
+      setHeldReader(undefined);
+    };
+    // Those a round left without an AI: the same plan's steps again, for them alone.
+    const again = () => {
+      setTeamPick(stayed);
+      setConnected(false);
+      setChosen(true);
+      setUse(undefined);
+      setLogin(null);
+      setPickedTarget(undefined);
+      setHeldReader(undefined);
+      setRound((n) => n + 1);
+    };
+    const note = (text: string) => (
+      <span className="ac-iconline">
+        <Icon name="info" />
+        <span>{text}</span>
+      </span>
+    );
+    const shown = rowsOf(forTeam);
+    return (
+      <BandDialog
+        title={title}
+        screen={screen}
+        onClose={onClose}
+        onBack={
+          back
+            ? () => {
+                if (choosing) setDraftPick(null);
+                else if (chosen) {
+                  setChosen(false);
+                  setLogin(null);
+                  setUse(undefined);
+                } else if (listing) setAllOpen(false);
+                else setAdding(false);
+              }
+            : undefined
+        }
+        scene={{
+          agents: drawn,
+          lead: cast.find((a) => isRightHand(a))?.id,
+          awake: connected,
+          day,
+          more: cast.length - drawn.length,
+          mark,
+          trail: connected ? "done" : chosen ? "walk" : undefined,
+        }}
+        actsRef={stepping ? setFootAt : undefined}
+        footer={
+          choosing ? (
+            <DialogFooter note={note(t("connectAi.team.marked", { n: draft.length, total: teamIds.length }))}>
+              <Button variant="primary" disabled={draft.length === 0} onClick={applyPick}>
+                {t("connectAi.team.useThese", { count: draft.length })}
+              </Button>
+            </DialogFooter>
+          ) : finished ? (
+            <DialogFooter>
+              {stayed.length > 0 && (
+                <Button onClick={again}>
+                  {stayed.length === 1
+                    ? t("connectAi.team.again", agentGrammar(nameOf(stayed[0])))
+                    : t("connectAi.team.againMany", { n: stayed.length })}
+                </Button>
+              )}
+              <Button variant="primary" onClick={onClose}>
+                {t("connectAi.done")}
+              </Button>
+            </DialogFooter>
+          ) : connected ? (
+            <DialogFooter>
+              <Button variant="primary" onClick={onClose}>
+                {t("connectAi.done")}
+              </Button>
+            </DialogFooter>
+          ) : picking && selected && account ? (
+            <DialogFooter>
+              <Button variant="primary" onClick={() => pick(planOfAccount(account), account)}>
+                {t("connectAi.use", { label: accountTitle(account) })}
+              </Button>
+            </DialogFooter>
+          ) : (
+            !chosen && (
+              <DialogFooter note={note(t("arrival.connect.without"))}>
+                <Button variant="ghost" onClick={onClose}>
+                  {t("arrival.connect.later")}
+                </Button>
+              </DialogFooter>
+            )
+          )
+        }
+      >
+        {!ready ? (
+          <Spinner />
+        ) : choosing ? (
+          // Long names fit whole on a row of their own; the list scrolls inside the dialog.
+          // biome-ignore lint/a11y/useSemanticElements: a list of checkboxes, not a native fieldset
+          <div className="arrival-picks" role="group" aria-label={t("connectAi.agentAria")}>
+            {rowsOf(teamIds).map((a) => {
+              const on = draft.includes(a.id);
+              return (
+                <label key={a.id} htmlFor={`${dom}-${a.id}`} className="arrival-pick" data-checked={on}>
+                  <Checkbox
+                    id={`${dom}-${a.id}`}
+                    checked={on}
+                    onCheckedChange={(next) =>
+                      setDraftPick((d) => (d === null ? d : next ? [...d, a.id] : d.filter((id) => id !== a.id)))
+                    }
+                  />
+                  <AgentAvatar name={a.name} initials={dir.agentInitials(a.id)} appearance={lookOf(a)} size="sm" />
+                  <span className="arrival-pick__name">{a.name}</span>
+                </label>
+              );
+            })}
+          </div>
+        ) : finished ? (
+          <div className="ai-turn">
+            <p className="ai-turn__title" role="status">
+              {woke.length === 1
+                ? t("connectAi.team.thinksOne", { ...agentGrammar(nameOf(woke[0])), plan })
+                : t("connectAi.team.thinksAll", { plan })}
+            </p>
+            {stayed.length > 0 && (
+              <span className="ai-turn__help">
+                {stayed.length === 1
+                  ? t("connectAi.team.stayed", agentGrammar(nameOf(stayed[0])))
+                  : t("connectAi.team.stayedMany", {
+                      names: namesText(t, stayed.map(nameOf), NAMES_TEAM),
+                    })}
+              </span>
+            )}
+            {forTeam.length > 1 && (
+              <FaceStrip agents={faces(forTeam)} stateOf={(a) => (linked[a.id] ? "done" : "failed")} />
+            )}
+            {/* Whom they answer, on the plan just connected: the team's right hand serves each person alone. */}
+            <PlanAudience
+              agents={faces(woke.filter((id) => !isRightHand(dir.agentById.get(id))))}
+              brain={kindOf(choice)}
+              coding={planOf(choice)}
+            />
+          </div>
+        ) : chosen ? (
+          <div className="arrival-main__steps">
+            {choice === "key" && keySelect}
+            {panel}
+          </div>
+        ) : (
+          <div className="arrival-main__pick">
+            {!listing && (
+              <div className="arrival-forline">
+                <AvatarStack>
+                  {shown.slice(0, 5).map((a) => (
+                    <AgentAvatar
+                      key={a.id}
+                      name={a.name}
+                      initials={dir.agentInitials(a.id)}
+                      appearance={lookOf(a)}
+                      size="xs"
+                    />
+                  ))}
+                </AvatarStack>
+                <b>
+                  {forTeam.length === teamIds.length
+                    ? t("connectAi.team.asleep", { count: teamIds.length })
+                    : t("connectAi.team.asleepSome", { n: forTeam.length, total: teamIds.length })}
+                </b>
+                {teamIds.length >= 2 && (
+                  <button type="button" className="ac-link arrival-forline__pick" onClick={() => setDraftPick(forTeam)}>
+                    {t("connectAi.team.choose")}
+                  </button>
+                )}
+              </div>
+            )}
+            {picking ? (
+              <>
+                <ConnectHave
+                  rows={rows}
+                  agentName={askedAgent.name}
+                  value={selected ? haveId(selected) : undefined}
+                  onChange={setHaveSel}
+                  dims={dims}
+                  all={listing}
+                  onAll={() => setAllOpen(true)}
+                />
+                {!listing && (
+                  <button
+                    type="button"
+                    className="arrival-have__link arrival-have__link--other"
+                    onClick={() => setAdding(true)}
+                  >
+                    <Icon name="plus" size={16} />
+                    <span>{t("connectAi.chat.other")}</span>
+                    <Icon name="chevronRight" size={16} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <ConnectChoices mayAddKey={mayAddKey} dims={dims} perAgent={perAgent} onPick={(next) => pick(next)} />
+            )}
+          </div>
+        )}
+      </BandDialog>
+    );
+  }
   if (band && asked) {
     const ready = loaded;
     const stepping = chosen && !connected;
@@ -621,210 +1091,181 @@ function ConnectAiDialog({
     // Someone else's plan: its owner hears of it and may take it back.
     const lends = account !== undefined && !account.mine && account.ownerId !== asked.ownerUserId;
     const back = stepping || listing || (adding && rows.length > 0 && !chosen && !used);
+    const screen = !ready
+      ? "loading"
+      : used && !chosen
+        ? "used"
+        : chosen
+          ? "steps"
+          : listing
+            ? "all"
+            : adding && rows.length > 0
+              ? "other"
+              : "pick";
     return (
-      <Dialog
-        open
-        onOpenChange={(o) => !o && onClose()}
+      <BandDialog
         title={title}
-        closeLabel={t("common.close")}
-        width={520}
-        bare
-        className="arrival arrival-chat"
-      >
-        <div className="arrival-hero">
-          <TeamScene
-            agents={
-              wide
-                ? sceneTeam(
-                    mine.filter((a) => chat.set.includes(a.id)),
-                    asked,
-                  )
-                : [asked]
-            }
-            lead={asked.id}
-            asleep={!connected}
-            day={day}
-            expression={connected ? "happy" : undefined}
-          >
-            {mark && (
-              <>
-                <span className="team-scene__trail" data-state={connected ? "done" : chosen ? "walk" : undefined}>
-                  {[0, 1, 2, 3, 4].map((n) => (
-                    <i key={n} style={{ "--n": n } as CSSProperties} />
-                  ))}
-                </span>
-                <span className="team-scene__mark">
-                  {mark === "key" ? <Icon name="key" /> : <ProviderLogo id={planMark(mark)} size="tile" />}
-                </span>
-              </>
-            )}
-          </TeamScene>
-          <Button
-            variant="ghost"
-            size="sm"
-            iconOnly
-            icon="close"
-            className="arrival-hero__close"
-            aria-label={t("common.close")}
-            onClick={onClose}
-          />
-        </div>
-        {/* The dialog's name is its hidden title; this is the same sentence, drawn. */}
-        <div className="arrival-lede arrival-lede--row">
-          {back && (
-            <Button
-              variant="ghost"
-              size="sm"
-              iconOnly
-              icon="chevronLeft"
-              aria-label={t("common.back")}
-              onClick={() => {
+        screen={screen}
+        onClose={onClose}
+        onBack={
+          back
+            ? () => {
                 if (chosen) {
                   setChosen(false);
                   setLogin(null);
                   setUse(undefined);
                 } else if (listing) setAllOpen(false);
                 else setAdding(false);
-              }}
-            />
-          )}
-          <p className="arrival-lede__title" aria-hidden="true">
-            {title}
-          </p>
-        </div>
-        <DialogBody>
-          {!ready ? (
-            <Spinner />
-          ) : used && !chosen ? (
-            <ExistingThinks agent={askedAgent} used={used} />
-          ) : chosen ? (
-            <div className="arrival-main__steps">
-              {choice === "key" && keySelect}
-              {panel}
-            </div>
-          ) : (
-            <div className="arrival-main__pick">
-              {several &&
-                !listing &&
-                (() => {
-                  // Whom it is for, as two cards with their faces: everyone who can't think, or this agent alone. The
-                  // sky above follows the pick.
-                  const everyone = chat.set.flatMap((id) => {
-                    const a = dir.agentById.get(id);
-                    return a ? [a] : [];
-                  });
-                  const face = (a: (typeof everyone)[number]) => (
-                    <AgentAvatar
-                      key={a.id}
-                      name={a.name}
-                      initials={dir.agentInitials(a.id)}
-                      appearance={lookOf(a)}
-                      size="sm"
-                    />
-                  );
-                  const choose = (next: "all" | "one") => {
-                    setScope(next);
-                    setHaveSel(undefined);
-                  };
-                  return (
-                    // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
-                    <div className="arrival-for" role="group" aria-label={t("connectAi.agentAria")}>
-                      <OptionCard pressed={wide} onClick={() => choose("all")}>
-                        <AvatarStack>{everyone.slice(0, 4).map(face)}</AvatarStack>
-                        <span className="ac-option__text">
-                          <span className="ac-option__title">{t("connectAi.all")}</span>
-                          <span className="ac-option__desc">
-                            {namesText(
-                              t,
-                              everyone.map((a) => a.name),
-                              2,
-                            )}
-                          </span>
-                        </span>
-                      </OptionCard>
-                      <OptionCard pressed={!wide} onClick={() => choose("one")}>
-                        {face(asked)}
-                        <span className="ac-option__text">
-                          <span className="ac-option__title">{asked.name}</span>
-                          {asked.role && <span className="ac-option__desc">{asked.role}</span>}
-                        </span>
-                      </OptionCard>
-                    </div>
-                  );
-                })()}
-              {picking ? (
-                <>
-                  <ConnectHave
-                    rows={rows}
-                    agentName={asked.name}
-                    value={selected ? haveId(selected) : undefined}
-                    onChange={setHaveSel}
-                    dims={dims}
-                    all={listing}
-                    onAll={() => setAllOpen(true)}
-                    disabled={have.busy}
-                  />
-                  {have.refused && <KeyRefused refusal={have.refused} />}
-                  {!listing && (
-                    <button
-                      type="button"
-                      className="arrival-have__link arrival-have__link--other"
-                      onClick={() => setAdding(true)}
-                    >
-                      <Icon name="plus" size={16} />
-                      <span>{t("connectAi.chat.other")}</span>
-                      <Icon name="chevronRight" size={16} />
-                    </button>
-                  )}
-                </>
-              ) : (
-                <ConnectChoices mayAddKey={mayAddKey} dims={dims} onPick={(next) => pick(next)} />
-              )}
-            </div>
-          )}
-        </DialogBody>
-        {/* A plan's own actions, when it has any: the footer shows only while it holds them. */}
-        {stepping && <div className="ac-dialog__foot arrival-chat__acts" ref={setFootAt} />}
-        {connected || (chosen && freeDone) ? (
-          <DialogFooter>
-            <Button variant="primary" onClick={onClose}>
-              {t("connectAi.done")}
-            </Button>
-          </DialogFooter>
-        ) : picking && selected ? (
-          <DialogFooter
-            note={
-              lends ? (
-                <span className="ac-iconline">
-                  <Icon name="mail" />
-                  <span>{t("connectAi.chat.told", { name: account?.ownerName?.split(" ")[0] ?? "" })}</span>
-                </span>
-              ) : undefined
-            }
-          >
-            <Button variant="primary" loading={have.busy} disabled={have.busy} onClick={confirm}>
-              {t("connectAi.use", {
-                label: account ? accountTitle(account) : selected.kind === "key" ? selected.key.label : "",
-              })}
-            </Button>
-          </DialogFooter>
-        ) : (
-          !chosen && (
-            <DialogFooter
-              note={
-                <span className="ac-iconline">
-                  <Icon name="info" />
-                  <span>{t("arrival.connect.without")}</span>
-                </span>
               }
-            >
-              <Button variant="ghost" onClick={onClose}>
-                {t("arrival.connect.later")}
+            : undefined
+        }
+        scene={{
+          agents: wide
+            ? sceneTeam(
+                mine.filter((a) => chat.set.includes(a.id)),
+                asked,
+              )
+            : [asked],
+          lead: asked.id,
+          awake: connected,
+          day,
+          mark,
+          trail: connected ? "done" : chosen ? "walk" : undefined,
+        }}
+        // A plan's own actions, when it has any: the footer shows only while it holds them.
+        actsRef={stepping ? setFootAt : undefined}
+        footer={
+          connected || (chosen && freeDone) ? (
+            <DialogFooter>
+              <Button variant="primary" onClick={onClose}>
+                {t("connectAi.done")}
               </Button>
             </DialogFooter>
+          ) : picking && selected ? (
+            <DialogFooter
+              note={
+                lends ? (
+                  <span className="ac-iconline">
+                    <Icon name="mail" />
+                    <span>{t("connectAi.chat.told", { name: account?.ownerName?.split(" ")[0] ?? "" })}</span>
+                  </span>
+                ) : undefined
+              }
+            >
+              <Button variant="primary" loading={have.busy} disabled={have.busy} onClick={confirm}>
+                {t("connectAi.use", {
+                  label: account ? accountTitle(account) : selected.kind === "key" ? selected.key.label : "",
+                })}
+              </Button>
+            </DialogFooter>
+          ) : (
+            !chosen && (
+              <DialogFooter
+                note={
+                  <span className="ac-iconline">
+                    <Icon name="info" />
+                    <span>{t("arrival.connect.without")}</span>
+                  </span>
+                }
+              >
+                <Button variant="ghost" onClick={onClose}>
+                  {t("arrival.connect.later")}
+                </Button>
+              </DialogFooter>
+            )
           )
+        }
+      >
+        {!ready ? (
+          <Spinner />
+        ) : used && !chosen ? (
+          <ExistingThinks agent={askedAgent} used={used} />
+        ) : chosen ? (
+          <div className="arrival-main__steps">
+            {choice === "key" && keySelect}
+            {panel}
+          </div>
+        ) : (
+          <div className="arrival-main__pick">
+            {several &&
+              !listing &&
+              (() => {
+                // Whom it is for, as two cards with their faces: everyone who can't think, or this agent alone. The
+                // sky above follows the pick.
+                const everyone = chat.set.flatMap((id) => {
+                  const a = dir.agentById.get(id);
+                  return a ? [a] : [];
+                });
+                const face = (a: (typeof everyone)[number]) => (
+                  <AgentAvatar
+                    key={a.id}
+                    name={a.name}
+                    initials={dir.agentInitials(a.id)}
+                    appearance={lookOf(a)}
+                    size="sm"
+                  />
+                );
+                const choose = (next: "all" | "one") => {
+                  setScope(next);
+                  setHaveSel(undefined);
+                };
+                return (
+                  // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+                  <div className="arrival-for" role="group" aria-label={t("connectAi.agentAria")}>
+                    <OptionCard pressed={wide} onClick={() => choose("all")}>
+                      <AvatarStack>{everyone.slice(0, 4).map(face)}</AvatarStack>
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">{t("connectAi.all")}</span>
+                        <span className="ac-option__desc">
+                          {namesText(
+                            t,
+                            everyone.map((a) => a.name),
+                            2,
+                          )}
+                        </span>
+                      </span>
+                    </OptionCard>
+                    <OptionCard pressed={!wide} onClick={() => choose("one")}>
+                      {face(asked)}
+                      <span className="ac-option__text">
+                        <span className="ac-option__title">{asked.name}</span>
+                        {asked.role && <span className="ac-option__desc">{asked.role}</span>}
+                      </span>
+                    </OptionCard>
+                  </div>
+                );
+              })()}
+            {picking ? (
+              <>
+                <ConnectHave
+                  rows={rows}
+                  agentName={asked.name}
+                  value={selected ? haveId(selected) : undefined}
+                  onChange={setHaveSel}
+                  dims={dims}
+                  all={listing}
+                  onAll={() => setAllOpen(true)}
+                  disabled={have.busy}
+                />
+                {have.refused && <KeyRefused refusal={have.refused} />}
+                {!listing && (
+                  <button
+                    type="button"
+                    className="arrival-have__link arrival-have__link--other"
+                    onClick={() => setAdding(true)}
+                  >
+                    <Icon name="plus" size={16} />
+                    <span>{t("connectAi.chat.other")}</span>
+                    <Icon name="chevronRight" size={16} />
+                  </button>
+                )}
+              </>
+            ) : (
+              <ConnectChoices mayAddKey={mayAddKey} dims={dims} onPick={(next) => pick(next)} />
+            )}
+          </div>
         )}
-      </Dialog>
+      </BandDialog>
     );
   }
   if (stage) {

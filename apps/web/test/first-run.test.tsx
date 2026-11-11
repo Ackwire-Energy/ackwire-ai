@@ -4,7 +4,6 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { payWith } from "./ai-picker";
 import {
   ADA_ID,
   ATLAS_ID,
@@ -115,8 +114,9 @@ describe("the first-run checklist", () => {
     };
     await openDm(state);
     await click(within(row("Conecte uma IA.")).getByRole("button", { name: "Conectar" }));
-    const add = screen().getByRole("dialog", { name: "Conectar uma IA" });
-    await click(payWith(add, "Com chave de API"));
+    // For the whole team (ADR 0160, addendum): the key is one of its cards.
+    const add = screen().getByRole("dialog", { name: "Conectar uma IA para o time" });
+    await click(within(add).getByRole("button", { name: /^Chave de API/ }));
     await act(async () =>
       fireEvent.change(within(add).getByLabelText("Cole aqui"), { target: { value: "sk-ant-api03-abcdefghijklmnop" } }),
     );
