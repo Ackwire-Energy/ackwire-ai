@@ -14,7 +14,9 @@ test("what ships keeps the bar above the composer one low width, the composer's:
   expect(last(bar, "width")).toBeUndefined();
   expect(last(bar, "max-width")).toBeUndefined();
   expect(last(".ac-typing", "margin")).toBe("0 0 var(--space-1)");
-  expect(last(bar, "height")).toBe("28px");
+  // One low line, a second only for a name that needs it: a name is never cut.
+  expect(last(bar, "min-height")).toBe("28px");
+  expect(last(bar, "height")).toBeUndefined();
   // The words never size it: they take the room left, on one line.
   const words = `${bar} .ac-typing__text`;
   expect(last(words, "display")).toBe("flex");
@@ -31,10 +33,18 @@ test("what ships keeps the bar above the composer one low width, the composer's:
   expect(last(".ac-typing .stop-run", "height")).toBe("24px");
   expect(last(".ac-typing__browser.ac-btn", "height")).toBe("24px");
   // An agent's step in the bar is as wide as its words while the bar has room ("planos-concorrentes.md" whole), so
-  // the time and the stop follow them; only a bar out of room cuts it.
+  // the time and the stop follow them; out of room it gives way first, down to nothing.
   expect(last(".ac-typing__step", "max-width")).toBeUndefined();
   expect(last(".ac-typing__step", "min-width")).toBe("0");
-  expect(last(".ac-typing__step", "flex")).toBe("0 auto");
+  expect(last(".ac-typing__step", "flex")).toBe("0 1000 auto");
+  // One agent: its name, step, time and who types beside it are the bar's own pieces; the name wraps, never cut, and
+  // what is typed beside it wraps ahead of the stop (no box that lets it run on under it).
+  expect(
+    last('.ac-typing[data-active="true"] .ac-typing__text:has(>.ac-typing__agents>.ac-typing__step)', "display"),
+  ).toBe("contents");
+  expect(last(".ac-typing__agents:has(>.ac-typing__step)>b", "white-space")).toBe("normal");
+  expect(last(".ac-typing__also", "white-space")).toBeUndefined();
+  expect(last(".ac-typing__also", "min-width")).toBeUndefined();
   // The clock's figures are all one width (`ac-num`), so the seconds never nudge it.
   expect(last(".ac-num", "font-variant-numeric")).toBe("tabular-nums");
 });

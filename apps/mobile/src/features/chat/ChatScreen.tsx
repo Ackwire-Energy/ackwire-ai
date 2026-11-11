@@ -169,7 +169,7 @@ import { FirstDay } from "./FirstDay";
 import { HeaderPill } from "./HeaderPill";
 import { composerSuggestions } from "./intent";
 import { IssueTakenLine } from "./issue-work";
-import { browsingRuns, useRowWatch, WorkingLine } from "./LiveRows";
+import { browsingRuns, WorkingLine } from "./LiveRows";
 import { useChatLive } from "./live";
 import {
   buildRows,
@@ -196,7 +196,6 @@ import { endsOnNoAiCard, noAiBanner } from "./no-ai-banner";
 import { PinnedLines, PinsSheet } from "./PinsSheet";
 import { QuoteBar } from "./QuoteLine";
 import { AgentLocked, UnavailableLines } from "./ReachLines";
-import { RowSight } from "./row-sight";
 import { SwipeReply } from "./SwipeReply";
 import {
   appendedKeys,
@@ -499,9 +498,6 @@ function Chat({
     () => (stoppable.length > 0 ? { runs: stoppable, onStop: stopRun } : undefined),
     [stoppable, stopRun],
   );
-  // Which agents' live rows are on screen: the line above the composer speaks only for those out of view. At work an
-  // agent has none (its words show whole once posted): the line speaks for every one.
-  const [sight] = useState(() => new RowSight());
   // An agent's DM header counts its tasks, here and elsewhere (ADR 0128); a tap opens them, pushed like a thread.
   const agentTasks = useDmAgentTasks(member && !isThread ? dmAgentId : null);
 
@@ -1954,13 +1950,7 @@ function Chat({
     const index = state && key !== undefined ? state.indexByKey(key) : undefined;
     return state !== undefined && index !== undefined && index >= state.startBuffered && index <= state.endBuffered;
   }, []);
-  const watchAsks = useAskWatch(asks, { frame: () => listFrame.current, insets: askInsets, drawn: askDrawn });
-  // The agents' live rows in the same band: the line above the composer leaves out those that show.
-  const watchRows = useRowWatch(sight, { frame: () => listFrame.current, insets: askInsets });
-  const watchList = useCallback(() => {
-    watchAsks();
-    watchRows();
-  }, [watchAsks, watchRows]);
+  const watchList = useAskWatch(asks, { frame: () => listFrame.current, insets: askInsets, drawn: askDrawn });
   const onListScroll = useCallback(() => {
     watchList();
     const state = listRef.current?.getState();
@@ -2288,7 +2278,6 @@ function Chat({
                     consults={lineConsults}
                     canStop={canStop}
                     onStop={stopRun}
-                    sight={sight}
                   />
                 ) : null}
                 {member && !awayAsk ? (
@@ -2301,7 +2290,6 @@ function Chat({
                       toggleBrowser(agentId, true);
                       toEnd();
                     }}
-                    sight={sight}
                     stop={lineStop}
                   />
                 ) : null}

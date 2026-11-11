@@ -59,7 +59,6 @@
     "failed": "Votre choix n'a pas été envoyé. Réessayez."
   },
   "chart": {
-    "pending": "Création du graphique…",
     "table": "Tableau",
     "item": "Élément",
     "share": "Partager",

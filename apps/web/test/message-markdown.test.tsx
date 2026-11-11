@@ -168,33 +168,6 @@ describe("in the channel", () => {
   });
 });
 
-describe("streaming words", () => {
-  test("Markdown with `words`: each plain word in an .ac-word span; mentions and code stay whole", () => {
-    const el = render(
-      <Markdown
-        source={"Oi **time**, olha `bun test` com @ada agora"}
-        variant="message"
-        words
-        mention={(h, k) => (
-          <span key={k} className="ac-mention">
-            @{h}
-          </span>
-        )}
-      />,
-    ).container;
-    const words = [...el.querySelectorAll(".ac-word")].map((w) => w.textContent);
-    expect(words).toEqual(["Oi", "time", ",", "olha", "com", "agora"]);
-    expect(el.querySelector("code")?.textContent).toBe("bun test");
-    expect(el.querySelector("code .ac-word")).toBeNull();
-    expect(el.querySelector(".ac-mention")?.textContent).toBe("@ada");
-    expect(el.textContent).toBe("Oi time, olha bun test com @ada agora");
-  });
-
-  test("without `words` nothing is wrapped (the final message)", () => {
-    expect(body("Uma frase só.").querySelector(".ac-word")).toBeNull();
-  });
-});
-
 describe("```json fences", () => {
   beforeAll(() => createI18n("pt-BR"));
   const RAW = '{"key":"infra-incident-ledger","timezone":"America/Sao_Paulo","reads":[1,2]}';

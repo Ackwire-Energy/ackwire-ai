@@ -58,17 +58,14 @@ export function MessageBody({
   return (
     <ChartAccent.Provider value={accent}>
       <ChartMessage.Provider value={pinFrom}>
-        <div className="md md--message">
-          <Markdown
-            source={body}
-            variant="message"
-            mention={mention}
-            channel={channel}
-            wikiLink={wikiLink}
-            idRef={renderIdRef}
-            bare
-          />
-        </div>
+        <Markdown
+          source={body}
+          variant="message"
+          mention={mention}
+          channel={channel}
+          wikiLink={wikiLink}
+          idRef={renderIdRef}
+        />
       </ChartMessage.Provider>
     </ChartAccent.Provider>
   );

@@ -23,14 +23,13 @@ const open = async (state = seedState()) => {
 };
 
 describe("a reply shows whole, once", () => {
-  test("its blocks are siblings in one wrapper, drawn once: no word fades in", () => {
+  test("its blocks are siblings in one wrapper, drawn once", () => {
     const view = render(<MessageBody body={"Primeiro parágrafo.\n\nSegundo parágrafo.\n\nTerceiro."} />);
     const wrappers = view.container.querySelectorAll(".md");
     expect(wrappers).toHaveLength(1);
     const wrapper = wrappers[0] as HTMLElement;
     expect(wrapper.classList.contains("md--message")).toBe(true);
     expect([...wrapper.children].map((c) => c.tagName)).toEqual(["P", "P", "P"]);
-    expect(wrapper.querySelector(".ac-word")).toBeNull();
   });
 
   test("while it works nothing of its words shows; its message brings them, once", async () => {
@@ -63,7 +62,6 @@ describe("a reply shows whole, once", () => {
       t.textContent?.includes("cache do relatório"),
     );
     expect(shown).toHaveLength(1);
-    expect(shown[0]?.querySelector(".ac-word")).toBeNull();
     expect(shown[0]?.closest(".ac-msg")?.classList.contains("ac-msg--streaming")).toBe(false);
   });
 });

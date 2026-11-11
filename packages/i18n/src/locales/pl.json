@@ -36,7 +36,6 @@
     "table": "Tabela",
     "chartItem": "Element",
     "chartShare": "Udział",
-    "chartPending": "Tworzę wykres…",
     "you": "ty",
     "saved": "Zapisano",
     "youSuffix": " (ty)",
@@ -4671,7 +4670,7 @@
       "showSteps": "Zobacz każdy krok",
       "hideSteps": "Ukryj kroki",
       "asked": "Poprosił o zgodę",
-      "grants": "{{name}} może {{doing}}, tylko ten raz i z tymi wartościami."
+      "grants": "{{name}} zrobi to tylko ten raz i z tymi wartościami: {{doing}}."
     }
   },
   "agent": {

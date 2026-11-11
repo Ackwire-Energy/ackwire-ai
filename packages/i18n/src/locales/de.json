@@ -36,7 +36,6 @@
     "table": "Tabelle",
     "chartItem": "Element",
     "chartShare": "Anteil",
-    "chartPending": "Diagramm wird erstellt…",
     "you": "du",
     "saved": "Gespeichert",
     "youSuffix": " (du)",
@@ -3802,7 +3801,7 @@
       "open": "Öffnen",
       "routine": "Immer in dieser Routine",
       "thisRoutine": "diese Routine",
-      "noteRoutine": "{{routine}} erledigt {{actions}} ab jetzt selbstständig, mit beliebigen Werten. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
+      "noteRoutine": "{{routine}} erledigt das ab jetzt selbstständig, mit beliebigen Werten: {{actions}}. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
       "doneRoutine": "Freigegeben. {{routine}} fragt danach nicht mehr.",
       "undoRoutine": "Zum Rückgängigmachen geh in die Einstellungen der Routine."
     },
@@ -4377,7 +4376,7 @@
       "showSteps": "Jeden Schritt ansehen",
       "hideSteps": "Schritte ausblenden",
       "asked": "Hat um Freigabe gebeten",
-      "grants": "{{name}} wird {{doing}}, nur dieses Mal und mit diesen Werten."
+      "grants": "{{name}} macht das nur dieses Mal und mit diesen Werten: {{doing}}."
     }
   },
   "agent": {

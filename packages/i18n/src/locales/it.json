@@ -36,7 +36,6 @@
     "table": "Tabella",
     "chartItem": "Elemento",
     "chartShare": "Quota",
-    "chartPending": "Creazione del grafico…",
     "you": "tu",
     "saved": "Salvato",
     "youSuffix": " (tu)",
@@ -3911,7 +3910,7 @@
       "open": "Apri",
       "routine": "Sempre in questa routine",
       "thisRoutine": "questa routine",
-      "noteRoutine": "{{routine}} fa {{actions}} da sola d'ora in poi, con qualsiasi valore. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
+      "noteRoutine": "{{routine}} lo fa da sola d'ora in poi, con qualsiasi valore: {{actions}}. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
       "doneRoutine": "Approvato. {{routine}} non lo chiederà più.",
       "undoRoutine": "Per annullarlo, vai nelle impostazioni della routine."
     },
@@ -4514,7 +4513,7 @@
       "showSteps": "Vedi ogni passo",
       "hideSteps": "Nascondi i passi",
       "asked": "Ha chiesto un'approvazione",
-      "grants": "{{name}} potrà {{doing}}, solo questa volta e con questi valori."
+      "grants": "{{name}} lo farà solo questa volta e con questi valori: {{doing}}."
     }
   },
   "agent": {

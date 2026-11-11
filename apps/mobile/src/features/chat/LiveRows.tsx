@@ -7,11 +7,10 @@ import {
   barElapsed,
   barFaces,
   barWords,
-  entriesOffScreen,
   listNames,
 } from "@agenteschat/client/lib/activity";
 import { barStep } from "@agenteschat/client/lib/work";
-import { type ReactNode, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
@@ -39,7 +38,6 @@ import { CHROME_MAX_SCALE, haptics, Icon, PixelStop, Text, useReducedMotion, use
 import { AgentFace, AgentWho, Face } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
-import type { Measurable } from "./ask-store";
 import {
   awayRun,
   type LineDrawn,
@@ -54,72 +52,6 @@ import {
   turnPhrase,
   workingEntries,
 } from "./logic";
-import { type RowSight, rowsShown } from "./row-sight";
-
-/** The runs whose live rows are on screen, redrawn only when that set changes. */
-export const useRowsInView = (sight: RowSight) =>
-  useSyncExternalStore(sight.subscribe, sight.getInView, sight.getInView);
-
-/** What the conversation tells the live rows' watch about its list: the requests' band (`AskView`). */
-export interface RowView {
-  /** The view the list fills: the band is measured from its frame in the window. */
-  frame: () => Measurable | null;
-  /** The band inside that frame, from its top and from its bottom (the header, the composer); null until placed. */
-  insets: () => { top: number; bottom: number } | null;
-}
-
-/**
- * Which live rows are on screen, for the line above the composer (the requests' watch, `useAskWatch`): a look is
- * asked for on a scroll (one a frame), on layout, when the list's size changes and when a row is drawn or goes; it
- * measures only the drawn live rows, and the sight publishes only when the set changes. Nothing runs while no row is
- * drawn. Returns the call that asks for a look.
- */
-export function useRowWatch(sight: RowSight, view: RowView): () => void {
-  const viewRef = useRef(view);
-  viewRef.current = view;
-  const frame = useRef<number | null>(null);
-  const look = useRef(0);
-  const watch = useCallback(() => {
-    if (frame.current !== null || !sight.hasRows()) return;
-    frame.current = requestAnimationFrame(() => {
-      frame.current = null;
-      look.current += 1;
-      lookAtRows(sight, viewRef.current, look.current, () => look.current);
-    });
-  }, [sight]);
-  // A row was drawn or went.
-  useEffect(() => sight.watch(watch), [sight, watch]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `view.insets` changes when the band's edges move
-  useEffect(() => {
-    watch();
-  }, [watch, view.insets]);
-  useEffect(
-    () => () => {
-      if (frame.current !== null) cancelAnimationFrame(frame.current);
-    },
-    [],
-  );
-  return watch;
-}
-
-/** One look at the drawn live rows against the list's band; a newer look drops an older one's answers. */
-function lookAtRows(sight: RowSight, view: RowView, look: number, latest: () => number) {
-  const drawn = sight.drawn();
-  const insets = view.insets();
-  const box = view.frame();
-  if (drawn.length === 0 || !insets || !box) return;
-  box.measureInWindow((_x, y, _width, height) => {
-    if (look !== latest() || !(height > 0)) return;
-    const band = { top: y + insets.top, bottom: y + height - insets.bottom };
-    const placed: { runId: string; y: number; height: number }[] = [];
-    for (const [runId, row] of drawn) {
-      row.measureInWindow((_rx, ry, _rw, rh) => {
-        placed.push({ runId, y: ry, height: rh });
-        if (placed.length === drawn.length && look === latest()) sight.setShown(rowsShown(placed, band));
-      });
-    }
-  });
-}
 
 /** The runs at work in their browser, one per agent: each gets its browser card. */
 export function browsingRuns(runs: LiveRun[]): LiveRun[] {
@@ -148,7 +80,6 @@ export function WorkingLine({
   consults,
   typing,
   onOpenBrowser,
-  sight,
   stop,
 }: {
   runs: LiveRun[];
@@ -157,8 +88,6 @@ export function WorkingLine({
   typing: string[];
   /** An agent in its browser: tapping the line opens its card in the conversation. */
   onOpenBrowser?: (agentId: string) => void;
-  /** Which agents' live rows are on screen: the line leaves those out. */
-  sight: RowSight;
   /**
    * "Parar", the word, last in the line: the runs here the person may stop. The line is the one place that stops
    * (the composer keeps only its send), so the state and its action read together.
@@ -169,16 +98,8 @@ export function WorkingLine({
   const dir = useDirectory();
   const { colors: c, shadows } = useTheme();
   const reduced = useReducedMotion();
-  const inView = useRowsInView(sight);
-  const rowInView = (r: LiveRun) => inView.has(r.runId);
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
-  // Its row on screen says what it does, for how long and how to stop it: the line leaves that agent out (a row not
-  // drawn yet is out of view).
-  const entries = entriesOffScreen(
-    workingEntries(runs, consults, agentName, typing, (id) => dir.memberById.get(id)?.name),
-    runs,
-    rowInView,
-  );
+  const entries = workingEntries(runs, consults, agentName, typing, (id) => dir.memberById.get(id)?.name);
   const asking = barAsking(entries);
   const agents = entries.filter((e) => e.type === "agent");
   const lead = agents[0];
@@ -189,8 +110,8 @@ export function WorkingLine({
   // new pace reads the clock afresh (`useNow`).
   const now = useNow(asking || solo ? 1000 : 60_000);
   if (entries.length === 0) return null;
-  // The one agent it speaks for with its row out of view; a question it asks keeps its own phrase.
-  const away = awayRun(entries, runs, rowInView);
+  // The one agent it speaks for; a question it asks keeps its own phrase.
+  const away = awayRun(entries, runs);
   const step = away && lead && !lead.consult ? barStep(t, away, i18n.language, now) : null;
   const color = lead ? agentLook(dir.agentById.get(lead.id)).color : null;
   const took = away ? barElapsed(t, entries, runs, now) : null;
@@ -233,13 +154,12 @@ export function WorkingLine({
   const clock = asking ? elapsedClock(now - asking.since) : null;
   const pop = reduced ? undefined : ZoomIn.springify().damping(11).stiffness(320).mass(0.6);
   const plate = [styles.tok, { backgroundColor: c.glassSolid }];
-  // The agents here are the ones whose rows are out of view: their faces open the pill.
+  // The agents at work open the pill with their faces.
   const faces = barFaces(entries);
   // An agent working in its browser: the line says so, and a tap opens its browser card in the conversation.
   const browsing = browsingRuns(runs)[0];
   const openBrowser = browsing && onOpenBrowser ? () => onOpenBrowser(browsing.agentId) : undefined;
-  // The line stops only the agents it speaks for: a row on screen has its own stop at its end.
-  const stopHere = stop ? stop.runs.filter((r) => !rowInView(r)) : [];
+  const stopHere = stop?.runs ?? [];
   return (
     <View style={styles.dock}>
       <Animated.View
@@ -438,19 +358,15 @@ export function LineStop({
 type LinePiece = (text: string, style?: StyleProp<TextStyle>, onTextLayout?: (e: TextLayoutEvent) => void) => ReactNode;
 
 /**
- * One agent whose row is out of view, as the web's `BarStep`: its name in ink and its row's step ("Nina consultando
- * o Email · …"), cut with "…" when the line is short of room, its time right after it; each new step fades in (a plain swap with Reduce Motion). The line's label says the whole step.
+ * One agent at work, as the web's `BarStep`: its name in ink, never cut (it wraps onto a second line when the line is
+ * that narrow), and its step ("Nina consultando o Email · …"), which gives way first when the line is short of room,
+ * its time right after it; each new step fades in (a plain swap with Reduce Motion). The line's label says the whole
+ * step.
  */
 function AwayStep({ name, step, reduced }: { name: string; step: string; reduced: boolean }) {
   return (
     <View style={styles.awayStep}>
-      <Text
-        variant="caption"
-        tone="ink"
-        numberOfLines={1}
-        maxFontSizeMultiplier={CHROME_MAX_SCALE}
-        style={[styles.ink, styles.awayName]}
-      >
+      <Text variant="caption" tone="ink" maxFontSizeMultiplier={CHROME_MAX_SCALE} style={[styles.ink, styles.awayName]}>
         {name}
       </Text>
       <Animated.View key={step} entering={reduced ? undefined : FadeIn.duration(160)} style={styles.barStep}>
@@ -585,7 +501,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    height: 28,
+    // One line, a second only for a name that needs it.
+    minHeight: 28,
+    paddingVertical: 2,
     paddingHorizontal: 8,
     borderRadius: 999,
     overflow: "hidden",
@@ -603,11 +521,11 @@ const styles = StyleSheet.create({
   agents: { flexDirection: "row", flexShrink: 1, overflow: "hidden" },
   people: { flexDirection: "row", maxWidth: "100%" },
   shrink: { flexShrink: 1 },
-  // One agent out of view: its name, then its row's step (cut with "…" on a narrow screen).
+  // One agent: its name, then its step, which gives way first (cut with "…", the line's label says it whole).
   awayStep: { flexDirection: "row", alignItems: "center", gap: 4, flexShrink: 1, minWidth: 0 },
-  awayName: { flexShrink: 0, maxWidth: 120 },
+  awayName: { flexShrink: 1 },
   // Its own width, so the time follows the words instead of floating after a fixed gap.
-  barStep: { flexShrink: 1, minWidth: 0 },
+  barStep: { flexShrink: 1000, minWidth: 0 },
   // Who types beside it, after its time: it gives way before the step does, its names first.
   also: { flexDirection: "row", flexShrink: 4, minWidth: 0 },
   wordsTap: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },

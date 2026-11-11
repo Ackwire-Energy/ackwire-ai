@@ -146,9 +146,6 @@
   "choices.failed": {
     "value": "Your pick didn't go through. Try again."
   },
-  "chart.pending": {
-    "value": "Building the chart…"
-  },
   "chart.table": {
     "value": "Table"
   },

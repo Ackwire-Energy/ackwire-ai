@@ -61,7 +61,6 @@ export const featureKeysEn = {
     failed: "Your pick didn't go through. Try again.",
   },
   chart: {
-    pending: "Building the chart…",
     table: "Table",
     item: "Item",
     share: "Share",

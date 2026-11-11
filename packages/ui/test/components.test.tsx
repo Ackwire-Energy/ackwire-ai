@@ -1046,6 +1046,19 @@ describe("Message aside and foot", () => {
         /(^|;)\s*(right|left|top|inset)\s*:/.test(body),
     );
     expect(byContent.map(([, selector = ""]) => selector.trim())).toEqual([]);
+    // So a grouped row's check at its line's end, under the bar, steps out of sight while the bar shows, keeping its
+    // room: nothing overlaps and nothing moves. On a touch screen only while the bar is open.
+    const hover = [...css.matchAll(/@media not \(hover: none\) \{([\s\S]*?)\n\}/g)].map((m) => m[1] ?? "").join("\n");
+    expect(
+      value(
+        ".ac-msg:hover:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating",
+        "visibility",
+        hover,
+      ),
+    ).toBe("hidden");
+    expect(css.replace(/\s+/g, " ")).toContain(
+      'html:not([data-pointer]) .ac-msg:focus-within:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating, .ac-msg:has(> .ac-msg__body > .ac-msg__actions:is([data-open="true"], :has([aria-expanded="true"]))) > .ac-msg__body > .ac-msg__aside--floating { visibility: hidden; }',
+    );
     expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(value(bar, "top"));
     expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
     expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");

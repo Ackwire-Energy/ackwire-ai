@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import type { LiveConsult, LiveRun, LiveWork, Message, RunConsultation, SecretRequest } from "@agenteschat/client";
-import { activitySentence, barElapsed, barFaces, barWords, entriesOffScreen } from "@agenteschat/client/lib/activity";
+import { activitySentence, barElapsed, barFaces, barWords } from "@agenteschat/client/lib/activity";
 import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { runAround, runPosition } from "@agenteschat/client/lib/chat";
 import { consultBlocksNearEnd, consultsForLine } from "@agenteschat/client/lib/consult-group";
+import { formatInt } from "@agenteschat/client/lib/format";
 import { issueTakenOf, issueWorkOf } from "@agenteschat/client/lib/issues";
 import {
   latestSecret,
@@ -495,52 +496,30 @@ describe("working line", () => {
     expect(line).not.toContain("PixelOrbit");
   });
 
-  test("said once: an agent whose live row is on screen is left out of the line; people typing always stay", () => {
-    const ada = run({ runId: "r", agentId: "ada", status: "running" });
-    const atlas = run({ runId: "s", agentId: "atlas", status: "running" });
-    const runs = [ada, atlas];
-    const all = workingEntries(runs, [], name, ["joao"], (id) => (id === "joao" ? "João" : undefined));
-    const adaShows = (r: LiveRun) => r.runId === "r";
-    const left = entriesOffScreen(all, runs, adaShows);
-    expect(left.map((e) => e.id)).toEqual(["atlas", "joao"]);
-    expect(barFaces(left).map((e) => e.id)).toEqual(["atlas", "joao"]);
-    // Both rows on screen: only who types is left (the line shows just that).
-    expect(entriesOffScreen(all, runs, () => true).map((e) => e.id)).toEqual(["joao"]);
-    // Nothing at work out of view and no one typing: no line at all.
-    expect(entriesOffScreen(workingEntries([ada], [], name), [ada], adaShows)).toEqual([]);
-  });
-
   test("the line speaks for one agent at work: its step, its time right after it, and its stop", async () => {
     const en = await translator("en");
     const now = 1_000_000;
     const ada = run({ runId: "r", agentId: "ada", status: "running", startedAt: now - 16_000 });
     const atlas = run({ runId: "s", agentId: "atlas", status: "running" });
-    const shows = (r: LiveRun) => r.runId === "s";
-    const left = entriesOffScreen(workingEntries([ada, atlas], [], name), [ada, atlas], shows);
-    expect(awayRun(left, [ada, atlas], shows)?.runId).toBe("r");
-    expect(barElapsed(en, left, [ada, atlas], now)).toBe("16s");
-    expect(lineStops(left, [ada, atlas], () => true, shows).map((r) => r.runId)).toEqual(["r"]);
-    // Its row on screen: the line has nothing of its own to say about it, and its stop is on the row.
     const alone = workingEntries([ada], [], name);
-    expect(awayRun(alone, [ada], () => true)).toBeUndefined();
-    expect(
-      lineStops(
-        alone,
-        [ada],
-        () => true,
-        () => true,
-      ),
-    ).toEqual([]);
-    // Two agents out of view: the line can't say whose time or stop.
+    expect(awayRun(alone, [ada])?.runId).toBe("r");
+    expect(barElapsed(en, alone, [ada], now)).toBe("16s");
+    expect(lineStops(alone, [ada], () => true).map((r) => r.runId)).toEqual(["r"]);
+    // Two agents at work: the line can't say whose time or stop.
     const both = workingEntries([ada, atlas], [], name);
-    expect(awayRun(both, [ada, atlas], () => false)).toBeUndefined();
-    // The step takes its own width, so its time follows the words instead of floating after a fixed gap.
+    expect(awayRun(both, [ada, atlas])).toBeUndefined();
+    expect(lineStops(both, [ada, atlas], () => true)).toEqual([]);
+    // The step takes its own width, so its time follows the words instead of floating after a fixed gap; short of room
+    // it gives way first. The name is never cut: no line cap, no width cap, it wraps.
     const lines = await source("features/chat/LiveRows.tsx");
-    expect(lines).toContain("barStep: { flexShrink: 1, minWidth: 0 },");
+    expect(lines).toContain("barStep: { flexShrink: 1000, minWidth: 0 },");
+    expect(lines).toContain("awayName: { flexShrink: 1 },");
+    const away = lines.slice(lines.indexOf("function AwayStep("), lines.indexOf("const TURN"));
+    expect(away.slice(0, away.indexOf("{name}"))).not.toContain("numberOfLines");
     // No "Ver": no row to go back to while it works. "Parar", the word, is the one stop: the composer keeps only its send.
     const line = lines.slice(lines.indexOf("export function WorkingLine("), lines.indexOf("type LinePiece"));
     expect(line).not.toContain("seeable");
-    expect(line).toContain("const stopHere = stop ? stop.runs.filter((r) => !rowInView(r)) : [];");
+    expect(line).toContain("const stopHere = stop?.runs ?? [];");
     expect(line).toContain('<LineStop runs={stopHere} onStop={stop.onStop} place="word" />');
     const screen = await source("features/chat/ChatScreen.tsx");
     expect(screen).toContain(
@@ -652,6 +631,12 @@ describe("reactions", () => {
       { reaction: "+1", emoji: "👍", people: 2, agentIds: [], mine: true },
     ]);
   });
+  test("every count reads as the person's language writes it (1.284), a capped one too (99+)", async () => {
+    expect(formatInt("pt-BR", 1284)).toBe("1.284");
+    const count = await source("ui/Count.tsx");
+    expect(count).toContain("formatInt(i18n.language, value)");
+    expect(count).toContain("formatInt(i18n.language, max)}+");
+  });
 });
 
 describe("composer", () => {
@@ -752,16 +737,15 @@ describe("markdown", () => {
       { kind: "details", summary: [{ kind: "text", text: "Mais" }], body: "linha" },
     ]);
   });
-  test("blocks: a fence still being written is an open code block; a fence still opening is hidden", () => {
+  test("blocks: a fence never closed runs to the end as code; a fence still opening is hidden", () => {
     expect(parseBlocks('Aqui:\n```chart\n{"type":"bar","ti')).toEqual([
       { kind: "paragraph", inline: [{ kind: "text", text: "Aqui:" }] },
-      { kind: "code", lang: "chart", text: '{"type":"bar","ti', open: true },
+      { kind: "code", lang: "chart", text: '{"type":"bar","ti' },
     ]);
     expect(parseBlocks("```ts\nconst a = 1;\n``").at(-1)).toEqual({
       kind: "code",
       lang: "ts",
       text: "const a = 1;",
-      open: true,
     });
     expect(parseBlocks("Aqui:\n```cha")).toEqual([{ kind: "paragraph", inline: [{ kind: "text", text: "Aqui:" }] }]);
     expect(parseBlocks("use `npm` e pronto `x`").map((b) => b.kind)).toEqual(["paragraph"]);

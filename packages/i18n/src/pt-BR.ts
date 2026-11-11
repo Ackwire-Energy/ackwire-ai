@@ -46,7 +46,6 @@ export const ptBR = {
     table: "Tabela",
     chartItem: "Item",
     chartShare: "Parte",
-    chartPending: "Montando o gráfico…",
     you: "você",
     youSuffix: " (você)",
     saved: "Salvo",

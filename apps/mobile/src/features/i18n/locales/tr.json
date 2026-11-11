@@ -57,7 +57,6 @@
     "failed": "Seçiminiz gönderilemedi. Tekrar deneyin."
   },
   "chart": {
-    "pending": "Grafik hazırlanıyor…",
     "table": "Tablo",
     "item": "Öğe",
     "share": "Pay",

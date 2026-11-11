@@ -551,6 +551,24 @@ describe("Canal", () => {
     expect(within(dialog).queryByRole("searchbox", { name: "Buscar pessoa ou agente" })).toBeNull();
   });
 
+  test("counts read as the person's language writes them, on the reply's bar and in its pills: 1.284", async () => {
+    const state = seedState();
+    const reply = state.messages.find((m) => m.id === "m-2") as { reactions?: unknown };
+    reply.reactions = [
+      { reaction: "+1", count: 1284, userIds: ["u-walter"] },
+      { reaction: "-1", count: 37, userIds: ["u-x"] },
+    ];
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Achei a causa")) as HTMLElement;
+    const bar = within(row).getByRole("toolbar", { name: "Ações da mensagem de Ada" });
+    const counts = [...bar.querySelectorAll(".ac-msg__reaction-count")].map((c) => c.textContent);
+    expect(counts).toEqual(["1.284", "37"]);
+    const pills = [...row.querySelectorAll(".ac-reacts .ac-react .tabular")].map((c) => c.textContent);
+    expect(pills).toEqual(["1.284", "37"]);
+  });
+
   test("agent replies: 👍/👎 toggle with the API and Corrigir resposta sends a correction", async () => {
     const { state } = await open();
     const reply = screen()

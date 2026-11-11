@@ -66,7 +66,6 @@ export const featureKeysPtBR = {
     failed: "Não deu para mandar sua escolha. Tente de novo.",
   },
   chart: {
-    pending: "Montando o gráfico…",
     table: "Tabela",
     item: "Item",
     share: "Parte",
