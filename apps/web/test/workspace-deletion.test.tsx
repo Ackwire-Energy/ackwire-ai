@@ -378,7 +378,8 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     });
     const { router } = await open(`/org/${ORG_ID}/settings/account`, { state });
     const card = screen().getByRole("region", { name: "Apagar conta" });
-    const cards = document.querySelectorAll(".settings__body > .ac-tabpanel > .ac-card");
+    // The kit's Tabs wrap the strip and the panel in a box that lays nothing out (`display: contents`).
+    const cards = document.querySelectorAll(".settings__body .ac-tabpanel > .ac-card");
     expect(cards[cards.length - 1]).toBe(card);
     expect(card.classList.contains("settings-danger")).toBe(true);
     expect(card.textContent).toContain("a sua conta é apagada de vez 7 dias depois. Até lá, dá para restaurar.");

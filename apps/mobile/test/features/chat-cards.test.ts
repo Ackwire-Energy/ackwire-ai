@@ -286,8 +286,10 @@ describe("a plan account on the phone (IA e uso › Contas): a row that opens", 
     expect(list).not.toContain("usageViews.thisMonth");
     expect(ascending(at(list, ["openAgentUsage(a.agentId)", "usageViews.moreAgents"]))).toBe(true);
     // "Usa agora" only for an agent using it now, never for the folded row.
-    expect(list).toContain("facts(a.share, a.tokens, a.now)");
-    expect(list).toContain("facts(shares.restShare, shares.restTokens)");
+    expect(list).toContain("shareFacts(t, i18n.language, window, a)");
+    expect(list).toContain(
+      "shareFacts(t, i18n.language, window, { share: shares.restShare, tokens: shares.restTokens })",
+    );
     // The renewal moves under the list, once.
     const parts = source("../usage/parts.tsx");
     expect(
