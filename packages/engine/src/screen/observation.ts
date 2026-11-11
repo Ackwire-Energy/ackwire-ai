@@ -263,7 +263,10 @@ export const FRESH_LOOK_MS = 8000;
 /** A look this recent is still what the agent knows of the screen: a plan's changes are counted from it. */
 export const KNOWN_LOOK_MS = 10 * 60_000;
 
-/** The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. */
+/**
+ * The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. A look older
+ * than `KNOWN_LOOK_MS` is dropped (nothing reads one), so idle agents' huge pages don't stay in memory.
+ */
 export function createLookMemory(now: () => number = Date.now, max = 1000) {
   const looks = new Map<string, ScreenObservation>();
   return {
@@ -271,6 +274,10 @@ export function createLookMemory(now: () => number = Date.now, max = 1000) {
       looks.delete(key);
       looks.set(key, o);
       if (looks.size > max) looks.delete(looks.keys().next().value as string);
+      for (const [k, old] of looks) {
+        if (now() - old.at < KNOWN_LOOK_MS) break;
+        looks.delete(k);
+      }
     },
     /** The last look, when it is younger than `ms`. */
     within(key: string, ms: number) {
