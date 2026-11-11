@@ -1441,6 +1441,110 @@
     "moveDown": "Descendre",
     "restoreOrder": "Rétablir l'ordre par défaut"
   },
+  "install": {
+    "frames": "Comment installer sur {{system}}",
+    "step": "Étape {{n}}",
+    "previous": "Étape précédente",
+    "next": "Étape suivante",
+    "fullGuide": "Pas à pas complet",
+    "copied": "Copié. Collez-le dans le terminal.",
+    "mac": {
+      "why": "<b>L'app est en bêta.</b> La première fois, votre Mac vous demande donc de confirmer :",
+      "drag": "Faites glisser agentes.chat dans Applications.",
+      "dragLong": "Ouvrez le fichier téléchargé et faites glisser agentes.chat dans Applications.",
+      "blocked": "Ouvrez l'app et cliquez sur Terminé.",
+      "blockedSub": "Ne cliquez pas sur Placer dans la corbeille.",
+      "settings": "Dans Réglages › Confidentialité et sécurité, cliquez sur Ouvrir quand même.",
+      "settingsLong": "Juste après, ouvrez Réglages Système › Confidentialité et sécurité, descendez jusqu'à Sécurité et cliquez sur Ouvrir quand même.",
+      "settingsSub": "Le bouton n'apparaît qu'après avoir essayé d'ouvrir l'app (étape 2), et disparaît au bout d'une heure environ. Il n'est pas là ? Rouvrez l'app et revenez.",
+      "settingsShort": "Il n'apparaît que juste après l'étape 2.",
+      "openSettings": "Ouvrir Confidentialité et sécurité",
+      "confirm": "Confirmez avec Touch ID ou votre mot de passe.",
+      "confirmLong": "Cliquez à nouveau sur Ouvrir quand même et confirmez avec Touch ID ou le mot de passe de votre Mac.",
+      "done": "C'est fait : désormais, elle s'ouvre directement.",
+      "stuckTitle": "Toujours pas de bouton, ou votre Mac dit que l'app est endommagée ?",
+      "stuckText": "Collez ceci dans Terminal et rouvrez l'app :"
+    },
+    "windows": {
+      "why": "<b>L'app est en bêta.</b> La première fois, Windows vous demande donc de confirmer :",
+      "keep": "Si votre navigateur le demande, choisissez Conserver.",
+      "more": "Ouvrez le programme d'installation et cliquez sur Informations complémentaires.",
+      "moreLong": "Ouvrez le programme d'installation. Si Windows a protégé votre ordinateur s'affiche, cliquez sur Informations complémentaires.",
+      "run": "Cliquez sur Exécuter quand même.",
+      "runLong": "Cliquez sur Exécuter quand même et suivez le programme d'installation.",
+      "done": "C'est fait : désormais, elle s'ouvre directement."
+    },
+    "linux": {
+      "why": "Pour Ubuntu, Debian et les systèmes similaires (x64). Linux ne demande rien de plus :",
+      "apt": "Installez le .deb d'un double-clic, ou depuis le terminal.",
+      "aptLong": "Double-cliquez sur le fichier téléchargé puis sur Installer, ou collez ceci dans le terminal :",
+      "open": "Ouvrez agentes.chat depuis vos applications."
+    },
+    "page": {
+      "docTitle": "Télécharger l'app · agentes.chat",
+      "title": "Téléchargez l'app agentes.chat",
+      "beta": "Bêta",
+      "text": "Votre workspace dans sa propre fenêtre, avec les notifications de votre système. En un clic, les agents travaillent sur cet ordinateur, dans leurs propres dossiers.",
+      "open": "Ouvrir agentes.chat",
+      "version": "Version {{version}}",
+      "versionSize": "Version {{version}} · {{size}}",
+      "soon": "Il n'y a pas encore de version pour {{system}}.",
+      "unavailable": "L'app ne peut pas être téléchargée d'ici pour le moment. Réessayez dans un instant.",
+      "installOn": "Installer sur {{system}}",
+      "system": "Système",
+      "whyTitle": "Pourquoi mon ordinateur demande-t-il de confirmer ?",
+      "whyText": "agentes.chat est en bêta : la version Mac n'est pas encore notariée par Apple, et le programme d'installation Windows ne porte pas encore de certificat Microsoft. Sans eux, votre ordinateur demande une fois avant d'ouvrir une app téléchargée sur internet. Ensuite, elle s'ouvre directement et se met à jour toute seule. Avant la fin de la bêta, cette étape disparaîtra.",
+      "openSource": "Code source ouvert",
+      "onlyHere": "Publiée uniquement ici et dans les versions publiées du projet",
+      "signedUpdates": "Mises à jour signées"
+    },
+    "scene": {
+      "finder": "Finder",
+      "file": "Fichier",
+      "edit": "Édition",
+      "view": "Présentation",
+      "window": "Fenêtre",
+      "applications": "Applications",
+      "notOpened": "« {{app}} » n'a pas été ouvert",
+      "notOpenedText": "Apple n'a pas pu vérifier que « {{app}} » ne contient pas de logiciel malveillant susceptible de nuire à votre Mac ou de compromettre votre confidentialité.",
+      "done": "Terminé",
+      "moveToTrash": "Placer dans la corbeille",
+      "search": "Rechercher",
+      "account": "Compte Apple",
+      "general": "Général",
+      "appearance": "Apparence",
+      "accessibility": "Accessibilité",
+      "privacy": "Confidentialité et sécurité",
+      "desktopDock": "Bureau et Dock",
+      "displays": "Moniteurs",
+      "security": "Sécurité",
+      "allowFrom": "Autoriser les applications téléchargées de",
+      "allowValue": "App Store et développeurs identifiés",
+      "blocked": "« {{app}} » a été bloqué afin de protéger votre Mac.",
+      "openAnyway": "Ouvrir quand même",
+      "confirmTitle": "Ouvrir « {{app}} » ?",
+      "confirmText": "Ne l'ouvrez que si vous faites confiance à sa provenance.",
+      "touchIdTitle": "Réglages Système",
+      "touchIdText": "Utilisez Touch ID ou saisissez votre mot de passe pour autoriser cette opération.",
+      "password": "Mot de passe",
+      "downloads": "Téléchargements",
+      "rare": "Ce fichier n'est pas souvent téléchargé. Assurez-vous de lui faire confiance avant de l'ouvrir.",
+      "delete": "Supprimer",
+      "keep": "Conserver",
+      "protectedTitle": "Windows a protégé votre ordinateur",
+      "protectedText": "Microsoft Defender SmartScreen a empêché le démarrage d'une application non reconnue. L'exécution de cette application peut présenter un risque pour votre ordinateur.",
+      "protectedShort": "Microsoft Defender SmartScreen a empêché le démarrage d'une application non reconnue.",
+      "moreInfo": "Informations complémentaires",
+      "dontRun": "Ne pas exécuter",
+      "appLabel": "Application :",
+      "publisher": "Éditeur :",
+      "unknownPublisher": "Éditeur inconnu",
+      "runAnyway": "Exécuter quand même",
+      "activities": "Activités",
+      "readingLists": "Lecture des listes de paquets... Fait",
+      "settingUp": "Paramétrage de agentes-chat ({{version}}) ..."
+    }
+  },
   "legal": {
     "updated": "Dernière mise à jour le {{date}}",
     "contents": "Sur cette page",
@@ -14906,6 +15010,9 @@
       "membersPersonal": "Personnes"
     },
     "advanced": "Avancé",
+    "tab": {
+      "account": "Profil"
+    },
     "sectionText": {
       "account": "Votre profil et l'apparence de l'app pour vous.",
       "notifications": "Ce qui vous parvient en notification ici. La boîte de réception garde tout.",
@@ -15182,9 +15289,6 @@
         "jev": "Les agents n'envoient de stickers d'eux-mêmes qu'avec Jev.",
         "jevLink": "Configurer Jev"
       }
-    },
-    "tab": {
-      "account": "Profil"
     }
   },
   "personalMode": {

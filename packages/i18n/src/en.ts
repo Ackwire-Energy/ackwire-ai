@@ -1509,8 +1509,9 @@ export const en = {
       dragLong: "Open the downloaded file and drag agentes.chat to Applications.",
       blocked: "Open the app and click Done.",
       blockedSub: "Don't click Move to Trash.",
-      settings: "In Settings › Privacy & Security, click Open Anyway.",
-      settingsLong: "Right after, open System Settings › Privacy & Security, scroll to Security and click Open Anyway.",
+      settings: "In Settings\u00a0›\u00a0Privacy & Security, click Open Anyway.",
+      settingsLong:
+        "Right after, open System Settings\u00a0›\u00a0Privacy & Security, scroll to Security and click Open Anyway.",
       settingsSub:
         "The button shows there only after you try to open the app (step 2), and goes away after about an hour. Not there? Open the app again and come back.",
       settingsShort: "It shows only right after step 2.",
@@ -1564,7 +1565,8 @@ export const en = {
       window: "Window",
       applications: "Applications",
       notOpened: "“{{app}}” Not Opened",
-      notOpenedText: "Apple could not verify “{{app}}” is free of malware that may harm your Mac or compromise your privacy.",
+      notOpenedText:
+        "Apple could not verify “{{app}}” is free of malware that may harm your Mac or compromise your privacy.",
       done: "Done",
       moveToTrash: "Move to Trash",
       search: "Search",

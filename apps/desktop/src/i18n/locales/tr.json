@@ -178,7 +178,7 @@
     "noneText": "Bir sunucunun ya da Mac mini'nin terminalinde. Sonunda bu uygulamayı ona bağlayan bir bağlantı gösterir.",
     "invalid": "Adresi kontrol edin, agentes.ekibiniz.ts.net gibi bir şey olmalı.",
     "httpRefused": "{{host}} güvenli bağlantı (https) kullanmıyor ve yalnızca bu {{device}} üzerindeki sunucular onsuz çalışabilir. Onun https adresini ya da Tailscale adresini kullanın.",
-    "noOwner": "{{host}} henüz bir sahibe sahip değil. Sunucuyu kuran kişi, sahip hesabını oluşturmak için bir bağlantı aldı: o bağlantıyı bu {{device}} üzerinde ya da telefonunuzda açın.",
+    "noOwner": "{{host}} adresinin henüz sahibi yok. Sunucuyu kuran kişi, sahip hesabını oluşturmak için bir bağlantı aldı: o bağlantıyı bu {{device}} üzerinde ya da telefonunuzda açın.",
     "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve sunucunun açık olduğunu kontrol edin, sonra tekrar deneyin.",
     "unreachableTailnet": "Tailscale ağınızdaki {{host}} sunucusuna ulaşamıyoruz. Bu {{device}} üzerinde Tailscale'i açın, bağlanın ve tekrar deneyin.",
     "unreachableHere": "Bu {{device}} üzerinde {{host}} adresinde yanıt veren yok. agentes.chat'i burada başlatın, sonra tekrar deneyin.",
