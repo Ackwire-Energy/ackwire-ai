@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { fileURLToPath } from "node:url";
 import {
   artifactFile,
   brandFonts,
@@ -70,6 +71,31 @@ test("a valid PDF with Portuguese text, standard fonts (the fallback), and pages
   expect(pages).toBeGreaterThan(2);
   checkXref(many);
 });
+
+test("a table wider than the page goes on in tables below it: 61 and 100 columns, every cell drawn", () => {
+  // In a child process with a deadline: a test's own timeout can't stop a loop that never yields.
+  const source = fileURLToPath(new URL("../src/pdf.ts", import.meta.url));
+  const script = `
+    const { markdownToPdf } = await import(${JSON.stringify(source)});
+    const row = (n, at) => "| " + Array.from({ length: n }, (_, i) => at + i).join(" | ") + " |";
+    const table = (n) => [row(n, "h"), "|" + " --- |".repeat(n), row(n, "v")].join("\\n");
+    const latin1 = (bytes) => Array.from(bytes, (b) => String.fromCharCode(b)).join("");
+    console.log(JSON.stringify([61, 100].map((n) => latin1(markdownToPdf(table(n), { fonts: "standard" })))));
+  `;
+  const run = Bun.spawnSync([process.execPath, "-e", script], { timeout: 10_000 });
+  expect(run.stderr.toString()).toBe("");
+  expect(run.exitedDueToTimeout ?? false).toBe(false);
+  expect(run.exitCode).toBe(0);
+  const pdfs = JSON.parse(run.stdout.toString()) as string[];
+  [61, 100].forEach((n, k) => {
+    const pdf = pdfs[k] ?? "";
+    for (let i = 0; i < n; i++) {
+      expect(pdf).toContain(`(h${i})`);
+      expect(pdf).toContain(`(v${i})`);
+    }
+    checkXref(pdf);
+  });
+}, 20_000);
 
 test("a document artifact downloads as PDF; tables too; other kinds can't", async () => {
   f = await setup();
