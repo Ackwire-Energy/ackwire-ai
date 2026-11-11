@@ -5,6 +5,7 @@ import {
   type ChannelAccess,
   type ChannelAccessMode,
 } from "@agenteschat/client/lib/channel-access";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rolePicksInSight } from "@agenteschat/client/lib/personal-view";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
@@ -246,17 +247,6 @@ export function NewChannelDialog({
   const [categoryId, setCategoryId] = useState<string | null>(category);
   const [selected, setSelected] = useState<Set<PickKey>>(new Set());
   const [touched, setTouched] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    setName("");
-    setTopic("");
-    setAccess({ mode: "public", roleIds: [] });
-    setCategoryId(category);
-    setSelected(new Set());
-    setTouched(false);
-  }, [open, category]);
-  const taken = new Set((channels.data ?? []).map((c) => c.name));
-  const error = channelNameError(name, taken);
   const create = useMutation({
     mutationFn: async () => {
       const channel = await api.chat.createChannel(org.id, {
@@ -275,6 +265,18 @@ export function NewChannelDialog({
       await navigate({ to: "/org/$orgId/c/$channelId", params: { orgId: org.id, channelId: channel.id } });
     },
   });
+  useEffect(() => {
+    if (!open) return;
+    setName("");
+    setTopic("");
+    setAccess({ mode: "public", roleIds: [] });
+    setCategoryId(category);
+    setSelected(new Set());
+    setTouched(false);
+    create.reset();
+  }, [open, category, create.reset]);
+  const taken = useHeldWhile(new Set((channels.data ?? []).map((c) => c.name)), create.isPending || create.isSuccess);
+  const error = channelNameError(name, taken);
 
   return (
     <Dialog

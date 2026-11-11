@@ -10,6 +10,7 @@ import {
   useUpdateRole,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { can, type RolePermission } from "@agenteschat/client/lib/permissions";
 import {
   type AreaLevel,
@@ -886,8 +887,10 @@ function AddPeopleDialog({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  // Who could get it before Adicionar, also while it closes: the ones being added keep their rows.
+  const listed = useHeldWhile(candidates, busy || !open);
   const q = query.trim().toLowerCase();
-  const shown = candidates.filter((p) => !q || `${p.name} ${p.email}`.toLowerCase().includes(q));
+  const shown = listed.filter((p) => !q || `${p.name} ${p.email}`.toLowerCase().includes(q));
   const close = (next: boolean) => {
     if (!next) {
       setPicked(new Set());
@@ -906,7 +909,7 @@ function AddPeopleDialog({
     >
       <Locked when={busy}>
         <DialogBody>
-          {candidates.length > PEOPLE_SEARCH_FROM && (
+          {listed.length > PEOPLE_SEARCH_FROM && (
             <Input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
