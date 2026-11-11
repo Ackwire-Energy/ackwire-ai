@@ -104,7 +104,7 @@ describe("the GIPHY key in Configurações › GIFs e figurinhas (ADR 0091)", ()
     expect(within(card()).queryByRole("button", { name: "Apagar" })).toBeNull();
     expect(card().textContent).toContain("Os agentes só mandam figurinhas por conta própria com o Jev.");
     expect(within(card()).getByRole("link", { name: "Configurar o Jev" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/settings/keys#jev`,
+      `/org/${ORG_ID}/settings/usage#jev`,
     );
   });
 

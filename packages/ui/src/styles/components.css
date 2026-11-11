@@ -5827,6 +5827,17 @@ html:not([data-pointer]) .ac-seg__item:focus-visible {
 .ac-card__head:has(> .ac-card__lead > .ac-card__key) > .ac-card__action {
   margin-inline-start: calc(22px + 10px);
 }
+/* A switch alone is the head's one small control: it keeps its place at the head's end and the words wrap beside it,
+   as in a row of settings. Buttons still go under words too long to share their line. */
+.ac-card__head:has(> .ac-card__action > .ac-switch:only-child) {
+  flex-wrap: nowrap;
+}
+.ac-card__head:has(> .ac-card__action > .ac-switch:only-child) > .ac-card__lead {
+  flex: 1 1 0%;
+}
+.ac-card__head:has(> .ac-card__action > .ac-switch:only-child) > .ac-card__action {
+  margin-inline-start: 0;
+}
 /* Foot: help text in a well pressed into the bottom of the card (8px from its edges), its icon an `.ac-iconline`
    lead. */
 .ac-card__foot {

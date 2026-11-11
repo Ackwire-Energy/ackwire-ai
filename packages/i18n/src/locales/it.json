@@ -1434,8 +1434,7 @@
     "noDate": "Nessuna data",
     "clearDate": "Togli la data",
     "risky": "Merge, deploy e altre azioni rischiose",
-    "riskyOff": "Spento, queste restano solo a te.",
-    "riskyOn": "Acceso, questa persona decide anche queste.",
+    "riskyOn": "Questa persona decide anche queste.",
     "lock": "Sempre a te: denaro, persone e ruoli, chiavi IA, la tua casella di posta ed eliminare.",
     "coveringTitle": "Approvi per",
     "coveringSubtitle": "Ciò che chiedono a queste persone arriva anche a te, e decidi a loro nome. Mai ciò che hai chiesto tu.",
@@ -1446,7 +1445,7 @@
     "failed": "Non è stato possibile salvare. Riprova."
   },
   "rightHandApprovals": {
-    "title": "{{name}} approva per te",
+    "title": "{{name}} crea e modifica agenti per te",
     "subtitle": "Solo ciò che nasce da una tua richiesta. Quello che non approverebbe lo passa a te.",
     "newAgents": "Creare agenti proposti da altri agenti",
     "newAgentsHelp": "Senza app, solo in canali aperti. Puoi annullarlo per 24 h.",
@@ -2298,10 +2297,10 @@
       "audienceHelp": "Fuori dal pubblico, la persona non vede {{name}} nella barra laterale.",
       "lock": "{{name}} non si può archiviare né eliminare. Senza che nessuno gli parli, pubblica solo la Settimana del team, per gli admin.",
       "audit": "Vedi cosa ha fatto {{name}}",
-      "change": "Cambia",
       "planHelp": "Paga chi è titolare del piano. Se il suo computer non è disponibile, la conversazione lo dice e propone una chiave API.",
       "lookEdit": "Cambia l'aspetto di {{name}}",
-      "planOwner": "di {{owner}}",
+      "planOwner": "account di {{owner}}",
+      "planName": "Piano {{name}}",
       "mine": "La tua IA",
       "mineHelp": "La tua conversazione con {{name}} pensa con il tuo piano o uno condiviso con te, e solo la tua.",
       "connectMine": "Collega il mio piano",
@@ -2319,15 +2318,13 @@
       "fallbackPlan": "Senza un piano tuo, usa il piano di {{owner}}, che risponde a tutti.",
       "fallbackYours": "Senza un altro piano, usa quello del workspace, che è tuo.",
       "fallbackNone": "Senza un piano tuo, {{name}} non può risponderti: il piano del workspace risponde solo a {{owner}}.",
-      "workspace": "IA del workspace",
+      "workspace": "IA di chi non ha un piano proprio",
       "workspaceHelp": "Chi non ha un piano proprio parla con {{name}} tramite questa IA.",
-      "workspacePlan": "Piano del workspace",
-      "workspacePlanHelp": "Un piano al posto della chiave. Risponde ad altre persone solo se il proprietario lo permette.",
-      "noPlans": "Collega un piano in Account IA per usarlo qui.",
-      "pickPlan": "Scegli un piano",
-      "sharesOn": "Attivo: chi non ha un piano proprio parla con {{name}} tramite questo piano.",
-      "sharesOff": "Disattivo: solo {{owner}} parla tramite questo piano. Chi non ha un piano proprio resta senza risposta.",
-      "sharesOffYou": "Disattivo: solo tu parli tramite questo piano. Chi non ha un piano proprio resta senza risposta."
+      "noPlans": "Collega un piano in IA e consumi per usarlo qui.",
+      "lend": "Presta questo piano a chi non ne ha uno",
+      "groupMine": "Solo per te",
+      "groupWorkspace": "Per tutto il workspace",
+      "groupAdmins": "solo admin"
     },
     "card": {
       "settings": "{{name}} · Impostazioni",
@@ -4841,6 +4838,7 @@
         "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo.",
         "addAccount": "Aggiungi account",
         "signInAgain": "Accedi di nuovo",
+        "connectPlan": "Collega un altro piano",
         "fallbackTitle": "Se {{computer}} smette di rispondere, rispondi tramite l'API",
         "fallbackHint": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
         "fallbackHint_female": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
@@ -9686,7 +9684,6 @@
     "page": {
       "title": "I tuoi piani",
       "hint": "Ogni piano resta sul computer su cui è stato collegato, e chi gestisce quel computer può accedervi. agentes.chat conserva solo il nome, l'email e l'utilizzo.",
-      "empty": "Accedi con il tuo account e gli agenti penseranno con quello.",
       "emptyTitle": "Usa il piano IA che già paghi",
       "emptyViewer": "Chi si occupa dell'IA dello spazio di lavoro collega un piano, e compare qui.",
       "connect": "Collega un'IA",
@@ -14827,10 +14824,7 @@
     "notOpen": "Il tuo ruolo in questo spazio di lavoro non apre {{section}}. Chi gestisce i ruoli può aprirlo per te.",
     "nav": "Sezioni delle impostazioni",
     "group": {
-      "you": "Tu",
-      "org": "Spazio di lavoro",
-      "agents": "Agenti",
-      "costs": "Costi e dati"
+      "org": "Spazio di lavoro"
     },
     "section": {
       "account": "Il tuo account",
@@ -14843,11 +14837,10 @@
       "access": "Agenti e accessi",
       "connectors": "Connettori e MCP",
       "skills": "Skill",
-      "keys": "Account IA",
       "storage": "Archiviazione",
       "computers": "Computer",
       "devices": "Dispositivi",
-      "usage": "Budget e consumi",
+      "usage": "IA e consumi",
       "audit": "Registro attività",
       "import": "Importa ed esporta",
       "billing": "Piano e fatturazione",
@@ -14858,7 +14851,6 @@
       "about": "Informazioni su agentes.chat",
       "generalPersonal": "Su di te",
       "keysPersonal": "IA e app",
-      "usagePersonal": "Piano e consumi",
       "membersPersonal": "Persone"
     },
     "advanced": "Avanzate",
@@ -14873,9 +14865,8 @@
       "access": "Cosa può usare ogni agente: un livello per connettore.",
       "connectors": "Servizi e server MCP collegati una sola volta per tutto lo spazio di lavoro.",
       "skills": "Istruzioni in Markdown che gli agenti aprono quando ne hanno bisogno.",
-      "keys": "I tuoi piani e le chiavi API dello spazio di lavoro.",
       "storage": "Dove si trovano i file dello spazio di lavoro.",
-      "usage": "Quanta IA usa ogni persona e ogni agente, e i limiti del mese.",
+      "usage": "Gli account IA dello spazio di lavoro, e quanto usa ogni persona e ogni agente.",
       "audit": "Cosa hanno fatto gli agenti fuori dalla conversazione e cosa ha cambiato la gente.",
       "import": "Porta agenti da un'altra app o spazio di lavoro, o porta questo altrove.",
       "billing": "Il piano, la carta e le fatture, su una nostra pagina fuori dall'app.",
@@ -14885,7 +14876,6 @@
       "approvals": "Chi decide per te quando un agente chiede la tua approvazione.",
       "about": "Chi lo fa, la sua licenza e dove si trova il codice sorgente.",
       "generalPersonal": "Cosa sanno di te i tuoi agenti, e come funziona questo spazio di lavoro.",
-      "keysPersonal": "L'IA con cui pensano i tuoi agenti, e le app e le skill che usano.",
       "usagePersonal": "Quanta IA usano i tuoi agenti, e il tuo piano.",
       "connectorsPersonal": "Le tue app e i server MCP, collegati una volta per i tuoi agenti.",
       "membersPersonal": "Chi c'è qui con te, e gli inviti.",
@@ -15001,42 +14991,10 @@
       "dialogTitle": "Cosa viene inviato",
       "dialogText": "Una volta al giorno. Questo è esattamente il prossimo report."
     },
-    "tilesTitle": "Tutto nello spazio di lavoro",
     "tileState": {
       "members_one": "{{count}} membro",
       "members_many": "{{count}} membri",
-      "members_other": "{{count}} membri",
-      "invitations_one": "{{count}} invito in attesa",
-      "invitations_many": "{{count}} inviti in attesa",
-      "invitations_other": "{{count}} inviti in attesa",
-      "agents_one": "{{count}} agente",
-      "agents_many": "{{count}} agenti",
-      "agents_other": "{{count}} agenti",
-      "connectors_one": "{{count}} collegato",
-      "connectors_many": "{{count}} collegati",
-      "connectors_other": "{{count}} collegati",
-      "noConnectors": "Ancora nessuna app collegata",
-      "skills_one": "{{count}} skill",
-      "skills_many": "{{count}} skill",
-      "skills_other": "{{count}} skill",
-      "computers_one": "{{online}} di {{count}} acceso",
-      "computers_many": "{{online}} di {{count}} accesi",
-      "computers_other": "{{online}} di {{count}} accesi",
-      "noComputers": "Ancora nessun computer",
-      "devices_one": "{{online}} di {{count}} acceso",
-      "devices_many": "{{online}} di {{count}} accesi",
-      "devices_other": "{{online}} di {{count}} accesi",
-      "noDevices": "Ancora nessun dispositivo",
-      "usage": "{{percent}} del budget usato questo mese",
-      "keys_one": "{{count}} chiave",
-      "keys_many": "{{count}} chiavi",
-      "keys_other": "{{count}} chiavi",
-      "platformKey": "Usa la chiave di questo server",
-      "noKeys": "Ancora nessuna chiave",
-      "plans_one": "{{count}} piano",
-      "plans_many": "{{count}} piani",
-      "plans_other": "{{count}} piani",
-      "noPlans": "Ancora nessun piano"
+      "members_other": "{{count}} membri"
     },
     "import": {
       "title": "Importa",
@@ -15172,6 +15130,9 @@
         "jev": "Gli agenti inviano sticker di loro iniziativa solo con Jev.",
         "jevLink": "Configura Jev"
       }
+    },
+    "tab": {
+      "account": "Profilo"
     }
   },
   "personalMode": {
@@ -15373,7 +15334,6 @@
     "equivalent": "≈ {{amount}} a prezzo API",
     "apiPrice": "il prezzo dell'API",
     "apiPriceHint": "Quando gli agenti usano i piani, nessuno paga a consumo. Questo importo è quanto costerebbe lo stesso uso tramite l'API.",
-    "thisMonth": "Questo mese",
     "moreAgents_one": "+{{count}} agente",
     "moreAgents_many": "+{{count}} agenti",
     "moreAgents_other": "+{{count}} agenti",
@@ -15381,7 +15341,7 @@
     "budgetShare": "{{percent}} del budget",
     "estimate": "I piani indicano solo quanto ha usato l'intero account. La parte di ogni agente è una stima, basata su quanto ha speso ciascuno.",
     "accounts": {
-      "title": "Account con piano",
+      "title": "Account",
       "empty": "Collega un piano e segui qui quanto ne usa ogni agente."
     },
     "api": {

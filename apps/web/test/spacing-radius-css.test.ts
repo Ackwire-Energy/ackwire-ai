@@ -189,13 +189,15 @@ test("every hairline between a card's rows, and over its foot, has one step of r
   expect(declarations(people, ".pu-limits__row")).toEqual([]);
   expect(last(people, ".pu-pick__select", "width")).toBe("200px");
   const plan = topLevel(await read(join(SRC, "components/plan-usage.css")));
-  expect(last(plan, ".plan-block", "padding")).toBe("var(--row-py) 0");
+  // An account's row: one step above and below its words, the list's 16 at its sides, what it folds on the same sides.
+  expect(last(plan, ".plan-row__head", "padding")).toBe("var(--space-3) var(--space-4)");
+  expect(last(plan, ".plan-row__body", "padding")).toBe("0 var(--space-4)");
+  expect(last(plan, ".plan-row__body", "gap")).toBe("var(--space-3)");
 });
 
-test("Seus planos and the API keys: each row has the rows' room above and below, 16 at its sides", async () => {
+test("the API keys: each row has the rows' room above and below, 16 at its sides", async () => {
   const layout = topLevel(await read(join(SRC, "layout.css")));
-  for (const row of [".ai-accounts__row", ".key-row"])
-    expect(last(layout, row, "padding")).toBe("var(--row-py) var(--space-4)");
+  expect(last(layout, ".key-row", "padding")).toBe("var(--row-py) var(--space-4)");
 });
 
 test("the settings sidebar's links are the ruler's compact step, the default one under a finger", async () => {

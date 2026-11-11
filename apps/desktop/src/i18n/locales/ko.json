@@ -324,7 +324,7 @@
     "usageRestart": "바꾸면 agentes.chat이 잠깐 다시 시작돼요.",
     "jev": "Jev",
     "jevText": "TypeSafe의 빠른 모델이에요. 누가 답할지 고르고, 메모리를 정리하고, 에이전트가 화면을 볼 수 있게 해요. 선택 사항이며 내 키로 사용해요.",
-    "jevWhere": "agentes.chat › 설정 › AI 계정에 있어요.",
+    "jevWhere": "agentes.chat › 설정 › AI와 사용량에 있어요.",
     "reachFailed": "내 기기에서 접속이 켜지지 않았어요: {{reason}}.",
     "backup": "지금 백업",
     "backedUp": "백업 완료: {{file}}",

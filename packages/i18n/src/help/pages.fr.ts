@@ -378,7 +378,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
               "Ouvrez https://console.typesafe.ai et connectez-vous avec Google ou votre e-mail. Un nouveau compte se crée de la même façon.",
               "Ajoutez du crédit dans la console. Jev est prépayé.",
               "Ouvrez https://console.typesafe.ai/keys, créez une clé et copiez-la tout de suite.",
-              "Dans agentes.chat, ouvrez **Paramètres › Comptes IA** et collez-la sous **Jev**. Seule la personne qui a installé ce serveur la voit.",
+              "Dans agentes.chat, ouvrez **Paramètres › IA et utilisation** et collez-la sous **Jev**. Seule la personne qui a installé ce serveur la voit.",
             ],
           },
           "Sur un serveur que vous faites tourner avec Docker, vous pouvez plutôt mettre la clé dans `.env` en tant que `TYPESAFE_API_KEY`. Celle-ci l’emporte sur celle des Paramètres.",
@@ -392,7 +392,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "0,042 USD par million de jetons lus par Jev. Ses réponses sont gratuites. Choisir qui répond lit environ 2 500 jetons, soit environ 0,0001 USD. Une capture d’écran fait environ 3 900 jetons.",
               "Les crédits achetés durent 12 mois. Activez la recharge automatique dans la console pour que Jev ne tombe pas à court.",
-              "**Paramètres › Comptes IA** indique combien de décisions Jev a prises ce mois-ci, et ce qu’elles ont coûté.",
+              "**Paramètres › IA et utilisation** indique combien de décisions Jev a prises ce mois-ci, et ce qu’elles ont coûté.",
             ],
           },
         ],
@@ -423,7 +423,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Clé refusée :** créez une nouvelle clé et collez-la dans **Paramètres › Comptes IA**.",
+              "**Clé refusée :** créez une nouvelle clé et collez-la dans **Paramètres › IA et utilisation**.",
               "**Plus de crédit :** ajoutez du crédit dans la console. Jev réessaie dans les 30 minutes, ou cliquez sur **Vérifier à nouveau**.",
               "**Occupé ou injoignable :** TypeSafe peut limiter les requêtes par seconde, ou cesser de répondre un moment. Jev reprend tout seul. Vos limites : https://console.typesafe.ai/rate-limits. Pour des limites plus élevées, écrivez à sales@typesafe.ai.",
             ],

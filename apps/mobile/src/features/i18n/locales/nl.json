@@ -1097,7 +1097,6 @@
     "proposalsWaiting_other": "{{count}} wachten",
     "drive": "Drive",
     "connectors": "Connectors en MCP's",
-    "usage": "Gebruik",
     "preferences": "Voorkeuren",
     "editProfile": "Profiel bewerken",
     "switchWorkspace": "Van werkruimte wisselen",
@@ -2216,16 +2215,13 @@
     "editSub": "Naam, logo, tijdzone en wat de agents weten",
     "group": {
       "org": "Werkruimte",
-      "people": "Mensen",
-      "agents": "Agents",
-      "costs": "Kosten en gegevens"
+      "people": "Mensen"
     },
     "section": {
       "members": "Leden",
       "roles": "Rollen",
       "access": "Toegang van agents",
-      "connectors": "Connectors",
-      "usage": "Gebruik en budget"
+      "connectors": "Connectors"
     },
     "ofOnline": "{{online}} van {{count}}",
     "deleteName": "{{name}} verwijderen",

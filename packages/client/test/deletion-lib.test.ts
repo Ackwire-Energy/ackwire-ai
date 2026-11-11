@@ -112,7 +112,7 @@ describe("what deleting an account does, line by line", () => {
       kind: "staysBehind",
       text: 'deleteAccount.staysBehind {"name":"Team"}',
       links: [
-        { label: `deleteAccount.disconnect {"name":"Bia's key"}`, orgId: "w", section: "keys" },
+        { label: `deleteAccount.disconnect {"name":"Bia's key"}`, orgId: "w", section: "usage" },
         { label: 'deleteAccount.disconnect {"name":"GitHub"}', orgId: "w", section: "connectors" },
         { label: 'deleteAccount.disconnect {"name":"bia@team.com"}', orgId: "w", section: "connectors" },
       ],

@@ -203,14 +203,10 @@ describe("the right hand elsewhere", () => {
     expect(document.querySelector('canvas[data-mood="wave"]')).toBeNull();
   });
 
-  test("Settings › Lodi: its name and face in the nav, the lock line and its audit link", async () => {
-    await go(withRightHand(seedState()), "settings/right_hand");
-    const link = within(screen().getByRole("navigation", { name: "Seções das configurações" })).getByRole("link", {
-      name: "Lodi",
-    });
-    expect(link.getAttribute("aria-current")).toBe("page");
+  test("Lodi's page: its name, the lock line and its audit link", async () => {
+    await go(withRightHand(seedState()), `agents/${LODI_ID}`);
     expect(screen().getByRole("heading", { name: "Lodi" })).toBeTruthy();
-    const body = document.querySelector(".settings__body") as HTMLElement;
+    const body = document.querySelector(".page") as HTMLElement;
     expect(body.textContent).toContain("Na barra lateral ele aparece sempre como “seu braço direito”.");
     expect(body.textContent).toContain("O Lodi não pode ser arquivado nem apagado.");
     expect(within(body).getByRole("link", { name: "Ver o que o Lodi fez" }).getAttribute("href")).toBe(
@@ -219,7 +215,7 @@ describe("the right hand elsewhere", () => {
   });
 
   test("Mudar visual: the face and the choices in the dialog's body, Cancelar and Salvar in its footer", async () => {
-    await go(withRightHand(seedState()), "settings/right_hand");
+    await go(withRightHand(seedState()), `agents/${LODI_ID}`);
     await click(screen().getByRole("button", { name: "Mudar o visual do Lodi" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar visual" });
     const body = dialog.querySelector(":scope > .ac-dialog__body") as HTMLElement;
@@ -230,7 +226,7 @@ describe("the right hand elsewhere", () => {
   });
 
   test("renaming it there saves the name and its @", async () => {
-    const { state } = await go(withRightHand(seedState()), "settings/right_hand");
+    const { state } = await go(withRightHand(seedState()), `agents/${LODI_ID}`);
     const name = screen().getByRole("textbox", { name: "Nome e visual" });
     await act(async () => fireEvent.change(name, { target: { value: "Bento" } }));
     await act(async () => fireEvent.blur(name));
@@ -241,7 +237,7 @@ describe("the right hand elsewhere", () => {
     ]);
   });
 
-  test("a member has no Lodi section", async () => {
+  test("nobody has a Lodi section in the settings", async () => {
     const state = withRightHand(seedState());
     const org = state.me?.organizations[0];
     if (org) org.role = "member";

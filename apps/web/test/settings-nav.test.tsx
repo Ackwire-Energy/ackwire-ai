@@ -41,7 +41,7 @@ describe("finding the settings", () => {
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/connectors`);
     // The section's own title (the connectors card has a "Conectores" heading too).
-    expect(document.querySelector(".settings__body > .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
+    expect(document.querySelector(".settings__body .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
   });
 
   test("the workspace menu lists my workspaces (this one marked) and a digit opens an option", async () => {
@@ -95,27 +95,27 @@ describe("finding the settings", () => {
   });
 
   test("every section has its own URL, with the sub-nav marking it", async () => {
-    const sections: [string, string][] = [
-      ["account", "Sua conta"],
-      ["general", "Geral"],
-      ["members", "Membros e convites"],
-      ["access", "Agentes e acesso"],
-      ["connectors", "Conectores e MCPs"],
-      ["skills", "Skills"],
-      ["keys", "Contas de IA"],
-      ["storage", "Armazenamento"],
-      ["devices", "Dispositivos"],
-      ["usage", "Orçamento e uso"],
-      ["import", "Importar e exportar"],
+    // Each with the entry of the list that holds it.
+    const sections: [string, string, string][] = [
+      ["account", "Sua conta", "account"],
+      ["general", "Geral", "general"],
+      ["members", "Membros e convites", "members"],
+      ["access", "Agentes e acesso", "connectors"],
+      ["connectors", "Conectores e MCPs", "connectors"],
+      ["skills", "Skills", "connectors"],
+      ["storage", "Armazenamento", "storage"],
+      ["devices", "Dispositivos", "devices"],
+      ["usage", "IA e uso", "usage"],
+      ["import", "Importar e exportar", "import"],
     ];
-    for (const [id, heading] of sections) {
+    for (const [id, heading, entry] of sections) {
       await go(`settings/${id}`);
       expect(screen().getAllByRole("heading", { level: 2, name: heading }).length).toBeGreaterThan(0);
       const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
       const current = within(nav)
         .getAllByRole("link")
         .find((l) => l.getAttribute("aria-current") === "page");
-      expect(current?.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/${id}`);
+      expect(current?.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/${entry}`);
       cleanup();
     }
   });
@@ -303,7 +303,7 @@ describe("the sections' strip on a phone", () => {
     return r ? r.left + r.width / 2 : null;
   };
 
-  test("opens with the current section's key in its middle, at once: Armazenamento, ninth of ten", async () => {
+  test("opens with the current section's key in its middle, at once: Armazenamento, under Advanced", async () => {
     phone();
     await go("settings/storage");
     expect(middle()).toBe(195);

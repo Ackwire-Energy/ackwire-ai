@@ -22,6 +22,7 @@ export function AdvancedScreen() {
     <SettingsPage title={t("settings.advanced")}>
       <SectionGroups
         areas={advanced}
+        untitled="advanced"
         extra={{
           people: (
             <GroupedRow

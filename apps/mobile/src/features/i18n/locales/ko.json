@@ -1024,7 +1024,6 @@
     "proposalsWaiting_other": "{{count}}개 대기 중",
     "drive": "Drive",
     "connectors": "커넥터와 MCP",
-    "usage": "사용량",
     "preferences": "환경설정",
     "editProfile": "프로필 편집",
     "switchWorkspace": "워크스페이스 전환",
@@ -2113,16 +2112,13 @@
     "editSub": "이름, 로고, 시간대, 에이전트가 아는 내용",
     "group": {
       "org": "워크스페이스",
-      "people": "사람",
-      "agents": "에이전트",
-      "costs": "비용과 데이터"
+      "people": "사람"
     },
     "section": {
       "members": "멤버",
       "roles": "역할",
       "access": "에이전트 접근 권한",
-      "connectors": "커넥터",
-      "usage": "사용량과 예산"
+      "connectors": "커넥터"
     },
     "ofOnline": "{{count}}대 중 {{online}}대",
     "deleteName": "{{name}} 삭제",

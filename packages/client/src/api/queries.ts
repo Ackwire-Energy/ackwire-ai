@@ -33,6 +33,7 @@ import {
   upsertInPages,
   withServerCounts,
 } from "../lib/notifications";
+import { workspaceUsesApi } from "../lib/plan-usage";
 import { learnPlanModels } from "../lib/plans";
 import { setMyReaction } from "../lib/reactions";
 import { recentConversations } from "../lib/recent";
@@ -2468,6 +2469,17 @@ export const useOverview = (orgId: string) => {
   const api = useApi();
   return useQuery({ queryKey: keys.overview(orgId), queryFn: () => api.orgs.overview(orgId), staleTime: 30_000 });
 };
+
+/**
+ * Whether the workspace bills per use (`workspaceUsesApi`): only then a screen shows a budget, the API per agent or
+ * what the API cost. False while loading, so a workspace on plans alone never shows a budget that then leaves.
+ */
+export function useWorkspaceUsesApi(orgId: string) {
+  const overview = useOverview(orgId).data;
+  const agents = useAgents(orgId).data ?? [];
+  const ai = useAiStatus(orgId).data;
+  return workspaceUsesApi(agents, ai, overview?.budgetUsedPercent ?? 0);
+}
 
 export const useSettings = (orgId: string) => {
   const api = useApi();

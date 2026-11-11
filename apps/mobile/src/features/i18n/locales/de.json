@@ -1097,7 +1097,6 @@
     "proposalsWaiting_other": "{{count}} warten",
     "drive": "Drive",
     "connectors": "Konnektoren und MCP",
-    "usage": "Nutzung",
     "preferences": "Einstellungen",
     "editProfile": "Profil bearbeiten",
     "switchWorkspace": "Workspace wechseln",
@@ -2216,16 +2215,13 @@
     "editSub": "Name, Logo, Zeitzone und was die Agenten wissen",
     "group": {
       "org": "Workspace",
-      "people": "Personen",
-      "agents": "Agenten",
-      "costs": "Kosten und Daten"
+      "people": "Personen"
     },
     "section": {
       "members": "Mitglieder",
       "roles": "Rollen",
       "access": "Zugriff der Agenten",
-      "connectors": "Konnektoren",
-      "usage": "Nutzung und Budget"
+      "connectors": "Konnektoren"
     },
     "ofOnline": "{{online}} von {{count}}",
     "deleteName": "{{name}} löschen",

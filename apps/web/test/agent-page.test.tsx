@@ -606,7 +606,17 @@ describe("agent page: inline editing and the save bar", () => {
         .getAllByRole("radio")
         .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
     expect([level("GitHub"), level("Suporte")]).toEqual(["Sem acesso", "Ler"]);
-    await click(screen().getByRole("button", { name: "Ler e escrever" }));
+    // One control over the list, from its own edge: no level chosen while the rows differ.
+    const all = screen().getByRole("radiogroup", { name: "Conectores" });
+    expect(all.closest(".newag__quick")).toBeTruthy();
+    expect(
+      within(all)
+        .getAllByRole("radio")
+        .map((r) => r.textContent),
+    ).toEqual(["Sem acesso", "Só ler", "Ler e escrever"]);
+    expect(within(all).queryByRole("radio", { checked: true })).toBeNull();
+    await click(within(all).getByRole("radio", { name: "Ler e escrever" }));
+    expect(within(all).getByRole("radio", { checked: true }).textContent).toBe("Ler e escrever");
     expect([level("GitHub"), level("Suporte")]).toEqual(["Ler e escrever", "Ler e escrever"]);
     expect(saveBar()?.textContent).toContain("2 alterações");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));

@@ -28,10 +28,11 @@ const disabled = (el: Element) => el.hasAttribute("disabled");
 const section = () => within(document.querySelector(".settings__body") as HTMLElement);
 
 describe("Configurações › GIFs e figurinhas (ADR 0091)", () => {
-  test("its own section in the nav, with what it is for", async () => {
+  test("a tab of Workspace, with what it is for", async () => {
     await go();
     const nav = screen().getByRole("navigation", { name: "Seções das configurações" });
-    expect(within(nav).getByRole("link", { name: "GIFs e figurinhas" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav).getByRole("link", { name: "Workspace" }).getAttribute("aria-current")).toBe("page");
+    expect(section().getByRole("tab", { name: "GIFs e figurinhas" }).getAttribute("aria-selected")).toBe("true");
     expect(section().getByRole("heading", { level: 2, name: "GIFs e figurinhas" })).toBeTruthy();
     expect(section().getByRole("region", { name: "Na conversa" })).toBeTruthy();
     expect(section().getByRole("region", { name: "Agentes" })).toBeTruthy();

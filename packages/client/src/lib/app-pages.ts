@@ -22,7 +22,7 @@ export const APP_PAGES = {
     label: "deleteAccount.menu",
   },
   account: { web: "/settings/account", phone: "/me/account", may: null, label: "settings.section.account" },
-  ai_accounts: { web: "/settings/keys", phone: "/ai-accounts", may: null, label: "settings.section.keys" },
+  ai_accounts: { web: "/settings/usage", phone: "/ai-accounts", may: null, label: "settings.section.usage" },
   workspace: {
     web: "/settings/general",
     phone: "/settings/general",
@@ -62,7 +62,8 @@ export const APP_PAGES = {
   right_hand: {
     web: "/settings/right_hand",
     phone: "/settings/right-hand",
-    may: "manage_agents",
+    // Everyone's: each person's own part is there, the workspace's shows only to who manages agents.
+    may: null,
     label: "settings.section.right_hand",
   },
   import: {

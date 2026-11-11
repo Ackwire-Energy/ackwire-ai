@@ -324,7 +324,7 @@
     "usageRestart": "変更すると、agentes.chatが少しの間再起動します。",
     "jev": "Jev",
     "jevText": "TypeSafeの高速モデルで、誰が答えるかを選び、メモリを整理し、エージェントが画面を見られるようにします。任意で、あなた自身のキーを使います。",
-    "jevWhere": "agentes.chat › 設定 › AIアカウント で設定します。",
+    "jevWhere": "agentes.chat › 設定 › AIと使用量 で設定します。",
     "reachFailed": "あなたのデバイスからのアクセスがオンになりませんでした: {{reason}}。",
     "backup": "今すぐバックアップ",
     "backedUp": "バックアップしました: {{file}}",

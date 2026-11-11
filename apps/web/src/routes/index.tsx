@@ -21,7 +21,7 @@ export const Route = createFileRoute("/")({
     if (search.open === "jev") {
       throw redirect({
         to: "/org/$orgId/settings/$section",
-        params: { orgId: landing.orgId, section: "keys" },
+        params: { orgId: landing.orgId, section: "usage" },
         hash: "jev",
       });
     }

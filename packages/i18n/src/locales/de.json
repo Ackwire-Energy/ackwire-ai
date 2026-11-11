@@ -1393,8 +1393,7 @@
     "noDate": "Ohne Datum",
     "clearDate": "Datum entfernen",
     "risky": "Merge, Deploy und andere riskante Aktionen",
-    "riskyOff": "Aus, diese bleiben nur bei dir.",
-    "riskyOn": "An, diese Person entscheidet auch diese.",
+    "riskyOn": "Diese Person entscheidet auch diese.",
     "lock": "Immer bei dir: Geld, Personen und Rollen, KI-Schlüssel, dein Postfach und Löschen.",
     "coveringTitle": "Du gibst frei für",
     "coveringSubtitle": "Was diese Personen gefragt werden, kommt auch zu dir, und du entscheidest in ihrem Namen. Nie, was du selbst angefragt hast.",
@@ -1405,7 +1404,7 @@
     "failed": "Speichern ging nicht. Versuch es noch einmal."
   },
   "rightHandApprovals": {
-    "title": "{{name}} gibt für dich frei",
+    "title": "{{name}} erstellt und ändert Agenten für dich",
     "subtitle": "Nur was aus einer deiner Anfragen kam. Was nicht freigegeben würde, geht an dich.",
     "newAgents": "Agenten erstellen, die andere Agenten vorschlagen",
     "newAgentsHelp": "Ohne Apps, nur in offenen Kanälen. Du kannst es 24 Std. lang rückgängig machen.",
@@ -2217,10 +2216,10 @@
       "audienceHelp": "Wer nicht dazugehört, sieht {{name}} nicht in der Seitenleiste.",
       "lock": "{{name}} kann weder archiviert noch gelöscht werden. Ungefragt postet er nur die Teamwoche, für Admins.",
       "audit": "Ansehen, was {{name}} getan hat",
-      "change": "Ändern",
       "planHelp": "Es zahlt, wem das Abo gehört. Ist sein Computer nicht erreichbar, sagt die Unterhaltung das und bietet einen API-Schlüssel an.",
       "lookEdit": "Aussehen von {{name}} ändern",
-      "planOwner": "von {{owner}}",
+      "planOwner": "Konto von {{owner}}",
+      "planName": "{{name}}-Abo",
       "mine": "Deine KI",
       "mineHelp": "Dein Gespräch mit {{name}} denkt mit deinem Abo oder einem, das mit dir geteilt wurde, und nur deins.",
       "connectMine": "Mein Abo verbinden",
@@ -2238,15 +2237,13 @@
       "fallbackPlan": "Ohne eigenes Abo nutzt es das Abo von {{owner}}, das allen antwortet.",
       "fallbackYours": "Ohne anderes Abo nutzt es das des Workspace, das dir gehört.",
       "fallbackNone": "Ohne eigenes Abo kann {{name}} dir nicht antworten: Das Abo des Workspace antwortet nur {{owner}}.",
-      "workspace": "KI des Workspace",
+      "workspace": "KI für alle ohne eigenes Abo",
       "workspaceHelp": "Wer kein eigenes Abo hat, spricht über diese KI mit {{name}}.",
-      "workspacePlan": "Abo des Workspace",
-      "workspacePlanHelp": "Ein Abo statt des Schlüssels. Anderen antwortet es nur, wenn die Person, der es gehört, das erlaubt.",
-      "noPlans": "Verbinde unter KI-Konten ein Abo, um es hier zu nutzen.",
-      "pickPlan": "Abo wählen",
-      "sharesOn": "An: Wer kein eigenes Abo hat, spricht über dieses Abo mit {{name}}.",
-      "sharesOff": "Aus: Nur {{owner}} spricht darüber. Wer kein eigenes Abo hat, bekommt keine Antwort.",
-      "sharesOffYou": "Aus: Nur du sprichst darüber. Wer kein eigenes Abo hat, bekommt keine Antwort."
+      "noPlans": "Verbinde unter KI und Verbrauch ein Abo, um es hier zu nutzen.",
+      "lend": "Dieses Abo an alle ohne eigenes verleihen",
+      "groupMine": "Nur für dich",
+      "groupWorkspace": "Für den ganzen Workspace",
+      "groupAdmins": "nur Admins"
     },
     "card": {
       "settings": "{{name}} · Einstellungen",
@@ -4680,6 +4677,7 @@
         "accountOthers": "Abos anderer Personen zeigen, wem sie gehören. Der Inhaber bekommt eine E-Mail und kann es zurücknehmen.",
         "addAccount": "Konto hinzufügen",
         "signInAgain": "Erneut anmelden",
+        "connectPlan": "Weiteres Abo verbinden",
         "fallbackTitle": "Wenn {{computer}} nicht mehr antwortet, über die API antworten",
         "fallbackHint": "Die Antwort kommt dann über die API und zählt zum Budget von {{name}}. Sonst sagt {{name}} der Person, die gefragt hat, Bescheid und wartet, bis der Computer zurück ist.",
         "effort": "Aufwand",
@@ -9326,7 +9324,6 @@
     "page": {
       "title": "Deine Abos",
       "hint": "Jedes Abo bleibt auf dem Computer, auf dem es verbunden wurde, und wer diesen Computer betreibt, kommt daran. agentes.chat speichert nur Name, E-Mail und Nutzung.",
-      "empty": "Melde dich mit deinem Konto an, und die Agenten denken damit.",
       "emptyTitle": "Nutze das KI-Abo, das du schon bezahlst",
       "emptyViewer": "Wer sich um die KI des Workspace kümmert, verbindet ein Abo, und es erscheint hier.",
       "connect": "KI verbinden",
@@ -14345,10 +14342,7 @@
     "notOpen": "Deine Rolle in diesem Workspace öffnet {{section}} nicht. Wer die Rollen verwaltet, kann es für dich freigeben.",
     "nav": "Bereiche der Einstellungen",
     "group": {
-      "you": "Du",
-      "org": "Workspace",
-      "agents": "Agenten",
-      "costs": "Kosten und Daten"
+      "org": "Workspace"
     },
     "section": {
       "account": "Dein Konto",
@@ -14361,11 +14355,10 @@
       "access": "Agenten und Zugriff",
       "connectors": "Konnektoren und MCP",
       "skills": "Skills",
-      "keys": "KI-Konten",
       "storage": "Speicher",
       "computers": "Computer",
       "devices": "Geräte",
-      "usage": "Budget und Verbrauch",
+      "usage": "KI und Verbrauch",
       "audit": "Audit-Log",
       "import": "Import und Export",
       "billing": "Tarif und Abrechnung",
@@ -14376,7 +14369,6 @@
       "about": "Über agentes.chat",
       "generalPersonal": "Über dich",
       "keysPersonal": "KI und Apps",
-      "usagePersonal": "Tarif und Verbrauch",
       "membersPersonal": "Personen"
     },
     "advanced": "Erweitert",
@@ -14391,9 +14383,8 @@
       "access": "Was jeder Agent nutzen kann: eine Stufe pro Konnektor.",
       "connectors": "Dienste und MCP-Server, die einmal für den ganzen Workspace verbunden werden.",
       "skills": "Markdown-Anweisungen, die Agenten öffnen, wenn sie sie brauchen.",
-      "keys": "Deine Abos und die API-Schlüssel des Workspace.",
       "storage": "Wo die Dateien des Workspace liegen.",
-      "usage": "Wie viel KI jede Person und jeder Agent nutzt, und die Limits des Monats.",
+      "usage": "Die KI-Konten des Workspace und wie viel jede Person und jeder Agent nutzt.",
       "audit": "Was Agenten außerhalb der Unterhaltung taten und was Personen änderten.",
       "import": "Hol Agenten aus einer anderen App oder einem anderen Workspace, oder nimm diesen mit.",
       "billing": "Plan, Karte und Rechnungen, auf einer Seite von uns außerhalb der App.",
@@ -14403,7 +14394,6 @@
       "approvals": "Wer für dich entscheidet, wenn ein Agent deine Freigabe braucht.",
       "about": "Wer es macht, seine Lizenz und wo sein Quellcode liegt.",
       "generalPersonal": "Was deine Agenten über dich wissen und wie dieser Workspace funktioniert.",
-      "keysPersonal": "Die KI, mit der deine Agenten denken, und die Apps und Skills, die sie nutzen.",
       "usagePersonal": "Wie viel KI deine Agenten nutzen, und dein Tarif.",
       "connectorsPersonal": "Deine Apps und MCP-Server, einmal für deine Agenten verbunden.",
       "membersPersonal": "Wer hier mit dir ist, und Einladungen.",
@@ -14519,33 +14509,9 @@
       "dialogTitle": "Was gesendet wird",
       "dialogText": "Einmal am Tag. Das ist genau der nächste Bericht."
     },
-    "tilesTitle": "Alles im Workspace",
     "tileState": {
       "members_one": "{{count}} Mitglied",
-      "members_other": "{{count}} Mitglieder",
-      "invitations_one": "{{count}} Einladung wartet",
-      "invitations_other": "{{count}} Einladungen warten",
-      "agents_one": "{{count}} Agent",
-      "agents_other": "{{count}} Agenten",
-      "connectors_one": "{{count}} verbunden",
-      "connectors_other": "{{count}} verbunden",
-      "noConnectors": "Noch keine Apps verbunden",
-      "skills_one": "{{count}} Skill",
-      "skills_other": "{{count}} Skills",
-      "computers_one": "{{online}} von {{count}} an",
-      "computers_other": "{{online}} von {{count}} an",
-      "noComputers": "Noch kein Computer",
-      "devices_one": "{{online}} von {{count}} an",
-      "devices_other": "{{online}} von {{count}} an",
-      "noDevices": "Noch kein Gerät",
-      "usage": "{{percent}} des Budgets diesen Monat verbraucht",
-      "keys_one": "{{count}} Schlüssel",
-      "keys_other": "{{count}} Schlüssel",
-      "platformKey": "Nutzt den Schlüssel dieses Servers",
-      "noKeys": "Noch keine Schlüssel",
-      "plans_one": "{{count}} Abo",
-      "plans_other": "{{count}} Abos",
-      "noPlans": "Noch keine Abos"
+      "members_other": "{{count}} Mitglieder"
     },
     "import": {
       "title": "Import",
@@ -14678,6 +14644,9 @@
         "jev": "Agenten senden nur mit Jev von selbst Sticker.",
         "jevLink": "Jev einrichten"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {
@@ -14875,14 +14844,13 @@
     "equivalent": "≈ {{amount}} zu API-Preisen",
     "apiPrice": "den API-Preis",
     "apiPriceHint": "Wenn Agenten Abos nutzen, zahlt niemand nach Nutzung. Dieser Betrag ist das, was dieselbe Nutzung über die API kosten würde.",
-    "thisMonth": "Dieser Monat",
     "moreAgents_one": "+{{count}} Agent",
     "moreAgents_other": "+{{count}} Agenten",
     "paid": "{{amount}} bezahlt",
     "budgetShare": "{{percent}} des Budgets",
     "estimate": "Abos zeigen nur, wie viel das ganze Konto verbraucht hat. Der Anteil jedes Agenten ist eine Schätzung, basierend auf dem, was er darüber verbraucht hat.",
     "accounts": {
-      "title": "Abo-Konten",
+      "title": "Konten",
       "empty": "Verbinde ein Abo und verfolge hier, wie viel jeder Agent davon nutzt."
     },
     "api": {

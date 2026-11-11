@@ -36,6 +36,7 @@ export type AppHref =
   | `/connectors/tools?id=${string}`
   | "/me/members"
   | "/me/approvals"
+  | "/settings/right-hand"
   | "/settings/computers"
   | "/settings/devices"
   | "/settings/skills"
@@ -261,7 +262,9 @@ export function notificationHref(
   // Someone who joined: Membros, where they now are (the app has no "say hi" of its own for them).
   if (n.kind === "invitation_accepted") return "/me/members";
   // Who approves for whom (ADR 0139): Perfil › Aprovações, where it is set and declined.
-  if (n.kind === "approval_cover" || n.kind === "right_hand_paused") return "/me/approvals";
+  if (n.kind === "approval_cover") return "/me/approvals";
+  // What the right hand does without asking: its own settings.
+  if (n.kind === "right_hand_paused") return "/settings/right-hand";
   // An update of a skill from its link: the skill's page, where what waits is applied.
   if (n.kind === "skill_update") return isSafeId(s.skillId) ? `/settings/skills/${s.skillId}` : "/settings/skills";
   if (n.kind === "machine_connected")

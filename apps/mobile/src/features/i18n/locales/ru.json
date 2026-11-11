@@ -1243,7 +1243,6 @@
     "proposalsWaiting_other": "{{count}} ждут",
     "drive": "Drive",
     "connectors": "Коннекторы и MCP",
-    "usage": "Расход",
     "preferences": "Предпочтения",
     "editProfile": "Изменить профиль",
     "switchWorkspace": "Сменить рабочее пространство",
@@ -2422,16 +2421,13 @@
     "editSub": "Название, логотип, часовой пояс и что знают агенты",
     "group": {
       "org": "Рабочее пространство",
-      "people": "Люди",
-      "agents": "Агенты",
-      "costs": "Расходы и данные"
+      "people": "Люди"
     },
     "section": {
       "members": "Участники",
       "roles": "Роли",
       "access": "Доступ агентов",
-      "connectors": "Коннекторы",
-      "usage": "Расход и бюджет"
+      "connectors": "Коннекторы"
     },
     "ofOnline": "{{online}} из {{count}}",
     "deleteName": "Удалить {{name}}",

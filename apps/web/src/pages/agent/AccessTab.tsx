@@ -1,5 +1,5 @@
 import { useAgentSkills } from "@agenteschat/client";
-import { type AccessResource, asksAt, type Level } from "@agenteschat/client/lib/access-levels";
+import { type AccessResource, asksAt, type Level, sharedLevel } from "@agenteschat/client/lib/access-levels";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Card, Chip, EmptyState, Icon, SearchField, Segmented, Toolbar } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
@@ -165,20 +165,21 @@ export function AccessTab({ part = "all" }: { part?: "all" | "basic" | "advanced
                     action={<span className="small muted">{t("agentPage.access.oneLevel")}</span>}
                   />
                   {editable && resources.some((r) => r.kind === "connector") && (
-                    // Every connector at once acts on this card's list: over it, at the end its rows' levels keep, and
-                    // under the title, so a narrow card wraps it instead of squeezing the title.
+                    // Every connector at once acts on this card's list: one control over it, from the rows' own edge.
                     <div className="newag__list-head">
                       <span className="newag__quick">
                         {t("agentPage.access.allConnectors")}
-                        <Button size="sm" variant="ghost" onClick={() => allConnectors("none")}>
-                          {t("access.level.none")}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => allConnectors("read")}>
-                          {t("agentPage.access.onlyRead")}
-                        </Button>
-                        <Button size="sm" variant="ghost" onClick={() => allConnectors("write")}>
-                          {t("access.level.write")}
-                        </Button>
+                        <Segmented
+                          size="sm"
+                          label={t("access.kind.connectors")}
+                          value={sharedLevel(resources.filter((r) => r.kind === "connector").map(level)) ?? "custom"}
+                          onValueChange={(l) => l !== "custom" && allConnectors(l)}
+                          options={[
+                            { value: "none", label: t("access.level.none") },
+                            { value: "read", label: t("agentPage.access.onlyRead") },
+                            { value: "write", label: t("access.level.write") },
+                          ]}
+                        />
                       </span>
                     </div>
                   )}

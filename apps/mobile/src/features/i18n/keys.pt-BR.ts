@@ -1137,7 +1137,6 @@ export const featureKeysPtBR = {
     proposalsWaiting_other: "{{count}} esperando",
     drive: "Drive",
     connectors: "Conectores e MCPs",
-    usage: "Uso",
     preferences: "Preferências",
     editProfile: "Editar perfil",
     switchWorkspace: "Trocar workspace",
@@ -2256,15 +2255,12 @@ export const featureKeysPtBR = {
     group: {
       org: "Workspace",
       people: "Pessoas",
-      agents: "Agentes",
-      costs: "Custos e dados",
     },
     section: {
       members: "Membros",
       roles: "Papéis",
       access: "Acesso dos agentes",
       connectors: "Conectores",
-      usage: "Uso e orçamento",
     },
     ofOnline: "{{online}} de {{count}}",
     deleteName: "Apagar {{name}}",

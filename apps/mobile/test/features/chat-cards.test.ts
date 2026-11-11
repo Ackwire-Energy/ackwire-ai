@@ -250,24 +250,59 @@ describe("a stretch's pause on the phone (ADR 0089)", () => {
   });
 });
 
-describe("a plan account's agents on the phone (Contas dos planos)", () => {
-  test("bars split by agent, then one list, then when it renews and how old, then the month", () => {
-    const screen = source("../usage/UsageScreen.tsx");
-    const block = screen.slice(...at(screen, ["function AccountBlock(", "function AgentShares("]));
-    expect(ascending(at(block, ["<PlanMeter usage={splitUsage(", "{list}", "usageViews.monthTokens"]))).toBe(true);
-    expect(block).not.toContain("account.agents.map");
+describe("a plan account on the phone (IA e uso › Contas): a row that opens", () => {
+  const screen = source("../usage/UsageScreen.tsx");
+
+  test("closed: its mark, name, plan and owner, one meter for the fullest window, the alert; it says it opens", () => {
+    const row = screen.slice(...at(screen, ["function AccountRow(", "function AgentShares("]));
+    const head = row.slice(...at(row, ["<Pressable", "</Pressable>"]));
+    expect(head).toContain("accessibilityState={{ expanded: open }}");
+    expect(
+      ascending(
+        at(head, ["<ProviderLogo", "accountName(t, account)", "{owner}", "text.short(line.top)", "line.alert"]),
+      ),
+    ).toBe(true);
+    // Near its limit it starts open; every other one starts closed.
+    expect(row).toContain('useState(line != null && line.state !== "ok")');
+    // Nothing of the open row is drawn while it is closed.
+    expect(row.indexOf("{open ? (")).toBeGreaterThan(row.indexOf("</Pressable>"));
+  });
+
+  test("open: bars split by agent, then one list, then when it renews and how old, then the month, then the way to the AI accounts screen", () => {
+    const row = screen.slice(...at(screen, ["function AccountRow(", "function AgentShares("]));
+    const body = row.slice(row.indexOf("{open ? ("));
+    expect(
+      ascending(
+        at(body, ["brandOf(account)", "usage={splitUsage(", "{list}", "usageViews.monthTokens", "mobile.ai.row"]),
+      ),
+    ).toBe(true);
+    // The row already says where the plan stands: the meter doesn't say it again.
+    expect(body).toMatch(/<PlanMeter\s+plain/);
+    // Only its owner manages it, on the AI accounts screen.
+    expect(body).toContain("account.mine && account.accountId ?");
+    expect(row).not.toContain("account.agents.map");
     const list = screen.slice(...at(screen, ["function AgentShares(", "/** The API per agent:"]));
-    expect(ascending(at(list, ["usageViews.thisMonth", "openAgentUsage(a.agentId)", "usageViews.moreAgents"]))).toBe(
-      true,
-    );
+    // One line of words per agent, no column titles over them.
+    expect(list).not.toContain("usageViews.thisMonth");
+    expect(ascending(at(list, ["openAgentUsage(a.agentId)", "usageViews.moreAgents"]))).toBe(true);
     // "Usa agora" only for an agent using it now, never for the folded row.
-    expect(list).toContain("tokens(a.tokens, a.now)");
-    expect(list).toContain("tokens(shares.restTokens)");
+    expect(list).toContain("shareFacts(t, i18n.language, window, a)");
+    expect(list).toContain(
+      "shareFacts(t, i18n.language, window, { share: shares.restShare, tokens: shares.restTokens })",
+    );
     // The renewal moves under the list, once.
     const parts = source("../usage/parts.tsx");
     expect(
       ascending(at(parts, ["!children ? (", "{children}\n      {children && renews ?", "text.updated(usage.at)"])),
     ).toBe(true);
+  });
+
+  test("no budget on plans alone: the API per agent, its spend by kind and the default budget wait for the API", () => {
+    expect(screen).toContain("const usesApi = useWorkspaceUsesApi(orgId);");
+    expect(screen).toContain("{usesApi ? <ApiCard data={data} /> : null}");
+    expect(screen).toContain('{view === "summary" && allowed && usesApi && report.data ? (');
+    expect(screen).toContain('{view === "summary" && allowed && usesApi ? <DefaultBudgetCard /> : null}');
+    expect(screen).toContain("useUsageReport(orgId, allowed && usesApi)");
   });
 });
 

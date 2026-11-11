@@ -378,7 +378,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "https://console.typesafe.ai adresini açın ve Google ya da e-postanızla giriş yapın. Yeni hesap da aynı şekilde açılır.",
               "Konsolda kredi ekleyin. Jev ön ödemelidir.",
               "https://console.typesafe.ai/keys adresini açın, bir anahtar oluşturun ve hemen kopyalayın.",
-              "agentes.chat'te **Ayarlar › Yapay zeka hesapları** bölümünü açın ve anahtarı **Jev** altına yapıştırın. Onu yalnızca bu sunucuyu kuran kişi görür.",
+              "agentes.chat'te **Ayarlar › Yapay zeka ve kullanım** bölümünü açın ve anahtarı **Jev** altına yapıştırın. Onu yalnızca bu sunucuyu kuran kişi görür.",
             ],
           },
           "Docker ile çalıştırdığınız bir sunucuda anahtarı bunun yerine `.env` dosyasına `TYPESAFE_API_KEY` olarak koyabilirsiniz. Bu anahtar, Ayarlar'dakinin önüne geçer.",
@@ -392,7 +392,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "Jev'in okuduğu her milyon token için US$ 0,042. Yanıtları ücretsizdir. Kimin yanıtlayacağını seçmek yaklaşık 2.500 token okur, yani yaklaşık US$ 0,0001. Bir ekran görüntüsü yaklaşık 3.900 token eder.",
               "Satın aldığınız krediler 12 ay geçerlidir. Jev'in kredisi bitmesin diye konsolda otomatik yüklemeyi açın.",
-              "**Ayarlar › Yapay zeka hesapları**, Jev'in bu ay kaç karar verdiğini ve bunların ne kadar tuttuğunu gösterir.",
+              "**Ayarlar › Yapay zeka ve kullanım**, Jev'in bu ay kaç karar verdiğini ve bunların ne kadar tuttuğunu gösterir.",
             ],
           },
         ],
@@ -423,7 +423,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Anahtar kabul edilmedi:** yeni bir anahtar oluşturun ve **Ayarlar › Yapay zeka hesapları** bölümüne yapıştırın.",
+              "**Anahtar kabul edilmedi:** yeni bir anahtar oluşturun ve **Ayarlar › Yapay zeka ve kullanım** bölümüne yapıştırın.",
               "**Kredi bitti:** konsolda kredi ekleyin. Jev 30 dakika içinde yeniden dener ya da **Tekrar kontrol et** düğmesine tıklayın.",
               "**Meşgul ya da ulaşılamıyor:** TypeSafe saniye başına istekleri sınırlayabilir ya da bir süre yanıt vermeyebilir. Jev kendiliğinden yeniden devreye girer. Limitleriniz: https://console.typesafe.ai/rate-limits. Daha yüksek limitler için sales@typesafe.ai adresine yazın.",
             ],

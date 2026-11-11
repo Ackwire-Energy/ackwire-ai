@@ -9,6 +9,7 @@ import {
 } from "@agenteschat/client";
 import { coveringLine } from "@agenteschat/client/lib/approval-words";
 import { endOfDay, toYmd } from "@agenteschat/client/lib/format";
+import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import {
   AffixInput,
   Avatar,
@@ -23,9 +24,10 @@ import {
   Switch,
   Textarea,
 } from "@agenteschat/ui";
-
+import { useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { LoadingLine } from "@/components/Loading";
 import { PrefRow } from "@/components/NoticePrefs";
 import { useOrg } from "@/components/org-context";
@@ -39,8 +41,9 @@ const NOBODY = "none";
 /**
  * Configurações › Você › Aprovações (ADR 0139): "Quem aprova por mim" (one person, always or only while my status
  * says out, until a day, risky actions off unless turned on), each change saved at once; then the people I approve
- * for, each with "Não quero cobrir". Alone in a personal workspace there is nobody to approve for you: only the right
- * hand's part, until someone joins or while a cover is set (ADR 0159).
+ * for, each with "Não quero cobrir". Alone in a personal workspace there is nobody to approve for you: the card waits
+ * until someone joins or while a cover is set (ADR 0159). What the right hand does for the person is on its own page,
+ * a row away.
  */
 export function ApprovalsSection() {
   const { t, i18n } = useTranslation();
@@ -49,10 +52,11 @@ export function ApprovalsSection() {
   const meId = useMe().data?.user.id ?? "";
   const dir = useDirectory(org.id);
   const covers = useApprovalCovers(org.id);
-  const rightHand = useRightHandApprovals(org.id).data;
   const set = useSetApprovalCover(org.id, meId);
-  const decline = useDeclineApprovalCover(org.id);
   const { solo } = usePersonalView();
+  const navigate = useNavigate();
+  const rightHand = dir.agents.find(isRightHand);
+  const decline = useDeclineApprovalCover(org.id);
   const failed = () => toast.show(t("approvalCover.failed"), "error");
   if (!covers.data) return covers.isError ? <p className="muted">{t("approvalCover.failed")}</p> : <LoadingLine />;
   const cover = covers.data.cover;
@@ -147,7 +151,7 @@ export function ApprovalsSection() {
                   id="cover-risky"
                   icon="alert"
                   label={t("approvalCover.risky")}
-                  hint={t(cover.risky ? "approvalCover.riskyOn" : "approvalCover.riskyOff")}
+                  hint={t("approvalCover.riskyOn")}
                   control={
                     <Switch
                       checked={cover.risky}
@@ -159,11 +163,24 @@ export function ApprovalsSection() {
               </>
             )}
           </div>
-          {!rightHand?.rightHand && <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>}
+          <CardFooter icon="lock">{t("approvalCover.lock")}</CardFooter>
         </Card>
       )}
 
-      {rightHand?.rightHand && <RightHandCard view={rightHand} name={rightHand.rightHand.name} />}
+      {rightHand && (
+        <Card>
+          <div className="settings-rows">
+            <PrefRow
+              id="rh-approvals"
+              lead={<AgentAvatar agentId={rightHand.id} name={rightHand.name} size="sm" />}
+              label={t("rightHandApprovals.title", { name: rightHand.name })}
+              onOpen={() =>
+                void navigate({ to: "/org/$orgId/agents/$agentId", params: { orgId: org.id, agentId: rightHand.id } })
+              }
+            />
+          </div>
+        </Card>
+      )}
 
       {covers.data.covering.length > 0 && (
         <Card aria-labelledby="covering-title">
@@ -250,8 +267,15 @@ function CheckRow({
   );
 }
 
+/** What the right hand creates and adjusts for the viewer without asking, on its own page; nothing while it loads. */
+export function RightHandApprovalsCard() {
+  const { org } = useOrg();
+  const view = useRightHandApprovals(org.id).data;
+  return view?.rightHand ? <RightHandCard view={view} name={view.rightHand.name} /> : null;
+}
+
 /**
- * "O Gerente aprova por você" (ADR 0139 §2), under the workspace's name for its right hand: one switch, the two kinds
+ * What the right hand does for the person without asking (ADR 0139 §2), under the workspace's name for it: one switch, the two kinds
  * (greyed when the person can't decide that themselves), the budget it may add per agent and their own guidance. The
  * day and month caps are code, not fields. What never leaves the person closes the card.
  */
@@ -288,6 +312,7 @@ function RightHandCard({ view, name }: { view: RightHandApprovals; name: string 
         action={
           <Switch
             checked={view.enabled && !view.pausedAt}
+            disabled={set.isPending}
             onCheckedChange={(enabled) => save({ enabled })}
             aria-label={title}
           />

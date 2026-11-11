@@ -280,7 +280,10 @@ describe("the right words for the right empty", () => {
   });
 
   test("a plain member connects a plan for their right hand", async () => {
-    await go(fresh(["read", "talk_to_agents"]), "settings/keys");
+    const api = createFakeApi(fresh(["read", "talk_to_agents"]), { seed: false });
+    api.orgs.planUsage = async () => ({ month: "2026-10", money: false, accounts: [], api: [] });
+    await renderApp(`/org/${ORG_ID}/settings/usage`, { api });
+    await settle(8);
     expect(within(empty()).getByRole("button", { name: "Conectar uma IA" })).toBeDefined();
   });
 

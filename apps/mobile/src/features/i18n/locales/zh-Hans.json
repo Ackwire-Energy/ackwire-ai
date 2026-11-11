@@ -1024,7 +1024,6 @@
     "proposalsWaiting_other": "{{count}} 条待处理",
     "drive": "Drive",
     "connectors": "连接器和 MCP",
-    "usage": "用量",
     "preferences": "偏好设置",
     "editProfile": "编辑资料",
     "switchWorkspace": "切换工作区",
@@ -2113,16 +2112,13 @@
     "editSub": "名称、标志、时区和智能体知道的内容",
     "group": {
       "org": "工作区",
-      "people": "人员",
-      "agents": "智能体",
-      "costs": "费用和数据"
+      "people": "人员"
     },
     "section": {
       "members": "成员",
       "roles": "角色",
       "access": "智能体的权限",
-      "connectors": "连接器",
-      "usage": "用量和预算"
+      "connectors": "连接器"
     },
     "ofOnline": "{{online}}/{{count}} 台在线",
     "deleteName": "删除 {{name}}",

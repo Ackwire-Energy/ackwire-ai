@@ -51,8 +51,8 @@ describe("a personal workspace's settings list", () => {
     expect(rows()).toEqual([
       "Sua conta",
       "Sobre você",
-      "IA e apps",
-      "Plano e uso",
+      "IA e uso",
+      "Conectores e MCPs",
       "Cofre",
       "Dispositivos",
       "Avançado",
@@ -68,60 +68,71 @@ describe("a personal workspace's settings list", () => {
       "Sua conta",
       "Sobre você",
       "Pessoas",
-      "IA e apps",
-      "Plano e uso",
+      "IA e uso",
+      "Conectores e MCPs",
       "Cofre",
       "Dispositivos",
       "Avançado",
     ]);
   });
 
-  test("Advanced shows every other section the person may open; connectors and skills are on AI and apps", async () => {
+  test("Advanced shows every other section no entry holds; what an entry holds is a tab of its page", async () => {
     await go(alone());
     await click(within(nav()).getByRole("button", { name: "Avançado" }));
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     const all = rows();
-    for (const name of ["Notificações", "Pessoas", "Papéis e permissões", "Auditoria", "Armazenamento"])
+    for (const name of ["Pessoas", "Auditoria", "Armazenamento"]) {
       expect(all).toContain(name);
-    expect(all).not.toContain("Conectores e MCPs");
-    expect(all).not.toContain("Skills");
-    expect(all.indexOf("Notificações")).toBeGreaterThan(all.indexOf("Avançado"));
+      expect(all.indexOf(name)).toBeGreaterThan(all.indexOf("Avançado"));
+    }
+    expect(all.filter((name) => name === "Conectores e MCPs")).toHaveLength(1);
+    expect(all.indexOf("Conectores e MCPs")).toBeLessThan(all.indexOf("Avançado"));
+    // Notifications are a tab of Your account, Skills of Connectors, Roles of People: not listed again.
+    for (const name of ["Notificações", "Skills", "Papéis e permissões"]) expect(all).not.toContain(name);
+    cleanup();
+    await go(alone(), "settings/skills");
+    expect(marked()).toBe("Conectores e MCPs");
+    expect(screen().getByRole("tab", { name: "Skills" }).getAttribute("aria-selected")).toBe("true");
+    // The Vault has its own line in a personal workspace's list, so it is no tab here.
+    expect(screen().queryByRole("tab", { name: "Cofre" })).toBeNull();
   });
 
   test("a section of Advanced opened by its address shows open in the list, marked", async () => {
-    await go(personal(), "settings/roles");
+    await go(personal(), "settings/audit");
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
-    expect(marked()).toBe("Papéis e permissões");
+    expect(marked()).toBe("Auditoria");
+    cleanup();
+    // Roles is on People's page, alone under Advanced or in the list with someone else here.
+    await go(personal(), "settings/roles");
+    expect(marked()).toBe("Pessoas");
   });
 
-  test("AI and apps holds the AI accounts, connectors and skills, each under its heading", async () => {
+  test("the old address of AI accounts opens AI and usage, where the accounts and the keys are", async () => {
     await go(personal(), "settings/keys");
-    expect(marked()).toBe("IA e apps");
-    for (const name of ["IA e apps", "Conectores e MCPs", "Skills"])
-      expect(screen().getAllByRole("heading", { level: 2, name }).length).toBeGreaterThan(0);
+    expect(marked()).toBe("IA e uso");
+    expect(screen().getByRole("region", { name: "Contas" })).toBeTruthy();
+    expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
+    // Connectors and Skills are sections of their own: not on this page.
+    expect(screen().queryByRole("heading", { level: 2, name: "Conectores e MCPs" })).toBeNull();
+    expect(screen().queryByRole("heading", { level: 2, name: "Skills" })).toBeNull();
   });
 
-  test("connectors' own address still opens them alone, AI and apps marked in the list", async () => {
-    await go(personal(), "settings/connectors");
-    expect(marked()).toBe("IA e apps");
-    expect(document.querySelector(".settings__body > .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
-  });
-
-  test("Plan and usage holds Plan and billing where a billing service runs", async () => {
+  test("AI and usage holds Plan and billing where a billing service runs", async () => {
     const state = personal();
     state.authConfig = { ...state.authConfig, billingUrl: "https://billing.example.com" };
     await go(state, "settings/usage");
-    expect(marked()).toBe("Plano e uso");
-    expect(screen().getAllByRole("heading", { level: 2, name: "Plano e uso" }).length).toBeGreaterThan(0);
+    expect(marked()).toBe("IA e uso");
+    expect(screen().getAllByRole("heading", { level: 2, name: "IA e uso" }).length).toBeGreaterThan(0);
     expect(screen().getByRole("heading", { level: 2, name: "Plano e cobrança" })).toBeTruthy();
     expect(rows()).not.toContain("Plano e cobrança");
   });
 
-  test("a team's settings keep their groups, and no Advanced", async () => {
+  test("a team's settings are a short list too, in a team's words", async () => {
     await go(seedState());
-    expect(nav().querySelectorAll(".settings__group-label").length).toBeGreaterThan(1);
-    expect(within(nav()).queryByRole("button", { name: "Avançado" })).toBeNull();
-    expect(rows()).toContain("Geral");
+    expect(nav().querySelector(".settings__group-label")).toBeNull();
+    expect(within(nav()).getByRole("button", { name: "Avançado" })).toBeTruthy();
+    expect(rows()).toContain("Workspace");
+    expect(rows()).not.toContain("Sobre você");
   });
 
   test("⌘K lists About you, found by General too", async () => {

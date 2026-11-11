@@ -376,7 +376,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "Buka https://console.typesafe.ai lalu masuk dengan Google atau emailmu. Akun baru dibuat dengan cara yang sama.",
               "Tambahkan saldo di konsol. Jev memakai sistem prabayar.",
               "Buka https://console.typesafe.ai/keys, buat kunci, lalu langsung salin.",
-              "Di agentes.chat, buka **Pengaturan › Akun AI** lalu tempel di bawah **Jev**. Hanya orang yang menyiapkan server ini yang bisa melihatnya.",
+              "Di agentes.chat, buka **Pengaturan › AI dan pemakaian** lalu tempel di bawah **Jev**. Hanya orang yang menyiapkan server ini yang bisa melihatnya.",
             ],
           },
           "Di server yang kamu jalankan dengan Docker, kamu juga bisa menaruh kuncinya di `.env` sebagai `TYPESAFE_API_KEY`. Kunci itu lebih diutamakan daripada yang ada di Pengaturan.",
@@ -390,7 +390,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "US$ 0,042 per sejuta token yang dibaca Jev. Jawabannya gratis. Memilih siapa yang menjawab membaca sekitar 2.500 token, jadi sekitar US$ 0,0001. Satu tangkapan layar sekitar 3.900 token.",
               "Saldo yang kamu beli berlaku 12 bulan. Nyalakan isi ulang otomatis di konsol supaya saldo Jev tidak habis.",
-              "**Pengaturan › Akun AI** menampilkan berapa banyak keputusan yang dibuat Jev bulan ini, dan biayanya.",
+              "**Pengaturan › AI dan pemakaian** menampilkan berapa banyak keputusan yang dibuat Jev bulan ini, dan biayanya.",
             ],
           },
         ],
@@ -421,7 +421,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Kunci tidak diterima:** buat kunci baru lalu tempel di **Pengaturan › Akun AI**.",
+              "**Kunci tidak diterima:** buat kunci baru lalu tempel di **Pengaturan › AI dan pemakaian**.",
               "**Saldo habis:** tambahkan saldo di konsol. Jev mencoba lagi dalam 30 menit, atau klik **Periksa lagi**.",
               "**Sibuk atau tidak bisa dijangkau:** TypeSafe bisa membatasi permintaan per detik, atau berhenti menjawab sementara. Jev akan lanjut lagi dengan sendirinya. Batasmu: https://console.typesafe.ai/rate-limits. Untuk batas yang lebih tinggi, kirim email ke sales@typesafe.ai.",
             ],

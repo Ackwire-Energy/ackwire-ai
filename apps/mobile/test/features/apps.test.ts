@@ -33,9 +33,9 @@ const app = (over: Partial<ConnectedApp> = {}): ConnectedApp => ({
 });
 
 describe("Apps de IA on the phone (ADR 0119)", () => {
-  test("everyone opens it, with the agents it reaches", () => {
+  test("everyone opens it, among the connectors", () => {
     const apps = visibleSections(undefined).find((s) => s.id === "apps");
-    expect([apps?.group, apps?.href]).toEqual(["agents", "/settings/apps"]);
+    expect([apps?.group, apps?.href]).toEqual(["connectors", "/settings/apps"]);
   });
 
   test("each row's mark: the brand's own, the computer, or one letter that is never a mark", () => {

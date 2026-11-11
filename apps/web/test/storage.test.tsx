@@ -209,20 +209,6 @@ describe("Configurações → Armazenamento", () => {
     expect(linesOf(server())).toEqual(["Os arquivos ficam no disco dele."]);
   });
 
-  test("the General tiles say where files stay: this server, or agentes storage on the Cloud", async () => {
-    const tile = async (cloud: boolean) => {
-      cleanup();
-      const api = createFakeApi(seedState());
-      if (cloud) fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
-      await renderApp(`/org/${ORG_ID}/settings`, { api });
-      await settle(6);
-      const link = document.querySelector('a.settings-tile[href$="/settings/storage"]');
-      return link?.querySelector(".settings-tile__state")?.textContent;
-    };
-    expect(await tile(false)).toBe("Este servidor");
-    expect(await tile(true)).toBe("Armazenamento do agentes.chat");
-  });
-
   test("Show the folder: in the desktop app on its own server, once the app opens it", async () => {
     const win = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
     const asked: Record<string, unknown>[] = [];

@@ -236,7 +236,7 @@ export function GifKeyCard({ jevMissing }: { jevMissing: boolean }) {
           <Link
             className="ac-link"
             to="/org/$orgId/settings/$section"
-            params={{ orgId: org.id, section: "keys" }}
+            params={{ orgId: org.id, section: "usage" }}
             hash="jev"
           >
             {t("settings.media.giphy.jevLink")}

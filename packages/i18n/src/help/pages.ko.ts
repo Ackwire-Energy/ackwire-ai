@@ -373,7 +373,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
               "TypeSafe 콘솔(https://console.typesafe.ai)을 열고 Google이나 이메일로 로그인하세요. 새 계정도 같은 방법으로 만들어져요.",
               "콘솔에서 크레딧을 충전하세요. Jev는 선불이에요.",
               "키 페이지(https://console.typesafe.ai/keys)를 열어 키를 만들고 바로 복사하세요.",
-              "agentes.chat에서 **설정 › AI 계정**을 열고 **Jev** 아래에 붙여넣으세요. 이 서버를 설정한 사람만 볼 수 있어요.",
+              "agentes.chat에서 **설정 › AI와 사용량**을 열고 **Jev** 아래에 붙여넣으세요. 이 서버를 설정한 사람만 볼 수 있어요.",
             ],
           },
           "Docker로 운영하는 서버라면 대신 `.env`에 `TYPESAFE_API_KEY`로 키를 넣어도 돼요. 그 키가 설정의 키보다 우선해요.",
@@ -387,7 +387,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "Jev가 읽는 토큰 100만 개당 US$ 0.042예요. 답변은 무료예요. 답할 에이전트를 고를 때 약 2,500토큰을 읽으니 약 US$ 0.0001이에요. 스크린샷 한 장은 약 3,900토큰이에요.",
               "구매한 크레딧은 12개월 동안 유효해요. Jev 크레딧이 떨어지지 않도록 콘솔에서 자동 충전을 켜 두세요.",
-              "**설정 › AI 계정**에서 이번 달 Jev가 내린 결정 수와 비용을 볼 수 있어요.",
+              "**설정 › AI와 사용량**에서 이번 달 Jev가 내린 결정 수와 비용을 볼 수 있어요.",
             ],
           },
         ],
@@ -418,7 +418,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**키가 거부됨:** 새 키를 만들어 **설정 › AI 계정**에 붙여넣으세요.",
+              "**키가 거부됨:** 새 키를 만들어 **설정 › AI와 사용량**에 붙여넣으세요.",
               "**크레딧 부족:** 콘솔에서 크레딧을 충전하세요. Jev는 30분 안에 다시 시도하고, **다시 확인**을 클릭해도 돼요.",
               "**사용량이 많거나 연결 불가:** TypeSafe가 초당 요청 수를 제한하거나 잠시 응답하지 않을 수 있어요. Jev는 스스로 다시 작동해요. 내 한도: https://console.typesafe.ai/rate-limits. 더 높은 한도가 필요하면 sales@typesafe.ai로 문의하세요.",
             ],

@@ -1243,7 +1243,6 @@
     "proposalsWaiting_other": "{{count}} czeka",
     "drive": "Drive",
     "connectors": "Konektory i MCP",
-    "usage": "Użycie",
     "preferences": "Preferencje",
     "editProfile": "Edytuj profil",
     "switchWorkspace": "Przełącz przestrzeń roboczą",
@@ -2422,16 +2421,13 @@
     "editSub": "Nazwa, logo, strefa czasowa i to, co wiedzą agenci",
     "group": {
       "org": "Przestrzeń robocza",
-      "people": "Osoby",
-      "agents": "Agenci",
-      "costs": "Koszty i dane"
+      "people": "Osoby"
     },
     "section": {
       "members": "Członkowie",
       "roles": "Role",
       "access": "Dostęp agentów",
-      "connectors": "Konektory",
-      "usage": "Użycie i budżet"
+      "connectors": "Konektory"
     },
     "ofOnline": "{{online}} z {{count}}",
     "deleteName": "Usuń {{name}}",

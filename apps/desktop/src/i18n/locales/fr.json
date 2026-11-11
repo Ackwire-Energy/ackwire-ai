@@ -330,7 +330,7 @@
     "usageRestart": "Le modifier redémarre agentes.chat un instant.",
     "jev": "Jev",
     "jevText": "Un modèle rapide de TypeSafe qui choisit qui répond, garde la mémoire en ordre et permet aux agents de voir l'écran. Facultatif, avec votre propre clé.",
-    "jevWhere": "Dans agentes.chat › Paramètres › Comptes IA.",
+    "jevWhere": "Dans agentes.chat › Paramètres › IA et utilisation.",
     "reachFailed": "L'accès depuis vos appareils ne s'est pas activé : {{reason}}.",
     "backup": "Sauvegarder maintenant",
     "backedUp": "Sauvegardé : {{file}}",

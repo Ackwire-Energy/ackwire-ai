@@ -133,7 +133,7 @@ const STATES: {
   },
 ];
 
-describe("Jev's key in Configurações › Contas de IA", () => {
+describe("Jev's key in Configurações › IA e uso", () => {
   test("nobody but the server's owner sees it: who picks, and no Jev", async () => {
     await open({ aiStatus: routed("plans") });
     const section = screen().getByRole("region", { name: "Quem escolhe os agentes" });
@@ -393,7 +393,7 @@ describe("Jev's key in Configurações › Contas de IA", () => {
     const state = seedState({ jev: ON });
     const { router } = await renderApp("/?open=jev", { api: createFakeApi(state) });
     await settle(6);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/keys`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/usage`);
     expect(router.state.location.hash).toBe("jev");
     expect(document.activeElement === card()).toBe(true);
   });

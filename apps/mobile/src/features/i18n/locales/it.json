@@ -1170,7 +1170,6 @@
     "proposalsWaiting_other": "{{count}} in attesa",
     "drive": "Drive",
     "connectors": "Connettori e MCP",
-    "usage": "Utilizzo",
     "preferences": "Preferenze",
     "editProfile": "Modifica profilo",
     "switchWorkspace": "Cambia spazio di lavoro",
@@ -2312,16 +2311,13 @@
     "editSub": "Nome, logo, fuso orario e cosa sanno gli agenti",
     "group": {
       "org": "Spazio di lavoro",
-      "people": "Persone",
-      "agents": "Agenti",
-      "costs": "Costi e dati"
+      "people": "Persone"
     },
     "section": {
       "members": "Membri",
       "roles": "Ruoli",
       "access": "Accesso degli agenti",
-      "connectors": "Connettori",
-      "usage": "Utilizzo e budget"
+      "connectors": "Connettori"
     },
     "ofOnline": "{{online}} di {{count}}",
     "deleteName": "Elimina {{name}}",
