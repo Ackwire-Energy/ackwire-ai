@@ -195,9 +195,10 @@ sign-in.
 - **Agents on that computer:** in the instance's onboarding or **Settings › Devices**, click **Use
   this Mac** (**Use this PC** on Windows, **Use this computer** on Linux). The app asks first, in its
   own dialog naming the instance and the organization. Its agents start with commands, the browser and
-  Claude Code or Codex when the computer has them, and no folders of yours. Commands can reach the
-  whole computer: turn them off in the app's **Preferences › Tools** unless you trust every workspace
-  that uses it. Folders are added in **Preferences › Folders**. The app pairs a computer with agentes.chat Cloud the same way. Until you pair it,
+  Claude Code or Codex when the computer has them, and no folders of yours. Commands are on by
+  default. Turn them off in the app's **Preferences › Tools**, where one switch counts for every
+  workspace on the computer. Folders are added in **Preferences › Folders**. The app pairs a computer
+  with agentes.chat Cloud the same way. Until you pair it,
   nothing of the computer is used. The app never offers the computer that runs the instance: its agents
   work there through the instance itself (This server as the agents' computer, below).
 - **Linux, a server or a VM:** **Settings › Devices › Connect a device** shows the command, and
@@ -556,6 +557,8 @@ computer and opens agentes.chat, signed in.
   your sign-in, not this computer's token, not your agents' connections (they pause while it is down).
   If something else holds the port when it starts, it moves to a free one. With reach on, Tailscale
   shares it only while it runs.
+- **Agents with Commands on can reach everything on this Mac**, the server's data in `~/.agentes`
+  included. Commands are on by default. Turn them off in the app's **Preferences › Tools**.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
   whenever your session ends. For a browser on another device, add one in **Settings › Your account**, **Add
   a password**.
