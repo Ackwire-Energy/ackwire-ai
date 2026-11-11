@@ -1367,7 +1367,7 @@ mode** instead: every agent works as one user, `agentes`, made without sudo, so 
 folders but not yours or the server's; its service is a user unit kept running with
 `loginctl enable-linger`, with its own copy of the token in `/home/agentes/host-computer-token`),
 and on a Mac agents work as you, in folders of their own, with a browser, Claude Code and Codex, and
-commands off unless you say yes. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
+commands on unless you say no. It writes `HOST_COMPUTER_TOKEN` to `.env` and to
 `host-computer-token` beside it (readable by you only), installs what runs the agents there from the
 address the app is published on (`BIND_ADDRESS` and `HOST_PORT`), and waits for it to answer, up to
 90 seconds. Running the setup again leaves it running while it answers and is up to date, and sets it

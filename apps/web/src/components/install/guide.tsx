@@ -195,7 +195,7 @@ export function InstallFrames({ build, release }: { build: InstallBuild; release
   const name = buildName({ target: buildTarget(build).target, arm: arm && system !== "mac" });
   return (
     <section className="ifr" aria-label={t("install.frames", { system: name })}>
-      <p className="ifr__lead">
+      <p className="ifr__lead ac-iconline">
         <Icon name="info" size={16} />
         <span>
           <Trans i18nKey={why} components={{ b: <strong /> }} />
@@ -326,7 +326,7 @@ export function InstallSteps({ build, release }: { build: InstallBuild; release:
         ))}
       </ol>
       {system === "mac" && (
-        <div className="ist__stuck">
+        <div className="ist__stuck ac-iconline">
           <Icon name="question" />
           <div>
             <p className="ist__line">{t("install.mac.stuckTitle")}</p>

@@ -923,7 +923,7 @@
   position: relative;
   box-shadow:
     0 0 0 2px var(--w2),
-    0 0 0 4px var(--hi) !important;
+    0 0 0 4px var(--hi);
 }
 .isc-hl::after {
   content: "";
@@ -1014,6 +1014,7 @@
 @media (prefers-reduced-motion: reduce) {
   .isc-hl::after,
   .isc-ptr,
+  .isc-ptr--drag,
   .isc-ghost {
     animation: none;
   }
@@ -1028,17 +1029,14 @@
   min-width: 0;
   margin-top: 4px;
 }
+/* The icon sits on the first line by .ac-iconline. */
 .ifr__lead {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 8px;
   margin: 0;
   color: var(--muted);
   font-size: 13.5px;
   line-height: 19px;
 }
 .ifr__lead > .ac-icon {
-  margin-top: 2px;
   color: var(--faint);
 }
 .ifr__lead strong {
@@ -1191,8 +1189,7 @@
   width: 2px;
   background: var(--line);
 }
-.ist__text,
-.ist__stuck {
+.ist__text {
   display: grid;
   grid-template-columns: 32px minmax(0, 1fr);
   gap: 14px;
@@ -1245,14 +1242,18 @@
     0 0 0 1px var(--line),
     0 14px 34px -18px #0005;
 }
-.ist__stuck {
+/* The icon on the title's first line (.ac-iconline); its gap puts the words on the steps' edge (32px + 14px). */
+.ist__stuck.ac-iconline {
+  gap: 26px;
   margin-top: 8px;
   padding-top: 20px;
   border-top: 1px solid var(--line);
 }
 .ist__stuck > .ac-icon {
-  margin: 4px auto 0;
   color: var(--faint);
+}
+.ist__stuck > div {
+  flex: 1;
 }
 .ist__stuck .ist__line {
   font-size: 15px;
