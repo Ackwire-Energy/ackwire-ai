@@ -940,6 +940,7 @@ async function refreshTokens(
   const wrapper = deps.keyWrappers[0];
   if (!wrapper) throw new Error("no key wrapper");
   const sealed = await sealSecret(wrapper, JSON.stringify(next), aadFor(c.orgId, c.id));
+  // No `updatedAt`: a new token for the same sign-in lists the same tools, and the tool listing cache is keyed on it.
   await deps.db
     .update(connectorConnections)
     .set({
@@ -947,7 +948,6 @@ async function refreshTokens(
       wrappedDataKey: sealed.wrappedDataKey,
       kekId: sealed.kekId,
       tokenExpiresAt: token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null,
-      updatedAt: at,
     })
     .where(and(eq(connectorConnections.id, c.id), eq(connectorConnections.secretCiphertext, c.secretCiphertext ?? "")));
   return next;
