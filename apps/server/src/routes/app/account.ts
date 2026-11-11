@@ -293,6 +293,7 @@ export function accountRoutes(deps: AppDeps) {
     "/me",
     "/me/unread",
     "/me/password",
+    "/me/work-area",
     "/phone-sign-in",
     "/account",
     "/account/*",

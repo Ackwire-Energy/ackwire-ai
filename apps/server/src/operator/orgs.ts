@@ -140,13 +140,10 @@ const User = z
       .nullable()
       .openapi({ description: "Since when it is blocked (`PUT /users/{userId}/block`)." }),
     blockedReason: z.string().nullable(),
-    workArea: z
-      .enum(WORK_AREA_ANSWERS)
-      .nullable()
-      .openapi({
-        description:
-          "The person's own area, asked once during the onboarding: `dev`, `marketing`, `sales`, `finance`, `ops`, `support`, `other`, or `skipped`; null until asked (or for an account from before the question).",
-      }),
+    workArea: z.enum(WORK_AREA_ANSWERS).nullable().openapi({
+      description:
+        "The person's own area, asked once during the onboarding: `dev`, `marketing`, `sales`, `finance`, `ops`, `support`, `other`, or `skipped`; null until asked (or for an account from before the question).",
+    }),
     orgs: z.array(
       z.object({
         orgId: z.uuid(),
