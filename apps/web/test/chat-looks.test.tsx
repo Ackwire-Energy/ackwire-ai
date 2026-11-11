@@ -7,7 +7,7 @@ import { keys, type Message } from "@agenteschat/client";
 import type { ChatPrefs } from "@agenteschat/client/lib/chat-look";
 import { act, cleanup, fireEvent, render, within } from "@testing-library/react";
 import { useLayoutEffect } from "react";
-import { usePageTextSize } from "@/chat/look";
+import { usePageClock, usePageTextSize } from "@/chat/look";
 import {
   ADA_ID,
   createFakeApi,
@@ -190,6 +190,21 @@ describe("Tamanho do texto in a conversation", () => {
       </>,
     );
     expect(painted).toBe("xl");
+  });
+});
+
+describe("The page's clock", () => {
+  test("a 12-hour language gives the bubbles' time its wider room, and a 24-hour one gives it back", () => {
+    function Page({ language }: { language: string }) {
+      usePageClock(language);
+      return null;
+    }
+    const page = render(<Page language="en" />);
+    expect(document.documentElement.dataset.clock).toBe("12h");
+    page.rerender(<Page language="pt-BR" />);
+    expect(document.documentElement.dataset.clock).toBe("24h");
+    cleanup();
+    expect(document.documentElement.dataset.clock).toBeUndefined();
   });
 });
 

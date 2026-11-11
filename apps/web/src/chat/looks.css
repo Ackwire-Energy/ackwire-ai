@@ -34,6 +34,13 @@
   --msg-bubble: var(--own-bubble);
   --msg-mine-mix: 30%;
 }
+/* The time's own width in a bubble's corner (11px): "23:43", or "11:43 PM" on a 12-hour page (`usePageClock`). */
+:root {
+  --stamp-clock: 32px;
+}
+[data-clock="12h"] {
+  --stamp-clock: 52px;
+}
 /* Quiet rows (an event pill, a thread's line) on the text's column: the messages' side padding, the face and gap. */
 .channel__messages {
   --thread-indent: calc(16px + var(--name-face) + var(--space-3));
@@ -53,7 +60,7 @@
   --msg-inline: 8px;
   --own-bubble: color-mix(in srgb, var(--msg-mine) var(--msg-mine-mix), var(--bg));
   /* The room the time takes at the end of the last line (`.ac-msg__stamp`), past the bubble's padding. */
-  --stamp-room: 44px;
+  --stamp-room: calc(var(--stamp-clock) + 12px);
   gap: 8px;
 }
 .ac-msg[data-look="bubbles"][data-tone="strong"] {
@@ -61,7 +68,7 @@
   --stamp-ink: var(--on-dark);
 }
 .ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside:not(:empty)) {
-  --stamp-room: 62px;
+  --stamp-room: calc(var(--stamp-clock) + 30px);
 }
 /* The bubble is the plate: it lights on hover, the row doesn't. */
 .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) {
