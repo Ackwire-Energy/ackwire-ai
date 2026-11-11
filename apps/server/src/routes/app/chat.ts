@@ -415,6 +415,10 @@ export function chatRoutes(deps: AppDeps) {
                 startedAt: z.string().nullable(),
                 heartbeatAt: z.string().nullable().openapi({ description: "Last sign of life of its worker." }),
                 createdAt: z.string(),
+                workingMs: z.number().int().openapi({
+                  description:
+                    "How long the work it is doing now has taken, in milliseconds, as this server counts it: since it last went back to work (after waiting for a person, an approval or its computer) or last posted, else since it was created. For the conversation's \"thinking for …\": count on from it with the app's own clock, never from `startedAt`, which stays at the run's first start.",
+                }),
                 pendingMessageIds: z.array(z.uuid()).openapi({
                   description:
                     "Messages sent while it works that it hasn't read yet. A message whose `meta.steeredRunIds` names a run that is not here, or is here without it in this list, was read (or handed on: `agent.run.redispatched`).",

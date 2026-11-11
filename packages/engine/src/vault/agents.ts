@@ -10,6 +10,7 @@
 import {
   isReservedSecretName,
   SECRET_NAME,
+  VAULT_READ_ONLY_CONFIG,
   VaultSourceError,
   vaultOrigin,
   vaultRule,
@@ -33,8 +34,8 @@ import {
   vaultPersonOfRun,
 } from "./access";
 import { assertRoom, cleanContact, cleanKeyName, cleanText, cleanWebsite, connectionRow } from "./items";
-import { named, refuse, vaultItemName } from "./refusals";
-import { openItemValue, readItemValue, sealItemValue } from "./seal";
+import { named, refuse, VaultRefusal, vaultItemName, vaultPlaceName } from "./refusals";
+import { openItemValue, readItemValue, sealItemValue, sourceCall, sourceConnection, sourceOf } from "./seal";
 import {
   VAULT_LIMITS,
   type VaultAgentChange,
@@ -43,10 +44,12 @@ import {
   type VaultDeps,
   type VaultItemForAgent,
   type VaultItemKind,
+  type VaultPlace,
   type VaultReleasedLogin,
   type VaultRun,
   vaultNow,
 } from "./service";
+import { indexSourceItem } from "./sync";
 import { recordAgentChange, recordReads } from "./uses";
 import {
   agentView,
@@ -55,12 +58,17 @@ import {
   hasValue,
   hostOf,
   loadVault,
+  placeOf,
   readContact,
   sourceNameOf,
+  THE_VAULT,
   type VaultState,
 } from "./views";
 
 const { vaultConnections, vaultItems } = schema;
+
+type Source = NonNullable<ReturnType<typeof sourceOf>>;
+type SourceConnection = Awaited<ReturnType<typeof sourceConnection>>;
 
 /** Values a made password keeps behind it (`previousSecrets`). */
 export const VAULT_PREVIOUS_KEPT = 5;
@@ -158,7 +166,30 @@ export async function listUsableVault(
     listed.filter((item) => item.kind === "contact").map((item) => item.id),
   );
   const inList = new Set(listed.map((item) => item.id));
-  return items.map((item) => agentView(item, inList.has(item.id) ? (contacts.get(item.id) ?? null) : null));
+  return items.map((item) =>
+    agentView(
+      item,
+      inList.has(item.id) ? (contacts.get(item.id) ?? null) : null,
+      placeOf(deps.sources, connectionOf(state, item)),
+    ),
+  );
+}
+
+/** A connection whose items this run uses by default: a login saved there is one the agent can type afterwards. */
+const reaches = (connection: ConnectionRow, person: VaultRunPerson, agentId: string) =>
+  runAccess(connection.ownerUserId, connection, person, agentId) === "use";
+
+/**
+ * The places this run's logins can be kept: the Vault, then each connected password manager whose items it uses by
+ * default, with whether it takes a new login (`vault_list` says so before the agent saves anything).
+ */
+export async function listVaultPlaces(deps: VaultDeps, run: VaultRun, given?: VaultRunPerson): Promise<VaultPlace[]> {
+  const person = given ?? (await vaultPersonOfRun(deps.db, run));
+  const connections = await deps.db.select().from(vaultConnections).where(eq(vaultConnections.orgId, run.orgId));
+  return [
+    THE_VAULT,
+    ...connections.filter((c) => reaches(c, person, run.agentId)).map((c) => placeOf(deps.sources, c)),
+  ];
 }
 
 /** An item by id as the run sees it: hidden ones (and ids that aren't ids) are not found. */
@@ -271,7 +302,7 @@ export async function releaseVaultLogin(
   if (pageOrigin && !vaultRuleMatches(rule, pageOrigin))
     throw refuse.wrongSite(vaultRuleLabel(rule), hostOf(pageOrigin));
   const password = await valueForRun(deps, item, connection, source);
-  return { item: agentView(item, null), password, rule };
+  return { item: agentView(item, null, placeOf(deps.sources, connection)), password, rule };
 }
 
 /** Prefers the person's own key over the team's, a built-in one over an external one, then the newest. */
@@ -373,8 +404,9 @@ function auditByAgent(
  * An agent's change (`vault_save`): a new contact, personal to the person behind the run (none behind it: refused),
  * or, on an item it may use, a contact's title and fields, a login's username or any item's description. A personal
  * item changes for its owner (only their runs see it); a team item only for someone who manages credentials, as in
- * the app (ADR 0144 §2). Only built-in items: an external one changes in its source. A contact whose saved fields
- * don't open here is refused: its fields are only ever changed on top of what was saved.
+ * the app (ADR 0144 §2). An item kept in a password manager changes there: from here only a login's username, where
+ * its source takes changes (§9). A contact whose saved fields don't open here is refused: its fields are only ever
+ * changed on top of what was saved.
  */
 export async function saveVaultItemByAgent(
   deps: VaultDeps,
@@ -385,12 +417,44 @@ export async function saveVaultItemByAgent(
   const person = await vaultPersonOfRun(db, run);
   if (!change.itemId) return createContact(deps, run, person, change);
 
-  const { item, source } = await itemForRun(deps, run, person, change.itemId, "item");
-  if (item.connectionId) throw refuse.notAllowed(`${named(item)} comes from ${source}. It changes there, not here.`);
+  const { item, connection, source } = await itemForRun(deps, run, person, change.itemId, "item");
+  // A login kept in a password manager: its username changes there, when the source can; nothing else does from here.
+  const usernameOnly =
+    item.kind === "login" &&
+    change.username !== undefined &&
+    change.title === undefined &&
+    change.description === undefined &&
+    change.contact === undefined;
+  const external = connection ? sourceOf(deps.sources, connection.kind) : undefined;
+  const update = usernameOnly ? external?.updateLogin : undefined;
+  if (item.connectionId && !update) {
+    throw refuse.notAllowed(`${named(item)} comes from ${source}. It changes there, not here.`);
+  }
   if (!item.ownerUserId && !(person.personId && person.manages)) {
     throw refuse.notAllowed(
       `${named(item)} is ${await sharedWords(db, run)}: only someone who manages credentials changes it, and nobody behind this request does. Ask one of them, or a person can change it in Settings, Vault.`,
     );
+  }
+  if (connection && external && update && item.externalRef) {
+    const ref = item.externalRef;
+    const place = placeOf(deps.sources, connection);
+    if (place.writes === "read_only") throw refuse.readOnly(place);
+    const username = await asRefusal(() => cleanText(change.username, VAULT_LIMITS.username, "username"));
+    const listed = await sourceWrite(deps, connection, (opened, signal) =>
+      update.call(external, opened, ref, { username }, signal),
+    );
+    const row = await db.transaction(async (tx) => {
+      const kept = await indexSourceItem(tx, connection, listed, vaultNow(deps));
+      if (!kept) throw new Error("vault item index returned nothing");
+      await recordAgentChange(tx, run, person, item.id, "edit");
+      await auditByAgent(tx, run, person, "vault.item_changed", kept, {
+        fields: ["username"],
+        source: connection.kind,
+      });
+      return kept;
+    });
+    await publishVaultChanged(deps.pubsub, run.orgId);
+    return { outcome: "updated", item: agentView(row, null, place) };
   }
   const kind = item.kind as VaultItemKind;
   const set: Partial<typeof vaultItems.$inferInsert> = {};
@@ -511,15 +575,135 @@ async function assertMayReplace(db: Executor, item: ItemRow, run: VaultRun, pers
 const sharedWords = async (db: Executor, run: VaultRun) =>
   (await isPersonalWorkspace(db, run.orgId)) ? "shared in this workspace" : "the team's";
 
+/** A write into a connection's source, as a refusal the agent can act on. A refused write is remembered as read-only. */
+async function sourceWrite<T>(
+  deps: VaultDeps,
+  connection: ConnectionRow,
+  work: (opened: SourceConnection, signal: AbortSignal) => Promise<T>,
+): Promise<T> {
+  const place = placeOf(deps.sources, connection);
+  const opened = await sourceConnection(deps, connection).catch(() => {
+    throw refuse.sourceWrite(place, "Its connection has to be made again in Settings, Vault, Connections.");
+  });
+  try {
+    return await sourceCall((signal) => work(opened, signal));
+  } catch (error) {
+    if (!(error instanceof VaultSourceError)) throw error;
+    if (error.code !== "read_only") throw refuse.sourceWrite(place, error.message);
+    await deps.db
+      .update(vaultConnections)
+      .set({ config: { ...connection.config, [VAULT_READ_ONLY_CONFIG]: "true" }, updatedAt: vaultNow(deps) })
+      .where(and(eq(vaultConnections.orgId, connection.orgId), eq(vaultConnections.id, connection.id)));
+    await publishVaultChanged(deps.pubsub, connection.orgId);
+    throw refuse.readOnly({ ...place, writes: "read_only" });
+  }
+}
+
 /**
- * A password an agent's computer made, into the Vault (ADR 0144 §8), before anything is typed: a form sent with a
- * password the Vault doesn't have would lock the agent out. The same login or key again (the person's own first,
- * then the team's) takes the new value, keeping the old one sealed behind it for `restoreMadePassword`: a site that
- * turned the new one down still takes the old one.
+ * Whether a login following this connection's access could be typed in the run's shared browser profile, on the
+ * terms of `assertProfileMay`: the team's, open to everyone, for every agent of the profile.
+ */
+const fitsProfile = (connection: ConnectionRow, profile: VaultBrowserProfile | null) =>
+  !profile ||
+  (!connection.ownerUserId &&
+    connection.audienceEveryone &&
+    (connection.allAgents || profile.agentIds.every((id) => connection.agentIds.includes(id))));
+
+/** A place's name as an agent may write it in `save_in`: case, accents' forms and punctuation don't count. */
+const foldPlace = (text: string) =>
+  text
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+
+/**
+ * Where a new login goes (ADR 0144 §9). The place the person named (`saveIn`: `vault`, or a connected password
+ * manager by its name, what it reads, both, or its id), refused when it can't take one. Else the one connected
+ * password manager this run uses that takes new logins, since that is where the agent's logins live. Else (none, or
+ * more than one) the Vault. `connection` null is the Vault; `why` says what decided, for the tool's answer.
+ */
+function destinationFor(
+  deps: VaultDeps,
+  state: VaultState,
+  run: VaultRun,
+  person: VaultRunPerson,
+  profile: VaultBrowserProfile | null,
+  saveIn: string | undefined,
+): { connection: ConnectionRow | null; why?: string } {
+  const mine = [...state.connections.values()].filter((c) => reaches(c, person, run.agentId));
+  const nameOf = (c: ConnectionRow) => vaultPlaceName(placeOf(deps.sources, c));
+  const wanted = foldPlace(saveIn ?? "");
+  if (wanted) {
+    if (wanted === "vault" || wanted === "the vault") return { connection: null, why: "as asked" };
+    const found = mine.filter((c) => {
+      const place = placeOf(deps.sources, c);
+      return [c.id, place.name, c.label, `${place.name} ${c.label}`].some((name) => foldPlace(name) === wanted);
+    });
+    const [connection] = found;
+    if (!connection || found.length > 1) {
+      throw refuse.notAllowed(
+        found.length > 1
+          ? `More than one connected password manager matches that (${found.map(nameOf).join(", ")}). Give \`save_in\` the full name, as vault_list shows it.`
+          : `No password manager by that name is connected for you here. \`save_in\` takes "vault"${mine.length > 0 ? ` or one of: ${mine.map(nameOf).join(", ")}` : ""}.`,
+      );
+    }
+    const place = placeOf(deps.sources, connection);
+    if (place.writes === "read_only") throw refuse.readOnly(place);
+    if (place.writes === "no") {
+      throw refuse.notAllowed(
+        `${vaultPlaceName(place)} doesn't take new logins from here: people add them there. Save it in the Vault instead (\`save_in\`: "vault").`,
+      );
+    }
+    if (!fitsProfile(connection, profile)) {
+      throw refuse.notAllowed(
+        `A login in ${vaultPlaceName(place)} couldn't be typed in the shared browser profile "${profile?.name}": it isn't open to every agent that uses it. Save it in the Vault instead (\`save_in\`: "vault"), or switch to your own browser (browser_profile with "own").`,
+      );
+    }
+    return { connection, why: "as asked" };
+  }
+  if (mine.length === 0) return { connection: null };
+  const writable = mine.filter((c) => placeOf(deps.sources, c).writes === "yes");
+  const [only] = writable;
+  if (only && writable.length === 1) {
+    return fitsProfile(only, profile)
+      ? { connection: only, why: "the one connected password manager that takes your new logins" }
+      : {
+          connection: null,
+          why: `${nameOf(only)} isn't open to every agent of the shared browser profile "${profile?.name}", so a login there couldn't be typed in it`,
+        };
+  }
+  if (writable.length > 1) {
+    return {
+      connection: null,
+      why: `more than one connected password manager takes new logins (${writable.map(nameOf).join(", ")}); to keep it in one of them, name it in \`save_in\``,
+    };
+  }
+  const readOnly = mine.filter((c) => placeOf(deps.sources, c).writes === "read_only");
+  return {
+    connection: null,
+    why:
+      readOnly.length > 0
+        ? `${readOnly.map(nameOf).join(", ")} can only be read with the token it was connected with; someone who manages that connection can reconnect it with one that also writes`
+        : `${mine.map(nameOf).join(", ")} doesn't take new logins from here`,
+  };
+}
+
+/**
+ * A password an agent's computer made, kept before anything is typed (ADR 0144 §8): a form sent with a password
+ * nothing keeps would lock the agent out. The same login or key again (the person's own first, then the team's) takes
+ * the new value, keeping the old one sealed behind it for `restoreMadePassword`: a site that turned the new one down
+ * still takes the old one.
  *
- * A new one is the team's, open to everyone, for this agent (with `profile`, for every agent of that shared browser
- * profile, or it couldn't be typed there): the session it opens stays in the agent's browser for all its work (§5),
- * so its next run needs it whoever asked. Only its site, username and name show; the value comes back to nobody.
+ * A new login goes where `destinationFor` says (§9): the one connected password manager that takes this run's new
+ * logins, the place the person named (`saveIn`), or the Vault. In a password manager it follows that connection's
+ * access, as every item read from it does; one that turns out to read only is remembered so, and the login goes to
+ * the Vault unless that place was asked for. A key is always the Vault's.
+ *
+ * A new one in the Vault is the team's, open to everyone, for this agent (with `profile`, for every agent of that
+ * shared browser profile, or it couldn't be typed there): the session it opens stays in the agent's browser for all
+ * its work (§5), so its next run needs it whoever asked. Only its site, username and name show; the value comes back
+ * to nobody.
  */
 export async function saveMadePassword(
   deps: VaultDeps,
@@ -527,6 +711,7 @@ export async function saveMadePassword(
   target: VaultMadeTarget,
   value: string,
   profile: VaultBrowserProfile | null = null,
+  saveIn?: string,
 ): Promise<VaultAgentResult> {
   const { db } = deps;
   const person = await vaultPersonOfRun(db, run);
@@ -542,22 +727,63 @@ export async function saveMadePassword(
     return { kind: "login" as const, title: hostOf(website), website, username, keyName: null };
   });
   const state = await loadVault(db, run.orgId);
+  const destination: ReturnType<typeof destinationFor> =
+    fields.kind === "login" ? destinationFor(deps, state, run, person, profile, saveIn) : { connection: null };
+  const asked = Boolean(foldPlace(saveIn ?? ""));
   const same = state.items.filter(
     (item) =>
       item.kind === fields.kind &&
-      !item.connectionId &&
-      usable(item, undefined, person, run.agentId) &&
+      // A key is the Vault's own; a place the person named holds only its own logins.
+      (fields.kind === "key" || asked ? (item.connectionId ?? null) === (destination.connection?.id ?? null) : true) &&
+      usable(item, connectionOf(state, item), person, run.agentId) &&
       (fields.website
         ? item.username === fields.username && forSite(item, fields.website)
         : item.keyName === fields.keyName),
   );
-  const existing = same.find((item) => item.ownerUserId && item.ownerUserId === person.personId) ?? same[0];
-  if (existing) {
+  const builtIn = same.filter((item) => !item.connectionId);
+  const existing =
+    builtIn.find((item) => item.ownerUserId && item.ownerUserId === person.personId) ?? builtIn[0] ?? same[0];
+  let why = destination.why;
+  if (existing && !existing.connectionId) {
     await assertMayReplace(deps.db, existing, run, person);
     const sealed = await sealItemValue(deps, existing, existing.secretVersion + 1, value);
     const kept = keptBehind([...existing.previousSecrets, ...sealedValueOf(existing)]);
     const row = await replaceValue(deps, run, person, existing, sealed, kept);
     return { outcome: "updated", item: agentView(row, null) };
+  }
+  if (existing) {
+    const connection = connectionOf(state, existing);
+    const place = placeOf(deps.sources, connection);
+    const source = connection ? sourceOf(deps.sources, connection.kind) : undefined;
+    const reason =
+      place.writes === "read_only"
+        ? "its token can only read"
+        : source?.updateLogin
+          ? null
+          : `a login already in ${place.name} can't be changed from here`;
+    if (connection && source?.updateLogin && !reason) {
+      await assertMayReplace(deps.db, existing, run, person);
+      try {
+        const row = await replaceInSource(deps, run, person, existing, connection, source, value);
+        return { outcome: "updated", item: agentView(row, null, place) };
+      } catch (error) {
+        if (asked || !(error instanceof VaultRefusal) || error.code !== "read_only") throw error;
+      }
+    } else if (asked) {
+      if (place.writes === "read_only") throw refuse.readOnly(place);
+      throw refuse.notAllowed(
+        `${named(existing)} is in ${vaultPlaceName(place)}, and ${reason}. Change its password there, or keep the new one in the Vault (\`save_in\`: "vault").`,
+      );
+    }
+    why = `${vaultItemName(existing)} in ${vaultPlaceName(place)} keeps its old password (${reason ?? "its token can only read"}): tell the person to change it there`;
+  } else if (destination.connection) {
+    try {
+      const created = await createInSource(deps, run, person, destination.connection, fields, value);
+      return { ...created, ...(why ? { why } : {}) };
+    } catch (error) {
+      if (asked || !(error instanceof VaultRefusal) || error.code !== "read_only") throw error;
+      why = `${vaultPlaceName(placeOf(deps.sources, destination.connection))} turned out to be read-only (its token can only read; someone who manages that connection can reconnect it with one that also writes)`;
+    }
   }
   await asRefusal(() => assertRoom(db, run.orgId));
   const id = Bun.randomUUIDv7();
@@ -584,28 +810,101 @@ export async function saveMadePassword(
     return created;
   });
   await publishVaultChanged(deps.pubsub, run.orgId);
-  return { outcome: "created", item: agentView(row, null) };
+  return { outcome: "created", item: agentView(row, null), ...(why ? { why } : {}) };
 }
 
-/** An item's value and the ones kept behind it, in one step that loses to any other change. */
+/** A new login kept in a connection's source, then indexed here at once, as the next sync would find it. */
+async function createInSource(
+  deps: VaultDeps,
+  run: VaultRun,
+  person: VaultRunPerson,
+  connection: ConnectionRow,
+  fields: { title: string; website: string | null; username: string | null },
+  value: string,
+): Promise<VaultAgentResult> {
+  const source = sourceOf(deps.sources, connection.kind);
+  const create = source?.createLogin;
+  if (!source || !create) throw refuse.notAllowed("That password manager doesn't take new logins from here.");
+  await asRefusal(() => assertRoom(deps.db, run.orgId));
+  const listed = await sourceWrite(deps, connection, (opened, signal) =>
+    create.call(
+      source,
+      opened,
+      {
+        title: fields.title,
+        password: value,
+        ...(fields.username ? { username: fields.username } : {}),
+        ...(fields.website ? { website: fields.website, match: "site" as const } : {}),
+      },
+      signal,
+    ),
+  );
+  const row = await deps.db.transaction(async (tx) => {
+    const created = await indexSourceItem(tx, connection, listed, vaultNow(deps), run.agentId);
+    if (!created) throw new Error("vault item index returned nothing");
+    await recordAgentChange(tx, run, person, created.id, "create");
+    await auditByAgent(tx, run, person, "vault.item_created", created, { made: true, source: connection.kind });
+    return created;
+  });
+  await publishVaultChanged(deps.pubsub, run.orgId);
+  return { outcome: "created", item: agentView(row, null, placeOf(deps.sources, connection)) };
+}
+
+/**
+ * A login's new password, written to the password manager that keeps it. What it had is read first and sealed
+ * behind the row here (`previousSecrets`), as for a Vault item: `undo` writes it back, and a password manager's own
+ * history is not something an agent can reach. `previous`: what to keep behind it instead (an `undo`).
+ */
+async function replaceInSource(
+  deps: VaultDeps,
+  run: VaultRun,
+  person: VaultRunPerson,
+  item: ItemRow,
+  connection: ConnectionRow,
+  source: Source,
+  value: string,
+  previous?: ItemRow["previousSecrets"],
+) {
+  const update = source.updateLogin;
+  const ref = item.externalRef;
+  if (!update || !ref) throw refuse.notAllowed(`${named(item)} can't be changed from here.`);
+  const version = item.secretVersion + 1;
+  const kept = previous ?? keptBehind([...item.previousSecrets, ...(await behindOf(deps, item, connection, version))]);
+  await sourceWrite(deps, connection, (opened, signal) =>
+    update.call(source, opened, ref, { password: value }, signal),
+  );
+  return replaceValue(deps, run, person, item, { secretVersion: version }, kept, { source: connection.kind });
+}
+
+/** What a login in a password manager holds now, sealed as `version` to go behind its row; nothing when unreadable. */
+async function behindOf(deps: VaultDeps, item: ItemRow, connection: ConnectionRow, version: number) {
+  const now = await readItemValue(deps, item, connection).catch(() => null);
+  return now ? [await sealItemValue(deps, item, version, now)] : [];
+}
+
+/**
+ * An item's value and the ones kept behind it, in one step that loses to any other change. `set`: a Vault item's new
+ * seal; an item in a password manager only takes the next version (its value is there).
+ */
 async function replaceValue(
   deps: VaultDeps,
   run: VaultRun,
   person: VaultRunPerson,
   item: ItemRow,
-  sealed: Awaited<ReturnType<typeof sealItemValue>>,
+  set: Partial<Awaited<ReturnType<typeof sealItemValue>>> & { secretVersion: number },
   previousSecrets: ItemRow["previousSecrets"],
+  audit: Record<string, unknown> = {},
 ) {
   const row = await deps.db.transaction(async (tx) => {
     const [updated] = await tx
       .update(vaultItems)
       // A key's hint names the value it replaces.
-      .set({ ...sealed, previousSecrets, keyHint: null, updatedAt: vaultNow(deps) })
+      .set({ ...set, previousSecrets, keyHint: null, updatedAt: vaultNow(deps) })
       .where(and(eq(vaultItems.id, item.id), eq(vaultItems.secretVersion, item.secretVersion)))
       .returning();
     if (!updated) throw refuse.notAllowed("It changed meanwhile. Nothing was replaced. Try again.");
     await recordAgentChange(tx, run, person, item.id, "edit");
-    await auditByAgent(tx, run, person, "vault.item_changed", updated, { fields: ["secret"], made: true });
+    await auditByAgent(tx, run, person, "vault.item_changed", updated, { fields: ["secret"], made: true, ...audit });
     return updated;
   });
   await publishVaultChanged(deps.pubsub, run.orgId);
@@ -628,12 +927,19 @@ export async function restoreMadePassword(
   { discard = false }: { discard?: boolean } = {},
 ): Promise<VaultAgentResult & { kept: number }> {
   const person = await vaultPersonOfRun(deps.db, run);
-  const { item } = await itemForRun(deps, run, person, itemId, "item");
+  const { item, connection } = await itemForRun(deps, run, person, itemId, "item");
   await assertMayReplace(deps.db, item, run, person);
   const last = item.previousSecrets.at(-1);
   if (!last) throw refuse.notAllowed(`${named(item)} keeps no earlier password.`);
   const value = await openItemValue(deps, { ...item, ...last }).catch(() => null);
   if (value === null) throw refuse.noValue(item);
+  const source = connection ? sourceOf(deps.sources, connection.kind) : undefined;
+  if (connection && source) {
+    const behind = discard ? [] : await behindOf(deps, item, connection, item.secretVersion + 1);
+    const kept = [...behind, ...item.previousSecrets.slice(0, -1)];
+    const row = await replaceInSource(deps, run, person, item, connection, source, value, kept);
+    return { outcome: "updated", item: agentView(row, null, placeOf(deps.sources, connection)), kept: kept.length };
+  }
   const sealed = await sealItemValue(deps, item, item.secretVersion + 1, value);
   const kept = [...(discard ? [] : sealedValueOf(item)), ...item.previousSecrets.slice(0, -1)];
   const row = await replaceValue(deps, run, person, item, sealed, kept);

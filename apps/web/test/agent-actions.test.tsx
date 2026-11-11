@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Agent, AgentAction, Message, MissionPlan } from "@agenteschat/client";
-import { AGENT_ACTION_KINDS, ApiError, keys } from "@agenteschat/client";
+import { AGENT_ACTION_KINDS, keys } from "@agenteschat/client";
 import { en, ptBR } from "@agenteschat/i18n";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { RECEIPT_ICONS } from "@/components/AgentActions";
@@ -85,17 +85,14 @@ const click = async (el: HTMLElement) => {
 };
 
 describe("receipts under the agent's reply", () => {
-  test("one change: a quiet row with the sentence, the target links to the issue, Desfazer with the time in tabular figures", async () => {
+  test("one change: a quiet row with the sentence, the target links to the issue, nothing to press", async () => {
     await open(withActions([action()]));
     const group = receipts();
     const row = group.querySelector(".ag-rc") as HTMLElement;
-    expect(row.textContent).toContain("Criei a tarefa #23 · Prompt de avaliação após a assinatura");
+    expect(row.textContent).toBe("Criei a tarefa #23 · Prompt de avaliação após a assinatura");
     const link = within(group).getByRole("link", { name: "#23" });
     expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/issues/23`);
-    const undo = within(group).getByRole("button", { name: /^Desfazer/ });
-    const time = undo.querySelector(".ag-rc__time") as HTMLElement;
-    expect(time.className).toContain("ac-num");
-    expect(time.textContent).toMatch(/^4:5\d$/);
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
     // A single receipt has no group header.
     expect(group.querySelector(".ag-rcg__hd")).toBeNull();
   });
@@ -127,98 +124,65 @@ describe("receipts under the agent's reply", () => {
     );
     const row = receipts().querySelector(".ag-rc") as HTMLElement;
     const sentence = row.querySelector(".ag-rc__sentence") as HTMLElement;
-    // Desfazer ends the sentence, inside its words.
-    expect(sentence.lastElementChild?.matches(".ag-rc__act")).toBe(true);
-    const words = sentence.cloneNode(true) as HTMLElement;
-    words.querySelector(".ag-rc__act")?.remove();
-    expect(words.textContent?.trim()).toBe("Mudei o pedido da rotina Resumo da semana");
+    // The sentence is its words alone: nothing ends it.
+    expect(sentence.textContent).toBe("Mudei o pedido da rotina Resumo da semana");
     expect(sentence.querySelector(".ag-rc__target")?.previousSibling?.textContent).toEndWith("rotina ");
     expect((row.querySelector(".ag-rc__ic svg") as SVGElement).style.width).toBe("16px");
   });
 
-  test("several: 'N mudanças · agora', Desfazer tudo, one row each with its own Desfazer", async () => {
+  test("several: 'N mudanças · agora' and one row each, with no Desfazer anywhere", async () => {
     await open(withActions([action(), priority(), memory()]));
     const group = receipts();
-    expect(group.querySelector(".ag-rcg__hd")?.textContent).toContain("3 mudanças");
-    expect(within(group).getByRole("button", { name: "Desfazer tudo" })).toBeTruthy();
-    expect(within(group).getAllByRole("button", { name: "Desfazer" })).toHaveLength(3);
+    expect(group.querySelector(".ag-rcg__hd")?.textContent).toBe("3 mudanças · agora");
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
+    expect(group.textContent).not.toContain("Desfazer");
     expect(group.textContent).toContain("Prioridade alta na #23");
     expect(group.textContent).toContain("Guardei na memória: o prompt é por evento");
-    const mem = within(group).getByRole("link", { name: "memória" });
-    expect(mem.getAttribute("href")).toBe(`/org/${ORG_ID}/agents/${ADA_ID}/memory`);
   });
 
-  test("Desfazer: struck through, 'Desfeito por você' and Refazer; Refazer brings it back", async () => {
-    const { state } = await open(withActions([action()]));
-    await click(within(receipts()).getByRole("button", { name: /^Desfazer/ }));
-    expect(state.calls.find((c) => c.method === "actions.undo")?.args).toEqual([ORG_ID, "act-1"]);
-    const row = receipts().querySelector(".ag-rc") as HTMLElement;
-    expect(row.className).toContain("is-undone");
-    expect(row.textContent).toContain("Desfeito por você");
-    await click(within(receipts()).getByRole("button", { name: "Refazer" }));
-    expect(state.calls.find((c) => c.method === "actions.redo")?.args).toEqual([ORG_ID, "act-1"]);
-    expect((receipts().querySelector(".ag-rc") as HTMLElement).className).not.toContain("is-undone");
-    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
+  test("a memory's link opens that memory: its page at the item, and in a conversation Memória beside it, landed on it", async () => {
+    await open(withActions([memory({ target: { type: "memory", id: "mem-5" } })]));
+    const link = within(receipts()).getByRole("link", { name: "memória" });
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/agents/${ADA_ID}/memory?item=mem-5`);
+    await click(link);
+    await settle(6);
+    const panel = document.querySelector(".thread-panel") as HTMLElement;
+    expect(
+      within(panel)
+        .getByRole("tab", { name: /Memória/ })
+        .getAttribute("aria-selected"),
+    ).toBe("true");
+    const landed = [...panel.querySelectorAll<HTMLElement>(".is-landed")];
+    expect(landed.map((el) => el.dataset.itemId)).toEqual(["mem-5"]);
+    expect(landed[0]?.textContent).toContain("O login usa tokens de 15 minutos");
   });
 
-  test("Desfazer tudo undoes every one still undoable; a failure is said in a toast", async () => {
-    const { state } = await open(
-      withActions([action(), priority(), memory()], (s) => {
-        s.actionErrors = { "act-2": new ApiError(409, "action.changed_since", "changed") };
-      }),
-    );
-    await click(within(receipts()).getByRole("button", { name: "Desfazer tudo" }));
-    expect(state.calls.find((c) => c.method === "actions.undoMessage")?.args).toEqual([ORG_ID, "m-act"]);
-    const rows = [...receipts().querySelectorAll(".ag-rcg__it")] as HTMLElement[];
-    expect(rows.map((r) => r.className.includes("is-undone"))).toEqual([true, false, true]);
-    expect(document.body.textContent).toContain("1 mudança não pôde ser desfeita.");
-  });
-
-  test("an error rolls the optimistic undo back and says why in the person's language", async () => {
-    await open(
-      withActions([action()], (s) => {
-        s.actionErrors = { "act-1": new ApiError(409, "action.changed_since", "Changed since") };
-      }),
-    );
-    await click(within(receipts()).getByRole("button", { name: /^Desfazer/ }));
-    expect((receipts().querySelector(".ag-rc") as HTMLElement).className).not.toContain("is-undone");
-    expect(document.body.textContent).toContain("Alguém mudou isso depois.");
-    expect(document.body.textContent).not.toContain("Changed since");
-  });
-
-  test("after the window: plain history, no buttons (an undone one stays struck through)", async () => {
+  test("a skill's link opens the skill in Skills for who manages agents", async () => {
     await open(
       withActions([
-        action({ undoableUntil: inMs(-1_000) }),
-        memory({ undoableUntil: inMs(-1_000), undoneAt: inMs(-60_000), undoneByUserId: "u-joao" }),
+        action({
+          kind: "skill.updated",
+          target: { type: "skill", id: "sk-1", title: "deploy" },
+          params: { name: "deploy" },
+        }),
+      ]),
+    );
+    const link = receipts().querySelector("a.ag-rc__target") as HTMLAnchorElement;
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/skills?skill=sk-1`);
+  });
+
+  test("one undone before stays as history: struck through, 'Desfeito por …', nothing to press", async () => {
+    await open(
+      withActions([
+        action({ undoableUntil: inMs(200_000) }),
+        memory({ undoneAt: inMs(-60_000), undoneByUserId: "u-joao" }),
       ]),
     );
     const group = receipts();
     expect(within(group).queryAllByRole("button")).toHaveLength(0);
     const rows = [...group.querySelectorAll(".ag-rcg__it")] as HTMLElement[];
-    expect(rows.map((r) => r.dataset.phase)).toEqual(["settled", "settled"]);
+    expect(rows.map((r) => r.className.includes("is-undone"))).toEqual([false, true]);
     expect(rows[1]?.textContent).toContain("Desfeito por João");
-  });
-
-  test("the countdown runs out on screen: Desfazer goes away", async () => {
-    await open(withActions([action({ undoableUntil: inMs(1_200) })]));
-    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
-    await act(() => new Promise((r) => setTimeout(r, 2_100)));
-    await settle(2);
-    expect(within(receipts()).queryByRole("button")).toBeNull();
-    expect((receipts().querySelector(".ag-rc") as HTMLElement).dataset.phase).toBe("settled");
-  });
-
-  test("a member who neither asked nor owns the agent sees the receipts without buttons", async () => {
-    await open(
-      withActions([action({ requestedByUserId: "u-joao" }), priority({ requestedByUserId: "u-joao" })], (s) => {
-        const org = s.me?.organizations[0];
-        if (org) org.role = "member";
-      }),
-    );
-    const group = receipts();
-    expect(group.textContent).toContain("2 mudanças");
-    expect(within(group).queryAllByRole("button")).toHaveLength(0);
   });
 
   test("live: message.actions replaces the receipts for everyone", async () => {
@@ -242,7 +206,7 @@ describe("receipts under the agent's reply", () => {
     const first = group.querySelector(".ag-rcg__it") as HTMLElement;
     expect(first.className).toContain("is-undone");
     expect(first.textContent).toContain("Desfeito por João");
-    expect(within(first).getByRole("button", { name: "Refazer" })).toBeTruthy();
+    expect(within(group).queryAllByRole("button")).toHaveLength(0);
   });
 
   test("no receipts: nothing under the message", async () => {
@@ -262,12 +226,11 @@ describe("receipts this build doesn't expect", () => {
       expect(AGENT_ACTION_KINDS.filter((kind) => typeof sentence(strings, kind) !== "string")).toEqual([]);
   });
 
-  test("a kind from a newer server: 'Fiz uma mudança' with the plain check, Desfazer still there", async () => {
+  test("a kind from a newer server: 'Fiz uma mudança' with the plain check", async () => {
     await open(withActions([action({ kind: "something.new" as AgentAction["kind"] })]));
     const row = receipts().querySelector(".ag-rc") as HTMLElement;
     expect(row.textContent).toContain("Fiz uma mudança");
     expect(row.querySelector(".ag-rc__ic svg")).not.toBeNull();
-    expect(within(receipts()).getByRole("button", { name: /^Desfazer/ })).toBeTruthy();
   });
 
   test("receipts that throw: one quiet line in their place, the reply's text and the rest of the message stay; reported once a draw; fixed live, they are back", async () => {

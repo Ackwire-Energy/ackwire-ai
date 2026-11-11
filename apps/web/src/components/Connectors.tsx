@@ -173,7 +173,7 @@ export function ConnectorsSection({
   const using = (item: ConnectedItem) =>
     agentList.filter((a) => levelIn(access.byAgent.get(a.id), `connector:${item.id}`) !== "none");
 
-  // Back from OAuth: open "O que faz" for the connection that just came in.
+  // Back from OAuth: the confirmation for the connection that just came in.
   const returned = useRef(false);
   const listsFetching = connections.isFetching || servers.isFetching;
   useEffect(() => {
@@ -190,14 +190,15 @@ export function ConnectorsSection({
         ? latest(all.filter((i) => !i.custom && i.def?.id === connected))
         : latest(all.filter((i) => i.custom && i.needsReview));
     const done = outcome === "reconnected" || outcome === "same_account" ? outcome : "connected";
-    // Signing in elsewhere ends here: say what happened, as connecting with a key does.
-    if (item && connected) toast.show(outcomeText(t, done, item));
-    // Only a new account goes on to its tools; another account of a server the provider didn't name, to its name.
+    // Signing in elsewhere ends here: say what happened, as connecting with a key does (a toast, or the confirmation).
+    const confirms = admin && done === "connected";
+    if (item && connected && !confirms) toast.show(outcomeText(t, done, item));
+    // Only a new account gets the confirmation; "Ajustar" there names another account its provider didn't name.
     const url = item?.server?.serverUrl;
     const naming =
       Boolean(url && !item?.server?.accountLabel) &&
       all.filter((i) => i.server && url && sameServer(i.server.serverUrl, url)).length > 1;
-    if (item && admin && done === "connected") setFlow({ step: 1, item, naming });
+    if (item && confirms) setFlow({ step: "done", item, naming });
     // GitHub comes straight back when nothing is left to ask: the dialog says what it reaches now and where to add more.
     if (item?.def?.id === "github" && admin && done === "reconnected")
       setFlow({ step: 0, def: item.def, mode: "reconnect", item });
