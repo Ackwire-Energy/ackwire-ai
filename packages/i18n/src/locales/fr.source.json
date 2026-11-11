@@ -27035,10 +27035,10 @@
     "value": "See posts, stories and insights"
   },
   "connectors.can.instagram.2": {
-    "value": "Read direct messages"
+    "value": "Publish posts and read direct messages"
   },
   "connectors.can.instagram.ask": {
-    "value": "Publishing posts and answering messages always asks for your approval"
+    "value": "Answering messages always asks for your approval"
   },
   "connectors.can.facebook.1": {
     "value": "See posts, comments and insights"
@@ -27050,13 +27050,13 @@
     "value": "Deleting posts and comments always asks for your approval"
   },
   "connectors.can.linkedin.1": {
-    "value": "Publish posts and videos"
+    "value": "Publish posts, links and videos"
   },
   "connectors.can.linkedin.2": {
     "value": "Comment on posts"
   },
   "connectors.can.linkedin.ask": {
-    "value": "Sharing links and deleting posts always asks for your approval"
+    "value": "Deleting posts always asks for your approval"
   },
   "connectors.can.youtube.1": {
     "value": "See videos, comments and analytics"

@@ -12052,8 +12052,8 @@
       },
       "instagram": {
         "1": "Podgląd postów, relacji i statystyk",
-        "2": "Czytanie wiadomości prywatnych",
-        "ask": "Publikowanie postów i odpowiadanie na wiadomości zawsze prosi o twoje zatwierdzenie"
+        "2": "Publikowanie postów i czytanie wiadomości prywatnych",
+        "ask": "Odpowiadanie na wiadomości zawsze prosi o twoje zatwierdzenie"
       },
       "facebook": {
         "1": "Podgląd postów, komentarzy i statystyk",
@@ -12061,9 +12061,9 @@
         "ask": "Usuwanie postów i komentarzy zawsze prosi o twoje zatwierdzenie"
       },
       "linkedin": {
-        "1": "Publikowanie postów i filmów",
+        "1": "Publikowanie postów, linków i filmów",
         "2": "Komentowanie postów",
-        "ask": "Udostępnianie linków i usuwanie postów zawsze prosi o twoje zatwierdzenie"
+        "ask": "Usuwanie postów zawsze prosi o twoje zatwierdzenie"
       },
       "youtube": {
         "1": "Podgląd filmów, komentarzy i statystyk",

@@ -11165,8 +11165,8 @@
       },
       "instagram": {
         "1": "Gönderileri, hikayeleri ve istatistikleri görür",
-        "2": "Direkt mesajları okur",
-        "ask": "Gönderi yayınlamak ve mesajları yanıtlamak her zaman onayınızı ister"
+        "2": "Gönderi yayınlar ve direkt mesajları okur",
+        "ask": "Mesajları yanıtlamak her zaman onayınızı ister"
       },
       "facebook": {
         "1": "Gönderileri, yorumları ve istatistikleri görür",
@@ -11174,9 +11174,9 @@
         "ask": "Gönderi ve yorum silmek her zaman onayınızı ister"
       },
       "linkedin": {
-        "1": "Gönderi ve video yayınlar",
+        "1": "Gönderi, bağlantı ve video yayınlar",
         "2": "Gönderilere yorum yapar",
-        "ask": "Bağlantı paylaşmak ve gönderi silmek her zaman onayınızı ister"
+        "ask": "Gönderi silmek her zaman onayınızı ister"
       },
       "youtube": {
         "1": "Videoları, yorumları ve analizleri görür",

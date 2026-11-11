@@ -10839,8 +10839,8 @@
       },
       "instagram": {
         "1": "Melihat postingan, story, dan statistik",
-        "2": "Membaca pesan langsung",
-        "ask": "Memublikasikan postingan dan membalas pesan selalu meminta persetujuanmu"
+        "2": "Memublikasikan postingan dan membaca pesan langsung",
+        "ask": "Membalas pesan selalu meminta persetujuanmu"
       },
       "facebook": {
         "1": "Melihat postingan, komentar, dan statistik",
@@ -10848,9 +10848,9 @@
         "ask": "Menghapus postingan dan komentar selalu meminta persetujuanmu"
       },
       "linkedin": {
-        "1": "Memublikasikan postingan dan video",
+        "1": "Memublikasikan postingan, tautan, dan video",
         "2": "Mengomentari postingan",
-        "ask": "Membagikan tautan dan menghapus postingan selalu meminta persetujuanmu"
+        "ask": "Menghapus postingan selalu meminta persetujuanmu"
       },
       "youtube": {
         "1": "Melihat video, komentar, dan analitik",

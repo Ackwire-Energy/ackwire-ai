@@ -11639,8 +11639,8 @@
       },
       "instagram": {
         "1": "Voir les publications, les stories et les statistiques",
-        "2": "Lire les messages privés",
-        "ask": "La publication et les réponses aux messages demandent toujours votre approbation"
+        "2": "Publier des posts et lire les messages privés",
+        "ask": "Les réponses aux messages demandent toujours votre approbation"
       },
       "facebook": {
         "1": "Voir les publications, les commentaires et les statistiques",
@@ -11648,9 +11648,9 @@
         "ask": "La suppression de publications et de commentaires demande toujours votre approbation"
       },
       "linkedin": {
-        "1": "Publier des posts et des vidéos",
+        "1": "Publier des posts, des liens et des vidéos",
         "2": "Commenter des publications",
-        "ask": "Le partage de liens et la suppression de publications demandent toujours votre approbation"
+        "ask": "La suppression de publications demande toujours votre approbation"
       },
       "youtube": {
         "1": "Voir les vidéos, les commentaires et les statistiques",

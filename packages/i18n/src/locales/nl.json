@@ -11292,8 +11292,8 @@
       },
       "instagram": {
         "1": "Posts, verhalen en statistieken bekijken",
-        "2": "Directe berichten lezen",
-        "ask": "Posts publiceren en op berichten antwoorden vraagt altijd om jouw goedkeuring"
+        "2": "Posts publiceren en directe berichten lezen",
+        "ask": "Op berichten antwoorden vraagt altijd om jouw goedkeuring"
       },
       "facebook": {
         "1": "Posts, reacties en statistieken bekijken",
@@ -11301,9 +11301,9 @@
         "ask": "Posts en reacties verwijderen vraagt altijd om jouw goedkeuring"
       },
       "linkedin": {
-        "1": "Posts en video's publiceren",
+        "1": "Posts, links en video's publiceren",
         "2": "Op posts reageren",
-        "ask": "Links delen en posts verwijderen vraagt altijd om jouw goedkeuring"
+        "ask": "Posts verwijderen vraagt altijd om jouw goedkeuring"
       },
       "youtube": {
         "1": "Video's, reacties en statistieken bekijken",

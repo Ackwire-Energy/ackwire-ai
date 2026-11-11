@@ -11120,8 +11120,8 @@ export const en = {
       abacatepay: { "1": "See charges and customers", "2": "Create Pix charges" },
       instagram: {
         "1": "See posts, stories and insights",
-        "2": "Read direct messages",
-        ask: "Publishing posts and answering messages always asks for your approval",
+        "2": "Publish posts and read direct messages",
+        ask: "Answering messages always asks for your approval",
       },
       facebook: {
         "1": "See posts, comments and insights",
@@ -11129,9 +11129,9 @@ export const en = {
         ask: "Deleting posts and comments always asks for your approval",
       },
       linkedin: {
-        "1": "Publish posts and videos",
+        "1": "Publish posts, links and videos",
         "2": "Comment on posts",
-        ask: "Sharing links and deleting posts always asks for your approval",
+        ask: "Deleting posts always asks for your approval",
       },
       youtube: {
         "1": "See videos, comments and analytics",

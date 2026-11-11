@@ -13,8 +13,10 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
   acceptCustomSuggestion,
+  actionLevel,
   ConflictError,
   type CustomDeps,
+  classifyByRules,
   completeOAuth,
   composioMcpTool,
   composioToolkitUrl,
@@ -201,10 +203,9 @@ describe("the entries", () => {
       }),
     );
     expect(asking).toEqual({
-      // Instagram's publish step and a LinkedIn link share ask by their words (publish, share).
-      instagram: ["INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", "INSTAGRAM_SEND_TEXT_MESSAGE"],
+      instagram: ["INSTAGRAM_SEND_TEXT_MESSAGE"],
       facebook: ["FACEBOOK_DELETE_POST", "FACEBOOK_DELETE_COMMENT"],
-      linkedin: ["LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE", "LINKEDIN_DELETE_POST"],
+      linkedin: ["LINKEDIN_DELETE_POST"],
       youtube: ["YOUTUBE_CREATE_COMMENT_REPLY", "YOUTUBE_SET_COMMENT_MODERATION_STATUS", "YOUTUBE_DELETE_COMMENT"],
       pinterest: ["PINTEREST_UPDATE_BOARD", "PINTEREST_DELETE_PIN", "PINTEREST_DELETE_BOARD"],
       reddit: ["REDDIT_DELETE_REDDIT_POST", "REDDIT_DELETE_REDDIT_COMMENT"],
@@ -222,6 +223,31 @@ describe("the entries", () => {
     expect(listed("instagram", /COMMENT|MENTION|TAGS/)).toEqual([]);
     expect(listed("reddit", /INBOX|PRIVATE_MESSAGE|VOTE|WIKI|MODERAT/)).toEqual([]);
     expect(social.map((id) => [id, mcpPreset(id)?.category])).toEqual(social.map((id) => [id, "social"]));
+  });
+
+  test("Instagram's publish step and a LinkedIn link share are posts: plain writes, while any other publish or share asks", () => {
+    expect(
+      [
+        "INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH",
+        "LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE",
+        "FACEBOOK_PUBLISH_SCHEDULED_POST",
+        "LINKEDIN_PUBLISH_POST",
+        "WEBFLOW_PUBLISH_SITE",
+        "BOX_SHARE_FILE",
+      ].map((slug) => [slug, actionLevel(slug)]),
+    ).toEqual([
+      ["INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", "write"],
+      ["LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE", "write"],
+      ["FACEBOOK_PUBLISH_SCHEDULED_POST", "sensitive"],
+      ["LINKEDIN_PUBLISH_POST", "sensitive"],
+      ["WEBFLOW_PUBLISH_SITE", "sensitive"],
+      ["BOX_SHARE_FILE", "sensitive"],
+    ]);
+    // Only through Composio: another server's tool of the same name keeps the rule of its words.
+    expect(classifyByRules({ name: "post_ig_user_media_publish" })).toMatchObject({
+      level: "approval",
+      sensitive: true,
+    });
   });
 
   test("one way per service: the vendor's server, else Composio here, else Em breve, else unavailable", () => {
@@ -301,6 +327,35 @@ describe("connecting through Composio", () => {
     await expect(completeOAuth(w.deps, { id: f.owner.id }, { state: second, code: "ca_2" })).rejects.toBeInstanceOf(
       ConflictError,
     );
+  });
+
+  test("Instagram's publish step is stored as a write an admin can narrow, even when Composio tags it destructive", async () => {
+    const w = await world();
+    const way = mcpPreset("instagram")?.composio;
+    if (!way) throw new Error("no Instagram way");
+    w.fake.addTools("instagram", way.version, [
+      tool("INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", ["destructiveHint"]),
+      tool("INSTAGRAM_SEND_TEXT_MESSAGE"),
+    ]);
+    const started = await connectCustomServer(w.deps, f.owner.id, f.org.id, {
+      serverUrl: composioToolkitUrl("instagram"),
+      returnTo: "/x",
+    });
+    if (started.status !== "oauth") throw new Error("expected oauth");
+    const state = new URL(started.authorizeUrl).searchParams.get("state") ?? "";
+    const code = w.fake.state.links.at(-1)?.connectedAccountId ?? "";
+    w.fake.activate(code, "", null);
+    const { connection } = await completeOAuth(w.deps, { id: f.owner.id }, { state, code });
+    await syncCustomTools(w.deps, connection);
+    await acceptCustomSuggestion(w.deps, f.owner.id, f.org.id, connection.id);
+    const tools = await f.db
+      .select()
+      .from(schema.customTools)
+      .where(eq(schema.customTools.connectionId, connection.id));
+    expect(Object.fromEntries(tools.map((t) => [t.name, [t.access, t.sensitive]]))).toEqual({
+      post_ig_user_media_publish: ["write", false],
+      send_text_message: ["approval", true],
+    });
   });
 
   test("stored with Composio's account and no secret, named by its Google address, every agent's, its tools ours", async () => {

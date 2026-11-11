@@ -11229,8 +11229,8 @@
       },
       "instagram": {
         "1": "Beiträge, Storys und Statistiken ansehen",
-        "2": "Direktnachrichten lesen",
-        "ask": "Beiträge veröffentlichen und auf Nachrichten antworten fragt immer nach deiner Freigabe"
+        "2": "Beiträge veröffentlichen und Direktnachrichten lesen",
+        "ask": "Auf Nachrichten antworten fragt immer nach deiner Freigabe"
       },
       "facebook": {
         "1": "Beiträge, Kommentare und Statistiken ansehen",
@@ -11238,9 +11238,9 @@
         "ask": "Beiträge und Kommentare löschen fragt immer nach deiner Freigabe"
       },
       "linkedin": {
-        "1": "Beiträge und Videos veröffentlichen",
+        "1": "Beiträge, Links und Videos veröffentlichen",
         "2": "Beiträge kommentieren",
-        "ask": "Links teilen und Beiträge löschen fragt immer nach deiner Freigabe"
+        "ask": "Beiträge löschen fragt immer nach deiner Freigabe"
       },
       "youtube": {
         "1": "Videos, Kommentare und Statistiken ansehen",

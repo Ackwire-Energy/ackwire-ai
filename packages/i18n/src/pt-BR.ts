@@ -11226,8 +11226,8 @@ export const ptBR = {
       abacatepay: { "1": "Ver cobranças e clientes", "2": "Criar cobranças Pix" },
       instagram: {
         "1": "Ver posts, stories e métricas",
-        "2": "Ler mensagens do Direct",
-        ask: "Publicar posts e responder mensagens sempre pede sua aprovação",
+        "2": "Publicar posts e ler mensagens do Direct",
+        ask: "Responder mensagens sempre pede sua aprovação",
       },
       facebook: {
         "1": "Ver posts, comentários e métricas",
@@ -11235,9 +11235,9 @@ export const ptBR = {
         ask: "Apagar posts e comentários sempre pede sua aprovação",
       },
       linkedin: {
-        "1": "Publicar posts e vídeos",
+        "1": "Publicar posts, links e vídeos",
         "2": "Comentar em posts",
-        ask: "Compartilhar links e apagar posts sempre pede sua aprovação",
+        ask: "Apagar posts sempre pede sua aprovação",
       },
       youtube: {
         "1": "Ver vídeos, comentários e métricas",

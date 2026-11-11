@@ -11568,8 +11568,8 @@
       },
       "instagram": {
         "1": "Ver publicaciones, historias y estadísticas",
-        "2": "Leer mensajes directos",
-        "ask": "Publicar contenido y responder mensajes siempre pide tu aprobación"
+        "2": "Publicar contenido y leer mensajes directos",
+        "ask": "Responder mensajes siempre pide tu aprobación"
       },
       "facebook": {
         "1": "Ver publicaciones, comentarios y estadísticas",
@@ -11577,9 +11577,9 @@
         "ask": "Eliminar publicaciones y comentarios siempre pide tu aprobación"
       },
       "linkedin": {
-        "1": "Publicar textos y videos",
+        "1": "Publicar textos, enlaces y videos",
         "2": "Comentar publicaciones",
-        "ask": "Compartir enlaces y eliminar publicaciones siempre pide tu aprobación"
+        "ask": "Eliminar publicaciones siempre pide tu aprobación"
       },
       "youtube": {
         "1": "Ver videos, comentarios y estadísticas",
