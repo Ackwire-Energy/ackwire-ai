@@ -3097,6 +3097,12 @@ async function executeRunInner(
     if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
       const ownModel = u.scope ? ownLimitsModel(plan.account?.provider, plan.model) : null;
       const line = rightHandNoAiReason(u.code, ownModel ? u.scope : undefined);
+      // What the plan's CLI or its computer said is kept in the run and reported, as any agent's CLI failure is, and the
+      // line names what the CLI said. Otherwise a CLI that can't start there fails every turn with nothing saying why.
+      if (line === "cli_failed" || line === "computer_failed") {
+        await addRunStep(db, run, "error", { reason: "brain_unavailable", code: u.code, message: u.message });
+        options.failed?.(new BrainFailure(u.code, u.message, true));
+      }
       const said = line === "cli_failed" ? cliWords({ code: u.code, message: u.message }) : "";
       await failNoAi(line, undefined, ownModel?.label, said || undefined);
       return "failed";

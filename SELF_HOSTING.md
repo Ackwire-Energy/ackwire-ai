@@ -1081,7 +1081,9 @@ Install the ones you want on that computer, as the user that runs the runner: Cu
 `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the runner's PATH must
 include), OpenCode's with `npm install -g opencode-ai@1.19.5`, Grok Build with
 `curl -fsSL https://x.ai/cli/install.sh | bash` (it puts `grok` in `~/.local/bin` too; agents think with it only
-through a Grok account added in Settings, AI accounts, never the computer's own sign-in), Google's Antigravity CLI with
+through a Grok account added in Settings, AI accounts, never the computer's own sign-in; on Linux its sandbox needs
+bubblewrap, `sudo apt install -y bubblewrap`, or Grok Build refuses to start and every turn fails), Google's
+Antigravity CLI with
 `curl -fsSL https://antigravity.google/cli/install.sh | bash` (`agy` in `~/.local/bin`; Gemini accounts sign in on Linux
 computers only, each in a folder of its own, and a personal Google plan used this way is against Google's terms for
 consumer plans: Gemini Enterprise or an API key avoids that). A runner in system mode (each agent

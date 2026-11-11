@@ -3,6 +3,7 @@ import { ACCOUNTS_PROTOCOL, LOCKED_BRAIN_PROTOCOL, MACHINE_PROTOCOL_VERSION } fr
 import { and, eq, schema } from "@agenteschat/db";
 import {
   type Brain,
+  BrainFailure,
   type BrainTurn,
   createAgentRuns,
   createClaudeCodeBrain,
@@ -312,6 +313,50 @@ test("its CLI killed at a tool of its own after a bridge call: nothing of the tu
   expect(said.map((m) => m.meta.bodyCode)).toEqual(["no_ai"]);
   expect(said[0]?.meta.noAi).toMatchObject({ reason: "plan_tools" });
   expect(said.some((m) => m.body.includes("Looking it up"))).toBe(false);
+});
+
+test("its plan's CLI failing: its line says so, and what the CLI said stays in the run's steps and is reported", async () => {
+  const { fx, deps, lodi } = await world();
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, (await lodi()).id, { brain: "claude_code", account: ANAS });
+  const agent = await lodi();
+  // A CLI that refuses to start on that computer fails every turn the same way, in a few seconds.
+  const words = "Claude Code ended without an answer (exit 1): error: the sandbox could not start here";
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield { type: "error", code: "claude_failed", message: words, retryable: true };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const dm = await openPersonAgentDm(fx.db, fx.org.id, fx.owner.id, agent.id);
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
+  const reported: { code: string; message: string }[] = [];
+  await drainOutbox(fx.db, handlers, {
+    onError: (_job, error, outcome) => {
+      if (outcome === "failed" && error instanceof BrainFailure)
+        reported.push({ code: error.code, message: error.message });
+    },
+  });
+  const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agent.id));
+  expect(run).toMatchObject({ status: "failed", error: "no_ai" });
+  const cards = (await fx.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id))).filter(
+    (m) => m.meta.bodyCode === "no_ai",
+  );
+  expect(cards.map((m) => (m.meta.noAi as { reason?: string }).reason)).toEqual(["cli_failed"]);
+  const steps = await fx.db
+    .select({ data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(and(eq(schema.agentRunSteps.runId, run?.id ?? ""), eq(schema.agentRunSteps.kind, "error")));
+  expect(steps.map((s) => s.data)).toContainEqual({
+    reason: "brain_unavailable",
+    code: "claude_failed",
+    message: words,
+  });
+  expect(reported).toEqual([{ code: "claude_failed", message: words }]);
 });
 
 test("its turn goes to the runner as the locked-down chat profile, with no checkout and none of the owner's servers", async () => {
