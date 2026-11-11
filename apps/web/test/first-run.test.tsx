@@ -112,7 +112,11 @@ describe("the first-run checklist", () => {
     ]);
     expect(card().querySelector(".setup-cl__head small")?.textContent).toBe("0 de 4");
     expect(row("Ligue o time.").dataset.dim).toBeUndefined();
-    expect(rows().slice(1).every((r) => r.dataset.dim !== undefined)).toBe(true);
+    expect(
+      rows()
+        .slice(1)
+        .every((r) => r.dataset.dim !== undefined),
+    ).toBe(true);
     expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
     expect(row("Conecte os apps do trabalho.").textContent).toContain("Abre com o plano.");
     expect([...card().querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Ver planos"]);

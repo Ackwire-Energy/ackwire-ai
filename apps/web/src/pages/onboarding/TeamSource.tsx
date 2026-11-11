@@ -93,13 +93,7 @@ export function useTeamSource(
   // The report only once the apply settled and kept the step (`TeamSourceBody`'s `reporting`): a clean one stays on
   // what was found, its button pending, until the rail moves on.
   const view: TeamSourceView =
-    base !== "import"
-      ? base
-      : facts.report && holding && !facts.applying
-        ? "report"
-        : facts.coming
-          ? "found"
-          : "bring";
+    base !== "import" ? base : facts.report && holding && !facts.applying ? "report" : facts.coming ? "found" : "bring";
   const replyCard = replyCardOf(chosen);
 
   const none = useMutation({
@@ -159,7 +153,9 @@ export function useTeamSource(
           : t(o.personal ? "onboarding.flow.team.bring.titleOtherPersonal" : "onboarding.flow.team.bring.titleOther"),
         lead: t("onboarding.flow.team.bring.lead"),
         say:
-          asksFirst(facts.card) && app ? t("onboarding.flow.lodi.bring", { app }) : t("onboarding.flow.lodi.bringFiles"),
+          asksFirst(facts.card) && app
+            ? t("onboarding.flow.lodi.bring", { app })
+            : t("onboarding.flow.lodi.bringFiles"),
       };
     if (view === "found" || view === "report")
       return {

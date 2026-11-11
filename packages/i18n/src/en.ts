@@ -800,8 +800,7 @@ export const en = {
         found: {
           title_one: "Found {{count}} agent in {{app}}",
           title_other: "Found {{count}} agents in {{app}}",
-          lead:
-            "They arrive with the instructions, skills and routines they already have. You can change everything later.",
+          lead: "They arrive with the instructions, skills and routines they already have. You can change everything later.",
           bring: "Bring the team",
           bringPersonal: "Bring the agents",
         },

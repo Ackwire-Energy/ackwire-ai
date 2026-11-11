@@ -31,7 +31,11 @@ export function Arrival() {
   }, [asked]);
   if (beta === null) return null;
   // Every agent already thinks (a workspace joined with its AI in place): nothing to connect.
-  const allThink = teamThinks(dir.agents.map((a) => a.id), status.data) === true;
+  const allThink =
+    teamThinks(
+      dir.agents.map((a) => a.id),
+      status.data,
+    ) === true;
   return (
     <BetaDialog
       onContinue={() => {

@@ -191,7 +191,9 @@ const noneYet = async (go = "Montar um time novo") => {
 const landings = (router: Awaited<ReturnType<typeof renderApp>>["router"]) => {
   const seen: { path: string; arrival: string | undefined }[] = [];
   router.subscribe("onBeforeNavigate", (e) => {
-    if (!e.pathChanged) return;
+    // Against the last path seen, not `pathChanged`: the router's resolved location can lag behind a navigation that
+    // only drops the arrival from the address.
+    if (e.toLocation.pathname === (seen.at(-1)?.path ?? e.fromLocation?.pathname)) return;
     const arrival = (e.toLocation.search as Record<string, unknown>).arrival;
     seen.push({ path: e.toLocation.pathname, arrival: arrival === undefined ? undefined : String(arrival) });
   });
@@ -517,7 +519,7 @@ describe("a workspace being set up resumes from its data", () => {
       await settle(14);
       expect(heading()).toBe(title);
       expect(calls(state, "orgs.create")).toEqual([]);
-      expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual(saved);
+      expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual<typeof saved>(saved);
       cleanup();
     }
   });
@@ -614,8 +616,8 @@ describe("a workspace being set up resumes from its data", () => {
 
     // Back without paying to one set up meanwhile in another tab: it opens as it is, never a new workspace's step 1.
     const meanwhile = settingUp({ context: "Loja online", team: true, held: true });
-    const org = meanwhile.me?.organizations[0];
-    if (org) delete org.onboarding;
+    const setUp = meanwhile.me?.organizations[0];
+    if (setUp) delete setUp.onboarding;
     const again = await renderApp(`/org/${ORG_ID}/onboarding`, { api: createFakeApi(meanwhile) });
     await settle(14);
     expect(again.router.state.location.pathname.startsWith(`/org/${ORG_ID}/`)).toBe(true);
