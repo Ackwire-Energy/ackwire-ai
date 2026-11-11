@@ -59,7 +59,14 @@ import {
   signsInOnce,
 } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { geminiPersonal, isPlanId, planOf, providerFitsChoice, signInProviderOf } from "@agenteschat/client/lib/plans";
+import {
+  geminiPersonal,
+  isPlanId,
+  planOf,
+  planReplies,
+  providerFitsChoice,
+  signInProviderOf,
+} from "@agenteschat/client/lib/plans";
 import {
   AUTO,
   keyLine,
@@ -868,6 +875,114 @@ function ForSelect({ agents, all, target, onTarget }: Pick<PlanPanelProps, "agen
   );
 }
 
+/** Where an agent is in a sign-in for several, one login each: done, signing in now, still to come, or it didn't end. */
+export type FaceState = "done" | "now" | "next" | "failed";
+
+/**
+ * The agents of a sign-in for several, one face each in their order (ADR 0160, addendum): a check on those done, a
+ * ring on the one signing in now, the ones to come dimmed, a mark on one whose login didn't end. One name at a time is
+ * said in the words above it; each face carries its own for a screen reader and on hover.
+ */
+export function FaceStrip({ agents, stateOf }: { agents: readonly PlanAgent[]; stateOf: (a: PlanAgent) => FaceState }) {
+  const { t } = useTranslation();
+  const said: Record<FaceState, string> = {
+    done: t("connectAi.who.state.done"),
+    now: t("connectAi.who.state.now"),
+    next: t("connectAi.who.state.next"),
+    failed: t("connectAi.team.state.failed"),
+  };
+  return (
+    <ul className="ai-strip" aria-label={t("connectAi.agentAria")}>
+      {agents.map((a) => {
+        const state = stateOf(a);
+        return (
+          <li key={a.id} className="ai-strip__face" data-state={state} title={a.name}>
+            <AgentAvatar name={a.name} initials={a.initials} appearance={a.appearance} size="sm" />
+            {(state === "done" || state === "failed") && (
+              <i className="ai-strip__badge" aria-hidden="true">
+                <Icon name={state === "done" ? "check" : "alert"} size={14} />
+              </i>
+            )}
+            <span className="ac-visually-hidden">{`${a.name}: ${said[state]}`}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Whom agents that just started thinking with the person's plan answer, as one line under what they think with (ADR
+ * 0160, addendum): only the person, with the way to let the team in ("Answers other people", ADR 0059 §5, with the
+ * same terms behind its ⓘ and the same rule when the server keeps "only some people" with nobody picked).
+ */
+export function PlanAudience({
+  agents,
+  brain,
+  plan,
+  coding,
+}: {
+  agents: readonly PlanAgent[];
+  brain: MachineAccountKind;
+  plan?: string | null;
+  coding?: ReturnType<typeof planOf>;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const api = useApi();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const dir = useDirectory(org.id);
+  // From the rows as they are now: an agent just moved onto the plan starts on its owner alone.
+  const [on, setOn] = useState(() =>
+    agents.every((a) => {
+      const row = dir.agentById.get(a.id);
+      return row?.brain?.kind === brain && answersOthers(audienceOf(row), row.ownerUserId);
+    }),
+  );
+  const [busy, setBusy] = useState(false);
+  const shown = usePlanRepliesShown(on);
+  const [one] = agents;
+  if (!shown || !one) return null;
+  const says = planReplies(t, { on, agent: agents.length === 1 ? one.name : null, brain, plan, coding });
+  const toggle = async (next: boolean) => {
+    setOn(next);
+    setBusy(true);
+    try {
+      const saved = [];
+      for (const a of agents) saved.push(await api.agents.setBrain(org.id, a.id, { onlyOwner: !next }));
+      for (const a of agents) void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, a.id) });
+      void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+      // The server keeps "Only some people" with nobody picked as it is: the line says what it saved.
+      if (next && saved.every((s) => s.onlyOwner)) {
+        setOn(false);
+        if (agents.length === 1) toast.show(t("aiAccounts.share.pickPeople", agentGrammar(one.name)), "info");
+      }
+    } catch {
+      setOn(!next);
+      toast.show(t("agentPage.work.failed"), "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const line =
+    agents.length === 1
+      ? t(on ? "connectAi.team.audience.on" : "connectAi.team.audience.off", agentGrammar(one.name))
+      : t(on ? "connectAi.team.audience.onAll" : "connectAi.team.audience.offAll");
+  return (
+    <p className="ai-aud">
+      <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={16} />
+      <span className="ai-aud__text">
+        <span>{line}</span>
+        <button type="button" className="ac-link" disabled={busy} onClick={() => void toggle(!on)}>
+          {t(on ? "connectAi.team.audience.unshare" : "connectAi.team.audience.share")}
+        </button>
+        <InfoHint name={says.about}>{says.text}</InfoHint>
+      </span>
+    </p>
+  );
+}
+
 /** The computer's own sign-in as a brain view says it: no account. */
 const OWN_SIGN_IN = { account: null, accounts: [] } as const;
 
@@ -918,6 +1033,10 @@ function PlanSteps({
   const [sent, setSent] = useState(false);
   // Of "All agents", those whose login ended without signing in: none runs for them until the key goes again.
   const [missed, setMissed] = useState<string[]>([]);
+  // One login per agent in turn: those the person skipped after their login didn't end, and why the one signing in now
+  // ended without signing in (`AddAccount`'s `onEnd`), while it shows.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [endWhy, setEndWhy] = useState<string | null>(null);
   const [other, setOther] = useState(false);
   const [ownSaved, setOwnSaved] = useState(false);
   // A sign-in begun here keeps its steps while its computer is offline: they say Reconnecting, and it goes on.
@@ -991,16 +1110,18 @@ function PlanSteps({
     }
   };
   const account = Object.values(assigned)[0];
-  const allDone = todo.length > 0 && todo.every((a) => assigned[a.id]);
+  // Every agent signed in, or skipped once at least one did: those that think now are told.
+  const allDone =
+    todo.length > 0 && todo.every((a) => assigned[a.id] || skipped.includes(a.id)) && todo.some((a) => assigned[a.id]);
   const told = useRef(false);
   useEffect(() => {
     if (!allDone || told.current) return;
     told.current = true;
     onDone(
-      todo.map((a) => a.id),
+      todo.filter((a) => assigned[a.id]).map((a) => a.id),
       account ?? null,
     );
-  }, [allDone, todo, account, onDone]);
+  }, [allDone, todo, account, onDone, assigned]);
 
   const replyToEveryone = async (on: boolean) => {
     setReplies(on);
@@ -1078,7 +1199,8 @@ function PlanSteps({
             ? t("connectAi.doneAll", {
                 names: namesText(
                   t,
-                  forWhom.map((a) => a.name),
+                  // A skipped agent stays out: only those that think now.
+                  forWhom.filter((a) => a.done || assigned[a.id]).map((a) => a.name),
                   NAMES_SHOWN,
                 ),
                 label: account?.label ?? brand,
@@ -1177,7 +1299,7 @@ function PlanSteps({
   const otherChosen = ownable && own ? !own.chosen : other;
   const signedOut = !everyone && current?.status === "signed_out" ? current : undefined;
   // One sign-in per agent, in turn: the agent signing in now, and the account the first one signed in as.
-  const turn = everyone && !coding && !once ? todo.find((a) => !assigned[a.id]) : undefined;
+  const turn = everyone && !coding && !once ? todo.find((a) => !assigned[a.id] && !skipped.includes(a.id)) : undefined;
   const sameAs = Object.values(assigned).find((a) => a.email)?.email ?? undefined;
   const stateOf = (a: PlanSetAgent) =>
     a.done || assigned[a.id]
@@ -1185,6 +1307,46 @@ function PlanSteps({
       : !missed.includes(a.id) && (coding || once ? sent : a.id === turn?.id)
         ? "now"
         : "next";
+  // Under a dialog that already names the plan (`plain`), one login per agent is one instruction at a time: how far
+  // along, whose turn it is, and every agent's face in order; a login that didn't end says so in its place, with the
+  // way to skip that agent beside "Try again" once someone else is left or done.
+  const perAgent = plain && turn !== undefined;
+  const turnAt = turn ? todo.findIndex((a) => a.id === turn.id) + 1 : 0;
+  const maySkip =
+    todo.some((a) => assigned[a.id]) || todo.filter((a) => !assigned[a.id] && !skipped.includes(a.id)).length > 1;
+  const faceOf = (a: PlanAgent): FaceState =>
+    assigned[a.id] || forWhom.find((x) => x.id === a.id)?.done
+      ? "done"
+      : skipped.includes(a.id) || (a.id === turn?.id && endWhy)
+        ? "failed"
+        : a.id === turn?.id
+          ? "now"
+          : "next";
+  const turnHead = perAgent && turn && (
+    <div className="ai-turn">
+      {/* The words change with each turn and slide in; the faces stay, so the ring moves and a check appears. */}
+      <div key={`${turn.id}:${endWhy ? "end" : "on"}`} className="ai-turn__words arrival-swap" data-dir="fwd">
+        <small className="ai-turn__count">{t("connectAi.team.progress", { n: turnAt, total: todo.length })}</small>
+        <p className="ai-turn__title" role="status">
+          {endWhy
+            ? t("connectAi.team.failed", agentGrammar(turn.name))
+            : t("connectAi.team.turn", { ...agentGrammar(turn.name), plan: brand })}
+        </p>
+        <span className="ai-turn__help">{endWhy ?? t("connectAi.team.turnHelp", { plan: brand })}</span>
+      </div>
+      <FaceStrip agents={forWhom} stateOf={faceOf} />
+    </div>
+  );
+  const skip = turn && (
+    <Button
+      onClick={() => {
+        setSkipped((s) => [...s, turn.id]);
+        setEndWhy(null);
+      }}
+    >
+      {t("connectAi.team.skip", agentGrammar(turn.name))}
+    </Button>
+  );
   return (
     <>
       {wait}
@@ -1221,7 +1383,8 @@ function PlanSteps({
           })}
         </ul>
       )}
-      {everyone && !coding && steps && (
+      {steps && turnHead}
+      {everyone && !coding && steps && !perAgent && (
         <p className="ai-panel__each">
           <span className="ac-hintline">
             <span>{t(once ? "connectAi.once" : "connectAi.each")}</span>
@@ -1310,7 +1473,12 @@ function PlanSteps({
           local={view?.ownSignIn}
           ready={ready}
           loading={gates.catching}
-          {...(turn ? { signInLabel: t("connectAi.signInFor", agentGrammar(turn.name)) } : {})}
+          {...(perAgent
+            ? { signInLabel: t("connectAi.team.signIn", { plan: brand }), quiet: true, onEnd: setEndWhy }
+            : turn
+              ? { signInLabel: t("connectAi.signInFor", agentGrammar(turn.name)) }
+              : {})}
+          {...(perAgent && maySkip ? { endActions: skip } : {})}
           {...(everyone && coding && !once ? { fanOut: todo.map((a) => ({ id: a.id })) } : {})}
           onSent={() => {
             setSent(true);

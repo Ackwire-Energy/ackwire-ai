@@ -2630,6 +2630,60 @@ export const ptBR = {
       other: "Conectar outra IA",
       told: "{{name}} recebe um aviso por e-mail.",
     },
+    /** Connect for the whole team (ADR 0160, addendum): the agents without an AI, picked, signed in and woken. */
+    team: {
+      title: "Conectar uma IA para o time",
+      asleep_one: "{{count}} agente sem IA",
+      asleep_other: "{{count}} agentes sem IA",
+      /** The "For" line once the agents were narrowed with Choose. */
+      asleepSome: "{{n}} de {{total}} agentes sem IA",
+      choose: "Escolher",
+      /** A quiet tag at the end of a plan's card: that plan asks for one sign-in per agent. */
+      perAgent: "Um login por agente",
+      pickTitle: "Para quais agentes",
+      marked: "{{n}} de {{total}} marcados.",
+      useThese_one: "Usar este agente",
+      useThese_other: "Usar estes {{count}}",
+      /** The step counter while each agent signs in on its own. */
+      progress: "{{n}} de {{total}}",
+      turn: "Entre no {{plan}} para o {{name}}",
+      turn_female: "Entre no {{plan}} para a {{name}}",
+      turnHelp: "É a mesma conta. O {{plan}} só pede o login de novo para cada agente.",
+      /** The footer's main button during an agent's turn. */
+      signIn: "Entrar no {{plan}}",
+      failed: "O login do {{name}} não terminou",
+      failed_female: "O login da {{name}} não terminou",
+      skip: "Pular o {{name}}",
+      skip_female: "Pular a {{name}}",
+      state: {
+        /** An agent's face in the row of faces, for screen readers and on hover. */
+        failed: "O login não terminou",
+      },
+      woke_one: "{{count}} agente acordou",
+      woke_other: "{{count}} agentes acordaram",
+      wokeAll: "O time acordou",
+      thinksAll: "Eles já pensam com o seu {{plan}}",
+      thinksOne: "O {{name}} já pensa com o seu {{plan}}",
+      thinksOne_female: "A {{name}} já pensa com o seu {{plan}}",
+      stayed: "O {{name}} ficou sem IA: o login dele não terminou.",
+      stayed_female: "A {{name}} ficou sem IA: o login dela não terminou.",
+      stayedMany: "{{names}} ficaram sem IA: os logins não terminaram.",
+      again: "Conectar o {{name}}",
+      again_female: "Conectar a {{name}}",
+      againMany: "Conectar os {{n}}",
+      /** Whom they answer on the person's own subscription (ADR 0059 §5), and the link that opens them to the team. */
+      audience: {
+        offAll: "Com a sua assinatura, eles respondem só a você.",
+        onAll: "Eles respondem a quem pode falar com eles.",
+        off: "Com a sua assinatura, o {{name}} responde só a você.",
+        off_female: "Com a sua assinatura, a {{name}} responde só a você.",
+        on: "O {{name}} responde a quem pode falar com ele.",
+        on_female: "A {{name}} responde a quem pode falar com ela.",
+        share: "Liberar para o time",
+        /** The same link once they answer the team: back to answering only the person. */
+        unshare: "Só para mim",
+      },
+    },
     billing: "Um plano entra no computador do workspace, e o computador vem com um plano ativo do agentes.chat.",
     billingWeb: "Escolha um na web, em agentes.chat.",
     orPayGo: "Ou pague pelo uso",
@@ -4928,6 +4982,59 @@ export const ptBR = {
           done: "A conta {{account}} entrou no {{computer}}. Clique em Usar para salvar.",
         },
         offCloud: "O {{computer}} não está respondendo",
+        /** Who thinks as one change per screen (ADR 0032, addendum of 2026-11-10). */
+        v2: {
+          title: "Quem pensa pelo {{name}}",
+          title_female: "Quem pensa pela {{name}}",
+          /** The first screen's footer note: one line. */
+          only: "Vale só para o {{name}}.",
+          only_female: "Vale só para a {{name}}.",
+          /** A line on the first screen that opens effort, speed, context and the rest. */
+          more: "Mais opções",
+          switch: "Trocar de conta",
+          switchTitle: "Trocar a conta do {{name}}",
+          switchTitle_female: "Trocar a conta da {{name}}",
+          /** The label over the account the agent uses now. */
+          inUse: "Em uso",
+          /** The main button: `label` is the account's title ("Claude 2 · Max"). */
+          switchTo: "Trocar para {{label}}",
+          teamTitle: "Trocar a conta do time",
+          /** Two cards, when the account thinks for all of its owner's agents: whom the switch is for. */
+          justOne: "Só o {{name}}",
+          justOne_female: "Só a {{name}}",
+          everyone: "Todos nesta conta",
+          /** The label over the account they switch to. */
+          target: "Trocar para",
+          switchMany_one: "Trocar {{count}} agente",
+          switchMany_other: "Trocar os {{count}} agentes",
+          limitTitle: "A conta do {{name}} está no limite",
+          limitTitle_female: "A conta da {{name}} está no limite",
+          /** `when` is a day and a time ("sábado às 18:00"). */
+          limitBack: "{{account}} volta {{when}}",
+          /** When the time it's back isn't known. */
+          limitSoon: "{{account}} volta quando o plano renovar",
+          limitHelp: "Enquanto isso o {{name}} pode pensar com outra conta que já está conectada.",
+          limitHelp_female: "Enquanto isso a {{name}} pode pensar com outra conta que já está conectada.",
+          wait: "Esperar",
+          modelTitle: "Modelo do {{name}}",
+          modelTitle_female: "Modelo da {{name}}",
+          moreTitle: "Mais opções do {{name}}",
+          moreTitle_female: "Mais opções da {{name}}",
+          /** A switch: its ⓘ is `fallbackHint`. */
+          fallback: "Usar a chave de API se o plano parar",
+          /** A line under More options where several computers can run it. */
+          computer: "Computador",
+          doneTitle: "Pronto",
+          doneSub: "O que estava em andamento continua com a conta nova.",
+          /** The main button of the first screen, of More options and of the last screen. */
+          finish: "Concluído",
+          undo: "Desfazer",
+          /** A toast after Undo. */
+          undone: "Voltou ao que era antes.",
+          /** The agents the server didn't move when switching everyone on the account: `names` lists them. */
+          missed_one: "{{names}} ficou com a conta de antes.",
+          missed_other: "{{names}} ficaram com a conta de antes.",
+        },
       },
       computer: {
         title: "Onde o {{name}} trabalha?",

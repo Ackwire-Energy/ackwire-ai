@@ -365,6 +365,178 @@
   text-overflow: ellipsis;
 }
 
+/* For the whole team (ADR 0160, addendum): one line says for whom (their faces, how many, the way to pick), then the
+   AIs as the list. Past four agents the sky says how many more. */
+.team-scene__more {
+  flex: none;
+  align-self: center;
+  margin-inline-start: -4px;
+  color: #fff;
+  font-family: var(--font-dot);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+}
+.arrival-forline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 6px;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+.arrival-forline > b {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.arrival-forline__pick {
+  flex: none;
+  margin-inline-start: auto;
+  font-size: 13.5px;
+}
+/* A plan that asks for one login per agent there: said at its card's end, quietly. */
+.arrival-opts__tag--quiet {
+  color: var(--ink-muted);
+}
+/* Whom of them: one row each, the whole name on one line (an ellipsis past the row), the list scrolling inside the
+   dialog and fading at its foot, as every account's does. */
+.arrival-picks {
+  display: flex;
+  flex-direction: column;
+  max-height: 296px;
+  overflow-y: auto;
+  margin: 0 -6px;
+  padding: 0 6px 18px;
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 28px), transparent);
+}
+.arrival-pick {
+  display: grid;
+  grid-template-columns: 18px 24px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 2px;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.arrival-pick:first-child {
+  border-top: 0;
+}
+.arrival-pick__name {
+  overflow: hidden;
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+/* One instruction at a time (one login per agent in turn, and who woke): how far along, what to do, the help under
+   it, then every agent's face in order. Left on the title's edge. */
+.ai-turn,
+.ai-turn__words {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.ai-turn {
+  padding: 4px 0 10px;
+}
+.ai-turn__count {
+  color: var(--ink-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.ai-turn__title {
+  margin: 0;
+  max-width: 440px;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 24px;
+  text-wrap: pretty;
+}
+.ai-turn__help {
+  max-width: 440px;
+  color: var(--ink-muted);
+  font-size: 14.5px;
+  line-height: 21px;
+  text-wrap: pretty;
+}
+.ai-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ai-strip__face {
+  position: relative;
+  display: inline-flex;
+  border-radius: var(--radius-agent);
+}
+.ai-strip__face[data-state="next"] {
+  opacity: 0.38;
+}
+.ai-strip__face[data-state="now"] {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--ink);
+}
+.ai-strip__badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--raised);
+  box-shadow: 0 0 0 2px var(--raised);
+}
+.ai-strip__badge .ac-icon {
+  width: 10px;
+  height: 10px;
+}
+.ai-strip__face[data-state="failed"] .ai-strip__badge {
+  background: var(--attention);
+  color: #fff;
+}
+/* Whom they answer, over a hairline under who woke: the icon on the first line, the way to change it in the words. */
+.ai-aud {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  align-self: stretch;
+  margin: 14px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+}
+.ai-aud > .ac-icon {
+  margin-top: 2px;
+  color: var(--faint);
+}
+.ai-aud__text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.agp-addacct__starting {
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
 /* What is already connected. A row: the radio, the mark, the name and how full the plan is on one line; who else
    thinks with it and its state in words under the name. */
 .arrival-have {
@@ -795,6 +967,45 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
 }
 .sidebar__feedback .ac-chip {
   margin-left: auto;
+}
+
+/* A screen that changes slides in from the side it comes from (deeper ones from the end), its title with it; who is
+   signing in now moves along the faces, and a check or a mark pops onto a face as it lands. */
+@media (prefers-reduced-motion: no-preference) {
+  .arrival-swap[data-dir="fwd"] {
+    animation: arrival-swap-fwd 0.26s var(--out) both;
+  }
+  .arrival-swap[data-dir="back"] {
+    animation: arrival-swap-back 0.26s var(--out) both;
+  }
+  .ai-strip__face {
+    transition:
+      opacity 0.3s var(--out),
+      box-shadow 0.3s var(--out);
+  }
+  .ai-strip__badge {
+    animation: ai-badge-in 0.34s var(--spring) both;
+  }
+  .team-scene__more {
+    animation: arrival-in 0.3s var(--out) both;
+  }
+}
+@keyframes arrival-swap-fwd {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+@keyframes arrival-swap-back {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+@keyframes ai-badge-in {
+  from {
+    transform: scale(0);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

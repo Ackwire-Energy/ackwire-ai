@@ -2664,6 +2664,52 @@ export const en = {
       other: "Connect another AI",
       told: "{{name}} gets an email about it.",
     },
+    /** Connect for the whole team (ADR 0160, addendum): the agents without an AI, picked, signed in and woken. */
+    team: {
+      title: "Connect an AI for the team",
+      asleep_one: "{{count}} agent without AI",
+      asleep_other: "{{count}} agents without AI",
+      /** The "For" line once the agents were narrowed with Choose. */
+      asleepSome: "{{n}} of {{total}} agents without AI",
+      choose: "Choose",
+      /** A quiet tag at the end of a plan's card: that plan asks for one sign-in per agent. */
+      perAgent: "One sign-in per agent",
+      pickTitle: "For which agents",
+      marked: "{{n}} of {{total}} checked.",
+      useThese_one: "Use this agent",
+      useThese_other: "Use these {{count}}",
+      /** The step counter while each agent signs in on its own. */
+      progress: "{{n}} of {{total}}",
+      turn: "Sign in to {{plan}} for {{name}}",
+      turnHelp: "It's the same account. {{plan}} just asks you to sign in again for each agent.",
+      /** The footer's main button during an agent's turn. */
+      signIn: "Sign in to {{plan}}",
+      failed: "{{name}}'s sign-in didn't finish",
+      skip: "Skip {{name}}",
+      state: {
+        /** An agent's face in the row of faces, for screen readers and on hover. */
+        failed: "Sign-in didn't finish",
+      },
+      woke_one: "{{count}} agent woke up",
+      woke_other: "{{count}} agents woke up",
+      wokeAll: "The team is awake",
+      thinksAll: "They already think with your {{plan}}",
+      thinksOne: "{{name}} already thinks with your {{plan}}",
+      stayed: "{{name}} is still without AI: their sign-in didn't finish.",
+      stayedMany: "{{names}} are still without AI: their sign-ins didn't finish.",
+      again: "Connect {{name}}",
+      againMany: "Connect the {{n}}",
+      /** Whom they answer on the person's own subscription (ADR 0059 §5), and the link that opens them to the team. */
+      audience: {
+        offAll: "On your subscription, they answer only you.",
+        onAll: "They answer anyone who can talk to them.",
+        off: "On your subscription, {{name}} answers only you.",
+        on: "{{name}} answers anyone who can talk to them.",
+        share: "Open to the team",
+        /** The same link once they answer the team: back to answering only the person. */
+        unshare: "Only me",
+      },
+    },
     /** The Cloud's workspace on a billing hold, where a plan would sign in. */
     billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
     /** After `billing`, on the phone, where paying isn't offered. */
@@ -4958,6 +5004,51 @@ export const en = {
           done: "The {{account}} account is on {{computer}}. Click Use to save.",
         },
         offCloud: "{{computer}} isn't answering",
+        /** Who thinks as one change per screen (ADR 0032, addendum of 2026-11-10). */
+        v2: {
+          title: "Who thinks for {{name}}",
+          /** The first screen's footer note: one line. */
+          only: "Only for {{name}}.",
+          /** A line on the first screen that opens effort, speed, context and the rest. */
+          more: "More options",
+          switch: "Change account",
+          switchTitle: "Change {{name}}'s account",
+          /** The label over the account the agent uses now. */
+          inUse: "In use",
+          /** The main button: `label` is the account's title ("Claude 2 · Max"). */
+          switchTo: "Switch to {{label}}",
+          teamTitle: "Change the team's account",
+          /** Two cards, when the account thinks for all of its owner's agents: whom the switch is for. */
+          justOne: "Only {{name}}",
+          everyone: "Everyone on this account",
+          /** The label over the account they switch to. */
+          target: "Switch to",
+          switchMany_one: "Switch {{count}} agent",
+          switchMany_other: "Switch the {{count}} agents",
+          limitTitle: "{{name}}'s account is at its limit",
+          /** `when` is a day and a time ("Saturday at 18:00"). */
+          limitBack: "{{account}} is back {{when}}",
+          /** When the time it's back isn't known. */
+          limitSoon: "{{account}} is back when the plan renews",
+          limitHelp: "Meanwhile {{name}} can think with another account that's already connected.",
+          wait: "Wait",
+          modelTitle: "{{name}}'s model",
+          moreTitle: "More options for {{name}}",
+          /** A switch: its ⓘ is `fallbackHint`. */
+          fallback: "Use the API key if the plan stops",
+          /** A line under More options where several computers can run it. */
+          computer: "Computer",
+          doneTitle: "All set",
+          doneSub: "What was under way goes on with the new account.",
+          /** The main button of the first screen, of More options and of the last screen. */
+          finish: "Done",
+          undo: "Undo",
+          /** A toast after Undo. */
+          undone: "Back to how it was.",
+          /** The agents the server didn't move when switching everyone on the account: `names` lists them. */
+          missed_one: "{{names}} kept the account it had.",
+          missed_other: "{{names}} kept the accounts they had.",
+        },
       },
       computer: {
         title: "Where does {{name}} work?",
