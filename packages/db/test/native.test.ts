@@ -215,7 +215,7 @@ test("a folder that can't be opened for reading (Windows) still reopens, writes 
       refusals++;
       throw Object.assign(new Error(`EISDIR: illegal operation on a directory, open '${path}'`), { code: "EISDIR" });
     }
-    return open(path, flags, mode);
+    return open(path, flags ?? "r", mode);
   }) as typeof fs.openSync);
   try {
     const first = openPglite(db);

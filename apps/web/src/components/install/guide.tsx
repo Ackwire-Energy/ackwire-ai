@@ -183,7 +183,7 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
   const name = t(`machines.os.${buildTarget(system).target}`);
   return (
     <section className="ifr" aria-label={t("install.frames", { system: name })}>
-      <p className="ifr__lead">
+      <p className="ifr__lead ac-iconline">
         <Icon name="info" size={16} />
         <span>
           <Trans i18nKey={why} components={{ b: <strong /> }} />
@@ -220,8 +220,22 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
           {(step.short ?? step.sub) && <small>{step.short ?? step.sub}</small>}
         </span>
         <span className="ifr__nav">
-          <Button size="sm" variant="ghost" iconOnly icon="chevronLeft" aria-label={t("install.previous")} onClick={() => go(at - 1)} />
-          <Button size="sm" variant="ghost" iconOnly icon="chevronRight" aria-label={t("install.next")} onClick={() => go(at + 1)} />
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="chevronLeft"
+            aria-label={t("install.previous")}
+            onClick={() => go(at - 1)}
+          />
+          <Button
+            size="sm"
+            variant="ghost"
+            iconOnly
+            icon="chevronRight"
+            aria-label={t("install.next")}
+            onClick={() => go(at + 1)}
+          />
         </span>
       </div>
       <a className="ifr__more ac-link" href={`/download?system=${system}`} target="_blank" rel="noreferrer">
@@ -290,7 +304,7 @@ export function InstallSteps({ system, release }: { system: InstallSystem; relea
         ))}
       </ol>
       {system === "mac" && (
-        <div className="ist__stuck">
+        <div className="ist__stuck ac-iconline">
           <Icon name="question" />
           <div>
             <p className="ist__line">{t("install.mac.stuckTitle")}</p>
