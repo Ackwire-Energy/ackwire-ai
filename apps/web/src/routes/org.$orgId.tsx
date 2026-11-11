@@ -6,7 +6,7 @@ import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } 
 import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
-import { usePageClock, usePageTextSize } from "@/chat/look";
+import { usePageTextSize } from "@/chat/look";
 import { Arrival } from "@/components/arrival/Arrival";
 import { FeedbackHost } from "@/components/arrival/FeedbackDialog";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
@@ -60,7 +60,7 @@ function OrgLayout() {
   // The cached person, so a new logo or workspace name shows at once, not at the next navigation.
   const me = useMe().data ?? loaded.me;
   const membership = membershipIn(me, orgId);
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const href = useRouterState({ select: (s) => s.location.href });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
@@ -71,7 +71,6 @@ function OrgLayout() {
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   usePageTextSize(membership?.chatPrefs);
-  usePageClock(i18n.language);
   useEffect(() => {
     if (!membership) return;
     storage.set(STORAGE_KEYS.lastOrg, membership.id);

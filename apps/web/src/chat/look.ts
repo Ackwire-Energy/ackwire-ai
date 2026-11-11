@@ -1,5 +1,4 @@
 import { type ChatPrefs, chatLookOf, facesShown, textSizeOf } from "@agenteschat/client/lib/chat-look";
-import { uses12h } from "@agenteschat/client/lib/format";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type AgentColor, agentGradient, MessageLookContext } from "@agenteschat/ui";
 import { useContext, useLayoutEffect, useMemo } from "react";
@@ -39,19 +38,4 @@ export function usePageTextSize(prefs: ChatPrefs | undefined) {
       delete root.dataset.textSize;
     };
   }, [size]);
-}
-
-/**
- * The page's clock (`html[data-clock]`, looks.css): "11:43 PM" is half again as wide as "23:43", and a bubble's last
- * line keeps room for the time at its end by that width. Set before the first paint, as the text size.
- */
-export function usePageClock(language: string) {
-  const clock = uses12h(language) ? "12h" : "24h";
-  useLayoutEffect(() => {
-    const root = document.documentElement;
-    root.dataset.clock = clock;
-    return () => {
-      delete root.dataset.clock;
-    };
-  }, [clock]);
 }
