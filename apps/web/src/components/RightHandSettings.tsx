@@ -590,6 +590,7 @@ function TeamWeekPref({ name }: { name: string }) {
             prefs={prefs}
             admin={admin}
             locale={i18n.language}
+            plated
             onChange={(patch) => set.mutate(patch, { onError: (e) => toast.show(errorText(t, e), "error") })}
           />
         </span>
