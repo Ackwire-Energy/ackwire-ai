@@ -37,7 +37,6 @@
     "table": "표",
     "chartItem": "항목",
     "chartShare": "비중",
-    "chartPending": "차트를 만드는 중…",
     "you": "나",
     "saved": "저장했어요",
     "youSuffix": " (나)",
@@ -2454,6 +2453,7 @@
       "computer_away": "{{name}}은(는) 지금 답할 수 없어요: 요금제가 로그인된 컴퓨터를 쓸 수 없어요.",
       "computer_failed": "{{name}}은(는) 지금 답할 수 없어요: 요금제 컴퓨터에 문제가 생겼어요.",
       "cli_failed": "{{name}}은(는) 지금 답할 수 없어요: 요금제의 AI가 오류로 멈췄어요.",
+      "cli_failedWhy": "{{name}}은(는) 지금 답할 수 없어요: 요금제의 AI가 오류로 멈췄어요({{why}}).",
       "plan_limit": "{{name}}은(는) 지금 답할 수 없어요: 요금제가 한도에 도달했어요.",
       "plan_not_shared": "{{name}}과(와) 대화하려면 내 플랜을 연결하세요. 워크스페이스 플랜은 소유자에게만 답해요.",
       "plan_unattended": "{{name}}은(는) 답하지 않았어요. 사람이 보낸 요청이 아니고, 워크스페이스 플랜은 소유자에게만 답해요.",
@@ -3181,7 +3181,6 @@
     "messageTo": "{{name}}에게 보낼 메시지",
     "audienceEdit": "편집",
     "nowIn": "지금 #{{channel}}에서",
-    "answersHere": "여기서는 @ 없이 답합니다",
     "more": "더 보기",
     "of": "{{name}}의 프로필",
     "presence": "상태",
@@ -15051,6 +15050,7 @@
       "no_ai_computer_away": "지금은 답할 수 없어요: 내 요금제의 컴퓨터를 쓸 수 없어요.",
       "no_ai_computer_failed": "지금은 답할 수 없어요: 내 요금제 컴퓨터에 문제가 생겼어요.",
       "no_ai_cli_failed": "지금은 답할 수 없어요: 내 요금제의 AI가 오류로 멈췄어요.",
+      "no_ai_cli_failedWhy": "지금은 답할 수 없어요: 내 요금제의 AI가 오류로 멈췄어요({{why}}).",
       "no_ai_plan_limit": "지금은 답할 수 없어요: 내가 쓰는 요금제가 한도에 도달했어요.",
       "no_ai_plan_not_shared": "워크스페이스 플랜으로는 답할 수 없어요. 소유자에게만 답하거든요. 내 플랜을 연결하면 답할게요.",
       "no_ai_plan_unattended": "답하지 않았어요. 사람이 보낸 요청이 아니고, 워크스페이스 플랜은 소유자에게만 답해요.",
@@ -16309,8 +16309,7 @@
       "task": "작업",
       "state": "상태",
       "using": "지금 사용 중",
-      "time": "시간",
-      "computer": "실행 위치"
+      "time": "시간"
     },
     "sections": {
       "asked": "사람이 요청한 작업",
@@ -16370,7 +16369,6 @@
     },
     "askedBy": "{{name}}이(가) 요청함",
     "askedByYou": "내가 요청함",
-    "servers": "agentes 서버",
     "plan": "{{total}}개 중 {{done}}개 완료",
     "program": {
       "browser": "브라우저",

@@ -46,7 +46,6 @@ export const en = {
     table: "Table",
     chartItem: "Item",
     chartShare: "Share",
-    chartPending: "Building the chart…",
     you: "you",
     saved: "Saved",
     youSuffix: " (you)",
@@ -2693,6 +2692,8 @@ export const en = {
       computer_failed: "{{name}} can't answer now: the computer the plan is signed in on had a problem.",
       /** The plan's CLI on that computer failed, not the computer. */
       cli_failed: "{{name}} can't answer now: the plan's AI stopped with an error.",
+      /** The same, with what the CLI said (`why`: its own words, often in English). */
+      cli_failedWhy: "{{name}} can't answer now: the plan's AI stopped with an error ({{why}}).",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
       /** A request no person made (another agent's, a routine's): nobody's own plan would answer it. */
@@ -3481,8 +3482,6 @@ export const en = {
     messageTo: "Message {{name}}",
     audienceEdit: "Edit",
     nowIn: "now, in #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Answers here without an @",
     more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",
@@ -15639,6 +15638,7 @@ export const en = {
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
       no_ai_computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
       no_ai_cli_failed: "I can't answer now: my plan's AI stopped with an error.",
+      no_ai_cli_failedWhy: "I can't answer now: my plan's AI stopped with an error ({{why}}).",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared:
         "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
@@ -17011,7 +17011,7 @@ export const en = {
       fromRoutine: "started by the routine {{name}}",
       stopNote: "If you stop it, {{name}} is told you did and won't ask again on its own.",
     },
-    columns: { task: "Task", state: "State", using: "Using now", time: "Time", computer: "Runs on" },
+    columns: { task: "Task", state: "State", using: "Using now", time: "Time" },
     sections: {
       asked: "Asked by people",
       delegated: "Asked by agents",
@@ -17077,7 +17077,6 @@ export const en = {
     },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",
-    servers: "Our servers",
     plan: "{{done}} of {{total}} done",
     program: {
       browser: "Browser",

@@ -61,7 +61,6 @@
     "failed": "Twój wybór nie został wysłany. Spróbuj ponownie."
   },
   "chart": {
-    "pending": "Tworzenie wykresu…",
     "table": "Tabela",
     "item": "Element",
     "share": "Udostępnij",
@@ -405,12 +404,6 @@
     "toLatestNew": "Przejdź do najnowszych wiadomości: {{text}}",
     "stopAgent": "Zatrzymaj: {{name}}",
     "offlineWait": "Wyśle się po powrocie połączenia",
-    "turn": {
-      "thinking": "myśli",
-      "working": "pracuje",
-      "writing": "pisze",
-      "stopped": "zatrzymano"
-    },
     "steer": {
       "waiting": "{{name}} przeczyta to przy następnej przerwie",
       "computer": "{{name}} przeczyta to, gdy dostanie komputer",

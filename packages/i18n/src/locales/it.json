@@ -37,7 +37,6 @@
     "table": "Tabella",
     "chartItem": "Elemento",
     "chartShare": "Quota",
-    "chartPending": "Creazione del grafico…",
     "you": "tu",
     "saved": "Salvato",
     "youSuffix": " (tu)",
@@ -2651,6 +2650,7 @@
       "computer_away": "{{name}} non può rispondere ora: il computer del piano non è disponibile.",
       "computer_failed": "{{name}} non può rispondere ora: il computer del piano ha avuto un problema.",
       "cli_failed": "{{name}} non può rispondere ora: l'IA del piano si è fermata con un errore.",
+      "cli_failedWhy": "{{name}} non può rispondere ora: l'IA del piano si è fermata con un errore ({{why}}).",
       "plan_limit": "{{name}} non può rispondere ora: il piano ha raggiunto il limite.",
       "plan_not_shared": "Collega il tuo piano per parlare con {{name}}: il piano del workspace risponde solo al suo proprietario.",
       "plan_unattended": "{{name}} non ha risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
@@ -3412,7 +3412,6 @@
     "messageTo": "Messaggio per {{name}}",
     "audienceEdit": "Modifica",
     "nowIn": "ora, in #{{channel}}",
-    "answersHere": "Risponde qui senza bisogno di @",
     "more": "Altro",
     "of": "Profilo di {{name}}",
     "presence": "Presenza",
@@ -4120,7 +4119,7 @@
       "open": "Apri",
       "routine": "Sempre in questa routine",
       "thisRoutine": "questa routine",
-      "noteRoutine": "{{routine}} fa {{actions}} da sola d'ora in poi, con qualsiasi valore. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
+      "noteRoutine": "{{routine}} lo fa da sola d'ora in poi, con qualsiasi valore: {{actions}}. Fuori da questa routine continua a chiedere. Per annullare: le impostazioni della routine.",
       "doneRoutine": "Approvato. {{routine}} non lo chiederà più.",
       "undoRoutine": "Per annullarlo, vai nelle impostazioni della routine."
     },
@@ -4723,7 +4722,7 @@
       "showSteps": "Vedi ogni passo",
       "hideSteps": "Nascondi i passi",
       "asked": "Ha chiesto un'approvazione",
-      "grants": "{{name}} potrà {{doing}}, solo questa volta e con questi valori."
+      "grants": "{{name}} lo farà solo questa volta e con questi valori: {{doing}}."
     }
   },
   "agent": {
@@ -16108,6 +16107,7 @@
       "no_ai_computer_away": "Ora non posso rispondere: il computer del mio piano non è disponibile.",
       "no_ai_computer_failed": "Ora non posso rispondere: il computer del mio piano ha avuto un problema.",
       "no_ai_cli_failed": "Ora non posso rispondere: l'IA del mio piano si è fermata con un errore.",
+      "no_ai_cli_failedWhy": "Ora non posso rispondere: l'IA del mio piano si è fermata con un errore ({{why}}).",
       "no_ai_plan_limit": "Ora non posso rispondere: il piano con cui penso ha raggiunto il limite.",
       "no_ai_plan_not_shared": "Non posso risponderti con il piano del workspace: risponde solo al suo proprietario. Collega il tuo piano e ti risponderò.",
       "no_ai_plan_unattended": "Non ho risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
@@ -17508,8 +17508,7 @@
       "task": "Attività",
       "state": "Stato",
       "using": "Sta usando",
-      "time": "Durata",
-      "computer": "Gira su"
+      "time": "Durata"
     },
     "sections": {
       "asked": "Chieste da persone",
@@ -17571,7 +17570,6 @@
     },
     "askedBy": "L'ha chiesta {{name}}",
     "askedByYou": "L'hai chiesta tu",
-    "servers": "I nostri server",
     "plan": "{{done}} di {{total}} fatti",
     "program": {
       "browser": "Browser",

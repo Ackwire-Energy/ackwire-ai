@@ -37,7 +37,6 @@
     "table": "表格",
     "chartItem": "项目",
     "chartShare": "占比",
-    "chartPending": "正在生成图表…",
     "you": "你",
     "saved": "已保存",
     "youSuffix": "（你）",
@@ -2455,6 +2454,7 @@
       "computer_away": "{{name}} 现在无法回答：套餐所在的电脑不可用。",
       "computer_failed": "{{name}} 现在无法回答：套餐所在的电脑出了问题。",
       "cli_failed": "{{name}} 现在无法回答：套餐的 AI 因出错而停止。",
+      "cli_failedWhy": "{{name}} 现在无法回答：套餐的 AI 因出错而停止（{{why}}）。",
       "plan_limit": "{{name}} 现在无法回答：套餐已达到上限。",
       "plan_not_shared": "连接你自己的套餐才能与{{name}}交谈：工作区的套餐只回复其所有者。",
       "plan_unattended": "{{name}} 没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
@@ -3184,7 +3184,6 @@
     "messageTo": "发给 {{name}} 的消息",
     "audienceEdit": "编辑",
     "nowIn": "正在 #{{channel}} 中",
-    "answersHere": "在这里无需 @ 也会回复",
     "more": "更多",
     "of": "{{name}} 的个人资料",
     "presence": "在线状态",
@@ -15127,6 +15126,7 @@
       "no_ai_computer_away": "我现在无法回答：我的套餐所在的电脑不可用。",
       "no_ai_computer_failed": "我现在无法回答：我的套餐所在的电脑出了问题。",
       "no_ai_cli_failed": "我现在无法回答：我的套餐的 AI 因出错而停止。",
+      "no_ai_cli_failedWhy": "我现在无法回答：我的套餐的 AI 因出错而停止（{{why}}）。",
       "no_ai_plan_limit": "我现在无法回答：我用来思考的套餐已达到上限。",
       "no_ai_plan_not_shared": "我无法通过工作区的套餐回复你：它只回复其所有者。连接你自己的套餐后我就能回复。",
       "no_ai_plan_unattended": "我没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
@@ -16493,8 +16493,7 @@
       "task": "任务",
       "state": "状态",
       "using": "正在使用",
-      "time": "时长",
-      "computer": "运行位置"
+      "time": "时长"
     },
     "sections": {
       "asked": "成员的请求",
@@ -16554,7 +16553,6 @@
     },
     "askedBy": "由 {{name}} 提出",
     "askedByYou": "由你提出",
-    "servers": "agentes 服务器",
     "plan": "已完成 {{done}}/{{total}}",
     "program": {
       "browser": "浏览器",

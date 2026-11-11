@@ -93,3 +93,18 @@ test("every page starts at the page's top and side: lists, Settings, the wiki, t
     [],
   );
 });
+
+test("your name and @ wrap whole: on the account menu's top they go on under your face, in the sidebar never cut", async () => {
+  const layout = topLevel(await read("layout.css"));
+  // The face floats: the words beside it go on under it at the menu's width, a long @ breaking anywhere.
+  expect(last(layout, ".profile-menu__head", "display")).toBe("flow-root");
+  expect(last(layout, ".profile-menu__head", "overflow-wrap")).toBe("anywhere");
+  expect(last(layout, ".profile-menu__head>.ac-face-edit", "float")).toBe("left");
+  expect(last(layout, ".profile-menu__head>.list-col", "display")).toBe("block");
+  // The account row at a team's foot and a personal workspace's top row: the name wraps, no ellipsis.
+  const cut = declarations(layout, ".sidebar__user-name").filter(([p]) => p === "text-overflow" || p === "white-space");
+  expect(cut).toEqual([]);
+  expect(last(layout, ".sidebar__user-name", "overflow-wrap")).toBe("anywhere");
+  expect(last(layout, ".sidebar__org-button--me .sidebar__org-name", "white-space")).toBe("normal");
+  expect(last(layout, ".sidebar__org-button--me .sidebar__org-name", "overflow-wrap")).toBe("anywhere");
+});

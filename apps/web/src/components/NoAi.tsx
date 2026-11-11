@@ -15,6 +15,7 @@ import {
   noAiStatusKey,
   opensByItself,
   planLineFix,
+  planLineKey,
   planLinePasses,
   planOfKind,
   type RightHandPlanLine,
@@ -121,7 +122,9 @@ export function NoAiCard({ message }: { message: Message }) {
   // Any card on a billing hold is the wall: a Connect or a key from before it leads nowhere until the plan.
   if (card.held || hold) return <KeptCard message={message} card={card} hold={hold} />;
   if (card.planLine)
-    return <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} model={card.model} />;
+    return (
+      <PlanLineCard message={message} agentId={card.agentId} line={card.planLine} model={card.model} why={card.why} />
+    );
   const agent = dir.agentById.get(card.agentId);
   const name = agent?.name ?? t("channel.unknownAgent");
   const again = signInAgainPlan(card, agent);
@@ -317,11 +320,13 @@ function PlanLineCard({
   agentId,
   line,
   model,
+  why,
 }: {
   message: Message;
   agentId: string;
   line: RightHandPlanLine;
   model?: string;
+  why?: string;
 }) {
   const { t } = useTranslation();
   const { org, me } = useOrg();
@@ -347,7 +352,7 @@ function PlanLineCard({
         {t("noAi.card.connected", { name })}
       </RequestDone>
     );
-  const sentence = t(`noAi.rightHand.${line}`, { name, model });
+  const sentence = t(planLineKey(line, why), { name, model, why });
   const mine = connect !== null && (fix === "connectMine" || fix === "useKey");
   return (
     <RequestOpen

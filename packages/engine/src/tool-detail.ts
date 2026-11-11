@@ -10,7 +10,7 @@ import {
   SIGNED_SHAPES,
 } from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
-import { cutText } from "./format";
+import { clipText } from "@agenteschat/ui/widgets/spec";
 
 const MAX = 80;
 
@@ -249,7 +249,8 @@ const ABSOLUTE_PATH = /(?<![\w:/.~\\-])(?:~|[A-Za-z]:)?(?:[\\/][^\s\\/:"'()<>,;]
 /**
  * What a command-line tool said when it failed, as anyone in the conversation may read it: a provider's JSON answer's
  * own `message`, else its last line that names an error, else its last line. No stack frames, credentials and sign-ins
- * masked, absolute paths cut to their last part (they name people's folders), one line of at most 200 characters.
+ * masked, absolute paths cut to their last part (they name people's folders), one line of at most 200 characters (cut
+ * at a word, with "…").
  */
 export function cliErrorWords(text: string): string {
   let said = "";
@@ -273,7 +274,7 @@ export function cliErrorWords(text: string): string {
     .replace(/^(?:Uncaught )?error:\s*/i, "")
     .replace(/\s+/g, " ")
     .trim();
-  return cutText(short, 200);
+  return clipText(short, 200);
 }
 
 export const PREVIEW_CODE_CHARS = 4096;

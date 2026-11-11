@@ -13,7 +13,6 @@ import {
   useCardProposals,
 } from "@agenteschat/client";
 import { agentProposalOf, proposalStatus } from "@agenteschat/client/lib/action-cards";
-import { entriesOffScreen } from "@agenteschat/client/lib/activity";
 import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { askKindWords } from "@agenteschat/client/lib/approval-words";
 import { timeLeft } from "@agenteschat/client/lib/format";
@@ -77,11 +76,10 @@ import {
   secretRequestOf,
   timerDelay,
 } from "./ask-store";
-import { LineStop, useRowsInView } from "./LiveRows";
+import { LineStop } from "./LiveRows";
 import { approvalIdOf, lineStops, markedParts, markName, parseInline, questionOf, workingEntries } from "./logic";
 import { useCardTop, useOwnTop } from "./look";
 import { Spans } from "./MessageSpans";
-import type { RowSight } from "./row-sight";
 
 /**
  * A request in the conversation (an approval, a secret, a question, help in the agent's browser or on its
@@ -755,7 +753,6 @@ export function AskBar({
   consults,
   canStop,
   onStop,
-  sight,
 }: {
   away: AwayAsk;
   onSee: () => void;
@@ -764,8 +761,6 @@ export function AskBar({
   consults: LiveConsult[];
   canStop: (run: LiveRun) => boolean;
   onStop: (run: LiveRun) => void;
-  /** Which agents' live rows are on screen (theirs carry their stop). */
-  sight: RowSight;
 }) {
   const { t } = useTranslation();
   const dir = useDirectory();
@@ -784,17 +779,10 @@ export function AskBar({
   }).replace(/<\/?b>/g, "");
   const parts = markedParts(sentence);
   const plain = parts.map((p) => p.text).join("");
-  const inView = useRowsInView(sight);
-  const rowInView = (r: LiveRun) => inView.has(r.runId);
   const stops = lineStops(
-    entriesOffScreen(
-      workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
-      runs,
-      rowInView,
-    ),
+    workingEntries(runs, consults, (id) => dir.agentById.get(id)?.name ?? ""),
     runs,
     canStop,
-    rowInView,
   );
   // "See" scrolls to the card: no haptic.
   const see = onSee;
@@ -907,8 +895,9 @@ const styles = StyleSheet.create({
   done: { alignSelf: "stretch" },
   // The breathing square centered in the pill's 14-point mark.
   waitMark: { width: 14, height: 14, alignItems: "center", justifyContent: "center" },
-  // The bar: the working line's shape (WorkingLine), so one replaces the other without moving.
-  dock: { paddingHorizontal: 4, paddingBottom: 6 },
+  // The bar: the working line's shape and width (WorkingLine, the composer's edges), so one replaces the other
+  // without moving.
+  dock: { paddingBottom: 6 },
   pill: {
     flexDirection: "row",
     alignItems: "center",

@@ -37,7 +37,6 @@
     "table": "Tabel",
     "chartItem": "Item",
     "chartShare": "Porsi",
-    "chartPending": "Membuat grafik…",
     "you": "kamu",
     "saved": "Tersimpan",
     "youSuffix": " (kamu)",
@@ -2462,6 +2461,7 @@
       "computer_away": "{{name}} tidak bisa menjawab sekarang: komputer paketnya sedang tidak tersedia.",
       "computer_failed": "{{name}} tidak bisa menjawab sekarang: komputer paketnya mengalami masalah.",
       "cli_failed": "{{name}} tidak bisa menjawab sekarang: AI paketnya berhenti karena kesalahan.",
+      "cli_failedWhy": "{{name}} tidak bisa menjawab sekarang: AI paketnya berhenti karena kesalahan ({{why}}).",
       "plan_limit": "{{name}} tidak bisa menjawab sekarang: paketnya sudah mencapai batas.",
       "plan_not_shared": "Hubungkan paketmu sendiri untuk berbicara dengan {{name}}: paket workspace hanya menjawab pemiliknya.",
       "plan_unattended": "{{name}} tidak menjawab: permintaannya tidak datang dari seseorang, dan paket workspace hanya menjawab pemiliknya.",
@@ -3194,7 +3194,6 @@
     "messageTo": "Pesan untuk {{name}}",
     "audienceEdit": "Ubah",
     "nowIn": "sekarang, di #{{channel}}",
-    "answersHere": "Menjawab di sini tanpa perlu @",
     "more": "Lainnya",
     "of": "Profil {{name}}",
     "presence": "Kehadiran",
@@ -15113,6 +15112,7 @@
       "no_ai_computer_away": "Aku tidak bisa menjawab sekarang: komputer paketku sedang tidak tersedia.",
       "no_ai_computer_failed": "Aku tidak bisa menjawab sekarang: komputer paketku mengalami masalah.",
       "no_ai_cli_failed": "Aku tidak bisa menjawab sekarang: AI paketku berhenti karena kesalahan.",
+      "no_ai_cli_failedWhy": "Aku tidak bisa menjawab sekarang: AI paketku berhenti karena kesalahan ({{why}}).",
       "no_ai_plan_limit": "Aku tidak bisa menjawab sekarang: paket yang kupakai untuk berpikir sudah mencapai batas.",
       "no_ai_plan_not_shared": "Aku tidak bisa menjawabmu lewat paket workspace: paket itu hanya menjawab pemiliknya. Hubungkan paketmu sendiri dan aku akan menjawab.",
       "no_ai_plan_unattended": "Aku tidak menjawab: permintaannya tidak datang dari seseorang, dan paket workspace hanya menjawab pemiliknya.",
@@ -16419,8 +16419,7 @@
       "task": "Tugas",
       "state": "Status",
       "using": "Sedang dipakai",
-      "time": "Waktu",
-      "computer": "Berjalan di"
+      "time": "Waktu"
     },
     "sections": {
       "asked": "Diminta oleh orang",
@@ -16480,7 +16479,6 @@
     },
     "askedBy": "{{name}} meminta",
     "askedByYou": "Kamu meminta",
-    "servers": "Server kami",
     "plan": "{{done}} dari {{total}} selesai",
     "program": {
       "browser": "Browser",

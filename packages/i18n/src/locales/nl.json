@@ -37,7 +37,6 @@
     "table": "Tabel",
     "chartItem": "Item",
     "chartShare": "Aandeel",
-    "chartPending": "De grafiek wordt gemaakt…",
     "you": "jij",
     "saved": "Opgeslagen",
     "youSuffix": " (jij)",
@@ -2556,6 +2555,7 @@
       "computer_away": "{{name}} kan nu niet antwoorden: de computer van het abonnement is niet bereikbaar.",
       "computer_failed": "{{name}} kan nu niet antwoorden: de computer van het abonnement had een probleem.",
       "cli_failed": "{{name}} kan nu niet antwoorden: de AI van het abonnement is gestopt met een fout.",
+      "cli_failedWhy": "{{name}} kan nu niet antwoorden: de AI van het abonnement is gestopt met een fout ({{why}}).",
       "plan_limit": "{{name}} kan nu niet antwoorden: het abonnement heeft zijn limiet bereikt.",
       "plan_not_shared": "Koppel je eigen abonnement om met {{name}} te praten: het abonnement van de workspace antwoordt alleen de eigenaar.",
       "plan_unattended": "{{name}} heeft niet geantwoord: het verzoek kwam niet van een persoon, en het abonnement van de workspace antwoordt alleen de eigenaar.",
@@ -3302,7 +3302,6 @@
     "messageTo": "Bericht aan {{name}}",
     "audienceEdit": "Bewerken",
     "nowIn": "nu, in #{{channel}}",
-    "answersHere": "Antwoordt hier zonder @",
     "more": "Meer",
     "of": "Profiel van {{name}}",
     "presence": "Aanwezigheid",
@@ -15661,6 +15660,7 @@
       "no_ai_computer_away": "Ik kan nu niet antwoorden: de computer van mijn abonnement is niet bereikbaar.",
       "no_ai_computer_failed": "Ik kan nu niet antwoorden: de computer van mijn abonnement had een probleem.",
       "no_ai_cli_failed": "Ik kan nu niet antwoorden: de AI van mijn abonnement is gestopt met een fout.",
+      "no_ai_cli_failedWhy": "Ik kan nu niet antwoorden: de AI van mijn abonnement is gestopt met een fout ({{why}}).",
       "no_ai_plan_limit": "Ik kan nu niet antwoorden: het abonnement waarmee ik denk heeft zijn limiet bereikt.",
       "no_ai_plan_not_shared": "Ik kan je niet antwoorden via het abonnement van de workspace: het antwoordt alleen de eigenaar. Koppel je eigen abonnement, dan antwoord ik.",
       "no_ai_plan_unattended": "Ik heb niet geantwoord: het verzoek kwam niet van een persoon, en het abonnement van de workspace antwoordt alleen de eigenaar.",
@@ -17044,8 +17044,7 @@
       "task": "Taak",
       "state": "Status",
       "using": "Gebruikt nu",
-      "time": "Tijd",
-      "computer": "Draait op"
+      "time": "Tijd"
     },
     "sections": {
       "asked": "Gevraagd door mensen",
@@ -17106,7 +17105,6 @@
     },
     "askedBy": "{{name}} vroeg het",
     "askedByYou": "Jij vroeg het",
-    "servers": "Onze servers",
     "plan": "{{done}} van {{total}} klaar",
     "program": {
       "browser": "Browser",

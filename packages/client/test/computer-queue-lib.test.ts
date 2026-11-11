@@ -5,6 +5,7 @@ import type { ComputerQueue } from "../src/api/types";
 import {
   awayText,
   conversationWaits,
+  durationText,
   fanChipText,
   fanOutOf,
   fanOutText,
@@ -158,6 +159,15 @@ test("rows: what each turn is for, never its content, where, and its estimate", 
   );
   expect(queueStartText(en, queue.waiting[3] as never, agentName, NOW)).toBeNull();
   expect(awayText(en, at(-3), NOW)).toBe("Away 3 min");
+});
+
+test("how long something has gone on: seconds, minutes, hours, then days past two of them", () => {
+  const hour = 3_600_000;
+  expect(durationText(pt, 40_000)).toBe("40 s");
+  expect(durationText(pt, 25 * 60_000)).toBe("25 min");
+  expect(durationText(pt, 47 * hour)).toBe("47 h");
+  expect(durationText(pt, 82 * hour)).toBe("3 dias");
+  expect(durationText(en, 82 * hour)).toBe("3 days");
 });
 
 test("what fills the computer, by what each turn is for", () => {

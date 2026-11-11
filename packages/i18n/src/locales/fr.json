@@ -37,7 +37,6 @@
     "table": "Tableau",
     "chartItem": "Élément",
     "chartShare": "Part",
-    "chartPending": "Création du graphique…",
     "you": "vous",
     "saved": "Enregistré",
     "youSuffix": " (vous)",
@@ -2650,6 +2649,7 @@
       "computer_away": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement n'est pas disponible.",
       "computer_failed": "{{name}} ne peut pas répondre maintenant : l'ordinateur de l'abonnement a eu un problème.",
       "cli_failed": "{{name}} ne peut pas répondre maintenant : l'IA de l'abonnement s'est arrêtée sur une erreur.",
+      "cli_failedWhy": "{{name}} ne peut pas répondre maintenant : l'IA de l'abonnement s'est arrêtée sur une erreur ({{why}}).",
       "plan_limit": "{{name}} ne peut pas répondre maintenant : l'abonnement a atteint sa limite.",
       "plan_not_shared": "Connectez votre propre forfait pour parler à {{name}} : le forfait du workspace ne répond qu'à son propriétaire.",
       "plan_unattended": "{{name}} n'a pas répondu : la demande ne venait pas d'une personne, et le forfait du workspace ne répond qu'à son propriétaire.",
@@ -3411,7 +3411,6 @@
     "messageTo": "Message à {{name}}",
     "audienceEdit": "Modifier",
     "nowIn": "en ce moment, dans #{{channel}}",
-    "answersHere": "Répond ici sans besoin de @",
     "more": "Plus",
     "of": "Profil de {{name}}",
     "presence": "Présence",
@@ -16104,6 +16103,7 @@
       "no_ai_computer_away": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement n'est pas disponible.",
       "no_ai_computer_failed": "Je ne peux pas répondre maintenant : l'ordinateur de mon abonnement a eu un problème.",
       "no_ai_cli_failed": "Je ne peux pas répondre maintenant : l'IA de mon abonnement s'est arrêtée sur une erreur.",
+      "no_ai_cli_failedWhy": "Je ne peux pas répondre maintenant : l'IA de mon abonnement s'est arrêtée sur une erreur ({{why}}).",
       "no_ai_plan_limit": "Je ne peux pas répondre maintenant : l'abonnement avec lequel je réfléchis a atteint sa limite.",
       "no_ai_plan_not_shared": "Je ne peux pas vous répondre par le forfait du workspace : il ne répond qu'à son propriétaire. Connectez votre propre forfait et je répondrai.",
       "no_ai_plan_unattended": "Je n'ai pas répondu : la demande ne venait pas d'une personne, et le forfait du workspace ne répond qu'à son propriétaire.",
@@ -17504,8 +17504,7 @@
       "task": "Tâche",
       "state": "État",
       "using": "Utilise maintenant",
-      "time": "Durée",
-      "computer": "Tourne sur"
+      "time": "Durée"
     },
     "sections": {
       "asked": "Demandées par des personnes",
@@ -17567,7 +17566,6 @@
     },
     "askedBy": "Demande de {{name}}",
     "askedByYou": "Votre demande",
-    "servers": "Nos serveurs",
     "plan": "{{done}} sur {{total}} faits",
     "program": {
       "browser": "Navigateur",

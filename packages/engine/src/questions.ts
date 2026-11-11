@@ -7,6 +7,7 @@ import { consultedFor, NO_PERSON_READS } from "./consultations";
 import { isAgentOnlyDm } from "./dms";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent } from "./events";
+import { hasQuestionMark } from "./format";
 import type { ResourcefulDeps } from "./hand-off";
 import { notifyQuestion, resolveQuestionNotifications } from "./notification-producers";
 import { enqueue } from "./outbox";
@@ -23,6 +24,9 @@ export const ASK_USER_TOOL = "ask_user";
 export const QUESTION_MAX_CHARS = 300;
 export const questionTooLong = (length: number) =>
   `Not asked: this question is ${length} characters, and a card holds one short question (at most ${QUESTION_MAX_CHARS}). Write what you found and your plan in your text first (it is posted above the card), then call ask_user again with one short question, with choices when they fit (e.g. "Can I start filling in the form?" with Yes and Not yet, in the people's language).`;
+/** What the run reads when its card would ask nothing: no question mark (`hasQuestionMark`) and no choices. */
+export const NOT_A_QUESTION =
+  "Not asked: this asks nothing, with no question mark and no choices to pick from. Put it in your reply, or end your turn if your reply already says it: nobody waits on a note. If you need an answer to go on, call ask_user again with one direct question.";
 
 /** The shape the app renders (`meta.question`, `question.asked` / `question.answered`). */
 export interface AgentQuestion {
@@ -82,8 +86,9 @@ export const questionCardMeta = (q: AgentQuestionRow, why: string) => ({
  * to the executor, which posts it in the thread and suspends the run
  * (`waiting_input`). A consulted agent asks from the agents' DM, which no
  * person reads: its card goes where the person behind it asked (ADR 0034).
- * With a judge, a question for something the run could find, a secret asked in the chat, or one that asks for
- * nothing the run needs, is held first (`holdAsk`, ADR 0109 addendum).
+ * Text that asks nothing (no question mark, no choices) is refused with no judgment (`NOT_A_QUESTION`). With a
+ * judge, a question for something the run could find, a secret asked in the chat, or one that asks for nothing the
+ * run needs, is held first (`holdAsk`, ADR 0109 addendum).
  */
 export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource {
   const tool: ToolDefinition = {
@@ -138,12 +143,13 @@ export function createAskUserToolSource(deps: ResourcefulDeps = {}): ToolSource 
       }
       const text = typeof input.question === "string" ? input.question.trim() : "";
       if (text.length > QUESTION_MAX_CHARS) return { content: questionTooLong(text.length), isError: true };
-      // Loaded here: the check pulls in the controller, which imports most of the engine.
-      const held = await (await import("./hand-off")).holdAsk(deps, ctx, text);
-      if (held) return { content: held, data: { held: true } };
       const choices = Array.isArray(input.choices)
         ? [...new Set((input.choices as unknown[]).map((c) => String(c).trim()).filter(Boolean))]
         : [];
+      if (!hasQuestionMark(text) && choices.length < 2) return { content: NOT_A_QUESTION, isError: true };
+      // Loaded here: the check pulls in the controller, which imports most of the engine.
+      const held = await (await import("./hand-off")).holdAsk(deps, ctx, text);
+      if (held) return { content: held, data: { held: true } };
       return {
         content: "",
         waitForAnswer: { text, choices: choices.length >= 2 ? choices.slice(0, 4) : null, requestedForUserId },

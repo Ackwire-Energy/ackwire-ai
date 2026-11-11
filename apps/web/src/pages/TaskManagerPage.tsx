@@ -8,13 +8,14 @@ import {
   agentSummary,
   delegationText,
   endedState,
+  groupLead,
   groupTasks,
   helpersOf,
   hiddenCount,
-  taskClock,
   taskPlace,
   taskState,
   tasksOf,
+  taskTime,
   taskTitle,
   taskWhere,
   todayStart,
@@ -68,13 +69,28 @@ import "./task-manager.css";
 
 /*
  * The task manager (ADR 0128), one page: the agents as cards with their last half hour (one chosen shows only its
- * tasks), the tasks now (asked by people, grouped by agent, then the routines' background runs) with their state,
- * what each uses, its time, where it runs and Parar, and what ended today at the end. No cost anywhere: here people
- * stop work. A row or an agent chosen gives the toolbar "Ver passos" and "Parar tarefa" / "Parar tudo de Dev".
+ * tasks), the tasks now (asked by people, grouped by agent and folded until opened, then the routines' background
+ * runs) with their state, what each uses, its time and Parar, and what ended today at the end. No cost anywhere:
+ * here people stop work. A row or an agent's card chosen gives the toolbar "Ver passos" and "Parar tarefa" / "Parar
+ * tudo de Dev".
  */
 
 /** Points on a card's line: the last half hour, one per minute. */
 const LINE_POINTS = 30;
+
+/** A row's stop that asks first: the square alone, its words on hover and for screen readers (`what`: whose). */
+const stopSquare = (words: string, what?: string) => (
+  <Button
+    size="sm"
+    variant="ghost"
+    iconOnly
+    className="tm-stop"
+    aria-label={what ? `${words}: ${what}` : words}
+    title={words}
+  >
+    <PixelStop size={12} />
+  </Button>
+);
 
 /**
  * `agent`: that agent's card chosen as the page opens (`?agent=`, from its tasks' panel in a DM); `task`: that task's
@@ -99,13 +115,14 @@ export function TaskManagerPage({
   const programText = useProgramText();
   const { stop, stopping, said } = useTaskStop();
   const [q, setQ] = useState("");
-  // The agent card chosen (null: Todos), the row chosen (a run id, or `agent:<id>`), agents folded in the table.
+  // The agent card chosen (null: Todos), the task row chosen (a run id), the agents opened in the table.
   const [card, setCard] = useState<string | null>(agent ?? null);
   useEffect(() => {
     if (agent) setCard(agent);
   }, [agent]);
   const [selected, setSelected] = useState<string | null>(null);
-  const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+  const [shut, setShut] = useState<ReadonlySet<string>>(() => new Set());
   const [endedOpen, setEndedOpen] = useState(false);
   // Which "Parar tudo" confirmation is open: the toolbar's, or an agent row's (`row:<id>`).
   const [confirm, setConfirm] = useState<string | null>(null);
@@ -164,7 +181,6 @@ export function TaskManagerPage({
   if (card) addCard(card);
 
   const selTask = all.find((task) => task.runId === selected);
-  const selAgent = card ?? (selected?.startsWith("agent:") ? selected.slice("agent:".length) : null);
   const stoppableOf = (agentId: string) =>
     tasksOf(all, agentId)
       .filter((task) => task.canStop && !stopping.has(task.runId))
@@ -173,8 +189,14 @@ export function TaskManagerPage({
     setConfirm(null);
     setSelected((s) => (s === id ? null : id));
   };
-  const toggleFold = (key: string) =>
-    setFolded((was) => {
+  // A search opens every agent, so what it found shows; one folded during it stays folded until the search ends.
+  const searching = query !== "";
+  useEffect(() => {
+    if (!searching) setShut(new Set());
+  }, [searching]);
+  const isOpen = (key: string) => (searching ? !shut.has(key) : opened.has(key));
+  const toggle = (key: string) =>
+    (searching ? setShut : setOpened)((was) => {
       const next = new Set(was);
       if (!next.delete(key)) next.add(key);
       return next;
@@ -204,20 +226,13 @@ export function TaskManagerPage({
       chain={delegationText(t, task, (id) => dir.anyAgent(id)?.name, me.user.id)}
       stopAll={
         task.helpers && !stopping.has(task.runId)
-          ? stopChain(
-              task,
-              <Button size="sm" className="tm-stop">
-                <PixelStop size={12} />
-                {t("taskManager.actions.stopAll")}
-              </Button>,
-            )
+          ? stopChain(task, stopSquare(t("taskManager.actions.stopAll"), taskTitle(t, task)))
           : null
       }
       selected={selected === task.runId}
       stopping={stopping.has(task.runId)}
       onSelect={() => pick(task.runId)}
       onSteps={() => setPanel(task.runId)}
-      onQueue={setQueueOf}
       onStop={() => stopOne(task)}
     />
   );
@@ -225,7 +240,7 @@ export function TaskManagerPage({
   // Everyone's work counts here, as on the computers' rows; what the viewer may not see only counts.
   const working = summary.working + (hidden?.working ?? 0);
   const heading = card ? t("taskManager.agentTasks", { name: nameOf(card) }) : t("taskManager.now");
-  const barRunIds = selAgent ? stoppableOf(selAgent) : [];
+  const barRunIds = card ? stoppableOf(card) : [];
   const barHelpers = helpersOf(all.filter((task) => barRunIds.includes(task.runId)));
   const stopTool =
     selTask?.canStop && !stopping.has(selTask.runId) && selTask.helpers ? (
@@ -241,9 +256,9 @@ export function TaskManagerPage({
         <PixelStop size={12} />
         {t("taskManager.actions.stopTask")}
       </Button>
-    ) : !selTask && selAgent && barRunIds.length > 0 ? (
+    ) : !selTask && card && barRunIds.length > 0 ? (
       <StopAllConfirm
-        agentId={selAgent}
+        agentId={card}
         runIds={barRunIds}
         helpers={barHelpers}
         open={confirm === "bar"}
@@ -252,7 +267,7 @@ export function TaskManagerPage({
         trigger={
           <Button size="sm" variant="ghost" className="tm-tool-stop">
             <PixelStop size={12} />
-            {t("taskManager.actions.stopAllOf", { name: nameOf(selAgent) })}
+            {t("taskManager.actions.stopAllOf", { name: nameOf(card) })}
           </Button>
         }
       />
@@ -432,12 +447,11 @@ export function TaskManagerPage({
                       <AgentRow
                         group={g}
                         name={nameOf(g.agentId)}
-                        open={!folded.has(g.agentId)}
-                        onToggle={() => toggleFold(g.agentId)}
-                        selected={selected === `agent:${g.agentId}`}
-                        onSelect={() => pick(`agent:${g.agentId}`)}
+                        now={now}
+                        open={isOpen(g.agentId)}
+                        onToggle={() => toggle(g.agentId)}
                         stopAll={
-                          g.stoppable.length > 1 ? (
+                          g.stoppable.length > 0 ? (
                             <StopAllConfirm
                               agentId={g.agentId}
                               runIds={g.stoppable}
@@ -445,17 +459,12 @@ export function TaskManagerPage({
                               open={confirm === `row:${g.agentId}`}
                               onOpenChange={(open) => setConfirm(open ? `row:${g.agentId}` : null)}
                               onStop={(runIds, reason) => stop(runIds, reason, g.helpers > 0)}
-                              trigger={
-                                <Button size="sm" className="tm-stop">
-                                  <PixelStop size={12} />
-                                  {t("taskManager.confirm.stop", { count: g.stoppable.length })}
-                                </Button>
-                              }
+                              trigger={stopSquare(t("taskManager.actions.stopAllOf", { name: nameOf(g.agentId) }))}
                             />
                           ) : null
                         }
                       />
-                      {!folded.has(g.agentId) && g.tasks.map((task) => row(task, "grouped"))}
+                      {isOpen(g.agentId) && g.tasks.map((task) => row(task, "grouped"))}
                     </Fragment>
                   ))}
                 </TaskSection>
@@ -471,29 +480,23 @@ export function TaskManagerPage({
                       <AgentRow
                         group={g}
                         name={nameOf(g.agentId)}
-                        open={!folded.has(`by:${g.agentId}`)}
-                        onToggle={() => toggleFold(`by:${g.agentId}`)}
-                        selected={false}
-                        onSelect={() => toggleFold(`by:${g.agentId}`)}
+                        now={now}
+                        open={isOpen(`by:${g.agentId}`)}
+                        onToggle={() => toggle(`by:${g.agentId}`)}
                         stopAll={
-                          g.stoppable.length > 1 ? (
+                          g.stoppable.length > 0 ? (
                             <StopAllConfirm
                               agentId={g.agentId}
                               runIds={g.stoppable}
                               open={confirm === `by:${g.agentId}`}
                               onOpenChange={(open) => setConfirm(open ? `by:${g.agentId}` : null)}
                               onStop={(runIds, reason) => stop(runIds, reason, true)}
-                              trigger={
-                                <Button size="sm" className="tm-stop">
-                                  <PixelStop size={12} />
-                                  {t("taskManager.confirm.stop", { count: g.stoppable.length })}
-                                </Button>
-                              }
+                              trigger={stopSquare(t("taskManager.actions.stopAllOf", { name: nameOf(g.agentId) }))}
                             />
                           ) : null
                         }
                       />
-                      {!folded.has(`by:${g.agentId}`) && g.tasks.map((task) => row(task, "flat"))}
+                      {isOpen(`by:${g.agentId}`) && g.tasks.map((task) => row(task, "flat"))}
                     </Fragment>
                   ))}
                 </TaskSection>
@@ -582,7 +585,6 @@ function TaskTable({ children }: { children: ReactNode }) {
         <span>{t("taskManager.columns.state")}</span>
         <span>{t("taskManager.columns.using")}</span>
         <span className="tm-cell--time">{t("taskManager.columns.time")}</span>
-        <span className="tm-cell--where">{t("taskManager.columns.computer")}</span>
       </div>
       {children}
     </div>
@@ -615,8 +617,8 @@ function TaskSection({
 
 /**
  * One task: what it is (the whole row picks it), its state, what it uses now, its time (shaded as it grows, but not on
- * a wait with a known reason: that isn't stuck), where it runs and Parar. `grouped` sits under its agent's row; `flat`
- * (a routine's background run) shows its agent's face; `agent` is the list of one agent's tasks (its card chosen).
+ * a wait with a known reason: that isn't stuck) and Parar. `grouped` sits under its agent's row; `flat` (a routine's
+ * background run) shows its agent's face; `agent` is the list of one agent's tasks (its card chosen).
  */
 function TaskRow({
   task,
@@ -630,7 +632,6 @@ function TaskRow({
   stopping,
   onSelect,
   onSteps,
-  onQueue,
   onStop,
 }: {
   task: ManagedTask;
@@ -647,8 +648,6 @@ function TaskRow({
   onSelect: () => void;
   /** "Ver passos": its panel. */
   onSteps: () => void;
-  /** Its computer's line ("Onde roda"), in the line's dialog. */
-  onQueue: (machineId: string) => void;
   onStop: () => void;
 }) {
   const { t } = useTranslation();
@@ -668,8 +667,6 @@ function TaskRow({
   ]
     .filter(Boolean)
     .join(" · ");
-  const age = taskAge(task, now);
-  const machine = task.machine;
   // A routine's run shows its agent's face (its section has no agent rows); a person's task, its state's mark.
   const face = (
     <OpensAgent agentId={task.agentId}>
@@ -682,7 +679,7 @@ function TaskRow({
         {look === "flat" ? face : <TaskMark task={task} />}
         <span className="tm-name">
           <button type="button" className="tm-hit" aria-pressed={selected} onClick={onSelect}>
-            <span className="tm-hit__text">{title}</span>
+            {title}
           </button>
           <small>{sub}</small>
         </span>
@@ -693,29 +690,7 @@ function TaskRow({
       <span className="tm-cell tm-cell--use">
         <UsingNow task={task} />
       </span>
-      <span
-        className="tm-cell tm-cell--time ac-num"
-        style={{ "--h": taskState(task) === "waiting" ? 0 : heatOf(age) } as CSSProperties}
-      >
-        {taskClock(age)}
-      </span>
-      <span className="tm-cell tm-cell--where">
-        {machine ? (
-          // On a computer: it opens that computer's line.
-          <button
-            type="button"
-            className="tm-where"
-            aria-label={`${t("queue.see")}: ${machine.name}`}
-            title={t("queue.see")}
-            onClick={() => onQueue(machine.id)}
-          >
-            <Icon name="computer" size={14} />
-            <span>{machine.name}</span>
-          </button>
-        ) : (
-          t("taskManager.servers")
-        )}
-      </span>
+      <TaskTime task={task} now={now} />
       <span className="tm-cell tm-cell--act">
         <Button
           size="sm"
@@ -728,29 +703,49 @@ function TaskRow({
         />
         {task.canStop &&
           (stopAll ?? (
-            <StopTaskButton label={t("taskManager.actions.stop")} title={title} stopping={stopping} onClick={onStop} />
+            <StopTaskButton
+              label={t("taskManager.actions.stop")}
+              title={title}
+              stopping={stopping}
+              onClick={onStop}
+              compact
+            />
           ))}
       </span>
     </li>
   );
 }
 
-/** An agent's row over its tasks: fold, its face and count, how it stands, the apps it uses now, "Parar 2". */
+/** "Tempo": the task's time (`taskTime`), warming as its work goes on; a wait never warms, it isn't stuck. */
+function TaskTime({ task, now }: { task: ManagedTask; now: number }) {
+  const { t } = useTranslation();
+  return (
+    <span
+      className="tm-cell tm-cell--time ac-num"
+      style={{ "--h": taskState(task) === "waiting" ? 0 : heatOf(taskAge(task, now)) } as CSSProperties}
+    >
+      {taskTime(t, task, now)}
+    </span>
+  );
+}
+
+/**
+ * An agent's row over its tasks, folded until opened (the whole row opens it): its face and count, how it stands,
+ * the apps it uses now, the time of the task its state is about (`groupLead`), and its stop for all of them.
+ */
 function AgentRow({
   group,
   name,
+  now,
   open,
   onToggle,
-  selected,
-  onSelect,
   stopAll,
 }: {
   group: AgentTasks;
   name: string;
+  now: number;
   open: boolean;
   onToggle: () => void;
-  selected: boolean;
-  onSelect: () => void;
   stopAll: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -769,35 +764,36 @@ function AgentRow({
     <Chip icon="clock">{t("taskManager.state.queued")}</Chip>
   );
   return (
-    <li className="tm-row tm-row--agent" data-selected={selected || undefined}>
+    <li className="tm-row tm-row--agent" data-open={open || undefined}>
       <span className="tm-cell tm-cell--name">
-        <button
-          type="button"
-          className="tm-twist"
-          aria-expanded={open}
-          aria-label={t("taskManager.toggleAgent", { name })}
-          onClick={onToggle}
-        >
-          <Icon name="chevronDown" size={14} />
-        </button>
-        <OpensAgent agentId={group.agentId}>
-          <AgentAvatar agentId={group.agentId} name={name} size="sm" />
-        </OpensAgent>
-        <span className="tm-name">
-          <button type="button" className="tm-hit" aria-pressed={selected} onClick={onSelect}>
-            {name}
-          </button>
+        <span className="tm-who">
+          <span className="tm-twist" aria-hidden="true">
+            <Icon name="chevronDown" size={14} />
+          </span>
+          <OpensAgent agentId={group.agentId}>
+            <AgentAvatar agentId={group.agentId} name={name} size="xs" />
+          </OpensAgent>
+          <span className="tm-name">
+            <button
+              type="button"
+              className="tm-hit"
+              aria-expanded={open}
+              aria-label={t("taskManager.toggleAgent", { name })}
+              onClick={onToggle}
+            >
+              {name}
+            </button>
+          </span>
+          <CountChip size="sm" aria-label={t("taskManager.tasks", { count: group.tasks.length })}>
+            {group.tasks.length}
+          </CountChip>
         </span>
-        <CountChip size="sm" aria-label={t("taskManager.tasks", { count: group.tasks.length })}>
-          {group.tasks.length}
-        </CountChip>
       </span>
       <span className="tm-cell tm-cell--state">{state}</span>
       <span className="tm-cell tm-cell--use">
         <ProgramStack tasks={group.tasks} />
       </span>
-      <span className="tm-cell tm-cell--time" />
-      <span className="tm-cell tm-cell--where" />
+      <TaskTime task={groupLead(group)} now={now} />
       <span className="tm-cell tm-cell--act">{stopAll}</span>
     </li>
   );
@@ -907,7 +903,7 @@ function EndedRow({
         </OpensAgent>
         <span className="tm-name">
           <button type="button" className="tm-hit" aria-pressed={selected} onClick={onOpen}>
-            <span className="tm-hit__text">{taskTitle(t, task)}</span>
+            {taskTitle(t, task)}
           </button>
           <small>{[agentName, taskPlace(t, task)].filter(Boolean).join(" · ")}</small>
         </span>

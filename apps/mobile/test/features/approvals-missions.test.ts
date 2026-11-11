@@ -530,6 +530,14 @@ describe("a request's sheet on the phone", () => {
     expect(parts).toContain("label={t(`mobile.approval.trait.${undo}`)}");
   });
 
+  test("Aprovar sempre's switch says what it covers behind its ⓘ: no paragraph under it, the sheet ends on its buttons", () => {
+    const sheet = read("approvals/ApprovalSheet.tsx");
+    const next = sheet.slice(sheet.indexOf('t("mobile.approval.sheet.nextTime")'), sheet.indexOf("{pending ? ("));
+    expect(next).toContain("toggle={always}");
+    expect(next).toContain('text: approveAlwaysHint(t, a, name || t("channel.unknownAgent"))');
+    expect(next).not.toContain("GroupedFooter");
+  });
+
   test("the undo trait it shows: a merge can be undone, a delete can't, and the foot keeps what it touches", () => {
     const merge = approval({ id: "m" });
     expect(approvalEffects(merge).undo).toBe("reversible");

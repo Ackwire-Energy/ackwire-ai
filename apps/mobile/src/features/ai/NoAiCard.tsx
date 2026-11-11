@@ -9,6 +9,7 @@ import {
   noAiCardOf,
   noAiLineKey,
   planLineFix,
+  planLineKey,
   planLinePasses,
   planOfKind,
   signInAgainPlan,
@@ -95,7 +96,7 @@ export function NoAiCard({ message: m }: { message: Message }) {
   const title = answering
     ? t("noAi.card.answering", { name })
     : planLine
-      ? t(`noAi.rightHand.${planLine}`, { name, model: card.model })
+      ? t(planLineKey(planLine, card.why), { name, model: card.model, why: card.why })
       : ready
         ? t("noAi.card.connected", { name })
         : answer === "still_missing"

@@ -1,12 +1,8 @@
 import type { ComputerSummary, EndedTask, ManagedTask } from "@agenteschat/client";
-import { type Activity, activityVerb } from "@agenteschat/client/lib/activity";
-import { capitalize } from "@agenteschat/client/lib/format";
-import { brainName } from "@agenteschat/client/lib/outages";
 import {
   type AgentTasks,
   delegationText,
   endedState,
-  type TaskProgram,
   taskState,
   tasksOf,
   taskWaitWords,
@@ -146,70 +142,6 @@ export function endedText(t: TFunction, task: Pick<EndedTask, "status" | "stoppe
 /** "Terminadas hoje", the latest first. */
 export const endedLatestFirst = (ended: readonly EndedTask[]) =>
   [...ended].sort((a, b) => Date.parse(b.finishedAt) - Date.parse(a.finishedAt));
-
-/** What a task uses now, as its line says it: a brain's product, one of the agent's own programs or an app. */
-export interface UsingNow {
-  /** A computer brain's mark (`claude_code`, `codex`, `cursor`); else the call's own logo (`activity`). */
-  brain: string | null;
-  activity: Activity | null;
-  /** "Claude Code", "Navegador", "GitHub". */
-  name: string;
-  /** "Navegador · página de cancelar", "PR #231". */
-  detail: string | null;
-}
-
-/**
- * "Usando agora": the program and what it does there. A brain says what it called through us, if anything; one of our
- * own tools says what it does ("agentes · Escrevendo na wiki"). `appName` names a connector's app (the catalog's
- * label); null while nothing runs (queued, or only thinking).
- */
-export function usingNow(
-  t: TFunction,
-  program: TaskProgram,
-  options: { locale?: string; appName?: (activity: Activity) => string } = {},
-): UsingNow | null {
-  const appName = options.appName ?? ((a: Activity) => a.app ?? "");
-  switch (program.kind) {
-    case "none":
-      return null;
-    case "brain": {
-      const inner = program.inner ? usingNow(t, program.inner, options) : null;
-      const detail = inner
-        ? inner.detail
-          ? t("taskManager.program.inside", { program: inner.name, detail: inner.detail })
-          : inner.name
-        : program.detail;
-      return { brain: program.brain, activity: null, name: brainName(program.brain), detail: detail || null };
-    }
-    case "browser":
-    case "screen":
-    case "terminal": {
-      const name =
-        program.kind === "browser"
-          ? t("taskManager.program.browser")
-          : program.kind === "screen"
-            ? t("taskManager.program.screen")
-            : t("taskManager.program.terminal");
-      return { brain: null, activity: program.activity, name, detail: program.detail };
-    }
-    case "app":
-      return {
-        brain: null,
-        activity: program.activity,
-        name: appName(program.activity) || program.activity.app || program.activity.service || "",
-        detail: program.detail,
-      };
-    case "agentes": {
-      const doing = capitalize(activityVerb(t, program.activity), options.locale);
-      return {
-        brain: null,
-        activity: program.activity,
-        name: t("taskManager.program.agentes"),
-        detail: [doing, program.detail].filter(Boolean).join(" · ") || null,
-      };
-    }
-  }
-}
 
 /** One agent's tasks now: its DM header's count and its tasks screen (ADR 0128). */
 export interface AgentTaskView {

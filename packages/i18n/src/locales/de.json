@@ -37,7 +37,6 @@
     "table": "Tabelle",
     "chartItem": "Element",
     "chartShare": "Anteil",
-    "chartPending": "Diagramm wird erstellt…",
     "you": "du",
     "saved": "Gespeichert",
     "youSuffix": " (du)",
@@ -2557,6 +2556,7 @@
       "computer_away": "{{name}} kann gerade nicht antworten: Der Computer, auf dem das Abo angemeldet ist, ist nicht erreichbar.",
       "computer_failed": "{{name}} kann gerade nicht antworten: Der Computer des Abos hatte ein Problem.",
       "cli_failed": "{{name}} kann gerade nicht antworten: Die KI des Abos wurde mit einem Fehler beendet.",
+      "cli_failedWhy": "{{name}} kann gerade nicht antworten: Die KI des Abos wurde mit einem Fehler beendet ({{why}}).",
       "plan_limit": "{{name}} kann gerade nicht antworten: Das Abo hat sein Limit erreicht.",
       "plan_not_shared": "Verbinde dein eigenes Abo, um mit {{name}} zu sprechen: Das Abo des Workspace antwortet nur der Person, der es gehört.",
       "plan_unattended": "{{name}} hat nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
@@ -3301,7 +3301,6 @@
     "messageTo": "Nachricht an {{name}}",
     "audienceEdit": "Bearbeiten",
     "nowIn": "jetzt in #{{channel}}",
-    "answersHere": "Antwortet hier ohne @",
     "more": "Mehr",
     "of": "Profil von {{name}}",
     "presence": "Status",
@@ -4003,7 +4002,7 @@
       "open": "Öffnen",
       "routine": "Immer in dieser Routine",
       "thisRoutine": "diese Routine",
-      "noteRoutine": "{{routine}} erledigt {{actions}} ab jetzt selbstständig, mit beliebigen Werten. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
+      "noteRoutine": "{{routine}} erledigt das ab jetzt selbstständig, mit beliebigen Werten: {{actions}}. Außerhalb dieser Routine wird weiter gefragt. Rückgängig machen: in den Einstellungen der Routine.",
       "doneRoutine": "Freigegeben. {{routine}} fragt danach nicht mehr.",
       "undoRoutine": "Zum Rückgängigmachen geh in die Einstellungen der Routine."
     },
@@ -4578,7 +4577,7 @@
       "showSteps": "Jeden Schritt ansehen",
       "hideSteps": "Schritte ausblenden",
       "asked": "Hat um Freigabe gebeten",
-      "grants": "{{name}} wird {{doing}}, nur dieses Mal und mit diesen Werten."
+      "grants": "{{name}} macht das nur dieses Mal und mit diesen Werten: {{doing}}."
     }
   },
   "agent": {
@@ -15593,6 +15592,7 @@
       "no_ai_computer_away": "Ich kann gerade nicht antworten: Der Computer, auf dem mein Abo angemeldet ist, ist nicht erreichbar.",
       "no_ai_computer_failed": "Ich kann gerade nicht antworten: Der Computer meines Abos hatte ein Problem.",
       "no_ai_cli_failed": "Ich kann gerade nicht antworten: Die KI meines Abos wurde mit einem Fehler beendet.",
+      "no_ai_cli_failedWhy": "Ich kann gerade nicht antworten: Die KI meines Abos wurde mit einem Fehler beendet ({{why}}).",
       "no_ai_plan_limit": "Ich kann gerade nicht antworten: Das Abo, mit dem ich denke, hat sein Limit erreicht.",
       "no_ai_plan_not_shared": "Über das Abo des Workspace kann ich dir nicht antworten: Es antwortet nur der Person, der es gehört. Verbinde dein eigenes Abo, dann antworte ich.",
       "no_ai_plan_unattended": "Ich habe nicht geantwortet: Die Anfrage kam nicht von einer Person, und das Abo des Workspace antwortet nur der Person, der es gehört.",
@@ -16868,8 +16868,7 @@
       "task": "Aufgabe",
       "state": "Status",
       "using": "Nutzt gerade",
-      "time": "Dauer",
-      "computer": "Läuft auf"
+      "time": "Dauer"
     },
     "sections": {
       "asked": "Von Personen beauftragt",
@@ -16930,7 +16929,6 @@
     },
     "askedBy": "Auftrag von {{name}}",
     "askedByYou": "Dein Auftrag",
-    "servers": "Unsere Server",
     "plan": "{{done}} von {{total}} erledigt",
     "program": {
       "browser": "Browser",

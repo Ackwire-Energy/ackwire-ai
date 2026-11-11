@@ -84,12 +84,12 @@ const openStatus = async () => {
   await press("ArrowRight");
   return screen().getAllByRole("menu")[1] as HTMLElement;
 };
-const names = (els: HTMLElement[]) => els.map((el) => el.textContent);
+const names = (els: HTMLElement[]) => els.map((el) => el.getAttribute("aria-label") ?? el.textContent);
 const statusCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "orgs.setStatus").map((c) => c.args);
 
 describe("the account menu", () => {
-  test("Enter opens it: me on top, then four items; focus goes in, Esc closes it and focus is back on the row", async () => {
+  test("Enter opens it: me on top, my face first, then four items; Esc closes it and focus is back on the row", async () => {
     await go();
     const row = account();
     expect(row.getAttribute("aria-haspopup")).toBe("menu");
@@ -102,11 +102,14 @@ describe("the account menu", () => {
     expect(head?.textContent).toContain("@walter · Online");
     expect(head?.querySelector(".ac-presence")?.getAttribute("data-presence")).toBe("online");
     expect(names(within(menu).getAllByRole("menuitem"))).toEqual([
+      "Trocar foto",
       "Definir status",
       "Editar perfil",
       "Configurações",
       "Sair",
     ]);
+    expect(document.activeElement?.getAttribute("aria-label")).toBe("Trocar foto");
+    await press("ArrowDown");
     expect(document.activeElement?.textContent).toBe("Definir status");
     await press("ArrowDown");
     expect(document.activeElement?.textContent).toBe("Editar perfil");
@@ -157,6 +160,8 @@ describe("the account menu", () => {
     const menu = await openMenu();
     expect(menu.querySelector(".profile-menu__head")?.textContent).toContain("@walter · Ocupado");
     expect(menu.querySelector(".profile-menu__line")?.textContent).toBe("📅Em reuniãoAté você mudar");
+    // Past my face, the first row.
+    await press("ArrowDown");
     await press("ArrowRight");
     const status = screen().getAllByRole("menu")[1] as HTMLElement;
     expect(within(status).getByRole("menuitemradio", { name: "Ocupado" }).getAttribute("aria-checked")).toBe("true");
@@ -177,6 +182,72 @@ describe("the account menu", () => {
     await click(within(dialog).getByRole("button", { name: "Cancelar" }));
     expect(screen().queryByRole("dialog")).toBeNull();
     expect(document.activeElement === row).toBe(true);
+  });
+
+  test("my face on top changes my photo: Enter on it asks how I want to appear, Esc brings focus back to the row", async () => {
+    const { router } = await go();
+    const row = account();
+    const menu = await openMenu();
+    const face = within(menu).getByRole("menuitem", { name: "Trocar foto" });
+    // My face as everywhere, with how I appear; the glyph over it shows on hover and focus, the photo badge on a touch
+    // screen, both for the eyes only.
+    expect(face.getAttribute("title")).toBe("Trocar foto");
+    expect(face.querySelector(".ac-avatar .ac-presence")?.getAttribute("data-presence")).toBe("online");
+    for (const part of [".ac-face-edit__glyph", ".ac-face-edit__badge"])
+      expect(face.querySelector(part)?.getAttribute("aria-hidden")).toBe("true");
+    expect(document.activeElement === face).toBe(true);
+    await press("Enter");
+    await settle(2);
+    expect(screen().queryByRole("menu")).toBeNull();
+    const ask = screen().getByRole("dialog", { name: "Como você quer aparecer?" });
+    expect(within(ask).getByRole("button", { name: /^Criar um avatar/ })).toBeTruthy();
+    expect(within(ask).getByRole("button", { name: /^Enviar uma foto/ })).toBeTruthy();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
+    await press("Escape");
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(document.activeElement === row).toBe(true);
+  });
+
+  test("its question leads where Editar perfil's does: the photo to upload, or the avatar builder", async () => {
+    await go();
+    await click(within(await openMenu()).getByRole("menuitem", { name: "Trocar foto" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Como você quer aparecer?" })).getByRole("button", {
+        name: /^Enviar uma foto/,
+      }),
+    );
+    const photo = screen().getByRole("dialog", { name: "Foto do perfil" });
+    expect(within(photo).getByRole("button", { name: /Solte uma imagem aqui/ })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Como você quer aparecer?" })).toBeNull();
+    await press("Escape");
+    expect(screen().queryByRole("dialog")).toBeNull();
+
+    await click(within(await openMenu()).getByRole("menuitem", { name: "Trocar foto" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Como você quer aparecer?" })).getByRole("button", {
+        name: /^Criar um avatar/,
+      }),
+    );
+    const builder = screen().getByRole("dialog", { name: "Seu avatar" });
+    expect(within(builder).getByRole("radio", { name: "Masculino" })).toBeTruthy();
+    // The photo is one link away there too.
+    await click(within(builder).getByRole("button", { name: "Enviar foto" }));
+    expect(screen().getByRole("dialog", { name: "Foto do perfil" })).toBeTruthy();
+    expect(screen().queryByRole("dialog", { name: "Seu avatar" })).toBeNull();
+  });
+
+  test("a long name and @ are whole on top and at the foot, the name's capitals at the face's top", async () => {
+    const long = "Maria Eduarda Albuquerque de Vasconcelos Figueiredo";
+    const state = seedState();
+    const walter = state.members.find((m) => m.userId === "u-walter");
+    if (walter) Object.assign(walter, { name: long, handle: "maria.eduarda.vasconcelos.figueiredo" });
+    if (state.me) state.me.user.name = long;
+    await go(state);
+    expect(account().querySelector(".sidebar__user-name")?.textContent).toBe(long);
+    const head = (await openMenu()).querySelector(".profile-menu__head");
+    // The name's capitals start at the face's top, as beside any face taller than its line.
+    expect(head?.querySelector(".profile-card__name.ac-captop")?.textContent).toBe(long);
+    expect(head?.textContent).toContain("@maria.eduarda.vasconcelos.figueiredo · Online");
   });
 
   test("my name is in my profile: one Salvar saves it, and the directory shows it at once", async () => {
@@ -241,6 +312,7 @@ describe("the account menu", () => {
       "Oculto",
     ]);
     expect(names(within(menu).getAllByRole("menuitem"))).toEqual([
+      "Trocar foto",
       "O que você está fazendo?",
       "Editar perfil",
       "Configurações",

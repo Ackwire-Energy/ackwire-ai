@@ -39,22 +39,29 @@ const approveCalls = (state: ReturnType<typeof seedState>) =>
   state.calls.filter((c) => c.method === "approvals.approve").map((c) => c.args);
 
 describe("Aprovar sempre on a request", () => {
-  test("in the conversation, on the card's face: the button, what it covers and where to undo it", async () => {
+  test("in the conversation, on the card's face: the button, and what it covers and where to undo it in its tip", async () => {
     const state = withComposio();
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     // Beside Aprovar and Agora não, without opening Ver detalhes.
     expect(card.querySelector(".rq__details")).toBeNull();
-    expect(card.textContent).toContain(HINT);
-    expect(card.querySelector(".ap-always")?.getAttribute("title")).toBe("GITHUB_CREATE_AN_ISSUE_COMMENT");
-    // One row under the text, in this order, and what it covers on its own line under them.
+    // One row of buttons under the text, in this order, and no line of words among them.
     const foot = card.querySelector(".rq__foot") as HTMLElement;
     expect([...foot.querySelectorAll(":scope > button")].map((b) => b.textContent).slice(1)).toEqual([
       "Aprovar sempre",
       "Agora não",
     ]);
-    expect(foot.querySelector(":scope > .ap-always")).not.toBeNull();
+    expect(foot.querySelector(":scope > p")).toBeNull();
+    expect(card.textContent).not.toContain(HINT);
+    // What it covers: the button's description, and its tip on a resting pointer.
+    const always = within(card).getByRole("button", { name: "Aprovar sempre" });
+    expect(always.getAttribute("aria-description")).toBe(HINT);
+    await act(async () => {
+      fireEvent.pointerEnter(always, { pointerType: "mouse" });
+      await Bun.sleep(300);
+    });
+    expect(document.querySelector(".ac-tip")?.textContent).toBe(HINT);
     await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
     expect(screen().getByRole("group", { name: "Aprovação concluída" })).toBeTruthy();
@@ -86,7 +93,10 @@ describe("Aprovar sempre on a request", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
-    expect(card.textContent).toContain("Fora desta rotina continua pedindo. Para desfazer: configurações da rotina.");
+    expect(card.textContent).not.toContain("Fora desta rotina");
+    expect(
+      within(card).getByRole("button", { name: "Sempre nesta rotina" }).getAttribute("aria-description"),
+    ).toContain("Fora desta rotina continua pedindo. Para desfazer: configurações da rotina.");
     await click(within(card).getByRole("button", { name: "Sempre nesta rotina" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, first.id, undefined, true]]);
     const toast = screen().getByRole("status");
@@ -110,7 +120,7 @@ describe("Aprovar sempre on a request", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
-    expect(card.textContent).toContain(
+    expect(within(card).getByRole("button", { name: "Aprovar sempre leituras" }).getAttribute("aria-description")).toBe(
       "Cobre só leituras de Rodar SQL, neste projeto (project_id=proj-a), de agora em diante. O que muda dados continua pedindo. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
@@ -125,7 +135,7 @@ describe("Aprovar sempre on a request", () => {
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     await seeDetails(card);
     expect(within(card).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
-    expect(card.querySelector(".ap-always")).toBeNull();
+    expect(card.querySelector("[aria-description]")).toBeNull();
     await click(within(card).getByRole("button", { name: "Aprovar merge" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined]]);
   });
@@ -141,11 +151,16 @@ describe("Aprovar sempre on a request", () => {
     expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
     await click(document.querySelector('.ap-li[data-id="ap-merge"]') as HTMLElement);
     const pane = screen().getByRole("region", { name: /\(GitHub\)$/ });
-    expect(pane.textContent).toContain(HINT);
-    // Beside Refuse and Approve, first in the bar.
-    const buttons = [...(pane.querySelector(".ap-bar__acts")?.querySelectorAll(".ac-locked > button") ?? [])];
+    // Beside Refuse and Approve, first in a bar of buttons alone: what each allows is in its tip.
+    const bar = pane.querySelector(".ap-bar") as HTMLElement;
+    expect(bar.querySelector("p")).toBeNull();
+    const buttons = [...(bar.querySelector(".ap-bar__acts")?.querySelectorAll(".ac-locked > button") ?? [])];
     expect(buttons.map((b) => b.textContent?.replace(/R$/, ""))).toEqual(["Aprovar sempre", "Recusar", "Aprovar"]);
+    expect(buttons[0]?.getAttribute("aria-description")).toBe(HINT);
     expect(buttons.at(-1)?.getAttribute("data-approve")).toBe("ap-merge");
+    expect(buttons.at(-1)?.getAttribute("aria-description")).toMatch(
+      /^Ada vai .+, só desta vez e com estes valores\.$/,
+    );
     await click(within(pane).getByRole("button", { name: "Aprovar sempre" }));
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
@@ -291,10 +306,11 @@ describe("a custom server's own tool, as Higgsfield's", () => {
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.querySelector(".rq__wt b")?.textContent).toBe("Gerar imagem");
     expect(card.textContent).not.toContain("generate_image");
-    expect(card.textContent).toContain(
+    const always = within(card).getByRole("button", { name: "Aprovar sempre" });
+    expect(always.getAttribute("aria-description")).toBe(
       "Cobre Gerar imagem, de agora em diante, com qualquer valor. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
-    await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
+    await click(always);
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
 
@@ -354,11 +370,11 @@ describe("git requests", () => {
     await settle(4);
     const card = screen().getByRole("group", { name: "Pedido de aprovação" });
     expect(card.textContent).toContain("Enviar para ana/fix em acme/app (24 h, sem force push)");
-    expect(card.textContent).toContain(
+    const always = within(card).getByRole("button", { name: "Aprovar sempre" });
+    expect(always.getAttribute("aria-description")).toBe(
       "Cobre enviar para ana/fix em acme/app, de agora em diante. Para desfazer: Ferramentas e acesso, na página da Ada.",
     );
-    expect(card.textContent).not.toContain("com qualquer valor");
-    await click(within(card).getByRole("button", { name: "Aprovar sempre" }));
+    await click(always);
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined, true]]);
   });
 

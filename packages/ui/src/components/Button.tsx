@@ -16,7 +16,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   /** The control ruler: `md` 40 (default), `sm` 32 (toolbars, rows, composer), `lg` 48 (only a full screen's main action). */
   size?: "md" | "sm" | "lg";
-  /** Leading icon. With `iconOnly`, the only content (then `aria-label` is required). */
+  /**
+   * Leading icon. With `iconOnly`, the only content (then `aria-label` is required); `iconOnly` with no `icon` shows
+   * its child as the glyph (a stop square, an `Icon` of its own).
+   */
   icon?: IconName;
   iconOnly?: boolean;
   block?: boolean;
@@ -78,7 +81,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     >
       {/* The label stays (invisible) while loading, so the width never changes. */}
       {leading && <Icon name={leading} />}
-      {!iconOnly && children}
+      {(!iconOnly || !leading) && children}
       {!iconOnly && kbd && kbd.length > 0 && (
         <span className="ac-btn__kbd" aria-hidden="true">
           {kbd.map((k) => (

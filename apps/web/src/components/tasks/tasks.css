@@ -36,24 +36,18 @@
   margin-left: -4px;
 }
 
-/* "Usando agora": the logo, the program, what it does in it. */
+/* "Usando agora": the logo on the program's line (`.ac-iconline`, in the program's own size and line), the program,
+   what it does in it, each whole (a long command breaks where it must). */
 .tm-use {
-  display: flex;
-  align-items: center;
-  gap: 9px;
   min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
 }
 .tm-use__text {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  line-height: 1.3;
-}
-.tm-use__text b,
-.tm-use__text small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .tm-use__text b {
   font-size: 13px;
@@ -97,9 +91,10 @@
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px 16px;
+  gap: var(--space-2) var(--space-4);
   margin: 0;
-  padding: 10px 14px;
+  /* The rows' sides, and a button's clear above and below it. */
+  padding: var(--action-clear) var(--space-3);
   border-top: 1px solid var(--line);
   background: var(--plate-soft);
   font-size: 13px;
@@ -299,24 +294,18 @@
   gap: 14px;
   padding: 14px var(--pane-x) 18px;
 }
+/* What it does now, and on what: one sentence that wraps whole, the orbit on its first line (`.ac-iconline`). */
 .tm-panel__now {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-width: 0;
   margin: 0;
   font-size: 14px;
   color: var(--ink2);
+  overflow-wrap: anywhere;
 }
 .tm-panel__now b {
-  flex: none;
   font-weight: 600;
 }
 .tm-panel__now small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-size: 13px;
   color: var(--faint);
 }
@@ -340,12 +329,21 @@
   font-weight: 600;
   color: var(--ink2);
 }
-/* Estado, Tempo, Usando agora, Onde roda: four wells, two by two. */
+/* Estado and Tempo side by side, Usando agora under them at the panel's width, so what it uses keeps the room to say it
+   whole; on a narrow phone one under another. */
 .tm-panel__facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
+}
+.tm-panel__facts:not(.tm-agentpanel__wells) > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+@media (max-width: 480px) {
+  .tm-panel__facts:not(.tm-agentpanel__wells) {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 .tm-panel__facts > div {
   min-width: 0;

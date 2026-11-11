@@ -4,7 +4,6 @@ import {
   Button,
   Dialog,
   DialogBody,
-  PixelSpinner,
   paintCells,
   paintLineArea,
   useElementWidth,
@@ -42,38 +41,21 @@ export const ChartAccent = createContext<AgentColor>("sky");
 
 /**
  * The agent's message a chart is in, where it can be pinned to a board as a widget (ADR 0135): its "Pin" button.
- * Null elsewhere (a live answer, a notice, a consultation): no button.
+ * Null elsewhere (a notice, a consultation): no button.
  */
 export const ChartMessage = createContext<{ messageId: string; agentId: string } | null>(null);
 
-/**
- * Charts already drawn once (by their data): when an answer stops streaming, the live row gives way to the
- * message and the chart mounts again; it shouldn't grow in twice.
- */
+/** Charts already drawn once (by their data): one mounted again (its row drawn again) shouldn't grow in twice. */
 const drawn = new Set<string>();
 const ChartStill = createContext(false);
 
 const reduceMotion = () => typeof matchMedia !== "undefined" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-/**
- * A ```chart block: the chart when its JSON reads as one, else the code (while an answer is still being
- * written, a "montando o gráfico" card instead of half a JSON).
- */
-export function ChartOrCode({ text, writing }: { text: string; writing?: boolean }) {
+/** A ```chart block: the chart when its JSON reads as one, else the code. */
+export function ChartOrCode({ text }: { text: string }) {
   const spec = useMemo(() => parseChart(text), [text]);
   if (spec) return <ChartBlock spec={spec} source={text} />;
-  if (writing) return <ChartPending />;
   return <CodeBlock lang="json" text={text} />;
-}
-
-function ChartPending() {
-  const { t } = useTranslation();
-  return (
-    <div className="chart-card chart-card--pending" role="status">
-      <PixelSpinner size={16} />
-      <span>{t("common.chartPending")}</span>
-    </div>
-  );
 }
 
 /**
