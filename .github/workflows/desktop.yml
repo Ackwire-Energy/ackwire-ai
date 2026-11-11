@@ -708,5 +708,8 @@ jobs:
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' > notes.txt
           if [ ! -s notes.txt ] || ! grep -q '[^[:space:]]' notes.txt; then echo "agentes.chat $VERSION" > notes.txt; fi
+          # How to open it the first time while the builds aren't notarized/signed (ADR 0036 §10). It starts with
+          # <!-- install -->, where the server cuts the notes the app shows on an update.
+          { echo; sed -e "s|{{repo}}|$GITHUB_REPOSITORY|g" -e "s|{{version}}|$VERSION|g" .github/desktop-install.md; } >> notes.txt
           ls -l out
           gh release create "$TAG" out/* --title "agentes.chat $VERSION" --notes-file notes.txt

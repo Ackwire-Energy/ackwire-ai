@@ -62,6 +62,10 @@ test("release body and checksum parsing", () => {
     minVersion: "0.2.0",
   });
   expect(parseReleaseBody(null)).toEqual({ notes: "" });
+  // The first-open steps the CI adds are for the release page, not the app's update notes.
+  expect(parseReleaseBody("- item\n\n<!-- install -->\n## Installing (first open)\nmin-version: 9.9.9")).toEqual({
+    notes: "- item",
+  });
   expect(parseSha256(`${SUM.toUpperCase()}  file.dmg`)).toBe(SUM);
   expect(parseSha256("nope")).toBeNull();
 });

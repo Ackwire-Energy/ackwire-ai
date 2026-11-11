@@ -79,10 +79,18 @@ export function desktopTarget(target: string | undefined, arch: string | undefin
   return null;
 }
 
-/** `min-version: x.y.z` out of a release body, and the notes without that line. */
+/**
+ * Where a release body's first-open steps start (`.github/desktop-install.md`, added by the desktop CI): they are for
+ * people downloading from the release page, not the app's update notes (ADR 0036 §10).
+ */
+export const INSTALL_NOTES_MARK = "<!-- install -->";
+
+/** `min-version: x.y.z` out of a release body, and the notes without that line or the first-open steps. */
 export function parseReleaseBody(body: string | null | undefined): { notes: string; minVersion?: string } {
   let minVersion: string | undefined;
-  const lines = (body ?? "").split(/\r?\n/).filter((line) => {
+  const text = body ?? "";
+  const cut = text.indexOf(INSTALL_NOTES_MARK);
+  const lines = (cut < 0 ? text : text.slice(0, cut)).split(/\r?\n/).filter((line) => {
     const m = line.match(/^\s*min-version:\s*v?(\S+)\s*$/i);
     if (!m) return true;
     if (m[1] && SEMVER.test(m[1])) minVersion = m[1];
