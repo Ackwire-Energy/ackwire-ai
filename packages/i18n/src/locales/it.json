@@ -13354,6 +13354,7 @@
     "onHost": "su {{host}}",
     "onHostChip": "Su {{host}}",
     "menu": "Azioni per {{name}}",
+    "settings": "Impostazioni",
     "rename": "Rinomina",
     "renameName": "Rinomina {{name}}",
     "renameTitle": "Rinomina il dispositivo",

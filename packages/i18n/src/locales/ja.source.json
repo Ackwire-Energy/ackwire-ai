@@ -31173,6 +31173,9 @@
   "devices.menu": {
     "value": "{{name}} actions"
   },
+  "devices.settings": {
+    "value": "Settings"
+  },
   "devices.rename": {
     "value": "Rename"
   },

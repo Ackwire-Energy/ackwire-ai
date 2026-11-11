@@ -12469,6 +12469,7 @@
     "onHost": "di {{host}}",
     "onHostChip": "Di {{host}}",
     "menu": "Tindakan {{name}}",
+    "settings": "Pengaturan",
     "rename": "Ganti nama",
     "renameName": "Ganti nama {{name}}",
     "renameTitle": "Ganti nama perangkat",

@@ -12415,6 +12415,7 @@
     "onHost": "{{host}}に接続",
     "onHostChip": "{{host}}に接続",
     "menu": "{{name}}の操作",
+    "settings": "設定",
     "rename": "名前を変更",
     "renameName": "{{name}}の名前を変更",
     "renameTitle": "デバイスの名前を変更",
