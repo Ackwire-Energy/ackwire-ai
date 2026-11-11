@@ -7374,7 +7374,7 @@ button.ac-voice__play:active {
   right: 8px;
   z-index: var(--z-lifted);
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
   padding: 2px;
   border-radius: var(--radius-item);
   background: var(--glass-solid);
