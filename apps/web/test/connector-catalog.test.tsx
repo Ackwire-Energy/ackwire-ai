@@ -3,7 +3,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AccessInput, ConnectorDef } from "@agenteschat/client";
+import { type AccessInput, type ConnectorDef, keys } from "@agenteschat/client";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
@@ -639,6 +639,40 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
         { connectionId: id, scope: "github:repo.read" },
       ]);
     }
+  });
+
+  test("the connection being made never reads as replacing one, though the list has it before the key is answered", async () => {
+    const state = seedState({ connections: [] });
+    const api = createFakeApi(state);
+    const send = api.connectors.connectWithKey;
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    api.connectors.connectWithKey = async (...args) => {
+      const made = await send(...args);
+      await answered;
+      return made;
+    };
+    const { services } = await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Adicionar conector" }));
+    await pick(screen().getByRole("dialog", { name: "Adicionar conector" }), "GitHub");
+    const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    const note = () => flow().querySelector(".ac-dialog__foot-note")?.textContent;
+    await click(within(flow()).getByText("Conectar com uma chave de API"));
+    await type(within(flow()).getByLabelText("Chave de API"), "ghp_abcdef123456");
+    const shown = note();
+    expect(shown).toContain("Ao conectar, todos os agentes podem usar.");
+    await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
+    // The list is read again while the key is still being answered.
+    await act(async () => services.queryClient.invalidateQueries({ queryKey: keys.connections(ORG_ID) }));
+    await settle(4);
+    expect(services.queryClient.getQueryData<unknown[]>(keys.connections(ORG_ID))).toHaveLength(1);
+    expect(note()).toBe(shown);
+    await act(async () => answer());
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
   });
 
   test("back from OAuth (`?connected=github`): what it does (read-only, by scope), then 'Ler' = its read scopes", async () => {
