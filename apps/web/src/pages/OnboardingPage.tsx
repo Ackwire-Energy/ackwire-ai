@@ -565,52 +565,52 @@ export function OnboardingPage() {
     ? t("onboarding.flow.area.title")
     : asking
       ? t("onboarding.purpose.title")
-    : step === "name"
-      ? t("onboarding.workspace.title")
-      : step === "business"
-        ? t("agentSetup.firstRun.about.title", { org: name })
-        : step === "team"
-          ? (teamHead?.title ?? t(personalNow ? "onboarding.flow.steps.teamPersonal" : "onboarding.flow.team.title"))
-          : step === "plan"
-            ? t(personalNow ? "onboarding.flow.plan.titlePersonal" : "onboarding.flow.plan.title")
-            : step === "people"
-              ? t("onboarding.flow.people.title")
-              : aiDone
-                ? personalNow || alone
-                  ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
-                  : t("onboarding.flow.ai.doneTitle", { org: name })
-                : personalNow
-                  ? t("onboarding.flow.ai.titlePersonal")
-                  : alone
-                    ? // The right hand alone (the team step left with no agents): by its name, as its stage says it.
-                      t("onboarding.flow.ai.titleAlone", agentGrammar(lodiName))
-                    : t("arrival.connect.title");
+      : step === "name"
+        ? t("onboarding.workspace.title")
+        : step === "business"
+          ? t("agentSetup.firstRun.about.title", { org: name })
+          : step === "team"
+            ? (teamHead?.title ?? t(personalNow ? "onboarding.flow.steps.teamPersonal" : "onboarding.flow.team.title"))
+            : step === "plan"
+              ? t(personalNow ? "onboarding.flow.plan.titlePersonal" : "onboarding.flow.plan.title")
+              : step === "people"
+                ? t("onboarding.flow.people.title")
+                : aiDone
+                  ? personalNow || alone
+                    ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
+                    : t("onboarding.flow.ai.doneTitle", { org: name })
+                  : personalNow
+                    ? t("onboarding.flow.ai.titlePersonal")
+                    : alone
+                      ? // The right hand alone (the team step left with no agents): by its name, as its stage says it.
+                        t("onboarding.flow.ai.titleAlone", agentGrammar(lodiName))
+                      : t("arrival.connect.title");
   const lead = asksArea
     ? t("onboarding.flow.area.lead")
     : asking
       ? t("onboarding.purpose.lead")
-    : step === "name"
-      ? t("onboarding.workspace.lead")
-      : step === "business"
-        ? t("agentSetup.firstRun.about.desc")
-        : step === "team"
-          ? (teamHead?.lead ?? t("onboarding.flow.team.madeLead"))
-          : step === "plan"
-            ? t(
-                personalNow
-                  ? "onboarding.flow.plan.leadPersonal"
-                  : alone
-                    ? "onboarding.flow.plan.leadAlone"
-                    : "onboarding.flow.plan.lead",
-              )
-            : step === "people"
-              ? // A server that sends no email invites through its link only (ADR 0090).
-                t(emails ? "onboarding.flow.people.lead" : "members.dialog.linkStep.lead")
-              : aiDone
-                ? aiLabel
-                  ? t("onboarding.flow.ai.doneLead", { label: aiLabel })
-                  : t("onboarding.flow.ai.doneLeadAny")
-                : t("arrival.connect.text");
+      : step === "name"
+        ? t("onboarding.workspace.lead")
+        : step === "business"
+          ? t("agentSetup.firstRun.about.desc")
+          : step === "team"
+            ? (teamHead?.lead ?? t("onboarding.flow.team.madeLead"))
+            : step === "plan"
+              ? t(
+                  personalNow
+                    ? "onboarding.flow.plan.leadPersonal"
+                    : alone
+                      ? "onboarding.flow.plan.leadAlone"
+                      : "onboarding.flow.plan.lead",
+                )
+              : step === "people"
+                ? // A server that sends no email invites through its link only (ADR 0090).
+                  t(emails ? "onboarding.flow.people.lead" : "members.dialog.linkStep.lead")
+                : aiDone
+                  ? aiLabel
+                    ? t("onboarding.flow.ai.doneLead", { label: aiLabel })
+                    : t("onboarding.flow.ai.doneLeadAny")
+                  : t("arrival.connect.text");
   // Its own back: the first question from the name, the workspace the person came from, the team step's previous
   // view, the team from the AI step (nothing to go back to once it thinks), the AI step from the people step.
   let back: { label: string; go: () => void } | null = null;

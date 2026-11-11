@@ -14,7 +14,7 @@ export function AreaStep({ onAnswer }: { onAnswer: (area: WorkAreaAnswer) => voi
   return (
     <>
       <div className="onb__answer">
-        <div className="tp-chips__row" role="group" aria-label={t("onboarding.flow.area.title")}>
+        <div className="tp-chips__row">
           {WORK_AREAS.map((a) => (
             <button key={a} type="button" className="tp-chip" aria-pressed={a === area} onClick={() => setArea(a)}>
               {a === area && <Icon name="check" size={14} />}
