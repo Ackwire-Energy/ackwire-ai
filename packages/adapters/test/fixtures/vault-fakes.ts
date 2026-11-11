@@ -15,6 +15,7 @@ import {
 import type {
   OnePasswordClient,
   OnePasswordItem,
+  OnePasswordNewItem,
   OnePasswordOverview,
   OnePasswordSdk,
   OnePasswordVault,
@@ -142,6 +143,8 @@ export async function createFakeBitwarden(options: FakeBitwardenOptions = {}) {
     rejectAll: false,
     /** Requests never answer (until aborted). */
     hang: false,
+    /** A new cipher is turned down with a 400, as a policy against personal items does. */
+    refuseNew: false,
   };
   const calls: FakeCall[] = [];
   const issued = new Set<string>();
@@ -233,6 +236,44 @@ export async function createFakeBitwarden(options: FakeBitwardenOptions = {}) {
         const found = ciphers.find((c) => c.Id === cipherPath[1]);
         return found ? json(shape(found)) : json({ message: "Resource not found." }, 404);
       }
+      if (path === "/ciphers" && method === "POST") {
+        if (state.refuseNew) return json({ message: `policy forbids it (${clientSecret})` }, 400);
+        // As clients send it: camelCase, every text already an EncString.
+        const sent = JSON.parse(body ?? "{}") as {
+          type: number;
+          folderId: string | null;
+          organizationId: string | null;
+          name: string;
+          notes: string | null;
+          reprompt: number;
+          login: {
+            username: string | null;
+            password: string | null;
+            totp: string | null;
+            uris: { uri: string; uriChecksum?: string; match: number | null }[];
+          };
+        };
+        const created = {
+          Id: globalThis.crypto.randomUUID(),
+          OrganizationId: sent.organizationId,
+          FolderId: sent.folderId,
+          Type: sent.type,
+          Key: null,
+          Name: sent.name,
+          Notes: sent.notes,
+          Reprompt: sent.reprompt,
+          RevisionDate: "2026-11-10T09:00:00.000Z",
+          DeletedDate: null,
+          Login: {
+            Username: sent.login.username,
+            Password: sent.login.password,
+            Totp: sent.login.totp,
+            Uris: sent.login.uris.map((u) => ({ Uri: u.uri, UriChecksum: u.uriChecksum ?? null, Match: u.match })),
+          },
+        };
+        ciphers.push(created as (typeof ciphers)[number]);
+        return json(shape(created));
+      }
     }
     throw new Error(`unexpected request ${method} ${href}`);
   }) as typeof globalThis.fetch;
@@ -242,6 +283,8 @@ export async function createFakeBitwarden(options: FakeBitwardenOptions = {}) {
     calls,
     state,
     folders,
+    /** The account's key, for a test to open what the client encrypted. */
+    userKey: user.key,
     /** How many access tokens the identity server gave. */
     tokens: () => tokens,
     /** Every token given so far stops working (a new one works). */
@@ -269,7 +312,14 @@ export interface FakeOpItem {
   state?: "active" | "archived";
 }
 
-export type FakeOpMethod = "createClient" | "vaults.list" | "items.list" | "items.get" | "items.getAll";
+export type FakeOpMethod =
+  | "createClient"
+  | "vaults.list"
+  | "items.list"
+  | "items.get"
+  | "items.getAll"
+  | "items.create"
+  | "items.put";
 
 export function createFakeOnePassword(
   options: { token?: string; vaults?: OnePasswordVault[]; items?: FakeOpItem[] } = {},
@@ -279,12 +329,14 @@ export function createFakeOnePassword(
   class AuthExpiredError extends Error {}
   const state = {
     vaults: options.vaults ?? [{ id: "vaultagents0000000000000001", title: "Agents" }],
-    items: [...(options.items ?? [])],
+    items: (options.items ?? []).map((item) => ({ ...item })),
     /** Calls to `failOn` (or every call, with "all") throw what `failWith` makes, until cleared. */
     failOn: null as FakeOpMethod | "all" | null,
     failWith: null as (() => unknown) | null,
     /** Calls never answer. */
     hang: false,
+    /** The service account was made with read access only: writes are refused in 1Password's words. */
+    readOnly: false,
   };
   const calls = {
     createClient: [] as { integrationName: string; integrationVersion: string }[],
@@ -292,7 +344,19 @@ export function createFakeOnePassword(
     getAll: [] as string[][],
     itemsList: 0,
     vaultsList: [] as unknown[],
+    create: [] as OnePasswordNewItem[],
+    put: [] as OnePasswordItem[],
   };
+
+  const mayWrite = () => {
+    if (state.readOnly) {
+      throw new Error(
+        `you do not have the right permissions to perform this action: not sufficient permissions (${token})`,
+      );
+    }
+  };
+  const fieldValue = (item: OnePasswordItem | OnePasswordNewItem, id: string) =>
+    item.fields.find((f) => f.id === id)?.value;
 
   const gate = async (method: FakeOpMethod) => {
     if (state.hang) await new Promise(() => undefined);
@@ -315,6 +379,7 @@ export function createFakeOnePassword(
     category: item.category,
     vaultId: vaultOf(),
     updatedAt: new Date(item.updatedAt ?? "2026-10-01T10:00:00.000Z"),
+    websites: item.websites ?? [],
     fields: [
       ...(item.username !== undefined
         ? [{ id: "username", title: "username", fieldType: "Text", value: item.username }]
@@ -360,6 +425,37 @@ export function createFakeOnePassword(
             return item ? { content: full(item) } : { error: { type: "itemNotFound" } };
           }),
         };
+      },
+      async create(params) {
+        calls.create.push(structuredClone(params));
+        await gate("items.create");
+        mayWrite();
+        const password = fieldValue(params, "password");
+        const username = fieldValue(params, "username");
+        const item: FakeOpItem = {
+          id: `created${String(state.items.length).padStart(19, "0")}`,
+          title: params.title,
+          category: params.category,
+          websites: params.websites ?? [],
+          ...(username !== undefined ? { username } : {}),
+          ...(password !== undefined ? { password } : {}),
+          updatedAt: "2026-11-10T09:00:00.000Z",
+        };
+        state.items.push(item);
+        return full(item);
+      },
+      async put(next) {
+        calls.put.push(structuredClone(next));
+        await gate("items.put");
+        mayWrite();
+        const item = state.items.find((i) => i.id === next.id);
+        if (!item) throw new Error(`item ${next.id} not found (service account ${token})`);
+        const password = fieldValue(next, "password");
+        const username = fieldValue(next, "username");
+        if (password !== undefined) item.password = password;
+        if (username !== undefined) item.username = username;
+        item.updatedAt = "2026-11-10T09:30:00.000Z";
+        return full(item);
       },
     },
   };
