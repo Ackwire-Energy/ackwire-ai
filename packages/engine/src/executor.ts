@@ -198,7 +198,7 @@ import {
 import { type Feedback, queueFeedback } from "./feedback";
 import type { PendingFeedbackOffer } from "./feedback-offers";
 import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
-import { cutText } from "./format";
+import { cutText, hasQuestionMark } from "./format";
 import type { ModelGateway } from "./gateway";
 import { type CodeSetup, codeStart } from "./git/machine";
 import { agentRepositoryList, repositoriesPrompt } from "./git/repos";
@@ -4840,7 +4840,7 @@ async function executeRunInner(
           closingSummary(transcript, anythingPosted) ||
           (result.executedCount > 0 && !anythingPosted ? DONE_TEXT : "");
       // It changed something since its last message and wrote nothing more: its receipts still go out.
-      const text = written || (!silent && anythingPosted && (await hasUnpostedReceipts(db, run)) ? DONE_TEXT : "");
+      let text = written || (!silent && anythingPosted && (await hasUnpostedReceipts(db, run)) ? DONE_TEXT : "");
       // A line the server wrote (not the model): its code, so the app shows it in the person's language.
       const code =
         said || text === ""
@@ -4944,6 +4944,13 @@ async function executeRunInner(
           : null,
         evidence: judging.evidence,
       });
+      // A card holds a question: a reply with no question mark asks nothing (the card has no choices), so it is its
+      // answer and nobody waits on it. One that only repeats its last message word for word, with nothing else to
+      // show, adds nothing: the turn ends there. Before the judgment below, which it spares.
+      if (decision.outcome === "ask_card" && !hasQuestionMark(text || judged)) {
+        decision = { outcome: "done", rule: "not_a_question", verdict: decision.verdict };
+        if (repeatsLastPost(text) && updates.length === 0 && !saved && !(await hasUnpostedReceipts(db, run))) text = "";
+      }
       // On its way to asking a person, by the verdict `ask` or by repeating a promise (`continue`), yet asking them for
       // nothing it needs (a status note, an optional offer, a question it already asked): it is its answer, never a
       // nudge to ask nor a question card the run would wait on. On a judge error the rule stands.

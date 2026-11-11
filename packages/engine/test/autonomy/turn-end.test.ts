@@ -44,13 +44,14 @@ scenario("S17", "an unkept promise gets one nudge; a turn that set up its waker 
   await assertInvariants(w);
 });
 
-scenario("S18", "a blocker described instead of asked becomes a question card the person is notified of", async () => {
+scenario("S18", "a blocker described, then asked when told: a question card the person is notified of", async () => {
   const blocker =
     "O que falta: 1. Script de migração. 2. Preciso de uma credencial read-only do banco e de um teste no Teams. Termino o script e te mostro.";
+  const asked = "Pode me passar uma credencial read-only do banco e rodar um teste no Teams?";
   const w = await world({
     agents: ["otto"],
     judge: { followThrough: () => "ask" },
-    script: { otto: [{ text: blocker }, { text: blocker }] },
+    script: { otto: [{ text: blocker }, { text: asked }] },
   });
   await w.say("@otto como está a integração com o Teams?");
   await w.settle();
@@ -78,7 +79,7 @@ scenario("S31", "a run in circles ends as stuck with Continuar, and nothing cont
   await assertInvariants(w);
 });
 
-scenario("S32", "a promise repeated without acting: bounded continues, then a question card", async () => {
+scenario("S32", "a promise repeated without acting: bounded continues, then it ends with no card", async () => {
   const w = await world({
     agents: ["otto"],
     judge: { followThrough: () => "continue" },
@@ -87,7 +88,9 @@ scenario("S32", "a promise repeated without acting: bounded continues, then a qu
   await w.say("@otto arruma o teste do login");
   await w.settle();
   expect(w.f.provider.calls.length).toBeLessThanOrEqual(4);
-  expect(await openQuestions(w)).toHaveLength(1);
+  // A promise asks nothing: posted as it is, never a card a person would answer.
+  expect(await openQuestions(w)).toHaveLength(0);
+  expect((await w.runs("otto")).map((r) => r.status)).toEqual(["done"]);
   await assertInvariants(w);
 });
 
@@ -211,7 +214,7 @@ scenario("S45", "a second promise after real tool work gets its second continue,
 
 scenario(
   "S46",
-  "at the cap, a turn that still describes its need after the ask nudge becomes the question",
+  "at the cap, a turn that asks in its text after the ask nudge still becomes the question card",
   async () => {
     const w = await world({
       agents: ["otto"],
@@ -229,7 +232,7 @@ scenario(
           { text: "Criei uma; vou criar a próxima." },
           { calls: [{ name: "create_issue", input: { title: "Sentry: timeout no export" } }] },
           { text: "Para ligar o alerta falta o token do Sentry e acesso ao banco." },
-          { text: "Preciso do token do Sentry e de acesso ao banco." },
+          { text: "Pode me passar o token do Sentry e o acesso ao banco?" },
         ],
       },
     });

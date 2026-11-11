@@ -1,15 +1,24 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test";
 import { schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
-import { ASKS_NOTHING, answerQuestion, drainOutbox, FOLLOW_UP_TOOL, postPersonMessage, wakeFollowUp } from "../src";
+import {
+  ASKS_NOTHING,
+  answerQuestion,
+  drainOutbox,
+  FOLLOW_UP_TOOL,
+  NOT_A_QUESTION,
+  postPersonMessage,
+  wakeFollowUp,
+} from "../src";
 import { repeatedAsk, saysNeedsNothing } from "../src/hand-off";
 import { type Fixture, setup } from "./fixtures";
 
 /**
  * A question card that asks the person for nothing the run needs (a status note, an optional offer) never makes the
- * run wait, in any language: `ask_user` refuses it (`ask_check` → `none`) and the agent says it in its reply, and a
- * reply read as needing a person but asking for nothing is its answer, never a nudge nor a card. The fake judge reads
- * no words: it answers by the exact text it is shown.
+ * run wait, in any language: `ask_user` refuses it (text with no question mark and no choices by its words alone, an
+ * offer by `ask_check` → `none`) and the agent says it in its reply, and a reply read as needing a person but asking
+ * for nothing is its answer, never a nudge nor a card. The fake judge reads no words: it answers by the exact text it
+ * is shown.
  */
 
 setDefaultTimeout(30_000);
@@ -25,26 +34,36 @@ const CASES = {
   pt: {
     question: "Qual canal recebe o post: #geral ou #avisos?",
     note: "Não preciso de nada de você agora. Só entra se você quiser o comunicado também no Portal.",
+    offer: "Não preciso de nada de você agora. Quer o comunicado também no Portal?",
   },
   en: {
     question: "Which channel gets the post: #general or #news?",
     note: "I don't need anything from you now. Only if you want the notice on the Portal too.",
+    offer: "I don't need anything from you now. Want the notice on the Portal too?",
   },
   ja: {
     question: "投稿はどのチャンネルですか：#general と #news のどちらですか？",
     note: "今はあなたから必要なものはありません。ポータルにも掲載したい場合だけ教えてください。",
+    offer: "今はあなたから必要なものはありません。ポータルにも掲載しますか？",
   },
   de: {
     question: "Welcher Kanal bekommt den Beitrag: #general oder #news?",
     note: "Ich brauche gerade nichts von dir. Nur wenn du die Mitteilung auch im Portal willst.",
+    offer: "Ich brauche gerade nichts von dir. Willst du die Mitteilung auch im Portal?",
   },
 } as const;
 const LANGS = Object.keys(CASES) as (keyof typeof CASES)[];
-const NOTES: Set<string> = new Set(Object.values(CASES).map((c) => c.note));
-/** The fake `ask_check`: a note asks for nothing, anything else is a person's to answer. */
+const NOTES: Set<string> = new Set(Object.values(CASES).flatMap((c) => [c.note, c.offer]));
+/** The fake `ask_check`: a note or an optional offer asks for nothing, anything else is a person's to answer. */
 const askCheck = (state: Record<string, unknown>) => (NOTES.has(String(state.question)) ? "none" : "person");
 
 const lastText = (req: ModelRequest) => JSON.stringify(req.messages.at(-1)?.content);
+/** The last tool result a model call read. */
+const lastResult = (req: ModelRequest | undefined) =>
+  (req?.messages ?? [])
+    .flatMap((m) => (typeof m.content === "string" ? [] : m.content))
+    .filter((b) => b.type === "tool_result")
+    .at(-1);
 const WHY = "I need a person's answer before I go on: this decides what I change next.";
 const DONE = "Pronto: o post das 9h está agendado.";
 
@@ -65,24 +84,28 @@ describe("ask_user that asks for nothing", () => {
   for (const lang of LANGS) {
     const { question, note } = CASES[lang];
 
-    test(`${lang}: a status note is refused and goes in the reply; the run doesn't wait`, async () => {
+    test(`${lang}: a status note and an optional offer are refused and go in the reply; the run doesn't wait`, async () => {
+      const { offer } = CASES[lang];
       f = await setup({
         askUser: true,
         judge: (kind, _id, state) => (kind === "ask_check" ? askCheck(state) : undefined),
-        reply: (req) =>
-          lastText(req).includes("tool_result")
+        reply: (_req, call) =>
+          call > 2
             ? { chunks: [DONE] }
-            : { chunks: [DONE], toolUses: [{ name: "ask_user", input: { why: WHY, question: note } }] },
+            : {
+                chunks: [DONE],
+                toolUses: [{ name: "ask_user", input: { why: WHY, question: call === 1 ? note : offer } }],
+              },
       });
       await say("@dev valeu");
       await drainOutbox(f.db, f.handlers);
       expect(await questions()).toHaveLength(0);
       expect((await runs()).map((r) => r.status)).toEqual(["done"]);
-      expect(lastText(f.provider.calls[1]?.request as ModelRequest)).toContain(ASKS_NOTHING.slice(0, 40));
-      // What it already wrote in that turn reached the judge with the question.
-      const [check] = judged("ask_check");
-      expect(check?.state.question).toBe(note);
-      expect(check?.state.reply).toBe(DONE);
+      // The note asks no question: refused by its words alone, as an error, with no judgment.
+      expect(lastResult(f.provider.calls[1]?.request)).toMatchObject({ content: NOT_A_QUESTION, isError: true });
+      expect(lastText(f.provider.calls[2]?.request as ModelRequest)).toContain(ASKS_NOTHING.slice(0, 40));
+      // The offer asks one: the judge read it, with what it already wrote in that turn.
+      expect(judged("ask_check").map((c) => [c.state.question, c.state.reply])).toEqual([[offer, DONE]]);
     });
 
     test(`${lang}: a real question is still asked and waits`, async () => {
@@ -168,6 +191,82 @@ describe("ask_user that asks for nothing", () => {
     await drainOutbox(f.db, f.handlers);
     expect(await questions()).toHaveLength(0);
     expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+  });
+});
+
+describe("a question card asks something: a question mark in any script, or choices to pick from", () => {
+  const STATUS =
+    "Abri os PRs #12 e #13 com a correção do login, e os testes passaram nos dois. O que falta depende de vocês: o merge dos PRs e o acesso de escrita ao repositório de infraestrutura.";
+  const NOTHING_PENDING =
+    "Não tenho mais nada pendente aqui. O que falta já está dito acima e depende de vocês: o merge dos PRs e o acesso ao repositório.";
+  /** Judgments that read the list of what is left as a need only a person can fill. */
+  const needsPerson = (kind: string) =>
+    kind === "follow_through" ? "ask" : kind === "ask_check" ? "person" : undefined;
+  /** The question check alone, letting every question through. */
+  const letThrough = (kind: string) => (kind === "ask_check" ? "person" : undefined);
+  const asking = (input: Record<string, unknown>) => () => ({
+    chunks: [],
+    toolUses: [{ name: "ask_user", input: { why: WHY, ...input } }],
+  });
+
+  test("a statement is refused before any judgment: no card, and the run reads why", async () => {
+    f = await setup({
+      askUser: true,
+      judge: letThrough,
+      reply: (req) =>
+        lastText(req).includes("tool_result")
+          ? { chunks: [] }
+          : { chunks: [STATUS], toolUses: [{ name: "ask_user", input: { why: WHY, question: NOTHING_PENDING } }] },
+    });
+    await say("@dev como estão os PRs do login?");
+    await drainOutbox(f.db, f.handlers);
+    expect(await questions()).toHaveLength(0);
+    expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+    expect(lastResult(f.provider.calls[1]?.request)).toMatchObject({ content: NOT_A_QUESTION, isError: true });
+    expect(judged("ask_check")).toHaveLength(0);
+    expect(await agentPosts()).toEqual([STATUS]);
+  });
+
+  test.each([
+    ["a question mark", "Posso fazer o merge dos dois PRs agora?"],
+    ["the Spanish ¿ alone", "¿Hago el merge de los dos PRs ahora"],
+    ["the full-width ？", "2つのPRを今マージしてもいいですか？"],
+    ["the Arabic ؟", "هل أدمج الآن؟"],
+  ])("a real question is asked: %s", async (_, question) => {
+    f = await setup({ askUser: true, judge: letThrough, reply: asking({ question }) });
+    await say("@dev e os PRs?");
+    await drainOutbox(f.db, f.handlers);
+    expect((await questions()).map((q) => q.text)).toEqual([question]);
+    expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
+  });
+
+  test("a choice list with no question mark is asked", async () => {
+    const choices = ["staging", "produção"];
+    f = await setup({ askUser: true, judge: letThrough, reply: asking({ question: "Escolha o ambiente", choices }) });
+    await say("@dev faz o deploy");
+    await drainOutbox(f.db, f.handlers);
+    expect((await questions()).map((q) => [q.text, q.choices])).toEqual([["Escolha o ambiente", choices]]);
+    expect((await runs()).map((r) => r.status)).toEqual(["waiting_input"]);
+  });
+
+  test("told to ask with nothing pending, a reply that asks nothing is its answer: no card", async () => {
+    f = await setup({
+      askUser: true,
+      judge: needsPerson,
+      reply: (_req, call) => ({ chunks: [call === 1 ? STATUS : NOTHING_PENDING] }),
+    });
+    await say("@dev como estão os PRs do login?");
+    await drainOutbox(f.db, f.handlers);
+    expect(f.provider.calls).toHaveLength(2);
+    // Told once to ask, and how to end when it needs nothing.
+    expect(lastText(f.provider.calls[1]?.request as ModelRequest)).toContain(
+      "end your turn without writing anything more",
+    );
+    expect(await questions()).toHaveLength(0);
+    expect((await runs()).map((r) => r.status)).toEqual(["done"]);
+    expect(await agentPosts()).toEqual([STATUS, NOTHING_PENDING]);
+    // No judgment spent on a card it never makes.
+    expect(judged("ask_check").map((c) => c.state.question)).toEqual([STATUS]);
   });
 });
 

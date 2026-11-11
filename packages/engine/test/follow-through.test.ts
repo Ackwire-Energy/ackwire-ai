@@ -62,7 +62,7 @@ const ask = (fx: Fixture, body: string, threadId?: string) =>
     ...(threadId ? { threadId } : {}),
   });
 
-test("a promise nothing keeps: one more turn to keep it, one to ask, then the reply becomes a question card", async () => {
+test("a promise nothing keeps: one more turn to keep it, one to ask, then the reply is its answer, never a card", async () => {
   f = await setup({
     judge: (kind) => (kind === "follow_through" ? "continue" : undefined),
     reply: (_request, call) => ({
@@ -87,31 +87,31 @@ test("a promise nothing keeps: one more turn to keep it, one to ask, then the re
   const steps = await f.db.select().from(schema.agentRunSteps);
   expect(steps.filter((s) => s.data.nudged === "promise").length).toBe(1);
   expect(steps.filter((s) => s.data.nudged === "ask").length).toBe(1);
+  // The last reply asks nothing and only repeats the one before: no card that would keep a person on it, and no
+  // second copy of it either.
   expect((await agentMessages(f)).map((m) => m.body)).toEqual([
     "O job de testes ainda está rodando. Vou checar de novo daqui a pouco e te passo os números.",
     "Ainda rodando: vou checar de novo depois.",
-    "Ainda rodando: vou checar de novo depois.",
   ]);
-  // The last reply is the question a person answers: the run waits on it.
-  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
-  expect((await f.db.select().from(schema.agentQuestions)).map((q) => [q.status, q.text])).toEqual([
-    ["open", "Ainda rodando: vou checar de novo depois."],
-  ]);
+  expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("done");
+  expect(await f.db.select().from(schema.agentQuestions)).toEqual([]);
+  expect(steps.some((s) => (s.data.continuation as { rule?: string } | undefined)?.rule === "not_a_question")).toBe(
+    true,
+  );
 });
 
-test("a need only a person can fill, described instead of asked: one nudge to ask, then the reply is the question", async () => {
+test("a need only a person can fill, asked in the text instead of the card: one nudge to ask, then the reply is the question", async () => {
+  const asked = "Pode me mandar o token do Sentry? Com ele eu configuro o alerta.";
   f = await setup({
     judge: (kind) => (kind === "follow_through" ? "ask" : undefined),
-    reply: () => ({ chunks: ["Assim que você me mandar o token do Sentry, vou configurar o alerta."] }),
+    reply: () => ({ chunks: [asked] }),
   });
   await ask(f, "@dev configura o alerta do Sentry");
   await drainOutbox(f.db, f.handlers);
   expect(followThroughCalls(f).length).toBe(2);
   expect(f.provider.calls.length).toBe(2);
   expect((await f.db.select().from(schema.agentRuns))[0]?.status).toBe("waiting_input");
-  expect((await f.db.select().from(schema.agentQuestions)).map((q) => q.text)).toEqual([
-    "Assim que você me mandar o token do Sentry, vou configurar o alerta.",
-  ]);
+  expect((await f.db.select().from(schema.agentQuestions)).map((q) => q.text)).toEqual([asked]);
 });
 
 test("a reply too long for a question card is posted whole, never cut into one", async () => {
