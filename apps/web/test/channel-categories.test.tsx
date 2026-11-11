@@ -6,7 +6,7 @@ setupDom();
 
 import { act, cleanup, createEvent, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { endExit, exitsLast, renderApp, screen, settle } from "./render";
 
 afterEach(() => {
   cleanup();
@@ -172,18 +172,11 @@ describe("what a dialog makes or renames is never taken by itself, while it is s
   const sidebar = () => document.querySelector("nav.sidebar") as HTMLElement;
   const categoryNames = () =>
     [...sidebar().querySelectorAll(".sidebar__section-toggle .sidebar__label")].map((l) => l.textContent);
-  /** A closing dialog stays on screen until its exit animation ends, as in the browser. */
-  const exitsLast = () => {
-    const sheet = document.createElement("style");
-    sheet.dataset.layout = "";
-    sheet.textContent = '.ac-dialog[data-state="closed"] { animation-name: dialog-out; }';
-    document.head.append(sheet);
-  };
-  /** The dialog, closed and still on screen, then its exit ended. */
+  /** The dialog, closed and still on screen (`exitsLast`), then its exit ended. */
   const closing = async (dialog: HTMLElement) => {
     expect([dialog.isConnected, dialog.getAttribute("data-state")]).toEqual([true, "closed"]);
     expect(dialog.textContent).not.toContain("Já existe");
-    await act(async () => fireEvent.animationEnd(dialog, { animationName: "dialog-out" }));
+    await endExit(dialog);
     expect(dialog.isConnected).toBe(false);
   };
 

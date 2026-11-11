@@ -6,7 +6,7 @@ setupDom();
 import type { OrgRole } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ORG_ID, seedRoles, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { endExit, exitsLast, renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -21,7 +21,8 @@ async function openRole(name: string) {
     { ...admin, id: "role-support", name: "Suporte", position: 1, permissions: [], hoist: false },
     everyone,
   ];
-  await renderApp(`/org/${ORG_ID}/settings/roles`, { api: createFakeApi(state) });
+  const api = createFakeApi(state);
+  await renderApp(`/org/${ORG_ID}/settings/roles`, { api });
   await settle(6);
   const row = screen()
     .getAllByRole("button")
@@ -33,7 +34,7 @@ async function openRole(name: string) {
     state.calls
       .filter((c) => c.method === "roles.update")
       .map((c) => (c.args.at(-1) as { permissions: string[] }).permissions);
-  return { choice: () => screen().getByRole("radiogroup", { name: "Computadores dos agentes" }), saved };
+  return { choice: () => screen().getByRole("radiogroup", { name: "Computadores dos agentes" }), saved, api, state };
 }
 
 const checked = (group: HTMLElement) =>
@@ -121,5 +122,41 @@ describe("Mencionar todos (`@todos`): one key in Conversas", () => {
     await click(toggle);
     await settle(4);
     expect(saved().at(-1)).toEqual(["mention_everyone"]);
+  });
+});
+
+describe("Adicionar pessoas to a role", () => {
+  test("the ones being added keep their rows, and nobody reads as having it, while it adds and closes", async () => {
+    const { api, state } = await openRole("Suporte");
+    const setFor = api.roles.setFor;
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    api.roles.setFor = async (...args) => {
+      const saved = await setFor(...args);
+      await answered;
+      return saved;
+    };
+    exitsLast();
+    await click(screen().getByRole("button", { name: "Adicionar pessoas" }));
+    await settle(2);
+    const dialog = screen().getByRole("dialog", { name: "Adicionar a Suporte" });
+    const rows = () => [...dialog.querySelectorAll(".roles-pick__row")].map((r) => r.textContent);
+    const listed = rows();
+    expect(listed.length).toBeGreaterThan(0);
+    for (const row of dialog.querySelectorAll(".roles-pick__row")) await click(row);
+    await click(within(dialog).getByRole("button", { name: `Adicionar ${listed.length}` }));
+    await settle(4);
+    expect(state.calls.some((c) => c.method === "roles.setFor")).toBe(true);
+    expect(rows()).toEqual(listed);
+    expect(dialog.textContent).not.toContain("Todo mundo já tem");
+    await act(async () => answer());
+    await settle(6);
+    expect(dialog.getAttribute("data-state")).toBe("closed");
+    expect(rows()).toEqual(listed);
+    expect(dialog.textContent).not.toContain("Todo mundo já tem");
+    await endExit(dialog);
+    expect(dialog.isConnected).toBe(false);
   });
 });

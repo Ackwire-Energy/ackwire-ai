@@ -117,6 +117,7 @@ import { everyoneWord, isEveryoneMention, mentionsReader, offersEveryone } from 
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
@@ -5398,13 +5399,6 @@ function AddMembersDialog({
       setSelected(new Set());
     }
   }, [open]);
-  const rows = useMemberRows(q, exclude, undefined, { channel: true });
-  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
-  const invite = useInviteOffer(q);
-  const inviteDialog = useInviteDialog();
-  const newAgent = useNewAgent();
-  const navigate = useNavigate();
-  const creates = can(org, "create_agents");
   const add = useMutation({
     mutationFn: async () => {
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -5414,6 +5408,14 @@ function AddMembersDialog({
       onClose();
     },
   });
+  // Who was in before Adicionar, also while it closes: the ones being added keep their rows.
+  const rows = useMemberRows(q, useHeldWhile(exclude, add.isPending || !open), undefined, { channel: true });
+  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
+  const invite = useInviteOffer(q);
+  const inviteDialog = useInviteDialog();
+  const newAgent = useNewAgent();
+  const navigate = useNavigate();
+  const creates = can(org, "create_agents");
   return (
     <Dialog
       open={open}
