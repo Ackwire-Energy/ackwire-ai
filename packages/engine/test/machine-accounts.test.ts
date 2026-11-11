@@ -360,6 +360,63 @@ test("hello.accounts: what the runner found since hello, sent the moment welcome
   ]);
 });
 
+test("a sign-in that fails on the computer: its code and the CLI's words (masked) reach the poll, an error is logged", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const ends = new Map<string, unknown>();
+  const { deps } = fakeHub(machineId, (req) => {
+    if (req.action === "begin")
+      return { url: "https://claude.ai/oauth/authorize?code=true", publicKey: "k".repeat(44) };
+    return req.action === "status" ? ends.get(req.loginId) : {};
+  });
+  const logged: { level: string; message: string; data?: Record<string, unknown> }[] = [];
+  const log = {
+    error: (message: string, data?: Record<string, unknown>) => logged.push({ level: "error", message, data }),
+    warn: (message: string, data?: Record<string, unknown>) => logged.push({ level: "warn", message, data }),
+  };
+  const ended = async (end: unknown) => {
+    const login = await beginAccountLogin(deps, f.owner.id, f.org.id, machineId, "claude_code");
+    ends.set(login.loginId, end);
+    const status = await accountLoginStatus({ ...deps, log }, f.owner.id, f.org.id, machineId, login.loginId);
+    expect(await accountRow(login.loginId)).toBeNull();
+    return status;
+  };
+
+  const refused = await ended({
+    state: "failed",
+    error: "Claude Code couldn't sign in with that code",
+    code: "bad_code",
+    message: "OAuth error: invalid_grant for ya29.FAKE-not-a-real-token-xxxx",
+  });
+  expect(refused).toEqual({
+    state: "failed",
+    error: "Claude Code couldn't sign in with that code",
+    code: "bad_code",
+    message: "OAuth error: invalid_grant for ••••",
+  });
+  expect(logged).toHaveLength(1);
+  expect(logged[0]).toMatchObject({
+    level: "error",
+    data: { orgId: f.org.id, userId: f.owner.id, machineId, accountKind: "claude_code", code: "bad_code" },
+  });
+  expect(String(logged[0]?.data?.error)).toBe(
+    "Error: claude_code sign-in failed: bad_code: OAuth error: invalid_grant for ••••",
+  );
+
+  // An older runner's failure, a code this server doesn't know, a cancel and an expiry.
+  expect(await ended({ state: "failed", error: "Canceled" })).toEqual({ state: "failed", error: "Canceled" });
+  expect(await ended({ state: "failed", error: "x", code: "made_up", message: "y" })).toEqual({
+    state: "failed",
+    error: "x",
+  });
+  expect(await ended({ state: "failed", error: "Canceled", code: "canceled" })).toMatchObject({ code: "canceled" });
+  expect(await ended({ state: "expired", error: "The sign-in took too long.", code: "timeout" })).toEqual({
+    state: "expired",
+    code: "timeout",
+  });
+  expect(logged.map((l) => l.level)).toEqual(["error", "warn"]);
+});
+
 test("signing in: the person who connected the computer; the code is sealed to it; done stores the account once", async () => {
   f = await setup();
   const { machineId } = await ownedMachine();

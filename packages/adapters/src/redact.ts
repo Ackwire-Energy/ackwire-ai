@@ -46,3 +46,11 @@ export function errorLineOf(output: string): string {
     .filter(Boolean);
   return lines.filter((l) => ERROR_LINE.test(l)).at(-1) ?? lines.at(-1) ?? "";
 }
+
+/** `text` in at most `max` characters: when longer, cut after its last whole word, with "…". */
+export function cutAtWord(text: string, max: number): string {
+  if (text.length <= max) return text;
+  const head = text.slice(0, max - 1).replace(/[\uD800-\uDBFF]$/, "");
+  const space = head.lastIndexOf(" ");
+  return `${(space > 0 ? head.slice(0, space) : head).trimEnd()}…`;
+}
