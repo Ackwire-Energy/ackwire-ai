@@ -126,6 +126,7 @@ describe("the composer's row", () => {
     const card = box().closest(".ac-composer") as HTMLElement;
     expect(card.querySelector(":scope > .ac-composer__pills")).toBeTruthy();
     expect(fireEvent.mouseDown(card.querySelector(".ac-composer__pills") as HTMLElement)).toBe(false);
+    fireEvent.mouseUp(card);
     expect(document.activeElement).toBe(box());
     unmount();
     render(<Box inlinePills pills={<span className="ac-composer__agent">Ada</span>} />);
@@ -155,6 +156,7 @@ describe("formatting floats over the selection", () => {
     await select(7, 13);
     const bold = within(bar() as HTMLElement).getByRole("button", { name: "Negrito" });
     expect(fireEvent.mouseDown(bold)).toBe(false);
+    fireEvent.mouseUp(bold);
     await act(async () => fireEvent.click(bold));
     expect(box().value).toBe("deploy **amanhã**");
     expect([box().selectionStart, box().selectionEnd]).toEqual([9, 15]);

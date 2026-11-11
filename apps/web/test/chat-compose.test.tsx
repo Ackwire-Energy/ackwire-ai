@@ -46,18 +46,18 @@ const rowOf = (box: HTMLElement) =>
 describe("composer row and formatting", () => {
   test("a channel, a thread and a DM: attach, emoji, the text and send, and no formatting bar at rest", async () => {
     await open();
-    expect(rowOf(composer())).toEqual(["Anexar arquivo", "Emoji, GIF ou figurinha", "Mensagem para #eng", "Enviar"]);
+    expect(rowOf(composer())).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Mensagem para #eng", "Enviar"]);
     expect(screen().queryByRole("toolbar", { name: "Formatação" })).toBeNull();
     const bar = within(article("o login está devolvendo 401")).getByRole("toolbar");
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Responder" })));
     await settle(6);
     const reply = screen().getByRole("combobox", { name: "Responder na thread" });
-    expect(rowOf(reply)).toEqual(["Anexar arquivo", "Emoji, GIF ou figurinha", "Responder na thread", "Enviar"]);
+    expect(rowOf(reply)).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Responder na thread", "Enviar"]);
     cleanup();
     await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const dm = screen().getByRole("combobox", { name: "Mensagem para Ada" });
-    expect(rowOf(dm)).toEqual(["Anexar arquivo", "Emoji, GIF ou figurinha", "Mensagem para Ada", "Enviar"]);
+    expect(rowOf(dm)).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Mensagem para Ada", "Enviar"]);
     // Who answers stays: the agent's chip opens the row.
     const row = dm.closest(".ac-composer__row") as HTMLElement;
     expect(row.firstElementChild?.querySelector(".ac-composer__agent")?.textContent).toContain("Ada");

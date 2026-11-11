@@ -981,7 +981,8 @@ export function Composer({
                     barRef={bar}
                     onLeave={(to, back) => {
                       if (back) ref.current?.focus();
-                      else if (to !== ref.current) setSelected(null);
+                      else if (to !== ref.current && !(to instanceof Node && bar.current?.contains(to)))
+                        setSelected(null);
                     }}
                   />
                 )}
