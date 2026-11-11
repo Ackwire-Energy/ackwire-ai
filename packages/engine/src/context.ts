@@ -36,6 +36,7 @@ import { cutText, stringsOf } from "./format";
 import { issueWorkBrief, issueWorkOf } from "./issue-work";
 import { openTasksBrief } from "./issues";
 import type { MachineCaller } from "./machine-hub";
+import { type TaskEnd, taskEndText } from "./machine-task-text";
 import { type MessageMedia, mediaOf } from "./media";
 import { type DescribedMessage, describeMessages } from "./message-links";
 import { postedBySql } from "./message-place";
@@ -2208,6 +2209,9 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false, p
   const t = m.meta?.machineTask as
     | {
         title?: unknown;
+        status?: unknown;
+        seconds?: unknown;
+        computer?: unknown;
         result?: unknown;
         lastLine?: unknown;
         files?: unknown;
@@ -2217,7 +2221,12 @@ export function taskNotice(m: Pick<Message, "body" | "meta">, current = false, p
       }
     | undefined;
   if (!t || typeof t !== "object") return null;
-  const parts = [`[Background task ${typeof t.id === "string" ? t.id : ""}]: ${m.body}`];
+  // The body is in the language of whom the task is for: the agent reads its English line, from the same fields.
+  const ended =
+    typeof t.title === "string" && typeof t.status === "string" && typeof t.seconds === "number"
+      ? taskEndText(t as TaskEnd, typeof t.computer === "string" ? t.computer : null)
+      : m.body;
+  const parts = [`[Background task ${typeof t.id === "string" ? t.id : ""}]: ${ended}`];
   if (typeof t.branch === "string") parts.push(`Branch: ${t.branch}`);
   if (Array.isArray(t.files) && t.files.length > 0) parts.push(`Files it changed: ${t.files.join(", ")}`);
   if (typeof t.result === "string" && t.result)

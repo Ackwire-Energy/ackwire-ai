@@ -55,9 +55,15 @@ const leafAt = (tree: LocaleStrings, key: string): unknown =>
 
 /**
  * A string the server writes itself (a computer's default name) in `code`, English where that language has none,
- * with `{{name}}` filled from `vars`.
+ * with `{{name}}` filled from `vars`. With `vars.count`, its plural form comes first (`key_one`, `key_few`…), as
+ * i18next picks it.
  */
 export function serverText(code: AppLocale, key: string, vars: Record<string, string> = {}): string {
-  const raw = leafAt(STRINGS[code], key) ?? leafAt(en, key);
-  return typeof raw === "string" ? raw.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => vars[k] ?? m) : key;
+  const forms =
+    vars.count === undefined ? [] : [`${key}_${new Intl.PluralRules(code).select(Number(vars.count))}`, `${key}_other`];
+  for (const k of [...forms, key]) {
+    const raw = leafAt(STRINGS[code], k) ?? leafAt(en, k);
+    if (typeof raw === "string") return raw.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, name: string) => vars[name] ?? m);
+  }
+  return key;
 }

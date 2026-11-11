@@ -1,6 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, desc, type Executor, eq, gte, inArray, isNull, schema, sql } from "@agenteschat/db";
-import { appLocale } from "@agenteschat/i18n/locale";
+import { serverText } from "@agenteschat/i18n";
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import { runAuthority } from "./authority";
 import { getChannelCached } from "./context";
 import type { ContextDeps } from "./context/summaries";
@@ -14,6 +15,7 @@ import { messageLink } from "./message-links";
 import { insertMessage, type Message, messageView, replyExcerpt } from "./messages";
 import { missionOfThread } from "./missions";
 import { enqueue } from "./outbox";
+import { lineLocale } from "./requester";
 import { ACTIVE_RUN_STATUSES } from "./run-inbox";
 import { deliverNoticeToRun } from "./run-resume";
 import { type AgentRun, isTerminal, replyThreadOf, runErrorDetail } from "./runs";
@@ -398,7 +400,7 @@ export async function moveToBackground(
     const queued = (live?.agent ?? 0) >= WORK_LIMITS.perAgent || (live?.org ?? 0) >= perOrgCap;
     const workId = Bun.randomUUIDv7();
     const say = plainText(input.say, WORK_LIMITS.sayMax);
-    const locale = await localeOf(tx, requester);
+    const locale = await lineLocale(tx, run.orgId, requester, run.id);
     const anchor = await insertMessage(tx, {
       orgId: run.orgId,
       channelId: run.channelId,
@@ -571,21 +573,15 @@ async function workTitle(deps: { db: Database; context?: ContextDeps }, runId: s
   return plainText(named, WORK_LIMITS.titleMax);
 }
 
-async function localeOf(db: Executor, userId: string | null) {
-  if (!userId) return "pt-BR" as const;
-  const [u] = await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId));
-  return appLocale([u?.locale]) ?? "pt-BR";
-}
-
 /** The anchor's words when the safety net moved the run (stored as the fallback; the apps word `work_auto_moved`). */
-export const autoMovedText = (locale: string, minutes: number) =>
-  locale !== "pt-BR"
-    ? `This will take a while, so I'll keep going in the background. I'll post updates here, the next one in about ${minutes} min.`
-    : `Isso vai levar um tempo, então sigo em segundo plano. Te aviso aqui. O próximo update deve sair em ~${minutes} min.`;
+export const autoMovedText = (locale: AppLocale, minutes: number) =>
+  serverText(locale, "chat.body.work_auto_moved", { minutes: String(minutes) });
 
 /** The update the server posts for a silent work (stored as the fallback; the apps word `work_auto_update`). */
-export const autoUpdateText = (locale: string, minutes: number) =>
-  locale !== "pt-BR" ? `Still on it (${minutes} min).` : `Ainda trabalhando nisso (${minutes} min).`;
+export const autoUpdateText = (locale: AppLocale, minutes: number) =>
+  serverText(locale, "work.autoUpdate", {
+    duration: serverText(locale, "work.duration.minutes", { count: String(minutes) }),
+  });
 
 async function scheduleCheckIn(tx: Executor, work: Pick<WorkRow, "id" | "orgId" | "updateSeq" | "nextUpdateAt">) {
   if (!work.nextUpdateAt) return;
@@ -743,7 +739,7 @@ async function postFallbackUpdate(deps: { db: Database; pubsub?: PubSub }, work:
     .where(eq(schema.agents.id, work.agentId));
   const line = agent?.runId === run.id && agent.kind ? { kind: agent.kind, subject: agent.subject ?? "" } : null;
   const minutes = Math.max(1, Math.round((now.getTime() - work.startedAt.getTime()) / 60_000));
-  const locale = await localeOf(deps.db, work.requestedByUserId);
+  const locale = await lineLocale(deps.db, work.orgId, work.requestedByUserId, run.id);
   const posted = await deps.db.transaction(async (tx) => {
     const seq = work.updateSeq + 1;
     const [updated] = await tx
@@ -865,7 +861,7 @@ export async function endWork(
       const detail = status === "failed" ? runErrorDetail(run.error) : null;
       const minutes = Math.max(1, Math.round((now.getTime() - work.startedAt.getTime()) / 60_000));
       const byUserId = run.error?.startsWith("canceled_by:") ? run.error.slice(12) : null;
-      const locale = await localeOf(tx, work.requestedByUserId);
+      const locale = await lineLocale(tx, work.orgId, work.requestedByUserId, run.id);
       const last = status !== "done" && work.updateSeq > 0 ? work.lastUpdateText : null;
       const [by] = byUserId ? await tx.select({ name: users.name }).from(users).where(eq(users.id, byUserId)) : [];
       end = await insertMessage(tx, {
@@ -875,7 +871,7 @@ export async function endWork(
         author: { type: "agent", agentId: work.agentId, runId: run.id, hop: run.hop },
         body: [
           endText(locale, status, minutes, by?.name),
-          last ? `${locale !== "pt-BR" ? "Last update" : "Último update"}: ${last}` : "",
+          last ? `${serverText(locale, "work.lastUpdate")}: ${last}` : "",
         ]
           .filter(Boolean)
           .join("\n\n"),
@@ -911,22 +907,12 @@ export async function endWork(
   return ended.work;
 }
 
-const endText = (locale: string, status: "done" | "failed" | "canceled", minutes: number, by?: string) =>
-  locale !== "pt-BR"
-    ? status === "done"
-      ? `Done (${minutes} min).`
-      : status === "failed"
-        ? `This background work didn't finish (${minutes} min).`
-        : by
-          ? `Stopped by ${by} after ${minutes} min.`
-          : `Stopped after ${minutes} min.`
-    : status === "done"
-      ? `Concluído (${minutes} min).`
-      : status === "failed"
-        ? `Esse trabalho em segundo plano não terminou (${minutes} min).`
-        : by
-          ? `Parado por ${by} aos ${minutes} min.`
-          : `Parado aos ${minutes} min.`;
+/** The end's own words (`chat.body.work_end_*`, as the apps say them without a reason). */
+const endText = (locale: AppLocale, status: "done" | "failed" | "canceled", minutes: number, by?: string) =>
+  serverText(locale, `chat.body.work_end_${status}${status === "canceled" && by ? "By" : ""}`, {
+    minutes: String(minutes),
+    ...(by ? { name: by } : {}),
+  });
 
 /**
  * Releases queued works that now fit (oldest first) in the caller's transaction: each goes live with a fresh promise,

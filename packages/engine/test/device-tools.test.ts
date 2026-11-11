@@ -516,13 +516,11 @@ describe("waiting for a device", () => {
     if (!run) throw new Error("no run");
     return run;
   };
-  const cardOf = async () => {
+  const cardMessageOf = async () => {
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, f.general.id));
-    return rows.find((m) => (m.meta as { deviceWait?: unknown }).deviceWait)?.meta.deviceWait as Record<
-      string,
-      unknown
-    >;
+    return rows.find((m) => (m.meta as { deviceWait?: unknown }).deviceWait);
   };
+  const cardOf = async () => (await cardMessageOf())?.meta.deviceWait as Record<string, unknown>;
 
   test("an unplugged phone parks the run with a card; it goes on by itself once the host reports it free", async () => {
     const w = await world({ reply: waitingReply as never });
@@ -552,6 +550,10 @@ describe("waiting for a device", () => {
       hostName: "Sam's MacBook",
     });
     expect(Date.parse(String(card.until)) - Date.parse(String(card.since))).toBe(24 * 3600_000);
+    // The card's words, in the language of whom the agent works for.
+    expect((await cardMessageOf())?.body).toBe(
+      "Sam's MacBook não está vendo Pixel 8 agora. Começo quando ele for conectado de novo.",
+    );
     // Sam's device is what someone else's agent waits on: Sam hears it.
     expect((await notificationsOf(w.sam.id)).map((n) => n.kind)).toContain("device.waiting");
     // The give-up job is queued for the day after.
@@ -587,6 +589,19 @@ describe("waiting for a device", () => {
     expect(waiting?.doneAt).not.toBeNull();
     // It ended: the day-after job finds nothing to end.
     expect(await expireDeviceWait({ db: f.db }, run.id, String(card.waitId))).toBe(false);
+  });
+
+  test("the card's line reads in English for a person with no language", async () => {
+    const w = await world({ reply: waitingReply as never });
+    await f.db.update(schema.users).set({ locale: null }).where(eq(schema.users.id, f.owner.id));
+    await f.db
+      .update(schema.machinePhones)
+      .set({ audienceMode: "everyone", state: "offline" })
+      .where(eq(schema.machinePhones.id, w.phone.id));
+    expect((await runOf("@dev record the pixel")).status).toBe("waiting_input");
+    expect((await cardMessageOf())?.body).toBe(
+      "Sam's MacBook doesn't see Pixel 8 right now. I'll start when it's plugged back in.",
+    );
   });
 
   test("a person's message moves the run on; Stop waiting and the day's end each end a wait, by who may", async () => {
