@@ -287,6 +287,10 @@ test("user detail: workspaces and at most the 10 newest sessions", async () => {
     createdAt: "2026-01-01T00:10:00.000Z",
   });
   expect(user.sessions.at(-1)?.ip).toBe("198.51.100.2");
+  // Its own area, said once during the onboarding (`PUT /api/app/me/work-area`): null until then.
+  expect(user).toMatchObject({ workArea: null });
+  await t.db.update(schema.users).set({ workArea: "sales" }).where(eq(schema.users.id, acme.ownerId));
+  expect(await body(await op(`/users/${acme.ownerId}`))).toMatchObject({ workArea: "sales" });
 
   expect((await op("/users/nobody")).status).toBe(404);
 });

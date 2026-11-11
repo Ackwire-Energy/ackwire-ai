@@ -849,8 +849,16 @@ export async function setMyLocale(db: Database, userId: string, locale: UserLoca
 }
 
 /**
+ * Saves the person's own area, asked once during the onboarding (an id the route checked against `WORK_AREAS`, or
+ * `skipped`). About the person, not a workspace.
+ */
+export async function setMyWorkArea(db: Database, userId: string, area: string) {
+  await db.update(users).set({ workArea: area }).where(eq(users.id, userId));
+}
+
+/**
  * The person's name and photo as saved (a session's cached cookie keeps the old ones for minutes after a change
- * elsewhere), their language and whether it follows each device's.
+ * elsewhere), their language and whether it follows each device's, and their area.
  */
 export async function myAccount(db: Database, userId: string) {
   const [row] = await db
@@ -859,6 +867,7 @@ export async function myAccount(db: Database, userId: string) {
       image: users.image,
       locale: users.locale,
       localeAuto: users.localeAuto,
+      workArea: users.workArea,
       deletionDueAt: users.deletionDueAt,
       deletionRequestedAt: users.deletionRequestedAt,
     })
@@ -871,6 +880,7 @@ export async function myAccount(db: Database, userId: string) {
     image: row?.image ?? null,
     locale: row?.locale ?? null,
     localeAuto: row?.localeAuto ?? true,
+    workArea: row?.workArea ?? null,
   };
 }
 

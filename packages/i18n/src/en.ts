@@ -747,6 +747,9 @@ export const en = {
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
         /** On the plan step, with the AI step right after it. */
         planThen: "Once the plan is on, the next screen is where you connect your AI.",
+        /** The person's own area, asked once: on a team's rail after what it does, on a personal one after its purpose. */
+        area: "One last thing before the team.",
+        areaPersonal: "One last thing before your agents.",
         /** The team step's question: does the person already have agents in another app. */
         ask: "Already have a team somewhere else? I'll bring all of it here.",
         /** How a team with no agents yet starts: the template for what it does, or just the two of them. */
@@ -771,6 +774,24 @@ export const en = {
         /** The people step: by email, or (a server that sends no email) through the workspace's link. */
         people: "Now the people. Give me their emails and I'll send the invitations.",
         peopleLink: "Now the people. Send them the link and I'll show you each request.",
+      },
+      /**
+       * The person's own area (about them, never the workspace), asked once per account: on a team's rail after what
+       * it does, on a personal one after what it is for. Optional; the operator API reads it.
+       */
+      area: {
+        title: "And you, what do you work on?",
+        lead: "Just so we know who uses agentes.chat.",
+        skip: "Skip this step",
+        options: {
+          dev: "Development",
+          marketing: "Marketing",
+          sales: "Sales",
+          finance: "Finance",
+          ops: "Operations",
+          support: "Customer support",
+          other: "Something else",
+        },
       },
       preview: {
         label: "Your workspace, as you answer",
@@ -942,11 +963,26 @@ export const en = {
       lead: "You can change this later, nothing is lost.",
       personal: "For me",
       personalText: "Agents that look after your day.",
-      team: "For my company or team",
+      team: "For my team",
       teamText: "People and agents work together, with channels, roles and approvals.",
       /** A quiet line of what it does, under each answer. */
       personalExamples: "Your day at 7 · Bills · Training",
       teamExamples: "Customer support · Finance · Reports",
+      /** The web's cards (ADR 0162): one line under the title, then a pill per agent of the drawing. */
+      personalLine: "Agents that look after your day.",
+      teamLine: "People and agents in one place.",
+      /** What each agent of a card's drawing does, on its pill: a few words. */
+      activities: {
+        agenda: "Daily agenda",
+        home: "Home",
+        bills: "Bills",
+        studies: "Studies",
+        travel: "Trips",
+        support: "Support",
+        finance: "Finance",
+        reports: "Reports",
+        sales: "Sales",
+      },
     },
     /** A personal workspace's name, given at once in the person's language (renamed in Settings like any other). */
     personal: {
