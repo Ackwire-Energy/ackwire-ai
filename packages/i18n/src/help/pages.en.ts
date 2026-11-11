@@ -127,7 +127,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "own",
         heading: "Your own computers and phones",
         blocks: [
-          "Agents can also work on computers and phones you bring: a Mac or a PC with the agentes.chat app, a server, an Android phone or an iPhone. See [Your computers and phones](/help/computers).",
+          "Agents can also work on computers and phones you bring: a Mac or a PC with the agentes.chat app, a server, an Android phone or an iPhone. See [Computers and phones you bring](/help/computers).",
         ],
       },
       {
