@@ -1529,6 +1529,8 @@
       "version": "Wersja {{version}}",
       "versionSize": "Wersja {{version}} · {{size}}",
       "soon": "Nie ma jeszcze wersji na {{system}}.",
+      "useArm": "Komputer z procesorem ARM? Pobierz wersję ARM",
+      "useX64": "Pobierz wersję x64",
       "unavailable": "Nie można teraz pobrać aplikacji z tego miejsca. Spróbuj ponownie za chwilę.",
       "installOn": "Zainstaluj na {{system}}",
       "system": "System",
@@ -14417,6 +14419,7 @@
     "downloadFor": "Pobierz na {{system}}",
     "downloadApp": "Pobierz aplikację",
     "otherSystems": "Inne systemy",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "Na telefonie",
     "onTheIphone": "Na iPhonie",
     "screen": {

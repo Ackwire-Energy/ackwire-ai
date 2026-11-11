@@ -1489,6 +1489,8 @@
       "version": "Version {{version}}",
       "versionSize": "Version {{version}} · {{size}}",
       "soon": "Il n'y a pas encore de version pour {{system}}.",
+      "useArm": "Ordinateur avec une puce ARM ? Téléchargez la version ARM",
+      "useX64": "Télécharger la version x64",
       "unavailable": "L'app ne peut pas être téléchargée d'ici pour le moment. Réessayez dans un instant.",
       "installOn": "Installer sur {{system}}",
       "system": "Système",
@@ -13957,6 +13959,7 @@
     "downloadFor": "Télécharger pour {{system}}",
     "downloadApp": "Télécharger l'app",
     "otherSystems": "Autres systèmes",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "Sur le téléphone",
     "onTheIphone": "Sur l'iPhone",
     "screen": {

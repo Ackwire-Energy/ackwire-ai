@@ -3560,6 +3560,12 @@
   "install.page.soon": {
     "value": "There's no version for {{system}} yet."
   },
+  "install.page.useArm": {
+    "value": "Computer with an ARM chip? Get the ARM version"
+  },
+  "install.page.useX64": {
+    "value": "Get the x64 version"
+  },
   "install.page.unavailable": {
     "value": "The app can't be downloaded from here right now. Try again in a moment."
   },
@@ -32801,6 +32807,9 @@
   },
   "devices.otherSystems": {
     "value": "Other systems"
+  },
+  "devices.armBuild": {
+    "value": "{{system}} (ARM)"
   },
   "devices.onThePhone": {
     "value": "On the phone"

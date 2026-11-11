@@ -1409,6 +1409,8 @@
       "version": "版本 {{version}}",
       "versionSize": "版本 {{version}} · {{size}}",
       "soon": "还没有 {{system}} 版本。",
+      "useArm": "电脑使用 ARM 芯片？下载 ARM 版",
+      "useX64": "下载 x64 版",
       "unavailable": "现在无法从这里下载应用。请稍后再试。",
       "installOn": "在 {{system}} 上安装",
       "system": "系统",
@@ -13074,6 +13076,7 @@
     "downloadFor": "下载 {{system}} 版",
     "downloadApp": "下载应用",
     "otherSystems": "其他系统",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "在手机上",
     "onTheIphone": "在 iPhone 上",
     "screen": {

@@ -1409,6 +1409,8 @@
       "version": "バージョン{{version}}",
       "versionSize": "バージョン{{version}} · {{size}}",
       "soon": "{{system}}版はまだありません。",
+      "useArm": "ARMチップのコンピューターですか？ARM版をダウンロード",
+      "useX64": "x64版をダウンロード",
       "unavailable": "現在ここからアプリをダウンロードできません。しばらくしてからもう一度お試しください。",
       "installOn": "{{system}}にインストール",
       "system": "システム",
@@ -13012,6 +13014,7 @@
     "downloadFor": "{{system}}版をダウンロード",
     "downloadApp": "アプリをダウンロード",
     "otherSystems": "ほかのシステム",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "スマートフォンで",
     "onTheIphone": "iPhoneで",
     "screen": {

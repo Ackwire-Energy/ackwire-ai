@@ -1448,6 +1448,8 @@
       "version": "Sürüm {{version}}",
       "versionSize": "Sürüm {{version}} · {{size}}",
       "soon": "{{system}} için henüz bir sürüm yok.",
+      "useArm": "ARM işlemcili bir bilgisayar mı? ARM sürümünü indirin",
+      "useX64": "x64 sürümünü indir",
       "unavailable": "Uygulama şu anda buradan indirilemiyor. Birazdan tekrar deneyin.",
       "installOn": "{{system}} için kur",
       "system": "Sistem",
@@ -13437,6 +13439,7 @@
     "downloadFor": "{{system}} için indir",
     "downloadApp": "Uygulamayı indir",
     "otherSystems": "Diğer sistemler",
+    "armBuild": "{{system}} (ARM)",
     "onThePhone": "Telefonda",
     "onTheIphone": "iPhone'da",
     "screen": {
