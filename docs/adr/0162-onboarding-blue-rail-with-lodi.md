@@ -5,13 +5,15 @@
 - Amends: 0137 §6 (the onboarding asked only the workspace's name, then its right hand's DM), 0155 §6 (the right
   hand's card had five rows), 0079 §3 (the billing link's claims) and §7 (where a hold offers the plan), 0071 §3 (when
   our notifications ask opens)
-- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState`, `landingOf`),
-  `lib/setup-checklist.ts` (three rows, invitations finish the people row), `lib/push-offer.ts` (`pushAskAt`),
-  `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts` (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB`
-  queued by `setBillingHold`), `billing-link.ts` (`plan`); web `pages/OnboardingPage.tsx`, `pages/onboarding/*`,
-  `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`, `components/FirstRun.tsx`,
-  `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone `features/onboarding/OnboardingFlow.tsx`,
-  `features/onboarding/steps.tsx`
+- Code: client `lib/onboarding.ts` (`railSteps`, `railStepAt`, `railState` with its `funnel`, `landingOf`),
+  `lib/no-ai.ts` (`teamThinks`), `lib/setup-checklist.ts` (three rows, invitations finish the people row, the plan
+  row), `lib/push-offer.ts` (`pushAskAt`), `lib/billing.ts` (`planOfferOf`); engine `team-templates.ts`
+  (`sayTeamHello`), `standing.ts` (`TEAM_HELLO_JOB` queued by `setBillingHold`), `billing-link.ts` (`plan`); web
+  `pages/OnboardingPage.tsx`, `pages/onboarding/*` (`TeamSource.tsx`: `useTeamSource`, `TeamSource`; `AiStep.tsx`:
+  `AiHost`, `AiStep`, `AiStage`), `components/Sky.tsx` (`OnboardingProgress`, `TeamAsleepSky`), `lib/plan-offer.ts`,
+  `lib/arrival.ts` (`ARRIVAL_BETA_ONLY`), `components/arrival/Arrival.tsx`, `components/FirstRun.tsx`,
+  `components/Standing.tsx` (`HoldBanner`), `components/WebPush.tsx` (`PushAskInline`), `routes/onboarding.tsx`; phone
+  `features/onboarding/OnboardingFlow.tsx`, `features/onboarding/steps.tsx`, `features/right-hand/FirstRun.tsx`
 
 ## Context
 
@@ -98,3 +100,51 @@ way out of the account stays one quiet "Sair".
 - **The floating date** never floats over the conversation's start (the greeting and its cards): above the first day it
   shows nothing (`dayAtTop`, the phone's `dayInView`).
 - **The computer notice** says no line under its title before the provisioner names a step (`setupNoticeStatusKey`).
+
+## Amended 2026-11-10: the whole path before the workspace opens
+
+The rail now ends where the team can think, instead of leaving an AI and, for a team from another app, the import to
+the workspace. Amends §1 (the steps), §2 (the plan step's words), §3 (where it opens) and §5 (the card on a hold).
+
+- **The steps.** A team's: its name, what it does, its team, the plan, connect an AI. A personal workspace's (ADR
+  0159): what it is for, its agents, the plan, connect an AI; it has no business step, and its name ("Pessoal") is never
+  asked. The plan is listed while the workspace waits for its first plan, and stays listed once paid (it reads
+  "Ligado"): showing a held plan step saves the onboarding's step as `computer`, so the rail lists the plan when the
+  workspace waits for one or that step was passed. A server that never held the workspace has no plan step. `railState`
+  takes a `funnel` (`thinks`, `passed`); the phone passes `null` and keeps the steps of §1 and §7.
+- **The team step asks first** whether the person already has agents in another app: the import page's cards, then
+  "Ainda não uso nenhum". An app that answers a request is asked from the step (copy the request, paste its answer,
+  "Ler a resposta"); a file or a folder goes through the import's picker. What was found shows before anything is made,
+  and "Trazer o time" applies it (ADR 0055). Imported agents arrive with no model of their own, so they take the new
+  agent's default and think with the AI connected next. A step with something skipped or failed, or with the agents'
+  files still copying, stays on its report until Continue; an import that brought no agent goes on as "none" would.
+  The import's views load only once the step is reached, so the first screen after sign-up stays light.
+- **"Ainda não uso nenhum"** opens a team's templates as before, and a personal workspace's next step ("Seguir sem
+  agentes"). Both save the onboarding's step as `agents` (no new column), so a resume opens on the templates. In a
+  team's workspace the marker only picks that view: the step is answered by its agents. In a personal workspace,
+  which may have none, it answers the step.
+- **The plan step** says what comes after it beside its button ("Em seguida: conectar a sua IA.") and its way out reads
+  "Ligar depois e só conhecer o workspace". Paying no longer finishes the onboarding: back from the billing page
+  (`?paid`) the step says the payment was received and asks again every 5 s until the hold lifts, then the AI step
+  follows.
+- **The AI step** is Connect an AI (ADR 0160 §3) on the onboarding page: the same choices as cards, with the team asleep
+  on the stage beside them. Claude and ChatGPT open the team's Connect on that plan (`intent`), an API key the key's
+  panel (`intent: "api_key"`), another plan that plan's own steps; with the right hand alone, its own Connect. The step
+  is answered from data: every agent of the team has an AI, ready or waiting for its computer (`teamThinks`). A status
+  that doesn't list every agent answers nothing until it is read again, which happens whenever the team changes. While
+  the step is up it reads the status every 10 s and the plans' state every 5 s, since the onboarding has no socket, so
+  an AI connected in another tab, on the phone, or right after paying moves it on. Once it thinks, the step says so
+  with the team awake and "Entrar no workspace". "Conectar depois" finishes the onboarding the same way, and a failure
+  says so. A skipped plan never reaches this step.
+- **Nothing opens under the person.** While they are on a step they chose (one picked on the rail, an import's report,
+  the AI's done screen), the page doesn't open the workspace by itself.
+- **Where it opens.** As in §3, with the arrival's notice alone (`?arrival=beta`, ADR 0160) after the AI step or a
+  skipped plan; a team that already thinks when its team is made still opens with `?arrival=1`.
+- **The card on a hold** (amends §5): a first row, "Ligue o time." ("Ligue os seus agentes." in a personal workspace),
+  whose "Ver planos" opens the billing page, for an owner who may pay while the workspace waits for its first plan. The
+  AI row says "É o passo seguinte ao plano."; the others still open with the plan. In the right hand's DM the hold's
+  banner steps aside while the card shows that row (after its "payment received" line, which still shows); everywhere
+  else, and for anyone the card doesn't show the row to, it stays (amends §3, where the banner was the one way to the
+  plan).
+- **The phone** (§7) keeps its steps (`funnel: null`): no AI step, and a workspace left at the web's AI step opens
+  there. Its card on a hold shows the plan row in words only, saying the plan is chosen on the web.

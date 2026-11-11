@@ -150,8 +150,19 @@ export async function finishOnboarding(api: ApiClient, orgId: string): Promise<O
 }
 
 /**
+ * Whether its first-run card leads with the plan for this person (the card's plan row, `firstRunSteps`, ADR 0162):
+ * the card still up, the workspace waiting for its first agentes.chat plan, and an owner who may pay. Here, apart from
+ * the card's rows, for the hold's banner, which every page loads.
+ */
+export const leadsWithPlan = (
+  agent: Pick<Agent, "setup" | "builtin">,
+  may: { owner: boolean; pay: boolean; waitsForPlan?: boolean },
+) => agent.builtin === "right_hand" && Boolean(agent.setup) && may.owner && Boolean(may.waitsForPlan) && may.pay;
+
+/**
  * The line under its greeting: on a billing hold with no team yet, how the team comes and that it works with the
- * plan; otherwise what it does (the hold's banner and the checklist's AI row already say the plan once a team is here).
+ * plan; otherwise what it does (once a team is here, the checklist's plan row, which leads it while the workspace
+ * waits for its first plan, and the hold's banner already say the plan; ADR 0162).
  */
 export const introLeadKey = (held: boolean, hasTeam: boolean) =>
   held && !hasTeam ? ("rightHand.intro.heldLead" as const) : ("rightHand.intro.lead" as const);

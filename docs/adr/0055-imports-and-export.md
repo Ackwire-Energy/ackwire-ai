@@ -138,3 +138,7 @@ Two things people hit bringing agents from another app with `EXPORT_PROMPT`: the
 - A reply's keys are a model's guesses too, so the parser gives its own: an agent goes by its name (two with one name keep the model's key after it), a routine by its agent and name, a note by what it says. Channels, routines, notes and to-dos may name an agent by key, handle or name; with a single agent, any name means it.
 - An agent that comes back with no instructions never clears what an earlier import brought (`unchanged`): each bot's reply fills in what it can read.
 - Replies imported before this were kept as `<app>:<the model's ref>`. `loadImportState` reads those rows as the app's package too, so asking again updates what they made.
+
+## Addendum (2026-11-10): the onboarding's team step brings the agents (§3, §4)
+
+The onboarding no longer sends a person who has agents elsewhere to Settings › Import after it ends: its team step asks first whether they have agents in another app, and brings them there (ADR 0162, amended 2026-11-10). The step uses the same flow as the import page: an app that answers `EXPORT_PROMPT` is asked from the step, a file or a folder goes through the picker, the preview shows what was found and applying it makes the team. Agents brought there arrive with no model (`model: null`), so they take the new agent's default and think with the AI connected in the next step: a model kept from the other app (§4) could be one the workspace never connects. A step that brought no agent goes on as if the person had none.

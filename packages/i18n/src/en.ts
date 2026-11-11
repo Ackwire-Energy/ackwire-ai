@@ -716,13 +716,23 @@ export const en = {
       left_other: "{{count}} steps left",
       done: "All set",
     },
-    /** The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview and the plan step. */
+    /**
+     * The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview, the team step's question and
+     * import, the plan step and the AI step. `<key>Personal`: a personal workspace's words (ADR 0159).
+     */
     flow: {
       steps: {
         name: "Workspace name",
         business: "What you do",
         team: "Your team",
         plan: "Turn the team on",
+        /** The rail's last step: connecting the AI the team thinks with. */
+        ai: "Connect an AI",
+        /** A personal workspace's first step: what it is for ("For me"). */
+        namePersonal: "What it's for",
+        teamPersonal: "Your agents",
+        planPersonal: "Turn the agents on",
+        aiPersonal: "Connect an AI",
       },
       stepOf: "Step {{n}} of {{total}}",
       lodi: {
@@ -730,6 +740,22 @@ export const en = {
         business: "With that I'll know who to bring onto the team.",
         team: "This is the team I'd put together. You can change anything later.",
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
+        /** On the plan step, with the AI step right after it. */
+        planThen: "Once the plan is on, the next screen is where you connect your AI.",
+        /** The team step's question: does the person already have agents in another app. */
+        ask: "Already have a team somewhere else? I'll bring all of it here.",
+        askPersonal: "Already use agents somewhere else? I'll bring them all here.",
+        /** `{{app}}`: the other app ("Grok Bot"). */
+        bring: "Copy the request, paste it in {{app}} and bring back the answer. I'll do the rest.",
+        /** The same, for an app that hands back a file or a folder, dropped on the step. */
+        bringFiles: "Drop here what the app exported. I'll do the rest.",
+        found: "Found your team. Check that everyone is here.",
+        foundPersonal: "Found your agents. Check that they're all here.",
+        /** The AI step: picking an AI wakes the team (or, alone, Lodi). */
+        ai: "Last step. Pick the AI you already use and the team wakes up.",
+        aiPersonal: "Last step. Pick the AI you already use and I wake up.",
+        /** Once an AI is connected, before the workspace opens. */
+        connected: "There we go. Call me in the workspace and I'll show you the rest.",
       },
       preview: {
         label: "Your workspace, as you answer",
@@ -737,7 +763,49 @@ export const en = {
         name: "Your workspace",
         ghost: "Your team shows up here",
       },
-      team: { title: "Your team" },
+      team: {
+        title: "Your team",
+        /** The team step opens on this question; the cards are the import page's apps, then "none". */
+        ask: {
+          title: "Do you already have agents in another app?",
+          lead: "If you do, I'll bring the whole team: instructions, skills and routines.",
+          leadPersonal: "If you do, I'll bring them all: instructions, skills and routines.",
+          none: "I don't use any yet",
+          /** `{{org}}`: the workspace's name. */
+          noneText: "I'll put together a team for {{org}} from what you do.",
+          noneTextPersonal: "We start with just the two of us. Agents can come later, whenever you want.",
+          /** The button, with an app picked. `{{app}}`: the other app. */
+          from: "Bring from {{app}}",
+          /** The button, with "I don't use any yet" picked. */
+          fresh: "Build a new team",
+          freshPersonal: "Continue without agents",
+        },
+        /** Bringing the team from an app that answers a request: copy the request there, paste its answer here. */
+        bring: {
+          title: "Bring your team from {{app}}",
+          titlePersonal: "Bring your agents from {{app}}",
+          /** The same, for "Another app". */
+          titleOther: "Bring your team from another app",
+          titleOtherPersonal: "Bring your agents from another app",
+          lead: "It takes a minute. Nothing changes there.",
+          ask: "Ask {{app}} to export",
+          paste: "Paste it in your chat with {{app}}.",
+          reply: "It answers with a JSON: copy the whole answer and paste it in the field below.",
+          field: "Paste the answer from {{app}} here",
+          placeholder: "The answer's JSON",
+          read: "Read the answer",
+          fresh: "I'd rather build a new team",
+        },
+        /** What the other app sent, before anything is made. */
+        found: {
+          title_one: "Found {{count}} agent in {{app}}",
+          title_other: "Found {{count}} agents in {{app}}",
+          lead:
+            "They arrive with the instructions, skills and routines they already have. You can change everything later.",
+          bring: "Bring the team",
+          bringPersonal: "Bring the agents",
+        },
+      },
       plan: {
         title: "Turn your team on",
         lead: "Your team is ready. With the plan and an AI, it starts today.",
@@ -748,7 +816,31 @@ export const en = {
         cancel: "Cancel anytime",
         cta: "Turn the team on",
         all: "See all plans",
-        skip: "Go to the workspace without it",
+        /** Opens the workspace with no plan: the right hand's card then leads with the plan. */
+        skip: "Turn it on later and just look around the workspace",
+        /** Beside the plan's button: the step after it. */
+        next: "Next: connect your AI.",
+        titlePersonal: "Turn your agents on",
+        leadPersonal: "With the plan and an AI, they start today.",
+        asleepPersonal: "Asleep until the plan",
+      },
+      /** The rail's last step (ADR 0162): the AI the team thinks with, then the workspace. */
+      ai: {
+        later: "Connect later",
+        /** `{{org}}`: the workspace's name. */
+        doneTitle: "Done. The {{org}} team is thinking now.",
+        /** `{{name}}`: the right hand, alone in a personal workspace. */
+        doneTitlePersonal: "Done. {{name}} is thinking now.",
+        /** `{{label}}`: the AI picked ("Claude"). */
+        doneLead: "Your {{label}} answers for every agent. You can change it later, one by one.",
+        doneLeadAny: "The AI you connected answers for every agent. You can change it later, one by one.",
+        /** The tag on the card of the AI just connected ("Claude"). */
+        connected: "Connected",
+        enter: "Go to the workspace",
+        /** Under the team, once it wakes. `{{names}}`: the agents, already joined ("Lodi, Nina and Leo"). */
+        awake: "Your team woke up",
+        answer_one: "{{names}} answers now.",
+        answer_other: "{{names}} answer now.",
       },
       account: "Your account",
     },
@@ -756,6 +848,10 @@ export const en = {
       context: "Written",
       skipped: "Skipped",
       later: "Later",
+      /** The plan step, once the plan is on. */
+      on: "On",
+      /** The AI step, once an AI is connected (its name when picked here). */
+      ai: "Connected",
       invites_one: "{{count}} invite",
       invites_other: "{{count}} invites",
     },
@@ -981,7 +1077,7 @@ export const en = {
       go_other: "Import {{count}} items",
       nothingNew: "All of this is already here.",
       nothingToBring: "Nothing here can come along. Each item says why.",
-      withTeam: "It arrives when you create the team.",
+      withTeam: "It arrives when you bring the team.",
       applying: "Importing… {{done}} of {{total}}",
       files: {
         copy: "Copy the files to the Drive",
@@ -5577,6 +5673,16 @@ export const en = {
       notNow: "Not now",
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Opens with the plan.",
+      /** The AI row on a billing hold: the plan row above it comes first. */
+      afterPlanNext: "It's the next step after the plan.",
+      /** The first row while the workspace waits for its first plan (ADR 0162), its button opening the billing page. */
+      plan: {
+        todo: "Turn the team on.",
+        todoDesc: "With an agentes.chat plan, the agents start working.",
+        action: "See plans",
+        todoPersonal: "Turn your agents on.",
+        todoDescPersonal: "With an agentes.chat plan, your agents start working.",
+      },
       about: {
         /** A personal workspace's row 1, its button (ADR 0159). */
         action: "Tell",

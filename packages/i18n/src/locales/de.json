@@ -701,14 +701,29 @@
         "name": "Name des Workspace",
         "business": "Was ihr macht",
         "team": "Dein Team",
-        "plan": "Team einschalten"
+        "plan": "Team einschalten",
+        "ai": "KI verbinden",
+        "namePersonal": "Wofür du es nutzt",
+        "teamPersonal": "Deine Agenten",
+        "planPersonal": "Agenten einschalten",
+        "aiPersonal": "KI verbinden"
       },
       "stepOf": "Schritt {{n}} von {{total}}",
       "lodi": {
         "name": "Hallo {{first}}. Ich bin {{name}}. Ich stelle das Team in etwa zwei Minuten mit dir zusammen.",
         "business": "Damit weiß ich, wen ich ins Team hole.",
         "team": "So würde ich das Team zusammenstellen. Du kannst später alles ändern.",
-        "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo."
+        "plan": "Nach dem Tarif fehlt nur noch eine KI. Ich zeige dir, wo.",
+        "planThen": "Sobald der Tarif läuft, verbindest du auf dem nächsten Bildschirm deine KI.",
+        "ask": "Du hast schon ein Team woanders? Ich hole es komplett hierher.",
+        "askPersonal": "Du nutzt schon Agenten woanders? Ich hole sie alle hierher.",
+        "bring": "Kopiere die Anfrage, füge sie in {{app}} ein und bring die Antwort mit. Den Rest mache ich.",
+        "bringFiles": "Leg hier ab, was die App exportiert hat. Den Rest mache ich.",
+        "found": "Ich habe dein Team gefunden. Schau, ob alle da sind.",
+        "foundPersonal": "Ich habe deine Agenten gefunden. Schau, ob alle da sind.",
+        "ai": "Letzter Schritt. Wähle die KI, die du schon nutzt, und das Team wacht auf.",
+        "aiPersonal": "Letzter Schritt. Wähle die KI, die du schon nutzt, und ich wache auf.",
+        "connected": "Jetzt passt es. Ruf mich im Workspace, dann zeige ich dir den Rest."
       },
       "preview": {
         "label": "Dein Workspace, während du antwortest",
@@ -716,7 +731,39 @@
         "ghost": "Hier erscheint dein Team"
       },
       "team": {
-        "title": "Dein Team"
+        "title": "Dein Team",
+        "ask": {
+          "title": "Hast du schon Agenten in einer anderen App?",
+          "lead": "Wenn ja, hole ich das ganze Team: Anweisungen, Skills und Routinen.",
+          "leadPersonal": "Wenn ja, hole ich sie alle: Anweisungen, Skills und Routinen.",
+          "none": "Ich nutze noch keine",
+          "noneText": "Ich stelle für {{org}} ein Team zusammen, passend zu dem, was ihr macht.",
+          "noneTextPersonal": "Wir fangen zu zweit an. Agenten kommen später dazu, wann du willst.",
+          "from": "Aus {{app}} holen",
+          "fresh": "Neues Team zusammenstellen",
+          "freshPersonal": "Ohne Agenten weiter"
+        },
+        "bring": {
+          "title": "Hol dein Team aus {{app}}",
+          "titlePersonal": "Hol deine Agenten aus {{app}}",
+          "titleOther": "Hol dein Team aus einer anderen App",
+          "titleOtherPersonal": "Hol deine Agenten aus einer anderen App",
+          "lead": "Dauert eine Minute. Dort ändert sich nichts.",
+          "ask": "Bitte {{app}} um den Export",
+          "paste": "Füge sie in deinen Chat mit {{app}} ein.",
+          "reply": "Die Antwort ist ein JSON: Kopiere die ganze Antwort und füge sie unten ins Feld ein.",
+          "field": "Füge hier die Antwort von {{app}} ein",
+          "placeholder": "Das JSON der Antwort",
+          "read": "Antwort lesen",
+          "fresh": "Lieber ein neues Team zusammenstellen"
+        },
+        "found": {
+          "title_one": "{{count}} Agent in {{app}} gefunden",
+          "title_other": "{{count}} Agenten in {{app}} gefunden",
+          "lead": "Sie kommen mit den Anweisungen, Skills und Routinen, die sie schon haben. Du kannst später alles ändern.",
+          "bring": "Team holen",
+          "bringPersonal": "Agenten holen"
+        }
       },
       "plan": {
         "title": "Schalte dein Team ein",
@@ -728,7 +775,23 @@
         "cancel": "Jederzeit kündbar",
         "cta": "Team einschalten",
         "all": "Alle Tarife ansehen",
-        "skip": "Ohne Einschalten in den Workspace"
+        "skip": "Später einschalten und erst den Workspace ansehen",
+        "next": "Danach: deine KI verbinden.",
+        "titlePersonal": "Schalte deine Agenten ein",
+        "leadPersonal": "Mit dem Tarif und einer KI legen sie heute los.",
+        "asleepPersonal": "Schlafen bis zum Tarif"
+      },
+      "ai": {
+        "later": "Später verbinden",
+        "doneTitle": "Fertig. Das Team von {{org}} denkt jetzt.",
+        "doneTitlePersonal": "Fertig. {{name}} denkt jetzt.",
+        "doneLead": "Dein {{label}} antwortet für alle Agenten. Du kannst das später einzeln ändern.",
+        "doneLeadAny": "Die KI, die du verbunden hast, antwortet für alle Agenten. Du kannst das später einzeln ändern.",
+        "connected": "Verbunden",
+        "enter": "Zum Workspace",
+        "awake": "Dein Team ist aufgewacht",
+        "answer_one": "{{names}} antwortet jetzt.",
+        "answer_other": "{{names}} antworten jetzt."
       },
       "account": "Dein Konto"
     },
@@ -736,6 +799,8 @@
       "context": "Geschrieben",
       "skipped": "Übersprungen",
       "later": "Später",
+      "on": "An",
+      "ai": "Verbunden",
       "invites_one": "{{count}} Einladung",
       "invites_other": "{{count}} Einladungen"
     },
@@ -959,7 +1024,7 @@
       "go_other": "{{count}} Elemente importieren",
       "nothingNew": "Das alles ist schon hier.",
       "nothingToBring": "Nichts davon kann mitkommen. Bei jedem Element steht, warum.",
-      "withTeam": "Kommt an, wenn du das Team erstellst.",
+      "withTeam": "Kommt an, wenn du das Team holst.",
       "applying": "Wird importiert… {{done}} von {{total}}",
       "files": {
         "copy": "Dateien ins Drive kopieren",
@@ -5425,6 +5490,14 @@
       "complete": "Alles bereit.",
       "notNow": "Jetzt nicht",
       "afterPlan": "Öffnet mit dem Tarif.",
+      "afterPlanNext": "Das ist der nächste Schritt nach dem Tarif.",
+      "plan": {
+        "todo": "Schalte das Team ein.",
+        "todoDesc": "Mit einem agentes.chat-Tarif legen die Agenten los.",
+        "action": "Tarife ansehen",
+        "todoPersonal": "Schalte deine Agenten ein.",
+        "todoDescPersonal": "Mit einem agentes.chat-Tarif legen deine Agenten los."
+      },
       "about": {
         "action": "Erzählen",
         "title": "Was macht {{org}}?",

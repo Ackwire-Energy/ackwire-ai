@@ -691,14 +691,29 @@
         "name": "워크스페이스 이름",
         "business": "하는 일",
         "team": "내 팀",
-        "plan": "팀 켜기"
+        "plan": "팀 켜기",
+        "ai": "AI 연결",
+        "namePersonal": "어디에 쓸지",
+        "teamPersonal": "내 에이전트",
+        "planPersonal": "에이전트 켜기",
+        "aiPersonal": "AI 연결"
       },
       "stepOf": "{{total}}단계 중 {{n}}단계",
       "lodi": {
         "name": "안녕하세요, {{first}}님. 저는 {{name}}예요. 2분 정도면 같이 팀을 꾸릴 수 있어요.",
         "business": "이제 팀에 누구를 부를지 알겠어요.",
         "team": "제가 꾸린다면 이런 팀이에요. 나중에 뭐든 바꿀 수 있어요.",
-        "plan": "요금제 다음에는 AI만 연결하면 돼요. 어디서 하는지 보여 드릴게요."
+        "plan": "요금제 다음에는 AI만 연결하면 돼요. 어디서 하는지 보여 드릴게요.",
+        "planThen": "요금제가 켜지면 다음 화면에서 AI를 연결해요.",
+        "ask": "다른 곳에 이미 팀이 있나요? 통째로 여기로 데려올게요.",
+        "askPersonal": "다른 곳에서 이미 에이전트를 쓰고 있나요? 모두 여기로 데려올게요.",
+        "bring": "요청을 복사해서 {{app}}에 붙여 넣고 답을 가져오세요. 나머지는 제가 할게요.",
+        "bringFiles": "앱이 내보낸 것을 여기에 끌어다 놓으세요. 나머지는 제가 할게요.",
+        "found": "팀을 찾았어요. 모두 있는지 확인해 주세요.",
+        "foundPersonal": "에이전트를 찾았어요. 모두 있는지 확인해 주세요.",
+        "ai": "마지막 단계예요. 이미 쓰는 AI를 고르면 팀이 깨어나요.",
+        "aiPersonal": "마지막 단계예요. 이미 쓰는 AI를 고르면 제가 깨어나요.",
+        "connected": "이제 됐어요. 워크스페이스에서 불러 주시면 나머지를 보여 드릴게요."
       },
       "preview": {
         "label": "답하는 동안 채워지는 내 워크스페이스",
@@ -706,7 +721,38 @@
         "ghost": "팀이 여기에 나타나요"
       },
       "team": {
-        "title": "내 팀"
+        "title": "내 팀",
+        "ask": {
+          "title": "다른 앱에서 이미 에이전트를 쓰고 있나요?",
+          "lead": "그렇다면 팀 전체를 데려올게요. 지침, 스킬, 루틴까지요.",
+          "leadPersonal": "그렇다면 모두 데려올게요. 지침, 스킬, 루틴까지요.",
+          "none": "아직 쓰는 게 없어요",
+          "noneText": "{{org}}에서 하는 일에 맞춰 팀을 꾸려 드릴게요.",
+          "noneTextPersonal": "우선 우리 둘이 시작해요. 에이전트는 원할 때 나중에 추가하면 돼요.",
+          "from": "{{app}}에서 가져오기",
+          "fresh": "새 팀 꾸리기",
+          "freshPersonal": "에이전트 없이 계속"
+        },
+        "bring": {
+          "title": "{{app}}에서 팀을 가져오세요",
+          "titlePersonal": "{{app}}에서 에이전트를 가져오세요",
+          "titleOther": "다른 앱에서 팀을 가져오세요",
+          "titleOtherPersonal": "다른 앱에서 에이전트를 가져오세요",
+          "lead": "1분이면 돼요. 그쪽은 아무것도 바뀌지 않아요.",
+          "ask": "{{app}}에 내보내기 요청하기",
+          "paste": "{{app}} 대화창에 붙여 넣어요.",
+          "reply": "JSON으로 답해요. 답 전체를 복사해서 아래 칸에 붙여 넣으세요.",
+          "field": "{{app}}의 답을 여기에 붙여 넣으세요",
+          "placeholder": "답의 JSON",
+          "read": "답 읽기",
+          "fresh": "새 팀을 꾸리는 게 좋아요"
+        },
+        "found": {
+          "title_other": "{{app}}에서 에이전트 {{count}}개를 찾았어요",
+          "lead": "이미 가진 지침, 스킬, 루틴과 함께 와요. 나중에 뭐든 바꿀 수 있어요.",
+          "bring": "팀 가져오기",
+          "bringPersonal": "에이전트 가져오기"
+        }
       },
       "plan": {
         "title": "팀을 켜세요",
@@ -718,7 +764,22 @@
         "cancel": "언제든지 해지 가능",
         "cta": "팀 켜기",
         "all": "모든 요금제 보기",
-        "skip": "켜지 않고 워크스페이스로 가기"
+        "skip": "나중에 켜고 우선 워크스페이스 둘러보기",
+        "next": "다음: AI 연결하기.",
+        "titlePersonal": "에이전트를 켜세요",
+        "leadPersonal": "요금제와 AI가 있으면 오늘부터 일해요.",
+        "asleepPersonal": "요금제 전까지 잠자는 중"
+      },
+      "ai": {
+        "later": "나중에 연결",
+        "doneTitle": "완료됐어요. {{org}} 팀이 이제 생각해요.",
+        "doneTitlePersonal": "완료됐어요. {{name}}이(가) 이제 생각해요.",
+        "doneLead": "{{label}}이(가) 모든 에이전트를 대신해 답해요. 나중에 하나씩 바꿀 수 있어요.",
+        "doneLeadAny": "연결한 AI가 모든 에이전트를 대신해 답해요. 나중에 하나씩 바꿀 수 있어요.",
+        "connected": "연결됨",
+        "enter": "워크스페이스로 가기",
+        "awake": "팀이 깨어났어요",
+        "answer_other": "{{names}}이(가) 이제 답해요."
       },
       "account": "내 계정"
     },
@@ -726,6 +787,8 @@
       "context": "작성함",
       "skipped": "건너뜀",
       "later": "나중에",
+      "on": "켜짐",
+      "ai": "연결됨",
       "invites_other": "초대 {{count}}개"
     },
     "back": "뒤로",
@@ -938,7 +1001,7 @@
       "go_other": "항목 {{count}}개 가져오기",
       "nothingNew": "모두 이미 여기 있어요.",
       "nothingToBring": "가져올 수 있는 게 없어요. 항목마다 이유가 나와 있어요.",
-      "withTeam": "팀을 만들면 함께 와요.",
+      "withTeam": "팀을 가져오면 함께 와요.",
       "applying": "가져오는 중… {{total}}개 중 {{done}}개",
       "files": {
         "copy": "파일을 Drive에 복사",
@@ -5223,6 +5286,14 @@
       "complete": "모두 준비됐어요.",
       "notNow": "나중에",
       "afterPlan": "플랜과 함께 열려요.",
+      "afterPlanNext": "요금제 다음 단계예요.",
+      "plan": {
+        "todo": "팀을 켜세요.",
+        "todoDesc": "agentes.chat 요금제가 있으면 에이전트가 일을 시작해요.",
+        "action": "요금제 보기",
+        "todoPersonal": "에이전트를 켜세요.",
+        "todoDescPersonal": "agentes.chat 요금제가 있으면 내 에이전트가 일을 시작해요."
+      },
       "about": {
         "action": "알려 주기",
         "title": "{{org}}는 무슨 일을 하나요?",

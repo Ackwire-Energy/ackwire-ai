@@ -41,6 +41,8 @@ export function presetInput(t: TFunction, preset: Preset): AgentInput {
  * agents arrive chosen in "agents", which only picks and creates the team.
  * "computer" comes before "ai": a computer the agents can use helps that step,
  * whose plan sign-in runs on it.
+ * The web's rail reads two of them back as answers with no data of their own (`RailFunnel`, ADR 0162): "agents" for
+ * a workspace that brings no agents yet, "computer" for a plan step that was shown.
  */
 export const ONBOARDING_STEPS = [
   { id: "workspace", optional: false },
@@ -57,34 +59,59 @@ export type OnboardingStepId = (typeof ONBOARDING_STEPS)[number]["id"];
 export const stepIndex = (id: OnboardingStepId) => ONBOARDING_STEPS.findIndex((s) => s.id === id);
 
 /**
- * The onboarding's steps on the rail (ADR 0162), web and phone: the workspace's name, what it does, its team, and the
- * plan, which only a workspace waiting for its first plan has (agentes.chat Cloud).
+ * The onboarding's steps on the rail (ADR 0162), web and phone: the workspace's name, what it does, its team, the plan
+ * (agentes.chat Cloud) and connecting an AI. A personal workspace (ADR 0159) has no "what it does" step: its name
+ * step is the purpose question. The phone lists neither the AI step nor a personal path (`railState`'s `funnel`).
  */
-export type RailStep = "name" | "business" | "team" | "plan";
-export const railSteps = (waitsForPlan: boolean): RailStep[] =>
-  waitsForPlan ? ["name", "business", "team", "plan"] : ["name", "business", "team"];
+export type RailStep = "name" | "business" | "team" | "plan" | "ai";
+export const railSteps = (f: { plan: boolean; ai: boolean; personal: boolean }): RailStep[] => [
+  ...(f.personal ? (["name"] as const) : (["name", "business"] as const)),
+  "team",
+  ...(f.plan ? (["plan"] as const) : []),
+  ...(f.ai ? (["ai"] as const) : []),
+];
 
 /**
- * The step to show, read from the workspace's data (it exists, has its context, has a team, waits for its plan), so a
- * workspace left at any step resumes there; "open" once it is ready to open.
+ * The step to show, read from the workspace's data (it exists, has its context, has a team, waits for its plan, its
+ * team thinks), so a workspace left at any step resumes there; "open" once it is ready to open. `ai` says whether the
+ * rail has the AI step at all.
  */
 export function railStepAt(f: {
   created: boolean;
   context: boolean;
   team: boolean;
   waitsForPlan: boolean;
+  personal: boolean;
+  ai: boolean;
+  thinks: boolean;
 }): RailStep | "open" {
   if (!f.created) return "name";
-  if (!f.context) return "business";
+  if (!f.personal && !f.context) return "business";
   if (!f.team) return "team";
-  return f.waitsForPlan ? "plan" : "open";
+  if (f.waitsForPlan) return "plan";
+  return f.ai && !f.thinks ? "ai" : "open";
+}
+
+/**
+ * What the web's rail reads besides the workspace's data (ADR 0162, amended 2026-11-10): whether every agent thinks
+ * (`teamThinks`; undefined while that isn't known, read as not yet) and the furthest step the server stored
+ * (`onboarding.step`), which answers what has no data of its own: a personal workspace's "no agents yet" ("agents")
+ * and a plan step once shown ("computer", so the step stays on the rail, answered, after paying).
+ */
+export interface RailFunnel {
+  thinks: boolean | undefined;
+  passed: OnboardingStepId | undefined;
 }
 
 /**
  * Where an onboarding stands, web and phone: its steps, the one its data reaches, how many are answered, and the step
  * to show, which is one the person went back to (`picked`) while it stays answered, else the one reached. Before the
- * workspace exists only the server's billing says whether a plan step will come. A personal workspace (ADR 0159) has
- * no steps once it exists: it opens, and its right hand's card holds the rest.
+ * workspace exists only the server's billing says whether a plan step will come.
+ *
+ * `funnel` null (the phone) keeps the rail it has always had: no AI step, and a personal workspace (ADR 0159) has no
+ * steps once it exists (it opens, its right hand's card holds the rest). With a funnel (the web, ADR 0162 amended
+ * 2026-11-10) the rail ends on connecting an AI, answered once every agent thinks, and a personal workspace walks it
+ * too, with no "what it does" step: its team step is answered by agents brought in or by "no agents yet".
  */
 export function railState(f: {
   orgId: string | null;
@@ -94,22 +121,42 @@ export function railState(f: {
   team: number;
   picked: RailStep | null;
   personal?: boolean;
+  funnel: RailFunnel | null;
 }) {
   const waitsForPlan = f.orgId ? billingHoldOf(f.standing) === "payment" : Boolean(f.billingUrl);
-  const steps = railSteps(waitsForPlan);
+  const funnel = f.funnel;
+  const personal = Boolean(f.personal);
+  const passed = stepIndex(funnel?.passed ?? "workspace");
+  // A plan step shown once stays on the rail, answered, after paying; a server that never held the workspace has none.
+  const hasPlanStep = waitsForPlan || (funnel !== null && passed >= stepIndex("computer"));
+  const steps = funnel
+    ? railSteps({ plan: hasPlanStep, ai: true, personal })
+    : railSteps({ plan: waitsForPlan, ai: false, personal: false });
   const at =
-    f.personal && f.orgId !== null
+    !funnel && personal && f.orgId !== null
       ? "open"
       : railStepAt({
           created: f.orgId !== null,
           context: f.context.trim() !== "",
-          team: f.team > 0,
+          // "No agents yet" answers a personal workspace's team step; a team's still makes one (its templates).
+          team: f.team > 0 || (funnel !== null && personal && passed >= stepIndex("agents")),
           waitsForPlan,
+          personal: funnel !== null && personal,
+          ai: funnel !== null,
+          thinks: funnel?.thinks === true,
         });
   const reached = at === "open" ? steps.length : steps.indexOf(at);
   const back = f.picked ? steps.indexOf(f.picked) : -1;
   const step = back >= 0 && back < reached ? steps[back] : steps[Math.min(reached, steps.length - 1)];
-  return { steps, at, reached, step: step ?? "name", index: steps.indexOf(step ?? "name") };
+  return {
+    steps,
+    at,
+    reached,
+    step: step ?? "name",
+    index: steps.indexOf(step ?? "name"),
+    waitsForPlan,
+    hasPlanStep,
+  };
 }
 
 /** What an agent does first, as the plan step lists it: its first routine, else its role. */

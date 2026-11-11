@@ -711,14 +711,29 @@
         "name": "Nome dello spazio di lavoro",
         "business": "Cosa fate",
         "team": "Il tuo team",
-        "plan": "Attiva il team"
+        "plan": "Attiva il team",
+        "ai": "Collega un'IA",
+        "namePersonal": "A cosa ti serve",
+        "teamPersonal": "I tuoi agenti",
+        "planPersonal": "Attiva gli agenti",
+        "aiPersonal": "Collega un'IA"
       },
       "stepOf": "Passo {{n}} di {{total}}",
       "lodi": {
         "name": "Ciao {{first}}. Sono {{name}}. Metto su il team con te in circa due minuti.",
         "business": "Con questo so già chi chiamare nel team.",
         "team": "Questo è il team che metterei su. Puoi cambiare tutto dopo.",
-        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove."
+        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove.",
+        "planThen": "Con il piano attivo, la prossima schermata è quella per collegare la tua IA.",
+        "ask": "Hai già un team da un'altra parte? Lo porto qui tutto intero.",
+        "askPersonal": "Usi già agenti da un'altra parte? Li porto tutti qui.",
+        "bring": "Copia la richiesta, incollala in {{app}} e riporta la risposta. Al resto penso io.",
+        "bringFiles": "Trascina qui quello che l'app ha esportato. Al resto penso io.",
+        "found": "Ho trovato il tuo team. Controlla che ci siano tutti.",
+        "foundPersonal": "Ho trovato i tuoi agenti. Controlla che ci siano tutti.",
+        "ai": "Ultimo passo. Scegli l'IA che usi già e il team si sveglia.",
+        "aiPersonal": "Ultimo passo. Scegli l'IA che usi già e io mi sveglio.",
+        "connected": "Ecco fatto. Chiamami nello spazio di lavoro e ti mostro il resto."
       },
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
@@ -726,7 +741,40 @@
         "ghost": "Il tuo team appare qui"
       },
       "team": {
-        "title": "Il tuo team"
+        "title": "Il tuo team",
+        "ask": {
+          "title": "Hai già agenti in un'altra app?",
+          "lead": "Se sì, porto tutto il team: istruzioni, skill e routine.",
+          "leadPersonal": "Se sì, li porto tutti: istruzioni, skill e routine.",
+          "none": "Non ne uso ancora",
+          "noneText": "Metto su un team per {{org}} partendo da quello che fate.",
+          "noneTextPersonal": "Iniziamo noi due. Gli agenti arrivano dopo, quando vuoi.",
+          "from": "Porta da {{app}}",
+          "fresh": "Crea un nuovo team",
+          "freshPersonal": "Continua senza agenti"
+        },
+        "bring": {
+          "title": "Porta il tuo team da {{app}}",
+          "titlePersonal": "Porta i tuoi agenti da {{app}}",
+          "titleOther": "Porta il tuo team da un'altra app",
+          "titleOtherPersonal": "Porta i tuoi agenti da un'altra app",
+          "lead": "Ci vuole un minuto. Lì non cambia niente.",
+          "ask": "Chiedi a {{app}} di esportare",
+          "paste": "Incollala nella chat con {{app}}.",
+          "reply": "Risponde con un JSON: copia tutta la risposta e incollala nel campo qui sotto.",
+          "field": "Incolla qui la risposta di {{app}}",
+          "placeholder": "Il JSON della risposta",
+          "read": "Leggi la risposta",
+          "fresh": "Preferisco creare un nuovo team"
+        },
+        "found": {
+          "title_one": "Ho trovato {{count}} agente in {{app}}",
+          "title_many": "Ho trovato {{count}} agenti in {{app}}",
+          "title_other": "Ho trovato {{count}} agenti in {{app}}",
+          "lead": "Arrivano con le istruzioni, le skill e le routine che hanno già. Puoi cambiare tutto dopo.",
+          "bring": "Porta il team",
+          "bringPersonal": "Porta gli agenti"
+        }
       },
       "plan": {
         "title": "Attiva il tuo team",
@@ -738,7 +786,24 @@
         "cancel": "Disdici quando vuoi",
         "cta": "Attiva il team",
         "all": "Vedi tutti i piani",
-        "skip": "Entra nello spazio di lavoro senza attivarlo"
+        "skip": "Attivalo dopo e intanto guarda lo spazio di lavoro",
+        "next": "Poi: collega la tua IA.",
+        "titlePersonal": "Attiva i tuoi agenti",
+        "leadPersonal": "Con il piano e un'IA, iniziano oggi.",
+        "asleepPersonal": "Dormono fino al piano"
+      },
+      "ai": {
+        "later": "Collega dopo",
+        "doneTitle": "Fatto. Il team di {{org}} ragiona già.",
+        "doneTitlePersonal": "Fatto. {{name}} ragiona già.",
+        "doneLead": "Il tuo {{label}} risponde per tutti gli agenti. Puoi cambiarlo dopo, uno per uno.",
+        "doneLeadAny": "L'IA che hai collegato risponde per tutti gli agenti. Puoi cambiarla dopo, uno per uno.",
+        "connected": "Collegato",
+        "enter": "Entra nello spazio di lavoro",
+        "awake": "Il tuo team si è svegliato",
+        "answer_one": "{{names}} risponde già.",
+        "answer_many": "{{names}} rispondono già.",
+        "answer_other": "{{names}} rispondono già."
       },
       "account": "Il tuo account"
     },
@@ -746,6 +811,8 @@
       "context": "Scritto",
       "skipped": "Saltato",
       "later": "Più tardi",
+      "on": "Attivo",
+      "ai": "Collegata",
       "invites_one": "{{count}} invito",
       "invites_many": "{{count}} inviti",
       "invites_other": "{{count}} inviti"
@@ -980,7 +1047,7 @@
       "go_other": "Importa {{count}} elementi",
       "nothingNew": "Tutto questo c'è già.",
       "nothingToBring": "Niente qui può essere portato. Ogni elemento dice perché.",
-      "withTeam": "Arriva quando crei il team.",
+      "withTeam": "Arriva quando porti il team.",
       "applying": "Importazione… {{done}} di {{total}}",
       "files": {
         "copy": "Copia i file nel Drive",
@@ -5633,6 +5700,14 @@
       "complete": "Tutto pronto.",
       "notNow": "Non ora",
       "afterPlan": "Si apre con il piano.",
+      "afterPlanNext": "È il passo che viene dopo il piano.",
+      "plan": {
+        "todo": "Attiva il team.",
+        "todoDesc": "Con un piano agentes.chat, gli agenti iniziano a lavorare.",
+        "action": "Vedi i piani",
+        "todoPersonal": "Attiva i tuoi agenti.",
+        "todoDescPersonal": "Con un piano agentes.chat, i tuoi agenti iniziano a lavorare."
+      },
       "about": {
         "action": "Racconta",
         "title": "Cosa fa {{org}}?",

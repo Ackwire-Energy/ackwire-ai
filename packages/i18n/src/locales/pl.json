@@ -721,14 +721,29 @@
         "name": "Nazwa przestrzeni roboczej",
         "business": "Czym się zajmujecie",
         "team": "Twój zespół",
-        "plan": "Włącz zespół"
+        "plan": "Włącz zespół",
+        "ai": "Połącz AI",
+        "namePersonal": "Do czego",
+        "teamPersonal": "Twoi agenci",
+        "planPersonal": "Włącz agentów",
+        "aiPersonal": "Połącz AI"
       },
       "stepOf": "Krok {{n}} z {{total}}",
       "lodi": {
         "name": "Cześć, {{first}}. Jestem {{name}}. Złożę z tobą zespół w jakieś dwie minuty.",
         "business": "Dzięki temu wiem, kogo zaprosić do zespołu.",
         "team": "Taki zespół bym złożył. Wszystko możesz potem zmienić.",
-        "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie."
+        "plan": "Po planie zostaje tylko podłączyć AI. Pokażę ci, gdzie.",
+        "planThen": "Gdy plan będzie włączony, na następnym ekranie połączysz swoją AI.",
+        "ask": "Masz już zespół gdzie indziej? Przeniosę go tu w całości.",
+        "askPersonal": "Używasz już agentów gdzie indziej? Przeniosę ich tu wszystkich.",
+        "bring": "Skopiuj prośbę, wklej ją w {{app}} i przynieś odpowiedź. Resztą zajmę się ja.",
+        "bringFiles": "Upuść tutaj to, co wyeksportowała aplikacja. Resztą zajmę się ja.",
+        "found": "Znalazłem twój zespół. Sprawdź, czy wszyscy są.",
+        "foundPersonal": "Znalazłem twoich agentów. Sprawdź, czy wszyscy są.",
+        "ai": "Ostatni krok. Wybierz AI, której już używasz, a zespół się obudzi.",
+        "aiPersonal": "Ostatni krok. Wybierz AI, której już używasz, a ja się obudzę.",
+        "connected": "No i gotowe. Zawołaj mnie w przestrzeni roboczej, a pokażę ci resztę."
       },
       "preview": {
         "label": "Twoja przestrzeń robocza, gdy odpowiadasz",
@@ -736,7 +751,41 @@
         "ghost": "Tu pojawi się twój zespół"
       },
       "team": {
-        "title": "Twój zespół"
+        "title": "Twój zespół",
+        "ask": {
+          "title": "Masz już agentów w innej aplikacji?",
+          "lead": "Jeśli tak, przeniosę cały zespół: instrukcje, umiejętności i rutyny.",
+          "leadPersonal": "Jeśli tak, przeniosę ich wszystkich: instrukcje, umiejętności i rutyny.",
+          "none": "Jeszcze żadnych nie używam",
+          "noneText": "Złożę zespół dla {{org}} na podstawie tego, czym się zajmujecie.",
+          "noneTextPersonal": "Zaczynamy we dwoje. Agenci mogą dojść później, kiedy zechcesz.",
+          "from": "Przenieś z {{app}}",
+          "fresh": "Złóż nowy zespół",
+          "freshPersonal": "Kontynuuj bez agentów"
+        },
+        "bring": {
+          "title": "Przenieś swój zespół z {{app}}",
+          "titlePersonal": "Przenieś swoich agentów z {{app}}",
+          "titleOther": "Przenieś swój zespół z innej aplikacji",
+          "titleOtherPersonal": "Przenieś swoich agentów z innej aplikacji",
+          "lead": "To zajmie minutę. Tam nic się nie zmieni.",
+          "ask": "Poproś {{app}} o eksport",
+          "paste": "Wklej ją w rozmowie z {{app}}.",
+          "reply": "Odpowie w formacie JSON: skopiuj całą odpowiedź i wklej ją w pole poniżej.",
+          "field": "Wklej tutaj odpowiedź z {{app}}",
+          "placeholder": "JSON z odpowiedzi",
+          "read": "Odczytaj odpowiedź",
+          "fresh": "Wolę złożyć nowy zespół"
+        },
+        "found": {
+          "title_one": "Znalazłem {{count}} agenta w {{app}}",
+          "title_few": "Znalazłem {{count}} agentów w {{app}}",
+          "title_many": "Znalazłem {{count}} agentów w {{app}}",
+          "title_other": "Znalazłem {{count}} agenta w {{app}}",
+          "lead": "Przychodzą z instrukcjami, umiejętnościami i rutynami, które już mają. Później możesz wszystko zmienić.",
+          "bring": "Przenieś zespół",
+          "bringPersonal": "Przenieś agentów"
+        }
       },
       "plan": {
         "title": "Włącz swój zespół",
@@ -748,7 +797,25 @@
         "cancel": "Zrezygnuj w dowolnej chwili",
         "cta": "Włącz zespół",
         "all": "Zobacz wszystkie plany",
-        "skip": "Wejdź do przestrzeni roboczej bez włączania"
+        "skip": "Włącz później i na razie obejrzyj przestrzeń roboczą",
+        "next": "Dalej: połącz swoją AI.",
+        "titlePersonal": "Włącz swoich agentów",
+        "leadPersonal": "Z planem i AI zaczynają dziś.",
+        "asleepPersonal": "Śpią do czasu planu"
+      },
+      "ai": {
+        "later": "Połącz później",
+        "doneTitle": "Gotowe. Zespół {{org}} już myśli.",
+        "doneTitlePersonal": "Gotowe. {{name}} już myśli.",
+        "doneLead": "Twój {{label}} odpowiada za wszystkich agentów. Później możesz to zmienić, jednego po drugim.",
+        "doneLeadAny": "Połączona AI odpowiada za wszystkich agentów. Później możesz to zmienić, jednego po drugim.",
+        "connected": "Połączono",
+        "enter": "Przejdź do przestrzeni roboczej",
+        "awake": "Twój zespół się obudził",
+        "answer_one": "{{names}} już odpowiada.",
+        "answer_few": "{{names}} już odpowiadają.",
+        "answer_many": "{{names}} już odpowiadają.",
+        "answer_other": "{{names}} już odpowiadają."
       },
       "account": "Twoje konto"
     },
@@ -756,6 +823,8 @@
       "context": "Napisany",
       "skipped": "Pominięto",
       "later": "Później",
+      "on": "Włączony",
+      "ai": "Połączona",
       "invites_one": "{{count}} zaproszenie",
       "invites_few": "{{count}} zaproszenia",
       "invites_many": "{{count}} zaproszeń",
@@ -1001,7 +1070,7 @@
       "go_other": "Importuj {{count}} elementu",
       "nothingNew": "Wszystko to już tu jest.",
       "nothingToBring": "Niczego stąd nie da się przenieść. Przy każdym elemencie podano powód.",
-      "withTeam": "Pojawi się, gdy utworzysz zespół.",
+      "withTeam": "Pojawi się, gdy przeniesiesz zespół.",
       "applying": "Importowanie… {{done}} z {{total}}",
       "files": {
         "copy": "Skopiuj pliki do Drive",
@@ -5821,6 +5890,14 @@
       "complete": "Wszystko gotowe.",
       "notNow": "Nie teraz",
       "afterPlan": "Otwiera się z planem.",
+      "afterPlanNext": "To kolejny krok po planie.",
+      "plan": {
+        "todo": "Włącz zespół.",
+        "todoDesc": "Z planem agentes.chat agenci zaczynają pracować.",
+        "action": "Zobacz plany",
+        "todoPersonal": "Włącz swoich agentów.",
+        "todoDescPersonal": "Z planem agentes.chat twoi agenci zaczynają pracować."
+      },
       "about": {
         "action": "Opowiedz",
         "title": "Czym zajmuje się {{org}}?",

@@ -5,10 +5,12 @@ import {
   useApi,
   useAuthConfig,
   useClosingMe,
+  useComputerSetup,
   useRestoreAccount,
   useRestoreWorkspace,
 } from "@agenteschat/client";
 import { billingHoldOf } from "@agenteschat/client/lib/billing";
+import { computerEdition } from "@agenteschat/client/lib/computer";
 import {
   accountDeletingText,
   accountOutOfReach,
@@ -21,11 +23,15 @@ import {
   workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
 import { errorText, holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
+import { stepPermissions } from "@agenteschat/client/lib/home";
+import { planHoldOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isRightHand } from "@agenteschat/client/lib/right-hand";
+import { isRightHand, leadsWithPlan, rightHandOf } from "@agenteschat/client/lib/right-hand";
+import type { FirstRunPowers } from "@agenteschat/client/lib/setup-checklist";
+import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button, Card, CardHeader, EmptyState, Icon, Spinner } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
@@ -40,7 +46,8 @@ import { useToast } from "@/lib/toast";
  * (the reason only when the workspace is told one, else only that its agents are paused for review);
  * suspended, a screen of its own in place of the shell. Both say where to ask about it. `org.standing` events
  * move both live. A billing hold (ADR 0079) says what it is in its own words, and gives its owners and admins
- * the way to fix it on the billing service. A workspace being deleted gets a screen of its own too.
+ * the way to fix it on the billing service, except in the right hand's DM while its card leads with the plan, whose
+ * row has that way (ADR 0162). A workspace being deleted gets a screen of its own too.
  */
 
 /** "Precisa de ajuda? Escreva para …", or to ask who runs the server, as `supportLineOf` says. */
@@ -65,11 +72,37 @@ export function SupportLine() {
 
 const PAID_POLL_MS = 5000;
 
+/**
+ * What the right hand's first-run rows may do for this person (`firstRunSteps`). Here, beside the hold's banner that
+ * reads the card's plan row (`leadsWithPlan`), so the banner loads neither the card nor its rows' module: the root
+ * route renders this file.
+ */
+export function useFirstRunPowers(): FirstRunPowers {
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const setup = useComputerSetup(org.id);
+  const may = stepPermissions(org, me.user.id, dir.agents);
+  return {
+    owner: org.role === "owner",
+    configure: can(org, "configure"),
+    createAgents: may.createAgents,
+    connectAi: may.connectAi,
+    pay: may.pay,
+    connectors: can(org, "manage_connectors"),
+    invite: may.invite,
+    personal: isPersonal(org),
+    // Waiting for its first plan (`usePlanHold`'s rule): a lapsed one keeps its rows, and this banner says the fix.
+    waitsForPlan: planHoldOf(computerEdition(setup.data), org.standing) === "payment",
+  };
+}
+
 export function HoldBanner() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const billingUrl = useAuthConfig().data?.billingUrl;
   const dir = useDirectory(org.id);
+  const powers = useFirstRunPowers();
+  const matchRoute = useMatchRoute();
   const billing = billingHoldOf(org.standing);
   const paid = usePaidReturn(org.id, billing !== null);
   // Back from paying, the billing service lifts the hold on its next pass: until `org.standing` says so, that's all.
@@ -94,6 +127,15 @@ export function HoldBanner() {
   if (billing === "payment") {
     // Waiting for its first plan, nothing is lost: with only the right hand here, its own words say it.
     if (dir.loading || dir.agents.every(isRightHand)) return null;
+    // In the right hand's DM its card leads with the plan, with the way to it: one button there, not two. Anywhere
+    // else, and for whoever the card isn't for, the banner stays.
+    const hand = rightHandOf(dir.agents);
+    if (
+      hand &&
+      leadsWithPlan(hand, powers) &&
+      matchRoute({ to: "/org/$orgId/dm/agent/$agentId", params: { orgId: org.id, agentId: hand.id } })
+    )
+      return null;
     return (
       <section className="outages" aria-label={t("standing.label")}>
         <div className="outage hold-banner" role="status">

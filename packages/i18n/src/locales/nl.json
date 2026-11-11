@@ -701,14 +701,29 @@
         "name": "Naam van de werkruimte",
         "business": "Wat jullie doen",
         "team": "Je team",
-        "plan": "Team aanzetten"
+        "plan": "Team aanzetten",
+        "ai": "Een AI koppelen",
+        "namePersonal": "Waarvoor je het gebruikt",
+        "teamPersonal": "Je agents",
+        "planPersonal": "Agents aanzetten",
+        "aiPersonal": "Een AI koppelen"
       },
       "stepOf": "Stap {{n}} van {{total}}",
       "lodi": {
         "name": "Hoi {{first}}. Ik ben {{name}}. Ik stel het team in zo'n twee minuten met je samen.",
         "business": "Daarmee weet ik wie ik bij het team haal.",
         "team": "Dit is het team dat ik zou samenstellen. Je kunt later alles veranderen.",
-        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar."
+        "plan": "Na het abonnement hoef je alleen nog een AI te koppelen. Ik laat je zien waar.",
+        "planThen": "Zodra het abonnement aanstaat, koppel je op het volgende scherm je AI.",
+        "ask": "Heb je al een team ergens anders? Ik haal het in zijn geheel hierheen.",
+        "askPersonal": "Gebruik je al agents ergens anders? Ik haal ze allemaal hierheen.",
+        "bring": "Kopieer het verzoek, plak het in {{app}} en breng het antwoord terug. De rest doe ik.",
+        "bringFiles": "Zet hier neer wat de app heeft geëxporteerd. De rest doe ik.",
+        "found": "Ik heb je team gevonden. Kijk of iedereen er is.",
+        "foundPersonal": "Ik heb je agents gevonden. Kijk of ze er allemaal zijn.",
+        "ai": "Laatste stap. Kies de AI die je al gebruikt en het team wordt wakker.",
+        "aiPersonal": "Laatste stap. Kies de AI die je al gebruikt en ik word wakker.",
+        "connected": "Zo. Roep me in de werkruimte en ik laat je de rest zien."
       },
       "preview": {
         "label": "Je werkruimte, terwijl je antwoordt",
@@ -716,7 +731,39 @@
         "ghost": "Hier verschijnt je team"
       },
       "team": {
-        "title": "Je team"
+        "title": "Je team",
+        "ask": {
+          "title": "Heb je al agents in een andere app?",
+          "lead": "Zo ja, dan haal ik het hele team: instructies, skills en routines.",
+          "leadPersonal": "Zo ja, dan haal ik ze allemaal: instructies, skills en routines.",
+          "none": "Ik gebruik er nog geen",
+          "noneText": "Ik stel een team samen voor {{org}} op basis van wat jullie doen.",
+          "noneTextPersonal": "We beginnen met z'n tweeën. Agents komen later, wanneer je wilt.",
+          "from": "Ophalen uit {{app}}",
+          "fresh": "Een nieuw team samenstellen",
+          "freshPersonal": "Doorgaan zonder agents"
+        },
+        "bring": {
+          "title": "Haal je team uit {{app}}",
+          "titlePersonal": "Haal je agents uit {{app}}",
+          "titleOther": "Haal je team uit een andere app",
+          "titleOtherPersonal": "Haal je agents uit een andere app",
+          "lead": "Het duurt een minuut. Daar verandert niets.",
+          "ask": "Vraag {{app}} om te exporteren",
+          "paste": "Plak het in je chat met {{app}}.",
+          "reply": "Het antwoordt met een JSON: kopieer het hele antwoord en plak het in het veld hieronder.",
+          "field": "Plak hier het antwoord van {{app}}",
+          "placeholder": "De JSON van het antwoord",
+          "read": "Antwoord lezen",
+          "fresh": "Ik stel liever een nieuw team samen"
+        },
+        "found": {
+          "title_one": "{{count}} agent gevonden in {{app}}",
+          "title_other": "{{count}} agents gevonden in {{app}}",
+          "lead": "Ze komen met de instructies, skills en routines die ze al hebben. Je kunt later alles veranderen.",
+          "bring": "Team ophalen",
+          "bringPersonal": "Agents ophalen"
+        }
       },
       "plan": {
         "title": "Zet je team aan",
@@ -728,7 +775,23 @@
         "cancel": "Altijd opzegbaar",
         "cta": "Team aanzetten",
         "all": "Alle abonnementen bekijken",
-        "skip": "Naar de werkruimte zonder aanzetten"
+        "skip": "Later aanzetten en eerst de werkruimte bekijken",
+        "next": "Daarna: je AI koppelen.",
+        "titlePersonal": "Zet je agents aan",
+        "leadPersonal": "Met het abonnement en een AI beginnen ze vandaag.",
+        "asleepPersonal": "Slapen tot het abonnement"
+      },
+      "ai": {
+        "later": "Later koppelen",
+        "doneTitle": "Klaar. Het team van {{org}} denkt nu mee.",
+        "doneTitlePersonal": "Klaar. {{name}} denkt nu mee.",
+        "doneLead": "Je {{label}} antwoordt voor alle agents. Je kunt het later per agent veranderen.",
+        "doneLeadAny": "De AI die je hebt gekoppeld antwoordt voor alle agents. Je kunt het later per agent veranderen.",
+        "connected": "Gekoppeld",
+        "enter": "Naar de werkruimte",
+        "awake": "Je team is wakker",
+        "answer_one": "{{names}} antwoordt nu.",
+        "answer_other": "{{names}} antwoorden nu."
       },
       "account": "Je account"
     },
@@ -736,6 +799,8 @@
       "context": "Geschreven",
       "skipped": "Overgeslagen",
       "later": "Later",
+      "on": "Aan",
+      "ai": "Gekoppeld",
       "invites_one": "{{count}} uitnodiging",
       "invites_other": "{{count}} uitnodigingen"
     },
@@ -959,7 +1024,7 @@
       "go_other": "{{count}} items importeren",
       "nothingNew": "Dit staat hier allemaal al.",
       "nothingToBring": "Niets hiervan kan mee. Bij elk item staat waarom.",
-      "withTeam": "Het komt binnen als je het team maakt.",
+      "withTeam": "Het komt binnen als je het team ophaalt.",
       "applying": "Importeren… {{done}} van {{total}}",
       "files": {
         "copy": "De bestanden naar de Drive kopiëren",
@@ -5466,6 +5531,14 @@
       "complete": "Alles klaar.",
       "notNow": "Niet nu",
       "afterPlan": "Opent met het abonnement.",
+      "afterPlanNext": "Dat is de stap na het abonnement.",
+      "plan": {
+        "todo": "Zet het team aan.",
+        "todoDesc": "Met een agentes.chat-abonnement gaan de agents aan de slag.",
+        "action": "Abonnementen bekijken",
+        "todoPersonal": "Zet je agents aan.",
+        "todoDescPersonal": "Met een agentes.chat-abonnement gaan je agents aan de slag."
+      },
       "about": {
         "action": "Vertellen",
         "title": "Wat doet {{org}}?",

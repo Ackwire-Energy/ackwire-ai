@@ -26,7 +26,8 @@ with Postgres alone, and must not need a third-party widget in the apps.
 
 2. **First the beta notice, then Connect an AI.** The notice says the product is in beta and what that means, and,
    only where the server takes feedback, where to send it. Every way out of it goes on. Connect an AI follows for a
-   person who has one to connect (`useMayConnectAi`) while some agent has none.
+   person who has one to connect (`useMayConnectAi`) while some agent has none. After the onboarding's AI step, or a
+   plan left for later, the onboarding asks for the notice alone (`?arrival=beta`, ADR 0162 amended 2026-11-10).
 
 3. **Connect an AI gets a stage, not a second flow.** Opened with `arrival`, the same dialog (ADR 0061) shows the
    workspace's agents asleep under a night sky beside the choices, and the sky turns to day as they wake once an AI

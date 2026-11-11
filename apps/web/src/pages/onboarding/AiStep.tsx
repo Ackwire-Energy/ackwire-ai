@@ -1,0 +1,191 @@
+import { type Agent, type Me, type OrgSummary, useComputerSetup } from "@agenteschat/client";
+import { joinNames } from "@agenteschat/client/lib/format";
+import { type AiChoice, gateDims, planLabel, planMark } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
+import { Button, Icon, ProviderLogo } from "@agenteschat/ui";
+import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { usePlanGates } from "@/components/ai/ConnectAiSteps";
+import { ConnectChoices } from "@/components/arrival/ConnectChoices";
+import { sceneTeam, TeamScene, useDawn } from "@/components/arrival/TeamScene";
+import { ConnectAiProvider, type ConnectAiRequest, useConnectAi } from "@/components/ConnectAi";
+import { OrgProvider, useOrg } from "@/components/org-context";
+import "./ai-step.css";
+
+/*
+ * The rail's last step, Connect an AI (ADR 0162, amended), before the workspace opens: the arrival's choices as cards
+ * (ADR 0160), each opening the same Connect dialog as anywhere in the app for the right hand and the whole team, and
+ * the team asleep on its stage beside them until it thinks. The step is answered by the data (every agent ready or
+ * waiting), never by the dialog closing, so a connect made in another tab moves it on too.
+ */
+
+/** Asked again this often while the choices show: this page opens no socket, so no event says a plan can sign in. */
+const GATES_POLL_MS = 5000;
+
+/**
+ * What the step and the column beside it need from the workspace's shell, which this page is outside of: the
+ * workspace and the person (`useOrg`), and the Connect dialog. Mounted only on this step.
+ */
+export function AiHost({ org, me, children }: { org: OrgSummary; me: Me; children: ReactNode }) {
+  return (
+    <OrgProvider org={org} me={me}>
+      <ConnectAiProvider>{children}</ConnectAiProvider>
+    </OrgProvider>
+  );
+}
+
+/**
+ * The dialog a pick opens, for every agent here (the right hand first). Claude and ChatGPT go in as the step the
+ * person asked for and a key as its own, which open the dialog for the whole team on that choice; any other plan as
+ * the plan to open on. The right hand alone is its own dialog.
+ */
+export function connectRequest(choice: AiChoice, agentIds: readonly string[]): ConnectAiRequest {
+  const [first, ...rest] = agentIds;
+  const who = first !== undefined && rest.length === 0 ? { agentId: first } : { agentIds: [...agentIds] };
+  if (choice === "key") return { ...who, intent: "api_key" };
+  if (choice === "claude" || choice === "chatgpt") return { ...who, intent: choice };
+  return { ...who, plan: choice };
+}
+
+/**
+ * The step's body: the choices, with what not connecting means and Connect later beside it; once every agent thinks,
+ * the AI picked here (when one was) and Go to the workspace. `agents`: the right hand first, then the team.
+ */
+export function AiStep({
+  orgId,
+  agents,
+  done,
+  leaving,
+  picked,
+  onPick,
+  onLater,
+  onEnter,
+}: {
+  orgId: string;
+  agents: readonly Agent[];
+  /** Every agent thinks: the connected screen. */
+  done: boolean;
+  /** The workspace is opening: both ways out wait. */
+  leaving: boolean;
+  /** The card picked, as the page names it once connected (the connected screen's tile), when it can. */
+  picked: AiChoice | null;
+  /** A card picked: the page names it on the rail and in the heading once connected ("Claude"). */
+  onPick?: (choice: AiChoice) => void;
+  /** Connect later: the onboarding finishes as it is. */
+  onLater: () => void;
+  onEnter: () => void;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const connect = useConnectAi();
+  const ids = agents.map((a) => a.id);
+  const lead = agents[0];
+  // A plan's tile dims while it can't sign in (no computer yet, or the Cloud's still being prepared after paying):
+  // read again while the choices show, the computer's setup too (the dialog reads the same), so they light up alone.
+  const poll = done ? false : GATES_POLL_MS;
+  const gates = usePlanGates(orgId, lead?.id, poll);
+  useComputerSetup(orgId, true, poll);
+  if (done)
+    return (
+      <>
+        {picked && (
+          <div className="arrival-opts">
+            <div className="ac-option onb-ai__connected">
+              {picked === "key" ? (
+                <span className="arrival-opts__tile" aria-hidden="true">
+                  <Icon name="key" />
+                </span>
+              ) : (
+                <ProviderLogo id={planMark(picked)} size="tile" />
+              )}
+              <span className="ac-option__text">
+                <span className="ac-option__title">
+                  {picked === "key" ? t("connectAi.key.title") : planLabel(t, picked)}
+                </span>
+                <span className="ac-option__desc">
+                  {picked === "key" ? t("connectAi.key.sub") : t(`connectAi.plan.${picked}.tiers`)}
+                </span>
+              </span>
+              <span className="arrival-opts__tag">{t("onboarding.flow.ai.connected")}</span>
+            </div>
+          </div>
+        )}
+        <div className="onb__actions">
+          <Button
+            variant="primary"
+            block
+            kbd={["↵"]}
+            data-enter=""
+            onClick={onEnter}
+            disabled={leaving}
+            loading={leaving}
+          >
+            {t("onboarding.flow.ai.enter")}
+          </Button>
+        </div>
+      </>
+    );
+  return (
+    <>
+      <div className="onb__answer">
+        <ConnectChoices
+          mayAddKey={can(org, "manage_credentials")}
+          dims={(c) => lead !== undefined && gateDims(gates.gateOf(c))}
+          onPick={(choice) => {
+            onPick?.(choice);
+            connect?.open(connectRequest(choice, ids));
+          }}
+        />
+      </div>
+      <p className="onb__skip">
+        <span className="muted">{t("arrival.connect.without")}</span>
+        <button type="button" className="ac-link" disabled={leaving} onClick={onLater}>
+          {t("onboarding.flow.ai.later")}
+        </button>
+      </p>
+    </>
+  );
+}
+
+/**
+ * Beside the step on wide screens, in place of the workspace's preview: the team on its sky, asleep until it thinks,
+ * then waking as the night turns to day, with who answers now.
+ */
+export function AiStage({
+  agents,
+  lead,
+  awake,
+}: {
+  /** The right hand first, then the team. */
+  agents: readonly Agent[];
+  lead: Agent | undefined;
+  /** Every agent thinks: the sky turns to day. */
+  awake: boolean;
+}) {
+  const { t } = useTranslation();
+  const day = useDawn(awake);
+  const names = agents.map((a) => a.name);
+  return (
+    <aside className="onb-stage">
+      <div className="onb-stage__frame arrival-stage">
+        <TeamScene
+          shape="tall"
+          quiet={0.22}
+          agents={sceneTeam(agents, lead)}
+          lead={lead?.id}
+          asleep={!awake}
+          day={day}
+          expression={awake ? "happy" : undefined}
+        />
+        <div className="arrival-stage__cap">
+          <b>{t(awake ? "onboarding.flow.ai.awake" : "arrival.stage.ready")}</b>
+          <span>
+            {awake
+              ? t("onboarding.flow.ai.answer", { names: joinNames(names, t), count: agents.length })
+              : t("arrival.stage.wake")}
+          </span>
+        </div>
+      </div>
+    </aside>
+  );
+}

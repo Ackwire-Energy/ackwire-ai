@@ -1715,6 +1715,21 @@
   "onboarding.flow.steps.plan": {
     "value": "Turn the team on"
   },
+  "onboarding.flow.steps.ai": {
+    "value": "Connect an AI"
+  },
+  "onboarding.flow.steps.namePersonal": {
+    "value": "What it's for"
+  },
+  "onboarding.flow.steps.teamPersonal": {
+    "value": "Your agents"
+  },
+  "onboarding.flow.steps.planPersonal": {
+    "value": "Turn the agents on"
+  },
+  "onboarding.flow.steps.aiPersonal": {
+    "value": "Connect an AI"
+  },
   "onboarding.flow.stepOf": {
     "value": "Step {{n}} of {{total}}"
   },
@@ -1730,6 +1745,36 @@
   "onboarding.flow.lodi.plan": {
     "value": "After the plan, all that's left is connecting an AI. I'll show you where."
   },
+  "onboarding.flow.lodi.planThen": {
+    "value": "Once the plan is on, the next screen is where you connect your AI."
+  },
+  "onboarding.flow.lodi.ask": {
+    "value": "Already have a team somewhere else? I'll bring all of it here."
+  },
+  "onboarding.flow.lodi.askPersonal": {
+    "value": "Already use agents somewhere else? I'll bring them all here."
+  },
+  "onboarding.flow.lodi.bring": {
+    "value": "Copy the request, paste it in {{app}} and bring back the answer. I'll do the rest."
+  },
+  "onboarding.flow.lodi.bringFiles": {
+    "value": "Drop here what the app exported. I'll do the rest."
+  },
+  "onboarding.flow.lodi.found": {
+    "value": "Found your team. Check that everyone is here."
+  },
+  "onboarding.flow.lodi.foundPersonal": {
+    "value": "Found your agents. Check that they're all here."
+  },
+  "onboarding.flow.lodi.ai": {
+    "value": "Last step. Pick the AI you already use and the team wakes up."
+  },
+  "onboarding.flow.lodi.aiPersonal": {
+    "value": "Last step. Pick the AI you already use and I wake up."
+  },
+  "onboarding.flow.lodi.connected": {
+    "value": "There we go. Call me in the workspace and I'll show you the rest."
+  },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
   },
@@ -1741,6 +1786,84 @@
   },
   "onboarding.flow.team.title": {
     "value": "Your team"
+  },
+  "onboarding.flow.team.ask.title": {
+    "value": "Do you already have agents in another app?"
+  },
+  "onboarding.flow.team.ask.lead": {
+    "value": "If you do, I'll bring the whole team: instructions, skills and routines."
+  },
+  "onboarding.flow.team.ask.leadPersonal": {
+    "value": "If you do, I'll bring them all: instructions, skills and routines."
+  },
+  "onboarding.flow.team.ask.none": {
+    "value": "I don't use any yet"
+  },
+  "onboarding.flow.team.ask.noneText": {
+    "value": "I'll put together a team for {{org}} from what you do."
+  },
+  "onboarding.flow.team.ask.noneTextPersonal": {
+    "value": "We start with just the two of us. Agents can come later, whenever you want."
+  },
+  "onboarding.flow.team.ask.from": {
+    "value": "Bring from {{app}}"
+  },
+  "onboarding.flow.team.ask.fresh": {
+    "value": "Build a new team"
+  },
+  "onboarding.flow.team.ask.freshPersonal": {
+    "value": "Continue without agents"
+  },
+  "onboarding.flow.team.bring.title": {
+    "value": "Bring your team from {{app}}"
+  },
+  "onboarding.flow.team.bring.titlePersonal": {
+    "value": "Bring your agents from {{app}}"
+  },
+  "onboarding.flow.team.bring.titleOther": {
+    "value": "Bring your team from another app"
+  },
+  "onboarding.flow.team.bring.titleOtherPersonal": {
+    "value": "Bring your agents from another app"
+  },
+  "onboarding.flow.team.bring.lead": {
+    "value": "It takes a minute. Nothing changes there."
+  },
+  "onboarding.flow.team.bring.ask": {
+    "value": "Ask {{app}} to export"
+  },
+  "onboarding.flow.team.bring.paste": {
+    "value": "Paste it in your chat with {{app}}."
+  },
+  "onboarding.flow.team.bring.reply": {
+    "value": "It answers with a JSON: copy the whole answer and paste it in the field below."
+  },
+  "onboarding.flow.team.bring.field": {
+    "value": "Paste the answer from {{app}} here"
+  },
+  "onboarding.flow.team.bring.placeholder": {
+    "value": "The answer's JSON"
+  },
+  "onboarding.flow.team.bring.read": {
+    "value": "Read the answer"
+  },
+  "onboarding.flow.team.bring.fresh": {
+    "value": "I'd rather build a new team"
+  },
+  "onboarding.flow.team.found.title": {
+    "value": {
+      "one": "Found {{count}} agent in {{app}}",
+      "other": "Found {{count}} agents in {{app}}"
+    }
+  },
+  "onboarding.flow.team.found.lead": {
+    "value": "They arrive with the instructions, skills and routines they already have. You can change everything later."
+  },
+  "onboarding.flow.team.found.bring": {
+    "value": "Bring the team"
+  },
+  "onboarding.flow.team.found.bringPersonal": {
+    "value": "Bring the agents"
   },
   "onboarding.flow.plan.title": {
     "value": "Turn your team on"
@@ -1770,7 +1893,49 @@
     "value": "See all plans"
   },
   "onboarding.flow.plan.skip": {
-    "value": "Go to the workspace without it"
+    "value": "Turn it on later and just look around the workspace"
+  },
+  "onboarding.flow.plan.next": {
+    "value": "Next: connect your AI."
+  },
+  "onboarding.flow.plan.titlePersonal": {
+    "value": "Turn your agents on"
+  },
+  "onboarding.flow.plan.leadPersonal": {
+    "value": "With the plan and an AI, they start today."
+  },
+  "onboarding.flow.plan.asleepPersonal": {
+    "value": "Asleep until the plan"
+  },
+  "onboarding.flow.ai.later": {
+    "value": "Connect later"
+  },
+  "onboarding.flow.ai.doneTitle": {
+    "value": "Done. The {{org}} team is thinking now."
+  },
+  "onboarding.flow.ai.doneTitlePersonal": {
+    "value": "Done. {{name}} is thinking now."
+  },
+  "onboarding.flow.ai.doneLead": {
+    "value": "Your {{label}} answers for every agent. You can change it later, one by one."
+  },
+  "onboarding.flow.ai.doneLeadAny": {
+    "value": "The AI you connected answers for every agent. You can change it later, one by one."
+  },
+  "onboarding.flow.ai.connected": {
+    "value": "Connected"
+  },
+  "onboarding.flow.ai.enter": {
+    "value": "Go to the workspace"
+  },
+  "onboarding.flow.ai.awake": {
+    "value": "Your team woke up"
+  },
+  "onboarding.flow.ai.answer": {
+    "value": {
+      "one": "{{names}} answers now.",
+      "other": "{{names}} answer now."
+    }
   },
   "onboarding.flow.account": {
     "value": "Your account"
@@ -1783,6 +1948,12 @@
   },
   "onboarding.railValue.later": {
     "value": "Later"
+  },
+  "onboarding.railValue.on": {
+    "value": "On"
+  },
+  "onboarding.railValue.ai": {
+    "value": "Connected"
   },
   "onboarding.railValue.invites": {
     "value": {
@@ -2310,7 +2481,7 @@
     "value": "Nothing here can come along. Each item says why."
   },
   "onboarding.import.withTeam": {
-    "value": "It arrives when you create the team."
+    "value": "It arrives when you bring the team."
   },
   "onboarding.import.applying": {
     "value": "Importing… {{done}} of {{total}}"
@@ -13319,6 +13490,24 @@
   },
   "agentSetup.firstRun.afterPlan": {
     "value": "Opens with the plan."
+  },
+  "agentSetup.firstRun.afterPlanNext": {
+    "value": "It's the next step after the plan."
+  },
+  "agentSetup.firstRun.plan.todo": {
+    "value": "Turn the team on."
+  },
+  "agentSetup.firstRun.plan.todoDesc": {
+    "value": "With an agentes.chat plan, the agents start working."
+  },
+  "agentSetup.firstRun.plan.action": {
+    "value": "See plans"
+  },
+  "agentSetup.firstRun.plan.todoPersonal": {
+    "value": "Turn your agents on."
+  },
+  "agentSetup.firstRun.plan.todoDescPersonal": {
+    "value": "With an agentes.chat plan, your agents start working."
   },
   "agentSetup.firstRun.about.action": {
     "value": "Tell"

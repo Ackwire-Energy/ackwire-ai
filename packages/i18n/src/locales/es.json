@@ -711,14 +711,29 @@
         "name": "Nombre del espacio de trabajo",
         "business": "Qué hacen",
         "team": "Tu equipo",
-        "plan": "Activar el equipo"
+        "plan": "Activar el equipo",
+        "ai": "Conectar una IA",
+        "namePersonal": "Para qué lo usarás",
+        "teamPersonal": "Tus agentes",
+        "planPersonal": "Activar los agentes",
+        "aiPersonal": "Conectar una IA"
       },
       "stepOf": "Paso {{n}} de {{total}}",
       "lodi": {
         "name": "Hola, {{first}}. Soy {{name}}. Voy a armar el equipo contigo en unos dos minutos.",
         "business": "Con eso ya sé a quién llamar para el equipo.",
         "team": "Este es el equipo que yo armaría. Puedes cambiar todo después.",
-        "plan": "Después del plan, solo falta conectar una IA. Te muestro dónde."
+        "plan": "Después del plan, solo falta conectar una IA. Te muestro dónde.",
+        "planThen": "Con el plan activado, la siguiente pantalla es la de conectar tu IA.",
+        "ask": "¿Ya tienes un equipo en otro lugar? Lo traigo entero aquí.",
+        "askPersonal": "¿Ya usas agentes en otro lugar? Los traigo todos aquí.",
+        "bring": "Copia el pedido, pégalo en {{app}} y trae la respuesta. Del resto me encargo yo.",
+        "bringFiles": "Suelta aquí lo que exportó la app. Del resto me encargo yo.",
+        "found": "Encontré tu equipo. Revisa que estén todos.",
+        "foundPersonal": "Encontré tus agentes. Revisa que estén todos.",
+        "ai": "Último paso. Elige la IA que ya usas y el equipo despierta.",
+        "aiPersonal": "Último paso. Elige la IA que ya usas y yo despierto.",
+        "connected": "Ahora sí. Llámame en el espacio de trabajo y te muestro el resto."
       },
       "preview": {
         "label": "Tu espacio de trabajo, mientras respondes",
@@ -726,7 +741,40 @@
         "ghost": "Tu equipo aparece aquí"
       },
       "team": {
-        "title": "Tu equipo"
+        "title": "Tu equipo",
+        "ask": {
+          "title": "¿Ya tienes agentes en otra app?",
+          "lead": "Si los tienes, traigo el equipo entero: instrucciones, habilidades y rutinas.",
+          "leadPersonal": "Si los tienes, los traigo todos: instrucciones, habilidades y rutinas.",
+          "none": "Todavía no uso ninguno",
+          "noneText": "Armo un equipo para {{org}} a partir de lo que hacen.",
+          "noneTextPersonal": "Empezamos solo nosotros dos. Los agentes vienen después, cuando quieras.",
+          "from": "Traer de {{app}}",
+          "fresh": "Armar un equipo nuevo",
+          "freshPersonal": "Seguir sin agentes"
+        },
+        "bring": {
+          "title": "Trae tu equipo de {{app}}",
+          "titlePersonal": "Trae tus agentes de {{app}}",
+          "titleOther": "Trae tu equipo de otra app",
+          "titleOtherPersonal": "Trae tus agentes de otra app",
+          "lead": "Toma un minuto. Allí no cambia nada.",
+          "ask": "Pídele a {{app}} que exporte",
+          "paste": "Pégalo en tu chat con {{app}}.",
+          "reply": "Responde con un JSON: copia la respuesta entera y pégala en el campo de abajo.",
+          "field": "Pega aquí la respuesta de {{app}}",
+          "placeholder": "El JSON de la respuesta",
+          "read": "Leer la respuesta",
+          "fresh": "Prefiero armar un equipo nuevo"
+        },
+        "found": {
+          "title_one": "Encontré {{count}} agente en {{app}}",
+          "title_many": "Encontré {{count}} agentes en {{app}}",
+          "title_other": "Encontré {{count}} agentes en {{app}}",
+          "lead": "Llegan con las instrucciones, las habilidades y las rutinas que ya tienen. Puedes cambiarlo todo después.",
+          "bring": "Traer el equipo",
+          "bringPersonal": "Traer los agentes"
+        }
       },
       "plan": {
         "title": "Activa tu equipo",
@@ -738,7 +786,24 @@
         "cancel": "Cancela cuando quieras",
         "cta": "Activar el equipo",
         "all": "Ver todos los planes",
-        "skip": "Entrar al espacio de trabajo sin activarlo"
+        "skip": "Activarlo después y solo conocer el espacio de trabajo",
+        "next": "A continuación: conectar tu IA.",
+        "titlePersonal": "Activa tus agentes",
+        "leadPersonal": "Con el plan y una IA, empiezan hoy.",
+        "asleepPersonal": "Dormidos hasta el plan"
+      },
+      "ai": {
+        "later": "Conectar después",
+        "doneTitle": "Listo. El equipo de {{org}} ya piensa.",
+        "doneTitlePersonal": "Listo. {{name}} ya piensa.",
+        "doneLead": "Tu {{label}} responde por todos los agentes. Puedes cambiarlo después, uno por uno.",
+        "doneLeadAny": "La IA que conectaste responde por todos los agentes. Puedes cambiarla después, uno por uno.",
+        "connected": "Conectado",
+        "enter": "Entrar al espacio de trabajo",
+        "awake": "Tu equipo despertó",
+        "answer_one": "{{names}} ya responde.",
+        "answer_many": "{{names}} ya responden.",
+        "answer_other": "{{names}} ya responden."
       },
       "account": "Tu cuenta"
     },
@@ -746,6 +811,8 @@
       "context": "Escrito",
       "skipped": "Omitido",
       "later": "Después",
+      "on": "Activado",
+      "ai": "Conectada",
       "invites_one": "{{count}} invitación",
       "invites_many": "{{count}} invitaciones",
       "invites_other": "{{count}} invitaciones"
@@ -980,7 +1047,7 @@
       "go_other": "Importar {{count}} elementos",
       "nothingNew": "Todo esto ya está aquí.",
       "nothingToBring": "Nada de aquí se puede traer. Cada elemento dice por qué.",
-      "withTeam": "Llega cuando crees el equipo.",
+      "withTeam": "Llega cuando traigas el equipo.",
       "applying": "Importando… {{done}} de {{total}}",
       "files": {
         "copy": "Copiar los archivos al Drive",
@@ -5585,6 +5652,14 @@
       "complete": "Todo listo.",
       "notNow": "Ahora no",
       "afterPlan": "Se abre con el plan.",
+      "afterPlanNext": "Es el paso siguiente al plan.",
+      "plan": {
+        "todo": "Activa el equipo.",
+        "todoDesc": "Con un plan de agentes.chat, los agentes empiezan a trabajar.",
+        "action": "Ver planes",
+        "todoPersonal": "Activa tus agentes.",
+        "todoDescPersonal": "Con un plan de agentes.chat, tus agentes empiezan a trabajar."
+      },
       "about": {
         "action": "Contar",
         "title": "¿Qué hace {{org}}?",

@@ -401,16 +401,32 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
+/* On the words' first line, the button's label among them: what comes after the plan may take two lines. */
 .onb__plan-acts {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2) var(--space-4);
   font-size: 14px;
 }
+/* What comes after the plan ("Next: connect your AI."), after its buttons. */
+.onb__plan-acts > .muted {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Back from paying, in place of the buttons: a line of the card, the spinner on its first line. */
+.onb__paid {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+/* The way past a step: a muted note and its link side by side, the link under the note when they don't fit. */
 .onb__skip {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: baseline;
+  gap: 6px 12px;
   margin: 0;
   padding-bottom: var(--space-6);
   font-size: 14px;
@@ -538,8 +554,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
     flex-direction: column;
     align-items: stretch;
   }
-  .onb__plan-acts > .ac-link {
+  .onb__plan-acts > .ac-link,
+  .onb__plan-acts > .muted {
     align-self: center;
+    text-align: center;
   }
   .onb__actions {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-3));
