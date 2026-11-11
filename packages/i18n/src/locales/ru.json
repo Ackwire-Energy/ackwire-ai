@@ -13927,6 +13927,7 @@
     "onHost": "на {{host}}",
     "onHostChip": "На {{host}}",
     "menu": "Действия: {{name}}",
+    "settings": "Настройки",
     "rename": "Переименовать",
     "renameName": "Переименовать {{name}}",
     "renameTitle": "Переименовать устройство",

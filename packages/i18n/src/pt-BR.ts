@@ -12995,6 +12995,7 @@ export const ptBR = {
     onHost: "em {{host}}",
     onHostChip: "Em {{host}}",
     menu: "Ações de {{name}}",
+    settings: "Configurações",
     rename: "Renomear",
     renameName: "Renomear {{name}}",
     renameTitle: "Renomear o dispositivo",

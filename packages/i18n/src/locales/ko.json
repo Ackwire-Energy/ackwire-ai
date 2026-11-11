@@ -12592,6 +12592,7 @@
     "onHost": "{{host}}에 연결됨",
     "onHostChip": "{{host}}에 연결됨",
     "menu": "{{name}} 작업",
+    "settings": "설정",
     "rename": "이름 바꾸기",
     "renameName": "{{name}} 이름 바꾸기",
     "renameTitle": "기기 이름 바꾸기",

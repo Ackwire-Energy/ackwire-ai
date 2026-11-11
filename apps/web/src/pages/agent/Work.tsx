@@ -163,6 +163,7 @@ import {
   OpenPrefsButton,
   ReconnectThisMacButton,
   ThisMacButton,
+  ToolsOffHereNote,
   useAgentsHere,
   useIsThisMac,
   useThisMac,
@@ -1603,14 +1604,7 @@ function BrainForm({ view, onClose }: { view: AgentBrain; onClose: () => void })
           {card === "gemini" && adding === false && geminiPersonal(accounts.find((a) => a.id === account)) && (
             <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
           )}
-          {toolOffHere && (
-            <SettingNote icon="settings">
-              {t("machines.thisMac.toolsOff")}
-              <span style={{ display: "block", marginTop: 8 }}>
-                <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-              </span>
-            </SettingNote>
-          )}
+          {toolOffHere && <ToolsOffHereNote />}
           {/* Another plan, as the "Sem IA" cell offers it: Connect an AI, for this agent (its owner's choice). */}
           {view.canUsePlans && connect && !hold && (
             <span>
