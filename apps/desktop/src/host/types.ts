@@ -10,6 +10,7 @@ import type {
   Tailnet,
 } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
+import type { MacFolder, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -210,6 +211,18 @@ export interface Host {
   openTailscale(page: "app" | "download" | "https"): Promise<void>;
   /** A home the server here's sync just made (its first tools go on, `firstTools`). */
   onNewHostHome(cb: (homeId: string) => void): () => void;
+  /** macOS: whether the app may record the screen (asks nothing). True elsewhere. */
+  screenAccess(): Promise<boolean>;
+  /** macOS: the system's Screen Recording prompt, the first time; it takes effect once the app opens again. */
+  requestScreenAccess(): Promise<boolean>;
+  /** Whether the app may read the folder; the first read on a Mac raises the system's prompt and waits for it. */
+  folderAccess(folder: MacFolder): Promise<boolean>;
+  /** System Settings › Privacy & Security on Screen Recording, or on Files and Folders. */
+  openPrivacy(pane: "screen" | "files"): Promise<void>;
+  /** The setup macOS may quit the app in the middle of, kept until it is finished (`prepare.rs`). */
+  setupState(): Promise<SetupState | null>;
+  /** Keeps it (with the main window's page, to open there again) or, null, forgets it. */
+  setSetupState(state: SetupState | null): Promise<void>;
 }
 
 export type MenuAction =

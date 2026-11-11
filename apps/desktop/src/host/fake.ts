@@ -9,6 +9,7 @@
  * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting. A pair link
  * (`agenteschat://pair?server=…&link=ABCDEFGH`) joins Estúdio Norte once its maker lets it in, `HGFEDCBA`'s maker
  * says no, and any other code expired.
+ * `?mac=ready`: every permission of this Mac allowed already (Prepare this Mac is skipped).
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
@@ -33,6 +34,7 @@ import {
   type Tailnet,
 } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
+import type { MacFolder, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspace, ServerWorkspaces } from "../control/server";
 import type { TrayState } from "../control/tray";
@@ -74,6 +76,14 @@ export interface FakeHost extends Host {
   readonly site: FakeSite;
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
+  /** This Mac's permissions: Screen Recording, the folders allowed and refused, the setup kept, the panes opened. */
+  readonly mac: {
+    screen: boolean;
+    folders: Set<MacFolder>;
+    refused: Set<MacFolder>;
+    setup: SetupState | null;
+    panes: string[];
+  };
 }
 
 /**
@@ -122,6 +132,8 @@ export function createFakeHost(
     here?: HereOptions;
     someCommands?: boolean;
     welcomeAdd?: boolean;
+    /** Every permission of this Mac allowed already (`?mac=ready`). */
+    macReady?: boolean;
   } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
@@ -219,7 +231,7 @@ export function createFakeHost(
 
   if (scenario === "selfhost") {
     spawn("a1b2c3d4", acmeSeed());
-    // `?commands=some`: the second organization joined after commands were on, and starts without them.
+    // `?commands=some`: the second organization joined with commands turned off.
     const horizonte = horizonteSeed();
     if (options.someCommands) horizonte.access.tools.commands = false;
     spawn("e5f6a7b8", horizonte);
@@ -555,6 +567,27 @@ export function createFakeHost(
       console.info("[fake] open Tailscale:", page);
     },
     onNewHostHome: () => () => {},
+    // Screen Recording takes effect once the app opens again, as on a Mac; a folder is allowed at its first read.
+    mac: {
+      screen: options.macReady === true,
+      folders: new Set<MacFolder>(options.macReady ? ["desktop", "documents", "downloads"] : []),
+      refused: new Set<MacFolder>(),
+      setup: null,
+      panes: [],
+    },
+    screenAccess: async () => platform !== "mac" || host.mac.screen,
+    requestScreenAccess: async () => host.mac.screen,
+    folderAccess: async (folder) => {
+      if (!host.mac.refused.has(folder)) host.mac.folders.add(folder);
+      return platform !== "mac" || host.mac.folders.has(folder);
+    },
+    openPrivacy: async (pane) => {
+      host.mac.panes.push(pane);
+    },
+    setupState: async () => host.mac.setup,
+    setSetupState: async (state) => {
+      host.mac.setup = state && { ...state, resumed: false };
+    },
     onDev: (cb) => {
       devListeners.add(cb);
       return () => devListeners.delete(cb);
