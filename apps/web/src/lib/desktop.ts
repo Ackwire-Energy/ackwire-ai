@@ -163,7 +163,7 @@ export const browserSignInUrl = (provider: SignInProvider, requestId: string, ac
  */
 export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
-  /** False where agents can't work on this computer for this server (agentes.chat, a server on it, Windows). */
+  /** False where agents can't work on this computer for this server: a server on this computer itself. */
   agentsHere?: boolean;
   /** This server runs inside the app on this computer: the app signs its owner in ("Continue on this Mac"). */
   local?: boolean;

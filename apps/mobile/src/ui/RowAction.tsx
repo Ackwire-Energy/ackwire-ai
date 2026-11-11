@@ -13,12 +13,17 @@ export function RowAction({
   onPress,
   accessibilityLabel,
   accessibilityRole = "button",
+  strong = false,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
   /** Read aloud instead of the label. */
   accessibilityLabel?: string;
   accessibilityRole?: AccessibilityRole;
+  /** The row's main action among several (Send beside Not now): its word in ink. */
+  strong?: boolean;
+  disabled?: boolean;
 }) {
   const { colors } = useTheme();
   return (
@@ -26,6 +31,7 @@ export function RowAction({
       to={0.95}
       haptic={false}
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole={accessibilityRole}
       accessibilityLabel={accessibilityLabel ?? label}
       hitSlop={6}
@@ -35,7 +41,7 @@ export function RowAction({
       <View style={styles.face}>
         <RNText
           maxFontSizeMultiplier={CHROME_MAX_SCALE}
-          style={[systemText("footnote", weights.semibold), { color: colors.muted }]}
+          style={[systemText("footnote", weights.semibold), { color: strong ? colors.ink : colors.muted }]}
         >
           {label}
         </RNText>

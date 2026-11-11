@@ -163,3 +163,25 @@ export const codedErrorMessage = (error: unknown): string | null => {
   const e = codedError(error);
   return e ? e.message || e.code : null;
 };
+
+const DOMAIN_ERRORS = new Set([
+  "ForbiddenError",
+  "UnauthorizedError",
+  "NotFoundError",
+  "ConflictError",
+  "ValidationError",
+  "TooManyError",
+  "MisconfiguredError",
+  "BudgetExceededError",
+  "PersonLimitError",
+  "MissingCredentialError",
+]);
+
+/**
+ * An error nobody wrote for the caller: not one of the domain errors above, nor a plain `Error` (whose message a tool
+ * wrote for the model). A `TypeError`, a database error, a timeout: the app itself failing.
+ */
+export function isUnexpectedError(error: unknown): boolean {
+  if (!(error instanceof Error)) return true;
+  return error.constructor !== Error && !DOMAIN_ERRORS.has(error.name);
+}

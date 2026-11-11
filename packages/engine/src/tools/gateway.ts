@@ -21,6 +21,7 @@ import { answersAgentsOnly, consultationOrigin } from "../consultations";
 import { recordOutcome } from "../context/outcomes";
 import { sha256 } from "../crypto";
 import { provenReadOnly } from "../databases/guard";
+import { isUnexpectedError } from "../errors";
 import { cutMarked, cutText, pgSafeJson, pgSafeText } from "../format";
 import { mergeReposOfCall, recordMergeDone, reposOfGithubCall } from "../git/repos";
 import { recordRead } from "../outbound";
@@ -452,6 +453,11 @@ export function createToolGateway(deps: {
   now?: () => Date;
   /** What this server can connect: `find_tools` names each connector a search asks for that the agent lacks. */
   catalog?: ServerCatalog;
+  /**
+   * Said after one of our own tools breaks with an error nobody wrote for the model (`isUnexpectedError`): where the
+   * server takes feedback, that the agent may offer a report (`APP_FAULT_HINT`, ADR 0160 §12).
+   */
+  faultHint?: string;
   /** Live events (the autonomy brakes' proposal card, ADR 0131). */
   pubsub?: PubSub;
 }) {
@@ -590,8 +596,14 @@ export function createToolGateway(deps: {
       return tool.external ? { ...capped, content: wrapExternal(tool.name, capped.content) } : capped;
     } catch (error) {
       const message = pgSafeText(error instanceof Error ? error.message : String(error));
+      // Our own tool breaking in a way nobody foresaw is the app's fault, not the agent's nor an outside service's.
+      const hint =
+        deps.faultHint && !tool.external && !tool.connectionId && isUnexpectedError(error) ? deps.faultHint : "";
       // An MCP server's error text is its own words too.
-      return { content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}`, isError: true };
+      return {
+        content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}${hint && `\n${hint}`}`,
+        isError: true,
+      };
     }
   }
 

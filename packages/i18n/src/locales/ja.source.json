@@ -22929,6 +22929,459 @@
   "photo.tooBig": {
     "value": "The image is over 8 MB."
   },
+  "portrait.ask.title": {
+    "value": "How do you want to appear?"
+  },
+  "portrait.ask.build": {
+    "value": "Build an avatar"
+  },
+  "portrait.ask.buildText": {
+    "value": "A pixel portrait made your way: hair, clothes, accessories."
+  },
+  "portrait.ask.photo": {
+    "value": "Upload a photo"
+  },
+  "portrait.ask.photoText": {
+    "value": "Choose an image from your computer and frame it."
+  },
+  "portrait.title": {
+    "value": "Your avatar"
+  },
+  "portrait.preview": {
+    "value": "Your avatar"
+  },
+  "portrait.shuffle": {
+    "value": "Shuffle"
+  },
+  "portrait.small": {
+    "value": "Small sizes in the chat show the face alone."
+  },
+  "portrait.photoAsk": {
+    "value": "Prefer a photo?"
+  },
+  "portrait.photoUpload": {
+    "value": "Upload photo"
+  },
+  "portrait.saved": {
+    "value": "Avatar updated."
+  },
+  "portrait.failed": {
+    "value": "The avatar couldn't be saved. Try again."
+  },
+  "portrait.showAll": {
+    "value": "Show every option"
+  },
+  "portrait.showFewer": {
+    "value": "Show fewer options"
+  },
+  "portrait.beardHint": {
+    "value": "The beard follows the hair color."
+  },
+  "portrait.hatsHint": {
+    "value": "A cap, a beanie, a hat and a scarf cover the hair."
+  },
+  "portrait.swatch": {
+    "value": "{{group}} {{n}}"
+  },
+  "portrait.build.label": {
+    "value": "Build"
+  },
+  "portrait.build.m": {
+    "value": "Masculine"
+  },
+  "portrait.build.f": {
+    "value": "Feminine"
+  },
+  "portrait.tabs.label": {
+    "value": "Parts of the avatar"
+  },
+  "portrait.tabs.face": {
+    "value": "Face"
+  },
+  "portrait.tabs.hair": {
+    "value": "Hair"
+  },
+  "portrait.tabs.beard": {
+    "value": "Beard"
+  },
+  "portrait.tabs.makeup": {
+    "value": "Makeup"
+  },
+  "portrait.tabs.marks": {
+    "value": "Marks"
+  },
+  "portrait.tabs.accessories": {
+    "value": "Accessories"
+  },
+  "portrait.tabs.clothes": {
+    "value": "Clothes"
+  },
+  "portrait.tabs.background": {
+    "value": "Background"
+  },
+  "portrait.sections.skin": {
+    "value": "Skin tone"
+  },
+  "portrait.sections.eyes": {
+    "value": "Eye color"
+  },
+  "portrait.sections.mood": {
+    "value": "Expression"
+  },
+  "portrait.sections.color": {
+    "value": "Color"
+  },
+  "portrait.sections.hairColor": {
+    "value": "Hair color"
+  },
+  "portrait.sections.clothesColor": {
+    "value": "Clothes color"
+  },
+  "portrait.sections.cut": {
+    "value": "Cut"
+  },
+  "portrait.sections.beard": {
+    "value": "Beard"
+  },
+  "portrait.sections.lips": {
+    "value": "Lipstick"
+  },
+  "portrait.sections.shadow": {
+    "value": "Eyeshadow"
+  },
+  "portrait.sections.blush": {
+    "value": "Blush"
+  },
+  "portrait.sections.mark": {
+    "value": "Marks"
+  },
+  "portrait.sections.glasses": {
+    "value": "Glasses"
+  },
+  "portrait.sections.ear": {
+    "value": "Earrings"
+  },
+  "portrait.sections.neck": {
+    "value": "Around the neck"
+  },
+  "portrait.sections.extra": {
+    "value": "On the head"
+  },
+  "portrait.sections.piece": {
+    "value": "Piece"
+  },
+  "portrait.sections.bg": {
+    "value": "Background"
+  },
+  "portrait.options.mood.smile": {
+    "value": "Smile"
+  },
+  "portrait.options.mood.grin": {
+    "value": "Big smile"
+  },
+  "portrait.options.mood.laugh": {
+    "value": "Laughing"
+  },
+  "portrait.options.mood.calm": {
+    "value": "Calm"
+  },
+  "portrait.options.mood.wink": {
+    "value": "Wink"
+  },
+  "portrait.options.mood.wow": {
+    "value": "Surprised"
+  },
+  "portrait.options.hair.none": {
+    "value": "Bald"
+  },
+  "portrait.options.hair.buzz": {
+    "value": "Buzz cut"
+  },
+  "portrait.options.hair.short": {
+    "value": "Short"
+  },
+  "portrait.options.hair.side": {
+    "value": "Side part"
+  },
+  "portrait.options.hair.quiff": {
+    "value": "Quiff"
+  },
+  "portrait.options.hair.curly": {
+    "value": "Curly"
+  },
+  "portrait.options.hair.afro": {
+    "value": "Afro"
+  },
+  "portrait.options.hair.bob": {
+    "value": "Bob"
+  },
+  "portrait.options.hair.bangs": {
+    "value": "Bangs"
+  },
+  "portrait.options.hair.long": {
+    "value": "Long"
+  },
+  "portrait.options.hair.wavy": {
+    "value": "Wavy"
+  },
+  "portrait.options.hair.curls": {
+    "value": "Long curls"
+  },
+  "portrait.options.hair.bun": {
+    "value": "Bun"
+  },
+  "portrait.options.hair.pony": {
+    "value": "Ponytail"
+  },
+  "portrait.options.hair.spiky": {
+    "value": "Spiky"
+  },
+  "portrait.options.hair.mohawk": {
+    "value": "Mohawk"
+  },
+  "portrait.options.hair.braids": {
+    "value": "Braids"
+  },
+  "portrait.options.hair.pigtails": {
+    "value": "Pigtails"
+  },
+  "portrait.options.hair.crew": {
+    "value": "Crew cut"
+  },
+  "portrait.options.hair.fade": {
+    "value": "Fade"
+  },
+  "portrait.options.hair.slick": {
+    "value": "Slicked back"
+  },
+  "portrait.options.hair.flat": {
+    "value": "Flat top"
+  },
+  "portrait.options.hair.undercut": {
+    "value": "Undercut"
+  },
+  "portrait.options.hair.mullet": {
+    "value": "Mullet"
+  },
+  "portrait.options.hair.dreads": {
+    "value": "Dreadlocks"
+  },
+  "portrait.options.hair.medium": {
+    "value": "Medium"
+  },
+  "portrait.options.hair.receding": {
+    "value": "Receding"
+  },
+  "portrait.options.beard.none": {
+    "value": "No beard"
+  },
+  "portrait.options.beard.stubble": {
+    "value": "Stubble"
+  },
+  "portrait.options.beard.mustache": {
+    "value": "Mustache"
+  },
+  "portrait.options.beard.goatee": {
+    "value": "Goatee"
+  },
+  "portrait.options.beard.strap": {
+    "value": "Chinstrap"
+  },
+  "portrait.options.beard.full": {
+    "value": "Full"
+  },
+  "portrait.options.beard.long": {
+    "value": "Long"
+  },
+  "portrait.options.lips.none": {
+    "value": "No lipstick"
+  },
+  "portrait.options.lips.nude": {
+    "value": "Nude"
+  },
+  "portrait.options.lips.pink": {
+    "value": "Pink"
+  },
+  "portrait.options.lips.red": {
+    "value": "Red"
+  },
+  "portrait.options.lips.wine": {
+    "value": "Wine"
+  },
+  "portrait.options.lips.purple": {
+    "value": "Purple"
+  },
+  "portrait.options.lips.black": {
+    "value": "Black"
+  },
+  "portrait.options.shadow.none": {
+    "value": "No eyeshadow"
+  },
+  "portrait.options.shadow.rose": {
+    "value": "Rose"
+  },
+  "portrait.options.shadow.violet": {
+    "value": "Violet"
+  },
+  "portrait.options.shadow.blue": {
+    "value": "Blue"
+  },
+  "portrait.options.shadow.green": {
+    "value": "Green"
+  },
+  "portrait.options.shadow.gold": {
+    "value": "Gold"
+  },
+  "portrait.options.shadow.smoky": {
+    "value": "Smoky"
+  },
+  "portrait.options.blush.soft": {
+    "value": "Soft"
+  },
+  "portrait.options.blush.strong": {
+    "value": "Strong"
+  },
+  "portrait.options.blush.none": {
+    "value": "No blush"
+  },
+  "portrait.options.mark.none": {
+    "value": "None"
+  },
+  "portrait.options.mark.freckles": {
+    "value": "Freckles"
+  },
+  "portrait.options.mark.mole": {
+    "value": "Mole"
+  },
+  "portrait.options.mark.scar": {
+    "value": "Scar"
+  },
+  "portrait.options.mark.bandaid": {
+    "value": "Bandage"
+  },
+  "portrait.options.mark.piercing": {
+    "value": "Piercing"
+  },
+  "portrait.options.glasses.none": {
+    "value": "No glasses"
+  },
+  "portrait.options.glasses.round": {
+    "value": "Round"
+  },
+  "portrait.options.glasses.square": {
+    "value": "Square"
+  },
+  "portrait.options.glasses.gold": {
+    "value": "Gold"
+  },
+  "portrait.options.glasses.tinted": {
+    "value": "Tinted"
+  },
+  "portrait.options.glasses.shades": {
+    "value": "Sunglasses"
+  },
+  "portrait.options.ear.none": {
+    "value": "No earrings"
+  },
+  "portrait.options.ear.studs": {
+    "value": "Gold studs"
+  },
+  "portrait.options.ear.pearls": {
+    "value": "Pearls"
+  },
+  "portrait.options.ear.hoops": {
+    "value": "Hoops"
+  },
+  "portrait.options.ear.drops": {
+    "value": "Drops"
+  },
+  "portrait.options.neck.none": {
+    "value": "Nothing"
+  },
+  "portrait.options.neck.necklace": {
+    "value": "Necklace"
+  },
+  "portrait.options.neck.pearls": {
+    "value": "Pearls"
+  },
+  "portrait.options.neck.choker": {
+    "value": "Choker"
+  },
+  "portrait.options.neck.bowtie": {
+    "value": "Bow tie"
+  },
+  "portrait.options.neck.muffler": {
+    "value": "Scarf"
+  },
+  "portrait.options.extra.none": {
+    "value": "Nothing"
+  },
+  "portrait.options.extra.headband": {
+    "value": "Headband"
+  },
+  "portrait.options.extra.bandana": {
+    "value": "Bandana"
+  },
+  "portrait.options.extra.bow": {
+    "value": "Bow"
+  },
+  "portrait.options.extra.flower": {
+    "value": "Flower"
+  },
+  "portrait.options.extra.headphones": {
+    "value": "Headphones"
+  },
+  "portrait.options.extra.cap": {
+    "value": "Cap"
+  },
+  "portrait.options.extra.beanie": {
+    "value": "Beanie"
+  },
+  "portrait.options.extra.hat": {
+    "value": "Hat"
+  },
+  "portrait.options.extra.crown": {
+    "value": "Crown"
+  },
+  "portrait.options.extra.scarf": {
+    "value": "Headscarf"
+  },
+  "portrait.options.clothes.tee": {
+    "value": "T-shirt"
+  },
+  "portrait.options.clothes.vneck": {
+    "value": "V-neck"
+  },
+  "portrait.options.clothes.tank": {
+    "value": "Tank top"
+  },
+  "portrait.options.clothes.shirt": {
+    "value": "Shirt"
+  },
+  "portrait.options.clothes.suit": {
+    "value": "Suit"
+  },
+  "portrait.options.clothes.blazer": {
+    "value": "Blazer"
+  },
+  "portrait.options.clothes.jacket": {
+    "value": "Jacket"
+  },
+  "portrait.options.clothes.hoodie": {
+    "value": "Hoodie"
+  },
+  "portrait.options.clothes.turtle": {
+    "value": "Turtleneck"
+  },
+  "portrait.options.clothes.overall": {
+    "value": "Overalls"
+  },
+  "portrait.options.clothes.polo": {
+    "value": "Polo"
+  },
+  "portrait.options.clothes.dress": {
+    "value": "Dress"
+  },
   "orgLogo.label": {
     "value": "Logo"
   },
@@ -31720,16 +32173,58 @@
     "value": "Connect another computer"
   },
   "devices.computer.step1": {
-    "value": "Download the app on it:"
+    "value": "Get the agentes.chat app on it:"
   },
   "devices.computer.step2": {
-    "value": "Open it and sign in to {{org}}."
+    "value": "Open it and sign in as yourself."
   },
   "devices.computer.step3": {
-    "value": "Turn on Let agents use this computer."
+    "value": "Click Allow when it asks to let {{org}}'s agents use it."
+  },
+  "devices.computer.shows": {
+    "value": "It shows up here by itself, only for you until you share it."
+  },
+  "devices.computer.waiting": {
+    "value": "Waiting for a computer of yours…"
+  },
+  "devices.computer.connected": {
+    "value": "Connected: {{name}}"
   },
   "devices.computer.orLine": {
     "value": "Or paste one line in its terminal"
+  },
+  "devices.computer.noApp": {
+    "value": "Can't install the app on it? Use a terminal line"
+  },
+  "devices.thisApp.text": {
+    "value": "The agentes.chat app connects it in one click, and asks you first."
+  },
+  "devices.thisApp.open": {
+    "value": "Open the agentes.chat app"
+  },
+  "devices.thisApp.browserAsks": {
+    "value": "Your browser asks to open it: choose Open, and Always allow if it offers."
+  },
+  "devices.thisApp.noApp": {
+    "value": "Don't have the app?"
+  },
+  "devices.thisApp.afterInstall": {
+    "value": "After installing, press Open the agentes.chat app again. The link works once, for 10 minutes."
+  },
+  "devices.thisApp.waiting": {
+    "value": "Waiting for the app on this computer…"
+  },
+  "devices.thisApp.expired": {
+    "value": "This link expired."
+  },
+  "devices.thisApp.again": {
+    "value": "Make a new link"
+  },
+  "devices.thisApp.failed": {
+    "value": "Couldn't make the link. Try again in a moment."
+  },
+  "devices.thisApp.server": {
+    "value": "A server? Use a terminal line"
   },
   "devices.link.serverTitle": {
     "value": "Connect a server"
@@ -36053,6 +36548,9 @@
   "chat.work.step.sendingFeedback": {
     "value": "Asked to send feedback"
   },
+  "chat.work.step.offeringFeedback": {
+    "value": "Offered to report a problem"
+  },
   "chat.work.step.deletingRoutine": {
     "value": "Deleted a routine"
   },
@@ -36382,6 +36880,9 @@
   },
   "chat.activity.sendingFeedback": {
     "value": "preparing feedback"
+  },
+  "chat.activity.offeringFeedback": {
+    "value": "preparing a report"
   },
   "chat.activity.deletingRoutine": {
     "value": "deleting a routine"
@@ -42030,5 +42531,53 @@
   },
   "feedback.another": {
     "value": "Send another"
+  },
+  "feedback.offer.group": {
+    "value": "Report about the app"
+  },
+  "feedback.offer.ready": {
+    "value": "<b>Report ready</b>: {{summary}}"
+  },
+  "feedback.offer.goesCloud": {
+    "value": "Goes in your name to the agentes.chat team"
+  },
+  "feedback.offer.goesServer": {
+    "value": "Goes in your name to whoever runs this server"
+  },
+  "feedback.offer.see": {
+    "value": "See the report"
+  },
+  "feedback.offer.hide": {
+    "value": "Close the report"
+  },
+  "feedback.offer.send": {
+    "value": "Send"
+  },
+  "feedback.offer.notNow": {
+    "value": "Not now"
+  },
+  "feedback.offer.answer": {
+    "value": "The answer comes to your email."
+  },
+  "feedback.offer.sentCloud": {
+    "value": "<b>Report sent</b> to the agentes.chat team"
+  },
+  "feedback.offer.sentServer": {
+    "value": "<b>Report sent</b> to whoever runs this server"
+  },
+  "feedback.offer.sentAuto": {
+    "value": "<b>Report sent without asking</b>: {{summary}}"
+  },
+  "feedback.offer.view": {
+    "value": "View"
+  },
+  "feedback.offer.always": {
+    "value": "Always send"
+  },
+  "feedback.offer.alwaysOn": {
+    "value": "From now on, reports like this go without asking."
+  },
+  "feedback.offer.askFirst": {
+    "value": "Ask before sending"
   }
 }

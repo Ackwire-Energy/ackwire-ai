@@ -34,9 +34,9 @@ defaults:
 
 jobs:
   build:
-    # 16 vCPU / 32 GB: Gradle and the native code need the memory. The job expects the Android SDK on the
-    # runner's image, as on GitHub's ubuntu-24.04.
-    runs-on: nscloud-ubuntu-24.04-amd64-16x32
+    # Gradle and the native code want 32 GB (CI_RUNNER_XLARGE names a runner that has them). The job expects the
+    # Android SDK on the runner's image, as on GitHub's ubuntu-24.04.
+    runs-on: ${{ vars.CI_RUNNER_XLARGE || 'ubuntu-latest' }}
     timeout-minutes: 60
     env:
       APP_VARIANT: ${{ inputs.variant }}

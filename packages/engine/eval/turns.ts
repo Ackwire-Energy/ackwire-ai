@@ -164,6 +164,15 @@ export const TURNS: ScriptedTurn[] = [
     reachable: [{ tool: "send_feedback", query: "send feedback about the app" }],
     wants: ["send_feedback", "find_tools", "use_tool"],
   },
+  {
+    id: "feedback-offer",
+    title: "A complaint about the app itself: a report offered, not sent",
+    where: "dm",
+    body: "mandei a planilha em anexo de novo e ela sumiu, é a terceira vez que o anexo some aqui no app",
+    listed: ["find_tools", "use_tool"],
+    reachable: [{ tool: "offer_feedback", query: "report a problem with the app" }],
+    wants: ["offer_feedback", "find_tools", "use_tool"],
+  },
 ];
 
 /** A made-up deploy connector: one read, one action that asks a person's approval. */

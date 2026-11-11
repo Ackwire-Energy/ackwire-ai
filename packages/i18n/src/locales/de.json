@@ -9497,6 +9497,193 @@
     "notImage": "Wähle ein Bild (JPG, PNG oder WebP).",
     "tooBig": "Das Bild ist größer als 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Wie möchtest du erscheinen?",
+      "build": "Avatar erstellen",
+      "buildText": "Ein Pixelporträt nach deinem Geschmack: Haare, Kleidung, Accessoires.",
+      "photo": "Foto hochladen",
+      "photoText": "Wähle ein Bild von deinem Computer und richte es aus."
+    },
+    "title": "Dein Avatar",
+    "preview": "Dein Avatar",
+    "shuffle": "Zufällig",
+    "small": "In kleinen Größen im Chat ist nur das Gesicht zu sehen.",
+    "photoAsk": "Lieber ein Foto?",
+    "photoUpload": "Foto hochladen",
+    "saved": "Avatar aktualisiert.",
+    "failed": "Der Avatar konnte nicht gespeichert werden. Versuch es noch einmal.",
+    "showAll": "Alle Optionen anzeigen",
+    "showFewer": "Weniger Optionen anzeigen",
+    "beardHint": "Der Bart hat die Haarfarbe.",
+    "hatsHint": "Kappe, Mütze, Hut und Kopftuch verdecken die Haare.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Typ",
+      "m": "Maskulin",
+      "f": "Feminin"
+    },
+    "tabs": {
+      "label": "Teile des Avatars",
+      "face": "Gesicht",
+      "hair": "Haare",
+      "beard": "Bart",
+      "makeup": "Make-up",
+      "marks": "Merkmale",
+      "accessories": "Accessoires",
+      "clothes": "Kleidung",
+      "background": "Hintergrund"
+    },
+    "sections": {
+      "skin": "Hautton",
+      "eyes": "Augenfarbe",
+      "mood": "Ausdruck",
+      "color": "Farbe",
+      "hairColor": "Haarfarbe",
+      "clothesColor": "Kleidungsfarbe",
+      "cut": "Schnitt",
+      "beard": "Bart",
+      "lips": "Lippenstift",
+      "shadow": "Lidschatten",
+      "blush": "Rouge",
+      "mark": "Merkmale",
+      "glasses": "Brille",
+      "ear": "Ohrringe",
+      "neck": "Am Hals",
+      "extra": "Auf dem Kopf",
+      "piece": "Kleidungsstück",
+      "bg": "Hintergrund"
+    },
+    "options": {
+      "mood": {
+        "smile": "Lächeln",
+        "grin": "Breites Lächeln",
+        "laugh": "Lachen",
+        "calm": "Ruhig",
+        "wink": "Zwinkern",
+        "wow": "Überrascht"
+      },
+      "hair": {
+        "none": "Glatze",
+        "buzz": "Raspelkurz",
+        "short": "Kurz",
+        "side": "Seitenscheitel",
+        "quiff": "Tolle",
+        "curly": "Lockig",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Pony",
+        "long": "Lang",
+        "wavy": "Wellig",
+        "curls": "Lange Locken",
+        "bun": "Dutt",
+        "pony": "Pferdeschwanz",
+        "spiky": "Stachelig",
+        "mohawk": "Irokese",
+        "braids": "Flechtzöpfe",
+        "pigtails": "Zwei Zöpfe",
+        "crew": "Bürstenschnitt",
+        "fade": "Fade",
+        "slick": "Zurückgekämmt",
+        "flat": "Flat Top",
+        "undercut": "Undercut",
+        "mullet": "Vokuhila",
+        "dreads": "Dreadlocks",
+        "medium": "Mittellang",
+        "receding": "Geheimratsecken"
+      },
+      "beard": {
+        "none": "Kein Bart",
+        "stubble": "Dreitagebart",
+        "mustache": "Schnurrbart",
+        "goatee": "Kinnbart",
+        "strap": "Konturbart",
+        "full": "Vollbart",
+        "long": "Lang"
+      },
+      "lips": {
+        "none": "Kein Lippenstift",
+        "nude": "Nude",
+        "pink": "Rosa",
+        "red": "Rot",
+        "wine": "Weinrot",
+        "purple": "Lila",
+        "black": "Schwarz"
+      },
+      "shadow": {
+        "none": "Kein Lidschatten",
+        "rose": "Rosé",
+        "violet": "Violett",
+        "blue": "Blau",
+        "green": "Grün",
+        "gold": "Gold",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Dezent",
+        "strong": "Kräftig",
+        "none": "Kein Rouge"
+      },
+      "mark": {
+        "none": "Keine",
+        "freckles": "Sommersprossen",
+        "mole": "Muttermal",
+        "scar": "Narbe",
+        "bandaid": "Pflaster",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Keine Brille",
+        "round": "Rund",
+        "square": "Eckig",
+        "gold": "Goldrand",
+        "tinted": "Getönt",
+        "shades": "Sonnenbrille"
+      },
+      "ear": {
+        "none": "Keine Ohrringe",
+        "studs": "Goldstecker",
+        "pearls": "Perlen",
+        "hoops": "Creolen",
+        "drops": "Hänger"
+      },
+      "neck": {
+        "none": "Nichts",
+        "necklace": "Halskette",
+        "pearls": "Perlen",
+        "choker": "Choker",
+        "bowtie": "Fliege",
+        "muffler": "Schal"
+      },
+      "extra": {
+        "none": "Nichts",
+        "headband": "Haarband",
+        "bandana": "Bandana",
+        "bow": "Schleife",
+        "flower": "Blume",
+        "headphones": "Kopfhörer",
+        "cap": "Kappe",
+        "beanie": "Mütze",
+        "hat": "Hut",
+        "crown": "Krone",
+        "scarf": "Kopftuch"
+      },
+      "clothes": {
+        "tee": "T-Shirt",
+        "vneck": "V-Ausschnitt",
+        "tank": "Tanktop",
+        "shirt": "Hemd",
+        "suit": "Anzug",
+        "blazer": "Blazer",
+        "jacket": "Jacke",
+        "hoodie": "Kapuzenpulli",
+        "turtle": "Rollkragen",
+        "overall": "Latzhose",
+        "polo": "Poloshirt",
+        "dress": "Kleid"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo hochladen",
@@ -13104,10 +13291,26 @@
     },
     "computer": {
       "title": "Einen anderen Computer verbinden",
-      "step1": "Lade dort die App herunter:",
-      "step2": "Öffne sie und melde dich bei {{org}} an.",
-      "step3": "Schalte Agenten diesen Computer nutzen lassen ein.",
-      "orLine": "Oder füge eine Zeile in sein Terminal ein"
+      "step1": "Hol dir die agentes.chat-App darauf:",
+      "step2": "Öffne sie und melde dich mit deinem eigenen Konto an.",
+      "step3": "Klicke auf Erlauben, wenn sie fragt, ob die Agenten von {{org}} ihn nutzen dürfen.",
+      "shows": "Er erscheint hier von selbst, nur für dich, bis du ihn teilst.",
+      "waiting": "Warte auf einen deiner Computer…",
+      "connected": "Verbunden: {{name}}",
+      "orLine": "Oder füge eine Zeile in sein Terminal ein",
+      "noApp": "Kannst du die App dort nicht installieren? Nutze eine Terminal-Zeile"
+    },
+    "thisApp": {
+      "text": "Die agentes.chat-App verbindet ihn mit einem Klick und fragt dich vorher.",
+      "open": "agentes.chat-App öffnen",
+      "browserAsks": "Dein Browser fragt, ob er sie öffnen darf: Wähle Öffnen und Immer erlauben, wenn er es anbietet.",
+      "noApp": "Du hast die App noch nicht?",
+      "afterInstall": "Klicke nach der Installation noch einmal auf agentes.chat-App öffnen. Der Link funktioniert einmal, 10 Minuten lang.",
+      "waiting": "Warte auf die App auf diesem Computer…",
+      "expired": "Dieser Link ist abgelaufen.",
+      "again": "Neuen Link erstellen",
+      "failed": "Der Link konnte nicht erstellt werden. Versuch es gleich noch einmal.",
+      "server": "Ein Server? Nutze eine Terminal-Zeile"
     },
     "link": {
       "serverTitle": "Server verbinden",
@@ -14834,6 +15037,7 @@
         "settingStatus": "Den eigenen Status aktualisiert",
         "settingReplyStyle": "Die Art zu antworten angepasst",
         "sendingFeedback": "Um das Senden von Feedback gebeten",
+        "offeringFeedback": "Angeboten, ein Problem zu melden",
         "deletingRoutine": "Eine Routine gelöscht",
         "runningRoutine": "Eine Routine jetzt ausgeführt",
         "proposingTeam": "Ein Team vorgeschlagen",
@@ -14947,6 +15151,7 @@
       "settingStatus": "Aktualisieren des eigenen Status",
       "settingReplyStyle": "Anpassen der Art zu antworten",
       "sendingFeedback": "Feedback vorbereiten",
+      "offeringFeedback": "Bericht vorbereiten",
       "deletingRoutine": "Löschen einer Routine",
       "runningRoutine": "Ausführen einer Routine",
       "proposingTeam": "Vorschlagen eines Teams",
@@ -17441,6 +17646,24 @@
     "send": "Senden",
     "thanks": "Zugestellt. Danke.",
     "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
-    "another": "Noch eins senden"
+    "another": "Noch eins senden",
+    "offer": {
+      "group": "Bericht über die App",
+      "ready": "<b>Bericht bereit</b>: {{summary}}",
+      "goesCloud": "Geht in deinem Namen an das Team von agentes.chat",
+      "goesServer": "Geht in deinem Namen an die Person, die diesen Server betreibt",
+      "see": "Bericht ansehen",
+      "hide": "Bericht schließen",
+      "send": "Senden",
+      "notNow": "Jetzt nicht",
+      "answer": "Die Antwort kommt an deine E-Mail-Adresse.",
+      "sentCloud": "<b>Bericht gesendet</b> an das Team von agentes.chat",
+      "sentServer": "<b>Bericht gesendet</b> an die Person, die diesen Server betreibt",
+      "sentAuto": "<b>Bericht ohne Nachfrage gesendet</b>: {{summary}}",
+      "view": "Ansehen",
+      "always": "Immer senden",
+      "alwaysOn": "Ab jetzt gehen solche Berichte ohne Nachfrage raus.",
+      "askFirst": "Vor dem Senden fragen"
+    }
   }
 }

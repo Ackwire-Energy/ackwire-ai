@@ -15,10 +15,11 @@ test("the rail keeps no room for the row's buttons it hides: a mark stays centre
   expect(rules.length).toBe(3);
   for (const [, selector] of rules) expect(selector?.replace(/"/g, "")).toContain(".sidebar:not([data-rail=true])");
   expect(last(shipped, ".sidebar[data-rail=true] .sidebar__row-acts", "display")).toBe("none");
-  // The plate is a centring box of the rail's own size, its 28px face inside with room for the status mark.
+  // The plate is a centring box of the rail's own size, its face (--sidebar-rail-face, 28px: sidebar-css.test.ts)
+  // inside with room for the status mark.
   expect(last(shipped, ".sidebar[data-rail=true] .sidebar__item", "padding")).toBe("0");
   expect(last(shipped, ".sidebar[data-rail=true] .sidebar__item", "justify-content")).toBe("center");
-  expect(last(shipped, ".sidebar__item>.ac-avatar--sm", "width")).toBe("28px");
+  expect(last(shipped, ".sidebar__item>.ac-avatar--sm", "width")).toBe("var(--sidebar-rail-face)");
 });
 
 test("a grip is its row's height, so its dots share the row's middle", async () => {

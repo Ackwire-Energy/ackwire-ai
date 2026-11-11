@@ -96,6 +96,7 @@ import type {
   EndpointCheck,
   EndpointModel,
   FeedbackFile,
+  FeedbackOffer,
   ForeignMailbox,
   FormerAgent,
   GifKey,
@@ -540,6 +541,12 @@ export function createHttpApi(options: TransportOptions = {}): HttpApi {
         return files.upload<FeedbackFile>("/api/app/feedback/files", form);
       },
       dropFeedbackFile: (id) => request<void>(`/api/app/feedback/files/${enc(id)}`, { method: "DELETE" }),
+      decideFeedbackOffer: async (orgId, messageId, decision) =>
+        (
+          await request<{ offer: FeedbackOffer }>(`/api/app/feedback/offers/${enc(messageId)}`, {
+            json: { orgId, decision },
+          })
+        ).offer,
       jev: () => nullOn(404, () => request<JevKey>("/api/app/jev")),
       saveJev: (apiKey) => request<JevKey>("/api/app/jev", { method: "PUT", json: { apiKey } }),
       checkJev: () => request<JevKey>("/api/app/jev/check", { method: "POST" }),

@@ -4,6 +4,10 @@
     "windows": "PC",
     "linux": "电脑"
   },
+  "windowTitle": {
+    "welcome": "欢迎",
+    "prefs": "偏好设置"
+  },
   "common": {
     "cancel": "取消",
     "close": "关闭",
@@ -80,6 +84,7 @@
     "pauseTomorrow": "到明天上午 9 点",
     "pauseManual": "直到我恢复",
     "pauseHint": "已在运行的工作会正常完成。",
+    "pauseHintServer": "已在运行的任务会正常结束。服务器保持在线。",
     "resume": "恢复智能体",
     "open": "打开 agentes.chat",
     "prefs": "偏好设置…",
@@ -122,8 +127,7 @@
     "quitTitle": "退出 agentes.chat？",
     "quitBody": "应用关闭期间，智能体无法使用这台 {{device}}。已在运行的工作会完成，并在你再次打开应用时发送结果。",
     "quitHereBody": "agentes.chat 将在这台 {{device}} 上停止运行：在你再次打开应用之前，任何人都无法使用它，无论是在这里、你的手机上还是队友的手机上。",
-    "quitConfirm": "退出",
-    "pauseHintServer": "已在运行的任务会正常结束。服务器保持在线。"
+    "quitConfirm": "退出"
   },
   "first": {
     "title": "你的团队和智能体，在一起",
@@ -135,9 +139,9 @@
     "addTitle": "添加工作区",
     "addLead": "你已有的工作区都保留在这里，各自保持登录。",
     "addCloud": "在 agentes.chat 创建工作区",
-    "addOwn": "使用你团队的服务器",
     "addNew": "想要一个新的工作区？",
-    "addNewLink": "创建一个"
+    "addNewLink": "创建一个",
+    "addOwn": "使用你团队的服务器"
   },
   "own": {
     "title": "你自己的服务器",
@@ -160,26 +164,26 @@
     "looking": "正在查找你的服务器…",
     "foundTailnet": "在你的 Tailscale 网络上",
     "foundHere": "agentes.chat 正在这里运行",
-    "use": "使用",
-    "none": "还没有服务器？在服务器上运行这个",
-    "noneText": "在服务器或 Mac mini 的终端中运行。最后会显示一个链接，用来把这个应用连接上去。",
-    "invalid": "请检查地址，格式类似 agentes.yourteam.ts.net。",
-    "httpRefused": "{{host}} 没有使用安全连接（https），只有这台 {{device}} 上的服务器可以不用它。请使用它的 https 地址或 Tailscale 地址。",
-    "noOwner": "{{host}} 还没有所有者。安装服务器的人收到了一个创建所有者账号的链接：请在这台 {{device}} 或你的手机上打开那个链接。",
-    "unreachable": "无法连接到 {{host}}。请检查地址以及服务器是否开着，然后重试。",
-    "unreachableHere": "这台 {{device}} 上的 {{host}} 没有响应。请先在这里启动 agentes.chat，然后重试。",
-    "certificate": "{{host}} 的证书无效。请联系服务器的管理者。",
-    "notAgentes": "{{host}} 不是 agentes.chat 服务器。请检查地址。",
-    "serverTooOld": "{{host}} 需要更新才能配合此应用使用。",
-    "appTooOld": "请更新应用以使用 {{host}}。",
     "foundNoOwner": "正在等待所有者账号",
+    "use": "使用",
     "setUp": "设置",
     "noneFound": "没有找到服务器。",
     "lookAgain": "重新查找",
     "tailnetOff": "这台 {{device}} 上的 Tailscale 已关闭，所以你的 Tailscale 网络中的服务器不会显示在这里。",
     "addressHint": "一个 https 地址，或它以 .ts.net 结尾的 Tailscale 地址。",
     "checkUpdates": "检查更新",
-    "unreachableTailnet": "无法连接到你的 Tailscale 网络中的 {{host}}。请在这台 {{device}} 上打开 Tailscale，连接后重试。"
+    "none": "还没有服务器？在服务器上运行这个",
+    "noneText": "在服务器或 Mac mini 的终端中运行。最后会显示一个链接，用来把这个应用连接上去。",
+    "invalid": "请检查地址，格式类似 agentes.yourteam.ts.net。",
+    "httpRefused": "{{host}} 没有使用安全连接（https），只有这台 {{device}} 上的服务器可以不用它。请使用它的 https 地址或 Tailscale 地址。",
+    "noOwner": "{{host}} 还没有所有者。安装服务器的人收到了一个创建所有者账号的链接：请在这台 {{device}} 或你的手机上打开那个链接。",
+    "unreachable": "无法连接到 {{host}}。请检查地址以及服务器是否开着，然后重试。",
+    "unreachableTailnet": "无法连接到你的 Tailscale 网络中的 {{host}}。请在这台 {{device}} 上打开 Tailscale，连接后重试。",
+    "unreachableHere": "这台 {{device}} 上的 {{host}} 没有响应。请先在这里启动 agentes.chat，然后重试。",
+    "certificate": "{{host}} 的证书无效。请联系服务器的管理者。",
+    "notAgentes": "{{host}} 不是 agentes.chat 服务器。请检查地址。",
+    "serverTooOld": "{{host}} 需要更新才能配合此应用使用。",
+    "appTooOld": "请更新应用以使用 {{host}}。"
   },
   "here": {
     "title": "在这台 {{device}} 上运行 agentes.chat",
@@ -240,6 +244,7 @@
       "back": "关闭来自你设备的访问后，这台 {{device}} 上的 agentes.chat 没有再次响应。"
     },
     "serveFix": "请从 tailscale.com 安装 Tailscale。",
+    "connectTray": "从时钟旁的图标连接它。",
     "operatorRun": "请在终端中授予一次该权限：",
     "turnOn": "开启",
     "copyDetails": "复制详细信息",
@@ -248,14 +253,13 @@
     "notifyFailedBody": "打开 agentes.chat 查看发生了什么。",
     "already": "agentes.chat 已安装在这台 {{device}} 上",
     "alreadyText": "它通过终端安装，独立运行。在这个应用中使用它。",
+    "alreadyDocker": "它通过 Docker 安装，独立运行。在这个应用中使用它。",
     "useIt": "使用它",
     "notRunning": "agentes.chat 已安装在这台 {{device}} 上，但没有运行",
     "notRunningText": "它通过终端安装在 {{path}} 中。要启动它，请在终端中运行下面的命令，然后重试：",
     "running": "agentes.chat 已在这台 {{device}} 上运行",
     "runningText": "这个应用正在运行它。打开它来登录。",
-    "openIt": "打开它",
-    "connectTray": "从时钟旁的图标连接它。",
-    "alreadyDocker": "它通过 Docker 安装，独立运行。在这个应用中使用它。"
+    "openIt": "打开它"
   },
   "link": {
     "question": "将应用连接到此服务器？",
@@ -293,13 +297,13 @@
     "removed": "{{host}} 已从此应用中移除",
     "workspaces_other": "{{count}} 个工作区",
     "signedOut": "未登录",
-    "newsOne": "1 条新通知",
-    "newsMany": "{{n}} 条新通知",
     "offline": "自 {{time}} 起离线",
     "signIn": "登录",
     "signOut": "退出此服务器",
     "signedOutDone": "你已退出 {{host}}",
-    "removeFromApp": "从此应用中移除"
+    "removeFromApp": "从此应用中移除",
+    "newsOne": "1 条新通知",
+    "newsMany": "{{n}} 条新通知"
   },
   "server": {
     "title": "这台 {{device}} 上的 agentes.chat",
@@ -308,8 +312,10 @@
     "stopped": "已停止",
     "updating": "正在更新",
     "failing": "无法启动",
+    "restarting": "正在重启",
     "onlyHere": "运行中 · 仅限这台 {{device}}",
     "onTailnet": "运行中 · 在你的 Tailscale 网络上",
+    "tailnetDown": "运行中 · 这台 {{device}} 上的 Tailscale 未连接",
     "address": "地址",
     "data": "数据",
     "phone": "在你的手机上",
@@ -331,20 +337,6 @@
     "stopHereTitle": "停止这台 {{device}} 上的 agentes.chat？",
     "stopHereBody": "它会立即停止，并且不再随应用启动。数据保留在 {{path}} 中。",
     "stopHereConfirm": "停止",
-    "notHere": "未在这里运行。数据仍在 {{path}} 中。",
-    "startHere": "在这里启动",
-    "stoppedBanner": "agentes.chat 已在这台 {{device}} 上停止",
-    "stoppedBody": "在它重新启动之前，任何人都无法使用。",
-    "failingBanner": "agentes.chat 无法在这台 {{device}} 上启动",
-    "version": "版本 {{version}}，随应用更新",
-    "updatesWithApp": "更新应用时，这台 {{device}} 上的 agentes.chat 也会一并更新。",
-    "updateBack": "更新没有启动。agentes.chat 已回到 {{version}}。",
-    "restarting": "正在重启",
-    "tailnetDown": "运行中 · 这台 {{device}} 上的 Tailscale 未连接",
-    "failingBody": "打开应用查看发生了什么，然后重试。",
-    "restartedBanner": "agentes.chat 在这台 {{device}} 上重启了 3 次",
-    "restartedBody": "它会自己恢复。如果一直这样，打开应用查看原因。",
-    "updateBackBody": "新版本会在应用下次更新时再次尝试。",
     "stopFor1h": "停止 1 小时",
     "startNow": "立即启动",
     "stopUntilStart": "停止，直到我启动",
@@ -361,13 +353,39 @@
     "failingWhy": "详细信息说明了原因：复制给帮助你的人，或查看日志。",
     "showLogs": "显示日志",
     "help": "帮助",
-    "gotIt": "知道了"
+    "gotIt": "知道了",
+    "notHere": "未在这里运行。数据仍在 {{path}} 中。",
+    "startHere": "在这里启动",
+    "stoppedBanner": "agentes.chat 已在这台 {{device}} 上停止",
+    "stoppedBody": "在它重新启动之前，任何人都无法使用。",
+    "failingBanner": "agentes.chat 无法在这台 {{device}} 上启动",
+    "failingBody": "打开应用查看发生了什么，然后重试。",
+    "restartedBanner": "agentes.chat 在这台 {{device}} 上重启了 3 次",
+    "restartedBody": "它会自己恢复。如果一直这样，打开应用查看原因。",
+    "version": "版本 {{version}}，随应用更新",
+    "updatesWithApp": "更新应用时，这台 {{device}} 上的 agentes.chat 也会一并更新。",
+    "updateBack": "更新没有启动。agentes.chat 已回到 {{version}}。",
+    "updateBackBody": "新版本会在应用下次更新时再次尝试。"
   },
   "pair": {
     "title": "允许 {{org}} 的智能体在这台 {{device}} 上工作？",
     "body": "由 {{host}} 发起请求。它们开始时无法访问你的任何文件夹，命令也处于关闭状态。",
     "allow": "允许",
-    "notNow": "以后再说"
+    "notNow": "以后再说",
+    "offerTitle": "允许 {{org}} 的智能体使用这台 {{device}}？",
+    "offerBody": "它们开始时无法访问你的任何文件夹，命令也是关闭的。你可以在偏好设置中选择给它们什么，并随时停止它们。",
+    "keepReady": "保持就绪：登录时打开 agentes.chat",
+    "linkTitle": "将这台 {{device}} 连接到 {{org}}？",
+    "askedBy": "请求人",
+    "from": "来自",
+    "linkBody": "{{org}} 的智能体开始时无法访问你的任何文件夹，命令也是关闭的。如果不是你发起的请求，请选择“以后再说”。",
+    "waiting": "正在等待 {{by}} 允许加入…",
+    "done": "已连接到 {{org}}",
+    "expired": "此链接已过期。请在“设置 › 设备”中新建一个。",
+    "denied": "{{by}} 没有允许加入。什么都没有改变。",
+    "letOrg": "允许 {{org}} 的智能体使用这台 {{device}}",
+    "canUse": "智能体可以使用",
+    "notUsing": "该工作区的智能体不使用这台 {{device}}"
   },
   "tools": {
     "claudeName": "Claude Code",
@@ -444,7 +462,6 @@
     },
     "thisMac": {
       "agents": "智能体",
-      "letAgents": "允许智能体使用这台 {{device}}",
       "letAgentsDesc": "应用打开时，智能体会在需要时使用这台 {{device}}。",
       "commandsDesc": "测试、构建和其他终端命令。它们以 {{user}} 的身份运行，每条都会显示在“动态”中。",
       "who": "谁可以使用",
@@ -734,9 +751,5 @@
     "bringAllToFront": "全部置于顶层",
     "help": "帮助",
     "downloaded": "下载完成"
-  },
-  "windowTitle": {
-    "welcome": "欢迎",
-    "prefs": "偏好设置"
   }
 }

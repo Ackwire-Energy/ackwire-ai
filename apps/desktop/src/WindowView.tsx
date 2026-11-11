@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost } from "./app";
 import { IPHONE_SETUP_PREF } from "./control/devices";
+import { PAIR_OFFER_PREF, type PairTarget, targetKey } from "./control/pair";
 import { readPref, useOnShown, writePref } from "./hooks";
 import type { WindowName } from "./host/types";
 import { FirstRun } from "./windows/FirstRun";
 import { IphoneSetup } from "./windows/IphoneSetup";
 import { Notch } from "./windows/Notch";
+import { PairOffer } from "./windows/Pair";
 import { Popover } from "./windows/Popover";
 import { Prefs } from "./windows/Prefs";
 
@@ -22,20 +24,45 @@ export function WindowView({ name }: { name: WindowName }) {
   return <Popover />;
 }
 
-/** Preferences asked for the iPhone setup (`IPHONE_SETUP_PREF`, cleared once it shows): there, else the first run. */
+/**
+ * Preferences asked for the iPhone setup (`IPHONE_SETUP_PREF`), or the popover offers this computer to a workspace
+ * (`PAIR_OFFER_PREF`), each cleared once it shows: there, else the first run.
+ */
 function Welcome() {
   const host = useHost();
   const [iphone, setIphone] = useState(() => readPref(IPHONE_SETUP_PREF, false));
+  const [offer, setOffer] = useState(() => readPref<PairTarget | null>(PAIR_OFFER_PREF, null));
   useEffect(() => {
     if (iphone) writePref(IPHONE_SETUP_PREF, false);
   }, [iphone]);
+  useEffect(() => {
+    if (offer) writePref(PAIR_OFFER_PREF, null);
+  }, [offer]);
   // Cleared here too: asked again while it already shows, the state doesn't change and the effect wouldn't run.
   useOnShown("welcome", () => {
+    const asked = readPref<PairTarget | null>(PAIR_OFFER_PREF, null);
+    if (asked) {
+      writePref(PAIR_OFFER_PREF, null);
+      setOffer(asked);
+    }
     if (!readPref(IPHONE_SETUP_PREF, false)) return;
     writePref(IPHONE_SETUP_PREF, false);
     setIphone(true);
   });
-  return iphone ? <IphoneSetup onClose={() => void host.hideWindow("welcome").catch(() => {})} /> : <FirstRun />;
+  const hide = () => void host.hideWindow("welcome").catch(() => {});
+  if (iphone) return <IphoneSetup onClose={hide} />;
+  if (offer)
+    return (
+      <PairOffer
+        key={targetKey(offer)}
+        target={offer}
+        onClose={() => {
+          setOffer(null);
+          hide();
+        }}
+      />
+    );
+  return <FirstRun />;
 }
 
 /** A window that broke while drawing (main.tsx's boundary): what happened, and drawn again from the start. */

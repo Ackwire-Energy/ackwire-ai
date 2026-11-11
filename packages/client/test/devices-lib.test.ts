@@ -15,6 +15,7 @@ import {
   linkPhase,
   mayTakePhone,
   narrowsAudience,
+  newComputerOf,
   phoneCloseState,
   phoneScreenCover,
   phoneScreenUrl,
@@ -153,6 +154,17 @@ describe("connect links", () => {
     expect(linkPhase({ status: "waiting" }, expiresAt, NOW.getTime() + 61_000)).toBe("expired");
     // A computer already asking keeps asking past the link's own time.
     expect(linkPhase({ status: "asking" }, expiresAt, NOW.getTime() + 61_000)).toBe("asking");
+  });
+
+  test("another computer from the app: the person's first one that wasn't there when the screen opened", () => {
+    const list = [computer({ id: "old" }), computer({ id: "ana", ownerUserId: "u-ana" })];
+    const known = new Set(list.map((d) => d.id));
+    expect(newComputerOf(list, known, "u-sam")).toBeUndefined();
+    list.push(computer({ id: "theirs", ownerUserId: "u-ana" }));
+    expect(newComputerOf(list, known, "u-sam")).toBeUndefined();
+    list.push(computer({ id: "mine" }));
+    expect(newComputerOf(list, known, "u-sam")?.id).toBe("mine");
+    expect(newComputerOf(list, known, undefined)).toBeUndefined();
   });
 });
 

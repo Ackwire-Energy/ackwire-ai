@@ -191,8 +191,15 @@ describe("the frame mermaid draws in", () => {
 
   test("a frame that doesn't answer in time is thrown away, and the next drawing gets a fresh one", async () => {
     const stuck = drawWithMermaid("stuck", FLOW, false, 30);
+    // Watched before anything else is awaited: on a busy machine the 30 ms end before the frame is ready, and a
+    // rejection nobody watches yet fails the test as an unhandled error. A plain handler, not `expect().rejects`:
+    // that one waits for the promise where it is written, and this one settles only once the frame below loads.
+    const failed = stuck.then(
+      () => null,
+      (error: Error) => error,
+    );
     const first = await readyFrame();
-    await expect(stuck).rejects.toThrow("didn't finish");
+    expect((await failed)?.message).toContain("didn't finish");
     expect(first.removed).toBe(true);
     const next = drawWithMermaid("next", FLOW, false, 1000);
     expect(frames).toHaveLength(2);
@@ -765,13 +772,14 @@ describe("inside the frame, mermaid-frame.js", () => {
   });
 
   // Safari, Firefox and the desktop app draw on the page's thread. Past the page's bounds each family below held WebKit
-  // or Firefox for seconds, and at them mermaid answers in a moment.
+  // or Firefox for seconds, and at them mermaid answers in a moment. The limit leaves room for a machine whose cores
+  // are all running other test files (1.09 s measured there for a source that takes a fraction of that alone).
   const repeated = (header: string, line: string, count: number) => `${header}\n${Array(count).fill(line).join("\n")}`;
   async function answersQuickly(source: string) {
     expect(mermaidDrawable(source)).toBe(true);
     const start = performance.now();
     expect(await frameScript().ask({ id: "bound", source, dark: false })).toBeDefined();
-    expect(performance.now() - start).toBeLessThan(1000);
+    expect(performance.now() - start).toBeLessThan(3000);
   }
 
   test("a source over 5,000 characters or 200 lines stays code, and one at the bounds is answered in a moment", async () => {

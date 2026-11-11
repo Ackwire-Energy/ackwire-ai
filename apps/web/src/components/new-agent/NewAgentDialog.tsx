@@ -1183,7 +1183,7 @@ function NewAgentDialog({
             className="nac__foot"
             note={
               <span className="nac__foot-left">
-                <button type="button" className="ac-link ac-iconline nac__import" onClick={toImport}>
+                <button type="button" className="ac-link nac__import" onClick={toImport}>
                   <Icon name="download" size={16} />
                   {t("newAgentCard.import")}
                 </button>

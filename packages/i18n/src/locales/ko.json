@@ -9124,6 +9124,193 @@
     "notImage": "JPG, PNG, WebP 이미지를 선택하세요.",
     "tooBig": "이미지가 8MB를 넘어요."
   },
+  "portrait": {
+    "ask": {
+      "title": "어떤 모습으로 보이고 싶으세요?",
+      "build": "아바타 만들기",
+      "buildText": "머리, 옷, 액세서리를 골라 나만의 픽셀 초상화를 만들어요.",
+      "photo": "사진 올리기",
+      "photoText": "컴퓨터에서 이미지를 골라 위치를 맞춰요."
+    },
+    "title": "내 아바타",
+    "preview": "내 아바타",
+    "shuffle": "랜덤",
+    "small": "채팅의 작은 크기에서는 얼굴만 보여요.",
+    "photoAsk": "사진이 더 좋으세요?",
+    "photoUpload": "사진 업로드",
+    "saved": "아바타를 업데이트했어요.",
+    "failed": "아바타를 저장하지 못했어요. 다시 시도해 주세요.",
+    "showAll": "모든 옵션 보기",
+    "showFewer": "옵션 줄이기",
+    "beardHint": "수염은 머리 색을 따라가요.",
+    "hatsHint": "야구모자, 비니, 모자, 머리 스카프는 머리를 가려요.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "타입",
+      "m": "남성형",
+      "f": "여성형"
+    },
+    "tabs": {
+      "label": "아바타 부위",
+      "face": "얼굴",
+      "hair": "머리",
+      "beard": "수염",
+      "makeup": "메이크업",
+      "marks": "특징",
+      "accessories": "액세서리",
+      "clothes": "옷",
+      "background": "배경"
+    },
+    "sections": {
+      "skin": "피부 톤",
+      "eyes": "눈 색",
+      "mood": "표정",
+      "color": "색",
+      "hairColor": "머리 색",
+      "clothesColor": "옷 색",
+      "cut": "헤어스타일",
+      "beard": "수염",
+      "lips": "립스틱",
+      "shadow": "아이섀도",
+      "blush": "블러셔",
+      "mark": "특징",
+      "glasses": "안경",
+      "ear": "귀걸이",
+      "neck": "목",
+      "extra": "머리 위",
+      "piece": "아이템",
+      "bg": "배경"
+    },
+    "options": {
+      "mood": {
+        "smile": "미소",
+        "grin": "활짝 웃음",
+        "laugh": "웃음",
+        "calm": "차분함",
+        "wink": "윙크",
+        "wow": "놀람"
+      },
+      "hair": {
+        "none": "민머리",
+        "buzz": "반삭",
+        "short": "짧은 머리",
+        "side": "옆 가르마",
+        "quiff": "리젠트",
+        "curly": "곱슬머리",
+        "afro": "아프로",
+        "bob": "단발",
+        "bangs": "앞머리",
+        "long": "긴 머리",
+        "wavy": "웨이브",
+        "curls": "긴 곱슬",
+        "bun": "올림머리",
+        "pony": "포니테일",
+        "spiky": "스파이크",
+        "mohawk": "모히칸",
+        "braids": "땋은 머리",
+        "pigtails": "양갈래",
+        "crew": "크루컷",
+        "fade": "페이드",
+        "slick": "올백",
+        "flat": "플랫탑",
+        "undercut": "언더컷",
+        "mullet": "멀릿",
+        "dreads": "드레드",
+        "medium": "중간 길이",
+        "receding": "M자 이마"
+      },
+      "beard": {
+        "none": "수염 없음",
+        "stubble": "짧은 수염",
+        "mustache": "콧수염",
+        "goatee": "염소수염",
+        "strap": "턱선 수염",
+        "full": "풍성한 수염",
+        "long": "긴 수염"
+      },
+      "lips": {
+        "none": "립스틱 없음",
+        "nude": "누드",
+        "pink": "핑크",
+        "red": "레드",
+        "wine": "와인",
+        "purple": "퍼플",
+        "black": "블랙"
+      },
+      "shadow": {
+        "none": "아이섀도 없음",
+        "rose": "로즈",
+        "violet": "바이올렛",
+        "blue": "블루",
+        "green": "그린",
+        "gold": "골드",
+        "smoky": "스모키"
+      },
+      "blush": {
+        "soft": "연하게",
+        "strong": "진하게",
+        "none": "블러셔 없음"
+      },
+      "mark": {
+        "none": "없음",
+        "freckles": "주근깨",
+        "mole": "점",
+        "scar": "흉터",
+        "bandaid": "반창고",
+        "piercing": "피어싱"
+      },
+      "glasses": {
+        "none": "안경 없음",
+        "round": "둥근 테",
+        "square": "사각 테",
+        "gold": "금테",
+        "tinted": "틴트 렌즈",
+        "shades": "선글라스"
+      },
+      "ear": {
+        "none": "귀걸이 없음",
+        "studs": "금 스터드",
+        "pearls": "진주",
+        "hoops": "링",
+        "drops": "드롭"
+      },
+      "neck": {
+        "none": "없음",
+        "necklace": "목걸이",
+        "pearls": "진주",
+        "choker": "초커",
+        "bowtie": "나비넥타이",
+        "muffler": "목도리"
+      },
+      "extra": {
+        "none": "없음",
+        "headband": "헤어밴드",
+        "bandana": "반다나",
+        "bow": "리본",
+        "flower": "꽃",
+        "headphones": "헤드폰",
+        "cap": "야구모자",
+        "beanie": "비니",
+        "hat": "모자",
+        "crown": "왕관",
+        "scarf": "머리 스카프"
+      },
+      "clothes": {
+        "tee": "티셔츠",
+        "vneck": "브이넥",
+        "tank": "민소매",
+        "shirt": "셔츠",
+        "suit": "정장",
+        "blazer": "블레이저",
+        "jacket": "재킷",
+        "hoodie": "후드티",
+        "turtle": "터틀넥",
+        "overall": "멜빵바지",
+        "polo": "폴로 셔츠",
+        "dress": "원피스"
+      }
+    }
+  },
   "orgLogo": {
     "label": "로고",
     "add": "로고 업로드",
@@ -12611,10 +12798,26 @@
     },
     "computer": {
       "title": "다른 컴퓨터 연결",
-      "step1": "그 컴퓨터에서 앱을 다운로드하세요:",
-      "step2": "앱을 열고 {{org}}에 로그인하세요.",
-      "step3": "‘에이전트가 이 컴퓨터를 사용하도록 허용’을 켜세요.",
-      "orLine": "또는 터미널에 한 줄 붙여 넣기"
+      "step1": "그 컴퓨터에 agentes.chat 앱을 설치하세요:",
+      "step2": "앱을 열고 내 계정으로 로그인하세요.",
+      "step3": "{{org}}의 에이전트가 사용해도 되는지 물으면 ‘허용’을 클릭하세요.",
+      "shows": "여기에 자동으로 나타나요. 공유하기 전까지는 나만 쓸 수 있어요.",
+      "waiting": "내 컴퓨터를 기다리는 중…",
+      "connected": "연결됨: {{name}}",
+      "orLine": "또는 터미널에 한 줄 붙여 넣기",
+      "noApp": "앱을 설치할 수 없나요? 터미널 한 줄을 사용하세요"
+    },
+    "thisApp": {
+      "text": "agentes.chat 앱이 한 번의 클릭으로 연결하고, 먼저 물어봐요.",
+      "open": "agentes.chat 앱 열기",
+      "browserAsks": "브라우저가 열어도 되는지 물어봐요. ‘열기’를 고르고, 보이면 ‘항상 허용’도 고르세요.",
+      "noApp": "앱이 없나요?",
+      "afterInstall": "설치한 뒤 ‘agentes.chat 앱 열기’를 다시 누르세요. 링크는 한 번만, 10분 동안 작동해요.",
+      "waiting": "이 컴퓨터의 앱을 기다리는 중…",
+      "expired": "이 링크는 만료됐어요.",
+      "again": "새 링크 만들기",
+      "failed": "링크를 만들지 못했어요. 잠시 후 다시 시도하세요.",
+      "server": "서버인가요? 터미널 한 줄을 사용하세요"
     },
     "link": {
       "serverTitle": "서버 연결",
@@ -14301,6 +14504,7 @@
         "settingStatus": "자기 상태를 업데이트했어요",
         "settingReplyStyle": "답변 방식을 조정했어요",
         "sendingFeedback": "피드백 전송을 요청했어요",
+        "offeringFeedback": "문제 보고를 제안했어요",
         "deletingRoutine": "루틴을 삭제했어요",
         "runningRoutine": "루틴을 지금 실행했어요",
         "proposingTeam": "팀을 제안했어요",
@@ -14414,6 +14618,7 @@
       "settingStatus": "자기 상태를 업데이트하는 중",
       "settingReplyStyle": "답변 방식을 조정하는 중",
       "sendingFeedback": "피드백을 준비하는 중",
+      "offeringFeedback": "보고를 준비하는 중",
       "deletingRoutine": "루틴을 삭제하는 중",
       "runningRoutine": "루틴을 지금 실행하는 중",
       "proposingTeam": "팀을 제안하는 중",
@@ -16873,6 +17078,24 @@
     "send": "보내기",
     "thanks": "전달됐어요. 감사합니다.",
     "reply": "모두 읽어요. 답변이 필요하면 {{email}}로 보내 드려요.",
-    "another": "하나 더 보내기"
+    "another": "하나 더 보내기",
+    "offer": {
+      "group": "앱에 대한 보고",
+      "ready": "<b>보고 준비 완료</b>: {{summary}}",
+      "goesCloud": "내 이름으로 agentes.chat 팀에 전달돼요",
+      "goesServer": "내 이름으로 이 서버를 운영하는 사람에게 전달돼요",
+      "see": "보고 보기",
+      "hide": "보고 닫기",
+      "send": "보내기",
+      "notNow": "나중에 하기",
+      "answer": "답변은 내 이메일로 와요.",
+      "sentCloud": "agentes.chat 팀에 <b>보고를 보냈어요</b>",
+      "sentServer": "이 서버를 운영하는 사람에게 <b>보고를 보냈어요</b>",
+      "sentAuto": "<b>묻지 않고 보고를 보냈어요</b>: {{summary}}",
+      "view": "보기",
+      "always": "항상 보내기",
+      "alwaysOn": "이제부터 이런 보고는 묻지 않고 보내요.",
+      "askFirst": "보내기 전에 묻기"
+    }
   }
 }

@@ -30,7 +30,7 @@ pub struct HostSync {
 }
 
 /// This computer's name for the server (Settings › Computers): the Mac's own, else its host name.
-fn computer_name() -> Option<String> {
+pub(crate) fn computer_name() -> Option<String> {
     #[cfg(target_os = "macos")]
     {
         let out = Command::new("scutil").args(["--get", "ComputerName"]).output().ok()?;

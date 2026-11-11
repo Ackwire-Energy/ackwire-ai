@@ -106,7 +106,7 @@ describe("Configurações → Dispositivos, in the app", () => {
     expect(screen().queryByRole("button", { name: "Abrir Pastas" })).toBeNull();
   });
 
-  test("agentes.chat, a server on this computer, Windows: the app says no, and no This Mac shows", async () => {
+  test("a server on this computer: the app says no, and no This Mac shows", async () => {
     const asked = inTheApp({ status: { orgs: [], agentsHere: false }, code: "WXYZ-1234" });
     const api = createFakeApi(seedState());
     await renderApp(`/org/${ORG_ID}/settings/computers`, { api });

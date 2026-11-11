@@ -1,6 +1,6 @@
 {
   "identifier": "prefs",
-  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits, and its devices on its server with the main window's session (`site_fetch`: only those paths).",
+  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits, and its devices on its server with the main window's session (`site_fetch`: only those paths), and pairing this computer with another workspace after the system's own dialog.",
   "windows": ["prefs"],
   "permissions": [
     "core:default",
@@ -37,6 +37,8 @@
     "allow-local-server-backup",
     "allow-local-server-diagnostics",
     "allow-tailscale-status",
-    "allow-tailscale-open"
+    "allow-tailscale-open",
+    "allow-runner-add",
+    "allow-pair-ask"
   ]
 }

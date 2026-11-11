@@ -5,7 +5,7 @@
 - Code: web `components/arrival/*` (`Arrival`, `BetaDialog`, `TeamScene`, `ConnectChoices`, `FeedbackDialog`,
   `FeedbackMark`), `components/ConnectAi.tsx` (`ConnectAiRequest.arrival`), `pages/OnboardingPage.tsx`
   (`?arrival=1`); server `routes/app/feedback.ts` (`POST /api/app/feedback`, `…/feedback/files`, `GET /api/feedback-files/{token}`), `auth.ts` (`auth-config.feedback`);
-  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`), `feedback-tools.ts` (`send_feedback`); config `FEEDBACK_EMAIL`; web
+  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`), `feedback-tools.ts` (`send_feedback`, `offer_feedback`), `feedback-offers.ts` (`decideFeedbackOffer`, `APP_FAULT_HINT`); server `POST …/feedback/offers/{messageId}`; web `components/FeedbackOffer.tsx`, phone `features/chat/FeedbackOffer.tsx`; config `FEEDBACK_EMAIL`; web
   `lib/feedback.ts`, `lib/context-menu.ts` (`setMenuReporter`); table `feedback_files` (migration 0246)
 
 ## Context
@@ -100,6 +100,32 @@ with Postgres alone, and must not need a third-party widget in the apps.
     - A run nobody is behind (a routine's, an agent's own) sends none: the run policy refuses a routine's, and the
       tool refuses any call with no person, or a person who is no longer a member.
     - It counts toward the same ten an hour as the person's form, and one call sends once however often it runs.
+
+12. **An agent offers one when the app itself fails** (added 2026-11-10). `offer_feedback` is the agent's own
+    initiative: one of our own tools broke with an internal error, its browser or desktop crashed, it went in circles
+    on the same app error, or the person complained that something of the app doesn't work and what the agent saw
+    confirms it. Never an outside service's failure, a limit, a missing permission or setting, or the agent's own
+    mistake. It takes the problem in a few words (`summary`) and the report (`text`).
+    - **It sends nothing and holds nothing.** The report rides on the agent's next reply (`meta.feedbackOffer`) as a
+      quiet row under it, of the receipts' family: the problem in a few words, where it goes, "See the report" opening
+      the agent's text inside the row, and Send and Not now. No approval, no run waiting: the agent has already
+      answered. Only the person it goes in the name of sees the row and decides it
+      (`POST /api/app/feedback/offers/{messageId}`), once; decided, its state goes to their other devices
+      (`feedback_offer.updated`). Sent, it is the same email as §11's ("Written by" says the agent wrote it on its own
+      and the person read it and sent it), one per offer, within the same ten an hour. Put away, the row is gone.
+    - **How the agent comes to it.** The tool is among those loaded on demand, under the same words in their label
+      as §11's (the prompt grows by nothing), so a complaint about the app leads the judge to that group. When one of
+      our own tools breaks with an error nobody wrote for the model (`isUnexpectedError`: not a domain error, not a
+      plain `Error` a tool wrote), the Tool Gateway adds one sentence to the result naming the tool (`faultHint`),
+      only where the server takes feedback. A connected app's or an MCP server's failure never gets it.
+    - **Seldom.** One offer a day in a conversation, and none there for a week after the person put one away. A run
+      nobody is behind offers none (the run policy refuses a routine's, the tool any call with no person).
+    - **Always send.** On a sent row the person may choose it (`chatPrefs.feedbackAuto`, theirs alone, per
+      workspace, on every device). From then on the report is queued in the same transaction as the reply it rides
+      on, never before, and the row says it went without asking; opened, it holds "Ask before sending". Past their
+      hour's ten the row asks again.
+    - **Not here yet.** A run that dies before any reply (the server's own error) has no message for the row to ride
+      on, so it offers nothing.
 
 ## Consequences
 

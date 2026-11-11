@@ -102,12 +102,6 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
           // The language this computer shows the app in (ADR 0122): nothing to explain.
           { title: "Language", hint: null, line: null },
           {
-            title: "Open at login",
-            hint: "Agents only use this Mac while the app is open.",
-            switch: "Agents only use this Mac while the app is open.",
-            line: null,
-          },
-          {
             title: "Let me know about messages and requests",
             hint: "Mentions, direct messages and what waits for you, while the app is in the background.",
             switch: "Mentions, direct messages and what waits for you, while the app is in the background.",
@@ -135,6 +129,13 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
             line: null,
           },
         ]);
+        // Open at login closes This Mac's card, where agents use this computer while the app is open.
+        expect(row(el, "Open at login")).toEqual({
+          title: "Open at login",
+          hint: "Agents only use this Mac while the app is open.",
+          switch: "Agents only use this Mac while the app is open.",
+          line: null,
+        });
         // The computer's name and the organizations: no lines that only describe them.
         expect(row(el, "Name")?.line).toBeNull();
         expect(el.textContent).not.toContain("Each one has its own folders and tasks");

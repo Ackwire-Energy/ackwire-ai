@@ -76,6 +76,7 @@ import {
   type DeviceGrant,
   devicePair,
   formatUserCode,
+  LINK_CODE,
   PairingError,
   redeemIssuedCode,
   takeEnrollCode,
@@ -274,7 +275,7 @@ async function pair(p: Parsed): Promise<number> {
     }
   }
   const link = p.flags.has("link") ? (flagString(p, "link") ?? "") : undefined;
-  if (link !== undefined && !/^[A-Za-z0-9-]{4,40}$/.test(link)) {
+  if (link !== undefined && !LINK_CODE.test(link)) {
     return refuse("--link takes the code at the end of the link (like 7KQ2-M9XD)");
   }
   if (link !== undefined && enrollCode) return refuse("--link and --enroll-file each connect this computer: use one");

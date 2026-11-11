@@ -357,6 +357,10 @@ export interface NotificationLatest {
   /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */
   diskUse?: number;
   diskFreeGb?: number;
+  /** `device.join_request`: the computer's system (`darwin`, `windows`, `linux`), address and rough place. */
+  os?: string;
+  ip?: string;
+  location?: string;
   /** `app_created`: how many of each kind (`agent`, `routine`, `skill`, `memory`, `channel`), summed as rows merge. */
   created?: Record<string, number>;
   /** `browser_handoff` still unanswered an hour later (`remindNotifications`): its push says the agent still needs them. */

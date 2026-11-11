@@ -4416,6 +4416,25 @@ export function useCalendarProposal(orgId: string, where: { channelId: string; m
   });
 }
 
+/**
+ * A report about the app an agent offered under its reply (`meta.feedbackOffer`): Send queues it in my name, Not now
+ * puts it away, and the row says so at once (my other devices see it through `feedback_offer.updated`).
+ */
+export function useFeedbackOffer(
+  orgId: string,
+  where: { channelId: string; threadId?: string | null; messageId: string },
+) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: "send" | "dismiss") => api.system.decideFeedbackOffer(orgId, where.messageId, decision),
+    onSuccess: (offer) => {
+      cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ feedbackOffer: offer }));
+      if (where.threadId) void qc.invalidateQueries({ queryKey: keys.thread(orgId, where.channelId, where.threadId) });
+    },
+  });
+}
+
 // ── Agent access (tool tree) ─────────────────────────────────────────────────
 
 /** The agent's tool tree. `retry: false`: a 404 means the backend doesn't have it yet. */

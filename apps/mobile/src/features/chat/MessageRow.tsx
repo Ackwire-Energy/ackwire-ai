@@ -101,6 +101,7 @@ import { secretRequestOf } from "./ask-store";
 import { ChatMedia } from "./ChatMedia";
 import { ConsultPairRow, useRunConsults } from "./ConsultGroup";
 import { ApprovalInline, QuestionCard, ThreadLink } from "./cards";
+import { FeedbackOfferRow } from "./FeedbackOffer";
 import { HandedTaskChips, IssueWorkCard } from "./issue-work";
 import { cacheContinued } from "./live";
 import {
@@ -852,6 +853,7 @@ export const MessageRow = memo(function MessageRow({
             {isAgent ? <HandedTaskChips message={m} /> : null}
             {isAgent ? <TeamChecks message={m} /> : null}
             {isAgent ? <ReachLines message={m} /> : null}
+            {isAgent ? <FeedbackOfferRow message={m} /> : null}
             {isAgent && m.longWork ? <MessageWorkLine message={m} threaded={Boolean(thread)} /> : null}
             {files.length > 0 ? <MessageFiles files={files} /> : null}
             {trails && m.author.id && trails.browser.length > 0 ? (

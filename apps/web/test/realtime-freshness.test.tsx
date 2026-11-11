@@ -126,8 +126,9 @@ describe("a conversation shown again", () => {
     await heard(socket, m);
     await act(async () => socket.drop());
     await go("/org/$orgId/c/$channelId", { channelId: ENG_ID });
-    // No socket yet, so no `subscribed` and no catch-up: only the showing's own read can bring it.
-    expect(sockets.last()).toBe(socket);
+    // No open socket, so no `subscribed` and no catch-up: only the showing's own read can bring it. On a busy
+    // machine the first retry (half a second) may already have made the next socket; nothing opens it here.
+    expect(sockets.last().readyState).not.toBe(1);
     expect(inView(document.body, "mensagem no eng enquanto eu estava no general")).toHaveLength(1);
   });
 

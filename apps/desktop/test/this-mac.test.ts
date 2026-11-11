@@ -119,11 +119,11 @@ test("status on the server here: its own homes point at its loopback address, wh
   });
 });
 
-test("connect: refused where agents can't work here (the Cloud, a server on this computer, Windows)", async () => {
+test("connect: refused where the page says agents can't work here (a server on this computer)", async () => {
   const { store, sent, deps } = setup({});
   store.start();
   await settle();
-  for (const origin of ["https://app.agentes.chat", "http://127.0.0.1:4310"]) {
+  for (const origin of ["http://127.0.0.1:4310", "https://agentes.tail1234.ts.net"]) {
     await expect(answerThisMac(deps, { kind: "connect", orgId: "o1", origin, agentsHere: false })).rejects.toThrow(
       "not_here",
     );
@@ -132,7 +132,14 @@ test("connect: refused where agents can't work here (the Cloud, a server on this
 });
 
 test("connect: pairs with the asking page's own server; the first organization starts with safe tools", async () => {
-  const { store, sent, event, deps } = setup({ h1: paired("o1") });
+  const { store, sent, event, deps: base } = setup({ h1: paired("o1") });
+  let opensAtLogin = false;
+  const deps = {
+    ...base,
+    onPaired: () => {
+      opensAtLogin = true;
+    },
+  };
   store.start();
   await settle();
   const connect = (orgId: string) => answerThisMac(deps, { kind: "connect", orgId, origin: SERVER, agentsHere: true });
@@ -151,6 +158,7 @@ test("connect: pairs with the asking page's own server; the first organization s
     expiresAt: "2026-10-21T20:00:00Z",
   });
   expect(await answer).toEqual({ userCode: "ABCD-EFGH" });
+  expect(opensAtLogin).toBe(false);
 
   // Confirmed on the site, and no other organization here has tools to copy: the browser on, Claude Code on
   // because it was found here, Codex (not found) and commands off.
@@ -164,6 +172,8 @@ test("connect: pairs with the asking page's own server; the first organization s
     ["commands", false],
     ["browser", true],
   ]);
+  // Its agents work while the app runs: it opens at login now.
+  expect(opensAtLogin).toBe(true);
 });
 
 test("connect: a new organization copies the others' tools but never their commands (the dialog said off)", async () => {
