@@ -861,7 +861,7 @@
     "value": "Let agents of {{org}} work on this {{device}}?"
   },
   "pair.body": {
-    "value": "{{host}} asked. They start with no folders of yours and commands off."
+    "value": "{{host}} asked. Agents get commands, the browser and coding tools here. Folders come later, in Preferences."
   },
   "pair.allow": {
     "value": "Allow"
@@ -872,11 +872,14 @@
   "pair.offerTitle": {
     "value": "Let {{org}}'s agents use this {{device}}?"
   },
-  "pair.offerBody": {
-    "value": "They start with no folders of yours and commands off. You pick what they get in Preferences, and you can stop them any time."
-  },
   "pair.keepReady": {
     "value": "Keep it ready: open agentes.chat at login"
+  },
+  "pair.canDo": {
+    "value": "What agents can do here"
+  },
+  "pair.foldersLater": {
+    "value": "No folders of yours yet. Add them later in Preferences › Folders."
   },
   "pair.linkTitle": {
     "value": "Connect this {{device}} to {{org}}?"
@@ -888,7 +891,7 @@
     "value": "From"
   },
   "pair.linkBody": {
-    "value": "{{org}}'s agents start with no folders of yours and commands off. If you didn't ask for this, choose Not now."
+    "value": "If you didn't ask for this, choose Not now."
   },
   "pair.waiting": {
     "value": "Waiting for {{by}} to let it in…"
@@ -910,6 +913,66 @@
   },
   "pair.notUsing": {
     "value": "Its agents don't use this {{device}}"
+  },
+  "prepare.title": {
+    "value": "Get this {{device}} ready"
+  },
+  "prepare.lead": {
+    "value": "Connected to {{org}}. Allow these now so its agents never stop to ask."
+  },
+  "prepare.screen": {
+    "value": "Screen Recording"
+  },
+  "prepare.screenDesc": {
+    "value": "Lets agents take screenshots of this {{device}}."
+  },
+  "prepare.screenAgain": {
+    "value": "macOS asks again about once a month. Choose Allow."
+  },
+  "prepare.disk": {
+    "value": "Full Disk Access"
+  },
+  "prepare.diskDesc": {
+    "value": "Lets agents open your files without macOS asking for each folder."
+  },
+  "prepare.diskHow": {
+    "value": "In Settings, turn on agentes.chat in the list, or add it with +."
+  },
+  "prepare.network": {
+    "value": "Local network (phones over Wi-Fi)"
+  },
+  "prepare.networkDesc": {
+    "value": "Lets agents find and use Android phones on your Wi-Fi."
+  },
+  "prepare.networkHint": {
+    "value": "macOS never tells apps the answer. Open Settings to see it."
+  },
+  "prepare.asked": {
+    "value": "Asked"
+  },
+  "prepare.notAsked": {
+    "value": "Not asked yet"
+  },
+  "prepare.on": {
+    "value": "On"
+  },
+  "prepare.openSettings": {
+    "value": "Open Settings"
+  },
+  "prepare.reopen": {
+    "value": "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here."
+  },
+  "prepare.tookEffect": {
+    "value": "agentes.chat opened again with your changes."
+  },
+  "prepare.skip": {
+    "value": "Skip for now"
+  },
+  "prepare.prefsTitle": {
+    "value": "Permissions"
+  },
+  "prepare.prefsHint": {
+    "value": "macOS may turn these off when the app updates. Turn them on again here."
   },
   "tools.claudeName": {
     "value": "Claude Code"

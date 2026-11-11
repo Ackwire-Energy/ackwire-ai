@@ -8,13 +8,16 @@ const last = (sheet: string, selector: string, property: string) =>
     .filter(([p]) => p === property)
     .at(-1)?.[1];
 
-test("the activity bar's room opens and closes in a glide (from 0, not from auto), still with reduced motion", () => {
+test("the activity bar's room opens and closes in a glide (by its cap, from 0), still with reduced motion", () => {
   const idle = '.channel__composer > .ac-typing:not([data-active="true"])';
-  expect(last(topLevel(css), idle, "height")).toBe("0");
-  expect(last(topLevel(css), '.ac-typing[data-active="true"]', "height")).toBe("28px");
+  expect(last(topLevel(css), idle, "max-height")).toBe("0");
+  // Open, at least its one low line and room for a name on a second (`max-height`, what the glide runs to).
+  expect(last(topLevel(css), '.ac-typing[data-active="true"]', "min-height")).toBe("28px");
+  expect(last(topLevel(css), '.ac-typing[data-active="true"]', "max-height")).toBe("64px");
+  expect(last(topLevel(css), '.ac-typing[data-active="true"]', "height")).toBeUndefined();
   const motion = atRule(css, "@media (prefers-reduced-motion: no-preference)");
   const glide = last(motion, ".channel__composer > .ac-typing", "transition") ?? "";
-  expect(glide).toContain("height 180ms");
+  expect(glide).toContain("max-height 180ms");
   expect(glide).toContain("margin 180ms");
   expect(last(topLevel(css), ".channel__composer > .ac-typing", "transition")).toBeUndefined();
 });

@@ -22,65 +22,26 @@ const open = async (state = seedState()) => {
   return { ...r, ev, state };
 };
 
-describe("a streaming answer keeps its spacing", () => {
-  const answer = "Primeiro parágrafo.\n\nSegundo parágrafo.\n\nTerceiro, ainda escrevendo";
-
-  test("settled blocks and the tail share one wrapper: the gap between blocks is the same live and final", () => {
-    const view = render(<MessageBody body={answer} live />);
-    const wrappers = () => view.container.querySelectorAll(".md");
-    expect(wrappers()).toHaveLength(1);
-    const wrapper = wrappers()[0] as HTMLElement;
+describe("a reply shows whole, once", () => {
+  test("its blocks are siblings in one wrapper, drawn once", () => {
+    const view = render(<MessageBody body={"Primeiro parágrafo.\n\nSegundo parágrafo.\n\nTerceiro."} />);
+    const wrappers = view.container.querySelectorAll(".md");
+    expect(wrappers).toHaveLength(1);
+    const wrapper = wrappers[0] as HTMLElement;
     expect(wrapper.classList.contains("md--message")).toBe(true);
-    // Every block is a sibling of the others (the `> * + *` gap applies between the settled ones and the tail).
     expect([...wrapper.children].map((c) => c.tagName)).toEqual(["P", "P", "P"]);
-    expect(wrapper.lastElementChild?.querySelector(".ac-word")).not.toBeNull();
-    expect(wrapper.firstElementChild?.querySelector(".ac-word")).toBeNull();
-    // The final message: the same wrapper element, the same blocks, no fading words.
-    view.rerender(<MessageBody body={answer} />);
-    expect(wrappers()).toHaveLength(1);
-    expect(wrappers()[0]).toBe(wrapper);
-    expect(wrapper.children).toHaveLength(3);
-    expect(wrapper.querySelector(".ac-word")).toBeNull();
-  });
-});
-
-describe("a streaming answer's done paragraphs stay put", () => {
-  test("a paragraph ending (the text ends on a blank line) doesn't redraw the ones above it or fade them in again", () => {
-    const view = render(<MessageBody body={"Um.\n\nDois.\n\nTres"} live />);
-    const blocks = () => [...view.container.querySelectorAll(".md--message > p")];
-    const [um, dois] = blocks();
-    for (const body of ["Um.\n\nDois.\n\nTres.\n\n", "Um.\n\nDois.\n\nTres.\n\nQuatro"]) {
-      view.rerender(<MessageBody body={body} live />);
-      expect(blocks()[0]).toBe(um as Element);
-      expect(blocks()[1]).toBe(dois as Element);
-      expect(um?.querySelector(".ac-word")).toBeNull();
-      expect(dois?.querySelector(".ac-word")).toBeNull();
-    }
   });
 
-  test("the final message keeps every block the live answer drew (not only the wrapper)", () => {
-    const body = "Um.\n\nDois.\n\nTres.\n\nQuatro.";
-    const view = render(<MessageBody body={body} live />);
-    const before = [...view.container.querySelectorAll(".md--message > *")];
-    view.rerender(<MessageBody body={body} />);
-    const after = [...view.container.querySelectorAll(".md--message > *")];
-    expect(after).toHaveLength(4);
-    for (const [i, el] of after.entries()) expect(el).toBe(before[i] as Element);
-    expect(view.container.querySelector(".ac-word")).toBeNull();
-  });
-});
-
-describe("live answer → saved message", () => {
-  test("the text the person was reading stays the same element when the message takes the block's place", async () => {
+  test("while it works nothing of its words shows; its message brings them, once", async () => {
     const { ev } = await open();
     const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
     const body = "O cache do relatório expirou.\n\nVou refazer a consulta";
     await ev({ type: "agent.run", ...ids, status: "running" });
+    await ev({ type: "agent.typing", ...ids });
     await ev({ type: "agent.delta", ...ids, seq: 0, text: body });
     await settle(3);
-    const row = document.querySelector('[data-run-id="r-live"]') as HTMLElement;
-    const text = row.querySelector(".ac-msg__text") as HTMLElement;
-    expect(text.textContent).toBe("O cache do relatório expirou.Vou refazer a consulta");
+    expect(document.querySelector('[data-run-id="r-live"]')).toBeNull();
+    expect(document.body.textContent).not.toContain("cache do relatório");
     await ev({
       type: "message.created",
       messageId: "m-ada",
@@ -101,10 +62,7 @@ describe("live answer → saved message", () => {
       t.textContent?.includes("cache do relatório"),
     );
     expect(shown).toHaveLength(1);
-    expect(shown[0]).toBe(text);
-    expect(text.isConnected).toBe(true);
-    expect(text.querySelector(".ac-word")).toBeNull();
-    expect(text.closest(".ac-msg")?.classList.contains("ac-msg--streaming")).toBe(false);
+    expect(shown[0]?.closest(".ac-msg")?.classList.contains("ac-msg--streaming")).toBe(false);
   });
 });
 

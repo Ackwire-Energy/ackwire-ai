@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { EndedTask, HiddenTasks, ManagedTask, TaskNow, TaskWait } from "../api/types";
 import { type Activity, toolActivity } from "./activity";
-import { etaMinutes } from "./computer-queue";
+import { durationText, etaMinutes } from "./computer-queue";
 import { usageWhenShort } from "./plan-usage";
 import { usageWindowText } from "./usage-pause";
 
@@ -220,6 +220,21 @@ export function taskClock(ms: number): string {
 }
 
 /**
+ * A task's "Tempo": its clock while it works or waits its turn ("6:12", "1:02:10"); waiting, how long it has waited
+ * as people say it ("25 min", "3 h", "3 dias"), since its pause began when the server knows that, else since it
+ * started. A wait of days as a clock ("82:07:59") reads as nothing.
+ */
+export function taskTime(
+  t: TFunction,
+  task: Pick<ManagedTask, "status" | "startedAt" | "createdAt" | "wait">,
+  now: number,
+): string {
+  if (taskState(task) !== "waiting") return taskClock(now - taskSince(task));
+  const since = task.wait?.since ? Date.parse(task.wait.since) : taskSince(task);
+  return durationText(t, Math.max(0, now - since));
+}
+
+/**
  * What a task uses right now ("Usando agora"):
  * - `brain`: a computer brain's turn (Claude Code, Codex, Cursor); `inner` is what it called last through us, if any;
  * - `browser`, `screen`: the agent's own browser or desktop;
@@ -331,6 +346,16 @@ export interface AgentTasks {
   /** What those asked of other agents, still on: it stops with them. */
   helpers: number;
 }
+
+/**
+ * The task an agent's row speaks for, its time beside its state: the one at work, else one waiting on a person, else
+ * one held, else the oldest.
+ */
+export const groupLead = (g: Pick<AgentTasks, "tasks">): ManagedTask =>
+  g.tasks.find((t) => taskState(t) === "working") ??
+  g.tasks.find((t) => waitsOnPerson(t)) ??
+  g.tasks.find((t) => taskState(t) === "waiting") ??
+  (g.tasks[0] as ManagedTask);
 
 /** How many runs these tasks asked of other agents, still on. */
 export const helpersOf = (tasks: readonly Pick<ManagedTask, "helpers">[]) =>

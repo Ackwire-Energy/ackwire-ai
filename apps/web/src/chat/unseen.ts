@@ -41,8 +41,8 @@ export function firstNewKey(items: TimelineItem[], previousLastKey: string | und
 
 /**
  * The reply highest up of these runs, whose blocks just went (`lastByRun`: each run's last message), that wasn't among
- * the rows before (`before`, their keys): it took its block's place, where its first words showed, so it can land above
- * rows that came after it. A run that ended with nothing more to say leaves its earlier message, already read. Null
+ * the rows before (`before`, their keys): placed before its post (`PLACE_KEPT_MS`), it can land above rows that came
+ * after it. A run that ended with nothing more to say leaves its earlier message, already read. Null
  * when none is here.
  */
 export function landedKey(

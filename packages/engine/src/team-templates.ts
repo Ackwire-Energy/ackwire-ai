@@ -12,12 +12,12 @@ import { firstName } from "./format";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
+import { personLocale } from "./requester";
 import { billingHold, TEAM_HELLO_JOB } from "./standing";
 import {
   channelPlaces,
   checkTeam,
   createTeam,
-  personLocale,
   postTeamCard,
   rightHandDm,
   type TeamDeps,

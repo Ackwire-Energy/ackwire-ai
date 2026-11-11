@@ -1,5 +1,5 @@
 import { useConfirmDevice, useMe } from "@agenteschat/client";
-import { Button } from "@agenteschat/ui";
+import { Button, SettingNote } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -148,6 +148,19 @@ export function OpenPrefsButton({ tab, children }: { tab: "folders" | "tools" | 
     >
       {children}
     </Button>
+  );
+}
+
+/** A tool switched off in this very Mac's Preferences, and the way there to turn it on. */
+export function ToolsOffHereNote() {
+  const { t } = useTranslation();
+  return (
+    <SettingNote icon="settings">
+      {t("machines.thisMac.toolsOff")}
+      <span style={{ display: "block", marginTop: "var(--space-2)" }}>
+        <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
+      </span>
+    </SettingNote>
   );
 }
 

@@ -165,3 +165,15 @@ export async function cancelWifiPairing(
   const machine = await pairingHost(deps.db, actorId, orgId, machineId);
   await deps.hub.call(machine.id, { op: "phone.pair.cancel", pairingId }).catch(() => undefined);
 }
+
+/**
+ * `POST …/computers/{machineId}/phone-looks`: a phone guide waits for a cabled phone, so the computer also looks for
+ * one it has no USB driver for, for the next minute. Anyone who sees the computer may ask: it only reads. A computer
+ * offline or too old to look simply doesn't.
+ */
+export async function lookForPhones(deps: Deps, actorId: string, orgId: string, machineId: string): Promise<void> {
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const machine = await getMachine(deps.db, orgId, machineId);
+  if (!machine || machine.kind === "managed") throw new NotFoundError("Device not found", "device.not_found");
+  await deps.hub.call(machine.id, { op: "phone.look" }).catch(() => undefined);
+}

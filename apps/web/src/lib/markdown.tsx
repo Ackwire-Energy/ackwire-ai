@@ -42,65 +42,42 @@ export type EmbedRenderer = (target: string, key: string, block: boolean) => Rea
  */
 export type IdRenderer = (id: string, text: string, key: string, shown?: ReactNode) => ReactNode;
 
-/**
- * A streaming answer's words, each in its own span (keyed by position, so a
- * word already on screen keeps its node and only new ones fade in); spaces
- * stay plain text.
- */
-function wordSpans(text: string, key: string): ReactNode[] {
-  const out: ReactNode[] = [];
-  let i = 0;
-  for (const part of text.split(/(\s+)/)) {
-    if (!part) continue;
-    if (/^\s+$/.test(part)) out.push(part);
-    else
-      out.push(
-        <span key={`${key}-w${i++}`} className="ac-word">
-          {part}
-        </span>,
-      );
-  }
-  return out;
-}
-
-/** Internal ids first (`idRef`, never in words still being written), then `#channel` references, then @mentions. */
+/** Internal ids first (`idRef`), then `#channel` references, then @mentions. */
 function withRefs(
   text: string,
   key: string,
   mention?: MentionRenderer,
-  words?: boolean,
   channel?: ChannelRenderer,
   idRef?: IdRenderer,
 ): ReactNode[] {
-  const parts = idRef && !words ? splitIdRefs(text) : [];
+  const parts = idRef ? splitIdRefs(text) : [];
   if (idRef && parts.some((p) => p.id !== undefined)) {
     return parts.flatMap((part, i) =>
       part.id === undefined
-        ? withRefs(part.text, `${key}-x${i}`, mention, words, channel)
+        ? withRefs(part.text, `${key}-x${i}`, mention, channel)
         : [idRef(part.id, part.text, `${key}-id${i}`)],
     );
   }
-  if (!channel) return withMentions(text, key, mention, words);
+  if (!channel) return withMentions(text, key, mention);
   return splitChannelRefs(text).flatMap((part, i) =>
     part.name === undefined
-      ? withMentions(part.text, `${key}-c${i}`, mention, words)
+      ? withMentions(part.text, `${key}-c${i}`, mention)
       : [channel(part.name, part.text, `${key}-ch${i}`)],
   );
 }
 
-function withMentions(text: string, key: string, mention?: MentionRenderer, words?: boolean): ReactNode[] {
-  const plain = (t: string, k: string) => (words ? wordSpans(t, k) : [t]);
-  if (!mention) return plain(text, key);
+function withMentions(text: string, key: string, mention?: MentionRenderer): ReactNode[] {
+  if (!mention) return [text];
   const out: ReactNode[] = [];
   let last = 0;
   let n = 0;
   for (const m of text.matchAll(MENTION)) {
     const start = (m.index ?? 0) + (m[1]?.length ?? 0);
-    if (start > last) out.push(...plain(text.slice(last, start), `${key}-p${n}`));
+    if (start > last) out.push(text.slice(last, start));
     out.push(mention(m[2] ?? "", `${key}-m${n++}`));
     last = start + 1 + (m[2]?.length ?? 0);
   }
-  if (last < text.length) out.push(...plain(text.slice(last), `${key}-p${n}`));
+  if (last < text.length) out.push(text.slice(last));
   return out;
 }
 
@@ -129,21 +106,19 @@ export function renderInline(
   mention?: MentionRenderer,
   wiki?: WikiLinkRenderer,
   embed?: EmbedRenderer,
-  /** Each plain word in its own `.ac-word` span (a streaming answer's words fade in). */
-  words?: boolean,
   channel?: ChannelRenderer,
-  /** Bare addresses as pills. Off while being written, which would change pill at every letter, and in a link's words. */
-  pills = !words,
+  /** Bare addresses as pills. Off in a link's words. */
+  pills = true,
   idRef?: IdRenderer,
 ): ReactNode[] {
   const out: ReactNode[] = [];
   let rest = text;
   let n = 0;
-  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, words, channel, pills, idRef);
+  const inner = (t: string, k: string) => renderInline(t, k, mention, wiki, embed, channel, pills, idRef);
   while (rest) {
     const m = rest.match(INLINE);
     if (!m || m.index === undefined) {
-      out.push(...withRefs(rest, `${key}-t${n}`, mention, words, channel, idRef));
+      out.push(...withRefs(rest, `${key}-t${n}`, mention, channel, idRef));
       break;
     }
     const tok = m[0];
@@ -154,7 +129,7 @@ export function renderInline(
     // `![[…]]` inside a sentence: the "!" belongs to the embed.
     const isEmbed = Boolean(m[6] && embed && m.index > 0 && rest[m.index - 1] === "!");
     const before = rest.slice(0, isEmbed ? m.index - 1 : m.index);
-    if (before) out.push(...withRefs(before, textKey, mention, words, channel, idRef));
+    if (before) out.push(...withRefs(before, textKey, mention, channel, idRef));
     if (isEmbed && embed) {
       out.push(embed(parseWikiToken(tok).title, k, false));
       rest = rest.slice(m.index + tok.length);
@@ -166,7 +141,7 @@ export function renderInline(
           {tok.slice(1, -1)}
         </code>
       );
-      const id = idRef && !words ? loneIdRef(tok.slice(1, -1)) : null;
+      const id = idRef ? loneIdRef(tok.slice(1, -1)) : null;
       out.push(id && idRef ? idRef(id, tok.slice(1, -1), k, code) : code);
     } else if (m[2]) out.push(<strong key={k}>{inner(tok.slice(2, -2), k)}</strong>);
     else if (m[3]) out.push(<em key={k}>{inner(tok.slice(1, -1), k)}</em>);
@@ -175,7 +150,7 @@ export function renderInline(
       const parts = tok.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
       const href = parts?.[2] ?? "";
       const label = parts?.[1] ?? "";
-      const own = renderInline(label, k, mention, wiki, undefined, undefined, undefined, false);
+      const own = renderInline(label, k, mention, wiki, undefined, undefined, false);
       out.push(SAFE_URL.test(href) ? link(href, k, own, pills && label === href) : tok);
     } else if (m[6]) {
       const { title, label } = parseWikiToken(tok);
@@ -200,7 +175,7 @@ export function renderInline(
  */
 export function inlineWords(words: ReactNode, key = "w"): ReactNode {
   return typeof words === "string"
-    ? renderInline(words, key, undefined, undefined, undefined, false, undefined, false)
+    ? renderInline(words, key, undefined, undefined, undefined, undefined, false)
     : words;
 }
 
@@ -236,16 +211,11 @@ export interface MarkdownProps {
   idRef?: IdRenderer;
   /** Skip a leading `# Title` equal to this (the page shows the title itself). */
   title?: string;
-  /** Plain words in `.ac-word` spans: a streaming answer's newest block, whose words fade in. */
-  words?: boolean;
   /** The first lines of a page (a link's hover card): its ```mermaid blocks stay code, the cut may have split one. */
   excerpt?: boolean;
   /** Added to the wrapper. */
   className?: string;
-  /**
-   * The blocks without a wrapper of their own: a streaming answer draws its settled blocks and its tail inside one
-   * `.md--message`, so the space between blocks is the same while it streams as on the final message.
-   */
+  /** The blocks without a wrapper of their own: a `<details>`'s body, inside its parent's. */
   bare?: boolean;
 }
 
@@ -268,14 +238,13 @@ export function Markdown({
   embed,
   idRef,
   title,
-  words,
   excerpt,
   className,
   bare,
 }: MarkdownProps) {
   const message = variant === "message";
   const inline = (text: string, k: string) =>
-    renderInline(text, k, mention, wikiLink, embed, words, channel, undefined, idRef);
+    renderInline(text, k, mention, wikiLink, embed, channel, undefined, idRef);
   // Parsed once per source (a streaming row re-renders every reveal frame); never mutated.
   const all = useMemo(() => parseMarkdown(source, { breaks: message, details: true }), [source, message]);
   const [first] = all;
@@ -304,12 +273,8 @@ export function Markdown({
         return <p key={k}>{inline(b.text, k)}</p>;
       case "code": {
         const lang = b.lang.toLowerCase();
-        if (lang === "chart") return <ChartOrCode key={k} text={b.text} writing={Boolean(words)} />;
-        // Drawn once its block is done. Only the last block of an answer still being written can grow (an open
-        // fence always runs to the end): it keeps the code, so the diagram isn't drawn again on every word. A
-        // diagram before it stays drawn even when the whole answer is the tail for a frame (it ends on a blank line).
-        if (lang === "mermaid" && !excerpt && !(words && i === parsed.length - 1))
-          return <MermaidOrCode key={k} text={b.text} />;
+        if (lang === "chart") return <ChartOrCode key={k} text={b.text} />;
+        if (lang === "mermaid" && !excerpt) return <MermaidOrCode key={k} text={b.text} />;
         return <CodeBlock key={k} lang={b.lang} text={b.text} />;
       }
       case "list": {
@@ -367,7 +332,6 @@ export function Markdown({
               wikiLink={wikiLink}
               embed={embed}
               idRef={idRef}
-              words={words}
               excerpt={excerpt}
               bare
             />

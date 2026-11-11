@@ -204,6 +204,7 @@ export const OP_ROUTES: Readonly<Record<MachineOp, "machine" | "agent">> = {
   "phone.pair.code": "machine",
   "phone.pair.status": "machine",
   "phone.pair.cancel": "machine",
+  "phone.look": "machine",
 };
 
 type AccessRequestOp = Extract<MachineRequest, { op: "access.request" }>;
@@ -659,6 +660,7 @@ async function routeRequest(ctx: HandlerContext, req: MachineRequest, scope: Req
     if (!ctx.phones) throw new RunnerError("phone_missing", "This computer doesn't reach phones.");
     return ctx.phones.pair(req);
   }
+  if (req.op === "phone.look") return { looking: ctx.phones?.look() ?? false } satisfies MachineReplies["phone.look"];
   if (isPhoneOp(req)) return handlePhone(ctx, req, scope);
   // Each agent works in its own folder: that folder is its workspace.
   if (req.agent) ctx = { ...ctx, workspaceReal: await agentWorkspace(ctx.workspaceReal, req.agent) };

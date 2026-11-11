@@ -10,7 +10,7 @@ import type { Host } from "../host/types";
 import { siteApi } from "./devices";
 import { appServer, homeServer, type ServerWorkspaces } from "./server";
 import { type DesktopStore, isPairedHome, isUnpairedHome, type Snapshot } from "./store";
-import { connect, whenPaired } from "./this-mac";
+import { connect, type PairTools, whenPaired } from "./this-mac";
 
 /** A workspace this computer could work for: offered once after sign-in, and listed in Preferences. */
 export interface PairTarget {
@@ -88,10 +88,17 @@ export function nextOffer(
 
 /**
  * Pairs this computer with `target`'s workspace using the main window's session there: the runner's code, confirmed
- * by the app, and who may use it when that isn't only the person. The person already said yes in the app.
+ * by the app, who may use it when that isn't only the person, and the tools they chose. The person already said yes
+ * in the app.
  */
-export async function pairWithSession(host: Host, store: DesktopStore, target: PairTarget, audience?: DeviceAudience) {
-  const { userCode } = await connect({ store }, target.orgId, target.server);
+export async function pairWithSession(
+  host: Host,
+  store: DesktopStore,
+  target: PairTarget,
+  audience?: DeviceAudience,
+  tools?: Partial<PairTools>,
+) {
+  const { userCode } = await connect({ store, tools }, target.orgId, target.server);
   if (!userCode) return;
   const api = siteApi(host, target.server);
   const machine = await api.machines.confirmDevice(target.orgId, userCode, {});
@@ -103,10 +110,10 @@ export type LinkFailure = "expired" | "denied" | "network" | "internal" | "link_
 
 /**
  * Pairs this computer with a connect link: a home of its own (one left unpaired, or a new one), then the runner asks
- * the server with the link and waits for the link's maker. `done` resolves with the workspace's name, or rejects with
- * a `LinkFailure`; `cancel` stops waiting.
+ * the server with the link and waits for the link's maker; once in, the tools the person chose. `done` resolves with
+ * the workspace's name, or rejects with a `LinkFailure`; `cancel` stops waiting.
  */
-export async function pairWithLink(store: DesktopStore, server: string, code: string) {
+export async function pairWithLink(store: DesktopStore, server: string, code: string, tools: Partial<PairTools> = {}) {
   const homeId = store.getSnapshot().homes.find(isUnpairedHome)?.homeId ?? (await store.addHome());
   let stop = () => {};
   const done = new Promise<string>((resolve, reject) => {
@@ -127,7 +134,7 @@ export async function pairWithLink(store: DesktopStore, server: string, code: st
   });
   // The caller may never look at `done` after a cancel.
   done.catch(() => {});
-  whenPaired(store, homeId);
+  whenPaired(store, homeId, tools);
   try {
     await store.request(homeId, { type: "pair.start", server, link: code });
   } catch (err) {

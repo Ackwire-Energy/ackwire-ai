@@ -188,13 +188,13 @@ The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a
 **Servers** in the app's Preferences (and its menus) switches between instances; each keeps its own
 sign-in.
 
-- **Agents on that Mac or Linux computer:** in the instance's onboarding or **Settings → Computers**,
-  click **Use this Mac** (**Use this computer** on Linux). The app asks first, in its own dialog naming
-  the instance and the organization. Its agents start with no folders of yours and commands off, even
-  when other organizations' agents there have commands on; you choose more in the app's Preferences. On
-  Windows, and with agentes.chat Cloud, the app is only a window onto the workspace and nothing of the
-  computer is used. Nor on the computer that runs the instance: its agents work there through the
-  instance itself (This server as the agents' computer, below), so the app doesn't offer it.
+- **Agents on that computer:** in the instance's onboarding or **Settings → Computers**, click **Use
+  this Mac** (**Use this PC** on Windows, **Use this computer** on Linux). The app asks first, in its
+  own dialog naming the instance and the organization. Its agents start with no folders of yours and
+  commands off, even when other organizations' agents there have commands on; you choose more in the
+  app's Preferences. The app pairs a computer with agentes.chat Cloud the same way. Until you pair it,
+  nothing of the computer is used. The app never offers the computer that runs the instance: its agents
+  work there through the instance itself (This server as the agents' computer, below).
 - **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
   Agent computers below explains it.
 
@@ -204,6 +204,35 @@ your browser or the app's window: the request names the system and, like any req
 another site, carries this instance's address (its `Origin` header) and the browser's IP. The app asks
 agentes.chat for its own updates when it starts and every 6 hours, naming its system and processor (its
 version too, when it installs one). On Linux the AppImage updates itself; a deb downloads the new deb.
+
+</details>
+
+<details>
+<summary><b>Phones for agents</b></summary>
+
+Agents use a phone through a computer you connected (Connect a computer, above): **Settings → Devices
+→ Connect a device**, then **Android phone** or **iPhone**. The steps follow what that computer sees.
+
+- **Android by cable** (recommended): the computer needs Android platform-tools (`adb` on the PATH or
+  in `ANDROID_HOME`, which Android Studio installs). On the phone, turn on Developer options and USB
+  debugging, plug it in, check **Always allow from this computer** and tap **Allow**.
+- **Android over Wi-Fi:** Android 14 or newer with the May 2026 security update, on the same network
+  as the computer, which must find phones over mDNS (`adb mdns check` names its daemon). Only a
+  computer you manage that doesn't run each agent as its own user pairs this way. On the phone, turn
+  on **Developer options › Wireless debugging**, then scan the QR the computer shows from **Pair device
+  with QR code** there, or type what **Pair device with pairing code** shows. Not with the camera: it
+  reads the QR as a Wi-Fi network named `agentes-…`, which doesn't exist, and takes the phone off the
+  computer's Wi-Fi, where it must stay. On a Mac, the agentes.chat app needs **System
+  Settings › Privacy & Security › Local Network**, or the computer never hears the phone. Wireless
+  debugging turns off when the phone restarts.
+- **iPhone through a Mac:** Xcode from the App Store, with an Apple Account added in its **Settings ›
+  Accounts** (a free one is enough: the Mac renews the test helper every 7 days). The Mac downloads the
+  iOS tools, about 8 GB. Then plug the iPhone in, trust the Mac, and turn on Developer Mode and UI
+  Automation. A newer iOS needs an Xcode that knows it: update Xcode when the iPhone updates.
+
+Android's pairing QR aside, the steps show no QR code: one that opens them in the agentes.chat phone
+app waits until the app is in the App Store and Google Play, since until then it would only open the
+web page in the phone's browser.
 
 </details>
 
@@ -1081,7 +1110,9 @@ Install the ones you want on that computer, as the user that runs the runner: Cu
 `curl https://cursor.com/install -fsS | bash` (it lands in `~/.local/bin`, which the runner's PATH must
 include), OpenCode's with `npm install -g opencode-ai@1.19.5`, Grok Build with
 `curl -fsSL https://x.ai/cli/install.sh | bash` (it puts `grok` in `~/.local/bin` too; agents think with it only
-through a Grok account added in Settings, AI and usage, never the computer's own sign-in), Google's Antigravity CLI with
+through a Grok account added in Settings, AI and usage, never the computer's own sign-in; on Linux its sandbox needs
+bubblewrap, `sudo apt install -y bubblewrap`, or Grok Build refuses to start and every turn fails), Google's
+Antigravity CLI with
 `curl -fsSL https://antigravity.google/cli/install.sh | bash` (`agy` in `~/.local/bin`; Gemini accounts sign in on Linux
 computers only, each in a folder of its own, and a personal Google plan used this way is against Google's terms for
 consumer plans: Gemini Enterprise or an API key avoids that). A runner in system mode (each agent

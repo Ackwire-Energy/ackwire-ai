@@ -1,11 +1,11 @@
 import { parseChart } from "@agenteschat/client/lib/chart";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import { memo, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import { Icon, Text, useReducedMotion } from "@/ui";
+import { memo, useMemo, useState } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Icon, Text } from "@/ui";
 import { useColors } from "../shared/hooks";
 import { tapHaptic } from "../shared/parts";
-import { ChartCard, ChartPending } from "./ChartCard";
+import { ChartCard } from "./ChartCard";
 import { CodeCard } from "./CodeCard";
 import { CHAT_TEXT_MAX_SCALE, type Inline, parseBlocks } from "./logic";
 import { useRowLook } from "./look";
@@ -13,13 +13,10 @@ import { Spans, Table } from "./MessageSpans";
 
 /**
  * A message's text: paragraphs, lists, quotes, headings, bold, italic,
- * @mentions and code (mono only for code). While an agent writes, its
- * thin caret blinks at the end, after the words still fading in (`tail`).
+ * @mentions and code (mono only for code).
  */
 export const MessageText = memo(function MessageText({
   body,
-  streaming = false,
-  tail,
   muted = false,
   selectable = true,
   accent,
@@ -29,9 +26,6 @@ export const MessageText = memo(function MessageText({
   small = false,
 }: {
   body: string;
-  streaming?: boolean;
-  /** The newest words, fading in, at the end of the last block (plain text only). */
-  tail?: ReactNode;
   muted?: boolean;
   /**
    * false in chat rows: a long press there opens the message sheet (which has "Copiar texto"), and native
@@ -58,48 +52,20 @@ export const MessageText = memo(function MessageText({
   const sized = small ? null : look.text;
   const line = small ? undefined : (sized ?? styles.line);
   const fit = sized ? { maxFontSizeMultiplier: CHAT_TEXT_MAX_SCALE } : {};
-  const spans = (inline: Inline[]) => (
-    <Spans inline={inline} channelRefs={channelRefs} everyone={everyone} ink={ink} live={streaming} />
-  );
+  const spans = (inline: Inline[]) => <Spans inline={inline} channelRefs={channelRefs} everyone={everyone} ink={ink} />;
   const tone = muted ? "muted" : "ink";
-  const last = blocks.length - 1;
-  const caret =
-    streaming || tail ? (
-      <>
-        {tail}
-        {streaming ? <Caret /> : null}
-      </>
-    ) : null;
   return (
     <View style={styles.wrap}>
       {blocks.map((b, i) => {
-        const end = i === last ? caret : null;
         switch (b.kind) {
           case "code":
-            return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i}>
-                <Fenced lang={b.lang} text={b.text} accent={accent} open={b.open === true} />
-                {/* A block still being written takes no fading tail or caret: its card grows instead. */}
-                {end && !b.open ? (
-                  <Text variant="body" style={line} {...fit}>
-                    {end}
-                  </Text>
-                ) : null}
-              </View>
-            );
+            // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
+            return <Fenced key={i} lang={b.lang} text={b.text} accent={accent} />;
           case "table":
             return (
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
-              <View key={i}>
-                <View style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
-                  <Table header={b.header} rows={b.rows} align={b.align} />
-                </View>
-                {end ? (
-                  <Text variant="body" style={line} {...fit}>
-                    {end}
-                  </Text>
-                ) : null}
+              <View key={i} style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
+                <Table header={b.header} rows={b.rows} align={b.align} />
               </View>
             );
           case "heading":
@@ -107,7 +73,6 @@ export const MessageText = memo(function MessageText({
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant={variant} tone="ink" style={[line, styles.heading, inked]} {...fit}>
                 {spans(b.inline)}
-                {end}
               </Text>
             );
           case "bullet":
@@ -119,7 +84,6 @@ export const MessageText = memo(function MessageText({
                 </Text>
                 <Text variant={variant} tone={tone} style={[line, styles.flex, inked]} {...fit}>
                   {spans(b.inline)}
-                  {end}
                 </Text>
               </View>
             );
@@ -128,11 +92,6 @@ export const MessageText = memo(function MessageText({
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <View key={i} style={ink ? [styles.cut, { backgroundColor: c.bg }] : undefined}>
                 <Details summary={b.summary} body={b.body} muted={muted} accent={accent} channelRefs={channelRefs} />
-                {end ? (
-                  <Text variant="body" style={line} {...fit}>
-                    {end}
-                  </Text>
-                ) : null}
               </View>
             );
           case "quote":
@@ -141,7 +100,6 @@ export const MessageText = memo(function MessageText({
               <View key={i} style={[styles.quote, { borderLeftColor: ink ?? c.line2 ?? c.line }]}>
                 <Text variant={variant} tone="muted" style={[line, inked]} {...fit}>
                   {spans(b.inline)}
-                  {end}
                 </Text>
               </View>
             );
@@ -150,29 +108,19 @@ export const MessageText = memo(function MessageText({
               // biome-ignore lint/suspicious/noArrayIndexKey: the blocks of one text, in order
               <Text key={i} variant={variant} tone={tone} style={[line, inked]} selectable={selectable} {...fit}>
                 {spans(b.inline)}
-                {end}
               </Text>
             );
         }
       })}
-      {blocks.length === 0 && caret ? (
-        <Text variant="body" style={line} {...fit}>
-          {caret}
-        </Text>
-      ) : null}
     </View>
   );
 });
 
-/**
- * A fenced block: a ```chart that reads as one is drawn; one still being written shows "Montando o
- * gráfico…"; anything else is a code card (growing while it is written).
- */
-function Fenced({ lang, text, accent, open }: { lang: string; text: string; accent?: AgentColorName; open: boolean }) {
+/** A fenced block: a ```chart that reads as one is drawn; anything else is a code card. */
+function Fenced({ lang, text, accent }: { lang: string; text: string; accent?: AgentColorName }) {
   const isChart = lang.toLowerCase() === "chart";
-  const chart = useMemo(() => (isChart && !open ? parseChart(text) : null), [isChart, open, text]);
+  const chart = useMemo(() => (isChart ? parseChart(text) : null), [isChart, text]);
   if (chart) return <ChartCard spec={chart} {...(accent ? { accent } : {})} />;
-  if (isChart && open) return <ChartPending {...(accent ? { accent } : {})} />;
   return <CodeCard lang={isChart ? "json" : lang} text={text} />;
 }
 
@@ -226,22 +174,6 @@ function Details({
       ) : null}
     </View>
   );
-}
-
-/** The agent's thin caret while it writes (agent blue: the agent's identity); still with reduce motion. */
-function Caret() {
-  const c = useColors();
-  const reduce = useReducedMotion();
-  const [on, setOn] = useState(true);
-  useEffect(() => {
-    if (reduce) {
-      setOn(true);
-      return;
-    }
-    const timer = setInterval(() => setOn((v) => !v), 500);
-    return () => clearInterval(timer);
-  }, [reduce]);
-  return <RNText style={{ color: c.agent, opacity: on ? 1 : 0 }}>{"\u2009▏"}</RNText>;
 }
 
 const styles = StyleSheet.create({

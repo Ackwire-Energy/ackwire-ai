@@ -31,7 +31,7 @@ export function SidePanel({
   const own = useRef<HTMLElement>(null);
   const ref = panelRef ?? own;
   const scrim = useRef<HTMLButtonElement>(null);
-  useModalSheet(ref, ".thread-panel__scrim, .ac-toasts");
+  useModalSheet(ref, ".thread-panel__scrim");
   useLayoutEffect(() => {
     const panel = ref.current;
     const dim = scrim.current;

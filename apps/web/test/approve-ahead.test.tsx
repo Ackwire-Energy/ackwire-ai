@@ -140,7 +140,10 @@ describe("an action approved ahead, on Aprovações", () => {
     expect(pane.querySelector(".ap-card__ahead")?.textContent).toBe(
       `Aprova uma ação futura: roda sozinha ${WHEN}, sem pedir de novo`,
     );
-    expect(pane.querySelector(".ap-bar__text")?.textContent).toBe(`Aprovar agora vale para ${WHEN}.`);
+    expect(pane.querySelector(".ap-bar p")).toBeNull();
+    expect(pane.querySelector("[data-approve]")?.getAttribute("aria-description")).toBe(
+      `Aprovar agora vale para ${WHEN}.`,
+    );
     expect(pane.textContent).not.toContain("Aprovar roda a ação na hora.");
   });
 

@@ -630,7 +630,7 @@ export async function reconcileChannelRuns(
   runIds?: string[],
 ): Promise<boolean> {
   const live = runsInChannel(store.get().streams, channelId).filter(
-    (r) => !r.provisional && r.status !== "failed" && r.status !== "canceled" && (!runIds || runIds.includes(r.runId)),
+    (r) => !r.provisional && r.status !== "failed" && (!runIds || runIds.includes(r.runId)),
   );
   const askedAt = Date.now();
   const active = await api.agents.activeRuns(orgId, channelId).catch(() => undefined);

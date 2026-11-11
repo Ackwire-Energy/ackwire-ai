@@ -9,6 +9,8 @@
  * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting. A pair link
  * (`agenteschat://pair?server=…&link=ABCDEFGH`) joins Estúdio Norte once its maker lets it in, `HGFEDCBA`'s maker
  * says no, and any other code expired.
+ * `?mac=ready`: Screen Recording and Full Disk Access allowed already (with Local Network asked, Prepare this Mac
+ * is skipped).
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
@@ -33,8 +35,10 @@ import {
   type Tailnet,
 } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
+import type { MacPermission, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspace, ServerWorkspaces } from "../control/server";
+import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_LINKS, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import { createFakeSite, type FakeSite } from "../dev/fake-site";
@@ -74,6 +78,19 @@ export interface FakeHost extends Host {
   readonly site: FakeSite;
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
+  /**
+   * This Mac's permissions: Screen Recording, Full Disk Access, the Local Network prompts raised, the setup kept, the
+   * panes opened.
+   */
+  readonly mac: {
+    screen: boolean;
+    disk: boolean;
+    networkAsks: number;
+    setup: SetupState | null;
+    panes: MacPermission[];
+  };
+  /** The site in the main window asks this computer (ADR 0036): resolves with the popover's reply. */
+  askThisMac(request: ThisMacRequest): Promise<{ ok: boolean; data: unknown }>;
 }
 
 /**
@@ -122,6 +139,8 @@ export function createFakeHost(
     here?: HereOptions;
     someCommands?: boolean;
     welcomeAdd?: boolean;
+    /** Screen Recording and Full Disk Access allowed already (`?mac=ready`). */
+    macReady?: boolean;
   } = {},
 ): FakeHost {
   const runners = new Map<string, FakeRunner>();
@@ -129,6 +148,9 @@ export function createFakeHost(
   const stateListeners = new Set<(c: RunnerStateChange) => void>();
   const shownListeners = new Set<(n: WindowName) => void>();
   const devListeners = new Set<() => void>();
+  const thisMacListeners = new Set<(id: number, request: ThisMacRequest) => void>();
+  const thisMacReplies = new Map<number, (reply: { ok: boolean; data: unknown }) => void>();
+  let thisMacAsked = 0;
   let signIns = 0;
   /** Servers the app signed out of (`signOutServer`): listed with no workspaces. */
   const signedOut = new Set<string>();
@@ -219,7 +241,7 @@ export function createFakeHost(
 
   if (scenario === "selfhost") {
     spawn("a1b2c3d4", acmeSeed());
-    // `?commands=some`: the second organization joined after commands were on, and starts without them.
+    // `?commands=some`: the second organization joined with commands turned off.
     const horizonte = horizonteSeed();
     if (options.someCommands) horizonte.access.tools.commands = false;
     spawn("e5f6a7b8", horizonte);
@@ -387,14 +409,27 @@ export function createFakeHost(
       version,
       os: platform === "mac" ? "macos" : platform,
       arch: platform === "mac" ? "aarch64" : "x86_64",
+      system: platform === "mac" ? "15.5" : null,
     }),
     autostart: async () => autostart,
     setAutostart: async (on) => {
       autostart = on;
     },
-    // No main window in the browser: nobody asks.
-    onThisMac: () => () => {},
-    thisMacReply: async () => {},
+    // No main window in the browser: only tests ask (`askThisMac`).
+    onThisMac: (cb) => {
+      thisMacListeners.add(cb);
+      return () => thisMacListeners.delete(cb);
+    },
+    thisMacReply: async (id, ok, data) => {
+      thisMacReplies.get(id)?.({ ok, data });
+      thisMacReplies.delete(id);
+    },
+    askThisMac: (request) =>
+      new Promise((resolve) => {
+        const id = ++thisMacAsked;
+        thisMacReplies.set(id, resolve);
+        for (const l of thisMacListeners) l(id, request);
+      }),
     // No menu bar in the browser.
     setAppMenu: async () => {},
     onMenuAction: () => () => {},
@@ -555,6 +590,27 @@ export function createFakeHost(
       console.info("[fake] open Tailscale:", page);
     },
     onNewHostHome: () => () => {},
+    // Screen Recording and Full Disk Access take effect once the app opens again, as on a Mac.
+    mac: {
+      screen: options.macReady === true,
+      disk: options.macReady === true,
+      networkAsks: 0,
+      setup: null,
+      panes: [],
+    },
+    screenAccess: async () => platform !== "mac" || host.mac.screen,
+    requestScreenAccess: async () => host.mac.screen,
+    diskAccess: async () => platform !== "mac" || host.mac.disk,
+    askLocalNetwork: async () => {
+      host.mac.networkAsks++;
+    },
+    openPrivacy: async (pane) => {
+      host.mac.panes.push(pane);
+    },
+    setupState: async () => host.mac.setup,
+    setSetupState: async (state) => {
+      host.mac.setup = state && { ...state, resumed: false };
+    },
     onDev: (cb) => {
       devListeners.add(cb);
       return () => devListeners.delete(cb);

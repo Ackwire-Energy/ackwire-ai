@@ -1,5 +1,6 @@
 import type { ReactionCount } from "@agenteschat/client";
 import { useCorrectMessage } from "@agenteschat/client";
+import { formatInt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Dialog, DialogBody, DialogFooter, Field, Locked, Textarea } from "@agenteschat/ui";
 import { type ReactNode, useState } from "react";
@@ -33,7 +34,7 @@ export function MessageFeedback({
   /** The "…" menu (Salvar na wiki, Copiar link, Responder em thread). */
   more?: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { me } = useOrg();
   const reactions = useMessageReactions(messageId, initial, { feedback: true, load: active });
   const [correcting, setCorrecting] = useState(false);
@@ -59,7 +60,7 @@ export function MessageFeedback({
           icon="thumbUp"
           onClick={() => reactions.toggle(UP)}
         >
-          {up.count > 0 && <span className="ac-msg__reaction-count">{up.count}</span>}
+          {up.count > 0 && <span className="ac-msg__reaction-count">{formatInt(i18n.language, up.count)}</span>}
         </Button>
         <Button
           variant="ghost"
@@ -70,7 +71,7 @@ export function MessageFeedback({
           icon="thumbDown"
           onClick={() => reactions.toggle(DOWN)}
         >
-          {down.count > 0 && <span className="ac-msg__reaction-count">{down.count}</span>}
+          {down.count > 0 && <span className="ac-msg__reaction-count">{formatInt(i18n.language, down.count)}</span>}
         </Button>
         <Button
           variant="ghost"

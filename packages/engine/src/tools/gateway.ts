@@ -1,4 +1,5 @@
 import { ASK_AGAIN, commandKind, loneMerge, type MergeDone, PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
+import { startInFlight } from "@agenteschat/adapters/in-flight";
 import { and, desc, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { auditsCall, callSubject, callTitle, recordToolCall, type ToolCallSubject } from "../agent-audit";
 import {
@@ -574,6 +575,7 @@ export function createToolGateway(deps: {
   }
 
   async function outputOf(tool: ToolDefinition, input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutput> {
+    const done = startInFlight(`tool ${tool.name}`, ctx.runId);
     try {
       const output = await tool.execute(input, ctx);
       if (output.outcome) {
@@ -604,6 +606,8 @@ export function createToolGateway(deps: {
         content: `Tool failed: ${tool.external ? wrapExternal(tool.name, message) : message}${hint && `\n${hint}`}`,
         isError: true,
       };
+    } finally {
+      done();
     }
   }
 

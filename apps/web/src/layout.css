@@ -723,6 +723,11 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A personal workspace's top row is you: your name wraps whole there, as at a team's foot. */
+.sidebar__org-button--me .sidebar__org-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .sidebar__org-meta {
   font-size: 12px;
   line-height: 16px;
@@ -857,14 +862,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* A long name wraps whole: never cut to an ellipsis. */
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
   line-height: 22px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Page container */
@@ -1079,15 +1083,16 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
 }
 /* The activity bar takes room only while someone works: no empty band above the composer. Its room opens and closes
    in a short glide, so the messages above (kept at the bottom) move with it instead of jumping its height. */
+/* Its room opens and closes in a glide: by its cap (`max-height`), since a name that wraps makes it taller. */
 .channel__composer > .ac-typing:not([data-active="true"]) {
   min-height: 0;
-  height: 0;
+  max-height: 0;
   margin: 0;
 }
 @media (prefers-reduced-motion: no-preference) {
   .channel__composer > .ac-typing {
     transition:
-      height 180ms ease-out,
+      max-height 180ms ease-out,
       margin 180ms ease-out;
   }
 }
@@ -2482,14 +2487,6 @@ html:not([data-pointer]) .artifact-table__sort:focus-visible {
   background: var(--surface-sunken);
   box-shadow: inset 0 0 0 1px var(--line);
 }
-.chart-card--pending {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 16px;
-  color: var(--faint);
-  font-size: 13.5px;
-}
 /* The title and its buttons (an `.ac-acts`, the last icon on the card's 16px side) in an `.ac-actline`: buttons that
    don't fit beside the title go under it, from its edge. */
 .chart-card__top {
@@ -3389,8 +3386,21 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   width: 280px;
   max-height: var(--radix-dropdown-menu-content-available-height);
 }
+/* Your name and @ start beside your face, the name's capitals at its top, and what the face's height can't hold goes on
+   under it at the menu's width: a face never owns a column, and a long name or @ wraps whole, never past the edge. */
 .profile-menu__head {
-  padding: 10px 10px 8px;
+  display: flow-root;
+  padding: 10px 10px 4px;
+  overflow-wrap: anywhere;
+}
+/* The 4 under the face is the head's: a short name keeps the head's height, a long one clears the presence badge. */
+.profile-menu__head > .ac-face-edit {
+  float: left;
+  margin: 0 12px 4px 0;
+}
+.profile-menu__head > .list-col,
+.profile-menu__head > .list-col > * {
+  display: block;
 }
 .profile-menu__line {
   margin: 0 4px 6px;
@@ -6381,8 +6391,10 @@ html:not([data-pointer]) .photo-drop:focus-visible {
   gap: 14px;
   padding-top: 4px;
 }
+/* Full width, its own height: a block switch grows along its row, and in this column that would be down. */
 .avatar-builder__side .ac-seg {
   align-self: stretch;
+  flex: none;
 }
 .avatar-builder__stage {
   width: 192px;
@@ -7066,14 +7078,15 @@ html:not([data-pointer]) .run-continue:focus-visible {
   margin: -4px 0 0;
   color: var(--ink2);
 }
-/* The activity bar while someone works: one low pill of one width (orbit · faces · words · time | Ver ■), so a
-   turning phrase, a ticking clock or a control coming and going never moves its edge: the words take what the
-   rest leaves and end in "…". Solid: a blur here would redo itself on every frame of the streaming text behind
-   it. */
+/* The activity bar while someone works: one low pill as wide as the composer under it, its edges on the composer's
+   (orbit · faces · words · time | Ver ■), the line that says who works while their words wait for the message: a
+   turning phrase, a ticking clock or a control coming and going never moves its edge, the words take what the rest
+   leaves. One line, unless an agent's name needs a second: a name is never cut. Solid: a blur here would redo itself
+   on every frame of what scrolls behind it. */
 .ac-typing[data-active="true"] {
-  max-width: 440px;
-  height: 28px;
-  padding: 0 8px;
+  min-height: 28px;
+  max-height: 64px;
+  padding: 2px 8px;
   border-radius: var(--radius-full);
   background: var(--glass-solid);
   box-shadow: var(--e1), var(--top);
@@ -8090,6 +8103,14 @@ html:not([data-pointer]) .izoom__stage:focus-visible {
 }
 .phone-code .machine-pair__steps {
   align-self: stretch;
+}
+/* A step's words, then the stores under them, on the same left edge. */
+.phone-code__step {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
 }
 a.machine-row__name:hover {
   text-decoration: underline;
@@ -9705,13 +9726,6 @@ html:not([data-pointer]) .newag__sel .ac-select__trigger:focus-visible {
     animation: none;
     transition: none;
   }
-}
-
-/* "Aprovar sempre": what it covers, on a line of its own after the approval's buttons. */
-.ap-always {
-  order: 1;
-  flex-basis: 100%;
-  margin: 0;
 }
 
 /* Secrets (ADR 0027): the agent page's list. */
@@ -13078,18 +13092,6 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   display: flex;
 }
 
-/* A streaming answer: each word fades in as it is revealed; still with reduced motion. */
-@media (prefers-reduced-motion: no-preference) {
-  .ac-word {
-    animation: ac-word-in 280ms ease-out both;
-  }
-}
-@keyframes ac-word-in {
-  from {
-    opacity: 0;
-  }
-}
-
 /* ── Messages fluidity ── */
 
 /* "Novas": where the unseen messages start; it fades a few seconds after the person got there. */
@@ -13211,37 +13213,28 @@ html:not([data-pointer]) .channel__latest-btn.ac-btn:focus-visible {
 .ac-typing__text + .ac-typing__elapsed:has(+ .ac-typing__also)::before {
   content: "· ";
 }
-/* One agent out of view: its row's step after its name, as wide as its words while the bar has room (cut with "…"
-   only when it runs out), its time, "Ver" and the stop right after it. */
+/* One agent: its name, its step, its time and who types beside it are the bar's own pieces. The name is never cut: it
+   wraps onto a second line when the bar is that narrow. Its step gives way first, down to nothing (the whole step is
+   its tip); then what is typed beside it wraps too, ahead of the stop, never under it. */
+.ac-typing[data-active="true"] .ac-typing__text:has(> .ac-typing__agents > .ac-typing__step),
+.ac-typing__agents:has(> .ac-typing__step) {
+  display: contents;
+}
+.ac-typing__agents:has(> .ac-typing__step) > b {
+  white-space: normal;
+}
 .ac-typing__step {
   display: flex;
-  flex: 0 1 auto;
+  flex: 0 1000 auto;
   min-width: 0;
-  margin-left: 0.3em;
-}
-/* Its step and someone typing beside it ("· Marina digitando…", after its time): the pill widens for both. */
-.ac-typing[data-active="true"][data-wide] {
-  max-width: 640px;
-}
-/* A task's conversation column is a little wider than the bar's one width: there the bar spans its composer, as it
-   does in a thread beside a channel. */
-:is(.ac-details__side, .issue-page__talk) .channel__composer > .ac-typing[data-active="true"] {
-  max-width: none;
 }
 .ac-typing__also {
-  display: flex;
   flex: 0 1 auto;
-  min-width: 0;
   margin-right: auto;
-  white-space: pre;
 }
 .ac-typing__also::before {
   content: "· ";
   color: var(--faint);
-}
-/* The names give way, never what they do. */
-.ac-typing__also > .ac-typing__typers {
-  min-width: 0;
 }
 .ac-typing[data-active="true"] .ac-typing__text:has(+ .ac-typing__also) {
   flex: 0 1 auto;

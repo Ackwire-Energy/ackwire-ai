@@ -59,7 +59,6 @@
     "failed": "Votre choix n'a pas été envoyé. Réessayez."
   },
   "chart": {
-    "pending": "Création du graphique…",
     "table": "Tableau",
     "item": "Élément",
     "share": "Partager",
@@ -391,12 +390,6 @@
     "toLatestNew": "Aller aux derniers messages : {{text}}",
     "stopAgent": "Arrêter {{name}}",
     "offlineWait": "Partira au retour de la connexion",
-    "turn": {
-      "thinking": "réfléchit",
-      "working": "travaille",
-      "writing": "écrit",
-      "stopped": "arrêté"
-    },
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
       "computer": "{{name}} le lira dès qu'il aura l'ordinateur",
@@ -1902,7 +1895,8 @@
       "team_limit": "Supprimez de cet iPhone une app que vous avez créée",
       "helper_untrusted": "Faites confiance à l'app de test sur cet iPhone",
       "booting": "Démarrage en cours",
-      "no_driver": "Windows a besoin du pilote USB de ce téléphone",
+      "no_driver": "Windows a besoin du pilote USB du fabricant du téléphone",
+      "no_driverLinux": "Linux a besoin de règles udev pour ce téléphone",
       "os_too_old": "Le système de ce téléphone est trop ancien",
       "adb_offline": "Débranchez le câble et rebranchez-le",
       "other": "Pas encore prêt"
@@ -2004,12 +1998,11 @@
       "noHost": "Ce téléphone fonctionne via l'un de vos ordinateurs. Connectez-en un d'abord.",
       "hostOffline": "{{host}} est hors ligne. Allumez-le et ouvrez agentes.chat dessus.",
       "step1": "Activez les Options pour les développeurs",
-      "step1Text": "Touchez 7 fois Numéro de build, puis saisissez votre code PIN.",
+      "step1Text": "Touchez 7 fois Numéro de build, puis saisissez votre code PIN. Sur Samsung : Informations sur le logiciel › Numéro de version.",
       "openAbout": "Ouvrir À propos du téléphone",
       "step2": "Activez le Débogage USB",
       "openDev": "Ouvrir Options pour les développeurs",
       "step3": "Branchez-le sur {{host}}",
-      "step3Hint": "Utilisez un câble qui transmet les données, pas un câble de charge seule. Si le téléphone demande à quoi sert l'USB, choisissez Transfert de fichiers.",
       "looking": "Recherche de ce téléphone",
       "step4": "Touchez Autoriser sur ce téléphone",
       "step4Text": "Cochez d'abord Toujours autoriser cet ordinateur.",
@@ -2027,7 +2020,7 @@
       "wifi1": "Activez le Débogage sans fil",
       "wifi1Text": "Cochez Toujours autoriser sur ce réseau, puis touchez Autoriser.",
       "wifi2": "Scannez le code sur un ordinateur",
-      "wifi2Text": "Depuis Débogage sans fil › Associer l'appareil avec un code QR.",
+      "wifi2Text": "Depuis Débogage sans fil › Associer l'appareil avec un code QR. N'utilisez pas l'appareil photo : il lit le code comme un réseau Wi-Fi et sort le téléphone de votre Wi-Fi.",
       "wifi2Hint": "Dans agentes.chat sur un ordinateur, ouvrez Connecter un appareil › Téléphone Android › Par Wi-Fi et choisissez {{host}}.",
       "codeHead": "Associer avec un code d'association",
       "codeNote": "Depuis Débogage sans fil › Associer l'appareil avec un code d'association. Ouvrez Paramètres et agentes.chat côte à côte pour garder le code à l'écran.",
@@ -2257,9 +2250,9 @@
     "anotherLead": "Sur agentes.chat. Vous restez dans {{org}} et pouvez changer à tout moment.",
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
+    "enter": "Entrer dans l'espace de travail",
     "shareMessage": "Rejoignez {{org}} sur agentes.chat : {{url}}",
-    "failed": "Impossible d'enregistrer. Réessayez.",
-    "enter": "Entrer dans l'espace de travail"
+    "failed": "Impossible d'enregistrer. Réessayez."
   },
   "ai": {
     "yourPlan": "Votre abonnement IA",

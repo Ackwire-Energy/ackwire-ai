@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { builtCss, declarations, topLevel } from "./built-css";
 
-test("what ships keeps the bar above the composer one low width: the words take what is left, the clock ticks in place", async () => {
+test("what ships keeps the bar above the composer one low width, the composer's: the words take what is left, the clock ticks in place", async () => {
   const css = topLevel(await builtCss());
   const last = (selector: string, property: string) =>
     declarations(css, selector)
@@ -9,10 +9,14 @@ test("what ships keeps the bar above the composer one low width: the words take 
       .at(-1)?.[1];
   const bar = '.ac-typing[data-active="true"]';
   // One width whatever it says or shows (a turning phrase, the seconds, "Ver" or the stop coming and going): no width
-  // of its own, so it fills the composer, up to 440px.
+  // of its own and no cap, so it fills the composer's column, its edges on the composer's (the channel, a thread in
+  // the panel, a DM, a task's conversation alike).
   expect(last(bar, "width")).toBeUndefined();
-  expect(last(bar, "max-width")).toBe("440px");
-  expect(last(bar, "height")).toBe("28px");
+  expect(last(bar, "max-width")).toBeUndefined();
+  expect(last(".ac-typing", "margin")).toBe("0 0 var(--space-1)");
+  // One low line, a second only for a name that needs it: a name is never cut.
+  expect(last(bar, "min-height")).toBe("28px");
+  expect(last(bar, "height")).toBeUndefined();
   // The words never size it: they take the room left, on one line.
   const words = `${bar} .ac-typing__text`;
   expect(last(words, "display")).toBe("flex");
@@ -29,14 +33,18 @@ test("what ships keeps the bar above the composer one low width: the words take 
   expect(last(".ac-typing .stop-run", "height")).toBe("24px");
   expect(last(".ac-typing__browser.ac-btn", "height")).toBe("24px");
   // An agent's step in the bar is as wide as its words while the bar has room ("planos-concorrentes.md" whole), so
-  // the time and the stop follow them; only a bar out of room cuts it.
+  // the time and the stop follow them; out of room it gives way first, down to nothing.
   expect(last(".ac-typing__step", "max-width")).toBeUndefined();
   expect(last(".ac-typing__step", "min-width")).toBe("0");
-  expect(last(".ac-typing__step", "flex")).toBe("0 auto");
-  // Its step and someone typing beside it: the pill widens for both.
-  expect(last(`${bar}[data-wide]`, "max-width")).toBe("640px");
-  // A task's conversation column: the bar spans its composer, no 440px stop short of the composer's edge.
-  expect(last(`:is(.ac-details__side,.issue-page__talk) .channel__composer>${bar}`, "max-width")).toBe("none");
+  expect(last(".ac-typing__step", "flex")).toBe("0 1000 auto");
+  // One agent: its name, step, time and who types beside it are the bar's own pieces; the name wraps, never cut, and
+  // what is typed beside it wraps ahead of the stop (no box that lets it run on under it).
+  expect(
+    last('.ac-typing[data-active="true"] .ac-typing__text:has(>.ac-typing__agents>.ac-typing__step)', "display"),
+  ).toBe("contents");
+  expect(last(".ac-typing__agents:has(>.ac-typing__step)>b", "white-space")).toBe("normal");
+  expect(last(".ac-typing__also", "white-space")).toBeUndefined();
+  expect(last(".ac-typing__also", "min-width")).toBeUndefined();
   // The clock's figures are all one width (`ac-num`), so the seconds never nudge it.
   expect(last(".ac-num", "font-variant-numeric")).toBe("tabular-nums");
 });

@@ -55,7 +55,6 @@
     "failed": "你的选择没有发送成功。请重试。"
   },
   "chart": {
-    "pending": "正在生成图表…",
     "table": "表格",
     "item": "项目",
     "share": "分享",
@@ -363,12 +362,6 @@
     "toLatestNew": "前往最新消息：{{text}}",
     "stopAgent": "停止 {{name}}",
     "offlineWait": "恢复连接后发送",
-    "turn": {
-      "thinking": "思考中",
-      "working": "工作中",
-      "writing": "撰写中",
-      "stopped": "已停止"
-    },
     "steer": {
       "waiting": "{{name}} 会在下次暂停时读取",
       "computer": "{{name}} 拿到电脑后会阅读",
@@ -1715,7 +1708,8 @@
       "team_limit": "从这台 iPhone 上删除一个你自己构建的 App",
       "helper_untrusted": "在这台 iPhone 上信任测试助手",
       "booting": "正在启动",
-      "no_driver": "Windows 需要这台手机的 USB 驱动",
+      "no_driver": "Windows 需要手机厂商的 USB 驱动",
+      "no_driverLinux": "Linux 需要为这台手机添加 udev 规则",
       "os_too_old": "这台手机的系统太旧",
       "adb_offline": "拔下数据线，再重新插上",
       "other": "还没准备好"
@@ -1815,12 +1809,11 @@
       "noHost": "这台手机需要通过你的一台电脑工作。请先连接一台电脑。",
       "hostOffline": "{{host}} 已离线。请打开它，并在上面打开 agentes.chat。",
       "step1": "打开开发者选项",
-      "step1Text": "点按“版本号”7 次，然后输入你的 PIN 码。",
+      "step1Text": "点按“版本号”7 次，然后输入你的 PIN 码。三星手机：软件信息 › 编译编号。",
       "openAbout": "打开“关于手机”",
       "step2": "打开 USB 调试",
       "openDev": "打开“开发者选项”",
       "step3": "插到 {{host}}",
-      "step3Hint": "请使用能传输数据的数据线，不要用只能充电的线。如果手机询问 USB 的用途，请选择“文件传输”。",
       "looking": "正在查找这台手机",
       "step4": "在这台手机上点按“允许”",
       "step4Text": "先勾选“一律允许使用这台计算机进行调试”。",
@@ -1838,7 +1831,7 @@
       "wifi1": "打开无线调试",
       "wifi1Text": "勾选“一律允许通过此网络进行调试”，然后点按“允许”。",
       "wifi2": "扫描电脑上的二维码",
-      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。",
+      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。不要用相机：它会把二维码当成 Wi-Fi 网络，让手机断开你的 Wi-Fi。",
       "wifi2Hint": "在电脑上的 agentes.chat 中打开 连接设备 › Android 手机 › 通过 Wi-Fi，然后选择 {{host}}。",
       "codeHead": "使用配对码配对",
       "codeNote": "在 无线调试 › 使用配对码配对设备 中查看。请分屏同时打开“设置”和 agentes.chat，让配对码一直显示在屏幕上。",
@@ -2062,9 +2055,9 @@
     "anotherLead": "在 agentes.chat 上创建。你仍留在 {{org}}，随时可以切换。",
     "suggested": "根据你的 {{domain}} 邮箱，我建议用 {{org}}。",
     "create": "创建",
+    "enter": "进入工作区",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
-    "failed": "无法保存，请重试。",
-    "enter": "进入工作区"
+    "failed": "无法保存，请重试。"
   },
   "ai": {
     "yourPlan": "你的 AI 套餐",

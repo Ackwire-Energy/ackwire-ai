@@ -23,7 +23,7 @@ import {
 } from "@agenteschat/client/lib/approval-words";
 import { nextLabel, timeLeft, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { ApprovalCard, Button, cx, EventPillAction, Icon } from "@agenteschat/ui";
+import { ApprovalCard, Button, cx, EventPillAction, Icon, Tip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import { useContext } from "react";
@@ -86,7 +86,7 @@ function waitingFor(t: TFunction, approval: Approval, agent: Agent | undefined, 
 /**
  * "Aprovar sempre" ("Aprovar sempre leituras" for a SQL tool's reads), where the request offers it: approves this one
  * and the agent's next calls of its kind, and with it `also` (the requests of that kind waiting beside it,
- * `approveAlwaysAlso`). The line under it says exactly what that covers and where to undo it.
+ * `approveAlwaysAlso`). Its tip says exactly what that covers and where to undo it: the row holds only buttons.
  */
 export function ApproveAlways({
   approval,
@@ -153,7 +153,7 @@ export function ApproveAlways({
     );
   };
   return (
-    <>
+    <Tip tip={approveAlwaysHint(t, approval, g.name)} look="ac-hint__bubble ac-glass" align="center" button>
       <Button
         size="sm"
         icon="check"
@@ -163,10 +163,7 @@ export function ApproveAlways({
       >
         {approveAlwaysLabel(t, approval)}
       </Button>
-      <p className="small muted ap-always" title={kind?.actions.join(", ") || kind?.tool}>
-        {approveAlwaysHint(t, approval, g.name)}
-      </p>
-    </>
+    </Tip>
   );
 }
 

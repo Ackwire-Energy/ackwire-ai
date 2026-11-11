@@ -1060,6 +1060,38 @@ export const PLAN_USAGE_LIMITS = { windows: 8, label: 40 } as const;
 export type AccountLoginState = "waiting" | "done" | "failed" | "expired";
 
 /**
+ * Why a sign-in ended without signing in (`status`'s `code`, beside `error`), for the apps to say in their own words.
+ * An older runner sends none.
+ */
+export const ACCOUNT_LOGIN_FAILURES = [
+  /** The CLI isn't installed on the computer. */
+  "not_installed",
+  /** The CLI found no terminal to read the pasted code from. */
+  "no_tty",
+  /** The CLI couldn't reach the provider. */
+  "network",
+  /** The provider refused the pasted code: not the page's, already used, or too old. */
+  "bad_code",
+  /** The CLI stopped with an error of its own (its words in `message`). */
+  "cli_exit",
+  /** The CLI finished, but its status says the account isn't signed in (its words in `message`). */
+  "not_signed_in_after_login",
+  /** The CLI finished, but its status didn't answer in time. */
+  "status_unknown",
+  /** `claude setup-token` finished without showing its token. */
+  "no_token",
+  /** It signed in, but the computer couldn't keep the sign-in. */
+  "not_kept",
+  /** Nobody finished it within `ACCOUNT_LOGIN_TTL_MS` (`expired`). */
+  "timeout",
+  /** The person canceled it. */
+  "canceled",
+] as const;
+export type AccountLoginFailure = (typeof ACCOUNT_LOGIN_FAILURES)[number];
+export const isAccountLoginFailure = (v: unknown): v is AccountLoginFailure =>
+  (ACCOUNT_LOGIN_FAILURES as readonly unknown[]).includes(v);
+
+/**
  * `op: "account"` (protocol 13, ADR 0041 §2). `begin` starts the CLI's sign-in
  * in a new folder named `loginId` (it becomes the account id). Claude Code
  * answers the URL it printed and an ephemeral public key; the browser seals the
@@ -2320,6 +2352,12 @@ export type MachineRequest = (
   | { op: "phone.pair.code"; address: string; code: string }
   | { op: "phone.pair.status"; pairingId: string }
   | { op: "phone.pair.cancel"; pairingId: string }
+  /**
+   * A phone guide is open and waits for a phone: for the next minute, a Windows runner also looks for a plugged phone
+   * Windows has no USB driver for (adb never lists one) and reports it as `no_driver`. Older runners answer
+   * `bad_request`, which the server ignores.
+   */
+  | { op: "phone.look" }
 ) & {
   agent?: AgentScope;
   /** Protocol 34: a `browser.*` op in this browser profile's session instead of the agent's (ADR 0110). */
@@ -2390,6 +2428,7 @@ export const MACHINE_OPS: readonly MachineOp[] = [
   "phone.pair.code",
   "phone.pair.status",
   "phone.pair.cancel",
+  "phone.look",
 ];
 
 /** What each op answers with `ok: true`. */
@@ -2429,6 +2468,10 @@ export interface MachineReplies {
     accounts?: RunnerAccountInfo[];
     /** `failed`: why, for people. */
     error?: string;
+    /** `failed` or `expired`: why, as a code (`ACCOUNT_LOGIN_FAILURES`). */
+    code?: AccountLoginFailure;
+    /** With `code`: what the CLI itself said, without tokens or the pasted code, cut at a word. */
+    message?: string;
   };
   /** `cwd`: where it runs, relative to the agent's folder (`.worktrees/<taskId>` with a branch). */
   "task.start": {
@@ -2544,6 +2587,7 @@ export interface MachineReplies {
   "phone.pair.code": PhonePairing;
   "phone.pair.status": PhonePairing;
   "phone.pair.cancel": { canceled: boolean };
+  "phone.look": { looking: boolean };
 }
 
 /** An element numbered on a `browser.capture` image: its ref and box (CSS pixels). */

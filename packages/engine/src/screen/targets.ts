@@ -311,7 +311,10 @@ function closestByWords(words: string, candidates: ScreenElement[]): ScreenEleme
   const terms = normalizeWords(words)
     .split(" ")
     .filter((t) => t.length > 1);
-  const hits = (text: string) => terms.filter((t) => normalizeWords(text).includes(t)).length;
+  const hits = (text: string) => {
+    const said = normalizeWords(text);
+    return terms.filter((t) => said.includes(t)).length;
+  };
   return candidates
     .map((e) => ({
       e,

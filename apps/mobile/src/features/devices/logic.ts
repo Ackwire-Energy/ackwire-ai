@@ -30,10 +30,14 @@ export interface StatusView {
   line: string | null;
 }
 
-/** What a reason code says (`PhoneReason` and the server's own); an unknown one says it isn't ready. */
-export function reasonText(t: TFunction, reason: string | null | undefined): string {
+/**
+ * What a reason code says (`PhoneReason` and the server's own); an unknown one says it isn't ready. `os`: the host's,
+ * since a phone with no driver needs its maker's on Windows and udev rules on Linux.
+ */
+export function reasonText(t: TFunction, reason: string | null | undefined, os?: string | null): string {
   const other = t("mobile.devices.reason.other");
-  return reason ? t(`mobile.devices.reason.${reason}`, { defaultValue: other }) : other;
+  const key = reason === "no_driver" && os && computerKind(os) === "linux" ? "no_driverLinux" : reason;
+  return key ? t(`mobile.devices.reason.${key}`, { defaultValue: other }) : other;
 }
 
 export function statusView(

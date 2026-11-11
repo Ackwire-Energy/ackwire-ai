@@ -59,7 +59,6 @@
     "failed": "Tu elección no se envió. Inténtalo de nuevo."
   },
   "chart": {
-    "pending": "Armando el gráfico…",
     "table": "Tabla",
     "item": "Elemento",
     "share": "Compartir",
@@ -391,12 +390,6 @@
     "toLatestNew": "Ir a los mensajes más recientes: {{text}}",
     "stopAgent": "Detener a {{name}}",
     "offlineWait": "Se envía cuando vuelva la conexión",
-    "turn": {
-      "thinking": "pensando",
-      "working": "trabajando",
-      "writing": "escribiendo",
-      "stopped": "detenido"
-    },
     "steer": {
       "waiting": "{{name}} lo lee en la próxima pausa",
       "computer": "{{name}} lo lee cuando tenga la computadora",
@@ -1902,7 +1895,8 @@
       "team_limit": "Elimina de este iPhone una app que creaste",
       "helper_untrusted": "Confía en la app de pruebas en este iPhone",
       "booting": "Iniciándose",
-      "no_driver": "Windows necesita el controlador USB de este teléfono",
+      "no_driver": "Windows necesita el controlador USB del fabricante del teléfono",
+      "no_driverLinux": "Linux necesita reglas udev para este teléfono",
       "os_too_old": "El sistema de este teléfono es demasiado antiguo",
       "adb_offline": "Desconecta el cable y vuelve a conectarlo",
       "other": "Todavía no está listo"
@@ -2004,12 +1998,11 @@
       "noHost": "Este teléfono funciona a través de una computadora tuya. Conecta una primero.",
       "hostOffline": "{{host}} está sin conexión. Enciéndela y abre agentes.chat ahí.",
       "step1": "Activa las Opciones para desarrolladores",
-      "step1Text": "Toca 7 veces Número de compilación y luego escribe tu PIN.",
+      "step1Text": "Toca 7 veces Número de compilación y luego escribe tu PIN. En Samsung: Información de software › Número de compilación.",
       "openAbout": "Abrir Información del teléfono",
       "step2": "Activa la Depuración por USB",
       "openDev": "Abrir Opciones para desarrolladores",
       "step3": "Conéctalo a {{host}}",
-      "step3Hint": "Usa un cable que transmita datos, no uno que solo cargue. Si el teléfono pregunta para qué es el USB, elige Transferencia de archivos.",
       "looking": "Buscando este teléfono",
       "step4": "Toca Permitir en este teléfono",
       "step4Text": "Primero marca Permitir siempre desde esta computadora.",
@@ -2027,7 +2020,7 @@
       "wifi1": "Activa la Depuración inalámbrica",
       "wifi1Text": "Marca Permitir siempre en esta red y toca Permitir.",
       "wifi2": "Escanea el código en una computadora",
-      "wifi2Text": "Desde Depuración inalámbrica › Vincular dispositivo con código QR.",
+      "wifi2Text": "Desde Depuración inalámbrica › Vincular dispositivo con código QR. No uses la cámara: lee el código como una red Wi-Fi y saca el teléfono de tu Wi-Fi.",
       "wifi2Hint": "En agentes.chat en una computadora, abre Conectar un dispositivo › Teléfono Android › Por Wi-Fi y elige {{host}}.",
       "codeHead": "Vincular con un código de vinculación",
       "codeNote": "Desde Depuración inalámbrica › Vincular dispositivo con código de sincronización. Abre Configuración y agentes.chat en pantalla dividida para que el código siga a la vista.",
@@ -2257,9 +2250,9 @@
     "anotherLead": "En agentes.chat. Sigues en {{org}} y puedes cambiar cuando quieras.",
     "suggested": "Por tu correo de {{domain}}, sugerí {{org}}.",
     "create": "Crear",
+    "enter": "Entrar al espacio de trabajo",
     "shareMessage": "Únete a {{org}} en agentes.chat: {{url}}",
-    "failed": "No se pudo guardar. Inténtalo de nuevo.",
-    "enter": "Entrar al espacio de trabajo"
+    "failed": "No se pudo guardar. Inténtalo de nuevo."
   },
   "ai": {
     "yourPlan": "Tu plan de IA",

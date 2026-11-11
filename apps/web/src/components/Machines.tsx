@@ -59,7 +59,7 @@ import { useOpenComputer } from "@/components/computer/open";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
-import { OpenPrefsButton, useIsThisMac } from "@/components/ThisMac";
+import { OpenPrefsButton, ToolsOffHereNote, useIsThisMac } from "@/components/ThisMac";
 import { useToast } from "@/lib/toast";
 import { BrowserProfilesCard } from "./browser/BrowserProfiles";
 import { MachineBrowserCard } from "./browser/MachineBrowserCard";
@@ -581,17 +581,21 @@ function FoldersCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r:
 /** Ferramentas: on/off chips; the owner can turn one off (never on), except on the workspace's own computer. */
 function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: Reduce) => void }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
+  // The site only turns a tool off. Turning one on happens in this Mac's app (ADR 0036).
+  const here = useIsThisMac(org.id, m.id);
   const access = m.access;
   if (!access) return null;
+  const isOn = (tool: (typeof MACHINE_TOOLS)[number]) =>
+    tool === "cursor" || tool === "opencode" || tool === "grok" || tool === "antigravity"
+      ? (access.tools[tool] ?? access.tools.codex)
+      : access.tools[tool];
   return (
     <Card aria-labelledby="sec-machine-tools">
       <CardHeader id="sec-machine-tools" icon="cog" title={t("machines.access.tools")} />
       <List className="machine-list" aria-label={t("machines.access.tools")}>
         {MACHINE_TOOLS.map((tool) => {
-          const on =
-            tool === "cursor" || tool === "opencode" || tool === "grok" || tool === "antigravity"
-              ? (access.tools[tool] ?? access.tools.codex)
-              : access.tools[tool];
+          const on = isOn(tool);
           const name = t(`machines.access.tool.${tool}`);
           // Commands, on, has a line under its name: the name rises to its tile's top and its state stays on the
           // name's line. A name alone centres on the tile, its state with it.
@@ -630,6 +634,7 @@ function ToolsCard({ machine: m, onReduce }: { machine: Machine; onReduce: (r: R
           );
         })}
       </List>
+      {here && !MACHINE_TOOLS.every(isOn) && <ToolsOffHereNote />}
     </Card>
   );
 }

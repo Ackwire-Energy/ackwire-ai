@@ -214,7 +214,7 @@ describe("a question for one person", () => {
 describe("a question that doesn't say who it is for", () => {
   test("it names the person behind the run and nobody else here: it is theirs", async () => {
     const { bia } = await setupRoom();
-    await say(bia.id, ask({ question: "Qual foi o combinado, Bia." }));
+    await say(bia.id, ask({ question: "Qual foi o combinado, Bia?" }));
     expect((await questions())[0]?.requestedForUserId).toBe(bia.id);
   });
 

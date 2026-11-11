@@ -176,6 +176,9 @@ export function createFakeDevices(
     cancelWifiPairing: async (orgId, machineId, id) => {
       record("devices.cancelWifiPairing", orgId, machineId, id);
     },
+    lookForPhones: async (orgId, machineId) => {
+      record("devices.lookForPhones", orgId, machineId);
+    },
   };
   return {
     client,

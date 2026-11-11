@@ -13,7 +13,7 @@ import type {
   VaultOverview,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
-import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { generateSecretKeyPair } from "../../../packages/adapters/src/secret-box";
 import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -574,8 +574,11 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     const filled = within(code).getAllByRole("textbox") as HTMLInputElement[];
     expect(filled.map((b) => b.value)).toEqual(["4", "8", "2", "1", "0", "7"]);
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
-    await settle(6);
-    expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true);
+    // Sealing the code is WebCrypto, which runs off the JS thread: on a loaded machine it outlasts any number of
+    // ticks, so this waits for the delivery instead of counting them.
+    await waitFor(() => expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true), {
+      timeout: 10_000,
+    });
     expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(false);
   });
 });

@@ -57,7 +57,6 @@
     "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal."
   },
   "chart": {
-    "pending": "Diagramm wird erstellt…",
     "table": "Tabelle",
     "item": "Eintrag",
     "share": "Teilen",
@@ -377,12 +376,6 @@
     "toLatestNew": "Zu den neuesten Nachrichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Wird gesendet, sobald die Verbindung zurück ist",
-    "turn": {
-      "thinking": "denkt nach",
-      "working": "arbeitet",
-      "writing": "schreibt",
-      "stopped": "gestoppt"
-    },
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
       "computer": "{{name}} liest es, sobald der Computer frei ist",
@@ -1811,7 +1804,8 @@
       "team_limit": "Entferne eine selbst erstellte App von diesem iPhone",
       "helper_untrusted": "Vertraue der Test-App auf diesem iPhone",
       "booting": "Startet gerade",
-      "no_driver": "Windows braucht den USB-Treiber dieses Handys",
+      "no_driver": "Windows braucht den USB-Treiber vom Hersteller des Handys",
+      "no_driverLinux": "Linux braucht udev-Regeln für dieses Handy",
       "os_too_old": "Das System dieses Handys ist zu alt",
       "adb_offline": "Zieh das Kabel ab und steck es wieder ein",
       "other": "Noch nicht bereit"
@@ -1912,12 +1906,11 @@
       "noHost": "Dieses Handy arbeitet über einen deiner Computer. Verbinde zuerst einen.",
       "hostOffline": "{{host}} ist offline. Schalte ihn ein und öffne dort agentes.chat.",
       "step1": "Entwickleroptionen aktivieren",
-      "step1Text": "Tippe 7-mal auf Build-Nummer und gib dann deine PIN ein.",
+      "step1Text": "Tippe 7-mal auf Build-Nummer und gib dann deine PIN ein. Bei Samsung: Softwareinformationen › Buildnummer.",
       "openAbout": "Über das Telefon öffnen",
       "step2": "USB-Debugging aktivieren",
       "openDev": "Entwickleroptionen öffnen",
       "step3": "An {{host}} anschließen",
-      "step3Hint": "Nimm ein Kabel, das Daten überträgt, nicht nur eines zum Laden. Wenn das Handy fragt, wofür USB genutzt wird, wähle Dateiübertragung.",
       "looking": "Suche dieses Handy",
       "step4": "Tippe auf diesem Handy auf Zulassen",
       "step4Text": "Setz vorher das Häkchen bei Von diesem Computer immer zulassen.",
@@ -1935,7 +1928,7 @@
       "wifi1": "Debugging über WLAN einschalten",
       "wifi1Text": "Setz das Häkchen bei In diesem Netzwerk immer zulassen und tippe auf Zulassen.",
       "wifi2": "Code auf einem Computer scannen",
-      "wifi2Text": "Unter Debugging über WLAN › Gerät über QR-Code koppeln.",
+      "wifi2Text": "Unter Debugging über WLAN › Gerät über QR-Code koppeln. Nicht die Kamera nutzen: Sie liest den Code als WLAN-Netz und nimmt das Handy aus deinem WLAN.",
       "wifi2Hint": "Öffne agentes.chat auf einem Computer, dann Gerät verbinden › Android-Handy › Über WLAN, und wähle {{host}}.",
       "codeHead": "Mit Kopplungscode koppeln",
       "codeNote": "Unter Debugging über WLAN › Gerät über Kopplungscode koppeln. Öffne Einstellungen und agentes.chat nebeneinander, damit der Code sichtbar bleibt.",
@@ -2163,9 +2156,9 @@
     "anotherLead": "Auf agentes.chat. Du bleibst in {{org}} und kannst jederzeit wechseln.",
     "suggested": "Anhand deiner E-Mail bei {{domain}} habe ich {{org}} vorgeschlagen.",
     "create": "Erstellen",
+    "enter": "Zum Workspace",
     "shareMessage": "Tritt {{org}} auf agentes.chat bei: {{url}}",
-    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal.",
-    "enter": "Zum Workspace"
+    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal."
   },
   "ai": {
     "yourPlan": "Dein KI-Abo",

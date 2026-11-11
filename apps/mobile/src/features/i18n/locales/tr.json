@@ -57,7 +57,6 @@
     "failed": "Seçiminiz gönderilemedi. Tekrar deneyin."
   },
   "chart": {
-    "pending": "Grafik hazırlanıyor…",
     "table": "Tablo",
     "item": "Öğe",
     "share": "Pay",
@@ -377,12 +376,6 @@
     "toLatestNew": "En son mesajlara git: {{text}}",
     "stopAgent": "{{name}} ajanını durdur",
     "offlineWait": "Bağlantı geri gelince gönderilir",
-    "turn": {
-      "thinking": "düşünüyor",
-      "working": "çalışıyor",
-      "writing": "yazıyor",
-      "stopped": "durdu"
-    },
     "steer": {
       "waiting": "{{name}} bir sonraki arada okuyacak",
       "computer": "{{name}} bilgisayarı alınca okuyacak",
@@ -1811,7 +1804,8 @@
       "team_limit": "Kendi oluşturduğunuz bir uygulamayı bu iPhone'dan silin",
       "helper_untrusted": "Bu iPhone'da test yardımcısına güvenin",
       "booting": "Başlatılıyor",
-      "no_driver": "Windows'un bu telefonun USB sürücüsüne ihtiyacı var",
+      "no_driver": "Windows'un telefon üreticisinin USB sürücüsüne ihtiyacı var",
+      "no_driverLinux": "Linux'un bu telefon için udev kurallarına ihtiyacı var",
       "os_too_old": "Bu telefonun sistemi çok eski",
       "adb_offline": "Kabloyu çıkarıp yeniden takın",
       "other": "Henüz hazır değil"
@@ -1912,12 +1906,11 @@
       "noHost": "Bu telefon sizin bir bilgisayarınız üzerinden çalışır. Önce bir bilgisayar bağlayın.",
       "hostOffline": "{{host}} çevrimdışı. Açın ve orada agentes.chat'i açın.",
       "step1": "Geliştirici seçeneklerini açın",
-      "step1Text": "Derleme numarası'na 7 kez dokunun, ardından PIN'inizi girin.",
+      "step1Text": "Derleme numarası'na 7 kez dokunun, ardından PIN'inizi girin. Samsung'da: Yazılım bilgileri › Yapım numarası.",
       "openAbout": "Telefon hakkında'yı aç",
       "step2": "USB hata ayıklamayı açın",
       "openDev": "Geliştirici seçenekleri'ni aç",
       "step3": "{{host}} bilgisayarına takın",
-      "step3Hint": "Yalnızca şarj eden değil, veri aktaran bir kablo kullanın. Telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin.",
       "looking": "Bu telefon aranıyor",
       "step4": "Bu telefonda İzin ver'e dokunun",
       "step4Text": "Önce Bu bilgisayardan her zaman izin ver'i işaretleyin.",
@@ -1935,7 +1928,7 @@
       "wifi1": "Kablosuz hata ayıklamayı açın",
       "wifi1Text": "Bu ağda her zaman izin ver'i işaretleyip İzin ver'e dokunun.",
       "wifi2": "Kodu bir bilgisayarda tarayın",
-      "wifi2Text": "Kablosuz hata ayıklama › Cihazı QR koduyla eşle bölümünden.",
+      "wifi2Text": "Kablosuz hata ayıklama › Cihazı QR koduyla eşle bölümünden. Kamerayı kullanmayın: kodu bir Wi-Fi ağı olarak okur ve telefonu Wi-Fi ağınızdan çıkarır.",
       "wifi2Hint": "Bir bilgisayardaki agentes.chat'te Cihaz bağla › Android telefon › Wi-Fi üzerinden'i açıp {{host}} seçin.",
       "codeHead": "Eşleme koduyla eşle",
       "codeNote": "Kablosuz hata ayıklama › Cihazı eşleme koduyla eşle bölümünden. Kod ekranda kalsın diye Ayarlar'ı ve agentes.chat'i yan yana açın.",
@@ -2163,9 +2156,9 @@
     "anotherLead": "agentes.chat üzerinde. {{org}} çalışma alanında kalırsınız ve istediğiniz zaman geçiş yapabilirsiniz.",
     "suggested": "{{domain}} alan adlı e-postanıza bakarak {{org}} adını önerdim.",
     "create": "Oluştur",
+    "enter": "Çalışma alanına gir",
     "shareMessage": "agentes.chat üzerinde {{org}} çalışma alanına katılın: {{url}}",
-    "failed": "Kaydedilemedi. Tekrar deneyin.",
-    "enter": "Çalışma alanına gir"
+    "failed": "Kaydedilemedi. Tekrar deneyin."
   },
   "ai": {
     "yourPlan": "Yapay zeka planınız",

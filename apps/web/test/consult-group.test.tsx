@@ -487,6 +487,15 @@ describe("the working line while the row shows the questions", () => {
     expect(bar()).toBe("Ada pensando…");
   });
 
+  test("the asker back at work: no row shows its questions until its reply comes, so the line says them", async () => {
+    const { socket } = await open(withAsk([consultation({})]));
+    await push(socket, { type: "agent.thinking", runId: RUN, agentId: ADA_ID });
+    await push(socket, asking);
+    await settle(2);
+    expect(row()).toBeNull();
+    expect(bar()).toBe("Ada está perguntando para Atlas…");
+  });
+
   test("the reply that asked is farther up: the line still says it (the only sign at the bottom)", async () => {
     const { socket } = await open(talkAfter(withAsk([consultation({})]), 3));
     await push(socket, asking);

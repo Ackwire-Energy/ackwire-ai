@@ -69,7 +69,15 @@ import {
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type KeyboardEvent, type PointerEvent, type ReactNode, useEffect, useRef, useState } from "react";
+import {
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactElement,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { AgentAvatar, AgentWho } from "@/components/AgentAvatar";
 import {
@@ -679,7 +687,7 @@ export function expiryText(t: TFunction, a: Pick<Approval, "expiresAt">) {
 }
 
 /** Approve: one click, or a hold for high risk (let go early and nothing happens). */
-export function ApproveButton({ approval, block }: { approval: Approval; block?: boolean }) {
+export function ApproveButton({ approval, block, tip }: { approval: Approval; block?: boolean; tip?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const decide = useDecideApproval(org.id);
@@ -689,6 +697,7 @@ export function ApproveButton({ approval, block }: { approval: Approval; block?:
       high={approvalRisk(approval) === "high"}
       block={block}
       id={approval.id}
+      tip={tip}
       pending={decide.isPending}
       onGo={(el) => {
         // Approved: a burst of the agent's pixels from its avatar.
@@ -699,12 +708,16 @@ export function ApproveButton({ approval, block }: { approval: Approval; block?:
   );
 }
 
-/** The approve button itself: one click, or held for `high` risk; `id` lets A focus it. */
+/**
+ * The approve button itself: one click, or held for `high` risk; `id` lets A focus it. `tip`: what approving does, in
+ * its tip (the bar under a request holds only its buttons).
+ */
 export function HoldToApprove({
   label,
   high,
   block,
   id,
+  tip,
   pending,
   onGo,
 }: {
@@ -712,6 +725,7 @@ export function HoldToApprove({
   high: boolean;
   block?: boolean;
   id: string;
+  tip?: string;
   pending: boolean;
   onGo: (el: HTMLElement) => void;
 }) {
@@ -726,8 +740,16 @@ export function HoldToApprove({
     },
     [],
   );
+  const tipped = (button: ReactElement) =>
+    tip ? (
+      <Tip tip={tip} look="ac-hint__bubble ac-glass" align="center" button>
+        {button}
+      </Tip>
+    ) : (
+      button
+    );
   if (!high)
-    return (
+    return tipped(
       <Button
         variant="primary"
         size="sm"
@@ -739,7 +761,7 @@ export function HoldToApprove({
         onClick={(e) => onGo(e.currentTarget)}
       >
         {label}
-      </Button>
+      </Button>,
     );
   const start = (el: HTMLElement) => {
     if (timer.current || pending) return;
@@ -758,7 +780,7 @@ export function HoldToApprove({
     timer.current = null;
     setHolding(false);
   };
-  return (
+  return tipped(
     <Button
       variant="primary"
       size="sm"
@@ -799,7 +821,7 @@ export function HoldToApprove({
     >
       {/* One label: a shorter one while held would shrink the button out from under the pointer. */}
       {t("approvals.hold")}
-    </Button>
+    </Button>,
   );
 }
 
@@ -1358,9 +1380,9 @@ const PHASE_STATUS: Record<
 };
 
 /**
- * The decision, in one bar: what approving lets the agent do (once, with these values), then Refuse and Approve
- * ("Aprovar sempre" beside them where its kind offers it); refusing opens the reason in its place. Pinned to the
- * bottom of the page's pane; the details dialog's footer elsewhere. Nothing while it isn't yours to decide.
+ * The decision, in one bar of buttons: Refuse and Approve ("Aprovar sempre" before them where its kind offers it), what
+ * each lets the agent do in its tip (Approve: once, with these values); refusing opens the reason in its place. Pinned
+ * to the bottom of the page's pane; the details dialog's footer elsewhere. Nothing while it isn't yours to decide.
  */
 function DecisionBar({
   approval: a,
@@ -1413,10 +1435,7 @@ function DecisionBar({
         ? t("approvals.clickNoteAhead", { when: nextLabel(i18n.language, a.runAt) })
         : t("approvals.review.grants", { name, doing: approvalDoing(t, a, i18n.language) });
   return (
-    <div className={cx("ap-bar", floating && "ap-bar--float")}>
-      <p className="ap-bar__text" title={note}>
-        {note}
-      </p>
+    <div className={cx("ap-bar ap-bar--acts", floating && "ap-bar--float")}>
       <div className="ap-bar__acts">
         <Locked when={deciding}>
           {approveAlwaysOffered(a) && <ApproveAlways approval={a} agent={agent} also={also} />}
@@ -1424,7 +1443,7 @@ function DecisionBar({
             {t("approval.refuse")}
             <Kbd>R</Kbd>
           </Button>
-          <ApproveButton approval={a} />
+          <ApproveButton approval={a} tip={note} />
         </Locked>
       </div>
     </div>
