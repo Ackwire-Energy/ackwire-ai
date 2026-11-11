@@ -10,7 +10,7 @@ import type {
   Tailnet,
 } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
-import type { MacFolder, SetupState } from "../control/permissions";
+import type { MacPermission, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -215,10 +215,12 @@ export interface Host {
   screenAccess(): Promise<boolean>;
   /** macOS: the system's Screen Recording prompt, the first time; it takes effect once the app opens again. */
   requestScreenAccess(): Promise<boolean>;
-  /** Whether the app may read the folder; the first read on a Mac raises the system's prompt and waits for it. */
-  folderAccess(folder: MacFolder): Promise<boolean>;
-  /** System Settings › Privacy & Security on Screen Recording, or on Files and Folders. */
-  openPrivacy(pane: "screen" | "files"): Promise<void>;
+  /** macOS: whether the app has Full Disk Access (asks nothing, and no prompt can ask for it). True elsewhere. */
+  diskAccess(): Promise<boolean>;
+  /** macOS: a short Bonjour browse, which raises the Local Network prompt the first time. Nothing says the answer. */
+  askLocalNetwork(): Promise<void>;
+  /** System Settings › Privacy & Security on the permission's own list. */
+  openPrivacy(pane: MacPermission): Promise<void>;
   /** The setup macOS may quit the app in the middle of, kept until it is finished (`prepare.rs`). */
   setupState(): Promise<SetupState | null>;
   /** Keeps it (with the main window's page, to open there again) or, null, forgets it. */

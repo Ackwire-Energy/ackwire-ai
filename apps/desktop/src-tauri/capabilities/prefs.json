@@ -42,7 +42,8 @@
     "allow-pair-ask",
     "allow-screen-access",
     "allow-screen-request",
-    "allow-folder-access",
+    "allow-disk-access",
+    "allow-network-ask",
     "allow-privacy-open",
     "allow-setup-state-get",
     "allow-setup-state-set"

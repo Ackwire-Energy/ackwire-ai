@@ -679,7 +679,8 @@ pub fn run() {
             cover::cover_details,
             prepare::screen_access,
             prepare::screen_request,
-            prepare::folder_access,
+            prepare::disk_access,
+            prepare::network_ask,
             prepare::privacy_open,
             prepare::setup_state_get,
             prepare::setup_state_set
@@ -781,7 +782,7 @@ pub fn run() {
             deep_link::setup(&handle);
             // Started at login: in the background (the popover, the tray). Opened by hand: the main window on
             // the server open now, or the first run while there is none. Opened again by macOS in the middle of a
-            // setup (Screen Recording's "Quit & Reopen"): the main window on the page it showed, and the setup's
+            // setup (the "Quit & Reopen" after a permission): the main window on the page it showed, and the setup's
             // window over it.
             let at_login = std::env::args().any(|a| a == AUTOSTART_ARG);
             let resume = prepare::resume(&handle, at_login);

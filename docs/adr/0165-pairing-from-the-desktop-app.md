@@ -67,20 +67,26 @@ else, while the app already pairs this computer in one click behind the system's
    whole computer) and gets commands on. The server this app runs here keeps commands off for its own homes
    (ADR 0060), since commands there would reach its own data.
 8. **Prepare this Mac.** On a Mac, right after Allow (or Connect, or the site's This computer), the same window goes on
-   to one step, unless every permission is already on: Screen Recording, and the Desktop, Documents and Downloads
-   folders, each with what it lets agents do, its live state and one button (Allow the first time, which raises the
-   system's prompt, then Open Settings on the right System Settings pane once it was refused). Agents keep taking
-   screenshots with `screencapture` through commands, no screen tool of their own: the runner is the app's child, so
-   the system asks for, and grants to, the app. States are read again whenever the window comes to the front. macOS
-   says whether the screen is allowed without asking; a folder's state comes from reading it, so a folder is only
-   read once it was asked for in this version of the app. Skip for now and Continue both close it, and the pairing
-   never depends on it. Preferences › General › This Mac lists the same rows under Permissions. Windows and Linux skip
-   the step.
-9. **Resume after Quit & Reopen.** Screen Recording applies only once the app opens again, so macOS offers to quit and
-   reopen it. While the step shows, the app keeps it in its data folder (`setup.json`: the step, the workspace, the
-   time and the main window's page). Opened again within 30 minutes, not at login, the app opens the main window on
-   that page and the step over it, with fresh states and a line that Screen Recording took effect; Preferences comes
-   back the same way when the person asked from there. Finishing, skipping or closing the window forgets it;
+   to one step, unless nothing is left to ask: Screen Recording, Full Disk Access and Local Network, each with what it
+   lets agents do, its live state and one button. Agents keep taking screenshots with `screencapture` through
+   commands, no screen tool of their own: the runner is the app's child, so the system asks for, and grants to, the
+   app. Screen Recording's button is Allow the first time (the system's prompt), then Open Settings; its row says macOS
+   asks again about once a month. Full Disk Access replaces per-folder grants (Desktop, Documents, Downloads), whose
+   prompts stopped agents mid-task: no prompt can ask for it, so its button always opens System Settings on its list
+   (`Privacy_AllFiles`) and the row says to turn agentes.chat on there. Its state comes from opening the privacy
+   database (`TCC.db`, the user's or else the system's), which opens only with it and never prompts. Local Network
+   (macOS 15 and later) covers adb, the runner's child, finding and connecting Android phones over Wi-Fi (mDNS and the
+   TCP connect). macOS has no call that reads it: Allow raises its prompt with a short Bonjour browse from the app,
+   then the button opens System Settings (`Privacy_LocalNetwork`), and the row says only "Not asked yet" or "Asked",
+   never On. `Info.plist` names its Bonjour types and keeps the folder usage strings, which still word any folder
+   prompt. States are read again whenever the window comes to the front. Skip for now and Continue both close it, and
+   the pairing never depends on it. Preferences › General › This Mac lists the same rows under Permissions. Windows
+   and Linux skip the step.
+9. **Resume after Quit & Reopen.** Screen Recording and Full Disk Access apply only once the app opens again, so macOS
+   offers to quit and reopen it. While the step shows, the app keeps it in its data folder (`setup.json`: the step,
+   the workspace, the time and the main window's page). Opened again within 30 minutes, not at login, the app opens
+   the main window on that page and the step over it, with fresh states and a line that the changes took effect;
+   Preferences comes back the same way when the person asked from there. Finishing, skipping or closing the window forgets it;
    quitting doesn't.
 
 ## Consequences
@@ -97,5 +103,5 @@ else, while the app already pairs this computer in one click behind the system's
 - Nothing interrupts agents later for a Mac permission the person already gave, and a refused one has its way out in
   the app, never a terminal command.
 - An ad-hoc signed Mac app loses every one of these grants with each update (macOS ties them to the build's
-  signature), and the asked folders are forgotten with the version, so Preferences › This Mac shows them off again
+  signature), and what was asked is forgotten with the version, so Preferences › This Mac shows them off again
   and is where people turn them back on. A Developer ID signature keeps them across updates.

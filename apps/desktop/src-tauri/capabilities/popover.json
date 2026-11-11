@@ -33,6 +33,6 @@
     "allow-local-server-diagnostics",
     "allow-local-server-sync",
     "allow-screen-access",
-    "allow-folder-access"
+    "allow-disk-access"
   ]
 }

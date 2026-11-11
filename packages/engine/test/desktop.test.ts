@@ -805,6 +805,7 @@ describe("folders and tools on the machine (protocol 10)", () => {
     const mac = devicesText({ computers: [{ name: "Sam's Mac", os: "darwin" }], phones });
     expect(mac).toContain("`screencapture -x screen.png`");
     expect(mac).toContain("Screen Recording in the agentes.chat app there (Preferences › General › Permissions)");
+    expect(mac).toContain('A file there refused with "Permission denied" needs Full Disk Access');
     expect(devicesText({ computers: [{ name: "Box", os: "linux" }], phones })).not.toContain("screencapture");
   });
 

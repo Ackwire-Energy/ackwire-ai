@@ -4,25 +4,25 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import {
   type Asked,
-  allOn,
+  allDone,
   askedIn,
   type Grants,
   MAC_ASKED_PREF,
   MAC_PERMISSIONS,
   type MacPermission,
   readGrants,
+  viaSettings,
   withAsked,
 } from "../control/permissions";
 import { readPref, usePending, writePref } from "../hooks";
 import type { Host } from "../host/types";
-import { PrefCard, PrefRow } from "./settings";
+import { hintFor, PrefCard, PrefRow } from "./settings";
 import { useToast } from "./Toast";
 
 const ICON: Record<MacPermission, IconName> = {
   screen: "image",
-  desktop: "computer",
-  documents: "document",
-  downloads: "download",
+  disk: "drive",
+  network: "phone",
 };
 
 /** This Mac's permissions now, nothing asked. */
@@ -31,21 +31,21 @@ export async function macGrants(host: Host): Promise<Grants> {
   return readGrants(host, askedIn(readPref<Asked | null>(MAC_ASKED_PREF, null), version));
 }
 
-/** A pairing on a Mac goes on to Prepare this Mac while any permission isn't on. */
-export const needsPrepare = async (host: Host) => host.platform === "mac" && !allOn(await macGrants(host));
+/** A pairing on a Mac goes on to Prepare this Mac while any permission is left to ask. */
+export const needsPrepare = async (host: Host) => host.platform === "mac" && !allDone(await macGrants(host));
 
 export interface MacGrants {
   grants: Grants | null;
   pending: MacPermission | null;
-  /** Allow (the system's prompt) the first time, System Settings once it was refused. */
+  /** Allow (the system's prompt) the first time, System Settings once it was asked, and always for Full Disk Access. */
   ask: (p: MacPermission) => Promise<void>;
 }
 
 /**
- * The permissions, read again whenever the window comes back to the front (from System Settings). `beforeScreen`: just
- * before Screen Recording is asked, which may end with macOS quitting the app.
+ * The permissions, read again whenever the window comes back to the front (from System Settings). `beforeQuit`: just
+ * before Screen Recording or Full Disk Access is asked, which may end with macOS quitting the app.
  */
-export function useMacGrants(beforeScreen?: () => Promise<void>): MacGrants {
+export function useMacGrants(beforeQuit?: () => Promise<void>): MacGrants {
   const { t } = useTranslation();
   const host = useHost();
   const toast = useToast();
@@ -67,14 +67,12 @@ export function useMacGrants(beforeScreen?: () => Promise<void>): MacGrants {
   const ask = (p: MacPermission) =>
     run(p, async () => {
       try {
-        if (p === "screen") await beforeScreen?.();
-        if (grants?.[p] === "off") await host.openPrivacy(p === "screen" ? "screen" : "files");
-        else {
-          const { version } = await host.appInfo();
-          writePref(MAC_ASKED_PREF, withAsked(readPref<Asked | null>(MAC_ASKED_PREF, null), version, p));
-          if (p === "screen") await host.requestScreenAccess();
-          else await host.folderAccess(p);
-        }
+        if (p !== "network") await beforeQuit?.();
+        const { version } = await host.appInfo();
+        writePref(MAC_ASKED_PREF, withAsked(readPref<Asked | null>(MAC_ASKED_PREF, null), version, p));
+        if (viaSettings(p, grants?.[p] ?? "ask")) await host.openPrivacy(p);
+        else if (p === "screen") await host.requestScreenAccess();
+        else await host.askLocalNetwork();
       } catch {
         toast(t("desktop.common.error"), "alert");
       }
@@ -84,8 +82,9 @@ export function useMacGrants(beforeScreen?: () => Promise<void>): MacGrants {
 }
 
 /**
- * The permissions as rows: what each lets agents do, its state, one button. Under them, once Screen Recording was
- * asked, what to do when macOS asks to quit and reopen the app; `resumed`: it just did, so the line says it took effect.
+ * The permissions as rows: what each lets agents do, its state, one button. Under them, once Screen Recording or Full
+ * Disk Access was asked and is still off, what to do when macOS asks to quit and reopen the app; `resumed`: it just
+ * did, so the line says it took effect. Local Network shows only whether it was asked, never a green it can't know.
  */
 export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; resumed?: boolean }) {
   const { t } = useTranslation();
@@ -97,13 +96,14 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
     },
     [resumed],
   );
+  const reopen = grants?.screen === "off" || grants?.disk === "off";
   const line =
-    grants?.screen === "on" && resumed ? (
+    grants && resumed && !reopen ? (
       <p ref={seen} className="dk-under-card dk-help ac-iconline" aria-live="polite">
         <Icon name="check" size={14} />
         <span>{t("desktop.prepare.tookEffect")}</span>
       </p>
-    ) : grants?.screen === "off" ? (
+    ) : reopen ? (
       <p ref={seen} className="dk-under-card dk-help">
         {t("desktop.prepare.reopen")}
       </p>
@@ -113,6 +113,13 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
       <PrefCard>
         {MAC_PERMISSIONS.map((p) => {
           const grant = grants?.[p];
+          const title = t(`desktop.prepare.${p}`);
+          const under =
+            p === "screen"
+              ? t("desktop.prepare.screenAgain")
+              : p === "disk" && grant !== "on"
+                ? t("desktop.prepare.diskHow")
+                : null;
           return (
             <PrefRow
               key={p}
@@ -121,8 +128,15 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
                   <Icon name={ICON[p]} size={16} />
                 </span>
               }
-              title={t(`desktop.prepare.${p}`)}
+              title={title}
+              hint={p === "network" ? hintFor(t, title, t("desktop.prepare.networkHint")) : undefined}
+              chip={
+                p === "network" && grant ? (
+                  <Chip>{t(grant === "asked" ? "desktop.prepare.asked" : "desktop.prepare.notAsked")}</Chip>
+                ) : undefined
+              }
               desc={t(`desktop.prepare.${p}Desc`)}
+              under={under && <span className="dk-help">{under}</span>}
               end={
                 grant === "on" ? (
                   <Chip icon="check" tone="done">
@@ -135,7 +149,7 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
                     disabled={pending !== null && pending !== p}
                     onClick={() => void ask(p)}
                   >
-                    {t(grant === "ask" ? "desktop.pair.allow" : "desktop.prepare.openSettings")}
+                    {t(viaSettings(p, grant) ? "desktop.prepare.openSettings" : "desktop.pair.allow")}
                   </Button>
                 ) : null
               }

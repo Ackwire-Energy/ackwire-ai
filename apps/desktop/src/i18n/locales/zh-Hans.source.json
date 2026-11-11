@@ -926,23 +926,32 @@
   "prepare.screenDesc": {
     "value": "Lets agents take screenshots of this {{device}}."
   },
-  "prepare.desktop": {
-    "value": "Desktop folder"
+  "prepare.screenAgain": {
+    "value": "macOS asks again about once a month. Choose Allow."
   },
-  "prepare.desktopDesc": {
-    "value": "Lets agents open files on your Desktop."
+  "prepare.disk": {
+    "value": "Full Disk Access"
   },
-  "prepare.documents": {
-    "value": "Documents folder"
+  "prepare.diskDesc": {
+    "value": "Lets agents open your files without macOS asking for each folder."
   },
-  "prepare.documentsDesc": {
-    "value": "Lets agents open files in Documents."
+  "prepare.diskHow": {
+    "value": "In Settings, turn on agentes.chat in the list, or add it with +."
   },
-  "prepare.downloads": {
-    "value": "Downloads folder"
+  "prepare.network": {
+    "value": "Local network (phones over Wi-Fi)"
   },
-  "prepare.downloadsDesc": {
-    "value": "Lets agents open files in Downloads."
+  "prepare.networkDesc": {
+    "value": "Lets agents find and use Android phones on your Wi-Fi."
+  },
+  "prepare.networkHint": {
+    "value": "macOS never tells apps the answer. Open Settings to see it."
+  },
+  "prepare.asked": {
+    "value": "Asked"
+  },
+  "prepare.notAsked": {
+    "value": "Not asked yet"
   },
   "prepare.on": {
     "value": "On"
@@ -954,7 +963,7 @@
     "value": "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here."
   },
   "prepare.tookEffect": {
-    "value": "agentes.chat opened again. Screen Recording is on."
+    "value": "agentes.chat opened again with your changes."
   },
   "prepare.skip": {
     "value": "Skip for now"

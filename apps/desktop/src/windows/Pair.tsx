@@ -12,7 +12,7 @@ import { type ReactNode, useCallback, useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
 import { type LinkFailure, type LinkInfo, type PairTarget, pairWithLink, pairWithSession } from "../control/pair";
-import { allOn } from "../control/permissions";
+import { allDone } from "../control/permissions";
 import { serverName } from "../control/server";
 import { type PairTools, pairTools, toolsFound } from "../control/this-mac";
 import { MacPortrait, OrgTile } from "../ui/bits";
@@ -149,8 +149,8 @@ function ToolSwitches({
 
 /**
  * "Get this Mac ready", right after pairing on a Mac: the permissions agents need, asked now so nothing stops them
- * later. Kept by the app from the start, so when macOS quits it for Screen Recording it opens here again (`resumed`,
- * the statuses read fresh). Skip for now and Continue both end it; nothing about the pairing depends on it.
+ * later. Kept by the app from the start, so when macOS quits it for Screen Recording or Full Disk Access it opens here
+ * again (`resumed`, the statuses read fresh). Skip for now and Continue both end it: the pairing never depends on it.
  */
 export function Prepare({
   org,
@@ -185,7 +185,7 @@ export function Prepare({
       title={t("desktop.prepare.title")}
       acts={
         <>
-          {!(mac.grants && allOn(mac.grants)) && (
+          {!(mac.grants && allDone(mac.grants)) && (
             <Button variant="ghost" onClick={finish}>
               {t("desktop.prepare.skip")}
             </Button>

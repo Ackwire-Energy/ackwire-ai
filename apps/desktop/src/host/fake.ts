@@ -9,7 +9,8 @@
  * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting. A pair link
  * (`agenteschat://pair?server=…&link=ABCDEFGH`) joins Estúdio Norte once its maker lets it in, `HGFEDCBA`'s maker
  * says no, and any other code expired.
- * `?mac=ready`: every permission of this Mac allowed already (Prepare this Mac is skipped).
+ * `?mac=ready`: Screen Recording and Full Disk Access allowed already (with Local Network asked, Prepare this Mac
+ * is skipped).
  * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
@@ -34,7 +35,7 @@ import {
   type Tailnet,
 } from "../control/local-server";
 import type { LinkInfo } from "../control/pair";
-import type { MacFolder, SetupState } from "../control/permissions";
+import type { MacPermission, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspace, ServerWorkspaces } from "../control/server";
 import type { ThisMacRequest } from "../control/this-mac";
@@ -77,13 +78,16 @@ export interface FakeHost extends Host {
   readonly site: FakeSite;
   onDev(cb: () => void): () => void;
   setVersion(version: string): void;
-  /** This Mac's permissions: Screen Recording, the folders allowed and refused, the setup kept, the panes opened. */
+  /**
+   * This Mac's permissions: Screen Recording, Full Disk Access, the Local Network prompts raised, the setup kept, the
+   * panes opened.
+   */
   readonly mac: {
     screen: boolean;
-    folders: Set<MacFolder>;
-    refused: Set<MacFolder>;
+    disk: boolean;
+    networkAsks: number;
     setup: SetupState | null;
-    panes: string[];
+    panes: MacPermission[];
   };
   /** The site in the main window asks this computer (ADR 0036): resolves with the popover's reply. */
   askThisMac(request: ThisMacRequest): Promise<{ ok: boolean; data: unknown }>;
@@ -135,7 +139,7 @@ export function createFakeHost(
     here?: HereOptions;
     someCommands?: boolean;
     welcomeAdd?: boolean;
-    /** Every permission of this Mac allowed already (`?mac=ready`). */
+    /** Screen Recording and Full Disk Access allowed already (`?mac=ready`). */
     macReady?: boolean;
   } = {},
 ): FakeHost {
@@ -585,19 +589,19 @@ export function createFakeHost(
       console.info("[fake] open Tailscale:", page);
     },
     onNewHostHome: () => () => {},
-    // Screen Recording takes effect once the app opens again, as on a Mac; a folder is allowed at its first read.
+    // Screen Recording and Full Disk Access take effect once the app opens again, as on a Mac.
     mac: {
       screen: options.macReady === true,
-      folders: new Set<MacFolder>(options.macReady ? ["desktop", "documents", "downloads"] : []),
-      refused: new Set<MacFolder>(),
+      disk: options.macReady === true,
+      networkAsks: 0,
       setup: null,
       panes: [],
     },
     screenAccess: async () => platform !== "mac" || host.mac.screen,
     requestScreenAccess: async () => host.mac.screen,
-    folderAccess: async (folder) => {
-      if (!host.mac.refused.has(folder)) host.mac.folders.add(folder);
-      return platform !== "mac" || host.mac.folders.has(folder);
+    diskAccess: async () => platform !== "mac" || host.mac.disk,
+    askLocalNetwork: async () => {
+      host.mac.networkAsks++;
     },
     openPrivacy: async (pane) => {
       host.mac.panes.push(pane);

@@ -200,7 +200,7 @@ describe("pairing from the app", () => {
     });
   });
 
-  test("Prepare this Mac: each permission asked once, then System Settings; kept for macOS's Quit & Reopen", () =>
+  test("Prepare this Mac: Screen Recording and Local Network asked once, Full Disk Access in Settings; kept for Quit & Reopen", () =>
     mount("welcome", <WindowView name="welcome" />, async (el, host) => {
       writePref(PREPARE_PREF, { org: "Estúdio Norte", server: FAKE_SERVER });
       await act(async () => host.showWindow("welcome"));
@@ -214,7 +214,18 @@ describe("pairing from the app", () => {
       expect(rowOf(el, "Screen Recording")?.querySelector("small")?.textContent).toBe(
         "Lets agents take screenshots of this Mac.",
       );
-      expect(["Desktop folder", "Documents folder", "Downloads folder"].map(end)).toEqual(["Allow", "Allow", "Allow"]);
+      expect(rowOf(el, "Screen Recording")?.textContent).toContain(
+        "macOS asks again about once a month. Choose Allow.",
+      );
+      // No prompt asks for Full Disk Access: its button is always System Settings, and the row says what to do there.
+      expect(end("Full Disk Access")).toBe("Open Settings");
+      expect(rowOf(el, "Full Disk Access")?.textContent).toContain(
+        "In Settings, turn on agentes.chat in the list, or add it with +.",
+      );
+      const network = "Local network (phones over Wi-Fi)";
+      expect(end(network)).toBe("Allow");
+      expect(rowOf(el, network)?.querySelector(".ac-chip")?.textContent).toBe("Not asked yet");
+      expect(el.textContent).not.toContain("When macOS asks to Quit & Reopen");
 
       // Screen Recording applies once the app opens again: asked, it says what macOS will ask, and its way out.
       await act(async () => button(rowOf(el, "Screen Recording"), "Allow")?.click());
@@ -225,14 +236,22 @@ describe("pairing from the app", () => {
       await act(async () => button(rowOf(el, "Screen Recording"), "Open Settings")?.click());
       expect(host.mac.panes).toEqual(["screen"]);
 
-      // A folder is allowed at its first read; a refused one goes to Files and Folders.
-      await act(async () => button(rowOf(el, "Desktop folder"), "Allow")?.click());
-      await until(() => end("Desktop folder") === "On");
-      host.mac.refused.add("documents");
-      await act(async () => button(rowOf(el, "Documents folder"), "Allow")?.click());
-      await until(() => end("Documents folder") === "Open Settings");
-      await act(async () => button(rowOf(el, "Documents folder"), "Open Settings")?.click());
-      expect(host.mac.panes).toEqual(["screen", "files"]);
+      await act(async () => button(rowOf(el, "Full Disk Access"), "Open Settings")?.click());
+      expect(host.mac.panes).toEqual(["screen", "disk"]);
+      // Turned on there, it reads On once the window comes back to the front.
+      host.mac.disk = true;
+      await act(async () => window.dispatchEvent(new Event("focus")));
+      await until(() => end("Full Disk Access") === "On");
+      expect(rowOf(el, "Full Disk Access")?.textContent).not.toContain("In Settings");
+
+      // Local Network: the prompt once, then only "Asked" and System Settings, never a green macOS can't vouch for.
+      await act(async () => button(rowOf(el, network), "Allow")?.click());
+      await until(() => end(network) === "Open Settings");
+      expect(host.mac.networkAsks).toBe(1);
+      expect(rowOf(el, network)?.querySelector(".ac-chip")?.textContent).toBe("Asked");
+      await act(async () => button(rowOf(el, network), "Open Settings")?.click());
+      expect(host.mac.panes).toEqual(["screen", "disk", "network"]);
+      expect(host.mac.networkAsks).toBe(1);
 
       await act(async () => button(el, "Skip for now")?.click());
       await until(() => el.querySelector('[data-screen="choose"]'));
@@ -247,7 +266,7 @@ describe("pairing from the app", () => {
         await until(() => el.querySelector("h1")?.textContent === "Get this Mac ready");
         expect(el.textContent).toContain("Connected to Estúdio Norte.");
         await until(() => rowOf(el, "Screen Recording")?.querySelector(".ac-chip")?.textContent === "On");
-        expect(el.textContent).toContain("agentes.chat opened again. Screen Recording is on.");
+        expect(el.textContent).toContain("agentes.chat opened again with your changes.");
         expect(el.textContent).not.toContain("When macOS asks to Quit & Reopen");
         await act(async () => button(el, "Continue")?.click());
         expect(host.mac.setup).toBeNull();
@@ -267,7 +286,7 @@ describe("pairing from the app", () => {
       <WindowView name="welcome" />,
       async (el) => {
         await until(() => button(el, "Allow"));
-        writePref(MAC_ASKED_PREF, { version: "0.6.0", asked: ["screen", "desktop", "documents", "downloads"] });
+        writePref(MAC_ASKED_PREF, { version: "0.6.0", asked: ["screen", "network"] });
         await act(async () => button(el, "Allow")?.click());
         await until(() => el.querySelector("h1")?.textContent === "Connected to Estúdio Norte");
       },
@@ -289,7 +308,7 @@ describe("pairing from the app", () => {
         await until(() => rowOf(el, "Commands"));
         expect(switches(el)).toMatchObject({ Commands: "true", Browser: "false" });
         await act(async () => toggle(el, "Browser"));
-        writePref(MAC_ASKED_PREF, { version: "0.6.0", asked: ["screen", "desktop", "documents", "downloads"] });
+        writePref(MAC_ASKED_PREF, { version: "0.6.0", asked: ["screen", "network"] });
 
         await act(async () => button(el, "Connect")?.click());
         await until(() => el.textContent?.includes("Waiting for Sam Rivera to let it in…"));
@@ -368,7 +387,7 @@ describe("pairing from the app", () => {
       "prefs",
       <General />,
       async (el, host) => {
-        await until(() => el.textContent?.includes("agentes.chat opened again. Screen Recording is on."));
+        await until(() => el.textContent?.includes("agentes.chat opened again with your changes."));
         expect(host.mac.setup).toBeNull();
       },
       {

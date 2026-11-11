@@ -320,7 +320,8 @@ export function ThisMacCards({ homes, offers, bottom }: { homes: Home[]; offers:
 
 /**
  * This Mac's permissions, as Prepare this Mac asks them, and where people turn them on again: an ad-hoc signed app
- * loses them with each update. Asking for Screen Recording keeps Preferences to open again when macOS reopens the app.
+ * loses them with each update. Asking for Screen Recording or Full Disk Access keeps Preferences to open again when
+ * macOS reopens the app.
  */
 function Permissions() {
   const { t } = useTranslation();

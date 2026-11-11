@@ -1,6 +1,6 @@
 //! "Prepare this Mac" (ADR 0165): the macOS permissions agents need here, asked by the app right after pairing so
-//! nothing stops them later, and the setup that comes back when macOS quits the app for Screen Recording ("Quit &
-//! Reopen"). The runners are the app's children, so what the app is granted covers them: the system names the app
+//! nothing stops them later, and the setup that comes back when macOS quits the app for Screen Recording or Full Disk
+//! Access ("Quit & Reopen"). The runners are the app's children, so what the app is granted covers them: the system names the app
 //! when a runner's `screencapture` asks. On Windows and Linux there is nothing to ask and every answer is yes.
 
 use std::io;
@@ -8,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Deserialize;
 use serde_json::Value;
 use tauri::{AppHandle, Manager, Url};
 use tauri_plugin_opener::OpenerExt;
@@ -164,42 +163,89 @@ pub fn screen_request() -> bool {
     screen_allowed(true)
 }
 
-#[derive(Debug, Deserialize, Clone, Copy)]
-#[serde(rename_all = "lowercase")]
-pub enum Folder {
-    Desktop,
-    Documents,
-    Downloads,
+/// Whether the first of `files` that is there opens.
+fn opens_first(files: &[PathBuf]) -> bool {
+    files
+        .iter()
+        .map(std::fs::File::open)
+        .find(|r| !matches!(r, Err(e) if e.kind() == io::ErrorKind::NotFound))
+        .is_some_and(|r| r.is_ok())
 }
 
-/// Whether the app may list `dir`. On a Mac the first look at a protected folder raises the system's prompt and waits
-/// for the answer; a refusal reads as "operation not permitted". A folder that isn't there has nothing to allow.
-fn readable(dir: &Path) -> bool {
-    let denied = |e: &io::Error| e.kind() == io::ErrorKind::PermissionDenied;
-    match std::fs::read_dir(dir) {
-        Ok(mut entries) => !matches!(entries.next(), Some(Err(e)) if denied(&e)),
-        Err(e) => !denied(&e),
-    }
-}
-
-/// Off the main thread: the read may wait on the system's prompt.
+/// Full Disk Access has no prompt and no call that reads it. The privacy database opens only with it, and a refused
+/// open is "operation not permitted", never a prompt: the user's copy, or the system's on an account without one yet.
 #[tauri::command]
-pub async fn folder_access(app: AppHandle, folder: Folder) -> Result<bool, String> {
-    let path = app.path();
-    let dir = match folder {
-        Folder::Desktop => path.desktop_dir(),
-        Folder::Documents => path.document_dir(),
-        Folder::Downloads => path.download_dir(),
+pub fn disk_access(app: AppHandle) -> bool {
+    if !cfg!(target_os = "macos") {
+        return true;
     }
-    .map_err(|e| e.to_string())?;
-    tauri::async_runtime::spawn_blocking(move || readable(&dir)).await.map_err(|e| e.to_string())
+    let tcc = Path::new("Library/Application Support/com.apple.TCC/TCC.db");
+    let user = app.path().home_dir().ok().map(|home| home.join(tcc));
+    opens_first(&user.into_iter().chain([Path::new("/").join(tcc)]).collect::<Vec<_>>())
+}
+
+/// Local Network (macOS 15 and later) has no call that reads it either. A Bonjour browse from the app raises its
+/// prompt the first time, and the grant covers adb, the app's grandchild, pairing Android phones over Wi-Fi.
+#[cfg(target_os = "macos")]
+fn browse_briefly() -> Result<(), String> {
+    use std::ffi::{c_char, c_void};
+    type Reply = extern "C" fn(*mut c_void, u32, u32, i32, *const c_char, *const c_char, *const c_char, *mut c_void);
+    extern "C" fn ignore(
+        _: *mut c_void,
+        _: u32,
+        _: u32,
+        _: i32,
+        _: *const c_char,
+        _: *const c_char,
+        _: *const c_char,
+        _: *mut c_void,
+    ) {
+    }
+    // dns_sd.h, in libSystem.
+    extern "C" {
+        fn DNSServiceBrowse(
+            sd: *mut *mut c_void,
+            flags: u32,
+            interface: u32,
+            regtype: *const c_char,
+            domain: *const c_char,
+            reply: Reply,
+            context: *mut c_void,
+        ) -> i32;
+        fn DNSServiceRefDeallocate(sd: *mut c_void);
+    }
+    let mut sd = std::ptr::null_mut();
+    // SAFETY: a valid out pointer, a NUL-terminated type, the default domain and a reply that is never called
+    // (nothing processes results); the ref is freed once below.
+    let err = unsafe {
+        DNSServiceBrowse(&mut sd, 0, 0, c"_adb-tls-connect._tcp".as_ptr(), std::ptr::null(), ignore, std::ptr::null_mut())
+    };
+    if err != 0 {
+        return Err(format!("browse failed ({err})"));
+    }
+    std::thread::sleep(std::time::Duration::from_secs(2));
+    // SAFETY: the ref DNSServiceBrowse made, freed once.
+    unsafe { DNSServiceRefDeallocate(sd) };
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn browse_briefly() -> Result<(), String> {
+    Ok(())
+}
+
+/// Off the main thread: the browse stays open a moment.
+#[tauri::command]
+pub async fn network_ask() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(browse_briefly).await.map_err(|e| e.to_string())?
 }
 
 /// System Settings › Privacy & Security on one pane.
 fn pane_url(pane: &str) -> Option<String> {
     let anchor = match pane {
         "screen" => "Privacy_ScreenCapture",
-        "files" => "Privacy_FilesAndFolders",
+        "disk" => "Privacy_AllFiles",
+        "network" => "Privacy_LocalNetwork",
         _ => return None,
     };
     Some(format!("x-apple.systempreferences:com.apple.preference.security?{anchor}"))
@@ -232,36 +278,41 @@ mod tests {
     }
 
     #[test]
-    fn a_folder_reads_as_allowed_unless_listing_it_is_refused() {
+    fn full_disk_access_reads_from_the_first_probe_that_is_there() {
         let dir = std::env::temp_dir().join(format!("agentes-prepare-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
-        assert!(readable(&dir));
-        assert!(readable(&dir.join("missing")));
+        let there = dir.join("there");
+        std::fs::write(&there, b"x").unwrap();
+        let missing = dir.join("missing");
+        assert!(opens_first(&[missing.clone(), there.clone()]));
+        assert!(!opens_first(&[missing.clone()]));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let locked = dir.join("locked");
-            std::fs::create_dir_all(&locked).unwrap();
-            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
-            // Root lists anything; everyone else is refused.
+            std::fs::set_permissions(&there, std::fs::Permissions::from_mode(0o000)).unwrap();
+            // Root opens anything; everyone else is refused, and a refusal is the answer, not a reason to look on.
             // SAFETY: geteuid has no preconditions.
             let root = unsafe { libc::geteuid() } == 0;
-            assert_eq!(readable(&locked), root);
-            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o755)).unwrap();
+            assert_eq!(opens_first(&[there.clone(), dir.clone()]), root);
         }
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
     #[test]
-    fn only_the_two_privacy_panes_open() {
+    fn only_the_three_privacy_panes_open() {
         assert_eq!(
             pane_url("screen").as_deref(),
             Some("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
         );
         assert_eq!(
-            pane_url("files").as_deref(),
-            Some("x-apple.systempreferences:com.apple.preference.security?Privacy_FilesAndFolders")
+            pane_url("disk").as_deref(),
+            Some("x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")
         );
+        assert_eq!(
+            pane_url("network").as_deref(),
+            Some("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
+        );
+        assert_eq!(pane_url("files"), None);
         assert_eq!(pane_url("x-apple.systempreferences:com.apple.Accounts"), None);
     }
 }
