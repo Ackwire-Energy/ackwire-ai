@@ -1,4 +1,4 @@
-import { useAgentGroups, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
+import { useAgentGroups, useChannels, useDms, useSetSidebarView, useSidebarView } from "@agenteschat/client";
 import { hiddenAgentIds } from "@agenteschat/client/lib/audience";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { dayOnePins, type PinKind, pinsOf, togglePin } from "@agenteschat/client/lib/sidebar-view";
@@ -21,24 +21,32 @@ export function useSidebarPins() {
   const dir = useDirectory(org.id);
   const dms = useDms(org.id).data;
   const groups = useAgentGroups(org.id).data;
+  const channels = useChannels(org.id).data;
   const hidden = hiddenAgentIds(org, dir.agents);
+  const listed = dir.agents.filter((a) => !hidden.has(a.id));
   const lastActive = new Map<string, string>();
   for (const d of dms ?? [])
     if (d.with.type === "agent" && d.lastMessage) lastActive.set(d.with.id, d.lastMessage.createdAt);
   const dayOne = dayOnePins(
-    dir.agents.filter((a) => !isRightHand(a) && !hidden.has(a.id)),
+    listed.filter((a) => !isRightHand(a)),
     me.user.id,
     lastActive,
     groups,
   );
-  const pins = pinsOf(view, dayOne);
+  // A pin of something no longer in these lists holds no place.
+  const known = {
+    agents: listed.map((a) => a.id),
+    channels: channels?.filter((c) => c.isMember).map((c) => c.id),
+    people: dir.members.map((m) => m.userId),
+  };
+  const pins = pinsOf(view, dayOne, known);
   const toggle = (kind: PinKind, id: string) => {
     if (!togglePin(pins, kind, id)) {
       toast.show(t(`sidebarPins.full.${kind}`), "info");
       return;
     }
     setView((now) => {
-      const from = pinsOf(now, dayOne);
+      const from = pinsOf(now, dayOne, known);
       return { ...now, pins: togglePin(from, kind, id) ?? from };
     });
   };

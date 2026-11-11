@@ -369,27 +369,29 @@ export async function triesToChangePermissions(judge: Judge, input: { orgId: str
 }
 
 /**
- * At or past this probability that an agent's @mention needs something from the agent it names (1 − what
- * `mentionNeedsNothing` answers), the mention wakes it (ADR 0089; `ROUTER_MENTION_THRESHOLD`). Low on purpose: a
- * missed hand-off is lost work nobody sees, a needless wake is one turn that ends in `pass`, so only a judge at
- * least 80% sure that the message needs nothing (a thanks, an "ok", a quote) leaves the agent asleep.
+ * At or past this probability that an agent's @mention plainly asks the agent it names to do something (1 − what
+ * `mentionNeedsNothing` answers), the mention wakes it (ADR 0089 addendum 2026-11-10; `ROUTER_MENTION_THRESHOLD`). A
+ * mention in an agent's message is credit or a reference unless it plainly asks: a needless wake is rarely a quiet
+ * `pass`, the woken agent answers the person a second time or corrects the first in public, and its own mention
+ * wakes that one back. Agents ask each other with `ask_agent` and hand work with `tell_agent`, which come back by
+ * themselves, so an unsure judge leaves the agent asleep.
  */
-export const MENTION_WAKE_THRESHOLD = 0.2;
+export const MENTION_WAKE_THRESHOLD = 0.6;
 
 /**
  * The bar for a wake `DEEP_WAKE_HOP` or more links down a chain of agents when the woken agent's computer already
  * has runs waiting for room (ADR 0032 "Calm wakes"): there a needless wake costs everyone's turn, not just one.
  */
-export const DEEP_MENTION_THRESHOLD = 0.6;
+export const DEEP_MENTION_THRESHOLD = 0.85;
 export const DEEP_WAKE_HOP = 4;
 
 /**
- * An agent's message @mentions other agents: for each, does it need nothing from that agent (ADR 0089)? Nothing is
- * a thanks, an "ok", agreement or a sign-off, a quote or a name ("as @x said", "@x already deployed", "talk to @x"),
- * a report of what it couldn't do or that it won't be called again,
- * or a plan or an offer that waits for a person ("if you agree, I'll ask @x"). Work, a question, a delivery (a file,
- * a handover, results, a summary, a verdict) and "I'll ask @x to…" need it. `answering`: the message it answers, so a
- * hand-back or a question back reads as one. Probability per agent id, in any language; who wakes is `jobs.ts`'s.
+ * An agent's message @mentions other agents: for each, does it leave that agent nothing to do (ADR 0089, addendum
+ * 2026-11-10)? A mention is credit or a reference: a name, a source, what the agent did, said, sent or was asked
+ * ("via @x", "the numbers are from @x", "I asked @x"), agreement, a correction, a thanks, a plan to ask it later.
+ * Only a message that plainly asks the agent itself to do or answer something now needs it (a request, a task, a
+ * question to it, work handed to it), or one that answers the agent's own question. `answering`: the message it
+ * answers. Probability per agent id, in any language; who wakes is `jobs.ts`'s.
  */
 export async function mentionNeedsNothing(
   judge: Judge,
@@ -411,12 +413,12 @@ export async function mentionNeedsNothing(
       instructions: {
         agent: { handle: `@${t.handle}`, name: t.name, role: t.role },
         question:
-          "Does `message` need nothing from `agent`, so `agent` can ignore it? It needs nothing only when, toward `agent`, it just thanks, acknowledges, agrees or signs off, quotes or names it, reports to others what `agent` did or couldn't do (not results or a verdict it hands to `agent`), says it won't call on `agent` (again), tells a person to talk to it, or offers a person to involve it later. Anything it gives `agent` to do, answer, read or act on needs it, also when it hands back work `agent` asked for. `answering` is the message it replies to, when there is one.",
+          "Does `message` leave `agent` nothing to do, so `agent` can ignore it? A mention of an agent in another agent's message is credit or a reference, not a request: it needs `agent` only when it plainly asks `agent` itself to do or answer something now, or answers a question `agent` asked it. Naming it, citing it as the source of a number or a fact, saying what it did, said, sent, has or was asked, agreeing with it, correcting it, thanking it, reporting to people, or saying the author will ask it later asks nothing of it. `answering` is the message it replies to, when there is one.",
       },
       criteria: {
-        true: "Nothing for the agent: thanks, 'ok' or 👍, agreement or a sign-off, even addressed to it; or it only names the agent: what it said, did, couldn't do or can do ('as @agent said', '@agent already deployed', '@agent couldn't open the file, so I won't ask it again'), 'talk to @agent', or a plan or offer that waits for a person to decide ('if you agree, I'll open an issue for @agent', 'want me to ask @agent?').",
+        true: "Nothing for the agent: it credits, cites or names the agent ('via @agent', 'the numbers are from @agent', 'I asked @agent', '@agent sent me the report', 'as @agent said', '@agent already deployed'), agrees with it or corrects it, thanks it, acknowledges or signs off, even addressed to it, tells a person to talk to it, or says the author will ask it something later ('I'll ask @agent to review it', 'want me to ask @agent?').",
         false:
-          "Something for the agent: work, a request, an assignment, a question, or a delivery for it to read or act on (a file, a handover, results, a summary, a verdict, a review), also in the last line of a long message; or the author says it will ask the agent to do something, with no person to decide first ('I'll ask @agent to review it').",
+          "It plainly asks the agent itself to do or answer something now: a request, a task, an assignment or a question addressed to it ('@agent, can you pull today's costs?', '@agent please review #12'), work handed to it to take on ('@agent, here is the handover: it's yours from here'), or the answer to a question the agent asked it (`answering` is that agent's question).",
       },
     };
   });

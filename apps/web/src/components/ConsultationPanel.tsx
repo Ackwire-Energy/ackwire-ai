@@ -1,4 +1,4 @@
-import { type Message, useConsultationConversation } from "@agenteschat/client";
+import { type Message, useExchangeConversation } from "@agenteschat/client";
 import { consultLineState, consultOriginKey } from "@agenteschat/client/lib/consult-group";
 import { dayLabel, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -50,7 +50,8 @@ export function ConsultationPanel({
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   useEscClose(onClose);
-  const query = useConsultationConversation(org.id, channelId, consultationId);
+  // The whole exchange its row stands for: the other questions between the same two agents come in it too.
+  const query = useExchangeConversation(org.id, channelId, consultationId);
   const c = query.data?.consultation;
   const list = query.data?.messages;
   const now = useNow(c?.status === "open");

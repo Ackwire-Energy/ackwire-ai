@@ -594,6 +594,78 @@ describe("Bitwarden source", () => {
   });
 });
 
+describe("Bitwarden source: a new login", () => {
+  const NEW = {
+    title: "shop.acme.example",
+    username: "agent@acme.example",
+    password: "fake-new-bw-password-77",
+    website: "https://shop.acme.example",
+    match: "site" as const,
+    notes: "Made by an agent",
+  };
+
+  test("goes to the agents' folder, every text encrypted with the account's key, and is listed and revealed", async () => {
+    const { fake, source, connection } = await setup();
+    const created = await source.createLogin?.(connection, NEW);
+    expect(created).toMatchObject({
+      kind: "login",
+      title: NEW.title,
+      username: NEW.username,
+      websites: [{ url: NEW.website, match: "site" }],
+    });
+    expect(JSON.stringify(created)).not.toContain(NEW.password);
+
+    const [post] = fake.callsTo("/ciphers").filter((c) => c.method === "POST");
+    expect(post?.url).toBe("https://api.bitwarden.com/ciphers");
+    expect(post?.headers["content-type"]).toBe("application/json");
+    // Nothing leaves in the clear: not the password, not the username, not the website.
+    for (const plain of Object.values(NEW)) expect(post?.body).not.toContain(plain);
+    const sent = JSON.parse(post?.body ?? "{}");
+    const agents = fake.folders[0]?.Id;
+    expect(sent).toMatchObject({ type: 1, folderId: agents, organizationId: null, favorite: false, reprompt: 0 });
+    expect(sent.key).toBeUndefined();
+    // What was sent opens with the same key and primitives the reads use.
+    expect(decryptString(sent.name, fake.userKey)).toBe(NEW.title);
+    expect(decryptString(sent.notes, fake.userKey)).toBe(NEW.notes);
+    expect(decryptString(sent.login.username, fake.userKey)).toBe(NEW.username);
+    expect(decryptString(sent.login.password, fake.userKey)).toBe(NEW.password);
+    expect(sent.login.uris).toHaveLength(1);
+    expect(sent.login.uris[0].match).toBe(0);
+    expect(decryptString(sent.login.uris[0].uri, fake.userKey)).toBe(NEW.website);
+    expect(decryptString(sent.login.uris[0].uriChecksum, fake.userKey)).toBe(
+      toBase64(sha256(new TextEncoder().encode(NEW.website))),
+    );
+
+    const ref = created?.ref ?? "";
+    expect((await source.list(connection)).map((i) => i.ref)).toContain(ref);
+    expect(await source.reveal(connection, ref, "password")).toBe(NEW.password);
+  });
+
+  test("without a website or username, and for the exact origin", async () => {
+    const { fake, source, connection } = await setup();
+    await source.createLogin?.(connection, { title: "Bare", password: NEW.password });
+    await source.createLogin?.(connection, { ...NEW, match: "exact" });
+    const [bare, exact] = fake.callsTo("/ciphers").map((c) => JSON.parse(c.body ?? "{}"));
+    expect(bare.login).toMatchObject({ username: null, uris: [] });
+    expect(bare.notes).toBeNull();
+    expect(exact.login.uris[0].match).toBe(1);
+  });
+
+  test("a login the server turns down is unsupported, the session kept, never the server's words", async () => {
+    const { fake, source, connection } = await setup();
+    await source.list(connection);
+    fake.state.refuseNew = true;
+    const refused = await sourceError(() => source.createLogin?.(connection, NEW) ?? Promise.resolve());
+    expect(refused.code).toBe("unsupported");
+    expect(refused.message).not.toContain(FAKE_BW.clientSecret);
+    expect(fake.tokens()).toBe(2);
+  });
+
+  test("it never changes a login already there", () => {
+    expect(createBitwardenSource().updateLogin).toBeUndefined();
+  });
+});
+
 describe("Bitwarden key derivations", () => {
   test("one at a time per workspace, two at most across the process; a caller that gave up never starts", async () => {
     const queue = derivationQueue(2);

@@ -397,6 +397,9 @@ export async function transitionRun(
       ...(to === "running"
         ? { startedAt: sql`coalesce(${agentRuns.startedAt}, ${now.toISOString()}::timestamptz)`, heartbeatAt: now }
         : {}),
+      // Back to work after waiting (a person, an approval, its computer): its "thinking for …" counts from here. A
+      // first start keeps counting from when the run was created, as the person who wrote to it saw it.
+      ...(to === "running" && from !== "queued" ? { workingSince: now } : {}),
       ...(isTerminal(to) ? { finishedAt: now } : {}),
       // Only a run waiting for its computer keeps the machine it waits for.
       waitingMachineId: null,

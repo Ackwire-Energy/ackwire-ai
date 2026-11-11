@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentGroup,
   AgentSort,
   Availability,
   Channel,
@@ -48,7 +49,7 @@ import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } 
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, sidebarItemOrder, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
-import { AGENT_SORTS, sortAgents } from "@agenteschat/client/lib/sidebar-view";
+import { AGENT_SORTS, sortAgents, splitPinned } from "@agenteschat/client/lib/sidebar-view";
 import { badgeCount, looksUnread } from "@agenteschat/client/lib/unread";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
@@ -122,7 +123,15 @@ import { useStreams } from "@/realtime/context";
 import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
-import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
+import {
+  DeleteGroupDialog,
+  type GroupDialogFor,
+  GroupMenu,
+  GroupNameDialog,
+  useAgentDrag,
+  useGroupEntries,
+  useMoveAgent,
+} from "./AgentGroups";
 import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
 import { FeedbackMark } from "./arrival/FeedbackDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
@@ -366,21 +375,20 @@ export function Sidebar() {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
 
-  // AGENTES (ADR 0083 and its addendum): the agents that talk to me (who manages agents may list the rest), my pinned
-  // ones on top, then the ones in no group, then each group of agents, each in my order.
+  // AGENTES (ADR 0083 and its addendum): the agents that talk to me (who manages agents may list the rest), the ones in
+  // no group, then each group of agents, each with my pinned ones on top and the rest in my order.
   const manages = can(org, "manage_agents");
   const team = dir.agents.filter((a) => !isRightHand(a));
   const shownAgents = team.filter((a) => (manages && view.showAllAgents) || canTalk(a));
   const busyKey = useStreams((st) => [...runningAgents(st)].sort().join());
   const busy = useMemo(() => new Set(busyKey ? busyKey.split(",") : []), [busyKey]);
   const groups = useAgentGroups(orgId).data ?? [];
-  const pinnedAgents = pins.agents.flatMap((id) => shownAgents.filter((a) => a.id === id));
-  const byGroup = agentSections(
-    shownAgents.filter((a) => !pins.agents.includes(a.id)),
-    groups,
-    (a) => a.id,
-  );
-  const ordered = (list: Agent[]) => sortAgents(list, view.agentSort, me.user.id, busy);
+  const byGroup = agentSections(shownAgents, groups, (a) => a.id);
+  const ordered = (items: Agent[]) => {
+    const { top, rest } = splitPinned(items, pins.agents, (a) => a.id);
+    return { top, rest: sortAgents(rest, view.agentSort, me.user.id, busy) };
+  };
+  const loose = ordered(byGroup.ungrouped);
   // Members never see an empty group; who arranges the agents keeps them, to drop agents in.
   const agentGroups = byGroup.groups.filter((g) => g.items.length > 0 || (manages && g.group.agentIds.length === 0));
   const groupIds = agentGroups.map((g) => `group:${g.group.id}` as SectionId);
@@ -390,6 +398,15 @@ export function Sidebar() {
   const drag = useAgentDrag(groups);
   const moveAgent = useMoveAgent(groups);
   const [groupDialog, setGroupDialog] = useState<GroupDialogFor | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<AgentGroup | null>(null);
+  const groupMenuEntries = useGroupEntries();
+  const groupChoices = (group: AgentGroup) => ({
+    group,
+    index: groups.findIndex((g) => g.id === group.id),
+    count: groups.length,
+    onRename: () => setGroupDialog({ mode: "rename", group }),
+    onDelete: () => setDeletingGroup(group),
+  });
   const agentsUnread = shownAgents.reduce((n, a) => n + (dmOf.get(a.id)?.unread ?? 0), 0);
   // "Mudar de grupo" in an agent's right click: the keyboard's way to what dragging does.
   const groupEntries = (a: Agent): MenuEntry[] => {
@@ -531,11 +548,11 @@ export function Sidebar() {
         />
       )}
       {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
-      {pinnedAgents.map(agentRow)}
-      {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
+      {loose.top.map(agentRow)}
+      {loose.top.length > 0 && (loose.rest.length > 0 || agentGroups.length > 0) && (
         <hr className="sidebar__pins-end" />
       )}
-      {ordered(byGroup.ungrouped).map(agentRow)}
+      {loose.rest.map(agentRow)}
     </>
   );
   const blocks: Record<SectionKey, ReactNode> = {
@@ -633,7 +650,11 @@ export function Sidebar() {
                   {manages && (
                     <MenuItem
                       icon="layers"
-                      onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}
+                      onSelect={() => {
+                        // Equipe opens on the view it remembers: here, its setores.
+                        storage.set(STORAGE_KEYS.teamView, "sectors");
+                        void navigate({ to: "/org/$orgId/team", params: { orgId } });
+                      }}
                     >
                       {t("sidebarAgents.organize")}
                     </MenuItem>
@@ -648,7 +669,8 @@ export function Sidebar() {
           </SidebarSection>
         )}
         {agentGroups.map(({ group, items }) => {
-          const list = ordered(items);
+          const { top, rest } = ordered(items);
+          const list = [...top, ...rest];
           // Where a dragged row would land: a line before the row at that place among the others.
           const others = list.filter((a) => a.id !== drag.dragging);
           const lineAt = drag.over?.groupId === group.id ? drag.over.index : null;
@@ -663,20 +685,29 @@ export function Sidebar() {
               sections={sections}
               defaultOpen={groupsOpen}
               className="sidebar__section--category sidebar__section--group"
+              headProps={
+                manages
+                  ? entityMenu(() => [{ kind: "header", label: group.name }, ...groupMenuEntries(groupChoices(group))])
+                  : undefined
+              }
               summary={
                 workingHere > 0 && (
                   <span className="sidebar__section-working">{t("sidebarAgents.working", { count: workingHere })}</span>
                 )
               }
               action={
-                <span className="sidebar__section-count" title={t("sidebarAgents.count", { count: list.length })}>
-                  {list.length}
-                </span>
+                <>
+                  {manages && <GroupMenu {...groupChoices(group)} className="sidebar__section-add" />}
+                  <span className="sidebar__section-count" title={t("sidebarAgents.count", { count: list.length })}>
+                    {list.length}
+                  </span>
+                </>
               }
               drop={organize ? drag.zone(group.id) : undefined}
             >
-              {list.map((a) => (
+              {list.map((a, i) => (
                 <Fragment key={a.id}>
+                  {i > 0 && i === top.length && <hr className="sidebar__pins-end" />}
                   {lineAt === others.indexOf(a) && line}
                   {agentRow(a)}
                 </Fragment>
@@ -888,6 +919,7 @@ export function Sidebar() {
       />
       <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
+      {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
       {/* Beta: the way to the feedback form, a row of its own at the bottom, where this server takes it. Not beside
           the person's name, which it would leave no room for; the rail has no room for a row's words. */}

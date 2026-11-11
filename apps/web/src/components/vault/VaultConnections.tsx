@@ -269,6 +269,8 @@ function ConnectionRow({
   const actions = useVaultConnectionActions(org.id);
   const line = [
     t("vault.connections.reads", { label: c.label }),
+    // Its credential can't save new logins: agents keep theirs in the Vault until it is reconnected with one that can.
+    c.readOnly ? t("vault.connections.readOnly") : null,
     t("vault.connections.items", { count: c.itemCount }),
     c.syncedAt ? t("vault.connections.synced", { when: relativeTime(t, i18n.language, c.syncedAt) }) : null,
   ]

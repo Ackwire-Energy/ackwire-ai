@@ -108,6 +108,8 @@ export interface VaultConnection {
   kind: string;
   /** Brand name (`1Password`). */
   name: string;
+  /** Its credential may only read: agents save no new login there until it is connected again with one that writes. */
+  readOnly?: boolean;
   scope: VaultScope;
   ownerUserId: string | null;
   /** What it reads (a vault's or a folder's name). */

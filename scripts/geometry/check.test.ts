@@ -106,6 +106,8 @@ describe("geometry check", () => {
     // A title in a row that wraps a word a line is squeezed; one long address wrapping its full lines is not.
     for (const twin of ["bad-wordwrap--row", "good-wordwrap--url"]) expect(fixture).toContain(twin);
     expect(rules).toContain('".ac-facts__value, .ac-factline__fact"');
+    // A word broken at its syllables in a box that hyphenates (a narrow calendar item's title) is no midword.
+    expect(fixture).toContain("good-midword--hyphens");
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
