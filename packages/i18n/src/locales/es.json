@@ -2883,8 +2883,6 @@
     "chip": "Memoria actualizada",
     "was": "Antes: {{text}}",
     "open": "Lo que sabe {{name}}",
-    "undo": "Deshacer",
-    "undone": "Deshecho",
     "group": "Memoria actualizada por {{name}}"
   },
   "reach": {
@@ -3039,23 +3037,11 @@
     "someone": "alguien",
     "you": "tú",
     "undo": "Deshacer",
-    "redo": "Rehacer",
-    "undoAll": "Deshacer todo",
     "changes_one": "{{count}} cambio",
     "changes_many": "{{count}} cambios",
     "changes_other": "{{count}} cambios",
     "undoneBy": "Deshecho por {{name}}",
-    "ago": "hace {{time}}",
-    "timeLeft": "Quedan {{time}} para deshacer",
     "group": "Cambios de {{name}}",
-    "undone": "Deshecho.",
-    "redone": "Rehecho.",
-    "undoneAll_one": "{{count}} cambio deshecho.",
-    "undoneAll_many": "{{count}} cambios deshechos.",
-    "undoneAll_other": "{{count}} cambios deshechos.",
-    "partial_one": "No se pudo deshacer {{count}} cambio.",
-    "partial_many": "No se pudieron deshacer {{count}} cambios.",
-    "partial_other": "No se pudieron deshacer {{count}} cambios.",
     "errors": {
       "changed_since": "Alguien cambió esto después. Si lo deshaces ahora, se pierde ese cambio.",
       "expired": "Se acabó el tiempo para deshacer.",
@@ -3705,6 +3691,7 @@
       "ready": "Conectado",
       "syncing": "Sincronizando",
       "reads": "Lee {{label}}",
+      "readOnly": "solo lectura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementos",
       "synced": "sincronizado {{when}}",
@@ -3753,7 +3740,7 @@
       "onepassword": {
         "step": {
           "1": "Crea en 1Password una bóveda solo para tus agentes y mueve a ella los inicios de sesión que pueden usar",
-          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda",
+          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda (lectura y escritura, si tus agentes van a guardar allí nuevos inicios de sesión)",
           "3": "Pega aquí el token de la cuenta de servicio"
         },
         "field": {
@@ -11435,7 +11422,7 @@
       "close": "Cerrar detalles",
       "can": "Lo que podrán hacer los agentes",
       "afterText": "Ningún agente lo usa hasta que tú elijas.",
-      "allText": "Una vez conectado, todos los agentes pueden usarlo. Después eliges el acceso de cada agente.",
+      "allText": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
       "addAccount": "Agregar otra cuenta",
       "accountsText": "Cada cuenta tiene sus propios agentes y niveles.",
       "reconnect": "Volver a conectar",
@@ -12236,11 +12223,10 @@
     "notApproved": "{{name}} solo deja iniciar sesión a las apps que aprobó, y agentes.chat todavía no está aprobado. Si te da una clave de API, puedes conectarlo con ella.",
     "serverSaid": "El servidor respondió: {{detail}}",
     "nothingYet": "Nada queda disponible para los agentes hasta el paso 3.",
-    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes cambiarlo en el paso 3.",
-    "newAccount": "La cuenta nueva empieza sin agentes, salvo los que tienen acceso a todo. Tú eliges en el paso 3.",
+    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
     "replace": "Reemplaza el inicio de sesión actual. Quién lo usa sigue igual.",
     "replaceUnchecked": "Inicia sesión en la misma cuenta que antes. No podemos comprobar cuál es, y quién la usa sigue igual.",
-    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo. Empieza sin agentes, salvo los que tienen acceso a todo.",
+    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo.",
     "addTitle": "Otra cuenta de {{name}}",
     "reconnectTitle": "Volver a conectar {{name}}",
     "accountName": "Nombre de esta cuenta",
@@ -12266,7 +12252,17 @@
     "grant": "Dar acceso",
     "saved_one": "{{name}}: {{count}} agente puede usarlo.",
     "saved_many": "{{name}}: {{count}} agentes pueden usarlo.",
-    "saved_other": "{{name}}: {{count}} agentes pueden usarlo."
+    "saved_other": "{{name}}: {{count}} agentes pueden usarlo.",
+    "done": {
+      "title": "{{name}} conectado",
+      "everyone": "Todos los agentes pueden usarlo.",
+      "waiting": "Los agentes solo reciben las herramientas cuando continúes, con los niveles que sugerimos.",
+      "asks_one": "{{count}} acción pide aprobación en el chat.",
+      "asks_many": "{{count}} acciones piden aprobación en el chat.",
+      "asks_other": "{{count}} acciones piden aprobación en el chat.",
+      "adjust": "Ajustar",
+      "ok": "Listo"
+    }
   },
   "database": {
     "name": "Base de datos",

@@ -1,19 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import { AGENT_ACTION_KINDS, type AgentAction } from "../src/api/types";
-import {
-  actionErrorKey,
-  actionPhase,
-  actionTextKey,
-  actionTextValues,
-  actionTimeLeft,
-  canUndoAction,
-  formatTimeLeft,
-  hookToCopy,
-  undoableNow,
-} from "../src/lib/actions";
+import { actionErrorKey, actionTextKey, actionTextValues, formatTimeLeft, hookToCopy } from "../src/lib/actions";
 
-const now = Date.parse("2026-10-18T12:00:00Z");
 const action = (over: Partial<AgentAction> = {}): AgentAction => ({
   id: "a1",
   kind: "issue.created",
@@ -31,16 +20,9 @@ const action = (over: Partial<AgentAction> = {}): AgentAction => ({
 });
 
 describe("receipts", () => {
-  test("phase: undo, then redo once undone, settled after the window", () => {
-    expect(actionPhase(action(), now)).toBe("undo");
-    expect(actionPhase(action({ undoneAt: "2026-10-18T11:59:30Z" }), now)).toBe("redo");
-    expect(actionPhase(action({ undoableUntil: "2026-10-18T11:00:00Z" }), now)).toBe("settled");
-  });
-
-  test("time left and countdown", () => {
-    expect(actionTimeLeft(action(), now)).toBe(240_000);
+  test("a countdown's minutes and seconds", () => {
     expect(formatTimeLeft(238_000)).toBe("3:58");
-    expect(actionTimeLeft(action({ undoableUntil: "2026-10-18T11:00:00Z" }), now)).toBe(0);
+    expect(formatTimeLeft(0)).toBe("0:00");
   });
 
   test("a webhook routine the agent made offers its address to who asked or manages routines; nothing else does", () => {
@@ -63,16 +45,7 @@ describe("receipts", () => {
     expect(hookToCopy({ ...made, kind: "routine.updated" }, { userId: "u1", managesRoutines: false })).toBe("rt1");
   });
 
-  test("who sees the buttons", () => {
-    expect(canUndoAction(action(), { userId: "u1", managesAgents: false, ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: false })).toBe(false);
-    expect(canUndoAction(action(), { userId: "u2", managesAgents: true, ownsAgent: false })).toBe(true);
-    expect(canUndoAction(action(), { userId: "u2", managesAgents: false, ownsAgent: true })).toBe(true);
-  });
-
-  test("Desfazer tudo takes only the undoable ones; i18n keys", () => {
-    const list = [action(), action({ id: "a2", undoneAt: "2026-10-18T11:59:30Z" })];
-    expect(undoableNow(list, now).map((a) => a.id)).toEqual(["a1"]);
+  test("i18n keys", () => {
     expect(actionTextKey(action())).toBe("agentActions.issue.created");
     expect(actionErrorKey("action.changed_since")).toBe("agentActions.errors.changed_since");
   });
@@ -158,7 +131,7 @@ describe("receipt sentence values", () => {
     expect(actionTextKey(unknown)).toBe("agentActions.other");
   });
 
-  test("a merge done without asking: its pull request, or the branch of a plain git merge, and nothing to undo", () => {
+  test("a merge done without asking: its pull request, or the branch of a plain git merge", () => {
     const pr = action({
       kind: "pr.merged",
       target: { type: "repository", id: "acme/app", title: "acme/app" },
@@ -168,8 +141,6 @@ describe("receipt sentence values", () => {
     expect(actionTextKey(pr)).toBe("agentActions.pr.merged");
     const branch = action({ ...pr, params: { repo: "acme/app", ref: "feature/x" } });
     expect(actionTextValues(branch, t)).toEqual({ repo: "acme/app", ref: "feature/x", context: "branch" });
-    const now = Date.now();
-    expect(actionPhase(action({ ...pr, undoableUntil: new Date(now).toISOString() }), now)).toBe("settled");
   });
 
   test("a workspace change: its words, and its action as the context when this build knows it", () => {

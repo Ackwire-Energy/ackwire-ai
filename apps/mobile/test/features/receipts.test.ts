@@ -1,20 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { AGENT_ACTION_KINDS, type AgentAction, type AgentActionKind } from "@agenteschat/client";
 import {
-  anyLive,
   boldRuns,
   groupStart,
-  optimisticRedo,
-  optimisticUndo,
   RECEIPT_ICONS,
   receiptIcon,
   receiptLayout,
-  receiptView,
   targetHref,
-  viewerCanUndo,
 } from "../../src/features/chat/actions";
 
-const now = Date.parse("2026-10-18T12:00:00Z");
 const action = (over: Partial<AgentAction> = {}): AgentAction => ({
   id: "a1",
   kind: "issue.created",
@@ -39,56 +33,11 @@ describe("receipts under an agent's reply", () => {
     expect(receiptLayout([action(), action({ id: "a2" })])).toBe("group");
   });
 
-  test("phases: Desfazer with the time left, Refazer once undone, plain history after the window", () => {
-    expect(receiptView(action(), true, now)).toEqual({
-      phase: "undo",
-      timeLeft: "4:58",
-      struck: false,
-      button: "undo",
-    });
-    const undone = action({ undoneAt: "2026-10-18T11:59:30Z", undoneByUserId: "u1" });
-    expect(receiptView(undone, true, now)).toEqual({ phase: "redo", timeLeft: "", struck: true, button: "redo" });
-    const old = action({ undoableUntil: "2026-10-18T11:58:00Z" });
-    expect(receiptView(old, true, now)).toEqual({ phase: "settled", timeLeft: "", struck: false, button: null });
-    // Undone and expired: still crossed out, no button.
-    expect(receiptView({ ...old, undoneAt: "2026-10-18T11:57:00Z" }, true, now).struck).toBe(true);
-    // Who may not undo sees no button.
-    expect(receiptView(action(), false, now).button).toBeNull();
-  });
-
-  test("the clock ticks only while something counts down", () => {
-    expect(anyLive([action()], now)).toBe(true);
-    expect(anyLive([action({ undoableUntil: "2026-10-18T11:00:00Z" })], now)).toBe(false);
-  });
-
-  test("who sees the buttons: the person it worked for, who manages agents, the agent's owner", () => {
-    const a = action();
-    expect(viewerCanUndo(a, { userId: "u1", managesAgents: false, ownsAgent: false })).toBe(true);
-    expect(viewerCanUndo(a, { userId: "u2", managesAgents: false, ownsAgent: false })).toBe(false);
-    expect(viewerCanUndo(a, { userId: "u2", managesAgents: true, ownsAgent: false })).toBe(true);
-    expect(viewerCanUndo(a, { userId: "u2", managesAgents: false, ownsAgent: true })).toBe(true);
-    // Still loading who I am: no buttons.
-    expect(viewerCanUndo(a, { userId: null, managesAgents: true, ownsAgent: false })).toBe(false);
-  });
-
   test("the group's age is its first change", () => {
     expect(
       groupStart([action({ createdAt: "2026-10-18T11:59:30Z" }), action({ createdAt: "2026-10-18T11:58:00Z" })]),
     ).toBe("2026-10-18T11:58:00Z");
     expect(groupStart([])).toBeNull();
-  });
-
-  test("optimistic undo, undo all and redo", () => {
-    const list = [action(), action({ id: "a2" }), action({ id: "a3", undoableUntil: "2026-10-18T11:00:00Z" })];
-    const one = optimisticUndo(list, ["a1"], "me", now);
-    expect(one[0]?.undoneByUserId).toBe("me");
-    expect(one[1]?.undoneAt).toBeNull();
-    const all = optimisticUndo(list, ["a1", "a2", "a3"], "me", now);
-    expect(all.map((a) => Boolean(a.undoneAt))).toEqual([true, true, false]);
-    const back = optimisticRedo(all, "a1", now);
-    expect(back[0]?.undoneAt).toBeNull();
-    expect(back[0]?.redoneAt).toBe(new Date(now).toISOString());
-    expect(back[1]?.undoneAt).not.toBeNull();
   });
 
   test("tapping the target opens what the phone has", () => {
@@ -97,7 +46,10 @@ describe("receipts under an agent's reply", () => {
     expect(targetHref({ type: "channel", id: "c9", title: "tech" }, "c1")).toBe("/chat/c9");
     expect(targetHref({ type: "thread", id: "t1" }, "c1")).toBe("/chat/c1?thread=t1");
     expect(targetHref({ type: "wiki_page", id: "w1", slug: "x" }, "c1")).toBeNull();
-    expect(targetHref({ type: "memory", id: "m1" }, "c1")).toBeNull();
+    // A memory opens its own screen, where it is fixed or forgotten; a skill its page.
+    expect(targetHref({ type: "memory", id: "m1" }, "c1")).toBe("/memory/m1");
+    expect(targetHref({ type: "memory", id: "../x" }, "c1")).toBeNull();
+    expect(targetHref({ type: "skill", id: "s1" }, "c1")).toBe("/settings/skills/s1");
     expect(targetHref({ type: "routine", id: "r1" }, "c1")).toBe("/routines/r1");
     expect(targetHref({ type: "routine", id: "" }, "c1")).toBeNull();
   });

@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { RunConsultation } from "../src/api/types";
 import {
+  asExchanges,
   consultAskedKey,
   consultBlocksNearEnd,
   consultGroupSummary,
@@ -13,6 +14,8 @@ import {
   consultPair,
   consultSeconds,
   consultsForLine,
+  EXCHANGE_GAP_MS,
+  exchangeIds,
   firstOfRun,
   foldsNotice,
   groupsByRun,
@@ -102,6 +105,58 @@ describe("groupsByRun", () => {
     ]);
     expect([...groups.keys()]).toEqual(["r1", "r2"]);
     expect(groups.get("r1")?.map((c) => c.id)).toEqual(["a", "b"]);
+  });
+});
+
+describe("an exchange between two agents: one row, one conversation", () => {
+  // Lia asks Theo, Theo hands Lia a note while answering, Lia hands Theo a note into that same run: three asking runs.
+  const exchange = [
+    q({ id: "ask", runId: "r1", status: "answered", answer: "ok", answeredAt: iso(187) }),
+    q({
+      id: "back",
+      kind: "note",
+      runId: "r2",
+      agentId: "theo",
+      consultedAgentId: "lia",
+      status: "answered",
+      answer: "ok",
+      createdAt: iso(41),
+      answeredAt: iso(97),
+    }),
+    q({
+      id: "into",
+      kind: "note",
+      runId: "r3",
+      status: "answered",
+      answer: "ok",
+      createdAt: iso(55),
+      answeredAt: iso(187),
+    }),
+  ];
+
+  test("its questions draw on the first asking run's reply, with the whole exchange's time and the other face", () => {
+    const groups = groupsByRun(asExchanges(exchange));
+    expect([...groups.keys()]).toEqual(["r1"]);
+    expect(groups.get("r1")?.map((c) => c.id)).toEqual(["ask", "back", "into"]);
+    const pair = consultPair(groups.get("r1") ?? [], T0 + 300_000, "lia");
+    expect(pair?.faces).toEqual([{ agentId: "theo", off: false }]);
+    expect(pair?.seconds).toBe(187);
+  });
+
+  test("its row opens all of it, whichever question opens it", () => {
+    expect(exchangeIds(exchange, "into")).toEqual(["ask", "back", "into"]);
+    expect(exchangeIds(exchange, "missing")).toEqual(["missing"]);
+  });
+
+  test("another pair, or the same pair a while after it ended, is its own row", () => {
+    const later = q({ id: "later", runId: "r4", createdAt: iso(187 + EXCHANGE_GAP_MS / 1000 + 1) });
+    const others = q({ id: "others", runId: "r5", agentId: "lia", consultedAgentId: "rio", createdAt: iso(60) });
+    const groups = groupsByRun(asExchanges([...exchange, later, others]));
+    expect([...groups.keys()].sort()).toEqual(["r1", "r4", "r5"]);
+    // While one is still out, the next between the same two joins it.
+    const open = q({ id: "open", runId: "r6", createdAt: iso(1000) });
+    const joins = q({ id: "joins", runId: "r7", agentId: "theo", consultedAgentId: "lia", createdAt: iso(5000) });
+    expect(asExchanges([open, joins]).map((c) => c.runId)).toEqual(["r6", "r6"]);
   });
 });
 

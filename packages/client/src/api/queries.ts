@@ -17,7 +17,7 @@ import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
-import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS, exchangeIds } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
 import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
@@ -3087,18 +3087,58 @@ export const useConsultations = (orgId: string, channelId: string, enabled = tru
  * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
  * (its key sits under the list's) on every consult event.
  */
+const consultationQuery = (
+  api: ReturnType<typeof useApi>,
+  orgId: string,
+  channelId: string,
+  consultationId: string | null,
+) => ({
+  queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+  // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
+  queryFn: async () => {
+    const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
+    return talk && { ...talk, ...forPeople(talk) };
+  },
+  enabled: consultationId !== null,
+  refetchInterval: (q: { state: { data?: { consultation: { status: string } } | null } }) =>
+    q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false,
+});
+
 export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
-    // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
-    queryFn: async () => {
-      const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
-      return talk && { ...talk, ...forPeople(talk) };
-    },
-    enabled: consultationId !== null,
-    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
+  return useQuery(consultationQuery(api, orgId, channelId, consultationId));
+};
+
+/** Stable, so `useQueries` keeps the same list while no conversation changed. */
+const messagesOfTalks = (results: { data?: { messages: Message[] } | null }[]) =>
+  results.flatMap((r) => r.data?.messages ?? []);
+
+/**
+ * What a pair row opens: the question's own conversation (`useConsultationConversation`) with the rest of its
+ * exchange (`exchangeIds`: the other questions and hand-offs between the same two agents its row stands for), one
+ * conversation, oldest first.
+ */
+export const useExchangeConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  const own = useConsultationConversation(orgId, channelId, consultationId);
+  const list = useConsultations(orgId, channelId, consultationId !== null);
+  const others = useMemo(
+    () => (consultationId ? exchangeIds(list.data ?? [], consultationId).filter((id) => id !== consultationId) : []),
+    [list.data, consultationId],
+  );
+  const rest = useQueries({
+    queries: others.map((id) => consultationQuery(api, orgId, channelId, id)),
+    combine: messagesOfTalks,
   });
+  const data = useMemo(() => {
+    if (!own.data || rest.length === 0) return own.data;
+    const byId = new Map([...own.data.messages, ...rest].map((m) => [m.id, m]));
+    return {
+      ...own.data,
+      messages: [...byId.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+    };
+  }, [own.data, rest]);
+  return { ...own, data };
 };
 
 export const useRoster = (orgId: string, channelId: string, enabled = true) => {

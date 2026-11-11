@@ -2981,8 +2981,6 @@
     "chip": "Pamięć zaktualizowana",
     "was": "Wcześniej: {{text}}",
     "open": "Co wie {{name}}",
-    "undo": "Cofnij",
-    "undone": "Cofnięto",
     "group": "Pamięć zaktualizowana przez {{name}}"
   },
   "reach": {
@@ -3135,26 +3133,12 @@
     "someone": "ktoś",
     "you": "ty",
     "undo": "Cofnij",
-    "redo": "Ponów",
-    "undoAll": "Cofnij wszystko",
     "changes_one": "{{count}} zmiana",
     "changes_few": "{{count}} zmiany",
     "changes_many": "{{count}} zmian",
     "changes_other": "{{count}} zmiany",
     "undoneBy": "Cofnięte przez: {{name}}",
-    "ago": "{{time}} temu",
-    "timeLeft": "{{time}} na cofnięcie",
     "group": "Zmiany: {{name}}",
-    "undone": "Cofnięto.",
-    "redone": "Ponowiono.",
-    "undoneAll_one": "Cofnięto {{count}} zmianę.",
-    "undoneAll_few": "Cofnięto {{count}} zmiany.",
-    "undoneAll_many": "Cofnięto {{count}} zmian.",
-    "undoneAll_other": "Cofnięto {{count}} zmiany.",
-    "partial_one": "Nie udało się cofnąć {{count}} zmiany.",
-    "partial_few": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_many": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_other": "Nie udało się cofnąć {{count}} zmiany.",
     "errors": {
       "changed_since": "Ktoś to w międzyczasie zmienił. Cofnięcie teraz usunęłoby tę zmianę.",
       "expired": "Czas na cofnięcie minął.",
@@ -3840,6 +3824,7 @@
       "ready": "Połączono",
       "syncing": "Synchronizowanie",
       "reads": "Odczytuje: {{label}}",
+      "readOnly": "tylko do odczytu",
       "items_one": "{{count}} element",
       "items_few": "{{count}} elementy",
       "items_many": "{{count}} elementów",
@@ -3892,7 +3877,7 @@
       "onepassword": {
         "step": {
           "1": "Utwórz w 1Password sejf tylko dla swoich agentów i przenieś do niego loginy, których mogą używać",
-          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu",
+          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu (odczyt i zapis, jeśli agenci mają zapisywać tam nowe loginy)",
           "3": "Wklej tutaj token konta usługi"
         },
         "field": {
@@ -11919,7 +11904,7 @@
       "close": "Zamknij szczegóły",
       "can": "Co będą mogli robić agenci",
       "afterText": "Żaden agent z niego nie korzysta, dopóki nie wybierzesz.",
-      "allText": "Po połączeniu każdy agent może z niego korzystać. Następnie wybierasz dostęp każdego agenta.",
+      "allText": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
       "addAccount": "Dodaj kolejne konto",
       "accountsText": "Każde konto ma własnych agentów i poziomy.",
       "reconnect": "Połącz ponownie",
@@ -12740,11 +12725,10 @@
     "notApproved": "{{name}} pozwala logować się tylko zatwierdzonym aplikacjom, a agentes.chat jeszcze nie jest zatwierdzony. Jeśli dostaniesz tam klucz API, możesz połączyć się nim.",
     "serverSaid": "Odpowiedź serwera: {{detail}}",
     "nothingYet": "Do kroku 3 nic nie jest dostępne dla agentów.",
-    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to zmienić w kroku 3.",
-    "newAccount": "Nowe konto zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego. Wybierasz w kroku 3.",
+    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
     "replace": "Zastępuje obecne logowanie. Kto z niego korzysta, pozostaje bez zmian.",
     "replaceUnchecked": "Zaloguj się na to samo konto co wcześniej. Nie możemy sprawdzić, które to konto, a kto z niego korzysta, pozostaje bez zmian.",
-    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić. Zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego.",
+    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić.",
     "addTitle": "Kolejne konto {{name}}",
     "reconnectTitle": "Połącz ponownie {{name}}",
     "accountName": "Nazwa tego konta",
@@ -12773,7 +12757,18 @@
     "saved_one": "{{name}}: może z niego korzystać {{count}} agent.",
     "saved_few": "{{name}}: mogą z niego korzystać {{count}} agenci.",
     "saved_many": "{{name}}: może z niego korzystać {{count}} agentów.",
-    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta."
+    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta.",
+    "done": {
+      "title": "Połączono z {{name}}",
+      "everyone": "Każdy agent może z niego korzystać.",
+      "waiting": "Agenci dostaną narzędzia dopiero, gdy przejdziesz dalej, na poziomach, które sugerujemy.",
+      "asks_one": "{{count}} akcja prosi o zatwierdzenie na czacie.",
+      "asks_few": "{{count}} akcje proszą o zatwierdzenie na czacie.",
+      "asks_many": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "asks_other": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "adjust": "Dostosuj",
+      "ok": "Gotowe"
+    }
   },
   "database": {
     "name": "Baza danych",

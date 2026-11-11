@@ -386,8 +386,12 @@ describe("Instalar skill: private repositories", () => {
     await settle(6);
   };
 
-  /** Connecting GitHub's last two steps, as from Conectores: what it does (Continuar), who uses it (Liberar). */
+  /** After connecting GitHub, as from Conectores: its confirmation, then under Ajustar what it does and who uses it. */
   const finishConnecting = async () => {
+    await click(
+      within(screen().getByRole("dialog", { name: "GitHub conectado" })).getByRole("button", { name: "Ajustar" }),
+    );
+    await settle(4);
     await click(
       within(screen().getByRole("dialog", { name: "O que GitHub faz" })).getByRole("button", { name: "Continuar" }),
     );
@@ -553,8 +557,7 @@ describe("Instalar skill: private repositories", () => {
     expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
       { url: folder, list: true },
     ]);
-    // Signing in ends where connecting with a key does: GitHub's tools, then who uses it.
-    expect(document.body.textContent).toContain("GitHub conectado.");
+    // Signing in ends where connecting with a key does: GitHub's confirmation.
     await finishConnecting();
     const dialog = screen().getByRole("dialog", { name: "Instalar skill" });
     expect((within(dialog).getByRole("textbox", { name: "Link do GitHub" }) as HTMLInputElement).value).toBe(folder);

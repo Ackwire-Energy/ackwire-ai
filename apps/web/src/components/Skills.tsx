@@ -19,7 +19,7 @@ import {
   useSkills,
   useSkillUsage,
 } from "@agenteschat/client";
-import { fromConnection, itemName } from "@agenteschat/client/lib/connected";
+import { fromConnection } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
 import { relativeTime } from "@agenteschat/client/lib/format";
@@ -465,7 +465,7 @@ export function InstallSkillDialog({
       read(initialUrl, true);
     }
   }, [open]);
-  // Signed in on GitHub: on to what it does and who uses it, as Conectores goes on after signing in.
+  // Signed in on GitHub: its confirmation, as Conectores shows after signing in.
   const resumed = useRef(false);
   useEffect(() => {
     if (!open || !connected || resumed.current || !connections.data || !catalog.data) return;
@@ -473,9 +473,8 @@ export function InstallSkillDialog({
     const connection = connections.data.find((c) => c.connector === "github" && !c.revokedAt);
     if (!connection || !can(org, "manage_connectors")) return;
     const item = fromConnection(connection, catalog.data.connectors);
-    toast.show(t("connectors.connectedToast", { name: itemName(t, item) }));
-    setFlow({ step: 1, item });
-  }, [open, connected, connections.data, catalog.data, org, t, toast]);
+    setFlow({ step: "done", item });
+  }, [open, connected, connections.data, catalog.data, org]);
   const submit = async () => {
     setError(null);
     const onError = (e: Error) => setError(errorText(t, e));
