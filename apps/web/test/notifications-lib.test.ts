@@ -205,6 +205,16 @@ describe("answering and opening", () => {
       to: "/org/$orgId/approvals",
       search: { open: "a" },
     });
+    // The right hand paused what it does without asking: its own page, by the address that leads there. Who approves
+    // for whom stays in the person's settings.
+    expect(openTarget(notification({ id: "7", kind: "right_hand_paused", source: {} }))).toEqual({
+      to: "/org/$orgId/settings/$section",
+      params: { section: "right_hand" },
+    });
+    expect(openTarget(notification({ id: "8", kind: "approval_cover", source: {} }))).toEqual({
+      to: "/org/$orgId/settings/$section",
+      params: { section: "approvals" },
+    });
   });
 
   test("at the message itself: in a thread, a DM, a channel", () => {
