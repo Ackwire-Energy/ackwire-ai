@@ -4,6 +4,7 @@ import { textOf } from "@agenteschat/providers";
 import { announceAgentStatus } from "./agent-status";
 import { executesHere, RUN_STALE_MS } from "./cancel";
 import { onConsultedRunFinished } from "./consultations";
+import { ValidationError } from "./errors";
 import { liveTurnOf, publishChannelEvent, publishMessageCreated } from "./events";
 import type { Transcript } from "./executor";
 import { getMessage, insertMessage, messageView } from "./messages";
@@ -27,6 +28,12 @@ const { agentRuns, agentRunSteps, outbox, channels, approvals } = schema;
 
 /** A run is resumed at most this many times after a dead worker; then it fails. */
 const MAX_RECOVERIES = 2;
+/**
+ * A run dead longer than this fails with the notice instead of resuming. A restart's runs are swept within minutes,
+ * and a long outage's resume as they were; past this, work went on without the run (another may have done its task
+ * since), so taking it up again could repeat what was done.
+ */
+export const RESUME_MAX_AGE_MS = 6 * 60 * 60_000;
 
 type StoredTranscript = {
   messages?: { role: string; content: Parameters<typeof textOf>[0] }[];
@@ -55,7 +62,7 @@ type SweepTime = { now: Date; cutoff: Date };
  */
 export async function recoverStaleRuns(
   deps: { db: Database; pubsub?: PubSub },
-  options: { now?: Date; staleMs?: number } = {},
+  options: { now?: Date; staleMs?: number; onError?: (runId: string, error: unknown) => void } = {},
 ): Promise<{ resumed: string[]; failed: string[]; requeued: string[] }> {
   const { db } = deps;
   const now = options.now ?? new Date();
@@ -85,19 +92,26 @@ export async function recoverStaleRuns(
   for (const run of stale) {
     // Its executor is alive in this process: a beat that didn't get through (the database was away) is no death.
     if (executesHere(run.id)) continue;
-    const steps = await db
-      .select({ kind: agentRunSteps.kind, data: agentRunSteps.data })
-      .from(agentRunSteps)
-      .where(eq(agentRunSteps.runId, run.id))
-      .orderBy(desc(agentRunSteps.seq))
-      .limit(500);
-    const recovered = steps.filter((s) => s.kind === "error" && s.data.reason === "recovered").length;
-    const results = new Set(steps.filter((s) => s.kind === "tool_result").map((s) => String(s.data.toolUseId)));
-    const cutTool = steps.some((s) => s.kind === "tool_call" && !results.has(String(s.data.toolUseId)));
-    if (!cutTool && recovered < MAX_RECOVERIES && run.transcript) {
-      if (await resume(db, run, at, ranSinceLastCall(steps))) out.resumed.push(run.id);
-    } else if (await failInterrupted(deps, run, at)) {
-      out.failed.push(run.id);
+    // One run that can't be recovered never holds back the others: the next sweep tries it again.
+    try {
+      const steps = await db
+        .select({ kind: agentRunSteps.kind, data: agentRunSteps.data })
+        .from(agentRunSteps)
+        .where(eq(agentRunSteps.runId, run.id))
+        .orderBy(desc(agentRunSteps.seq))
+        .limit(500);
+      const recovered = steps.filter((s) => s.kind === "error" && s.data.reason === "recovered").length;
+      const results = new Set(steps.filter((s) => s.kind === "tool_result").map((s) => String(s.data.toolUseId)));
+      const cutTool = steps.some((s) => s.kind === "tool_call" && !results.has(String(s.data.toolUseId)));
+      const beat = run.heartbeatAt ?? run.startedAt ?? run.updatedAt;
+      const recent = now.getTime() - beat.getTime() < RESUME_MAX_AGE_MS;
+      if (!cutTool && recent && recovered < MAX_RECOVERIES && run.transcript) {
+        if (await resume(db, run, at, ranSinceLastCall(steps))) out.resumed.push(run.id);
+      } else if (await failInterrupted(deps, run, at)) {
+        out.failed.push(run.id);
+      }
+    } catch (error) {
+      options.onError?.(run.id, error);
     }
   }
 
@@ -266,17 +280,27 @@ async function failInterrupted(deps: { db: Database; pubsub?: PubSub }, run: Age
     const closedSecrets = await cancelSecretRequests(tx, run.id);
     for (const row of closedSecrets) await syncSecretMessage(tx, row);
     // A routine's background run never posts by itself (ADR 0053 §5): its ledger says it was cut off.
-    const message = run.background
-      ? null
-      : await insertMessage(tx, {
-          orgId: run.orgId,
-          channelId: run.channelId,
-          threadId,
-          author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
-          body: said ? `${said}\n\n${note}` : note,
-          // `text`: what the agent wrote; the app explains the interruption in the person's language.
-          meta: { interrupted: { reason: "deploy", text: said } },
-        });
+    const post = (thread: string | null) =>
+      insertMessage(tx, {
+        orgId: run.orgId,
+        channelId: run.channelId,
+        threadId: thread,
+        author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+        body: said ? `${said}\n\n${note}` : note,
+        // `text`: what the agent wrote; the app explains the interruption in the person's language.
+        meta: { interrupted: { reason: "deploy", text: said } },
+      });
+    let message: Awaited<ReturnType<typeof post>> | null = null;
+    if (!run.background) {
+      try {
+        message = await post(threadId);
+      } catch (error) {
+        // Its thread is gone, or no longer a thread of this channel: the notice goes to the channel itself. The
+        // refusal is the insert finding no row, no statement error, so the transaction goes on.
+        if (!(error instanceof ValidationError) || !threadId) throw error;
+        message = await post(null);
+      }
+    }
     if (message) await tx.update(agentRuns).set({ replyMessageId: message.id }).where(eq(agentRuns.id, run.id));
     await addRunStep(tx, run, "error", { reason: "interrupted", message: INTERRUPTED_BY_RESTART });
     // Its job is done for good.

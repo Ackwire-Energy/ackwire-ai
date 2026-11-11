@@ -29,6 +29,7 @@ import { ConflictError, ForbiddenError, NotFoundError, TooManyError, ValidationE
 import type { Judge } from "../judge";
 import { getMessage, listMessages, type MessageView, postPersonMessage } from "../messages";
 import { getMembership } from "../organizations";
+import { outageParkedOf } from "../runs";
 import type { Talker } from "../talker";
 import { listWorkingRuns } from "../working";
 import type { AppPrincipal } from "./grants";
@@ -287,7 +288,7 @@ async function taskState(deps: AppsToolDeps, p: AppPrincipal, message: Message, 
     case "waiting_input": {
       // Also held, with nobody to answer, while its computer is away or its AI provider is down: it carries on
       // by itself, and an "answer" sent now would land in the middle of it.
-      const wait = consultationWait({ ...run, outage: !!run.transcript?.outage });
+      const wait = consultationWait({ ...run, outage: outageParkedOf(run) });
       if (wait === "computer" || wait === "outage")
         return {
           status: "still_running" as TaskStatus,

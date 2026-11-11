@@ -187,7 +187,7 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
   const none: FirstRunFacts = { context: false, team: false, ai: false, apps: false, people: false };
 
   test("what the onboarding leaves, one order everywhere, for the owners, each row by what they may do", () => {
-    expect(FIRST_RUN_STEPS).toEqual(["about", "team", "ai", "apps", "people"]);
+    expect(FIRST_RUN_STEPS).toEqual(["plan", "about", "team", "ai", "apps", "people"]);
     // A team's onboarding asked what it does and made its team (ADR 0162): its card has the rest.
     expect(firstRunSteps(lodi(), owner)).toEqual(["ai", "apps", "people"]);
     expect(firstRunSteps(lodi(), { ...owner, connectors: false, invite: false })).toEqual(["ai"]);
@@ -195,6 +195,21 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     expect(firstRunSteps(lodi(), { ...owner, owner: false })).toEqual([]);
     expect(firstRunSteps(lodi(null), owner)).toEqual([]);
     expect(firstRunSteps({ setup: { role: null, done: [] }, builtin: null }, owner)).toEqual([]);
+  });
+
+  test("a workspace waiting for its first plan leads with the plan row, for whoever may pay (ADR 0162)", () => {
+    expect(firstRunSteps(lodi(), { ...owner, waitsForPlan: true })).toEqual(["plan", "ai", "apps", "people"]);
+    expect(firstRunSteps(lodi(), { ...owner, waitsForPlan: true, pay: false })).toEqual(["ai", "apps", "people"]);
+    expect(firstRunSteps(lodi(), { ...owner, waitsForPlan: true, personal: true })).toEqual([
+      "plan",
+      "about",
+      "team",
+      "ai",
+      "apps",
+    ]);
+    // The data never does it (it leaves when the hold lifts), so it is never a beat either.
+    expect([...firstRunDone({ role: null, done: [] }, { ...none, ai: true })]).toEqual(["ai"]);
+    expect(firstRunBeats(["plan", "ai"], { members: 1, invited: 0 })).toEqual(["ai"]);
   });
 
   test("each row reads done from its data; only a skip of apps or people is stored", () => {
@@ -207,11 +222,19 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     expect([...firstRunDone({ role: null, done: ["ai", "who"] }, none)]).toEqual([]);
   });
 
-  test("on a hold every row waits for the plan, a skipped one stays done, and no ask shows", () => {
+  test("on a hold the rows wait for the plan, a skipped one stays done, and no ask shows", () => {
     const done = firstRunDone({ role: null, done: ["apps"] }, none);
     const state = (s: Parameters<typeof firstRunRowState>[0], held: boolean) => firstRunRowState(s, { done, held });
-    expect(FIRST_RUN_STEPS.map((s) => state(s, true))).toEqual(["open", "open", "afterPlan", "done", "afterPlan"]);
-    expect(FIRST_RUN_STEPS.map((s) => state(s, false))).toEqual(["open", "open", "open", "done", "open"]);
+    // The plan row, and a personal workspace's first two, stay open: they are what can be done on the hold.
+    expect(FIRST_RUN_STEPS.map((s) => state(s, true))).toEqual([
+      "open",
+      "open",
+      "open",
+      "afterPlan",
+      "done",
+      "afterPlan",
+    ]);
+    expect(FIRST_RUN_STEPS.map((s) => state(s, false))).toEqual(["open", "open", "open", "open", "done", "open"]);
     const thinks = new Set([...done, "ai" as const]);
     expect(firstRunAsks(thinks, true, true)).toBe(false);
     expect(firstRunAsks(thinks, false, true)).toBe(true);
@@ -232,10 +255,27 @@ describe("the right hand's first run (ADR 0155 §6, ADR 0162)", () => {
     expect(firstRunRow(t, "ai", "done", f, false).title).toBe('agentSetup.firstRun.ai.done {"label":"Claude"}');
     expect(firstRunRow(t, "ai", "done", { ...f, label: null }, false).title).toBe("agentSetup.firstRun.ai.doneAny");
     expect(firstRunRow(t, "people", "done", f, true).title).toBe("agentSetup.firstRun.people.doneNone");
+    // On a hold the AI row is the step right after the plan's; the others open with the plan.
     expect(firstRunRow(t, "ai", "afterPlan", f, false)).toEqual({
       title: 'agentSetup.firstRun.ai.todo {"org":"Acme"}',
+      desc: "agentSetup.firstRun.afterPlanNext",
+      action: "",
+    });
+    expect(firstRunRow(t, "apps", "afterPlan", f, false)).toEqual({
+      title: 'agentSetup.firstRun.apps.todo {"org":"Acme"}',
       desc: "agentSetup.firstRun.afterPlan",
       action: "",
+    });
+    // The plan row asks with its button and is never skipped.
+    expect(firstRunRow(t, "plan", "open", f, false)).toEqual({
+      title: 'agentSetup.firstRun.plan.todo {"org":"Acme"}',
+      desc: 'agentSetup.firstRun.plan.todoDesc {"org":"Acme"}',
+      action: "agentSetup.firstRun.plan.action",
+    });
+    expect(firstRunRow(t, "plan", "open", { ...f, personal: true }, false)).toEqual({
+      title: 'agentSetup.firstRun.plan.todoPersonal {"org":"Acme"}',
+      desc: 'agentSetup.firstRun.plan.todoDescPersonal {"org":"Acme"}',
+      action: "agentSetup.firstRun.plan.action",
     });
   });
 

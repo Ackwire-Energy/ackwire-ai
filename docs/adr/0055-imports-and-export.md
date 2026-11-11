@@ -128,3 +128,17 @@ The old handle is read again from what the import kept (`import_items.key`, cut 
 ## Addendum (2026-11-01): skills arrive on, routines arrive active
 
 Imported skills now arrive on for the agents that had them, and imported routines arrive active, with their next run set as when someone makes one by hand. `enableSkills` is gone from the request (an old client that still sends it is ignored). A skill is turned on only where the agent or the skill is new in that apply, so a re-import never turns back on what someone turned off. Routines still count against an agent's active-routine cap: one past it arrives paused instead, with the note `too_many_routines` on its create, and the report says how many did. An MCP connection to set up is named by its server (else its host), without the host and header names, since the name reads inside that sentence. The preview no longer says that skills arrive off or routines paused, and it no longer lists what doesn't come along; what to set up afterwards reads as one line each ("Ada usa o HubSpot. Conectar"). The rules for skills and routines in §4 above are superseded by this.
+
+## Addendum (2026-11-10): another app's reply asks for every agent and never makes one twice
+
+Two things people hit bringing agents from another app with `EXPORT_PROMPT`: the bot exported only itself, and asking a second time made the same agent again.
+
+- The request now opens by asking for all of the person's agents in one file, not only the one in the chat, and says an export with only that one is wrong when there are others. An agent the bot can't read is still listed, with its name, its role and empty instructions.
+- Every reply from one app is one package: `source.ref` is the app (`grok-bot`), not the `ref` the model writes, which changes from one export to the next and made each reply a new package. Our own export keeps `agenteschat:<org>`. The cost: two accounts of one app, imported by the same person, share a package, and the preview shows the second as updates.
+- A reply's keys are a model's guesses too, so the parser gives its own: an agent goes by its name (two with one name keep the model's key after it), a routine by its agent and name, a note by what it says. Channels, routines, notes and to-dos may name an agent by key, handle or name; with a single agent, any name means it.
+- An agent that comes back with no instructions never clears what an earlier import brought (`unchanged`): each bot's reply fills in what it can read.
+- Replies imported before this were kept as `<app>:<the model's ref>`. `loadImportState` reads those rows as the app's package too, so asking again updates what they made.
+
+## Addendum (2026-11-10): the onboarding's team step brings the agents (§3, §4)
+
+The onboarding no longer sends a person who has agents elsewhere to Settings › Import after it ends: its team step asks first whether they have agents in another app, and brings them there (ADR 0162, amended 2026-11-10). The step uses the same flow as the import page: an app that answers `EXPORT_PROMPT` is asked from the step, a file or a folder goes through the picker, the preview shows what was found and applying it makes the team. Agents brought there arrive with no model (`model: null`), so they take the new agent's default and think with the AI connected in the next step: a model kept from the other app (§4) could be one the workspace never connects. A step that brought no agent goes on as if the person had none.

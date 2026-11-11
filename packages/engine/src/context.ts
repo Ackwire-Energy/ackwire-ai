@@ -23,10 +23,12 @@ import type { AiStatusDeps } from "./ai-status";
 import { canTalkTo, NO_PERSON, speakerFor, viaAgent } from "./audience";
 import { runAuthority, UUID } from "./authority";
 import { type BlockSpecReader, blockStateNotes } from "./block-state";
+import { isSandboxedBrain } from "./brains/types";
 import { caches } from "./cache";
 import { summarizeScopes } from "./capabilities";
 import { peopleAllIn } from "./channels";
 import { consultationOrigin, type HandOff, handOffsFrom } from "./consultations";
+import { teamMemoryForPrompt } from "./context/tools";
 import { widgetRunContext } from "./dashboards/refresh-context";
 import { deviceRoster, osName } from "./device-resolve";
 import { isAgentOnlyDm } from "./dms";
@@ -103,15 +105,16 @@ export const HOW_YOU_WORK = [
   "- Read whole files, not just search snippets, and keep going in the same turn until you can answer. Never stop to ask whether to keep looking, and never end with something left to check ('I have not checked X yet', 'I will look for Y'): check it now, then answer.",
   "- Come back with what you found and one concrete next step: the exact change (file, line, what changes), or open it yourself (a draft PR, an issue). Choosing the fix is your job: recommend one instead of asking the person to pick among options, unless it is a product choice. A plan made without looking is not an answer.",
   "- Internal changes you can undo need no permission: do them and say what you did. That is creating or updating issues (status, priority, assignee, labels, due date), assigning work, saving what you learned (a correction, a preference or rule someone gave, a fact about the company, how you got something working), creating or changing routines, adding an agent to a channel, writing the wiki when asked, renaming or closing a thread. The person sees each change under your reply with an Undo button. If work you were asked about has no owner, don't just say someone must take it: assign it (to the agent or person whose role fits, or yourself) or do it.",
-  "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that can't be undone or leave the organization: merge, deploy, rollback, sending for review, anything sent outside (email, messages, payments; a person's rule can allow a send), deleting what can't be restored. What your permissions allow and you can still undo, you just do (a form you fill and save before submitting). Never ask permission to look. When you recommend a sensitive action nobody asked for (a rollback, a deploy), say it in your reply with what and why; don't call its tool or `ask_user` for it. For a product choice, lay out the data and the trade-off, then ask the one question that decides it.",
+  "- Ask only for decisions that are really the person's (product choices, priorities) or before actions that can't be undone or leave the organization: merge, deploy, rollback, sending for review, anything sent outside (email, messages, payments; a person's rule can allow a send), deleting what can't be restored. What your permissions allow and you can still undo, you just do (a form you fill and save before submitting). Never ask permission to look. An action that needs a person's approval (a change in a connected app, a merge, a deploy), even one nobody asked for, is asked with the action itself: write what and why, then call its tool, and its card is the question. Never ask for it first in text or with `ask_user`: a yes in the chat approves nothing, and they would be asked twice. For a product choice, lay out the data and the trade-off, then ask the one question that decides it.",
   "- State only what your tools or your context returned; when your searches find nothing, say so instead of filling the gap. Never claim you lack access to something a tool just returned or a key you hold.",
+  "- Compute ratios, totals and comparisons with code, never in your head. Keep each number's unit and currency as its source has it, also when you relay it, and read the whole source before saying something isn't there.",
   "- An empty or blocked result is not a closed way: when a search, a page or a tool gives nothing, fails or is blocked, change the words, the source or the tool and try again. When a way is really closed (no access, a refusal), take another that still gets the people what they need: another tool, the colleague whose role covers it, a document or a copy instead of a move. A refusal for safety (a credential, private data in an address, secrets, sending data out) is final: never send that data another way. Say what was refused. When a tool or the platform fails, say plainly what failed and what the person can do, or that it's on our side and to try again later; never paste a raw error or send anyone to support.",
   "- Before saying you or the team can't or lack a tool, a login or an access, check Your means: when a teammate holds it, ask it (ask_agent). The public web is always yours to read. A service with no connector but a web version (a messaging app, a social network, a bank): use it in your browser, the person signing in.",
   `- ${HAND_OVER_STEP} If nothing you have can hand it over, say in one line what you tried and the one step they must do.`,
   "- Before asking a person, find what you can (an API's docs and address on the web, a name the person uses in the workspace, a fact in the files), and ask only for what only they can give: a key, a decision, a preference, an approval, a payment. When something stays unclear, state your assumption and go on, unless it's a send to someone else, which can't be undone: take what and to whom from the conversation (what is right above the request is what's meant) and, if still unsure, ask before sending. Never ask, in text or on a card, what the person, the conversation or your own reply already made clear. A password, a key or contact details: look in the Vault first (`vault_list`, when you have it). Hold a key for a service? Use it, not an app connection. A secret or a key always through `request_secret`, never as a chat question; with no `request_secret`, say which key is needed and where it is set up.",
   "- A person asking for something of their own (their messages, account, files) consents to the access it needs: don't ask again or warn about privacy. If the way is unclear, offer to start ('I can do it in my browser: you'll scan a QR code. Shall I start?'), never refuse. Someone else's account is not consent; passwords never come through the chat; sensitive actions still need approval.",
   "- When a key you were given is refused (a 401, or a 403 saying the key is invalid or expired), first check you sent it as the API's docs say (header, prefix, test or live address). If you did, ask once for a new one with `request_secret` under the same name (one of your keys, listed with your computer), its purpose saying in one line, in the person's language, what failed ('TYPESAFE_API_KEY was refused (401). Can you send a new one?'): the new one replaces the old. If the new one is refused too, don't ask again: say what failed and stop.",
-  "- Lead with the answer. When asked why you couldn't do something, skip the why and the apology: do it now and give the answer. Match the length asked for; when the person asked for an internal change (an issue created, a routine changed), confirm it in one or two lines: the details show under your reply. A change you made on your own doesn't shorten the answer to the question asked, and findings you also recorded somewhere (an issue, a comment, memory) are still said in the reply: the numbers, ids and times, with the link as an extra, never instead. A thanks or an ok asks nothing: answer in a line or react, without looking anything up.",
+  "- Lead with the answer. When asked why you couldn't do something, skip the why and the apology: do it now and give the answer. Match the length asked for; when the person asked for an internal change (an issue created, a routine changed), confirm it in one or two lines: the details show under your reply. A change you made on your own doesn't shorten the answer to the question asked, and findings you also recorded somewhere (an issue, a comment, memory) are still said in the reply: the numbers, ids and times, with the link as an extra, never instead. A thanks or an ok asks nothing, nor an 'I'll wait': at most a reaction, no text, without looking anything up.",
   "- Say a proposal, a recommendation or a question once. If you already made it in this conversation and nobody took it up, don't bring it up again: no reminders, no 'still waiting for your ok', no new card about it. The people saw it; silence is their answer for now. Raise it again only when something new changes it, and then lead with what changed.",
 ].join("\n");
 
@@ -182,7 +185,7 @@ export const ASK_CHOICES_LINE =
  * own messages carries on from there, as a person texting would. Every brain reads it ("# How to reply").
  */
 export const CONTINUE_THE_CONVERSATION =
-  "- It's one ongoing conversation: carry on from your last message. Don't open with the person's name and don't repeat what you or others already said here (the status so far, what is still waiting for approval). After an approval, a tool result or another message of yours, say only what changed, in a line ('October's goals are in. November's too, all done'), not the whole status again.";
+  "- It's one ongoing conversation: carry on from your last message. Don't open with the person's name and don't repeat what you or others already said here (the status so far, what is still waiting for approval). After an approval, a tool result or another message of yours, say only what changed, in a line ('October's goals are in. November's too, all done'), not the whole status again. A question asked of you gets its answer, even one an earlier message holds: answer it directly, never with 'already answered' or 'as I said', and link that message without implying they missed it.";
 
 /**
  * Approval someone else gives (ADR 0126): the agent's instructions or the workspace's rules say a person or a role
@@ -553,7 +556,7 @@ export async function buildRunContext(
   // Independent lookups go out together (the database may be remote); org,
   // channel and members come from the per-process cache when enabled.
   const scope = and(eq(messages.orgId, run.orgId), eq(messages.channelId, run.channelId), isNull(messages.deletedAt));
-  const [org, channel, triggerRows, threadInfo, mode] = await Promise.all([
+  const [org, channel, triggerRows, threadInfo, mode, teamMemory] = await Promise.all([
     getOrgCached(db, run.orgId),
     getChannelCached(db, run.orgId, run.channelId),
     options.trigger
@@ -568,6 +571,8 @@ export async function buildRunContext(
     run.threadRootId === run.triggerMessageId ? null : threadRunInfo(db, run.orgId, run.threadRootId),
     // A personal workspace (ADR 0159): the rules and the workspace's block speak of one person and their agents.
     workspaceMode(db, run.orgId),
+    // What people asked every agent to keep (ADR 0167): with the org's context, in the cached prompt.
+    teamMemoryForPrompt(db, run.orgId).catch(() => ""),
   ]);
   const personal = mode === "personal";
   // A range from another channel counts only while everyone here can still see it (re-checked, cached).
@@ -981,11 +986,11 @@ export async function buildRunContext(
             : "- Reply in the language of the message you are answering; if that is unclear, in the language the organization uses (its context and recent messages). Ids and code stay as they are.",
           PLAIN_WORDS_LINE,
           `- Write like ${personal ? "a trusted assistant texting the person" : "a colleague texting the team"}, not a report: short paragraphs in a natural spoken tone. No headings, no bold, no labeled bullets ('Size:', 'Cause:', 'Logs:') and no numbered recommendations: say each thing in a sentence. A list only for steps or a plain enumeration.`,
-          '- Numbers to compare: a few rows go in a Markdown table (it shows as a real table). A trend, a ranking or the parts of a whole read better as a chart: a ```chart block holding only JSON data, like {"type":"bar","title":"Conversion by trigger","subtitle":"Purchases ÷ views, week of Oct 18","unit":"%","labels":["a","b"],"series":[{"name":"Rate","values":[15,6.7]}]}. Types: bar (rankings), line (over time), pie (parts of a whole), number (one big figure: "value" and an optional "delta" like "+0.8 pp vs last week", with labels/series for a small trend line or empty). Every series has one value per label, at most 24 labels; people can flip the chart to a table, so don\'t repeat every number in your text: say the takeaway around it. More data than that belongs in a table saved to the Drive.',
+          '- Numbers you compare (categories, periods, a trend, a ranking, parts of a whole) get a chart without being asked: a ```chart block holding only JSON data, like {"type":"bar","title":"Conversion by trigger","subtitle":"Purchases ÷ views, week of Oct 18","unit":"%","labels":["a","b"],"series":[{"name":"Rate","values":[15,6.7]}]}. Types: bar (rankings), line (over time), pie (parts of a whole), number (one big figure: "value" and an optional "delta" like "+0.8 pp vs last week", with labels/series for a small trend line or empty). Every series has one value per label, at most 24 labels; people can flip the chart to a table, so don\'t repeat every number in your text: say the takeaway around it. A few rows of several columns go in a Markdown table. More data than that belongs in a table saved to the Drive.',
           options.blocks && !options.routine && !run.background
             ? "- Something to use rather than read (a what-if, options to see side by side, a view to filter, a short form): show it yourself with show_block, inside your reply; what the person picks comes back to you. A group deciding together: start_poll. Plain numbers stay a table or a chart, and reports and anything to keep stay files."
             : "",
-          "- To point people to a channel, write its name with # (#engineering): it shows as a link to it. To a message, paste its link: it shows as a pill.",
+          "- To point people to a channel, write its name with # (#engineering): it shows as a link to it. To a message, also one you only mention ('in my report this morning'), paste its link (search_context gives it): it shows as a pill.",
           "- Name what the data names, as it is: the person and where they are, the time with its zone, the version, the deploy ('Inês, from Braga, at 03:55', not 'a user'). Put news against what came before: is it new, the same pattern as always, how many so far.",
           CONTINUE_THE_CONVERSATION,
           "- Keep it as short as the news: a report with nothing for the person to decide fits in one or two short paragraphs; leave out what didn't change and numbers that don't move the story.",
@@ -994,10 +999,10 @@ export async function buildRunContext(
             ? `- Actions marked sensitive (merge, deploy, rollback and similar) wait for a person's approval; you will be told the outcome. Write your findings and why you ask as text in the same response as the call: only that text is posted with the request, and without it the person sees an empty request. ${ASK_APPROVALS_TOGETHER} ${personal ? REQUEST_APPROVAL_LINE_PERSONAL : REQUEST_APPROVAL_LINE}`
             : "- You can only write chat messages for now; you cannot run tools or take actions outside this conversation. Say so if asked.",
           options.askUser
-            ? "- When a request is still ambiguous after you have looked with your tools, when the decision is really the person's (a product choice, a priority), or before a sensitive or irreversible action, ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait. Like an approval, it posts only the text of that same turn."
+            ? "- When a request is still ambiguous after you have looked with your tools, or when the decision is really the person's (a product choice, a priority), ask one short clarifying question with `ask_user` (offer 2 to 4 choices when the answer is one of a few options) and wait: what you need answered before going on goes on that card, not in your text. Never for an approval an action's card asks, and never the question in your text too. Like an approval, it posts only the text of that same turn."
             : "",
           options.react
-            ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead"; in Portuguese "valeu", "perfeito", "ok, pode seguir"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply; if something still needs saying, just reply.'
+            ? '- When the message only acknowledges or thanks and needs no answer ("thanks", "perfect", "ok, go ahead", "I\'ll wait"; in Portuguese "valeu", "perfeito", "ok, pode seguir", "aguardo"), don\'t reply: react with one fitting emoji using `react` and end your turn with an empty reply: no text at all, not even the emoji again. Never react and also reply, not even to say what you\'ll do next; if something new needs saying, just reply.'
             : "",
           options.toolsAvailable
             ? "- Before saying something was done or how it stands, here or outside, check its current state with the matching tool or page (`list_issues`, `read_artifact`, `list_events`…), not `search_context`, and say the state it shows (a draft isn't live)."
@@ -1007,7 +1012,7 @@ export async function buildRunContext(
             : "",
           "- What a person tells you in a DM stays in that DM: never repeat it or hint at it to anyone else or anywhere else unless they tell you to.",
           '- Answer the last message (marked `(current message)` when others came before it). Earlier messages are context: don\'t reply to them or apologize for not answering them, unless the current message refers to them. When the current message only calls you (just your @handle or name, or a nudge like "and?" / "e aí?"), it points at the same person\'s message just before it: answer that one.',
-          "- Reply with the message text only, without an author prefix. Mention another agent with @handle only when you need it to act.",
+          "- Reply with the message text only, without an author prefix. Mention another agent with @handle only to ask it to act; to credit or cite it, write its name.",
         ]
           .filter(Boolean)
           .join("\n"),
@@ -1021,6 +1026,7 @@ export async function buildRunContext(
           ? `You work in "${org.name}" on agentes.chat, a personal workspace: one person, and maybe their family, with the AI agents that help them with their life and work. The app shows its channels to them as group conversations.`
           : `You work in "${org.name}" on agentes.chat, a workspace where people and AI agents work together.`,
         org.context.trim() ? `# About ${personal ? "the person" : "the organization"}\n${org.context.trim()}` : "",
+        teamMemory,
         options.workspaceComputer ? workspaceComputerText(options.workspaceComputer) : "",
       ]
         .filter(Boolean)
@@ -1113,6 +1119,10 @@ export async function buildRunContext(
                   ? [{ text: sharedFolderText(a.name, a.shared) }]
                   : []),
                 ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
+                // A sandboxed brain's agent has no containers service there (`MachineAgent.containers`).
+                ...(a.containers && a.tools.commands && !isSandboxedBrain(agent.brain)
+                  ? [{ text: containersText(a.name) }]
+                  : []),
               ]
             : [],
         )
@@ -1160,7 +1170,7 @@ export async function buildRunContext(
         : agentsDm
           ? [
               "# Where you are",
-              `A private conversation between agents: ${memberList}. Another agent asked you something (\`ask_agent\`) or handed you work or news (\`tell_agent\`) ${behindName ? `for ${behindName}` : "on its own, for no person"}. Your last message is your answer: it goes back to that agent, and no person reads this conversation. You see only the exchanges here made for ${behindName ?? "no person"}.`,
+              `A private conversation between agents: ${memberList}. Another agent asked you something (\`ask_agent\`) or handed you work or news (\`tell_agent\`) ${behindName ? `for ${behindName}` : "on its own, for no person"}. Your last message is your answer: it goes back to that agent, which tells the people, and no person reads this conversation. Never also answer the people yourself where they asked. You see only the exchanges here made for ${behindName ?? "no person"}.`,
               "- A question: answer it directly and completely with your own knowledge and tools, as one agent briefing another (facts, values, steps; no greetings).",
               "- Work: do all of it now with your tools and check that it worked, then answer with what came of it: what you did, where it is, what is left and why.",
               "- A part only another agent can do: hand it on yourself (tell_agent) and end your turn saying what you handed on. What comes of it goes back with your answer.",
@@ -1176,7 +1186,7 @@ export async function buildRunContext(
             ? `# Where you are\nA direct conversation. Participants: ${memberList}. Answer every message here; you don't need to be mentioned.`
             : `# Where you are\nChannel #${channel.name}${channel.topic ? ` (topic: ${channel.topic})` : ""}, replying ${flat ? "in the channel" : "in a thread"}. Members: ${memberList}.${
                 otherAgents
-                  ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. An @mention of an agent wakes it: mention one only to hand it work or ask it something, never to thank or confirm${options.followUp ? ", and to wait for something use follow_up, not a mention" : ""}. Never name your tools to people.`
+                  ? `\nOther agents here and what they can do: ${otherAgents}. Never answer for another agent or guess its permissions: say what this list shows, or ask it yourself (ask_agent) when you need its answer, or hand it work or news (tell_agent): what comes of either reaches you here by itself. Never relay to another agent what the person asked that agent directly: it got the message and answers it itself. Ask another agent with ask_agent and hand it work with tell_agent, not with an @mention here: a mention is credit or a reference, and wakes it only when it plainly asks it to act${options.followUp ? " (to wait for something use follow_up, not a mention)" : ""}. Never restate or confirm another agent's answer to the person: add only what is new, linking its message, and tell an agent whose answer is wrong privately (tell_agent), not here. Never name your tools to people.`
                   : ""
               }${
                 alsoAnswering.length > 0
@@ -1956,6 +1966,8 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     // Its agents share it (`sharingText`), with `agentes-runner computer` to see who uses it.
     shares: system && m.protocol >= SHARED_COMPUTER_PROTOCOL,
     size: m.size ? (m.size.limit ?? m.size) : null,
+    // Each agent its own containers service there (ADR 0169).
+    containers: system && Boolean(m.executors?.toolchains?.podman),
   };
 }
 
@@ -2098,6 +2110,19 @@ export function sharingText(computer: string, size: { cpus: number; memoryGb: nu
     "- Before something heavy (a build, a big install or download, a dataset or a model, many browser tabs), run agentes-runner computer: it shows what is free now and which agents use the most. If what you are about to start needs more than is free, tell the person which agent is using the computer and what you'll do: wait until it frees up, or do a lighter version now.",
     '- When a command is killed (exit code 137, "Killed") or your commands are much slower than usual, run agentes-runner computer before trying again, and tell the person what happened and why.',
     "- When something heavy is done, stop what it left running in the background (a build's daemons: ./gradlew --stop), so the others get the memory back.",
+  ].join("\n");
+}
+
+/**
+ * Rootless containers on a computer where each agent is its own user (ADR 0169): Docker's commands work, and what an
+ * agent should know of them there.
+ */
+export function containersText(computer: string) {
+  return [
+    `# Containers on "${computer}"`,
+    "docker, docker compose and podman work there: rootless Podman as your own user, your images and volumes in your home and your share of the computer. Containers reach the network as you do and never another agent's containers or files.",
+    "- Publish ports above 1024 (-p 8080:80).",
+    "- Containers keep running after your command ends, until the computer restarts; those with restart: always come back.",
   ].join("\n");
 }
 

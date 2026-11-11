@@ -1,13 +1,16 @@
 import type { OrgSettings } from "@agenteschat/client";
 import {
   keys,
+  type Memory,
   useApi,
   useServerTelemetry,
   useSetServerTelemetry,
   useSettings,
+  useTeamMemories,
   useUpdateSettings,
 } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
+import { memoryLine } from "@agenteschat/client/lib/proposals";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
@@ -36,12 +39,15 @@ import {
   useToast,
 } from "@/ui";
 import { router } from "@/ui/navigation";
+import { MemoryFix } from "../agents/AgentProfileScreen";
+import { useMemoryOriginText } from "../agents/useMemoryOriginText";
 import { Note } from "../ai/parts";
 import { ZoneList } from "../me/AccountPage";
 import { PHOTO_MAX_BASE64, photoContentType } from "../me/logic";
 import { useColors } from "../shared/hooks";
 import { OrgAvatar } from "../shared/OrgAvatar";
 import { errorHaptic, goBack, MONO, successHaptic } from "../shared/parts";
+import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { TextArea } from "../shared/TextArea";
 import { missingIdeas, nameOnLeave, withIdea, zoneLabel } from "./logic";
 import { chooseAction, Gap, SettingsPage } from "./parts";
@@ -434,8 +440,67 @@ export function GeneralScreen() {
         </>
       )}
 
+      <TeamMemory />
       <UsageStatistics />
     </SettingsPage>
+  );
+}
+
+/**
+ * Memória do time (ADR 0167): what people asked every agent to keep, with who and when, under the context every agent
+ * reads. Who reviews memory taps one to change or forget it.
+ */
+function TeamMemory() {
+  return (
+    <SheetHostProvider>
+      <TeamMemoryList />
+    </SheetHostProvider>
+  );
+}
+
+function TeamMemoryList() {
+  const { t } = useTranslation();
+  const { orgId, org } = useOrg();
+  const sheet = useSheet();
+  const list = useTeamMemories(orgId);
+  const originText = useMemoryOriginText();
+  const reviews = can(org, "review_memory");
+  if (!list.data) return null;
+  const fix = (m: Memory) =>
+    sheet.open(
+      <MemoryFix
+        memory={m}
+        agentId=""
+        agentName=""
+        g=""
+        source={originText(m)}
+        title={t("teamMemory.title")}
+        onSee={undefined}
+        onDone={sheet.close}
+      />,
+    );
+  return (
+    <>
+      <Gap />
+      <GroupedHeader>{t("teamMemory.title")}</GroupedHeader>
+      <GroupedList>
+        {list.data.length === 0 ? (
+          <GroupedRow label={t("teamMemory.empty")} labelLines={4} faint />
+        ) : (
+          list.data.map((m) => (
+            <GroupedRow
+              key={m.id}
+              label={m.summary ?? memoryLine(t, m)}
+              labelLines={6}
+              sub={originText(m)}
+              subLines={2}
+              {...(reviews ? { chevron: true, onPress: () => fix(m) } : {})}
+            />
+          ))
+        )}
+      </GroupedList>
+      <GroupedFooter>{t("teamMemory.help")}</GroupedFooter>
+    </>
   );
 }
 

@@ -2,6 +2,7 @@ import type { Agent } from "@agenteschat/client";
 import {
   useAgentBrain,
   useAiStatus,
+  useAuthConfig,
   useCatalog,
   useConfirmSetup,
   useConnections,
@@ -15,7 +16,6 @@ import {
 import { errorText } from "@agenteschat/client/lib/errors";
 import { emailName, joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { stepPermissions } from "@agenteschat/client/lib/home";
 import { aiStateOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
@@ -50,12 +50,14 @@ import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SetupAsks, SetupCardView, StepDialog, useDoneSay } from "@/components/AgentSetup";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { useConnectAi } from "@/components/ConnectAi";
 import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
+import { useFirstRunPowers } from "@/components/Standing";
 import { TeamTemplatesDialog } from "@/components/TeamPlan";
 import { useAgentThinks } from "@/hooks/useAgentThinks";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -63,13 +65,14 @@ import { useDirectory } from "@/hooks/useDirectory";
 /*
  * The right hand's first run (ADR 0155 §6, ADR 0162): one checklist card inside its greeting, drawn by the app and
  * never stored, for the workspace's owners, with what the onboarding didn't do: an AI, apps, people. A personal
- * workspace (ADR 0159), which the onboarding opens at once, has four in its words: what the person wants help with
- * (areas of life), their agents, an AI, their apps. Each row opens in place, none needing a model, and reads done
- * from the data; only "Agora não" is kept. On a billing hold every row waits for the plan, whose one button is the
- * hold's banner.
+ * workspace (ADR 0159) has four in its words: what the person wants help with (areas of life), their agents, an AI,
+ * their apps. Each row opens in place, none needing a model, and reads done from the data; only "Not now" is kept.
+ * While the workspace waits for its first plan, the plan leads as a row of its own whose button is the way to it (the
+ * hold's, `from: "hold"`), the AI row says it comes next, and the rest wait for the plan (ADR 0162).
  */
 
 const ROW_ICON: Record<FirstRunStep, IconName> = {
+  plan: "power",
   about: "person",
   team: "agent",
   ai: "bolt",
@@ -79,20 +82,8 @@ const ROW_ICON: Record<FirstRunStep, IconName> = {
 
 /** The rows this person sees on the right hand's card (none: the card isn't theirs). */
 export function useFirstRunSteps(agent: Agent | undefined): FirstRunStep[] {
-  const { org, me } = useOrg();
-  const dir = useDirectory(org.id);
-  if (!agent) return [];
-  const may = stepPermissions(org, me.user.id, dir.agents);
-  return firstRunSteps(agent, {
-    owner: org.role === "owner",
-    configure: can(org, "configure"),
-    createAgents: may.createAgents,
-    connectAi: may.connectAi,
-    pay: may.pay,
-    connectors: can(org, "manage_connectors"),
-    invite: may.invite,
-    personal: isPersonal(org),
-  });
+  const powers = useFirstRunPowers();
+  return agent ? firstRunSteps(agent, powers) : [];
 }
 
 /** Where the card stands for this person: `open` while a row is left, `complete`, or `none` (not theirs). */
@@ -157,6 +148,7 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const thinks = useAgentThinks(agent);
   // Through the API, the workspace's key it runs on names its maker, as the side panel does (Automático names none).
   const keyMaker = useAgentBrain(org.id, agent.id).data?.workspaceAi?.key?.provider;
+  const billingUrl = useAuthConfig().data?.billingUrl;
   const navigate = useNavigate();
   const [open, setOpen] = useState<"about" | "apps" | null>(null);
   const [templates, setTemplates] = useState<{ initial?: string } | null>(null);
@@ -191,6 +183,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
   const next = steps.find((s) => stateOf(s) === "open");
   const skip = (step: "apps" | "people") => confirm.mutate(step);
   const act: Record<FirstRunStep, () => void> = {
+    // Its button leaves for the billing service (`actionNode` below), never this.
+    plan: () => undefined,
     about: () => setOpen("about"),
     team: () =>
       done.has("team") ? void navigate({ to: "/org/$orgId/team", params: { orgId: org.id } }) : setTemplates({}),
@@ -217,7 +211,8 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
         invited: run.invited.length ? joinNames(run.invited, t) : null,
         personal,
       },
-      agent.setup?.done.includes(s) ?? false,
+      // Nothing about the plan is stored: it is never skipped, it leaves when the hold lifts.
+      s !== "plan" && (agent.setup?.done.includes(s) ?? false),
     );
     return {
       key: s,
@@ -227,8 +222,18 @@ export function FirstRunCard({ agent, channelId }: { agent: Agent; channelId: st
       desc: words.desc,
       dim: state === "afterPlan",
       saying: said && beatRow(said.step) === s ? said.text : null,
-      ...(words.action && !inline && (s !== "ai" || connect) && (s !== "people" || invite)
+      ...(words.action && !inline && s !== "plan" && (s !== "ai" || connect) && (s !== "people" || invite)
         ? { action: { label: words.action, primary: s === next, onClick: act[s] } }
+        : {}),
+      // The plan's row: the hold's own way to the billing service (no billing service, no button).
+      ...(s === "plan" && state === "open" && words.action && billingUrl
+        ? {
+            actionNode: (
+              <BillingLinkButton orgId={org.id} from="hold" size="sm" variant="primary">
+                {words.action}
+              </BillingLinkButton>
+            ),
+          }
         : {}),
       ...(words.skip && (s === "apps" || s === "people") && !inline
         ? { skip: { label: words.skip, busy: confirm.isPending, onClick: () => skip(s) } }

@@ -3,8 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { payWith } from "./ai-picker";
 import {
   ADA_ID,
   ATLAS_ID,
@@ -91,32 +91,53 @@ describe("the first-run checklist", () => {
     expect(ai).not.toContain("Automático");
   });
 
-  test("on a hold every row waits for the plan, with no plan button on the card", async () => {
+  test("on a hold the plan leads with the card's one button, the AI row is next, the rest wait", async () => {
     const state = fresh();
     const org = state.me?.organizations[0];
     if (org) org.standing = { state: "hold", reason: "payment" };
+    state.authConfig = { billingUrl: "https://billing.example.com" };
+    // The link isn't minted: the click is all this test follows, never a page left.
+    state.billingLinkError = new ApiError(503, "billing.unavailable", "Billing is down");
     const api = createFakeApi(state);
     // agentes.chat Cloud, where each workspace's own computer waits for the plan: only there is a hold.
     fakeMachinesOf.get(api)?.setSetup({ state: null });
     await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api });
     await settle(12);
-    expect(rows().every((r) => r.dataset.dim !== undefined)).toBe(true);
-    expect(card().textContent).toContain("Abre com o plano.");
-    expect(card().querySelectorAll("button")).toHaveLength(0);
+    expect(rows().map((r) => r.querySelector(".ac-mediarow__head")?.textContent)).toEqual([
+      "Ligue o time.",
+      "Conecte uma IA.",
+      "Conecte os apps do trabalho.",
+      "Chame quem trabalha com você.",
+    ]);
+    expect(card().querySelector(".setup-cl__head small")?.textContent).toBe("0 de 4");
+    expect(row("Ligue o time.").dataset.dim).toBeUndefined();
+    expect(
+      rows()
+        .slice(1)
+        .every((r) => r.dataset.dim !== undefined),
+    ).toBe(true);
+    expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
+    expect(row("Conecte os apps do trabalho.").textContent).toContain("Abre com o plano.");
+    expect([...card().querySelectorAll("button")].map((b) => b.textContent)).toEqual(["Ver planos"]);
+    await click(within(row("Ligue o time.")).getByRole("button", { name: "Ver planos" }));
+    expect(calls(state, "orgs.billingLink").map((c) => c.args)).toEqual([[ORG_ID, "hold"]]);
   });
 
   test("the AI row connects the whole team, naming no one, and a key saved there is Lodi's AI too", async () => {
     const state = withRightHand(seedState(), { setup: { role: null, done: [] } });
     state.members = state.members.slice(0, 1);
     state.connections = [];
+    // The team the person made: theirs, so it wakes with the right hand (alone, Lodi would get its own dialog).
+    for (const a of state.agents) a.ownerUserId = "u-walter";
     state.aiStatus = {
       any: false,
       agents: [LODI_ID, ADA_ID, ATLAS_ID].map((agentId) => ({ agentId, state: "no_ai", reason: "no_key" })),
     };
     await openDm(state);
     await click(within(row("Conecte uma IA.")).getByRole("button", { name: "Conectar" }));
-    const add = screen().getByRole("dialog", { name: "Conectar uma IA" });
-    await click(payWith(add, "Com chave de API"));
+    // For the whole team (ADR 0160, addendum): the key is one of its cards.
+    const add = screen().getByRole("dialog", { name: "Conectar uma IA para o time" });
+    await click(within(add).getByRole("button", { name: /^Chave de API/ }));
     await act(async () =>
       fireEvent.change(within(add).getByLabelText("Cole aqui"), { target: { value: "sk-ant-api03-abcdefghijklmnop" } }),
     );

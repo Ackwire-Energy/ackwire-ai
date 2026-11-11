@@ -282,7 +282,15 @@ function Fix({
             <AgentFace agentId={agentId} size={32} live={false} />
           ) : (
             <LineIcon
-              name={row.kind === "unanswered" ? "help" : row.kind === "stalled" ? "issue" : "clock"}
+              name={
+                row.kind === "unanswered"
+                  ? "help"
+                  : row.kind === "stalled"
+                    ? "issue"
+                    : row.kind === "howto"
+                      ? "sparkle"
+                      : "clock"
+              }
               size={15}
               color={c.muted}
               variant="small"

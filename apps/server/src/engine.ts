@@ -86,6 +86,7 @@ import {
   type EmailArt,
   emailArtAt,
   envSpeechEngines,
+  type GatewayEmbeddings,
   type GitProxyDeps,
   GrokBrain,
   getAgentCached,
@@ -126,7 +127,7 @@ import {
   withComposio,
   withJudgeFallback,
 } from "@agenteschat/engine";
-import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
+import { createOpenAIEmbeddings, createVoyageEmbeddings, type ModelProvider } from "@agenteschat/providers";
 import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
 import { version } from "./version";
@@ -145,7 +146,7 @@ export interface EngineOptions {
   /** Revokes Apple tokens at an account's deletion (ADR 0035); absent: from `config`. */
   appleRevoke?: AppleTokenRevoker;
   http?: typeof fetch;
-  embeddings?: { provider: EmbeddingProvider; apiKey: string };
+  embeddings?: GatewayEmbeddings;
   deltaFlushMs?: number;
   /** Latency measurements from runs (logged by the server). */
   onTiming?(name: string, ms: number, attrs: Record<string, unknown>): void;
@@ -191,11 +192,22 @@ export interface EngineOptions {
 export function buildEngine(o: EngineOptions) {
   const { db, config, adapters } = o;
   const keyWrappers = [adapters.keyWrapper, ...adapters.legacyKeyWrappers];
-  const embeddings =
+  const tuning = { kinds: config.EMBEDDINGS_KINDS, queryTimeoutMs: config.EMBEDDINGS_QUERY_TIMEOUT_MS };
+  const embeddings: GatewayEmbeddings | undefined =
     o.embeddings ??
     (config.EMBEDDINGS_PROVIDER === "voyage" && config.VOYAGE_API_KEY
-      ? { provider: createVoyageEmbeddings({ model: config.EMBEDDING_MODEL }), apiKey: config.VOYAGE_API_KEY }
-      : undefined);
+      ? {
+          provider: createVoyageEmbeddings({ model: config.EMBEDDING_MODEL }),
+          apiKey: config.VOYAGE_API_KEY,
+          ...tuning,
+        }
+      : config.EMBEDDINGS_PROVIDER === "openai" && config.EMBEDDINGS_URL
+        ? {
+            provider: createOpenAIEmbeddings({ url: config.EMBEDDINGS_URL, model: config.EMBEDDING_MODEL }),
+            apiKey: config.EMBEDDINGS_API_KEY ?? "",
+            ...tuning,
+          }
+        : undefined);
   const gateway = createModelGateway({
     db,
     keyWrappers,
@@ -206,6 +218,7 @@ export function buildEngine(o: EngineOptions) {
       await queueBudgetEmail(db, config.PUBLIC_URL, e);
     },
     embeddings,
+    errors: o.errors,
   });
   const context: ContextDeps = {
     db,
@@ -807,6 +820,8 @@ export function buildEngine(o: EngineOptions) {
   };
   return {
     gateway,
+    /** The search index's vectors (undefined: words alone), for the boot backfill (`queueEmbeddingBackfill`). */
+    embeddings,
     tools,
     context,
     handlers,

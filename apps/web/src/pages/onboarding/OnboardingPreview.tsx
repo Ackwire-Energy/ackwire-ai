@@ -30,6 +30,7 @@ export function OnboardingPreview({
   orgId,
   agents,
   person,
+  personal,
 }: {
   org: string;
   logo: string | null;
@@ -38,6 +39,8 @@ export function OnboardingPreview({
   orgId: string | null;
   agents: PreviewAgent[];
   person: Pick<User, "name" | "image">;
+  /** A personal workspace has no team (ADR 0159): its empty place speaks of its agents. */
+  personal: boolean;
 }) {
   const { t } = useTranslation();
   const made = useQuery({ ...channelsQuery(useApi(), orgId ?? ""), enabled: orgId !== null }).data;
@@ -111,7 +114,11 @@ export function OnboardingPreview({
                     </span>
                   </span>
                 ))}
-                {team === 0 && <span className="onb-preview__ghost">{t("onboarding.flow.preview.ghost")}</span>}
+                {team === 0 && (
+                  <span className="onb-preview__ghost">
+                    {t(personal ? "onboarding.flow.preview.ghostPersonal" : "onboarding.flow.preview.ghost")}
+                  </span>
+                )}
               </div>
             </div>
           </div>

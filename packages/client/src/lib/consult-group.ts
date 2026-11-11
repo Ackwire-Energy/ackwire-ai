@@ -76,6 +76,61 @@ export const consultOriginKey = (c: Pick<RunConsultation, "kind">, inChannel: bo
       ? ("chat.consultPanel.origin" as const)
       : ("chat.consultPanel.originDm" as const);
 
+/**
+ * Questions and hand-offs between the same two agents, either way, this close are one exchange: one asked before the
+ * last one ended, or within this after it. An exchange draws one row and opens one conversation.
+ */
+export const EXCHANGE_GAP_MS = 5 * 60_000;
+
+type Exchangeable = Pick<
+  RunConsultation,
+  "id" | "runId" | "agentId" | "consultedAgentId" | "status" | "createdAt" | "answeredAt"
+>;
+
+/** Each question's exchange, by question id: the exchange's first question. */
+function exchangeRoots(list: readonly Exchangeable[]): Map<string, Exchangeable> {
+  const out = new Map<string, Exchangeable>();
+  const current = new Map<string, { root: Exchangeable; end: number }>();
+  for (const c of [...list].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))) {
+    const pair = [c.agentId, c.consultedAgentId].sort().join(" ");
+    const at = Date.parse(c.createdAt);
+    const end = c.answeredAt ? Date.parse(c.answeredAt) : c.status === "open" ? Number.POSITIVE_INFINITY : at;
+    const open = current.get(pair);
+    if (open && at <= open.end + EXCHANGE_GAP_MS) {
+      open.end = Math.max(open.end, end);
+      out.set(c.id, open.root);
+    } else {
+      current.set(pair, { root: c, end });
+      out.set(c.id, c);
+    }
+  }
+  return out;
+}
+
+/**
+ * The conversation's questions as their rows draw them: each under the run of its exchange's first question, so the
+ * reply of that run shows one row for the whole exchange (its time from the first ask to the last answer) and the
+ * other runs' replies show none.
+ */
+export function asExchanges<T extends Exchangeable>(list: readonly T[]): T[] {
+  const roots = exchangeRoots(list);
+  return list.map((c) => {
+    const runId = roots.get(c.id)?.runId ?? c.runId;
+    return runId === c.runId ? c : { ...c, runId };
+  });
+}
+
+/** The questions of `id`'s exchange, oldest first: the conversation its row opens. */
+export function exchangeIds(list: readonly Exchangeable[], id: string): string[] {
+  const roots = exchangeRoots(list);
+  const root = roots.get(id);
+  if (!root) return [id];
+  return list
+    .filter((c) => roots.get(c.id) === root)
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt))
+    .map((c) => c.id);
+}
+
 /** The conversation's questions by the run that asked them, each run's oldest first. */
 export function groupsByRun(list: readonly RunConsultation[]): Map<string, RunConsultation[]> {
   const out = new Map<string, RunConsultation[]>();
@@ -122,7 +177,7 @@ export function consultGroupSummary(
 export type ConsultPairItem = Pick<
   RunConsultation,
   "id" | "kind" | "consultedAgentId" | "status" | "waiting" | "question" | "answer" | "expiresAt"
-> & { createdAt: string | null; answeredAt: string | null };
+> & { agentId?: string; createdAt: string | null; answeredAt: string | null };
 
 export const pairItemOf = (c: MessageConsultation): ConsultPairItem => ({
   id: c.consultationId,
@@ -176,15 +231,20 @@ export interface ConsultPair {
   seconds: number | null;
 }
 
-/** The pair row of a run's questions: "Theo ⇄ Atlas · 2 min", "Theo ⇄ Atlas e mais 2 · 1 de 3 42 s". */
-export function consultPair(group: readonly ConsultPairItem[], now: number): ConsultPair | null {
+/**
+ * The pair row of a run's questions: "Theo ⇄ Atlas · 2 min", "Theo ⇄ Atlas e mais 2 · 1 de 3 42 s". `askerId`: the
+ * row's asker; in an exchange the other agent may have asked it too, and its face is still the other agent's.
+ */
+export function consultPair(group: readonly ConsultPairItem[], now: number, askerId?: string): ConsultPair | null {
   const first = group[0];
   if (!first) return null;
   const states = group.map((c) => consultLineState(c, now));
   const closed = (s: ConsultLineState) => s === "answered" || s === "failed" || s === "expired";
+  const other = (c: ConsultPairItem) =>
+    askerId && c.agentId && c.consultedAgentId === askerId ? c.agentId : c.consultedAgentId;
   const off = new Map<string, boolean>();
   group.forEach((c, i) => {
-    off.set(c.consultedAgentId, states[i] === "failed" || states[i] === "expired");
+    off.set(other(c), states[i] === "failed" || states[i] === "expired");
   });
   const faces = [...off].map(([agentId, o]) => ({ agentId, off: o }));
   const summary = consultGroupSummary(group, now);

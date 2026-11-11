@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
+import { isSandboxedBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -427,6 +428,8 @@ async function machineViews(db: Database, actorId: string, orgId: string, only?:
       /** The workspace's own computer is asleep in standby (ADR 0161): it wakes when wanted, nothing is wrong. */
       standby: inStandby(m),
       networkTransition: managed ? m.networkTransition : null,
+      /** The workspace's own computer's agents wait for their way out, as the operator says: a line, never an error. */
+      egressWaiting: managed && machineOnline(m, now) && m.egressWaitingAt !== null,
       egress: managed && machineOnline(m, now) && m.egress?.ip ? { ...m.egress, ip: m.egress.ip } : null,
       lastSeenAt: m.lastSeenAt?.toISOString() ?? null,
       hostname: managed ? "" : m.hostname,
@@ -513,6 +516,34 @@ export async function publishMachineUpdated(
   });
 }
 
+/**
+ * `PUT …/machines/{machineId}/egress-waiting`: the operator says the workspace's own computer's agents wait for their
+ * way out (`egress_waiting_at` keeps the first time), or no longer; its people's apps read it again. Null: the
+ * workspace has no such managed computer.
+ */
+export async function setMachineEgressWaiting(
+  deps: { db: Database; pubsub?: PubSub },
+  orgId: string,
+  machineId: string,
+  waiting: boolean,
+) {
+  const [row] = await deps.db
+    .update(machines)
+    .set({ egressWaitingAt: waiting ? sql`coalesce(${machines.egressWaitingAt}, now())` : null })
+    .where(
+      and(
+        eq(machines.orgId, orgId),
+        eq(machines.id, machineId),
+        eq(machines.kind, "managed"),
+        isNull(machines.deletedAt),
+      ),
+    )
+    .returning({ id: machines.id });
+  if (!row) return null;
+  await publishMachineUpdated(deps.pubsub, orgId, machineId, { egressWaiting: waiting });
+  return { waiting };
+}
+
 /** How many `deletedAgentIds` lists: a computer that misses one only keeps that agent's transcripts. */
 const DELETED_AGENTS_LISTED = 500;
 
@@ -593,6 +624,8 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       // System mode keeps an account's folder with this agent's user only while it thinks with it.
       ...(account ? { account } : {}),
       ...(extra.length > 0 ? { accounts: extra } : {}),
+      // Where a sandbox of its CLI's own is what holds its turns, a containers service outside it would be a way out.
+      ...(a.builtin !== RIGHT_HAND && !isSandboxedBrain(a.brain) ? { containers: true } : {}),
     };
   });
 }
@@ -698,8 +731,9 @@ export async function detachMachine(tx: Executor, machine: Pick<MachineRow, "id"
       ...(machine.kind === "connected" ? {} : { tokenHash: null }),
       online: false,
       connectedReplica: null,
-      // A managed computer issued again comes back on this row, not asleep (ADR 0161).
+      // A managed computer issued again comes back on this row, not asleep (ADR 0161), its agents waiting for nothing.
       standbyAt: null,
+      egressWaitingAt: null,
       previousAgentIds: ids,
       updatedAt: now,
     })

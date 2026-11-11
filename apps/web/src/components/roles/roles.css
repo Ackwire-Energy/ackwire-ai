@@ -287,32 +287,10 @@ html:not([data-pointer]) .roles-back:focus-visible {
   list-style: none;
 }
 /* A role's people: a MediaRow each (the face, the name and the email on one line, Remover at its end, their other
-   roles under them); a pick's row a plain line. */
+   roles under them); a pick's row the same after its check. */
 .roles-person {
   padding: 10px 0;
   border-top: 1px solid var(--line);
-}
-.roles-pick__row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: var(--row-py) 0;
-  border-top: 1px solid var(--line);
-}
-.roles-person__text {
-  flex: 1 1 200px;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.roles-person__text b {
-  font-size: 14px;
-  font-weight: 600;
-}
-.roles-person__text span {
-  font-size: 12.5px;
-  color: var(--muted);
-  overflow-wrap: anywhere;
 }
 .roles-person:first-child,
 .roles-pick li:first-child .roles-pick__row {
@@ -335,12 +313,20 @@ html:not([data-pointer]) .roles-back:focus-visible {
   all: unset;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   width: 100%;
   padding: var(--row-py) 4px;
   border-top: 1px solid var(--line);
   cursor: pointer;
+}
+/* On the name's line: the middle of the row's 24px face. */
+.roles-pick__row > .ac-check {
+  margin-block-start: 3px;
+}
+.roles-pick__who {
+  flex: 1;
+  min-width: 0;
 }
 html:not([data-pointer]) .roles-pick__row:focus-visible {
   border-radius: 8px;

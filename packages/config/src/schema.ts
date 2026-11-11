@@ -366,9 +366,9 @@ export const envVars = {
     section: "Agents",
   },
   ROUTER_MENTION_THRESHOLD: {
-    schema: z.coerce.number().min(0).max(1).default(0.2),
+    schema: z.coerce.number().min(0).max(1).default(0.6),
     description:
-      "When an agent @mentions another, minimum probability (0–1) that the message needs something from that agent for it to answer. Low on purpose: only a judge sure the message needs nothing (a thanks, an ok, a quote) leaves the agent asleep.",
+      "When an agent @mentions another, minimum probability (0–1) that the message plainly asks that agent to do something for it to answer. A mention is credit or a reference unless it asks: agents ask each other with ask_agent and tell_agent.",
     section: "Agents",
   },
   AGENT_MAX_OUTPUT_TOKENS: {
@@ -457,9 +457,9 @@ export const envVars = {
     section: "Agents",
   },
   EMBEDDINGS_PROVIDER: {
-    schema: z.enum(["none", "voyage"]).default("none"),
+    schema: z.enum(["none", "voyage", "openai"]).default("none"),
     description:
-      "Vector embeddings for search. `none`: full-text search only. `voyage`: Voyage AI (needs `VOYAGE_API_KEY`); usage is recorded per organization (kind `embedding`).",
+      "Vector embeddings for search, so a request finds what was written in other words or another language (ADR 0167). `none`: full-text search only. `voyage`: Voyage AI (needs `VOYAGE_API_KEY`). `openai`: any server with OpenAI's embeddings API at `EMBEDDINGS_URL`: DeepInfra, OpenAI, or one of your own such as the compose file's `embeddings` profile. Usage is recorded per organization (kind `embedding`). When the server can't answer, search goes on with words alone.",
     section: "Search",
   },
   VOYAGE_API_KEY: {
@@ -468,9 +468,46 @@ export const envVars = {
     section: "Search",
     secret: true,
   },
+  EMBEDDINGS_URL: {
+    schema: z.url().optional(),
+    description:
+      "With `EMBEDDINGS_PROVIDER=openai`: the base of the embeddings API, requests go to `/embeddings` under it. DeepInfra: `https://api.deepinfra.com/v1/openai`. The compose file's `embeddings` profile: `http://embeddings:8080/v1`. It may be on your own network: only this server calls it.",
+    section: "Search",
+    example: "https://api.deepinfra.com/v1/openai",
+  },
+  EMBEDDINGS_API_KEY: {
+    schema: z.string().optional(),
+    description:
+      "The key that embeddings server asks for, sent as `Authorization: Bearer` (with `EMBEDDINGS_PROVIDER=openai`). A server of your own may need none.",
+    section: "Search",
+    secret: true,
+  },
   EMBEDDING_MODEL: {
-    schema: z.string().default("voyage-3.5"),
-    description: "Embedding model (1024 dimensions). After changing it, reindex (`search.reindex`).",
+    schema: z.string().optional(),
+    description:
+      "Embedding model, with at most 1024 numbers per vector (fewer are padded with zeros). Default: `voyage-3.5` for `voyage`, `Qwen/Qwen3-Embedding-0.6B` for `openai`. Also `Qwen/Qwen3-Embedding-8B`, `BAAI/bge-m3` and `ibm-granite/granite-embedding-311m-multilingual-r2`, or any other the server knows. After a change, each workspace's documents of `EMBEDDINGS_KINDS` get vectors again in the background from the next start; until then search finds them by their words.",
+    section: "Search",
+  },
+  EMBEDDINGS_KINDS: {
+    schema: z
+      .string()
+      .default("context_item")
+      .transform((value) =>
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.enum(["message", "context_item", "issue", "file", "wiki", "action"]))),
+    description:
+      "What gets vectors, comma-separated, from context_item (memories), wiki, file, issue, action and message. The rest is found by its words alone. Messages are most of what is indexed, and their vectors would take most of the disk.",
+    section: "Search",
+    example: "context_item,wiki,file,issue,action",
+  },
+  EMBEDDINGS_QUERY_TIMEOUT_MS: {
+    schema: z.coerce.number().int().min(100).max(60_000).default(1500),
+    description:
+      "How long a search waits for its query's vector before it goes on with words alone, in milliseconds. An agent's run searches its memory before it starts, so a run may start this much later. A model on a small CPU may need more.",
     section: "Search",
   },
   BRAVE_SEARCH_API_KEY: {

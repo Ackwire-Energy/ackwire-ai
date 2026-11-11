@@ -113,6 +113,17 @@ html:not([data-pointer]) .onb__me:focus-visible {
   align-items: flex-start;
   min-width: 0;
 }
+/*
+ * A step taller than the window (bringing a team from another app) scrolls the page, and the scrollbar takes its room
+ * from this pane's right edge, which moved the centred column half of it to the left of every other step's. The same
+ * room on the left keeps the column in place: `100vw` counts the scrollbar and this pane (`100%`, beside the rail's
+ * 280px column in layout.css) doesn't, so it is 0 while nothing scrolls or where scrollbars take no room.
+ */
+@media (min-width: 761px) {
+  .onb--rail > .onb__main {
+    padding-left: calc(100vw - 100% - 280px);
+  }
+}
 /* The step's column and, on wide screens, the workspace's preview beside it. */
 .onb__cols {
   --onb-gutter: clamp(16px, 4vw, 32px);
@@ -267,6 +278,10 @@ html:not([data-pointer]) .onb__back:focus-visible {
     opacity 0.36s var(--out) 0.16s,
     transform 0.36s var(--out) 0.16s;
 }
+/* With its way out under the button, the bar is a group of its own: the button keeps a button's room from its top. */
+.onb__actions:has(> .onb__skip) {
+  padding-top: var(--space-2);
+}
 .onb__actions::before {
   content: "";
   position: absolute;
@@ -326,8 +341,9 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-/* The team made: who is in it, one line each. */
-.onb__team {
+/* The team made: who is in it, one line each. Over the list's own margin (team-plan.css) by specificity, never by which
+   sheet links last. */
+.tp-agents.onb__team {
   margin: 0;
 }
 /* The plan: the team asleep on the agents' sky, what each one does, the price, the one button. */
@@ -401,19 +417,39 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   font-size: 14px;
   overflow-wrap: anywhere;
 }
+/* On the words' first line, the button's label among them: what comes after the plan may take two lines. */
 .onb__plan-acts {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2) var(--space-4);
   font-size: 14px;
 }
+/* What comes after the plan ("Next: connect your AI."), after its buttons. */
+.onb__plan-acts > .muted {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Back from paying, in place of the buttons: a line of the card, the spinner on its first line. */
+.onb__paid {
+  margin: 0;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+/* The way past a step: a muted note and its link side by side, the link under the note when they don't fit. */
 .onb__skip {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
+  align-items: baseline;
+  gap: 6px 12px;
   margin: 0;
   padding-bottom: var(--space-6);
   font-size: 14px;
+}
+/* Under the step's button, in its bar (the team step's way out): the bar keeps the room below it. */
+.onb__actions > .onb__skip {
+  padding-bottom: 0;
 }
 /*
  * The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. Never wider: the
@@ -538,8 +574,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
     flex-direction: column;
     align-items: stretch;
   }
-  .onb__plan-acts > .ac-link {
+  .onb__plan-acts > .ac-link,
+  .onb__plan-acts > .muted {
     align-self: center;
+    text-align: center;
   }
   .onb__actions {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + var(--space-3));

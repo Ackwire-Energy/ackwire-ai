@@ -14,6 +14,21 @@ export function redactCommon(text: string): string {
     .replace(/((?:password|passwd|secret|token|api[_-]?key)\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi, "$1***");
 }
 
+/** A field holding a service's own credential (`access_token`, a Page's `page_access_token`), never a page cursor. */
+const TOKEN_FIELD = /(^|_)(access|refresh)_?token$/i;
+
+/**
+ * An answer without its credential fields, at any depth: Facebook lists a person's Pages with each Page's access
+ * token, which would let an agent act around its approvals.
+ */
+export function withoutTokens(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutTokens);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, v]) => (TOKEN_FIELD.test(key) ? [] : [[key, withoutTokens(v)]])),
+  );
+}
+
 /** A crash's stack frame (`at fn (/x/y.js:1:2)`, `at /x/y.js:1:2`) or the Node.js version line it ends with. */
 const STACK_FRAME = /\s*\bat (?:async |new )?(?:[^\s()]+ \([^)]*\)|\/\S+|file:\/\/\S+|node:\S+)|\s*\bNode\.js v[\d.]+/g;
 /** A line that names what went wrong (`Error: …`, `TypeError: …`, `ENOSPC: …`, `error: …`). */

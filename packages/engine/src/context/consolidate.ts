@@ -1,7 +1,8 @@
-import { and, asc, eq, inArray, isNull, lt, lte, or, schema, sql } from "@agenteschat/db";
+import { and, asc, eq, inArray, isNull, lt, lte, ne, or, schema, sql } from "@agenteschat/db";
 import { isPlaybook } from "../audience";
 import { enqueue } from "../outbox";
 import {
+  accessSql,
   type ContextItem,
   isVerified,
   mergeEvidence,
@@ -14,7 +15,7 @@ import { learnConfig } from "./learn";
 import { decayAgentSkills, promoteHowTos, shareAcrossAgents } from "./learned-skills";
 import { proposeFromItem } from "./proposals";
 import { REFLECT_DEFAULTS } from "./reflect";
-import { type ContextDeps, ensurePeriodSummary, judgeOf } from "./summaries";
+import { type ContextDeps, ensurePeriodSummary, judgeOf, summaryModelReady } from "./summaries";
 
 const { contextItems, messages, threadReflections, channels } = schema;
 
@@ -26,6 +27,9 @@ export const DECAY = { factor: 0.95, unusedDays: 7, archiveBelow: 0.1, archiveAf
  * (restorable in the Memory tab): a fleeting lesson doesn't stay (ADR 0120 addendum).
  */
 export const LEARNED_EXPIRE_DAYS = 14;
+
+/** An unconfirmed fact unused this long is archived (ADR 0167). */
+export const UNCONFIRMED_FACT_DAYS = 30;
 
 /**
  * Periodic job `context.consolidate` per organization:
@@ -121,6 +125,8 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
         eq(contextItems.orgId, orgId),
         eq(contextItems.status, "active"),
         eq(contextItems.pinned, false),
+        // Only requests that match bring an item back now (ADR 0167): what a person said stays until they take it back.
+        ne(contextItems.createdByKind, "person"),
         lt(contextItems.relevance, DECAY.archiveBelow),
         lt(contextItems.createdAt, new Date(now.getTime() - DECAY.archiveAfterDays * 86_400_000)),
       ),
@@ -147,7 +153,29 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
       ),
     )
     .returning({ id: contextItems.id });
-  for (const s of [...stale, ...fleeting])
+  // A fact no person or outcome confirmed that no request matched or opened for a month goes (ADR 0167): restorable
+  // in the Memory tab. Who holds which access is read in every run, and a person's restore starts a new month.
+  const monthAgo = new Date(now.getTime() - UNCONFIRMED_FACT_DAYS * 86_400_000);
+  const unconfirmed = await db
+    .update(contextItems)
+    .set({ status: "archived", updatedAt: now })
+    .where(
+      and(
+        eq(contextItems.orgId, orgId),
+        eq(contextItems.status, "active"),
+        eq(contextItems.pinned, false),
+        eq(contextItems.kind, "fact"),
+        eq(contextItems.verified, false),
+        sql`not ${accessSql()}`,
+        or(
+          lt(contextItems.lastUsedAt, monthAgo),
+          and(isNull(contextItems.lastUsedAt), lt(contextItems.createdAt, monthAgo)),
+        ),
+        lt(contextItems.updatedAt, monthAgo),
+      ),
+    )
+    .returning({ id: contextItems.id });
+  for (const s of [...stale, ...fleeting, ...unconfirmed])
     await enqueue(db, { orgId, kind: "search.index", payload: { kind: "context_item", sourceId: s.id } });
 
   // Last week's summary per channel that was busy (≥ 30 messages).
@@ -191,6 +219,7 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
     merged,
     archived: stale.length,
     expired: fleeting.length,
+    unconfirmed: unconfirmed.length,
     proposals,
     linked: judged.linked,
     skills,
@@ -350,8 +379,12 @@ export async function enqueueIdleReflections(deps: ContextDeps, now = new Date()
     .having(sql`max(${messages.createdAt}) < ${idleBefore.toISOString()}::timestamptz and count(*) >= 2`)
     .limit(500);
   let queued = 0;
+  // Per workspace, once a sweep: no model to reflect with, no job that would only fail (ADR 0167).
+  const ready = new Map<string, boolean>();
   for (const t of threads) {
     if (!t.threadId) continue;
+    if (!ready.has(t.orgId)) ready.set(t.orgId, await summaryModelReady(deps, t.orgId));
+    if (!ready.get(t.orgId)) continue;
     const [state] = await deps.db
       .select()
       .from(threadReflections)

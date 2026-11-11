@@ -9,6 +9,7 @@ import {
   useRenameChannelCategory,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, StyleSheet, TextInput } from "react-native";
@@ -153,7 +154,10 @@ export function NewCategoryScreen({ channelId }: { channelId?: string }) {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Set<string>>(() => new Set(channelId ? [channelId] : []));
   const categoryName = new Map((categories.data ?? []).map((x) => [x.id, x.name]));
-  const taken = (categories.data ?? []).some((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const taken = useHeldWhile(
+    (categories.data ?? []).some((x) => x.name.trim().toLowerCase() === name.trim().toLowerCase()),
+    create.isPending || create.isSuccess,
+  );
   const save = () => {
     if (!name.trim()) return toast({ title: t("channelCategories.nameEmpty"), icon: "x" });
     if (taken) return toast({ title: t("channelCategories.nameTaken", { name: name.trim() }), icon: "x" });
