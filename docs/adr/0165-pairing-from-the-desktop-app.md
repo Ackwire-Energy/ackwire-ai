@@ -9,7 +9,9 @@
   `GET /api/machines/connect-links/{code}`); client `lib/server.ts` (`pairLink`), `lib/devices.ts` (`newComputerOf`);
   web `components/devices/ConnectDialog.tsx`, `components/ThisMac.tsx`; phone
   `features/devices/ConnectScreen.tsx`; desktop `main_window.rs` (`agents_here`), the `agenteschat://pair` handler and
-  its confirm, Preferences › This Mac; runner control `pair.start` with `link` (`packages/adapters/src/runner-control.ts`)
+  its confirm, Preferences › This Mac; runner control `pair.start` with `link` (`packages/adapters/src/runner-control.ts`);
+  the open defaults and Prepare this Mac: desktop `control/this-mac.ts` (`pairTools`, `firstTools`), `windows/Pair.tsx`
+  (`ToolSwitches`, `Prepare`), `control/permissions.ts`, `ui/permissions.tsx`, `src-tauri/src/prepare.rs`
 
 ## Context
 
@@ -52,6 +54,34 @@ else, while the app already pairs this computer in one click behind the system's
    says "Connected: {{name}}" with its page; one line for a terminal stays the way out. A server's flow is unchanged.
 6. **The phone** offers this phone, another computer through its app (the same steps and live wait, no button to
    open the app, which a phone can't do for another computer) and a server or VPS.
+7. **Open defaults, shown before Allow.** A computer paired from the app starts with commands on, the browser on, and
+   Claude Code and Codex on when found here; folders none, added later in Preferences › Folders. This overrides
+   ADR 0036 §8 ("commands off") for pairing from the app; a terminal pairing was already open unless `--no-exec`. The
+   card after sign-in and a pair link's confirm show these as switches under "What agents can do here", prefilled,
+   so the person changes them before Allow or Connect; Claude Code and Codex rows show only once a runner here has
+   found them. The runner still starts a pairing with commands off (`pair.start`), and the app sets the chosen tools
+   right after `pair.done` with `tools.set`, as it always set the first tools. The site's This computer pairs behind
+   the system's dialog, which has no switches: it says what agents get, and the defaults apply. Only a new home gets
+   them: a home refused by its organization that pairs again keeps the access its runner kept. A new workspace on a
+   computer that already works for others copies their Claude Code, Codex and browser switches (they are for the
+   whole computer) and gets commands on. The server this app runs here keeps commands off for its own homes
+   (ADR 0060), since commands there would reach its own data.
+8. **Prepare this Mac.** On a Mac, right after Allow (or Connect, or the site's This computer), the same window goes on
+   to one step, unless every permission is already on: Screen Recording, and the Desktop, Documents and Downloads
+   folders, each with what it lets agents do, its live state and one button (Allow the first time, which raises the
+   system's prompt, then Open Settings on the right System Settings pane once it was refused). Agents keep taking
+   screenshots with `screencapture` through commands, no screen tool of their own: the runner is the app's child, so
+   the system asks for, and grants to, the app. States are read again whenever the window comes to the front. macOS
+   says whether the screen is allowed without asking; a folder's state comes from reading it, so a folder is only
+   read once it was asked for in this version of the app. Skip for now and Continue both close it, and the pairing
+   never depends on it. Preferences › General › This Mac lists the same rows under Permissions. Windows and Linux skip
+   the step.
+9. **Resume after Quit & Reopen.** Screen Recording applies only once the app opens again, so macOS offers to quit and
+   reopen it. While the step shows, the app keeps it in its data folder (`setup.json`: the step, the workspace, the
+   time and the main window's page). Opened again within 30 minutes, not at login, the app opens the main window on
+   that page and the step over it, with fresh states and a line that Screen Recording took effect; Preferences comes
+   back the same way when the person asked from there. Finishing, skipping or closing the window forgets it;
+   quitting doesn't.
 
 ## Consequences
 
@@ -62,3 +92,10 @@ else, while the app already pairs this computer in one click behind the system's
   single-use and rate-limited per address.
 - An app built before this still refuses Cloud and doesn't know `agenteschat://pair`: the web keeps the terminal line
   as the way out there.
+- Agents of a newly paired computer can run commands from the start, which reach the rest of the computer, not only
+  the allowed folders: the pairing sheets say so under Commands, and the person turns it off there or in Preferences.
+- Nothing interrupts agents later for a Mac permission the person already gave, and a refused one has its way out in
+  the app, never a terminal command.
+- An ad-hoc signed Mac app loses every one of these grants with each update (macOS ties them to the build's
+  signature), and the asked folders are forgotten with the version, so Preferences › This Mac shows them off again
+  and is where people turn them back on. A Developer ID signature keeps them across updates.

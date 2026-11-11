@@ -59,6 +59,12 @@ const COMMANDS: &[&str] = &[
     "welcome_mode_take",
     "pair_link_info",
     "pair_ask",
+    "screen_access",
+    "screen_request",
+    "folder_access",
+    "privacy_open",
+    "setup_state_get",
+    "setup_state_set",
 ];
 
 fn main() {

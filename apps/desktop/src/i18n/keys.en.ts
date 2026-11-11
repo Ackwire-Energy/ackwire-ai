@@ -398,20 +398,21 @@ export const desktopEn = {
   },
   pair: {
     title: "Let agents of {{org}} work on this {{device}}?",
-    body: "{{host}} asked. They start with no folders of yours and commands off.",
+    /** The system's dialog before the site pairs this computer: no switches there, so it says what they get. */
+    body: "{{host}} asked. They can run commands and use the browser and the coding tools found here, but no folders of yours until you add them in Preferences.",
     allow: "Allow",
     notNow: "Not now",
     /** Shown once after sign-in, for a workspace this computer doesn't work for yet. */
     offerTitle: "Let {{org}}'s agents use this {{device}}?",
-    offerBody:
-      "They start with no folders of yours and commands off. You pick what they get in Preferences, and you can stop them any time.",
     keepReady: "Keep it ready: open agentes.chat at login",
+    /** Over the pairing's switches (Commands, Claude Code, Codex, Browser), on as they start. */
+    canDo: "What agents can do here",
+    foldersLater: "No folders of yours yet. Add them later in Preferences\u00a0›\u00a0Folders.",
     /** A link from the web asks to connect this computer: who asked, from which server. */
     linkTitle: "Connect this {{device}} to {{org}}?",
     askedBy: "Asked by",
     from: "From",
-    linkBody:
-      "{{org}}'s agents start with no folders of yours and commands off. If you didn't ask for this, choose Not now.",
+    linkBody: "If you didn't ask for this, choose Not now.",
     waiting: "Waiting for {{by}} to let it in…",
     done: "Connected to {{org}}",
     expired: "This link expired. Make a new one under Settings\u00a0›\u00a0Devices.",
@@ -420,6 +421,28 @@ export const desktopEn = {
     letOrg: "Let {{org}}'s agents use this {{device}}",
     canUse: "Agents can use it",
     notUsing: "Its agents don't use this {{device}}",
+  },
+  /** A Mac's permissions, asked right after pairing ("Prepare this Mac") and listed in Preferences › General. */
+  prepare: {
+    title: "Get this {{device}} ready",
+    lead: "Connected to {{org}}. Allow these now so its agents never stop to ask.",
+    screen: "Screen Recording",
+    screenDesc: "Lets agents take screenshots of this {{device}}.",
+    desktop: "Desktop folder",
+    desktopDesc: "Lets agents open files on your Desktop.",
+    documents: "Documents folder",
+    documentsDesc: "Lets agents open files in Documents.",
+    downloads: "Downloads folder",
+    downloadsDesc: "Lets agents open files in Downloads.",
+    on: "On",
+    /** System Settings › Privacy & Security, where a refused permission is turned on. */
+    openSettings: "Open Settings",
+    /** Once Screen Recording was asked: macOS applies it only after the app opens again. */
+    reopen: "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here.",
+    tookEffect: "agentes.chat opened again. Screen Recording is on.",
+    skip: "Skip for now",
+    prefsTitle: "Permissions",
+    prefsHint: "macOS may turn these off when the app updates. Turn them on again here.",
   },
   tools: {
     claudeName: "Claude Code",

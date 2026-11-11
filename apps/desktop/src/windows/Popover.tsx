@@ -27,6 +27,7 @@ import { NOTCH_PREF } from "../control/notch";
 import { SITE_NOTIFY_PREF } from "../control/notify";
 import { nextOffer, PAIR_OFFER_PREF, PAIR_OFFERED_PREF, targetKey } from "../control/pair";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
+import { PREPARE_PREF } from "../control/permissions";
 import { homeServer, type ServerList, type ServerWorkspaces, serverName } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
 import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
@@ -35,6 +36,7 @@ import { agentOf, readPref, useLocalServer, useOnShown, usePending, useUpdateChe
 import type { BadgeCounts } from "../host/types";
 import { AgentFace, Banner, BrandFace, Count, HelpLink, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
 import { CopyDetails } from "../ui/here";
+import { needsPrepare } from "../ui/permissions";
 import { useToast } from "../ui/Toast";
 import { baseName, clock, shortPath, since } from "../ui/time";
 
@@ -229,7 +231,18 @@ export function Popover() {
       const showRequests = () => host.showWindow("popover");
       const localDir = () => host.localServer().then((s) => s.dir);
       const revealFolder = (path: string) => host.revealFolder(path);
-      const onPaired = () => void host.setAutostart(true).catch(() => {});
+      // Its agents work while the app runs; on a Mac, the permissions they need next, up front.
+      const onPaired = (org: string) => {
+        void host.setAutostart(true).catch(() => {});
+        if (request.kind !== "connect") return;
+        void needsPrepare(host)
+          .then((needed) => {
+            if (!needed) return;
+            writePref(PREPARE_PREF, { org, server: request.origin });
+            return host.showWindow("welcome");
+          })
+          .catch(() => {});
+      };
       answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder, onPaired }, request)
         .then(
           (data) => host.thisMacReply(id, true, data ?? null),
