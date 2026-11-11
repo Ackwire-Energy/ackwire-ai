@@ -175,7 +175,8 @@ function wrap(runs: Run[], size: number, width: number): Run[][] {
       line = [];
       used = 0;
     }
-    while (wWidth > width) {
+    // Never on an empty remainder: in a width below 0 not even that fits, and the loop would never end.
+    while (text && wWidth > width) {
       let cut = text.length;
       while (cut > 1 && textWidth(text.slice(0, cut), w.font, size) > width - used) cut--;
       push(text.slice(0, cut), w.font);
@@ -360,8 +361,25 @@ function escapePdfString(text: string) {
     .replace(/\)/g, "\\)");
 }
 
+/** Narrower than this, a column holds a few letters a line: a table with more columns goes on in tables below it. */
+const MIN_COLUMN_WIDTH = 40;
+
 function drawTable(c: Canvas, rows: string[][]) {
   const columns = Math.max(1, ...rows.map((r) => r.length));
+  const tables = Math.ceil(columns / Math.floor(CONTENT_WIDTH / MIN_COLUMN_WIDTH));
+  // The columns shared out evenly (13 columns: 6, then 7).
+  for (let t = 0; t < tables; t++) {
+    const from = Math.floor((t * columns) / tables);
+    const to = Math.floor(((t + 1) * columns) / tables);
+    drawColumns(
+      c,
+      rows.map((r) => r.slice(from, to)),
+      to - from,
+    );
+  }
+}
+
+function drawColumns(c: Canvas, rows: string[][], columns: number) {
   const colWidth = CONTENT_WIDTH / columns;
   const size = 9.5;
   const leading = 12.5;
