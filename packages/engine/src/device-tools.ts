@@ -7,6 +7,7 @@ import {
   workspacePath,
 } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, isNotNull, schema, sql } from "@agenteschat/db";
+import { serverText } from "@agenteschat/i18n";
 import { getAgentCached } from "./agents";
 import { type ArtifactDeps, cleanFileName, getArtifact, storedFileOfArtifact } from "./artifacts";
 import { sniffModelImage } from "./avatars";
@@ -33,6 +34,7 @@ import { fullMachinePath } from "./machine-access";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { formatDuration } from "./machine-task-text";
 import { MachineDroppedError, MachineOfflineError, pausedMessage } from "./machines";
+import { lineLocale } from "./requester";
 import { runnerUpdateWay } from "./runner-update";
 import { replyThreadOf } from "./runs";
 import { SANDBOX_SCOPE, truncateOutput, withConnectedMachine } from "./sandbox";
@@ -546,36 +548,37 @@ async function waitForDevice(deps: DeviceToolDeps, ctx: ToolContext, asked: stri
   const host = computer;
   const status = host && hub ? await hub.status(host.id) : null;
   const owner = check.ok ? null : await ownerName(ctx.db, target);
+  const locale = await lineLocale(ctx.db, ctx.orgId, check.requester, ctx.runId);
+  // The card's own words (`devices.wait.*`, as the apps' `waitText` says them), in the language of whom it works for.
+  const line = (key: string, vars: Record<string, string> = {}) =>
+    serverText(locale, `devices.wait.${key}`, { deviceName: name, ...vars });
   let body: string;
   if (!check.ok) {
     if (!check.requestId) return refusal(check.message, "device.not_allowed");
     reason = "asked";
-    body = `Waiting for ${owner ?? "its owner"} to let me use ${name}.`;
+    body = owner ? line("asked", { owner }) : line("askedOwner");
   } else if (!host || !status?.online) {
-    reason = "offline";
-    body = phone
-      ? host
-        ? `Waiting for ${host.name} to be back online (${name} is on it).`
-        : `Waiting for ${name} to be connected to a computer.`
-      : `Waiting for ${name} to be back online.`;
-    if (phone && !host) reason = "missing";
+    reason = phone && !host ? "missing" : "offline";
+    body = phone && host ? line("hostOffline", { host: host.name }) : line("offline");
   } else if (!phone) {
     if (!status.paused) return { content: `${name} is online now: go ahead.` };
     reason = "offline";
-    body = `Waiting for ${name} to be resumed by its owner.`;
+    body = line("offline");
   } else if (phone.state === "offline") {
     reason = "missing";
-    body = `Waiting for ${name} to be connected to ${host.name}.`;
+    body = line("missing", { host: host.name });
   } else if (phone.state === "needs_you" || phone.state === "preparing") {
     reason = phone.state;
     detail = phone.reason;
-    body = `Waiting for ${name}: ${phoneReasonText(phone.reason, name, host.name).text}`;
+    const key = `devices.reason.${phone.reason ?? "other"}`;
+    const said = serverText(locale, key);
+    body = line("needs", { reason: said === key ? serverText(locale, "devices.reason.other") : said });
   } else if (phone.state === "unsupported") {
     return refusal(phoneReasonText(phone.reason, name, host.name).text, "device.unsupported");
   } else if (phone.holder && phone.holder.runId !== ctx.runId) {
     reason = "busy";
     holder = { ...phone.holder, label: phone.holder.label ?? null };
-    body = `Waiting for ${name} to be free.`;
+    body = line("busy");
   } else {
     return { content: `${name} is ready now: go ahead.` };
   }
