@@ -44,7 +44,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Twoi agenci też tu pracują",
         blocks: [
           "Twoi agenci też pracują na tym komputerze, we własnych folderach, z przeglądarką oraz z Claude Code lub Codexem, jeśli są tu zainstalowane. Polecenia są wyłączone, dopóki nie włączysz ich w **Preferencje › Narzędzia**.",
-          "Agenci działają tu jako ty. Z włączonymi poleceniami mają dostęp do reszty tego komputera, także do `.agentes`: bazy danych, `.env` z `AGENTES_SECRET`, klucza właściciela i tokenu tego komputera. Dotyczy to każdej przestrzeni roboczej, która używa tego komputera, także tej w agentes.chat Cloud. Zobacz [Do czego mają dostęp agenci](/help/computers#reach).",
+          "Agenci działają tu jako ty. Z włączonymi poleceniami mają dostęp do reszty tego komputera, także do `.agentes`: bazy danych, `.env` z `AGENTES_SECRET`, klucza właściciela i tokenu tego komputera. Dotyczy to każdej przestrzeni roboczej, która używa tego komputera, także tej w agentes.chat Cloud. **Polecenia** są na początku włączone. **Preferencje\u00a0›\u00a0Narzędzia** je wyłącza. Zobacz [Do czego mają dostęp agenci](/help/computers#reach).",
         ],
       },
       {
@@ -52,7 +52,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Udostępnij go też innej przestrzeni roboczej",
         blocks: [
           "Przestrzenie robocze serwera, który tu uruchamiasz, korzystają z tego komputera same. Żeby mogła z niego korzystać także przestrzeń robocza gdzie indziej, na przykład w agentes.chat Cloud, otwórz **Preferencje › Serwery**, naciśnij **Dodaj serwer…**, zaloguj się do tej przestrzeni roboczej i naciśnij **Zezwól**, gdy aplikacja zapyta.",
-          "Każda przestrzeń robocza ma tu własnych agentów i foldery. **Polecenia** w **Preferencje › Narzędzia** obowiązują od razu wszystkie przestrzenie robocze na tym komputerze: włącz je tylko wtedy, gdy powierzasz agentom każdej z nich cały ten komputer.",
+          "Każda przestrzeń robocza ma tu własnych agentów i foldery. **Polecenia** są tam też na początku włączone, chyba że wyłączysz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**. Ich przełącznik w **Preferencje\u00a0›\u00a0Narzędzia** obowiązuje od razu wszystkie przestrzenie robocze na tym komputerze: zostaw go włączonego tylko wtedy, gdy powierzasz agentom każdej z nich cały ten komputer.",
         ],
       },
       {
@@ -237,7 +237,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
               "na komputerze, który uruchamia też agentes.chat, jego bazę danych i klucze w `.agentes`",
             ],
           },
-          "agentes.chat odrzuca polecenia, które wskazują jego klucze, tokeny i dane logowania, ale to zasada, nie mur. Dlatego **Polecenia** są na początku wyłączone. Włączenie ich w **Preferencje › Narzędzia** obowiązuje od razu wszystkie przestrzenie robocze na komputerze: zrób to tylko wtedy, gdy powierzyłbyś wszystko, co na nim jest, agentom każdej przestrzeni roboczej i osobom, dla których pracują. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad.",
+          "agentes.chat odrzuca polecenia, które wskazują jego klucze, tokeny i dane logowania, ale to zasada, nie mur. **Polecenia** są na początku włączone. Wyłącz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**, albo później w **Preferencje\u00a0›\u00a0Narzędzia**, gdzie jeden przełącznik obowiązuje od razu wszystkie przestrzenie robocze na komputerze. Zostaw je włączone tylko wtedy, gdy powierzyłbyś wszystko, co na nim jest, agentom każdej przestrzeni roboczej i osobom, dla których pracują. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad.",
           "Prawdziwy mur da ci serwer z Linuksem. Na Debianie 13, zainstalowanym z `--system`, każdy agent jest osobnym użytkownikiem. Na Ubuntu agenci dzielą jednego użytkownika, `agentes`: widzą nawzajem swoje foldery, ale nie twoje ani serwera. Możesz też dać agentom osobny komputer.",
         ],
       },

@@ -44,7 +44,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Vos agents travaillent ici aussi",
         blocks: [
           "Vos agents travaillent aussi sur cet ordinateur, dans des dossiers rien qu’à eux, avec un navigateur, et avec Claude Code ou Codex s’ils sont installés ici. Les commandes restent désactivées tant que vous ne les activez pas dans **Préférences › Outils**.",
-          "Ici, les agents tournent sous votre compte. Avec les commandes activées, ils peuvent atteindre le reste de cet ordinateur, `.agentes` compris\u00a0: la base de données, le `.env` avec `AGENTES_SECRET`, la clé du propriétaire et le jeton de cet ordinateur. C’est vrai pour chaque espace de travail qui utilise cet ordinateur, y compris un espace sur agentes.chat Cloud. Voir [Ce que les agents peuvent atteindre](/help/computers#reach).",
+          "Ici, les agents tournent sous votre compte. Avec les commandes activées, ils peuvent atteindre le reste de cet ordinateur, `.agentes` compris\u00a0: la base de données, le `.env` avec `AGENTES_SECRET`, la clé du propriétaire et le jeton de cet ordinateur. C’est vrai pour chaque espace de travail qui utilise cet ordinateur, y compris un espace sur agentes.chat Cloud. Les **Commandes** sont activées au départ. **Préférences\u00a0›\u00a0Outils** les désactive. Voir [Ce que les agents peuvent atteindre](/help/computers#reach).",
         ],
       },
       {
@@ -52,7 +52,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Le prêter aussi à un autre espace de travail",
         blocks: [
           "Les espaces de travail du serveur que vous faites tourner ici utilisent déjà cet ordinateur, sans rien à faire. Pour qu’un espace de travail d’ailleurs l’utilise aussi, par exemple sur agentes.chat Cloud, ouvrez **Préférences\u00a0›\u00a0Serveurs**, cliquez sur **Ajouter un serveur…**, connectez-vous à cet espace de travail et cliquez sur **Autoriser** quand l’app le demande.",
-          "Chaque espace de travail a ici ses propres agents et dossiers. **Commandes**, dans **Préférences\u00a0›\u00a0Outils**, vaut pour tous les espaces de travail de cet ordinateur à la fois\u00a0: ne l’activez que si vous confiez tout cet ordinateur aux agents de chaque espace de travail.",
+          "Chaque espace de travail a ici ses propres agents et dossiers. Les **Commandes** y sont aussi activées au départ, sauf si vous les désactivez dans la question de l’app avant d’appuyer sur **Autoriser**. Leur interrupteur, dans **Préférences\u00a0›\u00a0Outils**, vaut pour tous les espaces de travail de cet ordinateur à la fois\u00a0: ne le laissez activé que si vous confiez tout cet ordinateur aux agents de chaque espace de travail.",
         ],
       },
       {
@@ -239,7 +239,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
               "sur un ordinateur qui fait aussi tourner agentes.chat, sa base de données et ses clés dans `.agentes`",
             ],
           },
-          "agentes.chat refuse les commandes qui citent ses clés, ses jetons et les connexions enregistrées, mais c’est une règle, pas un mur. C’est pourquoi les **Commandes** sont désactivées au départ. Les activer dans **Préférences\u00a0›\u00a0Outils** vaut pour tous les espaces de travail de l’ordinateur à la fois\u00a0: faites-le seulement si vous confieriez tout ce qu’il contient aux agents de chaque espace de travail et aux personnes pour qui ils travaillent. Claude Code et Codex lancent leurs propres commandes dans le dossier de l’agent, selon leurs propres règles.",
+          "agentes.chat refuse les commandes qui citent ses clés, ses jetons et les connexions enregistrées, mais c’est une règle, pas un mur. Les **Commandes** sont activées au départ. Désactivez-les dans la question de l’app avant d’appuyer sur **Autoriser**, ou plus tard dans **Préférences\u00a0›\u00a0Outils**, où un seul interrupteur vaut pour tous les espaces de travail de l’ordinateur à la fois. Ne les laissez activées que si vous confieriez tout ce qu’il contient aux agents de chaque espace de travail et aux personnes pour qui ils travaillent. Claude Code et Codex lancent leurs propres commandes dans le dossier de l’agent, selon leurs propres règles.",
           "Pour un vrai mur, utilisez un serveur Linux. Sous Debian 13, installé avec `--system`, chaque agent est un utilisateur à part. Sous Ubuntu, les agents partagent un utilisateur, `agentes`\u00a0: ils voient les dossiers les uns des autres, pas les vôtres ni ceux du serveur. Ou donnez aux agents un ordinateur rien qu’à eux.",
         ],
       },
