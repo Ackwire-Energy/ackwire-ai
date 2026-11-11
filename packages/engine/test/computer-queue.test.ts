@@ -88,7 +88,7 @@ test("estimates: the line takes slots as they free, agents' turns spaced, a pers
   expect(starts).toEqual([NOW + MIN, NOW + 2 * MIN, NOW + 3 * MIN]);
   expect(after).toEqual([["kai"], ["rio"], ["rio", "nova"]]);
 
-  // Agents freed at the same moment still start 10 s apart.
+  // Agents freed at the same moment still start the spacing apart.
   const spaced = estimateQueue(
     NOW,
     [
