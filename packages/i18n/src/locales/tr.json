@@ -2421,6 +2421,12 @@
       "action": "Rutin oluştur",
       "done": "Rutin oluşturuldu"
     },
+    "howto": {
+      "title": "{{name}} öğrendi: {{what}}",
+      "line": "{{uses}}× kullanıldı. Beceri yapılsın mı?",
+      "action": "Beceri yap",
+      "done": "Onaylandı"
+    },
     "stalled": {
       "title": "#{{number}} {{title}} görevindeki adımlar durdu",
       "line_one": "{{steps}} adımı #{{on}} için {{hours}} saattir bekliyor.",
@@ -2466,6 +2472,7 @@
   },
   "routing": {
     "title": "Ajanları kim seçer",
+    "reflectionOff": "Hafıza henüz biten konuşmalardan öğrenmiyor: bunun için yukarıda bir sağlayıcı anahtarı gerekir.",
     "how": "Ajanlar nasıl seçilir",
     "by": {
       "jev": "Bahsetme olmayan her mesajı kimin yanıtlayacağını Jev seçer.",
@@ -5300,6 +5307,15 @@
       "andMore": "{{names}} ve daha fazlası"
     }
   },
+  "teamMemory": {
+    "title": "Ekip hafızası",
+    "help": "İnsanların tüm ajanlardan saklamasını istedikleri, kimin ne zaman söylediğiyle birlikte. Her ajan bunu tüm işlerinde okur.",
+    "empty": "Henüz bir şey yok. Biri tüm ajanlardan bir şeyi hatırlamasını istediğinde burada görünür.",
+    "remove": "Kaldır",
+    "removed": "Ekip hafızasından kaldırıldı",
+    "make": "Ekibin yap",
+    "made": "Artık tüm ajanlar bunu saklıyor"
+  },
   "memory": {
     "fromRefusal": "Bir daha önerilmesin: {{text}}",
     "fromCorrection": "Bir kişi düzeltti: {{text}}",
@@ -5337,6 +5353,9 @@
     "unverifiedTitle": "Bunu yalnızca ajanlar söyledi. Bağlama işaretli bir ipucu olarak girer.",
     "pinned": "Her zaman bağlamda",
     "lowTrust": "Dış kaynak, güvenilir değil",
+    "confirm": "Onayla",
+    "confirmTitle": "Doğru olduğunu söyleyin: ajanlar bunu güvenilir olarak kullanır.",
+    "confirmed": "Onaylandı",
     "used_one": "{{count}} kez kullanıldı",
     "used_other": "{{count}} kez kullanıldı",
     "unusedFor": "{{days}} gündür kullanılmadı",
@@ -8078,6 +8097,7 @@
       "machine_offline_resumes_other": "{{computer}} çevrimdışı oldu: yalnızca bağlantı koptuysa {{count}} görev orada çalışmaya devam ediyor, bilgisayar yeniden başladıysa kaldıkları yerden devam ederler.",
       "machine_task_resumed": "{{computer}} geri geldi: “{{title}}” kaldığı yerden devam etti",
       "machine_task_resume_waits": "{{computer}} geri geldi: proje hazır olunca “{{title}}” kaldığı yerden devam edecek",
+      "machine_task_restarted": "{{computer}} geri geldi: “{{title}}” yeniden başlatıldı",
       "machine_task_done": "“{{title}}”, {{computer}} üzerinde {{span}} içinde tamamlandı",
       "machine_task_failed": "“{{title}}”, {{computer}} üzerinde {{span}} sonra başarısız oldu",
       "machine_task_canceled": "“{{title}}”, {{computer}} üzerinde durduruldu",
@@ -11183,6 +11203,7 @@
       "support": "Destek",
       "marketing": "Pazarlama",
       "automation": "Otomasyon",
+      "social": "Sosyal medya",
       "email": "E-posta"
     },
     "emptyCategory": "Bu kategoride henüz bağlayıcı yok",
@@ -11534,6 +11555,41 @@
         "1": "Tahsilatları ve müşterileri görür",
         "2": "Pix tahsilatı oluşturur"
       },
+      "instagram": {
+        "1": "Gönderileri, hikayeleri ve istatistikleri görür",
+        "2": "Gönderi yayınlar ve direkt mesajları okur",
+        "ask": "Mesajları yanıtlamak her zaman onayınızı ister"
+      },
+      "facebook": {
+        "1": "Gönderileri, yorumları ve istatistikleri görür",
+        "2": "Gönderi, fotoğraf ve video yayınlar ve yorumları yanıtlar",
+        "ask": "Gönderi ve yorum silmek her zaman onayınızı ister"
+      },
+      "linkedin": {
+        "1": "Gönderi, bağlantı ve video yayınlar",
+        "2": "Gönderilere yorum yapar",
+        "ask": "Gönderi silmek her zaman onayınızı ister"
+      },
+      "youtube": {
+        "1": "Videoları, yorumları ve analizleri görür",
+        "2": "Videoları ve oynatma listelerini düzenler ve yorum yapar",
+        "ask": "Yorumları yanıtlamak, denetlemek ve silmek her zaman onayınızı ister"
+      },
+      "pinterest": {
+        "1": "Pinleri, panoları ve analizleri görür",
+        "2": "Pin oluşturur ve panoları düzenler",
+        "ask": "Panoları değiştirmek ve silmek her zaman onayınızı ister"
+      },
+      "reddit": {
+        "1": "Gönderi arar ve yorumları okur",
+        "2": "Gönderi paylaşır, yorum yapar ve düzenler",
+        "ask": "Silmek her zaman onayınızı ister"
+      },
+      "whatsapp": {
+        "1": "Numaraları, şablonları ve teslimatları görür",
+        "2": "Mesaj şablonları oluşturur",
+        "ask": "Mesaj göndermek her zaman onayınızı ister"
+      },
       "database": {
         "1": "Tabloları görür",
         "2": "Yanıt vermek için verileri sorgular",
@@ -11677,7 +11733,14 @@
       "revenuecat": "Uygulama içi abonelikler, ürünler, teklifler ve gelir.",
       "superwall": "Ödeme duvarları, kampanyalar ve deneyler.",
       "paddle": "Müşteriler, abonelikler, işlemler ve ürünler.",
-      "abacatepay": "Pix tahsilatları, müşteriler ve para çekme işlemleri."
+      "abacatepay": "Pix tahsilatları, müşteriler ve para çekme işlemleri.",
+      "instagram": "Instagram işletme ve içerik üreticisi hesapları: gönderiler, hikayeler, istatistikler ve direkt mesajlar.",
+      "facebook": "Facebook Sayfaları: gönderiler, fotoğraflar, videolar, yorumlar ve istatistikler.",
+      "linkedin": "Giriş yapan üye adına LinkedIn gönderileri, videoları ve yorumları.",
+      "youtube": "YouTube kanalının videoları, yorumları, oynatma listeleri ve analizleri.",
+      "pinterest": "Pinterest pinleri, panoları ve analizleri.",
+      "reddit": "Reddit gönderileri, yorumları ve toplulukları.",
+      "whatsapp": "WhatsApp Business mesajları ve şablonları."
     }
   },
   "toolNames": {
@@ -13003,7 +13066,8 @@
       "draining": "Ağ değişiyor. Bilgisayarın açık oturumları {{when}} saatinde yeniden başlayacak.",
       "restart": "Bilgisayar oturumları ağı uygulamak için yeniden başlıyor. Yeni işler bu bitene kadar bekler.",
       "line": "Çıkış IP’si {{ip}}",
-      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir."
+      "hint": "Ajanlar gezinirken sitelerin gördüğü adres. Bilgisayarın ağı değişince güncellenir.",
+      "waiting": "Ajanların internet bağlantısı yeniden kuruluyor. Bağlantıları geri gelene kadar bekler."
     },
     "online": "Çevrimiçi",
     "offline": "Çevrimdışı",
@@ -15353,6 +15417,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” kesildi.",
       "machine_task_resumed": "{{computer}} geri döndü: “{{title}}” kaldığı yerden devam etti.",
       "machine_task_resume_waits": "{{computer}} geri döndü: “{{title}}”, proje hazır olunca kaldığı yerden devam eder.",
+      "machine_task_restarted": "{{computer}} geri döndü: “{{title}}” yeniden başlatıldı.",
       "machine_offline": "{{computer}} çevrimdışı oldu.",
       "brain_unavailable": "{{brain}} şu anda yanıt veremiyor. Geri gelince yanıt vereceğim.",
       "brain_unavailable_paused": "{{brain}} uygulamasının çalıştığı bilgisayar duraklatıldı. Devam ettirilince yanıtlayacağım.",

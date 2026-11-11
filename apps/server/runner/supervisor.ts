@@ -41,7 +41,7 @@ import {
   type TurnContext,
 } from "@agenteschat/adapters/machine-protocol";
 import type { AccountGrant } from "./accounts";
-import { type AgentUser, readAgentUsers, systemLauncher } from "./agent-users";
+import { type AgentUser, keepContainers, readAgentUsers, rootlessContainers, systemLauncher } from "./agent-users";
 import { type BindPolicyOptions, ensureBrowserBindPolicy } from "./browser-bind-policy";
 import type { BrowserViews } from "./browser-views";
 import { backoffDelay } from "./connection";
@@ -370,6 +370,8 @@ export interface SupervisorOptions {
   grant?: (kind: AccountKind, accountId: string) => Promise<AccountGrant | null>;
   /** What root launched for this agent on a sign-in with its own user: no stop by uid reaches it. */
   stopAccountScopes?: (uid: number) => void;
+  /** Its containers service (ADR 0169), which outlives its worker but not a network it is leaving. */
+  stopContainers?: (uid: number) => void;
   /** A turn's plan usage, for its account (`AccountManager.noteRateLimit`, `noteCodexRateLimits`). */
   usage?: (kind: AccountKind, accountId: string, info: unknown) => void;
   /** A refreshed ChatGPT sign-in root keeps for all agents (`AccountManager.keepCodexAuth`). */
@@ -934,6 +936,7 @@ export class Supervisor {
     w.networkRetiring = true;
     w.ready = false;
     this.opts.stopAccountScopes?.(w.user.uid);
+    this.opts.stopContainers?.(w.user.uid);
     this.endSession(w, why, true);
     this.endShows(w, why);
     for (const waiter of [...w.waiters]) waiter.reject(new RunnerError("dropped", why));
@@ -1874,8 +1877,15 @@ export function retireLegacyPending(
 }
 
 /** `agentes-runner worker` for one agent through its launcher (its user, its slice, only its environment). */
-export function workerCommand(user: AgentUser, runner: string[], home: string, systemd?: boolean, oomPolicy?: boolean) {
-  const l = systemLauncher(user, systemd, oomPolicy);
+export function workerCommand(
+  user: AgentUser,
+  runner: string[],
+  home: string,
+  systemd?: boolean,
+  oomPolicy?: boolean,
+  containers?: boolean,
+) {
+  const l = systemLauncher(user, systemd, oomPolicy, containers);
   return {
     argv: [...l.prefix, ...runner, "worker", "--agent", user.id, "--dir", l.home, "--home", home],
     cwd: l.home,
@@ -1883,10 +1893,22 @@ export function workerCommand(user: AgentUser, runner: string[], home: string, s
   };
 }
 
-/** Starts each agent's worker as a process (`runner`: how this runner starts itself), its bind check passed first. */
-export function launchWorker(runner: string[], policy: BindPolicyOptions, base = AGENT_WORKER_HOMES): StartWorker {
+/**
+ * Starts each agent's worker as a process (`runner`: how this runner starts itself), its bind check passed first and
+ * its containers service as the agents frame says (`containers`, ADR 0169), where there are rootless containers;
+ * without it, only its containers don't work.
+ */
+export function launchWorker(
+  runner: string[],
+  policy: BindPolicyOptions,
+  base = AGENT_WORKER_HOMES,
+  log?: (line: string) => void,
+  containers: (agentId: string) => boolean = () => false,
+): StartWorker {
   return (user) => {
     ensureBrowserBindPolicy(user, runner, policy);
+    const problem = rootlessContainers() ? keepContainers(user, containers(user.id)) : null;
+    if (problem) log?.(`[${user.user}] its containers service didn't start: ${problem}`);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);

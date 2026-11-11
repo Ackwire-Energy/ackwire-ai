@@ -9,6 +9,7 @@ import {
   useUpdateRole,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { can, type RolePermission } from "@agenteschat/client/lib/permissions";
 import {
   COMPUTER_KEYS,
@@ -567,11 +568,13 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
   const { t } = useTranslation();
   const fail = useFail();
   const toast = useToast();
-  const { orgId, data, people, failed, viewer } = useRolesData();
+  const { orgId, data, people: live, failed, viewer } = useRolesData();
   const set = useSetMemberRoles(orgId);
   const change = useChangeRole(orgId);
   const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  // Everyone as before Adicionar: the ones being added keep their rows while it adds and the screen goes back.
+  const people = useHeldWhile(live, busy);
   const [query, setQuery] = useState("");
   const owner = roleId === OWNER_ROLE;
   const role = data?.roles.find((r) => r.id === roleId);
@@ -585,6 +588,7 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
       : [];
   const add = async () => {
     setBusy(true);
+    let stays = true;
     try {
       const ids = [...picked];
       // Owners as the web makes them: one by one, stopping at a refusal.
@@ -608,9 +612,12 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
         toast({ title: t("rolesPage.added", { count: added, name }), icon: "check" });
       }
       if (refused) fail(refused);
-      else goBack();
+      else {
+        stays = false;
+        goBack();
+      }
     } finally {
-      setBusy(false);
+      if (stays) setBusy(false);
     }
   };
   return (

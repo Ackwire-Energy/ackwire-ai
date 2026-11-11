@@ -730,6 +730,8 @@ export interface RunnerToolchains {
   /** The Apple Account team that signs the iPhone test helper, as Xcode names it ("Sam Rivera (Personal Team)"). */
   appleTeam?: string;
   node?: string;
+  /** Podman's version: with the runner in system mode, the agents' containers (ADR 0169). */
+  podman?: string;
 }
 
 /** The phone a `phone.*` op is for. */
@@ -1992,6 +1994,11 @@ export interface MachineAgent {
   account?: string;
   /** The other accounts here it thinks with: the team's right hand on people's own plans (ADR 0137 §11). */
   accounts?: string[];
+  /**
+   * Its containers service may run here (ADR 0169). Absent for a brain whose shell runs in a sandbox of the CLI's own,
+   * which that service, outside it, would be a way out of, and for the team's right hand, which thinks on several.
+   */
+  containers?: boolean;
 }
 
 /** The pause state (protocol 9). `until` null: paused until the owner resumes. */
@@ -2789,6 +2796,7 @@ const TOOLCHAINS: readonly (keyof RunnerToolchains)[] = [
   "xcode",
   "appleTeam",
   "node",
+  "podman",
 ];
 const idOrNull = (v: unknown) => (isString(v) && v.length <= 64 ? v : null);
 

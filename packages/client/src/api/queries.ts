@@ -3572,19 +3572,30 @@ export function useMemoryAction(orgId: string, agentId: string) {
       action:
         | { type: "edit"; id: string; text: string }
         | { type: "pin"; id: string; pinned: boolean }
-        | { type: "archive"; id: string; archived: boolean },
+        | { type: "archive"; id: string; archived: boolean }
+        | { type: "confirm"; id: string }
+        | { type: "team"; id: string },
     ) => {
       if (action.type === "edit") return api.memory.edit(orgId, action.id, action.text);
       if (action.type === "pin") return api.memory.setPinned(orgId, action.id, action.pinned);
+      if (action.type === "confirm") return api.memory.confirm(orgId, action.id);
+      if (action.type === "team") return api.memory.makeTeam(orgId, action.id);
       return api.memory.setArchived(orgId, action.id, action.archived);
     },
     onSuccess: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: keys.memory(orgId, agentId) }),
         qc.invalidateQueries({ queryKey: keys.orgMemories(orgId) }),
+        qc.invalidateQueries({ queryKey: keys.teamMemories(orgId) }),
       ]),
   });
 }
+
+/** Memória do time (ADR 0167). */
+export const useTeamMemories = (orgId: string) => {
+  const api = useApi();
+  return useQuery({ queryKey: keys.teamMemories(orgId), queryFn: () => api.memory.listTeam(orgId) });
+};
 
 export const useProposals = (orgId: string) => {
   const api = useApi();

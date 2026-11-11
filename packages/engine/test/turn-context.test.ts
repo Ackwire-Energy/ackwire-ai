@@ -475,6 +475,24 @@ describe("# This turn", () => {
       '# Sharing "MacBook"\nAll the agents on "MacBook" share its 4 CPUs and most of its 8 GB',
     );
     expect(seen).toHaveLength(6);
+    expect(seen[5]?.system).not.toContain("# Containers");
+
+    // Its runner found Podman: each agent has its containers there (ADR 0169), which Cursor's sandbox keeps it from.
+    await f.db
+      .update(schema.machines)
+      .set({ executors: { ...row?.executors, mode: "system", toolchains: { podman: "5.4.2" } } })
+      .where(eq(schema.machines.id, paired.machineId));
+    const turn = async () => {
+      await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
+      await drainOutbox(f.db, handlers);
+      return seen.at(-1)?.system ?? "";
+    };
+    expect(await turn()).not.toContain("# Containers");
+    await f.db.update(schema.agents).set({ brain: "claude_code" }).where(eq(schema.agents.id, f.agent.id));
+    expect(await turn()).toContain(
+      '# Containers on "MacBook"\ndocker, docker compose and podman work there: rootless Podman as your own user',
+    );
+    expect(seen).toHaveLength(8);
   });
 });
 

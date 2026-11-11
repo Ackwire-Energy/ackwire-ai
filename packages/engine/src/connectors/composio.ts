@@ -16,7 +16,7 @@ import { ConflictError, ValidationError } from "../errors";
 import { composioUserId } from "../mail/accounts";
 import { notifyComposioLimit } from "../notification-producers";
 import { requirePermission } from "../organizations";
-import { actionLevel } from "./classify";
+import { actionLevel, POSTING_ACTIONS } from "./classify";
 import {
   type ConnectOutcome,
   type ConnectorConnection,
@@ -83,12 +83,12 @@ function toolsOf(client: ComposioClient, way: ComposioWay): Promise<ComposioTool
 
 /**
  * An action as an MCP tool: our name for it, and Composio's hints read by our rules. It reads only when Composio says
- * so and nothing in it sends, deletes, pays or shares; it asks whenever Composio says it destroys, our words call it
- * sensitive, or the entry's `ask` names it.
+ * so and nothing in it sends, deletes, pays or shares; it asks whenever Composio says it destroys (a post aside,
+ * `POSTING_ACTIONS`), our words call it sensitive, or the entry's `ask` names it.
  */
 export function composioMcpTool(way: ComposioWay, tool: ComposioTool): McpTool {
   const asks =
-    tool.tags.includes("destructiveHint") ||
+    (tool.tags.includes("destructiveHint") && !POSTING_ACTIONS.has(tool.slug)) ||
     actionLevel(tool.slug) === "sensitive" ||
     (way.ask ?? []).includes(tool.slug);
   return {

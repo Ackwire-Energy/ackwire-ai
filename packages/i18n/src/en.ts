@@ -2546,6 +2546,13 @@ export const en = {
       action: "Create routine",
       done: "Routine created",
     },
+    /** A how-to of the reader's agent reused past the bar (ADR 0167): `{{what}}` is its plain title. */
+    howto: {
+      title: "{{name}} learned: {{what}}",
+      line: "Used {{uses}}×. Make it a skill?",
+      action: "Make it a skill",
+      done: "Confirmed",
+    },
     stalled: {
       /** `{{number}}` is the task's number, `{{title}}` its title. */
       title: "Steps stopped in #{{number}} {{title}}",
@@ -2596,6 +2603,8 @@ export const en = {
   },
   routing: {
     title: "Who picks the agents",
+    /** Memory's reflection on finished conversations needs a provider key (Settings › AI accounts, above). */
+    reflectionOff: "Memory doesn't learn from finished conversations yet: that needs a provider key, added above.",
     how: "How agents are picked",
     by: {
       jev: "Jev picks who answers each message without a mention.",
@@ -5565,6 +5574,16 @@ export const en = {
       andMore: "{{names}} and more",
     },
   },
+  /** Memória do time (ADR 0167): Settings › General, the agent's memory tab and the phone's memory screen. */
+  teamMemory: {
+    title: "Team memory",
+    help: "What people asked every agent to keep, with who said it and when. Every agent reads it in all its work.",
+    empty: "Nothing yet. When someone asks every agent to remember something, it shows here.",
+    remove: "Remove",
+    removed: "Removed from team memory",
+    make: "Make it the team's",
+    made: "Every agent keeps it now",
+  },
   memory: {
     /** A lesson from a refused change: what it was. */
     fromRefusal: "Not to propose again: {{text}}",
@@ -5587,6 +5606,9 @@ export const en = {
     unverifiedTitle: "Only agents said this. It goes into context as a marked hint.",
     pinned: "Always in context",
     lowTrust: "External source, not trusted",
+    confirm: "Confirm",
+    confirmTitle: "Say it's right: agents then use it as trusted.",
+    confirmed: "Confirmed",
     used_zero: "never used",
     used_one: "used {{count}} time",
     used_other: "used {{count}} times",
@@ -8322,6 +8344,7 @@ export const en = {
         "{{computer}} went offline: {{count}} tasks keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped",
       machine_task_resume_waits: "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready",
+      machine_task_restarted: "{{computer}} is back: “{{title}}” started again",
       machine_task_done: "“{{title}}” finished in {{span}} on {{computer}}",
       machine_task_failed: "“{{title}}” failed after {{span}} on {{computer}}",
       machine_task_canceled: "“{{title}}” was stopped on {{computer}}",
@@ -11392,6 +11415,7 @@ export const en = {
       support: "Support",
       marketing: "Marketing",
       automation: "Automation",
+      social: "Social",
       email: "Email",
     },
     emptyCategory: "No connectors in this category yet",
@@ -11564,6 +11588,41 @@ export const en = {
       superwall: { "1": "See paywalls and results", "2": "Create and adjust campaigns" },
       paddle: { "1": "See customers, subscriptions and transactions", "2": "Create products and prices" },
       abacatepay: { "1": "See charges and customers", "2": "Create Pix charges" },
+      instagram: {
+        "1": "See posts, stories and insights",
+        "2": "Publish posts and read direct messages",
+        ask: "Answering messages always asks for your approval",
+      },
+      facebook: {
+        "1": "See posts, comments and insights",
+        "2": "Publish posts, photos and videos and answer comments",
+        ask: "Deleting posts and comments always asks for your approval",
+      },
+      linkedin: {
+        "1": "Publish posts, links and videos",
+        "2": "Comment on posts",
+        ask: "Deleting posts always asks for your approval",
+      },
+      youtube: {
+        "1": "See videos, comments and analytics",
+        "2": "Edit videos and playlists and write comments",
+        ask: "Replying to, moderating and deleting comments always asks for your approval",
+      },
+      pinterest: {
+        "1": "See pins, boards and analytics",
+        "2": "Create pins and organize boards",
+        ask: "Changing boards and deleting always asks for your approval",
+      },
+      reddit: {
+        "1": "Search posts and read comments",
+        "2": "Post, comment and edit",
+        ask: "Deleting always asks for your approval",
+      },
+      whatsapp: {
+        "1": "See numbers, templates and deliveries",
+        "2": "Create message templates",
+        ask: "Sending messages always asks for your approval",
+      },
       database: { "1": "See the tables", "2": "Query the data to answer", "3": "Never changes anything" },
     },
     connectedList: "Connected",
@@ -11710,6 +11769,13 @@ export const en = {
       superwall: "Paywalls, campaigns and experiments.",
       paddle: "Customers, subscriptions, transactions and products.",
       abacatepay: "Pix charges, customers and withdrawals.",
+      instagram: "Instagram business and creator accounts: posts, stories, insights and direct messages.",
+      facebook: "Facebook Pages: posts, photos, videos, comments and insights.",
+      linkedin: "LinkedIn posts, videos and comments as the member who signs in.",
+      youtube: "YouTube channel videos, comments, playlists and analytics.",
+      pinterest: "Pinterest pins, boards and analytics.",
+      reddit: "Reddit posts, comments and communities.",
+      whatsapp: "WhatsApp Business messages and templates.",
     },
   },
   toolNames: {
@@ -13003,6 +13069,7 @@ export const en = {
       restart: "Computer sessions are restarting to apply network settings. New work waits until this finishes.",
       line: "Exit IP {{ip}}",
       hint: "The address websites see when the agents browse. It updates when the computer’s network changes.",
+      waiting: "Reconnecting the agents’ internet. Their connections wait until it’s back.",
     },
     online: "Online",
     offline: "Offline",
@@ -15419,6 +15486,7 @@ export const en = {
       machine_task_resumed: "{{computer}} is back: “{{title}}” resumed where it stopped.",
       machine_task_resume_waits:
         "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready.",
+      machine_task_restarted: "{{computer}} is back: “{{title}}” started again.",
       machine_offline: "{{computer}} went offline.",
       brain_unavailable: "{{brain}} can't answer right now. I'll answer when it's back.",
       /** Waits that don't pass by themselves (`meta.brainUnavailable.code`): the cause and who fixes it. */

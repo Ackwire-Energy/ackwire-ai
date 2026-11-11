@@ -82,6 +82,8 @@ export interface JudgeTable {
   ask?: (state: Record<string, unknown>) => "findable" | "secret" | "person" | "none" | "fail";
   /** `alert_triage` (ADR 0131 §5): whether an unrequested item is work now or noise for the digest (default work). */
   triage?: (state: Record<string, unknown>) => "work" | "noise";
+  /** `held_reply`: what goes out after a reply held back as untried (default: the new words alone). */
+  heldReply?: (state: Record<string, unknown>) => "reply" | "both" | "held";
 }
 
 /** Judgments the engine asks along the way that the scenarios leave at the fake's defaults. */
@@ -194,6 +196,8 @@ export async function world(options: WorldOptions) {
       }
       case "alert_triage":
         return table.triage?.(state) ?? "work";
+      case "held_reply":
+        return table.heldReply?.(state) ?? "reply";
       case "note_reply":
       case "note_reply_matters":
         return table.noteReply ?? 0.9;

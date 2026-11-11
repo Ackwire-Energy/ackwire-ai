@@ -12,6 +12,7 @@ import {
 } from "@agenteschat/client";
 import { modeOf } from "@agenteschat/client/lib/audience";
 import { capitalize, joinNames, namesText } from "@agenteschat/client/lib/format";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { INVITE_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -209,9 +210,10 @@ function InviteDialog({ request, open, onClose }: { request: InviteRequest; open
   const host = useMemo(() => hostOf(dir.agents), [dir.agents]);
 
   // Who is in already, and who has an invitation waiting: said on their chip and left out of the send.
-  const members = new Set(dir.members.map((m) => m.email.toLowerCase()));
-  const waiting = new Set(
-    (invitations.data ?? []).filter((i) => i.status === "pending").map((i) => i.email.toLowerCase()),
+  const members = useHeldWhile(new Set(dir.members.map((m) => m.email.toLowerCase())), inviteMany.isPending);
+  const waiting = useHeldWhile(
+    new Set((invitations.data ?? []).filter((i) => i.status === "pending").map((i) => i.email.toLowerCase())),
+    inviteMany.isPending,
   );
   const stateOf = (c: ChipAddress) =>
     !c.valid ? "bad" : members.has(c.email) ? "member" : waiting.has(c.email) ? "invited" : "ok";

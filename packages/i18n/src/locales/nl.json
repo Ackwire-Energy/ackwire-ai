@@ -2424,6 +2424,12 @@
       "action": "Routine maken",
       "done": "Routine gemaakt"
     },
+    "howto": {
+      "title": "{{name}} leerde: {{what}}",
+      "line": "{{uses}}× gebruikt. Een skill van maken?",
+      "action": "Maak er een skill van",
+      "done": "Bevestigd"
+    },
     "stalled": {
       "title": "Stappen staan stil in #{{number}} {{title}}",
       "line_one": "Stap {{steps}} staat al {{hours}} u stil en wacht op #{{on}}.",
@@ -2469,6 +2475,7 @@
   },
   "routing": {
     "title": "Wie de agents kiest",
+    "reflectionOff": "Het geheugen leert nog niet van afgeronde gesprekken: daarvoor is een sleutel van een aanbieder nodig, hierboven.",
     "how": "Hoe agents worden gekozen",
     "by": {
       "jev": "Jev kiest wie elk bericht zonder vermelding beantwoordt.",
@@ -5365,6 +5372,15 @@
       "andMore": "{{names}} en meer"
     }
   },
+  "teamMemory": {
+    "title": "Teamgeheugen",
+    "help": "Wat mensen alle agents vroegen te onthouden, met wie het zei en wanneer. Elke agent leest het bij al zijn werk.",
+    "empty": "Nog niets. Als iemand alle agents vraagt iets te onthouden, verschijnt het hier.",
+    "remove": "Verwijderen",
+    "removed": "Uit het teamgeheugen verwijderd",
+    "make": "Naar het team",
+    "made": "Alle agents onthouden het nu"
+  },
   "memory": {
     "fromRefusal": "Niet opnieuw voorstellen: {{text}}",
     "fromCorrection": "Iemand heeft gecorrigeerd: {{text}}",
@@ -5405,6 +5421,9 @@
     "unverifiedTitle": "Alleen agents zeiden dit. Het gaat als gemarkeerde hint mee in de context.",
     "pinned": "Altijd in de context",
     "lowTrust": "Externe bron, niet vertrouwd",
+    "confirm": "Bevestigen",
+    "confirmTitle": "Zeg dat het klopt: agents gebruiken het dan als betrouwbaar.",
+    "confirmed": "Bevestigd",
     "used_zero": "nooit gebruikt",
     "used_one": "{{count}} keer gebruikt",
     "used_other": "{{count}} keer gebruikt",
@@ -8171,6 +8190,7 @@
       "machine_offline_resumes_other": "{{computer}} is offline gegaan: {{count}} taken blijven daar draaien als alleen de verbinding wegviel, en gaan verder waar ze stopten als de computer opnieuw is opgestart.",
       "machine_task_resumed": "{{computer}} is terug: „{{title}}” gaat verder waar het stopte",
       "machine_task_resume_waits": "{{computer}} is terug: „{{title}}” gaat verder waar het stopte zodra het project klaar is",
+      "machine_task_restarted": "{{computer}} is terug: „{{title}}” is opnieuw gestart",
       "machine_task_done": "„{{title}}” klaar na {{span}} op {{computer}}",
       "machine_task_failed": "„{{title}}” mislukt na {{span}} op {{computer}}",
       "machine_task_canceled": "„{{title}}” is gestopt op {{computer}}",
@@ -11310,6 +11330,7 @@
       "support": "Support",
       "marketing": "Marketing",
       "automation": "Automatisering",
+      "social": "Sociale media",
       "email": "E-mail"
     },
     "emptyCategory": "Nog geen connectors in deze categorie",
@@ -11661,6 +11682,41 @@
         "1": "Betaalverzoeken en klanten bekijken",
         "2": "Pix-betaalverzoeken maken"
       },
+      "instagram": {
+        "1": "Posts, verhalen en statistieken bekijken",
+        "2": "Posts publiceren en directe berichten lezen",
+        "ask": "Op berichten antwoorden vraagt altijd om jouw goedkeuring"
+      },
+      "facebook": {
+        "1": "Posts, reacties en statistieken bekijken",
+        "2": "Posts, foto's en video's publiceren en op reacties antwoorden",
+        "ask": "Posts en reacties verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "linkedin": {
+        "1": "Posts, links en video's publiceren",
+        "2": "Op posts reageren",
+        "ask": "Posts verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "youtube": {
+        "1": "Video's, reacties en statistieken bekijken",
+        "2": "Video's en afspeellijsten bewerken en reageren",
+        "ask": "Reacties beantwoorden, modereren en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "pinterest": {
+        "1": "Pins, borden en statistieken bekijken",
+        "2": "Pins maken en borden ordenen",
+        "ask": "Borden wijzigen en verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "reddit": {
+        "1": "Posts zoeken en reacties lezen",
+        "2": "Posten, reageren en bewerken",
+        "ask": "Verwijderen vraagt altijd om jouw goedkeuring"
+      },
+      "whatsapp": {
+        "1": "Nummers, sjablonen en bezorging bekijken",
+        "2": "Berichtsjablonen maken",
+        "ask": "Berichten versturen vraagt altijd om jouw goedkeuring"
+      },
       "database": {
         "1": "De tabellen bekijken",
         "2": "De data bevragen om te antwoorden",
@@ -11804,7 +11860,14 @@
       "revenuecat": "In-app-abonnementen, producten, aanbiedingen en omzet.",
       "superwall": "Paywalls, campagnes en experimenten.",
       "paddle": "Klanten, abonnementen, transacties en producten.",
-      "abacatepay": "Pix-betaalverzoeken, klanten en opnames."
+      "abacatepay": "Pix-betaalverzoeken, klanten en opnames.",
+      "instagram": "Zakelijke en creator-accounts op Instagram: posts, verhalen, statistieken en directe berichten.",
+      "facebook": "Facebook-pagina's: posts, foto's, video's, reacties en statistieken.",
+      "linkedin": "LinkedIn-posts, video's en reacties namens het lid dat inlogt.",
+      "youtube": "Video's, reacties, afspeellijsten en statistieken van het YouTube-kanaal.",
+      "pinterest": "Pins, borden en statistieken op Pinterest.",
+      "reddit": "Posts, reacties en community's op Reddit.",
+      "whatsapp": "Berichten en sjablonen van WhatsApp Business."
     }
   },
   "toolNames": {
@@ -13130,7 +13193,8 @@
       "draining": "Het netwerk verandert. Open sessies van de computer starten om {{when}} opnieuw.",
       "restart": "De sessies van de computer starten opnieuw om het netwerk toe te passen. Nieuw werk wacht tot dit klaar is.",
       "line": "Uitgaand IP {{ip}}",
-      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer."
+      "hint": "Het adres dat websites zien als de agents browsen. Het verandert mee met het netwerk van de computer.",
+      "waiting": "Het internet van de agents wordt opnieuw verbonden. Hun verbindingen wachten tot het terug is."
     },
     "online": "Online",
     "offline": "Offline",
@@ -15492,6 +15556,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” is onderbroken.",
       "machine_task_resumed": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte.",
       "machine_task_resume_waits": "{{computer}} is terug: “{{title}}” gaat verder waar het stopte zodra het project klaar is.",
+      "machine_task_restarted": "{{computer}} is terug: “{{title}}” is opnieuw gestart.",
       "machine_offline": "{{computer}} is offline gegaan.",
       "brain_unavailable": "{{brain}} kan nu niet antwoorden. Ik antwoord zodra het terug is.",
       "brain_unavailable_paused": "De computer waarop {{brain}} draait is gepauzeerd. Ik antwoord zodra die wordt hervat.",

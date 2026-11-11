@@ -2425,6 +2425,12 @@
       "action": "Routine erstellen",
       "done": "Routine erstellt"
     },
+    "howto": {
+      "title": "{{name}} hat gelernt: {{what}}",
+      "line": "{{uses}}× genutzt. Zum Skill machen?",
+      "action": "Zum Skill machen",
+      "done": "Bestätigt"
+    },
     "stalled": {
       "title": "Schritte stehen still in #{{number}} {{title}}",
       "line_one": "Schritt {{steps}} steht seit {{hours}} h still und wartet auf #{{on}}.",
@@ -2470,6 +2476,7 @@
   },
   "routing": {
     "title": "Wer die Agenten auswählt",
+    "reflectionOff": "Das Gedächtnis lernt noch nicht aus beendeten Gesprächen: Dafür braucht es oben einen Anbieter-Schlüssel.",
     "how": "Wie Agenten ausgewählt werden",
     "by": {
       "jev": "Jev wählt aus, wer auf jede Nachricht ohne Erwähnung antwortet.",
@@ -5317,6 +5324,15 @@
       "andMore": "{{names}} und mehr"
     }
   },
+  "teamMemory": {
+    "title": "Team-Gedächtnis",
+    "help": "Was alle Agenten auf Wunsch der Leute behalten, mit wer es sagte und wann. Jeder Agent liest es bei all seiner Arbeit.",
+    "empty": "Noch nichts. Wenn jemand alle Agenten bittet, sich etwas zu merken, erscheint es hier.",
+    "remove": "Entfernen",
+    "removed": "Aus dem Team-Gedächtnis entfernt",
+    "make": "Ins Team-Gedächtnis übernehmen",
+    "made": "Jetzt behalten es alle Agenten"
+  },
   "memory": {
     "fromRefusal": "Nicht erneut vorschlagen: {{text}}",
     "fromCorrection": "Eine Person hat korrigiert: {{text}}",
@@ -5357,6 +5373,9 @@
     "unverifiedTitle": "Das haben nur Agenten gesagt. Es kommt als markierter Hinweis in den Kontext.",
     "pinned": "Immer im Kontext",
     "lowTrust": "Externe Quelle, nicht vertrauenswürdig",
+    "confirm": "Bestätigen",
+    "confirmTitle": "Sagen, dass es stimmt: Die Agenten nutzen es dann als vertrauenswürdig.",
+    "confirmed": "Bestätigt",
     "used_zero": "nie genutzt",
     "used_one": "{{count}}-mal genutzt",
     "used_other": "{{count}}-mal genutzt",
@@ -8125,6 +8144,7 @@
       "machine_offline_resumes_other": "{{computer}} ist offline gegangen: {{count}} Aufgaben laufen dort weiter, falls nur die Verbindung abgebrochen ist, und machen dort weiter, wo sie standen, falls der Computer neu gestartet wurde.",
       "machine_task_resumed": "{{computer}} ist zurück: „{{title}}“ macht dort weiter, wo es aufgehört hat",
       "machine_task_resume_waits": "{{computer}} ist zurück: „{{title}}“ macht dort weiter, wo es aufgehört hat, sobald das Projekt bereit ist",
+      "machine_task_restarted": "{{computer}} ist zurück: „{{title}}“ wurde neu gestartet",
       "machine_task_done": "„{{title}}“ in {{span}} auf {{computer}} fertig",
       "machine_task_failed": "„{{title}}“ nach {{span}} auf {{computer}} fehlgeschlagen",
       "machine_task_canceled": "„{{title}}“ wurde auf {{computer}} gestoppt",
@@ -11248,6 +11268,7 @@
       "support": "Support",
       "marketing": "Marketing",
       "automation": "Automatisierung",
+      "social": "Soziale Netzwerke",
       "email": "E-Mail"
     },
     "emptyCategory": "Noch keine Konnektoren in dieser Kategorie",
@@ -11599,6 +11620,41 @@
         "1": "Zahlungsforderungen und Kunden ansehen",
         "2": "Pix-Zahlungsforderungen erstellen"
       },
+      "instagram": {
+        "1": "Beiträge, Storys und Statistiken ansehen",
+        "2": "Beiträge veröffentlichen und Direktnachrichten lesen",
+        "ask": "Auf Nachrichten antworten fragt immer nach deiner Freigabe"
+      },
+      "facebook": {
+        "1": "Beiträge, Kommentare und Statistiken ansehen",
+        "2": "Beiträge, Fotos und Videos veröffentlichen und auf Kommentare antworten",
+        "ask": "Beiträge und Kommentare löschen fragt immer nach deiner Freigabe"
+      },
+      "linkedin": {
+        "1": "Beiträge, Links und Videos veröffentlichen",
+        "2": "Beiträge kommentieren",
+        "ask": "Beiträge löschen fragt immer nach deiner Freigabe"
+      },
+      "youtube": {
+        "1": "Videos, Kommentare und Statistiken ansehen",
+        "2": "Videos und Playlists bearbeiten und kommentieren",
+        "ask": "Auf Kommentare antworten, sie moderieren und löschen fragt immer nach deiner Freigabe"
+      },
+      "pinterest": {
+        "1": "Pins, Pinnwände und Statistiken ansehen",
+        "2": "Pins erstellen und Pinnwände ordnen",
+        "ask": "Pinnwände ändern und etwas löschen fragt immer nach deiner Freigabe"
+      },
+      "reddit": {
+        "1": "Beiträge suchen und Kommentare lesen",
+        "2": "Posten, kommentieren und bearbeiten",
+        "ask": "Löschen fragt immer nach deiner Freigabe"
+      },
+      "whatsapp": {
+        "1": "Nummern, Vorlagen und Zustellungen ansehen",
+        "2": "Nachrichtenvorlagen erstellen",
+        "ask": "Nachrichten senden fragt immer nach deiner Freigabe"
+      },
       "database": {
         "1": "Tabellen ansehen",
         "2": "Daten abfragen, um zu antworten",
@@ -11742,7 +11798,14 @@
       "revenuecat": "In-App-Abos, Produkte, Angebote und Umsatz.",
       "superwall": "Paywalls, Kampagnen und Experimente.",
       "paddle": "Kunden, Abos, Transaktionen und Produkte.",
-      "abacatepay": "Pix-Zahlungsforderungen, Kunden und Auszahlungen."
+      "abacatepay": "Pix-Zahlungsforderungen, Kunden und Auszahlungen.",
+      "instagram": "Instagram-Business- und Creator-Konten: Beiträge, Storys, Statistiken und Direktnachrichten.",
+      "facebook": "Facebook-Seiten: Beiträge, Fotos, Videos, Kommentare und Statistiken.",
+      "linkedin": "LinkedIn-Beiträge, Videos und Kommentare im Namen des angemeldeten Mitglieds.",
+      "youtube": "Videos, Kommentare, Playlists und Statistiken des YouTube-Kanals.",
+      "pinterest": "Pins, Pinnwände und Statistiken auf Pinterest.",
+      "reddit": "Beiträge, Kommentare und Communitys auf Reddit.",
+      "whatsapp": "Nachrichten und Vorlagen von WhatsApp Business."
     }
   },
   "toolNames": {
@@ -13068,7 +13131,8 @@
       "draining": "Das Netzwerk ändert sich. Offene Sitzungen des Computers starten um {{when}} neu.",
       "restart": "Die Sitzungen des Computers starten neu, um das Netzwerk zu übernehmen. Neue Arbeit wartet, bis das fertig ist.",
       "line": "Ausgangs-IP {{ip}}",
-      "hint": "Die Adresse, die Websites sehen, wenn die Agenten surfen. Sie ändert sich, wenn sich das Netzwerk des Computers ändert."
+      "hint": "Die Adresse, die Websites sehen, wenn die Agenten surfen. Sie ändert sich, wenn sich das Netzwerk des Computers ändert.",
+      "waiting": "Die Internetverbindung der Agenten wird wiederhergestellt. Ihre Verbindungen warten, bis sie zurück ist."
     },
     "online": "Online",
     "offline": "Offline",
@@ -15424,6 +15488,7 @@
       "machine_task_interruptedNoComputer": "„{{title}}“ wurde unterbrochen.",
       "machine_task_resumed": "{{computer}} ist zurück: „{{title}}“ läuft dort weiter, wo es aufgehört hat.",
       "machine_task_resume_waits": "{{computer}} ist zurück: „{{title}}“ läuft dort weiter, wo es aufgehört hat, sobald das Projekt bereit ist.",
+      "machine_task_restarted": "{{computer}} ist zurück: „{{title}}“ wurde neu gestartet.",
       "machine_offline": "{{computer}} ist offline gegangen.",
       "brain_unavailable": "{{brain}} kann gerade nicht antworten. Ich antworte, sobald es wieder da ist.",
       "brain_unavailable_paused": "Der Computer, auf dem {{brain}} läuft, ist pausiert. Ich antworte, sobald er fortgesetzt wird.",

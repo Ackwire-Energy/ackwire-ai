@@ -714,7 +714,7 @@ ones a self-hosted instance usually touches:
 | `POSTGRES_PASSWORD` | required | Database password. Read by the compose file only. |
 | `AGENTES_IMAGE` | `ghcr.io/agentes-chat/agentes:latest` | The image to run. A version tag or a digest holds a version. |
 | `BIND_ADDRESS`, `HOST_PORT` | `127.0.0.1`, `3000` | Where the compose file publishes the app. |
-| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore), `speech` (Voice messages). |
+| `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore), `speech` (Voice messages), `embeddings` (Search across languages). |
 | `DOMAIN` | | The public domain Caddy gets a certificate for. |
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
 | `TS_HOSTNAME` | `agentes` | The server's name in your tailnet: `https://<TS_HOSTNAME>.<tailnet>.ts.net`. After changing it, run the setup again to update `PUBLIC_URL`. |
@@ -788,13 +788,27 @@ my password" on the sign-in page emails a link to the web app's reset page (`/re
 
 Recordings are kept with your files, outside the Drive, for `VOICE_RETENTION_DAYS` (90 by default; 0 keeps them forever). A daily sweep then deletes the audio; the message and its words stay for agents and search, and the player says the recording is gone.
 
+**Search across languages.** Search matches words, so a request in Portuguese misses a memory saved in English, and one in other words misses it too. Before every run an agent searches its memory with the message that started it; with vectors it finds what it needs by meaning, in any language. Set `EMBEDDINGS_PROVIDER=openai` and `EMBEDDINGS_URL` to a server with OpenAI's embeddings API, with `EMBEDDINGS_API_KEY` if it asks for a key:
+
+| Server | `EMBEDDINGS_URL` | `EMBEDDING_MODEL` |
+| --- | --- | --- |
+| DeepInfra, with its key | `https://api.deepinfra.com/v1/openai` | `Qwen/Qwen3-Embedding-0.6B` (the default, $0.01 per million tokens), `Qwen/Qwen3-Embedding-8B` (the same price, better scores) or `BAAI/bge-m3` |
+| OpenAI, with its key | `https://api.openai.com/v1` | `text-embedding-3-small` or `text-embedding-3-large`, asked for 1024 numbers |
+| This machine, below | `http://embeddings:8080/v1` | `Qwen/Qwen3-Embedding-0.6B`, `BAAI/bge-m3` or `ibm-granite/granite-embedding-311m-multilingual-r2` |
+| Ollama, vLLM or llama.cpp of your own | its address, ending in `/v1` | the name it serves the model under |
+
+The model may give at most 1024 numbers per vector; fewer are padded with zeros. The Qwen3 models get the instruction their queries need only under their names above, so a server that names them otherwise (Ollama's `qwen3-embedding`) gets plain queries. `EMBEDDINGS_KINDS` says what gets vectors: memories (`context_item`) by default; `context_item,wiki,file,issue,action` adds wiki pages, files, tasks and the team's actions, and `message` messages, which are most of what is indexed and whose vectors would take most of the disk. The rest is found by its words. At each start, every workspace's documents of those kinds that this model hasn't embedded get their vectors in the background, so turning vectors on, changing the model or adding a kind needs nothing else. A query waits at most `EMBEDDINGS_QUERY_TIMEOUT_MS` (1.5 seconds) for its vector; when the server is late or down, that search goes on with words alone, and three failures in a row go to error reports, once. Each workspace's usage shows the vectors' cost (kind `embedding`) at the model's list price, also when the model runs on a server of your own (granite, which DeepInfra doesn't host, costs nothing there). Without `EMBEDDINGS_PROVIDER`, search is full-text, as on any install with only Postgres.
+
+**Search across languages on this machine.** The `embeddings` profile runs Hugging Face's text-embeddings-inference on this server's CPU: add `embeddings` to `COMPOSE_PROFILES`, set `EMBEDDINGS_PROVIDER=openai` and `EMBEDDINGS_URL=http://embeddings:8080/v1`, then `docker compose up -d`. It serves `EMBEDDING_MODEL`, Qwen3-Embedding-0.6B by default; `BAAI/bge-m3` gives vectors of the same size, and `ibm-granite/granite-embedding-311m-multilingual-r2` is about twice as fast on a CPU. Its first start downloads the model from Hugging Face into its volume (about 1.2 GB for Qwen3-Embedding-0.6B), so its network reaches the internet; what it embeds never leaves this machine. By default it takes up to 2 CPUs and 3 GB of memory (`EMBEDDINGS_CPUS`, `EMBEDDINGS_MEMORY`, with `EMBEDDINGS_THREADS` threads; Docker refuses more CPUs than the machine has), in batches of at most 2,048 tokens (`EMBEDDINGS_BATCH_TOKENS`). If `docker compose logs embeddings` shows it restarting for memory, give it `EMBEDDINGS_MEMORY=4g`. On a CPU a query's vector can take a second or more, and longer while it embeds a batch, so set `EMBEDDINGS_QUERY_TIMEOUT_MS=3000`: an agent's run then starts up to 3 seconds later when the server is busy, and past that its memory search goes on words. The image is for x86-64 servers only. Nothing waits for the service: while it starts, or if it is down, search goes on words alone.
+
 **Files.** The compose file stores uploaded files (Drive files, attachments, photos) in the `files`
 volume. With all four `S3_*` variables set they go to that bucket instead, and with neither, into
 Postgres. Choose before the first upload: a file stays in the store it was written to. An
 organization can also keep its files in a bucket of its own (**Settings → Storage**).
 
 **Services through Composio (optional).** Google Drive, Google Calendar, Sheets and Docs, Slack,
-Microsoft Teams, OneDrive, HubSpot, Salesforce and Zendesk have no server that connects to us directly;
+Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Instagram, Facebook Pages, LinkedIn, YouTube,
+Pinterest, Reddit and WhatsApp Business have no server that connects to us directly;
 Asana, Figma, Intercom, Dropbox and Square have one that doesn't let us in yet. With `COMPOSIO_API_KEY`
 set to the key of a project of yours at https://composio.dev, they connect through it: people sign in on
 Composio's page with Composio's own app (in English, and the service's consent screen says "Composio"),
@@ -805,7 +819,10 @@ month. To use an OAuth app of your own instead of Composio's, add it to your Com
 config for its toolkit and set `COMPOSIO_AUTH_CONFIGS=googledrive=ac_…` (several pairs separated by
 commas). Point a Composio webhook subscription at `{PUBLIC_URL}/api/webhooks/composio` and set its
 secret in `COMPOSIO_WEBHOOK_SECRET` so an expired account shows "Reconnect" right away. Disconnecting
-deletes the account at Composio, without revoking it at the service.
+deletes the account at Composio, without revoking it at the service. Instagram connects business and
+creator accounts only, and WhatsApp a WhatsApp Business account, whose id Composio's page asks for.
+Composio's own LinkedIn and YouTube apps share their rate limits and daily quota with all of Composio's
+customers: with heavy use, give them OAuth apps of your own in `COMPOSIO_AUTH_CONFIGS`.
 
 **Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
 code emailed to them (with no email set up, their password instead): it closes for everyone at once,
@@ -933,9 +950,9 @@ party only when you turn that service on:
 | OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | OpenCode | Always on | Nothing of yours: the server reads OpenCode Go's public model list, with no key, at boot and about once an hour, so that plan's model picker stays current. If the list is out of reach, the picker uses the list built into this version. |
 | TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI accounts** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
-| Voyage AI | `EMBEDDINGS_PROVIDER=voyage` and `VOYAGE_API_KEY` | The text of messages and memory items as they are indexed (up to 8,000 characters each), and search queries. Without it, search is full-text only. |
+| Voyage AI, DeepInfra, OpenAI or another embeddings server | `EMBEDDINGS_PROVIDER=voyage` with `VOYAGE_API_KEY`, or `EMBEDDINGS_PROVIDER=openai` with `EMBEDDINGS_URL` | The text of what `EMBEDDINGS_KINDS` lists (memory items by default) as it is indexed, up to 8,000 characters each, and search queries. The `embeddings` profile keeps them on this machine. Without one, search is full-text only. |
 | Web search for agents | Always on: DuckDuckGo's HTML page with no key, unless `BRAVE_SEARCH_API_KEY` (Brave Search) or `SEARXNG_URL` (your own SearXNG) is set; an agent with a browser on its computer searches there instead (Google, then Bing or DuckDuckGo) | The words an agent searches for (`web_search`). `web_fetch` opens the public pages an agent asks for, from this server: never an internal or private address. |
-| Composio | `COMPOSIO_API_KEY` | Gmail and Outlook mailboxes for agents, and the services connected through it (Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox and Square): Composio holds those connections, and what agents read or write there passes through it, files included. IMAP mailboxes and the other connectors connect directly. |
+| Composio | `COMPOSIO_API_KEY` | Gmail and Outlook mailboxes for agents, and the services connected through it (Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit and WhatsApp Business): Composio holds those connections, and what agents read or write there passes through it, files included. IMAP mailboxes and the other connectors connect directly. |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
 | Expo | An iPhone signed in to the instance | For each push to that iPhone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
 | agentes.chat push relay | An Android phone signed in to the instance, unless `FIREBASE_SERVICE_ACCOUNT` is set or `PUSH_SENDER` is `direct` or `off` | Once, to register the instance: its version. Then, for each push to that phone: its FCM token, a title (up to 80 characters), a line of text (up to 180) and what the notification opens (ids of the workspace, conversation or request), which the relay passes to Firebase Cloud Messaging without keeping them. |
@@ -1220,6 +1237,22 @@ for new work and which agents use the most; agents are told to run it before som
 the person when another agent's work leaves no room, and to stop what a finished build left running.
 Gradle's and Kotlin's daemons exit after 5 idle minutes anyway (`GRADLE_OPTS` in each agent's environment).
 Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
+
+**Containers (`--system`).** Agents can run `docker`, `docker compose` and `podman` on a computer where each is its
+own user once Podman is there: `apt install --no-install-recommends podman crun uidmap passt catatonit netavark
+aardvark-dns docker-compose`, and `podman-docker` for the `docker` command on a computer without Docker (where Docker
+is, its `docker` talks to the agent's Podman, never to Docker's daemon), then restart the runner
+(`systemctl restart agentes-runner`). Nobody joins a `docker` group, which
+would make any agent root on the computer: each agent's containers are rootless Podman under its own user, run by a
+containers service of its own (`agentes-containers-<uid>.service`, a systemd user manager in the agent's slice), its
+images and volumes in its home, its limits the agent's share (one container's `--memory` and `--cpus` work inside
+it). Each agent gets the 65536 subordinate ids from `uid << 16` in `/etc/subuid` and `/etc/subgid`, the runner
+replacing the range useradd gave it, and none if another range is in the way (the log says which). Their traffic
+leaves as the agent's own uid, but a container on the host network (`--network host`) whose user inside isn't root
+leaves as one of those ids: a firewall of yours that keys on the agents' uid range should treat every uid from 65536
+up the same way. Containers stop when the computer restarts and come back, those with `restart: always`, with the
+agent's next request. Agents on Codex, Cursor, Grok or Antigravity get none: their CLI's own sandbox is what holds
+them, and the containers service runs outside it. [ADR 0169](docs/adr/0169-agents-containers.md) has the rest.
 
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is

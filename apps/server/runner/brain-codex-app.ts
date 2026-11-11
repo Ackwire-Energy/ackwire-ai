@@ -5,7 +5,7 @@ import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile, CommandScope } from "@agenteschat/adapters/command-policy";
 import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
-import { accountEnv, yieldRoute } from "./accounts";
+import { accountEnv, withoutContainers, yieldRoute } from "./accounts";
 import {
   type CodexAppRunner,
   type CodexBrainEvent,
@@ -841,7 +841,7 @@ export class CodexAppServers implements CodexAppRunner {
     const id = randomUUID();
     const token = newMcpToken();
     const base: NodeJS.ProcessEnv = {
-      ...process.env,
+      ...withoutContainers(process.env),
       ...(opts.env ?? {}),
       [CODEX_MCP_ENV[0]]: token,
       ...(opts.socketPath ? { [CODEX_MCP_ENV[1]]: opts.socketPath } : {}),

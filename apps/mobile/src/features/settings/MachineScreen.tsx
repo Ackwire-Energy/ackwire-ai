@@ -193,6 +193,11 @@ export function MachineScreen({ machineId }: { machineId: string }) {
             {line}
           </Text>
         ))}
+        {managed && m.online && m.egressWaiting && (
+          <Text variant="small" tone="muted" style={styles.center}>
+            {t("machines.egress.waiting")}
+          </Text>
+        )}
         {managed && m.networkTransition && (
           <Text variant="small" tone="muted" style={styles.center}>
             {t(m.networkTransition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {

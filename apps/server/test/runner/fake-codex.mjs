@@ -1,5 +1,5 @@
-// A fake `codex` for route and task tests. Each start appends its argv, $CODEX_HOME, its folder and
-// $OPENAI_API_KEY to $FAKE_CODEX_LOG (one JSON line).
+// A fake `codex` for route and task tests. Each start appends its argv, $CODEX_HOME, its folder, $OPENAI_API_KEY
+// and which of the containers service's variables it got to $FAKE_CODEX_LOG (one JSON line).
 // `debug models` prints a catalog with several Luna models. `exec … --output-schema <file> -o <file>` reads
 // the prompt on stdin, writes an answer in the schema's shape (its first handle 0.9) to the `-o` file and
 // prints Codex's `--json` events. "SLOW_ROUTE" never answers.
@@ -20,6 +20,7 @@ if (log) {
       codexHome: process.env.CODEX_HOME ?? null,
       cwd: process.cwd(),
       apiKey: process.env.OPENAI_API_KEY ?? null,
+      containers: ["CONTAINER_HOST", "DOCKER_HOST", "XDG_RUNTIME_DIR"].filter((k) => k in process.env),
     })}\n`,
   );
 }
