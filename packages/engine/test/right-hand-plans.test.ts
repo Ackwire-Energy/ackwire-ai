@@ -295,10 +295,11 @@ test("its plan's CLI failing: its line says so, and what the CLI said stays in t
   });
   const dm = await openPersonAgentDm(fx.db, fx.org.id, fx.owner.id, agent.id);
   await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
-  const reported: unknown[] = [];
+  const reported: { code: string; message: string }[] = [];
   await drainOutbox(fx.db, handlers, {
     onError: (_job, error, outcome) => {
-      if (outcome === "failed" && error instanceof BrainFailure) reported.push(error);
+      if (outcome === "failed" && error instanceof BrainFailure)
+        reported.push({ code: error.code, message: error.message });
     },
   });
   const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agent.id));
@@ -316,7 +317,7 @@ test("its plan's CLI failing: its line says so, and what the CLI said stays in t
     code: "claude_failed",
     message: words,
   });
-  expect(reported).toEqual([expect.objectContaining({ code: "claude_failed", message: words })]);
+  expect(reported).toEqual([{ code: "claude_failed", message: words }]);
 });
 
 test("its turn goes to the runner as the locked-down chat profile, with no checkout and none of the owner's servers", async () => {
