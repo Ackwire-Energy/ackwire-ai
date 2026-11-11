@@ -23,6 +23,7 @@ import {
   agentCategorySlice,
   agentSlice,
   agentTmp,
+  installedSystemd,
   type RunCommand,
   runSync,
   scopeOomPolicy,
@@ -543,11 +544,12 @@ function agentView(u: AgentUser, more: string[]) {
  * stopping the slice stops them all. Without no_new_privs, which would void the id-map helpers' set-user-ID: its
  * mount view keeps set-user-ID to them alone (`NOSUID_VIEW`), and the bounding set still drops NET_ADMIN and NET_RAW.
  * `Restart=always` runs it again, network hook included, if it dies; OOMPolicy=continue: a container the kernel stops
- * for memory takes only itself. A service's command line is its ExecStart=, where systemd expands `${…}` (and `$NAME`
- * as a whole word) itself, unlike a scope's: every `$` goes as `$$`, which it reads as one, on any version
- * (`--expand-environment=no` needs systemd 254).
+ * for memory takes only itself. A service's command line is its ExecStart=, unlike a scope's: systemd expands `$` in
+ * it, and writes it to the unit's file under /run/systemd/transient with every `$` doubled, which is what runs after
+ * any daemon-reload. So `--expand-environment=no` (`literal`, systemd 254 and later), which keeps it as it is in
+ * both; before 254 there is no such switch, and every `$` goes doubled, which it reads as one.
  */
-export function containersCommand(u: AgentUser): string[] {
+export function containersCommand(u: AgentUser, literal = installedSystemd() >= 254): string[] {
   const env = Object.entries(agentEnv(u, true)).map(([name, value]) => `${name}=${value}`);
   const command = [
     "/bin/sh",
@@ -587,6 +589,7 @@ export function containersCommand(u: AgentUser): string[] {
     "/usr/bin/systemd-run",
     "--quiet",
     "--collect",
+    ...(literal ? ["--expand-environment=no"] : []),
     `--unit=${containersUnit(u.uid)}`,
     `--slice=${agentSlice(u.uid)}`,
     "--property=Delegate=yes",
@@ -595,7 +598,7 @@ export function containersCommand(u: AgentUser): string[] {
     "--property=OOMPolicy=continue",
     "--property=TimeoutStopSec=15",
     "--",
-    ...command.map((arg) => arg.replaceAll("$", () => "$$")),
+    ...(literal ? command : command.map((arg) => arg.replaceAll("$", () => "$$"))),
   ];
 }
 
