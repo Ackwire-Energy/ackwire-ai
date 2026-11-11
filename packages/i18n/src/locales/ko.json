@@ -1383,8 +1383,7 @@
     "noDate": "날짜 없음",
     "clearDate": "날짜 지우기",
     "risky": "머지, 배포 같은 위험한 작업",
-    "riskyOff": "꺼짐: 이런 건 나만 결정해요.",
-    "riskyOn": "켜짐: 이런 것도 이 사람이 결정해요.",
+    "riskyOn": "이런 것도 이 사람이 결정해요.",
     "lock": "항상 내가 결정해요: 돈, 사람과 역할, AI 키, 내 메일함, 삭제.",
     "coveringTitle": "내가 대신 승인하는 사람",
     "coveringSubtitle": "이 사람들에게 온 요청이 나에게도 와요. 그 사람 이름으로 결정해요. 내가 요청한 건 결정하지 않아요.",
@@ -1395,7 +1394,7 @@
     "failed": "저장하지 못했어요. 다시 시도해 주세요."
   },
   "rightHandApprovals": {
-    "title": "{{name}}이(가) 나 대신 승인",
+    "title": "{{name}}이(가) 나 대신 에이전트를 만들고 조정",
     "subtitle": "내 요청에서 시작된 것만이에요. 승인하지 않을 건 나에게 넘겨요.",
     "newAgents": "다른 에이전트가 제안한 에이전트 만들기",
     "newAgentsHelp": "앱 없이 공개 채널에서만요. 24시간 동안 되돌릴 수 있어요.",
@@ -2164,10 +2163,10 @@
       "audienceHelp": "대상이 아닌 사람에게는 사이드바에 {{name}}이(가) 보이지 않아요.",
       "lock": "{{name}}은(는) 보관하거나 삭제할 수 없어요. 말을 걸지 않아도 올리는 건 관리자에게 보내는 팀의 한 주뿐이에요.",
       "audit": "{{name}}이(가) 한 일 보기",
-      "change": "바꾸기",
       "planHelp": "비용은 요금제 주인이 내요. 그 컴퓨터를 쓸 수 없으면 대화에서 알려 주고 API 키를 제안해요.",
       "lookEdit": "{{name}}의 모습 바꾸기",
-      "planOwner": "{{owner}}의 플랜",
+      "planOwner": "{{owner}}의 계정",
+      "planName": "{{name}} 플랜",
       "mine": "내 AI",
       "mineHelp": "{{name}}과(와)의 내 대화는 내 플랜이나 나에게 공유된 플랜으로 생각해요. 내 대화만 그래요.",
       "connectMine": "내 플랜 연결",
@@ -2185,15 +2184,13 @@
       "fallbackPlan": "내 플랜이 없으면 모두에게 답하는 {{owner}}의 플랜을 사용해요.",
       "fallbackYours": "다른 플랜이 없으면 내 것인 워크스페이스 플랜을 사용해요.",
       "fallbackNone": "내 플랜이 없으면 {{name}}이(가) 답할 수 없어요. 워크스페이스 플랜은 {{owner}}에게만 답해요.",
-      "workspace": "워크스페이스 AI",
+      "workspace": "자기 플랜이 없는 사람의 AI",
       "workspaceHelp": "자기 플랜이 없는 사람은 이 AI로 {{name}}과(와) 대화해요.",
-      "workspacePlan": "워크스페이스 플랜",
-      "workspacePlanHelp": "키 대신 쓰는 플랜이에요. 소유자가 허용할 때만 다른 사람에게 답해요.",
-      "noPlans": "여기서 쓰려면 AI 계정에서 플랜을 연결하세요.",
-      "pickPlan": "플랜 선택",
-      "sharesOn": "켜짐: 자기 플랜이 없는 사람은 이 플랜으로 {{name}}과(와) 대화해요.",
-      "sharesOff": "꺼짐: {{owner}}만 이 플랜으로 대화해요. 자기 플랜이 없는 사람은 답을 받지 못해요.",
-      "sharesOffYou": "꺼짐: 나만 이 플랜으로 대화해요. 자기 플랜이 없는 사람은 답을 받지 못해요."
+      "noPlans": "여기서 쓰려면 AI와 사용량에서 플랜을 연결하세요.",
+      "lend": "플랜이 없는 사람에게 이 플랜 빌려주기",
+      "groupMine": "나만",
+      "groupWorkspace": "워크스페이스 전체",
+      "groupAdmins": "관리자만"
     },
     "card": {
       "settings": "{{name}} · 설정",
@@ -3659,6 +3656,8 @@
       "access": "기본 접근 권한",
       "accessTitle": "{{label}}의 기본 접근 권한",
       "accessText": "항목을 따로 바꾸지 않으면 이 설정을 따라요. 바꾸면 바로 저장돼요.",
+      "noAgents": "이 연결을 쓰는 에이전트가 없어요.",
+      "giveAccess": "접근 허용",
       "actionsName": "{{name}} 더 보기",
       "disconnect": "연결 해제",
       "removeTitle": "{{name}} 연결을 해제할까요?",
@@ -4538,6 +4537,7 @@
         "accountOthers": "다른 사람의 플랜에는 주인이 표시돼요. 주인은 이메일을 받고 되돌려 받을 수 있어요.",
         "addAccount": "계정 추가",
         "signInAgain": "다시 로그인",
+        "connectPlan": "다른 요금제 연결",
         "fallbackTitle": "{{computer}}이(가) 응답하지 않으면 API로 답하기",
         "fallbackHint": "API로 답하고 {{name}}의 예산에서 차감돼요. 끄면 {{name}}은(는) 요청한 사람에게 알리고 컴퓨터가 돌아오기를 기다려요.",
         "effort": "사고 수준",
@@ -7996,7 +7996,7 @@
       "dmWith": "{{name}}과(와)의 DM",
       "homeHint": "미션에는 스레드가 생겨요. {{name}}은(는) 그곳에서 이야기하고, 결정을 요청하고, 작업을 보여 줘요.",
       "offline": "{{name}}이(가) 오프라인이에요. 다시 연결되면 계획이 시작돼요.",
-      "needsMachine": "미션은 연결된 컴퓨터에서 실행돼요. 설정 › 컴퓨터에서 {{name}}에 컴퓨터를 연결하세요.",
+      "needsMachine": "미션은 연결된 컴퓨터에서 실행돼요. 설정 › 기기에서 {{name}}에 컴퓨터를 연결하세요.",
       "commandHint": "어느 대화의 입력창에서든 이렇게 입력해서 시작할 수도 있어요:",
       "approvals": "머지, 배포, 롤백은 항상 승인을 요청해요",
       "start": "미션 시작",
@@ -8983,7 +8983,6 @@
     "page": {
       "title": "내 요금제",
       "hint": "각 요금제는 연결한 컴퓨터에 남고, 그 컴퓨터를 운영하는 사람이 접근할 수 있어요. agentes.chat은 이름, 이메일, 사용량만 보관해요.",
-      "empty": "계정으로 로그인하면 에이전트가 그 계정으로 생각해요.",
       "emptyTitle": "이미 결제 중인 AI 요금제를 쓸 수 있어요",
       "emptyViewer": "워크스페이스의 AI 담당자가 요금제를 연결하면 여기에 표시돼요.",
       "connect": "AI 연결",
@@ -12756,8 +12755,6 @@
       "firstTime": "처음 사용할 때",
       "step1": "다운로드한 파일을 열고 agentes.chat을 응용 프로그램 폴더로 끌어다 놓으세요.",
       "step1Install": "다운로드한 파일을 열어 설치하세요.",
-      "step2": "앱을 열고 내 서버 사용, 내 서버에 연결을 차례로 클릭한 뒤 이 페이지의 주소를 입력하세요. 로그인한 다음 설정 → 컴퓨터에서 이 {{device}} 사용을 클릭하세요.",
-      "other": "다른 방법: 서버 또는 Linux",
       "otherText": "컴퓨터의 터미널에서 이 명령을 실행한 다음, 표시되는 코드를 확인하세요.",
       "waiting": "컴퓨터가 연결되기를 기다리는 중…"
     },
@@ -13353,19 +13350,9 @@
       },
       "saved": "이제 {{name}}은(는) {{computer}}을(를) 사용해요."
     },
-    "lead": "에이전트가 일하는 곳: 이 서버와 연결한 컴퓨터예요.",
-    "leadCloud": "에이전트가 일하는 곳이에요. 이 워크스페이스 전용 컴퓨터로 항상 켜져 있어요.",
     "about": "이 컴퓨터에 대해 알아보기",
     "how": "컴퓨터 작동 방식",
-    "hostMissing": "이 서버도 에이전트의 컴퓨터가 될 수 있어요. <guide>방법 보기</guide>",
-    "other": {
-      "title": "다른 컴퓨터",
-      "text": "집에 있는 Mac mini나 다른 서버처럼 코드로 연결한 컴퓨터예요. 각 컴퓨터에서 무엇을 허용할지는 그 컴퓨터에서 정해요.",
-      "emptyTitle": "어떤 컴퓨터에서든 에이전트를 실행해요",
-      "emptyText": "집의 Mac mini나 다른 서버를 코드로 연결하면 에이전트가 거기서 일해요.",
-      "emptyViewerTitle": "팀의 컴퓨터가 여기에 표시돼요",
-      "emptyViewer": "컴퓨터를 연결할 수 있는 사람이 추가하면 여기에 표시돼요."
-    }
+    "hostMissing": "이 서버도 에이전트의 컴퓨터가 될 수 있어요. <guide>방법 보기</guide>"
   },
   "outage": {
     "region": "오프라인 컴퓨터",
@@ -13902,10 +13889,7 @@
     "notOpen": "이 워크스페이스에서 내 역할로는 {{section}}을(를) 열 수 없어요. 역할을 관리하는 사람이 열어 줄 수 있어요.",
     "nav": "설정 섹션",
     "group": {
-      "you": "나",
-      "org": "워크스페이스",
-      "agents": "에이전트",
-      "costs": "비용과 데이터"
+      "org": "워크스페이스"
     },
     "section": {
       "account": "내 계정",
@@ -13918,11 +13902,10 @@
       "access": "에이전트와 접근 권한",
       "connectors": "커넥터와 MCP",
       "skills": "스킬",
-      "keys": "AI 계정",
       "storage": "저장 공간",
       "computers": "컴퓨터",
       "devices": "기기",
-      "usage": "예산과 사용량",
+      "usage": "AI와 사용량",
       "audit": "감사 로그",
       "import": "가져오기와 내보내기",
       "billing": "요금제와 결제",
@@ -13933,7 +13916,6 @@
       "about": "agentes.chat 정보",
       "generalPersonal": "나에 대해",
       "keysPersonal": "AI와 앱",
-      "usagePersonal": "요금제와 사용량",
       "membersPersonal": "사람"
     },
     "advanced": "고급",
@@ -13948,9 +13930,8 @@
       "access": "각 에이전트가 사용할 수 있는 것이에요. 커넥터마다 하나의 수준이 있어요.",
       "connectors": "워크스페이스 전체에 한 번 연결하는 서비스와 MCP 서버예요.",
       "skills": "에이전트가 필요할 때 여는 Markdown 지침이에요.",
-      "keys": "내 요금제와 워크스페이스의 API 키예요.",
       "storage": "워크스페이스의 파일이 저장되는 곳이에요.",
-      "usage": "각 사람과 각 에이전트가 쓰는 AI의 양과 이번 달 한도.",
+      "usage": "워크스페이스의 AI 계정과, 각 사람과 각 에이전트가 쓰는 양.",
       "audit": "에이전트가 대화 밖에서 한 일과 사람들이 바꾼 것이에요.",
       "import": "다른 앱이나 워크스페이스에서 에이전트를 가져오거나 이 곳을 옮겨요.",
       "billing": "요금제, 카드, 청구서는 앱 밖의 저희 페이지에 있어요.",
@@ -13960,7 +13941,6 @@
       "approvals": "에이전트가 승인을 요청할 때 대신 결정하는 사람이에요.",
       "about": "만든 곳, 라이선스, 소스 코드 위치.",
       "generalPersonal": "에이전트가 나에 대해 아는 내용과 이 워크스페이스의 방식이에요.",
-      "keysPersonal": "에이전트가 생각할 때 쓰는 AI와, 쓰는 앱과 스킬이에요.",
       "usagePersonal": "에이전트가 쓰는 AI의 양과 내 요금제예요.",
       "connectorsPersonal": "내 앱과 MCP 서버를 한 번 연결해 에이전트가 쓰게 해요.",
       "membersPersonal": "여기 함께 있는 사람과 초대.",
@@ -14076,24 +14056,8 @@
       "dialogTitle": "보내는 내용",
       "dialogText": "하루에 한 번 보내요. 다음 보고서의 실제 내용이에요."
     },
-    "tilesTitle": "워크스페이스의 모든 것",
     "tileState": {
-      "members_other": "멤버 {{count}}명",
-      "invitations_other": "대기 중인 초대 {{count}}개",
-      "agents_other": "에이전트 {{count}}명",
-      "connectors_other": "{{count}}개 연결됨",
-      "noConnectors": "아직 연결된 앱이 없어요",
-      "skills_other": "스킬 {{count}}개",
-      "computers_other": "{{count}}대 중 {{online}}대 켜짐",
-      "noComputers": "아직 컴퓨터가 없어요",
-      "devices_other": "{{count}}대 중 {{online}}대 켜짐",
-      "noDevices": "아직 기기가 없어요",
-      "usage": "이번 달 예산의 {{percent}} 사용",
-      "keys_other": "키 {{count}}개",
-      "platformKey": "이 서버의 키 사용 중",
-      "noKeys": "아직 키가 없어요",
-      "plans_other": "요금제 {{count}}개",
-      "noPlans": "아직 요금제가 없어요"
+      "members_other": "멤버 {{count}}명"
     },
     "import": {
       "title": "가져오기",
@@ -14223,6 +14187,9 @@
         "jev": "에이전트가 스스로 스티커를 보내는 건 Jev를 쓸 때만 가능해요.",
         "jevLink": "Jev 설정"
       }
+    },
+    "tab": {
+      "account": "프로필"
     }
   },
   "personalMode": {
@@ -14416,13 +14383,12 @@
     "equivalent": "API 가격으로 ≈ {{amount}}",
     "apiPrice": "API 가격",
     "apiPriceHint": "에이전트가 플랜을 쓰면 아무도 사용량만큼 내지 않아요. 이 금액은 같은 사용을 API로 했을 때의 비용이에요.",
-    "thisMonth": "이번 달",
     "moreAgents_other": "+에이전트 {{count}}명",
     "paid": "{{amount}} 결제됨",
     "budgetShare": "예산의 {{percent}}",
     "estimate": "요금제는 계정 전체 사용량만 알려줘요. 에이전트별 사용량은 각 에이전트가 쓴 양으로 추정한 값이에요.",
     "accounts": {
-      "title": "요금제 계정",
+      "title": "계정",
       "empty": "요금제를 연결하면 에이전트별 사용량을 여기서 볼 수 있어요."
     },
     "api": {
@@ -16304,7 +16270,7 @@
       "turn": "가로로 돌리기",
       "upright": "세로로 돌리기",
       "message": "{{name}}에게 메시지 보내기",
-      "chooseOnWeb": "agentes.chat의 설정 › 컴퓨터에서 선택하세요."
+      "chooseOnWeb": "agentes.chat의 설정 › 기기에서 선택하세요."
     }
   },
   "taskManager": {
@@ -16827,7 +16793,6 @@
       "created": "위젯을 {{where}}에 추가했어요",
       "test": "테스트",
       "testAgain": "다시 테스트",
-      "testing": "{{name}}이(가) 실제 데이터로 만들고 있어요…",
       "tested": "실제 데이터 · {{when}}",
       "stale": "테스트 후에 바뀌었어요",
       "testFailed": "잘 안 됐어요: {{reason}}",
@@ -16849,6 +16814,10 @@
       "editAskOf": "요청 바꾸기: {{ask}}",
       "testingShort": "테스트 중…",
       "buildingFoot": "{{name}}이(가) 만드는 중…",
+      "thinking": "생각 중",
+      "finishing": "위젯 만드는 중",
+      "stop": "중지",
+      "stillWorking": "아직 작업 중입니다. 실제 데이터는 1~2분 걸릴 수 있습니다.",
       "failedTitle": "{{name}}이(가) 만들지 못했어요",
       "staleHint": "다시 테스트해서 어떻게 보이는지 확인하세요.",
       "whoButton": "맡을 에이전트: {{name}}",

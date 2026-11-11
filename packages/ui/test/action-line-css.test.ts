@@ -15,6 +15,13 @@ test("the action line: words on their one-line width, actions beside them only w
   expect(rule(".ac-actline > :is(span, div):empty")).toContain("display: none");
 });
 
+test("a card's head keeps a lone switch at its end, the words wrapping beside it", () => {
+  const head = ".ac-card__head:has(> .ac-card__action > .ac-switch:only-child)";
+  expect(rule(head)).toContain("flex-wrap: nowrap");
+  expect(rule(`${head} > .ac-card__lead`)).toContain("flex: 1 1 0%");
+  expect(rule(`${head} > .ac-card__action`)).toContain("margin-inline-start: 0");
+});
+
 test("on a phone a lone button takes the width of what holds it, at its own height", () => {
   const phone = css.split("@media (max-width: 640px) {\n  .ac-card > .ac-acts > .ac-btn:only-child")[1] ?? "";
   expect(phone.split("}")[0]).toContain(":not(.ac-btn--ghost) {\n    flex: 1 1 auto;");

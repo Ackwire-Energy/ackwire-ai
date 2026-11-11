@@ -19,7 +19,23 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "适合谁",
         blocks: [
-          "适合你自己或小团队在这台电脑开机时使用。如果团队更大，或需要一台始终在线的服务器，请[把 agentes.chat 安装到服务器上](/help/install-on-a-server)，然后在应用中选择 **连接到我的服务器**。你的数据之后可以迁移过去。",
+          "适合你自己或小团队。一台一直开着的 Mac mini、一台闲置的 PC 或一台笔记本电脑都很合适：按 [保持开机](#keep-on) 中的方法设置好。在 Mac 或 PC 上，用这个应用就能不借助 Docker 运行 agentes.chat。",
+          "团队更大的话，请看 [选哪种方式](/help/install-on-a-server#choose)。你的数据之后可以迁移到服务器。",
+        ],
+      },
+      {
+        id: "keep-on",
+        heading: "保持开机",
+        blocks: [
+          "如果这台电脑也有别人在用，请设置一次：",
+          {
+            list: [
+              "设置完成后，**登录时打开** 会自动开启。",
+              "在 Mac 上，到 **系统设置\u00a0›\u00a0用户与群组** 中开启 **自动登录**，这样重启后应用会自动打开。开启 FileVault 会关闭自动登录。",
+              "在 Mac 上，到 **系统设置\u00a0›\u00a0能源** 中开启 **断电后自动启动**。",
+              "服务器在运行且 **从你的手机和队友那里访问** 开启时，Mac 会保持唤醒。在 Windows 和 Linux 上，请在系统的电源设置中关闭睡眠。",
+            ],
+          },
         ],
       },
       {
@@ -27,40 +43,139 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "你的智能体也在这里工作",
         blocks: [
           "你的智能体也在这台电脑上工作，各自有自己的文件夹和浏览器，如果这里装了 Claude Code 或 Codex，它们也能使用。在 **偏好设置 › 工具** 中开启之前，命令一直处于关闭状态。",
+          "这里的智能体以你的身份运行。开启命令后，它们可以访问这台电脑的其他部分，包括 `.agentes`：数据库、含有 `AGENTES_SECRET` 的 `.env`、所有者密钥和这台电脑的令牌。所有使用这台电脑的工作区都是如此，包括 agentes.chat Cloud 上的工作区。请看 [智能体能访问什么](/help/computers#reach)。",
+        ],
+      },
+      {
+        id: "another-workspace",
+        heading: "也借给其他工作区",
+        blocks: [
+          "你在这里运行的服务器上的工作区会自动使用这台电脑。要让别处的工作区也使用它，比如 agentes.chat Cloud 上的工作区，请打开 **偏好设置\u00a0›\u00a0服务器**，点 **添加服务器…**，登录那个工作区，在应用询问时点 **允许**。",
+          "每个工作区在这里都有自己的智能体和文件夹。**偏好设置\u00a0›\u00a0工具** 中的 **命令** 对这台电脑上的所有工作区同时生效：只有当你放心让每个工作区的智能体使用这整台电脑时才开启。",
         ],
       },
       {
         id: "reach",
         heading: "从手机和团队访问",
         blocks: [
-          "**允许从手机和队友访问** 会把 agentes.chat 接入 Tailscale，一个连接你各台设备的私有网络：你的手机和你邀请的人可以加入，其他人都无法访问 agentes.chat。Tailscale 是免费的：https://tailscale.com/download 。关闭这个选项时，agentes.chat 只能在这台电脑上使用。",
+          "**从你的手机和队友那里访问** 会把 agentes.chat 接入 Tailscale，一个连接你各台设备的私有网络：你的手机和你邀请的人可以加入，其他人都无法访问 agentes.chat。Tailscale 是免费的：https://tailscale.com/download 。关闭这个选项时，agentes.chat 只能在这台电脑上使用。",
+          "如果这台电脑已经在 Tailscale 的 443 端口上共享了别的东西，agentes.chat 会改用 8443，地址以 `:8443` 结尾。",
+        ],
+      },
+      {
+        id: "password",
+        heading: "从其他设备登录",
+        blocks: [
+          "所有者一开始没有密码：在这台电脑上，应用会帮你登录。要在另一台电脑的浏览器中登录，请在 **设置\u00a0›\u00a0你的账号** 中添加密码。手机应用扫描 **偏好设置\u00a0›\u00a0服务器** 中 **在你的手机上** 下方的二维码即可连接。这需要开启 **从你的手机和队友那里访问**。",
+        ],
+      },
+      {
+        id: "updates",
+        heading: "更新",
+        blocks: [
+          "应用会自动检查更新，在 **偏好设置\u00a0›\u00a0更新** 中点 **更新并重新打开** 后安装。服务器和所有智能体会随之重启。数据库会先复制一份，如果新版本在 3 分钟内没有响应，应用会自动回到上一个版本及其数据。",
         ],
       },
       {
         id: "backups",
-        heading: "备份和迁移",
+        heading: "备份",
         blocks: [
-          "**偏好设置 › 服务器** 中的 **立即备份** 会把数据库、文件和设置保存到你主文件夹的 `.agentes/backups` 中。",
+          "目前还没有自动备份。**偏好设置\u00a0›\u00a0服务器** 中的 **立即备份** 会让服务器暂停片刻，把数据库、文件和 `.env` 保存到你主文件夹的 `.agentes/backups` 中。它保留最新的两份。",
+          "时不时把它们复制到这台电脑以外的地方，比如移动硬盘或云盘。里面有你的密钥：请妥善保管，不要给别人。",
+        ],
+      },
+      {
+        id: "ai-programs",
+        heading: "Claude Code 和 Codex",
+        blocks: [
+          "应用通过你登录 shell 的 `PATH`，以及 `~/.local/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 等常用文件夹来查找 Claude Code 和 Codex。如果 **偏好设置\u00a0›\u00a0工具** 显示 **未找到**，请确认 `claude` 或 `codex` 能在新的终端窗口中运行，然后退出并重新打开应用。",
+        ],
+      },
+      {
+        id: "moving",
+        heading: "迁移到服务器",
+        blocks: [
+          {
+            list: ["退出应用，然后用应用自带的服务器导出数据库。在 Mac 上："],
+          },
+          {
+            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+          },
+          {
+            list: [
+              "[把 agentes.chat 安装到服务器上](/help/install-on-a-server)，但先不要启动。在它的 `.env` 中填入 `~/.agentes/.env` 里的 `AGENTES_SECRET`，然后只启动数据库：`docker compose up -d postgres`。",
+              "导入导出的文件：`docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`。",
+              "用 `docker compose up -d` 启动它，按完整指南中的方法把 `~/.agentes/files` 复制进去，然后像以前一样登录。",
+            ],
+          },
         ],
       },
     ],
   },
   computers: {
-    title: "给智能体用的电脑",
-    summary: "智能体在你连接的电脑上运行代码、处理文件：可以是装有 agentes.chat 应用的 Mac 或 PC，也可以是服务器。",
+    title: "你的电脑和手机",
+    summary:
+      "带上 Mac、PC、Linux 电脑、服务器或手机，你的智能体就能在上面工作。在 agentes.chat Cloud 和你自己的服务器上都一样。",
     sections: [
       {
-        id: "mac",
-        heading: "装有应用的 Mac 或 PC",
+        id: "app",
+        heading: "通过 agentes.chat 应用",
         blocks: [
-          "agentes.chat 应用会在独立窗口中打开你的服务器，点一下，它的智能体就能在这台电脑上各自的文件夹里工作。安装并打开应用，选择 **使用你自己的服务器 › 连接到我的服务器**，然后输入服务器地址。登录后，在 **设置 › 电脑** 中点 **使用这台 Mac**（Windows 上是 **使用这台 PC**，Linux 上是 **使用这台电脑**）。",
+          "在那台电脑上安装并打开应用，登录你的工作区。它会问 **允许 <workspace> 的智能体使用这台 Mac？**（Windows 上是这台 PC，Linux 上是这台电脑）。选择谁可以使用，然后点 **允许**。就这么简单。",
+          "已经登录了？在 **偏好设置\u00a0›\u00a0通用** 的 **智能体** 卡片中打开这个工作区。",
         ],
       },
       {
-        id: "server",
-        heading: "服务器或 Linux 电脑",
+        id: "web",
+        heading: "通过网站",
         blocks: [
-          "在 **设置 › 电脑** 中，复制 **其他方式** 下的命令，在那台电脑的终端里运行。它会显示一个代码和一个链接：打开链接，核对代码一致，然后用你的账号确认。无需事先安装任何东西。",
+          "在 **设置\u00a0›\u00a0设备** 中，点 **连接设备**：",
+          {
+            list: [
+              "**这台 Mac** 或 **这台 PC**：打开应用，应用会先问你。",
+              "**另一台电脑**：在那台电脑上安装应用，用你自己的账号登录，然后点 **允许**。它会自动出现在这里。",
+              "**服务器或 VPS**：在它的终端里运行一行命令，然后允许它加入。这行命令只能用一次，10 分钟内有效。",
+            ],
+          },
+          "应用只能一键连接 https 地址，比如以 `.ts.net` 结尾的 Tailscale 地址。如果是普通的 http 地址，请使用终端命令。",
+        ],
+      },
+      {
+        id: "phones",
+        heading: "手机",
+        blocks: [
+          "Android 手机通过任意一台已连接的电脑接入：用数据线，或在装有 2026 年 5 月安全更新的 Android 14 及以上版本通过 Wi-Fi。iPhone 通过装有应用和 Xcode 的 Mac 接入，其余由应用准备。两者都从 **连接设备** 开始。",
+        ],
+      },
+      {
+        id: "who",
+        heading: "谁可以使用",
+        blocks: [
+          "新设备只供你使用：**仅我** 指你本人和为你工作的智能体。你可以在允许时，或之后在 **设置\u00a0›\u00a0设备** 中它的页面上，把它开放给工作区所有人，或部分人员和角色。",
+        ],
+      },
+      {
+        id: "open",
+        heading: "应用打开期间",
+        blocks: [
+          "只有当应用在那台电脑上运行、电脑处于唤醒状态时，智能体才能在上面工作。应用询问时，请保持勾选 **保持就绪：登录时打开 agentes.chat**。关机或睡眠的电脑会显示 **离线**，智能体会等它回来。",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "暂停和断开",
+        blocks: [
+          "在电脑上，时钟旁的 agentes.chat 图标会暂停所有工作区的智能体。在 **偏好设置\u00a0›\u00a0通用** 中，每个工作区的开关只暂停那一个，**离开** 则断开它。暂停期间不会开始新工作，正在运行的会照常完成。断开后，智能体的文件夹仍保留在磁盘上。",
+          "在网站上，设备页面上的 **移除** 会断开它。",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "一台电脑，多个工作区",
+        blocks: [
+          "在同一个应用中分别登录每个工作区，并为每个工作区点 **允许**。agentes.chat Cloud 上的工作区和你自己服务器上的工作区可以共用一台电脑（应用 0.6.1 及以上版本）。每个工作区在上面都有自己的智能体和文件夹，断开其中一个不会影响其他工作区。",
+          "应用在这台电脑上运行的服务器已经连接好，无需任何操作。如果还想把这台电脑借给别处的工作区，请看 [也借给其他工作区](/help/run-on-your-computer#another-workspace)。",
+          "只把笔记本电脑上的应用当作打开工作区的窗口？当它询问是否让智能体使用这台笔记本电脑时，点 **以后再说**，它就仍然只是一个窗口。",
         ],
       },
       {
@@ -71,17 +186,20 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
-        id: "pausing",
-        heading: "暂停",
+        id: "reach",
+        heading: "智能体能访问什么",
         blocks: [
-          "使用应用时，连接这台电脑的人可以通过时钟旁的 agentes.chat 图标，暂停在这台电脑上工作的智能体。恢复之前不会开始任何新工作，正在运行的会照常完成。",
-        ],
-      },
-      {
-        id: "organizations",
-        heading: "多个工作区",
-        blocks: [
-          "一台电脑可以同时为多个工作区工作。每个工作区在上面有自己的智能体、文件夹和任务，断开其中一个不会影响其他工作区。",
+          "智能体以你的身份运行，也就是这台电脑的用户。它们的文件工具只在自己的文件夹里使用，但命令可以读取你能读取的任何内容：",
+          {
+            list: [
+              "你的文件和登录信息",
+              "其他智能体的文件夹，包括其他工作区的，以及它们浏览器中保存的登录",
+              "连接这台电脑的令牌",
+              "如果这台电脑也运行 agentes.chat，还有 `.agentes` 中它的数据库和密钥",
+            ],
+          },
+          "agentes.chat 会拒绝提到密钥、令牌和登录信息的命令，但这只是一条规则，不是一堵墙。所以 **命令** 默认关闭。在 **偏好设置\u00a0›\u00a0工具** 中开启后，会同时对这台电脑上的所有工作区生效：只有当你愿意把电脑上的一切托付给每个工作区的智能体，以及它们为之工作的人时，才开启。Claude Code 和 Codex 在智能体的文件夹中按自己的规则运行自己的命令。",
+          "如果需要一堵真正的墙，请使用 Linux 服务器。在 Debian 13 上用 `--system` 安装时，每个智能体都是一个独立的用户。在 Ubuntu 上，智能体共用一个用户 `agentes`：它们能看到彼此的文件夹，但看不到你的或服务器的。或者给智能体一台专用电脑。",
         ],
       },
     ],
@@ -98,6 +216,13 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "own",
+        heading: "你的电脑和手机",
+        blocks: [
+          "智能体也可以在你带来的电脑和手机上工作：装有 agentes.chat 应用的 Mac 或 PC、服务器、Android 手机或 iPhone。请看 [你带来的电脑和手机](/help/computers)。",
+        ],
+      },
+      {
         id: "plans",
         heading: "你的 AI 套餐",
         blocks: [
@@ -108,7 +233,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "size",
         heading: "配置",
-        blocks: ["它的 CPU、内存和磁盘显示在 **设置 › 电脑** 中。"],
+        blocks: ["它的 CPU、内存和磁盘显示在 **设置 › 设备** 中。"],
       },
       {
         id: "trouble",
@@ -362,7 +487,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "打开 https://console.typesafe.ai ，用 Google 或你的邮箱登录。新账号也用同样的方式创建。",
               "在控制台中充值。Jev 是预付费的。",
               "打开 https://console.typesafe.ai/keys ，创建一个密钥并立即复制。",
-              "在 agentes.chat 中打开 **设置 › AI 账号**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
+              "在 agentes.chat 中打开 **设置 › AI 和用量**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
             ],
           },
           "在用 Docker 运行的服务器上，你也可以把密钥写进 `.env` 的 `TYPESAFE_API_KEY`。它优先于设置中的密钥。",
@@ -376,7 +501,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "Jev 每读取一百万 token 收费 0.042 美元。它的回答免费。选择谁来回复大约读取 2,500 个 token，也就是约 0.0001 美元。一张屏幕截图大约 3,900 个 token。",
               "购买的额度 12 个月内有效。在控制台中开启自动充值，以免 Jev 额度用完。",
-              "**设置 › AI 账号** 会显示 Jev 本月做了多少次决定，以及花了多少钱。",
+              "**设置 › AI 和用量** 会显示 Jev 本月做了多少次决定，以及花了多少钱。",
             ],
           },
         ],
@@ -407,7 +532,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**密钥不被接受：** 创建一个新密钥，粘贴到 **设置 › AI 账号** 中。",
+              "**密钥不被接受：** 创建一个新密钥，粘贴到 **设置 › AI 和用量** 中。",
               "**额度用完：** 在控制台中充值。Jev 会在 30 分钟内重试，你也可以点 **重新检查**。",
               "**繁忙或无法连接：** TypeSafe 可能会限制每秒请求数，或暂时停止响应。Jev 会自行恢复。你的限额：https://console.typesafe.ai/rate-limits 。需要更高的限额，请写信至 sales@typesafe.ai。",
             ],
@@ -519,12 +644,26 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
     summary: "在你自己的服务器上免费运行 agentes.chat，供整个团队使用。一条命令就能装好。",
     sections: [
       {
+        id: "choose",
+        heading: "选哪种方式",
+        blocks: [
+          {
+            list: [
+              "**agentes.chat Cloud**：适合任何团队，在哪里都能访问。由我们运行、更新和备份。每个工作区都有自己的电脑，每个智能体在上面都是独立的用户。",
+              "**你的电脑，配合应用**：适合你自己或小团队，在那台电脑开机时可以访问。一台一直开着的 Mac mini 就很合适。一键更新，手动备份。智能体在那台电脑上以你的身份运行。",
+              "**服务器**：适合更大的团队，一直在线。用三条命令更新，还可以每天自动备份。在 Debian 13 上，每个智能体都是独立的用户。",
+            ],
+          },
+          "从你的电脑迁移到服务器：[迁移到服务器](/help/run-on-your-computer#moving)。任何一种方式都可以通过 [带上你的智能体](/help/import) 从另一种方式带来智能体。",
+        ],
+      },
+      {
         id: "need",
         heading: "你需要什么",
         blocks: [
           {
             list: [
-              "一台 64 位 Linux（x64 或 arm64）服务器或 VPS。小团队可以从 2 个 CPU、4 GB 内存和 20 GB 磁盘起步。只是试用的话，装了 Docker Desktop、OrbStack 或 Colima 的 Mac 也可以。",
+              "一台 64 位 Linux（x64 或 arm64）服务器或 VPS。小团队可以从 2 个 CPU、4 GB 内存和 20 GB 磁盘起步。在 Mac 或 PC 上，[应用就能运行 agentes.chat](/help/run-on-your-computer)，不需要 Docker。",
               "带 Compose 的 Docker。在 Linux 上，缺少时安装程序会先问你，再帮你装上。",
               "一种访问方式：一个免费的 Tailscale 账号（默认方式，私有，不需要域名，也不用开放端口），或者一个指向服务器的域名，并开放 80 和 443 端口。",
             ],
@@ -598,11 +737,11 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "computers",
         heading: "智能体的电脑",
         blocks: [
-          "设置可以把这台服务器也当作智能体的电脑，它们在上面运行命令、使用浏览器、存放文件。设置会先问你，在服务器能胜任时建议选是。在 Linux 上，每个智能体都有自己的用户和屏幕。如果你选了否，加上 `--computer yes` 再运行一次安装：",
+          "设置可以把这台服务器也当作智能体的电脑，它们在上面运行命令、使用浏览器、存放文件。设置会先问你，在服务器能胜任时建议选是。在 Debian 13 上，每个智能体都有自己的用户和屏幕。在 Ubuntu 上，智能体共用一个用户 `agentes`。如果你选了否，加上 `--computer yes` 再运行一次安装：",
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "其他电脑，比如装了 agentes.chat 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0电脑** 里连接，详见 [给智能体用的电脑](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
+          "其他电脑，比如装了 agentes.chat 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0设备** 里连接，详见 [你的电脑和手机](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
         ],
       },
       {

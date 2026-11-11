@@ -6,7 +6,7 @@ setupDom();
 import { localMeta, quoteExcerpt, replyOf } from "@agenteschat/client/lib/reply";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { objectUrls } from "@/components/artifacts/FileView";
-import { createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -37,12 +37,40 @@ const pickEmoji = async (trigger: HTMLElement, name: string) => {
   await settle(3);
 };
 
-describe("composer toolbar", () => {
+/** The buttons and the text box of a composer's one row, by name, in the order they are drawn. */
+const rowOf = (box: HTMLElement) =>
+  Array.from((box.closest(".ac-composer__row") as HTMLElement).querySelectorAll("button, textarea")).map((el) =>
+    el.getAttribute("aria-label"),
+  );
+
+describe("composer row and formatting", () => {
+  test("a channel, a thread and a DM: attach, emoji, the text and send, and no formatting bar at rest", async () => {
+    await open();
+    expect(rowOf(composer())).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Mensagem para #eng", "Enviar"]);
+    expect(screen().queryByRole("toolbar", { name: "Formatação" })).toBeNull();
+    const bar = within(article("o login está devolvendo 401")).getByRole("toolbar");
+    await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Responder" })));
+    await settle(6);
+    const reply = screen().getByRole("combobox", { name: "Responder na thread" });
+    expect(rowOf(reply)).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Responder na thread", "Enviar"]);
+    cleanup();
+    await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const dm = screen().getByRole("combobox", { name: "Mensagem para Ada" });
+    expect(rowOf(dm)).toEqual(["Anexar arquivo", "Emojis, GIFs e figurinhas", "Mensagem para Ada", "Enviar"]);
+    // Who answers stays: the agent's chip opens the row.
+    const row = dm.closest(".ac-composer__row") as HTMLElement;
+    expect(row.firstElementChild?.querySelector(".ac-composer__agent")?.textContent).toContain("Ada");
+    expect(screen().queryByRole("toolbar", { name: "Formatação" })).toBeNull();
+  });
+
   test("Negrito wraps the selection in the channel composer; ⌘K makes a link, not the palette", async () => {
     await open();
     const box = composer();
     await act(async () => fireEvent.change(box, { target: { value: "olha o deploy" } }));
+    box.focus();
     box.setSelectionRange(7, 13);
+    await act(async () => fireEvent.select(box));
     const toolbar = screen().getByRole("toolbar", { name: "Formatação" });
     await act(async () => fireEvent.click(within(toolbar).getByRole("button", { name: "Negrito" })));
     expect(composer().value).toBe("olha o **deploy**");

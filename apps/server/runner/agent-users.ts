@@ -140,13 +140,30 @@ const DELEGATE = [
 ];
 
 /**
+ * Root, in the containers service, before a network hook: the computer's cgroup2 kept in the agent's tmpfs (`$m`,
+ * root's alone). A hook that enters its namespace through `ip netns exec` mounts a fresh /sys with no cgroup2 under it,
+ * where the agent's user manager can't start ("Cannot determine cgroup we are running in"), so `CGROUP_BACK` binds this
+ * one there again. A bind, never a new cgroup2 mount: one from the init cgroup namespace would set the hierarchy's root
+ * flags (nsdelegate, memory_recursiveprot) for the whole computer from its own options.
+ */
+const CGROUP_KEPT = ['mkdir -p "$m/cgroup"', 'mount --bind /sys/fs/cgroup "$m/cgroup"'];
+const keptCgroup = (uid: number) => `${AGENT_RAM_ROOT}/${uid}/cgroup`;
+/** Root, after the network hook (`$1` the kept cgroup2): put back where the hook's /sys has none. */
+const CGROUP_BACK = [
+  "set -e",
+  '[ -e /sys/fs/cgroup/cgroup.controllers ] || mount --bind "$1" /sys/fs/cgroup',
+  "shift",
+  'exec "$@"',
+].join("\n");
+
+/**
  * Root, in the containers service, last: every mount nosuid but the two id-map helpers. The service runs without
  * no_new_privs, which would void their set-user-ID, so this is what keeps every other set-user-ID program from its
  * processes. The options a mount has are given back with nosuid, since a remount with util-linux's older mount(2)
  * path would reset them. A mount it can't remount (an autofs point) stays as it is.
  */
 const NOSUID_VIEW = [
-  "command -v findmnt >/dev/null",
+  'command -v findmnt >/dev/null || { echo "findmnt is missing (util-linux): no nosuid view without it" >&2; exit 1; }',
   'findmnt -rno TARGET,VFS-OPTIONS | while read -r p o; do mount -o "remount,bind,nosuid,$o" "$p" 2>/dev/null || :; done',
   `for f in ${ID_MAP_HELPERS.join(" ")}; do mount --bind "$f" "$f"; mount -o remount,bind,suid "$f"; done`,
 ];
@@ -154,7 +171,9 @@ const NOSUID_VIEW = [
 /**
  * As the agent, the containers service's start: its own defaults where it has none (`$1` and `$2`, Podman's
  * containers.conf and storage.conf), Podman's socket and its restart of `restart: always` containers switched on,
- * then its user manager. All of it is the agent's to change; none of it keeps it apart from the others.
+ * then its user manager. All of it is the agent's to change; none of it keeps it apart from the others. A user manager
+ * logs to /dev/console, which the agent can't open, unless told the journal; and one that exits at once loses its
+ * unit there (journald reads that from the gone process), so the cgroup it needs is checked here first, out loud.
  */
 const CONTAINERS_START = [
   'c="$HOME/.config"',
@@ -165,8 +184,13 @@ const CONTAINERS_START = [
   // biome-ignore lint/suspicious/noTemplateCurlyInString: the shell's own expansion, not JavaScript's.
   '  [ -e "$c/systemd/user/$u" ] || ln -s "/usr/lib/systemd/user/${u#*/}" "$c/systemd/user/$u" || :',
   "done",
-  "exec /usr/lib/systemd/systemd --user",
+  'g=/sys/fs/cgroup$(sed -n "s/^0:://p" /proc/self/cgroup)',
+  '[ -w "$g" ] || { echo "its user manager has no cgroup to run in ($g is not writable)" >&2; exit 1; }',
+  "exec /usr/lib/systemd/systemd --user --log-target=journal",
 ].join("\n");
+
+/** The identifier of its steps' lines in the journal, where the runner reads why it stopped (`containersFailure`). */
+const CONTAINERS_LOG = "agentes-containers";
 
 /** Podman's banner before every `docker compose` (an external provider's) off. */
 const CONTAINERS_CONF =
@@ -543,14 +567,17 @@ function agentView(u: AgentUser, more: string[]) {
  * cgroup is the agent's to divide, so each container's `--memory` and `--cpus` hold inside the agent's share, and
  * stopping the slice stops them all. Without no_new_privs, which would void the id-map helpers' set-user-ID: its
  * mount view keeps set-user-ID to them alone (`NOSUID_VIEW`), and the bounding set still drops NET_ADMIN and NET_RAW.
- * `Restart=always` runs it again, network hook included, if it dies; OOMPolicy=continue: a container the kernel stops
- * for memory takes only itself. A service's command line is its ExecStart=, unlike a scope's: systemd expands `$` in
- * it, and writes it to the unit's file under /run/systemd/transient with every `$` doubled, which is what runs after
- * any daemon-reload. So `--expand-environment=no` (`literal`, systemd 254 and later), which keeps it as it is in
- * both; before 254 there is no such switch, and every `$` goes doubled, which it reads as one.
+ * `Restart=always` runs it again, network hook included, if it dies, 5 starts a minute at most: one that fails at every
+ * start then stays failed (no `--collect`), its steps' lines in the journal under `CONTAINERS_LOG`, and isn't started
+ * again for the same command (`ensureContainers`). OOMPolicy=continue: a container the kernel stops for memory takes
+ * only itself. A service's command line is its ExecStart=, unlike a scope's: systemd expands `$` in it, and writes it
+ * to the unit's file under /run/systemd/transient with every `$` doubled, which is what runs after any daemon-reload.
+ * So `--expand-environment=no` (`literal`, systemd 254 and later), which keeps it as it is in both; before 254 there is
+ * no such switch, and every `$` goes doubled, which it reads as one.
  */
 export function containersCommand(u: AgentUser, literal = installedSystemd() >= 254): string[] {
   const env = Object.entries(agentEnv(u, true)).map(([name, value]) => `${name}=${value}`);
+  const hook = networkPrefix(u);
   const command = [
     "/bin/sh",
     "-c",
@@ -564,10 +591,11 @@ export function containersCommand(u: AgentUser, literal = installedSystemd() >= 
     "--",
     "/bin/sh",
     "-c",
-    agentView(u, [...RUNTIME_DIR, ...DELEGATE, ...NOSUID_VIEW]),
+    agentView(u, [...RUNTIME_DIR, ...DELEGATE, ...(hook.length > 0 ? CGROUP_KEPT : []), ...NOSUID_VIEW]),
     "sh",
     String(u.uid),
-    ...networkPrefix(u),
+    ...hook,
+    ...(hook.length > 0 ? ["/bin/sh", "-c", CGROUP_BACK, "sh", keptCgroup(u.uid)] : []),
     SETPRIV,
     "--bounding-set=-net_admin,-net_raw",
     "--",
@@ -588,15 +616,18 @@ export function containersCommand(u: AgentUser, literal = installedSystemd() >= 
   return [
     "/usr/bin/systemd-run",
     "--quiet",
-    "--collect",
     ...(literal ? ["--expand-environment=no"] : []),
     `--unit=${containersUnit(u.uid)}`,
     `--slice=${agentSlice(u.uid)}`,
     "--property=Delegate=yes",
     "--property=Restart=always",
     "--property=RestartSec=5",
+    "--property=StartLimitIntervalSec=60",
+    "--property=StartLimitBurst=5",
     "--property=OOMPolicy=continue",
     "--property=TimeoutStopSec=15",
+    "--property=StandardError=journal",
+    `--property=SyslogIdentifier=${CONTAINERS_LOG}`,
     "--",
     ...(literal ? command : command.map((arg) => arg.replaceAll("$", () => "$$"))),
   ];
@@ -605,8 +636,9 @@ export function containersCommand(u: AgentUser, literal = installedSystemd() >= 
 /**
  * The agent's containers service running as `containersCommand` says now: started when it isn't, and started again
  * when what it would run changed (its network hook above all: a namespace's containers live where the agent's other
- * processes do), which stops its containers. Its description carries that command's hash. Returns why it doesn't
- * run, or null.
+ * processes do), which stops its containers. Its description carries that command's hash. One its start limit stopped
+ * stays down for that same command, which would fail the same way: started again once the command changes, the
+ * computer restarts, or someone runs `systemctl reset-failed` on it. Returns why it doesn't run, or null.
  */
 export function ensureContainers(u: AgentUser, run: RunCommand = runSync): string | null {
   const [file = "", ...args] = containersCommand(u);
@@ -615,14 +647,42 @@ export function ensureContainers(u: AgentUser, run: RunCommand = runSync): strin
     .digest("hex")
     .slice(0, 16)}`;
   const unit = containersUnit(u.uid);
-  const shown = run("systemctl", ["show", "--property=ActiveState,Description", unit]).output;
+  const shown = run("systemctl", ["show", "--property=ActiveState,Description,Result", unit]).output;
   const property = (name: string) => new RegExp(`^${name}=(.*)$`, "m").exec(shown)?.[1];
-  if (["active", "activating", "reloading"].includes(property("ActiveState") ?? "")) {
-    if (property("Description") === description) return null;
+  const same = property("Description") === description;
+  const state = property("ActiveState") ?? "";
+  if (state === "failed") {
+    // With Restart=always it fails only when systemd stops restarting it (its start limit, the last failure's result
+    // kept) or when a stop timed out, which says nothing about its next start.
+    const result = property("Result") ?? "";
+    if (same && result !== "timeout") return containersFailure(u.uid, result, run);
+    // A failed unit stays loaded, and a new one can't take its name.
+    run("systemctl", ["reset-failed", unit]);
+  } else if (["active", "activating", "reloading"].includes(state)) {
+    if (same) return null;
     run("systemctl", ["stop", unit]);
   }
   const r = run(file, [`--description=${description}`, ...args]);
   return r.code === 0 ? null : `${file} failed (${r.code}): ${r.output.slice(0, 300)}`;
+}
+
+/**
+ * Why its containers service stopped at its start limit: the last line its steps wrote, or its user manager (whose
+ * lines lose their unit when it exits at once, so they're found by the agent's uid).
+ */
+function containersFailure(uid: number, result: string, run: RunCommand) {
+  const r = run("journalctl", [
+    "--no-pager",
+    "--output=cat",
+    "--lines=1",
+    `_SYSTEMD_UNIT=${containersUnit(uid)}`,
+    `SYSLOG_IDENTIFIER=${CONTAINERS_LOG}`,
+    "+",
+    `_UID=${uid}`,
+    "SYSLOG_IDENTIFIER=systemd",
+  ]);
+  const line = r.code === 0 ? r.output.split("\n")[0]?.trim() : "";
+  return line ? line.slice(0, 300) : `its service failed at every start (${result})`;
 }
 
 /** The agent's containers stop (a network change's deadline, the agent left this computer). */

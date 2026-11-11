@@ -1422,8 +1422,7 @@
     "noDate": "Geen datum",
     "clearDate": "Datum weghalen",
     "risky": "Merge, deploy en andere risicovolle acties",
-    "riskyOff": "Uit, deze blijven alleen bij jou.",
-    "riskyOn": "Aan, deze persoon beslist deze ook.",
+    "riskyOn": "Deze persoon beslist deze ook.",
     "lock": "Altijd bij jou: geld, mensen en rollen, AI-sleutels, je mailbox en verwijderen.",
     "coveringTitle": "Je keurt goed voor",
     "coveringSubtitle": "Wat aan deze mensen gevraagd wordt, komt ook bij jou, en je beslist namens hen. Nooit wat je zelf vroeg.",
@@ -1434,7 +1433,7 @@
     "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },
   "rightHandApprovals": {
-    "title": "{{name}} keurt voor je goed",
+    "title": "{{name}} maakt en past agents voor je aan",
     "subtitle": "Alleen wat uit een verzoek van jou kwam. Wat het niet zou goedkeuren, geeft het aan jou door.",
     "newAgents": "Agents maken die andere agents voorstellen",
     "newAgentsHelp": "Zonder apps, alleen in open kanalen. Je kunt het 24 uur ongedaan maken.",
@@ -2245,10 +2244,10 @@
       "audienceHelp": "Wie erbuiten valt, ziet {{name}} niet in de zijbalk.",
       "lock": "{{name}} kan niet gearchiveerd of verwijderd worden. Ongevraagd plaatst hij alleen de Teamweek, voor admins.",
       "audit": "Bekijk wat {{name}} deed",
-      "change": "Wijzigen",
       "planHelp": "De eigenaar van het abonnement betaalt. Is de computer ervan niet bereikbaar, dan zegt het gesprek dat en biedt het een API-sleutel aan.",
       "lookEdit": "Uiterlijk van {{name}} wijzigen",
-      "planOwner": "van {{owner}}",
+      "planOwner": "account van {{owner}}",
+      "planName": "{{name}}-abonnement",
       "mine": "Jouw AI",
       "mineHelp": "Jouw gesprek met {{name}} denkt met jouw abonnement of een abonnement dat met je gedeeld is, en alleen dat van jou.",
       "connectMine": "Mijn abonnement koppelen",
@@ -2266,15 +2265,13 @@
       "fallbackPlan": "Zonder eigen abonnement gebruikt het het abonnement van {{owner}}, dat iedereen antwoordt.",
       "fallbackYours": "Zonder ander abonnement gebruikt het dat van de workspace, dat van jou is.",
       "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
-      "workspace": "AI van de workspace",
+      "workspace": "AI voor wie geen eigen abonnement heeft",
       "workspaceHelp": "Wie geen eigen abonnement heeft, praat via deze AI met {{name}}.",
-      "workspacePlan": "Abonnement van de workspace",
-      "workspacePlanHelp": "Een abonnement in plaats van de sleutel. Het antwoordt anderen alleen als de eigenaar dat toestaat.",
-      "noPlans": "Koppel een abonnement onder AI-accounts om het hier te gebruiken.",
-      "pickPlan": "Kies een abonnement",
-      "sharesOn": "Aan: wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
-      "sharesOff": "Uit: alleen {{owner}} praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord.",
-      "sharesOffYou": "Uit: alleen jij praat erdoor. Wie geen eigen abonnement heeft, krijgt geen antwoord."
+      "noPlans": "Koppel een abonnement onder AI en gebruik om het hier te gebruiken.",
+      "lend": "Dit abonnement uitlenen aan wie er geen heeft",
+      "groupMine": "Alleen voor jou",
+      "groupWorkspace": "Voor de hele workspace",
+      "groupAdmins": "alleen admins"
     },
     "card": {
       "settings": "{{name}} · Instellingen",
@@ -3798,6 +3795,8 @@
       "access": "Standaardtoegang",
       "accessTitle": "Standaardtoegang van {{label}}",
       "accessText": "De items volgen dit, tenzij je er een wijzigt. Elke wijziging wordt meteen opgeslagen.",
+      "noAgents": "Geen enkele agent gebruikt deze verbinding.",
+      "giveAccess": "Toegang geven",
       "actionsName": "Meer voor {{name}}",
       "disconnect": "Ontkoppelen",
       "removeTitle": "{{name}} ontkoppelen?",
@@ -4729,6 +4728,7 @@
         "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
+        "connectPlan": "Ander abonnement koppelen",
         "fallbackTitle": "Als {{computer}} niet meer reageert, antwoord via de API",
         "fallbackHint": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
         "fallbackHint_female": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
@@ -8360,7 +8360,7 @@
       "homeHint": "De missie krijgt een thread: daar praat {{name}}, vraagt om besluiten en laat zijn werk zien.",
       "homeHint_female": "De missie krijgt een thread: daar praat {{name}}, vraagt om besluiten en laat haar werk zien.",
       "offline": "{{name}} is offline. Het plan start zodra hij terug is.",
-      "needsMachine": "Missies draaien op een gekoppelde computer. Koppel er een aan {{name}} in Instellingen › Computers.",
+      "needsMachine": "Missies draaien op een gekoppelde computer. Koppel er een aan {{name}} in Instellingen › Apparaten.",
       "commandHint": "Je kunt er ook een starten door te typen in het invoerveld van elk gesprek:",
       "approvals": "Merge, deploy en rollback vragen altijd om goedkeuring",
       "start": "Missie starten",
@@ -9406,7 +9406,6 @@
     "page": {
       "title": "Je abonnementen",
       "hint": "Elk abonnement blijft op de computer waarop het gekoppeld is, en wie die computer beheert, kan erbij. agentes.chat bewaart alleen de naam, het e-mailadres en het gebruik.",
-      "empty": "Log in met je account en de agents denken ermee.",
       "emptyTitle": "Gebruik het AI-abonnement dat je al betaalt",
       "emptyViewer": "Wie de AI van de werkruimte beheert, verbindt een abonnement, en het verschijnt hier.",
       "connect": "AI koppelen",
@@ -13313,8 +13312,6 @@
       "firstTime": "De eerste keer",
       "step1": "Open het gedownloade bestand en sleep agentes.chat naar Apps.",
       "step1Install": "Open het gedownloade bestand om het te installeren.",
-      "step2": "Open de app, klik op Je eigen server gebruiken en daarna op Verbinden met mijn server, en typ het adres van deze pagina. Log in en klik dan op Deze {{device}} gebruiken in Instellingen → Computers.",
-      "other": "Andere manieren: server of Linux",
       "otherText": "Voer dit uit in de terminal van de computer en bevestig dan de code die hij toont.",
       "waiting": "Wachten tot de computer verbinding maakt…"
     },
@@ -13916,19 +13913,9 @@
       },
       "saved": "{{name}} gebruikt nu {{computer}}."
     },
-    "lead": "Waar je agents werken: deze server en elke computer die je koppelt.",
-    "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
-    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>.",
-    "other": {
-      "title": "Andere computers",
-      "text": "Gekoppeld met een code, zoals een Mac mini thuis of een andere server. Wat elke computer toestaat, stel je op die computer zelf in.",
-      "emptyTitle": "Laat agents op elke computer draaien",
-      "emptyText": "Verbind een Mac mini thuis of een andere server met een code, en agents werken erop.",
-      "emptyViewerTitle": "De computers van het team verschijnen hier",
-      "emptyViewer": "Wie computers mag verbinden, voegt er een toe, en hij verschijnt hier."
-    }
+    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>."
   },
   "outage": {
     "region": "Offline computers",
@@ -14479,10 +14466,7 @@
     "notOpen": "Je rol in deze werkruimte opent {{section}} niet. Wie de rollen beheert, kan het voor je openzetten.",
     "nav": "Onderdelen van de instellingen",
     "group": {
-      "you": "Jij",
-      "org": "Werkruimte",
-      "agents": "Agents",
-      "costs": "Kosten en gegevens"
+      "org": "Werkruimte"
     },
     "section": {
       "account": "Je account",
@@ -14495,11 +14479,10 @@
       "access": "Agents en toegang",
       "connectors": "Connectors en MCP's",
       "skills": "Skills",
-      "keys": "AI-accounts",
       "storage": "Opslag",
       "computers": "Computers",
       "devices": "Apparaten",
-      "usage": "Budget en gebruik",
+      "usage": "AI en gebruik",
       "audit": "Auditlog",
       "import": "Importeren en exporteren",
       "billing": "Abonnement en facturatie",
@@ -14510,7 +14493,6 @@
       "about": "Over agentes.chat",
       "generalPersonal": "Over jou",
       "keysPersonal": "AI en apps",
-      "usagePersonal": "Abonnement en gebruik",
       "membersPersonal": "Mensen"
     },
     "advanced": "Geavanceerd",
@@ -14525,9 +14507,8 @@
       "access": "Wat elke agent kan gebruiken: één niveau per connector.",
       "connectors": "Diensten en MCP-servers die één keer voor de hele werkruimte zijn gekoppeld.",
       "skills": "Markdown-instructies die agents openen als ze ze nodig hebben.",
-      "keys": "Je abonnementen en de API-sleutels van de werkruimte.",
       "storage": "Waar de bestanden van de werkruimte staan.",
-      "usage": "Hoeveel AI elke persoon en elke agent gebruikt, en de limieten van de maand.",
+      "usage": "De AI-accounts van de werkruimte, en hoeveel elke persoon en elke agent gebruikt.",
       "audit": "Wat agents buiten het gesprek deden en wat mensen veranderden.",
       "import": "Haal agents uit een andere app of werkruimte, of neem deze mee.",
       "billing": "Het abonnement, de kaart en de facturen, op een pagina van ons buiten de app.",
@@ -14537,7 +14518,6 @@
       "approvals": "Wie voor je beslist als een agent om je goedkeuring vraagt.",
       "about": "Wie het maakt, de licentie en waar de broncode staat.",
       "generalPersonal": "Wat je agents over je weten, en hoe deze werkruimte werkt.",
-      "keysPersonal": "De AI waarmee je agents denken, en de apps en skills die ze gebruiken.",
       "usagePersonal": "Hoeveel AI je agents gebruiken, en je abonnement.",
       "connectorsPersonal": "Je apps en MCP-servers, één keer verbonden voor je agents.",
       "membersPersonal": "Wie hier met je is, en uitnodigingen.",
@@ -14653,33 +14633,9 @@
       "dialogTitle": "Wat er wordt verstuurd",
       "dialogText": "Eén keer per dag. Dit is precies het volgende rapport."
     },
-    "tilesTitle": "Alles in de werkruimte",
     "tileState": {
       "members_one": "{{count}} lid",
-      "members_other": "{{count}} leden",
-      "invitations_one": "{{count}} uitnodiging wacht",
-      "invitations_other": "{{count}} uitnodigingen wachten",
-      "agents_one": "{{count}} agent",
-      "agents_other": "{{count}} agents",
-      "connectors_one": "{{count}} gekoppeld",
-      "connectors_other": "{{count}} gekoppeld",
-      "noConnectors": "Nog geen apps gekoppeld",
-      "skills_one": "{{count}} skill",
-      "skills_other": "{{count}} skills",
-      "computers_one": "{{online}} van {{count}} aan",
-      "computers_other": "{{online}} van {{count}} aan",
-      "noComputers": "Nog geen computer",
-      "devices_one": "{{online}} van {{count}} aan",
-      "devices_other": "{{online}} van {{count}} aan",
-      "noDevices": "Nog geen apparaat",
-      "usage": "{{percent}} van het budget gebruikt deze maand",
-      "keys_one": "{{count}} sleutel",
-      "keys_other": "{{count}} sleutels",
-      "platformKey": "Gebruikt de sleutel van deze server",
-      "noKeys": "Nog geen sleutels",
-      "plans_one": "{{count}} abonnement",
-      "plans_other": "{{count}} abonnementen",
-      "noPlans": "Nog geen abonnementen"
+      "members_other": "{{count}} leden"
     },
     "import": {
       "title": "Importeren",
@@ -14812,6 +14768,9 @@
         "jev": "Agents sturen alleen zelf stickers met Jev.",
         "jevLink": "Jev instellen"
       }
+    },
+    "tab": {
+      "account": "Profiel"
     }
   },
   "personalMode": {
@@ -15009,14 +14968,13 @@
     "equivalent": "≈ {{amount}} tegen API-prijzen",
     "apiPrice": "de API-prijs",
     "apiPriceHint": "Als agents abonnementen gebruiken, betaalt niemand per gebruik. Dit bedrag is wat hetzelfde gebruik via de API zou kosten.",
-    "thisMonth": "Deze maand",
     "moreAgents_one": "+{{count}} andere agent",
     "moreAgents_other": "+{{count}} andere agents",
     "paid": "{{amount}} betaald",
     "budgetShare": "{{percent}} van het budget",
     "estimate": "Abonnementen zeggen alleen hoeveel het hele account gebruikte. Het deel van elke agent is een schatting, op basis van wat elk eraan uitgaf.",
     "accounts": {
-      "title": "Abonnementsaccounts",
+      "title": "Accounts",
       "empty": "Verbind een abonnement en volg hier hoeveel elke agent gebruikt."
     },
     "api": {
@@ -17033,7 +16991,7 @@
       "turn": "Draai liggend",
       "upright": "Draai rechtop",
       "message": "Bericht aan {{name}}",
-      "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Computers."
+      "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Apparaten."
     }
   },
   "taskManager": {
@@ -17575,7 +17533,6 @@
       "created": "Widget toegevoegd aan {{where}}",
       "test": "Testen",
       "testAgain": "Opnieuw testen",
-      "testing": "{{name}} bouwt hem met echte gegevens…",
       "tested": "Echte gegevens · {{when}}",
       "stale": "Gewijzigd sinds de test",
       "testFailed": "Het is niet gelukt: {{reason}}",
@@ -17597,6 +17554,10 @@
       "editAskOf": "Vraag wijzigen: {{ask}}",
       "testingShort": "Testen…",
       "buildingFoot": "{{name}} bouwt hem…",
+      "thinking": "Denkt na",
+      "finishing": "Bouwt de widget",
+      "stop": "Stoppen",
+      "stillWorking": "Nog bezig. Echte gegevens kunnen een minuut of twee duren.",
       "failedTitle": "{{name}} kon hem niet bouwen",
       "staleHint": "Test opnieuw om te zien hoe het eruitziet.",
       "whoButton": "Wie ervoor zorgt: {{name}}",

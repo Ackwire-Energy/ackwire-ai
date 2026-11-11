@@ -61,6 +61,11 @@ export interface BrainTool {
   inputSchema: Record<string, unknown>; // JSON Schema object
   /** The same in every run of the agent (`ToolSpec.stable`): the model brain's cached start of the tool list. */
   stable?: boolean;
+  /**
+   * A computer brain's harness lists it with its schema from the first round instead of holding it behind its own
+   * tool search (the bridge's `tools/list`).
+   */
+  upFront?: boolean;
 }
 
 /** What a computer brain needs to reach the agent's machine. */

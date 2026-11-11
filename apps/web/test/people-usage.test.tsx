@@ -134,7 +134,7 @@ const joaoMonth = (money: boolean): PersonUsage => ({
   created: [],
 });
 
-describe("Orçamento e uso › Pessoas", () => {
+describe("IA e uso › Pessoas", () => {
   test("admins: each person's month with the limit, who uses agents now, the drawer with a DM as a count only", async () => {
     const state = seedState();
     state.peopleUsage = people;
@@ -319,7 +319,7 @@ describe("Orçamento e uso › Pessoas", () => {
     cleanup();
     await renderApp(`/org/${ORG_ID}/settings/usage`, { api: createFakeApi(personal(false)) });
     await settle(5);
-    expect(screen().getByRole("tablist", { name: "Plano e uso" })).toBeTruthy();
+    expect(screen().getByRole("tablist", { name: "IA e uso" })).toBeTruthy();
     expect(screen().getByRole("tab", { name: "Pessoas" })).toBeTruthy();
   });
 });

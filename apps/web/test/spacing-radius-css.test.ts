@@ -164,8 +164,8 @@ test("a button inside a field is as far from its end as from its top and bottom,
   expect(last(kit, ".ac-token--sm", "--token-x-spare")).toBe("5px");
   expect(last(kit, ".ac-token--sm", "border-radius")).toBe("var(--radius-xs)");
   expect(last(kit, ".ac-token--sm .ac-token__remove", "border-radius")).toBe("var(--radius-cut)");
-  // The composer's tools: one room at both ends and under them, its send button the card's corner less it.
-  expect(last(kit, ".ac-composer__tools", "padding")).toBe("4px var(--space-2) var(--space-2)");
+  // The composer's row: one room on every side, its send button the card's corner less it.
+  expect(last(kit, ".ac-composer__row", "padding")).toBe("var(--space-2)");
   expect(last(kit, ".ac-composer__send", "border-radius")).toBe("var(--control-r-sm)");
   // The password field's eye: a 32px button in the ruler's 48px field, as far from its end as from its top and
   // bottom, its corner the field's less that room.
@@ -198,13 +198,15 @@ test("every hairline between a card's rows, and over its foot, has one step of r
   expect(declarations(people, ".pu-limits__row")).toEqual([]);
   expect(last(people, ".pu-pick__select", "width")).toBe("200px");
   const plan = topLevel(await read(join(SRC, "components/plan-usage.css")));
-  expect(last(plan, ".plan-block", "padding")).toBe("var(--row-py) 0");
+  // An account's row: one step above and below its words, the list's 16 at its sides, what it folds on the same sides.
+  expect(last(plan, ".plan-row__head", "padding")).toBe("var(--space-3) var(--space-4)");
+  expect(last(plan, ".plan-row__body", "padding")).toBe("0 var(--space-4)");
+  expect(last(plan, ".plan-row__body", "gap")).toBe("var(--space-3)");
 });
 
-test("Seus planos and the API keys: each row has the rows' room above and below, 16 at its sides", async () => {
+test("the API keys: each row has the rows' room above and below, 16 at its sides", async () => {
   const layout = topLevel(await read(join(SRC, "layout.css")));
-  for (const row of [".ai-accounts__row", ".key-row"])
-    expect(last(layout, row, "padding")).toBe("var(--row-py) var(--space-4)");
+  expect(last(layout, ".key-row", "padding")).toBe("var(--row-py) var(--space-4)");
 });
 
 test("the settings sidebar's links are the ruler's compact step, the default one under a finger", async () => {

@@ -79,7 +79,8 @@ describe("web addresses → the app's screens", () => {
     expect(to("/settings/connectors")).toBe("/connectors");
     expect(to("/settings/members?request=r1&do=approve")).toBe("/join-requests?request=r1");
     expect(to("/settings/members")).toBe("/me/members");
-    expect(to("/settings/keys")).toBe("/ai-accounts");
+    // AI accounts became part of AI and usage: its old address lands there.
+    expect(to("/settings/keys")).toBe("/usage");
     expect(to("/settings/usage")).toBe("/usage");
     // Computadores became Dispositivos: its old addresses land there.
     expect(to("/settings/computers")).toBe("/settings/devices");

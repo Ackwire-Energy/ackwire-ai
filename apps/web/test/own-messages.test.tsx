@@ -350,12 +350,7 @@ describe("the bar hugs my message, a GIF or a picture too", () => {
     const block = (selector: string) => app.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
     expect(block(".artifact-tile")).toContain("--tile-w: 206px;");
     expect(block(".artifact-cards > .artifact-tile:only-child")).toContain("--tile-w: 320px;");
-    expect(block(".artifact-cards > .artifact-tile[data-media]:only-child")).toContain("max-width: 420px;");
-    for (const sel of [
-      ".artifact-tile",
-      ".artifact-cards > .artifact-tile:only-child",
-      ".artifact-cards > .artifact-tile[data-media]:only-child",
-    ])
+    for (const sel of [".artifact-tile", ".artifact-cards > .artifact-tile:only-child"])
       expect(block(sel)).not.toContain("min(100%");
     // Others' rows keep their bar on the row's right, a keyboard's focus shows it too.
     expect(r.get(".ac-msg__actions")).toContain("right: 12px");

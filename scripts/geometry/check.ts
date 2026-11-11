@@ -309,6 +309,7 @@ export const SELF_TESTED = [
   "calstack",
   "bleed",
   "stampout",
+  "stampover",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */

@@ -20,7 +20,23 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Kimin için",
         blocks: [
-          "Bu bilgisayar açıkken sizin ya da küçük bir ekibin kullanması için yapıldı. Daha büyük bir ekip ya da hep açık bir sunucu için [agentes.chat'i bir sunucuya kurun](/help/install-on-a-server) ve uygulamada **Sunucuma bağlan** seçeneğini seçin. Verilerinizi sonra oraya taşıyabilirsiniz.",
+          "Siz ya da küçük bir ekip. Açık kalan bir Mac mini, yedek bir PC ya da dizüstü bilgisayar iyi bir yuva olur: onu [Açık tutun](#keep-on) bölümündeki gibi ayarlayın. Bir Mac'te ya da PC'de agentes.chat'i Docker olmadan çalıştırmanın yolu uygulamadır.",
+          "Daha büyük bir ekip için [Hangi kurulumu seçmeli](/help/install-on-a-server#choose) sayfasına bakın. Verilerinizi sonra bir sunucuya taşıyabilirsiniz.",
+        ],
+      },
+      {
+        id: "keep-on",
+        heading: "Açık tutun",
+        blocks: [
+          "Başkalarının da kullandığı bir bilgisayarda bunu bir kez ayarlayın:",
+          {
+            list: [
+              "**Oturum açılınca başlat** kurulumdan sonra kendiliğinden açılır.",
+              "Mac'te **Sistem Ayarları\u00a0›\u00a0Kullanıcılar ve Gruplar** içinde **Otomatik oturum açma** seçeneğini açın, böylece uygulama yeniden başlatmadan sonra açılır. FileVault otomatik oturum açmayı kapatır.",
+              "Mac'te **Sistem Ayarları\u00a0›\u00a0Enerji** içinde **Elektrik kesintisinden sonra otomatik olarak başlat** seçeneğini açın.",
+              "Sunucu çalışırken ve **Telefonunuzdan ve ekip arkadaşlarınızdan erişin** açıkken Mac uyku moduna geçmez. Windows ve Linux'ta uykuyu sistemin güç ayarlarından kapatın.",
+            ],
+          },
         ],
       },
       {
@@ -28,6 +44,15 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Ajanlarınız da burada çalışır",
         blocks: [
           "Ajanlarınız da bu bilgisayarda, kendi klasörlerinde, bir tarayıcıyla ve burada kuruluysa Claude Code ya da Codex ile çalışır. Komutlar, siz **Tercihler › Araçlar** bölümünden açana kadar kapalı kalır.",
+          "Buradaki ajanlar sizin adınıza çalışır. Komutlar açıkken bu bilgisayarın geri kalanına, `.agentes` dahil, ulaşabilirler: veritabanı, `AGENTES_SECRET` içeren `.env`, sahip anahtarı ve bu bilgisayarın jetonu. Bu, agentes.chat Cloud'daki bir çalışma alanı dahil, bu bilgisayarı kullanan her çalışma alanı için geçerlidir. [Ajanlar nelere ulaşabilir](/help/computers#reach) bölümüne bakın.",
+        ],
+      },
+      {
+        id: "another-workspace",
+        heading: "Başka bir çalışma alanına da açın",
+        blocks: [
+          "Burada çalıştırdığınız sunucunun çalışma alanları bu bilgisayarı kendiliğinden kullanır. Başka bir yerdeki bir çalışma alanının da, örneğin agentes.chat Cloud'daki birinin, kullanmasını istiyorsanız **Tercihler\u00a0›\u00a0Sunucular** bölümünü açın, **Sunucu ekle…** düğmesine basın, o çalışma alanında oturum açın ve uygulama sorduğunda **İzin ver** düğmesine basın.",
+          "Her çalışma alanının burada kendi ajanları ve klasörleri olur. **Tercihler\u00a0›\u00a0Araçlar** içindeki **Komutlar**, bu bilgisayardaki tüm çalışma alanları için aynı anda geçerlidir: yalnızca her çalışma alanının ajanlarına bu bilgisayarın tamamını emanet edebiliyorsanız açın.",
         ],
       },
       {
@@ -35,34 +60,123 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Telefonunuzdan ve ekibinizden erişim",
         blocks: [
           "**Telefonunuzdan ve ekip arkadaşlarınızdan erişin**, agentes.chat'i cihazlarınız için özel bir ağ olan Tailscale'e koyar: telefonunuz ve davet ettiğiniz kişiler bu ağa katılır, başka hiç kimse agentes.chat'e ulaşamaz. Tailscale ücretsizdir: https://tailscale.com/download. Bu seçenek kapalıyken agentes.chat yalnızca bu bilgisayarda çalışır.",
+          "Bu bilgisayar Tailscale'in 443 portunda zaten başka bir şey paylaşıyorsa agentes.chat 8443 portunu kullanır ve adresi `:8443` ile biter.",
+        ],
+      },
+      {
+        id: "password",
+        heading: "Diğer cihazlardan giriş",
+        blocks: [
+          "Sahibin başta bir şifresi yoktur: uygulama bu bilgisayarda sizin yerinize oturum açar. Başka bir bilgisayardaki tarayıcıdan giriş yapmak için **Ayarlar\u00a0›\u00a0Hesabınız** bölümünden bir şifre ekleyin. Telefon uygulaması, **Tercihler\u00a0›\u00a0Sunucular** içindeki **Telefonunuzda** altında bulunan QR kodunu tarayarak bağlanır. Bunun için **Telefonunuzdan ve ekip arkadaşlarınızdan erişin** açık olmalıdır.",
+        ],
+      },
+      {
+        id: "updates",
+        heading: "Güncellemeler",
+        blocks: [
+          "Uygulama güncellemeleri kendisi arar ve **Tercihler\u00a0›\u00a0Güncellemeler** içinde **Güncelle ve yeniden aç** düğmesine bastığınızda yükler. Sunucu ve tüm ajanlar onunla birlikte yeniden başlar. Önce veritabanı kopyalanır ve yeni sürüm 3 dakika içinde yanıt vermezse uygulama kendiliğinden önceki sürüme ve onun verilerine geri döner.",
         ],
       },
       {
         id: "backups",
-        heading: "Yedekler ve taşıma",
+        heading: "Yedekler",
         blocks: [
-          "**Tercihler › Sunucular** içindeki **Şimdi yedekle**, veritabanını, dosyaları ve ayarları ana klasörünüzdeki `.agentes/backups` içine kaydeder.",
+          "Henüz hiçbir şey kendiliğinden yedeklenmiyor. **Tercihler\u00a0›\u00a0Sunucular** içindeki **Şimdi yedekle**, sunucuyu kısa bir süre durdurur ve veritabanını, dosyaları ve `.env` dosyasını ana klasörünüzdeki `.agentes/backups` içine kaydeder. En yeni iki yedeği tutar.",
+          "Bunları ara sıra bu bilgisayarın dışına, bir diske ya da bir bulut depolama alanına kopyalayın. İçlerinde anahtarlarınız var: onları gizli tutun.",
+        ],
+      },
+      {
+        id: "ai-programs",
+        heading: "Claude Code ve Codex",
+        blocks: [
+          "Uygulama Claude Code ve Codex'i oturum açma kabuğunuzun `PATH` değişkeniyle ve `~/.local/bin`, `/opt/homebrew/bin` ve `/usr/local/bin` gibi alışılmış klasörlerde arar. **Tercihler\u00a0›\u00a0Araçlar** **Bulunamadı** diyorsa `claude` ya da `codex` komutunun yeni bir Terminal penceresinde çalıştığını kontrol edin, sonra uygulamadan çıkıp yeniden açın.",
+        ],
+      },
+      {
+        id: "moving",
+        heading: "Bir sunucuya taşıma",
+        blocks: [
+          {
+            list: ["Uygulamadan çıkın, sonra veritabanının dökümünü uygulamanın kendi sunucu kopyasıyla alın. Mac'te:"],
+          },
+          {
+            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+          },
+          {
+            list: [
+              "[agentes.chat'i bir sunucuya kurun](/help/install-on-a-server), ama henüz başlatmayın. Onun `.env` dosyasına `~/.agentes/.env` içindeki `AGENTES_SECRET` değerini yazın, sonra yalnızca veritabanını başlatın: `docker compose up -d postgres`.",
+              "Dökümü yükleyin: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
+              "`docker compose up -d` ile başlatın, `~/.agentes/files` klasörünü tam kılavuzda gösterildiği gibi içine kopyalayın ve eskisi gibi giriş yapın.",
+            ],
+          },
         ],
       },
     ],
   },
   computers: {
-    title: "Ajanlarınız için bilgisayarlar",
+    title: "Bilgisayarlarınız ve telefonlarınız",
     summary:
-      "Ajanlar, bağladığınız bilgisayarlarda kod çalıştırır ve dosyalarla çalışır: agentes.chat uygulaması kurulu bir Mac ya da PC, veya bir sunucu.",
+      "Bir Mac, PC, Linux bilgisayar, sunucu ya da telefon getirin, ajanlarınız onun üzerinde çalışsın. Hem agentes.chat Cloud'da hem kendi sunucunuzda.",
     sections: [
       {
-        id: "mac",
-        heading: "Uygulamayla bir Mac ya da PC",
+        id: "app",
+        heading: "agentes.chat uygulamasından",
         blocks: [
-          "agentes.chat uygulaması sunucunuzu kendi penceresinde açar ve tek tıkla ajanları o bilgisayarda, kendi klasörlerinde çalıştırır. Uygulamayı kurun, açın, **Kendi sunucunuzu kullanın › Sunucuma bağlan** seçeneğini seçin ve sunucunuzun adresini yazın. Ardından giriş yapmış olarak **Ayarlar › Bilgisayarlar** bölümünde **Bu Mac'i kullan** düğmesine tıklayın (Windows'ta **Bu PC'yi kullan**, Linux'ta **Bu bilgisayarı kullan**).",
+          "Uygulamayı bilgisayara kurun, açın ve çalışma alanınızda oturum açın. Uygulama **<workspace> ajanları bu Mac cihazını kullanabilsin mi?** diye sorar (Windows'ta bu PC, Linux'ta bu bilgisayar). Kimlerin kullanabileceğini seçin ve **İzin ver** düğmesine basın. Hepsi bu.",
+          "Zaten oturum açtınız mı? Çalışma alanını **Tercihler\u00a0›\u00a0Genel** içindeki **Ajanlar** kartında açın.",
         ],
       },
       {
-        id: "server",
-        heading: "Bir sunucu ya da Linux bilgisayar",
+        id: "web",
+        heading: "Web sitesinden",
         blocks: [
-          "**Ayarlar › Bilgisayarlar** bölümünde **Diğer yollar** altındaki komutu kopyalayın ve o bilgisayarın terminalinde çalıştırın. Bir kod ve bir bağlantı gösterir: bağlantıyı açın, kodun eşleştiğini kontrol edin ve hesabınızla onaylayın. Önceden kurulacak hiçbir şey yok.",
+          "**Ayarlar\u00a0›\u00a0Cihazlar** bölümünde **Cihaz bağla** düğmesine basın:",
+          {
+            list: [
+              "**Bu Mac** ya da **Bu PC**: uygulamayı açar, uygulama önce size sorar.",
+              "**Başka bir bilgisayar**: uygulamayı oraya kurun, kendi hesabınızla oturum açın ve **İzin ver** düğmesine basın. Bilgisayar burada kendiliğinden görünür.",
+              "**Bir sunucu ya da VPS**: terminalinde tek bir satır çalıştırın, sonra katılmasına izin verin. Satır yalnızca bir kez ve 10 dakika boyunca çalışır.",
+            ],
+          },
+          "Uygulama tek tıkla yalnızca https kullanan bir adrese bağlanır, örneğin `.ts.net` ile biten bir Tailscale adresine. Düz bir http adresinde terminal satırını kullanın.",
+        ],
+      },
+      {
+        id: "phones",
+        heading: "Telefonlar",
+        blocks: [
+          "Bir Android telefon, zaten bağlı herhangi bir bilgisayar üzerinden bağlanır: kabloyla ya da Mayıs 2026 güvenlik güncellemesi yüklü Android 14 ve sonrasında Wi-Fi ile. Bir iPhone, uygulama ve Xcode kurulu bir Mac üzerinden bağlanır, gerisini uygulama hazırlar. İkisi de **Cihaz bağla** ile başlar.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Kimler kullanabilir",
+        blocks: [
+          "Yeni bir cihaz yalnızca sizindir: **Yalnızca ben**, siz ve sizin için çalışan ajanlar demektir. İzin verirken ya da daha sonra **Ayarlar\u00a0›\u00a0Cihazlar** içindeki sayfasından onu çalışma alanındaki herkese ya da bazı kişilere ve rollere açın.",
+        ],
+      },
+      {
+        id: "open",
+        heading: "Uygulama açıkken",
+        blocks: [
+          "Ajanlar bir bilgisayarda yalnızca uygulama orada çalışırken ve bilgisayar uyanıkken çalışır. Uygulama sorduğunda **Hazır tut: oturum açılınca agentes.chat'i başlat** işaretli kalsın. Kapalı ya da uykudaki bir bilgisayar **Çevrimdışı** görünür ve ajanlar onun geri gelmesini bekler.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Duraklatma ve bağlantıyı kesme",
+        blocks: [
+          "Bilgisayarda, saatin yanındaki agentes.chat simgesi tüm çalışma alanlarının ajanlarını duraklatır. **Tercihler\u00a0›\u00a0Genel** içinde her çalışma alanının anahtarı yalnızca onu duraklatır, **Ayrıl** ise bağlantısını keser. Duraklatılmışken yeni hiçbir şey başlamaz ve çalışmakta olanlar tamamlanır. Bağlantıyı kesmek ajanların klasörlerini diskte bırakır.",
+          "Web sitesinden, cihazın sayfasındaki **Kaldır** onun bağlantısını keser.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Birden çok çalışma alanı, tek bilgisayar",
+        blocks: [
+          "Aynı uygulamada her çalışma alanında oturum açın ve her biri için **İzin ver** düğmesine basın. agentes.chat Cloud'daki ve kendi sunucularınızdaki çalışma alanları aynı bilgisayarı paylaşabilir (uygulama 0.6.1 ve sonrası). Her birinin orada kendi ajanları ve klasörleri olur ve birinin bağlantısını kesmek diğerlerini etkilemez.",
+          "Uygulamanın bu bilgisayarda çalıştırdığı bir sunucu zaten bağlıdır ve hiçbir şey gerektirmez. Bu bilgisayarı başka bir yerdeki bir çalışma alanına da açmak için [Başka bir çalışma alanına da açın](/help/run-on-your-computer#another-workspace) bölümüne bakın.",
+          "Uygulamayı bir dizüstünde yalnızca çalışma alanınıza açılan bir pencere olarak mı kullanıyorsunuz? Ajanların dizüstünü kullanması için izin istediğinde **Şimdi değil** derseniz uygulama sade bir pencere olarak kalır.",
         ],
       },
       {
@@ -73,17 +187,20 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
-        id: "pausing",
-        heading: "Duraklatma",
+        id: "reach",
+        heading: "Ajanlar nelere ulaşabilir",
         blocks: [
-          "Uygulamada, bir bilgisayarı bağlayan kişi, saatin yanındaki agentes.chat simgesinden oradaki ajanları duraklatabilir. Devam ettirene kadar yeni hiçbir şey başlamaz. Çalışmakta olan işler tamamlanır.",
-        ],
-      },
-      {
-        id: "organizations",
-        heading: "Birden çok çalışma alanı",
-        blocks: [
-          "Bir bilgisayar birden çok çalışma alanı için çalışabilir. Her birinin orada kendi ajanları, klasörleri ve görevleri olur ve birinin bağlantısını kesmek diğerlerini etkilemez.",
+          "Ajanlar sizin adınıza, bilgisayarın kullanıcısı olarak çalışır. Dosya araçları kendi klasörlerinde kalır, ama bir komut sizin okuyabildiğiniz her şeyi okuyabilir:",
+          {
+            list: [
+              "dosyalarınız ve oturumlarınız",
+              "diğer ajanların klasörleri, başka çalışma alanlarınınkiler dahil, ve tarayıcılarının sakladığı oturumlar",
+              "bu bilgisayarı bağlayan jeton",
+              "agentes.chat'i de çalıştıran bir bilgisayarda, onun `.agentes` içindeki veritabanı ve anahtarları",
+            ],
+          },
+          "agentes.chat anahtarların, token'ların ve oturum bilgilerinin adını geçiren komutları reddeder, ama bu bir kuraldır, duvar değil. Bu yüzden **Komutlar** kapalı başlar. Onları **Tercihler\u00a0›\u00a0Araçlar** içinde açmak bilgisayardaki tüm çalışma alanları için aynı anda geçerlidir: bunu yalnızca her çalışma alanının ajanlarına ve onların çalıştığı kişilere bilgisayardaki her şeyi emanet edebiliyorsanız yapın. Claude Code ve Codex kendi komutlarını ajanın klasöründe, kendi kurallarıyla çalıştırır.",
+          "Gerçek bir duvar için bir Linux sunucu kullanın. Debian 13'te `--system` ile kurulduğunda her ajan ayrı bir kullanıcıdır. Ubuntu'da ajanlar tek bir kullanıcıyı, `agentes` kullanıcısını paylaşır: birbirlerinin klasörlerini görürler, sizinkileri ya da sunucununkileri görmezler. Ya da ajanlara kendilerine ait bir bilgisayar verin.",
         ],
       },
     ],
@@ -100,6 +217,13 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "own",
+        heading: "Kendi bilgisayarlarınız ve telefonlarınız",
+        blocks: [
+          "Ajanlar getirdiğiniz bilgisayarlarda ve telefonlarda da çalışabilir: agentes.chat uygulamalı bir Mac ya da PC, bir sunucu, bir Android telefon ya da bir iPhone. [Getirdiğiniz bilgisayarlar ve telefonlar](/help/computers) sayfasına bakın.",
+        ],
+      },
+      {
         id: "plans",
         heading: "Yapay zeka planlarınız",
         blocks: [
@@ -110,7 +234,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "size",
         heading: "Boyutu",
-        blocks: ["İşlemcileri, belleği ve diski **Ayarlar › Bilgisayarlar** bölümünde görünür."],
+        blocks: ["İşlemcileri, belleği ve diski **Ayarlar\u00a0›\u00a0Cihazlar** bölümünde görünür."],
       },
       {
         id: "trouble",
@@ -378,7 +502,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
               "https://console.typesafe.ai adresini açın ve Google ya da e-postanızla giriş yapın. Yeni hesap da aynı şekilde açılır.",
               "Konsolda kredi ekleyin. Jev ön ödemelidir.",
               "https://console.typesafe.ai/keys adresini açın, bir anahtar oluşturun ve hemen kopyalayın.",
-              "agentes.chat'te **Ayarlar › Yapay zeka hesapları** bölümünü açın ve anahtarı **Jev** altına yapıştırın. Onu yalnızca bu sunucuyu kuran kişi görür.",
+              "agentes.chat'te **Ayarlar › Yapay zeka ve kullanım** bölümünü açın ve anahtarı **Jev** altına yapıştırın. Onu yalnızca bu sunucuyu kuran kişi görür.",
             ],
           },
           "Docker ile çalıştırdığınız bir sunucuda anahtarı bunun yerine `.env` dosyasına `TYPESAFE_API_KEY` olarak koyabilirsiniz. Bu anahtar, Ayarlar'dakinin önüne geçer.",
@@ -392,7 +516,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "Jev'in okuduğu her milyon token için US$ 0,042. Yanıtları ücretsizdir. Kimin yanıtlayacağını seçmek yaklaşık 2.500 token okur, yani yaklaşık US$ 0,0001. Bir ekran görüntüsü yaklaşık 3.900 token eder.",
               "Satın aldığınız krediler 12 ay geçerlidir. Jev'in kredisi bitmesin diye konsolda otomatik yüklemeyi açın.",
-              "**Ayarlar › Yapay zeka hesapları**, Jev'in bu ay kaç karar verdiğini ve bunların ne kadar tuttuğunu gösterir.",
+              "**Ayarlar › Yapay zeka ve kullanım**, Jev'in bu ay kaç karar verdiğini ve bunların ne kadar tuttuğunu gösterir.",
             ],
           },
         ],
@@ -423,7 +547,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Anahtar kabul edilmedi:** yeni bir anahtar oluşturun ve **Ayarlar › Yapay zeka hesapları** bölümüne yapıştırın.",
+              "**Anahtar kabul edilmedi:** yeni bir anahtar oluşturun ve **Ayarlar › Yapay zeka ve kullanım** bölümüne yapıştırın.",
               "**Kredi bitti:** konsolda kredi ekleyin. Jev 30 dakika içinde yeniden dener ya da **Tekrar kontrol et** düğmesine tıklayın.",
               "**Meşgul ya da ulaşılamıyor:** TypeSafe saniye başına istekleri sınırlayabilir ya da bir süre yanıt vermeyebilir. Jev kendiliğinden yeniden devreye girer. Limitleriniz: https://console.typesafe.ai/rate-limits. Daha yüksek limitler için sales@typesafe.ai adresine yazın.",
             ],
@@ -537,12 +661,26 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
       "agentes.chat'i kendi sunucunuzda, ücretsiz, tüm ekibiniz için çalıştırın. Tek bir komut her şeyi hazırlar.",
     sections: [
       {
+        id: "choose",
+        heading: "Hangi kurulumu seçmeli",
+        blocks: [
+          {
+            list: [
+              "**agentes.chat Cloud**: her ekip için, her yerden erişilebilir. Onu biz çalıştırır, günceller ve yedekleriz. Her çalışma alanına kendi bilgisayarı verilir ve orada her ajan ayrı bir kullanıcıdır.",
+              "**Uygulamayla kendi bilgisayarınız**: sizin ya da küçük bir ekip için, o bilgisayar açıkken erişilebilir. Açık kalan bir Mac mini iyi iş görür. Tek tıkla güncellenir, yedeğini elle alırsınız. Ajanlar o bilgisayarda sizin adınıza çalışır.",
+              "**Bir sunucu**: daha büyük bir ekip için, her zaman açık. Üç komutla güncellenir ve her gün kendiliğinden yedek alabilir. Debian 13'te her ajan ayrı bir kullanıcıdır.",
+            ],
+          },
+          "Bilgisayarınızdan bir sunucuya: [Bir sunucuya taşıma](/help/run-on-your-computer#moving). Hepsi [Ajanlarınızı getirin](/help/import) ile başka birinden ajan getirebilir.",
+        ],
+      },
+      {
         id: "need",
         heading: "Gerekenler",
         blocks: [
           {
             list: [
-              "64 bit Linux'lu bir sunucu ya da VPS, x64 veya arm64. Küçük bir ekip için 2 CPU, 4 GB bellek ve 20 GB disk iyi bir başlangıçtır. Denemek için Docker Desktop, OrbStack ya da Colima yüklü bir Mac de olur.",
+              "64 bit Linux'lu bir sunucu ya da VPS, x64 veya arm64. Küçük bir ekip için 2 CPU, 4 GB bellek ve 20 GB disk iyi bir başlangıçtır. Bir Mac'te ya da PC'de [agentes.chat'i uygulama çalıştırır](/help/run-on-your-computer), Docker gerekmez.",
               "Compose ile Docker. Linux'ta eksikse kurulum programı önce sorar, sonra kurar.",
               "Bir erişim yolu: ücretsiz bir Tailscale hesabı (varsayılan, özel, alan adı ve açık port gerekmez) ya da sunucuyu gösteren bir alan adı ve açık 80 ile 443 portları.",
             ],
@@ -616,11 +754,11 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "computers",
         heading: "Ajanlarınızın bilgisayarları",
         blocks: [
-          "Kurulum bu sunucuyu ajanlarınızın bilgisayarı da yapabilir: komutları orada çalıştırır, bir tarayıcı kullanır ve dosyalarını orada tutarlar. Kurulum sorar ve sunucu bunu iyi kaldırabiliyorsa evet önerir. Linux'ta her ajanın ekranı olan kendi kullanıcısı olur. Hayır dediyseniz kurulumu `--computer yes` ile yeniden çalıştırın:",
+          "Kurulum bu sunucuyu ajanlarınızın bilgisayarı da yapabilir: komutları orada çalıştırır, bir tarayıcı kullanır ve dosyalarını orada tutarlar. Kurulum sorar ve sunucu bunu iyi kaldırabiliyorsa evet önerir. Debian 13'te her ajanın ekranı olan kendi kullanıcısı olur. Ubuntu'da ajanlar tek bir kullanıcıyı, `agentes` kullanıcısını paylaşır. Hayır dediyseniz kurulumu `--computer yes` ile yeniden çalıştırın:",
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "agentes.chat uygulamalı bir Mac ya da başka bir sunucu gibi diğer bilgisayarlar **Ayarlar\u00a0›\u00a0Bilgisayarlar** üzerinden bağlanır, [Ajanlarınız için bilgisayarlar](/help/computers) sayfasındaki gibi. Tailscale'de önce tailnet'inize katılırlar.",
+          "agentes.chat uygulamalı bir Mac ya da başka bir sunucu gibi diğer bilgisayarlar **Ayarlar\u00a0›\u00a0Cihazlar** üzerinden bağlanır, [Bilgisayarlarınız ve telefonlarınız](/help/computers) sayfasındaki gibi. Tailscale'de önce tailnet'inize katılırlar.",
         ],
       },
       {

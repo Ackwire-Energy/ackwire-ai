@@ -30,6 +30,8 @@ import {
   effectiveColumns,
   type ItemRow,
   runAccess,
+  scopeOf,
+  sharedWithAgent,
   type VaultRunPerson,
   vaultPersonOfRun,
 } from "./access";
@@ -47,6 +49,7 @@ import {
   type VaultPlace,
   type VaultReleasedLogin,
   type VaultRun,
+  type VaultUnreached,
   vaultNow,
 } from "./service";
 import { indexSourceItem } from "./sync";
@@ -190,6 +193,44 @@ export async function listVaultPlaces(deps: VaultDeps, run: VaultRun, given?: Va
     THE_VAULT,
     ...connections.filter((c) => reaches(c, person, run.agentId)).map((c) => placeOf(deps.sources, c)),
   ];
+}
+
+/**
+ * Connected password managers the person behind the run may know of, whose items this agent doesn't use by default:
+ * what lets it say "connected, but I have no access" instead of "nothing is connected". Only the connection: no item
+ * of it, and whether any was read, never how many. One the run may not know exists (someone else's personal one, a
+ * team one outside that person's reach) is left out.
+ */
+export async function listUnreachedConnections(
+  deps: VaultDeps,
+  run: VaultRun,
+  given?: VaultRunPerson,
+): Promise<VaultUnreached[]> {
+  const person = given ?? (await vaultPersonOfRun(deps.db, run));
+  const connections = await deps.db.select().from(vaultConnections).where(eq(vaultConnections.orgId, run.orgId));
+  const unreached = connections.filter(
+    (c) => !sharedWithAgent(c, run.agentId) && runAccess(c.ownerUserId, c, person, run.agentId) === "not_shared",
+  );
+  if (unreached.length === 0) return [];
+  const withItems = await deps.db
+    .selectDistinct({ connectionId: vaultItems.connectionId })
+    .from(vaultItems)
+    .where(
+      and(
+        eq(vaultItems.orgId, run.orgId),
+        eq(vaultItems.missing, false),
+        inArray(
+          vaultItems.connectionId,
+          unreached.map((c) => c.id),
+        ),
+      ),
+    );
+  const has = new Set(withItems.map((r) => r.connectionId));
+  return unreached.map((c) => ({
+    place: placeOf(deps.sources, c),
+    scope: scopeOf(c.ownerUserId),
+    hasItems: has.has(c.id),
+  }));
 }
 
 /** An item by id as the run sees it: hidden ones (and ids that aren't ids) are not found. */

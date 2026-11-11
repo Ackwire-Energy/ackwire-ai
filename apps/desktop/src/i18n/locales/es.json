@@ -330,7 +330,7 @@
     "usageRestart": "Cambiarlo reinicia agentes.chat por un momento.",
     "jev": "Jev",
     "jevText": "Un modelo rápido de TypeSafe que elige quién responde, mantiene la memoria ordenada y permite que los agentes vean la pantalla. Opcional, con tu propia clave.",
-    "jevWhere": "En agentes.chat › Configuración › Cuentas de IA.",
+    "jevWhere": "En agentes.chat › Configuración › IA y uso.",
     "reachFailed": "El acceso desde tus dispositivos no se activó: {{reason}}.",
     "backup": "Hacer una copia ahora",
     "backedUp": "Copia de seguridad hecha: {{file}}",

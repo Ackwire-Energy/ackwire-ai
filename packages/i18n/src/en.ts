@@ -1519,8 +1519,7 @@ export const en = {
     noDate: "No end date",
     clearDate: "Remove the date",
     risky: "Merge, deploy and other risky actions",
-    riskyOff: "Off, these stay with you only.",
-    riskyOn: "On, this person decides these too.",
+    riskyOn: "This person decides these too.",
     lock: "Always yours: money, people and roles, AI keys, your mailbox and deleting.",
     coveringTitle: "You approve for",
     coveringSubtitle:
@@ -1531,9 +1530,9 @@ export const en = {
     decline: "Stop covering",
     failed: "Couldn't save. Try again.",
   },
-  /** Configurações › Você › Aprovações: what the right hand approves for me (ADR 0139 §2). */
+  /** The right hand's page: what it creates and adjusts for me without asking (ADR 0139 §2). */
   rightHandApprovals: {
-    title: "{{name}} approves for you",
+    title: "{{name}} creates and adjusts agents for you",
     subtitle: "Only what came from a request of yours. What it wouldn't approve, it passes to you.",
     newAgents: "Create agents other agents propose",
     newAgentsHelp: "No apps, open channels only. You can undo it for 24 h.",
@@ -2361,12 +2360,13 @@ export const en = {
       audienceHelp: "Outside it, a person doesn't see {{name}} in the sidebar.",
       lock: "{{name}} can't be archived or deleted. The only thing it posts without being asked is Team week, for admins.",
       audit: "See what {{name}} did",
-      change: "Change",
       planHelp: "The plan's owner pays. When its computer is away, the conversation says so and offers an API key.",
       /** The face that opens the look's dialog, read aloud and on hover. */
       lookEdit: "Change {{name}}'s look",
       /** After a plan's name when it is someone else's. */
-      planOwner: "from {{owner}}",
+      planOwner: "{{owner}}'s account",
+      /** A plan by its account's name ("Claude plan"). */
+      planName: "{{name}} plan",
       /** Each person's own AI for their conversation with the right hand (ADR 0137 §11). */
       mine: "Your AI",
       mineHelp: "Your conversation with {{name}} thinks with your plan or one shared with you, and only yours does.",
@@ -2389,16 +2389,15 @@ export const en = {
       fallbackYours: "Without another plan, it uses the workspace's, which is yours.",
       fallbackNone: "Without your own plan, {{name}} can't answer you: the workspace's plan serves only {{owner}}.",
       /** What admins set for people with no plan of their own. */
-      workspace: "Workspace AI",
+      workspace: "AI for people without their own plan",
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
-      workspacePlan: "Workspace plan",
-      workspacePlanHelp: "A plan in place of the key. It serves other people only when its owner lets it.",
-      noPlans: "Connect a plan in AI accounts to use it here.",
-      pickPlan: "Choose a plan",
-      /** "Atende outras pessoas" on the workspace's plan. */
-      sharesOn: "On: people without their own plan talk to {{name}} through this plan.",
-      sharesOff: "Off: only {{owner}} talks through it. People without their own plan get no answer.",
-      sharesOffYou: "Off: only you talk through it. People without their own plan get no answer.",
+      noPlans: "Connect a plan in AI and usage to use it here.",
+      /** Under the switch that lends the workspace's plan: what it does, whatever its state. */
+      lend: "Lend this plan to people without one",
+      /** The right hand's page, its two groups: what is the viewer's alone, and what admins set for everyone. */
+      groupMine: "Just for you",
+      groupWorkspace: "For the whole workspace",
+      groupAdmins: "admins only",
     },
     card: {
       settings: "{{name}} · Settings",
@@ -3998,6 +3997,9 @@ export const en = {
       access: "Default access",
       accessTitle: "Default access of {{label}}",
       accessText: "Its items follow this, unless you change one of them. Each change saves at once.",
+      /** On a connection no agent may use, beside the action that opens its access. */
+      noAgents: "No agent uses this connection.",
+      giveAccess: "Give access",
       actionsName: "More for {{name}}",
       disconnect: "Disconnect",
       removeTitle: "Disconnect {{name}}?",
@@ -4939,6 +4941,7 @@ export const en = {
         accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
+        connectPlan: "Connect another plan",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
           "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
@@ -8517,7 +8520,7 @@ export const en = {
       homeHint: "The mission gets a thread: that's where {{name}} talks, asks for decisions and shows his work.",
       homeHint_female: "The mission gets a thread: that's where {{name}} talks, asks for decisions and shows her work.",
       offline: "{{name}} is offline. The plan starts when it's back.",
-      needsMachine: "Missions run on a connected computer. Connect one to {{name}} in Settings\u00a0›\u00a0Computers.",
+      needsMachine: "Missions run on a connected computer. Connect one to {{name}} in Settings\u00a0›\u00a0Devices.",
       commandHint: "You can also start one by typing in any conversation's composer:",
       approvals: "Merge, deploy and rollback always ask for approval",
       start: "Start mission",
@@ -9495,7 +9498,6 @@ export const en = {
     page: {
       title: "Your plans",
       hint: "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage.",
-      empty: "Sign in with your account and agents think with it.",
       emptyTitle: "Use the AI plan you already pay for",
       emptyViewer: "Whoever looks after the workspace's AI connects a plan, and it shows up here.",
       connect: "Connect an AI",
@@ -13191,9 +13193,6 @@ export const en = {
       firstTime: "The first time",
       step1: "Open the downloaded file and drag agentes.chat to Applications.",
       step1Install: "Open the downloaded file to install it.",
-      step2:
-        "Open it, click Use your own server, then Connect to my server, and type this page's address. Sign in, then click Use this {{device}} in Settings → Computers.",
-      other: "Other ways: server or Linux",
       otherText: "Run this in the computer's terminal, then confirm the code it shows.",
       waiting: "Waiting for the computer to connect…",
     },
@@ -13826,19 +13825,9 @@ export const en = {
       state: { online: "online", paused: "paused", offline: "offline" },
       saved: "{{name}} now uses {{computer}}.",
     },
-    lead: "Where your agents work: this server and any computer you connect.",
-    leadCloud: "Where your agents work: a computer just for this workspace, always on.",
     about: "About this computer",
     how: "How computers work",
     hostMissing: "This server can be your agents' computer too: <guide>here's how</guide>.",
-    other: {
-      title: "Other computers",
-      text: "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer.",
-      emptyTitle: "Run agents on any computer",
-      emptyText: "Connect a Mac mini at home or another server with a code, and agents work on it.",
-      emptyViewerTitle: "The team's computers show up here",
-      emptyViewer: "Whoever can connect computers adds one, and it shows up here.",
-    },
   },
   outage: {
     region: "Offline computers",
@@ -14406,10 +14395,7 @@ export const en = {
     notOpen: "Your role in this workspace doesn't open {{section}}. Whoever manages roles can open it for you.",
     nav: "Settings sections",
     group: {
-      you: "You",
       org: "Workspace",
-      agents: "Agents",
-      costs: "Costs and data",
     },
     section: {
       account: "Your account",
@@ -14423,11 +14409,10 @@ export const en = {
       access: "Agents and access",
       connectors: "Connectors and MCPs",
       skills: "Skills",
-      keys: "AI accounts",
       storage: "Storage",
       computers: "Computers",
       devices: "Devices",
-      usage: "Budget and usage",
+      usage: "AI and usage",
       audit: "Audit log",
       import: "Import and export",
       billing: "Plan and billing",
@@ -14436,17 +14421,17 @@ export const en = {
       apps: "AI apps",
       approvals: "Approvals",
       about: "About agentes.chat",
-      // A personal workspace's names (ADR 0159): General, AI accounts and Budget and usage in their own words.
+      // A personal workspace's names (ADR 0159): General and Members in their own words.
       generalPersonal: "About you",
-      /** AI accounts, connectors and skills on one page. */
+      /** The phone's AI accounts screen. */
       keysPersonal: "AI and apps",
-      /** Budget and usage, and the plan and billing, on one page. */
-      usagePersonal: "Plan and usage",
       /** Members and invitations, in the short list once someone else is a member. */
       membersPersonal: "People",
     },
     /** A personal workspace's settings list ends with this row, which shows or hides every other section. */
     advanced: "Advanced",
+    /** An entry's own tab, beside the sections its page holds. */
+    tab: { account: "Profile" },
     sectionText: {
       account: "Your profile and how the app looks for you.",
       notifications: "What reaches you as an alert here. The inbox keeps everything.",
@@ -14458,9 +14443,8 @@ export const en = {
       access: "What each agent can use: one level per connector.",
       connectors: "Services and MCP servers connected once for the whole workspace.",
       skills: "Markdown instructions agents open when they need them.",
-      keys: "Your plans and the workspace's API keys.",
       storage: "Where the workspace's files live.",
-      usage: "How much AI each person and each agent uses, and the month's limits.",
+      usage: "The workspace's AI accounts, and how much each person and agent uses.",
       audit: "What agents did outside the conversation and what people changed.",
       import: "Bring agents from another app or workspace, or take this one along.",
       billing: "The plan, card and invoices, on a page of ours outside the app.",
@@ -14470,7 +14454,6 @@ export const en = {
       approvals: "Who decides for you when an agent asks for your approval.",
       about: "Who makes it, its license and where its source code is.",
       generalPersonal: "What your agents know about you, and how this workspace works.",
-      keysPersonal: "The AI your agents think with, and the apps and skills they use.",
       usagePersonal: "How much AI your agents use, and your plan.",
       connectorsPersonal: "Your apps and MCP servers, connected once for your agents.",
       membersPersonal: "Who's here with you, and invitations.",
@@ -14604,33 +14587,9 @@ export const en = {
       dialogTitle: "What is sent",
       dialogText: "Once a day. This is the next report, exactly.",
     },
-    tilesTitle: "Everything in the workspace",
     tileState: {
       members_one: "{{count}} member",
       members_other: "{{count}} members",
-      invitations_one: "{{count}} invitation waiting",
-      invitations_other: "{{count}} invitations waiting",
-      agents_one: "{{count}} agent",
-      agents_other: "{{count}} agents",
-      connectors_one: "{{count}} connected",
-      connectors_other: "{{count}} connected",
-      noConnectors: "No apps connected yet",
-      skills_one: "{{count}} skill",
-      skills_other: "{{count}} skills",
-      computers_one: "{{online}} of {{count}} on",
-      computers_other: "{{online}} of {{count}} on",
-      noComputers: "No computer yet",
-      devices_one: "{{online}} of {{count}} on",
-      devices_other: "{{online}} of {{count}} on",
-      noDevices: "No device yet",
-      usage: "{{percent}} of the budget used this month",
-      keys_one: "{{count}} key",
-      keys_other: "{{count}} keys",
-      platformKey: "Using this server's key",
-      noKeys: "No keys yet",
-      plans_one: "{{count}} plan",
-      plans_other: "{{count}} plans",
-      noPlans: "No plans yet",
     },
     import: {
       title: "Import",
@@ -14934,7 +14893,6 @@ export const en = {
     apiPriceHint:
       "When agents use plans, nobody pays by use. This amount is what the same use would cost through the API.",
     /** The column of each agent's tokens in an account's list. */
-    thisMonth: "This month",
     /** The row an account's list folds the rest of its agents into: how many (`percent`, their share, sits beside it). */
     moreAgents_one: "+{{count}} agent",
     moreAgents_other: "+{{count}} agents",
@@ -14943,7 +14901,7 @@ export const en = {
     estimate:
       "Plans only tell how much the whole account used. Each agent's part is an estimate, from what each one spent on it.",
     accounts: {
-      title: "Plan accounts",
+      title: "Accounts",
       empty: "Connect a plan and follow here how much each agent uses.",
     },
     api: {
@@ -17019,7 +16977,7 @@ export const en = {
       turn: "Turn sideways",
       upright: "Turn upright",
       message: "Message {{name}}",
-      chooseOnWeb: "Choose it on agentes.chat, in Settings\u00a0›\u00a0Computers.",
+      chooseOnWeb: "Choose it on agentes.chat, in Settings\u00a0›\u00a0Devices.",
     },
   },
   taskManager: {
@@ -17549,7 +17507,6 @@ export const en = {
       /** Asking is tested first (ADR 0135): the agent builds a draft with real data before the widget is created. */
       test: "Test",
       testAgain: "Test again",
-      testing: "{{name}} is building it with real data…",
       tested: "Real data · {{when}}",
       stale: "Changed since the test",
       testFailed: "It didn't work: {{reason}}",
@@ -17572,6 +17529,10 @@ export const en = {
       editAskOf: "Change the ask: {{ask}}",
       testingShort: "Testing…",
       buildingFoot: "{{name}} building…",
+      thinking: "Thinking",
+      finishing: "Building the widget",
+      stop: "Stop",
+      stillWorking: "Still working. Real data can take a minute or two.",
       failedTitle: "{{name}} couldn't build it",
       staleHint: "Test again to see how it looks.",
       whoButton: "Who looks after it: {{name}}",

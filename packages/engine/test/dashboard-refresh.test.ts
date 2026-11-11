@@ -7,6 +7,7 @@ import { WIDGET_SCHEDULE_CRON, type WidgetSpec } from "@agenteschat/ui/widgets/s
 import {
   applyWidgetUpdate,
   askWidgetChange,
+  bridgeToolsFor,
   closeRoutineRun,
   createDashboard,
   createDashboardToolSource,
@@ -17,6 +18,7 @@ import {
   dropWidgetRoutine,
   executeRoutineRun,
   ForbiddenError,
+  getWidget,
   insertWidget,
   listRoutines,
   queueRoutineRun,
@@ -24,9 +26,12 @@ import {
   routineSlots,
   setRoutineActive,
   syncWidgetRoutine,
+  testWidget,
   toolPolicy,
   updateRoutine,
   updateWidget,
+  WIDGET_UP_FRONT_MAX,
+  widgetUpFront,
 } from "../src";
 import { widgetFailureCode } from "../src/dashboards/refresh-ledger";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -244,6 +249,11 @@ describe("the refresh run", () => {
     expect(prompt).toContain("This is a widget update");
     expect(prompt).toContain("Quanto vendemos hoje, contra ontem");
     expect(prompt).toContain("This is its first build");
+    // Quick by instruction: arithmetic never in a shell, no sleeping on an asynchronous query, answer at once.
+    expect(prompt).toContain("in your head or inside one query, never in a shell");
+    expect(prompt).toContain("Never sleep or wait in a shell");
+    expect(prompt).toContain("call its status once more instead");
+    expect(prompt).toContain("Call update_widget as soon as the numbers are in hand");
 
     const row = await widgetOf(w.id);
     expect(row).toMatchObject({
@@ -645,5 +655,84 @@ describe("changes, Resolve and the routine's life", () => {
     expect(toolPolicy(person, { name: "update_widget", scope: "" }).action).toBe("refuse");
     expect(toolPolicy(person, { name: "create_dashboard", scope: "" }).action).toBe("allow");
     expect(toolPolicy(plain, { name: "list_dashboards", scope: "" }).action).toBe("allow");
+  });
+
+  test("a widget run starts with what it reads with and update_widget in hand, nothing that writes", async () => {
+    const appRead = { name: "stripe_list_subscriptions", scope: "stripe:read", connectionId: "x" };
+    const appWrite = { name: "stripe_create_refund", scope: "stripe:write", connectionId: "x" };
+    const appSensitiveRead = { name: "stripe_export", scope: "stripe:read", connectionId: "x", sensitive: true };
+    expect(widgetUpFront({ name: "update_widget", scope: "" })).toBe(true);
+    expect(widgetUpFront(appRead)).toBe(true);
+    expect(widgetUpFront({ name: "web_search", scope: "web:read" })).toBe(true);
+    expect(widgetUpFront({ name: "web_fetch", scope: "web:read" })).toBe(true);
+    for (const held of [
+      appWrite,
+      appSensitiveRead,
+      { name: "create_issue", scope: "issues:write" },
+      // Its own reads and its browser stay a search away.
+      { name: "list_issues", scope: "issues:read" },
+      { name: "browser_do", scope: "browser:use" },
+      { name: "post_message", scope: "" },
+    ]) {
+      expect(widgetUpFront(held)).toBe(false);
+    }
+
+    // Through the bridge a computer brain lists its tools from: the widget run's marks, and no other run's.
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id);
+    const rr = await fireWidget((await syncWidgetRoutine(dash(), f.org.id, w.id, { ensure: true })) ?? "");
+    const id = { orgId: f.org.id, agentId: f.agent.id, runId: rr.agentRunId ?? "", machineId: "" };
+    const listed = await bridgeToolsFor({ db: f.db, pubsub: f.pubsub, tools: f.tools }, id);
+    const upFront = listed.filter((t) => t.upFront).map((t) => t.name);
+    expect(upFront).toContain("update_widget");
+    expect(upFront.length).toBeLessThanOrEqual(WIDGET_UP_FRONT_MAX);
+    for (const name of upFront) expect(["update_widget", "web_search", "web_fetch"]).toContain(name);
+  });
+
+  test("a widget being built says the call its run is in, only to who sees it", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const nina = await addMember(f.db, f.org.id, "member", "nina");
+    const b = await createDashboard(dash(), f.owner.id, f.org.id, {
+      title: "Sales",
+      audience: "workspace",
+      editPolicy: "viewers",
+    });
+    const draft = await testWidget(dash(), f.owner.id, f.org.id, b.id, {
+      agentId: f.agent.id,
+      prompt: "MRR em real",
+      format: "auto",
+      schedule: "hour",
+    });
+    const stepOf = async () => (await getWidget(dash(), f.owner.id, f.org.id, draft.id)).step;
+    // Queued, no run yet: nothing to say.
+    expect(await stepOf()).toBeNull();
+    const [queued] = await f.db
+      .select()
+      .from(schema.routineRuns)
+      .where(eq(schema.routineRuns.routineId, draft.routineId ?? ""));
+    await executeRoutineRun(routineDeps(f), queued?.id ?? "");
+    const runId = (await routineRunRow(f, queued?.id ?? "")).agentRunId ?? "";
+    const add = (seq: number, kind: "tool_call" | "tool_result" | "model_call", data: Record<string, unknown>) =>
+      f.db.insert(schema.agentRunSteps).values({ orgId: f.org.id, runId, seq: 900 + seq, kind, data });
+    await add(1, "tool_call", {
+      name: "stripe_list_subscriptions",
+      input: { secret: "never sent" },
+      connector: "Stripe",
+      service: "stripe",
+    });
+    const step = await stepOf();
+    expect(step).toMatchObject({ tool: "stripe_list_subscriptions", connector: "Stripe", service: "stripe" });
+    expect(Object.keys(step ?? {}).sort()).toEqual(["at", "connector", "service", "tool"]);
+    // Whoever edits the board still doesn't know the draft exists, its step included.
+    await expect(getWidget(dash(), nina.id, f.org.id, draft.id)).rejects.toMatchObject({ code: "widget.not_found" });
+    // Between calls it is thinking.
+    await add(2, "tool_result", { name: "stripe_list_subscriptions" });
+    expect(await stepOf()).toBeNull();
+    await add(3, "tool_call", { name: "update_widget", input: {} });
+    expect(await stepOf()).toMatchObject({ tool: "update_widget", connector: null, service: null });
+    // Built: no step any more.
+    await f.db.update(schema.dashboardWidgets).set({ status: "ok" }).where(eq(schema.dashboardWidgets.id, draft.id));
+    expect(await stepOf()).toBeNull();
   });
 });

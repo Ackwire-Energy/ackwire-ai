@@ -1163,7 +1163,6 @@
     "proposalsWaiting_other": "{{count}} en attente",
     "drive": "Drive",
     "connectors": "Connecteurs et MCP",
-    "usage": "Consommation",
     "preferences": "Préférences",
     "editProfile": "Modifier le profil",
     "switchWorkspace": "Changer d'espace de travail",
@@ -2316,16 +2315,13 @@
     "editSub": "Nom, logo, fuseau horaire et ce que savent les agents",
     "group": {
       "org": "Espace de travail",
-      "people": "Personnes",
-      "agents": "Agents",
-      "costs": "Coûts et données"
+      "people": "Personnes"
     },
     "section": {
       "members": "Membres",
       "roles": "Rôles",
       "access": "Accès des agents",
-      "connectors": "Connecteurs",
-      "usage": "Utilisation et budget"
+      "connectors": "Connecteurs"
     },
     "ofOnline": "{{online}} sur {{count}}",
     "deleteName": "Supprimer {{name}}",
@@ -2409,7 +2405,7 @@
       "guide": "Ouvrir le guide de {{name}}",
       "fields": "Informations",
       "private": "Ces informations sont gardées chiffrées et ne sont plus jamais affichées.",
-      "teamHelp": "Ses éléments sont d'abord visibles par tout l'espace de travail et utilisés par aucun agent. Vous choisissez les agents ensuite.",
+      "teamHelp": "Tout l'espace de travail voit ses éléments et tous les agents peuvent les utiliser. Vous pouvez ajuster cela ensuite.",
       "personalHelp": "Vous seul voyez ses éléments, et vos agents les utilisent quand vous le demandez.",
       "checking": "Vérification avec {{name}}…",
       "connected": "{{name}} connecté",

@@ -1,3 +1,4 @@
+import { applyFormat, FORMAT_KINDS, type FormatKind } from "@agenteschat/ui/format";
 import { Canvas, Group, Path, Skia, vec } from "@shopify/react-native-skia";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -160,6 +161,8 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
  * placeholder; with text, the round ink send button pops in. One line keeps "+", text and send on the
  * same center line; longer text grows the pill upward and everything stays at the bottom. GIFs and stickers (`media`)
  * have their button at the empty field's end: they go as a message of their own, never with words.
+ * Formatting has no button in the row: while words are selected in the field, a bar of them (bold, italic, lists…)
+ * shows right over it and writes Markdown around the selection, which stays selected.
  *
  * While an agent works: the empty field's button is "Parar" (a rounded square), one
  * tap and it stops, no question asked (what it did stays and can continue); with text, a tap on send joins
@@ -199,6 +202,8 @@ export function Composer({
   }, [text]);
   const [caret, setCaret] = useState(0);
   const [selection, setSelection] = useState<{ start: number; end: number } | undefined>(undefined);
+  // The words selected in the field: with some, the formatting bar shows over the field.
+  const [range, setRange] = useState({ start: 0, end: 0 });
   const [focused, setFocused] = useState(false);
   const [taught, setTaught] = useState(() => readValueSync(STORED.stopSendTaught) === "1");
   const input = useRef<TextInputInstance | null>(null);
@@ -252,6 +257,16 @@ export function Composer({
   };
   const hold = working && has ? { hint: t("mobile.composer.holdToStop"), onHold: holdSend } : null;
 
+  const formatting = focused && range.end > range.start && !voice?.active;
+  const format = (kind: FormatKind) => {
+    haptics.selection();
+    const next = applyFormat(text, range.start, range.end, kind, { link: t("composer.format.linkText") });
+    setText(next.value);
+    setCaret(next.end);
+    setRange({ start: next.start, end: next.end });
+    setSelection({ start: next.start, end: next.end });
+  };
+
   const pick = (handle: string) => {
     if (!token || !insertMention) return;
     haptics.selection();
@@ -294,6 +309,44 @@ export function Composer({
       ) : null}
       {banner}
       {voice?.above ?? null}
+      {formatting ? (
+        <Animated.View
+          entering={reducedMotion ? undefined : FadeIn.duration(140)}
+          exiting={reducedMotion ? undefined : FadeOut.duration(100)}
+          style={styles.formatBleed}
+        >
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="always"
+            contentContainerStyle={styles.formatRow}
+          >
+            <View
+              accessibilityRole="toolbar"
+              accessibilityLabel={t("composer.format.toolbar")}
+              style={[styles.format, { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` }]}
+            >
+              {FORMAT_KINDS.map((kind) => (
+                <PressScale
+                  key={kind}
+                  to={0.9}
+                  haptic={false}
+                  onPress={() => format(kind)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(`composer.format.${kind}`)}
+                  // 36 wide and tall: the slop reaches 44 up and down without pushing the field.
+                  hitSlop={{ top: 4, bottom: 4 }}
+                  style={styles.formatButton}
+                >
+                  <View style={styles.center}>
+                    <Icon name={kind} size={20} color={colors.ink2} />
+                  </View>
+                </PressScale>
+              ))}
+            </View>
+          </ScrollView>
+        </Animated.View>
+      ) : null}
       <View style={styles.row}>
         {/* The "+" plate; while a take is held hands free or paused, the same plate holds its trash. */}
         {voice?.leading ? (
@@ -372,6 +425,7 @@ export function Composer({
               {...(selection ? { selection } : {})}
               onSelectionChange={(e) => {
                 setCaret(e.nativeEvent.selection.end);
+                setRange(e.nativeEvent.selection);
                 if (selection) setSelection(undefined);
               }}
               multiline
@@ -619,6 +673,11 @@ const styles = StyleSheet.create({
   pillsBleed: { marginHorizontal: -10 },
   pills: { gap: 6, paddingHorizontal: 14, paddingBottom: 8 },
   pill: { height: 32, borderRadius: 999 },
+  // As the pills: to the screen edges, so on a narrow phone the last buttons scroll in instead of being cut.
+  formatBleed: { marginHorizontal: -10 },
+  formatRow: { paddingHorizontal: 10, paddingBottom: 8 },
+  format: { flexDirection: "row", height: 44, padding: 4, gap: 2, borderRadius: 22 },
+  formatButton: { width: SEND, height: SEND, borderRadius: SEND / 2 },
   pillIn: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12 },
   row: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
   plus: { width: FIELD, height: FIELD, borderRadius: FIELD / 2 },

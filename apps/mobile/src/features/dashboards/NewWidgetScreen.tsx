@@ -6,12 +6,15 @@ import {
   useTestWidget,
   useWidgetDraft,
   useWidgetSuggestions,
+  WIDGET_STILL_MS,
   type Widget,
   type WidgetFormat,
   type WidgetSchedule,
   type WidgetSuggestion,
+  widgetStepWords,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
+import { taskClock } from "@agenteschat/client/lib/task-manager";
 import {
   sizeToLayout,
   WIDGET_FORMATS,
@@ -23,6 +26,7 @@ import {
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Button,
@@ -31,6 +35,7 @@ import {
   GroupedList,
   GroupedRow,
   Icon,
+  LIST_TIME,
   LineIcon,
   Locked,
   PressScale,
@@ -43,7 +48,7 @@ import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
 import { AgentFace } from "../shared/Face";
-import { useDirectory, useOrgId } from "../shared/hooks";
+import { useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic, tapHaptic } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { closeAgentPick, openAgentPick } from "./agent-pick";
@@ -73,7 +78,8 @@ const CONDITION_MAX = 200;
  * agent's suggestions under it while it is empty; the card's header holds its title, a bell that turns the alert on
  * (and its condition, in the card) and the size; its footer says who looks after it (a pushed screen to change) and
  * how often it updates (a pick menu). "Test" in the bar has the agent build a draft with real data in place; then the
- * ask folds into one line that opens it again, and "Create" confirms the draft. Changing the ask, the agent or the
+ * ask folds into one line that opens it again, and "Create" confirms the draft. While it builds the card says the step
+ * its agent is in and for how long, and Stop ends the build with the ask as it was typed. Changing the ask, the agent or the
  * format after a test marks it stale (Test again); a failed test says why, with Try again. Where it goes sits under the
  * card. Testing again or leaving deletes the draft. `dashboardId`: the board it starts on (`home` for My Home).
  */
@@ -117,6 +123,9 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   const [title, setTitle] = useState<string | null>(null);
   // The ask opened again after a test (its folded line tapped).
   const [editing, setEditing] = useState(false);
+  // A test being sent, and when the build under way started.
+  const [sending, setSending] = useState(false);
+  const [since, setSince] = useState(0);
   // The first agent until the person picks one.
   useEffect(() => {
     const first = agents[0];
@@ -128,7 +137,8 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   useLayoutEffect(() => {
     removeDraft.current = remove.mutate;
   });
-  const live = useRef({ draftId: null as string | null, confirmed: false, gone: false });
+  // `run`: which test the screen waits for (one stopped before its draft came back is dropped when it does).
+  const live = useRef({ draftId: null as string | null, confirmed: false, gone: false, run: 0 });
   useEffect(() => {
     live.current.gone = false;
     return () => {
@@ -155,7 +165,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   // A draft that is gone (swept, or removed elsewhere) is no test any more.
   const draft: Widget | null = tested && !draftQ.isError ? (draftQ.data ?? tested.widget) : null;
   const currentKey = testKeyOf(text, agentId, format);
-  const phase = testPhase({ pending: test.isPending, draft, testedKey: tested?.key ?? null, currentKey });
+  const phase = testPhase({ pending: sending, draft, testedKey: tested?.key ?? null, currentKey });
   const barLabel = newWidgetBarLabel(phase);
   const asking = asksInCard(phase, editing);
   // Once tested, the size follows what the agent built (unless one was picked).
@@ -163,7 +173,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   const sized = sizeFor(kind, size);
   const layout = sizeToLayout(sized);
   const asked = Boolean(text.trim() && agentId && target);
-  const busy = test.isPending || confirm.isPending;
+  const busy = sending || confirm.isPending;
   const ready = asked && !busy && phase !== "testing";
 
   const pickAgent = (id: string) => {
@@ -200,6 +210,10 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     setTested(null);
     setEditing(false);
     const key = currentKey;
+    live.current.run += 1;
+    const mine = live.current.run;
+    setSending(true);
+    setSince(Date.now());
     test
       .mutateAsync({
         dashboardId: target,
@@ -211,17 +225,30 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         size: sized,
       })
       .then((widget) => {
-        // Left while it was starting: nobody will confirm it.
-        if (live.current.gone) {
+        // Left or stopped while it was starting: nobody will confirm it.
+        if (live.current.gone || live.current.run !== mine) {
           removeDraft.current(widget.id);
           return;
         }
         live.current.draftId = widget.id;
         setTested({ widget, key });
+        setSending(false);
       })
       .catch((error: unknown) => {
-        if (!live.current.gone) failed(error);
+        if (live.current.gone || live.current.run !== mine) return;
+        setSending(false);
+        failed(error);
       });
+  };
+
+  /** Stop: the build ends (its draft goes, and its run with it) and the ask is back as it was typed. */
+  const stop = () => {
+    live.current.run += 1;
+    const building = live.current.draftId;
+    live.current.draftId = null;
+    if (building) removeDraft.current(building);
+    setSending(false);
+    setTested(null);
   };
 
   /** Create: the tested draft goes on the board with the size, schedule, alert and title picked now. */
@@ -460,7 +487,10 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     );
   } else if (phase === "testing") {
     body = (
-      <BuildingSweep color={look.color} text={t("dashboards.newWidget.testing", { name: look.name })} height={44} />
+      <View style={styles.gap10}>
+        <BuildingSweep color={look.color} text={widgetStepWords(t, draftQ.data?.step)} height={44} />
+        <BuildClock since={since} onStop={stop} />
+      </View>
     );
   } else if (phase === "failed" && draft) {
     body = (
@@ -620,6 +650,32 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   );
 }
 
+/**
+ * Under a build: how long it has taken, Stop at the row's end, and past a while one quiet line that it is still at
+ * it. Its own component, so only it redraws each second.
+ */
+function BuildClock({ since, onStop }: { since: number; onStop: () => void }) {
+  const { t } = useTranslation();
+  const elapsed = Math.max(0, useNow(1000) - since);
+  return (
+    <View style={styles.gap8}>
+      {elapsed >= WIDGET_STILL_MS ? (
+        <Animated.View entering={FadeIn.duration(200)}>
+          <Text variant="caption" tone="faint">
+            {t("dashboards.newWidget.stillWorking")}
+          </Text>
+        </Animated.View>
+      ) : null}
+      <View style={styles.buildFoot}>
+        <Text variant="footnote" tone="muted" accessibilityRole="timer" style={LIST_TIME}>
+          {taskClock(elapsed)}
+        </Text>
+        <Button size="sm" variant="secondary" label={t("dashboards.newWidget.stop")} onPress={onStop} />
+      </View>
+    </View>
+  );
+}
+
 /** The footer's two picks: 44 tall to the finger, across only as far as the dot between them. */
 const FOOT_SLOP = { top: 9, bottom: 9, left: 4, right: 4 };
 /** The size switch: its corner, and its segments' inside it (concentric, 2 in from its edge). */
@@ -680,6 +736,7 @@ const styles = StyleSheet.create({
   },
   conditionInput: { flex: 1, minWidth: 0, paddingVertical: 8, ...fieldText("footnote") },
   foot: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  buildFoot: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 },
   footPick: { flexDirection: "row", alignItems: "center", gap: 4, paddingVertical: 4 },
   caption: { textAlign: "center", paddingTop: 8 },
   semibold: { fontWeight: "600", flexShrink: 1 },

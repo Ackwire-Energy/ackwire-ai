@@ -27,7 +27,8 @@ test("a square never keeps a column beside three lines: its line under it at the
   const phone = atRule(layout, "@media (max-width: 640px)");
   expect(last(phone, ".agp-person:has(> .agp-person__t > span)", "display")).toBe("grid");
   expect(last(phone, ".agp-person > .agp-person__t > span", "grid-column")).toBe("1 / -1");
-  // A settings line that opens something, with a status: the chevron on the name's line, the status under them.
+  // A settings line that opens something, with a status: the chevron on the name's line, the status under them at the
+  // row's width, a step from the icon.
   const rows = atRule(layout, "@media (max-width: 760px)");
   const open = ".settings-row--lead.settings-row--open:has(> .settings-row__text > .settings-row__status)";
   expect(last(rows, open, "display")).toBe("grid");
@@ -35,4 +36,5 @@ test("a square never keeps a column beside three lines: its line under it at the
   expect(
     last(rows, ".settings-row--lead.settings-row--open > .settings-row__text > .settings-row__status", "grid-column"),
   ).toBe("1 / -1");
+  expect(last(rows, open, "gap")).toBe("var(--space-2) var(--space-3)");
 });

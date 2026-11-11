@@ -1017,7 +1017,6 @@
     "proposalsWaiting_other": "{{count}}개 대기 중",
     "drive": "Drive",
     "connectors": "커넥터와 MCP",
-    "usage": "사용량",
     "preferences": "환경설정",
     "editProfile": "프로필 편집",
     "switchWorkspace": "워크스페이스 전환",
@@ -2117,16 +2116,13 @@
     "editSub": "이름, 로고, 시간대, 에이전트가 아는 내용",
     "group": {
       "org": "워크스페이스",
-      "people": "사람",
-      "agents": "에이전트",
-      "costs": "비용과 데이터"
+      "people": "사람"
     },
     "section": {
       "members": "멤버",
       "roles": "역할",
       "access": "에이전트 접근 권한",
-      "connectors": "커넥터",
-      "usage": "사용량과 예산"
+      "connectors": "커넥터"
     },
     "ofOnline": "{{count}}대 중 {{online}}대",
     "deleteName": "{{name}} 삭제",
@@ -2210,7 +2206,7 @@
       "guide": "{{name}} 안내서 열기",
       "fields": "입력 정보",
       "private": "이 정보는 암호화되어 보관되고 다시는 표시되지 않아요.",
-      "teamHelp": "항목은 처음에 워크스페이스의 모든 사람에게 보이고, 어떤 에이전트도 쓰지 않아요. 에이전트는 다음에 골라요.",
+      "teamHelp": "워크스페이스의 모든 사람이 항목을 보고, 모든 에이전트가 쓸 수 있어요. 다음에 조정할 수 있어요.",
       "personalHelp": "항목은 나만 볼 수 있고, 내가 부탁할 때 에이전트가 사용해요.",
       "checking": "{{name}}에서 확인하는 중…",
       "connected": "{{name}} 연결됨",

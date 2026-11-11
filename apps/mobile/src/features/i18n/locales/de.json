@@ -1090,7 +1090,6 @@
     "proposalsWaiting_other": "{{count}} warten",
     "drive": "Drive",
     "connectors": "Konnektoren und MCP",
-    "usage": "Nutzung",
     "preferences": "Einstellungen",
     "editProfile": "Profil bearbeiten",
     "switchWorkspace": "Workspace wechseln",
@@ -2220,16 +2219,13 @@
     "editSub": "Name, Logo, Zeitzone und was die Agenten wissen",
     "group": {
       "org": "Workspace",
-      "people": "Personen",
-      "agents": "Agenten",
-      "costs": "Kosten und Daten"
+      "people": "Personen"
     },
     "section": {
       "members": "Mitglieder",
       "roles": "Rollen",
       "access": "Zugriff der Agenten",
-      "connectors": "Konnektoren",
-      "usage": "Nutzung und Budget"
+      "connectors": "Konnektoren"
     },
     "ofOnline": "{{online}} von {{count}}",
     "deleteName": "{{name}} löschen",
@@ -2313,7 +2309,7 @@
       "guide": "Anleitung von {{name}} öffnen",
       "fields": "Angaben",
       "private": "Diese Angaben werden verschlüsselt aufbewahrt und nie wieder angezeigt.",
-      "teamHelp": "Seine Einträge sind zuerst für alle im Workspace sichtbar und von keinem Agenten genutzt. Die Agenten wählst du danach.",
+      "teamHelp": "Alle im Workspace sehen seine Einträge und jeder Agent kann sie verwenden. Du kannst das danach anpassen.",
       "personalHelp": "Nur du siehst seine Einträge, und deine Agenten verwenden sie, wenn du sie darum bittest.",
       "checking": "Wird mit {{name}} geprüft…",
       "connected": "{{name}} verbunden",

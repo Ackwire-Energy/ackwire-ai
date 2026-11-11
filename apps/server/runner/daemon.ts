@@ -567,7 +567,7 @@ export class RunnerDaemon implements RequestObserver {
   private startContainers(u: AgentUser) {
     if (this.opts.workers || !rootlessContainers()) return;
     const problem = keepContainers(u, this.containersAllowed(u.id));
-    if (problem) this.opts.log(`[${u.user}] its containers service didn't start: ${problem}`);
+    if (problem) this.opts.log(`[${u.user}] containers unavailable: ${problem}`);
   }
 
   /** The agents frame lets it have a containers service (`MachineAgent.containers`). */
@@ -1979,7 +1979,7 @@ export class RunnerDaemon implements RequestObserver {
             try {
               const u = agentUser(a);
               const problem = keepContainers(u, true);
-              if (problem) this.opts.log(`[${u.user}] its containers service didn't start: ${problem}`);
+              if (problem) this.opts.log(`[${u.user}] containers unavailable: ${problem}`);
             } catch (err) {
               // Its network is switching, say: its worker's next start brings the service.
               this.opts.log(`${a.handle}: its containers service waits (${err instanceof Error ? err.message : err})`);

@@ -20,7 +20,23 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Pour qui",
         blocks: [
-          "Conçu pour vous ou une petite équipe, tant que cet ordinateur est allumé. Pour une équipe plus grande, ou un serveur toujours allumé, [installez agentes.chat sur un serveur](/help/install-on-a-server) et choisissez **Se connecter à mon serveur** dans l’app. Vos données pourront y être transférées plus tard.",
+          "Vous ou une petite équipe. Un Mac mini, un PC inutilisé ou un portable qui reste allumé fait très bien l’affaire\u00a0: préparez-le comme dans [Le garder allumé](#keep-on). Sur un Mac ou un PC, l’app permet de faire tourner agentes.chat sans Docker.",
+          "Pour une équipe plus grande, voir [Quelle installation choisir](/help/install-on-a-server#choose). Vos données pourront passer sur un serveur plus tard.",
+        ],
+      },
+      {
+        id: "keep-on",
+        heading: "Le garder allumé",
+        blocks: [
+          "Sur un ordinateur que d’autres utilisent, préparez-le une fois\u00a0:",
+          {
+            list: [
+              "**Ouvrir à la connexion** s’active tout seul après la configuration.",
+              "Sur un Mac, choisissez votre compte dans **Connexion automatique en tant que**, dans **Réglages Système\u00a0›\u00a0Utilisateurs et groupes**, pour que l’app s’ouvre après un redémarrage. FileVault désactive la connexion automatique.",
+              "Sur un Mac, activez **Démarrer automatiquement après une panne de courant** dans **Réglages Système\u00a0›\u00a0Énergie**.",
+              "Un Mac reste éveillé tant que le serveur tourne et que **Y accéder depuis votre téléphone et vos collègues** est activé. Sous Windows et Linux, désactivez la veille dans les réglages d’alimentation du système.",
+            ],
+          },
         ],
       },
       {
@@ -28,6 +44,15 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Vos agents travaillent ici aussi",
         blocks: [
           "Vos agents travaillent aussi sur cet ordinateur, dans des dossiers rien qu’à eux, avec un navigateur, et avec Claude Code ou Codex s’ils sont installés ici. Les commandes restent désactivées tant que vous ne les activez pas dans **Préférences › Outils**.",
+          "Ici, les agents tournent sous votre compte. Avec les commandes activées, ils peuvent atteindre le reste de cet ordinateur, `.agentes` compris\u00a0: la base de données, le `.env` avec `AGENTES_SECRET`, la clé du propriétaire et le jeton de cet ordinateur. C’est vrai pour chaque espace de travail qui utilise cet ordinateur, y compris un espace sur agentes.chat Cloud. Voir [Ce que les agents peuvent atteindre](/help/computers#reach).",
+        ],
+      },
+      {
+        id: "another-workspace",
+        heading: "Le prêter aussi à un autre espace de travail",
+        blocks: [
+          "Les espaces de travail du serveur que vous faites tourner ici utilisent déjà cet ordinateur, sans rien à faire. Pour qu’un espace de travail d’ailleurs l’utilise aussi, par exemple sur agentes.chat Cloud, ouvrez **Préférences\u00a0›\u00a0Serveurs**, cliquez sur **Ajouter un serveur…**, connectez-vous à cet espace de travail et cliquez sur **Autoriser** quand l’app le demande.",
+          "Chaque espace de travail a ici ses propres agents et dossiers. **Commandes**, dans **Préférences\u00a0›\u00a0Outils**, vaut pour tous les espaces de travail de cet ordinateur à la fois\u00a0: ne l’activez que si vous confiez tout cet ordinateur aux agents de chaque espace de travail.",
         ],
       },
       {
@@ -35,55 +60,57 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Depuis votre téléphone et votre équipe",
         blocks: [
           "**Y accéder depuis votre téléphone et vos collègues** place agentes.chat sur Tailscale, un réseau privé pour vos appareils : votre téléphone et les personnes que vous invitez le rejoignent, et personne d’autre ne peut atteindre agentes.chat. Tailscale est gratuit : https://tailscale.com/download. Quand cette option est désactivée, agentes.chat ne fonctionne que sur cet ordinateur.",
+          "Si cet ordinateur partage déjà autre chose sur le port 443 de Tailscale, agentes.chat prend le 8443, et son adresse se termine par `:8443`.",
+        ],
+      },
+      {
+        id: "password",
+        heading: "Se connecter depuis d’autres appareils",
+        blocks: [
+          "Le propriétaire commence sans mot de passe\u00a0: l’app vous connecte sur cet ordinateur. Pour vous connecter depuis un navigateur sur un autre ordinateur, ajoutez-en un dans **Paramètres\u00a0›\u00a0Votre compte**. L’app mobile se connecte en scannant le QR code sous **Sur votre téléphone**, dans **Préférences\u00a0›\u00a0Serveurs**. Il faut pour cela que **Y accéder depuis votre téléphone et vos collègues** soit activé.",
+        ],
+      },
+      {
+        id: "updates",
+        heading: "Mises à jour",
+        blocks: [
+          "L’app cherche les mises à jour toute seule, et en installe une quand vous cliquez sur **Mettre à jour et rouvrir** dans **Préférences\u00a0›\u00a0Mises à jour**. Le serveur et tous les agents redémarrent avec elle. La base de données est d’abord copiée, et si la nouvelle version ne répond pas dans les 3 minutes, l’app revient toute seule à la version précédente et à ses données.",
         ],
       },
       {
         id: "backups",
-        heading: "Sauvegardes et déménagement",
+        heading: "Sauvegardes",
         blocks: [
-          "**Sauvegarder maintenant**, dans **Préférences › Serveurs**, enregistre la base de données, les fichiers et les réglages dans `.agentes/backups`, dans votre dossier personnel.",
-        ],
-      },
-    ],
-  },
-  computers: {
-    title: "Des ordinateurs pour vos agents",
-    summary:
-      "Les agents exécutent du code et travaillent sur des fichiers sur les ordinateurs que vous connectez : un Mac ou un PC avec l’app agentes.chat, ou un serveur.",
-    sections: [
-      {
-        id: "mac",
-        heading: "Un Mac ou un PC, avec l’app",
-        blocks: [
-          "L’app agentes.chat ouvre votre serveur dans sa propre fenêtre et, en un clic, ses agents travaillent sur cet ordinateur, dans des dossiers rien qu’à eux. Installez l’app, ouvrez-la, choisissez **Utiliser votre propre serveur › Se connecter à mon serveur** et saisissez l’adresse de votre serveur. Ensuite, une fois connecté, cliquez sur **Utiliser ce Mac** (**Utiliser ce PC** sous Windows, **Utiliser ce poste** sous Linux) dans **Paramètres › Ordinateurs**.",
+          "Rien ne se sauvegarde encore tout seul. **Sauvegarder maintenant**, dans **Préférences\u00a0›\u00a0Serveurs**, arrête le serveur un instant et enregistre la base de données, les fichiers et le `.env` dans `.agentes/backups`, dans votre dossier personnel. Les deux plus récentes sont gardées.",
+          "De temps en temps, copiez-les hors de cet ordinateur, sur un disque ou un stockage en ligne. Elles contiennent vos clés\u00a0: gardez-les privées.",
         ],
       },
       {
-        id: "server",
-        heading: "Un serveur ou un ordinateur sous Linux",
+        id: "ai-programs",
+        heading: "Claude Code et Codex",
         blocks: [
-          "Dans **Paramètres › Ordinateurs**, copiez la commande sous **Autres méthodes** et exécutez-la dans le terminal de cet ordinateur. Elle affiche un code et un lien : ouvrez le lien, vérifiez que le code correspond et confirmez avec votre compte. Rien à installer au préalable.",
+          "L’app trouve Claude Code et Codex grâce au `PATH` de votre shell de connexion, plus les dossiers habituels comme `~/.local/bin`, `/opt/homebrew/bin` et `/usr/local/bin`. Si **Préférences\u00a0›\u00a0Outils** indique **Introuvable**, vérifiez que `claude` ou `codex` se lance dans une nouvelle fenêtre du Terminal, puis quittez et rouvrez l’app.",
         ],
       },
       {
-        id: "folders",
-        heading: "Dossiers",
+        id: "moving",
+        heading: "Passer sur un serveur",
         blocks: [
-          "Chaque agent a toujours son propre dossier, dans `~/agentes/<workspace>`. D’autres dossiers peuvent être autorisés sur l’ordinateur lui-même, jamais depuis le site : dans l’app, via **Préférences › Dossiers**, ou avec `agentes-runner folders allow` sur un serveur. Chaque espace de travail autorise ses propres dossiers : ce que vous autorisez pour l’un ne vaut que pour ses agents. Retirer un dossier ne supprime rien. Cela retire seulement l’accès.",
-        ],
-      },
-      {
-        id: "pausing",
-        heading: "Mettre en pause",
-        blocks: [
-          "Avec l’app, la personne qui a connecté un ordinateur peut y mettre ses agents en pause, depuis l’icône agentes.chat près de l’horloge. Rien de nouveau ne démarre tant qu’elle ne reprend pas. Ce qui était en cours se termine.",
-        ],
-      },
-      {
-        id: "organizations",
-        heading: "Plusieurs espaces de travail",
-        blocks: [
-          "Un même ordinateur peut travailler pour plusieurs espaces de travail. Chacun y a ses propres agents, dossiers et tâches, et en déconnecter un ne touche pas aux autres.",
+          {
+            list: [
+              "Quittez l’app, puis exportez la base de données avec la copie du serveur fournie dans l’app. Sur un Mac\u00a0:",
+            ],
+          },
+          {
+            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+          },
+          {
+            list: [
+              "[Installez agentes.chat sur un serveur](/help/install-on-a-server), mais ne le démarrez pas encore. Dans son `.env`, mettez le `AGENTES_SECRET` de `~/.agentes/.env`, puis démarrez seulement la base de données\u00a0: `docker compose up -d postgres`.",
+              "Chargez l’export\u00a0: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
+              "Démarrez-le avec `docker compose up -d`, copiez `~/.agentes/files` dedans comme le montre le guide complet, et connectez-vous comme avant.",
+            ],
+          },
         ],
       },
     ],
@@ -100,6 +127,13 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "own",
+        heading: "Vos propres ordinateurs et téléphones",
+        blocks: [
+          "Les agents peuvent aussi travailler sur les ordinateurs et téléphones que vous connectez\u00a0: un Mac ou un PC avec l’app agentes.chat, un serveur, un téléphone Android ou un iPhone. Voir [Les ordinateurs et téléphones que vous connectez](/help/computers).",
+        ],
+      },
+      {
         id: "plans",
         heading: "Vos abonnements IA",
         blocks: [
@@ -110,12 +144,104 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "size",
         heading: "Sa taille",
-        blocks: ["Ses processeurs, sa mémoire et son disque sont indiqués dans **Paramètres › Ordinateurs**."],
+        blocks: ["Ses processeurs, sa mémoire et son disque sont indiqués dans **Paramètres\u00a0›\u00a0Appareils**."],
       },
       {
         id: "trouble",
         heading: "S’il ne répond plus",
         blocks: ["Il revient en général en quelques minutes, et nous nous en occupons : vous n’avez rien à faire."],
+      },
+    ],
+  },
+  computers: {
+    title: "Vos ordinateurs et téléphones",
+    summary:
+      "Apportez un Mac, un PC, un ordinateur sous Linux, un serveur ou un téléphone, et vos agents travaillent dessus. Sur agentes.chat Cloud comme sur votre propre serveur.",
+    sections: [
+      {
+        id: "app",
+        heading: "Depuis l’app agentes.chat",
+        blocks: [
+          "Installez l’app sur l’ordinateur, ouvrez-la et connectez-vous à votre espace de travail. Elle demande **Laisser les agents de <workspace> utiliser ce Mac\u00a0?** (ce PC sous Windows, cet ordinateur sous Linux). Choisissez qui peut l’utiliser et cliquez sur **Autoriser**. C’est tout.",
+          "Déjà connecté\u00a0? Activez l’espace de travail dans **Préférences\u00a0›\u00a0Général**, dans la carte **Agents**.",
+        ],
+      },
+      {
+        id: "web",
+        heading: "Depuis le site",
+        blocks: [
+          "Dans **Paramètres\u00a0›\u00a0Appareils**, cliquez sur **Connecter un appareil**\u00a0:",
+          {
+            list: [
+              "**Ce Mac** ou **Ce PC**\u00a0: ouvre l’app, qui vous demande d’abord.",
+              "**Un autre ordinateur**\u00a0: installez-y l’app, connectez-vous avec votre compte et cliquez sur **Autoriser**. Il apparaît ici tout seul.",
+              "**Un serveur ou un VPS**\u00a0: lancez une ligne dans son terminal, puis laissez-le rejoindre. La ligne marche une fois, pendant 10 minutes.",
+            ],
+          },
+          "L’app ne se connecte en un clic qu’à une adresse en https, comme une adresse Tailscale qui se termine par `.ts.net`. Sur une simple adresse http, utilisez la ligne de terminal.",
+        ],
+      },
+      {
+        id: "phones",
+        heading: "Téléphones",
+        blocks: [
+          "Un téléphone Android se connecte via n’importe quel ordinateur déjà connecté\u00a0: par câble, ou en Wi-Fi à partir d’Android 14 avec la mise à jour de sécurité de mai 2026. Un iPhone se connecte via un Mac qui a l’app et Xcode, et l’app prépare le reste. Les deux commencent par **Connecter un appareil**.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Qui peut l’utiliser",
+        blocks: [
+          "Un nouvel appareil est pour vous seul\u00a0: **Moi seulement** veut dire vous et les agents qui travaillent pour vous. Ouvrez-le à tout l’espace de travail, ou à certaines personnes et certains rôles, au moment de l’autoriser ou plus tard sur sa page dans **Paramètres\u00a0›\u00a0Appareils**.",
+        ],
+      },
+      {
+        id: "open",
+        heading: "Tant que l’app est ouverte",
+        blocks: [
+          "Les agents travaillent sur un ordinateur seulement tant que l’app y tourne et que l’ordinateur est éveillé. Quand l’app le demande, laissez coché **Le garder prêt\u00a0: ouvrir agentes.chat à la connexion**. Un ordinateur éteint ou en veille apparaît **Hors ligne**, et les agents attendent son retour.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Mettre en pause et déconnecter",
+        blocks: [
+          "Sur l’ordinateur, l’icône agentes.chat près de l’horloge met en pause les agents de tous les espaces de travail. Dans **Préférences\u00a0›\u00a0Général**, l’interrupteur de chaque espace de travail ne met en pause que celui-ci, et **Quitter** le déconnecte. Rien de nouveau ne démarre pendant la pause, et ce qui était en cours se termine. Déconnecter garde les dossiers des agents sur le disque.",
+          "Depuis le site, **Retirer** sur la page de l’appareil le déconnecte.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Plusieurs espaces de travail, un seul ordinateur",
+        blocks: [
+          "Connectez-vous à chaque espace de travail dans la même app et cliquez sur **Autoriser** pour chacun. Des espaces de travail sur agentes.chat Cloud et sur vos propres serveurs peuvent partager un ordinateur (app 0.6.1 et plus récente). Chacun y a ses propres agents et dossiers, et en déconnecter un ne touche pas aux autres.",
+          "Un serveur que l’app fait tourner sur cet ordinateur est déjà connecté et n’a besoin de rien. Pour prêter aussi cet ordinateur à un espace de travail d’ailleurs, voir [Le prêter aussi à un autre espace de travail](/help/run-on-your-computer#another-workspace).",
+          "Vous utilisez l’app sur un portable seulement comme fenêtre sur votre espace de travail\u00a0? Quand elle propose de laisser les agents utiliser le portable, **Plus tard** le garde comme simple fenêtre.",
+        ],
+      },
+      {
+        id: "folders",
+        heading: "Dossiers",
+        blocks: [
+          "Chaque agent a toujours son propre dossier, dans `~/agentes/<workspace>`. D’autres dossiers peuvent être autorisés sur l’ordinateur lui-même, jamais depuis le site : dans l’app, via **Préférences › Dossiers**, ou avec `agentes-runner folders allow` sur un serveur. Chaque espace de travail autorise ses propres dossiers : ce que vous autorisez pour l’un ne vaut que pour ses agents. Retirer un dossier ne supprime rien. Cela retire seulement l’accès.",
+        ],
+      },
+      {
+        id: "reach",
+        heading: "Ce que les agents peuvent atteindre",
+        blocks: [
+          "Les agents tournent sous votre compte, celui de l’utilisateur de l’ordinateur. Leurs outils de fichiers restent dans leurs dossiers, mais une commande peut lire tout ce que vous pouvez lire\u00a0:",
+          {
+            list: [
+              "vos fichiers et vos connexions",
+              "les dossiers des autres agents, y compris ceux des autres espaces de travail, et les connexions que gardent leurs navigateurs",
+              "le jeton qui connecte cet ordinateur",
+              "sur un ordinateur qui fait aussi tourner agentes.chat, sa base de données et ses clés dans `.agentes`",
+            ],
+          },
+          "agentes.chat refuse les commandes qui citent ses clés, ses jetons et les connexions enregistrées, mais c’est une règle, pas un mur. C’est pourquoi les **Commandes** sont désactivées au départ. Les activer dans **Préférences\u00a0›\u00a0Outils** vaut pour tous les espaces de travail de l’ordinateur à la fois\u00a0: faites-le seulement si vous confieriez tout ce qu’il contient aux agents de chaque espace de travail et aux personnes pour qui ils travaillent. Claude Code et Codex lancent leurs propres commandes dans le dossier de l’agent, selon leurs propres règles.",
+          "Pour un vrai mur, utilisez un serveur Linux. Sous Debian 13, installé avec `--system`, chaque agent est un utilisateur à part. Sous Ubuntu, les agents partagent un utilisateur, `agentes`\u00a0: ils voient les dossiers les uns des autres, pas les vôtres ni ceux du serveur. Ou donnez aux agents un ordinateur rien qu’à eux.",
+        ],
       },
     ],
   },
@@ -378,7 +504,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
               "Ouvrez https://console.typesafe.ai et connectez-vous avec Google ou votre e-mail. Un nouveau compte se crée de la même façon.",
               "Ajoutez du crédit dans la console. Jev est prépayé.",
               "Ouvrez https://console.typesafe.ai/keys, créez une clé et copiez-la tout de suite.",
-              "Dans agentes.chat, ouvrez **Paramètres › Comptes IA** et collez-la sous **Jev**. Seule la personne qui a installé ce serveur la voit.",
+              "Dans agentes.chat, ouvrez **Paramètres › IA et utilisation** et collez-la sous **Jev**. Seule la personne qui a installé ce serveur la voit.",
             ],
           },
           "Sur un serveur que vous faites tourner avec Docker, vous pouvez plutôt mettre la clé dans `.env` en tant que `TYPESAFE_API_KEY`. Celle-ci l’emporte sur celle des Paramètres.",
@@ -392,7 +518,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
             list: [
               "0,042 USD par million de jetons lus par Jev. Ses réponses sont gratuites. Choisir qui répond lit environ 2 500 jetons, soit environ 0,0001 USD. Une capture d’écran fait environ 3 900 jetons.",
               "Les crédits achetés durent 12 mois. Activez la recharge automatique dans la console pour que Jev ne tombe pas à court.",
-              "**Paramètres › Comptes IA** indique combien de décisions Jev a prises ce mois-ci, et ce qu’elles ont coûté.",
+              "**Paramètres › IA et utilisation** indique combien de décisions Jev a prises ce mois-ci, et ce qu’elles ont coûté.",
             ],
           },
         ],
@@ -423,7 +549,7 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Clé refusée :** créez une nouvelle clé et collez-la dans **Paramètres › Comptes IA**.",
+              "**Clé refusée :** créez une nouvelle clé et collez-la dans **Paramètres › IA et utilisation**.",
               "**Plus de crédit :** ajoutez du crédit dans la console. Jev réessaie dans les 30 minutes, ou cliquez sur **Vérifier à nouveau**.",
               "**Occupé ou injoignable :** TypeSafe peut limiter les requêtes par seconde, ou cesser de répondre un moment. Jev reprend tout seul. Vos limites : https://console.typesafe.ai/rate-limits. Pour des limites plus élevées, écrivez à sales@typesafe.ai.",
             ],
@@ -537,12 +663,26 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
       "Faites tourner agentes.chat sur votre propre serveur, gratuitement, pour toute votre équipe. Une commande suffit.",
     sections: [
       {
+        id: "choose",
+        heading: "Quelle installation choisir",
+        blocks: [
+          {
+            list: [
+              "**agentes.chat Cloud**\u00a0: pour toute équipe, accessible de partout. Nous le faisons tourner, le mettons à jour et le sauvegardons. Chaque espace de travail a son propre ordinateur, où chaque agent est un utilisateur à part.",
+              "**Votre ordinateur, avec l’app**\u00a0: pour vous ou une petite équipe, accessible tant que cet ordinateur est allumé. Un Mac mini qui reste allumé fait très bien l’affaire. Vous le mettez à jour en un clic et le sauvegardez à la main. Les agents tournent sous votre compte sur cet ordinateur.",
+              "**Un serveur**\u00a0: pour une équipe plus grande, en ligne en permanence. Vous le mettez à jour en trois commandes, et il peut se sauvegarder tout seul chaque jour. Sous Debian 13, chaque agent est un utilisateur à part.",
+            ],
+          },
+          "De votre ordinateur vers un serveur\u00a0: [Passer sur un serveur](/help/run-on-your-computer#moving). Chacune peut récupérer les agents d’une autre avec [Importer vos agents](/help/import).",
+        ],
+      },
+      {
         id: "need",
         heading: "Ce qu'il vous faut",
         blocks: [
           {
             list: [
-              "Un serveur ou un VPS sous Linux 64 bits, en x64 ou arm64. Pour une petite équipe, 2 CPU, 4 Go de mémoire et 20 Go de disque sont un bon début. Pour essayer, un Mac avec Docker Desktop, OrbStack ou Colima convient aussi.",
+              "Un serveur ou un VPS sous Linux 64 bits, en x64 ou arm64. Pour une petite équipe, 2 CPU, 4 Go de mémoire et 20 Go de disque sont un bon début. Sur un Mac ou un PC, [l’app fait tourner agentes.chat](/help/run-on-your-computer) sans Docker.",
               "Docker avec Compose. Sous Linux, l'installateur les ajoute s'ils manquent, après vous avoir demandé.",
               "Un moyen d'y accéder\u00a0: un compte Tailscale gratuit (le choix par défaut, privé, sans domaine ni port ouvert), ou un domaine qui pointe vers le serveur, avec les ports 80 et 443 ouverts.",
             ],
@@ -616,11 +756,11 @@ export const helpFr: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "computers",
         heading: "Les ordinateurs de vos agents",
         blocks: [
-          "La configuration peut faire de ce serveur l'ordinateur de vos agents, où ils lancent des commandes, utilisent un navigateur et gardent leurs fichiers. Elle vous demande, et propose oui là où le serveur s'y prête bien. Sous Linux, chaque agent a son propre utilisateur, avec un écran. Si vous avez dit non, relancez l'installation avec `--computer yes`\u00a0:",
+          "La configuration peut faire de ce serveur l'ordinateur de vos agents, où ils lancent des commandes, utilisent un navigateur et gardent leurs fichiers. Elle vous demande, et propose oui là où le serveur s'y prête bien. Sous Debian 13, chaque agent a son propre utilisateur, avec un écran. Sous Ubuntu, les agents partagent un utilisateur, `agentes`. Si vous avez dit non, relancez l'installation avec `--computer yes`\u00a0:",
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "D'autres ordinateurs, comme un Mac avec l'app agentes.chat ou un autre serveur, se connectent depuis **Paramètres\u00a0›\u00a0Ordinateurs**, comme dans [Des ordinateurs pour vos agents](/help/computers). Sur Tailscale, ils rejoignent d'abord votre tailnet.",
+          "D'autres ordinateurs, comme un Mac avec l'app agentes.chat ou un autre serveur, se connectent depuis **Paramètres\u00a0›\u00a0Appareils**, comme dans [Vos ordinateurs et téléphones](/help/computers). Sur Tailscale, ils rejoignent d'abord votre tailnet.",
         ],
       },
       {

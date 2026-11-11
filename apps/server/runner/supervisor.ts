@@ -1908,7 +1908,7 @@ export function launchWorker(
   return (user) => {
     ensureBrowserBindPolicy(user, runner, policy);
     const problem = rootlessContainers() ? keepContainers(user, containers(user.id)) : null;
-    if (problem) log?.(`[${user.user}] its containers service didn't start: ${problem}`);
+    if (problem) log?.(`[${user.user}] containers unavailable: ${problem}`);
     const home = workerHome(base, user);
     retireLegacyPending(base, home, user);
     const { argv, cwd, env } = workerCommand(user, runner, home);

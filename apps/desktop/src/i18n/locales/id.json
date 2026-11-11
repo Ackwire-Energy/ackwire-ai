@@ -324,7 +324,7 @@
     "usageRestart": "Mengubahnya akan memulai ulang agentes.chat sebentar.",
     "jev": "Jev",
     "jevText": "Model cepat buatan TypeSafe yang memilih siapa yang menjawab, merapikan memori, dan membuat agen bisa melihat layar. Opsional, dengan kuncimu sendiri.",
-    "jevWhere": "Di agentes.chat › Pengaturan › Akun AI.",
+    "jevWhere": "Di agentes.chat › Pengaturan › AI dan pemakaian.",
     "reachFailed": "Akses dari perangkatmu tidak aktif: {{reason}}.",
     "backup": "Cadangkan sekarang",
     "backedUp": "Dicadangkan: {{file}}",

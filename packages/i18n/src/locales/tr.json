@@ -1422,8 +1422,7 @@
     "noDate": "Tarih yok",
     "clearDate": "Tarihi kaldırın",
     "risky": "Merge, deploy ve diğer riskli işlemler",
-    "riskyOff": "Kapalı, bunlar yalnızca sizde kalır.",
-    "riskyOn": "Açık, bunlara da bu kişi karar verir.",
+    "riskyOn": "Bunlara da bu kişi karar verir.",
     "lock": "Her zaman sizde: para, kişiler ve roller, yapay zeka anahtarları, posta kutunuz ve silme.",
     "coveringTitle": "Yerine onayladığınız kişiler",
     "coveringSubtitle": "Bu kişilerden istenenler size de gelir ve onların adına karar verirsiniz. Kendi isteklerinize asla.",
@@ -1434,7 +1433,7 @@
     "failed": "Kaydedilemedi. Tekrar deneyin."
   },
   "rightHandApprovals": {
-    "title": "{{name}} sizin yerinize onaylar",
+    "title": "{{name}} sizin yerinize ajan oluşturur ve ayarlar",
     "subtitle": "Yalnızca sizin bir isteğinizden gelenler. Onaylamayacaklarını size iletir.",
     "newAgents": "Diğer ajanların önerdiği ajanları oluşturmak",
     "newAgentsHelp": "Uygulama yok, yalnızca açık kanallar. 24 saat boyunca geri alabilirsiniz.",
@@ -2242,10 +2241,10 @@
       "audienceHelp": "Bunun dışındaki kişi kenar çubuğunda {{name}} adını görmez.",
       "lock": "{{name}} arşivlenemez ve silinemez. Kimse onunla konuşmadan paylaştığı tek şey, yöneticilere giden Ekibin haftası.",
       "audit": "{{name}} neler yaptı, gör",
-      "change": "Değiştir",
       "planHelp": "Ücreti planın sahibi öder. Planın bilgisayarına ulaşılamadığında konuşma bunu söyler ve bir API anahtarı önerir.",
       "lookEdit": "{{name}} görünümünü değiştir",
-      "planOwner": "sahibi: {{owner}}",
+      "planOwner": "{{owner}} kişisinin hesabı",
+      "planName": "{{name}} planı",
       "mine": "Yapay zekân",
       "mineHelp": "{{name}} ile konuşman, kendi planınla ya da seninle paylaşılan bir planla düşünür, yalnızca seninki.",
       "connectMine": "Planımı bağla",
@@ -2263,15 +2262,13 @@
       "fallbackPlan": "Kendi planın yoksa herkese yanıt veren {{owner}} planını kullanır.",
       "fallbackYours": "Başka plan yoksa senin olan çalışma alanı planını kullanır.",
       "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
-      "workspace": "Çalışma alanı yapay zekâsı",
+      "workspace": "Kendi planı olmayanların yapay zekâsı",
       "workspaceHelp": "Kendi planı olmayanlar {{name}} ile bu yapay zekâ üzerinden konuşur.",
-      "workspacePlan": "Çalışma alanı planı",
-      "workspacePlanHelp": "Anahtarın yerine bir plan. Başkalarına yalnızca sahibi izin verirse yanıt verir.",
-      "noPlans": "Burada kullanmak için Yapay zeka hesapları bölümünden bir plan bağla.",
-      "pickPlan": "Plan seç",
-      "sharesOn": "Açık: kendi planı olmayanlar {{name}} ile bu plan üzerinden konuşur.",
-      "sharesOff": "Kapalı: bu plan üzerinden yalnızca {{owner}} konuşur. Kendi planı olmayanlar yanıt alamaz.",
-      "sharesOffYou": "Kapalı: bu plan üzerinden yalnızca sen konuşursun. Kendi planı olmayanlar yanıt alamaz."
+      "noPlans": "Burada kullanmak için Yapay zeka ve kullanım bölümünden bir plan bağla.",
+      "lend": "Bu planı, planı olmayanlara ödünç ver",
+      "groupMine": "Yalnızca sizin için",
+      "groupWorkspace": "Tüm çalışma alanı için",
+      "groupAdmins": "yalnızca yöneticiler"
     },
     "card": {
       "settings": "{{name}} · Ayarlar",
@@ -3783,6 +3780,8 @@
       "access": "Varsayılan erişim",
       "accessTitle": "{{label}} için varsayılan erişim",
       "accessText": "Birini değiştirmediğiniz sürece öğeler buna uyar. Her değişiklik hemen kaydedilir.",
+      "noAgents": "Bu bağlantıyı hiçbir ajan kullanmıyor.",
+      "giveAccess": "Erişim ver",
       "actionsName": "{{name}} için diğer seçenekler",
       "disconnect": "Bağlantıyı kes",
       "removeTitle": "{{name}} bağlantısı kesilsin mi?",
@@ -4690,6 +4689,7 @@
         "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir.",
         "addAccount": "Hesap ekle",
         "signInAgain": "Yeniden giriş yap",
+        "connectPlan": "Başka bir plan bağla",
         "fallbackTitle": "{{computer}} yanıt vermezse API üzerinden yanıtla",
         "fallbackHint": "API üzerinden yanıt verir ve {{name}} ajanının bütçesinden düşer. Aksi halde {{name}} isteyen kişiye haber verir ve bilgisayarın geri gelmesini bekler.",
         "effort": "Çaba",
@@ -8264,7 +8264,7 @@
       "homeHint": "Misyonun bir ileti dizisi olur: {{name}} orada konuşur, karar ister ve çalışmasını gösterir.",
       "homeHint_female": "Misyonun bir ileti dizisi olur: {{name}} orada konuşur, karar ister ve çalışmasını gösterir.",
       "offline": "{{name}} çevrimdışı. Geri gelince plan başlar.",
-      "needsMachine": "Misyonlar bağlı bir bilgisayarda çalışır. Ayarlar › Bilgisayarlar bölümünden {{name}} için bir bilgisayar bağlayın.",
+      "needsMachine": "Misyonlar bağlı bir bilgisayarda çalışır. Ayarlar › Cihazlar bölümünden {{name}} için bir bilgisayar bağlayın.",
       "commandHint": "Herhangi bir sohbetin mesaj kutusuna yazarak da başlatabilirsiniz:",
       "approvals": "Birleştirme, dağıtım ve geri alma her zaman onay ister",
       "start": "Misyonu başlat",
@@ -9297,7 +9297,6 @@
     "page": {
       "title": "Planlarınız",
       "hint": "Her plan bağlandığı bilgisayarda kalır ve o bilgisayarı kullanan kişi ona erişebilir. agentes.chat yalnızca adını, e-postasını ve kullanımını saklar.",
-      "empty": "Hesabınızla giriş yapın, ajanlar onunla düşünsün.",
       "emptyTitle": "Zaten ödediğiniz yapay zeka planını kullanın",
       "emptyViewer": "Çalışma alanının yapay zekasıyla ilgilenen kişi bir plan bağlar ve burada görünür.",
       "connect": "Yapay zeka bağla",
@@ -13186,8 +13185,6 @@
       "firstTime": "İlk seferde",
       "step1": "İndirilen dosyayı açın ve agentes.chat'i Uygulamalar klasörüne sürükleyin.",
       "step1Install": "Kurmak için indirilen dosyayı açın.",
-      "step2": "Uygulamayı açın, Kendi sunucunu kullan'a, ardından Sunucuma bağlan'a tıklayın ve bu sayfanın adresini yazın. Giriş yapın, sonra Ayarlar → Bilgisayarlar bölümünde Bu {{device}} cihazını kullan'a tıklayın.",
-      "other": "Diğer yollar: sunucu veya Linux",
       "otherText": "Bunu bilgisayarın terminalinde çalıştırın, sonra gösterdiği kodu onaylayın.",
       "waiting": "Bilgisayarın bağlanması bekleniyor…"
     },
@@ -13789,19 +13786,9 @@
       },
       "saved": "{{name}} artık {{computer}} kullanıyor."
     },
-    "lead": "Ajanlarınızın çalıştığı yer: bu sunucu ve bağladığınız bilgisayarlar.",
-    "leadCloud": "Ajanlarınızın çalıştığı yer: yalnızca bu çalışma alanına ait, her zaman açık bir bilgisayar.",
     "about": "Bu bilgisayar hakkında",
     "how": "Bilgisayarlar nasıl çalışır",
-    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>.",
-    "other": {
-      "title": "Diğer bilgisayarlar",
-      "text": "Evdeki bir Mac mini ya da başka bir sunucu gibi, bir kodla bağlanır. Her birinin neye izin verdiği o bilgisayarda ayarlanır.",
-      "emptyTitle": "Ajanları herhangi bir bilgisayarda çalıştırın",
-      "emptyText": "Evdeki bir Mac mini'yi veya başka bir sunucuyu kodla bağlayın, ajanlar orada çalışsın.",
-      "emptyViewerTitle": "Ekibin bilgisayarları burada görünür",
-      "emptyViewer": "Bilgisayar bağlayabilen kişi bir tane ekler ve burada görünür."
-    }
+    "hostMissing": "Bu sunucu da ajanlarınızın bilgisayarı olabilir: <guide>nasıl yapılır</guide>."
   },
   "outage": {
     "region": "Çevrimdışı bilgisayarlar",
@@ -14352,10 +14339,7 @@
     "notOpen": "Bu çalışma alanındaki rolünüz {{section}} bölümünü açmıyor. Rolleri yöneten kişi sizin için açabilir.",
     "nav": "Ayarlar bölümleri",
     "group": {
-      "you": "Siz",
-      "org": "Çalışma alanı",
-      "agents": "Ajanlar",
-      "costs": "Maliyetler ve veriler"
+      "org": "Çalışma alanı"
     },
     "section": {
       "account": "Hesabınız",
@@ -14368,11 +14352,10 @@
       "access": "Ajanlar ve erişim",
       "connectors": "Bağlayıcılar ve MCP'ler",
       "skills": "Beceriler",
-      "keys": "Yapay zeka hesapları",
       "storage": "Depolama",
       "computers": "Bilgisayarlar",
       "devices": "Cihazlar",
-      "usage": "Bütçe ve kullanım",
+      "usage": "Yapay zeka ve kullanım",
       "audit": "Denetim kaydı",
       "import": "İçe ve dışa aktarma",
       "billing": "Plan ve faturalandırma",
@@ -14383,7 +14366,6 @@
       "about": "agentes.chat hakkında",
       "generalPersonal": "Hakkınızda",
       "keysPersonal": "Yapay zeka ve uygulamalar",
-      "usagePersonal": "Plan ve kullanım",
       "membersPersonal": "Kişiler"
     },
     "advanced": "Gelişmiş",
@@ -14398,9 +14380,8 @@
       "access": "Her ajanın neleri kullanabileceği: bağlayıcı başına bir düzey.",
       "connectors": "Tüm çalışma alanı için bir kez bağlanan hizmetler ve MCP sunucuları.",
       "skills": "Ajanların ihtiyaç duyduklarında açtıkları Markdown talimatları.",
-      "keys": "Planlarınız ve çalışma alanının API anahtarları.",
       "storage": "Çalışma alanının dosyalarının durduğu yer.",
-      "usage": "Her kişinin ve her ajanın ne kadar yapay zekâ kullandığı ve ayın limitleri.",
+      "usage": "Çalışma alanının yapay zeka hesapları ve her kişinin ve her ajanın ne kadar kullandığı.",
       "audit": "Ajanların konuşma dışında yaptıkları ve kişilerin değiştirdikleri.",
       "import": "Başka bir uygulamadan veya çalışma alanından ajan getirin ya da bunu taşıyın.",
       "billing": "Plan, kart ve faturalar, uygulama dışındaki sayfamızda.",
@@ -14410,7 +14391,6 @@
       "approvals": "Bir ajan onayınızı istediğinde sizin yerinize kimin karar verdiği.",
       "about": "Kimin yaptığı, lisansı ve kaynak kodunun yeri.",
       "generalPersonal": "Ajanlarınızın sizin hakkınızda bildikleri ve bu çalışma alanının nasıl işlediği.",
-      "keysPersonal": "Ajanlarınızın düşünürken kullandığı yapay zeka, kullandıkları uygulamalar ve beceriler.",
       "usagePersonal": "Ajanlarınızın ne kadar yapay zeka kullandığı ve planınız.",
       "connectorsPersonal": "Uygulamalarınız ve MCP sunucularınız, ajanlarınız için bir kez bağlanır.",
       "membersPersonal": "Burada sizinle kimler var, ve davetler.",
@@ -14526,33 +14506,9 @@
       "dialogTitle": "Ne gönderiliyor",
       "dialogText": "Günde bir kez. Bir sonraki rapor tam olarak bu."
     },
-    "tilesTitle": "Çalışma alanındaki her şey",
     "tileState": {
       "members_one": "{{count}} üye",
-      "members_other": "{{count}} üye",
-      "invitations_one": "{{count}} davet bekliyor",
-      "invitations_other": "{{count}} davet bekliyor",
-      "agents_one": "{{count}} ajan",
-      "agents_other": "{{count}} ajan",
-      "connectors_one": "{{count}} bağlı",
-      "connectors_other": "{{count}} bağlı",
-      "noConnectors": "Henüz bağlı uygulama yok",
-      "skills_one": "{{count}} beceri",
-      "skills_other": "{{count}} beceri",
-      "computers_one": "{{count}} bilgisayardan {{online}} tanesi açık",
-      "computers_other": "{{count}} bilgisayardan {{online}} tanesi açık",
-      "noComputers": "Henüz bilgisayar yok",
-      "devices_one": "{{count}} cihazdan {{online}} tanesi açık",
-      "devices_other": "{{count}} cihazdan {{online}} tanesi açık",
-      "noDevices": "Henüz cihaz yok",
-      "usage": "Bu ay bütçenin {{percent}} kadarı kullanıldı",
-      "keys_one": "{{count}} anahtar",
-      "keys_other": "{{count}} anahtar",
-      "platformKey": "Bu sunucunun anahtarı kullanılıyor",
-      "noKeys": "Henüz anahtar yok",
-      "plans_one": "{{count}} plan",
-      "plans_other": "{{count}} plan",
-      "noPlans": "Henüz plan yok"
+      "members_other": "{{count}} üye"
     },
     "import": {
       "title": "İçe aktar",
@@ -14685,6 +14641,9 @@
         "jev": "Ajanlar kendiliğinden çıkartmayı yalnızca Jev ile gönderir.",
         "jevLink": "Jev'i kur"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {
@@ -14882,14 +14841,13 @@
     "equivalent": "API fiyatıyla ≈ {{amount}}",
     "apiPrice": "API fiyatı",
     "apiPriceHint": "Ajanlar plan kullandığında kimse kullanım başına ödeme yapmaz. Bu tutar, aynı kullanımın API üzerinden ne kadar tutacağıdır.",
-    "thisMonth": "Bu ay",
     "moreAgents_one": "+{{count}} ajan",
     "moreAgents_other": "+{{count}} ajan",
     "paid": "{{amount}} ödendi",
     "budgetShare": "Bütçenin {{percent}} kadarı",
     "estimate": "Planlar yalnızca hesabın tamamının ne kadar kullandığını söyler. Her ajanın payı, her birinin harcadığına göre bir tahmindir.",
     "accounts": {
-      "title": "Plan hesapları",
+      "title": "Hesaplar",
       "empty": "Bir plan bağlayın ve her ajanın ne kadar kullandığını buradan izleyin."
     },
     "api": {
@@ -16786,7 +16744,7 @@
       "turn": "Yan çevirin",
       "upright": "Dik çevirin",
       "message": "{{name}} ajanına mesaj gönder",
-      "chooseOnWeb": "agentes.chat üzerinde, Ayarlar › Bilgisayarlar bölümünden seçin."
+      "chooseOnWeb": "agentes.chat üzerinde, Ayarlar › Cihazlar bölümünden seçin."
     }
   },
   "taskManager": {
@@ -17328,7 +17286,6 @@
       "created": "Widget şuraya eklendi: {{where}}",
       "test": "Test et",
       "testAgain": "Yeniden test et",
-      "testing": "{{name}} gerçek verilerle hazırlıyor…",
       "tested": "Gerçek veriler · {{when}}",
       "stale": "Testten sonra değişti",
       "testFailed": "Olmadı: {{reason}}",
@@ -17350,6 +17307,10 @@
       "editAskOf": "İsteği değiştir: {{ask}}",
       "testingShort": "Test ediliyor…",
       "buildingFoot": "{{name}} hazırlıyor…",
+      "thinking": "Düşünüyor",
+      "finishing": "Widget'ı hazırlıyor",
+      "stop": "Durdur",
+      "stillWorking": "Hâlâ çalışıyor. Gerçek veriler bir iki dakika sürebilir.",
       "failedTitle": "{{name}} hazırlayamadı",
       "staleHint": "Nasıl göründüğünü görmek için yeniden test edin.",
       "whoButton": "Kim ilgilenecek: {{name}}",

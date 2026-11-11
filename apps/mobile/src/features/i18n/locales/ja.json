@@ -1017,7 +1017,6 @@
     "proposalsWaiting_other": "{{count}} 件待ち",
     "drive": "Drive",
     "connectors": "コネクタとMCP",
-    "usage": "使用量",
     "preferences": "環境設定",
     "editProfile": "プロフィールを編集",
     "switchWorkspace": "ワークスペースを切り替え",
@@ -2117,16 +2116,13 @@
     "editSub": "名前、ロゴ、タイムゾーン、エージェントが知っていること",
     "group": {
       "org": "ワークスペース",
-      "people": "人",
-      "agents": "エージェント",
-      "costs": "費用とデータ"
+      "people": "人"
     },
     "section": {
       "members": "メンバー",
       "roles": "ロール",
       "access": "エージェントのアクセス",
-      "connectors": "コネクタ",
-      "usage": "使用量と予算"
+      "connectors": "コネクタ"
     },
     "ofOnline": "{{count}}台中{{online}}台",
     "deleteName": "{{name}}を削除",
@@ -2210,7 +2206,7 @@
       "guide": "{{name}}のガイドを開く",
       "fields": "入力情報",
       "private": "この情報は暗号化して保管され、二度と表示されません。",
-      "teamHelp": "項目は最初、ワークスペースの全員に表示され、どのエージェントも使いません。エージェントはあとで選びます。",
+      "teamHelp": "ワークスペースの全員が項目を見られ、すべてのエージェントが使えます。あとで調整できます。",
       "personalHelp": "項目はあなただけに表示され、あなたが頼んだときにエージェントが使います。",
       "checking": "{{name}}で確認しています…",
       "connected": "{{name}}を接続しました",

@@ -336,3 +336,13 @@ Asked to create a role for a marketing person who may not merge or deploy, the r
 ADR 0162: the workspace's name, what it does, its team from a template and, where the workspace waits for its first
 plan, the plan come before the workspace opens, on the blue rail with the right hand on its horizon. Paid or done, it
 opens in #general, where the team says hi; the plan left for later opens the right hand's DM.
+
+## Amendment (2026-11-10): its settings are its own page (§11)
+
+The right hand has no entry in Settings. Its page (`/agents/{id}`, where `/settings/right_hand` now leads) holds its
+settings in two groups. "Só para você", for every member: "Sua IA", when its weekly card comes, and what it creates and
+adjusts for them without asking (ADR 0139 §2). "Para todo o workspace", only with `manage_agents`: its name and look,
+"IA de quem não tem plano próprio" (the fallback of §11, before "IA do workspace"), the switch "Emprestar este plano a
+quem não tem um" (before "Atende outras pessoas"), its monthly budget where something bills per use, and who may use
+it. A value that changes is one row that opens its choice in a dialog (a sheet on the phone). Alone in a personal
+workspace, lending and the audience are not shown.

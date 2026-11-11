@@ -891,7 +891,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     const api = createFakeApi(state);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
-    expect(document.querySelector(".settings__body > .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
+    expect(document.querySelector(".settings__body .ac-pagehead h2")?.textContent).toBe("Conectores e MCPs");
     const mcps = () => screen().getByRole("region", { name: "MCPs" });
     expect(mcps().textContent).toContain("Os servidores MCP que você conectar pelo endereço aparecem aqui.");
     await click(within(mcps()).getByRole("button", { name: "Adicionar MCP" }));

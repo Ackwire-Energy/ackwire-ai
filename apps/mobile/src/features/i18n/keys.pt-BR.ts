@@ -1130,7 +1130,6 @@ export const featureKeysPtBR = {
     proposalsWaiting_other: "{{count}} esperando",
     drive: "Drive",
     connectors: "Conectores e MCPs",
-    usage: "Uso",
     preferences: "Preferências",
     editProfile: "Editar perfil",
     switchWorkspace: "Trocar workspace",
@@ -2266,15 +2265,12 @@ export const featureKeysPtBR = {
     group: {
       org: "Workspace",
       people: "Pessoas",
-      agents: "Agentes",
-      costs: "Custos e dados",
     },
     section: {
       members: "Membros",
       roles: "Papéis",
       access: "Acesso dos agentes",
       connectors: "Conectores",
-      usage: "Uso e orçamento",
     },
     ofOnline: "{{online}} de {{count}}",
     deleteName: "Apagar {{name}}",
@@ -2360,8 +2356,7 @@ export const featureKeysPtBR = {
       guide: "Abrir o guia do {{name}}",
       fields: "Dados",
       private: "Esses dados ficam guardados com criptografia e não aparecem de novo.",
-      teamHelp:
-        "Os itens começam visíveis para todos do workspace e sem nenhum agente. Você escolhe os agentes depois.",
+      teamHelp: "Todos do workspace veem os itens e todos os agentes podem usar. Você pode ajustar em seguida.",
       personalHelp: "Só você vê os itens, e seus agentes usam quando você pede.",
       checking: "Conferindo com o {{name}}…",
       connected: "{{name}} conectado",

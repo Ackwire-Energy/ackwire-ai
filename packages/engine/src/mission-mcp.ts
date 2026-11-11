@@ -1,5 +1,6 @@
 import {
   findPullRequestUrl,
+  MCP_ALWAYS_LOAD,
   MCP_TOOLS_MAX,
   type McpToolInfo,
   MISSION_MCP_TOOLS,
@@ -416,6 +417,7 @@ export async function handleMissionMcpList(
         name: t.name,
         description: cutText(t.description, 4000),
         inputSchema: toBrainSchema(t.inputSchema),
+        ...(t.upFront ? { _meta: { [MCP_ALWAYS_LOAD]: true } } : {}),
       })),
     };
   } catch (error) {

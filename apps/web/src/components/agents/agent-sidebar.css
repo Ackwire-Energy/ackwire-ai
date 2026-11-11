@@ -254,27 +254,17 @@ html:not([data-pointer]) .dm-side__row--link:focus-visible {
   margin: 0;
   color: var(--ink);
 }
-/* Its plan for this person, in a column this narrow: the words take the row beside the icon and the buttons go under
-   them, from their edge (the 30px icon and the 12px gap); beside the words they squeezed them to a word a line. */
-.dm-side__sec .settings-row {
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  padding: 0 0 10px;
+/* Its plan for this person is a row that opens, as the panel's other pressable rows: its plate reaches 8 past the
+   section's sides, so its icon starts on the heading's edge and stays 8 inside the plate. */
+.dm-side__sec .settings-row--open {
+  width: calc(100% + 2 * var(--space-2));
+  margin: 0 calc(-1 * var(--space-2)) var(--space-2);
+  padding: var(--space-2);
   border-top: 0;
+  border-radius: 8px;
 }
-.dm-side__sec .settings-row > .settings-row__text {
-  flex: 1 1 0;
-}
-/* Stronger than the rule that raises an end to the name's line (a lead row with help text): under the words it sits
-   where it falls. */
-.dm-side .dm-side__sec .settings-row.settings-row--lead > .settings-row__end {
-  flex-basis: 100%;
-  box-sizing: border-box;
-  padding-left: 42px;
-  translate: none;
-}
-.dm-side__sec .rh-set__acts {
-  flex-wrap: wrap;
+.dm-side__sec .settings-row--open:hover {
+  background: var(--side-hover);
 }
 /* Under the sidebar's breakpoint the header's glyphs hold the computer, the search and the toggle: the search gives
    way, leaving the name its room beside them. */

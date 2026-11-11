@@ -7,7 +7,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
-import { hintOf, shownText } from "./hint";
+import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -67,25 +67,30 @@ async function page(accounts: AiAccounts["accounts"], role: "owner" | "member" =
   if (state.me?.organizations[0]) state.me.organizations[0].role = role;
   const api = createFakeApi(state);
   fakeMachinesOf.get(api)?.setAiAccounts({ accounts, computers });
+  // The old address of Contas de IA: it opens IA e uso, where the accounts are now.
   await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
   await settle(6);
-  const rows = () => [...document.querySelectorAll(".ai-accounts__row")] as HTMLElement[];
-  return { state, api, rows };
+  return { state, api };
 }
 
-describe("Contas de IA", () => {
-  test("never blank: with no plan yet, one way to connect one, the same picker as everywhere", async () => {
-    await page([]);
-    const plans = screen().getByRole("region", { name: "Seus planos" });
-    // Its title and ⓘ (what a plan is for and where it stays), what a plan gives and the one way to connect it.
-    expect(hintOf("Seus planos", plans).text).toBe(
-      "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O agentes.chat guarda só o nome, o email e o uso.",
-    );
-    expect(shownText(plans)).toBe(
-      "Seus planosUse o plano de IA que você já pagaEntre com sua conta e os agentes pensam com ela.Conectar uma IA",
-    );
+/** The accounts' rows after the seeded computer's own sign-in, which is always the first. */
+const rows = () => ([...document.querySelectorAll(".plan-row")] as HTMLElement[]).slice(1);
+
+/** A row with what it folds in sight: near its limit it already is. */
+async function opened(row: HTMLElement | undefined) {
+  const head = within(row as HTMLElement).getAllByRole("button")[0] as HTMLElement;
+  if (head.getAttribute("aria-expanded") !== "true") await click(head);
+  return row as HTMLElement;
+}
+
+describe("IA e uso: the viewer's own accounts", () => {
+  test("the old address opens IA e uso; with accounts, Conectar uma IA is in the card's head, the same picker as everywhere", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/settings/keys`, { api: createFakeApi(seedState()) });
+    await settle(6);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/usage`);
+    const plans = screen().getByRole("region", { name: "Contas" });
     const connect = within(plans).getByRole("button", { name: "Conectar uma IA" });
-    expect(connect.closest(".ac-empty__actions")).not.toBeNull();
+    expect(connect.closest(".ac-card__head")).not.toBeNull();
     await act(async () => fireEvent.click(connect));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
@@ -96,22 +101,29 @@ describe("Contas de IA", () => {
     const member = await page([WORK, MINIMAX], "member");
     // Looking at the plans asks the computers for fresh usage.
     expect(member.state.calls.some((c) => c.method === "machines.refreshAccountUsage")).toBe(true);
-    const [work, mm] = member.rows();
-    expect(work?.textContent).toContain("Trabalho");
-    expect(work?.textContent).toContain("walt@acme.com · Ada pensa com ela");
-    expect(work?.querySelector(".ac-planmeter")).not.toBeNull();
-    expect(work?.textContent).toContain("Quase no limite");
-    // A coding plan's key: its last 4 and what its maker shares.
-    expect(mm?.textContent).toContain("chave …MnOp · Nenhum agente ainda");
+    const [work, mm] = rows();
+    // Closed: its name, plan and owner, and one meter for its fullest window.
+    const head = work?.querySelector(".plan-row__head") as HTMLElement;
+    expect(head.textContent).toContain("Trabalho\u2002Team\u2002de Walter");
+    expect(head.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 84%");
+    expect(within(head).getAllByRole("meter")).toHaveLength(1);
+    // Near its limit: what matters then on one line under them, and the row starts open.
+    expect(head.querySelector(".plan-row__alert")?.textContent).toMatch(/^Quase no limite · renova /);
+    expect(head.getAttribute("aria-expanded")).toBe("true");
+    expect(work?.textContent).toContain("Claude Code · walt@acme.com");
+    expect(work?.querySelector(".plan-shares__row")?.textContent).toBe("Ada · usa agora");
+    // A coding plan's key, closed until asked: its last 4 and what its maker shares.
+    expect(mm?.querySelector(".plan-row__head")?.getAttribute("aria-expanded")).toBe("false");
+    expect(mm?.querySelector(".plan-row__body")?.textContent).toBe("");
+    await opened(mm);
+    expect(mm?.textContent).toContain("chave …MnOp");
     expect(mm?.textContent).toContain("MiniMax não mostra o uso por aqui.");
     expect(mm?.querySelector('[data-mark="minimax"]')).not.toBeNull();
     expect(within(mm as HTMLElement).getByRole("button", { name: "Trocar a chave" })).toBeTruthy();
-    // Where the accounts stay is the title's ⓘ: no line under the list.
-    expect(shownText(screen().getByRole("region", { name: "Seus planos" }))).not.toMatch(/As contas ficam|guarda só/);
     expect(screen().queryByRole("region", { name: "Chaves de provedor" })).toBeNull();
     cleanup();
     await page([WORK]);
-    expect(screen().getByRole("region", { name: "Seus planos" })).toBeTruthy();
+    expect(screen().getByRole("region", { name: "Contas" })).toBeTruthy();
     expect(screen().getByRole("region", { name: "Chaves de provedor" })).toBeTruthy();
   });
 
@@ -125,19 +137,17 @@ describe("Contas de IA", () => {
       keyHint: "Q7f2",
     };
     const seat = { ...WORK, id: "acct_seat", kind: "antigravity" as const, label: "Gemini", provider: "enterprise" };
-    const { rows } = await page([zen, seat], "owner", [
-      { ...MAC, brains: { ...MAC.brains, opencode: true, antigravity: true } },
-    ]);
+    await page([zen, seat], "owner", [{ ...MAC, brains: { ...MAC.brains, opencode: true, antigravity: true } }]);
     const [oc, gemini] = rows();
     expect(oc?.textContent).toContain("OpenCode");
     expect(oc?.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("opencode");
     expect(gemini?.querySelector(".ac-brand")?.getAttribute("data-mark")).toBe("gemini");
-    expect(document.querySelectorAll(".ai-accounts__row .ac-brand__initial")).toHaveLength(0);
+    expect(document.querySelectorAll(".plan-row .ac-brand__initial")).toHaveLength(0);
   });
 
   test("a signed-out account its computer couldn't check says so, and still signs in again", async () => {
-    const { rows } = await page([{ ...WORK, status: "signed_out" as const, statusKnown: false }]);
-    const row = rows()[0] as HTMLElement;
+    await page([{ ...WORK, status: "signed_out" as const, statusKnown: false }]);
+    const row = await opened(rows()[0]);
     expect(row.textContent).toContain("O computador não conseguiu confirmar o login desta vez.");
     expect(row.textContent).not.toContain("Saiu da conta.");
     expect(within(row).getByRole("button", { name: "Entrar de novo" })).toBeTruthy();
@@ -146,13 +156,13 @@ describe("Contas de IA", () => {
   test("Sign in again: the account's own email goes to Claude's sign-in unseen; another account coming back is said, with Try again only", async () => {
     const out = { ...WORK, status: "signed_out" as const };
     const free = { ...WORK, id: "acct_pessoal", label: "Pessoal", email: "walt@gmail.com", usedBy: [], usage: null };
-    const { state, api, rows } = await page([out, free]);
+    const { state, api } = await page([out, free]);
     fakeMachinesOf.get(api)?.endLogin("login_1", {
       state: "failed",
       signedInAs: "walt@gmail.com",
       duplicate: { label: "Pessoal", account: free },
     });
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Entrar de novo" }));
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Entrar de novo" }));
     const dialog = screen().getByRole("dialog", { name: "Trabalho" });
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
@@ -175,11 +185,11 @@ describe("Contas de IA", () => {
 
   test("a sign-in the server refuses says why, not that the computer didn't answer; one it can't explain still does", async () => {
     const out = { ...WORK, status: "signed_out" as const };
-    const { api, rows } = await page([out]);
+    const { api } = await page([out]);
     api.machines.beginAccountLogin = async () => {
       throw new ApiError(409, "account.method_unsupported", "This computer can't connect Claude this way yet.");
     };
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Entrar de novo" }));
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Entrar de novo" }));
     const dialog = screen().getByRole("dialog", { name: "Trabalho" });
     const realOpen = window.open;
     window.open = (() => ({ closed: false, opener: {}, location: { href: "" }, close: () => {} })) as never;
@@ -212,8 +222,8 @@ describe("Contas de IA", () => {
   });
 
   test("disconnecting names the agent that thinks with it; renaming saves the new name", async () => {
-    const { state, rows } = await page([WORK, MINIMAX]);
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Desconectar" }));
+    const { state } = await page([WORK, MINIMAX]);
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Desconectar" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar Trabalho?" });
     expect(confirm.textContent).toContain(
       "Ada deixa de pensar com ela. O MacBook sai da conta e apaga o que guardava.",
@@ -228,7 +238,7 @@ describe("Contas de IA", () => {
     expect(document.body.textContent).toContain("Trabalho desconectada.");
     expect(rows()).toHaveLength(1);
 
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Renomear" }));
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Renomear" }));
     const rename = screen().getByRole("dialog", { name: "Renomear MiniMax" });
     await act(async () =>
       fireEvent.change(within(rename).getByLabelText("Nome"), { target: { value: "MiniMax do Walt" } }),
@@ -244,7 +254,7 @@ describe("Contas de IA", () => {
   });
 });
 
-describe("Contas de IA: the same account signed in again and again", () => {
+describe("IA e uso: the same account signed in again and again", () => {
   const copy = (id: string, over: Partial<AiAccounts["accounts"][number]> = {}): AiAccounts["accounts"][number] => ({
     ...base,
     kind: "codex",
@@ -257,14 +267,14 @@ describe("Contas de IA: the same account signed in again and again", () => {
   });
 
   test("one row, its logins with no agent flagged, and Remover takes only those: the agents keep theirs", async () => {
-    const { state, rows } = await page([
+    const { state } = await page([
       copy("gpt_ada", { usedBy: ["Ada"] }),
       copy("gpt_2", { status: "signed_out" }),
       copy("gpt_3"),
       copy("gpt_4", { status: "signed_out" }),
     ]);
     expect(rows()).toHaveLength(1);
-    const row = rows()[0] as HTMLElement;
+    const row = await opened(rows()[0]);
     expect(row.textContent).toContain("Mais 3 logins desta conta, sem nenhum agente.");
     await click(within(row).getByRole("button", { name: "Remover" }));
     await settle(4);
@@ -277,23 +287,24 @@ describe("Contas de IA: the same account signed in again and again", () => {
   });
 
   test("none with an agent: the signed-in one stays; a single login is never flagged", async () => {
-    const { rows } = await page([copy("gpt_1", { status: "signed_out" }), copy("gpt_2")]);
-    expect(rows()[0]?.textContent).toContain("Mais 1 login desta conta, sem nenhum agente.");
+    await page([copy("gpt_1", { status: "signed_out" }), copy("gpt_2")]);
+    expect((await opened(rows()[0])).textContent).toContain("Mais 1 login desta conta, sem nenhum agente.");
     cleanup();
-    const one = await page([copy("gpt_1")]);
-    expect(one.rows()[0]?.textContent).not.toContain("desta conta, sem nenhum agente");
-    expect(within(one.rows()[0] as HTMLElement).queryByRole("button", { name: "Remover" })).toBeNull();
+    await page([copy("gpt_1")]);
+    const one = await opened(rows()[0]);
+    expect(one.textContent).not.toContain("desta conta, sem nenhum agente");
+    expect(within(one).queryByRole("button", { name: "Remover" })).toBeNull();
+    expect(within(one).getByRole("button", { name: "Renomear" })).toBeTruthy();
   });
 });
 
-describe("Contas de IA: a plan with a login per agent", () => {
+describe("IA e uso: a plan with a login per agent", () => {
   const usage = (percent: number, at: string) => ({
     windows: [{ kind: "five_hour" as const, usedPercent: percent, resetsAt: "2099-01-01T15:40:00.000Z" }],
     source: "probe" as const,
     at,
   });
-  test("every plan's windows in the agents' own compact line: the two tightest, one bar, all of them on hover", async () => {
-    const at = new Date().toISOString();
+  test("closed, one meter: the window closest to its limit; open, every window with its bar", async () => {
     const team: AiAccounts["accounts"][number] = {
       ...WORK,
       usage: {
@@ -303,32 +314,31 @@ describe("Contas de IA: a plan with a login per agent", () => {
           { kind: "seven_day_sonnet", usedPercent: 3 },
         ],
         source: "probe",
-        at,
+        at: new Date().toISOString(),
       },
     };
-    const own: AiComputer = {
-      ...MAC,
-      own: {
-        claude_code: { plan: "max", usage: { windows: [{ kind: "five_hour", usedPercent: 5 }], source: "turn", at } },
-      },
-    };
-    const { rows } = await page([team], "owner", [own]);
-    const [mine, account] = rows();
-    // The computer's own sign-in reads like an account: its maker's name, then its plan once.
-    expect([mine, account].map((r) => r?.querySelector(".ai-accounts__name")?.textContent)).toEqual([
-      "Claude · Max",
-      "Trabalho · Team",
-    ]);
-    expect(mine?.querySelector(".ac-planmeter__line")?.textContent).toBe("5h 5%");
-    const meter = account?.querySelector(".ac-planmeter--compact") as HTMLElement;
-    expect(meter.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40% · 5h 12%");
+    await page([team]);
+    const [account] = rows();
+    const head = account?.querySelector(".plan-row__head") as HTMLElement;
+    expect(head.querySelector(".ac-planmeter__line")?.textContent).toBe("semana 40%");
     expect(
-      within(meter)
+      within(head)
         .getAllByRole("meter")
         .map((m) => m.getAttribute("aria-label")),
     ).toEqual(["Semana"]);
-    expect(meter.title.split("\n")).toEqual(["Semana 40%", "5 horas 12%", "Semana · Sonnet 3%"]);
-    expect(meter.querySelector(".ac-planmeter__state")).toBeNull();
+    // Under 80%: no line under the row, and it stays closed.
+    expect(head.querySelector(".plan-row__alert")).toBeNull();
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    await opened(account);
+    expect([...(account as HTMLElement).querySelectorAll(".ac-planmeter__window")].map((w) => w.textContent)).toEqual([
+      "Semana40%",
+      "5 horas12%",
+      "Semana · Sonnet3%",
+    ]);
+    // Closing it takes what it folds out of reach.
+    await click(head);
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    expect(account?.querySelector(".plan-row__fold")?.hasAttribute("inert")).toBe(true);
   });
 
   /** One GLM key signed in for Ada, Theo and Lia: three logins, one account. */
@@ -349,29 +359,34 @@ describe("Contas de IA: a plan with a login per agent", () => {
   ];
 
   test("one row for the account: every agent on it, one meter from the newest usage", async () => {
-    const { rows } = await page(LOGINS);
+    await page(LOGINS);
     expect(rows()).toHaveLength(1);
-    const [row] = rows();
-    expect(row?.textContent).toContain("chave …4f2a · Ada, Theo e Lia pensam com ela");
-    expect(row?.querySelectorAll(".ac-planmeter")).toHaveLength(1);
-    expect(row?.textContent).toContain("62%");
-    // A MediaRow: its mark and its name on one line, its actions, evenly spaced, at that line's end (under its words
-    // in a narrow list), the facts and the meter under them.
-    expect(row?.classList.contains("ac-mediarow")).toBe(true);
-    expect(row?.querySelector(":scope > .ac-mediarow__head > .ai-accounts__name")).not.toBeNull();
-    expect(row?.querySelector(":scope > .ac-acts.ac-mediarow__end--wrap")).not.toBeNull();
-    expect(row?.querySelector(":scope > .ac-mediarow__body .ac-planmeter")).not.toBeNull();
+    const row = await opened(rows()[0]);
+    expect(row.querySelector(".plan-row__head .ac-planmeter__line")?.textContent).toBe("5h 62%");
+    expect(row.textContent).toContain("chave …4f2a");
+    expect([...row.querySelectorAll(".plan-shares__row")].map((r) => r.textContent)).toEqual([
+      "Ada · usa agora",
+      "Theo · usa agora",
+      "Lia · usa agora",
+    ]);
+    // What its owner does with it: one line of actions under everything else, starting on the words' edge.
+    const acts = row.querySelector(".plan-row__body > .ai-accounts__own:last-child > .ac-acts") as HTMLElement;
+    expect(
+      within(acts)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Renomear", "Trocar a chave", "Desconectar"]);
   });
 
   test("one login signed out: whose, said under the facts", async () => {
     const [ada, theo, lia] = LOGINS as [Row, Row, Row];
-    const { rows } = await page([ada, { ...theo, status: "signed_out" }, lia]);
-    expect(rows()[0]?.textContent).toContain("Theo ficou sem login.");
+    await page([ada, { ...theo, status: "signed_out" }, lia]);
+    expect((await opened(rows()[0])).textContent).toContain("Theo ficou sem login.");
   });
 
   test("Disconnect takes every login of the account, and the dialog names every agent", async () => {
-    const { state, rows } = await page(LOGINS);
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Desconectar" }));
+    const { state } = await page(LOGINS);
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Desconectar" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar GLM Coding?" });
     expect(confirm.textContent).toContain(
       "Ada, Theo e Lia deixam de pensar com ela. O MacBook sai da conta e apaga o que guardava.",
@@ -387,20 +402,22 @@ describe("Contas de IA: a plan with a login per agent", () => {
 
   test("two accounts with the same name stay two rows: a name is anyone's to repeat", async () => {
     const other = glm("acct_bo", "Bo", { keyHint: "9z9z" });
-    const { state, rows } = await page([...LOGINS, other]);
+    const { state } = await page([...LOGINS, other]);
     expect(rows()).toHaveLength(2);
-    expect(rows()[1]?.textContent).toContain("chave …9z9z · Bo pensa com ela");
-    await click(within(rows()[1] as HTMLElement).getByRole("button", { name: "Desconectar" }));
+    const second = await opened(rows()[1]);
+    expect(second.textContent).toContain("chave …9z9z");
+    expect(second.querySelector(".plan-shares__row")?.textContent).toBe("Bo · usa agora");
+    await click(within(second).getByRole("button", { name: "Desconectar" }));
     await click(within(screen().getByRole("dialog")).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.filter((c) => c.method === "machines.removeAccount").map((c) => c.args[2])).toEqual(["acct_bo"]);
   });
 
   test("Replace the key: the new key goes to every login of the account, sealed to each", async () => {
-    const { state, api, rows } = await page(LOGINS);
+    const { state, api } = await page(LOGINS);
     const machines = fakeMachinesOf.get(api);
     for (const [n, l] of LOGINS.entries()) machines?.endLogin(`login_${n + 1}`, { state: "done", account: l });
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Trocar a chave" }));
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Trocar a chave" }));
     const dialog = screen().getByRole("dialog", { name: "GLM Coding" });
     await act(async () =>
       fireEvent.change(within(dialog).getByLabelText("Chave do GLM Coding"), {
@@ -420,14 +437,14 @@ describe("Contas de IA: a plan with a login per agent", () => {
   });
 
   test("Replace the key, one login failing: Try again sends the key only to that login", async () => {
-    const { state, api, rows } = await page(LOGINS);
+    const { state, api } = await page(LOGINS);
     const machines = fakeMachinesOf.get(api);
     const [ada, theo, lia] = LOGINS as [Row, Row, Row];
     machines?.endLogin("login_1", { state: "done", account: ada });
     machines?.endLogin("login_2", { state: "done", account: theo });
     machines?.endLogin("login_3", { state: "failed" });
     machines?.endLogin("login_4", { state: "done", account: lia });
-    await click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Trocar a chave" }));
+    await click(within(await opened(rows()[0])).getByRole("button", { name: "Trocar a chave" }));
     const dialog = screen().getByRole("dialog", { name: "GLM Coding" });
     const send = async () => {
       await act(async () =>
@@ -474,8 +491,8 @@ describe("Contas de IA: a plan with a login per agent", () => {
     machines?.setAiAccounts({ accounts: [all], computers: [MAC] });
     await renderApp(`/org/${ORG_ID}/settings/keys`, { api });
     await settle(6);
-    const row = document.querySelector(".ai-accounts__row") as HTMLElement;
-    expect(row.textContent).toContain("Ada pensa com ela");
+    const row = await opened(rows()[0]);
+    expect(row.querySelector(".plan-shares__row")?.textContent).toBe("Ada · usa agora");
     await click(within(row).getByRole("button", { name: "Usar também para o Atlas" }));
     await settle(4);
     expect(state.calls.filter((c) => c.method === "agents.setBrain").map((c) => c.args)).toEqual([

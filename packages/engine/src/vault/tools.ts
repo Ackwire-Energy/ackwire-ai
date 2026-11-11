@@ -7,6 +7,7 @@ import { untrustedBlock } from "../untrusted";
 import {
   CONTACT_FIELDS,
   deleteVaultItemByAgent,
+  listUnreachedConnections,
   listUsableVault,
   listVaultPlaces,
   saveVaultItemByAgent,
@@ -18,6 +19,7 @@ import {
   type VaultItemKind,
   type VaultPlace,
   type VaultRun,
+  type VaultUnreached,
   vaultItemName,
   vaultPersonOfRun,
   vaultPlaceName,
@@ -144,22 +146,44 @@ export function vaultPlacesText(places: VaultPlace[]): string | null {
   ].join("\n");
 }
 
+/**
+ * Connected password managers this agent has no access to, and who gives it: the difference between "nothing is
+ * connected" and "connected, not open to me". Names the connection only, never an item of it.
+ */
+export function vaultUnreachedText(
+  unreached: VaultUnreached[],
+  who: { name: string | null; manages?: boolean },
+): string | null {
+  if (unreached.length === 0) return null;
+  const person = who.name ?? "its owner";
+  const team = `whoever manages the workspace's credentials${who.name && who.manages ? ` (${who.name} does)` : ""}`;
+  return [
+    "Connected, but you have no access. These password managers are connected to the Vault and you are not one of the agents that may use them, so nothing kept in them is shown to you. Never tell a person that nothing is connected: say which one is connected, that you have no access to it yet, and who gives it.",
+    ...unreached.map(
+      (u) =>
+        `- ${vaultPlaceName(u.place)} (${u.scope === "team" ? "team" : `personal, ${person}`}, ${u.hasItems ? "has items" : "no items read yet"}): ${u.scope === "team" ? team : person} gives you access in Settings, Vault, Connections, "Default access" of that connection.`,
+    ),
+  ].join("\n");
+}
+
 /** What `vault_list` answers (see the file's comment): never a value. */
 export function vaultListText(
   items: VaultItemForAgent[],
-  who: { name: string | null },
+  who: { name: string | null; manages?: boolean },
   filtered: boolean,
   places: VaultPlace[] = [],
+  unreached: VaultUnreached[] = [],
 ): string {
   const forWhom = who.name ? ` for ${who.name}` : "";
   const kept = vaultPlacesText(places);
+  const closed = vaultUnreachedText(unreached, who);
   if (items.length === 0) {
     const none = filtered
       ? `Nothing in the Vault matches that for you here${forWhom}.`
       : who.name
         ? `Nothing in the Vault is shared with you for ${who.name}.`
         : "Nobody is behind this run, and nothing in the Vault open to everyone in the workspace is shared with you.";
-    return `${none} A person adds a login, a key or contact details in Settings, Vault, and picks the agents that may use it; a password or key typed in your request card (request_secret) can be kept there with "Save to the Vault".${kept ? `\n\n${kept}` : ""}`;
+    return `${none} A person adds a login, a key or contact details in Settings, Vault, and picks the agents that may use it; a password or key typed in your request card (request_secret) can be kept there with "Save to the Vault".${closed ? `\n\n${closed}` : ""}${kept ? `\n\n${kept}` : ""}`;
   }
   const shown = items.slice(0, VAULT_LIST_MAX);
   const owner = who.name ?? "its owner";
@@ -192,6 +216,7 @@ export function vaultListText(
   if (items.length > shown.length) {
     parts.push(`${items.length - shown.length} more: narrow it with \`query\`, \`site\` or \`kind\`.`);
   }
+  if (closed) parts.push(closed);
   if (kept) parts.push(kept);
   return parts.join("\n\n");
 }
@@ -246,8 +271,15 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
         );
         const name = person.personId ? await nameOf(ctx, person.personId) : null;
         const places = await listVaultPlaces(deps, run, person);
+        const unreached = await listUnreachedConnections(deps, run, person);
         return {
-          content: vaultListText(items, { name }, Boolean(kind || site || query), places),
+          content: vaultListText(
+            items,
+            { name, manages: person.manages },
+            Boolean(kind || site || query),
+            places,
+            unreached,
+          ),
           data: { vaultItems: items.length },
         };
       } catch (error) {

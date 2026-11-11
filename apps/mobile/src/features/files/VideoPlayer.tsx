@@ -35,7 +35,7 @@ export interface VideoPlayerProps {
   /** Where it plays from, with the session when the link is ours. */
   source: { uri: string; headers?: Record<string, string> };
   name: string;
-  /** `inline` in a message (at `width`, its own shape); `screen` fills the file screen. */
+  /** `inline` in a message (at `width`, one shape, the video whole in it); `screen` fills the file screen. */
   variant?: "inline" | "screen";
   width?: number;
   /** The corner button of an inline video: opens the file screen. */
@@ -64,7 +64,6 @@ export function VideoPlayer({ source, name, variant = "inline", width = 300, onO
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [muted, setMuted] = useState(false);
-  const [shape, setShape] = useState<{ width: number; height: number } | null>(null);
   const [shown, setShown] = useState(true);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -102,11 +101,7 @@ export function VideoPlayer({ source, name, variant = "inline", width = 300, onO
     setEnded(true);
     setShown(true);
   });
-  useEventListener(player, "sourceLoad", ({ duration: d, availableVideoTracks }) => {
-    setDuration(d);
-    const track = availableVideoTracks.find((v) => v.size.width > 0 && v.size.height > 0);
-    if (track) setShape(track.size);
-  });
+  useEventListener(player, "sourceLoad", ({ duration: d }) => setDuration(d));
 
   const toggle = () => {
     tapHaptic();
@@ -130,7 +125,7 @@ export function VideoPlayer({ source, name, variant = "inline", width = 300, onO
   };
 
   const inline = variant === "inline";
-  const height = inline ? videoHeight(width, shape) : undefined;
+  const height = inline ? videoHeight(width) : undefined;
   const length = duration > 0 ? videoClock(duration) : "";
   const playLabel = ended
     ? t("mobile.files.video.replay")

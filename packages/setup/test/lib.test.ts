@@ -712,7 +712,7 @@ describe("the agents' computer", () => {
       { ...server, systemd: false },
       { ...server, connected: true },
     ]) {
-      expect(why(machine)?.fix).toContain("Settings → Computers");
+      expect(why(machine)?.fix).toContain("Settings › Devices");
     }
   });
 
@@ -1208,7 +1208,7 @@ describe("the plan", () => {
       computer: { state: "off", wasOn: false },
       telemetry: { value: "off", kept: false },
     });
-    expect(off).toContain("agents' computer: not this machine (connect one later in Settings → Computers)");
+    expect(off).toContain("agents' computer: not this machine (connect one later in Settings › Devices)");
     expect(off).toContain("usage statistics: not sent (TELEMETRY=off)");
     expect(off.some((s) => s.includes("install.sh"))).toBe(false);
     expect(planSteps({ ...base, computer: { state: "off", wasOn: true } })).toContain(

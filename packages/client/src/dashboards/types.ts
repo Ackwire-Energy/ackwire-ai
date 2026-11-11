@@ -178,9 +178,19 @@ export interface WidgetUpdate {
   costUsd: number | null;
 }
 
+/** The tool call a widget's build is in (`widgetStepWords` says it): the live chip's fields, never its input. */
+export interface WidgetStep {
+  tool: string;
+  connector: string | null;
+  service: string | null;
+  at: string;
+}
+
 export interface WidgetDetail extends Widget {
   dashboard: { id: string; kind: DashboardKind; title: string };
   canEdit: boolean;
+  /** While it builds or updates: the call its run is in; null between calls. Absent from an older server. */
+  step?: WidgetStep | null;
   /** Newest first. */
   history: WidgetUpdate[];
 }

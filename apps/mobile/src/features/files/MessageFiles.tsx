@@ -14,12 +14,21 @@ import { useColors, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
 import { AttachmentTile } from "./AttachmentTile";
 import { ImageStack } from "./ImageStack";
-import { encodeFileList, extensionOf, type FileInfo, fileInfo, IMAGE_EXT, singleImageHeight, VIDEO_EXT } from "./logic";
+import {
+  encodeFileList,
+  extensionOf,
+  type FileInfo,
+  fileInfo,
+  IMAGE_EXT,
+  singleImageHeight,
+  VIDEO_EXT,
+  videoHeight,
+} from "./logic";
 import { useArtifacts, useRemoteFile } from "./source";
 import { VideoPlayer } from "./VideoPlayer";
 
 /**
- * A message's files. Pictures alone: one inline at its own shape, or several as a deck to swipe through
+ * A message's files. Pictures alone: one inline, whole in a box of one shape, or several as a deck to swipe through
  * (`ImageStack`), tapping opens the viewer at that picture. Any other attachment: a tile across the row
  * (`AttachmentTile`: what it holds drawn small, its name, whole, with its kind and size under it), with the pictures
  * beside them as tiles of only the picture, two to a row (as on the web's phone width). A video plays right there (its
@@ -159,9 +168,8 @@ function InlineImage({
   const c = useColors();
   const version = detail?.shownVersion ?? file.version;
   const link = useRemoteFile(orgId, file.id, version);
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [failed, setFailed] = useState(false);
-  const height = singleImageHeight(width, size);
+  const height = singleImageHeight(width);
   return (
     <Pressable
       onPress={onPress}
@@ -178,10 +186,9 @@ function InlineImage({
         <Image
           source={{ uri: link.data.uri, headers: link.data.headers, cacheKey: `${file.id}@${version ?? "latest"}` }}
           recyclingKey={`${file.id}@${version ?? "latest"}`}
-          contentFit="cover"
+          contentFit="contain"
           transition={160}
           style={StyleSheet.absoluteFill}
-          onLoad={(e) => setSize({ width: e.source.width, height: e.source.height })}
           onError={() => setFailed(true)}
           accessible={false}
         />
@@ -236,10 +243,7 @@ function InlineVideo({
         />
       ) : (
         <View
-          style={[
-            styles.shot,
-            { width, height: Math.round((width * 9) / 16), backgroundColor: c.sunken, borderColor: c.line2 },
-          ]}
+          style={[styles.shot, { width, height: videoHeight(width), backgroundColor: c.sunken, borderColor: c.line2 }]}
         />
       )}
     </View>

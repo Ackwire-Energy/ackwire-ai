@@ -1236,7 +1236,6 @@
     "proposalsWaiting_other": "{{count}} czeka",
     "drive": "Drive",
     "connectors": "Konektory i MCP",
-    "usage": "Użycie",
     "preferences": "Preferencje",
     "editProfile": "Edytuj profil",
     "switchWorkspace": "Przełącz przestrzeń roboczą",
@@ -2426,16 +2425,13 @@
     "editSub": "Nazwa, logo, strefa czasowa i to, co wiedzą agenci",
     "group": {
       "org": "Przestrzeń robocza",
-      "people": "Osoby",
-      "agents": "Agenci",
-      "costs": "Koszty i dane"
+      "people": "Osoby"
     },
     "section": {
       "members": "Członkowie",
       "roles": "Role",
       "access": "Dostęp agentów",
-      "connectors": "Konektory",
-      "usage": "Użycie i budżet"
+      "connectors": "Konektory"
     },
     "ofOnline": "{{online}} z {{count}}",
     "deleteName": "Usuń {{name}}",
@@ -2519,7 +2515,7 @@
       "guide": "Otwórz przewodnik {{name}}",
       "fields": "Dane",
       "private": "Te dane są przechowywane w postaci zaszyfrowanej i nigdy nie są ponownie pokazywane.",
-      "teamHelp": "Na początku jego elementy widzą wszyscy w przestrzeni roboczej i nie używa ich żaden agent. Agentów wybierasz później.",
+      "teamHelp": "Jego elementy widzą wszyscy w przestrzeni roboczej i każdy agent może ich używać. Możesz to potem zmienić.",
       "personalHelp": "Tylko ty widzisz jego elementy, a twoi agenci używają ich, gdy o to poprosisz.",
       "checking": "Sprawdzanie w {{name}}…",
       "connected": "Połączono z {{name}}",

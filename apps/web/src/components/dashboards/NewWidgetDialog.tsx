@@ -10,10 +10,13 @@ import {
   useTestWidget,
   useWidgetDraft,
   useWidgetSuggestions,
+  WIDGET_STILL_MS,
+  widgetStepWords,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { taskClock } from "@agenteschat/client/lib/task-manager";
 import {
   BuildingDither,
   Button,
@@ -75,8 +78,10 @@ export interface NewWidgetDialogProps {
  * to follow is written in its body (with the agent's suggestions), the agent's face in its footer opens the list of
  * agents, the schedule beside it how often it updates, the bell in its head the alert, S/M/L its size; its title is
  * edited in place. Test has the agent build it there with real data (a draft), and only a draft that worked for what
- * is asked now can be created; after the test the ask folds into one line that opens it again. Or a chart an agent
- * already sent in the chat is pinned. Under the card, the board it goes on. Used by a board's page and by Home.
+ * is asked now can be created; while it builds the card says the step its agent is in and for how long, and Stop
+ * ends the build with the ask as it was written; after the test the ask folds into one line that opens it again. Or
+ * a chart an agent already sent in the chat is pinned. Under the card, the board it goes on. Used by a board's page
+ * and by Home.
  */
 export function NewWidgetDialog({ orgId, open, onClose, dashboardId, tab = "ask" }: NewWidgetDialogProps) {
   const { t } = useTranslation();
@@ -155,6 +160,12 @@ function NewWidgetBody({
   const [titleEdit, setTitleEdit] = useState<string | null>(null);
   // After a test the ask folds into one line; this opens it again for a change.
   const [editing, setEditing] = useState(false);
+  // A test being sent, when the build under way started, and how many were stopped (the ask takes the focus back).
+  const [sending, setSending] = useState(false);
+  const [since, setSince] = useState(0);
+  const [stops, setStops] = useState(0);
+  // Which test the dialog waits for: one stopped or replaced before its draft came back is dropped when it does.
+  const run = useRef(0);
   const askField = useRef<HTMLTextAreaElement>(null);
   useUnsavedInDialog(text.trim() !== "" || condition.trim() !== "");
 
@@ -167,7 +178,8 @@ function NewWidgetBody({
   const confirm = useConfirmWidget(orgId);
   const remove = useRemoveWidget(orgId);
   const pin = usePinWidget(orgId);
-  const live = useWidgetDraft(orgId, draftId).data ?? (test.data?.id === draftId ? test.data : undefined);
+  const detail = useWidgetDraft(orgId, draftId).data;
+  const live = detail ?? (test.data?.id === draftId ? test.data : undefined);
   const draft = draftId && live?.id === draftId ? live : undefined;
 
   // A draft nobody created is deleted when the dialog closes or another test replaces it (the server sweeps any
@@ -192,6 +204,9 @@ function NewWidgetBody({
     field.focus();
     field.setSelectionRange(field.value.length, field.value.length);
   }, [editing]);
+  useEffect(() => {
+    if (stops > 0) askField.current?.focus();
+  }, [stops]);
 
   const sources = suggestions.data?.sources ?? [];
   const sugs = suggestions.data?.suggestions ?? [];
@@ -210,7 +225,10 @@ function NewWidgetBody({
   // What a test answers for: what is asked, of whom, in what format (schedule, alert, size and board don't count).
   const askKey = JSON.stringify([asked, agent?.id ?? "", format]);
   const phase: TestPhase =
-    mode === "ask" ? phaseOf(test.isPending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
+    mode === "ask" ? phaseOf(sending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
+  const clock = useNow(phase === "testing" ? 1000 : false);
+  const elapsed = phase === "testing" ? Math.max(0, clock - since) : 0;
+  const stepWords = widgetStepWords(t, detail?.id === draftId ? detail?.step : null, i18n.language);
   // The draft's data, still shown (dimmed) once the ask changed since the test.
   const built = draft?.status === "ok" && draft.spec ? draft : null;
   const tested = phase === "ok" ? built : null;
@@ -228,7 +246,13 @@ function NewWidgetBody({
   const shownSpec: WidgetSpec | null = mode === "pin" ? ((chosen?.spec as WidgetSpec | undefined) ?? null) : null;
 
   const failed = (error: unknown) => toast.show(errorText(t, error, i18n.language), "error");
-  const canTest = mode === "ask" && Boolean(agent) && asked.length > 0 && targetId !== null && phase !== "testing";
+  const canTest =
+    mode === "ask" &&
+    Boolean(agent) &&
+    asked.length > 0 &&
+    targetId !== null &&
+    phase !== "testing" &&
+    !remove.isPending;
   const busy = confirm.isPending || pin.isPending;
   const alertInput = { enabled: alertOn, condition: alertOn ? condition.trim() : "" };
 
@@ -242,18 +266,25 @@ function NewWidgetBody({
     setEditing(false);
     setAlertOpen(false);
     const forAsk = askKey;
+    run.current += 1;
+    const mine = run.current;
+    setSending(true);
+    setSince(Date.now());
     const made = (draftMade: Widget) => {
-      // Closed while it was sent: nobody will create it.
-      if (!alive.current) {
+      // Closed or stopped while it was sent: nobody will create it.
+      if (!alive.current || run.current !== mine) {
         drop.current(draftMade.id);
         return;
       }
       pending.current = draftMade.id;
       setDraftId(draftMade.id);
       setTestedFor(forAsk);
+      setSending(false);
     };
     const refused = (error: unknown) => {
-      if (alive.current) failed(error);
+      if (!alive.current || run.current !== mine) return;
+      setSending(false);
+      failed(error);
     };
     // The person's own title, else a suggestion's when its ask is the one sent; else the agent names it.
     const own = titleEdit?.trim() || undefined;
@@ -270,6 +301,18 @@ function NewWidgetBody({
     };
     // Its promise, not the mutation's callbacks: those don't run once the dialog is gone, and the draft must go then.
     void test.mutateAsync(input).then(made, refused);
+  };
+
+  /** Stop: the build ends (its draft goes, and its run with it) and the ask is back as it was written. */
+  const stop = () => {
+    run.current += 1;
+    const building = pending.current;
+    pending.current = null;
+    if (building) remove.mutate(building);
+    setSending(false);
+    setDraftId(null);
+    setTestedFor(null);
+    setStops((n) => n + 1);
   };
 
   /** Create widget: the tested draft goes on the board, with the title, size, schedule and alert chosen now. */
@@ -596,7 +639,18 @@ function NewWidgetBody({
     ) : phase === "testing" ? (
       <div className="wk-build nw-build">
         <BuildingDither color={color} />
-        <p>{t("dashboards.newWidget.testing", { name })}</p>
+        <div className="nw-build__words">
+          <p className="nw-build__step" role="status">
+            <span key={stepWords}>{stepWords}</span>
+          </p>
+          <div
+            className="nw-build__still"
+            data-on={elapsed >= WIDGET_STILL_MS || undefined}
+            aria-hidden={elapsed < WIDGET_STILL_MS}
+          >
+            <p>{t("dashboards.newWidget.stillWorking")}</p>
+          </div>
+        </div>
       </div>
     ) : phase === "failed" ? (
       <div className="nw-fail ac-iconline" role="status">
@@ -668,7 +722,13 @@ function NewWidgetBody({
     phase === "testing" ? (
       <>
         <PixelSpinner size={14} color={color} />
-        <span className="wg__when">{t("dashboards.newWidget.buildingFoot", { name })}</span>
+        <span className="wg__when nwc-building">{t("dashboards.newWidget.buildingFoot", { name })}</span>
+        <span className="nwc-clock" role="timer">
+          {taskClock(elapsed)}
+        </span>
+        <Button size="sm" icon="stop" className="nwc-stop" onClick={stop}>
+          {t("dashboards.newWidget.stop")}
+        </Button>
       </>
     ) : (
       <>

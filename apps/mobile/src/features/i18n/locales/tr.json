@@ -1090,7 +1090,6 @@
     "proposalsWaiting_other": "{{count}} bekliyor",
     "drive": "Drive",
     "connectors": "Bağlayıcılar ve MCP'ler",
-    "usage": "Kullanım",
     "preferences": "Tercihler",
     "editProfile": "Profili düzenle",
     "switchWorkspace": "Çalışma alanını değiştir",
@@ -2220,16 +2219,13 @@
     "editSub": "Ad, logo, saat dilimi ve ajanların bildikleri",
     "group": {
       "org": "Çalışma alanı",
-      "people": "Kişiler",
-      "agents": "Ajanlar",
-      "costs": "Maliyetler ve veriler"
+      "people": "Kişiler"
     },
     "section": {
       "members": "Üyeler",
       "roles": "Roller",
       "access": "Ajanların erişimi",
-      "connectors": "Bağlayıcılar",
-      "usage": "Kullanım ve bütçe"
+      "connectors": "Bağlayıcılar"
     },
     "ofOnline": "{{online}} / {{count}}",
     "deleteName": "{{name}} çalışma alanını sil",
@@ -2313,7 +2309,7 @@
       "guide": "{{name}} rehberini aç",
       "fields": "Bilgiler",
       "private": "Bu bilgiler şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
-      "teamHelp": "Öğeleri başta çalışma alanındaki herkese görünür ve hiçbir ajan kullanmaz. Ajanları sonra seçersiniz.",
+      "teamHelp": "Öğelerini çalışma alanındaki herkes görür ve tüm ajanlar kullanabilir. Bunu sonra ayarlayabilirsiniz.",
       "personalHelp": "Öğelerini yalnızca siz görürsünüz, ajanlarınız da siz istediğinizde kullanır.",
       "checking": "{{name}} ile kontrol ediliyor…",
       "connected": "{{name}} bağlandı",

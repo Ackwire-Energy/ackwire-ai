@@ -462,6 +462,48 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
 .nwc .nw-build .wk-build__dither {
   height: 96px;
 }
+/* What its agent is at, under the dither; past a while, one quiet line more opens under it. */
+.nw-build__words {
+  align-self: stretch;
+  min-width: 0;
+}
+.nw-build__step {
+  overflow-wrap: anywhere;
+}
+.nw-build__step > span {
+  animation: ac-fade-in 200ms ease-out both;
+}
+.nw-build__still {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.25s ease,
+    margin-top 0.25s ease,
+    opacity 0.25s ease;
+}
+.nw-build__still[data-on] {
+  grid-template-rows: 1fr;
+  margin-top: var(--space-1);
+  opacity: 1;
+}
+.nw-build__still > p {
+  min-height: 0;
+  overflow: hidden;
+  color: var(--muted);
+}
+/* The build's footer: who is at it, for how long, and the way out at its end. */
+.nwc-clock {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.nwc-stop {
+  flex: none;
+  margin-left: auto;
+}
+.nwc[data-size="s"] .nwc-building {
+  display: none;
+}
 /* The title, written on the card: quiet text until the pointer or the keys reach it. */
 .nwc__title {
   flex: 1;
@@ -559,7 +601,7 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 /* After the test: the ask as one line that opens it again. */
 .nwc-asked {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
   margin: -3px -6px;
@@ -574,12 +616,21 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 }
 .nwc-asked > span {
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+  text-align: start;
 }
+/* The ask is shown whole: when it and the row's choices don't fit side by side, the choices go under it. */
+.nwc-row:has(> .nwc-asked) {
+  flex-wrap: wrap;
+}
+.nwc-row > .nwc-asked {
+  flex: 1 1 200px;
+}
+/* An icon is a box one line tall, so it stays on the ask's first line when the ask wraps. */
 .nwc-asked .ac-icon {
   flex: none;
+  box-sizing: content-box;
+  padding-block: 4px;
 }
 .nwc-asked:hover {
   background: var(--plate);
@@ -945,6 +996,12 @@ html:not([data-pointer]) :is(.nw-sug, .nw-pick, .nw-alert__sugs button):focus-vi
 }
 @media (prefers-reduced-motion: reduce) {
   .nwc.wg {
+    transition: none;
+  }
+  .nw-build__step > span {
+    animation: none;
+  }
+  .nw-build__still {
     transition: none;
   }
   .db-card,

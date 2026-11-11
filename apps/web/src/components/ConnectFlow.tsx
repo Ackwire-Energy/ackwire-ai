@@ -62,7 +62,7 @@ import {
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { TFunction } from "i18next";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
@@ -588,16 +588,13 @@ function DoneStep({ item, onAdjust, onClose }: { item: ConnectedItem; onAdjust: 
   const { save } = useCustomServerAction(org.id);
   const waiting = item.pending > 0 ? item.server : null;
   return (
-    <>
-      <DialogBody className="cflow__body">
-        <p className="cflow__text">{connectedSummary(t, item)}</p>
-        {item.toolsError && <Alert>{t("toolReview.unreadable", { reason: item.toolsError })}</Alert>}
-      </DialogBody>
-      <DialogFooter bar>
-        <Button disabled={save.isPending} onClick={onAdjust}>
-          {t("connectFlow.done.adjust")}
-        </Button>
-        {waiting ? (
+    <ConnectedDone
+      text={connectedSummary(t, item)}
+      busy={save.isPending}
+      onAdjust={onAdjust}
+      onClose={onClose}
+      primary={
+        waiting && (
           <Button
             variant="primary"
             disabled={save.isPending}
@@ -615,7 +612,45 @@ function DoneStep({ item, onAdjust, onClose }: { item: ConnectedItem; onAdjust: 
           >
             {t("connectFlow.next")}
           </Button>
-        ) : (
+        )
+      }
+    >
+      {item.toolsError && <Alert>{t("toolReview.unreadable", { reason: item.toolsError })}</Alert>}
+    </ConnectedDone>
+  );
+}
+
+/**
+ * How connecting anything ends, inside its dialog: one sentence on who can use it, then "Ajustar" (the detail) and
+ * "Pronto", or `primary` in its place.
+ */
+export function ConnectedDone({
+  text,
+  children,
+  busy,
+  primary,
+  onAdjust,
+  onClose,
+}: {
+  text: string;
+  children?: ReactNode;
+  busy?: boolean;
+  primary?: ReactNode;
+  onAdjust: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <DialogBody className="cflow__body">
+        <p className="cflow__text">{text}</p>
+        {children}
+      </DialogBody>
+      <DialogFooter bar>
+        <Button disabled={busy} onClick={onAdjust}>
+          {t("connectFlow.done.adjust")}
+        </Button>
+        {primary || (
           <Button variant="primary" onClick={onClose}>
             {t("connectFlow.done.ok")}
           </Button>

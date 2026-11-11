@@ -795,7 +795,7 @@
     "value": "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key."
   },
   "server.jevWhere": {
-    "value": "In agentes.chat › Settings › AI accounts."
+    "value": "In agentes.chat › Settings › AI and usage."
   },
   "server.reachFailed": {
     "value": "Access from your devices didn't turn on: {{reason}}."

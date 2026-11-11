@@ -1503,8 +1503,7 @@
     "noDate": "Bez daty",
     "clearDate": "Usuń datę",
     "risky": "Merge, deploy i inne ryzykowne działania",
-    "riskyOff": "Wyłączone, te zostają tylko u ciebie.",
-    "riskyOn": "Włączone, ta osoba decyduje też o nich.",
+    "riskyOn": "Ta osoba decyduje też o nich.",
     "lock": "Zawsze u ciebie: pieniądze, osoby i role, klucze AI, twoja skrzynka i usuwanie.",
     "coveringTitle": "Zatwierdzasz za",
     "coveringSubtitle": "To, o co proszą te osoby, trafia też do ciebie, a ty decydujesz w ich imieniu. Nigdy o tym, o co sam(a) prosisz.",
@@ -1515,7 +1514,7 @@
     "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },
   "rightHandApprovals": {
-    "title": "{{name}} zatwierdza za ciebie",
+    "title": "{{name}} tworzy i dostosowuje agentów za ciebie",
     "subtitle": "Tylko to, co wyszło z twojej prośby. Czego by nie zatwierdził, przekazuje tobie.",
     "newAgents": "Tworzenie agentów proponowanych przez inne agenty",
     "newAgentsHelp": "Bez aplikacji, tylko w otwartych kanałach. Możesz to cofnąć przez 24 h.",
@@ -2414,10 +2413,10 @@
       "audienceHelp": "Osoba spoza tej grupy nie widzi {{name}} na pasku bocznym.",
       "lock": "{{name}} nie da się zarchiwizować ani usunąć. Bez pytania publikuje tylko Tydzień zespołu, dla adminów.",
       "audit": "Zobacz, co zrobił {{name}}",
-      "change": "Zmień",
       "planHelp": "Płaci właściciel planu. Gdy jego komputer jest niedostępny, rozmowa o tym mówi i proponuje klucz API.",
       "lookEdit": "Zmień wygląd: {{name}}",
-      "planOwner": "od: {{owner}}",
+      "planOwner": "konto: {{owner}}",
+      "planName": "Plan {{name}}",
       "mine": "Twoja AI",
       "mineHelp": "Twoja rozmowa z {{name}} myśli z Twoim planem lub udostępnionym Ci planem, i tylko Twoja.",
       "connectMine": "Połącz mój plan",
@@ -2435,15 +2434,13 @@
       "fallbackPlan": "Bez własnego planu korzysta z planu użytkownika {{owner}}, który odpowiada wszystkim.",
       "fallbackYours": "Bez innego planu korzysta z planu workspace'u, który jest Twój.",
       "fallbackNone": "Bez własnego planu {{name}} nie może Ci odpowiedzieć: plan workspace'u odpowiada tylko użytkownikowi {{owner}}.",
-      "workspace": "AI workspace'u",
+      "workspace": "AI dla osób bez własnego planu",
       "workspaceHelp": "Osoby bez własnego planu rozmawiają z {{name}} przez tę AI.",
-      "workspacePlan": "Plan workspace'u",
-      "workspacePlanHelp": "Plan zamiast klucza. Odpowiada innym tylko wtedy, gdy pozwala na to jego właściciel.",
-      "noPlans": "Połącz plan w sekcji Konta AI, aby użyć go tutaj.",
-      "pickPlan": "Wybierz plan",
-      "sharesOn": "Włączone: osoby bez własnego planu rozmawiają z {{name}} przez ten plan.",
-      "sharesOff": "Wyłączone: tylko {{owner}} rozmawia przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi.",
-      "sharesOffYou": "Wyłączone: tylko Ty rozmawiasz przez ten plan. Osoby bez własnego planu nie dostaną odpowiedzi."
+      "noPlans": "Połącz plan w sekcji AI i zużycie, aby użyć go tutaj.",
+      "lend": "Użycz tego planu osobom, które go nie mają",
+      "groupMine": "Tylko dla ciebie",
+      "groupWorkspace": "Dla całej przestrzeni roboczej",
+      "groupAdmins": "tylko admini"
     },
     "card": {
       "settings": "{{name}} · Ustawienia",
@@ -4048,6 +4045,8 @@
       "access": "Dostęp domyślny",
       "accessTitle": "Dostęp domyślny dla {{label}}",
       "accessText": "Jego elementy stosują się do tego, chyba że zmienisz któryś z nich. Każda zmiana zapisuje się od razu.",
+      "noAgents": "Żaden agent nie korzysta z tego połączenia.",
+      "giveAccess": "Daj dostęp",
       "actionsName": "Więcej dla {{name}}",
       "disconnect": "Rozłącz",
       "removeTitle": "Rozłączyć {{name}}?",
@@ -5033,6 +5032,7 @@
         "accountOthers": "Plany innych osób pokazują, czyje są. Właściciel dostaje e-mail i może go odebrać.",
         "addAccount": "Dodaj konto",
         "signInAgain": "Zaloguj się ponownie",
+        "connectPlan": "Połącz inny plan",
         "fallbackTitle": "Jeśli {{computer}} przestanie odpowiadać, odpowiadaj przez API",
         "fallbackHint": "Odpowiada przez API i liczy się to do budżetu agenta {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",
         "fallbackHint_female": "Odpowiada przez API i liczy się to do budżetu agentki {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",
@@ -8882,7 +8882,7 @@
       "homeHint": "Misja dostaje wątek: tam {{name}} rozmawia, prosi o decyzje i pokazuje swoją pracę.",
       "homeHint_female": "Misja dostaje wątek: tam {{name}} rozmawia, prosi o decyzje i pokazuje swoją pracę.",
       "offline": "{{name}} jest offline. Plan ruszy, gdy wróci.",
-      "needsMachine": "Misje działają na podłączonym komputerze. Podłącz go do {{name}} w Ustawienia › Komputery.",
+      "needsMachine": "Misje działają na podłączonym komputerze. Podłącz go do {{name}} w Ustawienia › Urządzenia.",
       "commandHint": "Możesz też rozpocząć misję, pisząc w polu wiadomości dowolnej rozmowy:",
       "approvals": "Merge, wdrożenie i rollback zawsze wymagają zatwierdzenia",
       "start": "Rozpocznij misję",
@@ -10013,7 +10013,6 @@
     "page": {
       "title": "Twoje plany",
       "hint": "Każdy plan zostaje na komputerze, na którym go połączono, i ma do niego dostęp każdy, kto obsługuje ten komputer. agentes.chat przechowuje tylko jego nazwę, e-mail i użycie.",
-      "empty": "Zaloguj się na swoje konto, a agenci będą na nim myśleć.",
       "emptyTitle": "Korzystaj z planu AI, za który już płacisz",
       "emptyViewer": "Osoba odpowiedzialna za AI w przestrzeni roboczej łączy plan, a on pojawi się tutaj.",
       "connect": "Połącz AI",
@@ -14164,8 +14163,6 @@
       "firstTime": "Za pierwszym razem",
       "step1": "Otwórz pobrany plik i przeciągnij agentes.chat do folderu Aplikacje.",
       "step1Install": "Otwórz pobrany plik, aby go zainstalować.",
-      "step2": "Otwórz ją, kliknij Użyj własnego serwera, potem Połącz z moim serwerem i wpisz adres tej strony. Zaloguj się, a potem kliknij Podłącz ten {{device}} w Ustawienia → Komputery.",
-      "other": "Inne sposoby: serwer lub Linux",
       "otherText": "Uruchom to w terminalu komputera, a potem potwierdź pokazany kod.",
       "waiting": "Czekam, aż komputer się połączy…"
     },
@@ -14775,19 +14772,9 @@
       },
       "saved": "{{name}} używa teraz: {{computer}}."
     },
-    "lead": "Gdzie pracują twoi agenci: ten serwer i każdy podłączony komputer.",
-    "leadCloud": "Gdzie pracują twoi agenci: komputer tylko dla tej przestrzeni roboczej, zawsze włączony.",
     "about": "O tym komputerze",
     "how": "Jak działają komputery",
-    "hostMissing": "Ten serwer też może być komputerem twoich agentów: <guide>zobacz jak</guide>.",
-    "other": {
-      "title": "Inne komputery",
-      "text": "Podłączone kodem, np. Mac mini w domu albo inny serwer. Na co każdy z nich pozwala, ustawia się na tym komputerze.",
-      "emptyTitle": "Uruchamiaj agentów na dowolnym komputerze",
-      "emptyText": "Połącz kodem Maca mini w domu albo inny serwer, a agenci będą na nim pracować.",
-      "emptyViewerTitle": "Tu pojawią się komputery zespołu",
-      "emptyViewer": "Komputer dodaje osoba, która może je łączyć, a on pojawi się tutaj."
-    }
+    "hostMissing": "Ten serwer też może być komputerem twoich agentów: <guide>zobacz jak</guide>."
   },
   "outage": {
     "region": "Komputery offline",
@@ -15367,10 +15354,7 @@
     "notOpen": "Twoja rola w tej przestrzeni roboczej nie otwiera sekcji {{section}}. Osoba zarządzająca rolami może ją dla ciebie otworzyć.",
     "nav": "Sekcje ustawień",
     "group": {
-      "you": "Ty",
-      "org": "Przestrzeń robocza",
-      "agents": "Agenci",
-      "costs": "Koszty i dane"
+      "org": "Przestrzeń robocza"
     },
     "section": {
       "account": "Twoje konto",
@@ -15383,11 +15367,10 @@
       "access": "Agenci i dostęp",
       "connectors": "Konektory i MCP",
       "skills": "Umiejętności",
-      "keys": "Konta AI",
       "storage": "Miejsce na dane",
       "computers": "Komputery",
       "devices": "Urządzenia",
-      "usage": "Budżet i zużycie",
+      "usage": "AI i zużycie",
       "audit": "Dziennik audytu",
       "import": "Import i eksport",
       "billing": "Plan i płatności",
@@ -15398,7 +15381,6 @@
       "about": "O agentes.chat",
       "generalPersonal": "O tobie",
       "keysPersonal": "AI i aplikacje",
-      "usagePersonal": "Plan i zużycie",
       "membersPersonal": "Osoby"
     },
     "advanced": "Zaawansowane",
@@ -15413,9 +15395,8 @@
       "access": "Z czego może korzystać każdy agent: jeden poziom na konektor.",
       "connectors": "Usługi i serwery MCP podłączone raz dla całej przestrzeni roboczej.",
       "skills": "Instrukcje w Markdown, które agenci otwierają, gdy ich potrzebują.",
-      "keys": "Twoje plany i klucze API przestrzeni roboczej.",
       "storage": "Gdzie są przechowywane pliki przestrzeni roboczej.",
-      "usage": "Ile AI używa każda osoba i każdy agent, oraz limity miesiąca.",
+      "usage": "Konta AI przestrzeni roboczej oraz ile zużywa każda osoba i każdy agent.",
       "audit": "Co agenci zrobili poza rozmową i co zmienili ludzie.",
       "import": "Przenieś agentów z innej aplikacji lub przestrzeni albo zabierz tę.",
       "billing": "Plan, karta i faktury, na naszej stronie poza aplikacją.",
@@ -15425,7 +15406,6 @@
       "approvals": "Kto decyduje za ciebie, gdy agent prosi o twoją zgodę.",
       "about": "Kto go tworzy, jego licencja i gdzie jest kod źródłowy.",
       "generalPersonal": "Co twoi agenci wiedzą o tobie i jak działa ta przestrzeń robocza.",
-      "keysPersonal": "AI, którą twoi agenci myślą, oraz aplikacje i skille, których używają.",
       "usagePersonal": "Ile AI używają twoi agenci, i twój plan.",
       "connectorsPersonal": "Twoje aplikacje i serwery MCP, połączone raz dla twoich agentów.",
       "membersPersonal": "Kto jest tu z tobą, i zaproszenia.",
@@ -15541,51 +15521,11 @@
       "dialogTitle": "Co jest wysyłane",
       "dialogText": "Raz dziennie. Dokładnie tak wygląda następny raport."
     },
-    "tilesTitle": "Wszystko w przestrzeni roboczej",
     "tileState": {
       "members_one": "{{count}} członek",
       "members_few": "{{count}} członków",
       "members_many": "{{count}} członków",
-      "members_other": "{{count}} członków",
-      "invitations_one": "{{count}} zaproszenie czeka",
-      "invitations_few": "{{count}} zaproszenia czekają",
-      "invitations_many": "{{count}} zaproszeń czeka",
-      "invitations_other": "{{count}} zaproszenia czekają",
-      "agents_one": "{{count}} agent",
-      "agents_few": "{{count}} agentów",
-      "agents_many": "{{count}} agentów",
-      "agents_other": "{{count}} agentów",
-      "connectors_one": "{{count}} podłączony",
-      "connectors_few": "{{count}} podłączone",
-      "connectors_many": "{{count}} podłączonych",
-      "connectors_other": "{{count}} podłączone",
-      "noConnectors": "Brak podłączonych aplikacji",
-      "skills_one": "{{count}} umiejętność",
-      "skills_few": "{{count}} umiejętności",
-      "skills_many": "{{count}} umiejętności",
-      "skills_other": "{{count}} umiejętności",
-      "computers_one": "Włączone: {{online}} z {{count}}",
-      "computers_few": "Włączone: {{online}} z {{count}}",
-      "computers_many": "Włączone: {{online}} z {{count}}",
-      "computers_other": "Włączone: {{online}} z {{count}}",
-      "noComputers": "Brak komputera",
-      "devices_one": "Włączone: {{online}} z {{count}}",
-      "devices_few": "Włączone: {{online}} z {{count}}",
-      "devices_many": "Włączone: {{online}} z {{count}}",
-      "devices_other": "Włączone: {{online}} z {{count}}",
-      "noDevices": "Nie ma jeszcze urządzeń",
-      "usage": "{{percent}} budżetu wykorzystane w tym miesiącu",
-      "keys_one": "{{count}} klucz",
-      "keys_few": "{{count}} klucze",
-      "keys_many": "{{count}} kluczy",
-      "keys_other": "{{count}} klucze",
-      "platformKey": "Używa klucza tego serwera",
-      "noKeys": "Brak kluczy",
-      "plans_one": "{{count}} plan",
-      "plans_few": "{{count}} plany",
-      "plans_many": "{{count}} planów",
-      "plans_other": "{{count}} plany",
-      "noPlans": "Brak planów"
+      "members_other": "{{count}} członków"
     },
     "import": {
       "title": "Import",
@@ -15724,6 +15664,9 @@
         "jev": "Agenci wysyłają naklejki sami tylko z Jev.",
         "jevLink": "Skonfiguruj Jev"
       }
+    },
+    "tab": {
+      "account": "Profil"
     }
   },
   "personalMode": {
@@ -15929,7 +15872,6 @@
     "equivalent": "≈ {{amount}} po cenach API",
     "apiPrice": "cenę API",
     "apiPriceHint": "Gdy agenci korzystają z planów, nikt nie płaci za użycie. Ta kwota to koszt takiego samego użycia przez API.",
-    "thisMonth": "Ten miesiąc",
     "moreAgents_one": "+{{count}} inny agent",
     "moreAgents_few": "+{{count}} innych agentów",
     "moreAgents_many": "+{{count}} innych agentów",
@@ -15938,7 +15880,7 @@
     "budgetShare": "{{percent}} budżetu",
     "estimate": "Plany podają tylko, ile zużyło całe konto. Część każdego agenta to szacunek na podstawie tego, ile każdy z nich na nim wydał.",
     "accounts": {
-      "title": "Konta z planem",
+      "title": "Konta",
       "empty": "Połącz plan i śledź tutaj, ile zużywa każdy agent."
     },
     "api": {
@@ -17956,7 +17898,7 @@
       "turn": "Obróć poziomo",
       "upright": "Obróć pionowo",
       "message": "Napisz do {{name}}",
-      "chooseOnWeb": "Wybierz go w agentes.chat, w Ustawienia › Komputery."
+      "chooseOnWeb": "Wybierz go w agentes.chat, w Ustawienia › Urządzenia."
     }
   },
   "taskManager": {
@@ -18536,7 +18478,6 @@
       "created": "Dodano widżet: {{where}}",
       "test": "Testuj",
       "testAgain": "Testuj ponownie",
-      "testing": "{{name}} buduje go na prawdziwych danych…",
       "tested": "Prawdziwe dane · {{when}}",
       "stale": "Zmieniono od testu",
       "testFailed": "Nie udało się: {{reason}}",
@@ -18558,6 +18499,10 @@
       "editAskOf": "Zmień prośbę: {{ask}}",
       "testingShort": "Testowanie…",
       "buildingFoot": "{{name}} buduje…",
+      "thinking": "Myśli",
+      "finishing": "Buduje widżet",
+      "stop": "Zatrzymaj",
+      "stillWorking": "Nadal pracuje. Prawdziwe dane mogą zająć minutę lub dwie.",
       "failedTitle": "{{name}}: nie udało się zbudować",
       "staleHint": "Przetestuj ponownie, aby zobaczyć, jak wygląda.",
       "whoButton": "Kto się nim zajmuje: {{name}}",

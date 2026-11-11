@@ -52,8 +52,8 @@ same shape.
 - **Chat:** every conversation opens in bubbles (DMs already did); a person's own choice still wins. The panels on the
   right of a conversation (the agent's panel beside its DM, a channel's members column) start closed at every width;
   the person's own toggle is remembered and wins.
-- **Settings:** six sections in one list (Your account, About you, AI and apps, Plan and usage, Vault, Computers) and
-  the rest under Advanced, collapsed. People joins the list once others are members. Every section still opens by its
+- **Settings:** six sections in one list (Your account, About you, AI and usage, Connectors, Vault, Computers) and
+  the rest under Advanced, collapsed. AI and usage also holds the plan and billing. People joins the list once others are members. Every section still opens by its
   address, from ⌘K and from the right hand's cards.
 - **An agent's page:** its bar is Overview, Instructions, Memory, "Can use" (its apps and mailboxes), Settings (name,
   look and budget) and Advanced, with no "More". Advanced holds the rest, whole: Activity, Files and Usage a click away,

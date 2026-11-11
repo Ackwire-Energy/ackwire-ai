@@ -14,7 +14,7 @@ import {
 import { STICKER_STILL_T, WAVE_SECONDS } from "@agenteschat/ui/agent/stickers";
 import { stickerFrame } from "../../src/agent/sticker";
 import { agentStarters, buildConversations, homeLayout, rightHandPin } from "../../src/features/chats/logic";
-import { SETTINGS_SECTIONS, visibleSections } from "../../src/features/settings/logic";
+import { SETTINGS_SECTIONS } from "../../src/features/settings/logic";
 import { agent, at } from "./fixtures";
 
 const lodi = agent({ id: "a-lodi", name: "Lodi", builtin: "right_hand" });
@@ -169,12 +169,11 @@ test("on a hold for its first plan the phone's card leads with the plan row: whe
   for (const banned of ["billingLink", "BillingLink", "planOffer", "plans.json"]) expect(card).not.toContain(banned);
 });
 
-test("Configurações has its section for who manages agents, at its own screen", () => {
-  const ids = (permissions: string[]) =>
-    visibleSections({ id: "o", name: "Acme", role: "member", permissions }).map((s) => s.id);
-  expect(ids(["read", "manage_agents"])).toContain("right_hand");
-  expect(ids(["read"])).not.toContain("right_hand");
-  expect(SETTINGS_SECTIONS.find((s) => s.id === "right_hand")?.href).toBe("/settings/right-hand");
+test("Configurações lists no section for it: its settings open from its own profile, on their screen", () => {
+  const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
+  expect(SETTINGS_SECTIONS.map((s) => s.id as string)).not.toContain("right_hand");
+  expect(src("right-hand/SettingsScreen.tsx")).toContain('router.push("/settings/right-hand" as never)');
+  expect(src("agents/AgentProfileScreen.tsx")).toContain("onPress: openRightHandSettings");
 });
 
 test("its DM, cards and profile treat it apart through the one shared helper", () => {

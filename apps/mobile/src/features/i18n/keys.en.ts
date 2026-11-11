@@ -1152,7 +1152,6 @@ export const featureKeysEn = {
     proposalsWaiting_other: "{{count}} waiting",
     drive: "Drive",
     connectors: "Connectors and MCPs",
-    usage: "Usage",
     preferences: "Preferences",
     editProfile: "Edit profile",
     switchWorkspace: "Switch workspace",
@@ -2336,8 +2335,6 @@ export const featureKeysEn = {
     group: {
       org: "Workspace",
       people: "People",
-      agents: "Agents",
-      costs: "Costs and data",
     },
     /** Shorter names for the rows whose group already says the rest (the web's are `settings.section.*`). */
     section: {
@@ -2345,7 +2342,6 @@ export const featureKeysEn = {
       roles: "Roles",
       access: "Agents' access",
       connectors: "Connectors",
-      usage: "Usage and budget",
     },
     /** The computers row's value: how many are on, of how many. */
     ofOnline: "{{online}} of {{count}}",
@@ -2435,8 +2431,7 @@ export const featureKeysEn = {
       guide: "Open the {{name}} guide",
       fields: "Details",
       private: "These details are kept encrypted and never shown again.",
-      teamHelp:
-        "Its items start visible to everyone in the workspace and used by no agent. You choose the agents next.",
+      teamHelp: "Everyone in the workspace sees its items and every agent can use them. You can adjust it next.",
       personalHelp: "Only you see its items, and your agents use them when you ask.",
       checking: "Checking with {{name}}…",
       connected: "{{name}} connected",

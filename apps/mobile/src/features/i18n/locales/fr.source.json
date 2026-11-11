@@ -2654,9 +2654,6 @@
   "me.connectors": {
     "value": "Connectors and MCPs"
   },
-  "me.usage": {
-    "value": "Usage"
-  },
   "me.preferences": {
     "value": "Preferences"
   },
@@ -5465,12 +5462,6 @@
   "settings.group.people": {
     "value": "People"
   },
-  "settings.group.agents": {
-    "value": "Agents"
-  },
-  "settings.group.costs": {
-    "value": "Costs and data"
-  },
   "settings.section.members": {
     "value": "Members"
   },
@@ -5482,9 +5473,6 @@
   },
   "settings.section.connectors": {
     "value": "Connectors"
-  },
-  "settings.section.usage": {
-    "value": "Usage and budget"
   },
   "settings.ofOnline": {
     "value": "{{online}} of {{count}}"
@@ -5658,7 +5646,7 @@
     "value": "These details are kept encrypted and never shown again."
   },
   "vault.connect.teamHelp": {
-    "value": "Its items start visible to everyone in the workspace and used by no agent. You choose the agents next."
+    "value": "Everyone in the workspace sees its items and every agent can use them. You can adjust it next."
   },
   "vault.connect.personalHelp": {
     "value": "Only you see its items, and your agents use them when you ask."

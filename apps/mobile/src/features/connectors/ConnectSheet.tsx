@@ -435,7 +435,7 @@ function ConnectedSteps({
 const POP = Easing.bezier(0.23, 1, 0.32, 1);
 
 /** Just connected: a check that pops in (the phone buzzes with it), the name and, once known, what it means. */
-function ConnectedNote({ name, text }: { name: string; text: string | null }) {
+export function ConnectedNote({ name, text }: { name: string; text: string | null }) {
   const { t } = useTranslation();
   const { colors, reducedMotion } = useTheme();
   return (

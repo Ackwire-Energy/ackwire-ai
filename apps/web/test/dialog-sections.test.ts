@@ -31,6 +31,7 @@ const OWN_INSET =
 /** Components from other files that render sections (checked where they are defined). */
 const SECTION_COMPONENTS = new Set([
   "ConnectFlow",
+  "ConnectedDone",
   "ConnectedRepos",
   "ConnectorSky",
   "EndpointForm",
