@@ -5,7 +5,7 @@ import { Button, Icon, Logo, Segmented } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildTarget, INSTALL_SYSTEMS, type InstallSystem, InstallSteps, systemHere } from "@/components/install/guide";
+import { buildTarget, INSTALL_SYSTEMS, InstallSteps, type InstallSystem, systemHere } from "@/components/install/guide";
 import { LanguageSelect } from "@/components/LanguageSelect";
 import { DownloadSky } from "@/components/Sky";
 import { useDocumentTitle } from "@/lib/desktop";

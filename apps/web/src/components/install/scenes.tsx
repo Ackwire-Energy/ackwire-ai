@@ -56,7 +56,15 @@ const Lights = () => (
 );
 
 /** The ringed thing to click, with the pointer on it. */
-function Hit({ as: Tag = "span", className, children }: { as?: "span" | "div"; className: string; children: ReactNode }) {
+function Hit({
+  as: Tag = "span",
+  className,
+  children,
+}: {
+  as?: "span" | "div";
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <Tag className={`${className} isc-hl`}>
       {children}
