@@ -19,6 +19,8 @@ import type { RunnerError } from "../../runner/errors";
 import { type HandlerContext, handleRequest, OP_ROUTES, type RequestScope } from "../../runner/handlers";
 import { acquireLock } from "../../runner/lock";
 import {
+  APPLE_EVERY,
+  APPLE_MISSES_KEPT,
   androidText,
   applyInput,
   type IosScreenDriverFactory,
@@ -771,6 +773,30 @@ test("an iPhone on iOS 16 is reported as too old, never left out; one newer than
   const plain = rig({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk: "27.0" });
   await plain.manager.poll();
   expect(plain.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
+  // Once its helper is stuck the way an old Xcode explains, the newer iOS is named as the cause.
+  const stuck = (need: { state: string; reason: string }, sdk: string) =>
+    rig(
+      { devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk },
+      { ios: () => ({ need: () => need, reap: () => {}, stopAll: () => {} }) as unknown as IosHelper },
+    );
+  const states = [];
+  for (const [need, sdk] of [
+    [{ state: "preparing", reason: "device_support" }, "26.2"],
+    [{ state: "needs_you", reason: "ui_not_authorized" }, "26.2"],
+    [{ state: "preparing", reason: "device_support" }, "27.0"],
+    [{ state: "preparing", reason: "helper_missing" }, "26.2"],
+  ] as const) {
+    const s = stuck(need, sdk);
+    await s.manager.poll();
+    const phone = s.manager.list().find((p) => p.serial === IPHONE);
+    states.push([phone?.state, phone?.reason]);
+  }
+  expect(states).toEqual([
+    ["needs_you", "xcode_too_old"],
+    ["needs_you", "xcode_too_old"],
+    ["preparing", "device_support"],
+    ["preparing", "helper_missing"],
+  ]);
 });
 
 test("devicectl failing once leaves the iPhones it saw, and an op under way keeps its phone", async () => {
@@ -781,6 +807,9 @@ test("devicectl failing once leaves the iPhones it saw, and an op under way keep
   await r.manager.poll();
   await r.manager.poll();
   expect(r.manager.list().some((p) => p.serial === IPHONE)).toBe(true);
+  // Failing look after look, it's taken as unplugged.
+  for (let i = 0; i < APPLE_EVERY * APPLE_MISSES_KEPT; i++) await r.manager.poll();
+  expect(r.manager.list().some((p) => p.serial === IPHONE)).toBe(false);
 });
 
 test("iOS simulator: install with its bundle id, launch, screenshot, record, flow, the app's log", async () => {

@@ -225,10 +225,11 @@ Agents use a phone through a computer you connected (Connect a computer, above):
   computer's Wi-Fi, where it must stay. On a Mac, the agentes.chat app needs **System
   Settings › Privacy & Security › Local Network**, or the computer never hears the phone. Wireless
   debugging turns off when the phone restarts.
-- **iPhone through a Mac:** Xcode from the App Store, with an Apple Account added in its **Settings ›
-  Accounts** (a free one is enough: the Mac renews the test helper every 7 days). The Mac downloads the
-  iOS tools, about 8 GB. Then plug the iPhone in, trust the Mac, and turn on Developer Mode and UI
-  Automation. A newer iOS needs an Xcode that knows it: update Xcode when the iPhone updates.
+- **iPhone through a Mac:** an iPhone on iOS 17 or newer, and Xcode from the App Store with an Apple
+  Account added in its **Settings › Apple Accounts** (a free one is enough: the Mac renews the test
+  helper every 7 days). The Mac downloads the iOS tools, about 8 GB. Then plug the iPhone in, trust the
+  Mac, and turn on Developer Mode and UI Automation. A newer iOS needs an Xcode that knows it: update
+  Xcode when the iPhone updates.
 
 Android's pairing QR aside, the steps show no QR code: one that opens them in the agentes.chat phone
 app waits until the app is in the App Store and Google Play, since until then it would only open the

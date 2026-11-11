@@ -74,6 +74,8 @@ import { type PairRequest, parseMdnsServices, serialOfMdnsName, WifiPairer, wifi
 export const POLL_MS = 3_000;
 /** iPhones and simulators are looked at every this many polls (`devicectl` costs about a second). */
 export const APPLE_EVERY = 2;
+/** Apple looks in a row devicectl may fail (a busy Mac) before the iPhones it last listed are taken as gone. */
+export const APPLE_MISSES_KEPT = 2;
 export const IDLE_MS = 5 * 60_000;
 /** A phone's facts (model, screen, battery) are read again after this long. */
 export const FACTS_TTL_MS = 5 * 60_000;
@@ -227,10 +229,10 @@ export const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
   device_support: "Xcode is still preparing the iPhone. Try again in a few minutes.",
 };
 
-/** Reasons only the test helper has: an iPhone still installs, opens apps and reads its log meanwhile. */
 /** Helper failures an Xcode older than the iPhone's iOS explains (its device support or test daemon too old). */
 const OLD_XCODE_SIGNS = new Set<PhoneReason>(["device_support", "ui_not_authorized"]);
 
+/** Reasons only the test helper has: an iPhone still installs, opens apps and reads its log meanwhile. */
 const HELPER_REASONS = new Set<PhoneReason>([
   "helper_missing",
   "helper_expired",
@@ -445,6 +447,7 @@ export class PhoneManager {
   private reconnecting: Promise<void> | null = null;
   private readonly pairer: WifiPairer;
   private appleSeen: Phone[] | null = null;
+  private appleMisses = 0;
   /** Until when a phone guide asked to look for phones Windows has no driver for (`phone.look`). */
   private lookUntil = 0;
   private driverless: { at: number; phones: Phone[] } | null = null;
@@ -816,8 +819,12 @@ export class PhoneManager {
       // not JSON: an Xcode mid-update
     }
     const devices = await this.devicectlJson(xcrun, ["list", "devices"]);
-    // devicectl failing or slow once (a busy Mac) isn't every iPhone unplugged: the last ones stand.
-    if (devices === null) return [...out, ...(this.appleSeen ?? []).filter((p) => p.kind === "device")];
+    // devicectl failing or slow for a look or two (a busy Mac) isn't every iPhone unplugged: the last ones stand.
+    if (devices === null) {
+      if (++this.appleMisses > APPLE_MISSES_KEPT) return out;
+      return [...out, ...(this.appleSeen ?? []).filter((p) => p.kind === "device")];
+    }
+    this.appleMisses = 0;
     const usb = needsUsbList(devices)
       ? new Set((await usbmuxPlugged(this.opts.usbmuxSocket ?? USBMUXD_SOCKET).catch(() => new Map())).keys())
       : undefined;
@@ -839,9 +846,10 @@ export class PhoneManager {
         phone.state === "ready" && this.ios ? this.ios.need(phone.serial, this.opts.readOnly ? null : xcrun) : null;
       // An iOS newer than this Mac's iPhone SDK often still works (apps open, screenshots), so the version alone
       // turns nothing away: it names the likely cause once the helper itself is stuck.
-      const oldXcode =
-        need?.state === "needs_you" && OLD_XCODE_SIGNS.has(need.reason) && sdkTooOld(phone.osVersion, tools.sdk);
-      out.push(need ? { ...phone, ...need, ...(oldXcode ? { reason: "xcode_too_old" as const } : {}) } : phone);
+      // device_support is only "preparing" to the helper, but with an older SDK the person has the way out.
+      const oldXcode = !!need && OLD_XCODE_SIGNS.has(need.reason) && sdkTooOld(phone.osVersion, tools.sdk);
+      const named = oldXcode ? { state: "needs_you" as const, reason: "xcode_too_old" as const } : {};
+      out.push(need ? { ...phone, ...need, ...named } : phone);
     }
     return out;
   }
