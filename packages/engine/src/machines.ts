@@ -23,6 +23,7 @@ import {
 } from "@agenteschat/db";
 import { getAgent } from "./agents";
 import { type AuditEntry, recordAudit } from "./audit";
+import { isSandboxedBrain } from "./brains/types";
 import { caches } from "./cache";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
@@ -623,6 +624,8 @@ export async function machineAgents(db: Database, orgId: string, machineId: stri
       // System mode keeps an account's folder with this agent's user only while it thinks with it.
       ...(account ? { account } : {}),
       ...(extra.length > 0 ? { accounts: extra } : {}),
+      // Where a sandbox of its CLI's own is what holds its turns, a containers service outside it would be a way out.
+      ...(a.builtin !== RIGHT_HAND && !isSandboxedBrain(a.brain) ? { containers: true } : {}),
     };
   });
 }
