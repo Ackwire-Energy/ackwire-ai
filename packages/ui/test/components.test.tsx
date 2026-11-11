@@ -757,8 +757,10 @@ describe("Menu", () => {
     expect([...face.children].map((c) => c.getAttribute("class")?.split(" ")[0])).toEqual([
       "ac-avatar",
       "ac-face-edit__glyph",
+      "ac-face-edit__badge",
     ]);
-    expect(face.querySelector(".ac-face-edit__glyph")?.getAttribute("aria-hidden")).toBe("true");
+    for (const part of [".ac-face-edit__glyph", ".ac-face-edit__badge"])
+      expect(face.querySelector(part)?.getAttribute("aria-hidden")).toBe("true");
     await act(async () => fireEvent.keyDown(face, { key: "Enter" }));
     expect(changed).toBe(1);
     expect(body().queryByRole("menu")).toBeNull();
@@ -776,6 +778,13 @@ describe("Menu", () => {
     const glyph = css.split(".ac-face-edit__glyph {")[1]?.split("}")[0] ?? "";
     expect(glyph).toContain("z-index: var(--z-raised);");
     expect(glyph).toContain("opacity: 0;");
+    // No hover on a touch screen: the photo badge stays on the face's top corner there, and only there.
+    expect(css).toContain(
+      ".ac-face-edit__badge {\n  display: none;\n}\n@media (hover: none) {\n  .ac-face-edit__badge {",
+    );
+    const badge = css.split("@media (hover: none) {\n  .ac-face-edit__badge {")[1]?.split("}")[0] ?? "";
+    for (const line of ["top: -4px;", "right: -4px;", "z-index: var(--z-lifted);", "display: grid;"])
+      expect(badge).toContain(line);
   });
 });
 

@@ -2072,7 +2072,7 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
             // On top, as the workspace's header is in a team's: the face (how you appear on it) and the name.
             <button
               type="button"
-              className="sidebar__org-button"
+              className="sidebar__org-button sidebar__org-button--me"
               aria-label={`${t("shell.account")}: ${who}`}
               title={who}
             >
@@ -2109,7 +2109,7 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
             <MyFace size="lg" presence={presence} presenceLabel={presenceWord} />
           </MenuFace>
           <span className="list-col">
-            <span className="profile-card__name">{me.user.name}</span>
+            <span className="profile-card__name ac-captop">{me.user.name}</span>
             <span className="small muted">{[handle && `@${handle}`, presenceWord].filter(Boolean).join(" · ")}</span>
           </span>
         </div>

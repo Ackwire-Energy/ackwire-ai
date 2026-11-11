@@ -1107,6 +1107,27 @@ textarea.ac-input {
 html:not([data-pointer]) .ac-face-edit:focus-visible {
   box-shadow: var(--focus-ring);
 }
+/* A touch screen has no hover to show the glyph: a small photo badge stays on the face's top corner instead (the
+   presence badge keeps the bottom one), ringed in the surface as that badge is. */
+.ac-face-edit__badge {
+  display: none;
+}
+@media (hover: none) {
+  .ac-face-edit__badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    z-index: var(--z-lifted);
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--ink);
+    color: var(--bg);
+    box-shadow: 0 0 0 2px var(--presence-ring, var(--raised));
+  }
+}
 .ac-avatar--running::after {
   content: "";
   position: absolute;

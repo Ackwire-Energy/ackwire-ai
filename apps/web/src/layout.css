@@ -723,6 +723,11 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* A personal workspace's top row is you: your name wraps whole there, as at a team's foot. */
+.sidebar__org-button--me .sidebar__org-name {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .sidebar__org-meta {
   font-size: 12px;
   line-height: 16px;
@@ -857,14 +862,13 @@ html:not([data-pointer]) .sidebar__user:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* A long name wraps whole: never cut to an ellipsis. */
 .sidebar__user-name {
   font-size: 14px;
   font-weight: 600;
   line-height: 22px;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 /* Page container */
@@ -3406,8 +3410,21 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   width: 280px;
   max-height: var(--radix-dropdown-menu-content-available-height);
 }
+/* Your name and @ start beside your face, the name's capitals at its top, and what the face's height can't hold goes on
+   under it at the menu's width: a face never owns a column, and a long name or @ wraps whole, never past the edge. */
 .profile-menu__head {
-  padding: 10px 10px 8px;
+  display: flow-root;
+  padding: 10px 10px 4px;
+  overflow-wrap: anywhere;
+}
+/* The 4 under the face is the head's: a short name keeps the head's height, a long one clears the presence badge. */
+.profile-menu__head > .ac-face-edit {
+  float: left;
+  margin: 0 12px 4px 0;
+}
+.profile-menu__head > .list-col,
+.profile-menu__head > .list-col > * {
+  display: block;
 }
 .profile-menu__line {
   margin: 0 4px 6px;

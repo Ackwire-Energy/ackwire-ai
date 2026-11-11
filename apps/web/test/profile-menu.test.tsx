@@ -189,10 +189,12 @@ describe("the account menu", () => {
     const row = account();
     const menu = await openMenu();
     const face = within(menu).getByRole("menuitem", { name: "Trocar foto" });
-    // My face as everywhere, with how I appear; the glyph over it shows on hover and focus, for the eyes only.
+    // My face as everywhere, with how I appear; the glyph over it shows on hover and focus, the photo badge on a touch
+    // screen, both for the eyes only.
     expect(face.getAttribute("title")).toBe("Trocar foto");
     expect(face.querySelector(".ac-avatar .ac-presence")?.getAttribute("data-presence")).toBe("online");
-    expect(face.querySelector(".ac-face-edit__glyph")?.getAttribute("aria-hidden")).toBe("true");
+    for (const part of [".ac-face-edit__glyph", ".ac-face-edit__badge"])
+      expect(face.querySelector(part)?.getAttribute("aria-hidden")).toBe("true");
     expect(document.activeElement === face).toBe(true);
     await press("Enter");
     await settle(2);
@@ -232,6 +234,20 @@ describe("the account menu", () => {
     await click(within(builder).getByRole("button", { name: "Enviar foto" }));
     expect(screen().getByRole("dialog", { name: "Foto do perfil" })).toBeTruthy();
     expect(screen().queryByRole("dialog", { name: "Seu avatar" })).toBeNull();
+  });
+
+  test("a long name and @ are whole on top and at the foot, the name's capitals at the face's top", async () => {
+    const long = "Maria Eduarda Albuquerque de Vasconcelos Figueiredo";
+    const state = seedState();
+    const walter = state.members.find((m) => m.userId === "u-walter");
+    if (walter) Object.assign(walter, { name: long, handle: "maria.eduarda.vasconcelos.figueiredo" });
+    if (state.me) state.me.user.name = long;
+    await go(state);
+    expect(account().querySelector(".sidebar__user-name")?.textContent).toBe(long);
+    const head = (await openMenu()).querySelector(".profile-menu__head");
+    // The name's capitals start at the face's top, as beside any face taller than its line.
+    expect(head?.querySelector(".profile-card__name.ac-captop")?.textContent).toBe(long);
+    expect(head?.textContent).toContain("@maria.eduarda.vasconcelos.figueiredo · Online");
   });
 
   test("my name is in my profile: one Salvar saves it, and the directory shows it at once", async () => {

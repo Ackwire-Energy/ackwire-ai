@@ -18,6 +18,7 @@ import {
   GroupedHeader,
   GroupedList,
   GroupedRow,
+  Icon,
   PersonAvatar,
   PixelOrbit,
   SCREEN_X,
@@ -70,6 +71,10 @@ const open = (href: string) => router.push(href as never);
 const AGENTS_SHOWN = 3;
 /** Your photo on the cover, unframed (framed faces stop at 52). */
 const PHOTO = 96;
+/** The photo badge on its top corner and its glyph; its center sits on the photo's ring at 45°. */
+const PHOTO_BADGE = 30;
+const PHOTO_BADGE_ICON = 14;
+const PHOTO_BADGE_AT = ((PHOTO + 6) / 2) * (1 - Math.SQRT1_2) - PHOTO_BADGE / 2;
 /** How far the photo hangs below the sky. */
 const PHOTO_OVERLAP = 48;
 /** Your agents on the sky's horizon beside your photo: two on each side, unframed (the 24 size). */
@@ -278,12 +283,19 @@ export function MeScreen() {
                 <PersonAvatar name={name || "?"} size={PHOTO} photo={photo} />
               </View>
             </WithPresence>
+            {/* A touch screen has no hover: the photo badge says the face changes it (presence keeps its corner). */}
+            <View
+              style={[styles.photoBadge, { backgroundColor: c.action, borderColor: c.grouped }]}
+              pointerEvents="none"
+            >
+              <Icon name="image" size={PHOTO_BADGE_ICON} color={c.onAction} />
+            </View>
           </Pressable>
-          <Text variant="display2" numberOfLines={2} style={styles.center}>
+          <Text variant="display2" style={styles.center}>
             {name}
           </Text>
           {headline ? (
-            <Text variant="subhead" tone="muted" numberOfLines={1} style={styles.center}>
+            <Text variant="subhead" tone="muted" style={styles.center}>
               {headline}
             </Text>
           ) : null}
@@ -568,6 +580,17 @@ const styles = StyleSheet.create({
   // A ring in the page's color lifts the photo off the sky.
   ring: { borderRadius: 999, borderWidth: 3 },
   pressed: { opacity: 0.6 },
+  photoBadge: {
+    position: "absolute",
+    top: PHOTO_BADGE_AT,
+    right: PHOTO_BADGE_AT,
+    width: PHOTO_BADGE,
+    height: PHOTO_BADGE,
+    borderRadius: PHOTO_BADGE / 2,
+    borderWidth: 3,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   center: { textAlign: "center" },
   groups: { paddingHorizontal: SCREEN_X, paddingTop: 4 },
   gapBig: { height: 24 },
