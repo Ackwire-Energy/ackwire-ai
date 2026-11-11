@@ -137,7 +137,8 @@ test("a sign-in that names a web address for a first-time account is not a phone
   await signUp(ana, "ana@example.com");
   await setSignupMode(t.db, "open");
 
-  for (const more of [{ newUserCallbackURL: "/" }, { errorCallbackURL: "/" }]) {
+  const webWaysBack: Record<string, string>[] = [{ newUserCallbackURL: "/" }, { errorCallbackURL: "/" }];
+  for (const more of webWaysBack) {
     const res = await proxy(ana, await phoneStart("google", pair().challenge, more));
     expect(res.status).toBe(400);
     expect(res.headers.getSetCookie().some((c) => c.includes("state="))).toBe(false);

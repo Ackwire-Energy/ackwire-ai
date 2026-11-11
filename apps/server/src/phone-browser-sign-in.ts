@@ -59,8 +59,10 @@ function isAppLink(context: TrustsOrigins, link: unknown): link is string {
   }
 }
 
-const challengeOf = (state: { challenge?: unknown } | null | undefined) =>
-  typeof state?.challenge === "string" && KEY.test(state.challenge) ? state.challenge : null;
+const challengeOf = (state: object | null | undefined) => {
+  const challenge = (state as { challenge?: unknown } | null | undefined)?.challenge;
+  return typeof challenge === "string" && KEY.test(challenge) ? challenge : null;
+};
 
 /**
  * Whether the proxy may plant the state of `authorizationURL` in the visitor's browser: only a pending sign-in that
