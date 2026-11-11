@@ -7637,7 +7637,9 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
     var(--top),
     inset 0 0 0 2px var(--line-strong);
 }
-/* Inline pills (a DM with an agent): its chip opens the text's row, a hairline between it and attach. */
+/* Inline pills (a DM with an agent, `.ac-composer--lead`): its chip opens the text's row, a hairline between it and
+   attach. The card's own class says "lead", not "pill": scripts/geometry reads a class with "pill" in it as a pill and
+   would weigh the chip's plate against the glyph of the ghost button that ends the row. */
 .ac-composer__row > .ac-composer__pills {
   flex: 0 1 auto;
   flex-wrap: nowrap;
@@ -7652,7 +7654,7 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
   height: 16px;
   background: var(--line2);
 }
-.ac-composer--inline-pills .ac-composer__agent {
+.ac-composer--lead .ac-composer__agent {
   padding: 0 10px 0 4px;
   background: var(--plate-soft);
   box-shadow: inset 0 0 0 1px var(--line);
@@ -7662,10 +7664,10 @@ html:not([data-pointer]) .ac-video__rail:focus-visible .ac-video__knob {
 }
 /* A phone's row has no room for a name beside the text: the chip is the face, the header and the placeholder say who. */
 @media (max-width: 640px) {
-  .ac-composer--inline-pills .ac-composer__agent {
+  .ac-composer--lead .ac-composer__agent {
     padding: 0 4px;
   }
-  .ac-composer--inline-pills .ac-composer__agent .ac-composer__pill-text {
+  .ac-composer--lead .ac-composer__agent .ac-composer__pill-text {
     position: absolute;
     width: 1px;
     height: 1px;

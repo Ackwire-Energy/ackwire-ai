@@ -868,7 +868,7 @@ export function Composer({
           {/* biome-ignore lint/a11y/noStaticElementInteractions: files dropped anywhere on the card (the attach button is the accessible way), and its empty room is part of the text box, as a mouse sees it */}
           <div
             ref={box}
-            className={cx("ac-composer", inlinePills && "ac-composer--inline-pills", className)}
+            className={cx("ac-composer", inlinePills && "ac-composer--lead", className)}
             data-disabled={disabled || undefined}
             data-dragging={dragging || undefined}
             data-voice={recording ? rec.phase : undefined}
