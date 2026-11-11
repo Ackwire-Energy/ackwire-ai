@@ -43,6 +43,7 @@ import { toolsHere } from "../../control/this-mac";
 import { agentOf, useLocalServer, usePending, writePref } from "../../hooks";
 import type { Host } from "../../host/types";
 import { AgentFace, ConnectionChip, OrgTile } from "../../ui/bits";
+import { MacPermissionCard, useMacGrants } from "../../ui/permissions";
 import { CardTitle, hintFor, PrefCard, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 
@@ -112,7 +113,7 @@ const AUDIENCE_ICON: Record<DeviceAudience["mode"], IconName> = {
  * General's This Mac part: one switch per workspace the person is signed in to (a paired one pauses and resumes, one
  * this computer doesn't work for yet pairs it after the system's dialog), Commands, who can use it, and the phones
  * plugged in with their state and one way out each (Stop, Show me how). The rule and the phones are the server's, as
- * the web sets them. `bottom`: Open at login, under the rest.
+ * the web sets them. On a Mac, its permissions (`Permissions`). `bottom`: Open at login, under the rest.
  */
 export function ThisMacCards({ homes, offers, bottom }: { homes: Home[]; offers: PairTarget[]; bottom?: ReactNode }) {
   const { t, i18n } = useTranslation();
@@ -262,6 +263,8 @@ export function ThisMacCards({ homes, offers, bottom }: { homes: Home[]; offers:
         {bottom}
       </PrefCard>
 
+      {host.platform === "mac" && homes.length > 0 && <Permissions />}
+
       {homes.map((h, i) => {
         const target = targets[i];
         const computer = thisComputer(answers[h.homeId]?.list, h);
@@ -311,6 +314,35 @@ export function ThisMacCards({ homes, offers, bottom }: { homes: Home[]; offers:
           </Fragment>
         );
       })}
+    </>
+  );
+}
+
+/**
+ * This Mac's permissions, as Prepare this Mac asks them, and where people turn them on again: an ad-hoc signed app
+ * loses them with each update. Asking for Screen Recording or Full Disk Access keeps Preferences to open again when
+ * macOS reopens the app.
+ */
+function Permissions() {
+  const { t } = useTranslation();
+  const host = useHost();
+  const [resumed, setResumed] = useState(false);
+  useEffect(() => {
+    host
+      .setupState()
+      .then((s) => {
+        if (s?.step !== "prefs" || !s.resumed) return;
+        setResumed(true);
+        return host.setSetupState(null);
+      })
+      .catch(() => {});
+  }, [host]);
+  const mac = useMacGrants(() => host.setSetupState({ step: "prefs" }).catch(() => {}));
+  const title = t("desktop.prepare.prefsTitle");
+  return (
+    <>
+      <CardTitle hint={hintFor(t, title, t("desktop.prepare.prefsHint"))}>{title}</CardTitle>
+      <MacPermissionCard mac={mac} resumed={resumed} />
     </>
   );
 }

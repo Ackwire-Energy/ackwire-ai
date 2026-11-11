@@ -13,6 +13,8 @@ import {
   type TaskExecutor,
 } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { serverText } from "@agenteschat/i18n";
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import { isAutoModel } from "@agenteschat/providers";
 import { autoPlanModel, claudeCodeModel, planOf } from "@agenteschat/providers/plans";
 import { getAgentCached } from "./agents";
@@ -21,7 +23,7 @@ import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import { cutText } from "./format";
 import { routineDeliveryBlock } from "./hand-off";
-import { taskEndText } from "./machine-task-text";
+import { taskEndLine, taskEndText } from "./machine-task-text";
 import {
   getMachineById,
   MachineDroppedError,
@@ -36,7 +38,7 @@ import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-c
 import { MISSION_RULES } from "./mission-rules";
 import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
-import { personBehindCall } from "./requester";
+import { lineLocale, personBehindCall } from "./requester";
 import { routineBriefOf } from "./routine-brief";
 import { issueRunToolToken } from "./run-tool-tokens";
 import { runnerUpdateWay } from "./runner-update";
@@ -966,14 +968,13 @@ export async function settleInterruptedTask(
       // Queued behind a folder that isn't ready (being prepared again, or failed and left for the person):
       // it resumes once the project is ready, not now.
       const waits = queue && mission?.worktreeState !== "ready";
+      const code = shell ? "machine_task_restarted" : waits ? "machine_task_resume_waits" : "machine_task_resumed";
+      const params = { title: claimed.title, computer: machine.name };
+      const locale = await lineLocale(deps.db, claimed.orgId, claimed.requestedByUserId, claimed.runId);
       await postTaskNotice(deps, claimed, {
-        body: shell
-          ? `The computer ${machine.name} is back: "${claimed.title}" started again.`
-          : waits
-            ? `The computer ${machine.name} is back: "${claimed.title}" resumes where it stopped once the project is ready.`
-            : `The computer ${machine.name} is back: resumed "${claimed.title}" where it stopped.`,
-        code: shell ? "machine_task_restarted" : waits ? "machine_task_resume_waits" : "machine_task_resumed",
-        params: { title: claimed.title, computer: machine.name },
+        body: serverText(locale, `chat.body.${code}`, params),
+        code,
+        params,
         meta: { machineTaskResumed: { fromId: claimed.id, taskId: next.id, ...(waits ? { waits: true } : {}) } },
       });
       await publishTaskEvent(deps.pubsub, linked ?? claimed);
@@ -1037,8 +1038,8 @@ async function queueResumed(db: Executor, input: StartTaskInput, from: MachineTa
 
 /**
  * A line the server writes in the task's thread, as the task's agent (no
- * run, no routing): offline, resumed. English text plus a code the app
- * shows in the person's language.
+ * run, no routing): offline, resumed. Its text in the language of whom the
+ * task is for, plus a code the apps show in each reader's language.
  */
 export async function postTaskNotice(
   deps: TaskDeps,
@@ -1107,14 +1108,15 @@ export async function interruptOfflineMachineTasks(
   const since = (machine.lastSeenAt ?? new Date()).toISOString();
   for (const { resumes, list } of threads.values()) {
     const first = list[0] as MachineTaskRow;
-    const one = list.length === 1;
-    const then = resumes
-      ? `, and ${one ? "resumes where it" : "resume where they"} stopped if the computer restarted.`
-      : `. If the computer restarted, ${one ? "it stopped and won't resume by itself" : "they stopped and won't resume by themselves"}.`;
+    const locale = await lineLocale(deps.db, first.orgId, first.requestedByUserId, first.runId);
+    // The apps' event line for it (`missions.notice.machine_offline…`): the chat's own is too short for the agent.
+    const body = serverText(locale, `missions.notice.machine_offline${resumes ? "_resumes" : ""}`, {
+      computer: machine.name,
+      title: first.title,
+      count: String(list.length),
+    });
     await postTaskNotice(deps, first, {
-      body: `The computer ${machine.name} went offline (since ${since.slice(11, 16)} UTC): ${
-        one ? `"${first.title}" keeps` : `${list.length} tasks here keep`
-      } running there if only the connection dropped${then}`,
+      body,
       code: "machine_offline",
       // `context`: the apps' wording for tasks that resume by themselves (`machine_offline_resumes`).
       params: {
@@ -1275,18 +1277,16 @@ export async function checkCutTaskStart(
   await settleInterruptedTask(deps, row);
 }
 
-/** The text of a task's end, for the thread (English; the app uses the code). */
-const endText = (row: MachineTaskRow, computer: string, blocked: { command: string }[] = []) =>
-  taskEndText(
-    { title: row.title, status: row.status, seconds: taskSeconds(row), exitCode: row.exitCode, blocked },
-    computer,
-  );
-
-/** A task's end as the notice the agent reads (`meta.machineTask` with the result) and people see. */
-export function taskEndNotice(row: MachineTaskRow, computer: string) {
+/**
+ * A task's end as the notice the agent reads (`text`, and `meta.machineTask` with the result) and people see (`body`,
+ * in `locale`, the language of whom the task is for, kept in `machineTask.locale`). `computer`: null when it's gone.
+ */
+export function taskEndNotice(row: MachineTaskRow, computer: string | null, locale: AppLocale = "en") {
   const files = Array.isArray(row.files) ? row.files : [];
+  const at = computer ?? "the computer";
   return {
-    body: endText(row, computer),
+    body: taskEndLine(locale, row, computer),
+    text: taskEndText({ title: row.title, status: row.status, seconds: taskSeconds(row), exitCode: row.exitCode }, at),
     meta: {
       machineTask: {
         id: row.id,
@@ -1294,8 +1294,9 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
         status: row.status,
         exitCode: row.exitCode,
         seconds: taskSeconds(row),
-        computer,
+        computer: at,
         executor: row.executor,
+        locale,
         ...(row.branch ? { branch: row.branch } : {}),
         ...(row.lastLine ? { lastLine: row.lastLine } : {}),
         ...(files.length ? { files: files.slice(0, 20) } : {}),
@@ -1304,7 +1305,7 @@ export function taskEndNotice(row: MachineTaskRow, computer: string) {
       bodyCode: `machine_task_${row.status}`,
       bodyParams: {
         title: row.title,
-        computer,
+        computer: at,
         seconds: String(taskSeconds(row)),
         exitCode: String(row.exitCode ?? ""),
       },
@@ -1332,7 +1333,6 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     return null;
   }
   const machine = await getMachineById(deps.db, row.machineId);
-  const computer = machine?.name ?? "the computer";
   const [origin] = row.runId
     ? await deps.db
         .select({
@@ -1363,7 +1363,8 @@ export async function wakeConversationForTask(deps: TaskDeps, taskId: string, op
     [row.agentId],
     row.requestedByUserId ? { requesterUserId: row.requestedByUserId } : {},
   );
-  const notice = taskEndNotice(row, computer);
+  const locale = await lineLocale(deps.db, row.orgId, row.requestedByUserId, row.runId);
+  const notice = taskEndNotice(row, machine?.name ?? null, locale);
   const machineTask = {
     ...notice.meta.machineTask,
     ...(row.runId ? { runId: row.runId } : {}),
@@ -1425,6 +1426,7 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
     !agentLike &&
     row.mode !== "setup" &&
     (row.status === "failed" || row.status === "interrupted" || blocked.length > 0);
+  const locale = notice ? await lineLocale(deps.db, row.orgId, row.requestedByUserId, row.runId) : "en";
   const claimed = await deps.db.transaction(async (tx) => {
     const [won] = await tx
       .update(machineTasks)
@@ -1438,7 +1440,7 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
           channelId: row.channelId,
           threadId: row.threadRootId,
           author: { type: "agent", agentId: row.agentId, runId: null, hop: 0, stretchId: null },
-          body: endText(row, computer, blocked),
+          body: taskEndLine(locale, row, machine?.name ?? null),
           meta: {
             machineTask: {
               id: row.id,
@@ -1448,6 +1450,7 @@ async function claimMissionTaskEnd(deps: TaskDeps, row: MachineTaskRow) {
               seconds: taskSeconds(row),
               computer,
               executor: row.executor,
+              locale,
               missionId: row.missionId,
               ...(row.branch ? { branch: row.branch } : {}),
               ...(row.lastLine ? { lastLine: row.lastLine } : {}),

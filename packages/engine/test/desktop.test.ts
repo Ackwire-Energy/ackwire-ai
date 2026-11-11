@@ -16,6 +16,7 @@ import {
   DEVICE_MAX_PENDING_PER_IP,
   DeviceCodeLimitError,
   denyDeviceCode,
+  devicesText,
   drainOutbox,
   ForbiddenError,
   formatUserCode,
@@ -786,6 +787,31 @@ describe("folders and tools on the machine (protocol 10)", () => {
       "/srv is outside your folder. Nobody can allow folders on Box, the workspace's own computer: work in your folder, read from your home, or copy what you need into your folder with a command.",
     );
     expect(notAllowedMessage("Box", "Grok is turned off", "/srv", true)).toBe("Grok is turned off. Tell the people.");
+  });
+
+  test("a person's computer used as a device: folders and tools are that person's to allow, never request_folder_access", () => {
+    const detail = "/Users/sam/Projects is outside your folder (ask for it with request_folder_access)";
+    const mac = { os: "darwin", executors: {} };
+    expect(notAllowedMessage("Sam's Mac", detail, "/Users/sam/Projects", false, mac)).toBe(
+      "/Users/sam/Projects is outside your folder. Only the person at Sam's Mac can allow /Users/sam/Projects, in the agentes.chat app there (Preferences › Folders): tell them, or work inside your own folder.",
+    );
+    expect(notAllowedMessage("Box", detail, "/srv", false, { os: "linux", executors: {} })).toContain(
+      "with `agentes-runner folders allow /srv` there",
+    );
+    expect(notAllowedMessage("Sam's Mac", "Cursor is turned off on this computer", undefined, false, mac)).toBe(
+      "Cursor is turned off on this computer. On Sam's Mac, only the person at it can allow folders or turn tools on: tell them.",
+    );
+  });
+
+  test("a person's Mac among the devices: a screenshot is screencapture through commands, Screen Recording in the app", () => {
+    const phones: { name: string; platform: string }[] = [];
+    const mac = devicesText({ computers: [{ name: "Sam's Mac", os: "darwin" }], phones });
+    expect(mac).toContain("`screencapture -x screen.png`");
+    expect(mac).toContain("Screen Recording in the agentes.chat app there (Preferences › General › Permissions)");
+    // macOS refuses a protected folder with EPERM: a shell says "Operation not permitted", the runner's file tools
+    // "Permission denied".
+    expect(mac).toContain('refused with "Operation not permitted" or "Permission denied" needs Full Disk Access');
+    expect(devicesText({ computers: [{ name: "Box", os: "linux" }], phones })).not.toContain("screencapture");
   });
 
   test("what the agent reads: its folders, the tools that are off, and the outcome of a request", () => {

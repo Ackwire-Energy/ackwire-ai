@@ -122,7 +122,7 @@ export async function startDeviceWait(
     note?: string;
     /** What the tool answers the model now. */
     content: string;
-    /** The card's words (English; the apps say them from the fields). */
+    /** The card's words in the language of whom the agent works for (the apps say them again from the fields). */
     body: string;
   },
 ): Promise<ToolOutput> {

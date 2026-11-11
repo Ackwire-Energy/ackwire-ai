@@ -456,6 +456,7 @@ test("the safety net leaves a quick answer of many fast calls in the conversatio
 
 test("the promise: a nudge when no update came, then exactly one update of the server's; a racing update wins", async () => {
   f = await setup();
+  await f.db.update(schema.users).set({ locale: "es" }).where(eq(schema.users.id, f.owner.id));
   const run = await working("@dev roda a migração");
   const { work } = await moved(run);
   const due = new Date((work.nextUpdateAt as Date).getTime() + 1000);
@@ -481,6 +482,8 @@ test("the promise: a nudge when no update came, then exactly one update of the s
   const auto = (await messages()).filter((m) => (m.meta.workUpdate as { auto?: boolean } | undefined)?.auto);
   expect(auto).toHaveLength(1);
   expect(auto[0]?.meta.bodyCode).toBe("work_auto_update");
+  // In the language of whom the work is for.
+  expect(auto[0]?.body).toStartWith("Sigo en ello (");
   const [after] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.id, work.id));
   expect(after?.updateSeq).toBe(1);
   expect((after?.nextUpdateAt?.getTime() ?? 0) - later.getTime()).toBe(10 * 60_000);

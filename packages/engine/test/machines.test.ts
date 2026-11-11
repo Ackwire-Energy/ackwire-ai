@@ -1130,10 +1130,33 @@ describe("tools on a connected machine", () => {
     const out = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(out).toMatchObject({ isError: true });
     expect(out.content).toContain("Commands are turned off on the computer Files only");
+    // A runner that reports no access has only its start flag.
+    expect(out.content).toContain("--no-exec");
     const listed = await f.tools?.list(ctx);
     expect(listed?.find((t) => t.name === "run_code")?.description).not.toContain("claude -p");
     // Files still work.
     expect((await call(ctx, "write_file", { path: "a.txt", content: "x" })).isError).toBeFalsy();
+  });
+
+  test("commands switched off in the app on a Mac point to the app, on Linux to the runner's command", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    await grantScopes(f.db, f.org.id, f.agent.id, SANDBOX);
+    const paired = await pair(f.owner.id, "Ana's Mac", false);
+    const runner = fakeRunner(f.machineHub as MachineHub, { execAllowed: false });
+    const access = { folders: [], tools: { claude: false, codex: false, commands: false } };
+    await runner.hello(paired.token, { os: "darwin", access });
+    await setAgentComputerTarget(deps(), f.owner.id, f.org.id, f.agent.id, paired.machineId);
+    const ctx = await runCtx();
+    const out = await call(ctx, "run_code", { language: "bash", code: "ls" });
+    expect(out).toMatchObject({ isError: true });
+    expect(out.content).toContain(
+      "Commands are turned off on the computer Ana's Mac: you can only read, write, list and upload files there. Tell the people: only the person at Ana's Mac can turn commands on, in the agentes.chat app there (Preferences › Tools, Commands).",
+    );
+    expect(out.content).not.toContain("--no-exec");
+    await f.db.update(schema.machines).set({ os: "linux" }).where(eq(schema.machines.id, paired.machineId));
+    const linux = await call(ctx, "run_code", { language: "bash", code: "ls" });
+    expect(linux.content).toContain("can turn commands on, with `agentes-runner tools enable commands` there.");
+    expect(linux.content).not.toContain("--no-exec");
   });
 
   test("a runner too old for agent folders is refused instead of sharing one folder", async () => {

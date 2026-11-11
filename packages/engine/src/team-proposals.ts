@@ -1,7 +1,7 @@
 import { holdEvents, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
-import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
+import type { AppLocale } from "@agenteschat/i18n/locale";
 import {
   agentsLike,
   agentsLikeText,
@@ -45,7 +45,7 @@ import { setAgentComputerTarget } from "./machines";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import type { Notice } from "./notices";
 import { can, getMembership, requirePermission } from "./organizations";
-import { personBehindCall } from "./requester";
+import { personBehindCall, personLocale } from "./requester";
 import { RIGHT_HAND } from "./right-hand";
 import { createRoutine, deleteRoutine } from "./routines";
 import { deliverNoticeToRun } from "./run-resume";
@@ -199,12 +199,6 @@ export function skillSlug(title: string, n: number) {
     .slice(0, 56)
     .replace(/-+$/, "");
   return SKILL_NAME.test(slug) ? slug : `skill-${n + 1}`;
-}
-
-/** The person's language for the card's own lines (a template's text, the weekly check's name). */
-export async function personLocale(db: Database, userId: string | null, preferred?: string | null) {
-  const [row] = userId ? await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)) : [];
-  return appLocale([preferred, row?.locale], true) ?? "en";
 }
 
 /**

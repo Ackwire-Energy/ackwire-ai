@@ -59,6 +59,9 @@
   "common.retry": {
     "value": "Try again"
   },
+  "common.soon": {
+    "value": "Soon"
+  },
   "common.unknownError": {
     "value": "Something went wrong. Try again."
   },
@@ -4338,7 +4341,7 @@
     "value": "Making the code…"
   },
   "openOnPhone.stepApp": {
-    "value": "Install the agentes app on your phone (App Store or Google Play)."
+    "value": "Install the agentes app on your phone."
   },
   "openOnPhone.stepTailscale": {
     "value": "Install Tailscale on your phone and sign in with the same Tailscale account as this server."
@@ -32444,6 +32447,9 @@
   },
   "devices.menu": {
     "value": "{{name}} actions"
+  },
+  "devices.settings": {
+    "value": "Settings"
   },
   "devices.rename": {
     "value": "Rename"

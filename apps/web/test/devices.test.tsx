@@ -46,6 +46,16 @@ const refetch = async (services: Awaited<ReturnType<typeof renderApp>>["services
   });
   await settle(4);
 };
+/** A row's ⋯ (Radix opens a menu from the keyboard here): its menu. */
+const openMenu = async (trigger: HTMLElement) => {
+  trigger.focus();
+  await act(async () => {
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    fireEvent.keyUp(trigger, { key: "Enter" });
+  });
+  await settle(2);
+  return screen().getByRole("menu");
+};
 const calls = (state: ReturnType<typeof acmeState>, method: string) => state.calls.filter((c) => c.method === method);
 
 async function open(
@@ -124,6 +134,26 @@ describe("Settings › Devices", () => {
     await act(async () => fireEvent.change(search, { target: { value: "pixel" } }));
     await settle(2);
     expect(names()).toEqual(["Sam's MacBook Pro", "Pixel 8"]);
+  });
+
+  test("a row's menu opens with Settings, its page, for computers and phones", async () => {
+    const { router } = await open(`/org/${ORG_ID}/settings/devices`);
+    let menu = await openMenu(screen().getByRole("button", { name: "Sam's MacBook Pro actions" }));
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Settings", "Rename", "Remove"]);
+    await click(within(menu).getByRole("menuitem", { name: "Settings" }));
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/${MAC}`);
+    await act(() =>
+      router.navigate({ to: "/org/$orgId/settings/$section", params: { orgId: ORG_ID, section: "devices" } }),
+    );
+    await settle(4);
+    menu = await openMenu(screen().getByRole("button", { name: "Pixel 8 actions" }));
+    expect(within(menu).getAllByRole("menuitem")[0]?.textContent).toBe("Settings");
+    await click(within(menu).getByRole("menuitem", { name: "Settings" }));
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/devices/phones/${PIXEL}`);
   });
 
   test("Let it join, from the list: name and who can use it, then the server lets it in", async () => {
