@@ -2254,7 +2254,7 @@ export const featureKeysEn = {
     zoneTitle: "Time zone",
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "What's the new workspace called?",
-    /** Its first question (ADR 0159), before the name: "For me" or "For my company or team". */
+    /** Its first question (ADR 0159), before the name: "For me" or "For my team". */
     anotherPurpose: "What's the new workspace for?",
     anotherLead: "On agentes.chat. You stay in {{org}} and can switch any time.",
     /** The first run's name, suggested from a work address's domain. */

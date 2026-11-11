@@ -47,7 +47,7 @@ const click = async (el: Element, rounds = 10) => {
 };
 /** The first question answered for a company or team: its name comes next. */
 const forATeam = async () => {
-  await click(answer(/Para minha empresa ou time/), 4);
+  await click(answer(/Para meu time/), 4);
   await click(button("Continuar"), 4);
 };
 const type = async (label: string, value: string) => {
@@ -1066,7 +1066,7 @@ describe("the name step's other cases", () => {
     if (state.me) state.me.user = { ...state.me.user, canCreateWorkspace: false };
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
-    await click(answer(/Para minha empresa ou time/), 4);
+    await click(answer(/Para meu time/), 4);
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     expect(document.querySelector(".onb__note")?.textContent).toBeTruthy();
   });
@@ -1084,7 +1084,7 @@ describe("for me (ADR 0159)", () => {
     await settle(10);
     expect(heading()).toBe("Para que você vai usar o agentes.chat?");
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
-    // "For me", not "For my company or team", whose words start the same in Portuguese.
+    // "For me", not "For my team", whose words start the same in Portuguese.
     await click(answer(/^Para mim(?!ha)/), 4);
     expect(screen().queryByLabelText("Nome")).toBeNull();
     // Its whole path on the rail at once: what it is for, its agents, the plan, an AI.
@@ -1149,7 +1149,7 @@ describe("for me (ADR 0159)", () => {
     await forATeam();
     expect(screen().getByLabelText("Nome")).toBeTruthy();
     await click(button("Voltar"), 4);
-    expect(answer(/Para minha empresa ou time/).getAttribute("aria-checked")).toBe("true");
+    expect(answer(/Para meu time/).getAttribute("aria-checked")).toBe("true");
     expect(calls(state, "orgs.create")).toEqual([]);
   });
 });

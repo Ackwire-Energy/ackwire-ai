@@ -895,7 +895,7 @@ export const ptBR = {
       lead: "Dá para mudar depois, nada se perde.",
       personal: "Para mim",
       personalText: "Agentes que cuidam do seu dia.",
-      team: "Para minha empresa ou time",
+      team: "Para meu time",
       teamText: "Pessoas e agentes trabalham juntos, com canais, papéis e aprovações.",
       personalExamples: "O seu dia às 7h · Contas · Treino",
       teamExamples: "Atendimento · Financeiro · Relatórios",

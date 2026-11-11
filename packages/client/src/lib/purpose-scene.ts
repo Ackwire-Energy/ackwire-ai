@@ -1,7 +1,7 @@
 /*
  * The drawings of the onboarding's first question (ADR 0159), the same on the web and the phone: on a 240 × 172 stage
  * (scaled to the card), the person signing up in the middle of six agents, each joined to them ("For me"), or on top
- * of a small org chart of people and agents ("For my company or team"). Pure numbers: each app draws the faces with
+ * of a small org chart of people and agents ("For my team"). Pure numbers: each app draws the faces with
  * its own avatars, the lines in its own vector layer.
  */
 

@@ -963,7 +963,7 @@ export const en = {
       lead: "You can change this later, nothing is lost.",
       personal: "For me",
       personalText: "Agents that look after your day.",
-      team: "For my company or team",
+      team: "For my team",
       teamText: "People and agents work together, with channels, roles and approvals.",
       /** A quiet line of what it does, under each answer. */
       personalExamples: "Your day at 7 · Bills · Training",
