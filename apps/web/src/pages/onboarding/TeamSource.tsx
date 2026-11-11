@@ -172,13 +172,13 @@ export function useTeamSource(
       ? () => setStage("start")
       : view === "start" || view === "bring"
         ? ask
-      : view === "found" && !facts.applying && !facts.report
-        ? () => {
-            // Back to the request or the files; an apply that failed lets the step go with it.
-            resetFlow.current?.();
-            if (holding) hold(false);
-          }
-        : null;
+        : view === "found" && !facts.applying && !facts.report
+          ? () => {
+              // Back to the request or the files; an apply that failed lets the step go with it.
+              resetFlow.current?.();
+              if (holding) hold(false);
+            }
+          : null;
 
   /** The step's heading and Lodi's line for the view on screen. */
   const head = (t: TFunction, _org: string): { title: string; lead: string; say: string } => {

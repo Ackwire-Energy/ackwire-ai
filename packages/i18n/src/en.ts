@@ -793,7 +793,8 @@ export const en = {
           lead: "You can change all of it later, nothing is lost.",
           template: "Start with a ready-made team",
           /** `{{template}}`: the template's name ("Marketing agency"). */
-          templateText_one: "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
+          templateText_one:
+            "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
           templateText_other:
             "{{count}} agents from the {{template}} template, each in its own channel, with their routines ready.",
           scratch: "Start from scratch",
