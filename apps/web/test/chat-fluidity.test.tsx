@@ -219,31 +219,80 @@ describe("following the bottom", () => {
   });
 });
 
-describe("an image in a message", () => {
-  test("keeps its loading size until it is decoded (one size change, not a collapse first)", async () => {
+describe("a message's attachments", () => {
+  const withFiles = async (files: [name: string, type: string][], hold = false) => {
     const state = seedState();
     const api = createFakeApi(state);
-    const image = await api.artifacts.upload(
-      ORG_ID,
-      new File([new Uint8Array([137, 80, 78, 71, 1, 2, 3])], "tela.png", { type: "image/png" }),
-    );
+    const refs = [];
+    for (const [name, type] of files) {
+      const file = await api.artifacts.upload(ORG_ID, new File([new Uint8Array([1, 2, 3])], name, { type }));
+      refs.push({ id: file.id, version: 1, title: name });
+    }
     const base = state.messages[0] as (typeof state.messages)[number];
     state.messages.push({
       ...base,
-      id: "m-image",
+      id: "m-files",
       threadId: null,
-      body: "A tela:",
+      body: "Os arquivos:",
       mentionedAgentIds: [],
-      meta: { artifacts: [{ id: image.id, version: 1 }] },
+      meta: { artifacts: refs },
       createdAt: new Date().toISOString(),
     });
+    // The files' details never arrive: what the tiles are before them.
+    if (hold) api.artifacts.get = () => new Promise(() => {});
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(10);
-    const thumb = document.querySelector(".artifact-tile__picture") as HTMLElement;
-    const img = thumb.querySelector("img") as HTMLImageElement;
+    return [...document.querySelectorAll<HTMLElement>(".artifact-cards > *")];
+  };
+  /** What decides a tile's box: its classes and kind, and whether it has a cover, a name under it, a player. */
+  const shape = (tile: HTMLElement) => ({
+    tile: tile.classList.contains("artifact-tile"),
+    media: tile.dataset.media ?? null,
+    kind: tile.dataset.kind === "video" ? "video" : null,
+    cover: [...tile.children].some((c) => c.classList.contains("artifact-tile__cover")),
+    name: tile.querySelector(".artifact-tile__foot .artifact-tile__title")?.textContent ?? null,
+    player: tile.querySelector(".ac-video--tile .ac-video__media") !== null,
+  });
+  const FILES: [string, string][] = [
+    ["motor.zip", "application/zip"],
+    ["tela.png", "image/png"],
+    ["clipe.mp4", "video/mp4"],
+    ["notas.pdf", "application/pdf"],
+  ];
+
+  test("each kind has its box before its details load: a file its cover and name, a picture its cover alone, a video its player's box", async () => {
+    const [zip, picture, video, pdf] = (await withFiles(FILES, true)).map(shape);
+    expect(zip).toEqual({ tile: true, media: null, kind: null, cover: true, name: "motor.zip", player: false });
+    expect(picture).toEqual({ tile: true, media: "true", kind: null, cover: true, name: null, player: false });
+    expect(video).toEqual({ tile: true, media: null, kind: "video", cover: false, name: null, player: true });
+    expect(pdf).toEqual({ tile: true, media: null, kind: null, cover: true, name: "notas.pdf", player: false });
+    for (const tile of document.querySelectorAll(".artifact-cards > *")) {
+      expect(tile.classList.contains("artifact-tile--loading")).toBe(true);
+      expect(tile.getAttribute("aria-busy")).toBe("true");
+    }
+  });
+
+  test("and keeps that box once they do, and once the picture is in: no tile changes shape", async () => {
+    const before = (await withFiles(FILES, true)).map(shape);
+    cleanup();
+    const tiles = await withFiles(FILES);
+    expect(tiles.map(shape)).toEqual(before);
+    expect(document.querySelector(".artifact-tile--loading")).toBeNull();
+    const picture = tiles[1]?.querySelector(".artifact-tile__picture") as HTMLElement;
+    const img = picture.querySelector("img") as HTMLImageElement;
     expect(img.getAttribute("src")).toStartWith("blob:");
-    expect(thumb.dataset.loading).toBe("true");
+    // No attribute, class or size of its own marks the picture as loading or loaded: the tile's box is its box.
+    const marks = () => [picture.className, picture.getAttribute("style"), img.getAttribute("style"), img.className];
+    const loading = marks();
     await act(async () => fireEvent.load(img));
-    expect(thumb.dataset.loading).toBeUndefined();
+    expect(marks()).toEqual(loading);
+    expect(picture.dataset.loading).toBeUndefined();
+    expect(document.querySelector(".ac-video")?.hasAttribute("data-ready")).toBe(false);
+  });
+
+  test("a file whose name doesn't say what it is keeps a file's box, its name wrapping as it will", async () => {
+    const [tile] = await withFiles([["Relatório do trimestre (versão final para a diretoria)", "image/png"]], true);
+    expect(shape(tile as HTMLElement).name).toBe("Relatório do trimestre (versão final para a diretoria)");
+    expect(shape(tile as HTMLElement).media).toBeNull();
   });
 });

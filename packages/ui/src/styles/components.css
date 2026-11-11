@@ -7267,18 +7267,11 @@ button.ac-voice__play:active {
   border-radius: 16px 16px 16px 4px;
   box-shadow: 0 0 0 1px var(--line);
 }
+/* One box from the first paint, the video whole inside it: its own proportions are known only once its metadata
+   loads, and a tile that took them then would move every row under it. */
 .ac-video--tile .ac-video__media {
-  width: auto;
-  min-width: min(220px, 100%);
-  max-width: 100%;
-  max-height: 320px;
-}
-.ac-video--tile[data-tall] .ac-video__media {
-  max-height: 360px;
-}
-/* Until its size is known the tile keeps a loading size, so it changes once. */
-.ac-video--tile:not([data-ready]) .ac-video__media {
   width: 320px;
+  max-width: 100%;
   height: 180px;
 }
 .ac-video--viewer {

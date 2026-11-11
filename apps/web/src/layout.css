@@ -1649,8 +1649,8 @@ html:not([data-pointer]) .artifact-tile:has(.artifact-tile__open:focus-visible) 
   --tile-w: 320px;
   --tile-cover: 180px;
 }
+/* Before its details arrive: the same cover and name (`LoadingTile`), so it has its final size already. */
 .artifact-tile--loading {
-  height: calc(var(--tile-cover) + 52px);
   background: var(--sunken);
   box-shadow: none;
 }
@@ -1941,29 +1941,12 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   z-index: 1;
   border-radius: inherit;
 }
-/* A picture alone on its message: whole, at its own proportions (Download and More stay). */
-.artifact-cards > .artifact-tile[data-media]:only-child {
-  --tile-w: fit-content;
-  max-width: 420px;
-}
-.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__cover {
-  height: auto;
-  border-bottom: 0;
-}
+/* A picture alone on its message: whole inside the lone tile's box. Its own proportions are known only once it
+   decodes, and a tile that took them then would move every row under it. */
 .artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture img {
-  width: auto;
-  min-width: 140px;
-  max-width: 100%;
-  height: auto;
-  min-height: 140px;
-  max-height: 320px;
+  object-fit: contain;
 }
-/* Its loading size (the lone tile's `height: auto` would collapse it until the picture decodes). */
-.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture[data-loading] {
-  width: 240px;
-  height: 180px;
-}
-/* A video is its player, at its own proportions. */
+/* A video is its player. */
 .artifact-tile[data-kind="video"] {
   width: fit-content;
   max-width: 100%;
@@ -1978,7 +1961,7 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
     --tile-w: calc(50% - 5px);
     --tile-cover: 120px;
   }
-  .artifact-tile:not([data-media], .artifact-tile--loading) {
+  .artifact-tile:not([data-media]) {
     --tile-w: 100%;
   }
   .artifact-tile__table :is(th, td):nth-child(n + 3) {

@@ -87,7 +87,7 @@ export function usePreviewUrl(artifactId: string, version: number, contentType: 
 }
 
 /**
- * A video on a chat message: our player at its own proportions, played right there in parts (it starts at once,
+ * A video on a chat message: our player in the tile's one box, played right there in parts (it starts at once,
  * whatever its size); its corner group opens the viewer, then the caller's actions; `tip`, its name and size, on hover
  * or the keys' focus, as a picture's. One this browser can't play (a codec it lacks) shows `fallback` instead, the
  * file's tile.

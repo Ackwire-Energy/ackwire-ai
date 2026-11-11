@@ -1,7 +1,7 @@
 import type { Artifact, ArtifactContent, ArtifactFileContent, ArtifactRef } from "@agenteschat/client";
 import { useArtifact } from "@agenteschat/client";
 import { documentStart, KIND_ICON, parseDelimited, patchCounts } from "@agenteschat/client/lib/artifacts";
-import { fileIcon, formatBytes, previewKind } from "@agenteschat/client/lib/files";
+import { fileIcon, formatBytes, previewKind, previewKindOfName } from "@agenteschat/client/lib/files";
 import { Button, Icon, type IconName, Menu, Tip } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -33,8 +33,8 @@ const COVER_CHARS = 1200;
  * (its cover: the start of a document, a table's first rows, a change's files, a diagram, a page) and its name with
  * its kind and size under it. A click opens the viewer; Download and More show over the cover on hover, and the
  * desktop app's right click has the same actions. A picture is only the picture, as is a video its player: their name
- * and size are in their tip and in the viewer's header. A picture alone on its message shows whole (CSS:
- * `.artifact-cards > :only-child`).
+ * and size are in their tip and in the viewer's header. A picture alone on its message shows whole inside its tile
+ * (CSS: `.artifact-cards > :only-child`). Every tile has its size before what it holds loads (`LoadingTile`).
  */
 export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { t, i18n } = useTranslation();
@@ -61,7 +61,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       </div>
     );
   }
-  if (!a) return <div className="artifact-tile artifact-tile--loading" aria-busy="true" />;
+  if (!a) return <LoadingTile title={ref.title} />;
   // What lives in the conversation isn't a file: the thing itself, not a tile that opens it (ADR 0113).
   if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
   if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
@@ -151,6 +151,37 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       cover: <PictureCover content={content} artifactId={a.id} version={a.shownVersion} title={a.title} />,
     });
   return tile({ icon, meta, cover: <FileCover content={content} /> });
+}
+
+/**
+ * A tile before its file's details arrive, in the box it keeps once they do, so the rows around it never move: a
+ * picture or a video by its name ("tela.png"), as the phone reads it; anything else a cover over its name, which wraps
+ * as it will.
+ */
+function LoadingTile({ title = "" }: { title?: string }) {
+  const kind = previewKindOfName(title);
+  if (kind === "video")
+    return (
+      <div className="artifact-tile artifact-tile--loading" data-kind="video" aria-busy="true">
+        <span className="ac-video ac-video--tile">
+          <span className="ac-video__media" />
+        </span>
+      </div>
+    );
+  return (
+    <div className="artifact-tile artifact-tile--loading" data-media={kind === "image" || undefined} aria-busy="true">
+      <div className="artifact-tile__cover" />
+      {kind !== "image" && (
+        <div className="artifact-tile__foot ac-iconline" aria-hidden="true">
+          <Icon name={fileIcon(title)} size={16} />
+          <span className="artifact-tile__name">
+            <span className="artifact-tile__title">{title || "\u00a0"}</span>
+            <span className="artifact-tile__meta">{"\u00a0"}</span>
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 const extOf = (name: string) => /\.([a-z0-9]{1,8})$/i.exec(name.trim())?.[1]?.toLowerCase() ?? "";
@@ -373,7 +404,7 @@ function CoverTable({ columns, rows }: { columns: string[]; rows: string[][] }) 
   );
 }
 
-/** A picture's cover; it keeps its loading size until decoded, so the tile changes size once. */
+/** A picture's cover: its box is the tile's from the first paint, the picture comes into it. */
 function PictureCover({
   content,
   artifactId,
@@ -387,19 +418,9 @@ function PictureCover({
 }) {
   const { t } = useTranslation();
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, true);
-  const [decoded, setDecoded] = useState<string | null>(null);
   if (failed) return <TypeCover content={content} />;
   return (
-    <span className="artifact-tile__picture" data-loading={url && decoded === url ? undefined : "true"}>
-      {url && (
-        <img
-          src={url}
-          alt={t("files.imageAlt", { title })}
-          onLoad={() => setDecoded(url)}
-          onError={() => setDecoded(url)}
-        />
-      )}
-    </span>
+    <span className="artifact-tile__picture">{url && <img src={url} alt={t("files.imageAlt", { title })} />}</span>
   );
 }
 
