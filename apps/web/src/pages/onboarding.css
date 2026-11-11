@@ -574,8 +574,9 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 /*
  * What the workspace is for (ADR 0159), the onboarding's brand moment: two wide cards one over the other (OptionList
  * `cards`), each as tall as the other: on the left who would be there (`PurposeScene`: you with your agents around
- * you, or a team's chart) on its horizon, on the right the words, from the top (they take several lines), clear of the
- * radio in the corner. The title, both cards and Continuar fit a 720px window. On a phone, the drawing over the words.
+ * you, or a team's chart) on its horizon, inside the card's hairline; on the right the words, from the top (they take
+ * several lines), clear of the radio in the corner. The title, both cards and Continuar fit a 720px window. On a phone,
+ * the drawing over the words.
  */
 .onb-purpose .ac-optlist__cards {
   grid-template-columns: minmax(0, 1fr);
@@ -590,8 +591,11 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   padding: 0;
   overflow: hidden;
 }
+/* The drawing's band sits inside the card's 1px hairline, its corners the card's less that hairline: the border shows
+   all the way round, chosen or not. */
 .onb-purpose .ac-optrow__lead {
   align-self: stretch;
+  margin: 1px 0 1px 1px;
 }
 .onb-purpose .ac-optrow__text {
   flex: 1;
@@ -604,6 +608,8 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   width: 232px;
   height: auto;
   min-height: 176px;
+  overflow: hidden;
+  border-radius: calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px);
 }
 /* As tall as the card, whatever the words make it: the room fills the band, the stage on its middle. */
 .onb-purpose .onb-scene__room {
@@ -711,10 +717,14 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   .onb-purpose .ac-optrow {
     flex-direction: column;
   }
+  .onb-purpose .ac-optrow__lead {
+    margin: 1px 1px 0;
+  }
   .onb-purpose .onb-scene {
     width: 100%;
     height: 128px;
     min-height: 0;
+    border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
   }
   .onb-purpose .onb-scene__stage {
     scale: 0.64;
