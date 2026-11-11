@@ -716,31 +716,146 @@ export const en = {
       left_other: "{{count}} steps left",
       done: "All set",
     },
-    /** The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview and the plan step. */
+    /**
+     * The blue rail with Lodi (ADR 0162): its steps, Lodi's line on each, the preview, the team step's question and
+     * import, the plan step and the AI step. `<key>Personal`: a personal workspace's words (ADR 0159).
+     */
     flow: {
       steps: {
         name: "Workspace name",
         business: "What you do",
         team: "Your team",
         plan: "Turn the team on",
+        /** The rail's last step: connecting the AI the team thinks with. */
+        ai: "Connect an AI",
+        /** A team's last step: inviting the people who work there. */
+        people: "Invite people",
+        /** A personal workspace's first step: what it is for ("For me"). */
+        namePersonal: "What it's for",
+        teamPersonal: "Your agents",
+        planPersonal: "Turn the agents on",
+        aiPersonal: "Connect an AI",
       },
       stepOf: "Step {{n}} of {{total}}",
       lodi: {
         name: "Hi, {{first}}. I'm {{name}}. I'll put the team together with you in about two minutes.",
         business: "With that I'll know who to bring onto the team.",
         team: "This is the team I'd put together. You can change anything later.",
+        /** Back on the team step once the team is made: the list of who is in it. */
+        teamMade: "The team is already put together. We move on whenever you're ready.",
+        teamMadePersonal: "Your agents are already here. We move on whenever you're ready.",
         plan: "After the plan, all that's left is connecting an AI. I'll show you where.",
+        /** On the plan step, with the AI step right after it. */
+        planThen: "Once the plan is on, the next screen is where you connect your AI.",
+        /** The team step's question: does the person already have agents in another app. */
+        ask: "Already have a team somewhere else? I'll bring all of it here.",
+        /** How a team with no agents yet starts: the template for what it does, or just the two of them. */
+        start: "I have a team ready for what you do. Or we start with just the two of us.",
+        askPersonal: "Already use agents somewhere else? I'll bring them all here.",
+        /** `{{app}}`: the other app ("Grok Bot"). */
+        bring: "Copy the request, paste it in {{app}} and bring back the answer. I'll do the rest.",
+        /** The same, for an app that hands back a file or a folder, dropped on the step. */
+        bringFiles: "Drop here what the app exported. I'll do the rest.",
+        found: "Found your team. Check that everyone is here.",
+        foundPersonal: "Found your agents. Check that they're all here.",
+        /** The AI step: picking an AI wakes the team (or, alone, Lodi). */
+        ai: "Last step. Pick the AI you already use and the team wakes up.",
+        aiPersonal: "Last step. Pick the AI you already use and I wake up.",
+        /** The same where inviting people comes after it (a team's rail), for the team or the right hand alone. */
+        aiThen: "Pick the AI you already use and the team wakes up. Then all that's left is inviting people.",
+        aiThenAlone: "Pick the AI you already use and I wake up. Then all that's left is inviting people.",
+        /** Once an AI is connected, before the workspace opens. */
+        connected: "There we go. Call me in the workspace and I'll show you the rest.",
+        /** Once an AI is connected, with inviting people still to come. */
+        connectedThen: "There we go. All that's left is inviting the people you work with.",
+        /** The people step: by email, or (a server that sends no email) through the workspace's link. */
+        people: "Now the people. Give me their emails and I'll send the invitations.",
+        peopleLink: "Now the people. Send them the link and I'll show you each request.",
       },
       preview: {
         label: "Your workspace, as you answer",
         /** The workspace's name in the preview until one is typed. */
         name: "Your workspace",
         ghost: "Your team shows up here",
+        ghostPersonal: "Your agents show up here",
       },
-      team: { title: "Your team" },
+      team: {
+        title: "Your team",
+        /** Under the title once the team is made (back from a later step): the list of who is in it. */
+        madeLead: "They're already in the workspace. You can adjust each one later.",
+        /**
+         * After "I don't use any yet", how a team starts: the template for what it does (its templates next) or from
+         * scratch (the next step with only the right hand; the agents are created by hand later). Two radio cards, each
+         * with who comes in it.
+         */
+        start: {
+          title: "How do you want to start the team?",
+          lead: "You can change all of it later, nothing is lost.",
+          template: "Start with a ready-made team",
+          /** `{{template}}`: the template's name ("Marketing agency"). */
+          templateText_one:
+            "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
+          templateText_other:
+            "{{count}} agents from the {{template}} template, each in its own channel, with their routines ready.",
+          scratch: "Start from scratch",
+          /** `{{name}}`: the right hand's name. */
+          scratchText: "Just {{name}}, your right hand. You create each agent later, your way.",
+          /** Beside the right hand's face and an empty place: who the team starts with. */
+          scratchWho: "{{name}} and whoever you create",
+          /** The button, with the template's team picked. */
+          see: "See the ready-made team",
+          /** The button, with "Start from scratch" picked. */
+          scratchGo: "Go on with just {{name}}",
+        },
+        /** The team step opens on this question; the cards are the import page's apps, then "none". */
+        ask: {
+          title: "Do you already have agents in another app?",
+          lead: "If you do, I'll bring the whole team: instructions, skills and routines.",
+          leadPersonal: "If you do, I'll bring them all: instructions, skills and routines.",
+          none: "I don't use any yet",
+          /** `{{org}}`: the workspace's name. */
+          noneText: "I'll put together a team for {{org}} from what you do.",
+          noneTextPersonal: "We start with just the two of us. Agents can come later, whenever you want.",
+          /** The button, with an app picked. `{{app}}`: the other app. */
+          from: "Bring from {{app}}",
+          /** The button, with "I don't use any yet" picked. */
+          fresh: "Build a new team",
+          freshPersonal: "Continue without agents",
+          /** A team's quiet link under the button: on to the next step with only the right hand, no agents brought. */
+          skip: "Skip this step",
+          /** Beside "Skip this step": what skipping means. */
+          skipText: "You can create the agents later, one by one.",
+        },
+        /** Bringing the team from an app that answers a request: copy the request there, paste its answer here. */
+        bring: {
+          title: "Bring your team from {{app}}",
+          titlePersonal: "Bring your agents from {{app}}",
+          /** The same, for "Another app". */
+          titleOther: "Bring your team from another app",
+          titleOtherPersonal: "Bring your agents from another app",
+          lead: "It takes a minute. Nothing changes there.",
+          ask: "Ask {{app}} to export",
+          paste: "Paste it in your chat with {{app}}.",
+          reply: "It answers with a JSON: copy the whole answer and paste it in the field below.",
+          field: "Paste the answer from {{app}} here",
+          placeholder: "The answer's JSON",
+          read: "Read the answer",
+          fresh: "I'd rather build a new team",
+        },
+        /** What the other app sent, before anything is made. */
+        found: {
+          title_one: "Found {{count}} agent in {{app}}",
+          title_other: "Found {{count}} agents in {{app}}",
+          lead: "They arrive with the instructions, skills and routines they already have. You can change everything later.",
+          bring: "Bring the team",
+          bringPersonal: "Bring the agents",
+        },
+      },
       plan: {
         title: "Turn your team on",
         lead: "Your team is ready. With the plan and an AI, it starts today.",
+        /** The same, for a team with only its right hand (the team step was skipped). */
+        leadAlone: "With the plan and an AI, your right hand starts today. You can create the other agents later.",
         asleep: "Asleep until the plan",
         price: "<b>{{name}} plan</b> · {{price}} a month",
         name: "<b>{{name}} plan</b>",
@@ -748,7 +863,54 @@ export const en = {
         cancel: "Cancel anytime",
         cta: "Turn the team on",
         all: "See all plans",
-        skip: "Go to the workspace without it",
+        /** Opens the workspace with no plan: the right hand's card then leads with the plan. */
+        skip: "Turn it on later and just look around the workspace",
+        /** Beside the plan's button: the step after it. */
+        next: "Next: connect your AI.",
+        titlePersonal: "Turn your agents on",
+        leadPersonal: "With the plan and an AI, they start today.",
+        asleepPersonal: "Asleep until the plan",
+        ctaPersonal: "Turn the agents on",
+      },
+      /** The rail's last step (ADR 0162): the AI the team thinks with, then the workspace. */
+      ai: {
+        /** A personal workspace's heading for the step (a team's is `arrival.connect.title`). */
+        titlePersonal: "Connect an AI for your agents to think",
+        /** A team's heading for it with no agents but its right hand: `{{name}}`, the right hand ("Lodi"). */
+        titleAlone: "Connect an AI for {{name}} to think",
+        later: "Connect later",
+        /** `{{org}}`: the workspace's name. */
+        doneTitle: "Done. The {{org}} team is thinking now.",
+        /** `{{name}}`: the right hand, alone in a personal workspace. */
+        doneTitlePersonal: "Done. {{name}} is thinking now.",
+        /** `{{label}}`: the AI picked ("Claude"). */
+        doneLead: "Your {{label}} answers for every agent. You can change it later, one by one.",
+        doneLeadAny: "The AI you connected answers for every agent. You can change it later, one by one.",
+        /** The tag on the card of the AI just connected ("Claude"). */
+        connected: "Connected",
+        enter: "Go to the workspace",
+        /** Under the team, once it wakes. `{{names}}`: the agents, already joined ("Lodi, Nina and Leo"). */
+        awake: "Your team woke up",
+        answer_one: "{{names}} answers now.",
+        answer_other: "{{names}} answer now.",
+        /**
+         * Over a personal workspace's sky (a team's is `arrival.stage`): its agents, or `{{name}}`, its right hand,
+         * while it is alone there. Asleep, then awake.
+         */
+        readyPersonal: "Your agents are ready",
+        readyAlone: "{{name}} is ready",
+        wakePersonal: "Just one AI away from waking up.",
+        awakePersonal: "Your agents woke up",
+        awakeAlone: "{{name}} woke up",
+      },
+      /** A team's last step (ADR 0162, amended 2026-11-11): inviting the people who work there. */
+      people: {
+        title: "Who works with you?",
+        lead: "Invite your teammates. Each one gets an email to join.",
+        /** The button while no address is typed yet. */
+        send: "Send invitations",
+        /** The quiet link under the button: the workspace opens with no invitations. */
+        later: "Invite later",
       },
       account: "Your account",
     },
@@ -756,6 +918,10 @@ export const en = {
       context: "Written",
       skipped: "Skipped",
       later: "Later",
+      /** The plan step, once the plan is on. */
+      on: "On",
+      /** The AI step, once an AI is connected (its name when picked here). */
+      ai: "Connected",
       invites_one: "{{count}} invite",
       invites_other: "{{count}} invites",
     },
@@ -981,7 +1147,7 @@ export const en = {
       go_other: "Import {{count}} items",
       nothingNew: "All of this is already here.",
       nothingToBring: "Nothing here can come along. Each item says why.",
-      withTeam: "It arrives when you create the team.",
+      withTeam: "It arrives when you bring the team.",
       applying: "Importing… {{done}} of {{total}}",
       files: {
         copy: "Copy the files to the Drive",
@@ -2546,6 +2712,75 @@ export const en = {
       other: "Or connect another",
       manageKeys: "Manage or delete keys",
     },
+    /** Connect opened from an agent's conversation (ADR 0160, addendum): what is already connected, to pick from. */
+    chat: {
+      mine: "Yours",
+      yours: "Yours",
+      keys: "Workspace key",
+      best: "Most room right now",
+      atLimit: "At their limit",
+      seeAll: "See all {{count}} accounts",
+      allTitle: "All accounts",
+      search: "Search an account or a person",
+      none: "No account by that name.",
+      other: "Connect another AI",
+      told: "{{name}} gets an email about it.",
+    },
+    /** Connect for the whole team (ADR 0160, addendum): the agents without an AI, picked, signed in and woken. */
+    team: {
+      title: "Connect an AI for the team",
+      /** A personal workspace has no team (ADR 0159): the same title for its agents. */
+      titlePersonal: "Connect an AI for your agents",
+      asleep_one: "{{count}} agent without AI",
+      asleep_other: "{{count}} agents without AI",
+      /** The "For" line once the agents were narrowed with Choose. */
+      asleepSome: "{{n}} of {{total}} agents without AI",
+      choose: "Choose",
+      /** A quiet tag at the end of a plan's card: that plan asks for one sign-in per agent. */
+      perAgent: "One sign-in per agent",
+      pickTitle: "For which agents",
+      marked: "{{n}} of {{total}} checked.",
+      useThese_one: "Use this agent",
+      useThese_other: "Use these {{count}}",
+      /** The step counter while each agent signs in on its own. */
+      progress: "{{n}} of {{total}}",
+      turn: "Sign in to {{plan}} for {{name}}",
+      turnHelp: "It's the same account. {{plan}} just asks you to sign in again for each agent.",
+      /** The footer's main button during an agent's turn. */
+      signIn: "Sign in to {{plan}}",
+      failed: "{{name}}'s sign-in didn't finish",
+      skip: "Skip {{name}}",
+      state: {
+        /** An agent's face in the row of faces, for screen readers and on hover. */
+        failed: "Sign-in didn't finish",
+      },
+      woke_one: "{{count}} agent woke up",
+      woke_other: "{{count}} agents woke up",
+      wokeAll: "The team is awake",
+      wokeAllPersonal: "Your agents woke up",
+      /** The end's title when every agent was passed over. */
+      wokeNone: "Nobody woke up",
+      thinksAll: "They already think with your {{plan}}",
+      thinksOne: "{{name}} already thinks with your {{plan}}",
+      stayed: "{{name}} is still without AI: their sign-in didn't finish.",
+      stayedMany: "{{names}} are still without AI: their sign-ins didn't finish.",
+      /** One agent passed over, and why its sign-in didn't finish (`why`: the sign-in's own words). */
+      why: "{{name}}: {{why}}",
+      /** The team's right hand still without an AI at the end: its own Connect, since its AI is each person's. */
+      stayedHand: "{{name}} has no AI for you yet.",
+      again: "Connect {{name}}",
+      againMany: "Connect the {{n}}",
+      /** Whom they answer on the person's own subscription (ADR 0059 §5), and the link that opens them to the team. */
+      audience: {
+        offAll: "On your subscription, they answer only you.",
+        onAll: "They answer anyone who can talk to them.",
+        off: "On your subscription, {{name}} answers only you.",
+        on: "{{name}} answers anyone who can talk to them.",
+        share: "Open to the team",
+        /** The same link once they answer the team: back to answering only the person. */
+        unshare: "Only me",
+      },
+    },
     /** The Cloud's workspace on a billing hold, where a plan would sign in. */
     billing: "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan.",
     /** After `billing`, on the phone, where paying isn't offered. */
@@ -2609,6 +2844,9 @@ export const en = {
       ready: "The computer is ready.",
       useKey: "Use an API key now",
       connecting: "This server's computer connects within a minute. You sign in here as soon as it does.",
+      /** On the onboarding with no computer: one is connected only once the workspace opens. */
+      computerLater:
+        "Accounts need a computer, and this workspace has none yet. You can add one once the workspace opens.",
     },
     /** The Cloud's one computer in a plan's sign-in, unnamed: "Send to the computer". */
     theComputer: "the computer",
@@ -4638,7 +4876,6 @@ export const en = {
       failed: "Couldn't save. Try again.",
       use: "Use",
       brain: {
-        sub: "Applies only to {{name}}, in every conversation.",
         model: "API key",
         modelText: "Paid per use. It counts against {{name}}'s budget.",
         /** A plan's card: `plan` is its name ("Claude", "ChatGPT", "OpenCode Go"). */
@@ -4664,8 +4901,6 @@ export const en = {
         accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
-        connectPlan: "Connect another plan",
-        keyLabel: "API key",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
           "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
@@ -4697,11 +4932,8 @@ export const en = {
         },
         advanced: {
           title: "Advanced settings",
-          sub: "{{brain}}. Applies to every conversation.",
-          think: "How it thinks",
           answers: "Who it answers",
           defaults: "Back to defaults",
-          done: "Done",
           contents: {
             model: "Context window",
             auto: "Context window and who it answers",
@@ -4826,9 +5058,56 @@ export const en = {
           },
           startFailed: "No answer from {{computer}}. Try again in a moment.",
           sendFailed: "Couldn't send the code. Check it and try again.",
-          done: "The {{account}} account is on {{computer}}. Click Use to save.",
+          done: "The {{account}} account is signed in again on {{computer}}. It's in use now.",
         },
         offCloud: "{{computer}} isn't answering",
+        /** Who thinks as one change per screen (ADR 0032, addendum of 2026-11-10). */
+        v2: {
+          title: "Who thinks for {{name}}",
+          /** The first screen's footer note: one line. */
+          only: "Only for {{name}}.",
+          /** A line on the first screen that opens effort, speed, context and the rest. */
+          more: "More options",
+          switch: "Change account",
+          switchTitle: "Change {{name}}'s account",
+          /** The label over the account the agent uses now. */
+          inUse: "In use",
+          /** The main button: `label` is the account's title ("Claude 2 · Max"). */
+          switchTo: "Switch to {{label}}",
+          teamTitle: "Change the team's account",
+          /** The two cards of the team screen, for a screen reader: whom the switch is for. */
+          teamAria: "Whom it is for",
+          /** Two cards, when the account thinks for all of its owner's agents: whom the switch is for. */
+          justOne: "Only {{name}}",
+          everyone: "Everyone on this account",
+          /** The label over the account they switch to. */
+          target: "Switch to",
+          switchMany_one: "Switch {{count}} agent",
+          switchMany_other: "Switch the {{count}} agents",
+          limitTitle: "{{name}}'s account is at its limit",
+          /** `when` is a day and a time ("Saturday at 18:00"). */
+          limitBack: "{{account}} is back {{when}}",
+          /** When the time it's back isn't known. */
+          limitSoon: "{{account}} is back when the plan renews",
+          limitHelp: "Meanwhile {{name}} can think with another account that's already connected.",
+          wait: "Wait",
+          modelTitle: "{{name}}'s model",
+          moreTitle: "More options for {{name}}",
+          /** A switch: its ⓘ is `fallbackHint`. */
+          fallback: "Use the API key if the plan stops",
+          /** A line under More options where several computers can run it. */
+          computer: "Computer",
+          doneTitle: "All set",
+          doneSub: "What was under way goes on with the new account.",
+          /** The main button of the first screen, of More options and of the last screen. */
+          finish: "Done",
+          undo: "Undo",
+          /** A toast after Undo. */
+          undone: "Back to how it was.",
+          /** The agents the server didn't move when switching everyone on the account: `names` lists them. */
+          missed_one: "{{names}} kept the account it had.",
+          missed_other: "{{names}} kept the accounts they had.",
+        },
       },
       computer: {
         title: "Where does {{name}} work?",
@@ -5574,6 +5853,16 @@ export const en = {
       notNow: "Not now",
       /** Apps and people on a billing hold: no button, they open with the plan. */
       afterPlan: "Opens with the plan.",
+      /** The AI row on a billing hold: the plan row above it comes first. */
+      afterPlanNext: "It's the next step after the plan.",
+      /** The first row while the workspace waits for its first plan (ADR 0162), its button opening the billing page. */
+      plan: {
+        todo: "Turn the team on.",
+        todoDesc: "With an agentes.chat plan, the agents start working.",
+        action: "See plans",
+        todoPersonal: "Turn your agents on.",
+        todoDescPersonal: "With an agentes.chat plan, your agents start working.",
+      },
       about: {
         /** A personal workspace's row 1, its button (ADR 0159). */
         action: "Tell",

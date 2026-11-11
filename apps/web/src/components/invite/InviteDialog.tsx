@@ -66,7 +66,7 @@ import { useEdited } from "@/hooks/useEdited";
 import { TYPED_VALUES } from "@/i18n";
 import { lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
-import { AddressFace, type ChipAddress, ChipNote, ChipRole, EmailChips } from "./EmailChips";
+import { AddressFace, type ChipAddress, ChipNote, ChipRole, chipsFrom, EmailChips } from "./EmailChips";
 import { InviteLinkPanel } from "./InviteLinkPanel";
 import "@/components/auth.css";
 import "./invite.css";
@@ -164,12 +164,6 @@ interface Outcome {
   status: BatchInviteResult["status"];
   roleId: string;
 }
-
-/** The new addresses in `text`, after the chips already there. */
-const chipsFrom = (text: string, known: readonly ChipAddress[]): ChipAddress[] => {
-  const seen = new Set(known.map((c) => c.email));
-  return addressesIn(text).filter((a) => !seen.has(a.email));
-};
 
 /** "Julia" from julia.martins@acme.com: the address's first word, as the host calls each person. */
 const nameOf = (email: string, locale: string) => capitalize(email.split("@")[0]?.split(/[._-]/)[0] || email, locale);

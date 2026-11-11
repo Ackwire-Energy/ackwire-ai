@@ -1,5 +1,6 @@
 import type { ConnectorDef } from "@agenteschat/client";
 import {
+  keys,
   useAgents,
   useCatalog,
   useChannels,
@@ -34,6 +35,7 @@ import {
   setGaze,
   spriteTone,
 } from "@agenteschat/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import {
   createContext,
@@ -358,6 +360,7 @@ function NewAgentDialog({
   const create = useCreateAgent(org.id);
   const brain = useNewAgentBrain();
   const connectAi = useConnectAi();
+  const qc = useQueryClient();
 
   const picks: Pick[] = useMemo(
     () => ["zero", ...(personal ? PERSONAL_STARTERS.map((s) => s.id) : ROLE_GROUPS.flatMap((g) => [...g.roles]))],
@@ -716,6 +719,8 @@ function NewAgentDialog({
             skills.map((s) => ({ skillId: s.id, enabled: chosenSkills.includes(s.id) })),
           ),
         );
+      // Its AI was set after it was made: what the workspace knew of who can think is from before it existed.
+      void qc.invalidateQueries({ queryKey: keys.aiStatus(org.id) });
       if (failures.length > 0)
         toast.show(t("newAgent.partly", { ...agentGrammar(name), reason: failureText(t, failures[0]) }), "error");
       const from = hero.current?.getBoundingClientRect();

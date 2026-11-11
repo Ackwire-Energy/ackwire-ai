@@ -61,6 +61,16 @@ describe("the arrival, right after the onboarding", () => {
     expect(screen().queryByRole("dialog", { name: CONNECT })).toBeNull();
   });
 
+  test("after the onboarding's own AI step (beta): the notice alone, even with agents that don't think", async () => {
+    const { router } = await open(withoutAi(), "?arrival=beta");
+    const beta = screen().getByRole("dialog", { name: BETA });
+    expect(router.state.location.search).not.toHaveProperty("arrival");
+    await click(within(beta).getByRole("button", { name: /Continuar/ }));
+    await settle(6);
+    expect(screen().queryByRole("dialog", { name: BETA })).toBeNull();
+    expect(screen().queryByRole("dialog", { name: CONNECT })).toBeNull();
+  });
+
   test("no mark in the address, no notice", async () => {
     await open(withoutAi());
     expect(screen().queryByRole("dialog", { name: BETA })).toBeNull();

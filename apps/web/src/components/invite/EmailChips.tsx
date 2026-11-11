@@ -1,3 +1,4 @@
+import { addressesIn } from "@agenteschat/client/lib/text";
 import { Avatar, Button, Select, type SelectOption } from "@agenteschat/ui";
 import { type ReactNode, type RefObject, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,13 +13,19 @@ export interface ChipAddress {
 /** What a paste must hold to become chips at once: more than one address, or an address with its name. */
 const LIST = /[\s,;<]/;
 
+/** The new addresses in `text`, after the chips already there (the invite dialog's and the onboarding's). */
+export const chipsFrom = (text: string, known: readonly ChipAddress[]): ChipAddress[] => {
+  const seen = new Set(known.map((c) => c.email));
+  return addressesIn(text).filter((a) => !seen.has(a.email));
+};
+
 /** An address's face: its first letter, as a person's tile shows their initials. */
 export function AddressFace({ email }: { email: string }) {
   return <Avatar name={email} initials={email.charAt(0).toUpperCase()} size="sm" />;
 }
 
 /**
- * Addresses as chips (ADR 0090), in the onboarding's Team step and the invite dialog. Enter, a comma, a semicolon
+ * Addresses as chips (ADR 0090), in the onboarding's people step and the invite dialog. Enter, a comma, a semicolon
  * or leaving the field hands what was typed to `onAdd`, which reads it with `addressesIn` (the way mail apps and
  * spreadsheets copy addresses: `Ana Silva <ana@x.com>`, quotes, `mailto:`); a pasted list goes at once; Backspace in
  * an empty field takes the last chip back. Each chip shows its face and address, then `aside` (its role, or why it

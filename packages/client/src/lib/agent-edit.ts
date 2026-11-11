@@ -36,6 +36,11 @@ export const AGENT_SECTIONS = [
 export type AgentSection = (typeof AGENT_SECTIONS)[number];
 export const isAgentSection = (v: unknown): v is AgentSection => AGENT_SECTIONS.includes(v as AgentSection);
 
+/** The screens "Quem pensa" can open on from a link, past its first one (ADR 0032 §5, addendum 2026-11-10). */
+export const BRAIN_SCREENS = ["model", "more", "switch"] as const;
+export type BrainScreen = (typeof BRAIN_SCREENS)[number];
+export const isBrainScreen = (v: unknown): v is BrainScreen => BRAIN_SCREENS.includes(v as BrainScreen);
+
 /*
  * A personal workspace's agent page (ADR 0159 §3): the same page, simpler. Its bar keeps what one person uses
  * (Overview, Instructions, Memory, the apps it can use, its name and look) and an Advanced tab holds the rest: who owns
@@ -56,13 +61,15 @@ export function shownAgentTab(tab: AgentTab, sec: AgentSection | undefined, pers
 }
 
 /**
- * `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa").
+ * `?tab=settings&sec=brain` (unknown values are dropped; the old `sec=model` lands on "Quem pensa"), with `&brain=model`
+ * (or `more`, `switch`) opening "Quem pensa" on that screen.
  * `?computer=1` opens the agent's computer; `?browser=1`, `?desktop=1` and `?terminal=1` are older links to it
  * (notifications, the Mac app's tray).
  */
 export function agentSearch(search: Record<string, unknown>): {
   tab?: AgentTab;
   sec?: AgentSection;
+  brain?: BrainScreen;
   computer?: 1;
 } {
   const sec = search.sec === "model" ? "brain" : search.sec;
@@ -70,6 +77,7 @@ export function agentSearch(search: Record<string, unknown>): {
   return {
     tab: isAgentTab(search.tab) ? search.tab : undefined,
     sec: isAgentSection(sec) ? sec : undefined,
+    ...(sec === "brain" && isBrainScreen(search.brain) ? { brain: search.brain } : {}),
     ...([search.computer, search.browser, search.desktop, search.terminal].some(on) ? { computer: 1 as const } : {}),
   };
 }
