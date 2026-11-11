@@ -72,7 +72,7 @@ describe("Configurações → Dispositivos, in the app", () => {
     expect(asked).toContainEqual({ kind: "prefs", tab: "folders" });
   });
 
-  test("this Mac's page: allowing folders and turning the browser on open the app's Preferences", async () => {
+  test("this Mac's page: allowing folders, turning a tool or the browser on open the app's Preferences", async () => {
     const mac = { status: { orgs: [] } as ThisMacStatus, code: null };
     const asked = inTheApp(mac);
     const api = createFakeApi(seedState());
@@ -87,9 +87,17 @@ describe("Configurações → Dispositivos, in the app", () => {
     await settle(8);
     expect(screen().queryByText(/Liberar é no próprio computador/)).toBeNull();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir Pastas" })));
-    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Abrir Ferramentas" })));
     expect(asked).toContainEqual({ kind: "prefs", tab: "folders" });
-    expect(asked).toContainEqual({ kind: "prefs", tab: "tools" });
+    // The site only turns a tool off: one that is off says where it goes on.
+    const tools = screen().getByRole("region", { name: "Ferramentas" });
+    expect(tools.textContent).toContain("Desligado neste Mac. Ligue nas Preferências do app, em Ferramentas.");
+    await act(async () => fireEvent.click(within(tools).getByRole("button", { name: "Abrir Ferramentas" })));
+    expect(asked.filter((r) => r.tab === "tools")).toHaveLength(1);
+    const elsewhere = screen()
+      .getAllByRole("button", { name: "Abrir Ferramentas" })
+      .find((b) => !tools.contains(b));
+    await act(async () => fireEvent.click(elsewhere as HTMLElement));
+    expect(asked.filter((r) => r.tab === "tools")).toHaveLength(2);
   });
 
   test("another computer's page, in the app: the usual words", async () => {
@@ -104,6 +112,7 @@ describe("Configurações → Dispositivos, in the app", () => {
     await settle(8);
     expect(screen().getByText(/Liberar é no próprio computador/)).toBeTruthy();
     expect(screen().queryByRole("button", { name: "Abrir Pastas" })).toBeNull();
+    expect(screen().getByRole("region", { name: "Ferramentas" }).textContent).not.toContain("Desligado neste");
   });
 
   test("a server on this computer: the app says no, and no This Mac shows", async () => {

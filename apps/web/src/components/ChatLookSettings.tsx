@@ -9,6 +9,7 @@ import {
   chatLookOf,
   DEFAULT_TEXT_SIZE,
   facesShown,
+  openAtOf,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
@@ -144,7 +145,7 @@ export function ChatLookSettings() {
   // What shows checked is what the conversations use: in a personal workspace, bubbles for channels too (ADR 0159).
   const { style, tone } = chatLookOf(prefs, dm, isPersonal(org));
   const textSize = textSizeOf(prefs);
-  const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
+  const openAt = openAtOf(prefs);
   const save = (patch: Parameters<typeof set.mutate>[0]) =>
     set.mutate(patch, { onError: () => toast.show(t("settings.account.activityFailed")) });
   const mine = agentGradient(dm ? SAMPLE_AGENT.color : "sky")[1];

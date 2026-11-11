@@ -73,7 +73,7 @@ export const useCardTop = (marginTop = 0) => ({ marginTop: useContext(RowPartCon
 /** `quietInset` in this conversation's look. */
 export const useQuietInset = () => quietInset(useRowLook());
 
-/** The rows' frames per style, shared by the saved row (`MessageRow`) and the live one (`TurnRow`). */
+/** The rows' frames per style. */
 export const lookRows = StyleSheet.create({
   bubblesRow: { paddingLeft: BUBBLES_INSET, paddingRight: 44, gap: 8 },
   bubblesSlot: { width: 30, paddingTop: 0 },

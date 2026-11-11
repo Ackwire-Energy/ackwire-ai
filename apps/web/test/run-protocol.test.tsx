@@ -1,11 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { isWriting } from "@agenteschat/client/lib/activity";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import type { Message, RunStep } from "@agenteschat/client";
-import { applyChannelEvent, emptyStreams, narrationOf, reconcileRuns, type StreamsState } from "@agenteschat/client";
+import { applyChannelEvent, emptyStreams, reconcileRuns, type StreamsState } from "@agenteschat/client";
 import { splitCanceled, workFromSteps } from "@agenteschat/client/lib/work";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
@@ -16,33 +15,15 @@ afterEach(() => cleanup());
 const base = { channelId: "c", threadId: "t", agentId: "ada", runId: "r" };
 type Ev = Parameters<typeof applyChannelEvent>[1];
 const run = (events: Ev[], s: StreamsState = emptyStreams) => events.reduce((acc, e) => applyChannelEvent(acc, e), s);
-const delta = (seq: number, turn: number, text: string): Ev => ({ type: "agent.delta", ...base, seq, turn, text });
-const narration = (turn: number, text: string) => ({ type: "agent.narration", ...base, turn, text }) as Ev;
+/** An older server's piece of a reply (it still sent which model call it came from). */
+const delta = (seq: number, turn: number, text: string) => ({ type: "agent.delta", ...base, seq, turn, text }) as Ev;
 
-describe("narration keyed by turn", () => {
-  test("agent.narration moves that turn's text out of the answer", () => {
-    const s = run([delta(0, 0, "Vou checar "), delta(1, 0, "o ambiente."), narration(0, "Vou checar o ambiente.")]);
-    const r = s.runs.r;
-    expect(narrationOf(r ?? {})).toEqual(["Vou checar o ambiente."]);
-    expect(r?.text).toBe("");
-  });
-
-  test("tool call first, then narration for the same turn: one line, not two", () => {
-    const s = run([
-      delta(0, 0, "Vou checar"),
-      { type: "agent.tool", ...base, tool: "run_code", toolUseId: "t1" } as Ev,
-      narration(0, "Vou checar o ambiente."),
-      delta(1, 1, "Pronto."),
-    ]);
-    expect(narrationOf(s.runs.r ?? {})).toEqual(["Vou checar o ambiente."]);
-    expect(s.runs.r?.text).toBe("Pronto.");
-  });
-
-  // ADR 0097, 2026-11-03 addendum item 6: text still in the body when the next model call starts is a held reply.
-  test("a delta of a new turn replaces a held reply, it never becomes narration", () => {
+describe("a run's live state holds what it does, never what it writes", () => {
+  test("an older server's deltas, of one turn or a new one: no words kept, only that it writes", () => {
     const s = run([delta(0, 0, "Não consigo, precisa do seu QR code."), delta(1, 1, "Achei.")]);
-    expect(narrationOf(s.runs.r ?? {})).toEqual([]);
-    expect(s.runs.r?.text).toBe("Achei.");
+    expect(s.runs.r?.status).toBe("running");
+    expect(JSON.stringify(s.runs.r)).not.toContain("QR code");
+    expect(s.runs.r?.work ?? []).toEqual([]);
   });
 
   test("steered with stop: the row shows it's stopping; the message joins the work once read", () => {
@@ -52,9 +33,7 @@ describe("narration keyed by turn", () => {
     ]);
     expect(s.runs.r?.stopping).toBe(true);
     s = run([{ type: "agent.run.read", channelId: "c", runId: "r", agentId: "ada", messageIds: ["m9"] } as Ev], s);
-    // What it wrote stays where it was, and it is still writing.
-    expect(s.runs.r?.text).toBe("Trabalhando");
-    expect(isWriting(s.runs.r as NonNullable<typeof s.runs.r>)).toBe(true);
+    expect(s.runs.r?.status).toBe("running");
     expect(s.runs.r?.work?.at(-1)).toEqual({ kind: "steer", messageId: "m9" });
   });
 });
@@ -206,9 +185,7 @@ describe("in the channel", () => {
     await act(async () =>
       socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.run", ...ids, status: "running" } }),
     );
-    await act(async () =>
-      socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.delta", ...ids, seq: 0, text: "Quase" } }),
-    );
+    await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { type: "agent.typing", ...ids } }));
     await settle(2);
     // The composer's send button is the stop while the box is empty: one click, nothing asked.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Parar a Ada" })));

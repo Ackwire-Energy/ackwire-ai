@@ -34,7 +34,9 @@ describe("agent activity: thinking → typing → idle", () => {
     expect(runsInChannel(s, "c1").some((r) => r.provisional)).toBe(false);
     s = applyChannelEvent(s, { type: "agent.typing", ...base });
     s = applyChannelEvent(s, { type: "agent.delta", ...base, seq: 1, text: "Achei" });
-    expect(runsInChannel(s, "c1")).toMatchObject([{ status: "running", text: "Achei" }]);
+    // It writes; its words wait for its message.
+    expect(runsInChannel(s, "c1")).toMatchObject([{ status: "running" }]);
+    expect(JSON.stringify(runsInChannel(s, "c1"))).not.toContain("Achei");
     s = applyChannelEvent(s, { type: "agent.idle", ...base });
     expect(runsInChannel(s, "c1")).toEqual([]);
   });

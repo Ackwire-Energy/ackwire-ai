@@ -525,12 +525,12 @@ test("a task's end in a thread names its computer only where the workspace has m
   const latest = async () => (await inbox(bia.id)).items.find((n) => n.kind === "thread_reply")?.latest.text;
   // The Cloud's one computer: Bia hears how it ended, not where. The agent still reads where.
   const first = await end();
-  expect(first.body).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
-  expect(await latest()).toBe('Task "Run the tests" finished after 2 min.');
+  expect(first.body).toBe(`“Run the tests” finished on ${computer}.`);
+  expect(await latest()).toBe("“Run the tests” finished.");
   // A second computer: the line says which.
   await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "MacBook" });
   await end();
-  expect(await latest()).toBe(`Task "Run the tests" finished on ${computer} after 2 min.`);
+  expect(await latest()).toBe(`“Run the tests” finished on ${computer}.`);
 });
 
 test("in a DM, a reminder and a routine's report reach the person, in their own words", async () => {

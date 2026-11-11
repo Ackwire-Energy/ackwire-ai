@@ -140,9 +140,20 @@ function OwnerChip({ userId }: { userId: string | null }) {
 }
 
 /** The state, its reason in words, and its one action. */
-function StatusLine({ status, host, action }: { status: PhoneDevice["status"]; host?: string; action?: ReactNode }) {
+function StatusLine({
+  status,
+  host,
+  hostOs,
+  action,
+}: {
+  status: PhoneDevice["status"];
+  host?: string;
+  /** The host's system: a phone with no driver reads by it. */
+  hostOs?: string;
+  action?: ReactNode;
+}) {
   const { t, i18n } = useTranslation();
-  const sentence = statusSentence(t, i18n.language, status, { host });
+  const sentence = statusSentence(t, i18n.language, status, { host, hostOs });
   const label = status.kind === "in_use" && status.label ? status.label : null;
   return (
     <div className="dv-statusline" data-status={statusLook(status)} role="status">
@@ -502,7 +513,7 @@ function PhonePage({ phoneId }: { phoneId: string }) {
             )
           }
         />
-        <StatusLine status={p.status} host={host.name} action={action} />
+        <StatusLine status={p.status} host={host.name} hostOs={host.os} action={action} />
         <Facts facts={facts} />
       </Card>
       <PhoneLive key={p.id} phone={p} host={host.name} />

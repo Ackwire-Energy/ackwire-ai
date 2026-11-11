@@ -3,7 +3,6 @@ import {
   CHAT_RHYTHM,
   CHAT_STYLES,
   CHAT_TEXT_SIZES,
-  type ChatOpenAt,
   type ChatPrefs,
   type ChatStyle,
   type ChatTextSize,
@@ -12,6 +11,7 @@ import {
   DEFAULT_TEXT_SIZE,
   facesShown,
   mineOnRight,
+  openAtOf,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
@@ -487,7 +487,7 @@ export function ChatLookPage() {
     if (sizeDraft === textSize) setSizeDraft(null);
   }, [sizeDraft, textSize]);
   const shownSize = sizeDraft ?? textSize;
-  const openAt: ChatOpenAt = prefs?.openAt ?? "latest";
+  const openAt = openAtOf(prefs);
   const save = (patch: ChatPrefs) =>
     set.mutate(patch, {
       onError: () => {

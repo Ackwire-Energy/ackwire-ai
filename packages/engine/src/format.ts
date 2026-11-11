@@ -23,8 +23,11 @@ export function fromNow(at: Date, now = Date.now()) {
 export const andList = (xs: string[]) =>
   xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 
-/** Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`. */
-export const hasQuestionMark = (text: string) => /[?？؟]/.test(text);
+/**
+ * Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`, the
+ * Spanish `¿`. Greek's `;` is left out: it is also a semicolon.
+ */
+export const hasQuestionMark = (text: string) => /[?？؟¿]/.test(text);
 
 /** A person's first name, from their whole name. */
 export const firstName = (name: string) => name.trim().split(/\s+/)[0] ?? "";

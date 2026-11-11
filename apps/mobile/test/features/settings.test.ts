@@ -657,3 +657,32 @@ test("Auditoria's row screen: the call's title in words, and what the tool said 
   const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
   expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
 });
+
+test("my photo on Você changes it with a tap, through Conta's own Alterar foto", () => {
+  const read = (file: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", file), "utf8");
+  const me = read("MeScreen.tsx");
+  // One button around the photo and its presence badge, named as Conta's link, off while a photo uploads.
+  const button = me.slice(me.indexOf("onPress={changePhoto}"), me.indexOf("</Pressable>"));
+  expect(button).toContain("disabled={uploading}");
+  expect(button).toContain('accessibilityRole="button"');
+  expect(button).toContain('accessibilityLabel={t("mobile.me.account.changePhoto")}');
+  expect(button).toContain('<PersonAvatar name={name || "?"} size={PHOTO} photo={photo} />');
+  // A touch screen has no hover: the photo badge always says the face changes it, on the top corner, ringed in the
+  // page as the photo is, and for the eyes only (the button already says what it does).
+  expect(button).toContain("styles.photoBadge, { backgroundColor: c.action, borderColor: c.grouped }");
+  expect(button).toContain('pointerEvents="none"');
+  expect(button).toContain('<Icon name="image" size={PHOTO_BADGE_ICON} color={c.onAction} />');
+  expect(me).toContain("const PHOTO_BADGE_AT = ((PHOTO + 6) / 2) * (1 - Math.SQRT1_2) - PHOTO_BADGE / 2;");
+  // My name and the @ under it wrap whole, never cut to a line or two.
+  const cover = me.slice(me.indexOf("</Pressable>"), me.indexOf("<View style={styles.groups}>"));
+  expect(cover).toContain('<Text variant="display2" style={styles.center}>');
+  expect(cover).not.toContain("numberOfLines");
+  // One flow: the sheet, the upload and the refresh live in `useChangePhoto`, which Conta's link opens too.
+  expect(me).toContain("const { changePhoto, uploading } = useChangePhoto();");
+  const account = read("AccountPage.tsx");
+  expect(account).toContain("const { changePhoto, uploading } = useChangePhoto();");
+  expect(account).not.toContain("ImagePicker");
+  const parts = read("parts.tsx");
+  expect(parts).toContain("export function useChangePhoto()");
+  expect(parts).toContain('...(hasPhoto ? [t("mobile.me.account.removePhoto")] : [])');
+});

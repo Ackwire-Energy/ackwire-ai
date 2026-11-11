@@ -18,7 +18,6 @@ import {
   drainOutbox,
   executeToolForRun,
   listMessages,
-  liveTurnOf,
   type MachineStatus,
   postPersonMessage,
   type SteerMessage,
@@ -331,10 +330,10 @@ test("a message sent before the turn is steerable is handed to it as soon as it 
   expect((run?.transcript as { request?: string } | null)?.request).toContain("e atualiza a doc");
 });
 
-/** Past `WORKING_TEXT_MAX`: a stretch this long shows while it's written, a shorter one waits for the turn's end. */
+/** Past `WORKING_TEXT_MAX`: a stretch this long is read as the answer (a stopped reply keeps it). */
 const LONG = "Vou olhar cada arquivo do projeto antes de mexer em qualquer coisa. ".repeat(5);
 
-test("text a brain kept back past a call's start goes out as that stretch's, and a message read mid-answer opens a paragraph", async () => {
+test("a computer brain's stretches, a call and a message read mid-answer: none of its words go out before its reply", async () => {
   f = await setup({
     toolSources: [
       {
@@ -354,7 +353,6 @@ test("text a brain kept back past a call's start goes out as that stretch's, and
   const fx = f;
   const machineId = await computerAgent(fx);
   const events = fx.listen(fx.general.id);
-  const seen: (ReturnType<typeof liveTurnOf> | null)[] = [];
   let runId = "";
   const handed: SteerMessage[][] = [];
   const sent = gate();
@@ -374,20 +372,16 @@ test("text a brain kept back past a call's start goes out as that stretch's, and
         yield { type: "text_delta", text: `${LONG}Vou olhar o build.gra` };
         await pause();
         await executeToolForRun(fx.jobDeps, id, { id: "c-1", name: "check_env", input: {} });
-        seen.push(liveTurnOf(runId) ?? null);
         yield { type: "text_delta", text: "dle primeiro." };
         await pause();
-        seen.push(liveTurnOf(runId) ?? null);
         yield { type: "tool_call", id: "c-1", name: "check_env", input: {}, executed: { content: "ok" } };
         yield { type: "text_delta", text: `${LONG}A resposta.` };
         await pause();
-        seen.push(liveTurnOf(runId) ?? null);
         sent.open();
         await waitUntil(() => handed.length > 0);
         yield { type: "steer_read", uuids: handed[0]?.map((m) => m.uuid) ?? [] };
         yield { type: "text_delta", text: "E sobre o recado." };
         await pause();
-        seen.push(liveTurnOf(runId) ?? null);
         yield { type: "done", text: `${LONG}A resposta.\n\nE sobre o recado.` };
       } finally {
         io.steerable?.(null);
@@ -405,27 +399,20 @@ test("text a brain kept back past a call's start goes out as that stretch's, and
   await post(fx, "@dev e o recado?");
   await drained;
 
-  const deltas = events.filter((e) => e.type === "agent.delta") as unknown as {
-    at: number;
-    from: number;
-    text: string;
-  }[];
-  const first = `${LONG}Vou olhar o build.gradle primeiro.`;
-  const second = `${LONG}A resposta.`;
-  // The stretch each piece belongs to, past the call's start or not.
-  expect(deltas.map((d) => [d.from, d.text]).filter(([, text]) => String(text).trim())).toEqual([
-    [0, `${LONG}Vou olhar o build.gra`],
-    [0, "dle primeiro."],
-    [first.length, second],
-    [first.length, "\n\nE sobre o recado."],
-  ]);
-  expect(deltas.map((d) => d.text).join("")).toBe(`${first}${second}\n\nE sobre o recado.`);
-  // An app opening now never starts on the end of a text it can't see the start of.
-  expect(seen.map((l) => l?.text)).toEqual(["", "", second, `${second}\n\nE sobre o recado.`]);
-  expect(seen[1]?.at).toBe(first.length);
+  expect(handed).toHaveLength(1);
+  // It said it writes; its step lines aside, none of its words went out but in its reply.
+  expect(events.some((e) => e.type === "agent.typing")).toBe(true);
+  const before = JSON.stringify(
+    events.filter((e) => e.type !== "message.created"),
+    (k, v) => (k === "said" ? undefined : v),
+  );
+  for (const words of ["build.gra", "dle primeiro", "A resposta", "E sobre o recado"])
+    expect([words, before.includes(words)]).toEqual([words, false]);
+  const main = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
+  expect(main.at(-1)?.body).toBe(`${LONG}A resposta.\n\nE sobre o recado.`.trim());
 });
 
-test("a stretch's last word held back while it could still grow goes out with it when the call ends", async () => {
+test("a long stretch a call ended is never posted: the reply is what it said after its last call", async () => {
   f = await setup();
   const fx = f;
   await computerAgent(fx);
@@ -433,8 +420,7 @@ test("a stretch's last word held back while it could still grow goes out with it
   const brain: Brain = {
     kind: "claude_code",
     async *run() {
-      // A last "N" could still become the silence word, so it waits; the call ending says the stretch is over.
-      yield { type: "text_delta", text: `${LONG}Vou seguir o plano N` };
+      yield { type: "text_delta", text: `${LONG}Vou seguir o plano` };
       yield { type: "tool_call", id: "c-1", name: "Bash", input: {}, executed: { content: "ok" } };
       yield { type: "text_delta", text: "Pronto." };
       yield { type: "done", text: "Pronto." };
@@ -447,45 +433,9 @@ test("a stretch's last word held back while it could still grow goes out with it
   });
   await post(fx, "@dev segue o plano");
   await drainOutbox(fx.db, handlers);
-  const deltas = events.filter((e) => e.type === "agent.delta") as unknown as { from: number; text: string }[];
-  const first = `${LONG}Vou seguir o plano N`;
-  expect(
-    deltas
-      .filter((d) => d.from === 0)
-      .map((d) => d.text)
-      .join(""),
-  ).toBe(first);
-  expect(
-    deltas
-      .filter((d) => d.from === first.length)
-      .map((d) => d.text)
-      .join(""),
-  ).toBe("Pronto.");
-});
-
-test("a short stretch a call ended never shows, and the next one starts where the shown text ends", async () => {
-  f = await setup();
-  const fx = f;
-  await computerAgent(fx);
-  const events = fx.listen(fx.general.id);
-  const brain: Brain = {
-    kind: "claude_code",
-    async *run() {
-      yield { type: "text_delta", text: "Vou seguir o plano" };
-      yield { type: "tool_call", id: "c-1", name: "Bash", input: {}, executed: { content: "ok" } };
-      yield { type: "text_delta", text: "Pronto." };
-      yield { type: "done", text: "Pronto." };
-    },
-  };
-  const handlers = createJobHandlers({
-    ...fx.jobDeps,
-    brains: { claude_code: () => brain },
-    machines: { status: async (id) => statusOf(id) },
-  });
-  await post(fx, "@dev segue o plano");
-  await drainOutbox(fx.db, handlers);
-  const deltas = events.filter((e) => e.type === "agent.delta") as unknown as { from: number; text: string }[];
-  expect(deltas.map((d) => [d.from, d.text])).toEqual([[0, "Pronto."]]);
+  const main = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
+  expect(main.map((m) => m.body)).toEqual(["@dev segue o plano", "Pronto."]);
+  expect(JSON.stringify(events.filter((e) => e.type !== "message.created"))).not.toContain("Pronto");
 });
 
 /** A queued run with one message in its inbox, and a listener for it that retries fast. */

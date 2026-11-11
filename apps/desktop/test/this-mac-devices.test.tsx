@@ -137,9 +137,8 @@ describe("the iPhone setup window", () => {
         "SettingsPrivacy & SecurityDeveloper Mode",
       );
       expect(el.textContent).toContain("Sam Rivera · Personal Team");
-      expect(
-        el.querySelector('svg[role="img"][aria-label="QR code that opens these steps on the iPhone"]'),
-      ).toBeTruthy();
+      // Our phone app is in no store yet: no QR that would only open a web page on the iPhone.
+      expect(el.querySelector(".dk-ip__qr")).toBeNull();
       expect(button(el, "Back")).toBeTruthy();
       expect(button(el, "Cancel")).toBeTruthy();
 

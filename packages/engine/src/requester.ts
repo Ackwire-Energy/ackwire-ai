@@ -1,10 +1,18 @@
 import { and, type Executor, eq, schema } from "@agenteschat/db";
-import { fedByRoutine, personOfMessage, type RunAuthority, runAuthority, runAuthorityById } from "./authority";
+import { appLocale } from "@agenteschat/i18n/locale";
+import {
+  accountablePerson,
+  fedByRoutine,
+  personOfMessage,
+  type RunAuthority,
+  runAuthority,
+  runAuthorityById,
+} from "./authority";
 import type { Audience } from "./task-access";
 import type { ToolContext } from "./tools/types";
 import type { WikiActor } from "./wiki";
 
-const { agentRuns } = schema;
+const { agentRuns, users } = schema;
 
 /**
  * The person a tool call acts for (ADR 0053): the person behind its run (`authority.ts`), or null when
@@ -29,6 +37,21 @@ export async function personBehindCall(
     : [];
   if (run) return (await runAuthority(ctx.db, run)).personId;
   return ctx.triggerMessageId ? personOfMessage(ctx.db, ctx.orgId, ctx.triggerMessageId) : null;
+}
+
+/** The person's language for the lines written for them (a template's text, the weekly check's name). */
+export async function personLocale(db: Executor, userId: string | null, preferred?: string | null) {
+  const [row] = userId ? await db.select({ locale: users.locale }).from(users).where(eq(users.id, userId)) : [];
+  return appLocale([preferred, row?.locale], true) ?? "en";
+}
+
+/**
+ * The language of a line the server writes in a chat as an agent (a device wait, a task's end, a long work's update):
+ * the person it works for, else the one behind its run (who asked, or a routine's creator), else English.
+ */
+export async function lineLocale(db: Executor, orgId: string, person: string | null, runId: string | null) {
+  if (person || !runId) return personLocale(db, person);
+  return personLocale(db, accountablePerson(await runAuthorityById(db, orgId, runId)));
 }
 
 /** `visible_to` of the tools that make something people read (ADR 0151). */

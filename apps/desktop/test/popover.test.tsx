@@ -7,7 +7,11 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { I18nextProvider } from "react-i18next";
 import { AppProvider } from "../src/app";
-import { DesktopStore } from "../src/control/store";
+import { siteApi } from "../src/control/devices";
+import { PREPARE_PREF } from "../src/control/permissions";
+import { DesktopStore, pairedHomes } from "../src/control/store";
+import { FAKE_SERVER } from "../src/dev/fake-runner";
+import { readPref, writePref } from "../src/hooks";
 import { createFakeHost, type FakeHost } from "../src/host/fake";
 import { createDesktopI18n } from "../src/i18n";
 import { ToastProvider } from "../src/ui/Toast";
@@ -261,4 +265,36 @@ describe("the server here's Stop (ADR 0158)", () => {
       const start = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Start it");
       expect(start).toBeTruthy();
     }));
+});
+
+test("the site's This computer: the Mac pairs with commands on, then the welcome window prepares it", async () => {
+  const host = createFakeHost("popover", "selfhost");
+  try {
+    await withMenu(
+      async (_el, store) => {
+        let userCode = "";
+        await act(async () => {
+          const reply = await host.askThisMac({
+            kind: "connect",
+            orgId: "o-norte",
+            origin: FAKE_SERVER,
+            agentsHere: true,
+          });
+          userCode = (reply.data as { userCode: string }).userCode;
+        });
+        await act(async () => {
+          await siteApi(host, FAKE_SERVER).machines.confirmDevice("o-norte", userCode, {});
+        });
+        const norte = () => pairedHomes(store.getSnapshot()).find((h) => h.status?.org?.id === "o-norte");
+        await until(() => norte()?.access?.tools.commands === true);
+        await until(() => host.window === "welcome");
+        expect(readPref<unknown>(PREPARE_PREF, null)).toEqual({ org: "Estúdio Norte", server: FAKE_SERVER });
+        expect(await host.autostart()).toBe(true);
+      },
+      host,
+      (el) => el.querySelector(".dk-pop__foot"),
+    );
+  } finally {
+    writePref(PREPARE_PREF, null);
+  }
 });

@@ -1,7 +1,19 @@
-import type { PhoneDevice } from "@agenteschat/client";
+import { type PhoneDevice, useLookForPhones } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
-import { wifiPairLive, wifiPairText } from "@agenteschat/client/lib/devices";
+import {
+  ANDROID_SLOW_MS,
+  ANDROID_UDEV,
+  ANDROID_USB_DRIVERS,
+  type AndroidStage,
+  type AndroidStep,
+  androidNotShowing,
+  androidSteps,
+  type StepState,
+  wifiPairLive,
+  wifiPairText,
+} from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { computerKind } from "@agenteschat/client/lib/machines";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { useState } from "react";
@@ -25,9 +37,9 @@ import {
   useToast,
 } from "@/ui";
 import { router } from "@/ui/navigation";
-import { Note, Step, StepsCard, StepText } from "../ai/parts";
+import { Note, OpenPage, Step, StepsCard, StepText } from "../ai/parts";
 import { Gap, SettingsPage } from "../settings/parts";
-import { useMeId } from "../shared/hooks";
+import { useMeId, useNow } from "../shared/hooks";
 import { pickOne } from "../shared/PickerSheet";
 import { goBack } from "../shared/parts";
 import { androidStage, phoneFacts, phoneHosts, reasonText, thisPhoneOn } from "./logic";
@@ -53,19 +65,31 @@ function useHost(machineId: string | undefined) {
   return { list, hosts, host, setPicked };
 }
 
+const STEP_LOOK: Record<StepState, "now" | "done" | "later"> = {
+  done: "done",
+  current: "now",
+  needs: "now",
+  waiting: "later",
+};
+
 /**
  * "Deixar agentes usarem este celular", on the Android phone itself: Developer options and USB debugging with buttons
- * that open those exact screens, then the cable into the computer, with a live line from what the computer reports
- * (not seen yet, waiting for Allow, ready), and Android's own prompt drawn in the app's language. Ready, it says so,
- * with the phone's name and who can use it. No cable: Wireless debugging, then the QR agentes.chat shows on a
- * computer, or the six-digit code typed here.
+ * that open those exact screens and Done to tick each (the computer can't see them until the phone shows up), then the
+ * cable into the computer, with a live line from what the computer reports (not seen yet, no driver for it, waiting for
+ * Allow, ready), and Android's own prompt drawn in the app's language. One step is open at a time, a folded one opens
+ * when tapped; once the computer sees the phone, every step before Allow ticks by itself. After 30 s on the cable with
+ * no phone seen, why it may not show up, for the computer's system. Ready, it says so, with the phone's name and who
+ * can use it. No cable: Wireless debugging, then the QR agentes.chat shows on a computer, or the six-digit code typed
+ * here.
  */
 export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { org } = useOrg();
   const { list, hosts, host, setPicked } = useHost(machineId);
-  const [opened, setOpened] = useState({ about: false, usb: false, wifi: false });
+  const [openedWifi, setOpenedWifi] = useState(false);
+  const [ticked, setTicked] = useState<ReadonlySet<AndroidStep>>(() => new Set());
+  const [asked, setAsked] = useState<{ step: AndroidStep; at: AndroidStage["kind"] } | null>(null);
   const [wifi, setWifi] = useState(false);
   const [byCode, setByCode] = useState(false);
   const pairing = useWifiPairCode(host?.id ?? null);
@@ -78,12 +102,29 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
       thisPhoneOn(host.phones, "android", Device.modelName))
     : null;
   const stage = androidStage(phone);
+  const hostDown = host?.status.kind === "offline";
+  const reason = phone && phone.status.kind !== "offline" && "reason" in phone.status ? phone.status.reason : null;
+  const cable: AndroidStage =
+    !phone || stage === "looking"
+      ? { kind: "looking" }
+      : reason === "no_driver"
+        ? { kind: "driver", phone }
+        : { kind: "allow", phone };
+  const steps = androidSteps(cable, ticked, asked?.at === cable.kind ? asked.step : null);
+  const waiting = Boolean(host) && !wifi && !hostDown && cable.kind === "looking" && steps.now === "plug";
+  const [since, setSince] = useState<number | null>(null);
+  if (waiting !== (since !== null)) setSince(waiting ? Date.now() : null);
+  const now = useNow(waiting ? 1000 : 60_000);
+  const slow = since !== null && Math.max(now, Date.now()) - since >= ANDROID_SLOW_MS;
+  useLookForPhones(org?.id ?? "", host?.id ?? null, Boolean(org) && !wifi && !hostDown && stage !== "done");
   if (host && phone && stage === "done") return <AndroidDone phone={phone} hostName={hostName} />;
 
   const open = (screen: keyof typeof SCREENS) => {
     const s = SCREENS[screen];
     Linking.sendIntent(s.action, [{ key: ":settings:fragment_args_key", value: s.row }]).then(
-      () => setOpened((o) => ({ ...o, [screen]: true })),
+      () => {
+        if (screen === "wifi") setOpenedWifi(true);
+      },
       () => toast({ title: t("mobile.devices.android.openFailed"), icon: "x" }),
     );
   };
@@ -95,10 +136,37 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
     });
     if (key) setPicked(key);
   };
-  // Seen by the computer at all: USB debugging is on, so the first two steps are done whatever was tapped here.
+  const tick = (step: AndroidStep, on: boolean) => {
+    setTicked((had) => {
+      const next = new Set(had);
+      if (on) next.add(step);
+      else next.delete(step);
+      return next;
+    });
+    setAsked(null);
+  };
+  /** A step's look, and a tap that opens it while folded. */
+  const fold = (step: AndroidStep) => ({
+    state: STEP_LOOK[steps.states[step]],
+    onPress: steps.open === step ? undefined : () => setAsked({ step, at: cable.kind }),
+  });
+  const shown = (step: AndroidStep) => steps.open === step;
+  /** Done on a step still to do; Not done yet on a tick only the person gave. */
+  const mark = (step: AndroidStep) =>
+    steps.states[step] !== "done" ? (
+      <Button
+        size="sm"
+        variant="secondary"
+        icon="check"
+        label={t("devices.android.done")}
+        onPress={() => tick(step, true)}
+      />
+    ) : steps.byHand.has(step) ? (
+      <Button size="sm" variant="ghost" label={t("devices.android.notYet")} onPress={() => tick(step, false)} />
+    ) : null;
+  const linux = computerKind(host?.os) === "linux";
+  // Seen by the computer at all (Wi-Fi): Wireless debugging is on, so its first step is done whatever was tapped here.
   const seen = stage !== "looking";
-  const hostDown = host?.status.kind === "offline";
-  const reason = phone && phone.status.kind !== "offline" && "reason" in phone.status ? phone.status.reason : null;
   const liveLine = hostDown ? (
     <Note icon="x">{t("mobile.devices.android.hostOffline", { host: hostName })}</Note>
   ) : (
@@ -141,47 +209,74 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
             <Step
               n={1}
               title={t("mobile.devices.android.step1")}
-              state={seen || opened.about ? "done" : "now"}
+              {...fold("devOptions")}
               side={
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon="out"
-                  label={t("mobile.devices.android.openAbout")}
-                  onPress={() => open("about")}
-                />
+                shown("devOptions") ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon="out"
+                      label={t("mobile.devices.android.openAbout")}
+                      onPress={() => open("about")}
+                    />
+                    {mark("devOptions")}
+                  </>
+                ) : undefined
               }
             >
-              {seen || opened.about ? null : <StepText>{t("mobile.devices.android.step1Text")}</StepText>}
+              {shown("devOptions") ? <StepText>{t("mobile.devices.android.step1Text")}</StepText> : null}
             </Step>
             <Step
               n={2}
               divider
               title={t("mobile.devices.android.step2")}
-              state={seen || opened.usb ? "done" : opened.about ? "now" : "later"}
+              {...fold("usbDebugging")}
               side={
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  icon="out"
-                  label={t("mobile.devices.android.openDev")}
-                  onPress={() => open("usb")}
-                />
+                shown("usbDebugging") ? (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      icon="out"
+                      label={t("mobile.devices.android.openDev")}
+                      onPress={() => open("usb")}
+                    />
+                    {mark("usbDebugging")}
+                  </>
+                ) : undefined
               }
             />
-            <Step
-              n={3}
-              divider
-              title={t("mobile.devices.android.step3", { host: hostName })}
-              hint={t("mobile.devices.android.step3Hint")}
-              state={seen ? "done" : opened.usb ? "now" : "later"}
-            >
-              {seen ? null : liveLine}
+            <Step n={3} divider title={t("mobile.devices.android.step3", { host: hostName })} {...fold("plug")}>
+              {!shown("plug") ? null : cable.kind === "driver" ? (
+                <>
+                  <Note icon="info">
+                    {t(linux ? "devices.android.noDriverLinux" : "devices.android.noDriver", { computer: hostName })}
+                  </Note>
+                  {linux ? <OpenPage href={ANDROID_UDEV} label={t("devices.android.udev")} /> : <DriverLinks />}
+                </>
+              ) : steps.states.plug === "done" ? null : (
+                <>
+                  {liveLine}
+                  {slow ? (
+                    <NotShowing
+                      os={host.os}
+                      onUsbDebugging={() => setAsked({ step: "usbDebugging", at: cable.kind })}
+                    />
+                  ) : null}
+                </>
+              )}
             </Step>
-            <Step n={4} divider title={t("mobile.devices.android.step4")} state={seen ? "now" : "later"}>
-              <StepText>{t("mobile.devices.android.step4Text")}</StepText>
-              {reason && reason !== "unauthorized" ? <Note icon="info">{reasonText(t, reason)}</Note> : null}
-              <AdbPrompt />
+            <Step n={4} divider title={t("mobile.devices.android.step4")} {...fold("allow")}>
+              {shown("allow") ? (
+                <>
+                  <StepText>{t("mobile.devices.android.step4Text")}</StepText>
+                  {reason && reason !== "unauthorized" && reason !== "no_driver" ? (
+                    <Note icon="info">{reasonText(t, reason, host.os)}</Note>
+                  ) : null}
+                  <AdbPrompt />
+                </>
+              ) : null}
             </Step>
           </StepsCard>
         </View>
@@ -192,7 +287,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
             <Step
               n={1}
               title={t("mobile.devices.android.wifi1")}
-              state={seen || opened.wifi ? "done" : "now"}
+              state={seen || openedWifi ? "done" : "now"}
               side={
                 <Button
                   size="sm"
@@ -203,14 +298,14 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
                 />
               }
             >
-              {seen || opened.wifi ? null : <StepText>{t("mobile.devices.android.wifi1Text")}</StepText>}
+              {seen || openedWifi ? null : <StepText>{t("mobile.devices.android.wifi1Text")}</StepText>}
             </Step>
             <Step
               n={2}
               divider
               title={t("mobile.devices.android.wifi2")}
               hint={t("mobile.devices.android.wifi2Hint", { host: hostName })}
-              state={seen ? "done" : opened.wifi ? "now" : "later"}
+              state={seen ? "done" : openedWifi ? "now" : "later"}
             >
               <StepText>{t("mobile.devices.android.wifi2Text")}</StepText>
               {seen || byCode ? null : liveLine}
@@ -218,7 +313,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
           </StepsCard>
           <Gap />
           {byCode ? (
-            <PairByCode pairing={pairing} hostName={hostName} />
+            <PairByCode pairing={pairing} hostName={hostName} mac={computerKind(host.os) === "mac"} />
           ) : (
             <GroupedList>
               <GroupedRow icon="key" label={t("devices.wifiPair.useCode")} chevron onPress={() => setByCode(true)} />
@@ -245,11 +340,54 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
   );
 }
 
+/** The phone makers' USB drivers for Windows, opened on their official pages. */
+function DriverLinks() {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.links}>
+      <OpenPage href={ANDROID_USB_DRIVERS.google} label={t("devices.android.drivers.google")} />
+      <OpenPage href={ANDROID_USB_DRIVERS.samsung} label={t("devices.android.drivers.samsung")} />
+      <OpenPage href={ANDROID_USB_DRIVERS.others} label={t("devices.android.drivers.others")} />
+    </View>
+  );
+}
+
+/** Why a plugged phone may not show up, under the cable step after 30 s: the driver only on a Windows computer. */
+function NotShowing({ os, onUsbDebugging }: { os: string; onUsbDebugging: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <View style={styles.help} accessibilityRole="summary">
+      <Text variant="small" tone="ink" style={styles.helpTitle}>
+        {t("devices.android.slow")}
+      </Text>
+      {androidNotShowing(os).map((item) => (
+        <View key={item} style={styles.helpItem}>
+          <StepText>{`•  ${t(`devices.android.help.${item}`)}`}</StepText>
+          {item === "usbDebugging" ? (
+            <Text variant="small" tone="ink" style={styles.helpTitle} onPress={onUsbDebugging} accessibilityRole="link">
+              {t("devices.android.help.seeStep")}
+            </Text>
+          ) : null}
+          {item === "driver" ? <DriverLinks /> : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 /**
  * The six-digit way, typed on this phone: the address and the code Pair device with pairing code shows, sent to the
  * computer, which pairs and connects; the line under them follows it, and a failure leaves both to fix and send again.
  */
-function PairByCode({ pairing, hostName }: { pairing: ReturnType<typeof useWifiPairCode>; hostName: string }) {
+function PairByCode({
+  pairing,
+  hostName,
+  mac,
+}: {
+  pairing: ReturnType<typeof useWifiPairCode>;
+  hostName: string;
+  mac: boolean;
+}) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const [address, setAddress] = useState("");
@@ -258,7 +396,7 @@ function PairByCode({ pairing, hostName }: { pairing: ReturnType<typeof useWifiP
   const busy = pairing.pending || wifiPairLive(p);
   const failed = Boolean(pairing.error) || p?.state === "failed";
   const ready = /^\S+:\d{1,5}$/.test(address.trim()) && /^\d{6}$/.test(code);
-  const line = pairing.error ? errorText(t, pairing.error) : p ? wifiPairText(t, p, hostName) : null;
+  const line = pairing.error ? errorText(t, pairing.error) : p ? wifiPairText(t, p, hostName, mac) : null;
   const send = () => {
     if (ready && !busy) pairing.pair({ address: address.trim(), code });
   };
@@ -403,6 +541,10 @@ function AndroidDone({ phone: p, hostName }: { phone: PhoneDevice; hostName: str
 
 const styles = StyleSheet.create({
   block: { paddingHorizontal: 4, paddingTop: 16, gap: 12, alignItems: "flex-start" },
+  links: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 4 },
+  help: { marginTop: 8, gap: 6 },
+  helpTitle: { fontWeight: "600" },
+  helpItem: { gap: 4 },
   steps: { paddingTop: 12 },
   code: { gap: 16 },
   input: { flex: 1, minWidth: 0, paddingVertical: 12, paddingHorizontal: 0 },

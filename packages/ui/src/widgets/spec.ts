@@ -205,11 +205,12 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 
 /**
  * `text` at most `max` characters long: a longer one ends at the last whole word that fits, with "…" (cut inside a
- * word only when one word alone is longer than half of `max`). Nothing is ever cut mid-word to fit a box.
+ * word only when one word alone is longer than half of `max`). Nothing is ever cut mid-word to fit a box, nor between
+ * an emoji's two halves (Postgres refuses jsonb with a lone surrogate).
  */
 export function clipText(text: string, max: number): string {
   if (text.length <= max) return text;
-  const cut = text.slice(0, Math.max(0, max - 1));
+  const cut = text.slice(0, Math.max(0, max - 1)).replace(/[\uD800-\uDBFF]$/, "");
   const space = cut.lastIndexOf(" ");
   const kept = space >= max / 2 ? cut.slice(0, space) : cut;
   return `${kept.replace(/[\s,;:–—-]+$/, "")}…`;

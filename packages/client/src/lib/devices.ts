@@ -84,13 +84,21 @@ const REASONS = new Set([
   "os_too_old",
   "adb_offline",
 ]);
-const reasonKey = (reason: string) => (REASONS.has(reason) ? reason : "other");
+/** A reason's key. A phone with no driver reads by the host's system: Windows wants its maker's driver, Linux udev rules. */
+const reasonKey = (reason: string, os?: string | null) =>
+  !REASONS.has(reason)
+    ? "other"
+    : reason === "no_driver" && os && computerKind(os) === "linux"
+      ? "no_driverLinux"
+      : reason;
 
-/** Why it isn't ready, as a sentence ("Developer Mode is off"). */
-export const reasonText = (t: TFunction, reason: string) => say(t, `devices.reason.${reasonKey(reason)}`);
+/** Why it isn't ready, as a sentence ("Developer Mode is off"). `os`: the host's, for words that depend on it. */
+export const reasonText = (t: TFunction, reason: string, os?: string | null) =>
+  say(t, `devices.reason.${reasonKey(reason, os)}`);
 
 /** What to do about it, phrased as the action ("Turn on Developer Mode"). */
-export const fixText = (t: TFunction, reason: string) => say(t, `devices.fix.${reasonKey(reason)}`);
+export const fixText = (t: TFunction, reason: string, os?: string | null) =>
+  say(t, `devices.fix.${reasonKey(reason, os)}`);
 
 /**
  * The quiet line under a row's pill: "for Rui since 14:10", "last seen 14:02", "with Ana's iMac", "until 18:00";
@@ -100,7 +108,7 @@ export function statusDetail(
   t: TFunction,
   locale: string,
   s: DeviceStatus,
-  options: { host?: string | null; now?: Date } = {},
+  options: { host?: string | null; hostOs?: string | null; now?: Date } = {},
 ): string | null {
   const now = options.now ?? new Date();
   switch (s.kind) {
@@ -109,7 +117,7 @@ export function statusDetail(
         ? t("devices.detail.forSince", { name: firstName(s.userName), time: clockAt(locale, s.since, now) })
         : t("devices.detail.since", { time: clockAt(locale, s.since, now) });
     case "needs_you":
-      return fixText(t, s.reason);
+      return fixText(t, s.reason, options.hostOs);
     case "preparing":
       return reasonKey(s.reason) === "other" ? null : reasonText(t, s.reason);
     case "paused":
@@ -129,12 +137,12 @@ export function statusSentence(
   t: TFunction,
   locale: string,
   s: DeviceStatus,
-  options: { host?: string | null; now?: Date } = {},
+  options: { host?: string | null; hostOs?: string | null; now?: Date } = {},
 ): string | null {
   const now = options.now ?? new Date();
   switch (s.kind) {
     case "needs_you":
-      return reasonText(t, s.reason);
+      return reasonText(t, s.reason, options.hostOs);
     case "offline":
       if (s.withHost && options.host) return t("devices.line.offlineWithHost", { host: options.host });
       return s.lastSeenAt
@@ -363,26 +371,90 @@ export const newComputerOf = (
 // ── Connect a phone ─────────────────────────────────────────────────────────
 
 /**
- * Where plugging an Android phone into `host` stands, from what the computer reports: still looking, the phone asks
- * to allow USB debugging, or it's ready. Phones the computer already had when the dialog opened (`known`) count only
- * while they still wait for Allow.
+ * Where plugging an Android phone into `host` stands, from what the computer reports: still looking, the computer
+ * sees the phone but has no driver for it, the phone asks to allow USB debugging, or it's ready. Phones the computer
+ * already had when the dialog opened (`known`) count only while they still wait for a driver or Allow.
  */
 export type AndroidStage =
   | { kind: "looking" }
+  | { kind: "driver"; phone: PhoneDevice }
   | { kind: "allow"; phone: PhoneDevice }
   | { kind: "ready"; phone: PhoneDevice };
+
+const waitsOn = (p: PhoneDevice, reason: string) => p.status.kind === "needs_you" && p.status.reason === reason;
 
 export function androidStage(host: ComputerDevice | undefined, known: ReadonlySet<string>): AndroidStage {
   const phones = (host?.phones ?? []).filter(
     (p) => p.platform === "android" && p.phoneKind === "device" && p.status.kind !== "offline",
   );
-  const asking = phones.find((p) => p.status.kind === "needs_you" && p.status.reason === "unauthorized");
+  const asking = phones.find((p) => waitsOn(p, "unauthorized"));
   if (asking) return { kind: "allow", phone: asking };
+  const driverless = phones.find((p) => waitsOn(p, "no_driver"));
+  if (driverless) return { kind: "driver", phone: driverless };
   const fresh = phones.find((p) => !known.has(p.id));
   if (fresh)
     return fresh.status.kind === "needs_you" ? { kind: "allow", phone: fresh } : { kind: "ready", phone: fresh };
   return { kind: "looking" };
 }
+
+/** The cable guide's steps, in order. */
+export const ANDROID_STEPS = ["devOptions", "usbDebugging", "plug", "allow"] as const;
+export type AndroidStep = (typeof ANDROID_STEPS)[number];
+/** Steps done on the phone alone: the computer can't see them until the phone shows up, so the person ticks them. */
+export const ANDROID_TICKABLE: ReadonlySet<AndroidStep> = new Set<AndroidStep>(["devOptions", "usbDebugging"]);
+
+/**
+ * The cable guide's checklist: each step done, the one to do now, or waiting. The person ticks the phone-only steps;
+ * once the computer sees the phone in any state, every step before Allow is done by itself. `byHand`: ticked by the
+ * person and not seen by the computer yet, so they may untick it. One step is open: the one asked for, else now's.
+ */
+export function androidSteps(
+  stage: AndroidStage,
+  ticked: ReadonlySet<AndroidStep>,
+  asked: AndroidStep | null = null,
+): { states: Record<AndroidStep, StepState>; now: AndroidStep; open: AndroidStep; byHand: ReadonlySet<AndroidStep> } {
+  const seen = stage.kind !== "looking";
+  const done = (s: AndroidStep) =>
+    s === "allow"
+      ? stage.kind === "ready"
+      : s === "plug"
+        ? stage.kind === "allow" || stage.kind === "ready"
+        : seen || ticked.has(s);
+  const now = ANDROID_STEPS.find((s) => !done(s)) ?? "allow";
+  const states = Object.fromEntries(
+    ANDROID_STEPS.map((s) => [s, done(s) ? "done" : s !== now ? "waiting" : seen ? "needs" : "current"]),
+  ) as Record<AndroidStep, StepState>;
+  const byHand = new Set(seen ? [] : ANDROID_STEPS.filter((s) => ANDROID_TICKABLE.has(s) && ticked.has(s)));
+  return { states, now, open: asked ?? now, byHand };
+}
+
+/** How often an open phone guide asks its computer to look for a phone with no driver (it looks for a minute after). */
+export const PHONE_LOOK_MS = 20_000;
+
+/** How long the guide looks for a plugged phone before it says why one may not show up. */
+export const ANDROID_SLOW_MS = 30_000;
+
+/** The official pages for a phone maker's USB driver on Windows: Google's (Pixel), Samsung's, and the other makers'. */
+export const ANDROID_USB_DRIVERS = {
+  google: "https://developer.android.com/studio/run/win-usb",
+  samsung: "https://developer.samsung.com/android-usb-driver",
+  others: "https://developer.android.com/studio/run/oem-usb",
+} as const;
+/** Android's own page on udev rules, so Linux may open a phone. */
+export const ANDROID_UDEV = "https://developer.android.com/studio/run/device#setting-up";
+
+/** Why a plugged phone may not show up, as the checklist under the cable step says it; the driver only on Windows. */
+export const androidNotShowing = (os: string | null | undefined) => [
+  "cable" as const,
+  "unlocked" as const,
+  "fileTransfer" as const,
+  "usbDebugging" as const,
+  "samsung" as const,
+  ...(computerKind(os) === "windows" ? ["driver" as const] : []),
+];
+
+/** Our phone app is in neither store yet, so a QR meant to open steps in it would only open a web page: hidden. */
+export const PHONE_APP_IN_STORE = { android: false, ios: false } as const;
 
 /** How often a Wi-Fi pairing is asked where it stands while it runs. */
 export const WIFI_PAIR_POLL_MS = 1500;
@@ -395,13 +467,22 @@ export const wifiPairLive = (p: Pick<WifiPairing, "state"> | undefined) =>
 export const wifiHosts = (hosts: readonly ComputerDevice[]) =>
   hosts.filter((h) => h.machineKind === "connected" && h.mayManage && !h.systemMode);
 
+const LOCAL_NETWORK = new Set(["timed_out", "same_wifi", "mdns_off"]);
+
 /**
  * The line a Wi-Fi pairing shows: where it is while it runs, else why it failed (the cause and the way out). A code
- * the phone refused reads differently from a pairing it stopped.
+ * the phone refused reads differently from a pairing it stopped. On a Mac, a phone it never heard from, couldn't reach
+ * or couldn't look for may also be macOS's Local Network permission for the app, so those name it.
  */
-export function wifiPairText(t: TFunction, p: Pick<WifiPairing, "state" | "reason" | "way">, computer: string) {
+export function wifiPairText(
+  t: TFunction,
+  p: Pick<WifiPairing, "state" | "reason" | "way">,
+  computer: string,
+  mac = false,
+) {
   if (p.state === "failed") {
-    const reason = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    const base = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    const reason = mac && LOCAL_NETWORK.has(base) ? `${base}Mac` : base;
     return say(t, `devices.wifiPair.fail.${reason}`, {
       computer,
       defaultValue: say(t, "devices.wifiPair.fail.failed"),

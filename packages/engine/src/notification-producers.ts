@@ -1,11 +1,12 @@
 import { and, asc, eq, inArray, isNotNull, isNull, rowsOf, schema, sql } from "@agenteschat/db";
+import { appLocale } from "@agenteschat/i18n/locale";
 import type { PlanModel } from "@agenteschat/providers/plans";
 import { approvalCardThreads, approvalOriginOf, notifiedIds } from "./approvals";
 import { accountablePerson, runAuthorityById } from "./authority";
 import { autonomyNoteFor, proposalCardOf } from "./brakes";
 import { readableChannelIds } from "./channels";
 import { threadFollowChoices } from "./follows";
-import { type TaskEnd, taskEndText } from "./machine-task-text";
+import { type TaskEnd, taskEndLine } from "./machine-task-text";
 import { isMediaAfterReply } from "./media";
 import { type PreviewMeta, previewMediaKind, previewMeta, readableBody } from "./message-preview";
 import { isQuietNotice } from "./notices";
@@ -306,17 +307,22 @@ export async function notifyMessage(deps: NotificationDeps, orgId: string, messa
 
 /**
  * What a notification quotes of a message: its body, but a task's end (`meta.machineTask`) names its computer only
- * where the workspace has more than one, the apps' rule (`namesComputers`). The agent still reads where it ran.
+ * where the workspace has more than one, the apps' rule (`namesComputers`), in the body's language. The agent still
+ * reads where it ran.
  */
 async function quotedBody(deps: NotificationDeps, orgId: string, message: typeof messages.$inferSelect) {
-  const task = message.meta.machineTask as (TaskEnd & { computer?: string }) | undefined;
+  const task = message.meta.machineTask as (TaskEnd & { computer?: string; locale?: string }) | undefined;
   if (typeof task?.title !== "string") return message.body;
   const computers = await deps.db
     .select({ id: machines.id })
     .from(machines)
     .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
     .limit(2);
-  return taskEndText(task, computers.length > 1 ? (task.computer ?? null) : null);
+  return taskEndLine(
+    appLocale([task.locale], true) ?? "en",
+    task,
+    computers.length > 1 ? (task.computer ?? null) : null,
+  );
 }
 
 async function threadTitle(deps: NotificationDeps, orgId: string, rootId: string) {

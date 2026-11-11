@@ -213,6 +213,7 @@ New ops, each with a `target` (a monitor, a browser id, a simulator device): `sc
 
 - On connected machines, Claude Code tasks can browse with Playwright through the shell and drive a simulator with `simctl`/`idb`, reading the screenshots they save. Good for trying flows now; no live view, no take over, model cost on the person's plan.
 - Agents' instructions: when asked to "use my computer", offer the browser or the simulator; never improvise control of the owner's desktop (`screencapture`, `osascript`, `cliclick`), which would act as the owner with none of §7's safeguards.
+- Amended with ADR 0165: a screenshot of a person's own Mac is allowed through commands (`screencapture -x` into the agent's folder there, then uploaded to the chat), since the app pairing asks for Screen Recording up front. Control (`osascript`, `cliclick`) stays out.
 
 ## Order
 

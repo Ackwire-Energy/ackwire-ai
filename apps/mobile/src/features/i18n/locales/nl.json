@@ -57,7 +57,6 @@
     "failed": "Je keuze is niet verstuurd. Probeer het opnieuw."
   },
   "chart": {
-    "pending": "De grafiek wordt gemaakt…",
     "table": "Tabel",
     "item": "Onderdeel",
     "share": "Aandeel",
@@ -377,12 +376,6 @@
     "toLatestNew": "Naar de nieuwste berichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Gaat weg zodra de verbinding terug is",
-    "turn": {
-      "thinking": "denkt na",
-      "working": "aan het werk",
-      "writing": "schrijft",
-      "stopped": "gestopt"
-    },
     "steer": {
       "waiting": "{{name}} leest het bij de volgende pauze",
       "computer": "{{name}} leest het zodra de computer vrij is",
@@ -1812,7 +1805,8 @@
       "team_limit": "Verwijder een zelfgemaakte app van deze iPhone",
       "helper_untrusted": "Vertrouw de testhelper op deze iPhone",
       "booting": "Wordt opgestart",
-      "no_driver": "Windows heeft de USB-driver van deze telefoon nodig",
+      "no_driver": "Windows heeft de USB-driver van de maker van de telefoon nodig",
+      "no_driverLinux": "Linux heeft udev-regels voor deze telefoon nodig",
       "os_too_old": "Het systeem van deze telefoon is te oud",
       "adb_offline": "Haal de kabel eruit en sluit hem opnieuw aan",
       "other": "Nog niet klaar"
@@ -1913,12 +1907,11 @@
       "noHost": "Deze telefoon werkt via een computer van je. Koppel er eerst een.",
       "hostOffline": "{{host}} is offline. Zet hem aan en open daar agentes.chat.",
       "step1": "Zet Ontwikkelaarsopties aan",
-      "step1Text": "Tik 7 keer op Buildnummer en voer dan je pincode in.",
+      "step1Text": "Tik 7 keer op Buildnummer en voer dan je pincode in. Op een Samsung: Software-informatie › Buildnummer.",
       "openAbout": "Over de telefoon openen",
       "step2": "Zet USB-foutopsporing aan",
       "openDev": "Ontwikkelaarsopties openen",
       "step3": "Sluit hem aan op {{host}}",
-      "step3Hint": "Gebruik een kabel die data doorgeeft, niet een die alleen oplaadt. Kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is.",
       "looking": "Zoeken naar deze telefoon",
       "step4": "Tik op Toestaan op deze telefoon",
       "step4Text": "Vink eerst Altijd toestaan vanaf deze computer aan.",
@@ -1936,7 +1929,7 @@
       "wifi1": "Zet Draadloze foutopsporing aan",
       "wifi1Text": "Vink Altijd toestaan op dit netwerk aan en tik op Toestaan.",
       "wifi2": "Scan de code op een computer",
-      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code.",
+      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code. Gebruik de camera niet: die leest de code als een wifinetwerk en haalt de telefoon van je wifi.",
       "wifi2Hint": "Open in agentes.chat op een computer Apparaat koppelen › Android-telefoon › Via wifi en kies {{host}}.",
       "codeHead": "Koppelen met een koppelingscode",
       "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
@@ -2164,9 +2157,9 @@
     "anotherLead": "Op agentes.chat. Je blijft in {{org}} en kunt altijd wisselen.",
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
+    "enter": "Naar de werkruimte",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
-    "enter": "Naar de werkruimte"
+    "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",

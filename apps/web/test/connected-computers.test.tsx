@@ -15,7 +15,7 @@ import { objectUrls } from "@/components/artifacts/FileView";
 import { createI18n } from "@/i18n";
 import { ADA_ID, createFakeApi, ENG_ID, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { hintOf, shownText } from "./hint";
-import { renderApp, screen, settle } from "./render";
+import { renderApp, screen, settle, showIn } from "./render";
 
 const saved: { url: string; name: string }[] = [];
 const realSave = fileSaver.save;
@@ -432,6 +432,94 @@ describe("Configurações → Dispositivos (self-host)", () => {
     );
     expect(within(dialog).getByRole("button", { name: "Outros sistemas" })).toBeTruthy();
     expect(dialog.textContent).not.toMatch(/instalado|installed/i);
+  });
+
+  const WINDOWS_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0";
+  const IPHONE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148";
+  /** Another computer's flow, on a browser on `ua`, with builds for Mac and Linux only. */
+  const computerFlow = async (ua: string, api = createFakeApi(seedState())) => {
+    fakeMachinesOf.get(api)?.setRelease(
+      {
+        version: "0.6.0",
+        url: "/api/desktop/download/0.6.0/agentes_0.6.0_aarch64.dmg",
+        sha256: "",
+        publishedAt: "2026-11-10T12:00:00.000Z",
+      },
+      ["darwin", "linux"],
+    );
+    asBrowserOn(ua);
+    const app = await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
+    await settle(8);
+    await click(screen().getByRole("button", { name: "Conectar um dispositivo" }));
+    await settle(4);
+    await click(
+      within(screen().getByRole("dialog", { name: "Conectar um dispositivo" })).getByText("Outro computador"),
+    );
+    await settle(4);
+    return Object.assign(screen().getByRole("dialog", { name: "Conectar outro computador" }), { app });
+  };
+  const menuItems = (menu: HTMLElement) =>
+    within(menu)
+      .getAllByRole("menuitem")
+      .map((i) => [i.textContent, i.hasAttribute("data-disabled")]);
+
+  test("download: a system with no build yet is offered disabled, marked Em breve, in the menu", async () => {
+    const dialog = await computerFlow(MAC_UA);
+    expect(within(dialog).getByRole("link", { name: "Baixar para macOS" })).toBeTruthy();
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
+    expect(menuItems(menu)).toEqual([
+      ["Baixar para WindowsEm breve", true],
+      ["Baixar para Linux", false],
+    ]);
+  });
+
+  test("download: on a system with no build yet, its button stays, disabled and marked Em breve", async () => {
+    const dialog = await computerFlow(WINDOWS_UA);
+    const mine = within(dialog).getByRole("button", { name: "Baixar para Windows" }) as HTMLButtonElement;
+    expect([mine.disabled, mine.nextElementSibling?.textContent]).toEqual([true, "Em breve"]);
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
+    expect(menuItems(menu)).toEqual([
+      ["Baixar para macOS", false],
+      ["Baixar para Linux", false],
+    ]);
+  });
+
+  test("download: while the builds are asked for, the button waits disabled and nothing says Em breve", async () => {
+    const api = createFakeApi(seedState());
+    api.machines.desktopLatest = () => new Promise(() => {});
+    const dialog = await computerFlow(WINDOWS_UA, api);
+    const mine = within(dialog).getByRole("button", { name: /^Baixar para Windows/ }) as HTMLButtonElement;
+    expect([mine.disabled, mine.getAttribute("aria-busy")]).toEqual([true, "true"]);
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
+    expect(menuItems(menu)).toEqual([
+      ["Baixar para macOS", true],
+      ["Baixar para Linux", true],
+    ]);
+    expect(screen().queryByText("Em breve")).toBeNull();
+  });
+
+  test("download: the longest words (Dutch) for the button, its mark and the menu, for the layout check", async () => {
+    const dialog = await computerFlow(WINDOWS_UA);
+    await showIn(dialog.app.services, "nl");
+    const mine = within(dialog).getByRole("button", { name: "Downloaden voor Windows" });
+    expect(mine.nextElementSibling?.textContent).toBe("Binnenkort");
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "Andere systemen" }));
+    expect(menuItems(menu)).toEqual([
+      ["Downloaden voor macOS", false],
+      ["Downloaden voor Linux", false],
+    ]);
+  });
+
+  test("download: on a phone, the menu alone, Windows marked, in the longest words (Dutch) for the layout check", async () => {
+    const dialog = await computerFlow(IPHONE_UA);
+    await showIn(dialog.app.services, "nl");
+    expect(within(dialog).queryByRole("button", { name: /^Downloaden voor/ })).toBeNull();
+    const menu = await openMenu(within(dialog).getByRole("button", { name: "De app downloaden" }));
+    expect(menuItems(menu)).toEqual([
+      ["Downloaden voor macOS", false],
+      ["Downloaden voor WindowsBinnenkort", true],
+      ["Downloaden voor Linux", false],
+    ]);
   });
 
   test("a row: its state and whose it is; it opens the computer's page", async () => {

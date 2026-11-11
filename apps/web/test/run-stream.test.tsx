@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { Message } from "@agenteschat/client";
-import { applyChannelEvent, emptyStreams, narrationOf, runsInChannel, type StreamsState } from "@agenteschat/client";
+import { applyChannelEvent, emptyStreams, runsInChannel, type StreamsState } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -15,25 +15,22 @@ const base = { channelId: "c", threadId: "t", agentId: "ada", runId: "r" };
 type Ev = Parameters<typeof applyChannelEvent>[1];
 const run = (events: Ev[], s: StreamsState = emptyStreams) => events.reduce(applyChannelEvent, s);
 
-describe("streaming a reply with tools in between", () => {
-  test("the first delta (seq 0) after agent.typing is kept: no cut-off start", () => {
+describe("a reply with tools in between: its words wait for its message", () => {
+  test("agent.typing says it writes; an older server's deltas add no words", () => {
     const s = run([
       { type: "agent.run", ...base, status: "running" } as Ev,
       { type: "agent.typing", ...base } as Ev,
       { type: "agent.delta", ...base, seq: 0, text: "Primeiro pedaço. " },
       { type: "agent.delta", ...base, seq: 1, text: "Segundo." },
-      { type: "agent.delta", ...base, seq: 1, text: "Segundo." },
     ]);
-    expect(runsInChannel(s, "c")[0]?.text).toBe("Primeiro pedaço. Segundo.");
+    expect(runsInChannel(s, "c")[0]?.status).toBe("running");
+    expect(JSON.stringify(runsInChannel(s, "c")[0])).not.toContain("pedaço");
   });
 
-  test("3 model calls: narration leaves the body, no lost characters, the final message replaces the live one", () => {
-    let seq = 0;
-    const delta = (text: string): Ev => ({ type: "agent.delta", ...base, seq: seq++, text });
+  test("3 model calls: the calls and their output are its work, nothing it said; the final message ends it", () => {
     let s = run([
       { type: "agent.run", ...base, status: "running" } as Ev,
-      delta("Vou checar "),
-      delta("o ambiente."),
+      { type: "agent.typing", ...base } as Ev,
       {
         type: "agent.tool",
         ...base,
@@ -43,8 +40,6 @@ describe("streaming a reply with tools in between", () => {
       },
       { type: "agent.tool.output", ...base, toolUseId: "t1", stream: "stderr", text: "go: not found" },
       { type: "agent.tool", ...base, tool: null },
-      delta("Go não está instalado; "),
-      delta("vou tentar com gcc."),
       {
         type: "agent.tool",
         ...base,
@@ -53,15 +48,12 @@ describe("streaming a reply with tools in between", () => {
         code: { language: "bash", source: "gcc --version" },
       },
       { type: "agent.tool", ...base, tool: null },
-      delta("Pronto: "),
-      delta("compilei."),
+      { type: "agent.typing", ...base } as Ev,
     ]);
     const r = runsInChannel(s, "c")[0];
-    expect(narrationOf(r ?? {})).toEqual(["Vou checar o ambiente.", "Go não está instalado; vou tentar com gcc."]);
-    expect(r?.text).toBe("Pronto: compilei.");
-    const calls = (r?.work ?? []).filter((w) => w.kind === "call");
+    expect(r?.status).toBe("running");
     expect(
-      calls.map((c) => (c.kind === "call" ? [c.id, c.running, c.output.map((o) => o.text).join("")] : [])),
+      (r?.work ?? []).map((c) => (c.kind === "call" ? [c.id, c.running, c.output.map((o) => o.text).join("")] : [])),
     ).toEqual([
       ["t1", false, "go: not found"],
       ["t2", false, ""],
@@ -91,10 +83,10 @@ describe("live row and Parar", () => {
   };
   const ids = { threadId: null, runId: "r-live", agentId: ADA_ID };
 
-  test("tool calls stack in the block: open while running, folded into a summary when done", async () => {
+  test("its tools: the bar says the one running; its reply, posted whole, keeps them folded in its steps", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Vou checar o ambiente." });
+    await ev({ type: "agent.typing", ...ids });
     await ev({
       type: "agent.tool",
       ...ids,
@@ -102,12 +94,7 @@ describe("live row and Parar", () => {
       toolUseId: "t1",
       code: { language: "python", source: "print(1)" },
     });
-    await settle(2);
-    // The first thing it says opens the block, as a message would; the steps list holds the rest.
-    const opened = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    expect(opened.querySelector(".ac-msg__text")?.textContent).toBe("Vou checar o ambiente.");
-    expect(document.querySelector(".live-work__say")).toBeNull();
-    await ev({ type: "agent.delta", ...ids, seq: 1, text: "Rodando o teste." });
+    await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t1" });
     await ev({
       type: "agent.tool",
       ...ids,
@@ -116,30 +103,41 @@ describe("live row and Parar", () => {
       code: { language: "python", source: "print(2)" },
     });
     await ev({ type: "agent.tool.output", ...ids, toolUseId: "t2", stream: "stdout", text: "2\n" });
-    await ev({ type: "agent.delta", ...ids, seq: 2, text: "Deu 2." });
     await settle(3);
-    const row = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    // One line while it works: what it does now and the steps; a click opens every call.
-    const head = row.querySelector(".ac-tools__head") as HTMLElement;
-    expect(head.getAttribute("aria-expanded")).toBe("false");
-    expect(head.textContent).toContain("Rodando código…");
-    expect(head.textContent).toContain("2 passos");
-    await act(async () => fireEvent.click(head));
-    const lines = () => [...row.querySelectorAll<HTMLElement>("button.ac-tools__row")];
-    expect(lines()).toHaveLength(2);
-    // t2 still runs: open, with its code.
-    expect(lines()[1]?.getAttribute("aria-expanded")).toBe("true");
-    expect(within(row).getByLabelText("Código (python)").textContent).toBe("print(2)");
+    // Nothing of it in the conversation while it works: the bar says the step.
+    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+    expect(document.querySelector(".ac-typing__text")?.textContent).toContain("rodando código");
     await ev({ type: "agent.tool", ...ids, tool: null, toolUseId: "t2" });
-    await settle(2);
-    expect(lines().at(-1)?.textContent).toContain("Rodou 1 linha de python · saída 2 B");
-    expect(lines().at(-1)?.getAttribute("aria-expanded")).toBe("false");
+    await ev({
+      type: "message.created",
+      messageId: "m-reply",
+      message: {
+        id: "m-reply",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Deu 2.",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        createdAt: new Date(Date.now() + 10_000).toISOString(),
+      },
+    });
+    await ev({ type: "agent.run", ...ids, status: "done" });
+    await settle(4);
+    const reply = document.querySelector('[data-message-id="m-reply"]') as HTMLElement;
+    expect(reply.querySelector(".ac-msg__text")?.textContent).toBe("Deu 2.");
+    const head = reply.querySelector(".ac-tools__head") as HTMLElement;
+    expect(head.getAttribute("aria-expanded")).toBe("false");
+    await act(async () => fireEvent.click(head));
+    const lines = [...reply.querySelectorAll<HTMLElement>("button.ac-tools__row")];
+    expect(lines).toHaveLength(2);
+    expect(lines.at(-1)?.textContent).toContain("Rodou 1 linha de python · saída 2 B");
   });
 
-  test("Parar: one click on the composer's stop, then the pill 'You stopped Ada | Continue'; text kept", async () => {
+  test("Parar: one click on the composer's stop, its row goes, then its stopped message: 'You stopped Ada | Continue'", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a análise" });
+    await ev({ type: "agent.typing", ...ids });
     await settle(2);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Parar a Ada" })));
     await settle(2);
@@ -148,6 +146,24 @@ describe("live row and Parar", () => {
     expect(state.calls.find((c) => c.method === "agents.cancelRun")?.args).toEqual([ORG_ID, "r-live"]);
     await ev({ type: "run.canceled", ...ids, byUserId: "u-walter" });
     await settle(2);
+    // What it wrote comes whole in the message the server posts for the stop.
+    expect(document.body.textContent).not.toContain("Começando a análise");
+    await ev({
+      type: "message.created",
+      messageId: "m-stopped",
+      message: {
+        id: "m-stopped",
+        channelId: ENG_ID,
+        threadId: null,
+        author: { type: "agent", id: ADA_ID },
+        body: "Começando a análise\n\n_Stopped by Walter._",
+        mentionedAgentIds: [],
+        agentRunId: "r-live",
+        meta: { canceled: { byUserId: "u-walter", text: "Começando a análise" } },
+        createdAt: new Date(Date.now() + 10_000).toISOString(),
+      },
+    });
+    await settle(3);
     const stopped = screen()
       .getAllByRole("article")
       .find((a) => a.textContent?.includes("Começando a análise")) as HTMLElement;
@@ -156,10 +172,10 @@ describe("live row and Parar", () => {
     expect(stopped.querySelector('.ac-avatar[data-state="idle"]')).not.toBeNull();
   });
 
-  test("a reply too big to ride its event keeps its text on screen until its copy read over HTTP takes the place", async () => {
+  test("a reply too big to ride its event shows once its copy read over HTTP lands, whole", async () => {
     const { state, api, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Resposta longa sobre o Azure" });
+    await ev({ type: "agent.typing", ...ids });
     await settle(2);
     const body = `Resposta longa sobre o Azure. ${"Mais detalhes. ".repeat(400)}`;
     state.messages.push({
@@ -191,8 +207,8 @@ describe("live row and Parar", () => {
     await ev({ type: "agent.idle", ...ids });
     await ev({ type: "run.finished", ...ids, status: "done" });
     await settle(3);
-    // Not a blank while the read is on its way: the streamed text stays.
-    expect(document.body.textContent).toContain("Resposta longa sobre o Azure");
+    // Nothing of it before its copy is read: no part of it shows, then changes.
+    expect(document.body.textContent).not.toContain("Resposta longa sobre o Azure");
     await act(async () => release());
     await settle(5);
     const answers = screen()
@@ -206,7 +222,7 @@ describe("live row and Parar", () => {
   test("back to the tab after a while, the conversation is read again: an answer whose end never came lands", async () => {
     const { state, ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
-    await ev({ type: "agent.delta", ...ids, seq: 0, text: "Começando a resposta" });
+    await ev({ type: "agent.typing", ...ids });
     await settle(2);
     // While the tab was away, the run ended and its events never reached this page (the socket still looks open).
     state.activeRuns = { [ENG_ID]: [] };

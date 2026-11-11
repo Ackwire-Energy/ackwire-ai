@@ -111,6 +111,7 @@ p {
   color: var(--muted);
   font-size: 14px;
   max-width: 54ch;
+  text-wrap: pretty;
 }
 .dk-path,
 .dk-code-inline {
@@ -1007,10 +1008,15 @@ body[data-window="popover"] {
   gap: 8px;
 }
 /* Pairing this computer (Pair.tsx): its facts and choices in a card as wide as the words around it. */
-.dk-pair .dk-card {
+.dk-pair .dk-card,
+.dk-pair__group {
   width: 100%;
   max-width: 60ch;
   text-align: start;
+}
+/* A card with its title and the line under it: the sheet's gap above, the title on the card's edge, 8 over it. */
+.dk-pair__group > .dk-ctitle {
+  margin: 0 0 8px;
 }
 /* Run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
    longer), and two fields side by side. */
@@ -1616,6 +1622,10 @@ body[data-window="popover"] {
 .dk-crow__under {
   flex-basis: 100%;
   padding-left: 44px;
+}
+/* A row without a picture: the line under it starts with its words. */
+.dk-crow > .dk-crow__text:first-child ~ .dk-crow__under {
+  padding-left: 0;
 }
 .dk-inline-form {
   display: flex;

@@ -1,3 +1,6 @@
+import { serverText } from "@agenteschat/i18n";
+import type { AppLocale } from "@agenteschat/i18n/locale";
+
 /** `3 min`, `1 h 05 min`, `40 s`. */
 export function formatDuration(seconds: number) {
   if (seconds < 60) return `${seconds} s`;
@@ -17,8 +20,8 @@ export interface TaskEnd {
 }
 
 /**
- * A task's end in its thread, in English (the apps show its `bodyCode` in the person's words). `computer`: where it
- * ran, or null for a line that doesn't say (a notification where the workspace has only one computer).
+ * A task's end as the agent reads it, in English (people read `taskEndLine`). `computer`: where it ran, or null for a
+ * line that doesn't say.
  */
 export function taskEndText(task: TaskEnd, computer: string | null) {
   const took = formatDuration(task.seconds);
@@ -34,4 +37,17 @@ export function taskEndText(task: TaskEnd, computer: string | null) {
     default:
       return `Task "${task.title}" failed${on} after ${took} (exit code ${task.exitCode ?? "none"}).${blocked}`;
   }
+}
+
+const END_STATUSES = new Set(["done", "failed", "canceled", "interrupted"]);
+
+/**
+ * A task's end as people read it, in their language: the chat's own line (`chat.body.machine_task_*`), naming
+ * `computer` when given, else in its `…NoComputer` words (one computer in the workspace, or none known).
+ */
+export function taskEndLine(locale: AppLocale, task: Pick<TaskEnd, "title" | "status">, computer: string | null) {
+  const key = `chat.body.machine_task_${END_STATUSES.has(task.status) ? task.status : "failed"}`;
+  return computer
+    ? serverText(locale, key, { title: task.title, computer })
+    : serverText(locale, `${key}NoComputer`, { title: task.title });
 }

@@ -101,7 +101,7 @@ describe.each(["panel", "page"] as const)("%s", (surface) => {
     expect(inView(view, "resposta da Ada")).toHaveLength(1);
   });
 
-  test("a live run: thinking, its tool once, its output once, its words, then its saved message in one row", async () => {
+  test("a live run: thinking, its tool once, its output once, writing with no words, then its saved message in one row", async () => {
     const state = seedState();
     const { socket, view } = await open(surface, state);
     const run = { runId: "run-a", agentId: ADA_ID, threadId: "m-1" };
@@ -121,9 +121,11 @@ describe.each(["panel", "page"] as const)("%s", (surface) => {
     const live = view.querySelector(".live-code") as HTMLElement;
     expect(within(live).getByLabelText("Saída").querySelector(".live-code__stdout")?.textContent).toBe("saida\n");
     await event(socket, { type: "agent.tool", ...run, tool: null, toolUseId: "t1" });
-    await event(socket, { type: "agent.delta", ...run, seq: 0, turn: 1, at: 0, text: "escrevendo a resposta" });
+    await event(socket, { type: "agent.typing", ...run });
+    await event(socket, { type: "agent.delta", ...run, seq: 0, text: "escrevendo a resposta" });
     await settle(2);
-    expect(view.textContent).toContain("escrevendo a resposta");
+    // It writes: the bar says so, its words wait for its message.
+    expect(view.textContent).not.toContain("escrevendo a resposta");
     const m = reply("r-1", "escrevendo a resposta final", {
       author: { type: "agent", id: ADA_ID },
       agentRunId: "run-a",
@@ -244,20 +246,22 @@ describe.each(["panel", "page"] as const)("%s", (surface) => {
   });
 });
 
-test("a run already live when the panel opens: its words show there", async () => {
+test("a run already live when the panel opens: the panel's bar says it works, and none of its words", async () => {
   const state = seedState();
   const api = createFakeApi(state);
   const run = { runId: "run-a", agentId: ADA_ID, threadId: "m-1" };
   api.agents.activeRuns = async () => [{ ...run, channelId: ENG_ID, status: "running" } as ActiveRun];
   const { socket } = await openChannel(state, api);
   await event(socket, { type: "agent.thinking", ...run });
-  await event(socket, { type: "agent.delta", ...run, seq: 0, turn: 1, at: 0, text: "ja escrevendo" });
+  await event(socket, { type: "agent.typing", ...run });
+  await event(socket, { type: "agent.delta", ...run, seq: 0, text: "ja escrevendo" });
   await settle(2);
   const side = await openPanel();
-  expect(side.textContent).toContain("ja escrevendo");
+  expect(side.textContent).not.toContain("ja escrevendo");
+  expect(side.querySelector('.ac-typing[data-active="true"]')?.textContent).toContain("Ada");
 });
 
-test("the panel closed while a run streams: reopened, its words and then its message, once", async () => {
+test("the panel closed while a run works: reopened, its message once, whole", async () => {
   const state = seedState();
   const api = createFakeApi(state);
   const run = { runId: "run-a", agentId: ADA_ID, threadId: "m-1" };
@@ -265,14 +269,12 @@ test("the panel closed while a run streams: reopened, its words and then its mes
   const { socket } = await openChannel(state, api);
   const side = await openPanel();
   await event(socket, { type: "agent.thinking", ...run });
-  await event(socket, { type: "agent.delta", ...run, seq: 0, turn: 1, at: 0, text: "antes de fechar " });
+  await event(socket, { type: "agent.typing", ...run });
   await settle(2);
   await act(async () => fireEvent.click(within(side).getByRole("button", { name: "Fechar a thread" })));
   await settle(3);
-  await event(socket, { type: "agent.delta", ...run, seq: 1, turn: 1, at: 16, text: "depois de fechar" });
-  await settle(2);
   const open1 = await openPanel();
-  expect(open1.textContent).toContain("antes de fechar depois de fechar");
+  expect(open1.querySelector('.ac-typing[data-active="true"]')?.textContent).toContain("Ada");
   await act(async () => fireEvent.click(within(open1).getByRole("button", { name: "Fechar a thread" })));
   await settle(3);
   const m = reply("r-1", "antes de fechar depois de fechar, salvo", {

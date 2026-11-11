@@ -545,11 +545,7 @@ export function toolItemsLive(work: LiveWork[], stopped = false): ToolItem[] {
   const listed = work.flatMap((w) =>
     w.kind === "call" && !UNLISTED.has(toolActivity(w.tool, w.connector, w.detail, w).kind) ? [w] : [],
   );
-  work.forEach((w, i) => {
-    if (w.kind === "say") {
-      items.push({ kind: "say", key: `say-${i}`, text: w.text });
-      return;
-    }
+  work.forEach((w) => {
     if (w.kind === "steer") {
       items.push({ kind: "steer", key: `steer-${w.messageId}`, messageId: w.messageId, now: w.now === true });
       return;
@@ -749,18 +745,18 @@ export function waitStep(t: TFunction, work: LiveWork[] | undefined, step?: Live
 }
 
 /**
- * The bar's words for one agent whose row is out of view: the row's step with a lower-case start, after its name
- * ("Nina consultando o Email · …"), or "escrevendo…" while its words arrive and no call runs. Its own words only once
- * the turn has gone on for `STEP_WORDS_AFTER_MS`.
+ * The bar's words for one agent at work: its step with a lower-case start, after its name ("Nina consultando o Email ·
+ * …"), or "escrevendo…" while it writes (`running`: its words show whole once posted) and no call runs. Its own words
+ * only once the turn has gone on for `STEP_WORDS_AFTER_MS`.
  */
 export function barStep(
   t: TFunction,
-  run: Pick<LiveRun, "text" | "work" | "step" | "startedAt" | "workingSince">,
+  run: Pick<LiveRun, "status" | "work" | "step" | "startedAt" | "workingSince">,
   locale?: string,
   now = Date.now(),
 ): string {
   const calling = (run.work ?? []).some((w) => w.kind === "call" && w.running);
-  if (!calling && run.text.length > 0) return `${activityVerb(t, { kind: "writing" })}…`;
+  if (!calling && run.status === "running") return `${activityVerb(t, { kind: "writing" })}…`;
   const long = now - (run.workingSince ?? run.startedAt ?? now) >= STEP_WORDS_AFTER_MS;
   return lowerFirst(waitStep(t, run.work, long ? run.step : undefined), locale);
 }

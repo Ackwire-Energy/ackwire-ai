@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
-import { taskProgram, taskTitle, taskWaitGroups, taskWaitGroupText } from "@agenteschat/client/lib/task-manager";
+import { taskTitle, taskWaitGroups, taskWaitGroupText } from "@agenteschat/client/lib/task-manager";
 import {
   agentTasksHref,
   agentTasksOf,
@@ -16,7 +16,6 @@ import {
   taskStateWords,
   taskSubline,
   tasksBadge,
-  usingNow,
 } from "../../src/features/task-manager/logic";
 import { translator } from "./fixtures";
 
@@ -132,17 +131,29 @@ describe("rows with a face (#41)", () => {
     const screen = read("TaskManagerScreen.tsx");
     expect(screen).toContain("<AgentFace agentId={task.agentId} size={MEDIA_ROW.card.face} live={false} />");
     expect(screen).toMatch(/name=\{agent\}\s*meta=\{sub \|\| undefined\}\s*>/);
-    // The row opens the task (stopping lives on its screen): the title on one line, its state as words under it, and
-    // a chevron, never a stop button squeezing the title.
+    // The row opens the task (stopping lives on its screen): the title whole, never cut, its state as words under it,
+    // and a chevron, never a stop button squeezing the title.
     expect(screen).toMatch(
-      /\{title\}\s*<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/,
+      /<Text variant="body">\{title\}<\/Text>\s*<StateLine task=\{task\} state=\{state\} now=\{now\} \/>\s*<\/MediaRow>/,
     );
+    expect(screen).not.toMatch(/numberOfLines=\{\d\}[^>]*>\s*\{(title|line\.text)\}/);
     expect(screen).not.toContain("end={stop}");
-    expect(screen).not.toContain("numberOfLines={2}");
     expect(screen).toContain('<Icon name="right" size={15} color={c.faint} />');
     expect(screen).toContain(
       'flatTask: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 16 }',
     );
+  });
+
+  test("an agent's tasks stay folded under its row until it is tapped; the row says how long, as its tasks do", () => {
+    const screen = read("TaskManagerScreen.tsx");
+    expect(screen).toContain("useState<ReadonlySet<string>>(() => new Set())");
+    expect(screen).toContain("open={opened.has(g.agentId)}");
+    expect(screen).toContain("open={opened.has(`by:");
+    expect(screen).not.toContain("closed.has(");
+    expect(screen).toContain("taskTime(t, groupLead(group), now)");
+    // A task's time is its clock at work, how long it has waited otherwise: never "82:07:59".
+    expect(read("parts.tsx")).toContain("taskTime(t, task, now)");
+    expect(read("parts.tsx")).not.toContain("taskClock");
   });
 
   test("stopping several asks with the agent's face and the question on one line, what happens under them", () => {
@@ -151,49 +162,6 @@ describe("rows with a face (#41)", () => {
       /<MediaRow\s*size="row"\s*face=\{<AgentFace agentId=\{agentId\} size=\{MEDIA_ROW\.row\.face\}/,
     );
     expect(parts).not.toContain("confirmHead");
-  });
-});
-
-describe("what a task uses now", () => {
-  test("a computer brain says what it called through us", async () => {
-    const t = await translator("pt-BR");
-    const browsing = {
-      kind: "browser" as const,
-      activity: { kind: "browsing" as const },
-      detail: "página de cancelar",
-    };
-    expect(usingNow(t, { kind: "brain", brain: "claude_code", inner: browsing, detail: null })).toEqual({
-      brain: "claude_code",
-      activity: null,
-      name: "Claude Code",
-      detail: "Navegador · página de cancelar",
-    });
-    expect(usingNow(t, { kind: "brain", brain: "codex", inner: null, detail: null })?.detail).toBeNull();
-  });
-
-  test("the agent's own programs, an app by its name, and our own tools by what they do", async () => {
-    const t = await translator("pt-BR");
-    const terminal = usingNow(t, {
-      kind: "terminal",
-      activity: { kind: "runningCommand" },
-      detail: "consultas lentas",
-    });
-    expect(terminal).toMatchObject({ brain: null, name: "Terminal", detail: "consultas lentas" });
-    const github = usingNow(t, {
-      kind: "app",
-      activity: { kind: "consulting", app: "GitHub", service: "github" },
-      detail: "PR #231",
-    });
-    expect(github).toMatchObject({ name: "GitHub", detail: "PR #231" });
-    const writing = { kind: "agentes" as const, activity: { kind: "writingWiki" as const }, detail: "Roadmap" };
-    const wiki = usingNow(t, writing, { locale: "pt-BR" });
-    expect(wiki?.name).toBe("agentes");
-    expect(wiki?.detail).toBe("Escrevendo na wiki · Roadmap");
-  });
-
-  test("nothing while it waits its turn", async () => {
-    const t = await translator("pt-BR");
-    expect(usingNow(t, taskProgram(task({ runId: "r1", status: "queued" })))).toBeNull();
   });
 });
 

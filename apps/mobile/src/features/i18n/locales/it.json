@@ -59,7 +59,6 @@
     "failed": "La tua scelta non è stata inviata. Riprova."
   },
   "chart": {
-    "pending": "Creazione del grafico…",
     "table": "Tabella",
     "item": "Voce",
     "share": "Condividi",
@@ -391,12 +390,6 @@
     "toLatestNew": "Vai agli ultimi messaggi: {{text}}",
     "stopAgent": "Ferma {{name}}",
     "offlineWait": "Parte appena torna la connessione",
-    "turn": {
-      "thinking": "sta pensando",
-      "working": "al lavoro",
-      "writing": "sta scrivendo",
-      "stopped": "fermato"
-    },
     "steer": {
       "waiting": "{{name}} lo legge alla prossima pausa",
       "computer": "{{name}} lo legge quando ha il computer",
@@ -1903,7 +1896,8 @@
       "team_limit": "Rimuovi da questo iPhone un'app creata da te",
       "helper_untrusted": "Autorizza l'app di test su questo iPhone",
       "booting": "Si sta avviando",
-      "no_driver": "Windows ha bisogno del driver USB di questo telefono",
+      "no_driver": "Windows ha bisogno del driver USB del produttore del telefono",
+      "no_driverLinux": "Linux ha bisogno delle regole udev per questo telefono",
       "os_too_old": "Il sistema di questo telefono è troppo vecchio",
       "adb_offline": "Scollega il cavo e ricollegalo",
       "other": "Non è ancora pronto"
@@ -2005,12 +1999,11 @@
       "noHost": "Questo telefono funziona tramite un tuo computer. Collegane prima uno.",
       "hostOffline": "{{host}} è offline. Accendilo e apri agentes.chat lì.",
       "step1": "Attiva Opzioni sviluppatore",
-      "step1Text": "Tocca 7 volte Numero build, poi inserisci il PIN.",
+      "step1Text": "Tocca 7 volte Numero build, poi inserisci il PIN. Sui Samsung: Informazioni software › Numero build.",
       "openAbout": "Apri Informazioni sul telefono",
       "step2": "Attiva il Debug USB",
       "openDev": "Apri Opzioni sviluppatore",
       "step3": "Collegalo a {{host}}",
-      "step3Hint": "Usa un cavo che trasmette dati, non uno solo di ricarica. Se il telefono chiede a cosa serve l'USB, scegli Trasferimento file.",
       "looking": "Ricerca di questo telefono",
       "step4": "Tocca Consenti su questo telefono",
       "step4Text": "Prima seleziona Consenti sempre da questo computer.",
@@ -2028,7 +2021,7 @@
       "wifi1": "Attiva il Debug wireless",
       "wifi1Text": "Spunta Consenti sempre su questa rete, poi tocca Consenti.",
       "wifi2": "Scansiona il codice su un computer",
-      "wifi2Text": "Da Debug wireless › Accoppia dispositivo con codice QR.",
+      "wifi2Text": "Da Debug wireless › Accoppia dispositivo con codice QR. Non usare la fotocamera: legge il codice come una rete Wi-Fi e toglie il telefono dalla tua rete.",
       "wifi2Hint": "In agentes.chat su un computer, apri Collega un dispositivo › Telefono Android › Tramite Wi-Fi e scegli {{host}}.",
       "codeHead": "Accoppia con un codice di accoppiamento",
       "codeNote": "Da Debug wireless › Accoppia dispositivo con codice di accoppiamento. Apri Impostazioni e agentes.chat affiancati, così il codice resta sullo schermo.",
@@ -2258,9 +2251,9 @@
     "anotherLead": "Su agentes.chat. Resti in {{org}} e puoi cambiare quando vuoi.",
     "suggested": "In base alla tua email di {{domain}}, ho suggerito {{org}}.",
     "create": "Crea",
+    "enter": "Entra nello spazio di lavoro",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
-    "failed": "Non è stato possibile salvare. Riprova.",
-    "enter": "Entra nello spazio di lavoro"
+    "failed": "Non è stato possibile salvare. Riprova."
   },
   "ai": {
     "yourPlan": "Il tuo piano di IA",

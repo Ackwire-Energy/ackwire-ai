@@ -358,6 +358,8 @@ export function isNewWork(request: MachineRequest) {
     case "phone.pair.code":
     case "phone.pair.status":
     case "phone.pair.cancel":
+    // A person's guide asking the computer to look for a phone.
+    case "phone.look":
       return false;
     case "secret":
       return request.action !== "discard" && request.action !== "remove" && request.action !== "activate";

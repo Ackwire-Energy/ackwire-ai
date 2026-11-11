@@ -110,6 +110,8 @@ const PLACES = new Set([
 
 /** A table row has no name of its own in the snapshot: its cells say which row it is. */
 const ROWS = new Set(["row"]);
+/** A place's name, at most. */
+const PLACE_CHARS = 80;
 const CELLS = new Set(["cell", "gridcell", "rowheader", "columnheader"]);
 
 const unquote = (s: string) => s.replace(/\\(.)/g, "$1");
@@ -172,16 +174,37 @@ export function observeSnapshot(input: {
     if (parent >= 0) (children[parent] as number[]).push(index);
     open.push({ depth, index });
   });
+  /**
+   * A row's first named cells, once per row: enough of them for a place's characters with any one left out. Every
+   * element in a row reads it: joining all of its cells for each one would grow with the row's size squared, in time
+   * and in memory (a cut keeps its whole join alive).
+   */
+  const rowCells = new Map<number, { index: number; name: string }[]>();
+  const cellsOf = (row: number) => {
+    let cells = rowCells.get(row);
+    if (cells) return cells;
+    cells = [];
+    let size = 0;
+    for (const c of children[row] as number[]) {
+      const { role, name } = nodes[c] as Node;
+      if (!name || !CELLS.has(role)) continue;
+      cells.push({ index: c, name: name.slice(0, PLACE_CHARS) });
+      size += Math.min(name.length, PLACE_CHARS) + 3;
+      if (size >= 2 * (PLACE_CHARS + 3)) break;
+    }
+    rowCells.set(row, cells);
+    return cells;
+  };
   /** How a container reads as a place: its name, or for a row the other cells' text ("Invoice 42 · R$ 42,00"). */
   const placeOf = (i: number, via: number): string | null => {
     const n = nodes[i] as Node;
     if (!PLACES.has(n.role)) return null;
-    if (n.name) return `${n.role} "${cutText(n.name, 80)}"`;
+    if (n.name) return `${n.role} "${cutText(n.name, PLACE_CHARS)}"`;
     if (!ROWS.has(n.role)) return null;
-    const cells = (children[i] as number[])
-      .filter((c) => c !== via && CELLS.has((nodes[c] as Node).role) && (nodes[c] as Node).name)
-      .map((c) => (nodes[c] as Node).name as string);
-    return cells.length > 0 ? `${n.role} "${cutText(cells.join(" · "), 80)}"` : null;
+    const cells = cellsOf(i)
+      .filter((c) => c.index !== via)
+      .map((c) => c.name);
+    return cells.length > 0 ? `${n.role} "${cutText(cells.join(" · "), PLACE_CHARS)}"` : null;
   };
   const elements: ScreenElement[] = [];
   nodes.forEach((n, index) => {
@@ -225,7 +248,11 @@ export function observeSnapshot(input: {
 
 /** How an element reads to a judge: its line plus where it sits. */
 export function describeElement(e: ScreenElement, max = 220): string {
-  const own = e.line.replace(/^-\s+/, "").replace(/\s*\[ref=e\d+\]/, "");
+  // Only the head of a long line: the text is cut at `max` anyway, and the ref's pattern backtracks over long spaces.
+  const own = e.line
+    .slice(0, max + 64)
+    .replace(/^-\s+/, "")
+    .replace(/\s*\[ref=e\d+\]/, "");
   const where = e.context.length > 0 ? ` — in ${e.context.join(" › ")}` : "";
   const text = `${own}${where}`;
   return text.length > max ? `${cutText(text, max - 1)}…` : text;
@@ -236,7 +263,10 @@ export const FRESH_LOOK_MS = 8000;
 /** A look this recent is still what the agent knows of the screen: a plan's changes are counted from it. */
 export const KNOWN_LOOK_MS = 10 * 60_000;
 
-/** The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. */
+/**
+ * The last look at each agent's screen, by key, for the newest `max` keys: what its plans start from. A look older
+ * than `KNOWN_LOOK_MS` is dropped (nothing reads one), so idle agents' huge pages don't stay in memory.
+ */
 export function createLookMemory(now: () => number = Date.now, max = 1000) {
   const looks = new Map<string, ScreenObservation>();
   return {
@@ -244,6 +274,10 @@ export function createLookMemory(now: () => number = Date.now, max = 1000) {
       looks.delete(key);
       looks.set(key, o);
       if (looks.size > max) looks.delete(looks.keys().next().value as string);
+      for (const [k, old] of looks) {
+        if (now() - old.at < KNOWN_LOOK_MS) break;
+        looks.delete(k);
+      }
     },
     /** The last look, when it is younger than `ms`. */
     within(key: string, ms: number) {

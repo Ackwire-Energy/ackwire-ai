@@ -756,6 +756,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   opacity: 0;
   animation: onb-zpop 0.7s var(--out) both;
 }
+/* The z is drawn, not written: a mark, not words. */
+.onb-zpop::before {
+  content: "z";
+}
 @keyframes onb-zpop {
   0% {
     opacity: 1;

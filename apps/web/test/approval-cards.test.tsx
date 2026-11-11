@@ -150,7 +150,8 @@ describe("Approvals: the request beside the list", () => {
     expect(review().textContent).toContain("O que vai ser publicado");
     expect(review().querySelector(".ap-review__text")?.textContent).toContain("Os testes passaram. Pode revisar?");
     const bar = review().querySelector(".ap-bar") as HTMLElement;
-    expect(bar.querySelector(".ap-bar__text")?.textContent).toBe(
+    expect(bar.querySelector("p")).toBeNull();
+    expect(bar.querySelector('[data-approve="ap-merge"]')?.getAttribute("aria-description")).toBe(
       "Ada vai comentar numa issue, só desta vez e com estes valores.",
     );
     await click(bar.querySelector('[data-approve="ap-merge"]') as HTMLElement);

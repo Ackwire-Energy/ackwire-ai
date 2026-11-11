@@ -1,6 +1,6 @@
 {
   "identifier": "prefs",
-  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits, and its devices on its server with the main window's session (`site_fetch`: only those paths), and pairing this computer with another workspace after the system's own dialog.",
+  "description": "Preferences: general, the servers this app opens (the server here's reach, usage statistics, backups, start and stop), updates, and (while agents work here) this computer's folders, tools, activity and limits, and its devices on its server with the main window's session (`site_fetch`: only those paths), pairing this computer with another workspace after the system's own dialog, and this Mac's permissions (their state, the system's prompts, System Settings), Preferences kept to open again when macOS quits the app for Screen Recording.",
   "windows": ["prefs"],
   "permissions": [
     "core:default",
@@ -39,6 +39,13 @@
     "allow-tailscale-status",
     "allow-tailscale-open",
     "allow-runner-add",
-    "allow-pair-ask"
+    "allow-pair-ask",
+    "allow-screen-access",
+    "allow-screen-request",
+    "allow-disk-access",
+    "allow-network-ask",
+    "allow-privacy-open",
+    "allow-setup-state-get",
+    "allow-setup-state-set"
   ]
 }

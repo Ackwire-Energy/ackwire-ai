@@ -219,9 +219,11 @@ describe("background tasks (ADR 0029)", () => {
     expect(wake).toContain(`[Background task ${start.taskId}]`);
     expect(wake).toContain("Built. Tests pass.");
     expect(wake).toContain("Tell the people what came of it");
+    // People read the chat's own line in their language; the agent reads the English one, with how long it took.
+    expect(wake).toContain('Task \\"Build the app\\" finished on MacBook after 13 min.');
     const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
     const notice = main.find((m) => m.meta.machineTask);
-    expect(notice?.body).toBe('Task "Build the app" finished on MacBook after 13 min.');
+    expect(notice?.body).toBe("“Build the app” terminou no MacBook.");
     expect(notice?.meta).toMatchObject({ bodyCode: "machine_task_done", machineTask: { status: "done" } });
     expect(main.at(-1)?.body).toBe("The app builds and the tests pass.");
     const runs = await f.db.select().from(schema.agentRuns);
@@ -542,10 +544,9 @@ describe("background tasks (ADR 0029)", () => {
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     const notices = thread.filter((m) => m.meta.bodyCode === "machine_offline");
     expect(notices).toHaveLength(1);
-    expect(notices[0]?.body).toContain("The computer MacBook went offline");
     // Claude Code with a session: they run on through a network drop, and resume after a restart.
-    expect(notices[0]?.body).toContain(
-      "2 tasks here keep running there if only the connection dropped, and resume where they stopped if the computer restarted.",
+    expect(notices[0]?.body).toBe(
+      "MacBook ficou offline: 2 tarefas continuam rodando lá se só a conexão caiu, e retomam de onde pararam se o computador reiniciou.",
     );
     expect(notices[0]?.meta.bodyParams).toMatchObject({ count: "2", context: "resumes" });
 
@@ -628,7 +629,7 @@ describe("background tasks (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     const notice = thread.find((m) => m.meta.bodyCode === "machine_task_restarted");
-    expect(notice?.body).toBe('The computer MacBook is back: "Dev server" started again.');
+    expect(notice?.body).toBe("MacBook voltou: “Dev server” começou de novo.");
     expect(notice?.meta.bodyParams).toEqual({ title: "Dev server", computer: "MacBook" });
     // Starting again is not an end: nobody is woken.
     expect(await f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "machine.task_done"))).toEqual([]);
@@ -678,7 +679,7 @@ describe("background tasks (ADR 0029)", () => {
     expect(await taskRow(deploy.id)).toMatchObject({ status: "interrupted", resumedTaskId: null });
     await drainOutbox(f.db, f.handlers);
     let thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
-    expect(thread.find((m) => m.meta.machineTask)?.body).toContain("was interrupted on MacBook");
+    expect(thread.find((m) => m.meta.machineTask)?.body).toBe("“Deploy” foi interrompida no MacBook.");
     expect(thread.at(-1)?.body).toBe("The deploy was interrupted; want me to run it again?");
 
     // Resuming turned off on that computer.
@@ -701,6 +702,43 @@ describe("background tasks (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     expect(thread.filter((m) => m.meta.bodyCode === "machine_task_restarted")).toEqual([]);
+  });
+
+  test("a task's end reads in the language of whom it is for, and in English when nobody is behind it", async () => {
+    f = await setup({ machines: true, reply: () => ({ chunks: ["ok"] }) });
+    const paired = await pairedMachine();
+    const hub = f.machineHub as MachineHub;
+    const runner = taskRunner(hub);
+    await runner.hello(paired.token);
+    const start = (title: string, requestedByUserId: string | null) =>
+      startMachineTask(
+        { db: f.db, pubsub: f.pubsub, call: hub.call },
+        {
+          orgId: f.org.id,
+          agent: { id: f.agent.id, handle: "dev" },
+          machineId: paired.machineId,
+          protocol: 4,
+          machineName: "MacBook",
+          channelId: f.general.id,
+          threadRootId: null,
+          runId: null,
+          requestedByUserId,
+          title,
+          executor: "shell",
+          command: "make",
+        },
+      );
+    const mine = await start("Build", f.owner.id);
+    const nobody = await start("Lint", null);
+    for (const task of [mine, nobody]) {
+      await runner.frame({ type: "task.done", taskId: task.id, exitCode: 0, seconds: 23 });
+    }
+    await drainOutbox(f.db, f.handlers);
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const ended = (title: string) => main.find((m) => (m.meta.machineTask as { title?: string })?.title === title);
+    expect(ended("Build")?.body).toBe("“Build” terminou no MacBook.");
+    expect(ended("Build")?.meta.machineTask).toMatchObject({ locale: "pt-BR" });
+    expect(ended("Lint")?.body).toBe("“Lint” finished on MacBook.");
   });
 
   test("a shell task's offline notice says it comes back after a restart; the grace's end tells open apps", async () => {
@@ -736,8 +774,8 @@ describe("background tasks (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     const notice = thread.find((m) => m.meta.bodyCode === "machine_offline");
-    expect(notice?.body).toContain(
-      '"Build" keeps running there if only the connection dropped, and resumes where it stopped if the computer restarted.',
+    expect(notice?.body).toBe(
+      "MacBook ficou offline: “Build” continua rodando lá se só a conexão caiu, e retoma de onde parou se o computador reiniciou.",
     );
     expect(notice?.meta.bodyParams).toMatchObject({ context: "resumes" });
     // Still away past the grace: open apps look again (it is an outage now).

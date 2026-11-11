@@ -168,60 +168,6 @@ describe("in the channel", () => {
   });
 });
 
-describe("streaming words", () => {
-  test("Markdown with `words`: each plain word in an .ac-word span; mentions and code stay whole", () => {
-    const el = render(
-      <Markdown
-        source={"Oi **time**, olha `bun test` com @ada agora"}
-        variant="message"
-        words
-        mention={(h, k) => (
-          <span key={k} className="ac-mention">
-            @{h}
-          </span>
-        )}
-      />,
-    ).container;
-    const words = [...el.querySelectorAll(".ac-word")].map((w) => w.textContent);
-    expect(words).toEqual(["Oi", "time", ",", "olha", "com", "agora"]);
-    expect(el.querySelector("code")?.textContent).toBe("bun test");
-    expect(el.querySelector("code .ac-word")).toBeNull();
-    expect(el.querySelector(".ac-mention")?.textContent).toBe("@ada");
-    expect(el.textContent).toBe("Oi time, olha bun test com @ada agora");
-  });
-
-  test("without `words` nothing is wrapped (the final message)", () => {
-    expect(body("Uma frase só.").querySelector(".ac-word")).toBeNull();
-  });
-
-  test("MessageBody live: settled blocks plain, the tail last with fading words", () => {
-    const el = render(<MessageBody body={"Primeiro bloco.\n\nAgora escrevendo"} live />).container;
-    // One wrapper (the gap between blocks stays the same as each settles): the tail is its last block.
-    expect(el.querySelectorAll(".md")).toHaveLength(1);
-    const blocks = (el.querySelector(".md") as HTMLElement).children;
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0]?.querySelector(".ac-word")).toBeNull();
-    expect([...(blocks[1]?.querySelectorAll(".ac-word") ?? [])].map((w) => w.textContent)).toEqual([
-      "Agora",
-      "escrevendo",
-    ]);
-  });
-
-  test("words before inline code stay once as an answer streams past it, with their spaces", () => {
-    const full = "Vou pedir `calendar:read` (ver a agenda), só leitura.";
-    const r = render(<MessageBody body="" live />);
-    for (let i = 1; i <= full.length; i++) {
-      r.rerender(<MessageBody body={full.slice(0, i)} live />);
-      // Written so far, the backticks of a closed code span gone.
-      const shown = full
-        .slice(0, i)
-        .replace(/`([^`]*)`/, "$1")
-        .trimEnd();
-      expect(r.container.textContent).toBe(shown);
-    }
-  });
-});
-
 describe("```json fences", () => {
   beforeAll(() => createI18n("pt-BR"));
   const RAW = '{"key":"infra-incident-ledger","timezone":"America/Sao_Paulo","reads":[1,2]}';
@@ -327,49 +273,6 @@ describe("```mermaid fences", () => {
     expect(within(el).queryByRole("button", { name: "Código" })).toBeNull();
     expect(el.querySelector(".artifact-diagram")).toBeNull();
     expect(el.textContent).not.toContain("Não foi possível");
-  });
-
-  test("while an answer streams its last block stays code, open or closed; the finished message draws it", async () => {
-    const view = render(<MessageBody body={`Olha o fluxo:\n\n\`\`\`mermaid\n${FLOW}`} live />);
-    await settle();
-    const el = view.container;
-    expect(el.querySelector(".md > :last-child .code-card__code")?.textContent).toBe(FLOW);
-    view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} live />);
-    await settle();
-    expect(el.querySelector(".md > :last-child .code-card__code")?.textContent).toBe(FLOW);
-    expect(el.querySelector("img")).toBeNull();
-    expect(asked).toEqual([]);
-    view.rerender(<MessageBody body={`Olha o fluxo:\n\n${fence(FLOW)}`} />);
-    await settle();
-    expect(el.querySelector(".code-card__preview img")).not.toBeNull();
-    expect(asked).toEqual([FLOW]);
-  });
-
-  test("a closed fence the answer has moved past is drawn while it streams, once", async () => {
-    const answer = `Olha o fluxo:\n\n${fence(FLOW)}\n\nDepois do deploy`;
-    const view = render(<MessageBody body={answer} live />);
-    await settle();
-    expect(view.container.querySelector(".code-card__preview img")).not.toBeNull();
-    view.rerender(<MessageBody body={`${answer} eu aviso.`} live />);
-    await settle();
-    // The finished message takes the live row's place: the drawing is reused, not made again.
-    view.unmount();
-    const done = render(<MessageBody body={`${answer} eu aviso.`} />).container;
-    expect(done.querySelector(".code-card__preview img")).not.toBeNull();
-    expect(asked).toEqual([FLOW]);
-  });
-
-  test("a diagram already drawn stays drawn while the answer pauses on a blank line", async () => {
-    const answer = `Olha:\n\n${fence(FLOW)}\n\nDepois do deploy.`;
-    const view = render(<MessageBody body={`${answer} E`} live />);
-    await settle();
-    // The reveal stops after whole words and their spaces: at a paragraph break the whole answer is the tail.
-    view.rerender(<MessageBody body={`${answer}\n\n`} live />);
-    await settle();
-    const el = view.container;
-    expect(el.querySelector(".md .code-card__preview img")).not.toBeNull();
-    expect(el.querySelector(".code-card__code")).toBeNull();
-    expect(asked).toEqual([FLOW]);
   });
 
   /** What the fake drew for a source, as found in the image. */

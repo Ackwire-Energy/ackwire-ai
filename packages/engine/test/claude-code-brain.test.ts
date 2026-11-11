@@ -519,7 +519,7 @@ test("end to end through the real hub: the runner's brain.event frames reach the
 
 const LONG_ANSWER = "Olá, ".repeat(70);
 
-test("live text end to end: the runner's partial deltas reach the channel as agent.delta while the run thinks", async () => {
+test("the runner's partial text never reaches the channel: it says it writes, then its reply is posted whole", async () => {
   f = await setup({ machines: true });
   const fx = f;
   const hub = fx.machineHub;
@@ -539,8 +539,8 @@ test("live text end to end: the runner's partial deltas reach the channel as age
     .set({ machineId: paired.machineId, brain: "claude_code" })
     .where(eq(schema.agents.id, fx.agent.id));
   const events = fx.listen(fx.general.id);
-  /** What the channel had seen when the runner sent its last delta (before the answer). */
-  let seenBeforeDone: string[] = [];
+  /** What the channel had seen when the runner sent its last piece (before the answer). */
+  let seenBeforeDone: typeof events = [];
   const reply = (frame: unknown) => hub.message(conn, JSON.stringify(frame));
   const conn = hub.open({
     send(text: string) {
@@ -552,9 +552,7 @@ test("live text end to end: the runner's partial deltas reach the channel as age
           await reply({ type: "brain.event", runId: frame.runId, event: { type: "text_delta", text: piece } });
           await new Promise((r) => setTimeout(r, 30));
         }
-        seenBeforeDone = events.flatMap((e) =>
-          e.type === "agent.delta" ? [(e as unknown as { text: string }).text] : [],
-        );
+        seenBeforeDone = [...events];
         const final = { type: "done", text: `${LONG_ANSWER}tudo certo.`, session: { id: frame.session.id } };
         await reply({ type: "brain.event", runId: frame.runId, event: final });
         await reply({ type: "brain.done", runId: frame.runId });
@@ -575,7 +573,6 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   );
   const handlers = createJobHandlers({
     ...fx.jobDeps,
-    deltaFlushMs: 0,
     machines: hub,
     brains: {
       claude_code: (_agent, _run, s) =>
@@ -593,12 +590,15 @@ test("live text end to end: the runner's partial deltas reach the channel as age
   });
   await drainOutbox(fx.db, handlers);
 
-  // Streamed live, piece by piece, before the turn ended.
-  expect(seenBeforeDone.join("")).toBe(`${LONG_ANSWER}tudo certo.`);
-  expect(seenBeforeDone.length).toBeGreaterThanOrEqual(2);
-  expect(events.findIndex((e) => e.type === "agent.typing")).toBeLessThan(
-    events.findIndex((e) => e.type === "agent.delta"),
+  // Before the turn ended: that it writes, no message of its own and none of its words.
+  expect(seenBeforeDone.map((e) => e.type)).toContain("agent.typing");
+  const agentPosts = seenBeforeDone.filter(
+    (e) =>
+      e.type === "message.created" &&
+      (e as { message?: { author: { type: string } } }).message?.author.type === "agent",
   );
+  expect(agentPosts).toEqual([]);
+  expect(JSON.stringify(events.filter((e) => e.type !== "message.created"))).not.toContain("tudo certo");
   const timeline = await listMessages(fx.db, fx.owner.id, fx.org.id, fx.general.id);
   expect(timeline.map((m) => m.body)).toEqual(["@dev oi", `${LONG_ANSWER}tudo certo.`]);
 });
