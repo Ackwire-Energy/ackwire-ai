@@ -968,6 +968,21 @@ export const en = {
       /** A quiet line of what it does, under each answer. */
       personalExamples: "Your day at 7 · Bills · Training",
       teamExamples: "Customer support · Finance · Reports",
+      /** The web's cards (ADR 0162): one line under the title, then a pill per agent of the drawing. */
+      personalLine: "Agents that look after your day.",
+      teamLine: "People and agents in one place.",
+      /** What each agent of a card's drawing does, on its pill: a few words. */
+      activities: {
+        agenda: "Daily agenda",
+        home: "Home",
+        bills: "Bills",
+        studies: "Studies",
+        travel: "Trips",
+        support: "Support",
+        finance: "Finance",
+        reports: "Reports",
+        sales: "Sales",
+      },
     },
     /** A personal workspace's name, given at once in the person's language (renamed in Settings like any other). */
     personal: {

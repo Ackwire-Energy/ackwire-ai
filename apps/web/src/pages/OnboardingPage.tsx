@@ -41,7 +41,6 @@ import {
   Logo,
   Menu,
   MenuItem,
-  OptionList,
   setGaze,
 } from "@agenteschat/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,7 +57,6 @@ import { ErrorState } from "@/components/Loading";
 import { COMPACT_QUERY, DESKTOP_QUERY, useMediaQuery } from "@/components/NavDrawer";
 import { OrgProvider } from "@/components/org-context";
 import { ImageCropDialog, OrgMark } from "@/components/ProfilePhoto";
-import { PurposeScene } from "@/components/PurposeScene";
 import { BootSplash, OnboardingHorizon, OnboardingProgress } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { ZonePicker } from "@/components/ZoneSelect";
@@ -75,6 +73,7 @@ import { AiHost, AiStage, AiStep } from "./onboarding/AiStep";
 import { AreaStep } from "./onboarding/AreaStep";
 import { OnboardingPreview, type PreviewAgent } from "./onboarding/OnboardingPreview";
 import { PeopleStep } from "./onboarding/PeopleStep";
+import { PurposeCards } from "./onboarding/PurposeCards";
 import { BusinessStep, PlanStep, TeamStep, useTemplate } from "./onboarding/steps";
 import { TeamSource, useTeamSource } from "./onboarding/TeamSource";
 import { TeamStart } from "./onboarding/TeamStart";
@@ -856,24 +855,7 @@ export function OnboardingPage() {
                   <Locked when={busy}>
                     {asking ? (
                       <div className="onb__answer">
-                        <OptionList<WorkspaceMode | "">
-                          aria-label={t("onboarding.purpose.title")}
-                          layout="cards"
-                          className="onb-purpose"
-                          value={purpose ?? ""}
-                          onValueChange={(v) => setPurpose(v || null)}
-                          options={PURPOSES.map((mode) => ({
-                            value: mode,
-                            leading: <PurposeScene kind={mode} chosen={purpose === mode} you={you} />,
-                            title: t(`onboarding.purpose.${mode}`),
-                            description: (
-                              <>
-                                <span>{t(`onboarding.purpose.${mode}Text`)}</span>
-                                <span className="onb-purpose__examples">{t(`onboarding.purpose.${mode}Examples`)}</span>
-                              </>
-                            ),
-                          }))}
-                        />
+                        <PurposeCards value={purpose} onValueChange={setPurpose} you={you} />
                         {unpaidElsewhere && (
                           <UnpaidNote
                             orgId={unpaidElsewhere}
@@ -1116,7 +1098,6 @@ export function OnboardingPage() {
 }
 
 /** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
-const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
 /**
  * The AI step and its stage inside the workspace's context and Connect an AI (ADR 0160), which the onboarding has

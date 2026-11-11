@@ -573,10 +573,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 }
 /*
  * What the workspace is for (ADR 0159), the onboarding's brand moment: two wide cards one over the other (OptionList
- * `cards`), each as tall as the other: on the left who would be there (`PurposeScene`: you with your agents around
- * you, or a team's chart) on its horizon, inside the card's hairline; on the right the words, from the top (they take
- * several lines), clear of the radio in the corner. The title, both cards and Continuar fit a 720px window. On a phone,
- * the drawing over the words.
+ * `cards`, `PurposeCards`), each as tall as the other: on the left who would be there (`PurposeScene`: you with your
+ * agents around you, or a team's chart) on its horizon, inside the card's hairline, a hairline between it and the
+ * words; on the right the title, one line and the cluster of pills (ADR 0162), clear of the radio in the corner. The
+ * title, both cards and Continue fit a 720px window. On a phone, the drawing over the words.
  */
 .onb-purpose .ac-optlist__cards {
   grid-template-columns: minmax(0, 1fr);
@@ -596,16 +596,17 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 .onb-purpose .ac-optrow__lead {
   align-self: stretch;
   margin: 1px 0 1px 1px;
+  border-right: 1px solid var(--line);
 }
 .onb-purpose .ac-optrow__text {
   flex: 1;
   width: auto;
   min-width: 0;
-  padding: 16px 44px 16px 8px;
+  padding: 16px 16px 16px 20px;
 }
 /* The drawing's band: the stage a step smaller, standing on the band's horizon. */
 .onb-purpose .onb-scene {
-  width: 232px;
+  width: 184px;
   height: auto;
   min-height: 176px;
   overflow: hidden;
@@ -618,9 +619,19 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   height: auto;
 }
 .onb-purpose .onb-scene__stage {
-  scale: 0.9;
+  scale: 0.8;
 }
+/* A faint veil over the drawing, so its side reads a shade apart while the drawing and its sky stay as they are. */
+.onb-purpose .onb-scene::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  pointer-events: none;
+}
+/* The title alone clears the radio in the corner. */
 .onb-purpose .ac-optrow__title {
+  padding-right: 28px;
   font-size: 17px;
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -628,11 +639,132 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 .onb-purpose .ac-optrow__desc {
   margin-top: 4px;
 }
-.onb-purpose__examples {
-  display: block;
-  margin-top: 8px;
-  font-size: 13px;
-  color: var(--faint);
+/* The cluster (ADR 0162): pills of one size in their order, 6px apart both ways, left-aligned with the title, a pill
+   that doesn't fit going to the next line; its box reserved for two lines. Nothing in it ever changes size or place:
+   its life is colour, opacity and a tiny scale on a pill itself. */
+.onb-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px;
+  min-height: 54px;
+  margin-top: 12px;
+}
+.onb-pill {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 10px 0 3px;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  /* Asleep: a step dimmer, completely still. */
+  opacity: 0.55;
+  transition:
+    opacity 0.3s var(--out),
+    color 0.2s var(--out),
+    background-color 0.3s var(--out),
+    box-shadow 0.2s var(--out);
+}
+.onb-pill > .ac-avatar {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+/* Lit: the card is chosen. */
+.onb-cluster[data-lit] .onb-pill {
+  opacity: 1;
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+/* Waking: each pill lights in turn, a beat after its agent, with a small scale-in on the pill itself. */
+.onb-cluster[data-waking] .onb-pill {
+  transition-delay: var(--d, 0ms);
+  animation: onb-pill-light 0.34s var(--out) var(--d, 0ms);
+}
+@keyframes onb-pill-light {
+  from {
+    transform: scale(0.96);
+  }
+}
+/* Pointed at, or its agent is: border and words brighten. */
+.onb-pill:hover,
+.onb-pill.is-hot {
+  opacity: 1;
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--faint);
+}
+/* Work: a thin pixel sweep along the pill's foot, inside it. */
+.onb-pill__bar {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, var(--ink2) 0 2px, transparent 2px 4px);
+  transform: scaleX(0);
+  transform-origin: left;
+  opacity: 0;
+  pointer-events: none;
+}
+.onb-pill.is-working .onb-pill__bar {
+  animation: onb-pill-sweep 1.6s steps(16, end) both;
+}
+@keyframes onb-pill-sweep {
+  0% {
+    opacity: 1;
+    transform: scaleX(0);
+  }
+  85% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+/* Its agent bobs gently while it works (the box's own translate: it is placed by left and top). */
+.onb-scene__face.is-bob {
+  animation: onb-scene-bob 0.8s ease-in-out 2;
+}
+@keyframes onb-scene-bob {
+  50% {
+    translate: 0 -2px;
+  }
+}
+/* A sleeping z popping off an agent as it wakes. */
+.onb-zpop {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  color: var(--ink2);
+  font-family: var(--font-dot, monospace);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+  animation: onb-zpop 0.7s var(--out) both;
+}
+@keyframes onb-zpop {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(6px, -14px) scale(0.6);
+  }
 }
 .onb-scene {
   /* The ground the horizon rises from: the card, as it is chosen or not. */
@@ -719,6 +851,8 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   }
   .onb-purpose .ac-optrow__lead {
     margin: 1px 1px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
   }
   .onb-purpose .onb-scene {
     width: 100%;
@@ -735,11 +869,18 @@ html:not([data-pointer]) .onb__logo:focus-visible {
     padding: 10px 14px 14px;
   }
   .onb-purpose .ac-optrow__title {
+    padding-right: 0;
     font-size: 16px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .onb-scene[data-chosen] .onb-scene__line {
+  .onb-scene[data-chosen] .onb-scene__line,
+  .onb-pill,
+  .onb-cluster[data-waking] .onb-pill,
+  .onb-pill.is-working .onb-pill__bar,
+  .onb-scene__face.is-bob,
+  .onb-zpop {
+    transition: none;
     animation: none;
   }
 }
