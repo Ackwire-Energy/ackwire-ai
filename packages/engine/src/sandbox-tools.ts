@@ -42,7 +42,7 @@ import { copyToComputer } from "./file-pulls";
 import { cutText, formatBytes, textOfBytes } from "./format";
 import { mergeReposOfCall } from "./git/repos";
 import { fullMachinePath, pathInOwnFolder, requestFolderAccess } from "./machine-access";
-import { MachineRequestError } from "./machine-hub";
+import { MachineRequestError, type MachineStatus } from "./machine-hub";
 import {
   foldersFixedMessage,
   notAllowedMessage,
@@ -1319,6 +1319,9 @@ export function createSandboxToolSource(
         detail: (str(input.prompt) || str(input.command)).slice(0, 500),
       }),
       async execute(input, ctx) {
+        let where = info.name;
+        // A person's computer named with `computer`: its refusals point to that person, not to request_folder_access.
+        let device = null as MachineStatus | null;
         try {
           const prompt = str(input.prompt).trim();
           const command = str(input.command).trim();
@@ -1334,12 +1337,12 @@ export function createSandboxToolSource(
           const hub = hubOf();
           // On another device (`computer`), a full one keeps the task in its line instead of refusing it.
           const elsewhere = str(input.computer).trim() !== "";
-          let where = info.name;
           const row = await run(
             ctx,
             async (computer) => {
               const status = await hub.status(computer.machineId);
               where = status?.name ?? info.name;
+              if (computer.machineId !== info.machineId) device = status;
               const agent = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
               // One session per conversation for Claude Code and Codex (the runner maps Codex's own thread id).
               const session = executor === "claude" || executor === "codex" ? ctx.threadRootId : null;
@@ -1426,7 +1429,7 @@ export function createSandboxToolSource(
           }
           if (error instanceof MachineRequestError && error.code === "not_allowed") {
             return {
-              content: `Not started: ${notAllowedMessage(info.name, error.message, undefined, info.managed)}`,
+              content: `Not started: ${notAllowedMessage(where, error.message, undefined, device ? device.kind === "managed" : info.managed, device ?? undefined)}`,
               isError: true,
               data: { code: "machine.not_allowed" },
             };

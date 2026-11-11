@@ -133,20 +133,16 @@ async function modelSmoke(db: Database) {
   await addChannelMember(db, userId, orgId, general.id, { agentId: agent.id });
   step(`using ${credential ? "the org's own key" : "the platform key"}${orgWorkspace ? " with a workspace id" : ""}`);
 
-  let streamed = "";
-  let firstDeltaAt = 0;
+  let firstTypingAt = 0;
   const seen = new Map<string, number>();
   const postedAt = { t: 0 };
-  pubsub.subscribe(channelTopic(general.id), (e: { type: string; text?: unknown }) => {
+  pubsub.subscribe(channelTopic(general.id), (e: { type: string }) => {
     seen.set(e.type, (seen.get(e.type) ?? 0) + 1);
     if (e.type === "agent.thinking" && !seen.has("thinking@")) {
       seen.set("thinking@", Date.now() - postedAt.t);
     }
-    if (e.type === "agent.delta") {
-      if (!firstDeltaAt) firstDeltaAt = Date.now();
-      streamed += String(e.text);
-      process.stdout.write(String(e.text));
-    }
+    // Its words never go out live: the reply comes whole in its message.
+    if (e.type === "agent.typing" && !firstTypingAt) firstTypingAt = Date.now();
   });
   postedAt.t = Date.now();
   await postPersonMessage({ db, pubsub }, userId, orgId, general.id, { body: "@smoke say hello to the team" });
@@ -160,7 +156,6 @@ async function modelSmoke(db: Database) {
     if (run && (run.status === "done" || run.status === "failed")) break;
     await Bun.sleep(500);
   }
-  process.stdout.write("\n");
   if (run?.status !== "done") throw new Error(`run did not finish: ${run?.status ?? "none"} ${run?.error ?? ""}`);
 
   const [reply] = await db
@@ -173,9 +168,8 @@ async function modelSmoke(db: Database) {
     JSON.stringify(
       {
         reply: reply?.body,
-        streamedChars: streamed.length,
         postToThinkingMs: seen.get("thinking@") ?? null,
-        postToFirstDeltaMs: firstDeltaAt ? firstDeltaAt - postedAt.t : null,
+        postToFirstTypingMs: firstTypingAt ? firstTypingAt - postedAt.t : null,
         events: Object.fromEntries([...seen].filter(([k]) => !k.endsWith("@"))),
       },
       null,

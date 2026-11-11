@@ -21,6 +21,7 @@ import {
   isUnpairedHome,
   orgName,
   pairedHomes,
+  type Snapshot,
 } from "./store";
 
 /**
@@ -62,8 +63,8 @@ export interface ThisMacDeps {
   revealFolder(path: string): Promise<void>;
   /** How long to wait for the runner's code. */
   codeTimeoutMs?: number;
-  /** The site confirmed a pairing it asked for: its agents work while the app runs, so it opens at login. */
-  onPaired?(): void;
+  /** The site confirmed a pairing it asked for (the workspace's name): its agents work while the app runs. */
+  onPaired?(org: string): void;
 }
 
 const orgOf = (h: Home) => h.status?.org?.id;
@@ -129,9 +130,15 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
 /**
  * Starts the runner's device-code sign-in with `origin` for `orgId` and resolves with its code, which whoever pairs
  * confirms with their session (the site, or the app's own windows through `site_fetch`); null when already connected.
+ * Once paired, a new home gets `tools` (the pairing sheet's choices) over the open defaults.
  */
 export async function connect(
-  { store, codeTimeoutMs = 20_000, onPaired }: Pick<ThisMacDeps, "store" | "codeTimeoutMs" | "onPaired">,
+  {
+    store,
+    codeTimeoutMs = 20_000,
+    onPaired,
+    tools = {},
+  }: Pick<ThisMacDeps, "store" | "codeTimeoutMs" | "onPaired"> & { tools?: Partial<PairTools> },
   orgId: string,
   origin: string,
 ): Promise<ThisMacConnect> {
@@ -140,7 +147,8 @@ export async function connect(
   if (same.some((h) => !isRefusedHome(h))) return { userCode: null };
   // Refused by this organization: its own home, so it comes back as the same computer. Else a home left
   // unpaired by an earlier try, or a new one.
-  const homeId = same[0]?.homeId ?? homes.find(isUnpairedHome)?.homeId ?? (await store.addHome());
+  const back = same[0]?.homeId;
+  const homeId = back ?? homes.find(isUnpairedHome)?.homeId ?? (await store.addHome());
 
   const code = new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -160,7 +168,8 @@ export async function connect(
       }
     });
   });
-  void whenPaired(store, homeId, onPaired);
+  // A home that comes back keeps the access its runner kept.
+  void whenPaired(store, homeId, back ? null : tools, onPaired);
   try {
     await store.request(homeId, { type: "pair.start", server: origin });
   } catch (err) {
@@ -170,30 +179,38 @@ export async function connect(
   return { userCode: await code };
 }
 
+/** What the pairing sheets offer agents on this computer; folders come later, in Preferences. */
+export type PairTools = Pick<RunnerTools, "claude" | "codex" | "commands"> & { browser: boolean };
+const PAIR_TOOLS = ["claude", "codex", "commands", "browser"] as const;
+
+/** Claude Code and Codex as a runner here found them (they are for the whole computer); null before any runner said. */
+export const toolsFound = (snap: Snapshot, homeId?: string) =>
+  (snap.homes.find((h) => h.homeId === homeId) ?? snap.homes.find((h) => h.status?.executors))?.status?.executors ??
+  null;
+
 /**
- * A new organization's tools on this computer: the ones the others have (they are for the whole computer);
- * the first one starts with the browser on, Claude Code and Codex on when found here. Commands always start off:
- * a page asked for this pairing, and the system's dialog promised it; only Preferences › Tools turns them on.
+ * A new pairing's tools, open (ADR 0165): commands on; Claude Code, Codex and the browser as the other workspaces here
+ * have them (they are for the whole computer), else Claude Code and Codex when found and the browser on.
  */
-export async function firstTools(store: DesktopStore, homeId: string) {
+export function pairTools(snap: Snapshot, homeId?: string): PairTools {
+  const found = toolsFound(snap, homeId) ?? {};
+  const others = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools;
+  const base = others ?? { claude: !!found.claude, codex: !!found.codex, browser: true };
+  return { claude: !!base.claude, codex: !!base.codex, commands: true, browser: !!base.browser };
+}
+
+/** A new home's first tools: `chosen` (the pairing sheet's switches) over `pairTools`. */
+export async function firstTools(store: DesktopStore, homeId: string, chosen: Partial<PairTools> = {}) {
   await store.refresh(homeId);
-  const snap = store.getSnapshot();
-  const found = snap.homes.find((h) => h.homeId === homeId)?.status?.executors ?? {};
-  const others = pairedHomes(snap).find((h) => h.homeId !== homeId)?.access?.tools ?? {
-    claude: !!found.claude,
-    codex: !!found.codex,
-    commands: false,
-    browser: true,
-  };
-  const base = { ...others, commands: false };
-  for (const tool of ["claude", "codex", "commands", "browser"] as const) {
-    await store.request(homeId, { type: "tools.set", tool, on: !!base[tool] }).catch(() => {});
+  const tools = { ...pairTools(store.getSnapshot(), homeId), ...chosen };
+  for (const tool of PAIR_TOOLS) {
+    await store.request(homeId, { type: "tools.set", tool, on: tools[tool] }).catch(() => {});
   }
 }
 
 /**
  * The tools as Preferences › Tools shows them, one switch each for every organization here. Commands may be on
- * for some only (a new organization starts without them): the switch is on when all have them, and
+ * for some only (turned off at pairing, or the server here's own): the switch is on when all have them, and
  * `commandsOnlyFor` names the organizations that do while others don't.
  */
 export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; commandsOnlyFor: string[] } {
@@ -204,14 +221,22 @@ export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; command
   return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
 }
 
-/** Once the pairing is confirmed, the new organization's first tools, then `onDone`. */
-export function whenPaired(store: DesktopStore, homeId: string, onDone?: () => void) {
+/**
+ * Once the pairing is confirmed, the new organization's first tools (`chosen` over the defaults; null for a home that
+ * comes back, which keeps its own), then `onDone` with the workspace's name.
+ */
+export function whenPaired(
+  store: DesktopStore,
+  homeId: string,
+  chosen: Partial<PairTools> | null,
+  onDone?: (org: string) => void,
+) {
   const off = store.onEvent((id, event) => {
     if (id !== homeId || (event.kind !== "pair.done" && event.kind !== "pair.failed")) return;
     off();
     if (event.kind !== "pair.done") return;
-    void firstTools(store, homeId);
-    onDone?.();
+    if (chosen) void firstTools(store, homeId, chosen);
+    onDone?.(event.org.name);
   });
   // A code nobody confirms expires; stop listening well after.
   setTimeout(off, 30 * 60_000);
@@ -223,15 +248,14 @@ export function whenPaired(store: DesktopStore, homeId: string, onDone?: () => v
  */
 export function whenHostHomeReady(store: DesktopStore, homeId: string, timeoutMs = 60_000) {
   const ready = () => store.home(homeId)?.status?.paired === true;
-  if (ready()) {
-    void firstTools(store, homeId);
-    return;
-  }
+  // The open defaults, commands included, as for any computer paired from the app (ADR 0165 §7).
+  const start = () => void firstTools(store, homeId);
+  if (ready()) return start();
   const timer = setTimeout(() => off(), timeoutMs);
   const off = store.subscribe(() => {
     if (!ready()) return;
     clearTimeout(timer);
     off();
-    void firstTools(store, homeId);
+    start();
   });
 }

@@ -27,12 +27,12 @@ import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import type { AuthResult } from "@/auth/client";
 import { useAuth } from "@/auth/context";
-import { AvatarBuilderDialog, AvatarChoiceDialog } from "@/components/AvatarBuilder";
+import { ChangeAvatarDialog } from "@/components/AvatarBuilder";
 import { ChatLookSettings } from "@/components/ChatLookSettings";
 import { PrefRow } from "@/components/NoticePrefs";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
-import { MyFace, ProfilePhotoDialog } from "@/components/ProfilePhoto";
+import { MyFace } from "@/components/ProfilePhoto";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { localePatch, rememberLocale } from "@/i18n";
@@ -296,8 +296,6 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
   const [zone, setZone] = useState("");
   const [useOrgZone, setUseOrgZone] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [photo, setPhoto] = useState(false);
-  const [builder, setBuilder] = useState(false);
   const [ask, setAsk] = useState(false);
   useEffect(() => {
     if (!focus) return;
@@ -394,27 +392,7 @@ export function ProfileDialog({ focus, onClose }: { focus: "name" | "timezone" |
           </Button>
         </DialogFooter>
       </form>
-      <AvatarChoiceDialog
-        open={ask}
-        onClose={() => setAsk(false)}
-        onBuild={() => {
-          setAsk(false);
-          setBuilder(true);
-        }}
-        onPhoto={() => {
-          setAsk(false);
-          setPhoto(true);
-        }}
-      />
-      <AvatarBuilderDialog
-        open={builder}
-        onClose={() => setBuilder(false)}
-        onUploadPhoto={() => {
-          setBuilder(false);
-          setPhoto(true);
-        }}
-      />
-      <ProfilePhotoDialog open={photo} onClose={() => setPhoto(false)} />
+      <ChangeAvatarDialog open={ask} onClose={() => setAsk(false)} />
     </Dialog>
   );
 }

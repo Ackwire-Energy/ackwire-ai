@@ -414,8 +414,7 @@ export function workingEntries(
   typing: string[] = [],
   personName: (id: string) => string | undefined = () => undefined,
 ): ActivityEntry[] {
-  // Writing agents stay in: the line above the box is on while they work.
-  return barEntries(runs, typing, agentName, personName, consults, true);
+  return barEntries(runs, typing, agentName, personName, consults);
 }
 
 /**
@@ -427,39 +426,24 @@ export const stoppableInLine = (runs: LiveRun[]) =>
 
 /**
  * What the line above the composer stops with its own "Parar" (the working line, or the requests' line while it
- * takes its place): the runs I may stop of the one agent at work here, whose live rows are out of view (a row on
- * screen carries its own stop). With several, the line can't say whose (the box's own stop stops them all).
+ * takes its place): the runs I may stop of the one agent at work here. With several, the line can't say whose (the
+ * box's own stop stops them all).
  */
-export function lineStops(
-  entries: ActivityEntry[],
-  runs: LiveRun[],
-  canStop: (run: LiveRun) => boolean,
-  rowInView: (run: LiveRun) => boolean = () => false,
-): LiveRun[] {
+export function lineStops(entries: ActivityEntry[], runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun[] {
   const agents = entries.filter((e) => e.type === "agent");
   const solo = agents.length === 1 ? agents[0] : undefined;
-  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r) && !rowInView(r)) : [];
+  return solo ? stoppableInLine(runs).filter((r) => r.agentId === solo.id && canStop(r)) : [];
 }
 
 /**
- * The one agent the working line speaks for while its live row is out of view (`entriesOffScreen` left it in): its
- * run, for the row's step, its time, "Ver" and its stop. None with several agents, or while its row is on screen
- * (a question it asks keeps its phrase in the line; the row says the rest).
+ * The one agent the working line speaks for: its run, for its step, its time and its stop. None with several agents
+ * (a question it asks keeps its phrase in the line).
  */
-export function awayRun(
-  entries: ActivityEntry[],
-  runs: LiveRun[],
-  rowInView: (run: LiveRun) => boolean,
-): LiveRun | undefined {
+export function awayRun(entries: ActivityEntry[], runs: LiveRun[]): LiveRun | undefined {
   const agents = entries.filter((e) => e.type === "agent");
   const solo = agents.length === 1 ? agents[0] : undefined;
-  const run = solo ? runs.find((r) => r.agentId === solo.id) : undefined;
-  return run && !rowInView(run) ? run : undefined;
+  return solo ? runs.find((r) => r.agentId === solo.id) : undefined;
 }
-
-/** The run whose live row offers its stop (the web's rule): the latest one here I may stop. */
-export const rowStopOf = (runs: LiveRun[], canStop: (run: LiveRun) => boolean): LiveRun | undefined =>
-  stoppableInLine(runs).findLast((r) => canStop(r));
 
 /**
  * Who may press "Parar" (the web's `useStopRun`): admins, the agent's owner,
@@ -693,7 +677,7 @@ export type Block =
   | { kind: "heading"; inline: Inline[] }
   | { kind: "bullet"; inline: Inline[]; ordinal: string | null }
   | { kind: "quote"; inline: Inline[] }
-  | { kind: "code"; lang: string; text: string; open?: boolean }
+  | { kind: "code"; lang: string; text: string }
   | { kind: "table"; header: Inline[][]; rows: Inline[][][]; align: TableAlign[] }
   /** Closed until tapped (the shared `detailsAt`, ADR 0147): `body` is Markdown of its own. */
   | { kind: "details"; summary: Inline[]; body: string };
@@ -862,14 +846,13 @@ function plainBlocks(body: string): Block[] {
   const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
   for (let i = 0; i < parts.length; i += 3) {
     const text = parts[i] ?? "";
-    // The last part may hold a block still being written (no closing fence yet): the web's rule, so an
-    // answer that is still streaming shows its code (or "Montando o gráfico…") instead of the raw text.
+    // The last part may hold a block without its closing fence: it runs to the end of the text, as code.
     const last = i + 3 >= parts.length;
     const open = last ? /```([a-zA-Z0-9_+-]*)\n([\s\S]*)$/.exec(text) : null;
     if (open) {
       textBlocks(text.slice(0, open.index), out);
       const code = (open[2] ?? "").replace(/`{1,2}$/, "").replace(/\n$/, "");
-      out.push({ kind: "code", lang: open[1] ?? "", text: code, open: true });
+      out.push({ kind: "code", lang: open[1] ?? "", text: code });
     } else textBlocks(last ? text.replace(/```[a-zA-Z0-9_+-]*$/, "") : text, out); // a fence still opening
     if (i + 2 < parts.length)
       out.push({ kind: "code", lang: parts[i + 1] ?? "", text: (parts[i + 2] ?? "").replace(/\n$/, "") });

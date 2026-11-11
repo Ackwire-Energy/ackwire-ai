@@ -154,14 +154,18 @@ const SYSTEMS = [
 
 /**
  * "Download for Mac" for the system this page is open on, and a small "Other systems" menu with the other two. A
- * web page can't know whether the app is already installed, so it never says so. A phone shows the menu alone.
+ * system with no build yet shows disabled with "Em breve"; while its build is asked for, disabled with no mark, so
+ * "Em breve" never flashes. A web page can't know whether the app is already installed, so it never says so. A phone
+ * shows the menu alone.
  */
 export function DownloadButtons({
   primary = false,
-  onLine,
 }: {
   primary?: boolean;
-  /** A system with no app build here: its one line to paste instead (a computer's terminal, `unix` or `windows`). */
+  /**
+   * @deprecated Not used: a system with no build is disabled with "Em breve", and its terminal line is reached from
+   * the flow's own link.
+   */
   onLine?: (shell: "unix" | "windows") => void;
 }) {
   const { t } = useTranslation();
@@ -176,44 +180,59 @@ export function DownloadButtons({
     const url = builds[target].data?.url;
     return url ? downloadHref(url, origin) : null;
   };
-  const mine = here ? SYSTEMS.find((s) => s.target === here) : undefined;
+  // `null` is the server's answer that there's no build; a failed ask says nothing, so that system isn't offered.
+  const soon = (s: (typeof SYSTEMS)[number]) => builds[s.target].data === null;
+  const offered = (s: (typeof SYSTEMS)[number]) => !builds[s.target].isError;
+  const found = here ? SYSTEMS.find((s) => s.target === here) : undefined;
+  const mine = found && offered(found) ? found : undefined;
   const mineHref = mine ? hrefOf(mine.target) : null;
-  // Every other system is offered: one without a build here gets its one-line install.
-  const others = SYSTEMS.filter((s) => s.target !== mine?.target && (hrefOf(s.target) || onLine));
+  const others = SYSTEMS.filter((s) => s.target !== mine?.target && offered(s));
   const name = (s: (typeof SYSTEMS)[number]) => t(`machines.os.${s.target}`);
+  const soonChip = <Chip icon="lock">{t("common.soon")}</Chip>;
+  const variant = primary ? "primary" : "default";
   return (
     <>
-      {mine && mineHref && (
-        <Button asChild size="sm" variant={primary ? "primary" : "default"}>
-          <a href={mineHref} download>
-            <Icon name="download" />
-            {t("devices.downloadFor", { system: name(mine) })}
-          </a>
-        </Button>
-      )}
+      {mine &&
+        (mineHref ? (
+          <Button asChild size="sm" variant={variant}>
+            <a href={mineHref} download>
+              <Icon name="download" />
+              {t("devices.downloadFor", { system: name(mine) })}
+            </a>
+          </Button>
+        ) : (
+          // Beside the button, not in it: on a narrow screen the mark goes under it instead of past the edge.
+          <span className="row">
+            <Button size="sm" variant={variant} icon="download" disabled loading={builds[mine.target].isPending}>
+              {t("devices.downloadFor", { system: name(mine) })}
+            </Button>
+            {soon(mine) && soonChip}
+          </span>
+        ))}
       {others.length > 0 && (
         <Menu
           label={t("devices.otherSystems")}
           trigger={
             <Button size="sm" variant="ghost">
-              {mine && mineHref ? t("devices.otherSystems") : t("devices.downloadApp")}
+              {mine ? t("devices.otherSystems") : t("devices.downloadApp")}
               <Icon name="chevronDown" />
             </Button>
           }
         >
-          {others.map((s) => (
-            <MenuItem
-              key={s.target}
-              leading={<ProviderLogo id={s.target === "darwin" ? "apple" : s.target} size="xs" />}
-              onSelect={() => {
-                const href = hrefOf(s.target);
-                if (href) window.location.assign(href);
-                else onLine?.(s.target === "windows" ? "windows" : "unix");
-              }}
-            >
-              {hrefOf(s.target) ? t("devices.downloadFor", { system: name(s) }) : name(s)}
-            </MenuItem>
-          ))}
+          {others.map((s) => {
+            const href = hrefOf(s.target);
+            return (
+              <MenuItem
+                key={s.target}
+                leading={<ProviderLogo id={s.target === "darwin" ? "apple" : s.target} size="xs" off={!href} />}
+                disabled={!href}
+                hint={soon(s) ? soonChip : undefined}
+                onSelect={href ? () => window.location.assign(href) : undefined}
+              >
+                {t("devices.downloadFor", { system: name(s) })}
+              </MenuItem>
+            );
+          })}
         </Menu>
       )}
     </>

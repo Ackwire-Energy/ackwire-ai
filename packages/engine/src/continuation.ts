@@ -38,7 +38,10 @@ export interface ContinuationState {
   /** The run's executed tool calls when it was last told to continue: the next continue needs more. */
   executedAtNudge?: number;
   askNudged?: boolean;
-  /** The last turn was told to ask: this one is judged past the cap, and turns into the question if it didn't. */
+  /**
+   * The last turn was told to ask: this one is judged past the cap, and a reply that still asks only in its text
+   * becomes the question card.
+   */
   askPending?: boolean;
   /** It was told once to say whether it still needs its open requests (`openRequestNudge`). */
   requestNudged?: boolean;
@@ -153,7 +156,7 @@ export function findableNudge(means: string[], tried: string[]) {
 
 /** What a run reads, once, when it described what only a person can give instead of asking for it. */
 export const ASK_NUDGE =
-  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few; but a sign-in, a QR code, a code or a captcha with browser_ask_person or desktop_ask_person once the page or app is at that step, a key or a password through request_secret, an approval only someone else can give through request_approval, a permission through request_permission. Do not end with a list of what's missing. If you need nothing from them to finish, just give your answer, with no question.";
+  "You need something only a person can give (a credential, a decision, a test, access). Ask them now with ask_user: one direct question, with choices if it is one of a few; but a sign-in, a QR code, a code or a captcha with browser_ask_person or desktop_ask_person once the page or app is at that step, a key or a password through request_secret, an approval only someone else can give through request_approval, a permission through request_permission. Do not end with a list of what's missing. If you need nothing from them to finish, end your turn without writing anything more: your reply above stands.";
 
 /**
  * What a run reads, once, when its reply asks a person for a secret in the chat (ADR 0109 addendum): its reply is not

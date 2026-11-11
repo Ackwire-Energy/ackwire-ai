@@ -21,7 +21,6 @@ import {
   usageLine,
 } from "@agenteschat/client/lib/chat";
 import { dayLabel, shortTarget } from "@agenteschat/client/lib/format";
-import { initialReveal, REVEAL_MAX_LAG_MS, rebaseReveal, revealStep, wordEnd } from "@agenteschat/client/lib/reveal";
 import { buildTimeline, groupsWith, messageKey } from "@agenteschat/client/lib/timeline";
 import { barStep, stepLabel, stepPhrase, toolPhrase, toolWhy, waitStep } from "@agenteschat/client/lib/work";
 import type { TFunction } from "i18next";
@@ -32,59 +31,9 @@ const t = i18n.t.bind(i18n) as TFunction;
 const i18nEn = createI18n("en");
 const tEn = i18nEn.t.bind(i18nEn) as TFunction;
 
-describe("smooth reveal of streamed text", () => {
-  const text = "Os 401 no Sentry";
-
-  test("releases whole words, never half of one", () => {
-    expect(wordEnd(text, 0)).toBe(0);
-    expect(wordEnd(text, 1)).toBe(3);
-    expect(wordEnd(text, 3)).toBe(3);
-    expect(wordEnd(text, 4)).toBe(7);
-    expect(wordEnd(text, 99)).toBe(text.length);
-    expect(text.slice(0, revealStep(0, text, 16))).toBe("Os ");
-    expect(text.slice(0, revealStep(3, text, 16))).toBe("Os 401 ");
-    expect(revealStep(text.length, text, 16)).toBe(text.length);
-  });
-
-  test("a big buffer drains fast; a paused tab catches up at once", () => {
-    const big = "palavra ".repeat(200);
-    const step = revealStep(0, big, 16);
-    expect(step).toBeGreaterThan(60);
-    expect(big.slice(0, step).endsWith(" ")).toBe(true);
-    expect(revealStep(0, big, 10_000)).toBe(big.length);
-  });
-
-  test("a fast stream never lags far behind (about REVEAL_MAX_LAG_MS), and drains when it ends", () => {
-    let target = "";
-    let shown = 0;
-    // 600 characters per second in 16 ms frames, for 3 seconds.
-    for (let frame = 0; frame < 190; frame++) {
-      target += "abcd abcd ";
-      shown = revealStep(shown, target, 16);
-    }
-    const lagMs = ((target.length - shown) / 600) * 1000;
-    expect(lagMs).toBeLessThan(REVEAL_MAX_LAG_MS * 1.5);
-    let frames = 0;
-    while (shown < target.length && frames < 1000) {
-      shown = revealStep(shown, target, 16);
-      frames++;
-    }
-    expect(shown).toBe(target.length);
-    expect(frames * 16).toBeLessThan(2500);
-  });
-
-  test("mid-reply mounts show what's there; a replaced text starts over", () => {
-    expect(initialReveal("Oi")).toBe(0);
-    expect(initialReveal("x".repeat(400))).toBe(400);
-    expect(rebaseReveal(5, "Hello world", "Hello world again")).toBe(5);
-    expect(rebaseReveal(5, "Hello world", "Outra coisa")).toBe(0);
-    expect(rebaseReveal(20, "Hi", "Hi there")).toBe(2);
-  });
-});
-
 describe("the card's phrase and the waiting row's step line", () => {
   const name = () => "Theo";
-  const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo", lastSeq: 0 } as const;
+  const base = { channelId: "c1", threadId: "m1", runId: "r1", agentId: "theo" } as const;
   const call = (over: Partial<Extract<LiveWork, { kind: "call" }>> = {}): LiveWork => ({
     kind: "call",
     id: "k1",
@@ -100,48 +49,38 @@ describe("the card's phrase and the waiting row's step line", () => {
 
   test("one agent on its own: just its name (its row says what it does); several: the sentence", () => {
     for (const run of [
-      { ...base, status: "running" as const, text: "" },
-      { ...base, status: "running" as const, text: "", tool: "browser_read", work: [call()] },
-      { ...base, status: "running" as const, text: "Pronto: criei" },
+      { ...base, status: "thinking" as const },
+      { ...base, status: "thinking" as const, tool: "browser_read", work: [call()] },
+      { ...base, status: "running" as const },
     ]) {
-      const entries = barEntries([run], [], name, () => undefined, [], true);
+      const entries = barEntries([run], [], name, () => undefined);
       expect(barPhrase(t, entries)).toBe("Theo");
       expect(barPhrase(t, entries, (n) => `[${n}]`)).toBe("[Theo]");
     }
     const two = barEntries(
       [
-        { ...base, status: "running" as const, text: "" },
-        { ...base, runId: "r2", agentId: "iris", status: "running" as const, text: "" },
+        { ...base, status: "thinking" as const },
+        { ...base, runId: "r2", agentId: "iris", status: "running" as const },
       ],
       [],
       (id) => (id === "theo" ? "Theo" : "Iris"),
       () => undefined,
-      [],
-      true,
     );
     expect(barPhrase(t, two)).toBe("Theo e Iris estão trabalhando…");
   });
 
-  test("a turn it stopped, or one that failed, lends the time nothing: the time is the new turn's", () => {
-    const again = { ...base, runId: "r2", status: "running" as const, text: "", startedAt: 90_000 };
-    for (const status of ["canceled", "failed"] as const) {
-      const old = { ...base, status, text: "", startedAt: 0, work: [call({ running: false })] };
-      const entries = barEntries([old, again], [], name, () => undefined, [], true);
-      expect(barPhrase(t, entries)).toBe("Theo");
-      expect(barElapsed(t, entries, [old, again], 100_000)).toBe("10 s");
-    }
+  test("a turn that failed lends the time nothing: the time is the new turn's", () => {
+    const again = { ...base, runId: "r2", status: "running" as const, startedAt: 90_000 };
+    const old = { ...base, status: "failed" as const, startedAt: 0, work: [call({ running: false })] };
+    const entries = barEntries([old, again], [], name, () => undefined);
+    expect(barPhrase(t, entries)).toBe("Theo");
+    expect(barElapsed(t, entries, [old, again], 100_000)).toBe("10 s");
   });
 
-  test("waiting for words: at work with nothing written, said or read", () => {
-    const run = { status: "running" as const, text: "", work: [call()] };
-    expect(waitsForWords(run)).toBe(true);
-    expect(waitsForWords({ ...run, status: "thinking" })).toBe(true);
-    expect(waitsForWords({ ...run, text: "Olá" })).toBe(false);
-    expect(waitsForWords({ ...run, work: [{ kind: "say", text: "Vou olhar o login." }] })).toBe(false);
-    expect(waitsForWords({ ...run, work: [{ kind: "steer", messageId: "m1" }] })).toBe(false);
-    // Waiting on an approval keeps the waiting row (no header in and out again).
-    expect(waitsForWords({ ...run, status: "waiting_approval" })).toBe(true);
-    for (const status of ["canceled", "failed"] as const) expect(waitsForWords({ ...run, status })).toBe(false);
+  test("at work its words wait for its message, whatever it did so far: only a failed run has a row of its own", () => {
+    for (const status of ["thinking", "queued", "running", "waiting_approval"] as const)
+      expect(waitsForWords({ status })).toBe(true);
+    expect(waitsForWords({ status: "failed" })).toBe(false);
   });
 
   test("the step line: 'Pensando…', then the step running now, verb first, its target cut to what names it", () => {
@@ -187,46 +126,39 @@ describe("the card's phrase and the waiting row's step line", () => {
   });
 
   test("an agent whose row is on screen leaves the bar; a question out and people typing stay", () => {
-    const theo = { ...base, status: "running" as const, text: "" };
-    const iris = { ...base, runId: "r2", agentId: "iris", status: "running" as const, text: "" };
+    const theo = { ...base, status: "running" as const };
+    const iris = { ...base, runId: "r2", agentId: "iris", status: "running" as const };
     const names = (id: string) => (id === "theo" ? "Theo" : "Iris");
-    const entries = barEntries([theo, iris], ["u-marina"], names, () => "Marina", [], true);
+    const entries = barEntries([theo, iris], ["u-marina"], names, () => "Marina");
     const shown = (inView: string[]) =>
       entriesOffScreen(entries, [theo, iris], (r) => inView.includes(r.runId)).map((e) => e.name);
     expect(shown([])).toEqual(["Theo", "Iris", "Marina"]);
     expect(shown(["r1"])).toEqual(["Iris", "Marina"]);
     expect(shown(["r1", "r2"])).toEqual(["Marina"]);
-    const asking = barEntries(
-      [theo],
-      [],
-      names,
-      () => undefined,
-      [
-        {
-          runId: "r1",
-          agentId: "theo",
-          consultedAgentId: "iris",
-          channelId: "c1",
-          threadId: "m1",
-          status: "asking",
-          since: 0,
-          at: 0,
-        },
-      ],
-      true,
-    );
+    const asking = barEntries([theo], [], names, () => undefined, [
+      {
+        runId: "r1",
+        agentId: "theo",
+        consultedAgentId: "iris",
+        channelId: "c1",
+        threadId: "m1",
+        status: "asking",
+        since: 0,
+        at: 0,
+      },
+    ]);
     expect(entriesOffScreen(asking, [theo], () => true)).toEqual(asking);
   });
 
-  test("out of view, the bar takes the row's step after the name, its start in lower case; 'escrevendo…' as it writes", () => {
-    expect(barStep(t, { text: "", work: [] }, "pt-BR")).toBe("pensando…");
-    expect(barStep(t, { text: "", work: [call({ tool: "read_file", detail: "src/auth/refresh.ts" })] }, "pt-BR")).toBe(
-      "mexendo nos arquivos do PC · refresh.ts…",
-    );
-    expect(barStep(t, { text: "Pronto: criei", work: [] }, "pt-BR")).toBe("escrevendo…");
+  test("the bar takes the step after the name, its start in lower case; 'escrevendo…' as it writes", () => {
+    expect(barStep(t, { status: "thinking", work: [] }, "pt-BR")).toBe("pensando…");
+    expect(
+      barStep(t, { status: "thinking", work: [call({ tool: "read_file", detail: "src/auth/refresh.ts" })] }, "pt-BR"),
+    ).toBe("mexendo nos arquivos do PC · refresh.ts…");
+    expect(barStep(t, { status: "running", work: [] }, "pt-BR")).toBe("escrevendo…");
     // A call running while its words wait: the call's step.
-    expect(barStep(t, { text: "Vou olhar", work: [call({ detail: null })] }, "pt-BR")).toBe("usando o navegador…");
-    expect(barStep(tEn, { text: "", work: [] }, "en")).toBe("thinking…");
+    expect(barStep(t, { status: "running", work: [call({ detail: null })] }, "pt-BR")).toBe("usando o navegador…");
+    expect(barStep(tEn, { status: "thinking", work: [] }, "en")).toBe("thinking…");
   });
 
   test("a run's time, the bar's and its row's alike: from 2 s on, minutes past a minute", () => {
@@ -359,7 +291,7 @@ describe("humanized activity", () => {
     );
   });
 
-  test("runs carry the tool from `agent.tool`; writing runs leave the bar", () => {
+  test("runs carry the tool from `agent.tool`; writing runs stay on the bar, writing", () => {
     const base = { channelId: "c", threadId: "t", agentId: "theo", runId: "r" };
     let s = applyChannelEvent(emptyStreams, { type: "agent.thinking", ...base });
     const names = (id: string) => (id === "theo" ? "Theo" : "?");
@@ -374,8 +306,8 @@ describe("humanized activity", () => {
     expect(bar()).toBe("Theo está consultando o GitHub · Marina está digitando…");
     s = applyChannelEvent(s, { type: "agent.tool", ...base, tool: null });
     expect(bar()).toBe("Theo está trabalhando · Marina está digitando…");
-    s = applyChannelEvent(s, { type: "agent.delta", ...base, seq: 1, text: "Achei" });
-    expect(bar()).toBe("Marina está digitando…");
+    s = applyChannelEvent(s, { type: "agent.typing", ...base } as Parameters<typeof applyChannelEvent>[1]);
+    expect(bar()).toBe("Theo está escrevendo · Marina está digitando…");
     // After the final message, a late tool event is ignored.
     s = applyChannelEvent(s, {
       type: "message.created",

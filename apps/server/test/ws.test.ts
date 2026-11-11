@@ -289,7 +289,6 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
     "message.claimed",
     "agent.run",
     "agent.typing",
-    "agent.delta",
     "message.created",
     "agent.run",
     "agent.idle",
@@ -299,13 +298,9 @@ test("end to end: a subscriber sees the message, the streamed deltas and the age
   // The agent's presence moved with its run, for the whole workspace (ADR 0084 §11).
   const org = c.frames.filter((f) => f.type === "event" && f.scope === "org").map((f) => f.event);
   expect(org).toContainEqual(expect.objectContaining({ type: "agent.status", agentId }));
-  expect(
-    events
-      .filter((e) => e.type === "agent.delta")
-      .map((e) => e.text)
-      .join(""),
-  ).toBe("Hello there");
-  const reply = events[8] as {
+  // Its words come whole, in its message.
+  expect(JSON.stringify(events.slice(0, 7))).not.toContain("Hello there");
+  const reply = events[7] as {
     message: { body: string; threadId: string | null; author: { type: string; id: string } };
   };
   // Asked in the channel, answered in the channel.

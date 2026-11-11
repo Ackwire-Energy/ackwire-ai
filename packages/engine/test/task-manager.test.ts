@@ -227,6 +227,7 @@ describe("why a task waits", () => {
       await addRunStep(f.db, run, "error", { reason: "usage_wait", code: wait.code, ...(pause ? { pause } : {}) });
   };
   const resetsAt = "2026-11-07T21:00:00.000Z";
+  const since = "2026-11-05T09:30:00.000Z";
   const pauseWait = {
     code: "usage_pause",
     source: "plan",
@@ -234,9 +235,10 @@ describe("why a task waits", () => {
     resetsAt,
     waitId: "w1",
     waitKey: "plan:m:k:a",
+    since: Date.parse(since),
   };
 
-  test("a pause: the plan, its window, how far along and when it resets", async () => {
+  test("a pause: the plan, its window, how far along, since when and when it resets", async () => {
     f = await setup();
     await ask("@dev resume a semana");
     const [run] = await runs();
@@ -252,6 +254,7 @@ describe("why a task waits", () => {
       percent: 95,
       window: "seven_day",
       resetsAt,
+      since,
       canContinue: true,
     });
   });

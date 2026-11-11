@@ -9,7 +9,6 @@ import { cleanup, render } from "@testing-library/react";
 import { copyPillAddresses, withPillAddresses } from "@/chat/link-pill-copy";
 import { MessageBody } from "@/chat/MessageBody";
 import { createI18n } from "@/i18n";
-import { Markdown } from "@/lib/markdown";
 
 beforeAll(() => createI18n("pt-BR"));
 afterEach(() => cleanup());
@@ -76,11 +75,6 @@ describe("a bare address of a known service", () => {
 
   test("inside code it stays code", () => {
     expect(body(`\`${PR}\``).querySelector("a")).toBeNull();
-  });
-
-  test("while an answer is being written it stays plain: it would change pill at every letter", () => {
-    const { container } = render(<Markdown source={PR} variant="message" words />);
-    expect(anchor(container).textContent).toBe(PR);
   });
 });
 

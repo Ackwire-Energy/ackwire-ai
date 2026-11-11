@@ -82,7 +82,7 @@ describe("timeline", () => {
     const items = buildTimeline(
       [yesterday, m1, m2, m3],
       [approval],
-      [{ runId: "r", agentId: "atlas", channelId: "c", threadId: "m1", status: "running", text: "Os 401", lastSeq: 1 }],
+      [{ runId: "r", agentId: "atlas", channelId: "c", threadId: "m1", status: "running" }],
     );
     expect(items.map((i) => (i.kind === "message" ? `${i.key}${i.grouped ? "+" : ""}` : i.kind))).toEqual([
       "day",

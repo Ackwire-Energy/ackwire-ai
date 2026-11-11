@@ -32,7 +32,7 @@ import {
 } from "../src";
 import { currentWaits, onMessageWhileWaiting } from "../src/waits";
 import { addMember, type Fixture, setup } from "./fixtures";
-import { connectedComputer, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
+import { connectedComputer, type FakeRunnerOptions, fakeRunner, pairMachine, RUNNER } from "./machine-fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -52,14 +52,19 @@ type PhoneAnswer = (req: MachineRequest) => unknown;
  * Ana's agent @dev on its own computer, and Sam with his MacBook (online) reaching a Pixel 8. The device tools' hub
  * answers `phone.*` itself (`answer`) and passes everything else to the real hub, so files come back for real.
  */
-async function world(options: { reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] } } = {}) {
+async function world(
+  options: {
+    reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] };
+    exec?: FakeRunnerOptions["exec"];
+  } = {},
+) {
   const devDeps = {} as DeviceToolDeps;
   f = await setup({
     machines: true,
     reply: (options.reply as never) ?? (() => ({ chunks: ["ok"] })),
     toolSources: [createDeviceToolSource(devDeps)],
   });
-  await connectedComputer(f);
+  await connectedComputer(f, { exec: options.exec });
   const sam = await addMember(f.db, f.org.id, "member", "Sam Rivera");
   const mac = await pairMachine({ db: f.db, pubsub: f.pubsub }, sam.id, f.org.id, {
     name: "Sam's MacBook",
@@ -67,6 +72,7 @@ async function world(options: { reply?: (req: ModelRequest) => { chunks: string[
     os: "darwin",
   });
   const runner = fakeRunner(f.machineHub as MachineHub, {
+    exec: options.exec,
     async push(req, bytes, name) {
       await receiveMachineUpload(
         { db: f.db, artifacts: f.artifactDeps, pubsub: f.pubsub },
@@ -263,6 +269,51 @@ describe("computer on someone else's device", () => {
     expect(after.content).toContain('  Phone "Pixel 8" (Android 15): ready.');
     const one = await call(ctx, "computer_status", { computer: "pixel 8" });
     expect(one.content).toBe('- Phone "Pixel 8" (Android 15): ready, on "Sam\'s MacBook".\nYou may use it for ana.');
+  });
+
+  test("computer_status says which switches are off on a shared computer and who turns them on", async () => {
+    const w = await world();
+    const ctx = await runCtx();
+    const machine = eq(schema.machines.id, w.mac.machineId);
+    await f.db
+      .update(schema.machines)
+      .set({
+        audienceMode: "everyone",
+        os: "darwin",
+        execAllowed: false,
+        access: { folders: [], tools: { claude: false, codex: false, commands: false } },
+        executors: { claude: { version: "2.1.0" } },
+      })
+      .where(machine);
+    const mac = await call(ctx, "computer_status", { computer: "Sam's MacBook" });
+    // Codex was never found there: nothing to turn on.
+    expect(mac.content).toContain(
+      "\n  Off there: shell commands, Claude Code. Only the person at it can turn them on, in the agentes.chat app there (Preferences › Tools).\n",
+    );
+    await f.db.update(schema.machines).set({ os: "linux" }).where(machine);
+    expect((await call(ctx, "computer_status", {})).content).toContain(
+      "  Off there: shell commands, Claude Code. Only the person at it can turn them on, with `agentes-runner tools enable commands` and `agentes-runner tools enable claude` there.",
+    );
+    await f.db
+      .update(schema.machines)
+      .set({ execAllowed: true, access: { folders: [], tools: { claude: true, codex: false, commands: true } } })
+      .where(machine);
+    expect((await call(ctx, "computer_status", {})).content).not.toContain("Off there");
+  });
+
+  test("a refusal on a person's computer points to that person; on the agent's own, to request_folder_access", async () => {
+    const w = await world({
+      exec: () => ({ fail: { code: "not_allowed", message: "Grok Build is turned off on this computer" } }),
+    });
+    const ctx = await runCtx();
+    await f.db.update(schema.machines).set({ audienceMode: "everyone" }).where(eq(schema.machines.id, w.mac.machineId));
+    const there = await call(ctx, "run_code", { language: "bash", code: "ls", computer: "Sam's MacBook" });
+    expect(there.content).toContain(
+      "On Sam's MacBook, only the person at it can allow folders or turn tools on: tell them.",
+    );
+    expect(there.content).not.toContain("request_folder_access");
+    const own = await call(ctx, "run_code", { language: "bash", code: "ls", computer: "Build box" });
+    expect(own.content).toContain("ask with request_folder_access");
   });
 });
 
@@ -465,13 +516,11 @@ describe("waiting for a device", () => {
     if (!run) throw new Error("no run");
     return run;
   };
-  const cardOf = async () => {
+  const cardMessageOf = async () => {
     const rows = await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, f.general.id));
-    return rows.find((m) => (m.meta as { deviceWait?: unknown }).deviceWait)?.meta.deviceWait as Record<
-      string,
-      unknown
-    >;
+    return rows.find((m) => (m.meta as { deviceWait?: unknown }).deviceWait);
   };
+  const cardOf = async () => (await cardMessageOf())?.meta.deviceWait as Record<string, unknown>;
 
   test("an unplugged phone parks the run with a card; it goes on by itself once the host reports it free", async () => {
     const w = await world({ reply: waitingReply as never });
@@ -501,6 +550,10 @@ describe("waiting for a device", () => {
       hostName: "Sam's MacBook",
     });
     expect(Date.parse(String(card.until)) - Date.parse(String(card.since))).toBe(24 * 3600_000);
+    // The card's words, in the language of whom the agent works for.
+    expect((await cardMessageOf())?.body).toBe(
+      "Sam's MacBook não está vendo Pixel 8 agora. Começo quando ele for conectado de novo.",
+    );
     // Sam's device is what someone else's agent waits on: Sam hears it.
     expect((await notificationsOf(w.sam.id)).map((n) => n.kind)).toContain("device.waiting");
     // The give-up job is queued for the day after.
@@ -536,6 +589,19 @@ describe("waiting for a device", () => {
     expect(waiting?.doneAt).not.toBeNull();
     // It ended: the day-after job finds nothing to end.
     expect(await expireDeviceWait({ db: f.db }, run.id, String(card.waitId))).toBe(false);
+  });
+
+  test("the card's line reads in English for a person with no language", async () => {
+    const w = await world({ reply: waitingReply as never });
+    await f.db.update(schema.users).set({ locale: null }).where(eq(schema.users.id, f.owner.id));
+    await f.db
+      .update(schema.machinePhones)
+      .set({ audienceMode: "everyone", state: "offline" })
+      .where(eq(schema.machinePhones.id, w.phone.id));
+    expect((await runOf("@dev record the pixel")).status).toBe("waiting_input");
+    expect((await cardMessageOf())?.body).toBe(
+      "Sam's MacBook doesn't see Pixel 8 right now. I'll start when it's plugged back in.",
+    );
   });
 
   test("a person's message moves the run on; Stop waiting and the day's end each end a wait, by who may", async () => {

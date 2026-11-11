@@ -279,6 +279,7 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "es": [
@@ -513,6 +514,7 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "fr": [
@@ -914,6 +916,7 @@
       "portrait.options.clothes.polo",
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "de": [
@@ -1332,6 +1335,7 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
       "agentPage.work.brain.v2.computer",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "it": [
@@ -1673,6 +1677,7 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
       "agentPage.work.brain.v2.computer",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "nl": [
@@ -2239,6 +2244,7 @@
       "portrait.options.hair.undercut",
       "portrait.options.hair.dreads",
       "agentPage.work.brain.v2.computer",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "ja": [
@@ -2391,7 +2397,8 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "devices.android.drivers.samsung"
     ],
     "ko": [
       "devices.system.android",
@@ -2959,6 +2966,7 @@
       "portrait.options.hair.flat",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "tr": [
@@ -3133,7 +3141,8 @@
       "portrait.options.clothes.blazer",
       "portrait.options.hair.fade",
       "portrait.options.hair.undercut",
-      "portrait.options.hair.mullet"
+      "portrait.options.hair.mullet",
+      "devices.android.drivers.samsung"
     ],
     "pl": [
       "devices.cpus",
@@ -3407,6 +3416,7 @@
       "portrait.options.hair.flat",
       "portrait.options.hair.undercut",
       "portrait.options.hair.mullet",
+      "devices.android.drivers.samsung",
       "onboarding.flow.area.options.marketing"
     ],
     "ru": [
@@ -3545,7 +3555,8 @@
       "openOnPhone.appStore",
       "openOnPhone.googlePlay",
       "arrival.beta.word",
-      "feedback.mark"
+      "feedback.mark",
+      "devices.android.drivers.samsung"
     ]
   },
   "mobile-base": {

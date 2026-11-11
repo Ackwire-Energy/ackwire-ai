@@ -398,20 +398,24 @@ export const desktopEn = {
   },
   pair: {
     title: "Let agents of {{org}} work on this {{device}}?",
-    body: "{{host}} asked. They start with no folders of yours and commands off.",
+    /**
+     * The system's dialog before the site pairs this computer: no switches there, so it says what they get. At most 120
+     * characters in every language: Rust refuses the app's labels past that.
+     */
+    body: "{{host}} asked. Agents get commands, the browser and coding tools here. Folders come later, in Preferences.",
     allow: "Allow",
     notNow: "Not now",
     /** Shown once after sign-in, for a workspace this computer doesn't work for yet. */
     offerTitle: "Let {{org}}'s agents use this {{device}}?",
-    offerBody:
-      "They start with no folders of yours and commands off. You pick what they get in Preferences, and you can stop them any time.",
     keepReady: "Keep it ready: open agentes.chat at login",
+    /** Over the pairing's switches (Commands, Claude Code, Codex, Browser), on as they start. */
+    canDo: "What agents can do here",
+    foldersLater: "No folders of yours yet. Add them later in Preferences\u00a0›\u00a0Folders.",
     /** A link from the web asks to connect this computer: who asked, from which server. */
     linkTitle: "Connect this {{device}} to {{org}}?",
     askedBy: "Asked by",
     from: "From",
-    linkBody:
-      "{{org}}'s agents start with no folders of yours and commands off. If you didn't ask for this, choose Not now.",
+    linkBody: "If you didn't ask for this, choose Not now.",
     waiting: "Waiting for {{by}} to let it in…",
     done: "Connected to {{org}}",
     expired: "This link expired. Make a new one under Settings\u00a0›\u00a0Devices.",
@@ -420,6 +424,37 @@ export const desktopEn = {
     letOrg: "Let {{org}}'s agents use this {{device}}",
     canUse: "Agents can use it",
     notUsing: "Its agents don't use this {{device}}",
+  },
+  /** A Mac's permissions, asked right after pairing ("Prepare this Mac") and listed in Preferences › General. */
+  prepare: {
+    title: "Get this {{device}} ready",
+    lead: "Connected to {{org}}. Allow these now so its agents never stop to ask.",
+    screen: "Screen Recording",
+    screenDesc: "Lets agents take screenshots of this {{device}}.",
+    /** Under Screen Recording: macOS asks about it again every month or so, with Allow as one choice. */
+    screenAgain: "macOS asks again about once a month. Choose Allow.",
+    /** macOS's own name for the permission (System Settings › Privacy & Security). */
+    disk: "Full Disk Access",
+    diskDesc: "Lets agents open your files without macOS asking for each folder.",
+    /** No prompt can ask for Full Disk Access: the person turns the app on in its list, or adds it with the + button. */
+    diskHow: "In Settings, turn on agentes.chat in the list, or add it with +.",
+    /** macOS's Local Network permission, which Android phones paired over Wi-Fi need. */
+    network: "Local network (phones over Wi-Fi)",
+    networkDesc: "Lets agents find and use Android phones on your Wi-Fi.",
+    /** Behind the ⓘ: why this row never shows On. */
+    networkHint: "macOS never tells apps the answer. Open Settings to see it.",
+    /** Local Network's state: whether the app asked, since macOS doesn't say whether it was allowed. */
+    asked: "Asked",
+    notAsked: "Not asked yet",
+    on: "On",
+    /** System Settings › Privacy & Security, where a refused permission is turned on. */
+    openSettings: "Open Settings",
+    /** Once Screen Recording or Full Disk Access was asked: macOS applies it only after the app opens again. */
+    reopen: "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here.",
+    tookEffect: "agentes.chat opened again with your changes.",
+    skip: "Skip for now",
+    prefsTitle: "Permissions",
+    prefsHint: "macOS may turn these off when the app updates. Turn them on again here.",
   },
   tools: {
     claudeName: "Claude Code",

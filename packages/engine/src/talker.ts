@@ -401,8 +401,8 @@ async function postReply(
     if (last && (at.getTime() - last.getTime() < TALKER_MIN_GAP_MS || last >= message.createdAt)) {
       return "rate_limited" as const;
     }
-    // The agent already wrote after the person (the task answered), its reply possibly in a place above theirs (where
-    // its words first showed); its notices don't count.
+    // The agent already wrote after the person (the task answered), its reply possibly in a place above theirs
+    // (`PLACE_KEPT_MS`); its notices don't count.
     const [answered] = await tx
       .select({ id: messages.id })
       .from(messages)

@@ -9,6 +9,7 @@ import {
   ACCOUNT_KINDS,
   ACCOUNT_LOGIN_TTL_MS,
   type AccountKind,
+  type AccountLoginFailure,
   type AccountLoginState,
   type AuthMethod,
   accountCodeAad,
@@ -29,6 +30,7 @@ import {
   type RunnerAccountInfo,
   type WireSecretBox,
 } from "@agenteschat/adapters/machine-protocol";
+import { cutAtWord, errorLineOf, redactCommon } from "@agenteschat/adapters/redact";
 import { generateSecretKeyPair, openSecret, redactSecrets } from "@agenteschat/adapters/secret-box";
 import {
   type CodingPlan,
@@ -524,6 +526,15 @@ export async function tokenOf(dir: string): Promise<string | null> {
 
 /** Tokens out of what people read (a CLI's error, a screen). */
 const withoutTokens = (text: string) => text.replace(OAUTH_TOKENS, "…");
+
+/** The most of a CLI's own words a sign-in that failed keeps. */
+const SAID_CHARS = 300;
+
+/** What a CLI's output says went wrong (`errorLineOf`), credentials masked, cut at a word; undefined when nothing. */
+function saidIn(text: string): string | undefined {
+  const line = redactCommon(errorLineOf(text));
+  return line ? cutAtWord(line, SAID_CHARS) : undefined;
+}
 
 /**
  * System mode, in an agent's worker: that agent's own folder for an account root keeps (`AccountGrant`), its
@@ -1028,7 +1039,8 @@ export function parseAgyLoginUrl(output: string, final = false): string | null {
 
 /**
  * `agy models`: signed in when it lists models and says nothing about signing in. An Enterprise sign-in says so in its
- * settings (`provider: "enterprise"`).
+ * settings (`provider: "enterprise"`). Signed out, 1.5.0 exits 1 with "Please sign in to view available models"; an
+ * account Google won't serve, "Eligibility check failed: …".
  */
 export function parseAgyStatus(
   status: number | null,
@@ -1036,9 +1048,10 @@ export function parseAgyStatus(
   auth: string | null,
 ): Omit<RunnerAccountInfo, "id" | "kind"> {
   const text = stripAnsi(output);
+  // 1.5.0 lists one model a line, its slug and its name split by a tab (`gemini-4-argon-high\tGemini 4 Argon (High)`).
   const loggedIn =
     status === 0 &&
-    /^\s*gemini-[\w.-]+\s{2,}\S/im.test(text) &&
+    /^[ \t]*gemini-[\w.-]+[ \t]+\S/im.test(text) &&
     !/auth(?:entication)? required|not (?:authenticated|logged in|signed in)|sign in/i.test(text);
   // A seat: "Atende outras pessoas" says a seat's words for it.
   return {
@@ -1068,6 +1081,25 @@ export function parseCursorStatus(status: number | null, output: string): Omit<R
 export function parseCodexStatus(status: number | null, output: string): Omit<RunnerAccountInfo, "id" | "kind"> {
   const text = stripAnsi(output);
   return { loggedIn: status === 0 && /logged in/i.test(text) && !/not logged in/i.test(text) };
+}
+
+/**
+ * Why a sign-in's CLI stopped with an error, by what it printed. A pasted code the provider refused reads like
+ * Antigravity CLI 1.5.0's `couldn't log in: token exchange failed: oauth2: "invalid_grant" "Bad Request"`.
+ */
+export function loginFailureOf(output: string): AccountLoginFailure {
+  if (/no controlling terminal|cannot open \/dev\/tty|not a (?:tty|terminal)\b/i.test(output)) return "no_tty";
+  if (
+    /dial tcp|no such host|connection (?:refused|reset)|network is unreachable|i\/o timeout|tls handshake|timeout awaiting|context deadline exceeded|getaddrinfo|could not resolve|\bE(?:CONNREFUSED|CONNRESET|NOTFOUND|TIMEDOUT|AI_AGAIN)\b/i.test(
+      output,
+    )
+  ) {
+    return "network";
+  }
+  if (/invalid_grant|invalid (?:authorization )?code|code (?:is |has )?(?:invalid|expired)/i.test(output)) {
+    return "bad_code";
+  }
+  return "cli_exit";
 }
 
 // ── Running the CLIs ─────────────────────────────────────────────────────────
@@ -1216,6 +1248,9 @@ interface Login {
   exited: boolean;
   account?: RunnerAccountInfo;
   error?: string;
+  /** Why it ended without signing in, and what the CLI said about it (`failWith`). */
+  failure?: AccountLoginFailure;
+  said?: string;
   startedAt: number;
   timer: ReturnType<typeof setTimeout> | null;
   /** Signing in again to an existing account: its folder is never removed by this sign-in. */
@@ -1871,7 +1906,7 @@ export class AccountManager {
     this.log(`account ${login.id.slice(0, 8)} (${provider} key) kept`);
   }
 
-  /** Where a sign-in is: `waiting`, `done` (with the account), `failed` or `expired`. */
+  /** Where a sign-in is: `waiting`, `done` (with the account), `failed` or `expired` (why: `code`, the CLI's words). */
   status(loginId: string): MachineReplies["account"] {
     const login = this.logins.get(loginId);
     if (!login) throw new RunnerError("not_found", "This sign-in is gone (it expired or was canceled)");
@@ -1882,6 +1917,8 @@ export class AccountManager {
       state: login.state,
       ...(login.account ? { account: login.account } : {}),
       ...(login.error ? { error: login.error } : {}),
+      ...(login.failure ? { code: login.failure } : {}),
+      ...(login.said ? { message: login.said } : {}),
     };
   }
 
@@ -1890,9 +1927,8 @@ export class AccountManager {
     const login = this.logins.get(loginId);
     if (!login) return false;
     if (login.state !== "waiting") return false;
-    this.settle(login, "failed", "Canceled");
+    this.failWith(login, "failed", "canceled", "Canceled");
     await this.drop(login);
-    this.log(`account sign-in ${loginId.slice(0, 8)} canceled`);
     return true;
   }
 
@@ -1905,9 +1941,8 @@ export class AccountManager {
 
   private expire(login: Login) {
     if (login.state !== "waiting") return;
-    this.settle(login, "expired", "The sign-in took too long. Start again.");
+    this.failWith(login, "expired", "timeout", "The sign-in took too long. Start again.");
     void this.drop(login);
-    this.log(`account sign-in ${login.id.slice(0, 8)} expired`);
   }
 
   /**
@@ -1924,16 +1959,18 @@ export class AccountManager {
         const token = parseSetupToken(this.shown(login), true) ?? login.token;
         if (code === 0 && token && (await this.keepToken(login, token))) return;
         if (code === 0 && login.state === "waiting") {
-          this.settle(
+          this.failWith(
             login,
             "failed",
+            "no_token",
             `${LABEL[login.kind]} finished, but didn't show its token. Update it, or try again.`,
           );
         }
       } else if (code === 0) {
         // Signed in anew: a turn refused before (`refused`) says nothing about this sign-in.
         await rm(this.marker(login.kind, login.id, "invalid"), { force: true }).catch(() => undefined);
-        const info = await this.lookUp(login.kind, login.id);
+        const status: { said?: string } = {};
+        const info = await this.lookUp(login.kind, login.id, status);
         if (login.state !== "waiting") return;
         if (info.loggedIn && !info.statusUnknown) {
           await rm(path.join(login.dir, SIGNING_IN), { force: true }).catch(() => undefined);
@@ -1948,29 +1985,37 @@ export class AccountManager {
           this.log(`account ${login.id.slice(0, 8)} (${login.kind}) signed in`);
           return;
         }
-        this.settle(
-          login,
-          "failed",
-          info.statusUnknown
-            ? `${LABEL[login.kind]} finished, but didn't say whether the account is signed in. Try again.`
-            : `${LABEL[login.kind]} finished, but the account isn't signed in. Try again.`,
-        );
+        if (info.statusUnknown) {
+          this.failWith(
+            login,
+            "failed",
+            "status_unknown",
+            `${LABEL[login.kind]} finished, but didn't say whether the account is signed in. Try again.`,
+          );
+        } else {
+          this.failWith(
+            login,
+            "failed",
+            "not_signed_in_after_login",
+            `${LABEL[login.kind]} finished, but the account isn't signed in. Try again.`,
+            status.said,
+          );
+        }
       }
       if (login.state === "waiting") {
-        const tail = withoutTokens(stripAnsi(this.shown(login)))
-          .split("\n")
-          .map((l) => l.trim())
-          .filter(Boolean)
-          .at(-1);
-        // Never the pasted code back (a CLI may repeat what it refused, and a screen shows it in its field).
-        const safe = tail && !(login.code && tail.includes(login.code)) ? tail.slice(0, 200) : "";
-        this.settle(
-          login,
-          "failed",
-          login.spawnError === "ENOENT"
-            ? `${LABEL[login.kind]} is not installed on this computer.`
-            : `${LABEL[login.kind]} couldn't sign in${login.code ? " with that code" : ""}${safe ? `: ${safe}` : ""}`,
-        );
+        const printed = this.printed(login);
+        const said = saidIn(printed);
+        if (login.spawnError === "ENOENT") {
+          this.failWith(login, "failed", "not_installed", `${LABEL[login.kind]} is not installed on this computer.`);
+        } else {
+          this.failWith(
+            login,
+            "failed",
+            loginFailureOf(printed),
+            `${LABEL[login.kind]} couldn't sign in${login.code ? " with that code" : ""}${said ? `: ${said}` : ""}`,
+            said,
+          );
+        }
       }
       if (!login.again && login.started) await this.discard(login.kind, login.id).catch(() => undefined);
     })();
@@ -1986,9 +2031,10 @@ export class AccountManager {
       await writeFile(this.marker(login.kind, login.id, "shared"), "", { mode: 0o600 });
     } catch (err) {
       if (login.state === "waiting") {
-        this.settle(
+        this.failWith(
           login,
           "failed",
+          "not_kept",
           `${LABEL[login.kind]} signed in, but this computer couldn't keep it (${errnoCode(err) ?? "error"}).`,
         );
       }
@@ -2010,6 +2056,32 @@ export class AccountManager {
     this.added(info);
     this.log(`account ${login.id.slice(0, 8)} (${login.kind}, for all agents) signed in`);
     return true;
+  }
+
+  /**
+   * What a sign-in's CLI printed, without tokens or the pasted code: a CLI may repeat what it refused, and a screen
+   * shows it in its field.
+   */
+  private printed(login: Login): string {
+    const code = login.code;
+    return withoutTokens(stripAnsi(this.shown(login)))
+      .split("\n")
+      .filter((l) => !code || !(l.includes(code) || l.includes(encodeURIComponent(code))))
+      .join("\n");
+  }
+
+  /** A sign-in that ended without signing in: why (`failure`, the CLI's own words), for people (`error`), logged. */
+  private failWith(
+    login: Login,
+    state: "failed" | "expired",
+    failure: AccountLoginFailure,
+    error: string,
+    said?: string,
+  ) {
+    this.settle(login, state, error);
+    login.failure = failure;
+    if (said) login.said = said;
+    this.log(`account sign-in ${login.id.slice(0, 8)} (${login.kind}) ${state}: ${failure}${said ? `: ${said}` : ""}`);
   }
 
   private settle(login: Login, state: AccountLoginState, error?: string) {
@@ -2054,10 +2126,10 @@ export class AccountManager {
   /**
    * One account's status and how it signs in (never throws). A look that says nothing for sure keeps the last
    * conclusive answer, else signed in when a sign-in finished in its folder: only the CLI saying so, or a refusal,
-   * signs it out.
+   * signs it out. `status.said`: what its CLI said, when one ran.
    */
-  private async lookUp(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
-    const looked = await this.look(kind, id);
+  private async lookUp(kind: AccountKind, id: string, status?: { said?: string }): Promise<RunnerAccountInfo> {
+    const looked = await this.look(kind, id, status);
     const info = { ...looked, ...this.authMethodOf(kind, id, looked) };
     if (!info.statusUnknown) {
       this.knownLoggedIn.set(id, info.loggedIn);
@@ -2073,7 +2145,7 @@ export class AccountManager {
    * while it has one; a folder an agent's user had, as its turns last said, with the plan Claude Code keeps there
    * (that user could write it, so it is only ever one of the plans' words); any other, as its CLI says.
    */
-  private async look(kind: AccountKind, id: string): Promise<RunnerAccountInfo> {
+  private async look(kind: AccountKind, id: string, out?: { said?: string }): Promise<RunnerAccountInfo> {
     const dir = this.dirOf(kind, id);
     const refused = existsSync(this.marker(kind, id, "invalid"));
     const shared = this.sharedFlag(kind, id);
@@ -2112,6 +2184,7 @@ export class AccountManager {
       },
       this.cliOps,
     ).catch((err: unknown): CliResult => ({ status: null, stdout: "", stderr: String(err) }));
+    if (out) out.said = saidIn(withoutTokens(stripAnsi(`${r.stdout}\n${r.stderr}`)));
     // Codex says it on stderr.
     const status =
       kind === "claude_code"

@@ -1,3 +1,4 @@
+import { startInFlight } from "@agenteschat/adapters/in-flight";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
 import { percentile } from "./format";
 
@@ -399,6 +400,7 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
     const [row] = await db.select({ id: outbox.id }).from(outbox).where(held(job));
     return Boolean(row);
   };
+  const done = startInFlight(`job ${job.kind}`, typeof job.payload.runId === "string" ? job.payload.runId : null);
   try {
     if (!handler) throw new PermanentJobError(`no handler for job kind ${job.kind}`);
     const failed = (error: unknown) => options.onError?.(job, error, "failed");
@@ -412,6 +414,7 @@ async function runJob(db: Database, handlers: JobHandlers, job: OutboxJob, optio
     options.onError?.(job, error, outcome);
   } finally {
     clearInterval(renew);
+    done();
   }
 }
 

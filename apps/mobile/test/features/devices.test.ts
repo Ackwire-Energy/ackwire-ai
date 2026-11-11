@@ -114,6 +114,12 @@ describe("the phone in hand", () => {
     expect(androidStage(phone({ id: "p", status: needs("unauthorized") }))).toBe("allow");
     expect(androidStage(phone({ id: "p" }))).toBe("done");
   });
+  test("a phone with no driver: its maker's USB driver on Windows, udev rules on Linux", async () => {
+    const t = await translator("en");
+    expect(reasonText(t, "no_driver", "windows")).toBe("Windows needs the phone maker's USB driver");
+    expect(reasonText(t, "no_driver", "linux")).toBe("Linux needs udev rules for this phone");
+    expect(reasonText(t, "no_driver")).toBe("Windows needs the phone maker's USB driver");
+  });
   test("the iPhone's steps follow the Mac's reason", () => {
     expect(iphoneStep(null)).toBe(0);
     expect(iphoneStep(phone({ id: "i", status: needs("untrusted") }))).toBe(1);

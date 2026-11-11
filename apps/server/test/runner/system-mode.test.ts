@@ -475,6 +475,7 @@ test("a system-mode runner (root) without workers does no agent work; machine-le
     "phone.pair.code",
     "phone.pair.status",
     "phone.pair.cancel",
+    "phone.look",
   ]);
 
   if (posix) {

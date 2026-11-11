@@ -19,7 +19,7 @@ import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
 import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS, exchangeIds } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
-import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
+import { PHONE_LOOK_MS, WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
 import { ISSUES_VIEW_DEFAULT, type IssuesViewChange, withIssuesView } from "../lib/issues-view";
 import { LoginReadError, loginReadPasses } from "../lib/machines";
@@ -6464,6 +6464,21 @@ export function useAppActions(orgId: string) {
       onSuccess: done,
     }),
   };
+}
+
+/**
+ * While a phone guide waits for a phone on `machineId` (`on`), asks that computer now and every 20 s to also look for
+ * a plugged phone it has no driver for: adb never lists one, and the computer looks only while asked.
+ */
+export function useLookForPhones(orgId: string, machineId: string | null, on: boolean) {
+  const api = useApi();
+  useEffect(() => {
+    if (!on || !machineId) return;
+    const look = () => void api.devices.lookForPhones(orgId, machineId).catch(() => undefined);
+    look();
+    const id = setInterval(look, PHONE_LOOK_MS);
+    return () => clearInterval(id);
+  }, [api, orgId, machineId, on]);
 }
 
 /**

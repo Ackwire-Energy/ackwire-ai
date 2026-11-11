@@ -3,8 +3,9 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { accountCodeAad } from "@agenteschat/adapters/machine-protocol";
+import { cutAtWord } from "@agenteschat/adapters/redact";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
-import { AccountManager, accountEnv, parseAgyLoginUrl, parseAgyStatus } from "../../runner/accounts";
+import { AccountManager, accountEnv, loginFailureOf, parseAgyLoginUrl, parseAgyStatus } from "../../runner/accounts";
 import { AGY_CHAT_AGENT, AGY_PLANTED, agyAuthOf, agyRuntimeDir, prepareAgyHome } from "../../runner/agy-home";
 import {
   type AntigravityBrainTurnRequest,
@@ -132,18 +133,38 @@ test("the CLI's words: its models, its sign-in status, its sign-in link and its 
   expect(parseAgyModels("gemini-4-argon-high       Gemini 4 Argon (High)\n...\n")).toEqual([
     { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
   ]);
-  const models = "gemini-4-argon-high       Gemini 4 Argon (High)\n";
+  // What 1.5.0 prints on stdout (its "Fetching available models..." goes to stderr): a tab between slug and name.
+  const listed = "gemini-4-argon-high\tGemini 4 Argon (High)\ngemini-3.8-flash-medium\tGemini 3.8 Flash (Medium)\n";
+  expect(parseAgyModels(listed)).toEqual([
+    { id: "gemini-4-argon-high", label: "Gemini 4 Argon (High)" },
+    { id: "gemini-3.8-flash-medium", label: "Gemini 3.8 Flash (Medium)" },
+  ]);
+  expect(parseAgyModels("Fetching available models...\n")).toEqual([]);
+  const models = `${listed}\nFetching available models...\n`;
   expect(parseAgyStatus(0, models, "oauth-personal")).toEqual({ loggedIn: true });
+  expect(parseAgyStatus(0, "gemini-4-argon-high       Gemini 4 Argon (High)\n", null)).toEqual({ loggedIn: true });
   expect(parseAgyStatus(0, models, "oauth-business")).toEqual({
     loggedIn: true,
     provider: "enterprise",
     plan: "enterprise",
   });
-  expect(parseAgyStatus(1, "Error: authentication required", null)).toEqual({ loggedIn: false });
+  const signedOut =
+    "Fetching available models...\nError: Please sign in to view available models. Launch the CLI without arguments to sign in.\n";
+  expect(parseAgyStatus(1, signedOut, null)).toEqual({ loggedIn: false });
+  expect(parseAgyStatus(0, "Fetching available models...\n", null)).toEqual({ loggedIn: false });
   const login =
-    "Open this link to sign in:\nhttps://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1\nPaste";
-  expect(parseAgyLoginUrl(login)).toBe("https://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1");
+    "Open this link in a browser to log in with Google:\r\n\r\n  https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1\r\n\r\nThen paste the authorization code";
+  expect(parseAgyLoginUrl(login)).toBe("https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1");
   expect(parseAgyLoginUrl("https://evil.example/accounts.google.com\n", true)).toBeNull();
+  // Why a sign-in failed, by the CLI's words.
+  expect(loginFailureOf('couldn\'t log in: token exchange failed: oauth2: "invalid_grant" "Bad Request"')).toBe(
+    "bad_code",
+  );
+  expect(loginFailureOf("token exchange failed: dial tcp: lookup oauth2.googleapis.com: no such host")).toBe("network");
+  expect(loginFailureOf("Error: no controlling terminal; cannot complete interactive login")).toBe("no_tty");
+  expect(loginFailureOf("panic: something else")).toBe("cli_exit");
+  expect(cutAtWord("Eligibility check failed: PERMISSION_DENIED", 30)).toBe("Eligibility check failed:…");
+  expect(cutAtWord("short", 30)).toBe("short");
   const usage = antigravityUsage(
     "Model quotas\n\nGemini Models\nWeekly Limit Remaining\n75%\nFive Hour Limit Remaining\n40% · resets in 2h 30m\n\nClaude and GPT models\nWeekly Limit Remaining\n100%\n",
     "probe",
@@ -392,13 +413,17 @@ test.skipIf(!posix)(
     managers.push(m);
     const id = "0193eeee-0000-7000-8000-0000000000d2";
     const begun = await m.begin("antigravity", id, false, undefined, "enterprise");
-    expect(begun.url).toBe("https://accounts.google.com/o/oauth2/v2/auth?client_id=agy&state=s1");
+    expect(begun.url).toBe("https://accounts.google.com/o/oauth2/auth?client_id=agy&state=s1");
     expect(typeof begun.publicKey).toBe("string");
     expect(agyAuthOf(path.join(home, "accounts", "antigravity", id))).toBe("oauth-business");
     const aad = accountCodeAad(id, ORG);
     await m.code(id, aad, await sealSecret(begun.publicKey as string, "4/0AbCdEf-code", aad));
-    await waitFor(() => m.status(id).state === "done", 5000);
-    expect(m.status(id).account).toMatchObject({ kind: "antigravity", loggedIn: true, provider: "enterprise" });
+    await waitFor(() => m.status(id).state !== "waiting", 5000);
+    // `agy models` lists its models split by a tab: signed in.
+    expect(m.status(id)).toMatchObject({
+      state: "done",
+      account: { kind: "antigravity", loggedIn: true, provider: "enterprise" },
+    });
     // Elsewhere than Linux the CLI keeps every sign-in in one keychain: refused.
     const mac = new AccountManager({ root: path.join(home, "mac"), orgId: () => ORG, platform: "darwin" });
     managers.push(mac);
@@ -407,4 +432,48 @@ test.skipIf(!posix)(
     });
   },
   20_000,
+);
+
+test.skipIf(!posix)(
+  "a sign-in that fails says why as a code with the CLI's own words, never the pasted code, and leaves no folder",
+  async () => {
+    const home = tempDir("agy-accounts-");
+    dirs.push(home);
+    const lines: string[] = [];
+    const m = new AccountManager({
+      root: path.join(home, "accounts"),
+      orgId: () => ORG,
+      platform: "linux",
+      commands: { antigravity: [process.execPath, FAKE] },
+      log: (l) => lines.push(l),
+    });
+    managers.push(m);
+    const signIn = async (n: number, code: string) => {
+      const id = `0193eeee-0000-7000-8000-0000000000e${n}`;
+      const begun = await m.begin("antigravity", id);
+      const aad = accountCodeAad(id, ORG);
+      await m.code(id, aad, await sealSecret(begun.publicKey as string, code, aad));
+      await waitFor(() => m.status(id).state !== "waiting", 5000);
+      await waitFor(() => !existsSync(path.join(home, "accounts", "antigravity", id)), 3000);
+      return m.status(id);
+    };
+    const refused = await signIn(1, "4/0Abad-code-xyz");
+    expect(refused).toMatchObject({
+      state: "failed",
+      code: "bad_code",
+      message: 'couldn\'t log in: token exchange failed: oauth2: "invalid_grant" "Bad Request"',
+    });
+    expect(refused.error).toContain("couldn't sign in with that code");
+    expect(JSON.stringify(refused)).not.toContain("4/0Abad-code-xyz");
+    expect(await signIn(2, "4/0Aoffline-code")).toMatchObject({ state: "failed", code: "network" });
+    // Signed in, but Google won't serve the account: `agy models` says why.
+    expect(await signIn(3, "4/0Aineligible-code")).toMatchObject({
+      state: "failed",
+      code: "not_signed_in_after_login",
+      message: "Error: Eligibility check failed: PERMISSION_DENIED (code 403): The caller does not have permission",
+    });
+    expect(lines.filter((l) => l.includes("failed: "))).toHaveLength(3);
+    expect(lines.join("\n")).not.toContain("4/0A");
+  },
+  30_000,
 );

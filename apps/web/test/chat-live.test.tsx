@@ -150,7 +150,7 @@ const bar = () => ({ textContent: typingBar().querySelector(".ac-typing__text")?
 const lastPerson = (state: ReturnType<typeof seedState>) => state.messages[state.messages.length - 1];
 
 describe("typing bar above the composer", () => {
-  test("mention → the bar says 'Atlas pensando…' while its row is out of view; its block, last in the timeline", async () => {
+  test("mention → the bar says 'Atlas pensando…', then 'escrevendo…'; none of its words in the conversation until its reply", async () => {
     const { socket } = await open();
     await sendText("@atlas olha o deploy");
     expect(bar().textContent).toBe("Atlas pensando…");
@@ -168,17 +168,14 @@ describe("typing bar above the composer", () => {
     await push(socket, { type: "agent.typing", ...run });
     await push(socket, { type: "agent.delta", ...run, seq: 1, text: "Deploy ok" });
     await settle();
-    const streaming = document.querySelector(".ac-msg--streaming") as HTMLElement;
-    expect(streaming.textContent).toContain("Deploy ok");
-    // It's the last row of the timeline; with no layout here the row counts as out of view, so the card above the box
-    // speaks for it (its face and what it does now).
-    const rows = screen().getAllByRole("article");
-    expect(rows[rows.length - 1]).toBe(streaming);
+    // Nothing of it in the conversation: the card above the box speaks for it (its face and what it does now).
+    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+    expect(rowsWith("Deploy ok")).toHaveLength(0);
     expect(bar().textContent).toBe("Atlas escrevendo…");
     expect(typingBar().querySelector(".ac-avatar--agent")).not.toBeNull();
     await push(socket, { type: "agent.idle", ...run });
     await settle();
-    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+    expect(bar().textContent).toBe("");
   });
 
   test("an agent out of view and people: 'Atlas pensando… · João digitando…'; our typing frames are throttled", async () => {
@@ -188,17 +185,9 @@ describe("typing bar above the composer", () => {
     await push(socket, { type: "user.typing", userId: "u-joao", threadId: null, ttlMs: 6000 });
     await settle();
     expect(bar().textContent).toBe("Atlas pensando…");
-    // Who is typing comes after the agent's own words and time; the pill widens for both.
+    // Who is typing comes after the agent's own words and time, on the pill as wide as the composer.
     expect(typingBar().querySelector(".ac-typing__also")?.textContent).toBe("João digitando…");
-    expect(typingBar().dataset.wide).toBe("true");
-    await push(socket, {
-      type: "agent.delta",
-      threadId: null,
-      runId: "r-g",
-      agentId: ATLAS_ID,
-      seq: 1,
-      text: "Sim",
-    });
+    await push(socket, { type: "agent.typing", threadId: null, runId: "r-g", agentId: ATLAS_ID });
     await settle();
     // Atlas writes now; it stays on the card while it works.
     expect(bar().textContent).toBe("Atlas escrevendo…");
@@ -987,7 +976,7 @@ describe("regression: the router picks nobody (production #general, 'oi' after '
     const first = lastPerson(state);
     expect(bar().textContent).toBe("Ada pensando…");
     const run = { threadId: first?.id, runId: "r-1st", agentId: ADA_ID };
-    await pushG({ type: "agent.delta", ...run, seq: 1, text: "Oi!" });
+    await pushG({ type: "agent.typing", ...run });
     await pushG({
       type: "message.created",
       messageId: "reply-1",

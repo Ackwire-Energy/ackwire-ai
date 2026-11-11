@@ -57,6 +57,7 @@ import {
   startSessionTask,
   stopMission,
   syncMissionFiles,
+  taskNotice,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -1390,7 +1391,8 @@ describe("missions (ADR 0029)", () => {
       expect((notice?.meta.machineTask as { blocked?: unknown } | undefined)?.blocked).toEqual([
         { tool: "Bash", command },
       ]);
-      expect(notice?.body).toContain("Blocked:");
+      // People see them under the line (from its meta); the agent reads them in its English line.
+      expect(notice && taskNotice(notice)).toContain(`Blocked: \`${command}\``);
       await expect(
         retryBlockedCommand(md(), f.owner.id, f.org.id, view.id, { taskId: item.taskId, command: "ls" }),
       ).rejects.toMatchObject({ code: "mission.command_not_found" });

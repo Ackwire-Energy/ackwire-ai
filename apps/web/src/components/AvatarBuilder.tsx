@@ -28,6 +28,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useOrg } from "@/components/org-context";
+import { ProfilePhotoDialog } from "@/components/ProfilePhoto";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 
@@ -193,6 +194,29 @@ export function AvatarChoiceDialog({
         </div>
       </DialogBody>
     </Dialog>
+  );
+}
+
+/**
+ * "Trocar foto" as Editar perfil's button and the account menu's face open it: the question, then the builder or the
+ * photo. `onClose` as soon as the question is answered or dismissed: what it led to stays open on its own.
+ */
+export function ChangeAvatarDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [next, setNext] = useState<"build" | "photo" | null>(null);
+  const go = (to: "build" | "photo") => {
+    onClose();
+    setNext(to);
+  };
+  return (
+    <>
+      <AvatarChoiceDialog open={open} onClose={onClose} onBuild={() => go("build")} onPhoto={() => go("photo")} />
+      <AvatarBuilderDialog
+        open={next === "build"}
+        onClose={() => setNext(null)}
+        onUploadPhoto={() => setNext("photo")}
+      />
+      <ProfilePhotoDialog open={next === "photo"} onClose={() => setNext(null)} />
+    </>
   );
 }
 

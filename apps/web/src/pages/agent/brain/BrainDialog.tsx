@@ -51,7 +51,7 @@ import { sceneTeam, TeamScene, useDawn } from "@/components/arrival/TeamScene";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useOrg } from "@/components/org-context";
 import { useWidenAsk } from "@/components/ReachLines";
-import { OpenPrefsButton, useIsThisMac } from "@/components/ThisMac";
+import { ToolsOffHereNote, useIsThisMac } from "@/components/ThisMac";
 import { useAdminsLock } from "@/hooks/usePersonalView";
 import { modelLimitText } from "@/lib/plan-usage";
 import { useToast } from "@/lib/toast";
@@ -709,14 +709,7 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
           {s.savedCard === "gemini" && geminiPersonal(s.currentAccount) && (
             <SettingNote icon="alert">{t("connectAi.plan.gemini.warning")}</SettingNote>
           )}
-          {toolOffHere && (
-            <SettingNote icon="settings">
-              {t("machines.thisMac.toolsOff")}
-              <span style={{ display: "block", marginTop: 8 }}>
-                <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-              </span>
-            </SettingNote>
-          )}
+          {toolOffHere && <ToolsOffHereNote />}
           <div className="bd-lines">
             <BrainLine
               label={t("agentPage.work.brain.planModel")}

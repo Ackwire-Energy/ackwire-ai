@@ -13,12 +13,13 @@ import { agentGrammar } from "./grammar";
 /** Whole minutes until `iso`, at least 1: an estimate never reads "0 min". */
 export const etaMinutes = (iso: string, now: number) => Math.max(1, Math.round((Date.parse(iso) - now) / 60_000));
 
-/** "3 min", "40 s", "2 h": how long something has gone on. */
+/** "3 min", "40 s", "2 h", "3 dias": how long something has gone on. */
 export function durationText(t: TFunction, ms: number) {
   if (ms < 60_000) return t("run.elapsedSeconds", { n: Math.max(1, Math.round(ms / 1000)) });
   const minutes = Math.round(ms / 60_000);
   if (minutes < 60) return t("format.inMinutes", { count: minutes });
-  return t("format.inHours", { count: Math.round(minutes / 60) });
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? t("format.inHours", { count: hours }) : t("format.inDays", { count: Math.round(hours / 24) });
 }
 
 /** "1st", "4º", "4." in the language's own ordinal form. */

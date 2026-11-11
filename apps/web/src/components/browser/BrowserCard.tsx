@@ -225,7 +225,7 @@ export function RunBrowserCard({ run, name }: { run: LiveRun; name: string }) {
   const settings = useAgentBrowserSettings(org.id, run.agentId, steps.length > 0);
   const profiles = useBrowserProfiles(org.id, steps.length > 0);
   const inProfile = runProfile(steps, settings.data?.profileId ?? null, profiles.data);
-  const ended = run.status === "failed" || run.status === "canceled";
+  const ended = run.status === "failed";
   const ask = !run.provisional && (ended || steps.length === 0);
   const open = useAgentBrowserHandoff(org.id, run.agentId, ask, HELD_STALE_MS);
   const held = isHeldTakeover(open.data, run.runId);

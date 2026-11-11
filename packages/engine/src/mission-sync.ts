@@ -30,6 +30,7 @@ import {
   tellSession,
 } from "./missions";
 import { tellMainSession } from "./missions-engine";
+import { lineLocale } from "./requester";
 
 const { missions, missionFiles, missionDecisions, missionReviews, missionParticipants, messages, users } = schema;
 
@@ -390,8 +391,9 @@ async function wakeAgentForTask(deps: MissionDeps, mission: MissionRow, task: Ma
     return;
   }
   const machine = await getMachineById(deps.db, task.machineId);
-  const notice = taskEndNotice(task, machine?.name ?? "the computer");
-  await tellMainSession(deps, mission, notice.body, {
+  const locale = await lineLocale(deps.db, task.orgId, task.requestedByUserId, task.runId);
+  const notice = taskEndNotice(task, machine?.name ?? null, locale);
+  await tellMainSession(deps, mission, notice.text, {
     requestedBy: task.requestedByUserId,
     from: "the computer",
     kind: "task",

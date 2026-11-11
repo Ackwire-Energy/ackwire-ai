@@ -239,7 +239,8 @@ a.dv-row__detail {
 /* ---------- Live checklist ----------------------------------------------------------
    ol.dv-steps > li.dv-step[data-state=done|current|waiting|needs]: a 24 mark, the title over one line,
    then optional extras (actions, a setting drawing, a path, a command, a QR). The mark centres on the
-   title and its line. The current step sits on a plate, so the eye lands on it. */
+   title and its line. No plates: every mark lines up with the controls above the list, and the current step reads as
+   current by its live mark and ink title. */
 .dv-steps {
   display: flex;
   flex-direction: column;
@@ -257,8 +258,7 @@ a.dv-row__detail {
   column-gap: var(--space-3);
   row-gap: 0;
   align-items: center;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-lg);
+  padding: var(--space-2) 0;
 }
 .dv-step__mark {
   grid-area: mark;
@@ -300,6 +300,9 @@ a.dv-row__detail {
   color: var(--ink-muted);
   overflow-wrap: anywhere;
 }
+.dv-step__title + .dv-step__text {
+  margin-top: var(--space-1);
+}
 .dv-step__text code,
 .dv-step__title code {
   font-family: var(--font-mono);
@@ -338,25 +341,16 @@ a.dv-row__detail {
   padding-top: var(--space-4);
   border-top: 1px solid var(--line);
 }
-/* The six-digit way: the address and the code side by side, Pair under them; one column on a phone. */
-.dv-step__more > .ac-locked {
+/* The six-digit way: the address over the code, both the step's full width, Pair under them (full width on a phone). */
+.dv-pair-code {
   align-self: stretch;
 }
-.dv-pair-code {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 8rem);
-  gap: var(--space-4) var(--space-3);
-}
 .dv-pair-code > .ac-btn {
-  grid-column: 1 / -1;
-  justify-self: start;
+  align-self: flex-start;
 }
 @media (width <= 640px) {
-  .dv-pair-code {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .dv-pair-code > .ac-btn {
-    justify-self: stretch;
+    align-self: stretch;
   }
 }
 /* What only a phone-sized screen says (the Wi-Fi QR is shown on computers alone). */
@@ -375,11 +369,6 @@ a.dv-row__detail {
   color: var(--ink2);
   font-weight: 500;
 }
-.dv-step[data-state="current"] {
-  background: var(--surface-sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  padding-block: var(--space-3);
-}
 .dv-step[data-state="current"] .dv-step__mark {
   color: var(--ink);
   background: var(--raised);
@@ -394,10 +383,6 @@ a.dv-row__detail {
   color: var(--ink-muted);
   font-weight: 500;
 }
-.dv-step[data-state="needs"] {
-  background: var(--attention-soft);
-  padding-block: var(--space-3);
-}
 .dv-step[data-state="needs"] .dv-step__mark {
   color: var(--attention);
   background: var(--raised);
@@ -409,6 +394,60 @@ a.dv-row__detail {
 .dv-step__mark > .ac-icon {
   width: 14px;
   height: 14px;
+}
+/* A folded step: its title alone, a button that opens it (a done step to look again, a later one to read ahead). It
+   takes the row's height, the step's own padding, so a finger finds it. */
+.dv-step__open {
+  justify-self: stretch;
+  margin-block: calc(-1 * var(--space-2));
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.dv-step__open:hover {
+  color: var(--ink);
+}
+/* Why a plugged phone may not show up: a title over a short list, under the cable step it waits on. */
+.dv-slow {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.dv-slow__title {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.dv-slow__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding-inline-start: var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 18px;
+  color: var(--ink2);
+  overflow-wrap: anywhere;
+}
+.dv-slow__list > li::marker {
+  color: var(--faint);
+}
+.dv-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+  line-height: 18px;
+}
+.dv-slow__list .dv-links {
+  margin-top: var(--space-1);
 }
 
 /* A tiny drawing of the phone's own setting row, in the app's look: the row to find is ringed, with a
@@ -537,6 +576,9 @@ a.dv-row__detail {
   align-items: start;
   gap: var(--space-6);
 }
+.dv-split:not(:has(> .dv-qr)) {
+  grid-template-columns: minmax(0, 1fr);
+}
 .dv-split > .dv-qr {
   position: sticky;
   top: 0;
@@ -547,7 +589,7 @@ a.dv-row__detail {
     min-height: 490px;
   }
 }
-/* Narrow: one column. A code meant for a phone's camera can't be scanned from the phone showing it, so it goes. */
+/* Narrow: one column. A code the phone scans can't be scanned from the phone showing it, so it goes. */
 @media (width <= 640px) {
   .dv-split {
     grid-template-columns: minmax(0, 1fr);
