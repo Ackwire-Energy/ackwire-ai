@@ -5001,6 +5001,7 @@
         "accountOthers": "Plany innych osób pokazują, czyje są. Właściciel dostaje e-mail i może go odebrać.",
         "addAccount": "Dodaj konto",
         "signInAgain": "Zaloguj się ponownie",
+        "connectPlan": "Połącz inny plan",
         "fallbackTitle": "Jeśli {{computer}} przestanie odpowiadać, odpowiadaj przez API",
         "fallbackHint": "Odpowiada przez API i liczy się to do budżetu agenta {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",
         "fallbackHint_female": "Odpowiada przez API i liczy się to do budżetu agentki {{name}}. W przeciwnym razie {{name}} informuje osobę, która prosiła, i czeka, aż komputer wróci.",

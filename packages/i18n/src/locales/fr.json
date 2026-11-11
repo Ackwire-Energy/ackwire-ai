@@ -4834,6 +4834,7 @@
         "accountOthers": "Les forfaits d’autres personnes indiquent à qui ils sont. Leur propriétaire reçoit un e-mail et peut les reprendre.",
         "addAccount": "Ajouter un compte",
         "signInAgain": "Se reconnecter",
+        "connectPlan": "Connecter un autre abonnement",
         "fallbackTitle": "Si {{computer}} ne répond plus, répondre via l'API",
         "fallbackHint": "Il répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",
         "fallbackHint_female": "Elle répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",

@@ -4508,6 +4508,7 @@
         "accountOthers": "他の人のプランには持ち主の名前が表示されます。持ち主にはメールが届き、取り戻すこともできます。",
         "addAccount": "アカウントを追加",
         "signInAgain": "もう一度ログイン",
+        "connectPlan": "別のプランを接続",
         "fallbackTitle": "{{computer}}が応答しなくなったら、API経由で返信する",
         "fallbackHint": "API経由で返信し、{{name}}の予算から差し引かれます。オフにすると、{{name}}は依頼した人に知らせて、コンピューターが戻るのを待ちます。",
         "effort": "思考レベル",

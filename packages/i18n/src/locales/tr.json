@@ -4658,6 +4658,7 @@
         "accountOthers": "Başkalarının planları kimin olduğunu gösterir. Sahibi bir e-posta alır ve geri alabilir.",
         "addAccount": "Hesap ekle",
         "signInAgain": "Yeniden giriş yap",
+        "connectPlan": "Başka bir plan bağla",
         "fallbackTitle": "{{computer}} yanıt vermezse API üzerinden yanıtla",
         "fallbackHint": "API üzerinden yanıt verir ve {{name}} ajanının bütçesinden düşer. Aksi halde {{name}} isteyen kişiye haber verir ve bilgisayarın geri gelmesini bekler.",
         "effort": "Çaba",

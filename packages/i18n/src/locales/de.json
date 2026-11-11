@@ -4675,6 +4675,7 @@
         "accountOthers": "Abos anderer Personen zeigen, wem sie gehören. Der Inhaber bekommt eine E-Mail und kann es zurücknehmen.",
         "addAccount": "Konto hinzufügen",
         "signInAgain": "Erneut anmelden",
+        "connectPlan": "Weiteres Abo verbinden",
         "fallbackTitle": "Wenn {{computer}} nicht mehr antwortet, über die API antworten",
         "fallbackHint": "Die Antwort kommt dann über die API und zählt zum Budget von {{name}}. Sonst sagt {{name}} der Person, die gefragt hat, Bescheid und wartet, bis der Computer zurück ist.",
         "effort": "Aufwand",

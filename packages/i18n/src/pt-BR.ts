@@ -4841,6 +4841,7 @@ export const ptBR = {
           "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
         addAccount: "Adicionar conta",
         signInAgain: "Entrar de novo",
+        connectPlan: "Conectar outro plano",
         fallbackTitle: "Se o {{computer}} parar de responder, responder pela API",
         /** The switch's ⓘ: the same in both states. */
         fallbackHint:

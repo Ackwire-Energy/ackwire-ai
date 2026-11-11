@@ -4530,6 +4530,7 @@
         "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
+        "connectPlan": "连接其他套餐",
         "fallbackTitle": "{{computer}} 无响应时，通过 API 回复",
         "fallbackHint": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
         "fallbackHint_female": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",

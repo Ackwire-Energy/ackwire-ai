@@ -4697,6 +4697,7 @@
         "accountOthers": "Abonnementen van anderen laten zien van wie ze zijn. De eigenaar krijgt een e-mail en kan het terugnemen.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
+        "connectPlan": "Ander abonnement koppelen",
         "fallbackTitle": "Als {{computer}} niet meer reageert, antwoord via de API",
         "fallbackHint": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
         "fallbackHint_female": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",

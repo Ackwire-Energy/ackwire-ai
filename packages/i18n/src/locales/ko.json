@@ -4506,6 +4506,7 @@
         "accountOthers": "다른 사람의 플랜에는 주인이 표시돼요. 주인은 이메일을 받고 되돌려 받을 수 있어요.",
         "addAccount": "계정 추가",
         "signInAgain": "다시 로그인",
+        "connectPlan": "다른 요금제 연결",
         "fallbackTitle": "{{computer}}이(가) 응답하지 않으면 API로 답하기",
         "fallbackHint": "API로 답하고 {{name}}의 예산에서 차감돼요. 끄면 {{name}}은(는) 요청한 사람에게 알리고 컴퓨터가 돌아오기를 기다려요.",
         "effort": "사고 수준",

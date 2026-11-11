@@ -4523,6 +4523,7 @@
         "accountOthers": "Paket orang lain menunjukkan milik siapa. Pemiliknya menerima email dan bisa menariknya kembali.",
         "addAccount": "Tambah akun",
         "signInAgain": "Masuk lagi",
+        "connectPlan": "Hubungkan paket lain",
         "fallbackTitle": "Jika {{computer}} berhenti merespons, jawab lewat API",
         "fallbackHint": "Agen menjawab lewat API dan dihitung dari anggaran {{name}}. Jika tidak, {{name}} memberi tahu siapa pun yang meminta dan menunggu komputernya kembali.",
         "effort": "Upaya",

@@ -11523,6 +11523,9 @@
   "agentPage.work.brain.signInAgain": {
     "value": "Sign in again"
   },
+  "agentPage.work.brain.connectPlan": {
+    "value": "Connect another plan"
+  },
   "agentPage.work.brain.fallbackTitle": {
     "value": "If {{computer}} stops answering, answer through the API"
   },

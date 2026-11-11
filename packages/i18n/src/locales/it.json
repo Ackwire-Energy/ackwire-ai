@@ -4836,6 +4836,7 @@
         "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo.",
         "addAccount": "Aggiungi account",
         "signInAgain": "Accedi di nuovo",
+        "connectPlan": "Collega un altro piano",
         "fallbackTitle": "Se {{computer}} smette di rispondere, rispondi tramite l'API",
         "fallbackHint": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
         "fallbackHint_female": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",

@@ -4809,6 +4809,7 @@
         "accountOthers": "Los planes de otras personas muestran de quién son. Su dueño recibe un correo y puede recuperarlo.",
         "addAccount": "Agregar cuenta",
         "signInAgain": "Volver a iniciar sesión",
+        "connectPlan": "Conectar otro plan",
         "fallbackTitle": "Si {{computer}} deja de responder, responder a través de la API",
         "fallbackHint": "Responde a través de la API y cuenta para el presupuesto de {{name}}. Si no, {{name}} le avisa a quien preguntó y espera a que la computadora vuelva.",
         "effort": "Esfuerzo",

@@ -4900,6 +4900,7 @@ export const en = {
         accountOthers: "Other people's plans show whose they are. Their owner gets an email and can take it back.",
         addAccount: "Add account",
         signInAgain: "Sign in again",
+        connectPlan: "Connect another plan",
         fallbackTitle: "If {{computer}} stops answering, answer through the API",
         fallbackHint:
           "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back.",
