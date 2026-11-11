@@ -117,7 +117,6 @@ const CLOUD_EXTRA = [
   "desktop.keyboard.field",
   "desktop.keyboard.label",
   ...["got", "copied", "tooLong", "textOnly"].map((k) => `desktop.clipboard.${k}`),
-  "computers.leadCloud",
   "computers.about",
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
@@ -163,11 +162,9 @@ const CLOUD_EXTRA = [
 /** The same screens' self-host keys, past the `agentComputer.` ones. */
 const SELFHOST_EXTRA = [
   ...PLAN_REPLIES,
-  "computers.lead",
   "browser.inCard.offline",
   "browser.inCard.noComputer",
   "computers.hostMissing",
-  ...["title", "text", "emptyTitle"].map((k) => `computers.other.${k}`),
   "computers.how",
   "computers.agents.title",
   "machines.host.label",

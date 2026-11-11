@@ -8560,7 +8560,7 @@
       "homeHint": "La misión tiene un hilo: ahí {{name}} habla, pide decisiones y muestra su trabajo.",
       "homeHint_female": "La misión tiene un hilo: ahí {{name}} habla, pide decisiones y muestra su trabajo.",
       "offline": "{{name}} está sin conexión. El plan empieza cuando vuelva.",
-      "needsMachine": "Las misiones corren en una computadora conectada. Conecta una a {{name}} en Configuración › Computadoras.",
+      "needsMachine": "Las misiones corren en una computadora conectada. Conecta una a {{name}} en Configuración › Dispositivos.",
       "commandHint": "También puedes empezar una escribiendo en el campo de mensaje de cualquier conversación:",
       "approvals": "Merge, deploy y rollback siempre piden aprobación",
       "start": "Empezar misión",
@@ -13634,8 +13634,6 @@
       "firstTime": "La primera vez",
       "step1": "Abre el archivo descargado y arrastra agentes.chat a Aplicaciones.",
       "step1Install": "Abre el archivo descargado para instalarla.",
-      "step2": "Ábrela, haz clic en Usar tu propio servidor, luego en Conectar a mi servidor, y escribe la dirección de esta página. Inicia sesión y haz clic en Usar esta {{device}} en Configuración → Computadoras.",
-      "other": "Otras formas: servidor o Linux",
       "otherText": "Ejecuta esto en la terminal de la computadora y confirma el código que muestra.",
       "waiting": "Esperando a que la computadora se conecte…"
     },
@@ -14219,19 +14217,9 @@
       },
       "saved": "{{name}} ahora usa {{computer}}."
     },
-    "lead": "Dónde trabajan tus agentes: este servidor y los computadores que conectes.",
-    "leadCloud": "Donde trabajan tus agentes: una computadora solo para este espacio de trabajo, siempre encendida.",
     "about": "Acerca de esta computadora",
     "how": "Cómo funcionan las computadoras",
-    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: <guide>mira cómo</guide>.",
-    "other": {
-      "title": "Otras computadoras",
-      "text": "Conectadas con un código, como una Mac mini en casa u otro servidor. Lo que permite cada una se configura en esa computadora.",
-      "emptyTitle": "Ejecuta agentes en cualquier computadora",
-      "emptyText": "Conecta un Mac mini en casa u otro servidor con un código, y los agentes trabajan en él.",
-      "emptyViewerTitle": "Las computadoras del equipo aparecen aquí",
-      "emptyViewer": "Quien puede conectar computadoras agrega una, y aparece aquí."
-    }
+    "hostMissing": "Este servidor también puede ser la computadora de tus agentes: <guide>mira cómo</guide>."
   },
   "outage": {
     "region": "Computadoras desconectadas",
@@ -17322,7 +17310,7 @@
       "turn": "Gira el teléfono",
       "upright": "Ponlo vertical",
       "message": "Escribirle a {{name}}",
-      "chooseOnWeb": "Elígela en agentes.chat, en Configuración › Computadoras."
+      "chooseOnWeb": "Elígela en agentes.chat, en Configuración › Dispositivos."
     }
   },
   "taskManager": {

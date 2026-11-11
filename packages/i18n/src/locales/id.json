@@ -8045,7 +8045,7 @@
       "homeHint": "Misi mendapat utas: di sanalah {{name}} berbicara, meminta keputusan, dan menunjukkan hasil kerjanya.",
       "homeHint_female": "Misi mendapat utas: di sanalah {{name}} berbicara, meminta keputusan, dan menunjukkan hasil kerjanya.",
       "offline": "{{name}} sedang offline. Rencana dimulai saat ia kembali.",
-      "needsMachine": "Misi berjalan di komputer yang terhubung. Hubungkan satu ke {{name}} di Pengaturan › Komputer.",
+      "needsMachine": "Misi berjalan di komputer yang terhubung. Hubungkan satu ke {{name}} di Pengaturan › Perangkat.",
       "commandHint": "Kamu juga bisa memulainya dengan mengetik di kolom pesan percakapan mana pun:",
       "approvals": "Merge, deploy, dan rollback selalu meminta persetujuan",
       "start": "Mulai misi",
@@ -12816,8 +12816,6 @@
       "firstTime": "Pertama kali",
       "step1": "Buka file yang diunduh lalu seret agentes.chat ke Applications.",
       "step1Install": "Buka file yang diunduh untuk memasangnya.",
-      "step2": "Buka aplikasinya, klik Pakai servermu sendiri, lalu Hubungkan ke serverku, dan ketik alamat halaman ini. Masuk, lalu klik Pakai {{device}} ini di Pengaturan → Komputer.",
-      "other": "Cara lain: server atau Linux",
       "otherText": "Jalankan ini di terminal komputer itu, lalu konfirmasi kode yang ditampilkannya.",
       "waiting": "Menunggu komputer terhubung…"
     },
@@ -13393,19 +13391,9 @@
       },
       "saved": "{{name}} sekarang memakai {{computer}}."
     },
-    "lead": "Tempat agenmu bekerja: server ini dan komputer mana pun yang kamu hubungkan.",
-    "leadCloud": "Tempat agenmu bekerja: komputer khusus untuk ruang kerja ini, selalu menyala.",
     "about": "Tentang komputer ini",
     "how": "Cara kerja komputer",
-    "hostMissing": "Server ini juga bisa jadi komputer agenmu: <guide>begini caranya</guide>.",
-    "other": {
-      "title": "Komputer lain",
-      "text": "Dihubungkan dengan kode, seperti Mac mini di rumah atau server lain. Apa yang diizinkan tiap komputer diatur di komputer itu sendiri.",
-      "emptyTitle": "Jalankan agen di komputer apa pun",
-      "emptyText": "Hubungkan Mac mini di rumah atau server lain dengan kode, dan agen bekerja di sana.",
-      "emptyViewerTitle": "Komputer tim muncul di sini",
-      "emptyViewer": "Orang yang bisa menghubungkan komputer menambahkannya, lalu muncul di sini."
-    }
+    "hostMissing": "Server ini juga bisa jadi komputer agenmu: <guide>begini caranya</guide>."
   },
   "outage": {
     "region": "Komputer offline",
@@ -16392,7 +16380,7 @@
       "turn": "Putar ke samping",
       "upright": "Putar tegak",
       "message": "Kirim pesan ke {{name}}",
-      "chooseOnWeb": "Pilih di agentes.chat, di Pengaturan › Komputer."
+      "chooseOnWeb": "Pilih di agentes.chat, di Pengaturan › Perangkat."
     }
   },
   "taskManager": {

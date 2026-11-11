@@ -188,18 +188,18 @@ The agentes.chat desktop app (macOS, Windows and Linux) opens your instance in a
 **Servers** in the app's Preferences (and its menus) switches between instances; each keeps its own
 sign-in.
 
-- **Agents on that computer:** in the instance's onboarding or **Settings → Computers**, click **Use
+- **Agents on that computer:** in the instance's onboarding or **Settings › Devices**, click **Use
   this Mac** (**Use this PC** on Windows, **Use this computer** on Linux). The app asks first, in its
   own dialog naming the instance and the organization. Its agents start with no folders of yours and
   commands off, even when other organizations' agents there have commands on; you choose more in the
   app's Preferences. The app pairs a computer with agentes.chat Cloud the same way. Until you pair it,
   nothing of the computer is used. The app never offers the computer that runs the instance: its agents
   work there through the instance itself (This server as the agents' computer, below).
-- **Linux, a server or a VM:** **Settings → Computers → Connect a computer** shows the command, and
+- **Linux, a server or a VM:** **Settings › Devices › Connect a device** shows the command, and
   Agent computers below explains it.
 
-Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), the page that offers the app (Settings →
-Computers, and onboarding's computer step) asks agentes.chat for its newest version as it opens, from
+Unless it has builds of its own (`DESKTOP_RELEASES_TOKEN`), the page that offers the app (Settings ›
+Devices, and onboarding's computer step) asks agentes.chat for its newest version as it opens, from
 your browser or the app's window: the request names the system and, like any request a page makes to
 another site, carries this instance's address (its `Origin` header) and the browser's IP. The app asks
 agentes.chat for its own updates when it starts and every 6 hours, naming its system and processor (its
@@ -506,8 +506,8 @@ port past the host's firewall.
 
 agentes.chat also runs as one program with its database built in, with nothing else to install: no
 Docker, no Postgres to set up. The desktop app's **Run agentes.chat on this computer** does it with no
-terminal (below), and on a computer without a screen the installer will do it with
-`install.sh --native`. By hand, from a release package, further below.
+terminal (below). `install.sh` can't do it without Docker yet. On a Mac or a PC, use the app. By hand,
+from a release package, further below.
 
 - **The database is PGlite:** real Postgres compiled to WebAssembly, running inside that program,
   with pgvector. It's the same engine the tests run on, so the migrations and the queries are the
@@ -531,7 +531,7 @@ the `https://…ts.net` address it prints, then start it again. The desktop app 
 switch.
 
 **From the desktop app** (macOS, Windows and Linux). On its first screen, click **Use your own server**,
-then **Run agentes.chat on this Mac** (this computer, on Windows and Linux). On Windows the folder is
+then **Run agentes.chat on this Mac** (this PC on Windows, this computer on Linux). On Windows the folder is
 `%USERPROFILE%\.agentes`. Your name comes from this computer; type
 your email (your team sees it). **Reach it from your phone and teammates** puts it on your tailnet
 (off; you can turn it on later), and **Send anonymous usage statistics** is on (it writes `TELEMETRY`
@@ -576,7 +576,7 @@ statistics** switch does that), or use the switch in **Settings → General → 
 Installed by hand, `agentes-server telemetry` prints the next report and sends nothing (with the server
 stopped); while it runs, and from the desktop app, **See what is sent** there shows the same.
 
-**By hand.** Each version's release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
+**By hand.** From the first `v<version>` release, each release has a package per computer, `agentes-native-<version>-<os>-<arch>.tar.gz`
 (`darwin-arm64`, `darwin-x64`, `linux-x64`, `linux-arm64`), its Bun included, and `native.json`, which
 names each package's SHA-256. Check it, then:
 
@@ -1072,7 +1072,7 @@ Agents run commands and code, drive a browser, and can think with Claude Code or
 computer that runs the runner: this server itself (This server as the agents' computer, below) or
 one you connect, a server, a VM or a laptop.
 
-**Settings → Computers → Connect a computer** shows the command for this instance:
+**Settings › Devices › Connect a device** shows the command for this instance:
 
 ```sh
 curl -fsSL https://chat.example.com/api/machines/install.sh | sh
@@ -1213,7 +1213,9 @@ terminal are for the person who connected the computer, since they act as its us
 agent runs as that one user, its desktop and terminal included, so whoever uses either can read the
 other agents' folders, the sign-ins on that computer and the runner's token, as the agents' commands
 can. Give the runner a user of its own, or a VM. On a Linux server, the installer's `--system` option
-(as root) makes each agent its own user instead. On x64 it also installs `agent-browser` once for all
+(as root) makes each agent its own user instead. Ubuntu's systemd can't do it (`--system` refuses
+there): the setup's simple mode runs every agent as one shared user, `agentes`, which sees the other
+agents' folders but not yours or the server's. On x64 it also installs `agent-browser` once for all
 of them, in `/opt/agentes-runner/browser` (root's, checked against the SHA-256 in the installer;
 running the installer again updates it), and Google Chrome from Google's apt repository when the
 computer has none, kept current by the computer's package updates. If the installer can't download
@@ -1302,7 +1304,7 @@ stays writable by the others whatever its umask; without it, it stays readable o
 organization gets a folder and a group of its own (`/srv/agentes/shared-<id>`), so nothing crosses between
 organizations. Without `--system` it is `shared` in the runner's workspace. Agents are told to look there
 before downloading anything big, to keep credentials, `.env` files and sign-in folders out of it, and to
-check the free space first. **Settings → Computers** shows its path, its size (measured hourly) and the
+check the free space first. **Settings › Devices** shows its path, its size (measured hourly) and the
 free space on the disk, and the workspace's admins get a notification when that disk passes 85%.
 
 Mac and Windows computers get no agents' desktops: the agent's browser runs headless, and its card

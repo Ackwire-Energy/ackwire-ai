@@ -153,7 +153,7 @@ describe("access", () => {
     // Granted, but no computer was chosen for it: computer_status says so.
     expect(await call(ctx, "computer_status", {})).toMatchObject({ isError: true, content: NO_COMPUTER_MESSAGE });
     // Where people connect their own, that is what to do.
-    expect(NO_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to connect one (Settings → Computers).");
+    expect(NO_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to connect one (Settings › Devices).");
     expect(REMOVED_COMPUTER_MESSAGE).toContain("Ask an admin or your owner to choose another one.");
   });
 });

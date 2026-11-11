@@ -27,7 +27,6 @@ export type { HelpBlock, HelpDocument, HelpSection } from "./types";
 export const HELP_PAGES = {
   "install-on-a-server": "selfhost",
   "run-on-your-computer": "selfhost",
-  computers: "selfhost",
   "workspace-computer": "cloud",
   import: "both",
   wiki: "both",
@@ -36,6 +35,7 @@ export const HELP_PAGES = {
   "who-answers": "both",
   jev: "selfhost",
   "apps-de-ia": "both",
+  computers: "both",
 } as const;
 
 export type HelpSlug = keyof typeof HELP_PAGES;

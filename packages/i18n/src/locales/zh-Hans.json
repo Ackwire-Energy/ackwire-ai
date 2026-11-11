@@ -8046,7 +8046,7 @@
       "homeHint": "专项任务会有一个话题：{{name}} 在那里沟通、请你做决定并展示他的工作。",
       "homeHint_female": "专项任务会有一个话题：{{name}} 在那里沟通、请你做决定并展示她的工作。",
       "offline": "{{name}} 处于离线状态。它恢复在线后计划就会开始。",
-      "needsMachine": "专项任务在已连接的电脑上运行。请在 设置 › 电脑 中为 {{name}} 连接一台。",
+      "needsMachine": "专项任务在已连接的电脑上运行。请在 设置 › 设备 中为 {{name}} 连接一台。",
       "commandHint": "你也可以在任意对话的输入框中输入以下命令来开始：",
       "approvals": "合并、部署和回滚始终需要审批",
       "start": "开始专项任务",
@@ -12824,8 +12824,6 @@
       "firstTime": "首次使用",
       "step1": "打开下载的文件，把 agentes.chat 拖到“应用程序”中。",
       "step1Install": "打开下载的文件进行安装。",
-      "step2": "打开它，点击“使用你自己的服务器”，再点击“连接到我的服务器”，然后输入此页面的地址。登录后，在 设置 → 电脑 中点击“使用这台{{device}}”。",
-      "other": "其他方式：服务器或 Linux",
       "otherText": "在这台电脑的终端中运行以下命令，然后确认它显示的代码。",
       "waiting": "正在等待电脑连接…"
     },
@@ -13401,19 +13399,9 @@
       },
       "saved": "{{name}} 现在使用 {{computer}}。"
     },
-    "lead": "智能体工作的地方：此服务器和你连接的任何电脑。",
-    "leadCloud": "你的智能体工作的地方：一台专属这个工作区、始终开机的电脑。",
     "about": "关于这台电脑",
     "how": "电脑如何运作",
-    "hostMissing": "这台服务器也可以作为智能体的电脑：<guide>查看方法</guide>。",
-    "other": {
-      "title": "其他电脑",
-      "text": "通过代码连接，比如家里的 Mac mini 或另一台服务器。每台电脑允许做什么，在那台电脑上设置。",
-      "emptyTitle": "在任何电脑上运行智能体",
-      "emptyText": "用代码连接家里的 Mac mini 或其他服务器，智能体就能在上面工作。",
-      "emptyViewerTitle": "团队的电脑会显示在这里",
-      "emptyViewer": "能连接电脑的成员添加后，电脑会显示在这里。"
-    }
+    "hostMissing": "这台服务器也可以作为智能体的电脑：<guide>查看方法</guide>。"
   },
   "outage": {
     "region": "离线的电脑",
@@ -16466,7 +16454,7 @@
       "turn": "横屏",
       "upright": "竖屏",
       "message": "给 {{name}} 发消息",
-      "chooseOnWeb": "请在 agentes.chat 的 设置 › 电脑 中选择。"
+      "chooseOnWeb": "请在 agentes.chat 的 设置 › 设备 中选择。"
     }
   },
   "taskManager": {

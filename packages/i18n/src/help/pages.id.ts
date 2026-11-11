@@ -20,7 +20,23 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "who",
         heading: "Untuk siapa",
         blocks: [
-          "Dibuat untukmu atau tim kecil, selama komputer ini menyala. Untuk tim yang lebih besar, atau server yang selalu menyala, [pasang agentes.chat di server](/help/install-on-a-server) lalu pilih **Hubungkan ke serverku** di aplikasi. Datamu bisa dipindahkan ke sana nanti.",
+          "Kamu atau tim kecil. Mac mini, PC cadangan, atau laptop yang tetap menyala cocok jadi rumahnya: siapkan seperti di [Biarkan tetap menyala](#keep-on). Di Mac atau PC, aplikasi inilah cara menjalankan agentes.chat tanpa Docker.",
+          "Untuk tim yang lebih besar, lihat [Pilih cara penyiapan](/help/install-on-a-server#choose). Datamu bisa dipindahkan ke server nanti.",
+        ],
+      },
+      {
+        id: "keep-on",
+        heading: "Biarkan tetap menyala",
+        blocks: [
+          "Di komputer yang juga diandalkan orang lain, siapkan sekali saja:",
+          {
+            list: [
+              "**Buka saat login** menyala sendiri setelah penyiapan.",
+              "Di Mac, nyalakan **Login otomatis** di **Pengaturan Sistem\u00a0›\u00a0Pengguna & Grup**, supaya aplikasinya terbuka setelah restart. FileVault mematikan login otomatis.",
+              "Di Mac, nyalakan **Mulai secara otomatis setelah listrik padam** di **Pengaturan Sistem\u00a0›\u00a0Energi**.",
+              "Mac tetap terjaga selama server berjalan dan **Akses dari ponselmu dan rekan tim** menyala. Di Windows dan Linux, matikan mode tidur di pengaturan daya sistem.",
+            ],
+          },
         ],
       },
       {
@@ -28,6 +44,15 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Agen-agenmu juga bekerja di sini",
         blocks: [
           "Agen-agenmu juga bekerja di komputer ini, di folder mereka sendiri, dengan browser, dan dengan Claude Code atau Codex kalau terpasang di sini. Perintah tetap mati sampai kamu menyalakannya di **Preferensi › Alat**.",
+          "Agen di sini berjalan sebagai kamu. Kalau Perintah menyala, mereka bisa menjangkau seluruh komputer ini, termasuk `.agentes`: database, `.env` berisi `AGENTES_SECRET`, kunci pemilik, dan token komputer ini. Itu berlaku untuk setiap ruang kerja yang memakai komputer ini, termasuk ruang kerja di agentes.chat Cloud. Lihat [Apa yang bisa dijangkau agen](/help/computers#reach).",
+        ],
+      },
+      {
+        id: "another-workspace",
+        heading: "Pinjamkan juga ke ruang kerja lain",
+        blocks: [
+          "Ruang kerja dari server yang kamu jalankan di sini memakai komputer ini dengan sendirinya. Supaya ruang kerja di tempat lain juga bisa memakainya, misalnya ruang kerja di agentes.chat Cloud, buka **Preferensi\u00a0›\u00a0Server**, tekan **Tambah server…**, masuk ke ruang kerja itu, lalu tekan **Izinkan** saat aplikasi bertanya.",
+          "Tiap ruang kerja punya agen dan foldernya sendiri di sini. **Perintah** di **Preferensi\u00a0›\u00a0Alat** berlaku untuk semua ruang kerja di komputer ini sekaligus: nyalakan hanya kalau kamu percaya menyerahkan seluruh komputer ini kepada agen dari setiap ruang kerja.",
         ],
       },
       {
@@ -35,34 +60,123 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Dari ponselmu dan timmu",
         blocks: [
           "**Akses dari ponselmu dan rekan tim** menaruh agentes.chat di Tailscale, jaringan pribadi untuk perangkatmu: ponselmu dan orang yang kamu undang bergabung ke jaringan itu, dan tidak ada orang lain yang bisa menjangkau agentes.chat. Tailscale gratis: https://tailscale.com/download. Kalau dimatikan, agentes.chat hanya bisa dipakai di komputer ini.",
+          "Kalau komputer ini sudah membagikan hal lain di port 443 Tailscale, agentes.chat memakai port 8443, dan alamatnya diakhiri `:8443`.",
+        ],
+      },
+      {
+        id: "password",
+        heading: "Masuk dari perangkat lain",
+        blocks: [
+          "Awalnya pemilik tidak punya kata sandi: aplikasi memasukkanmu di komputer ini. Untuk masuk dari browser di komputer lain, tambahkan kata sandi di **Pengaturan\u00a0›\u00a0Akunmu**. Aplikasi ponsel terhubung dengan memindai kode QR di bawah **Di ponselmu**, di **Preferensi\u00a0›\u00a0Server**. Untuk itu, **Akses dari ponselmu dan rekan tim** harus menyala.",
+        ],
+      },
+      {
+        id: "updates",
+        heading: "Pembaruan",
+        blocks: [
+          "Aplikasi mencari pembaruan sendiri, dan memasangnya saat kamu menekan **Perbarui dan buka ulang** di **Preferensi\u00a0›\u00a0Pembaruan**. Server dan semua agen ikut dimulai ulang. Database disalin dulu, dan kalau versi baru tidak merespons dalam 3 menit, aplikasi kembali sendiri ke versi sebelumnya beserta datanya.",
         ],
       },
       {
         id: "backups",
-        heading: "Cadangan dan pindahan",
+        heading: "Cadangan",
         blocks: [
-          "**Cadangkan sekarang**, di **Preferensi › Server**, menyimpan database, file, dan pengaturan di `.agentes/backups`, di folder pribadimu.",
+          "Belum ada yang dicadangkan otomatis. **Cadangkan sekarang**, di **Preferensi\u00a0›\u00a0Server**, menghentikan server sebentar lalu menyimpan database, file, dan `.env` di `.agentes/backups`, di folder pribadimu. Dua cadangan terbaru yang disimpan.",
+          "Sesekali salin cadangan itu ke luar komputer ini, ke disk atau penyimpanan cloud. Isinya kunci-kuncimu: jaga kerahasiaannya.",
+        ],
+      },
+      {
+        id: "ai-programs",
+        heading: "Claude Code dan Codex",
+        blocks: [
+          "Aplikasi mencari Claude Code dan Codex lewat `PATH` shell login-mu, ditambah folder yang biasa seperti `~/.local/bin`, `/opt/homebrew/bin`, dan `/usr/local/bin`. Kalau **Preferensi\u00a0›\u00a0Alat** menampilkan **Tidak ditemukan**, pastikan `claude` atau `codex` bisa berjalan di jendela Terminal baru, lalu tutup dan buka lagi aplikasinya.",
+        ],
+      },
+      {
+        id: "moving",
+        heading: "Pindah ke server",
+        blocks: [
+          {
+            list: ["Tutup aplikasi, lalu buat dump database dengan salinan server milik aplikasi itu sendiri. Di Mac:"],
+          },
+          {
+            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+          },
+          {
+            list: [
+              "[Pasang agentes.chat di server](/help/install-on-a-server), tapi jangan dijalankan dulu. Di `.env`-nya, isi `AGENTES_SECRET` dari `~/.agentes/.env`, lalu jalankan databasenya saja: `docker compose up -d postgres`.",
+              "Muat dump-nya: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
+              "Jalankan dengan `docker compose up -d`, salin `~/.agentes/files` ke dalamnya seperti di panduan lengkap, lalu masuk seperti sebelumnya.",
+            ],
+          },
         ],
       },
     ],
   },
   computers: {
-    title: "Komputer untuk agen-agenmu",
+    title: "Komputer dan ponselmu",
     summary:
-      "Agen menjalankan kode dan mengolah file di komputer yang kamu hubungkan: Mac atau PC dengan aplikasi agentes.chat, atau server.",
+      "Bawa Mac, PC, komputer Linux, server, atau ponsel, dan agen-agenmu bekerja di sana. Sama saja di agentes.chat Cloud maupun di server milikmu sendiri.",
     sections: [
       {
-        id: "mac",
-        heading: "Mac atau PC, dengan aplikasinya",
+        id: "app",
+        heading: "Dari aplikasi agentes.chat",
         blocks: [
-          "Aplikasi agentes.chat membuka servermu di jendelanya sendiri, dan dengan satu klik agen-agennya bekerja di komputer itu, di folder mereka sendiri. Pasang aplikasinya, buka, pilih **Pakai servermu sendiri › Hubungkan ke serverku** lalu ketik alamat servermu. Setelah masuk, klik **Pakai Mac ini** (**Pakai PC ini** di Windows, **Pakai komputer ini** di Linux) di **Pengaturan › Komputer**.",
+          "Pasang aplikasi di komputer itu, buka, lalu masuk ke ruang kerjamu. Aplikasi bertanya **Izinkan agen <workspace> memakai Mac ini?** (PC ini di Windows, komputer ini di Linux). Pilih siapa yang boleh memakainya lalu tekan **Izinkan**. Selesai.",
+          "Sudah masuk? Nyalakan ruang kerjanya di **Preferensi\u00a0›\u00a0Umum**, di kartu **Agen**.",
         ],
       },
       {
-        id: "server",
-        heading: "Server atau komputer Linux",
+        id: "web",
+        heading: "Dari situs",
         blocks: [
-          "Di **Pengaturan › Komputer**, salin perintah di bawah **Cara lain** lalu jalankan di terminal komputer itu. Perintah itu menampilkan kode dan tautan: buka tautannya, pastikan kodenya sama, lalu konfirmasi dengan akunmu. Tidak ada yang perlu dipasang lebih dulu.",
+          "Di **Pengaturan\u00a0›\u00a0Perangkat**, tekan **Hubungkan perangkat**:",
+          {
+            list: [
+              "**Mac ini** atau **PC ini**: membuka aplikasi, yang bertanya dulu kepadamu.",
+              "**Komputer lain**: pasang aplikasi di sana, masuk dengan akunmu sendiri, lalu tekan **Izinkan**. Komputer itu muncul di sini dengan sendirinya.",
+              "**Server atau VPS**: jalankan satu baris di terminalnya, lalu izinkan server itu bergabung. Baris itu hanya berlaku sekali, selama 10 menit.",
+            ],
+          },
+          "Aplikasi terhubung dengan satu klik hanya ke alamat https, seperti alamat Tailscale yang diakhiri `.ts.net`. Untuk alamat http biasa, pakai baris terminal.",
+        ],
+      },
+      {
+        id: "phones",
+        heading: "Ponsel",
+        blocks: [
+          "Ponsel Android terhubung lewat komputer mana pun yang sudah terhubung: dengan kabel, atau lewat Wi-Fi di Android 14 ke atas dengan pembaruan keamanan Mei 2026. iPhone terhubung lewat Mac yang punya aplikasinya dan Xcode, dan aplikasinya menyiapkan sisanya. Keduanya dimulai dari **Hubungkan perangkat**.",
+        ],
+      },
+      {
+        id: "who",
+        heading: "Siapa yang bisa memakainya",
+        blocks: [
+          "Perangkat baru hanya untukmu: **Hanya saya** berarti kamu dan agen yang bekerja untukmu. Buka untuk semua orang di ruang kerja, atau untuk orang dan peran tertentu, saat kamu mengizinkannya atau nanti di halamannya di **Pengaturan\u00a0›\u00a0Perangkat**.",
+        ],
+      },
+      {
+        id: "open",
+        heading: "Selama aplikasinya terbuka",
+        blocks: [
+          "Agen bekerja di komputer hanya selama aplikasi berjalan di sana dan komputernya tidak tidur. Saat aplikasi bertanya, biarkan **Tetap siap: buka agentes.chat saat login** tercentang. Komputer yang mati atau tidur tampil **Offline**, dan agen menunggu sampai komputernya kembali.",
+        ],
+      },
+      {
+        id: "pausing",
+        heading: "Menjeda dan memutuskan",
+        blocks: [
+          "Di komputer itu, ikon agentes.chat di dekat jam menjeda agen dari semua ruang kerja. Di **Preferensi\u00a0›\u00a0Umum**, sakelar tiap ruang kerja hanya menjeda ruang kerja itu, dan **Keluar** memutuskannya. Selama dijeda tidak ada yang baru dimulai, dan yang sedang berjalan tetap diselesaikan. Folder agen tetap tersimpan di disk setelah diputuskan.",
+          "Dari situs, **Hapus** di halaman perangkat memutuskannya.",
+        ],
+      },
+      {
+        id: "organizations",
+        heading: "Beberapa ruang kerja, satu komputer",
+        blocks: [
+          "Masuk ke tiap ruang kerja di aplikasi yang sama lalu tekan **Izinkan** untuk masing-masing. Ruang kerja di agentes.chat Cloud dan di server milikmu sendiri bisa berbagi satu komputer (aplikasi 0.6.1 ke atas). Masing-masing punya agen dan foldernya sendiri di sana, dan memutuskan satu ruang kerja tidak memengaruhi yang lain.",
+          "Server yang dijalankan aplikasi di komputer ini sudah terhubung dan tidak perlu apa-apa. Untuk meminjamkan komputer itu juga ke ruang kerja di tempat lain, lihat [Pinjamkan juga ke ruang kerja lain](/help/run-on-your-computer#another-workspace).",
+          "Memakai aplikasi di laptop hanya sebagai jendela ke ruang kerjamu? Saat aplikasi meminta izin agar agen memakai laptop itu, **Nanti saja** membuatnya tetap jadi jendela biasa.",
         ],
       },
       {
@@ -73,17 +187,20 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
-        id: "pausing",
-        heading: "Menjeda",
+        id: "reach",
+        heading: "Apa yang bisa dijangkau agen",
         blocks: [
-          "Dengan aplikasinya, orang yang menghubungkan komputer bisa menjeda agen-agen di sana, dari ikon agentes.chat di dekat jam. Tidak ada yang baru dimulai sampai mereka melanjutkannya. Yang sedang berjalan tetap diselesaikan.",
-        ],
-      },
-      {
-        id: "organizations",
-        heading: "Beberapa ruang kerja",
-        blocks: [
-          "Satu komputer bisa bekerja untuk beberapa ruang kerja. Masing-masing punya agen, folder, dan tugasnya sendiri di sana, dan memutuskan satu ruang kerja tidak memengaruhi yang lain.",
+          "Agen berjalan sebagai kamu, pengguna komputer itu. Alat file mereka tetap di folder mereka, tapi sebuah perintah bisa membaca apa pun yang bisa kamu baca:",
+          {
+            list: [
+              "file dan akun-akun yang kamu masuki",
+              "folder agen lain, termasuk milik ruang kerja lain, dan login yang disimpan browser mereka",
+              "token yang menghubungkan komputer ini",
+              "di komputer yang juga menjalankan agentes.chat, database dan kuncinya di `.agentes`",
+            ],
+          },
+          "agentes.chat menolak perintah yang menyebut kunci, token, dan data login, tapi itu aturan, bukan tembok. Karena itu **Perintah** awalnya mati. Menyalakannya di **Preferensi\u00a0›\u00a0Alat** berlaku untuk semua ruang kerja di komputer itu sekaligus: lakukan hanya kalau kamu percaya menyerahkan semua isinya kepada agen dari setiap ruang kerja, dan kepada orang-orang yang mereka bantu. Claude Code dan Codex menjalankan perintahnya sendiri di folder agen, dengan aturannya sendiri.",
+          "Untuk tembok sungguhan, pakai server Linux. Di Debian 13, kalau dipasang dengan `--system`, tiap agen jadi pengguna tersendiri. Di Ubuntu, agen berbagi satu pengguna, `agentes`: mereka bisa melihat folder satu sama lain, tapi bukan foldermu atau folder server. Atau beri agen komputer milik mereka sendiri.",
         ],
       },
     ],
@@ -100,6 +217,13 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         ],
       },
       {
+        id: "own",
+        heading: "Komputer dan ponselmu sendiri",
+        blocks: [
+          "Agen juga bisa bekerja di komputer dan ponsel yang kamu bawa: Mac atau PC dengan aplikasi agentes.chat, server, ponsel Android, atau iPhone. Lihat [Komputer dan ponsel yang kamu bawa](/help/computers).",
+        ],
+      },
+      {
         id: "plans",
         heading: "Paket AI kamu",
         blocks: [
@@ -110,7 +234,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "size",
         heading: "Ukurannya",
-        blocks: ["CPU, memori, dan disknya terlihat di **Pengaturan › Komputer**."],
+        blocks: ["CPU, memori, dan disknya terlihat di **Pengaturan\u00a0›\u00a0Perangkat**."],
       },
       {
         id: "trouble",
@@ -535,12 +659,26 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
       "Jalankan agentes.chat di servermu sendiri, gratis, untuk seluruh timmu. Satu perintah menyiapkan semuanya.",
     sections: [
       {
+        id: "choose",
+        heading: "Pilih cara penyiapan",
+        blocks: [
+          {
+            list: [
+              "**agentes.chat Cloud**: untuk tim mana pun, bisa diakses dari mana saja. Kami yang menjalankan, memperbarui, dan mencadangkannya. Tiap ruang kerja mendapat komputernya sendiri, dan di sana tiap agen jadi pengguna tersendiri.",
+              "**Komputermu, dengan aplikasinya**: untukmu atau tim kecil, bisa diakses selama komputer itu menyala. Mac mini yang tetap menyala cocok sekali. Kamu memperbaruinya dengan satu klik dan mencadangkannya secara manual. Agen berjalan sebagai kamu di komputer itu.",
+              "**Server**: untuk tim yang lebih besar, menyala terus. Kamu memperbaruinya dengan tiga perintah, dan server bisa mencadangkan dirinya sendiri setiap hari. Di Debian 13, tiap agen jadi pengguna tersendiri.",
+            ],
+          },
+          "Dari komputermu ke server: [Pindah ke server](/help/run-on-your-computer#moving). Semuanya bisa membawa agen dari yang lain dengan [Bawa agen-agenmu](/help/import).",
+        ],
+      },
+      {
         id: "need",
         heading: "Yang kamu perlukan",
         blocks: [
           {
             list: [
-              "Server atau VPS dengan Linux 64-bit, di x64 atau arm64. Untuk tim kecil, 2 CPU, memori 4 GB, dan disk 20 GB sudah cukup untuk mulai. Untuk mencoba, Mac dengan Docker Desktop, OrbStack, atau Colima juga bisa.",
+              "Server atau VPS dengan Linux 64-bit, di x64 atau arm64. Untuk tim kecil, 2 CPU, memori 4 GB, dan disk 20 GB sudah cukup untuk mulai. Di Mac atau PC, [aplikasinya menjalankan agentes.chat](/help/run-on-your-computer) tanpa Docker.",
               "Docker dengan Compose. Di Linux, pemasang menambahkannya kalau belum ada, setelah bertanya dulu.",
               "Cara masuk: akun Tailscale gratis (bawaan, privat, tanpa domain dan tanpa port terbuka), atau domain yang mengarah ke server, dengan port 80 dan 443 terbuka.",
             ],
@@ -614,11 +752,11 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "computers",
         heading: "Komputer agen-agenmu",
         blocks: [
-          "Penyiapan bisa menjadikan server ini juga komputer agenmu, tempat mereka menjalankan perintah, memakai browser, dan menyimpan file. Ia bertanya, dan menyarankan ya kalau server sanggup. Di Linux, setiap agen mendapat pengguna sendiri, dengan layar. Kalau kamu menjawab tidak, jalankan pemasangan lagi dengan `--computer yes`:",
+          "Penyiapan bisa menjadikan server ini juga komputer agenmu, tempat mereka menjalankan perintah, memakai browser, dan menyimpan file. Ia bertanya, dan menyarankan ya kalau server sanggup. Di Debian 13, setiap agen mendapat pengguna sendiri, dengan layar. Di Ubuntu, agen berbagi satu pengguna, `agentes`. Kalau kamu menjawab tidak, jalankan pemasangan lagi dengan `--computer yes`:",
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "Komputer lain, seperti Mac dengan aplikasi agentes.chat atau server lain, terhubung dari **Pengaturan\u00a0›\u00a0Komputer**, seperti di [Komputer untuk agen-agenmu](/help/computers). Di Tailscale, komputer itu masuk ke tailnet-mu lebih dulu.",
+          "Komputer lain, seperti Mac dengan aplikasi agentes.chat atau server lain, terhubung dari **Pengaturan\u00a0›\u00a0Perangkat**, seperti di [Komputer dan ponselmu](/help/computers). Di Tailscale, komputer itu masuk ke tailnet-mu lebih dulu.",
         ],
       },
       {

@@ -8360,7 +8360,7 @@
       "homeHint": "De missie krijgt een thread: daar praat {{name}}, vraagt om besluiten en laat zijn werk zien.",
       "homeHint_female": "De missie krijgt een thread: daar praat {{name}}, vraagt om besluiten en laat haar werk zien.",
       "offline": "{{name}} is offline. Het plan start zodra hij terug is.",
-      "needsMachine": "Missies draaien op een gekoppelde computer. Koppel er een aan {{name}} in Instellingen › Computers.",
+      "needsMachine": "Missies draaien op een gekoppelde computer. Koppel er een aan {{name}} in Instellingen › Apparaten.",
       "commandHint": "Je kunt er ook een starten door te typen in het invoerveld van elk gesprek:",
       "approvals": "Merge, deploy en rollback vragen altijd om goedkeuring",
       "start": "Missie starten",
@@ -13313,8 +13313,6 @@
       "firstTime": "De eerste keer",
       "step1": "Open het gedownloade bestand en sleep agentes.chat naar Apps.",
       "step1Install": "Open het gedownloade bestand om het te installeren.",
-      "step2": "Open de app, klik op Je eigen server gebruiken en daarna op Verbinden met mijn server, en typ het adres van deze pagina. Log in en klik dan op Deze {{device}} gebruiken in Instellingen → Computers.",
-      "other": "Andere manieren: server of Linux",
       "otherText": "Voer dit uit in de terminal van de computer en bevestig dan de code die hij toont.",
       "waiting": "Wachten tot de computer verbinding maakt…"
     },
@@ -13894,19 +13892,9 @@
       },
       "saved": "{{name}} gebruikt nu {{computer}}."
     },
-    "lead": "Waar je agents werken: deze server en elke computer die je koppelt.",
-    "leadCloud": "Waar je agents werken: een computer alleen voor deze werkruimte, altijd aan.",
     "about": "Over deze computer",
     "how": "Zo werken computers",
-    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>.",
-    "other": {
-      "title": "Andere computers",
-      "text": "Gekoppeld met een code, zoals een Mac mini thuis of een andere server. Wat elke computer toestaat, stel je op die computer zelf in.",
-      "emptyTitle": "Laat agents op elke computer draaien",
-      "emptyText": "Verbind een Mac mini thuis of een andere server met een code, en agents werken erop.",
-      "emptyViewerTitle": "De computers van het team verschijnen hier",
-      "emptyViewer": "Wie computers mag verbinden, voegt er een toe, en hij verschijnt hier."
-    }
+    "hostMissing": "Deze server kan ook de computer van je agents zijn: <guide>zo werkt het</guide>."
   },
   "outage": {
     "region": "Offline computers",
@@ -17011,7 +16999,7 @@
       "turn": "Draai liggend",
       "upright": "Draai rechtop",
       "message": "Bericht aan {{name}}",
-      "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Computers."
+      "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Apparaten."
     }
   },
   "taskManager": {

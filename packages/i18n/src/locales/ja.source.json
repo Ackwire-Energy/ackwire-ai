@@ -20147,7 +20147,7 @@
     "value": "{{name}} is offline. The plan starts when it's back."
   },
   "missions.new.needsMachine": {
-    "value": "Missions run on a connected computer. Connect one to {{name}} in Settings › Computers."
+    "value": "Missions run on a connected computer. Connect one to {{name}} in Settings › Devices."
   },
   "missions.new.commandHint": {
     "value": "You can also start one by typing in any conversation's composer:"
@@ -32152,12 +32152,6 @@
   "machines.download.step1Install": {
     "value": "Open the downloaded file to install it."
   },
-  "machines.download.step2": {
-    "value": "Open it, click Use your own server, then Connect to my server, and type this page's address. Sign in, then click Use this {{device}} in Settings → Computers."
-  },
-  "machines.download.other": {
-    "value": "Other ways: server or Linux"
-  },
   "machines.download.otherText": {
     "value": "Run this in the computer's terminal, then confirm the code it shows."
   },
@@ -33630,12 +33624,6 @@
   "computers.agents.saved": {
     "value": "{{name}} now uses {{computer}}."
   },
-  "computers.lead": {
-    "value": "Where your agents work: this server and any computer you connect."
-  },
-  "computers.leadCloud": {
-    "value": "Where your agents work: a computer just for this workspace, always on."
-  },
   "computers.about": {
     "value": "About this computer"
   },
@@ -33644,24 +33632,6 @@
   },
   "computers.hostMissing": {
     "value": "This server can be your agents' computer too: <guide>here's how</guide>."
-  },
-  "computers.other.title": {
-    "value": "Other computers"
-  },
-  "computers.other.text": {
-    "value": "Connected with a code, like a Mac mini at home or another server. What each one allows is set on that computer."
-  },
-  "computers.other.emptyTitle": {
-    "value": "Run agents on any computer"
-  },
-  "computers.other.emptyText": {
-    "value": "Connect a Mac mini at home or another server with a code, and agents work on it."
-  },
-  "computers.other.emptyViewerTitle": {
-    "value": "The team's computers show up here"
-  },
-  "computers.other.emptyViewer": {
-    "value": "Whoever can connect computers adds one, and it shows up here."
   },
   "outage.region": {
     "value": "Offline computers"
@@ -40847,7 +40817,7 @@
     "value": "Message {{name}}"
   },
   "agentComputer.phone.chooseOnWeb": {
-    "value": "Choose it on agentes.chat, in Settings › Computers."
+    "value": "Choose it on agentes.chat, in Settings › Devices."
   },
   "taskManager.title": {
     "value": "Task manager"

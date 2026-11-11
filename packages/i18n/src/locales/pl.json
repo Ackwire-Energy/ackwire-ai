@@ -8882,7 +8882,7 @@
       "homeHint": "Misja dostaje wątek: tam {{name}} rozmawia, prosi o decyzje i pokazuje swoją pracę.",
       "homeHint_female": "Misja dostaje wątek: tam {{name}} rozmawia, prosi o decyzje i pokazuje swoją pracę.",
       "offline": "{{name}} jest offline. Plan ruszy, gdy wróci.",
-      "needsMachine": "Misje działają na podłączonym komputerze. Podłącz go do {{name}} w Ustawienia › Komputery.",
+      "needsMachine": "Misje działają na podłączonym komputerze. Podłącz go do {{name}} w Ustawienia › Urządzenia.",
       "commandHint": "Możesz też rozpocząć misję, pisząc w polu wiadomości dowolnej rozmowy:",
       "approvals": "Merge, wdrożenie i rollback zawsze wymagają zatwierdzenia",
       "start": "Rozpocznij misję",
@@ -14164,8 +14164,6 @@
       "firstTime": "Za pierwszym razem",
       "step1": "Otwórz pobrany plik i przeciągnij agentes.chat do folderu Aplikacje.",
       "step1Install": "Otwórz pobrany plik, aby go zainstalować.",
-      "step2": "Otwórz ją, kliknij Użyj własnego serwera, potem Połącz z moim serwerem i wpisz adres tej strony. Zaloguj się, a potem kliknij Podłącz ten {{device}} w Ustawienia → Komputery.",
-      "other": "Inne sposoby: serwer lub Linux",
       "otherText": "Uruchom to w terminalu komputera, a potem potwierdź pokazany kod.",
       "waiting": "Czekam, aż komputer się połączy…"
     },
@@ -14753,19 +14751,9 @@
       },
       "saved": "{{name}} używa teraz: {{computer}}."
     },
-    "lead": "Gdzie pracują twoi agenci: ten serwer i każdy podłączony komputer.",
-    "leadCloud": "Gdzie pracują twoi agenci: komputer tylko dla tej przestrzeni roboczej, zawsze włączony.",
     "about": "O tym komputerze",
     "how": "Jak działają komputery",
-    "hostMissing": "Ten serwer też może być komputerem twoich agentów: <guide>zobacz jak</guide>.",
-    "other": {
-      "title": "Inne komputery",
-      "text": "Podłączone kodem, np. Mac mini w domu albo inny serwer. Na co każdy z nich pozwala, ustawia się na tym komputerze.",
-      "emptyTitle": "Uruchamiaj agentów na dowolnym komputerze",
-      "emptyText": "Połącz kodem Maca mini w domu albo inny serwer, a agenci będą na nim pracować.",
-      "emptyViewerTitle": "Tu pojawią się komputery zespołu",
-      "emptyViewer": "Komputer dodaje osoba, która może je łączyć, a on pojawi się tutaj."
-    }
+    "hostMissing": "Ten serwer też może być komputerem twoich agentów: <guide>zobacz jak</guide>."
   },
   "outage": {
     "region": "Komputery offline",
@@ -17934,7 +17922,7 @@
       "turn": "Obróć poziomo",
       "upright": "Obróć pionowo",
       "message": "Napisz do {{name}}",
-      "chooseOnWeb": "Wybierz go w agentes.chat, w Ustawienia › Komputery."
+      "chooseOnWeb": "Wybierz go w agentes.chat, w Ustawienia › Urządzenia."
     }
   },
   "taskManager": {
