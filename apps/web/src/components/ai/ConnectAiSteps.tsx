@@ -983,13 +983,13 @@ export function PlanAudience({
       ? t(on ? "connectAi.team.audience.on" : "connectAi.team.audience.off", agentGrammar(one.name))
       : t(on ? "connectAi.team.audience.onAll" : "connectAi.team.audience.offAll");
   return (
-    <p className="ai-aud">
+    <p className="ai-aud ac-iconline">
       <Icon name={on ? "audienceEveryone" : "audienceOwner"} size={16} />
       <span className="ai-aud__text">
-        <span>{line}</span>
+        <span>{line}</span>{" "}
         <button type="button" className="ac-link" disabled={busy} onClick={() => void toggle(!on)}>
           {t(on ? "connectAi.team.audience.unshare" : "connectAi.team.audience.share")}
-        </button>
+        </button>{" "}
         <InfoHint name={says.about}>{says.text}</InfoHint>
       </span>
     </p>

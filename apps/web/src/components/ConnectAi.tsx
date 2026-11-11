@@ -52,6 +52,7 @@ import {
   DialogBody,
   DialogFooter,
   Icon,
+  type IconName,
   OptionCard,
   ProviderLogo,
   Spinner,
@@ -266,6 +267,14 @@ export function ConnectAiProvider({
 /** A chosen plan's steps, named as its maker sells it; the key's, as the picker names it. */
 const stepTitle = (t: TFunction, choice: AiChoice) =>
   choice === "key" ? t("connectAi.title.api_key") : planTitle(t, choice);
+
+/** A footer's note: its icon on the words' first line, the footer's buttons outside it, centred with the line. */
+const footNote = (icon: IconName, text: string) => (
+  <span className="ac-iconline">
+    <Icon name={icon} />
+    <span>{text}</span>
+  </span>
+);
 
 /** The sky over the narrow dialog: who wakes (four drawn, the rest as "+N"), and the AI's mark at the end of a trail. */
 interface BandScene {
@@ -1029,7 +1038,7 @@ function ConnectAiDialog({
             {rowsOf(teamIds).map((a) => {
               const on = pickDraft.includes(a.id);
               return (
-                <label key={a.id} htmlFor={`${dom}-${a.id}`} className="arrival-pick" data-checked={on}>
+                <label key={a.id} htmlFor={`${dom}-${a.id}`} className="arrival-pick ac-iconline" data-checked={on}>
                   <Checkbox
                     id={`${dom}-${a.id}`}
                     checked={on}
@@ -1255,12 +1264,9 @@ function ConnectAiDialog({
           ) : picking && selected ? (
             <DialogFooter
               note={
-                lends ? (
-                  <span className="ac-iconline">
-                    <Icon name="mail" />
-                    <span>{t("connectAi.chat.told", { name: account?.ownerName?.split(" ")[0] ?? "" })}</span>
-                  </span>
-                ) : undefined
+                lends
+                  ? footNote("mail", t("connectAi.chat.told", { name: account?.ownerName?.split(" ")[0] ?? "" }))
+                  : undefined
               }
             >
               <Button variant="primary" loading={have.busy} disabled={have.busy} onClick={confirm}>
@@ -1271,14 +1277,7 @@ function ConnectAiDialog({
             </DialogFooter>
           ) : (
             !chosen && (
-              <DialogFooter
-                note={
-                  <span className="ac-iconline">
-                    <Icon name="info" />
-                    <span>{t("arrival.connect.without")}</span>
-                  </span>
-                }
-              >
+              <DialogFooter note={footNote("info", t("arrival.connect.without"))}>
                 <Button variant="ghost" onClick={onClose}>
                   {t("arrival.connect.later")}
                 </Button>

@@ -802,8 +802,10 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
               </span>
             </OptionCard>
           </div>
-          <p className="arrival-opts__label">{t("agentPage.work.brain.v2.target")}</p>
-          {aim && <HaveRow item={aim} checked still />}
+          <div className="bd-use">
+            <p className="arrival-opts__label">{t("agentPage.work.brain.v2.target")}</p>
+            {aim && <HaveRow item={aim} checked still />}
+          </div>
         </>
       );
     }

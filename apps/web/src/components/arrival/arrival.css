@@ -305,7 +305,6 @@
 /* The footer: buttons of one height; its note never wraps (a longer thing belongs under the instruction). */
 .arrival-chat .ac-dialog__foot {
   flex-wrap: nowrap;
-  gap: 12px;
 }
 .arrival-chat .ac-dialog__foot .ac-btn {
   height: 40px;
@@ -313,9 +312,6 @@
 .arrival-chat .ac-dialog__foot-note {
   white-space: nowrap;
   overflow: hidden;
-}
-.arrival-chat .ac-dialog__foot-note .ac-iconline {
-  align-items: center;
 }
 .arrival-chat .ac-dialog__foot-note .ac-iconline > span {
   overflow: hidden;
@@ -422,19 +418,21 @@
   align-items: start;
   min-height: 44px;
   padding: 10px 2px;
+  font-size: 15px;
+  line-height: 24px;
   border-top: 1px solid var(--line);
   cursor: pointer;
 }
 .arrival-pick:first-child {
   border-top: 0;
 }
-/* The box on the name's first line, centred on its 24px. */
-.arrival-pick > :first-child {
-  margin-top: 3px;
+/* The box on the name's first line (`.ac-iconline` centres it on the row's 24px line): none of the kit's own nudge, and
+   that line as its own, which the centring measures. */
+.arrival-pick > .ac-check {
+  margin: 0;
+  line-height: inherit;
 }
 .arrival-pick__name {
-  font-size: 15px;
-  line-height: 24px;
   overflow-wrap: anywhere;
 }
 /* One instruction at a time (one login per agent in turn, and who woke): how far along, what to do, the help under
@@ -473,7 +471,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin: 8px 0 0;
+  margin: 2px 0 0;
   padding: 0;
   list-style: none;
 }
@@ -485,7 +483,7 @@
 .ai-strip__face[data-state="next"] {
   opacity: 0.38;
 }
-.ai-strip__face[data-state="now"] {
+.ai-strip__face[data-state="now"] > .ac-avatar {
   box-shadow:
     0 0 0 2px var(--raised),
     0 0 0 4px var(--ink);
@@ -513,10 +511,6 @@
 }
 /* Whom they answer, over a hairline under who woke: the icon on the first line, the way to change it in the words. */
 .ai-aud {
-  display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  gap: 8px;
-  align-items: start;
   align-self: stretch;
   margin: 14px 0 0;
   padding-top: 14px;
@@ -526,14 +520,13 @@
   line-height: 20px;
 }
 .ai-aud > .ac-icon {
-  margin-top: 2px;
   color: var(--faint);
 }
+/* The words, the way to change them and the ⓘ in one flow of text: the ⓘ sits on the words' capitals (the kit's
+   inline hint), wherever the line wraps. */
 .ai-aud__text {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
+  flex: 1;
+  min-width: 0;
 }
 .agp-addacct__starting {
   color: var(--ink-muted);
@@ -721,6 +714,11 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
 }
 .arrival-chat .ai-panel > .ac-card__foot {
   padding-block: 12px 0;
+}
+/* With no card's padding round it, a note keeps its own line: trimmed to its capitals (layout.css) it would stand past
+   the panel, and the dialog's body would scroll by that much. */
+.arrival-chat .ai-panel--plan > .ac-setnote {
+  margin-block: 0;
 }
 .arrival-chat .ai-panel .setup-line.ac-iconline > .ac-icon:first-child {
   display: none;

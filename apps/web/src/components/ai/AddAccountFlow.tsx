@@ -686,7 +686,9 @@ function AddAccountFlow({
   );
   /** The sign-in's button (or "Open again" once begun) with "Copy link" beside it. */
   const signIn = (label: string) => {
-    const size = actionsAt ? undefined : "sm";
+    // The footer's size where the footer holds them; under the step (and once begun, beside "Open again", always small)
+    // the small one, so the two stand as tall as each other.
+    const size = actionsAt && !login ? undefined : "sm";
     const main = login ? (
       openAgain(login.url)
     ) : (

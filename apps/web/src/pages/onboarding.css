@@ -278,6 +278,10 @@ html:not([data-pointer]) .onb__back:focus-visible {
     opacity 0.36s var(--out) 0.16s,
     transform 0.36s var(--out) 0.16s;
 }
+/* With its way out under the button, the bar is a group of its own: the button keeps a button's room from its top. */
+.onb__actions:has(> .onb__skip) {
+  padding-top: var(--space-2);
+}
 .onb__actions::before {
   content: "";
   position: absolute;
@@ -337,8 +341,9 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   font-size: 13px;
   overflow-wrap: anywhere;
 }
-/* The team made: who is in it, one line each. */
-.onb__team {
+/* The team made: who is in it, one line each. Over the list's own margin (team-plan.css) by specificity, never by which
+   sheet links last. */
+.tp-agents.onb__team {
   margin: 0;
 }
 /* The plan: the team asleep on the agents' sky, what each one does, the price, the one button. */

@@ -22,8 +22,9 @@
 .bd-screen:focus {
   outline: none;
 }
-/* With the footer under it, the middle stops at its own focus room, as the body before a footer does. */
-.bd .bd-screen > .ac-dialog__body.ac-dialog__body:last-child {
+/* With the footer under it, the middle stops at its own focus room, as the body before a footer does: the screen's
+   last part, it isn't the dialog's, so it doesn't take the dialog's inset at its foot. */
+.bd .bd-glide > .bd-screen:not(:last-child) > .ac-dialog__body.ac-dialog__body {
   padding-bottom: 4px;
 }
 /* With none (a sign-in whose actions aren't there yet), it keeps the dialog's edge at its foot. */
@@ -82,6 +83,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+/* Whom a switch is for, then the account it goes to: the body's own gap between them, no margin of the cards' own. */
+.bd .arrival-for {
+  margin-bottom: 0;
 }
 /* The one in use is only shown: its row doesn't take a click. */
 .arrival-have__row[data-still] {
@@ -337,7 +342,8 @@ html:not([data-pointer]) .bd-line:focus-visible {
 .bd .arrival-have__row.bd-pick {
   grid-template-columns: 18px minmax(0, 1fr);
 }
-.bd-pick__hint {
+/* Over the account line's colour (arrival.css) by specificity, never by which sheet links last. */
+.arrival-have__line.bd-pick__hint {
   color: var(--faint);
 }
 
