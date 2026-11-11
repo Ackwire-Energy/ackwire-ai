@@ -3960,6 +3960,9 @@ export const en = {
       access: "Default access",
       accessTitle: "Default access of {{label}}",
       accessText: "Its items follow this, unless you change one of them. Each change saves at once.",
+      /** On a connection no agent may use, beside the action that opens its access. */
+      noAgents: "No agent uses this connection.",
+      giveAccess: "Give access",
       actionsName: "More for {{name}}",
       disconnect: "Disconnect",
       removeTitle: "Disconnect {{name}}?",

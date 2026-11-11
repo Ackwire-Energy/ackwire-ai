@@ -2309,7 +2309,7 @@
       "guide": "De handleiding van {{name}} openen",
       "fields": "Gegevens",
       "private": "Deze gegevens worden versleuteld bewaard en nooit meer getoond.",
-      "teamHelp": "De items zijn eerst zichtbaar voor iedereen in de werkruimte en door geen agent gebruikt. Daarna kies je de agenten.",
+      "teamHelp": "Iedereen in de werkruimte ziet de items en elke agent mag ze gebruiken. Daarna kun je dat aanpassen.",
       "personalHelp": "Alleen jij ziet de items, en je agenten gebruiken ze als je erom vraagt.",
       "checking": "Controleren bij {{name}}…",
       "connected": "{{name}} gekoppeld",

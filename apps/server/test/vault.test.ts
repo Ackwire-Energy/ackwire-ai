@@ -418,6 +418,20 @@ test("a connected password manager: its credentials and passwords never come bac
   const external = seen.overview.items.find((i) => i.connectionId === connection.id);
   expect(external).toMatchObject({ kind: "login", sourceName: "AcmePass", accessFromConnection: true });
 
+  // Connected without an access: every agent, as a standing choice. Only who manages it changes that.
+  const open = { everyone: true, roleIds: [], userIds: [], allAgents: true, agentIds: [] };
+  expect((JSON.parse(okText) as { access: unknown }).access).toEqual(open);
+  const none = { ...open, allAgents: false };
+  const setAccess = (b: Browser, access: unknown) =>
+    b(`${w.vault}/connections/${connection.id}`, { method: "PATCH", json: { access } });
+  expect((await setAccess(w.ana, none)).status).toBe(404);
+  const still = (await overviewOf(w.owner, w.vault)).overview.connections as unknown as { access: unknown }[];
+  expect(still[0]?.access).toEqual(open);
+  const narrowed = await setAccess(w.owner, none);
+  expect(narrowed.status).toBe(200);
+  expect(((await narrowed.json()) as { access: unknown }).access).toEqual(none);
+  expect((await setAccess(w.ana, open)).status).toBe(404);
+
   expect((await w.owner(`${w.vault}/connections/${connection.id}`, { method: "DELETE" })).status).toBe(204);
   const gone = await overviewOf(w.owner, w.vault);
   expect(gone.overview.connections).toEqual([]);

@@ -3886,6 +3886,9 @@ export const ptBR = {
       access: "Acesso padrão",
       accessTitle: "Acesso padrão de {{label}}",
       accessText: "Os itens seguem este acesso, a não ser que você mude um deles. Cada mudança salva na hora.",
+      /** On a connection no agent may use, beside the action that opens its access. */
+      noAgents: "Nenhum agente usa esta conexão.",
+      giveAccess: "Dar acesso",
       actionsName: "Mais opções de {{name}}",
       disconnect: "Desconectar",
       removeTitle: "Desconectar {{name}}?",

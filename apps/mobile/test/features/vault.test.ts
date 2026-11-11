@@ -9,6 +9,7 @@ import type {
   VaultSourceInfo,
   VaultUse,
 } from "@agenteschat/client";
+import { vaultNoAgents } from "@agenteschat/client/lib/vault";
 import type { TFunction } from "i18next";
 import {
   accessProblem,
@@ -390,6 +391,12 @@ describe("recent uses", () => {
     );
     expect(usageFacts(t, "en", use({ action: "edit", userId: "u1" }), names, NOW)).not.toContain(" · ");
   });
+});
+
+test("a connection no agent may use: neither all of them nor one picked", () => {
+  expect(vaultNoAgents({ allAgents: false, agentIds: [] })).toBe(true);
+  expect(vaultNoAgents({ allAgents: true, agentIds: [] })).toBe(false);
+  expect(vaultNoAgents({ allAgents: false, agentIds: ["a1"] })).toBe(false);
 });
 
 describe("password managers", () => {

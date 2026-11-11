@@ -3754,6 +3754,8 @@
       "access": "Varsayılan erişim",
       "accessTitle": "{{label}} için varsayılan erişim",
       "accessText": "Birini değiştirmediğiniz sürece öğeler buna uyar. Her değişiklik hemen kaydedilir.",
+      "noAgents": "Bu bağlantıyı hiçbir ajan kullanmıyor.",
+      "giveAccess": "Erişim ver",
       "actionsName": "{{name}} için diğer seçenekler",
       "disconnect": "Bağlantıyı kes",
       "removeTitle": "{{name}} bağlantısı kesilsin mi?",

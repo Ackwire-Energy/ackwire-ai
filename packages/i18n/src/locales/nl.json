@@ -3769,6 +3769,8 @@
       "access": "Standaardtoegang",
       "accessTitle": "Standaardtoegang van {{label}}",
       "accessText": "De items volgen dit, tenzij je er een wijzigt. Elke wijziging wordt meteen opgeslagen.",
+      "noAgents": "Geen enkele agent gebruikt deze verbinding.",
+      "giveAccess": "Toegang geven",
       "actionsName": "Meer voor {{name}}",
       "disconnect": "Ontkoppelen",
       "removeTitle": "{{name}} ontkoppelen?",

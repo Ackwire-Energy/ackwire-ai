@@ -3643,6 +3643,8 @@
       "access": "Akses bawaan",
       "accessTitle": "Akses bawaan {{label}}",
       "accessText": "Item-itemnya mengikuti ini, kecuali kamu mengubah salah satunya. Setiap perubahan langsung tersimpan.",
+      "noAgents": "Belum ada agen yang memakai koneksi ini.",
+      "giveAccess": "Beri akses",
       "actionsName": "Lainnya untuk {{name}}",
       "disconnect": "Putuskan",
       "removeTitle": "Putuskan {{name}}?",

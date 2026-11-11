@@ -6,6 +6,7 @@ export { type VaultRunPerson, type VaultViewer, vaultPersonOfRun } from "./acces
 export {
   checkVaultLogin,
   deleteVaultItemByAgent,
+  listUnreachedConnections,
   listUsableVault,
   listVaultPlaces,
   releaseVaultKeys,

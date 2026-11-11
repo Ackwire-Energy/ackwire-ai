@@ -2309,7 +2309,7 @@
       "guide": "{{name}} rehberini aç",
       "fields": "Bilgiler",
       "private": "Bu bilgiler şifrelenmiş olarak saklanır ve bir daha gösterilmez.",
-      "teamHelp": "Öğeleri başta çalışma alanındaki herkese görünür ve hiçbir ajan kullanmaz. Ajanları sonra seçersiniz.",
+      "teamHelp": "Öğelerini çalışma alanındaki herkes görür ve tüm ajanlar kullanabilir. Bunu sonra ayarlayabilirsiniz.",
       "personalHelp": "Öğelerini yalnızca siz görürsünüz, ajanlarınız da siz istediğinizde kullanır.",
       "checking": "{{name}} ile kontrol ediliyor…",
       "connected": "{{name}} bağlandı",

@@ -1,5 +1,6 @@
 import { useVault, type VaultConnection, type VaultItem, type VaultOverview } from "@agenteschat/client";
 import { joinNames, relativeTime } from "@agenteschat/client/lib/format";
+import { vaultNoAgents } from "@agenteschat/client/lib/vault";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, View } from "react-native";
@@ -312,13 +313,20 @@ function ConnectionRow({ icon, conn, now }: { icon: IconName; conn: VaultConnect
       subLines={2}
       media
       below={
-        <View style={styles.chips}>
-          <Chip icon={state.icon} label={t(state.key)} />
-          <Chip
-            icon={conn.scope === "personal" ? "lock" : "members"}
-            label={conn.scope === "personal" ? t("mobile.vault.tab.personal") : t("mobile.vault.tab.team")}
-          />
-        </View>
+        <>
+          <View style={styles.chips}>
+            <Chip icon={state.icon} label={t(state.key)} />
+            <Chip
+              icon={conn.scope === "personal" ? "lock" : "members"}
+              label={conn.scope === "personal" ? t("mobile.vault.tab.personal") : t("mobile.vault.tab.team")}
+            />
+          </View>
+          {vaultNoAgents(conn.access) ? (
+            <Text variant="small" tone="muted">
+              {t("vault.connections.noAgents")}
+            </Text>
+          ) : null}
+        </>
       }
       chevron
       onPress={() => router.push(vaultHref.connection(conn.id) as never)}

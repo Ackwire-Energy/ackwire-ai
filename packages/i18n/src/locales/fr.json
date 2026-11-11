@@ -3880,6 +3880,8 @@
       "access": "Accès par défaut",
       "accessTitle": "Accès par défaut de {{label}}",
       "accessText": "Ses éléments suivent ce réglage, sauf si vous en changez un. Chaque changement est enregistré aussitôt.",
+      "noAgents": "Aucun agent n'utilise cette connexion.",
+      "giveAccess": "Donner l'accès",
       "actionsName": "Plus d'options pour {{name}}",
       "disconnect": "Déconnecter",
       "removeTitle": "Déconnecter {{name}} ?",

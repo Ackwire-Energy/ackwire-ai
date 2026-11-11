@@ -9282,6 +9282,12 @@
   "vault.connections.accessText": {
     "value": "Its items follow this, unless you change one of them. Each change saves at once."
   },
+  "vault.connections.noAgents": {
+    "value": "No agent uses this connection."
+  },
+  "vault.connections.giveAccess": {
+    "value": "Give access"
+  },
   "vault.connections.actionsName": {
     "value": "More for {{name}}"
   },

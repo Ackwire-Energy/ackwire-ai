@@ -11,7 +11,14 @@ import { recordAudit } from "../audit";
 import { UUID } from "../authority";
 import { NotFoundError, ValidationError } from "../errors";
 import { publishVaultChanged } from "../events";
-import { type ConnectionRow, cleanAccess, scopeOf, type VaultViewer, viewerManages } from "./access";
+import {
+  type ConnectionRow,
+  cleanAccess,
+  DEFAULT_CONNECTION_ACCESS,
+  scopeOf,
+  type VaultViewer,
+  viewerManages,
+} from "./access";
 import { cleanScope, teamNeedsPermission, vaultViewer } from "./items";
 import { sealConnectionSecret, sourceCall, sourceOf } from "./seal";
 import {
@@ -99,7 +106,7 @@ export async function connectVaultSource(
   if (scope === "team" && !viewer.manages) throw teamNeedsPermission();
   const source = sourceOf(deps.sources, input.kind);
   if (!source) throw new ValidationError("This server can't connect that password manager", "vault.source_unknown");
-  const access = await cleanAccess(db, orgId, scope, input.access);
+  const access = await cleanAccess(db, orgId, scope, input.access ?? DEFAULT_CONNECTION_ACCESS[scope]);
   const result = await sourceCall((signal) => source.connect(inputOf(input.input), signal, { orgId }));
 
   const ownerUserId = scope === "personal" ? userId : null;

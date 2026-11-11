@@ -2309,7 +2309,7 @@
       "guide": "Anleitung von {{name}} öffnen",
       "fields": "Angaben",
       "private": "Diese Angaben werden verschlüsselt aufbewahrt und nie wieder angezeigt.",
-      "teamHelp": "Seine Einträge sind zuerst für alle im Workspace sichtbar und von keinem Agenten genutzt. Die Agenten wählst du danach.",
+      "teamHelp": "Alle im Workspace sehen seine Einträge und jeder Agent kann sie verwenden. Du kannst das danach anpassen.",
       "personalHelp": "Nur du siehst seine Einträge, und deine Agenten verwenden sie, wenn du sie darum bittest.",
       "checking": "Wird mit {{name}} geprüft…",
       "connected": "{{name}} verbunden",

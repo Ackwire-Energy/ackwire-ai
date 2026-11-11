@@ -7,6 +7,7 @@ import type {
 } from "@agenteschat/client";
 import { vaultConnectRefusal } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { vaultNoAgents } from "@agenteschat/client/lib/vault";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
@@ -33,11 +34,12 @@ import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { OpenPage, Step, StepTitle } from "@/components/ai/AddAccountFlow";
+import { ConnectedDone } from "@/components/ConnectFlow";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { useVaultConnectionActions } from "./data";
-import { AccessBlock, AgentFaces, agentsSummary } from "./VaultAccess";
+import { AccessBlock, AgentFaces, accessSentence, agentsSummary } from "./VaultAccess";
 import { ScopeLine, VaultTile } from "./VaultItemDialog";
 import "./vault.css";
 
@@ -101,7 +103,8 @@ function ConnectForm({
   /** Reconnecting this one: new credentials, same scope. */
   connection?: VaultConnection;
   canManageTeam: boolean;
-  onDone: () => void;
+  /** Closed, or just connected (`made`): reconnecting ends with a toast, connecting with its confirmation. */
+  onDone: (made?: VaultConnection) => void;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -138,8 +141,8 @@ function ConnectForm({
       ? await actions.update(connection.id, { input })
       : await actions.connect({ kind, scope, input });
     if (!done) return;
-    toast.show(t("vault.connections.connected", { name: source.name, count: done.itemCount }));
-    onDone();
+    if (connection) toast.show(t("vault.connections.connected", { name: source.name, count: done.itemCount }));
+    onDone(connection ? undefined : done);
   };
 
   return (
@@ -225,7 +228,7 @@ function ConnectForm({
         <Button type="submit" variant="primary" loading={busy} disabled={busy}>
           {connection ? t("vault.connections.reconnect") : t("vault.connections.connect")}
         </Button>
-        <Button variant="ghost" onClick={onDone}>
+        <Button variant="ghost" onClick={() => onDone()}>
           {t("common.cancel")}
         </Button>
       </span>
@@ -297,10 +300,21 @@ function ConnectionRow({
         {c.status === "error" && (
           <span className="small vlt-conn__fix">{t(`vault.connections.fix.${errorKey(c.errorCode)}`)}</span>
         )}
-        <span className="connected-row__who small muted">
-          <AgentFaces access={c.access} />
-          {agentsSummary(t, i18n.language, dir, c.access)}
-        </span>
+        {vaultNoAgents(c.access) ? (
+          <span className="connected-row__who vlt-conn__none small muted">
+            {t("vault.connections.noAgents")}
+            {c.can.edit && (
+              <button type="button" className="ac-link" onClick={onAccess}>
+                {t("vault.connections.giveAccess")}
+              </button>
+            )}
+          </span>
+        ) : (
+          <span className="connected-row__who small muted">
+            <AgentFaces access={c.access} />
+            {agentsSummary(t, i18n.language, dir, c.access)}
+          </span>
+        )}
         {c.can.edit && (
           <div className="connected-row__actions">
             {/* A full Vault isn't fixed by reconnecting: it syncs again once items are removed. */}
@@ -412,6 +426,8 @@ function SourceCard({
   const actions = useVaultConnectionActions(org.id);
   const [form, setForm] = useState<null | { connection?: VaultConnection }>(null);
   const [access, setAccess] = useState<VaultConnection | null>(null);
+  const [made, setMade] = useState<VaultConnection | null>(null);
+  const dir = useDirectory(org.id);
   const [removing, setRemoving] = useState<VaultConnection | null>(null);
   const id = `vlt-src-${source.kind}`;
   const kinds = new Intl.ListFormat(i18n.language, { style: "long", type: "conjunction" }).format(
@@ -459,8 +475,29 @@ function SourceCard({
           source={source}
           connection={form.connection}
           canManageTeam={canManageTeam}
-          onDone={() => setForm(null)}
+          onDone={(connected) => {
+            setForm(null);
+            if (connected) setMade(connected);
+          }}
         />
+      )}
+      {made && (
+        <Dialog
+          open
+          onOpenChange={(o) => !o && setMade(null)}
+          title={t("connectFlow.done.title", { name: source.name })}
+          closeLabel={t("common.close")}
+          width={440}
+        >
+          <ConnectedDone
+            text={accessSentence(t, i18n.language, dir, made.scope, made.access)}
+            onAdjust={() => {
+              setAccess(made);
+              setMade(null);
+            }}
+            onClose={() => setMade(null)}
+          />
+        </Dialog>
       )}
       {access && <ConnectionAccessDialog connection={access} onClose={() => setAccess(null)} />}
       <Dialog
