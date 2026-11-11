@@ -216,6 +216,9 @@ export const REASON_WORDS: Partial<Record<PhoneReason, string>> = {
 };
 
 /** Reasons only the test helper has: an iPhone still installs, opens apps and reads its log meanwhile. */
+/** Helper failures an Xcode older than the iPhone's iOS explains (its device support or test daemon too old). */
+const OLD_XCODE_SIGNS = new Set<PhoneReason>(["device_support", "ui_not_authorized"]);
+
 const HELPER_REASONS = new Set<PhoneReason>([
   "helper_missing",
   "helper_expired",
@@ -759,15 +762,15 @@ export class PhoneManager {
         }
         this.locked.delete(key);
       }
-      if (phone.state === "ready" && sdkTooOld(phone.osVersion, tools.sdk)) {
-        out.push({ ...phone, state: "needs_you", reason: "xcode_too_old" });
-        continue;
-      }
       // Ready to the Mac, the iPhone still waits for its test helper: built, renewed and checked by itself.
       // Read-only (`doctor`) says the helper's state and builds nothing (`need` without xcrun only looks).
       const need =
         phone.state === "ready" && this.ios ? this.ios.need(phone.serial, this.opts.readOnly ? null : xcrun) : null;
-      out.push(need ? { ...phone, ...need } : phone);
+      // An iOS newer than this Mac's iPhone SDK often still works (apps open, screenshots), so the version alone
+      // turns nothing away: it names the likely cause once the helper itself is stuck.
+      const oldXcode =
+        need?.state === "needs_you" && OLD_XCODE_SIGNS.has(need.reason) && sdkTooOld(phone.osVersion, tools.sdk);
+      out.push(need ? { ...phone, ...need, ...(oldXcode ? { reason: "xcode_too_old" as const } : {}) } : phone);
     }
     return out;
   }

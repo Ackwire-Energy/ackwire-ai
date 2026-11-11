@@ -659,15 +659,11 @@ test("an iPhone on iOS 16 is reported as too old, never left out; one newer than
   expect([parseLockState({ result: { passcodeRequired: true } }), parseLockState({})]).toEqual([true, null]);
   const r = rig({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk: "26.2" });
   await r.manager.poll();
-  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
-    state: "needs_you",
-    reason: "xcode_too_old",
-  });
-  // Only the helper needs the matching Xcode: devicectl still opens apps.
+  // A newer iOS than the SDK turns nothing away by itself: it often still works.
+  expect(r.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
   const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
   const launched = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: RunnerError) => e);
   expect((launched as Partial<RunnerError>).code).not.toBe("phone_not_ready");
-  expect(await errorCode(() => r.op({ op: "phone.screenshot", ...t }))).toBe("phone_not_ready");
   const plain = rig({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk: "27.0" });
   await plain.manager.poll();
   expect(plain.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
