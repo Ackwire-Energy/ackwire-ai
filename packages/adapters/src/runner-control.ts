@@ -192,8 +192,12 @@ export interface ControlIphoneSetup {
     | { state: "missing" }
     | { state: "downloading"; percent: number | null; done?: string; total?: string }
     | { state: "failed"; message: string };
-  /** The Apple Account in Xcode › Settings › Accounts, by its team (a free one is a Personal Team); null: none. */
+  /** The Apple Account in Xcode › Settings › Apple Accounts, by its team (a free one is a Personal Team); null: none. */
   account: { name: string; personal: boolean } | null;
+  /** With `account: null`: Xcode lists an Apple Account that shows no team yet (an older app reads it as missing). */
+  noTeam?: true;
+  /** The iPhone SDK Xcode builds with ("26.2"). */
+  sdk?: string;
 }
 
 /** App → runner requests. Every request is answered by exactly one `reply` with the same `id`. */

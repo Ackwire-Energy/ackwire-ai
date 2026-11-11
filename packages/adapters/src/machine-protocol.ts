@@ -625,8 +625,12 @@ export type PhoneReason =
   /** iPhone: the test helper isn't built yet, or its free signature ran out (`helper_expired`). */
   | "helper_missing"
   | "helper_expired"
-  /** iPhone: Xcode on the Mac is signed in to no Apple Account (Xcode › Settings › Accounts), so nothing signs the helper. */
+  /** iPhone: Xcode on the Mac is signed in to no Apple Account (Xcode › Settings › Apple Accounts), so nothing signs the helper. */
   | "apple_account_missing"
+  /** iPhone: Xcode lists an Apple Account but no team yet (it shows one after its first build for an iPhone). */
+  | "apple_team_missing"
+  /** iPhone: the phone refused UI actions (unlocked, so its daily passcode grant or UI Automation). */
+  | "ui_not_authorized"
   /** iPhone: a free Apple Account's limit (3 apps of its own per phone, 10 app ids a week) stops the helper. */
   | "team_limit"
   /** iPhone: the phone doesn't trust the helper's developer yet (Settings › General › VPN & Device Management). */
@@ -729,6 +733,10 @@ export interface RunnerToolchains {
   xcode?: string;
   /** The Apple Account team that signs the iPhone test helper, as Xcode names it ("Sam Rivera (Personal Team)"). */
   appleTeam?: string;
+  /** What Xcode's Apple Accounts hold: a team, an account with no team yet, or nothing. */
+  appleAccount?: "team" | "no_team" | "none";
+  /** The iPhone SDK Xcode builds with ("26.2"): an iPhone on a newer iOS needs a newer Xcode. */
+  xcodeSdk?: string;
   node?: string;
   /** Podman's version: with the runner in system mode, the agents' containers (ADR 0169). */
   podman?: string;
@@ -2795,6 +2803,8 @@ const TOOLCHAINS: readonly (keyof RunnerToolchains)[] = [
   "maestro",
   "xcode",
   "appleTeam",
+  "appleAccount",
+  "xcodeSdk",
   "node",
   "podman",
 ];
@@ -2851,8 +2861,9 @@ export function parseToolchains(v: Record<string, unknown>): RunnerToolchains {
   const out: RunnerToolchains = {};
   for (const key of TOOLCHAINS) {
     const value = cut(v[key], 100);
-    if (value) out[key] = value;
+    if (value) (out as Record<string, string>)[key] = value;
   }
+  if (out.appleAccount && !["team", "no_team", "none"].includes(out.appleAccount)) delete out.appleAccount;
   return out;
 }
 

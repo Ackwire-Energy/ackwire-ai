@@ -2,12 +2,16 @@ import type { ComputerDevice, DeviceAudience, PhoneDevice } from "@agenteschat/c
 import {
   androidStage,
   computerLine,
+  DDIS_UPDATE,
   IPHONE_STEPS,
   type IphoneStep,
+  iosMajor,
+  iphoneNoTeam,
   iphoneOf,
   iphoneSteps,
   phoneLine,
   type StepState,
+  useStalled,
   wifiHosts,
   wifiPairLive,
   wifiPairText,
@@ -31,6 +35,7 @@ import {
 } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
 import { FlowFooter, type FlowProps } from "./flow";
@@ -572,42 +577,78 @@ export function IphoneFlow({
   const phone = iphoneOf(mac);
   const states = iphoneSteps(mac, phone);
   const ready = IPHONE_STEPS.every((s) => states[s] === "done");
-  const helperReason = phone && "reason" in phone.status ? phone.status.reason : null;
+  const reason = phone && "reason" in phone.status ? phone.status.reason : null;
+  const tooOld = phone?.status.kind === "unsupported";
+  const at = IPHONE_STEPS.find((s) => states[s] === "current" || states[s] === "needs") ?? null;
+  // The Mac reports by itself; a step that sits unchanged gets what most likely holds it (an iPhone below iOS 17 has
+  // nothing to try).
+  const stalled = useStalled(at && mac && !tooOld ? [mac.id, at, phone?.id, reason].join(":") : null);
+  const [plugged, setPlugged] = useState(false);
+  const looking = at === "connected" && !phone;
   useEffect(() => setTitle(t("devices.iphone.title")), [setTitle, t]);
+  const macName = mac?.name ?? "";
+  const sdk = mac?.toolchains.xcodeSdk;
   const text: Record<IphoneStep, ReactNode> = {
     xcode:
       states.xcode === "done"
         ? t("devices.iphone.xcodeDone", { version: mac?.toolchains.xcode ?? "" })
-        : t("devices.iphone.xcodeText", { mac: mac?.name ?? "" }),
+        : reason === "xcode_too_old" && phone
+          ? t(sdk ? "devices.iphone.xcodeOld" : "devices.iphone.xcodeOldAny", {
+              name: phone.name,
+              version: phone.osVersion,
+              major: iosMajor(phone.osVersion),
+              sdk,
+              mac: macName,
+            })
+          : t("devices.iphone.xcodeText", { mac: macName }),
     tools: states.tools === "done" ? t("devices.iphone.toolsDone") : t("devices.iphone.toolsText"),
     account:
       states.account === "done"
         ? (mac?.toolchains.appleTeam ?? t("devices.iphone.accountDone"))
-        : t("devices.iphone.accountText", { mac: mac?.name ?? "" }),
+        : iphoneNoTeam(mac, phone)
+          ? t("devices.iphone.teamMissingText")
+          : t("devices.iphone.accountText", { mac: macName }),
     connected:
-      states.connected === "done" && phone
-        ? t("devices.iphone.connectedDone", { name: phone.name, version: phone.osVersion })
-        : t("devices.iphone.connectedText", { mac: mac?.name ?? "" }),
+      tooOld && phone
+        ? t("devices.iphone.tooOld", { name: phone.name, version: phone.osVersion })
+        : states.connected === "done" && phone
+          ? t("devices.iphone.connectedDone", { name: phone.name, version: phone.osVersion })
+          : t("devices.iphone.connectedText", { mac: macName }),
     trust: states.trust === "done" ? t("devices.iphone.trustDone") : t("devices.iphone.trustText"),
     developerMode: states.developerMode === "done" ? t("devices.iphone.devModeDone") : t("devices.iphone.devModeText"),
-    uiAutomation: t("devices.iphone.uiAutomationText"),
+    uiAutomation:
+      reason === "ui_not_authorized" ? t("devices.iphone.uiRefusedText") : t("devices.iphone.uiAutomationText"),
     helper:
-      helperReason === "helper_untrusted"
+      reason === "helper_untrusted"
         ? t("devices.iphone.helperUntrustedText")
-        : helperReason === "team_limit"
+        : reason === "team_limit"
           ? t("devices.iphone.teamLimitText")
           : t("devices.iphone.helperText"),
   };
   const more: Partial<Record<IphoneStep, ReactNode>> = {
     xcode: (
-      <span className="dv-step__acts">
-        <Button asChild size="sm" icon="external">
-          <a href={APP_STORE_XCODE} target="_blank" rel="noopener noreferrer">
-            {t("devices.iphone.getXcode")}
-          </a>
-        </Button>
-      </span>
+      <>
+        <span className="dv-step__acts">
+          <Button asChild size="sm" icon="external">
+            <a href={APP_STORE_XCODE} target="_blank" rel="noopener noreferrer">
+              {t("devices.iphone.getXcode")}
+            </a>
+          </Button>
+        </span>
+        {reason === "xcode_too_old" && <CommandBlock command={DDIS_UPDATE} />}
+      </>
     ),
+    ...(looking && !plugged && !stalled
+      ? {
+          connected: (
+            <span className="dv-step__acts">
+              <Button size="sm" onClick={() => setPlugged(true)}>
+                {t("devices.iphone.pluggedIn")}
+              </Button>
+            </span>
+          ),
+        }
+      : {}),
     developerMode: (
       <SettingsPath
         label={t("devices.onTheIphone")}
@@ -628,7 +669,7 @@ export function IphoneFlow({
         ]}
       />
     ),
-    ...(helperReason === "helper_untrusted"
+    ...(reason === "helper_untrusted"
       ? {
           helper: (
             <SettingsPath
@@ -669,7 +710,17 @@ export function IphoneFlow({
               <ol className="dv-steps">
                 {IPHONE_STEPS.map((s) => (
                   <Step key={s} state={states[s]} title={t(`devices.iphone.steps.${s}`)} text={text[s]}>
-                    {states[s] === "current" || states[s] === "needs" ? more[s] : null}
+                    {s === at && (more[s] || stalled || (looking && plugged)) ? (
+                      <>
+                        {more[s]}
+                        {(stalled || (looking && plugged)) && (
+                          <p className="dv-step__stall ac-iconline small" role="status">
+                            <Icon name="info" size={14} />
+                            <span>{t(`devices.iphone.stall.${s}`, { mac: macName })}</span>
+                          </p>
+                        )}
+                      </>
+                    ) : null}
                   </Step>
                 ))}
               </ol>
