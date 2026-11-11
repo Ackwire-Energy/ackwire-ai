@@ -1427,7 +1427,6 @@ export const ptBR = {
   },
   /** Instalar o app desktop na primeira vez (ADR 0036 §10): os passos embaixo de cada download e a página `/download`. */
   install: {
-    beta: "O app está em beta.",
     frames: "Como instalar no {{system}}",
     step: "Passo {{n}}",
     previous: "Passo anterior",
@@ -1435,7 +1434,7 @@ export const ptBR = {
     fullGuide: "Passo a passo completo",
     copied: "Copiado. Cole no terminal.",
     mac: {
-      why: "Ele ainda não é notarizado pela Apple. Por isso, na primeira vez, o Mac pede uma confirmação:",
+      why: "<b>O app está em beta.</b> Por isso, na primeira vez, o Mac pede uma confirmação:",
       drag: "Arraste o agentes.chat para Aplicativos.",
       dragLong: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
       blocked: "Abra o app e clique em Concluído.",
@@ -1454,7 +1453,7 @@ export const ptBR = {
       stuckText: "Cole isto no Terminal e abra o app de novo:",
     },
     windows: {
-      why: "O instalador ainda não tem assinatura da Microsoft. Por isso, na primeira vez, o Windows pede uma confirmação:",
+      why: "<b>O app está em beta.</b> Por isso, na primeira vez, o Windows pede uma confirmação:",
       keep: "Se o navegador perguntar, escolha Manter.",
       more: "Abra o instalador e clique em Mais informações.",
       moreLong: "Abra o instalador. Se aparecer O Windows protegeu o computador, clique em Mais informações.",

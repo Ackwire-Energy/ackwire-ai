@@ -2,7 +2,7 @@ import { type DesktopRelease, useDesktopLatest } from "@agenteschat/client";
 import { desktopTargetOf, type Platform, platformOf } from "@agenteschat/client/lib/machines";
 import { Button, Icon } from "@agenteschat/ui";
 import { type CSSProperties, useLayoutEffect, useRef, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { DownloadButtons } from "@/components/devices/parts";
 import { CommandBlock } from "@/components/machine-bits";
 import { SCENE_H, SCENE_W, Scene, type SceneId } from "./scenes";
@@ -55,11 +55,14 @@ interface Step {
   settings?: boolean;
 }
 
-function useSteps(system: InstallSystem, version: string): { why: string; steps: Step[] } {
+/** The line over the frames: the app is in beta, so the system asks once (`<b>` marks the first sentence). */
+type WhyKey = "install.mac.why" | "install.windows.why" | "install.linux.why";
+
+function useSteps(system: InstallSystem, version: string): { why: WhyKey; steps: Step[] } {
   const { t } = useTranslation();
   if (system === "mac")
     return {
-      why: t("install.mac.why"),
+      why: "install.mac.why",
       steps: [
         { scene: "macDrag", text: t("install.mac.drag"), long: t("install.mac.dragLong") },
         { scene: "macBlocked", text: t("install.mac.blocked"), sub: t("install.mac.blockedSub") },
@@ -81,7 +84,7 @@ function useSteps(system: InstallSystem, version: string): { why: string; steps:
     };
   if (system === "windows")
     return {
-      why: t("install.windows.why"),
+      why: "install.windows.why",
       steps: [
         { scene: "winKeep", text: t("install.windows.keep") },
         { scene: "winMore", text: t("install.windows.more"), long: t("install.windows.moreLong") },
@@ -94,7 +97,7 @@ function useSteps(system: InstallSystem, version: string): { why: string; steps:
       ],
     };
   return {
-    why: t("install.linux.why"),
+    why: "install.linux.why",
     steps: [
       {
         scene: "linuxApt",
@@ -183,8 +186,7 @@ export function InstallFrames({ system, release }: { system: InstallSystem; rele
       <p className="ifr__lead">
         <Icon name="info" size={16} />
         <span>
-          {system !== "linux" && <strong>{t("install.beta")}</strong>}
-          {why}
+          <Trans i18nKey={why} components={{ b: <strong /> }} />
         </span>
       </p>
       <div className="ifr__pic">

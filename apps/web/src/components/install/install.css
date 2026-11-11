@@ -1031,9 +1031,7 @@
   margin-top: 2px;
   color: var(--faint);
 }
-/* "The app is in beta." then why, as two sentences: the gap is the space between them. */
 .ifr__lead strong {
-  margin-inline-end: 0.28em;
   color: var(--ink);
   font-weight: 600;
 }

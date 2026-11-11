@@ -1497,7 +1497,6 @@ export const en = {
   },
   /** Installing the desktop app the first time (ADR 0036 §10): the steps under every download and the `/download` page. */
   install: {
-    beta: "The app is in beta.",
     frames: "How to install on {{system}}",
     step: "Step {{n}}",
     previous: "Previous step",
@@ -1505,7 +1504,7 @@ export const en = {
     fullGuide: "Full step by step",
     copied: "Copied. Paste it in the terminal.",
     mac: {
-      why: "It isn't notarized by Apple yet, so the first time your Mac asks you to confirm:",
+      why: "<b>The app is in beta.</b> So the first time, your Mac asks you to confirm:",
       drag: "Drag agentes.chat to Applications.",
       dragLong: "Open the downloaded file and drag agentes.chat to Applications.",
       blocked: "Open the app and click Done.",
@@ -1523,7 +1522,7 @@ export const en = {
       stuckText: "Paste this in Terminal and open the app again:",
     },
     windows: {
-      why: "The installer isn't signed by Microsoft yet, so the first time Windows asks you to confirm:",
+      why: "<b>The app is in beta.</b> So the first time, Windows asks you to confirm:",
       keep: "If your browser asks, choose Keep.",
       more: "Open the installer and click More info.",
       moreLong: "Open the installer. If Windows protected your PC shows up, click More info.",
