@@ -2135,10 +2135,7 @@
       "fallbackNone": "Ohne eigenes Abo kann {{name}} dir nicht antworten: Das Abo des Workspace antwortet nur {{owner}}.",
       "workspace": "KI für alle ohne eigenes Abo",
       "workspaceHelp": "Wer kein eigenes Abo hat, spricht über diese KI mit {{name}}.",
-      "workspacePlan": "Abo des Workspace",
-      "workspacePlanHelp": "Ein Abo statt des Schlüssels. Anderen antwortet es nur, wenn die Person, der es gehört, das erlaubt.",
       "noPlans": "Verbinde unter KI und Verbrauch ein Abo, um es hier zu nutzen.",
-      "pickPlan": "Abo wählen",
       "sharesOn": "Wer kein eigenes Abo hat, spricht über dieses Abo mit {{name}}.",
       "lend": "Dieses Abo an alle ohne eigenes verleihen",
       "groupMine": "Nur für dich",
@@ -13905,26 +13902,9 @@
       "dialogTitle": "Was gesendet wird",
       "dialogText": "Einmal am Tag. Das ist genau der nächste Bericht."
     },
-    "tilesTitle": "Alles im Workspace",
     "tileState": {
       "members_one": "{{count}} Mitglied",
-      "members_other": "{{count}} Mitglieder",
-      "invitations_one": "{{count}} Einladung wartet",
-      "invitations_other": "{{count}} Einladungen warten",
-      "agents_one": "{{count}} Agent",
-      "agents_other": "{{count}} Agenten",
-      "connectors_one": "{{count}} verbunden",
-      "connectors_other": "{{count}} verbunden",
-      "noConnectors": "Noch keine Apps verbunden",
-      "skills_one": "{{count}} Skill",
-      "skills_other": "{{count}} Skills",
-      "computers_one": "{{online}} von {{count}} an",
-      "computers_other": "{{online}} von {{count}} an",
-      "noComputers": "Noch kein Computer",
-      "devices_one": "{{online}} von {{count}} an",
-      "devices_other": "{{online}} von {{count}} an",
-      "noDevices": "Noch kein Gerät",
-      "usage": "{{percent}} des Budgets diesen Monat verbraucht"
+      "members_other": "{{count}} Mitglieder"
     },
     "import": {
       "title": "Import",

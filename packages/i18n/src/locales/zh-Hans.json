@@ -2055,10 +2055,7 @@
       "fallbackNone": "没有自己的套餐时，{{name}}无法回复你：工作区的套餐只回复{{owner}}。",
       "workspace": "没有自己套餐的人使用的 AI",
       "workspaceHelp": "没有自己套餐的人通过这个 AI 与{{name}}交谈。",
-      "workspacePlan": "工作区套餐",
-      "workspacePlanHelp": "用套餐代替密钥。只有所有者允许时，它才回复其他人。",
       "noPlans": "请先在“AI 和用量”中连接套餐，才能在这里使用。",
-      "pickPlan": "选择套餐",
       "sharesOn": "没有自己套餐的人通过这个套餐与{{name}}交谈。",
       "lend": "把这个套餐借给没有套餐的人",
       "groupMine": "仅对你",
@@ -13468,19 +13465,8 @@
       "dialogTitle": "发送的内容",
       "dialogText": "每天一次。下面就是下一份报告的完整内容。"
     },
-    "tilesTitle": "工作区中的一切",
     "tileState": {
-      "members_other": "{{count}} 位成员",
-      "invitations_other": "{{count}} 个待处理的邀请",
-      "agents_other": "{{count}} 个智能体",
-      "connectors_other": "已连接 {{count}} 个",
-      "noConnectors": "还没有连接应用",
-      "skills_other": "{{count}} 个技能",
-      "computers_other": "{{count}} 台中 {{online}} 台开着",
-      "noComputers": "还没有电脑",
-      "devices_other": "{{count}} 台中 {{online}} 台开着",
-      "noDevices": "还没有设备",
-      "usage": "本月已用预算的 {{percent}}"
+      "members_other": "{{count}} 位成员"
     },
     "import": {
       "title": "导入",

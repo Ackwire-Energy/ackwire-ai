@@ -2056,10 +2056,7 @@
       "fallbackNone": "내 플랜이 없으면 {{name}}이(가) 답할 수 없어요. 워크스페이스 플랜은 {{owner}}에게만 답해요.",
       "workspace": "자기 플랜이 없는 사람의 AI",
       "workspaceHelp": "자기 플랜이 없는 사람은 이 AI로 {{name}}과(와) 대화해요.",
-      "workspacePlan": "워크스페이스 플랜",
-      "workspacePlanHelp": "키 대신 쓰는 플랜이에요. 소유자가 허용할 때만 다른 사람에게 답해요.",
       "noPlans": "여기서 쓰려면 AI와 사용량에서 플랜을 연결하세요.",
-      "pickPlan": "플랜 선택",
       "sharesOn": "자기 플랜이 없는 사람은 이 플랜으로 {{name}}과(와) 대화해요.",
       "lend": "플랜이 없는 사람에게 이 플랜 빌려주기",
       "groupMine": "나만",
@@ -13397,19 +13394,8 @@
       "dialogTitle": "보내는 내용",
       "dialogText": "하루에 한 번 보내요. 다음 보고서의 실제 내용이에요."
     },
-    "tilesTitle": "워크스페이스의 모든 것",
     "tileState": {
-      "members_other": "멤버 {{count}}명",
-      "invitations_other": "대기 중인 초대 {{count}}개",
-      "agents_other": "에이전트 {{count}}명",
-      "connectors_other": "{{count}}개 연결됨",
-      "noConnectors": "아직 연결된 앱이 없어요",
-      "skills_other": "스킬 {{count}}개",
-      "computers_other": "{{count}}대 중 {{online}}대 켜짐",
-      "noComputers": "아직 컴퓨터가 없어요",
-      "devices_other": "{{count}}대 중 {{online}}대 켜짐",
-      "noDevices": "아직 기기가 없어요",
-      "usage": "이번 달 예산의 {{percent}} 사용"
+      "members_other": "멤버 {{count}}명"
     },
     "import": {
       "title": "가져오기",

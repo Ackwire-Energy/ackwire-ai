@@ -75,8 +75,17 @@ test("Lodi's settings: the workspace's plan is lent by a switch for whoever sets
   expect(screen).toContain('t("rightHand.settings.planName", { name: a.label })');
   // The budget only where something bills per use, lending and the audience only with someone else here.
   expect(screen).toContain("{usesApi ? (");
-  expect(screen).toContain("{view && !solo ? (");
+  expect(screen).toContain("{kind && view && !solo ? (");
   expect(screen).toContain("{solo ? null : (");
+  // What it is now is one row that opens the choice of the key or a plan, the one in use checked: no loose
+  // "Usar uma chave de API" row and no second list of plans under another heading.
+  expect(screen).toContain('title: t("rightHand.settings.workspace"),');
+  expect(screen).toContain("value: kind ? (view?.account ?? null) : KEY,");
+  expect(screen).toContain('if (kind) set({ brain: "model" });');
+  expect(screen).toContain("set({ brain: plan.kind, account: plan.id });");
+  expect(screen).toContain("disabled={busy || hold}");
+  expect(screen).not.toContain("noAi.rightHand.useKey");
+  expect(screen).not.toContain("workspacePlan");
   // Any plan's CLI: Claude Code's, Codex's, Cursor's, OpenCode's, Grok Build's or the Antigravity CLI's.
   expect(screen).toContain('agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null');
   expect(screen).toContain("t(`aiAccounts.connect.$" + "{kind}`)");

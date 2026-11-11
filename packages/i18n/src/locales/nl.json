@@ -2134,10 +2134,7 @@
       "fallbackNone": "Zonder eigen abonnement kan {{name}} je niet antwoorden: het abonnement van de workspace antwoordt alleen {{owner}}.",
       "workspace": "AI voor wie geen eigen abonnement heeft",
       "workspaceHelp": "Wie geen eigen abonnement heeft, praat via deze AI met {{name}}.",
-      "workspacePlan": "Abonnement van de workspace",
-      "workspacePlanHelp": "Een abonnement in plaats van de sleutel. Het antwoordt anderen alleen als de eigenaar dat toestaat.",
       "noPlans": "Koppel een abonnement onder AI en gebruik om het hier te gebruiken.",
-      "pickPlan": "Kies een abonnement",
       "sharesOn": "Wie geen eigen abonnement heeft, praat via dit abonnement met {{name}}.",
       "lend": "Dit abonnement uitlenen aan wie er geen heeft",
       "groupMine": "Alleen voor jou",
@@ -13968,26 +13965,9 @@
       "dialogTitle": "Wat er wordt verstuurd",
       "dialogText": "Eén keer per dag. Dit is precies het volgende rapport."
     },
-    "tilesTitle": "Alles in de werkruimte",
     "tileState": {
       "members_one": "{{count}} lid",
-      "members_other": "{{count}} leden",
-      "invitations_one": "{{count}} uitnodiging wacht",
-      "invitations_other": "{{count}} uitnodigingen wachten",
-      "agents_one": "{{count}} agent",
-      "agents_other": "{{count}} agents",
-      "connectors_one": "{{count}} gekoppeld",
-      "connectors_other": "{{count}} gekoppeld",
-      "noConnectors": "Nog geen apps gekoppeld",
-      "skills_one": "{{count}} skill",
-      "skills_other": "{{count}} skills",
-      "computers_one": "{{online}} van {{count}} aan",
-      "computers_other": "{{online}} van {{count}} aan",
-      "noComputers": "Nog geen computer",
-      "devices_one": "{{online}} van {{count}} aan",
-      "devices_other": "{{online}} van {{count}} aan",
-      "noDevices": "Nog geen apparaat",
-      "usage": "{{percent}} van het budget gebruikt deze maand"
+      "members_other": "{{count}} leden"
     },
     "import": {
       "title": "Importeren",

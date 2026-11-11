@@ -5228,17 +5228,8 @@
   "rightHand.settings.workspaceHelp": {
     "value": "People without their own plan talk to {{name}} through this AI."
   },
-  "rightHand.settings.workspacePlan": {
-    "value": "Workspace plan"
-  },
-  "rightHand.settings.workspacePlanHelp": {
-    "value": "A plan in place of the key. It serves other people only when its owner lets it."
-  },
   "rightHand.settings.noPlans": {
     "value": "Connect a plan in AI and usage to use it here."
-  },
-  "rightHand.settings.pickPlan": {
-    "value": "Choose a plan"
   },
   "rightHand.settings.sharesOn": {
     "value": "People without their own plan talk to {{name}} through this plan."
@@ -33765,62 +33756,11 @@
   "settings.telemetry.dialogText": {
     "value": "Once a day. This is the next report, exactly."
   },
-  "settings.tilesTitle": {
-    "value": "Everything in the workspace"
-  },
   "settings.tileState.members": {
     "value": {
       "one": "{{count}} member",
       "other": "{{count}} members"
     }
-  },
-  "settings.tileState.invitations": {
-    "value": {
-      "one": "{{count}} invitation waiting",
-      "other": "{{count}} invitations waiting"
-    }
-  },
-  "settings.tileState.agents": {
-    "value": {
-      "one": "{{count}} agent",
-      "other": "{{count}} agents"
-    }
-  },
-  "settings.tileState.connectors": {
-    "value": {
-      "one": "{{count}} connected",
-      "other": "{{count}} connected"
-    }
-  },
-  "settings.tileState.noConnectors": {
-    "value": "No apps connected yet"
-  },
-  "settings.tileState.skills": {
-    "value": {
-      "one": "{{count}} skill",
-      "other": "{{count}} skills"
-    }
-  },
-  "settings.tileState.computers": {
-    "value": {
-      "one": "{{online}} of {{count}} on",
-      "other": "{{online}} of {{count}} on"
-    }
-  },
-  "settings.tileState.noComputers": {
-    "value": "No computer yet"
-  },
-  "settings.tileState.devices": {
-    "value": {
-      "one": "{{online}} of {{count}} on",
-      "other": "{{online}} of {{count}} on"
-    }
-  },
-  "settings.tileState.noDevices": {
-    "value": "No device yet"
-  },
-  "settings.tileState.usage": {
-    "value": "{{percent}} of the budget used this month"
   },
   "settings.import.title": {
     "value": "Import"

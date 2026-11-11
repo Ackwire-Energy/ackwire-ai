@@ -2131,10 +2131,7 @@
       "fallbackNone": "Kendi planın yoksa {{name}} sana yanıt veremez: çalışma alanının planı yalnızca {{owner}} için yanıt verir.",
       "workspace": "Kendi planı olmayanların yapay zekâsı",
       "workspaceHelp": "Kendi planı olmayanlar {{name}} ile bu yapay zekâ üzerinden konuşur.",
-      "workspacePlan": "Çalışma alanı planı",
-      "workspacePlanHelp": "Anahtarın yerine bir plan. Başkalarına yalnızca sahibi izin verirse yanıt verir.",
       "noPlans": "Burada kullanmak için Yapay zeka ve kullanım bölümünden bir plan bağla.",
-      "pickPlan": "Plan seç",
       "sharesOn": "Kendi planı olmayanlar {{name}} ile bu plan üzerinden konuşur.",
       "lend": "Bu planı, planı olmayanlara ödünç ver",
       "groupMine": "Yalnızca sizin için",
@@ -13841,26 +13838,9 @@
       "dialogTitle": "Ne gönderiliyor",
       "dialogText": "Günde bir kez. Bir sonraki rapor tam olarak bu."
     },
-    "tilesTitle": "Çalışma alanındaki her şey",
     "tileState": {
       "members_one": "{{count}} üye",
-      "members_other": "{{count}} üye",
-      "invitations_one": "{{count}} davet bekliyor",
-      "invitations_other": "{{count}} davet bekliyor",
-      "agents_one": "{{count}} ajan",
-      "agents_other": "{{count}} ajan",
-      "connectors_one": "{{count}} bağlı",
-      "connectors_other": "{{count}} bağlı",
-      "noConnectors": "Henüz bağlı uygulama yok",
-      "skills_one": "{{count}} beceri",
-      "skills_other": "{{count}} beceri",
-      "computers_one": "{{count}} bilgisayardan {{online}} tanesi açık",
-      "computers_other": "{{count}} bilgisayardan {{online}} tanesi açık",
-      "noComputers": "Henüz bilgisayar yok",
-      "devices_one": "{{count}} cihazdan {{online}} tanesi açık",
-      "devices_other": "{{count}} cihazdan {{online}} tanesi açık",
-      "noDevices": "Henüz cihaz yok",
-      "usage": "Bu ay bütçenin {{percent}} kadarı kullanıldı"
+      "members_other": "{{count}} üye"
     },
     "import": {
       "title": "İçe aktar",

@@ -62,7 +62,8 @@ export const APP_PAGES = {
   right_hand: {
     web: "/settings/right_hand",
     phone: "/settings/right-hand",
-    may: "manage_agents",
+    // Everyone's: each person's own part is there, the workspace's shows only to who manages agents.
+    may: null,
     label: "settings.section.right_hand",
   },
   import: {

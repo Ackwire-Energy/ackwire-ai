@@ -45,6 +45,7 @@ import { useFailed } from "../routines/hooks";
 import { usePersonalView } from "../settings/hooks";
 import { Gap, SettingsPage } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
+import { pickOne } from "../shared/PickerSheet";
 import { type Directory, useColors, useDirectory, useMeId } from "../shared/hooks";
 import { RightHandApprovalsGroup } from "./Approvals";
 
@@ -181,30 +182,28 @@ export function RightHandMine({ agent }: { agent: Agent }) {
   );
 }
 
+/** The API key among the plans in the choice of the workspace's AI. */
+const KEY = "key";
+
 /**
- * The workspace's AI on a plan (ADR 0137 §11): what every DM thinks with while its person has none. The plan's account,
- * and "Atende outras pessoas" as for any agent on its owner's plan (the plan's owner chooses, an admin may override,
- * the plan's owner hears it by email): on, whoever has no plan of their own talks to it on this one.
+ * The AI of people with no plan of their own (ADR 0137 §11), as on the web: one row with what it is now (a plan and
+ * whose account, or the API key) that opens the choice of the key or a plan the person may set (their own, everyone's
+ * with `use_others_plans`). On the key, its model is the row under it. On a plan, the switch that lends it, as for any
+ * agent on its owner's plan: the plan's owner chooses, an admin may override, the plan's owner hears it by email.
  */
-function PlanRows({
-  agent,
-  kind,
-  dir,
-}: {
-  agent: Agent;
-  kind: Exclude<NonNullable<Agent["brain"]>["kind"], "model">;
-  dir: Directory;
-}) {
+function WorkspaceAi({ agent, dir }: { agent: Agent; dir: Directory }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
-  const held = usePlanHold(orgId, org) !== null;
+  const hold = usePlanHold(orgId, org) !== null;
   const api = useApi();
   const qc = useQueryClient();
   const failed = useFailed();
   const meId = useMeId();
+  const modelLabel = useModelLabel();
   const view = useAgentBrain(orgId, agent.id, true, false, "workspace").data;
+  const kind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
   const signIn = view?.accounts.find((a) => a.id === view.account);
-  const owner = signIn?.ownerId ? dir.memberById.get(signIn.ownerId)?.name.split(" ")[0] : undefined;
+  const key = view?.workspaceAi?.key;
   const { solo } = usePersonalView();
   const [busy, setBusy] = useState(false);
   const set = (input: AgentBrainInput) => {
@@ -221,27 +220,88 @@ function PlanRows({
       .catch(failed)
       .finally(() => setBusy(false));
   };
+  const theirs = (id: string | null | undefined) =>
+    id && id !== meId ? dir.memberById.get(id)?.name.split(" ")[0] : undefined;
+  const plans = (view?.accounts ?? []).filter((a) => a.status === "active");
+  // A plan in use that is no longer active stays listed, so the choice never opens with nothing checked.
+  const listed = signIn && !plans.some((p) => p.id === signIn.id) ? [signIn, ...plans] : plans;
+  const choose = async () => {
+    const picked = await pickOne({
+      title: t("rightHand.settings.workspace"),
+      value: kind ? (view?.account ?? null) : KEY,
+      options: [
+        {
+          key: KEY,
+          label: t("rightHand.settings.mineKeyName"),
+          sub: key?.label,
+          leading: key
+            ? { kind: "node", node: <ProviderLogo id={key.provider} size="sm" /> }
+            : { kind: "icon", name: "key" },
+        },
+        ...listed.map((a) => {
+          const owner = theirs(a.ownerId);
+          return {
+            key: a.id,
+            label: t("rightHand.settings.planName", { name: a.label }),
+            sub: owner ? t("rightHand.settings.planOwner", { owner }) : undefined,
+            leading: { kind: "node" as const, node: <ProviderLogo id={a.kind} size="sm" /> },
+          };
+        }),
+      ],
+    });
+    if (picked === null) return;
+    if (picked === KEY) {
+      if (kind) set({ brain: "model" });
+      return;
+    }
+    const plan = listed.find((p) => p.id === picked);
+    if (plan && plan.id !== view?.account) set({ brain: plan.kind, account: plan.id });
+  };
+  const owner = theirs(signIn?.ownerId);
   const on = view ? !view.onlyOwner : false;
   const g = agentGrammar(agent.name);
   return (
     <>
       <GroupedList>
         <GroupedRow
-          leading={<ProviderLogo id={kind} size="sm" />}
-          label={t("rightHand.settings.planName", { name: signIn?.label ?? t(`aiAccounts.connect.${kind}`) })}
-          {...(owner && signIn?.ownerId !== meId ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
+          {...(kind
+            ? { leading: <ProviderLogo id={kind} size="sm" /> }
+            : key
+              ? { leading: <ProviderLogo id={key.provider} size="sm" /> }
+              : { icon: "key" as const })}
+          label={
+            kind
+              ? t("rightHand.settings.planName", { name: signIn?.label ?? t(`aiAccounts.connect.${kind}`) })
+              : t("rightHand.settings.mineKeyName")
+          }
+          labelLines={2}
+          {...(kind
+            ? owner
+              ? { sub: t("rightHand.settings.planOwner", { owner }) }
+              : {}
+            : key
+              ? { sub: key.label }
+              : {})}
+          // On a billing hold nothing changes before the plan (ADR 0162).
+          chevron={!hold}
+          disabled={busy || hold}
+          onPress={() => void choose()}
         />
-        {held ? null : (
+        {kind ? null : (
           <GroupedRow
             icon="brain"
-            label={t("noAi.rightHand.useKey")}
+            label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
             chevron
-            disabled={busy}
-            onPress={() => set({ brain: "model" })}
+            onPress={() => openAgentAi(agent.id)}
           />
         )}
       </GroupedList>
-      {view && !solo ? (
+      {hold ? (
+        <PlanHoldNote org={org} />
+      ) : plans.length === 0 ? (
+        <GroupedFooter>{t("rightHand.settings.noPlans", g)}</GroupedFooter>
+      ) : null}
+      {kind && view && !solo ? (
         <>
           <Gap />
           <GroupedList>
@@ -261,73 +321,6 @@ function PlanRows({
   );
 }
 
-/** The plans the workspace's AI may move onto (the admin's own, everyone's with `use_others_plans`), a tap each. */
-function WorkspacePlanRows({ agent, dir }: { agent: Agent; dir: Directory }) {
-  const { t } = useTranslation();
-  const { orgId, org } = useOrg();
-  const hold = usePlanHold(orgId, org);
-  const api = useApi();
-  const qc = useQueryClient();
-  const failed = useFailed();
-  const meId = useMeId();
-  const view = useAgentBrain(orgId, agent.id, true, false, "workspace").data;
-  const g = agentGrammar(agent.name);
-  const plans = (view?.accounts ?? []).filter((a) => a.status === "active");
-  const pick = (a: (typeof plans)[number]) =>
-    void api.agents
-      .setBrain(orgId, agent.id, { scope: "workspace", brain: a.kind, account: a.id })
-      .then(() => {
-        for (const key of [keys.agentBrain(orgId, agent.id), keys.agents(orgId), keys.aiStatus(orgId)])
-          void qc.invalidateQueries({ queryKey: key });
-      })
-      .catch(failed);
-  const header = (
-    <GroupedHeader
-      {...(plans.length > 0 && !hold
-        ? {
-            hint: {
-              name: t("common.about", { label: t("rightHand.settings.workspacePlan") }),
-              text: t("rightHand.settings.workspacePlanHelp", g),
-            },
-          }
-        : {})}
-    >
-      {t("rightHand.settings.workspacePlan")}
-    </GroupedHeader>
-  );
-  if (hold)
-    return (
-      <>
-        {header}
-        <PlanHoldNote org={org} />
-      </>
-    );
-  return (
-    <>
-      {header}
-      {plans.length > 0 ? (
-        <GroupedList>
-          {plans.map((a) => {
-            const owner =
-              a.ownerId && a.ownerId !== meId ? dir.memberById.get(a.ownerId)?.name.split(" ")[0] : undefined;
-            return (
-              <GroupedRow
-                key={a.id}
-                leading={<ProviderLogo id={a.kind} size="sm" />}
-                label={t("rightHand.settings.planName", { name: a.label })}
-                {...(owner ? { sub: t("rightHand.settings.planOwner", { owner }) } : {})}
-                chevron
-                onPress={() => pick(a)}
-              />
-            );
-          })}
-        </GroupedList>
-      ) : null}
-      {plans.length === 0 ? <GroupedFooter>{t("rightHand.settings.noPlans", g)}</GroupedFooter> : null}
-    </>
-  );
-}
-
 function Form({ agent }: { agent: Agent }) {
   const { t } = useTranslation();
   const { orgId } = useOrg();
@@ -336,10 +329,8 @@ function Form({ agent }: { agent: Agent }) {
   const failed = useFailed();
   const usesApi = useWorkspaceUsesApi(orgId);
   const { solo } = usePersonalView();
-  const modelLabel = useModelLabel();
   const dir = useDirectory();
   const planKind = agent.brain && agent.brain.kind !== "model" ? agent.brain.kind : null;
-  const key = useAgentBrain(orgId, agent.id, true, false, "workspace").data?.workspaceAi?.key;
   const roles = useRoles(orgId).data?.roles ?? [];
   const update = useUpdateAgent(orgId, agent.id);
   const [budget, setBudget] = useState(agent.monthlyBudgetUsd == null ? "" : String(agent.monthlyBudgetUsd));
@@ -395,22 +386,7 @@ function Form({ agent }: { agent: Agent }) {
       >
         {t("rightHand.settings.workspace")}
       </GroupedHeader>
-      {planKind ? (
-        <PlanRows agent={agent} kind={planKind} dir={dir} />
-      ) : (
-        <>
-          <GroupedList>
-            <GroupedRow
-              icon="brain"
-              label={agent.model === AUTO ? t("brain.auto.label") : (modelLabel(agent.model) ?? agent.model)}
-              {...(key ? { sub: key.label } : {})}
-              chevron
-              onPress={() => openAgentAi(agent.id)}
-            />
-          </GroupedList>
-          <WorkspacePlanRows agent={agent} dir={dir} />
-        </>
-      )}
+      <WorkspaceAi agent={agent} dir={dir} />
 
       {usesApi ? (
         <>

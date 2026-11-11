@@ -2056,10 +2056,7 @@
       "fallbackNone": "Tanpa paket sendiri, {{name}} tidak bisa menjawabmu: paket workspace hanya menjawab {{owner}}.",
       "workspace": "AI bagi yang tidak punya paket sendiri",
       "workspaceHelp": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat AI ini.",
-      "workspacePlan": "Paket workspace",
-      "workspacePlanHelp": "Paket sebagai pengganti kunci. Paket ini menjawab orang lain hanya kalau pemiliknya mengizinkan.",
       "noPlans": "Hubungkan paket di AI dan pemakaian untuk memakainya di sini.",
-      "pickPlan": "Pilih paket",
       "sharesOn": "Yang tidak punya paket sendiri berbicara dengan {{name}} lewat paket ini.",
       "lend": "Pinjamkan paket ini ke yang tidak punya",
       "groupMine": "Hanya untukmu",
@@ -13459,19 +13456,8 @@
       "dialogTitle": "Apa yang dikirim",
       "dialogText": "Sekali sehari. Ini laporan berikutnya, persis apa adanya."
     },
-    "tilesTitle": "Semua yang ada di ruang kerja",
     "tileState": {
-      "members_other": "{{count}} anggota",
-      "invitations_other": "{{count}} undangan menunggu",
-      "agents_other": "{{count}} agen",
-      "connectors_other": "{{count}} terhubung",
-      "noConnectors": "Belum ada aplikasi yang terhubung",
-      "skills_other": "{{count}} skill",
-      "computers_other": "{{online}} dari {{count}} menyala",
-      "noComputers": "Belum ada komputer",
-      "devices_other": "{{online}} dari {{count}} menyala",
-      "noDevices": "Belum ada perangkat",
-      "usage": "{{percent}} anggaran terpakai bulan ini"
+      "members_other": "{{count}} anggota"
     },
     "import": {
       "title": "Impor",

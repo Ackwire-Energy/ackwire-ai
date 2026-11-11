@@ -2056,10 +2056,7 @@
       "fallbackNone": "自分のプランがないと{{name}}は返信できません。ワークスペースのプランは{{owner}}にしか応えません。",
       "workspace": "自分のプランがない人のAI",
       "workspaceHelp": "自分のプランがない人は、このAIで{{name}}と話します。",
-      "workspacePlan": "ワークスペースのプラン",
-      "workspacePlanHelp": "キーの代わりに使うプランです。他の人に応えるのは、持ち主が許可したときだけです。",
       "noPlans": "ここで使うには、「AIと使用量」でプランを接続してください。",
-      "pickPlan": "プランを選択",
       "sharesOn": "自分のプランがない人は、このプランで{{name}}と話します。",
       "lend": "プランがない人にこのプランを貸す",
       "groupMine": "あなただけ",
@@ -13405,19 +13402,8 @@
       "dialogTitle": "送信内容",
       "dialogText": "1日1回送信します。次回のレポートは以下のとおりです。"
     },
-    "tilesTitle": "ワークスペースのすべて",
     "tileState": {
-      "members_other": "メンバー{{count}}人",
-      "invitations_other": "招待{{count}}件が保留中",
-      "agents_other": "エージェント{{count}}体",
-      "connectors_other": "{{count}}件接続済み",
-      "noConnectors": "まだアプリが接続されていません",
-      "skills_other": "スキル{{count}}件",
-      "computers_other": "{{count}}台中{{online}}台がオン",
-      "noComputers": "まだコンピューターがありません",
-      "devices_other": "{{count}}台中{{online}}台がオン",
-      "noDevices": "デバイスはまだありません",
-      "usage": "今月の予算の{{percent}}を使用"
+      "members_other": "メンバー{{count}}人"
     },
     "import": {
       "title": "インポート",

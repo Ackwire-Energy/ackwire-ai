@@ -227,6 +227,8 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
     expect(screen).toContain('onPress={() => router.push("/settings/advanced")}');
     const advanced = src("settings/AdvancedScreen.tsx");
     expect(advanced).toContain("<SectionGroups");
+    // Its own group is the screen's title, never a header saying "Avançado" again under it.
+    expect(advanced).toContain('untitled="advanced"');
     expect(advanced).toContain('onPress={() => router.push("/me/approvals")}');
     expect(advanced).toContain("<DeleteWorkspaceRow />");
     // AI and apps ends with Connectors and Skills in a personal workspace.

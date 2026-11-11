@@ -122,9 +122,12 @@ function PersonalSettingsList({ others }: { others: number | undefined }) {
 export function SectionGroups({
   areas,
   extra,
+  untitled,
 }: {
   areas: readonly SettingsEntry[];
   extra?: Partial<Record<SettingsGroup, ReactElement>>;
+  /** The group the screen's own title already names (Advanced on the Advanced screen): its rows, no header. */
+  untitled?: SettingsGroup;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -138,7 +141,7 @@ export function SectionGroups({
         if (rows.length === 0 && !more) return null;
         return (
           <Fragment key={group}>
-            <GroupedHeader>{t(GROUP_LABEL[group])}</GroupedHeader>
+            {group === untitled ? <Gap /> : <GroupedHeader>{t(GROUP_LABEL[group])}</GroupedHeader>}
             <GroupedList>
               {rows.map((s) =>
                 s.id === "general" ? (
