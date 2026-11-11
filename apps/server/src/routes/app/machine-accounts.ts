@@ -1,3 +1,4 @@
+import { ACCOUNT_LOGIN_FAILURES } from "@agenteschat/adapters";
 import {
   accountLoginStatus,
   beginAccountLogin,
@@ -57,6 +58,13 @@ const AccountLoginStatus = z
     state: z.enum(["waiting", "done", "failed", "expired"]),
     account: MachineAccount.optional().openapi({ description: "Once `done`: the account, stored." }),
     error: z.string().optional().openapi({ description: "`failed`: why, for people." }),
+    code: z.enum(ACCOUNT_LOGIN_FAILURES).optional().openapi({
+      description:
+        "`failed` or `expired` on the computer: why, for the app to say in its own words. `not_installed`, `no_tty` (no terminal to take the code), `network` (the provider out of reach), `bad_code` (the provider refused the pasted code), `cli_exit` (the CLI stopped with an error of its own), `not_signed_in_after_login` (it finished, but its status says signed out), `status_unknown` (its status didn't answer), `no_token`, `not_kept`, `timeout` (`expired`), `canceled`. An older runner sends none.",
+    }),
+    message: z.string().optional().openapi({
+      description: "With `code`: what the CLI itself said (English, credentials masked, at most 300 characters).",
+    }),
     duplicate: z.object({ label: z.string(), account: MachineAccount }).optional().openapi({
       description:
         "`failed`: the account that signed in is one the caller already has on this computer (named `label`, and `account` itself). A new sign-in is removed there; signing in again leaves the account signed out.",
@@ -88,7 +96,7 @@ export function machineAccountRoutes(deps: AppDeps) {
   const withHub = () => {
     const hub = deps.extras?.sandbox?.machines?.hub;
     if (!hub) throw new ValidationError("Connected computers are not available on this server");
-    return { db, pubsub, hub };
+    return { db, pubsub, hub, ...(deps.log ? { log: deps.log } : {}) };
   };
 
   app.openapi(

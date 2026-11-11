@@ -3,6 +3,7 @@ import {
   ACCOUNT_LOGIN_TTL_MS,
   ACCOUNTS_PROTOCOL,
   type AccountKind,
+  type AccountLoginFailure,
   type AccountLoginState,
   ANTIGRAVITY_PROTOCOL,
   type AuthMethod,
@@ -15,6 +16,7 @@ import {
   GROK_PROTOCOL,
   isAccountId,
   isAccountKind,
+  isAccountLoginFailure,
   isClaudeLoginMethod,
   isLoginEmail,
   MAX_MACHINE_ACCOUNTS,
@@ -75,6 +77,7 @@ import {
 import { recordAccountFailure } from "./operator-events";
 import { can, requirePermission } from "./organizations";
 import { runnerUpdateWay } from "./runner-update";
+import { scrubSignIns } from "./tool-detail";
 import { wakeOnRoom } from "./usage-pause";
 
 const { machineAccounts, agents, machines, rightHandBrains, users } = schema;
@@ -167,6 +170,11 @@ export interface MachineAccountDeps {
 
 export interface MachineAccountHubDeps extends MachineAccountDeps {
   hub: Pick<MachineCaller, "call" | "status">;
+  /** A sign-in that failed on the computer is logged here (an error line is reported, ADR 0104). */
+  log?: {
+    error(message: string, data?: Record<string, unknown>): void;
+    warn(message: string, data?: Record<string, unknown>): void;
+  };
 }
 
 const kindOf = (row: Pick<MachineAccountRow, "kind">): AccountKind =>
@@ -1268,6 +1276,10 @@ export interface AccountLoginStatus {
   account?: MachineAccountView;
   /** `failed`: why, for people. */
   error?: string;
+  /** `failed` or `expired` on the computer: why, as a code (an older runner sends none). */
+  code?: AccountLoginFailure;
+  /** With `code`: what the CLI itself said, credentials masked. */
+  message?: string;
   /**
    * `failed`: the account that signed in is one the person already has on this computer (a new sign-in is removed
    * there): its name, and the account itself, theirs to think with instead.
@@ -1294,11 +1306,30 @@ export async function accountLoginStatus(
   const state: AccountLoginState = LOGIN_STATES.includes(reply.state as AccountLoginState)
     ? (reply.state as AccountLoginState)
     : "failed";
-  const error = typeof reply.error === "string" ? reply.error.slice(0, 300) : undefined;
+  const said = (v: unknown) => (typeof v === "string" ? scrubSignIns(v, "••••").text.slice(0, 300) : undefined);
+  const error = said(reply.error);
+  if (state === "waiting") return { state };
   if (state !== "done") {
+    const code = isAccountLoginFailure(reply.code) ? reply.code : undefined;
+    const message = code ? said(reply.message) : undefined;
+    if (code && code !== "canceled") {
+      const kind = kindOf(row);
+      const fields = { orgId, userId, machineId: machine.id, accountKind: kind, code, message };
+      if (state === "failed") {
+        deps.log?.error("account sign-in failed on the computer", {
+          ...fields,
+          error: new Error(`${kind} sign-in failed: ${code}${message ? `: ${message}` : ""}`),
+        });
+      } else deps.log?.warn("account sign-in expired on the computer", fields);
+    }
     // The runner removed the folder of a new sign-in that ended without signing in.
-    if (state !== "waiting") await dropSignIn(deps.db, orgId, row.id);
-    return { state, ...(state === "failed" && error ? { error } : {}) };
+    await dropSignIn(deps.db, orgId, row.id);
+    return {
+      state,
+      ...(state === "failed" && error ? { error } : {}),
+      ...(code ? { code } : {}),
+      ...(message ? { message } : {}),
+    };
   }
   const [info] = parseAccounts(reply.account ? [reply.account] : []);
   if (!info) {

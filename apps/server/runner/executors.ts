@@ -279,15 +279,14 @@ function detectGrok(run: Run): Promise<Probe> {
 export const AGY_BIN = "agy";
 
 /**
- * `agy models` → its slugs and names, one per line: `gemini-4-argon-high       Gemini 4 Argon (High)`
- * (antigravity.google/docs/cli/headless, read 2026-11-04). A line without a slug and a name (a sign-in notice, `...`)
- * is skipped.
+ * `agy models` → its slugs and names, one per line, split by a tab in 1.5.0 (`gemini-4-argon-high\tGemini 4 Argon
+ * (High)`) or by spaces. A line without a slug and a name (a sign-in notice, `...`) is skipped.
  */
 export function parseAgyModels(output: string): CursorModelInfo[] {
   const out: CursorModelInfo[] = [];
   // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
   for (const raw of output.replace(/\u001b\[[0-9;]*m/g, "").split("\n")) {
-    const m = /^\s*([a-z0-9][\w.:/-]{0,79})\s{2,}(\S.{0,79}?)\s*$/i.exec(raw);
+    const m = /^\s*([a-z0-9][\w.:/-]{0,79})(?:\t\s*| {2,})(\S.{0,79}?)\s*$/i.exec(raw);
     if (!m?.[1] || !m[2] || out.some((x) => x.id === m[1])) continue;
     out.push({ id: m[1], label: m[2] });
     if (out.length >= 60) break;

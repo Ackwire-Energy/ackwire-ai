@@ -5816,11 +5816,29 @@ export interface AccountLoginStart {
   expiresAt: string;
 }
 
+/** Why a sign-in ended on the computer (mirror of `ACCOUNT_LOGIN_FAILURES` in `@agenteschat/adapters`). */
+export type AccountLoginFailure =
+  | "not_installed"
+  | "no_tty"
+  | "network"
+  | "bad_code"
+  | "cli_exit"
+  | "not_signed_in_after_login"
+  | "status_unknown"
+  | "no_token"
+  | "not_kept"
+  | "timeout"
+  | "canceled";
+
 /** `GET …/account-logins/{loginId}`. */
 export interface AccountLoginStatus {
   state: "waiting" | "done" | "failed" | "expired";
   account?: MachineAccount;
   error?: string;
+  /** `failed` or `expired` on the computer: why (an older runner sends none). */
+  code?: AccountLoginFailure;
+  /** With `code`: what the CLI itself said, in English. */
+  message?: string;
   /** `failed`: the viewer already has this account on that computer, named `label` (an older server sends no `account`). */
   duplicate?: { label: string; account?: MachineAccount };
   /** `failed`: signing in again came back as another account, this email; the account stays signed out. */
