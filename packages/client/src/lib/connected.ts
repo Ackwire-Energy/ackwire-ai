@@ -2,6 +2,7 @@ import type { TFunction } from "i18next";
 import type { Connection, ConnectOutcome, ConnectorDef, CustomServer } from "../api/types";
 import { exposedTools, sameServer, toolsToReview } from "./custom-tools";
 import { connectorName } from "./scopes";
+import { reviewToolsOf } from "./tool-review";
 
 /** A one-color mark the web app serves, drawn in its brand color. Only a file of ours by name, never any URL. */
 export const CONNECTOR_MARK = /^\/connectors\/[a-z0-9-]+\.svg$/;
@@ -183,6 +184,28 @@ export function outcomeText(t: TFunction, outcome: ConnectOutcome, item: Connect
   return item.server?.accountLabel
     ? t("connectors.outcome.sameAccount", { name, service })
     : t("connectors.outcome.already", { name });
+}
+
+/**
+ * How many of a connection's actions ask in the chat at the levels it has: a server's tools at "pede aprovação" (the
+ * decision, else our suggestion, which is what applying them saves), a catalog connector's sensitive ones.
+ */
+export function asksCount(t: TFunction, item: Pick<ConnectedItem, "server" | "def">) {
+  return item.server
+    ? reviewToolsOf(t, item.server).filter((x) => x.level === "approval").length
+    : (item.def?.tools ?? []).filter((x) => x.sensitive).length;
+}
+
+/**
+ * What a connection just made is, in a sentence or two: every agent has it and how many actions ask ("Todos os
+ * agentes podem usar. 4 ações pedem aprovação no chat."). A server whose tools no one gave a level yet says
+ * that instead: agents get none of them until someone does (`pending`). Nothing asking adds no second sentence.
+ */
+export function connectedSummary(t: TFunction, item: Pick<ConnectedItem, "server" | "def" | "pending">) {
+  const lead =
+    item.pending > 0 ? t("connectFlow.done.waiting", { count: item.pending }) : t("connectFlow.done.everyone");
+  const asks = asksCount(t, item);
+  return asks > 0 ? t("common.joinSentences", { a: lead, b: t("connectFlow.done.asks", { count: asks }) }) : lead;
 }
 
 /** What changed in the GitHub organizations we reach since `before`, in a sentence; it says so when nothing did. */

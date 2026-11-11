@@ -195,6 +195,8 @@ import {
   STEP_HELD_MAX,
   takeStepWords,
 } from "./events";
+import { type Feedback, queueFeedback } from "./feedback";
+import type { PendingFeedbackOffer } from "./feedback-offers";
 import { comesBackHere, FOLLOW_UP_TOOL, wakesLater } from "./follow-through";
 import { cutText } from "./format";
 import type { ModelGateway } from "./gateway";
@@ -550,6 +552,8 @@ export interface Transcript {
   desktop?: BrowserTrailStep[];
   /** Tasks the right hand handed on, not yet on a posted message (`meta.tasks`, its chips). */
   tasks?: HandedTask[];
+  /** A report it offered about the app, not yet on a posted message (`meta.feedbackOffer`, ADR 0160 §12). */
+  feedbackOffer?: PendingFeedbackOffer;
   /** The agent reacted (`react`) instead of replying: an empty final answer posts nothing. */
   reacted?: boolean;
   /** It sent a GIF or its sticker (`send_gif`, `send_sticker`, ADR 0091): an empty final answer posts nothing. */
@@ -1392,7 +1396,8 @@ async function executeRunInner(
     lineMachine = null;
     await db
       .update(agentRuns)
-      .set({ waitingMachineId: null, ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
+      // Out of the line, it works from now: "thinking for …" never counts the wait for room.
+      .set({ waitingMachineId: null, workingSince: new Date(), ...(run.turns === 0 ? { startedAt: new Date() } : {}) })
       .where(and(eq(agentRuns.id, run.id), eq(agentRuns.status, "running")));
     await publishChannelEvent(deps.pubsub, { type: "agent.thinking", ...where, ...bg });
     await publishChannelEvent(deps.pubsub, {
@@ -1889,6 +1894,17 @@ async function executeRunInner(
       ? new Date(at)
       : undefined;
   };
+  /**
+   * When it last posted, not yet on its row: what it posts ends the stretch of work the conversation was counting
+   * ("thinking for …"), so if it goes on it counts from there (`agent_runs.working_since`), as the apps that saw the
+   * message land already do. Written with the run's next save (`worked`), never in a statement of its own.
+   */
+  let postedAt: Date | null = null;
+  const worked = () => {
+    const at = postedAt;
+    postedAt = null;
+    return at ? { workingSince: at } : {};
+  };
   /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
   const post = async (
     tx: Executor,
@@ -1900,6 +1916,10 @@ async function executeRunInner(
   ) => {
     // What it wrote ends the reply its words showed for: it takes their place. A line the server writes doesn't.
     const placed = note ? undefined : takePlace(threadId);
+    // A report that goes by itself (ADR 0160 §12) is queued with the message that says so, never kept on it.
+    const { [FEEDBACK_SEND]: feedbackSend, ...shown } = (meta ?? {}) as Record<string, unknown> & {
+      [FEEDBACK_SEND]?: { key: string; feedback: Feedback };
+    };
     const tagged = report && !note ? { routine: report } : {};
     // What a run a routine's reading feeds writes holds no credential it may have read (ADR 0053 §3); one a person
     // wrote into since (`steeredBy`, in the transcript as it is now) answers that person. Any other run writes as
@@ -1988,7 +2008,7 @@ async function executeRunInner(
       threadId,
       said,
       {
-        ...meta,
+        ...shown,
         ...runMeta,
         ...tagged,
         ...(readOutside && !note ? { readOutside: true } : {}),
@@ -2014,6 +2034,8 @@ async function executeRunInner(
         text: said,
       };
     }
+    if (feedbackSend) await queueFeedback(tx, { orgId: run.orgId, ...feedbackSend });
+    postedAt = new Date();
     // Act with undo (ADR 0037 round 2): the changes the run made so far become this message's receipts.
     if ((await linkRunActions(tx, run.orgId, run.id, m.id)) > 0) withReceipts.push(m.id);
     if (!note && transcript) transcript.lastPosted = body.trim();
@@ -2028,7 +2050,7 @@ async function executeRunInner(
   const saveTranscript = (tx: Executor, t: Transcript) =>
     tx
       .update(agentRuns)
-      .set({ transcript: storedTranscript(t), updatedAt: new Date() })
+      .set({ transcript: storedTranscript(t), updatedAt: new Date(), ...worked() })
       .where(eq(agentRuns.id, run.id));
 
   // What the bridge kept stays on the row until taken (`takeBridgeEffects`); this copy never carries it.
@@ -2607,7 +2629,12 @@ async function executeRunInner(
     const [counted] = await Promise.all([
       db
         .update(agentRuns)
-        .set({ turns: sql`${agentRuns.turns} + 1`, transcript: storedTranscript(t), updatedAt: new Date() })
+        .set({
+          turns: sql`${agentRuns.turns} + 1`,
+          transcript: storedTranscript(t),
+          updatedAt: new Date(),
+          ...worked(),
+        })
         .where(eq(agentRuns.id, run.id))
         .returning(),
       addRunStep(db, run, "model_call", {
@@ -5787,11 +5814,14 @@ function createDeltaPublisher(
   };
 }
 
+/** Where `takeMemoryUpdates` hands `post` the email of a report that goes by itself: never saved on the message. */
+const FEEDBACK_SEND = "feedbackSend";
+
 /**
  * Moves pending memory updates, artifacts, a proposed mission's link, the
  * agents it consulted, where it browsed and what it did on its desktop onto the
  * message being posted (the "memory updated", file preview, mission link,
- * "message from @agent", browser and desktop cards).
+ * "message from @agent", browser and desktop cards), and a report it offered about the app (its row under the reply).
  */
 function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const updates = t.memoryUpdates ?? [];
@@ -5801,7 +5831,9 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   const browser = t.browser ?? [];
   const desktop = t.desktop ?? [];
   const tasks = t.tasks ?? [];
+  const offer = t.feedbackOffer;
   if (
+    !offer &&
     updates.length === 0 &&
     files.length === 0 &&
     !link &&
@@ -5818,6 +5850,7 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   t.browser = [];
   t.desktop = [];
   t.tasks = [];
+  t.feedbackOffer = undefined;
   const meta: Record<string, unknown> = {};
   if (updates.length > 0) meta.memoryUpdates = updates;
   if (files.length > 0) meta.artifacts = files;
@@ -5826,6 +5859,10 @@ function takeMemoryUpdates(t: Transcript): Record<string, unknown> | undefined {
   if (browser.length > 0) meta.browser = { steps: browser };
   if (desktop.length > 0) meta.desktop = { steps: desktop };
   if (tasks.length > 0) meta.tasks = tasks;
+  if (offer) {
+    meta.feedbackOffer = offer.view;
+    if (offer.send) meta[FEEDBACK_SEND] = { key: `offer:${offer.view.id}`, feedback: offer.send };
+  }
   return meta;
 }
 

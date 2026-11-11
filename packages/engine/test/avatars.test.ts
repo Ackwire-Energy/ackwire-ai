@@ -155,6 +155,27 @@ describe("profile photo", () => {
     expect(second.avatarUrl).toEndWith(".png");
     expect([...blobs.objects.keys()]).toEqual([`avatars/${bia.id}/${second.avatarUrl.split("/").at(-1)}`]);
 
+    // A portrait drawn in the app is a photo that keeps its recipe after the address; the file is found the same way.
+    const drawn = await setAvatar({ db: f.db, blobs }, bia.id, {
+      imageBase64: b64(PNG),
+      contentType: "image/png",
+      portrait: "1.f.s3.wavy.dark",
+    });
+    expect(drawn.avatarUrl).toBe(`${second.avatarUrl}#px=1.f.s3.wavy.dark`);
+    expect((await listMembers(f.db, f.org.id)).find((m) => m.userId === bia.id)?.avatarUrl).toBe(drawn.avatarUrl);
+    expect(blobs.objects.size).toBe(1);
+    await expect(
+      setAvatar({ db: f.db, blobs }, bia.id, { imageBase64: b64(PNG), contentType: "image/png", portrait: "1.<x>" }),
+    ).rejects.toBeInstanceOf(ValidationError);
+    // A photo after it replaces the portrait's file, and removing clears either.
+    await setAvatar({ db: f.db, blobs }, bia.id, { imageBase64: b64(JPEG), contentType: "image/jpeg" });
+    expect([...blobs.objects.keys()]).toHaveLength(1);
+    await setAvatar({ db: f.db, blobs }, bia.id, {
+      imageBase64: b64(PNG),
+      contentType: "image/png",
+      portrait: "1.m.s1.short.black",
+    });
+
     await removeAvatar({ db: f.db, blobs }, bia.id);
     expect(blobs.objects.size).toBe(0);
     const [row] = await f.db

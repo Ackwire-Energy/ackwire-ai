@@ -868,6 +868,34 @@ test.if(posix)(
 );
 
 test.if(posix)(
+  "an idle close dates the session's kept text once: the process's exit after it doesn't again",
+  async () => {
+    const expired = new Date(Date.now() - SESSION_SYSTEM_KEEP_MS - 60_000);
+    let kept = "";
+    const age = () => {
+      for (const f of readdirSync(kept)) utimesSync(path.join(kept, f), expired, expired);
+    };
+    // Just after the idle close's drop (its log line comes right before it), before the process exits and its exit
+    // handler drops it again.
+    const { m, home, turn } = setup({
+      idleMs: 50,
+      log: (l) => {
+        if (l.includes("idle; closing")) queueMicrotask(age);
+      },
+    });
+    kept = path.join(home, "brains", "sessions");
+    await turn(1, "hi", { system: "S1" });
+    const proc = m.process(AGENT.id, SESSION(1));
+    await waitFor(() => m.size === 0 && proc?.exited === true, 4000);
+    // The exit handlers run on the loop's next turn after the exit.
+    await new Promise((resolve) => setImmediate(resolve));
+    const dated = readdirSync(kept).map((f) => statSync(path.join(kept, f)).mtimeMs);
+    expect(dated.length).toBeGreaterThan(0);
+    for (const t of dated) expect(t).toBeLessThan(Date.now() - SESSION_SYSTEM_KEEP_MS);
+  },
+);
+
+test.if(posix)(
   "protocol 40: the system text is the agent's with the folder's CLAUDE.md; the conversation opens the session once, and again after it compacted",
   async () => {
     const { m, home, ws, spawns, turn } = setup({ idleMs: 50 });

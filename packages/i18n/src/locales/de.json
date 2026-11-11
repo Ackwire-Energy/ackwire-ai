@@ -2789,8 +2789,6 @@
     "was": "Vorher: {{text}}",
     "open": "Was {{name}} weiß",
     "open_female": "Was {{name}} weiß",
-    "undo": "Rückgängig",
-    "undone": "Rückgängig gemacht",
     "group": "Gedächtnis aktualisiert von {{name}}"
   },
   "reach": {
@@ -2945,20 +2943,10 @@
     "someone": "jemand",
     "you": "du",
     "undo": "Rückgängig",
-    "redo": "Wiederholen",
-    "undoAll": "Alles rückgängig",
     "changes_one": "{{count}} Änderung",
     "changes_other": "{{count}} Änderungen",
     "undoneBy": "Rückgängig gemacht von {{name}}",
-    "ago": "vor {{time}}",
-    "timeLeft": "Noch {{time}} zum Rückgängigmachen",
     "group": "Änderungen von {{name}}",
-    "undone": "Rückgängig gemacht.",
-    "redone": "Wiederhergestellt.",
-    "undoneAll_one": "{{count}} Änderung rückgängig gemacht.",
-    "undoneAll_other": "{{count}} Änderungen rückgängig gemacht.",
-    "partial_one": "{{count}} Änderung konnte nicht rückgängig gemacht werden.",
-    "partial_other": "{{count}} Änderungen konnten nicht rückgängig gemacht werden.",
     "errors": {
       "changed_since": "Jemand hat das inzwischen geändert. Wenn du es jetzt rückgängig machst, geht diese Änderung verloren.",
       "expired": "Die Zeit zum Rückgängigmachen ist abgelaufen.",
@@ -3602,6 +3590,7 @@
       "ready": "Verbunden",
       "syncing": "Wird synchronisiert",
       "reads": "Liest {{label}}",
+      "readOnly": "nur Lesezugriff",
       "items_one": "{{count}} Eintrag",
       "items_other": "{{count}} Einträge",
       "synced": "synchronisiert {{when}}",
@@ -3650,7 +3639,7 @@
       "onepassword": {
         "step": {
           "1": "Leg in 1Password einen Tresor nur für deine Agenten an und verschiebe die Logins hinein, die sie verwenden dürfen",
-          "2": "Leg ein Dienstkonto an, das nur auf diesen Tresor Zugriff hat",
+          "2": "Leg ein Dienstkonto an, das nur auf diesen Tresor Zugriff hat (Lesen und Schreiben, wenn deine Agenten dort neue Logins speichern sollen)",
           "3": "Füge hier das Token des Dienstkontos ein"
         },
         "field": {
@@ -9497,6 +9486,193 @@
     "notImage": "Wähle ein Bild (JPG, PNG oder WebP).",
     "tooBig": "Das Bild ist größer als 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Wie möchtest du erscheinen?",
+      "build": "Avatar erstellen",
+      "buildText": "Ein Pixelporträt nach deinem Geschmack: Haare, Kleidung, Accessoires.",
+      "photo": "Foto hochladen",
+      "photoText": "Wähle ein Bild von deinem Computer und richte es aus."
+    },
+    "title": "Dein Avatar",
+    "preview": "Dein Avatar",
+    "shuffle": "Zufällig",
+    "small": "In kleinen Größen im Chat ist nur das Gesicht zu sehen.",
+    "photoAsk": "Lieber ein Foto?",
+    "photoUpload": "Foto hochladen",
+    "saved": "Avatar aktualisiert.",
+    "failed": "Der Avatar konnte nicht gespeichert werden. Versuch es noch einmal.",
+    "showAll": "Alle Optionen anzeigen",
+    "showFewer": "Weniger Optionen anzeigen",
+    "beardHint": "Der Bart hat die Haarfarbe.",
+    "hatsHint": "Kappe, Mütze, Hut und Kopftuch verdecken die Haare.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Typ",
+      "m": "Maskulin",
+      "f": "Feminin"
+    },
+    "tabs": {
+      "label": "Teile des Avatars",
+      "face": "Gesicht",
+      "hair": "Haare",
+      "beard": "Bart",
+      "makeup": "Make-up",
+      "marks": "Merkmale",
+      "accessories": "Accessoires",
+      "clothes": "Kleidung",
+      "background": "Hintergrund"
+    },
+    "sections": {
+      "skin": "Hautton",
+      "eyes": "Augenfarbe",
+      "mood": "Ausdruck",
+      "color": "Farbe",
+      "hairColor": "Haarfarbe",
+      "clothesColor": "Kleidungsfarbe",
+      "cut": "Schnitt",
+      "beard": "Bart",
+      "lips": "Lippenstift",
+      "shadow": "Lidschatten",
+      "blush": "Rouge",
+      "mark": "Merkmale",
+      "glasses": "Brille",
+      "ear": "Ohrringe",
+      "neck": "Am Hals",
+      "extra": "Auf dem Kopf",
+      "piece": "Kleidungsstück",
+      "bg": "Hintergrund"
+    },
+    "options": {
+      "mood": {
+        "smile": "Lächeln",
+        "grin": "Breites Lächeln",
+        "laugh": "Lachen",
+        "calm": "Ruhig",
+        "wink": "Zwinkern",
+        "wow": "Überrascht"
+      },
+      "hair": {
+        "none": "Glatze",
+        "buzz": "Raspelkurz",
+        "short": "Kurz",
+        "side": "Seitenscheitel",
+        "quiff": "Tolle",
+        "curly": "Lockig",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Pony",
+        "long": "Lang",
+        "wavy": "Wellig",
+        "curls": "Lange Locken",
+        "bun": "Dutt",
+        "pony": "Pferdeschwanz",
+        "spiky": "Stachelig",
+        "mohawk": "Irokese",
+        "braids": "Flechtzöpfe",
+        "pigtails": "Zwei Zöpfe",
+        "crew": "Bürstenschnitt",
+        "fade": "Fade",
+        "slick": "Zurückgekämmt",
+        "flat": "Flat Top",
+        "undercut": "Undercut",
+        "mullet": "Vokuhila",
+        "dreads": "Dreadlocks",
+        "medium": "Mittellang",
+        "receding": "Geheimratsecken"
+      },
+      "beard": {
+        "none": "Kein Bart",
+        "stubble": "Dreitagebart",
+        "mustache": "Schnurrbart",
+        "goatee": "Kinnbart",
+        "strap": "Konturbart",
+        "full": "Vollbart",
+        "long": "Lang"
+      },
+      "lips": {
+        "none": "Kein Lippenstift",
+        "nude": "Nude",
+        "pink": "Rosa",
+        "red": "Rot",
+        "wine": "Weinrot",
+        "purple": "Lila",
+        "black": "Schwarz"
+      },
+      "shadow": {
+        "none": "Kein Lidschatten",
+        "rose": "Rosé",
+        "violet": "Violett",
+        "blue": "Blau",
+        "green": "Grün",
+        "gold": "Gold",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Dezent",
+        "strong": "Kräftig",
+        "none": "Kein Rouge"
+      },
+      "mark": {
+        "none": "Keine",
+        "freckles": "Sommersprossen",
+        "mole": "Muttermal",
+        "scar": "Narbe",
+        "bandaid": "Pflaster",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Keine Brille",
+        "round": "Rund",
+        "square": "Eckig",
+        "gold": "Goldrand",
+        "tinted": "Getönt",
+        "shades": "Sonnenbrille"
+      },
+      "ear": {
+        "none": "Keine Ohrringe",
+        "studs": "Goldstecker",
+        "pearls": "Perlen",
+        "hoops": "Creolen",
+        "drops": "Hänger"
+      },
+      "neck": {
+        "none": "Nichts",
+        "necklace": "Halskette",
+        "pearls": "Perlen",
+        "choker": "Choker",
+        "bowtie": "Fliege",
+        "muffler": "Schal"
+      },
+      "extra": {
+        "none": "Nichts",
+        "headband": "Haarband",
+        "bandana": "Bandana",
+        "bow": "Schleife",
+        "flower": "Blume",
+        "headphones": "Kopfhörer",
+        "cap": "Kappe",
+        "beanie": "Mütze",
+        "hat": "Hut",
+        "crown": "Krone",
+        "scarf": "Kopftuch"
+      },
+      "clothes": {
+        "tee": "T-Shirt",
+        "vneck": "V-Ausschnitt",
+        "tank": "Tanktop",
+        "shirt": "Hemd",
+        "suit": "Anzug",
+        "blazer": "Blazer",
+        "jacket": "Jacke",
+        "hoodie": "Kapuzenpulli",
+        "turtle": "Rollkragen",
+        "overall": "Latzhose",
+        "polo": "Poloshirt",
+        "dress": "Kleid"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo hochladen",
@@ -10909,7 +11085,7 @@
       "close": "Details schließen",
       "can": "Was Agenten tun können",
       "afterText": "Kein Agent nutzt ihn, bis du es festlegst.",
-      "allText": "Nach dem Verbinden kann jeder Agent ihn nutzen. Danach legst du den Zugriff jedes Agenten fest.",
+      "allText": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du später anpassen.",
       "addAccount": "Weiteres Konto hinzufügen",
       "accountsText": "Jedes Konto hat seine eigenen Agenten und Stufen.",
       "reconnect": "Erneut verbinden",
@@ -11690,11 +11866,10 @@
     "notApproved": "{{name}} lässt nur freigegebene Apps zur Anmeldung zu, und agentes.chat ist noch nicht freigegeben. Wenn du dort einen API-Schlüssel bekommst, kannst du dich damit verbinden.",
     "serverSaid": "Der Server hat geantwortet: {{detail}}",
     "nothingYet": "Bis Schritt 3 ist nichts für Agenten verfügbar.",
-    "allCanUse": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du in Schritt 3 ändern.",
-    "newAccount": "Das neue Konto startet ohne Agenten, außer denen mit Zugriff auf alles. Du wählst in Schritt 3.",
+    "allCanUse": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du später anpassen.",
     "replace": "Ersetzt die aktuelle Anmeldung. Wer sie nutzt, bleibt gleich.",
     "replaceUnchecked": "Melde dich beim selben Konto wie vorher an. Wir können nicht prüfen, welches es ist, und wer es nutzt, bleibt gleich.",
-    "newAccountUnchecked": "Melde dich bei einem Konto an, das noch nicht verbunden ist, wir können das nicht prüfen. Es startet ohne Agenten, außer denen mit Zugriff auf alles.",
+    "newAccountUnchecked": "Melde dich bei einem Konto an, das noch nicht verbunden ist, wir können das nicht prüfen.",
     "addTitle": "Weiteres {{name}}-Konto",
     "reconnectTitle": "{{name}} erneut verbinden",
     "accountName": "Name dieses Kontos",
@@ -11717,7 +11892,16 @@
     "asksDefault": "Sensible Aktionen fragen im Chat immer nach Freigabe.",
     "grant": "Zugriff geben",
     "saved_one": "{{name}}: {{count}} Agent kann ihn nutzen.",
-    "saved_other": "{{name}}: {{count}} Agenten können ihn nutzen."
+    "saved_other": "{{name}}: {{count}} Agenten können ihn nutzen.",
+    "done": {
+      "title": "{{name}} verbunden",
+      "everyone": "Jeder Agent kann ihn nutzen.",
+      "waiting": "Agenten bekommen die Tools erst, wenn du fortfährst, mit den Stufen, die wir vorschlagen.",
+      "asks_one": "{{count}} Aktion fragt im Chat nach Freigabe.",
+      "asks_other": "{{count}} Aktionen fragen im Chat nach Freigabe.",
+      "adjust": "Anpassen",
+      "ok": "Fertig"
+    }
   },
   "database": {
     "name": "Datenbank",
@@ -14850,6 +15034,7 @@
         "settingStatus": "Den eigenen Status aktualisiert",
         "settingReplyStyle": "Die Art zu antworten angepasst",
         "sendingFeedback": "Um das Senden von Feedback gebeten",
+        "offeringFeedback": "Angeboten, ein Problem zu melden",
         "deletingRoutine": "Eine Routine gelöscht",
         "runningRoutine": "Eine Routine jetzt ausgeführt",
         "proposingTeam": "Ein Team vorgeschlagen",
@@ -14963,6 +15148,7 @@
       "settingStatus": "Aktualisieren des eigenen Status",
       "settingReplyStyle": "Anpassen der Art zu antworten",
       "sendingFeedback": "Feedback vorbereiten",
+      "offeringFeedback": "Bericht vorbereiten",
       "deletingRoutine": "Löschen einer Routine",
       "runningRoutine": "Ausführen einer Routine",
       "proposingTeam": "Vorschlagen eines Teams",
@@ -17457,6 +17643,24 @@
     "send": "Senden",
     "thanks": "Zugestellt. Danke.",
     "reply": "Alles wird gelesen. Eine Antwort, falls nötig, kommt an {{email}}.",
-    "another": "Noch eins senden"
+    "another": "Noch eins senden",
+    "offer": {
+      "group": "Bericht über die App",
+      "ready": "<b>Bericht bereit</b>: {{summary}}",
+      "goesCloud": "Geht in deinem Namen an das Team von agentes.chat",
+      "goesServer": "Geht in deinem Namen an die Person, die diesen Server betreibt",
+      "see": "Bericht ansehen",
+      "hide": "Bericht schließen",
+      "send": "Senden",
+      "notNow": "Jetzt nicht",
+      "answer": "Die Antwort kommt an deine E-Mail-Adresse.",
+      "sentCloud": "<b>Bericht gesendet</b> an das Team von agentes.chat",
+      "sentServer": "<b>Bericht gesendet</b> an die Person, die diesen Server betreibt",
+      "sentAuto": "<b>Bericht ohne Nachfrage gesendet</b>: {{summary}}",
+      "view": "Ansehen",
+      "always": "Immer senden",
+      "alwaysOn": "Ab jetzt gehen solche Berichte ohne Nachfrage raus.",
+      "askFirst": "Vor dem Senden fragen"
+    }
   }
 }

@@ -108,6 +108,7 @@ export type ActivityKind =
   | "settingStatus"
   | "settingReplyStyle"
   | "sendingFeedback"
+  | "offeringFeedback"
   | "deletingRoutine"
   | "runningRoutine"
   | "proposingTeam"
@@ -267,6 +268,7 @@ const BUILTIN: Record<string, ActivityKind> = {
   set_status: "settingStatus",
   set_reply_style: "settingReplyStyle",
   send_feedback: "sendingFeedback",
+  offer_feedback: "offeringFeedback",
   delete_routine: "deletingRoutine",
   run_routine_now: "runningRoutine",
   propose_team: "proposingTeam",
@@ -513,8 +515,9 @@ const turnAtWork = (runs: LiveRun[], agentId: string) =>
   runs.find((r) => r.agentId === agentId && r.status !== "failed" && r.status !== "canceled");
 
 /** How long a run has been at it ("16 s", "1 min 5 s"), from 2 s on: the bar's time and its live row's alike. */
-export function runElapsed(t: TFunction, run: Pick<LiveRun, "startedAt">, now: number): string | null {
-  const took = elapsedParts(now - (run.startedAt ?? now));
+export function runElapsed(t: TFunction, run: Pick<LiveRun, "startedAt" | "workingSince">, now: number): string | null {
+  // The work it is doing now (`workingSince`), not the run's first start: a run that posted or waited counts again.
+  const took = elapsedParts(now - (run.workingSince ?? run.startedAt ?? now));
   if (!took) return null;
   return took.m > 0 ? t("run.elapsedMinutes", { m: took.m, s: took.s }) : t("run.elapsedSeconds", { n: took.s });
 }

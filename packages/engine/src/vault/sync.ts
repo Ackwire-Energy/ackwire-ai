@@ -19,13 +19,13 @@ import {
   type VaultSourceItem,
   vaultOrigin,
 } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, lt, not, or, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, lt, not, or, schema, sql } from "@agenteschat/db";
 import { UUID } from "../authority";
 import { SealedValueError } from "../crypto";
 import { publishVaultChanged } from "../events";
 import { enqueue } from "../outbox";
 import { closedOrg } from "../standing";
-import type { ConnectionRow } from "./access";
+import type { ConnectionRow, ItemRow } from "./access";
 import { sourceCall, sourceConnection, sourceOf } from "./seal";
 import {
   VAULT_ITEM_KINDS,
@@ -74,6 +74,38 @@ function rowOf(connection: ConnectionRow, item: VaultSourceItem) {
     accessFromConnection: true,
     missing: false,
   };
+}
+
+/**
+ * One item a source just answered a write with (a login it now keeps, or one it changed), indexed at once as the
+ * next sync would: the same row by (connection, the source's id), following the connection's access. Null when the
+ * item can't be kept (`rowOf`).
+ */
+export async function indexSourceItem(
+  db: Executor,
+  connection: ConnectionRow,
+  item: VaultSourceItem,
+  now: Date,
+  createdByAgentId?: string,
+): Promise<ItemRow | null> {
+  const row = rowOf(connection, item);
+  if (!row) return null;
+  const [kept] = await db
+    .insert(vaultItems)
+    .values({ ...row, createdAt: now, updatedAt: now, ...(createdByAgentId ? { createdByAgentId } : {}) })
+    .onConflictDoUpdate({
+      target: [vaultItems.connectionId, vaultItems.externalRef],
+      set: {
+        title: row.title,
+        website: row.website,
+        match: row.match,
+        username: row.username,
+        missing: false,
+        updatedAt: now,
+      },
+    })
+    .returning();
+  return kept ?? null;
 }
 
 /** Why a connection failed, as a code people can act on. A seal that no longer opens means: connect it again. */

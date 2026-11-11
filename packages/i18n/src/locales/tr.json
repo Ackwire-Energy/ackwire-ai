@@ -2778,8 +2778,6 @@
     "chip": "Bellek güncellendi",
     "was": "Önce: {{text}}",
     "open": "{{name}} neler biliyor",
-    "undo": "Geri al",
-    "undone": "Geri alındı",
     "group": "Belleği güncelleyen: {{name}}"
   },
   "reach": {
@@ -2932,20 +2930,10 @@
     "someone": "biri",
     "you": "siz",
     "undo": "Geri al",
-    "redo": "Yinele",
-    "undoAll": "Tümünü geri al",
     "changes_one": "{{count}} değişiklik",
     "changes_other": "{{count}} değişiklik",
     "undoneBy": "{{name}} geri aldı",
-    "ago": "{{time}} önce",
-    "timeLeft": "Geri almak için {{time}} kaldı",
     "group": "{{name}} tarafından yapılan değişiklikler",
-    "undone": "Geri alındı.",
-    "redone": "Yinelendi.",
-    "undoneAll_one": "{{count}} değişiklik geri alındı.",
-    "undoneAll_other": "{{count}} değişiklik geri alındı.",
-    "partial_one": "{{count}} değişiklik geri alınamadı.",
-    "partial_other": "{{count}} değişiklik geri alınamadı.",
     "errors": {
       "changed_since": "O zamandan beri biri bunu değiştirdi. Şimdi geri almak o değişikliği kaybettirir.",
       "expired": "Geri alma süresi doldu.",
@@ -3589,6 +3577,7 @@
       "ready": "Bağlı",
       "syncing": "Eşitleniyor",
       "reads": "Okunan: {{label}}",
+      "readOnly": "salt okunur",
       "items_one": "{{count}} öğe",
       "items_other": "{{count}} öğe",
       "synced": "{{when}} eşitlendi",
@@ -3637,7 +3626,7 @@
       "onepassword": {
         "step": {
           "1": "1Password'de yalnızca ajanlarınız için bir kasa oluşturun ve kullanabilecekleri giriş bilgilerini oraya taşıyın",
-          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun",
+          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun (ajanlarınız oraya yeni giriş bilgileri kaydedecekse okuma ve yazma)",
           "3": "Hizmet hesabının token'ını buraya yapıştırın"
         },
         "field": {
@@ -9441,6 +9430,193 @@
     "notImage": "Bir görsel seçin (JPG, PNG veya WebP).",
     "tooBig": "Görsel 8 MB'tan büyük."
   },
+  "portrait": {
+    "ask": {
+      "title": "Nasıl görünmek istersiniz?",
+      "build": "Avatar oluştur",
+      "buildText": "Size göre bir piksel portre: saç, kıyafet, aksesuar.",
+      "photo": "Fotoğraf yükle",
+      "photoText": "Bilgisayarınızdan bir görsel seçin ve çerçeveleyin."
+    },
+    "title": "Avatarınız",
+    "preview": "Avatarınız",
+    "shuffle": "Karıştır",
+    "small": "Sohbetteki küçük boyutlarda yalnızca yüz görünür.",
+    "photoAsk": "Fotoğraf mı tercih edersiniz?",
+    "photoUpload": "Fotoğraf yükle",
+    "saved": "Avatar güncellendi.",
+    "failed": "Avatar kaydedilemedi. Tekrar deneyin.",
+    "showAll": "Tüm seçenekleri göster",
+    "showFewer": "Daha az seçenek göster",
+    "beardHint": "Sakal, saç rengini takip eder.",
+    "hatsHint": "Kasket, bere, şapka ve başörtüsü saçı örter.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Tip",
+      "m": "Maskülen",
+      "f": "Feminen"
+    },
+    "tabs": {
+      "label": "Avatarın bölümleri",
+      "face": "Yüz",
+      "hair": "Saç",
+      "beard": "Sakal",
+      "makeup": "Makyaj",
+      "marks": "İzler",
+      "accessories": "Aksesuarlar",
+      "clothes": "Kıyafet",
+      "background": "Arka plan"
+    },
+    "sections": {
+      "skin": "Ten rengi",
+      "eyes": "Göz rengi",
+      "mood": "İfade",
+      "color": "Renk",
+      "hairColor": "Saç rengi",
+      "clothesColor": "Kıyafet rengi",
+      "cut": "Kesim",
+      "beard": "Sakal",
+      "lips": "Ruj",
+      "shadow": "Göz farı",
+      "blush": "Allık",
+      "mark": "İzler",
+      "glasses": "Gözlük",
+      "ear": "Küpe",
+      "neck": "Boyunda",
+      "extra": "Başta",
+      "piece": "Parça",
+      "bg": "Arka plan"
+    },
+    "options": {
+      "mood": {
+        "smile": "Gülümseme",
+        "grin": "Kocaman gülümseme",
+        "laugh": "Kahkaha",
+        "calm": "Sakin",
+        "wink": "Göz kırpma",
+        "wow": "Şaşkın"
+      },
+      "hair": {
+        "none": "Kel",
+        "buzz": "Asker tıraşı",
+        "short": "Kısa",
+        "side": "Yandan ayrık",
+        "quiff": "Kabarık",
+        "curly": "Kıvırcık",
+        "afro": "Afro",
+        "bob": "Küt",
+        "bangs": "Kâkül",
+        "long": "Uzun",
+        "wavy": "Dalgalı",
+        "curls": "Uzun bukleler",
+        "bun": "Topuz",
+        "pony": "At kuyruğu",
+        "spiky": "Dikenli",
+        "mohawk": "Mohawk",
+        "braids": "Örgü",
+        "pigtails": "Çift kuyruk",
+        "crew": "Asker tıraşı",
+        "fade": "Fade",
+        "slick": "Geriye taranmış",
+        "flat": "Düz tepe",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Rasta",
+        "medium": "Orta boy",
+        "receding": "Açık alın"
+      },
+      "beard": {
+        "none": "Sakalsız",
+        "stubble": "Kirli sakal",
+        "mustache": "Bıyık",
+        "goatee": "Keçi sakalı",
+        "strap": "İnce sakal",
+        "full": "Gür",
+        "long": "Uzun"
+      },
+      "lips": {
+        "none": "Rujsuz",
+        "nude": "Nude",
+        "pink": "Pembe",
+        "red": "Kırmızı",
+        "wine": "Bordo",
+        "purple": "Mor",
+        "black": "Siyah"
+      },
+      "shadow": {
+        "none": "Farsız",
+        "rose": "Pembe",
+        "violet": "Mor",
+        "blue": "Mavi",
+        "green": "Yeşil",
+        "gold": "Altın",
+        "smoky": "Dumanlı"
+      },
+      "blush": {
+        "soft": "Hafif",
+        "strong": "Belirgin",
+        "none": "Allıksız"
+      },
+      "mark": {
+        "none": "Yok",
+        "freckles": "Çiller",
+        "mole": "Ben",
+        "scar": "Yara izi",
+        "bandaid": "Yara bandı",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Gözlüksüz",
+        "round": "Yuvarlak",
+        "square": "Kare",
+        "gold": "Altın",
+        "tinted": "Renkli cam",
+        "shades": "Güneş gözlüğü"
+      },
+      "ear": {
+        "none": "Küpesiz",
+        "studs": "Altın çivi küpe",
+        "pearls": "İnci",
+        "hoops": "Halka",
+        "drops": "Sallantılı"
+      },
+      "neck": {
+        "none": "Yok",
+        "necklace": "Kolye",
+        "pearls": "İnci",
+        "choker": "Tasma kolye",
+        "bowtie": "Papyon",
+        "muffler": "Atkı"
+      },
+      "extra": {
+        "none": "Yok",
+        "headband": "Saç bandı",
+        "bandana": "Bandana",
+        "bow": "Fiyonk",
+        "flower": "Çiçek",
+        "headphones": "Kulaklık",
+        "cap": "Kasket",
+        "beanie": "Bere",
+        "hat": "Şapka",
+        "crown": "Taç",
+        "scarf": "Başörtüsü"
+      },
+      "clothes": {
+        "tee": "Tişört",
+        "vneck": "V yaka",
+        "tank": "Atlet",
+        "shirt": "Gömlek",
+        "suit": "Takım elbise",
+        "blazer": "Blazer",
+        "jacket": "Ceket",
+        "hoodie": "Kapüşonlu",
+        "turtle": "Boğazlı kazak",
+        "overall": "Tulum",
+        "polo": "Polo yaka",
+        "dress": "Elbise"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Logo yükle",
@@ -10845,7 +11021,7 @@
       "close": "Ayrıntıları kapat",
       "can": "Ajanların yapabilecekleri",
       "afterText": "Siz seçene kadar hiçbir ajan kullanmaz.",
-      "allText": "Bağlandıktan sonra her ajan kullanabilir. Ardından her ajanın erişimini seçersiniz.",
+      "allText": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
       "addAccount": "Başka bir hesap ekle",
       "accountsText": "Her hesabın kendi ajanları ve seviyeleri vardır.",
       "reconnect": "Yeniden bağla",
@@ -11626,11 +11802,10 @@
     "notApproved": "{{name}} yalnızca onayladığı uygulamaların giriş yapmasına izin veriyor ve agentes.chat henüz onaylanmadı. Size bir API anahtarı veriyorsa onunla bağlanabilirsiniz.",
     "serverSaid": "Sunucunun yanıtı: {{detail}}",
     "nothingYet": "3. adıma kadar ajanlar hiçbir şey kullanamaz.",
-    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu 3. adımda değiştirebilirsiniz.",
-    "newAccount": "Yeni hesap, her şeye erişimi olanlar dışında ajansız başlar. 3. adımda siz seçersiniz.",
+    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
     "replace": "Mevcut girişin yerini alır. Kimin kullandığı aynı kalır.",
     "replaceUnchecked": "Öncekiyle aynı hesaba giriş yapın. Hangisi olduğunu kontrol edemiyoruz ve kimin kullandığı aynı kalır.",
-    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz. Her şeye erişimi olanlar dışında ajansız başlar.",
+    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz.",
     "addTitle": "Başka bir {{name}} hesabı",
     "reconnectTitle": "{{name}} yeniden bağla",
     "accountName": "Bu hesabın adı",
@@ -11653,7 +11828,16 @@
     "asksDefault": "Hassas işlemler sohbette her zaman onay ister.",
     "grant": "Erişim ver",
     "saved_one": "{{name}}: {{count}} ajan kullanabilir.",
-    "saved_other": "{{name}}: {{count}} ajan kullanabilir."
+    "saved_other": "{{name}}: {{count}} ajan kullanabilir.",
+    "done": {
+      "title": "{{name}} bağlandı",
+      "everyone": "Her ajan kullanabilir.",
+      "waiting": "Ajanlar araçları ancak siz devam ettiğinizde, önerdiğimiz seviyelerle alır.",
+      "asks_one": "{{count}} işlem sohbette onay ister.",
+      "asks_other": "{{count}} işlem sohbette onay ister.",
+      "adjust": "Ayarla",
+      "ok": "Tamam"
+    }
   },
   "database": {
     "name": "Veritabanı",
@@ -14780,6 +14964,7 @@
         "settingStatus": "Kendi durumunu güncelledi",
         "settingReplyStyle": "Yanıtlama biçimini ayarladı",
         "sendingFeedback": "Geri bildirim göndermeyi istedi",
+        "offeringFeedback": "Bir sorunu bildirmeyi önerdi",
         "deletingRoutine": "Bir rutini sildi",
         "runningRoutine": "Bir rutini şimdi çalıştırdı",
         "proposingTeam": "Bir ekip önerdi",
@@ -14893,6 +15078,7 @@
       "settingStatus": "kendi durumunu güncelliyor",
       "settingReplyStyle": "yanıtlama biçimini ayarlıyor",
       "sendingFeedback": "geri bildirim hazırlıyor",
+      "offeringFeedback": "bildirim hazırlıyor",
       "deletingRoutine": "bir rutini siliyor",
       "runningRoutine": "bir rutini şimdi çalıştırıyor",
       "proposingTeam": "bir ekip öneriyor",
@@ -17387,6 +17573,24 @@
     "send": "Gönder",
     "thanks": "Ulaştı. Teşekkürler.",
     "reply": "Hepsi okunur. Gerekirse yanıt {{email}} adresine gelir.",
-    "another": "Bir tane daha gönder"
+    "another": "Bir tane daha gönder",
+    "offer": {
+      "group": "Uygulama hakkında bildirim",
+      "ready": "<b>Bildirim hazır</b>: {{summary}}",
+      "goesCloud": "Adınıza agentes.chat ekibine gider",
+      "goesServer": "Adınıza bu sunucuyu yöneten kişiye gider",
+      "see": "Bildirimi gör",
+      "hide": "Bildirimi kapat",
+      "send": "Gönder",
+      "notNow": "Şimdi değil",
+      "answer": "Yanıt e-posta adresinize gelir.",
+      "sentCloud": "agentes.chat ekibine <b>bildirim gönderildi</b>",
+      "sentServer": "Bu sunucuyu yöneten kişiye <b>bildirim gönderildi</b>",
+      "sentAuto": "<b>Bildirim sormadan gönderildi</b>: {{summary}}",
+      "view": "Gör",
+      "always": "Her zaman gönder",
+      "alwaysOn": "Bundan sonra bu tür bildirimler sormadan gider.",
+      "askFirst": "Göndermeden önce sor"
+    }
   }
 }

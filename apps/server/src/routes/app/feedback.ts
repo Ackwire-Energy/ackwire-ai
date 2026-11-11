@@ -1,5 +1,6 @@
 import {
   attachFeedbackFiles,
+  decideFeedbackOffer,
   dropFeedbackFile,
   FEEDBACK_ABOUT_MAX,
   FEEDBACK_FACT_MAX,
@@ -52,6 +53,18 @@ const FeedbackFile = z
     contentType: z.string(),
   })
   .openapi("FeedbackFile");
+
+const FeedbackOffer = z
+  .object({
+    id: z.uuid(),
+    forUserId: z.string().openapi({ description: "The person it goes in the name of: only they decide it." }),
+    summary: z.string(),
+    text: z.string(),
+    state: z.enum(["offered", "sent", "dismissed"]),
+    auto: z.literal(true).optional().openapi({ description: "Sent with the reply: they chose Always send." }),
+    decidedAt: z.string().optional(),
+  })
+  .openapi("FeedbackOffer");
 
 /**
  * The apps' feedback form (ADR 0160): what the person wrote goes by email to whoever runs the server
@@ -223,6 +236,49 @@ export function feedbackRoutes(deps: AppDeps) {
       });
       deps.wakeWorkers?.();
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/feedback/offers/{messageId}",
+      tags,
+      summary: "Send or dismiss a report an agent offered",
+      description:
+        "A report an agent offered about the app on its own (a reply's `meta.feedbackOffer`), decided by the person it is for, once: `send` queues the same email as the form's, in their name, with the agent's text; `dismiss` puts it away. Decided already, it answers with how it stands. 403 for anyone else, 409 when the server takes no feedback, 429 past ten an hour.",
+      security,
+      request: {
+        params: z.object({ messageId: z.uuid().openapi({ param: { name: "messageId", in: "path" } }) }),
+        body: body(
+          z.object({
+            orgId: z.uuid(),
+            decision: z.enum(["send", "dismiss"]),
+          }),
+        ),
+      },
+      responses: {
+        200: json(z.object({ offer: FeedbackOffer })),
+        400: errors[400],
+        401: errors[401],
+        403: errors[403],
+        404: errors[404],
+        409: errors[409],
+      },
+    }),
+    async (c) => {
+      const input = c.req.valid("json");
+      const offer = await decideFeedbackOffer(
+        { db, pubsub: adapters.pubsub, rateLimiter: adapters.rateLimiter, to: config.FEEDBACK_EMAIL, version },
+        {
+          orgId: input.orgId,
+          messageId: c.req.valid("param").messageId,
+          userId: c.get("user").id,
+          decision: input.decision,
+        },
+      );
+      if (offer.state === "sent") deps.wakeWorkers?.();
+      return c.json({ offer }, 200);
     },
   );
 

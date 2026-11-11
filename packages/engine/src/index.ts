@@ -120,6 +120,7 @@ export * from "./events";
 export * from "./executor";
 export * from "./exports";
 export * from "./feedback";
+export * from "./feedback-offers";
 export * from "./feedback-tools";
 export * from "./file-pulls";
 export * from "./follow-through";

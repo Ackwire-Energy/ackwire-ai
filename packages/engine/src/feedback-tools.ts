@@ -2,6 +2,14 @@ import type { RateLimiter } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { namesLabel, namesOf } from "./approvals";
 import { FEEDBACK_MAX, FEEDBACK_PER_HOUR, queueFeedback } from "./feedback";
+import {
+  agentFeedback,
+  FEEDBACK_SUMMARY_MAX,
+  feedbackAutoOf,
+  feedbackOfferRefusal,
+  OFFER_FEEDBACK_TOOL,
+  type PendingFeedbackOffer,
+} from "./feedback-offers";
 import { getMembership } from "./organizations";
 import { personBehindCall } from "./requester";
 import type { ToolDefinition, ToolSource } from "./tools/types";
@@ -105,5 +113,90 @@ export function createFeedbackToolSource(deps: {
       };
     },
   };
-  return { name: "feedback", tools: async () => (deps.to ? [tool] : []) };
+  /**
+   * `offer_feedback` (ADR 0160 §12): the agent's own initiative, when the app itself failed or the person complained
+   * about it. It sends nothing: the report rides on the reply as a row the person sends or turns down, so it needs no
+   * approval and holds nothing. One a day in a conversation; a person who chose "Always send" gets it sent with the
+   * reply, within their ten an hour.
+   */
+  const offer: ToolDefinition = {
+    name: OFFER_FEEDBACK_TOOL,
+    description:
+      "Offer, on your own initiative, to report a problem with this app itself to whoever runs this server: a row under your reply with the report, which the person sends with one click or dismisses; nothing waits on it. Only when the app really failed: one of its own tools broke with an internal error, your browser or desktop crashed, you went in circles on the same app error, or the person complains that something of the app doesn't work and what you see confirms it. Never for an outside service's failure, a limit, a missing permission or setting, or your own mistake. `summary`: the problem in a few words, in their language, no capital letter and no period ('the browser closed while opening a page'). `text`: the report in their language: what was being done, what happened as it appeared, when; nothing else from the conversation. Still answer them as well as you can, and don't ask in words whether to send it: the row asks.",
+    scope: "",
+    inputSchema: {
+      type: "object",
+      properties: {
+        summary: { type: "string", minLength: 1, maxLength: FEEDBACK_SUMMARY_MAX },
+        text: { type: "string", minLength: 1, maxLength: FEEDBACK_MAX },
+      },
+      required: ["summary", "text"],
+      additionalProperties: false,
+    },
+    async execute(input, ctx) {
+      const to = deps.to;
+      if (!to) return { content: "This server takes no feedback: nothing was offered.", isError: true };
+      const summary = typeof input.summary === "string" ? input.summary.replace(/\s+/g, " ").trim() : "";
+      const text = typeof input.text === "string" ? input.text.trim() : "";
+      if (!summary || !text)
+        return { content: "Give the problem in `summary` and the report in `text`.", isError: true };
+      const person = await personBehindCall(ctx);
+      const member = person ? await getMembership(ctx.db, person, ctx.orgId) : null;
+      if (!person || !member) {
+        return {
+          content: "A report goes in a person's name, and nobody is behind this run: nothing was offered.",
+          isError: true,
+        };
+      }
+      const refusal = await feedbackOfferRefusal(ctx.db, {
+        orgId: ctx.orgId,
+        channelId: ctx.channelId,
+        userId: person,
+      });
+      if (refusal) return { content: refusal, isError: true };
+      const pending: PendingFeedbackOffer = {
+        view: {
+          id: crypto.randomUUID(),
+          forUserId: person,
+          summary: summary.slice(0, FEEDBACK_SUMMARY_MAX),
+          text: text.slice(0, FEEDBACK_MAX),
+          state: "offered",
+        },
+      };
+      // "Always send": it goes with the reply, while they are within their hour's ten; past it, the row asks.
+      if (
+        (await feedbackAutoOf(ctx.db, ctx.orgId, person)) &&
+        (!deps.rateLimiter || (await deps.rateLimiter.consume(`feedback:${person}`, FEEDBACK_PER_HOUR)).allowed)
+      ) {
+        const [user] = await ctx.db
+          .select({ name: users.name, email: users.email })
+          .from(users)
+          .where(eq(users.id, person));
+        const [agent] = await ctx.db
+          .select({ name: agents.name, handle: agents.handle })
+          .from(agents)
+          .where(and(eq(agents.orgId, ctx.orgId), eq(agents.id, ctx.agentId)));
+        if (user) {
+          pending.view = { ...pending.view, state: "sent", auto: true, decidedAt: new Date().toISOString() };
+          pending.send = agentFeedback({
+            to,
+            version: deps.version,
+            user,
+            orgName: member.orgName,
+            role: member.role,
+            agent,
+            text: pending.view.text,
+            how: "on its own; they chose to always send these",
+          });
+        }
+      }
+      return {
+        content: pending.send
+          ? "It goes with your reply, in their name (they chose to always send these): a row under it says so. Finish your answer; don't mention the report."
+          : "Offered: a row under your reply lets them send it or dismiss it. Finish your answer; don't ask them about the report in words.",
+        data: { feedbackOffer: pending },
+      };
+    },
+  };
+  return { name: "feedback", tools: async () => (deps.to ? [tool, offer] : []) };
 }

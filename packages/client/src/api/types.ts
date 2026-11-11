@@ -103,6 +103,23 @@ export interface FeedbackInput {
   files?: string[];
 }
 
+/**
+ * `message.meta.feedbackOffer` (server-made): a report about the app the agent offered on its own, under its reply.
+ * Only `forUserId` sees its row and decides it (`decideFeedbackOffer`); `auto`: it went with the reply, because they
+ * chose Always send.
+ */
+export interface FeedbackOffer {
+  id: string;
+  forUserId: string;
+  /** The problem in a few words, as the row's one line. */
+  summary: string;
+  /** The report, as the email carries it. */
+  text: string;
+  state: "offered" | "sent" | "dismissed";
+  auto?: true;
+  decidedAt?: string;
+}
+
 export interface FeedbackAbout {
   /** The app's own word for the thing: `message`, `card`, `button`… */
   kind: string;
@@ -1462,6 +1479,12 @@ export interface ActiveRun {
   /** Last sign of life from the worker. */
   heartbeatAt?: string | null;
   createdAt?: string;
+  /**
+   * How long the work it is doing now has taken, in milliseconds, as the server counts it (since it last went back
+   * to work or last posted, else since it was created). A length, not a time: "thinking for …" counts on from it by
+   * this device's clock. Absent on a server from before it.
+   */
+  workingMs?: number;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
@@ -1592,6 +1615,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       proposal: CalendarProposal;
+    }
+  /** A report an agent offered was sent or turned down: its row (`meta.feedbackOffer`) as it is now. */
+  | {
+      type: "feedback_offer.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      offer: FeedbackOffer;
     }
   /** The right hand's team card changed (ADR 0137 §10): the whole card. */
   | {

@@ -1,6 +1,6 @@
 # Social and ads apps: what to register
 
-For whoever runs a server: the Cloud's owner or a self-hoster. ADR 0167 is the design. Each service turns on when its
+For whoever runs a server: the Cloud's owner or a self-hoster. ADR 0170 is the design. Each service turns on when its
 variables are set, in the server's environment only; secrets never go anywhere else. Prices are the vendors' public
 ones, read on 2026-11-10.
 

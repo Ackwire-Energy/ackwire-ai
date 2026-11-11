@@ -2981,8 +2981,6 @@
     "chip": "Pamięć zaktualizowana",
     "was": "Wcześniej: {{text}}",
     "open": "Co wie {{name}}",
-    "undo": "Cofnij",
-    "undone": "Cofnięto",
     "group": "Pamięć zaktualizowana przez {{name}}"
   },
   "reach": {
@@ -3135,26 +3133,12 @@
     "someone": "ktoś",
     "you": "ty",
     "undo": "Cofnij",
-    "redo": "Ponów",
-    "undoAll": "Cofnij wszystko",
     "changes_one": "{{count}} zmiana",
     "changes_few": "{{count}} zmiany",
     "changes_many": "{{count}} zmian",
     "changes_other": "{{count}} zmiany",
     "undoneBy": "Cofnięte przez: {{name}}",
-    "ago": "{{time}} temu",
-    "timeLeft": "{{time}} na cofnięcie",
     "group": "Zmiany: {{name}}",
-    "undone": "Cofnięto.",
-    "redone": "Ponowiono.",
-    "undoneAll_one": "Cofnięto {{count}} zmianę.",
-    "undoneAll_few": "Cofnięto {{count}} zmiany.",
-    "undoneAll_many": "Cofnięto {{count}} zmian.",
-    "undoneAll_other": "Cofnięto {{count}} zmiany.",
-    "partial_one": "Nie udało się cofnąć {{count}} zmiany.",
-    "partial_few": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_many": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_other": "Nie udało się cofnąć {{count}} zmiany.",
     "errors": {
       "changed_since": "Ktoś to w międzyczasie zmienił. Cofnięcie teraz usunęłoby tę zmianę.",
       "expired": "Czas na cofnięcie minął.",
@@ -3840,6 +3824,7 @@
       "ready": "Połączono",
       "syncing": "Synchronizowanie",
       "reads": "Odczytuje: {{label}}",
+      "readOnly": "tylko do odczytu",
       "items_one": "{{count}} element",
       "items_few": "{{count}} elementy",
       "items_many": "{{count}} elementów",
@@ -3892,7 +3877,7 @@
       "onepassword": {
         "step": {
           "1": "Utwórz w 1Password sejf tylko dla swoich agentów i przenieś do niego loginy, których mogą używać",
-          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu",
+          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu (odczyt i zapis, jeśli agenci mają zapisywać tam nowe loginy)",
           "3": "Wklej tutaj token konta usługi"
         },
         "field": {
@@ -10172,6 +10157,193 @@
     "notImage": "Wybierz obraz (JPG, PNG lub WebP).",
     "tooBig": "Obraz ma ponad 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Jak chcesz się pokazywać?",
+      "build": "Stwórz awatar",
+      "buildText": "Pikselowy portret po swojemu: włosy, ubranie, dodatki.",
+      "photo": "Prześlij zdjęcie",
+      "photoText": "Wybierz obraz z komputera i go wykadruj."
+    },
+    "title": "Twój awatar",
+    "preview": "Twój awatar",
+    "shuffle": "Losuj",
+    "small": "W małych rozmiarach na czacie widać samą twarz.",
+    "photoAsk": "Wolisz zdjęcie?",
+    "photoUpload": "Prześlij zdjęcie",
+    "saved": "Awatar zaktualizowany.",
+    "failed": "Nie udało się zapisać awatara. Spróbuj ponownie.",
+    "showAll": "Pokaż wszystkie opcje",
+    "showFewer": "Pokaż mniej opcji",
+    "beardHint": "Broda ma kolor włosów.",
+    "hatsHint": "Czapka z daszkiem, czapka zimowa, kapelusz i chusta zakrywają włosy.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Typ",
+      "m": "Męski",
+      "f": "Kobiecy"
+    },
+    "tabs": {
+      "label": "Części awatara",
+      "face": "Twarz",
+      "hair": "Włosy",
+      "beard": "Broda",
+      "makeup": "Makijaż",
+      "marks": "Znaki",
+      "accessories": "Akcesoria",
+      "clothes": "Ubranie",
+      "background": "Tło"
+    },
+    "sections": {
+      "skin": "Odcień skóry",
+      "eyes": "Kolor oczu",
+      "mood": "Wyraz twarzy",
+      "color": "Kolor",
+      "hairColor": "Kolor włosów",
+      "clothesColor": "Kolor ubrania",
+      "cut": "Fryzura",
+      "beard": "Broda",
+      "lips": "Szminka",
+      "shadow": "Cień do powiek",
+      "blush": "Róż",
+      "mark": "Znaki szczególne",
+      "glasses": "Okulary",
+      "ear": "Kolczyki",
+      "neck": "Na szyi",
+      "extra": "Na głowie",
+      "piece": "Strój",
+      "bg": "Tło"
+    },
+    "options": {
+      "mood": {
+        "smile": "Uśmiech",
+        "grin": "Szeroki uśmiech",
+        "laugh": "Śmiech",
+        "calm": "Spokój",
+        "wink": "Mrugnięcie",
+        "wow": "Zaskoczenie"
+      },
+      "hair": {
+        "none": "Bez włosów",
+        "buzz": "Na zapałkę",
+        "short": "Krótkie",
+        "side": "Z przedziałkiem",
+        "quiff": "Czub",
+        "curly": "Kręcone",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Grzywka",
+        "long": "Długie",
+        "wavy": "Falowane",
+        "curls": "Długie loki",
+        "bun": "Kok",
+        "pony": "Kucyk",
+        "spiky": "Na jeża",
+        "mohawk": "Irokez",
+        "braids": "Warkocze",
+        "pigtails": "Kitki",
+        "crew": "Na jeża",
+        "fade": "Fade",
+        "slick": "Zaczesane do tyłu",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dredy",
+        "medium": "Średnie",
+        "receding": "Zakola"
+      },
+      "beard": {
+        "none": "Bez brody",
+        "stubble": "Zarost",
+        "mustache": "Wąsy",
+        "goatee": "Kozia bródka",
+        "strap": "Wąska broda",
+        "full": "Pełna",
+        "long": "Długa"
+      },
+      "lips": {
+        "none": "Bez szminki",
+        "nude": "Nude",
+        "pink": "Róż",
+        "red": "Czerwień",
+        "wine": "Bordo",
+        "purple": "Fiolet",
+        "black": "Czerń"
+      },
+      "shadow": {
+        "none": "Bez cieni",
+        "rose": "Róż",
+        "violet": "Fiolet",
+        "blue": "Błękit",
+        "green": "Zieleń",
+        "gold": "Złoto",
+        "smoky": "Przydymiony"
+      },
+      "blush": {
+        "soft": "Delikatny",
+        "strong": "Mocny",
+        "none": "Bez różu"
+      },
+      "mark": {
+        "none": "Brak",
+        "freckles": "Piegi",
+        "mole": "Pieprzyk",
+        "scar": "Blizna",
+        "bandaid": "Plaster",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Bez okularów",
+        "round": "Okrągłe",
+        "square": "Kwadratowe",
+        "gold": "Złote",
+        "tinted": "Barwione",
+        "shades": "Przeciwsłoneczne"
+      },
+      "ear": {
+        "none": "Bez kolczyków",
+        "studs": "Złote sztyfty",
+        "pearls": "Perły",
+        "hoops": "Koła",
+        "drops": "Wiszące"
+      },
+      "neck": {
+        "none": "Nic",
+        "necklace": "Naszyjnik",
+        "pearls": "Perły",
+        "choker": "Choker",
+        "bowtie": "Muszka",
+        "muffler": "Szalik"
+      },
+      "extra": {
+        "none": "Nic",
+        "headband": "Opaska",
+        "bandana": "Bandana",
+        "bow": "Kokarda",
+        "flower": "Kwiatek",
+        "headphones": "Słuchawki",
+        "cap": "Czapka z daszkiem",
+        "beanie": "Czapka zimowa",
+        "hat": "Kapelusz",
+        "crown": "Korona",
+        "scarf": "Chusta"
+      },
+      "clothes": {
+        "tee": "Koszulka",
+        "vneck": "Dekolt w serek",
+        "tank": "Bokserka",
+        "shirt": "Koszula",
+        "suit": "Garnitur",
+        "blazer": "Marynarka",
+        "jacket": "Kurtka",
+        "hoodie": "Bluza z kapturem",
+        "turtle": "Golf",
+        "overall": "Ogrodniczki",
+        "polo": "Koszulka polo",
+        "dress": "Sukienka"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Prześlij logo",
@@ -11732,7 +11904,7 @@
       "close": "Zamknij szczegóły",
       "can": "Co będą mogli robić agenci",
       "afterText": "Żaden agent z niego nie korzysta, dopóki nie wybierzesz.",
-      "allText": "Po połączeniu każdy agent może z niego korzystać. Następnie wybierasz dostęp każdego agenta.",
+      "allText": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
       "addAccount": "Dodaj kolejne konto",
       "accountsText": "Każde konto ma własnych agentów i poziomy.",
       "reconnect": "Połącz ponownie",
@@ -12553,11 +12725,10 @@
     "notApproved": "{{name}} pozwala logować się tylko zatwierdzonym aplikacjom, a agentes.chat jeszcze nie jest zatwierdzony. Jeśli dostaniesz tam klucz API, możesz połączyć się nim.",
     "serverSaid": "Odpowiedź serwera: {{detail}}",
     "nothingYet": "Do kroku 3 nic nie jest dostępne dla agentów.",
-    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to zmienić w kroku 3.",
-    "newAccount": "Nowe konto zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego. Wybierasz w kroku 3.",
+    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
     "replace": "Zastępuje obecne logowanie. Kto z niego korzysta, pozostaje bez zmian.",
     "replaceUnchecked": "Zaloguj się na to samo konto co wcześniej. Nie możemy sprawdzić, które to konto, a kto z niego korzysta, pozostaje bez zmian.",
-    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić. Zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego.",
+    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić.",
     "addTitle": "Kolejne konto {{name}}",
     "reconnectTitle": "Połącz ponownie {{name}}",
     "accountName": "Nazwa tego konta",
@@ -12586,7 +12757,18 @@
     "saved_one": "{{name}}: może z niego korzystać {{count}} agent.",
     "saved_few": "{{name}}: mogą z niego korzystać {{count}} agenci.",
     "saved_many": "{{name}}: może z niego korzystać {{count}} agentów.",
-    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta."
+    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta.",
+    "done": {
+      "title": "Połączono z {{name}}",
+      "everyone": "Każdy agent może z niego korzystać.",
+      "waiting": "Agenci dostaną narzędzia dopiero, gdy przejdziesz dalej, na poziomach, które sugerujemy.",
+      "asks_one": "{{count}} akcja prosi o zatwierdzenie na czacie.",
+      "asks_few": "{{count}} akcje proszą o zatwierdzenie na czacie.",
+      "asks_many": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "asks_other": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "adjust": "Dostosuj",
+      "ok": "Gotowe"
+    }
   },
   "database": {
     "name": "Baza danych",
@@ -15841,6 +16023,7 @@
         "settingStatus": "Zaktualizowano własny status",
         "settingReplyStyle": "Dostosowano sposób odpowiadania",
         "sendingFeedback": "Poproszono o wysłanie opinii",
+        "offeringFeedback": "Zaproponowano zgłoszenie problemu",
         "deletingRoutine": "Usunięto rutynę",
         "runningRoutine": "Uruchomiono rutynę teraz",
         "proposingTeam": "Zaproponowano zespół",
@@ -15954,6 +16137,7 @@
       "settingStatus": "aktualizowanie własnego statusu",
       "settingReplyStyle": "dostosowywanie sposobu odpowiadania",
       "sendingFeedback": "przygotowywanie opinii",
+      "offeringFeedback": "przygotowywanie zgłoszenia",
       "deletingRoutine": "usuwanie rutyny",
       "runningRoutine": "uruchamianie rutyny teraz",
       "proposingTeam": "proponowanie zespołu",
@@ -18586,6 +18770,24 @@
     "send": "Wyślij",
     "thanks": "Dostarczono. Dziękujemy.",
     "reply": "Wszystko jest czytane. Odpowiedź, jeśli będzie potrzebna, przyjdzie na {{email}}.",
-    "another": "Wyślij kolejną"
+    "another": "Wyślij kolejną",
+    "offer": {
+      "group": "Zgłoszenie dotyczące aplikacji",
+      "ready": "<b>Zgłoszenie gotowe</b>: {{summary}}",
+      "goesCloud": "Trafi w twoim imieniu do zespołu agentes.chat",
+      "goesServer": "Trafi w twoim imieniu do osoby, która prowadzi ten serwer",
+      "see": "Zobacz zgłoszenie",
+      "hide": "Zamknij zgłoszenie",
+      "send": "Wyślij",
+      "notNow": "Nie teraz",
+      "answer": "Odpowiedź przyjdzie na twój e-mail.",
+      "sentCloud": "<b>Zgłoszenie wysłane</b> do zespołu agentes.chat",
+      "sentServer": "<b>Zgłoszenie wysłane</b> do osoby, która prowadzi ten serwer",
+      "sentAuto": "<b>Zgłoszenie wysłane bez pytania</b>: {{summary}}",
+      "view": "Zobacz",
+      "always": "Zawsze wysyłaj",
+      "alwaysOn": "Od teraz takie zgłoszenia będą wysyłane bez pytania.",
+      "askFirst": "Pytaj przed wysłaniem"
+    }
   }
 }
