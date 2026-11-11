@@ -1936,7 +1936,7 @@
       "wifi1": "Debugging über WLAN einschalten",
       "wifi1Text": "Setz das Häkchen bei In diesem Netzwerk immer zulassen und tippe auf Zulassen.",
       "wifi2": "Code auf einem Computer scannen",
-      "wifi2Text": "Unter Debugging über WLAN › Gerät über QR-Code koppeln.",
+      "wifi2Text": "Unter Debugging über WLAN › Gerät über QR-Code koppeln. Nicht die Kamera nutzen: Sie liest den Code als WLAN-Netz und nimmt das Handy aus deinem WLAN.",
       "wifi2Hint": "Öffne agentes.chat auf einem Computer, dann Gerät verbinden › Android-Handy › Über WLAN, und wähle {{host}}.",
       "codeHead": "Mit Kopplungscode koppeln",
       "codeNote": "Unter Debugging über WLAN › Gerät über Kopplungscode koppeln. Öffne Einstellungen und agentes.chat nebeneinander, damit der Code sichtbar bleibt.",
@@ -2164,9 +2164,9 @@
     "anotherLead": "Auf agentes.chat. Du bleibst in {{org}} und kannst jederzeit wechseln.",
     "suggested": "Anhand deiner E-Mail bei {{domain}} habe ich {{org}} vorgeschlagen.",
     "create": "Erstellen",
+    "enter": "Zum Workspace",
     "shareMessage": "Tritt {{org}} auf agentes.chat bei: {{url}}",
-    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal.",
-    "enter": "Zum Workspace"
+    "failed": "Speichern hat nicht geklappt. Versuch es noch einmal."
   },
   "ai": {
     "yourPlan": "Dein KI-Abo",

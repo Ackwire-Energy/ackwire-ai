@@ -2,6 +2,7 @@ import type { PhoneDevice } from "@agenteschat/client";
 import { computerName } from "@agenteschat/client/lib/computer";
 import { wifiPairLive, wifiPairText } from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { computerKind } from "@agenteschat/client/lib/machines";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import * as Device from "expo-device";
 import { useState } from "react";
@@ -218,7 +219,7 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
           </StepsCard>
           <Gap />
           {byCode ? (
-            <PairByCode pairing={pairing} hostName={hostName} />
+            <PairByCode pairing={pairing} hostName={hostName} mac={computerKind(host.os) === "mac"} />
           ) : (
             <GroupedList>
               <GroupedRow icon="key" label={t("devices.wifiPair.useCode")} chevron onPress={() => setByCode(true)} />
@@ -249,7 +250,15 @@ export function AndroidSetupScreen({ machineId }: { machineId?: string }) {
  * The six-digit way, typed on this phone: the address and the code Pair device with pairing code shows, sent to the
  * computer, which pairs and connects; the line under them follows it, and a failure leaves both to fix and send again.
  */
-function PairByCode({ pairing, hostName }: { pairing: ReturnType<typeof useWifiPairCode>; hostName: string }) {
+function PairByCode({
+  pairing,
+  hostName,
+  mac,
+}: {
+  pairing: ReturnType<typeof useWifiPairCode>;
+  hostName: string;
+  mac: boolean;
+}) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const [address, setAddress] = useState("");
@@ -258,7 +267,7 @@ function PairByCode({ pairing, hostName }: { pairing: ReturnType<typeof useWifiP
   const busy = pairing.pending || wifiPairLive(p);
   const failed = Boolean(pairing.error) || p?.state === "failed";
   const ready = /^\S+:\d{1,5}$/.test(address.trim()) && /^\d{6}$/.test(code);
-  const line = pairing.error ? errorText(t, pairing.error) : p ? wifiPairText(t, p, hostName) : null;
+  const line = pairing.error ? errorText(t, pairing.error) : p ? wifiPairText(t, p, hostName, mac) : null;
   const send = () => {
     if (ready && !busy) pairing.pair({ address: address.trim(), code });
   };

@@ -1,6 +1,6 @@
-//! One runner child process per organization home (ADR 0036 §2, §4b), and none without homes: in the Cloud,
-//! or with a server whose agents work elsewhere, nothing of this computer runs. The server here's own homes
-//! (`host_sync.rs`) run the same way.
+//! One runner child process per organization home (ADR 0036 §2, §4b), and none without homes: nothing of this
+//! computer runs for a workspace until it is paired here, on agentes.chat Cloud as on a self-hosted server
+//! (ADR 0165). The server here's own homes (`host_sync.rs`) run the same way.
 //!
 //! Each home lives in `~/.agentes-runner/orgs/<localId>/` and runs the bundled sidecar
 //! `agentes-runner app --home <dir>`. Its stdout carries one JSON line per message of the

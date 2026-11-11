@@ -13650,7 +13650,7 @@ export const ptBR = {
       wireless: "Ative a depuração por Wi-Fi",
       wirelessText:
         "Opções do desenvolvedor\u00a0›\u00a0Depuração por Wi-Fi. Marque Sempre permitir nesta rede e toque em Permitir.",
-      scan: "Escaneie o código com o celular",
+      scan: "Escaneie pela Depuração por Wi-Fi, não pela câmera",
       code: "Digite o que o celular mostra",
       pathQr: "Parear o dispositivo com um código QR",
       making: "Gerando o código…",
@@ -13666,16 +13666,24 @@ export const ptBR = {
       pair: "Parear",
       tryAgain: "Tentar de novo",
       qrLabel: "Código QR para a depuração por Wi-Fi no celular",
-      qrLine: "Escaneie com o celular",
-      qrCaption: "Celular e computador no mesmo Wi-Fi.",
+      qrLine: "Não pela câmera",
+      qrCaption:
+        "Ela oferece uma rede Wi-Fi chamada agentes-…, que não existe. Deixe o celular no Wi-Fi do computador.",
       fail: {
         mdns_off:
           "{{computer}} não consegue procurar celulares no Wi-Fi. Atualize o Android platform-tools nele, ou use um cabo.",
-        same_wifi: "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}} e tente de novo.",
+        mdns_offMac:
+          "{{computer}} não consegue procurar celulares no Wi-Fi. Nesse Mac, ligue o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local e tente de novo.",
+        same_wifi:
+          "Não deu para alcançar o celular. Ele não está na mesma rede que {{computer}}. Coloque-o no mesmo Wi-Fi e tente de novo.",
+        same_wifiMac:
+          "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}}. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         refused: "O celular parou o pareamento. Deixe a tela de pareamento aberta e tente de novo.",
         refusedCode: "O celular não aceitou esse código. Confira o código e o endereço, e pareie de novo.",
         timed_out:
-          "Ninguém escaneou o código em 2 minutos. Confira se o celular está no mesmo Wi-Fi que {{computer}} e tente de novo.",
+          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi.",
+        timed_outMac:
+          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         outdated:
           "O pareamento por Wi-Fi precisa do Android 14 ou mais novo com a atualização de segurança de maio de 2026. Atualize o celular, ou use um cabo.",
         adb_missing: "{{computer}} não tem o Android platform-tools. Instale o Android Studio nele e tente de novo.",

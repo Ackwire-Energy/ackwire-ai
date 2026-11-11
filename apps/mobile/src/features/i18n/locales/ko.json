@@ -1839,7 +1839,7 @@
       "wifi1": "무선 디버깅 켜기",
       "wifi1Text": "이 네트워크에서 항상 허용을 체크하고 허용을 탭하세요.",
       "wifi2": "컴퓨터에 표시된 코드 스캔",
-      "wifi2Text": "무선 디버깅 › QR 코드로 기기 페어링에서 스캔하세요.",
+      "wifi2Text": "무선 디버깅 › QR 코드로 기기 페어링에서 스캔하세요. 카메라는 쓰지 마세요. 코드를 Wi-Fi 네트워크로 읽어서 휴대폰이 지금 Wi-Fi에서 끊어져요.",
       "wifi2Hint": "컴퓨터의 agentes.chat에서 기기 연결 › Android 휴대폰 › Wi-Fi로를 열고 {{host}}을(를) 고르세요.",
       "codeHead": "페어링 코드로 페어링",
       "codeNote": "무선 디버깅 › 페어링 코드로 기기 페어링에서 확인하세요. 코드가 화면에 남도록 설정과 agentes.chat을 화면 분할로 나란히 여세요.",
@@ -2063,9 +2063,9 @@
     "anotherLead": "agentes.chat에 만들어요. {{org}}에는 그대로 남고 언제든 전환할 수 있어요.",
     "suggested": "{{domain}} 이메일을 보고 {{org}}을(를) 제안했어요.",
     "create": "만들기",
+    "enter": "워크스페이스로 가기",
     "shareMessage": "agentes.chat에서 {{org}}에 참여하세요: {{url}}",
-    "failed": "저장하지 못했어요. 다시 시도해 주세요.",
-    "enter": "워크스페이스로 가기"
+    "failed": "저장하지 못했어요. 다시 시도해 주세요."
   },
   "ai": {
     "yourPlan": "내 AI 요금제",

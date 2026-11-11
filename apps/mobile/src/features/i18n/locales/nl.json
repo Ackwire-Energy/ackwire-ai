@@ -1936,7 +1936,7 @@
       "wifi1": "Zet Draadloze foutopsporing aan",
       "wifi1Text": "Vink Altijd toestaan op dit netwerk aan en tik op Toestaan.",
       "wifi2": "Scan de code op een computer",
-      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code.",
+      "wifi2Text": "Via Draadloze foutopsporing › Apparaat koppelen met QR-code. Gebruik de camera niet: die leest de code als een wifinetwerk en haalt de telefoon van je wifi.",
       "wifi2Hint": "Open in agentes.chat op een computer Apparaat koppelen › Android-telefoon › Via wifi en kies {{host}}.",
       "codeHead": "Koppelen met een koppelingscode",
       "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
@@ -2164,9 +2164,9 @@
     "anotherLead": "Op agentes.chat. Je blijft in {{org}} en kunt altijd wisselen.",
     "suggested": "Op basis van je e-mail bij {{domain}} stelde ik {{org}} voor.",
     "create": "Aanmaken",
+    "enter": "Naar de werkruimte",
     "shareMessage": "Kom bij {{org}} op agentes.chat: {{url}}",
-    "failed": "Opslaan lukte niet. Probeer het opnieuw.",
-    "enter": "Naar de werkruimte"
+    "failed": "Opslaan lukte niet. Probeer het opnieuw."
   },
   "ai": {
     "yourPlan": "Je AI-abonnement",

@@ -6,6 +6,7 @@ import {
   type IphoneStep,
   iphoneOf,
   iphoneSteps,
+  PHONE_APP_IN_STORE,
   phoneLine,
   type StepState,
   wifiHosts,
@@ -136,7 +137,7 @@ type WifiPair = ReturnType<typeof useWifiPairing>;
  * computer shows beside the steps, or the six-digit code typed here. The last step's line follows the computer:
  * waiting for the scan, found and pairing, connecting, or why it failed with Try again.
  */
-function WifiSteps({ pair, computer }: { pair: WifiPair; computer: string }) {
+function WifiSteps({ pair, computer, mac }: { pair: WifiPair; computer: string; mac: boolean }) {
   const { t } = useTranslation();
   const p = pair.pairing;
   const found = p !== undefined && (p.state === "pairing" || p.state === "connecting" || p.state === "connected");
@@ -144,7 +145,7 @@ function WifiSteps({ pair, computer }: { pair: WifiPair; computer: string }) {
   const line = pair.error
     ? errorText(t, pair.error)
     : p
-      ? wifiPairText(t, p, computer)
+      ? wifiPairText(t, p, computer, mac)
       : pair.way === "qr"
         ? t("devices.wifiPair.making")
         : undefined;
@@ -177,6 +178,7 @@ function WifiSteps({ pair, computer }: { pair: WifiPair; computer: string }) {
         <SettingsPath
           label={t("devices.onThePhone")}
           segments={[
+            t("devices.android.path.devOptions"),
             t("devices.android.path.wireless"),
             t(code ? "devices.android.path.pairCode" : "devices.wifiPair.pathQr"),
           ]}
@@ -210,7 +212,7 @@ function CodeForm({ pair, locked }: { pair: WifiPair; locked: boolean }) {
   return (
     <Locked when={locked}>
       <form
-        className="dv-pair-code"
+        className="ac-form dv-pair-code"
         onSubmit={(e) => {
           e.preventDefault();
           if (ready && !locked) pair.pairWithCode({ address: address.trim(), code });
@@ -328,9 +330,9 @@ function NeedsComputer({ text, onConnect }: { text: string; onConnect: () => voi
 
 /**
  * An Android phone through a computer people connected: pick the computer, then a checklist the computer drives (it
- * sees the phone ask to allow USB debugging, then ready). Beside it a QR that opens the same steps in our phone app,
- * where buttons open each setting. Over Wi-Fi: the computer shows Android's pairing QR (or takes the six-digit code),
- * then finds, pairs and connects the phone by itself.
+ * sees the phone ask to allow USB debugging, then ready). Once our phone app is in the store, a QR beside it opens the
+ * same steps there, where buttons open each setting. Over Wi-Fi: the computer shows Android's pairing QR (or takes the
+ * six-digit code), then finds, pairs and connects the phone by itself.
  */
 export function AndroidFlow({
   onClose,
@@ -364,9 +366,10 @@ export function AndroidFlow({
   if (paired && host) return <PhoneConnected phone={paired} host={host} onClose={onClose} />;
   if (stage.kind === "ready" && host) return <PhoneConnected phone={stage.phone} host={host} onClose={onClose} />;
   const origin = typeof window === "undefined" ? "" : window.location.origin;
-  const guide = host
-    ? `${origin}/org/${org.id}/settings/devices/android-setup?computer=${encodeURIComponent(host.id)}`
-    : "";
+  const guide =
+    host && PHONE_APP_IN_STORE.android
+      ? `${origin}/org/${org.id}/settings/devices/android-setup?computer=${encodeURIComponent(host.id)}`
+      : "";
   const looking = host ? t("devices.android.looking", { computer: host.name }) : "";
   const allow = stage.kind === "allow";
   const steps =
@@ -404,7 +407,7 @@ export function AndroidFlow({
         </Step>
       </ol>
     ) : (
-      host && <WifiSteps pair={wifi} computer={host.name} />
+      host && <WifiSteps pair={wifi} computer={host.name} mac={computerKind(host.os) === "mac"} />
     );
   return (
     <>
@@ -412,58 +415,60 @@ export function AndroidFlow({
         {hosts.length === 0 && way === "cable" ? (
           <NeedsComputer text={t("devices.android.noComputer")} onConnect={onConnectComputer} />
         ) : (
-          <div className="dv-split">
-            <div className="stack-4" style={{ gap: "var(--space-4)" }}>
-              {host && (
-                <Field
-                  label={t(way === "cable" ? "devices.android.plugInto" : "devices.android.pairWith")}
-                  id="dv-android-host"
-                >
-                  <HostSelect hosts={hosts} value={host.id} onChange={setPicked} id="dv-android-host" />
-                </Field>
-              )}
-              <Segmented
-                block
-                label={t("devices.android.way")}
-                value={way}
-                onValueChange={setWay}
-                options={[
-                  {
-                    value: "cable",
-                    label: (
-                      <>
-                        {t("devices.android.cable")}
-                        <span className="dv-seg__note">{t("devices.android.recommended")}</span>
-                      </>
-                    ),
-                  },
-                  { value: "wifi", label: t("devices.android.wifi") },
-                ]}
-              />
-              {!host ? (
-                <NeedsComputer text={t("devices.wifiPair.noComputer")} onConnect={onConnectComputer} />
-              ) : host.status.kind === "offline" ? (
-                <p className="setup-progress setup-progress--line ac-iconline" role="status">
-                  <Icon name="dash" size={14} />
-                  <span>{t("devices.android.hostOffline", { computer: host.name })}</span>
-                </p>
-              ) : (
-                steps
-              )}
-            </div>
-            {way === "wifi" && wifi.way === "qr" && host ? (
-              <WifiCard pair={wifi} />
-            ) : guide ? (
-              <div className="dv-qr">
-                <span className="dv-qr__code">
-                  <QrCode text={guide} label={t("devices.android.qrLabel")} />
-                </span>
-                <span className="dv-qr__text">
-                  <p className="dv-qr__line">{t("devices.android.qrLine")}</p>
-                  <p className="dv-qr__caption">{t("devices.android.qrCaption")}</p>
-                </span>
+          // The computer and the way span the body on every tab, so switching ways never moves them; a QR sits
+          // beside the steps alone.
+          <div className="stack-4" style={{ gap: "var(--space-4)" }}>
+            {host && (
+              <Field
+                label={t(way === "cable" ? "devices.android.plugInto" : "devices.android.pairWith")}
+                id="dv-android-host"
+              >
+                <HostSelect hosts={hosts} value={host.id} onChange={setPicked} id="dv-android-host" />
+              </Field>
+            )}
+            <Segmented
+              block
+              label={t("devices.android.way")}
+              value={way}
+              onValueChange={setWay}
+              options={[
+                {
+                  value: "cable",
+                  label: (
+                    <>
+                      {t("devices.android.cable")}
+                      <span className="dv-seg__note">{t("devices.android.recommended")}</span>
+                    </>
+                  ),
+                },
+                { value: "wifi", label: t("devices.android.wifi") },
+              ]}
+            />
+            {!host ? (
+              <NeedsComputer text={t("devices.wifiPair.noComputer")} onConnect={onConnectComputer} />
+            ) : host.status.kind === "offline" ? (
+              <p className="setup-progress setup-progress--line ac-iconline" role="status">
+                <Icon name="dash" size={14} />
+                <span>{t("devices.android.hostOffline", { computer: host.name })}</span>
+              </p>
+            ) : (
+              <div className="dv-split">
+                {steps}
+                {way === "wifi" && wifi.way === "qr" ? (
+                  <WifiCard pair={wifi} />
+                ) : guide ? (
+                  <div className="dv-qr">
+                    <span className="dv-qr__code">
+                      <QrCode text={guide} label={t("devices.android.qrLabel")} />
+                    </span>
+                    <span className="dv-qr__text">
+                      <p className="dv-qr__line">{t("devices.android.qrLine")}</p>
+                      <p className="dv-qr__caption">{t("devices.android.qrCaption")}</p>
+                    </span>
+                  </div>
+                ) : null}
               </div>
-            ) : null}
+            )}
           </div>
         )}
       </DialogBody>

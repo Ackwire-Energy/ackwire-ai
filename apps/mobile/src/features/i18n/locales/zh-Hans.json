@@ -1839,7 +1839,7 @@
       "wifi1": "打开无线调试",
       "wifi1Text": "勾选“一律允许通过此网络进行调试”，然后点按“允许”。",
       "wifi2": "扫描电脑上的二维码",
-      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。",
+      "wifi2Text": "在 无线调试 › 使用二维码配对设备 中扫描。不要用相机：它会把二维码当成 Wi-Fi 网络，让手机断开你的 Wi-Fi。",
       "wifi2Hint": "在电脑上的 agentes.chat 中打开 连接设备 › Android 手机 › 通过 Wi-Fi，然后选择 {{host}}。",
       "codeHead": "使用配对码配对",
       "codeNote": "在 无线调试 › 使用配对码配对设备 中查看。请分屏同时打开“设置”和 agentes.chat，让配对码一直显示在屏幕上。",
@@ -2063,9 +2063,9 @@
     "anotherLead": "在 agentes.chat 上创建。你仍留在 {{org}}，随时可以切换。",
     "suggested": "根据你的 {{domain}} 邮箱，我建议用 {{org}}。",
     "create": "创建",
+    "enter": "进入工作区",
     "shareMessage": "在 agentes.chat 上加入 {{org}}：{{url}}",
-    "failed": "无法保存，请重试。",
-    "enter": "进入工作区"
+    "failed": "无法保存，请重试。"
   },
   "ai": {
     "yourPlan": "你的 AI 套餐",

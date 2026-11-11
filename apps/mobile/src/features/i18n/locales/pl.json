@@ -2130,7 +2130,7 @@
       "wifi1": "Włącz debugowanie bezprzewodowe",
       "wifi1Text": "Zaznacz Zawsze zezwalaj w tej sieci i stuknij Zezwól.",
       "wifi2": "Zeskanuj kod na komputerze",
-      "wifi2Text": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu QR.",
+      "wifi2Text": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu QR. Nie używaj aparatu: odczyta kod jako sieć Wi-Fi i odłączy telefon od twojej sieci.",
       "wifi2Hint": "W agentes.chat na komputerze otwórz Podłącz urządzenie › Telefon z Androidem › Przez Wi-Fi i wybierz {{host}}.",
       "codeHead": "Sparuj za pomocą kodu parowania",
       "codeNote": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu parowania. Otwórz Ustawienia i agentes.chat obok siebie, żeby kod został na ekranie.",
@@ -2366,9 +2366,9 @@
     "anotherLead": "W agentes.chat. Zostajesz w {{org}} i możesz przełączyć się w każdej chwili.",
     "suggested": "Na podstawie twojego adresu w domenie {{domain}} proponuję {{org}}.",
     "create": "Utwórz",
+    "enter": "Wejdź do przestrzeni roboczej",
     "shareMessage": "Dołącz do {{org}} w agentes.chat: {{url}}",
-    "failed": "Nie udało się zapisać. Spróbuj ponownie.",
-    "enter": "Wejdź do przestrzeni roboczej"
+    "failed": "Nie udało się zapisać. Spróbuj ponownie."
   },
   "ai": {
     "yourPlan": "Twój plan AI",

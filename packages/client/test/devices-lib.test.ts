@@ -236,7 +236,7 @@ describe("pairing over Wi-Fi", () => {
     expect(line({ state: "pairing", way: "qr" })).toBe("Found a phone. Pairing…");
     expect(line({ state: "connected", way: "qr" })).toBe("Paired. Connecting…");
     expect(line({ state: "failed", way: "qr", reason: "same_wifi" })).toBe(
-      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro and try again.",
+      "Couldn't reach the phone. It's not on the same network as Sam's MacBook Pro. Put it on the same Wi-Fi and try again.",
     );
     expect(line({ state: "failed", way: "code", reason: "refused" })).toBe(
       "The phone didn't take that code. Check the code and the address, then pair again.",
@@ -245,6 +245,25 @@ describe("pairing over Wi-Fi", () => {
       "The phone stopped the pairing. Keep its pairing screen open and try again.",
     );
     expect(line({ state: "failed", way: "qr" })).toBe("The pairing didn't work. Try again, or use a cable.");
+    expect(line({ state: "failed", way: "qr", reason: "timed_out" })).toBe(
+      "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as Sam's MacBook Pro and scan from Wireless debugging.",
+    );
+    expect(line({ state: "failed", way: "qr", reason: "mdns_off" })).toBe(
+      "Sam's MacBook Pro can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable.",
+    );
+    // On a Mac, each cause macOS's Local Network permission also gives names that setting; other causes don't.
+    const onMac = (reason: Parameters<typeof wifiPairText>[1]["reason"]) =>
+      wifiPairText(t, { state: "failed", way: "code", reason }, "Sam's MacBook Pro", true);
+    expect(onMac("same_wifi")).toBe(
+      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
+    );
+    expect(onMac("mdns_off")).toBe(
+      "Sam's MacBook Pro can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings › Privacy & Security › Local Network, then try again.",
+    );
+    expect(onMac("timed_out")).toEndWith(
+      "On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
+    );
+    expect(onMac("refused")).toBe("The phone didn't take that code. Check the code and the address, then pair again.");
     expect([
       wifiPairLive({ state: "connecting" }),
       wifiPairLive({ state: "connected" }),

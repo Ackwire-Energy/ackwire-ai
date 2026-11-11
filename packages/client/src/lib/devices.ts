@@ -384,6 +384,9 @@ export function androidStage(host: ComputerDevice | undefined, known: ReadonlySe
   return { kind: "looking" };
 }
 
+/** Our phone app is in neither store yet, so a QR meant to open steps in it would only open a web page: hidden. */
+export const PHONE_APP_IN_STORE = { android: false, ios: false } as const;
+
 /** How often a Wi-Fi pairing is asked where it stands while it runs. */
 export const WIFI_PAIR_POLL_MS = 1500;
 
@@ -395,13 +398,22 @@ export const wifiPairLive = (p: Pick<WifiPairing, "state"> | undefined) =>
 export const wifiHosts = (hosts: readonly ComputerDevice[]) =>
   hosts.filter((h) => h.machineKind === "connected" && h.mayManage && !h.systemMode);
 
+const LOCAL_NETWORK = new Set(["timed_out", "same_wifi", "mdns_off"]);
+
 /**
  * The line a Wi-Fi pairing shows: where it is while it runs, else why it failed (the cause and the way out). A code
- * the phone refused reads differently from a pairing it stopped.
+ * the phone refused reads differently from a pairing it stopped. On a Mac, a phone it never heard from, couldn't reach
+ * or couldn't look for may also be macOS's Local Network permission for the app, so those name it.
  */
-export function wifiPairText(t: TFunction, p: Pick<WifiPairing, "state" | "reason" | "way">, computer: string) {
+export function wifiPairText(
+  t: TFunction,
+  p: Pick<WifiPairing, "state" | "reason" | "way">,
+  computer: string,
+  mac = false,
+) {
   if (p.state === "failed") {
-    const reason = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    const base = p.reason === "refused" && p.way === "code" ? "refusedCode" : (p.reason ?? "failed");
+    const reason = mac && LOCAL_NETWORK.has(base) ? `${base}Mac` : base;
     return say(t, `devices.wifiPair.fail.${reason}`, {
       computer,
       defaultValue: say(t, "devices.wifiPair.fail.failed"),

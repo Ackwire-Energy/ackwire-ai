@@ -2028,7 +2028,7 @@
       "wifi1": "Attiva il Debug wireless",
       "wifi1Text": "Spunta Consenti sempre su questa rete, poi tocca Consenti.",
       "wifi2": "Scansiona il codice su un computer",
-      "wifi2Text": "Da Debug wireless › Accoppia dispositivo con codice QR.",
+      "wifi2Text": "Da Debug wireless › Accoppia dispositivo con codice QR. Non usare la fotocamera: legge il codice come una rete Wi-Fi e toglie il telefono dalla tua rete.",
       "wifi2Hint": "In agentes.chat su un computer, apri Collega un dispositivo › Telefono Android › Tramite Wi-Fi e scegli {{host}}.",
       "codeHead": "Accoppia con un codice di accoppiamento",
       "codeNote": "Da Debug wireless › Accoppia dispositivo con codice di accoppiamento. Apri Impostazioni e agentes.chat affiancati, così il codice resta sullo schermo.",
@@ -2258,9 +2258,9 @@
     "anotherLead": "Su agentes.chat. Resti in {{org}} e puoi cambiare quando vuoi.",
     "suggested": "In base alla tua email di {{domain}}, ho suggerito {{org}}.",
     "create": "Crea",
+    "enter": "Entra nello spazio di lavoro",
     "shareMessage": "Entra in {{org}} su agentes.chat: {{url}}",
-    "failed": "Non è stato possibile salvare. Riprova.",
-    "enter": "Entra nello spazio di lavoro"
+    "failed": "Non è stato possibile salvare. Riprova."
   },
   "ai": {
     "yourPlan": "Il tuo piano di IA",
