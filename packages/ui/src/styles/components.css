@@ -1377,6 +1377,12 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
     transform: translateY(2px);
   }
 }
+/* A button whose tip a long press opens (`Tip button`): that press never selects its words or opens the page's menu. */
+[data-hold-tip] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 .ac-msg__tip {
   padding: var(--space-1) var(--space-2);
   background: var(--surface-raised);
@@ -3818,9 +3824,6 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   opacity: 1;
   pointer-events: auto;
 }
-.ac-msg__actions .ac-btn[aria-pressed="true"] {
-  background: var(--surface-sunken);
-}
 .ac-msg__reaction-count {
   font-size: 12px;
 }
@@ -4021,13 +4024,14 @@ html:not([data-pointer]) .ac-color__hue:focus-visible {
   box-shadow: var(--focus-ring);
 }
 
-/* The bar above the composer: the orbit (or three dots while only people type), tiny avatars, "Theo está trabalhando…" */
+/* The bar above the composer: the orbit (or three dots while only people type), tiny avatars, "Theo está trabalhando…".
+   Its edges are the composer's: as wide as the column under it. */
 .ac-typing {
   display: flex;
   align-items: center;
   gap: 6px;
   min-height: 20px;
-  margin: 0 4px 4px;
+  margin: 0 0 var(--space-1);
   font-size: 12px;
   line-height: 16px;
   color: var(--ink-muted);
@@ -6194,6 +6198,9 @@ html:not([data-pointer]) .ac-hint:focus-visible {
 .ac-msg__actions {
   --bar-r: 10px;
   --bar-pad: 2px;
+  /* Its plates: 26 square around a 16 icon. */
+  --bar-btn: 26px;
+  --bar-icon: 16px;
   top: 0;
   right: 12px;
   z-index: var(--z-sticky);
@@ -6216,22 +6223,43 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
 .ac-msg__actions:has([aria-expanded="true"]) {
   transform: translateY(-50%);
 }
+/* One place on every row, first or grouped, whatever ends its first line (a check, a time, nothing): it never moves
+   from row to row as the pointer goes down a conversation. */
 .ac-msg--grouped > .ac-msg__body > .ac-msg__actions {
   top: 0;
 }
-/* Left of a grouped message's check (20px wide, at the row's end), 8px from it, past the row's side padding. */
-.ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions {
-  right: calc(var(--msg-inline) + 28px);
+/* A grouped row's check at its line's end sits under the bar: it steps out of sight, keeping its room, while the bar
+   shows, so nothing overlaps and nothing moves. A touch screen's bar shows only open (its hover is a tap's leftover). */
+@media not (hover: none) {
+  .ac-msg:hover:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating {
+    visibility: hidden;
+  }
+}
+html:not([data-pointer])
+  .ac-msg:focus-within:has(> .ac-msg__body > .ac-msg__actions)
+  > .ac-msg__body
+  > .ac-msg__aside--floating,
+.ac-msg:has(> .ac-msg__body > .ac-msg__actions:is([data-open="true"], :has([aria-expanded="true"])))
+  > .ac-msg__body
+  > .ac-msg__aside--floating {
+  visibility: hidden;
 }
 .ac-msg__actions .ac-btn--sm {
-  min-width: 26px;
-  width: 26px;
-  height: 26px;
+  min-width: var(--bar-btn);
+  width: var(--bar-btn);
+  height: var(--bar-btn);
   border-radius: calc(var(--bar-r) - var(--bar-pad));
 }
+/* A plate with a count after its icon (👍 1): one plate as wide as both, the icon as far from its start as in a square
+   plate and the count as far from its end, the small button's own gap between them. Pressed, it takes the bar's plate
+   (a ghost's, `[aria-pressed]`), never a fill of its own. */
+.ac-msg__actions .ac-btn--sm:not(.ac-btn--icon) {
+  width: auto;
+  padding-inline: calc((var(--bar-btn) - var(--bar-icon)) / 2);
+}
 .ac-msg__actions .ac-btn--sm .ac-icon {
-  width: 16px;
-  height: 16px;
+  width: var(--bar-icon);
+  height: var(--bar-icon);
 }
 /* The row being hovered stays above its neighbours, so its bar is never under the next row. */
 .ac-msg:hover,
@@ -6414,8 +6442,7 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * holds them at any width.
  */
 @media not ((hover: none) or (pointer: coarse)) {
-  .ac-msg--own > .ac-msg__body > .ac-msg__actions,
-  .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions {
     top: calc(7px + var(--msg-line) / 2 - var(--cap-mid) - 14px);
     right: calc(100% + 2px);
     flex-direction: row-reverse;
@@ -6441,8 +6468,7 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
  * finger's is bigger: it sits over the bubble's top edge on its right, 4px up so it clears the first line.
  */
 @media (hover: none), (pointer: coarse) {
-  .ac-msg--own > .ac-msg__body > .ac-msg__actions,
-  .ac-msg--own:has(> .ac-msg__body .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions {
+  .ac-msg--own > .ac-msg__body > .ac-msg__actions {
     top: -4px;
     right: 8px;
   }
@@ -10024,12 +10050,8 @@ html:not([data-pointer]) .ac-filter__option:focus-visible {
   /* The message bar's 26px plates grow to the 32 of every small one here, 8px apart: their targets touch, never
      overlap. */
   .ac-msg__actions {
+    --bar-btn: var(--control-h-sm);
     gap: 8px;
-  }
-  .ac-msg__actions .ac-btn--sm {
-    min-width: var(--control-h-sm);
-    min-height: var(--control-h-sm);
-    border-radius: calc(var(--bar-r) - var(--bar-pad));
   }
   .ac-composer__format-btn {
     width: var(--control-h-md);

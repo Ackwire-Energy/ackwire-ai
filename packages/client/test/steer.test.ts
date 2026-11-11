@@ -241,37 +241,23 @@ describe("the live work: what it read, when it read it", () => {
   const delta = (seq: number, turn: number, text: string) =>
     ({ type: "agent.delta", ...base, seq, turn, text }) as ChannelEvent;
 
-  test("steered only notes it; read adds the step once and leaves the text where it is", () => {
+  test("steered only notes it; read adds the step once", () => {
     let s = run([delta(0, 1, "Olhando os logs."), steered("m2")]);
-    expect(s.runs.r1?.text).toBe("Olhando os logs.");
     expect(s.runs.r1?.work ?? []).toEqual([]);
     s = applyChannelEvent(s, read("m2"));
-    expect(s.runs.r1?.text).toBe("Olhando os logs.");
     expect(s.runs.r1?.work).toEqual([{ kind: "steer", messageId: "m2" }]);
     s = applyChannelEvent(s, read("m2"));
     expect(s.runs.r1?.work).toHaveLength(1);
   });
 
-  test("stop and send: the step says it stopped to read; the cut text of the turn is narration", () => {
+  test("stop and send: the step says it stopped to read; nothing it wrote is in the work", () => {
     let s = run([delta(0, 1, "Começando a"), steered("m3", { now: true })]);
-    s = applyChannelEvent(s, { type: "agent.narration", ...base, turn: 1, text: "Começando a" } as Ev);
     s = applyChannelEvent(s, read("m3"));
-    expect(s.runs.r1?.work).toEqual([
-      { kind: "say", text: "Começando a", turn: 1 },
-      { kind: "steer", messageId: "m3", now: true },
-    ]);
+    expect(s.runs.r1?.work).toEqual([{ kind: "steer", messageId: "m3", now: true }]);
     expect(s.runs.r1?.steerNow).toEqual([]);
     s = applyChannelEvent(s, delta(1, 2, "Certo, mudando."));
-    expect(s.runs.r1?.text).toBe("Certo, mudando.");
-  });
-
-  test("a new model call: narration stays in the work, a whole reply sent back for another try is replaced", () => {
-    let s = run([delta(0, 1, "Vou abrir o site.")]);
-    s = applyChannelEvent(s, { type: "agent.narration", ...base, turn: 1, text: "Vou abrir o site." } as Ev);
-    s = applyChannelEvent(s, delta(1, 2, "Não consigo: o site pede um QR code."));
-    s = applyChannelEvent(s, delta(2, 3, "Abri o WhatsApp Web: escaneie o QR code."));
-    expect(s.runs.r1?.work).toEqual([{ kind: "say", text: "Vou abrir o site.", turn: 1 }]);
-    expect(s.runs.r1?.text).toBe("Abri o WhatsApp Web: escaneie o QR code.");
+    expect(s.runs.r1?.status).toBe("running");
+    expect(JSON.stringify(s.runs.r1)).not.toContain("mudando");
   });
 
   test("agent.passed: its row goes at once, and late deltas don't bring it back", () => {
@@ -297,7 +283,7 @@ describe("the live work: what it read, when it read it", () => {
     expect(Object.keys(s.runs)).toEqual([]);
     // A normal run alongside still shows.
     s = applyChannelEvent(s, delta(0, 1, "Oi"));
-    expect(s.runs.r1?.text).toBe("Oi");
+    expect(s.runs.r1?.status).toBe("running");
   });
 
   test("a fast reply while it works (meta.talker) doesn't end the task's row", () => {
@@ -310,7 +296,7 @@ describe("the live work: what it read, when it read it", () => {
       meta: { talker: { runId: "r1" } },
     };
     s = applyChannelEvent(s, { type: "message.created", channelId: "c1", messageId: "t1", message } as unknown as Ev);
-    expect(s.runs.r1?.text).toBe("Trabalhando");
+    expect(s.runs.r1?.status).toBe("running");
   });
 
   test("steered with stop: the row shows it's stopping", () => {
@@ -318,9 +304,9 @@ describe("the live work: what it read, when it read it", () => {
     expect(s.runs.r1?.stopping).toBe(true);
   });
 
-  test("run.continued: the stopped row gives way to the new run, live as any other", () => {
+  test("run.continued: the stopped run is gone, the new one is live as any other", () => {
     let s = run([delta(0, 1, "Parcial"), { type: "run.canceled", ...base, byUserId: "u1" } as Ev]);
-    expect(s.runs.r1?.status).toBe("canceled");
+    expect(s.runs.r1).toBeUndefined();
     s = applyChannelEvent(s, {
       type: "run.continued",
       channelId: "c1",

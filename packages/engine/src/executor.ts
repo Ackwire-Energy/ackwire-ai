@@ -190,8 +190,6 @@ import {
 import {
   type ChannelEvent,
   holdStepWords,
-  type LiveTurn,
-  liveTurns,
   type MemoryUpdate,
   publishChannelEvent,
   publishMessageCreated,
@@ -227,7 +225,6 @@ import {
 import { computerBackSoon, type MachineCaller } from "./machine-hub";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
 import { MEDIA_TOOLS } from "./media";
-import { PLACE_KEPT_MS } from "./message-place";
 import {
   getMessage,
   insertMessage,
@@ -261,7 +258,6 @@ import {
   replyPolicyFor,
   routedAsFollowUp,
   stripSentinel,
-  visibleText,
 } from "./reply-policy";
 import { routineCreatorOf, wikiPersonOf } from "./requester";
 import {
@@ -436,8 +432,6 @@ export interface EngineDeps {
   /** Overrides the model's context window from the catalog (tests). */
   contextWindowTokens?: number;
   contextMessages: number;
-  /** Coalesce stream deltas for this long before publishing (0 = publish every delta). */
-  deltaFlushMs?: number;
   /** Tool Gateway. Without it agents can only chat. */
   tools?: ToolGateway;
   /** Model calls one run may make (tool loops). */
@@ -546,7 +540,8 @@ export interface Transcript {
    * (`heldWords`), or alone when the run ends without any (a pass, an empty turn, a closing line, a failure).
    */
   held?: string;
-  deltaSeq: number;
+  /** What replies once streamed counted their pieces with: read by nothing now, kept on old runs' transcripts. */
+  deltaSeq?: number;
   /** Memory changes made by tools, not yet attached to a posted message (`meta.memoryUpdates`). */
   memoryUpdates?: MemoryUpdate[];
   /** Artifacts created or changed by tools, not yet attached to a posted message (`meta.artifacts`, with titles). */
@@ -1916,23 +1911,6 @@ async function executeRunInner(
   let readOutside = false;
   const outsideMemo: OutsideMemo = {};
   /**
-   * Where the reply it is writing first showed words (`createDeltaPublisher`), since it last posted: the message it
-   * posts next takes that place, so what people sent while it wrote stays below it, as the apps drew it live. A "stop
-   * and send" (`steer: "now"`) drops it: what it writes next answers that message, below it.
-   */
-  const place: ShownPlace = { at: null, channelId: run.channelId, threadId: null };
-  /** That place for a message posted now in `threadId`, once (the next words open a new one); none past `PLACE_KEPT_MS`. */
-  const takePlace = (threadId: string | null) => {
-    const { at } = place;
-    place.at = null;
-    return at !== null &&
-      place.channelId === run.channelId &&
-      place.threadId === threadId &&
-      Date.now() - at < PLACE_KEPT_MS
-      ? new Date(at)
-      : undefined;
-  };
-  /**
    * When it last posted, not yet on its row: what it posts ends the stretch of work the conversation was counting
    * ("thinking for …"), so if it goes on it counts from there (`agent_runs.working_since`), as the apps that saw the
    * message land already do. Written with the run's next save (`worked`), never in a statement of its own.
@@ -1943,7 +1921,10 @@ async function executeRunInner(
     postedAt = null;
     return at ? { workingSince: at } : {};
   };
-  /** Posts as the agent where it replies. `note`: a line the server writes about the run (not its words). */
+  /**
+   * Posts as the agent where it replies, at the end of the conversation (what it writes shows whole there, once: none of
+   * it went out live, ADR 0010). `note`: a line the server writes about the run (not its words).
+   */
   const post = async (
     tx: Executor,
     threadId: string | null,
@@ -1952,8 +1933,6 @@ async function executeRunInner(
     createdAt?: Date,
     note = false,
   ) => {
-    // What it wrote ends the reply its words showed for: it takes their place. A line the server writes doesn't.
-    const placed = note ? undefined : takePlace(threadId);
     // A report that goes by itself (ADR 0160 §12) is queued with the message that says so, never kept on it.
     const { [FEEDBACK_SEND]: feedbackSend, ...shown } = (meta ?? {}) as Record<string, unknown> & {
       [FEEDBACK_SEND]?: { key: string; feedback: Feedback };
@@ -2055,7 +2034,7 @@ async function executeRunInner(
         ...(unreached.length > 0 ? { unreachedAgents: unreached } : {}),
         ...(missed.length > 0 ? { unreachedPeople: missed } : {}),
       },
-      createdAt ?? placed,
+      createdAt,
     );
     await linkRunChecks(
       tx,
@@ -2330,7 +2309,6 @@ async function executeRunInner(
       ),
       postedUpTo: context.messages.length,
       postedCount: 0,
-      deltaSeq: 0,
     };
     const t0 = transcript;
     later(() => saveTranscript(db, t0));
@@ -3045,15 +3023,12 @@ async function executeRunInner(
     t.pending = { calls: [{ toolUseId, name: ASK_USER_TOOL, questionId, bridged: true }] };
     // Its question carries the reply it held back (`heldWords`).
     delete t.held;
-    // The card is the reply its words showed for: it takes their place.
-    const at = takePlace(replyThreadId);
     const pause = await db.transaction(async (tx) => {
-      const posted = await postPauseCards(
-        tx,
-        run,
-        { approvals: [], questions: [{ id: questionId, toolUseId, text, choices: null }], secretRequestIds: [] },
-        at,
-      );
+      const posted = await postPauseCards(tx, run, {
+        approvals: [],
+        questions: [{ id: questionId, toolUseId, text, choices: null }],
+        secretRequestIds: [],
+      });
       t.postedUpTo = t.messages.length;
       t.postedCount += posted.messages.length;
       await saveTranscript(tx, t);
@@ -3337,8 +3312,7 @@ async function executeRunInner(
     // A background run never posts by itself (ADR 0053 §5): its cards speak for it.
     if (run.background || repeatsLastPost(text)) text = "";
     text = await heldWords(text);
-    // The bridge posted its cards when it asked: what it says goes with them, not up where its words first showed.
-    takePlace(replyThreadId);
+    // The bridge posted its cards when it asked: what it says goes with them.
     const message = text ? await post(db, replyThreadId, text, withFallback(t, takeMemoryUpdates(t)), at) : null;
     if (message) t.postedCount++;
     t.postedUpTo = t.messages.length;
@@ -4158,8 +4132,7 @@ async function executeRunInner(
         }
       }
       const turn = run.turns + 1;
-      const deltas = createDeltaPublisher(deps.pubsub, run, where, deps.deltaFlushMs ?? 50, transcript.deltaSeq, {
-        turn,
+      const deltas = createTurnText(deps.pubsub, run, where, {
         onFirst: () => {
           deps.onTiming?.("claim_to_first_delta_ms", Date.now() - claimedAt, { runId: run.id });
           if (admitted?.fromLine && !askingForRoom)
@@ -4167,8 +4140,6 @@ async function executeRunInner(
         },
         quiet: run.background,
         scrub: isRightHand(agent),
-        stretches: plan.kind === "claude_code",
-        place,
       });
       // "Stop and send" (`steer: "now"`) aborts only this model call: the loop goes on and reads the
       // message at once. Computer brains run tools inside their turn, so they read it at the next step.
@@ -4176,7 +4147,6 @@ async function executeRunInner(
       // A message to read now landed after the steering was taken above: read it first, no call spent.
       if (turnAbort?.signal.aborted) {
         unregisterTurnAbort(run.id, turnAbort);
-        place.at = null;
         continue;
       }
       const io: BrainIO = {
@@ -4404,7 +4374,6 @@ async function executeRunInner(
         // Canceled mid-stream: the gateway recorded the usage so far; keep the text so far.
         if (await isCanceled()) return stopCanceled(deltas.text(), deltas.answer());
         // Keep the sequence moving: a retried turn must not reuse numbers the app already saw (it drops them).
-        transcript.deltaSeq = deltas.seq();
         if (error instanceof BrainFailure) {
           const cause = accountFailureCause(error.code, error.provider.cause);
           brainFailure = { code: error.code, cause };
@@ -4429,7 +4398,6 @@ async function executeRunInner(
         }
         if (turnAbort?.signal.aborted) {
           await interruptedTurn(turn, deltas.text());
-          place.at = null;
           continue;
         }
         if (turnPlan.kind !== "model") {
@@ -4588,14 +4556,7 @@ async function executeRunInner(
           await publishQueueChanged(deps.pubsub, run.orgId, ranOn);
         }
       }
-      // A bridged call paused the run in this turn: what it wrote leads to a card, or the card says it already.
-      const [now] =
-        turnPlan.kind === "model"
-          ? []
-          : await db.select({ status: agentRuns.status }).from(agentRuns).where(eq(agentRuns.id, run.id));
-      await deltas.flush(
-        result.toolCalls.length === 0 && now?.status !== "waiting_approval" && now?.status !== "waiting_input",
-      );
+      await deltas.flush();
       if (transcript.outage?.noteId) await outageOver(transcript.outage.noteId).catch(() => {});
       const passedLine = transcript.outage?.line;
       delete transcript.outage;
@@ -4606,7 +4567,6 @@ async function executeRunInner(
       }
       prof.mark(`model#${run.turns + 1}`);
       await deferred;
-      transcript.deltaSeq = deltas.seq();
       // Side effects of the tools a computer brain ran through the bridge (cards, a `react`): for this reply.
       if (turnPlan.kind !== "model") mergeToolEffects(transcript, await takeBridgeEffects(db, run.id));
       // A computer brain's turn with nothing to say (its tools ran through the bridge) adds no empty message.
@@ -4795,8 +4755,6 @@ async function executeRunInner(
         // Suspend: post what the agent said (`pauseLead`), one card per approval and each question, then wait.
         transcript.pending = { calls };
         const t = transcript;
-        // What it says and its cards end the reply its words showed for: they take its place, in that order.
-        const at = takePlace(replyThreadId);
         // Only this turn's text: what leads to a question, or what says more than an approval's or a secret's
         // card, with a reply it held back (`heldWords`). Earlier narration is in the steps. A background run never
         // posts by itself (ADR 0053 §5): its cards speak for it.
@@ -4804,14 +4762,13 @@ async function executeRunInner(
         const spoken = run.background ? "" : asks.length > 0 ? text : pauseLead(text);
         const said = await heldWords(repeatsLastPost(spoken) ? "" : spoken);
         const posted = await db.transaction(async (tx) => {
-          const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t)), at) : null;
+          const lead = said ? await post(tx, replyThreadId, said, withFallback(t, takeMemoryUpdates(t))) : null;
           // The cards, the same way a computer brain's bridged call posts them (`postPauseCards`).
-          const pause = await postPauseCards(
-            tx,
-            run,
-            { approvals: waiting, questions: asks, secretRequestIds: secretAsks },
-            at && lead ? new Date(at.getTime() + 1) : at,
-          );
+          const pause = await postPauseCards(tx, run, {
+            approvals: waiting,
+            questions: asks,
+            secretRequestIds: secretAsks,
+          });
           t.postedUpTo = t.messages.length;
           t.postedCount += (lead ? 1 : 0) + pause.messages.length;
           await saveTranscript(tx, t);
@@ -5747,53 +5704,26 @@ function postAgentMessage(
 /** Model text this long is read as the answer: what it writes before a tool call ("I need the inbox id") is shorter. */
 const WORKING_TEXT_MAX = 280;
 
-/** When a run's reply first showed words (ms), and where: the message it posts next takes that place (`takePlace`). */
-interface ShownPlace {
-  at: number | null;
-  channelId: string;
-  threadId: string | null;
-}
-
 /**
- * Batches stream deltas so a fast model doesn't send one pub/sub message per
- * token (each is a NOTIFY on the Postgres adapter). Chunks stay well under the
- * NOTIFY payload limit. `seq` continues across the turns of a run. The silence
- * word (NO_REPLY) never shows live, on any run: what could still become it is
- * held, and it is cut when it shows up (`visibleText`, reply-policy.ts).
- *
- * People read a reply's answer, never its working text. No brain's stream says which is which until the next tool
- * call or the turn's end, so each stretch is held until it ends the turn (`flush(true)`) or reaches `WORKING_TEXT_MAX`;
- * a tool call drops what was held. The cost: a short answer arrives whole at the turn's end, and working text past
- * that length still shows until its call.
+ * A model call's text as it comes, kept here: none of it goes out live (ADR 0010), so the reply shows whole, once, when
+ * it is posted, and nothing on screen appears and then changes. The apps hear only that it writes (`agent.typing`, at
+ * the call's first text) and the first sentence before each call, as that call's step line (`takeStepWords`).
  */
-function createDeltaPublisher(
+function createTurnText(
   pubsub: PubSub,
   run: AgentRun,
   /** Where the run answers, read at each event: a computer brain's turn can move mid-way. */
   where: { channelId: string; threadId: string | null; agentId: string; runId: string },
-  flushMs: number,
-  startSeq = 0,
   first: {
-    turn: number;
     onFirst?: () => void;
-    /** Background work (a routine's run): nothing of its text shows live in the conversation. */
+    /** Background work (a routine's run): it holds no conversation, so not even "escrevendo" shows. */
     quiet?: boolean;
-    /** The right hand's (`scrubSignIns`): a sign-in or a key never shows, its last word held until it is whole. */
+    /** The right hand's (`scrubSignIns`): a sign-in or a key never reaches a step line. */
     scrub?: boolean;
-    /**
-     * Its brain reports every call it ran, our bridge's too, so a stretch has a known end (`agent.delta.from`). Claude
-     * Code alone does: the others leave our bridge's calls out, and text after one would pass for the stretch before it.
-     */
-    stretches?: boolean;
-    /** The run's: set when its words first show here, read by every delta (`agent.delta.shownAt`). */
-    place?: ShownPlace;
   },
 ) {
   let started = false;
-  const MAX_CHUNK = 2000;
   let all = "";
-  /** What was published so far (always a prefix of what may be shown). */
-  let shown = "";
   /** The stretches read as the answer so far, and where the current one starts in `all`. */
   let kept = "";
   let openAt = 0;
@@ -5802,9 +5732,6 @@ function createDeltaPublisher(
     return final || open.trim().length >= WORKING_TEXT_MAX ? kept + open : kept;
   };
   const scrubbed = (text: string) => (first.scrub ? scrubSignIns(text, "••••").text : text);
-  const live: LiveTurn = { turn: first.turn, text: "", from: 0, stretches: first.stretches };
-  /** Length of `all` at the last send. */
-  let sentUpTo = 0;
   /** When each piece arrived: [ms, length of `all` once it was added]. */
   const marks: [number, number][] = [];
   /**
@@ -5824,64 +5751,13 @@ function createDeltaPublisher(
     }
     return out;
   };
-  let seq = startSeq;
-  let timer: ReturnType<typeof setTimeout> | null = null;
   let pending: Promise<void> = Promise.resolve();
-
-  const send = (final = false) => {
-    if (timer) clearTimeout(timer);
-    timer = null;
-    sentUpTo = all.length;
-    if (first.quiet) return;
-    const said = visibleText(showable(final), final);
-    const visible = first.scrub ? scrubSignIns(final ? said : said.slice(0, said.search(/\S*$/)), "••••").text : said;
-    // A held piece turned out to be the word (now cut): nothing new to show.
-    if (!visible.startsWith(shown)) return;
-    let at = shown.length;
-    let rest = visible.slice(at);
-    shown = visible;
-    const { place } = first;
-    if (
-      rest &&
-      place &&
-      (place.at === null || place.channelId !== where.channelId || place.threadId !== where.threadId)
-    ) {
-      place.at = Date.now();
-      place.channelId = where.channelId;
-      place.threadId = where.threadId;
-    }
-    const shownAt = place?.at != null ? new Date(place.at).toISOString() : undefined;
-    if (shownAt) live.shownAt = shownAt;
-    if (shown) {
-      live.text = shown;
-      liveTurns.set(run.id, live);
-    }
-    while (rest.length > 0) {
-      const text = rest.slice(0, MAX_CHUNK);
-      rest = rest.slice(MAX_CHUNK);
-      const evt: ChannelEvent = {
-        type: "agent.delta",
-        channelId: where.channelId,
-        threadId: where.threadId,
-        runId: run.id,
-        agentId: run.agentId,
-        seq: seq++,
-        text,
-        turn: first.turn,
-        at,
-        ...(first.stretches ? { from: live.from } : {}),
-        ...(shownAt ? { shownAt } : {}),
-      };
-      at += text.length;
-      pending = pending.then(() => publishChannelEvent(pubsub, evt));
-    }
-  };
   return {
     push(text: string) {
       if (text && !started) {
         started = true;
         first.onFirst?.();
-        // Published in order, before the first delta.
+        // Published in order: the apps say it writes, its words wait for its message.
         if (!first.quiet) pending = pending.then(() => publishChannelEvent(pubsub, { type: "agent.typing", ...where }));
       }
       all += text;
@@ -5889,28 +5765,18 @@ function createDeltaPublisher(
       // Only its start is read for a step line (`takeStepWords`): the rest of a long stretch is never copied.
       if (!first.quiet && all.length - text.length - openAt < STEP_HELD_MAX)
         holdStepWords(run.id, scrubbed(all.slice(openAt, openAt + STEP_HELD_MAX)));
-      if (flushMs === 0 || all.length - sentUpTo >= MAX_CHUNK) send();
-      else timer ??= setTimeout(() => send(), flushMs);
     },
-    /** `answer`: the turn ended on this text, not on a tool call or a failure: what was held shows, unless it was the word. */
-    async flush(answer = false) {
-      send(answer);
-      liveTurns.delete(run.id);
+    /** The turn ended (on its text, a tool call or a failure): what it held for a step line goes. */
+    async flush() {
       takeStepWords(run.id);
       await pending;
     },
-    seq: () => seq,
     /** A call the brain ran inside its turn ended (through the bridge or on its own): later text is a new stretch. */
     toolEnded() {
       takeStepWords(run.id);
       breaks.push([Date.now(), all.length]);
       kept = showable(false);
       openAt = all.length;
-      if (!first.stretches) return;
-      // The stretch is over, so what waited for its last word to grow is whole, and starts no later text.
-      send(true);
-      live.from = shown.length;
-      live.spoke = false;
     },
     /** A person's message was read: what it writes next opens a paragraph, as in the answer it posts (`joinText`). */
     messageRead() {
@@ -6043,7 +5909,6 @@ export function continuedTranscript(stopped: Transcript, line: string): Transcri
     messages: structuredClone(stopped.messages),
     postedUpTo: 0,
     postedCount: 0,
-    deltaSeq: 0,
     ...(stopped.repo ? { repo: stopped.repo } : {}),
     // The same tools and model: the thinking blocks it replays stay valid only with the same `tools`.
     ...(stopped.toolGroups ? { toolGroups: stopped.toolGroups } : {}),

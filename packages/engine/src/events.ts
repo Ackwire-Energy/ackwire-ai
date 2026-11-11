@@ -62,42 +62,14 @@ type RouterRule = "reply" | "only_agent" | "follow_up" | "coordinator" | "defaul
 /** Why a routed message reached no agent: no step could read it, and no rule fit (`strategy` `none`). */
 export const MENTION_NEEDED = "mention_needed";
 
-export interface LiveTurn {
-  turn: number;
-  text: string;
-  /** Where the body starts: past the last call. With `stretches`, the current stretch's start (`agent.delta.from`). */
-  from: number;
-  /** Its brain says when each call ended (`createDeltaPublisher`). */
-  stretches?: boolean;
-  /** A call started in this stretch: the app moved it to the narration, and the rest of it goes there too. */
-  spoke?: boolean;
-  /** When the reply it writes first showed words (`agent.delta.shownAt`). */
-  shownAt?: string;
-}
-
-/**
- * The text each run executing here has streamed so far in its current model call (what its `agent.delta` events
- * carried), until that call ends. An app opened mid-answer reads it with the active runs and goes on from there.
- * ponytail: per process; a request served by another replica gets none and the app shows the waiting row until the
- * call ends, as before. Ask the run's replica over pub/sub if replicas ever split one workspace.
- */
-export const liveTurns = new Map<string, LiveTurn>();
-
-/** A tool starts inside the model call (a computer brain's): the body so far became narration. */
-export function liveTurnToolStarted(runId: string) {
-  const live = liveTurns.get(runId);
-  if (live?.stretches) live.spoke = true;
-  else if (live) live.from = live.text.length;
-}
-
 /** The most a step line says of what the agent wrote: one short line, cut with "…". */
 const STEP_WORDS_MAX = 120;
 /** How much of a stretch is kept for it: its first sentence is all that is read. */
 export const STEP_HELD_MAX = 600;
 
 /**
- * What each run executing here wrote since its last call, held out of the chat (`createDeltaPublisher`): the words of
- * its next call's step line (`takeStepWords`), never posted. Same ceiling as `liveTurns`.
+ * What each run executing here wrote since its last call, held out of the chat (`createTurnText`): the words of its
+ * next call's step line (`takeStepWords`), never posted.
  */
 const stepHeld = new Map<string, string>();
 
@@ -117,14 +89,6 @@ export function takeStepWords(runId: string): string | undefined {
   const line = held ? (plainLines(redactCredentials(stripSentinel(held)).replace(/\p{Cc}/gu, " "))[0] ?? "") : "";
   const sentence = /^.+?[.!?…:](?=\s|$)/u.exec(line)?.[0] ?? line;
   return oneLine(sentence.replace(/[.:]$/, ""), STEP_WORDS_MAX) || undefined;
-}
-
-/** What `GET …/active-runs` gives of it: the body so far and where it starts in the call's text (`agent.delta.at`). */
-export function liveTurnOf(runId: string) {
-  const live = liveTurns.get(runId);
-  if (!live) return undefined;
-  const at = live.spoke ? live.text.length : live.from;
-  return { turn: live.turn, at, text: live.text.slice(at), ...(live.shownAt ? { shownAt: live.shownAt } : {}) };
 }
 
 const RULES = new Set(["reply", "only_agent", "follow_up", "coordinator", "default", "alone"]);
@@ -162,31 +126,6 @@ export type ChannelEvent =
       message?: MessageView;
       threadId?: string | null;
       agentRunId?: string | null;
-    }
-  /** A fragment of an agent's reply while it is generated (not persisted; the final message follows). */
-  | {
-      type: "agent.delta";
-      channelId: string;
-      threadId: string | null;
-      runId: string;
-      agentId: string;
-      seq: number;
-      text: string;
-      /** The model call this text belongs to (1, 2…): a new turn starts a new segment, never glued to the last one. */
-      turn: number;
-      /** Where `text` starts in its turn's text (UTF-16 units): an app that missed a piece sees the hole. */
-      at?: number;
-      /**
-       * Where its stretch starts in the turn's text: a computer brain's turn holds many, one between each two calls.
-       * Brains keep text back, so a stretch's end can arrive after the next call's start: this says what it finishes.
-       * Only from a brain that says when each call ended (`createDeltaPublisher`).
-       */
-      from?: number;
-      /**
-       * When the reply it belongs to first showed words (ISO, the server's clock), until the run posts it: its message
-       * keeps that place (`PLACE_KEPT_MS`), so the apps draw the live reply there, with what people send meanwhile below.
-       */
-      shownAt?: string;
     }
   /** An agent run changed state (`running` = typing indicator). */
   | {
@@ -349,7 +288,7 @@ export type ChannelEvent =
         holder: { type: "agent"; agentId: string; since: string } | { type: "person"; userId: string; since: string };
       } | null;
     }
-  /** The agent's first words arrived (switch "thinking" to "typing"). */
+  /** It writes (a model call's first text): the apps say so; its words wait for the message that posts them whole. */
   | { type: "agent.typing"; channelId: string; threadId: string | null; agentId: string; runId: string }
   /** A long work changed (ADR 0121): moved, updated, waiting, queued or ended. Its anchor's line redraws from `work`. */
   | {

@@ -59,7 +59,6 @@
     "failed": "Votre choix n'a pas été envoyé. Réessayez."
   },
   "chart": {
-    "pending": "Création du graphique…",
     "table": "Tableau",
     "item": "Élément",
     "share": "Partager",
@@ -391,12 +390,6 @@
     "toLatestNew": "Aller aux derniers messages : {{text}}",
     "stopAgent": "Arrêter {{name}}",
     "offlineWait": "Partira au retour de la connexion",
-    "turn": {
-      "thinking": "réfléchit",
-      "working": "travaille",
-      "writing": "écrit",
-      "stopped": "arrêté"
-    },
     "steer": {
       "waiting": "{{name}} le lira à la prochaine pause",
       "computer": "{{name}} le lira dès qu'il aura l'ordinateur",

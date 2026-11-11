@@ -53,7 +53,16 @@ test("a rounded thing near a rounded box's edge has the box's radius less the ro
   expect(last(top, ".ac-msg__actions", "border-radius")).toBe("var(--bar-r)");
   const inBar = "calc(var(--bar-r) - var(--bar-pad))";
   expect(last(top, ".ac-msg__actions .ac-btn--sm", "border-radius")).toBe(inBar);
-  expect(last(atRule(kit, "@media (pointer: coarse)"), ".ac-msg__actions .ac-btn--sm", "border-radius")).toBe(inBar);
+  // Under a finger the plates grow through the bar's own size, so their corner stays the bar's less its room.
+  expect(last(atRule(kit, "@media (pointer: coarse)"), ".ac-msg__actions", "--bar-btn")).toBe("var(--control-h-sm)");
+  // A plate with a count (👍 1) is one plate around the icon and the count, the icon as far in as in a square one.
+  expect(last(top, ".ac-msg__actions .ac-btn--sm", "width")).toBe("var(--bar-btn)");
+  expect(last(top, ".ac-msg__actions .ac-btn--sm:not(.ac-btn--icon)", "width")).toBe("auto");
+  expect(last(top, ".ac-msg__actions .ac-btn--sm:not(.ac-btn--icon)", "padding-inline")).toBe(
+    "calc((var(--bar-btn) - var(--bar-icon)) / 2)",
+  );
+  // Pressed, it keeps the ghost's plate: no fill of the bar's own over it.
+  expect(kit).not.toContain('.ac-msg__actions .ac-btn[aria-pressed="true"]');
   // Segmented controls, and the command palette's rows in its list.
   expect(last(top, ".ac-seg__item", "border-radius")).toBe("calc(var(--seg-r) - var(--seg-in))");
   expect(last(top, ".ac-palette__list", "padding")).toBe("var(--palette-pad)");

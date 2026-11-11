@@ -13,6 +13,7 @@ import {
 import { Button, CountBadge, cx, Icon, Kbd, Locked, prefersReducedMotion } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type FormEvent, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { OpenDetailsContext } from "@/components/details-link";
 import { useNotificationOpener } from "@/components/NotificationOpen";
@@ -142,7 +143,9 @@ export function NoticeIsland() {
     }, CLOSE_DELAY_MS);
   };
 
-  return (
+  // In <body>, beside a side pane rather than in the page it makes inert (`useModalSheet` keeps it out of that): over a
+  // thread open in the panel, "Ver" is the island's, never the panel header's under it.
+  return createPortal(
     <div className="ni-wrap">
       {/* Resting the pointer on it opens it; the pill itself is the button (keyboard, a click). */}
       <div
@@ -224,7 +227,8 @@ export function NoticeIsland() {
           </>
         )}
       </span>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

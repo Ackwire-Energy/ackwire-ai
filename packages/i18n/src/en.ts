@@ -44,7 +44,6 @@ export const en = {
     table: "Table",
     chartItem: "Item",
     chartShare: "Share",
-    chartPending: "Building the chart…",
     you: "you",
     saved: "Saved",
     youSuffix: " (you)",
@@ -3442,8 +3441,6 @@ export const en = {
     messageTo: "Message {{name}}",
     audienceEdit: "Edit",
     nowIn: "now, in #{{channel}}",
-    /** An agent set to answer in this channel without being mentioned (its card opened from the channel). */
-    answersHere: "Answers here without an @",
     more: "More",
     of: "Profile of {{name}}",
     presence: "Presence",

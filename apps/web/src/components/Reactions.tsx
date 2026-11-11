@@ -1,6 +1,6 @@
 import type { ReactionCount } from "@agenteschat/client";
 import { useReactions, useToggleReaction } from "@agenteschat/client";
-import { joinNames } from "@agenteschat/client/lib/format";
+import { formatInt, joinNames } from "@agenteschat/client/lib/format";
 import {
   Button,
   EMOJI_CATEGORIES,
@@ -114,7 +114,7 @@ export function MessageReactions({
   /** An agent's reply: 👍/👎 replace each other (they teach the agent). */
   feedback?: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
   const labels = useEmojiLabels();
@@ -138,7 +138,7 @@ export function MessageReactions({
           <Reaction
             key={r.reaction}
             pressed={r.userIds.includes(userId)}
-            count={r.count}
+            count={formatInt(i18n.language, r.count)}
             label={who}
             title={who}
             onClick={() => toggle(r.reaction)}

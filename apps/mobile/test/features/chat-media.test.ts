@@ -29,7 +29,7 @@ import {
   stickerCellId,
   stickerRowsOnScreen,
 } from "../../src/features/chat/media";
-import { type ScrollRow, turnRowByRun, unseenBelow } from "../../src/features/chat/scroll";
+import { type ScrollRow, unseenBelow } from "../../src/features/chat/scroll";
 import { buildConversations } from "../../src/features/chats/logic";
 import { agent, at, message, notification, translator } from "./fixtures";
 
@@ -104,14 +104,6 @@ describe("the sticker or GIF an agent adds after its reply", () => {
     const b = message({ id: "b", body: "", meta: { media: gif }, createdAt: at(9) });
     const shown = buildRows([a, b]).filter((r) => r.kind === "message");
     expect(shown.map((r) => r.kind === "message" && r.grouped)).toEqual([false, true]);
-  });
-
-  test("never takes its run's block key: the reply keeps it", () => {
-    const rows = [
-      { kind: "message", key: "reply", message: reply() },
-      { kind: "message", key: "after", message: after() },
-    ];
-    expect(turnRowByRun(rows, new Set()).get("run1")).toBe("reply");
   });
 
   test("never counts as new below the person", () => {

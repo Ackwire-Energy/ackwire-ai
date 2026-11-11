@@ -3,7 +3,7 @@ import { ApiError, useMission, useMissionAct, useMissionCommands } from "@agente
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatTime } from "@agenteschat/client/lib/format";
 import { executorName } from "@agenteschat/client/lib/missions";
-import { Button, Checkbox, Chip, DetailsDialog, DetailsSection, Icon, Skeleton } from "@agenteschat/ui";
+import { Button, Checkbox, Chip, DetailsDialog, DetailsSection, Icon, Skeleton, Tip } from "@agenteschat/ui";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
@@ -16,9 +16,10 @@ import "./missions.css";
 /**
  * The command card (ADR 0029): the executor asks to run a command off its
  * allow list ("Claude Code quer rodar: `swift build`"). The owner or someone
- * who decides answers Aprovar / Recusar / Aprovar sempre nesta missão; the
- * waiting executor gets the answer within seconds. Merges, pushes to the
- * default branch and deploys never come here (they need `request_approval`).
+ * who decides answers Aprovar / Recusar / Aprovar sempre nesta missão, what
+ * each "sempre" covers in its button's tip; the waiting executor gets the
+ * answer within seconds. Merges, pushes to the default branch and deploys
+ * never come here (they need `request_approval`).
  */
 export function MissionCommandCard({ command: meta }: { command: MissionCommandMeta }) {
   const { t, i18n } = useTranslation();
@@ -68,14 +69,28 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
               {t("missions.command.deny")}
             </Button>
             {c.rules.length > 0 && (
-              <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => answer("always")}>
-                {t("missions.command.always")}
-              </Button>
+              <Tip
+                tip={t("missions.command.alwaysHint", { rules: c.rules.map(ruleText).join(", ") })}
+                look="ac-hint__bubble ac-glass"
+                align="center"
+                button
+              >
+                <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => answer("always")}>
+                  {t("missions.command.always")}
+                </Button>
+              </Tip>
             )}
             {c.agentKind && (
-              <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => answer("agent")}>
-                {t("missions.command.alwaysAgent")}
-              </Button>
+              <Tip
+                tip={t("missions.command.alwaysAgentHint", { kind: c.agentKind })}
+                look="ac-hint__bubble ac-glass"
+                align="center"
+                button
+              >
+                <Button size="sm" variant="ghost" disabled={decide.isPending} onClick={() => answer("agent")}>
+                  {t("missions.command.alwaysAgent")}
+                </Button>
+              </Tip>
             )}
           </div>
         ) : (
@@ -93,18 +108,6 @@ export function MissionCommandCard({ command: meta }: { command: MissionCommandM
                     name: by,
                     time,
                   })}
-        </p>
-      )}
-      {c.state === "pending" && c.rules.length > 0 && m.canAct && (
-        <p className="mi-hint ac-iconline">
-          <Icon name="info" size={14} />
-          {t("missions.command.alwaysHint", { rules: c.rules.map(ruleText).join(", ") })}
-        </p>
-      )}
-      {c.state === "pending" && c.agentKind && m.canAct && (
-        <p className="mi-hint ac-iconline">
-          <Icon name="info" size={14} />
-          {t("missions.command.alwaysAgentHint", { kind: c.agentKind })}
         </p>
       )}
     </section>

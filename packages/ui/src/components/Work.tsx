@@ -100,7 +100,8 @@ export function Reaction({
   disabled,
 }: {
   pressed?: boolean;
-  count?: number;
+  /** How many, as the person's language writes it ("1.284"). */
+  count?: ReactNode;
   /** Accessible name: "Útil, 2". */
   label: string;
   /** Tooltip, e.g. who reacted. */

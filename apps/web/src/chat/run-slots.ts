@@ -3,11 +3,10 @@ import { waitsForWords } from "@agenteschat/client/lib/activity";
 import { isMediaAfterReply } from "@agenteschat/client/lib/media";
 
 /**
- * One block per agent answer, from "pensando" to the final message: a block whose words showed sits where they first
- * did (`shownAt`, `blockPlaces`), with what people send meanwhile below it, as its message will once posted there; the
- * others sit at the end of the conversation. Each lives under a key that never changes. A "pensando…" guessed on send
- * hands its key to the real run that replaces it, and the final message is rendered under the same key, so React keeps
- * the element: no remount, no flash, no height jump.
+ * One block per agent answer, from "pensando" to the final message, at the end of the conversation, where its message
+ * is posted. Each lives under a key that never changes. A "pensando…" guessed on send hands its key to the real run that
+ * replaces it, and the final message is rendered under the same key, so React keeps a drawn block's element: no
+ * remount, no flash, no height jump.
  */
 export interface RunSlot {
   key: string;
@@ -16,18 +15,13 @@ export interface RunSlot {
   provisional: boolean;
   /** When its run left the live store (it waits there for its message to land). */
   goneAt: number | null;
-  /** When its words first showed (`LiveRun.shownAt`): where it draws. */
-  shownAt?: string;
 }
 
 export interface SlotRun {
   runId: string;
   agentId: string;
   provisional?: boolean;
-  shownAt?: string;
 }
-
-const shownOf = (r: SlotRun) => (r.shownAt ? { shownAt: r.shownAt } : {});
 
 /** How long a finished block waits for its message (normally a frame or two). */
 export const SLOT_HOLD_MS = 4000;
@@ -66,14 +60,7 @@ export function nextSlots(
     // question, then resumed after the answer).
     if (!r && opts.landed(s.runId)) continue;
     if (r) {
-      out.push({
-        key: s.key,
-        runId: r.runId,
-        agentId: r.agentId,
-        provisional: Boolean(r.provisional),
-        goneAt: null,
-        ...shownOf(r),
-      });
+      out.push({ key: s.key, runId: r.runId, agentId: r.agentId, provisional: Boolean(r.provisional), goneAt: null });
       continue;
     }
     const goneAt = s.goneAt ?? opts.now;
@@ -87,7 +74,6 @@ export function nextSlots(
       agentId: r.agentId,
       provisional: Boolean(r.provisional),
       goneAt: null,
-      ...shownOf(r),
     });
   }
   return out;
@@ -115,17 +101,14 @@ export function blockRowByRun(
   return out;
 }
 
-/** Same blocks (keys, runs and places) in the same order. */
+/** Same blocks (keys and runs) in the same order. */
 export const sameSlots = (a: RunSlot[], b: RunSlot[]) =>
   a.length === b.length &&
-  a.every(
-    (s, i) =>
-      s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt && s.shownAt === b[i]?.shownAt,
-  );
+  a.every((s, i) => s.key === b[i]?.key && s.runId === b[i]?.runId && s.goneAt === b[i]?.goneAt);
 
 /**
- * The blocks in the order they draw: every agent at work has its own, and the ones still waiting for their first
- * words (`waiting`) stay last, so an answer that starts goes above them; each group keeps its order.
+ * The blocks in the order they draw: every agent at work has its own, and the ones still at work (`waiting`) stay last,
+ * after one that ended badly; each group keeps its order.
  */
 export function waitingLast<S extends Pick<RunSlot, "runId">>(
   slots: readonly S[],
@@ -135,17 +118,9 @@ export function waitingLast<S extends Pick<RunSlot, "runId">>(
 }
 
 /**
- * Its block is in the conversation: words of its own, or something to show while it waits for them (its browser
- * card, "sem notícias · Atualizar" on a run gone quiet). Until then the bar above the composer speaks for it: its
- * face, what it does now, for how long, and its stop.
+ * Its block is in the conversation: it ended badly, or it has something to show while it works (its browser card, "sem
+ * notícias · Atualizar" on a run gone quiet). Otherwise the bar above the composer speaks for it: its face, what it
+ * does now, for how long, and its stop. Its words show whole, once its message is posted.
  */
 export const rowShows = (r: LiveRun, now: number) =>
   !waitsForWords(r) || browserSteps(r.work).length > 0 || isQuiet(r, now);
-
-/** The first thing it said, out of its work list (the line its block opens with, above its tools). */
-export function openerOf(r: Pick<LiveRun, "work">): { said: string | null; work: NonNullable<LiveRun["work"]> } {
-  const work = r.work ?? [];
-  const first = work.find((w) => w.kind === "say");
-  if (first?.kind === "say") return { said: first.text, work: work.filter((w) => w !== first) };
-  return { said: null, work };
-}

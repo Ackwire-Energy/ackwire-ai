@@ -42,11 +42,8 @@ const lastText = (req: ModelRequest) => {
 };
 const agentMessages = async () =>
   (await f.db.select().from(schema.messages)).filter((m) => m.authorType === "agent").map((m) => m.body);
-const deltasOf = (events: RealtimeEvent[]) =>
-  events
-    .filter((e) => e.type === "agent.delta")
-    .map((e) => (e as unknown as { text: string }).text)
-    .join("");
+/** What went out before its message: never its words (`agent.typing` only says it writes). */
+const beforeMessage = (events: RealtimeEvent[]) => JSON.stringify(events.filter((e) => e.type !== "message.created"));
 const runRow = async () => (await f.db.select().from(schema.agentRuns))[0];
 
 /** A person's message in #general without a mention, and the router bringing the agent in. */
@@ -82,7 +79,8 @@ describe("a run that must answer never posts the silence word", () => {
     expect(first.tools?.map((t) => t.name) ?? []).not.toContain("pass");
     expect(systemText(first.system)).not.toContain("# Why you were called");
     await Bun.sleep(5);
-    expect(deltasOf(events)).toBe("Aqui está.");
+    expect(beforeMessage(events)).not.toContain("NO_");
+    expect(beforeMessage(events)).not.toContain("Aqui");
     expect(events.some((e) => e.type === "agent.passed")).toBe(false);
     expect((await runRow())?.status).toBe("done");
   });
@@ -111,15 +109,15 @@ describe("a run that must answer never posts the silence word", () => {
     expect(await agentMessages()).toEqual(["Feito."]);
   });
 
-  test("the word glued to real text is cut, in the message and in the stream", async () => {
+  test("the word glued to real text is cut from the message, and none of it went out before", async () => {
     f = await setup({ reply: () => ({ chunks: ["NO_REP", "LY Claro", ", aqui está.", " NO_", "REPLY"] }) });
     const events = f.listen(f.general.id);
     await postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body: "@dev oi" });
     await drainOutbox(f.db, f.handlers);
     expect(await agentMessages()).toEqual(["Claro, aqui está."]);
     await Bun.sleep(5);
-    expect(deltasOf(events)).not.toContain("NO");
-    expect(deltasOf(events).trim()).toBe("Claro, aqui está.");
+    expect(beforeMessage(events)).not.toContain("NO_");
+    expect(beforeMessage(events)).not.toContain("Claro");
   });
 });
 
@@ -248,7 +246,7 @@ describe("a run nobody called by name may stay quiet", () => {
     expect(f.provider.calls.length).toBe(1);
     await Bun.sleep(5);
     expect(events.some((e) => e.type === "agent.passed")).toBe(true);
-    expect(deltasOf(events)).not.toContain("NO_REPLY");
+    expect(beforeMessage(events)).not.toContain("NO_REPLY");
   });
 
   test("another agent's reply to the same message since is read before the first call", async () => {

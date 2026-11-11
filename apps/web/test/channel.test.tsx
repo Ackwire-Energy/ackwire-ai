@@ -95,7 +95,7 @@ describe("Canal", () => {
     expect((box as HTMLTextAreaElement).value).toBe("");
   });
 
-  test("streams an agent reply with the running ring and cursor, then shows the final message", async () => {
+  test("an agent at work: the bar and the running ring say it, none of its words; then its final message, whole", async () => {
     const withDm = seedState();
     seedDm(withDm, { type: "agent", id: ATLAS_ID });
     const { socket } = await open(withDm);
@@ -104,13 +104,15 @@ describe("Canal", () => {
     // Asked in the channel: it answers there, its events carry no thread.
     const run = { threadId: null, runId: "r-9", agentId: ATLAS_ID };
     await ev({ type: "agent.run", ...run, status: "running" });
+    await ev({ type: "agent.typing", ...run });
     await ev({ type: "agent.delta", ...run, seq: 1, text: "Os 401 no Sentry caíram de 312 para" });
     await settle();
-    const streaming = document.querySelector(".ac-msg--streaming");
-    expect(streaming?.textContent).toContain("Atlas");
-    expect(streaming?.textContent).toContain("escrevendo…");
-    expect(streaming?.textContent).toContain("Os 401 no Sentry caíram de 312 para");
-    expect(streaming?.querySelector(".ac-avatar--running")).not.toBeNull();
+    expect(document.querySelector(".ac-msg--streaming")).toBeNull();
+    expect(document.body.textContent).not.toContain("Os 401 no Sentry caíram de 312 para");
+    const bar = document.querySelector('.ac-typing[data-active="true"]') as HTMLElement;
+    expect(bar.textContent).toContain("Atlas");
+    expect(bar.textContent).toContain("escrevendo…");
+    expect(bar.querySelector(".ac-avatar--running")).not.toBeNull();
     // Its DM in the sidebar shows the ring too.
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.querySelector(".ac-avatar--running")).not.toBeNull();
@@ -321,8 +323,11 @@ describe("Canal", () => {
       "Aprovar sempre",
       "Agora não para todos",
     ]);
-    // What it covers, on a line of its own under the buttons.
-    expect(foot.querySelector(":scope > .ap-always")).not.toBeNull();
+    // Only buttons: what it covers is the button's tip and description.
+    expect([...foot.children].every((el) => el.matches("button, .rq__end"))).toBe(true);
+    expect(within(foot).getByRole("button", { name: "Aprovar sempre" }).getAttribute("aria-description")).toContain(
+      "de agora em diante",
+    );
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver cada um" })));
     const items = [...card.querySelectorAll(".rq__item")] as HTMLElement[];
     expect(items).toHaveLength(3);
@@ -546,6 +551,24 @@ describe("Canal", () => {
     expect(within(dialog).queryByRole("searchbox", { name: "Buscar pessoa ou agente" })).toBeNull();
   });
 
+  test("counts read as the person's language writes them, on the reply's bar and in its pills: 1.284", async () => {
+    const state = seedState();
+    const reply = state.messages.find((m) => m.id === "m-2") as { reactions?: unknown };
+    reply.reactions = [
+      { reaction: "+1", count: 1284, userIds: ["u-walter"] },
+      { reaction: "-1", count: 37, userIds: ["u-x"] },
+    ];
+    await open(state);
+    const row = screen()
+      .getAllByRole("article")
+      .find((a) => a.textContent?.includes("Achei a causa")) as HTMLElement;
+    const bar = within(row).getByRole("toolbar", { name: "Ações da mensagem de Ada" });
+    const counts = [...bar.querySelectorAll(".ac-msg__reaction-count")].map((c) => c.textContent);
+    expect(counts).toEqual(["1.284", "37"]);
+    const pills = [...row.querySelectorAll(".ac-reacts .ac-react .tabular")].map((c) => c.textContent);
+    expect(pills).toEqual(["1.284", "37"]);
+  });
+
   test("agent replies: 👍/👎 toggle with the API and Corrigir resposta sends a correction", async () => {
     const { state } = await open();
     const reply = screen()
@@ -558,7 +581,11 @@ describe("Canal", () => {
     await act(async () => fireEvent.click(up));
     await settle(4);
     expect(state.calls.find((c) => c.method === "chat.react")?.args).toEqual([ORG_ID, "m-2", "+1"]);
-    expect(within(bar).getByRole("button", { name: "Útil" }).getAttribute("aria-pressed")).toBe("true");
+    const pressed = within(bar).getByRole("button", { name: "Útil" });
+    expect(pressed.getAttribute("aria-pressed")).toBe("true");
+    // Pressed with its count: one plate around the icon and the "1", never the square of an icon alone.
+    expect(pressed.querySelector(".ac-msg__reaction-count")?.textContent).toBe("1");
+    expect(pressed.classList.contains("ac-btn--icon")).toBe(false);
     // 👎 replaces 👍.
     await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Não ajudou" })));
     await settle(4);

@@ -33,7 +33,7 @@ import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { usePrefersReducedMotion } from "@/hooks/useRevealedText";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { lookOf } from "@/lib/look";
 import { agentActivitySince, dayPart, isNewDay, lastVisit, markVisit } from "@/lib/welcome";
 

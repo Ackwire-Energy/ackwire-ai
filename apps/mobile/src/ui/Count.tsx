@@ -1,3 +1,5 @@
+import { formatInt } from "@agenteschat/client/lib/format";
+import { useTranslation } from "react-i18next";
 import { Text as RNText, View } from "react-native";
 import { useTheme } from "./theme";
 import { CHROME_MAX_SCALE, countBadge, countStyle, type Weight } from "./type-scale";
@@ -26,7 +28,10 @@ export interface CountProps {
  */
 export function Count({ value, size = 14, inverted = false, color, fill, max, hero = false, weight }: CountProps) {
   const { colors, fonts } = useTheme();
-  const label = max !== undefined && value > max ? `${max}+` : String(value);
+  const { i18n } = useTranslation();
+  // In the person's language ("1.284" in Portuguese).
+  const label =
+    max !== undefined && value > max ? `${formatInt(i18n.language, max)}+` : formatInt(i18n.language, value);
   const face = hero
     ? { fontFamily: fonts.dot, fontSize: size, lineHeight: Math.round(size * 1.2) }
     : countStyle(size, weight);

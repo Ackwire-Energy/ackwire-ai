@@ -5,7 +5,7 @@ import { announceAgentStatus } from "./agent-status";
 import { executesHere, RUN_STALE_MS } from "./cancel";
 import { onConsultedRunFinished } from "./consultations";
 import { ValidationError } from "./errors";
-import { liveTurnOf, publishChannelEvent, publishMessageCreated } from "./events";
+import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { Transcript } from "./executor";
 import { getMessage, insertMessage, messageView } from "./messages";
 import { enqueue } from "./outbox";
@@ -385,29 +385,24 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
   );
   const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
   const now = Date.now();
-  return rows.map((r) => {
-    const live = liveTurnOf(r.id);
-    return {
-      runId: r.id,
-      agentId: r.agent_id,
-      channelId,
-      status: r.status,
-      threadId: r.kind === "dm" && r.thread_root_id === r.trigger_message_id ? null : r.thread_root_id,
-      triggerMessageId: r.trigger_message_id,
-      startedAt: iso(r.started_at),
-      heartbeatAt: iso(r.heartbeat_at),
-      createdAt: iso(r.created_at) as string,
-      // How long the work it is doing now has taken (`agent_runs.working_since`, else since it was created), as a
-      // length and not a time: the app counts on from it by its own clock, whatever that clock says.
-      workingMs: Math.max(0, now - new Date(r.working_since ?? r.created_at).getTime()),
-      // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
-      pendingMessageIds: pendingIds(r.pending),
-      // A routine's work, or long work (ADR 0121): it holds no conversation's working row.
-      background: r.background === true || r.background === "t",
-      // Opened mid-answer: the text so far, so the app goes on from there instead of waiting for the message.
-      ...(live ? { live } : {}),
-    };
-  });
+  return rows.map((r) => ({
+    runId: r.id,
+    agentId: r.agent_id,
+    channelId,
+    status: r.status,
+    threadId: r.kind === "dm" && r.thread_root_id === r.trigger_message_id ? null : r.thread_root_id,
+    triggerMessageId: r.trigger_message_id,
+    startedAt: iso(r.started_at),
+    heartbeatAt: iso(r.heartbeat_at),
+    createdAt: iso(r.created_at) as string,
+    // How long the work it is doing now has taken (`agent_runs.working_since`, else since it was created), as a
+    // length and not a time: the app counts on from it by its own clock, whatever that clock says.
+    workingMs: Math.max(0, now - new Date(r.working_since ?? r.created_at).getTime()),
+    // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
+    pendingMessageIds: pendingIds(r.pending),
+    // A routine's work, or long work (ADR 0121): it holds no conversation's working row.
+    background: r.background === true || r.background === "t",
+  }));
 }
 
 /** `array_to_json(uuid[])`: parsed by the driver, or still text. */

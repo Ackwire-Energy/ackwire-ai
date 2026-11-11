@@ -59,7 +59,6 @@
     "failed": "La tua scelta non è stata inviata. Riprova."
   },
   "chart": {
-    "pending": "Creazione del grafico…",
     "table": "Tabella",
     "item": "Voce",
     "share": "Condividi",
@@ -391,12 +390,6 @@
     "toLatestNew": "Vai agli ultimi messaggi: {{text}}",
     "stopAgent": "Ferma {{name}}",
     "offlineWait": "Parte appena torna la connessione",
-    "turn": {
-      "thinking": "sta pensando",
-      "working": "al lavoro",
-      "writing": "sta scrivendo",
-      "stopped": "fermato"
-    },
     "steer": {
       "waiting": "{{name}} lo legge alla prossima pausa",
       "computer": "{{name}} lo legge quando ha il computer",

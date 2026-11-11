@@ -879,7 +879,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
 }
 
 /* The decision: a bar floating at the bottom of the request (the selection bar's look); the dialog's footer
-   elsewhere. What approving allows on the left, Refuse and Approve on the right. */
+   elsewhere. Only its buttons, at its end: what each allows is in its tip. */
 .ap-bar {
   position: relative;
   display: flex;
@@ -905,8 +905,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   font-size: 13.5px;
   color: var(--muted);
 }
-/* As wide as its buttons: on a narrow bar they wrap, and the line that says what Aprovar sempre covers goes under them at
-   their width (it adds none of its own), never cut by the bar's edge. */
+/* As wide as its buttons: on a narrow bar they wrap, from its end. */
 .ap-bar__acts {
   display: flex;
   flex-wrap: wrap;
@@ -916,8 +915,12 @@ html:not([data-pointer]) .ap-li:focus-visible {
   flex: 0 1 auto;
   min-width: 0;
 }
-.ap-bar__acts .ap-always {
-  contain: inline-size;
+/* The buttons alone: at the bar's end, the same room on every side of them. */
+.ap-bar--acts {
+  justify-content: flex-end;
+}
+.ap-bar--acts.ap-bar--float {
+  padding: 10px;
 }
 .ap-bar--refuse {
   display: block;

@@ -55,7 +55,6 @@
     "failed": "選択を送信できませんでした。もう一度お試しください。"
   },
   "chart": {
-    "pending": "グラフを作成中…",
     "table": "表",
     "item": "項目",
     "share": "共有",
@@ -363,12 +362,6 @@
     "toLatestNew": "最新のメッセージへ: {{text}}",
     "stopAgent": "{{name}}を止める",
     "offlineWait": "接続が戻ると送信されます",
-    "turn": {
-      "thinking": "考え中",
-      "working": "作業中",
-      "writing": "入力中",
-      "stopped": "停止"
-    },
     "steer": {
       "waiting": "{{name}}は次の区切りで読みます",
       "computer": "{{name}}はコンピューターが使えるようになったら読みます",

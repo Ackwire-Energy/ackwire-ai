@@ -75,16 +75,7 @@ import {
   useWikiTree,
 } from "@agenteschat/client";
 import { actionCardOf } from "@agenteschat/client/lib/action-cards";
-import {
-  activityVerb,
-  barElapsed,
-  barEntries,
-  entriesOffScreen,
-  isWriting,
-  runElapsed,
-  toolActivity,
-  waitsForWords,
-} from "@agenteschat/client/lib/activity";
+import { barElapsed, barEntries, entriesOffScreen, runElapsed, waitsForWords } from "@agenteschat/client/lib/activity";
 import type { AgentTab } from "@agenteschat/client/lib/agent-edit";
 import { foldTalk, TALK_LINE_CHARS, talksToAgent } from "@agenteschat/client/lib/agent-talk";
 import { looksLikeApiKey } from "@agenteschat/client/lib/api-key-text";
@@ -115,7 +106,7 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorCode, errorText, restrictionLine, runErrorText, runFailureLine } from "@agenteschat/client/lib/errors";
 import { everyoneWord, isEveryoneMention, mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
-import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
+import { dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
@@ -146,15 +137,8 @@ import { isReminderMessage, reminderBody, routineReplyOf } from "@agenteschat/cl
 import { picksForMe, replyAloneKey } from "@agenteschat/client/lib/routing";
 import { seenMessageId } from "@agenteschat/client/lib/seen";
 import { hiddenCount, tasksOf, todayStart } from "@agenteschat/client/lib/task-manager";
-import { holdsText } from "@agenteschat/client/lib/text";
 import { contextMarks, hiddenByThreads, rangeCandidates, threadStartOf } from "@agenteschat/client/lib/threads";
-import {
-  blockPlaces,
-  buildTimeline,
-  lastPostedId,
-  mergeTimeline,
-  type TimelineItem,
-} from "@agenteschat/client/lib/timeline";
+import { buildTimeline, lastPostedId, mergeTimeline, type TimelineItem } from "@agenteschat/client/lib/timeline";
 import { usageWaitOf } from "@agenteschat/client/lib/usage-pause";
 import { appVia } from "@agenteschat/client/lib/via";
 import { voiceOf } from "@agenteschat/client/lib/voice";
@@ -232,7 +216,6 @@ import { readingLanding } from "@/chat/reading";
 import {
   blockRowByRun,
   nextSlots,
-  openerOf,
   type RunSlot,
   rowShows,
   SLOT_HOLD_MS,
@@ -375,7 +358,7 @@ import { useComposerDraft } from "@/hooks/useComposerDraft";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useDmSidebar, useMembersColumn } from "@/hooks/useMembersColumn";
 import { useMentionSearch } from "@/hooks/useMentionSearch";
-import { usePrefersReducedMotion, useRevealedText } from "@/hooks/useRevealedText";
+import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 import { TYPED_VALUES } from "@/i18n";
@@ -1279,12 +1262,12 @@ function ChannelView({
     return ungroupAfter(items, special);
   }, [thread, channelList, channelMessages.data, threadMessages.data, threadsView, agentsAtWork]);
 
-  // The agents' blocks (one per run, from "pensando" to its final message: `chat/run-slots.ts`), each where its words
-  // first showed, else at the end. They change when runs start or end or their words first show, never on a delta.
+  // The agents' blocks (one per run, from "pensando" to its final message: `chat/run-slots.ts`), at the end. They
+  // change when runs start or end, never on another of a run's events.
   const liveRunsKey = useStreams((s) =>
     scopedRuns(s)
       .sort((a, b) => (a.startedAt ?? 0) - (b.startedAt ?? 0))
-      .map((r) => `${r.runId}\t${r.agentId}\t${r.provisional ? 1 : 0}\t${r.shownAt ?? ""}`)
+      .map((r) => `${r.runId}\t${r.agentId}\t${r.provisional ? 1 : 0}`)
       .join("\n"),
   );
   const landedRuns = useMemo(
@@ -1300,8 +1283,8 @@ function ChannelView({
   const slots = useMemo(() => {
     const onScreen = liveRunsKey
       ? liveRunsKey.split("\n").map((line) => {
-          const [runId = "", agentId = "", provisional, shownAt] = line.split("\t");
-          return { runId, agentId, provisional: provisional === "1", ...(shownAt ? { shownAt } : {}) };
+          const [runId = "", agentId = "", provisional] = line.split("\t");
+          return { runId, agentId, provisional: provisional === "1" };
         })
       : [];
     // Its message is in a cache already (it lands in the timeline on the next render), or came without its body and
@@ -1328,8 +1311,8 @@ function ChannelView({
     return () => clearTimeout(timer);
   }, [slots]);
   const slotsKey = slots.map((x) => x.key).join(" ");
-  // Questions the agents asked other agents from here, drawn inside the replies that asked them (loaded or live):
-  // how their answers' notices draw, and which ones the working line leaves to a block near the end.
+  // Questions the agents asked other agents from here, drawn inside the replies that asked them: how their answers'
+  // notices draw, and which ones the working line leaves to a reply near the end (a run at work draws none yet).
   const consultRows = useMemo(() => timeline.flatMap((i) => (i.kind === "message" ? [i.message] : [])), [timeline]);
   const liveRuns = useMemo(() => new Set(slots.map((slot) => slot.runId)), [slots]);
   const consultGroups = useConsultGroups(channel.id, consultRows, liveRuns, consultId);
@@ -1430,7 +1413,7 @@ function ChannelView({
   const dividerOn = useRef(false);
   /**
    * Something arrived out of view: the divider before `key` (the first one since the person left). `up`: it landed
-   * above the divider already drawn (a reply keeps the place where its first words showed), which moves there.
+   * above the divider already drawn (a message placed before its post, `PLACE_KEPT_MS`), which moves there.
    */
   const markUnseen = (key: string, up = false) => {
     if (unseenFromRef.current !== null && !up) return;
@@ -1592,7 +1575,7 @@ function ChannelView({
     const blocks = previousSlots.current.split(" ");
     const shown = slotsKey.split(" ");
     const newBlock = shown.some((k) => k && !blocks.includes(k));
-    // Runs whose block just went: each one's message took its place, which can be above rows that came after it.
+    // Runs whose block just went: each one's message can sit above rows that came after it (`PLACE_KEPT_MS`).
     const gone = new Set(
       [...runKeys.current].flatMap(([runId, key]) => (blocks.includes(key) && !shown.includes(key) ? [runId] : [])),
     );
@@ -2079,7 +2062,7 @@ function ChannelView({
   );
   const writingAgents = useStreams((s) =>
     scopedRuns(s)
-      .filter((r) => r.status === "running" && r.text.length > 0)
+      .filter((r) => r.status === "running")
       .map((r) => r.agentId)
       .filter((id, i, all) => all.indexOf(id) === i)
       .join(" "),
@@ -2982,10 +2965,9 @@ function Parts({ resetKey, children }: { resetKey: unknown; children: ReactNode 
 }
 
 /**
- * Persisted rows and the agents' live blocks: one whose words showed sits where they first did, with what people sent
- * meanwhile below it, the others last (`blockPlaces`). One flat keyed list: an answer seen live is drawn under its
- * block's key in that same place (its message is posted there), so the final message takes the block's place without
- * a remount. Memoized: streaming deltas don't re-render it.
+ * Persisted rows, then the agents' live blocks at the end (their replies are posted there, after what people sent
+ * meanwhile). One flat keyed list: an answer seen live is drawn under its block's key, so the final message takes a
+ * drawn block's place without a remount. Memoized: a run's events don't re-render it.
  */
 const Timeline = memo(function Timeline({
   items,
@@ -3114,8 +3096,6 @@ const Timeline = memo(function Timeline({
     const waiting = new Set(waitingKey.split(" "));
     return waitingLast(slots, (runId) => waiting.has(runId));
   }, [slots, waitingKey]);
-  // Each block where its words first showed (what people sent meanwhile reads below it), the others last.
-  const places = useMemo(() => blockPlaces(items, drawn, (slot) => slot.shownAt), [items, drawn]);
   // A take over whose run has no live block and no message here: its card at the end (`HeldBrowserRow`).
   const heldPlaces = useHeldPlaces();
   const held = useMemo(
@@ -3153,16 +3133,10 @@ const Timeline = memo(function Timeline({
     );
   };
   for (const [at, item] of items.entries()) {
-    // A block drawn right before it: it starts its own run of rows, its header back.
-    const placed = places.before.get(at) ?? [];
-    const grouped = item.kind === "message" && item.grouped && !afterUnshown() && placed.length === 0;
+    const grouped = item.kind === "message" && item.grouped && !afterUnshown();
     const after = items[at + 1];
     // Where it sits in its author's run: my own rows' bubbles square the corners they share.
-    const run = runPosition(
-      grouped,
-      after?.kind === "message" && after.grouped && !unshown.has(item.key) && !places.before.has(at + 1),
-    );
-    for (const slot of placed) rows.push(blockRow(slot));
+    const run = runPosition(grouped, after?.kind === "message" && after.grouped && !unshown.has(item.key));
     if (divider?.key === item.key) {
       rows.push(
         <div key="unread-divider" className="channel__unread" data-fade={divider.fading || undefined}>
@@ -3221,7 +3195,7 @@ const Timeline = memo(function Timeline({
     );
   }
   rows.push(<QueueWaitTurns key="queue-waits" channelId={channelId} messages={shownMessages} />);
-  for (const slot of places.after) rows.push(blockRow(slot));
+  for (const slot of drawn) rows.push(blockRow(slot));
   for (const place of held) rows.push(<HeldBrowserRow key={`held-${place.runId}`} place={place} />);
   // A row that fails to draw (data this build doesn't expect) is one quiet line: the rest of the conversation, the
   // sidebar and the composer keep working. Its message changing draws it again: a live block that broke has none,
@@ -3276,10 +3250,7 @@ const HELD_RECENT_MS = 12 * 60 * 60_000;
 /** Model names for the rows of "Ajustar trecho" (no usage line is shown there). */
 const NO_LABELS = new Map<string, string>();
 
-/**
- * The live run as a message, while it has none (the block's text and header come from the run). Its time is its
- * message's to be: when its words first showed, else when it started.
- */
+/** The live run as a message, while it has none (the block's header comes from the run): from when it started. */
 function liveMessageOf(r: LiveRun): MessageType {
   return {
     id: `live:${r.runId}`,
@@ -3290,15 +3261,15 @@ function liveMessageOf(r: LiveRun): MessageType {
     mentionedAgentIds: [],
     agentRunId: r.runId,
     meta: {},
-    createdAt: r.shownAt ?? new Date(r.startedAt ?? Date.now()).toISOString(),
+    createdAt: new Date(r.startedAt ?? Date.now()).toISOString(),
   } as MessageType;
 }
 
 /**
- * One agent's answer, from "pensando" to its final message: the
- * live run while it works, then the message, in the same component (same element: nothing remounts or
- * flashes). Until the message lands, the last live state stays on screen. Subscribed by run id, so a
- * streaming delta re-renders only this block.
+ * One agent's answer, from "pensando" to its final message: the live run while it works (drawn only for what it has
+ * to show meanwhile, its browser card; its words show whole once posted), then the message, in the same component (same
+ * element: nothing remounts or flashes). A message whose live row was drawn takes that row's place; one whose row never
+ * drew slides in like any new row. Subscribed by run id, so a run's events re-render only this block.
  */
 function RunBlock({
   runId,
@@ -3325,14 +3296,13 @@ function RunBlock({
   const liveChannel = live?.channelId;
   const liveThread = live?.threadId;
   const liveStart = live?.startedAt;
-  const liveShown = live?.shownAt;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the placeholder only depends on who and when
   const placeholder = useMemo(
     () => (live ? liveMessageOf(live) : null),
-    [liveId, liveAgent, liveChannel, liveThread, liveStart, liveShown],
+    [liveId, liveAgent, liveChannel, liveThread, liveStart],
   );
-  // No words of its own yet: the bar above the composer speaks for it, and the block draws only for something to
-  // show (`rowShows`). A run gone quiet meanwhile draws for "sem notícias · Atualizar": wake when that moment comes.
+  // At work the bar above the composer speaks for it, and the block draws only for something to show (`rowShows`).
+  // A run gone quiet meanwhile draws for "sem notícias · Atualizar": wake when that moment comes.
   const waits = Boolean(live && !message && waitsForWords(live));
   useDue(live?.lastEventAt ?? liveStart ?? null, QUIET_AFTER_MS, waits);
   const hidden = Boolean(live && !message && !rowShows(live, Date.now()));
@@ -3343,6 +3313,8 @@ function RunBlock({
   useLayoutEffect(() => {
     if (drawnRun) rowDrawn?.();
   }, [drawnRun, rowDrawn]);
+  const wasDrawn = useRef(false);
+  if (drawnRun) wasDrawn.current = true;
   if (!shown || hidden) return null;
   // At work it never groups under the agent's own message: it starts as the waiting row with its face, and taking the
   // face away when the words arrive would move the row. Its saved message groups as any other.
@@ -3354,6 +3326,7 @@ function RunBlock({
       seenLive={message ? last.current : undefined}
       grouped={together}
       {...rest}
+      entering={rest.entering || Boolean(message && !wasDrawn.current)}
     />
   );
 }
@@ -3466,15 +3439,9 @@ function RunTail({ run }: { run: LiveRun }) {
   );
 }
 
-/** Under a live block: "sem notícias há 4 min · Atualizar", or what it is doing between its steps. */
-function LiveRunStatus({
-  run,
-  quietOnly = false,
-}: {
-  run: LiveRun /** Waiting for its words, the bar says what it does: only "sem notícias" here. */;
-  quietOnly?: boolean;
-}) {
-  const { t, i18n } = useTranslation();
+/** Under a live block: "sem notícias há 4 min · Atualizar" (what it does now is the bar's to say). */
+function LiveRunStatus({ run }: { run: LiveRun }) {
+  const { t } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
   const qc = useQueryClient();
@@ -3491,8 +3458,8 @@ function LiveRunStatus({
       window.removeEventListener("focus", again);
     };
   }, []);
-  const quiet = isQuiet(run);
   const [checking, setChecking] = useState(false);
+  if (!isQuiet(run)) return null;
   const recheck = () => {
     setChecking(true);
     void reconcileChannelRuns(api, liveStore, org.id, run.channelId, [run.runId])
@@ -3501,33 +3468,17 @@ function LiveRunStatus({
       })
       .finally(() => setChecking(false));
   };
-  const doing = run.tool ? toolActivity(run.tool, run.connector, null, run) : null;
-  const showDoing =
-    !quietOnly &&
-    !quiet &&
-    doing &&
-    doing.kind !== "thinking" &&
-    !(run.work ?? []).some((w) => w.kind === "call" && w.running);
-  if (!quiet && !showDoing) return null;
   return (
     <div className="run-status">
-      {quiet ? (
-        <p className="ac-msg__activity run-quiet">
-          {t("run.quiet", {
-            minutes: Math.max(3, Math.floor((Date.now() - (run.lastEventAt ?? run.startedAt ?? 0)) / 60_000)),
-          })}
-          {" · "}
-          <Button variant="ghost" size="sm" loading={checking} onClick={recheck}>
-            {t("run.refresh")}
-          </Button>
-        </p>
-      ) : (
-        doing && (
-          <p className="ac-msg__activity" aria-live="polite">
-            {capitalize(activityVerb(t, doing), i18n.language)}…
-          </p>
-        )
-      )}
+      <p className="ac-msg__activity run-quiet">
+        {t("run.quiet", {
+          minutes: Math.max(3, Math.floor((Date.now() - (run.lastEventAt ?? run.startedAt ?? 0)) / 60_000)),
+        })}
+        {" · "}
+        <Button variant="ghost" size="sm" loading={checking} onClick={recheck}>
+          {t("run.refresh")}
+        </Button>
+      </p>
     </div>
   );
 }
@@ -3614,8 +3565,14 @@ function useDue(from: number | null, ms: number, on: boolean) {
   const wait = at - Date.now();
   useEffect(() => {
     if (!on || wait <= 0) return;
-    const timer = setTimeout(() => tick((n) => n + 1), wait);
-    return () => clearTimeout(timer);
+    const again = () => tick((n) => n + 1);
+    const timer = setTimeout(again, wait);
+    // Back to the tab after a while: look again at once (a sleeping computer's timers run late).
+    window.addEventListener("focus", again);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("focus", again);
+    };
   }, [on, wait]);
   return !on || wait <= 0;
 }
@@ -3818,7 +3775,7 @@ function ActivityBar({
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const all = useStreams((s) => runsInChannel(s, channelId).filter((r) => visible?.current(r) ?? true), sameRuns);
-  const runs = all.filter((r) => r.status !== "failed" && r.status !== "canceled");
+  const runs = all.filter((r) => r.status !== "failed");
   const typing = useLive((s) => s.typing[channelId]);
   // Ticks while someone is on it (a question out counts: seen on the last render).
   const asking = useRef(false);
@@ -3832,8 +3789,8 @@ function ActivityBar({
   const consults = consultsForLine(heard, consultBlocks);
   asking.current = consults.length > 0;
   const ids = typingIn({ [channelId]: typing ?? {} }, channelId, now, me.user.id, threadId);
-  // Its row on screen says what it does, for how long and how to stop it: the bar leaves that agent out (a row not
-  // drawn yet is out of view). Still waiting for its words, its row says none of that: the bar keeps it.
+  // At work, its row shows only what it has to show meanwhile (its browser card): the bar says what it does, for how
+  // long, and stops it. A row that says all that (none at work now) leaves the agent out while it is in view.
   const rowInView = (r: LiveRun) => !waitsForWords(r) && !outOfView(r.runId);
   const entries = entriesOffScreen(
     barEntries(
@@ -3842,7 +3799,6 @@ function ActivityBar({
       (id) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent"),
       (id) => dir.memberById.get(id)?.name,
       consults,
-      true,
     ),
     runs,
     rowInView,
@@ -3859,14 +3815,13 @@ function ActivityBar({
   const took = soloAway ? barElapsed(t, entries, runs, now) : null;
   // The row's own words for what it does now, after its name; a question out keeps its own phrase.
   const step = soloAway && firstAgent && !firstAgent.consult ? barStep(t, soloAway, i18n.language, now) : null;
-  const typers = entries.some((e) => e.type === "person");
   // Agents running code: "Ver código" with the live code and output.
   const coding = runs.filter(
     (r) => !rowInView(r) && r.code && (r.work ?? []).some((w) => w.kind === "call" && w.running),
   );
   // An agent working in its browser: the bar says so, and a click opens its browser card in the conversation.
   // Its row in view draws its browser card itself.
-  const browsing = runs.find((r) => !isWriting(r) && usesBrowser(r) && !rowInView(r));
+  const browsing = runs.find((r) => usesBrowser(r) && !rowInView(r));
   const openBrowser = browsing ? () => requestBrowserCard({ agentId: browsing.agentId }) : undefined;
   // A request waiting for you, out of view: the bar says that instead (waiting beats working).
   const ask = asks[0];
@@ -3892,8 +3847,6 @@ function ActivityBar({
         data-active={active || Boolean(ask)}
         data-ask={ask ? true : undefined}
         data-browser={pill && openBrowser ? true : undefined}
-        // The agent's step and someone typing: the pill widens so neither is cut to nothing.
-        data-wide={pill && step !== null && typers ? true : undefined}
         onClick={
           pill && openBrowser
             ? (e) => {
@@ -4036,30 +3989,18 @@ export const TimelineMessage = memo(function TimelineMessage({
   const { org, me } = useOrg();
   const qc = useQueryClient();
   const dismissRun = useDismissRun();
-  // The words arrive at a steady reading pace, each fading in (`MessageBody live`).
-  const revealed = useRevealedText(live?.text ?? "", live?.status === "running" || live?.status === "thinking");
   const liveFailed = live?.status === "failed";
   const failedWhy = liveFailed ? runErrorText(t, live?.errorCode, live?.errorParams) : null;
   // Refused by the workspace's standing: its own words, not the server's English.
   const refusal = liveFailed ? restrictionLine(t, live?.errorCode, live?.errorParams) : null;
   const liveWaiting = live?.status === "waiting_approval";
-  const liveStopped = live?.status === "canceled";
-  const opening = live ? openerOf(live) : { said: null, work: [] };
-  // Nothing said and no steps yet: its words stream at the top, so the line it opens with stays put when a tool
-  // call turns it into narration (and the answer, with no tools, starts there too).
-  const wordsOnTop = !opening.said && opening.work.length === 0;
-  // At work with no words shown yet: its face and what it has to show (its browser card, a quiet run's notice), no
-  // name or time; the bar above the composer says what it does, for how long, and stops it.
-  const waiting = Boolean(live && waitsForWords({ ...live, text: revealed }));
+  // At work: its words show whole once posted. Meanwhile its face and what it has to show (its browser card, a quiet
+  // run's notice), no name or time; the bar above the composer says what it does, for how long, and stops it.
+  const waiting = Boolean(live && waitsForWords(live));
   // A sent message that waits for the connection: not "Não enviada", it goes out on its own.
   const queued = useWaiting(m.local === "failed" ? m.clientId : undefined);
   const local = m.local === "failed" && queued ? "pending" : m.local;
   const slowSend = useAfter(500, local === "pending");
-  // The streamed row it replaces was already on screen: take its place without sliding in again (an agent's sticker
-  // after its reply replaces nothing: it slides in).
-  const replacesLive = useStreams((s) =>
-    Boolean(m.agentRunId && !isMediaAfterReply(m.meta) && s.finished[m.agentRunId]),
-  );
   const dir = useDirectory(org.id);
   const actions = useChannelActions();
   const pushAsk = useContext(PushAskContext);
@@ -4224,7 +4165,8 @@ export const TimelineMessage = memo(function TimelineMessage({
   // The root of a mission in the channel: its work lives in its thread.
   const missionStart = !m.threadId && Boolean(meta.missionStart) && actions?.openThread !== undefined;
   // It asked other agents before answering: one row right before the reply, its run's questions (on the run's last
-  // message here, or on its live row while it works) and the ones its `meta.consulted` names.
+  // message here; a run at work shows them on none until its reply comes, the working line says them) and the ones
+  // its `meta.consulted` names.
   const consulted = useMemo(() => (m.author.type === "agent" ? consultationsOf(m.meta) : []), [m.author.type, m.meta]);
   const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);
   const consults = useReplyConsults(
@@ -4278,22 +4220,14 @@ export const TimelineMessage = memo(function TimelineMessage({
   const barred = !readOnly && (feedback || personBar);
   // Watched live here: the steps it took stay in the block, folded ("3 passos"), instead of the summary.
   const keptAll = seenLive?.work?.length ? seenLive.work : null;
-  const keptWork =
+  const keptSteps =
     keptAll && onCards.length > 0
       ? keptAll.filter((w) => !(w.kind === "call" && onCards.some((s) => isScreenTool(w.tool, s))))
       : keptAll;
-  // The line it opened with live stays where it was, above the steps: it never vanishes into the fold.
-  const keptFirst = keptWork?.find((w) => w.kind === "say");
-  const keptSteps = keptFirst && keptWork ? keptWork.filter((w) => w !== keptFirst) : keptWork;
-  // Said before a call and then posted as this message (the lead before a card): the body already shows it.
-  const keptSaid = keptFirst?.kind === "say" && !holdsText(body, keptFirst.text) ? keptFirst : undefined;
   // What's in a `MessageText`, for the bubbles: the name opens the first, the time ends the last (a row with none keeps
-  // them above its cards).
-  const liveWords = !liveFailed && Boolean(revealed);
-  const liveLead = !(wordsOnTop && liveWords) && Boolean(opening.said);
-  const leadShown = live ? liveLead : keptSaid?.kind === "say";
+  // them above its cards). At work, nothing: its words show whole once posted.
   const bodyShown = live
-    ? liveWords
+    ? false
     : !missionCard &&
       // A request says its action itself ("Pedido de aprovação: …" would repeat it).
       !approvalId &&
@@ -4339,12 +4273,12 @@ export const TimelineMessage = memo(function TimelineMessage({
         grouped={grouped && !waiting && !pair}
         own={own}
         run={run}
-        bare={waiting || !(leadShown || bodyShown)}
+        bare={waiting || !bodyShown}
         quote={quoted ? <QuotedMessage reply={quoted} /> : undefined}
         nameColor={dir.nameColorOf(m.author)}
         waiting={waiting}
-        entering={entering && !replacesLive}
-        streaming={Boolean(live) && !liveFailed && !liveWaiting && !liveStopped}
+        entering={entering}
+        streaming={Boolean(live) && !liveFailed && !liveWaiting}
         className={cx(
           local && `ac-msg--local ac-msg--${local}`,
           contextMark && "msg--context",
@@ -4468,43 +4402,13 @@ export const TimelineMessage = memo(function TimelineMessage({
       >
         {live && waiting ? (
           <Parts resetKey={m}>
-            <LiveRunStatus run={live} quietOnly />
+            <LiveRunStatus run={live} />
             <RunBrowserCard run={live} name={name} />
             <span className="ac-visually-hidden">{t("channel.writing")}</span>
           </Parts>
         ) : live ? (
+          // Ended badly while at work: what went wrong, how to fix it, and its tools as far as they got.
           <Parts resetKey={m}>
-            {/* The first thing it said opens the block, above its tools; with nothing said, its words stream on top. */}
-            {/* Keyed like the saved message's parts: its text stays the same element when the message takes its place. */}
-            {wordsOnTop && liveWords ? (
-              <MessageText key="body">
-                <MessageBody
-                  body={revealed}
-                  resolveMention={dir.mentionName}
-                  mentionTone={dir.mentionTone}
-                  live={!liveStopped}
-                  accent={colorOf(agent)}
-                />
-              </MessageText>
-            ) : (
-              opening.said && (
-                <MessageText key="said" closes={!liveWords}>
-                  <MessageBody body={opening.said} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
-                </MessageText>
-              )
-            )}
-            {/* The answer streams under the line it opened with, above its tools (where its saved message has it). */}
-            {liveWords && !wordsOnTop && (
-              <MessageText key="body" opens={!liveLead}>
-                <MessageBody
-                  body={revealed}
-                  resolveMention={dir.mentionName}
-                  mentionTone={dir.mentionTone}
-                  live={!liveStopped}
-                  accent={colorOf(agent)}
-                />
-              </MessageText>
-            )}
             {liveFailed && (
               <div className="ac-msg__error-row" role="alert">
                 <p className="ac-msg__error ac-iconline">
@@ -4529,35 +4433,15 @@ export const TimelineMessage = memo(function TimelineMessage({
                 />
               </div>
             )}
-            {liveStopped ? (
-              <StoppedLine runId={live.runId} byUserId={live.canceledBy} owner={live} />
-            ) : (
-              !liveFailed && <LiveRunStatus run={live} />
-            )}
-            {/* Its tools, as on its saved message: one line (what it does now) opening into each call. */}
-            <LiveTools
-              work={opening.work}
-              agentName={name}
-              color={colorOf(agent)}
-              steerNote={steerNote}
-              stopped={liveStopped || liveFailed}
-            />
-            {/* Last, after its tools; also on a failed or stopped run, for the person still in control (they hand back from it). */}
+            <LiveTools work={live.work ?? []} agentName={name} color={colorOf(agent)} steerNote={steerNote} stopped />
+            {/* Last, after its tools: for the person still in control of its browser (they hand back from it). */}
             <RunBrowserCard run={live} name={name} />
-            {!liveFailed && !liveWaiting && !liveStopped && (
-              <span className="ac-visually-hidden">{t("channel.writing")}</span>
-            )}
           </Parts>
         ) : (
           <Parts resetKey={m}>
-            {keptSaid?.kind === "say" && (
-              <MessageText key="said" closes={!bodyShown}>
-                <MessageBody body={keptSaid.text} resolveMention={dir.mentionName} mentionTone={dir.mentionTone} />
-              </MessageText>
-            )}
             {routine && report && reportOpen && <RoutineReport text={report} />}
             {bodyShown && (
-              <MessageText key="body" opens={!leadShown} style={workOver ? { opacity: 0.6 } : undefined}>
+              <MessageText key="body" style={workOver ? { opacity: 0.6 } : undefined}>
                 <MessageBody
                   body={talk ? talk.lead : body}
                   resolveMention={dir.mentionName}

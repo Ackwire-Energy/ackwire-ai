@@ -45,9 +45,9 @@ export interface ConsultGroups {
   listed: ReadonlySet<string>;
   /** How each answer's notice draws: hidden under a reply close by, one line to a reply farther up, its card. */
   folds: ReadonlyMap<string, ConsultNoticeFold>;
-  /** Runs whose block shows their questions near the end: the working line doesn't say them again. */
+  /** Runs whose reply shows their questions near the end: the working line doesn't say them again. */
   nearEnd: ReadonlySet<string>;
-  /** Runs drawn as live blocks: a message the run already posted leaves the block to the live one. */
+  /** Runs at work: their questions wait for their reply (a message they already posted leaves them to it). */
   live: ReadonlySet<string>;
   /** The question open in the panel beside the conversation: its line shows pressed. */
   open: string | null;
@@ -73,8 +73,9 @@ const RELOAD_ON = new Set(["agent.consulting", "agent.consulted", "agent.consult
 
 /**
  * The conversation's questions to other agents, by the run that asked; reloaded when one changes. `rows`: the
- * messages drawn here, in order; `live`: the runs drawn as live blocks after them. Both show their questions:
- * the answers' notices close to them fold, and the working line leaves out the ones near the end.
+ * messages drawn here, in order; `live`: the runs at work after them. A reply shows its run's questions: the answers'
+ * notices close to it fold, and the working line leaves out the ones near the end. A run at work draws none until its
+ * reply comes (its answers' notices fold meanwhile): the line says its questions.
  */
 export function useConsultGroups(
   channelId: string,
@@ -103,7 +104,7 @@ export function useConsultGroups(
       byRun: groupsByRun(all),
       listed: new Set(all.map((c) => c.id)),
       folds: consultNoticeFolds(rows, all, live),
-      nearEnd: consultBlocksNearEnd(rows, all, live),
+      nearEnd: new Set([...consultBlocksNearEnd(rows, all)].filter((runId) => !live.has(runId))),
       live,
       open,
       helping,
@@ -123,7 +124,8 @@ const NO_ITEMS: ConsultPairItem[] = [];
 
 /**
  * The questions a reply's pair row stands for: its run's (`runId`, null: none) and those its `meta.consulted` names
- * that the list doesn't have. `saved`: a message the run posted while it still works, whose live row shows them.
+ * that the list doesn't have. `saved`: a saved message; one its run posted while it still works shows none, they wait
+ * for the run's reply (the working line says them meanwhile).
  * `reached`: hand-offs the message's reach lines show (`reachHandoffs`), left out here.
  */
 export function useReplyConsults(

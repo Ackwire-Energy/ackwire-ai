@@ -101,9 +101,6 @@
   "common.chartShare": {
     "value": "Share"
   },
-  "common.chartPending": {
-    "value": "Building the chart…"
-  },
   "common.you": {
     "value": "you"
   },
@@ -8009,9 +8006,6 @@
   },
   "profile.nowIn": {
     "value": "now, in #{{channel}}"
-  },
-  "profile.answersHere": {
-    "value": "Answers here without an @"
   },
   "profile.more": {
     "value": "More"

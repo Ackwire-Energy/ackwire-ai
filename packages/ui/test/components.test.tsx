@@ -969,7 +969,7 @@ describe("Message aside and foot", () => {
     expect(css).not.toMatch(/\.ac-menu__item\s*\{[^}]*min-height:\s*\d+px/);
   });
 
-  test("the action bar is small and sits on the row's top edge, left of the check", async () => {
+  test("the action bar is small and sits on the row's top edge, in one place on every row", async () => {
     const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
       /\/\*[\s\S]*?\*\//g,
       "",
@@ -996,12 +996,26 @@ describe("Message aside and foot", () => {
     expect(
       bodies(".ac-msg--grouped:has(> .ac-msg__body > .ac-msg__foot:not(:empty)) > .ac-msg__body > .ac-msg__actions"),
     ).toBe("");
-    // 26px buttons with 16px icons, 2px around them, no gap: a 30px bar.
-    for (const decl of [/(^|;)\s*gap:\s*0\s*(;|$)/, /--bar-pad:\s*2px\s*(;|$)/, /--bar-r:\s*10px\s*(;|$)/])
+    // 26px plates around 16px icons, 2px around them, no gap: a 30px bar.
+    for (const decl of [
+      /(^|;)\s*gap:\s*0\s*(;|$)/,
+      /--bar-pad:\s*2px\s*(;|$)/,
+      /--bar-r:\s*10px\s*(;|$)/,
+      /--bar-btn:\s*26px\s*(;|$)/,
+      /--bar-icon:\s*16px\s*(;|$)/,
+    ])
       expect(bodies(bar)).toMatch(decl);
-    expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("26px");
-    expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("26px");
-    expect(value(".ac-msg__actions .ac-btn--sm .ac-icon", "width")).toBe("16px");
+    expect(value(".ac-msg__actions .ac-btn--sm", "width")).toBe("var(--bar-btn)");
+    expect(value(".ac-msg__actions .ac-btn--sm", "height")).toBe("var(--bar-btn)");
+    expect(value(".ac-msg__actions .ac-btn--sm .ac-icon", "width")).toBe("var(--bar-icon)");
+    // A plate with its count (👍 1) is one plate around both: as tall, the icon as far from its start as in a square one.
+    const counted = ".ac-msg__actions .ac-btn--sm:not(.ac-btn--icon)";
+    expect(value(counted, "width")).toBe("auto");
+    expect(value(counted, "padding-inline")).toBe("calc((var(--bar-btn) - var(--bar-icon)) / 2)");
+    // Between the icon and its count, the small button's own gap (a token the geometry check knows).
+    expect(value(counted, "gap")).toBeUndefined();
+    // Pressed, it takes the bar's own plate (a ghost's): no fill of its own.
+    expect(bodies('.ac-msg__actions .ac-btn[aria-pressed="true"]')).toBe("");
     // On touch a small button keeps its 32px plate and its target grows to 44 past it: one with words up and down
     // only, an icon 4px to each side too. The bar's 26px plates grow to the 32 of the rest, 8px apart, so the
     // targets of two side by side touch and never overlap.
@@ -1019,18 +1033,33 @@ describe("Message aside and foot", () => {
     const tokens = await Bun.file(new URL("../src/styles/tokens.css", import.meta.url).pathname).text();
     expect(tokens).toContain("--touch-target: 44px;");
     const buttons = ".ac-msg__actions .ac-btn--sm";
-    expect(value(buttons, "min-height", touch)).toBe("var(--control-h-sm)");
-    expect(value(buttons, "min-width", touch)).toBe("var(--control-h-sm)");
+    // Its plates, square or with a count, grow to the 32 of every small button there.
+    expect(value(bar, "--bar-btn", touch)).toBe("var(--control-h-sm)");
     expect(value(`${buttons}::after`, "inset", touch)).toBeUndefined();
     expect(Number.parseFloat(value(bar, "gap", touch) ?? "")).toBe(8);
-    // Left of a grouped message's check at the row's end (a 16px icon, 2px each side) and 8px from it, past the row's
-    // own side padding; a check right after the time in the name's line is out of its way.
+    // One place on every row: what a row holds at its end (a grouped message's check, a time) never moves the bar.
+    const byContent = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(
+      ([, selector = "", body = ""]) =>
+        /\.ac-msg__actions\s*$/.test(selector.trim()) &&
+        selector.includes(":has(") &&
+        !selector.includes(".ac-msg--own") &&
+        /(^|;)\s*(right|left|top|inset)\s*:/.test(body),
+    );
+    expect(byContent.map(([, selector = ""]) => selector.trim())).toEqual([]);
+    // So a grouped row's check at its line's end, under the bar, steps out of sight while the bar shows, keeping its
+    // room: nothing overlaps and nothing moves. On a touch screen only while the bar is open.
+    const hover = [...css.matchAll(/@media not \(hover: none\) \{([\s\S]*?)\n\}/g)].map((m) => m[1] ?? "").join("\n");
     expect(
       value(
-        ".ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions",
-        "right",
+        ".ac-msg:hover:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating",
+        "visibility",
+        hover,
       ),
-    ).toBe("calc(var(--msg-inline) + 28px)");
+    ).toBe("hidden");
+    expect(css.replace(/\s+/g, " ")).toContain(
+      'html:not([data-pointer]) .ac-msg:focus-within:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating, .ac-msg:has(> .ac-msg__body > .ac-msg__actions:is([data-open="true"], :has([aria-expanded="true"]))) > .ac-msg__body > .ac-msg__aside--floating { visibility: hidden; }',
+    );
+    expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(value(bar, "top"));
     expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
     expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");
   });

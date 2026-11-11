@@ -118,12 +118,7 @@ test("the built stylesheet keeps the bar's 32px plates on touch, the small butto
   const kit = await Bun.file(join(ROOT, "packages/ui/src/styles/components.css")).text();
   const [built, source] = [touchRules(css), touchRules(kit)];
   // The bar's 26px plates grow to the 32 every small button keeps on touch; each one's target grows to 44 past it.
-  for (const selector of [
-    ".ac-msg__actions",
-    ".ac-msg__actions .ac-btn--sm",
-    ".ac-btn--sm::after",
-    ".ac-btn--sm.ac-btn--icon::after",
-  ]) {
+  for (const selector of [".ac-msg__actions", ".ac-btn--sm::after", ".ac-btn--sm.ac-btn--icon::after"]) {
     expect(declarations(source, selector).length).toBeGreaterThan(0);
     expect(declarations(built, selector)).toEqual(expect.arrayContaining(declarations(source, selector)));
   }

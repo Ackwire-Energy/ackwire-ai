@@ -36,7 +36,6 @@
     "table": "Tabela",
     "chartItem": "Element",
     "chartShare": "Udział",
-    "chartPending": "Tworzę wykres…",
     "you": "ty",
     "saved": "Zapisano",
     "youSuffix": " (ty)",
@@ -3486,7 +3485,6 @@
     "messageTo": "Wiadomość do: {{name}}",
     "audienceEdit": "Edytuj",
     "nowIn": "teraz, w #{{channel}}",
-    "answersHere": "Odpowiada tutaj bez @",
     "more": "Więcej",
     "of": "Profil: {{name}}",
     "presence": "Obecność",
@@ -4857,7 +4855,7 @@
       "showSteps": "Zobacz każdy krok",
       "hideSteps": "Ukryj kroki",
       "asked": "Poprosił o zgodę",
-      "grants": "{{name}} może {{doing}}, tylko ten raz i z tymi wartościami."
+      "grants": "{{name}} zrobi to tylko ten raz i z tymi wartościami: {{doing}}."
     }
   },
   "agent": {

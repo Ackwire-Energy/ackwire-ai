@@ -40,6 +40,33 @@ test("the closed island ends in 'Ver', which opens the message where it happened
   expect(island.get().items.map((i) => i.n.id)).toEqual([]);
 });
 
+test("over a thread open in the panel the island stays in reach: its 'Ver' is the island's, never the panel's", async () => {
+  const state = seedState();
+  state.messages.push({
+    id: "m-reply",
+    channelId: ENG_ID,
+    threadId: "m-1",
+    author: { type: "agent", id: ADA_ID },
+    body: "Olhei o refresh.",
+    mentionedAgentIds: [],
+    agentRunId: null,
+    createdAt: new Date().toISOString(),
+  });
+  const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}?thread=m-1`, { api: createFakeApi(state) });
+  await settle(6);
+  expect(document.querySelector(".thread-panel")).toBeTruthy();
+  await act(async () => island.arrive(reply));
+  await settle(3);
+  // In <body> beside the panel, never in the page the panel makes inert behind it.
+  const wrap = document.querySelector(".ni-wrap") as HTMLElement;
+  expect(wrap.parentElement).toBe(document.body);
+  expect(wrap.closest("[inert]")).toBeNull();
+  await act(async () => fireEvent.click(within(wrap).getByRole("button", { name: "Ver" })));
+  await settle(4);
+  expect(r.router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);
+  expect(r.router.state.location.search).toMatchObject({ m: "m-1" });
+});
+
 test("the island is centered on the window, not the work area beside the sidebar", async () => {
   const css = topLevel(await builtCss("src/styles.css", "src/components/notice-island.css"));
   const last = (selector: string, property: string) =>

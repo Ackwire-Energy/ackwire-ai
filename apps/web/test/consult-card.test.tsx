@@ -292,9 +292,9 @@ describe("the working line while an agent asks another", () => {
     await settle();
     expect(bar()).toBe("Atlas respondeu. Ada está escrevendo…");
     expect(typingBar().querySelector(".ac-typing__clock")).toBeNull();
-    await push(socket, { type: "agent.delta", ...run, seq: 0, text: "O Atlas me passou" });
+    await push(socket, { type: "agent.typing", ...run });
     await settle();
-    // Writing now: the question is over; the card stays on while she works (her row out of view, no layout here).
+    // Writing now: the question is over; the card stays on while she works, her words waiting for her reply.
     expect(bar()).toBe("Ada escrevendo…");
     expect(typingBar().querySelector(".ac-typing__to")).toBeNull();
   });
@@ -309,7 +309,7 @@ describe("the working line while an agent asks another", () => {
     await push(socket, { type: "agent.idle", threadId: null, runId: "r-b", agentId: ATLAS_ID });
     await settle();
     expect(bar()).toBe("Ada pensando…");
-    // Alone, its row out of view (not in the conversation yet, then no layout here): the bar keeps its face.
+    // Alone, at work with no row in the conversation: the bar keeps its face.
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);
     await act(() => new Promise((r) => setTimeout(r, 2100)));
     expect(typingBar().querySelectorAll(".ac-typing__tok")).toHaveLength(1);

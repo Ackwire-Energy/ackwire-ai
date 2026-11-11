@@ -57,7 +57,6 @@
     "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal."
   },
   "chart": {
-    "pending": "Diagramm wird erstellt…",
     "table": "Tabelle",
     "item": "Eintrag",
     "share": "Teilen",
@@ -377,12 +376,6 @@
     "toLatestNew": "Zu den neuesten Nachrichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
     "offlineWait": "Wird gesendet, sobald die Verbindung zurück ist",
-    "turn": {
-      "thinking": "denkt nach",
-      "working": "arbeitet",
-      "writing": "schreibt",
-      "stopped": "gestoppt"
-    },
     "steer": {
       "waiting": "{{name}} liest es bei der nächsten Pause",
       "computer": "{{name}} liest es, sobald der Computer frei ist",
