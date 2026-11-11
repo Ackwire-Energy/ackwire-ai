@@ -301,6 +301,7 @@ import {
   addRunStep,
   cliFailureOf,
   cliFailureText,
+  cliRefusedStart,
   isTerminal,
   NO_AI,
   OUR_ERROR,
@@ -656,6 +657,11 @@ export interface Transcript {
    */
   outage?: { since: number; n: number; waitId: string; noteId?: string } & KeyLinePlace;
   /**
+   * Tries in a row that failed with a retryable error since its last turn that answered (`OUTAGE_PARK.tries`). Counted
+   * on the run, not the job: a wait for room between two tries hands the run a new job whose attempts start over.
+   */
+  failedTries?: number;
+  /**
    * When the computer first had no room for this run's turn (ms), until a turn starts or it waits on something else.
    * A blip (a deploy dropping the computer for seconds, within the outage grace) keeps its place; a real outage doesn't.
    */
@@ -944,8 +950,11 @@ const toolResultFor = (approval: Approval | undefined, by?: string | null): { co
  * `jobId`: that job's row. `owned`: whether this claim still holds the job (`JobContext.owned`). `failed`: the run
  * gave up on an error that is the app's to fix (`JobContext.failed`).
  */
-/** A provider outage's resume ladder (minutes, the last repeats), and how long a run waits before failing. */
-export const OUTAGE_PARK = { ladderMinutes: [2, 15, 30, 60], maxMs: 24 * 60 * 60_000 } as const;
+/**
+ * A provider outage's resume ladder (minutes, the last repeats), how long a run waits before failing, and how many
+ * failed tries in a row park it (as many as each of its jobs' attempts, `maxAttempts: 4`).
+ */
+export const OUTAGE_PARK = { ladderMinutes: [2, 15, 30, 60], maxMs: 24 * 60 * 60_000, tries: 4 } as const;
 
 type RunJobOptions = {
   finalAttempt: boolean;
@@ -4438,8 +4447,12 @@ async function executeRunInner(
         // Held or suspended meanwhile: that is why, whatever the brain made of the refusal.
         const paused = await standingRefusal(db, run.orgId, run.agentId);
         if (paused) return fail(paused.message);
-        // A CLI's failure says who failed it and what it said; the computer only ran it.
-        const cli = error instanceof BrainFailure && !error.retryable ? cliFailureText(error, turnPlan.account) : null;
+        // A CLI's failure says who failed it and what it said; the computer only ran it. One that refused to start
+        // would fail every retry the same way: it ends here too.
+        const cli =
+          error instanceof BrainFailure && (!error.retryable || cliRefusedStart(error))
+            ? cliFailureText(error, turnPlan.account)
+            : null;
         const reason = cli ?? userFacing(error);
         if (reason) {
           // Refused on the server's own key, the account is ours: nobody else will tell us. A CLI's own error has no
@@ -4449,8 +4462,9 @@ async function executeRunInner(
           if (cli?.startsWith("cli_")) options.failed?.(error);
           return fail(reason);
         }
+        const tries = retryableOutage(error) ? (transcript.failedTries ?? 0) + 1 : 0;
         // Back from a park and refused again: one try per wake, or a line's head would hit the limit on every job retry.
-        if (options.finalAttempt || (transcript.outage && retryableOutage(error))) {
+        if (options.finalAttempt || tries >= OUTAGE_PARK.tries || (transcript.outage && retryableOutage(error))) {
           const line = rateLimited(error) ? keyLineOf(thinker) : undefined;
           if (retryableOutage(error) && (await parkOutage(error, line))) return;
           options.failed?.(error);
@@ -4458,6 +4472,10 @@ async function executeRunInner(
             return fail(gaveUp(error, turnPlan.account));
           // Neither the provider's nor the computer's: the run's catch words it as ours.
           throw error;
+        }
+        if (tries > 0) {
+          transcript.failedTries = tries;
+          await saveTranscript(db, transcript);
         }
         await addRunStep(db, run, "error", { reason: "transient", message: String(error), willRetry: true });
         throw error;
@@ -4481,6 +4499,7 @@ async function executeRunInner(
       if (transcript.outage?.noteId) await outageOver(transcript.outage.noteId).catch(() => {});
       const passedLine = transcript.outage?.line;
       delete transcript.outage;
+      delete transcript.failedTries;
       if (passedLine) {
         await saveTranscript(db, transcript);
         await kickKeyLine(db, run.orgId, passedLine);

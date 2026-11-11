@@ -167,6 +167,19 @@ export interface CliFailure {
 }
 
 /**
+ * Grok Build's words when it fails closed at its start: on Linux without bubblewrap (1.0.70: "Install bubblewrap with
+ * `apt install -y bubblewrap`. Refusing to start with denied paths unprotected."), outside its pinned version range.
+ */
+const REFUSED_START = /\brefus(?:e|es|ing) to start\b/i;
+
+/**
+ * A CLI that refused to start on its computer: every retry fails the same way until someone installs or updates
+ * something there, whatever the runner called it.
+ */
+export const cliRefusedStart = (failure: CliFailure) =>
+  isCliFailure(failure.code) && REFUSED_START.test(failure.message);
+
+/**
  * Who failed a CLI's turn: the provider, when it refused or failed the CLI's call (a status, or the runner's cause), as
  * a key's failure would read on that plan; else the CLI itself, with what it said (`cliErrorWords`, safe for anyone in
  * the conversation; empty when it said nothing), and how it ended when it ended without its answer. Never the computer:
