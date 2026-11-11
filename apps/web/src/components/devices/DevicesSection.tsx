@@ -240,7 +240,7 @@ export function DeviceRowView({
   const toast = useToast();
   const d = row.device;
   const host = row.kind === "phone" ? row.host : null;
-  const detail = statusDetail(t, i18n.language, d.status, { host: host?.name });
+  const detail = statusDetail(t, i18n.language, d.status, { host: host?.name, hostOs: host?.os });
   const target: Target =
     row.kind === "computer" ? { kind: "computer", device: row.device } : { kind: "phone", device: row.device };
   const label = t("devices.menu", { name: d.name });
