@@ -393,7 +393,10 @@ start_engine() {
     die "$e_name started, but Docker still doesn't answer after 3 minutes." \
       "Open $e_name and see what it says, then run this again."
   DOCKER_VERSION=$(docker_version) || DOCKER_VERSION='?'
-  t_step "Docker $DOCKER_VERSION, started ($e_name)"
+  case $e_name in
+    "the Docker engine") t_step "Docker $DOCKER_VERSION, started" ;;
+    *) t_step "Docker $DOCKER_VERSION, started ($e_name)" ;;
+  esac
 }
 
 # Up to 3 minutes for the engine to answer.
