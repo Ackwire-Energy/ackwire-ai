@@ -3233,6 +3233,42 @@ test.if(posix)(
   },
 );
 
+test.if(posix)(
+  "a start never hands its start page to a Chrome still running on the profile: that leftover stops first",
+  async () => {
+    // What an overlapping runner left: a Chrome it recorded on the agent's profile, still running, that no session
+    // holds. Started beside it, Chrome would open its start page there as one more tab and exit.
+    const leftover = Bun.spawn(["sleep", "60"]);
+    const gone = () => leftover.exitCode !== null || leftover.signalCode !== null;
+    try {
+      const chromes = fakeChromes();
+      const leftoverAtStart: boolean[] = [];
+      const t = setup({
+        isOurChrome: async (pid) => pid === leftover.pid && !gone(),
+        startChrome: (exe, args, profile) => {
+          leftoverAtStart.push(!gone());
+          return chromes.start(exe, args, profile);
+        },
+      });
+      const profile = path.join(await t.folder(), ".agentes", "browser");
+      mkdirSync(profile, { recursive: true });
+      writeFileSync(path.join(profile, "SingletonLock"), `computer-${leftover.pid}`);
+      mkdirSync(path.join(t.home, "browser"), { recursive: true });
+      writeFileSync(path.join(t.home, "browser", "chromes.json"), JSON.stringify([{ pid: leftover.pid, profile }]));
+
+      expect(await t.act("open", ["https://shop.example.com"])).toMatchObject({ success: true });
+      expect(leftoverAtStart).toEqual([false]);
+      expect(chromes.started.map((c) => c.tabs)).toEqual([[expect.stringMatching(/\/agentes-start\.html$/)]]);
+      const recorded = JSON.parse(readFileSync(path.join(t.home, "browser", "chromes.json"), "utf8")) as {
+        pid: number;
+      }[];
+      expect(recorded.map((c) => c.pid)).not.toContain(leftover.pid);
+    } finally {
+      leftover.kill("SIGKILL");
+    }
+  },
+);
+
 test.if(posix)("deleting a profile stops its Chrome and removes its folder; system mode refuses profiles", async () => {
   const t = setup();
   const ctx = { workspaceReal: t.ws, exec: true, token: "agm_x", access: browserOn, browser: t.manager };
