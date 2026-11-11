@@ -64,8 +64,9 @@ else, while the app already pairs this computer in one click behind the system's
    the system's dialog, which has no switches: it says what agents get, and the defaults apply. Only a new home gets
    them: a home refused by its organization that pairs again keeps the access its runner kept. A new workspace on a
    computer that already works for others copies their Claude Code, Codex and browser switches (they are for the
-   whole computer) and gets commands on. The server this app runs here keeps commands off for its own homes
-   (ADR 0060), since commands there would reach its own data.
+   whole computer) and gets commands on. The server this app runs here gets the same for its own homes, overriding
+   ADR 0060 §3's "commands off on a Mac" for the app: commands there run as the person and can reach the server's
+   files, which Preferences › Tools turns off.
 8. **Prepare this Mac.** On a Mac, right after Allow (or Connect, or the site's This computer), the same window goes on
    to one step, unless nothing is left to ask: Screen Recording, Full Disk Access and Local Network, each with what it
    lets agents do, its live state and one button. Agents keep taking screenshots with `screencapture` through

@@ -248,8 +248,8 @@ export function whenPaired(
  */
 export function whenHostHomeReady(store: DesktopStore, homeId: string, timeoutMs = 60_000) {
   const ready = () => store.home(homeId)?.status?.paired === true;
-  // The server here's own homes keep commands off: they would reach its own data (ADR 0060).
-  const start = () => void firstTools(store, homeId, { commands: false });
+  // The open defaults, commands included, as for any computer paired from the app (ADR 0165 §7).
+  const start = () => void firstTools(store, homeId);
   if (ready()) return start();
   const timer = setTimeout(() => off(), timeoutMs);
   const off = store.subscribe(() => {

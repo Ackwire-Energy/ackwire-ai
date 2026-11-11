@@ -241,7 +241,7 @@ test("connect: the pairing sheet's choices go over the defaults; a home that com
   expect(toolsOf("h1")).toEqual([]);
 });
 
-test("the server here's own new home: open tools but commands, which would reach its own data", async () => {
+test("the server here's own new home: the same open tools as any pairing, commands included", async () => {
   const { store, sent } = setup({ h1: paired("o1", "online", "http://127.0.0.1:4310") });
   store.start();
   await settle();
@@ -251,7 +251,7 @@ test("the server here's own new home: open tools but commands, which would reach
   expect(sent.filter((s) => s.type === "tools.set").map((s) => [s.tool, s.on])).toEqual([
     ["claude", true],
     ["codex", false],
-    ["commands", false],
+    ["commands", true],
     ["browser", true],
   ]);
 });
