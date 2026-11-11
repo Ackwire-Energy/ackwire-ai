@@ -454,7 +454,8 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 /*
  * The preview: the workspace's sidebar at its own size, in a frame, showing only what exists now. Never wider: the
  * sidebar's one-line names (a long workspace or person) end in its ellipsis there, as in the app, instead of widening
- * the preview into the question's column.
+ * the preview into the question's column. No caption over it: the frame starts on the step's top line (the rail
+ * wordmark's, where Back's middle sits).
  */
 .onb-preview {
   flex: 0 0 272px;
@@ -462,22 +463,6 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   position: sticky;
   top: 0;
   padding-top: 40px;
-}
-.onb-preview__label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0 0 var(--space-2);
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--muted);
-}
-.onb-preview__dot {
-  width: var(--space-2);
-  height: var(--space-2);
-  border-radius: var(--radius-cut);
-  background: var(--ok);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 20%, transparent);
 }
 .onb-preview__frame {
   height: min(600px, calc(100dvh - 120px));
