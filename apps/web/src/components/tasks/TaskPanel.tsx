@@ -30,9 +30,9 @@ import "@/components/threads/threads.css";
 
 /**
  * A task opened from the task manager ("Ver passos", ADR 0128), over the page like a thread beside its channel: the
- * agent and what the task is, what it does now, its state, time, what it uses and where it runs (no cost), its steps
- * as a reply's block lists them (asked again every 3 s while it works), "Abrir na conversa" and "Parar tarefa". Once
- * stopped it says so, and who stopped it can still say why.
+ * agent and what the task is, what it does now, its state, time and what it uses (no cost), its steps as a reply's
+ * block lists them (asked again every 3 s while it works), "Abrir na conversa" and "Parar tarefa". Once stopped it
+ * says so, and who stopped it can still say why.
  */
 export function TaskPanel({
   runId,
@@ -114,7 +114,6 @@ export function TaskPanel({
     [t("taskManager.columns.state"), state],
     [t("taskManager.columns.time"), task ? taskTime(t, task, now) : took !== null ? formatDuration(t, took) : "—"],
     [t("taskManager.columns.using"), using],
-    [t("taskManager.columns.computer"), last ? (last.machine?.name ?? t("taskManager.servers")) : "—"],
   ];
   const hasSteps = steps.data?.steps.some((s) => s.kind === "tool_call") ?? false;
 

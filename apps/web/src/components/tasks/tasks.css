@@ -329,13 +329,16 @@
   font-weight: 600;
   color: var(--ink2);
 }
-/* Estado, Tempo, Usando agora, Onde roda: four wells, two by two; on a narrow phone one under another, so what it uses
-   keeps the room to say it whole. */
+/* Estado and Tempo side by side, Usando agora under them at the panel's width, so what it uses keeps the room to say it
+   whole; on a narrow phone one under another. */
 .tm-panel__facts {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
+}
+.tm-panel__facts:not(.tm-agentpanel__wells) > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 @media (max-width: 480px) {
   .tm-panel__facts:not(.tm-agentpanel__wells) {

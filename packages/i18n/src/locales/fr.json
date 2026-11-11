@@ -17181,8 +17181,7 @@
       "task": "Tâche",
       "state": "État",
       "using": "Utilise maintenant",
-      "time": "Durée",
-      "computer": "Tourne sur"
+      "time": "Durée"
     },
     "sections": {
       "asked": "Demandées par des personnes",
@@ -17244,7 +17243,6 @@
     },
     "askedBy": "Demande de {{name}}",
     "askedByYou": "Votre demande",
-    "servers": "Nos serveurs",
     "plan": "{{done}} sur {{total}} faits",
     "program": {
       "browser": "Navigateur",

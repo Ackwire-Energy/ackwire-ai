@@ -16483,8 +16483,7 @@
       "task": "Görev",
       "state": "Durum",
       "using": "Şu an kullanılan",
-      "time": "Süre",
-      "computer": "Çalıştığı yer"
+      "time": "Süre"
     },
     "sections": {
       "asked": "Kişilerin istedikleri",
@@ -16545,7 +16544,6 @@
     },
     "askedBy": "{{name}} istedi",
     "askedByYou": "Siz istediniz",
-    "servers": "Sunucularımız",
     "plan": "{{done}}/{{total}} tamamlandı",
     "program": {
       "browser": "Tarayıcı",

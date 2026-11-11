@@ -16730,8 +16730,7 @@
       "task": "Taak",
       "state": "Status",
       "using": "Gebruikt nu",
-      "time": "Tijd",
-      "computer": "Draait op"
+      "time": "Tijd"
     },
     "sections": {
       "asked": "Gevraagd door mensen",
@@ -16792,7 +16791,6 @@
     },
     "askedBy": "{{name}} vroeg het",
     "askedByYou": "Jij vroeg het",
-    "servers": "Onze servers",
     "plan": "{{done}} van {{total}} klaar",
     "program": {
       "browser": "Browser",

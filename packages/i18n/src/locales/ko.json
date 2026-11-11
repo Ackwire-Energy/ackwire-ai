@@ -16003,8 +16003,7 @@
       "task": "작업",
       "state": "상태",
       "using": "지금 사용 중",
-      "time": "시간",
-      "computer": "실행 위치"
+      "time": "시간"
     },
     "sections": {
       "asked": "사람이 요청한 작업",
@@ -16064,7 +16063,6 @@
     },
     "askedBy": "{{name}}이(가) 요청함",
     "askedByYou": "내가 요청함",
-    "servers": "agentes 서버",
     "plan": "{{total}}개 중 {{done}}개 완료",
     "program": {
       "browser": "브라우저",

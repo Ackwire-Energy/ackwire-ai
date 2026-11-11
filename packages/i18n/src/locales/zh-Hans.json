@@ -16188,8 +16188,7 @@
       "task": "任务",
       "state": "状态",
       "using": "正在使用",
-      "time": "时长",
-      "computer": "运行位置"
+      "time": "时长"
     },
     "sections": {
       "asked": "成员的请求",
@@ -16249,7 +16248,6 @@
     },
     "askedBy": "由 {{name}} 提出",
     "askedByYou": "由你提出",
-    "servers": "agentes 服务器",
     "plan": "已完成 {{done}}/{{total}}",
     "program": {
       "browser": "浏览器",

@@ -17038,8 +17038,7 @@
       "task": "Tarea",
       "state": "Estado",
       "using": "Usando ahora",
-      "time": "Tiempo",
-      "computer": "Se ejecuta en"
+      "time": "Tiempo"
     },
     "sections": {
       "asked": "Pedidas por personas",
@@ -17101,7 +17100,6 @@
     },
     "askedBy": "Lo pidió {{name}}",
     "askedByYou": "Lo pediste tú",
-    "servers": "Nuestros servidores",
     "plan": "{{done}} de {{total}} hechos",
     "program": {
       "browser": "Navegador",

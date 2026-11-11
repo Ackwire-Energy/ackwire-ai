@@ -16011,8 +16011,7 @@
       "task": "タスク",
       "state": "状態",
       "using": "使用中",
-      "time": "時間",
-      "computer": "実行場所"
+      "time": "時間"
     },
     "sections": {
       "asked": "人からの依頼",
@@ -16072,7 +16071,6 @@
     },
     "askedBy": "{{name}}が依頼",
     "askedByYou": "あなたが依頼",
-    "servers": "agentesのサーバー",
     "plan": "{{total}}件中{{done}}件完了",
     "program": {
       "browser": "ブラウザ",

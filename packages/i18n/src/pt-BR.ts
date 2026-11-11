@@ -16762,7 +16762,7 @@ export const ptBR = {
       fromRoutine: "começou na rotina {{name}}",
       stopNote: "Se parar, {{name}} fica sabendo que você parou e não pede de novo por conta própria.",
     },
-    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo", computer: "Onde roda" },
+    columns: { task: "Tarefa", state: "Estado", using: "Usando agora", time: "Tempo" },
     sections: {
       asked: "Pedidas por pessoas",
       delegated: "Pedidas por agentes",
@@ -16827,7 +16827,6 @@ export const ptBR = {
     },
     askedBy: "{{name}} pediu",
     askedByYou: "Você pediu",
-    servers: "Nossos servidores",
     plan: "{{done}} de {{total}} feitos",
     program: {
       browser: "Navegador",

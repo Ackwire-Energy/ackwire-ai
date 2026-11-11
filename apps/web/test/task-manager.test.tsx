@@ -392,12 +392,13 @@ describe("the task manager page", () => {
     await settle(4);
     const panel = screen().getByRole("complementary", { name: "Corrigir o link de cancelar" });
     expect(panel.querySelector(".thread-head__meta")?.textContent).toBe("Ada · Conversa direta · Você pediu");
-    // Estado, Tempo, Usando agora, Onde roda; no cost.
+    // Estado, Tempo, Usando agora; where it runs is nowhere, and no cost.
     const facts = [...panel.querySelectorAll(".tm-panel__facts dt")].map((d) => d.textContent);
-    expect(facts).toEqual(["Estado", "Tempo", "Usando agora", "Onde roda"]);
+    expect(facts).toEqual(["Estado", "Tempo", "Usando agora"]);
     expect(panel.textContent).toContain("Trabalhando");
     expect(panel.textContent).toContain("Claude Code");
-    expect(panel.textContent).toContain("MacBook");
+    expect(panel.textContent).not.toContain("MacBook");
+    expect(panel.textContent).not.toContain("Onde roda");
     expect(panel.textContent).not.toMatch(/US\$|R\$|\$/);
     // Its steps as a reply's block lists them: the one done, the one it is on.
     expect(state.calls.find((c) => c.method === "working.taskSteps")?.args).toEqual([ORG_ID, "r-link"]);

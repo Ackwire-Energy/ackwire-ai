@@ -17646,8 +17646,7 @@
       "task": "Zadanie",
       "state": "Stan",
       "using": "Używa teraz",
-      "time": "Czas",
-      "computer": "Gdzie działa"
+      "time": "Czas"
     },
     "sections": {
       "asked": "Zlecone przez osoby",
@@ -17710,7 +17709,6 @@
     },
     "askedBy": "{{name}} poprosił(a)",
     "askedByYou": "Twoja prośba",
-    "servers": "Nasze serwery",
     "plan": "{{done}} z {{total}} gotowe",
     "program": {
       "browser": "Przeglądarka",

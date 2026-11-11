@@ -16573,7 +16573,7 @@ export const en = {
       fromRoutine: "started by the routine {{name}}",
       stopNote: "If you stop it, {{name}} is told you did and won't ask again on its own.",
     },
-    columns: { task: "Task", state: "State", using: "Using now", time: "Time", computer: "Runs on" },
+    columns: { task: "Task", state: "State", using: "Using now", time: "Time" },
     sections: {
       asked: "Asked by people",
       delegated: "Asked by agents",
@@ -16639,7 +16639,6 @@ export const en = {
     },
     askedBy: "{{name}} asked",
     askedByYou: "You asked",
-    servers: "Our servers",
     plan: "{{done}} of {{total}} done",
     program: {
       browser: "Browser",
