@@ -2942,8 +2942,6 @@
     "was": "Eerst: {{text}}",
     "open": "Wat {{name}} weet",
     "open_female": "Wat {{name}} weet",
-    "undo": "Ongedaan maken",
-    "undone": "Ongedaan gemaakt",
     "group": "Geheugen bijgewerkt door {{name}}"
   },
   "reach": {
@@ -3096,20 +3094,10 @@
     "someone": "iemand",
     "you": "jij",
     "undo": "Ongedaan maken",
-    "redo": "Opnieuw",
-    "undoAll": "Alles ongedaan maken",
     "changes_one": "{{count}} wijziging",
     "changes_other": "{{count}} wijzigingen",
     "undoneBy": "Ongedaan gemaakt door {{name}}",
-    "ago": "{{time}} geleden",
-    "timeLeft": "Nog {{time}} om ongedaan te maken",
     "group": "Wijzigingen door {{name}}",
-    "undone": "Ongedaan gemaakt.",
-    "redone": "Opnieuw uitgevoerd.",
-    "undoneAll_one": "{{count}} wijziging ongedaan gemaakt.",
-    "undoneAll_other": "{{count}} wijzigingen ongedaan gemaakt.",
-    "partial_one": "{{count}} wijziging kon niet ongedaan worden gemaakt.",
-    "partial_other": "{{count}} wijzigingen konden niet ongedaan worden gemaakt.",
     "errors": {
       "changed_since": "Iemand heeft dit sindsdien gewijzigd. Nu ongedaan maken zou die wijziging wissen.",
       "expired": "De tijd om ongedaan te maken is voorbij.",
@@ -3753,6 +3741,7 @@
       "ready": "Gekoppeld",
       "syncing": "Synchroniseren",
       "reads": "Leest {{label}}",
+      "readOnly": "alleen-lezen",
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "synced": "gesynchroniseerd {{when}}",
@@ -3801,7 +3790,7 @@
       "onepassword": {
         "step": {
           "1": "Maak in 1Password een kluis alleen voor je agenten en zet daar de logins in die ze mogen gebruiken",
-          "2": "Maak een serviceaccount met alleen toegang tot die kluis",
+          "2": "Maak een serviceaccount met alleen toegang tot die kluis (lezen en schrijven, als je agenten daar nieuwe logins moeten opslaan)",
           "3": "Plak hier het token van het serviceaccount"
         },
         "field": {
@@ -11342,7 +11331,7 @@
       "close": "Details sluiten",
       "can": "Wat agents kunnen doen",
       "afterText": "Geen agent gebruikt het tot jij kiest.",
-      "allText": "Na het koppelen kan elke agent het gebruiken. Daarna kies je de toegang van elke agent.",
+      "allText": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
       "addAccount": "Nog een account toevoegen",
       "accountsText": "Elk account heeft eigen agents en niveaus.",
       "reconnect": "Opnieuw koppelen",
@@ -12123,11 +12112,10 @@
     "notApproved": "{{name}} laat alleen goedgekeurde apps inloggen, en agentes.chat is nog niet goedgekeurd. Krijg je er een API-sleutel, dan kun je daarmee koppelen.",
     "serverSaid": "De server antwoordde: {{detail}}",
     "nothingYet": "Tot stap 3 is er niets beschikbaar voor agents.",
-    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je in stap 3 aanpassen.",
-    "newAccount": "Het nieuwe account begint zonder agents, behalve die met toegang tot alles. Je kiest in stap 3.",
+    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
     "replace": "Vervangt de huidige login. Wie het gebruikt, blijft hetzelfde.",
     "replaceUnchecked": "Log in met hetzelfde account als eerst. We kunnen niet controleren welk het is, en wie het gebruikt, blijft hetzelfde.",
-    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren. Het begint zonder agents, behalve die met toegang tot alles.",
+    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren.",
     "addTitle": "Nog een {{name}}-account",
     "reconnectTitle": "{{name}} opnieuw koppelen",
     "accountName": "Naam van dit account",
@@ -12150,7 +12138,16 @@
     "asksDefault": "Gevoelige acties vragen altijd om goedkeuring in de chat.",
     "grant": "Toegang geven",
     "saved_one": "{{name}}: {{count}} agent kan het gebruiken.",
-    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken."
+    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken.",
+    "done": {
+      "title": "{{name}} gekoppeld",
+      "everyone": "Elke agent kan het gebruiken.",
+      "waiting": "Agents krijgen de tools pas als je doorgaat, op de niveaus die wij voorstellen.",
+      "asks_one": "{{count}} actie vraagt om goedkeuring in de chat.",
+      "asks_other": "{{count}} acties vragen om goedkeuring in de chat.",
+      "adjust": "Aanpassen",
+      "ok": "Klaar"
+    }
   },
   "database": {
     "name": "Database",

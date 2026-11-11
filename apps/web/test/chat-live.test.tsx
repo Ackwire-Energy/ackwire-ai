@@ -1163,8 +1163,8 @@ describe("direct messages with an agent", () => {
 });
 
 describe("memory changes and proposals in the chat", () => {
-  test("'memória atualizada' card (memory.updated) with a link to what Ada knows, and Desfazer", async () => {
-    const { socket, state } = await open();
+  test("'memória atualizada' card (memory.updated) with a link to that memory, and nothing to undo", async () => {
+    const { socket } = await open();
     await push(socket, {
       type: "memory.updated",
       threadId: "m-1",
@@ -1183,13 +1183,9 @@ describe("memory changes and proposals in the chat", () => {
     expect(card.textContent).toContain("Ada lembrou");
     expect(card.textContent).toContain("O login usa tokens de 15 minutos.");
     expect(within(card).getByRole("link", { name: "O que a Ada sabe" }).getAttribute("href")).toBe(
-      `/org/${ORG_ID}/agents/${ADA_ID}/memory`,
+      `/org/${ORG_ID}/agents/${ADA_ID}/memory?item=mem-5`,
     );
-    await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desfazer" })));
-    await settle(4);
-    expect(state.calls.find((c) => c.method === "memory.revert")?.args).toEqual([ORG_ID, "mem-5"]);
-    expect(card.textContent).toContain("Desfeito");
-    expect(within(card).queryByRole("button", { name: "Desfazer" })).toBeNull();
+    expect(within(card).queryAllByRole("button")).toHaveLength(0);
   });
 
   test("after a reload, cards come from meta.memoryUpdates on the agent's message", async () => {
@@ -1219,7 +1215,7 @@ describe("memory changes and proposals in the chat", () => {
     const card = screen().getByRole("group", { name: "Memória atualizada por Ada" });
     expect(card.textContent).toContain("Ada esqueceu");
     expect(card.querySelector(".struck")?.textContent).toBe("O staging fica em staging.acme.com.br.");
-    expect(within(card).getByRole("button", { name: "Desfazer" })).toBeTruthy();
+    expect(within(card).queryAllByRole("button")).toHaveLength(0);
   });
 
   test("a proposed change (memory.updated, proposed) shows the proposal inline", async () => {

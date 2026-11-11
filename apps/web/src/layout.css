@@ -11216,6 +11216,30 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   padding-top: 0;
   border-top: 0;
 }
+/* The memory a link opened: a soft plate for a moment where it landed, out to the card's padding on a row that has
+   none of its own. */
+.agp-mem.is-landed {
+  --landed-out: var(--space-2);
+  border-radius: var(--space-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.agp-mem, .memory-item).is-landed {
+    background: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.agp-mem, .memory-item).is-landed {
+    animation: item-landed 2.4s var(--out) forwards;
+  }
+}
+@keyframes item-landed {
+  0%,
+  40% {
+    background-color: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
+}
 /* A learned item's technical detail, folded under its plain summary */
 .agp-mem__details > summary {
   cursor: pointer;
@@ -13745,6 +13769,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-accounts__row,
 .key-row {
   padding: var(--row-py) var(--space-4);
+}
+/* Their actions are small ghost buttons, 32px boxes: the name's line takes their axis, as the kit's MediaRow gives a
+   plated one's, so they keep the row's padding above as the words under them keep it below. */
+:is(.ai-accounts__row, .key-row):has(> .ac-mediarow__end .ac-btn--sm) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
 }
 .key-row__tail {
   gap: var(--space-3);

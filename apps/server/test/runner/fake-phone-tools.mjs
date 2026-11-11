@@ -7,6 +7,9 @@
 //   install: adb install's answer (installFail: its error, exit 1)   monkey, logcat, pidof: { app: pid }
 //   simctl, devicectl: the JSON each lists   launchFail: devicectl's error   simlog: `log show`'s text
 //   maestroExit, maestroOutput   javaMissing: maestro says JAVA_HOME isn't set
+//   videoFirst: maestro answers once a flow's recording (`*-flow.mp4`, not empty) sits beside its YAML, as on a phone
+//   where the recorder is up before the flow ends (on a loaded machine maestro's process could end before the
+//   recorder's has written a byte, and the flow came back with no video)
 //   wait: recorders (scrcpy, simctl recordVideo, idevicesyslog) run until SIGINT instead of ending at once
 //   xcodebuild: build-for-testing writes an .xctestrun (wdaBuildFail: prints it, exit 65); test-without-building
 //   serves a fake WebDriverAgent on TEST_RUNNER_USE_PORT and its MJPEG stream on TEST_RUNNER_MJPEG_SERVER_PORT (a
@@ -17,7 +20,7 @@
 //   mdnsOff: `adb mdns check` fails   mdns: what `adb mdns services` lists after its heading
 //   pair: what `adb pair` prints (pairFail: on stderr, exit 1)
 //   connectable: { "host:port": "the adb devices -l line `adb connect` adds" }
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
@@ -138,7 +141,17 @@ else if (tool === "xcrun" && args[0] === "xcodebuild") {
 } else if (tool === "maestro") {
   if (args[0] === "--version") out("2.11.0\n");
   else if (state.javaMissing) fail("ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.\n");
-  else out(state.maestroOutput ?? "Flow passed\n", state.maestroExit ?? 0);
+  else if (state.videoFirst) {
+    const dir = path.dirname(args.at(-1));
+    const recorded = () =>
+      readdirSync(dir).some((f) => f.endsWith("-flow.mp4") && statSync(path.join(dir, f)).size > 0);
+    const until = Date.now() + 15_000;
+    const answer = () =>
+      recorded() || Date.now() > until
+        ? out(state.maestroOutput ?? "Flow passed\n", state.maestroExit ?? 0)
+        : setTimeout(answer, 20);
+    answer();
+  } else out(state.maestroOutput ?? "Flow passed\n", state.maestroExit ?? 0);
 } else if (tool === "scrcpy") {
   if (args[0] === "--version") out("scrcpy 4.0 <https://github.com/Genymobile/scrcpy>\n");
   else recorder(flag("record"));

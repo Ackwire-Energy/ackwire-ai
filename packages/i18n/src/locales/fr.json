@@ -3043,8 +3043,6 @@
     "chip": "Mémoire mise à jour",
     "was": "Avant : {{text}}",
     "open": "Ce que sait {{name}}",
-    "undo": "Annuler",
-    "undone": "Annulé",
     "group": "Mémoire mise à jour par {{name}}"
   },
   "reach": {
@@ -3199,23 +3197,11 @@
     "someone": "quelqu'un",
     "you": "vous",
     "undo": "Annuler",
-    "redo": "Rétablir",
-    "undoAll": "Tout annuler",
     "changes_one": "{{count}} modification",
     "changes_many": "{{count}} modifications",
     "changes_other": "{{count}} modifications",
     "undoneBy": "Annulé par {{name}}",
-    "ago": "il y a {{time}}",
-    "timeLeft": "Encore {{time}} pour annuler",
     "group": "Modifications de {{name}}",
-    "undone": "Annulé.",
-    "redone": "Rétabli.",
-    "undoneAll_one": "{{count}} modification annulée.",
-    "undoneAll_many": "{{count}} modifications annulées.",
-    "undoneAll_other": "{{count}} modifications annulées.",
-    "partial_one": "{{count}} modification n'a pas pu être annulée.",
-    "partial_many": "{{count}} modifications n'ont pas pu être annulées.",
-    "partial_other": "{{count}} modifications n'ont pas pu être annulées.",
     "errors": {
       "changed_since": "Quelqu'un a modifié ceci entre-temps. Annuler maintenant ferait perdre cette modification.",
       "expired": "Le délai pour annuler est dépassé.",
@@ -3865,6 +3851,7 @@
       "ready": "Connecté",
       "syncing": "Synchronisation",
       "reads": "Lit {{label}}",
+      "readOnly": "lecture seule",
       "items_one": "{{count}} élément",
       "items_other": "{{count}} éléments",
       "synced": "synchronisé {{when}}",
@@ -3913,7 +3900,7 @@
       "onepassword": {
         "step": {
           "1": "Créez dans 1Password un coffre réservé à vos agents et déplacez-y les identifiants qu'ils peuvent utiliser",
-          "2": "Créez un compte de service avec accès à ce coffre uniquement",
+          "2": "Créez un compte de service avec accès à ce coffre uniquement (lecture et écriture, si vos agents doivent y enregistrer de nouveaux identifiants)",
           "3": "Collez ici le jeton du compte de service"
         },
         "field": {
@@ -11697,7 +11684,7 @@
       "close": "Fermer les détails",
       "can": "Ce que les agents pourront faire",
       "afterText": "Aucun agent ne l'utilise tant que vous n'avez pas choisi.",
-      "allText": "Une fois connecté, tous les agents peuvent l'utiliser. Ensuite, vous choisissez l'accès de chaque agent.",
+      "allText": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pourrez ajuster cela plus tard.",
       "addAccount": "Ajouter un autre compte",
       "accountsText": "Chaque compte a ses propres agents et niveaux.",
       "reconnect": "Reconnecter",
@@ -12498,11 +12485,10 @@
     "notApproved": "{{name}} n'autorise la connexion qu'aux applications qu'il a approuvées, et agentes.chat ne l'est pas encore. S'il vous fournit une clé API, vous pouvez vous connecter avec.",
     "serverSaid": "Le serveur a répondu : {{detail}}",
     "nothingYet": "Rien n'est disponible pour les agents avant l'étape 3.",
-    "allCanUse": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pouvez changer cela à l'étape 3.",
-    "newAccount": "Le nouveau compte démarre sans agents, sauf ceux qui ont accès à tout. Vous choisissez à l'étape 3.",
+    "allCanUse": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pourrez ajuster cela plus tard.",
     "replace": "Remplace la connexion actuelle. Ceux qui l'utilisent restent les mêmes.",
     "replaceUnchecked": "Connectez-vous au même compte qu'avant. Nous ne pouvons pas vérifier lequel c'est, et ceux qui l'utilisent restent les mêmes.",
-    "newAccountUnchecked": "Connectez-vous à un compte qui n'est pas encore connecté, nous ne pouvons pas le vérifier. Il démarre sans agents, sauf ceux qui ont accès à tout.",
+    "newAccountUnchecked": "Connectez-vous à un compte qui n'est pas encore connecté, nous ne pouvons pas le vérifier.",
     "addTitle": "Un autre compte {{name}}",
     "reconnectTitle": "Reconnecter {{name}}",
     "accountName": "Nom de ce compte",
@@ -12528,7 +12514,17 @@
     "grant": "Donner l'accès",
     "saved_one": "{{name}} : {{count}} agent peut l'utiliser.",
     "saved_many": "{{name}} : {{count}} agents peuvent l'utiliser.",
-    "saved_other": "{{name}} : {{count}} agents peuvent l'utiliser."
+    "saved_other": "{{name}} : {{count}} agents peuvent l'utiliser.",
+    "done": {
+      "title": "{{name}} connecté",
+      "everyone": "Tous les agents peuvent l'utiliser.",
+      "waiting": "Les agents ne reçoivent les outils que lorsque vous continuez, aux niveaux que nous suggérons.",
+      "asks_one": "{{count}} action demande une approbation dans le chat.",
+      "asks_many": "{{count}} actions demandent une approbation dans le chat.",
+      "asks_other": "{{count}} actions demandent une approbation dans le chat.",
+      "adjust": "Ajuster",
+      "ok": "Terminé"
+    }
   },
   "database": {
     "name": "Base de données",

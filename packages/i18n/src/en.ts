@@ -3079,8 +3079,6 @@ export const en = {
     chip: "Memory updated",
     was: "Before: {{text}}",
     open: "What {{name}} knows",
-    undo: "Undo",
-    undone: "Undone",
     group: "Memory updated by {{name}}",
   },
   reach: {
@@ -3248,20 +3246,10 @@ export const en = {
     someone: "someone",
     you: "you",
     undo: "Undo",
-    redo: "Redo",
-    undoAll: "Undo all",
     changes_one: "{{count}} change",
     changes_other: "{{count}} changes",
     undoneBy: "Undone by {{name}}",
-    ago: "{{time}} ago",
-    timeLeft: "{{time}} left to undo",
     group: "Changes by {{name}}",
-    undone: "Undone.",
-    redone: "Redone.",
-    undoneAll_one: "{{count}} change undone.",
-    undoneAll_other: "{{count}} changes undone.",
-    partial_one: "{{count}} change could not be undone.",
-    partial_other: "{{count}} changes could not be undone.",
     errors: {
       changed_since: "Someone changed this since. Undoing now would lose that change.",
       expired: "The time to undo is over.",
@@ -3931,6 +3919,7 @@ export const en = {
       ready: "Connected",
       syncing: "Syncing",
       reads: "Reads {{label}}",
+      readOnly: "read-only",
       items_one: "{{count}} item",
       items_other: "{{count}} items",
       synced: "synced {{when}}",
@@ -3981,7 +3970,7 @@ export const en = {
       onepassword: {
         step: {
           "1": "Create a vault in 1Password only for your agents and move into it the logins they may use",
-          "2": "Create a service account with access to that vault only",
+          "2": "Create a service account with access to that vault only (read and write, if your agents should save new logins there)",
           "3": "Paste the service account token here",
         },
         field: {
@@ -11413,7 +11402,7 @@ export const en = {
       close: "Close details",
       can: "What agents will be able to do",
       afterText: "No agent uses it until you choose.",
-      allText: "Once connected, every agent can use it. Next, you choose each agent's access.",
+      allText: "Once connected, every agent can use it. You can adjust that later.",
       addAccount: "Add another account",
       accountsText: "Each account has its own agents and levels.",
       reconnect: "Reconnect",
@@ -12010,13 +11999,11 @@ export const en = {
       "{{name}} only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that.",
     serverSaid: "The server answered: {{detail}}",
     nothingYet: "Nothing is available to agents until step 3.",
-    allCanUse: "Once connected, every agent can use it. You can change that in step 3.",
-    newAccount: "The new account starts with no agents, except those with access to everything. You choose in step 3.",
+    allCanUse: "Once connected, every agent can use it. You can adjust that later.",
     replace: "Replaces the current sign-in. Who uses it stays the same.",
     replaceUnchecked:
       "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same.",
-    newAccountUnchecked:
-      "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything.",
+    newAccountUnchecked: "Sign in to an account that isn't connected yet, we can't check.",
     addTitle: "Another {{name}} account",
     reconnectTitle: "Reconnect {{name}}",
     accountName: "Name of this account",
@@ -12040,6 +12027,17 @@ export const en = {
     grant: "Grant",
     saved_one: "{{name}}: {{count}} agent can use it.",
     saved_other: "{{name}}: {{count}} agents can use it.",
+    /** The end of connecting: a short confirmation. "Adjust" opens the detail (tools, then who uses it). */
+    done: {
+      title: "{{name}} connected",
+      everyone: "Every agent can use it.",
+      /** A server by address whose tools no one gave a level yet: "Continue" saves the ones we suggest. */
+      waiting: "Agents get the tools only when you continue, at the levels we suggest.",
+      asks_one: "{{count}} action asks for approval in the chat.",
+      asks_other: "{{count}} actions ask for approval in the chat.",
+      adjust: "Adjust",
+      ok: "Done",
+    },
   },
   database: {
     name: "Database",

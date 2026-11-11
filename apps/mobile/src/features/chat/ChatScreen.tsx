@@ -47,7 +47,12 @@ import { canTalk } from "@agenteschat/client/lib/audience";
 import { runPosition, screenAboveEnd } from "@agenteschat/client/lib/chat";
 import { CHAT_RHYTHM, firstUnreadId, opensAtLastRead } from "@agenteschat/client/lib/chat-look";
 import { type ConversationWait, conversationWaits } from "@agenteschat/client/lib/computer-queue";
-import { consultBlocksNearEnd, consultNoticeFolds, consultsForLine } from "@agenteschat/client/lib/consult-group";
+import {
+  asExchanges,
+  consultBlocksNearEnd,
+  consultNoticeFolds,
+  consultsForLine,
+} from "@agenteschat/client/lib/consult-group";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { mentionsReader, offersEveryone } from "@agenteschat/client/lib/everyone";
 import { capitalize } from "@agenteschat/client/lib/format";
@@ -695,7 +700,9 @@ function Chat({
   // Questions agents asked other agents, in the pair row before the replies that asked (`ConsultGroup`): how each
   // answer's notice draws (hidden under a reply close by, one line to one farther up), and the working line without
   // the questions a row near the end shows. A turn at work that posted nothing yet carries its row at the end.
-  const consultList = useConsultations(orgId, channelId).data ?? NO_CONSULTATIONS;
+  // An exchange between the same two agents draws on its first asking run's reply (`asExchanges`).
+  const consultData = useConsultations(orgId, channelId).data;
+  const consultList = useMemo(() => (consultData ? asExchanges(consultData) : NO_CONSULTATIONS), [consultData]);
   const liveTurns = useMemo(
     () => new Set(shownRuns.flatMap((r) => (shownMessages.some((m) => m.agentRunId === r.runId) ? [] : [r.runId]))),
     [shownRuns, shownMessages],

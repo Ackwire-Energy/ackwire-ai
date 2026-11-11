@@ -755,13 +755,13 @@ export function waitStep(t: TFunction, work: LiveWork[] | undefined, step?: Live
  */
 export function barStep(
   t: TFunction,
-  run: Pick<LiveRun, "text" | "work" | "step" | "startedAt">,
+  run: Pick<LiveRun, "text" | "work" | "step" | "startedAt" | "workingSince">,
   locale?: string,
   now = Date.now(),
 ): string {
   const calling = (run.work ?? []).some((w) => w.kind === "call" && w.running);
   if (!calling && run.text.length > 0) return `${activityVerb(t, { kind: "writing" })}…`;
-  const long = now - (run.startedAt ?? now) >= STEP_WORDS_AFTER_MS;
+  const long = now - (run.workingSince ?? run.startedAt ?? now) >= STEP_WORDS_AFTER_MS;
   return lowerFirst(waitStep(t, run.work, long ? run.step : undefined), locale);
 }
 

@@ -954,6 +954,7 @@ export async function routeMessage(
         authorAgentId: messages.authorAgentId,
         authorUserId: messages.authorUserId,
         mentionedAgentIds: messages.mentionedAgentIds,
+        mentionedUserIds: messages.mentionedUserIds,
         routable,
         // Whom the router sent it to (null: it never decided on it), and whether a run it started is still at work.
         routedTo: routingDecisions.selectedAgentIds,
@@ -1103,7 +1104,29 @@ export async function routeMessage(
     !history.some((m) => m.authorAgentId && m.authorAgentId !== root.authorAgentId)
       ? root.authorAgentId
       : null;
-  const repliedAgentId = quotedAgentId ?? rootAgentId;
+  // An agent's question to this person (its latest message in this conversation mentions them and asks something),
+  // recent, with nobody else speaking since: what they write next answers it, so it goes to that agent like a reply,
+  // whatever the scores. A short "pode sim" reads like an ok and would reach nobody.
+  const conversation = [...history.filter((m) => m.threadId === message.threadId), ...(root ? [root] : [])];
+  const lastOther = byAgent ? undefined : conversation.find((m) => m.authorUserId !== message.authorUserId);
+  const askedAgentId =
+    lastOther?.authorAgentId &&
+    candidateIds.has(lastOther.authorAgentId) &&
+    message.authorUserId &&
+    lastOther.mentionedUserIds.includes(message.authorUserId) &&
+    hasQuestionMark(lastOther.body) &&
+    message.createdAt.getTime() - lastOther.createdAt.getTime() <= ASKED_REPLY_WINDOW_MS
+      ? lastOther.authorAgentId
+      : null;
+  // A message that @mentions people (and no agent) is for them: no reply rule gives it to an agent. Only an answer to
+  // an agent's own question to this person still goes to it, and not one that is nothing but the mentions.
+  const mentionsPeople = !byAgent && [...run, message].some((m) => m.mentionedUserIds.length > 0);
+  const onlyMentions =
+    mentionsPeople &&
+    !/[\p{L}\p{N}]/u.test([...run.map((m) => m.body), message.body].join(" ").replace(/@[\w.-]+/g, ""));
+  const answersAgent = onlyMentions ? null : askedAgentId;
+  const forPeople = mentionsPeople && !answersAgent;
+  const repliedAgentId = mentionsPeople ? answersAgent : (quotedAgentId ?? rootAgentId ?? askedAgentId);
   if (repliedAgentId) continuityAgentId = repliedAgentId;
   const continuityHandle = candidates.find((c) => c.agentId === continuityAgentId)?.handle ?? null;
   // No other person here (R2 asks it): read once, and only when it needs it.
@@ -1261,7 +1284,11 @@ export async function routeMessage(
     const emoji = decided?.social ? (decided.social.react ? decided.social.emoji : "") : socialReaction(saidText);
     return emoji ? normalizeReaction(emoji) : "";
   };
-  const reactToSocial = async (decided: RoutingResult | null): Promise<RouteResult["reacted"]> => {
+  const reactToSocial = async (
+    decided: RoutingResult | null,
+    /** The agent a rule held back for a social message: the one it was for reacts. */
+    heldFor: string | null = null,
+  ): Promise<RouteResult["reacted"]> => {
     if (byAgent || toPerson || peopleTalking) return undefined;
     const reaction = socialOf(decided);
     if (!isValidReaction(reaction)) return undefined;
@@ -1271,6 +1298,7 @@ export async function routeMessage(
       (decided?.addressee && candidateIds.has(decided.addressee) ? decided.addressee : null) ??
       (named.length === 1 ? named[0]?.id : null) ??
       thankedAgent() ??
+      heldFor ??
       (toRoom
         ? ((talkingWith && candidateIds.has(talkingWith) ? talkingWith : null) ??
           bestPlaced(
@@ -1452,7 +1480,27 @@ export async function routeMessage(
     !followUp &&
     !(talkingTo !== null && picked.includes(talkingTo)) &&
     (decided.alreadyAnswered ?? 0) >= ALREADY_ANSWERED_THRESHOLD;
-  const selected = followUp && talkingTo ? [talkingTo] : duplicate ? [] : picked;
+  const pick = followUp && talkingTo ? [talkingTo] : duplicate ? [] : picked;
+  // A rule never answers for the step: an ok, a thanks or an "I'll wait" (the step's `social`, else `isAck`) gets the
+  // agent's reaction, not a run, and a follow-up the step needs no agent for (`NO_AGENT_NEED`) gets nobody. Not when
+  // the agent's last words here asked something, nor for an answer to its question to this person: those are answers.
+  const [only] = pick.length === 1 ? pick : [];
+  const askedHere = (agentId: string) =>
+    hasQuestionMark(
+      conversation
+        .find((m) => m.authorAgentId === agentId)
+        ?.body.trim()
+        .split("\n")
+        .at(-1) ?? "",
+    );
+  const social = decided.social ? decided.social.react : isAck(decided.needsAgent ?? 0);
+  const heldBack =
+    !byAgent &&
+    !answersAgent &&
+    only !== undefined &&
+    !askedHere(only) &&
+    (social || (followUp && !picked.includes(only) && (decided.needsAgent ?? 1) < NO_AGENT_NEED));
+  const selected = forPeople || heldBack ? [] : pick;
   // R5 (ADR 0074, "A message for the agents always gets one"): a person's message the policy gave nobody, that
   // is for the agents, gets one: never one for a person, one already answered, or an ack ("valeu"). The agent it
   // speaks to, as the step's own pick. Else, unless people talk among themselves: the agent they talk with, the
@@ -1468,6 +1516,7 @@ export async function routeMessage(
     selected.length === 0 &&
     !duplicate &&
     !toPerson &&
+    !heldBack &&
     // "valeu" after an answer wakes nobody: it costs a run for nothing.
     !ack
   ) {
@@ -1536,11 +1585,12 @@ export async function routeMessage(
         selectedAgentIds: chosen,
         reason:
           [
-            followUp || (fallback === "talk" && !mayPass) ? FOLLOW_UP : null,
+            (followUp && selected.length > 0) || (fallback === "talk" && !mayPass) ? FOLLOW_UP : null,
             fallback === "alone" ? "alone" : fallback ? "default" : null,
             fallback === "talk" ? "talking to" : fallback ? "best" : null,
-            followUp && resumes ? "last talked to" : null,
+            followUp && resumes && selected.length > 0 ? "last talked to" : null,
             duplicate ? "already answered by another agent" : null,
+            forPeople ? "for people" : heldBack ? "held back" : null,
             words,
           ]
             .filter(Boolean)
@@ -1555,7 +1605,7 @@ export async function routeMessage(
     return createAgentRuns(tx, message, chosen, "router", { joinChannelRun: message.authorType === "person" });
   });
   if (!runs) return { runs: [], skipped: "already_routed" };
-  const reacted = chosen.length === 0 ? await reactToSocial(decided) : undefined;
+  const reacted = chosen.length === 0 ? await reactToSocial(decided, heldBack ? (only ?? null) : null) : undefined;
   return {
     runs,
     selected: chosen,
@@ -1582,6 +1632,12 @@ const FOR_SOMEONE: ReadonlySet<string> = new Set(["+1", "🙏", "❤️", "❤"]
 export const DEFAULT_NEED = 0.25;
 /** The most words a thanks, an ok or a sign-off has ("ありがとうございます" is five). */
 export const ACK_MAX_WORDS = 5;
+
+/** Below this need-any-agent score the step hears no agent needed: a rule's follow-up then picks nobody. */
+export const NO_AGENT_NEED = 0.1;
+
+/** How long an agent's question to a person in the chat (`@person …?`) takes their next message there as its answer. */
+export const ASKED_REPLY_WINDOW_MS = 2 * 3600_000;
 
 /** Another person's message this recent, right before, means people are talking among themselves (R5). */
 export const PEOPLE_WINDOW_MS = 5 * 60_000;

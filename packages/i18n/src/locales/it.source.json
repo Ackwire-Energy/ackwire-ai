@@ -7184,12 +7184,6 @@
   "memoryCard.open": {
     "value": "What {{name}} knows"
   },
-  "memoryCard.undo": {
-    "value": "Undo"
-  },
-  "memoryCard.undone": {
-    "value": "Undone"
-  },
   "memoryCard.group": {
     "value": "Memory updated by {{name}}"
   },
@@ -7540,12 +7534,6 @@
   "agentActions.undo": {
     "value": "Undo"
   },
-  "agentActions.redo": {
-    "value": "Redo"
-  },
-  "agentActions.undoAll": {
-    "value": "Undo all"
-  },
   "agentActions.changes": {
     "value": {
       "one": "{{count}} change",
@@ -7555,32 +7543,8 @@
   "agentActions.undoneBy": {
     "value": "Undone by {{name}}"
   },
-  "agentActions.ago": {
-    "value": "{{time}} ago"
-  },
-  "agentActions.timeLeft": {
-    "value": "{{time}} left to undo"
-  },
   "agentActions.group": {
     "value": "Changes by {{name}}"
-  },
-  "agentActions.undone": {
-    "value": "Undone."
-  },
-  "agentActions.redone": {
-    "value": "Redone."
-  },
-  "agentActions.undoneAll": {
-    "value": {
-      "one": "{{count}} change undone.",
-      "other": "{{count}} changes undone."
-    }
-  },
-  "agentActions.partial": {
-    "value": {
-      "one": "{{count}} change could not be undone.",
-      "other": "{{count}} changes could not be undone."
-    }
   },
   "agentActions.errors.changed_since": {
     "value": "Someone changed this since. Undoing now would lose that change."
@@ -9246,6 +9210,9 @@
   "vault.connections.reads": {
     "value": "Reads {{label}}"
   },
+  "vault.connections.readOnly": {
+    "value": "read-only"
+  },
   "vault.connections.items": {
     "value": {
       "one": "{{count}} item",
@@ -9367,7 +9334,7 @@
     "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
   },
   "vault.source.onepassword.step.2": {
-    "value": "Create a service account with access to that vault only"
+    "value": "Create a service account with access to that vault only (read and write, if your agents should save new logins there)"
   },
   "vault.source.onepassword.step.3": {
     "value": "Paste the service account token here"
@@ -27584,7 +27551,7 @@
     "value": "No agent uses it until you choose."
   },
   "connectors.detail.allText": {
-    "value": "Once connected, every agent can use it. Next, you choose each agent's access."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectors.detail.addAccount": {
     "value": "Add another account"
@@ -29330,10 +29297,7 @@
     "value": "Nothing is available to agents until step 3."
   },
   "connectFlow.allCanUse": {
-    "value": "Once connected, every agent can use it. You can change that in step 3."
-  },
-  "connectFlow.newAccount": {
-    "value": "The new account starts with no agents, except those with access to everything. You choose in step 3."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectFlow.replace": {
     "value": "Replaces the current sign-in. Who uses it stays the same."
@@ -29342,7 +29306,7 @@
     "value": "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same."
   },
   "connectFlow.newAccountUnchecked": {
-    "value": "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything."
+    "value": "Sign in to an account that isn't connected yet, we can't check."
   },
   "connectFlow.addTitle": {
     "value": "Another {{name}} account"
@@ -29412,6 +29376,27 @@
       "one": "{{name}}: {{count}} agent can use it.",
       "other": "{{name}}: {{count}} agents can use it."
     }
+  },
+  "connectFlow.done.title": {
+    "value": "{{name}} connected"
+  },
+  "connectFlow.done.everyone": {
+    "value": "Every agent can use it."
+  },
+  "connectFlow.done.waiting": {
+    "value": "Agents get the tools only when you continue, at the levels we suggest."
+  },
+  "connectFlow.done.asks": {
+    "value": {
+      "one": "{{count}} action asks for approval in the chat.",
+      "other": "{{count}} actions ask for approval in the chat."
+    }
+  },
+  "connectFlow.done.adjust": {
+    "value": "Adjust"
+  },
+  "connectFlow.done.ok": {
+    "value": "Done"
   },
   "database.name": {
     "value": "Database"

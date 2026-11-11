@@ -2927,8 +2927,6 @@
     "chip": "Bellek güncellendi",
     "was": "Önce: {{text}}",
     "open": "{{name}} neler biliyor",
-    "undo": "Geri al",
-    "undone": "Geri alındı",
     "group": "Belleği güncelleyen: {{name}}"
   },
   "reach": {
@@ -3081,20 +3079,10 @@
     "someone": "biri",
     "you": "siz",
     "undo": "Geri al",
-    "redo": "Yinele",
-    "undoAll": "Tümünü geri al",
     "changes_one": "{{count}} değişiklik",
     "changes_other": "{{count}} değişiklik",
     "undoneBy": "{{name}} geri aldı",
-    "ago": "{{time}} önce",
-    "timeLeft": "Geri almak için {{time}} kaldı",
     "group": "{{name}} tarafından yapılan değişiklikler",
-    "undone": "Geri alındı.",
-    "redone": "Yinelendi.",
-    "undoneAll_one": "{{count}} değişiklik geri alındı.",
-    "undoneAll_other": "{{count}} değişiklik geri alındı.",
-    "partial_one": "{{count}} değişiklik geri alınamadı.",
-    "partial_other": "{{count}} değişiklik geri alınamadı.",
     "errors": {
       "changed_since": "O zamandan beri biri bunu değiştirdi. Şimdi geri almak o değişikliği kaybettirir.",
       "expired": "Geri alma süresi doldu.",
@@ -3738,6 +3726,7 @@
       "ready": "Bağlı",
       "syncing": "Eşitleniyor",
       "reads": "Okunan: {{label}}",
+      "readOnly": "salt okunur",
       "items_one": "{{count}} öğe",
       "items_other": "{{count}} öğe",
       "synced": "{{when}} eşitlendi",
@@ -3786,7 +3775,7 @@
       "onepassword": {
         "step": {
           "1": "1Password'de yalnızca ajanlarınız için bir kasa oluşturun ve kullanabilecekleri giriş bilgilerini oraya taşıyın",
-          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun",
+          "2": "Yalnızca o kasaya erişimi olan bir hizmet hesabı oluşturun (ajanlarınız oraya yeni giriş bilgileri kaydedecekse okuma ve yazma)",
           "3": "Hizmet hesabının token'ını buraya yapıştırın"
         },
         "field": {
@@ -11215,7 +11204,7 @@
       "close": "Ayrıntıları kapat",
       "can": "Ajanların yapabilecekleri",
       "afterText": "Siz seçene kadar hiçbir ajan kullanmaz.",
-      "allText": "Bağlandıktan sonra her ajan kullanabilir. Ardından her ajanın erişimini seçersiniz.",
+      "allText": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
       "addAccount": "Başka bir hesap ekle",
       "accountsText": "Her hesabın kendi ajanları ve seviyeleri vardır.",
       "reconnect": "Yeniden bağla",
@@ -11996,11 +11985,10 @@
     "notApproved": "{{name}} yalnızca onayladığı uygulamaların giriş yapmasına izin veriyor ve agentes.chat henüz onaylanmadı. Size bir API anahtarı veriyorsa onunla bağlanabilirsiniz.",
     "serverSaid": "Sunucunun yanıtı: {{detail}}",
     "nothingYet": "3. adıma kadar ajanlar hiçbir şey kullanamaz.",
-    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu 3. adımda değiştirebilirsiniz.",
-    "newAccount": "Yeni hesap, her şeye erişimi olanlar dışında ajansız başlar. 3. adımda siz seçersiniz.",
+    "allCanUse": "Bağlandıktan sonra her ajan kullanabilir. Bunu daha sonra ayarlayabilirsiniz.",
     "replace": "Mevcut girişin yerini alır. Kimin kullandığı aynı kalır.",
     "replaceUnchecked": "Öncekiyle aynı hesaba giriş yapın. Hangisi olduğunu kontrol edemiyoruz ve kimin kullandığı aynı kalır.",
-    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz. Her şeye erişimi olanlar dışında ajansız başlar.",
+    "newAccountUnchecked": "Henüz bağlı olmayan bir hesaba giriş yapın, bunu kontrol edemiyoruz.",
     "addTitle": "Başka bir {{name}} hesabı",
     "reconnectTitle": "{{name}} yeniden bağla",
     "accountName": "Bu hesabın adı",
@@ -12023,7 +12011,16 @@
     "asksDefault": "Hassas işlemler sohbette her zaman onay ister.",
     "grant": "Erişim ver",
     "saved_one": "{{name}}: {{count}} ajan kullanabilir.",
-    "saved_other": "{{name}}: {{count}} ajan kullanabilir."
+    "saved_other": "{{name}}: {{count}} ajan kullanabilir.",
+    "done": {
+      "title": "{{name}} bağlandı",
+      "everyone": "Her ajan kullanabilir.",
+      "waiting": "Ajanlar araçları ancak siz devam ettiğinizde, önerdiğimiz seviyelerle alır.",
+      "asks_one": "{{count}} işlem sohbette onay ister.",
+      "asks_other": "{{count}} işlem sohbette onay ister.",
+      "adjust": "Ayarla",
+      "ok": "Tamam"
+    }
   },
   "database": {
     "name": "Veritabanı",

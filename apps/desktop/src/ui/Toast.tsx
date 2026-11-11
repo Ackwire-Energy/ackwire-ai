@@ -1,5 +1,5 @@
 import { Icon, type IconName } from "@agenteschat/ui";
-import { createContext, type ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useState } from "react";
 
 type Show = (message: string, icon?: IconName) => void;
 const ToastContext = createContext<Show>(() => {});
@@ -8,19 +8,17 @@ const ToastContext = createContext<Show>(() => {});
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toast, setToast] = useState<{ message: string; icon: IconName; key: number } | null>(null);
   const [on, setOn] = useState(false);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const show = useCallback<Show>((message, icon = "check") => {
     setToast({ message, icon, key: Date.now() });
     setOn(true);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setOn(false), 2600);
   }, []);
-  useEffect(
-    () => () => {
-      if (timer.current) clearTimeout(timer.current);
-    },
-    [],
-  );
+  // The shown toast's own timer: a toast asked for after the provider is gone (an action ending after its window)
+  // starts none.
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setOn(false), 2600);
+    return () => clearTimeout(timer);
+  }, [toast]);
   return (
     <ToastContext.Provider value={show}>
       {children}

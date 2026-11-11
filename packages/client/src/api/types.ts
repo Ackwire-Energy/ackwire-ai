@@ -1479,6 +1479,12 @@ export interface ActiveRun {
   /** Last sign of life from the worker. */
   heartbeatAt?: string | null;
   createdAt?: string;
+  /**
+   * How long the work it is doing now has taken, in milliseconds, as the server counts it (since it last went back
+   * to work or last posted, else since it was created). A length, not a time: "thinking for …" counts on from it by
+   * this device's clock. Absent on a server from before it.
+   */
+  workingMs?: number;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */

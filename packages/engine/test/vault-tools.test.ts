@@ -14,6 +14,7 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   ASK_PERSON_TOOL,
   cancelSecretRequests,
+  connectVaultSource,
   createAgent,
   createAgentRuns,
   createBrowserProfile,
@@ -54,6 +55,7 @@ import { openItemValue } from "../src/vault/seal";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 import { agentRunRow, channelRoutine, fire } from "./routine-fixtures";
+import { SOURCE_TOKEN, writableSource } from "./vault-fixtures";
 
 /**
  * The Vault's tools (ADR 0144): what the Vault shares with an agent for the person behind its run, listed without a
@@ -334,7 +336,7 @@ test("vault_list shows what is shared with the agent for the person behind the r
   expect(out.content).toContain('username "dev@acme.example"');
   expect(out.content).toContain("on acme.example");
   // Ana's own key: by its variable name, for run_code's `keys`, and its id, for vault_save.
-  expect(out.content).toContain(`- ACME_API_KEY (personal, ana, id ${v.items.key.id}):`);
+  expect(out.content).toContain(`- ACME_API_KEY (personal, ana, kept in the Vault, id ${v.items.key.id}):`);
   expect(out.content).toContain("Read-only key for the Acme API");
   // A contact's fields are meant for the agent.
   expect(out.content).toContain("billing@acme.example");
@@ -398,7 +400,9 @@ test("what each item says reaches the model as data: its own block, markers neut
   // Every item's text is in a block of its own, after the line the engine writes (id, scope, site).
   const blocks = out.content.match(/<external_data source="vault item">/g) ?? [];
   expect(blocks).toHaveLength(3);
-  expect(out.content).toContain(`- ${v.items.login.id} (team), on acme.example:\n<external_data source="vault item">`);
+  expect(out.content).toContain(
+    `- ${v.items.login.id} (team, kept in the Vault), on acme.example:\n<external_data source="vault item">`,
+  );
   // The text can't close its block early.
   const login = out.content.slice(out.content.indexOf(v.items.login.id));
   const block = login.slice(0, login.indexOf("</external_data>"));
@@ -1087,6 +1091,70 @@ test("a made password is for a named account", async () => {
   expect(out.isError).toBe(true);
   expect(out.content).toContain("username");
   expect(v.computer.calls.filter((c) => c.op === "vault.password")).toHaveLength(0);
+});
+
+test("with a password manager connected, the tools say where a login is kept and where a new one went", async () => {
+  const v = await makerSetup();
+  const source = writableSource();
+  Object.assign(v.vault.sources, { fakepass: source });
+  const connection = await connectVaultSource(v.vault, f.owner.id, f.org.id, {
+    kind: "fakepass",
+    scope: "team",
+    input: { token: SOURCE_TOKEN },
+    access: { everyone: true, roleIds: [], userIds: [], allAgents: true, agentIds: [] },
+  });
+  const ana = await v.runFor(f.owner.id);
+  v.computer.s.made = [MADE, "made-for-the-vault-2", "made-unfilled-3"];
+  const out = await v.call(ana, "browser_make_password", { target: "e2", username: "lia@acme.example" });
+  expect(out.isError).toBeFalsy();
+  const [login] = await madeLogins();
+  if (!login) throw new Error("no login");
+  expect(login.connectionId).toBe(connection.id);
+  expect(out.content).toContain(
+    `Saved in FakePass · "Agents" (the one connected password manager that takes your new logins) as login ${login.id}`,
+  );
+  // Typed from where it is kept, as any login read from a password manager.
+  expect(source.calls.some((c) => c.op === "reveal")).toBe(true);
+
+  const list = await v.call(ana, "vault_list", { kind: "login" });
+  expect(list.content).toContain(`- ${login.id} (team, kept in FakePass · "Agents"), anywhere on `);
+  expect(list.content).toContain(`(team, kept in the Vault), on acme.example:`);
+  expect(list.content).toContain('- FakePass · "Agents": takes new logins');
+
+  // The person named the Vault: there, and the answer says so.
+  const named = await v.call(ana, "browser_make_password", {
+    target: "e2",
+    username: "rui@acme.example",
+    save_in: "vault",
+  });
+  expect(named.content).toContain("Saved in the Vault (as asked) as login ");
+
+  // A field that didn't take it: nothing is deleted from a person's password manager.
+  v.computer.s.typeVault = () => ({
+    success: false,
+    data: null,
+    error: "not a password field",
+    code: "not_password_field",
+  });
+  const unfilled = await v.call(ana, "browser_make_password", { target: "e2", username: "eva@acme.example" });
+  expect(unfilled.isError).toBe(true);
+  expect(unfilled.content).toContain('stays in FakePass · "Agents" with a password no site has');
+  expect(source.items).toHaveLength(2);
+
+  source.readOnly = true;
+  const refused = await v.call(ana, "browser_make_password", {
+    target: "e2",
+    username: "noa@acme.example",
+    save_in: "FakePass",
+  });
+  expect(refused.isError).toBe(true);
+  expect(refused.content).toContain("This FakePass token can only read");
+  const audit = await f.db.select().from(schema.auditLog);
+  for (const text of [out, list, named, unfilled, refused, audit, v.computer.calls]) {
+    const said = JSON.stringify(text);
+    for (const secret of [MADE, "made-for-the-vault-2", "made-unfilled-3", SOURCE_TOKEN])
+      expect(said).not.toContain(secret);
+  }
 });
 
 test("typed nowhere, the Vault stays as it was: a new login goes, a replaced one comes back", async () => {

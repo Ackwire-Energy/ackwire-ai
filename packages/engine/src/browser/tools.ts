@@ -80,6 +80,7 @@ import {
   type VaultDeps,
   VaultRefusal,
   vaultItemName,
+  vaultPlaceName,
 } from "../vault";
 import type { BrowserPageReader } from "../web-tools";
 import {
@@ -1249,7 +1250,16 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       const agent = scopeOf(ctx.agentId, await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
       const value = await requestMadePassword(hub, linked.status.machineId, agent, input, ctx.signal);
       const profile = await vaultProfile(ctx, linked.profile);
-      const saved = await saveMadePassword(vault, run, { website, username }, value, profile);
+      const saved = await saveMadePassword(
+        vault,
+        run,
+        { website, username },
+        value,
+        profile,
+        str(input.save_in).trim() || undefined,
+      );
+      const place = vaultPlaceName(saved.item.place);
+      const where = `${place}${saved.why ? ` (${saved.why})` : ""}`;
       const fields = [str(input.target), str(input.confirm)].map((t) => t.trim()).filter(Boolean);
       let filled = false;
       const typed = await plan(
@@ -1264,17 +1274,24 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
       );
       // A form with one field filled, or none (a person took the browser, the field moved), isn't sent.
       if (!filled) {
+        // Nothing is deleted from a person's password manager: a login made there stays, and the next call replaces it.
+        if (saved.outcome === "created" && saved.item.place.connectionId) {
+          return {
+            ...typed,
+            content: `${typed.content}\nNot every field took the password. Login ${saved.item.id} stays in ${place} with a password no site has: don't send the form, call this again and it takes the new one.`,
+          };
+        }
         await (saved.outcome === "created"
           ? deleteVaultItemByAgent(vault, run, saved.item.id)
           : restoreMadePassword(vault, run, saved.item.id, { discard: true }));
         return {
           ...typed,
-          content: `${typed.content}\nNot every field took the password, and the Vault is as it was. Don't send the form: call this again.`,
+          content: `${typed.content}\nNot every field took the password, and ${place} is as it was. Don't send the form: call this again.`,
         };
       }
       return {
         ...typed,
-        content: `${typed.content}\nThe Vault keeps this password as login ${saved.item.id}${saved.outcome === "updated" ? ", in place of the one it had" : ""}: sign in with it from now on. Now send the form. If the site turns the password down, call this again with the \`length\` and \`classes\` it asks for.${saved.outcome === "updated" ? ` If the old one stays in force, \`undo\` with this id brings it back.` : ""}`,
+        content: `${typed.content}\nSaved in ${where} as login ${saved.item.id}${saved.outcome === "updated" ? ", in place of the password it had" : ""}: sign in with it from now on. Now send the form. If the site turns the password down, call this again with the \`length\` and \`classes\` it asks for.${saved.outcome === "updated" ? ` If the old one stays in force, \`undo\` with this id brings it back.` : ""}`,
       };
     } catch (error) {
       return { content: vaultErrorText(error), isError: true };
@@ -1744,7 +1761,7 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
     ),
     tool(
       "browser_make_password",
-      `For an account you are making, or a password you are changing, yourself: makes a strong password on your computer, keeps it in the Vault for this site and \`username\`, and types it into \`target\` and \`confirm\`. You never see it. Never ask a person to invent one. Then send the form yourself.`,
+      `For an account you are making, or a password you are changing, yourself: makes a strong password on your computer, keeps it for this site and \`username\`, and types it into \`target\` and \`confirm\`. It is kept where your logins live: the one connected password manager that takes new logins, else the Vault; the answer says where. You never see it. Never ask a person to invent one. Then send the form yourself.`,
       {
         type: "object",
         properties: {
@@ -1766,6 +1783,12 @@ export function createBrowserToolSource(deps: BrowserToolDeps): ToolSource & { r
             type: "string",
             maxLength: 64,
             description: "A login's id: back to the password it had before you made this one, typing nothing.",
+          },
+          save_in: {
+            type: "string",
+            maxLength: 200,
+            description:
+              'Only when the person named where to keep it: `vault` (this workspace\'s Vault) or a connected password manager as vault_list names it (`1Password · "Agents"`).',
           },
         },
         additionalProperties: false,

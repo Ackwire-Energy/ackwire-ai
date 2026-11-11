@@ -92,13 +92,15 @@ test("the harness: 'me de bom dia…' 5 and 23 minutes after the talk with Ada i
 });
 
 test("the harness: a reply case quotes the agent's message or answers in its thread, as people do", async () => {
-  // Every agent quiet: only the rule for a reply to an agent picks.
+  // Every agent quiet: only the rule for a reply to an agent picks. Some need for an agent, as any reply has: one the
+  // step needs no agent for at all is nobody's, rule or not.
   const quiet = createJevRouterStrategy({
     key: "k",
     recordUsage: async () => {},
     fetch: (async (_url: string, init: RequestInit) => {
       const { questions } = JSON.parse(String(init.body)) as { questions: Record<string, unknown> };
-      return Response.json({ answers: Object.fromEntries(Object.keys(questions).map((id) => [id, { noul: 0.05 }])) });
+      const noul = (id: string) => ({ noul: id === "needs_agent" ? 0.2 : 0.05 });
+      return Response.json({ answers: Object.fromEntries(Object.keys(questions).map((id) => [id, noul(id)])) });
     }) as unknown as typeof fetch,
   });
   const evaluation = await routerEval();

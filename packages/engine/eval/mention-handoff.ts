@@ -1,16 +1,15 @@
 /**
- * Mention eval (ADR 0034, ADR 0089): when an agent's message @mentions another
- * agent, does it need nothing from it (no run: a thanks, an "ok", a sign-off, a
- * quote or a name, a plan that waits for a person), or something (a run: work,
- * a question, a delivery, "I'll ask @x to…")? Scores every case with the
+ * Mention eval (ADR 0034, ADR 0089 and its addendum of 2026-11-10): when an agent's
+ * message @mentions another agent, does it leave it nothing to do (no run: credit,
+ * a source, a thanks, an "ok", a sign-off, a quote or a name, a plan to ask it
+ * later), or does it plainly ask it something (a run: a request, a question, work
+ * handed to it, the answer to its own question)? Scores every case with the
  * production judge (`mentionNeedsNothing`) and the production threshold
- * (`MENTION_WAKE_THRESHOLD`: it wakes unless the judge is at least 80% sure it
- * needs nothing), with the message it answers when there is one. Between agents
- * with no turn cap, it also tells a hand-back of the work or a question back (a
- * run) from a thanks, an "ok" or a 👍, an agreement or a sign-off (none), in
- * Portuguese, English, Spanish, German, Japanese and Arabic, and hand-offs
- * production missed (a handover, a verdict's summary, "I'll ask @x"). It passes
- * when every case is right.
+ * (`MENTION_WAKE_THRESHOLD`: it wakes only when the judge reads a request), with
+ * the message it answers when there is one. Between agents with no turn cap, it
+ * also tells a hand-back of the work or a question back (a run) from a thanks, an
+ * "ok" or a 👍, an agreement or a sign-off (none), in Portuguese, English,
+ * Spanish, German, Japanese and Arabic. It passes when every case is right.
  *
  * Two more judgments of agents working together (ADR 0095), in the same six
  * languages and at production thresholds: whether the sender of a note
@@ -157,24 +156,26 @@ const CASES: Case[] = [
     body: "@nina, aqui está o documento completo da passagem da contabilidade: contas a pagar de novembro, os fornecedores com contrato vencendo e o calendário de fechamento. Está em Financeiro/Passagem, com a planilha de conciliação junto.",
     answering: { from: "a person", text: "Theo, passa tudo da contabilidade para a Nina antes de sexta." },
   },
+  // A summary that asks nothing of the agent it names: since the addendum of 2026-11-10, credit, not a request.
   {
     id: "verdict-summary-at-the-end",
-    wakes: true,
+    wakes: false,
     from: "ada",
     to: theo,
     body: "Li o diff dos dois PRs e rodei os testes: 312 passaram, 4 ignorados.\n\n#12, aprovar com ressalvas: a importação agora valida o CSV antes de gravar. Falta um teste para o arquivo vazio.\n\n#13, aprovar: só testes e documentação.\n\n@theo, o resumo é esse.",
     answering: { from: "a person", text: "@ada consegue revisar o #12 e o #13 agora?" },
   },
+  // A plan to ask later: the author asks with tell_agent, the mention alone wakes nobody.
   {
     id: "ill-ask-for-review",
-    wakes: true,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Walter, o PR #12 já está aberto. Vou pedir para a @ada revisar antes de chegar até você.",
   },
   {
     id: "en-ill-ask-for-review",
-    wakes: true,
+    wakes: false,
     from: "theo",
     to: ada,
     body: "Walter, PR #12 is open now. I'll ask @ada to review it before it goes to you.",
