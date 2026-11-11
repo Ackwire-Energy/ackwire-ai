@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import type { OrgRole } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -456,8 +456,9 @@ describe("New widget (ADR 0135 §3)", () => {
     await click(button(dialog, "Testar") as HTMLElement);
     await settle(6);
     const building = card(dialog);
-    expect(building.textContent).toContain("Ada está montando com os dados de verdade…");
-    expect(building.querySelector(".wg__foot")?.textContent).toBe("Ada montando…");
+    // Between calls it is thinking; who is at it, for how long and the way out sit in the card's footer.
+    expect(within(building).getByRole("status").textContent).toBe("Pensando");
+    expect(building.querySelector(".wg__foot")?.textContent).toBe("Ada montando…0:00Parar");
     expect((button(dialog, "Testando…") as HTMLButtonElement).disabled).toBe(true);
     expect(button(dialog, "Criar widget")).toBeNull();
     // Unnamed while the agent hasn't named it: never the ask.
@@ -473,6 +474,101 @@ describe("New widget (ADR 0135 §3)", () => {
     expect(within(card(dialog)).getByRole("img", { name: /^Dados de verdade/ })).toBeTruthy();
     expect(card(dialog).getAttribute("aria-label")).toBe("Erros hoje");
     expect(button(dialog, "Criar widget")).toBeTruthy();
+  });
+
+  test("while it builds: the step its agent is in, in words, the time it takes, and one more line past 45 s", async () => {
+    const began = Date.now();
+    setSystemTime(new Date(began));
+    try {
+      const { fake, services, dialog } = await start((fake) => {
+        withSuggestions(fake);
+        fake.holdDrafts = true;
+      });
+      await type(ask(dialog), "MRR em real");
+      await click(button(dialog, "Testar") as HTMLElement);
+      await settle(6);
+      const draftId = fake.drafts[0]?.id as string;
+      const line = () => within(card(dialog)).getByRole("status").textContent;
+      const step = async (tool: string, connector: string | null) => {
+        fake.steps.set(draftId, { tool, connector, service: null, at: new Date().toISOString() });
+        // What a `dashboard.widget` event does to the draft (and the 2 s poll, without one).
+        await act(async () => services.queryClient.invalidateQueries());
+        await settle(6);
+      };
+      expect(line()).toBe("Pensando");
+      // The connected app by its name, our own tools by what they do: never a tool's name.
+      await step("stripe_list_subscriptions", "Stripe");
+      expect(line()).toBe("Consultando o Stripe");
+      await step("web_fetch", null);
+      expect(line()).toBe("Lendo uma página da web");
+      await step("update_widget", null);
+      expect(line()).toBe("Montando o widget");
+      expect(card(dialog).textContent).not.toMatch(/update_widget|web_fetch|stripe_list/);
+      // The worst case: a server connected by address with a long name, whole, wrapping inside the card.
+      const long = "Painel Financeiro Consolidado da Controladoria Regional Sul";
+      await step("custom_abc_query_everything", long);
+      expect(line()).toBe(`Consultando o ${long}`);
+      fake.steps.delete(draftId);
+      await act(async () => services.queryClient.invalidateQueries());
+      await settle(6);
+      expect(line()).toBe("Pensando");
+
+      const still = card(dialog).querySelector(".nw-build__still") as HTMLElement;
+      const clock = () => within(card(dialog)).getByRole("timer").textContent;
+      const tick = async (seconds: number) => {
+        setSystemTime(new Date(began + seconds * 1000));
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 1100));
+        });
+      };
+      expect(still.hasAttribute("data-on")).toBe(false);
+      expect(still.getAttribute("aria-hidden")).toBe("true");
+      await tick(40);
+      expect(clock()).toMatch(/^0:4[0-2]$/);
+      expect(still.hasAttribute("data-on")).toBe(false);
+      await tick(106);
+      expect(clock()).toMatch(/^1:4[6-8]$/);
+      expect(still.hasAttribute("data-on")).toBe(true);
+      expect(still.getAttribute("aria-hidden")).toBe("false");
+      expect(still.textContent).toBe("Ainda trabalhando. Dados de verdade podem levar um ou dois minutos.");
+    } finally {
+      setSystemTime();
+    }
+  });
+
+  test("Parar stops the build: the draft goes, what was typed stays to change and test again", async () => {
+    const { state, fake, dialog } = await start((fake) => {
+      withSuggestions(fake);
+      fake.holdDrafts = true;
+    });
+    await type(ask(dialog), "MRR em real");
+    await click(button(dialog, "Testar") as HTMLElement);
+    await settle(6);
+    const draftId = fake.drafts[0]?.id as string;
+    await click(within(card(dialog)).getByRole("button", { name: "Parar" }));
+    await settle(6);
+    expect(callsOf(state, "dashboards.removeWidget").map((c) => c.args)).toEqual([[ORG_ID, draftId]]);
+    expect(fake.drafts).toHaveLength(0);
+    // The dialog stays, with the ask as written, in focus, ready to test again.
+    expect((ask(dialog) as HTMLTextAreaElement).value).toBe("MRR em real");
+    expect(document.activeElement).toBe(ask(dialog));
+    expect(within(card(dialog)).queryByRole("status")).toBeNull();
+    expect(button(dialog, "Parar")).toBeNull();
+    await type(ask(dialog), "MRR em dólar");
+    const again = button(dialog, "Testar") as HTMLButtonElement;
+    expect(again.disabled).toBe(false);
+    await click(again);
+    await settle(6);
+    expect(callsOf(state, "dashboards.testWidget")).toHaveLength(2);
+    expect(within(card(dialog)).getByRole("status").textContent).toBe("Pensando");
+    // Closing drops the second draft only: the stopped one is already gone.
+    const second = fake.drafts[0]?.id as string;
+    await click(within(dialog).getByRole("button", { name: "Cancelar" }));
+    await settle(6);
+    expect(callsOf(state, "dashboards.removeWidget").map((c) => c.args)).toEqual([
+      [ORG_ID, draftId],
+      [ORG_ID, second],
+    ]);
   });
 
   test("a changed ask, agent or format makes the test stale; a new test drops the old draft", async () => {

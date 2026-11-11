@@ -42013,9 +42013,6 @@
   "dashboards.newWidget.testAgain": {
     "value": "Test again"
   },
-  "dashboards.newWidget.testing": {
-    "value": "{{name}} is building it with real data…"
-  },
   "dashboards.newWidget.tested": {
     "value": "Real data · {{when}}"
   },
@@ -42078,6 +42075,18 @@
   },
   "dashboards.newWidget.buildingFoot": {
     "value": "{{name}} building…"
+  },
+  "dashboards.newWidget.thinking": {
+    "value": "Thinking"
+  },
+  "dashboards.newWidget.finishing": {
+    "value": "Building the widget"
+  },
+  "dashboards.newWidget.stop": {
+    "value": "Stop"
+  },
+  "dashboards.newWidget.stillWorking": {
+    "value": "Still working. Real data can take a minute or two."
   },
   "dashboards.newWidget.failedTitle": {
     "value": "{{name}} couldn't build it"

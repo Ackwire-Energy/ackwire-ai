@@ -17,6 +17,7 @@ import type {
   PinnableBlock,
   Widget,
   WidgetDetail,
+  WidgetStep,
   WidgetSuggestions,
   WidgetUpdate,
 } from "@agenteschat/client";
@@ -53,6 +54,8 @@ export interface FakeDashboards {
   holdDrafts: boolean;
   /** What a draft's test costs (`lastCostUsd`). */
   testCostUsd: number;
+  /** The call a building draft's run is in (its view's `step`), by widget id. */
+  steps: Map<string, WidgetStep>;
 }
 
 /** The words of the example data a draft is built with. */
@@ -214,6 +217,7 @@ export function createFakeDashboards(
     drafts: [],
     holdDrafts: false,
     testCostUsd: 0.01,
+    steps: new Map(),
     history: new Map(),
     suggestions: new Map(),
     pinnable: [],
@@ -406,6 +410,7 @@ export function createFakeDashboards(
           dashboard: { id: d.id, kind: d.kind, title: d.title },
           canEdit: d.canEdit,
           history: clone(fake.history.get(widgetId) ?? []),
+          step: w.status === "building" ? (fake.steps.get(widgetId) ?? null) : null,
         };
         return detail;
       },

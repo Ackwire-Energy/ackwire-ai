@@ -17430,7 +17430,6 @@ export const en = {
       /** Asking is tested first (ADR 0135): the agent builds a draft with real data before the widget is created. */
       test: "Test",
       testAgain: "Test again",
-      testing: "{{name}} is building it with real data…",
       tested: "Real data · {{when}}",
       stale: "Changed since the test",
       testFailed: "It didn't work: {{reason}}",
@@ -17453,6 +17452,10 @@ export const en = {
       editAskOf: "Change the ask: {{ask}}",
       testingShort: "Testing…",
       buildingFoot: "{{name}} building…",
+      thinking: "Thinking",
+      finishing: "Building the widget",
+      stop: "Stop",
+      stillWorking: "Still working. Real data can take a minute or two.",
       failedTitle: "{{name}} couldn't build it",
       staleHint: "Test again to see how it looks.",
       whoButton: "Who looks after it: {{name}}",

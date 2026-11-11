@@ -26,7 +26,8 @@ import type { ToolDefinition } from "./types";
  *   tools hold it to its creator's rooms and agents (ADR 0053 §2, amended 2026-10-31).
  * - `routine` redoing a widget (its brief's `widget`, ADR 0135 §5): it only reads (built-in reads, connected apps'
  *   reads, the web, the browser) and answers through `update_widget`; everything else is refused with why,
- *   `hand_off` included: a widget's refresh never posts. `update_widget` is no other run's.
+ *   `hand_off` included: a widget's refresh never posts. `update_widget` is no other run's. What it starts with in
+ *   hand, where a brain's harness would hold tools back behind a search: `widgetUpFront`.
  *
  * Tool names are written here as plain strings (not imported) so the table loads before the tool
  * modules, which import the gateway.
@@ -337,6 +338,22 @@ function widgetRunPolicy(what: ToolKind): PolicyDecision {
     default:
       return refuse(REFUSALS.widgetOnly);
   }
+}
+
+/** Most tools a widget's refresh run starts with in hand (`widgetUpFront`): past it, a search away as before. */
+// ponytail: a count in list order; rank by the widget's ask and its last `sources` when workspaces outgrow it.
+export const WIDGET_UP_FRONT_MAX = 60;
+
+/**
+ * Whether a widget's refresh run starts with `tool` in hand instead of a search away: `update_widget`, the web, and
+ * the connected apps' reads (a big connector's directory stands for its reads). Its first data call then costs no
+ * lookup round. Every other tool the run may use (built-in reads, the browser) stays listed, one search away.
+ */
+export function widgetUpFront(tool: PolicyTool): boolean {
+  const what = toolKind(tool);
+  if (what.kind === "widget") return true;
+  if (tool.connectionId) return what.kind === "read" || what.kind === "directory";
+  return tool.name === "web_search" || tool.name === "web_fetch";
 }
 
 /** Where an approval asked while nobody watched comes from (`approvals.origin`): the card and notification say so. */

@@ -239,9 +239,24 @@ export interface WidgetUpdateView {
   costUsd: number | null;
 }
 
+/**
+ * The tool call a widget's refresh run is in right now, for the building card's step line: the fields the chat's live
+ * chip carries (the app says them in words), never the call's input.
+ */
+export interface WidgetStepView {
+  tool: string;
+  /** The connected app's label ("Stripe"); null for one of our own tools. */
+  connector: string | null;
+  service: string | null;
+  /** When the call started. */
+  at: string;
+}
+
 export interface WidgetDetailView extends WidgetView {
   dashboard: { id: string; kind: DashboardKind; title: string };
   canEdit: boolean;
+  /** While it is `building` or `updating`: the call its run is in; null between calls (it is thinking) and otherwise. */
+  step: WidgetStepView | null;
   /** The latest updates, newest first. */
   history: WidgetUpdateView[];
 }

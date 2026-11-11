@@ -1,4 +1,6 @@
 import type { TFunction } from "i18next";
+import { activityVerb, toolActivity } from "../lib/activity";
+import { capitalize } from "../lib/format";
 import type {
   DashboardAudience,
   DashboardEditPolicy,
@@ -9,6 +11,7 @@ import type {
   Widget,
   WidgetCostEstimate,
   WidgetSchedule,
+  WidgetStep,
 } from "./types";
 
 /**
@@ -244,3 +247,17 @@ export function widgetCostLine(
 /** The widgets of a board that are updating or being built (a sweep on each). */
 export const busyWidgets = (widgets: readonly Widget[]) =>
   widgets.filter((w) => w.status === "updating" || w.status === "building");
+
+/** A build that takes longer than this says it is still at it. */
+export const WIDGET_STILL_MS = 45_000;
+
+/**
+ * The building card's step line, in the chat's own words for a call ("Consultando o Stripe", "Pesquisando na web"),
+ * never a tool's name; "Pensando" between calls, and its own words for the call that hands the data in.
+ */
+export function widgetStepWords(t: TFunction, step: WidgetStep | null | undefined, locale?: string): string {
+  if (!step?.tool) return t("dashboards.newWidget.thinking");
+  if (step.tool === "update_widget" && !step.connector) return t("dashboards.newWidget.finishing");
+  const activity = toolActivity(step.tool, step.connector, null, { service: step.service });
+  return capitalize(activityVerb(t, activity), locale);
+}
