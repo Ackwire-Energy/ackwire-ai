@@ -861,7 +861,7 @@
     "value": "Let agents of {{org}} work on this {{device}}?"
   },
   "pair.body": {
-    "value": "{{host}} asked. They can run commands and use the browser and the coding tools found here, but no folders of yours until you add them in Preferences."
+    "value": "{{host}} asked. Agents get commands, the browser and coding tools here. Folders come later, in Preferences."
   },
   "pair.allow": {
     "value": "Allow"

@@ -288,7 +288,7 @@ test("the site's This computer: the Mac pairs with commands on, then the welcome
         const norte = () => pairedHomes(store.getSnapshot()).find((h) => h.status?.org?.id === "o-norte");
         await until(() => norte()?.access?.tools.commands === true);
         await until(() => host.window === "welcome");
-        expect(readPref(PREPARE_PREF, null)).toEqual({ org: "Estúdio Norte", server: FAKE_SERVER });
+        expect(readPref<unknown>(PREPARE_PREF, null)).toEqual({ org: "Estúdio Norte", server: FAKE_SERVER });
         expect(await host.autostart()).toBe(true);
       },
       host,

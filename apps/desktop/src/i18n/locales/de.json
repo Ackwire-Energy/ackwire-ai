@@ -372,7 +372,7 @@
   },
   "pair": {
     "title": "Agenten von {{org}} auf diesem {{device}} arbeiten lassen?",
-    "body": "{{host}} hat angefragt. Sie können Befehle ausführen und den Browser und die hier gefundenen Programmiertools nutzen, aber keine deiner Ordner, bis du sie in den Einstellungen hinzufügst.",
+    "body": "{{host}} hat angefragt. Agenten bekommen Befehle, Browser und Programmiertools. Ordner folgen später in den Einstellungen.",
     "allow": "Erlauben",
     "notNow": "Nicht jetzt",
     "offerTitle": "Agenten von {{org}} diesen {{device}} nutzen lassen?",

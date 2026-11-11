@@ -372,7 +372,7 @@
   },
   "pair": {
     "title": "Agents van {{org}} laten werken op deze {{device}}?",
-    "body": "{{host}} vroeg erom. Ze kunnen opdrachten uitvoeren en de browser en de codetools die hier staan gebruiken, maar geen mappen van jou tot je die toevoegt in Voorkeuren.",
+    "body": "{{host}} vroeg erom. Agents krijgen opdrachten, de browser en de codetools hier. Mappen voeg je later toe in Voorkeuren.",
     "allow": "Toestaan",
     "notNow": "Niet nu",
     "offerTitle": "Agents van {{org}} deze {{device}} laten gebruiken?",

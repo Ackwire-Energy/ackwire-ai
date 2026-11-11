@@ -53,7 +53,10 @@ type PhoneAnswer = (req: MachineRequest) => unknown;
  * answers `phone.*` itself (`answer`) and passes everything else to the real hub, so files come back for real.
  */
 async function world(
-  options: { reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] }; exec?: FakeRunnerOptions["exec"] } = {},
+  options: {
+    reply?: (req: ModelRequest) => { chunks: string[]; toolUses?: never[] };
+    exec?: FakeRunnerOptions["exec"];
+  } = {},
 ) {
   const devDeps = {} as DeviceToolDeps;
   f = await setup({
@@ -303,10 +306,7 @@ describe("computer on someone else's device", () => {
       exec: () => ({ fail: { code: "not_allowed", message: "Grok Build is turned off on this computer" } }),
     });
     const ctx = await runCtx();
-    await f.db
-      .update(schema.machines)
-      .set({ audienceMode: "everyone" })
-      .where(eq(schema.machines.id, w.mac.machineId));
+    await f.db.update(schema.machines).set({ audienceMode: "everyone" }).where(eq(schema.machines.id, w.mac.machineId));
     const there = await call(ctx, "run_code", { language: "bash", code: "ls", computer: "Sam's MacBook" });
     expect(there.content).toContain(
       "On Sam's MacBook, only the person at it can allow folders or turn tools on: tell them.",

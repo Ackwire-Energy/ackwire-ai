@@ -111,6 +111,7 @@ p {
   color: var(--muted);
   font-size: 14px;
   max-width: 54ch;
+  text-wrap: pretty;
 }
 .dk-path,
 .dk-code-inline {

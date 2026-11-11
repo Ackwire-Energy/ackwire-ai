@@ -372,7 +372,7 @@
   },
   "pair": {
     "title": "{{org}} ajanları bu {{device}} üzerinde çalışabilsin mi?",
-    "body": "{{host}} istedi. Komut çalıştırabilir, tarayıcıyı ve burada bulunan kodlama araçlarını kullanabilirler ama sen Tercihler'den eklemeden hiçbir klasörüne erişemezler.",
+    "body": "{{host}} istedi. Ajanlar komutları, tarayıcıyı ve kodlama araçlarını kullanır. Klasörleri sonra Tercihler'den eklersin.",
     "allow": "İzin ver",
     "notNow": "Şimdi değil",
     "offerTitle": "{{org}} ajanları bu {{device}} cihazını kullanabilsin mi?",

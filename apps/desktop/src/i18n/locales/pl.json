@@ -378,7 +378,7 @@
   },
   "pair": {
     "title": "Pozwolić agentom z {{org}} pracować na tym urządzeniu ({{device}})?",
-    "body": "{{host}} o to poprosił. Mogą uruchamiać polecenia i używać przeglądarki oraz znalezionych tu narzędzi do kodu, ale nie mają dostępu do Twoich folderów, dopóki nie dodasz ich w Preferencjach.",
+    "body": "{{host}} o to poprosił. Agenci dostaną polecenia, przeglądarkę i narzędzia do kodu. Foldery dodasz w Preferencjach.",
     "allow": "Zezwól",
     "notNow": "Nie teraz",
     "offerTitle": "Pozwolić agentom z {{org}} używać tego urządzenia ({{device}})?",

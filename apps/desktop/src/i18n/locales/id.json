@@ -369,7 +369,7 @@
   },
   "pair": {
     "title": "Izinkan agen {{org}} bekerja di {{device}} ini?",
-    "body": "{{host}} memintanya. Mereka bisa menjalankan perintah serta memakai browser dan alat coding yang ada di sini, tapi tidak bisa membuka folder milikmu sampai kamu menambahkannya di Preferensi.",
+    "body": "{{host}} memintanya. Agen dapat perintah, browser, dan alat coding di sini. Folder ditambahkan nanti di Preferensi.",
     "allow": "Izinkan",
     "notNow": "Nanti saja",
     "offerTitle": "Izinkan agen {{org}} memakai {{device}} ini?",

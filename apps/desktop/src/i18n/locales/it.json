@@ -375,7 +375,7 @@
   },
   "pair": {
     "title": "Permettere agli agenti di {{org}} di lavorare su questo {{device}}?",
-    "body": "{{host}} l'ha chiesto. Possono eseguire comandi e usare il browser e gli strumenti di codice trovati qui, ma nessuna tua cartella finché non le aggiungi in Preferenze.",
+    "body": "{{host}} l'ha chiesto. Gli agenti avranno comandi, browser e strumenti di codice di qui. Le cartelle dopo, in Preferenze.",
     "allow": "Consenti",
     "notNow": "Non ora",
     "offerTitle": "Lasciare che gli agenti di {{org}} usino questo {{device}}?",

@@ -401,7 +401,7 @@ export const desktopPtBR = {
   /** The system's own dialog before a page pairs this computer (main_window.rs draws it). */
   pair: {
     title: "Deixar os agentes de {{org}} trabalharem neste {{device}}?",
-    body: "{{host}} pediu. Eles podem rodar comandos e usar o navegador e as ferramentas de código encontradas aqui, mas nenhuma pasta sua até você adicionar nas Preferências.",
+    body: "{{host}} pediu. Os agentes terão comandos, navegador e ferramentas de código daqui. Pastas vêm depois, nas Preferências.",
     allow: "Permitir",
     notNow: "Agora não",
     offerTitle: "Deixar os agentes de {{org}} usarem este {{device}}?",

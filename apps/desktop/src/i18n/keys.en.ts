@@ -398,8 +398,11 @@ export const desktopEn = {
   },
   pair: {
     title: "Let agents of {{org}} work on this {{device}}?",
-    /** The system's dialog before the site pairs this computer: no switches there, so it says what they get. */
-    body: "{{host}} asked. They can run commands and use the browser and the coding tools found here, but no folders of yours until you add them in Preferences.",
+    /**
+     * The system's dialog before the site pairs this computer: no switches there, so it says what they get. At most 120
+     * characters in every language: Rust refuses the app's labels past that.
+     */
+    body: "{{host}} asked. Agents get commands, the browser and coding tools here. Folders come later, in Preferences.",
     allow: "Allow",
     notNow: "Not now",
     /** Shown once after sign-in, for a workspace this computer doesn't work for yet. */

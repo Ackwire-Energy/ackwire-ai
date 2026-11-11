@@ -375,7 +375,7 @@
   },
   "pair": {
     "title": "Laisser les agents de {{org}} travailler sur ce {{device}} ?",
-    "body": "{{host}} a demandé. Ils peuvent lancer des commandes et utiliser le navigateur et les outils de code trouvés ici, mais aucun de vos dossiers tant que vous ne les ajoutez pas dans les Préférences.",
+    "body": "{{host}} a demandé. Les agents auront commandes, navigateur et outils de code. Les dossiers ensuite, en Préférences.",
     "allow": "Autoriser",
     "notNow": "Plus tard",
     "offerTitle": "Laisser les agents de {{org}} utiliser ce {{device}} ?",
