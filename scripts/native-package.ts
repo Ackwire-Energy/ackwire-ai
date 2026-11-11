@@ -160,7 +160,8 @@ export async function buildFolders(out: string, version: string) {
 
   const server = join(base, "server");
   const built = await Bun.build({
-    entrypoints: [join(ROOT, "apps/server/src/native.ts")],
+    // The freeze watch's thread is a file of its own, loaded beside `native.js` (`startFreezeWatch`).
+    entrypoints: [join(ROOT, "apps/server/src/native.ts"), join(ROOT, "apps/server/src/freeze-watch-worker.ts")],
     target: "bun",
     outdir: join(server, "lib"),
     external: EXTERNAL,
