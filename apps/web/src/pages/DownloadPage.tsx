@@ -132,7 +132,7 @@ export function DownloadPage({ initial, initialArm }: { initial?: InstallSystem;
               }}
               options={INSTALL_SYSTEMS.map((s) => ({
                 value: s,
-                label: t(`machines.os.${buildTarget(s).target}`),
+                label: t(`machines.os.${buildTarget({ system: s, arm: false }).target}`),
               }))}
             />
           </div>
