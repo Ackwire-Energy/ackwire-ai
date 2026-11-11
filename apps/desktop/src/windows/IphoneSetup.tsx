@@ -107,7 +107,9 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
     (current === "helper" && states.helper === "needs") ||
     (current === "account" && (!!setup?.noTeam || reason === "apple_team_missing"));
   const stalled = useStalled(
-    current && !quiet ? [current, setup ? "" : "asking", phone?.serial, reason, platform?.state, progress].join(":") : null,
+    current && !quiet
+      ? [current, setup ? "" : "asking", phone?.serial, reason, platform?.state, progress].join(":")
+      : null,
   );
   const [plugged, setPlugged] = useState(false);
   const looking = current === "connected" && !phone;
