@@ -206,6 +206,42 @@ test("its computer asleep: one line says why, the run fails at once, no wait and
   expect(usage.filter((u) => u.billedTo !== "plan")).toEqual([]);
 });
 
+test("its plan's CLI failing: its line says what the CLI said, the card keeps the way to a key", async () => {
+  const { fx, deps, lodi } = await world();
+  await setAgentBrain(deps, fx.owner.id, fx.org.id, (await lodi()).id, { brain: "claude_code", account: ANAS });
+  const agent = await lodi();
+  const brain: Brain = {
+    kind: "claude_code",
+    async *run() {
+      yield {
+        type: "error",
+        code: "claude_failed",
+        message: "Claude Code ended without an answer (exit 1): Error: Invalid settings file: hooks must be an object",
+        retryable: true,
+      };
+    },
+  };
+  const handlers = createJobHandlers({
+    ...fx.jobDeps,
+    brains: { claude_code: () => brain },
+    machines: { status: async (id) => statusOf(id) },
+  });
+  const dm = await openPersonAgentDm(fx.db, fx.org.id, fx.owner.id, agent.id);
+  await postPersonMessage({ db: fx.db, pubsub: fx.pubsub }, fx.owner.id, fx.org.id, dm.id, { body: "oi" });
+  await drainOutbox(fx.db, handlers);
+  const [run] = await fx.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.agentId, agent.id));
+  expect(run?.status).toBe("failed");
+  const cards = (await fx.db.select().from(schema.messages).where(eq(schema.messages.channelId, dm.id))).filter(
+    (m) => m.meta.bodyCode === "no_ai",
+  );
+  expect(cards.map((m) => m.meta.noAi)).toMatchObject([
+    { reason: "cli_failed", why: "Invalid settings file: hooks must be an object" },
+  ]);
+  expect(cards[0]?.body).toBe(
+    "I can't answer now: my plan's AI stopped with an error (Invalid settings file: hooks must be an object).",
+  );
+});
+
 test("a request no person made, on a plan that answers only its owner: its line never says to connect a plan", async () => {
   const { fx, deps, lodi: helper } = await world();
   await setAgentBrain(deps, fx.owner.id, fx.org.id, (await helper()).id, { brain: "claude_code", account: ANAS });

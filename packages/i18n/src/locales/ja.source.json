@@ -5881,6 +5881,9 @@
   "noAi.rightHand.cli_failed": {
     "value": "{{name}} can't answer now: the plan's AI stopped with an error."
   },
+  "noAi.rightHand.cli_failedWhy": {
+    "value": "{{name}} can't answer now: the plan's AI stopped with an error ({{why}})."
+  },
   "noAi.rightHand.plan_limit": {
     "value": "{{name}} can't answer now: the plan reached its limit."
   },
@@ -37246,6 +37249,9 @@
   },
   "chat.body.no_ai_cli_failed": {
     "value": "I can't answer now: my plan's AI stopped with an error."
+  },
+  "chat.body.no_ai_cli_failedWhy": {
+    "value": "I can't answer now: my plan's AI stopped with an error ({{why}})."
   },
   "chat.body.no_ai_plan_limit": {
     "value": "I can't answer now: the plan I think with reached its limit."

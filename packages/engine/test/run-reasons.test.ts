@@ -215,6 +215,14 @@ test("what a CLI said is safe to show anyone: no secrets, no sign-ins, no folder
     "could not reach https://api.anthropic.com/v1/messages",
   );
   expect(cliErrorWords(`Error: ${"x".repeat(500)}`)).toHaveLength(200);
+  // A long one ends at a word, with "…": the cause and its way out stay whole.
+  expect(
+    cliErrorWords(
+      "error: this sandbox could not enforce its deny list on Linux: bwrap exec failed: No such file or directory (os error 2). Install bubblewrap with `apt install -y bubblewrap`. Refusing to start with denied paths unprotected.",
+    ),
+  ).toBe(
+    "this sandbox could not enforce its deny list on Linux: bwrap exec failed: No such file or directory (os error 2). Install bubblewrap with `apt install -y bubblewrap`. Refusing to start with denied…",
+  );
   expect(cliErrorWords("first line\nsecond line")).toBe("second line");
   // Sign-ins in an address, a token pasted in a command, a signed one, a folder in quotes or in a file:// address.
   const more = cliErrorWords(

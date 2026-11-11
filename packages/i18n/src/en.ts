@@ -2479,6 +2479,8 @@ export const en = {
       computer_failed: "{{name}} can't answer now: the computer the plan is signed in on had a problem.",
       /** The plan's CLI on that computer failed, not the computer. */
       cli_failed: "{{name}} can't answer now: the plan's AI stopped with an error.",
+      /** The same, with what the CLI said (`why`: its own words, often in English). */
+      cli_failedWhy: "{{name}} can't answer now: the plan's AI stopped with an error ({{why}}).",
       plan_limit: "{{name}} can't answer now: the plan reached its limit.",
       plan_not_shared: "Connect your own plan to talk to {{name}}: the workspace's plan serves only its owner.",
       /** A request no person made (another agent's, a routine's): nobody's own plan would answer it. */
@@ -15203,6 +15205,7 @@ export const en = {
       no_ai_computer_away: "I can't answer now: the computer my plan is signed in on is away.",
       no_ai_computer_failed: "I can't answer now: the computer my plan is signed in on had a problem.",
       no_ai_cli_failed: "I can't answer now: my plan's AI stopped with an error.",
+      no_ai_cli_failedWhy: "I can't answer now: my plan's AI stopped with an error ({{why}}).",
       no_ai_plan_limit: "I can't answer now: the plan I think with reached its limit.",
       no_ai_plan_not_shared:
         "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",

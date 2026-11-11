@@ -2891,6 +2891,11 @@ test("a failure that keeps coming back parks after its tries in a row, though wa
   const inMinutes = ((wake?.nextAttemptAt.getTime() ?? 0) - Date.now()) / 60_000;
   expect(inMinutes).toBeGreaterThan(OUTAGE_PARK.ladderMinutes[0] - 0.5);
   expect(inMinutes).toBeLessThanOrEqual(OUTAGE_PARK.ladderMinutes[0]);
+  // Its note names the CLI and what it said (the apps word it, `provider_wait_said`), never "can't answer right now".
+  const notes = (await timeline(f)).filter((m) => m.author.type === "agent");
+  expect(notes.map((m) => [m.meta.bodyCode, m.meta.bodyParams])).toEqual([
+    ["provider_wait_said", { provider: "Grok Build", detail: "connection reset by peer" }],
+  ]);
 
   // It passes: the wake answers, and the count starts over.
   healed = true;
