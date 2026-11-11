@@ -1058,6 +1058,8 @@ export interface ApiClient {
     ): Promise<WifiPairing>;
     wifiPairing(orgId: string, machineId: string, pairingId: string): Promise<WifiPairing>;
     cancelWifiPairing(orgId: string, machineId: string, pairingId: string): Promise<void>;
+    /** Asks the computer to also look for a plugged phone it has no driver for, which adb never lists (Windows). */
+    lookForPhones(orgId: string, machineId: string): Promise<void>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {

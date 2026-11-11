@@ -6,6 +6,7 @@ import {
   adbStateOf,
   androidKind,
   androidTransport,
+  driverlessPhones,
   keyguardShowing,
   parseAdbDevices,
   parseAndroidFacts,
@@ -21,7 +22,9 @@ import {
   androidText,
   applyInput,
   type IosScreenDriverFactory,
+  LOOK_MS,
   NO_IOS_CONTROL,
+  noDriverWords,
   OPENING_LATE,
   type PhoneIo,
   PhoneManager,
@@ -278,6 +281,7 @@ function rig(
     ios?: (env: NodeJS.ProcessEnv, root: string, now: () => number) => IosHelper;
     iosScreen?: IosScreenDriverFactory;
     openMs?: number;
+    pnp?: () => Promise<string | null>;
   } = {},
 ) {
   const root = tempDir("phones-");
@@ -315,6 +319,7 @@ function rig(
     ...(opts.readOnly ? { readOnly: true } : {}),
     ...(opts.iosScreen ? { iosScreen: opts.iosScreen } : {}),
     ...(opts.openMs ? { openMs: opts.openMs } : {}),
+    ...(opts.pnp ? { pnp: opts.pnp } : {}),
     pairPollMs: 5,
   });
   const calls = () =>
@@ -347,6 +352,105 @@ function rig(
     },
   };
 }
+
+/** `PNP_SHELL` on a Windows PC with a Pixel and a Galaxy plugged in and no driver for either, beside other devices. */
+const PNP_OUT = JSON.stringify([
+  {
+    InstanceId: "USB\\VID_18D1&PID_4EE7\\38021FDH2000AB",
+    FriendlyName: "Pixel 8",
+    Class: null,
+    Status: "Error",
+    ConfigManagerErrorCode: 28,
+  },
+  {
+    InstanceId: "USB\\VID_18D1&PID_4EE7&MI_01\\6&2A3B4C5D&0&0001",
+    FriendlyName: "ADB Interface",
+    Class: null,
+    Status: "Error",
+    ConfigManagerErrorCode: 28,
+  },
+  {
+    InstanceId: "USB\\VID_046D&PID_C52B\\5&1A2B3C&0&3",
+    FriendlyName: "USB Receiver",
+    Class: "HIDClass",
+    Status: "Error",
+    ConfigManagerErrorCode: 10,
+  },
+  {
+    InstanceId: "USB\\VID_04E8&PID_6860\\R5CW12345XY",
+    FriendlyName: "SAMSUNG_Android",
+    Class: null,
+    Status: "Error",
+    ConfigManagerErrorCode: 28,
+  },
+  {
+    InstanceId: "USB\\VID_0BDA&PID_8153\\000001",
+    FriendlyName: "USB 10/100/1000 LAN",
+    Class: "Net",
+    Status: "Error",
+    ConfigManagerErrorCode: 28,
+  },
+  {
+    InstanceId: "USB\\VID_04E8&PID_61F5\\S4EVNF0M123456",
+    FriendlyName: "Portable SSD T7",
+    Class: "DiskDrive",
+    Status: "Degraded",
+    ConfigManagerErrorCode: 0,
+  },
+  {
+    InstanceId: "USB\\VID_2717&PID_FF48&MI_00\\7&1F2E3D&0&0000",
+    FriendlyName: "MTP",
+    Class: "WPD",
+    Status: "Error",
+    ConfigManagerErrorCode: 28,
+  },
+]);
+
+test("Windows: a plugged phone with no USB driver, from PowerShell's PnP list, one per phone", () => {
+  expect(driverlessPhones(PNP_OUT)).toEqual([
+    { serial: "38021FDH2000AB", model: "Pixel 8" },
+    { serial: "R5CW12345XY", model: "Android phone" },
+    // Only an interface listed: no serial of its own, the phone by vendor and product.
+    { serial: "usb-2717-ff48", model: "Android phone" },
+  ]);
+  // PowerShell prints one device as an object, none as nothing.
+  expect(driverlessPhones(JSON.stringify(JSON.parse(PNP_OUT)[0]))).toEqual([
+    { serial: "38021FDH2000AB", model: "Pixel 8" },
+  ]);
+  expect(driverlessPhones("")).toEqual([]);
+  expect(driverlessPhones("Get-PnpDevice : not recognized")).toEqual([]);
+  expect(noDriverWords("win32")).toContain("Install its maker's");
+  expect(noDriverWords("linux")).toContain("udev rules");
+});
+
+test("Windows: a phone with no driver shows as no_driver only while a guide asks", async () => {
+  let asked = 0;
+  const pnp = async () => {
+    asked++;
+    return PNP_OUT;
+  };
+  const r = rig({}, { platform: "win32", tools: [], pnp });
+  await r.manager.poll();
+  expect(r.manager.list()).toEqual([]);
+  expect(asked).toBe(0);
+  expect(r.manager.look()).toBe(true);
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => [p.serial, p.state, p.reason])).toEqual([
+    ["38021FDH2000AB", "needs_you", "no_driver"],
+    ["R5CW12345XY", "needs_you", "no_driver"],
+    ["usb-2717-ff48", "needs_you", "no_driver"],
+  ]);
+  // Polls in between reuse the last look.
+  await r.manager.poll();
+  expect(asked).toBe(1);
+  // The guide closed: a minute later it stops looking.
+  r.tick(LOOK_MS);
+  await r.manager.poll();
+  expect(r.manager.list()).toEqual([]);
+  expect(asked).toBe(1);
+  // Other systems don't look.
+  expect(rig({}, { tools: [] }).manager.look()).toBe(false);
+});
 
 const ANDROID_STATE = {
   adbDevices: `List of devices attached\n${PIXEL} device usb:1-1 model:Pixel_8\nR5CT1234567 unauthorized usb:1-2\n${EMU} device model:sdk_gphone64_arm64\n`,
