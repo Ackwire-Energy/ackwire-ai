@@ -204,7 +204,7 @@ describe("an agent reacts to the thanks of the person it just answered", () => {
     expect((await reactionsOn(thanks.id)).map((r) => r.agentId)).toEqual([f.agent.id]);
   });
 
-  test("thanks between two people in an agent's thread: that agent doesn't react", async () => {
+  test("thanks between two people in an agent's thread: that agent neither reacts nor runs", async () => {
     f = await setup();
     const ops = await addOps();
     const bia = await addBia();
@@ -212,8 +212,8 @@ describe("an agent reacts to the thanks of the person it just answered", () => {
     await said(bia.id, "I cleaned the old logs, should be fine now", minutesAgo(15), report.id);
     const thanks = await said(f.owner.id, "valeu", minutesAgo(1), report.id);
     const result = await route(thanks.id);
-    // A reply under an agent's message is that agent's by the reply rule: a run that may pass, never a reaction.
-    expect(result.selected).toEqual([ops.id]);
+    // The reply rule never answers for the step: a thanks under the agent's message starts no run.
+    expect(result.selected).toEqual([]);
     expect(result.reacted).toBeUndefined();
     expect(await reactionsOn(thanks.id)).toEqual([]);
   });
