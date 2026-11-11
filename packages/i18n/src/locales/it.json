@@ -3695,6 +3695,7 @@
       "ready": "Collegato",
       "syncing": "Sincronizzazione",
       "reads": "Legge {{label}}",
+      "readOnly": "sola lettura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementi",
       "synced": "sincronizzato {{when}}",
@@ -3743,7 +3744,7 @@
       "onepassword": {
         "step": {
           "1": "Crea in 1Password una cassaforte solo per i tuoi agenti e spostaci i login che possono usare",
-          "2": "Crea un account di servizio con accesso solo a quella cassaforte",
+          "2": "Crea un account di servizio con accesso solo a quella cassaforte (lettura e scrittura, se i tuoi agenti devono salvarci nuovi login)",
           "3": "Incolla qui il token dell'account di servizio"
         },
         "field": {

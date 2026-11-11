@@ -3473,6 +3473,7 @@
       "ready": "Terhubung",
       "syncing": "Menyinkronkan",
       "reads": "Membaca {{label}}",
+      "readOnly": "hanya baca",
       "items_other": "{{count}} item",
       "synced": "disinkronkan {{when}}",
       "syncNow": "Sinkronkan sekarang",
@@ -3519,7 +3520,7 @@
       "onepassword": {
         "step": {
           "1": "Buat brankas di 1Password khusus untuk agenmu dan pindahkan ke sana login yang boleh mereka gunakan",
-          "2": "Buat akun layanan yang hanya punya akses ke brankas itu",
+          "2": "Buat akun layanan yang hanya punya akses ke brankas itu (baca dan tulis, jika agenmu perlu menyimpan login baru di sana)",
           "3": "Tempel token akun layanan di sini"
         },
         "field": {

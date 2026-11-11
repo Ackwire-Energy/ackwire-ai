@@ -3673,6 +3673,7 @@ export const ptBR = {
       ready: "Conectado",
       syncing: "Sincronizando",
       reads: "Lê {{label}}",
+      readOnly: "só leitura",
       items_one: "{{count}} item",
       items_other: "{{count}} itens",
       synced: "sincronizado {{when}}",
@@ -3721,7 +3722,7 @@ export const ptBR = {
       onepassword: {
         step: {
           "1": "Crie no 1Password um cofre só para seus agentes e mova para ele os logins que eles podem usar",
-          "2": "Crie uma conta de serviço com acesso só a esse cofre",
+          "2": "Crie uma conta de serviço com acesso só a esse cofre (leitura e escrita, se seus agentes forem salvar novos logins nele)",
           "3": "Cole aqui o token da conta de serviço",
         },
         field: {

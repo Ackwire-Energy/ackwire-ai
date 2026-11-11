@@ -3695,6 +3695,7 @@
       "ready": "Connecté",
       "syncing": "Synchronisation",
       "reads": "Lit {{label}}",
+      "readOnly": "lecture seule",
       "items_one": "{{count}} élément",
       "items_other": "{{count}} éléments",
       "synced": "synchronisé {{when}}",
@@ -3743,7 +3744,7 @@
       "onepassword": {
         "step": {
           "1": "Créez dans 1Password un coffre réservé à vos agents et déplacez-y les identifiants qu'ils peuvent utiliser",
-          "2": "Créez un compte de service avec accès à ce coffre uniquement",
+          "2": "Créez un compte de service avec accès à ce coffre uniquement (lecture et écriture, si vos agents doivent y enregistrer de nouveaux identifiants)",
           "3": "Collez ici le jeton du compte de service"
         },
         "field": {

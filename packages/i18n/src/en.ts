@@ -3705,6 +3705,7 @@ export const en = {
       ready: "Connected",
       syncing: "Syncing",
       reads: "Reads {{label}}",
+      readOnly: "read-only",
       items_one: "{{count}} item",
       items_other: "{{count}} items",
       synced: "synced {{when}}",
@@ -3755,7 +3756,7 @@ export const en = {
       onepassword: {
         step: {
           "1": "Create a vault in 1Password only for your agents and move into it the logins they may use",
-          "2": "Create a service account with access to that vault only",
+          "2": "Create a service account with access to that vault only (read and write, if your agents should save new logins there)",
           "3": "Paste the service account token here",
         },
         field: {

@@ -2318,6 +2318,7 @@
       "ready": "Bağlı",
       "syncing": "Eşitleniyor…",
       "reads": "Okunan: {{label}}",
+      "noWrites": "salt okunur",
       "items_one": "{{count}} öğe",
       "items_other": "{{count}} öğe",
       "synced": "{{when}} eşitlendi",

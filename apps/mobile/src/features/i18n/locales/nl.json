@@ -2318,6 +2318,7 @@
       "ready": "Gekoppeld",
       "syncing": "Synchroniseren…",
       "reads": "Leest {{label}}",
+      "noWrites": "alleen-lezen",
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "synced": "gesynchroniseerd {{when}}",

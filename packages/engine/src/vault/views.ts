@@ -2,7 +2,7 @@
  * Vault rows as people and agents see them (ADR 0144). Never a value: a contact's fields are the only thing opened
  * here, since they are meant to be read (by the people who see the item and by the agents who may use it).
  */
-import type { VaultSources } from "@agenteschat/adapters";
+import { VAULT_READ_ONLY_CONFIG, type VaultSources } from "@agenteschat/adapters";
 import { asc, type Executor, eq, schema } from "@agenteschat/db";
 import {
   accessView,
@@ -24,6 +24,7 @@ import {
   type VaultItemForAgent,
   type VaultItemKind,
   type VaultMatch,
+  type VaultPlace,
   type VaultSourceInfo,
 } from "./service";
 
@@ -69,6 +70,29 @@ export function sourceNameOf(sources: VaultSources, kind: string): string {
   } catch {
     return kind;
   }
+}
+
+/** This workspace's own Vault as a place: it always takes a new item. */
+export const THE_VAULT: VaultPlace = { name: "the Vault", connectionId: null, label: null, writes: "yes" };
+
+/** A connection's credential was refused a write: it only reads until a person connects it again. */
+export const connectionReadOnly = (connection: Pick<ConnectionRow, "config">) =>
+  connection.config[VAULT_READ_ONLY_CONFIG] === "true";
+
+/** Where a connection's items are kept (none: the Vault itself), and whether a new login can go there. */
+export function placeOf(sources: VaultSources, connection: ConnectionRow | undefined): VaultPlace {
+  if (!connection) return THE_VAULT;
+  const writes = connectionReadOnly(connection)
+    ? "read_only"
+    : sourceOf(sources, connection.kind)?.createLogin
+      ? "yes"
+      : "no";
+  return {
+    name: sourceNameOf(sources, connection.kind),
+    connectionId: connection.id,
+    label: connection.label,
+    writes,
+  };
 }
 
 /** The sources a person can connect here, as the app draws their cards. */
@@ -164,7 +188,11 @@ export async function itemView(
 }
 
 /** An item for an agent: what it needs to pick and use it, never a value. */
-export function agentView(item: ItemRow, contact: VaultContactFields | null): VaultItemForAgent {
+export function agentView(
+  item: ItemRow,
+  contact: VaultContactFields | null,
+  place: VaultPlace = THE_VAULT,
+): VaultItemForAgent {
   return {
     id: item.id,
     kind: item.kind as VaultItemKind,
@@ -176,6 +204,7 @@ export function agentView(item: ItemRow, contact: VaultContactFields | null): Va
     username: item.username,
     keyName: item.keyName,
     contact: item.kind === "contact" ? (contact ?? {}) : null,
+    place,
     ...(item.previousSecrets.length > 0 ? { earlier: item.previousSecrets.length } : {}),
   };
 }
@@ -191,6 +220,7 @@ export function connectionView(
     id: row.id,
     kind: row.kind,
     name: sourceNameOf(sources, row.kind),
+    readOnly: connectionReadOnly(row),
     scope: scopeOf(row.ownerUserId),
     ownerUserId: row.ownerUserId,
     label: row.label,

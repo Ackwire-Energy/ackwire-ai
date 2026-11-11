@@ -2215,6 +2215,7 @@
       "ready": "已连接",
       "syncing": "正在同步…",
       "reads": "读取 {{label}}",
+      "noWrites": "只读",
       "items_other": "{{count}} 个项目",
       "synced": "{{when}}已同步",
       "sync": "立即同步",

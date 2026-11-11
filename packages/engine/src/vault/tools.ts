@@ -8,6 +8,7 @@ import {
   CONTACT_FIELDS,
   deleteVaultItemByAgent,
   listUsableVault,
+  listVaultPlaces,
   saveVaultItemByAgent,
   VAULT_LIMITS,
   type VaultAgentChange,
@@ -15,9 +16,11 @@ import {
   type VaultDeps,
   type VaultItemForAgent,
   type VaultItemKind,
+  type VaultPlace,
   type VaultRun,
   vaultItemName,
   vaultPersonOfRun,
+  vaultPlaceName,
   vaultRefusalOutput,
 } from "./index";
 
@@ -25,7 +28,8 @@ import {
  * The Vault as tools (ADR 0144): what people saved for the agent, found before it asks them (`vault_list`), and the
  * contacts it keeps for them (`vault_save`, `vault_delete`). No tool ever returns a password or a key: a login is
  * typed by the browser (`type_secret` with `login`, browser/tools.ts) and a key goes to one command (`run_code` with
- * `keys`, sandbox-tools.ts), each sealed for the agent's own computer. Contact fields aren't secret: they are meant
+ * `keys`, sandbox-tools.ts), each sealed for the agent's own computer. Every item says where it is kept (the Vault,
+ * or a connected password manager by name), and the list says which of those places take a new login (§9). Contact fields aren't secret: they are meant
  * for the agent to read and type. Who may use what is the Vault's (`vault/access.ts`), checked on every call for the
  * person behind the run.
  */
@@ -84,7 +88,7 @@ const ITEM_BLOCK_CHARS = 6000;
 const itemBlock = (lines: string[]) => untrustedBlock("vault item", lines.join("\n"), ITEM_BLOCK_CHARS);
 
 function itemLine(item: VaultItemForAgent, owner: string): string {
-  const scope = item.scope === "team" ? "team" : `personal, ${owner}`;
+  const scope = `${item.scope === "team" ? "team" : `personal, ${owner}`}, kept in ${vaultPlaceName(item.place)}`;
   const about = [
     ...(item.description ? [`about: ${line(item.description)}`] : []),
     ...(item.earlier
@@ -116,16 +120,46 @@ async function nameOf(ctx: ToolContext, userId: string) {
   return u?.name?.trim() || "them";
 }
 
+const TAKES_NEW: Record<VaultPlace["writes"], string> = {
+  yes: "takes new logins",
+  read_only:
+    "read-only: its token can only read, so nothing is saved or changed there until someone who manages that connection reconnects it with a token that also writes",
+  no: "read from here only: people add and change logins there",
+};
+
+/**
+ * The places this run's items are kept and which take a login the agent makes, with where one goes when the person
+ * names no place (ADR 0144 §9). Nothing when the Vault is the only place.
+ */
+export function vaultPlacesText(places: VaultPlace[]): string | null {
+  const managers = places.filter((p) => p.connectionId);
+  if (managers.length === 0) return null;
+  const writable = managers.filter((p) => p.writes === "yes");
+  const only = writable.length === 1 ? writable[0] : undefined;
+  return [
+    "Where these are kept (each item says its place). A connected password manager is not the Vault: say which one an item is in when you tell a person.",
+    "- the Vault (this workspace's own): takes new logins, keys and contacts",
+    ...managers.map((p) => `- ${vaultPlaceName(p)}: ${TAKES_NEW[p.writes]}`),
+    `A login you make (browser_make_password) is kept in ${only ? vaultPlaceName(only) : "the Vault"} unless the person names another place (\`save_in\`); the answer always says where it went.`,
+  ].join("\n");
+}
+
 /** What `vault_list` answers (see the file's comment): never a value. */
-export function vaultListText(items: VaultItemForAgent[], who: { name: string | null }, filtered: boolean): string {
+export function vaultListText(
+  items: VaultItemForAgent[],
+  who: { name: string | null },
+  filtered: boolean,
+  places: VaultPlace[] = [],
+): string {
   const forWhom = who.name ? ` for ${who.name}` : "";
+  const kept = vaultPlacesText(places);
   if (items.length === 0) {
     const none = filtered
       ? `Nothing in the Vault matches that for you here${forWhom}.`
       : who.name
         ? `Nothing in the Vault is shared with you for ${who.name}.`
         : "Nobody is behind this run, and nothing in the Vault open to everyone in the workspace is shared with you.";
-    return `${none} A person adds a login, a key or contact details in Settings, Vault, and picks the agents that may use it; a password or key typed in your request card (request_secret) can be kept there with "Save to the Vault".`;
+    return `${none} A person adds a login, a key or contact details in Settings, Vault, and picks the agents that may use it; a password or key typed in your request card (request_secret) can be kept there with "Save to the Vault".${kept ? `\n\n${kept}` : ""}`;
   }
   const shown = items.slice(0, VAULT_LIST_MAX);
   const owner = who.name ?? "its owner";
@@ -158,6 +192,7 @@ export function vaultListText(items: VaultItemForAgent[], who: { name: string | 
   if (items.length > shown.length) {
     parts.push(`${items.length - shown.length} more: narrow it with \`query\`, \`site\` or \`kind\`.`);
   }
+  if (kept) parts.push(kept);
   return parts.join("\n\n");
 }
 
@@ -210,8 +245,9 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
           VAULT_LIST_MAX,
         );
         const name = person.personId ? await nameOf(ctx, person.personId) : null;
+        const places = await listVaultPlaces(deps, run, person);
         return {
-          content: vaultListText(items, { name }, Boolean(kind || site || query)),
+          content: vaultListText(items, { name }, Boolean(kind || site || query), places),
           data: { vaultItems: items.length },
         };
       } catch (error) {
@@ -232,7 +268,7 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
   const save: ToolDefinition = {
     name: VAULT_SAVE_TOOL,
     description:
-      "Keep contact details in the Vault, or change what isn't secret there. Without `id`: a new contact (`title` and its fields), personal to the person behind this run (only they see it, and their agents use it when they ask). With `id` (from vault_list): change a contact's title or fields, a login's username, or any item's description, on that person's own items, or on the team's when they manage credentials. Passwords and keys are never saved here: people save them in Settings, Vault, or from your request card, and you make your own with `browser_make_password` or `vault_make_password`. Do it when a person asks, or offers details worth keeping.",
+      "Keep contact details in the Vault, or change what isn't secret there. Without `id`: a new contact (`title` and its fields), personal to the person behind this run (only they see it, and their agents use it when they ask). With `id` (from vault_list): change a contact's title or fields, a login's username, or any item's description, on that person's own items, or on the team's when they manage credentials. An item kept in a connected password manager changes there: only a login's username, alone, where that manager takes changes. Passwords and keys are never saved here: people save them in Settings, Vault, or from your request card, and you make your own with `browser_make_password` or `vault_make_password`. Do it when a person asks, or offers details worth keeping.",
     scope: VAULT_WRITE_SCOPE,
     inputSchema: {
       type: "object",
@@ -292,7 +328,7 @@ export function createVaultToolSource(deps: VaultDeps): ToolSource {
           };
         }
         return {
-          content: `Updated ${vaultItemName(item)} in the Vault.`,
+          content: `Updated ${vaultItemName(item)} in ${vaultPlaceName(item.place)}.`,
           data: { vaultItem: { id: item.id, outcome: result.outcome } },
         };
       } catch (error) {

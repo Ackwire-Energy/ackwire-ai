@@ -2414,6 +2414,7 @@
       "ready": "Conectado",
       "syncing": "Sincronizando…",
       "reads": "Lee {{label}}",
+      "noWrites": "solo lectura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementos",
       "synced": "sincronizado {{when}}",
