@@ -12327,6 +12327,11 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 .sidebar__section-add.ac-btn + .sidebar__section-add.ac-btn {
   margin-inline-start: calc(var(--space-2) - 2px);
 }
+/* A header's button beside its count or its "working" line stands 8 apart too, never 2. */
+.sidebar__section-head > .ac-btn + .sidebar__section-count,
+.sidebar__section-head > .sidebar__section-working + .ac-btn {
+  margin-inline-start: calc(var(--space-2) - 2px);
+}
 /*
  * Channel categories (ADR 0080). Closed, a category also keeps its unread channels in sight, not only the open
  * one (the rule above hides the rest).
