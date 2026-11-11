@@ -16364,8 +16364,7 @@
       "task": "Tugas",
       "state": "Status",
       "using": "Sedang dipakai",
-      "time": "Waktu",
-      "computer": "Berjalan di"
+      "time": "Waktu"
     },
     "sections": {
       "asked": "Diminta oleh orang",
@@ -16425,7 +16424,6 @@
     },
     "askedBy": "{{name}} meminta",
     "askedByYou": "Kamu meminta",
-    "servers": "Server kami",
     "plan": "{{done}} dari {{total}} selesai",
     "program": {
       "browser": "Browser",

@@ -59,6 +59,26 @@ describe("Button", () => {
     expect(close.textContent).toBe("");
   });
 
+  test("an icon-only button with no icon of its own shows its child as the glyph", () => {
+    render(
+      <>
+        <Button variant="ghost" size="sm" iconOnly aria-label="Parar">
+          <span className="glyph" />
+        </Button>
+        <Button variant="ghost" size="sm" iconOnly icon="close" aria-label="Fechar">
+          <span className="glyph" />
+        </Button>
+      </>,
+    );
+    const stop = body().getByRole("button", { name: "Parar" });
+    expect(stop.className).toContain("ac-btn--icon");
+    expect(stop.querySelector(".glyph")).not.toBeNull();
+    // With an icon, the icon alone.
+    const close = body().getByRole("button", { name: "Fechar" });
+    expect(close.querySelector(".glyph")).toBeNull();
+    expect(close.querySelector("svg.ac-icon")).not.toBeNull();
+  });
+
   test("asChild renders a link with button styles", () => {
     render(
       <Button asChild variant="primary">

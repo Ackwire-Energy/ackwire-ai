@@ -7,6 +7,7 @@ import {
   groupTasks,
   hiddenCount,
   taskPlace,
+  taskTime,
   taskWaitGroups,
   taskWaitGroupText,
   taskWaitWords,
@@ -84,6 +85,23 @@ test("a wait on no limit: the agent's line of work, a computer gone, one not rea
   expect(on("no_computer")?.state).toBe("taskManager.wait.computerWait");
   expect(words(task(null, null))?.next).toBe("taskManager.wait.answerNext");
   expect(words(task(null, null, { status: "waiting_approval" }))?.next).toBe("taskManager.wait.okNext");
+});
+
+test("Tempo: a clock at work or in the queue; waiting, how long since it paused, else since it started", () => {
+  const ago = (ms: number) => ({
+    startedAt: new Date(now - ms).toISOString(),
+    createdAt: new Date(now - ms).toISOString(),
+  });
+  const hour = 3_600_000;
+  expect(taskTime(t, task(null, null, { status: "running", ...ago(372_000) }), now)).toBe("6:12");
+  expect(taskTime(t, task(null, null, { status: "queued", ...ago(hour + 130_000) }), now)).toBe("1:02:10");
+  // Paused for two days of the 82 hours since it started: never "82:07:59".
+  const paused = wait({ since: new Date(now - 50 * hour).toISOString() });
+  expect(taskTime(t, task("plan", paused, ago(82 * hour)), now)).toBe('format.inDays {"count":2}');
+  expect(taskTime(t, task("plan", wait(), ago(82 * hour)), now)).toBe('format.inDays {"count":3}');
+  expect(taskTime(t, task(null, null, { status: "waiting_approval", ...ago(18 * 60_000) }), now)).toBe(
+    'format.inMinutes {"count":18}',
+  );
 });
 
 test("an older server sends no wait: the plain words, no second line", () => {

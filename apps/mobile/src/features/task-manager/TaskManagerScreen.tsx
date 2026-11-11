@@ -3,10 +3,12 @@ import {
   type AgentTasks,
   agentSummary,
   endedState,
+  groupLead,
   groupTasks,
   hiddenCount,
   taskPlace,
   taskState,
+  taskTime,
   taskTitle,
   taskWaitWords,
 } from "@agenteschat/client/lib/task-manager";
@@ -84,10 +86,10 @@ function useRowMotion() {
 
 /**
  * The task manager (ADR 0128), pushed from Agentes: what the agents are doing now, under a line that counts it
- * ("2 trabalhando · 1 espera você"). The tasks people asked for, by agent (its row is one tap: it folds, and says how
- * its tasks stand), each a row with its state as text (the orbit while it runs, amber while it waits on you) and a
- * chevron: stopping is done on the task's own screen, never from a button in the list. Then the routines' work in
- * the background and what ended today. Above them, the computers with work, each opening its line in a sheet.
+ * ("2 trabalhando · 1 espera você"). The tasks people asked for, by agent (its row says how its tasks stand and is
+ * one tap: folded until opened), each a row with its state as text (the orbit while it runs, amber while it waits on
+ * you) and a chevron: stopping is done on the task's own screen, never from a button in the list. Then the routines'
+ * work in the background and what ended today. Above them, the computers with work, each opening its line in a sheet.
  */
 export function TaskManagerScreen() {
   return (
@@ -107,7 +109,7 @@ function TaskManager() {
   // Tasks being stopped from their screens read "Parando…" here too.
   const { stopping } = useStopper();
   const { fade, layout } = useRowMotion();
-  const [closed, setClosed] = useState<ReadonlySet<string>>(() => new Set());
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
   const [endedOpen, setEndedOpen] = useState(false);
   const view = tasks.data;
   const { groups, delegated, background } = useMemo(
@@ -129,7 +131,7 @@ function TaskManager() {
       .filter(Boolean)
       .join(" · ") || t("mobile.taskManager.quiet");
   const toggle = (agentId: string) =>
-    setClosed((was) => {
+    setOpened((was) => {
       const next = new Set(was);
       if (next.has(agentId)) next.delete(agentId);
       else next.add(agentId);
@@ -192,7 +194,7 @@ function TaskManager() {
                   <AgentGroup
                     key={g.agentId}
                     group={g}
-                    open={!closed.has(g.agentId)}
+                    open={opened.has(g.agentId)}
                     onToggle={() => toggle(g.agentId)}
                     divider={i > 0}
                     live={i < LIVE_ROWS}
@@ -212,7 +214,7 @@ function TaskManager() {
                     key={g.agentId}
                     group={g}
                     flat
-                    open={!closed.has(`by:${g.agentId}`)}
+                    open={opened.has(`by:${g.agentId}`)}
                     onToggle={() => toggle(`by:${g.agentId}`)}
                     divider={i > 0}
                     live={i < LIVE_ROWS}
@@ -299,6 +301,7 @@ function AgentGroup({
   const heldTask = group.tasks.find((task) => taskState(task) === "waiting");
   const line = groupLine(t, group, heldTask ? taskWaitWords(t, i18n.language, heldTask, now)?.state : null);
   const mark: RowState = line.mark === "working" ? "working" : line.mark === "waiting" ? "ok" : "queued";
+  const time = taskTime(t, groupLead(group), now);
   const chevron = useAnimatedStyle(() => ({
     transform: [{ rotate: withTiming(open ? "0deg" : "-90deg", { duration: 200 }) }],
   }));
@@ -311,7 +314,7 @@ function AgentGroup({
         onPress={onToggle}
         accessibilityRole="button"
         accessibilityState={{ expanded: open }}
-        accessibilityLabel={`${name}, ${line.text}`}
+        accessibilityLabel={`${name}, ${line.text}, ${time}`}
         style={({ pressed }) => [styles.agent, pressed && { backgroundColor: c.sunken }]}
       >
         {divider ? <View style={[styles.divider, styles.agentDivider, { backgroundColor: c.line2 }]} /> : null}
@@ -332,12 +335,11 @@ function AgentGroup({
           </View>
           <View style={styles.row}>
             <TaskMark state={mark} color={color} />
-            <Text
-              variant="footnote"
-              numberOfLines={1}
-              style={[styles.shrink, { color: line.mark === "waiting" ? c.amber : c.muted }]}
-            >
+            <Text variant="footnote" style={[styles.shrink, { color: line.mark === "waiting" ? c.amber : c.muted }]}>
               {line.text}
+            </Text>
+            <Text variant="caption" tone="faint" style={styles.num}>
+              · {time}
             </Text>
           </View>
         </View>
@@ -357,7 +359,7 @@ function AgentGroup({
 }
 
 /**
- * A task, a 60-point row: its title on one line, its state under it (the orbit while it runs, the time; amber while it
+ * A task, a 60-point row: its title, whole, its state under it (the orbit while it runs, the time; amber while it
  * waits on you) and a chevron, since it opens its own screen, where it is stopped. Under its agent's row it starts
  * at the name's column; a routine's (`flat`) is a MediaRow: its agent's face, name, where and who asked on one
  * line, the title and state under them at the row's width.
@@ -411,17 +413,13 @@ function TaskRow({
             name={agent}
             meta={sub || undefined}
           >
-            <Text variant="body" numberOfLines={1}>
-              {title}
-            </Text>
+            <Text variant="body">{title}</Text>
             <StateLine task={task} state={state} now={now} />
           </MediaRow>
         </View>
       ) : (
         <View style={styles.taskText}>
-          <Text variant="body" numberOfLines={1}>
-            {title}
-          </Text>
+          <Text variant="body">{title}</Text>
           <StateLine task={task} state={state} now={now} />
         </View>
       )}
@@ -487,7 +485,7 @@ function EndedRow({ task, divider, meId }: { task: EndedTask; divider: boolean; 
         <AgentFace agentId={task.agentId} size={30} live={false} />
       </OpensAgent>
       <View style={styles.taskText}>
-        <Text variant="subhead" numberOfLines={1} style={styles.medium}>
+        <Text variant="subhead" style={styles.medium}>
           {title}
         </Text>
         <Text variant="footnote" tone="muted" numberOfLines={1}>

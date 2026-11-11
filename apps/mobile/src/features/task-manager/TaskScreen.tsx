@@ -1,6 +1,7 @@
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { endedState, linePlace, taskClock, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
+import { endedState, linePlace, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
+import { formatDuration } from "@agenteschat/client/lib/work";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
@@ -135,7 +136,7 @@ function Ended({ task }: { task: EndedTask }) {
             {endedText(t, task, meId)}
           </Text>
           <Text variant="footnote" tone="faint" style={styles.num}>
-            {`· ${taskClock(took)}`}
+            {`· ${formatDuration(t, took)}`}
           </Text>
         </View>
       }

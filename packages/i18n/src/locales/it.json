@@ -17453,8 +17453,7 @@
       "task": "Attività",
       "state": "Stato",
       "using": "Sta usando",
-      "time": "Durata",
-      "computer": "Gira su"
+      "time": "Durata"
     },
     "sections": {
       "asked": "Chieste da persone",
@@ -17516,7 +17515,6 @@
     },
     "askedBy": "L'ha chiesta {{name}}",
     "askedByYou": "L'hai chiesta tu",
-    "servers": "I nostri server",
     "plan": "{{done}} di {{total}} fatti",
     "program": {
       "browser": "Browser",

@@ -40795,9 +40795,6 @@
   "taskManager.columns.time": {
     "value": "Time"
   },
-  "taskManager.columns.computer": {
-    "value": "Runs on"
-  },
   "taskManager.sections.asked": {
     "value": "Asked by people"
   },
@@ -40944,9 +40941,6 @@
   },
   "taskManager.askedByYou": {
     "value": "You asked"
-  },
-  "taskManager.servers": {
-    "value": "Our servers"
   },
   "taskManager.plan": {
     "value": "{{done}} of {{total}} done"

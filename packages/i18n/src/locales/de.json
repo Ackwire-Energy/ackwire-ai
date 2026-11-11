@@ -16813,8 +16813,7 @@
       "task": "Aufgabe",
       "state": "Status",
       "using": "Nutzt gerade",
-      "time": "Dauer",
-      "computer": "Läuft auf"
+      "time": "Dauer"
     },
     "sections": {
       "asked": "Von Personen beauftragt",
@@ -16875,7 +16874,6 @@
     },
     "askedBy": "Auftrag von {{name}}",
     "askedByYou": "Dein Auftrag",
-    "servers": "Unsere Server",
     "plan": "{{done}} von {{total}} erledigt",
     "program": {
       "browser": "Browser",
