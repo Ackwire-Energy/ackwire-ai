@@ -798,6 +798,7 @@
       },
       "ai": {
         "titlePersonal": "Koppel een AI zodat je agents kunnen denken",
+        "titleAlone": "Koppel een AI zodat {{name}} kan denken",
         "later": "Later koppelen",
         "doneTitle": "Klaar. Het team van {{org}} denkt nu mee.",
         "doneTitlePersonal": "Klaar. {{name}} denkt nu mee.",

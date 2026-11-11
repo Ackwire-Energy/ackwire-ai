@@ -820,6 +820,8 @@
       },
       "ai": {
         "titlePersonal": "Połącz AI, żeby Twoi agenci mogli myśleć",
+        "titleAlone": "Połącz AI, żeby {{name}} mógł myśleć",
+        "titleAlone_female": "Połącz AI, żeby {{name}} mogła myśleć",
         "later": "Połącz później",
         "doneTitle": "Gotowe. Zespół {{org}} już myśli.",
         "doneTitlePersonal": "Gotowe. {{name}} już myśli.",

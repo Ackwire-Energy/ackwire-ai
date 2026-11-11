@@ -811,6 +811,8 @@ export const ptBR = {
       },
       ai: {
         titlePersonal: "Conecte uma IA para os seus agentes pensarem",
+        titleAlone: "Conecte uma IA para o {{name}} pensar",
+        titleAlone_female: "Conecte uma IA para a {{name}} pensar",
         later: "Conectar depois",
         doneTitle: "Pronto. O time da {{org}} já pensa.",
         doneTitlePersonal: "Pronto. O {{name}} já pensa.",

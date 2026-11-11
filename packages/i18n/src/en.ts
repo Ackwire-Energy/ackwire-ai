@@ -855,6 +855,8 @@ export const en = {
       ai: {
         /** A personal workspace's heading for the step (a team's is `arrival.connect.title`). */
         titlePersonal: "Connect an AI for your agents to think",
+        /** A team's heading for it with no agents but its right hand: `{{name}}`, the right hand ("Lodi"). */
+        titleAlone: "Connect an AI for {{name}} to think",
         later: "Connect later",
         /** `{{org}}`: the workspace's name. */
         doneTitle: "Done. The {{org}} team is thinking now.",

@@ -787,6 +787,7 @@
       },
       "ai": {
         "titlePersonal": "连接一个 AI，让你的智能体开始思考",
+        "titleAlone": "连接一个 AI，让 {{name}} 开始思考",
         "later": "稍后连接",
         "doneTitle": "好了。{{org}} 的团队已经在思考了。",
         "doneTitlePersonal": "好了。{{name}} 已经在思考了。",

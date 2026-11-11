@@ -798,6 +798,7 @@
       },
       "ai": {
         "titlePersonal": "Verbinde eine KI, damit deine Agenten denken können",
+        "titleAlone": "Verbinde eine KI, damit {{name}} denken kann",
         "later": "Später verbinden",
         "doneTitle": "Fertig. Das Team von {{org}} denkt jetzt.",
         "doneTitlePersonal": "Fertig. {{name}} denkt jetzt.",

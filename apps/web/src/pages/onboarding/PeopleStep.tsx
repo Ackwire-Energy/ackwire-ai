@@ -11,9 +11,10 @@ import "@/components/invite/invite.css";
 
 /*
  * The last step of a team's rail (ADR 0162, amended 2026-11-11): the people who work there, invited with the invite
- * dialog's own pieces (ADR 0090): the address chips, each with its role, and the workspace's link. Its button sends
- * the invitations and finishes the onboarding; "Invite later" finishes it with none. A server that sends no email
- * invites through the link only, as the dialog does.
+ * dialog's own pieces (ADR 0090): the address chips, each with its role, and the workspace's link to copy (renewing or
+ * turning it off belongs to Members, not to a workspace still being set up). Its button sends the invitations and
+ * finishes the onboarding; "Invite later" finishes it with none. A server that sends no email invites through the link
+ * only, as the dialog does.
  */
 
 /** The role picker's value for no role: a member (the invite dialog's). */
@@ -113,7 +114,7 @@ export function PeopleStep({
     return (
       <>
         <div className="onb__answer">
-          <InviteLinkPanel />
+          <InviteLinkPanel copyOnly />
           <ol className="invite-how">
             {(["how1", "how2", "how3"] as const).map((k, i) => (
               <li key={k}>
@@ -175,7 +176,7 @@ export function PeopleStep({
                 : t("members.dialog.pasteHelp")}
           </p>
           {link ? (
-            <InviteLinkPanel />
+            <InviteLinkPanel copyOnly />
           ) : (
             <div className="invite-orlink ac-mediarow">
               <span className="ac-mediarow__face">

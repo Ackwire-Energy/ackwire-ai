@@ -798,6 +798,7 @@
       },
       "ai": {
         "titlePersonal": "Ajanlarınız düşünebilsin diye bir yapay zeka bağlayın",
+        "titleAlone": "{{name}} düşünebilsin diye bir yapay zeka bağlayın",
         "later": "Sonra bağla",
         "doneTitle": "Tamam. {{org}} ekibi artık düşünüyor.",
         "doneTitlePersonal": "Tamam. {{name}} artık düşünüyor.",

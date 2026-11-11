@@ -787,6 +787,7 @@
       },
       "ai": {
         "titlePersonal": "에이전트가 생각할 수 있게 AI를 연결하세요",
+        "titleAlone": "{{name}}이(가) 생각할 수 있게 AI를 연결하세요",
         "later": "나중에 연결",
         "doneTitle": "완료됐어요. {{org}} 팀이 이제 생각해요.",
         "doneTitlePersonal": "완료됐어요. {{name}}이(가) 이제 생각해요.",

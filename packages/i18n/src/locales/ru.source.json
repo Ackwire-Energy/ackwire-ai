@@ -1979,6 +1979,9 @@
   "onboarding.flow.ai.titlePersonal": {
     "value": "Connect an AI for your agents to think"
   },
+  "onboarding.flow.ai.titleAlone": {
+    "value": "Connect an AI for {{name}} to think"
+  },
   "onboarding.flow.ai.later": {
     "value": "Connect later"
   },

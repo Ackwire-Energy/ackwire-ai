@@ -809,6 +809,7 @@
       },
       "ai": {
         "titlePersonal": "Conecta una IA para que tus agentes piensen",
+        "titleAlone": "Conecta una IA para que {{name}} piense",
         "later": "Conectar después",
         "doneTitle": "Listo. El equipo de {{org}} ya piensa.",
         "doneTitlePersonal": "Listo. {{name}} ya piensa.",

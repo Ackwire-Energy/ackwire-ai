@@ -693,7 +693,8 @@ describe("a team with no agents for now (ADR 0162, amended 2026-11-11)", () => {
     // Kept by the server, so a reload resumes after the step; nothing made.
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[ORG_ID, { step: "agents" }]]);
     expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
-    expect(heading()).toBe(CONNECT);
+    // Its right hand alone thinks with it: named, never a team that isn't there.
+    expect(heading()).toBe("Conecte uma IA para o Lodi pensar");
     expect(eyebrow()).toBe("Passo 4 de 5");
     // The team step answered, its agents to come; Lodi alone wakes with the AI, the people still to come.
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
@@ -842,7 +843,13 @@ describe("inviting people, a team's last step (ADR 0162, amended 2026-11-11)", (
       "Quem abrir pede para entrar. Eu te mostro cada pedido, e você aprova.",
     );
     expect(screen().queryByLabelText("E-mails")).toBeNull();
-    expect(document.querySelector(".onb__body .invite-link")).not.toBeNull();
+    // The link to copy and until when it works: renewing or turning it off is for Members, once the workspace opens.
+    await click(button("Criar link"), 8);
+    const link = document.querySelector(".onb__body .invite-link") as HTMLElement;
+    expect(within(link).getByRole("button", { name: "Copiar link" })).toBeTruthy();
+    expect(link.querySelector(".invite-link__foot")?.textContent).toMatch(/^Vale até \d+ \S+$/);
+    expect(within(link).queryByRole("button", { name: "Renovar" })).toBeNull();
+    expect(within(link).queryByRole("button", { name: "Desativar" })).toBeNull();
     await click(button("Entrar no workspace"), 16);
     expect(calls(state, "orgs.inviteMany")).toEqual([]);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${GENERAL_ID}`);

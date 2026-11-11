@@ -787,6 +787,7 @@
       },
       "ai": {
         "titlePersonal": "Hubungkan AI supaya agenmu bisa berpikir",
+        "titleAlone": "Hubungkan AI supaya {{name}} bisa berpikir",
         "later": "Hubungkan nanti",
         "doneTitle": "Beres. Tim {{org}} sudah berpikir.",
         "doneTitlePersonal": "Beres. {{name}} sudah berpikir.",

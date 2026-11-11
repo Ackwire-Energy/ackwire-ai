@@ -787,6 +787,7 @@
       },
       "ai": {
         "titlePersonal": "エージェントが考えられるようにAIを接続しましょう",
+        "titleAlone": "{{name}}が考えられるようにAIを接続しましょう",
         "later": "あとで接続",
         "doneTitle": "準備できました。{{org}}のチームはもう考えています。",
         "doneTitlePersonal": "準備できました。{{name}}はもう考えています。",

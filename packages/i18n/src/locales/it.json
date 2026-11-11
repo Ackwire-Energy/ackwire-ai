@@ -809,6 +809,7 @@
       },
       "ai": {
         "titlePersonal": "Collega un'IA per far ragionare i tuoi agenti",
+        "titleAlone": "Collega un'IA per far ragionare {{name}}",
         "later": "Collega dopo",
         "doneTitle": "Fatto. Il team di {{org}} ragiona già.",
         "doneTitlePersonal": "Fatto. {{name}} ragiona già.",

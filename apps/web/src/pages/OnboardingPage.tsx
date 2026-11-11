@@ -554,7 +554,12 @@ export function OnboardingPage() {
                 ? personalNow || alone
                   ? t("onboarding.flow.ai.doneTitlePersonal", agentGrammar(lodiName))
                   : t("onboarding.flow.ai.doneTitle", { org: name })
-                : t(personalNow ? "onboarding.flow.ai.titlePersonal" : "arrival.connect.title");
+                : personalNow
+                  ? t("onboarding.flow.ai.titlePersonal")
+                  : alone
+                    ? // The right hand alone (the team step left with no agents): by its name, as its stage says it.
+                      t("onboarding.flow.ai.titleAlone", agentGrammar(lodiName))
+                    : t("arrival.connect.title");
   const lead = asking
     ? t("onboarding.purpose.lead")
     : step === "name"
