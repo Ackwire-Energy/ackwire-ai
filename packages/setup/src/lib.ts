@@ -621,15 +621,25 @@ export function diagnoseDocker(output: string, platform: Platform): Problem {
 /** A `docker compose` failure people hit often, said with its fix; null for anything else. */
 export function diagnoseCompose(output: string, platform: Platform): Problem | null {
   // A registry that refuses an image (a private one, or one this computer isn't signed in to): Compose then also says
-  // the other images are missing, which isn't the cause.
-  const refused = /https:\/\/([^/\s"]+)\/v2\/([^\s"]+)\/manifests\/([^\s"]+)"?:\s*(denied|unauthorized)/i.exec(output);
-  if (refused || /pull access denied|requested access to the resource is denied/i.test(output)) {
-    const [, host, name, tag] = refused ?? [];
-    const image = host && name ? `${host}/${name}:${tag}` : "an image";
+  // the other images are missing, which isn't the cause. Docker names it on the image's line ("Image <ref> Error …
+  // denied") or in the registry's address (".../v2/<name>/manifests/<tag>": denied).
+  const named = /Image (\S+) Error\b[^\n]*\b(?:denied|unauthorized)\b/i.exec(output)?.[1];
+  const url = /https:\/\/([^/\s"]+)\/v2\/([^\s"]+)\/manifests\/([^\s"]+)"?:\s*(?:denied|unauthorized)/i.exec(output);
+  const refused =
+    named ??
+    (url ? `${url[1]}/${url[2]}:${url[3]}` : undefined) ??
+    (/error from registry: (denied|unauthorized)|pull access denied|requested access to the resource is denied/i.test(
+      output,
+    )
+      ? "an image"
+      : undefined);
+  if (refused) {
+    const first = refused.split("/")[0] ?? "";
+    const registry = refused !== "an image" && /[.:]/.test(first) ? first : "<registry>";
     return {
       check: "image",
-      error: `Docker couldn't download ${image}: the registry refused it.`,
-      fix: `It may be private: sign in with docker login ${host ?? "<registry>"} (with a token that can read packages), or set AGENTES_IMAGE in .env to an image this computer can download. Then run the setup again.`,
+      error: `Docker couldn't download ${refused}: the registry refused it.`,
+      fix: `It may be private: sign in with docker login ${registry} (with a token that can read packages), or set AGENTES_IMAGE in .env to an image this computer can download. Then run the setup again.`,
     };
   }
   const busy = output.split("\n").find((line) => /port is already allocated|address already in use/i.test(line));

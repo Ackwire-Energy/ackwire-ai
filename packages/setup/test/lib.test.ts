@@ -630,6 +630,15 @@ describe("Docker", () => {
       error: "Docker couldn't download ghcr.io/agentes-chat/agentes:latest: the registry refused it.",
     });
     expect(refused?.fix).toContain("docker login ghcr.io");
+    // Docker 29 says it on the image's line alone.
+    expect(
+      diagnoseCompose(
+        "Image ghcr.io/agentes-chat/agentes:latest Error error from registry: denied\ndenied\nError response from daemon: error from registry: denied",
+        "linux",
+      ),
+    ).toMatchObject({
+      error: "Docker couldn't download ghcr.io/agentes-chat/agentes:latest: the registry refused it.",
+    });
   });
 
   test("the app's own refusal names the values to fix", () => {
