@@ -1389,7 +1389,7 @@ export class RunnerDaemon implements RequestObserver {
             ? {
                 look: () => appleToolchains(),
                 // An older server drops the frame: its next hello carries the same.
-                onChange: (toolchains) => void this.send({ type: "toolchains.changed", toolchains }),
+                onChange: (toolchains) => this.send({ type: "toolchains.changed", toolchains }),
               }
             : null,
         );

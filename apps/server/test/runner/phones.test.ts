@@ -24,10 +24,10 @@ import {
   NO_IOS_CONTROL,
   OPENING_LATE,
   type PhoneIo,
-  phoneNotReady,
   PhoneManager,
   type PhoneRequest,
   type PhoneScreenDriver,
+  phoneNotReady,
   SimulatorScreen,
   screenDriverFor,
 } from "../../runner/phones";
@@ -638,13 +638,36 @@ test("an iPhone on iOS 16 is reported as too old, never left out; one newer than
   expect(parseDevicectl(unwired, new Set(["OLD16"]))).toEqual([
     expect.objectContaining({ serial: "OLD16", state: "unsupported", reason: "os_too_old", osVersion: "16.7.10" }),
   ]);
-  expect([sdkTooOld("27.0", "26.2"), sdkTooOld("26.4", "26.2"), sdkTooOld("27.0", "27.0"), sdkTooOld("27.0", null)]).toEqual(
-    [true, false, false, false],
-  );
+  // The version decides: a flag alone never turns a working iPhone away, and usbmuxd's list only brings in old ones.
+  const flagged = iphone({ transport: "wired", udid: "NEW27" });
+  const listed = { ...flagged, connectionProperties: { ...flagged.connectionProperties, isMobileDeviceOnly: true } };
+  expect(parseDevicectl({ result: { devices: [listed] } })).toEqual([
+    expect.objectContaining({ serial: "NEW27", state: "ready" }),
+  ]);
+  expect(
+    parseDevicectl(
+      { result: { devices: [iphone({ transport: "localNetwork", udid: "NEAR27" })] } },
+      new Set(["NEAR27"]),
+    ),
+  ).toEqual([]);
+  expect([
+    sdkTooOld("27.0", "26.2"),
+    sdkTooOld("26.4", "26.2"),
+    sdkTooOld("27.0", "27.0"),
+    sdkTooOld("27.0", null),
+  ]).toEqual([true, false, false, false]);
   expect([parseLockState({ result: { passcodeRequired: true } }), parseLockState({})]).toEqual([true, null]);
   const r = rig({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk: "26.2" });
   await r.manager.poll();
-  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({ state: "needs_you", reason: "xcode_too_old" });
+  expect(r.manager.list().find((p) => p.serial === IPHONE)).toMatchObject({
+    state: "needs_you",
+    reason: "xcode_too_old",
+  });
+  // Only the helper needs the matching Xcode: devicectl still opens apps.
+  const t = { platform: "ios", serial: IPHONE, holder: r.holder("run-1") };
+  const launched = await r.op({ op: "phone.launch", ...t, app: "com.acme.app" }).catch((e: RunnerError) => e);
+  expect((launched as Partial<RunnerError>).code).not.toBe("phone_not_ready");
+  expect(await errorCode(() => r.op({ op: "phone.screenshot", ...t }))).toBe("phone_not_ready");
   const plain = rig({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } }, sdk: "27.0" });
   await plain.manager.poll();
   expect(plain.manager.list().find((p) => p.serial === IPHONE)?.state).toBe("ready");
@@ -815,7 +838,7 @@ test("a real iPhone: install and launch through devicectl, the rest through its 
       ...ANDROID_STATE,
       wdaTree: tree,
       wdaRefuse:
-        "Error Domain=com.apple.dt.XCTDaemonErrorDomain Code=41 \"Not authorized for performing UI testing actions.\"",
+        'Error Domain=com.apple.dt.XCTDaemonErrorDomain Code=41 "Not authorized for performing UI testing actions."',
     });
     const refused = (await r.op(short)) as { passed: boolean; output: string };
     expect(refused.passed).toBe(false);

@@ -635,7 +635,12 @@ describe("a runner that dies mid-request (brain turns never stay working)", () =
     await Bun.sleep(5);
     const events: Record<string, unknown>[] = [];
     f.pubsub.subscribe(orgTopic(f.org.id), (e) => events.push((e as { event?: Record<string, unknown> }).event ?? {}));
-    const toolchains = { xcode: "27.0", xcodeSdk: "27.0", appleTeam: "Sam Rivera (Personal Team)", appleAccount: "team" };
+    const toolchains = {
+      xcode: "27.0",
+      xcodeSdk: "27.0",
+      appleTeam: "Sam Rivera (Personal Team)",
+      appleAccount: "team",
+    };
     await runner.frame({ type: "toolchains.changed", toolchains });
     await Bun.sleep(5);
     expect(await row()).toMatchObject({ browser: { available: true }, toolchains });

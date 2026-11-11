@@ -21,7 +21,8 @@ export const IOS_MIN = 17;
 /** An iPhone devicectl lists but can't drive: iOS before 17, reached through the old MobileDevice only. */
 const tooOld = (d: unknown) => {
   const os = majorOf(str(rec(rec(d).deviceProperties).osVersionNumber));
-  return rec(rec(d).connectionProperties).isMobileDeviceOnly === true || (os > 0 && os < IOS_MIN);
+  // The version decides when devicectl gives one: a flag alone never turns a working iPhone away.
+  return os > 0 ? os < IOS_MIN : rec(rec(d).connectionProperties).isMobileDeviceOnly === true;
 };
 
 const devicesOf = (json: unknown) => {
@@ -45,7 +46,7 @@ export function parseDevicectl(json: unknown, usb: ReadonlySet<string> = new Set
     if (!serial) continue;
     // Only a phone plugged into this Mac counts: every iPhone ever paired with Xcode (a family member's, a
     // colleague's) shows up over the network whenever it is near, and plugging in is the person's own act.
-    if (str(conn.transportType) !== "wired" && !usb.has(udidKey(serial))) continue;
+    if (str(conn.transportType) !== "wired" && !(tooOld(d) && usb.has(udidKey(serial)))) continue;
     const name = str(props.name);
     const phone: Phone = {
       platform: "ios",

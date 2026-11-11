@@ -225,6 +225,8 @@ const HELPER_REASONS = new Set<PhoneReason>([
   "ui_automation_off",
   "apple_team_missing",
   "ui_not_authorized",
+  // devicectl installs and opens apps on an iOS newer than the Mac's SDK: only the helper needs the matching Xcode.
+  "xcode_too_old",
 ]);
 const NEEDS_HELPER = new Set(["phone.screenshot", "phone.record", "phone.flow"]);
 
@@ -593,7 +595,9 @@ export class PhoneManager {
     if (xcrun && (!select || (await runTool(select, ["-p"], { timeoutMs: 5000, env: this.env })).code !== 0)) {
       xcrun = null;
     }
-    const sdk = xcrun ? await runTool(xcrun, ["--sdk", "iphoneos", "--show-sdk-version"], { timeoutMs: 10_000, env: this.env }) : null;
+    const sdk = xcrun
+      ? await runTool(xcrun, ["--sdk", "iphoneos", "--show-sdk-version"], { timeoutMs: 10_000, env: this.env })
+      : null;
     const sdkVersion = sdk?.code === 0 ? sdk.stdout.toString("utf8").trim() : "";
     const tools: Tools = {
       adb,

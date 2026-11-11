@@ -104,14 +104,19 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
 
 /**
  * The last look, and a fresh one in the background now and every `TOOLCHAINS_TTL_MS` (written to `file`). `apple`
- * (a Mac): Xcode's part every `APPLE_LOOK_MS`; when it changed, `onChange` gets the whole list.
+ * (a Mac): Xcode's part every `APPLE_LOOK_MS`; when it differs from what the server heard, `onChange` gets the whole
+ * list (false: not sent, tried again the next minute).
  */
 export function cachedToolchains(
   file: string,
   probe: () => Promise<RunnerToolchains> = () => probeToolchains(),
-  apple: { look: () => Promise<AppleKeys>; onChange: (toolchains: RunnerToolchains) => void } | null = null,
+  apple: { look: () => Promise<AppleKeys>; onChange: (toolchains: RunnerToolchains) => unknown } | null = null,
 ) {
   let current = readJson<RunnerToolchains>(file);
+  const appleOf = (t: RunnerToolchains | null) =>
+    JSON.stringify([t?.xcode, t?.xcodeSdk, t?.appleTeam, t?.appleAccount]);
+  /** Xcode's part as the server last heard it (`hello` reads `get`, or a frame that went out). */
+  let told = appleOf(current);
   let looking: Promise<void> | null = null;
   const look = () =>
     (looking ??= probe()
@@ -142,10 +147,12 @@ export function cachedToolchains(
         appleAccount: undefined,
         ...keys,
       });
-      if (JSON.stringify(next) === JSON.stringify(before)) return;
-      current = next;
-      writeJson(file, next);
-      apple.onChange(next);
+      if (JSON.stringify(next) !== JSON.stringify(before)) {
+        current = next;
+        writeJson(file, next);
+      }
+      // Against what the server heard, not the last look: a hello sent before the start's full look finished.
+      if (appleOf(next) !== told && apple.onChange(next) !== false) told = appleOf(next);
     } catch {
       // the next minute's look
     } finally {
@@ -155,7 +162,10 @@ export function cachedToolchains(
   const appleTimer = apple ? setInterval(() => void lookApple(), APPLE_LOOK_MS) : null;
   appleTimer?.unref?.();
   return {
-    get: () => current ?? undefined,
+    get: () => {
+      told = appleOf(current);
+      return current ?? undefined;
+    },
     look,
     lookApple,
     stop: () => {

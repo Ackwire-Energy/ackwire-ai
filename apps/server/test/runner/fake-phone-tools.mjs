@@ -123,8 +123,7 @@ else if (tool === "xcrun" && args[0] === "xcodebuild") {
   else if (line.startsWith("devicectl device info lockState")) {
     writeFileSync(json, JSON.stringify({ result: { passcodeRequired: state.lockState === true } }));
     out("");
-  }
-  else if (line.startsWith("devicectl list devices") && state.devicectlFail) fail(state.devicectlFail);
+  } else if (line.startsWith("devicectl list devices") && state.devicectlFail) fail(state.devicectlFail);
   else if (line.startsWith("devicectl list devices")) {
     writeFileSync(json, JSON.stringify(state.devicectl ?? { result: { devices: [] } }));
     out("");

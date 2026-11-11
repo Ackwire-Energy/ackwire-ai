@@ -2,7 +2,7 @@ import { afterEach, expect, setDefaultTimeout, test } from "bun:test";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { RunnerError } from "../../runner/errors";
+import type { RunnerError } from "../../runner/errors";
 import {
   type AppleLook,
   type AppleTeam,
@@ -20,11 +20,11 @@ import {
   parseXcodeTeams,
   profileExpiry,
   profileTeam,
-  subjectTeam,
-  validIdentities,
   RENEW_BEFORE_MS,
   RETRY_MS,
+  subjectTeam,
   teamLabel,
+  validIdentities,
   WDA_VERSION,
   WdaClient,
   wdaScreenDriver,
@@ -163,7 +163,8 @@ test("Apple teams from every source: Xcode's cache, profiles, signing identities
   expect(certs.map((c) => c.sha1)).toEqual([revoked, valid]);
   expect(certs.filter((c) => ids.has(c.sha1)).map((c) => c.pem)).toEqual([pem("MIIBnew")]);
   // The team is the OU, never the id in the CN's parentheses (the person's).
-  const libre = "subject= /UID=QWERTY1234/CN=Apple Development: Sam Rivera (QWERTY1234)/OU=A1B2C3D4E5/O=Sam Rivera/C=US";
+  const libre =
+    "subject= /UID=QWERTY1234/CN=Apple Development: Sam Rivera (QWERTY1234)/OU=A1B2C3D4E5/O=Sam Rivera/C=US";
   const openssl =
     "subject=UID = QWERTY1234, CN = Apple Development: Sam Rivera (QWERTY1234), OU = A1B2C3D4E5, O = Sam Rivera, C = US";
   for (const line of [libre, openssl]) expect(subjectTeam(line)).toEqual({ ...TEAM, free: false });
@@ -214,7 +215,10 @@ test("a helper that stops answering is dropped and started again; one that is sl
   expect(await c.call("GET", "/slow", undefined, { timeoutMs: 100 }).catch((e) => e)).toBeInstanceOf(HelperSlow);
   expect(gone).toEqual([]);
   const refused = await c.tap(1, 2).catch((e: RunnerError) => e);
-  expect(refused).toMatchObject({ code: "phone_not_ready", message: expect.stringContaining("refused the test helper") });
+  expect(refused).toMatchObject({
+    code: "phone_not_ready",
+    message: expect.stringContaining("refused the test helper"),
+  });
   expect(gone).toEqual(["ui_not_authorized"]);
   // A stopped flow stops its calls at once.
   const stop = new AbortController();
@@ -565,7 +569,8 @@ test("the Mac's screen locked: no signing build until it's unlocked; a helper th
   expect(await m.settle(null)).toBe(null);
   const up = await m.helper.run("device", IPHONE, m.xcrun);
   up.child.kill("SIGKILL");
-  for (let i = 0; i < 200 && !m.logged.some((l) => l.startsWith("iPhone test helper stopped")); i++) await Bun.sleep(25);
+  for (let i = 0; i < 200 && !m.logged.some((l) => l.startsWith("iPhone test helper stopped")); i++)
+    await Bun.sleep(25);
   expect(m.logged.some((l) => l.startsWith(`iPhone test helper stopped (${IPHONE})`))).toBe(true);
   const again = await m.helper.run("device", IPHONE, m.xcrun);
   expect(again).not.toBe(up);

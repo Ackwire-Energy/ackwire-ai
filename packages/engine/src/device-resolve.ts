@@ -402,7 +402,10 @@ export function phoneReasonText(
     case "device_support":
       return { text: `${host} is preparing ${phone} (it downloads what Xcode needs for it).`, byItself: true };
     case "os_too_old":
-      return { text: `${phone} runs a system too old for the testing tools (an iPhone needs iOS 17 or newer). Use another phone.`, byItself: false };
+      return {
+        text: `${phone} runs a system too old for the testing tools (an iPhone needs iOS 17 or newer). Use another phone.`,
+        byItself: false,
+      };
     default:
       return { text: `${phone} isn't ready${reason ? ` (${reason})` : ""}.`, byItself: false };
   }

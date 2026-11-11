@@ -183,7 +183,9 @@ export const validIdentities = (out: string) =>
 export function certificatesOf(out: string): { sha1: string; pem: string }[] {
   const certs: { sha1: string; pem: string }[] = [];
   let sha1: string | null = null;
-  for (const m of out.matchAll(/SHA-1 hash:\s*([0-9A-F]{40})|(-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----)/g)) {
+  for (const m of out.matchAll(
+    /SHA-1 hash:\s*([0-9A-F]{40})|(-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----)/g,
+  )) {
     if (m[1]) sha1 = m[1];
     else if (m[2] && sha1) {
       certs.push({ sha1, pem: m[2] });
@@ -515,7 +517,8 @@ export class WdaClient implements IosScreen {
       }).catch(async (err: unknown) => {
         if (stop?.aborted) throw new RunnerError("internal", "Stopped");
         const words = `The test helper didn't answer: ${err instanceof Error ? err.message : String(err)}`;
-        // Slow on a busy screen, yet up: the caller may ask again. Down, or stuck: it's started again.
+        // Slow on a busy screen, yet up: the caller may ask again. Down, or stuck: it's started again. WDA answers
+        // `/status` on a queue of its own, beside the call that timed out.
         if (timeout.aborted && (await this.ready())) throw new HelperSlow(words);
         this.opts.onGone?.(null);
         throw new HelperGone(words);
@@ -589,7 +592,7 @@ export class WdaClient implements IosScreen {
 
   /** The phone's lock screen shows (no session needed). */
   async locked() {
-    return (await this.call<boolean>("GET", "/wda/locked")) === true;
+    return (await this.call<boolean>("GET", "/wda/locked", undefined, { timeoutMs: 10_000 })) === true;
   }
 
   async tap(x: number, y: number) {
@@ -798,6 +801,8 @@ export class IosHelper {
   /** Phones an op is starting the helper for: a setup check finishing meanwhile leaves it running. */
   private readonly wanted = new Set<string>();
   private xcode: string | null = null;
+  /** The last build waited for the Mac's screen to be unlocked (`Deferred`). */
+  private macLocked = false;
 
   constructor(private readonly opts: IosHelperOptions) {
     this.dir = path.join(opts.home, ".agentes-runner", "wda");
@@ -891,7 +896,11 @@ export class IosHelper {
         this.failed.delete(key);
       })
       .catch((err: unknown) => {
-        if (err instanceof Deferred) return;
+        if (err instanceof Deferred) {
+          if (!this.macLocked) this.opts.log(`iPhone test helper: waiting, ${err.message}`);
+          this.macLocked = true;
+          return;
+        }
         const detail = err instanceof Error ? err.message : String(err);
         const known = err instanceof HelperFailure ? err.reason : null;
         const reason = known ?? (this.meta(key) ? "helper_expired" : "helper_missing");
@@ -939,6 +948,7 @@ export class IosHelper {
       // One report has Xcode 27 dropping the account when it signs while the keychain is locked.
       if (await (this.opts.screenLocked ?? (() => macScreenLocked(this.opts.env)))())
         throw new Deferred("the Mac's screen is locked");
+      this.macLocked = false;
       const found = await (this.opts.teams ?? (() => appleLook({ env: this.opts.env, log: this.opts.log })))();
       const look = Array.isArray(found) ? appleLookOf(found, 0) : found;
       team = look.teams[0];
@@ -1031,7 +1041,11 @@ export class IosHelper {
         const failure = this.failed.get(key);
         throw new RunnerError(
           "phone_not_ready",
-          failure ? helperWords(failure.reason, failure.detail) : "The test helper is still being set up on this Mac.",
+          failure
+            ? helperWords(failure.reason, failure.detail)
+            : this.macLocked
+              ? "This Mac's screen is locked, and the test helper is signed only while it's unlocked. Unlock the Mac, then try again."
+              : "The test helper is still being set up on this Mac.",
         );
       }
     }

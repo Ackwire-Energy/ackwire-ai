@@ -217,7 +217,7 @@ test("a slow look at a busy screen is asked again; a helper that died is started
     run,
   );
   expect(once.output.split("\n")).toEqual([
-    'OK      tapOn',
+    "OK      tapOn",
     "FAILED  tapOn: The test helper didn't answer: ECONNREFUSED",
   ]);
 });

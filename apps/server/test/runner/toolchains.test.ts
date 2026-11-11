@@ -1,6 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import type { RunnerToolchains } from "@agenteschat/adapters/machine-protocol";
 import { appleToolchains, cachedToolchains, probeToolchains } from "../../runner/toolchains";
 import { removeDirs, tempDir } from "./helpers";
 
@@ -84,7 +85,7 @@ test("Xcode's part, looked at every minute: a team found, or Xcode updated, goes
   const file = path.join(c.root, "toolchains.json");
   writeFileSync(file, JSON.stringify({ git: "2.50.1", xcode: "26.3", appleAccount: "no_team" }));
   const told: unknown[] = [];
-  let apple: Record<string, string> = { xcode: "26.3", appleAccount: "no_team" };
+  let apple: RunnerToolchains = { xcode: "26.3", appleAccount: "no_team" };
   const cache = cachedToolchains(file, () => new Promise(() => {}), {
     look: async () => apple,
     onChange: (t) => told.push(t),
@@ -107,4 +108,22 @@ test("Xcode's part, looked at every minute: a team found, or Xcode updated, goes
   expect(quiet.get()).toEqual(whole);
   expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(whole);
   quiet.stop();
+  // hello carried the file's last look, and the start's full look found more: the server hears it the next minute,
+  // again each minute while nothing could be sent.
+  writeFileSync(file, JSON.stringify({ git: "2.50.1", xcode: "26.3", appleAccount: "no_team" }));
+  const sent: unknown[] = [];
+  let online = false;
+  const late = cachedToolchains(file, async () => whole, {
+    look: async () => apple,
+    onChange: (t) => online && sent.push(t) > 0,
+  });
+  expect(late.get()).toEqual({ git: "2.50.1", xcode: "26.3", appleAccount: "no_team" });
+  await late.look();
+  await late.lookApple();
+  expect(sent).toEqual([]);
+  online = true;
+  await late.lookApple();
+  await late.lookApple();
+  expect(sent).toEqual([whole]);
+  late.stop();
 });
