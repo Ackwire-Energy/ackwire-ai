@@ -11,6 +11,7 @@ import {
   choose,
   chosenLevel,
   confirm,
+  doneSummary,
   emptyReview,
   firstStep,
   isWaiting,
@@ -81,6 +82,56 @@ const TOOLS = [
 ];
 
 describe("where the sheet is", () => {
+  test("connecting ends on its confirmation, which is no step of the dashes", () => {
+    expect(CATALOG_STEPS).not.toContain("done");
+    expect(ADDRESS_STEPS).not.toContain("done");
+    expect(Object.keys(STEP_KEYS)).not.toContain("done");
+    // Back from a sign-in: the confirmation, for whoever can adjust it.
+    expect(firstStep({ needsReview: true }, true, "done")).toBe("done");
+    expect(firstStep({ needsReview: true }, false, "done")).toBe("who");
+  });
+
+  test("the confirmation's sentence: who can use it, what asks (never '0 ações'), tools still without a level", async () => {
+    const t = await translator("pt-BR");
+    const ours = (sensitive: number) =>
+      doneSummary(t, {
+        kind: "catalog",
+        def: def("github", {
+          tools: Array.from({ length: 3 }, (_, i) => ({
+            name: `tool_${i}`,
+            scope: "github:x",
+            sensitive: i < sensitive,
+          })),
+        }),
+      });
+    expect([0, 1, 2].map((n) => ours(n)?.text)).toEqual([
+      "Todos os agentes podem usar.",
+      "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
+      "Todos os agentes podem usar. 2 ações pedem aprovação no chat.",
+    ]);
+    expect(ours(1)?.waiting).toBeNull();
+    // A server by address no one gave levels yet: Continuar is what gives agents its tools.
+    const fresh = server(TOOLS);
+    expect(doneSummary(t, { kind: "server", server: fresh })).toEqual({
+      text: "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos. 1 ação pede aprovação no chat.",
+      waiting: fresh,
+      unreadable: null,
+    });
+    // Its levels saved (a one-click server comes so): nothing waits.
+    const saved = server(TOOLS.map((x) => ({ ...x, access: x.level ?? "approval" })));
+    expect(doneSummary(t, { kind: "server", server: saved })).toEqual({
+      text: "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
+      waiting: null,
+      unreadable: null,
+    });
+    expect(doneSummary(t, { kind: "server", server: server([], { toolsError: "401" }) })?.unreadable).toBe("401");
+    // The lists still catching up: nothing to say yet. A connection they never list: everyone's, nothing known to ask.
+    expect(doneSummary(t, { kind: "loading" })).toBeNull();
+    expect(doneSummary(t, { kind: "none" })?.text).toBe("Todos os agentes podem usar.");
+    const en = await translator("en");
+    expect(doneSummary(en, { kind: "none" })?.text).toBe("Every agent can use it.");
+  });
+
   test("the steps: a catalog service starts with what it does, a server by address with connecting, then who", () => {
     expect(CATALOG_STEPS).toEqual(["about", "connect", "review", "who"]);
     expect(ADDRESS_STEPS).toEqual(["connect", "who"]);

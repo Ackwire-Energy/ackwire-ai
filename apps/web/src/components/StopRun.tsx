@@ -1,5 +1,5 @@
 import type { LiveRun, Message } from "@agenteschat/client";
-import { ApiError, continuedRunIdOf, keys, useContinuedRun } from "@agenteschat/client";
+import { ApiError, continuedRunIdOf, keys, useContinuedRun, workingSinceOf } from "@agenteschat/client";
 import { activityVerb, toolActivity } from "@agenteschat/client/lib/activity";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -105,7 +105,7 @@ export function runContext(t: TFunction, run: LiveRun, now = Date.now()) {
       : t("run.ctx.tool", { doing: activityVerb(t, doing), time: ago(call.since) });
   }
   if (run.text) return t("run.ctx.writing");
-  return t("run.ctx.thinking", { time: ago(run.startedAt) });
+  return t("run.ctx.thinking", { time: ago(workingSinceOf(run)) });
 }
 
 /**

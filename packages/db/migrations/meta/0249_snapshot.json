@@ -1,5 +1,5 @@
 {
-  "id": "eadd10dd-8114-4e73-9a8c-3e959f4f1908",
+  "id": "64569882-6b29-4db1-832c-386969f4771c",
   "prevId": "6c16eb63-58ac-4f16-b57e-5b9b970afb60",
   "version": "7",
   "dialect": "postgresql",
@@ -11293,12 +11293,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "egress_waiting_at": {
-          "name": "egress_waiting_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
         "wanted_at": {
           "name": "wanted_at",
           "type": "timestamp with time zone",
@@ -15338,6 +15332,12 @@
         },
         "heartbeat_at": {
           "name": "heartbeat_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "working_since": {
+          "name": "working_since",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

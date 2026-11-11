@@ -2694,8 +2694,6 @@
     "was": "Sebelumnya: {{text}}",
     "open": "Yang diketahui {{name}}",
     "open_female": "Yang diketahui {{name}}",
-    "undo": "Urungkan",
-    "undone": "Diurungkan",
     "group": "Memori diperbarui oleh {{name}}"
   },
   "reach": {
@@ -2850,17 +2848,9 @@
     "someone": "seseorang",
     "you": "kamu",
     "undo": "Urungkan",
-    "redo": "Ulangi",
-    "undoAll": "Urungkan semua",
     "changes_other": "{{count}} perubahan",
     "undoneBy": "Diurungkan oleh {{name}}",
-    "ago": "{{time}} lalu",
-    "timeLeft": "{{time}} lagi untuk mengurungkan",
     "group": "Perubahan oleh {{name}}",
-    "undone": "Diurungkan.",
-    "redone": "Diulangi.",
-    "undoneAll_other": "{{count}} perubahan diurungkan.",
-    "partial_other": "{{count}} perubahan tidak bisa diurungkan.",
     "errors": {
       "changed_since": "Seseorang mengubah ini sejak itu. Mengurungkan sekarang akan menghilangkan perubahan tersebut.",
       "expired": "Waktu untuk mengurungkan sudah habis.",
@@ -3483,6 +3473,7 @@
       "ready": "Terhubung",
       "syncing": "Menyinkronkan",
       "reads": "Membaca {{label}}",
+      "readOnly": "hanya baca",
       "items_other": "{{count}} item",
       "synced": "disinkronkan {{when}}",
       "syncNow": "Sinkronkan sekarang",
@@ -3529,7 +3520,7 @@
       "onepassword": {
         "step": {
           "1": "Buat brankas di 1Password khusus untuk agenmu dan pindahkan ke sana login yang boleh mereka gunakan",
-          "2": "Buat akun layanan yang hanya punya akses ke brankas itu",
+          "2": "Buat akun layanan yang hanya punya akses ke brankas itu (baca dan tulis, jika agenmu perlu menyimpan login baru di sana)",
           "3": "Tempel token akun layanan di sini"
         },
         "field": {
@@ -9183,6 +9174,193 @@
     "notImage": "Pilih gambar (JPG, PNG, atau WebP).",
     "tooBig": "Ukuran gambar lebih dari 8 MB."
   },
+  "portrait": {
+    "ask": {
+      "title": "Kamu mau tampil seperti apa?",
+      "build": "Buat avatar",
+      "buildText": "Potret piksel sesuai gayamu: rambut, pakaian, aksesori.",
+      "photo": "Unggah foto",
+      "photoText": "Pilih gambar dari komputermu lalu atur bingkainya."
+    },
+    "title": "Avatarmu",
+    "preview": "Avatarmu",
+    "shuffle": "Acak",
+    "small": "Pada ukuran kecil di chat, hanya wajah yang tampil.",
+    "photoAsk": "Lebih suka foto?",
+    "photoUpload": "Unggah foto",
+    "saved": "Avatar diperbarui.",
+    "failed": "Avatar tidak bisa disimpan. Coba lagi.",
+    "showAll": "Tampilkan semua opsi",
+    "showFewer": "Tampilkan lebih sedikit opsi",
+    "beardHint": "Warna janggut mengikuti warna rambut.",
+    "hatsHint": "Topi, kupluk, dan kerudung menutupi rambut.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Tipe",
+      "m": "Maskulin",
+      "f": "Feminin"
+    },
+    "tabs": {
+      "label": "Bagian avatar",
+      "face": "Wajah",
+      "hair": "Rambut",
+      "beard": "Janggut",
+      "makeup": "Riasan",
+      "marks": "Tanda",
+      "accessories": "Aksesori",
+      "clothes": "Pakaian",
+      "background": "Latar"
+    },
+    "sections": {
+      "skin": "Warna kulit",
+      "eyes": "Warna mata",
+      "mood": "Ekspresi",
+      "color": "Warna",
+      "hairColor": "Warna rambut",
+      "clothesColor": "Warna pakaian",
+      "cut": "Potongan",
+      "beard": "Janggut",
+      "lips": "Lipstik",
+      "shadow": "Perona mata",
+      "blush": "Perona pipi",
+      "mark": "Tanda",
+      "glasses": "Kacamata",
+      "ear": "Anting",
+      "neck": "Di leher",
+      "extra": "Di kepala",
+      "piece": "Jenis pakaian",
+      "bg": "Latar"
+    },
+    "options": {
+      "mood": {
+        "smile": "Senyum",
+        "grin": "Senyum lebar",
+        "laugh": "Tertawa",
+        "calm": "Tenang",
+        "wink": "Kedipan",
+        "wow": "Terkejut"
+      },
+      "hair": {
+        "none": "Botak",
+        "buzz": "Cepak",
+        "short": "Pendek",
+        "side": "Belah samping",
+        "quiff": "Jambul",
+        "curly": "Keriting",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Poni",
+        "long": "Panjang",
+        "wavy": "Bergelombang",
+        "curls": "Ikal panjang",
+        "bun": "Cepol",
+        "pony": "Kuncir kuda",
+        "spiky": "Jabrik",
+        "mohawk": "Mohawk",
+        "braids": "Kepang",
+        "pigtails": "Kuncir dua",
+        "crew": "Cepak",
+        "fade": "Fade",
+        "slick": "Sisir ke belakang",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Gimbal",
+        "medium": "Sedang",
+        "receding": "Garis rambut mundur"
+      },
+      "beard": {
+        "none": "Tanpa janggut",
+        "stubble": "Brewok tipis",
+        "mustache": "Kumis",
+        "goatee": "Janggut kambing",
+        "strap": "Janggut garis rahang",
+        "full": "Lebat",
+        "long": "Panjang"
+      },
+      "lips": {
+        "none": "Tanpa lipstik",
+        "nude": "Nude",
+        "pink": "Merah muda",
+        "red": "Merah",
+        "wine": "Marun",
+        "purple": "Ungu",
+        "black": "Hitam"
+      },
+      "shadow": {
+        "none": "Tanpa perona mata",
+        "rose": "Merah muda",
+        "violet": "Ungu",
+        "blue": "Biru",
+        "green": "Hijau",
+        "gold": "Emas",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Tipis",
+        "strong": "Tebal",
+        "none": "Tanpa perona pipi"
+      },
+      "mark": {
+        "none": "Tidak ada",
+        "freckles": "Bintik-bintik",
+        "mole": "Tahi lalat",
+        "scar": "Bekas luka",
+        "bandaid": "Plester",
+        "piercing": "Tindik"
+      },
+      "glasses": {
+        "none": "Tanpa kacamata",
+        "round": "Bulat",
+        "square": "Kotak",
+        "gold": "Emas",
+        "tinted": "Berwarna",
+        "shades": "Kacamata hitam"
+      },
+      "ear": {
+        "none": "Tanpa anting",
+        "studs": "Anting tusuk emas",
+        "pearls": "Mutiara",
+        "hoops": "Anting ring",
+        "drops": "Anting juntai"
+      },
+      "neck": {
+        "none": "Tidak ada",
+        "necklace": "Kalung",
+        "pearls": "Kalung mutiara",
+        "choker": "Choker",
+        "bowtie": "Dasi kupu-kupu",
+        "muffler": "Syal"
+      },
+      "extra": {
+        "none": "Tidak ada",
+        "headband": "Bando",
+        "bandana": "Bandana",
+        "bow": "Pita",
+        "flower": "Bunga",
+        "headphones": "Headphone",
+        "cap": "Topi",
+        "beanie": "Kupluk",
+        "hat": "Topi lebar",
+        "crown": "Mahkota",
+        "scarf": "Kerudung"
+      },
+      "clothes": {
+        "tee": "Kaus",
+        "vneck": "Kerah V",
+        "tank": "Singlet",
+        "shirt": "Kemeja",
+        "suit": "Jas",
+        "blazer": "Blazer",
+        "jacket": "Jaket",
+        "hoodie": "Hoodie",
+        "turtle": "Kerah tinggi",
+        "overall": "Overall",
+        "polo": "Kaus polo",
+        "dress": "Gaun"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Unggah logo",
@@ -10519,7 +10697,7 @@
       "close": "Tutup detail",
       "can": "Apa yang bisa dilakukan agen",
       "afterText": "Tidak ada agen yang memakainya sampai kamu memilih.",
-      "allText": "Setelah terhubung, semua agen bisa memakainya. Berikutnya, kamu memilih akses tiap agen.",
+      "allText": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa menyesuaikannya nanti.",
       "addAccount": "Tambah akun lain",
       "accountsText": "Tiap akun punya agen dan levelnya sendiri.",
       "reconnect": "Hubungkan ulang",
@@ -11280,11 +11458,10 @@
     "notApproved": "{{name}} hanya mengizinkan aplikasi yang sudah disetujuinya untuk masuk, dan agentes.chat belum disetujui. Kalau {{name}} memberimu kunci API, kamu bisa menghubungkan dengan kunci itu.",
     "serverSaid": "Jawaban server: {{detail}}",
     "nothingYet": "Belum ada yang tersedia untuk agen sampai langkah 3.",
-    "allCanUse": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa mengubahnya di langkah 3.",
-    "newAccount": "Akun baru dimulai tanpa agen, kecuali yang punya akses ke semuanya. Kamu memilihnya di langkah 3.",
+    "allCanUse": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa menyesuaikannya nanti.",
     "replace": "Menggantikan sesi masuk saat ini. Siapa yang memakainya tetap sama.",
     "replaceUnchecked": "Masuk ke akun yang sama seperti sebelumnya. Kami tidak bisa memeriksa akun yang mana, dan siapa yang memakainya tetap sama.",
-    "newAccountUnchecked": "Masuk ke akun yang belum terhubung, kami tidak bisa memeriksanya. Akun ini dimulai tanpa agen, kecuali yang punya akses ke semuanya.",
+    "newAccountUnchecked": "Masuk ke akun yang belum terhubung, kami tidak bisa memeriksanya.",
     "addTitle": "Akun {{name}} lain",
     "reconnectTitle": "Hubungkan ulang {{name}}",
     "accountName": "Nama akun ini",
@@ -11304,7 +11481,15 @@
     "asksCount_other": "{{count}} tindakan selalu meminta persetujuan di chat.",
     "asksDefault": "Tindakan sensitif selalu meminta persetujuan di chat.",
     "grant": "Berikan",
-    "saved_other": "{{name}}: {{count}} agen bisa memakainya."
+    "saved_other": "{{name}}: {{count}} agen bisa memakainya.",
+    "done": {
+      "title": "{{name}} terhubung",
+      "everyone": "Semua agen bisa memakainya.",
+      "waiting": "Agen baru mendapat alat-alatnya setelah kamu melanjutkan, dengan level yang kami sarankan.",
+      "asks_other": "{{count}} tindakan meminta persetujuan di chat.",
+      "adjust": "Sesuaikan",
+      "ok": "Selesai"
+    }
   },
   "database": {
     "name": "Basis data",
@@ -14380,6 +14565,7 @@
         "settingStatus": "Memperbarui statusnya",
         "settingReplyStyle": "Menyesuaikan cara menjawab",
         "sendingFeedback": "Meminta mengirim masukan",
+        "offeringFeedback": "Menawarkan untuk melaporkan masalah",
         "deletingRoutine": "Menghapus rutinitas",
         "runningRoutine": "Menjalankan rutinitas sekarang",
         "proposingTeam": "Mengusulkan tim",
@@ -14493,6 +14679,7 @@
       "settingStatus": "memperbarui statusnya",
       "settingReplyStyle": "menyesuaikan cara menjawab",
       "sendingFeedback": "menyiapkan masukan",
+      "offeringFeedback": "menyiapkan laporan",
       "deletingRoutine": "menghapus rutinitas",
       "runningRoutine": "menjalankan rutinitas sekarang",
       "proposingTeam": "mengusulkan tim",
@@ -17000,6 +17187,24 @@
     "send": "Kirim",
     "thanks": "Terkirim. Terima kasih.",
     "reply": "Semua dibaca. Balasan, kalau perlu, dikirim ke {{email}}.",
-    "another": "Kirim lagi"
+    "another": "Kirim lagi",
+    "offer": {
+      "group": "Laporan tentang aplikasi",
+      "ready": "<b>Laporan siap</b>: {{summary}}",
+      "goesCloud": "Dikirim atas namamu ke tim agentes.chat",
+      "goesServer": "Dikirim atas namamu ke pengelola server ini",
+      "see": "Lihat laporan",
+      "hide": "Tutup laporan",
+      "send": "Kirim",
+      "notNow": "Nanti saja",
+      "answer": "Jawabannya dikirim ke emailmu.",
+      "sentCloud": "<b>Laporan terkirim</b> ke tim agentes.chat",
+      "sentServer": "<b>Laporan terkirim</b> ke pengelola server ini",
+      "sentAuto": "<b>Laporan terkirim tanpa bertanya</b>: {{summary}}",
+      "view": "Lihat",
+      "always": "Selalu kirim",
+      "alwaysOn": "Mulai sekarang, laporan seperti ini dikirim tanpa bertanya.",
+      "askFirst": "Tanya dulu sebelum mengirim"
+    }
   }
 }

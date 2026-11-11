@@ -2683,8 +2683,6 @@
     "chip": "メモリを更新しました",
     "was": "以前: {{text}}",
     "open": "{{name}}が知っていること",
-    "undo": "元に戻す",
-    "undone": "元に戻しました",
     "group": "{{name}}が更新したメモリ"
   },
   "reach": {
@@ -2839,17 +2837,9 @@
     "someone": "誰か",
     "you": "あなた",
     "undo": "元に戻す",
-    "redo": "やり直す",
-    "undoAll": "すべて元に戻す",
     "changes_other": "{{count}}件の変更",
     "undoneBy": "{{name}}が元に戻しました",
-    "ago": "{{time}}前",
-    "timeLeft": "元に戻せるのはあと{{time}}",
     "group": "{{name}}による変更",
-    "undone": "元に戻しました。",
-    "redone": "やり直しました。",
-    "undoneAll_other": "{{count}}件の変更を元に戻しました。",
-    "partial_other": "{{count}}件の変更を元に戻せませんでした。",
     "errors": {
       "changed_since": "その後、誰かがこれを変更しました。今元に戻すと、その変更が失われます。",
       "expired": "元に戻せる時間が過ぎました。",
@@ -3472,6 +3462,7 @@
       "ready": "接続済み",
       "syncing": "同期中",
       "reads": "{{label}}を読み取り",
+      "readOnly": "読み取り専用",
       "items_other": "{{count}}件",
       "synced": "{{when}}に同期",
       "syncNow": "今すぐ同期",
@@ -3518,7 +3509,7 @@
       "onepassword": {
         "step": {
           "1": "1Passwordにエージェント専用の保管庫を作り、エージェントが使ってよいログインをそこに移します",
-          "2": "その保管庫だけにアクセスできるサービスアカウントを作ります",
+          "2": "その保管庫だけにアクセスできるサービスアカウントを作ります（エージェントが新しいログインをそこに保存する場合は、読み取りと書き込み）",
           "3": "サービスアカウントのトークンをここに貼り付けます"
         },
         "field": {
@@ -9130,6 +9121,193 @@
     "notImage": "画像を選んでください（JPG、PNG、WebP）。",
     "tooBig": "画像が8 MBを超えています。"
   },
+  "portrait": {
+    "ask": {
+      "title": "どのように表示しますか?",
+      "build": "アバターを作る",
+      "buildText": "髪型、服、アクセサリーを選んで、ドット絵のポートレートを作ります。",
+      "photo": "写真をアップロード",
+      "photoText": "パソコンから画像を選んで、位置を合わせます。"
+    },
+    "title": "あなたのアバター",
+    "preview": "あなたのアバター",
+    "shuffle": "シャッフル",
+    "small": "チャット内の小さい表示では顔だけが表示されます。",
+    "photoAsk": "写真のほうがいいですか？",
+    "photoUpload": "写真をアップロード",
+    "saved": "アバターを更新しました。",
+    "failed": "アバターを保存できませんでした。もう一度お試しください。",
+    "showAll": "すべてのオプションを表示",
+    "showFewer": "オプションを減らす",
+    "beardHint": "ひげは髪の色に合わせられます。",
+    "hatsHint": "キャップ、ニット帽、ハット、ヘッドスカーフは髪を覆います。",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "顔立ち",
+      "m": "男性的",
+      "f": "女性的"
+    },
+    "tabs": {
+      "label": "アバターのパーツ",
+      "face": "顔",
+      "hair": "髪",
+      "beard": "ひげ",
+      "makeup": "メイク",
+      "marks": "特徴",
+      "accessories": "アクセサリー",
+      "clothes": "服",
+      "background": "背景"
+    },
+    "sections": {
+      "skin": "肌の色",
+      "eyes": "目の色",
+      "mood": "表情",
+      "color": "色",
+      "hairColor": "髪の色",
+      "clothesColor": "服の色",
+      "cut": "髪型",
+      "beard": "ひげ",
+      "lips": "口紅",
+      "shadow": "アイシャドウ",
+      "blush": "チーク",
+      "mark": "特徴",
+      "glasses": "メガネ",
+      "ear": "イヤリング",
+      "neck": "首まわり",
+      "extra": "頭につけるもの",
+      "piece": "アイテム",
+      "bg": "背景"
+    },
+    "options": {
+      "mood": {
+        "smile": "笑顔",
+        "grin": "満面の笑み",
+        "laugh": "大笑い",
+        "calm": "穏やか",
+        "wink": "ウインク",
+        "wow": "びっくり"
+      },
+      "hair": {
+        "none": "スキンヘッド",
+        "buzz": "丸刈り",
+        "short": "ショート",
+        "side": "横分け",
+        "quiff": "リーゼント",
+        "curly": "カーリー",
+        "afro": "アフロ",
+        "bob": "ボブ",
+        "bangs": "前髪",
+        "long": "ロング",
+        "wavy": "ウェーブ",
+        "curls": "ロングカール",
+        "bun": "お団子",
+        "pony": "ポニーテール",
+        "spiky": "ツンツン",
+        "mohawk": "モヒカン",
+        "braids": "三つ編み",
+        "pigtails": "ツインテール",
+        "crew": "クルーカット",
+        "fade": "フェード",
+        "slick": "オールバック",
+        "flat": "フラットトップ",
+        "undercut": "アンダーカット",
+        "mullet": "マレット",
+        "dreads": "ドレッド",
+        "medium": "ミディアム",
+        "receding": "後退した生え際"
+      },
+      "beard": {
+        "none": "ひげなし",
+        "stubble": "無精ひげ",
+        "mustache": "口ひげ",
+        "goatee": "あごひげ",
+        "strap": "ラインひげ",
+        "full": "フル",
+        "long": "ロング"
+      },
+      "lips": {
+        "none": "口紅なし",
+        "nude": "ヌード",
+        "pink": "ピンク",
+        "red": "レッド",
+        "wine": "ワイン",
+        "purple": "パープル",
+        "black": "ブラック"
+      },
+      "shadow": {
+        "none": "アイシャドウなし",
+        "rose": "ローズ",
+        "violet": "バイオレット",
+        "blue": "ブルー",
+        "green": "グリーン",
+        "gold": "ゴールド",
+        "smoky": "スモーキー"
+      },
+      "blush": {
+        "soft": "ほんのり",
+        "strong": "しっかり",
+        "none": "チークなし"
+      },
+      "mark": {
+        "none": "なし",
+        "freckles": "そばかす",
+        "mole": "ほくろ",
+        "scar": "傷あと",
+        "bandaid": "ばんそうこう",
+        "piercing": "ピアス"
+      },
+      "glasses": {
+        "none": "メガネなし",
+        "round": "丸型",
+        "square": "スクエア",
+        "gold": "ゴールド",
+        "tinted": "カラーレンズ",
+        "shades": "サングラス"
+      },
+      "ear": {
+        "none": "イヤリングなし",
+        "studs": "ゴールドスタッド",
+        "pearls": "パール",
+        "hoops": "フープ",
+        "drops": "ドロップ"
+      },
+      "neck": {
+        "none": "なし",
+        "necklace": "ネックレス",
+        "pearls": "パール",
+        "choker": "チョーカー",
+        "bowtie": "蝶ネクタイ",
+        "muffler": "マフラー"
+      },
+      "extra": {
+        "none": "なし",
+        "headband": "ヘアバンド",
+        "bandana": "バンダナ",
+        "bow": "リボン",
+        "flower": "花",
+        "headphones": "ヘッドホン",
+        "cap": "キャップ",
+        "beanie": "ニット帽",
+        "hat": "ハット",
+        "crown": "王冠",
+        "scarf": "ヘッドスカーフ"
+      },
+      "clothes": {
+        "tee": "Tシャツ",
+        "vneck": "Vネック",
+        "tank": "タンクトップ",
+        "shirt": "シャツ",
+        "suit": "スーツ",
+        "blazer": "ブレザー",
+        "jacket": "ジャケット",
+        "hoodie": "パーカー",
+        "turtle": "タートルネック",
+        "overall": "オーバーオール",
+        "polo": "ポロシャツ",
+        "dress": "ワンピース"
+      }
+    }
+  },
   "orgLogo": {
     "label": "ロゴ",
     "add": "ロゴをアップロード",
@@ -10465,7 +10643,7 @@
       "close": "詳細を閉じる",
       "can": "エージェントができること",
       "afterText": "あなたが選ぶまで、どのエージェントも使いません。",
-      "allText": "接続すると、すべてのエージェントが使えます。次に、各エージェントのアクセスを選びます。",
+      "allText": "接続すると、すべてのエージェントが使えます。あとから調整できます。",
       "addAccount": "別のアカウントを追加",
       "accountsText": "アカウントごとに、エージェントとレベルが分かれます。",
       "reconnect": "再接続",
@@ -11226,11 +11404,10 @@
     "notApproved": "{{name}}は承認済みのアプリしかログインを許可しておらず、agentes.chatはまだ承認されていません。APIキーが発行されれば、それで接続できます。",
     "serverSaid": "サーバーの応答: {{detail}}",
     "nothingYet": "ステップ3までは、エージェントは何も使えません。",
-    "allCanUse": "接続すると、すべてのエージェントが使えます。ステップ3で変更できます。",
-    "newAccount": "新しいアカウントは、すべてにアクセスできるエージェントを除き、エージェントなしで始まります。ステップ3で選べます。",
+    "allCanUse": "接続すると、すべてのエージェントが使えます。あとから調整できます。",
     "replace": "現在のログインを置き換えます。使う人はそのままです。",
     "replaceUnchecked": "前と同じアカウントでログインしてください。どのアカウントかは確認できず、使う人はそのままです。",
-    "newAccountUnchecked": "まだ接続されていないアカウントでログインしてください（確認はできません）。すべてにアクセスできるエージェントを除き、エージェントなしで始まります。",
+    "newAccountUnchecked": "まだ接続されていないアカウントでログインしてください（確認はできません）。",
     "addTitle": "{{name}}の別アカウント",
     "reconnectTitle": "{{name}}を再接続",
     "accountName": "このアカウントの名前",
@@ -11250,7 +11427,15 @@
     "asksCount_other": "{{count}}件の操作は、常にチャットで承認を求めます。",
     "asksDefault": "重要な操作は、常にチャットで承認を求めます。",
     "grant": "許可",
-    "saved_other": "{{name}}: {{count}}体のエージェントが使えます。"
+    "saved_other": "{{name}}: {{count}}体のエージェントが使えます。",
+    "done": {
+      "title": "{{name}}を接続しました",
+      "everyone": "すべてのエージェントが使えます。",
+      "waiting": "続けると、提案したレベルでエージェントがツールを使えるようになります。それまでは使えません。",
+      "asks_other": "{{count}}件の操作は、チャットで承認を求めます。",
+      "adjust": "調整",
+      "ok": "完了"
+    }
   },
   "database": {
     "name": "データベース",
@@ -14326,6 +14511,7 @@
         "settingStatus": "自分のステータスを更新しました",
         "settingReplyStyle": "返信のしかたを調整しました",
         "sendingFeedback": "フィードバックの送信を依頼しました",
+        "offeringFeedback": "問題の報告を提案しました",
         "deletingRoutine": "ルーティンを削除しました",
         "runningRoutine": "ルーティンを今すぐ実行しました",
         "proposingTeam": "チームを提案しました",
@@ -14439,6 +14625,7 @@
       "settingStatus": "自分のステータスを更新中",
       "settingReplyStyle": "返信のしかたを調整中",
       "sendingFeedback": "フィードバックを準備中",
+      "offeringFeedback": "報告を準備中",
       "deletingRoutine": "ルーティンを削除中",
       "runningRoutine": "ルーティンを今すぐ実行中",
       "proposingTeam": "チームを提案中",
@@ -16898,6 +17085,24 @@
     "send": "送信",
     "thanks": "届きました。ありがとうございます。",
     "reply": "すべて読まれます。返信が必要な場合は{{email}}に届きます。",
-    "another": "もう1件送る"
+    "another": "もう1件送る",
+    "offer": {
+      "group": "アプリについての報告",
+      "ready": "<b>報告の準備ができました</b>: {{summary}}",
+      "goesCloud": "あなたの名前でagentes.chatのチームに届きます",
+      "goesServer": "あなたの名前でこのサーバーの管理者に届きます",
+      "see": "報告を見る",
+      "hide": "報告を閉じる",
+      "send": "送信",
+      "notNow": "今はしない",
+      "answer": "返信はあなたのメールに届きます。",
+      "sentCloud": "agentes.chatのチームに<b>報告を送信しました</b>",
+      "sentServer": "このサーバーの管理者に<b>報告を送信しました</b>",
+      "sentAuto": "<b>確認なしで報告を送信しました</b>: {{summary}}",
+      "view": "見る",
+      "always": "常に送信",
+      "alwaysOn": "今後、このような報告は確認なしで送信されます。",
+      "askFirst": "送信前に確認する"
+    }
   }
 }

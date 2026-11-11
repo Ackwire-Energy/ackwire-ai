@@ -147,6 +147,8 @@ export class DesktopStore {
     return () => {
       for (const s of this.stops) s();
       this.stops = [];
+      // No reply can reach a request still open now: it fails at once, not on its timer seconds after its window.
+      this.client.close();
     };
   }
 

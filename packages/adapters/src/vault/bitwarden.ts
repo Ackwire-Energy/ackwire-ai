@@ -1,7 +1,9 @@
 /**
  * Bitwarden and Vaultwarden as a Vault source (ADR 0144): a client of their API written here, so there is no CLI to
  * download and nothing on disk. It signs in with the account's personal API key, opens the account with its master
- * password, and reads the logins of one folder.
+ * password, and reads the logins of one folder. It also keeps a new login in that folder (the API key is the whole
+ * account's, so there is no read-only kind); it never changes a login already there: Bitwarden replaces a whole
+ * login on every edit, passkeys and attachments included, and what this client doesn't read it can't send back.
  *
  * - The master password opens the whole account, so the connect card asks for an account made only for agents.
  * - Only the folder's own logins count: personal (no organization), not in the trash, of the login type.
@@ -25,12 +27,15 @@ import {
   decryptSymmetricKey,
   decryptUserKey,
   deriveMasterKey,
+  encryptString,
   type SymmetricKey,
+  toBase64,
 } from "./bitwarden-crypto";
 import { type VaultMatch, vaultOrigin } from "./site";
 import {
   type VaultConnection,
   type VaultConnectResult,
+  type VaultNewLogin,
   type VaultSecretField,
   type VaultSource,
   type VaultSourceDescriptor,
@@ -91,6 +96,7 @@ const MESSAGES = {
   unsupported: "This account uses encryption this connection can't read yet.",
   folderMissing: "There's no folder with this name in the account.",
   notFound: "This login is no longer in the folder.",
+  notSaved: "Bitwarden didn't accept the new login. The account may not be allowed to keep logins of its own.",
   rateLimited: "Bitwarden asked us to wait before trying again.",
   privateServer:
     "This server's address is on a private or internal network, which this server doesn't connect to. Use its public HTTPS address.",
@@ -306,6 +312,28 @@ async function apiGet(
   if (answer.status !== 200) {
     throw failureOf(http, answer, options.notFound ?? fail("unreachable", MESSAGES.unreadable));
   }
+  if (!answer.body || typeof answer.body !== "object") throw fail("unreachable", MESSAGES.unreadable);
+  return answer.body;
+}
+
+/**
+ * Sends a new cipher. A 400 here is the server turning the login down (a policy that forbids personal items, a field
+ * too long), not the API key: the session stays.
+ */
+async function apiPost(http: Http, url: string, accessToken: string, body: unknown, signal?: AbortSignal) {
+  const answer = await send(
+    http,
+    url,
+    {
+      method: "POST",
+      headers: { ...apiHeaders(accessToken), "content-type": "application/json" },
+      body: JSON.stringify(body),
+    },
+    MAX_BODY_BYTES,
+    signal,
+  );
+  if (answer.status === 400) throw fail("unsupported", MESSAGES.notSaved);
+  if (answer.status !== 200) throw failureOf(http, answer, fail("unreachable", MESSAGES.unreadable));
   if (!answer.body || typeof answer.body !== "object") throw fail("unreachable", MESSAGES.unreadable);
   return answer.body;
 }
@@ -572,6 +600,42 @@ function itemOf(cipher: unknown, userKey: SymmetricKey): VaultSourceItem | null 
   }
 }
 
+/** Bitwarden's URI match detection for our rule: base domain (0) for the whole site, host (1) for the origin. */
+const MATCH_BASE_DOMAIN = 0;
+const MATCH_HOST = 1;
+
+/**
+ * A new login as Bitwarden's clients send one (`CipherRequestModel`): every text an EncString of type 2 under the
+ * user key, no key of its own. A website goes with its checksum (the SHA-256 of the address, in base64, encrypted
+ * too), which clients check when a login has its own key.
+ */
+function newCipher(login: VaultNewLogin, folderId: string, userKey: SymmetricKey) {
+  const enc = (value: string) => encryptString(value, userKey);
+  return {
+    type: CIPHER_TYPE_LOGIN,
+    folderId,
+    organizationId: null,
+    favorite: false,
+    reprompt: 0,
+    name: enc(login.title),
+    notes: login.notes ? enc(login.notes) : null,
+    login: {
+      username: login.username ? enc(login.username) : null,
+      password: enc(login.password),
+      totp: null,
+      uris: login.website
+        ? [
+            {
+              uri: enc(login.website),
+              uriChecksum: enc(toBase64(sha256(new TextEncoder().encode(login.website)))),
+              match: login.match === "site" ? MATCH_BASE_DOMAIN : MATCH_HOST,
+            },
+          ]
+        : [],
+    },
+  };
+}
+
 // ---- The source ----------------------------------------------------------------------------------------------
 
 interface Session {
@@ -729,6 +793,16 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
     }
   }
 
+  /** The agents' folder's id: what a sync found, else asked for now. */
+  async function folderIdOf(session: Session, settings: ConnectionSettings, signal?: AbortSignal) {
+    if (session.folderId) return session.folderId;
+    const folders = await apiGet(http, `${settings.endpoints.apiUrl}/folders`, session.accessToken, { signal });
+    const folder = findFolder(list(pick(folders, "Data")), session.userKey, settings.folder);
+    if (!folder) throw fail("folder_missing", MESSAGES.folderMissing);
+    session.folderId = folder.id;
+    return folder.id;
+  }
+
   return {
     kind: BITWARDEN_SOURCE_KIND,
 
@@ -799,14 +873,7 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
       // Bitwarden holds logins only; a cipher id is a UUID (never a path).
       if (field !== "password" || !UUID.test(ref)) throw fail("not_found", MESSAGES.notFound);
       return withSession(connection, signal, async (session, settings) => {
-        let folderId = session.folderId;
-        if (!folderId) {
-          const folders = await apiGet(http, `${settings.endpoints.apiUrl}/folders`, session.accessToken, { signal });
-          const folder = findFolder(list(pick(folders, "Data")), session.userKey, settings.folder);
-          if (!folder) throw fail("folder_missing", MESSAGES.folderMissing);
-          folderId = folder.id;
-          session.folderId = folderId;
-        }
+        const folderId = await folderIdOf(session, settings, signal);
         const cipher = await apiGet(http, `${settings.endpoints.apiUrl}/ciphers/${ref}`, session.accessToken, {
           notFound: fail("not_found", MESSAGES.notFound),
           signal,
@@ -823,6 +890,23 @@ export function createBitwardenSource(options: BitwardenSourceOptions = {}): Vau
         }
         if (!password) throw fail("not_found", MESSAGES.notFound);
         return password;
+      });
+    },
+
+    async createLogin(connection, login: VaultNewLogin, signal): Promise<VaultSourceItem> {
+      return withSession(connection, signal, async (session, settings) => {
+        const folderId = await folderIdOf(session, settings, signal);
+        const created = await apiPost(
+          http,
+          `${settings.endpoints.apiUrl}/ciphers`,
+          session.accessToken,
+          newCipher(login, folderId, session.userKey),
+          signal,
+        );
+        // Read back with the account's key, as a sync would: an answer that isn't our login in our folder isn't kept.
+        const item = isFolderLogin(created, folderId) ? itemOf(created, session.userKey) : null;
+        if (!item) throw fail("unreachable", MESSAGES.unreadable);
+        return item;
       });
     },
   };

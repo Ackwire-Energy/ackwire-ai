@@ -1,7 +1,7 @@
 import type { ConnectorDef, CustomServer, ToolDecision } from "@agenteschat/client";
 import { catalogToolClass } from "@agenteschat/client/lib/access-levels";
-import type { ConnectedItem } from "@agenteschat/client/lib/connected";
-import { humanize } from "@agenteschat/client/lib/custom-tools";
+import { type ConnectedItem, connectedSummary } from "@agenteschat/client/lib/connected";
+import { humanize, toolsToReview } from "@agenteschat/client/lib/custom-tools";
 import {
   bySubject,
   matchTool,
@@ -18,8 +18,11 @@ import type { TFunction } from "i18next";
  * the tests share. No React Native imports.
  */
 
-/** Where a connect sheet is: what it does → connect → its tools → who uses it. */
-export type Step = "about" | "connect" | "review" | "who";
+/**
+ * Where a connect sheet is: what it does → connect → "done", the short confirmation that ends it. "Ajustar" there
+ * goes on to the detail: its tools → who uses it.
+ */
+export type Step = "about" | "connect" | "done" | "review" | "who";
 
 /** A catalog service starts with what agents could do there; a server by its address with connecting. */
 export const CATALOG_STEPS: Step[] = ["about", "connect", "review", "who"];
@@ -27,7 +30,7 @@ export const CATALOG_STEPS: Step[] = ["about", "connect", "review", "who"];
 export const ADDRESS_STEPS: Step[] = ["connect", "who"];
 
 /** Each step's name for the progress dashes (the web's step names; "about" is the phone's own). */
-export const STEP_KEYS: Record<Step, string> = {
+export const STEP_KEYS: Record<Exclude<Step, "done">, string> = {
   about: "mobile.connectors.review.stepAbout",
   connect: "connectFlow.step.0",
   review: "connectFlow.step.1",
@@ -36,8 +39,8 @@ export const STEP_KEYS: Record<Step, string> = {
 
 /**
  * Where a sheet opens. A new service: on what it does. A connection: on who uses it (a connection opens its own
- * screen from the gallery); `start` asks for a step (back from a sign-in, the tools still in the flow; connecting
- * again over a connection, for an admin).
+ * screen from the gallery); `start` asks for a step (back from a sign-in, its confirmation; connecting again over a
+ * connection, for an admin).
  */
 export function firstStep(
   existing: Pick<ConnectedItem, "needsReview"> | undefined,
@@ -46,7 +49,7 @@ export function firstStep(
 ): Step {
   if (!existing) return "about";
   if (start === "connect") return admin ? "connect" : "who";
-  if (start === "review" || start === "who") return start === "review" && !admin ? "who" : start;
+  if (start === "done" || start === "review") return admin ? start : "who";
   return "who";
 }
 
@@ -72,6 +75,26 @@ export function reviewTarget(
   if (server) return { kind: "server", server };
   if (def?.kind === "catalog") return { kind: "catalog", def };
   return !servers || fetching ? { kind: "loading" } : { kind: "none" };
+}
+
+/**
+ * The confirmation's sentence for a connection just made (the web's): who can use it and how many actions ask, or,
+ * for a server whose tools no one gave a level yet, that agents get them on Continuar (`waiting`: that server).
+ * `unreadable`: why its tools couldn't be read, when they couldn't. Null while the lists catch up.
+ */
+export function doneSummary(
+  t: TFunction,
+  target: ReviewTarget,
+): { text: string; waiting: CustomServer | null; unreadable: string | null } | null {
+  if (target.kind === "loading") return null;
+  const server = target.kind === "server" ? target.server : null;
+  const pending = server ? toolsToReview(server) : 0;
+  const def = target.kind === "catalog" ? target.def : null;
+  return {
+    text: connectedSummary(t, { server, def, pending }),
+    waiting: pending > 0 ? server : null,
+    unreadable: server?.toolsError ?? null,
+  };
 }
 
 /** A catalog connector's tools, read-only, classified by our scopes (the web's catalog review). */
@@ -158,7 +181,7 @@ export function waitingHits(state: ReviewState, tools: ReviewTool[], query: stri
     .filter((m) => m.ok);
 }
 
-/** Back from a sign-in that finished on the link route: Conectores opens the review of that connection. */
+/** Back from a sign-in that finished on the link route: Conectores opens that connection's confirmation. */
 export const returnHref = (connectionId: string) => ({
   pathname: "/connectors" as const,
   params: { connected: connectionId },

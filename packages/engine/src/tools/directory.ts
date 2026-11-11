@@ -398,6 +398,7 @@ export const RARE_TOOLS: ReadonlySet<string> = new Set([
   "update_skill_from_source",
   "read_conversation",
   "send_feedback",
+  "offer_feedback",
 ]);
 const RARE_GROUP = "more";
 

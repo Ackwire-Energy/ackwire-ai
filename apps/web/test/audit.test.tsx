@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
@@ -11,6 +11,14 @@ import { renderApp, screen, settle, showIn } from "./render";
 afterEach(() => cleanup());
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
+/**
+ * The rows are minutes and a day old, and the list groups them by day: at noon, so they never straddle midnight (a
+ * run just past it put them all on Ontem). Only the clock the app reads; timers still run.
+ */
+const NOON = new Date();
+NOON.setHours(12, 0, 0, 0);
+setSystemTime(NOON);
+afterAll(() => setSystemTime());
 const at = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
 
 const row = (over: Partial<AuditRow> & Pick<AuditRow, "id">): AuditRow => ({

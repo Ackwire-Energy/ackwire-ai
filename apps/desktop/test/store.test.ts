@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import type { ControlEvent, ControlStatus } from "@agenteschat/adapters/runner-control";
+import type { ControlError } from "../src/control/client";
 import { DesktopStore } from "../src/control/store";
 import type { Host } from "../src/host/types";
 
@@ -210,4 +211,14 @@ test("status: showing this window reads every home again; another window being s
   await drain();
   expect(asked.filter((t) => t === "status").length).toBe(before + 1);
   expect(store.home("h1")?.status?.connection).toBe("online");
+});
+
+test("stopping: a request still waiting for its reply fails at once, so nothing waits on its timer after the window", async () => {
+  const { store, drain } = heldSetup();
+  const stop = store.start();
+  await drain();
+  const resume = store.request("h1", { type: "resume" }).catch((e: unknown) => e);
+  stop();
+  expect(((await resume) as ControlError).code).toBe("closed");
+  expect(store.client.inFlight).toBe(0);
 });

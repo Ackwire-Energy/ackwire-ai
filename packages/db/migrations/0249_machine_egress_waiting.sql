@@ -1,1 +1,0 @@
-ALTER TABLE "machines" ADD COLUMN "egress_waiting_at" timestamp with time zone;

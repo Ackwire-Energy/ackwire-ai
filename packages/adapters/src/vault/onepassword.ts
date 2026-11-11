@@ -1,6 +1,8 @@
 /**
  * 1Password as a Vault source (ADR 0144): a service account the person creates with access to one vault only (the
- * connection refuses one that sees more), read through 1Password's own SDK.
+ * connection refuses one that sees more), read through 1Password's own SDK. A service account made with read and
+ * write access to the vault also keeps new logins and changes a login's username or password; one that only reads
+ * is refused by 1Password at the write, which comes out as `read_only`.
  *
  * - The SDK is loaded when a 1Password connection is first used, never at boot: a server with no such connection
  *   never loads it. If it can't load here, the source says `unsupported`.
@@ -20,6 +22,8 @@ import {
   type VaultConnection,
   type VaultConnectResult,
   type VaultItemKind,
+  type VaultLoginChange,
+  type VaultNewLogin,
   type VaultSecretField,
   type VaultSource,
   type VaultSourceDescriptor,
@@ -57,7 +61,18 @@ export interface OnePasswordItem {
   category: string;
   vaultId: string;
   fields: { id: string; title: string; sectionId?: string; fieldType: string; value: string }[];
+  websites?: { url: string; label?: string; autofillBehavior: string }[];
   updatedAt?: Date | string;
+}
+
+/** What this source sends to create a login (the SDK's `ItemCreateParams`). */
+export interface OnePasswordNewItem {
+  category: "Login";
+  vaultId: string;
+  title: string;
+  fields: { id: string; title: string; fieldType: string; value: string }[];
+  websites?: { url: string; label: string; autofillBehavior: string }[];
+  notes?: string;
 }
 
 /** The part of the SDK's client this source uses. The real `@1password/sdk` module satisfies it. */
@@ -70,6 +85,9 @@ export interface OnePasswordClient {
       vaultId: string,
       itemIds: string[],
     ): Promise<{ individualResponses: { content?: OnePasswordItem; error?: { type: string } }[] }>;
+    create(params: OnePasswordNewItem): Promise<OnePasswordItem>;
+    /** Replaces the item with what is given: always the item as `get` returned it, with only our change. */
+    put(item: OnePasswordItem): Promise<OnePasswordItem>;
   };
 }
 
@@ -120,6 +138,8 @@ const MESSAGES = {
   vaultGone: "The service account can no longer see this vault.",
   manyVaults: "The service account sees more than one vault. Give it access to one vault only.",
   notFound: "This item is no longer in the vault.",
+  readOnly: "This service account can only read this vault.",
+  notALogin: "This item isn't a login.",
   rateLimited: "1Password asked us to wait before reading more.",
   unreachable: "Couldn't reach 1Password.",
   timeout: "1Password took too long to answer.",
@@ -135,7 +155,7 @@ const DESCRIPTOR: VaultSourceDescriptor = {
   kinds: ["login", "key"],
   steps: [
     "Create a vault in 1Password only for your agents and move into it the logins they may use",
-    "Create a service account with access to that vault only",
+    "Create a service account with access to that vault only (read and write, if your agents should save new logins there)",
     "Paste the service account token here",
   ],
   fields: [{ id: "token", kind: "secret", label: "Service account token", required: true, placeholder: "ops_…" }],
@@ -144,7 +164,8 @@ const DESCRIPTOR: VaultSourceDescriptor = {
 
 async function importSdk(): Promise<OnePasswordSdk> {
   const mod = await import("@1password/sdk");
-  if (typeof mod.createClient === "function") return mod;
+  // The SDK types what it takes with string enums (`ItemCategory.Login` is "Login"); this source sends those strings.
+  if (typeof mod.createClient === "function") return mod as unknown as OnePasswordSdk;
   // The SDK is CommonJS: some loaders only give its exports as `default`.
   const fallback = (mod as unknown as { default?: OnePasswordSdk }).default;
   if (fallback && typeof fallback.createClient === "function") return fallback;
@@ -229,12 +250,39 @@ function secretOf(item: OnePasswordItem, field: VaultSecretField): string | unde
   return found?.value || undefined;
 }
 
+/** A login as `list` gives it, from its full item. Never a concealed field. */
+function loginOf(item: OnePasswordItem): VaultSourceItem {
+  const websites = websitesOf(item.websites);
+  const username = usernameOf(item);
+  const updatedAt = stampOf(item.updatedAt) || undefined;
+  return {
+    ref: item.id,
+    kind: "login",
+    title: item.title?.trim() || "Login",
+    ...(websites.length > 0 ? { websites } : {}),
+    ...(username ? { username } : {}),
+    ...(updatedAt ? { updatedAt } : {}),
+  };
+}
+
+/** The item with one built-in field set (added when the item has none by that id), everything else as it was. */
+function withField(item: OnePasswordItem, id: "username" | "password", value: string): OnePasswordItem {
+  const fieldType = id === "password" ? "Concealed" : "Text";
+  const has = item.fields.some((f) => f.id === id);
+  return {
+    ...item,
+    fields: has
+      ? item.fields.map((f) => (f.id === id ? { ...f, value } : f))
+      : [...item.fields, { id, title: id, fieldType, value }],
+  };
+}
+
 function isSdkError(err: unknown, cls: ErrorClass | undefined, name: string): boolean {
   if (typeof cls === "function" && err instanceof cls) return true;
   return err instanceof Error && err.constructor?.name === name;
 }
 
-type Context = "connect" | "list" | "reveal";
+type Context = "connect" | "list" | "reveal" | "write";
 
 /** What the SDK's untyped errors say, by kind (read only to pick a code, never passed on). */
 const SAYS_RATE_LIMITED = /rate.?limit|too many requests|\b429\b/i;
@@ -247,6 +295,12 @@ const SAYS_AUTH_FAILED =
  */
 const SAYS_BAD_TOKEN =
   /bad service account token|create (another|a new) token|secret key|account (couldn't|could not) be found/i;
+/**
+ * A write the service account may not make. 1Password's own words for it speak of permissions ("you do not have the
+ * right permissions to perform this action"); a refusal by status alone is taken the same way, since the same token
+ * has just read the vault.
+ */
+const SAYS_NO_PERMISSION = /permission|forbidden|not allowed|read.?only|\b403\b/i;
 /** A missing item or vault (the SDK 0.5.0 says "item couldn't be found"). */
 const SAYS_NOT_FOUND = /not.?found|no item|could(n't| not) be found|does ?n[o']t exist|\b404\b/i;
 
@@ -263,9 +317,10 @@ function classify(err: unknown, sdk: OnePasswordSdk | null, context: Context, no
   if (isSdkError(err, sdk?.AuthExpiredError, "AuthExpiredError")) return fail("auth_failed", MESSAGES.authFailed);
   const said = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (SAYS_RATE_LIMITED.test(said)) return fail("rate_limited", MESSAGES.rateLimited, retryAt());
+  if (context === "write" && SAYS_NO_PERMISSION.test(said)) return fail("read_only", MESSAGES.readOnly);
   if (SAYS_AUTH_FAILED.test(said) || SAYS_BAD_TOKEN.test(said)) return fail("auth_failed", MESSAGES.authFailed);
   if (context !== "connect" && SAYS_NOT_FOUND.test(said)) {
-    return context === "reveal" ? fail("not_found", MESSAGES.notFound) : fail("no_vault", MESSAGES.vaultGone);
+    return context === "list" ? fail("no_vault", MESSAGES.vaultGone) : fail("not_found", MESSAGES.notFound);
   }
   return fail("unreachable", MESSAGES.unreachable);
 }
@@ -507,6 +562,53 @@ export function createOnePasswordSource(options: OnePasswordSourceOptions = {}):
         const value = secretOf(item, field);
         if (!value) throw fail("not_found", MESSAGES.notFound);
         return value;
+      });
+    },
+
+    async createLogin(connection, login: VaultNewLogin, signal): Promise<VaultSourceItem> {
+      return withClient(connection, signal, async (client, vaultId) => {
+        const params: OnePasswordNewItem = {
+          category: "Login",
+          vaultId,
+          title: login.title,
+          fields: [
+            ...(login.username
+              ? [{ id: "username", title: "username", fieldType: "Text", value: login.username }]
+              : []),
+            { id: "password", title: "password", fieldType: "Concealed", value: login.password },
+          ],
+          ...(login.website
+            ? {
+                websites: [
+                  {
+                    url: login.website,
+                    label: "website",
+                    autofillBehavior: login.match === "site" ? "AnywhereOnWebsite" : "ExactDomain",
+                  },
+                ],
+              }
+            : {}),
+          ...(login.notes ? { notes: login.notes } : {}),
+        };
+        const created = await bounded(() => client.items.create(params), "write", signal);
+        if (!created?.id) throw fail("unreachable", MESSAGES.unreachable);
+        return loginOf(created);
+      });
+    },
+
+    async updateLogin(connection, ref, change: VaultLoginChange, signal): Promise<VaultSourceItem> {
+      if (!ITEM_ID.test(ref)) throw fail("not_found", MESSAGES.notFound);
+      return withClient(connection, signal, async (client, vaultId) => {
+        const item = await bounded(() => client.items.get(vaultId, ref), "reveal", signal);
+        if (!item || item.id !== ref || (item.vaultId && item.vaultId !== vaultId)) {
+          throw fail("not_found", MESSAGES.notFound);
+        }
+        if (item.category !== "Login") throw fail("invalid_input", MESSAGES.notALogin);
+        let next = item;
+        if (change.username !== undefined) next = withField(next, "username", change.username);
+        if (change.password !== undefined) next = withField(next, "password", change.password);
+        if (next === item) return loginOf(item);
+        return loginOf(await bounded(() => client.items.put(next), "write", signal));
       });
     },
   };

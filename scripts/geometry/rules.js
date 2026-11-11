@@ -750,11 +750,12 @@
     /**
      * Words broken inside themselves: more lines than words, so the box is narrower than its own words. `wordwrap` looks
      * only at text right inside a row; this catches it however deep the row that squeezes it is (a title beside a bar's
-     * buttons, wrapped in a link or an edit-in-place).
+     * buttons, wrapped in a link or an edit-in-place). A box that hyphenates (`hyphens: auto`: a narrow calendar item's
+     * title) breaks a long word at its syllables on purpose.
      */
     midword(out) {
       for (const el of document.body.querySelectorAll("*")) {
-        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table")) continue;
+        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table") || style(el).hyphens === "auto") continue;
         let count = 0;
         const tops = new Set();
         for (const n of el.childNodes) {

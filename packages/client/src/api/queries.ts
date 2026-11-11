@@ -1051,7 +1051,8 @@ export type AgentGroupAction =
 
 /**
  * Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. Agents I put
- * in a group leave my pins (`unpinAgents`), so they show in it; `pinnedAt` in a move's result says where one was.
+ * in a group leave my pins (`unpinAgents`), so they land where I put them; `pinnedAt` in a move's result says where one
+ * was.
  */
 export function useAgentGroupAction(orgId: string) {
   const api = useApi();
@@ -4412,6 +4413,25 @@ export function useCalendarProposal(orgId: string, where: { channelId: string; m
     onSuccess: (proposal) => {
       cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ calendarProposal: proposal }));
       void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+/**
+ * A report about the app an agent offered under its reply (`meta.feedbackOffer`): Send queues it in my name, Not now
+ * puts it away, and the row says so at once (my other devices see it through `feedback_offer.updated`).
+ */
+export function useFeedbackOffer(
+  orgId: string,
+  where: { channelId: string; threadId?: string | null; messageId: string },
+) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: "send" | "dismiss") => api.system.decideFeedbackOffer(orgId, where.messageId, decision),
+    onSuccess: (offer) => {
+      cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ feedbackOffer: offer }));
+      if (where.threadId) void qc.invalidateQueries({ queryKey: keys.thread(orgId, where.channelId, where.threadId) });
     },
   });
 }

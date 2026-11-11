@@ -1593,6 +1593,8 @@ interface Live {
   lastUsed: number;
   idleTimer: ReturnType<typeof setTimeout> | null;
   persistent: boolean;
+  /** `drop` ran: a process closed while idle exits after, and its exit handler drops it again. */
+  dropped?: boolean;
 }
 
 /** What the bridge needs for one process's MCP server: its local token, and the run it works for now. */
@@ -2547,6 +2549,9 @@ export class BrainManager {
   }
 
   private drop(live: Live) {
+    // Once per process: a second pass at its exit would date the kept system text from the exit, not the close.
+    if (live.dropped) return;
+    live.dropped = true;
     if (live.idleTimer) clearTimeout(live.idleTimer);
     live.idleTimer = null;
     if (this.live.get(live.key) === live) this.live.delete(live.key);

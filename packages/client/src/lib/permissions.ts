@@ -86,30 +86,12 @@ export const addsAgentsTo = (
   org: Membership,
 ) => (channel?.isMember === true && can(org, "post")) || managesChannel(channel, meId, org);
 
-/** Mirrors the server's `UNDO_WINDOW_MS` (packages/engine/src/agent-actions.ts). */
-export const UNDO_WINDOW_MS = 5 * 60_000;
-
 /** Who may edit what an agent remembers: who reviews memory, or the agent's owner (the server's `requireEdit`). */
 export const editsMemory = (
   agent: { ownerUserId?: string | null } | null | undefined,
   meId: string | null | undefined,
   org: Membership,
 ) => can(org, "review_memory") || (!!meId && agent?.ownerUserId === meId);
-
-/**
- * Who may undo a memory change from its chat card: who may edit the agent's memory, or the person who asked for the
- * change while the undo window is open (`sentAt` absent: just now). Mirrors the server's `revertMemoryChange`.
- */
-export const undoesMemoryChange = (
-  update: { requestedByUserId?: string | null },
-  agent: { ownerUserId?: string | null } | null | undefined,
-  meId: string | null | undefined,
-  org: Membership,
-  sentAt?: string | null,
-  now = Date.now(),
-) =>
-  editsMemory(agent, meId, org) ||
-  (!!meId && update.requestedByUserId === meId && (!sentAt || now - new Date(sentAt).getTime() < UNDO_WINDOW_MS));
 
 /** I may leave this channel: I'm in it, and it isn't #general, where everyone stays. */
 export const leavesChannel = (channel: { isMember?: boolean; name: string }) =>

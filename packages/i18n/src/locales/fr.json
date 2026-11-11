@@ -2887,8 +2887,6 @@
     "chip": "Mémoire mise à jour",
     "was": "Avant : {{text}}",
     "open": "Ce que sait {{name}}",
-    "undo": "Annuler",
-    "undone": "Annulé",
     "group": "Mémoire mise à jour par {{name}}"
   },
   "reach": {
@@ -3043,23 +3041,11 @@
     "someone": "quelqu'un",
     "you": "vous",
     "undo": "Annuler",
-    "redo": "Rétablir",
-    "undoAll": "Tout annuler",
     "changes_one": "{{count}} modification",
     "changes_many": "{{count}} modifications",
     "changes_other": "{{count}} modifications",
     "undoneBy": "Annulé par {{name}}",
-    "ago": "il y a {{time}}",
-    "timeLeft": "Encore {{time}} pour annuler",
     "group": "Modifications de {{name}}",
-    "undone": "Annulé.",
-    "redone": "Rétabli.",
-    "undoneAll_one": "{{count}} modification annulée.",
-    "undoneAll_many": "{{count}} modifications annulées.",
-    "undoneAll_other": "{{count}} modifications annulées.",
-    "partial_one": "{{count}} modification n'a pas pu être annulée.",
-    "partial_many": "{{count}} modifications n'ont pas pu être annulées.",
-    "partial_other": "{{count}} modifications n'ont pas pu être annulées.",
     "errors": {
       "changed_since": "Quelqu'un a modifié ceci entre-temps. Annuler maintenant ferait perdre cette modification.",
       "expired": "Le délai pour annuler est dépassé.",
@@ -3709,6 +3695,7 @@
       "ready": "Connecté",
       "syncing": "Synchronisation",
       "reads": "Lit {{label}}",
+      "readOnly": "lecture seule",
       "items_one": "{{count}} élément",
       "items_other": "{{count}} éléments",
       "synced": "synchronisé {{when}}",
@@ -3757,7 +3744,7 @@
       "onepassword": {
         "step": {
           "1": "Créez dans 1Password un coffre réservé à vos agents et déplacez-y les identifiants qu'ils peuvent utiliser",
-          "2": "Créez un compte de service avec accès à ce coffre uniquement",
+          "2": "Créez un compte de service avec accès à ce coffre uniquement (lecture et écriture, si vos agents doivent y enregistrer de nouveaux identifiants)",
           "3": "Collez ici le jeton du compte de service"
         },
         "field": {
@@ -9856,6 +9843,193 @@
     "notImage": "Choisissez une image (JPG, PNG ou WebP).",
     "tooBig": "L'image dépasse 8 Mo."
   },
+  "portrait": {
+    "ask": {
+      "title": "Comment voulez-vous apparaître ?",
+      "build": "Créer un avatar",
+      "buildText": "Un portrait en pixels à votre façon : cheveux, vêtements, accessoires.",
+      "photo": "Envoyer une photo",
+      "photoText": "Choisissez une image sur votre ordinateur et cadrez-la."
+    },
+    "title": "Votre avatar",
+    "preview": "Votre avatar",
+    "shuffle": "Aléatoire",
+    "small": "En petit format dans le chat, seul le visage s'affiche.",
+    "photoAsk": "Vous préférez une photo ?",
+    "photoUpload": "Importer une photo",
+    "saved": "Avatar mis à jour.",
+    "failed": "Impossible d'enregistrer l'avatar. Réessayez.",
+    "showAll": "Afficher toutes les options",
+    "showFewer": "Afficher moins d'options",
+    "beardHint": "La barbe suit la couleur des cheveux.",
+    "hatsHint": "Une casquette, un bonnet, un chapeau ou un foulard couvrent les cheveux.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Traits",
+      "m": "Masculin",
+      "f": "Féminin"
+    },
+    "tabs": {
+      "label": "Parties de l'avatar",
+      "face": "Visage",
+      "hair": "Cheveux",
+      "beard": "Barbe",
+      "makeup": "Maquillage",
+      "marks": "Marques",
+      "accessories": "Accessoires",
+      "clothes": "Vêtements",
+      "background": "Fond"
+    },
+    "sections": {
+      "skin": "Couleur de peau",
+      "eyes": "Couleur des yeux",
+      "mood": "Expression",
+      "color": "Couleur",
+      "hairColor": "Couleur des cheveux",
+      "clothesColor": "Couleur des vêtements",
+      "cut": "Coupe",
+      "beard": "Barbe",
+      "lips": "Rouge à lèvres",
+      "shadow": "Fard à paupières",
+      "blush": "Blush",
+      "mark": "Marques",
+      "glasses": "Lunettes",
+      "ear": "Boucles d'oreilles",
+      "neck": "Autour du cou",
+      "extra": "Sur la tête",
+      "piece": "Pièce",
+      "bg": "Fond"
+    },
+    "options": {
+      "mood": {
+        "smile": "Sourire",
+        "grin": "Grand sourire",
+        "laugh": "Rire",
+        "calm": "Calme",
+        "wink": "Clin d'œil",
+        "wow": "Surprise"
+      },
+      "hair": {
+        "none": "Chauve",
+        "buzz": "Coupe rase",
+        "short": "Courts",
+        "side": "Raie sur le côté",
+        "quiff": "Houppe",
+        "curly": "Bouclés",
+        "afro": "Afro",
+        "bob": "Carré",
+        "bangs": "Frange",
+        "long": "Longs",
+        "wavy": "Ondulés",
+        "curls": "Longues boucles",
+        "bun": "Chignon",
+        "pony": "Queue de cheval",
+        "spiky": "En pics",
+        "mohawk": "Crête",
+        "braids": "Tresses",
+        "pigtails": "Couettes",
+        "crew": "Brosse",
+        "fade": "Dégradé",
+        "slick": "Plaqués en arrière",
+        "flat": "Brosse carrée",
+        "undercut": "Undercut",
+        "mullet": "Mulet",
+        "dreads": "Dreadlocks",
+        "medium": "Mi-longs",
+        "receding": "Dégarni"
+      },
+      "beard": {
+        "none": "Sans barbe",
+        "stubble": "Barbe de trois jours",
+        "mustache": "Moustache",
+        "goatee": "Bouc",
+        "strap": "En collier",
+        "full": "Complète",
+        "long": "Longue"
+      },
+      "lips": {
+        "none": "Sans rouge à lèvres",
+        "nude": "Nude",
+        "pink": "Rose",
+        "red": "Rouge",
+        "wine": "Bordeaux",
+        "purple": "Violet",
+        "black": "Noir"
+      },
+      "shadow": {
+        "none": "Sans fard",
+        "rose": "Rose",
+        "violet": "Violet",
+        "blue": "Bleu",
+        "green": "Vert",
+        "gold": "Doré",
+        "smoky": "Charbonneux"
+      },
+      "blush": {
+        "soft": "Léger",
+        "strong": "Marqué",
+        "none": "Sans blush"
+      },
+      "mark": {
+        "none": "Aucune",
+        "freckles": "Taches de rousseur",
+        "mole": "Grain de beauté",
+        "scar": "Cicatrice",
+        "bandaid": "Pansement",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Sans lunettes",
+        "round": "Rondes",
+        "square": "Carrées",
+        "gold": "Dorées",
+        "tinted": "Teintées",
+        "shades": "Lunettes de soleil"
+      },
+      "ear": {
+        "none": "Sans boucles d'oreilles",
+        "studs": "Puces dorées",
+        "pearls": "Perles",
+        "hoops": "Créoles",
+        "drops": "Pendantes"
+      },
+      "neck": {
+        "none": "Rien",
+        "necklace": "Collier",
+        "pearls": "Perles",
+        "choker": "Ras-du-cou",
+        "bowtie": "Nœud papillon",
+        "muffler": "Écharpe"
+      },
+      "extra": {
+        "none": "Rien",
+        "headband": "Bandeau",
+        "bandana": "Bandana",
+        "bow": "Nœud",
+        "flower": "Fleur",
+        "headphones": "Casque audio",
+        "cap": "Casquette",
+        "beanie": "Bonnet",
+        "hat": "Chapeau",
+        "crown": "Couronne",
+        "scarf": "Foulard"
+      },
+      "clothes": {
+        "tee": "T-shirt",
+        "vneck": "Col en V",
+        "tank": "Débardeur",
+        "shirt": "Chemise",
+        "suit": "Costume",
+        "blazer": "Blazer",
+        "jacket": "Veste",
+        "hoodie": "Sweat à capuche",
+        "turtle": "Col roulé",
+        "overall": "Salopette",
+        "polo": "Polo",
+        "dress": "Robe"
+      }
+    }
+  },
   "orgLogo": {
     "label": "Logo",
     "add": "Importer un logo",
@@ -11319,7 +11493,7 @@
       "close": "Fermer les détails",
       "can": "Ce que les agents pourront faire",
       "afterText": "Aucun agent ne l'utilise tant que vous n'avez pas choisi.",
-      "allText": "Une fois connecté, tous les agents peuvent l'utiliser. Ensuite, vous choisissez l'accès de chaque agent.",
+      "allText": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pourrez ajuster cela plus tard.",
       "addAccount": "Ajouter un autre compte",
       "accountsText": "Chaque compte a ses propres agents et niveaux.",
       "reconnect": "Reconnecter",
@@ -12120,11 +12294,10 @@
     "notApproved": "{{name}} n'autorise la connexion qu'aux applications qu'il a approuvées, et agentes.chat ne l'est pas encore. S'il vous fournit une clé API, vous pouvez vous connecter avec.",
     "serverSaid": "Le serveur a répondu : {{detail}}",
     "nothingYet": "Rien n'est disponible pour les agents avant l'étape 3.",
-    "allCanUse": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pouvez changer cela à l'étape 3.",
-    "newAccount": "Le nouveau compte démarre sans agents, sauf ceux qui ont accès à tout. Vous choisissez à l'étape 3.",
+    "allCanUse": "Une fois connecté, tous les agents peuvent l'utiliser. Vous pourrez ajuster cela plus tard.",
     "replace": "Remplace la connexion actuelle. Ceux qui l'utilisent restent les mêmes.",
     "replaceUnchecked": "Connectez-vous au même compte qu'avant. Nous ne pouvons pas vérifier lequel c'est, et ceux qui l'utilisent restent les mêmes.",
-    "newAccountUnchecked": "Connectez-vous à un compte qui n'est pas encore connecté, nous ne pouvons pas le vérifier. Il démarre sans agents, sauf ceux qui ont accès à tout.",
+    "newAccountUnchecked": "Connectez-vous à un compte qui n'est pas encore connecté, nous ne pouvons pas le vérifier.",
     "addTitle": "Un autre compte {{name}}",
     "reconnectTitle": "Reconnecter {{name}}",
     "accountName": "Nom de ce compte",
@@ -12150,7 +12323,17 @@
     "grant": "Donner l'accès",
     "saved_one": "{{name}} : {{count}} agent peut l'utiliser.",
     "saved_many": "{{name}} : {{count}} agents peuvent l'utiliser.",
-    "saved_other": "{{name}} : {{count}} agents peuvent l'utiliser."
+    "saved_other": "{{name}} : {{count}} agents peuvent l'utiliser.",
+    "done": {
+      "title": "{{name}} connecté",
+      "everyone": "Tous les agents peuvent l'utiliser.",
+      "waiting": "Les agents ne reçoivent les outils que lorsque vous continuez, aux niveaux que nous suggérons.",
+      "asks_one": "{{count}} action demande une approbation dans le chat.",
+      "asks_many": "{{count}} actions demandent une approbation dans le chat.",
+      "asks_other": "{{count}} actions demandent une approbation dans le chat.",
+      "adjust": "Ajuster",
+      "ok": "Terminé"
+    }
   },
   "database": {
     "name": "Base de données",
@@ -15353,6 +15536,7 @@
         "settingStatus": "A mis à jour son statut",
         "settingReplyStyle": "A ajusté sa façon de répondre",
         "sendingFeedback": "A demandé à envoyer un retour",
+        "offeringFeedback": "A proposé de signaler un problème",
         "deletingRoutine": "A supprimé une routine",
         "runningRoutine": "A lancé une routine maintenant",
         "proposingTeam": "A proposé une équipe",
@@ -15466,6 +15650,7 @@
       "settingStatus": "mise à jour de son statut",
       "settingReplyStyle": "réglage de sa façon de répondre",
       "sendingFeedback": "prépare un retour",
+      "offeringFeedback": "prépare un rapport",
       "deletingRoutine": "suppression d'une routine",
       "runningRoutine": "lancement d'une routine maintenant",
       "proposingTeam": "proposition d'une équipe",
@@ -18101,6 +18286,24 @@
     "send": "Envoyer",
     "thanks": "C'est remis. Merci.",
     "reply": "Tout est lu. La réponse, s'il en faut une, arrive à {{email}}.",
-    "another": "En envoyer un autre"
+    "another": "En envoyer un autre",
+    "offer": {
+      "group": "Rapport sur l'application",
+      "ready": "<b>Rapport prêt</b> : {{summary}}",
+      "goesCloud": "Part en votre nom à l'équipe d'agentes.chat",
+      "goesServer": "Part en votre nom à la personne qui gère ce serveur",
+      "see": "Voir le rapport",
+      "hide": "Fermer le rapport",
+      "send": "Envoyer",
+      "notNow": "Pas maintenant",
+      "answer": "La réponse arrive dans votre boîte e-mail.",
+      "sentCloud": "<b>Rapport envoyé</b> à l'équipe d'agentes.chat",
+      "sentServer": "<b>Rapport envoyé</b> à la personne qui gère ce serveur",
+      "sentAuto": "<b>Rapport envoyé sans demander</b> : {{summary}}",
+      "view": "Voir",
+      "always": "Toujours envoyer",
+      "alwaysOn": "Désormais, les rapports de ce type partent sans demander.",
+      "askFirst": "Demander avant d'envoyer"
+    }
   }
 }

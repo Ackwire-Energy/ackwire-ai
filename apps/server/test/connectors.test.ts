@@ -633,12 +633,12 @@ test("connector accounts: another Stripe account, the outcome back from OAuth, R
   expect(first).toBe(
     `http://localhost:3000/settings/connectors?connected=${encodeURIComponent(`custom:${acme.id}`)}&outcome=connected`,
   );
-  // Another account: a row of its own, which no agent uses yet.
+  // Another account: a row of its own, every agent's as the first.
   expect(await signIn(await start(), "loja")).toContain("&outcome=connected");
   expect((await servers()).map((s) => s.label)).toEqual(["Stripe (Acme)", "Stripe (Loja B)"]);
   expect(await levels()).toEqual([
     ["Stripe (Acme)", "granted"],
-    ["Stripe (Loja B)", "off"],
+    ["Stripe (Loja B)", "granted"],
   ]);
   // The same account again: nothing new.
   expect(await signIn(await start(), "acme")).toContain("&outcome=same_account");

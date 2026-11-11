@@ -118,11 +118,28 @@ function cancel(state: StreamsState, runId: string, byUserId?: string | null): S
   };
 }
 
+/**
+ * How much later than a row's own count the server's must be for the row to take it: more than a slow read's delay
+ * or two clocks' drift within one stretch of work, less than any wait worth counting again.
+ */
+export const WORK_MISSED_MS = 5000;
+
+/** When the work a run is doing now began, by this device's clock: what "thinking for …" counts from. */
+export const workingSinceOf = (run: Pick<LiveRun, "startedAt" | "workingSince">): number | undefined =>
+  run.workingSince ?? run.startedAt;
+
 export interface LiveRun {
   /** When a provisional row was added (for the safety timeout). */
   since?: number;
   /** When this client first saw the run (places the live row by time in the timeline). */
   startedAt?: number;
+  /**
+   * When the work it is doing now began, by this device's clock: what "thinking for …" counts from
+   * (`workingSinceOf`). Set when its row opens (and again each time it reopens: after it posted, waited, was approved)
+   * and never moved back by a later read of the server (`reconcileRuns`), so leaving the conversation and coming back
+   * keeps the count.
+   */
+  workingSince?: number;
   /** The message that started it (its live row goes right after it). */
   triggerMessageId?: string | null;
   /**
@@ -381,6 +398,7 @@ export function expectReply(
     provisional: true,
     since: now,
     startedAt: now,
+    workingSince: now,
     ...(event.messageId && event.messageId !== input.threadId ? { triggerMessageId: event.messageId } : {}),
   };
   return { ...state, runs: { ...state.runs, [runId]: run } };
@@ -445,6 +463,9 @@ function upsert(
     // No delta yet: the backend's first delta is seq 0, so "seen" starts below it.
     lastSeq: -1,
     startedAt: provisional?.startedAt ?? Date.now(),
+    // A row that opens now counts from now, or from the message I sent that it answers; one already open keeps its
+    // count (`current`, below).
+    workingSince: provisional?.workingSince ?? provisional?.startedAt ?? Date.now(),
     // A "pensando…" row hangs off the message I sent: that message started the run.
     ...(provisional ? { triggerMessageId: guessedFrom(provisional) } : {}),
     ...current,
@@ -723,6 +744,8 @@ function applyEvent(state: StreamsState, event: StreamEvent): StreamsState {
         ...(event.errorCode ? { errorCode: event.errorCode, errorParams: event.errorParams } : {}),
         ...(event.triggerMessageId ? { triggerMessageId: event.triggerMessageId } : {}),
         ...(event.startedAt ? { startedAt: Date.parse(event.startedAt) } : {}),
+        // An event that says when it started opens the row counting from there; a row already open keeps its count.
+        ...(event.startedAt && !current ? { workingSince: Date.parse(event.startedAt) } : {}),
       });
     }
     case "agent.thinking": {
@@ -888,6 +911,13 @@ export const isActiveStatus = (status: string) => ACTIVE.has(status);
  * The server's list of active runs in a channel is the truth: live rows it
  * doesn't know are dropped (a failed or canceled row stays until seen), and
  * active runs we never heard of get a "pensando…" row.
+ *
+ * "Thinking for …" (`workingSince`) never goes back for a row already here: the server's `startedAt` is the run's
+ * first start, minutes before the work it is doing now when it posted or waited on the way, so taking it made the
+ * count jump on every return to the conversation. A row keeps its own count, unless the server says the work began
+ * well after it (`WORK_MISSED_MS`) and nothing was heard from the run since then: a new stretch began while this
+ * device wasn't listening (a conversation is listened to only while it is open). A row made here counts
+ * from the server's length of the work (`workingMs`), turned into this device's clock at the middle of the read.
  */
 export function reconcileRuns(
   state: StreamsState,
@@ -915,8 +945,16 @@ export function reconcileRuns(
     }
     const startedAt = a.startedAt ? Date.parse(a.startedAt) : undefined;
     const heartbeat = a.heartbeatAt ? Date.parse(a.heartbeatAt) : undefined;
+    const served =
+      typeof a.workingMs === "number" ? Math.round((askedAt + now) / 2) - Math.max(0, a.workingMs) : undefined;
     const r = s.runs[a.runId];
     if (r) {
+      const mine = workingSinceOf(r);
+      // Heard from the run after the moment the server counts from: this device was listening when that stretch
+      // began and chose its own count (a message it took for one posted on the way), so it keeps it.
+      const heardSince = served !== undefined && (r.lastEventAt ?? 0) >= served;
+      const missed = served !== undefined && (mine === undefined || (served - mine > WORK_MISSED_MS && !heardSince));
+      const workingSince = missed ? served : mine;
       // What the server knows better: where it started, and that it's alive.
       const lastEventAt = Math.max(r.lastEventAt ?? 0, heartbeat ?? 0) || r.lastEventAt;
       s = {
@@ -927,6 +965,7 @@ export function reconcileRuns(
             ...r,
             ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
             ...(startedAt ? { startedAt } : {}),
+            ...(workingSince !== undefined ? { workingSince } : {}),
             ...(lastEventAt ? { lastEventAt } : {}),
           },
         },
@@ -938,6 +977,8 @@ export function reconcileRuns(
     s = upsert(s, a, {
       status: "thinking",
       startedAt: startedAt ?? now,
+      // A server from before `workingMs` only knows the run's first start.
+      workingSince: served ?? startedAt ?? now,
       lastEventAt: now,
       ...(a.triggerMessageId ? { triggerMessageId: a.triggerMessageId } : {}),
     });
