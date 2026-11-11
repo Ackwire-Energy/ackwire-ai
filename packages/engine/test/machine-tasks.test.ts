@@ -696,8 +696,8 @@ describe("background tasks (ADR 0029)", () => {
     await drainOutbox(f.db, f.handlers);
     const thread = await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: root.id });
     const notice = thread.find((m) => m.meta.bodyCode === "machine_offline");
-    expect(notice?.body).toContain(
-      '"Build" keeps running there if only the connection dropped. If the computer restarted, it stopped and won\'t resume by itself.',
+    expect(notice?.body).toBe(
+      "MacBook ficou offline: “Build” continua rodando lá se só a conexão caiu. Se o computador reiniciou, ela parou e não retoma sozinha.",
     );
     expect(notice?.meta.bodyParams).not.toHaveProperty("context");
     // Still away past the grace: open apps look again (it is an outage now).
