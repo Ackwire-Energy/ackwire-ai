@@ -89,6 +89,11 @@ export interface ContextEvidence {
   /** For `agent`/`self`: the agent that made the claim. */
   agentId?: string;
   at: string;
+  /**
+   * `human` only: the item's content is this message's exact words, saved in a run that read outside content (ADR
+   * 0167). Its title is the agent's wording, for people only: a model reads the quote alone.
+   */
+  quote?: boolean;
 }
 
 /**

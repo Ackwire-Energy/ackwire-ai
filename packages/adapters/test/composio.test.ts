@@ -427,6 +427,25 @@ describe("Composio client", () => {
     expect(String(refused)).toContain("Invalid id value");
   });
 
+  test("an answer reaches us without the service's credentials, its page cursors kept", async () => {
+    const pages = {
+      data: [{ id: "101", name: "Acme Store", access_token: "fake-page-token", tasks: ["CREATE_CONTENT"] }],
+      paging: { cursors: { after: "QVFIUz" } },
+      page_access_token: "fake-token",
+      refreshToken: "fake-refresh",
+      nextPageToken: "CAUQAA",
+    };
+    const { fetch } = fakeFetch(tool("FACEBOOK_LIST_MANAGED_PAGES", pages));
+    const account = { connectedAccountId: "ca_1", userId: "org_1", toolkit: "facebook" };
+    expect(
+      await createComposioClient({ apiKey: "k", fetch }).executeTool("FACEBOOK_LIST_MANAGED_PAGES", account, {}),
+    ).toEqual({
+      data: [{ id: "101", name: "Acme Store", tasks: ["CREATE_CONTENT"] }],
+      paging: { cursors: { after: "QVFIUz" } },
+      nextPageToken: "CAUQAA",
+    });
+  });
+
   test("fetchFile never follows a redirect: the link's own address answers, or nothing does", async () => {
     const asked: (RequestInit | undefined)[] = [];
     const client = createComposioClient({

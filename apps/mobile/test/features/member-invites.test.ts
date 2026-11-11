@@ -267,3 +267,15 @@ describe("Invite people in a personal workspace (ADR 0159 §4)", () => {
     expect(sheets).toContain("...givable.filter((r) => r.key !== helper.id),");
   });
 });
+
+describe("Convidar pessoas while it sends", () => {
+  test("whoever is being invited never reads as invited already: the rows keep the lists from before Convidar", () => {
+    const invite = readFileSync(join(import.meta.dir, "../../src/features/members/InvitePeople.tsx"), "utf8");
+    expect(invite).toContain(
+      "const members = useHeldWhile(new Set(people.map((m) => m.email.toLowerCase())), inviteMany.isPending);",
+    );
+    expect(invite).toMatch(
+      /const invited = useHeldWhile\(\s*new Set\(pendingInvitations\(invitations\)[^;]*\),\s*inviteMany\.isPending,\s*\);/,
+    );
+  });
+});

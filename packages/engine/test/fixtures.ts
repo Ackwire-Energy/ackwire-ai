@@ -4,6 +4,7 @@ import {
   createMemoryBlobStore,
   createMemoryPubSub,
   createPostgresSearchResolver,
+  type ErrorReporter,
   type GifProvider,
   type KeyWrapper,
   noPlatformCredentials,
@@ -55,6 +56,7 @@ import {
   createWorkToolSource,
   type FakeScheduleAnswer,
   type FakeScheduleAnswers,
+  type GatewayEmbeddings,
   localDateTimeOf,
   type RunExecutorDeps,
   type SandboxDeps,
@@ -199,8 +201,13 @@ export async function setup(
     calendarTools?: boolean;
     /** Add the skill tools (load_skill, read_skill_file). */
     skillTools?: boolean;
-    /** Fake embeddings (hybrid search). Off: full-text only, no embedding usage rows. */
-    embeddings?: boolean;
+    /**
+     * Embeddings (hybrid search): `true`, the fake for every kind; an object sets the provider (the fake when left
+     * out), the kinds that get vectors and the query's timeout. Off: full-text only, no embedding usage rows.
+     */
+    embeddings?: boolean | Partial<Omit<GatewayEmbeddings, "apiKey">>;
+    /** Where the gateway reports an embeddings outage. */
+    errors?: ErrorReporter;
     /** Add the scheduling tools (schedule_reminder, create_routine…). */
     scheduleTools?: boolean;
     /** Keep the workspace's right hand (ADR 0137). Off: its only agent is `@dev`. */
@@ -286,7 +293,10 @@ export async function setup(
     // Every provider but OpenAI answers through `provider`.
     providers: { ...Object.fromEntries(PROVIDER_IDS.map((id) => [id, provider])), openai: openaiProvider },
     platformCredentials: options.platform ?? noPlatformCredentials,
-    embeddings: options.embeddings ? { provider: embeddings, apiKey: "test" } : undefined,
+    embeddings: options.embeddings
+      ? { provider: embeddings, apiKey: "test", ...(options.embeddings === true ? {} : options.embeddings) }
+      : undefined,
+    errors: options.errors,
   });
   const search = createPostgresSearchResolver(db);
   const context: ContextDeps = {

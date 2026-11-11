@@ -1199,6 +1199,30 @@
   "auth.desktopOwner.text": {
     "value": "You set up agentes.chat on this {{device}}: no password needed."
   },
+  "auth.server.into": {
+    "value": "Signing in to <b>{{server}}</b>"
+  },
+  "auth.server.intoHere": {
+    "value": "Signing in to the agentes.chat <b>on this {{device}}</b>"
+  },
+  "auth.forgotHere.ownerTitle": {
+    "value": "You don't need a password here."
+  },
+  "auth.forgotHere.ownerLead": {
+    "value": "You set up agentes.chat on this {{device}}. Sign in here, then create a new password."
+  },
+  "auth.forgotHere.notOwner": {
+    "value": "Not the account of whoever set it up? Ask an owner of your workspace for a new-password link."
+  },
+  "auth.forgotHere.title": {
+    "value": "This server doesn't send email."
+  },
+  "auth.forgotHere.lead": {
+    "value": "Ask an owner of your workspace for a new-password link. They make it in Members, and it works for 1 hour."
+  },
+  "auth.forgotHere.back": {
+    "value": "Back to the password"
+  },
   "auth.reset.title": {
     "value": "Create a new password."
   },
@@ -1715,6 +1739,24 @@
   "onboarding.flow.steps.plan": {
     "value": "Turn the team on"
   },
+  "onboarding.flow.steps.ai": {
+    "value": "Connect an AI"
+  },
+  "onboarding.flow.steps.people": {
+    "value": "Invite people"
+  },
+  "onboarding.flow.steps.namePersonal": {
+    "value": "What it's for"
+  },
+  "onboarding.flow.steps.teamPersonal": {
+    "value": "Your agents"
+  },
+  "onboarding.flow.steps.planPersonal": {
+    "value": "Turn the agents on"
+  },
+  "onboarding.flow.steps.aiPersonal": {
+    "value": "Connect an AI"
+  },
   "onboarding.flow.stepOf": {
     "value": "Step {{n}} of {{total}}"
   },
@@ -1727,8 +1769,62 @@
   "onboarding.flow.lodi.team": {
     "value": "This is the team I'd put together. You can change anything later."
   },
+  "onboarding.flow.lodi.teamMade": {
+    "value": "The team is already put together. We move on whenever you're ready."
+  },
+  "onboarding.flow.lodi.teamMadePersonal": {
+    "value": "Your agents are already here. We move on whenever you're ready."
+  },
   "onboarding.flow.lodi.plan": {
     "value": "After the plan, all that's left is connecting an AI. I'll show you where."
+  },
+  "onboarding.flow.lodi.planThen": {
+    "value": "Once the plan is on, the next screen is where you connect your AI."
+  },
+  "onboarding.flow.lodi.ask": {
+    "value": "Already have a team somewhere else? I'll bring all of it here."
+  },
+  "onboarding.flow.lodi.start": {
+    "value": "I have a team ready for what you do. Or we start with just the two of us."
+  },
+  "onboarding.flow.lodi.askPersonal": {
+    "value": "Already use agents somewhere else? I'll bring them all here."
+  },
+  "onboarding.flow.lodi.bring": {
+    "value": "Copy the request, paste it in {{app}} and bring back the answer. I'll do the rest."
+  },
+  "onboarding.flow.lodi.bringFiles": {
+    "value": "Drop here what the app exported. I'll do the rest."
+  },
+  "onboarding.flow.lodi.found": {
+    "value": "Found your team. Check that everyone is here."
+  },
+  "onboarding.flow.lodi.foundPersonal": {
+    "value": "Found your agents. Check that they're all here."
+  },
+  "onboarding.flow.lodi.ai": {
+    "value": "Last step. Pick the AI you already use and the team wakes up."
+  },
+  "onboarding.flow.lodi.aiPersonal": {
+    "value": "Last step. Pick the AI you already use and I wake up."
+  },
+  "onboarding.flow.lodi.aiThen": {
+    "value": "Pick the AI you already use and the team wakes up. Then all that's left is inviting people."
+  },
+  "onboarding.flow.lodi.aiThenAlone": {
+    "value": "Pick the AI you already use and I wake up. Then all that's left is inviting people."
+  },
+  "onboarding.flow.lodi.connected": {
+    "value": "There we go. Call me in the workspace and I'll show you the rest."
+  },
+  "onboarding.flow.lodi.connectedThen": {
+    "value": "There we go. All that's left is inviting the people you work with."
+  },
+  "onboarding.flow.lodi.people": {
+    "value": "Now the people. Give me their emails and I'll send the invitations."
+  },
+  "onboarding.flow.lodi.peopleLink": {
+    "value": "Now the people. Send them the link and I'll show you each request."
   },
   "onboarding.flow.preview.label": {
     "value": "Your workspace, as you answer"
@@ -1739,14 +1835,137 @@
   "onboarding.flow.preview.ghost": {
     "value": "Your team shows up here"
   },
+  "onboarding.flow.preview.ghostPersonal": {
+    "value": "Your agents show up here"
+  },
   "onboarding.flow.team.title": {
     "value": "Your team"
+  },
+  "onboarding.flow.team.madeLead": {
+    "value": "They're already in the workspace. You can adjust each one later."
+  },
+  "onboarding.flow.team.start.title": {
+    "value": "How do you want to start the team?"
+  },
+  "onboarding.flow.team.start.lead": {
+    "value": "You can change all of it later, nothing is lost."
+  },
+  "onboarding.flow.team.start.template": {
+    "value": "Start with a ready-made team"
+  },
+  "onboarding.flow.team.start.templateText": {
+    "value": {
+      "one": "{{count}} agent from the {{template}} template, in its own channel, with its routine ready.",
+      "other": "{{count}} agents from the {{template}} template, each in its own channel, with their routines ready."
+    }
+  },
+  "onboarding.flow.team.start.scratch": {
+    "value": "Start from scratch"
+  },
+  "onboarding.flow.team.start.scratchText": {
+    "value": "Just {{name}}, your right hand. You create each agent later, your way."
+  },
+  "onboarding.flow.team.start.scratchWho": {
+    "value": "{{name}} and whoever you create"
+  },
+  "onboarding.flow.team.start.see": {
+    "value": "See the ready-made team"
+  },
+  "onboarding.flow.team.start.scratchGo": {
+    "value": "Go on with just {{name}}"
+  },
+  "onboarding.flow.team.ask.title": {
+    "value": "Do you already have agents in another app?"
+  },
+  "onboarding.flow.team.ask.lead": {
+    "value": "If you do, I'll bring the whole team: instructions, skills and routines."
+  },
+  "onboarding.flow.team.ask.leadPersonal": {
+    "value": "If you do, I'll bring them all: instructions, skills and routines."
+  },
+  "onboarding.flow.team.ask.none": {
+    "value": "I don't use any yet"
+  },
+  "onboarding.flow.team.ask.noneText": {
+    "value": "I'll put together a team for {{org}} from what you do."
+  },
+  "onboarding.flow.team.ask.noneTextPersonal": {
+    "value": "We start with just the two of us. Agents can come later, whenever you want."
+  },
+  "onboarding.flow.team.ask.from": {
+    "value": "Bring from {{app}}"
+  },
+  "onboarding.flow.team.ask.fresh": {
+    "value": "Build a new team"
+  },
+  "onboarding.flow.team.ask.freshPersonal": {
+    "value": "Continue without agents"
+  },
+  "onboarding.flow.team.ask.skip": {
+    "value": "Skip this step"
+  },
+  "onboarding.flow.team.ask.skipText": {
+    "value": "You can create the agents later, one by one."
+  },
+  "onboarding.flow.team.bring.title": {
+    "value": "Bring your team from {{app}}"
+  },
+  "onboarding.flow.team.bring.titlePersonal": {
+    "value": "Bring your agents from {{app}}"
+  },
+  "onboarding.flow.team.bring.titleOther": {
+    "value": "Bring your team from another app"
+  },
+  "onboarding.flow.team.bring.titleOtherPersonal": {
+    "value": "Bring your agents from another app"
+  },
+  "onboarding.flow.team.bring.lead": {
+    "value": "It takes a minute. Nothing changes there."
+  },
+  "onboarding.flow.team.bring.ask": {
+    "value": "Ask {{app}} to export"
+  },
+  "onboarding.flow.team.bring.paste": {
+    "value": "Paste it in your chat with {{app}}."
+  },
+  "onboarding.flow.team.bring.reply": {
+    "value": "It answers with a JSON: copy the whole answer and paste it in the field below."
+  },
+  "onboarding.flow.team.bring.field": {
+    "value": "Paste the answer from {{app}} here"
+  },
+  "onboarding.flow.team.bring.placeholder": {
+    "value": "The answer's JSON"
+  },
+  "onboarding.flow.team.bring.read": {
+    "value": "Read the answer"
+  },
+  "onboarding.flow.team.bring.fresh": {
+    "value": "I'd rather build a new team"
+  },
+  "onboarding.flow.team.found.title": {
+    "value": {
+      "one": "Found {{count}} agent in {{app}}",
+      "other": "Found {{count}} agents in {{app}}"
+    }
+  },
+  "onboarding.flow.team.found.lead": {
+    "value": "They arrive with the instructions, skills and routines they already have. You can change everything later."
+  },
+  "onboarding.flow.team.found.bring": {
+    "value": "Bring the team"
+  },
+  "onboarding.flow.team.found.bringPersonal": {
+    "value": "Bring the agents"
   },
   "onboarding.flow.plan.title": {
     "value": "Turn your team on"
   },
   "onboarding.flow.plan.lead": {
     "value": "Your team is ready. With the plan and an AI, it starts today."
+  },
+  "onboarding.flow.plan.leadAlone": {
+    "value": "With the plan and an AI, your right hand starts today. You can create the other agents later."
   },
   "onboarding.flow.plan.asleep": {
     "value": "Asleep until the plan"
@@ -1770,7 +1989,85 @@
     "value": "See all plans"
   },
   "onboarding.flow.plan.skip": {
-    "value": "Go to the workspace without it"
+    "value": "Turn it on later and just look around the workspace"
+  },
+  "onboarding.flow.plan.next": {
+    "value": "Next: connect your AI."
+  },
+  "onboarding.flow.plan.titlePersonal": {
+    "value": "Turn your agents on"
+  },
+  "onboarding.flow.plan.leadPersonal": {
+    "value": "With the plan and an AI, they start today."
+  },
+  "onboarding.flow.plan.asleepPersonal": {
+    "value": "Asleep until the plan"
+  },
+  "onboarding.flow.plan.ctaPersonal": {
+    "value": "Turn the agents on"
+  },
+  "onboarding.flow.ai.titlePersonal": {
+    "value": "Connect an AI for your agents to think"
+  },
+  "onboarding.flow.ai.titleAlone": {
+    "value": "Connect an AI for {{name}} to think"
+  },
+  "onboarding.flow.ai.later": {
+    "value": "Connect later"
+  },
+  "onboarding.flow.ai.doneTitle": {
+    "value": "Done. The {{org}} team is thinking now."
+  },
+  "onboarding.flow.ai.doneTitlePersonal": {
+    "value": "Done. {{name}} is thinking now."
+  },
+  "onboarding.flow.ai.doneLead": {
+    "value": "Your {{label}} answers for every agent. You can change it later, one by one."
+  },
+  "onboarding.flow.ai.doneLeadAny": {
+    "value": "The AI you connected answers for every agent. You can change it later, one by one."
+  },
+  "onboarding.flow.ai.connected": {
+    "value": "Connected"
+  },
+  "onboarding.flow.ai.enter": {
+    "value": "Go to the workspace"
+  },
+  "onboarding.flow.ai.awake": {
+    "value": "Your team woke up"
+  },
+  "onboarding.flow.ai.answer": {
+    "value": {
+      "one": "{{names}} answers now.",
+      "other": "{{names}} answer now."
+    }
+  },
+  "onboarding.flow.ai.readyPersonal": {
+    "value": "Your agents are ready"
+  },
+  "onboarding.flow.ai.readyAlone": {
+    "value": "{{name}} is ready"
+  },
+  "onboarding.flow.ai.wakePersonal": {
+    "value": "Just one AI away from waking up."
+  },
+  "onboarding.flow.ai.awakePersonal": {
+    "value": "Your agents woke up"
+  },
+  "onboarding.flow.ai.awakeAlone": {
+    "value": "{{name}} woke up"
+  },
+  "onboarding.flow.people.title": {
+    "value": "Who works with you?"
+  },
+  "onboarding.flow.people.lead": {
+    "value": "Invite your teammates. Each one gets an email to join."
+  },
+  "onboarding.flow.people.send": {
+    "value": "Send invitations"
+  },
+  "onboarding.flow.people.later": {
+    "value": "Invite later"
   },
   "onboarding.flow.account": {
     "value": "Your account"
@@ -1783,6 +2080,12 @@
   },
   "onboarding.railValue.later": {
     "value": "Later"
+  },
+  "onboarding.railValue.on": {
+    "value": "On"
+  },
+  "onboarding.railValue.ai": {
+    "value": "Connected"
   },
   "onboarding.railValue.invites": {
     "value": {
@@ -2310,7 +2613,7 @@
     "value": "Nothing here can come along. Each item says why."
   },
   "onboarding.import.withTeam": {
-    "value": "It arrives when you create the team."
+    "value": "It arrives when you bring the team."
   },
   "onboarding.import.applying": {
     "value": "Importing… {{done}} of {{total}}"
@@ -3524,6 +3827,21 @@
   "shell.addPasswordReauth": {
     "value": "Sign in again to add a password."
   },
+  "shell.newPassword": {
+    "value": "Create a new password"
+  },
+  "shell.newPasswordHint": {
+    "value": "Your other sessions end, and AI apps connected with the old password need to be connected again."
+  },
+  "shell.newPasswordRow": {
+    "value": "To change the password you use in other browsers and on other devices"
+  },
+  "shell.newPasswordSaved": {
+    "value": "New password saved."
+  },
+  "shell.newPasswordReauth": {
+    "value": "Sign in again to create a new password."
+  },
   "shell.yourWorkspaces": {
     "value": "Your workspaces"
   },
@@ -3540,10 +3858,25 @@
     "value": "Add workspace"
   },
   "shell.addWorkspaceHint": {
-    "value": "A new one on agentes.chat, or your team's server"
+    "value": "Join one you already have, create one, or use your team's server"
   },
   "shell.yourServer": {
     "value": "Your server"
+  },
+  "shell.serverHere": {
+    "value": "The agentes.chat on this {{device}}"
+  },
+  "shell.serverStopped": {
+    "value": "stopped"
+  },
+  "shell.serverOffline": {
+    "value": "offline since {{time}}"
+  },
+  "shell.serverSignedOut": {
+    "value": "not signed in"
+  },
+  "shell.serverSignIn": {
+    "value": "Sign in"
   },
   "shell.wiki": {
     "value": "Wiki"
@@ -3939,7 +4272,7 @@
     "value": "Install the agentes app on your phone (App Store or Google Play)."
   },
   "openOnPhone.stepTailscale": {
-    "value": "Install Tailscale on your phone and join this server's network (tailnet)."
+    "value": "Install Tailscale on your phone and sign in with the same Tailscale account as this server."
   },
   "openOnPhone.appStore": {
     "value": "App Store"
@@ -3958,6 +4291,12 @@
   },
   "openOnPhone.failed": {
     "value": "Couldn't make the code."
+  },
+  "openOnPhone.localOnly": {
+    "value": "This server only opens on the computer it runs on, so your phone can't reach it."
+  },
+  "openOnPhone.localOnlyHow": {
+    "value": "In the agentes.chat app on that computer, turn on Reach it from your phone and teammates in Preferences › Servers. Then come back here."
   },
   "team.title": {
     "value": "Team"
@@ -5681,6 +6020,18 @@
   "teamWeek.routine.done": {
     "value": "Routine created"
   },
+  "teamWeek.howto.title": {
+    "value": "{{name}} learned: {{what}}"
+  },
+  "teamWeek.howto.line": {
+    "value": "Used {{uses}}×. Make it a skill?"
+  },
+  "teamWeek.howto.action": {
+    "value": "Make it a skill"
+  },
+  "teamWeek.howto.done": {
+    "value": "Confirmed"
+  },
   "teamWeek.stalled.title": {
     "value": "Steps stopped in #{{number}} {{title}}"
   },
@@ -5785,6 +6136,9 @@
   },
   "routing.title": {
     "value": "Who picks the agents"
+  },
+  "routing.reflectionOff": {
+    "value": "Memory doesn't learn from finished conversations yet: that needs a provider key, added above."
   },
   "routing.how": {
     "value": "How agents are picked"
@@ -5977,6 +6331,150 @@
   "connectAi.have.manageKeys": {
     "value": "Manage or delete keys"
   },
+  "connectAi.chat.mine": {
+    "value": "Yours"
+  },
+  "connectAi.chat.yours": {
+    "value": "Yours"
+  },
+  "connectAi.chat.keys": {
+    "value": "Workspace key"
+  },
+  "connectAi.chat.best": {
+    "value": "Most room right now"
+  },
+  "connectAi.chat.atLimit": {
+    "value": "At their limit"
+  },
+  "connectAi.chat.seeAll": {
+    "value": "See all {{count}} accounts"
+  },
+  "connectAi.chat.allTitle": {
+    "value": "All accounts"
+  },
+  "connectAi.chat.search": {
+    "value": "Search an account or a person"
+  },
+  "connectAi.chat.none": {
+    "value": "No account by that name."
+  },
+  "connectAi.chat.other": {
+    "value": "Connect another AI"
+  },
+  "connectAi.chat.told": {
+    "value": "{{name}} gets an email about it."
+  },
+  "connectAi.team.title": {
+    "value": "Connect an AI for the team"
+  },
+  "connectAi.team.titlePersonal": {
+    "value": "Connect an AI for your agents"
+  },
+  "connectAi.team.asleep": {
+    "value": {
+      "one": "{{count}} agent without AI",
+      "other": "{{count}} agents without AI"
+    }
+  },
+  "connectAi.team.asleepSome": {
+    "value": "{{n}} of {{total}} agents without AI"
+  },
+  "connectAi.team.choose": {
+    "value": "Choose"
+  },
+  "connectAi.team.perAgent": {
+    "value": "One sign-in per agent"
+  },
+  "connectAi.team.pickTitle": {
+    "value": "For which agents"
+  },
+  "connectAi.team.marked": {
+    "value": "{{n}} of {{total}} checked."
+  },
+  "connectAi.team.useThese": {
+    "value": {
+      "one": "Use this agent",
+      "other": "Use these {{count}}"
+    }
+  },
+  "connectAi.team.progress": {
+    "value": "{{n}} of {{total}}"
+  },
+  "connectAi.team.turn": {
+    "value": "Sign in to {{plan}} for {{name}}"
+  },
+  "connectAi.team.turnHelp": {
+    "value": "It's the same account. {{plan}} just asks you to sign in again for each agent."
+  },
+  "connectAi.team.signIn": {
+    "value": "Sign in to {{plan}}"
+  },
+  "connectAi.team.failed": {
+    "value": "{{name}}'s sign-in didn't finish"
+  },
+  "connectAi.team.skip": {
+    "value": "Skip {{name}}"
+  },
+  "connectAi.team.state.failed": {
+    "value": "Sign-in didn't finish"
+  },
+  "connectAi.team.woke": {
+    "value": {
+      "one": "{{count}} agent woke up",
+      "other": "{{count}} agents woke up"
+    }
+  },
+  "connectAi.team.wokeAll": {
+    "value": "The team is awake"
+  },
+  "connectAi.team.wokeAllPersonal": {
+    "value": "Your agents woke up"
+  },
+  "connectAi.team.wokeNone": {
+    "value": "Nobody woke up"
+  },
+  "connectAi.team.thinksAll": {
+    "value": "They already think with your {{plan}}"
+  },
+  "connectAi.team.thinksOne": {
+    "value": "{{name}} already thinks with your {{plan}}"
+  },
+  "connectAi.team.stayed": {
+    "value": "{{name}} is still without AI: their sign-in didn't finish."
+  },
+  "connectAi.team.stayedMany": {
+    "value": "{{names}} are still without AI: their sign-ins didn't finish."
+  },
+  "connectAi.team.why": {
+    "value": "{{name}}: {{why}}"
+  },
+  "connectAi.team.stayedHand": {
+    "value": "{{name}} has no AI for you yet."
+  },
+  "connectAi.team.again": {
+    "value": "Connect {{name}}"
+  },
+  "connectAi.team.againMany": {
+    "value": "Connect the {{n}}"
+  },
+  "connectAi.team.audience.offAll": {
+    "value": "On your subscription, they answer only you."
+  },
+  "connectAi.team.audience.onAll": {
+    "value": "They answer anyone who can talk to them."
+  },
+  "connectAi.team.audience.off": {
+    "value": "On your subscription, {{name}} answers only you."
+  },
+  "connectAi.team.audience.on": {
+    "value": "{{name}} answers anyone who can talk to them."
+  },
+  "connectAi.team.audience.share": {
+    "value": "Open to the team"
+  },
+  "connectAi.team.audience.unshare": {
+    "value": "Only me"
+  },
   "connectAi.billing": {
     "value": "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan."
   },
@@ -6117,6 +6615,9 @@
   },
   "connectAi.wait.connecting": {
     "value": "This server's computer connects within a minute. You sign in here as soon as it does."
+  },
+  "connectAi.wait.computerLater": {
+    "value": "Accounts need a computer, and this workspace has none yet. You can add one once the workspace opens."
   },
   "connectAi.theComputer": {
     "value": "the computer"
@@ -10974,9 +11475,6 @@
   "agentPage.work.use": {
     "value": "Use"
   },
-  "agentPage.work.brain.sub": {
-    "value": "Applies only to {{name}}, in every conversation."
-  },
   "agentPage.work.brain.model": {
     "value": "API key"
   },
@@ -11033,12 +11531,6 @@
   },
   "agentPage.work.brain.signInAgain": {
     "value": "Sign in again"
-  },
-  "agentPage.work.brain.connectPlan": {
-    "value": "Connect another plan"
-  },
-  "agentPage.work.brain.keyLabel": {
-    "value": "API key"
   },
   "agentPage.work.brain.fallbackTitle": {
     "value": "If {{computer}} stops answering, answer through the API"
@@ -11133,20 +11625,11 @@
   "agentPage.work.brain.advanced.title": {
     "value": "Advanced settings"
   },
-  "agentPage.work.brain.advanced.sub": {
-    "value": "{{brain}}. Applies to every conversation."
-  },
-  "agentPage.work.brain.advanced.think": {
-    "value": "How it thinks"
-  },
   "agentPage.work.brain.advanced.answers": {
     "value": "Who it answers"
   },
   "agentPage.work.brain.advanced.defaults": {
     "value": "Back to defaults"
-  },
-  "agentPage.work.brain.advanced.done": {
-    "value": "Done"
   },
   "agentPage.work.brain.advanced.contents.model": {
     "value": "Context window"
@@ -11443,10 +11926,100 @@
     "value": "Couldn't send the code. Check it and try again."
   },
   "agentPage.work.brain.add.done": {
-    "value": "The {{account}} account is on {{computer}}. Click Use to save."
+    "value": "The {{account}} account is signed in again on {{computer}}. It's in use now."
   },
   "agentPage.work.brain.offCloud": {
     "value": "{{computer}} isn't answering"
+  },
+  "agentPage.work.brain.v2.title": {
+    "value": "Who thinks for {{name}}"
+  },
+  "agentPage.work.brain.v2.only": {
+    "value": "Only for {{name}}."
+  },
+  "agentPage.work.brain.v2.more": {
+    "value": "More options"
+  },
+  "agentPage.work.brain.v2.switch": {
+    "value": "Change account"
+  },
+  "agentPage.work.brain.v2.switchTitle": {
+    "value": "Change {{name}}'s account"
+  },
+  "agentPage.work.brain.v2.inUse": {
+    "value": "In use"
+  },
+  "agentPage.work.brain.v2.switchTo": {
+    "value": "Switch to {{label}}"
+  },
+  "agentPage.work.brain.v2.teamTitle": {
+    "value": "Change the team's account"
+  },
+  "agentPage.work.brain.v2.teamAria": {
+    "value": "Whom it is for"
+  },
+  "agentPage.work.brain.v2.justOne": {
+    "value": "Only {{name}}"
+  },
+  "agentPage.work.brain.v2.everyone": {
+    "value": "Everyone on this account"
+  },
+  "agentPage.work.brain.v2.target": {
+    "value": "Switch to"
+  },
+  "agentPage.work.brain.v2.switchMany": {
+    "value": {
+      "one": "Switch {{count}} agent",
+      "other": "Switch the {{count}} agents"
+    }
+  },
+  "agentPage.work.brain.v2.limitTitle": {
+    "value": "{{name}}'s account is at its limit"
+  },
+  "agentPage.work.brain.v2.limitBack": {
+    "value": "{{account}} is back {{when}}"
+  },
+  "agentPage.work.brain.v2.limitSoon": {
+    "value": "{{account}} is back when the plan renews"
+  },
+  "agentPage.work.brain.v2.limitHelp": {
+    "value": "Meanwhile {{name}} can think with another account that's already connected."
+  },
+  "agentPage.work.brain.v2.wait": {
+    "value": "Wait"
+  },
+  "agentPage.work.brain.v2.modelTitle": {
+    "value": "{{name}}'s model"
+  },
+  "agentPage.work.brain.v2.moreTitle": {
+    "value": "More options for {{name}}"
+  },
+  "agentPage.work.brain.v2.fallback": {
+    "value": "Use the API key if the plan stops"
+  },
+  "agentPage.work.brain.v2.computer": {
+    "value": "Computer"
+  },
+  "agentPage.work.brain.v2.doneTitle": {
+    "value": "All set"
+  },
+  "agentPage.work.brain.v2.doneSub": {
+    "value": "What was under way goes on with the new account."
+  },
+  "agentPage.work.brain.v2.finish": {
+    "value": "Done"
+  },
+  "agentPage.work.brain.v2.undo": {
+    "value": "Undo"
+  },
+  "agentPage.work.brain.v2.undone": {
+    "value": "Back to how it was."
+  },
+  "agentPage.work.brain.v2.missed": {
+    "value": {
+      "one": "{{names}} kept the account it had.",
+      "other": "{{names}} kept the accounts they had."
+    }
   },
   "agentPage.work.computer.title": {
     "value": "Where does {{name}} work?"
@@ -12596,6 +13169,27 @@
   "agentPage.saveBar.andMore": {
     "value": "{{names}} and more"
   },
+  "teamMemory.title": {
+    "value": "Team memory"
+  },
+  "teamMemory.help": {
+    "value": "What people asked every agent to keep, with who said it and when. Every agent reads it in all its work."
+  },
+  "teamMemory.empty": {
+    "value": "Nothing yet. When someone asks every agent to remember something, it shows here."
+  },
+  "teamMemory.remove": {
+    "value": "Remove"
+  },
+  "teamMemory.removed": {
+    "value": "Removed from team memory"
+  },
+  "teamMemory.make": {
+    "value": "Make it the team's"
+  },
+  "teamMemory.made": {
+    "value": "Every agent keeps it now"
+  },
   "memory.fromRefusal": {
     "value": "Not to propose again: {{text}}"
   },
@@ -12685,6 +13279,15 @@
   },
   "memory.lowTrust": {
     "value": "External source, not trusted"
+  },
+  "memory.confirm": {
+    "value": "Confirm"
+  },
+  "memory.confirmTitle": {
+    "value": "Say it's right: agents then use it as trusted."
+  },
+  "memory.confirmed": {
+    "value": "Confirmed"
   },
   "memory.used": {
     "value": {
@@ -13287,6 +13890,24 @@
   "agentSetup.firstRun.afterPlan": {
     "value": "Opens with the plan."
   },
+  "agentSetup.firstRun.afterPlanNext": {
+    "value": "It's the next step after the plan."
+  },
+  "agentSetup.firstRun.plan.todo": {
+    "value": "Turn the team on."
+  },
+  "agentSetup.firstRun.plan.todoDesc": {
+    "value": "With an agentes.chat plan, the agents start working."
+  },
+  "agentSetup.firstRun.plan.action": {
+    "value": "See plans"
+  },
+  "agentSetup.firstRun.plan.todoPersonal": {
+    "value": "Turn your agents on."
+  },
+  "agentSetup.firstRun.plan.todoDescPersonal": {
+    "value": "With an agentes.chat plan, your agents start working."
+  },
   "agentSetup.firstRun.about.action": {
     "value": "Tell"
   },
@@ -13331,6 +13952,12 @@
   },
   "agentSetup.firstRun.team.actionPersonal": {
     "value": "See agents"
+  },
+  "agentSetup.firstRun.team.donePersonal": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
   },
   "agentSetup.firstRun.ai.todo": {
     "value": "Connect an AI."
@@ -14360,7 +14987,7 @@
     "value": "Send me the day's workout every morning"
   },
   "newAgent.starters.mel.instructions": {
-    "value": "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies; gives no diet or medical advice."
+    "value": "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies, and gives no diet or medical advice."
   },
   "newAgent.starters.mel.tasks.a": {
     "value": "Suggest three quick dinners"
@@ -14692,6 +15319,30 @@
   "members.rolesOf": {
     "value": "{{name}}'s roles"
   },
+  "members.moreOf": {
+    "value": "More for {{name}}"
+  },
+  "members.passwordLink.item": {
+    "value": "Make a new-password link"
+  },
+  "members.passwordLink.hint": {
+    "value": "For when they forgot their password"
+  },
+  "members.passwordLink.title": {
+    "value": "New-password link for {{name}}"
+  },
+  "members.passwordLink.lead": {
+    "value": "It works once, for 1 hour. Send it wherever you talk."
+  },
+  "members.passwordLink.label": {
+    "value": "Link"
+  },
+  "members.passwordLink.making": {
+    "value": "Making the link…"
+  },
+  "members.passwordLink.copy": {
+    "value": "Copy link"
+  },
   "members.everyoneNote": {
     "value": "Everyone applies to every person in the workspace."
   },
@@ -14717,6 +15368,12 @@
     "value": {
       "one": "Who's part of {{org}}: {{people}} person and {{agents}} agents.",
       "other": "Who's part of {{org}}: {{people}} people and {{agents}} agents."
+    }
+  },
+  "members.subtitlePersonal": {
+    "value": {
+      "one": "Who's here: {{people}} person and {{agents}} agents.",
+      "other": "Who's here: {{people}} people and {{agents}} agents."
     }
   },
   "members.inviteTitle": {
@@ -14994,6 +15651,12 @@
   },
   "members.dialog.role.helpsText": {
     "value": "Can change agents, settings and who's here, as you can. Sees everything shared here, except your direct messages."
+  },
+  "members.dialog.reach.line": {
+    "value": {
+      "one": "<agents/> will answer whoever joins.",
+      "other": "<agents/> will answer whoever joins."
+    }
   },
   "members.dialog.where.titleOne": {
     "value": "Which channels does {{name}} join right away?"
@@ -19073,6 +19736,9 @@
   },
   "missions.notice.machine_task_resume_waits": {
     "value": "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready"
+  },
+  "missions.notice.machine_task_restarted": {
+    "value": "{{computer}} is back: “{{title}}” started again"
   },
   "missions.notice.machine_task_done": {
     "value": "“{{title}}” finished in {{span}} on {{computer}}"
@@ -26875,6 +27541,9 @@
   "connectors.category.automation": {
     "value": "Automation"
   },
+  "connectors.category.social": {
+    "value": "Social"
+  },
   "connectors.category.email": {
     "value": "Email"
   },
@@ -27448,6 +28117,69 @@
   "connectors.can.abacatepay.2": {
     "value": "Create Pix charges"
   },
+  "connectors.can.instagram.1": {
+    "value": "See posts, stories and insights"
+  },
+  "connectors.can.instagram.2": {
+    "value": "Publish posts and read direct messages"
+  },
+  "connectors.can.instagram.ask": {
+    "value": "Answering messages always asks for your approval"
+  },
+  "connectors.can.facebook.1": {
+    "value": "See posts, comments and insights"
+  },
+  "connectors.can.facebook.2": {
+    "value": "Publish posts, photos and videos and answer comments"
+  },
+  "connectors.can.facebook.ask": {
+    "value": "Deleting posts and comments always asks for your approval"
+  },
+  "connectors.can.linkedin.1": {
+    "value": "Publish posts, links and videos"
+  },
+  "connectors.can.linkedin.2": {
+    "value": "Comment on posts"
+  },
+  "connectors.can.linkedin.ask": {
+    "value": "Deleting posts always asks for your approval"
+  },
+  "connectors.can.youtube.1": {
+    "value": "See videos, comments and analytics"
+  },
+  "connectors.can.youtube.2": {
+    "value": "Edit videos and playlists and write comments"
+  },
+  "connectors.can.youtube.ask": {
+    "value": "Replying to, moderating and deleting comments always asks for your approval"
+  },
+  "connectors.can.pinterest.1": {
+    "value": "See pins, boards and analytics"
+  },
+  "connectors.can.pinterest.2": {
+    "value": "Create pins and organize boards"
+  },
+  "connectors.can.pinterest.ask": {
+    "value": "Changing boards and deleting always asks for your approval"
+  },
+  "connectors.can.reddit.1": {
+    "value": "Search posts and read comments"
+  },
+  "connectors.can.reddit.2": {
+    "value": "Post, comment and edit"
+  },
+  "connectors.can.reddit.ask": {
+    "value": "Deleting always asks for your approval"
+  },
+  "connectors.can.whatsapp.1": {
+    "value": "See numbers, templates and deliveries"
+  },
+  "connectors.can.whatsapp.2": {
+    "value": "Create message templates"
+  },
+  "connectors.can.whatsapp.ask": {
+    "value": "Sending messages always asks for your approval"
+  },
   "connectors.can.database.1": {
     "value": "See the tables"
   },
@@ -27843,6 +28575,27 @@
   },
   "connectors.descriptions.abacatepay": {
     "value": "Pix charges, customers and withdrawals."
+  },
+  "connectors.descriptions.instagram": {
+    "value": "Instagram business and creator accounts: posts, stories, insights and direct messages."
+  },
+  "connectors.descriptions.facebook": {
+    "value": "Facebook Pages: posts, photos, videos, comments and insights."
+  },
+  "connectors.descriptions.linkedin": {
+    "value": "LinkedIn posts, videos and comments as the member who signs in."
+  },
+  "connectors.descriptions.youtube": {
+    "value": "YouTube channel videos, comments, playlists and analytics."
+  },
+  "connectors.descriptions.pinterest": {
+    "value": "Pinterest pins, boards and analytics."
+  },
+  "connectors.descriptions.reddit": {
+    "value": "Reddit posts, comments and communities."
+  },
+  "connectors.descriptions.whatsapp": {
+    "value": "WhatsApp Business messages and templates."
   },
   "toolNames.order": {
     "value": "modifiers-first"
@@ -30139,6 +30892,15 @@
   "files.nav.place": {
     "value": "{{index}} of {{count}}"
   },
+  "errors.passwordLink.email": {
+    "value": "This server sends email: they ask for their own link in Forgot password."
+  },
+  "errors.passwordLink.serverOwner": {
+    "value": "Whoever set up this server signs in on the computer it runs on, with no link."
+  },
+  "errors.passwordLink.otherWorkspace": {
+    "value": "They're also in a workspace that isn't yours: only the owners of all of them can make the link."
+  },
   "errors.said.gone": {
     "value": "This isn't here anymore. Refresh the page and try again."
   },
@@ -31080,6 +31842,9 @@
   },
   "machines.egress.hint": {
     "value": "The address websites see when the agents browse. It updates when the computer’s network changes."
+  },
+  "machines.egress.waiting": {
+    "value": "Reconnecting the agents’ internet. Their connections wait until it’s back."
   },
   "machines.online": {
     "value": "Online"
@@ -33771,6 +34536,9 @@
   "audit.change.member.role_changed": {
     "value": "Changed a member's role"
   },
+  "audit.change.member.password_link": {
+    "value": "Made a new-password link for a member"
+  },
   "audit.change.apps.connected": {
     "value": "Connected {{app}}"
   },
@@ -35042,6 +35810,12 @@
   },
   "personalMode.toPersonal.bubbles": {
     "value": "Conversations open as bubbles"
+  },
+  "personalMode.toPersonal.others": {
+    "value": {
+      "one": "The other person here sees it this way too",
+      "other": "The {{count}} other people here see it this way too"
+    }
   },
   "personalMode.toPersonal.stays": {
     "value": "Nothing is lost: agents, conversations, routines, files and everyone's access stay as they are."
@@ -37081,6 +37855,9 @@
   },
   "chat.body.machine_task_resume_waits": {
     "value": "{{computer}} is back: “{{title}}” resumes where it stopped once the project is ready."
+  },
+  "chat.body.machine_task_restarted": {
+    "value": "{{computer}} is back: “{{title}}” started again."
   },
   "chat.body.machine_offline": {
     "value": "{{computer}} went offline."

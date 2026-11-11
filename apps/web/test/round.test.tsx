@@ -9,12 +9,12 @@ import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { channelNameError, toChannelName } from "@/components/NewChannelDialog";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedState } from "./fake-api";
 import { proceed, startAs } from "./new-agent-flow";
-import { renderApp, screen, settle } from "./render";
+import { endExit, exitsLast, renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
-const go = async (path: string, state = seedState()) => {
-  const r = await renderApp(`/org/${ORG_ID}/${path}`, { api: createFakeApi(state) });
+const go = async (path: string, state = seedState(), api = createFakeApi(state)) => {
+  const r = await renderApp(`/org/${ORG_ID}/${path}`, { api });
   await settle(5);
   const socket = r.sockets.last();
   await act(async () => socket.open());
@@ -255,6 +255,43 @@ describe("Detalhes do canal: membros", () => {
     ]);
     dialog = screen().getByRole("dialog", { name: "#eng" });
     expect(dialog.textContent).toContain("João");
+  });
+
+  test("Adicionar: the ones being added keep their rows, and nobody reads as in already, while it adds and closes", async () => {
+    const state = seedState();
+    // João isn't in #eng yet: the one person to add.
+    state.channelMembers[ENG_ID] = (state.channelMembers[ENG_ID] ?? []).filter((m) => m.id !== "u-joao");
+    const api = createFakeApi(state);
+    const addMember = api.chat.addMember;
+    let answer = () => {};
+    const answered = new Promise<void>((resolve) => {
+      answer = resolve;
+    });
+    api.chat.addMember = async (...args) => {
+      await addMember(...args);
+      await answered;
+    };
+    const { socket } = await go(`c/${ENG_ID}`, state, api);
+    const dialog = await openDetails();
+    await click(within(dialog).getByRole("button", { name: "Adicionar pessoa ou agente" }));
+    const add = screen().getByRole("dialog", { name: "Adicionar a #eng" });
+    exitsLast();
+    await click(within(add).getByRole("checkbox", { name: /João/ }));
+    await click(within(add).getByRole("button", { name: "Adicionar 1" }));
+    // Added on the server, which says so on the socket before it answers.
+    await act(async () => socket.push({ type: "event", scope: "org", event: { type: "channels.changed" } }));
+    await settle(6);
+    expect(state.channelMembers[ENG_ID]?.some((m) => m.id === "u-joao")).toBe(true);
+    const joao = () => add.querySelector("#pick-person-u-joao");
+    expect(joao()).not.toBeNull();
+    expect(add.textContent).not.toContain("já está em");
+    await act(async () => answer());
+    await settle(6);
+    expect(add.getAttribute("data-state")).toBe("closed");
+    expect(joao()).not.toBeNull();
+    expect(add.textContent).not.toContain("já está em");
+    await endExit(add);
+    expect(add.isConnected).toBe(false);
   });
 
   test("members see it read-only", async () => {

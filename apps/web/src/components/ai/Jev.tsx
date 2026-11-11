@@ -211,6 +211,7 @@ export function WhoPicksSection() {
         action={<HelpLink slug="who-answers">{t("routing.how")}</HelpLink>}
       />
       {line && <p className="who-line">{t(line.key, line.params)}</p>}
+      {line && status.data?.reflection === false && <p className="who-line">{t("routing.reflectionOff")}</p>}
       {jev.data && <JevCard routing={status.data?.routing?.by} />}
     </Card>
   );

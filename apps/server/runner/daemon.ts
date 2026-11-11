@@ -73,7 +73,10 @@ import {
   ensureGitCacheUser,
   GIT_CACHE_DIR,
   grantGitCache,
+  keepContainers,
   readAgentUsers,
+  rootlessContainers,
+  stopContainers,
   systemLauncher,
   trustedNetworkLauncher,
 } from "./agent-users";
@@ -556,7 +559,20 @@ export class RunnerDaemon implements RequestObserver {
     const agentUser = this.session?.agentUser;
     if (!agentUser) return runnerUser(this.opts.home, await this.agentFolder(agent), agent);
     const u = agentUser(agent);
+    this.startContainers(u);
     return systemDesktopUser(systemLauncher(u), { uid: u.uid, gid: agentGid(u.user) });
+  }
+
+  /** Its containers service (ADR 0169), as before its worker: a desktop's or a terminal's docker finds it. */
+  private startContainers(u: AgentUser) {
+    if (this.opts.workers || !rootlessContainers()) return;
+    const problem = keepContainers(u, this.containersAllowed(u.id));
+    if (problem) this.opts.log(`[${u.user}] its containers service didn't start: ${problem}`);
+  }
+
+  /** The agents frame lets it have a containers service (`MachineAgent.containers`). */
+  private containersAllowed(agentId: string) {
+    return this.agents.find((a) => a.id === agentId)?.containers === true;
   }
 
   /** Its switch is on, and the last check made under that switch passed. */
@@ -655,7 +671,9 @@ export class RunnerDaemon implements RequestObserver {
   private async terminalUser(agent: AgentScope): Promise<TerminalUser> {
     const agentUser = this.session?.agentUser;
     if (!agentUser) return runnerTerminalUser(await this.agentFolder(agent));
-    return systemTerminalUser(systemLauncher(agentUser(agent)), agent);
+    const u = agentUser(agent);
+    this.startContainers(u);
+    return systemTerminalUser(systemLauncher(u), agent);
   }
 
   /** The agent's folder in the connected workspace. */
@@ -1203,7 +1221,7 @@ export class RunnerDaemon implements RequestObserver {
     let accountBrains: AccountBrains | null = null;
     if (config.mode === "system") {
       const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
-      const users = new AgentUsers({ home, range, ...(sharedSpec && this.shared ? { shared: sharedSpec, log } : {}) });
+      const users = new AgentUsers({ home, range, log, ...(sharedSpec && this.shared ? { shared: sharedSpec } : {}) });
       for (const user of readAgentUsers(home)) {
         this.networkUsers.set(user.uid, user);
         // Keep already-running users out of cron/at even when their network must drain before preparation.
@@ -1306,13 +1324,16 @@ export class RunnerDaemon implements RequestObserver {
           return this.networkScopesBusy(agentId) || (!!user && this.networkProcessesBusy(user));
         },
         user: agentUser,
-        start: launchWorker(this.self.command, policy),
+        start: launchWorker(this.self.command, policy, undefined, log, (id) => this.containersAllowed(id)),
         ...(this.opts.workers || config.managedBy === "host"
           ? {}
           : {
               prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
         stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
+        ...(this.opts.workers || !rootlessContainers()
+          ? {}
+          : { stopContainers: (uid: number) => void stopContainers(uid) }),
         toolNotice: (agentId, notice) => accountBrains?.toolNotice(agentId, notice),
         taskStop: (agentId, taskId) => accountBrains?.stopTask(agentId, taskId),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
@@ -1921,6 +1942,8 @@ export class RunnerDaemon implements RequestObserver {
         const clear = deleted.has(u.id) && !here.has(u.id) && !this.swept.has(u.id);
         if (!clear && !gone.includes(u.id)) continue;
         hosted?.dropTurns(new RunnerError("dropped", "The agent left this computer."), u.id);
+        // Its containers stop with it; back, its `restart: always` ones start again with its containers service.
+        if (!this.opts.workers && rootlessContainers()) stopContainers(u.uid);
         // Archived or moved, it may come back: what the sign-ins hold for it stays until it is deleted.
         if (!clear) {
           this.accountUsers?.stopScopes(u.uid);
@@ -1931,6 +1954,27 @@ export class RunnerDaemon implements RequestObserver {
           this.accountUsers?.sweepAgent(u);
         } catch (err) {
           this.opts.log(`${u.user}: couldn't clear it from its sign-ins (${err instanceof Error ? err.message : err})`);
+        }
+      }
+      // Its brain changed (ADR 0169): a sandboxed one's containers service stops before its next turn; one let have it
+      // again gets it now while its worker runs, else with its worker's next start.
+      if (!this.opts.workers && rootlessContainers()) {
+        const had = new Set(this.agents.filter((a) => a.containers).map((a) => a.id));
+        for (const a of list) {
+          const uid = uids.get(a.id);
+          if (uid === undefined || Boolean(a.containers) === had.has(a.id)) continue;
+          const agentUser = this.session?.agentUser;
+          if (!a.containers) stopContainers(uid);
+          else if (agentUser && this.session?.supervisor?.runningPid(a.id) !== undefined) {
+            try {
+              const u = agentUser(a);
+              const problem = keepContainers(u, true);
+              if (problem) this.opts.log(`[${u.user}] its containers service didn't start: ${problem}`);
+            } catch (err) {
+              // Its network is switching, say: its worker's next start brings the service.
+              this.opts.log(`${a.handle}: its containers service waits (${err instanceof Error ? err.message : err})`);
+            }
+          }
         }
       }
     }

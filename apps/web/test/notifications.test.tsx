@@ -573,7 +573,7 @@ describe("someone gave an agent the person's plan (ADR 0059 §3)", () => {
 });
 
 describe("an agent's model left its plan's list", () => {
-  test("which model, which plan, what runs now; Escolher outro modelo opens the agent's Quem pensa", async () => {
+  test("which model, which plan, what runs now; Escolher outro modelo opens the agent's Quem pensa on its model", async () => {
     const dropped = notification({
       id: "n-dropped",
       kind: "plan_model_dropped",
@@ -590,7 +590,12 @@ describe("an agent's model left its plan's list", () => {
     await click(within(row).getByRole("button", { name: "Escolher outro modelo" }));
     await settle(8);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/agents/${ADA_ID}`);
-    expect(screen().getByRole("dialog", { name: "Quem pensa" })).toBeTruthy();
+    // Straight on the model's screen, its models to pick from; back leads to the dialog's first screen.
+    const d = screen().getByRole("dialog", { name: "Modelo da Ada" });
+    expect(within(d).getByRole("radiogroup", { name: "Modelo da Ada" })).toBeTruthy();
+    await click(within(d).getByRole("button", { name: "Voltar" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "Quem pensa pela Ada" })).toBe(d);
   });
 });
 
@@ -747,10 +752,13 @@ describe("its computer is ready: what comes next", () => {
     const row = () => document.querySelector('[data-n="n-ready"]') as HTMLElement;
     await click(within(row()).getByRole("button", { name: "Abrir" }));
     await settle(8);
-    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA" });
+    // Connect for the team; Claude's steps say the computer is ready first.
+    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA para o time" });
+    await click(within(dialog).getByRole("button", { name: /^Claude/ }));
+    await settle(4);
     const panel = within(dialog).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("O computador está pronto.");
-    expect((within(panel).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
+    expect((within(dialog).getByRole("button", { name: "Entrar com Claude" }) as HTMLButtonElement).disabled).toBe(
       false,
     );
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
@@ -778,7 +786,8 @@ describe("its computer is ready: what comes next", () => {
     const row = () => document.querySelector('[data-n="n-ready"]') as HTMLElement;
     await click(row().querySelector(".nt-what") as HTMLElement);
     await settle(8);
-    expect(screen().getByRole("dialog", { name: "Conectar uma IA" })).toBeTruthy();
+    // Nobody named: Connect for the team (ADR 0160, addendum), Ada being the one without an AI.
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA para o time" })).toBeTruthy();
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/notifications`);
     expect(state.calls.filter((c) => c.method === "notifications.read").map((c) => c.args)).toEqual([
       [ORG_ID, "n-ready", true],

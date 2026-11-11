@@ -32,7 +32,7 @@ import { consolidateOrg } from "./context/consolidate";
 import { applyReactionFeedback } from "./context/feedback";
 import { LEARN_JOB, learnRun } from "./context/learn";
 import { REFLECT_DEFAULTS, reflectThread } from "./context/reflect";
-import { judgeOf } from "./context/summaries";
+import { judgeOf, summaryModelReady } from "./context/summaries";
 import { reportDroppedMentions, tellWakeSkipped } from "./continuation";
 import { DEVICE_WAIT_EXPIRED_JOB, expireDeviceWait } from "./device-waits";
 import {
@@ -140,6 +140,8 @@ async function maybeEnqueueReflection(deps: JobDeps, orgId: string, threadId: st
     .where(and(eq(schema.messages.orgId, orgId), eq(schema.messages.threadId, threadId)));
   const n = Number(row?.n ?? 0);
   if (n === 0 || n % every !== 0) return;
+  // No model to reflect with: a job would only fail (ADR 0167).
+  if (deps.context && !(await summaryModelReady(deps.context, orgId))) return;
   await enqueue(deps.db, {
     orgId,
     kind: "context.reflect",
@@ -205,7 +207,7 @@ export interface JobDeps extends RunExecutorDeps {
     /** The small model on another provider's key (e.g. `{ openai: "gpt-6-luna" }`); else its catalog pick. */
     cheapModels?: Record<string, string>;
     minScore?: number;
-    /** Probability that an agent's @mention needs the agent it names for it to wake (`MENTION_WAKE_THRESHOLD`). */
+    /** Probability that an agent's @mention asks the agent it names to act, for it to wake (`MENTION_WAKE_THRESHOLD`). */
     mentionThreshold?: number;
     /** Replaces the core small-model step (e.g. an optional external classifier). */
     strategy?: RouterStrategy;
@@ -299,14 +301,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
   if (deps.quietByTyping || deps.router?.quietByTyping) typingLogFor(deps.pubsub);
   const routing = messageRouter(deps);
 
-  // An agent's @mention wakes the other agent unless the judge is sure it needs nothing from it.
+  // An agent's @mention is credit or a reference: it wakes the other agent only when it plainly asks it something.
   const mentionThreshold = deps.router?.mentionThreshold ?? MENTION_WAKE_THRESHOLD;
   /**
-   * Which agents an agent's @mentions wake (ADR 0089): the judge asks, per mentioned agent, whether the message
-   * needs nothing from it, in any language, reading the message being answered too; it wakes unless the judge is
-   * sure (`MENTION_WAKE_THRESHOLD`). Thanks, an "ok", a sign-off or a quote need nothing. Without a judge, or when it
-   * fails, only a message that opens with "@handle" wakes that agent. Each decision goes in
-   * `routing_decisions`, its score the chance the message needs the agent (1 − the judge's "nothing").
+   * Which agents an agent's @mentions wake (ADR 0089, addendum 2026-11-10): the judge asks, per mentioned agent,
+   * whether the message leaves it nothing to do, in any language, reading the message being answered too; it wakes
+   * only when the judge reads a plain request to it (`MENTION_WAKE_THRESHOLD`). A name, a source, a thanks or a
+   * correction asks nothing. Without a judge, or when it fails, only a message that opens with "@handle" wakes that
+   * agent. Each decision goes in `routing_decisions`, its score the chance the message asks the agent (1 − the
+   * judge's "nothing").
    */
   async function delegatedAgents(
     message: NonNullable<Awaited<ReturnType<typeof getMessage>>>,
@@ -638,8 +641,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         if (message.mentionedAgentIds.length > 0) {
           // No cap on hand-offs between agents: the stretch's limits hold a run agents start (`startOrJoinRun`).
           const handed = await delegatedAgents(message, outside, { wakeAll: Boolean(actingRoutine) });
-          // An agent the routine's run already handed this to (tell_agent) has it: the mention doesn't wake it again.
-          const told = routineRun ? await consultedBy(message.orgId, routineRun) : [];
+          // An agent the run already asked or handed this to (ask_agent, tell_agent) has it: the mention doesn't wake it
+          // again, or it would answer the person here too, besides the agent that asked.
+          const askerRun = routineRun ?? message.agentRunId;
+          const told = askerRun ? await consultedBy(message.orgId, askerRun) : [];
           let allowed = handed.allowed.filter((id) => !told.includes(id));
           // In an open mission's thread, another agent acts for the person behind it: only the
           // mission's owner and deciders make the mission's agent work (ADR 0029).
@@ -848,7 +853,9 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "search.reindex": async (job) => {
       if (!deps.search) return;
-      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, orgOf(job));
+      // The boot backfill's reindex names the kinds that get vectors (`queueEmbeddingBackfill`); a person's has none.
+      const kinds = Array.isArray(job.payload.kinds) ? (job.payload.kinds as SearchKind[]) : undefined;
+      await reindexOrg({ db: deps.db, search: deps.search, gateway: deps.gateway }, orgOf(job), { kinds });
     },
     "context.reflect": async (job) => {
       if (!deps.context) return;

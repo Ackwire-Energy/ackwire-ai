@@ -1737,6 +1737,13 @@
       "when": 1794625300000,
       "tag": "0249_run_working_since",
       "breakpoints": true
+    },
+    {
+      "idx": 250,
+      "version": "7",
+      "when": 1794635300000,
+      "tag": "0250_machine_egress_waiting",
+      "breakpoints": true
     }
   ]
 }

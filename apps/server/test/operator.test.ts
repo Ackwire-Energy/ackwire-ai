@@ -687,6 +687,35 @@ test("the workspace's computer in standby: said and taken back, its wake in the 
   }
 });
 
+test("the workspace's computer's agents waiting for their way out: said, kept and taken back, only for it", async () => {
+  const { orgId } = acme;
+  const NONE = "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b";
+  const issue = await createOperatorApp(deps, TOKEN).request(`/api/operator/v1/orgs/${orgId}/machines`, {
+    method: "POST",
+    headers: { authorization: BEARER, "content-type": "application/json" },
+    body: "{}",
+  });
+  const { machineId } = await body<{ machineId: string }>(issue);
+  const waiting = (id: string, json: unknown, org = orgId) => put(`/orgs/${org}/machines/${id}/egress-waiting`, json);
+  const row = async () => (await t.db.select().from(schema.machines).where(eq(schema.machines.id, machineId)))[0];
+
+  expect(await body(await waiting(machineId, { waiting: true }))).toEqual({ waiting: true });
+  expect((await row())?.egressWaitingAt).toBeInstanceOf(Date);
+  expect(await body(await waiting(machineId, { waiting: false }))).toEqual({ waiting: false });
+  expect((await row())?.egressWaitingAt).toBeNull();
+  const listed = await body<{ machines: { id: string; name: string }[] }>(await op(`/orgs/${orgId}/machines`));
+  const mac = listed.machines.find((m) => m.name === "Mac");
+  for (const [id, org] of [
+    [mac?.id ?? NONE, orgId],
+    [NONE, orgId],
+    [machineId, NONE],
+  ] as const) {
+    expect((await waiting(id, { waiting: true }, org)).status).toBe(404);
+  }
+  expect((await waiting(machineId, {})).status).toBe(400);
+  expect((await waiting(machineId, { waiting: "yes" })).status).toBe(400);
+});
+
 test("billing holds: put on, changed and lifted, never over a hold set through /standing", async () => {
   const [org] = await t.db.insert(schema.organizations).values({ name: "Billing Co" }).returning();
   if (!org) throw new Error("no org");

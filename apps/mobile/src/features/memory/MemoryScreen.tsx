@@ -1,6 +1,7 @@
 import { type Memory, useMemoryAction, useOrgMemories } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { can } from "@agenteschat/client/lib/permissions";
 import { memoryLine } from "@agenteschat/client/lib/proposals";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import { useDeferredValue, useMemo, useState } from "react";
@@ -246,6 +247,33 @@ function MemoryDetail({ id }: { id: string }) {
           ),
       },
     ]);
+  const confirm = () =>
+    action.mutate(
+      { type: "confirm", id: m.id },
+      {
+        onSuccess: () => {
+          successHaptic();
+          toast({ title: t("mobile.memory.confirmedToast"), agentId });
+        },
+        onError: failed,
+      },
+    );
+  // Confirmar (ADR 0167): who may edit it, or the person who said it.
+  const confirms = (editable || m.editedByUserId === meId) && (m.lowTrust || !m.verified);
+  // Tornar do time (ADR 0167): who reviews memory makes it every agent's, its copies archived.
+  const teams = can(org, "review_memory") && !m.howTo && !m.playbook && m.kind !== "lesson";
+  const makeTeam = () =>
+    action.mutate(
+      { type: "team", id: m.id },
+      {
+        onSuccess: () => {
+          successHaptic();
+          toast({ title: t("teamMemory.made"), agentId });
+          goBack();
+        },
+        onError: failed,
+      },
+    );
   const fix = () =>
     sheet.open(
       <MemoryFix
@@ -314,16 +342,40 @@ function MemoryDetail({ id }: { id: string }) {
             </View>
           ) : null}
         </View>
-        {editable ? (
+        {editable || confirms || teams ? (
           <View style={styles.actions}>
-            <Button variant="secondary" wide icon="pen" label={t("mobile.memory.fix")} onPress={fix} />
-            <Button
-              variant="ghost"
-              wide
-              label={t("mobile.intentAgents.fix.forget")}
-              disabled={action.isPending}
-              onPress={forget}
-            />
+            {confirms ? (
+              <Button
+                variant="secondary"
+                wide
+                icon="check"
+                label={t("mobile.memory.confirm")}
+                disabled={action.isPending}
+                onPress={confirm}
+              />
+            ) : null}
+            {teams ? (
+              <Button
+                variant="secondary"
+                wide
+                icon="members"
+                label={t("teamMemory.make")}
+                disabled={action.isPending}
+                onPress={makeTeam}
+              />
+            ) : null}
+            {editable ? (
+              <>
+                <Button variant="secondary" wide icon="pen" label={t("mobile.memory.fix")} onPress={fix} />
+                <Button
+                  variant="ghost"
+                  wide
+                  label={t("mobile.intentAgents.fix.forget")}
+                  disabled={action.isPending}
+                  onPress={forget}
+                />
+              </>
+            ) : null}
           </View>
         ) : null}
       </ScrollView>

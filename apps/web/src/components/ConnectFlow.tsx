@@ -36,6 +36,7 @@ import {
 } from "@agenteschat/client/lib/connected";
 import { humanize, isHttpsUrl, sameServer } from "@agenteschat/client/lib/custom-tools";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { connectorBrand, connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import {
   partsOf,
@@ -279,11 +280,16 @@ function ConnectStep({
     def?.id === "github" && !viaComposio && !mode && !accountOnly && githubApp.data?.installable === true;
   const viaApp = appOffered && how === "app";
   const busy = connect.isPending || withKey.isPending || oauth.isPending || installApp.isPending;
+  const sent = busy || withKey.isSuccess || connect.data?.status === "connected";
   // As the server does: a server by address takes another account, a catalog connector a new sign-in.
-  const accounts = (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl));
-  const again = byAddress
-    ? accounts.length > 0
-    : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt);
+  const accounts = useHeldWhile(
+    (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl)),
+    sent,
+  );
+  const again = useHeldWhile(
+    byAddress ? accounts.length > 0 : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt),
+    sent,
+  );
   const replacing = mode === "reconnect" || (!byAddress && again);
   const connectionId = mode === "reconnect" && item?.custom ? item.id : undefined;
   const unchecked = byAddress && accountUnchecked(accounts);

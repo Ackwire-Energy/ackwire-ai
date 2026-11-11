@@ -417,7 +417,7 @@ function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">
   return <Tag {...rest} />;
 }
 
-function SourceMark({ card }: { card: ImportCard }) {
+export function SourceMark({ card }: { card: ImportCard }) {
   // The app's own theme, which can differ from the system's: so not a `<picture>` with a media query.
   const dark = useTheme().resolved === "dark";
   if (card === "other") {
@@ -781,7 +781,7 @@ function useBundleIndex(flow: ImportFlowState) {
 const RANK: Record<ImportItemResult["action"], number> = { create: 0, update: 0, unchanged: 1, skip: 2 };
 
 /** The dry run, to pick from: groups with a status per row, then what to do after and what stays behind. */
-function Preview({
+export function Preview({
   flow,
   orgId,
   standalone,

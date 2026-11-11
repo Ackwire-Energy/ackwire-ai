@@ -44,7 +44,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
   const git = find("git");
   const java = find("java");
   const hasJava = !stub(java) || (await say("/usr/libexec/java_home", [])) !== "";
-  const [gitV, javaV, adbV, scrcpyV, maestroV, xcodeV, nodeV, teams] = await Promise.all([
+  const [gitV, javaV, adbV, scrcpyV, maestroV, xcodeV, nodeV, podmanV, teams] = await Promise.all([
     stub(git) && !devTools ? "" : say(git, ["--version"]),
     hasJava ? say(java, ["-version"]) : "",
     say(findAdb(env, platform, home, dirs), ["version"]),
@@ -52,6 +52,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
     say(find("maestro"), ["--version"]),
     platform === "darwin" && devTools ? say(find("xcodebuild"), ["-version"]) : "",
     say(find("node"), ["--version"]),
+    say(find("podman"), ["--version"]),
     platform === "darwin" && devTools ? (opts.teams ?? (() => xcodeTeams(env)))() : [],
   ]);
   const sdk = findSdk(env, platform, home);
@@ -65,6 +66,7 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
     xcode: version(xcodeV, /Xcode/),
     appleTeam: teams[0] ? teamLabel(teams[0]) : undefined,
     node: version(nodeV, /^/),
+    podman: version(podmanV, /podman version/),
   };
   return Object.fromEntries(Object.entries(found).filter(([, v]) => v !== undefined)) as RunnerToolchains;
 }

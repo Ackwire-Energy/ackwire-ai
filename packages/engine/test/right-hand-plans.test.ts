@@ -110,7 +110,10 @@ test("Lodi takes a Claude plan signed in as an account, never a computer's own s
   // Its audience is its own: everyone still has their DM with it.
   expect((await lodi()).audienceMode).toBe("everyone");
   // Its user there holds the sign-in while it thinks (system mode lends the folder by the `agents` frame).
-  expect((await machineAgents(fx.db, fx.org.id, machineId)).find((a) => a.id === id)).toMatchObject({ account: ANAS });
+  const listed = (await machineAgents(fx.db, fx.org.id, machineId)).find((a) => a.id === id);
+  expect(listed).toMatchObject({ account: ANAS });
+  // It thinks on several plans, sandboxed ones too: no containers service of its own (ADR 0169).
+  expect(listed?.containers).toBeUndefined();
   // An admin's view: Ana's plan, not theirs to give; "Atende outras pessoas" as for any agent on its owner's plan.
   expect(await getAgentBrain(deps, caio.id, fx.org.id, id)).toMatchObject({ canUsePlans: false, account: ANAS });
   expect(await codeOf(setAgentBrain(deps, caio.id, fx.org.id, id, { account: ANAS, onlyOwner: true }))).toBeNull();

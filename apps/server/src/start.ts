@@ -54,6 +54,7 @@ import {
   APP_JOB_KINDS,
   adoptRestoredOperatorEvents,
   allowsPrivateEndpoints,
+  backfillMemoryTrust,
   composioUsageHook,
   createGifKey,
   createLocalKeyWrapper,
@@ -73,6 +74,7 @@ import {
   meterComposio,
   moveIssueComments,
   publicHttpsFetch,
+  queueEmbeddingBackfill,
   relayCredentials,
   resolveHostDns,
   retireHostTokens,
@@ -84,6 +86,7 @@ import {
   surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
+  widenDmHowTos,
 } from "@agenteschat/engine";
 
 import { type AgentesModule, type Edition, type ModuleContext, resolveAdapters } from "@agenteschat/modules";
@@ -386,6 +389,30 @@ async function boot(
       if (made > 0) log.info("right hands created", { made });
     })
     .catch((error: unknown) => log.warn("right hands backfill failed", { error: String(error) }));
+  // Off the boot path, once (ADR 0167): untrusted memories saved from a person's own words are trusted again, and
+  // how-tos agents worked out between themselves that name nobody reach their other work.
+  void backfillMemoryTrust(database.db)
+    .then(async (r) => {
+      if (Object.keys(r.changed).length > 0) log.info("memory trust re-derived", { ...r });
+      const widened = await widenDmHowTos(database.db);
+      if (widened > 0) log.info("how-tos out of agents' DMs", { widened });
+    })
+    .catch((error: unknown) => log.warn("memory backfill failed", { error: String(error) }));
+  // Off the boot path (ADR 0167): what this model hasn't embedded yet gets its vectors, a reindex per workspace.
+  const vectors = engine.embeddings;
+  if (config.EMBEDDINGS_PROVIDER !== "none" && !vectors) {
+    const missing = config.EMBEDDINGS_PROVIDER === "voyage" ? "VOYAGE_API_KEY" : "EMBEDDINGS_URL";
+    log.warn("search goes on words alone", {
+      because: `EMBEDDINGS_PROVIDER=${config.EMBEDDINGS_PROVIDER} needs ${missing}`,
+    });
+  }
+  if (vectors?.kinds) {
+    void queueEmbeddingBackfill(database.db, { model: vectors.provider.model, kinds: vectors.kinds })
+      .then((queued) => {
+        if (queued > 0) log.info("embeddings backfill queued", { workspaces: queued, model: vectors.provider.model });
+      })
+      .catch((error: unknown) => log.warn("embeddings backfill failed", { error: String(error) }));
+  }
   // Off the boot path: tasks' comments from before their conversations move into them once (ADR 0145).
   void moveIssueComments(database.db)
     .then((moved) => {
