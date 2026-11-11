@@ -57,6 +57,8 @@ const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
   plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
   plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
 };
+/** `cli_failed` with what the plan's CLI said (`NoAiCard.why`). */
+const cliFailedText = (why: string) => `I can't answer now: my plan's AI stopped with an error (${why}).`;
 
 /**
  * `plan_hold`: no word on its AI: a billing hold stopped the run, and the card keeps the message for after the plan.
@@ -77,6 +79,8 @@ export interface NoAiCard extends ConnectIntent {
   own?: AgentAi["own"];
   /** With `model_limit`, `model_region` and `model_off`: the model's name the line says ("Kimi K2"). */
   model?: string;
+  /** With `cli_failed`: what the plan's CLI said (`cliWords`), the cause the line names. */
+  why?: string;
   /** The run that couldn't think (deleted when "Responder agora" starts it again). */
   runId: string;
 }
@@ -116,6 +120,7 @@ export async function postNoAiCard(
   reason: NoAiCardReason,
   own?: AgentAi["own"],
   model?: string,
+  why?: string,
 ): Promise<Message | null> {
   const { db } = deps;
   const threadId = replyThreadOf(run);
@@ -142,6 +147,7 @@ export async function postNoAiCard(
       reason,
       ...(own ? { own } : {}),
       ...(model ? { model } : {}),
+      ...(why && reason === "cli_failed" ? { why } : {}),
       ...intent,
       runId: run.id,
     };
@@ -152,7 +158,9 @@ export async function postNoAiCard(
       author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
       body: own
         ? noAiNotSignedInText(own)
-        : (REASON_TEXT[reason] ?? (reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT)),
+        : noAi.why
+          ? cliFailedText(noAi.why)
+          : (REASON_TEXT[reason] ?? (reason === "not_signed_in" ? NO_AI_SIGNED_OUT_TEXT : NO_AI_TEXT)),
       meta: { ...bodyCode(NO_AI), noAi },
     });
   });

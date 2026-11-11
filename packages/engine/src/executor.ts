@@ -301,6 +301,7 @@ import {
   cliFailureOf,
   cliFailureText,
   cliRefusedStart,
+  cliWords,
   isTerminal,
   NO_AI,
   OUR_ERROR,
@@ -917,10 +918,15 @@ const computersOwn = (error: unknown, account?: { provider?: string }) => {
 
 /** `brain`: the turn's brain in words, for a refusal of its runner's (a CLI's own failure names its CLI). */
 const outageNote = (error: unknown, account: { provider?: string } | undefined, brain: string) => {
-  // The computer failing on its own isn't its provider: the wait is said as its brain's.
+  // The computer failing on its own isn't its provider: the wait is said as its brain's, a CLI's with what it said.
   const cli = error instanceof BrainFailure ? cliFailureOf(error, account) : null;
-  if (computersOwn(error, account))
-    return bodyCode("brain_unavailable", { brain: cli && "brain" in cli ? cli.brain : brain });
+  if (cli && "brain" in cli) {
+    const detail = cli.words || cli.ended;
+    return detail
+      ? bodyCode("provider_wait_said", { provider: cli.brain, detail })
+      : bodyCode("brain_unavailable", { brain: cli.brain });
+  }
+  if (computersOwn(error, account)) return bodyCode("brain_unavailable", { brain });
   const failure =
     error instanceof ProviderError
       ? providerFailureOf(error)
@@ -1499,10 +1505,10 @@ async function executeRunInner(
    * Nothing to think with (ADR 0061): the run fails with `no_ai`, and the conversation gets its agent's
    * card with Connect. Background work only fails (its routine says why).
    */
-  const failNoAi = async (why: NoAiCardReason, own?: AgentAi["own"], model?: string) => {
+  const failNoAi = async (why: NoAiCardReason, own?: AgentAi["own"], model?: string, said?: string) => {
     if (!run.background) {
       const cardDeps = { db, pubsub: deps.pubsub, gateway: deps.gateway, machines: deps.machines };
-      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model)
+      await postNoAiCard({ ...cardDeps, judge: deps.context?.judge }, run, why, own, model, said)
         .catch((error) => addRunStep(db, run, "error", { reason: "no_ai_card", message: String(error) }))
         .catch(() => {});
     }
@@ -2368,7 +2374,9 @@ async function executeRunInner(
               tx,
               replyThreadId,
               own
-                ? `${words.bodyParams.brain} can't answer right now. I'll answer when it's back.`
+                ? words.bodyCode === "provider_wait_said"
+                  ? `${words.bodyParams.provider} answered with an error (${words.bodyParams.detail}). I'll try again and answer as soon as it works.`
+                  : `${words.bodyParams.brain} can't answer right now. I'll answer when it's back.`
                 : PROVIDER_UNAVAILABLE_TEXT,
               own ? { ...words, brainUnavailable: { brain, code: own } } : words,
               undefined,
@@ -3088,7 +3096,9 @@ async function executeRunInner(
     // in on a key nor waits for the computer. Only waiting its turn for room stays a wait.
     if (isRightHand(agent) && u.code !== "busy" && !u.queued) {
       const ownModel = u.scope ? ownLimitsModel(plan.account?.provider, plan.model) : null;
-      await failNoAi(rightHandNoAiReason(u.code, ownModel ? u.scope : undefined), undefined, ownModel?.label);
+      const line = rightHandNoAiReason(u.code, ownModel ? u.scope : undefined);
+      const said = line === "cli_failed" ? cliWords({ code: u.code, message: u.message }) : "";
+      await failNoAi(line, undefined, ownModel?.label, said || undefined);
       return "failed";
     }
     // Tools already ran in a turn cut off by its computer: only that computer may finish it (the model

@@ -95,7 +95,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     code === "brain_unavailable" ? (m.brainUnavailable as { code?: unknown; long?: unknown } | undefined) : undefined;
   const busy = waitNote?.code === "busy";
   const noAi =
-    code === "no_ai" ? (m.noAi as { reason?: unknown; own?: unknown; model?: unknown } | undefined) : undefined;
+    code === "no_ai"
+      ? (m.noAi as { reason?: unknown; own?: unknown; model?: unknown; why?: unknown } | undefined)
+      : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   // The team's right hand on a plan (ADR 0137 §7): why its plan can't think now (`RIGHT_HAND_PLAN_LINES`); any agent's
   // computer with no such CLI, or no computer at all.
@@ -107,6 +109,8 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
       noAi.reason === "plan_hold")
       ? `no_ai_${noAi.reason}`
       : null;
+  // The plan's CLI failed: the line says what it said.
+  const cliSaid = noAi?.reason === "cli_failed" && typeof noAi.why === "string" && noAi.why ? noAi.why : null;
   const own =
     signedOut &&
     (noAi?.own === "codex" ||
@@ -193,7 +197,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
     : signedOut
       ? "no_ai_signed_out"
       : planLine
-        ? planLine
+        ? `${planLine}${cliSaid ? "Why" : ""}`
         : anon
           ? "secret_requestAnon"
           : code;
@@ -203,6 +207,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, {
     ...params,
     ...model,
+    ...(cliSaid ? { why: cliSaid } : {}),
     defaultValue: body,
   });
 }
