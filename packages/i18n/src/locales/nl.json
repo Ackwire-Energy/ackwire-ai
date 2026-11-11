@@ -22,6 +22,7 @@
     "loadingPage": "De pagina laden",
     "refreshing": "Vernieuwen",
     "retry": "Opnieuw proberen",
+    "soon": "Binnenkort",
     "unknownError": "Er ging iets mis. Probeer het opnieuw.",
     "ourSide": "Er ging iets mis aan onze kant. Probeer het over een poosje opnieuw.",
     "signedOut": "Je sessie is verlopen. Log opnieuw in om verder te gaan.",
@@ -1756,7 +1757,7 @@
   "openOnPhone": {
     "qr": "QR-code om in te loggen in de agentes-app",
     "making": "Code maken…",
-    "stepApp": "Installeer de agentes-app op je telefoon (App Store of Google Play).",
+    "stepApp": "Installeer de agentes-app op je telefoon.",
     "stepTailscale": "Installeer Tailscale op je telefoon en log in met hetzelfde Tailscale-account als deze server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",

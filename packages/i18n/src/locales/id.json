@@ -22,6 +22,7 @@
     "loadingPage": "Memuat halaman",
     "refreshing": "Menyegarkan",
     "retry": "Coba lagi",
+    "soon": "Segera",
     "unknownError": "Ada yang salah. Coba lagi.",
     "ourSide": "Ada yang salah di pihak kami. Coba lagi sebentar lagi.",
     "signedOut": "Sesimu berakhir. Masuk lagi untuk melanjutkan.",
@@ -1705,7 +1706,7 @@
   "openOnPhone": {
     "qr": "Kode QR untuk masuk ke aplikasi agentes",
     "making": "Membuat kode…",
-    "stepApp": "Pasang aplikasi agentes di ponselmu (App Store atau Google Play).",
+    "stepApp": "Pasang aplikasi agentes di ponselmu.",
     "stepTailscale": "Pasang Tailscale di ponselmu dan masuk dengan akun Tailscale yang sama dengan server ini.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
