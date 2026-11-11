@@ -879,7 +879,20 @@
       "team": "Für mein Team",
       "teamText": "Personen und Agenten arbeiten zusammen, mit Kanälen, Rollen und Freigaben.",
       "personalExamples": "Dein Tag um 7 · Rechnungen · Training",
-      "teamExamples": "Kundensupport · Finanzen · Berichte"
+      "teamExamples": "Kundensupport · Finanzen · Berichte",
+      "personalLine": "Agenten, die sich um deinen Tag kümmern.",
+      "teamLine": "Menschen und Agenten an einem Ort.",
+      "activities": {
+        "agenda": "Tagesplan",
+        "home": "Zuhause",
+        "bills": "Rechnungen",
+        "studies": "Lernen",
+        "travel": "Reisen",
+        "support": "Kundenservice",
+        "finance": "Finanzen",
+        "reports": "Berichte",
+        "sales": "Vertrieb"
+      }
     },
     "personal": {
       "name": "Privat"

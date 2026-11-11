@@ -863,7 +863,20 @@
       "team": "내 팀을 위해",
       "teamText": "사람과 에이전트가 채널, 역할, 승인으로 함께 일해요.",
       "personalExamples": "아침 7시의 하루 · 청구서 · 운동",
-      "teamExamples": "고객 지원 · 재무 · 보고서"
+      "teamExamples": "고객 지원 · 재무 · 보고서",
+      "personalLine": "당신의 하루를 챙기는 에이전트.",
+      "teamLine": "사람과 에이전트가 한곳에.",
+      "activities": {
+        "agenda": "오늘 일정",
+        "home": "집안일",
+        "bills": "청구서",
+        "studies": "공부",
+        "travel": "여행",
+        "support": "고객 지원",
+        "finance": "재무",
+        "reports": "보고서",
+        "sales": "영업"
+      }
     },
     "personal": {
       "name": "개인"

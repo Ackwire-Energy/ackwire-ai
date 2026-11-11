@@ -109,9 +109,11 @@ export function PurposeScene({
                 <Avatar kind="person" name="" imageUrl={TEAMMATE} size="lg" />
               )}
               {life.waking && "look" in f && (
-                <span className="onb-zpop" style={{ animationDelay: `${life.wakeOrder(i) * WAKE_STEP_MS}ms` }}>
-                  z
-                </span>
+                <span
+                  className="onb-zpop"
+                  aria-hidden="true"
+                  style={{ animationDelay: `${life.wakeOrder(i) * WAKE_STEP_MS}ms` }}
+                />
               )}
             </span>
           ))}

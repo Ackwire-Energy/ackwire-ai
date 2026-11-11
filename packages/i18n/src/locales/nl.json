@@ -879,7 +879,20 @@
       "team": "Voor mijn team",
       "teamText": "Mensen en agents werken samen, met kanalen, rollen en goedkeuringen.",
       "personalExamples": "Je dag om 7 uur · Rekeningen · Training",
-      "teamExamples": "Klantenservice · Financiën · Rapporten"
+      "teamExamples": "Klantenservice · Financiën · Rapporten",
+      "personalLine": "Agents die voor je dag zorgen.",
+      "teamLine": "Mensen en agents op één plek.",
+      "activities": {
+        "agenda": "Dagplanning",
+        "home": "Thuis",
+        "bills": "Rekeningen",
+        "studies": "Studie",
+        "travel": "Reizen",
+        "support": "Klantenservice",
+        "finance": "Financiën",
+        "reports": "Rapporten",
+        "sales": "Verkoop"
+      }
     },
     "personal": {
       "name": "Persoonlijk"
