@@ -26,7 +26,7 @@ import { handleRequest } from "../../runner/handlers";
 import { CODEX_MCP_SERVER } from "../../runner/mcp";
 import { agentWorkspace } from "../../runner/paths";
 import type { Spawn } from "../../runner/scope-gate";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, removeDirs, tempDir, withContainersClient } from "./helpers";
 
 const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
@@ -575,6 +575,7 @@ test.skipIf(!posix)(
       [
         "#!/bin/sh",
         `printf "%s" "$CODEX_HOME" > "${fake}/home"`,
+        `printf "%s" "$CONTAINER_HOST$DOCKER_HOST$XDG_RUNTIME_DIR" > "${fake}/containers"`,
         `for a in "$@"; do printf "%s\\n" "$a"; done > "${fake}/args"`,
         "cat > /dev/null",
         `cat <<'EOF'\n${TURN1.join("\n")}\nEOF`,
@@ -601,9 +602,13 @@ test.skipIf(!posix)(
       effort: "xhigh" as const,
     };
     const events: CodexBrainEvent[] = [];
-    await handleCodexBrainTurn(ctx, req, { signal: new AbortController().signal, emit: (e) => events.push(e) });
+    await withContainersClient(() =>
+      handleCodexBrainTurn(ctx, req, { signal: new AbortController().signal, emit: (e) => events.push(e) }),
+    );
     expect(events.at(-1)).toMatchObject({ type: "done", text: "pong" });
     expect(readFileSync(path.join(fake, "home"), "utf8")).toBe(accountDir);
+    // Its sandbox holds the turn, so the agent's containers service isn't named to it (ADR 0169).
+    expect(readFileSync(path.join(fake, "containers"), "utf8")).toBe("");
     expect(readFileSync(path.join(fake, "args"), "utf8").split("\n")).toContain('model_reasoning_effort="high"');
     // The thread is this account's: the machine's own sign-in won't resume it.
     const threads = new CodexThreads(codexThreadsFile(home));

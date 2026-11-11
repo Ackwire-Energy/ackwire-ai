@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  activeRunsIn,
   addRunStep,
   canTransition,
   InvalidRunTransitionError,
@@ -65,6 +66,24 @@ describe("transitionRun", () => {
     const done = await transitionRun(f.db, runId, "running", "done");
     expect(done?.status).toBe("done");
     expect(done?.finishedAt).toBeInstanceOf(Date);
+  });
+
+  test("the work it is doing now: a first start counts from its creation, a return to work from that moment", async () => {
+    const created = new Date(Date.now() - 120_000);
+    await f.db.update(schema.agentRuns).set({ createdAt: created }).where(eq(schema.agentRuns.id, runId));
+    const working = async () => (await activeRunsIn(f.db, f.org.id, f.general.id)).find((r) => r.runId === runId);
+    // Queued, then started: no moment of its own yet, so the person who wrote to it counts from their message.
+    const started = await transitionRun(f.db, runId, "queued", "running");
+    expect(started?.workingSince).toBeNull();
+    expect((await working())?.workingMs).toBeGreaterThanOrEqual(120_000);
+    // Back from a wait (an approval, an answer): it counts from now, and its first start stays where it was.
+    await transitionRun(f.db, runId, "running", "waiting_input");
+    const resumed = await transitionRun(f.db, runId, "waiting_input", "running");
+    expect(resumed?.workingSince).toBeInstanceOf(Date);
+    expect(resumed?.startedAt?.getTime()).toBe(started?.startedAt?.getTime() ?? 0);
+    const now = await working();
+    expect(now?.workingMs).toBeLessThan(60_000);
+    expect(now?.startedAt).toBe(started?.startedAt?.toISOString() ?? "");
   });
 
   test("compare-and-set: a stale `from` changes nothing", async () => {

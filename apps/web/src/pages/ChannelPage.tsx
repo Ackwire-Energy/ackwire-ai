@@ -117,6 +117,7 @@ import { everyoneWord, isEveryoneMention, mentionsReader, offersEveryone } from 
 import { fileIcon, fitsUpload, formatBytes, MAX_UPLOAD_MB, previewKind } from "@agenteschat/client/lib/files";
 import { capitalize, dayLabel, formatFullDate, formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { issueTakenOf, issueWorkOf, taskConversationOf } from "@agenteschat/client/lib/issues";
 import { workAnchorBody, workContinuable, workIsOver } from "@agenteschat/client/lib/long-work";
 import { supersededBrainNotices } from "@agenteschat/client/lib/machine-outages";
@@ -909,8 +910,11 @@ function ChannelView({
     };
   }, [searchOpen, carry, channel.id]);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
-  // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
-  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
+  // (its memory, at the item it names); one panel at a time. Its opener again closes it (`close`, counted, so unsaved
+  // edits ask first).
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; item?: string; close?: number } | null>(
+    null,
+  );
   // What had the focus when the profile opened: it gets it back when the panel closes.
   const profileOpener = useRef<HTMLElement | null>(null);
   const closeProfile = useCallback(() => {
@@ -955,16 +959,17 @@ function ChannelView({
   }, [profileKeeps, setPanel]);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback(
-    (agentId: string, tab?: AgentTab) => {
+    (agentId: string, tab?: AgentTab, item?: string) => {
       if (profileKeeps()) return;
       setPanel(null);
       setSearchOpen(false);
       setConsultId(null);
       const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setProfile((open) => {
-        if (open?.agentId === agentId && open.tab === tab) return { ...open, close: (open.close ?? 0) + 1 };
+        if (open?.agentId === agentId && open.tab === tab && open.item === item)
+          return { ...open, close: (open.close ?? 0) + 1 };
         profileOpener.current = from;
-        return { agentId, tab };
+        return { agentId, tab, item };
       });
     },
     [profileKeeps, setPanel],
@@ -2735,7 +2740,9 @@ function ChannelView({
                                   search: mentionSearch,
                                   listLabel: t("mentions.list"),
                                   onPick: (item) => {
-                                    if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                                    // A DM takes no new member, so there is nothing to offer there.
+                                    const dm = Boolean(chrome?.dmAgentId || chrome?.dmPersonId);
+                                    if (item.note && !dm && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
                                   },
                                 }}
                               />
@@ -2798,9 +2805,10 @@ function ChannelView({
                   at a time; the members column stays under it. */}
                   {profile ? (
                     <AgentPanel
-                      key={`${profile.agentId}:${profile.tab ?? ""}`}
+                      key={`${profile.agentId}:${profile.tab ?? ""}:${profile.item ?? ""}`}
                       agentId={profile.agentId}
                       tab={profile.tab}
+                      item={profile.item}
                       closeRequest={profile.close}
                       onClose={closeProfile}
                     />
@@ -4619,14 +4627,7 @@ export const TimelineMessage = memo(function TimelineMessage({
             {agent &&
               memoryUpdates
                 .filter((u) => u.action !== "proposed")
-                .map((u) => (
-                  <MemoryChangeCard
-                    key={`${u.action}-${u.itemId}`}
-                    update={u}
-                    agentId={agent.id}
-                    sentAt={m.createdAt}
-                  />
-                ))}
+                .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
             {browserTrail.length > 0 && m.author.id && !m.local && (
               <BrowserTrailCard
                 agentId={m.author.id}
@@ -5398,13 +5399,6 @@ function AddMembersDialog({
       setSelected(new Set());
     }
   }, [open]);
-  const rows = useMemberRows(q, exclude, undefined, { channel: true });
-  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
-  const invite = useInviteOffer(q);
-  const inviteDialog = useInviteDialog();
-  const newAgent = useNewAgent();
-  const navigate = useNavigate();
-  const creates = can(org, "create_agents");
   const add = useMutation({
     mutationFn: async () => {
       for (const key of selected) await api.chat.addMember(org.id, channel.id, memberOf(key));
@@ -5414,6 +5408,14 @@ function AddMembersDialog({
       onClose();
     },
   });
+  // Who was in before Adicionar, also while it closes: the ones being added keep their rows.
+  const rows = useMemberRows(q, useHeldWhile(exclude, add.isPending || !open), undefined, { channel: true });
+  // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
+  const invite = useInviteOffer(q);
+  const inviteDialog = useInviteDialog();
+  const newAgent = useNewAgent();
+  const navigate = useNavigate();
+  const creates = can(org, "create_agents");
   return (
     <Dialog
       open={open}

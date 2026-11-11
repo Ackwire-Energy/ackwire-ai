@@ -17,7 +17,7 @@ import {
   routeWithPlan,
 } from "../../runner/brain-route";
 import { handleRequest, NEW_WORK_OPS, OP_ROUTES } from "../../runner/handlers";
-import { errorCode, removeDirs, tempDir } from "./helpers";
+import { errorCode, removeDirs, tempDir, withContainersClient } from "./helpers";
 
 const dirs: string[] = [];
 const managers: BrainManager[] = [];
@@ -194,7 +194,7 @@ test.skipIf(!posix)(
 
 test.skipIf(!posix)("Codex answers with the newest Luna its sign-in lists, the system prompt leading", async () => {
   const { home, deps, codex } = folders();
-  const reply = await routeWithPlan(request({ kind: "codex", account: ACCOUNT }), deps);
+  const reply = await withContainersClient(() => routeWithPlan(request({ kind: "codex", account: ACCOUNT }), deps));
   expect(reply).toEqual({
     json: { needs_agent: 0.9, scores: [{ handle: "dev", score: 0.9 }], reason: "a fake route" },
     model: "gpt-5.10-luna",
@@ -204,6 +204,8 @@ test.skipIf(!posix)("Codex answers with the newest Luna its sign-in lists, the s
   const [models, exec, route] = codex();
   expect(models?.args).toEqual(["debug", "models"]);
   expect(exec?.codexHome).toBe(home);
+  // Codex's sandbox holds it, so the agent's containers service isn't named to it (ADR 0169).
+  expect(exec?.containers).toEqual([]);
   expect((exec?.args as string[] | undefined)?.slice(0, 9)).toEqual(
     codexRouteArgs({ model: "gpt-5.10-luna", schemaFile: "", lastFile: "" }).slice(0, 9),
   );

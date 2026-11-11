@@ -10109,72 +10109,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   box-shadow: inset 0 0 0 1px var(--line);
   color: var(--ink2);
 }
-/* "Quem pensa": the opened card's settings full width, a small label above each. */
-.agp-advrow .ac-select__trigger {
-  cursor: pointer;
-}
-.agp-advrow__chev {
-  margin-left: auto;
-  flex: none;
-  color: var(--faint);
-}
-/* "Configuração avançada": its groups (how it thinks, who it answers) under a hairline each. */
-.agp-advgroup {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.agp-advgroup + .agp-advgroup {
-  padding-top: var(--form-gap);
-  border-top: 1px solid var(--line);
-}
-/* A form's group: its gap is its heading's room above the fields. */
-.agp-advgroup > .ac-grouphead {
-  margin-bottom: 0;
-}
-/* In the dialog "Atende outras pessoas" lines up like the switch under it: its line beside the switch, centered. */
-.agp-advgroup .plan-replies__terms {
-  grid-column: 1;
-}
-.agp-advgroup .plan-replies > .ac-switch {
-  grid-column: 2;
-  grid-row: 1 / span 2;
-  align-self: center;
-  translate: none;
-}
-.agp-advswitch {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-/* A setting of the opened brain: its label sits on its picker (6px), the settings a card's gap apart. */
-.agp-brainfield {
-  display: flex;
-  flex-direction: column;
-  gap: var(--field-gap);
-}
-.agp-brainfield__label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink2);
-}
-/* The account and its plan's usage in one outline: the meters hang under the account's picker, on a sunken band. */
-.agp-acct {
-  display: flex;
-  flex-direction: column;
-}
-.agp-acct--use > .ac-select .ac-select__trigger {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-}
-.agp-acct--use > .ac-planmeter {
-  padding: 12px 14px;
-  border: 1px solid var(--field-line);
-  border-top: 0;
-  border-radius: 0 0 var(--control-r-md) var(--control-r-md);
-  background: var(--sunken);
-}
 .agp-brainseg {
   display: flex;
   width: 100%;
@@ -10189,21 +10123,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
 }
 .agp-brainsel .newag__sel-value {
   gap: 10px;
-}
-/*
- * A switch's label and its ⓘ (an `.ac-hintline`, in the label's type so the ⓘ sits on its line), the switch
- * at the end: the card's foot ("Se o … parar de responder, responder pela API").
- */
-.agp-brainoff {
-  flex: 1;
-  font-size: 13.5px;
-  line-height: 1.35;
-}
-.agp-brainoff label {
-  cursor: pointer;
-}
-.agp-brainoff b {
-  font-weight: 600;
 }
 /*
  * "Atende outras pessoas" (`PlanReplies`), under a plan's account and at the end of a plan's panel: its label with
@@ -10242,12 +10161,6 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   .plan-replies > .ac-switch {
     translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
   }
-}
-/* At the plan's limit: the owner's free accounts, one click each, and "Conectar outra conta". */
-.agp-planoffer {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 /* "Add account": the provider's own sign-in, in numbered steps, as far apart as a panel's groups: a step's button
    sits nearer its own words than the next step's. Wrapped, its lines never end on a word alone, in a plan's panel or
@@ -11310,6 +11223,30 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
 .agp-mem:first-child {
   padding-top: 0;
   border-top: 0;
+}
+/* The memory a link opened: a soft plate for a moment where it landed, out to the card's padding on a row that has
+   none of its own. */
+.agp-mem.is-landed {
+  --landed-out: var(--space-2);
+  border-radius: var(--space-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.agp-mem, .memory-item).is-landed {
+    background: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.agp-mem, .memory-item).is-landed {
+    animation: item-landed 2.4s var(--out) forwards;
+  }
+}
+@keyframes item-landed {
+  0%,
+  40% {
+    background-color: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
 }
 /* A learned item's technical detail, folded under its plain summary */
 .agp-mem__details > summary {
@@ -12396,6 +12333,11 @@ html:not([data-pointer]) .sidebar__section-toggle:focus-visible {
 }
 /* Two of them side by side (Agentes' ⋯ and +) stand 8 apart, as every pair of icon buttons: the head's gap is 2. */
 .sidebar__section-add.ac-btn + .sidebar__section-add.ac-btn {
+  margin-inline-start: calc(var(--space-2) - 2px);
+}
+/* A header's button beside its count or its "working" line stands 8 apart too, never 2. */
+.sidebar__section-head > .ac-btn + .sidebar__section-count,
+.sidebar__section-head > .sidebar__section-working + .ac-btn {
   margin-inline-start: calc(var(--space-2) - 2px);
 }
 /*
@@ -13840,6 +13782,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 .ai-accounts__row,
 .key-row {
   padding: var(--row-py) var(--space-4);
+}
+/* Their actions are small ghost buttons, 32px boxes: the name's line takes their axis, as the kit's MediaRow gives a
+   plated one's, so they keep the row's padding above as the words under them keep it below. */
+:is(.ai-accounts__row, .key-row):has(> .ac-mediarow__end .ac-btn--sm) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
 }
 .key-row__tail {
   gap: var(--space-3);

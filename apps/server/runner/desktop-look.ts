@@ -4,6 +4,7 @@ import { pathToFileURL } from "node:url";
 import { type AgentScope, DESKTOP_SIZE } from "@agenteschat/adapters/machine-protocol";
 import MARK_BASE64 from "./assets/desktop-mark.png.b64" with { type: "text" };
 import WALLPAPER_BASE64 from "./assets/desktop-wallpaper.png.b64" with { type: "text" };
+import KEEPER_SOURCE from "./desktop-keeper.py" with { type: "text" };
 import { shQuote } from "./install-script";
 import { xmlEscape, xmlUnescape } from "./xml";
 
@@ -26,11 +27,14 @@ import { xmlEscape, xmlUnescape } from "./xml";
  *   the top of the apps menu, in place of XFCE's generic Terminal Emulator and File Manager. Their names are only
  *   English: the desktop session runs in `C.UTF-8` (`desktop-session.ts`), where a translated name never shows.
  * - The terminal's prompt and title show the agent's name, where bash's own show its system user and the
- *   computer's hostname.
+ *   computer's hostname, and each command goes to the history file as it runs (ADR 0168).
+ * - The desktop's keeper (`desktop-keeper.py`, ADR 0168) starts with the session (XDG autostart): it lists the app
+ *   windows open there, which the runner opens again after the computer restarted or moved. A desktop that takes a
+ *   new look while it runs starts it too.
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 5;
+export const LOOK_VERSION = 7;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
@@ -79,6 +83,11 @@ export const desktopName = (agent: Pick<AgentScope, "name" | "handle">) =>
 /** The look's own files and its marker, under HOME. */
 export const LOOK_DIR = ".local/share/agentes";
 export const LOOK_MARKER = `${LOOK_DIR}/look`;
+/** The desktop's keeper (ADR 0168), its settings, and the list of windows it keeps (`desktop-session.ts` reads it). */
+export const KEEPER_FILE = `${LOOK_DIR}/keeper.py`;
+export const KEEPER_SETTINGS = `${LOOK_DIR}/keeper.json`;
+export const KEEPER_STATE = ".local/state/agentes/windows.json";
+const KEEPER_AUTOSTART = ".config/autostart/agentes-keeper.desktop";
 /** XFCE's settings files (xfconf's channels), under HOME. */
 const XFCONF = ".config/xfce4/xfconf/xfce-perchannel-xml";
 
@@ -394,11 +403,16 @@ ${
 }</channel>
 `;
 
+/** A Terminal the runner opens again (`desktop-session.ts`) carries its one-line note in this variable. */
+export const TERMINAL_NOTE_ENV = "AGENTES_TERMINAL_NOTE";
+
 /**
  * `~/.bashrc` first (`--rcfile` reads this file in its place; Debian's and Ubuntu's bash still read
  * `/etc/bash.bashrc` before it), then the agent's name, green, in the prompt and in the window's title. The prompt
  * names it through a variable it expands, never in its own text, so no character of the name runs anything or
- * takes a prompt escape.
+ * takes a prompt escape. A Terminal opened again says its note (`TERMINAL_NOTE_ENV`) above its first prompt, once.
+ * Each command goes to the history file at the next prompt (`history -a`), so a shell killed with its computer keeps
+ * what was typed.
  */
 const bashrc = (name: string) =>
   [
@@ -407,6 +421,25 @@ const bashrc = (name: string) =>
     `AGENTES_NAME=${shQuote(name)}`,
     "shopt -s promptvars",
     String.raw`PS1='\[\e]0;$AGENTES_NAME: \w\a\]\[\e[1;32m\]$AGENTES_NAME\[\e[0m\]:\[\e[1;34m\]\w\[\e[0m\]\$ '`,
+    `[ -n "\${${TERMINAL_NOTE_ENV}-}" ] && printf '%s\\n\\n' "$${TERMINAL_NOTE_ENV}"; unset ${TERMINAL_NOTE_ENV}`,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: shell parameters, not a template literal
+    'PROMPT_COMMAND="history -a${PROMPT_COMMAND:+; $PROMPT_COMMAND}"',
+    "",
+  ].join("\n");
+
+/** The keeper's settings: which windows are the agent's Chrome and which are Browser's notes. */
+const keeperSettings = () =>
+  `${JSON.stringify({ browserClass: BROWSER_WM_CLASS, notes: [WAIT_WM_CLASS, NOTE_WM_CLASS] }, null, 2)}\n`;
+
+/** XFCE starts the keeper with the session, on its display and with its environment. */
+const keeperAutostart = (home: string) =>
+  [
+    "[Desktop Entry]",
+    "Type=Application",
+    "Name=agentes.chat",
+    "Comment=Lists the windows open on this desktop, to open them again after its computer restarted or moved",
+    `Exec=python3 -I ${execArg(`${home}/${KEEPER_FILE}`)} ${execArg(`${home}/${KEEPER_SETTINGS}`)}`,
+    "NoDisplay=true",
     "",
   ].join("\n");
 
@@ -576,6 +609,9 @@ export function lookFiles(home: string, o: LookOptions): LookFile[] {
       hidden(name),
     ]),
     ...(bash ? [[BASHRC, bashrc(desktopName(o.agent))] as [string, string]] : []),
+    [KEEPER_FILE, KEEPER_SOURCE],
+    [KEEPER_SETTINGS, keeperSettings()],
+    [KEEPER_AUTOSTART, keeperAutostart(home)],
     [`${LOOK_DIR}/wallpaper.png`, WALLPAPER],
     [`${LOOK_DIR}/mark.png`, MARK],
   ];
@@ -658,7 +694,9 @@ export const lookSettings = (home: string, o: LookOptions) => settingsOf(lookFil
  * over to read its new settings, gtk.css and docklike's file, which a panel reads only as it starts. That is the
  * panel's D-Bus Terminate, the call `xfce4-panel --restart` makes, which runs the restart from the panel's main
  * loop: its SIGUSR1 runs it inside a plain signal handler (XFCE 4.16 to 4.20), and `--restart` itself opens a
- * dialog on the agent's screen when it fails. The agent's apps and their windows stay as they are. A marker that
+ * dialog on the agent's screen when it fails. The agent's apps and their windows stay as they are. Then the desktop's
+ * keeper starts in that session, detached so the look's run doesn't wait on it, where none runs yet (one already
+ * there holds its lock: ADR 0168). A marker that
  * names this look already means the session shows it (it started with it, or took it here), and nothing is set
  * again. A run stopped part-way leaves the marker as it was, so the desktop's next start writes every file again,
  * over what xfconfd wrote back. Exits 1: a file wasn't written; 2: no session on that display; 3: a setting wasn't
@@ -683,6 +721,7 @@ export const LOOK_SCRIPT = [
   '  export DBUS_SESSION_BUS_ADDRESS="$s"',
   '  while read -r l; do printf %s "$l" | base64 -d | xargs -0 xfconf-query || exit 3; done',
   '  [ -z "$q" ] || dbus-send --session --print-reply --dest=org.xfce.Panel /org/xfce/Panel org.xfce.Panel.Terminate boolean:true > /dev/null || exit 4',
+  `  setsid -f python3 -I "$h/${KEEPER_FILE}" "$h/${KEEPER_SETTINGS}" < /dev/null > /dev/null 2>&1 || true`,
   "fi",
   'mkdir -p "$(dirname "$m")" && rm -f "$m.new" && printf "%s\\n" "$v" > "$m.new" && mv -f "$m.new" "$m"',
 ].join("\n");

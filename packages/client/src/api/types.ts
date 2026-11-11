@@ -1380,6 +1380,8 @@ export interface AiStatus {
   routing?: AiRouting;
   /** The organization has a key of its own, or the server's own Claude key. */
   apiKey?: boolean;
+  /** Memory reflects on finished conversations: there is a summary model it can call (absent from an older server). */
+  reflection?: boolean;
   agents: {
     agentId: string;
     /** `waiting`: its computer is away for now (not "no AI"). */
@@ -1479,6 +1481,12 @@ export interface ActiveRun {
   /** Last sign of life from the worker. */
   heartbeatAt?: string | null;
   createdAt?: string;
+  /**
+   * How long the work it is doing now has taken, in milliseconds, as the server counts it (since it last went back
+   * to work or last posted, else since it was created). A length, not a time: "thinking for …" counts on from it by
+   * this device's clock. Absent on a server from before it.
+   */
+  workingMs?: number;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
@@ -1999,7 +2007,7 @@ export interface ScopeInfo {
   sensitive: boolean;
 }
 
-/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação. */
+/** Catalog groups: Desenvolvimento, Produto, Docs, Pagamentos, Suporte, Marketing, Automação, Redes sociais. */
 export type ConnectorCategory =
   | "dev"
   | "product"
@@ -2009,7 +2017,8 @@ export type ConnectorCategory =
   | "sales"
   | "support"
   | "marketing"
-  | "automation";
+  | "automation"
+  | "social";
 
 /** A connector agentes.chat knows (`GET /connectors/catalog`: ours and the one-click MCP servers, one per service). */
 export interface ConnectorDef {
@@ -4379,6 +4388,11 @@ export interface Machine {
   /** The public address measured through an agent process, absent on older runners. */
   egress?: { ip: string; country?: string; at: string } | null;
   networkTransition?: { state: "draining" | "restart_required"; deadline: string; agents: string[] } | null;
+  /**
+   * The workspace's own computer, online, has its agents waiting for their way out: none of the proxies its network
+   * requires works now, so their connections are refused for a while. Absent from an older server: they don't wait.
+   */
+  egressWaiting?: boolean;
   name: string;
   /**
    * Absent from a server that doesn't say: `connected`. A `managed` one can't be removed, and its hostname,

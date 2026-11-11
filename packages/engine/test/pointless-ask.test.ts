@@ -275,7 +275,7 @@ describe("a promise that rests on what an earlier run set", () => {
   const inThread = (body: string, threadId: string) =>
     postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body, threadId });
 
-  test("a follow-up still to come keeps a repeated promise: told once, one post, no card", async () => {
+  test("a follow-up still to come keeps a repeated promise: no nudge, one post, no card", async () => {
     f = await setup({
       askUser: true,
       followUps: true,
@@ -292,9 +292,12 @@ describe("a promise that rests on what an earlier run set", () => {
     await inThread("@dev começa a rolagem", root.id);
     await drainOutbox(f.db, f.handlers);
     const before = f.provider.calls.length;
+    const posted = (await agentPosts()).length;
     await inThread("@dev e aí?", root.id);
     await drainOutbox(f.db, f.handlers);
-    expect(f.provider.calls.length).toBe(before + 2);
+    // The follow-up already brings it back: no nudge into a second status.
+    expect(f.provider.calls.length).toBe(before + 1);
+    expect(await agentPosts()).toHaveLength(posted + 1);
     expect(await questions()).toHaveLength(0);
     expect((await runs()).map((r) => r.status)).toEqual(["done", "done"]);
   });

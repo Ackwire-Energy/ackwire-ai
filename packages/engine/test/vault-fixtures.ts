@@ -36,7 +36,54 @@ export interface FakeSource extends VaultSource {
   /** The secrets `list` and `reveal` were handed (to prove they were unsealed). */
   seenTokens: string[];
   /** Every call, with the signal the engine gave it and the workspace `connect` was told (ADR 0144). */
-  calls: { op: "connect" | "list" | "reveal"; signal: AbortSignal | undefined; orgId: string | undefined }[];
+  calls: {
+    op: "connect" | "list" | "reveal" | "create" | "update";
+    signal: AbortSignal | undefined;
+    orgId: string | undefined;
+  }[];
+  /** Writes are refused as a token that only reads would be (a source made with `writableSource`). */
+  readOnly: boolean;
+  /** Writes fail as a provider's own error would, with its secrets in the text. */
+  writeBroken: boolean;
+}
+
+/**
+ * The fake password manager with write support, as 1Password has: a new login and a login's username or password.
+ * Its refusal of a write carries the token and the password on purpose, as a provider's raw error might.
+ */
+export function writableSource(): FakeSource {
+  const source = fakeSource();
+  const mayWrite = (connection: SourceConnection, password = "") => {
+    source.seenTokens.push(connection.secret.token ?? "");
+    if (source.readOnly) {
+      throw new VaultSourceError("read_only", "This token can only read this vault.");
+    }
+    if (source.writeBroken) throw new Error(`boom ${connection.secret.token} ${password}`);
+  };
+  source.createLogin = async (connection, login, signal) => {
+    source.calls.push({ op: "create", signal, orgId: connection.orgId });
+    mayWrite(connection, login.password);
+    const item: VaultSourceItem = {
+      ref: `made-${source.items.length + 1}`,
+      kind: "login",
+      title: login.title,
+      ...(login.username ? { username: login.username } : {}),
+      ...(login.website ? { websites: [{ url: login.website, match: login.match ?? "exact" }] } : {}),
+    };
+    source.items.push(item);
+    source.values.set(item.ref, login.password);
+    return { ...item };
+  };
+  source.updateLogin = async (connection, ref, change, signal) => {
+    source.calls.push({ op: "update", signal, orgId: connection.orgId });
+    mayWrite(connection, change.password);
+    const item = source.items.find((i) => i.ref === ref);
+    if (!item) throw new VaultSourceError("not_found", "It isn't there any more.");
+    if (change.username !== undefined) item.username = change.username;
+    if (change.password !== undefined) source.values.set(ref, change.password);
+    return { ...item };
+  };
+  return source;
 }
 
 export function fakeSource(): FakeSource {
@@ -47,6 +94,8 @@ export function fakeSource(): FakeSource {
     listError: null,
     seenTokens: [],
     calls: [],
+    readOnly: false,
+    writeBroken: false,
     describe: () => ({
       kind: "fakepass",
       name: "FakePass",

@@ -103,7 +103,18 @@ const CatalogEntry = z
       description:
         "`catalog`: our connector with its own scopes; `remote_mcp`: a server connected by its address in one click, the vendor's MCP server or the service through Composio (`via`).",
     }),
-    category: z.enum(["dev", "product", "docs", "data", "payments", "sales", "support", "marketing", "automation"]),
+    category: z.enum([
+      "dev",
+      "product",
+      "docs",
+      "data",
+      "payments",
+      "sales",
+      "support",
+      "marketing",
+      "automation",
+      "social",
+    ]),
     auth: z.array(z.enum(["oauth", "api_key"])),
     oauthConfigured: z
       .boolean()

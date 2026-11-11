@@ -2215,6 +2215,25 @@ test("the start-page language follows the responsible person and changes reach t
   expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("en");
 });
 
+test("an agent whose brain's shell runs in its CLI's own sandbox has no containers service (ADR 0169)", async () => {
+  f = await setup({ machines: true });
+  const paired = await pair();
+  const agent = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada-ctr" },
+    { model: "claude-sonnet-5-5" },
+  );
+  await setAgentComputerTarget(deps(), f.owner.id, f.org.id, agent.id, paired.machineId);
+  const containers = async (brain: string) => {
+    await f.db.update(schema.agents).set({ brain }).where(eq(schema.agents.id, agent.id));
+    return (await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.containers;
+  };
+  for (const brain of ["model", "claude_code", "opencode"]) expect(await containers(brain)).toBe(true);
+  for (const brain of ["codex", "cursor", "grok", "antigravity"]) expect(await containers(brain)).toBeUndefined();
+});
+
 test("personal computer IPs are neither stored nor broadcast to workspace readers", async () => {
   f = await setup({ machines: true });
   const hub = f.machineHub as MachineHub;

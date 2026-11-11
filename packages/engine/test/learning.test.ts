@@ -264,7 +264,7 @@ describe("agents learn on their own (ADR 0120)", () => {
     expect(none.get(other.id) ?? []).toEqual([]);
   });
 
-  test("a second similar task brings the how-to in with room for its method; fresh beats merely popular", async () => {
+  test("a second similar task brings the how-to in with room for its method; of its other notes, fresh comes first", async () => {
     f = await setup();
     const { run } = await personRun();
     const method = `GET ${MODELS_URL} with the bearer key. ${"Then page through with ?cursor= until next is null. ".repeat(12)}`;
@@ -284,7 +284,8 @@ describe("agents learn on their own (ADR 0120)", () => {
     expect(line.length).toBeGreaterThan(600);
     expect(line.length).toBeLessThan(800);
 
-    // Two of its own facts: the old one used a lot, the new one fresh. With room for one, the fresh one goes in.
+    // Two of its own facts: the old one used a lot, the new one fresh. Off the request, they come in only by name
+    // (ADR 0167), the fresh one first.
     const fact = (content: string, relevance: number, daysAgo: number) => ({
       orgId: f.org.id,
       kind: "fact" as const,
@@ -301,15 +302,16 @@ describe("agents learn on their own (ADR 0120)", () => {
     await f.db
       .insert(schema.contextItems)
       .values([fact("The office wifi is called Orbit.", 0.9, 200), fact("The staging host is new-box.", 0.6, 0)]);
-    const narrow = await retrieveForRun(f.context, {
+    const offTopic = await retrieveForRun(f.context, {
       orgId: f.org.id,
       agentId: f.agent.id,
       channelId: f.general.id,
       text: "",
-      budgetChars: 120,
     });
-    expect(narrow.text).toContain("new-box");
-    expect(narrow.text).not.toContain("Orbit");
+    expect(offTopic.itemIds).toEqual([]);
+    const also = offTopic.text.split("\n").find((l) => l.startsWith("- Also in your memory")) ?? "";
+    expect(also.indexOf("new-box")).toBeGreaterThan(-1);
+    expect(also.indexOf("new-box")).toBeLessThan(also.indexOf("Orbit"));
   });
 
   test("a how-to reused in three finished turns becomes the agent's skill; a bad outcome keeps it a note", async () => {
@@ -419,7 +421,12 @@ describe("agents learn on their own (ADR 0120)", () => {
     ]);
     const all = await items();
     expect(all.length).toBe(4);
-    expect(all.every((i) => i.trust === "low" && !i.verified && i.agentId === f.agent.id)).toBe(true);
+    // What the person asked is theirs to vouch for (ADR 0167): kept in their own words, never in the page's.
+    const said = all.find((i) => i.createdByKind === "person");
+    expect([said?.trust, said?.content]).toEqual(["high", "@dev read the vendor page and keep what matters"]);
+    expect(
+      all.filter((i) => i !== said).every((i) => i.trust === "low" && !i.verified && i.agentId === f.agent.id),
+    ).toBe(true);
 
     // Mail counts as outside too.
     const { run: mail } = await personRun("@dev what did the supplier say?");
@@ -740,7 +747,8 @@ describe("learning guards", () => {
       .where(eq(schema.agentRuns.id, harness.id));
     expect(await trust(harness)).toBe("low");
     await invoke(harness, "remember", { kind: "fact", content: "The vendor API is on v9.", basis: "person_said" });
-    expect((await items()).map((i) => i.trust)).toEqual(["low"]);
+    // The person's own words are theirs to vouch for (ADR 0167); what the fetch said never becomes the memory.
+    expect((await items()).map((i) => [i.trust, i.content])).toEqual([["high", "@dev look into the vendor"]]);
 
     // A screen read: the envelope is stripped from the step, only the gateway's `outside` mark is left.
     const { run: screen } = await personRun("@dev check the dashboard");

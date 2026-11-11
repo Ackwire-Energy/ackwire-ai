@@ -33,12 +33,13 @@ import {
   Toolbar,
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingLine } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useLandOn } from "@/lib/land-on";
 import { lookOf } from "@/lib/look";
 import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
@@ -47,6 +48,7 @@ import {
   KIND_ICON,
   type MemoryTab as Kind,
   memorySource,
+  memoryTabOf,
   NoMemories,
   usageLabel,
 } from "@/pages/MemoryPage";
@@ -192,7 +194,7 @@ function LearnedRow({ m }: { m: Memory }) {
       },
     );
   return (
-    <li className="agp-mem">
+    <li className="agp-mem" data-item-id={m.id}>
       {draft === null ? (
         m.summary ? (
           <>
@@ -238,6 +240,34 @@ function LearnedRow({ m }: { m: Memory }) {
       <span className="agp-row">
         {draft === null ? (
           <>
+            {(m.lowTrust || !m.verified) && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="check"
+                title={t("memory.confirmTitle")}
+                disabled={act.isPending}
+                onClick={() =>
+                  act.mutate({ type: "confirm", id: m.id }, { onSuccess: () => toast.show(t("memory.confirmed")) })
+                }
+              >
+                {t("memory.confirm")}
+              </Button>
+            )}
+            {/* Tornar do time (ADR 0167): who reviews memory makes it every agent's, its copies archived. */}
+            {can(org, "review_memory") && !m.howTo && !m.playbook && m.kind !== "lesson" && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="members"
+                disabled={act.isPending}
+                onClick={() =>
+                  act.mutate({ type: "team", id: m.id }, { onSuccess: () => toast.show(t("teamMemory.made")) })
+                }
+              >
+                {t("teamMemory.make")}
+              </Button>
+            )}
             <Button size="sm" variant="ghost" icon="edit" onClick={() => setDraft(m.text)}>
               {t("agentPage.memory.edit")}
             </Button>
@@ -278,7 +308,7 @@ function LearnedSkillRow({ s }: { s: LearnedSkill }) {
   const act = useSkillAction(org.id);
   const [open, setOpen] = useState(false);
   return (
-    <li className="agp-mem">
+    <li className="agp-mem" data-item-id={s.id}>
       <span>
         <b>{s.name}</b> · {s.description}
       </span>
@@ -362,7 +392,7 @@ function RulesCard({ rules }: { rules: Memory[] }) {
       />
       <ul className="agp-list agp-mems">
         {rules.map((m) => (
-          <li key={m.id} className="agp-mem">
+          <li key={m.id} className="agp-mem" data-item-id={m.id}>
             <span>{memoryLine(t, m)}</span>
             <span className="agp-chips">
               <span className="small muted">
@@ -461,16 +491,28 @@ function LearnedList({ list }: { list: Memory[] }) {
   );
 }
 
-/** Memória: proposals waiting, then what the agent knows (facts and decisions, lessons, archived) with search. */
-export function MemoryTab() {
+/**
+ * Memória: proposals waiting, then what the agent knows (facts and decisions, lessons, archived) with search. `item`:
+ * the memory or skill a link opened it at.
+ */
+export function MemoryTab({ item }: { item?: string }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const { agent, g } = useAgentEdit();
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
-  const [kind, setKind] = useState<Kind | "learned">("known");
+  const skills = useLearnedSkills(org.id, agent.id).data ?? [];
+  const [picked, setKind] = useState<Kind | "learned" | null>(null);
   const [q, setQ] = useState("");
   const list = memory.data ?? [];
+  // What a link named: its list shows until the person picks one, and it is landed on. What the agent learned goes
+  // to Aprendizados, where it is edited or forgotten.
+  const linked = list.find((m) => m.id === item);
+  const linkedSkill = skills.some((s) => s.id === item);
+  const linkedKind = linked?.learned && !linked.archived ? "learned" : linked ? memoryTabOf(linked) : null;
+  const kind = picked ?? linkedKind ?? (linkedSkill ? "learned" : "known");
+  const cols = useRef<HTMLDivElement>(null);
+  useLandOn(cols, item, Boolean(linked) || linkedSkill);
   const pending = pendingOnAgent(proposals.data ?? [], agent.id);
   const learned = list
     .filter(
@@ -508,7 +550,7 @@ export function MemoryTab() {
           />
         </div>
       </section>
-      <div className="agp-cols">
+      <div className="agp-cols" ref={cols}>
         <div className="agp-col">
           {pending.map((p) => (
             <ProposalCard key={p.id} proposal={p} />
@@ -573,7 +615,7 @@ export function MemoryTab() {
             ) : (
               <ul className="agp-list agp-mems">
                 {shown.map((m) => (
-                  <li key={m.id} className="agp-mem">
+                  <li key={m.id} className="agp-mem" data-item-id={m.id}>
                     <span>{memoryLine(t, m)}</span>
                     <span className="agp-chips">
                       <Chip icon={KIND_ICON[m.kind]}>{t(`memory.kinds.${m.kind}`)}</Chip>

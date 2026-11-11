@@ -25,7 +25,9 @@ import {
 import { composioConnectText } from "@agenteschat/client/lib/composio";
 import {
   accountUnchecked,
+  asksCount,
   type ConnectedItem,
+  connectedSummary,
   fromConnection,
   fromServer,
   itemName,
@@ -34,6 +36,7 @@ import {
 } from "@agenteschat/client/lib/connected";
 import { humanize, isHttpsUrl, sameServer } from "@agenteschat/client/lib/custom-tools";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import { connectorBrand, connectorDescription, connectorName } from "@agenteschat/client/lib/scopes";
 import {
   partsOf,
@@ -75,10 +78,10 @@ import { useToast } from "@/lib/toast";
 import { reviewNote, ToolLevelsView, ToolReview, type ToolReviewState } from "./ToolReview";
 
 /**
- * Connecting a service, in one dialog and three steps: (1) connect (OAuth
- * or an API key), (2) what it does (each tool reads, writes or always asks
- * for approval; off = never offered), (3) who can use it (one level per
- * agent). Rows of "Conectados" open steps 2 and 3 again.
+ * Connecting a service, in one dialog: connect (OAuth or an API key), then a short confirmation ("done": every agent
+ * can use it, so many actions ask) that ends the flow. "Ajustar" there, and the rows of "Conectados", open the two
+ * steps of detail: what it does (each tool reads, writes or always asks for approval; off = never offered) and who can
+ * use it (one level per agent).
  */
 export type FlowState =
   /**
@@ -95,7 +98,7 @@ export type FlowState =
       account?: boolean;
     }
   /** `naming`: a new account the provider didn't name ("Stripe 2"): its name comes first, above its tools. */
-  | { step: 1 | 2; item: ConnectedItem; naming?: boolean };
+  | { step: "done" | 1 | 2; item: ConnectedItem; naming?: boolean };
 
 /** Back from OAuth the app lands here; the server adds `?connected=…`. In the desktop app, through its window. */
 const returnPath = (orgId: string) => oauthReturnPath(`/org/${orgId}/settings/connectors`);
@@ -130,11 +133,15 @@ export function ConnectFlow({
         : name
           ? t(flow.mode === "add" ? "connectFlow.addTitle" : "connectFlow.connectTitle", { name })
           : t("connectFlow.customTitle")
-      : flow.step === 1
-        ? flow.item.server
-          ? t("toolReview.title")
-          : t("connectFlow.toolsTitle", { name })
-        : t("connectFlow.whoTitle", { name });
+      : flow.step === "done"
+        ? t("connectFlow.done.title", { name })
+        : flow.step === 1
+          ? flow.item.server
+            ? t("toolReview.title")
+            : t("connectFlow.toolsTitle", { name })
+          : t("connectFlow.whoTitle", { name });
+  // The confirmation is no step of the dots.
+  const at = flow.step === "done" ? null : flow.step;
   return (
     <Dialog
       open
@@ -158,13 +165,15 @@ export function ConnectFlow({
       width={620}
       className="cflow"
     >
-      <ol className="cflow__steps" aria-label={t("connectFlow.steps")}>
-        {([0, 1, 2] as const).map((i) => (
-          <li key={i} data-on={i <= flow.step || undefined} aria-current={i === flow.step ? "step" : undefined}>
-            <span className="ac-visually-hidden">{t(`connectFlow.step.${i}`)}</span>
-          </li>
-        ))}
-      </ol>
+      {at !== null && (
+        <ol className="cflow__steps" aria-label={t("connectFlow.steps")}>
+          {([0, 1, 2] as const).map((i) => (
+            <li key={i} data-on={i <= at || undefined} aria-current={i === at ? "step" : undefined}>
+              <span className="ac-visually-hidden">{t(`connectFlow.step.${i}`)}</span>
+            </li>
+          ))}
+        </ol>
+      )}
       {flow.step === 0 && (
         <ConnectStep
           def={flow.def}
@@ -173,7 +182,15 @@ export function ConnectFlow({
           item={flow.item}
           initialUrl={flow.url}
           accountOnly={flow.account === true}
-          onConnected={(item, naming) => onChange({ step: 1, item, naming })}
+          onConnected={(item, naming) => onChange({ step: "done", item, naming })}
+          onClose={onClose}
+        />
+      )}
+      {flow.step === "done" && (
+        <DoneStep
+          key={flow.item.id}
+          item={flow.item}
+          onAdjust={() => onChange({ step: 1, item: flow.item, naming: flow.naming })}
           onClose={onClose}
         />
       )}
@@ -200,7 +217,7 @@ export function ConnectFlow({
 
 /**
  * Step 1: OAuth ("Continuar no Linear"), or an API key. A service through Composio signs in on Composio's page
- * ("Continuar na Composio"): no key field of ours. A new account goes on to its tools; a new sign-in for an account,
+ * ("Continuar na Composio"): no key field of ours. A new account goes on to its confirmation; a new sign-in for an account,
  * or the same account again, ends here with a toast saying which. GitHub, where the server has the agentes.chat app
  * (ADR 0156), offers the app first (installed on GitHub's page, which comes back to Conectores) and an account second.
  */
@@ -263,11 +280,16 @@ function ConnectStep({
     def?.id === "github" && !viaComposio && !mode && !accountOnly && githubApp.data?.installable === true;
   const viaApp = appOffered && how === "app";
   const busy = connect.isPending || withKey.isPending || oauth.isPending || installApp.isPending;
+  const sent = busy || withKey.isSuccess || connect.data?.status === "connected";
   // As the server does: a server by address takes another account, a catalog connector a new sign-in.
-  const accounts = (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl));
-  const again = byAddress
-    ? accounts.length > 0
-    : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt);
+  const accounts = useHeldWhile(
+    (servers.data ?? []).filter((s) => sameServer(s.serverUrl, serverUrl)),
+    sent,
+  );
+  const again = useHeldWhile(
+    byAddress ? accounts.length > 0 : (connections.data ?? []).some((c) => c.connector === def?.id && !c.revokedAt),
+    sent,
+  );
   const replacing = mode === "reconnect" || (!byAddress && again);
   const connectionId = mode === "reconnect" && item?.custom ? item.id : undefined;
   const unchecked = byAddress && accountUnchecked(accounts);
@@ -281,9 +303,10 @@ function ConnectStep({
   const keyError = touched === "key" && apiKey.trim().length < 8 ? t("connectors.apiKeyInvalid") : undefined;
 
   const done = (next: ConnectedItem, outcome: ConnectOutcome) => {
+    // A new account's confirmation says it connected; any other ending is a toast.
+    if (outcome === "connected") return onConnected(next, byAddress && again && !next.server?.accountLabel);
     toast.show(outcomeText(t, outcome, next));
-    if (outcome === "connected") onConnected(next, byAddress && again && !next.server?.accountLabel);
-    else onClose();
+    onClose();
   };
   const byAddressResult = (result: Awaited<ReturnType<typeof connect.mutateAsync>>) => {
     if (result.status === "oauth") navigateAway(result.authorizeUrl);
@@ -451,8 +474,8 @@ function ConnectStep({
               ? t("connectFlow.github.appNote")
               : replacing
                 ? t(unchecked ? "connectFlow.replaceUnchecked" : "connectFlow.replace")
-                : again
-                  ? t(unchecked ? "connectFlow.newAccountUnchecked" : "connectFlow.newAccount")
+                : again && unchecked
+                  ? t("connectFlow.newAccountUnchecked")
                   : t("connectFlow.allCanUse")
         }
       >
@@ -551,6 +574,54 @@ function GithubOrgs() {
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The end of connecting: who can use it and how many actions ask, in a sentence, with "Pronto". A server whose tools
+ * no one gave a level yet says so instead, and "Continuar" saves the levels we suggest: agents get none before that.
+ * Tools that couldn't be read are said too, as their step under "Ajustar" says them.
+ */
+function DoneStep({ item, onAdjust, onClose }: { item: ConnectedItem; onAdjust: () => void; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { save } = useCustomServerAction(org.id);
+  const waiting = item.pending > 0 ? item.server : null;
+  return (
+    <>
+      <DialogBody className="cflow__body">
+        <p className="cflow__text">{connectedSummary(t, item)}</p>
+        {item.toolsError && <Alert>{t("toolReview.unreadable", { reason: item.toolsError })}</Alert>}
+      </DialogBody>
+      <DialogFooter bar>
+        <Button disabled={save.isPending} onClick={onAdjust}>
+          {t("connectFlow.done.adjust")}
+        </Button>
+        {waiting ? (
+          <Button
+            variant="primary"
+            disabled={save.isPending}
+            loading={save.isPending}
+            onClick={() =>
+              save.mutate(
+                {
+                  id: waiting.id,
+                  label: waiting.label,
+                  tools: reviewDecisions(reviewToolsOf(t, waiting), {}, new Set()),
+                },
+                { onSuccess: onClose },
+              )
+            }
+          >
+            {t("connectFlow.next")}
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={onClose}>
+            {t("connectFlow.done.ok")}
+          </Button>
+        )}
+      </DialogFooter>
+    </>
   );
 }
 
@@ -736,9 +807,7 @@ function WhoStep({ item, onBack, onClose }: { item: ConnectedItem; onBack: () =>
     // Granted tool by tool before: shown as is until a level is picked.
     ...(current(agentId) === "custom" ? [{ value: "custom" as LevelState, label: levelLabel("custom") }] : []),
   ];
-  const asks = item.server
-    ? item.server.tools.filter((x) => x.access === "approval").length
-    : (item.def?.tools ?? []).filter((x) => x.sensitive).length;
+  const asks = asksCount(t, item);
 
   const grant = useMutation({
     mutationFn: async () => {

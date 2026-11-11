@@ -59,6 +59,25 @@ export async function errorCode(fn: () => unknown): Promise<string> {
   }
 }
 
+/**
+ * `fn` run with this process's environment a client of an agent's containers service, as `systemLauncher` makes every
+ * launch of the agent (its runtime dir, Podman's socket): what a sandboxed CLI must not get (ADR 0169).
+ */
+export async function withContainersClient<T>(fn: () => Promise<T>): Promise<T> {
+  const socket = "unix:///run/user/21003/podman/podman.sock";
+  const client = { CONTAINER_HOST: socket, DOCKER_HOST: socket, XDG_RUNTIME_DIR: "/run/user/21003" };
+  const saved = Object.keys(client).map((k) => [k, process.env[k]] as const);
+  Object.assign(process.env, client);
+  try {
+    return await fn();
+  } finally {
+    for (const [k, v] of saved) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 export async function waitFor(cond: () => boolean, timeoutMs = 3000) {
   const start = Date.now();
   while (!cond()) {

@@ -17,11 +17,17 @@ export function ConnectChoices({
   onPick,
   dims,
   mayAddKey,
+  perAgent,
 }: {
   onPick: (choice: AiChoice) => void;
   /** A plan that can't sign in now: its mark dims, and its steps say why. */
   dims: (choice: PlanChoice) => boolean;
   mayAddKey: boolean;
+  /**
+   * For several agents: a plan that will ask for one login per agent there ends its card saying so, quietly, before
+   * it is picked (ADR 0160, addendum).
+   */
+  perAgent?: (choice: PlanChoice) => boolean;
 }) {
   const { t } = useTranslation();
   const [others, setOthers] = useState(false);
@@ -41,6 +47,9 @@ export function ConnectChoices({
       <ProviderLogo id={planMark(c)} size="tile" off={dims(c)} />,
       planLabel(t, c),
       t(`connectAi.plan.${c}.tiers`),
+      perAgent?.(c) ? (
+        <span className="arrival-opts__tag arrival-opts__tag--quiet">{t("connectAi.team.perAgent")}</span>
+      ) : undefined,
     );
   return (
     <div className="arrival-opts">

@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { Channel } from "@agenteschat/client";
 import { categoryHrefs, channelSteps, movesChannel, stepBefore } from "../../src/features/categories/logic";
 import {
@@ -168,5 +170,14 @@ describe("arranging categories", () => {
     expect(categoryHrefs.pick("c 1")).toBe("/channel-category?channelId=c%201");
     expect(categoryHrefs.create()).toBe("/channel-category-new");
     expect(categoryHrefs.edit("x")).toBe("/channel-category-edit?id=x");
+  });
+});
+
+describe("Nova categoria on the phone", () => {
+  test("the category being made never reads as taken: the name is checked against the list from before Criar", () => {
+    const screens = readFileSync(join(import.meta.dir, "../../src/features/categories/CategoryScreens.tsx"), "utf8");
+    expect(screens).toMatch(
+      /const taken = useHeldWhile\(\s*\(categories\.data \?\? \[\]\)\.some\([^;]*\),\s*create\.isPending \|\| create\.isSuccess,\s*\);/,
+    );
   });
 });

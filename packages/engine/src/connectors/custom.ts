@@ -15,6 +15,7 @@ import {
   classifyByRules,
   classifyTools,
   describeToolName,
+  POSTING_ACTIONS,
   type ReasonCode,
   type SuggestionSource,
   sharedPrefix,
@@ -52,7 +53,7 @@ import {
 } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
 import { seedToolPins } from "./pins";
-import { composioToolkitOf, type McpPreset, presetForServer } from "./presets";
+import { composioToolkitOf, composioToolName, type McpPreset, presetForServer } from "./presets";
 import { type McpServerInfo, refreshServerIcon } from "./server-icon";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
@@ -387,8 +388,8 @@ export async function reconnectTarget(db: Database, orgId: string, connectionId:
  * ("Reconectar") gives that account a new sign-in in place, so its name, tools and grants stay; signing in to
  * another account there is refused (`connector.other_account`), the grants were given for that one. Without it a
  * new account comes in, except when the provider says it is one already connected (its sign-in is refreshed,
- * `same_account`) or the server has no sign-in at all (the one connection it has). Only a server's first account
- * is every agent's (`grantToEveryAgent`); the others start with no agent. Addresses match as the apps match them
+ * `same_account`) or the server has no sign-in at all (the one connection it has). Every new account
+ * is every agent's (`grantToEveryAgent`). Addresses match as the apps match them
  * (`serverKey`). A service through Composio (ADR 0107) keeps Composio's account and no secret; the account it
  * replaces goes away at Composio.
  */
@@ -501,7 +502,6 @@ export async function storeCustomConnection(
             ? live[0]
             : null;
         if (twin) return { twin, row: null };
-        const first = live.length === 0;
         // The service's name, not the account's: `stripe`, then `stripe_2`; a later account goes by the server's
         // oldest one, whatever it is called now.
         const base = live[0] ? prefixService(toolPrefixOfConnection(live[0])) : toolPrefixOf(service);
@@ -531,10 +531,10 @@ export async function storeCustomConnection(
             authType: input.authType,
             label,
             account: named,
-            everyAgent: first,
+            everyAgent: true,
           },
         });
-        if (first) await grantToEveryAgent(tx, input.orgId, input.actorId, row);
+        await grantToEveryAgent(tx, input.orgId, input.actorId, row);
         return { twin: null, row };
       });
       if (!done.row) {
@@ -641,7 +641,11 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
     throw new ToolsUnreadable(reason, { cause: error });
   }
   if (account) await keepAccount(deps.db, c, account);
-  if (!composioServiceOf(c.serverUrl)) await seedToolPins(deps.db, c, listed);
+  const composio = composioServiceOf(c.serverUrl);
+  if (!composio) await seedToolPins(deps.db, c, listed);
+  const writeTools = composio
+    ? composio.way.actions.filter((a) => POSTING_ACTIONS.has(a)).map((a) => composioToolName(composio.way, a))
+    : [];
   const existing = await deps.db.select().from(customTools).where(eq(customTools.connectionId, c.id));
   const byName = new Map(existing.map((t) => [t.name, t]));
   const cached = new Map<string, ToolClass>();
@@ -663,6 +667,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
     server: c.label,
     judge: deps.judge,
     readTools: preset?.readTools,
+    writeTools,
     cached,
   });
   const seen = new Set<string>();
@@ -670,7 +675,7 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
     seen.add(tool.name);
     const old = byName.get(tool.name);
     const description = (tool.description ?? "").slice(0, 2000);
-    const cls = classes.get(tool.name) ?? classifyByRules(tool, preset?.readTools) ?? UNKNOWN_CLASS;
+    const cls = classes.get(tool.name) ?? classifyByRules(tool, preset?.readTools, writeTools) ?? UNKNOWN_CLASS;
     const suggestion = {
       suggestedAccess: cls.level,
       suggestionSource: cls.source,

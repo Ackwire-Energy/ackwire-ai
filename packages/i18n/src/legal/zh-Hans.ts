@@ -231,7 +231,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
               "**决定由谁回复。** 一个路由模型会读取新消息、工作区中智能体的名称和角色以及近期对话，以决定应由哪个智能体回复（如有）。该模型在 TypeSafe 运行，或作为后备在工作区的模型提供商处运行。路由绝不会授予智能体任何权限。",
               "**记忆。** 智能体会从对话中保留记忆（摘要、事实和经验），以便随时间不断改进。有关记忆的部分判断（某项内容是否值得保留，或是否与智能体已知的内容相冲突）由 TypeSafe 作出。记忆可在智能体的页面中查看和移除，并会随工作区一并删除。",
               "**搜索。** 为查找相关的消息和文档，文本可能会由 Voyage AI 转换为向量（嵌入）。",
-              "**连接器。** 当工作区连接某项服务（例如 GitHub、Google、Linear、Sentry、电子邮件收件箱或任何 MCP 服务器）时，我们以加密方式存储其访问令牌，并仅在工作区授予每个智能体的范围内读取或写入该服务。已连接的服务依据其自身条款处理该等数据。与 Gmail 和 Outlook 收件箱，以及与 Google Drive、Google Calendar、Google Sheets、Google Docs、Slack、Microsoft Teams、OneDrive、HubSpot、Salesforce、Zendesk、Asana、Figma、Intercom、Dropbox 和 Square 的连接均通过 Composio 进行，由其处理智能体在其中读取和写入的内容。",
+              "**连接器。** 当工作区连接某项服务（例如 GitHub、Google、Linear、Sentry、电子邮件收件箱或任何 MCP 服务器）时，我们以加密方式存储其访问令牌，并仅在工作区授予每个智能体的范围内读取或写入该服务。已连接的服务依据其自身条款处理该等数据。与 Gmail 和 Outlook 收件箱，以及与 Google Drive、Google Calendar、Google Sheets、Google Docs、Slack、Microsoft Teams、OneDrive、HubSpot、Salesforce、Zendesk、Asana、Figma、Intercom、Dropbox、Square、Instagram、Facebook、LinkedIn、YouTube、Pinterest、Reddit 和 WhatsApp 的连接均通过 Composio 进行，由其处理智能体在其中读取和写入的内容。",
               "**数据库。** 数据库连接为只读。凭据以加密方式存储，每次查询在运行前均会经过检查。",
               "**已连接的计算机。** 当有人连接一台计算机时，智能体可以在该计算机上设定的文件夹和权限范围内运行命令和使用浏览器。智能体浏览器的实时画面经过 Cloudflare 和我们服务器的内存，且不会被录制。智能体所采取步骤的摘要（例如访问过的地址和执行的操作）会随其工作一并保存，以便团队了解其所做的事情。",
               "**工作区的计算机。** 在 agentes.chat Cloud 上，工作区的智能体在我们为该工作区运行的一台计算机上工作，该计算机由 Contabo 托管于欧盟境内。我们按日统计每个智能体的浏览器、AI 工具和其他程序在该计算机上发送和接收的数据量。按照使用条款所述，该计算机将在工作区的 agentes.chat 套餐结束后被清除。",

@@ -13,9 +13,12 @@ import { and, eq, schema } from "@agenteschat/db";
 import {
   ARTIFACT_LIMITS,
   acceptCustomSuggestion,
+  actionLevel,
   ConflictError,
   type CustomDeps,
+  classifyByRules,
   completeOAuth,
+  composioMcpTool,
   composioToolkitUrl,
   composioToolName,
   composioUsageOf,
@@ -143,24 +146,31 @@ const call = (gateway: ReturnType<typeof createToolGateway>, ctx: ToolContext, n
   gateway.invoke(ctx, { toolUseId: `call-${++seq}`, name, input: input as Record<string, unknown> });
 
 describe("the entries", () => {
-  test("15 services, each once: explicit actions under one prefix, names that never collide, no meta tool", () => {
+  test("22 services, each once: explicit actions under one prefix, names that never collide, no meta tool", () => {
     const ways = MCP_PRESETS.filter((p) => p.composio);
     expect(ways.map((p) => p.id).sort()).toEqual(
       [
         "asana",
         "drive",
         "dropbox",
+        "facebook",
         "figma",
         "google-calendar",
         "google-docs",
         "google-sheets",
         "hubspot",
+        "instagram",
         "intercom",
+        "linkedin",
         "microsoft-teams",
         "onedrive",
+        "pinterest",
+        "reddit",
         "salesforce",
         "slack",
         "square",
+        "whatsapp",
+        "youtube",
         "zendesk",
       ].sort(),
     );
@@ -181,6 +191,63 @@ describe("the entries", () => {
     // GitHub never goes through Composio: its actions would bypass the agent's repository list.
     expect(ways.some((p) => p.composio?.toolkit === "github")).toBe(false);
     expect(composioToolName({ toolkit: "googledrive" }, "GOOGLEDRIVE_FIND_FILE")).toBe("find_file");
+  });
+
+  test("social networks: posts and comments go out on their own, deletes, sends, moderation and board changes ask", () => {
+    const social = ["instagram", "facebook", "linkedin", "youtube", "pinterest", "reddit", "whatsapp"];
+    const asking = Object.fromEntries(
+      social.map((id) => {
+        const way = mcpPreset(id)?.composio;
+        if (!way) return [id, null];
+        return [id, way.actions.filter((a) => composioMcpTool(way, tool(a)).destructiveHint === true)];
+      }),
+    );
+    expect(asking).toEqual({
+      instagram: ["INSTAGRAM_SEND_TEXT_MESSAGE"],
+      facebook: ["FACEBOOK_DELETE_POST", "FACEBOOK_DELETE_COMMENT"],
+      linkedin: ["LINKEDIN_DELETE_POST"],
+      youtube: ["YOUTUBE_CREATE_COMMENT_REPLY", "YOUTUBE_SET_COMMENT_MODERATION_STATUS", "YOUTUBE_DELETE_COMMENT"],
+      pinterest: ["PINTEREST_UPDATE_BOARD", "PINTEREST_DELETE_PIN", "PINTEREST_DELETE_BOARD"],
+      reddit: ["REDDIT_DELETE_REDDIT_POST", "REDDIT_DELETE_REDDIT_COMMENT"],
+      whatsapp: [
+        "WHATSAPP_SEND_MESSAGE",
+        "WHATSAPP_SEND_TEMPLATE_MESSAGE",
+        "WHATSAPP_SEND_MEDIA",
+        "WHATSAPP_SEND_INTERACTIVE_BUTTONS",
+        "WHATSAPP_SEND_INTERACTIVE_LIST",
+        "WHATSAPP_SEND_LOCATION",
+      ],
+    });
+    // What Composio's own apps can't do stays out: Instagram's comments, Reddit's inbox and votes.
+    const listed = (id: string, word: RegExp) => mcpPreset(id)?.composio?.actions.filter((a) => word.test(a));
+    expect(listed("instagram", /COMMENT|MENTION|TAGS/)).toEqual([]);
+    expect(listed("reddit", /INBOX|PRIVATE_MESSAGE|VOTE|WIKI|MODERAT/)).toEqual([]);
+    expect(social.map((id) => [id, mcpPreset(id)?.category])).toEqual(social.map((id) => [id, "social"]));
+  });
+
+  test("Instagram's publish step and a LinkedIn link share are posts: plain writes, while any other publish or share asks", () => {
+    expect(
+      [
+        "INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH",
+        "LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE",
+        "FACEBOOK_PUBLISH_SCHEDULED_POST",
+        "LINKEDIN_PUBLISH_POST",
+        "WEBFLOW_PUBLISH_SITE",
+        "BOX_SHARE_FILE",
+      ].map((slug) => [slug, actionLevel(slug)]),
+    ).toEqual([
+      ["INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", "write"],
+      ["LINKEDIN_CREATE_ARTICLE_OR_URL_SHARE", "write"],
+      ["FACEBOOK_PUBLISH_SCHEDULED_POST", "sensitive"],
+      ["LINKEDIN_PUBLISH_POST", "sensitive"],
+      ["WEBFLOW_PUBLISH_SITE", "sensitive"],
+      ["BOX_SHARE_FILE", "sensitive"],
+    ]);
+    // Only through Composio: another server's tool of the same name keeps the rule of its words.
+    expect(classifyByRules({ name: "post_ig_user_media_publish" })).toMatchObject({
+      level: "approval",
+      sensitive: true,
+    });
   });
 
   test("one way per service: the vendor's server, else Composio here, else Em breve, else unavailable", () => {
@@ -262,6 +329,35 @@ describe("connecting through Composio", () => {
     );
   });
 
+  test("Instagram's publish step is stored as a write an admin can narrow, even when Composio tags it destructive", async () => {
+    const w = await world();
+    const way = mcpPreset("instagram")?.composio;
+    if (!way) throw new Error("no Instagram way");
+    w.fake.addTools("instagram", way.version, [
+      tool("INSTAGRAM_POST_IG_USER_MEDIA_PUBLISH", ["destructiveHint"]),
+      tool("INSTAGRAM_SEND_TEXT_MESSAGE"),
+    ]);
+    const started = await connectCustomServer(w.deps, f.owner.id, f.org.id, {
+      serverUrl: composioToolkitUrl("instagram"),
+      returnTo: "/x",
+    });
+    if (started.status !== "oauth") throw new Error("expected oauth");
+    const state = new URL(started.authorizeUrl).searchParams.get("state") ?? "";
+    const code = w.fake.state.links.at(-1)?.connectedAccountId ?? "";
+    w.fake.activate(code, "", null);
+    const { connection } = await completeOAuth(w.deps, { id: f.owner.id }, { state, code });
+    await syncCustomTools(w.deps, connection);
+    await acceptCustomSuggestion(w.deps, f.owner.id, f.org.id, connection.id);
+    const tools = await f.db
+      .select()
+      .from(schema.customTools)
+      .where(eq(schema.customTools.connectionId, connection.id));
+    expect(Object.fromEntries(tools.map((t) => [t.name, [t.access, t.sensitive]]))).toEqual({
+      post_ig_user_media_publish: ["write", false],
+      send_text_message: ["approval", true],
+    });
+  });
+
   test("stored with Composio's account and no secret, named by its Google address, every agent's, its tools ours", async () => {
     const w = await world();
     const { connection, outcome } = await w.connect("ana@acme.com");
@@ -296,15 +392,17 @@ describe("connecting through Composio", () => {
     expect(w.fake.state.toolLists).toEqual([`googledrive@${VERSION}`]);
   });
 
-  test("another account is a new row with no agent; the same one only swaps Composio's account; Reconectar keeps it", async () => {
+  test("another account is a new row, every agent's too; the same one only swaps Composio's account; Reconectar keeps it", async () => {
     const w = await world();
     const ana = await w.connect("ana@acme.com");
     const bob = await w.connect("bob@acme.com");
     expect(bob.outcome).toBe("connected");
     expect(bob.connection).toMatchObject({ label: "Google Drive (bob@acme.com)", toolPrefix: "google_drive_2" });
-    expect(
-      await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, bob.connection.id)),
-    ).toEqual([]);
+    const given = await f.db
+      .select()
+      .from(schema.agentScopes)
+      .where(eq(schema.agentScopes.connectionId, bob.connection.id));
+    expect([...new Set(given.map((g) => g.scope))]).toEqual(["connector:*"]);
 
     const same = await w.connect("ana@acme.com");
     expect(same.outcome).toBe("same_account");

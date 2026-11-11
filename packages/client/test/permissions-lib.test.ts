@@ -1,12 +1,5 @@
 import { expect, test } from "bun:test";
-import {
-  addsAgentsTo,
-  editsMemory,
-  leavesChannel,
-  managesChannel,
-  setsAutoReply,
-  undoesMemoryChange,
-} from "../src/lib/permissions";
+import { addsAgentsTo, editsMemory, leavesChannel, managesChannel, setsAutoReply } from "../src/lib/permissions";
 
 const member = { permissions: ["read", "post"] };
 const manager = { permissions: ["read", "post", "manage_channels"] };
@@ -43,23 +36,12 @@ test("an agent goes in or out of a channel its person is in and may post in, or 
   expect(addsAgentsTo(undefined, "caio", member)).toBe(false);
 });
 
-test("a memory change is undone by who may edit the memory, or its requester within the window", () => {
+test("an agent's memory is edited by its owner or who reviews memory", () => {
   const bot = { ownerUserId: "caio" };
   const reviewer = { permissions: ["read", "review_memory"] };
-  const asked = { requestedByUserId: "bia" };
-  const now = Date.parse("2026-01-01T12:00:00Z");
-  const fresh = "2026-01-01T11:58:00Z";
-  const old = "2026-01-01T11:50:00Z";
   expect(editsMemory(bot, "caio", member)).toBe(true);
   expect(editsMemory(bot, "davi", reviewer)).toBe(true);
   expect(editsMemory(bot, "davi", member)).toBe(false);
-  expect(undoesMemoryChange(asked, bot, "davi", member, fresh, now)).toBe(false);
-  expect(undoesMemoryChange(asked, bot, "bia", member, fresh, now)).toBe(true);
-  expect(undoesMemoryChange(asked, bot, "bia", member, undefined, now)).toBe(true);
-  expect(undoesMemoryChange(asked, bot, "bia", member, old, now)).toBe(false);
-  expect(undoesMemoryChange(asked, bot, "caio", member, old, now)).toBe(true);
-  expect(undoesMemoryChange(asked, bot, "davi", reviewer, old, now)).toBe(true);
-  expect(undoesMemoryChange({ requestedByUserId: "" }, bot, "", member)).toBe(false);
 });
 
 test("a channel's exceptions (ADR 0134): the list's `can` decides managing when the server sends it", () => {

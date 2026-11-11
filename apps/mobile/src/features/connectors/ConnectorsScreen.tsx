@@ -150,8 +150,8 @@ function Gallery() {
     if (def) open(def);
     else sheet.open(<AddressSheet url={mcp || undefined} />);
   });
-  // Back from a sign-in that finished on the link route (`?connected=<id>`): its tools, as the web opens
-  // "O que faz" for the connection that just came in (admins; anyone else had the toast).
+  // Back from a sign-in that finished on the link route (`?connected=<id>`): the confirmation, as the web shows
+  // for the connection that just came in (admins; anyone else had the toast).
   const returned = useRef<string | null>(null);
   useEffect(() => {
     if (!connected || returned.current === connected || !connections.data || !servers.data || !catalog.data) return;
@@ -159,11 +159,7 @@ function Gallery() {
     const item = items.find((i) => i.id === connected);
     if (!item || !admin) return;
     sheet.open(
-      item.def ? (
-        <ConnectSheet def={item.def} item={item} start="review" fresh />
-      ) : (
-        <ServerSheet item={item} start="review" fresh />
-      ),
+      item.def ? <ConnectSheet def={item.def} item={item} start="done" /> : <ServerSheet item={item} start="done" />,
     );
   }, [connected, connections.data, servers.data, catalog.data, items, admin, sheet]);
 

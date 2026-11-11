@@ -19,6 +19,7 @@ import {
   AgentUsers,
   adbServerPort,
   agentGid,
+  agentSubids,
   readAgentUsers,
   systemLauncher,
 } from "../../runner/agent-users";
@@ -683,6 +684,25 @@ describe.if(ROOT)("the agents' isolation on this computer, as root", () => {
       expect(at.out).toMatch(/permission|not allowed/i);
       expect(at.code).not.toBe(0);
     } else console.log("no at here");
+  });
+
+  test("each agent's subordinate ids: its own block alone in /etc/subuid and /etc/subgid, by the real usermod (ADR 0169)", () => {
+    for (const u of [A, B]) {
+      const [first, last] = agentSubids(u.uid);
+      for (const file of ["/etc/subuid", "/etc/subgid"]) {
+        const rows = readFileSync(file, "utf8")
+          .split("\n")
+          .map((line) => line.split(":"))
+          .filter((row) => row.length === 3);
+        expect(rows.filter(([owner]) => owner === u.user)).toEqual([[u.user, String(first), "65536"]]);
+        // Nobody else's range over it.
+        const over = rows.filter(([owner, start, count]) => {
+          const a = Number(start);
+          return owner !== u.user && a <= last && a + Number(count) - 1 >= first;
+        });
+        expect(over).toEqual([]);
+      }
+    }
   });
 
   test("systemd-tmpfiles takes the cleanup line for the agents' own folders, and keeps what is fresh", () => {

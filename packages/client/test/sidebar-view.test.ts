@@ -5,6 +5,7 @@ import {
   repinAgent,
   SIDEBAR_VIEW_DEFAULT,
   sortAgents,
+  splitPinned,
   togglePin,
   unpinAgents,
 } from "../src/lib/sidebar-view";
@@ -38,14 +39,30 @@ test("day one never pins an agent in a group: its group keeps it whatever its DM
   expect(dayOnePins(agents, "me", active, groups)).toEqual(["c"]);
 });
 
-test("saved pins win over day one's; pinning adds at the end, a sixth is refused, unpinning takes it off", () => {
+test("saved pins win over day one's; pinning puts it first, a sixth is refused, unpinning takes it off", () => {
   expect(pinsOf(SIDEBAR_VIEW_DEFAULT, ["a"])).toEqual({ agents: ["a"], channels: [], people: [] });
   const saved = { ...SIDEBAR_VIEW_DEFAULT, pins: { agents: [], channels: ["1", "2", "3", "4"], people: [] } };
   expect(pinsOf(saved, ["a"]).agents).toEqual([]);
+  // First, where the person looks: at the end of the pinned rows, the row next to them hardly moved.
   const five = togglePin(saved.pins, "channels", "5");
-  expect(five?.channels).toEqual(["1", "2", "3", "4", "5"]);
+  expect(five?.channels).toEqual(["5", "1", "2", "3", "4"]);
   expect(five && togglePin(five, "channels", "6")).toBeNull();
-  expect(five && togglePin(five, "channels", "2")?.channels).toEqual(["1", "3", "4", "5"]);
+  expect(five && togglePin(five, "channels", "2")?.channels).toEqual(["5", "1", "3", "4"]);
+});
+
+test("a pin of something gone (a deleted agent, a channel I left) holds no place once its list is known", () => {
+  const saved = { ...SIDEBAR_VIEW_DEFAULT, pins: { agents: ["a", "gone"], channels: ["x"], people: ["p"] } };
+  expect(pinsOf(saved, [], { agents: ["a", "b"], people: ["q"] })).toEqual({
+    agents: ["a"],
+    channels: ["x"],
+    people: [],
+  });
+  // A list still loading (missing, or empty) keeps its pins.
+  expect(pinsOf(saved, [], { agents: [], channels: undefined })).toEqual(saved.pins);
+});
+
+test("a section's pinned rows lead it, in the pins' order; the rest keep theirs", () => {
+  expect(splitPinned(["a", "b", "c", "d"], ["c", "z", "a"], (x) => x)).toEqual({ top: ["c", "a"], rest: ["b", "d"] });
 });
 
 test("a group's order: the workspace's, mine first or working first, each keeping the rest in place", () => {
@@ -56,7 +73,7 @@ test("a group's order: the workspace's, mine first or working first, each keepin
   expect(ids(sortAgents(list, "working", "me", new Set(["c"])))).toEqual(["c", "a", "b", "d"]);
 });
 
-test("an agent put in a group leaves the pins (a pin takes it out of its group); Desfazer pins it back in its place", () => {
+test("an agent put in a group by hand leaves the pins (it lands where it was dropped); Desfazer pins it back in its place", () => {
   const view = { ...SIDEBAR_VIEW_DEFAULT, pins: { agents: ["a", "b", "c"], channels: ["x"], people: [] } };
   expect(unpinAgents(view, ["b"])).toEqual({ ...view, pins: { agents: ["a", "c"], channels: ["x"], people: [] } });
   // Nothing pinned to take off, or day one (no saved pins): nothing to save.

@@ -23,6 +23,7 @@ export const CATEGORIES: ConnectorCategory[] = [
   "support",
   "marketing",
   "automation",
+  "social",
 ];
 
 /**

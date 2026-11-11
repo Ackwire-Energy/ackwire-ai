@@ -10,6 +10,8 @@ import { agentGrammar } from "./grammar";
 
 export type TeamWeekRow =
   | { id: string; kind: "approvals"; agentId: string; approvalIds: string[]; since: string }
+  /** A how-to of the reader's agent reused past the bar that nobody vouched for yet (ADR 0167): "Virar skill?". */
+  | { id: string; kind: "howto"; agentId: string; itemId: string; title: string; uses: number }
   | { id: string; kind: "budget"; agentId: string; proposalId: string; stops: number; from: number; to: number }
   | { id: string; kind: "channel"; agentId: string; proposalId: string; channelId: string }
   | { id: string; kind: "unanswered"; channelId: string; count: number }
@@ -195,6 +197,12 @@ export function teamWeekRowText(t: TFunction, locale: string, row: TeamWeekRow, 
         line: say("teamWeek.routine.line", { count: row.count, text: row.text }),
         action: say("teamWeek.routine.action"),
       };
+    case "howto":
+      return {
+        title: say("teamWeek.howto.title", { ...named(row.agentId), what: row.title }),
+        line: say("teamWeek.howto.line", { uses: row.uses }),
+        action: say("teamWeek.howto.action"),
+      };
     case "stalled": {
       const steps = n.join(row.steps.map((s) => `#${s}`));
       return {
@@ -224,5 +232,6 @@ export function teamWeekDoneText(t: TFunction, row: TeamWeekRow, rightHandName: 
   if (row.kind === "routine") return say("teamWeek.routine.done");
   if (row.kind === "unanswered") return say("teamWeek.unanswered.done", agentGrammar(rightHandName));
   if (row.kind === "stalled") return say("teamWeek.stalled.done");
+  if (row.kind === "howto") return say("teamWeek.howto.done");
   return say("teamWeek.applied");
 }

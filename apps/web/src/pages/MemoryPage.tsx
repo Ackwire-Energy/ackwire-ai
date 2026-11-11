@@ -23,13 +23,14 @@ import {
 } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AskAgentButton } from "@/components/AskAgentButton";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useLandOn } from "@/lib/land-on";
 import { lookOf } from "@/lib/look";
 
 export type MemoryTab = "known" | "lessons" | "archived";
@@ -61,6 +62,10 @@ export function inMemoryTab(m: Memory, tab: MemoryTab) {
     : m.kind === "fact" || m.kind === "decision";
 }
 
+/** The tab that lists a memory; none for a rule in force (rules have their own card on the agent's page). */
+export const memoryTabOf = (m: Memory): MemoryTab | null =>
+  (["archived", "lessons", "known"] as const).find((tab) => inMemoryTab(m, tab)) ?? null;
+
 export function filterMemories(list: Memory[], tab: MemoryTab, query: string) {
   const q = query.trim().toLowerCase();
   return list.filter((m) => inMemoryTab(m, tab) && (!q || `${m.text} ${m.source}`.toLowerCase().includes(q)));
@@ -80,8 +85,8 @@ export function usageLabel(t: TFunction, m: Memory, now = new Date()) {
   return m.uses === 0 ? t("memory.used_zero") : t("memory.used", { count: m.uses });
 }
 
-/** An agent's memory: "O que a Ada sabe". */
-export function MemoryPage({ agentId }: { agentId: string }) {
+/** An agent's memory: "O que a Ada sabe". `item`: the memory a link opened it at. */
+export function MemoryPage({ agentId, item }: { agentId: string; item?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const dir = useDirectory(org.id);
@@ -100,7 +105,7 @@ export function MemoryPage({ agentId }: { agentId: string }) {
       </div>
     );
   }
-  return <MemoryView agent={agent} />;
+  return <MemoryView agent={agent} item={item} />;
 }
 
 /**
@@ -146,23 +151,28 @@ export function NoMemories({
   );
 }
 
-function MemoryView({ agent }: { agent: Agent }) {
+function MemoryView({ agent, item }: { agent: Agent; item?: string }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const memory = useMemory(org.id, agent.id);
   const proposals = useProposals(org.id);
   const action = useMemoryAction(org.id, agent.id);
   const g = agentGrammar(agent.name);
-  const [tab, setTab] = useState<MemoryTab>("known");
+  const [picked, setTab] = useState<MemoryTab | null>(null);
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<Memory | null>(null);
   const all = memory.data ?? [];
+  // The memory a link named: its tab shows until the person picks one, and it is landed on.
+  const linked = all.find((m) => m.id === item);
+  const tab = picked ?? (linked && memoryTabOf(linked)) ?? "known";
+  const page = useRef<HTMLDivElement>(null);
+  useLandOn(page, item, Boolean(linked));
   const items = filterMemories(all, tab, q);
   const count = (x: MemoryTab) => all.filter((m) => inMemoryTab(m, x)).length;
   const pendingProposals = (proposals.data ?? []).filter((p) => p.agentId === agent.id && p.status === "pending");
 
   return (
-    <div className="page page--full">
+    <div className="page page--full" ref={page}>
       <Link to="/org/$orgId/agents/$agentId" params={{ orgId: org.id, agentId: agent.id }} className="ac-back">
         <Icon name="chevronLeft" />
         {t("memory.back", g)}
@@ -214,6 +224,7 @@ function MemoryView({ agent }: { agent: Agent }) {
           <article
             key={m.id}
             className="memory-item"
+            data-item-id={m.id}
             aria-label={`${t(`memory.kinds.${m.kind}`)}: ${memoryLine(t, m)}`}
           >
             <div className="row">
@@ -249,6 +260,17 @@ function MemoryView({ agent }: { agent: Agent }) {
               </span>
               {/* A row of ghosts: their words 16px apart, the last one on the item's padding line. */}
               <div className="ac-acts">
+                {(m.lowTrust || !m.verified) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    title={t("memory.confirmTitle")}
+                    disabled={action.isPending}
+                    onClick={() => action.mutate({ type: "confirm", id: m.id })}
+                  >
+                    {t("memory.confirm")}
+                  </Button>
+                )}
                 <Button variant="ghost" size="sm" onClick={() => setEditing(m)}>
                   {t("memory.edit")}
                 </Button>

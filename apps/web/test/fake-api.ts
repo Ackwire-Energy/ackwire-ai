@@ -3490,6 +3490,15 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
       edit: async (orgId, id, text) => patchMemory(orgId, id, { text }),
       setPinned: async (orgId, id, pinned) => patchMemory(orgId, id, { pinned }),
       setArchived: async (orgId, id, archived) => patchMemory(orgId, id, { archived }),
+      confirm: async (orgId, id) => patchMemory(orgId, id, { confirmed: true }),
+      listTeam: async () => state.memories.filter((m) => !m.agentId && !m.archived),
+      makeTeam: async (orgId, id) => {
+        log("memory.team", orgId, id);
+        const m = state.memories.find((x) => x.id === id);
+        if (!m) throw new ApiError(404, "not_found", "Memory not found");
+        m.agentId = "";
+        return m;
+      },
       revert: async (orgId, id) => {
         log("memory.revert", orgId, id);
       },
@@ -3719,7 +3728,11 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     },
   };
 
-  function patchMemory(orgId: string, id: string, patch: { text?: string; pinned?: boolean; archived?: boolean }) {
+  function patchMemory(
+    orgId: string,
+    id: string,
+    patch: { text?: string; pinned?: boolean; archived?: boolean; confirmed?: boolean },
+  ) {
     log("memory.patch", orgId, id, patch);
     const m = state.memories.find((x) => x.id === id);
     if (!m) throw new ApiError(404, "not_found", "Memory not found");
@@ -3731,6 +3744,10 @@ export function createFakeHttpApi(state: FakeState): Omit<HttpApi, FakedParts> {
     }
     if (patch.pinned !== undefined) m.pinned = patch.pinned;
     if (patch.archived !== undefined) m.archived = patch.archived;
+    if (patch.confirmed) {
+      m.lowTrust = false;
+      m.verified = true;
+    }
     m.updatedAt = new Date().toISOString();
     return Promise.resolve(structuredClone(m));
   }

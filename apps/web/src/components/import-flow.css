@@ -328,7 +328,7 @@ label.imp-row__text {
 .imp-block {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 .imp-block__title {
   margin: 0;

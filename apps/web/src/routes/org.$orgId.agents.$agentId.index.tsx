@@ -3,12 +3,15 @@ import { Main } from "@/components/Main";
 import { agentSearch } from "@/lib/agent-edit";
 import { AgentPage } from "@/pages/AgentPage";
 
-/** The agent's page; `?tab=` and `?sec=` (a section of Configurações) make links to a part of it. */
+/**
+ * The agent's page; `?tab=` and `?sec=` (a section of Configurações) make links to a part of it, and `&brain=` to a
+ * screen of "Quem pensa".
+ */
 export const Route = createFileRoute("/org/$orgId/agents/$agentId/")({
   validateSearch: agentSearch,
   component: function Agent() {
     const { agentId } = Route.useParams();
-    const { tab, sec } = Route.useSearch();
+    const { tab, sec, brain } = Route.useSearch();
     const navigate = useNavigate({ from: Route.fullPath });
     return (
       <Main>
@@ -16,6 +19,7 @@ export const Route = createFileRoute("/org/$orgId/agents/$agentId/")({
           agentId={agentId}
           tab={tab ?? "overview"}
           section={sec}
+          brainAt={brain}
           onNavigate={(next, section) =>
             void navigate({
               search: { tab: next === "overview" ? undefined : next, sec: section },

@@ -1,5 +1,5 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, eq, inArray, isNull, like, or, schema, sql } from "@agenteschat/db";
 import { isCustomModel, isKnownModel, isOpenRouterModel } from "@agenteschat/providers";
 import { driveFolder, isIdHandle, isSecretFile } from "@agenteschat/ui/names";
 import { createAgent, freeHandle, HANDLE_PATTERN, updateAgent } from "./agents";
@@ -398,7 +398,13 @@ export function planImport(input: ImportInput, state: ImportState): { items: Pla
     // An OpenRouter model would need the workspace's OpenRouter key: an import keeps catalog models only.
     const model =
       a.model && !isOpenRouterModel(a.model) && !isCustomModel(a.model) && isKnownModel(a.model) ? a.model : null;
-    const step = compare("agent", a.key, hash);
+    // A source that couldn't read this agent (another bot's reply lists it by name only) has nothing to say about
+    // it: what an earlier import brought stays.
+    const prev = made("agent", a.key);
+    const step =
+      prev?.live && !r.instructions
+        ? { action: "unchanged" as const, targetId: prev.targetId }
+        : compare("agent", a.key, hash);
     const handle = step.action === "create" ? newHandles.get(a.key) : (made("agent", a.key)?.handle ?? r.wanted);
     if (!handle) {
       skip(item, "invalid");
@@ -525,7 +531,10 @@ export async function loadImportState(
   source: { app: string; ref: string },
   now = new Date(),
 ): Promise<ImportState> {
-  const rows = await db
+  // Another app's reply is one package per app ("grok-bot"). Replies imported before that were kept under the
+  // model's own name for the export ("grok-bot:my-bots"): they are the same package, so asking again finds them.
+  const reply = source.app === "agenteschat" && /^[a-z0-9-]+$/.test(source.ref);
+  const found = await db
     .select()
     .from(importItems)
     .where(
@@ -533,9 +542,17 @@ export async function loadImportState(
         eq(importItems.orgId, orgId),
         eq(importItems.createdByUserId, actorId),
         eq(importItems.sourceApp, source.app),
-        eq(importItems.sourceRef, source.ref),
+        reply
+          ? or(eq(importItems.sourceRef, source.ref), like(importItems.sourceRef, `${source.ref}:%`))
+          : eq(importItems.sourceRef, source.ref),
       ),
     );
+  // Of two rows with one key, the last one is the one the plan sees: this package's own, else the newest.
+  const rows = found.sort(
+    (a, b) =>
+      Number(a.sourceRef === source.ref) - Number(b.sourceRef === source.ref) ||
+      a.updatedAt.getTime() - b.updatedAt.getTime(),
+  );
   const targets = (kind: ImportItemKind) => rows.filter((r) => r.kind === kind).map((r) => r.targetId);
   const [agentRows, skillRows, channelRows, routineRows, noteRows, people] = await Promise.all([
     db

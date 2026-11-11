@@ -712,26 +712,101 @@
         "name": "Nome dello spazio di lavoro",
         "business": "Cosa fate",
         "team": "Il tuo team",
-        "plan": "Attiva il team"
+        "plan": "Attiva il team",
+        "ai": "Collega un'IA",
+        "people": "Invita persone",
+        "namePersonal": "A cosa ti serve",
+        "teamPersonal": "I tuoi agenti",
+        "planPersonal": "Attiva gli agenti",
+        "aiPersonal": "Collega un'IA"
       },
       "stepOf": "Passo {{n}} di {{total}}",
       "lodi": {
         "name": "Ciao {{first}}. Sono {{name}}. Metto su il team con te in circa due minuti.",
         "business": "Con questo so già chi chiamare nel team.",
         "team": "Questo è il team che metterei su. Puoi cambiare tutto dopo.",
-        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove."
+        "teamMade": "Il team è già pronto. Andiamo avanti quando vuoi.",
+        "teamMadePersonal": "I tuoi agenti sono già qui. Andiamo avanti quando vuoi.",
+        "plan": "Dopo il piano, manca solo collegare un'IA. Ti mostro dove.",
+        "planThen": "Con il piano attivo, la prossima schermata è quella per collegare la tua IA.",
+        "ask": "Hai già un team da un'altra parte? Lo porto qui tutto intero.",
+        "start": "Ho un team pronto per quello che fate. Oppure iniziamo noi due.",
+        "askPersonal": "Usi già agenti da un'altra parte? Li porto tutti qui.",
+        "bring": "Copia la richiesta, incollala in {{app}} e riporta la risposta. Al resto penso io.",
+        "bringFiles": "Trascina qui quello che l'app ha esportato. Al resto penso io.",
+        "found": "Ho trovato il tuo team. Controlla che ci siano tutti.",
+        "foundPersonal": "Ho trovato i tuoi agenti. Controlla che ci siano tutti.",
+        "ai": "Ultimo passo. Scegli l'IA che usi già e il team si sveglia.",
+        "aiPersonal": "Ultimo passo. Scegli l'IA che usi già e io mi sveglio.",
+        "aiThen": "Scegli l'IA che usi già e il team si sveglia. Poi resta solo da invitare le persone.",
+        "aiThenAlone": "Scegli l'IA che usi già e io mi sveglio. Poi resta solo da invitare le persone.",
+        "connected": "Ecco fatto. Chiamami nello spazio di lavoro e ti mostro il resto.",
+        "connectedThen": "Ecco fatto. Resta solo da invitare chi lavora con te.",
+        "people": "Ora le persone. Dammi le loro email e mando gli inviti.",
+        "peopleLink": "Ora le persone. Mandagli il link e ti mostro ogni richiesta."
       },
       "preview": {
         "label": "Il tuo spazio di lavoro, mentre rispondi",
         "name": "Il tuo spazio di lavoro",
-        "ghost": "Il tuo team appare qui"
+        "ghost": "Il tuo team appare qui",
+        "ghostPersonal": "I tuoi agenti appaiono qui"
       },
       "team": {
-        "title": "Il tuo team"
+        "title": "Il tuo team",
+        "madeLead": "Sono già nello spazio di lavoro. Puoi sistemare ciascuno dopo.",
+        "start": {
+          "title": "Come vuoi iniziare il team?",
+          "lead": "Puoi cambiare tutto dopo, non si perde nulla.",
+          "template": "Inizia con un team pronto",
+          "templateText_one": "{{count}} agente dal modello {{template}}, nel suo canale, con la sua routine pronta.",
+          "templateText_many": "{{count}} agenti dal modello {{template}}, ognuno nel suo canale, con le routine pronte.",
+          "templateText_other": "{{count}} agenti dal modello {{template}}, ognuno nel suo canale, con le routine pronte.",
+          "scratch": "Inizia da zero",
+          "scratchText": "Solo {{name}}, il tuo braccio destro. Ogni agente lo crei dopo, a modo tuo.",
+          "scratchWho": "{{name}} e chi creerai",
+          "see": "Vedi il team pronto",
+          "scratchGo": "Continua solo con {{name}}"
+        },
+        "ask": {
+          "title": "Hai già agenti in un'altra app?",
+          "lead": "Se sì, porto tutto il team: istruzioni, skill e routine.",
+          "leadPersonal": "Se sì, li porto tutti: istruzioni, skill e routine.",
+          "none": "Non ne uso ancora",
+          "noneText": "Metto su un team per {{org}} partendo da quello che fate.",
+          "noneTextPersonal": "Iniziamo noi due. Gli agenti arrivano dopo, quando vuoi.",
+          "from": "Porta da {{app}}",
+          "fresh": "Crea un nuovo team",
+          "freshPersonal": "Continua senza agenti",
+          "skip": "Salta questo passaggio",
+          "skipText": "Puoi creare gli agenti dopo, uno per uno."
+        },
+        "bring": {
+          "title": "Porta il tuo team da {{app}}",
+          "titlePersonal": "Porta i tuoi agenti da {{app}}",
+          "titleOther": "Porta il tuo team da un'altra app",
+          "titleOtherPersonal": "Porta i tuoi agenti da un'altra app",
+          "lead": "Ci vuole un minuto. Lì non cambia niente.",
+          "ask": "Chiedi a {{app}} di esportare",
+          "paste": "Incollala nella chat con {{app}}.",
+          "reply": "Risponde con un JSON: copia tutta la risposta e incollala nel campo qui sotto.",
+          "field": "Incolla qui la risposta di {{app}}",
+          "placeholder": "Il JSON della risposta",
+          "read": "Leggi la risposta",
+          "fresh": "Preferisco creare un nuovo team"
+        },
+        "found": {
+          "title_one": "Ho trovato {{count}} agente in {{app}}",
+          "title_many": "Ho trovato {{count}} agenti in {{app}}",
+          "title_other": "Ho trovato {{count}} agenti in {{app}}",
+          "lead": "Arrivano con le istruzioni, le skill e le routine che hanno già. Puoi cambiare tutto dopo.",
+          "bring": "Porta il team",
+          "bringPersonal": "Porta gli agenti"
+        }
       },
       "plan": {
         "title": "Attiva il tuo team",
         "lead": "Il tuo team è pronto. Con il piano e un'IA, inizia oggi.",
+        "leadAlone": "Con il piano e un'IA, il tuo braccio destro inizia oggi. Gli altri agenti puoi crearli dopo.",
         "asleep": "Dorme fino al piano",
         "price": "<b>Piano {{name}}</b> · {{price}} al mese",
         "name": "<b>Piano {{name}}</b>",
@@ -739,7 +814,40 @@
         "cancel": "Disdici quando vuoi",
         "cta": "Attiva il team",
         "all": "Vedi tutti i piani",
-        "skip": "Entra nello spazio di lavoro senza attivarlo"
+        "skip": "Attivalo dopo e intanto guarda lo spazio di lavoro",
+        "next": "Poi: collega la tua IA.",
+        "titlePersonal": "Attiva i tuoi agenti",
+        "leadPersonal": "Con il piano e un'IA, iniziano oggi.",
+        "asleepPersonal": "Dormono fino al piano",
+        "ctaPersonal": "Attiva gli agenti"
+      },
+      "ai": {
+        "titlePersonal": "Collega un'IA per far ragionare i tuoi agenti",
+        "titleAlone": "Collega un'IA per far ragionare {{name}}",
+        "later": "Collega dopo",
+        "doneTitle": "Fatto. Il team di {{org}} ragiona già.",
+        "doneTitlePersonal": "Fatto. {{name}} ragiona già.",
+        "doneLead": "Il tuo {{label}} risponde per tutti gli agenti. Puoi cambiarlo dopo, uno per uno.",
+        "doneLeadAny": "L'IA che hai collegato risponde per tutti gli agenti. Puoi cambiarla dopo, uno per uno.",
+        "connected": "Collegato",
+        "enter": "Entra nello spazio di lavoro",
+        "awake": "Il tuo team si è svegliato",
+        "answer_one": "{{names}} risponde già.",
+        "answer_many": "{{names}} rispondono già.",
+        "answer_other": "{{names}} rispondono già.",
+        "readyPersonal": "I tuoi agenti sono pronti",
+        "readyAlone": "{{name}} è pronto",
+        "readyAlone_female": "{{name}} è pronta",
+        "wakePersonal": "Manca solo un'IA per svegliarsi.",
+        "awakePersonal": "I tuoi agenti si sono svegliati",
+        "awakeAlone": "{{name}} si è svegliato",
+        "awakeAlone_female": "{{name}} si è svegliata"
+      },
+      "people": {
+        "title": "Chi lavora con te?",
+        "lead": "Invita le persone del tuo team. Ognuna riceve un'email per entrare.",
+        "send": "Invia gli inviti",
+        "later": "Invita più tardi"
       },
       "account": "Il tuo account"
     },
@@ -747,6 +855,8 @@
       "context": "Scritto",
       "skipped": "Saltato",
       "later": "Più tardi",
+      "on": "Attivo",
+      "ai": "Collegata",
       "invites_one": "{{count}} invito",
       "invites_many": "{{count}} inviti",
       "invites_other": "{{count}} inviti"
@@ -981,7 +1091,7 @@
       "go_other": "Importa {{count}} elementi",
       "nothingNew": "Tutto questo c'è già.",
       "nothingToBring": "Niente qui può essere portato. Ogni elemento dice perché.",
-      "withTeam": "Arriva quando crei il team.",
+      "withTeam": "Arriva quando porti il team.",
       "applying": "Importazione… {{done}} di {{total}}",
       "files": {
         "copy": "Copia i file nel Drive",
@@ -2408,6 +2518,12 @@
       "action": "Crea routine",
       "done": "Routine creata"
     },
+    "howto": {
+      "title": "{{name}} ha imparato: {{what}}",
+      "line": "Usato {{uses}}×. Farne una skill?",
+      "action": "Fanne una skill",
+      "done": "Confermato"
+    },
     "stalled": {
       "title": "Passi fermi in #{{number}} {{title}}",
       "line_one": "Il passo {{steps}} è fermo da {{hours}} h in attesa di #{{on}}.",
@@ -2455,6 +2571,7 @@
   },
   "routing": {
     "title": "Chi sceglie gli agenti",
+    "reflectionOff": "La memoria non impara ancora dalle conversazioni concluse: serve una chiave di un fornitore, qui sopra.",
     "how": "Come vengono scelti gli agenti",
     "by": {
       "jev": "Jev sceglie chi risponde a ogni messaggio senza menzione.",
@@ -2548,6 +2665,66 @@
       "other": "Oppure collegane un altro",
       "manageKeys": "Gestisci o elimina le chiavi"
     },
+    "chat": {
+      "mine": "I tuoi",
+      "yours": "Il tuo",
+      "keys": "Chiave dello spazio di lavoro",
+      "best": "Con più margine ora",
+      "atLimit": "Al limite",
+      "seeAll": "Vedi tutti i {{count}} account",
+      "allTitle": "Tutti gli account",
+      "search": "Cerca un account o una persona",
+      "none": "Nessun account con questo nome.",
+      "other": "Collega un'altra IA",
+      "told": "{{name}} riceve un'e-mail al riguardo."
+    },
+    "team": {
+      "title": "Collega un'IA per il team",
+      "titlePersonal": "Collega un'IA per i tuoi agenti",
+      "asleep_one": "{{count}} agente senza IA",
+      "asleep_many": "{{count}} agenti senza IA",
+      "asleep_other": "{{count}} agenti senza IA",
+      "asleepSome": "{{n}} agenti su {{total}} senza IA",
+      "choose": "Scegli",
+      "perAgent": "Un accesso per agente",
+      "pickTitle": "Per quali agenti",
+      "marked": "{{n}} su {{total}} selezionati.",
+      "useThese_one": "Usa questo agente",
+      "useThese_many": "Usa questi {{count}}",
+      "useThese_other": "Usa questi {{count}}",
+      "progress": "{{n}} di {{total}}",
+      "turn": "Accedi a {{plan}} per {{name}}",
+      "turnHelp": "È lo stesso account. {{plan}} chiede solo di accedere di nuovo per ogni agente.",
+      "signIn": "Accedi a {{plan}}",
+      "failed": "L'accesso per {{name}} non si è concluso",
+      "skip": "Salta {{name}}",
+      "state": {
+        "failed": "Accesso non concluso"
+      },
+      "woke_one": "{{count}} agente si è svegliato",
+      "woke_many": "{{count}} agenti si sono svegliati",
+      "woke_other": "{{count}} agenti si sono svegliati",
+      "wokeAll": "Il team si è svegliato",
+      "wokeAllPersonal": "I tuoi agenti si sono svegliati",
+      "wokeNone": "Nessuno si è svegliato",
+      "thinksAll": "Pensano già con il tuo piano {{plan}}",
+      "thinksOne": "{{name}} pensa già con il tuo piano {{plan}}",
+      "stayed": "{{name}} è ancora senza IA: l'accesso non si è concluso.",
+      "stayedMany": "{{names}} sono ancora senza IA: gli accessi non si sono conclusi.",
+      "why": "{{name}}: {{why}}",
+      "stayedHand": "{{name}} non ha ancora un'IA per te.",
+      "again": "Collega {{name}}",
+      "againMany": "Collega tutti e {{n}}",
+      "audience": {
+        "offAll": "Con il tuo abbonamento, rispondono solo a te.",
+        "onAll": "Rispondono a chiunque possa parlare con loro.",
+        "off": "Con il tuo abbonamento, {{name}} risponde solo a te.",
+        "on": "{{name}} risponde a chiunque possa parlargli.",
+        "on_female": "{{name}} risponde a chiunque possa parlarle.",
+        "share": "Apri al team",
+        "unshare": "Solo per me"
+      }
+    },
     "billing": "Un piano accede sul computer del workspace, e il computer arriva con un piano agentes.chat attivo.",
     "billingWeb": "Scegline uno sul web, su agentes.chat.",
     "orPayGo": "Oppure paga a consumo",
@@ -2623,7 +2800,8 @@
       "email": "Ti scriveremo quando il computer sarà pronto. Puoi chiudere questa pagina.",
       "ready": "Il computer è pronto.",
       "useKey": "Usa una chiave API ora",
-      "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato."
+      "connecting": "Il computer di questo server si collega entro un minuto. Accedi qui appena è collegato.",
+      "computerLater": "Gli account hanno bisogno di un computer, e questo spazio di lavoro non ne ha ancora. Puoi aggiungerne uno appena si apre lo spazio di lavoro."
     },
     "theComputer": "computer",
     "own": {
@@ -2890,8 +3068,6 @@
     "was": "Prima: {{text}}",
     "open": "Cosa sa {{name}}",
     "open_female": "Cosa sa {{name}}",
-    "undo": "Annulla",
-    "undone": "Annullato",
     "group": "Memoria aggiornata da {{name}}"
   },
   "reach": {
@@ -3044,23 +3220,11 @@
     "someone": "qualcuno",
     "you": "tu",
     "undo": "Annulla",
-    "redo": "Ripeti",
-    "undoAll": "Annulla tutto",
     "changes_one": "{{count}} modifica",
     "changes_many": "{{count}} modifiche",
     "changes_other": "{{count}} modifiche",
     "undoneBy": "Annullato da {{name}}",
-    "ago": "{{time}} fa",
-    "timeLeft": "{{time}} rimasti per annullare",
     "group": "Modifiche di {{name}}",
-    "undone": "Annullato.",
-    "redone": "Ripristinato.",
-    "undoneAll_one": "{{count}} modifica annullata.",
-    "undoneAll_many": "{{count}} modifiche annullate.",
-    "undoneAll_other": "{{count}} modifiche annullate.",
-    "partial_one": "{{count}} modifica non è stata annullata.",
-    "partial_many": "{{count}} modifiche non sono state annullate.",
-    "partial_other": "{{count}} modifiche non sono state annullate.",
     "errors": {
       "changed_since": "Qualcuno l'ha cambiato nel frattempo. Annullando ora perderesti quella modifica.",
       "expired": "Il tempo per annullare è scaduto.",
@@ -3710,6 +3874,7 @@
       "ready": "Collegato",
       "syncing": "Sincronizzazione",
       "reads": "Legge {{label}}",
+      "readOnly": "sola lettura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementi",
       "synced": "sincronizzato {{when}}",
@@ -3758,7 +3923,7 @@
       "onepassword": {
         "step": {
           "1": "Crea in 1Password una cassaforte solo per i tuoi agenti e spostaci i login che possono usare",
-          "2": "Crea un account di servizio con accesso solo a quella cassaforte",
+          "2": "Crea un account di servizio con accesso solo a quella cassaforte (lettura e scrittura, se i tuoi agenti devono salvarci nuovi login)",
           "3": "Incolla qui il token dell'account di servizio"
         },
         "field": {
@@ -4655,8 +4820,6 @@
       "failed": "Impossibile salvare. Riprova.",
       "use": "Usa",
       "brain": {
-        "sub": "Vale solo per {{name}}, in ogni conversazione.",
-        "sub_female": "Vale solo per {{name}}, in ogni conversazione.",
         "model": "Chiave API",
         "modelText": "Si paga a consumo. Rientra nel budget di {{name}}.",
         "modelText_female": "Si paga a consumo. Rientra nel budget di {{name}}.",
@@ -4677,8 +4840,6 @@
         "accountOthers": "I piani di altre persone mostrano di chi sono. Il proprietario riceve un’email e può riprenderlo.",
         "addAccount": "Aggiungi account",
         "signInAgain": "Accedi di nuovo",
-        "connectPlan": "Collega un altro piano",
-        "keyLabel": "Chiave API",
         "fallbackTitle": "Se {{computer}} smette di rispondere, rispondi tramite l'API",
         "fallbackHint": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
         "fallbackHint_female": "Risponde tramite l'API e rientra nel budget di {{name}}. Altrimenti {{name}} avvisa chi ha chiesto e aspetta che il computer torni disponibile.",
@@ -4724,11 +4885,8 @@
         },
         "advanced": {
           "title": "Impostazioni avanzate",
-          "sub": "{{brain}}. Vale per ogni conversazione.",
-          "think": "Come ragiona",
           "answers": "A chi risponde",
           "defaults": "Ripristina i predefiniti",
-          "done": "Fatto",
           "contents": {
             "model": "Finestra di contesto",
             "auto": "Finestra di contesto e a chi risponde",
@@ -4848,9 +5006,43 @@
           },
           "startFailed": "Nessuna risposta da {{computer}}. Riprova tra un attimo.",
           "sendFailed": "Impossibile inviare il codice. Controllalo e riprova.",
-          "done": "L'account {{account}} è su {{computer}}. Fai clic su Usa per salvare."
+          "done": "L'account {{account}} è di nuovo collegato su {{computer}}. Ora è in uso."
         },
-        "offCloud": "{{computer}} non risponde"
+        "offCloud": "{{computer}} non risponde",
+        "v2": {
+          "title": "Chi pensa per {{name}}",
+          "only": "Vale solo per {{name}}.",
+          "more": "Altre opzioni",
+          "switch": "Cambia account",
+          "switchTitle": "Cambia l'account di {{name}}",
+          "inUse": "In uso",
+          "switchTo": "Passa a {{label}}",
+          "teamTitle": "Cambia l'account del team",
+          "teamAria": "Per chi è",
+          "justOne": "Solo {{name}}",
+          "everyone": "Tutti su questo account",
+          "target": "Passa a",
+          "switchMany_one": "Cambia {{count}} agente",
+          "switchMany_many": "Cambia i {{count}} agenti",
+          "switchMany_other": "Cambia i {{count}} agenti",
+          "limitTitle": "L'account di {{name}} è al limite",
+          "limitBack": "{{account}} torna {{when}}",
+          "limitSoon": "{{account}} torna quando il piano si rinnova",
+          "limitHelp": "Nel frattempo {{name}} può pensare con un altro account già collegato.",
+          "wait": "Aspetta",
+          "modelTitle": "Modello di {{name}}",
+          "moreTitle": "Altre opzioni per {{name}}",
+          "fallback": "Usa la chiave API se il piano si ferma",
+          "computer": "Computer",
+          "doneTitle": "Tutto pronto",
+          "doneSub": "Quello che era in corso continua con il nuovo account.",
+          "finish": "Fatto",
+          "undo": "Annulla",
+          "undone": "Tutto com'era prima.",
+          "missed_one": "{{names}} tiene l'account di prima.",
+          "missed_many": "{{names}} tengono gli account di prima.",
+          "missed_other": "{{names}} tengono gli account di prima."
+        }
       },
       "computer": {
         "title": "Dove lavora {{name}}?",
@@ -5346,6 +5538,15 @@
       "andMore": "{{names}} e altro"
     }
   },
+  "teamMemory": {
+    "title": "Memoria del team",
+    "help": "Ciò che le persone hanno chiesto a tutti gli agenti di tenere, con chi l’ha detto e quando. Ogni agente lo legge in tutto il suo lavoro.",
+    "empty": "Ancora niente. Quando qualcuno chiede a tutti gli agenti di ricordare qualcosa, compare qui.",
+    "remove": "Rimuovi",
+    "removed": "Rimossa dalla memoria del team",
+    "make": "Rendi del team",
+    "made": "Ora tutti gli agenti la tengono"
+  },
   "memory": {
     "fromRefusal": "Da non riproporre: {{text}}",
     "fromCorrection": "Una persona ha corretto: {{text}}",
@@ -5387,6 +5588,9 @@
     "unverifiedTitle": "Lo hanno detto solo gli agenti. Entra nel contesto come indizio segnalato.",
     "pinned": "Sempre nel contesto",
     "lowTrust": "Fonte esterna, non attendibile",
+    "confirm": "Conferma",
+    "confirmTitle": "Di’ che è giusto: gli agenti la usano come affidabile.",
+    "confirmed": "Confermata",
     "used_one": "usato {{count}} volta",
     "used_many": "usato {{count}} volte",
     "used_other": "usato {{count}} volte",
@@ -5634,6 +5838,14 @@
       "complete": "Tutto pronto.",
       "notNow": "Non ora",
       "afterPlan": "Si apre con il piano.",
+      "afterPlanNext": "È il passo che viene dopo il piano.",
+      "plan": {
+        "todo": "Attiva il team.",
+        "todoDesc": "Con un piano agentes.chat, gli agenti iniziano a lavorare.",
+        "action": "Vedi i piani",
+        "todoPersonal": "Attiva i tuoi agenti.",
+        "todoDescPersonal": "Con un piano agentes.chat, i tuoi agenti iniziano a lavorare."
+      },
       "about": {
         "action": "Racconta",
         "title": "Cosa fa {{org}}?",
@@ -8233,6 +8445,7 @@
       "machine_offline_resumes_other": "{{computer}} è andato offline: {{count}} attività continuano lì se è caduta solo la connessione, e riprendono da dove si erano fermate se il computer si è riavviato.",
       "machine_task_resumed": "{{computer}} è tornato: “{{title}}” è ripresa da dove si era fermata",
       "machine_task_resume_waits": "{{computer}} è tornato: “{{title}}” riprende da dove si era fermata appena il progetto è pronto",
+      "machine_task_restarted": "{{computer}} è tornato: “{{title}}” è ripartito da capo",
       "machine_task_done": "“{{title}}” completata in {{span}} su {{computer}}",
       "machine_task_failed": "“{{title}}” non è riuscita dopo {{span}} su {{computer}}",
       "machine_task_canceled": "“{{title}}” è stata fermata su {{computer}}",
@@ -11482,6 +11695,7 @@
       "support": "Assistenza",
       "marketing": "Marketing",
       "automation": "Automazione",
+      "social": "Social network",
       "email": "Email"
     },
     "emptyCategory": "Ancora nessun connettore in questa categoria",
@@ -11516,7 +11730,7 @@
       "close": "Chiudi dettagli",
       "can": "Cosa potranno fare gli agenti",
       "afterText": "Nessun agente lo usa finché non scegli tu.",
-      "allText": "Una volta collegato, ogni agente può usarlo. Dopo scegli l'accesso di ogni agente.",
+      "allText": "Una volta collegato, ogni agente può usarlo. Puoi regolarlo in seguito.",
       "addAccount": "Aggiungi un altro account",
       "accountsText": "Ogni account ha i suoi agenti e livelli.",
       "reconnect": "Ricollega",
@@ -11833,6 +12047,41 @@
         "1": "Vedere addebiti e clienti",
         "2": "Creare addebiti Pix"
       },
+      "instagram": {
+        "1": "Vedere post, storie e statistiche",
+        "2": "Pubblicare post e leggere i messaggi diretti",
+        "ask": "Rispondere ai messaggi chiede sempre la tua approvazione"
+      },
+      "facebook": {
+        "1": "Vedere post, commenti e statistiche",
+        "2": "Pubblicare post, foto e video e rispondere ai commenti",
+        "ask": "Eliminare post e commenti chiede sempre la tua approvazione"
+      },
+      "linkedin": {
+        "1": "Pubblicare post, link e video",
+        "2": "Commentare i post",
+        "ask": "Eliminare post chiede sempre la tua approvazione"
+      },
+      "youtube": {
+        "1": "Vedere video, commenti e statistiche",
+        "2": "Modificare video e playlist e commentare",
+        "ask": "Rispondere, moderare ed eliminare commenti chiede sempre la tua approvazione"
+      },
+      "pinterest": {
+        "1": "Vedere pin, bacheche e statistiche",
+        "2": "Creare pin e organizzare le bacheche",
+        "ask": "Modificare le bacheche ed eliminare chiede sempre la tua approvazione"
+      },
+      "reddit": {
+        "1": "Cercare post e leggere commenti",
+        "2": "Pubblicare, commentare e modificare",
+        "ask": "Eliminare chiede sempre la tua approvazione"
+      },
+      "whatsapp": {
+        "1": "Vedere numeri, modelli e consegne",
+        "2": "Creare modelli di messaggio",
+        "ask": "L'invio di messaggi chiede sempre la tua approvazione"
+      },
       "database": {
         "1": "Vedere le tabelle",
         "2": "Interrogare i dati per rispondere",
@@ -11981,7 +12230,14 @@
       "revenuecat": "Abbonamenti in-app, prodotti, offerte e ricavi.",
       "superwall": "Paywall, campagne ed esperimenti.",
       "paddle": "Clienti, abbonamenti, transazioni e prodotti.",
-      "abacatepay": "Addebiti Pix, clienti e prelievi."
+      "abacatepay": "Addebiti Pix, clienti e prelievi.",
+      "instagram": "Account business e creator di Instagram: post, storie, statistiche e messaggi diretti.",
+      "facebook": "Pagine Facebook: post, foto, video, commenti e statistiche.",
+      "linkedin": "Post, video e commenti su LinkedIn a nome del membro che accede.",
+      "youtube": "Video, commenti, playlist e statistiche del canale YouTube.",
+      "pinterest": "Pin, bacheche e statistiche di Pinterest.",
+      "reddit": "Post, commenti e community di Reddit.",
+      "whatsapp": "Messaggi e modelli di WhatsApp Business."
     }
   },
   "toolNames": {
@@ -12317,11 +12573,10 @@
     "notApproved": "{{name}} consente l'accesso solo alle app che ha approvato, e agentes.chat non è ancora approvato. Se ti fornisce una chiave API, puoi collegarti con quella.",
     "serverSaid": "Il server ha risposto: {{detail}}",
     "nothingYet": "Niente è disponibile per gli agenti fino al passaggio 3.",
-    "allCanUse": "Una volta collegato, ogni agente può usarlo. Puoi cambiarlo nel passaggio 3.",
-    "newAccount": "Il nuovo account parte senza agenti, tranne quelli con accesso a tutto. Scegli nel passaggio 3.",
+    "allCanUse": "Una volta collegato, ogni agente può usarlo. Puoi regolarlo in seguito.",
     "replace": "Sostituisce l'accesso attuale. Chi lo usa resta invariato.",
     "replaceUnchecked": "Accedi allo stesso account di prima. Non possiamo verificare quale sia, e chi lo usa resta invariato.",
-    "newAccountUnchecked": "Accedi a un account non ancora collegato, non possiamo verificarlo. Parte senza agenti, tranne quelli con accesso a tutto.",
+    "newAccountUnchecked": "Accedi a un account non ancora collegato, non possiamo verificarlo.",
     "addTitle": "Un altro account {{name}}",
     "reconnectTitle": "Ricollega {{name}}",
     "accountName": "Nome di questo account",
@@ -12347,7 +12602,17 @@
     "grant": "Concedi",
     "saved_one": "{{name}}: {{count}} agente può usarlo.",
     "saved_many": "{{name}}: {{count}} agenti possono usarlo.",
-    "saved_other": "{{name}}: {{count}} agenti possono usarlo."
+    "saved_other": "{{name}}: {{count}} agenti possono usarlo.",
+    "done": {
+      "title": "{{name}} connesso",
+      "everyone": "Ogni agente può usarlo.",
+      "waiting": "Gli agenti ricevono gli strumenti solo quando continui, ai livelli che suggeriamo.",
+      "asks_one": "{{count}} azione chiede l'approvazione in chat.",
+      "asks_many": "{{count}} azioni chiedono l'approvazione in chat.",
+      "asks_other": "{{count}} azioni chiedono l'approvazione in chat.",
+      "adjust": "Regola",
+      "ok": "Fatto"
+    }
   },
   "database": {
     "name": "Database",
@@ -13331,7 +13596,8 @@
       "draining": "La rete sta cambiando. Le sessioni aperte del computer si riavvieranno alle {{when}}.",
       "restart": "Le sessioni del computer si stanno riavviando per applicare la rete. Il nuovo lavoro aspetta che finisca.",
       "line": "IP di uscita {{ip}}",
-      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer."
+      "hint": "L’indirizzo che i siti vedono quando gli agenti navigano. Si aggiorna quando cambia la rete del computer.",
+      "waiting": "Gli agenti si stanno ricollegando a internet. Le loro connessioni aspettano che torni."
     },
     "online": "Online",
     "offline": "Offline",
@@ -15738,6 +16004,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}” è stato interrotto.",
       "machine_task_resumed": "{{computer}} è tornato: “{{title}}” è ripreso da dove si era fermato.",
       "machine_task_resume_waits": "{{computer}} è tornato: “{{title}}” riprenderà da dove si era fermato quando il progetto sarà pronto.",
+      "machine_task_restarted": "{{computer}} è tornato: “{{title}}” è ripartito da capo.",
       "machine_offline": "{{computer}} è andato offline.",
       "brain_unavailable": "{{brain}} non può rispondere in questo momento. Risponderò quando tornerà disponibile.",
       "brain_unavailable_paused": "Il computer su cui gira {{brain}} è in pausa. Risponderò quando riprende.",

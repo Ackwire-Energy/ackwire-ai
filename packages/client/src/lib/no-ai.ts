@@ -774,3 +774,16 @@ export function onlyOwnerReplies(agents: readonly Agent[], hasAi: (agentId: stri
     thinking.every((a) => a.ownerUserId === viewerId && !answersOthers(audienceOf(a), a.ownerUserId))
   );
 }
+
+/**
+ * Whether every one of these agents thinks (ready, or waiting for its computer: anything but "no AI"), read alike by
+ * the onboarding's AI step and the arrival (ADR 0162, ADR 0160). Undefined while the status loads, and while it
+ * doesn't list one of them yet: a status read before an agent was made says nothing about that agent, so the caller
+ * waits for a fresh read instead of taking it as unanswered.
+ */
+export const teamThinks = (agentIds: readonly string[], status: AiStatus | undefined): boolean | undefined => {
+  if (status === undefined) return undefined;
+  const states = agentIds.map((id) => aiStateOf(status, id));
+  if (states.some((s) => s === undefined)) return undefined;
+  return states.length > 0 && states.every((s) => s !== "no_ai");
+};

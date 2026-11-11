@@ -1292,7 +1292,7 @@ export function createSandboxToolSource(
   ): ToolDefinition[] => [
     {
       name: "start_task",
-      description: `Start a detached command or a parallel CLI job on the computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts, a "claude" task resumes where it stopped once it's back (unless resuming is turned off on that computer); "codex" and "shell" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
+      description: `Start a detached command or a parallel CLI job on the computer "${info.name}" (a build, a dev server, a second Claude Code or Codex on its own task) and return at once with its id. To step out of this conversation while you keep working yourself, use work_in_background instead. With executor "claude" (the default when you give a prompt) Claude Code works on \`prompt\` in your folder, in this conversation's session (it remembers earlier turns), editing files on its own; "codex" runs Codex the same way; "shell" runs \`command\`. With \`branch\` it works in its own git worktree on that new branch; when your folder isn't a git repository, claude and codex work in their own subfolder work/<branch>/ instead (no branch; shell needs a repository). It keeps running if the connection drops. If the computer itself restarts or moves, once it's back a "claude" task resumes where it stopped and a "shell" command starts again in its folder (unless resuming is turned off on that computer); "codex" tasks stop, and you are woken to tell the people. You are woken in this conversation when it finishes, with its result: don't poll it with task_status, don't wait; tell the people it started and end your turn. Use run_code for short commands.`,
       scope: SANDBOX_SCOPE,
       sensitive: requireApproval,
       whyAsks: true,
@@ -1479,7 +1479,9 @@ export function createSandboxToolSource(
               ? [
                   `Its computer dropped off: it keeps running there if only the connection dropped. If the computer restarted, ${
                     (await taskResumesByItself(ctx.db, row))
-                      ? "Claude Code resumes it where it stopped once the computer is back."
+                      ? row.executor === "shell"
+                        ? "it starts again in its folder once the computer is back."
+                        : "Claude Code resumes it where it stopped once the computer is back."
                       : "it stopped and won't resume by itself; you are woken then."
                   }`,
                 ]

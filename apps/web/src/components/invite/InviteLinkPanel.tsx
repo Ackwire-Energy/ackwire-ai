@@ -14,9 +14,10 @@ import "./invite.css";
  * The workspace's invitation link (ADR 0068, 0090) on the invite dialog's link screen: whoever opens it only asks to
  * join, and someone who may invite approves each person. The address to copy, until when it works, "Renovar" (30 more
  * days, the same link) and "Desativar" (with how many waiting requests close with it); "Criar link" when there's
- * none. Links made before links could be shown again are listed to turn off.
+ * none. Links made before links could be shown again are listed to turn off. `copyOnly` (the onboarding's people
+ * step, ADR 0162): the link, until when it works and "Copiar link", nothing to renew or turn off.
  */
-export function InviteLinkPanel() {
+export function InviteLinkPanel({ copyOnly = false }: { copyOnly?: boolean } = {}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -62,19 +63,23 @@ export function InviteLinkPanel() {
           <p className="invite-link__foot">
             <Icon name="clock" size={14} />
             <span>{t("members.link.until", { date: until(current.expiresAt) })}</span>
-            <Button
-              variant="ghost"
-              size="sm"
-              loading={renew.isPending}
-              onClick={() =>
-                renew.mutate(current.id, {
-                  onSuccess: (res) => toast.show(t("members.link.renewed", { date: until(res.expiresAt) })),
-                })
-              }
-            >
-              {t("members.link.renew")}
-            </Button>
-            {turnOffButton(current)}
+            {!copyOnly && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  loading={renew.isPending}
+                  onClick={() =>
+                    renew.mutate(current.id, {
+                      onSuccess: (res) => toast.show(t("members.link.renewed", { date: until(res.expiresAt) })),
+                    })
+                  }
+                >
+                  {t("members.link.renew")}
+                </Button>
+                {turnOffButton(current)}
+              </>
+            )}
           </p>
         </>
       ) : (
@@ -85,21 +90,22 @@ export function InviteLinkPanel() {
           </Button>
         </div>
       )}
-      {all
-        .filter((l) => l.url === null)
-        .map((l) => {
-          const when = relativeTime(t, i18n.language, l.createdAt);
-          return (
-            <p key={l.id} className="invite-link__foot">
-              <span>
-                {l.createdBy
-                  ? t("members.link.earlier", { when, name: l.createdBy, date: until(l.expiresAt) })
-                  : t("members.link.earlierNoName", { when, date: until(l.expiresAt) })}
-              </span>
-              {turnOffButton(l)}
-            </p>
-          );
-        })}
+      {!copyOnly &&
+        all
+          .filter((l) => l.url === null)
+          .map((l) => {
+            const when = relativeTime(t, i18n.language, l.createdAt);
+            return (
+              <p key={l.id} className="invite-link__foot">
+                <span>
+                  {l.createdBy
+                    ? t("members.link.earlier", { when, name: l.createdBy, date: until(l.expiresAt) })
+                    : t("members.link.earlierNoName", { when, date: until(l.expiresAt) })}
+                </span>
+                {turnOffButton(l)}
+              </p>
+            );
+          })}
       <Dialog
         open={closing !== null}
         onOpenChange={(open) => !open && setClosing(null)}

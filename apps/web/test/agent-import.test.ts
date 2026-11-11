@@ -892,7 +892,8 @@ describe("agentes.chat bundle", () => {
     const b = parseImport([{ name: "agentes-chat-export.json", text: JSON.stringify(ourBundle) }], { models: MODELS });
     expect(b.source).toEqual({
       app: "agenteschat",
-      ref: "claude:dana-claude",
+      // Every reply from one app is one package: the model's own `ref` changes from one export to the next.
+      ref: "claude",
       name: "Dana's Claude",
       files: ["agentes-chat-export.json"],
     });
@@ -905,8 +906,8 @@ describe("agentes.chat bundle", () => {
       { key: "news", name: "newsletter", topic: "Drafts and feedback", agents: [{ key: "writer", autoReply: true }] },
     ]);
     expect(b.routines.map((r) => [r.key, r.channel, r.trigger])).toEqual([
-      ["draft", "news", { cron: "0 10 * * 5", timezone: "America/Sao_Paulo" }],
-      ["launch", null, { at: "2026-12-01T12:00:00.000Z" }],
+      ["writer/friday-draft", "news", { cron: "0 10 * * 5", timezone: "America/Sao_Paulo" }],
+      ["writer/launch-post", null, { at: "2026-12-01T12:00:00.000Z" }],
     ]);
     // A note keeps its title (our export writes one).
     expect(b.notes.map((n) => [n.agent, n.kind, n.title])).toEqual([
@@ -958,6 +959,61 @@ describe("agentes.chat bundle", () => {
     expect(long.endsWith("channel.")).toBe(true);
     // A label that fits stays as written.
     expect(b.leftOut.find((l) => l.kind === "other")?.label).toBe("Q4 planning");
+  });
+
+  test("asking the same app again brings the same package and the same agents, whatever keys the model picks", () => {
+    const read = (over: object) =>
+      parseImport([{ name: "pasted", text: JSON.stringify({ ...ourBundle, ...over }) }], { models: MODELS });
+    const first = read({});
+    const [writer] = ourBundle.agents;
+    const again = read({
+      source: { app: "Claude", ref: "export-2", name: "My agents", files: [] },
+      agents: [
+        { ...writer, key: "agent-1", handle: "agent-1" },
+        { ...writer, key: "agent-2", name: "Editor", handle: "" },
+      ],
+      channels: [{ key: "c1", name: "Newsletter", topic: "", agents: [{ key: "agent-1" }, { key: "Editor" }] }],
+      routines: [{ ...ourBundle.routines[0], key: "r-77", agent: "@agent-1", channel: null }],
+      notes: [{ key: "x", agent: "Writer", kind: "preference", content: "Dana likes short paragraphs." }],
+      todo: [{ kind: "app", label: "Gmail", agents: ["agent-2"] }],
+    });
+    expect(again.source.ref).toBe(first.source.ref);
+    expect(again.agents.map((a) => a.key)).toEqual(["writer", "editor"]);
+    expect(again.channels[0]?.agents.map((m) => m.key)).toEqual(["writer", "editor"]);
+    expect(again.routines.map((r) => [r.key, r.agent])).toEqual([["writer/friday-draft", "writer"]]);
+    expect(again.notes[0]?.key).toBe(first.notes[0]?.key);
+    expect(again.notes[0]?.agent).toBe("writer");
+    expect(again.todo[0]?.agents).toEqual(["editor"]);
+    // Two agents with one name stay two.
+    const twins = read({ agents: [writer, { ...writer, key: "writer-b" }] });
+    expect(twins.agents.map((a) => a.key)).toEqual(["writer", "writer-writer-b"]);
+  });
+
+  test("our own export keeps its workspace and its keys", () => {
+    const b = parseImport([
+      {
+        name: "agentes-chat-export.json",
+        text: JSON.stringify({
+          ...ourBundle,
+          source: { app: "agenteschat", ref: "org-1", name: "Acme", files: [] },
+          agents: [{ ...ourBundle.agents[0], key: "a-1" }],
+          channels: [],
+          routines: [{ ...ourBundle.routines[0], agent: "a-1", channel: null }],
+          notes: [{ key: "n1", agent: "a-1", kind: "fact", content: "Fridays." }],
+          todo: [],
+        }),
+      },
+    ]);
+    expect(b.source.ref).toBe("agenteschat:org-1");
+    expect(b.agents.map((a) => a.key)).toEqual(["a-1"]);
+    expect(b.routines.map((r) => [r.key, r.agent])).toEqual([["draft", "a-1"]]);
+    expect(b.notes.map((n) => [n.key, n.agent])).toEqual([["n1", "a-1"]]);
+  });
+
+  test("the export prompt asks for every agent, not only the one in the chat", () => {
+    expect(EXPORT_PROMPT).toContain("Export all of my agents in this one file, not only the one I'm talking to now");
+    expect(EXPORT_PROMPT).toContain('"agents" has one entry for every agent I have');
+    expect(EXPORT_PROMPT).toContain('"instructions": ""');
   });
 
   test("the export prompt asks for exactly our shape, and never for a secret", () => {

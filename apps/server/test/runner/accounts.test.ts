@@ -41,6 +41,7 @@ import {
   stripAnsi,
   tokenOf,
   watchCodexAuth,
+  withoutContainers,
 } from "../../runner/accounts";
 import { claudePlan } from "../../runner/executors";
 import { describeRequest, type HandlerContext, handleRequest } from "../../runner/handlers";
@@ -325,6 +326,19 @@ test.if(posix)(
     }
   },
 );
+
+test("a CLI in a sandbox of its own isn't named the agent's containers service, which runs outside it (ADR 0169)", () => {
+  const socket = "unix:///run/user/21003/podman/podman.sock";
+  const client = { CONTAINER_HOST: socket, DOCKER_HOST: socket, XDG_RUNTIME_DIR: "/run/user/21003" };
+  expect(withoutContainers({ PATH: "/bin", HOME: "/home/ag-a1b2c3d4", ...client })).toEqual({
+    PATH: "/bin",
+    HOME: "/home/ag-a1b2c3d4",
+  });
+  // Antigravity's runtime dir is its account's own, set after.
+  const agy = accountEnv("antigravity", "/acct", withoutContainers({ PATH: "/bin", ...client }));
+  expect(agy.XDG_RUNTIME_DIR).not.toBe("/run/user/21003");
+  expect(agy.CONTAINER_HOST ?? agy.DOCKER_HOST).toBeUndefined();
+});
 
 test.if(posix)(
   "Claude Code: a refused code fails the sign-in, removes its folder and never repeats the code",

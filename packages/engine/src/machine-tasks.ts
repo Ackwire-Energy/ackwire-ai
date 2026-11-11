@@ -843,7 +843,9 @@ export type LocalTaskStarter = (input: StartTaskInput) => Promise<MachineTaskRow
  * { interrupted }`, or missing from the journal on reconnect): final as
  * `interrupted`. Claude Code with a session resumes by itself (the machine's
  * `resume_tasks`, at most `MAX_TASK_RESUMES` in a row) and the thread hears
- * "resumed"; anything else wakes the agent to tell the people. A mission's
+ * "resumed"; an agent's shell command (a dev server, a build) starts again
+ * the same way in the folder it ran in, and the thread hears "started again"
+ * (ADR 0168); anything else wakes the agent to tell the people. A mission's
  * task resumes through the mission's queue (ADR 0044: one writer at a time,
  * only in a ready folder), ahead of what queued after it; `startQueued`
  * walks the machine's queue then (without it, the caller does: the computer
@@ -894,8 +896,9 @@ export async function settleInterruptedTask(
       .then((r) => r[0]?.handle)) as string | undefined;
     // Never seen running (its start was cut by a drop): the session may not have its task, so it comes along.
     const asked = claimed.startedAt ? null : claimed.prompt;
+    const shell = claimed.executor === "shell";
     try {
-      const input: StartTaskInput = {
+      const again = {
         orgId: claimed.orgId,
         agent: { id: claimed.agentId, handle: handle ?? "agent" },
         machineId: claimed.machineId,
@@ -906,38 +909,45 @@ export async function settleInterruptedTask(
         runId: null,
         requestedByUserId: claimed.requestedByUserId,
         title: claimed.title,
-        executor: "claude",
-        prompt: asked?.startsWith(RESUME_PROMPT)
-          ? asked
-          : asked
-            ? `${RESUME_PROMPT}\n\nWhat you were asked:\n${asked}`.slice(0, TASK_TEXT_LIMITS.prompt)
-            : RESUME_PROMPT,
-        sessionId: claimed.sessionId,
-        resume: true,
         resumedFromId: claimed.id,
         resumeCount: claimed.resumeCount + 1,
-        // The session lives in its folder (a worktree for a branch): resume it there.
-        cwd: claimed.cwd || null,
-        // In the mission's worktree (ADR 0044): the same kind, and a write item still ends in a commit.
-        mode: taskModeOf(claimed.mode),
-        ...(claimed.mode === "write" && mission?.branch
-          ? { commit: { message: `agentes: ${claimed.title}` }, worktreeBranch: mission.branch }
-          : {}),
-        // The main session's own task: only tagged; an item session gets the mission's tools again.
-        ...(mission && isAgentTask(claimed)
-          ? { missionId: mission.id }
-          : {
-              mission: mission
-                ? {
-                    id: mission.id,
-                    rules: MISSION_RULES,
-                    branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
-                    allow: await missionAllowRules(deps.db, mission.id),
-                    ...(claimed.mode === "read" ? { mode: "plan" as const } : {}),
-                  }
-                : null,
-            }),
       };
+      // The same command in the folder it ran in (a branch's worktree is there already). Nothing a person approved
+      // for the first start carries over: a command the computer holds is refused, and the agent hears it stopped.
+      const input: StartTaskInput = shell
+        ? { ...again, executor: "shell", command: claimed.command, cwd: claimed.cwd || null }
+        : {
+            ...again,
+            executor: "claude",
+            prompt: asked?.startsWith(RESUME_PROMPT)
+              ? asked
+              : asked
+                ? `${RESUME_PROMPT}\n\nWhat you were asked:\n${asked}`.slice(0, TASK_TEXT_LIMITS.prompt)
+                : RESUME_PROMPT,
+            sessionId: claimed.sessionId,
+            resume: true,
+            // The session lives in its folder (a worktree for a branch): resume it there.
+            cwd: claimed.cwd || null,
+            // In the mission's worktree (ADR 0044): the same kind, and a write item still ends in a commit.
+            mode: taskModeOf(claimed.mode),
+            ...(claimed.mode === "write" && mission?.branch
+              ? { commit: { message: `agentes: ${claimed.title}` }, worktreeBranch: mission.branch }
+              : {}),
+            // The main session's own task: only tagged; an item session gets the mission's tools again.
+            ...(mission && isAgentTask(claimed)
+              ? { missionId: mission.id }
+              : {
+                  mission: mission
+                    ? {
+                        id: mission.id,
+                        rules: MISSION_RULES,
+                        branchPrefix: `agentes/${mission.id.replace(/-/g, "").slice(-8)}/`,
+                        allow: await missionAllowRules(deps.db, mission.id),
+                        ...(claimed.mode === "read" ? { mode: "plan" as const } : {}),
+                      }
+                    : null,
+                }),
+          };
       // A started mission's queue (planning before Start has no folder or queue: it resumes at once).
       const queue = mission?.status === "active";
       const next = queue ? await queueResumed(deps.db, input, claimed) : await deps.start(input);
@@ -951,16 +961,18 @@ export async function settleInterruptedTask(
         actor: { type: "system", id: null },
         action: "machine.task_started",
         target: { type: "machine", id: claimed.machineId },
-        details: { taskId: next.id, resumedFromId: claimed.id, executor: "claude", title: claimed.title },
+        details: { taskId: next.id, resumedFromId: claimed.id, executor: claimed.executor, title: claimed.title },
       }).catch(() => undefined);
       // Queued behind a folder that isn't ready (being prepared again, or failed and left for the person):
       // it resumes once the project is ready, not now.
       const waits = queue && mission?.worktreeState !== "ready";
       await postTaskNotice(deps, claimed, {
-        body: waits
-          ? `The computer ${machine.name} is back: "${claimed.title}" resumes where it stopped once the project is ready.`
-          : `The computer ${machine.name} is back: resumed "${claimed.title}" where it stopped.`,
-        code: waits ? "machine_task_resume_waits" : "machine_task_resumed",
+        body: shell
+          ? `The computer ${machine.name} is back: "${claimed.title}" started again.`
+          : waits
+            ? `The computer ${machine.name} is back: "${claimed.title}" resumes where it stopped once the project is ready.`
+            : `The computer ${machine.name} is back: resumed "${claimed.title}" where it stopped.`,
+        code: shell ? "machine_task_restarted" : waits ? "machine_task_resume_waits" : "machine_task_resumed",
         params: { title: claimed.title, computer: machine.name },
         meta: { machineTaskResumed: { fromId: claimed.id, taskId: next.id, ...(waits ? { waits: true } : {}) } },
       });
@@ -980,8 +992,9 @@ export async function settleInterruptedTask(
 }
 
 /**
- * Whether an interrupted task resumes by itself once its computer is back: Claude Code with a session, at
- * most `MAX_TASK_RESUMES` in a row, not canceled, when its computer and its mission (still open) allow it.
+ * Whether an interrupted task resumes by itself once its computer is back: Claude Code with a session, or an
+ * agent's own shell command (never a mission's: its queue has its own order), at most `MAX_TASK_RESUMES` in a row,
+ * not canceled, when its computer and its mission (still open) allow it.
  */
 function resumesByItself(
   row: MachineTaskRow,
@@ -990,19 +1003,17 @@ function resumesByItself(
 ) {
   const missionAllows =
     !row.missionId || (mission?.resumeTasks === true && (mission.status === "active" || mission.status === "proposed"));
+  const resumes =
+    (row.executor === "claude" && Boolean(row.sessionId)) ||
+    (row.executor === "shell" && !row.missionId && row.command.trim() !== "");
   return (
-    missionAllows &&
-    row.executor === "claude" &&
-    Boolean(row.sessionId) &&
-    machine?.resumeTasks !== false &&
-    row.resumeCount < MAX_TASK_RESUMES &&
-    !row.canceledBy
+    missionAllows && resumes && machine?.resumeTasks !== false && row.resumeCount < MAX_TASK_RESUMES && !row.canceledBy
   );
 }
 
 /** Whether this task resumes by itself if its computer restarts (`resumesByItself`), for what the agent is told. */
 export async function taskResumesByItself(db: Database, row: MachineTaskRow) {
-  if (row.executor !== "claude") return false;
+  if (row.executor === "codex") return false;
   const machine = await getMachineById(db, row.machineId);
   const [mission] = row.missionId
     ? await db

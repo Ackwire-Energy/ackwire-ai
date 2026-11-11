@@ -692,26 +692,97 @@
         "name": "工作区名称",
         "business": "你们做什么",
         "team": "你的团队",
-        "plan": "开启团队"
+        "plan": "开启团队",
+        "ai": "连接 AI",
+        "people": "邀请成员",
+        "namePersonal": "用途",
+        "teamPersonal": "你的智能体",
+        "planPersonal": "开启智能体",
+        "aiPersonal": "连接 AI"
       },
       "stepOf": "第 {{n}} 步，共 {{total}} 步",
       "lodi": {
         "name": "你好，{{first}}。我是{{name}}。大约两分钟，我们一起把团队组建好。",
         "business": "有了这些，我就知道该请谁加入团队了。",
         "team": "这是我会组建的团队。之后可以随时修改。",
-        "plan": "有了套餐之后，只差连接一个 AI。我会告诉你在哪里连接。"
+        "teamMade": "团队已经组好了。准备好了我们就继续。",
+        "teamMadePersonal": "你的智能体已经到了。准备好了我们就继续。",
+        "plan": "有了套餐之后，只差连接一个 AI。我会告诉你在哪里连接。",
+        "planThen": "套餐开通后，下一个界面就是连接你的 AI。",
+        "ask": "在别处已经有团队了？我把它完整地搬过来。",
+        "start": "我为你们的业务准备了一个现成的团队。也可以先从我们两个开始。",
+        "askPersonal": "已经在别处使用智能体了？我把它们全部搬过来。",
+        "bring": "复制请求，粘贴到 {{app}}，再把回复带回来。剩下的交给我。",
+        "bringFiles": "把应用导出的内容拖到这里。剩下的交给我。",
+        "found": "找到你的团队了。看看大家是不是都在。",
+        "foundPersonal": "找到你的智能体了。看看是不是都在。",
+        "ai": "最后一步。选择你已经在用的 AI，团队就会醒来。",
+        "aiPersonal": "最后一步。选择你已经在用的 AI，我就会醒来。",
+        "aiThen": "选择你已经在用的 AI，团队就会醒来。之后只剩邀请成员了。",
+        "aiThenAlone": "选择你已经在用的 AI，我就会醒来。之后只剩邀请成员了。",
+        "connected": "好了。在工作区里叫我，我带你看看其余的。",
+        "connectedThen": "好了。现在只剩邀请和你一起工作的人了。",
+        "people": "现在轮到成员了。把他们的邮箱告诉我，我来发送邀请。",
+        "peopleLink": "现在轮到成员了。把链接发给他们，我会把每个申请展示给你。"
       },
       "preview": {
         "label": "你的工作区，随你的回答而变化",
         "name": "你的工作区",
-        "ghost": "你的团队会出现在这里"
+        "ghost": "你的团队会出现在这里",
+        "ghostPersonal": "你的智能体会出现在这里"
       },
       "team": {
-        "title": "你的团队"
+        "title": "你的团队",
+        "madeLead": "它们已经在工作区里了。之后可以逐个调整。",
+        "start": {
+          "title": "你想怎样开始组建团队？",
+          "lead": "之后都可以修改，不会丢失任何内容。",
+          "template": "从现成的团队开始",
+          "templateText_other": "{{template}}模板中的 {{count}} 个智能体，各有自己的频道，例行任务也已备好。",
+          "scratch": "从零开始",
+          "scratchText": "只有你的得力助手 {{name}}。每个智能体之后按你的方式逐个创建。",
+          "scratchWho": "{{name}}，以及你将创建的智能体",
+          "see": "查看现成的团队",
+          "scratchGo": "只带着 {{name}} 继续"
+        },
+        "ask": {
+          "title": "你已经在其他应用中有智能体了吗？",
+          "lead": "如果有，我会把整个团队搬过来：指令、技能和例行工作。",
+          "leadPersonal": "如果有，我会把它们全部搬过来：指令、技能和例行工作。",
+          "none": "还没有使用任何智能体",
+          "noneText": "我会根据你们做的事，为 {{org}} 组建一个团队。",
+          "noneTextPersonal": "先从我们两个开始。智能体以后随时都能加。",
+          "from": "从 {{app}} 导入",
+          "fresh": "组建新团队",
+          "freshPersonal": "不带智能体继续",
+          "skip": "跳过这一步",
+          "skipText": "智能体可以以后逐个创建。"
+        },
+        "bring": {
+          "title": "从 {{app}} 导入你的团队",
+          "titlePersonal": "从 {{app}} 导入你的智能体",
+          "titleOther": "从其他应用导入你的团队",
+          "titleOtherPersonal": "从其他应用导入你的智能体",
+          "lead": "只需一分钟。那边什么都不会变。",
+          "ask": "让 {{app}} 导出",
+          "paste": "粘贴到你和 {{app}} 的对话中。",
+          "reply": "它会回复一段 JSON：复制完整的回复，粘贴到下面的输入框。",
+          "field": "在这里粘贴 {{app}} 的回复",
+          "placeholder": "回复中的 JSON",
+          "read": "读取回复",
+          "fresh": "我更想组建一个新团队"
+        },
+        "found": {
+          "title_other": "在 {{app}} 中找到 {{count}} 个智能体",
+          "lead": "它们会带着已有的指令、技能和例行工作过来。之后什么都能改。",
+          "bring": "导入团队",
+          "bringPersonal": "导入智能体"
+        }
       },
       "plan": {
         "title": "开启你的团队",
         "lead": "你的团队已就绪。有了套餐和 AI，今天就能开工。",
+        "leadAlone": "有了套餐和 AI，你的得力助手今天就能开工。其他智能体以后再创建。",
         "asleep": "在套餐开通前休眠中",
         "price": "<b>{{name}}套餐</b> · 每月 {{price}}",
         "name": "<b>{{name}}套餐</b>",
@@ -719,7 +790,36 @@
         "cancel": "可随时取消",
         "cta": "开启团队",
         "all": "查看所有套餐",
-        "skip": "先进入工作区，暂不开启"
+        "skip": "稍后开启，先看看工作区",
+        "next": "下一步：连接你的 AI。",
+        "titlePersonal": "开启你的智能体",
+        "leadPersonal": "有了套餐和 AI，今天就能开工。",
+        "asleepPersonal": "在套餐开通前休眠中",
+        "ctaPersonal": "开启智能体"
+      },
+      "ai": {
+        "titlePersonal": "连接一个 AI，让你的智能体开始思考",
+        "titleAlone": "连接一个 AI，让 {{name}} 开始思考",
+        "later": "稍后连接",
+        "doneTitle": "好了。{{org}} 的团队已经在思考了。",
+        "doneTitlePersonal": "好了。{{name}} 已经在思考了。",
+        "doneLead": "你的 {{label}} 为所有智能体作答。之后可以逐个更换。",
+        "doneLeadAny": "你连接的 AI 为所有智能体作答。之后可以逐个更换。",
+        "connected": "已连接",
+        "enter": "进入工作区",
+        "awake": "你的团队醒了",
+        "answer_other": "{{names}} 已经能回复了。",
+        "readyPersonal": "你的智能体准备好了",
+        "readyAlone": "{{name}} 准备好了",
+        "wakePersonal": "只差一个 AI 就能醒来。",
+        "awakePersonal": "你的智能体醒了",
+        "awakeAlone": "{{name}} 醒了"
+      },
+      "people": {
+        "title": "谁和你一起工作？",
+        "lead": "邀请你团队里的成员。每个人都会收到一封加入邮件。",
+        "send": "发送邀请",
+        "later": "稍后邀请"
       },
       "account": "你的账号"
     },
@@ -727,6 +827,8 @@
       "context": "已填写",
       "skipped": "已跳过",
       "later": "稍后",
+      "on": "已开启",
+      "ai": "已连接",
       "invites_other": "{{count}} 份邀请"
     },
     "back": "返回",
@@ -939,7 +1041,7 @@
       "go_other": "导入 {{count}} 项",
       "nothingNew": "这些内容这里都已经有了。",
       "nothingToBring": "这里没有可以带上的内容。每一项都说明了原因。",
-      "withTeam": "创建团队时会一并导入。",
+      "withTeam": "导入团队时会一并带来。",
       "applying": "正在导入… {{done}}/{{total}}",
       "files": {
         "copy": "把文件复制到 Drive",
@@ -2230,6 +2332,12 @@
       "action": "创建例行任务",
       "done": "例行任务已创建"
     },
+    "howto": {
+      "title": "{{name}} 学会了：{{what}}",
+      "line": "已使用 {{uses}} 次。要做成技能吗？",
+      "action": "做成技能",
+      "done": "已确认"
+    },
     "stalled": {
       "title": "#{{number}} {{title}} 的步骤停了",
       "line_other": "步骤 {{steps}} 已经停了 {{hours}} 小时，在等 #{{on}}。",
@@ -2273,6 +2381,7 @@
   },
   "routing": {
     "title": "谁来挑选智能体",
+    "reflectionOff": "记忆还不会从结束的对话中学习：需要在上方添加一个服务商密钥。",
     "how": "如何挑选智能体",
     "by": {
       "jev": "对于没有提及的消息，由 Jev 挑选回答者。",
@@ -2360,6 +2469,59 @@
       "other": "或连接其他",
       "manageKeys": "管理或删除密钥"
     },
+    "chat": {
+      "mine": "你的账号",
+      "yours": "你的",
+      "keys": "工作区密钥",
+      "best": "当前余量最多",
+      "atLimit": "已达上限",
+      "seeAll": "查看全部 {{count}} 个账号",
+      "allTitle": "所有账号",
+      "search": "搜索账号或成员",
+      "none": "没有这个名称的账号。",
+      "other": "连接其他 AI",
+      "told": "{{name}} 会收到一封相关邮件。"
+    },
+    "team": {
+      "title": "为团队连接 AI",
+      "titlePersonal": "为你的智能体连接 AI",
+      "asleep_other": "{{count}} 个智能体没有 AI",
+      "asleepSome": "{{total}} 个智能体中有 {{n}} 个没有 AI",
+      "choose": "选择",
+      "perAgent": "每个智能体单独登录",
+      "pickTitle": "用于哪些智能体",
+      "marked": "已勾选 {{n}}/{{total}}。",
+      "useThese_other": "用于这 {{count}} 个",
+      "progress": "{{n}} / {{total}}",
+      "turn": "为 {{name}} 登录 {{plan}}",
+      "turnHelp": "是同一个账号。{{plan}} 只是要求每个智能体再登录一次。",
+      "signIn": "登录 {{plan}}",
+      "failed": "{{name}} 的登录没有完成",
+      "skip": "跳过 {{name}}",
+      "state": {
+        "failed": "登录没有完成"
+      },
+      "woke_other": "{{count}} 个智能体醒了",
+      "wokeAll": "团队醒了",
+      "wokeAllPersonal": "你的智能体醒了",
+      "wokeNone": "没有智能体醒来",
+      "thinksAll": "他们已经在用你的 {{plan}} 套餐思考",
+      "thinksOne": "{{name}} 已经在用你的 {{plan}} 套餐思考",
+      "stayed": "{{name}} 仍然没有 AI：登录没有完成。",
+      "stayedMany": "{{names}} 仍然没有 AI：登录没有完成。",
+      "why": "{{name}}：{{why}}",
+      "stayedHand": "{{name}} 还没有为你连接 AI。",
+      "again": "为 {{name}} 连接",
+      "againMany": "为这 {{n}} 个连接",
+      "audience": {
+        "offAll": "用你的订阅，他们只回复你。",
+        "onAll": "他们会回复所有能与之对话的人。",
+        "off": "用你的订阅，{{name}} 只回复你。",
+        "on": "{{name}} 会回复所有能与之对话的人。",
+        "share": "向团队开放",
+        "unshare": "仅我自己"
+      }
+    },
     "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 agentes.chat 套餐才会提供。",
     "billingWeb": "请在网页上的 agentes.chat 选择一个。",
     "orPayGo": "或按量付费",
@@ -2435,7 +2597,8 @@
       "email": "电脑就绪后我们会发邮件通知你，你可以关闭此页面。",
       "ready": "电脑已就绪。",
       "useKey": "现在使用 API 密钥",
-      "connecting": "这台服务器的电脑会在一分钟内连接。连接后你就可以在这里登录。"
+      "connecting": "这台服务器的电脑会在一分钟内连接。连接后你就可以在这里登录。",
+      "computerLater": "账号需要一台电脑，而这个工作区还没有。工作区打开后就可以添加一台。"
     },
     "theComputer": "电脑",
     "own": {
@@ -2687,8 +2850,6 @@
     "chip": "记忆已更新",
     "was": "之前：{{text}}",
     "open": "{{name}} 知道的事",
-    "undo": "撤销",
-    "undone": "已撤销",
     "group": "{{name}} 更新的记忆"
   },
   "reach": {
@@ -2841,17 +3002,9 @@
     "someone": "某人",
     "you": "你",
     "undo": "撤销",
-    "redo": "重做",
-    "undoAll": "全部撤销",
     "changes_other": "{{count}} 项更改",
     "undoneBy": "已由 {{name}} 撤销",
-    "ago": "{{time}}前",
-    "timeLeft": "还剩 {{time}} 可撤销",
     "group": "{{name}} 的更改",
-    "undone": "已撤销。",
-    "redone": "已重做。",
-    "undoneAll_other": "已撤销 {{count}} 项更改。",
-    "partial_other": "有 {{count}} 项更改无法撤销。",
     "errors": {
       "changed_since": "此后有人修改过这里。现在撤销会丢失那次修改。",
       "expired": "撤销时间已过。",
@@ -3474,6 +3627,7 @@
       "ready": "已连接",
       "syncing": "正在同步",
       "reads": "读取 {{label}}",
+      "readOnly": "只读",
       "items_other": "{{count}} 个项目",
       "synced": "{{when}}已同步",
       "syncNow": "立即同步",
@@ -3520,7 +3674,7 @@
       "onepassword": {
         "step": {
           "1": "在 1Password 中创建一个只给智能体用的保险库，并把它们可以使用的登录信息移进去",
-          "2": "创建一个只能访问该保险库的服务账号",
+          "2": "创建一个只能访问该保险库的服务账号（如果智能体要在其中保存新的登录信息，需授予读取和写入权限）",
           "3": "在这里粘贴服务账号的令牌"
         },
         "field": {
@@ -4360,8 +4514,6 @@
       "failed": "无法保存，请重试。",
       "use": "使用",
       "brain": {
-        "sub": "只对 {{name}} 生效，适用于所有对话。",
-        "sub_female": "只对 {{name}} 生效，适用于所有对话。",
         "model": "API 密钥",
         "modelText": "按用量付费，计入 {{name}} 的预算。",
         "modelText_female": "按用量付费，计入 {{name}} 的预算。",
@@ -4382,8 +4534,6 @@
         "accountOthers": "其他人的套餐会显示是谁的。主人会收到邮件，并且可以收回。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
-        "connectPlan": "连接其他套餐",
-        "keyLabel": "API 密钥",
         "fallbackTitle": "{{computer}} 无响应时，通过 API 回复",
         "fallbackHint": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
         "fallbackHint_female": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
@@ -4429,11 +4579,8 @@
         },
         "advanced": {
           "title": "高级设置",
-          "sub": "{{brain}}。适用于所有对话。",
-          "think": "思考方式",
           "answers": "回复对象",
           "defaults": "恢复默认",
-          "done": "完成",
           "contents": {
             "model": "上下文窗口",
             "auto": "上下文窗口和回复对象",
@@ -4543,9 +4690,39 @@
           },
           "startFailed": "{{computer}} 没有响应，请稍后重试。",
           "sendFailed": "无法发送代码，请检查后重试。",
-          "done": "{{account}} 账号已在 {{computer}} 上。点击“使用”保存。"
+          "done": "{{account}} 账号已在 {{computer}} 上重新登录，现在正在使用。"
         },
-        "offCloud": "{{computer}} 无响应"
+        "offCloud": "{{computer}} 无响应",
+        "v2": {
+          "title": "{{name}} 的思考方式",
+          "only": "仅适用于 {{name}}。",
+          "more": "更多选项",
+          "switch": "更换账号",
+          "switchTitle": "更换 {{name}} 的账号",
+          "inUse": "使用中",
+          "switchTo": "切换到 {{label}}",
+          "teamTitle": "更换团队的账号",
+          "teamAria": "适用对象",
+          "justOne": "仅 {{name}}",
+          "everyone": "此账号上的所有智能体",
+          "target": "切换到",
+          "switchMany_other": "切换 {{count}} 个智能体",
+          "limitTitle": "{{name}} 的账号已达上限",
+          "limitBack": "{{account}} {{when}}恢复",
+          "limitSoon": "{{account}} 会在套餐续期后恢复",
+          "limitHelp": "在此期间，{{name}} 可以用另一个已连接的账号思考。",
+          "wait": "等待",
+          "modelTitle": "{{name}} 的模型",
+          "moreTitle": "{{name}} 的更多选项",
+          "fallback": "套餐停止时使用 API 密钥",
+          "computer": "电脑",
+          "doneTitle": "都好了",
+          "doneSub": "进行中的工作会用新账号继续。",
+          "finish": "完成",
+          "undo": "撤销",
+          "undone": "已恢复原样。",
+          "missed_other": "{{names}} 仍使用原来的账号。"
+        }
       },
       "computer": {
         "title": "{{name}} 在哪里工作？",
@@ -5003,6 +5180,15 @@
       "andMore": "{{names}} 等"
     }
   },
+  "teamMemory": {
+    "title": "团队记忆",
+    "help": "大家要求所有智能体记住的内容，附上是谁在何时说的。每个智能体在所有工作中都会读到。",
+    "empty": "还没有内容。有人让所有智能体记住某件事时，会显示在这里。",
+    "remove": "移除",
+    "removed": "已从团队记忆中移除",
+    "make": "设为团队记忆",
+    "made": "现在所有智能体都会记住它"
+  },
   "memory": {
     "fromRefusal": "不再提议：{{text}}",
     "fromCorrection": "有人更正：{{text}}",
@@ -5039,6 +5225,9 @@
     "unverifiedTitle": "只是智能体这么说的。会作为带标记的提示进入上下文。",
     "pinned": "始终在上下文中",
     "lowTrust": "外部来源，不可信",
+    "confirm": "确认",
+    "confirmTitle": "确认无误后，智能体会把它当作可信内容使用。",
+    "confirmed": "已确认",
     "used_other": "已使用 {{count}} 次",
     "unusedFor": "已 {{days}} 天未使用",
     "supersedes": "取代：",
@@ -5266,6 +5455,14 @@
       "complete": "一切就绪。",
       "notNow": "以后再说",
       "afterPlan": "开通套餐后可用。",
+      "afterPlanNext": "这是开通套餐后的下一步。",
+      "plan": {
+        "todo": "开启团队。",
+        "todoDesc": "有了 agentes.chat 套餐，智能体就会开始工作。",
+        "action": "查看套餐",
+        "todoPersonal": "开启你的智能体。",
+        "todoDescPersonal": "有了 agentes.chat 套餐，你的智能体就会开始工作。"
+      },
       "about": {
         "action": "告诉我",
         "title": "{{org}} 是做什么的？",
@@ -7692,6 +7889,7 @@
       "machine_offline_resumes_other": "{{computer}} 已离线：如果只是连接断开，{{count}} 个任务会继续在上面运行。如果电脑重启了，任务会从停下的地方恢复。",
       "machine_task_resumed": "{{computer}} 已恢复：“{{title}}”从停下的地方继续",
       "machine_task_resume_waits": "{{computer}} 已恢复：项目就绪后，“{{title}}”会从停下的地方继续",
+      "machine_task_restarted": "{{computer}} 已恢复：“{{title}}”已重新开始",
       "machine_task_done": "“{{title}}”在 {{computer}} 上用时 {{span}} 完成",
       "machine_task_failed": "“{{title}}”在 {{computer}} 上运行 {{span}} 后失败",
       "machine_task_canceled": "“{{title}}”在 {{computer}} 上被停止",
@@ -10682,6 +10880,7 @@
       "support": "客服",
       "marketing": "营销",
       "automation": "自动化",
+      "social": "社交媒体",
       "email": "邮件"
     },
     "emptyCategory": "这个分类下还没有连接器",
@@ -10716,7 +10915,7 @@
       "close": "关闭详情",
       "can": "智能体将能做什么",
       "afterText": "在你选择之前，没有智能体会使用它。",
-      "allText": "连接后，所有智能体都可以使用。接下来，你可以选择每个智能体的访问权限。",
+      "allText": "连接后，所有智能体都可以使用。之后可以调整。",
       "addAccount": "添加另一个账号",
       "accountsText": "每个账号都有自己的智能体和权限级别。",
       "reconnect": "重新连接",
@@ -11033,6 +11232,41 @@
         "1": "查看收款和客户",
         "2": "创建 Pix 收款"
       },
+      "instagram": {
+        "1": "查看帖子、快拍和数据分析",
+        "2": "发布帖子并阅读私信",
+        "ask": "回复消息始终需要你的审批"
+      },
+      "facebook": {
+        "1": "查看帖子、评论和数据分析",
+        "2": "发布帖子、照片和视频并回复评论",
+        "ask": "删除帖子和评论始终需要你的审批"
+      },
+      "linkedin": {
+        "1": "发布帖子、链接和视频",
+        "2": "评论帖子",
+        "ask": "删除帖子始终需要你的审批"
+      },
+      "youtube": {
+        "1": "查看视频、评论和数据分析",
+        "2": "编辑视频和播放列表并发表评论",
+        "ask": "回复、审核和删除评论始终需要你的审批"
+      },
+      "pinterest": {
+        "1": "查看 Pin 图、图板和数据分析",
+        "2": "创建 Pin 图并整理图板",
+        "ask": "更改图板和删除始终需要你的审批"
+      },
+      "reddit": {
+        "1": "搜索帖子并阅读评论",
+        "2": "发帖、评论和编辑",
+        "ask": "删除始终需要你的审批"
+      },
+      "whatsapp": {
+        "1": "查看号码、模板和送达情况",
+        "2": "创建消息模板",
+        "ask": "发送消息始终需要你的审批"
+      },
       "database": {
         "1": "查看数据表",
         "2": "查询数据来回答问题",
@@ -11171,7 +11405,14 @@
       "revenuecat": "应用内订阅、产品、产品组合和收入。",
       "superwall": "付费墙、营销活动和实验。",
       "paddle": "客户、订阅、交易和产品。",
-      "abacatepay": "Pix 收款、客户和提现。"
+      "abacatepay": "Pix 收款、客户和提现。",
+      "instagram": "Instagram 商家和创作者账号：帖子、快拍、数据分析和私信。",
+      "facebook": "Facebook 公共主页：帖子、照片、视频、评论和数据分析。",
+      "linkedin": "以登录成员身份发布的 LinkedIn 帖子、视频和评论。",
+      "youtube": "YouTube 频道的视频、评论、播放列表和数据分析。",
+      "pinterest": "Pinterest 的 Pin 图、图板和数据分析。",
+      "reddit": "Reddit 的帖子、评论和社区。",
+      "whatsapp": "WhatsApp Business 消息和模板。"
     }
   },
   "toolNames": {
@@ -11477,11 +11718,10 @@
     "notApproved": "{{name}} 只允许它批准过的应用登录，而 agentes.chat 还未获批。如果它提供 API 密钥，你可以用密钥连接。",
     "serverSaid": "服务器返回：{{detail}}",
     "nothingYet": "到第 3 步之前，智能体都用不了任何功能。",
-    "allCanUse": "连接后，所有智能体都可以使用。你可以在第 3 步中修改。",
-    "newAccount": "新账号一开始没有智能体，可以访问全部内容的智能体除外。你在第 3 步中选择。",
+    "allCanUse": "连接后，所有智能体都可以使用。之后可以调整。",
     "replace": "替换当前的登录，使用者保持不变。",
     "replaceUnchecked": "请登录与之前相同的账号。我们无法核实是哪个账号，使用者保持不变。",
-    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。它一开始没有智能体，可以访问全部内容的智能体除外。",
+    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。",
     "addTitle": "另一个 {{name}} 账号",
     "reconnectTitle": "重新连接 {{name}}",
     "accountName": "此账号的名称",
@@ -11501,7 +11741,15 @@
     "asksCount_other": "{{count}} 项操作始终会在聊天中请求审批。",
     "asksDefault": "敏感操作始终会在聊天中请求审批。",
     "grant": "授予",
-    "saved_other": "{{name}}：{{count}} 个智能体可以使用。"
+    "saved_other": "{{name}}：{{count}} 个智能体可以使用。",
+    "done": {
+      "title": "{{name}} 已连接",
+      "everyone": "所有智能体都可以使用。",
+      "waiting": "继续后，智能体才会按我们建议的权限级别获得这些工具。",
+      "asks_other": "{{count}} 项操作会在聊天中请求审批。",
+      "adjust": "调整",
+      "ok": "完成"
+    }
   },
   "database": {
     "name": "数据库",
@@ -12457,7 +12705,8 @@
       "draining": "网络正在变更。电脑上打开的会话将在 {{when}} 重启。",
       "restart": "电脑会话正在重启以应用网络设置。新工作会等到完成后再开始。",
       "line": "出口 IP {{ip}}",
-      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。"
+      "hint": "智能体浏览网页时网站看到的地址。电脑的网络变化时会随之更新。",
+      "waiting": "正在重新连接智能体的网络。网络恢复前，它们的连接会等待。"
     },
     "online": "在线",
     "offline": "离线",
@@ -14774,6 +15023,7 @@
       "machine_task_interruptedNoComputer": "“{{title}}”被中断了。",
       "machine_task_resumed": "{{computer}} 恢复了：“{{title}}”已从中断处继续。",
       "machine_task_resume_waits": "{{computer}} 恢复了：项目就绪后，“{{title}}”会从中断处继续。",
+      "machine_task_restarted": "{{computer}} 恢复了：“{{title}}”已重新开始。",
       "machine_offline": "{{computer}} 已离线。",
       "brain_unavailable": "{{brain}} 暂时无法回答。恢复后我会回复。",
       "brain_unavailable_paused": "{{brain}} 运行的电脑已暂停。恢复后我会回复。",

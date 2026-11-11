@@ -9,6 +9,7 @@ import {
   useRenameChannelCategory,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { useHeldWhile } from "@agenteschat/client/lib/hold";
 import {
   Button,
   Checkbox,
@@ -68,15 +69,22 @@ export function NewCategoryDialog({
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [touched, setTouched] = useState(false);
   const nameField = useRef<HTMLInputElement>(null);
+  // Only as it opens: what opened it can change while it saves, once the list holds the category being made (Mover's
+  // `initialName` goes empty when its search finds that name).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on opening only
   useEffect(() => {
     if (!open) return;
     setName(initialName);
     setQ("");
     setPicked(new Set(withChannel ? [withChannel] : []));
     setTouched(false);
-  }, [open, withChannel, initialName]);
+    create.reset();
+  }, [open]);
   const categoryName = new Map((categories.data ?? []).map((c) => [c.id, c.name]));
-  const taken = (categories.data ?? []).some((c) => sameName(c.name, name));
+  const taken = useHeldWhile(
+    (categories.data ?? []).some((c) => sameName(c.name, name)),
+    create.isPending || create.isSuccess,
+  );
   const error = !name.trim() ? "empty" : taken ? "taken" : null;
   const needle = q.trim().toLowerCase();
   const list = (channels.data ?? []).filter((c) => !needle || c.name.includes(needle));
@@ -214,7 +222,9 @@ export function RenameCategoryDialog({
   useEffect(() => {
     if (category) setName(category.name);
   }, [category]);
-  const taken = (categories.data ?? []).some((c) => c.id !== category?.id && sameName(c.name, name));
+  // Never taken by itself, also while the dialog closes: its field still shows then, with `category` already null.
+  const renaming = useHeldWhile(category, category === null);
+  const taken = (categories.data ?? []).some((c) => c.id !== renaming?.id && sameName(c.name, name));
   const error = !name.trim()
     ? t("channelCategories.nameEmpty")
     : taken

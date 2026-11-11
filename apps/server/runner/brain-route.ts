@@ -23,6 +23,7 @@ import {
   signInKey,
   TOKEN_FD_ENV,
   TOKEN_STDIO,
+  withoutContainers,
 } from "./accounts";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -309,7 +310,7 @@ async function claudeRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string;
 }
 
 async function codexRoute(req: BrainRouteRequest, o: RouteDeps & { dir: string; home: string | null; key: string }) {
-  const env = o.home ? accountEnv("codex", o.home) : process.env;
+  const env = withoutContainers(o.home ? accountEnv("codex", o.home) : process.env);
   const model = await codexLuna(o, env);
   const schemaFile = path.join(o.dir, "schema.json");
   const lastFile = path.join(o.dir, "last.txt");

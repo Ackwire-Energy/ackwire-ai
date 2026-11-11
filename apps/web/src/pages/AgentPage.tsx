@@ -61,6 +61,7 @@ import {
   AGENT_TABS,
   type AgentSection,
   type AgentTab,
+  type BrainScreen,
   budgetValue,
   canEdit,
   changedKeys,
@@ -118,6 +119,10 @@ export interface AgentPageProps {
   agentId: string;
   tab: AgentTab;
   section?: AgentSection;
+  /** With the section "brain": the screen "Quem pensa" opens on (a notification's "Escolher outro modelo"). */
+  brainAt?: BrainScreen;
+  /** The memory or skill a link opened Memória at. */
+  item?: string;
   /** Changes the tab (and section) in the URL. */
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
@@ -187,7 +192,16 @@ function RightHandMineCard({ agent }: { agent: Agent }) {
   );
 }
 
-function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }: AgentPageProps & { agent: Agent }) {
+function AgentProfile({
+  agent,
+  tab,
+  section,
+  brainAt,
+  item,
+  onNavigate,
+  onClose,
+  closeRequest,
+}: AgentPageProps & { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -806,7 +820,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
                 {view === "overview" && <OverviewTab />}
                 {view === "instructions" && <InstructionsTab />}
                 {view === "access" && <AccessTab part={personal ? "basic" : "all"} />}
-                {view === "memory" && <MemoryTab />}
+                {view === "memory" && <MemoryTab item={item} />}
                 {view === "files" && <FilesTab />}
                 {view === "usage" && <UsageTab />}
                 {view === "activity" && <ActivityTab />}
@@ -847,6 +861,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
       <WorkDialogs
         open={work}
+        brainAt={section === "brain" ? brainAt : undefined}
         onClose={() => {
           setWork(null);
           if (section === "brain") onNavigate(tab);

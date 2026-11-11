@@ -52,6 +52,7 @@ import {
   type OutgoingMail,
 } from "./mail";
 import { readCapped } from "./read-capped";
+import { withoutTokens } from "./redact";
 import { verifyStandardWebhook } from "./standard-webhooks";
 
 /** Composio trigger types for a new message. */
@@ -287,7 +288,7 @@ export function createComposioClient(options: ComposioClientOptions): ComposioCl
     if (!result || result.successful === false) {
       throw toolError(slug, str(result?.error) ?? "unknown error");
     }
-    return result.data ?? {};
+    return withoutTokens(result.data ?? {});
   }
 
   async function listTools(toolkit: ComposioToolkit, version: string): Promise<ComposioTool[]> {
