@@ -629,7 +629,7 @@ html:not([data-pointer]) .nwc-ask:focus-visible {
 /* The pencil stays on the ask's first line when the ask wraps. */
 .nwc-asked .ac-icon {
   flex: none;
-  margin-top: calc(0.5lh - 7px);
+  margin-top: 4px;
 }
 .nwc-asked:hover {
   background: var(--plate);

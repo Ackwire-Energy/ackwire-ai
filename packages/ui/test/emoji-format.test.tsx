@@ -242,7 +242,11 @@ describe("Composer toolbar", () => {
     expect(body().queryByRole("toolbar", { name: "Formatação" })).toBeNull();
     box.focus();
     box.setSelectionRange(7, 13);
-    await act(async () => fireEvent.select(box));
+    // React only reports a select whose range differs from the last one it saw, in any test: the focus reports it too.
+    await act(async () => {
+      fireEvent.select(box);
+      fireEvent.focus(box);
+    });
     const toolbar = body().getByRole("toolbar", { name: "Formatação" });
     // One tab stop; the tooltip tells the shortcut.
     const bold = within(toolbar).getByRole("button", { name: "Negrito" });
