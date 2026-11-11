@@ -35,10 +35,15 @@ html[data-desktop="linux"] {
   -webkit-user-select: none;
 }
 /* With the work as a sheet on the sidebar's paper (layout.css `.shell__work`), the bar and that paper are one
-   surface: no hairline under the bar. A narrow window keeps it, its work being flat under the bar. */
+   surface: no hairline under the bar. A narrow window keeps it, its work being flat under the bar. The bar is the
+   sheet's room on top, so the sheet's own 8px there goes: with them the ⌘K field stood 4px under the window's edge
+   and 12px over the sheet, and now stands in the middle of what is around it. */
 @media (min-width: 761px) {
   html[data-desktop] .titlebar {
     border-bottom: 0;
+  }
+  html[data-desktop] .shell__work {
+    padding-top: 0;
   }
 }
 /* The workspace's sky over the sidebar's width, its hairline included: one sky with the header below. */
