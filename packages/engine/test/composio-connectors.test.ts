@@ -296,15 +296,17 @@ describe("connecting through Composio", () => {
     expect(w.fake.state.toolLists).toEqual([`googledrive@${VERSION}`]);
   });
 
-  test("another account is a new row with no agent; the same one only swaps Composio's account; Reconectar keeps it", async () => {
+  test("another account is a new row, every agent's too; the same one only swaps Composio's account; Reconectar keeps it", async () => {
     const w = await world();
     const ana = await w.connect("ana@acme.com");
     const bob = await w.connect("bob@acme.com");
     expect(bob.outcome).toBe("connected");
     expect(bob.connection).toMatchObject({ label: "Google Drive (bob@acme.com)", toolPrefix: "google_drive_2" });
-    expect(
-      await f.db.select().from(schema.agentScopes).where(eq(schema.agentScopes.connectionId, bob.connection.id)),
-    ).toEqual([]);
+    const given = await f.db
+      .select()
+      .from(schema.agentScopes)
+      .where(eq(schema.agentScopes.connectionId, bob.connection.id));
+    expect([...new Set(given.map((g) => g.scope))]).toEqual(["connector:*"]);
 
     const same = await w.connect("ana@acme.com");
     expect(same.outcome).toBe("same_account");

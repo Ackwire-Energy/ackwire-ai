@@ -26963,7 +26963,7 @@
     "value": "No agent uses it until you choose."
   },
   "connectors.detail.allText": {
-    "value": "Once connected, every agent can use it. Next, you choose each agent's access."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectors.detail.addAccount": {
     "value": "Add another account"
@@ -28709,10 +28709,7 @@
     "value": "Nothing is available to agents until step 3."
   },
   "connectFlow.allCanUse": {
-    "value": "Once connected, every agent can use it. You can change that in step 3."
-  },
-  "connectFlow.newAccount": {
-    "value": "The new account starts with no agents, except those with access to everything. You choose in step 3."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectFlow.replace": {
     "value": "Replaces the current sign-in. Who uses it stays the same."
@@ -28721,7 +28718,7 @@
     "value": "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same."
   },
   "connectFlow.newAccountUnchecked": {
-    "value": "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything."
+    "value": "Sign in to an account that isn't connected yet, we can't check."
   },
   "connectFlow.addTitle": {
     "value": "Another {{name}} account"
@@ -28791,6 +28788,27 @@
       "one": "{{name}}: {{count}} agent can use it.",
       "other": "{{name}}: {{count}} agents can use it."
     }
+  },
+  "connectFlow.done.title": {
+    "value": "{{name}} connected"
+  },
+  "connectFlow.done.everyone": {
+    "value": "Every agent can use it."
+  },
+  "connectFlow.done.waiting": {
+    "value": "Agents get the tools only when you continue, at the levels we suggest."
+  },
+  "connectFlow.done.asks": {
+    "value": {
+      "one": "{{count}} action asks for approval in the chat.",
+      "other": "{{count}} actions ask for approval in the chat."
+    }
+  },
+  "connectFlow.done.adjust": {
+    "value": "Adjust"
+  },
+  "connectFlow.done.ok": {
+    "value": "Done"
   },
   "database.name": {
     "value": "Database"

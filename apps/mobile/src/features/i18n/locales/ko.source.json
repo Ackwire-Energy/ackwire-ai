@@ -5015,9 +5015,6 @@
   "connectors.connectedTitle": {
     "value": "{{name}} connected"
   },
-  "connectors.connectedSub": {
-    "value": "Now check what agents can do on their own."
-  },
   "connectors.connectedDone": {
     "value": "Service connected."
   },

@@ -2124,7 +2124,6 @@
     "failed": "No se pudo conectar. Inténtalo de nuevo.",
     "refused": "{{name}} no lo autorizó. No se conectó nada.",
     "connectedTitle": "{{name}} conectado",
-    "connectedSub": "Ahora revisa qué pueden hacer los agentes por su cuenta.",
     "connectedDone": "Servicio conectado.",
     "levelFailed": "No se pudo cambiar el acceso de {{name}}. Inténtalo de nuevo.",
     "everyoneFailed": "No se pudo cambiar el acceso de todos. Inténtalo de nuevo.",

@@ -11084,7 +11084,7 @@
       "close": "Details schließen",
       "can": "Was Agenten tun können",
       "afterText": "Kein Agent nutzt ihn, bis du es festlegst.",
-      "allText": "Nach dem Verbinden kann jeder Agent ihn nutzen. Danach legst du den Zugriff jedes Agenten fest.",
+      "allText": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du später anpassen.",
       "addAccount": "Weiteres Konto hinzufügen",
       "accountsText": "Jedes Konto hat seine eigenen Agenten und Stufen.",
       "reconnect": "Erneut verbinden",
@@ -11865,11 +11865,10 @@
     "notApproved": "{{name}} lässt nur freigegebene Apps zur Anmeldung zu, und agentes.chat ist noch nicht freigegeben. Wenn du dort einen API-Schlüssel bekommst, kannst du dich damit verbinden.",
     "serverSaid": "Der Server hat geantwortet: {{detail}}",
     "nothingYet": "Bis Schritt 3 ist nichts für Agenten verfügbar.",
-    "allCanUse": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du in Schritt 3 ändern.",
-    "newAccount": "Das neue Konto startet ohne Agenten, außer denen mit Zugriff auf alles. Du wählst in Schritt 3.",
+    "allCanUse": "Nach dem Verbinden kann jeder Agent ihn nutzen. Das kannst du später anpassen.",
     "replace": "Ersetzt die aktuelle Anmeldung. Wer sie nutzt, bleibt gleich.",
     "replaceUnchecked": "Melde dich beim selben Konto wie vorher an. Wir können nicht prüfen, welches es ist, und wer es nutzt, bleibt gleich.",
-    "newAccountUnchecked": "Melde dich bei einem Konto an, das noch nicht verbunden ist, wir können das nicht prüfen. Es startet ohne Agenten, außer denen mit Zugriff auf alles.",
+    "newAccountUnchecked": "Melde dich bei einem Konto an, das noch nicht verbunden ist, wir können das nicht prüfen.",
     "addTitle": "Weiteres {{name}}-Konto",
     "reconnectTitle": "{{name}} erneut verbinden",
     "accountName": "Name dieses Kontos",
@@ -11892,7 +11891,16 @@
     "asksDefault": "Sensible Aktionen fragen im Chat immer nach Freigabe.",
     "grant": "Zugriff geben",
     "saved_one": "{{name}}: {{count}} Agent kann ihn nutzen.",
-    "saved_other": "{{name}}: {{count}} Agenten können ihn nutzen."
+    "saved_other": "{{name}}: {{count}} Agenten können ihn nutzen.",
+    "done": {
+      "title": "{{name}} verbunden",
+      "everyone": "Jeder Agent kann ihn nutzen.",
+      "waiting": "Agenten bekommen die Tools erst, wenn du fortfährst, mit den Stufen, die wir vorschlagen.",
+      "asks_one": "{{count}} Aktion fragt im Chat nach Freigabe.",
+      "asks_other": "{{count}} Aktionen fragen im Chat nach Freigabe.",
+      "adjust": "Anpassen",
+      "ok": "Fertig"
+    }
   },
   "database": {
     "name": "Datenbank",

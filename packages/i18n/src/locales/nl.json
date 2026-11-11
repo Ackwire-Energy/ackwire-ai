@@ -11147,7 +11147,7 @@
       "close": "Details sluiten",
       "can": "Wat agents kunnen doen",
       "afterText": "Geen agent gebruikt het tot jij kiest.",
-      "allText": "Na het koppelen kan elke agent het gebruiken. Daarna kies je de toegang van elke agent.",
+      "allText": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
       "addAccount": "Nog een account toevoegen",
       "accountsText": "Elk account heeft eigen agents en niveaus.",
       "reconnect": "Opnieuw koppelen",
@@ -11928,11 +11928,10 @@
     "notApproved": "{{name}} laat alleen goedgekeurde apps inloggen, en agentes.chat is nog niet goedgekeurd. Krijg je er een API-sleutel, dan kun je daarmee koppelen.",
     "serverSaid": "De server antwoordde: {{detail}}",
     "nothingYet": "Tot stap 3 is er niets beschikbaar voor agents.",
-    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je in stap 3 aanpassen.",
-    "newAccount": "Het nieuwe account begint zonder agents, behalve die met toegang tot alles. Je kiest in stap 3.",
+    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
     "replace": "Vervangt de huidige login. Wie het gebruikt, blijft hetzelfde.",
     "replaceUnchecked": "Log in met hetzelfde account als eerst. We kunnen niet controleren welk het is, en wie het gebruikt, blijft hetzelfde.",
-    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren. Het begint zonder agents, behalve die met toegang tot alles.",
+    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren.",
     "addTitle": "Nog een {{name}}-account",
     "reconnectTitle": "{{name}} opnieuw koppelen",
     "accountName": "Naam van dit account",
@@ -11955,7 +11954,16 @@
     "asksDefault": "Gevoelige acties vragen altijd om goedkeuring in de chat.",
     "grant": "Toegang geven",
     "saved_one": "{{name}}: {{count}} agent kan het gebruiken.",
-    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken."
+    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken.",
+    "done": {
+      "title": "{{name}} gekoppeld",
+      "everyone": "Elke agent kan het gebruiken.",
+      "waiting": "Agents krijgen de tools pas als je doorgaat, op de niveaus die wij voorstellen.",
+      "asks_one": "{{count}} actie vraagt om goedkeuring in de chat.",
+      "asks_other": "{{count}} acties vragen om goedkeuring in de chat.",
+      "adjust": "Aanpassen",
+      "ok": "Klaar"
+    }
   },
   "database": {
     "name": "Database",

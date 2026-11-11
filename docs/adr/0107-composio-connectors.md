@@ -104,7 +104,7 @@ A Composio connection is a server connected by address: a `connector_connections
 
 ### 6. Who can use it
 
-As for any server (ADR 0099 §5): a service's first account is every agent's at "Ler e escrever" (`connector:*`), later accounts start with no agent, and the dialog ends on "Quem pode usar". Sensitive actions ask at any level.
+As for any server (ADR 0099 §5): every account of a service is every agent's at "Ler e escrever" (`connector:*`), and the dialog ends on a short confirmation with "Quem pode usar" under "Ajustar". Sensitive actions ask at any level.
 
 ### 7. Counting, showing and capping calls
 

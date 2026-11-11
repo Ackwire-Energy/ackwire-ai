@@ -2121,7 +2121,6 @@ export const featureKeysEn = {
     failed: "Couldn't connect. Try again.",
     refused: "{{name}} didn't authorize. Nothing was connected.",
     connectedTitle: "{{name}} connected",
-    connectedSub: "Now check what agents can do on their own.",
     connectedDone: "Service connected.",
     levelFailed: "Couldn't change {{name}}'s access. Try again.",
     everyoneFailed: "Couldn't change everyone's access. Try again.",

@@ -2230,7 +2230,6 @@
     "failed": "Nie udało się połączyć. Spróbuj ponownie.",
     "refused": "Brak autoryzacji w {{name}}. Nic nie zostało połączone.",
     "connectedTitle": "Połączono z {{name}}",
-    "connectedSub": "Teraz sprawdź, co agenci mogą robić sami.",
     "connectedDone": "Usługa połączona.",
     "levelFailed": "Nie udało się zmienić dostępu do {{name}}. Spróbuj ponownie.",
     "everyoneFailed": "Nie udało się zmienić dostępu dla wszystkich. Spróbuj ponownie.",

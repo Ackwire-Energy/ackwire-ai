@@ -10696,7 +10696,7 @@
       "close": "Tutup detail",
       "can": "Apa yang bisa dilakukan agen",
       "afterText": "Tidak ada agen yang memakainya sampai kamu memilih.",
-      "allText": "Setelah terhubung, semua agen bisa memakainya. Berikutnya, kamu memilih akses tiap agen.",
+      "allText": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa menyesuaikannya nanti.",
       "addAccount": "Tambah akun lain",
       "accountsText": "Tiap akun punya agen dan levelnya sendiri.",
       "reconnect": "Hubungkan ulang",
@@ -11457,11 +11457,10 @@
     "notApproved": "{{name}} hanya mengizinkan aplikasi yang sudah disetujuinya untuk masuk, dan agentes.chat belum disetujui. Kalau {{name}} memberimu kunci API, kamu bisa menghubungkan dengan kunci itu.",
     "serverSaid": "Jawaban server: {{detail}}",
     "nothingYet": "Belum ada yang tersedia untuk agen sampai langkah 3.",
-    "allCanUse": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa mengubahnya di langkah 3.",
-    "newAccount": "Akun baru dimulai tanpa agen, kecuali yang punya akses ke semuanya. Kamu memilihnya di langkah 3.",
+    "allCanUse": "Setelah terhubung, semua agen bisa memakainya. Kamu bisa menyesuaikannya nanti.",
     "replace": "Menggantikan sesi masuk saat ini. Siapa yang memakainya tetap sama.",
     "replaceUnchecked": "Masuk ke akun yang sama seperti sebelumnya. Kami tidak bisa memeriksa akun yang mana, dan siapa yang memakainya tetap sama.",
-    "newAccountUnchecked": "Masuk ke akun yang belum terhubung, kami tidak bisa memeriksanya. Akun ini dimulai tanpa agen, kecuali yang punya akses ke semuanya.",
+    "newAccountUnchecked": "Masuk ke akun yang belum terhubung, kami tidak bisa memeriksanya.",
     "addTitle": "Akun {{name}} lain",
     "reconnectTitle": "Hubungkan ulang {{name}}",
     "accountName": "Nama akun ini",
@@ -11481,7 +11480,15 @@
     "asksCount_other": "{{count}} tindakan selalu meminta persetujuan di chat.",
     "asksDefault": "Tindakan sensitif selalu meminta persetujuan di chat.",
     "grant": "Berikan",
-    "saved_other": "{{name}}: {{count}} agen bisa memakainya."
+    "saved_other": "{{name}}: {{count}} agen bisa memakainya.",
+    "done": {
+      "title": "{{name}} terhubung",
+      "everyone": "Semua agen bisa memakainya.",
+      "waiting": "Agen baru mendapat alat-alatnya setelah kamu melanjutkan, dengan level yang kami sarankan.",
+      "asks_other": "{{count}} tindakan meminta persetujuan di chat.",
+      "adjust": "Sesuaikan",
+      "ok": "Selesai"
+    }
   },
   "database": {
     "name": "Basis data",
