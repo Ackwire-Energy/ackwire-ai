@@ -268,7 +268,8 @@ function CableSteps({ host, stage }: { host: ComputerDevice; stage: AndroidStage
             <p className="dv-slow__title" id="dv-slow-title">
               {t("devices.android.slow")}
             </p>
-            <ul className="dv-slow__list">
+            {/* biome-ignore lint/a11y/noRedundantRoles: Safari drops list semantics under list-style: none */}
+            <ul className="dv-slow__list" role="list">
               {androidNotShowing(host.os).map((item) => (
                 <li key={item}>
                   {t(`devices.android.help.${item}`)}
