@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { CHAT_TEXT_SIZES, chatLookOf, facesShown, mineOnRight, textSizeOf } from "@agenteschat/client/lib/chat-look";
+import {
+  CHAT_TEXT_SIZES,
+  chatLookOf,
+  facesShown,
+  mineOnRight,
+  openAtOf,
+  textSizeOf,
+} from "@agenteschat/client/lib/chat-look";
 import { AGENT_GRADIENTS, type AgentColorName, contrastOf, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import {
   BUBBLES_INSET,
@@ -144,6 +151,13 @@ describe("the rows follow the same choice as the web", () => {
     const page = await read("me/ChatLookPage.tsx");
     expect(page).toContain("useSetChatPrefs(orgId)");
     expect(page).toContain("save(dm ? { dmStyle: s } : { channelStyle: s })");
+  });
+
+  test("a conversation opens at the last read message until the person picks the newest, as on the web", async () => {
+    expect(openAtOf(undefined)).toBe("read");
+    expect(openAtOf({ openAt: "latest" })).toBe("latest");
+    expect(await read("me/ChatLookPage.tsx")).toContain("const openAt = openAtOf(prefs);");
+    expect(await read("chat/ChatScreen.tsx")).toContain("opensAtLastRead(org?.chatPrefs");
   });
 });
 

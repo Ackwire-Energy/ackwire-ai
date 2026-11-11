@@ -265,15 +265,25 @@ describe("Sua conta › Conversa", () => {
     expect(state.me?.organizations[0]?.chatPrefs).toEqual({ channelStyle: "compact", dmTone: "strong" });
   });
 
-  test("where a conversation opens: the newest message until the person picks", async () => {
+  test("where a conversation opens: the last read message until the person picks", async () => {
     const state = withChatPrefs(seedState());
     await openSettings(state);
+    const open = screen().getByRole("radiogroup", { name: "Ao abrir uma conversa, me leve para" });
+    const checked = (name: string) => within(open).getByRole("radio", { name }).getAttribute("aria-checked");
+    expect(checked("Última mensagem lida")).toBe("true");
+    expect(checked("Mensagem mais recente")).toBe("false");
+    await click(within(open).getByRole("radio", { name: "Mensagem mais recente" }));
+    expect(state.calls).toContainEqual({ method: "orgs.setChatPrefs", args: [ORG_ID, { openAt: "latest" }] });
+    expect(state.me?.organizations[0]?.chatPrefs).toEqual({ openAt: "latest" });
+    expect(checked("Mensagem mais recente")).toBe("true");
+  });
+
+  test("whoever picked the newest message keeps it", async () => {
+    await openSettings(withChatPrefs(seedState(), { openAt: "latest" }));
     const open = screen().getByRole("radiogroup", { name: "Ao abrir uma conversa, me leve para" });
     expect(within(open).getByRole("radio", { name: "Mensagem mais recente" }).getAttribute("aria-checked")).toBe(
       "true",
     );
-    await click(within(open).getByRole("radio", { name: "Última mensagem lida" }));
-    expect(state.calls).toContainEqual({ method: "orgs.setChatPrefs", args: [ORG_ID, { openAt: "read" }] });
   });
 
   test("Tamanho do texto: five steps, Padrão until the person picks, and a pick shows at once on the page", async () => {
@@ -374,8 +384,13 @@ describe("opening at the last read message", () => {
     expect(document.querySelector(".channel__unread")?.nextElementSibling).toBe(row("a1"));
   });
 
-  test("by default it opens at the end, with no line", async () => {
+  test("by default it opens there too: the line before the first unread message", async () => {
     await openUnread({});
+    expect(document.querySelector(".channel__unread")?.nextElementSibling).toBe(row("a1"));
+  });
+
+  test("whoever picked the newest message opens at the end, with no line", async () => {
+    await openUnread({ openAt: "latest" });
     expect(document.querySelector(".channel__unread")).toBeNull();
   });
 });
