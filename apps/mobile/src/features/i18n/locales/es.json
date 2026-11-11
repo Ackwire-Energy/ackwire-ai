@@ -2034,8 +2034,7 @@
       "codeNote": "Desde Depuración inalámbrica › Vincular dispositivo con código de sincronización. Abre Configuración y agentes.chat en pantalla dividida para que el código siga a la vista.",
       "wifiNote": "El Wi-Fi puede cortarse tras un reinicio. Un cable es más confiable.",
       "done": "{{name}} está conectado",
-      "openFailed": "Este teléfono no abrió esa pantalla. Búscala en Configuración.",
-      "step3Hint": "Usa un cable que transmita datos, no uno que solo cargue. Si el teléfono pregunta para qué es el USB, elige Transferencia de archivos."
+      "openFailed": "Este teléfono no abrió esa pantalla. Búscala en Configuración."
     },
     "iphone": {
       "title": "Conectar este iPhone",

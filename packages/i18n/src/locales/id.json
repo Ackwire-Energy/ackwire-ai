@@ -13220,10 +13220,7 @@
         "alwaysWifi": "Selalu izinkan di jaringan ini",
         "cancel": "Batal",
         "allow": "Izinkan"
-      },
-      "found": "Selesai di {{name}}",
-      "notShowing": "Ponsel tidak muncul?",
-      "notShowingHelp": "Coba kabel atau port lain, dan pilih Transfer file jika ponsel menanyakan fungsi USB-nya. Di Samsung, matikan Pemblokir Otomatis di Pengaturan › Keamanan dan privasi."
+      }
     },
     "wifiPair": {
       "noComputer": "Penyambungan lewat Wi-Fi berjalan dengan salah satu komputermu. Pakai kabel, atau hubungkan satu komputer.",

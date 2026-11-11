@@ -14580,10 +14580,7 @@
         "alwaysWifi": "Zawsze zezwalaj w tej sieci",
         "cancel": "Anuluj",
         "allow": "Zezwól"
-      },
-      "found": "Gotowe: {{name}}",
-      "notShowing": "Telefon się nie pokazuje?",
-      "notShowingHelp": "Spróbuj innego kabla lub portu i wybierz Przesyłanie plików, jeśli telefon zapyta, do czego służy USB. Na Samsungu wyłącz Automatyczny bloker w Ustawienia › Bezpieczeństwo i prywatność."
+      }
     },
     "wifiPair": {
       "noComputer": "Parowanie przez Wi-Fi działa z twoim komputerem. Użyj kabla albo podłącz komputer.",

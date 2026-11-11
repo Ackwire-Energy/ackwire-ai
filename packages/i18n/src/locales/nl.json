@@ -13721,10 +13721,7 @@
         "alwaysWifi": "Altijd toestaan op dit netwerk",
         "cancel": "Annuleren",
         "allow": "Toestaan"
-      },
-      "found": "Klaar op {{name}}",
-      "notShowing": "Telefoon verschijnt niet?",
-      "notShowingHelp": "Probeer een andere kabel of poort, en kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is. Zet op een Samsung Automatische blokkering uit in Instellingen › Beveiliging en privacy."
+      }
     },
     "wifiPair": {
       "noComputer": "Koppelen via wifi werkt met een computer van je. Gebruik een kabel, of koppel er een.",

@@ -1942,8 +1942,7 @@
       "codeNote": "Kablosuz hata ayıklama › Cihazı eşleme koduyla eşle bölümünden. Kod ekranda kalsın diye Ayarlar'ı ve agentes.chat'i yan yana açın.",
       "wifiNote": "Wi-Fi yeniden başlatmadan sonra kopabilir. Kablo daha güvenilirdir.",
       "done": "{{name}} bağlandı",
-      "openFailed": "Bu telefon o ekranı açmadı. Ayarlar'da bulun.",
-      "step3Hint": "Yalnızca şarj eden değil, veri aktaran bir kablo kullanın. Telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin."
+      "openFailed": "Bu telefon o ekranı açmadı. Ayarlar'da bulun."
     },
     "iphone": {
       "title": "Bu iPhone'u bağlayın",

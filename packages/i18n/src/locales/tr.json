@@ -13594,10 +13594,7 @@
         "alwaysWifi": "Bu ağda her zaman izin ver",
         "cancel": "İptal",
         "allow": "İzin ver"
-      },
-      "found": "{{name}} üzerinde tamamlandı",
-      "notShowing": "Telefon görünmüyor mu?",
-      "notShowingHelp": "Başka bir kablo ya da bağlantı noktası deneyin ve telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin. Samsung'da Ayarlar › Güvenlik ve gizlilik bölümünden Otomatik Engelleyici'yi kapatın."
+      }
     },
     "wifiPair": {
       "noComputer": "Wi-Fi ile eşleme sizin bir bilgisayarınızla çalışır. Kablo kullanın ya da bir bilgisayar bağlayın.",

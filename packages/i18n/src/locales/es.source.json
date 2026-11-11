@@ -33207,15 +33207,6 @@
   "devices.android.prompt.allow": {
     "value": "Allow"
   },
-  "devices.android.found": {
-    "value": "Done on {{name}}"
-  },
-  "devices.android.notShowing": {
-    "value": "Phone not showing up?"
-  },
-  "devices.android.notShowingHelp": {
-    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
-  },
   "devices.wifiPair.noComputer": {
     "value": "Wi-Fi pairing works with a computer of yours. Use a cable, or connect one."
   },

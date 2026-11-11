@@ -14127,10 +14127,7 @@
         "alwaysWifi": "Consenti sempre su questa rete",
         "cancel": "Annulla",
         "allow": "Consenti"
-      },
-      "found": "Fatto su {{name}}",
-      "notShowing": "Il telefono non compare?",
-      "notShowingHelp": "Prova un altro cavo o un'altra porta, e scegli Trasferimento file se il telefono chiede a cosa serve l'USB. Sui Samsung, disattiva Blocco automatico in Impostazioni › Sicurezza e privacy."
+      }
     },
     "wifiPair": {
       "noComputer": "L'accoppiamento via Wi-Fi funziona con un tuo computer. Usa un cavo, o collegane uno.",

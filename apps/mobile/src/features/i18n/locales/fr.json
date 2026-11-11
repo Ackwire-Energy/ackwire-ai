@@ -2034,8 +2034,7 @@
       "codeNote": "Depuis Débogage sans fil › Associer l'appareil avec un code d'association. Ouvrez Paramètres et agentes.chat côte à côte pour garder le code à l'écran.",
       "wifiNote": "Le Wi-Fi peut se couper après un redémarrage. Un câble est plus fiable.",
       "done": "{{name}} est connecté",
-      "openFailed": "Ce téléphone n'a pas ouvert cet écran. Cherchez-le dans Paramètres.",
-      "step3Hint": "Utilisez un câble qui transmet les données, pas un câble de charge seule. Si le téléphone demande à quoi sert l'USB, choisissez Transfert de fichiers."
+      "openFailed": "Ce téléphone n'a pas ouvert cet écran. Cherchez-le dans Paramètres."
     },
     "iphone": {
       "title": "Connecter cet iPhone",

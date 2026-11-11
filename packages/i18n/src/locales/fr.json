@@ -14117,10 +14117,7 @@
         "alwaysWifi": "Toujours autoriser sur ce réseau",
         "cancel": "Annuler",
         "allow": "Autoriser"
-      },
-      "found": "Terminé sur {{name}}",
-      "notShowing": "Le téléphone n'apparaît pas ?",
-      "notShowingHelp": "Essayez un autre câble ou un autre port, et choisissez Transfert de fichiers si le téléphone demande à quoi sert l'USB. Sur Samsung, désactivez le Bloqueur automatique dans Paramètres › Sécurité et confidentialité."
+      }
     },
     "wifiPair": {
       "noComputer": "L'association par Wi-Fi fonctionne avec un de vos ordinateurs. Utilisez un câble, ou connectez-en un.",

@@ -4781,9 +4781,6 @@
   "devices.android.openFailed": {
     "value": "This phone didn't open that screen. Find it in Settings."
   },
-  "devices.android.step3Hint": {
-    "value": "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer."
-  },
   "devices.iphone.title": {
     "value": "Connect this iPhone"
   },

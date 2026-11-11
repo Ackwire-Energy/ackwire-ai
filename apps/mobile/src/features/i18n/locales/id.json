@@ -1845,8 +1845,7 @@
       "codeNote": "Dari Proses debug nirkabel › Sambungkan perangkat dengan kode penyambungan. Buka Setelan dan agentes.chat berdampingan agar kodenya tetap terlihat.",
       "wifiNote": "Wi-Fi bisa terputus setelah dimulai ulang. Kabel lebih andal.",
       "done": "{{name}} sudah terhubung",
-      "openFailed": "Ponsel ini tidak membuka layar itu. Cari di Setelan.",
-      "step3Hint": "Pakai kabel yang bisa mengirim data, bukan yang hanya untuk mengisi daya. Jika ponsel menanyakan fungsi USB-nya, pilih Transfer file."
+      "openFailed": "Ponsel ini tidak membuka layar itu. Cari di Setelan."
     },
     "iphone": {
       "title": "Hubungkan iPhone ini",

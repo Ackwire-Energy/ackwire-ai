@@ -2136,8 +2136,7 @@
       "codeNote": "W Debugowanie bezprzewodowe › Sparuj urządzenie za pomocą kodu parowania. Otwórz Ustawienia i agentes.chat obok siebie, żeby kod został na ekranie.",
       "wifiNote": "Wi-Fi może się rozłączyć po ponownym uruchomieniu. Kabel jest pewniejszy.",
       "done": "{{name}} jest podłączony",
-      "openFailed": "Ten telefon nie otworzył tego ekranu. Znajdź go w Ustawieniach.",
-      "step3Hint": "Użyj kabla do przesyłania danych, nie takiego, który tylko ładuje. Jeśli telefon zapyta, do czego służy USB, wybierz Przesyłanie plików."
+      "openFailed": "Ten telefon nie otworzył tego ekranu. Znajdź go w Ustawieniach."
     },
     "iphone": {
       "title": "Podłącz tego iPhone'a",

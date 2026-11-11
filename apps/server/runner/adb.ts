@@ -271,9 +271,8 @@ const PHONE_VENDORS = new Set([
 /** Classes Windows gives a device it has no driver for, or a phone's own (MTP, ADB). */
 const UNKNOWN_CLASS = /^(|unknown|wpd|usbdevice|androidusbdeviceclass|adb)$/i;
 const SAYS_ANDROID = /android|\badb\b/i;
-/** A name that says what the device is, not the phone ("ADB Interface", "MTP", "USB Composite Device"). */
-const GENERIC_NAME =
-  /^(android( adb)?( interface| phone| device)?|adb( interface)?|mtp( device)?|usb .*|unknown .*|.*composite.*)$/i;
+/** A name that says what kind of device it is, not which phone ("ADB Interface", "SAMSUNG_Android", "MTP"). */
+const GENERIC_NAME = /android|\badb\b|\bmtp\b|\busb\b|interface|composite|unknown/i;
 
 /** A plugged phone Windows has no driver for: its USB serial (adb's own, once the driver is in) and model. */
 export interface DriverlessPhone {

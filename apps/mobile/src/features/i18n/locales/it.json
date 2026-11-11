@@ -2034,8 +2034,7 @@
       "codeNote": "Da Debug wireless › Accoppia dispositivo con codice di accoppiamento. Apri Impostazioni e agentes.chat affiancati, così il codice resta sullo schermo.",
       "wifiNote": "Il Wi-Fi può cadere dopo un riavvio. Un cavo è più affidabile.",
       "done": "{{name}} è collegato",
-      "openFailed": "Questo telefono non ha aperto quella schermata. Cercala in Impostazioni.",
-      "step3Hint": "Usa un cavo che trasmette dati, non uno solo di ricarica. Se il telefono chiede a cosa serve l'USB, scegli Trasferimento file."
+      "openFailed": "Questo telefono non ha aperto quella schermata. Cercala in Impostazioni."
     },
     "iphone": {
       "title": "Collega questo iPhone",

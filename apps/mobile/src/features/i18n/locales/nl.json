@@ -1942,8 +1942,7 @@
       "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
       "wifiNote": "Wifi kan wegvallen na een herstart. Een kabel is betrouwbaarder.",
       "done": "{{name}} is gekoppeld",
-      "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen.",
-      "step3Hint": "Gebruik een kabel die data doorgeeft, niet een die alleen oplaadt. Kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is."
+      "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen."
     },
     "iphone": {
       "title": "Deze iPhone koppelen",

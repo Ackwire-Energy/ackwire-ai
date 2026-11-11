@@ -254,7 +254,7 @@ describe("Connect a device", () => {
   });
 
   test("an Android phone: the computer's live checklist, Allow on the phone, then connected", async () => {
-    const { devices, services } = await open(`/org/${ORG_ID}/settings/devices`);
+    const { devices, services, state } = await open(`/org/${ORG_ID}/settings/devices`);
     await click(screen().getByRole("button", { name: "Connect a device" }));
     await click(screen().getByRole("button", { name: /Android phone/ }));
     const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
@@ -343,7 +343,7 @@ describe("Connect a device", () => {
       "The phone unlocked, with its screen on.",
       "If the phone asks how to use USB, pick File transfer.",
       "USB debugging on. See step 2",
-      "On Samsung, Auto Blocker off: Settings › Security and privacy › Auto Blocker.",
+      "On Samsung, Auto Blocker off: Settings\u00a0›\u00a0Security and privacy\u00a0›\u00a0Auto Blocker.",
       "On Windows, the phone maker's USB driver:Google, for PixelSamsungOther makers",
     ]);
     expect([...(help?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"))).toEqual(

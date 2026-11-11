@@ -1942,8 +1942,7 @@
       "codeNote": "Unter Debugging über WLAN › Gerät über Kopplungscode koppeln. Öffne Einstellungen und agentes.chat nebeneinander, damit der Code sichtbar bleibt.",
       "wifiNote": "Das WLAN kann nach einem Neustart abbrechen. Ein Kabel ist zuverlässiger.",
       "done": "{{name}} ist verbunden",
-      "openFailed": "Dieses Handy hat den Bildschirm nicht geöffnet. Such ihn in den Einstellungen.",
-      "step3Hint": "Nimm ein Kabel, das Daten überträgt, nicht nur eines zum Laden. Wenn das Handy fragt, wofür USB genutzt wird, wähle Dateiübertragung."
+      "openFailed": "Dieses Handy hat den Bildschirm nicht geöffnet. Such ihn in den Einstellungen."
     },
     "iphone": {
       "title": "Dieses iPhone verbinden",

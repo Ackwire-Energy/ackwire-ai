@@ -13659,10 +13659,7 @@
         "alwaysWifi": "In diesem Netzwerk immer zulassen",
         "cancel": "Abbrechen",
         "allow": "Zulassen"
-      },
-      "found": "Erledigt an {{name}}",
-      "notShowing": "Handy wird nicht angezeigt?",
-      "notShowingHelp": "Versuch ein anderes Kabel oder einen anderen Anschluss, und wähle Dateiübertragung, wenn das Handy fragt, wofür USB genutzt wird. Schalte bei Samsung Auto Blocker unter Einstellungen › Sicherheit und Datenschutz aus."
+      }
     },
     "wifiPair": {
       "noComputer": "Die Kopplung über WLAN klappt mit einem deiner Computer. Nutze ein Kabel oder verbinde einen.",
