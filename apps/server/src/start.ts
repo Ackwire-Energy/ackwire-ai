@@ -169,12 +169,15 @@ export async function startServer(options: StartOptions) {
     runtime: { name: "bun", version: Bun.version },
   });
   const log = createLogger(config.LOG_LEVEL, errors);
-  startFreezeWatch({
-    logLevel: config.LOG_LEVEL,
-    ...(config.SENTRY_DSN
-      ? { reports: { dsn: config.SENTRY_DSN, environment: config.SENTRY_ENVIRONMENT, release } }
-      : {}),
-  });
+  startFreezeWatch(
+    {
+      logLevel: config.LOG_LEVEL,
+      ...(config.SENTRY_DSN
+        ? { reports: { dsn: config.SENTRY_DSN, environment: config.SENTRY_ENVIRONMENT, release } }
+        : {}),
+    },
+    log,
+  );
   try {
     return await boot(options, config, log, release, errors);
   } catch (error) {
