@@ -87,9 +87,11 @@
 .arrival-have__row[data-still] {
   cursor: default;
 }
-/* Picking another row: its ring comes on softly. */
-.bd .arrival-have__row {
-  transition: box-shadow 140ms var(--out);
+/* Picking another row: its ring comes on softly (at once under reduced motion, like every change here). */
+@media (prefers-reduced-motion: no-preference) {
+  .bd .arrival-have__row {
+    transition: box-shadow 140ms var(--out);
+  }
 }
 /* Its limits under it, from the mark's edge: name, bar, how much, when it renews; the columns line up. */
 .bd-wins {

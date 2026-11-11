@@ -24,7 +24,7 @@ import { advancedContents, effortLevel, viewSpeedFits } from "@agenteschat/clien
 import { computerNameOf, setupView } from "@agenteschat/client/lib/computer";
 import { contextChoices, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { holdText } from "@agenteschat/client/lib/errors";
-import { namesText } from "@agenteschat/client/lib/format";
+import { firstName, namesText } from "@agenteschat/client/lib/format";
 import {
   type AiChoice,
   aiChoiceOf,
@@ -89,8 +89,6 @@ export interface BrainRow extends HaveItem {
   /** The plan runs on another computer only: the agent moves there first. */
   moves: BrainMachine | null;
 }
-
-const firstName = (name: string | null | undefined) => name?.split(" ")[0] ?? "";
 
 export function useBrainState(view: AgentBrain, opts: { added: readonly MachineAccount[]; signingIn: boolean }) {
   const { t, i18n } = useTranslation();
@@ -228,7 +226,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
     } else act = taken ? "move" : "use";
     const whose = a.mine
       ? t("connectAi.chat.yours")
-      : t("agentPage.work.brain.accountOf", { name: firstName(a.ownerName) });
+      : t("agentPage.work.brain.accountOf", { name: firstName(a.ownerName ?? "") });
     const alsoUsed =
       others.length > 0 && a.shared === true
         ? t("agentPage.work.brain.accountAlso", { agents: namesText(t, others, 2) })
@@ -252,7 +250,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
       off: act === "locked" || (!current && !runsHere(plan)),
       signIn: act === "also" || act === "again",
       lends: !a.mine && a.ownerId !== agent.ownerUserId,
-      ownerName: firstName(a.ownerName),
+      ownerName: firstName(a.ownerName ?? ""),
       moves: null,
     };
   };

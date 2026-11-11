@@ -1,5 +1,6 @@
 import type { AgentBrain, AgentBrainInput, AgentSetup, BrainKind, MachineAccount } from "@agenteschat/client";
 import { keys, useAgents, useApi, useSetComputerTarget, useUpdateAgent } from "@agenteschat/client";
+import type { BrainScreen } from "@agenteschat/client/lib/agent-edit";
 import { autonomyWords, setupOutcome } from "@agenteschat/client/lib/agent-setup";
 import { signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { EVERYONE_AUDIENCE, setupPlanQuestion } from "@agenteschat/client/lib/audience";
@@ -112,14 +113,18 @@ interface MoreDraft extends Advanced {
 /** The effort's ramp: Automático is the model's choice, not a level (an automatic model picks the effort too). */
 const EFFORTS: readonly EffortLevel[] = EFFORT_LEVELS;
 
-export function BrainDialog({ onClose }: { onClose: () => void }) {
+/**
+ * `at`: a screen to open on, past the first one, which "back" leads to (a link's, e.g. the notification "Escolher
+ * outro modelo" opens the model). One this person can't change opens the first screen.
+ */
+export function BrainDialog({ onClose, at }: { onClose: () => void; at?: BrainScreen }) {
   const work = useWork();
   // Every screen starts from what is saved: the dialog mounts once it is loaded.
   if (!work.brain.data || !work.computer.data) return null;
-  return <BrainFlow view={work.brain.data} onClose={onClose} />;
+  return <BrainFlow view={work.brain.data} onClose={onClose} at={at} />;
 }
 
-function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void }) {
+function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => void; at?: BrainScreen }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const api = useApi();
@@ -139,8 +144,13 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const [signingIn, setSigningIn] = useState(false);
   const s = useBrainState(view, { added, signingIn });
 
-  // The way through the screens: back pops one, a save lands on the first again. At its limit it opens on the way out.
-  const [trail, setTrail] = useState<Screen[]>(() => [s.limitedNow ? "limit" : "glance"]);
+  const mayModel = s.kind === "model" ? can("model") : can("brain");
+  // The way through the screens: back pops one, a save lands on the first again. At its limit it opens on the way out,
+  // unless a link asked for a screen of its own.
+  const [trail, setTrail] = useState<Screen[]>(() => {
+    const asked = at === "model" ? mayModel : at === "switch" ? can("brain") : at === "more";
+    return at && asked ? ["glance", at] : [s.limitedNow ? "limit" : "glance"];
+  });
   const screen: Screen = trail[trail.length - 1] ?? "glance";
   const [dir, setDir] = useState<"fwd" | "back">("fwd");
   const go = (next: Screen) => {
@@ -376,12 +386,10 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
 
   /** A row picked to switch to: its sign-in first where it needs one, whom it is for where others share the account. */
   const confirm = (row: BrainRow) => {
-    if (row.act === "also" && row.account) {
-      setAdding({ row, also: row.account });
-      return go("add");
-    }
-    if (row.act === "again" && row.account) {
-      setAdding({ row, again: row.account });
+    if (row.act === "also" || row.act === "again") {
+      // A sign-in happens on the agent's computer: with none there is nothing to sign in on (its button is off).
+      if (!row.account || !view.computer) return;
+      setAdding(row.act === "also" ? { row, also: row.account } : { row, again: row.account });
       return go("add");
     }
     if (s.takesTeam(row)) {
@@ -544,7 +552,8 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
           brain: "model",
           model: saved.model,
           // Only admins see and change the key: anyone else's leaves each agent's own.
-          ...(can("key") ? { key: saved.key ?? null } : {}),
+          // The workspace's default key is the picker's placeholder, not a key id: it goes as null.
+          ...(can("key") ? { key: saved.key === DEFAULT_KEY ? null : (saved.key ?? null) } : {}),
           contextTokens: s.shownContext,
           ...autonomy,
         }
@@ -612,12 +621,14 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
   const toolOffHere =
     useIsThisMac(org.id, view.computer?.machineId ?? "") && view.options.some((o) => o.reason === "tool_off");
   const modelLimit = modelLimitText(t, i18n.language, s.usage, s.savedCard, s.shownModel);
-  // Where its plan would think, when that says something the row in use doesn't (offline, no computer has it).
+  // Where its plan would think, when that says something the row in use doesn't (offline, no computer has it). With
+  // no computer for it, why not and what to do (its panel's words) come before the bare "no computer has it".
   const savedSide =
     s.currentRow?.kind === "plan" || s.savedCard === "key"
       ? null
-      : (s.side(s.savedCard) ??
-        (s.homeOf(s.savedCard) ? null : { icon: "block" as IconName, text: s.reason(s.savedCard) ?? "" }));
+      : s.homeOf(s.savedCard)
+        ? s.side(s.savedCard)
+        : { icon: "block" as IconName, text: s.reason(s.savedCard) ?? s.side(s.savedCard)?.text ?? "" };
   const lendsAny = view.canUseOthersPlans === true && s.listed.some((a) => !a.mine && a.ownerId !== agent.ownerUserId);
   const pairer = work.machines.data?.find((x) => x.id === view.computer?.machineId)?.pairedBy?.name.split(" ")[0];
   // On someone else's computer only whoever connected it adds a sign-in: with nothing of the owner's there, it says so.
@@ -626,7 +637,6 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
     !view.canManageAccounts &&
     view.computer !== null &&
     !s.rows.some((r) => r.kind === "account" || r.kind === "own");
-  const mayModel = s.kind === "model" ? can("model") : can("brain");
   const team = [agent, ...s.team];
   const scene =
     (screen === "team" && teamToo) || (screen === "done" && (switched?.others.length ?? 0) > 0)
@@ -766,7 +776,7 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
       return (
         <>
           {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
-          <div className="arrival-for" role="group" aria-label={t("connectAi.agentAria")}>
+          <div className="arrival-for" role="group" aria-label={t("agentPage.work.brain.v2.teamAria")}>
             <OptionCard pressed={!teamToo} onClick={() => setTeamToo(false)}>
               <AgentAvatar agentId={agent.id} name={agent.name} size="sm" />
               <span className="ac-option__text">
@@ -1066,7 +1076,9 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
     if (screen === "add") return <div className="ac-dialog__foot arrival-chat__acts" ref={setFootAt} />;
     if (screen === "glance") {
       const signIn =
-        s.signInAgain && s.currentRow && s.currentAccount ? { row: s.currentRow, again: s.currentAccount } : null;
+        s.signInAgain && s.currentRow && s.currentAccount && view.computer
+          ? { row: s.currentRow, again: s.currentAccount }
+          : null;
       return footer({
         note: (
           <span className="ac-iconline">
@@ -1108,15 +1120,18 @@ function BrainFlow({ view, onClose }: { view: AgentBrain; onClose: () => void })
         main: (
           <Button
             variant="primary"
-            disabled={!row || row.current || row.off || busy}
+            disabled={!row || row.current || row.off || (row.signIn === true && !view.computer) || busy}
             loading={busy}
             onClick={() => row && confirm(row)}
           >
-            {row?.act === "again"
-              ? t(isPlanId(row.choice) ? "aiAccounts.page.newKey" : "agentPage.work.brain.signInAgain")
-              : row?.act === "also"
-                ? t("connectAi.signInFor", g)
-                : t("agentPage.work.brain.v2.switchTo", { label: row?.title ?? "" })}
+            {!row
+              ? // Nothing to switch to (the one in use alone): the screen's own words, never "Switch to" and nothing.
+                t("agentPage.work.brain.v2.switch")
+              : row.act === "again"
+                ? t(isPlanId(row.choice) ? "aiAccounts.page.newKey" : "agentPage.work.brain.signInAgain")
+                : row.act === "also"
+                  ? t("connectAi.signInFor", g)
+                  : t("agentPage.work.brain.v2.switchTo", { label: row.title })}
           </Button>
         ),
       });

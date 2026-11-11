@@ -245,9 +245,13 @@ export function PickList({
   const dom = useId();
   const [query, setQuery] = useState("");
   const long = options.length > PICKS_SEARCHED && searchLabel !== undefined;
-  const q = query.trim().toLowerCase();
-  const shown = q
-    ? options.filter((o) => `${o.label} ${o.group ?? ""} ${o.keywords ?? ""}`.toLowerCase().includes(q))
+  // Each word on its own, so a maker's name and the model's ("nvidia free") find it in any order.
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = words.length
+    ? options.filter((o) => {
+        const text = `${o.label} ${o.group ?? ""} ${o.keywords ?? ""}`.toLowerCase();
+        return words.every((w) => text.includes(w));
+      })
     : options;
   const grouped = new Set(options.map((o) => o.group ?? "")).size > 1;
   const row = (o: PickOption) => (
@@ -279,7 +283,7 @@ export function PickList({
     ) : (
       groups.map((x) => (
         <Fragment key={x.name || "-"}>
-          {grouped && x.name && !q && <p className="arrival-opts__label">{x.name}</p>}
+          {grouped && x.name && words.length === 0 && <p className="arrival-opts__label">{x.name}</p>}
           {x.rows.map(row)}
         </Fragment>
       ))

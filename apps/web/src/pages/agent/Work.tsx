@@ -13,6 +13,7 @@ import {
   useUpdateAgentBrowserSettings,
 } from "@agenteschat/client";
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
+import type { BrainScreen } from "@agenteschat/client/lib/agent-edit";
 import { ownSignInName } from "@agenteschat/client/lib/ai-accounts";
 import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
 import { computerNameOf, setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
@@ -497,9 +498,18 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
 }
 
 /** The dialog that is open, if any. */
-export function WorkDialogs({ open, onClose }: { open: WorkDialog | null; onClose: () => void }) {
+export function WorkDialogs({
+  open,
+  brainAt,
+  onClose,
+}: {
+  open: WorkDialog | null;
+  /** The screen "Quem pensa" opens on, from a link; its first one otherwise. */
+  brainAt?: BrainScreen;
+  onClose: () => void;
+}) {
   // Who thinks has its own dialog, under the sky like Connect's (ADR 0032 §5, addendum 2026-11-10).
-  if (open === "brain") return <BrainDialog onClose={onClose} />;
+  if (open === "brain") return <BrainDialog onClose={onClose} at={brainAt} />;
   if (open === "computer") return <ComputerDialog onClose={onClose} />;
   if (open === "browser") return <BrowserDialog onClose={onClose} />;
   return null;

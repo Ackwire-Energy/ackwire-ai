@@ -61,6 +61,7 @@ import {
   AGENT_TABS,
   type AgentSection,
   type AgentTab,
+  type BrainScreen,
   budgetValue,
   canEdit,
   changedKeys,
@@ -118,6 +119,8 @@ export interface AgentPageProps {
   agentId: string;
   tab: AgentTab;
   section?: AgentSection;
+  /** With the section "brain": the screen "Quem pensa" opens on (a notification's "Escolher outro modelo"). */
+  brainAt?: BrainScreen;
   /** Changes the tab (and section) in the URL. */
   onNavigate: (tab: AgentTab, section?: AgentSection) => void;
   /** Shown in the panel beside its DM (like a thread's), not as a page: closes the panel. */
@@ -187,7 +190,15 @@ function RightHandMineCard({ agent }: { agent: Agent }) {
   );
 }
 
-function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }: AgentPageProps & { agent: Agent }) {
+function AgentProfile({
+  agent,
+  tab,
+  section,
+  brainAt,
+  onNavigate,
+  onClose,
+  closeRequest,
+}: AgentPageProps & { agent: Agent }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -847,6 +858,7 @@ function AgentProfile({ agent, tab, section, onNavigate, onClose, closeRequest }
 
       <WorkDialogs
         open={work}
+        brainAt={section === "brain" ? brainAt : undefined}
         onClose={() => {
           setWork(null);
           if (section === "brain") onNavigate(tab);
