@@ -420,8 +420,9 @@ export function ensureSubids(user: Pick<AgentUser, "user" | "uid">, etc = "/etc"
     try {
       return parseSubids(readFileSync(file, "utf8"));
     } catch {
-      // usermod refuses to add ranges to a file that isn't there.
-      writeFileSync(file, "", { mode: 0o644, flag: "a" });
+      // usermod refuses to add ranges to a file that isn't there. Podman reads it as the agent: readable by all.
+      writeFileSync(file, "", { flag: "a" });
+      chmodSync(file, 0o644);
       return [];
     }
   });
