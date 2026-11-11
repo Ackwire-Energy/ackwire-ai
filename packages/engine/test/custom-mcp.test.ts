@@ -566,7 +566,7 @@ describe("custom MCP servers", () => {
     ).rejects.toMatchObject({ code: "connector.other_server" });
   });
 
-  test("Adicionar outra conta: the same address is a second account, 'Tickets 2', its own tools and no agent", async () => {
+  test("Adicionar outra conta: the same address is a second account, 'Tickets 2', its own tools, every agent's too", async () => {
     f = await setup();
     const mcp = ticketsMcp();
     const deps = depsOf(f, { connect: mcp.connect });
@@ -589,16 +589,17 @@ describe("custom MCP servers", () => {
       Tickets: "tickets",
       "Tickets 2": "tickets_2",
     });
-    // Only the first account is every agent's; the first keeps its grant and its key.
+    // Each account is every agent's; the first keeps its grant and its key.
     const grants = await f.db.select().from(schema.agentScopes);
-    expect(grants.filter((g) => g.connectionId === first.server.id).map((g) => g.scope)).toEqual(["connector:*"]);
-    expect(grants.some((g) => g.connectionId === second.server.id)).toBe(false);
+    for (const id of [first.server.id, second.server.id]) {
+      expect(grants.filter((g) => g.connectionId === id).map((g) => g.scope)).toEqual(["connector:*"]);
+    }
     const firstRow = rows.find((r) => r.id === first.server.id);
     if (!firstRow) throw new Error("first account gone");
     expect(await connectionHeaders(deps, firstRow)).toEqual({ authorization: "Bearer tk_first_12345" });
   });
 
-  test("two connects of one server at once: only one of them is every agent's", async () => {
+  test("two connects of one server at once: two accounts, each with its own names, both every agent's", async () => {
     f = await setup();
     const mcp = ticketsMcp();
     const deps = depsOf(f, { connect: mcp.connect });
@@ -612,7 +613,7 @@ describe("custom MCP servers", () => {
     expect(rows.map((r) => r.toolPrefix).sort()).toEqual(["tickets", "tickets_2"]);
     const grants = await f.db.select().from(schema.agentScopes);
     const granted = new Set(grants.filter((g) => g.scope === "connector:*").map((g) => g.connectionId));
-    expect(granted.size).toBe(1);
+    expect(granted.size).toBe(2);
   });
 
   test("another account at its address typed another way is one too; its tools follow the server, not a rename", async () => {
@@ -635,7 +636,7 @@ describe("custom MCP servers", () => {
     if (second.status !== "connected") throw new Error(`expected connected, got ${second.status}`);
     const rows = await f.db.select().from(schema.connectorConnections);
     expect(rows.find((r) => r.id === second.server.id)?.toolPrefix).toBe("tickets_2");
-    expect((await f.db.select().from(schema.agentScopes)).some((g) => g.connectionId === second.server.id)).toBe(false);
+    expect((await f.db.select().from(schema.agentScopes)).some((g) => g.connectionId === second.server.id)).toBe(true);
     const again = await connectCustomServer(deps, f.owner.id, f.org.id, {
       serverUrl: `${SERVER}/`,
       apiKey: "tk_first_67890",
@@ -764,7 +765,7 @@ describe("custom MCP servers", () => {
     expect(await f.db.select().from(schema.connectorConnections)).toHaveLength(1);
   });
 
-  test("tool names never collide: each account its own, an agent sees only the accounts it was given; levels per account", async () => {
+  test("tool names never collide: each account its own, every agent's until narrowed; levels per account", async () => {
     f = await setup();
     const stripe = stripeMcp();
     const deps = depsOf(f, { connect: stripe.connect, resolveHost: async () => ["93.184.216.34"] });
@@ -778,15 +779,17 @@ describe("custom MCP servers", () => {
     expect(listed).toContainEqual(["stripe_list_customers", "[Stripe (Acme)"]);
     expect(listed).toContainEqual(["stripe_2_list_customers", "[Stripe (Loja B)"]);
     expect(new Set(listed.map(([name]) => name)).size).toBe(listed.length);
-    // The first account is every agent's; the second starts with none.
+    // Each account is every agent's.
     expect((await gateway.list(ctx)).map((t) => t.name)).toEqual([
+      "stripe_2_list_available_accounts_or_orgs",
+      "stripe_2_list_customers",
       "stripe_list_available_accounts_or_orgs",
       "stripe_list_customers",
     ]);
     const tree = await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id);
     expect(tree.connectors.map((c) => [c.label, c.state])).toEqual([
       ["Stripe (Acme)", "granted"],
-      ["Stripe (Loja B)", "off"],
+      ["Stripe (Loja B)", "granted"],
     ]);
 
     const only = { all: false, connectors: { [loja.server.id]: true }, scopes: [], tools: { allow: [], deny: [] } };

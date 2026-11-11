@@ -188,35 +188,15 @@ describe("what an agent changed reads whole", () => {
     for (const file of ["Receipts.tsx", "TeamChecks.tsx"]) expect(source(file)).not.toContain("numberOfLines");
   });
 
-  test("Desfazer ends its sentence with the time left, never a column beside it, and its room stays once it goes", () => {
+  test("a receipt is its sentence alone: no Desfazer, no Refazer, no time left, no clock", () => {
     const receipts = source("Receipts.tsx");
-    const sentence = receipts.slice(
-      receipts.indexOf("function Sentence("),
-      receipts.indexOf("/**\n * A webhook routine"),
-    );
-    // In the sentence's own Text, after its words, wrapping with them.
-    expect(
-      ascending(
-        at(sentence, [
-          "{runs.map(",
-          "{shown && undo ? (",
-          "onPress={unseen ? undefined : redo ? undo.onRedo : undo.onUndo}",
-        ]),
-      ),
-    ).toBe(true);
+    for (const gone of ['t("agentActions.undo")', "agentActions.redo", "useAgentActions", "setInterval"])
+      expect(receipts).not.toContain(gone);
     expect(receipts).not.toContain("RowButton");
     expect(receipts).not.toContain("ACT_LINE");
-    // The word and its time wrap as one; past the window its room keeps the last second's width, unseen, untouchable
-    // and unread.
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the component's own template, read as source text
-    expect(sentence).toContain("`\\u00a0·\\u00a0${time}`");
-    expect(sentence).toContain("undo?.view.timeLeft || formatTimeLeft(0)");
-    expect(sentence).toContain('accessibilityLabel={unseen ? runs.map((r) => r.text).join("") : undefined}');
-    expect(receipts).toContain('unseen: { color: "transparent" }');
-    // Greedy breaks: what ends the sentence never moves the words before it; an undone one's Refazer isn't struck.
-    expect(sentence).toContain('textBreakStrategy="simple"');
-    expect(receipts).toContain('link: { fontWeight: "600", textDecorationLine: "none" }');
-    expect(receipts).not.toContain('t("agentActions.timeLeft"');
+    // One undone elsewhere stays as history.
+    expect(receipts).toContain("struck={Boolean(a.undoneAt)}");
+    expect(receipts).toContain("{a.undoneAt ? <UndoneBy action={a} /> : <HandyLines action={a} />}");
   });
 
   test("a team check's icon stays outside its action line: Abrir goes under the words, from their edge", () => {

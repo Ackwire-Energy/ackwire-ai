@@ -16,11 +16,14 @@ import { AgentPage } from "@/pages/AgentPage";
 export function AgentPanel({
   agentId,
   tab,
+  item,
   closeRequest: asked,
   onClose,
 }: {
   agentId: string;
   tab?: AgentTab;
+  /** The memory or skill to land on in Memória. */
+  item?: string;
   closeRequest?: number;
   onClose: () => void;
 }) {
@@ -51,6 +54,7 @@ export function AgentPanel({
           agentId={agentId}
           tab={place.tab}
           section={place.section}
+          item={item}
           onNavigate={(tab, section) => setPlace({ tab, section })}
           onClose={onClose}
           closeRequest={closeRequest}

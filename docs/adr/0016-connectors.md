@@ -51,7 +51,7 @@ Servers that refused or broke our OAuth showed what the native flow missed. Scop
 
 ## Addendum (2026-10-31): several accounts per MCP server
 
-Amended by ADR 0099. A server's address connected again is another account of it, not a new sign-in: "Reconectar" names its connection (`connectionId`). Only a server's first account is every agent's. Tool names start with each connection's stored `tool_prefix`, set once, not with its label, so renaming never renames tools. Catalog connectors keep one connection each.
+Amended by ADR 0099. A server's address connected again is another account of it, not a new sign-in: "Reconectar" names its connection (`connectionId`). Every account is every agent's. Tool names start with each connection's stored `tool_prefix`, set once, not with its label, so renaming never renames tools. Catalog connectors keep one connection each.
 
 ## Addendum (2026-10-31): no native Google Drive; services through Composio
 

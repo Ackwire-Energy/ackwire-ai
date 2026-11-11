@@ -2857,8 +2857,6 @@ export const ptBR = {
     was: "Antes: {{text}}",
     open: "O que o {{name}} sabe",
     open_female: "O que a {{name}} sabe",
-    undo: "Desfazer",
-    undone: "Desfeito",
     group: "Memória atualizada por {{name}}",
   },
   reach: {
@@ -3019,20 +3017,10 @@ export const ptBR = {
     someone: "alguém",
     you: "você",
     undo: "Desfazer",
-    redo: "Refazer",
-    undoAll: "Desfazer tudo",
     changes_one: "{{count}} mudança",
     changes_other: "{{count}} mudanças",
     undoneBy: "Desfeito por {{name}}",
-    ago: "há {{time}}",
-    timeLeft: "{{time}} para desfazer",
     group: "Mudanças de {{name}}",
-    undone: "Desfeito.",
-    redone: "Refeito.",
-    undoneAll_one: "{{count}} mudança desfeita.",
-    undoneAll_other: "{{count}} mudanças desfeitas.",
-    partial_one: "{{count}} mudança não pôde ser desfeita.",
-    partial_other: "{{count}} mudanças não puderam ser desfeitas.",
     errors: {
       changed_since: "Alguém mudou isso depois. Não dá mais para desfazer sem perder essa mudança.",
       expired: "O tempo para desfazer acabou.",
@@ -3685,6 +3673,7 @@ export const ptBR = {
       ready: "Conectado",
       syncing: "Sincronizando",
       reads: "Lê {{label}}",
+      readOnly: "só leitura",
       items_one: "{{count}} item",
       items_other: "{{count}} itens",
       synced: "sincronizado {{when}}",
@@ -3733,7 +3722,7 @@ export const ptBR = {
       onepassword: {
         step: {
           "1": "Crie no 1Password um cofre só para seus agentes e mova para ele os logins que eles podem usar",
-          "2": "Crie uma conta de serviço com acesso só a esse cofre",
+          "2": "Crie uma conta de serviço com acesso só a esse cofre (leitura e escrita, se seus agentes forem salvar novos logins nele)",
           "3": "Cole aqui o token da conta de serviço",
         },
         field: {
@@ -11257,7 +11246,7 @@ export const ptBR = {
       close: "Fechar detalhe",
       can: "O que os agentes poderão fazer",
       afterText: "Nenhum agente usa até você escolher.",
-      allText: "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.",
+      allText: "Ao conectar, todos os agentes podem usar. Dá para ajustar depois.",
       addAccount: "Adicionar outra conta",
       accountsText: "Cada conta tem quem usa e níveis próprios.",
       reconnect: "Reconectar",
@@ -11840,12 +11829,10 @@ export const ptBR = {
       "{{name}} só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
     serverSaid: "O servidor respondeu: {{detail}}",
     nothingYet: "Nada fica disponível para os agentes até o passo 3.",
-    allCanUse: "Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.",
-    newAccount: "A nova conta começa sem agentes, menos os que têm acesso a tudo. Você escolhe no passo 3.",
+    allCanUse: "Ao conectar, todos os agentes podem usar. Dá para ajustar depois.",
     replace: "Substitui o login atual. Quem usa continua igual.",
     replaceUnchecked: "Entre na mesma conta de antes. A gente não consegue conferir qual é, e quem usa continua igual.",
-    newAccountUnchecked:
-      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
+    newAccountUnchecked: "Entre numa conta que ainda não está conectada, a gente não consegue conferir.",
     addTitle: "Outra conta do {{name}}",
     reconnectTitle: "Reconectar {{name}}",
     accountName: "Nome desta conta",
@@ -11869,6 +11856,17 @@ export const ptBR = {
     grant: "Liberar",
     saved_one: "{{name}}: {{count}} agente pode usar.",
     saved_other: "{{name}}: {{count}} agentes podem usar.",
+    /** The end of connecting: a short confirmation. "Ajustar" opens the detail (tools, then who uses it). */
+    done: {
+      title: "{{name}} conectado",
+      everyone: "Todos os agentes podem usar.",
+      /** A server by address whose tools no one gave a level yet: "Continuar" saves the ones we suggest. */
+      waiting: "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos.",
+      asks_one: "{{count}} ação pede aprovação no chat.",
+      asks_other: "{{count}} ações pedem aprovação no chat.",
+      adjust: "Ajustar",
+      ok: "Pronto",
+    },
   },
   database: {
     name: "Banco de dados",

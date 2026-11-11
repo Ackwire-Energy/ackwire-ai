@@ -1,6 +1,5 @@
 import type { AgentQuestion, MemoryUpdate, Proposal, SecretRequest, SecretToVaultInput } from "@agenteschat/client";
 import {
-  keys,
   useCardProposals,
   useDecideProposal,
   useDecideProposals,
@@ -11,7 +10,7 @@ import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { messagePath } from "@agenteschat/client/lib/message-links";
-import { can, undoesMemoryChange } from "@agenteschat/client/lib/permissions";
+import { can } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
   cardHead,
@@ -51,7 +50,7 @@ import {
   Switch,
   Textarea,
 } from "@agenteschat/ui";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -97,30 +96,11 @@ const hostOf = (site: string | null | undefined) => {
  * knows (its page's Memória tab in the panel beside the conversation), and "Desfazer"
  * (`POST …/memories/{id}/revert`) for who may still undo it. A proposed change shows the proposal inline instead.
  */
-export function MemoryChangeCard({
-  update,
-  agentId,
-  sentAt,
-}: {
-  update: MemoryUpdate;
-  agentId: string;
-  /** When the reply carrying the card was sent; absent for a card that just arrived live. */
-  sentAt?: string;
-}) {
+export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; agentId: string }) {
   const { t } = useTranslation();
-  const { org, me } = useOrg();
-  const api = useApi();
-  const qc = useQueryClient();
+  const { org } = useOrg();
   const dir = useDirectory(org.id);
   const openPanel = useOpenAgentPanel();
-  const [undone, setUndone] = useState(false);
-  const revert = useMutation({
-    mutationFn: () => api.memory.revert(org.id, update.itemId),
-    onSuccess: () => {
-      setUndone(true);
-      void qc.invalidateQueries({ queryKey: keys.memory(org.id, agentId) });
-    },
-  });
   if (update.action === "proposed") {
     const ids = cardProposalIds(update);
     if (ids.length > 1) return <ProposalGroup proposalIds={ids} />;
@@ -140,7 +120,7 @@ export function MemoryChangeCard({
         <span className="ac-approval__who">
           <b>{t(`memoryCard.${update.action}`, { name })}</b>
         </span>
-        <Chip icon={undone ? "close" : "check"}>{undone ? t("memoryCard.undone") : t("memoryCard.chip")}</Chip>
+        <Chip icon="check">{t("memoryCard.chip")}</Chip>
       </div>
       <p className={update.action === "forgot" ? "ac-approval__title struck" : "ac-approval__title"}>{update.text}</p>
       {update.action === "updated" && update.previousText && (
@@ -148,18 +128,14 @@ export function MemoryChangeCard({
           {t("memoryCard.was", { text: update.previousText })}
         </p>
       )}
-      {/* Undo, a button, before the ghost link: as every request card's row, the filled ones first. */}
+      {/* The memory itself, where it is fixed or forgotten. */}
       <div className="ac-approval__actions ac-acts">
-        {!undone && update.undo && undoesMemoryChange(update, dir.anyAgent(agentId), me.user.id, org, sentAt) && (
-          <Button size="sm" disabled={revert.isPending} loading={revert.isPending} onClick={() => revert.mutate()}>
-            {t("memoryCard.undo")}
-          </Button>
-        )}
         <Button asChild variant="ghost" size="sm">
           <Link
             to="/org/$orgId/agents/$agentId/memory"
             params={{ orgId: org.id, agentId }}
-            onClick={openPanel ? (e) => inPlaceClick(e, () => openPanel(agentId, "memory")) : undefined}
+            search={{ item: update.itemId }}
+            onClick={openPanel ? (e) => inPlaceClick(e, () => openPanel(agentId, "memory", update.itemId)) : undefined}
           >
             {t("memoryCard.open", g)}
           </Link>
