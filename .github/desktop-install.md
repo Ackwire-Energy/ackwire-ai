@@ -9,8 +9,8 @@ The desktop app is in beta: the Mac build isn't notarized by Apple yet and the W
 
 If the button never shows up, or macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/agentes.chat.app` in Terminal and open it again.
 
-**Windows**: if your browser asks, choose **Keep**. When **Windows protected your PC** shows up, click **More info**, then **Run anyway**.
+**Windows** (`x64-setup.exe`, or `arm64-setup.exe` on an ARM computer): if your browser asks, choose **Keep**. When **Windows protected your PC** shows up, click **More info**, then **Run anyway**.
 
-**Linux**: `sudo apt install ./agentes_{{version}}_amd64.deb`
+**Linux**: `sudo apt install ./agentes_{{version}}_amd64.deb` (`_arm64.deb` on an ARM computer).
 
 Every step, with pictures: https://app.agentes.chat/download (also at `/download` on your own server).

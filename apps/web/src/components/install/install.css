@@ -358,7 +358,9 @@
   background: #ffcc00;
   box-shadow: 0 0 0 2px var(--w2);
   color: #1d1d1f;
-  font: 800 11px/18px system-ui, sans-serif;
+  font:
+    800 11px / 18px system-ui,
+    sans-serif;
   text-align: center;
 }
 .isc-capsule {
@@ -855,13 +857,21 @@
     0 0 0 0.5px #ffffff26,
     0 18px 40px -12px #000a;
   color: #e8e3ef;
-  font: 10px/15px var(--font-mono), ui-monospace, monospace;
+  font:
+    10px / 15px var(--font-mono),
+    ui-monospace,
+    monospace;
 }
 .isc-term__bar {
   height: 22px;
   background: #2f2a3d;
   color: #c9c2d6;
-  font: 600 9.5px/22px Ubuntu, Cantarell, var(--font-sans), system-ui, sans-serif;
+  font:
+    600 9.5px / 22px Ubuntu,
+    Cantarell,
+    var(--font-sans),
+    system-ui,
+    sans-serif;
   text-align: center;
 }
 .isc-term__in {
@@ -1338,6 +1348,9 @@
   flex-direction: column;
   align-items: flex-end;
   gap: 6px;
+}
+.dlp__arch {
+  font-size: 13px;
 }
 .dlp__get small {
   color: var(--muted);

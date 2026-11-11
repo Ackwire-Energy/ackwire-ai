@@ -1476,6 +1476,8 @@ export const ptBR = {
       version: "Versão {{version}}",
       versionSize: "Versão {{version}} · {{size}}",
       soon: "Ainda não há versão para {{system}}.",
+      useArm: "Computador com processador ARM? Baixe a versão ARM",
+      useX64: "Baixar a versão x64",
       unavailable: "Não dá para baixar o app daqui agora. Tente de novo em instantes.",
       installOn: "Instalar no {{system}}",
       system: "Sistema",
@@ -13478,6 +13480,8 @@ export const ptBR = {
     downloadFor: "Baixar para {{system}}",
     downloadApp: "Baixar o app",
     otherSystems: "Outros sistemas",
+    /** A versão para computadores com processador ARM: "Windows (ARM)". */
+    armBuild: "{{system}} (ARM)",
     onThePhone: "No celular",
     onTheIphone: "No iPhone",
     /** A tela de um celular ao vivo na página dele: assistir, assumir o controle e por que ela não aparece. */

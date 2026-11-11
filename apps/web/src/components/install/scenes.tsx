@@ -56,7 +56,15 @@ const Lights = () => (
 );
 
 /** The ringed thing to click, with the pointer on it. */
-function Hit({ as: Tag = "span", className, children }: { as?: "span" | "div"; className: string; children: ReactNode }) {
+function Hit({
+  as: Tag = "span",
+  className,
+  children,
+}: {
+  as?: "span" | "div";
+  className: string;
+  children: ReactNode;
+}) {
   return (
     <Tag className={`${className} isc-hl`}>
       {children}
@@ -130,10 +138,15 @@ function Linux({ children }: { children: ReactNode }) {
   );
 }
 
-/** One install step's drawing. `version`: the build's, for the file names the systems show. */
-export function Scene({ id, version }: { id: SceneId; version: string }) {
+/**
+ * One install step's drawing. `version` and `file`: the build's, for what the systems show (the installer's or the
+ * package's name, x64 or ARM64).
+ */
+export function Scene({ id, version, file }: { id: SceneId; version: string; file?: string }) {
   const { t } = useTranslation();
   const v = version || "1.0.0";
+  const installer = file?.endsWith(".exe") ? file : `agentes_${v}_x64-setup.exe`;
+  const deb = file?.endsWith(".deb") ? file : `agentes_${v}_amd64.deb`;
   switch (id) {
     case "macDrag":
       return (
@@ -282,7 +295,7 @@ export function Scene({ id, version }: { id: SceneId; version: string }) {
               <div className="isc-flyout__file">
                 <span />
                 <div>
-                  <b>agentes_{v}_x64-setup.exe</b>
+                  <b>{installer}</b>
                   <small>{t("install.scene.rare")}</small>
                 </div>
               </div>
@@ -307,7 +320,8 @@ export function Scene({ id, version }: { id: SceneId; version: string }) {
             ) : (
               <div className="isc-smartscreen__facts">
                 <div>
-                  <span>{t("install.scene.appLabel")}</span>agentes_{v}_x64-setup.exe
+                  <span>{t("install.scene.appLabel")}</span>
+                  {installer}
                 </div>
                 <div>
                   <span>{t("install.scene.publisher")}</span>
@@ -328,7 +342,7 @@ export function Scene({ id, version }: { id: SceneId; version: string }) {
           <div className="isc-term">
             <div className="isc-term__bar">{DOWNLOADS}</div>
             <div className="isc-term__in">
-              <em>{DOWNLOADS}$</em> sudo apt install ./agentes_{v}_amd64.deb
+              <em>{DOWNLOADS}$</em> sudo apt install ./{deb}
               {"\n"}
               {t("install.scene.readingLists")}
               {"\n"}
