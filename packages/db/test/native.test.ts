@@ -1,8 +1,8 @@
 import { afterAll, beforeAll, expect, spyOn, test } from "bun:test";
 import fs, {
+  type Mode,
   mkdirSync,
   mkdtempSync,
-  type Mode,
   type OpenMode,
   type PathLike,
   readdirSync,
@@ -177,11 +177,9 @@ test("a folder sync skips Windows and lets a refusing system through, but not a 
   const fail = (code: string) => Object.assign(new Error(code), { code });
   const opens = () => 3;
   const syncs = () => undefined;
-  const refuse =
-    (code: string) =>
-    (): never => {
-      throw fail(code);
-    };
+  const refuse = (code: string) => (): never => {
+    throw fail(code);
+  };
   const io = (open: () => number, sync: () => void) => ({
     openSync: ((path: string) => {
       calls.push(`open ${path}`);
