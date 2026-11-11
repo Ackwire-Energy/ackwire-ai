@@ -13021,7 +13021,8 @@
       "team_limit": "免费 Apple 账户已达到 App 数量上限",
       "helper_untrusted": "iPhone 还没有信任测试助手",
       "booting": "正在启动",
-      "no_driver": "Windows 没有这台手机的驱动",
+      "no_driver": "Windows 没有这台手机的 USB 驱动",
+      "no_driverLinux": "Linux 无法打开这台手机",
       "os_too_old": "这个系统太旧，无法使用这些工具",
       "adb_offline": "手机没有响应",
       "other": "设备上需要处理一些事"
@@ -13041,7 +13042,8 @@
       "team_limit": "删除一个你自己构建的 App",
       "helper_untrusted": "在 iPhone 上信任它",
       "booting": "等它启动完成",
-      "no_driver": "安装手机的 USB 驱动",
+      "no_driver": "安装手机厂商的 USB 驱动",
+      "no_driverLinux": "为这台手机添加 udev 规则",
       "os_too_old": "更新手机系统",
       "adb_offline": "重新插上",
       "other": "查看需要什么"
@@ -13178,18 +13180,35 @@
       "noComputer": "手机需要通过电脑连接，但还没有连接任何电脑。",
       "hostOffline": "{{computer}} 已离线。请打开它，或选择另一台。",
       "devOptions": "打开开发者选项",
-      "devOptionsText": "设置 › 关于手机，然后点按“版本号”7 次。",
+      "devOptionsText": "设置 › 关于手机，然后点按“版本号”7 次。三星手机：关于手机 › 软件信息 › 编译编号。",
       "usbDebugging": "打开 USB 调试",
-      "usbDebuggingText": "设置 › 系统 › 开发者选项 › USB 调试。",
+      "usbDebuggingText": "设置 › 系统 › 开发者选项 › USB 调试。三星手机：设置 › 开发者选项。",
+      "done": "已完成",
+      "notYet": "还没做",
       "plug": "插上手机",
       "plugged": "已插到 {{computer}}",
       "looking": "正在 {{computer}} 上查找手机…",
-      "found": "已在 {{name}} 上完成",
       "allow": "在手机上点按“允许”",
       "allowText": "先勾选“一律允许使用这台计算机进行调试”。",
       "wifiNote": "手机重启后无线调试会关闭。数据线更可靠。",
-      "notShowing": "手机没有出现？",
-      "notShowingHelp": "换一根数据线或换个接口试试，如果手机询问 USB 的用途，请选择“文件传输”。三星手机请在 设置 › 安全和隐私 中关闭“自动拦截器”。",
+      "noDriver": "{{computer}} 能看到手机，但没有它的 USB 驱动。请安装厂商的驱动，然后重新插上手机。",
+      "noDriverLinux": "{{computer}} 能看到手机，但无法打开它。请为它添加 udev 规则，然后重新插上手机。",
+      "udev": "如何添加 udev 规则",
+      "slow": "还是没出现？",
+      "help": {
+        "cable": "一根能传数据的数据线。有些线只能充电。也可以换个接口试试。",
+        "unlocked": "手机已解锁，屏幕亮着。",
+        "fileTransfer": "如果手机询问 USB 的用途，请选择“文件传输”。",
+        "usbDebugging": "USB 调试已开启。",
+        "seeStep": "查看第 2 步",
+        "samsung": "三星手机请关闭“自动拦截器”：设置 › 安全和隐私 › 自动拦截器。",
+        "driver": "Windows 上需要手机厂商的 USB 驱动："
+      },
+      "drivers": {
+        "google": "Google（Pixel）",
+        "samsung": "三星",
+        "others": "其他厂商"
+      },
       "qrLabel": "在手机上打开这些步骤的二维码",
       "qrLine": "在手机上操作",
       "qrCaption": "扫码即可在 agentes.chat 应用中打开这些步骤，每项设置都有对应的按钮。",
@@ -13209,7 +13228,10 @@
         "alwaysWifi": "一律允许通过此网络进行调试",
         "cancel": "取消",
         "allow": "允许"
-      }
+      },
+      "found": "已在 {{name}} 上完成",
+      "notShowing": "手机没有出现？",
+      "notShowingHelp": "换一根数据线或换个接口试试，如果手机询问 USB 的用途，请选择“文件传输”。三星手机请在 设置 › 安全和隐私 中关闭“自动拦截器”。"
     },
     "wifiPair": {
       "noComputer": "通过 Wi-Fi 配对需要使用你的电脑。请用数据线，或先连接一台电脑。",

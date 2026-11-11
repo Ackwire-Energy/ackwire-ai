@@ -13916,7 +13916,8 @@
       "team_limit": "L'Apple Account gratuito ha raggiunto il limite di app",
       "helper_untrusted": "L'iPhone non ha ancora autorizzato l'app di test",
       "booting": "Avvio in corso",
-      "no_driver": "Windows non ha un driver per questo telefono",
+      "no_driver": "Windows non ha un driver USB per questo telefono",
+      "no_driverLinux": "Linux non riesce ad aprire questo telefono",
       "os_too_old": "Questo sistema è troppo vecchio per gli strumenti",
       "adb_offline": "Il telefono non risponde",
       "other": "Serve qualcosa sul dispositivo"
@@ -13936,7 +13937,8 @@
       "team_limit": "Rimuovi un'app che hai creato",
       "helper_untrusted": "Autorizzala sull'iPhone",
       "booting": "Aspetta che si avvii",
-      "no_driver": "Installa il driver USB del telefono",
+      "no_driver": "Installa il driver USB del produttore del telefono",
+      "no_driverLinux": "Aggiungi le regole udev per questo telefono",
       "os_too_old": "Aggiorna il telefono",
       "adb_offline": "Ricollegalo",
       "other": "Guarda cosa serve"
@@ -14077,18 +14079,35 @@
       "noComputer": "I telefoni si collegano tramite un computer, e non ce n'è ancora nessuno collegato.",
       "hostOffline": "{{computer}} è offline. Accendilo o scegline un altro.",
       "devOptions": "Attiva Opzioni sviluppatore",
-      "devOptionsText": "Impostazioni › Informazioni sul telefono, poi tocca 7 volte Numero build.",
+      "devOptionsText": "Impostazioni › Informazioni sul telefono, poi tocca 7 volte Numero build. Sui Samsung: Info sul telefono › Informazioni software › Numero build.",
       "usbDebugging": "Attiva il Debug USB",
-      "usbDebuggingText": "Impostazioni › Sistema › Opzioni sviluppatore › Debug USB.",
+      "usbDebuggingText": "Impostazioni › Sistema › Opzioni sviluppatore › Debug USB. Sui Samsung: Impostazioni › Opzioni sviluppatore.",
+      "done": "Fatto",
+      "notYet": "Non ancora",
       "plug": "Collega il telefono",
       "plugged": "Collegato a {{computer}}",
       "looking": "Ricerca di un telefono su {{computer}}…",
-      "found": "Fatto su {{name}}",
       "allow": "Tocca Consenti sul telefono",
       "allowText": "Prima seleziona Consenti sempre da questo computer.",
       "wifiNote": "Il debug wireless si disattiva quando il telefono si riavvia. Un cavo è più affidabile.",
-      "notShowing": "Il telefono non compare?",
-      "notShowingHelp": "Prova un altro cavo o un'altra porta, e scegli Trasferimento file se il telefono chiede a cosa serve l'USB. Sui Samsung, disattiva Blocco automatico in Impostazioni › Sicurezza e privacy.",
+      "noDriver": "{{computer}} vede il telefono ma non ha il suo driver USB. Installa il driver del produttore, poi ricollega il telefono.",
+      "noDriverLinux": "{{computer}} vede il telefono ma non riesce ad aprirlo. Aggiungi le regole udev per il telefono, poi ricollegalo.",
+      "udev": "Come aggiungere le regole udev",
+      "slow": "Ancora niente?",
+      "help": {
+        "cable": "Un cavo che trasferisce dati. Alcuni servono solo a caricare. Oppure prova un'altra porta.",
+        "unlocked": "Il telefono sbloccato, con lo schermo acceso.",
+        "fileTransfer": "Se il telefono chiede come usare l'USB, scegli Trasferimento file.",
+        "usbDebugging": "Debug USB attivo.",
+        "seeStep": "Vedi il passaggio 2",
+        "samsung": "Sui Samsung, Blocco automatico disattivato: Impostazioni › Sicurezza e privacy › Blocco automatico.",
+        "driver": "Su Windows, il driver USB del produttore del telefono:"
+      },
+      "drivers": {
+        "google": "Google, per Pixel",
+        "samsung": "Samsung",
+        "others": "Altri produttori"
+      },
       "qrLabel": "Codice QR che apre questi passaggi sul telefono",
       "qrLine": "Fallo dal telefono",
       "qrCaption": "Scansionalo per aprire questi passaggi nell'app agentes.chat, con un pulsante per ogni impostazione.",
@@ -14108,7 +14127,10 @@
         "alwaysWifi": "Consenti sempre su questa rete",
         "cancel": "Annulla",
         "allow": "Consenti"
-      }
+      },
+      "found": "Fatto su {{name}}",
+      "notShowing": "Il telefono non compare?",
+      "notShowingHelp": "Prova un altro cavo o un'altra porta, e scegli Trasferimento file se il telefono chiede a cosa serve l'USB. Sui Samsung, disattiva Blocco automatico in Impostazioni › Sicurezza e privacy."
     },
     "wifiPair": {
       "noComputer": "L'accoppiamento via Wi-Fi funziona con un tuo computer. Usa un cavo, o collegane uno.",

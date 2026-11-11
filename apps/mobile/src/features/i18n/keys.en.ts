@@ -1890,7 +1890,8 @@ export const featureKeysEn = {
       team_limit: "Remove an app you built from this iPhone",
       helper_untrusted: "Trust the test helper on this iPhone",
       booting: "Starting up",
-      no_driver: "Windows needs this phone's USB driver",
+      no_driver: "Windows needs the phone maker's USB driver",
+      no_driverLinux: "Linux needs udev rules for this phone",
       os_too_old: "This phone's system is too old",
       adb_offline: "Unplug the cable and plug it in again",
       other: "Not ready yet",
@@ -1988,13 +1989,13 @@ export const featureKeysEn = {
       noHost: "This phone works through a computer of yours. Connect one first.",
       hostOffline: "{{host}} is offline. Turn it on and open agentes.chat there.",
       step1: "Turn on Developer options",
-      step1Text: "Tap Build number 7 times, then enter your PIN.",
+      /** Android's own setting names; Samsung's own where its path differs. */
+      step1Text:
+        "Tap Build number 7 times, then enter your PIN. On Samsung: Software information\u00a0›\u00a0Build number.",
       openAbout: "Open About phone",
       step2: "Turn on USB debugging",
       openDev: "Open Developer options",
       step3: "Plug it into {{host}}",
-      step3Hint:
-        "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer.",
       looking: "Looking for this phone",
       step4: "Tap Allow on this phone",
       step4Text: "Check Always allow from this computer first.",

@@ -4443,7 +4443,10 @@
     "value": "Starting up"
   },
   "devices.reason.no_driver": {
-    "value": "Windows needs this phone's USB driver"
+    "value": "Windows needs the phone maker's USB driver"
+  },
+  "devices.reason.no_driverLinux": {
+    "value": "Linux needs udev rules for this phone"
   },
   "devices.reason.os_too_old": {
     "value": "This phone's system is too old"
@@ -4698,7 +4701,7 @@
     "value": "Turn on Developer options"
   },
   "devices.android.step1Text": {
-    "value": "Tap Build number 7 times, then enter your PIN."
+    "value": "Tap Build number 7 times, then enter your PIN. On Samsung: Software information › Build number."
   },
   "devices.android.openAbout": {
     "value": "Open About phone"
@@ -4711,9 +4714,6 @@
   },
   "devices.android.step3": {
     "value": "Plug it into {{host}}"
-  },
-  "devices.android.step3Hint": {
-    "value": "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer."
   },
   "devices.android.looking": {
     "value": "Looking for this phone"
@@ -4780,6 +4780,9 @@
   },
   "devices.android.openFailed": {
     "value": "This phone didn't open that screen. Find it in Settings."
+  },
+  "devices.android.step3Hint": {
+    "value": "Use a cable that carries data, not one that only charges. If the phone asks what the USB is for, pick File transfer."
   },
   "devices.iphone.title": {
     "value": "Connect this iPhone"

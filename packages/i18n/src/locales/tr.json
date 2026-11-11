@@ -13385,7 +13385,8 @@
       "team_limit": "Ücretsiz Apple Account uygulama sınırına ulaştı",
       "helper_untrusted": "iPhone henüz test yardımcısına güvenmiyor",
       "booting": "Başlatılıyor",
-      "no_driver": "Windows'ta bu telefon için sürücü yok",
+      "no_driver": "Windows'ta bu telefon için USB sürücüsü yok",
+      "no_driverLinux": "Linux bu telefonu açamıyor",
       "os_too_old": "Bu sistem araçlar için çok eski",
       "adb_offline": "Telefon yanıt vermiyor",
       "other": "Cihazda bir şey yapılması gerekiyor"
@@ -13405,7 +13406,8 @@
       "team_limit": "Kendi oluşturduğunuz bir uygulamayı silin",
       "helper_untrusted": "iPhone'da güvenin",
       "booting": "Başlamasını bekleyin",
-      "no_driver": "Telefonun USB sürücüsünü yükleyin",
+      "no_driver": "Telefon üreticisinin USB sürücüsünü yükleyin",
+      "no_driverLinux": "Bu telefon için udev kuralları ekleyin",
       "os_too_old": "Telefonu güncelleyin",
       "adb_offline": "Yeniden takın",
       "other": "Neye ihtiyacı olduğuna bakın"
@@ -13544,18 +13546,35 @@
       "noComputer": "Telefonlar bir bilgisayar üzerinden bağlanır ve henüz bağlı bilgisayar yok.",
       "hostOffline": "{{computer}} çevrimdışı. Açın ya da başka birini seçin.",
       "devOptions": "Geliştirici seçeneklerini açın",
-      "devOptionsText": "Ayarlar › Telefon hakkında, ardından Derleme numarası'na 7 kez dokunun.",
+      "devOptionsText": "Ayarlar › Telefon hakkında, ardından Derleme numarası'na 7 kez dokunun. Samsung'da: Telefon hakkında › Yazılım bilgileri › Yapım numarası.",
       "usbDebugging": "USB hata ayıklamayı açın",
-      "usbDebuggingText": "Ayarlar › Sistem › Geliştirici seçenekleri › USB hata ayıklama.",
+      "usbDebuggingText": "Ayarlar › Sistem › Geliştirici seçenekleri › USB hata ayıklama. Samsung'da: Ayarlar › Geliştirici seçenekleri.",
+      "done": "Tamam",
+      "notYet": "Henüz yapmadım",
       "plug": "Telefonu takın",
       "plugged": "{{computer}} bilgisayarına takılı",
       "looking": "{{computer}} üzerinde telefon aranıyor…",
-      "found": "{{name}} üzerinde tamamlandı",
       "allow": "Telefonda İzin ver'e dokunun",
       "allowText": "Önce Bu bilgisayardan her zaman izin ver'i işaretleyin.",
       "wifiNote": "Kablosuz hata ayıklama, telefon yeniden başlatıldığında kapanır. Kablo daha güvenilirdir.",
-      "notShowing": "Telefon görünmüyor mu?",
-      "notShowingHelp": "Başka bir kablo ya da bağlantı noktası deneyin ve telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin. Samsung'da Ayarlar › Güvenlik ve gizlilik bölümünden Otomatik Engelleyici'yi kapatın.",
+      "noDriver": "{{computer}} telefonu görüyor ama onun için USB sürücüsü yok. Üreticinin sürücüsünü yükleyin, ardından telefonu yeniden takın.",
+      "noDriverLinux": "{{computer}} telefonu görüyor ama açamıyor. Onun için udev kuralları ekleyin, ardından telefonu yeniden takın.",
+      "udev": "udev kuralları nasıl eklenir",
+      "slow": "Hâlâ görünmüyor mu?",
+      "help": {
+        "cable": "Veri aktaran bir kablo. Bazıları yalnızca şarj eder. Ya da başka bir bağlantı noktası deneyin.",
+        "unlocked": "Telefonun kilidi açık, ekranı açık.",
+        "fileTransfer": "Telefon USB'nin nasıl kullanılacağını sorarsa Dosya aktarımı'nı seçin.",
+        "usbDebugging": "USB hata ayıklama açık.",
+        "seeStep": "2. adıma bakın",
+        "samsung": "Samsung'da Otomatik Engelleyici kapalı: Ayarlar › Güvenlik ve gizlilik › Otomatik Engelleyici.",
+        "driver": "Windows'ta telefon üreticisinin USB sürücüsü:"
+      },
+      "drivers": {
+        "google": "Google, Pixel için",
+        "samsung": "Samsung",
+        "others": "Diğer üreticiler"
+      },
       "qrLabel": "Bu adımları telefonda açan QR kodu",
       "qrLine": "Telefonunuzdan yapın",
       "qrCaption": "Bu adımları, her ayar için düğmeleriyle agentes.chat uygulamasında açmak için tarayın.",
@@ -13575,7 +13594,10 @@
         "alwaysWifi": "Bu ağda her zaman izin ver",
         "cancel": "İptal",
         "allow": "İzin ver"
-      }
+      },
+      "found": "{{name}} üzerinde tamamlandı",
+      "notShowing": "Telefon görünmüyor mu?",
+      "notShowingHelp": "Başka bir kablo ya da bağlantı noktası deneyin ve telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin. Samsung'da Ayarlar › Güvenlik ve gizlilik bölümünden Otomatik Engelleyici'yi kapatın."
     },
     "wifiPair": {
       "noComputer": "Wi-Fi ile eşleme sizin bir bilgisayarınızla çalışır. Kablo kullanın ya da bir bilgisayar bağlayın.",

@@ -13372,7 +13372,8 @@ export const en = {
       team_limit: "The free Apple Account reached its app limit",
       helper_untrusted: "The iPhone doesn't trust the test helper yet",
       booting: "Starting",
-      no_driver: "Windows has no driver for this phone",
+      no_driver: "Windows has no USB driver for this phone",
+      no_driverLinux: "Linux can't open this phone",
       os_too_old: "This system is too old for the tools",
       adb_offline: "The phone isn't answering",
       other: "It needs something on the device",
@@ -13393,7 +13394,8 @@ export const en = {
       team_limit: "Remove an app you built",
       helper_untrusted: "Trust it on the iPhone",
       booting: "Wait for it to start",
-      no_driver: "Install the phone's USB driver",
+      no_driver: "Install the phone maker's USB driver",
+      no_driverLinux: "Add udev rules for this phone",
       os_too_old: "Update the phone",
       adb_offline: "Plug it in again",
       other: "See what it needs",
@@ -13530,19 +13532,45 @@ export const en = {
       noComputer: "Phones connect through a computer, and none is connected yet.",
       hostOffline: "{{computer}} is offline. Turn it on, or pick another one.",
       devOptions: "Turn on Developer options",
-      devOptionsText: "Settings\u00a0›\u00a0About phone, then tap Build number 7 times.",
+      /** Android's own setting names; Samsung's own where its path differs. */
+      devOptionsText:
+        "Settings\u00a0›\u00a0About phone, then tap Build number 7 times. On Samsung: About phone\u00a0›\u00a0Software information\u00a0›\u00a0Build number.",
       usbDebugging: "Turn on USB debugging",
-      usbDebuggingText: "Settings\u00a0›\u00a0System\u00a0›\u00a0Developer options\u00a0›\u00a0USB debugging.",
+      usbDebuggingText:
+        "Settings\u00a0›\u00a0System\u00a0›\u00a0Developer options\u00a0›\u00a0USB debugging. On Samsung: Settings\u00a0›\u00a0Developer options.",
+      /** A button: the person did this step on the phone. */
+      done: "Done",
+      /** Unticks a step the person ticked. */
+      notYet: "Not done yet",
       plug: "Plug the phone in",
       plugged: "Plugged into {{computer}}",
       looking: "Looking for a phone on {{computer}}…",
-      found: "Done on {{name}}",
       allow: "Tap Allow on the phone",
       allowText: "Check Always allow from this computer first.",
       wifiNote: "Wireless debugging turns off when the phone restarts. A cable is more reliable.",
-      notShowing: "Phone not showing up?",
-      notShowingHelp:
-        "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings\u00a0›\u00a0Security and privacy.",
+      noDriver:
+        "{{computer}} sees the phone but has no USB driver for it. Install the phone maker's driver, then plug the phone in again.",
+      noDriverLinux:
+        "{{computer}} sees the phone but can't open it. Add udev rules for it, then plug the phone in again.",
+      udev: "How to add udev rules",
+      /** Over a checklist of why a plugged phone may not show up, after 30 s without one. */
+      slow: "Still not showing up?",
+      /** Android's own setting names, as the phone shows them in this language; Samsung's own for Auto Blocker. */
+      help: {
+        cable: "A cable that carries data. Some only charge. Or try another port.",
+        unlocked: "The phone unlocked, with its screen on.",
+        fileTransfer: "If the phone asks how to use USB, pick File transfer.",
+        usbDebugging: "USB debugging on.",
+        seeStep: "See step 2",
+        samsung: "On Samsung, Auto Blocker off: Settings\u00a0›\u00a0Security and privacy\u00a0›\u00a0Auto Blocker.",
+        driver: "On Windows, the phone maker's USB driver:",
+      },
+      /** Links to each maker's USB driver page. */
+      drivers: {
+        google: "Google, for Pixel",
+        samsung: "Samsung",
+        others: "Other makers",
+      },
       qrLabel: "QR code that opens these steps on the phone",
       qrLine: "Do it from your phone",
       qrCaption: "Scan to open these steps in the agentes.chat app, with buttons for each setting.",

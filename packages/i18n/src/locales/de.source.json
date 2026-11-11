@@ -32674,7 +32674,10 @@
     "value": "Starting"
   },
   "devices.reason.no_driver": {
-    "value": "Windows has no driver for this phone"
+    "value": "Windows has no USB driver for this phone"
+  },
+  "devices.reason.no_driverLinux": {
+    "value": "Linux can't open this phone"
   },
   "devices.reason.os_too_old": {
     "value": "This system is too old for the tools"
@@ -32728,7 +32731,10 @@
     "value": "Wait for it to start"
   },
   "devices.fix.no_driver": {
-    "value": "Install the phone's USB driver"
+    "value": "Install the phone maker's USB driver"
+  },
+  "devices.fix.no_driverLinux": {
+    "value": "Add udev rules for this phone"
   },
   "devices.fix.os_too_old": {
     "value": "Update the phone"
@@ -33079,13 +33085,19 @@
     "value": "Turn on Developer options"
   },
   "devices.android.devOptionsText": {
-    "value": "Settings › About phone, then tap Build number 7 times."
+    "value": "Settings › About phone, then tap Build number 7 times. On Samsung: About phone › Software information › Build number."
   },
   "devices.android.usbDebugging": {
     "value": "Turn on USB debugging"
   },
   "devices.android.usbDebuggingText": {
-    "value": "Settings › System › Developer options › USB debugging."
+    "value": "Settings › System › Developer options › USB debugging. On Samsung: Settings › Developer options."
+  },
+  "devices.android.done": {
+    "value": "Done"
+  },
+  "devices.android.notYet": {
+    "value": "Not done yet"
   },
   "devices.android.plug": {
     "value": "Plug the phone in"
@@ -33096,9 +33108,6 @@
   "devices.android.looking": {
     "value": "Looking for a phone on {{computer}}…"
   },
-  "devices.android.found": {
-    "value": "Done on {{name}}"
-  },
   "devices.android.allow": {
     "value": "Tap Allow on the phone"
   },
@@ -33108,11 +33117,47 @@
   "devices.android.wifiNote": {
     "value": "Wireless debugging turns off when the phone restarts. A cable is more reliable."
   },
-  "devices.android.notShowing": {
-    "value": "Phone not showing up?"
+  "devices.android.noDriver": {
+    "value": "{{computer}} sees the phone but has no USB driver for it. Install the phone maker's driver, then plug the phone in again."
   },
-  "devices.android.notShowingHelp": {
-    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
+  "devices.android.noDriverLinux": {
+    "value": "{{computer}} sees the phone but can't open it. Add udev rules for it, then plug the phone in again."
+  },
+  "devices.android.udev": {
+    "value": "How to add udev rules"
+  },
+  "devices.android.slow": {
+    "value": "Still not showing up?"
+  },
+  "devices.android.help.cable": {
+    "value": "A cable that carries data. Some only charge. Or try another port."
+  },
+  "devices.android.help.unlocked": {
+    "value": "The phone unlocked, with its screen on."
+  },
+  "devices.android.help.fileTransfer": {
+    "value": "If the phone asks how to use USB, pick File transfer."
+  },
+  "devices.android.help.usbDebugging": {
+    "value": "USB debugging on."
+  },
+  "devices.android.help.seeStep": {
+    "value": "See step 2"
+  },
+  "devices.android.help.samsung": {
+    "value": "On Samsung, Auto Blocker off: Settings › Security and privacy › Auto Blocker."
+  },
+  "devices.android.help.driver": {
+    "value": "On Windows, the phone maker's USB driver:"
+  },
+  "devices.android.drivers.google": {
+    "value": "Google, for Pixel"
+  },
+  "devices.android.drivers.samsung": {
+    "value": "Samsung"
+  },
+  "devices.android.drivers.others": {
+    "value": "Other makers"
   },
   "devices.android.qrLabel": {
     "value": "QR code that opens these steps on the phone"
@@ -33161,6 +33206,15 @@
   },
   "devices.android.prompt.allow": {
     "value": "Allow"
+  },
+  "devices.android.found": {
+    "value": "Done on {{name}}"
+  },
+  "devices.android.notShowing": {
+    "value": "Phone not showing up?"
+  },
+  "devices.android.notShowingHelp": {
+    "value": "Try another cable or port, and pick File transfer if the phone asks what the USB is for. On Samsung, turn off Auto Blocker in Settings › Security and privacy."
   },
   "devices.wifiPair.noComputer": {
     "value": "Wi-Fi pairing works with a computer of yours. Use a cable, or connect one."

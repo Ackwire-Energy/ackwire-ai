@@ -1812,7 +1812,8 @@
       "team_limit": "Kendi oluşturduğunuz bir uygulamayı bu iPhone'dan silin",
       "helper_untrusted": "Bu iPhone'da test yardımcısına güvenin",
       "booting": "Başlatılıyor",
-      "no_driver": "Windows'un bu telefonun USB sürücüsüne ihtiyacı var",
+      "no_driver": "Windows'un telefon üreticisinin USB sürücüsüne ihtiyacı var",
+      "no_driverLinux": "Linux'un bu telefon için udev kurallarına ihtiyacı var",
       "os_too_old": "Bu telefonun sistemi çok eski",
       "adb_offline": "Kabloyu çıkarıp yeniden takın",
       "other": "Henüz hazır değil"
@@ -1913,12 +1914,11 @@
       "noHost": "Bu telefon sizin bir bilgisayarınız üzerinden çalışır. Önce bir bilgisayar bağlayın.",
       "hostOffline": "{{host}} çevrimdışı. Açın ve orada agentes.chat'i açın.",
       "step1": "Geliştirici seçeneklerini açın",
-      "step1Text": "Derleme numarası'na 7 kez dokunun, ardından PIN'inizi girin.",
+      "step1Text": "Derleme numarası'na 7 kez dokunun, ardından PIN'inizi girin. Samsung'da: Yazılım bilgileri › Yapım numarası.",
       "openAbout": "Telefon hakkında'yı aç",
       "step2": "USB hata ayıklamayı açın",
       "openDev": "Geliştirici seçenekleri'ni aç",
       "step3": "{{host}} bilgisayarına takın",
-      "step3Hint": "Yalnızca şarj eden değil, veri aktaran bir kablo kullanın. Telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin.",
       "looking": "Bu telefon aranıyor",
       "step4": "Bu telefonda İzin ver'e dokunun",
       "step4Text": "Önce Bu bilgisayardan her zaman izin ver'i işaretleyin.",
@@ -1942,7 +1942,8 @@
       "codeNote": "Kablosuz hata ayıklama › Cihazı eşleme koduyla eşle bölümünden. Kod ekranda kalsın diye Ayarlar'ı ve agentes.chat'i yan yana açın.",
       "wifiNote": "Wi-Fi yeniden başlatmadan sonra kopabilir. Kablo daha güvenilirdir.",
       "done": "{{name}} bağlandı",
-      "openFailed": "Bu telefon o ekranı açmadı. Ayarlar'da bulun."
+      "openFailed": "Bu telefon o ekranı açmadı. Ayarlar'da bulun.",
+      "step3Hint": "Yalnızca şarj eden değil, veri aktaran bir kablo kullanın. Telefon USB'nin ne için kullanılacağını sorarsa Dosya aktarımı'nı seçin."
     },
     "iphone": {
       "title": "Bu iPhone'u bağlayın",

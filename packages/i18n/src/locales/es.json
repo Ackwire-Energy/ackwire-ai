@@ -13835,7 +13835,8 @@
       "team_limit": "La Apple Account gratuita llegó a su límite de apps",
       "helper_untrusted": "El iPhone aún no confía en la app de pruebas",
       "booting": "Iniciando",
-      "no_driver": "Windows no tiene un controlador para este teléfono",
+      "no_driver": "Windows no tiene un controlador USB para este teléfono",
+      "no_driverLinux": "Linux no puede abrir este teléfono",
       "os_too_old": "Este sistema es demasiado antiguo para las herramientas",
       "adb_offline": "El teléfono no responde",
       "other": "Necesita algo en el dispositivo"
@@ -13855,7 +13856,8 @@
       "team_limit": "Elimina una app que creaste",
       "helper_untrusted": "Confía en ella en el iPhone",
       "booting": "Espera a que inicie",
-      "no_driver": "Instala el controlador USB del teléfono",
+      "no_driver": "Instala el controlador USB del fabricante del teléfono",
+      "no_driverLinux": "Agrega reglas udev para este teléfono",
       "os_too_old": "Actualiza el teléfono",
       "adb_offline": "Vuelve a conectarlo",
       "other": "Mira qué necesita"
@@ -13996,18 +13998,35 @@
       "noComputer": "Los teléfonos se conectan a través de una computadora, y todavía no hay ninguna conectada.",
       "hostOffline": "{{computer}} está sin conexión. Enciéndela o elige otra.",
       "devOptions": "Activa las Opciones para desarrolladores",
-      "devOptionsText": "Configuración › Información del teléfono y luego toca 7 veces Número de compilación.",
+      "devOptionsText": "Configuración › Información del teléfono y luego toca 7 veces Número de compilación. En Samsung: Información del teléfono › Información de software › Número de compilación.",
       "usbDebugging": "Activa la Depuración por USB",
-      "usbDebuggingText": "Configuración › Sistema › Opciones para desarrolladores › Depuración por USB.",
+      "usbDebuggingText": "Configuración › Sistema › Opciones para desarrolladores › Depuración por USB. En Samsung: Configuración › Opciones de desarrollador.",
+      "done": "Listo",
+      "notYet": "Aún no lo hice",
       "plug": "Conecta el teléfono",
       "plugged": "Conectado a {{computer}}",
       "looking": "Buscando un teléfono en {{computer}}…",
-      "found": "Listo en {{name}}",
       "allow": "Toca Permitir en el teléfono",
       "allowText": "Primero marca Permitir siempre desde esta computadora.",
       "wifiNote": "La depuración inalámbrica se desactiva cuando el teléfono se reinicia. Un cable es más confiable.",
-      "notShowing": "¿El teléfono no aparece?",
-      "notShowingHelp": "Prueba con otro cable o puerto, y elige Transferencia de archivos si el teléfono pregunta para qué es el USB. En Samsung, desactiva el Bloqueador automático en Configuración › Seguridad y privacidad.",
+      "noDriver": "{{computer}} ve el teléfono, pero no tiene su controlador USB. Instala el controlador del fabricante y vuelve a conectar el teléfono.",
+      "noDriverLinux": "{{computer}} ve el teléfono, pero no puede abrirlo. Agrega reglas udev para él y vuelve a conectar el teléfono.",
+      "udev": "Cómo agregar reglas udev",
+      "slow": "¿Todavía no aparece?",
+      "help": {
+        "cable": "Un cable que pase datos. Algunos solo cargan. O prueba con otro puerto.",
+        "unlocked": "El teléfono desbloqueado, con la pantalla encendida.",
+        "fileTransfer": "Si el teléfono pregunta cómo usar el USB, elige Transferencia de archivos.",
+        "usbDebugging": "Depuración por USB activada.",
+        "seeStep": "Ver el paso 2",
+        "samsung": "En Samsung, el Bloqueador automático desactivado: Configuración › Seguridad y privacidad › Bloqueador automático.",
+        "driver": "En Windows, el controlador USB del fabricante del teléfono:"
+      },
+      "drivers": {
+        "google": "Google, para Pixel",
+        "samsung": "Samsung",
+        "others": "Otros fabricantes"
+      },
       "qrLabel": "Código QR que abre estos pasos en el teléfono",
       "qrLine": "Hazlo desde tu teléfono",
       "qrCaption": "Escanéalo para abrir estos pasos en la app de agentes.chat, con botones para cada ajuste.",
@@ -14027,7 +14046,10 @@
         "alwaysWifi": "Permitir siempre en esta red",
         "cancel": "Cancelar",
         "allow": "Permitir"
-      }
+      },
+      "found": "Listo en {{name}}",
+      "notShowing": "¿El teléfono no aparece?",
+      "notShowingHelp": "Prueba con otro cable o puerto, y elige Transferencia de archivos si el teléfono pregunta para qué es el USB. En Samsung, desactiva el Bloqueador automático en Configuración › Seguridad y privacidad."
     },
     "wifiPair": {
       "noComputer": "La vinculación por Wi-Fi funciona con una computadora tuya. Usa un cable o conecta una.",

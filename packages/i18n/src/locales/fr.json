@@ -13906,7 +13906,8 @@
       "team_limit": "L'Apple Account gratuit a atteint sa limite d'apps",
       "helper_untrusted": "L'iPhone ne fait pas encore confiance à l'app de test",
       "booting": "Démarrage",
-      "no_driver": "Windows n'a pas de pilote pour ce téléphone",
+      "no_driver": "Windows n'a pas de pilote USB pour ce téléphone",
+      "no_driverLinux": "Linux ne peut pas ouvrir ce téléphone",
       "os_too_old": "Ce système est trop ancien pour les outils",
       "adb_offline": "Le téléphone ne répond pas",
       "other": "Il faut faire quelque chose sur l'appareil"
@@ -13926,7 +13927,8 @@
       "team_limit": "Supprimez une app que vous avez créée",
       "helper_untrusted": "Faites-lui confiance sur l'iPhone",
       "booting": "Attendez qu'il démarre",
-      "no_driver": "Installez le pilote USB du téléphone",
+      "no_driver": "Installez le pilote USB du fabricant du téléphone",
+      "no_driverLinux": "Ajoutez des règles udev pour ce téléphone",
       "os_too_old": "Mettez le téléphone à jour",
       "adb_offline": "Rebranchez-le",
       "other": "Voir ce qu'il faut faire"
@@ -14067,18 +14069,35 @@
       "noComputer": "Les téléphones se connectent via un ordinateur, et aucun n'est encore connecté.",
       "hostOffline": "{{computer}} est hors ligne. Allumez-le ou choisissez-en un autre.",
       "devOptions": "Activez les Options pour les développeurs",
-      "devOptionsText": "Paramètres › À propos du téléphone, puis touchez 7 fois Numéro de build.",
+      "devOptionsText": "Paramètres › À propos du téléphone, puis touchez 7 fois Numéro de build. Sur Samsung : À propos du téléphone › Informations sur le logiciel › Numéro de version.",
       "usbDebugging": "Activez le Débogage USB",
-      "usbDebuggingText": "Paramètres › Système › Options pour les développeurs › Débogage USB.",
+      "usbDebuggingText": "Paramètres › Système › Options pour les développeurs › Débogage USB. Sur Samsung : Paramètres › Options de développement.",
+      "done": "C'est fait",
+      "notYet": "Pas encore fait",
       "plug": "Branchez le téléphone",
       "plugged": "Branché sur {{computer}}",
       "looking": "Recherche d'un téléphone sur {{computer}}…",
-      "found": "Terminé sur {{name}}",
       "allow": "Touchez Autoriser sur le téléphone",
       "allowText": "Cochez d'abord Toujours autoriser cet ordinateur.",
       "wifiNote": "Le débogage sans fil se désactive au redémarrage du téléphone. Un câble est plus fiable.",
-      "notShowing": "Le téléphone n'apparaît pas ?",
-      "notShowingHelp": "Essayez un autre câble ou un autre port, et choisissez Transfert de fichiers si le téléphone demande à quoi sert l'USB. Sur Samsung, désactivez le Bloqueur automatique dans Paramètres › Sécurité et confidentialité.",
+      "noDriver": "{{computer}} voit le téléphone mais n'a pas de pilote USB pour lui. Installez le pilote du fabricant, puis rebranchez le téléphone.",
+      "noDriverLinux": "{{computer}} voit le téléphone mais ne peut pas l'ouvrir. Ajoutez des règles udev pour lui, puis rebranchez le téléphone.",
+      "udev": "Ajouter des règles udev",
+      "slow": "Toujours rien ?",
+      "help": {
+        "cable": "Un câble qui transmet les données. Certains ne font que charger. Ou essayez un autre port.",
+        "unlocked": "Le téléphone déverrouillé, écran allumé.",
+        "fileTransfer": "Si le téléphone demande comment utiliser l'USB, choisissez Transfert de fichiers.",
+        "usbDebugging": "Le débogage USB activé.",
+        "seeStep": "Voir l'étape 2",
+        "samsung": "Sur Samsung, le Bloqueur automatique désactivé : Paramètres › Sécurité et confidentialité › Bloqueur automatique.",
+        "driver": "Sous Windows, le pilote USB du fabricant du téléphone :"
+      },
+      "drivers": {
+        "google": "Google, pour Pixel",
+        "samsung": "Samsung",
+        "others": "Autres fabricants"
+      },
       "qrLabel": "QR code qui ouvre ces étapes sur le téléphone",
       "qrLine": "Faites-le depuis votre téléphone",
       "qrCaption": "Scannez-le pour ouvrir ces étapes dans l'app agentes.chat, avec un bouton pour chaque réglage.",
@@ -14098,7 +14117,10 @@
         "alwaysWifi": "Toujours autoriser sur ce réseau",
         "cancel": "Annuler",
         "allow": "Autoriser"
-      }
+      },
+      "found": "Terminé sur {{name}}",
+      "notShowing": "Le téléphone n'apparaît pas ?",
+      "notShowingHelp": "Essayez un autre câble ou un autre port, et choisissez Transfert de fichiers si le téléphone demande à quoi sert l'USB. Sur Samsung, désactivez le Bloqueur automatique dans Paramètres › Sécurité et confidentialité."
     },
     "wifiPair": {
       "noComputer": "L'association par Wi-Fi fonctionne avec un de vos ordinateurs. Utilisez un câble, ou connectez-en un.",

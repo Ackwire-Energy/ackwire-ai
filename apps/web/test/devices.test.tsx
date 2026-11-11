@@ -1,12 +1,13 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
 import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ANDROID_SLOW_MS, ANDROID_USB_DRIVERS } from "@agenteschat/client/lib/devices";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, fakeDevicesOf, fakeMachinesOf } from "./fake-api";
 import { notification } from "./fakes/notifications";
-import { ANA, acmeDevices, acmeState, IMAC, IPHONE, LIA, MAC, ORG_ID, PIXEL, RUI } from "./fixtures/devices";
+import { ANA, acmeDevices, acmeState, BUILD_PC, IMAC, IPHONE, LIA, MAC, ORG_ID, PIXEL, RUI } from "./fixtures/devices";
 import { renderApp, screen, settle, showIn } from "./render";
 
 let home: string | undefined;
@@ -18,8 +19,21 @@ const servedAt = (url: string) => {
 
 afterEach(() => {
   cleanup();
+  setSystemTime();
   if (home) domWindow().happyDOM.setURL(home);
 });
+
+/** Each step of a checklist: its state, and its title alone when folded. */
+const stepsOf = (dialog: HTMLElement) =>
+  [...dialog.querySelectorAll(".dv-step")].map(
+    (s) => `${s.getAttribute("data-state")}${s.hasAttribute("data-shut") ? " folded" : ""}`,
+  );
+/** The clock moves past the guide's 30 s, and the dialog's 1 s tick redraws it. */
+const after30s = async () => {
+  setSystemTime(new Date(Date.now() + ANDROID_SLOW_MS + 1000));
+  await act(() => new Promise((r) => setTimeout(r, 1100)));
+  await settle(4);
+};
 
 const click = async (el: Element) => {
   await act(async () => fireEvent.click(el));
@@ -244,9 +258,28 @@ describe("Connect a device", () => {
     await click(screen().getByRole("button", { name: "Connect a device" }));
     await click(screen().getByRole("button", { name: /Android phone/ }));
     const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
-    expect(dialog.textContent).toContain("Looking for a phone on Sam's MacBook Pro…");
+    // Fresh: Developer options open, the rest folded to their titles. The computer can't see it, so the person ticks it.
+    expect(stepsOf(dialog)).toEqual(["current", "waiting folded", "waiting folded", "waiting folded"]);
+    // A step on the phone shows its number, not the live mark: the computer isn't the one working on it.
+    expect(dialog.querySelector('.dv-step[data-state="current"] .dv-step__mark')?.childElementCount).toBe(0);
     // Our phone app is in no store yet: no QR that would only open this page in the phone's browser.
     expect(dialog.querySelector(".dv-qr")).toBeNull();
+    // The guide asks the computer to look for a phone it has no driver for.
+    expect(calls(state, "devices.lookForPhones").at(-1)?.args).toEqual([ORG_ID, MAC]);
+    await click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(stepsOf(dialog)).toEqual(["done folded", "current", "waiting folded", "waiting folded"]);
+    // Ticked by hand: opened again from its title, it may be unticked.
+    await click(within(dialog).getByRole("button", { name: "Turn on Developer options" }));
+    expect(stepsOf(dialog)).toEqual(["done", "current folded", "waiting folded", "waiting folded"]);
+    await click(within(dialog).getByRole("button", { name: "Not done yet" }));
+    expect(stepsOf(dialog)).toEqual(["current", "waiting folded", "waiting folded", "waiting folded"]);
+    await click(within(dialog).getByRole("button", { name: "Done" }));
+    await click(within(dialog).getByRole("button", { name: "Done" }));
+    expect(stepsOf(dialog)).toEqual(["done folded", "done folded", "current", "waiting folded"]);
+    expect(dialog.textContent).toContain("Looking for a phone on Sam's MacBook Pro…");
+    // Before 30 s, nothing more; no old hint behind an ⓘ.
+    expect(dialog.querySelector(".dv-slow")).toBeNull();
+    expect(dialog.textContent).not.toContain("Phone not showing up?");
     const list = acmeDevices();
     const mac = list.devices.find((d) => d.id === MAC);
     const pixel = mac?.phones.find((p) => p.id === PIXEL);
@@ -259,6 +292,11 @@ describe("Connect a device", () => {
     });
     devices.set(list);
     await refetch(services);
+    // Seen, even before Allow: every step before it ticks by itself, and none may be unticked.
+    expect(stepsOf(dialog)).toEqual(["done folded", "done folded", "done folded", "needs"]);
+    await click(within(dialog).getByRole("button", { name: "Turn on Developer options" }));
+    expect(within(dialog).queryByRole("button", { name: "Not done yet" })).toBeNull();
+    await click(within(dialog).getByRole("button", { name: "Tap Allow on the phone" }));
     const allow = dialog.querySelector('.dv-step[data-state="needs"]');
     expect(allow?.textContent).toContain("Tap Allow on the phone");
     expect(allow?.textContent).toContain("Allow USB debugging?");
@@ -267,6 +305,96 @@ describe("Connect a device", () => {
     devices.set(list);
     await refetch(services);
     expect(screen().getByRole("dialog", { name: "Galaxy S24 is connected" })).toBeTruthy();
+  });
+
+  test("Android by cable: the phone already plugged in shows up asking, and every step before Allow is done", async () => {
+    const { devices, services } = await open(`/org/${ORG_ID}/settings/devices/android-setup?computer=${MAC}`);
+    const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
+    const list = acmeDevices();
+    const mac = list.devices.find((d) => d.id === MAC);
+    const pixel = mac?.phones.find((p) => p.id === PIXEL);
+    if (!mac || !pixel) throw new Error("fixture");
+    mac.phones.push({
+      ...pixel,
+      id: "p-new",
+      name: "Galaxy S24",
+      status: { kind: "needs_you", reason: "unauthorized" },
+    });
+    devices.set(list);
+    await refetch(services);
+    expect(stepsOf(dialog)).toEqual(["done folded", "done folded", "done folded", "needs"]);
+    expect(dialog.querySelector('.dv-step[data-state="needs"]')?.textContent).toContain("Allow USB debugging?");
+  });
+
+  test("Android by cable on Windows: after 30 s, why a phone may not show up, the maker's USB driver included", async () => {
+    const { devices, services, state } = await open(
+      `/org/${ORG_ID}/settings/devices/android-setup?computer=${BUILD_PC}`,
+    );
+    const dialog = screen().getByRole("dialog", { name: "Connect an Android phone" });
+    expect(calls(state, "devices.lookForPhones").at(-1)?.args).toEqual([ORG_ID, BUILD_PC]);
+    await click(within(dialog).getByRole("button", { name: "Done" }));
+    await click(within(dialog).getByRole("button", { name: "Done" }));
+    await after30s();
+    const help = dialog.querySelector(".dv-slow");
+    expect(help?.closest(".dv-step")?.getAttribute("data-state")).toBe("current");
+    expect(help?.querySelector(".dv-slow__title")?.textContent).toBe("Still not showing up?");
+    expect([...(help?.querySelectorAll(".dv-slow__list > li") ?? [])].map((li) => li.textContent)).toEqual([
+      "A cable that carries data. Some only charge. Or try another port.",
+      "The phone unlocked, with its screen on.",
+      "If the phone asks how to use USB, pick File transfer.",
+      "USB debugging on. See step 2",
+      "On Samsung, Auto Blocker off: Settings › Security and privacy › Auto Blocker.",
+      "On Windows, the phone maker's USB driver:Google, for PixelSamsungOther makers",
+    ]);
+    expect([...(help?.querySelectorAll("a") ?? [])].map((a) => a.getAttribute("href"))).toEqual(
+      Object.values(ANDROID_USB_DRIVERS),
+    );
+    // See step 2 opens USB debugging again.
+    await click(within(dialog).getByRole("button", { name: "See step 2" }));
+    expect(stepsOf(dialog)).toEqual(["done folded", "done", "current folded", "waiting folded"]);
+
+    // The computer finds the phone with no driver: the cable step says so, with the drivers.
+    const list = acmeDevices();
+    const pc = list.devices.find((d) => d.id === BUILD_PC);
+    const pixel = list.devices.flatMap((d) => d.phones).find((p) => p.id === PIXEL);
+    if (!pc || !pixel) throw new Error("fixture");
+    pc.phones.push({
+      ...pixel,
+      id: "p-nodriver",
+      name: "Pixel 8",
+      hostMachineId: BUILD_PC,
+      status: { kind: "needs_you", reason: "no_driver" },
+    });
+    devices.set(list);
+    await refetch(services);
+    expect(stepsOf(dialog)).toEqual(["done folded", "done folded", "needs", "waiting folded"]);
+    const cable = dialog.querySelector('.dv-step[data-state="needs"]');
+    expect(cable?.querySelector(".dv-step__text")?.textContent).toBe(
+      "Windows build PC sees the phone but has no USB driver for it. Install the phone maker's driver, then plug the phone in again.",
+    );
+    expect(cable?.querySelectorAll(".dv-links a")).toHaveLength(3);
+  });
+
+  test("Android by cable on a Mac, in German with a long computer name: the 30 s help without a driver", async () => {
+    const longName = "Sams MacBook Pro aus dem Entwicklungsbüro im dritten Stock neben der Kaffeemaschine";
+    const app = await open(`/org/${ORG_ID}/settings/devices/android-setup?computer=${MAC}`, (devices) => {
+      const list = acmeDevices();
+      const mac = list.devices.find((d) => d.id === MAC);
+      if (mac) mac.name = longName;
+      devices.set(list);
+    });
+    await showIn(app.services, "de");
+    const dialog = screen().getByRole("dialog");
+    for (const _ of [1, 2]) {
+      const done = dialog.querySelector<HTMLButtonElement>('.dv-step[data-state="current"] .dv-step__more .ac-btn');
+      if (!done) throw new Error("no Done");
+      await click(done);
+    }
+    await after30s();
+    const items = dialog.querySelectorAll(".dv-slow__list > li");
+    expect(items).toHaveLength(5);
+    expect(dialog.querySelector(".dv-slow a")).toBeNull();
+    expect(dialog.textContent).toContain(longName);
   });
 
   test("an Android phone over Wi-Fi: Android's pairing QR, the computer's live line, then connected", async () => {
@@ -344,6 +472,9 @@ describe("Connect a device", () => {
     const app = await open(`/org/${ORG_ID}/settings/devices/android-setup?computer=${MAC}`);
     await showIn(app.services, "pt-BR");
     const dialog = screen().getByRole("dialog", { name: "Conectar um celular Android" });
+    expect(within(dialog).getByRole("button", { name: "Já fiz" })).toBeTruthy();
+    // A later step opens from its title, to read ahead.
+    await click(within(dialog).getByRole("button", { name: "Toque em Permitir no celular" }));
     expect(dialog.textContent).toContain("Permitir a depuração USB?");
     expect(dialog.textContent).toContain("Sempre permitir neste computador");
     await click(within(dialog).getByRole("radio", { name: "Por Wi-Fi" }));

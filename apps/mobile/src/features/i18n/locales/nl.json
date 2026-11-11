@@ -1812,7 +1812,8 @@
       "team_limit": "Verwijder een zelfgemaakte app van deze iPhone",
       "helper_untrusted": "Vertrouw de testhelper op deze iPhone",
       "booting": "Wordt opgestart",
-      "no_driver": "Windows heeft de USB-driver van deze telefoon nodig",
+      "no_driver": "Windows heeft de USB-driver van de maker van de telefoon nodig",
+      "no_driverLinux": "Linux heeft udev-regels voor deze telefoon nodig",
       "os_too_old": "Het systeem van deze telefoon is te oud",
       "adb_offline": "Haal de kabel eruit en sluit hem opnieuw aan",
       "other": "Nog niet klaar"
@@ -1913,12 +1914,11 @@
       "noHost": "Deze telefoon werkt via een computer van je. Koppel er eerst een.",
       "hostOffline": "{{host}} is offline. Zet hem aan en open daar agentes.chat.",
       "step1": "Zet Ontwikkelaarsopties aan",
-      "step1Text": "Tik 7 keer op Buildnummer en voer dan je pincode in.",
+      "step1Text": "Tik 7 keer op Buildnummer en voer dan je pincode in. Op een Samsung: Software-informatie › Buildnummer.",
       "openAbout": "Over de telefoon openen",
       "step2": "Zet USB-foutopsporing aan",
       "openDev": "Ontwikkelaarsopties openen",
       "step3": "Sluit hem aan op {{host}}",
-      "step3Hint": "Gebruik een kabel die data doorgeeft, niet een die alleen oplaadt. Kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is.",
       "looking": "Zoeken naar deze telefoon",
       "step4": "Tik op Toestaan op deze telefoon",
       "step4Text": "Vink eerst Altijd toestaan vanaf deze computer aan.",
@@ -1942,7 +1942,8 @@
       "codeNote": "Via Draadloze foutopsporing › Apparaat koppelen met koppelingscode. Open Instellingen en agentes.chat naast elkaar, zodat de code in beeld blijft.",
       "wifiNote": "Wifi kan wegvallen na een herstart. Een kabel is betrouwbaarder.",
       "done": "{{name}} is gekoppeld",
-      "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen."
+      "openFailed": "Deze telefoon opende dat scherm niet. Zoek het in Instellingen.",
+      "step3Hint": "Gebruik een kabel die data doorgeeft, niet een die alleen oplaadt. Kies Bestandsoverdracht als de telefoon vraagt waarvoor de USB is."
     },
     "iphone": {
       "title": "Deze iPhone koppelen",
