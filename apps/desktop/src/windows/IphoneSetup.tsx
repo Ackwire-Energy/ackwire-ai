@@ -27,8 +27,9 @@ import { hintFor } from "../ui/settings";
 /** How often the Mac is asked while the window is open: Xcode installed, the download's progress, a new account. */
 const ASK_MS = 2000;
 
-/** Without the QR the steps take its column too, and the tip and the way out sit under them at the bottom. */
+/** Without the QR the steps take its column too, and the tip and the way out make one footer row under them. */
 const NO_QR = { gridTemplateColumns: "minmax(0, 1fr)", gridTemplateRows: "1fr auto" };
+const NO_QR_SIDE = { flexDirection: "row", alignItems: "center", justifyContent: "space-between" } as const;
 
 export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
@@ -307,7 +308,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
               </p>
             )}
           </div>
-          <aside className="dk-ip__side">
+          <aside className="dk-ip__side" style={PHONE_APP_IN_STORE.ios ? undefined : NO_QR_SIDE}>
             {PHONE_APP_IN_STORE.ios && server && orgId && mac && (
               <div className="dk-card dk-ip__qr" data-padded="">
                 <QrCode text={iphoneStepsUrl(server, orgId, mac.id)} label={t("desktop.iphone.qrLabel")} />
