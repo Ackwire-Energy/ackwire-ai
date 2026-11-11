@@ -37,6 +37,7 @@ import type { LinkInfo } from "../control/pair";
 import type { MacFolder, SetupState } from "../control/permissions";
 import type { Platform } from "../control/platform";
 import type { ServerList, ServerWorkspace, ServerWorkspaces } from "../control/server";
+import type { ThisMacRequest } from "../control/this-mac";
 import type { TrayState } from "../control/tray";
 import { acmeSeed, FAKE_LINKS, FAKE_SERVER, FakeRunner, horizonteSeed } from "../dev/fake-runner";
 import { createFakeSite, type FakeSite } from "../dev/fake-site";
@@ -84,6 +85,8 @@ export interface FakeHost extends Host {
     setup: SetupState | null;
     panes: string[];
   };
+  /** The site in the main window asks this computer (ADR 0036): resolves with the popover's reply. */
+  askThisMac(request: ThisMacRequest): Promise<{ ok: boolean; data: unknown }>;
 }
 
 /**
@@ -141,6 +144,9 @@ export function createFakeHost(
   const stateListeners = new Set<(c: RunnerStateChange) => void>();
   const shownListeners = new Set<(n: WindowName) => void>();
   const devListeners = new Set<() => void>();
+  const thisMacListeners = new Set<(id: number, request: ThisMacRequest) => void>();
+  const thisMacReplies = new Map<number, (reply: { ok: boolean; data: unknown }) => void>();
+  let thisMacAsked = 0;
   let signIns = 0;
   /** Servers the app signed out of (`signOutServer`): listed with no workspaces. */
   const signedOut = new Set<string>();
@@ -404,9 +410,21 @@ export function createFakeHost(
     setAutostart: async (on) => {
       autostart = on;
     },
-    // No main window in the browser: nobody asks.
-    onThisMac: () => () => {},
-    thisMacReply: async () => {},
+    // No main window in the browser: only tests ask (`askThisMac`).
+    onThisMac: (cb) => {
+      thisMacListeners.add(cb);
+      return () => thisMacListeners.delete(cb);
+    },
+    thisMacReply: async (id, ok, data) => {
+      thisMacReplies.get(id)?.({ ok, data });
+      thisMacReplies.delete(id);
+    },
+    askThisMac: (request) =>
+      new Promise((resolve) => {
+        const id = ++thisMacAsked;
+        thisMacReplies.set(id, resolve);
+        for (const l of thisMacListeners) l(id, request);
+      }),
     // No menu bar in the browser.
     setAppMenu: async () => {},
     onMenuAction: () => () => {},

@@ -169,9 +169,11 @@ export function Prepare({
     () => host.setSetupState({ step: "prepare", org, server }).catch(() => {}),
     [host, org, server],
   );
+  // Left without Continue or Skip (Esc back to an earlier screen): forgotten too. A quit never unmounts it.
   useEffect(() => {
     void keep();
-  }, [keep]);
+    return () => void host.setSetupState(null).catch(() => {});
+  }, [keep, host]);
   const mac = useMacGrants(keep);
   const finish = () => {
     void host.setSetupState(null).catch(() => {});

@@ -423,6 +423,8 @@ fn hide_window(app: AppHandle, name: String) -> Result<(), String> {
     }
     let Some(window) = app.get_webview_window(&name) else { return Ok(()) };
     if MADE_ON_OPEN.contains(&name.as_str()) {
+        // `destroy` skips CloseRequested, where a setup on screen ends with its window.
+        prepare::closed(&app, &name);
         window.destroy().map_err(|e| e.to_string())?;
     } else {
         window.hide().map_err(|e| e.to_string())?;

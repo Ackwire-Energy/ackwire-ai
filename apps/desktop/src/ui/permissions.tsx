@@ -90,14 +90,23 @@ export function useMacGrants(beforeScreen?: () => Promise<void>): MacGrants {
 export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; resumed?: boolean }) {
   const { t } = useTranslation();
   const { grants, pending, ask } = mac;
+  // Opened again by macOS: Preferences starts at its top, so the card the person left comes back into view.
+  const seen = useCallback(
+    (el: HTMLElement | null) => {
+      if (resumed) el?.scrollIntoView?.({ block: "nearest" });
+    },
+    [resumed],
+  );
   const line =
     grants?.screen === "on" && resumed ? (
-      <p className="dk-under-card dk-help ac-iconline" aria-live="polite">
+      <p ref={seen} className="dk-under-card dk-help ac-iconline" aria-live="polite">
         <Icon name="check" size={14} />
         <span>{t("desktop.prepare.tookEffect")}</span>
       </p>
     ) : grants?.screen === "off" ? (
-      <p className="dk-under-card dk-help">{t("desktop.prepare.reopen")}</p>
+      <p ref={seen} className="dk-under-card dk-help">
+        {t("desktop.prepare.reopen")}
+      </p>
     ) : null;
   return (
     <>

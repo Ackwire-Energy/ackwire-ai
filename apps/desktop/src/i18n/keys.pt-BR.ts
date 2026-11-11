@@ -435,7 +435,7 @@ export const desktopPtBR = {
     openSettings: "Abrir Ajustes",
     reopen: "Quando o macOS pedir para encerrar e reabrir, aceite. O agentes.chat abre de novo bem aqui.",
     tookEffect: "O agentes.chat abriu de novo. A Gravação de Tela está ligada.",
-    skip: "Pular por agora",
+    skip: "Pular por enquanto",
     prefsTitle: "Permissões",
     prefsHint: "O macOS pode desligar isto quando o app atualiza. Ligue de novo aqui.",
   },
