@@ -566,13 +566,14 @@ describe("other conversations shown as a thread", () => {
     const socket = r.sockets.last();
     await act(async () => socket.open());
     await settle(4);
-    const talking = () => document.querySelector('[data-card="131"] .issue-card__talk')?.textContent;
-    expect(talking()).toContain("3 mensagens");
+    const talking = () =>
+      document.querySelector('[data-card="131"] .ac-factline__fact[title$="mensagens"]')?.textContent;
+    expect(talking()).toBe("3");
     conversation.count = 4;
     await act(async () => socket.push({ type: "event", scope: "org", event: { type: "issue.updated" } }));
     await act(() => new Promise((done) => setTimeout(done, UNREAD_REFRESH_MS + 100)));
     await settle(5);
-    expect(talking()).toContain("4 mensagens");
+    expect(talking()).toBe("4");
   });
 
   test("a mission's thread: a live reply lands", async () => {

@@ -184,6 +184,11 @@ describe("Configurações do workspace", () => {
       apiKey: "[redacted]",
       serverUrl: undefined,
     });
+    // Connecting ends on the confirmation; the tools are one step further, under Ajustar.
+    await click(
+      within(screen().getByRole("dialog", { name: "Sentry conectado" })).getByRole("button", { name: "Ajustar" }),
+    );
+    await settle(2);
     const tools = screen().getByRole("dialog", { name: "O que Sentry faz" });
     // Built-in connector: the tools read-only, grouped by subject, readable names first.
     const issues = within(tools).getByRole("region", { name: "Issues" });

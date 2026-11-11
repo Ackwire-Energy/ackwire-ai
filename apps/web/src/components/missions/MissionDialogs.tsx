@@ -45,7 +45,7 @@ import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
-import { MachineIcon } from "@/components/Machines";
+import { MachineIcon } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { ThisMacButton } from "@/components/ThisMac";
 import { useComputerEdition, useNamesComputers } from "@/components/WorkspaceComputer";

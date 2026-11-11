@@ -59,7 +59,6 @@ test("Calendar's and Routines' lists show their words whole: they wrap, never en
     ".routine-row__when-text b",
     ".routine-row__when-text small",
     ".routine-row__runs small",
-    ".routine-sel__text b",
     ".routines-horizon__label b",
     ".cal-band__label b",
   ]) {
@@ -72,8 +71,8 @@ test("Calendar's and Routines' lists show their words whole: they wrap, never en
   expect(last(top, ".routines-horizon__label", "height")).toBeUndefined();
   expect(last(top, ".routines-horizon__track", "align-self")).toBe("center");
   expect(last(top, ".cal-band__label", "height")).toBeUndefined();
-  // An event's title wraps in a list (Agenda, a day's "+N"); a day's cell and the time grid keep the event's box.
-  const listed = ":is(.cal-agenda__list,.cal-more__list) .cal-chip--line .cal-chip__title";
-  expect(last(top, listed, "white-space")).toBe("normal");
-  expect(last(top, listed, "overflow-wrap")).toBe("anywhere");
+  // An event's title wraps wherever it shows (a block, a row, a bar): no nowrap, no "…", a long word broken.
+  expect(last(top, ".cal-chip__title", "white-space")).toBeUndefined();
+  expect(last(top, ".cal-chip__title", "text-overflow")).toBeUndefined();
+  expect(last(top, ".cal-chip", "overflow-wrap")).toBe("anywhere");
 });

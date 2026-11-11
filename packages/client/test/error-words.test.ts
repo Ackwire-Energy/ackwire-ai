@@ -352,6 +352,9 @@ test("a provider refused this server's own OAuth app: what's wrong and who fixes
  * hit goes in `KNOWN` instead.
  */
 const PLAIN_LINE = new Set([
+  // A portrait's recipe is written by the builder, never typed: a malformed one is a fault of the app, not a choice
+  // the person can fix.
+  "avatar.portrait",
   // The feedback form says a file's type and size itself before any toast, and takes no more files than it may send
   // (FeedbackDialog).
   "feedback.file_too_large",

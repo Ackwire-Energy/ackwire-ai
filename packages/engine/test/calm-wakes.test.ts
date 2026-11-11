@@ -406,8 +406,8 @@ describe("deeper chains on a crowded computer", () => {
   });
 
   test("a wake four links down needs the judge's higher bar there", async () => {
-    // The judge: 50% sure the message needs nothing from the agent it names.
-    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.5 : undefined) });
+    // The judge: 70% sure the message asks the agent it names (30% that it leaves it nothing to do).
+    f = await setup({ judge: (kind) => (kind === "mention_needs_nothing" ? 0.3 : undefined) });
     const rio = await agentOf("Rio", "rio");
     const nova = await agentOf("Nova", "nova");
     const machineId = await computerFor(f.agent.id, rio.id);

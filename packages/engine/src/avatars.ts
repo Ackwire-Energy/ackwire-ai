@@ -97,7 +97,10 @@ export function stripImageMetadata(bytes: Uint8Array, type: "image/jpeg" | "imag
   return type === "image/jpeg" ? stripJpeg(bytes) : type === "image/png" ? stripPng(bytes) : stripWebp(bytes);
 }
 
-const AVATAR_PATH = /^\/api\/app\/avatars\/([^/]+)\/([0-9a-f]{16}\.(jpg|png|webp))$/;
+/** A stored photo's address; a drawn portrait keeps its recipe after it, as a fragment (`#px=1.f.s3.…`). */
+const AVATAR_PATH = /^\/api\/app\/avatars\/([^/]+)\/([0-9a-f]{16}\.(jpg|png|webp))(#px=[A-Za-z0-9.]+)?$/;
+/** A portrait's recipe as the apps write it: "1." and its values, letters and digits between dots (ADR 0166). */
+export const PORTRAIT_CODE = /^1(\.[A-Za-z0-9]{1,24}){1,48}$/;
 
 /**
  * An uploaded image (base64): JPEG, PNG or WebP up to 2 MB, checked by its
@@ -123,17 +126,23 @@ function readImage(input: { imageBase64: string; contentType: string }, code: "a
  * Sets a person's photo (`PUT …/me/avatar`): JPEG, PNG or WebP up to 2 MB,
  * checked by its bytes, stripped of metadata, stored in the platform bucket,
  * served by `GET /api/app/avatars/{userId}/{file}` (people sharing an org).
- * The app crops it (512×512) before sending.
+ * The app crops it (512×512) before sending. A portrait drawn in the app
+ * (ADR 0166) is a photo like any other, sent with the recipe it was drawn
+ * from: the recipe stays on the address as a fragment, which no request
+ * carries, so an app that knows it draws the portrait itself and opens it
+ * again to edit, and everything else shows the image.
  */
 export async function setAvatar(
   deps: { db: Database; blobs: BlobStore },
   userId: string,
-  input: { imageBase64: string; contentType: string },
+  input: { imageBase64: string; contentType: string; portrait?: string },
 ): Promise<{ avatarUrl: string }> {
+  if (input.portrait !== undefined && !PORTRAIT_CODE.test(input.portrait))
+    throw new ValidationError("That isn't a portrait's recipe", "avatar.portrait");
   const { body, type, file } = readImage(input, "avatar");
   await deps.blobs.put(`avatars/${userId}/${file}`, body, { contentType: type });
   const [before] = await deps.db.select({ image: users.image }).from(users).where(eq(users.id, userId));
-  const avatarUrl = `/api/app/avatars/${encodeURIComponent(userId)}/${file}`;
+  const avatarUrl = `/api/app/avatars/${encodeURIComponent(userId)}/${file}${input.portrait ? `#px=${input.portrait}` : ""}`;
   await deps.db.update(users).set({ image: avatarUrl, updatedAt: new Date() }).where(eq(users.id, userId));
   await removeStored(deps.blobs, userId, before?.image, file);
   return { avatarUrl };

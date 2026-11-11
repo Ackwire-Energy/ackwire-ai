@@ -1164,7 +1164,20 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
       });
       await settle(6);
     };
-    return { state, api, block, paste, sealed: () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null };
+    const sealed = () => fakeMachinesOf.get(api)?.lastLogin()?.box ?? null;
+    /**
+     * The code reached the computer and the block says so. Sealing it is WebCrypto, which runs off the JS thread: on a
+     * loaded machine it outlasts any number of ticks, so this waits for it instead of counting them.
+     */
+    const delivered = () =>
+      waitFor(
+        () => {
+          expect(sealed()).not.toBeNull();
+          expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+        },
+        { timeout: 10_000 },
+      );
+    return { state, api, block, paste, sealed, delivered };
   }
 
   test("while the code goes and the computer signs in, a line stands in for the field and its buttons; a failed send brings them back", async () => {
@@ -1229,11 +1242,10 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
   });
 
   test("Claude's code pasted into its field with ⌘V goes to the computer by itself, no click", async () => {
-    const { state, block, paste, sealed } = await codeField();
+    const { state, block, paste, delivered } = await codeField();
     await paste("c0de-from-claude#st4te");
-    expect(sealed()).not.toBeNull();
+    await delivered();
     expect(JSON.stringify(state.calls)).not.toContain("c0de-from-claude");
-    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
     expect(shownText(block)).not.toContain("Isso não parece o código do Claude.");
   });
 
@@ -1247,18 +1259,17 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
         writeText: async () => {},
       },
     });
-    const { block, paste, sealed } = await codeField();
+    const { block, paste, delivered } = await codeField();
     await click(within(block).getByRole("button", { name: "Colar" }));
     await settle(4);
     expect(shownText(block)).toContain("O navegador não deixou colar.");
     await paste("c0de-from-claude#st4te");
-    expect(sealed()).not.toBeNull();
-    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    await delivered();
     expect(shownText(block)).not.toContain("O navegador não deixou colar.");
   });
 
   test("a code that isn't this sign-in's waits for Enviar, the one action, with a line under it", async () => {
-    const { block, paste, sealed } = await codeField();
+    const { block, paste, sealed, delivered } = await codeField();
     await paste("c0de-from-claude#another-state");
     expect(sealed()).toBeNull();
     expect(shownText(block)).toContain("Isso não parece o código do Claude.");
@@ -1266,9 +1277,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     const send = within(block).getByRole("button", { name: "Enviar ao MacBook" }) as HTMLButtonElement;
     expect(send.disabled).toBe(false);
     await click(send);
-    await settle(6);
-    expect(sealed()).not.toBeNull();
-    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
+    await delivered();
   });
 
   test("Claude's code sent while the server restarts: the computer didn't answer, not a wrong code; Enviar sends it again", async () => {
@@ -1277,8 +1286,11 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     api.machines.sendAccountCode = async () => {
       throw new ApiError(502, "http_502", "Bad Gateway");
     };
+    // The code is sealed before it is sent, and sealing (WebCrypto) runs off the JS thread: no number of ticks waits
+    // for it on a busy machine.
+    const shows = (text: string) => waitFor(() => expect(shownText(block)).toContain(text), { timeout: 10_000 });
     await paste("c0de-from-claude#st4te");
-    expect(shownText(block)).toContain("O MacBook não respondeu. Tente de novo em instantes.");
+    await shows("O MacBook não respondeu. Tente de novo em instantes.");
     expect(shownText(block)).not.toContain("Confira");
     // The computer refusing it is still about the code.
     api.machines.sendAccountCode = async () => {
@@ -1287,14 +1299,12 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // A line stands in for the field and its buttons while the code goes: Enviar is a new button after each send.
     const send = () => within(block).getByRole("button", { name: "Enviar ao MacBook" });
     await click(send());
-    await settle(6);
-    expect(shownText(block)).toContain("Não deu para enviar o código. Confira e tente de novo.");
+    await shows("Não deu para enviar o código. Confira e tente de novo.");
     expect(shownText(block)).not.toContain("não respondeu");
     api.machines.sendAccountCode = sendCode;
     await click(send());
-    await settle(6);
+    await shows("Código enviado. O MacBook está terminando de entrar.");
     expect(sealed()).not.toBeNull();
-    expect(shownText(block)).toContain("Código enviado. O MacBook está terminando de entrar.");
   });
 
   test("Adicionar conta (ChatGPT): its settings first, then the sign-in on its button; the account is chosen", async () => {

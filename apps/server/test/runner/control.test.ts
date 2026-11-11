@@ -791,6 +791,48 @@ test("device pairing refused on the site: pair.failed with `denied`; cancel stop
   expect(readStoredConfig(home)).toBeNull();
 });
 
+test("pairing from a connect link: the link goes with the device; a used one fails as link_invalid", async () => {
+  const home = tempDir("home-");
+  const base = tempDir("agentes-");
+  dirs.push(home, base);
+  const bodies: Record<string, unknown>[] = [];
+  let used = false;
+  const fetch: FetchFn = async (url, init) => {
+    if (url.endsWith("/api/machines/device")) {
+      bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+      if (used) return Response.json({ error: { code: "machine.link_invalid", message: "Used" } }, { status: 400 });
+      return Response.json({
+        deviceCode: "dc",
+        userCode: "K7Q4ZP",
+        verificationUrl: "x",
+        expiresIn: 600,
+        interval: 3,
+        maker: { name: "Sam Rivera" },
+      });
+    }
+    return Response.json({ token: TOKEN, machineId: "m7", name: "box", org: { id: "o1", name: "Acme" } });
+  };
+  const c = control(home, { fetch, pairSleep: async () => {}, workspaceBase: base });
+  for (const link of ["no spaces", 42, ""])
+    expect(await c.request({ type: "pair.start", server: "https://agentes.test", link })).toMatchObject({
+      ok: false,
+      error: { code: "bad_request" },
+    });
+  expect(bodies).toEqual([]);
+  used = true;
+  await c.data({ type: "pair.start", server: "https://agentes.test", link: "OLD1-CODE" });
+  await waitFor(() => c.events("pair.failed").length === 1);
+  expect(c.events("pair.failed")[0]).toMatchObject({ code: "link_invalid", message: "Used" });
+  used = false;
+  expect(await c.data({ type: "pair.start", server: "https://agentes.test", link: "ABCD-EFGH" })).toEqual({
+    started: true,
+  });
+  await waitFor(() => c.events("pair.done").length === 1);
+  expect(bodies.map((b) => b.link)).toEqual(["OLD1-CODE", "ABCD-EFGH"]);
+  expect(c.events("pair.done")[0]).toMatchObject({ org: { id: "o1", name: "Acme" }, machine: { id: "m7" } });
+  expect(readStoredConfig(home)).toMatchObject({ machineId: "m7", orgId: "o1", managedBy: "desktop" });
+});
+
 test("a second runner on the same home answers every request with the reason, then exits", async () => {
   const home = tempDir("home-");
   dirs.push(home);

@@ -12,13 +12,11 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  Field,
   Icon,
   Locked,
   Menu,
   MenuItem,
   modKey,
-  Select,
   Spinner,
   Switch,
   useAutoGrow,
@@ -43,8 +41,8 @@ const joinCriteria = (description: string, criteria: string[]) =>
 
 /**
  * "Nova tarefa". Quick by default: one box (title, text, files) with who, priority, due date and column as
- * small buttons; "Abrir o formulário completo" grows it into the task's own layout (description, criteria as a
- * list, the attachments grid, details on the side), keeping what was typed. A print pastes (⌘V) anywhere in
+ * small buttons; "Abrir o formulário completo" grows it into the task's own layout (the same buttons under the title,
+ * description, criteria as a list, the attachments grid), keeping what was typed. A print pastes (⌘V) anywhere in
  * it, files drop anywhere on it; they go to the Drive at once and are linked to the task when it's created.
  */
 export function NewIssueDialog({
@@ -54,7 +52,7 @@ export function NewIssueDialog({
   onClose,
 }: {
   open: boolean;
-  /** The column of A fazer it was asked from ("Nova tarefa" under a column); else the first. */
+  /** The column of A fazer it was asked from (the "+" in its head); else the first. */
   columnId: string | null;
   columns: IssueColumn[];
   onClose: () => void;
@@ -217,6 +215,62 @@ export function NewIssueDialog({
     </p>
   );
   const priorityLabel = (p: IssuePriority) => t(`issues.priority.${p}`);
+  // Who, priority, who sees it, the due date and the column: one strip in both forms, under the title in the full one.
+  const props = (
+    <div className="ac-props issue-new__props">
+      <Menu
+        label={t("issues.form.assignee")}
+        trigger={
+          <Button
+            size="sm"
+            icon={chosen ? undefined : "person"}
+            aria-label={chosen ? `${t("issues.form.assignee")}: ${actors.name(chosen)}` : t("issues.form.assignee")}
+          >
+            {chosen && <ActorAvatar actor={chosen} name={actors.name(chosen)} size="xs" />}
+            {chosen ? actors.name(chosen) : t("issues.form.assignee")}
+          </Button>
+        }
+      >
+        {actors.options(true).map((o) => (
+          <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
+            {o.label}
+          </MenuItem>
+        ))}
+      </Menu>
+      <Menu
+        label={t("issues.form.priority")}
+        trigger={
+          <Button size="sm" icon="flag" aria-label={`${t("issues.form.priority")}: ${priorityLabel(priority)}`}>
+            {priorityLabel(priority)}
+          </Button>
+        }
+      >
+        {PRIORITIES.map((p) => (
+          <MenuItem key={p} icon="flag" onSelect={() => setPriority(p)}>
+            {priorityLabel(p)}
+          </MenuItem>
+        ))}
+      </Menu>
+      {whoSeesShown && <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />}
+      <DueDate value={due} onChange={setDue} />
+      {todoColumns.length > 1 && chosenColumn && (
+        <Menu
+          label={t("issues.column")}
+          trigger={
+            <Button size="sm" icon="stageTodo" aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}>
+              {columnTitle(chosenColumn)}
+            </Button>
+          }
+        >
+          {todoColumns.map((c) => (
+            <MenuItem key={c.id} icon="stageTodo" onSelect={() => setColumn(c.id)}>
+              {columnTitle(c)}
+            </MenuItem>
+          ))}
+        </Menu>
+      )}
+    </div>
+  );
   const createButton = (
     <Button type="submit" variant="primary" kbd={[mod, "↵"]} disabled={!ready} loading={action.isPending}>
       {t("issues.form.create")}
@@ -297,6 +351,8 @@ export function NewIssueDialog({
                   aria-label={t("issues.form.title")}
                   autoFocus
                 />
+                {props}
+                {agentNote}
                 <DetailsSection title={t("issues.description")}>
                   <div className="issue-new__editor">
                     <textarea
@@ -387,43 +443,6 @@ export function NewIssueDialog({
                   </div>
                 </DetailsSection>
               </div>
-              <aside className="issue-new__side" aria-label={t("issues.details")}>
-                <Field label={t("issues.form.assignee")} id="ni-who">
-                  <Select size="sm" value={assignee} onValueChange={setAssignee} options={actors.options(true)} />
-                </Field>
-                {todoColumns.length > 1 && (
-                  <Field label={t("issues.column")} id="ni-col">
-                    <Select
-                      size="sm"
-                      value={chosenColumn?.id}
-                      onValueChange={setColumn}
-                      options={todoColumns.map((c) => ({ value: c.id, label: columnTitle(c) }))}
-                    />
-                  </Field>
-                )}
-                {whoSeesShown && (
-                  <Field label={t("whoSees.label")} id="ni-sees">
-                    <WhoSeesButton select value={audience} onClick={() => setChoosing(true)} />
-                  </Field>
-                )}
-                <Field label={t("issues.form.priority")} id="ni-pri">
-                  <Select
-                    size="sm"
-                    value={priority}
-                    onValueChange={(v) => setPriority(v as IssuePriority)}
-                    options={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))}
-                  />
-                </Field>
-                <Field label={t("issues.due")} id="ni-due">
-                  <DueDate value={due} onChange={setDue} />
-                </Field>
-                {agent && (
-                  <div className="issue-new__who ac-iconline">
-                    <ActorAvatar actor={{ type: "agent", id: agent.id }} name={agent.name} size="sm" />
-                    <span>{t("issues.form.agentStartsAll", agentGrammar(agent.name))}</span>
-                  </div>
-                )}
-              </aside>
             </DialogBody>
           ) : (
             <DialogBody className="issue-new__quick">
@@ -454,69 +473,7 @@ export function NewIssueDialog({
                   {t("issues.form.criteriaFound", { count: quickCriteria.length })}
                 </p>
               )}
-              <div className="issue-new__props">
-                <Menu
-                  label={t("issues.form.assignee")}
-                  trigger={
-                    <Button
-                      size="sm"
-                      icon={chosen ? undefined : "person"}
-                      aria-label={
-                        chosen ? `${t("issues.form.assignee")}: ${actors.name(chosen)}` : t("issues.form.assignee")
-                      }
-                    >
-                      {chosen && <ActorAvatar actor={chosen} name={actors.name(chosen)} size="xs" />}
-                      {chosen ? actors.name(chosen) : t("issues.form.assignee")}
-                    </Button>
-                  }
-                >
-                  {actors.options(true).map((o) => (
-                    <MenuItem key={o.value} leading={o.leading} onSelect={() => setAssignee(o.value)}>
-                      {o.label}
-                    </MenuItem>
-                  ))}
-                </Menu>
-                <Menu
-                  label={t("issues.form.priority")}
-                  trigger={
-                    <Button
-                      size="sm"
-                      icon="flag"
-                      aria-label={`${t("issues.form.priority")}: ${priorityLabel(priority)}`}
-                    >
-                      {priorityLabel(priority)}
-                    </Button>
-                  }
-                >
-                  {PRIORITIES.map((p) => (
-                    <MenuItem key={p} icon="flag" onSelect={() => setPriority(p)}>
-                      {priorityLabel(p)}
-                    </MenuItem>
-                  ))}
-                </Menu>
-                {whoSeesShown && <WhoSeesButton value={audience} onClick={() => setChoosing(true)} />}
-                <DueDate value={due} onChange={setDue} />
-                {todoColumns.length > 1 && chosenColumn && (
-                  <Menu
-                    label={t("issues.column")}
-                    trigger={
-                      <Button
-                        size="sm"
-                        icon="stageTodo"
-                        aria-label={`${t("issues.column")}: ${columnTitle(chosenColumn)}`}
-                      >
-                        {columnTitle(chosenColumn)}
-                      </Button>
-                    }
-                  >
-                    {todoColumns.map((c) => (
-                      <MenuItem key={c.id} icon="stageTodo" onSelect={() => setColumn(c.id)}>
-                        {columnTitle(c)}
-                      </MenuItem>
-                    ))}
-                  </Menu>
-                )}
-              </div>
+              {props}
               {agentNote}
             </DialogBody>
           )}

@@ -464,7 +464,9 @@ test("B10: during the quiet window the first call's prompt is pre-warmed: the sa
   f = await setup({
     contextTools: true,
     react: true,
-    quietMs: 300,
+    // Long enough that the run reaches its window while it is still open on a machine busy with other test files:
+    // with 300 ms the run sometimes got there after it, and then there is rightly no pre-warm (the test below).
+    quietMs: 2000,
     reply: (r) => (r.maxTokens === 0 ? { chunks: [], usage: { outputTokens: 0 } } : { chunks: ["Oi!"] }),
   });
   const handlers = createJobHandlers({ ...f.jobDeps, prewarm: true });

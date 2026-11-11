@@ -20,8 +20,11 @@ const WEB = join(ROOT, "apps/web");
 const BASELINE = join(HERE, "baseline.json");
 /** A desktop, the narrowest phone, and the common one: a row can fit at 320 and still squeeze its words at 390. */
 const WIDTHS = [1280, 320, 390];
-/** One browser each: tabs on the same file:// origin share a renderer, so they'd lay out one at a time. */
-const BROWSERS = 4;
+/**
+ * One browser each: tabs on the same file:// origin share a renderer, so they'd lay out one at a time.
+ * `GEOMETRY_BROWSERS` raises it on a machine with more cores to spare (CI's runner).
+ */
+const BROWSERS = Math.max(1, Number(process.env.GEOMETRY_BROWSERS) || 4);
 /**
  * Fewer than this means the capture broke, and an empty run must not read as a clean one. `GEOMETRY_MIN_STATES` lowers
  * it for a local run over a few test files.
@@ -303,6 +306,7 @@ export const SELF_TESTED = [
   "factwrap",
   "undoinline",
   "countfill",
+  "calstack",
   "bleed",
   "stampout",
 ];

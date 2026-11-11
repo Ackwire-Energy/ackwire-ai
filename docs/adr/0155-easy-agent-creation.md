@@ -65,3 +65,9 @@ While a row is open for an owner, the right hand's prompt names none of the setu
 ADR 0162: the onboarding asks what the workspace does and makes its team, so the card keeps an AI (for the whole
 team), apps and people. An invitation waiting for its answer finishes the people row, which invites one address in
 place. On a hold every row waits with no button, and "Agora não" says nothing.
+
+## Amendment (2026-11-10): one card (§1)
+
+ADR 0164: on the web, the two steps become one dialog with the starting points on the left and the agent's card,
+edited in place, on the right, opened from every way in. The checklist (§2) reads what the card chose: its sentence,
+its starter and its apps.

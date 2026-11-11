@@ -25,8 +25,9 @@ import { hereBanner, hereLine, type LocalServerStatus } from "../control/local-s
 import { menuLabels } from "../control/menu-labels";
 import { NOTCH_PREF } from "../control/notch";
 import { SITE_NOTIFY_PREF } from "../control/notify";
+import { nextOffer, PAIR_OFFER_PREF, PAIR_OFFERED_PREF, targetKey } from "../control/pair";
 import { combinedPause, extendPause, type PauseChoice, pauseUntil } from "../control/pause";
-import { homeServer, type ServerList, serverName } from "../control/server";
+import { homeServer, type ServerList, type ServerWorkspaces, serverName } from "../control/server";
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
 import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
@@ -87,6 +88,27 @@ export function Popover() {
 
   // The server here's sync made a home: its first tools once its runner is up.
   useEffect(() => host.onNewHostHome((homeId) => whenHostHomeReady(store, homeId)), [host, store]);
+  // Signed in to a workspace this computer doesn't work for yet: its card, once, in the welcome window.
+  const workspacesSeen = useRef<ServerWorkspaces[] | null>(null);
+  useEffect(
+    () =>
+      host.onWorkspaces(() => {
+        void host
+          .workspaces()
+          .then((list) => {
+            const before = workspacesSeen.current;
+            workspacesSeen.current = list;
+            const offered = readPref<string[]>(PAIR_OFFERED_PREF, []);
+            const offer = nextOffer(list, before, store.getSnapshot(), offered);
+            if (!offer) return;
+            writePref(PAIR_OFFERED_PREF, [...offered, targetKey(offer)]);
+            writePref(PAIR_OFFER_PREF, offer);
+            return host.showWindow("welcome");
+          })
+          .catch(() => {});
+      }),
+    [host, store],
+  );
   // One of its homes was refused by its organization (its token): the next sync asks for a new one, once a
   // while per organization.
   const rotated = useRef(new Map<string, number>());
@@ -207,7 +229,8 @@ export function Popover() {
       const showRequests = () => host.showWindow("popover");
       const localDir = () => host.localServer().then((s) => s.dir);
       const revealFolder = (path: string) => host.revealFolder(path);
-      answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder }, request)
+      const onPaired = () => void host.setAutostart(true).catch(() => {});
+      answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder, onPaired }, request)
         .then(
           (data) => host.thisMacReply(id, true, data ?? null),
           (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),

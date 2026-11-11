@@ -20,10 +20,10 @@ import {
 import { addMember, type Fixture, setup } from "./fixtures";
 
 /**
- * An agent's @mention wakes the agent it names unless the judge is sure the message needs nothing from it (ADR
- * 0089), an agent woken for nothing passes, and a mention of an agent that isn't in the conversation is told to its
- * author. Fake judges answer how sure they are that a message needs nothing; the fake model keys on whose prompt it
- * is and what it may do.
+ * An agent's @mention wakes the agent it names only when the judge reads a plain request to it (ADR 0089, addendum
+ * 2026-11-10), never an agent its run already asked, an agent woken for nothing passes, and a mention of an agent that
+ * isn't in the conversation is told to its author. Fake judges answer how sure they are that a message leaves the
+ * agent nothing to do; the fake model keys on whose prompt it is and what it may do.
  */
 
 setDefaultTimeout(60_000);
@@ -60,7 +60,7 @@ const ask = (body: string) =>
 const runsOf = () => f.db.select().from(schema.agentRuns).orderBy(asc(schema.agentRuns.createdAt));
 
 describe("the judge is asked what must not wake", () => {
-  test("only thanks, an ok, a sign-off, a quote or a plan waiting for a person need nothing; a delivery needs it", async () => {
+  test("credit, a source, what it was asked, a thanks or a plan to ask later need nothing", async () => {
     const judge = createFakeJudge(() => 0.5);
     await mentionNeedsNothing(judge, {
       orgId: "o",
@@ -71,24 +71,32 @@ describe("the judge is asked what must not wake", () => {
     const [call] = judge.calls;
     expect(call?.kind).toBe("mention_needs_nothing");
     const q = call?.questions.nothing_0 as Extract<JudgeQuestion, { type: "noul" }>;
-    for (const nothing of ["thanks", "'ok'", "sign-off", "'as @agent said'", "'talk to @agent'", "waits for a person"])
+    for (const nothing of [
+      "'via @agent'",
+      "'the numbers are from @agent'",
+      "'I asked @agent'",
+      "corrects it",
+      "thanks",
+      "'as @agent said'",
+      "'I'll ask @agent to review it'",
+    ])
       expect(q.criteria.true).toContain(nothing);
-    for (const needs of ["a handover", "a summary", "a verdict", "a question", "'I'll ask @agent to review it'"])
+    for (const needs of ["plainly asks the agent itself", "a question addressed to it", "the handover"])
       expect(q.criteria.false).toContain(needs);
   });
 });
 
-describe("an agent's @mention wakes the other agent unless the judge is sure it needs nothing", () => {
-  test("hand-offs production missed wake it; a thanks, an ok, a sign-off and a quote don't", async () => {
-    // How sure the judge is that each message needs nothing from QA: only 0.8 or more leaves QA asleep.
+describe("an agent's @mention wakes the other agent only when it plainly asks it something", () => {
+  test("a request and a handover wake it; credit, a source, a correction or an unsure judge don't", async () => {
+    // How sure the judge is that each message leaves QA nothing to do: QA wakes only at 0.4 or less.
     const cases = [
-      { body: "@qa, aqui está o documento completo da passagem: contas a pagar e o calendário.", nothing: 0.42 },
-      { body: "#12, aprovar com ressalvas; #13, aprovar. @qa, o resumo é esse.", nothing: 0.5 },
-      { body: "Ana, o PR #12 está aberto. Vou pedir para o @qa revisar antes de chegar até você.", nothing: 0.6 },
-      { body: "Subi a v2.3.1 agora há pouco, @qa.", nothing: 0.79 },
+      { body: "@qa, revisa o PR #12 por favor.", nothing: 0.05 },
+      { body: "@qa, aqui está o documento completo da passagem: a partir de agora é com você.", nothing: 0.3 },
+      { body: "Os números são do painel de vendas, via @qa.", nothing: 0.9 },
+      { body: "Perguntei ao @qa e ele confirmou.", nothing: 0.85 },
+      { body: "Ana, o PR #12 está aberto. Vou pedir para o @qa revisar antes de chegar até você.", nothing: 0.75 },
+      { body: "O @qa está certo, refiz a conta.", nothing: 0.5 },
       { body: "Valeu, @qa!", nothing: 0.95 },
-      { body: "@qa ok", nothing: 0.9 },
-      { body: "@qa perfeito, por aqui está fechado.", nothing: 0.85 },
       { body: "Como o @qa disse, o timeout está no frete.", nothing: 0.88 },
     ];
     f = await setup({
@@ -113,18 +121,21 @@ describe("an agent's @mention wakes the other agent unless the judge is sure it 
     await drainOutbox(f.db, f.handlers);
 
     const woken = (await runsOf()).filter((r) => r.agentId === qa.id).map((r) => r.triggerMessageId);
-    expect(written.map((m) => woken.includes(m.id))).toEqual([true, true, true, true, false, false, false, false]);
+    expect(written.map((m) => woken.includes(m.id))).toEqual([true, true, false, false, false, false, false, false]);
     const decisions = await f.db.select().from(schema.routingDecisions);
-    const handover = decisions.find((d) => d.messageId === written[0]?.id);
+    const handover = decisions.find((d) => d.messageId === written[1]?.id);
     expect(handover).toMatchObject({ strategy: "mention-fake", selectedAgentIds: [qa.id] });
-    // The score kept is how likely the message needs the agent: 1 − the judge's "nothing".
-    expect(handover?.candidates[0]?.score).toBeCloseTo(0.58);
+    // The score kept is how likely the message asks the agent: 1 − the judge's "nothing".
+    expect(handover?.candidates[0]?.score).toBeCloseTo(0.7);
+    const unsure = decisions.find((d) => d.messageId === written[5]?.id);
+    expect(unsure).toMatchObject({ selectedAgentIds: [] });
   });
 
   test("an agent woken for nothing passes: one call, no message, nothing woken after it", async () => {
     f = await setup({
       toolSources: [createPassToolSource()],
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.6 : undefined),
+      // The judge wrongly reads a request in a plain report.
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0.3 : undefined),
       reply: (req) => {
         if (isFor(req, "QA", "qa")) return toolNames(req).includes("pass") ? pass : { chunks: ["Ok, anotado."] };
         return { chunks: ["Subi a v2.3.1 agora há pouco, @qa."] };
@@ -149,9 +160,9 @@ describe("an agent's @mention wakes the other agent unless the judge is sure it 
   test("a thanks the judge gets wrong wakes the other agent once, and it passes: no thanks-for-thanks loop", async () => {
     f = await setup({
       toolSources: [createPassToolSource()],
-      // Sure "pode revisar?" needs QA; unsure about the thanks back (0.5), so Dev wakes on it.
+      // Sure "pode revisar?" asks QA; wrong about the thanks back (0.3), so Dev wakes on it.
       judge: (kind, _id, state) =>
-        kind === "mention_needs_nothing" ? (messageText(state).includes("pode revisar") ? 0.1 : 0.5) : undefined,
+        kind === "mention_needs_nothing" ? (messageText(state).includes("pode revisar") ? 0.1 : 0.3) : undefined,
       reply: (req) => {
         const thanked = lastText(req).includes("Valeu");
         if (isFor(req, "QA", "qa"))
@@ -211,24 +222,42 @@ describe("an agent's @mention wakes the other agent unless the judge is sure it 
     expect(of(thanks.id)?.selectedAgentIds).toEqual([]);
     expect(of(handOff.id)?.selectedAgentIds).toEqual([qa.id]);
   });
-  test("an agent another agent says it will ask does the work now instead of passing", async () => {
+  test("an agent the run already asked with ask_agent isn't woken again by its mention here", async () => {
+    // The judge reads a plain request: without the consultation, QA would answer the person here too.
     f = await setup({
-      toolSources: [createPassToolSource()],
-      judge: (kind) => (kind === "mention_needs_nothing" ? 0.6 : undefined),
-      reply: (req) => {
-        if (isFor(req, "QA", "qa"))
-          return systemText(req.system).includes("says it will ask you") ? { chunks: ["Revisando o PR #12."] } : pass;
-        return { chunks: ["PR #12 aberto. Vou pedir para o @qa revisar."] };
-      },
+      askAgent: true,
+      judge: (kind) => (kind === "mention_needs_nothing" ? 0 : undefined),
+      reply: () => ({ chunks: ["Feito."] }),
     });
     const qa = await agent("QA", "qa", { inGeneral: true });
-    await ask("@dev abre o PR #12");
+    const person = await ask("@dev quantos pedidos entraram hoje?");
+    const [devRun] = await runsOf();
+    if (!devRun || !f.tools) throw new Error("no run or tools");
+    const ctx: ToolContext = {
+      db: f.db,
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      runId: devRun.id,
+      channelId: f.general.id,
+      threadRootId: person.id,
+      triggerMessageId: person.id,
+    };
+    await f.tools.invoke(ctx, {
+      toolUseId: "tu_ask",
+      name: "ask_agent",
+      input: { agent: "@qa", question: "Quantos pedidos entraram hoje?" },
+    });
+    await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "agent", agentId: f.agent.id, runId: devRun.id, hop: 1 },
+      body: "Perguntei ao @qa. @qa, confere os pedidos de hoje?",
+    });
     await drainOutbox(f.db, f.handlers);
 
-    const said = (await f.db.select().from(schema.messages))
-      .filter((m) => m.authorAgentId === qa.id)
-      .map((m) => m.body);
-    expect(said).toEqual(["Revisando o PR #12."]);
+    const qaRuns = (await runsOf()).filter((r) => r.agentId === qa.id);
+    expect(qaRuns.map((r) => r.trigger)).toEqual(["dm"]);
+    expect(qaRuns.some((r) => r.channelId === f.general.id)).toBe(false);
   });
 });
 

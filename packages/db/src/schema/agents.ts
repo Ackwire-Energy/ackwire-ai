@@ -169,8 +169,16 @@ export const agents = pgTable(
     /**
      * The setup checklist at the top of its chat (ADR 0155 §2): the ready-made role it started from (null: from
      * scratch or made elsewhere) and the steps a person confirmed. Null = made before the checklist: none shows.
+     * No migration for its extras (jsonb).
      */
-    setup: jsonb().$type<{ role: string | null; done: string[] }>(),
+    setup: jsonb().$type<{
+      role: string | null;
+      done: string[];
+      /** ADR 0164: how it introduced itself on its card, its personal starter, its apps at their levels. */
+      hello?: string;
+      starter?: string;
+      apps?: Record<string, "read" | "write">;
+    }>(),
     /**
      * Its computer (ADR 0025): the connected machine it works on; null = none yet (the workspace's own computer
      * takes the agents with none once it connects).

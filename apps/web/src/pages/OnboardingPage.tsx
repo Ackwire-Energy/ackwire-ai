@@ -1,5 +1,5 @@
 import type { Agent } from "@agenteschat/client";
-import { ApiError, keys, meQuery, useAuthConfig, type WorkspaceMode } from "@agenteschat/client";
+import { ApiError, keys, type Me, meQuery, useAuthConfig, type WorkspaceMode } from "@agenteschat/client";
 import { accountOutOfReach } from "@agenteschat/client/lib/deletion";
 import { errorCode, errorText } from "@agenteschat/client/lib/errors";
 import { firstName, joinNames } from "@agenteschat/client/lib/format";
@@ -187,7 +187,9 @@ export function OnboardingPage() {
       if (!target) return;
       const done = await finishOnboarding(api, target.orgId);
       sessionStore.remove(STORAGE_KEYS.confirmationSent);
-      await qc.invalidateQueries({ queryKey: keys.me });
+      // The answer that finished it says who the person is now: it opens without asking the server again.
+      if (done.me) qc.setQueryData(keys.me, done.me);
+      else await qc.invalidateQueries({ queryKey: keys.me });
       const params = { orgId: target.orgId };
       // Wherever it opens, on its arrival (ADR 0160): the beta notice, then Connect an AI.
       const search = { [ARRIVAL_PARAM]: 1 } as never;
@@ -216,16 +218,19 @@ export function OnboardingPage() {
     },
     mutationFn: async () => {
       let made: { orgId: string; generalChannelId: string } | null = null;
+      // `/me` as the create answered it, while nothing after it changed it.
+      let now: Me | undefined;
       if (!orgId) {
-        // "For me": no name to ask, the word for it in the person's language (renamed in Settings like any other).
-        const res = await api.orgs.create(
-          personal ? { name: t("onboarding.personal.name"), mode: "personal" } : { name: org.trim() },
-        );
+        const res = await api.orgs.create({
+          // "For me": no name to ask, the word for it in the person's language (renamed in Settings like any other).
+          name: personal ? t("onboarding.personal.name") : org.trim(),
+          ...(personal ? { mode: "personal" as const } : {}),
+          timezone: zoneNow,
+          // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
+          memberTimezone: browserTimezone() ?? undefined,
+        });
         made = { orgId: res.organization.id, generalChannelId: res.generalChannelId };
-        await api.orgs.updateSettings(made.orgId, { timezone: zoneNow });
-        // The person's own zone, detected here: agents read the local time from it (the language is `useServerLocale`'s).
-        const mine = browserTimezone();
-        if (mine) await api.orgs.updateMe(made.orgId, { timezone: mine }).catch(() => undefined);
+        now = res.me;
       } else {
         await api.orgs.updateSettings(orgId, { name: org.trim(), ...(zone ? { timezone: zone } : {}) });
       }
@@ -235,13 +240,15 @@ export function OnboardingPage() {
         if (logo) await api.orgs.setLogo(id, logo);
         else await api.orgs.removeLogo(id);
         setLogoDirty(false);
+        now = undefined;
       }
       // The next step's data first, then the workspace among mine: it shows at once, with no splash between.
       await Promise.all([
         qc.prefetchQuery({ queryKey: keys.settings(id), queryFn: () => api.orgs.settings(id) }),
         qc.prefetchQuery({ queryKey: keys.agents(id), queryFn: () => api.agents.list(id) }),
       ]);
-      await qc.invalidateQueries({ queryKey: keys.me });
+      if (now) qc.setQueryData(keys.me, now);
+      else await qc.invalidateQueries({ queryKey: keys.me });
       if (made) setCreated(made);
       setPicked(null);
     },
@@ -519,7 +526,11 @@ export function OnboardingPage() {
                         }))}
                       />
                       {unpaidElsewhere && (
-                        <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />
+                        <UnpaidNote
+                          orgId={unpaidElsewhere}
+                          name={me.data.organizations.find((o) => o.id === unpaidElsewhere)?.name}
+                          billing={Boolean(authConfig?.billingUrl)}
+                        />
                       )}
                     </div>
                   ) : (
@@ -595,7 +606,11 @@ export function OnboardingPage() {
                         onRemoved={() => setLogoOpen(false)}
                       />
                       {unpaidElsewhere && (
-                        <UnpaidNote orgId={unpaidElsewhere} billing={Boolean(authConfig?.billingUrl)} />
+                        <UnpaidNote
+                          orgId={unpaidElsewhere}
+                          name={me.data.organizations.find((o) => o.id === unpaidElsewhere)?.name}
+                          billing={Boolean(authConfig?.billingUrl)}
+                        />
                       )}
                     </div>
                   )}
@@ -705,20 +720,31 @@ export function OnboardingPage() {
 /** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
-/** Owning a workspace that waits for its first plan: said in place, with the way to that plan. */
-function UnpaidNote({ orgId, billing }: { orgId: string; billing: boolean }) {
+/**
+ * Owning a workspace that waits for its first plan: said in place, with the way into that workspace (someone who came
+ * back to this page after making it was looking for it, not for another) and the way to its plan.
+ */
+function UnpaidNote({ orgId, name, billing }: { orgId: string; name: string | undefined; billing: boolean }) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   return (
     <>
       <p className="onb__status ac-iconline" role="alert">
         <Icon name="pause" size={14} />
         <span>{t("standing.createUnpaid")}</span>
       </p>
-      {billing && (
+      {(name || billing) && (
         <div className="row">
-          <BillingLinkButton orgId={orgId} from="new_workspace" icon="external">
-            {t("standing.billing.cta.payment")}
-          </BillingLinkButton>
+          {name && (
+            <Button onClick={() => void navigate({ href: returnPlace(orgId) })}>
+              {t("standing.createUnpaidOpen", { name })}
+            </Button>
+          )}
+          {billing && (
+            <BillingLinkButton orgId={orgId} from="new_workspace" icon="external">
+              {t("standing.billing.cta.payment")}
+            </BillingLinkButton>
+          )}
         </div>
       )}
     </>

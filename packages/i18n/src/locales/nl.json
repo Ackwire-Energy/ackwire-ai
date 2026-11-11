@@ -2789,8 +2789,6 @@
     "was": "Eerst: {{text}}",
     "open": "Wat {{name}} weet",
     "open_female": "Wat {{name}} weet",
-    "undo": "Ongedaan maken",
-    "undone": "Ongedaan gemaakt",
     "group": "Geheugen bijgewerkt door {{name}}"
   },
   "reach": {
@@ -2943,20 +2941,10 @@
     "someone": "iemand",
     "you": "jij",
     "undo": "Ongedaan maken",
-    "redo": "Opnieuw",
-    "undoAll": "Alles ongedaan maken",
     "changes_one": "{{count}} wijziging",
     "changes_other": "{{count}} wijzigingen",
     "undoneBy": "Ongedaan gemaakt door {{name}}",
-    "ago": "{{time}} geleden",
-    "timeLeft": "Nog {{time}} om ongedaan te maken",
     "group": "Wijzigingen door {{name}}",
-    "undone": "Ongedaan gemaakt.",
-    "redone": "Opnieuw uitgevoerd.",
-    "undoneAll_one": "{{count}} wijziging ongedaan gemaakt.",
-    "undoneAll_other": "{{count}} wijzigingen ongedaan gemaakt.",
-    "partial_one": "{{count}} wijziging kon niet ongedaan worden gemaakt.",
-    "partial_other": "{{count}} wijzigingen konden niet ongedaan worden gemaakt.",
     "errors": {
       "changed_since": "Iemand heeft dit sindsdien gewijzigd. Nu ongedaan maken zou die wijziging wissen.",
       "expired": "De tijd om ongedaan te maken is voorbij.",
@@ -3600,6 +3588,7 @@
       "ready": "Gekoppeld",
       "syncing": "Synchroniseren",
       "reads": "Leest {{label}}",
+      "readOnly": "alleen-lezen",
       "items_one": "{{count}} item",
       "items_other": "{{count}} items",
       "synced": "gesynchroniseerd {{when}}",
@@ -3648,7 +3637,7 @@
       "onepassword": {
         "step": {
           "1": "Maak in 1Password een kluis alleen voor je agenten en zet daar de logins in die ze mogen gebruiken",
-          "2": "Maak een serviceaccount met alleen toegang tot die kluis",
+          "2": "Maak een serviceaccount met alleen toegang tot die kluis (lezen en schrijven, als je agenten daar nieuwe logins moeten opslaan)",
           "3": "Plak hier het token van het serviceaccount"
         },
         "field": {
@@ -5538,42 +5527,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Wat moet je nieuwe agent doen?",
-    "lead": "Zeg het in één zin. {{name}} zet hem klaar en laat hem zien voordat hij gemaakt wordt.",
-    "field": "Wat hij voor je doet",
-    "placeholder": "Bijv. Mijn agenda op orde houden en me aan belangrijke dingen herinneren",
-    "ideas": "Ideeën",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Mijn agenda op orde houden en me aan afspraken herinneren"
-      },
-      "money": {
-        "label": "Financiën",
-        "text": "Mijn rekeningen bijhouden en me waarschuwen voor de vervaldatum"
-      },
-      "training": {
-        "label": "Training",
-        "text": "Mijn trainingen voor de week plannen en aanpassen aan hoe ik me voel"
-      },
-      "studies": {
-        "label": "Studie",
-        "text": "Een studieplan maken en me overhoren over wat ik leerde"
-      },
-      "home": {
-        "label": "Huis",
-        "text": "De boodschappenlijst en het huishouden bijhouden"
-      },
-      "travel": {
-        "label": "Reizen",
-        "text": "Mijn reizen plannen: route, boekingen en documenten"
-      }
-    },
-    "full": "Ik vul liever alles zelf in",
-    "create": "Maken met {{name}}",
-    "message": "Ik wil een nieuwe agent: {{what}}"
-  },
   "newAgent": {
     "title": "Agent maken",
     "railOrg": "{{org}} · je bent {{role}}",
@@ -5943,7 +5896,197 @@
     "and": " en ",
     "routine": "Routine",
     "routineKeep": "De routine {{name}} maken",
-    "routineNotMade": "De routine is niet gemaakt: {{reason}}"
+    "routineNotMade": "De routine is niet gemaakt: {{reason}}",
+    "hello": {
+      "clara": "Ik let op je agenda en herinner je aan wat belangrijk is voordat het te laat is.",
+      "duda": "Ik houd je rekeningen en uitgaven bij en waarschuw je voordat er iets vervalt.",
+      "leo": "Ik stel je trainingen samen en houd je in het ritme, op jouw manier.",
+      "mel": "Ik plan je maaltijden en boodschappenlijst, naar jouw smaak en budget.",
+      "gabi": "Ik maak je studieplan en overhoor je over wat je hebt geleerd.",
+      "lu": "Ik bewaar je notities en ideeën en help je er tekst van te maken.",
+      "rosa": "Ik zorg voor de boodschappenlijst, het huishouden en wat er gerepareerd moet worden.",
+      "vic": "Ik plan je reizen: data, prijzen, boekingen en een dag-voor-dag-schema.",
+      "rui": "Ik volg je klanten, schrijf offertes en herinneringen en onthoud wie nog niet heeft betaald.",
+      "dev": "Ik programmeer, review PR's en zoek bugs uit.",
+      "ops": "Ik houd fouten, wachtrijen en deploys in de gaten.",
+      "qa": "Ik test flows en reproduceer gemelde bugs.",
+      "pm": "Ik organiseer de taken en maak de samenvattingen.",
+      "support": "Ik beantwoord klanten en geef door wat een mens nodig heeft.",
+      "sales": "Ik bereid offertes voor en volg geïnteresseerden op.",
+      "marketing": "Ik plan campagnes, posts en pagina's van de site.",
+      "content": "Ik schrijf en redigeer teksten, artikelen en nieuwsbrieven.",
+      "data": "Ik beantwoord vragen met cijfers en maak rapporten.",
+      "finance": "Ik houd betalingen, facturen en uitgaven bij.",
+      "people": "Ik help met werving, onboarding en vragen van het team.",
+      "research": "Ik onderzoek een onderwerp en lever een samenvatting met bronnen.",
+      "assistant": "Ik zorg voor de agenda, de e-mails en de herinneringen."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Kijkt elke ochtend in de agenda en stuurt wat er die dag is.\nHerinnert de dag ervoor aan elke afspraak en elke rekening met een datum.\nPlant, annuleert of accepteert nooit een uitnodiging zonder eerst te vragen.",
+        "tasks": {
+          "a": "Wat heb ik morgen?",
+          "b": "Herinner me elke 5e aan de huur",
+          "c": "Stuur me elke dag om 7 uur mijn agenda"
+        }
+      },
+      "duda": {
+        "instructions": "Houdt rekeningen en uitgaven bij, per categorie.\nWaarschuwt drie dagen voordat iets vervalt en als een uitgave uit de toon valt.\nBetaalt, maakt over of zegt nooit iets op zonder eerst te vragen.",
+        "tasks": {
+          "a": "Hoeveel heb ik deze maand uitgegeven?",
+          "b": "Welke rekeningen vervallen deze week?",
+          "c": "Sorteer deze uitgaven per categorie"
+        }
+      },
+      "leo": {
+        "instructions": "Stelt trainingen samen op jouw niveau, met jouw tijd en wat je leuk vindt.\nPast de week aan als je een dag overslaat of moe bent, zonder preek.\nGeeft geen medisch advies: bij pijn of een blessure raadt hij een professional aan.",
+        "tasks": {
+          "a": "Stel een training van 30 minuten voor vandaag samen",
+          "b": "Plan mijn hardloopweek",
+          "c": "Stuur me elke ochtend de training van de dag"
+        }
+      },
+      "mel": {
+        "instructions": "Plant de maaltijden van de week naar jouw smaak, tijd en budget.\nMaakt de boodschappenlijst bij het menu, per afdeling van de winkel.\nHoudt rekening met beperkingen en allergieën en geeft geen dieet- of medisch advies.",
+        "tasks": {
+          "a": "Stel drie snelle avondmaaltijden voor",
+          "b": "Maak het weekmenu",
+          "c": "Maak de boodschappenlijst voor het menu"
+        }
+      },
+      "gabi": {
+        "instructions": "Maakt het studieplan tot het examen, met wat er per dag past.\nOverhoort je over wat je hebt geleerd en legt opnieuw uit wat je fout had.\nMaakt je huiswerk niet voor je: helpt je naar het antwoord.",
+        "tasks": {
+          "a": "Maak een studieplan voor het examen",
+          "b": "Stel me 3 vragen over wat ik heb geleerd",
+          "c": "Leg dit onderwerp eenvoudig uit"
+        }
+      },
+      "lu": {
+        "instructions": "Bewaart de notities en ideeën die je stuurt en voegt vergelijkbare samen.\nMaakt van notities tekst in jouw toon, zonder iets toe te voegen wat je niet zei.\nRedigeert zorgvuldig en laat zien wat er veranderd is voordat hij het origineel vervangt.",
+        "tasks": {
+          "a": "Maak van deze notities een korte tekst",
+          "b": "Verzamel de ideeën van de week",
+          "c": "Redigeer deze tekst"
+        }
+      },
+      "rosa": {
+        "instructions": "Houdt de boodschappenlijst en het huishouden bij.\nNoteert wat er gerepareerd moet worden en herinnert eraan tot het gedaan is.\nKoopt of huurt nooit iets in zonder eerst te vragen.",
+        "tasks": {
+          "a": "Maak de boodschappenlijst van de week",
+          "b": "Wat moet er in huis gerepareerd worden?",
+          "c": "Verdeel de huishoudtaken"
+        }
+      },
+      "vic": {
+        "instructions": "Plant de reis met data, prijzen en een dag-voor-dag-schema.\nVergelijkt vluchten en verblijven en zegt waarom hij welke voorstelt.\nBoekt of betaalt nooit iets zonder eerst te vragen.",
+        "tasks": {
+          "a": "Plan 3 dagen Lissabon",
+          "b": "Laat het weten als het ticket goedkoper wordt",
+          "c": "Verzamel de boekingen van de reis"
+        }
+      },
+      "rui": {
+        "instructions": "Volgt elke klant: wat is afgesproken, wat nog openstaat en wie niet heeft betaald.\nSchrijft offertes en betalingsherinneringen in jouw toon, klaar om na te lezen.\nStuurt een klant nooit iets zonder jouw goedkeuring.",
+        "tasks": {
+          "a": "Schrijf een korte offerte voor een klant",
+          "b": "Wie heeft nog niet betaald?",
+          "c": "Waar wacht elke klant vandaag op?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nieuwe agent",
+    "lead": "Kies links en pas rechts aan. Je kunt later alles wijzigen.",
+    "list": "Startpunten",
+    "zero": "Vanaf nul",
+    "zeroSub": "Jij zegt wat hij doet",
+    "import": "Agents uit een andere app halen",
+    "hi": "Hoi, ik ben",
+    "hiBlank": "Hoi, ik ben",
+    "name": "Naam",
+    "namePlaceholder": "naam",
+    "what": "Wat hij doet",
+    "whatPlaceholder": "Wat ga ik voor je doen?",
+    "look": "Uiterlijk",
+    "lookDone": "Klaar",
+    "shuffle": "Loten",
+    "handle": "In de chat: @{{handle}}",
+    "handleRole": "In de chat: @{{handle}} · {{role}}",
+    "handleTaken": "In de chat: @{{handle}} · er is hier al een {{name}}",
+    "handleBlank": "De @ voor de chat komt van de naam",
+    "similar": "Lijkt op {{name}}, die al klaarstaat.",
+    "similarAction": "Beginnen met {{name}}",
+    "uses": "Gaat gebruiken",
+    "chooseApps": "Apps kiezen",
+    "otherApp": "Andere app",
+    "usesNone": "Nog niets.",
+    "worksIn": "Werkt in",
+    "how": "Hoe {{name}} werkt",
+    "howBlank": "Hoe hij werkt",
+    "instructionsPlaceholder": "Wat hij doet, wat hij vermijdt, wie hij om hulp vraagt",
+    "picker": {
+      "title": "Apps van {{name}}",
+      "titleBlank": "Apps van de agent",
+      "lead": "Een gekoppelde app komt meteen op de kaart. Andere koppel je hier.",
+      "suggested": "Voorgesteld voor {{name}}",
+      "suggestedBlank": "Voorgesteld",
+      "use": "Gebruiken",
+      "added": "Op de kaart"
+    },
+    "create": "{{name}} maken",
+    "createBlank": "Agent maken",
+    "failed": "Maken is niet gelukt: {{reason}}",
+    "level": {
+      "read": "Leest",
+      "write": "Leest en schrijft"
+    },
+    "app": {
+      "lead": "Hoe ver {{name}} gaat in {{app}}.",
+      "leadBlank": "Hoe ver hij gaat in {{app}}.",
+      "read": "Lezen",
+      "readDesc": "Ziet wat er in {{app}} staat. Verandert niets.",
+      "write": "Lezen en schrijven",
+      "writeDesc": "Maakt en bewerkt ook in {{app}}.",
+      "asks": "{{actions}} vragen altijd om je goedkeuring, op elk niveau.",
+      "asksAny": "Versturen, verwijderen en betalen vragen altijd om je goedkeuring, op elk niveau.",
+      "remove": "{{app}} weghalen",
+      "done": "Klaar"
+    },
+    "band": {
+      "label": "Wat {{name}} nodig heeft om te beginnen",
+      "ai": "Een AI om mee te denken",
+      "asleep": "Slaapt tot er een AI is"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Handleidingen die hij opent als dat nodig is.",
+    "chooseSkills": "Skills kiezen",
+    "otherSkill": "Andere skill",
+    "namesLead": "Wat dacht je van",
+    "namesRoll": "Andere namen",
+    "skill": {
+      "opens": "{{name}} opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "opensBlank": "Hij opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
+      "remove": "Weghalen bij {{name}}",
+      "removeBlank": "Weghalen bij de agent",
+      "done": "Klaar"
+    },
+    "names": {
+      "agenda": "Lia, Uur, Tess, Dora, Tijs, Emma",
+      "agendaWords": "agenda, afspra, herinner, vergader, rooster",
+      "money": "Penny, Nico, Mona, Kees, Lara, Daan",
+      "moneyWords": "rekening, uitgav, geld, financ, budget, betal",
+      "travel": "Route, Malou, Ravi, Vic, Nara, Tom",
+      "travelWords": "reis, ticket, vlucht, hotel, vakantie",
+      "training": "Leo, Bea, Bliksem, Kai, Nina, Daaf",
+      "trainingWords": "train, hardloop, sport, oefen, gym",
+      "study": "Gabi, Nils, Sophie, Teun, Iris, Ben",
+      "studyWords": "studie, studer, examen, cursus, leer",
+      "clients": "Ruud, Anna, Bram, Lies, Otto, Cleo",
+      "clientsWords": "klant, verkoop, offerte, factur",
+      "any": "Sol, Lia, Teun, Bea, Nino, Iris, Kai, Luma, Gijs, Roos, Nara, Tom"
+    }
   },
   "members": {
     "column": {
@@ -6774,20 +6917,19 @@
     "statusLabel": "Status",
     "due": "Deadline",
     "noDue": "Geen deadline",
-    "seeCalendar": "bekijk in de agenda",
+    "seeCalendar": "Bekijk in de agenda",
     "removeDue": "De deadline verwijderen",
     "links": "Gekoppeld",
     "prBy": "PR #{{number}} · geopend door {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Nog niets gekoppeld.",
     "github": {
       "label": "GitHub-link",
       "placeholder": "Link van issue of PR",
       "invalid": "Dat is geen link van een GitHub-issue of pull request.",
-      "remove": "GitHub-link verwijderen"
+      "remove": "GitHub-link verwijderen",
+      "add": "GitHub-link toevoegen"
     },
     "openConversation": "Gesprek bekijken",
-    "labels": "Labels",
     "tabs": {
       "label": "Onderdelen van de taak",
       "details": "Gegevens",
@@ -8597,6 +8739,8 @@
     },
     "upcoming": "Binnenkort",
     "upcomingEmpty": "Er komt niets aan.",
+    "owners": "Agents en mensen",
+    "showOwner": "{{name}} tonen",
     "viewZone": "Tijdzone van de agenda",
     "miniMonth": "Kies een dag",
     "new": "Nieuwe afspraak",
@@ -8622,12 +8766,6 @@
         "declined": "Je komt niet."
       }
     },
-    "kind": {
-      "event": "Afspraak",
-      "routine": "Routine",
-      "reminder": "Herinnering",
-      "deadline": "Deadline van taak"
-    },
     "every": {
       "hour": "elk uur",
       "hours": "elke {{count}} u",
@@ -8636,24 +8774,20 @@
     "perDay": "{{count}}× per dag",
     "runs_one": "{{count}} run in deze dagen.",
     "runs_other": "{{count}} runs in deze dagen.",
-    "routineDetail": "Routine van {{agent}} · levert aan {{target}}.",
+    "routineDetail": "Routine · levert aan {{target}}",
     "deadlineDetail": "De deadline van de taak.",
     "reminderBy": "Ingesteld door {{name}}",
-    "reminderPosted": "Geplaatst door {{agent}} · {{target}}",
+    "reminderPosted": "Herinnering · verschijnt in {{target}}",
     "cancelReminder": "Herinnering annuleren",
     "reminderCancelled": "Herinnering geannuleerd",
     "openIssue": "Taak openen",
     "openRoutines": "Bekijken in Routines",
     "openRoutine": "Routine openen",
     "runAria": "Routine {{name}}, {{time}}",
-    "runsAria": "{{count}} routines om {{time}}: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Routines om {{time}}",
-    "runsOn": "Routines · {{day}}",
-    "runsCount_one": "{{count}} routinerun",
-    "runsCount_other": "{{count}} routineruns",
-    "dayRunsAria_one": "{{count}} routinerun op {{day}}: {{names}}",
-    "dayRunsAria_other": "{{count}} routineruns op {{day}}: {{names}}",
+    "moreRuns_one": "+{{count}} routine",
+    "moreRuns_other": "+{{count}} routines",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "geantwoord",
@@ -9415,6 +9549,193 @@
     "removed": "Foto verwijderd.",
     "notImage": "Kies een afbeelding (JPG, PNG of WebP).",
     "tooBig": "De afbeelding is groter dan 8 MB."
+  },
+  "portrait": {
+    "ask": {
+      "title": "Hoe wil je eruitzien?",
+      "build": "Avatar maken",
+      "buildText": "Een pixelportret op jouw manier: haar, kleding, accessoires.",
+      "photo": "Foto uploaden",
+      "photoText": "Kies een afbeelding van je computer en kader die in."
+    },
+    "title": "Je avatar",
+    "preview": "Je avatar",
+    "shuffle": "Husselen",
+    "small": "In kleine formaten in de chat is alleen het gezicht te zien.",
+    "photoAsk": "Liever een foto?",
+    "photoUpload": "Foto uploaden",
+    "saved": "Avatar bijgewerkt.",
+    "failed": "De avatar kon niet worden opgeslagen. Probeer het opnieuw.",
+    "showAll": "Alle opties tonen",
+    "showFewer": "Minder opties tonen",
+    "beardHint": "De baard volgt de haarkleur.",
+    "hatsHint": "Een pet, muts, hoed en hoofddoek bedekken het haar.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Type",
+      "m": "Mannelijk",
+      "f": "Vrouwelijk"
+    },
+    "tabs": {
+      "label": "Onderdelen van de avatar",
+      "face": "Gezicht",
+      "hair": "Haar",
+      "beard": "Baard",
+      "makeup": "Make-up",
+      "marks": "Kenmerken",
+      "accessories": "Accessoires",
+      "clothes": "Kleding",
+      "background": "Achtergrond"
+    },
+    "sections": {
+      "skin": "Huidskleur",
+      "eyes": "Oogkleur",
+      "mood": "Uitdrukking",
+      "color": "Kleur",
+      "hairColor": "Haarkleur",
+      "clothesColor": "Kleur van kleding",
+      "cut": "Kapsel",
+      "beard": "Baard",
+      "lips": "Lippenstift",
+      "shadow": "Oogschaduw",
+      "blush": "Blush",
+      "mark": "Kenmerken",
+      "glasses": "Bril",
+      "ear": "Oorbellen",
+      "neck": "Om de hals",
+      "extra": "Op het hoofd",
+      "piece": "Kledingstuk",
+      "bg": "Achtergrond"
+    },
+    "options": {
+      "mood": {
+        "smile": "Glimlach",
+        "grin": "Brede lach",
+        "laugh": "Lachen",
+        "calm": "Rustig",
+        "wink": "Knipoog",
+        "wow": "Verrast"
+      },
+      "hair": {
+        "none": "Kaal",
+        "buzz": "Gemillimeterd",
+        "short": "Kort",
+        "side": "Zijscheiding",
+        "quiff": "Kuif",
+        "curly": "Krullend",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Pony",
+        "long": "Lang",
+        "wavy": "Golvend",
+        "curls": "Lange krullen",
+        "bun": "Knot",
+        "pony": "Paardenstaart",
+        "spiky": "Stekels",
+        "mohawk": "Hanenkam",
+        "braids": "Vlechten",
+        "pigtails": "Staartjes",
+        "crew": "Crewcut",
+        "fade": "Fade",
+        "slick": "Achterover",
+        "flat": "Flattop",
+        "undercut": "Undercut",
+        "mullet": "Matje",
+        "dreads": "Dreadlocks",
+        "medium": "Halflang",
+        "receding": "Inhammen"
+      },
+      "beard": {
+        "none": "Geen baard",
+        "stubble": "Stoppelbaard",
+        "mustache": "Snor",
+        "goatee": "Sik",
+        "strap": "Kaaklijn",
+        "full": "Volle baard",
+        "long": "Lang"
+      },
+      "lips": {
+        "none": "Geen lippenstift",
+        "nude": "Nude",
+        "pink": "Roze",
+        "red": "Rood",
+        "wine": "Wijnrood",
+        "purple": "Paars",
+        "black": "Zwart"
+      },
+      "shadow": {
+        "none": "Geen oogschaduw",
+        "rose": "Rosé",
+        "violet": "Violet",
+        "blue": "Blauw",
+        "green": "Groen",
+        "gold": "Goud",
+        "smoky": "Smokey"
+      },
+      "blush": {
+        "soft": "Zacht",
+        "strong": "Fel",
+        "none": "Geen blush"
+      },
+      "mark": {
+        "none": "Geen",
+        "freckles": "Sproeten",
+        "mole": "Moedervlek",
+        "scar": "Litteken",
+        "bandaid": "Pleister",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Geen bril",
+        "round": "Rond",
+        "square": "Vierkant",
+        "gold": "Gouden",
+        "tinted": "Getint",
+        "shades": "Zonnebril"
+      },
+      "ear": {
+        "none": "Geen oorbellen",
+        "studs": "Gouden knopjes",
+        "pearls": "Parels",
+        "hoops": "Ringen",
+        "drops": "Hangers"
+      },
+      "neck": {
+        "none": "Niets",
+        "necklace": "Ketting",
+        "pearls": "Parels",
+        "choker": "Choker",
+        "bowtie": "Vlinderdas",
+        "muffler": "Sjaal"
+      },
+      "extra": {
+        "none": "Niets",
+        "headband": "Haarband",
+        "bandana": "Bandana",
+        "bow": "Strik",
+        "flower": "Bloem",
+        "headphones": "Koptelefoon",
+        "cap": "Pet",
+        "beanie": "Muts",
+        "hat": "Hoed",
+        "crown": "Kroon",
+        "scarf": "Hoofddoek"
+      },
+      "clothes": {
+        "tee": "T-shirt",
+        "vneck": "V-hals",
+        "tank": "Tanktop",
+        "shirt": "Overhemd",
+        "suit": "Pak",
+        "blazer": "Blazer",
+        "jacket": "Jas",
+        "hoodie": "Hoodie",
+        "turtle": "Coltrui",
+        "overall": "Tuinbroek",
+        "polo": "Polo",
+        "dress": "Jurk"
+      }
+    }
   },
   "orgLogo": {
     "label": "Logo",
@@ -10823,7 +11144,7 @@
       "close": "Details sluiten",
       "can": "Wat agents kunnen doen",
       "afterText": "Geen agent gebruikt het tot jij kiest.",
-      "allText": "Na het koppelen kan elke agent het gebruiken. Daarna kies je de toegang van elke agent.",
+      "allText": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
       "addAccount": "Nog een account toevoegen",
       "accountsText": "Elk account heeft eigen agents en niveaus.",
       "reconnect": "Opnieuw koppelen",
@@ -11604,11 +11925,10 @@
     "notApproved": "{{name}} laat alleen goedgekeurde apps inloggen, en agentes.chat is nog niet goedgekeurd. Krijg je er een API-sleutel, dan kun je daarmee koppelen.",
     "serverSaid": "De server antwoordde: {{detail}}",
     "nothingYet": "Tot stap 3 is er niets beschikbaar voor agents.",
-    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je in stap 3 aanpassen.",
-    "newAccount": "Het nieuwe account begint zonder agents, behalve die met toegang tot alles. Je kiest in stap 3.",
+    "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
     "replace": "Vervangt de huidige login. Wie het gebruikt, blijft hetzelfde.",
     "replaceUnchecked": "Log in met hetzelfde account als eerst. We kunnen niet controleren welk het is, en wie het gebruikt, blijft hetzelfde.",
-    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren. Het begint zonder agents, behalve die met toegang tot alles.",
+    "newAccountUnchecked": "Log in met een account dat nog niet gekoppeld is, wij kunnen dat niet controleren.",
     "addTitle": "Nog een {{name}}-account",
     "reconnectTitle": "{{name}} opnieuw koppelen",
     "accountName": "Naam van dit account",
@@ -11631,7 +11951,16 @@
     "asksDefault": "Gevoelige acties vragen altijd om goedkeuring in de chat.",
     "grant": "Toegang geven",
     "saved_one": "{{name}}: {{count}} agent kan het gebruiken.",
-    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken."
+    "saved_other": "{{name}}: {{count}} agents kunnen het gebruiken.",
+    "done": {
+      "title": "{{name}} gekoppeld",
+      "everyone": "Elke agent kan het gebruiken.",
+      "waiting": "Agents krijgen de tools pas als je doorgaat, op de niveaus die wij voorstellen.",
+      "asks_one": "{{count}} actie vraagt om goedkeuring in de chat.",
+      "asks_other": "{{count}} acties vragen om goedkeuring in de chat.",
+      "adjust": "Aanpassen",
+      "ok": "Klaar"
+    }
   },
   "database": {
     "name": "Database",
@@ -13018,10 +13347,26 @@
     },
     "computer": {
       "title": "Nog een computer koppelen",
-      "step1": "Download de app erop:",
-      "step2": "Open hem en log in bij {{org}}.",
-      "step3": "Zet „Agents deze computer laten gebruiken” aan.",
-      "orLine": "Of plak één regel in de terminal"
+      "step1": "Zet de agentes.chat-app erop:",
+      "step2": "Open hem en log in met je eigen account.",
+      "step3": "Klik op Toestaan als hij vraagt of de agents van {{org}} hem mogen gebruiken.",
+      "shows": "Hij verschijnt hier vanzelf, alleen voor jou tot je hem deelt.",
+      "waiting": "Wachten op een computer van jou…",
+      "connected": "Gekoppeld: {{name}}",
+      "orLine": "Of plak één regel in de terminal",
+      "noApp": "Kun je de app er niet op zetten? Gebruik een regel in de terminal"
+    },
+    "thisApp": {
+      "text": "De agentes.chat-app koppelt hem met één klik, en vraagt het je eerst.",
+      "open": "Open de agentes.chat-app",
+      "browserAsks": "Je browser vraagt of hij hem mag openen: kies Openen, en Altijd toestaan als hij dat aanbiedt.",
+      "noApp": "Heb je de app nog niet?",
+      "afterInstall": "Klik na het installeren nog een keer op Open de agentes.chat-app. De link werkt één keer, 10 minuten lang.",
+      "waiting": "Wachten op de app op deze computer…",
+      "expired": "Deze link is verlopen.",
+      "again": "Nieuwe link maken",
+      "failed": "Kon de link niet maken. Probeer het zo opnieuw.",
+      "server": "Een server? Gebruik een regel in de terminal"
     },
     "link": {
       "serverTitle": "Server koppelen",
@@ -14723,6 +15068,8 @@
         "sendingDm": "Een direct bericht verstuurd",
         "settingStatus": "De eigen status bijgewerkt",
         "settingReplyStyle": "Aangepast hoe er wordt geantwoord",
+        "sendingFeedback": "Gevraagd om feedback te versturen",
+        "offeringFeedback": "Aangeboden om een probleem te melden",
         "deletingRoutine": "Een routine verwijderd",
         "runningRoutine": "Een routine nu uitgevoerd",
         "proposingTeam": "Een team voorgesteld",
@@ -14835,6 +15182,8 @@
       "sendingDm": "een direct bericht aan het versturen",
       "settingStatus": "de eigen status aan het bijwerken",
       "settingReplyStyle": "aan het aanpassen hoe er wordt geantwoord",
+      "sendingFeedback": "feedback aan het voorbereiden",
+      "offeringFeedback": "een melding aan het voorbereiden",
       "deletingRoutine": "een routine aan het verwijderen",
       "runningRoutine": "een routine nu aan het uitvoeren",
       "proposingTeam": "een team aan het voorstellen",
@@ -15748,6 +16097,7 @@
     "suspended": "Deze werkruimte is voorlopig niet beschikbaar.",
     "createRefused": "Je kunt nu geen werkruimte maken.",
     "createUnpaid": "Je hebt al een werkruimte die wacht op een agentes.chat-abonnement. Kies daar een abonnement voordat je er nog een maakt.",
+    "createUnpaidOpen": "{{name}} openen",
     "createInactive": "Je hebt al een werkruimte die nog niet actief is, dus je kunt voorlopig geen nieuwe maken.",
     "agentPaused": "Deze agent is voorlopig gepauzeerd.",
     "onHold": "Deze werkruimte staat in de wacht: {{reason}}",
@@ -17437,6 +17787,24 @@
     "send": "Versturen",
     "thanks": "Afgeleverd. Bedankt.",
     "reply": "Alles wordt gelezen. Een antwoord, als dat nodig is, komt naar {{email}}.",
-    "another": "Nog een sturen"
+    "another": "Nog een sturen",
+    "offer": {
+      "group": "Melding over de app",
+      "ready": "<b>Melding klaar</b>: {{summary}}",
+      "goesCloud": "Gaat op jouw naam naar het team van agentes.chat",
+      "goesServer": "Gaat op jouw naam naar degene die deze server beheert",
+      "see": "Melding bekijken",
+      "hide": "Melding sluiten",
+      "send": "Versturen",
+      "notNow": "Nu niet",
+      "answer": "Het antwoord komt in je e-mail.",
+      "sentCloud": "<b>Melding verstuurd</b> naar het team van agentes.chat",
+      "sentServer": "<b>Melding verstuurd</b> naar degene die deze server beheert",
+      "sentAuto": "<b>Melding verstuurd zonder te vragen</b>: {{summary}}",
+      "view": "Bekijken",
+      "always": "Altijd versturen",
+      "alwaysOn": "Vanaf nu gaan zulke meldingen weg zonder te vragen.",
+      "askFirst": "Vragen voor het versturen"
+    }
   }
 }

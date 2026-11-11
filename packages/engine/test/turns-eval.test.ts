@@ -104,11 +104,14 @@ const size = (r: ModelRequest) =>
  * (no assumption on what can't be undone), nothing offered or promised beyond the list and files on `send_dm`, 45,475
  * with `request_permission` down to one reason (`why`) and the task board on by default, 45,803 with `ask_user`'s
  * `person` and the rule that what is said in a DM stays there, 45,216 with the `ask_user` rule leaving to its
- * description what that says already, and 45,437 with each choice question's written answer (`ask_choices`, its
- * other words tightened for it); the ceiling leaves a little room. Where each workspace gets its own computer,
- * `workspaceComputerText` adds its 441 to that.
+ * description what that says already, 45,437 with each choice question's written answer (`ask_choices`, its
+ * other words tightened for it), 45,482 with feedback named in the rarer tools' label (ADR 0160 §11), and about 46,450
+ * with an approval asked by the action itself, a question answered directly, numbers computed with code, a chart for
+ * compared numbers, earlier messages linked, mentions only to ask, an ok answered by a reaction alone and a question
+ * card's question never written twice (ADR 0089 addendum 2026-11-10); the ceiling leaves a little room. Where each
+ * workspace gets its own computer, `workspaceComputerText` adds its 441 to that.
  */
-const OI_CEILING_CHARS = 45_900;
+const OI_CEILING_CHARS = 47_200;
 
 test("a DM 'oi' stays under the size ceiling", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn);

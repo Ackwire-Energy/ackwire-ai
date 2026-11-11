@@ -1,5 +1,6 @@
 import type {
   Agent,
+  AgentGroup,
   AgentSort,
   Availability,
   Channel,
@@ -48,7 +49,7 @@ import { AVAILABILITIES, isOutOfOffice, presenceOfAvailability, statusEndNote } 
 import { recentDms } from "@agenteschat/client/lib/recent";
 import { isRightHand, rightHandSeenKey } from "@agenteschat/client/lib/right-hand";
 import { inSidebarList, sidebarItemOrder, sidebarPlace } from "@agenteschat/client/lib/sidebar-items";
-import { AGENT_SORTS, sortAgents } from "@agenteschat/client/lib/sidebar-view";
+import { AGENT_SORTS, sortAgents, splitPinned } from "@agenteschat/client/lib/sidebar-view";
 import { badgeCount, looksUnread } from "@agenteschat/client/lib/unread";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
@@ -114,6 +115,7 @@ import { entityMenu } from "@/lib/entity-menu";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
+import { useScrollEdges } from "@/lib/scroll-edges";
 import { rightHandSeen, STORAGE_KEYS, sessionStore, storage, storedStrings } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import type { SettingsSection } from "@/pages/settings-sections";
@@ -121,7 +123,15 @@ import { useStreams } from "@/realtime/context";
 import { ProfileDialog } from "./AccountSettings";
 import { AddPasswordDialog } from "./AddPassword";
 import { AgentAvatar } from "./AgentAvatar";
-import { type GroupDialogFor, GroupNameDialog, useAgentDrag, useMoveAgent } from "./AgentGroups";
+import {
+  DeleteGroupDialog,
+  type GroupDialogFor,
+  GroupMenu,
+  GroupNameDialog,
+  useAgentDrag,
+  useGroupEntries,
+  useMoveAgent,
+} from "./AgentGroups";
 import { ArchivedChannelsDialog } from "./ArchivedChannelsDialog";
 import { FeedbackMark } from "./arrival/FeedbackDialog";
 import { MoveChannelDialog, NewCategoryDialog, RenameCategoryDialog } from "./ChannelCategoryDialogs";
@@ -132,8 +142,8 @@ import { useAgentMenu, useChannelMenu, usePersonMenu } from "./entity-menus";
 import { useInviteDialog } from "./invite/InviteDialog";
 import { useNow } from "./missions/MissionBits";
 import { COMPACT_QUERY, useMediaQuery, useNavDrawer } from "./NavDrawer";
-import { NewAgentAsk } from "./NewAgentAsk";
 import { NewChannelDialog } from "./NewChannelDialog";
+import { useNewAgent } from "./new-agent/NewAgentDialog";
 import { OpenOnPhoneDialog } from "./OpenOnPhone";
 import { useOrg } from "./org-context";
 import { StatusLine } from "./Presence";
@@ -330,10 +340,10 @@ export function Sidebar() {
   const rightHand = dir.agents.find((a) => isRightHand(a) && a.canTalk !== false);
   const dmOf = new Map((dms.data ?? []).map((d) => [d.with.id, d]));
   const rightHandDm = rightHand ? dmOf.get(rightHand.id) : undefined;
-  // New agent in a personal workspace (ADR 0159): one question, what it should do, and the right hand proposes it.
-  const [askingAgent, setAskingAgent] = useState(false);
+  // New agent: one dialog for every way in (ADR 0164); outside the shell (a test's page), the full form.
+  const newAgentDialog = useNewAgent();
   const newAgent = () =>
-    rightHand ? setAskingAgent(true) : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
+    newAgentDialog ? newAgentDialog.open() : void navigate({ to: "/org/$orgId/agents/new", params: { orgId } });
   const sections = useSidebarSections(me.user.id, orgId);
   // "Fixar no topo": pinned rows sit on top of their own section, above a thin line.
   const { view, setView, pins } = useSidebarPins();
@@ -365,21 +375,20 @@ export function Sidebar() {
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const rail = !compact && (tablet || collapsed);
 
-  // AGENTES (ADR 0083 and its addendum): the agents that talk to me (who manages agents may list the rest), my pinned
-  // ones on top, then the ones in no group, then each group of agents, each in my order.
+  // AGENTES (ADR 0083 and its addendum): the agents that talk to me (who manages agents may list the rest), the ones in
+  // no group, then each group of agents, each with my pinned ones on top and the rest in my order.
   const manages = can(org, "manage_agents");
   const team = dir.agents.filter((a) => !isRightHand(a));
   const shownAgents = team.filter((a) => (manages && view.showAllAgents) || canTalk(a));
   const busyKey = useStreams((st) => [...runningAgents(st)].sort().join());
   const busy = useMemo(() => new Set(busyKey ? busyKey.split(",") : []), [busyKey]);
   const groups = useAgentGroups(orgId).data ?? [];
-  const pinnedAgents = pins.agents.flatMap((id) => shownAgents.filter((a) => a.id === id));
-  const byGroup = agentSections(
-    shownAgents.filter((a) => !pins.agents.includes(a.id)),
-    groups,
-    (a) => a.id,
-  );
-  const ordered = (list: Agent[]) => sortAgents(list, view.agentSort, me.user.id, busy);
+  const byGroup = agentSections(shownAgents, groups, (a) => a.id);
+  const ordered = (items: Agent[]) => {
+    const { top, rest } = splitPinned(items, pins.agents, (a) => a.id);
+    return { top, rest: sortAgents(rest, view.agentSort, me.user.id, busy) };
+  };
+  const loose = ordered(byGroup.ungrouped);
   // Members never see an empty group; who arranges the agents keeps them, to drop agents in.
   const agentGroups = byGroup.groups.filter((g) => g.items.length > 0 || (manages && g.group.agentIds.length === 0));
   const groupIds = agentGroups.map((g) => `group:${g.group.id}` as SectionId);
@@ -389,6 +398,15 @@ export function Sidebar() {
   const drag = useAgentDrag(groups);
   const moveAgent = useMoveAgent(groups);
   const [groupDialog, setGroupDialog] = useState<GroupDialogFor | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<AgentGroup | null>(null);
+  const groupMenuEntries = useGroupEntries();
+  const groupChoices = (group: AgentGroup) => ({
+    group,
+    index: groups.findIndex((g) => g.id === group.id),
+    count: groups.length,
+    onRename: () => setGroupDialog({ mode: "rename", group }),
+    onDelete: () => setDeletingGroup(group),
+  });
   const agentsUnread = shownAgents.reduce((n, a) => n + (dmOf.get(a.id)?.unread ?? 0), 0);
   // "Mudar de grupo" in an agent's right click: the keyboard's way to what dragging does.
   const groupEntries = (a: Agent): MenuEntry[] => {
@@ -449,25 +467,8 @@ export function Sidebar() {
   // paints its own background (no sliding pill).
   const navRef = useRef<HTMLDivElement>(null);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  // The list fades out at an edge only while there is more to scroll past it (no hard cut).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the lists load
-  useLayoutEffect(() => {
-    const nav = navRef.current;
-    if (!nav) return;
-    const edges = () => {
-      nav.dataset.fadeTop = String(nav.scrollTop > 1);
-      nav.dataset.fadeBottom = String(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
-    };
-    edges();
-    const ro = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(edges);
-    ro?.observe(nav);
-    for (const child of Array.from(nav.children)) ro?.observe(child);
-    nav.addEventListener("scroll", edges, { passive: true });
-    return () => {
-      ro?.disconnect();
-      nav.removeEventListener("scroll", edges);
-    };
-  }, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
+  // The list fades out at an edge only while there is more to scroll past it (no hard cut); re-checked as lists load.
+  useScrollEdges(navRef, [channels.data, directs.length, shownAgents.length, groups.length, rail]);
 
   // The open conversation stays in sight: once per navigation (as soon as its row exists), a row
   // hidden past the list's edge is brought to the middle. Later scrolling is the person's.
@@ -506,14 +507,7 @@ export function Sidebar() {
       ? [item("archived-channels", t("channel.archivedTitle"), "archive", () => setShowArchived(true))]
       : [];
   const createAgentItem = can(org, "create_agents")
-    ? [
-        item(
-          "create-agent",
-          t("shell.createAgent"),
-          "plus",
-          () => void navigate({ to: "/org/$orgId/agents/new", params: { orgId } }),
-        ),
-      ]
+    ? [item("create-agent", t("shell.createAgent"), "plus", newAgent)]
     : [];
   const newGroupItem = manages
     ? [item("new-group", t("agentGroups.newGroup"), "layers", () => setGroupDialog({ mode: "create" }))]
@@ -554,11 +548,11 @@ export function Sidebar() {
         />
       )}
       {dir.loading && team.length === 0 && <SidebarSkeleton count={2} avatar label={t("common.loadingList")} />}
-      {pinnedAgents.map(agentRow)}
-      {pinnedAgents.length > 0 && (byGroup.ungrouped.length > 0 || agentGroups.length > 0) && (
+      {loose.top.map(agentRow)}
+      {loose.top.length > 0 && (loose.rest.length > 0 || agentGroups.length > 0) && (
         <hr className="sidebar__pins-end" />
       )}
-      {ordered(byGroup.ungrouped).map(agentRow)}
+      {loose.rest.map(agentRow)}
     </>
   );
   const blocks: Record<SectionKey, ReactNode> = {
@@ -656,7 +650,11 @@ export function Sidebar() {
                   {manages && (
                     <MenuItem
                       icon="layers"
-                      onSelect={() => void navigate({ to: "/org/$orgId/team", params: { orgId } })}
+                      onSelect={() => {
+                        // Equipe opens on the view it remembers: here, its setores.
+                        storage.set(STORAGE_KEYS.teamView, "sectors");
+                        void navigate({ to: "/org/$orgId/team", params: { orgId } });
+                      }}
                     >
                       {t("sidebarAgents.organize")}
                     </MenuItem>
@@ -671,7 +669,8 @@ export function Sidebar() {
           </SidebarSection>
         )}
         {agentGroups.map(({ group, items }) => {
-          const list = ordered(items);
+          const { top, rest } = ordered(items);
+          const list = [...top, ...rest];
           // Where a dragged row would land: a line before the row at that place among the others.
           const others = list.filter((a) => a.id !== drag.dragging);
           const lineAt = drag.over?.groupId === group.id ? drag.over.index : null;
@@ -686,20 +685,29 @@ export function Sidebar() {
               sections={sections}
               defaultOpen={groupsOpen}
               className="sidebar__section--category sidebar__section--group"
+              headProps={
+                manages
+                  ? entityMenu(() => [{ kind: "header", label: group.name }, ...groupMenuEntries(groupChoices(group))])
+                  : undefined
+              }
               summary={
                 workingHere > 0 && (
                   <span className="sidebar__section-working">{t("sidebarAgents.working", { count: workingHere })}</span>
                 )
               }
               action={
-                <span className="sidebar__section-count" title={t("sidebarAgents.count", { count: list.length })}>
-                  {list.length}
-                </span>
+                <>
+                  {manages && <GroupMenu {...groupChoices(group)} className="sidebar__section-add" />}
+                  <span className="sidebar__section-count" title={t("sidebarAgents.count", { count: list.length })}>
+                    {list.length}
+                  </span>
+                </>
               }
               drop={organize ? drag.zone(group.id) : undefined}
             >
-              {list.map((a) => (
+              {list.map((a, i) => (
                 <Fragment key={a.id}>
+                  {i > 0 && i === top.length && <hr className="sidebar__pins-end" />}
                   {lineAt === others.indexOf(a) && line}
                   {agentRow(a)}
                 </Fragment>
@@ -719,8 +727,10 @@ export function Sidebar() {
             </span>
           </Link>
         )}
-        {/* A personal workspace (ADR 0159): New agent right under its agents (the rail's tile, with no headers there). */}
-        {personal && createAgentItem.length > 0 && (rail ? <CreateAgentTile /> : <NewAgentRow onOpen={newAgent} />)}
+        {/* New agent right under the agents, in a personal workspace (ADR 0159) and a team's (ADR 0164); the rail's
+            tile, with no headers there (a team's rail has its own in the foot). */}
+        {createAgentItem.length > 0 &&
+          (rail ? personal && <CreateAgentTile onOpen={newAgent} /> : <NewAgentRow onOpen={newAgent} />)}
       </>
     ),
     // A personal workspace lists people only once someone else is a member (a family, ADR 0159).
@@ -816,7 +826,14 @@ export function Sidebar() {
     : null;
 
   return (
-    <nav className="sidebar" aria-label={t("shell.nav")} data-rail={rail} {...drawer?.navProps}>
+    <nav
+      className="sidebar"
+      aria-label={t("shell.nav")}
+      data-rail={rail}
+      // Its faces' sizes follow the mode (the agents' and New agent's, ADR 0164).
+      data-personal={personal || undefined}
+      {...drawer?.navProps}
+    >
       <div className="sidebar__top">
         <WorkspaceSky part="side" rail={rail} />
         {personal ? (
@@ -901,10 +918,8 @@ export function Sidebar() {
         withChannel={newCategory?.withChannel}
       />
       <SidebarSetupDialog open={customizing} onClose={() => setCustomizing(false)} />
-      {personal && rightHand && (
-        <NewAgentAsk open={askingAgent} onClose={() => setAskingAgent(false)} rightHand={rightHand} />
-      )}
       {groupDialog && <GroupNameDialog purpose={groupDialog} onClose={() => setGroupDialog(null)} />}
+      {deletingGroup && <DeleteGroupDialog group={deletingGroup} onClose={() => setDeletingGroup(null)} />}
 
       {/* Beta: the way to the feedback form, a row of its own at the bottom, where this server takes it. Not beside
           the person's name, which it would leave no room for; the rail has no room for a row's words. */}
@@ -915,7 +930,7 @@ export function Sidebar() {
           <SidebarHorizon working={working} total={dir.agents.length} />
           {/* The full sidebar creates from the Agentes header's + (always shown on touch screens); the rail has no
               headers. */}
-          {rail && can(org, "create_agents") && <CreateAgentTile />}
+          {rail && can(org, "create_agents") && <CreateAgentTile onOpen={newAgent} />}
           <div className="sidebar__me">
             <AccountMenu />
             {bell}
@@ -928,8 +943,8 @@ export function Sidebar() {
 
 /** Create agent as one of the rail's tiles (the full sidebar creates from the Agents header's +). */
 /**
- * New agent under a personal workspace's agents (ADR 0159): a row like theirs, an empty face with a plus where a face
- * would be, so it reads as the next one.
+ * New agent under the agents (ADR 0159, ADR 0164): a row like theirs, an empty face with a plus where a face would be,
+ * so it reads as the next one.
  */
 function NewAgentRow({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
@@ -943,15 +958,12 @@ function NewAgentRow({ onOpen }: { onOpen: () => void }) {
   );
 }
 
-function CreateAgentTile() {
+function CreateAgentTile({ onOpen }: { onOpen: () => void }) {
   const { t } = useTranslation();
-  const { org } = useOrg();
   return (
-    <Button asChild block variant="ghost" className="sidebar__create">
-      <Link to="/org/$orgId/agents/new" params={{ orgId: org.id }} title={t("shell.createAgent")}>
-        <Icon name="plus" />
-        <span className="sidebar__item-label">{t("shell.createAgent")}</span>
-      </Link>
+    <Button block variant="ghost" className="sidebar__create" title={t("shell.createAgent")} onClick={onOpen}>
+      <Icon name="plus" />
+      <span className="sidebar__item-label">{t("shell.createAgent")}</span>
     </Button>
   );
 }

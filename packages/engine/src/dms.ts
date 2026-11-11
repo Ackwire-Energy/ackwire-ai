@@ -293,15 +293,22 @@ export interface DmSummary {
 /**
  * My direct conversations, newest activity first (one with no message yet sorts by when it began, so a new one is on
  * top), with unread counts. An empty DM the other person opened isn't one yet: it shows with its first message, or
- * once I open it myself. A DM with an agent always shows.
+ * once I open it myself. A DM with an agent always shows. `only`: that one DM, as the list has it (`POST /dms`).
  */
-export async function listDms(db: Database, actorId: string, orgId: string): Promise<DmSummary[]> {
+export async function listDms(db: Database, actorId: string, orgId: string, only?: string): Promise<DmSummary[]> {
   await requirePermission(db, actorId, orgId, "read");
   const mine = await db
     .select({ id: channels.id, createdAt: channels.createdAt, createdByUserId: channels.createdByUserId })
     .from(channels)
     .innerJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actorId)))
-    .where(and(eq(channels.orgId, orgId), eq(channels.kind, "dm"), isNull(channels.archivedAt)));
+    .where(
+      and(
+        eq(channels.orgId, orgId),
+        eq(channels.kind, "dm"),
+        isNull(channels.archivedAt),
+        only ? eq(channels.id, only) : undefined,
+      ),
+    );
   if (mine.length === 0) return [];
   const ids = mine.map((c) => c.id);
   const [others, reads, last] = await Promise.all([

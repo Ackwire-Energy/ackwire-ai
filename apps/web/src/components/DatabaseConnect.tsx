@@ -47,7 +47,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { DatabaseRulesPanel } from "@/components/DatabaseRules";
 import { FlowTitle } from "@/components/FlowTitle";
 import { LoadingList, useStepText } from "@/components/Loading";
-import { CommandBlock } from "@/components/Machines";
+import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
 import { reviewNote, ToolReview, type ToolReviewState } from "@/components/ToolReview";
 import { useEdited } from "@/hooks/useEdited";

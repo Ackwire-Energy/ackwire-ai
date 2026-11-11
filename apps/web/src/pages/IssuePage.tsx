@@ -32,13 +32,12 @@ import {
   Menu,
   MenuItem,
   MenuSeparator,
+  Popover,
   SavedNote,
   Select,
-  type SelectOption,
   TabPanel,
   Tabs,
   useAutoGrow,
-  useElementWidth,
   WorkSweep,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -63,6 +62,7 @@ import { usePersonalView } from "@/hooks/usePersonalView";
 import {
   columnIdOf,
   columnsOf,
+  isCustomBoard,
   isOpen,
   PRIORITIES,
   STATUS_ICON,
@@ -72,11 +72,12 @@ import {
   useStageName,
   useStepText,
 } from "@/lib/issues";
-import { Markdown } from "@/lib/markdown";
+import { codeAndBold, Markdown } from "@/lib/markdown";
 import { useOpenParam } from "@/lib/open-param";
 import { useToast } from "@/lib/toast";
 import { useIssueRealtime } from "@/realtime/context";
 import { IssueDeleteButton, IssueDeleteProvider, useIssueDeleting } from "./IssueDelete";
+import { PRIORITY_ICON } from "./IssuesToolbar";
 import "./issues.css";
 
 /** One issue as a page (`/issues/131`); the board opens the same details in its panel. */
@@ -257,9 +258,9 @@ function IssueBarTitle({ issue: i }: { issue: Issue }) {
 }
 
 /**
- * An issue's details, the same on its page and in the dialog (whose bar has the title): who made it and from where, the title, then tabs
- * (the agent's work, live steps or "stalled" with "Pedir para continuar"; "Pedir a um agente"; description,
- * criteria and who checked them; sub-issues; discussion), and the aside with its fields and links. The title, the
+ * An issue's details, the same on its page and in the dialog (whose bar has the title): who made it and from where, the
+ * title, its fields and links as one strip, then tabs (the agent's work, live steps or "stalled" with "Pedir para
+ * continuar"; "Pedir a um agente"; description, criteria and who checked them; sub-issues; discussion). The title, the
  * description and the criteria are edited where they are, saved on leaving the field ("Salvo" by the source line).
  */
 export function IssueDetails({
@@ -285,68 +286,56 @@ export function IssueDetails({
   const [saved, flashSaved] = useSavedFlash();
   // The files it was created with show under the description (prints, logs): the rest are in "Anexos".
   const createdFiles = list.find((a) => a.event === "created")?.attachments ?? [];
-  // Too narrow for the fields beside the task (its conversation open beside it, a small window): they go on one line
-  // at its top instead of a card under everything. Unmeasured (0) keeps the aside.
-  const [layout, width] = useElementWidth<HTMLDivElement>();
-  const narrow = width > 0 && width <= NARROW_LAYOUT;
   return (
-    <div className="issue-layout" ref={layout}>
-      <div className="issue-details issue-layout__main">
-        <header className="issue-details__head">
-          <span className="small muted tabular">
-            {variant === "page"
-              ? t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })
-              : t("issues.createdByShort", { name: actors.name(i.createdBy) })}
-            {from && <> {from}</>}
-            <SavedNote shown={saved} label={t("common.saved")} className="issue-details__saved" />
-          </span>
-          {variant === "page" && <IssueTitle issue={i} onSaved={flashSaved} />}
-        </header>
-        {narrow && <PropsLine issue={i} />}
-        <Tabs
-          value={tab}
-          onValueChange={setTab}
-          label={t("issues.tabs.label")}
-          items={[
-            { value: "details", label: t("issues.tabs.details") },
-            { value: "files", label: t("issues.tabs.files"), count: files.length || undefined },
-            { value: "history", label: t("issues.tabs.history") },
-          ]}
-        >
-          <TabPanel value="details">
-            <WorkBox issue={i} />
-            <IssueWorkBlock issue={i} />
-            {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
-            <DetailsSection title={t("issues.description")}>
-              <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
-              {createdFiles.length > 0 && (
-                <div className="artifact-cards issue-description__files">
-                  {createdFiles.map((f) => (
-                    <ArtifactCard key={f.id} artifact={{ id: f.id }} />
-                  ))}
-                </div>
-              )}
-            </DetailsSection>
-            <IssueCriteria issue={i} onSaved={flashSaved} />
-            <IssueSubIssues issue={i} />
-            <DetailsSection title={t("issues.conversation.button")}>
-              <TaskConversationSummary issue={i} onOpen={onConversation} />
-            </DetailsSection>
-          </TabPanel>
-          <TabPanel value="files">
-            <IssueFiles issue={i} activity={list} />
-          </TabPanel>
-          <TabPanel value="history">
-            <History activity={list} loaded={activity.isSuccess} />
-          </TabPanel>
-        </Tabs>
-      </div>
-      {!narrow && (
-        <aside aria-label={t("issues.details")} className="issue-aside">
-          <Details issue={i} />
-          <Links issue={i} />
-        </aside>
-      )}
+    <div className="issue-details">
+      <header className="issue-details__head">
+        <span className="small muted tabular">
+          {variant === "page"
+            ? t("issues.createdBy", { number: i.number, name: actors.name(i.createdBy) })
+            : t("issues.createdByShort", { name: actors.name(i.createdBy) })}
+          {from && <> {from}</>}
+          <SavedNote shown={saved} label={t("common.saved")} className="issue-details__saved" />
+        </span>
+        {variant === "page" && <IssueTitle issue={i} onSaved={flashSaved} />}
+      </header>
+      <PropsLine issue={i} />
+      <Tabs
+        value={tab}
+        onValueChange={setTab}
+        label={t("issues.tabs.label")}
+        items={[
+          { value: "details", label: t("issues.tabs.details") },
+          { value: "files", label: t("issues.tabs.files"), count: files.length || undefined },
+          { value: "history", label: t("issues.tabs.history") },
+        ]}
+      >
+        <TabPanel value="details">
+          <WorkBox issue={i} />
+          <IssueWorkBlock issue={i} />
+          {i.assignee?.type !== "agent" && isOpen(i) && <AskAgent issue={i} />}
+          <DetailsSection title={t("issues.description")}>
+            <IssueDescription issue={i} hasFiles={createdFiles.length > 0} onSaved={flashSaved} />
+            {createdFiles.length > 0 && (
+              <div className="artifact-cards issue-description__files">
+                {createdFiles.map((f) => (
+                  <ArtifactCard key={f.id} artifact={{ id: f.id }} />
+                ))}
+              </div>
+            )}
+          </DetailsSection>
+          <IssueCriteria issue={i} onSaved={flashSaved} />
+          <IssueSubIssues issue={i} />
+          <DetailsSection title={t("issues.conversation.button")}>
+            <TaskConversationSummary issue={i} onOpen={onConversation} />
+          </DetailsSection>
+        </TabPanel>
+        <TabPanel value="files">
+          <IssueFiles issue={i} activity={list} />
+        </TabPanel>
+        <TabPanel value="history">
+          <History activity={list} loaded={activity.isSuccess} />
+        </TabPanel>
+      </Tabs>
     </div>
   );
 }
@@ -388,7 +377,7 @@ function IssueTitle({ issue: i, onSaved }: { issue: Issue; onSaved: () => void }
     );
   return (
     <EditInPlace label={t("issues.edit.title")} onEdit={() => setDraft(title)}>
-      <h1 className="issue-details__title">{title}</h1>
+      <h1 className="issue-details__title">{codeAndBold(title)}</h1>
     </EditInPlace>
   );
 }
@@ -823,10 +812,7 @@ function History({ activity, loaded }: { activity: IssueActivity[]; loaded: bool
   );
 }
 
-/** The details' width under which its fields leave the side for the line at the top (the old container query's). */
-const NARROW_LAYOUT = 803;
-
-/** What a task's four fields offer and how each changes it, for the aside and for the line at the top. */
+/** What a task's fields offer and how each changes it, for the strip at its top. */
 function useIssueFields(i: Issue) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -835,16 +821,18 @@ function useIssueFields(i: Issue) {
   const columns = useIssueColumns(org.id).data ?? [];
   const title = useColumnTitle();
   const stageName = useStageName();
+  const custom = isCustomBoard(columns);
   const update = (patch: IssuePatch) => action.mutate({ type: "update", id: i.id, patch });
   return {
     column: {
       value: columnIdOf(i, columns) ?? undefined,
-      // Every column, grouped by stage (also the keyboard way to move a card).
+      // Every column (also the keyboard way to move a card), under its stage's name only on a customized board: on
+      // the plain one each column is its stage, and the name over it said it twice.
       options: STATUSES.flatMap((s) =>
         columnsOf(columns, s).map((c) => ({
           value: c.id,
           label: title(c),
-          group: stageName(s),
+          ...(custom ? { group: stageName(s) } : {}),
           leading: <Icon name={STATUS_ICON[s]} size={16} />,
         })),
       ),
@@ -859,7 +847,11 @@ function useIssueFields(i: Issue) {
     },
     priority: {
       value: i.priority,
-      options: PRIORITIES.map((p) => ({ value: p, label: t(`issues.priority.${p}`) })),
+      options: PRIORITIES.map((p) => ({
+        value: p,
+        label: t(`issues.priority.${p}`),
+        leading: <Icon name={PRIORITY_ICON[p]} size={16} />,
+      })),
       onChange: (v: string) => update({ priority: v as IssuePriority }),
     },
     due: {
@@ -887,72 +879,26 @@ function useWhoSeesShown(i: Issue) {
   return !solo || (i.audience?.mode ?? "everyone") !== "everyone";
 }
 
-/** Column, who, priority and due date, at the top of the aside (on the page and in the dialog). */
-function Details({ issue: i }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
-  const f = useIssueFields(i);
-  const [choosing, setChoosing] = useState(false);
-  const whoSees = useWhoSeesShown(i);
-  return (
-    <>
-      <Field label={t("issues.column")} id={`is-col-${i.id}`}>
-        <Select
-          size="sm"
-          value={f.column.value}
-          onValueChange={f.column.onChange}
-          options={f.column.options}
-          placeholder={f.column.placeholder}
-        />
-      </Field>
-      <Field label={t("issues.form.assignee")} id={`is-who-${i.id}`}>
-        <Select size="sm" value={f.who.value} onValueChange={f.who.onChange} options={f.who.options} />
-      </Field>
-      {whoSees && (
-        <Field label={t("whoSees.label")} id={`is-who-sees-${i.id}`}>
-          <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />
-          {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
-        </Field>
-      )}
-      <Field label={t("issues.form.priority")} id={`is-pri-${i.id}`}>
-        <Select size="sm" value={f.priority.value} onValueChange={f.priority.onChange} options={f.priority.options} />
-      </Field>
-      <Field label={t("issues.due")} id={`is-due-${i.id}`}>
-        <DatePicker size="sm" {...f.due} />
-        {i.dueDate && (
-          <Link to="/org/$orgId/calendar" params={{ orgId: org.id }} className="ac-link small issue-due__link">
-            {t("issues.seeCalendar")}
-          </Link>
-        )}
-      </Field>
-    </>
-  );
-}
-
 /**
- * The same four fields where the aside doesn't fit beside the task (its conversation open beside it, a small
- * window): one line of compact buttons at the top, each its icon and value (its name on hover and to a screen
- * reader), then the task's GitHub link, pull requests and labels. With no link yet, pasting one is the aside's.
+ * The task's fields as one strip under who made it, at every width: Coluna, Responsável, Prioridade, Prazo and Quem
+ * vê, each its icon or face and its value (its name on hover and to a screen reader), then after a hairline its pull
+ * requests, labels and GitHub link. With no link yet, "GitHub" opens the field to paste one.
  */
 function PropsLine({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const actors = useActors();
   const f = useIssueFields(i);
   const [choosing, setChoosing] = useState(false);
   const whoSees = useWhoSeesShown(i);
-  const withLeading = (o: SelectOption) => (
-    <span className="issue-prop__value">
-      {o.leading}
-      {o.label}
-    </span>
-  );
   const prop = (label: string, control: ReactNode) => (
     <span className="issue-prop" title={label}>
       {control}
     </span>
   );
   return (
-    <div className="issue-props">
+    // biome-ignore lint/a11y/useSemanticElements: a labelled row of controls that change at once, not a form's fieldset
+    <div className="ac-props issue-props" role="group" aria-label={t("issues.details")}>
       {prop(
         t("issues.column"),
         <Select
@@ -962,7 +908,6 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           onValueChange={f.column.onChange}
           options={f.column.options}
           placeholder={f.column.placeholder}
-          renderValue={withLeading}
         />,
       )}
       {prop(
@@ -973,7 +918,6 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           value={f.who.value}
           onValueChange={f.who.onChange}
           options={f.who.options}
-          renderValue={withLeading}
         />,
       )}
       {prop(
@@ -984,26 +928,42 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           value={f.priority.value}
           onValueChange={f.priority.onChange}
           options={f.priority.options}
-          renderValue={(o) => withLeading({ ...o, leading: <Icon name="flag" size={16} /> })}
         />,
       )}
-      {prop(t("issues.due"), <DatePicker size="sm" short aria-label={t("issues.due")} {...f.due} />)}
+      {prop(
+        t("issues.due"),
+        <DatePicker
+          size="sm"
+          short
+          aria-label={t("issues.due")}
+          {...f.due}
+          footer={
+            i.dueDate && (
+              <Link to="/org/$orgId/calendar" params={{ orgId: org.id }} className="ac-link">
+                {t("issues.seeCalendar")}
+              </Link>
+            )
+          }
+        />,
+      )}
       {whoSees &&
         prop(
           t("whoSees.label"),
-          <WhoSeesButton value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
+          <WhoSeesButton select value={i.audience ?? { mode: "everyone" }} onClick={() => setChoosing(true)} />,
         )}
       {choosing && <IssueWhoSeesDialog issue={i} onClose={() => setChoosing(false)} />}
-      {(i.pullRequests.length > 0 || i.labels.length > 0 || i.githubUrl) && (
-        <span className="issue-props__sep" aria-hidden="true" />
-      )}
-      {i.githubUrl && <GithubLink issue={i} />}
+      <span className="ac-props__sep" aria-hidden="true" />
       {i.pullRequests.map((pr) => (
-        <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
-          <Icon name="pullRequest" size={16} />
-          {pr.openedBy
-            ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) })
-            : t("issues.pr", { number: pr.number })}
+        <a
+          key={pr.number}
+          href={webUrl(pr.url)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="issue-link"
+          title={pr.openedBy ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) }) : undefined}
+        >
+          <GitHubMark />
+          {t("issues.pr", { number: pr.number })}
         </a>
       ))}
       {i.labels.map((l) => (
@@ -1011,19 +971,29 @@ function PropsLine({ issue: i }: { issue: Issue }) {
           {l}
         </span>
       ))}
+      <GithubLink issue={i} />
     </div>
   );
 }
 
-/** The GitHub issue or pull request the task is about: a field to paste it, then a chip that opens it. */
+/** The GitHub issue or pull request the task is about: a chip that opens it and its ×, or "GitHub" to paste one. */
 function GithubLink({ issue: i }: { issue: Issue }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const action = useIssueAction(org.id);
+  const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [invalid, setInvalid] = useState(false);
   const save = (githubUrl: string | null) =>
-    action.mutate({ type: "update", id: i.id, patch: { githubUrl } }, { onSuccess: () => setText("") });
+    action.mutate(
+      { type: "update", id: i.id, patch: { githubUrl } },
+      {
+        onSuccess: () => {
+          setText("");
+          setOpen(false);
+        },
+      },
+    );
   const submit = () => {
     const url = text.trim();
     if (action.isPending) return;
@@ -1052,64 +1022,57 @@ function GithubLink({ issue: i }: { issue: Issue }) {
     );
   }
   return (
-    <Locked when={action.isPending}>
-      <Field
-        className="issue-github__field"
-        label={t("issues.github.label")}
-        id={`is-github-${i.id}`}
-        error={invalid ? t("issues.github.invalid") : undefined}
-      >
-        <Input
-          type="url"
-          inputMode="url"
-          spellCheck={false}
-          value={text}
-          placeholder={t("issues.github.placeholder")}
-          onChange={(e) => {
-            setText(e.target.value);
-            setInvalid(false);
-          }}
-          onBlur={submit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") submit();
-          }}
-        />
-      </Field>
-    </Locked>
-  );
-}
-
-/** Pull requests and labels (files are in "Anexos"). */
-function Links({ issue: i }: { issue: Issue }) {
-  const { t } = useTranslation();
-  const actors = useActors();
-  return (
-    <>
-      <div className="issue-aside__item">
-        <span className="ac-field__label">{t("issues.links")}</span>
-        {i.pullRequests.length === 0 && !i.githubUrl && <span className="small muted">{t("issues.noLinks")}</span>}
-        {i.pullRequests.map((pr) => (
-          <a key={pr.number} href={webUrl(pr.url)} target="_blank" rel="noopener noreferrer" className="issue-link">
-            <Icon name="pullRequest" size={16} />
-            {pr.openedBy
-              ? t("issues.prBy", { number: pr.number, name: actors.name(pr.openedBy) })
-              : t("issues.pr", { number: pr.number })}
-          </a>
-        ))}
-        <GithubLink issue={i} />
-      </div>
-      {i.labels.length > 0 && (
-        <div className="issue-aside__item">
-          <span className="ac-field__label">{t("issues.labels")}</span>
-          <span className="row" style={{ gap: 6 }}>
-            {i.labels.map((l) => (
-              <span key={l} className="ac-chip issue-label">
-                {l}
-              </span>
-            ))}
-          </span>
-        </div>
-      )}
-    </>
+    <Popover
+      label={t("issues.github.add")}
+      side="bottom"
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setInvalid(false);
+      }}
+      className="issue-github__pop"
+      trigger={
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="plus"
+          aria-label={t("issues.github.add")}
+          title={t("issues.github.add")}
+        >
+          GitHub
+        </Button>
+      }
+    >
+      <Locked when={action.isPending}>
+        <Field
+          className="issue-github__field"
+          label={t("issues.github.label")}
+          id={`is-github-${i.id}`}
+          error={invalid ? t("issues.github.invalid") : undefined}
+        >
+          <Input
+            type="url"
+            inputMode="url"
+            spellCheck={false}
+            value={text}
+            placeholder={t("issues.github.placeholder")}
+            onChange={(e) => {
+              setText(e.target.value);
+              setInvalid(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              e.preventDefault();
+              submit();
+            }}
+          />
+        </Field>
+        <span className="issue-github__acts">
+          <Button size="sm" variant="primary" loading={action.isPending} onClick={submit}>
+            {t("common.save")}
+          </Button>
+        </span>
+      </Locked>
+    </Popover>
   );
 }

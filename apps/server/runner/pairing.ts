@@ -36,6 +36,9 @@ export interface DeviceGrant {
 
 export type PairingFailure = "expired" | "denied" | "network" | "internal" | "canceled" | "link_invalid";
 
+/** A connect link's code as people paste it (`7KQ2-M9XD`); the server checks the rest. */
+export const LINK_CODE = /^[A-Za-z0-9-]{4,40}$/;
+
 /** A connect link that was used, expired or never existed (`machine.link_invalid`). */
 export const LINK_INVALID = "This link expired or was used already. Make a new one under Settings › Devices.";
 

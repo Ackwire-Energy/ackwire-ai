@@ -23,6 +23,11 @@ export interface ChatPrefs {
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
   textSize?: ChatTextSize;
+  /**
+   * "Always send" (ADR 0160 §12): a report an agent offers about the app goes with its reply, without asking. Kept
+   * here because it is theirs alone, per workspace, on every device.
+   */
+  feedbackAuto?: boolean;
 }
 
 const oneOf = <T extends string>(list: readonly T[], v: unknown) => (list.includes(v as T) ? (v as T) : undefined);
@@ -37,6 +42,7 @@ export function chatPrefsOf(stored: unknown): ChatPrefs {
     dmTone: oneOf(CHAT_TONES, o.dmTone),
     openAt: oneOf(CHAT_OPEN_AT, o.openAt),
     textSize: oneOf(CHAT_TEXT_SIZES, o.textSize),
+    feedbackAuto: typeof o.feedbackAuto === "boolean" ? o.feedbackAuto : undefined,
   };
   return Object.fromEntries(Object.entries(picks).filter(([, v]) => v !== undefined));
 }

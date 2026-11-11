@@ -9,7 +9,7 @@ import {
   layoutBars,
   layoutDay,
   minutesOfDay,
-  runSlots,
+  runStacks,
   SNAP_MIN,
   sameDay,
   shiftDays,
@@ -30,7 +30,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { EventChip } from "./EventChip";
 import { RoutineBand } from "./RoutineBand";
-import { MARK_LANE_PX, RunMarks } from "./RunMarks";
+import { RunsPopover } from "./RunsPopover";
 
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 /** Movement before a press on a chip becomes a drag (px). */
@@ -55,7 +55,7 @@ interface Gesture {
  * The day/week grid: hours 00:00–24:00 in a scroll area (opens around 07:00
  * or the first event), all-day and multi-day items as bars on top,
  * routines that run often as one band each (their runs as ticks), single
- * routine runs as small pixel marks at their time (a click lists them),
+ * routine runs as one-line rows at their time (stacked, then "+N rotinas"),
  * overlapping items side by side, today's column tinted with a filled day
  * pill, and the current-time line. Drag on empty space to create; drag a
  * chip to move it, its bottom edge to resize.
@@ -118,6 +118,18 @@ export function TimeGrid({
     scrolledFor.current = daysKey;
     el.scrollTop = (initialScrollMinutes(items, days) / 60) * HOUR_PX;
   }, [daysKey, loading]);
+
+  // How tall each block and stack of runs is drawn: a name that wraps reaches past its slot, and what starts under it
+  // then goes beside it, never under it (`layoutDay`, `runStacks`). Set only when a height changed.
+  const [heights, setHeights] = useState<ReadonlyMap<string, number>>(() => new Map());
+  useLayoutEffect(() => {
+    const drawn = new Map<string, number>();
+    for (const el of scroller.current?.querySelectorAll<HTMLElement>("[data-measure]") ?? [])
+      if (el.offsetHeight > 0) drawn.set(el.dataset.measure ?? "", el.offsetHeight);
+    const moved =
+      drawn.size !== heights.size || [...drawn].some(([key, h]) => Math.abs((heights.get(key) ?? 0) - h) > 0.5);
+    if (moved) setHeights(drawn);
+  });
 
   const colAt = (clientX: number, clientY: number) => {
     const hit = typeof document.elementFromPoint === "function" ? document.elementFromPoint(clientX, clientY) : null;
@@ -211,6 +223,7 @@ export function TimeGrid({
   return (
     <section
       className="cal-week"
+      data-days={cols}
       style={
         {
           "--hour-px": `${HOUR_PX}px`,
@@ -256,6 +269,7 @@ export function TimeGrid({
                 key={b.item.key}
                 item={b.item}
                 variant="bar"
+                now={now}
                 style={{
                   gridColumn: `${b.from + 1} / span ${b.span}`,
                   gridRow: b.lane + 1,
@@ -302,18 +316,26 @@ export function TimeGrid({
             ))}
           </div>
           {days.map((d, i) => {
+            // A stack of runs is one item beside the meetings it meets: a meeting at the same time sits beside it.
+            const stacks = runStacks(items, d, heights);
             const placed = layoutDay(
               items.filter((it) => !isRunMark(it)),
               d,
+              stacks,
+              heights,
             );
-            const slots = runSlots(items, d);
-            // Run marks keep a narrow lane on the column's right; events never sit under them.
-            const lane = slots.length > 0 ? MARK_LANE_PX : 0;
             const isToday = sameDay(d, today);
             const ghost =
               gesture?.kind === "create" && gesture.dayIndex === i
                 ? dragRange(d, gesture.colY0, gesture.moved ? gesture.colY1 : gesture.colY0)
                 : null;
+            const opens = (key: string) => ({
+              open: openKey === key && !gesture,
+              onOpenChange: (o: boolean) => onOpenKey(o ? key : null),
+            });
+            const run = (it: CalItem) => (
+              <EventChip key={it.key} item={it} variant="run" now={now} details={details(it)} {...opens(it.key)} />
+            );
             return (
               <div
                 key={toYmd(d)}
@@ -321,7 +343,6 @@ export function TimeGrid({
                 data-day={toYmd(d)}
                 data-col-index={i}
                 data-today={isToday || undefined}
-                data-marks={lane > 0 || undefined}
                 onPointerDown={(e) => startCreate(e, i)}
               >
                 {loading && i % 2 === 1 && (
@@ -332,55 +353,76 @@ export function TimeGrid({
                   />
                 )}
                 {placed.map((p) => {
-                  const g = gesture && gesture.item?.key === p.item.key && gesture.moved ? gesture : null;
+                  const it = p.item;
+                  // Across the column: the CSS lays the cluster's columns out from these (calendar.css).
+                  const at = {
+                    top: (p.top / 60) * HOUR_PX + 1,
+                    "--col": p.col,
+                    "--cols": p.cols,
+                    "--thins": p.thins,
+                    "--thin-before": p.thinBefore,
+                  } as CSSProperties;
+                  // Runs at one place, and a reminder: moments, a line each at their time.
+                  if (it.kind === "runs")
+                    return (
+                      <div
+                        key={it.key}
+                        className="cal-week__runs"
+                        data-measure={it.key}
+                        data-thin={p.thin || undefined}
+                        style={at}
+                      >
+                        {it.runs.slice(0, it.shown).map((r) => run(r.item))}
+                        {it.more > 0 && <RunsPopover runs={it.runs} more={it.more} {...opens(it.key)} />}
+                      </div>
+                    );
+                  if (it.kind === "reminder")
+                    return (
+                      <div key={it.key} className="cal-week__runs" data-measure={it.key} style={at}>
+                        {run(it)}
+                      </div>
+                    );
+                  const g = gesture && gesture.item?.key === it.key && gesture.moved ? gesture : null;
                   const top = p.top + (g?.kind === "move" ? g.dMin : 0);
                   const height = Math.max(SNAP_MIN, p.height + (g?.kind === "resize" ? g.dMin : 0));
                   return (
                     <EventChip
-                      key={p.item.key}
-                      item={p.item}
+                      key={it.key}
+                      item={it}
                       variant="block"
+                      now={now}
                       style={{
+                        ...at,
                         top: (top / 60) * HOUR_PX + 1,
-                        height: Math.max(20, (height / 60) * HOUR_PX - 2),
-                        left: `calc(${(p.col / p.cols) * 100}% - ${(p.col / p.cols) * lane}px + 2px)`,
-                        width: `calc(${100 / p.cols}% - ${lane / p.cols + 4}px)`,
+                        // Its slot at the least: a title that needs more room makes it taller, never cut.
+                        minHeight: Math.max(20, (height / 60) * HOUR_PX - 2),
                         ...(g?.kind === "move" && g.dDay
                           ? { transform: `translateX(calc(${g.dDay * 100}% * ${p.cols}))` }
                           : {}),
                       }}
-                      open={openKey === p.item.key && !gesture}
+                      measure={it.key}
+                      open={openKey === it.key && !gesture}
                       onOpenChange={(o) => {
                         if (suppressClick.current) {
                           suppressClick.current = false;
                           return;
                         }
-                        onOpenKey(o ? p.item.key : null);
+                        onOpenKey(o ? it.key : null);
                       }}
-                      details={details(p.item)}
-                      onPointerDown={(e) => startMove(e, p.item, i, "move")}
+                      details={details(it)}
+                      onPointerDown={(e) => startMove(e, it, i, "move")}
                       resizeHandle={
-                        p.item.kind === "event" ? (
+                        it.kind === "event" ? (
                           <span
                             className="cal-chip__resize"
                             aria-hidden="true"
-                            onPointerDown={(e) => startMove(e, p.item, i, "resize")}
+                            onPointerDown={(e) => startMove(e, it, i, "resize")}
                           />
                         ) : null
                       }
                     />
                   );
                 })}
-                {slots.map((slot) => (
-                  <RunMarks
-                    key={slot.key}
-                    runs={slot.runs}
-                    className="cal-week__marks"
-                    style={{ top: (slot.top / 60) * HOUR_PX + 2 }}
-                    open={openKey === slot.key && !gesture}
-                    onOpenChange={(o) => onOpenKey(o ? slot.key : null)}
-                  />
-                ))}
                 {ghost && (
                   <div
                     className="cal-week__ghost"

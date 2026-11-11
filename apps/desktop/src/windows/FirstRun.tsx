@@ -4,7 +4,7 @@
  * network, and the one-command setup for a server that has none yet) or to running agentes.chat on this
  * computer. A connect link (`agenteschat://connect`) opens here
  * too: the server in large type, nothing changes before Connect. Choosing a server opens the main window there
- * and closes this one.
+ * and closes this one. A pair link (`agenteschat://pair`) asks to connect this computer instead (`PairLinkSheet`).
  */
 import {
   CLOUD_SERVER,
@@ -65,12 +65,14 @@ import {
   stepStates,
   tailscaleFrom,
 } from "../control/local-server";
+import { parsePairLink } from "../control/pair";
 import { serverKind, serverName } from "../control/server";
 import { useOnShown, useTailnet, writePref } from "../hooks";
 import { BrandFace, CommandCopy, HelpLink } from "../ui/bits";
 import { CopyDetails, ReachProblem, ReachProgress, ReachRow, ServerTile } from "../ui/here";
 import { hintFor, PrefRow } from "../ui/settings";
 import { elapsedClock, shortPath } from "../ui/time";
+import { PairLinkSheet } from "./Pair";
 
 /** The sky as a horizon at the bottom of the first screen: the surface, then the sky. */
 const HORIZON: SkyOptions = {
@@ -110,6 +112,8 @@ export function FirstRun() {
   const setSettingUp = useCallback((busy: boolean) => {
     settingUp.current = busy;
   }, []);
+  // A pair link on screen; `seq` makes a newer one start over.
+  const [pair, setPair] = useState<{ server: string; code: string; seq: number } | null>(null);
   const linkSeq = useRef(0);
   const screenRef = useRef(screen);
   screenRef.current = screen;
@@ -158,6 +162,14 @@ export function FirstRun() {
   const openLink = useCallback(
     async (raw: string) => {
       const seq = ++linkSeq.current;
+      const asked = parsePairLink(raw);
+      if (asked) {
+        setPair({ ...asked, seq });
+        const from = screenRef.current;
+        if (from !== "pair") setTrail((t) => [...t, from]);
+        setScreen("pair");
+        return;
+      }
       const parsed = parseConnectLink(raw, { allowHttp: "loopback" });
       const list = await host.servers();
       setLink({ raw, parsed, view: linkView(parsed, "checking", list.current) });
@@ -218,7 +230,8 @@ export function FirstRun() {
   // Opened again ("Add a server…"): from the start, unless a link or the setup is on screen.
   useOnShown("welcome", () => {
     takeMode();
-    if (screen === "link" || settingUp.current) return;
+    // A link or pair screen whose sheet is gone has nothing to draw: it starts over too.
+    if ((screen === "link" && link) || (screen === "pair" && pair) || settingUp.current) return;
     setTrail([]);
     setScreen("choose");
     setAddress("");
@@ -278,6 +291,21 @@ export function FirstRun() {
               setLink(null);
               // An address typed in Connect: back there with it, as Esc does.
               if (link.typed && trail.length > 0) return back();
+              void host.servers().then(({ current }) => {
+                if (current) void host.hideWindow("welcome").catch(() => {});
+                else if (trail.length > 0) back();
+                else setScreen("choose");
+              });
+            }}
+          />
+        )}
+        {screen === "pair" && pair && (
+          <PairLinkSheet
+            key={pair.seq}
+            server={pair.server}
+            code={pair.code}
+            onClose={() => {
+              setPair(null);
               void host.servers().then(({ current }) => {
                 if (current) void host.hideWindow("welcome").catch(() => {});
                 else if (trail.length > 0) back();

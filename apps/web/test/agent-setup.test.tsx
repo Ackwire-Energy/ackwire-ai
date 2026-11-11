@@ -30,17 +30,32 @@ const click = async (el: Element, rounds = 6) => {
 };
 
 describe("the setup checklist in a new agent's DM", () => {
-  test("its greeting and the five steps; a step its data already says is done shows done", async () => {
+  test("its greeting and its steps; a step its data already says is done shows done", async () => {
     const state = withSetup(seedState());
     await openDm(state);
     const c = card();
     expect(c).toBeTruthy();
     expect(document.body.textContent).toContain("Pra eu começar, me ajuda com estas coisas rápidas:");
-    expect(c?.querySelectorAll(".setup-row")).toHaveLength(5);
-    // It thinks already (the AI status says ready) and it is in #eng: two done.
-    expect(c?.querySelectorAll(".setup-row[data-done]")).toHaveLength(2);
+    // In its chat (ADR 0164): its AI, apps and channels, and who it talks to as a line that only informs; how it
+    // works stays on its page.
+    expect(c?.querySelectorAll(".setup-row")).toHaveLength(4);
+    expect(c?.querySelectorAll(".setup-cl__meter i")).toHaveLength(3);
+    // It thinks already (the AI status says ready) and it is in #eng: two of the three counted done.
     expect(c?.textContent).toContain("Já tenho uma IA para pensar");
-    expect(c?.textContent).toContain("2 de 5");
+    expect(c?.textContent).toContain("2 de 3");
+    // On top, its sky, awake (it can think).
+    expect(c?.querySelector(".nac-band[data-day]")).toBeTruthy();
+  });
+
+  test("made from its card it says what it said there, in its own voice (ADR 0164)", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.setup = { role: "dev", done: ["who", "how"], hello: "Programo, reviso PRs e investigo bugs." };
+    await openDm(state);
+    const text = document.body.textContent ?? "";
+    expect(text).toContain("Programo, reviso PRs e investigo bugs.");
+    expect(text).not.toContain("Você me pediu");
+    expect(text).not.toContain("bugs..");
   });
 
   test("a step's button opens its dialog; saving confirms the step", async () => {
@@ -60,7 +75,7 @@ describe("the setup checklist in a new agent's DM", () => {
   test("with nothing left, its greeting asks for no help over a card that is all done", async () => {
     const state = withSetup(seedState(), ["apps", "who", "how"]);
     await openDm(state);
-    expect(card()?.textContent).toContain("5 de 5");
+    expect(card()?.textContent).toContain("3 de 3");
     expect(document.body.textContent).not.toContain("Pra eu começar");
   });
 
@@ -70,7 +85,7 @@ describe("the setup checklist in a new agent's DM", () => {
     expect(card()).toBeNull();
   });
 
-  test("alone in a personal workspace nobody else could talk to it: no who step, back once someone joins (ADR 0159)", async () => {
+  test("alone in a personal workspace nobody else could talk to it, nor a channel to join: neither step, back once someone joins (ADR 0159)", async () => {
     const personal = (alone: boolean) => {
       const state = withSetup(seedState());
       const org = state.me?.organizations[0];
@@ -79,10 +94,10 @@ describe("the setup checklist in a new agent's DM", () => {
       return state;
     };
     await openDm(personal(true));
-    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(4);
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(2);
     cleanup();
     await openDm(personal(false));
-    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(5);
+    expect(card()?.querySelectorAll(".setup-row")).toHaveLength(4);
   });
 });
 

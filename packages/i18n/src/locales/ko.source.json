@@ -5024,9 +5024,6 @@
   "rightHand.newDot": {
     "value": "New"
   },
-  "rightHand.rolePersonal": {
-    "value": "Personal assistant"
-  },
   "rightHand.actsAsYou": {
     "value": "acts with your permissions"
   },
@@ -6725,12 +6722,6 @@
   "memoryCard.open": {
     "value": "What {{name}} knows"
   },
-  "memoryCard.undo": {
-    "value": "Undo"
-  },
-  "memoryCard.undone": {
-    "value": "Undone"
-  },
   "memoryCard.group": {
     "value": "Memory updated by {{name}}"
   },
@@ -7081,12 +7072,6 @@
   "agentActions.undo": {
     "value": "Undo"
   },
-  "agentActions.redo": {
-    "value": "Redo"
-  },
-  "agentActions.undoAll": {
-    "value": "Undo all"
-  },
   "agentActions.changes": {
     "value": {
       "one": "{{count}} change",
@@ -7096,32 +7081,8 @@
   "agentActions.undoneBy": {
     "value": "Undone by {{name}}"
   },
-  "agentActions.ago": {
-    "value": "{{time}} ago"
-  },
-  "agentActions.timeLeft": {
-    "value": "{{time}} left to undo"
-  },
   "agentActions.group": {
     "value": "Changes by {{name}}"
-  },
-  "agentActions.undone": {
-    "value": "Undone."
-  },
-  "agentActions.redone": {
-    "value": "Redone."
-  },
-  "agentActions.undoneAll": {
-    "value": {
-      "one": "{{count}} change undone.",
-      "other": "{{count}} changes undone."
-    }
-  },
-  "agentActions.partial": {
-    "value": {
-      "one": "{{count}} change could not be undone.",
-      "other": "{{count}} changes could not be undone."
-    }
   },
   "agentActions.errors.changed_since": {
     "value": "Someone changed this since. Undoing now would lose that change."
@@ -8787,6 +8748,9 @@
   "vault.connections.reads": {
     "value": "Reads {{label}}"
   },
+  "vault.connections.readOnly": {
+    "value": "read-only"
+  },
   "vault.connections.items": {
     "value": {
       "one": "{{count}} item",
@@ -8908,7 +8872,7 @@
     "value": "Create a vault in 1Password only for your agents and move into it the logins they may use"
   },
   "vault.source.onepassword.step.2": {
-    "value": "Create a service account with access to that vault only"
+    "value": "Create a service account with access to that vault only (read and write, if your agents should save new logins there)"
   },
   "vault.source.onepassword.step.3": {
     "value": "Paste the service account token here"
@@ -13485,66 +13449,6 @@
   "agentSetup.firstRun.asks.whoPersonal": {
     "value": "Which agent does what?"
   },
-  "newAgentAsk.title": {
-    "value": "What should your new agent do?"
-  },
-  "newAgentAsk.lead": {
-    "value": "Say it in one sentence. {{name}} sets it up and shows it to you before creating it."
-  },
-  "newAgentAsk.field": {
-    "value": "What it does for you"
-  },
-  "newAgentAsk.placeholder": {
-    "value": "E.g. Keep my calendar in order and remind me of what matters"
-  },
-  "newAgentAsk.ideas": {
-    "value": "Ideas"
-  },
-  "newAgentAsk.idea.agenda.label": {
-    "value": "Calendar"
-  },
-  "newAgentAsk.idea.agenda.text": {
-    "value": "Keep my calendar in order and remind me of my appointments"
-  },
-  "newAgentAsk.idea.money.label": {
-    "value": "Finances"
-  },
-  "newAgentAsk.idea.money.text": {
-    "value": "Keep track of my bills and tell me before anything is due"
-  },
-  "newAgentAsk.idea.training.label": {
-    "value": "Training"
-  },
-  "newAgentAsk.idea.training.text": {
-    "value": "Plan my workouts for the week and adjust them to how I feel"
-  },
-  "newAgentAsk.idea.studies.label": {
-    "value": "Studies"
-  },
-  "newAgentAsk.idea.studies.text": {
-    "value": "Make me a study plan and quiz me on what I learned"
-  },
-  "newAgentAsk.idea.home.label": {
-    "value": "Home"
-  },
-  "newAgentAsk.idea.home.text": {
-    "value": "Keep the shopping list and the house chores in order"
-  },
-  "newAgentAsk.idea.travel.label": {
-    "value": "Travel"
-  },
-  "newAgentAsk.idea.travel.text": {
-    "value": "Plan my trips: itinerary, bookings and documents"
-  },
-  "newAgentAsk.full": {
-    "value": "Fill everything in myself"
-  },
-  "newAgentAsk.create": {
-    "value": "Create with {{name}}"
-  },
-  "newAgentAsk.message": {
-    "value": "I want a new agent: {{what}}"
-  },
   "newAgent.title": {
     "value": "Create agent"
   },
@@ -14343,6 +14247,414 @@
   },
   "newAgent.routineNotMade": {
     "value": "The routine wasn't created: {{reason}}"
+  },
+  "newAgent.hello.clara": {
+    "value": "I'll look after your calendar and remind you of what matters before it's too late."
+  },
+  "newAgent.hello.duda": {
+    "value": "I'll keep track of your bills and spending and warn you before anything is due."
+  },
+  "newAgent.hello.leo": {
+    "value": "I'll plan your workouts and keep you on pace, your way."
+  },
+  "newAgent.hello.mel": {
+    "value": "I'll plan your meals and shopping list, to your taste and your budget."
+  },
+  "newAgent.hello.gabi": {
+    "value": "I'll build your study plan and quiz you on what you learned."
+  },
+  "newAgent.hello.lu": {
+    "value": "I'll keep your notes and ideas and help you turn them into writing."
+  },
+  "newAgent.hello.rosa": {
+    "value": "I'll take care of the shopping list, the chores and what needs fixing."
+  },
+  "newAgent.hello.vic": {
+    "value": "I'll plan your trips: dates, prices, bookings and a day-by-day itinerary."
+  },
+  "newAgent.hello.rui": {
+    "value": "I'll follow up with your clients, write proposals and invoices and remember who hasn't paid."
+  },
+  "newAgent.hello.dev": {
+    "value": "I write code, review PRs and dig into bugs."
+  },
+  "newAgent.hello.ops": {
+    "value": "I keep an eye on errors, queues and deploys."
+  },
+  "newAgent.hello.qa": {
+    "value": "I test flows and reproduce reported bugs."
+  },
+  "newAgent.hello.pm": {
+    "value": "I organize tasks and write the summaries."
+  },
+  "newAgent.hello.support": {
+    "value": "I answer customers and pass on what needs a person."
+  },
+  "newAgent.hello.sales": {
+    "value": "I prepare proposals and follow up with leads."
+  },
+  "newAgent.hello.marketing": {
+    "value": "I plan campaigns, posts and site pages."
+  },
+  "newAgent.hello.content": {
+    "value": "I write and edit copy, articles and newsletters."
+  },
+  "newAgent.hello.data": {
+    "value": "I answer questions with numbers and build reports."
+  },
+  "newAgent.hello.finance": {
+    "value": "I keep track of payments, invoices and spending."
+  },
+  "newAgent.hello.people": {
+    "value": "I help with hiring, onboarding and the team's questions."
+  },
+  "newAgent.hello.research": {
+    "value": "I research a topic and deliver a summary with sources."
+  },
+  "newAgent.hello.assistant": {
+    "value": "I take care of the calendar, emails and reminders."
+  },
+  "newAgent.starters.clara.instructions": {
+    "value": "Checks the calendar every morning and sends what's on for the day.\nReminds the day before each appointment and each bill with a date.\nNever books, cancels or accepts an invite without asking first."
+  },
+  "newAgent.starters.clara.tasks.a": {
+    "value": "What do I have tomorrow?"
+  },
+  "newAgent.starters.clara.tasks.b": {
+    "value": "Remind me to pay the rent every 5th"
+  },
+  "newAgent.starters.clara.tasks.c": {
+    "value": "Send me my agenda every day at 7am"
+  },
+  "newAgent.starters.duda.instructions": {
+    "value": "Keeps track of bills and spending, sorted by category.\nWarns three days before anything is due and when a spend is out of the ordinary.\nNever pays, transfers or cancels anything without asking first."
+  },
+  "newAgent.starters.duda.tasks.a": {
+    "value": "How much did I spend this month?"
+  },
+  "newAgent.starters.duda.tasks.b": {
+    "value": "Which bills are due this week?"
+  },
+  "newAgent.starters.duda.tasks.c": {
+    "value": "Sort these expenses by category"
+  },
+  "newAgent.starters.leo.instructions": {
+    "value": "Plans workouts for your level, the time you have and what you enjoy.\nAdjusts the week when you miss a day or feel tired, no lecturing.\nGives no medical advice: with pain or an injury, suggests seeing a professional."
+  },
+  "newAgent.starters.leo.tasks.a": {
+    "value": "Plan a 30-minute workout for today"
+  },
+  "newAgent.starters.leo.tasks.b": {
+    "value": "Plan my running week"
+  },
+  "newAgent.starters.leo.tasks.c": {
+    "value": "Send me the day's workout every morning"
+  },
+  "newAgent.starters.mel.instructions": {
+    "value": "Plans the week's meals around your taste, time and budget.\nBuilds the shopping list for the menu, grouped by store aisle.\nRespects restrictions and allergies; gives no diet or medical advice."
+  },
+  "newAgent.starters.mel.tasks.a": {
+    "value": "Suggest three quick dinners"
+  },
+  "newAgent.starters.mel.tasks.b": {
+    "value": "Plan this week's menu"
+  },
+  "newAgent.starters.mel.tasks.c": {
+    "value": "Make the shopping list for the menu"
+  },
+  "newAgent.starters.gabi.instructions": {
+    "value": "Builds a study plan up to the exam, with what fits in each day.\nQuizzes you on what you studied and explains again what you got wrong.\nDoesn't do the homework for you: guides you to the answer."
+  },
+  "newAgent.starters.gabi.tasks.a": {
+    "value": "Make a study plan for the exam"
+  },
+  "newAgent.starters.gabi.tasks.b": {
+    "value": "Ask me 3 questions about what I studied"
+  },
+  "newAgent.starters.gabi.tasks.c": {
+    "value": "Explain this topic simply"
+  },
+  "newAgent.starters.lu.instructions": {
+    "value": "Keeps the notes and ideas you send and groups the similar ones.\nTurns notes into writing in your voice, never adding what you didn't say.\nEdits with care and shows what changed before replacing the original."
+  },
+  "newAgent.starters.lu.tasks.a": {
+    "value": "Turn these notes into a short text"
+  },
+  "newAgent.starters.lu.tasks.b": {
+    "value": "Gather this week's ideas"
+  },
+  "newAgent.starters.lu.tasks.c": {
+    "value": "Edit this text"
+  },
+  "newAgent.starters.rosa.instructions": {
+    "value": "Keeps the shopping list and the house chores up to date.\nNotes what needs fixing and keeps reminding until it's done.\nNever buys or hires anything without asking first."
+  },
+  "newAgent.starters.rosa.tasks.a": {
+    "value": "Make this week's shopping list"
+  },
+  "newAgent.starters.rosa.tasks.b": {
+    "value": "What needs fixing at home?"
+  },
+  "newAgent.starters.rosa.tasks.c": {
+    "value": "Split up the chores"
+  },
+  "newAgent.starters.vic.instructions": {
+    "value": "Plans the trip with dates, prices and a day-by-day itinerary.\nCompares flights and places to stay and says why it suggests each one.\nNever books or pays for anything without asking first."
+  },
+  "newAgent.starters.vic.tasks.a": {
+    "value": "Plan 3 days in Lisbon"
+  },
+  "newAgent.starters.vic.tasks.b": {
+    "value": "Tell me if the fare drops"
+  },
+  "newAgent.starters.vic.tasks.c": {
+    "value": "Gather the trip's bookings"
+  },
+  "newAgent.starters.rui.instructions": {
+    "value": "Follows each client: what was agreed, what's left and who hasn't paid.\nWrites proposals and payment reminders in your voice, ready to review.\nNever sends anything to a client without your approval."
+  },
+  "newAgent.starters.rui.tasks.a": {
+    "value": "Write a short proposal for a client"
+  },
+  "newAgent.starters.rui.tasks.b": {
+    "value": "Who hasn't paid yet?"
+  },
+  "newAgent.starters.rui.tasks.c": {
+    "value": "What is each client waiting for today?"
+  },
+  "newAgentCard.title": {
+    "value": "New agent"
+  },
+  "newAgentCard.lead": {
+    "value": "Pick on the left and adjust on the right. You can change everything later."
+  },
+  "newAgentCard.list": {
+    "value": "Starting points"
+  },
+  "newAgentCard.zero": {
+    "value": "From scratch"
+  },
+  "newAgentCard.zeroSub": {
+    "value": "You say what it does"
+  },
+  "newAgentCard.import": {
+    "value": "Bring agents from another app"
+  },
+  "newAgentCard.hi": {
+    "value": "Hi, I'm"
+  },
+  "newAgentCard.hiBlank": {
+    "value": "Hi, I'm"
+  },
+  "newAgentCard.name": {
+    "value": "Name"
+  },
+  "newAgentCard.namePlaceholder": {
+    "value": "name"
+  },
+  "newAgentCard.what": {
+    "value": "What it does"
+  },
+  "newAgentCard.whatPlaceholder": {
+    "value": "What will I do for you?"
+  },
+  "newAgentCard.look": {
+    "value": "Look"
+  },
+  "newAgentCard.lookDone": {
+    "value": "Done"
+  },
+  "newAgentCard.shuffle": {
+    "value": "Shuffle"
+  },
+  "newAgentCard.handle": {
+    "value": "In the chat: @{{handle}}"
+  },
+  "newAgentCard.handleRole": {
+    "value": "In the chat: @{{handle}} · {{role}}"
+  },
+  "newAgentCard.handleTaken": {
+    "value": "In the chat: @{{handle}} · there's already a {{name}} here"
+  },
+  "newAgentCard.handleBlank": {
+    "value": "Its @ for the chat comes from the name"
+  },
+  "newAgentCard.similar": {
+    "value": "Like {{name}}, who comes ready-made."
+  },
+  "newAgentCard.similarAction": {
+    "value": "Start with {{name}}"
+  },
+  "newAgentCard.uses": {
+    "value": "Will use"
+  },
+  "newAgentCard.chooseApps": {
+    "value": "Choose apps"
+  },
+  "newAgentCard.otherApp": {
+    "value": "Another app"
+  },
+  "newAgentCard.usesNone": {
+    "value": "Nothing yet."
+  },
+  "newAgentCard.worksIn": {
+    "value": "Works in"
+  },
+  "newAgentCard.how": {
+    "value": "How {{name}} works"
+  },
+  "newAgentCard.howBlank": {
+    "value": "How it works"
+  },
+  "newAgentCard.instructionsPlaceholder": {
+    "value": "What it does, what it avoids, who it asks for help"
+  },
+  "newAgentCard.picker.title": {
+    "value": "{{name}}'s apps"
+  },
+  "newAgentCard.picker.titleBlank": {
+    "value": "The agent's apps"
+  },
+  "newAgentCard.picker.lead": {
+    "value": "A connected app goes on the card at once. Connect any other right here."
+  },
+  "newAgentCard.picker.suggested": {
+    "value": "Suggested for {{name}}"
+  },
+  "newAgentCard.picker.suggestedBlank": {
+    "value": "Suggested"
+  },
+  "newAgentCard.picker.use": {
+    "value": "Use"
+  },
+  "newAgentCard.picker.added": {
+    "value": "On the card"
+  },
+  "newAgentCard.create": {
+    "value": "Create {{name}}"
+  },
+  "newAgentCard.createBlank": {
+    "value": "Create agent"
+  },
+  "newAgentCard.failed": {
+    "value": "Couldn't create it: {{reason}}"
+  },
+  "newAgentCard.level.read": {
+    "value": "Reads"
+  },
+  "newAgentCard.level.write": {
+    "value": "Reads and writes"
+  },
+  "newAgentCard.app.lead": {
+    "value": "How far {{name}} goes in {{app}}."
+  },
+  "newAgentCard.app.leadBlank": {
+    "value": "How far it goes in {{app}}."
+  },
+  "newAgentCard.app.read": {
+    "value": "Read"
+  },
+  "newAgentCard.app.readDesc": {
+    "value": "Sees what's in {{app}}. Changes nothing."
+  },
+  "newAgentCard.app.write": {
+    "value": "Read and write"
+  },
+  "newAgentCard.app.writeDesc": {
+    "value": "Also creates and edits in {{app}}."
+  },
+  "newAgentCard.app.asks": {
+    "value": "{{actions}} always ask for your approval, at any level."
+  },
+  "newAgentCard.app.asksAny": {
+    "value": "Sending, deleting and paying always ask for your approval, at any level."
+  },
+  "newAgentCard.app.remove": {
+    "value": "Remove {{app}}"
+  },
+  "newAgentCard.app.done": {
+    "value": "Done"
+  },
+  "newAgentCard.band.label": {
+    "value": "What {{name}} needs to start"
+  },
+  "newAgentCard.band.ai": {
+    "value": "An AI to think"
+  },
+  "newAgentCard.band.asleep": {
+    "value": "Asleep until it has an AI"
+  },
+  "newAgentCard.skills": {
+    "value": "Skills"
+  },
+  "newAgentCard.skillsHelpBlank": {
+    "value": "Manuals it opens when needed."
+  },
+  "newAgentCard.chooseSkills": {
+    "value": "Choose skills"
+  },
+  "newAgentCard.otherSkill": {
+    "value": "Another skill"
+  },
+  "newAgentCard.namesLead": {
+    "value": "How about"
+  },
+  "newAgentCard.namesRoll": {
+    "value": "Other names"
+  },
+  "newAgentCard.skill.opens": {
+    "value": "{{name}} opens this manual when the topic comes up. You edit it in Skills."
+  },
+  "newAgentCard.skill.opensBlank": {
+    "value": "It opens this manual when the topic comes up. You edit it in Skills."
+  },
+  "newAgentCard.skill.remove": {
+    "value": "Remove from {{name}}"
+  },
+  "newAgentCard.skill.removeBlank": {
+    "value": "Remove from the agent"
+  },
+  "newAgentCard.skill.done": {
+    "value": "Done"
+  },
+  "newAgentCard.names.agenda": {
+    "value": "Ivy, June, Nora, Milo, Tess, Cal"
+  },
+  "newAgentCard.names.agendaWords": {
+    "value": "calendar, schedul, appointment, remind, meeting, agenda"
+  },
+  "newAgentCard.names.money": {
+    "value": "Penny, Nick, Mona, Rex, Lou, Cass"
+  },
+  "newAgentCard.names.moneyWords": {
+    "value": "bill, spend, money, financ, budget, pay"
+  },
+  "newAgentCard.names.travel": {
+    "value": "Atlas, Skye, Ravi, Vic, Nara, Tom"
+  },
+  "newAgentCard.names.travelWords": {
+    "value": "trip, travel, flight, hotel, itinerar, vacation"
+  },
+  "newAgentCard.names.training": {
+    "value": "Leo, Bea, Bolt, Kai, Nina, Dave"
+  },
+  "newAgentCard.names.trainingWords": {
+    "value": "workout, run, gym, exercis, train"
+  },
+  "newAgentCard.names.study": {
+    "value": "Gabi, Nils, Sophie, Theo, Iris, Benji"
+  },
+  "newAgentCard.names.studyWords": {
+    "value": "stud, exam, course, learn, class"
+  },
+  "newAgentCard.names.clients": {
+    "value": "Rui, Anna, Ben, Liz, Otto, Cleo"
+  },
+  "newAgentCard.names.clientsWords": {
+    "value": "client, sale, proposal, invoic, customer"
+  },
+  "newAgentCard.names.any": {
+    "value": "Sol, Lia, Theo, Bea, Nino, Iris, Kai, Luma, Gil, Rafa, Nara, Tom"
   },
   "members.column.label": {
     "value": "Members of #{{channel}}"
@@ -16196,7 +16508,7 @@
     "value": "No due date"
   },
   "issues.seeCalendar": {
-    "value": "see in the calendar"
+    "value": "See in the calendar"
   },
   "issues.removeDue": {
     "value": "Remove the due date"
@@ -16210,9 +16522,6 @@
   "issues.artifactBy": {
     "value": "{{title}} ({{name}})"
   },
-  "issues.noLinks": {
-    "value": "Nothing linked yet."
-  },
   "issues.github.label": {
     "value": "GitHub link"
   },
@@ -16225,11 +16534,11 @@
   "issues.github.remove": {
     "value": "Remove the GitHub link"
   },
+  "issues.github.add": {
+    "value": "Add a GitHub link"
+  },
   "issues.openConversation": {
     "value": "View conversation"
-  },
-  "issues.labels": {
-    "value": "Labels"
   },
   "issues.tabs.label": {
     "value": "Task sections"
@@ -20618,6 +20927,12 @@
   "calendar.upcomingEmpty": {
     "value": "Nothing coming up."
   },
+  "calendar.owners": {
+    "value": "Agents and people"
+  },
+  "calendar.showOwner": {
+    "value": "Show {{name}}"
+  },
   "calendar.viewZone": {
     "value": "Calendar time zone"
   },
@@ -20681,18 +20996,6 @@
   "calendar.rsvp.mine.declined": {
     "value": "You're not going."
   },
-  "calendar.kind.event": {
-    "value": "Event"
-  },
-  "calendar.kind.routine": {
-    "value": "Routine"
-  },
-  "calendar.kind.reminder": {
-    "value": "Reminder"
-  },
-  "calendar.kind.deadline": {
-    "value": "Task due date"
-  },
   "calendar.every.hour": {
     "value": "every hour"
   },
@@ -20712,7 +21015,7 @@
     }
   },
   "calendar.routineDetail": {
-    "value": "{{agent}}'s routine · delivers to {{target}}."
+    "value": "Routine · delivers to {{target}}"
   },
   "calendar.deadlineDetail": {
     "value": "The task is due."
@@ -20721,7 +21024,7 @@
     "value": "Set by {{name}}"
   },
   "calendar.reminderPosted": {
-    "value": "Posted by {{agent}} · {{target}}"
+    "value": "Reminder · posts in {{target}}"
   },
   "calendar.cancelReminder": {
     "value": "Cancel reminder"
@@ -20741,28 +21044,16 @@
   "calendar.runAria": {
     "value": "Routine {{name}}, {{time}}"
   },
-  "calendar.runsAria": {
-    "value": "{{count}} routines at {{time}}: {{names}}"
-  },
   "calendar.runHint": {
     "value": "{{name}} · {{agent}} · {{time}}"
   },
   "calendar.runsAt": {
     "value": "Routines at {{time}}"
   },
-  "calendar.runsOn": {
-    "value": "Routines · {{day}}"
-  },
-  "calendar.runsCount": {
+  "calendar.moreRuns": {
     "value": {
-      "one": "{{count}} routine run",
-      "other": "{{count}} routine runs"
-    }
-  },
-  "calendar.dayRunsAria": {
-    "value": {
-      "one": "{{count}} routine run on {{day}}: {{names}}",
-      "other": "{{count}} routine runs on {{day}}: {{names}}"
+      "one": "+{{count}} routine",
+      "other": "+{{count}} routines"
     }
   },
   "calendar.runTimes": {
@@ -22592,6 +22883,459 @@
   },
   "photo.tooBig": {
     "value": "The image is over 8 MB."
+  },
+  "portrait.ask.title": {
+    "value": "How do you want to appear?"
+  },
+  "portrait.ask.build": {
+    "value": "Build an avatar"
+  },
+  "portrait.ask.buildText": {
+    "value": "A pixel portrait made your way: hair, clothes, accessories."
+  },
+  "portrait.ask.photo": {
+    "value": "Upload a photo"
+  },
+  "portrait.ask.photoText": {
+    "value": "Choose an image from your computer and frame it."
+  },
+  "portrait.title": {
+    "value": "Your avatar"
+  },
+  "portrait.preview": {
+    "value": "Your avatar"
+  },
+  "portrait.shuffle": {
+    "value": "Shuffle"
+  },
+  "portrait.small": {
+    "value": "Small sizes in the chat show the face alone."
+  },
+  "portrait.photoAsk": {
+    "value": "Prefer a photo?"
+  },
+  "portrait.photoUpload": {
+    "value": "Upload photo"
+  },
+  "portrait.saved": {
+    "value": "Avatar updated."
+  },
+  "portrait.failed": {
+    "value": "The avatar couldn't be saved. Try again."
+  },
+  "portrait.showAll": {
+    "value": "Show every option"
+  },
+  "portrait.showFewer": {
+    "value": "Show fewer options"
+  },
+  "portrait.beardHint": {
+    "value": "The beard follows the hair color."
+  },
+  "portrait.hatsHint": {
+    "value": "A cap, a beanie, a hat and a scarf cover the hair."
+  },
+  "portrait.swatch": {
+    "value": "{{group}} {{n}}"
+  },
+  "portrait.build.label": {
+    "value": "Build"
+  },
+  "portrait.build.m": {
+    "value": "Masculine"
+  },
+  "portrait.build.f": {
+    "value": "Feminine"
+  },
+  "portrait.tabs.label": {
+    "value": "Parts of the avatar"
+  },
+  "portrait.tabs.face": {
+    "value": "Face"
+  },
+  "portrait.tabs.hair": {
+    "value": "Hair"
+  },
+  "portrait.tabs.beard": {
+    "value": "Beard"
+  },
+  "portrait.tabs.makeup": {
+    "value": "Makeup"
+  },
+  "portrait.tabs.marks": {
+    "value": "Marks"
+  },
+  "portrait.tabs.accessories": {
+    "value": "Accessories"
+  },
+  "portrait.tabs.clothes": {
+    "value": "Clothes"
+  },
+  "portrait.tabs.background": {
+    "value": "Background"
+  },
+  "portrait.sections.skin": {
+    "value": "Skin tone"
+  },
+  "portrait.sections.eyes": {
+    "value": "Eye color"
+  },
+  "portrait.sections.mood": {
+    "value": "Expression"
+  },
+  "portrait.sections.color": {
+    "value": "Color"
+  },
+  "portrait.sections.hairColor": {
+    "value": "Hair color"
+  },
+  "portrait.sections.clothesColor": {
+    "value": "Clothes color"
+  },
+  "portrait.sections.cut": {
+    "value": "Cut"
+  },
+  "portrait.sections.beard": {
+    "value": "Beard"
+  },
+  "portrait.sections.lips": {
+    "value": "Lipstick"
+  },
+  "portrait.sections.shadow": {
+    "value": "Eyeshadow"
+  },
+  "portrait.sections.blush": {
+    "value": "Blush"
+  },
+  "portrait.sections.mark": {
+    "value": "Marks"
+  },
+  "portrait.sections.glasses": {
+    "value": "Glasses"
+  },
+  "portrait.sections.ear": {
+    "value": "Earrings"
+  },
+  "portrait.sections.neck": {
+    "value": "Around the neck"
+  },
+  "portrait.sections.extra": {
+    "value": "On the head"
+  },
+  "portrait.sections.piece": {
+    "value": "Piece"
+  },
+  "portrait.sections.bg": {
+    "value": "Background"
+  },
+  "portrait.options.mood.smile": {
+    "value": "Smile"
+  },
+  "portrait.options.mood.grin": {
+    "value": "Big smile"
+  },
+  "portrait.options.mood.laugh": {
+    "value": "Laughing"
+  },
+  "portrait.options.mood.calm": {
+    "value": "Calm"
+  },
+  "portrait.options.mood.wink": {
+    "value": "Wink"
+  },
+  "portrait.options.mood.wow": {
+    "value": "Surprised"
+  },
+  "portrait.options.hair.none": {
+    "value": "Bald"
+  },
+  "portrait.options.hair.buzz": {
+    "value": "Buzz cut"
+  },
+  "portrait.options.hair.short": {
+    "value": "Short"
+  },
+  "portrait.options.hair.side": {
+    "value": "Side part"
+  },
+  "portrait.options.hair.quiff": {
+    "value": "Quiff"
+  },
+  "portrait.options.hair.curly": {
+    "value": "Curly"
+  },
+  "portrait.options.hair.afro": {
+    "value": "Afro"
+  },
+  "portrait.options.hair.bob": {
+    "value": "Bob"
+  },
+  "portrait.options.hair.bangs": {
+    "value": "Bangs"
+  },
+  "portrait.options.hair.long": {
+    "value": "Long"
+  },
+  "portrait.options.hair.wavy": {
+    "value": "Wavy"
+  },
+  "portrait.options.hair.curls": {
+    "value": "Long curls"
+  },
+  "portrait.options.hair.bun": {
+    "value": "Bun"
+  },
+  "portrait.options.hair.pony": {
+    "value": "Ponytail"
+  },
+  "portrait.options.hair.spiky": {
+    "value": "Spiky"
+  },
+  "portrait.options.hair.mohawk": {
+    "value": "Mohawk"
+  },
+  "portrait.options.hair.braids": {
+    "value": "Braids"
+  },
+  "portrait.options.hair.pigtails": {
+    "value": "Pigtails"
+  },
+  "portrait.options.hair.crew": {
+    "value": "Crew cut"
+  },
+  "portrait.options.hair.fade": {
+    "value": "Fade"
+  },
+  "portrait.options.hair.slick": {
+    "value": "Slicked back"
+  },
+  "portrait.options.hair.flat": {
+    "value": "Flat top"
+  },
+  "portrait.options.hair.undercut": {
+    "value": "Undercut"
+  },
+  "portrait.options.hair.mullet": {
+    "value": "Mullet"
+  },
+  "portrait.options.hair.dreads": {
+    "value": "Dreadlocks"
+  },
+  "portrait.options.hair.medium": {
+    "value": "Medium"
+  },
+  "portrait.options.hair.receding": {
+    "value": "Receding"
+  },
+  "portrait.options.beard.none": {
+    "value": "No beard"
+  },
+  "portrait.options.beard.stubble": {
+    "value": "Stubble"
+  },
+  "portrait.options.beard.mustache": {
+    "value": "Mustache"
+  },
+  "portrait.options.beard.goatee": {
+    "value": "Goatee"
+  },
+  "portrait.options.beard.strap": {
+    "value": "Chinstrap"
+  },
+  "portrait.options.beard.full": {
+    "value": "Full"
+  },
+  "portrait.options.beard.long": {
+    "value": "Long"
+  },
+  "portrait.options.lips.none": {
+    "value": "No lipstick"
+  },
+  "portrait.options.lips.nude": {
+    "value": "Nude"
+  },
+  "portrait.options.lips.pink": {
+    "value": "Pink"
+  },
+  "portrait.options.lips.red": {
+    "value": "Red"
+  },
+  "portrait.options.lips.wine": {
+    "value": "Wine"
+  },
+  "portrait.options.lips.purple": {
+    "value": "Purple"
+  },
+  "portrait.options.lips.black": {
+    "value": "Black"
+  },
+  "portrait.options.shadow.none": {
+    "value": "No eyeshadow"
+  },
+  "portrait.options.shadow.rose": {
+    "value": "Rose"
+  },
+  "portrait.options.shadow.violet": {
+    "value": "Violet"
+  },
+  "portrait.options.shadow.blue": {
+    "value": "Blue"
+  },
+  "portrait.options.shadow.green": {
+    "value": "Green"
+  },
+  "portrait.options.shadow.gold": {
+    "value": "Gold"
+  },
+  "portrait.options.shadow.smoky": {
+    "value": "Smoky"
+  },
+  "portrait.options.blush.soft": {
+    "value": "Soft"
+  },
+  "portrait.options.blush.strong": {
+    "value": "Strong"
+  },
+  "portrait.options.blush.none": {
+    "value": "No blush"
+  },
+  "portrait.options.mark.none": {
+    "value": "None"
+  },
+  "portrait.options.mark.freckles": {
+    "value": "Freckles"
+  },
+  "portrait.options.mark.mole": {
+    "value": "Mole"
+  },
+  "portrait.options.mark.scar": {
+    "value": "Scar"
+  },
+  "portrait.options.mark.bandaid": {
+    "value": "Bandage"
+  },
+  "portrait.options.mark.piercing": {
+    "value": "Piercing"
+  },
+  "portrait.options.glasses.none": {
+    "value": "No glasses"
+  },
+  "portrait.options.glasses.round": {
+    "value": "Round"
+  },
+  "portrait.options.glasses.square": {
+    "value": "Square"
+  },
+  "portrait.options.glasses.gold": {
+    "value": "Gold"
+  },
+  "portrait.options.glasses.tinted": {
+    "value": "Tinted"
+  },
+  "portrait.options.glasses.shades": {
+    "value": "Sunglasses"
+  },
+  "portrait.options.ear.none": {
+    "value": "No earrings"
+  },
+  "portrait.options.ear.studs": {
+    "value": "Gold studs"
+  },
+  "portrait.options.ear.pearls": {
+    "value": "Pearls"
+  },
+  "portrait.options.ear.hoops": {
+    "value": "Hoops"
+  },
+  "portrait.options.ear.drops": {
+    "value": "Drops"
+  },
+  "portrait.options.neck.none": {
+    "value": "Nothing"
+  },
+  "portrait.options.neck.necklace": {
+    "value": "Necklace"
+  },
+  "portrait.options.neck.pearls": {
+    "value": "Pearls"
+  },
+  "portrait.options.neck.choker": {
+    "value": "Choker"
+  },
+  "portrait.options.neck.bowtie": {
+    "value": "Bow tie"
+  },
+  "portrait.options.neck.muffler": {
+    "value": "Scarf"
+  },
+  "portrait.options.extra.none": {
+    "value": "Nothing"
+  },
+  "portrait.options.extra.headband": {
+    "value": "Headband"
+  },
+  "portrait.options.extra.bandana": {
+    "value": "Bandana"
+  },
+  "portrait.options.extra.bow": {
+    "value": "Bow"
+  },
+  "portrait.options.extra.flower": {
+    "value": "Flower"
+  },
+  "portrait.options.extra.headphones": {
+    "value": "Headphones"
+  },
+  "portrait.options.extra.cap": {
+    "value": "Cap"
+  },
+  "portrait.options.extra.beanie": {
+    "value": "Beanie"
+  },
+  "portrait.options.extra.hat": {
+    "value": "Hat"
+  },
+  "portrait.options.extra.crown": {
+    "value": "Crown"
+  },
+  "portrait.options.extra.scarf": {
+    "value": "Headscarf"
+  },
+  "portrait.options.clothes.tee": {
+    "value": "T-shirt"
+  },
+  "portrait.options.clothes.vneck": {
+    "value": "V-neck"
+  },
+  "portrait.options.clothes.tank": {
+    "value": "Tank top"
+  },
+  "portrait.options.clothes.shirt": {
+    "value": "Shirt"
+  },
+  "portrait.options.clothes.suit": {
+    "value": "Suit"
+  },
+  "portrait.options.clothes.blazer": {
+    "value": "Blazer"
+  },
+  "portrait.options.clothes.jacket": {
+    "value": "Jacket"
+  },
+  "portrait.options.clothes.hoodie": {
+    "value": "Hoodie"
+  },
+  "portrait.options.clothes.turtle": {
+    "value": "Turtleneck"
+  },
+  "portrait.options.clothes.overall": {
+    "value": "Overalls"
+  },
+  "portrait.options.clothes.polo": {
+    "value": "Polo"
+  },
+  "portrait.options.clothes.dress": {
+    "value": "Dress"
   },
   "orgLogo.label": {
     "value": "Logo"
@@ -26210,7 +26954,7 @@
     "value": "No agent uses it until you choose."
   },
   "connectors.detail.allText": {
-    "value": "Once connected, every agent can use it. Next, you choose each agent's access."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectors.detail.addAccount": {
     "value": "Add another account"
@@ -27956,10 +28700,7 @@
     "value": "Nothing is available to agents until step 3."
   },
   "connectFlow.allCanUse": {
-    "value": "Once connected, every agent can use it. You can change that in step 3."
-  },
-  "connectFlow.newAccount": {
-    "value": "The new account starts with no agents, except those with access to everything. You choose in step 3."
+    "value": "Once connected, every agent can use it. You can adjust that later."
   },
   "connectFlow.replace": {
     "value": "Replaces the current sign-in. Who uses it stays the same."
@@ -27968,7 +28709,7 @@
     "value": "Sign in to the same account as before. We can't check which one it is, and who uses it stays the same."
   },
   "connectFlow.newAccountUnchecked": {
-    "value": "Sign in to an account that isn't connected yet, we can't check. It starts with no agents, except those with access to everything."
+    "value": "Sign in to an account that isn't connected yet, we can't check."
   },
   "connectFlow.addTitle": {
     "value": "Another {{name}} account"
@@ -28038,6 +28779,27 @@
       "one": "{{name}}: {{count}} agent can use it.",
       "other": "{{name}}: {{count}} agents can use it."
     }
+  },
+  "connectFlow.done.title": {
+    "value": "{{name}} connected"
+  },
+  "connectFlow.done.everyone": {
+    "value": "Every agent can use it."
+  },
+  "connectFlow.done.waiting": {
+    "value": "Agents get the tools only when you continue, at the levels we suggest."
+  },
+  "connectFlow.done.asks": {
+    "value": {
+      "one": "{{count}} action asks for approval in the chat.",
+      "other": "{{count}} actions ask for approval in the chat."
+    }
+  },
+  "connectFlow.done.adjust": {
+    "value": "Adjust"
+  },
+  "connectFlow.done.ok": {
+    "value": "Done"
   },
   "database.name": {
     "value": "Database"
@@ -31384,16 +32146,58 @@
     "value": "Connect another computer"
   },
   "devices.computer.step1": {
-    "value": "Download the app on it:"
+    "value": "Get the agentes.chat app on it:"
   },
   "devices.computer.step2": {
-    "value": "Open it and sign in to {{org}}."
+    "value": "Open it and sign in as yourself."
   },
   "devices.computer.step3": {
-    "value": "Turn on Let agents use this computer."
+    "value": "Click Allow when it asks to let {{org}}'s agents use it."
+  },
+  "devices.computer.shows": {
+    "value": "It shows up here by itself, only for you until you share it."
+  },
+  "devices.computer.waiting": {
+    "value": "Waiting for a computer of yours…"
+  },
+  "devices.computer.connected": {
+    "value": "Connected: {{name}}"
   },
   "devices.computer.orLine": {
     "value": "Or paste one line in its terminal"
+  },
+  "devices.computer.noApp": {
+    "value": "Can't install the app on it? Use a terminal line"
+  },
+  "devices.thisApp.text": {
+    "value": "The agentes.chat app connects it in one click, and asks you first."
+  },
+  "devices.thisApp.open": {
+    "value": "Open the agentes.chat app"
+  },
+  "devices.thisApp.browserAsks": {
+    "value": "Your browser asks to open it: choose Open, and Always allow if it offers."
+  },
+  "devices.thisApp.noApp": {
+    "value": "Don't have the app?"
+  },
+  "devices.thisApp.afterInstall": {
+    "value": "After installing, press Open the agentes.chat app again. The link works once, for 10 minutes."
+  },
+  "devices.thisApp.waiting": {
+    "value": "Waiting for the app on this computer…"
+  },
+  "devices.thisApp.expired": {
+    "value": "This link expired."
+  },
+  "devices.thisApp.again": {
+    "value": "Make a new link"
+  },
+  "devices.thisApp.failed": {
+    "value": "Couldn't make the link. Try again in a moment."
+  },
+  "devices.thisApp.server": {
+    "value": "A server? Use a terminal line"
   },
   "devices.link.serverTitle": {
     "value": "Connect a server"
@@ -35618,6 +36422,12 @@
   "chat.work.step.settingReplyStyle": {
     "value": "Adjusted how it replies"
   },
+  "chat.work.step.sendingFeedback": {
+    "value": "Asked to send feedback"
+  },
+  "chat.work.step.offeringFeedback": {
+    "value": "Offered to report a problem"
+  },
   "chat.work.step.deletingRoutine": {
     "value": "Deleted a routine"
   },
@@ -35944,6 +36754,12 @@
   },
   "chat.activity.settingReplyStyle": {
     "value": "adjusting how it replies"
+  },
+  "chat.activity.sendingFeedback": {
+    "value": "preparing feedback"
+  },
+  "chat.activity.offeringFeedback": {
+    "value": "preparing a report"
   },
   "chat.activity.deletingRoutine": {
     "value": "deleting a routine"
@@ -37877,6 +38693,9 @@
   },
   "standing.createUnpaid": {
     "value": "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another."
+  },
+  "standing.createUnpaidOpen": {
+    "value": "Open {{name}}"
   },
   "standing.createInactive": {
     "value": "You already have a workspace that isn't active yet, so you can't create another for now."
@@ -41392,24 +42211,6 @@
   "teamTemplates.agents.rui.task": {
     "value": "Write a short proposal for this client:"
   },
-  "teamTemplates.example.clara": {
-    "value": "Today: 9:00 dentist, 12:30 lunch with Paula, 18:00 pick up the package. Tomorrow is your mother's birthday. Want me to remind you in the morning?"
-  },
-  "teamTemplates.example.leo": {
-    "value": "Today, 30 minutes: 5 minutes of warm-up, 3 rounds of 12 squats, 10 push-ups and a 30-second plank, then 5 minutes of stretching. Tell me how it went and I'll adjust Wednesday's."
-  },
-  "teamTemplates.example.gabi": {
-    "value": "Today's topic: photosynthesis. In short, plants turn light, water and carbon dioxide into sugar and oxygen. Three questions: where does it happen, what goes in and what comes out?"
-  },
-  "teamTemplates.example.rosa": {
-    "value": "This week: rice, beans, eggs, bananas, coffee and detergent. At home: change the sheets on Thursday and call someone about the kitchen tap."
-  },
-  "teamTemplates.example.vic": {
-    "value": "Lisbon in 3 days: day 1, Alfama and the castle. Day 2, Belém and the river. Day 3, Sintra. The cheapest flights are on Tuesday the 12th. Want me to keep an eye on the price?"
-  },
-  "teamTemplates.example.rui": {
-    "value": "Hi Marcos, here's the proposal: a new site with 5 pages, delivered in 3 weeks, paid in two parts. If it works for you, I'll send the contract today."
-  },
   "teamTemplates.channels.iara": {
     "value": "support"
   },
@@ -41610,5 +42411,53 @@
   },
   "settings.tab.account": {
     "value": "Profile"
+  },
+  "feedback.offer.group": {
+    "value": "Report about the app"
+  },
+  "feedback.offer.ready": {
+    "value": "<b>Report ready</b>: {{summary}}"
+  },
+  "feedback.offer.goesCloud": {
+    "value": "Goes in your name to the agentes.chat team"
+  },
+  "feedback.offer.goesServer": {
+    "value": "Goes in your name to whoever runs this server"
+  },
+  "feedback.offer.see": {
+    "value": "See the report"
+  },
+  "feedback.offer.hide": {
+    "value": "Close the report"
+  },
+  "feedback.offer.send": {
+    "value": "Send"
+  },
+  "feedback.offer.notNow": {
+    "value": "Not now"
+  },
+  "feedback.offer.answer": {
+    "value": "The answer comes to your email."
+  },
+  "feedback.offer.sentCloud": {
+    "value": "<b>Report sent</b> to the agentes.chat team"
+  },
+  "feedback.offer.sentServer": {
+    "value": "<b>Report sent</b> to whoever runs this server"
+  },
+  "feedback.offer.sentAuto": {
+    "value": "<b>Report sent without asking</b>: {{summary}}"
+  },
+  "feedback.offer.view": {
+    "value": "View"
+  },
+  "feedback.offer.always": {
+    "value": "Always send"
+  },
+  "feedback.offer.alwaysOn": {
+    "value": "From now on, reports like this go without asking."
+  },
+  "feedback.offer.askFirst": {
+    "value": "Ask before sending"
   }
 }

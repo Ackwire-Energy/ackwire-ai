@@ -2978,8 +2978,6 @@
     "chip": "Pamięć zaktualizowana",
     "was": "Wcześniej: {{text}}",
     "open": "Co wie {{name}}",
-    "undo": "Cofnij",
-    "undone": "Cofnięto",
     "group": "Pamięć zaktualizowana przez {{name}}"
   },
   "reach": {
@@ -3132,26 +3130,12 @@
     "someone": "ktoś",
     "you": "ty",
     "undo": "Cofnij",
-    "redo": "Ponów",
-    "undoAll": "Cofnij wszystko",
     "changes_one": "{{count}} zmiana",
     "changes_few": "{{count}} zmiany",
     "changes_many": "{{count}} zmian",
     "changes_other": "{{count}} zmiany",
     "undoneBy": "Cofnięte przez: {{name}}",
-    "ago": "{{time}} temu",
-    "timeLeft": "{{time}} na cofnięcie",
     "group": "Zmiany: {{name}}",
-    "undone": "Cofnięto.",
-    "redone": "Ponowiono.",
-    "undoneAll_one": "Cofnięto {{count}} zmianę.",
-    "undoneAll_few": "Cofnięto {{count}} zmiany.",
-    "undoneAll_many": "Cofnięto {{count}} zmian.",
-    "undoneAll_other": "Cofnięto {{count}} zmiany.",
-    "partial_one": "Nie udało się cofnąć {{count}} zmiany.",
-    "partial_few": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_many": "Nie udało się cofnąć {{count}} zmian.",
-    "partial_other": "Nie udało się cofnąć {{count}} zmiany.",
     "errors": {
       "changed_since": "Ktoś to w międzyczasie zmienił. Cofnięcie teraz usunęłoby tę zmianę.",
       "expired": "Czas na cofnięcie minął.",
@@ -3837,6 +3821,7 @@
       "ready": "Połączono",
       "syncing": "Synchronizowanie",
       "reads": "Odczytuje: {{label}}",
+      "readOnly": "tylko do odczytu",
       "items_one": "{{count}} element",
       "items_few": "{{count}} elementy",
       "items_many": "{{count}} elementów",
@@ -3889,7 +3874,7 @@
       "onepassword": {
         "step": {
           "1": "Utwórz w 1Password sejf tylko dla swoich agentów i przenieś do niego loginy, których mogą używać",
-          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu",
+          "2": "Utwórz konto usługi z dostępem tylko do tego sejfu (odczyt i zapis, jeśli agenci mają zapisywać tam nowe loginy)",
           "3": "Wklej tutaj token konta usługi"
         },
         "field": {
@@ -5897,42 +5882,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "Co ma robić twój nowy agent?",
-    "lead": "Powiedz to jednym zdaniem. {{name}} go przygotuje i pokaże ci przed utworzeniem.",
-    "field": "Co robi dla ciebie",
-    "placeholder": "Np. Pilnować mojego kalendarza i przypominać o ważnych sprawach",
-    "ideas": "Pomysły",
-    "idea": {
-      "agenda": {
-        "label": "Kalendarz",
-        "text": "Pilnować mojego kalendarza i przypominać o spotkaniach"
-      },
-      "money": {
-        "label": "Finanse",
-        "text": "Śledzić moje rachunki i ostrzegać przed terminem"
-      },
-      "training": {
-        "label": "Trening",
-        "text": "Planować moje treningi na tydzień i dopasowywać je do samopoczucia"
-      },
-      "studies": {
-        "label": "Nauka",
-        "text": "Ułożyć mi plan nauki i sprawdzać, czego się nauczyłem"
-      },
-      "home": {
-        "label": "Dom",
-        "text": "Pilnować listy zakupów i domowych obowiązków"
-      },
-      "travel": {
-        "label": "Podróże",
-        "text": "Planować moje podróże: trasę, rezerwacje i dokumenty"
-      }
-    },
-    "full": "Wolę wypełnić wszystko sam",
-    "create": "Utwórz z {{name}}",
-    "message": "Chcę nowego agenta: {{what}}"
-  },
   "newAgent": {
     "title": "Utwórz agenta",
     "railOrg": "{{org}} · twoja rola: {{role}}",
@@ -6300,7 +6249,198 @@
     "and": " i ",
     "routine": "Rutyna",
     "routineKeep": "Utwórz rutynę {{name}}",
-    "routineNotMade": "Nie utworzono rutyny: {{reason}}"
+    "routineNotMade": "Nie utworzono rutyny: {{reason}}",
+    "hello": {
+      "clara": "Zadbam o twój kalendarz i przypomnę ci o tym, co ważne, zanim będzie za późno.",
+      "duda": "Będę pilnować twoich rachunków i wydatków i ostrzegę cię, zanim coś przyjdzie do zapłaty.",
+      "leo": "Ułożę twoje treningi i utrzymam cię w rytmie, po twojemu.",
+      "mel": "Zaplanuję twoje posiłki i listę zakupów, pod twój gust i budżet.",
+      "gabi": "Ułożę twój plan nauki i przepytam cię z materiału.",
+      "lu": "Przechowam twoje notatki i pomysły i pomogę zamienić je w tekst.",
+      "rosa": "Zajmę się listą zakupów, domowymi obowiązkami i tym, co trzeba naprawić.",
+      "vic": "Zaplanuję twoje podróże: daty, ceny, rezerwacje i plan dzień po dniu.",
+      "rui": "Będę pilnować twoich klientów, pisać oferty i przypomnienia o płatnościach i pamiętać, kto nie zapłacił.",
+      "dev": "Programuję, przeglądam PR-y i badam błędy.",
+      "ops": "Pilnuję błędów, kolejek i wdrożeń.",
+      "qa": "Testuję ścieżki i odtwarzam zgłoszone błędy.",
+      "pm": "Porządkuję zadania i robię podsumowania.",
+      "support": "Odpowiadam klientom i przekazuję to, co wymaga człowieka.",
+      "sales": "Przygotowuję oferty i dbam o kontakt z zainteresowanymi.",
+      "marketing": "Planuję kampanie, posty i strony serwisu.",
+      "content": "Piszę i redaguję teksty, artykuły i newslettery.",
+      "data": "Odpowiadam na pytania liczbami i przygotowuję raporty.",
+      "finance": "Pilnuję płatności, należności i wydatków.",
+      "people": "Pomagam przy rekrutacji, wdrażaniu nowych osób i pytaniach zespołu.",
+      "research": "Badam temat i dostarczam podsumowanie ze źródłami.",
+      "assistant": "Zajmuję się kalendarzem, e-mailami i przypomnieniami."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Co rano sprawdza kalendarz i wysyła plan dnia.\nDzień wcześniej przypomina o każdym spotkaniu i każdym rachunku z terminem.\nNigdy nie umawia, nie odwołuje ani nie przyjmuje zaproszeń bez pytania.",
+        "tasks": {
+          "a": "Co mam jutro?",
+          "b": "Przypominaj mi o czynszu co miesiąc 5.",
+          "c": "Wysyłaj mi kalendarz codziennie o 7:00"
+        }
+      },
+      "duda": {
+        "instructions": "Śledzi rachunki i wydatki, podzielone na kategorie.\nOstrzega trzy dni przed terminem płatności i gdy wydatek odbiega od normy.\nNigdy nie płaci, nie przelewa ani niczego nie anuluje bez pytania.",
+        "tasks": {
+          "a": "Ile wydaję w tym miesiącu?",
+          "b": "Które rachunki są do zapłaty w tym tygodniu?",
+          "c": "Uporządkuj te wydatki według kategorii"
+        }
+      },
+      "leo": {
+        "instructions": "Układa treningi pod twój poziom, twój czas i to, co lubisz.\nDopasowuje tydzień, gdy opuścisz trening lub potrzebujesz odpoczynku, bez kazań.\nNie udziela porad medycznych: przy bólu lub kontuzji radzi udać się do specjalisty.",
+        "tasks": {
+          "a": "Ułóż 30-minutowy trening na dziś",
+          "b": "Zaplanuj mój tydzień biegania",
+          "c": "Wysyłaj mi codziennie rano trening na dziś"
+        }
+      },
+      "mel": {
+        "instructions": "Planuje posiłki na tydzień według twojego gustu, czasu i budżetu.\nRobi listę zakupów do jadłospisu, pogrupowaną według działów sklepu.\nUwzględnia ograniczenia i alergie, nie układa diet ani nie udziela porad medycznych.",
+        "tasks": {
+          "a": "Zaproponuj trzy szybkie kolacje",
+          "b": "Ułóż jadłospis na tydzień",
+          "c": "Zrób listę zakupów do jadłospisu"
+        }
+      },
+      "gabi": {
+        "instructions": "Układa plan nauki do egzaminu, z tym, co mieści się w każdym dniu.\nPyta cię z materiału i jeszcze raz tłumaczy to, w czym był błąd.\nNie odrabia lekcji za ciebie: prowadzi cię do odpowiedzi.",
+        "tasks": {
+          "a": "Ułóż plan nauki do egzaminu",
+          "b": "Zadaj mi 3 pytania z materiału, który przerabiam",
+          "c": "Wytłumacz ten temat prosto"
+        }
+      },
+      "lu": {
+        "instructions": "Przechowuje notatki i pomysły, które wysyłasz, i łączy podobne.\nZamienia notatki w tekst w twoim stylu, nie dodając niczego od siebie.\nStarannie poprawia i pokazuje zmiany, zanim zastąpi oryginał.",
+        "tasks": {
+          "a": "Zamień te notatki w krótki tekst",
+          "b": "Zbierz pomysły z tego tygodnia",
+          "c": "Popraw ten tekst"
+        }
+      },
+      "rosa": {
+        "instructions": "Dba o aktualną listę zakupów i domowe obowiązki.\nZapisuje, co trzeba naprawić, i przypomina, aż będzie zrobione.\nNigdy niczego nie kupuje ani nikogo nie zatrudnia bez pytania.",
+        "tasks": {
+          "a": "Zrób listę zakupów na tydzień",
+          "b": "Co trzeba naprawić w domu?",
+          "c": "Podziel obowiązki domowe"
+        }
+      },
+      "vic": {
+        "instructions": "Planuje podróż z datami, cenami i planem na każdy dzień.\nPorównuje loty i noclegi i mówi, dlaczego proponuje każdy z nich.\nNigdy niczego nie rezerwuje ani nie płaci bez pytania.",
+        "tasks": {
+          "a": "Zaplanuj 3 dni w Lizbonie",
+          "b": "Daj znać, jeśli bilet stanieje",
+          "c": "Zbierz rezerwacje z podróży"
+        }
+      },
+      "rui": {
+        "instructions": "Śledzi każdego klienta: co ustalono, co zostało i kto nie zapłacił.\nPisze oferty i przypomnienia o płatności w twoim stylu, gotowe do przejrzenia.\nNigdy nic nie wysyła klientowi bez twojej zgody.",
+        "tasks": {
+          "a": "Napisz krótką ofertę dla klienta",
+          "b": "Kto jeszcze nie zapłacił?",
+          "c": "Na co dziś czeka każdy klient?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nowy agent",
+    "lead": "Wybierz po lewej i dopasuj po prawej. Wszystko zmienisz później.",
+    "list": "Punkty wyjścia",
+    "zero": "Od zera",
+    "zeroSub": "Ty mówisz, co robi",
+    "import": "Przenieś agentów z innej aplikacji",
+    "hi": "Cześć, jestem",
+    "hiBlank": "Cześć, jestem",
+    "name": "Imię",
+    "namePlaceholder": "imię",
+    "what": "Co robi",
+    "whatPlaceholder": "Co mam dla ciebie robić?",
+    "look": "Wygląd",
+    "lookDone": "Gotowe",
+    "shuffle": "Losuj",
+    "handle": "W czacie: @{{handle}}",
+    "handleRole": "W czacie: @{{handle}} · {{role}}",
+    "handleTaken": "W czacie: @{{handle}} · {{name}} już tu jest",
+    "handleBlank": "@ do czatu powstaje z imienia",
+    "similar": "Podobny do: {{name}}, gotowy od razu.",
+    "similar_female": "Podobna do: {{name}}, gotowa od razu.",
+    "similarAction": "Zacznij od: {{name}}",
+    "uses": "Będzie używać",
+    "chooseApps": "Wybierz aplikacje",
+    "otherApp": "Inna aplikacja",
+    "usesNone": "Na razie nic.",
+    "worksIn": "Pracuje w",
+    "how": "Jak pracuje {{name}}",
+    "howBlank": "Jak pracuje",
+    "instructionsPlaceholder": "Co robi, czego unika, kogo prosi o pomoc",
+    "picker": {
+      "title": "Aplikacje: {{name}}",
+      "titleBlank": "Aplikacje agenta",
+      "lead": "Połączona aplikacja od razu trafia na kartę. Inne połączysz tutaj.",
+      "suggested": "Sugerowane dla: {{name}}",
+      "suggestedBlank": "Sugerowane",
+      "use": "Użyj",
+      "added": "Na karcie"
+    },
+    "create": "Utwórz: {{name}}",
+    "createBlank": "Utwórz agenta",
+    "failed": "Nie udało się utworzyć: {{reason}}",
+    "level": {
+      "read": "Czyta",
+      "write": "Czyta i pisze"
+    },
+    "app": {
+      "lead": "Jak daleko {{name}} sięga w {{app}}.",
+      "leadBlank": "Jak daleko sięga w {{app}}.",
+      "read": "Czytanie",
+      "readDesc": "Widzi, co jest w {{app}}. Niczego nie zmienia.",
+      "write": "Czytanie i pisanie",
+      "writeDesc": "Także tworzy i edytuje w {{app}}.",
+      "asks": "{{actions}} zawsze wymagają twojej zgody, na każdym poziomie.",
+      "asksAny": "Wysyłanie, usuwanie i płacenie zawsze wymagają twojej zgody, na każdym poziomie.",
+      "remove": "Usuń {{app}}",
+      "done": "Gotowe"
+    },
+    "band": {
+      "label": "Czego {{name}} potrzebuje na start",
+      "ai": "AI do myślenia",
+      "asleep": "Śpi, dopóki nie ma AI"
+    },
+    "skills": "Umiejętności",
+    "skillsHelpBlank": "Instrukcje, które otwiera, gdy ich potrzebuje.",
+    "chooseSkills": "Wybierz umiejętności",
+    "otherSkill": "Inna umiejętność",
+    "namesLead": "Może",
+    "namesRoll": "Inne imiona",
+    "skill": {
+      "opens": "{{name}} otwiera tę instrukcję, gdy pojawia się temat. Edytujesz ją w Umiejętnościach.",
+      "opensBlank": "Otwiera tę instrukcję, gdy pojawia się temat. Edytujesz ją w Umiejętnościach.",
+      "remove": "Usuń u: {{name}}",
+      "removeBlank": "Usuń u agenta",
+      "done": "Gotowe"
+    },
+    "names": {
+      "agenda": "Lila, Zegar, Tesia, Dora, Tytus, Ema",
+      "agendaWords": "kalendar, spotkani, przypomn, termin, wizyt",
+      "money": "Grosz, Nikola, Monia, Cyprian, Lara, Złotek",
+      "moneyWords": "rachun, wydat, pieniąd, finans, budżet, płac",
+      "travel": "Trasa, Malwa, Rafał, Wiki, Nara, Tomek",
+      "travelWords": "podróż, bilet, lot, hotel, wakacj, urlop",
+      "training": "Leon, Beta, Piorun, Kai, Nina, Dawid",
+      "trainingWords": "trening, bieg, siłowni, ćwicz",
+      "study": "Gabi, Nil, Zosia, Teo, Iris, Benio",
+      "studyWords": "nauk, uczy, egzamin, kurs, studi",
+      "clients": "Rysiek, Ania, Bartek, Lena, Otto, Kleo",
+      "clientsWords": "klient, sprzedaż, ofert, faktur",
+      "any": "Sol, Lila, Teo, Beta, Nino, Iga, Kai, Luma, Gil, Rafi, Nara, Tom"
+    }
   },
   "members": {
     "column": {
@@ -7179,20 +7319,19 @@
     "statusLabel": "Status",
     "due": "Termin",
     "noDue": "Bez terminu",
-    "seeCalendar": "zobacz w kalendarzu",
+    "seeCalendar": "Zobacz w kalendarzu",
     "removeDue": "Usuń termin",
     "links": "Powiązane",
     "prBy": "PR #{{number}} · otworzył(a): {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Nic jeszcze nie powiązano.",
     "github": {
       "label": "Link do GitHub",
       "placeholder": "Link do issue lub PR",
       "invalid": "To nie jest link do issue ani pull requesta na GitHub.",
-      "remove": "Usuń link do GitHub"
+      "remove": "Usuń link do GitHub",
+      "add": "Dodaj link do GitHub"
     },
     "openConversation": "Zobacz rozmowę",
-    "labels": "Etykiety",
     "tabs": {
       "label": "Części zadania",
       "details": "Szczegóły",
@@ -9172,6 +9311,8 @@
     },
     "upcoming": "Nadchodzące",
     "upcomingEmpty": "Nic nie nadchodzi.",
+    "owners": "Agenci i osoby",
+    "showOwner": "Pokaż: {{name}}",
     "viewZone": "Strefa czasowa kalendarza",
     "miniMonth": "Wybierz dzień",
     "new": "Nowe wydarzenie",
@@ -9197,12 +9338,6 @@
         "declined": "Nie będziesz."
       }
     },
-    "kind": {
-      "event": "Wydarzenie",
-      "routine": "Rutyna",
-      "reminder": "Przypomnienie",
-      "deadline": "Termin zadania"
-    },
     "every": {
       "hour": "co godzinę",
       "hours": "co {{count}} h",
@@ -9213,28 +9348,22 @@
     "runs_few": "{{count}} uruchomienia w tych dniach.",
     "runs_many": "{{count}} uruchomień w tych dniach.",
     "runs_other": "{{count}} uruchomienia w tych dniach.",
-    "routineDetail": "Rutyna agenta {{agent}} · dostarcza do: {{target}}.",
+    "routineDetail": "Rutyna · dostarcza do: {{target}}",
     "deadlineDetail": "Termin zadania.",
     "reminderBy": "Ustawione przez: {{name}}",
-    "reminderPosted": "Opublikuje: {{agent}} · {{target}}",
+    "reminderPosted": "Przypomnienie · trafi do: {{target}}",
     "cancelReminder": "Anuluj przypomnienie",
     "reminderCancelled": "Przypomnienie anulowane",
     "openIssue": "Otwórz zadanie",
     "openRoutines": "Zobacz w Rutynach",
     "openRoutine": "Otwórz rutynę",
     "runAria": "Rutyna {{name}}, {{time}}",
-    "runsAria": "Rutyny o {{time}} ({{count}}): {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Rutyny o {{time}}",
-    "runsOn": "Rutyny · {{day}}",
-    "runsCount_one": "{{count}} uruchomienie rutyny",
-    "runsCount_few": "{{count}} uruchomienia rutyn",
-    "runsCount_many": "{{count}} uruchomień rutyn",
-    "runsCount_other": "{{count}} uruchomienia rutyn",
-    "dayRunsAria_one": "{{count}} uruchomienie rutyny w dniu {{day}}: {{names}}",
-    "dayRunsAria_few": "{{count}} uruchomienia rutyn w dniu {{day}}: {{names}}",
-    "dayRunsAria_many": "{{count}} uruchomień rutyn w dniu {{day}}: {{names}}",
-    "dayRunsAria_other": "{{count}} uruchomienia rutyn w dniu {{day}}: {{names}}",
+    "moreRuns_one": "+{{count}} rutyna",
+    "moreRuns_few": "+{{count}} rutyny",
+    "moreRuns_many": "+{{count}} rutyn",
+    "moreRuns_other": "+{{count}} rutyny",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "odpowiedziała",
@@ -10023,6 +10152,193 @@
     "removed": "Zdjęcie usunięte.",
     "notImage": "Wybierz obraz (JPG, PNG lub WebP).",
     "tooBig": "Obraz ma ponad 8 MB."
+  },
+  "portrait": {
+    "ask": {
+      "title": "Jak chcesz się pokazywać?",
+      "build": "Stwórz awatar",
+      "buildText": "Pikselowy portret po swojemu: włosy, ubranie, dodatki.",
+      "photo": "Prześlij zdjęcie",
+      "photoText": "Wybierz obraz z komputera i go wykadruj."
+    },
+    "title": "Twój awatar",
+    "preview": "Twój awatar",
+    "shuffle": "Losuj",
+    "small": "W małych rozmiarach na czacie widać samą twarz.",
+    "photoAsk": "Wolisz zdjęcie?",
+    "photoUpload": "Prześlij zdjęcie",
+    "saved": "Awatar zaktualizowany.",
+    "failed": "Nie udało się zapisać awatara. Spróbuj ponownie.",
+    "showAll": "Pokaż wszystkie opcje",
+    "showFewer": "Pokaż mniej opcji",
+    "beardHint": "Broda ma kolor włosów.",
+    "hatsHint": "Czapka z daszkiem, czapka zimowa, kapelusz i chusta zakrywają włosy.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Typ",
+      "m": "Męski",
+      "f": "Kobiecy"
+    },
+    "tabs": {
+      "label": "Części awatara",
+      "face": "Twarz",
+      "hair": "Włosy",
+      "beard": "Broda",
+      "makeup": "Makijaż",
+      "marks": "Znaki",
+      "accessories": "Akcesoria",
+      "clothes": "Ubranie",
+      "background": "Tło"
+    },
+    "sections": {
+      "skin": "Odcień skóry",
+      "eyes": "Kolor oczu",
+      "mood": "Wyraz twarzy",
+      "color": "Kolor",
+      "hairColor": "Kolor włosów",
+      "clothesColor": "Kolor ubrania",
+      "cut": "Fryzura",
+      "beard": "Broda",
+      "lips": "Szminka",
+      "shadow": "Cień do powiek",
+      "blush": "Róż",
+      "mark": "Znaki szczególne",
+      "glasses": "Okulary",
+      "ear": "Kolczyki",
+      "neck": "Na szyi",
+      "extra": "Na głowie",
+      "piece": "Strój",
+      "bg": "Tło"
+    },
+    "options": {
+      "mood": {
+        "smile": "Uśmiech",
+        "grin": "Szeroki uśmiech",
+        "laugh": "Śmiech",
+        "calm": "Spokój",
+        "wink": "Mrugnięcie",
+        "wow": "Zaskoczenie"
+      },
+      "hair": {
+        "none": "Bez włosów",
+        "buzz": "Na zapałkę",
+        "short": "Krótkie",
+        "side": "Z przedziałkiem",
+        "quiff": "Czub",
+        "curly": "Kręcone",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Grzywka",
+        "long": "Długie",
+        "wavy": "Falowane",
+        "curls": "Długie loki",
+        "bun": "Kok",
+        "pony": "Kucyk",
+        "spiky": "Na jeża",
+        "mohawk": "Irokez",
+        "braids": "Warkocze",
+        "pigtails": "Kitki",
+        "crew": "Na jeża",
+        "fade": "Fade",
+        "slick": "Zaczesane do tyłu",
+        "flat": "Flat top",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Dredy",
+        "medium": "Średnie",
+        "receding": "Zakola"
+      },
+      "beard": {
+        "none": "Bez brody",
+        "stubble": "Zarost",
+        "mustache": "Wąsy",
+        "goatee": "Kozia bródka",
+        "strap": "Wąska broda",
+        "full": "Pełna",
+        "long": "Długa"
+      },
+      "lips": {
+        "none": "Bez szminki",
+        "nude": "Nude",
+        "pink": "Róż",
+        "red": "Czerwień",
+        "wine": "Bordo",
+        "purple": "Fiolet",
+        "black": "Czerń"
+      },
+      "shadow": {
+        "none": "Bez cieni",
+        "rose": "Róż",
+        "violet": "Fiolet",
+        "blue": "Błękit",
+        "green": "Zieleń",
+        "gold": "Złoto",
+        "smoky": "Przydymiony"
+      },
+      "blush": {
+        "soft": "Delikatny",
+        "strong": "Mocny",
+        "none": "Bez różu"
+      },
+      "mark": {
+        "none": "Brak",
+        "freckles": "Piegi",
+        "mole": "Pieprzyk",
+        "scar": "Blizna",
+        "bandaid": "Plaster",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Bez okularów",
+        "round": "Okrągłe",
+        "square": "Kwadratowe",
+        "gold": "Złote",
+        "tinted": "Barwione",
+        "shades": "Przeciwsłoneczne"
+      },
+      "ear": {
+        "none": "Bez kolczyków",
+        "studs": "Złote sztyfty",
+        "pearls": "Perły",
+        "hoops": "Koła",
+        "drops": "Wiszące"
+      },
+      "neck": {
+        "none": "Nic",
+        "necklace": "Naszyjnik",
+        "pearls": "Perły",
+        "choker": "Choker",
+        "bowtie": "Muszka",
+        "muffler": "Szalik"
+      },
+      "extra": {
+        "none": "Nic",
+        "headband": "Opaska",
+        "bandana": "Bandana",
+        "bow": "Kokarda",
+        "flower": "Kwiatek",
+        "headphones": "Słuchawki",
+        "cap": "Czapka z daszkiem",
+        "beanie": "Czapka zimowa",
+        "hat": "Kapelusz",
+        "crown": "Korona",
+        "scarf": "Chusta"
+      },
+      "clothes": {
+        "tee": "Koszulka",
+        "vneck": "Dekolt w serek",
+        "tank": "Bokserka",
+        "shirt": "Koszula",
+        "suit": "Garnitur",
+        "blazer": "Marynarka",
+        "jacket": "Kurtka",
+        "hoodie": "Bluza z kapturem",
+        "turtle": "Golf",
+        "overall": "Ogrodniczki",
+        "polo": "Koszulka polo",
+        "dress": "Sukienka"
+      }
+    }
   },
   "orgLogo": {
     "label": "Logo",
@@ -11584,7 +11900,7 @@
       "close": "Zamknij szczegóły",
       "can": "Co będą mogli robić agenci",
       "afterText": "Żaden agent z niego nie korzysta, dopóki nie wybierzesz.",
-      "allText": "Po połączeniu każdy agent może z niego korzystać. Następnie wybierasz dostęp każdego agenta.",
+      "allText": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
       "addAccount": "Dodaj kolejne konto",
       "accountsText": "Każde konto ma własnych agentów i poziomy.",
       "reconnect": "Połącz ponownie",
@@ -12405,11 +12721,10 @@
     "notApproved": "{{name}} pozwala logować się tylko zatwierdzonym aplikacjom, a agentes.chat jeszcze nie jest zatwierdzony. Jeśli dostaniesz tam klucz API, możesz połączyć się nim.",
     "serverSaid": "Odpowiedź serwera: {{detail}}",
     "nothingYet": "Do kroku 3 nic nie jest dostępne dla agentów.",
-    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to zmienić w kroku 3.",
-    "newAccount": "Nowe konto zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego. Wybierasz w kroku 3.",
+    "allCanUse": "Po połączeniu każdy agent może z niego korzystać. Możesz to później dostosować.",
     "replace": "Zastępuje obecne logowanie. Kto z niego korzysta, pozostaje bez zmian.",
     "replaceUnchecked": "Zaloguj się na to samo konto co wcześniej. Nie możemy sprawdzić, które to konto, a kto z niego korzysta, pozostaje bez zmian.",
-    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić. Zaczyna bez agentów, z wyjątkiem tych, którzy mają dostęp do wszystkiego.",
+    "newAccountUnchecked": "Zaloguj się na konto, które nie jest jeszcze połączone, bo nie możemy tego sprawdzić.",
     "addTitle": "Kolejne konto {{name}}",
     "reconnectTitle": "Połącz ponownie {{name}}",
     "accountName": "Nazwa tego konta",
@@ -12438,7 +12753,18 @@
     "saved_one": "{{name}}: może z niego korzystać {{count}} agent.",
     "saved_few": "{{name}}: mogą z niego korzystać {{count}} agenci.",
     "saved_many": "{{name}}: może z niego korzystać {{count}} agentów.",
-    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta."
+    "saved_other": "{{name}}: może z niego korzystać {{count}} agenta.",
+    "done": {
+      "title": "Połączono z {{name}}",
+      "everyone": "Każdy agent może z niego korzystać.",
+      "waiting": "Agenci dostaną narzędzia dopiero, gdy przejdziesz dalej, na poziomach, które sugerujemy.",
+      "asks_one": "{{count}} akcja prosi o zatwierdzenie na czacie.",
+      "asks_few": "{{count}} akcje proszą o zatwierdzenie na czacie.",
+      "asks_many": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "asks_other": "{{count}} akcji prosi o zatwierdzenie na czacie.",
+      "adjust": "Dostosuj",
+      "ok": "Gotowe"
+    }
   },
   "database": {
     "name": "Baza danych",
@@ -13861,10 +14187,26 @@
     },
     "computer": {
       "title": "Podłącz inny komputer",
-      "step1": "Pobierz na nim aplikację:",
-      "step2": "Otwórz ją i zaloguj się do {{org}}.",
-      "step3": "Włącz opcję Pozwól agentom używać tego komputera.",
-      "orLine": "Albo wklej jedno polecenie w jego terminalu"
+      "step1": "Zainstaluj na nim aplikację agentes.chat:",
+      "step2": "Otwórz ją i zaloguj się na swoje konto.",
+      "step3": "Kliknij Zezwól, gdy zapyta, czy agenci {{org}} mogą go używać.",
+      "shows": "Pojawi się tu sam, widoczny tylko dla ciebie, dopóki go nie udostępnisz.",
+      "waiting": "Czekam na twój komputer…",
+      "connected": "Połączono: {{name}}",
+      "orLine": "Albo wklej jedno polecenie w jego terminalu",
+      "noApp": "Nie możesz zainstalować na nim aplikacji? Użyj polecenia w terminalu"
+    },
+    "thisApp": {
+      "text": "Aplikacja agentes.chat połączy go jednym kliknięciem i najpierw zapyta.",
+      "open": "Otwórz aplikację agentes.chat",
+      "browserAsks": "Przeglądarka zapyta, czy może ją otworzyć: wybierz Otwórz, a jeśli zaproponuje, także Zawsze zezwalaj.",
+      "noApp": "Nie masz aplikacji?",
+      "afterInstall": "Po instalacji kliknij jeszcze raz Otwórz aplikację agentes.chat. Link działa raz, przez 10 minut.",
+      "waiting": "Czekam na aplikację na tym komputerze…",
+      "expired": "Ten link wygasł.",
+      "again": "Utwórz nowy link",
+      "failed": "Nie udało się utworzyć linku. Spróbuj ponownie za chwilę.",
+      "server": "Serwer? Użyj polecenia w terminalu"
     },
     "link": {
       "serverTitle": "Podłącz serwer",
@@ -15631,6 +15973,8 @@
         "sendingDm": "Wysłano wiadomość bezpośrednią",
         "settingStatus": "Zaktualizowano własny status",
         "settingReplyStyle": "Dostosowano sposób odpowiadania",
+        "sendingFeedback": "Poproszono o wysłanie opinii",
+        "offeringFeedback": "Zaproponowano zgłoszenie problemu",
         "deletingRoutine": "Usunięto rutynę",
         "runningRoutine": "Uruchomiono rutynę teraz",
         "proposingTeam": "Zaproponowano zespół",
@@ -15743,6 +16087,8 @@
       "sendingDm": "wysyłanie wiadomości bezpośredniej",
       "settingStatus": "aktualizowanie własnego statusu",
       "settingReplyStyle": "dostosowywanie sposobu odpowiadania",
+      "sendingFeedback": "przygotowywanie opinii",
+      "offeringFeedback": "przygotowywanie zgłoszenia",
       "deletingRoutine": "usuwanie rutyny",
       "runningRoutine": "uruchamianie rutyny teraz",
       "proposingTeam": "proponowanie zespołu",
@@ -16670,6 +17016,7 @@
     "suspended": "Ta przestrzeń robocza jest na razie niedostępna.",
     "createRefused": "Nie możesz teraz utworzyć przestrzeni roboczej.",
     "createUnpaid": "Masz już przestrzeń roboczą, która czeka na plan agentes.chat. Wybierz dla niej plan, zanim utworzysz kolejną.",
+    "createUnpaidOpen": "Otwórz {{name}}",
     "createInactive": "Masz już przestrzeń roboczą, która nie jest jeszcze aktywna, więc na razie nie możesz utworzyć kolejnej.",
     "agentPaused": "Ten agent jest na razie wstrzymany.",
     "onHold": "Ta przestrzeń robocza jest wstrzymana: {{reason}}",
@@ -18374,6 +18721,24 @@
     "send": "Wyślij",
     "thanks": "Dostarczono. Dziękujemy.",
     "reply": "Wszystko jest czytane. Odpowiedź, jeśli będzie potrzebna, przyjdzie na {{email}}.",
-    "another": "Wyślij kolejną"
+    "another": "Wyślij kolejną",
+    "offer": {
+      "group": "Zgłoszenie dotyczące aplikacji",
+      "ready": "<b>Zgłoszenie gotowe</b>: {{summary}}",
+      "goesCloud": "Trafi w twoim imieniu do zespołu agentes.chat",
+      "goesServer": "Trafi w twoim imieniu do osoby, która prowadzi ten serwer",
+      "see": "Zobacz zgłoszenie",
+      "hide": "Zamknij zgłoszenie",
+      "send": "Wyślij",
+      "notNow": "Nie teraz",
+      "answer": "Odpowiedź przyjdzie na twój e-mail.",
+      "sentCloud": "<b>Zgłoszenie wysłane</b> do zespołu agentes.chat",
+      "sentServer": "<b>Zgłoszenie wysłane</b> do osoby, która prowadzi ten serwer",
+      "sentAuto": "<b>Zgłoszenie wysłane bez pytania</b>: {{summary}}",
+      "view": "Zobacz",
+      "always": "Zawsze wysyłaj",
+      "alwaysOn": "Od teraz takie zgłoszenia będą wysyłane bez pytania.",
+      "askFirst": "Pytaj przed wysłaniem"
+    }
   }
 }

@@ -35,7 +35,8 @@
     <script>
       // The app's own files didn't load while the boot sky is up (a deploy replaced them, the connection broke): one
       // reload at most every 30 s, then a box that says so over the sky. main.tsx calls it too, for the language's
-      // file. The key mirrors STORAGE_KEYS.bootRetry (src/lib/storage.ts), the language rule public/unavailable.html.
+      // file. The key mirrors STORAGE_KEYS.bootRetry (src/lib/storage.ts), the language rule `savedLocale()`
+      // (src/i18n/index.ts, test/locale-preload.test.ts keeps them one) and public/unavailable.html.
       (() => {
         const KEY = "agentes.bootRetry";
         const reloaded = () => {
@@ -78,13 +79,21 @@
           try {
             lang = localStorage.getItem("agentes.locale");
           } catch {}
-          if (lang && lang !== "auto" && known(lang)) return known(lang);
+          if (lang && Object.hasOwn(WORDS, lang)) return lang;
           const cookie = /(?:^|;\s*)agentes_locale=([\w-]+)/.exec(document.cookie);
           if (lang !== "auto" && cookie && known(cookie[1])) return known(cookie[1]);
           const tags = navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language];
           for (const tag of tags) if (known(tag)) return known(tag);
           return "en";
         };
+        // The language's file loads beside the app's own, not after it: the build fills the map (vite-locale-preload.ts).
+        const file = (/* LOCALE_FILES */ {})[language()];
+        if (file) {
+          const link = document.createElement("link");
+          link.rel = "modulepreload";
+          link.href = file;
+          document.head.append(link);
+        }
         const failed = () => {
           const boot = document.querySelector("#root > .boot");
           if (!boot || reloaded()) return;

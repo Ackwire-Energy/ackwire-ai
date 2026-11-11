@@ -232,9 +232,14 @@
     if (hasSurface(style(el))) return el.getBoundingClientRect();
     return contentRect(el);
   };
-  /** Pills, chips, tokens and buttons with words: the `pad` rule's family. */
+  /** An East Asian wide character (Chinese, Japanese kana, Korean, full-width forms): about two Latin ones wide. */
+  const WIDE = /[\u1100-\u115f\u2e80-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe30-\ufe4f\uff00-\uff60\uffe0-\uffe6]/;
+  /**
+   * Pills, chips, tokens and buttons with words: the `pad` rule's family. A calendar item is no pill: a block across its
+   * column, Google's, its words from its start and the room after them the column's.
+   */
   const PILLS =
-    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip'],[class*='__tag'],[class*='-tag']";
+    ".ac-btn:not(.ac-btn--icon,.ac-btn--glyph,.ac-btn--loading),.ac-token,.ac-chip,.ac-countchip,[class*='pill'],[class*='chip']:not(.cal-chip),[class*='__tag'],[class*='-tag']";
   /**
    * A card: a row with a surface of its own that starts with an icon and ends with what can be done about it (a button,
    * a link) or another icon. Pills are the `pad` rule's.
@@ -697,8 +702,10 @@
     },
     /**
      * Words squeezed to a sliver beside something that keeps its width (an action, a time): a block of text on 3 lines
-     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line. A block
-     * is what its words lay out in: a `<b>` or a link inside a sentence is the sentence's.
+     * or more with fewer than about 12 characters a line, or, straight inside a row, fewer than 1.6 words a line of
+     * fewer than 20 characters (an address that wraps its full lines is one word, not a squeeze). A block is what its
+     * words lay out in: a `<b>` or a link inside a sentence is the sentence's. A wide character (Chinese, Japanese,
+     * Korean) takes the room of two.
      */
     wordwrap(out) {
       const blocks = new Map();
@@ -735,18 +742,20 @@
           ((ps.display.includes("flex") && !ps.flexDirection.startsWith("column")) ||
             (ps.display.includes("grid") && ps.gridTemplateColumns.split(" ").length > 1)) &&
           flow(parent).length >= 2;
-        if (words.length / lines < 12 || (row && words.split(" ").length / lines < 1.6))
+        const room = [...words].reduce((n, ch) => n + (WIDE.test(ch) ? 2 : 1), 0);
+        if (room / lines < 12 || (row && words.split(" ").length / lines < 1.6 && room / lines < 20))
           out.push({ rule: "wordwrap", node: el, el: sig(el), box: sig(parent), lines, text: words.slice(0, 60) });
       }
     },
     /**
      * Words broken inside themselves: more lines than words, so the box is narrower than its own words. `wordwrap` looks
      * only at text right inside a row; this catches it however deep the row that squeezes it is (a title beside a bar's
-     * buttons, wrapped in a link or an edit-in-place).
+     * buttons, wrapped in a link or an edit-in-place). A box that hyphenates (`hyphens: auto`: a narrow calendar item's
+     * title) breaks a long word at its syllables on purpose.
      */
     midword(out) {
       for (const el of document.body.querySelectorAll("*")) {
-        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table")) continue;
+        if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table") || style(el).hyphens === "auto") continue;
         let count = 0;
         const tops = new Set();
         for (const n of el.childNodes) {
@@ -1143,8 +1152,8 @@
     /**
      * A glyph's middle on its line's capitals' middle, within 1px, where the eye centres a sign beside words: a row's
      * lead (a glyph, or a face no taller than 1.25 lines) on its first line, and a glyph inside or after words (an svg, or
-     * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row. A person's initials
-     * sit within 0.5px of their tile's middle.
+     * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row, and a face that is a
+     * word of its line (`.ac-who`) on that line. A person's initials sit within 0.5px of their tile's middle.
      */
     iconmid(out) {
       const push = (node, part, px, row) =>
@@ -1231,6 +1240,12 @@
         if (!caps) continue;
         const px = (box.top + box.bottom) / 2 - caps.mid;
         if (Math.abs(px) > 1) push(glyph, "inline", px);
+      }
+      for (const face of document.querySelectorAll(".ac-who > .ac-avatar")) {
+        if (!seen(face) || leads.has(face)) continue;
+        const r = face.getBoundingClientRect();
+        const px = (r.top + r.bottom) / 2 - capsAfter(face).mid;
+        if (Math.abs(px) > 1) push(face, "word", px);
       }
       for (const face of document.querySelectorAll(".ac-avatar")) {
         if (!seen(face) || face.querySelector("img,canvas")) continue;
@@ -2107,19 +2122,20 @@
     },
     /**
      * A fact keeps its value on one line (rule 17): a value that wraps is a finding, unless its fact is alone on its
-     * line and as wide as the strip, which only a value longer than the strip is.
+     * line and as wide as the strip, which only a value longer than the strip is. A line of facts (`.ac-factline`,
+     * a task card's) is held the same: it wraps between facts, never inside one.
      */
     factwrap(out) {
-      for (const value of document.querySelectorAll(".ac-facts__value")) {
+      for (const value of document.querySelectorAll(".ac-facts__value, .ac-factline__fact")) {
         if (!seen(value)) continue;
         const rects = [];
         const walker = document.createTreeWalker(value, NodeFilter.SHOW_TEXT);
         for (let n = walker.nextNode(); n; n = walker.nextNode()) if (n.textContent.trim()) rects.push(...textRects(n));
         if (lineCount(rects) < 2) continue;
-        const item = value.closest(".ac-facts__item") ?? value;
-        const strip = value.closest(".ac-facts") ?? item;
+        const item = value.closest(".ac-facts__item, .ac-factline__fact") ?? value;
+        const strip = value.closest(".ac-facts, .ac-factline") ?? item;
         const r = item.getBoundingClientRect();
-        const alone = [...strip.querySelectorAll(".ac-facts__item")].every(
+        const alone = [...strip.querySelectorAll(".ac-facts__item, .ac-factline__fact")].every(
           (o) => o === item || !seen(o) || !sameLine(o.getBoundingClientRect(), r),
         );
         if (alone && r.width >= strip.clientWidth - 1) continue;
@@ -2189,6 +2205,32 @@
         const ratio = (hi + 0.05) / (lo + 0.05);
         if (ratio < 3)
           out.push({ rule: "countfill", node: count, el: sig(count), box: placeOf(count), ratio: +ratio.toFixed(2) });
+      }
+    },
+    /**
+     * A day's column of the calendar: no item covers another. A stack of routine runs and a meeting that meet sit side
+     * by side, and a stack stops before the next item (`runStacks`, `layoutDay`). A meeting reaches down its slot (its
+     * `min-height`): what a wrapped title draws past it, the page measures and lays out again (`TimeGrid`'s heights),
+     * which a captured screen never ran, so only the slots are held here.
+     */
+    calstack(out) {
+      const slot = (el) => {
+        const r = el.getBoundingClientRect();
+        const planned = parseFloat(el.style.minHeight);
+        return { left: r.left, right: r.right, top: r.top, bottom: planned > 0 ? r.top + planned : r.bottom };
+      };
+      for (const col of document.body.querySelectorAll(".cal-week__col")) {
+        const items = [...col.querySelectorAll(":scope > .cal-chip--block, :scope > .cal-week__runs")].filter(seen);
+        for (const [i, a] of items.entries()) {
+          const ra = slot(a);
+          for (const b of items.slice(i + 1)) {
+            const rb = slot(b);
+            const across = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+            const down = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+            if (across > 1 && down > 1)
+              out.push({ rule: "calstack", node: b, el: sig(b), box: sig(a), px: +Math.min(across, down).toFixed(1) });
+          }
+        }
       }
     },
     /**

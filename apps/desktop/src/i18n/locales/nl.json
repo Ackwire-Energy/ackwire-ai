@@ -4,6 +4,10 @@
     "windows": "pc",
     "linux": "computer"
   },
+  "windowTitle": {
+    "welcome": "Welkom",
+    "prefs": "Voorkeuren"
+  },
   "common": {
     "cancel": "Annuleren",
     "close": "Sluiten",
@@ -82,6 +86,7 @@
     "pauseTomorrow": "Tot morgen 9.00 uur",
     "pauseManual": "Tot ik hervat",
     "pauseHint": "Wat al draait, wordt gewoon afgemaakt.",
+    "pauseHintServer": "Wat al loopt, eindigt gewoon. De server blijft online.",
     "resume": "De agents hervatten",
     "open": "agentes.chat openen",
     "prefs": "Voorkeuren…",
@@ -124,8 +129,7 @@
     "quitTitle": "agentes.chat afsluiten?",
     "quitBody": "Agents kunnen deze {{device}} niet gebruiken terwijl de app gesloten is. Wat al draait, wordt afgemaakt en stuurt het resultaat zodra je de app weer opent.",
     "quitHereBody": "agentes.chat stopt op deze {{device}}: niemand kan het gebruiken, hier, op je telefoon of die van je teamgenoten, tot je de app weer opent.",
-    "quitConfirm": "Afsluiten",
-    "pauseHintServer": "Wat al loopt, eindigt gewoon. De server blijft online."
+    "quitConfirm": "Afsluiten"
   },
   "first": {
     "title": "Je team en je agents, samen",
@@ -137,9 +141,9 @@
     "addTitle": "Een werkruimte toevoegen",
     "addLead": "Die je al hebt blijven hier, elk met een eigen aanmelding.",
     "addCloud": "Een werkruimte maken bij agentes.chat",
-    "addOwn": "De server van je team gebruiken",
     "addNew": "Wil je een nieuwe workspace?",
-    "addNewLink": "Maak er een"
+    "addNewLink": "Maak er een",
+    "addOwn": "De server van je team gebruiken"
   },
   "own": {
     "title": "Je eigen server",
@@ -162,26 +166,26 @@
     "looking": "Je server zoeken…",
     "foundTailnet": "Op je Tailscale-netwerk",
     "foundHere": "agentes.chat draait hier",
-    "use": "Gebruiken",
-    "none": "Heb je er nog geen? Voer dit erop uit",
-    "noneText": "In de terminal van een server of een Mac mini. Aan het eind toont het een link die deze app ermee verbindt.",
-    "invalid": "Controleer het adres, iets als agentes.jouwteam.ts.net.",
-    "httpRefused": "{{host}} gebruikt geen beveiligde verbinding (https), en alleen servers op deze {{device}} mogen zonder. Gebruik het https-adres of het Tailscale-adres.",
-    "noOwner": "{{host}} heeft nog geen eigenaar. Wie de server installeerde, kreeg een link om het eigenaarsaccount te maken: open die link op deze {{device}} of op je telefoon.",
-    "unreachable": "We kunnen {{host}} niet bereiken. Controleer het adres en of de server aanstaat, en probeer het opnieuw.",
-    "unreachableHere": "Niets reageert op {{host}} op deze {{device}}. Start agentes.chat hier en probeer het dan opnieuw.",
-    "certificate": "Het certificaat van {{host}} is niet geldig. Neem contact op met wie de server beheert.",
-    "notAgentes": "{{host}} is geen agentes.chat-server. Controleer het adres.",
-    "serverTooOld": "{{host}} heeft een update nodig om met deze app te werken.",
-    "appTooOld": "Werk de app bij om {{host}} te gebruiken.",
     "foundNoOwner": "Wacht op het eigenaarsaccount",
+    "use": "Gebruiken",
     "setUp": "Instellen",
     "noneFound": "Geen server gevonden.",
     "lookAgain": "Opnieuw zoeken",
     "tailnetOff": "Tailscale staat uit op deze {{device}}, dus servers in je Tailscale-netwerk verschijnen hier niet.",
     "addressHint": "Een adres met https, of het Tailscale-adres, dat eindigt op .ts.net.",
     "checkUpdates": "Zoeken naar updates",
-    "unreachableTailnet": "We kunnen {{host}} niet bereiken, dat in je Tailscale-netwerk zit. Open Tailscale op deze {{device}}, maak verbinding en probeer het opnieuw."
+    "none": "Heb je er nog geen? Voer dit erop uit",
+    "noneText": "In de terminal van een server of een Mac mini. Aan het eind toont het een link die deze app ermee verbindt.",
+    "invalid": "Controleer het adres, iets als agentes.jouwteam.ts.net.",
+    "httpRefused": "{{host}} gebruikt geen beveiligde verbinding (https), en alleen servers op deze {{device}} mogen zonder. Gebruik het https-adres of het Tailscale-adres.",
+    "noOwner": "{{host}} heeft nog geen eigenaar. Wie de server installeerde, kreeg een link om het eigenaarsaccount te maken: open die link op deze {{device}} of op je telefoon.",
+    "unreachable": "We kunnen {{host}} niet bereiken. Controleer het adres en of de server aanstaat, en probeer het opnieuw.",
+    "unreachableTailnet": "We kunnen {{host}} niet bereiken, dat in je Tailscale-netwerk zit. Open Tailscale op deze {{device}}, maak verbinding en probeer het opnieuw.",
+    "unreachableHere": "Niets reageert op {{host}} op deze {{device}}. Start agentes.chat hier en probeer het dan opnieuw.",
+    "certificate": "Het certificaat van {{host}} is niet geldig. Neem contact op met wie de server beheert.",
+    "notAgentes": "{{host}} is geen agentes.chat-server. Controleer het adres.",
+    "serverTooOld": "{{host}} heeft een update nodig om met deze app te werken.",
+    "appTooOld": "Werk de app bij om {{host}} te gebruiken."
   },
   "here": {
     "title": "agentes.chat draaien op deze {{device}}",
@@ -242,6 +246,7 @@
       "back": "agentes.chat reageerde niet opnieuw op deze {{device}} nadat toegang vanaf je apparaten was uitgezet."
     },
     "serveFix": "Installeer Tailscale via tailscale.com.",
+    "connectTray": "Verbind het via het pictogram bij de klok.",
     "operatorRun": "Geef die toestemming één keer, in de terminal:",
     "turnOn": "Aanzetten",
     "copyDetails": "Details kopiëren",
@@ -250,14 +255,13 @@
     "notifyFailedBody": "Open agentes.chat om te zien wat er is gebeurd.",
     "already": "agentes.chat is al geïnstalleerd op deze {{device}}",
     "alreadyText": "Het draait zelfstandig, geïnstalleerd via de terminal. Gebruik het in deze app.",
+    "alreadyDocker": "Het draait zelfstandig, geïnstalleerd met Docker. Gebruik het in deze app.",
     "useIt": "Gebruiken",
     "notRunning": "agentes.chat is geïnstalleerd op deze {{device}}, maar draait niet",
     "notRunningText": "Het is geïnstalleerd via de terminal, in {{path}}. Voer dit uit in de terminal om het te starten en probeer het dan opnieuw:",
     "running": "agentes.chat draait al op deze {{device}}",
     "runningText": "Deze app draait het. Open het om in te loggen.",
-    "openIt": "Openen",
-    "connectTray": "Verbind het via het pictogram bij de klok.",
-    "alreadyDocker": "Het draait zelfstandig, geïnstalleerd met Docker. Gebruik het in deze app."
+    "openIt": "Openen"
   },
   "link": {
     "question": "De app met deze server verbinden?",
@@ -296,13 +300,13 @@
     "workspaces_one": "{{count}} werkruimte",
     "workspaces_other": "{{count}} werkruimtes",
     "signedOut": "Niet ingelogd",
-    "newsOne": "1 nieuwe melding",
-    "newsMany": "{{n}} nieuwe meldingen",
     "offline": "Offline sinds {{time}}",
     "signIn": "Aanmelden",
     "signOut": "Afmelden bij deze server",
     "signedOutDone": "Je bent afgemeld bij {{host}}",
-    "removeFromApp": "Uit deze app verwijderen"
+    "removeFromApp": "Uit deze app verwijderen",
+    "newsOne": "1 nieuwe melding",
+    "newsMany": "{{n}} nieuwe meldingen"
   },
   "server": {
     "title": "agentes.chat op deze {{device}}",
@@ -311,8 +315,10 @@
     "stopped": "Gestopt",
     "updating": "Bijwerken",
     "failing": "Start niet",
+    "restarting": "Start opnieuw",
     "onlyHere": "Draait · alleen op deze {{device}}",
     "onTailnet": "Draait · op je Tailscale-netwerk",
+    "tailnetDown": "Draait · Tailscale is niet verbonden op deze {{device}}",
     "address": "Adres",
     "data": "Gegevens",
     "phone": "Op je telefoon",
@@ -334,20 +340,6 @@
     "stopHereTitle": "agentes.chat stoppen op deze {{device}}?",
     "stopHereBody": "Het stopt nu en start niet meer met de app. De gegevens blijven in {{path}}.",
     "stopHereConfirm": "Stoppen",
-    "notHere": "Draait hier niet. De gegevens staan nog in {{path}}.",
-    "startHere": "Hier starten",
-    "stoppedBanner": "agentes.chat is gestopt op deze {{device}}",
-    "stoppedBody": "Niemand kan het gebruiken tot het weer start.",
-    "failingBanner": "agentes.chat start niet op deze {{device}}",
-    "version": "Versie {{version}}, bijgewerkt met de app",
-    "updatesWithApp": "Als je de app bijwerkt, wordt agentes.chat op deze {{device}} ook bijgewerkt.",
-    "updateBack": "De update is niet gestart. agentes.chat draait weer op {{version}}.",
-    "restarting": "Start opnieuw",
-    "tailnetDown": "Draait · Tailscale is niet verbonden op deze {{device}}",
-    "failingBody": "Open de app om te zien wat er gebeurde en het opnieuw te proberen.",
-    "restartedBanner": "agentes.chat is 3 keer opnieuw gestart op deze {{device}}",
-    "restartedBody": "Het komt vanzelf terug. Blijft het gebeuren, open dan de app om te zien waarom.",
-    "updateBackBody": "De nieuwe versie wordt opnieuw geprobeerd bij de volgende update van de app.",
     "stopFor1h": "1 uur stoppen",
     "startNow": "Nu starten",
     "stopUntilStart": "Stoppen tot ik hem start",
@@ -364,13 +356,39 @@
     "failingWhy": "De details zeggen waarom: kopieer ze voor wie je helpt, of bekijk de logboeken.",
     "showLogs": "Logboeken tonen",
     "help": "Hulp",
-    "gotIt": "Begrepen"
+    "gotIt": "Begrepen",
+    "notHere": "Draait hier niet. De gegevens staan nog in {{path}}.",
+    "startHere": "Hier starten",
+    "stoppedBanner": "agentes.chat is gestopt op deze {{device}}",
+    "stoppedBody": "Niemand kan het gebruiken tot het weer start.",
+    "failingBanner": "agentes.chat start niet op deze {{device}}",
+    "failingBody": "Open de app om te zien wat er gebeurde en het opnieuw te proberen.",
+    "restartedBanner": "agentes.chat is 3 keer opnieuw gestart op deze {{device}}",
+    "restartedBody": "Het komt vanzelf terug. Blijft het gebeuren, open dan de app om te zien waarom.",
+    "version": "Versie {{version}}, bijgewerkt met de app",
+    "updatesWithApp": "Als je de app bijwerkt, wordt agentes.chat op deze {{device}} ook bijgewerkt.",
+    "updateBack": "De update is niet gestart. agentes.chat draait weer op {{version}}.",
+    "updateBackBody": "De nieuwe versie wordt opnieuw geprobeerd bij de volgende update van de app."
   },
   "pair": {
     "title": "Agents van {{org}} laten werken op deze {{device}}?",
     "body": "{{host}} vroeg erom. Ze beginnen zonder mappen van jou en met opdrachten uit.",
     "allow": "Toestaan",
-    "notNow": "Niet nu"
+    "notNow": "Niet nu",
+    "offerTitle": "Agents van {{org}} deze {{device}} laten gebruiken?",
+    "offerBody": "Ze beginnen zonder mappen van jou en met opdrachten uit. Wat ze krijgen kies je in Voorkeuren, en je kunt ze altijd stoppen.",
+    "keepReady": "Klaar houden: agentes.chat openen bij inloggen",
+    "linkTitle": "Deze {{device}} verbinden met {{org}}?",
+    "askedBy": "Gevraagd door",
+    "from": "Van",
+    "linkBody": "De agents van {{org}} beginnen zonder mappen van jou en met opdrachten uit. Heb je hier niet om gevraagd, kies dan Niet nu.",
+    "waiting": "Wachten tot {{by}} hem binnenlaat…",
+    "done": "Verbonden met {{org}}",
+    "expired": "Deze link is verlopen. Maak een nieuwe via Instellingen › Apparaten.",
+    "denied": "{{by}} heeft hem niet binnengelaten. Er is niets veranderd.",
+    "letOrg": "Agents van {{org}} deze {{device}} laten gebruiken",
+    "canUse": "Agents kunnen hem gebruiken",
+    "notUsing": "De agents daarvan gebruiken deze {{device}} niet"
   },
   "tools": {
     "claudeName": "Claude Code",
@@ -448,7 +466,6 @@
     },
     "thisMac": {
       "agents": "Agents",
-      "letAgents": "Agents deze {{device}} laten gebruiken",
       "letAgentsDesc": "Agents gebruiken deze {{device}} als ze die nodig hebben, zolang de app open is.",
       "commandsDesc": "Tests, builds en andere Terminal-opdrachten. Ze draaien als {{user}} en elke opdracht verschijnt in Activiteit.",
       "who": "Wie hem mag gebruiken",
@@ -738,9 +755,5 @@
     "bringAllToFront": "Alles naar voorgrond",
     "help": "Help",
     "downloaded": "Download voltooid"
-  },
-  "windowTitle": {
-    "welcome": "Welkom",
-    "prefs": "Voorkeuren"
   }
 }

@@ -3,11 +3,21 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { TeamTemplate } from "@agenteschat/client";
-import { ApiError } from "@agenteschat/client";
+import type { ApiClient, DirectMessage, TeamTemplate } from "@agenteschat/client";
+import { ApiError, keys } from "@agenteschat/client";
+import { browserTimezone } from "@agenteschat/client/lib/routines";
 import { focusManager } from "@tanstack/react-query";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, type FakeState, GENERAL_ID, LODI_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
+import {
+  ATLAS_ID,
+  createFakeApi,
+  type FakeState,
+  GENERAL_ID,
+  LODI_ID,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
 
@@ -45,6 +55,11 @@ const eyebrow = () => document.querySelector(".onb__eyebrow")?.textContent;
 /** The plan step's card: its button shares the rail step's name, "Ligar o time". */
 const planCard = () => document.querySelector(".onb__plan") as HTMLElement;
 const GREETING = "Oi, eu sou o Lodi. Monto o time com você.";
+/** A new workspace's zone and the person's own in it: this browser's, sent with the workspace. */
+const zones = () => {
+  const zone = browserTimezone();
+  return { timezone: zone ?? "UTC", ...(zone ? { memberTimezone: zone } : {}) };
+};
 
 const draft = (name: string, handle: string, role: string, channel: string) => ({
   name,
@@ -165,7 +180,7 @@ describe("the steps", () => {
     expect(eyebrow()).toBe("Passo 1 de 3");
     await type("Nome", "Ateliê Couto");
     await click(button("Continuar"), 14);
-    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Ateliê Couto" });
+    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Ateliê Couto", ...zones() });
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
     expect(heading()).toBe("O que a Ateliê Couto faz?");
     expect(eyebrow()).toBe("Passo 2 de 3");
@@ -536,7 +551,7 @@ describe("for me (ADR 0159)", () => {
     await click(answer(/^Para mim(?!ha)/), 4);
     expect(screen().queryByLabelText("Nome")).toBeNull();
     await click(button("Continuar"), 16);
-    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal" });
+    expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal", ...zones() });
     const orgId = state.me?.organizations.at(-1)?.id;
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([[orgId, { finished: true }]]);
     expect(router.state.location.pathname).toBe(`/org/${orgId}/dm/agent/${LODI_ID}`);
@@ -553,6 +568,87 @@ describe("for me (ADR 0159)", () => {
     await click(button("Voltar"), 4);
     expect(answer(/Para minha empresa ou time/).getAttribute("aria-checked")).toBe("true");
     expect(calls(state, "orgs.create")).toEqual([]);
+  });
+});
+
+/** Every call the app makes, reads too, in order, as "orgs.create". */
+function recorded(api: ApiClient) {
+  const log: string[] = [];
+  const wrap = <T extends object>(target: T, path: string): T =>
+    new Proxy(target, {
+      get(obj, key, receiver) {
+        const value = Reflect.get(obj, key, receiver);
+        const name = path ? `${path}.${String(key)}` : String(key);
+        if (typeof value === "function")
+          return (...args: unknown[]) => {
+            log.push(name);
+            return value.apply(obj, args);
+          };
+        return value && typeof value === "object" ? wrap(value, name) : value;
+      },
+    });
+  return { api: wrap(api, ""), log };
+}
+
+/**
+ * How long "Abrindo seu workspace" waits is its calls one after another: each is a round trip to the server (#1).
+ */
+describe("opening a new workspace, in round trips", () => {
+  test("For me: one call makes it with both zones, one finishes it and opens Lodi's DM, nobody asked again", async () => {
+    const state = newcomer(false);
+    const { api, log } = recorded(createFakeApi(state));
+    const { router } = await renderApp("/onboarding", { api });
+    await settle(10);
+    await click(answer(/^Para mim(?!ha)/), 4);
+    log.length = 0;
+    const off = router.subscribe("onBeforeNavigate", (e) => {
+      if (e.pathChanged) log.push(`→ ${e.toLocation.pathname}`);
+    });
+    await click(button("Continuar"), 16);
+    off();
+    const orgId = state.me?.organizations.at(-1)?.id;
+    const before = log.slice(0, log.findIndex((c) => c.startsWith("→")) + 1);
+    expect(before[0]).toBe("orgs.create");
+    // Its zones went with it and the answers said who the person is: none of them is asked on its own.
+    expect(before.filter((c) => ["account.me", "orgs.updateSettings", "orgs.updateMe"].includes(c))).toEqual([]);
+    // One call finishes it, and its answer says where it opens.
+    expect(before.slice(-2)).toEqual(["orgs.saveOnboarding", `→ /org/${orgId}/dm/agent/${LODI_ID}`]);
+    expect(state.me?.organizations.at(-1)?.onboarding).toBeUndefined();
+  });
+
+  test("a logo picked first: the workspace, its logo, then who the person is asked again, for the logo", async () => {
+    const state = newcomer(false);
+    const { api, log } = recorded(createFakeApi(state));
+    await renderApp("/onboarding", { api });
+    await settle(10);
+    await forATeam();
+    await click(button("Escolher o logo"), 4);
+    const dialog = screen().getByRole("dialog", { name: "Logo do workspace" });
+    const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    await act(async () =>
+      fireEvent.change(input, { target: { files: [new File(["png-bytes"], "logo.png", { type: "image/png" })] } }),
+    );
+    await settle(3);
+    await click(screen().getByRole("button", { name: "Salvar" }), 6);
+    await type("Nome", "Ateliê Couto");
+    log.length = 0;
+    await click(button("Continuar"), 14);
+    expect(log.slice(0, 5)).toEqual(["orgs.create", "orgs.setLogo", "orgs.settings", "agents.list", "account.me"]);
+    expect(heading()).toBe("O que a Ateliê Couto faz?");
+  });
+
+  test("a conversation opened for the first time shows from its own answer, no list read again for it", async () => {
+    const state = seedState();
+    const { api, log } = recorded(createFakeApi(state));
+    const { services } = await renderApp(`/org/${ORG_ID}/dm/agent/${ATLAS_ID}`, { api });
+    await settle(10);
+    expect(screen().getByRole("heading", { level: 1, name: /Atlas/ })).toBeTruthy();
+    expect(log.filter((c) => c === "dms.open")).toHaveLength(1);
+    expect(log.filter((c) => c === "dms.list")).toHaveLength(1);
+    expect(log.filter((c) => c === "chat.channels")).toHaveLength(1);
+    // In the DM list all the same, where the header's search finds it.
+    const dms = services.queryClient.getQueryData<DirectMessage[]>(keys.dms(ORG_ID)) ?? [];
+    expect(dms.some((d) => d.with.id === ATLAS_ID)).toBe(true);
   });
 });
 

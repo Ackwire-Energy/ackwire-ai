@@ -4,6 +4,10 @@
     "windows": "PC",
     "linux": "komputer"
   },
+  "windowTitle": {
+    "welcome": "Selamat datang",
+    "prefs": "Preferensi"
+  },
   "common": {
     "cancel": "Batal",
     "close": "Tutup",
@@ -80,6 +84,7 @@
     "pauseTomorrow": "Sampai besok pukul 09.00",
     "pauseManual": "Sampai aku melanjutkan",
     "pauseHint": "Yang sudah berjalan tetap selesai seperti biasa.",
+    "pauseHintServer": "Yang sudah berjalan selesai seperti biasa. Server tetap menyala.",
     "resume": "Lanjutkan agen",
     "open": "Buka agentes.chat",
     "prefs": "Preferensi…",
@@ -122,8 +127,7 @@
     "quitTitle": "Keluar dari agentes.chat?",
     "quitBody": "Agen tidak bisa memakai {{device}} ini selama aplikasi tertutup. Yang sudah berjalan akan selesai dan mengirim hasilnya saat kamu membukanya lagi.",
     "quitHereBody": "agentes.chat berhenti di {{device}} ini: tidak ada yang bisa memakainya, di sini, di ponselmu, atau di ponsel rekan timmu, sampai kamu membuka aplikasinya lagi.",
-    "quitConfirm": "Keluar",
-    "pauseHintServer": "Yang sudah berjalan selesai seperti biasa. Server tetap menyala."
+    "quitConfirm": "Keluar"
   },
   "first": {
     "title": "Timmu dan agenmu, bersama",
@@ -135,9 +139,9 @@
     "addTitle": "Tambah ruang kerja",
     "addLead": "Yang sudah kamu punya tetap di sini, masing-masing dengan login sendiri.",
     "addCloud": "Buat ruang kerja di agentes.chat",
-    "addOwn": "Pakai server timmu",
     "addNew": "Mau workspace baru?",
-    "addNewLink": "Buat satu"
+    "addNewLink": "Buat satu",
+    "addOwn": "Pakai server timmu"
   },
   "own": {
     "title": "Servermu sendiri",
@@ -160,26 +164,26 @@
     "looking": "Mencari servermu…",
     "foundTailnet": "Di jaringan Tailscale-mu",
     "foundHere": "agentes.chat berjalan di sini",
-    "use": "Pakai",
-    "none": "Belum punya? Jalankan ini di sana",
-    "noneText": "Di terminal server atau Mac mini. Di akhir, muncul tautan yang menghubungkan aplikasi ini ke sana.",
-    "invalid": "Periksa alamatnya, misalnya agentes.timkamu.ts.net.",
-    "httpRefused": "{{host}} tidak memakai koneksi aman (https), dan hanya server di {{device}} ini yang boleh tanpanya. Pakai alamat https-nya atau alamat Tailscale-nya.",
-    "noOwner": "{{host}} belum punya pemilik. Orang yang memasang server mendapat tautan untuk membuat akun pemilik: buka tautan itu di {{device}} ini atau di ponselmu.",
-    "unreachable": "Kami tidak bisa menjangkau {{host}}. Periksa alamatnya dan pastikan servernya menyala, lalu coba lagi.",
-    "unreachableHere": "Tidak ada yang merespons di {{host}} pada {{device}} ini. Jalankan agentes.chat di sini, lalu coba lagi.",
-    "certificate": "Sertifikat {{host}} tidak valid. Hubungi orang yang mengelola server.",
-    "notAgentes": "{{host}} bukan server agentes.chat. Periksa alamatnya.",
-    "serverTooOld": "{{host}} perlu diperbarui agar bisa dipakai dengan aplikasi ini.",
-    "appTooOld": "Perbarui aplikasi untuk memakai {{host}}.",
     "foundNoOwner": "Menunggu akun pemiliknya",
+    "use": "Pakai",
     "setUp": "Siapkan",
     "noneFound": "Tidak ada server yang ditemukan.",
     "lookAgain": "Cari lagi",
     "tailnetOff": "Tailscale mati di {{device}} ini, jadi server di jaringan Tailscale-mu tidak muncul di sini.",
     "addressHint": "Alamat dengan https, atau alamat Tailscale-nya, yang berakhiran .ts.net.",
     "checkUpdates": "Periksa pembaruan",
-    "unreachableTailnet": "Kami tidak bisa menjangkau {{host}}, yang ada di jaringan Tailscale-mu. Buka Tailscale di {{device}} ini, hubungkan, lalu coba lagi."
+    "none": "Belum punya? Jalankan ini di sana",
+    "noneText": "Di terminal server atau Mac mini. Di akhir, muncul tautan yang menghubungkan aplikasi ini ke sana.",
+    "invalid": "Periksa alamatnya, misalnya agentes.timkamu.ts.net.",
+    "httpRefused": "{{host}} tidak memakai koneksi aman (https), dan hanya server di {{device}} ini yang boleh tanpanya. Pakai alamat https-nya atau alamat Tailscale-nya.",
+    "noOwner": "{{host}} belum punya pemilik. Orang yang memasang server mendapat tautan untuk membuat akun pemilik: buka tautan itu di {{device}} ini atau di ponselmu.",
+    "unreachable": "Kami tidak bisa menjangkau {{host}}. Periksa alamatnya dan pastikan servernya menyala, lalu coba lagi.",
+    "unreachableTailnet": "Kami tidak bisa menjangkau {{host}}, yang ada di jaringan Tailscale-mu. Buka Tailscale di {{device}} ini, hubungkan, lalu coba lagi.",
+    "unreachableHere": "Tidak ada yang merespons di {{host}} pada {{device}} ini. Jalankan agentes.chat di sini, lalu coba lagi.",
+    "certificate": "Sertifikat {{host}} tidak valid. Hubungi orang yang mengelola server.",
+    "notAgentes": "{{host}} bukan server agentes.chat. Periksa alamatnya.",
+    "serverTooOld": "{{host}} perlu diperbarui agar bisa dipakai dengan aplikasi ini.",
+    "appTooOld": "Perbarui aplikasi untuk memakai {{host}}."
   },
   "here": {
     "title": "Jalankan agentes.chat di {{device}} ini",
@@ -240,6 +244,7 @@
       "back": "agentes.chat tidak merespons lagi di {{device}} ini setelah akses dari perangkatmu dimatikan."
     },
     "serveFix": "Pasang Tailscale dari tailscale.com.",
+    "connectTray": "Hubungkan lewat ikonnya di dekat jam.",
     "operatorRun": "Berikan izin itu sekali, di terminal:",
     "turnOn": "Aktifkan",
     "copyDetails": "Salin detail",
@@ -248,14 +253,13 @@
     "notifyFailedBody": "Buka agentes.chat untuk melihat apa yang terjadi.",
     "already": "agentes.chat sudah terpasang di {{device}} ini",
     "alreadyText": "Berjalan sendiri, dipasang dari terminal. Pakai di aplikasi ini.",
+    "alreadyDocker": "Berjalan sendiri, dipasang dengan Docker. Pakai di aplikasi ini.",
     "useIt": "Pakai",
     "notRunning": "agentes.chat terpasang di {{device}} ini, tapi tidak berjalan",
     "notRunningText": "Dipasang dari terminal, di {{path}}. Untuk menjalankannya, jalankan ini di terminal, lalu coba lagi:",
     "running": "agentes.chat sudah berjalan di {{device}} ini",
     "runningText": "Aplikasi ini yang menjalankannya. Buka untuk masuk.",
-    "openIt": "Buka",
-    "connectTray": "Hubungkan lewat ikonnya di dekat jam.",
-    "alreadyDocker": "Berjalan sendiri, dipasang dengan Docker. Pakai di aplikasi ini."
+    "openIt": "Buka"
   },
   "link": {
     "question": "Hubungkan aplikasi ke server ini?",
@@ -293,13 +297,13 @@
     "removed": "{{host}} dihapus dari aplikasi ini",
     "workspaces_other": "{{count}} ruang kerja",
     "signedOut": "Belum masuk",
-    "newsOne": "1 notifikasi baru",
-    "newsMany": "{{n}} notifikasi baru",
     "offline": "Offline sejak {{time}}",
     "signIn": "Masuk",
     "signOut": "Keluar dari server ini",
     "signedOutDone": "Kamu keluar dari {{host}}",
-    "removeFromApp": "Hapus dari aplikasi ini"
+    "removeFromApp": "Hapus dari aplikasi ini",
+    "newsOne": "1 notifikasi baru",
+    "newsMany": "{{n}} notifikasi baru"
   },
   "server": {
     "title": "agentes.chat di {{device}} ini",
@@ -308,8 +312,10 @@
     "stopped": "Berhenti",
     "updating": "Memperbarui",
     "failing": "Gagal dimulai",
+    "restarting": "Memulai ulang",
     "onlyHere": "Berjalan · hanya di {{device}} ini",
     "onTailnet": "Berjalan · di jaringan Tailscale-mu",
+    "tailnetDown": "Berjalan · Tailscale tidak terhubung di {{device}} ini",
     "address": "Alamat",
     "data": "Data",
     "phone": "Di ponselmu",
@@ -331,20 +337,6 @@
     "stopHereTitle": "Hentikan agentes.chat di {{device}} ini?",
     "stopHereBody": "Berhenti sekarang dan tidak lagi dimulai bersama aplikasi. Datanya tetap di {{path}}.",
     "stopHereConfirm": "Hentikan",
-    "notHere": "Tidak berjalan di sini. Datanya masih ada di {{path}}.",
-    "startHere": "Jalankan di sini",
-    "stoppedBanner": "agentes.chat berhenti di {{device}} ini",
-    "stoppedBody": "Tidak ada yang bisa memakainya sampai dijalankan lagi.",
-    "failingBanner": "agentes.chat gagal dimulai di {{device}} ini",
-    "version": "Versi {{version}}, diperbarui bersama aplikasi",
-    "updatesWithApp": "Memperbarui aplikasi juga memperbarui agentes.chat di {{device}} ini.",
-    "updateBack": "Pembaruan tidak berjalan. agentes.chat kembali ke {{version}}.",
-    "restarting": "Memulai ulang",
-    "tailnetDown": "Berjalan · Tailscale tidak terhubung di {{device}} ini",
-    "failingBody": "Buka aplikasinya untuk melihat apa yang terjadi dan mencoba lagi.",
-    "restartedBanner": "agentes.chat dimulai ulang 3 kali di {{device}} ini",
-    "restartedBody": "Ini akan kembali sendiri. Kalau terus terjadi, buka aplikasinya untuk melihat alasannya.",
-    "updateBackBody": "Versi baru akan dicoba lagi pada pembaruan aplikasi berikutnya.",
     "stopFor1h": "Hentikan selama 1 jam",
     "startNow": "Mulai sekarang",
     "stopUntilStart": "Hentikan sampai saya memulainya",
@@ -361,13 +353,39 @@
     "failingWhy": "Detailnya menjelaskan alasannya: salin untuk orang yang membantumu, atau lihat log.",
     "showLogs": "Tampilkan log",
     "help": "Bantuan",
-    "gotIt": "Mengerti"
+    "gotIt": "Mengerti",
+    "notHere": "Tidak berjalan di sini. Datanya masih ada di {{path}}.",
+    "startHere": "Jalankan di sini",
+    "stoppedBanner": "agentes.chat berhenti di {{device}} ini",
+    "stoppedBody": "Tidak ada yang bisa memakainya sampai dijalankan lagi.",
+    "failingBanner": "agentes.chat gagal dimulai di {{device}} ini",
+    "failingBody": "Buka aplikasinya untuk melihat apa yang terjadi dan mencoba lagi.",
+    "restartedBanner": "agentes.chat dimulai ulang 3 kali di {{device}} ini",
+    "restartedBody": "Ini akan kembali sendiri. Kalau terus terjadi, buka aplikasinya untuk melihat alasannya.",
+    "version": "Versi {{version}}, diperbarui bersama aplikasi",
+    "updatesWithApp": "Memperbarui aplikasi juga memperbarui agentes.chat di {{device}} ini.",
+    "updateBack": "Pembaruan tidak berjalan. agentes.chat kembali ke {{version}}.",
+    "updateBackBody": "Versi baru akan dicoba lagi pada pembaruan aplikasi berikutnya."
   },
   "pair": {
     "title": "Izinkan agen {{org}} bekerja di {{device}} ini?",
     "body": "{{host}} yang meminta. Mereka mulai tanpa folder milikmu dan dengan perintah mati.",
     "allow": "Izinkan",
-    "notNow": "Nanti saja"
+    "notNow": "Nanti saja",
+    "offerTitle": "Izinkan agen {{org}} memakai {{device}} ini?",
+    "offerBody": "Mereka mulai tanpa folder milikmu dan perintah mati. Kamu memilih apa yang mereka dapat di Preferensi, dan bisa menghentikan mereka kapan saja.",
+    "keepReady": "Tetap siap: buka agentes.chat saat login",
+    "linkTitle": "Hubungkan {{device}} ini ke {{org}}?",
+    "askedBy": "Diminta oleh",
+    "from": "Dari",
+    "linkBody": "Agen {{org}} mulai tanpa folder milikmu dan perintah mati. Kalau kamu tidak memintanya, pilih Nanti saja.",
+    "waiting": "Menunggu {{by}} mengizinkannya masuk…",
+    "done": "Terhubung ke {{org}}",
+    "expired": "Link ini sudah kedaluwarsa. Buat yang baru di Pengaturan › Perangkat.",
+    "denied": "{{by}} tidak mengizinkannya masuk. Tidak ada yang berubah.",
+    "letOrg": "Izinkan agen {{org}} memakai {{device}} ini",
+    "canUse": "Agen bisa memakainya",
+    "notUsing": "Agennya tidak memakai {{device}} ini"
   },
   "tools": {
     "claudeName": "Claude Code",
@@ -444,7 +462,6 @@
     },
     "thisMac": {
       "agents": "Agen",
-      "letAgents": "Izinkan agen memakai {{device}} ini",
       "letAgentsDesc": "Agen memakai {{device}} ini saat perlu, selama aplikasi terbuka.",
       "commandsDesc": "Tes, build, dan perintah Terminal lainnya. Semuanya berjalan sebagai {{user}}, dan setiap perintah muncul di Aktivitas.",
       "who": "Siapa yang bisa memakai",
@@ -734,9 +751,5 @@
     "bringAllToFront": "Bawa semua ke depan",
     "help": "Bantuan",
     "downloaded": "Unduhan selesai"
-  },
-  "windowTitle": {
-    "welcome": "Selamat datang",
-    "prefs": "Preferensi"
   }
 }

@@ -3,6 +3,8 @@ import type { Expression } from "../agent/engine.js";
 import { addLiveAgent, drawLive, type LiveAgent } from "../agent/live";
 import { cx } from "../cx";
 import { initialsOf } from "../names";
+import { recipeOfUrl } from "../person/engine.js";
+import { canDrawPortraits, PersonPortrait } from "../person/PersonPortrait";
 import { type AgentAppearance, appearanceStyle } from "./AgentLook";
 import { type BadgePresence, PresenceBadge } from "./PresenceBadge";
 
@@ -115,8 +117,8 @@ function AgentBody({
 
 /**
  * One tile for everyone: a rounded square (radius 30% of the side) with a
- * hairline and a faint top highlight. People show their photo or initials in
- * it, with an optional presence badge on the corner. Agents are the living
+ * hairline and a faint top highlight. People show their photo, their pixel
+ * portrait or initials in it, with an optional presence badge on the corner. Agents are the living
  * symbol from the agent engine standing in their own pixel sky: the dithered
  * body with the cut corner, white eyes and a pixel accessory, turning its
  * head, blinking and now and then making a face (see `state` and
@@ -145,6 +147,8 @@ export function Avatar({
   const a11y = labelled ? ({ role: "img", "aria-label": name } as const) : ({ "aria-hidden": true } as const);
   const agent = kind === "agent";
   const mood: AgentState = state ?? (running ? "thinking" : "idle");
+  // A photo that is a drawn portrait (ADR 0166) is drawn here from its recipe, crisp at this size.
+  const portrait = !agent && imageUrl && canDrawPortraits() ? recipeOfUrl(imageUrl) : null;
   return (
     <span
       className={cx(
@@ -175,6 +179,8 @@ export function Avatar({
           reactionKey={reactionKey}
           framed={tile}
         />
+      ) : portrait ? (
+        <PersonPortrait recipe={portrait} />
       ) : imageUrl ? (
         <img src={imageUrl} alt="" />
       ) : (

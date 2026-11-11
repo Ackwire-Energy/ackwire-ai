@@ -2880,8 +2880,6 @@
     "chip": "Memoria actualizada",
     "was": "Antes: {{text}}",
     "open": "Lo que sabe {{name}}",
-    "undo": "Deshacer",
-    "undone": "Deshecho",
     "group": "Memoria actualizada por {{name}}"
   },
   "reach": {
@@ -3036,23 +3034,11 @@
     "someone": "alguien",
     "you": "tú",
     "undo": "Deshacer",
-    "redo": "Rehacer",
-    "undoAll": "Deshacer todo",
     "changes_one": "{{count}} cambio",
     "changes_many": "{{count}} cambios",
     "changes_other": "{{count}} cambios",
     "undoneBy": "Deshecho por {{name}}",
-    "ago": "hace {{time}}",
-    "timeLeft": "Quedan {{time}} para deshacer",
     "group": "Cambios de {{name}}",
-    "undone": "Deshecho.",
-    "redone": "Rehecho.",
-    "undoneAll_one": "{{count}} cambio deshecho.",
-    "undoneAll_many": "{{count}} cambios deshechos.",
-    "undoneAll_other": "{{count}} cambios deshechos.",
-    "partial_one": "No se pudo deshacer {{count}} cambio.",
-    "partial_many": "No se pudieron deshacer {{count}} cambios.",
-    "partial_other": "No se pudieron deshacer {{count}} cambios.",
     "errors": {
       "changed_since": "Alguien cambió esto después. Si lo deshaces ahora, se pierde ese cambio.",
       "expired": "Se acabó el tiempo para deshacer.",
@@ -3702,6 +3688,7 @@
       "ready": "Conectado",
       "syncing": "Sincronizando",
       "reads": "Lee {{label}}",
+      "readOnly": "solo lectura",
       "items_one": "{{count}} elemento",
       "items_other": "{{count}} elementos",
       "synced": "sincronizado {{when}}",
@@ -3750,7 +3737,7 @@
       "onepassword": {
         "step": {
           "1": "Crea en 1Password una bóveda solo para tus agentes y mueve a ella los inicios de sesión que pueden usar",
-          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda",
+          "2": "Crea una cuenta de servicio con acceso solo a esa bóveda (lectura y escritura, si tus agentes van a guardar allí nuevos inicios de sesión)",
           "3": "Pega aquí el token de la cuenta de servicio"
         },
         "field": {
@@ -5658,42 +5645,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "¿Qué hará tu nuevo agente?",
-    "lead": "Dilo en una frase. {{name}} lo prepara y te lo muestra antes de crearlo.",
-    "field": "Qué hace por ti",
-    "placeholder": "Ej.: Ordenar mi agenda y recordarme lo importante",
-    "ideas": "Ideas",
-    "idea": {
-      "agenda": {
-        "label": "Agenda",
-        "text": "Ordenar mi agenda y recordarme mis citas"
-      },
-      "money": {
-        "label": "Finanzas",
-        "text": "Seguir mis cuentas y avisarme antes de que venzan"
-      },
-      "training": {
-        "label": "Entrenamiento",
-        "text": "Planear mis entrenamientos de la semana y ajustarlos a cómo me siento"
-      },
-      "studies": {
-        "label": "Estudios",
-        "text": "Hacerme un plan de estudio y preguntarme lo que aprendí"
-      },
-      "home": {
-        "label": "Casa",
-        "text": "Llevar la lista de compras y las tareas de la casa"
-      },
-      "travel": {
-        "label": "Viajes",
-        "text": "Planear mis viajes: itinerario, reservas y documentos"
-      }
-    },
-    "full": "Prefiero completar todo",
-    "create": "Crear con {{name}}",
-    "message": "Quiero un agente nuevo: {{what}}"
-  },
   "newAgent": {
     "title": "Crear agente",
     "railOrg": "{{org}} · eres {{role}}",
@@ -6057,7 +6008,199 @@
     "and": " y",
     "routine": "Rutina",
     "routineKeep": "Crear la rutina {{name}}",
-    "routineNotMade": "La rutina no se creó: {{reason}}"
+    "routineNotMade": "La rutina no se creó: {{reason}}",
+    "hello": {
+      "clara": "Voy a cuidar tu agenda y recordarte lo importante antes de que sea tarde.",
+      "duda": "Voy a seguir tus cuentas y gastos y avisarte antes de que algo venza.",
+      "leo": "Voy a armar tus entrenamientos y mantenerte en ritmo, a tu manera.",
+      "mel": "Voy a planear tus comidas y la lista de la compra, a tu gusto y a tu bolsillo.",
+      "gabi": "Voy a armar tu plan de estudios y preguntarte sobre lo que aprendiste.",
+      "lu": "Voy a guardar tus notas e ideas y ayudarte a convertirlo todo en texto.",
+      "rosa": "Voy a cuidar la lista de la compra, las tareas de la casa y lo que haya que arreglar.",
+      "vic": "Voy a planear tus viajes: fechas, precios, reservas y el itinerario día a día.",
+      "rui": "Voy a seguir a tus clientes, escribir propuestas y cobros y recordar quién no pagó.",
+      "dev": "Programo, reviso PRs e investigo bugs.",
+      "ops": "Vigilo los errores, las colas y los deploys.",
+      "qa": "Pruebo los flujos y reproduzco los bugs reportados.",
+      "pm": "Organizo las tareas y hago los resúmenes.",
+      "support": "Respondo a los clientes y paso lo que necesita a una persona.",
+      "sales": "Preparo propuestas y doy seguimiento a los interesados.",
+      "marketing": "Planeo campañas, posts y páginas del sitio.",
+      "content": "Escribo y reviso textos, artículos y newsletters.",
+      "data": "Respondo preguntas con números y armo informes.",
+      "finance": "Sigo los pagos, los cobros y los gastos.",
+      "people": "Ayudo con contrataciones, bienvenidas y dudas del equipo.",
+      "research": "Investigo un tema y entrego un resumen con fuentes.",
+      "assistant": "Me encargo de la agenda, los correos y los recordatorios."
+    },
+    "starters": {
+      "clara": {
+        "instructions": "Revisa la agenda cada mañana y envía lo que hay en el día.\nRecuerda la víspera de cada cita y de cada cuenta con fecha.\nNunca agenda, cancela ni acepta invitaciones sin preguntar antes.",
+        "tasks": {
+          "a": "¿Qué tengo mañana?",
+          "b": "Recuérdame pagar el alquiler cada día 5",
+          "c": "Mándame mi agenda todos los días a las 7"
+        }
+      },
+      "duda": {
+        "instructions": "Lleva las cuentas y los gastos, separados por categoría.\nAvisa tres días antes de que algo venza y cuando un gasto se sale de lo normal.\nNunca paga, transfiere ni cancela nada sin preguntar antes.",
+        "tasks": {
+          "a": "¿Cuánto gasté este mes?",
+          "b": "¿Qué cuentas vencen esta semana?",
+          "c": "Ordena estos gastos por categoría"
+        }
+      },
+      "leo": {
+        "instructions": "Arma los entrenamientos según tu nivel, el tiempo que tienes y lo que te gusta.\nAjusta la semana cuando faltas o necesitas descansar, sin sermones.\nNo da consejos médicos: con dolor o lesión, sugiere ver a un profesional.",
+        "tasks": {
+          "a": "Arma un entrenamiento de 30 minutos para hoy",
+          "b": "Planea mi semana de carrera",
+          "c": "Mándame el entrenamiento del día cada mañana"
+        }
+      },
+      "mel": {
+        "instructions": "Planifica las comidas de la semana según tu gusto, tu tiempo y tu presupuesto.\nArma la lista de la compra del menú, agrupada por sección del súper.\nRespeta restricciones y alergias, y no da dietas ni consejos médicos.",
+        "tasks": {
+          "a": "Sugiere tres cenas rápidas",
+          "b": "Arma el menú de la semana",
+          "c": "Haz la lista de la compra del menú"
+        }
+      },
+      "gabi": {
+        "instructions": "Arma el plan de estudio hasta el examen, con lo que cabe en cada día.\nTe hace preguntas sobre lo que estudiaste y vuelve a explicar lo que fallaste.\nNo hace la tarea por ti: te guía hasta la respuesta.",
+        "tasks": {
+          "a": "Arma un plan de estudios para el examen",
+          "b": "Hazme 3 preguntas sobre lo que estudié",
+          "c": "Explica este tema de forma sencilla"
+        }
+      },
+      "lu": {
+        "instructions": "Guarda las notas e ideas que le mandas y junta las parecidas.\nConvierte las notas en texto con tu tono, sin inventar lo que no dijiste.\nRevisa con cuidado y muestra lo que cambió antes de reemplazar el original.",
+        "tasks": {
+          "a": "Convierte estas notas en un texto corto",
+          "b": "Junta las ideas de la semana",
+          "c": "Revisa este texto"
+        }
+      },
+      "rosa": {
+        "instructions": "Mantiene al día la lista de la compra y las tareas de casa.\nAnota lo que hay que arreglar y lo recuerda hasta que se resuelva.\nNunca compra ni contrata nada sin preguntar antes.",
+        "tasks": {
+          "a": "Arma la lista de la compra de la semana",
+          "b": "¿Qué hay que arreglar en casa?",
+          "c": "Reparte las tareas de la casa"
+        }
+      },
+      "vic": {
+        "instructions": "Planifica el viaje con fechas, precios y un itinerario día a día.\nCompara vuelos y alojamientos y dice por qué sugiere cada uno.\nNunca reserva ni paga nada sin preguntar antes.",
+        "tasks": {
+          "a": "Planea 3 días en Lisboa",
+          "b": "Avísame si baja el pasaje",
+          "c": "Junta las reservas del viaje"
+        }
+      },
+      "rui": {
+        "instructions": "Sigue a cada cliente: lo acordado, lo que falta y quién no ha pagado.\nEscribe propuestas y recordatorios de cobro con tu tono, listos para revisar.\nNunca envía nada a un cliente sin tu aprobación.",
+        "tasks": {
+          "a": "Escribe una propuesta corta para un cliente",
+          "b": "¿Quién no ha pagado todavía?",
+          "c": "¿Qué espera hoy cada cliente?"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "Nuevo agente",
+    "lead": "Elige a la izquierda y ajusta a la derecha. Puedes cambiarlo todo después.",
+    "list": "Puntos de partida",
+    "zero": "Desde cero",
+    "zeroSub": "Tú dices lo que hace",
+    "import": "Traer agentes de otra app",
+    "hi": "Hola, soy",
+    "hiBlank": "Hola, soy",
+    "name": "Nombre",
+    "namePlaceholder": "nombre",
+    "what": "Lo que hace",
+    "whatPlaceholder": "¿Qué voy a hacer por ti?",
+    "look": "Apariencia",
+    "lookDone": "Listo",
+    "shuffle": "Sortear",
+    "handle": "En el chat: @{{handle}}",
+    "handleRole": "En el chat: @{{handle}} · {{role}}",
+    "handleTaken": "En el chat: @{{handle}} · ya hay un {{name}} aquí",
+    "handleTaken_female": "En el chat: @{{handle}} · ya hay una {{name}} aquí",
+    "handleBlank": "La @ para llamarlo en el chat viene del nombre",
+    "similar": "Parecido a {{name}}, que ya viene listo.",
+    "similar_female": "Parecida a {{name}}, que ya viene lista.",
+    "similarAction": "Empezar con {{name}}",
+    "uses": "Va a usar",
+    "chooseApps": "Elegir apps",
+    "otherApp": "Otra app",
+    "usesNone": "Nada por ahora.",
+    "worksIn": "Trabaja en",
+    "how": "Cómo trabaja {{name}}",
+    "howBlank": "Cómo trabaja",
+    "instructionsPlaceholder": "Qué hace, qué evita, a quién pide ayuda",
+    "picker": {
+      "title": "Apps de {{name}}",
+      "titleBlank": "Apps del agente",
+      "lead": "Una app conectada entra en la tarjeta al momento. Las demás las conectas aquí mismo.",
+      "suggested": "Sugeridas para {{name}}",
+      "suggestedBlank": "Sugeridas",
+      "use": "Usar",
+      "added": "En la tarjeta"
+    },
+    "create": "Crear a {{name}}",
+    "createBlank": "Crear agente",
+    "failed": "No se pudo crear: {{reason}}",
+    "level": {
+      "read": "Lee",
+      "write": "Lee y escribe"
+    },
+    "app": {
+      "lead": "Hasta dónde llega {{name}} en {{app}}.",
+      "leadBlank": "Hasta dónde llega en {{app}}.",
+      "read": "Leer",
+      "readDesc": "Ve lo que hay en {{app}}. No cambia nada.",
+      "write": "Leer y escribir",
+      "writeDesc": "También crea y edita en {{app}}.",
+      "asks": "{{actions}} siempre piden tu aprobación, en cualquier nivel.",
+      "asksAny": "Enviar, borrar y pagar siempre piden tu aprobación, en cualquier nivel.",
+      "remove": "Quitar {{app}}",
+      "done": "Listo"
+    },
+    "band": {
+      "label": "Lo que {{name}} necesita para empezar",
+      "ai": "Una IA para pensar",
+      "asleep": "Duerme hasta tener una IA"
+    },
+    "skills": "Skills",
+    "skillsHelpBlank": "Manuales que abre cuando los necesita.",
+    "chooseSkills": "Elegir skills",
+    "otherSkill": "Otra skill",
+    "namesLead": "Qué tal",
+    "namesRoll": "Otros nombres",
+    "skill": {
+      "opens": "{{name}} abre este manual cuando aparece el tema. Lo editas en Skills.",
+      "opensBlank": "Abre este manual cuando aparece el tema. Lo editas en Skills.",
+      "remove": "Quitar a {{name}}",
+      "removeBlank": "Quitar del agente",
+      "done": "Listo"
+    },
+    "names": {
+      "agenda": "Lía, Hora, Tere, Dora, Tito, Ema",
+      "agendaWords": "agenda, cita, recorda, reunion, reunión, horario, consulta",
+      "money": "Cuca, Nico, Moni, Ciro, Lara, Peso",
+      "moneyWords": "cuenta, gasto, dinero, finanz, factura, pagar",
+      "travel": "Ruta, Malú, Ravi, Vic, Nara, Tom",
+      "travelWords": "viaj, pasaje, vuelo, hotel, itinerario, vacacion",
+      "training": "Leo, Bea, Rayo, Kai, Nina, Davi",
+      "trainingWords": "entren, corr, gimnasio, ejercicio",
+      "study": "Gabi, Nilo, Sofía, Teo, Iris, Benji",
+      "studyWords": "estudi, examen, curso, aprend",
+      "clients": "Rui, Ana, Beto, Lis, Otto, Cleo",
+      "clientsWords": "client, venta, propuesta, cobro",
+      "any": "Sol, Lía, Teo, Bea, Nino, Iara, Caio, Luma, Gil, Rafa, Nara, Tom"
+    }
   },
   "members": {
     "column": {
@@ -6915,20 +7058,19 @@
     "statusLabel": "Estado",
     "due": "Fecha límite",
     "noDue": "Sin fecha límite",
-    "seeCalendar": "ver en el calendario",
+    "seeCalendar": "Ver en el calendario",
     "removeDue": "Quitar la fecha límite",
     "links": "Vinculado",
     "prBy": "PR #{{number}} · abierto por {{name}}",
     "artifactBy": "{{title}} ({{name}})",
-    "noLinks": "Todavía no hay nada vinculado.",
     "github": {
       "label": "Enlace de GitHub",
       "placeholder": "Enlace del issue o PR",
       "invalid": "Ese no es el enlace de un issue o pull request de GitHub.",
-      "remove": "Quitar el enlace de GitHub"
+      "remove": "Quitar el enlace de GitHub",
+      "add": "Añadir un enlace de GitHub"
     },
     "openConversation": "Ver conversación",
-    "labels": "Etiquetas",
     "tabs": {
       "label": "Partes de la tarea",
       "details": "Detalles",
@@ -8820,6 +8962,8 @@
     },
     "upcoming": "Próximos",
     "upcomingEmpty": "No hay nada próximo.",
+    "owners": "Agentes y personas",
+    "showOwner": "Mostrar a {{name}}",
     "viewZone": "Zona horaria del calendario",
     "miniMonth": "Elige un día",
     "new": "Nuevo evento",
@@ -8845,12 +8989,6 @@
         "declined": "No vas."
       }
     },
-    "kind": {
-      "event": "Evento",
-      "routine": "Rutina",
-      "reminder": "Recordatorio",
-      "deadline": "Fecha de entrega de tarea"
-    },
     "every": {
       "hour": "cada hora",
       "hours": "cada {{count}} h",
@@ -8860,26 +8998,21 @@
     "runs_one": "{{count}} ejecución en estos días.",
     "runs_many": "{{count}} ejecuciones en estos días.",
     "runs_other": "{{count}} ejecuciones en estos días.",
-    "routineDetail": "Rutina de {{agent}} · entrega en {{target}}.",
+    "routineDetail": "Rutina · entrega en {{target}}",
     "deadlineDetail": "La tarea vence.",
     "reminderBy": "Creado por {{name}}",
-    "reminderPosted": "Publicado por {{agent}} · {{target}}",
+    "reminderPosted": "Recordatorio · se publica en {{target}}",
     "cancelReminder": "Cancelar recordatorio",
     "reminderCancelled": "Recordatorio cancelado",
     "openIssue": "Abrir tarea",
     "openRoutines": "Ver en Rutinas",
     "openRoutine": "Abrir rutina",
     "runAria": "Rutina {{name}}, {{time}}",
-    "runsAria": "{{count}} rutinas a las {{time}}: {{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "Rutinas a las {{time}}",
-    "runsOn": "Rutinas · {{day}}",
-    "runsCount_one": "{{count}} ejecución de rutina",
-    "runsCount_many": "{{count}} ejecuciones de rutinas",
-    "runsCount_other": "{{count}} ejecuciones de rutinas",
-    "dayRunsAria_one": "{{count}} ejecución de rutina el {{day}}: {{names}}",
-    "dayRunsAria_many": "{{count}} ejecuciones de rutinas el {{day}}: {{names}}",
-    "dayRunsAria_other": "{{count}} ejecuciones de rutinas el {{day}}: {{names}}",
+    "moreRuns_one": "+{{count}} rutina",
+    "moreRuns_many": "+{{count}} rutinas",
+    "moreRuns_other": "+{{count}} rutinas",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "respondió",
@@ -9636,6 +9769,193 @@
     "removed": "Foto quitada.",
     "notImage": "Elige una imagen (JPG, PNG o WebP).",
     "tooBig": "La imagen pesa más de 8 MB."
+  },
+  "portrait": {
+    "ask": {
+      "title": "¿Cómo quieres aparecer?",
+      "build": "Crear un avatar",
+      "buildText": "Un retrato en píxeles a tu manera: cabello, ropa, accesorios.",
+      "photo": "Subir una foto",
+      "photoText": "Elige una imagen de tu computadora y encuádrala."
+    },
+    "title": "Tu avatar",
+    "preview": "Tu avatar",
+    "shuffle": "Aleatorio",
+    "small": "En tamaños pequeños, el chat muestra solo la cara.",
+    "photoAsk": "¿Prefieres una foto?",
+    "photoUpload": "Subir foto",
+    "saved": "Avatar actualizado.",
+    "failed": "No se pudo guardar el avatar. Inténtalo de nuevo.",
+    "showAll": "Mostrar todas las opciones",
+    "showFewer": "Mostrar menos opciones",
+    "beardHint": "La barba sigue el color del pelo.",
+    "hatsHint": "La gorra, el gorro, el sombrero y el pañuelo cubren el pelo.",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "Rasgos",
+      "m": "Masculino",
+      "f": "Femenino"
+    },
+    "tabs": {
+      "label": "Partes del avatar",
+      "face": "Cara",
+      "hair": "Pelo",
+      "beard": "Barba",
+      "makeup": "Maquillaje",
+      "marks": "Marcas",
+      "accessories": "Accesorios",
+      "clothes": "Ropa",
+      "background": "Fondo"
+    },
+    "sections": {
+      "skin": "Tono de piel",
+      "eyes": "Color de ojos",
+      "mood": "Expresión",
+      "color": "Color",
+      "hairColor": "Color de pelo",
+      "clothesColor": "Color de la ropa",
+      "cut": "Corte",
+      "beard": "Barba",
+      "lips": "Labial",
+      "shadow": "Sombra de ojos",
+      "blush": "Rubor",
+      "mark": "Marcas",
+      "glasses": "Lentes",
+      "ear": "Aretes",
+      "neck": "En el cuello",
+      "extra": "En la cabeza",
+      "piece": "Prenda",
+      "bg": "Fondo"
+    },
+    "options": {
+      "mood": {
+        "smile": "Sonrisa",
+        "grin": "Gran sonrisa",
+        "laugh": "Riendo",
+        "calm": "Calma",
+        "wink": "Guiño",
+        "wow": "Sorpresa"
+      },
+      "hair": {
+        "none": "Sin pelo",
+        "buzz": "Rapado",
+        "short": "Corto",
+        "side": "Raya al lado",
+        "quiff": "Tupé",
+        "curly": "Rizado",
+        "afro": "Afro",
+        "bob": "Bob",
+        "bangs": "Flequillo",
+        "long": "Largo",
+        "wavy": "Ondulado",
+        "curls": "Rizos largos",
+        "bun": "Recogido",
+        "pony": "Cola de caballo",
+        "spiky": "De punta",
+        "mohawk": "Mohicano",
+        "braids": "Trenzas",
+        "pigtails": "Coletas",
+        "crew": "Militar",
+        "fade": "Degradado",
+        "slick": "Hacia atrás",
+        "flat": "Plano",
+        "undercut": "Undercut",
+        "mullet": "Mullet",
+        "dreads": "Rastas",
+        "medium": "Medio",
+        "receding": "Entradas"
+      },
+      "beard": {
+        "none": "Sin barba",
+        "stubble": "Barba de tres días",
+        "mustache": "Bigote",
+        "goatee": "Perilla",
+        "strap": "Barba delineada",
+        "full": "Completa",
+        "long": "Larga"
+      },
+      "lips": {
+        "none": "Sin labial",
+        "nude": "Nude",
+        "pink": "Rosa",
+        "red": "Rojo",
+        "wine": "Vino",
+        "purple": "Morado",
+        "black": "Negro"
+      },
+      "shadow": {
+        "none": "Sin sombra",
+        "rose": "Rosa",
+        "violet": "Violeta",
+        "blue": "Azul",
+        "green": "Verde",
+        "gold": "Dorado",
+        "smoky": "Ahumado"
+      },
+      "blush": {
+        "soft": "Suave",
+        "strong": "Intenso",
+        "none": "Sin rubor"
+      },
+      "mark": {
+        "none": "Ninguna",
+        "freckles": "Pecas",
+        "mole": "Lunar",
+        "scar": "Cicatriz",
+        "bandaid": "Curita",
+        "piercing": "Piercing"
+      },
+      "glasses": {
+        "none": "Sin lentes",
+        "round": "Redondos",
+        "square": "Cuadrados",
+        "gold": "Dorados",
+        "tinted": "Tintados",
+        "shades": "Lentes de sol"
+      },
+      "ear": {
+        "none": "Sin aretes",
+        "studs": "Dorados pequeños",
+        "pearls": "Perlas",
+        "hoops": "Aros",
+        "drops": "Colgantes"
+      },
+      "neck": {
+        "none": "Nada",
+        "necklace": "Collar",
+        "pearls": "Perlas",
+        "choker": "Gargantilla",
+        "bowtie": "Corbatín",
+        "muffler": "Bufanda"
+      },
+      "extra": {
+        "none": "Nada",
+        "headband": "Diadema",
+        "bandana": "Bandana",
+        "bow": "Moño",
+        "flower": "Flor",
+        "headphones": "Audífonos",
+        "cap": "Gorra",
+        "beanie": "Gorro de lana",
+        "hat": "Sombrero",
+        "crown": "Corona",
+        "scarf": "Pañuelo"
+      },
+      "clothes": {
+        "tee": "Camiseta",
+        "vneck": "Cuello en V",
+        "tank": "Sin mangas",
+        "shirt": "Camisa",
+        "suit": "Traje",
+        "blazer": "Blazer",
+        "jacket": "Chaqueta",
+        "hoodie": "Sudadera",
+        "turtle": "Cuello alto",
+        "overall": "Overol",
+        "polo": "Polo",
+        "dress": "Vestido"
+      }
+    }
   },
   "orgLogo": {
     "label": "Logo",
@@ -11098,7 +11418,7 @@
       "close": "Cerrar detalles",
       "can": "Lo que podrán hacer los agentes",
       "afterText": "Ningún agente lo usa hasta que tú elijas.",
-      "allText": "Una vez conectado, todos los agentes pueden usarlo. Después eliges el acceso de cada agente.",
+      "allText": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
       "addAccount": "Agregar otra cuenta",
       "accountsText": "Cada cuenta tiene sus propios agentes y niveles.",
       "reconnect": "Volver a conectar",
@@ -11899,11 +12219,10 @@
     "notApproved": "{{name}} solo deja iniciar sesión a las apps que aprobó, y agentes.chat todavía no está aprobado. Si te da una clave de API, puedes conectarlo con ella.",
     "serverSaid": "El servidor respondió: {{detail}}",
     "nothingYet": "Nada queda disponible para los agentes hasta el paso 3.",
-    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes cambiarlo en el paso 3.",
-    "newAccount": "La cuenta nueva empieza sin agentes, salvo los que tienen acceso a todo. Tú eliges en el paso 3.",
+    "allCanUse": "Una vez conectado, todos los agentes pueden usarlo. Puedes ajustarlo después.",
     "replace": "Reemplaza el inicio de sesión actual. Quién lo usa sigue igual.",
     "replaceUnchecked": "Inicia sesión en la misma cuenta que antes. No podemos comprobar cuál es, y quién la usa sigue igual.",
-    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo. Empieza sin agentes, salvo los que tienen acceso a todo.",
+    "newAccountUnchecked": "Inicia sesión en una cuenta que todavía no esté conectada, no podemos comprobarlo.",
     "addTitle": "Otra cuenta de {{name}}",
     "reconnectTitle": "Volver a conectar {{name}}",
     "accountName": "Nombre de esta cuenta",
@@ -11929,7 +12248,17 @@
     "grant": "Dar acceso",
     "saved_one": "{{name}}: {{count}} agente puede usarlo.",
     "saved_many": "{{name}}: {{count}} agentes pueden usarlo.",
-    "saved_other": "{{name}}: {{count}} agentes pueden usarlo."
+    "saved_other": "{{name}}: {{count}} agentes pueden usarlo.",
+    "done": {
+      "title": "{{name}} conectado",
+      "everyone": "Todos los agentes pueden usarlo.",
+      "waiting": "Los agentes solo reciben las herramientas cuando continúes, con los niveles que sugerimos.",
+      "asks_one": "{{count}} acción pide aprobación en el chat.",
+      "asks_many": "{{count}} acciones piden aprobación en el chat.",
+      "asks_other": "{{count}} acciones piden aprobación en el chat.",
+      "adjust": "Ajustar",
+      "ok": "Listo"
+    }
   },
   "database": {
     "name": "Base de datos",
@@ -13334,10 +13663,26 @@
     },
     "computer": {
       "title": "Conectar otra computadora",
-      "step1": "Descarga la app en ella:",
-      "step2": "Ábrela e inicia sesión en {{org}}.",
-      "step3": "Activa Permitir que los agentes usen esta computadora.",
-      "orLine": "O pega una línea en su terminal"
+      "step1": "Instala la app de agentes.chat en ella:",
+      "step2": "Ábrela e inicia sesión con tu cuenta.",
+      "step3": "Haz clic en Permitir cuando pregunte si los agentes de {{org}} pueden usarla.",
+      "shows": "Aparece aquí sola, solo para ti hasta que la compartas.",
+      "waiting": "Esperando una computadora tuya…",
+      "connected": "Conectada: {{name}}",
+      "orLine": "O pega una línea en su terminal",
+      "noApp": "¿No puedes instalar la app en ella? Usa una línea en la terminal"
+    },
+    "thisApp": {
+      "text": "La app de agentes.chat la conecta con un clic, y te pregunta antes.",
+      "open": "Abrir la app de agentes.chat",
+      "browserAsks": "Tu navegador pregunta si puede abrirla: elige Abrir, y Permitir siempre si lo ofrece.",
+      "noApp": "¿No tienes la app?",
+      "afterInstall": "Después de instalarla, vuelve a pulsar Abrir la app de agentes.chat. El enlace funciona una vez, durante 10 minutos.",
+      "waiting": "Esperando la app en esta computadora…",
+      "expired": "Este enlace venció.",
+      "again": "Generar un enlace nuevo",
+      "failed": "No se pudo generar el enlace. Inténtalo de nuevo en un momento.",
+      "server": "¿Un servidor? Usa una línea en la terminal"
     },
     "link": {
       "serverTitle": "Conectar un servidor",
@@ -15066,6 +15411,8 @@
         "sendingDm": "Envió un mensaje directo",
         "settingStatus": "Actualizó su estado",
         "settingReplyStyle": "Ajustó cómo responde",
+        "sendingFeedback": "Pidió enviar comentarios",
+        "offeringFeedback": "Ofreció informar de un problema",
         "deletingRoutine": "Borró una rutina",
         "runningRoutine": "Ejecutó una rutina ahora",
         "proposingTeam": "Propuso un equipo",
@@ -15178,6 +15525,8 @@
       "sendingDm": "enviando un mensaje directo",
       "settingStatus": "actualizando su estado",
       "settingReplyStyle": "ajustando cómo responde",
+      "sendingFeedback": "preparando comentarios",
+      "offeringFeedback": "preparando un informe",
       "deletingRoutine": "borrando una rutina",
       "runningRoutine": "ejecutando una rutina ahora",
       "proposingTeam": "proponiendo un equipo",
@@ -16051,6 +16400,7 @@
     "suspended": "Este espacio de trabajo no está disponible por ahora.",
     "createRefused": "No puedes crear un espacio de trabajo ahora.",
     "createUnpaid": "Ya tienes un espacio de trabajo esperando un plan de agentes.chat. Elige su plan antes de crear otro.",
+    "createUnpaidOpen": "Abrir {{name}}",
     "createInactive": "Ya tienes un espacio de trabajo que aún no está activo, así que por ahora no puedes crear otro.",
     "agentPaused": "Este agente está en pausa por ahora.",
     "onHold": "Este espacio de trabajo está en espera: {{reason}}",
@@ -17751,6 +18101,24 @@
     "send": "Enviar",
     "thanks": "Entregado. Gracias.",
     "reply": "Se lee todo. La respuesta, si hace falta, llega a {{email}}.",
-    "another": "Enviar otro"
+    "another": "Enviar otro",
+    "offer": {
+      "group": "Informe sobre la app",
+      "ready": "<b>Informe listo</b>: {{summary}}",
+      "goesCloud": "Va a tu nombre al equipo de agentes.chat",
+      "goesServer": "Va a tu nombre a quien administra este servidor",
+      "see": "Ver el informe",
+      "hide": "Cerrar el informe",
+      "send": "Enviar",
+      "notNow": "Ahora no",
+      "answer": "La respuesta llega a tu correo.",
+      "sentCloud": "<b>Informe enviado</b> al equipo de agentes.chat",
+      "sentServer": "<b>Informe enviado</b> a quien administra este servidor",
+      "sentAuto": "<b>Informe enviado sin preguntar</b>: {{summary}}",
+      "view": "Ver",
+      "always": "Enviar siempre",
+      "alwaysOn": "De ahora en adelante, informes como este salen sin preguntar.",
+      "askFirst": "Preguntar antes de enviar"
+    }
   }
 }

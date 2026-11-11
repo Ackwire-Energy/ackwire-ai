@@ -16,6 +16,8 @@ export interface ServerWorkspace {
   logo: string | null;
   unread: number;
   waiting: number;
+  /** The person may pair a computer with it (`pair_computers`). Absent in older apps. */
+  pair?: boolean;
 }
 
 /** A server's workspaces; `signedIn` false lists none (signed out there). */
@@ -27,6 +29,8 @@ export interface ServerWorkspaces {
   offlineSince?: number;
   /** The server the app runs on this computer (also at its Tailscale address). Absent in older apps. */
   here?: boolean;
+  /** Agents of its workspaces may work on this computer (not a server on this computer itself). */
+  agentsHere?: boolean;
 }
 
 /** agentes.chat, a server on this computer, one on the person's Tailscale network, or one elsewhere. */

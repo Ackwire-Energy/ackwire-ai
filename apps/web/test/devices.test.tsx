@@ -1,16 +1,24 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ENG_ID, fakeDevicesOf, fakeMachinesOf } from "./fake-api";
 import { notification } from "./fakes/notifications";
-import { acmeDevices, acmeState, IMAC, IPHONE, LIA, MAC, ORG_ID, PIXEL, RUI } from "./fixtures/devices";
+import { ANA, acmeDevices, acmeState, IMAC, IPHONE, LIA, MAC, ORG_ID, PIXEL, RUI } from "./fixtures/devices";
 import { renderApp, screen, settle, showIn } from "./render";
+
+let home: string | undefined;
+/** The address this page is open at: the desktop app takes a pair link of an https server only. */
+const servedAt = (url: string) => {
+  home ??= domWindow().location.href;
+  domWindow().happyDOM.setURL(url);
+};
 
 afterEach(() => {
   cleanup();
+  if (home) domWindow().happyDOM.setURL(home);
 });
 
 const click = async (el: Element) => {
@@ -141,6 +149,94 @@ describe("Connect a device", () => {
       audience: { mode: "everyone", userIds: [], roleIds: [] },
     });
     expect(screen().getByRole("dialog", { name: "ci-runner is connected" })).toBeTruthy();
+  });
+
+  test("the computers: this one, another one, a server or VPS", async () => {
+    await open(`/org/${ORG_ID}/settings/devices`);
+    await click(screen().getByRole("button", { name: "Connect a device" }));
+    const computers = screen().getByRole("region", { name: "Computers" });
+    expect([...computers.querySelectorAll(".dv-option__title")].map((n) => n.textContent)).toEqual([
+      "This computer",
+      "Another computer",
+      "A server or VPS",
+    ]);
+    // Served over plain http here: the app wouldn't take a link to it, so this computer gets its one line.
+    await click(screen().getByRole("button", { name: /This computer/ }));
+    const line = screen().getByRole("dialog", { name: "Connect a computer" });
+    expect(within(line).queryByRole("link", { name: "Open the agentes.chat app" })).toBeNull();
+  });
+
+  test("this computer, from a browser: the app opens a link to this server, asks to join, the maker lets it in", async () => {
+    servedAt("https://app.agentes.chat/");
+    const { state, devices, services } = await open(`/org/${ORG_ID}/settings/devices`);
+    await click(screen().getByRole("button", { name: "Connect a device" }));
+    await click(screen().getByRole("button", { name: /This computer/ }));
+    const dialog = screen().getByRole("dialog", { name: "This computer" });
+    expect(calls(state, "devices.createLink")[0]?.args).toEqual([ORG_ID, "computer"]);
+    const app = within(dialog).getByRole("link", { name: "Open the agentes.chat app" });
+    expect(app.getAttribute("href")).toBe("agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=7KQ2-M9X1");
+    expect(dialog.textContent).toContain("Waiting for the app on this computer…");
+    expect(within(dialog).getByRole("heading", { name: "Don't have the app?" })).toBeTruthy();
+    expect(dialog.textContent).toContain("After installing, press Open the agentes.chat app again.");
+
+    devices.setLink({ status: "asking", request: acmeDevices().requests[0] });
+    await refetch(services);
+    const asking = screen().getByRole("dialog", { name: "ci-runner wants to join Acme" });
+    await click(within(asking).getByRole("button", { name: "Let it join" }));
+    // This computer is the maker's own until they share it.
+    expect(calls(state, "devices.approveRequest")[0]?.args[2]).toEqual({
+      name: "ci-runner",
+      audience: { mode: "owner", userIds: [], roleIds: [] },
+    });
+  });
+
+  test("this computer without the app: one line for its terminal, or a server's", async () => {
+    servedAt("https://app.agentes.chat/");
+    await open(`/org/${ORG_ID}/settings/devices`);
+    await click(screen().getByRole("button", { name: "Connect a device" }));
+    await click(screen().getByRole("button", { name: /This computer/ }));
+    await click(screen().getByRole("button", { name: "Or paste one line in its terminal" }));
+    const line = screen().getByRole("dialog", { name: "Connect a computer" });
+    expect(line.querySelector("code")?.textContent).toMatch(
+      /^curl -fsSL https:\/\/app\.agentes\.chat\/i\/7KQ2-M9X\d \| sh$/,
+    );
+    await click(within(line).getByRole("button", { name: "Back" }));
+    await click(screen().getByRole("button", { name: /This computer/ }));
+    await click(screen().getByRole("button", { name: "A server? Use a terminal line" }));
+    expect(screen().getByRole("dialog", { name: "Connect a server" })).toBeTruthy();
+  });
+
+  test("another computer: the app on it, signed in as me, then Connected once a computer of mine shows up", async () => {
+    const { devices, services } = await open(`/org/${ORG_ID}/settings/devices`);
+    await click(screen().getByRole("button", { name: "Connect a device" }));
+    await click(screen().getByRole("button", { name: /Another computer/ }));
+    const dialog = screen().getByRole("dialog", { name: "Connect another computer" });
+    expect(dialog.textContent).toContain("Open it and sign in as yourself.");
+    expect(dialog.textContent).toContain("Click Allow when it asks to let Acme's agents use it.");
+    expect(dialog.textContent).toContain("Waiting for a computer of yours…");
+
+    const list = acmeDevices();
+    const mac = list.devices.find((d) => d.id === MAC);
+    if (!mac) throw new Error("no Mac");
+    // Someone else's new computer isn't the one this dialog waits for.
+    devices.set({
+      ...list,
+      devices: [...list.devices, { ...mac, id: "m-ana-new", name: "Ana's laptop", ownerUserId: ANA, phones: [] }],
+    });
+    await refetch(services);
+    expect(dialog.textContent).toContain("Waiting for a computer of yours…");
+    devices.set({
+      ...list,
+      devices: [...list.devices, { ...mac, id: "m-sam-new", name: "Sam's Mac mini", phones: [] }],
+    });
+    await refetch(services);
+    expect(dialog.textContent).toContain("Connected: Sam's Mac mini");
+    expect(within(dialog).getByRole("link", { name: "Open its page" }).getAttribute("href")).toBe(
+      `/org/${ORG_ID}/settings/devices/m-sam-new`,
+    );
+    expect(within(dialog).getByRole("button", { name: "Done" })).toBeTruthy();
+    await click(within(dialog).getByRole("button", { name: "Can't install the app on it? Use a terminal line" }));
+    expect(screen().getByRole("dialog", { name: "Connect a computer" })).toBeTruthy();
   });
 
   test("an Android phone: the computer's live checklist, Allow on the phone, then connected", async () => {

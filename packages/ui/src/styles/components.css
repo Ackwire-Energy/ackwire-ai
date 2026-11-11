@@ -982,6 +982,13 @@ textarea.ac-input {
   object-fit: cover;
   border-radius: inherit;
 }
+/* A person's pixel portrait: drawn a little larger than its box (whole pixels per cell) and scaled down to it. */
+.ac-portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
 /* The initials' box trimmed to their capitals, so the tile centres the letters the eye sees, not the line around them
    (a line's room above and below the capitals differs, and its baseline lands on a whole pixel). Without text-box the
    capitals' middle sits --cap-mid above the line's. */
@@ -1489,26 +1496,45 @@ html:not([data-pointer]) .ac-msg__time--details:focus-visible {
   padding: 0 4px;
   border-radius: var(--radius-sm);
 }
-/* A face before an agent's name in a line of text: text-sized, centred on the capitals. `font-size: inherit` keeps
-   `em` on the line's size, not the avatar's own 9px. A word's space plus 0.2em before it, the same 0.4em after, so
-   the face reads as a word of its own; none before it where it opens its block (`data-lead`, set by `AgentWho`). */
+/* A face before a name in a line of text: text-sized by default (`--who-face` sets another size), centred on the
+   capitals. `font-size: inherit` keeps `em` on the line's size, not the avatar's own 9px. A word's space plus 0.2em
+   before it, the same 0.4em after, so the face reads as a word of its own; none before it where it opens its block
+   (`data-lead`, set by `AgentWho` and `ActorWho`). */
 .ac-who {
   white-space: nowrap;
 }
 .ac-who > .ac-avatar {
   font-size: inherit;
   display: inline-block;
-  width: 1.15em;
-  height: 1.15em;
-  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 0.575em);
+  width: var(--who-face, 1.15em);
+  height: var(--who-face, 1.15em);
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - var(--who-face, 1.15em) / 2);
   margin-inline: 0.2em 0.4em;
 }
 .ac-who[data-lead] > .ac-avatar {
   margin-inline-start: 0;
 }
+/* A person's letters and photo out of the flow, so the box's bottom is its baseline as an agent's canvas is and the
+   formula above holds. The letters keep the tile's trim to their capitals (`.ac-avatar__initials`), centred in it. */
+.ac-who > .ac-avatar > :is(img, .ac-avatar__initials) {
+  position: absolute;
+  inset: 0;
+}
+.ac-who > .ac-avatar > .ac-avatar__initials {
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
+  font-size: calc(var(--who-face, 1.15em) * 0.6);
+}
+/* A face drawn at the 24 of the small avatar (a task card's who) keeps that avatar's letters, as every 24 face does. */
+.ac-who > .ac-avatar--sm > .ac-avatar__initials {
+  font-size: 11px;
+}
+/* The face stays with the name's first word; a long name (a person's full one) wraps between its words. */
 .ac-who > b {
   font-weight: inherit;
   color: var(--ink);
+  white-space: normal;
 }
 .ac-mention--me {
   color: var(--attention);
@@ -3171,10 +3197,11 @@ html:not([data-pointer]) a.ac-list__row:focus-visible {
   box-shadow: var(--focus-ring-inset);
 }
 
-/* A neutral clickable row for side lists (ListRow): lead, title, meta. */
+/* A neutral clickable row for side lists (ListRow): lead, title, meta. The lead sits on the title's first line
+   (`.ac-iconline`, the row's line its own), and a long title wraps whole under it. */
 .ac-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
   width: 100%;
   min-width: 0;
@@ -3184,6 +3211,8 @@ html:not([data-pointer]) a.ac-list__row:focus-visible {
   background: transparent;
   color: var(--ink);
   font: inherit;
+  font-size: 13px;
+  line-height: 18px;
   text-align: left;
   cursor: pointer;
 }
@@ -3210,17 +3239,14 @@ html:not([data-pointer]) .ac-row:focus-visible {
   gap: 1px;
 }
 .ac-row__title {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .ac-row__meta {
   font-size: 12px;
+  line-height: 16px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
 
 /* Empty state */
@@ -4241,9 +4267,17 @@ html:not([data-pointer]) .ac-receipt__check:focus-visible {
 }
 .ac-date__foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: var(--space-2);
   padding-top: var(--menu-pad);
   border-top: 1px solid var(--line);
+}
+/* A way on from the date ("Ver no calendário") starts the row, the clear action ends it. */
+.ac-date__extra {
+  margin-inline-end: auto;
+  padding-inline-start: var(--space-1);
+  font-size: var(--control-fs-sm);
 }
 /* Its room is the menu's (`.ac-menu` sets the padding and the corner from it), so the head's buttons and the corner
    days are concentric with the box; the hairline over the foot has that room on both sides. */
@@ -11410,6 +11444,169 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   --fact-frame: color-mix(in srgb, var(--success) 45%, transparent);
 }
 
+/*
+ * ── Fact line: one quiet line of facts under a title (FactLine), each an icon and its words, no plates ──
+ * The line wraps between facts and never inside one: a fact is as wide as its words, so one that doesn't fit moves to
+ * the next line whole. Only a fact alone wider than the line (a long repository's link, a long label) wraps its own
+ * words, never past the line's end. An icon centred on the 20px line sits within a third of a pixel of the capitals'
+ * middle.
+ */
+.ac-factline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-3);
+  min-width: 0;
+  font-size: 12.5px;
+  line-height: 20px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.ac-factline__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* Any mark: the kit's icons, a maker's logo drawn in the text's color, 14 on the first line's middle. */
+.ac-factline__fact > svg {
+  flex: none;
+  align-self: flex-start;
+  margin-block-start: 3px;
+  color: var(--faint);
+}
+.ac-factline__fact[data-tone="warn"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.ac-factline__fact:is([data-tone="warn"], [data-tone="warn-icon"]) > svg {
+  color: var(--warn);
+}
+.ac-factline__fact[data-tone="ok"] > svg {
+  color: var(--ok);
+}
+.ac-factline__fact[data-tone="bold"] {
+  color: var(--ink);
+  font-weight: 700;
+}
+.ac-factline__fact[data-tone="label"] {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--plate);
+  color: var(--ink2);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/*
+ * ── Props strip: a thing's properties as one row of controls (a task's Coluna, Responsável, Prioridade, Prazo, Quem
+ * vê; a routine's) ── Each control 32 high in the field look and as wide as its value, 8 apart. A value nobody here
+ * may change and a switch with its word wear the same look. A hairline sets the links and labels after them apart; on
+ * a phone it is a line break, so they start a line of their own instead of hanging after a divider at a line's end.
+ */
+.ac-props {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ac-props .ac-select__trigger {
+  width: auto;
+  max-width: 100%;
+}
+/*
+ * A value wider than the strip (a long name, "Ana, Bruno e mais 5") wraps inside its control instead of ending in "…":
+ * the control is alone on its line by then (a wrapping row moves it down whole first), and grows from its 32.
+ */
+.ac-props :is(.ac-select--sm .ac-select__trigger, .ac-date__trigger--sm) {
+  height: auto;
+  min-height: var(--control-h-sm);
+  padding-block: 5px;
+}
+.ac-props .ac-select__value {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ac-props :is(.ac-select__value, .ac-select__text) {
+  overflow: visible;
+  text-overflow: clip;
+}
+/* Wrapped, its icon or face stays on the first line's capitals (`.ac-iconline`'s rule), never between the lines. */
+.ac-props .ac-select__value > span:has(> .ac-select__lead) {
+  align-items: flex-start;
+}
+.ac-props .ac-select__lead {
+  translate: 0 calc(8px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-props .ac-select__lead {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}
+/* A button opening a menu (who, priority) is a control of the strip: the field look; a face in it starts near its edge. */
+.ac-props > .ac-btn:not(.ac-btn--ghost),
+.ac-props > * > .ac-btn:not(.ac-btn--ghost) {
+  border: 0;
+  background: var(--field-bg);
+  box-shadow: inset 0 0 0 1px var(--field-line);
+}
+.ac-props .ac-btn .ac-avatar {
+  margin-inline-start: -2px;
+}
+/* The date is one more control as wide as its words: its calendar leads, as the others' icons and faces do. */
+.ac-props .ac-date__trigger > .ac-select__chev {
+  order: -1;
+}
+.ac-props__value,
+.ac-props__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: var(--control-h-sm);
+  box-sizing: border-box;
+  padding: 0 var(--space-3) 0 10px;
+  border: 1px solid var(--field-line);
+  border-radius: var(--control-r-sm);
+  background: var(--field-bg);
+  font-size: var(--control-fs-sm);
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ac-props__value > .ac-icon {
+  flex: none;
+  color: var(--ink-muted);
+}
+.ac-props__switch {
+  font-weight: 600;
+  cursor: pointer;
+}
+/* An ⓘ beside a control of the strip: centred on it, its hit box beside the control instead of over its edge. */
+.ac-props .ac-hint {
+  margin: 0;
+  translate: none;
+}
+.ac-props__sep {
+  flex: none;
+  width: 1px;
+  height: 18px;
+  background: var(--line2);
+}
+@media (max-width: 640px) {
+  .ac-props__sep {
+    flex-basis: 100%;
+    width: auto;
+    height: 0;
+    background: none;
+  }
+}
+
 /* ── Step track: a run's steps in one row, nodes joined by a line, a short label and the time under each ── */
 .ac-track {
   list-style: none;
@@ -11570,6 +11767,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
   --mediarow-axis: var(--mediarow-face);
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  /* Stretched to a taller neighbour's height (cards side by side), its lines stay at its top, not spread apart. */
+  align-content: start;
   align-items: start;
   column-gap: var(--space-3);
   row-gap: var(--space-2);

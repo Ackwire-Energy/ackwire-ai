@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { Agent, AgentSetupChecklist, AgentSetupStep, AudienceMode, ConnectorDef, SetupStep } from "../api/types";
 import type { Level } from "./access-levels";
-import { presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
+import { PERSONAL_STARTER_APPS, presetChannels, ROLE_DEFAULTS, ROLE_IDS, type RoleId } from "./new-agent";
 import { providerLabel } from "./providers";
 
 /*
@@ -62,6 +62,19 @@ export const nextStep = (steps: readonly AgentSetupStep[], done: ReadonlySet<Age
 export const suggestedLevels = (role: RoleId | null): Record<string, Level> => (role ? ROLE_DEFAULTS[role].levels : {});
 
 /**
+ * The apps its checklist suggests, at their levels: the ones its card was made with (ADR 0164), else its role's, else
+ * its personal starter's at write.
+ */
+export function setupApps(setup: AgentSetupChecklist | null | undefined): Record<string, Level> {
+  if (setup?.apps) return setup.apps;
+  const role = setupRole(setup);
+  if (role) return suggestedLevels(role);
+  return Object.fromEntries(
+    (setup?.starter ? (PERSONAL_STARTER_APPS[setup.starter] ?? []) : []).map((id) => [id, "write"]),
+  );
+}
+
+/**
  * The channels its role suggests among the ones given (by name); with none, the workspace's general channel, where
  * mentions reach it.
  */
@@ -84,15 +97,21 @@ export const BLANK_TASK_KEYS = ["a", "b"] as const;
  * its closing period, which the sentence saying it back closes.
  */
 export function askedLine(instructions: string): string | null {
-  const text = instructions.trim().replace(/\.+$/, "");
+  // "…tarde." said back as "“…tarde”.", never "“…tarde.”.".
+  const text = instructions.trim().replace(/[\s.…]+$/, "");
   return text && !text.includes("\n") && text.length <= 200 ? text : null;
 }
 
-/** The keys of its first tasks: a ready-made role's three, or a blank agent's own two. */
-export const setupTaskKeys = (role: RoleId | null): string[] =>
+/**
+ * The keys of its first tasks: a ready-made role's three, a personal starter's three (ADR 0164), or a blank agent's
+ * own two.
+ */
+export const setupTaskKeys = (role: RoleId | null, starter?: string | null): string[] =>
   role
     ? TASK_KEYS.map((k) => `newAgent.roles.${role}.tasks.${k}`)
-    : BLANK_TASK_KEYS.map((k) => `agentSetup.tasks.${k}`);
+    : starter && PERSONAL_STARTER_APPS[starter]
+      ? TASK_KEYS.map((k) => `newAgent.starters.${starter}.tasks.${k}`)
+      : BLANK_TASK_KEYS.map((k) => `agentSetup.tasks.${k}`);
 
 /** What a row says, from what the app read: names already joined in the person's language. */
 export interface SetupRowFacts {
@@ -397,22 +416,6 @@ const TEMPLATE_ROLES: Record<string, RoleId> = {
   bia: "support",
 };
 
-/**
- * The apps (catalog connector ids) a personal template's agents use (ADR 0159; mirror of the personal `MEMBERS` in
- * packages/engine/src/team-templates.ts), by handle: a person's calendar, files and lists rather than a team's tools.
- */
-const PERSONAL_TEMPLATE_APPS: Record<string, readonly string[]> = {
-  clara: ["google-calendar", "todoist"],
-  duda: ["google-sheets", "drive"],
-  leo: ["google-calendar"],
-  mel: ["todoist", "google-docs"],
-  gabi: ["notion", "google-docs"],
-  lu: ["google-docs", "notion"],
-  rosa: ["todoist", "google-calendar"],
-  vic: ["google-calendar", "drive"],
-  rui: ["google-calendar", "google-docs", "google-sheets"],
-};
-
 /** A template handle without its taken-name suffix (`iara-2` is Iara's). */
 const templateHandle = (handle: string) => handle.replace(/-\d+$/, "");
 
@@ -427,7 +430,7 @@ export function firstRunApps(team: readonly Pick<Agent, "handle" | "setup">[]): 
     const role = teamRole(a);
     const apps = role
       ? Object.keys(ROLE_DEFAULTS[role].levels)
-      : (PERSONAL_TEMPLATE_APPS[templateHandle(a.handle)] ?? []);
+      : (PERSONAL_STARTER_APPS[templateHandle(a.handle)] ?? []);
     for (const id of apps) count.set(id, (count.get(id) ?? 0) + 1);
   }
   return [...count.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id);

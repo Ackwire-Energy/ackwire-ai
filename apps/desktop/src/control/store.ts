@@ -38,6 +38,8 @@ export interface Snapshot {
 /** The runner speaks a control protocol this app doesn't know (development builds only). */
 export const isIncompatible = (h: Home) => !!h.hello && h.hello.control !== CONTROL_PROTOCOL_VERSION;
 export const isPairedHome = (h: Home) => h.status?.paired === true;
+/** A home whose runner said it is paired with nothing: one still starting is neither (it may be paired). */
+export const isUnpairedHome = (h: Home) => h.status?.paired === false;
 export const orgName = (h: Home) => h.status?.org?.name ?? "";
 
 /**
@@ -145,6 +147,8 @@ export class DesktopStore {
     return () => {
       for (const s of this.stops) s();
       this.stops = [];
+      // No reply can reach a request still open now: it fails at once, not on its timer seconds after its window.
+      this.client.close();
     };
   }
 

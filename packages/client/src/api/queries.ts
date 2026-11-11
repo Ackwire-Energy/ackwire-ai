@@ -17,7 +17,7 @@ import { newerBlockState, stateChanges, stateForPage } from "../lib/blocks";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { ChoiceAnswer } from "../lib/choices";
 import { newerSetup } from "../lib/computer";
-import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS } from "../lib/consult-group";
+import { CONSULT_CONVERSATION_POLL_MS, CONSULT_GROUP_POLL_MS, exchangeIds } from "../lib/consult-group";
 import { forPeople } from "../lib/consultations";
 import { WIFI_PAIR_POLL_MS, wifiPairLive } from "../lib/devices";
 import { answerWithin, noAnswer, sendWaits } from "../lib/errors";
@@ -1052,7 +1052,8 @@ export type AgentGroupAction =
 
 /**
  * Every change answers with all the groups. A move shows at once, and goes back if the server refuses it. Agents I put
- * in a group leave my pins (`unpinAgents`), so they show in it; `pinnedAt` in a move's result says where one was.
+ * in a group leave my pins (`unpinAgents`), so they land where I put them; `pinnedAt` in a move's result says where one
+ * was.
  */
 export function useAgentGroupAction(orgId: string) {
   const api = useApi();
@@ -3098,18 +3099,58 @@ export const useConsultations = (orgId: string, channelId: string, enabled = tru
  * page no events: while the question is out it reloads every `CONSULT_CONVERSATION_POLL_MS`, and with the list
  * (its key sits under the list's) on every consult event.
  */
+const consultationQuery = (
+  api: ReturnType<typeof useApi>,
+  orgId: string,
+  channelId: string,
+  consultationId: string | null,
+) => ({
+  queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
+  // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
+  queryFn: async () => {
+    const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
+    return talk && { ...talk, ...forPeople(talk) };
+  },
+  enabled: consultationId !== null,
+  refetchInterval: (q: { state: { data?: { consultation: { status: string } } | null } }) =>
+    q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false,
+});
+
 export const useConsultationConversation = (orgId: string, channelId: string, consultationId: string | null) => {
   const api = useApi();
-  return useQuery({
-    queryKey: keys.consultation(orgId, channelId, consultationId ?? ""),
-    // The relay line the server opens a mention to an agent outside the conversation with is the agent's, not people's.
-    queryFn: async () => {
-      const talk = await api.agents.consultation(orgId, channelId, consultationId ?? "");
-      return talk && { ...talk, ...forPeople(talk) };
-    },
-    enabled: consultationId !== null,
-    refetchInterval: (q) => (q.state.data?.consultation.status === "open" ? CONSULT_CONVERSATION_POLL_MS : false),
+  return useQuery(consultationQuery(api, orgId, channelId, consultationId));
+};
+
+/** Stable, so `useQueries` keeps the same list while no conversation changed. */
+const messagesOfTalks = (results: { data?: { messages: Message[] } | null }[]) =>
+  results.flatMap((r) => r.data?.messages ?? []);
+
+/**
+ * What a pair row opens: the question's own conversation (`useConsultationConversation`) with the rest of its
+ * exchange (`exchangeIds`: the other questions and hand-offs between the same two agents its row stands for), one
+ * conversation, oldest first.
+ */
+export const useExchangeConversation = (orgId: string, channelId: string, consultationId: string | null) => {
+  const api = useApi();
+  const own = useConsultationConversation(orgId, channelId, consultationId);
+  const list = useConsultations(orgId, channelId, consultationId !== null);
+  const others = useMemo(
+    () => (consultationId ? exchangeIds(list.data ?? [], consultationId).filter((id) => id !== consultationId) : []),
+    [list.data, consultationId],
+  );
+  const rest = useQueries({
+    queries: others.map((id) => consultationQuery(api, orgId, channelId, id)),
+    combine: messagesOfTalks,
   });
+  const data = useMemo(() => {
+    if (!own.data || rest.length === 0) return own.data;
+    const byId = new Map([...own.data.messages, ...rest].map((m) => [m.id, m]));
+    return {
+      ...own.data,
+      messages: [...byId.values()].sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt)),
+    };
+  }, [own.data, rest]);
+  return { ...own, data };
 };
 
 export const useRoster = (orgId: string, channelId: string, enabled = true) => {
@@ -4424,6 +4465,25 @@ export function useCalendarProposal(orgId: string, where: { channelId: string; m
     onSuccess: (proposal) => {
       cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ calendarProposal: proposal }));
       void qc.invalidateQueries({ queryKey: keys.calendar(orgId) });
+    },
+  });
+}
+
+/**
+ * A report about the app an agent offered under its reply (`meta.feedbackOffer`): Send queues it in my name, Not now
+ * puts it away, and the row says so at once (my other devices see it through `feedback_offer.updated`).
+ */
+export function useFeedbackOffer(
+  orgId: string,
+  where: { channelId: string; threadId?: string | null; messageId: string },
+) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (decision: "send" | "dismiss") => api.system.decideFeedbackOffer(orgId, where.messageId, decision),
+    onSuccess: (offer) => {
+      cacheMessageMeta(qc, orgId, where.channelId, where.messageId, () => ({ feedbackOffer: offer }));
+      if (where.threadId) void qc.invalidateQueries({ queryKey: keys.thread(orgId, where.channelId, where.threadId) });
     },
   });
 }
@@ -5830,6 +5890,22 @@ export function useRightHandWave(orgId: string, agentId: string): boolean {
     if (first && channelId) markRead(channelId);
   }, [first, channelId, markRead]);
   return wave === true;
+}
+
+/**
+ * A DM just opened, from `dms.open`'s answer, in the cached DM list: its header and the search find it without the
+ * list being read again. A list not loaded yet loads whole by itself.
+ */
+export function addDm(qc: QueryClient, orgId: string, dm: DirectMessage) {
+  const key = keys.dms(orgId);
+  const add = () =>
+    qc.setQueryData<DirectMessage[]>(key, (list) =>
+      list && !list.some((d) => d.channelId === dm.channelId) ? [...list, dm] : list,
+    );
+  add();
+  // A read of the list already on its way (the sidebar's, started with the page) may have left before this DM
+  // existed, and its answer would replace the list: once it lands, the DM goes in again, with no read of its own.
+  void qc.refetchQueries({ queryKey: key, exact: true, fetchStatus: "fetching" }, { cancelRefetch: false }).then(add);
 }
 
 /** A conversation shows nothing unread in the cached lists (read here or on another device). */

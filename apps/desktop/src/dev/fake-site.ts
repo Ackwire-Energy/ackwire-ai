@@ -1,7 +1,7 @@
 /**
  * The server's devices API as the fake host answers `siteFetch` (design work and tests): this computer in each fake
- * workspace, its phones (the Pixel an agent uses for Rui, the iPhone that needs Developer Mode), and the people and
- * roles of "Specific people or roles". Writes change it; `calls` keeps every request.
+ * workspace, its phones (the Pixel an agent uses for Rui, the iPhone that needs Developer Mode), the people and
+ * roles of "Specific people or roles", and confirming a runner's code. Writes change it; `calls` keeps every request.
  */
 import type { ComputerDevice, DeviceAudience, PhoneDevice } from "@agenteschat/client";
 import type { SiteAnswer } from "../host/types";
@@ -17,7 +17,13 @@ export interface FakeSite {
   signedOut: boolean;
 }
 
-export function createFakeSite(machineOf: (orgId: string) => { machineId: string; name: string } | null): FakeSite {
+type FakeMachine = { machineId: string; name: string };
+
+/** `confirm`: the runner showing `userCode` joins `orgId` (`POST …/machines/device/{userCode}/confirm`). */
+export function createFakeSite(
+  machineOf: (orgId: string) => FakeMachine | null,
+  confirm: (orgId: string, userCode: string) => FakeMachine | null = () => null,
+): FakeSite {
   const computers = new Map<string, ComputerDevice>();
   const computer = (orgId: string) => {
     const known = computers.get(orgId);
@@ -93,6 +99,12 @@ export function createFakeSite(machineOf: (orgId: string) => { machineId: string
       site.calls.push({ method, path, ...(parsed ? { body: parsed } : {}) });
       if (site.signedOut) return json(401, { error: { code: "auth.unauthorized", message: "Sign in" } });
       const [, , , , orgId = "", ...rest] = path.split("/");
+      if (method === "POST" && rest[0] === "machines" && rest[3] === "confirm") {
+        const joined = confirm(orgId, rest[2] ?? "");
+        return joined
+          ? json(201, { id: joined.machineId, name: joined.name })
+          : json(404, { error: { code: "machine.code_invalid", message: "This code expired." } });
+      }
       const mine = computer(orgId);
       const route = `${method} ${rest.join("/")}`;
       if (route === "GET devices") return json(200, { devices: mine ? [mine] : [], requests: [] });

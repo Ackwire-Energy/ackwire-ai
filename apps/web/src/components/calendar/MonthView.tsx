@@ -1,23 +1,24 @@
-import { type CalItem, dayRuns, onDay, sameDay } from "@agenteschat/client/lib/calendar";
+import { type CalItem, type DayEntry, dayEntries, sameDay } from "@agenteschat/client/lib/calendar";
 import { toYmd } from "@agenteschat/client/lib/format";
 import { Popover } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { dayLabel, EventChip } from "./EventChip";
-import { dayRunsLabel, MAX_DAY_MARKS, RunMarks } from "./RunMarks";
 
-/** Chips shown per day before "+N mais". */
+/** Rows shown per day before "+N mais". */
 const PER_DAY = 3;
 
 /**
- * Mês: 6 weeks; each day lists its first events and "+N mais" opens the rest
- * in a popover; the day's routine runs are one row of pixel marks under them.
+ * Mês: 6 weeks; each day lists its first items as rows (all day first, then
+ * by time: the owner's face, the time, the name) and "+N mais" opens the rest
+ * in a popover. A routine's runs are rows like the rest.
  */
 export function MonthView({
   days,
   month,
   items,
   today,
+  now,
   focusDay,
   openKey,
   onOpenKey,
@@ -28,6 +29,7 @@ export function MonthView({
   month: number;
   items: CalItem[];
   today: Date;
+  now: Date;
   focusDay: Date;
   openKey: string | null;
   onOpenKey: (key: string | null) => void;
@@ -36,6 +38,18 @@ export function MonthView({
 }) {
   const { t, i18n } = useTranslation();
   const weekdays = days.slice(0, 7);
+  const row = (e: DayEntry) => (
+    <EventChip
+      key={e.key}
+      item={e.item}
+      variant="line"
+      now={now}
+      day={e.day}
+      open={openKey === e.key}
+      onOpenChange={(o) => onOpenKey(o ? e.key : null)}
+      details={details(e.item)}
+    />
+  );
   return (
     <section className="cal-month" aria-label={t("calendar.grid")}>
       <div className="cal-month__head">
@@ -47,14 +61,8 @@ export function MonthView({
       </div>
       <div className="cal-month__grid">
         {days.map((d) => {
-          // Routines are pixel marks under the events, not chips.
-          const list = items
-            .filter((it) => it.kind !== "routine" && onDay(it, d))
-            .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.getTime() - b.start.getTime());
-          const shown = list.slice(0, PER_DAY);
-          const rest = list.length - shown.length;
-          const runs = dayRuns(items, d);
-          const runsKey = `runs-${toYmd(d)}`;
+          const list = dayEntries(items, d);
+          const rest = list.length - PER_DAY;
           return (
             <div
               key={toYmd(d)}
@@ -73,52 +81,22 @@ export function MonthView({
               >
                 {d.getDate()}
               </button>
-              {shown.map((it) => (
-                <EventChip
-                  key={it.key}
-                  item={it}
-                  variant="line"
-                  open={openKey === it.key}
-                  onOpenChange={(o) => onOpenKey(o ? it.key : null)}
-                  details={details(it)}
-                />
-              ))}
-              {runs.length > 0 && (
-                <RunMarks
-                  runs={runs}
-                  heading={t("calendar.runsOn", { day: dayLabel(i18n.language, d) })}
-                  label={dayRunsLabel(t, runs, dayLabel(i18n.language, d))}
-                  max={MAX_DAY_MARKS}
-                  side="bottom"
-                  className="cal-month__marks"
-                  open={openKey === runsKey}
-                  onOpenChange={(o) => onOpenKey(o ? runsKey : null)}
-                />
-              )}
+              {list.slice(0, rest > 0 ? PER_DAY : list.length).map(row)}
               {rest > 0 && (
                 <Popover
                   label={dayLabel(i18n.language, d)}
                   side="bottom"
                   className="cal-more"
                   trigger={
-                    <button type="button" className="cal-month__more">
-                      {t("calendar.more", { count: rest })}
+                    <button type="button" className="cal-month__more" aria-label={t("calendar.more", { count: rest })}>
+                      <span className="cal-more-words">{t("calendar.more", { count: rest })}</span>
+                      {/* Where the day is a column of faces, the count alone. */}
+                      <span className="cal-more-count">+{rest}</span>
                     </button>
                   }
                 >
                   <p className="cal-more__title">{dayLabel(i18n.language, d)}</p>
-                  <div className="cal-more__list">
-                    {list.map((it) => (
-                      <EventChip
-                        key={it.key}
-                        item={it}
-                        variant="line"
-                        open={openKey === it.key}
-                        onOpenChange={(o) => onOpenKey(o ? it.key : null)}
-                        details={details(it)}
-                      />
-                    ))}
-                  </div>
+                  <div className="cal-more__list">{list.map(row)}</div>
                 </Popover>
               )}
             </div>

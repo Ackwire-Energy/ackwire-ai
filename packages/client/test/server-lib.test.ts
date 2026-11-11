@@ -2,12 +2,14 @@ import { describe, expect, test } from "bun:test";
 import type { FetchLike } from "../src/api/http";
 import {
   APP_API,
+  appPairsWith,
   checkServer,
   connectLink,
   helpUrl,
   isLoopback,
   isTailnet,
   normalizeServer,
+  pairLink,
   parseConnectLink,
   readInstance,
   serverHost,
@@ -146,6 +148,22 @@ describe("connect links", () => {
       "WIFI:S:office;T:WPA;P:secret;;",
     ])
       expect(parseConnectLink(other)).toBeNull();
+  });
+
+  test("the desktop app's pair link: the server and the connect link's code", () => {
+    expect(pairLink("https://app.agentes.chat", "K7QM-4ZPA")).toBe(
+      "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=K7QM-4ZPA",
+    );
+    expect(parseConnectLink(pairLink("https://app.agentes.chat", "K7QM-4ZPA"))).toBeNull();
+    // Only where the app takes it: https, not on this computer.
+    expect(["https://app.agentes.chat", "https://chat.example.com:8443"].map(appPairsWith)).toEqual([true, true]);
+    for (const other of [
+      "http://192.168.1.20:3000",
+      "http://chat.example.com",
+      "http://localhost:3000",
+      "https://localhost",
+    ])
+      expect(appPairsWith(other)).toBe(false);
   });
 });
 

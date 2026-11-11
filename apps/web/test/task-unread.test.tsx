@@ -48,14 +48,15 @@ describe("mentions of me in a task's conversation (ADR 0145)", () => {
     await renderApp(`/org/${ORG_ID}/issues`, { api });
     await settle(8);
     expect(mentionsIn(tasksRow())).toBe("1");
-    expect(mentionsIn(document.querySelector('[data-card="131"] .issue-card__title'))).toBe("1");
+    // Beside the conversation's count, among the card's facts.
+    expect(mentionsIn(document.querySelector('[data-card="131"] .issue-card__facts'))).toBe("1");
     expect(mentionsIn(document.querySelector('[data-card="132"]'))).toBeNull();
     cleanup();
 
     state.issuesView = { ...structuredClone(ISSUES_VIEW_DEFAULT), layout: "list" };
     await renderApp(`/org/${ORG_ID}/issues`, { api });
     await settle(8);
-    expect(mentionsIn(document.querySelector('.issue-list__row[data-card="131"] .issue-list__title'))).toBe("1");
+    expect(mentionsIn(document.querySelector('.issue-list__row[data-card="131"] .issue-card__facts'))).toBe("1");
   });
 
   test("a plain reply I haven't read in a task's conversation makes Tarefas bold, as a channel, with no red count", async () => {

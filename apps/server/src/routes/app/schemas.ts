@@ -74,6 +74,10 @@ export const ChatPrefs = z
       .enum(CHAT_TEXT_SIZES)
       .optional()
       .openapi({ description: "Tamanho do texto of the messages, smallest first; absent: `md`." }),
+    feedbackAuto: z.boolean().optional().openapi({
+      description:
+        "Always send: a report an agent offers about the app goes with its reply, without asking; absent: it asks.",
+    }),
   })
   .openapi("ChatPrefs");
 
@@ -374,6 +378,16 @@ export const AgentSetupChecklist = z
       description: "The ready-made role it started from (`support`); null: from scratch or made elsewhere.",
     }),
     done: z.array(SetupStep).openapi({ description: "The steps a person confirmed (chose or skipped)." }),
+    hello: z.string().optional().openapi({
+      description: "How it introduced itself on its card, in its own voice (ADR 0164): its first message says it.",
+    }),
+    starter: z.string().optional().openapi({ description: "The personal starter it began as (ADR 0159 §3)." }),
+    apps: z
+      .record(z.string(), z.enum(["read", "write"]))
+      .optional()
+      .openapi({
+        description: "The apps it was made to use (catalog connector ids) at their levels (ADR 0164).",
+      }),
   })
   .openapi("AgentSetupChecklist");
 

@@ -119,11 +119,11 @@ export function VaultNewDialog({
         </>
       }
     >
-      <div className="issue-layout">
+      <div className="vlt-layout">
         <Locked when={actions.creating}>
           <form
             id={formId}
-            className="issue-layout__main vlt-details__main"
+            className="vlt-details__main"
             onSubmit={(e) => {
               e.preventDefault();
               void save();
@@ -177,7 +177,7 @@ export function VaultNewDialog({
             />
           </form>
           {/* Who may use it, where an item's page shows who has access (ADR 0144 §7): Personal or Team first. */}
-          <aside className="issue-aside vlt-aside">
+          <aside className="vlt-aside">
             <DetailsSection title={t("vault.access.title")}>
               <Segmented<VaultScope>
                 block

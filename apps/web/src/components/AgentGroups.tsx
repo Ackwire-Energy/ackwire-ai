@@ -21,7 +21,9 @@ import {
 import { type DragEvent, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
+import type { MenuEntry } from "@/lib/context-menu";
 import { useToast } from "@/lib/toast";
+import { MenuEntries } from "./DesktopMenus";
 import { useOrg } from "./org-context";
 import "./roles/roles.css";
 
@@ -167,48 +169,62 @@ export function DeleteGroupDialog({ group, onClose }: { group: AgentGroup; onClo
   );
 }
 
-/** A group header's "…" (owners and admins): rename, move among the groups, delete. */
-export function GroupMenu({
-  group,
-  index,
-  count,
-  onRename,
-  onDelete,
-}: {
+/** A group at `index` among the `count` groups, and what its Editar and Excluir open. */
+interface GroupChoices {
   group: AgentGroup;
   index: number;
   count: number;
   onRename: () => void;
   onDelete: () => void;
-}) {
+}
+
+/** A group's choices (owners and admins): rename, move among the groups, delete. Its "…" and its header's right click. */
+export function useGroupEntries() {
   const { t } = useTranslation();
   const { org } = useOrg();
   const action = useAgentGroupAction(org.id);
-  const label = t("agentGroups.options", { name: group.name });
-  const move = (to: number) => action.mutate({ type: "update", groupId: group.id, index: to });
+  return ({ group, index, count, onRename, onDelete }: GroupChoices): MenuEntry[] => {
+    const move = (to: number) => action.mutate({ type: "update", groupId: group.id, index: to });
+    return [
+      { kind: "item", id: "rename", label: t("agentGroups.rename"), icon: "edit", run: onRename },
+      ...(count > 1
+        ? ([
+            {
+              kind: "item",
+              id: "up",
+              label: t("agentGroups.moveUp"),
+              icon: "chevronUp",
+              disabled: index === 0,
+              run: () => move(index - 1),
+            },
+            {
+              kind: "item",
+              id: "down",
+              label: t("agentGroups.moveDown"),
+              icon: "chevronDown",
+              disabled: index === count - 1,
+              run: () => move(index + 1),
+            },
+          ] satisfies MenuEntry[])
+        : []),
+      { kind: "separator" },
+      { kind: "item", id: "delete", label: t("agentGroups.delete"), icon: "trash", danger: true, run: onDelete },
+    ];
+  };
+}
+
+/** A group header's "…" (owners and admins), on Equipe and in the sidebar (`className`: the header's buttons). */
+export function GroupMenu({ className, ...choices }: GroupChoices & { className?: string }) {
+  const { t } = useTranslation();
+  const entries = useGroupEntries();
+  const label = t("agentGroups.options", { name: choices.group.name });
   return (
     <Menu
       align="end"
       label={label}
-      trigger={<Button variant="ghost" size="sm" iconOnly icon="more" aria-label={label} />}
+      trigger={<Button variant="ghost" size="sm" iconOnly icon="more" className={className} aria-label={label} />}
     >
-      <MenuItem icon="edit" onSelect={onRename}>
-        {t("agentGroups.rename")}
-      </MenuItem>
-      {count > 1 && (
-        <>
-          <MenuItem icon="chevronUp" disabled={index === 0} onSelect={() => move(index - 1)}>
-            {t("agentGroups.moveUp")}
-          </MenuItem>
-          <MenuItem icon="chevronDown" disabled={index === count - 1} onSelect={() => move(index + 1)}>
-            {t("agentGroups.moveDown")}
-          </MenuItem>
-        </>
-      )}
-      <MenuSeparator />
-      <MenuItem icon="trash" danger onSelect={onDelete}>
-        {t("agentGroups.delete")}
-      </MenuItem>
+      <MenuEntries entries={entries(choices)} />
     </Menu>
   );
 }
@@ -341,8 +357,8 @@ export function useAgentDrag(groups: AgentGroup[]) {
     });
     return k < 0 ? rows.length : k;
   };
-  // The server counts the place among all the group's agents in its own order: the ones not listed (pinned on top,
-  // or not talking to me) and the person's sort would shift a place counted among the rows.
+  // The server counts the place among all the group's agents in its own order: the ones pinned on top of it, the ones
+  // not listed (not talking to me) and the person's sort would shift a place counted among the rows.
   const placeAt = (e: DragEvent<HTMLElement>, groupId: string) => {
     const ids = rowsOf(e).map((el) => el.dataset.agentRow ?? "");
     const k = indexAt(e);

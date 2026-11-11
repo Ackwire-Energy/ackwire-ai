@@ -1,23 +1,35 @@
 name: CI
 
-# All verification runs here: on every pull request (a draft once it is marked ready), every push to
-# main, every `v*` release tag, and on demand (`gh workflow run CI --ref <branch>` or "Run workflow" in
-# Actions). The `changes` job narrows a pull request or a push to the jobs its files touch; a manual run
-# or a release tag checks everything.
+# All verification runs here: on every push to main, every `v*` release tag, and on demand
+# (`gh workflow run CI --ref <branch>` or "Run workflow" in Actions). A pull request starts nothing by
+# itself, to keep runner minutes for the runs someone asks for: before it merges, run this by hand on its
+# branch, and that run's "CI result" is the check main requires.
 #
-# Pull requests run as `pull_request`, never `pull_request_target`: a fork's code gets a read-only token
-# and no secrets. Only jobs gated on a push or a tag (the images, the release assets) write anything or
-# read a secret.
+# The `changes` job narrows a run to the jobs its files touch: a push to main by what the push changed, a
+# manual run on a branch by what the branch changed since it left main. A manual run on main, one started
+# with `scope: all`, and a release tag check everything.
 #
-# Runners are GitHub's standard hosted ones. Everything runs on x64: on ARM the backend shards took 2.5x
-# as long (603 and 667 s against 229 and 275 s, 2026-10-26). Only the arm64 image builds on ARM, natively.
+# Only jobs gated on a push or a tag (the images, the release assets) write anything or read a secret.
+#
+# Runners: no label is written here. Each job names a repository variable (Settings → Secrets and
+# variables → Actions → Variables) and falls back to GitHub's own runner, so moving to another provider,
+# or back, is a change of variables:
+#   CI_RUNNER        the light jobs (4 vCPU is plenty)
+#   CI_RUNNER_LARGE  the tests and the isolation job's QEMU guest (8 vCPU, 16 GB: the guest takes 8 GB)
+#   CI_RUNNER_ARM    the arm64 image, built natively
+# The tests use the cores the runner has, so a smaller runner is slower, not broken. Everything else runs
+# on x64: on ARM the backend shards took 2.5x as long (603 and 667 s against 229 and 275 s, 2026-10-26).
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      scope:
+        description: "changed = only the jobs this branch's changes touch; all = every job"
+        type: choice
+        options: [changed, all]
+        default: changed
 
 permissions:
   contents: read
@@ -40,12 +52,15 @@ defaults:
 jobs:
   changes:
     name: What changed
-    if: github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
+    env:
+      # Everything: a release tag, a manual run asked for all, a manual run on main (nothing to compare it with).
+      ALL: >-
+        ${{ github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' &&
+        (inputs.scope == 'all' || github.ref_name == github.event.repository.default_branch)) }}
     permissions:
       contents: read
-      pull-requests: read # paths-filter reads a pull request's files from the API
     outputs:
       code: ${{ steps.groups.outputs.code }}
       shared: ${{ steps.groups.outputs.shared }}
@@ -57,11 +72,14 @@ jobs:
       docker: ${{ steps.groups.outputs.docker }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # A push to main: what the push changed. A manual run on a branch: what the branch changed since it left
+      # main (the merge base), which is what its pull request would change.
       - name: Changed files
         id: filter
-        if: github.event_name != 'workflow_dispatch' && github.ref_type != 'tag'
+        if: env.ALL != 'true'
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
+          base: ${{ github.event.repository.default_branch }}
           predicate-quantifier: some-with-excludes
           filters: |
             code:
@@ -96,7 +114,6 @@ jobs:
       - name: What runs
         id: groups
         env:
-          ALL: ${{ github.event_name == 'workflow_dispatch' || github.ref_type == 'tag' }}
           CODE: ${{ steps.filter.outputs.code }}
           CHANGES: ${{ steps.filter.outputs.changes || '[]' }}
         run: |
@@ -111,7 +128,7 @@ jobs:
     name: Lint, boundaries, typecheck, build
     needs: changes
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -233,35 +250,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  # The backend suite (PGlite, servers) on three runners at once: packages/engine split by file name, and
-  # apps/server on its own. Together they ran past the step's 20 minutes on one runner (2026-11-01: 683 s for
-  # 70 of engine's 82 files from n, 529 s for 97 of apps/server's 147). The groups preserve the existing selected test files.
+  # The backend suite (PGlite, servers) on three runners at once. One file after another, a third of it took
+  # 13 to 20 minutes on a runner whose other cores sat idle (2026-11-10), so each runner now spreads its files
+  # over its cores and Bun does the split in three. The paths select the same test files as before.
   test-backend:
     name: Test (backend ${{ matrix.shard }}/3)
     needs: changes
     if: needs.changes.outputs.shared == 'true' || needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-latest' }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - shard: 1
-            paths: packages/engine/test/[a-m]*.test.ts
-          - shard: 2
-            paths: >-
-              packages/engine/test/[!a-m]*.test.ts packages/adapters packages/config packages/db
-              packages/modules packages/providers packages/client packages/i18n packages/tokens packages/setup
-          - shard: 3
-            paths: apps/server
+        shard: [1, 2, 3]
+    env:
+      # The engine's own folder only: the suites in its subfolders are not part of this job.
+      PATHS: >-
+        packages/engine/test/*.test.ts packages/adapters packages/config packages/db packages/modules
+        packages/providers packages/client packages/i18n packages/tokens packages/setup apps/server
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - *setup-bun
       - *cache-bun
       - *install
+      # Test files run on every core, each in a process and with modules of its own (--parallel), and Bun splits
+      # them in three by count. Splitting by each file's measured time was tried (2026-11-10): the shards then
+      # opened with their heaviest files all at once and ran 40 to 60% longer.
       - name: Test
         timeout-minutes: 25
-        run: bun test ${{ matrix.paths }} 2>&1 | tee test.log
+        run: bun test --parallel --shard=${{ matrix.shard }}/3 $PATHS 2>&1 | tee test.log
       - &keep-test-errors
         name: Keep errors
         if: always()
@@ -286,7 +303,7 @@ jobs:
     if: >-
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-latest' }}
     timeout-minutes: 35
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
@@ -306,7 +323,12 @@ jobs:
         # The preload saves every screen the tests reach, for the geometry check below. It costs a few percent.
         env:
           GEOMETRY_OUT: ${{ runner.temp }}/geometry
-        run: bun test --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
+        # Three workers for every four cores: with every core busy, tests that wait on a timer or on work off the
+        # JS thread (a 30 ms limit, WebCrypto, a socket's retry) failed now and then, a different one each run.
+        run: |
+          cores=$(nproc)
+          workers=$(( cores * 3 / 4 )); [ "$workers" -ge 1 ] || workers=1
+          bun test --parallel="$workers" --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
       # Lays those screens out in the runner's Chrome at 1280, 320 and 390 px and fails on an offender that isn't in
       # scripts/geometry/baseline.json: an action on its row's edge, uneven padding in a chip, a row wrapping word by word.
       # A screen with messages also at the smallest and largest Tamanho do texto. Each screen is laid out twice, in the
@@ -314,7 +336,7 @@ jobs:
       - name: Geometry (the layout rules on every screen the tests reach)
         if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
         timeout-minutes: 12
-        run: bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
+        run: GEOMETRY_BROWSERS=$(nproc) bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
       - name: Test (new event dialog, alone)
@@ -352,7 +374,7 @@ jobs:
     name: Test (desktop, Rust)
     needs: changes
     if: needs.changes.outputs.desktop == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -387,8 +409,7 @@ jobs:
   # --verbose with --redact names each finding's file, line, commit and rule, never its value.
   secrets:
     name: Secret scan and boundaries
-    if: github.event.pull_request.draft != true
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -396,21 +417,34 @@ jobs:
           fetch-depth: 0
       # Bun first: the boundaries check below still runs when the scan fails.
       - *setup-bun
-      - run: docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --verbose --exit-code 1 /repo
+      # main and a release tag scan the whole history (about two minutes); a branch scans the commits it adds to
+      # main, which main's own runs have already scanned up to there.
+      - name: Secret scan
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          range=()
+          if [ "$GITHUB_REF_TYPE" = branch ] && [ "$GITHUB_REF_NAME" != "$DEFAULT_BRANCH" ] &&
+            git rev-parse --verify --quiet "origin/$DEFAULT_BRANCH" > /dev/null; then
+            range=(--log-opts="origin/$DEFAULT_BRANCH..HEAD")
+          fi
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f git --config /repo/.gitleaks.toml --no-banner --redact --verbose --exit-code 1 "${range[@]}" /repo
       - name: Boundaries (no cloud/ or ee/ imports, no internal notes in public files)
         if: success() || failure()
         run: bun run check:boundaries
 
   # System mode's isolation on real kernels, as root (apps/server/test/runner/isolation.root.test.ts): real
   # agent users, slices, the loopback table and the bind policy, then what each agent reaches, with real Gradle,
-  # Kotlin, adb and Xtigervnc as two agents at once. Ubuntu runs on GitHub's own kernel (and its Chrome); its
-  # systemd lacks BPF_FRAMEWORK, so the bind policy is left out there. Debian 13 (the Cloud's release: its own
-  # kernel and systemd, built with BPF_FRAMEWORK) boots in QEMU, with KVM where the runner has it.
+  # Kotlin, adb and Xtigervnc as two agents at once. Each leg boots a distribution's own cloud image in QEMU
+  # (scripts/isolation-vm.sh), with KVM where the runner has it: the test needs systemd as the machine's init,
+  # and a runner may run its job in a container, without one. Ubuntu 24.04's systemd lacks BPF_FRAMEWORK, so the bind
+  # policy is left out there, and that guest has Chrome; Debian 13 (the Cloud's release) has it.
+  # The guest takes 8 GB, so the runner has 16.
   isolation-root:
     name: Isolation as root (${{ matrix.leg }})
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-latest' }}
     timeout-minutes: 50
     strategy:
       fail-fast: false
@@ -424,30 +458,18 @@ jobs:
       # What the agents' users run in the bind check, built as the image builds it.
       - name: The runner bundle
         run: bun build apps/server/runner/main.ts --target=node --banner '#!/usr/bin/env node' --outfile "$RUNNER_TEMP/agentes-runner.mjs"
-      - name: Test as root (Ubuntu)
-        if: matrix.leg == 'ubuntu'
-        timeout-minutes: 30
-        run: |
-          sudo apt-get -qq update
-          sudo apt-get -qq install -y nftables tigervnc-standalone-server xauth at > /dev/null
-          uname -r
-          systemctl --version | head -2
-          sudo -E env "PATH=$PATH" AGENTES_ROOT_TESTS=1 AGENTES_TEST_RUNNER="$RUNNER_TEMP/agentes-runner.mjs" \
-            bun test apps/server/test/runner/isolation.root.test.ts
-      - name: The Debian 13 image
-        if: matrix.leg == 'debian13'
+      - name: The guest's image
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/isolation-image
-          key: isolation-image-${{ hashFiles('scripts/isolation-vm.sh') }}
-      - name: Test as root (Debian 13 in QEMU)
-        if: matrix.leg == 'debian13'
+          key: isolation-image-${{ matrix.leg }}-${{ hashFiles('scripts/isolation-vm.sh') }}
+      - name: Test as root (in QEMU)
         timeout-minutes: 45
         run: |
           sudo apt-get -qq update
           sudo apt-get -qq install -y --no-install-recommends qemu-system-x86 qemu-utils genisoimage > /dev/null
           bun build apps/server/test/runner/isolation.root.test.ts --target=bun --outfile "$RUNNER_TEMP/isolation.root.test.js"
-          scripts/isolation-vm.sh "$RUNNER_TEMP/isolation.root.test.js" "$RUNNER_TEMP/agentes-runner.mjs" ~/isolation-image
+          scripts/isolation-vm.sh "$RUNNER_TEMP/isolation.root.test.js" "$RUNNER_TEMP/agentes-runner.mjs" ~/isolation-image "${{ matrix.leg }}"
 
   # The image as self-hosters run it: the docker-compose.yml at the repository root with this
   # commit's image, a .env with only the three values it asks for, migrations on boot, the health
@@ -456,17 +478,13 @@ jobs:
   # then an upgrade's steps on the same volumes, the usage report the image prints (`agentes telemetry`),
   # and the backup profile: a dump and its restore.
   # amd64 only, nothing pushed.
-  # A pull request runs it only when the image's own files changed (Dockerfile, compose files, the
-  # backup image): code changes are the tests' job, and every push to main still runs it.
-  # Only pushes write the layer cache, which the image build below then reuses: PR-scoped entries
-  # would crowd main's out of the repository's cache quota.
+  # Only pushes write the layer cache, which the image build below then reuses: entries scoped to a
+  # branch would crowd main's out of the repository's cache quota.
   compose:
     name: Image boots with docker compose
     needs: changes
-    if: >-
-      needs.changes.outputs.image == 'true' &&
-      (github.event_name != 'pull_request' || needs.changes.outputs.docker == 'true')
-    runs-on: ubuntu-latest
+    if: needs.changes.outputs.image == 'true'
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     env:
       AGENTES_IMAGE: agentes:ci
@@ -569,10 +587,10 @@ jobs:
       matrix:
         include:
           - platform: linux/amd64
-            runner: ubuntu-latest
+            runner: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
             slug: amd64
           - platform: linux/arm64
-            runner: ubuntu-24.04-arm
+            runner: ${{ vars.CI_RUNNER_ARM || 'ubuntu-24.04-arm' }}
             slug: arm64
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
@@ -646,7 +664,7 @@ jobs:
   publish:
     name: Publish the images
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 10
     permissions:
       contents: read
@@ -705,7 +723,7 @@ jobs:
     if: >-
       github.ref_type == 'tag' && !cancelled() &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 5
     permissions:
       contents: write
@@ -730,7 +748,7 @@ jobs:
     if: >-
       github.ref_type == 'tag' && !cancelled() &&
       !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled')
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
     permissions:
       contents: write
@@ -760,13 +778,13 @@ jobs:
           gh release upload "$TAG" agentes-native-*.tar.gz native.json native.json.sig --clobber --repo "$GITHUB_REPOSITORY"
 
   # The one check to require once branch protection is on: red when any job failed or was
-  # cancelled; a skipped job is fine (nothing it covers changed). A draft gets no result at all.
+  # cancelled; a skipped job is fine (nothing it covers changed).
   done:
     name: CI result
-    if: always() && github.event.pull_request.draft != true
+    if: always()
     needs:
       [changes, check, test-backend, test-web, test-desktop-rust, secrets, isolation-root, compose, build, publish, release-install, release-native]
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 2
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

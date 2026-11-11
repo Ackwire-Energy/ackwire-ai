@@ -13,7 +13,15 @@ import type { RunnerTools } from "@agenteschat/adapters/machine-protocol";
 import { ControlError } from "./client";
 import { filesFolder } from "./local-server";
 import { homeServer } from "./server";
-import { type DesktopStore, type Home, isPairedHome, isRefusedHome, orgName, pairedHomes } from "./store";
+import {
+  type DesktopStore,
+  type Home,
+  isPairedHome,
+  isRefusedHome,
+  isUnpairedHome,
+  orgName,
+  pairedHomes,
+} from "./store";
 
 /**
  * `local`: the asking page is the server here (`local_server.rs`), whose own homes point at its loopback
@@ -54,6 +62,8 @@ export interface ThisMacDeps {
   revealFolder(path: string): Promise<void>;
   /** How long to wait for the runner's code. */
   codeTimeoutMs?: number;
+  /** The site confirmed a pairing it asked for: its agents work while the app runs, so it opens at login. */
+  onPaired?(): void;
 }
 
 const orgOf = (h: Home) => h.status?.org?.id;
@@ -116,8 +126,12 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
   return connect(deps, request.orgId, request.origin);
 }
 
-async function connect(
-  { store, codeTimeoutMs = 20_000 }: ThisMacDeps,
+/**
+ * Starts the runner's device-code sign-in with `origin` for `orgId` and resolves with its code, which whoever pairs
+ * confirms with their session (the site, or the app's own windows through `site_fetch`); null when already connected.
+ */
+export async function connect(
+  { store, codeTimeoutMs = 20_000, onPaired }: Pick<ThisMacDeps, "store" | "codeTimeoutMs" | "onPaired">,
   orgId: string,
   origin: string,
 ): Promise<ThisMacConnect> {
@@ -126,7 +140,7 @@ async function connect(
   if (same.some((h) => !isRefusedHome(h))) return { userCode: null };
   // Refused by this organization: its own home, so it comes back as the same computer. Else a home left
   // unpaired by an earlier try, or a new one.
-  const homeId = same[0]?.homeId ?? homes.find((h) => !isPairedHome(h))?.homeId ?? (await store.addHome());
+  const homeId = same[0]?.homeId ?? homes.find(isUnpairedHome)?.homeId ?? (await store.addHome());
 
   const code = new Promise<string>((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -146,7 +160,7 @@ async function connect(
       }
     });
   });
-  void whenPaired(store, homeId);
+  void whenPaired(store, homeId, onPaired);
   try {
     await store.request(homeId, { type: "pair.start", server: origin });
   } catch (err) {
@@ -190,12 +204,14 @@ export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; command
   return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
 }
 
-/** Once the site confirmed the pairing, the new organization's first tools. */
-function whenPaired(store: DesktopStore, homeId: string) {
+/** Once the pairing is confirmed, the new organization's first tools, then `onDone`. */
+export function whenPaired(store: DesktopStore, homeId: string, onDone?: () => void) {
   const off = store.onEvent((id, event) => {
     if (id !== homeId || (event.kind !== "pair.done" && event.kind !== "pair.failed")) return;
     off();
-    if (event.kind === "pair.done") void firstTools(store, homeId);
+    if (event.kind !== "pair.done") return;
+    void firstTools(store, homeId);
+    onDone?.();
   });
   // A code nobody confirms expires; stop listening well after.
   setTimeout(off, 30 * 60_000);

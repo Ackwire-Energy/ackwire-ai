@@ -10,6 +10,7 @@ import { type Config, connectorOAuthApps, githubAppConfig } from "@agenteschat/c
 import type { Database } from "@agenteschat/db";
 import {
   AntigravityBrain,
+  APP_FAULT_HINT,
   type ArtifactDeps,
   agentScopeFromDb,
   authorizeStream,
@@ -41,6 +42,7 @@ import {
   createDesktopControl,
   createDesktopToolSource,
   createDeviceToolSource,
+  createFeedbackToolSource,
   createFindAgentToolSource,
   createFollowUpToolSource,
   createGitHubAppSettings,
@@ -127,6 +129,7 @@ import {
 import { createVoyageEmbeddings, type EmbeddingProvider, type ModelProvider } from "@agenteschat/providers";
 import { type AppleTokenRevoker, appleTokenRevoker } from "./auth";
 import { hookConfig } from "./routes/app/context";
+import { version } from "./version";
 
 /** Why `/api/terminal` closes (with 4404) where sessions are screened (ADR 0076 §7). */
 export const NO_TERMINAL = "no_terminal";
@@ -400,6 +403,13 @@ export function buildEngine(o: EngineOptions) {
       createSetStatusToolSource({ pubsub: adapters.pubsub }),
       // How the person asked agents to talk to them (ADR 0147).
       createAgentStyleToolSource(),
+      // A person's feedback, sent by the agent they asked or offered by it when the app fails, where the server takes
+      // feedback (ADR 0160 §11, §12).
+      createFeedbackToolSource({
+        to: config.FEEDBACK_EMAIL,
+        version,
+        rateLimiter: adapters.rateLimiter,
+      }),
       createReactToolSource({ pubsub: adapters.pubsub }),
       // A GIF or the agent's sticker when asked (ADR 0091): listed by the workspace's switches and the agent's.
       createMediaToolSource({ pubsub: adapters.pubsub, gifs: adapters.gifs ?? null }),
@@ -522,6 +532,8 @@ export function buildEngine(o: EngineOptions) {
     ],
     catalog: { oauthApps: connectorDeps.oauthApps, mail: adapters.mail, composio },
     pubsub: adapters.pubsub,
+    // One of our own tools broke: where the server takes feedback, the agent may offer a report (ADR 0160 §12).
+    ...(config.FEEDBACK_EMAIL ? { faultHint: APP_FAULT_HINT } : {}),
   });
   // Mission tasks' tools and computer-brain runs' tools come through the hub's MCP bridge (ADR 0032).
   // Runs waiting for a device (bring your own devices) go on when its computer is back or its phones report it free.

@@ -1597,8 +1597,9 @@ html:not([data-pointer]) .member-row--add:focus-visible {
 /* Cards take the full row; file tiles (images, files) sit side by side and wrap. */
 /* ── Attachments on a message: tiles of one size, side by side ─────────────
    Each a cover on top (what it holds, drawn small: a document's start, a table's first rows, a change's files, a
-   diagram, a page, a picture) and its name with its kind and size under it. One surface: a hairline and the cut
-   corner, nothing raised inside. Alone on its message a tile is wider; a picture alone shows whole. */
+   diagram, a page) and its name with its kind and size under it. One surface: a hairline and the cut corner, nothing
+   raised inside. A picture is only its cover, its name and size in its tip. Alone on its message a tile is wider; a
+   picture alone shows whole. */
 .artifact-cards {
   display: flex;
   flex-wrap: wrap;
@@ -1674,13 +1675,13 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   border-bottom: 1px solid var(--line);
   pointer-events: none;
 }
+/* `.ac-iconline`: its icon on the title's capitals, the title's line its line. */
 .artifact-tile__foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   min-height: 52px;
   box-sizing: border-box;
   padding: 9px 12px 10px;
+  font-size: 13.5px;
+  line-height: 18px;
   color: var(--faint);
 }
 .artifact-tile__name {
@@ -1689,22 +1690,19 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   display: flex;
   flex-direction: column;
 }
+/* A file's name whole, wrapping (a tile beside it keeps its own height), never cut with "…". */
 .artifact-tile__title {
-  overflow: hidden;
   font-size: 13.5px;
   font-weight: 650;
   line-height: 18px;
   color: var(--ink);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .artifact-tile__meta {
-  overflow: hidden;
   font-size: 12px;
   line-height: 16px;
   color: var(--faint);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 /* Download and More over the cover's corner on hover (always shown on touch). */
 .artifact-tile__acts {
@@ -1929,7 +1927,21 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
 .artifact-tile[data-media] .artifact-tile__open {
   cursor: zoom-in;
 }
-/* A picture alone on its message: whole, at its own proportions, no name under it (Download and More stay). */
+.artifact-tile[data-media] .artifact-tile__cover {
+  border-bottom: 0;
+}
+/* The tip (a picture's or a video's name and size) hangs from the whole tile: over a picture it is the open button's
+   box, around a video its player. */
+.artifact-tile__tip {
+  display: block;
+}
+.artifact-tile[data-media] > .artifact-tile__tip {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+/* A picture alone on its message: whole, at its own proportions (Download and More stay). */
 .artifact-cards > .artifact-tile[data-media]:only-child {
   --tile-w: fit-content;
   max-width: 420px;
@@ -1937,9 +1949,6 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
 .artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__cover {
   height: auto;
   border-bottom: 0;
-}
-.artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__foot {
-  display: none;
 }
 .artifact-cards > .artifact-tile[data-media]:only-child .artifact-tile__picture img {
   width: auto;
@@ -1962,12 +1971,15 @@ html:not([data-pointer]) .artifact-tile__open:focus-visible {
   background: none;
   box-shadow: none;
 }
-/* On a phone: two to a row (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to
-   its size. */
+/* On a phone: pictures two to a row; a file the whole row, since its name wraps whole and half a row would take it a
+   word a line (a table's cover keeps two columns, the rest wouldn't read); alone, the whole width up to its size. */
 @media (max-width: 640px) {
   .artifact-tile {
     --tile-w: calc(50% - 5px);
     --tile-cover: 120px;
+  }
+  .artifact-tile:not([data-media], .artifact-tile--loading) {
+    --tile-w: 100%;
   }
   .artifact-tile__table :is(th, td):nth-child(n + 3) {
     display: none;
@@ -3345,7 +3357,6 @@ html:not([data-pointer]) .profile-trigger:focus-visible {
   .stack-4,
   .skill-sheet__main,
   .skill-history,
-  .issue-aside,
   .wiki-editor,
   .cal-side__section,
   .cflow__key,
@@ -6253,6 +6264,323 @@ html:not([data-pointer]) .live-code-toggle__btn:focus-visible {
 html:not([data-pointer]) .photo-drop:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+/* "How do you want to appear?" (ADR 0166): two doors side by side, each a picture over its name and a line. */
+.avatar-ask {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  padding-bottom: 4px;
+}
+.avatar-ask__door {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 0 16px;
+  border: 0;
+  border-radius: 18px;
+  background: var(--raised);
+  box-shadow: var(--e1);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  transition:
+    transform 0.16s var(--out, ease-out),
+    box-shadow 0.16s;
+}
+.avatar-ask__door:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--e2);
+}
+.avatar-ask__door:active {
+  transform: scale(0.985);
+}
+.avatar-ask__art {
+  display: grid;
+  place-items: center;
+  height: 150px;
+  margin-bottom: 10px;
+  background: var(--sunken);
+}
+.avatar-ask__art--sky {
+  background: linear-gradient(180deg, var(--agent-soft), color-mix(in srgb, var(--agent2) 55%, var(--agent-soft)));
+}
+.avatar-ask__fan {
+  display: flex;
+  align-items: flex-end;
+}
+.avatar-ask__fan > span {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 30%;
+  box-shadow: var(--e2);
+}
+.avatar-ask__fan > span:nth-child(1) {
+  transform: translateX(14px) rotate(-8deg);
+}
+.avatar-ask__fan > span:nth-child(2) {
+  position: relative;
+  z-index: var(--z-lifted);
+  width: 96px;
+  height: 96px;
+}
+.avatar-ask__fan > span:nth-child(3) {
+  transform: translateX(-14px) rotate(8deg);
+}
+.avatar-ask__photo {
+  position: relative;
+  display: block;
+}
+.avatar-ask__photo .ac-avatar {
+  width: 96px;
+  height: 96px;
+  font-size: 34px;
+  box-shadow: var(--e2);
+}
+.avatar-ask__badge {
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  box-shadow: 0 0 0 3px var(--sunken);
+}
+.avatar-ask__title {
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 22px;
+}
+.avatar-ask__text {
+  padding: 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: pretty;
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-ask__door {
+    transition: none;
+  }
+}
+@media (max-width: 560px) {
+  .avatar-ask {
+    grid-template-columns: 1fr;
+  }
+}
+/* The avatar builder (ADR 0166): the portrait on the left, its pieces in tabs on the right; every option is a tile
+   showing the person's own portrait wearing it. */
+.avatar-builder {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 28px;
+  height: min(520px, calc(100vh - 250px));
+  min-height: 340px;
+}
+.avatar-builder__side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding-top: 4px;
+}
+.avatar-builder__side .ac-seg {
+  align-self: stretch;
+}
+.avatar-builder__stage {
+  width: 192px;
+  height: 192px;
+  border-radius: 30%;
+  box-shadow: var(--e2);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .avatar-builder__stage[data-pop] {
+    animation: avatar-builder-pop 0.22s var(--out, ease-out);
+  }
+}
+@keyframes avatar-builder-pop {
+  0% {
+    transform: scale(0.94);
+  }
+  60% {
+    transform: scale(1.03);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.avatar-builder__sizes {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.avatar-builder__sizes > span {
+  display: block;
+  border-radius: 30%;
+}
+.avatar-builder__hint {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12.5px;
+  line-height: 17px;
+}
+.avatar-builder__side .avatar-builder__hint {
+  text-align: center;
+}
+.avatar-builder__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The tabs are a strip: on a narrow dialog they scroll sideways by swipe, with no scrollbar. */
+.avatar-builder__main .ac-tabs {
+  flex: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.avatar-builder__main .ac-tabs::-webkit-scrollbar {
+  display: none;
+}
+/* Inside the sideways strip the tab and its underline stay within it (1px past the edge made it scroll up and down). */
+.avatar-builder__main .ac-tab {
+  flex: none;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.avatar-builder__main .ac-tabpanel {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 18px 4px 12px;
+  margin: 0 -4px;
+}
+.avatar-builder__group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.avatar-builder__label {
+  margin: 0;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.avatar-builder__options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 14px 8px;
+}
+.avatar-builder__option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 16px;
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+.avatar-builder__face {
+  display: block;
+  width: 64px;
+  height: 64px;
+  border-radius: 30%;
+  transition:
+    transform 0.14s var(--out, ease-out),
+    box-shadow 0.14s;
+}
+.avatar-builder__option:hover .avatar-builder__face {
+  transform: translateY(-2px);
+}
+.avatar-builder__option:active .avatar-builder__face {
+  transform: scale(0.96);
+}
+.avatar-builder__option[aria-pressed="true"] {
+  color: var(--ink);
+  font-weight: 600;
+}
+.avatar-builder__option[aria-pressed="true"] .avatar-builder__face {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--ink);
+}
+/* From the keyboard the ring goes around the face, not the tile and its name. */
+html:not([data-pointer]) .avatar-builder__option:focus-visible {
+  outline: none;
+}
+html:not([data-pointer]) .avatar-builder__option:focus-visible .avatar-builder__face {
+  box-shadow:
+    0 0 0 2px var(--raised),
+    var(--focus-ring);
+}
+.avatar-builder__swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.avatar-builder__swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.14);
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+.avatar-builder__swatch:hover {
+  transform: scale(1.12);
+}
+.avatar-builder__swatch[aria-pressed="true"] {
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.14),
+    0 0 0 2px var(--raised),
+    0 0 0 4px var(--ink);
+}
+html:not([data-pointer]) .avatar-builder__swatch:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px var(--raised),
+    var(--focus-ring);
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-builder__face,
+  .avatar-builder__swatch {
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .avatar-builder {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
+  .avatar-builder__stage {
+    width: 128px;
+    height: 128px;
+  }
+  .avatar-builder__main .ac-tabpanel {
+    max-height: 46vh;
+  }
 }
 .photo-crop {
   display: flex;
@@ -10915,6 +11243,30 @@ html:not([data-pointer]) .agp-chipbtn:focus-visible {
   padding-top: 0;
   border-top: 0;
 }
+/* The memory a link opened: a soft plate for a moment where it landed, out to the card's padding on a row that has
+   none of its own. */
+.agp-mem.is-landed {
+  --landed-out: var(--space-2);
+  border-radius: var(--space-1);
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.agp-mem, .memory-item).is-landed {
+    background: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  :is(.agp-mem, .memory-item).is-landed {
+    animation: item-landed 2.4s var(--out) forwards;
+  }
+}
+@keyframes item-landed {
+  0%,
+  40% {
+    background-color: var(--plate);
+    box-shadow: 0 0 0 var(--landed-out, 0) var(--plate);
+  }
+}
 /* A learned item's technical detail, folded under its plain summary */
 .agp-mem__details > summary {
   cursor: pointer;
@@ -11787,10 +12139,23 @@ html[data-menu-overlay] .shell {
   margin: 0 1px;
   color: var(--faint);
 }
-/* Faces on the rail: a step up from the kit's small (24px), inside the rail's 40px tile with room for its badges. */
+/*
+ * The sidebar's faces as tokens, so New agent's empty face is always the agents' own (ADR 0164): on the rail a step up
+ * from the kit's small (24px), inside the rail's 40px tile with room for its badges; in the full list an agent's row
+ * has a message's face (`--name-face`), 40 in a personal workspace's plain list (ADR 0159), 12px from its words.
+ */
+.sidebar {
+  --sidebar-rail-face: 28px;
+  --sidebar-agent-face: var(--name-face);
+  --sidebar-agent-gap: 12px;
+}
+.sidebar[data-personal] {
+  --sidebar-agent-face: 40px;
+}
+/* Faces on the rail. */
 .sidebar__item > .ac-avatar--sm {
-  width: 28px;
-  height: 28px;
+  width: var(--sidebar-rail-face);
+  height: var(--sidebar-rail-face);
   font-size: 12px;
 }
 /*
@@ -11809,7 +12174,13 @@ html[data-menu-overlay] .shell {
 /* An agent's row breathes: the face 12px from its words, a little air between the name and its line. Its face keeps
    the 8px from the plate's edges every face row has. */
 .sidebar:not([data-rail="true"]) :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand]) {
-  gap: 12px;
+  gap: var(--sidebar-agent-gap);
+}
+.sidebar:not([data-rail="true"])
+  :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
+  > .ac-avatar--sm {
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
 }
 .sidebar:not([data-rail="true"])
   :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
@@ -12683,21 +13054,22 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
   .sidebar__agents-plain
   :is([data-agent-row] > .sidebar__item, .sidebar__item[data-right-hand])
   > .ac-avatar--sm {
-  width: 40px;
-  height: 40px;
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
   font-size: 15px;
 }
 /*
- * New agent under a personal workspace's agents: an empty face the exact box of the agents' (40 in the list, 28 on the
- * rail, radius 30% of the side, the tile's hairline), so the row lines up with theirs; its name centres on it like a
- * name alone.
+ * New agent under the agents (ADR 0159, ADR 0164): an empty face the exact box of the agents' faces in this sidebar
+ * (its tokens: a team's message-size face, a personal list's 40, the rail's 28), radius 30% of the side as their framed
+ * tile (`.ac-avatar--framed`), the tile's hairline, as far from its name as theirs; its name centres on it like a name
+ * alone.
  */
 .sidebar__new-agent-face {
   display: grid;
   flex: none;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--sidebar-rail-face);
+  height: var(--sidebar-rail-face);
   border-radius: 30%;
   background: var(--plate-soft, var(--plate));
   /* The tile's own edge (`.ac-avatar--framed::before`): the hairline and the faint top highlight. */
@@ -12712,10 +13084,11 @@ html:not([data-pointer]) .sidebar__bell:focus-visible {
     inset 0 1px 0 rgba(255, 255, 255, 0.07);
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent-face {
-  width: 40px;
-  height: 40px;
+  width: var(--sidebar-agent-face);
+  height: var(--sidebar-agent-face);
 }
 .sidebar:not([data-rail="true"]) .sidebar__new-agent {
+  gap: var(--sidebar-agent-gap);
   padding-block: 8px;
   color: var(--muted);
 }
@@ -13420,6 +13793,11 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 }
 .key-row {
   padding: var(--row-py) var(--space-4);
+}
+/* Their actions are small ghost buttons, 32px boxes: the name's line takes their axis, as the kit's MediaRow gives a
+   plated one's, so they keep the row's padding above as the words under them keep it below. */
+:is(.ai-accounts__row, .key-row):has(> .ac-mediarow__end .ac-btn--sm) {
+  --mediarow-axis: max(var(--mediarow-face), var(--control-h-sm));
 }
 .key-row__tail {
   gap: var(--space-3);

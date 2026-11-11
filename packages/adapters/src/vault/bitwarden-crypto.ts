@@ -1,5 +1,5 @@
 /**
- * The part of Bitwarden's cryptography the Vault's Bitwarden source needs (ADR 0144), read-only: the master key from
+ * The part of Bitwarden's cryptography the Vault's Bitwarden source needs (ADR 0144): the master key from
  * the master password (PBKDF2-SHA256 or Argon2id, with the account's own settings), its HKDF stretch, the user key it
  * protects, per-cipher keys and EncStrings of type 2 (AES-256-CBC with an HMAC-SHA256 checked before decrypting).
  *
@@ -247,10 +247,7 @@ export function decryptUserKey(protectedKey: string, masterKey: Uint8Array): Sym
   }
 }
 
-/**
- * Encrypts bytes as an EncString of type 2. The Vault never writes to Bitwarden: this exists so tests build their
- * fixtures with the same primitives the decryption uses.
- */
+/** Encrypts bytes as an EncString of type 2: a random IV, then the MAC over `iv || data` that decryption checks. */
 export function encryptBytes(plain: Uint8Array, key: SymmetricKey, iv?: Uint8Array): string {
   const nonce = iv ?? globalThis.crypto.getRandomValues(new Uint8Array(IV_BYTES));
   const data = cbc(key.encKey, nonce).encrypt(plain);
@@ -258,7 +255,7 @@ export function encryptBytes(plain: Uint8Array, key: SymmetricKey, iv?: Uint8Arr
   return `2.${toBase64(nonce)}|${toBase64(data)}|${toBase64(mac)}`;
 }
 
-/** Text as an EncString of type 2 (tests only, see `encryptBytes`). */
+/** Text as an EncString of type 2 (a new login's name, username, website, password). */
 export function encryptString(plain: string, key: SymmetricKey, iv?: Uint8Array): string {
   return encryptBytes(utf8(plain), key, iv);
 }

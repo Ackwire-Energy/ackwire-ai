@@ -17,7 +17,6 @@
  * "write" and it waits for a decision; `delete_customer` is sensitive).
  */
 import type { ApiClient, CustomServer, CustomTool, ToolAccess } from "@agenteschat/client";
-import { sameServer } from "@agenteschat/client/lib/custom-tools";
 import { partsOf } from "@agenteschat/client/lib/tool-review";
 import { clone, type MockContext, MockNotFoundError, mockId } from "./context";
 
@@ -65,7 +64,7 @@ const tool = ([name, description, readOnly]: [string, string, boolean | null], n
 export function createMockCustomConnectors(
   ctx: MockContext,
   log: (method: string, ...args: unknown[]) => void = () => {},
-  /** A server's first account connected (the backend gives it to every agent). */
+  /** An account connected (the backend gives it to every agent). */
   onConnected: (orgId: string, serverId: string) => Promise<void> = async () => {},
 ): ApiClient["customConnectors"] & {
   rename(orgId: string, id: string, label: string): CustomServer | null;
@@ -99,8 +98,6 @@ export function createMockCustomConnectors(
         return { status: "connected", server: clone(find(orgId, input.connectionId)), outcome: "reconnected" };
       }
       const now = ctx.now();
-      // The same server as the backend tells it (`serverKey`): a trailing slash or case doesn't make another.
-      const first = !list(orgId).some((s) => sameServer(s.serverUrl, input.serverUrl));
       const base = input.label?.trim() || new URL(input.serverUrl).hostname;
       const taken = new Set(list(orgId).map((s) => s.label.toLowerCase()));
       let label = base;
@@ -116,7 +113,7 @@ export function createMockCustomConnectors(
         createdAt: now.toISOString(),
       };
       list(orgId).push(server);
-      if (first) await onConnected(orgId, server.id);
+      await onConnected(orgId, server.id);
       // A real OAuth flow leaves for the provider; the mock connects at once.
       return { status: "connected", server: clone(server), outcome: "connected" };
     },

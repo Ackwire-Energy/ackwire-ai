@@ -28,6 +28,7 @@ export type AppHref =
   | `/settings/computers/${string}`
   | `/settings/devices/${string}`
   | `/settings/skills/${string}`
+  | `/memory/${string}`
   | `/consultation/${string}?channel=${string}`
   | "/routines"
   | "/issues"

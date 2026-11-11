@@ -7,6 +7,7 @@ import {
   useConsultations,
 } from "@agenteschat/client";
 import {
+  asExchanges,
   type ConsultLineState,
   type ConsultPairItem,
   consultLineKey,
@@ -59,8 +60,9 @@ const NO_REACHED: ReadonlySet<string> = new Set();
 
 /**
  * The questions a pair row stands for: those of run `runId` on the run's first message here (`messageId`; null: its
- * live turn, which shows them until the run posts), and those a reply's `meta.consulted` names that the list
- * doesn't have. `reached`: hand-offs the message's reach lines show (`reachHandoffs`), left out here.
+ * live turn, which shows them until the run posts), with the rest of their exchange when `runId` asked first
+ * (`asExchanges`), and those a reply's `meta.consulted` names that the list doesn't have. `reached`: hand-offs the
+ * message's reach lines show (`reachHandoffs`), left out here.
  */
 export function useRunConsults(
   runId: string | null | undefined,
@@ -72,7 +74,11 @@ export function useRunConsults(
   const orgId = useOrgId();
   const qc = useQueryClient();
   const list = useConsultations(orgId, where.channelId, Boolean(runId));
-  const group = useMemo(() => (runId ? groupsByRun(list.data ?? []).get(runId) : undefined), [list.data, runId]);
+  const group = useMemo(
+    () => (runId ? groupsByRun(asExchanges(list.data ?? [])).get(runId) : undefined),
+    [list.data, runId],
+  );
+  const listed = useMemo(() => new Set((list.data ?? []).map((c) => c.id)), [list.data]);
   const loaded =
     group && runId
       ? [
@@ -85,10 +91,10 @@ export function useRunConsults(
   const draws = group !== undefined && (messageId === null ? first === null : !first || first === messageId);
   return useMemo(() => {
     const run = group ?? NO_ITEMS;
-    const extra = consulted.filter((c) => !run.some((r) => r.id === c.consultationId)).map(pairItemOf);
+    const extra = consulted.filter((c) => !listed.has(c.consultationId)).map(pairItemOf);
     const mine = !draws ? NO_ITEMS : reached.size === 0 ? run : run.filter((c) => !reached.has(c.id));
     return extra.length === 0 ? mine : [...mine, ...extra];
-  }, [group, consulted, draws, reached]);
+  }, [group, listed, consulted, draws, reached]);
 }
 
 /**
@@ -133,7 +139,7 @@ export function ConsultPairRow({
   const c = useColors();
   const live = items.some((x) => x.status === "open");
   const now = useTick(live);
-  const pair = consultPair(items, now);
+  const pair = consultPair(items, now, askerId);
   if (!pair) return null;
   const nameOf = (id: string) => dir.agentById.get(id)?.name ?? t("mobile.chat.someone");
   const from = nameOf(askerId);

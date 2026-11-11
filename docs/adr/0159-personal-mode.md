@@ -122,3 +122,8 @@ Opening a personal workspace with no start place chosen (ADR 0108, "Início") la
 browser showed there, else on the right hand's; the home only when there is neither. A chosen channel or "where I left
 off" works as in a team workspace (web `routes/org.$orgId.index.tsx`).
 
+
+## Amendment (2026-11-10): "New agent" opens the card (§3)
+
+ADR 0164: the sidebar's "New agent" opens the same card as a team's, with the personal starters; the one-sentence ask
+sent to the right hand is gone.

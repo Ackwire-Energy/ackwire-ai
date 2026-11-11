@@ -496,10 +496,11 @@ export function connectionState(c: Pick<VaultConnection, "status" | "errorCode">
   return { key: "mobile.vault.connection.ready", icon: "check" };
 }
 
-/** "Reads Agents · 12 items · synced 2 min ago". */
+/** "Reads Agents · read-only · 12 items · synced 2 min ago" (read-only: its credential can't save new logins). */
 export function connectionLine(t: TFunction, locale: string, c: VaultConnection, now = new Date()): string {
   return [
     c.label ? t("mobile.vault.connection.reads", { label: c.label }) : null,
+    c.readOnly ? t("mobile.vault.connection.noWrites") : null,
     t("mobile.vault.connection.items", { count: c.itemCount }),
     c.syncedAt ? t("mobile.vault.connection.synced", { when: relativeTime(t, locale, c.syncedAt, now) }) : null,
   ]

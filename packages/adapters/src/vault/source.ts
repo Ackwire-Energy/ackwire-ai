@@ -4,13 +4,15 @@
  * module can add more through `AgentesModule.adapters()` (`vaultSources`, merged by kind).
  *
  * Nothing outside a source knows which one it is: access, history, the box to the computer and the runner's checks
- * are the same for every item. A source only connects, lists metadata and resolves one value when asked.
+ * are the same for every item. A source connects, lists metadata and resolves one value when asked; one that can also
+ * keeps a new login and changes one it holds (`createLogin`, `updateLogin`). No source deletes anything.
  *
  * Rules every source keeps (a shared contract test runs them):
  * - `list` returns metadata only. A password, a key or anything secret never appears in a `VaultSourceItem`.
  * - `reveal` returns one value for one field of one item and keeps nothing.
  * - Every failure is a `VaultSourceError` with a code. A provider's own message is never stored or shown: it may
  *   carry a token.
+ * - A write a credential may not make is `read_only`, never `auth_failed`: the connection still reads.
  * - `connect` validates what the person typed and returns what to keep, split into `config` (shown on screen) and
  *   `secret` (sealed at rest by the engine, never returned to a client).
  */
@@ -86,7 +88,8 @@ export type VaultSourceErrorCode =
   | "rate_limited"
   | "unreachable"
   | "unsupported"
-  | "invalid_input";
+  | "invalid_input"
+  | "read_only";
 
 /** A failure a person or an agent can act on. `message` is ours (English), never the provider's text. */
 export class VaultSourceError extends Error {
@@ -113,6 +116,28 @@ export interface VaultSourceContext {
   orgId: string;
 }
 
+/** A login for a source to keep. `website` is an HTTPS origin. */
+export interface VaultNewLogin {
+  title: string;
+  username?: string;
+  password: string;
+  website?: string;
+  match?: VaultMatch;
+  notes?: string;
+}
+
+/** What changes on a login a source holds: only the fields given. */
+export interface VaultLoginChange {
+  username?: string;
+  password?: string;
+}
+
+/**
+ * The `config` key that says a connection's credential may only read (`"true"`): set by the engine at the first
+ * write the source refuses as `read_only`, and gone when the person connects again (`connect` returns a new config).
+ */
+export const VAULT_READ_ONLY_CONFIG = "readOnly";
+
 export interface VaultSource {
   readonly kind: string;
   describe(): VaultSourceDescriptor;
@@ -129,6 +154,21 @@ export interface VaultSource {
   list(connection: VaultConnection, signal?: AbortSignal): Promise<VaultSourceItem[]>;
   /** One value, read now and kept nowhere. Throws `VaultSourceError` (`not_found` when the item or field is gone). */
   reveal(connection: VaultConnection, ref: string, field: VaultSecretField, signal?: AbortSignal): Promise<string>;
+  /**
+   * Keeps a new login where the connection reads from, and returns it as `list` would (never its password). Absent:
+   * the source can't. Throws `VaultSourceError` (`read_only` when the credential may only read).
+   */
+  createLogin?(connection: VaultConnection, login: VaultNewLogin, signal?: AbortSignal): Promise<VaultSourceItem>;
+  /**
+   * Changes a login the connection reads, everything else on it kept as it is, and returns it as `list` would.
+   * Absent: the source can't. Throws `VaultSourceError` (`read_only`, or `not_found` when the login is gone).
+   */
+  updateLogin?(
+    connection: VaultConnection,
+    ref: string,
+    change: VaultLoginChange,
+    signal?: AbortSignal,
+  ): Promise<VaultSourceItem>;
 }
 
 /** Sources by kind, as the engine receives them (the built-in one is the engine's own). */

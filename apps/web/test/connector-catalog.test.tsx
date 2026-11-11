@@ -4,9 +4,12 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { AccessInput, ConnectorDef } from "@agenteschat/client";
+import { connectedSummary } from "@agenteschat/client/lib/connected";
 import { icons } from "@agenteschat/ui";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import type { TFunction } from "i18next";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
+import { createI18n } from "@/i18n";
 import { setNavigateAway } from "@/lib/navigate";
 import { pick, rowMenu, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
@@ -214,9 +217,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(notion.textContent).toContain("Buscar e ler páginas");
     expect(notion.textContent).toContain("Um clique: você autoriza na página do serviço");
     // What connecting changes, as one line under what it can do (no heading of its own).
-    expect(notion.textContent).toContain(
-      "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.",
-    );
+    expect(notion.textContent).toContain("Ao conectar, todos os agentes podem usar. Dá para ajustar depois.");
     expect(within(notion).queryByRole("heading", { level: 4, name: "Depois de conectar" })).toBeNull();
     // × goes back to the catalog; another tile opens its own.
     await click(within(notion).getByRole("button", { name: "Fechar detalhe" }));
@@ -301,7 +302,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(names(dialog)).toEqual(["GitHub", "Zapier", "Não achou?"]);
   });
 
-  test("what connecting does to who uses it: a new service is everyone's, a new sign-in keeps who uses it, another account starts with none", async () => {
+  test("what connecting does to who uses it: a new service is everyone's, a new sign-in keeps who uses it, another account is everyone's too", async () => {
     const api = createFakeApi(seedState());
     await api.customConnectors.connect(ORG_ID, {
       serverUrl: "https://oauth.zapier.example/mcp/",
@@ -321,7 +322,7 @@ describe("Adicionar conector: one catalog", () => {
       await pressEsc(service(name));
       return text;
     };
-    const everyone = "Ao conectar, todos os agentes podem usar. Em seguida, você escolhe o acesso de cada um.";
+    const everyone = "Ao conectar, todos os agentes podem usar. Dá para ajustar depois.";
     expect(await detail("Notion", "Notion")).toContain(everyone);
     expect(await detail("GitHub, conectado", "GitHub")).toContain("Substitui o login atual. Quem usa continua igual.");
     expect(await detail("Zapier, conectado", "Zapier")).toContain("Cada conta tem quem usa e níveis próprios.");
@@ -342,12 +343,13 @@ describe("Adicionar conector: one catalog", () => {
     dialog = await catalog();
     await click(within(dialog).getByRole("button", { name: /Não achou/ }));
     await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
-    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
+    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Dá para ajustar depois.");
     await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.zapier.example/mcp");
     // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
     expect(flow().textContent).toContain(
-      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir.",
     );
+    expect(flow().textContent).not.toContain("sem agentes");
   });
 
   test("rules: how it connects, search", () => {
@@ -374,8 +376,14 @@ describe("Adicionar conector: one catalog", () => {
 });
 
 const REVIEW = "Revise o que o agente pode fazer sozinho";
+const WAITING = "Os agentes só recebem as ferramentas quando você continuar, nos níveis que sugerimos.";
+/** "Ajustar" on the confirmation: on to the detail. */
+const adjust = async () => {
+  await click(within(screen().getAllByRole("dialog").at(-1) as HTMLElement).getByRole("button", { name: "Ajustar" }));
+  await settle(4);
+};
 
-describe("the connect flow: conectar → o que faz → quem pode usar", () => {
+describe("the connect flow: conectar → conectado; Ajustar → o que faz → quem pode usar", () => {
   test("a one-click server that asks for a key; tools reviewed by subject; a level per agent", async () => {
     const { state, dialog } = await open();
     await pick(dialog, "Linear");
@@ -383,7 +391,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     expect(flow().textContent).toContain("Conectar Linear");
     const steps = within(flow()).getByRole("list", { name: "Passos" });
     expect(within(steps).getAllByRole("listitem")[0]?.getAttribute("aria-current")).toBe("step");
-    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Você muda isso no passo 3.");
+    expect(flow().textContent).toContain("Ao conectar, todos os agentes podem usar. Dá para ajustar depois.");
 
     await click(within(flow()).getByRole("button", { name: "Continuar no Linear" }));
     await settle(4);
@@ -400,7 +408,14 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
 
-    // Step 2: everything comes classified; only the ambiguous tool waits for a decision.
+    // The confirmation: no steps, one sentence. No one gave this server's tools a level yet, and it says so.
+    expect(screen().getByRole("dialog", { name: "Linear conectado" })).toBe(flow());
+    expect(within(flow()).queryByRole("list", { name: "Passos" })).toBeNull();
+    expect(flow().querySelector(".cflow__text")?.textContent).toBe(`${WAITING} 1 ação pede aprovação no chat.`);
+    expect(document.body.textContent).not.toContain("Linear conectado.");
+    await adjust();
+
+    // Ajustar, step 2: everything comes classified; only the ambiguous tool waits for a decision.
     expect(screen().getByRole("dialog", { name: REVIEW })).toBeTruthy();
     expect(flow().textContent).toContain("Classificamos as 5 ferramentas do Linear.");
     const decide = within(flow()).getByRole("region", { name: "Precisam da sua decisão · 1" });
@@ -504,7 +519,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await type(within(flow).getByLabelText("Chave de API"), "lin_api_123456");
     await click(within(flow).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
-    expect(screen().getByRole("dialog", { name: REVIEW })).toBeTruthy();
+    expect(screen().getByRole("dialog", { name: "Linear conectado" })).toBeTruthy();
   });
 
   test("a one-click server the catalog lists without a key (Intercom on the Cloud) offers no API key", async () => {
@@ -575,6 +590,7 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await type(within(flow()).getByLabelText("Nome"), "Suporte");
     await click(within(flow()).getByRole("button", { name: "Conectar" }));
     await settle(4);
+    await adjust();
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(4);
     expect(screen().getByRole("dialog", { name: "Quem pode usar Suporte" })).toBeTruthy();
@@ -617,6 +633,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await type(within(flow()).getByLabelText("Chave de API"), "ghp_abcdef123456");
     await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
     await settle(4);
+    expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
+    await adjust();
     expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(6);
@@ -648,6 +666,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await renderApp(`/org/${ORG_ID}/settings/connectors?connected=github`, { api });
     await settle(8);
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
+    await adjust();
     expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
     // Ours are classified by scope: read-only, by subject; each tool shows its level.
     await type(within(flow()).getByRole("searchbox", { name: "Buscar ferramenta" }), "merge");
@@ -707,6 +727,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
       code: "c1",
     });
     const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+    expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
+    await adjust();
     expect(screen().getByRole("dialog", { name: "O que GitHub faz" })).toBeTruthy();
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(6);
@@ -744,6 +766,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
       serverUrl: "https://oauth.suporte.example.com",
       label: "Suporte",
     });
+    expect(screen().getByRole("dialog", { name: "Suporte conectado" })).toBe(flow());
+    await adjust();
     expect(screen().getByRole("dialog", { name: REVIEW }).textContent).toContain("ferramentas do Suporte");
     cleanup();
 
@@ -756,6 +780,8 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     if (res.status !== "connected") throw new Error("expected connected");
     await renderApp(`/org/${ORG_ID}/settings?connected=custom:${res.server.id}`, { api });
     await settle(8);
+    expect(screen().getByRole("dialog", { name: "himetrica conectado" })).toBe(flow());
+    await adjust();
     expect(screen().getByRole("dialog", { name: REVIEW }).textContent).toContain("ferramentas do himetrica");
     await click(within(flow()).getByRole("button", { name: "Continuar" }));
     await settle(6);
@@ -815,7 +841,9 @@ describe("the connect flow: conectar → o que faz → quem pode usar", () => {
     await type(within(flow).getByLabelText("Nome"), "Suporte");
     await click(within(flow).getByRole("button", { name: "Conectar" }));
     await settle(4);
-    await click(within(screen().getByRole("dialog", { name: REVIEW })).getByRole("button", { name: "Cancelar" }));
+    await click(
+      within(screen().getByRole("dialog", { name: "Suporte conectado" })).getByRole("button", { name: "Fechar" }),
+    );
     await settle(4);
     expect(mcps().textContent).toContain("Suporte");
     expect(screen().getByRole("region", { name: "Conectores" }).textContent).not.toContain("Suporte");
@@ -903,14 +931,15 @@ describe("several accounts of one service", () => {
     expect(within(flow()).queryByLabelText("Chave de API")).toBeNull();
   });
 
-  test("another account: its name first, then its tools, then nobody uses it until you choose", async () => {
+  test("another account: every agent's too; Ajustar asks its name first, then its tools, then who uses it", async () => {
     const { state } = await twoAccounts();
     await click(within(await rowMenu("Zapier")).getByRole("menuitem", { name: "Adicionar outra conta" }));
     expect(screen().getByRole("dialog", { name: "Outra conta do Zapier" })).toBe(flow());
     // No account here was named by its provider, so step 1 can't tell accounts apart and asks for one not yet here.
     expect(flow().textContent).toContain(
-      "Entre numa conta que ainda não está conectada, a gente não consegue conferir. Ela começa sem agentes, menos os que têm acesso a tudo.",
+      "Entre numa conta que ainda não está conectada, a gente não consegue conferir.",
     );
+    expect(flow().textContent).not.toContain("sem agentes");
     await click(within(flow()).getByRole("button", { name: "Continuar no Zapier" }));
     await settle(4);
     const sent = state.calls.filter((c) => c.method === "customConnectors.connect").at(-1)?.args[1] as {
@@ -918,7 +947,8 @@ describe("several accounts of one service", () => {
       label?: string;
     };
     expect([sent.connectionId, sent.label]).toEqual([undefined, "Zapier"]);
-    expect(document.body.textContent).toContain("Zapier 3 conectado.");
+    expect(screen().getByRole("dialog", { name: "Zapier 3 conectado" })).toBe(flow());
+    await adjust();
     // A name the server numbered: asked above its tools, and a name another account has is refused there.
     const name = within(flow()).getByLabelText("Nome desta conta") as HTMLInputElement;
     expect(name.value).toBe("Zapier 3");
@@ -935,13 +965,13 @@ describe("several accounts of one service", () => {
     });
     expect(screen().getByRole("dialog", { name: "Quem pode usar Zapier Loja" })).toBe(flow());
     expect(levels(flow(), ["Nível de todos os agentes", "Nível de Ada", "Nível de Atlas"])).toEqual([
-      "Sem acesso",
-      "Sem acesso",
-      "Sem acesso",
+      "Ler e escrever",
+      "Ler e escrever",
+      "Ler e escrever",
     ]);
   });
 
-  test("Quem usa is per account: the first is every agent's, the second nobody's", async () => {
+  test("Quem usa is per account, and every account starts as every agent's", async () => {
     await twoAccounts();
     const who = async (name: string) => {
       await click(within(section()).getByRole("button", { name: `Quem usa ${name}` }));
@@ -952,7 +982,7 @@ describe("several accounts of one service", () => {
       return shown;
     };
     expect(await who("Zapier")).toEqual(["Ler e escrever", "Ler e escrever"]);
-    expect(await who("Zapier 2")).toEqual(["Sem acesso", "Sem acesso"]);
+    expect(await who("Zapier 2")).toEqual(["Ler e escrever", "Ler e escrever"]);
   });
 
   test("Renomear: the new name everywhere, a name another connector has is refused in place", async () => {
@@ -977,7 +1007,7 @@ describe("several accounts of one service", () => {
     expect(within(section()).getByRole("button", { name: "Quem usa Zapier Loja" })).toBeTruthy();
   });
 
-  test("back from OAuth, the outcome says what happened: only a new account goes on to its tools", async () => {
+  test("back from OAuth, the outcome says what happened: only a new account gets the confirmation", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     const res = await api.customConnectors.connect(ORG_ID, {
@@ -992,6 +1022,143 @@ describe("several accounts of one service", () => {
     await settle(8);
     expect(document.body.textContent).toContain("Zapier reconectado.");
     expect(screen().queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("the confirmation that ends connecting", () => {
+  const flow = () => screen().getAllByRole("dialog").at(-1) as HTMLElement;
+  const sentence = () => flow().querySelector(".cflow__text")?.textContent;
+  const buttons = () =>
+    [...flow().querySelectorAll(".ac-dialog__foot button")].map((b) => (b as HTMLButtonElement).textContent);
+  const connection = (connector: string, label: string) => ({
+    id: `conn-${connector}`,
+    connector,
+    label,
+    serverUrl: "https://mcp.example.com/mcp",
+    authType: "api_key" as const,
+    accountLabel: null,
+    tokenExpiresAt: null,
+    createdAt: new Date().toISOString(),
+    revokedAt: null,
+  });
+
+  test("ours: everyone can use it and how many actions ask; Pronto closes and nothing is saved", async () => {
+    const { state, dialog } = await open();
+    await pick(dialog, "GitHub");
+    await click(within(flow()).getByText("Conectar com uma chave de API"));
+    await type(within(flow()).getByLabelText("Chave de API"), "ghp_abcdef123456");
+    await click(within(flow()).getByRole("button", { name: "Conectar com a chave" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: "GitHub conectado" })).toBe(flow());
+    expect(sentence()).toBe("Todos os agentes podem usar. 1 ação pede aprovação no chat.");
+    expect(buttons()).toEqual(["Ajustar", "Pronto"]);
+    await click(within(flow()).getByRole("button", { name: "Pronto" }));
+    await settle(4);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(state.calls.filter((c) => c.method === "access.set" || c.method === "customConnectors.saveTools")).toEqual(
+      [],
+    );
+    // Its detail stays one click away on its row.
+    const section = screen().getByRole("region", { name: "Conectores" });
+    expect(within(section).getByRole("button", { name: "Quem usa GitHub" })).toBeTruthy();
+  });
+
+  test("nothing asks: the sentence stops at who can use it, never '0 ações'", async () => {
+    const state = seedState({ connections: [connection("sentry", "Sentry")] });
+    await renderApp(`/org/${ORG_ID}/settings/connectors?connected=sentry`, { api: createFakeApi(state) });
+    await settle(8);
+    expect(screen().getByRole("dialog", { name: "Sentry conectado" })).toBe(flow());
+    expect(sentence()).toBe("Todos os agentes podem usar.");
+  });
+
+  test("a server whose tools have no level yet: it says so, and Continuar saves the suggested ones", async () => {
+    const { state, dialog } = await open();
+    await click(within(dialog).getByRole("button", { name: /Não achou/ }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.suporte.example.com");
+    await type(within(flow()).getByLabelText("Nome"), "Suporte");
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    expect(sentence()).toBe(`${WAITING} 1 ação pede aprovação no chat.`);
+    expect(buttons()).toEqual(["Ajustar", "Continuar"]);
+    await click(within(flow()).getByRole("button", { name: "Continuar" }));
+    await settle(6);
+    expect(screen().queryByRole("dialog")).toBeNull();
+    const saved = state.calls.find((c) => c.method === "customConnectors.saveTools")?.args[2] as {
+      tools: { name: string; access: string; confirmed: boolean }[];
+    };
+    expect(Object.fromEntries(saved.tools.map((x) => [x.name, x.access]))).toEqual({
+      list_tickets: "read",
+      get_ticket: "read",
+      create_ticket: "write",
+      close_ticket: "write",
+      delete_customer: "approval",
+    });
+    // The one its name couldn't decide keeps waiting for a person, at our suggestion meanwhile.
+    expect(saved.tools.filter((x) => !x.confirmed).map((x) => x.name)).toEqual(["close_ticket"]);
+    expect(state.calls.filter((c) => c.method === "access.set")).toEqual([]);
+  });
+
+  test("a server whose tools already have their levels: Pronto, with what asks counted from them", async () => {
+    const api = createFakeApi(seedState());
+    const res = await api.customConnectors.connect(ORG_ID, {
+      serverUrl: "https://oauth.suporte.example.com",
+      label: "Suporte",
+      returnTo: "/",
+    });
+    if (res.status !== "connected") throw new Error("expected connected");
+    await api.customConnectors.saveTools(ORG_ID, res.server.id, {
+      label: "Suporte",
+      tools: res.server.tools.map((x) => ({
+        name: x.name,
+        access: x.readOnlyHint ? "read" : "approval",
+        label: x.name,
+      })),
+    });
+    await renderApp(`/org/${ORG_ID}/settings/connectors?connected=custom:${res.server.id}`, { api });
+    await settle(8);
+    expect(sentence()).toBe("Todos os agentes podem usar. 3 ações pedem aprovação no chat.");
+    expect(buttons()).toEqual(["Ajustar", "Pronto"]);
+  });
+
+  test("a name longer than a connection can take: whole in the title, the two buttons still there", async () => {
+    const long = "Atendimento e Suporte ao Cliente da Loja de Departamentos Internacional Example (Produção 2)";
+    expect(long.length).toBeGreaterThan(80);
+    const { dialog } = await open();
+    await click(within(dialog).getByRole("button", { name: /Não achou/ }));
+    await click(within(service("Outro serviço")).getByRole("button", { name: "Conectar pelo endereço" }));
+    await type(within(flow()).getByLabelText("Endereço do servidor MCP"), "https://oauth.suporte.example.com");
+    await type(within(flow()).getByLabelText("Nome"), long);
+    await click(within(flow()).getByRole("button", { name: "Conectar" }));
+    await settle(4);
+    expect(screen().getByRole("dialog", { name: `${long} conectado` })).toBe(flow());
+    expect(buttons()).toEqual(["Ajustar", "Continuar"]);
+  });
+
+  test("the sentence in both languages: one action, many, none", () => {
+    const of = (lng: "pt-BR" | "en", sensitive: number) =>
+      connectedSummary(createI18n(lng).t as TFunction, {
+        server: null,
+        pending: 0,
+        def: {
+          ...(CATALOG.connectors.find((d) => d.id === "github") as ConnectorDef),
+          tools: Array.from({ length: 3 }, (_, i) => ({
+            name: `tool_${i}`,
+            scope: "github:x",
+            sensitive: i < sensitive,
+          })),
+        },
+      });
+    expect([0, 1, 2].map((n) => of("pt-BR", n))).toEqual([
+      "Todos os agentes podem usar.",
+      "Todos os agentes podem usar. 1 ação pede aprovação no chat.",
+      "Todos os agentes podem usar. 2 ações pedem aprovação no chat.",
+    ]);
+    expect([0, 1, 2].map((n) => of("en", n))).toEqual([
+      "Every agent can use it.",
+      "Every agent can use it. 1 action asks for approval in the chat.",
+      "Every agent can use it. 2 actions ask for approval in the chat.",
+    ]);
   });
 });
 
@@ -1043,6 +1210,11 @@ describe("a server whose tools can't be read", () => {
     };
     await renderApp(`/org/${ORG_ID}/settings?connected=custom:${res.server.id}`, { api });
     await settle(8);
+    // The confirmation says it too, under who can use it.
+    const done = screen().getByRole("dialog", { name: "Suporte conectado" });
+    expect(done.querySelector(".cflow__text")?.textContent).toBe("Todos os agentes podem usar.");
+    expect(within(done).getByRole("alert").textContent).toBe(`Não deu para ler as ferramentas do conector: ${reason}`);
+    await adjust();
     const review = () => screen().getByRole("dialog", { name: REVIEW });
     expect(within(review()).getByRole("alert").textContent).toBe(
       `Não deu para ler as ferramentas do conector: ${reason}`,

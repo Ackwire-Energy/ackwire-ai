@@ -57,7 +57,7 @@ test("a paragraph or a list in a stack takes the stack's gap, never its browser 
       .flatMap((r) => r.declarations);
   // An agent's card: "só responde a" sat 13px further than the 12px gap from the bar above and the button below.
   expect(last(reset(layout, ".profile-card__body"), "margin-block")).toBe("0");
-  for (const stack of [".stack-4", ".skill-sheet__main", ".issue-aside", ".cal-side__section"])
+  for (const stack of [".stack-4", ".skill-sheet__main", ".cal-side__section"])
     expect(last(reset(layout, stack), "margin-block")).toBe("0");
   // The kit's cards (settings sections, dialogs' cards) as its forms and fields already did; their notes too.
   for (const stack of [".ac-form", ".ac-dialog__body", ".ac-card"])

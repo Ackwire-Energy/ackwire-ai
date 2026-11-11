@@ -32,7 +32,7 @@ desktop app (macOS, Windows and Linux) in the Desktop workflow (`.github/workflo
 
 ## Checks
 
-CI runs on every pull request. These must pass:
+CI does not start by itself on a pull request: a maintainer runs it on the branch before merging. These must pass:
 
 | Check | Command |
 | --- | --- |

@@ -137,6 +137,12 @@ export const agentRuns = pgTable(
     /** Bumped by the worker while it executes the run; a stale one means the worker died (recovered on boot). */
     heartbeatAt: timestamp({ withTimezone: true }),
     /**
+     * When the work it is doing now began, for the conversation's "thinking for …": set each time it goes back to
+     * work (after waiting for a person, an approval or its computer) and each time it posts and goes on. Null until
+     * then: its first stretch began when it was created. Never `startedAt`, which stays at its first start.
+     */
+    workingSince: timestamp({ withTimezone: true }),
+    /**
      * The computer this run waits for (`waiting_input` with a computer brain
      * and nothing to fall back on, ADR 0032 §5): queued again when it comes
      * back (`resumeRunsWaitingForMachine`). Null otherwise.

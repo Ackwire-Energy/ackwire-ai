@@ -344,6 +344,7 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
     trigger_message_id: string;
     started_at: string | Date | null;
     heartbeat_at: string | Date | null;
+    working_since: string | Date | null;
     created_at: string | Date;
     kind: string;
     pending: string[] | string | null;
@@ -351,7 +352,7 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
   }>(
     // Asking its computer from the line (`computerWaitOf`) it still waits: no "thinking" row for the ask.
     await db.execute(sql`select r.id, r.agent_id, ${shownStatusSql} as status, r.thread_root_id, r.trigger_message_id, r.started_at,
-        r.heartbeat_at, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending,
+        r.heartbeat_at, r.working_since, r.created_at, c.kind, array_to_json(r.pending_message_ids) as pending,
         (r.background or r.work_id is not null) as background
       from ${agentRuns} r join ${channels} c on c.id = r.channel_id
       where r.org_id = ${orgId}::uuid and r.channel_id = ${channelId}::uuid
@@ -359,6 +360,7 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
       order by r.created_at`),
   );
   const iso = (v: string | Date | null) => (v === null ? null : new Date(v).toISOString());
+  const now = Date.now();
   return rows.map((r) => {
     const live = liveTurnOf(r.id);
     return {
@@ -371,6 +373,9 @@ export async function activeRunsIn(db: Database, orgId: string, channelId: strin
       startedAt: iso(r.started_at),
       heartbeatAt: iso(r.heartbeat_at),
       createdAt: iso(r.created_at) as string,
+      // How long the work it is doing now has taken (`agent_runs.working_since`, else since it was created), as a
+      // length and not a time: the app counts on from it by its own clock, whatever that clock says.
+      workingMs: Math.max(0, now - new Date(r.working_since ?? r.created_at).getTime()),
       // Sent while it works and not read yet ("lê na próxima pausa"); the rest it already read.
       pendingMessageIds: pendingIds(r.pending),
       // A routine's work, or long work (ADR 0121): it holds no conversation's working row.

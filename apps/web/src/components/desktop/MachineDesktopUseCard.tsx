@@ -2,7 +2,7 @@ import type { Machine } from "@agenteschat/client";
 import { commandInReason, machineReasonText } from "@agenteschat/client/lib/machines";
 import { Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
-import { CommandBlock } from "../Machines";
+import { CommandBlock } from "../machine-bits";
 import "../browser/browser.css";
 
 /** Both switches desktop use needs, turned on at the computer. */

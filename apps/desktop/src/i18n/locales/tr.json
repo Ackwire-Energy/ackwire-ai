@@ -4,6 +4,10 @@
     "windows": "PC",
     "linux": "bilgisayar"
   },
+  "windowTitle": {
+    "welcome": "Hoş geldiniz",
+    "prefs": "Tercihler"
+  },
   "common": {
     "cancel": "İptal",
     "close": "Kapat",
@@ -82,6 +86,7 @@
     "pauseTomorrow": "Yarın saat 09.00'a kadar",
     "pauseManual": "Ben sürdürene kadar",
     "pauseHint": "Zaten çalışanlar normal şekilde biter.",
+    "pauseHintServer": "Zaten çalışan işler normal şekilde biter. Sunucu açık kalır.",
     "resume": "Ajanları sürdür",
     "open": "agentes.chat'i aç",
     "prefs": "Tercihler…",
@@ -124,8 +129,7 @@
     "quitTitle": "agentes.chat'ten çıkılsın mı?",
     "quitBody": "Uygulama kapalıyken ajanlar bu {{device}} üzerinde çalışamaz. Zaten çalışanlar biter ve uygulamayı yeniden açtığınızda sonucu gönderir.",
     "quitHereBody": "agentes.chat bu {{device}} üzerinde durur: uygulamayı yeniden açana kadar ne burada, ne telefonunuzda ne de ekip arkadaşlarınızın cihazlarında kimse onu kullanamaz.",
-    "quitConfirm": "Çık",
-    "pauseHintServer": "Zaten çalışan işler normal şekilde biter. Sunucu açık kalır."
+    "quitConfirm": "Çık"
   },
   "first": {
     "title": "Ekibiniz ve ajanlarınız bir arada",
@@ -137,9 +141,9 @@
     "addTitle": "Çalışma alanı ekle",
     "addLead": "Zaten sahip olduklarınız, her biri kendi girişiyle burada kalır.",
     "addCloud": "agentes.chat'te çalışma alanı oluştur",
-    "addOwn": "Ekibinizin sunucusunu kullanın",
     "addNew": "Yeni bir workspace mi istiyorsun?",
-    "addNewLink": "Bir tane oluştur"
+    "addNewLink": "Bir tane oluştur",
+    "addOwn": "Ekibinizin sunucusunu kullanın"
   },
   "own": {
     "title": "Kendi sunucunuz",
@@ -162,26 +166,26 @@
     "looking": "Sunucunuz aranıyor…",
     "foundTailnet": "Tailscale ağınızda",
     "foundHere": "agentes.chat burada çalışıyor",
-    "use": "Kullan",
-    "none": "Henüz yok mu? Sunucuda bunu çalıştırın",
-    "noneText": "Bir sunucunun ya da Mac mini'nin terminalinde. Sonunda bu uygulamayı ona bağlayan bir bağlantı gösterir.",
-    "invalid": "Adresi kontrol edin, agentes.ekibiniz.ts.net gibi bir şey olmalı.",
-    "httpRefused": "{{host}} güvenli bağlantı (https) kullanmıyor ve yalnızca bu {{device}} üzerindeki sunucular onsuz çalışabilir. Onun https adresini ya da Tailscale adresini kullanın.",
-    "noOwner": "{{host}} henüz bir sahibe sahip değil. Sunucuyu kuran kişi, sahip hesabını oluşturmak için bir bağlantı aldı: o bağlantıyı bu {{device}} üzerinde ya da telefonunuzda açın.",
-    "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve sunucunun açık olduğunu kontrol edin, sonra tekrar deneyin.",
-    "unreachableHere": "Bu {{device}} üzerinde {{host}} adresinde yanıt veren yok. agentes.chat'i burada başlatın, sonra tekrar deneyin.",
-    "certificate": "{{host}} sertifikası geçerli değil. Sunucuyu yöneten kişiyle konuşun.",
-    "notAgentes": "{{host}} bir agentes.chat sunucusu değil. Adresi kontrol edin.",
-    "serverTooOld": "{{host}} bu uygulamayla çalışmak için güncellenmeli.",
-    "appTooOld": "{{host}} sunucusunu kullanmak için uygulamayı güncelleyin.",
     "foundNoOwner": "Sahip hesabını bekliyor",
+    "use": "Kullan",
     "setUp": "Kur",
     "noneFound": "Sunucu bulunamadı.",
     "lookAgain": "Tekrar ara",
     "tailnetOff": "Bu {{device}} üzerinde Tailscale kapalı, bu yüzden Tailscale ağınızdaki sunucular burada görünmüyor.",
     "addressHint": "https ile başlayan bir adres ya da .ts.net ile biten Tailscale adresi.",
     "checkUpdates": "Güncellemeleri denetle",
-    "unreachableTailnet": "Tailscale ağınızdaki {{host}} sunucusuna ulaşamıyoruz. Bu {{device}} üzerinde Tailscale'i açın, bağlanın ve tekrar deneyin."
+    "none": "Henüz yok mu? Sunucuda bunu çalıştırın",
+    "noneText": "Bir sunucunun ya da Mac mini'nin terminalinde. Sonunda bu uygulamayı ona bağlayan bir bağlantı gösterir.",
+    "invalid": "Adresi kontrol edin, agentes.ekibiniz.ts.net gibi bir şey olmalı.",
+    "httpRefused": "{{host}} güvenli bağlantı (https) kullanmıyor ve yalnızca bu {{device}} üzerindeki sunucular onsuz çalışabilir. Onun https adresini ya da Tailscale adresini kullanın.",
+    "noOwner": "{{host}} henüz bir sahibe sahip değil. Sunucuyu kuran kişi, sahip hesabını oluşturmak için bir bağlantı aldı: o bağlantıyı bu {{device}} üzerinde ya da telefonunuzda açın.",
+    "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve sunucunun açık olduğunu kontrol edin, sonra tekrar deneyin.",
+    "unreachableTailnet": "Tailscale ağınızdaki {{host}} sunucusuna ulaşamıyoruz. Bu {{device}} üzerinde Tailscale'i açın, bağlanın ve tekrar deneyin.",
+    "unreachableHere": "Bu {{device}} üzerinde {{host}} adresinde yanıt veren yok. agentes.chat'i burada başlatın, sonra tekrar deneyin.",
+    "certificate": "{{host}} sertifikası geçerli değil. Sunucuyu yöneten kişiyle konuşun.",
+    "notAgentes": "{{host}} bir agentes.chat sunucusu değil. Adresi kontrol edin.",
+    "serverTooOld": "{{host}} bu uygulamayla çalışmak için güncellenmeli.",
+    "appTooOld": "{{host}} sunucusunu kullanmak için uygulamayı güncelleyin."
   },
   "here": {
     "title": "agentes.chat'i bu {{device}} üzerinde çalıştırın",
@@ -242,6 +246,7 @@
       "back": "Cihazlarınızdan erişim kapatıldıktan sonra agentes.chat bu {{device}} üzerinde yeniden yanıt vermedi."
     },
     "serveFix": "Tailscale'i tailscale.com adresinden yükleyin.",
+    "connectTray": "Saatin yanındaki simgesinden bağlayın.",
     "operatorRun": "Bu izni terminalde bir kez verin:",
     "turnOn": "Aç",
     "copyDetails": "Ayrıntıları kopyala",
@@ -250,14 +255,13 @@
     "notifyFailedBody": "Ne olduğunu görmek için agentes.chat'i açın.",
     "already": "agentes.chat bu {{device}} üzerinde zaten kurulu",
     "alreadyText": "Terminalden kuruldu, kendi başına çalışıyor. Bu uygulamada kullanın.",
+    "alreadyDocker": "Docker ile kuruldu, kendi başına çalışıyor. Bu uygulamada kullanın.",
     "useIt": "Kullan",
     "notRunning": "agentes.chat bu {{device}} üzerinde kurulu ama çalışmıyor",
     "notRunningText": "Terminalden kuruldu, konumu {{path}}. Başlatmak için bunu terminalde çalıştırın, sonra tekrar deneyin:",
     "running": "agentes.chat bu {{device}} üzerinde zaten çalışıyor",
     "runningText": "Onu bu uygulama çalıştırıyor. Giriş yapmak için açın.",
-    "openIt": "Aç",
-    "connectTray": "Saatin yanındaki simgesinden bağlayın.",
-    "alreadyDocker": "Docker ile kuruldu, kendi başına çalışıyor. Bu uygulamada kullanın."
+    "openIt": "Aç"
   },
   "link": {
     "question": "Uygulama bu sunucuya bağlansın mı?",
@@ -296,13 +300,13 @@
     "workspaces_one": "{{count}} çalışma alanı",
     "workspaces_other": "{{count}} çalışma alanı",
     "signedOut": "Giriş yapılmadı",
-    "newsOne": "1 yeni bildirim",
-    "newsMany": "{{n}} yeni bildirim",
     "offline": "{{time}} saatinden beri çevrim dışı",
     "signIn": "Giriş yap",
     "signOut": "Bu sunucudan çıkış yap",
     "signedOutDone": "{{host}} sunucusundan çıkış yaptın",
-    "removeFromApp": "Bu uygulamadan kaldır"
+    "removeFromApp": "Bu uygulamadan kaldır",
+    "newsOne": "1 yeni bildirim",
+    "newsMany": "{{n}} yeni bildirim"
   },
   "server": {
     "title": "Bu {{device}} üzerindeki agentes.chat",
@@ -311,8 +315,10 @@
     "stopped": "Durduruldu",
     "updating": "Güncelleniyor",
     "failing": "Başlamıyor",
+    "restarting": "Yeniden başlıyor",
     "onlyHere": "Çalışıyor · yalnızca bu {{device}} üzerinde",
     "onTailnet": "Çalışıyor · Tailscale ağınızda",
+    "tailnetDown": "Çalışıyor · Tailscale bu {{device}} üzerinde bağlı değil",
     "address": "Adres",
     "data": "Veriler",
     "phone": "Telefonunuzda",
@@ -334,20 +340,6 @@
     "stopHereTitle": "agentes.chat bu {{device}} üzerinde durdurulsun mu?",
     "stopHereBody": "Hemen durur ve artık uygulamayla birlikte başlamaz. Verileri {{path}} konumunda kalır.",
     "stopHereConfirm": "Durdur",
-    "notHere": "Burada çalışmıyor. Verileri hâlâ {{path}} konumunda.",
-    "startHere": "Burada başlat",
-    "stoppedBanner": "agentes.chat bu {{device}} üzerinde durdu",
-    "stoppedBody": "Yeniden başlayana kadar kimse kullanamaz.",
-    "failingBanner": "agentes.chat bu {{device}} üzerinde başlamıyor",
-    "version": "Sürüm {{version}}, uygulamayla birlikte güncellenir",
-    "updatesWithApp": "Uygulamayı güncellemek bu {{device}} üzerindeki agentes.chat'i de günceller.",
-    "updateBack": "Güncelleme başlamadı. agentes.chat {{version}} sürümüne geri döndü.",
-    "restarting": "Yeniden başlıyor",
-    "tailnetDown": "Çalışıyor · Tailscale bu {{device}} üzerinde bağlı değil",
-    "failingBody": "Ne olduğunu görmek ve yeniden denemek için uygulamayı açın.",
-    "restartedBanner": "agentes.chat bu {{device}} üzerinde 3 kez yeniden başladı",
-    "restartedBody": "Kendiliğinden geri gelir. Devam ederse nedenini görmek için uygulamayı açın.",
-    "updateBackBody": "Yeni sürüm, uygulamanın bir sonraki güncellemesinde yeniden denenecek.",
     "stopFor1h": "1 saat durdur",
     "startNow": "Şimdi başlat",
     "stopUntilStart": "Ben başlatana kadar durdur",
@@ -364,13 +356,39 @@
     "failingWhy": "Ayrıntılar nedenini söyler: sana yardım eden kişi için kopyala ya da kayıtlara bak.",
     "showLogs": "Kayıtları göster",
     "help": "Yardım",
-    "gotIt": "Anladım"
+    "gotIt": "Anladım",
+    "notHere": "Burada çalışmıyor. Verileri hâlâ {{path}} konumunda.",
+    "startHere": "Burada başlat",
+    "stoppedBanner": "agentes.chat bu {{device}} üzerinde durdu",
+    "stoppedBody": "Yeniden başlayana kadar kimse kullanamaz.",
+    "failingBanner": "agentes.chat bu {{device}} üzerinde başlamıyor",
+    "failingBody": "Ne olduğunu görmek ve yeniden denemek için uygulamayı açın.",
+    "restartedBanner": "agentes.chat bu {{device}} üzerinde 3 kez yeniden başladı",
+    "restartedBody": "Kendiliğinden geri gelir. Devam ederse nedenini görmek için uygulamayı açın.",
+    "version": "Sürüm {{version}}, uygulamayla birlikte güncellenir",
+    "updatesWithApp": "Uygulamayı güncellemek bu {{device}} üzerindeki agentes.chat'i de günceller.",
+    "updateBack": "Güncelleme başlamadı. agentes.chat {{version}} sürümüne geri döndü.",
+    "updateBackBody": "Yeni sürüm, uygulamanın bir sonraki güncellemesinde yeniden denenecek."
   },
   "pair": {
     "title": "{{org}} ajanları bu {{device}} üzerinde çalışabilsin mi?",
     "body": "{{host}} istedi. Klasörlerinize erişimleri olmadan ve komutlar kapalı başlarlar.",
     "allow": "İzin ver",
-    "notNow": "Şimdi değil"
+    "notNow": "Şimdi değil",
+    "offerTitle": "{{org}} ajanları bu {{device}} cihazını kullanabilsin mi?",
+    "offerBody": "Hiçbir klasörüne erişmeden ve komutlar kapalı başlarlar. Ne alacaklarını Tercihler'de sen seçersin ve onları istediğin zaman durdurabilirsin.",
+    "keepReady": "Hazır tut: oturum açılınca agentes.chat'i başlat",
+    "linkTitle": "Bu {{device}} cihazı {{org}} ile bağlansın mı?",
+    "askedBy": "İsteyen",
+    "from": "Nereden",
+    "linkBody": "{{org}} ajanları hiçbir klasörüne erişmeden ve komutlar kapalı başlar. Bunu sen istemediysen Şimdi değil seçeneğini seç.",
+    "waiting": "{{by}} kişisinin içeri almasını bekliyor…",
+    "done": "{{org}} ile bağlandı",
+    "expired": "Bu bağlantının süresi doldu. Ayarlar › Cihazlar bölümünde yenisini oluştur.",
+    "denied": "{{by}} içeri almadı. Hiçbir şey değişmedi.",
+    "letOrg": "{{org}} ajanları bu {{device}} cihazını kullanabilsin",
+    "canUse": "Ajanlar kullanabilir",
+    "notUsing": "Ajanları bu {{device}} cihazını kullanmıyor"
   },
   "tools": {
     "claudeName": "Claude Code",
@@ -448,7 +466,6 @@
     },
     "thisMac": {
       "agents": "Ajanlar",
-      "letAgents": "Ajanların bu {{device}} cihazını kullanmasına izin ver",
       "letAgentsDesc": "Uygulama açıkken ajanlar ihtiyaç duyduklarında bu {{device}} cihazını kullanır.",
       "commandsDesc": "Testler, derlemeler ve diğer Terminal komutları. {{user}} olarak çalışırlar ve her biri Etkinlik'te görünür.",
       "who": "Kimler kullanabilir",
@@ -738,9 +755,5 @@
     "bringAllToFront": "Tümünü öne getir",
     "help": "Yardım",
     "downloaded": "İndirme tamamlandı"
-  },
-  "windowTitle": {
-    "welcome": "Hoş geldiniz",
-    "prefs": "Tercihler"
   }
 }

@@ -290,6 +290,7 @@ import { DeleteChannelDialog } from "@/components/DeleteChannelDialog";
 import { MenuEntries } from "@/components/DesktopMenus";
 import { DeviceWaitCard } from "@/components/devices/DeviceWaitCard";
 import { useArchiveChannelWithUndo } from "@/components/entity-menus";
+import { FeedbackOfferRow } from "@/components/FeedbackOffer";
 import { InPlaceProvider } from "@/components/InPlace";
 import { HandedTaskChips, IssueTakenLine, IssueWorkCard } from "@/components/IssueWork";
 import { ArrivalCard, useArrival } from "@/components/invite/Arrival";
@@ -327,6 +328,7 @@ import { NewMissionDialog } from "@/components/missions/MissionDialogs";
 import { NavToggle } from "@/components/NavDrawer";
 import { CHANNEL_NAME, ChannelAccessChoice, toChannelName } from "@/components/NewChannelDialog";
 import { FailedRunFix, KeyGuardDialog, NoAiBanner, NoAiCard, useNoAiAutoOpen } from "@/components/NoAi";
+import { useNewAgent } from "@/components/new-agent/NewAgentDialog";
 import { OpensAgent } from "@/components/OpensAgent";
 import { useOrg } from "@/components/org-context";
 import { AuthorStatus } from "@/components/Presence";
@@ -907,8 +909,11 @@ function ChannelView({
     };
   }, [searchOpen, carry, channel.id]);
   // "Ver perfil" (a DM's header, the profile card): the agent's page in the same place, at a tab when a card asks
-  // (its memory); one panel at a time. Its opener again closes it (`close`, counted, so unsaved edits ask first).
-  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; close?: number } | null>(null);
+  // (its memory, at the item it names); one panel at a time. Its opener again closes it (`close`, counted, so unsaved
+  // edits ask first).
+  const [profile, setProfile] = useState<{ agentId: string; tab?: AgentTab; item?: string; close?: number } | null>(
+    null,
+  );
   // What had the focus when the profile opened: it gets it back when the panel closes.
   const profileOpener = useRef<HTMLElement | null>(null);
   const closeProfile = useCallback(() => {
@@ -953,16 +958,17 @@ function ChannelView({
   }, [profileKeeps, setPanel]);
   const outerPanel = useOpenAgentPanel();
   const openAgentPanel = useCallback(
-    (agentId: string, tab?: AgentTab) => {
+    (agentId: string, tab?: AgentTab, item?: string) => {
       if (profileKeeps()) return;
       setPanel(null);
       setSearchOpen(false);
       setConsultId(null);
       const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setProfile((open) => {
-        if (open?.agentId === agentId && open.tab === tab) return { ...open, close: (open.close ?? 0) + 1 };
+        if (open?.agentId === agentId && open.tab === tab && open.item === item)
+          return { ...open, close: (open.close ?? 0) + 1 };
         profileOpener.current = from;
-        return { agentId, tab };
+        return { agentId, tab, item };
       });
     },
     [profileKeeps, setPanel],
@@ -2733,7 +2739,9 @@ function ChannelView({
                                   search: mentionSearch,
                                   listLabel: t("mentions.list"),
                                   onPick: (item) => {
-                                    if (item.note && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
+                                    // A DM takes no new member, so there is nothing to offer there.
+                                    const dm = Boolean(chrome?.dmAgentId || chrome?.dmPersonId);
+                                    if (item.note && !dm && item.key.startsWith("agent:")) setOffer(item.key.slice(6));
                                   },
                                 }}
                               />
@@ -2796,9 +2804,10 @@ function ChannelView({
                   at a time; the members column stays under it. */}
                   {profile ? (
                     <AgentPanel
-                      key={`${profile.agentId}:${profile.tab ?? ""}`}
+                      key={`${profile.agentId}:${profile.tab ?? ""}:${profile.item ?? ""}`}
                       agentId={profile.agentId}
                       tab={profile.tab}
+                      item={profile.item}
                       closeRequest={profile.close}
                       onClose={closeProfile}
                     />
@@ -4613,17 +4622,11 @@ export const TimelineMessage = memo(function TimelineMessage({
             {m.author.type === "agent" && !m.local && <HandedTaskChips message={m} />}
             {m.author.type === "agent" && !m.local && <TeamChecks message={m} />}
             {m.author.type === "agent" && !m.local && <ReachLines message={m} />}
+            {m.author.type === "agent" && !m.local && <FeedbackOfferRow message={m} />}
             {agent &&
               memoryUpdates
                 .filter((u) => u.action !== "proposed")
-                .map((u) => (
-                  <MemoryChangeCard
-                    key={`${u.action}-${u.itemId}`}
-                    update={u}
-                    agentId={agent.id}
-                    sentAt={m.createdAt}
-                  />
-                ))}
+                .map((u) => <MemoryChangeCard key={`${u.action}-${u.itemId}`} update={u} agentId={agent.id} />)}
             {browserTrail.length > 0 && m.author.id && !m.local && (
               <BrowserTrailCard
                 agentId={m.author.id}
@@ -5399,6 +5402,7 @@ function AddMembersDialog({
   // An address nobody here has: invite them to the workspace and this channel (ADR 0090).
   const invite = useInviteOffer(q);
   const inviteDialog = useInviteDialog();
+  const newAgent = useNewAgent();
   const navigate = useNavigate();
   const creates = can(org, "create_agents");
   const add = useMutation({
@@ -5467,11 +5471,14 @@ function AddMembersDialog({
               className="member-row member-row--add"
               onClick={() => {
                 onInvite();
-                void navigate({
-                  to: "/org/$orgId/agents/new",
-                  params: { orgId: org.id },
-                  search: { channel: channel.id },
-                });
+                // The new agent's dialog, starting it in this channel too (ADR 0164).
+                if (newAgent) newAgent.open({ channelId: channel.id });
+                else
+                  void navigate({
+                    to: "/org/$orgId/agents/new",
+                    params: { orgId: org.id },
+                    search: { channel: channel.id },
+                  });
               }}
             >
               <span className="member-row__plus" aria-hidden="true">

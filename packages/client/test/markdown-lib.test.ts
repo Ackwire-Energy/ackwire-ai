@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { detailsAt, firstMentioned, parseMarkdown, readsAsPageTitle, tableAt } from "../src/lib/markdown";
+import {
+  codeAndBoldParts,
+  detailsAt,
+  firstMentioned,
+  parseMarkdown,
+  readsAsPageTitle,
+  tableAt,
+} from "../src/lib/markdown";
 
 describe("mentions", () => {
   test("the first agent a text @mentions, as the backend reads it: any case, never an email", () => {
@@ -106,4 +113,17 @@ test("a [[link]] to no page reads as a page's name; a bracketed sentence doesn't
   expect(readsAsPageTitle("Ada está verificando os registros de recebimento e envio.")).toBe(false);
   expect(readsAsPageTitle("Isso já foi resolvido?")).toBe(false);
   expect(readsAsPageTitle("a".repeat(81))).toBe(false);
+});
+
+test("a title's `code` and **bold**, the rest as typed: no link or mention, nothing half marked", () => {
+  expect(codeAndBoldParts("Corrigir `bun test` no **CI** de https://example.com @ana")).toEqual([
+    { text: "Corrigir " },
+    { text: "bun test", mark: "code" },
+    { text: " no " },
+    { text: "CI", mark: "bold" },
+    { text: " de https://example.com @ana" },
+  ]);
+  expect(codeAndBoldParts("um ` sozinho e **meio")).toEqual([{ text: "um ` sozinho e **meio" }]);
+  expect(codeAndBoldParts("vazio: ``")).toEqual([{ text: "vazio: ``" }]);
+  expect(codeAndBoldParts("")).toEqual([]);
 });

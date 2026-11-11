@@ -1,4 +1,4 @@
-import { useChannels, useConsultationConversation } from "@agenteschat/client";
+import { useChannels, useExchangeConversation } from "@agenteschat/client";
 import { consultLineState, consultOriginKey } from "@agenteschat/client/lib/consult-group";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { groupsWith } from "@agenteschat/client/lib/timeline";
@@ -45,7 +45,8 @@ function Consultation({ consultationId, channelId }: { consultationId: string; c
   const when = useWhen();
   const look = useConversationLook(false);
   const insets = useSafeAreaInsets();
-  const query = useConsultationConversation(orgId, channelId, consultationId && channelId ? consultationId : null);
+  // The whole exchange its row stands for: the other questions between the same two agents come in it too.
+  const query = useExchangeConversation(orgId, channelId, consultationId && channelId ? consultationId : null);
   // DMs aren't in the list: no channel name there.
   const channelName = useChannels(orgId).data?.find((x) => x.id === channelId)?.name ?? null;
   const q = query.data?.consultation;

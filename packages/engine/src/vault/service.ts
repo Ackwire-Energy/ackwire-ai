@@ -138,6 +138,8 @@ export interface VaultConnection {
   id: string;
   kind: string;
   name: string;
+  /** Its credential may only read: agents save nothing there until a person connects it again with one that writes. */
+  readOnly: boolean;
   scope: VaultScope;
   ownerUserId: string | null;
   label: string;
@@ -244,6 +246,22 @@ export interface SecretToVaultInput {
   agentIds: string[];
 }
 
+/**
+ * Where an item is kept, as an agent reads it: this workspace's own Vault, or a connected password manager by its
+ * brand name and what the connection reads (a vault's or a folder's name).
+ */
+export interface VaultPlace {
+  /** `the Vault`, or the password manager's brand name (`1Password`). */
+  name: string;
+  connectionId: string | null;
+  label: string | null;
+  /**
+   * Whether an agent's new login can be kept there: `read_only` when the connection's credential may only read, `no`
+   * when the source never takes one.
+   */
+  writes: "yes" | "read_only" | "no";
+}
+
 /** An item as an agent sees it: never a value. `contact` only for contacts (their fields are meant for agents). */
 export interface VaultItemForAgent {
   id: string;
@@ -256,6 +274,7 @@ export interface VaultItemForAgent {
   username: string | null;
   keyName: string | null;
   contact: VaultContactFields | null;
+  place: VaultPlace;
   /** Values a made password replaced, kept for `undo`. */
   earlier?: number;
 }
@@ -278,6 +297,8 @@ export interface VaultAgentChange {
 export interface VaultAgentResult {
   outcome: "created" | "updated" | "deleted";
   item: VaultItemForAgent;
+  /** Why it is kept where it is (`item.place`), when a rule chose the place: an English clause for the agent. */
+  why?: string;
 }
 
 /** What `releaseVaultLogin` gives the tool that seals it for the computer. */

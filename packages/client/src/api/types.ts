@@ -103,6 +103,23 @@ export interface FeedbackInput {
   files?: string[];
 }
 
+/**
+ * `message.meta.feedbackOffer` (server-made): a report about the app the agent offered on its own, under its reply.
+ * Only `forUserId` sees its row and decides it (`decideFeedbackOffer`); `auto`: it went with the reply, because they
+ * chose Always send.
+ */
+export interface FeedbackOffer {
+  id: string;
+  forUserId: string;
+  /** The problem in a few words, as the row's one line. */
+  summary: string;
+  /** The report, as the email carries it. */
+  text: string;
+  state: "offered" | "sent" | "dismissed";
+  auto?: true;
+  decidedAt?: string;
+}
+
 export interface FeedbackAbout {
   /** The app's own word for the thing: `message`, `card`, `button`… */
   kind: string;
@@ -717,6 +734,12 @@ export interface AgentSetupChecklist {
   role: string | null;
   /** The steps a person confirmed (chose in its dialog, or skipped). */
   done: SetupStep[];
+  /** How it introduced itself on its card, in its own voice (ADR 0164): its first message says it. */
+  hello?: string;
+  /** The personal starter it began as ("clara", ADR 0159 §3): its first tasks. */
+  starter?: string;
+  /** The apps it was made to use (catalog connector ids) at their levels (ADR 0164): its checklist suggests them. */
+  apps?: Record<string, "read" | "write">;
 }
 
 /** A costly step unrequested work needs a person's go for (ADR 0131 §3). */
@@ -877,8 +900,11 @@ export interface AgentInput {
   autonomy?: CommandApproval;
   /** Editing only: its autonomy brakes (ADR 0131); the fields given change. */
   brakes?: Partial<AgentBrakes>;
-  /** Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2). */
-  setup?: { role: RoleId | null };
+  /**
+   * Creating only: the ready-made role it starts from, for its setup checklist (ADR 0155 §2), and what its card said
+   * (ADR 0164): how it introduced itself, the personal starter it began as, the apps it will use at their levels.
+   */
+  setup?: { role: RoleId | null; hello?: string; starter?: string; apps?: Record<string, "read" | "write"> };
 }
 
 /** A person's answer to an agent's proposal of costly work nobody asked for (ADR 0131 §3). */
@@ -1453,6 +1479,12 @@ export interface ActiveRun {
   /** Last sign of life from the worker. */
   heartbeatAt?: string | null;
   createdAt?: string;
+  /**
+   * How long the work it is doing now has taken, in milliseconds, as the server counts it (since it last went back
+   * to work or last posted, else since it was created). A length, not a time: "thinking for …" counts on from it by
+   * this device's clock. Absent on a server from before it.
+   */
+  workingMs?: number;
   /** Messages sent to it while it works that it hasn't read yet (the others steered into it, it read). */
   pendingMessageIds?: string[];
   /** A routine's run working in the background: it holds no conversation and shows no "trabalhando". */
@@ -1583,6 +1615,14 @@ export type ChannelEvent =
       threadId: string | null;
       messageId: string;
       proposal: CalendarProposal;
+    }
+  /** A report an agent offered was sent or turned down: its row (`meta.feedbackOffer`) as it is now. */
+  | {
+      type: "feedback_offer.updated";
+      channelId: string;
+      threadId: string | null;
+      messageId: string;
+      offer: FeedbackOffer;
     }
   /** The right hand's team card changed (ADR 0137 §10): the whole card. */
   | {
@@ -4048,8 +4088,8 @@ export interface CalendarRange {
   routines: { routineId: string; name: string; agentId: string; at: string; target: RoutineTarget }[];
   /** Pending reminders the viewer may see (absent on an older server). */
   reminders?: CalendarReminder[];
-  /** Issues due in the range (all-day). */
-  deadlines: { issueId: string; number: number; title: string; date: string }[];
+  /** Issues due in the range (all-day), with who has each (absent on an older server). */
+  deadlines: { issueId: string; number: number; title: string; date: string; assignee?: Actor | null }[];
   proposals: CalendarProposal[];
 }
 
@@ -7429,6 +7469,8 @@ export interface PersonUsage {
   roleIds: string[];
   owner: boolean;
   money: boolean;
+  /** Some of it was use on a plan, priced at the API's list price ("≈"). */
+  estimated: boolean;
   renewsAt: string;
   since: string;
   until: string;

@@ -2683,8 +2683,6 @@
     "chip": "记忆已更新",
     "was": "之前：{{text}}",
     "open": "{{name}} 知道的事",
-    "undo": "撤销",
-    "undone": "已撤销",
     "group": "{{name}} 更新的记忆"
   },
   "reach": {
@@ -2837,17 +2835,9 @@
     "someone": "某人",
     "you": "你",
     "undo": "撤销",
-    "redo": "重做",
-    "undoAll": "全部撤销",
     "changes_other": "{{count}} 项更改",
     "undoneBy": "已由 {{name}} 撤销",
-    "ago": "{{time}}前",
-    "timeLeft": "还剩 {{time}} 可撤销",
     "group": "{{name}} 的更改",
-    "undone": "已撤销。",
-    "redone": "已重做。",
-    "undoneAll_other": "已撤销 {{count}} 项更改。",
-    "partial_other": "有 {{count}} 项更改无法撤销。",
     "errors": {
       "changed_since": "此后有人修改过这里。现在撤销会丢失那次修改。",
       "expired": "撤销时间已过。",
@@ -3470,6 +3460,7 @@
       "ready": "已连接",
       "syncing": "正在同步",
       "reads": "读取 {{label}}",
+      "readOnly": "只读",
       "items_other": "{{count}} 个项目",
       "synced": "{{when}}已同步",
       "syncNow": "立即同步",
@@ -3516,7 +3507,7 @@
       "onepassword": {
         "step": {
           "1": "在 1Password 中创建一个只给智能体用的保险库，并把它们可以使用的登录信息移进去",
-          "2": "创建一个只能访问该保险库的服务账号",
+          "2": "创建一个只能访问该保险库的服务账号（如果智能体要在其中保存新的登录信息，需授予读取和写入权限）",
           "3": "在这里粘贴服务账号的令牌"
         },
         "field": {
@@ -5335,42 +5326,6 @@
       }
     }
   },
-  "newAgentAsk": {
-    "title": "你的新智能体要做什么？",
-    "lead": "用一句话说。{{name}} 会准备好，在创建前先给你看。",
-    "field": "它为你做什么",
-    "placeholder": "例如：整理我的日程，提醒我重要的事",
-    "ideas": "想法",
-    "idea": {
-      "agenda": {
-        "label": "日程",
-        "text": "整理我的日程，提醒我的约会"
-      },
-      "money": {
-        "label": "财务",
-        "text": "跟踪我的账单，到期前提醒我"
-      },
-      "training": {
-        "label": "训练",
-        "text": "安排我一周的训练，并按我的状态调整"
-      },
-      "studies": {
-        "label": "学习",
-        "text": "给我做学习计划，并考考我学过的内容"
-      },
-      "home": {
-        "label": "家务",
-        "text": "管理购物清单和家务"
-      },
-      "travel": {
-        "label": "旅行",
-        "text": "规划我的旅行：行程、预订和证件"
-      }
-    },
-    "full": "我自己全部填写",
-    "create": "和 {{name}} 一起创建",
-    "message": "我想要一个新的智能体：{{what}}"
-  },
   "newAgent": {
     "title": "创建智能体",
     "railOrg": "{{org}} · 你的角色是{{role}}",
@@ -5726,7 +5681,197 @@
     "and": "和",
     "routine": "例行工作",
     "routineKeep": "创建例行工作 {{name}}",
-    "routineNotMade": "例行工作未创建：{{reason}}"
+    "routineNotMade": "例行工作未创建：{{reason}}",
+    "hello": {
+      "clara": "我会照看你的日历，在来不及之前提醒你重要的事。",
+      "duda": "我会盯着你的账单和开销，在到期之前提醒你。",
+      "leo": "我会按你的方式安排训练，帮你保持节奏。",
+      "mel": "我会按你的口味和预算安排三餐和购物清单。",
+      "gabi": "我会制定你的学习计划，并就学过的内容考考你。",
+      "lu": "我会收好你的笔记和想法，帮你把它们写成文字。",
+      "rosa": "我来负责购物清单、家务和需要修的东西。",
+      "vic": "我会规划你的旅行：日期、价格、预订和每天的行程。",
+      "rui": "我会跟进你的客户，写报价和付款提醒，记住谁还没付款。",
+      "dev": "我写代码、审 PR、排查 bug。",
+      "ops": "我盯着报错、队列和部署。",
+      "qa": "我测试流程，复现报告的 bug。",
+      "pm": "我整理任务，写总结。",
+      "support": "我回复客户，把需要人处理的转交出去。",
+      "sales": "我准备报价，跟进有意向的客户。",
+      "marketing": "我策划活动、帖子和网站页面。",
+      "content": "我撰写和润色文案、文章和通讯。",
+      "data": "我用数据回答问题，做报表。",
+      "finance": "我管理付款、收款和开销。",
+      "people": "我协助招聘、入职和团队的问题。",
+      "research": "我调研一个主题，给出带来源的总结。",
+      "assistant": "我负责日历、邮件和提醒。"
+    },
+    "starters": {
+      "clara": {
+        "instructions": "每天早上查看日历，发来当天的安排。\n每个约会和有截止日的账单都提前一天提醒。\n安排、取消日程或接受邀请前，一定先问你。",
+        "tasks": {
+          "a": "我明天有什么安排？",
+          "b": "每月 5 号提醒我交房租",
+          "c": "每天 7 点把日程发给我"
+        }
+      },
+      "duda": {
+        "instructions": "按类别记录账单和开销。\n到期前三天提醒，开销异常时也会提醒。\n付款、转账或取消任何东西前，一定先问你。",
+        "tasks": {
+          "a": "我这个月花了多少？",
+          "b": "这周有哪些账单到期？",
+          "c": "把这些开销按类别分好"
+        }
+      },
+      "leo": {
+        "instructions": "按你的水平、时间和喜好安排训练。\n你缺练或累了，就调整这一周，不说教。\n不提供医疗建议：有疼痛或受伤时，建议你去看专业人士。",
+        "tasks": {
+          "a": "给我安排今天 30 分钟的训练",
+          "b": "规划我这周的跑步",
+          "c": "每天早上发我当天的训练"
+        }
+      },
+      "mel": {
+        "instructions": "按你的口味、时间和预算安排一周的饭菜。\n按菜单列购物清单，按超市区域分组。\n尊重饮食限制和过敏，不提供减肥或医疗建议。",
+        "tasks": {
+          "a": "推荐三道快手晚餐",
+          "b": "做一份本周菜单",
+          "c": "按菜单列购物清单"
+        }
+      },
+      "gabi": {
+        "instructions": "制定到考试为止的学习计划，每天安排做得完的量。\n就你学过的内容出题，把答错的地方再讲一遍。\n不替你写作业：一步步引导你找到答案。",
+        "tasks": {
+          "a": "制定考试复习计划",
+          "b": "就我学过的内容出 3 道题",
+          "c": "简单讲讲这个主题"
+        }
+      },
+      "lu": {
+        "instructions": "收好你发来的笔记和想法，把相似的归在一起。\n用你的语气把笔记写成文字，不添加你没说的内容。\n仔细修改，替换原文前先让你看改了哪些。",
+        "tasks": {
+          "a": "把这些笔记写成一段短文",
+          "b": "汇总这周的想法",
+          "c": "润色这段文字"
+        }
+      },
+      "rosa": {
+        "instructions": "让购物清单和家务保持最新。\n记下需要修的东西，一直提醒到处理好。\n买任何东西或请人上门前，一定先问你。",
+        "tasks": {
+          "a": "列一份本周的购物清单",
+          "b": "家里有什么要修？",
+          "c": "分配家务"
+        }
+      },
+      "vic": {
+        "instructions": "规划旅行的日期、价格和每天的行程。\n比较机票和住宿，并说明推荐每一个的理由。\n预订或付款前，一定先问你。",
+        "tasks": {
+          "a": "规划里斯本 3 日游",
+          "b": "机票降价时告诉我",
+          "c": "汇总这次旅行的预订"
+        }
+      },
+      "rui": {
+        "instructions": "跟进每位客户：约定了什么、还差什么、谁还没付款。\n用你的语气写报价和付款提醒，方便你审阅。\n没有你的同意，绝不给客户发送任何内容。",
+        "tasks": {
+          "a": "给客户写一份简短报价",
+          "b": "谁还没付款？",
+          "c": "今天每位客户在等什么？"
+        }
+      }
+    }
+  },
+  "newAgentCard": {
+    "title": "新智能体",
+    "lead": "在左边选，在右边调整。之后都可以改。",
+    "list": "起点",
+    "zero": "从零开始",
+    "zeroSub": "由你决定它做什么",
+    "import": "从其他应用迁移智能体",
+    "hi": "你好，我是",
+    "hiBlank": "你好，我是",
+    "name": "名字",
+    "namePlaceholder": "名字",
+    "what": "做什么",
+    "whatPlaceholder": "我要为你做什么？",
+    "look": "外观",
+    "lookDone": "完成",
+    "shuffle": "随机",
+    "handle": "在聊天中：@{{handle}}",
+    "handleRole": "在聊天中：@{{handle}} · {{role}}",
+    "handleTaken": "在聊天中：@{{handle}} · 这里已经有 {{name}} 了",
+    "handleBlank": "聊天里的 @ 由名字生成",
+    "similar": "和 {{name}} 很像，{{name}} 已经准备好了。",
+    "similarAction": "从 {{name}} 开始",
+    "uses": "会用到",
+    "chooseApps": "选择应用",
+    "otherApp": "其他应用",
+    "usesNone": "暂时没有。",
+    "worksIn": "工作在",
+    "how": "{{name}} 的工作方式",
+    "howBlank": "工作方式",
+    "instructionsPlaceholder": "它做什么、避免什么、向谁求助",
+    "picker": {
+      "title": "{{name}} 的应用",
+      "titleBlank": "智能体的应用",
+      "lead": "已连接的应用会立刻加到卡片上。其他应用可以直接在这里连接。",
+      "suggested": "为 {{name}} 推荐",
+      "suggestedBlank": "推荐",
+      "use": "使用",
+      "added": "已在卡片上"
+    },
+    "create": "创建 {{name}}",
+    "createBlank": "创建智能体",
+    "failed": "创建失败：{{reason}}",
+    "level": {
+      "read": "读取",
+      "write": "读写"
+    },
+    "app": {
+      "lead": "{{name}} 在 {{app}} 里能做到哪一步。",
+      "leadBlank": "它在 {{app}} 里能做到哪一步。",
+      "read": "读取",
+      "readDesc": "查看 {{app}} 里的内容，不做任何更改。",
+      "write": "读写",
+      "writeDesc": "也能在 {{app}} 里创建和编辑。",
+      "asks": "{{actions}} 在任何级别都会先征得你的同意。",
+      "asksAny": "发送、删除和付款在任何级别都会先征得你的同意。",
+      "remove": "移除 {{app}}",
+      "done": "完成"
+    },
+    "band": {
+      "label": "{{name}} 开始工作需要什么",
+      "ai": "用来思考的 AI",
+      "asleep": "在有 AI 之前一直睡着"
+    },
+    "skills": "技能",
+    "skillsHelpBlank": "需要时会打开的操作指南。",
+    "chooseSkills": "选择技能",
+    "otherSkill": "其他技能",
+    "namesLead": "试试",
+    "namesRoll": "换一批名字",
+    "skill": {
+      "opens": "话题出现时，{{name}} 会打开这份指南。可在“技能”里编辑。",
+      "opensBlank": "话题出现时，它会打开这份指南。可在“技能”里编辑。",
+      "remove": "从 {{name}} 移除",
+      "removeBlank": "从智能体移除",
+      "done": "完成"
+    },
+    "names": {
+      "agenda": "小历, 时时, 小钟, 朵拉, 提托, 艾玛",
+      "agendaWords": "日历, 日程, 预约, 提醒, 会议, 安排",
+      "money": "小钱, 尼可, 莫娜, 元宝, 拉拉, 金金",
+      "moneyWords": "账单, 开销, 钱, 财务, 预算, 付款",
+      "travel": "路路, 米娜, 拉维, 远方, 娜拉, 小途",
+      "travelWords": "旅行, 旅游, 机票, 航班, 酒店, 度假",
+      "training": "里奥, 贝娅, 闪电, 凯, 妮娜, 大卫",
+      "trainingWords": "训练, 跑步, 健身, 运动, 锻炼",
+      "study": "嘉比, 诺亚, 索菲, 特奥, 艾瑞斯, 小本",
+      "studyWords": "学习, 考试, 课程, 复习, 功课",
+      "clients": "瑞瑞, 安娜, 小本, 丽莎, 奥托, 克莱奥",
+      "clientsWords": "客户, 销售, 报价, 发票, 收款",
+      "any": "小太阳, 莉亚, 特奥, 贝娅, 尼诺, 伊伊, 凯, 露玛, 吉尔, 拉菲, 娜拉, 汤姆"
+    }
   },
   "members": {
     "column": {
@@ -6533,15 +6678,14 @@
     "links": "关联内容",
     "prBy": "PR #{{number}} · 由 {{name}} 创建",
     "artifactBy": "{{title}}（{{name}}）",
-    "noLinks": "还没有关联内容。",
     "github": {
       "label": "GitHub 链接",
       "placeholder": "Issue 或 PR 链接",
       "invalid": "这不是 GitHub issue 或 pull request 的链接。",
-      "remove": "移除 GitHub 链接"
+      "remove": "移除 GitHub 链接",
+      "add": "添加 GitHub 链接"
     },
     "openConversation": "查看对话",
-    "labels": "标签",
     "tabs": {
       "label": "任务内容",
       "details": "详情",
@@ -8248,6 +8392,8 @@
     },
     "upcoming": "即将到来",
     "upcomingEmpty": "近期没有安排。",
+    "owners": "智能体和成员",
+    "showOwner": "显示 {{name}}",
     "viewZone": "日历时区",
     "miniMonth": "选择日期",
     "new": "新建日程",
@@ -8273,12 +8419,6 @@
         "declined": "你不参加。"
       }
     },
-    "kind": {
-      "event": "日程",
-      "routine": "例行工作",
-      "reminder": "提醒",
-      "deadline": "任务截止日期"
-    },
     "every": {
       "hour": "每小时",
       "hours": "每 {{count}} 小时",
@@ -8286,22 +8426,19 @@
     },
     "perDay": "每天 {{count}} 次",
     "runs_other": "这几天共运行 {{count}} 次。",
-    "routineDetail": "{{agent}} 的例行工作 · 发送到 {{target}}。",
+    "routineDetail": "例行工作 · 发送到 {{target}}",
     "deadlineDetail": "任务到期了。",
     "reminderBy": "由 {{name}} 设置",
-    "reminderPosted": "由 {{agent}} 发布 · {{target}}",
+    "reminderPosted": "提醒 · 发布在 {{target}}",
     "cancelReminder": "取消提醒",
     "reminderCancelled": "提醒已取消",
     "openIssue": "打开任务",
     "openRoutines": "在“例行工作”中查看",
     "openRoutine": "打开例行工作",
     "runAria": "例行工作 {{name}}，{{time}}",
-    "runsAria": "{{time}} 有 {{count}} 项例行工作：{{names}}",
     "runHint": "{{name}} · {{agent}} · {{time}}",
     "runsAt": "{{time}} 的例行工作",
-    "runsOn": "例行工作 · {{day}}",
-    "runsCount_other": "例行工作运行 {{count}} 次",
-    "dayRunsAria_other": "{{day}} 例行工作运行 {{count}} 次：{{names}}",
+    "moreRuns_other": "还有 {{count}} 项例行工作",
     "runTimes": "×{{count}}",
     "result": {
       "ok": "已回复",
@@ -9047,6 +9184,193 @@
     "removed": "照片已移除。",
     "notImage": "请选择图片（JPG、PNG 或 WebP）。",
     "tooBig": "图片超过 8 MB。"
+  },
+  "portrait": {
+    "ask": {
+      "title": "你想以什么形象出现?",
+      "build": "创建头像",
+      "buildText": "按你的喜好拼一幅像素肖像:发型、衣服、配饰。",
+      "photo": "上传照片",
+      "photoText": "从电脑中选择一张图片并调整取景。"
+    },
+    "title": "你的头像",
+    "preview": "你的头像",
+    "shuffle": "随机",
+    "small": "聊天中的小尺寸只显示脸部。",
+    "photoAsk": "更想用照片？",
+    "photoUpload": "上传照片",
+    "saved": "头像已更新。",
+    "failed": "头像保存失败，请重试。",
+    "showAll": "显示全部选项",
+    "showFewer": "显示较少选项",
+    "beardHint": "胡子的颜色跟随发色。",
+    "hatsHint": "鸭舌帽、毛线帽、帽子和包头巾会遮住头发。",
+    "swatch": "{{group}} {{n}}",
+    "build": {
+      "label": "类型",
+      "m": "男性化",
+      "f": "女性化"
+    },
+    "tabs": {
+      "label": "头像的组成部分",
+      "face": "脸部",
+      "hair": "头发",
+      "beard": "胡子",
+      "makeup": "妆容",
+      "marks": "特征",
+      "accessories": "配饰",
+      "clothes": "服装",
+      "background": "背景"
+    },
+    "sections": {
+      "skin": "肤色",
+      "eyes": "眼睛颜色",
+      "mood": "表情",
+      "color": "颜色",
+      "hairColor": "发色",
+      "clothesColor": "服装颜色",
+      "cut": "发型",
+      "beard": "胡子",
+      "lips": "口红",
+      "shadow": "眼影",
+      "blush": "腮红",
+      "mark": "特征",
+      "glasses": "眼镜",
+      "ear": "耳环",
+      "neck": "颈部",
+      "extra": "头部",
+      "piece": "款式",
+      "bg": "背景"
+    },
+    "options": {
+      "mood": {
+        "smile": "微笑",
+        "grin": "咧嘴笑",
+        "laugh": "大笑",
+        "calm": "平静",
+        "wink": "眨眼",
+        "wow": "惊讶"
+      },
+      "hair": {
+        "none": "光头",
+        "buzz": "寸头",
+        "short": "短发",
+        "side": "侧分",
+        "quiff": "飞机头",
+        "curly": "卷发",
+        "afro": "爆炸头",
+        "bob": "波波头",
+        "bangs": "刘海",
+        "long": "长发",
+        "wavy": "波浪",
+        "curls": "长卷发",
+        "bun": "丸子头",
+        "pony": "马尾",
+        "spiky": "刺猬头",
+        "mohawk": "莫西干",
+        "braids": "辫子",
+        "pigtails": "双马尾",
+        "crew": "圆寸",
+        "fade": "渐变",
+        "slick": "大背头",
+        "flat": "平头",
+        "undercut": "底削",
+        "mullet": "鲻鱼头",
+        "dreads": "脏辫",
+        "medium": "中长发",
+        "receding": "发际线后移"
+      },
+      "beard": {
+        "none": "无胡子",
+        "stubble": "胡茬",
+        "mustache": "小胡子",
+        "goatee": "山羊胡",
+        "strap": "下颌线胡",
+        "full": "络腮胡",
+        "long": "长胡子"
+      },
+      "lips": {
+        "none": "无口红",
+        "nude": "裸色",
+        "pink": "粉色",
+        "red": "红色",
+        "wine": "酒红",
+        "purple": "紫色",
+        "black": "黑色"
+      },
+      "shadow": {
+        "none": "无眼影",
+        "rose": "玫瑰色",
+        "violet": "紫罗兰",
+        "blue": "蓝色",
+        "green": "绿色",
+        "gold": "金色",
+        "smoky": "烟熏"
+      },
+      "blush": {
+        "soft": "淡",
+        "strong": "浓",
+        "none": "无腮红"
+      },
+      "mark": {
+        "none": "无",
+        "freckles": "雀斑",
+        "mole": "痣",
+        "scar": "疤痕",
+        "bandaid": "创可贴",
+        "piercing": "穿环"
+      },
+      "glasses": {
+        "none": "无眼镜",
+        "round": "圆框",
+        "square": "方框",
+        "gold": "金框",
+        "tinted": "有色镜片",
+        "shades": "墨镜"
+      },
+      "ear": {
+        "none": "无耳环",
+        "studs": "金耳钉",
+        "pearls": "珍珠",
+        "hoops": "耳圈",
+        "drops": "耳坠"
+      },
+      "neck": {
+        "none": "无",
+        "necklace": "项链",
+        "pearls": "珍珠",
+        "choker": "颈链",
+        "bowtie": "领结",
+        "muffler": "围巾"
+      },
+      "extra": {
+        "none": "无",
+        "headband": "发带",
+        "bandana": "印花头巾",
+        "bow": "蝴蝶结",
+        "flower": "花朵",
+        "headphones": "耳机",
+        "cap": "鸭舌帽",
+        "beanie": "毛线帽",
+        "hat": "帽子",
+        "crown": "皇冠",
+        "scarf": "包头巾"
+      },
+      "clothes": {
+        "tee": "T恤",
+        "vneck": "V领",
+        "tank": "背心",
+        "shirt": "衬衫",
+        "suit": "西装",
+        "blazer": "休闲西装",
+        "jacket": "夹克",
+        "hoodie": "卫衣",
+        "turtle": "高领",
+        "overall": "背带裤",
+        "polo": "Polo衫",
+        "dress": "连衣裙"
+      }
+    }
   },
   "orgLogo": {
     "label": "徽标",
@@ -10378,7 +10702,7 @@
       "close": "关闭详情",
       "can": "智能体将能做什么",
       "afterText": "在你选择之前，没有智能体会使用它。",
-      "allText": "连接后，所有智能体都可以使用。接下来，你可以选择每个智能体的访问权限。",
+      "allText": "连接后，所有智能体都可以使用。之后可以调整。",
       "addAccount": "添加另一个账号",
       "accountsText": "每个账号都有自己的智能体和权限级别。",
       "reconnect": "重新连接",
@@ -11139,11 +11463,10 @@
     "notApproved": "{{name}} 只允许它批准过的应用登录，而 agentes.chat 还未获批。如果它提供 API 密钥，你可以用密钥连接。",
     "serverSaid": "服务器返回：{{detail}}",
     "nothingYet": "到第 3 步之前，智能体都用不了任何功能。",
-    "allCanUse": "连接后，所有智能体都可以使用。你可以在第 3 步中修改。",
-    "newAccount": "新账号一开始没有智能体，可以访问全部内容的智能体除外。你在第 3 步中选择。",
+    "allCanUse": "连接后，所有智能体都可以使用。之后可以调整。",
     "replace": "替换当前的登录，使用者保持不变。",
     "replaceUnchecked": "请登录与之前相同的账号。我们无法核实是哪个账号，使用者保持不变。",
-    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。它一开始没有智能体，可以访问全部内容的智能体除外。",
+    "newAccountUnchecked": "请登录一个尚未连接的账号，我们无法核实。",
     "addTitle": "另一个 {{name}} 账号",
     "reconnectTitle": "重新连接 {{name}}",
     "accountName": "此账号的名称",
@@ -11163,7 +11486,15 @@
     "asksCount_other": "{{count}} 项操作始终会在聊天中请求审批。",
     "asksDefault": "敏感操作始终会在聊天中请求审批。",
     "grant": "授予",
-    "saved_other": "{{name}}：{{count}} 个智能体可以使用。"
+    "saved_other": "{{name}}：{{count}} 个智能体可以使用。",
+    "done": {
+      "title": "{{name}} 已连接",
+      "everyone": "所有智能体都可以使用。",
+      "waiting": "继续后，智能体才会按我们建议的权限级别获得这些工具。",
+      "asks_other": "{{count}} 项操作会在聊天中请求审批。",
+      "adjust": "调整",
+      "ok": "完成"
+    }
   },
   "database": {
     "name": "数据库",
@@ -12532,10 +12863,26 @@
     },
     "computer": {
       "title": "连接另一台电脑",
-      "step1": "在那台电脑上下载应用：",
-      "step2": "打开应用并登录 {{org}}。",
-      "step3": "打开“让智能体使用这台电脑”。",
-      "orLine": "或在它的终端里粘贴一行命令"
+      "step1": "在那台电脑上安装 agentes.chat 应用：",
+      "step2": "打开应用，用你自己的账号登录。",
+      "step3": "当它询问是否让 {{org}} 的智能体使用它时，点击“允许”。",
+      "shows": "它会自动出现在这里，在你共享之前只有你能用。",
+      "waiting": "正在等待你的电脑…",
+      "connected": "已连接：{{name}}",
+      "orLine": "或在它的终端里粘贴一行命令",
+      "noApp": "无法在上面安装应用？改用终端里的一行命令"
+    },
+    "thisApp": {
+      "text": "agentes.chat 应用一键即可连接，并会先征求你的同意。",
+      "open": "打开 agentes.chat 应用",
+      "browserAsks": "浏览器会询问是否打开：选择“打开”，如果有“始终允许”也一并选择。",
+      "noApp": "还没有应用？",
+      "afterInstall": "安装完成后，再点一次“打开 agentes.chat 应用”。链接只能用一次，10 分钟内有效。",
+      "waiting": "正在等待这台电脑上的应用…",
+      "expired": "这个链接已过期。",
+      "again": "生成新链接",
+      "failed": "无法生成链接。请稍后重试。",
+      "server": "是服务器？改用终端里的一行命令"
     },
     "link": {
       "serverTitle": "连接服务器",
@@ -14205,6 +14552,8 @@
         "sendingDm": "发送了一条私信",
         "settingStatus": "更新了自己的状态",
         "settingReplyStyle": "调整了回复方式",
+        "sendingFeedback": "请求发送反馈",
+        "offeringFeedback": "提出报告一个问题",
         "deletingRoutine": "删除了例行工作",
         "runningRoutine": "立即运行了例行工作",
         "proposingTeam": "提议了一个团队",
@@ -14317,6 +14666,8 @@
       "sendingDm": "发送私信",
       "settingStatus": "更新自己的状态",
       "settingReplyStyle": "调整回复方式",
+      "sendingFeedback": "准备反馈",
+      "offeringFeedback": "准备报告",
       "deletingRoutine": "删除例行工作",
       "runningRoutine": "立即运行例行工作",
       "proposingTeam": "提议团队",
@@ -15223,6 +15574,7 @@
     "suspended": "此工作区暂时不可用。",
     "createRefused": "你现在无法创建工作区。",
     "createUnpaid": "你已有一个工作区在等待选择 agentes.chat 套餐。请先为它选择套餐，再创建新的工作区。",
+    "createUnpaidOpen": "打开 {{name}}",
     "createInactive": "你已有一个尚未激活的工作区，所以暂时无法创建新的工作区。",
     "agentPaused": "这个智能体暂时已暂停。",
     "onHold": "此工作区已暂停：{{reason}}",
@@ -16884,6 +17236,24 @@
     "send": "发送",
     "thanks": "已送达，谢谢。",
     "reply": "每条都会有人看。如需回复，会发到 {{email}}。",
-    "another": "再发一条"
+    "another": "再发一条",
+    "offer": {
+      "group": "关于应用的报告",
+      "ready": "<b>报告已备好</b>：{{summary}}",
+      "goesCloud": "会以你的名义发给 agentes.chat 团队",
+      "goesServer": "会以你的名义发给管理这台服务器的人",
+      "see": "查看报告",
+      "hide": "收起报告",
+      "send": "发送",
+      "notNow": "暂时不用",
+      "answer": "回复会发到你的邮箱。",
+      "sentCloud": "<b>报告已发送</b>给 agentes.chat 团队",
+      "sentServer": "<b>报告已发送</b>给管理这台服务器的人",
+      "sentAuto": "<b>报告已直接发送，未再询问</b>：{{summary}}",
+      "view": "查看",
+      "always": "总是发送",
+      "alwaysOn": "从现在起，这类报告会直接发送，不再询问。",
+      "askFirst": "发送前先询问"
+    }
   }
 }

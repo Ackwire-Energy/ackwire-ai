@@ -60,9 +60,11 @@ import { useColors, useDirectory, useNow, useOrgId, usePullRefresh } from "../sh
 import { agentLook } from "../shared/logic";
 import { successHaptic, Tile } from "../shared/parts";
 import { useWaitingApprovals, useWorkingNow } from "../shared/queries";
+import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
 import { usePresenceOf } from "../status/hooks";
 import { useTasksToday } from "../task-manager/hooks";
+import { useSectorMenu } from "../team/SectorScreen";
 import { TeamEntry } from "../team/TeamEntry";
 import { ARRIVAL_LOOK_MS, clearArrived, useArrived } from "./arrival";
 import { openAgentDelete } from "./DeleteAgentScreen";
@@ -88,6 +90,14 @@ const FACE_IN = FadeIn.duration(280).easing(Easing.bezier(0.23, 1, 0.32, 1));
  * bar's "+" creates one; an archived agent restores with a swipe.
  */
 export function AgentsScreen() {
+  return (
+    <SheetHostProvider>
+      <Agents />
+    </SheetHostProvider>
+  );
+}
+
+function Agents() {
   const { t } = useTranslation();
   const dir = useDirectory();
   const header = useTabHeader();
@@ -327,6 +337,8 @@ function FreeSections({
   const { org } = useOrg();
   const { collapsed, toggle } = useCollapsedSections<string>(STORED.agentGroupsCollapsed, null);
   const pins = usePins();
+  const sectorMenu = useSectorMenu();
+  const manages = can(org, "manage_agents");
   let shown = before;
   return (
     <>
@@ -353,6 +365,9 @@ function FreeSections({
             count={lines.length}
             collapsed={collapsed.includes(group.id)}
             onToggle={() => toggle(group.id)}
+            {...(manages
+              ? { menu: { label: t("agentGroups.options", { name: group.name }), onPress: () => sectorMenu(group) } }
+              : {})}
           >
             {rows}
           </CollapsibleSection>

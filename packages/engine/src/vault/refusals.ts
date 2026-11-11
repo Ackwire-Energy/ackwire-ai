@@ -1,5 +1,8 @@
 import { SECRET_NAME, vaultRule, vaultRuleLabel } from "@agenteschat/adapters";
+import { cutText } from "../format";
 import type { ToolOutput } from "../tools/types";
+import { neutralizeUntrusted } from "../untrusted";
+import type { VaultPlace } from "./service";
 
 /**
  * Why the Vault refused an agent (ADR 0144). The message is English, for the model, and says what to do next. It
@@ -14,7 +17,8 @@ export type VaultRefusalCode =
   | "no_value"
   | "source_error"
   | "no_person"
-  | "not_allowed";
+  | "not_allowed"
+  | "read_only";
 
 export class VaultRefusal extends Error {
   constructor(
@@ -61,6 +65,22 @@ export const named = (item: VaultItemNaming) => {
   return `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 };
 
+/**
+ * A place in plain words, for the agent's tool text: `the Vault`, or `1Password · "Agents"`. The label is what the
+ * people who run the workspace's password manager called their vault or folder, so it is shown, but as one short
+ * quoted line with every envelope marker neutralised (ADR 0117).
+ */
+export function vaultPlaceName(place: VaultPlace): string {
+  if (!place.connectionId) return place.name;
+  const label = cutText(
+    neutralizeUntrusted(place.label ?? "")
+      .replace(/\s+/g, " ")
+      .trim(),
+    60,
+  );
+  return label ? `${place.name} · ${JSON.stringify(label)}` : place.name;
+}
+
 const NOT_FOUND =
   "No Vault item like that is shared with you. Look with vault_list, or ask the person to save it in Settings, Vault.";
 
@@ -87,6 +107,13 @@ export const refuse = {
     ),
   sourceError: (source: string, reason: string) =>
     new VaultRefusal("source_error", `Couldn't read it from ${source}: ${reason}`),
+  sourceWrite: (place: VaultPlace, reason: string) =>
+    new VaultRefusal("source_error", `Couldn't save it in ${vaultPlaceName(place)}: ${reason} Nothing was saved.`),
+  readOnly: (place: VaultPlace) =>
+    new VaultRefusal(
+      "read_only",
+      `This ${place.name} token can only read, so nothing was saved or changed in ${vaultPlaceName(place)}. Tell the person: someone who manages that connection creates a token that can also write there and reconnects it in Settings, Vault, Connections. Until then, new logins go in the Vault (\`save_in\`: "vault").`,
+    ),
   noPerson: () =>
     new VaultRefusal(
       "no_person",
