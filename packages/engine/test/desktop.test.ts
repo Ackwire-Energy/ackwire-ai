@@ -10,6 +10,7 @@ import {
   claudeCodeAvailability,
   computerBrainUnavailable,
   confirmDeviceCode,
+  containersText,
   createJobHandlers,
   createOrganization,
   DEVICE_MAX_PENDING_PER_IP,
@@ -846,6 +847,14 @@ describe("folders and tools on the machine (protocol 10)", () => {
     expect(sharedFolderText("Box", { dir: "/home/me/agentes/shared", system: false, os: "linux" })).toContain(
       "flock /home/me/agentes/shared/.lock",
     );
+  });
+
+  test("the containers block: Docker's commands, the agent's own containers, ports above 1024 (ADR 0168)", () => {
+    const text = containersText("Build box");
+    expect(text).toStartWith('# Containers on "Build box"\ndocker, docker compose and podman work there');
+    expect(text).toContain("never another agent's containers or files");
+    expect(text).toContain("-p 8080:80");
+    expect(text).toContain("restart: always come back");
   });
 
   test("the sharing block: the agents share the computer, look before something heavy, tell the person (ADR 0057)", () => {

@@ -74,6 +74,8 @@ import {
   GIT_CACHE_DIR,
   grantGitCache,
   readAgentUsers,
+  rootlessContainers,
+  stopContainers,
   systemLauncher,
   trustedNetworkLauncher,
 } from "./agent-users";
@@ -1203,7 +1205,7 @@ export class RunnerDaemon implements RequestObserver {
     let accountBrains: AccountBrains | null = null;
     if (config.mode === "system") {
       const range = config.agentUidRange ?? DEFAULT_AGENT_UID_RANGE;
-      const users = new AgentUsers({ home, range, ...(sharedSpec && this.shared ? { shared: sharedSpec, log } : {}) });
+      const users = new AgentUsers({ home, range, log, ...(sharedSpec && this.shared ? { shared: sharedSpec } : {}) });
       for (const user of readAgentUsers(home)) {
         this.networkUsers.set(user.uid, user);
         // Keep already-running users out of cron/at even when their network must drain before preparation.
@@ -1306,13 +1308,16 @@ export class RunnerDaemon implements RequestObserver {
           return this.networkScopesBusy(agentId) || (!!user && this.networkProcessesBusy(user));
         },
         user: agentUser,
-        start: launchWorker(this.self.command, policy),
+        start: launchWorker(this.self.command, policy, undefined, log),
         ...(this.opts.workers || config.managedBy === "host"
           ? {}
           : {
               prepareExisting: (existing: AgentUser[]) => prepareAgents(existing, prepare, policy, log),
             }),
         stopAccountScopes: (uid) => this.accountUsers?.stopScopes(uid),
+        ...(this.opts.workers || !rootlessContainers()
+          ? {}
+          : { stopContainers: (uid: number) => void stopContainers(uid) }),
         toolNotice: (agentId, notice) => accountBrains?.toolNotice(agentId, notice),
         taskStop: (agentId, taskId) => accountBrains?.stopTask(agentId, taskId),
         lend: (kind, accountId, uid) => this.accounts.lendTo(kind, accountId, uid),
@@ -1921,6 +1926,8 @@ export class RunnerDaemon implements RequestObserver {
         const clear = deleted.has(u.id) && !here.has(u.id) && !this.swept.has(u.id);
         if (!clear && !gone.includes(u.id)) continue;
         hosted?.dropTurns(new RunnerError("dropped", "The agent left this computer."), u.id);
+        // Its containers stop with it; back, its `restart: always` ones start again with its containers service.
+        if (!this.opts.workers && rootlessContainers()) stopContainers(u.uid);
         // Archived or moved, it may come back: what the sign-ins hold for it stays until it is deleted.
         if (!clear) {
           this.accountUsers?.stopScopes(u.uid);

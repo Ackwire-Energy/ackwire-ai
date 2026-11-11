@@ -1221,6 +1221,21 @@ the person when another agent's work leaves no room, and to stop what a finished
 Gradle's and Kotlin's daemons exit after 5 idle minutes anyway (`GRADLE_OPTS` in each agent's environment).
 Expo's default Android debug build fits an 8 GB computer this way, using nearly all the agents' memory.
 
+**Containers (`--system`).** Agents can run `docker`, `docker compose` and `podman` on a computer where each is its
+own user once Podman is there: `apt install --no-install-recommends podman crun uidmap passt catatonit netavark
+aardvark-dns docker-compose`, and `podman-docker` for the `docker` command on a computer without Docker (where Docker
+is, its `docker` talks to the agent's Podman, never to Docker's daemon), then restart the runner
+(`systemctl restart agentes-runner`). Nobody joins a `docker` group, which
+would make any agent root on the computer: each agent's containers are rootless Podman under its own user, run by a
+containers service of its own (`agentes-containers-<uid>.service`, a systemd user manager in the agent's slice), its
+images and volumes in its home, its limits the agent's share (one container's `--memory` and `--cpus` work inside
+it). Each agent gets the 65536 subordinate ids from `uid << 16` in `/etc/subuid` and `/etc/subgid`, the runner
+replacing the range useradd gave it, and none if another range is in the way (the log says which). Their traffic
+leaves as the agent's own uid, but a container on the host network (`--network host`) whose user inside isn't root
+leaves as one of those ids: a firewall of yours that keys on the agents' uid range should treat every uid from 65536
+up the same way. Containers stop when the computer restarts and come back, those with `restart: always`, with the
+agent's next request. [ADR 0168](docs/adr/0168-agents-containers.md) has the rest.
+
 **The shared folder.** Every computer has one folder all of its agents read and write, so what one of
 them downloads, clones or installs, the others use instead of fetching it again. With `--system` it is
 `/srv/agentes/shared`, owned by root and the group `agentes-shared`, which the runner makes and adds

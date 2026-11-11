@@ -730,6 +730,8 @@ export interface RunnerToolchains {
   /** The Apple Account team that signs the iPhone test helper, as Xcode names it ("Sam Rivera (Personal Team)"). */
   appleTeam?: string;
   node?: string;
+  /** Podman's version: with the runner in system mode, the agents' containers (ADR 0168). */
+  podman?: string;
 }
 
 /** The phone a `phone.*` op is for. */
@@ -2789,6 +2791,7 @@ const TOOLCHAINS: readonly (keyof RunnerToolchains)[] = [
   "xcode",
   "appleTeam",
   "node",
+  "podman",
 ];
 const idOrNull = (v: unknown) => (isString(v) && v.length <= 64 ? v : null);
 

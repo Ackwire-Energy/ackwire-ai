@@ -1112,6 +1112,16 @@ export async function buildRunContext(
                   ? [{ text: sharedFolderText(a.name, a.shared) }]
                   : []),
                 ...(a.shares && a.tools.commands ? [{ text: sharingText(a.name, a.size) }] : []),
+                // Codex's, Cursor's, Grok's and Antigravity's sandboxes keep their shell off the network and out of the
+                // home, where the agent's containers service and its images are.
+                ...(a.containers &&
+                a.tools.commands &&
+                agent.brain !== "codex" &&
+                agent.brain !== "cursor" &&
+                agent.brain !== "grok" &&
+                agent.brain !== "antigravity"
+                  ? [{ text: containersText(a.name) }]
+                  : []),
               ]
             : [],
         )
@@ -1955,6 +1965,8 @@ async function machineAccessOf(db: Database, orgId: string, agentId: string, mac
     // Its agents share it (`sharingText`), with `agentes-runner computer` to see who uses it.
     shares: system && m.protocol >= SHARED_COMPUTER_PROTOCOL,
     size: m.size ? (m.size.limit ?? m.size) : null,
+    // Each agent its own containers service there (ADR 0168).
+    containers: system && Boolean(m.executors?.toolchains?.podman),
   };
 }
 
@@ -2097,6 +2109,19 @@ export function sharingText(computer: string, size: { cpus: number; memoryGb: nu
     "- Before something heavy (a build, a big install or download, a dataset or a model, many browser tabs), run agentes-runner computer: it shows what is free now and which agents use the most. If what you are about to start needs more than is free, tell the person which agent is using the computer and what you'll do: wait until it frees up, or do a lighter version now.",
     '- When a command is killed (exit code 137, "Killed") or your commands are much slower than usual, run agentes-runner computer before trying again, and tell the person what happened and why.',
     "- When something heavy is done, stop what it left running in the background (a build's daemons: ./gradlew --stop), so the others get the memory back.",
+  ].join("\n");
+}
+
+/**
+ * Rootless containers on a computer where each agent is its own user (ADR 0168): Docker's commands work, and what an
+ * agent should know of them there.
+ */
+export function containersText(computer: string) {
+  return [
+    `# Containers on "${computer}"`,
+    "docker, docker compose and podman work there: rootless Podman as your own user, your images and volumes in your home and your share of the computer. Containers reach the network as you do and never another agent's containers or files.",
+    "- Publish ports above 1024 (-p 8080:80).",
+    "- Containers keep running after your command ends, until the computer restarts; those with restart: always come back.",
   ].join("\n");
 }
 
