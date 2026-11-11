@@ -395,10 +395,12 @@ a.dv-row__detail {
   width: 14px;
   height: 14px;
 }
-/* A folded step: its title alone, a button that opens it (a done step to look again, a later one to read ahead). */
+/* A folded step: its title alone, a button that opens it (a done step to look again, a later one to read ahead). It
+   takes the row's height, the step's own padding, so a finger finds it. */
 .dv-step__open {
   justify-self: stretch;
-  padding: 0;
+  margin-block: calc(-1 * var(--space-2));
+  padding: var(--space-2) 0;
   border: 0;
   background: none;
   font-family: inherit;
