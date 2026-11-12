@@ -1,7 +1,6 @@
 /**
- * Draws the desktop app's icons from the agent engine (packages/ui/src/agent/engine.js), so the
- * tray and the app icon are the same symbol as everywhere else: the body with the cut corner and
- * two pill eyes. Run by CI before `tauri build` (`bun apps/desktop/scripts/icons.ts`), then
+ * Draws the desktop app's icons from the Ackwire pixel "A" (packages/ui/src/brand/ackwire.ts), so the
+ * tray and the app icon are the same mark as everywhere else: three stepped chevrons. Run by CI before `tauri build` (`bun apps/desktop/scripts/icons.ts`), then
  * `tauri icon app-icon.png` makes the .icns and the PNG sizes from the 1024 px master.
  *
  * Outputs (all ignored by git):
@@ -14,7 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { bodyTones, eyeShapes, inBody, toneAt } from "../../../packages/ui/src/agent/engine.js";
+import { PIXEL_MARK, PIXEL_MARK_SIZE, PIXEL_MARK_TONES } from "../../../packages/ui/src/brand/ackwire";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -74,32 +73,23 @@ export function encodePng(width: number, height: number, rgba: Uint8Array): Uint
   return out;
 }
 
-/* ---------- Shapes (unit body coordinates: u, v in 0..1 over the body's square) ---------- */
+/* ---------- The mark ---------- */
 
-interface Box {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
+/** The mark's layer (1 outer … 3 inner) at a point in grid units, or 0 outside it. */
+function layerAt(gx: number, gy: number): number {
+  if (gx < 0 || gy < 0 || gx >= PIXEL_MARK_SIZE.w || gy >= PIXEL_MARK_SIZE.h) return 0;
+  const cell = PIXEL_MARK[Math.floor(gy)]?.[Math.floor(gx)];
+  return cell && cell !== "." ? Number(cell) : 0;
 }
 
-/** A pill (rounded on its short side). */
-function inPill(u: number, v: number, b: Box): boolean {
-  if (u < b.x || u > b.x + b.w || v < b.y || v > b.y + b.h) return false;
-  const r = Math.min(b.w, b.h) / 2;
-  const cx = Math.min(Math.max(u, b.x + r), b.x + b.w - r);
-  const cy = Math.min(Math.max(v, b.y + r), b.y + b.h - r);
-  return (u - cx) ** 2 + (v - cy) ** 2 <= r * r;
-}
+/* ---------- Tray: 36×36 template images (only alpha counts; macOS tints them) ---------- */
 
-const ROUND_EYES: Box[] = eyeShapes("round").map((e: Box) => ({ x: e.x, y: e.y, w: e.w, h: e.h }));
-
-function shifted(eyes: Box[], dx: number): Box[] {
-  return eyes.map((e) => ({ ...e, x: e.x + dx }));
-}
-
-/** Paused: the eyes are short dashes. */
-const DASH_EYES: Box[] = [0.375, 0.625].map((cx) => ({ x: cx - 0.085, y: 0.47, w: 0.17, h: 0.085 }));
+type TrayState = "idle" | "working" | "paused" | "offline" | "update" | "browsing" | "needs";
+const TRAY_PX = 36;
+/** The mark's grid in the 36 px canvas: 26 cells across 32 px, centered. */
+const TB = { x: 2, cell: 32 / PIXEL_MARK_SIZE.w };
+const TB_Y = (TRAY_PX - PIXEL_MARK_SIZE.h * TB.cell) / 2;
+const SS = 4; // supersampling per axis
 
 function distToSegment(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
   const dx = bx - ax;
@@ -108,32 +98,16 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
   return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
 }
 
-/* ---------- Tray: 36×36 template images (only alpha counts; macOS tints them) ---------- */
-
-type TrayState = "idle" | "working" | "paused" | "offline" | "update" | "browsing" | "needs";
-const TRAY_PX = 36;
-/** The body's square inside the 36 px canvas. */
-const TB = { x: 4, y: 4, s: 28 };
-const SS = 4; // supersampling per axis
-
 function trayCoverage(state: TrayState, px: number, py: number): boolean {
-  const u = (px - TB.x) / TB.s;
-  const v = (py - TB.y) / TB.s;
-  const eyes = state === "paused" ? DASH_EYES : state === "working" ? shifted(ROUND_EYES, 0.05) : ROUND_EYES;
-  const inEye = eyes.some((e) => inPill(u, v, e));
-  if (state === "offline") {
-    // Outline only, eyes filled.
-    if (inEye) return true;
-    const stroke = 2.6 / TB.s;
-    const inner = (uu: number, vv: number) =>
-      inBody((uu - stroke) / (1 - 2 * stroke), (vv - stroke) / (1 - 2 * stroke));
-    return inBody(u, v) && !inner(u, v);
-  }
+  const layer = layerAt((px - TB.x) / TB.cell, (py - TB_Y) / TB.cell);
+  // Offline: the outer layer alone. Paused: the middle layer drops out.
+  if (state === "offline") return layer === 1;
+  if (state === "paused" && layer === 2) return false;
   if (state === "browsing" || state === "needs") {
     // A badge cut out of the bottom-right corner: a ring while an agent is in its browser, a
     // filled dot when one needs a person. Same place and gap as the update badge.
     const bx = 28;
-    const by = 28;
+    const by = 27;
     const d = Math.hypot(px - bx, py - by);
     if (d <= 8) {
       if (d > 6.4) return false; // the gap around the badge
@@ -155,7 +129,7 @@ function trayCoverage(state: TrayState, px: number, py: number): boolean {
       );
     }
   }
-  return inBody(u, v) && !inEye;
+  return layer > 0;
 }
 
 function trayPng(state: TrayState): Uint8Array {
@@ -174,7 +148,7 @@ function trayPng(state: TrayState): Uint8Array {
   return encodePng(TRAY_PX, TRAY_PX, rgba);
 }
 
-/* ---------- App icon: 1024 px, the agent in the sky's dither on a dark tile ---------- */
+/* ---------- App icon: 1024 px, the pixel "A" in Ackwire greens on a Forest Green tile ---------- */
 
 const hex = (h: string): [number, number, number] => {
   const n = Number.parseInt(h.slice(1, 7), 16);
@@ -184,17 +158,18 @@ const hex = (h: string): [number, number, number] => {
 function appIconPng(): Uint8Array {
   const S = 1024;
   const tile = { x: 100, y: 100, s: 824, r: 185 };
-  const body = { x: 232, y: 222, s: 560 };
-  const cells = 22;
-  const tones = (bodyTones("sky") as string[]).map(hex);
-  const bg = hex("#151514");
+  // 26 cells of 24 px (624 px) across the tile, centered.
+  const cell = 24;
+  const mark = { x: (S - PIXEL_MARK_SIZE.w * cell) / 2, y: (S - PIXEL_MARK_SIZE.h * cell) / 2 };
+  const tones = PIXEL_MARK_TONES.dark.map(hex);
+  const bg = hex("#031f1b");
   const rgba = new Uint8Array(S * S * 4);
   const inTile = (x: number, y: number) => {
     const cx = Math.min(Math.max(x, tile.x + tile.r), tile.x + tile.s - tile.r);
     const cy = Math.min(Math.max(y, tile.y + tile.r), tile.y + tile.s - tile.r);
     return (x - cx) ** 2 + (y - cy) ** 2 <= tile.r * tile.r;
   };
-  const n = 3; // supersampling for the icon's edges
+  const n = 3; // supersampling for the tile's corners
   for (let y = 0; y < S; y++)
     for (let x = 0; x < S; x++) {
       let r = 0;
@@ -206,18 +181,8 @@ function appIconPng(): Uint8Array {
           const px = x + (sx + 0.5) / n;
           const py = y + (sy + 0.5) / n;
           if (!inTile(px, py)) continue;
-          let c = bg;
-          const u = (px - body.x) / body.s;
-          const v = (py - body.y) / body.s;
-          if (inBody(u, v)) {
-            const eye = ROUND_EYES.some((e) => inPill(u, v, e));
-            if (eye) c = [255, 255, 255];
-            else {
-              const cx = Math.min(cells - 1, Math.floor(u * cells));
-              const cy = Math.min(cells - 1, Math.floor(v * cells));
-              c = tones[toneAt(cx, cy, cells) as number] ?? tones[2] ?? bg;
-            }
-          }
+          const layer = layerAt((px - mark.x) / cell, (py - mark.y) / cell);
+          const c = layer > 0 ? (tones[layer - 1] ?? bg) : bg;
           r += c[0];
           g += c[1];
           b += c[2];

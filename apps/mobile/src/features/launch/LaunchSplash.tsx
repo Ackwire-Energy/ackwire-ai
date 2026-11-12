@@ -238,10 +238,7 @@ export function LaunchSplash({
         {fontsReady ? (
           <Animated.View style={[styles.name, reduced ? styles.still : nameStyle]}>
             <RNText allowFontScaling={false} style={[styles.word, { color: c.ink }]}>
-              agentes
-              <RNText allowFontScaling={false} style={styles.dot}>
-                .chat
-              </RNText>
+              Ackwire <RNText style={{ color: c.agent }}>AI</RNText>
             </RNText>
           </Animated.View>
         ) : null}
@@ -374,8 +371,7 @@ const styles = StyleSheet.create({
   agent: { width: BOX, height: BOX },
   // Under the body (the canvas has room around it), centered on the agent.
   name: { position: "absolute", top: PAD + LOGO + 18, left: BOX / 2 - 160, width: 320, alignItems: "center" },
-  word: { fontFamily: fonts.display, fontSize: 30, lineHeight: 38 },
-  dot: { fontFamily: fonts.dot, fontSize: 27 },
+  word: { fontFamily: fonts.display, fontSize: 30, lineHeight: 38, fontWeight: "800", letterSpacing: -0.9 },
   line: { position: "absolute", top: PAD + LOGO + 64, left: BOX / 2 - 160, width: 320, alignItems: "center" },
   center: { textAlign: "center" },
   panel: { position: "absolute", left: 0, right: 0, bottom: 0, paddingHorizontal: 24 },
