@@ -632,6 +632,8 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # linuxdeploy's patchelf, except on the two sidecars: they keep their bytes in the AppImage too.
+          PATCHELF: ${{ github.workspace }}/apps/desktop/scripts/patchelf-keep-sidecars.sh
         with:
           projectPath: apps/desktop
           tauriScript: bun run tauri
@@ -663,6 +665,20 @@ jobs:
           for f in /agentes-runner /agent-browser /server/native.js /web/index.html /licenses/bun/LICENSE.md /licenses/agent-browser/LICENSE; do
             grep -q -- "$f\$" deb.txt || { echo "::error::$f is not in the deb"; exit 1; }
           done
+
+      # The AppImage's sidecars are the ones built above, byte for byte (linuxdeploy rewrites any file it gives an
+      # rpath; patchelf-keep-sidecars.sh keeps it off these two), and the runner still starts.
+      - name: Check the AppImage's sidecars
+        shell: bash
+        run: |
+          APPIMAGE="$PWD/out/agentes_${VERSION}_${{ matrix.pkg }}.AppImage"
+          dir=$(mktemp -d)
+          (cd "$dir" && "$APPIMAGE" --appimage-extract > /dev/null)
+          for name in agentes-runner agent-browser; do
+            cmp "$BIN_DIR/$name-${{ matrix.triple }}" "$dir/squashfs-root/usr/bin/$name" \
+              || { echo "::error::The AppImage's $name isn't the one built"; exit 1; }
+          done
+          "$dir/squashfs-root/usr/bin/agentes-runner" --version
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
