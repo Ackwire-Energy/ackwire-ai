@@ -14576,10 +14576,10 @@ export const en = {
     },
     /**
      * The license's required attribution (AGPL-3.0 section 7(b), see NOTICE): translate it, but keep
-     * "Ackwire AI" and "Codari Global, LLC" and its meaning.
+     * "agentes.chat" and "Codari Global, LLC" and its meaning.
      */
     about: {
-      basedOn: "Based on <site>Ackwire AI</site> by Codari Global, LLC",
+      basedOn: "Based on <site>agentes.chat</site> by Codari Global, LLC",
       version: "Version",
       license: "Free software under the <license>GNU Affero General Public License v3</license>, with no warranty.",
       source: "Source code",

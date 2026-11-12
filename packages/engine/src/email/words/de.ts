@@ -370,8 +370,7 @@ export const words: EmailWords = {
     body: (app, org) => [{ b: app }, " hat jetzt Zugriff auf dein Konto in ", { b: org }, "."],
     note: "Das warst nicht du? Trenne die Verbindung sofort und ändere dein Passwort.",
     button: "Verbundene Apps ansehen",
-    why: (org) =>
-      `Du erhältst diese E-Mail, weil eine App mit deinem Konto in ${org} auf Ackwire AI verbunden wurde.`,
+    why: (org) => `Du erhältst diese E-Mail, weil eine App mit deinem Konto in ${org} auf Ackwire AI verbunden wurde.`,
     personal: {
       body: (app) => [{ b: app }, " hat jetzt Zugriff auf dein Konto in deinem persönlichen Workspace."],
       why: () =>

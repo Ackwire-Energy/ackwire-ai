@@ -15044,7 +15044,7 @@
       "rolesPersonal": "Ce que chaque personne ici peut faire. Les propriétaires peuvent tout faire."
     },
     "about": {
-      "basedOn": "Basé sur <site>Ackwire AI</site> de Codari Global, LLC",
+      "basedOn": "Basé sur <site>agentes.chat</site> de Codari Global, LLC",
       "version": "Version",
       "license": "Logiciel libre sous la <license>GNU Affero General Public License v3</license>, sans garantie.",
       "source": "Code source",

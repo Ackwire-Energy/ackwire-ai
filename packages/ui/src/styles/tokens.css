@@ -31,7 +31,7 @@
   --warn-soft: #fbeed5;
   --on-warn: #ffffff;
   --danger: #b42a20;
-  --info: #0a6f9e;
+  --info: #3f7a12;
   --plate: rgba(127, 127, 127, 0.1);
   --plate-soft: rgba(127, 127, 127, 0.06);
   --e1: 0 1px 1px rgba(23, 23, 22, 0.04), 0 2px 4px -1px rgba(23, 23, 22, 0.05), 0 0 0 1px var(--line);
@@ -71,7 +71,7 @@
   --warn-soft: #33260e;
   --on-warn: #2a1c00;
   --danger: #f08a80;
-  --info: #5cc4ea;
+  --info: #90ed42;
   --plate: rgba(127, 127, 127, 0.14);
   --plate-soft: rgba(127, 127, 127, 0.08);
   --e1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--line);

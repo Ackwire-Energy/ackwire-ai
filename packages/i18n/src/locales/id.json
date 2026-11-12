@@ -14119,7 +14119,7 @@
       "rolesPersonal": "Apa yang bisa dilakukan setiap orang di sini. Pemilik bisa melakukan semuanya."
     },
     "about": {
-      "basedOn": "Berdasarkan <site>Ackwire AI</site> oleh Codari Global, LLC",
+      "basedOn": "Berdasarkan <site>agentes.chat</site> oleh Codari Global, LLC",
       "version": "Versi",
       "license": "Perangkat lunak bebas di bawah <license>GNU Affero General Public License v3</license>, tanpa jaminan.",
       "source": "Kode sumber",

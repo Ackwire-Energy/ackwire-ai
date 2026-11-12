@@ -324,7 +324,7 @@ export const PLAN_MARKS = ["claude", "openai", "zai", "kimi"] as const;
 export const KEY_MARKS = ["claude", "openai", "gemini", "openrouter"] as const;
 
 /**
- * The billing hold that stops a plan: only the Cloud has an agentes.chat plan, so a self-hosted server never has one.
+ * The billing hold that stops a plan: only the Cloud has an Ackwire AI plan, so a self-hosted server never has one.
  * Not known yet (`edition` null) it counts: no moment of Connect or "Plano ativo" on a workspace on hold.
  */
 export const planHoldOf = (
@@ -344,7 +344,7 @@ export type PlanGate =
   | { state: "unsupported"; reason: BrainUnavailable | "keys"; overdue?: boolean }
   /** `owner`: the viewer doesn't own the agent; `computer`: only whoever connected it adds a sign-in there. */
   | { state: "locked"; who: "owner" | "computer" }
-  /** The Cloud's workspace is on a billing hold: it has no computer to sign in on until its agentes.chat plan is active. */
+  /** The Cloud's workspace is on a billing hold: it has no computer to sign in on until its Ackwire AI plan is active. */
   | { state: "billing"; hold: BillingHold }
   | { state: "ready" };
 

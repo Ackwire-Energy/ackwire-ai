@@ -25,7 +25,7 @@ export async function requireUserIn(context: RouterContext, href: string, orgId:
 }
 
 /**
- * `/terms` and `/privacy`: agentes.chat Cloud's documents where the server says it is the Cloud (true). Any other
+ * `/terms` and `/privacy`: Ackwire AI Cloud's documents where the server says it is the Cloud (true). Any other
  * server sends them to its own page (`TERMS_URL`, `PRIVACY_URL`), or has none (false).
  */
 export async function legalPage(context: RouterContext, kind: LegalKind): Promise<boolean> {

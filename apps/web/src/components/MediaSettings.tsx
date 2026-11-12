@@ -103,7 +103,7 @@ export function MediaSettingsSection() {
           />
         </div>
       </Card>
-      {/* The server's own GIPHY key, for its owner on a server that isn't agentes.chat's own (null to anyone else). */}
+      {/* The server's own GIPHY key, for its owner on a server that isn't Ackwire AI's own (null to anyone else). */}
       <GifKeyCard jevMissing={!shown.agentMediaAvailable} />
       <Card aria-labelledby="media-agents">
         <CardHeader id="media-agents" icon="agent" title={t("settings.media.agentsTitle")} />

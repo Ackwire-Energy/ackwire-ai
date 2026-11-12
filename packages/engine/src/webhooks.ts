@@ -255,7 +255,7 @@ export async function addGitHubRepoHook(
           authorization: `Bearer ${token}`,
           accept: "application/vnd.github+json",
           "content-type": "application/json",
-          "user-agent": "agentes.chat",
+          "user-agent": "Ackwire AI",
         },
         ...(init.body ? { body: JSON.stringify(init.body) } : {}),
       });

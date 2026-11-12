@@ -15,7 +15,7 @@ import { Text } from "@/ui/Text";
 import { useToast } from "@/ui/Toast";
 
 /**
- * "Onde fica o seu agentes.chat?": the team's own server (self-hosted, usually on Tailscale), by address with the
+ * "Onde fica o seu Ackwire AI?": the team's own server (self-hosted, usually on Tailscale), by address with the
  * URL keyboard open and its return key as the action, or by the QR code the web app shows. The server is checked
  * before anything changes. `onDone` leaves it (back on the sign-in, or closing the sheet it was opened in); `scan`
  * off where the camera's screen can't be pushed (over the waiting splash).

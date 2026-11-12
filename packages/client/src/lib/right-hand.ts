@@ -151,7 +151,7 @@ export async function finishOnboarding(api: ApiClient, orgId: string): Promise<O
 
 /**
  * Whether its first-run card leads with the plan for this person (the card's plan row, `firstRunSteps`, ADR 0162):
- * the card still up, the workspace waiting for its first agentes.chat plan, and an owner who may pay. Here, apart from
+ * the card still up, the workspace waiting for its first Ackwire AI plan, and an owner who may pay. Here, apart from
  * the card's rows, for the hold's banner, which every page loads.
  */
 export const leadsWithPlan = (

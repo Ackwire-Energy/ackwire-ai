@@ -22,3 +22,67 @@ export const ACKWIRE = {
   solarDeep: "#3f7a12",
   celadon: "#eef4ef",
 } as const;
+
+/**
+ * The "A" in the app's pixel style: the monogram's three layers as stepped chevrons on a 26×13 grid, each cell the
+ * number of its layer (1 the outer, 3 the inner), "." empty. Each layer has its own tone of Ackwire green, brightest
+ * outside, as light falls on the agents from above.
+ */
+export const PIXEL_MARK = [
+  "............11............",
+  "...........1111...........",
+  "..........111111..........",
+  ".........111..111.........",
+  "........111.22.111........",
+  ".......111.2222.111.......",
+  "......111.222222.111......",
+  ".....111.222..222.111.....",
+  "....111.222.33.222.111....",
+  "...111.222.3333.222.111...",
+  "..111.222.333333.222.111..",
+  ".111.222.333..333.222.111.",
+  "111.222.333....333.222.111",
+] as const;
+
+/** The pixel mark's grid, and a square box around it, centered (`viewBox`). */
+export const PIXEL_MARK_SIZE = { w: 26, h: 13 } as const;
+export const PIXEL_MARK_VIEWBOX = "0 -6.5 26 26";
+
+/** The three layers' tones per theme, outer to inner: deep enough on white on light, bright on black on dark. */
+export const PIXEL_MARK_TONES = {
+  light: ["#2f5f0d", "#3f7a12", "#5a9a1e"],
+  dark: ["#b8f582", "#90ed42", "#6cba2c"],
+} as const;
+
+/** One row's run of cells of one layer: `layer` 0 is the outer, 2 the inner. */
+export interface PixelRun {
+  x: number;
+  y: number;
+  w: number;
+  layer: 0 | 1 | 2;
+}
+
+/** The pixel mark as runs of cells, one rect each. */
+export function pixelMarkRuns(): PixelRun[] {
+  const runs: PixelRun[] = [];
+  PIXEL_MARK.forEach((row, y) => {
+    let start = 0;
+    for (let x = 1; x <= row.length; x++) {
+      if (row[x] === row[start]) continue;
+      const cell = row[start];
+      if (cell && cell !== ".") runs.push({ x: start, y, w: x - start, layer: (Number(cell) - 1) as 0 | 1 | 2 });
+      start = x;
+    }
+  });
+  return runs;
+}
+
+/**
+ * The pixel mark as SVG elements (for pages without React: the favicon, the error page): `fill` in the given tones
+ * (outer to inner), or with `as: "class"` the given class names, for a page whose stylesheet colors them per theme.
+ */
+export function pixelMarkRects(tones: readonly string[], as: "fill" | "class" = "fill"): string {
+  return pixelMarkRuns()
+    .map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="1" ${as}="${tones[r.layer]}"/>`)
+    .join("");
+}

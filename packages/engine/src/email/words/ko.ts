@@ -9,9 +9,7 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host
-      ? ["이 메일은 ", { nobr: host }, "의 Ackwire AI 서버에서 보냈어요."]
-      : "이 메일은 Ackwire AI에서 보냈어요.",
+    host ? ["이 메일은 ", { nobr: host }, "의 Ackwire AI 서버에서 보냈어요."] : "이 메일은 Ackwire AI에서 보냈어요.",
   fallback: "버튼이 작동하지 않나요? 이 주소를 브라우저에 복사해 붙여넣으세요.",
   role: { owner: "소유자", member: "멤버" },
   anAgent: "에이전트",

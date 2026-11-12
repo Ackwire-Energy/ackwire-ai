@@ -7,8 +7,7 @@ import type { EmailWords } from "./index";
  * forms with `plural("pl", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) =>
-    host ? atHost("Wysłano z serwera Ackwire AI pod", "adresem", host) : "Wysłano przez Ackwire AI.",
+  sentBy: (host) => (host ? atHost("Wysłano z serwera Ackwire AI pod", "adresem", host) : "Wysłano przez Ackwire AI."),
   fallback: "Przycisk nie działa? Skopiuj ten adres do przeglądarki:",
   role: { owner: "właściciel", member: "członek" },
   anAgent: "Agent",

@@ -100,7 +100,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
             list: ["Zamknij aplikację, a potem zrzuć bazę danych kopią serwera, którą ma aplikacja. Na Macu:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [

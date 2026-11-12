@@ -14572,7 +14572,7 @@
       "rolesPersonal": "Was jede Person hier tun kann. Inhaber können alles."
     },
     "about": {
-      "basedOn": "Basiert auf <site>Ackwire AI</site> von Codari Global, LLC",
+      "basedOn": "Basiert auf <site>agentes.chat</site> von Codari Global, LLC",
       "version": "Version",
       "license": "Freie Software unter der <license>GNU Affero General Public License v3</license>, ohne Gewährleistung.",
       "source": "Quellcode",

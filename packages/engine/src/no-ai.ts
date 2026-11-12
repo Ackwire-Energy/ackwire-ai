@@ -55,7 +55,7 @@ const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
     "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
   runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
   plan_tools: "I stopped before answering: my plan's AI on that computer offers tools of its own.",
-  plan_hold: "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected.",
+  plan_hold: "I kept your message. I'll answer here once the workspace has an Ackwire AI plan and an AI connected.",
 };
 /** `cli_failed` with what the plan's CLI said (`NoAiCard.why`). */
 const cliFailedText = (why: string) => `I can't answer now: my plan's AI stopped with an error (${why}).`;

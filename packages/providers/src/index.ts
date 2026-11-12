@@ -19,7 +19,7 @@ export * from "./types";
 
 /**
  * One adapter per entry of `PROVIDERS`, by the protocol it speaks: the server's defaults (modules may replace any).
- * `endpointFetch`: how calls reach workspaces' own endpoints (the server's guarded fetch on agentes.chat Cloud);
+ * `endpointFetch`: how calls reach workspaces' own endpoints (the server's guarded fetch on Ackwire AI Cloud);
  * `version`: this server's, in the User-Agent an endpoint that asks for one gets.
  */
 export function createModelProviders(

@@ -37,7 +37,7 @@ import { BusinessStep, PlanStep, TeamStep } from "./steps";
  * once, named in the person's language with the phone's time zone, and opens it in its right hand's DM, where its card
  * holds the rest. A company or team goes on: the workspace's name (its time zone from the phone, said in one line; its
  * logo later, in Configurações), the keyboard's return key as the action; what it does; its team, made from a
- * template; and, on agentes.chat Cloud, the plan it waits for, in words only. Its right hand stands on the sky and says
+ * template; and, on Ackwire AI Cloud, the plan it waits for, in words only. Its right hand stands on the sky and says
  * one line per step, the team joining it there once picked. The step is read from the workspace's data, so one left at
  * any step (here or on the web) resumes there, never a second one. It opens in #general, or in the right hand's DM
  * when the plan was left for the web.

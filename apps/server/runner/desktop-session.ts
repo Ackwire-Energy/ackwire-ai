@@ -1207,7 +1207,7 @@ export class DesktopSessions {
           );
         }
         const preparedAt = this.now();
-        // The agentes.chat look (desktop-look.ts), as the agent, while the screen server starts: it writes only
+        // The Ackwire AI look (desktop-look.ts), as the agent, while the screen server starts: it writes only
         // into HOME, which XFCE reads and Xtigervnc doesn't. Without it the desktop starts as its HOME has it.
         const look = lookCommand(user.home, this.lookOptions(agent, user, files.passwd));
         const looking = this.step(
@@ -1234,7 +1234,7 @@ export class DesktopSessions {
         const { code: looked, ms: lookMs } = await looking;
         if (looked !== 0) {
           this.opts.log(
-            `the desktop of ${agent.handle} keeps the look its home has: writing the agentes.chat look ${looked === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${looked})`}`,
+            `the desktop of ${agent.handle} keeps the look its home has: writing the Ackwire AI look ${looked === "late" ? `was stopped after ${this.stepMs / 1000} s` : `failed (exit ${looked})`}`,
           );
         }
         const sessionAt = this.now();

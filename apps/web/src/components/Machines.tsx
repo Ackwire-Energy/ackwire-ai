@@ -342,7 +342,7 @@ function RemoveDialog({
 }
 
 /**
- * Configurações → Computadores, first: this server's computer (`HOST_COMPUTER_TOKEN`), the machine agentes.chat
+ * Configurações → Computadores, first: this server's computer (`HOST_COMPUTER_TOKEN`), the machine Ackwire AI
  * is installed on. An admin who stopped it here can use it again; with none, admins read how to make it one,
  * but only while sign-up is closed (with open sign-up the server refuses one).
  */

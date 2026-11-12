@@ -304,8 +304,7 @@ export const en = {
     headline: "Your code",
     body: (org: string): Text => ["Type this code on the page to ask to join ", { b: org }, "."],
     small: ["It works for 10 minutes. If you didn't ask, ", { nobr: "ignore this email." }] as Text,
-    why: (org: string) =>
-      `You got this email because someone typed this address to ask to join ${org} on Ackwire AI.`,
+    why: (org: string) => `You got this email because someone typed this address to ask to join ${org} on Ackwire AI.`,
     personal: {
       body: (): Text => "Type this code on the page to ask to join this workspace.",
       why: () =>

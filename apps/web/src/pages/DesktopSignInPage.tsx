@@ -91,7 +91,7 @@ export function DesktopSignInPage({
       <div className="auth__form">
         <header className="auth__ask">
           <AgentAvatar
-            name="agentes.chat"
+            name="Ackwire AI"
             size="lg"
             state={state === "opening" || working ? "writing" : undefined}
             expression={state === "done" ? "happy" : undefined}

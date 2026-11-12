@@ -8,9 +8,7 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host
-      ? atHost("Ackwire AI sunucusu tarafından gönderildi.", "Sunucu:", host)
-      : "Ackwire AI tarafından gönderildi.",
+    host ? atHost("Ackwire AI sunucusu tarafından gönderildi.", "Sunucu:", host) : "Ackwire AI tarafından gönderildi.",
   fallback: "Düğme çalışmıyor mu? Bu adresi tarayıcınıza kopyalayın:",
   role: { owner: "sahip", member: "üye" },
   anAgent: "Bir ajan",

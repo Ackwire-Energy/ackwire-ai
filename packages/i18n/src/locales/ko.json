@@ -14057,7 +14057,7 @@
       "rolesPersonal": "여기 있는 사람마다 할 수 있는 일. 소유자는 모든 걸 할 수 있어요."
     },
     "about": {
-      "basedOn": "Codari Global, LLC의 <site>Ackwire AI</site> 기반",
+      "basedOn": "Codari Global, LLC의 <site>agentes.chat</site> 기반",
       "version": "버전",
       "license": "<license>GNU Affero General Public License v3</license>에 따른 자유 소프트웨어이며 보증은 없습니다.",
       "source": "소스 코드",

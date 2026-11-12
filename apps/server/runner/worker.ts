@@ -204,7 +204,7 @@ export class WorkerLink {
   private end(handlers: SocketHandlers | null) {
     if (!handlers || this.session !== handlers) return;
     this.session = null;
-    this.unanswered("The computer lost its connection to agentes.chat");
+    this.unanswered("The computer lost its connection to Ackwire AI");
     queueMicrotask(() => handlers.onClose(1000, ""));
   }
 

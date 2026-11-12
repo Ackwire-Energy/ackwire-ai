@@ -111,7 +111,7 @@ export interface ConnectorListingEntry {
   oauthConfigured: boolean;
   /** Can be connected on this server (an OAuth app, an API key, or Composio). */
   available: boolean;
-  /** A one-click server whose vendor hasn't approved agentes.chat yet, which Composio doesn't serve here ("Em breve"). */
+  /** A one-click server whose vendor hasn't approved Ackwire AI yet, which Composio doesn't serve here ("Em breve"). */
   soon: boolean;
   /** Connects through Composio (its page, its OAuth app): available only with `COMPOSIO_API_KEY` (ADR 0107). */
   via?: "composio";
@@ -144,13 +144,13 @@ export interface ServerCatalog {
   oauthApps: Record<string, unknown>;
   mail?: MailAdapters | null;
   composio?: ComposioConnectors | null;
-  /** The agentes.chat Cloud: a one-click server marked `cloudOAuthOnly` takes no key there. */
+  /** The Ackwire AI Cloud: a one-click server marked `cloudOAuthOnly` takes no key there. */
   cloud?: boolean;
 }
 
 /**
  * The one way a preset connects here (ADR 0107 §1): the vendor's server when it connects today, else Composio when this
- * server is set up for it, else "Em breve" for a vendor that hasn't approved agentes.chat, else unavailable.
+ * server is set up for it, else "Em breve" for a vendor that hasn't approved Ackwire AI, else unavailable.
  */
 function presetWay(p: McpPreset, composio: ComposioConnectors | null | undefined) {
   const viaComposio = p.composio ? composioToolkitUrl(p.composio.toolkit) : null;
@@ -228,7 +228,7 @@ export interface MissingConnector {
   /** What names it in a search: its label and its ids (`drive`). */
   names: string[];
   /**
-   * `unavailable`: this server can't connect it; `soon`: its vendor hasn't approved agentes.chat yet (a `soon`
+   * `unavailable`: this server can't connect it; `soon`: its vendor hasn't approved Ackwire AI yet (a `soon`
    * preset); `not_connected`: the workspace hasn't; `not_given`: the agent lacks it; `needs_reconnect`: a mailbox or
    * a Composio account of it stopped working.
    */

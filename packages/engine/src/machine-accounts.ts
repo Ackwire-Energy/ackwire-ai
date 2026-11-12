@@ -1158,7 +1158,7 @@ export async function beginAccountLogin(
       : claudeAuthMethodFor(await claudeAuthPolicy(deps.db), orgId, system);
     if (!again && method === "cli_login" && !claudeLoginMethodsOf(said, system).includes("cli_login")) {
       throw new ConflictError(
-        "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key.",
+        "This computer can't connect Claude this way yet. Update the Ackwire AI program on it, or use an API key.",
         "account.method_unsupported",
         { name: machine.name },
       );

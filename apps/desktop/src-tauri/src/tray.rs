@@ -44,7 +44,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
     use tauri::image::Image;
     use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
     let tray = TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("agentes.chat")
+        .tooltip("Ackwire AI")
         .icon(Image::from_bytes(icons::IDLE)?)
         .icon_as_template(true)
         .on_tray_icon_event(|tray, event| {
@@ -60,7 +60,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
-    // Off until the popover says (`tray_visible`): with agentes.chat nothing of this computer shows.
+    // Off until the popover says (`tray_visible`): with Ackwire AI nothing of this computer shows.
     tray.set_visible(false)?;
     Ok(())
 }
@@ -68,7 +68,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
 #[cfg(not(target_os = "macos"))]
 pub fn create(app: &AppHandle) -> tauri::Result<()> {
     let mut builder = tauri::tray::TrayIconBuilder::with_id(TRAY_ID)
-        .tooltip("agentes.chat")
+        .tooltip("Ackwire AI")
         .menu(&menu(app)?)
         .show_menu_on_left_click(true);
     if let Some(icon) = app.default_window_icon() {

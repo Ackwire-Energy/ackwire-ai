@@ -7,8 +7,7 @@ import type { EmailWords } from "./index";
  * forms with `plural("nl", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) =>
-    host ? atHost("Verstuurd door de agentes.chat-server", "op", host) : "Verstuurd door Ackwire AI.",
+  sentBy: (host) => (host ? atHost("Verstuurd door de agentes.chat-server", "op", host) : "Verstuurd door Ackwire AI."),
   fallback: "Werkt de knop niet? Kopieer dit adres naar je browser:",
   role: { owner: "eigenaar", member: "lid" },
   anAgent: "Een agent",

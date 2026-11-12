@@ -1,22 +1,30 @@
 import type { CSSProperties } from "react";
-import { BRAND_NAME, MONOGRAM_PATH, MONOGRAM_VIEWBOX } from "../brand/ackwire";
+import { BRAND_NAME, PIXEL_MARK_VIEWBOX, pixelMarkRuns } from "../brand/ackwire";
 import { cx } from "../cx";
 
+/** The pixel "A" never changes: its runs are computed once. */
+const RUNS = pixelMarkRuns();
+
 /**
- * The Ackwire "A" monogram in the theme's accent (`--agent`), or in the ink in the mono logo. A square mark: the
- * favicon, the app icon and a workspace without a logo of its own wear it.
+ * The Ackwire "A" in the app's pixel style: three stepped chevrons, each in its tone of Ackwire green, or in the ink
+ * in the mono logo. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
  */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
   return (
     <svg
-      viewBox={MONOGRAM_VIEWBOX}
+      viewBox={PIXEL_MARK_VIEWBOX}
+      shapeRendering="crispEdges"
       className={cx("ac-logo__mark", className)}
       style={size ? { width: size, height: size } : undefined}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <path className="ac-logo__body" d={MONOGRAM_PATH} />
+      <g className="ac-logo__body">
+        {RUNS.map((r) => (
+          <rect key={`${r.x}:${r.y}`} className={`ac-logo__px${r.layer + 1}`} x={r.x} y={r.y} width={r.w} height={1} />
+        ))}
+      </g>
     </svg>
   );
 }
@@ -32,7 +40,7 @@ export interface LogoProps {
   style?: CSSProperties;
 }
 
-/** "Ackwire AI" logo: the "A" + "Ackwire" in the ink and "AI" in the accent, as the brand's lockup. */
+/** "Ackwire AI" logo: the pixel "A" + "Ackwire" in the ink and "AI" in the accent, as the brand's lockup. */
 export function Logo({ mono, size = 24, className, style }: LogoProps) {
   return (
     <span

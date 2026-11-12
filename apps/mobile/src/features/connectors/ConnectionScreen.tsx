@@ -52,7 +52,7 @@ export const openConnection = (id: string) => router.push(`/connectors/${id}`);
  * it (one row per agent, the level as its value, changed in place), what always asks as that group's footer; its
  * tools as one row (what waits on you under it, in amber; a screen of their own); the account (which, Reconectar,
  * another account of an MCP server, each in a sheet); and Desconectar, alone in red, behind the system's
- * confirmation. GitHub also lists its repositories through the agentes.chat app, under who uses it. Connecting a new
+ * confirmation. GitHub also lists its repositories through the Ackwire AI app, under who uses it. Connecting a new
  * service stays in its sheet.
  */
 export function ConnectionScreen({ id }: { id: string }) {

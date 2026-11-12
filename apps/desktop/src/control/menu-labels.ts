@@ -49,7 +49,7 @@ export function menuLabels(t: TFunction): Record<string, string> {
     setupFailedBody: t("desktop.here.notifyFailedBody"),
     // Another server's new notifications (workspaces.rs, ADR 0154): "{count}" is left for Rust.
     serversCloud: t("desktop.servers.cloud"),
-    // The app's own windows by name, so the Dock's list never shows three "agentes.chat".
+    // The app's own windows by name, so the Dock's list never shows three "Ackwire AI".
     windowWelcome: t("desktop.windowTitle.welcome"),
     windowPrefs: t("desktop.windowTitle.prefs"),
     workspaceNewsOne: t("desktop.servers.newsOne"),

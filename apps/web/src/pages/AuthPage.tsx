@@ -529,7 +529,7 @@ export function AuthPage({
         {serverLine}
         <header className="auth__ask" ref={header} data-burst>
           <AgentAvatar
-            name="agentes.chat"
+            name="Ackwire AI"
             size="lg"
             state={pending || step === "browser" ? "writing" : undefined}
             expression={expression}

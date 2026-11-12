@@ -45,7 +45,7 @@ export interface McpPreset {
    * Postgres user). Every other tool keeps our usual suggestion.
    */
   readTools?: readonly string[];
-  /** The vendor hasn't approved agentes.chat yet: listed greyed out ("Em breve"), not connectable in one click. */
+  /** The vendor hasn't approved Ackwire AI yet: listed greyed out ("Em breve"), not connectable in one click. */
   soon?: true;
   /**
    * The Cloud offers OAuth only, no API key: the vendor's terms forbid an app asking its users for their token

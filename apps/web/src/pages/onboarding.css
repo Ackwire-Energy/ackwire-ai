@@ -326,7 +326,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   place-items: center;
   width: 100%;
   height: 100%;
-  background: linear-gradient(180deg, #4b93ff, #2b74e6);
+  background: linear-gradient(180deg, #9ef654, #81dd34);
   color: #fff;
   font-size: 20px;
   font-weight: 700;
@@ -480,7 +480,7 @@ html:not([data-pointer]) .onb__logo:focus-visible {
 }
 /* What the template brings, before it is made: tinted in the agents' blue, sliding in. */
 .onb-preview__side [data-fresh] {
-  background: color-mix(in srgb, var(--agent, #2b74e6) 8%, transparent);
+  background: color-mix(in srgb, var(--agent, #81dd34) 8%, transparent);
   animation: sidebar-row-in 0.36s var(--out) both;
 }
 @media (prefers-reduced-motion: reduce) {

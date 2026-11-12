@@ -36,8 +36,8 @@ import {
 
 /** The night stays in both themes: the stars need the dark. */
 const NIGHT = "#070b14";
-const NIGHT_TONES = ["#070b14", "#0a1120", "#0c1a35", "#0f2750"] as const;
-const LINE = "#88a9e6";
+const NIGHT_TONES = ["#070b14", "#141f0b", "#1f330e", "#2d4d12"] as const;
+const LINE = "#b3e18d";
 const MIN_ZOOM = 0.6;
 const MAX_ZOOM = 1.8;
 const FOCUS = { duration: 420, easing: Easing.out(Easing.cubic) };
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     paddingVertical: 1,
   },
   nameStrong: { color: "#ffffff", fontWeight: "600" },
-  pulse: { position: "absolute", left: 0, top: 0, width: 4, height: 4, backgroundColor: "#cfe0ff" },
+  pulse: { position: "absolute", left: 0, top: 0, width: 4, height: 4, backgroundColor: "#e5fdd1" },
   card: { marginHorizontal: 16, marginTop: 12, borderRadius: 20, overflow: "hidden", backgroundColor: NIGHT },
   cardHead: {
     position: "absolute",

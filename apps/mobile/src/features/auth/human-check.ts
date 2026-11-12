@@ -134,7 +134,7 @@ export class CheckCancelled extends Error {}
 
 /**
  * A refused request in the phone's words: the bot check's blocked line names no browser (the app has none to
- * switch to), then a known code (a blocked account's, with its kind on agentes.chat Cloud), too many tries, else the
+ * switch to), then a known code (a blocked account's, with its kind on Ackwire AI Cloud), too many tries, else the
  * generic line. Never the server's text.
  */
 export function refusalText(
@@ -164,7 +164,7 @@ export const refusalOf = ({ error }: { error: ({ status: number; code?: string }
 
 /**
  * A social sign-in Better Auth refused, as Apple's native sign-in gets the server's answer itself: a blocked account's
- * line (its kind on agentes.chat Cloud), a refusal the web's sign-in says too, else that it didn't work. Better Auth
+ * line (its kind on Ackwire AI Cloud), a refusal the web's sign-in says too, else that it didn't work. Better Auth
  * names a provider's own refusal in an `OAUTH_LINK_ERROR`'s message ("account not linked" is the web's
  * `account_not_linked`). `emails`: the server sends email.
  */

@@ -74,7 +74,7 @@ export function DesktopConnectorPage({
     <AuthShell>
       <div className="auth__form">
         <header className="auth__ask">
-          <AgentAvatar name="agentes.chat" size="lg" state="writing" />
+          <AgentAvatar name="Ackwire AI" size="lg" state="writing" />
           <div className="auth__bubble" aria-live="polite">
             <h1 className="auth__title">{t("auth.desktop.connecting")}</h1>
           </div>

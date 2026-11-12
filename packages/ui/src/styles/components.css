@@ -2056,12 +2056,30 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   height: 1.25em;
   flex: none;
 }
-/* The "A" in the accent: Solar Green on dark, its deep shade on light (Solar Green fails contrast on white). */
-.ac-logo__body {
-  fill: var(--agent);
+/* The pixel "A": each layer in its tone of Ackwire green (PIXEL_MARK_TONES), deep on light, bright on dark. */
+.ac-logo__mark {
+  --logo-1: #2f5f0d;
+  --logo-2: #3f7a12;
+  --logo-3: #5a9a1e;
 }
-.ac-logo--mono .ac-logo__body {
-  fill: currentColor;
+[data-theme="dark"] .ac-logo__mark {
+  --logo-1: #b8f582;
+  --logo-2: #90ed42;
+  --logo-3: #6cba2c;
+}
+.ac-logo__px1 {
+  fill: var(--logo-1);
+}
+.ac-logo__px2 {
+  fill: var(--logo-2);
+}
+.ac-logo__px3 {
+  fill: var(--logo-3);
+}
+.ac-logo--mono .ac-logo__mark {
+  --logo-1: currentColor;
+  --logo-2: currentColor;
+  --logo-3: currentColor;
 }
 .ac-logo__word {
   display: inline-flex;

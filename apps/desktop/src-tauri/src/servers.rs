@@ -1,6 +1,6 @@
-//! The servers this app opens and the one open now (`servers.json` in the app's config folder): agentes.chat,
+//! The servers this app opens and the one open now (`servers.json` in the app's config folder): Ackwire AI,
 //! a server of the person's own (an https address, or plain http on this computer), or several. The main
-//! window loads the current one. agentes.chat's pages get the capability of `capabilities/main.json`; any
+//! window loads the current one. Ackwire AI's pages get the capability of `capabilities/main.json`; any
 //! other server's get the same one, added at runtime for that origin only.
 
 use std::collections::BTreeSet;
@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, Url};
 
-/// agentes.chat Cloud.
+/// Ackwire AI Cloud.
 pub const CLOUD: &str = "https://app.agentes.chat";
 const FILE: &str = "servers.json";
 /// Servers kept in the list; choosing another past this drops the oldest that isn't open.
@@ -193,7 +193,7 @@ pub fn remove(app: &AppHandle, origin: &str) {
     crate::menus::servers_changed(app);
 }
 
-/// The main window's capability for a server other than agentes.chat, for its own origin only.
+/// The main window's capability for a server other than Ackwire AI, for its own origin only.
 fn grant(app: &AppHandle, origin: &str) {
     if origin == CLOUD {
         return;
@@ -214,7 +214,7 @@ fn grant(app: &AppHandle, origin: &str) {
         .permission("allow-context-menu")
         .permission("allow-page-ready");
     if let Err(err) = app.add_capability(capability) {
-        eprintln!("agentes.chat: no capability for {origin}: {err}");
+        eprintln!("Ackwire AI: no capability for {origin}: {err}");
         granted.remove(origin);
     }
 }

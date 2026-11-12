@@ -1,5 +1,5 @@
 //! One runner child process per organization home (ADR 0036 §2, §4b), and none without homes: nothing of this
-//! computer runs for a workspace until it is paired here, on agentes.chat Cloud as on a self-hosted server
+//! computer runs for a workspace until it is paired here, on Ackwire AI Cloud as on a self-hosted server
 //! (ADR 0165). The server here's own homes (`host_sync.rs`) run the same way.
 //!
 //! Each home lives in `~/.agentes-runner/orgs/<localId>/` and runs the bundled sidecar

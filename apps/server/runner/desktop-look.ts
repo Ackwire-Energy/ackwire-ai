@@ -9,7 +9,7 @@ import { shQuote } from "./install-script";
 import { xmlEscape, xmlUnescape } from "./xml";
 
 /**
- * The agents' desktops' own look (ADR 0058 §15): the agentes.chat wallpaper and a dock floating at the bottom
+ * The agents' desktops' own look (ADR 0058 §15): the Ackwire AI wallpaper and a dock floating at the bottom
  * center (the mark, which opens the apps menu, then Browser, Files and Terminal), one workspace, no top panel and
  * no desktop icons, Orchis's light theme where it is installed.
  *
@@ -436,7 +436,7 @@ const keeperAutostart = (home: string) =>
   [
     "[Desktop Entry]",
     "Type=Application",
-    "Name=agentes.chat",
+    "Name=Ackwire AI",
     "Comment=Lists the windows open on this desktop, to open them again after its computer restarted or moved",
     `Exec=python3 -I ${execArg(`${home}/${KEEPER_FILE}`)} ${execArg(`${home}/${KEEPER_SETTINGS}`)}`,
     "NoDisplay=true",

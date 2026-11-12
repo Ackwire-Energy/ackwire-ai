@@ -793,7 +793,7 @@ export async function computerTarget(db: Database, orgId: string, agentId: strin
 let workspaceComputers = false;
 
 /**
- * With external provisioning (agentes.chat Cloud) the workspace's computer is every agent's home: a computer someone
+ * With external provisioning (Ackwire AI Cloud) the workspace's computer is every agent's home: a computer someone
  * brought is a target an agent names for a call or a task, never where it lives.
  */
 export function setWorkspaceComputers(on: boolean) {

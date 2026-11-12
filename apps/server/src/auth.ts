@@ -55,7 +55,7 @@ import { ownerSignIn } from "./owner-claim";
 
 /**
  * Sign-in for people, built on Better Auth (ADR 0006):
- * Better Auth owns users, sessions, passwords and social sign-in; agentes.chat
+ * Better Auth owns users, sessions, passwords and social sign-in; Ackwire AI
  * owns organizations, memberships, roles and invitations
  * (`@agenteschat/engine` organizations). Agents are not users.
  * See docs/adr/0006-auth-and-tenancy.md.
@@ -379,7 +379,7 @@ export function createAuth(deps: {
       session: {
         create: {
           // A blocked account (ADR 0056 §9) gets no session, whatever the sign-in method. The code also
-          // makes a social sign-in's callback send the person back to the sign-in page. On agentes.chat Cloud the
+          // makes a social sign-in's callback send the person back to the sign-in page. On Ackwire AI Cloud the
           // body adds the block's kind, never its reason.
           before: async (session) => {
             const block = await accountBlock(db, session.userId);
@@ -634,7 +634,7 @@ export async function signupOpen(db: Database, config: Config, users: number) {
   return users === 0 ? !policy.ownerByLink : signupOpenToAll(db, policy);
 }
 
-/** Whether making a workspace needs an account early access allowed (ADR 0078 §4): only on agentes.chat Cloud. */
+/** Whether making a workspace needs an account early access allowed (ADR 0078 §4): only on Ackwire AI Cloud. */
 export const workspacePolicy = (config: Config): WorkspacePolicy => ({
   paidMachines: config.MACHINE_PROVISIONING === "external" && isAgentesCloud(config.PUBLIC_URL),
   allowSignup: config.ALLOW_SIGNUP,

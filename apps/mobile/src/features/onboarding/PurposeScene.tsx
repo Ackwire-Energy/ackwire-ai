@@ -21,7 +21,7 @@ const TEAMMATE = require("../../../assets/images/onboarding-teammate.jpg");
 const PAD = 6;
 
 /**
- * The drawing of an answer to "what will you use agentes.chat for?" (ADR 0159), as the web's `PurposeScene`, from the
+ * The drawing of an answer to "what will you use Ackwire AI for?" (ADR 0159), as the web's `PurposeScene`, from the
  * same numbers (`@agenteschat/client/lib/purpose-scene`): you in the middle of your agents, each joined to you, or on
  * top of a small org chart, over the cards' horizon at its foot. The answer not chosen rests: its agents sleep and its
  * lines fade. Decorative: the card's words say it.

@@ -539,14 +539,14 @@ export const EARLY_ACCESS_OTHER_EMAIL = "EARLY_ACCESS_OTHER_EMAIL";
  */
 export const ACCOUNT_NOT_LINKED = "account_not_linked";
 
-/** Where a restriction on agentes.chat Cloud is contested. */
+/** Where a restriction on Ackwire AI Cloud is contested. */
 export const LEGAL_EMAIL = "legal@agentes.chat";
 
-/** The reason agentes.chat Cloud's automatic hold is set with: it reads as the review line, never "on hold: review". */
+/** The reason Ackwire AI Cloud's automatic hold is set with: it reads as the review line, never "on hold: review". */
 const REVIEW_REASON = "review";
 
 /**
- * Mirror of what agentes.chat Cloud's automatic hold names, as `review.<category>`: the review line says it. Any other
+ * Mirror of what Ackwire AI Cloud's automatic hold names, as `review.<category>`: the review line says it. Any other
  * category reads as plain `review`.
  */
 const REVIEW_FLAGGED = ["phishing_impersonation", "account_takeover", "fraud", "illegal_content"] as const;
@@ -556,13 +556,13 @@ export const reviewFlaggedOf = (reason: string) =>
   REVIEW_FLAGGED.find((category) => reason === `${REVIEW_REASON}.${category}`);
 
 /**
- * Reasons agentes.chat Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
+ * Reasons Ackwire AI Cloud sets that rest on no Terms section, so nothing to contest: the automatic hold has a line
  * of its own, and `ended` holds a workspace whose plan ended, a billing matter.
  */
 const UNCONTESTED: ReadonlySet<string> = new Set([REVIEW_REASON, "ended"]);
 
 /**
- * What the server says of a restriction besides its code: the reason the workspace is told, and on agentes.chat
+ * What the server says of a restriction besides its code: the reason the workspace is told, and on Ackwire AI
  * Cloud `cloud` (`"true"` in a run's values, which are text) with a held agent's or a blocked account's kind.
  */
 export interface RestrictionFacts {
@@ -575,7 +575,7 @@ export interface RestrictionFacts {
  * A restriction in the person's words, the one place the apps pick it: a workspace on hold, suspended or being
  * deleted and a held agent (the API's `org.paused`, `org.suspended`, `org.deleting` and `agent.paused`, or a run's
  * `run.org_paused`…), a refused workspace (`org.create_refused`) and a blocked account (`ACCOUNT_BLOCKED`). On
- * agentes.chat Cloud the line of its kind, with the Terms section and how to contest it. Elsewhere the words it always
+ * Ackwire AI Cloud the line of its kind, with the Terms section and how to contest it. Elsewhere the words it always
  * had. Null for any other code.
  */
 export function restrictionLine(
@@ -791,7 +791,7 @@ export const forbiddenText = (t: TFunction, error: ApiError, locale?: string): s
   knownErrorText(t, error, locale) ?? t("common.notAllowed");
 
 /**
- * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on agentes.chat Cloud)
+ * A sign-in, sign-up or reset Better Auth refused (`{ status, code, message }`, a block's kind on Ackwire AI Cloud)
  * in the person's words: too many tries, a blocked account and the bot check by their codes, no answer (status 0, or
  * only the proxy's), else `untranslatedText`.
  */

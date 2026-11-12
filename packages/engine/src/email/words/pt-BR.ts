@@ -257,8 +257,7 @@ export const ptBR: Words = {
         body: () => "A pessoa para quem você pediu viu seu pedido e não aprovou.",
         small: "Se acha que foi engano, peça para ela convidar você por e-mail.",
       },
-      why: () =>
-        "Você recebeu este e-mail porque este endereço pediu para entrar num workspace pessoal no Ackwire AI.",
+      why: () => "Você recebeu este e-mail porque este endereço pediu para entrar num workspace pessoal no Ackwire AI.",
     },
   },
   joinCode: {

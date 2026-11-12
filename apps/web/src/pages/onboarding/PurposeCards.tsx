@@ -10,7 +10,7 @@ import { LIGHT_AFTER_MS, type PurposeLife, usePurposeLife, WAKE_STEP_MS } from "
 const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
 /**
- * "What will you use agentes.chat for?" (ADR 0159, 0162): two cards one over the other, one radio each. On the left the
+ * "What will you use Ackwire AI for?" (ADR 0159, 0162): two cards one over the other, one radio each. On the left the
  * drawing; on the right the title, one line, then a cluster of pills, each an agent of the drawing and what it does.
  * The cluster is decorative (the card's name stays its title and line) and its layout never moves: at rest the pills
  * are dim and their agents doze; pointing at one brightens it and wakes its agent; choosing the card wakes the agents in

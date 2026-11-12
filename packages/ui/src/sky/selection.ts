@@ -20,7 +20,7 @@ export function selectionSkyUrl(color: AgentColorName = "sky", dark = false): st
   const tones = agentTones(color);
   // Light rises from the pale end of the sky; dark from the deep end.
   const ramp = dark ? [tones[0], tones[1], tones[2], tones[3]] : [tones[5], tones[4], tones[3], tones[2]];
-  const first = ramp[0] ?? "#4b93ff";
+  const first = ramp[0] ?? "#9ef654";
   // Level 0 is the item itself; the first two steps are the sky's first tone, see-through.
   const levels: { fill: string; opacity?: number }[] = [
     { fill: "none" },

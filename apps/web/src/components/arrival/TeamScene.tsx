@@ -19,12 +19,12 @@ import "./arrival.css";
  */
 
 /** Top to horizon, as the sky's tones go: deep first. */
-const NIGHT = ["#050814", "#070c1e", "#0a122e", "#0e1a43", "#13245a", "#182f73", "#203f8f", "#2b53ad"];
-const DAY = ["#2468dc", "#2b74e6", "#3f88f5", "#5a9dff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+const NIGHT = ["#050814", "#070c1e", "#1b2c0c", "#264011", "#345617", "#426e1d", "#538926", "#67a632"];
+const DAY = ["#79d32d", "#81dd34", "#93ec48", "#a6f762", "#b6f87f", "#cffbaa", "#e5fdd1", "#f6feef"];
 /** The day on a dark page: the same blues, deeper, so the sky doesn't glare beside dark surfaces. */
-const DAY_DARK = ["#0b2459", "#0e2d6c", "#123881", "#174496", "#1d51aa", "#2660bd", "#3170cd", "#4183dc"];
+const DAY_DARK = ["#2f550f", "#396713", "#457b18", "#52901d", "#5ea324", "#6cb52e", "#79c539", "#89d449"];
 
-const STAR = pixelOf("#eaf1ff");
+const STAR = pixelOf("#f4feeb");
 const MOON = pixelOf("#f3f6ff");
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const bayer = (x: number, y: number) => BAYER[((y & 3) << 2) | (x & 3)] ?? 0.5;

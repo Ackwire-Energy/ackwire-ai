@@ -247,7 +247,7 @@ export function assertInviting(membership: Membership) {
 /**
  * Creates an organization owned by `userId`, with a `general` channel. Refused while their account is
  * blocked or they are in a workspace suspended or on any hold but a billing one: they don't carry on in a new
- * one (`org.create_refused`, the same words whatever the cause, and how to contest it on agentes.chat Cloud).
+ * one (`org.create_refused`, the same words whatever the cause, and how to contest it on Ackwire AI Cloud).
  * Billing holds refuse nobody, but one person
  * owns at most one workspace waiting for its first plan (`org.create_unpaid`, with that workspace's id); one being
  * deleted waits for none, so restoring it is what checks that.
@@ -524,14 +524,14 @@ export async function isSignupAllowed(db: Database, email: string, policy: Signu
 
 /** What decides whether making a workspace needs early access (`needsWorkspaceAllowance`). */
 export interface WorkspacePolicy {
-  /** agentes.chat Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
+  /** Ackwire AI Cloud, whose provisioner gives every workspace a computer that costs money (ADR 0056 §10). */
   paidMachines: boolean;
   /** `ALLOW_SIGNUP`. */
   allowSignup: boolean;
 }
 
 /**
- * Whether making a workspace needs the account allowed by early access (ADR 0078 §4): on agentes.chat Cloud, where
+ * Whether making a workspace needs the account allowed by early access (ADR 0078 §4): on Ackwire AI Cloud, where
  * every workspace gets a paid computer, while sign-up is by invitation only, for everyone but the installation's owner.
  */
 export async function needsWorkspaceAllowance(db: Database, userId: string, policy: WorkspacePolicy) {

@@ -1,5 +1,5 @@
 /**
- * The look every agentes.chat command line shares: the logo, a line down the left with a mark per step,
+ * The look every Ackwire AI command line shares: the logo, a line down the left with a mark per step,
  * spinners and questions. The setup uses it, and so does the runner (`@agenteschat/setup/src/term`); the
  * installers draw the same marks in POSIX sh (term-sh.ts).
  *
@@ -495,9 +495,9 @@ export function createTerm(o: TermOptions = {}) {
     /** The logo where it fits, then ┌ and the badge; nothing when the frame is the parent's. */
     intro(title: string, logo = true) {
       if (inherited) return;
-      if (!tty) return say([`agentes.chat ${title}`]);
+      if (!tty) return say([`Ackwire AI ${title}`]);
       if (logo && unicode && width >= LOGO_WIDTH + 1) say(["", ...logoLines(depth), ""]);
-      const badge = depth > 1 ? `\x1b[${BADGE[depth]}m agentes.chat \x1b[0m` : "agentes.chat";
+      const badge = depth > 1 ? `\x1b[${BADGE[depth]}m Ackwire AI \x1b[0m` : "Ackwire AI";
       say([...wrap(`${badge} ${title}`, width - 3).map((l, i) => lineOf(i === 0 ? dim(S.start) : bar(), l)), bar()]);
       gapped = true;
     },

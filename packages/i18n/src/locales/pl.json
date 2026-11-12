@@ -15522,7 +15522,7 @@
       "rolesPersonal": "Co może robić każda osoba tutaj. Właściciel może wszystko."
     },
     "about": {
-      "basedOn": "Oparte na <site>Ackwire AI</site> od Codari Global, LLC",
+      "basedOn": "Oparte na <site>agentes.chat</site> od Codari Global, LLC",
       "version": "Wersja",
       "license": "Wolne oprogramowanie na licencji <license>GNU Affero General Public License v3</license>, bez gwarancji.",
       "source": "Kod źródłowy",

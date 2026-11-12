@@ -10,13 +10,13 @@ export const LICENSE_URL = "https://www.gnu.org/licenses/agpl-3.0.html";
 export const PUBLIC_SOURCE_URL = "https://github.com/agentes-chat/agentes-chat";
 
 /**
- * A self-hosted server: never agentes.chat Cloud, nor before the server's config arrives, so the Cloud never shows
+ * A self-hosted server: never Ackwire AI Cloud, nor before the server's config arrives, so the Cloud never shows
  * what is only for self-hosting for a moment.
  */
 export const selfHosted = (server: AuthConfig | undefined) => server !== undefined && server.cloud !== true;
 
 /**
- * Whether the About screen shows: on every self-hosted server, for everyone; never on agentes.chat Cloud, which is
- * agentes.chat itself.
+ * Whether the About screen shows: on every self-hosted server, for everyone; never on Ackwire AI Cloud, which is
+ * Ackwire AI itself.
  */
 export const showsAbout = selfHosted;

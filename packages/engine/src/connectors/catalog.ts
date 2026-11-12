@@ -1,7 +1,7 @@
 import type { OutcomeKind } from "../context/outcomes";
 
 /**
- * Connector catalog: which MCP servers agentes.chat knows, and how each of
+ * Connector catalog: which MCP servers Ackwire AI knows, and how each of
  * their tools maps to one of OUR scopes (ADR 0016: MCP has no standard scopes).
  * A tool the server offers but this catalog doesn't list is never exposed.
  * `sensitive` tools always need a person's approval (merge, deploy and
@@ -23,7 +23,7 @@ export interface ConnectorTool {
   /** Outcome recorded when the call succeeds (ground truth for lessons); `subject` is a template. */
   onSuccess?: { kind: OutcomeKind; subject: string };
   /**
-   * Served by agentes.chat under this exact name (the git tools), never taken from the vendor's MCP server: access
+   * Served by Ackwire AI under this exact name (the git tools), never taken from the vendor's MCP server: access
    * lists and denies it by that name.
    */
   ours?: boolean;

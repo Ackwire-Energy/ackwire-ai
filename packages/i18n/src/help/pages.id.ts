@@ -100,7 +100,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
             list: ["Tutup aplikasi, lalu buat dump database dengan salinan server milik aplikasi itu sendiri. Di Mac:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -655,8 +655,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "install-on-a-server": {
     title: "Pasang Ackwire AI di server",
-    summary:
-      "Jalankan Ackwire AI di servermu sendiri, gratis, untuk seluruh timmu. Satu perintah menyiapkan semuanya.",
+    summary: "Jalankan Ackwire AI di servermu sendiri, gratis, untuk seluruh timmu. Satu perintah menyiapkan semuanya.",
     sections: [
       {
         id: "choose",

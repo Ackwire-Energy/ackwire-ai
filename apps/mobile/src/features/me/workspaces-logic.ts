@@ -4,7 +4,7 @@ import { CLOUD_SERVER, serverHost } from "@agenteschat/client/lib/server";
 /** A server's workspaces in Workspaces (ADR 0154), each with its unread count. */
 export interface ServerWorkspaces {
   server: string;
-  /** Its header: "agentes.chat" for the Cloud, the address for any other. */
+  /** Its header: "Ackwire AI" for the Cloud, the address for any other. */
   host: string;
   /** The server the app is on now. */
   current: boolean;
@@ -30,7 +30,7 @@ export function workspacesOf(input: {
   const counts = new Map(input.unread.map((u) => [u.orgId, u.unread]));
   return {
     server: input.server,
-    host: input.server === CLOUD_SERVER ? "agentes.chat" : serverHost(input.server),
+    host: input.server === CLOUD_SERVER ? "Ackwire AI" : serverHost(input.server),
     current: input.current,
     orgs: input.orgs.map((o) => ({ ...o, unread: counts.get(o.id) ?? 0 })),
     failed: input.failed && input.orgs.length === 0,

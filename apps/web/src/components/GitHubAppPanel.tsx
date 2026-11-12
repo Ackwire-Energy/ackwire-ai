@@ -39,7 +39,7 @@ import { useToast } from "@/lib/toast";
 const connectorsPath = (orgId: string) => `/org/${orgId}/settings/connectors`;
 
 /**
- * Settings → Conectores: the GitHub accounts where the organization installed the agentes.chat app (ADR 0033, 0156).
+ * Settings → Conectores: the GitHub accounts where the organization installed the Ackwire AI app (ADR 0033, 0156).
  * Where it is installed, agents act on GitHub as the app. Each account opens its page on GitHub (Gerenciar no GitHub,
  * where its repositories are picked), and Remover uninstalls it there too. Only installations made from here count
  * for this organization. Hidden when the server has no app and nothing is installed, except for the admins whose
@@ -197,7 +197,7 @@ function RemoveInstallationDialog({
 
 /**
  * Settings → Conectores, for the server's pinned owner only (the API answers `setup: null` to everyone else and on
- * agentes.chat): this server's GitHub App. None yet: Criar o app no GitHub sends GitHub the manifest, which makes the
+ * Ackwire AI): this server's GitHub App. None yet: Criar o app no GitHub sends GitHub the manifest, which makes the
  * app under their account and comes back here. Made here: its name, its page and Remover o app. From `GITHUB_APP_*`:
  * read-only, and it says where it is set.
  */

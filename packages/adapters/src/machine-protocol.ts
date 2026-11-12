@@ -332,7 +332,7 @@ export interface BrowserTraffic {
  * From this protocol on (ADR 0076): `desktop.text`, the text on an agent's
  * screen, read on the computer (tesseract, as the agent's own user) from a
  * capture like `desktop.capture`'s, for screening a person in control on
- * agentes.chat Cloud. The image never leaves the computer. A screen whose
+ * Ackwire AI Cloud. The image never leaves the computer. A screen whose
  * capture didn't change since the last read answers `same`. Served where
  * desktop use is (`desktop_unavailable` without tesseract). The server never
  * sends it to an older runner.
@@ -1230,7 +1230,7 @@ export const CHROME_FAILURES = {
   missingChromium:
     "Google Chrome isn't installed on this computer, and Google makes none for Linux on ARM: install Chromium on it (sudo apt install chromium on Debian, sudo snap install chromium on Ubuntu), then try again.",
   missingServer:
-    "Google Chrome isn't installed on this computer. Its admin should run the agentes.chat installer on it again.",
+    "Google Chrome isn't installed on this computer. Its admin should run the Ackwire AI installer on it again.",
   start: "Google Chrome didn't start on this computer.",
   profile: "The agent's browser profile on this computer didn't open. Try again in a minute.",
   outdated:
@@ -3494,7 +3494,7 @@ export interface MissionMcpTool {
 }
 
 const RULES_START =
-  "You work on an agentes.chat mission. Read the files in .agentes/ first (mission.md, decisions.md, notes.md). Use the agentes tools: keep the plan with update_plan, report milestones with report, ask decisions only with ask_decision, and ask for a review with request_review when you have something to show. Write plan items, reports, decisions and reviews in the language the people use in the thread (the language of the mission goal), short and plain.";
+  "You work on an Ackwire AI mission. Read the files in .agentes/ first (mission.md, decisions.md, notes.md). Use the agentes tools: keep the plan with update_plan, report milestones with report, ask decisions only with ask_decision, and ask for a review with request_review when you have something to show. Write plan items, reports, decisions and reviews in the language the people use in the thread (the language of the mission goal), short and plain.";
 const RULES_END =
   "Plan items are short outcomes in the people's language; never put tool names (request_review, upload_artifact and the like) in them. When every plan item is done, call complete_mission with what you delivered and what the person should check; don't keep working. Write what you learn and the next steps in .agentes/notes.md. When a tool tells you to stop and wait, end your turn.";
 

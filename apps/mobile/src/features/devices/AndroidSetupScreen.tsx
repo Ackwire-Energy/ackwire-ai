@@ -79,7 +79,7 @@ const STEP_LOOK: Record<StepState, "now" | "done" | "later"> = {
  * Allow, ready), and Android's own prompt drawn in the app's language. One step is open at a time, a folded one opens
  * when tapped; once the computer sees the phone, every step before Allow ticks by itself. After 30 s on the cable with
  * no phone seen, why it may not show up, for the computer's system. Ready, it says so, with the phone's name and who
- * can use it. No cable: Wireless debugging, then the QR agentes.chat shows on a computer, or the six-digit code typed
+ * can use it. No cable: Wireless debugging, then the QR Ackwire AI shows on a computer, or the six-digit code typed
  * here.
  */
 export function AndroidSetupScreen({ machineId }: { machineId?: string }) {

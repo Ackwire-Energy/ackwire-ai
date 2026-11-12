@@ -162,7 +162,7 @@ function Settings({
   const visible = SETTINGS_SECTIONS.filter((s) => s.allowed(org, server));
   // A section a link names that this person can't open: their first one, their account, saying why. Opening the
   // settings with no section named has nothing to explain. Billing where no billing service runs, or Sobre and Voz on
-  // agentes.chat Cloud, isn't about their role.
+  // Ackwire AI Cloud, isn't about their role.
   const wanted = section ?? "general";
   const current = visible.some((s) => s.id === wanted) ? wanted : (visible[0]?.id ?? "account");
   const serverLacks =
@@ -668,7 +668,7 @@ function DeleteWorkspaceCard() {
 
 /**
  * The usage report's switch (ADR 0060 §5): the title, the switch and "Ver o que é enviado". Only the
- * installation's owner gets it (the API answers `null` to everyone else, and on agentes.chat itself).
+ * installation's owner gets it (the API answers `null` to everyone else, and on Ackwire AI itself).
  */
 function UsageStatisticsCard() {
   const { t } = useTranslation();

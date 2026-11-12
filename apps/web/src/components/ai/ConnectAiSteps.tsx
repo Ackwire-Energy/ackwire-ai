@@ -1528,7 +1528,7 @@ export function usePlanHold() {
 }
 
 /**
- * A plan a workspace with no agentes.chat plan in force can't use, in place of its steps: why, and the way to that
+ * A plan a workspace with no Ackwire AI plan in force can't use, in place of its steps: why, and the way to that
  * plan for whoever pays (anyone else reads who can). A hold stops the Model Gateway for keys too, so no key is offered
  * as a way around it.
  */

@@ -69,7 +69,7 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_SYNC_BYTES = 32 * 1024 * 1024;
 /** Bitwarden's device type for SDK clients. */
 const DEVICE_TYPE = "21";
-const DEVICE_NAME = "agentes.chat";
+const DEVICE_NAME = "Ackwire AI";
 const DEFAULT_FOLDER = "Agents";
 const CIPHER_TYPE_LOGIN = 1;
 

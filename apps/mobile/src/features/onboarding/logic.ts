@@ -9,7 +9,7 @@ import type { TFunction } from "i18next";
  * right hand; then its DM (ADR 0137). Pure: no React Native imports.
  */
 
-/** The two answers to "What will you use agentes.chat for?" (ADR 0159), in this order. */
+/** The two answers to "What will you use Ackwire AI for?" (ADR 0159), in this order. */
 export const PURPOSES = ["personal", "team"] as const satisfies readonly WorkspaceMode[];
 
 /**

@@ -468,8 +468,7 @@ export const desktopEn = {
     commandsDesc: "Tests, builds and other Terminal commands. Each one shows in Activity.",
     commandsWarn: "Commands can reach the rest of this {{device}}, not only the allowed folders.",
     commandsWarnOrgs: "Commands can reach the rest of this {{device}}, other workspaces' folders included.",
-    commandsWarnHere:
-      "Commands run as you and can reach the rest of this {{device}}, Ackwire AI's own data included.",
+    commandsWarnHere: "Commands run as you and can reach the rest of this {{device}}, Ackwire AI's own data included.",
     commandsSome: "On only for {{orgs}}. Turn it on for every workspace here.",
     browserName: "Browser",
     browserDesc: "Opens websites for the agents in a browser of their own, without your logins.",

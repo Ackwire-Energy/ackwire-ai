@@ -173,7 +173,7 @@ export const githubAppManifestCallbackUri = (publicUrl: string) =>
   `${publicUrl.replace(/\/$/, "")}/api/app/github-app/manifest/callback`;
 
 /**
- * agentes.chat's own app's permissions (ADR 0156), by GitHub's manifest names (Variables is `actions_variables`).
+ * Ackwire AI's own app's permissions (ADR 0156), by GitHub's manifest names (Variables is `actions_variables`).
  * Never Codespaces (agents have their own computers, and Codespaces bill the organization) nor an organization's
  * administration, secrets, variables, runners or webhooks. Each call's token asks only what its tool needs
  * (`github-call.ts`).
@@ -211,7 +211,7 @@ const APP_PERMISSIONS = {
 
 /**
  * What happens on GitHub that agents hear (`github-events.ts`), by GitHub's event names: comments, reviews and new
- * items that name the app, and items being merged or closed. agentes.chat's own app subscribes to the same.
+ * items that name the app, and items being merged or closed. Ackwire AI's own app subscribes to the same.
  */
 export const GITHUB_APP_EVENTS = [
   "issues",
@@ -242,16 +242,16 @@ export async function missingGitHubAppEvents(app: GitHubAppConfig, http: GitHubH
 }
 
 /**
- * The app a server's owner creates on GitHub: the permissions, events and addresses agentes.chat's own app is
+ * The app a server's owner creates on GitHub: the permissions, events and addresses Ackwire AI's own app is
  * registered with, at this server's `PUBLIC_URL`. A webhook GitHub can't deliver to (no https) is left off: reading the
  * GitHub panel reconciles installations instead.
  */
 export function githubAppManifest(publicUrl: string) {
   const base = publicUrl.replace(/\/$/, "");
   const host = new URL(base).host;
-  const room = APP_NAME_MAX - "agentes.chat ()".length;
+  const room = APP_NAME_MAX - "Ackwire AI ()".length;
   return {
-    name: `agentes.chat (${host.slice(0, room)})`,
+    name: `Ackwire AI (${host.slice(0, room)})`,
     url: base,
     redirect_url: githubAppManifestCallbackUri(base),
     callback_urls: [githubAppCallbackUri(base)],
@@ -303,7 +303,7 @@ export async function convertGitHubAppManifest(http: GitHubHttp, code: string): 
   const res = await http
     .fetch(`${http.apiUrl}/app-manifests/${encodeURIComponent(code)}/conversions`, {
       method: "POST",
-      headers: { accept: "application/vnd.github+json", "user-agent": "agentes.chat" },
+      headers: { accept: "application/vnd.github+json", "user-agent": "Ackwire AI" },
     })
     .catch(() => null);
   const body = (res?.ok ? await res.json().catch(() => null) : null) as {

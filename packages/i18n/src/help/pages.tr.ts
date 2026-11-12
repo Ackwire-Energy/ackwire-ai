@@ -100,7 +100,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
             list: ["Uygulamadan çıkın, sonra veritabanının dökümünü uygulamanın kendi sunucu kopyasıyla alın. Mac'te:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -657,8 +657,7 @@ export const helpTr: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "install-on-a-server": {
     title: "Ackwire AI'i bir sunucuya kurun",
-    summary:
-      "Ackwire AI'i kendi sunucunuzda, ücretsiz, tüm ekibiniz için çalıştırın. Tek bir komut her şeyi hazırlar.",
+    summary: "Ackwire AI'i kendi sunucunuzda, ücretsiz, tüm ekibiniz için çalıştırın. Tek bir komut her şeyi hazırlar.",
     sections: [
       {
         id: "choose",

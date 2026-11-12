@@ -336,7 +336,7 @@ export function ConnectorsSection({
           onPick={(def) => {
             setAdding(false);
             // Connected already: a server by address takes another account, a catalog connector a new sign-in. GitHub
-            // through the agentes.chat app alone has no sign-in: it offers the app on another account, or an account.
+            // through the Ackwire AI app alone has no sign-in: it offers the app on another account, or an account.
             const item = items.find((i) => i.def?.id === def.id);
             setFlow(
               item && !item.viaGithubApp
@@ -629,7 +629,7 @@ function DisconnectDialog({
   const { disconnect: customDisconnect } = useCustomServerAction(org.id);
   const pending = catalogDisconnect.isPending || customDisconnect.isPending;
   const name = item ? itemName(t, item) : "";
-  // GitHub and the agentes.chat app: the app alone is uninstalled with it, an account goes and the app stays.
+  // GitHub and the Ackwire AI app: the app alone is uninstalled with it, an account goes and the app stays.
   const installations = useGitHubApp(org.id, item?.def?.id === "github").data?.installations ?? [];
   const githubNote = item ? githubDisconnectNote(t, item, installations) : null;
   return (

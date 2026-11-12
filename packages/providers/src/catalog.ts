@@ -32,7 +32,7 @@ export interface ProviderInfo {
 }
 
 /**
- * Model providers agentes.chat can talk to. Adding one is an entry here,
+ * Model providers Ackwire AI can talk to. Adding one is an entry here,
  * catalog rows with its prices, and an adapter for its protocol; the database
  * stores the provider id as text, so no migration is needed.
  */

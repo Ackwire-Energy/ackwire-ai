@@ -1,4 +1,4 @@
-// agentes.chat service worker: notifications in this browser (Web Push, ADR 0071), nothing else.
+// Ackwire AI service worker: notifications in this browser (Web Push, ADR 0071), nothing else.
 // It has no fetch handler and caches nothing, so the app loads exactly as it does without it. The page
 // registers it only when the person turns notifications on (apps/web/src/lib/web-push.ts).
 
@@ -56,7 +56,7 @@ function readPayload(event) {
     if (!data || typeof data !== "object") return null;
     const open = readOpenData(data.data);
     return {
-      title: typeof data.title === "string" && data.title ? data.title : "agentes.chat",
+      title: typeof data.title === "string" && data.title ? data.title : "Ackwire AI",
       body: typeof data.body === "string" ? data.body : "",
       tag: typeof data.tag === "string" && data.tag ? data.tag : undefined,
       url: openUrl(data.url, open),

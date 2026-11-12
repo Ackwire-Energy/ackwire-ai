@@ -1,5 +1,5 @@
 /**
- * `agentes-server`: agentes.chat with nothing else to install (native mode, ADR 0060 §2). One program
+ * `agentes-server`: Ackwire AI with nothing else to install (native mode, ADR 0060 §2). One program
  * whose database is built in (PGlite: `DATABASE_URL=pglite:///<folder>`), keeping everything in one
  * folder, `--data` (`~/.agentes` by default):
  *

@@ -15471,7 +15471,7 @@
       "rolesPersonal": "Что может делать каждый здесь. Владелец может всё."
     },
     "about": {
-      "basedOn": "Основано на <site>Ackwire AI</site> от Codari Global, LLC",
+      "basedOn": "Основано на <site>agentes.chat</site> от Codari Global, LLC",
       "version": "Версия",
       "license": "Свободное ПО по лицензии <license>GNU Affero General Public License v3</license>, без гарантий.",
       "source": "Исходный код",

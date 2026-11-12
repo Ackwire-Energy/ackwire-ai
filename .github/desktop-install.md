@@ -3,7 +3,7 @@
 
 The desktop app is in beta: the Mac build isn't notarized by Apple yet and the Windows installer isn't signed by Microsoft, so the first open asks once. After that it opens and updates by itself.
 
-**macOS**: drag agentes.chat to Applications and open it, click **Done**, then open **System Settings › Privacy & Security** and click **Open Anyway** (it shows up only right after you try to open the app, for about an hour). Confirm with Touch ID or your password.
+**macOS**: drag Ackwire AI to Applications and open it, click **Done**, then open **System Settings › Privacy & Security** and click **Open Anyway** (it shows up only right after you try to open the app, for about an hour). Confirm with Touch ID or your password.
 
 ![Open the app, click Done, then Open Anyway in Privacy & Security](https://github.com/{{repo}}/raw/main/docs/images/first-open-mac.png)
 

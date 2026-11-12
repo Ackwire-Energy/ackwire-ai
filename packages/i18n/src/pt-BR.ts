@@ -10864,8 +10864,7 @@ export const ptBR = {
       /** `program`: "Claude Code" or "Codex" (`brain.card`). */
       tool_off:
         "O {{program}} está desligado no {{computer}}. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
-      tool_offLinux:
-        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do Ackwire AI ou com {{command}}.",
+      tool_offLinux: "O {{program}} está desligado no {{computer}}. Ligue lá, no app do Ackwire AI ou com {{command}}.",
       not_installed: "O {{program}} não está instalado no {{computer}}.",
       not_reported: "O {{computer}} ainda está vendo quais programas tem. Isto muda sozinho quando terminar.",
       outdated: "A versão no {{computer}} é antiga. Atualize o Codex para usar.",
@@ -13824,8 +13823,7 @@ export const ptBR = {
         outdated:
           "O pareamento por Wi-Fi precisa do Android 14 ou mais novo com a atualização de segurança de maio de 2026. Atualize o celular, ou use um cabo.",
         adb_missing: "{{computer}} não tem o Android platform-tools. Instale o Android Studio nele e tente de novo.",
-        update:
-          "O pareamento por Wi-Fi precisa de um Ackwire AI mais novo em {{computer}}. Atualize e tente de novo.",
+        update: "O pareamento por Wi-Fi precisa de um Ackwire AI mais novo em {{computer}}. Atualize e tente de novo.",
         canceled: "O pareamento parou. Tente de novo.",
         failed: "O pareamento não deu certo. Tente de novo, ou use um cabo.",
       },
@@ -14584,7 +14582,7 @@ export const ptBR = {
       rolesPersonal: "O que cada pessoa daqui pode fazer. Quem é dono pode tudo.",
     },
     about: {
-      basedOn: "Baseado no <site>Ackwire AI</site> da Codari Global, LLC",
+      basedOn: "Baseado no <site>agentes.chat</site> da Codari Global, LLC",
       version: "Versão",
       license: "Software livre sob a <license>GNU Affero General Public License v3</license>, sem garantia.",
       source: "Código-fonte",
@@ -16599,8 +16597,7 @@ export const ptBR = {
     },
     /** A hold the billing service set (ADR 0079), said in place of its code. */
     billing: {
-      payment:
-        "Este workspace ainda não tem um plano do Ackwire AI. Os agentes começam a trabalhar quando ele tiver.",
+      payment: "Este workspace ainda não tem um plano do Ackwire AI. Os agentes começam a trabalhar quando ele tiver.",
       unpaid: "O pagamento do plano do Ackwire AI deste workspace não passou, e os agentes pararam.",
       ended:
         "O plano do Ackwire AI deste workspace terminou, e os agentes pararam. As conversas e os arquivos continuam aqui para ler e baixar.",

@@ -11,7 +11,7 @@ export type AuthResult =
       status: number;
       message: string;
       code?: string;
-      /** A blocked account on agentes.chat Cloud: the block's kind, with `cloud` (`restrictionLine`). */
+      /** A blocked account on Ackwire AI Cloud: the block's kind, with `cloud` (`restrictionLine`). */
       kind?: string;
       cloud?: boolean;
     };
