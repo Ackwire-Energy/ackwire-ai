@@ -8,8 +8,8 @@ import { type AgentColorName, EYE_COLOR, gradientOf, spriteBody, spriteGrid } fr
 
 /* ---------- tones ---------- */
 
-/** The landing's sky, deep blue to almost white. */
-export const SKY_TONES = ["#0a3f9c", "#0f56c4", "#2b74e6", "#4b93ff", "#78b4ff", "#a6cfff", "#cfe6ff", "#eef7ff"];
+/** The landing's sky in Ackwire's greens: black through Forest and Solar Green to Celadon Air. */
+export const SKY_TONES = ["#000000", "#031f1b", "#1f5c16", "#3f7a12", "#6cba2c", "#90ed42", "#c4f59a", "#eef4ef"];
 
 /** "#rgb", "#rrggbb" or "rgb(r, g, b)" → [r, g, b]; anything else is mid gray. */
 export function parseColor(color: string): [number, number, number] {

@@ -6,39 +6,39 @@ import type { EmailWords } from "./index";
  * single plural form, so a count's words differ only where one reads differently (`n === 1`).
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? atHost("Dikirim oleh server agentes.chat", "di", host) : "Dikirim oleh agentes.chat."),
+  sentBy: (host) => (host ? atHost("Dikirim oleh server Ackwire AI", "di", host) : "Dikirim oleh Ackwire AI."),
   fallback: "Tombolnya tidak berfungsi? Salin alamat ini ke browser kamu:",
   role: { owner: "pemilik", member: "anggota" },
   anAgent: "Seorang agen",
   someone: "Seseorang",
   verify: {
-    subject: "Konfirmasi email kamu untuk agentes.chat",
+    subject: "Konfirmasi email kamu untuk Ackwire AI",
     preheader: "Satu klik untuk mengonfirmasi alamat ini. Tautannya berlaku satu jam.",
     headline: "Konfirmasi email kamu",
     body: "Tinggal satu langkah: konfirmasi bahwa alamat ini milikmu.",
     button: "Konfirmasi email",
     small: "Tautannya berlaku satu jam. Kalau kamu tidak mendaftar, abaikan saja email ini.",
-    why: "Kamu menerima email ini karena alamat ini dipakai untuk mendaftar di agentes.chat.",
+    why: "Kamu menerima email ini karena alamat ini dipakai untuk mendaftar di Ackwire AI.",
   },
   reset: {
-    subject: "Atur ulang kata sandi agentes.chat kamu",
+    subject: "Atur ulang kata sandi Ackwire AI kamu",
     preheader: "Pilih kata sandi baru. Tautannya berlaku satu jam.",
     headline: "Pilih kata sandi baru",
     body: "Kami menerima permintaan untuk mengatur ulang kata sandi alamat ini.",
     button: "Pilih kata sandi baru",
     note: "Tidak merasa meminta ini? Abaikan email ini. Kata sandimu tetap sama.",
     small: "Tautannya berlaku satu jam.",
-    why: "Kamu menerima email ini karena seseorang meminta pengaturan ulang kata sandi alamat ini di agentes.chat.",
+    why: "Kamu menerima email ini karena seseorang meminta pengaturan ulang kata sandi alamat ini di Ackwire AI.",
   },
   invitation: {
-    subject: "Kamu diundang ke ruang kerja di agentes.chat",
+    subject: "Kamu diundang ke ruang kerja di Ackwire AI",
     preheader: "Terima dalam 7 hari, dengan alamat email ini.",
     headline: "Kamu diundang ke ruang kerja",
     body: (inviter, email, org, role) =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} mengundangmu bergabung ke `, { b: org }, ` sebagai ${role}.`]
         : ["Kamu diundang bergabung ke ", { b: org }, ` sebagai ${role}.`],
-    what: "agentes.chat adalah tempat orang dan agen AI bekerja bersama.",
+    what: "Ackwire AI adalah tempat orang dan agen AI bekerja bersama.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Pesannya: " }, `“${note}”`],
     button: "Terima undangan",
     small: "Undangan berlaku 7 hari. Terima dengan alamat email ini.",
@@ -47,8 +47,8 @@ export const words: EmailWords = {
     personal: {
       body: (inviter, email) =>
         inviter
-          ? [{ b: inviter }, `${email ? ` (${email})` : ""} mengundangmu ke ruang kerja pribadinya di agentes.chat.`]
-          : "Kamu diundang ke ruang kerja pribadi di agentes.chat.",
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} mengundangmu ke ruang kerja pribadinya di Ackwire AI.`]
+          : "Kamu diundang ke ruang kerja pribadi di Ackwire AI.",
       why: () =>
         "Kamu menerima email ini karena seseorang mengundang alamat ini ke ruang kerja pribadinya. Kalau kamu tidak mengenalnya, abaikan saja. Tidak ada yang terjadi sampai kamu menerimanya.",
     },
@@ -86,41 +86,41 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "Konfirmasi tempatmu di daftar tunggu agentes.chat",
+    subject: "Konfirmasi tempatmu di daftar tunggu Ackwire AI",
     preheader: "Satu klik dan tempatmu aman.",
     headline: "Konfirmasi tempatmu di daftar",
     body: (email) =>
       email
-        ? ["Kami menerima permintaan untuk memasukkan ", { b: email }, " ke daftar tunggu agentes.chat."]
-        : "Kami menerima permintaan untuk memasukkan alamat ini ke daftar tunggu agentes.chat.",
+        ? ["Kami menerima permintaan untuk memasukkan ", { b: email }, " ke daftar tunggu Ackwire AI."]
+        : "Kami menerima permintaan untuk memasukkan alamat ini ke daftar tunggu Ackwire AI.",
     approve: "Di sini, tidak ada hal penting yang terjadi tanpa persetujuan orang. Begitu juga dengan permintaan ini.",
     button: "Konfirmasi emailku",
     small:
       "Tautannya berlaku 48 jam. Bukan kamu? Abaikan email ini. Tanpa klik, alamat ini tidak akan masuk ke daftar.",
-    why: "Kamu menerima email ini karena alamat ini didaftarkan ke daftar tunggu agentes.chat.",
+    why: "Kamu menerima email ini karena alamat ini didaftarkan ke daftar tunggu Ackwire AI.",
   },
   earlyAccess: {
-    subject: "Undanganmu ke agentes.chat sudah tiba",
+    subject: "Undanganmu ke Ackwire AI sudah tiba",
     preheader: (days) => `Buat akunmu dalam ${days} hari, dengan alamat email ini.`,
     headline: "Aksesmu sudah siap",
-    body: (email) => [{ b: email }, " sekarang bisa membuat akun dan ruang kerja di agentes.chat."],
-    what: "agentes.chat adalah tempat orang dan agen AI bekerja bersama.",
+    body: (email) => [{ b: email }, " sekarang bisa membuat akun dan ruang kerja di Ackwire AI."],
+    what: "Ackwire AI adalah tempat orang dan agen AI bekerja bersama.",
     button: "Buat akunku",
     small: (days) =>
       `Tautannya berlaku ${days} hari, hanya untuk alamat ini. Daftar dengan kata sandi, atau dengan Google, GitHub, atau Apple di alamat yang sama.`,
-    why: "Kamu menerima email ini karena alamat ini ada di daftar tunggu agentes.chat, atau diundang ke agentes.chat. Tidak ada yang terjadi sampai kamu mendaftar.",
+    why: "Kamu menerima email ini karena alamat ini ada di daftar tunggu Ackwire AI, atau diundang ke Ackwire AI. Tidak ada yang terjadi sampai kamu mendaftar.",
   },
   earlyAccessAllowed: {
     subject: "Sekarang kamu bisa membuat ruang kerjamu sendiri",
     preheader: "Masuk dengan akun yang sudah kamu punya, lalu siapkan ruang kerjamu.",
     headline: "Buat ruang kerjamu sendiri",
     body: (email) => [
-      "Sekarang kamu bisa membuat ruang kerjamu sendiri di agentes.chat dengan ",
+      "Sekarang kamu bisa membuat ruang kerjamu sendiri di Ackwire AI dengan ",
       { b: email },
       ", akun yang sudah kamu punya.",
     ],
     button: "Buat ruang kerjaku",
-    why: "Kamu menerima email ini karena akun ini mendapat akses awal ke agentes.chat.",
+    why: "Kamu menerima email ini karena akun ini mendapat akses awal ke Ackwire AI.",
   },
   budget: {
     subject: {
@@ -198,7 +198,7 @@ export const words: EmailWords = {
     },
     button: { ai: "Hubungkan AI kamu", task: "Beri tugas pertama", create: "Buat agen" },
     why: (org) =>
-      `Kamu menerima email ini karena kamu pemilik ${org} di agentes.chat. Ini satu-satunya email tentang komputer ini.`,
+      `Kamu menerima email ini karena kamu pemilik ${org} di Ackwire AI. Ini satu-satunya email tentang komputer ini.`,
     personal: {
       body: () =>
         "Terima kasih sudah menunggu. Komputer agen-agenmu sudah menyala dan siap, dengan pengguna tersendiri untuk tiap agen. Komputer ini menyala siang dan malam, jadi agen-agenmu bisa bekerja kapan saja.",
@@ -206,7 +206,7 @@ export const words: EmailWords = {
         task: ["Beri tugas pertama.", "Buka percakapan dengan salah satu agenmu dan sebutkan apa yang kamu butuhkan."],
       },
       why: () =>
-        "Kamu menerima email ini karena ruang kerja ini di agentes.chat adalah milikmu. Ini satu-satunya email tentang komputer ini.",
+        "Kamu menerima email ini karena ruang kerja ini di Ackwire AI adalah milikmu. Ini satu-satunya email tentang komputer ini.",
     },
   },
   joinRequest: {
@@ -251,7 +251,7 @@ export const words: EmailWords = {
       reason: (reason) => [{ b: "Pesannya: " }, `“${reason}”`],
       small: "Kalau menurutmu ini keliru, minta seseorang di sana mengundangmu lewat email.",
     },
-    why: (org) => `Kamu menerima email ini karena alamat ini minta bergabung ke ${org} di agentes.chat.`,
+    why: (org) => `Kamu menerima email ini karena alamat ini minta bergabung ke ${org} di Ackwire AI.`,
     personal: {
       joined: { body: (who) => `${who} menyetujui permintaanmu. Sekarang kamu sudah ada di ruang kerjanya.` },
       invited: { body: (who) => `${who} menyetujui permintaanmu untuk bergabung ke ruang kerjanya.` },
@@ -260,27 +260,27 @@ export const words: EmailWords = {
         body: () => "Orang yang kamu mintai sudah melihat permintaanmu dan tidak menyetujuinya.",
         small: "Kalau menurutmu ini keliru, minta dia mengundangmu lewat email.",
       },
-      why: () => "Kamu menerima email ini karena alamat ini minta bergabung ke ruang kerja pribadi di agentes.chat.",
+      why: () => "Kamu menerima email ini karena alamat ini minta bergabung ke ruang kerja pribadi di Ackwire AI.",
     },
   },
   joinCode: {
-    subject: (code) => `${code} adalah kode agentes.chat kamu`,
+    subject: (code) => `${code} adalah kode Ackwire AI kamu`,
     preheader: "Ketik di halaman itu untuk minta bergabung. Kodenya berlaku 10 menit.",
     headline: "Kodemu",
     body: (org) => ["Ketik kode ini di halaman itu untuk minta bergabung ke ", { b: org }, "."],
     small: ["Berlaku 10 menit. Kalau kamu tidak memintanya, ", { nobr: "abaikan email ini." }],
     why: (org) =>
-      `Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ${org} di agentes.chat.`,
+      `Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ${org} di Ackwire AI.`,
     personal: {
       body: () => "Ketik kode ini di halaman itu untuk minta bergabung ke ruang kerja ini.",
       why: () =>
-        "Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ruang kerja pribadi di agentes.chat.",
+        "Kamu menerima email ini karena seseorang mengetik alamat ini untuk minta bergabung ke ruang kerja pribadi di Ackwire AI.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} adalah kodemu untuk menghapus ruang kerja`,
     subjectAccount: (code) => `${code} adalah kodemu untuk menghapus seluruh akunmu`,
-    preheader: "Ketik di agentes.chat untuk mengonfirmasi. Kodenya berlaku 10 menit.",
+    preheader: "Ketik di Ackwire AI untuk mengonfirmasi. Kodenya berlaku 10 menit.",
     headline: "Kodemu",
     workspace: (org) => [
       "Ketik kode ini untuk menghapus ruang kerja ",
@@ -299,8 +299,8 @@ export const words: EmailWords = {
     ],
     noSupport:
       "Berlaku 10 menit, dan tidak ada yang dihapus tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan beri tahu pengelola server ini.",
-    whyWorkspace: (org) => `Kamu menerima email ini karena akunmu meminta penghapusan ${org} di agentes.chat.`,
-    whyAccount: "Kamu menerima email ini karena akunmu meminta untuk dihapus dari agentes.chat.",
+    whyWorkspace: (org) => `Kamu menerima email ini karena akunmu meminta penghapusan ${org} di Ackwire AI.`,
+    whyAccount: "Kamu menerima email ini karena akunmu meminta untuk dihapus dari Ackwire AI.",
     personal: {
       workspace: (org) => [
         "Ketik kode ini untuk menghapus ruang kerjamu ",
@@ -322,10 +322,10 @@ export const words: EmailWords = {
     owner: "Berubah pikiran? Pulihkan sebelum waktu itu.",
     button: "Pulihkan ruang kerja",
     member: "Kalau ini keliru, minta pemilik untuk memulihkannya.",
-    why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di agentes.chat.`,
+    why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di Ackwire AI.`,
     personal: {
       member: "Kalau ini keliru, minta orang yang menghapusnya untuk memulihkannya.",
-      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di agentes.chat.",
+      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di Ackwire AI.",
     },
   },
   restored: {
@@ -334,27 +334,27 @@ export const words: EmailWords = {
     headline: "Ruang kerjanya sudah kembali",
     body: (by, org) => [{ b: by }, " memulihkan ", { b: org }, ". Ruang kerja ini bisa dipakai lagi."],
     button: "Buka ruang kerja",
-    why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di agentes.chat.`,
+    why: (org) => `Kamu menerima email ini karena kamu ada di ${org} di Ackwire AI.`,
     personal: {
-      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di agentes.chat.",
+      why: () => "Kamu menerima email ini karena kamu ada di ruang kerja ini di Ackwire AI.",
     },
   },
   appConnected: {
-    subject: "Sebuah aplikasi terhubung ke akun agentes.chat kamu",
+    subject: "Sebuah aplikasi terhubung ke akun Ackwire AI kamu",
     preheader: "Aplikasi ini bisa membaca dan mengirim tugas ke agen atas namamu di satu ruang kerja.",
     headline: "Sebuah aplikasi terhubung",
     body: (app, org) => [{ b: app }, " sekarang punya akses ke akunmu di ", { b: org }, "."],
     note: "Bukan kamu yang menghubungkannya? Putuskan sekarang dan ganti kata sandimu.",
     button: "Lihat aplikasi yang terhubung",
-    why: (org) => `Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ${org} di agentes.chat.`,
+    why: (org) => `Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ${org} di Ackwire AI.`,
     personal: {
       body: (app) => [{ b: app }, " sekarang punya akses ke akunmu di ruang kerja pribadimu."],
       why: () =>
-        "Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ruang kerja pribadimu di agentes.chat.",
+        "Kamu menerima email ini karena sebuah aplikasi terhubung ke akunmu di ruang kerja pribadimu di Ackwire AI.",
     },
   },
   accountDeleting: {
-    subject: (day) => `Akun agentes.chat kamu akan dihapus pada ${day}`,
+    subject: (day) => `Akun Ackwire AI kamu akan dihapus pada ${day}`,
     preheader: "Kamu punya 7 hari untuk berubah pikiran.",
     headline: "Akunmu sedang dihapus",
     body: (email, day, time) => [
@@ -369,10 +369,10 @@ export const words: EmailWords = {
     ],
     undo: "Berubah pikiran? Masuk sebelum tanggal itu dan tekan Pulihkan.",
     button: "Masuk untuk memulihkan",
-    why: "Kamu menerima email ini karena alamat ini punya akun di agentes.chat.",
+    why: "Kamu menerima email ini karena alamat ini punya akun di Ackwire AI.",
   },
   accountDeleted: {
-    subject: "Akun agentes.chat kamu sudah dihapus",
+    subject: "Akun Ackwire AI kamu sudah dihapus",
     preheader: "Akun ini sudah keluar di semua perangkat dan tidak bisa masuk lagi.",
     headline: "Akunmu sudah dihapus",
     body: (email) => ["Kami sudah menghapus akun ", { b: email }, "."],
@@ -383,7 +383,7 @@ export const words: EmailWords = {
     ],
     support: (address) => ["Kalau ini bukan kamu, kirim email ke ", { mail: address }, "."],
     noSupport: "Kalau ini bukan kamu, beri tahu pengelola server ini.",
-    why: "Kamu menerima email ini karena alamat ini punya akun di agentes.chat.",
+    why: "Kamu menerima email ini karena alamat ini punya akun di Ackwire AI.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `Agen pada ${day}: ${stalls} macet, ${noise} proses sia-sia`,
@@ -463,29 +463,29 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Timmu sedang menunggu",
-    preheader: "Ruang kerjamu sudah siap. Perlu paket agentes.chat untuk mulai.",
+    preheader: "Ruang kerjamu sudah siap. Perlu paket Ackwire AI untuk mulai.",
     headline: "Timmu sedang menunggu",
     body: (agents, channels, routines) => {
       const a = `${agents} agen`;
       const c = `${channels} kanal`;
       const r = `${routines} rutinitas`;
       return routines > 0
-        ? `${a}, ${c}, dan ${r} sudah siap. Perlu paket agentes.chat untuk mulai.`
-        : `${a} dan ${c} sudah siap. Perlu paket agentes.chat untuk mulai.`;
+        ? `${a}, ${c}, dan ${r} sudah siap. Perlu paket Ackwire AI untuk mulai.`
+        : `${a} dan ${c} sudah siap. Perlu paket Ackwire AI untuk mulai.`;
     },
-    button: "Lihat paket agentes.chat",
+    button: "Lihat paket Ackwire AI",
     why: (org) =>
-      `Kamu menerima email ini karena kamu mengelola ${org} di agentes.chat. Kami hanya mengirim dua pemberitahuan seperti ini.`,
+      `Kamu menerima email ini karena kamu mengelola ${org} di Ackwire AI. Kami hanya mengirim dua pemberitahuan seperti ini.`,
     personal: {
       subject: "Agen-agenmu sedang menunggu",
       headline: "Agen-agenmu sedang menunggu",
       body: (agents, _channels, routines) => {
         const a = `${agents} agen`;
         const r = `${routines} rutinitas`;
-        return `Siap jalan: ${routines > 0 ? `${a} dan ${r}` : a}. Tinggal perlu paket agentes.chat.`;
+        return `Siap jalan: ${routines > 0 ? `${a} dan ${r}` : a}. Tinggal perlu paket Ackwire AI.`;
       },
       why: () =>
-        "Kamu menerima email ini karena ruang kerja ini di agentes.chat adalah milikmu. Kami hanya mengirim dua pemberitahuan seperti ini.",
+        "Kamu menerima email ini karena ruang kerja ini di Ackwire AI adalah milikmu. Kami hanya mengirim dua pemberitahuan seperti ini.",
     },
   },
 };

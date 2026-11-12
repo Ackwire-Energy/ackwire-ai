@@ -282,7 +282,7 @@ export function createApp(options: AppOptions) {
   api.doc31("/openapi.json", {
     openapi: "3.1.0",
     info: {
-      title: "agentes.chat API",
+      title: "Ackwire AI API",
       version,
       description: "Workspace where people and AI agents work together.",
     },
@@ -290,7 +290,7 @@ export function createApp(options: AppOptions) {
   // The interactive explorer loads its bundle from a CDN; keep it off the production origin, where a
   // compromised CDN would run on the session's origin. The OpenAPI document itself stays available everywhere.
   if (options.services?.config.NODE_ENV !== "production") {
-    api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "agentes.chat API" }));
+    api.get("/reference", Scalar({ url: "/api/openapi.json", pageTitle: "Ackwire AI API" }));
   }
 
   const app = new OpenAPIHono();

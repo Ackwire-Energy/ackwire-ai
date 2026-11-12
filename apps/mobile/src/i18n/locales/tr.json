@@ -28,7 +28,7 @@
     "server": {
       "line": "Sunucu: {{host}} ·",
       "change": "Değiştir",
-      "title": "agentes.chat'iniz nerede?",
+      "title": "Ackwire AI'iniz nerede?",
       "subtitle": "Ekibinizin tarayıcıda açtığı adres.",
       "label": "Sunucu adresi",
       "placeholder": "agentes.ekibiniz.ts.net",
@@ -49,9 +49,9 @@
       "unreachable": "{{host}} sunucusuna ulaşamıyoruz. Adresi ve bağlantınızı kontrol edip tekrar deneyin.",
       "unreachableTailscale": "{{host}} adresine ulaşamıyoruz. Tailscale üzerinde: Tailscale uygulamasını açın, bağlanın ve tekrar deneyin. Zaten bağlı mısınız? Sunucunun bilgisayarı uykuda ya da uygulaması kapalı olabilir.",
       "certificate": "{{host}} sertifikası geçerli değil. Sunucuyu yöneten kişiyle konuşun.",
-      "notAgentes": "{{host}} bir agentes.chat sunucusu değil. Adresi kontrol edin.",
+      "notAgentes": "{{host}} bir Ackwire AI sunucusu değil. Adresi kontrol edin.",
       "serverTooOld": "{{host}} bu uygulamayla çalışmak için güncellenmeli.",
-      "appTooOld": "{{host}} sunucusunu kullanmak için agentes uygulamasını güncelleyin.",
+      "appTooOld": "{{host}} sunucusunu kullanmak için Ackwire AI uygulamasını güncelleyin.",
       "down": {
         "line": "{{host}} yanıt vermedi.",
         "text": "Sunucu kapalı ya da ağınızın dışında olabilir. Tekrar açıldığında uygulama kendiliğinden açılır.",
@@ -69,14 +69,14 @@
       "confirm": "Bağlan",
       "notNow": "Şimdi değil",
       "checking": "Sunucu kontrol ediliyor…",
-      "notALink": "Bu bağlantı bir agentes.chat sunucusuna ait değil.",
+      "notALink": "Bu bağlantı bir Ackwire AI sunucusuna ait değil.",
       "tokenFailed": "Kodun süresi doldu ya da kod zaten kullanıldı. E-postanızla giriş yapın veya bilgisayarda yeni bir kod gösterin.",
       "signInSlow": "Giriş beklenenden uzun sürüyor. E-postanızla giriş yapın veya bilgisayarda yeni bir kod gösterin."
     },
     "scan": {
       "hint": "Kamerayı bilgisayardaki QR koda tutun",
       "typeAddress": "Adresi yaz",
-      "notOurs": "Bu QR kod bir agentes.chat sunucusuna ait değil.",
+      "notOurs": "Bu QR kod bir Ackwire AI sunucusuna ait değil.",
       "cameraTitle": "Kamerayı kullanın",
       "cameraText": "Yalnızca QR kodu okumak için kullanılır.",
       "allow": "Kameraya izin ver",

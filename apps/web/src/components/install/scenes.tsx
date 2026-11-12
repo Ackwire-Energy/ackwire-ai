@@ -22,7 +22,7 @@ export type SceneId =
 export const SCENE_W = 400;
 export const SCENE_H = 250;
 
-const APP = "agentes.chat";
+const APP = "Ackwire AI";
 const ICON = "/icon-512.png";
 const CLOCK = "9:41";
 /** Names the systems show as they are, in every language. */

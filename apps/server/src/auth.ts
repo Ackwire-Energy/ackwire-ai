@@ -119,7 +119,7 @@ export function createAuth(deps: {
   const authorizations = socialAuthorizations(config, apple?.clientId ?? null);
 
   return betterAuth({
-    appName: "agentes.chat",
+    appName: "Ackwire AI",
     baseURL: config.PUBLIC_URL,
     basePath: "/api/auth",
     // Over HTTP each would tell any session whether a password is right, with none of the limit `deletionProof` keeps:

@@ -28,7 +28,7 @@
     "server": {
       "line": "Serwer: {{host}} ·",
       "change": "Zmień",
-      "title": "Gdzie działa twój agentes.chat?",
+      "title": "Gdzie działa twój Ackwire AI?",
       "subtitle": "Adres, który twój zespół otwiera w przeglądarce.",
       "label": "Adres serwera",
       "placeholder": "agentes.twojzespol.ts.net",
@@ -49,9 +49,9 @@
       "unreachable": "Nie możemy połączyć się z {{host}}. Sprawdź adres i połączenie, a potem spróbuj ponownie.",
       "unreachableTailscale": "Nie możemy połączyć się z {{host}}. Jest w Tailscale: otwórz aplikację Tailscale, połącz się i spróbuj ponownie. Już połączono? Komputer serwera może być uśpiony albo mieć zamkniętą aplikację.",
       "certificate": "Certyfikat {{host}} jest nieprawidłowy. Porozmawiaj z osobą, która zarządza serwerem.",
-      "notAgentes": "{{host}} nie jest serwerem agentes.chat. Sprawdź adres.",
+      "notAgentes": "{{host}} nie jest serwerem Ackwire AI. Sprawdź adres.",
       "serverTooOld": "{{host}} wymaga aktualizacji, żeby działać z tą aplikacją.",
-      "appTooOld": "Zaktualizuj aplikację agentes, żeby korzystać z {{host}}.",
+      "appTooOld": "Zaktualizuj aplikację Ackwire AI, żeby korzystać z {{host}}.",
       "down": {
         "line": "{{host}} nie odpowiada.",
         "text": "Serwer może nie działać albo być poza twoją siecią. Aplikacja otworzy się sama, gdy wróci.",
@@ -71,14 +71,14 @@
       "confirm": "Połącz",
       "notNow": "Nie teraz",
       "checking": "Sprawdzanie serwera…",
-      "notALink": "Ten link nie pochodzi z serwera agentes.chat.",
+      "notALink": "Ten link nie pochodzi z serwera Ackwire AI.",
       "tokenFailed": "Kod wygasł albo został już użyty. Zaloguj się adresem e-mail albo wyświetl nowy kod na komputerze.",
       "signInSlow": "Logowanie trwa dłużej, niż powinno. Zaloguj się adresem e-mail albo wyświetl nowy kod na komputerze."
     },
     "scan": {
       "hint": "Skieruj aparat na kod QR na komputerze",
       "typeAddress": "Wpisz adres",
-      "notOurs": "Ten kod QR nie pochodzi z serwera agentes.chat.",
+      "notOurs": "Ten kod QR nie pochodzi z serwera Ackwire AI.",
       "cameraTitle": "Użyj aparatu",
       "cameraText": "Służy tylko do odczytania kodu QR.",
       "allow": "Zezwól na aparat",

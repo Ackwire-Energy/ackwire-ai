@@ -44,7 +44,7 @@ const N = COMPUTER_GRID;
 const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map((v) => (v + 0.5) / 16);
 const ALU = ["#fbfbf9", "#eeeeea", "#dcdcd7", "#c4c4be", "#a3a39d", "#7d7d77"];
 const GRAPHITE = ["#3a3a37", "#262624", "#161615"];
-const SKY = ["#0a2f5e", "#0b4590", "#0063d1", "#2f80e0", "#5ea0ee", "#8cc3ff", "#c6e1ff"];
+const SKY = ["#031f1b", "#1f5c16", "#3f7a12", "#6cba2c", "#90ed42", "#b8f582", "#e8f5dc"];
 const NIGHT = ["#141413", "#1b1b1a", "#222220"];
 /* A dark screen on a dark surface: a step lighter than the surface, so the switched-off computer keeps its shape. */
 const NIGHT_ON_DARK = ["#2a2a28", "#323230", "#3b3b38"];

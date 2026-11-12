@@ -3,7 +3,7 @@ import { serverText } from "@agenteschat/i18n";
 import { type AppLocale, appLocale } from "@agenteschat/i18n/locale";
 import { dark, light, type ThemeColors } from "@agenteschat/tokens";
 import { filePath } from "@agenteschat/tokens/message-links";
-import { bodyPath, bodySvg, eyeShapes } from "@agenteschat/ui/agent/engine";
+import { BRAND_NAME, MONOGRAM_PATH, MONOGRAM_VIEWBOX } from "@agenteschat/ui/brand/ackwire";
 import type { Context, MiddlewareHandler } from "hono";
 import { signInPage } from "../routes/app/context";
 
@@ -47,15 +47,8 @@ export function pageLocale(c: Context): AppLocale {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 
-const BODY = bodyPath(2, 2, 28);
-const EYES = eyeShapes("round")
-  .map((e) => {
-    const [x, y, w, h] = [2 + e.x * 28, 2 + e.y * 28, e.w * 28, e.h * 28];
-    return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${w / 2}"/>`;
-  })
-  .join("");
-/** The app's logo (`Logo` in packages/ui): the agent mark in the sky's dither and its white eyes, then the word. */
-const LOGO = `<span class="logo" role="img" aria-label="agentes"><svg viewBox="0 0 32 32" aria-hidden="true"><defs><clipPath id="m"><path d="${BODY}"/></clipPath></defs><path class="body" d="${BODY}"/><image href="data:image/svg+xml,${encodeURIComponent(bodySvg("sky", 12))}" x="2" y="2" width="28" height="28" preserveAspectRatio="none" clip-path="url(#m)"/><g fill="#fff">${EYES}</g></svg><span aria-hidden="true">agentes</span></span>`;
+/** The app's logo (`Logo` in packages/ui): the Ackwire "A" in the accent, then the name. */
+const LOGO = `<span class="logo" role="img" aria-label="${BRAND_NAME}"><svg viewBox="${MONOGRAM_VIEWBOX}" aria-hidden="true"><path class="body" d="${MONOGRAM_PATH}"/></svg><span aria-hidden="true">Ackwire <span class="ai">AI</span></span></span>`;
 
 const vars = (t: ThemeColors) =>
   `--bg:${t.bg};--raised:${t.raised};--ink:${t.ink};--muted:${t.muted};--faint:${t.faint};--line:${t.line};--agent:${t.agent};--agent2:${t.agent2};--agent-soft:${t.agentSoft}`;
@@ -74,10 +67,10 @@ const CSS = `:root{color-scheme:light dark;${vars(light)};--font-sans:Onest,"Seg
 @media (prefers-color-scheme:dark){:root{${vars(dark)}}}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;justify-content:center;padding:96px 16px 34vh;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased}
-.logo{position:absolute;top:24px;left:28px;display:inline-flex;align-items:center;gap:.16em;font-size:24px;font-weight:300;letter-spacing:-.02em;line-height:1}
+.logo{position:absolute;top:24px;left:28px;display:inline-flex;align-items:center;gap:.28em;font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1}
 .logo svg{width:1.25em;height:1.25em;flex:none}
 .logo .body{fill:var(--agent)}
-.logo image{image-rendering:pixelated}
+.logo .ai{color:var(--agent)}
 main{display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:min(100%,460px);margin:auto 0}
 h1{margin:0;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-.03em;text-wrap:balance}
 p{margin:0;color:var(--muted)}

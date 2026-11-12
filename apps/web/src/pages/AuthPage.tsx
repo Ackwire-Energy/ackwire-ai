@@ -463,7 +463,7 @@ export function AuthPage({
         ) : (
           <Trans
             i18nKey="auth.server.into"
-            values={{ server: here === CLOUD_SERVER ? "agentes.chat" : serverHost(here) }}
+            values={{ server: here === CLOUD_SERVER ? "Ackwire AI" : serverHost(here) }}
             components={{ b: <b /> }}
           />
         )}

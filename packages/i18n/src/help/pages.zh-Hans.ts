@@ -4,22 +4,22 @@ import type { HelpDocument } from "./types";
 /** The help pages in zh-Hans: a page not here shows in English. */
 export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
-    title: "在你的电脑上运行 agentes.chat",
-    summary: "agentes.chat 应用也可以在 Mac、PC 或 Linux 电脑上直接运行 agentes.chat，供你自己或小团队使用。",
+    title: "在你的电脑上运行 Ackwire AI",
+    summary: "Ackwire AI 应用也可以在 Mac、PC 或 Linux 电脑上直接运行 Ackwire AI，供你自己或小团队使用。",
     sections: [
       {
         id: "how",
         heading: "运行方式",
         blocks: [
           "它在应用内运行，自带数据库，所有内容都保存在这台电脑的一个文件夹里，也就是你主文件夹中的 `.agentes`。无需安装其他东西：不用 Docker，也不用配置数据库。",
-          "它随应用启动，退出应用时停止。退出前会先询问你，因为在应用重新打开之前，谁都无法使用 agentes.chat。",
+          "它随应用启动，退出应用时停止。退出前会先询问你，因为在应用重新打开之前，谁都无法使用 Ackwire AI。",
         ],
       },
       {
         id: "who",
         heading: "适合谁",
         blocks: [
-          "适合你自己或小团队。一台一直开着的 Mac mini、一台闲置的 PC 或一台笔记本电脑都很合适：按 [保持开机](#keep-on) 中的方法设置好。在 Mac 或 PC 上，用这个应用就能不借助 Docker 运行 agentes.chat。",
+          "适合你自己或小团队。一台一直开着的 Mac mini、一台闲置的 PC 或一台笔记本电脑都很合适：按 [保持开机](#keep-on) 中的方法设置好。在 Mac 或 PC 上，用这个应用就能不借助 Docker 运行 Ackwire AI。",
           "团队更大的话，请看 [选哪种方式](/help/install-on-a-server#choose)。你的数据之后可以迁移到服务器。",
         ],
       },
@@ -50,7 +50,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "也借给其他工作区",
         blocks: [
-          "你在这里运行的服务器上的工作区会自动使用这台电脑。要让别处的工作区也使用它，比如 agentes.chat Cloud 上的工作区，请打开 **偏好设置\u00a0›\u00a0服务器**，点 **添加服务器…**，登录那个工作区，在应用询问时点 **允许**。",
+          "你在这里运行的服务器上的工作区会自动使用这台电脑。要让别处的工作区也使用它，比如 Ackwire AI Cloud 上的工作区，请打开 **偏好设置\u00a0›\u00a0服务器**，点 **添加服务器…**，登录那个工作区，在应用询问时点 **允许**。",
           "每个工作区在这里都有自己的智能体和文件夹。**命令** 对它也默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里的一个开关对这台电脑上的所有工作区生效。",
         ],
       },
@@ -58,8 +58,8 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "从手机和团队访问",
         blocks: [
-          "**从你的手机和队友那里访问** 会把 agentes.chat 接入 Tailscale，一个连接你各台设备的私有网络：你的手机和你邀请的人可以加入，其他人都无法访问 agentes.chat。Tailscale 是免费的：https://tailscale.com/download 。关闭这个选项时，agentes.chat 只能在这台电脑上使用。",
-          "如果这台电脑已经在 Tailscale 的 443 端口上共享了别的东西，agentes.chat 会改用 8443，地址以 `:8443` 结尾。",
+          "**从你的手机和队友那里访问** 会把 Ackwire AI 接入 Tailscale，一个连接你各台设备的私有网络：你的手机和你邀请的人可以加入，其他人都无法访问 Ackwire AI。Tailscale 是免费的：https://tailscale.com/download 。关闭这个选项时，Ackwire AI 只能在这台电脑上使用。",
+          "如果这台电脑已经在 Tailscale 的 443 端口上共享了别的东西，Ackwire AI 会改用 8443，地址以 `:8443` 结尾。",
         ],
       },
       {
@@ -103,7 +103,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           {
             list: [
-              "[把 agentes.chat 安装到服务器上](/help/install-on-a-server)，但先不要启动。在它的 `.env` 中填入 `~/.agentes/.env` 里的 `AGENTES_SECRET`，然后只启动数据库：`docker compose up -d postgres`。",
+              "[把 Ackwire AI 安装到服务器上](/help/install-on-a-server)，但先不要启动。在它的 `.env` 中填入 `~/.agentes/.env` 里的 `AGENTES_SECRET`，然后只启动数据库：`docker compose up -d postgres`。",
               "导入导出的文件：`docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`。",
               "用 `docker compose up -d` 启动它，按完整指南中的方法把 `~/.agentes/files` 复制进去，然后像以前一样登录。",
             ],
@@ -115,11 +115,11 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
   computers: {
     title: "你的电脑和手机",
     summary:
-      "带上 Mac、PC、Linux 电脑、服务器或手机，你的智能体就能在上面工作。在 agentes.chat Cloud 和你自己的服务器上都一样。",
+      "带上 Mac、PC、Linux 电脑、服务器或手机，你的智能体就能在上面工作。在 Ackwire AI Cloud 和你自己的服务器上都一样。",
     sections: [
       {
         id: "app",
-        heading: "通过 agentes.chat 应用",
+        heading: "通过 Ackwire AI 应用",
         blocks: [
           "在那台电脑上安装并打开应用，登录你的工作区。它会问 **允许 <workspace> 的智能体使用这台 Mac？**（Windows 上是这台 PC，Linux 上是这台电脑）。选择谁可以使用，然后点 **允许**。就这么简单。",
           "已经登录了？在 **偏好设置\u00a0›\u00a0通用** 的 **智能体** 卡片中打开这个工作区。",
@@ -158,14 +158,14 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "应用打开期间",
         blocks: [
-          "只有当应用在那台电脑上运行、电脑处于唤醒状态时，智能体才能在上面工作。应用询问时，请保持勾选 **保持就绪：登录时打开 agentes.chat**。关机或睡眠的电脑会显示 **离线**，智能体会等它回来。",
+          "只有当应用在那台电脑上运行、电脑处于唤醒状态时，智能体才能在上面工作。应用询问时，请保持勾选 **保持就绪：登录时打开 Ackwire AI**。关机或睡眠的电脑会显示 **离线**，智能体会等它回来。",
         ],
       },
       {
         id: "pausing",
         heading: "暂停和断开",
         blocks: [
-          "在电脑上，时钟旁的 agentes.chat 图标会暂停所有工作区的智能体。在 **偏好设置\u00a0›\u00a0通用** 中，每个工作区的开关只暂停那一个，**离开** 则断开它。暂停期间不会开始新工作，正在运行的会照常完成。断开后，智能体的文件夹仍保留在磁盘上。",
+          "在电脑上，时钟旁的 Ackwire AI 图标会暂停所有工作区的智能体。在 **偏好设置\u00a0›\u00a0通用** 中，每个工作区的开关只暂停那一个，**离开** 则断开它。暂停期间不会开始新工作，正在运行的会照常完成。断开后，智能体的文件夹仍保留在磁盘上。",
           "在网站上，设备页面上的 **移除** 会断开它。",
         ],
       },
@@ -173,7 +173,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "organizations",
         heading: "一台电脑，多个工作区",
         blocks: [
-          "在同一个应用中分别登录每个工作区，并为每个工作区点 **允许**。agentes.chat Cloud 上的工作区和你自己服务器上的工作区可以共用一台电脑（应用 0.6.1 及以上版本）。每个工作区在上面都有自己的智能体和文件夹，断开其中一个不会影响其他工作区。",
+          "在同一个应用中分别登录每个工作区，并为每个工作区点 **允许**。Ackwire AI Cloud 上的工作区和你自己服务器上的工作区可以共用一台电脑（应用 0.6.1 及以上版本）。每个工作区在上面都有自己的智能体和文件夹，断开其中一个不会影响其他工作区。",
           "应用在这台电脑上运行的服务器已经连接好，无需任何操作。如果还想把这台电脑借给别处的工作区，请看 [也借给其他工作区](/help/run-on-your-computer#another-workspace)。",
           "只把笔记本电脑上的应用当作打开工作区的窗口？当它询问是否让智能体使用这台笔记本电脑时，点 **以后再说**，它就仍然只是一个窗口。",
         ],
@@ -195,10 +195,10 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "你的文件和登录信息",
               "其他智能体的文件夹，包括其他工作区的，以及它们浏览器中保存的登录",
               "连接这台电脑的令牌",
-              "如果这台电脑也运行 agentes.chat，还有 `.agentes` 中它的数据库和密钥",
+              "如果这台电脑也运行 Ackwire AI，还有 `.agentes` 中它的数据库和密钥",
             ],
           },
-          "agentes.chat 会拒绝提到密钥、令牌和登录信息的命令，但这只是一条规则，不是一堵墙。**命令** 默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里的一个开关对这台电脑上的所有工作区生效。Claude Code 和 Codex 在智能体的文件夹中按自己的规则运行自己的命令。",
+          "Ackwire AI 会拒绝提到密钥、令牌和登录信息的命令，但这只是一条规则，不是一堵墙。**命令** 默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里的一个开关对这台电脑上的所有工作区生效。Claude Code 和 Codex 在智能体的文件夹中按自己的规则运行自己的命令。",
           "如果需要一堵真正的墙，请使用 Linux 服务器。在 Debian 13 上用 `--system` 安装时，每个智能体都是一个独立的用户。在 Ubuntu 上，智能体共用一个用户 `agentes`：它们能看到彼此的文件夹，但看不到你的或服务器的。或者给智能体一台专用电脑。",
         ],
       },
@@ -219,14 +219,14 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "你的电脑和手机",
         blocks: [
-          "智能体也可以在你带来的电脑和手机上工作：装有 agentes.chat 应用的 Mac 或 PC、服务器、Android 手机或 iPhone。请看 [你带来的电脑和手机](/help/computers)。",
+          "智能体也可以在你带来的电脑和手机上工作：装有 Ackwire AI 应用的 Mac 或 PC、服务器、Android 手机或 iPhone。请看 [你带来的电脑和手机](/help/computers)。",
         ],
       },
       {
         id: "plans",
         heading: "你的 AI 套餐",
         blocks: [
-          "你的智能体可以用你自己的 AI 套餐来思考，比如 Claude、ChatGPT、GLM 或 Kimi，只需在这台电脑上登录，无需 API 密钥。账号只留在这台电脑上，agentes.chat 永远看不到密码和登录凭据。",
+          "你的智能体可以用你自己的 AI 套餐来思考，比如 Claude、ChatGPT、GLM 或 Kimi，只需在这台电脑上登录，无需 API 密钥。账号只留在这台电脑上，Ackwire AI 永远看不到密码和登录凭据。",
           "Google 的 AI Pro 和 Ultra 套餐在这里无法使用：Google 的条款不允许在其他产品中使用它们。Gemini 的 API 密钥可以。",
         ],
       },
@@ -244,7 +244,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   import: {
     title: "带上你的智能体",
-    summary: "从其他应用或另一个 agentes.chat 工作区带来智能体，连同它们的指令、技能、例行工作和记忆。",
+    summary: "从其他应用或另一个 Ackwire AI 工作区带来智能体，连同它们的指令、技能、例行工作和记忆。",
     sections: [
       {
         id: "comes",
@@ -409,7 +409,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "who-answers": {
     title: "谁来回复消息",
-    summary: "提及会指定智能体。没有提及时，agentes.chat 按以下顺序替你选择。",
+    summary: "提及会指定智能体。没有提及时，Ackwire AI 按以下顺序替你选择。",
     sections: [
       {
         id: "order",
@@ -431,7 +431,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "由 agentes.chat 托管你的工作区时，Jev 已包含在内。在你自己运行的服务器上，它使用所有者的 TypeSafe 密钥，每条消息约 0.0001 美元：[设置 Jev](/help/jev#setup)。",
+          "由 Ackwire AI 托管你的工作区时，Jev 已包含在内。在你自己运行的服务器上，它使用所有者的 TypeSafe 密钥，每条消息约 0.0001 美元：[设置 Jev](/help/jev#setup)。",
         ],
       },
       {
@@ -487,7 +487,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "打开 https://console.typesafe.ai ，用 Google 或你的邮箱登录。新账号也用同样的方式创建。",
               "在控制台中充值。Jev 是预付费的。",
               "打开 https://console.typesafe.ai/keys ，创建一个密钥并立即复制。",
-              "在 agentes.chat 中打开 **设置 › AI 和用量**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
+              "在 Ackwire AI 中打开 **设置 › AI 和用量**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
             ],
           },
           "在用 Docker 运行的服务器上，你也可以把密钥写进 `.env` 的 `TYPESAFE_API_KEY`。它优先于设置中的密钥。",
@@ -544,14 +544,14 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "apps-de-ia": {
     title: "AI 应用",
-    summary: "在 Claude、Cursor 或其他 MCP 应用中直接请 agentes.chat 的智能体完成任务，无需离开，答案就在原处返回。",
+    summary: "在 Claude、Cursor 或其他 MCP 应用中直接请 Ackwire AI 的智能体完成任务，无需离开，答案就在原处返回。",
     sections: [
       {
         id: "what",
         heading: "工作原理",
         blocks: [
-          "agentes.chat 是一个 MCP 服务器。把它的地址粘贴到你的 AI 应用中，用你的账号登录并选择一个工作区。之后，这个应用就可以列出智能体和频道、以你的身份给智能体发送任务、等待回复，以及查看最近的任务。",
-          "例如，正在 Unity 或 Blender 里编辑场景时，对 Claude 说：“让市场智能体写一段发布文案”。这条消息会以你的名义出现在 agentes.chat 中，标注 **via Claude**，智能体的回复会回到 Claude。",
+          "Ackwire AI 是一个 MCP 服务器。把它的地址粘贴到你的 AI 应用中，用你的账号登录并选择一个工作区。之后，这个应用就可以列出智能体和频道、以你的身份给智能体发送任务、等待回复，以及查看最近的任务。",
+          "例如，正在 Unity 或 Blender 里编辑场景时，对 Claude 说：“让市场智能体写一段发布文案”。这条消息会以你的名义出现在 Ackwire AI 中，标注 **via Claude**，智能体的回复会回到 Claude。",
           "地址在 **设置 › AI 应用** 中，以 `/mcp` 结尾。",
         ],
       },
@@ -561,14 +561,14 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Claude**（claude.ai、Claude Desktop 和手机）：在 **Customize › Connectors** 中点 **+ Add**，再点 **Add custom connector**，命名为 agentes.chat，粘贴地址后点 **Continue**。选择 **Sign in now**，点 **Add** 并授权。在 Team 和 Enterprise 套餐中，由 Claude 组织的 Owner 在 Organization settings › Connectors 中添加连接器，每个人再在 Customize › Connectors 中点 **Connect**。Claude 免费版可以添加一个自定义连接器。",
+              "**Claude**（claude.ai、Claude Desktop 和手机）：在 **Customize › Connectors** 中点 **+ Add**，再点 **Add custom connector**，命名为 Ackwire AI，粘贴地址后点 **Continue**。选择 **Sign in now**，点 **Add** 并授权。在 Team 和 Enterprise 套餐中，由 Claude 组织的 Owner 在 Organization settings › Connectors 中添加连接器，每个人再在 Customize › Connectors 中点 **Connect**。Claude 免费版可以添加一个自定义连接器。",
               "**Claude Code：** 运行 `claude mcp add --transport http --scope user agentes <address>`，然后输入 `/mcp`，选择 agentes 并点 **Authenticate**。只用于当前文件夹时，去掉 `--scope user`。",
               "**Cursor：** 在 **设置 › AI 应用** 中点 **添加到 Cursor**，或把地址写进 `~/.cursor/mcp.json`。第一次使用时，Cursor 会请你登录。",
               '**VS Code：** 点 **添加到 VS Code**，或把地址写进 `.vscode/mcp.json`，并加上 `"type": "http"`。',
               "**其他应用：** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains 等在 **连接应用** 里都有各自的步骤，地址已经填好。",
             ],
           },
-          "登录时，agentes.chat 会显示是哪个应用请求访问、之后会返回到哪里。只有在你刚刚发起连接时才继续。",
+          "登录时，Ackwire AI 会显示是哪个应用请求访问、之后会返回到哪里。只有在你刚刚发起连接时才继续。",
         ],
       },
       {
@@ -585,7 +585,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`：你从应用发出的任务，以及智能体正在做的事。",
             ],
           },
-          "应用以你的身份行事，只能看到你能看到的内容。它永远不会审批智能体的操作：当智能体停下来请求审批时，回复中会说明并附上链接，由人在 agentes.chat 中做决定。它也不会更改设置、成员或权限。",
+          "应用以你的身份行事，只能看到你能看到的内容。它永远不会审批智能体的操作：当智能体停下来请求审批时，回复中会说明并附上链接，由人在 Ackwire AI 中做决定。它也不会更改设置、成员或权限。",
         ],
       },
       {
@@ -621,7 +621,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "他人写的文字",
         blocks: [
-          "回复中包含智能体和成员在 agentes.chat 中写的文字。应用收到的这些文字会被标记为内容而非指令，但某段文字仍可能试图诱导应用去做别的事。在确认之前，请检查你的应用将要做什么。",
+          "回复中包含智能体和成员在 Ackwire AI 中写的文字。应用收到的这些文字会被标记为内容而非指令，但某段文字仍可能试图诱导应用去做别的事。在确认之前，请检查你的应用将要做什么。",
         ],
       },
       {
@@ -640,8 +640,8 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
     ],
   },
   "install-on-a-server": {
-    title: "在服务器上安装 agentes.chat",
-    summary: "在你自己的服务器上免费运行 agentes.chat，供整个团队使用。一条命令就能装好。",
+    title: "在服务器上安装 Ackwire AI",
+    summary: "在你自己的服务器上免费运行 Ackwire AI，供整个团队使用。一条命令就能装好。",
     sections: [
       {
         id: "choose",
@@ -649,7 +649,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**agentes.chat Cloud**：适合任何团队，在哪里都能访问。由我们运行、更新和备份。每个工作区都有自己的电脑，每个智能体在上面都是独立的用户。",
+              "**Ackwire AI Cloud**：适合任何团队，在哪里都能访问。由我们运行、更新和备份。每个工作区都有自己的电脑，每个智能体在上面都是独立的用户。",
               "**你的电脑，配合应用**：适合你自己或小团队，在那台电脑开机时可以访问。一台一直开着的 Mac mini 就很合适。一键更新，手动备份。智能体在那台电脑上以你的身份运行。",
               "**服务器**：适合更大的团队，一直在线。用三条命令更新，还可以每天自动备份。在 Debian 13 上，每个智能体都是独立的用户。",
             ],
@@ -663,7 +663,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "一台 64 位 Linux（x64 或 arm64）服务器或 VPS。小团队可以从 2 个 CPU、4 GB 内存和 20 GB 磁盘起步。在 Mac 或 PC 上，[应用就能运行 agentes.chat](/help/run-on-your-computer)，不需要 Docker。",
+              "一台 64 位 Linux（x64 或 arm64）服务器或 VPS。小团队可以从 2 个 CPU、4 GB 内存和 20 GB 磁盘起步。在 Mac 或 PC 上，[应用就能运行 Ackwire AI](/help/run-on-your-computer)，不需要 Docker。",
               "带 Compose 的 Docker。在 Linux 上，缺少时安装程序会先问你，再帮你装上。",
               "一种访问方式：一个免费的 Tailscale 账号（默认方式，私有，不需要域名，也不用开放端口），或者一个指向服务器的域名，并开放 80 和 443 端口。",
             ],
@@ -706,14 +706,14 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "你的账号",
         blocks: [
           "打开服务器的地址并注册：第一个账号就是所有者。之后注册会关闭，其他人通过邀请加入，邀请在 **设置\u00a0›\u00a0成员和邀请** 里发出。",
-          "在 Tailscale 上，你邀请的人也需要加入你的 tailnet。先在 https://console.tailscale.com/admin/users 邀请他们，再在 agentes.chat 里邀请。",
+          "在 Tailscale 上，你邀请的人也需要加入你的 tailnet。先在 https://console.tailscale.com/admin/users 邀请他们，再在 Ackwire AI 里邀请。",
         ],
       },
       {
         id: "email",
         heading: "邮件",
         blocks: [
-          "没有配置邮件时，agentes.chat 会把每封邮件写进日志而不是发出去，所以邀请链接可以从日志里复制。重置密码不可用。",
+          "没有配置邮件时，Ackwire AI 会把每封邮件写进日志而不是发出去，所以邀请链接可以从日志里复制。重置密码不可用。",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -727,7 +727,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "使用 Tailscale 时，在手机上安装 Tailscale 应用，并登录同一个 tailnet。",
-              "安装 agentes.chat 应用。",
+              "安装 Ackwire AI 应用。",
               "扫描设置显示的二维码，或者 **设置\u00a0›\u00a0你的账号\u00a0›\u00a0在手机上打开** 里的二维码，后者还会帮你登录。",
             ],
           },
@@ -741,7 +741,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "其他电脑，比如装了 agentes.chat 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0设备** 里连接，详见 [你的电脑和手机](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
+          "其他电脑，比如装了 Ackwire AI 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0设备** 里连接，详见 [你的电脑和手机](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
         ],
       },
       {
@@ -776,7 +776,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "它会发送什么",
         blocks: [
-          "服务器每天向 agentes.chat 发送一次匿名使用统计：人数、智能体数量、机器大小、用掉的 AI 令牌，以及智能体的浏览器收发了多少数据等计数。从不发送消息、文件、名字或网站。`docker compose run --rm agentes telemetry` 会原样显示将要发送的内容。所有者可以在 **设置\u00a0›\u00a0常规** 里关闭，或者在 `.env` 里设置 `TELEMETRY=off`。",
+          "服务器每天向 Ackwire AI 发送一次匿名使用统计：人数、智能体数量、机器大小、用掉的 AI 令牌，以及智能体的浏览器收发了多少数据等计数。从不发送消息、文件、名字或网站。`docker compose run --rm agentes telemetry` 会原样显示将要发送的内容。所有者可以在 **设置\u00a0›\u00a0常规** 里关闭，或者在 `.env` 里设置 `TELEMETRY=off`。",
           "除非你把 `SENTRY_DSN` 设为你自己选的兼容 Sentry 的服务器，否则错误报告不会发到任何地方。报告包含错误和发生的位置，从不包含消息、邮箱地址、IP 地址、Cookie 或令牌。",
         ],
       },
@@ -784,7 +784,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "完整指南",
         blocks: [
-          "所有设置、自己的代理（比如 nginx）、不用 Docker 的运行方式、给自行安装的 AI 智能体的步骤，以及出问题时怎么办，都在 agentes.chat 仓库里的 `SELF_HOSTING.md` 中。",
+          "所有设置、自己的代理（比如 nginx）、不用 Docker 的运行方式、给自行安装的 AI 智能体的步骤，以及出问题时怎么办，都在 Ackwire AI 仓库里的 `SELF_HOSTING.md` 中。",
         ],
       },
     ],

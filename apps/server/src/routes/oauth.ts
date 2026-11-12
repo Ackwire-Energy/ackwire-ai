@@ -85,7 +85,7 @@ export function registerAppsRoot(app: OpenAPIHono, deps: AppDeps, options: AppsR
     authorization_servers: [urls.issuer],
     scopes_supported: [...APP_SCOPES],
     bearer_methods_supported: ["header"],
-    resource_name: "agentes.chat",
+    resource_name: "Ackwire AI",
     resource_documentation: urls.docs,
   };
   const authorizationServer = {

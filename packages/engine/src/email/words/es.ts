@@ -8,39 +8,39 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host ? atHost("Enviado por el servidor de agentes.chat", "en", host) : "Enviado por agentes.chat.",
+    host ? atHost("Enviado por el servidor de Ackwire AI", "en", host) : "Enviado por Ackwire AI.",
   fallback: "¿El botón no funciona? Copia esta dirección en tu navegador:",
   role: { owner: "propietario", member: "miembro" },
   anAgent: "Un agente",
   someone: "Alguien",
   verify: {
-    subject: "Confirma tu correo en agentes.chat",
+    subject: "Confirma tu correo en Ackwire AI",
     preheader: "Un clic para confirmar esta dirección. El enlace es válido por una hora.",
     headline: "Confirma tu correo",
     body: "Solo falta un paso: confirmar que esta dirección es tuya.",
     button: "Confirmar correo",
     small: "El enlace es válido por una hora. Si no te registraste, puedes ignorar este correo.",
-    why: "Recibiste este correo porque esta dirección se usó para registrarse en agentes.chat.",
+    why: "Recibiste este correo porque esta dirección se usó para registrarse en Ackwire AI.",
   },
   reset: {
-    subject: "Restablece tu contraseña de agentes.chat",
+    subject: "Restablece tu contraseña de Ackwire AI",
     preheader: "Elige una contraseña nueva. El enlace es válido por una hora.",
     headline: "Elige una contraseña nueva",
     body: "Recibimos una solicitud para restablecer la contraseña de esta dirección.",
     button: "Elegir una contraseña nueva",
     note: "¿No lo pediste? Ignora este correo. Tu contraseña sigue igual.",
     small: "El enlace es válido por una hora.",
-    why: "Recibiste este correo porque alguien pidió restablecer la contraseña de esta dirección en agentes.chat.",
+    why: "Recibiste este correo porque alguien pidió restablecer la contraseña de esta dirección en Ackwire AI.",
   },
   invitation: {
-    subject: "Te invitaron a un espacio de trabajo en agentes.chat",
+    subject: "Te invitaron a un espacio de trabajo en Ackwire AI",
     preheader: "Acepta en un plazo de 7 días, con esta dirección de correo.",
     headline: "Te invitaron a un espacio de trabajo",
     body: (inviter, email, org, role) =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} te invitó a unirte a `, { b: org }, ` como ${role}.`]
         : ["Te invitaron a unirte a ", { b: org }, ` como ${role}.`],
-    what: "agentes.chat es donde personas y agentes de IA trabajan juntos.",
+    what: "Ackwire AI es donde personas y agentes de IA trabajan juntos.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Su nota: " }, `“${note}”`],
     button: "Aceptar invitación",
     small: "La invitación es válida por 7 días. Acéptala con esta dirección de correo.",
@@ -51,9 +51,9 @@ export const words: EmailWords = {
         inviter
           ? [
               { b: inviter },
-              `${email ? ` (${email})` : ""} te invitó a su espacio de trabajo personal en agentes.chat.`,
+              `${email ? ` (${email})` : ""} te invitó a su espacio de trabajo personal en Ackwire AI.`,
             ]
-          : "Te invitaron a un espacio de trabajo personal en agentes.chat.",
+          : "Te invitaron a un espacio de trabajo personal en Ackwire AI.",
       why: () =>
         "Recibiste este correo porque alguien invitó a esta dirección a su espacio de trabajo personal. Si no sabes quién es, ignóralo. No pasa nada hasta que aceptes.",
     },
@@ -91,41 +91,41 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "Confirma tu lugar en la lista de espera de agentes.chat",
+    subject: "Confirma tu lugar en la lista de espera de Ackwire AI",
     preheader: "Un clic y tu lugar queda reservado.",
     headline: "Confirma tu lugar en la lista",
     body: (email) =>
       email
-        ? ["Recibimos una solicitud para agregar ", { b: email }, " a la lista de espera de agentes.chat."]
-        : "Recibimos una solicitud para agregar esta dirección a la lista de espera de agentes.chat.",
+        ? ["Recibimos una solicitud para agregar ", { b: email }, " a la lista de espera de Ackwire AI."]
+        : "Recibimos una solicitud para agregar esta dirección a la lista de espera de Ackwire AI.",
     approve: "Aquí no pasa nada importante sin que una persona lo apruebe. Eso también vale para esta solicitud.",
     button: "Confirmar mi correo",
     small:
       "El enlace es válido por 48 horas. ¿No fuiste tú? Ignora este correo. Sin el clic, la dirección nunca entra en la lista.",
-    why: "Recibiste este correo porque esta dirección se anotó en la lista de espera de agentes.chat.",
+    why: "Recibiste este correo porque esta dirección se anotó en la lista de espera de Ackwire AI.",
   },
   earlyAccess: {
-    subject: "Llegó tu invitación a agentes.chat",
+    subject: "Llegó tu invitación a Ackwire AI",
     preheader: (days) => `Crea tu cuenta en un plazo de ${days} días, con esta dirección de correo.`,
     headline: "Tu acceso está listo",
-    body: (email) => [{ b: email }, " ya puede crear una cuenta y un espacio de trabajo en agentes.chat."],
-    what: "agentes.chat es donde personas y agentes de IA trabajan juntos.",
+    body: (email) => [{ b: email }, " ya puede crear una cuenta y un espacio de trabajo en Ackwire AI."],
+    what: "Ackwire AI es donde personas y agentes de IA trabajan juntos.",
     button: "Crear mi cuenta",
     small: (days) =>
       `El enlace es válido por ${days} días, solo para esta dirección. Regístrate con una contraseña, o con Google, GitHub o Apple en esta misma dirección.`,
-    why: "Recibiste este correo porque esta dirección está en la lista de espera de agentes.chat, o recibió una invitación a agentes.chat. No pasa nada hasta que te registres.",
+    why: "Recibiste este correo porque esta dirección está en la lista de espera de Ackwire AI, o recibió una invitación a Ackwire AI. No pasa nada hasta que te registres.",
   },
   earlyAccessAllowed: {
     subject: "Ya puedes crear tu propio espacio de trabajo",
     preheader: "Inicia sesión con la cuenta que ya tienes y configúralo.",
     headline: "Crea tu propio espacio de trabajo",
     body: (email) => [
-      "Ya puedes crear tu propio espacio de trabajo en agentes.chat con ",
+      "Ya puedes crear tu propio espacio de trabajo en Ackwire AI con ",
       { b: email },
       ", la cuenta que ya tienes.",
     ],
     button: "Crear mi espacio de trabajo",
-    why: "Recibiste este correo porque esta cuenta recibió acceso anticipado a agentes.chat.",
+    why: "Recibiste este correo porque esta cuenta recibió acceso anticipado a Ackwire AI.",
   },
   budget: {
     subject: {
@@ -214,7 +214,7 @@ export const words: EmailWords = {
     },
     button: { ai: "Conectar tu IA", task: "Dar una primera tarea", create: "Crear un agente" },
     why: (org) =>
-      `Recibiste este correo porque eres propietario de ${org} en agentes.chat. Es el único correo sobre esta computadora.`,
+      `Recibiste este correo porque eres propietario de ${org} en Ackwire AI. Es el único correo sobre esta computadora.`,
     personal: {
       body: () =>
         "Gracias por esperar. La computadora de tus agentes ya está encendida y configurada, con un usuario propio para cada agente. Queda encendida día y noche, para que tus agentes puedan trabajar a cualquier hora.",
@@ -222,7 +222,7 @@ export const words: EmailWords = {
         task: ["Da una primera tarea.", "Abre una conversación con uno de tus agentes y di lo que necesitas."],
       },
       why: () =>
-        "Recibiste este correo porque este espacio de trabajo en agentes.chat es tuyo. Es el único correo sobre esta computadora.",
+        "Recibiste este correo porque este espacio de trabajo en Ackwire AI es tuyo. Es el único correo sobre esta computadora.",
     },
   },
   joinRequest: {
@@ -267,7 +267,7 @@ export const words: EmailWords = {
       reason: (reason) => [{ b: "Su nota: " }, `“${reason}”`],
       small: "Si crees que es un error, pídele a alguien de ahí que te invite por correo.",
     },
-    why: (org) => `Recibiste este correo porque esta dirección pidió unirse a ${org} en agentes.chat.`,
+    why: (org) => `Recibiste este correo porque esta dirección pidió unirse a ${org} en Ackwire AI.`,
     personal: {
       joined: { body: (who) => `${who} aprobó tu solicitud. Ya estás en su espacio de trabajo.` },
       invited: { body: (who) => `${who} aprobó tu solicitud para unirte a su espacio de trabajo.` },
@@ -277,27 +277,27 @@ export const words: EmailWords = {
         small: "Si crees que es un error, pídele que te invite por correo.",
       },
       why: () =>
-        "Recibiste este correo porque esta dirección pidió unirse a un espacio de trabajo personal en agentes.chat.",
+        "Recibiste este correo porque esta dirección pidió unirse a un espacio de trabajo personal en Ackwire AI.",
     },
   },
   joinCode: {
-    subject: (code) => `${code} es tu código de agentes.chat`,
+    subject: (code) => `${code} es tu código de Ackwire AI`,
     preheader: "Escríbelo en la página para pedir unirte. Es válido por 10 minutos.",
     headline: "Tu código",
     body: (org) => ["Escribe este código en la página para pedir unirte a ", { b: org }, "."],
     small: ["Es válido por 10 minutos. Si no lo pediste, ", { nobr: "ignora este correo." }],
     why: (org) =>
-      `Recibiste este correo porque alguien escribió esta dirección para pedir unirse a ${org} en agentes.chat.`,
+      `Recibiste este correo porque alguien escribió esta dirección para pedir unirse a ${org} en Ackwire AI.`,
     personal: {
       body: () => "Escribe este código en la página para pedir unirte a este espacio de trabajo.",
       why: () =>
-        "Recibiste este correo porque alguien escribió esta dirección para pedir unirse a un espacio de trabajo personal en agentes.chat.",
+        "Recibiste este correo porque alguien escribió esta dirección para pedir unirse a un espacio de trabajo personal en Ackwire AI.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} es tu código para eliminar un espacio de trabajo`,
     subjectAccount: (code) => `${code} es tu código para eliminar toda tu cuenta`,
-    preheader: "Escríbelo en agentes.chat para confirmar. Es válido por 10 minutos.",
+    preheader: "Escríbelo en Ackwire AI para confirmar. Es válido por 10 minutos.",
     headline: "Tu código",
     workspace: (org) => [
       "Escribe este código para eliminar el espacio de trabajo ",
@@ -316,8 +316,8 @@ export const words: EmailWords = {
     ],
     noSupport:
       "Es válido por 10 minutos, y no se elimina nada sin él. Si no fuiste tú, no lo compartas y avisa a quienes administran este servidor.",
-    whyWorkspace: (org) => `Recibiste este correo porque tu cuenta pidió eliminar ${org} en agentes.chat.`,
-    whyAccount: "Recibiste este correo porque tu cuenta pidió eliminarse de agentes.chat.",
+    whyWorkspace: (org) => `Recibiste este correo porque tu cuenta pidió eliminar ${org} en Ackwire AI.`,
+    whyAccount: "Recibiste este correo porque tu cuenta pidió eliminarse de Ackwire AI.",
     personal: {
       workspace: (org) => [
         "Escribe este código para eliminar tu espacio de trabajo ",
@@ -339,10 +339,10 @@ export const words: EmailWords = {
     owner: "¿Cambiaste de opinión? Restáuralo antes de esa fecha.",
     button: "Restaurar el espacio de trabajo",
     member: "Si es un error, pídele a un propietario que lo restaure.",
-    why: (org) => `Recibiste este correo porque formas parte de ${org} en agentes.chat.`,
+    why: (org) => `Recibiste este correo porque formas parte de ${org} en Ackwire AI.`,
     personal: {
       member: "Si es un error, pídele a quien lo eliminó que lo restaure.",
-      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en agentes.chat.",
+      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en Ackwire AI.",
     },
   },
   restored: {
@@ -351,27 +351,27 @@ export const words: EmailWords = {
     headline: "El espacio de trabajo volvió",
     body: (by, org) => [{ b: by }, " restauró ", { b: org }, ". Funciona de nuevo."],
     button: "Abrir el espacio de trabajo",
-    why: (org) => `Recibiste este correo porque formas parte de ${org} en agentes.chat.`,
+    why: (org) => `Recibiste este correo porque formas parte de ${org} en Ackwire AI.`,
     personal: {
-      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en agentes.chat.",
+      why: () => "Recibiste este correo porque formas parte de este espacio de trabajo en Ackwire AI.",
     },
   },
   appConnected: {
-    subject: "Se conectó una app a tu cuenta de agentes.chat",
+    subject: "Se conectó una app a tu cuenta de Ackwire AI",
     preheader: "Puede leer y enviar tareas a los agentes en tu nombre en un espacio de trabajo.",
     headline: "Se conectó una app",
     body: (app, org) => [{ b: app }, " ahora tiene acceso a tu cuenta en ", { b: org }, "."],
     note: "¿No la conectaste tú? Desconéctala ahora y cambia tu contraseña.",
     button: "Ver apps conectadas",
-    why: (org) => `Recibiste este correo porque se conectó una app a tu cuenta en ${org} en agentes.chat.`,
+    why: (org) => `Recibiste este correo porque se conectó una app a tu cuenta en ${org} en Ackwire AI.`,
     personal: {
       body: (app) => [{ b: app }, " ahora tiene acceso a tu cuenta en tu espacio de trabajo personal."],
       why: () =>
-        "Recibiste este correo porque se conectó una app a tu cuenta en tu espacio de trabajo personal en agentes.chat.",
+        "Recibiste este correo porque se conectó una app a tu cuenta en tu espacio de trabajo personal en Ackwire AI.",
     },
   },
   accountDeleting: {
-    subject: (day) => `Tu cuenta de agentes.chat se eliminará el ${day}`,
+    subject: (day) => `Tu cuenta de Ackwire AI se eliminará el ${day}`,
     preheader: "Tienes 7 días para cambiar de opinión.",
     headline: "Tu cuenta se está eliminando",
     body: (email, day, time) => [
@@ -389,10 +389,10 @@ export const words: EmailWords = {
     ],
     undo: "¿Cambiaste de opinión? Inicia sesión antes de esa fecha y pulsa Restaurar.",
     button: "Iniciar sesión para restaurar",
-    why: "Recibiste este correo porque esta dirección tiene una cuenta en agentes.chat.",
+    why: "Recibiste este correo porque esta dirección tiene una cuenta en Ackwire AI.",
   },
   accountDeleted: {
-    subject: "Se eliminó tu cuenta de agentes.chat",
+    subject: "Se eliminó tu cuenta de Ackwire AI",
     preheader: "Se cerró la sesión en todas partes y ya no se puede volver a iniciar sesión.",
     headline: "Se eliminó tu cuenta",
     body: (email) => ["Eliminamos la cuenta ", { b: email }, "."],
@@ -406,7 +406,7 @@ export const words: EmailWords = {
     ],
     support: (address) => ["Si no fuiste tú, escribe a ", { mail: address }, "."],
     noSupport: "Si no fuiste tú, avisa a quienes administran este servidor.",
-    why: "Recibiste este correo porque esta dirección tenía una cuenta en agentes.chat.",
+    why: "Recibiste este correo porque esta dirección tenía una cuenta en Ackwire AI.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `Agentes el ${day}: ${stalls} atascos, ${noise} ejecuciones inútiles`,
@@ -486,29 +486,29 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Tu equipo está esperando",
-    preheader: "Tu espacio de trabajo está listo. Falta un plan de agentes.chat para empezar.",
+    preheader: "Tu espacio de trabajo está listo. Falta un plan de Ackwire AI para empezar.",
     headline: "Tu equipo está esperando",
     body: (agents, channels, routines) => {
       const a = plural("es", agents, { one: `1 agente`, other: `${agents} agentes` });
       const c = plural("es", channels, { one: `1 canal`, other: `${channels} canales` });
       const r = plural("es", routines, { one: `1 rutina`, other: `${routines} rutinas` });
       return routines > 0
-        ? `${a}, ${c} y ${r} están listos. Falta un plan de agentes.chat para que empiecen.`
-        : `${a} y ${c} están listos. Falta un plan de agentes.chat para que empiecen.`;
+        ? `${a}, ${c} y ${r} están listos. Falta un plan de Ackwire AI para que empiecen.`
+        : `${a} y ${c} están listos. Falta un plan de Ackwire AI para que empiecen.`;
     },
-    button: "Ver planes de agentes.chat",
+    button: "Ver planes de Ackwire AI",
     why: (org) =>
-      `Recibiste este correo porque administras ${org} en agentes.chat. Solo enviamos dos avisos como este.`,
+      `Recibiste este correo porque administras ${org} en Ackwire AI. Solo enviamos dos avisos como este.`,
     personal: {
       subject: "Tus agentes están esperando",
       headline: "Tus agentes están esperando",
       body: (agents, _channels, routines) => {
         const a = plural("es", agents, { one: `1 agente`, other: `${agents} agentes` });
         const r = plural("es", routines, { one: `1 rutina`, other: `${routines} rutinas` });
-        return `Todo listo: ${routines > 0 ? `${a} y ${r}` : a}. Solo falta un plan de agentes.chat.`;
+        return `Todo listo: ${routines > 0 ? `${a} y ${r}` : a}. Solo falta un plan de Ackwire AI.`;
       },
       why: () =>
-        "Recibiste este correo porque este espacio de trabajo en agentes.chat es tuyo. Solo enviamos dos avisos como este.",
+        "Recibiste este correo porque este espacio de trabajo en Ackwire AI es tuyo. Solo enviamos dos avisos como este.",
     },
   },
 };

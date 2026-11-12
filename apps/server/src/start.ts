@@ -197,7 +197,7 @@ async function boot(
   release: string,
   errors: ErrorReporter,
 ) {
-  log.info("starting agentes.chat", { version: release, edition, config: redactConfig(config) });
+  log.info("starting Ackwire AI", { version: release, edition, config: redactConfig(config) });
   log.info(
     "error reports",
     config.SENTRY_DSN

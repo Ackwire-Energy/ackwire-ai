@@ -22,41 +22,41 @@ export const atHost = (lead: string, word: string, host: string): Text =>
   host.length > 36 ? [`${lead} ${word} `, { nobr: `${host}.` }] : [`${lead} `, { nobr: `${word} ${host}.` }];
 
 export const en = {
-  /** Who sent it: agentes.chat, or a self-hosted server named by its host. */
+  /** Who sent it: Ackwire AI, or a self-hosted server named by its host. */
   sentBy: (host: string | null): Text =>
-    host ? atHost("Sent by the agentes.chat server", "at", host) : "Sent by agentes.chat.",
+    host ? atHost("Sent by the Ackwire AI server", "at", host) : "Sent by Ackwire AI.",
   fallback: "Button not working? Copy this address into your browser:",
   role: { owner: "an owner", member: "a member" } as Record<string, string>,
   anAgent: "An agent",
   someone: "Someone",
   verify: {
-    subject: "Confirm your email for agentes.chat",
+    subject: "Confirm your email for Ackwire AI",
     preheader: "One click to confirm this address. The link works for an hour.",
     headline: "Confirm your email",
     body: "One step left: confirm that this address is yours.",
     button: "Confirm email",
     small: "The link works for an hour. If you didn't sign up, you can ignore this email.",
-    why: "You got this email because this address was used to sign up for agentes.chat.",
+    why: "You got this email because this address was used to sign up for Ackwire AI.",
   },
   reset: {
-    subject: "Reset your agentes.chat password",
+    subject: "Reset your Ackwire AI password",
     preheader: "Choose a new password. The link works for an hour.",
     headline: "Choose a new password",
     body: "We got a request to reset the password for this address.",
     button: "Choose a new password",
     note: "Didn't ask for this? Ignore this email. Your password stays the same.",
     small: "The link works for an hour.",
-    why: "You got this email because someone asked to reset the password for this address on agentes.chat.",
+    why: "You got this email because someone asked to reset the password for this address on Ackwire AI.",
   },
   invitation: {
-    subject: "You're invited to a workspace on agentes.chat",
+    subject: "You're invited to a workspace on Ackwire AI",
     preheader: "Accept within 7 days, with this email address.",
     headline: "You're invited to a workspace",
     body: (inviter: string, email: string | null, org: string, role: string): Text =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to join `, { b: org }, ` as ${role}.`]
         : ["You're invited to join ", { b: org }, ` as ${role}.`],
-    what: "agentes.chat is where people and AI agents work together.",
+    what: "Ackwire AI is where people and AI agents work together.",
     noteFrom: (inviter: string, note: string): Text => [{ b: inviter ? `${inviter}: ` : "Their note: " }, `“${note}”`],
     button: "Accept invitation",
     small: "The invitation works for 7 days. Accept it with this email address.",
@@ -66,8 +66,8 @@ export const en = {
     personal: {
       body: (inviter: string, email: string | null): Text =>
         inviter
-          ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to their personal workspace on agentes.chat.`]
-          : "You're invited to a personal workspace on agentes.chat.",
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} invited you to their personal workspace on Ackwire AI.`]
+          : "You're invited to a personal workspace on Ackwire AI.",
       why: () =>
         "You got this email because someone invited this address to their personal workspace. If you don't know them, ignore it. Nothing happens until you accept.",
     },
@@ -104,41 +104,41 @@ export const en = {
     },
   },
   waitlist: {
-    subject: "Confirm your spot on the agentes.chat waiting list",
+    subject: "Confirm your spot on the Ackwire AI waiting list",
     preheader: "One click and your spot is saved.",
     headline: "Confirm your spot on the list",
     body: (email: string | null): Text =>
       email
-        ? ["We got a request to put ", { b: email }, " on the agentes.chat waiting list."]
-        : "We got a request to put this address on the agentes.chat waiting list.",
+        ? ["We got a request to put ", { b: email }, " on the Ackwire AI waiting list."]
+        : "We got a request to put this address on the Ackwire AI waiting list.",
     approve: "Here, nothing important happens without a person approving it. That goes for this request too.",
     button: "Confirm my email",
     small:
       "The link works for 48 hours. Wasn't you? Ignore this email. Without the click, the address never joins the list.",
-    why: "You got this email because this address was entered on the agentes.chat waiting list.",
+    why: "You got this email because this address was entered on the Ackwire AI waiting list.",
   },
   earlyAccess: {
-    subject: "Your invitation to agentes.chat is here",
+    subject: "Your invitation to Ackwire AI is here",
     preheader: (days: number) => `Create your account within ${days} days, with this email address.`,
     headline: "Your access is ready",
-    body: (email: string): Text => [{ b: email }, " can now create an account and a workspace on agentes.chat."],
-    what: "agentes.chat is where people and AI agents work together.",
+    body: (email: string): Text => [{ b: email }, " can now create an account and a workspace on Ackwire AI."],
+    what: "Ackwire AI is where people and AI agents work together.",
     button: "Create my account",
     small: (days: number) =>
       `The link works for ${days} days, for this address only. Sign up with a password, or with Google, GitHub or Apple on this same address.`,
-    why: "You got this email because this address is on the agentes.chat waiting list, or was invited to agentes.chat. Nothing happens until you sign up.",
+    why: "You got this email because this address is on the Ackwire AI waiting list, or was invited to Ackwire AI. Nothing happens until you sign up.",
   },
   earlyAccessAllowed: {
     subject: "You can now create your own workspace",
     preheader: "Sign in with the account you already have and set it up.",
     headline: "Create your own workspace",
     body: (email: string): Text => [
-      "You can now create your own workspace on agentes.chat with ",
+      "You can now create your own workspace on Ackwire AI with ",
       { b: email },
       ", the account you already have.",
     ],
     button: "Create my workspace",
-    why: "You got this email because this account was given early access to agentes.chat.",
+    why: "You got this email because this account was given early access to Ackwire AI.",
   },
   budget: {
     subject: {
@@ -227,7 +227,7 @@ export const en = {
     },
     button: { ai: "Connect your AI", task: "Give a first task", create: "Create an agent" },
     why: (org: string) =>
-      `You got this email because you own ${org} on agentes.chat. It's the only email about this computer.`,
+      `You got this email because you own ${org} on Ackwire AI. It's the only email about this computer.`,
     /** A personal workspace's (ADR 0159): the person's computer for their agents, who they talk to directly. */
     personal: {
       body: (): Text =>
@@ -236,7 +236,7 @@ export const en = {
         task: ["Give a first task.", "Open a conversation with one of your agents and say what you need."] as Step,
       },
       why: () =>
-        "You got this email because this workspace on agentes.chat is yours. It's the only email about this computer.",
+        "You got this email because this workspace on Ackwire AI is yours. It's the only email about this computer.",
     },
   },
   joinRequest: {
@@ -285,7 +285,7 @@ export const en = {
       reason: (reason: string): Text => [{ b: "Their note: " }, `“${reason}”`],
       small: "If you think it's a mistake, ask someone there to invite you by email.",
     },
-    why: (org: string) => `You got this email because this address asked to join ${org} on agentes.chat.`,
+    why: (org: string) => `You got this email because this address asked to join ${org} on Ackwire AI.`,
     /** Joining someone's personal workspace (ADR 0159): the person who answered, not a company. */
     personal: {
       joined: { body: (who: string): Text => `${who} approved your request. You're in their workspace now.` },
@@ -295,27 +295,27 @@ export const en = {
         body: (): Text => "The person you asked looked at your request and didn't approve it.",
         small: "If you think it's a mistake, ask them to invite you by email.",
       },
-      why: () => "You got this email because this address asked to join a personal workspace on agentes.chat.",
+      why: () => "You got this email because this address asked to join a personal workspace on Ackwire AI.",
     },
   },
   joinCode: {
-    subject: (code: string) => `${code} is your agentes.chat code`,
+    subject: (code: string) => `${code} is your Ackwire AI code`,
     preheader: "Type it on the page to ask to join. It works for 10 minutes.",
     headline: "Your code",
     body: (org: string): Text => ["Type this code on the page to ask to join ", { b: org }, "."],
     small: ["It works for 10 minutes. If you didn't ask, ", { nobr: "ignore this email." }] as Text,
     why: (org: string) =>
-      `You got this email because someone typed this address to ask to join ${org} on agentes.chat.`,
+      `You got this email because someone typed this address to ask to join ${org} on Ackwire AI.`,
     personal: {
       body: (): Text => "Type this code on the page to ask to join this workspace.",
       why: () =>
-        "You got this email because someone typed this address to ask to join a personal workspace on agentes.chat.",
+        "You got this email because someone typed this address to ask to join a personal workspace on Ackwire AI.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code: string) => `${code} is your code to delete a workspace`,
     subjectAccount: (code: string) => `${code} is your code to delete your whole account`,
-    preheader: "Type it in agentes.chat to confirm. It works for 10 minutes.",
+    preheader: "Type it in Ackwire AI to confirm. It works for 10 minutes.",
     headline: "Your code",
     workspace: (org: string): Text => [
       "Type this code to delete the workspace ",
@@ -334,8 +334,8 @@ export const en = {
     ],
     noSupport:
       "It works for 10 minutes, and nothing is deleted without it. If it wasn't you, don't share it and tell the people who run this server." as Text,
-    whyWorkspace: (org: string) => `You got this email because your account asked to delete ${org} on agentes.chat.`,
-    whyAccount: "You got this email because your account asked to be deleted on agentes.chat.",
+    whyWorkspace: (org: string) => `You got this email because your account asked to delete ${org} on Ackwire AI.`,
+    whyAccount: "You got this email because your account asked to be deleted on Ackwire AI.",
     personal: {
       workspace: (org: string): Text => [
         "Type this code to delete your workspace ",
@@ -357,10 +357,10 @@ export const en = {
     owner: "Changed your mind? Restore it before then.",
     button: "Restore the workspace",
     member: "If it's a mistake, ask an owner to restore it." as Text,
-    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+    why: (org: string) => `You got this email because you're in ${org} on Ackwire AI.`,
     personal: {
       member: "If it's a mistake, ask whoever deleted it to restore it." as Text,
-      why: () => "You got this email because you're in this workspace on agentes.chat.",
+      why: () => "You got this email because you're in this workspace on Ackwire AI.",
     },
   },
   restored: {
@@ -369,27 +369,27 @@ export const en = {
     headline: "The workspace is back",
     body: (by: string, org: string): Text => [{ b: by }, " restored ", { b: org }, ". It works again."],
     button: "Open the workspace",
-    why: (org: string) => `You got this email because you're in ${org} on agentes.chat.`,
+    why: (org: string) => `You got this email because you're in ${org} on Ackwire AI.`,
     personal: {
-      why: () => "You got this email because you're in this workspace on agentes.chat.",
+      why: () => "You got this email because you're in this workspace on Ackwire AI.",
     },
   },
   appConnected: {
-    subject: "An app was connected to your agentes.chat account",
+    subject: "An app was connected to your Ackwire AI account",
     preheader: "It can read and send tasks to agents as you in one workspace.",
     headline: "An app was connected",
     body: (app: string, org: string): Text => [{ b: app }, " now has access to your account in ", { b: org }, "."],
     note: "Didn't connect it? Disconnect it now and change your password.",
     button: "See connected apps",
-    why: (org: string) => `You got this email because an app was connected to your account in ${org} on agentes.chat.`,
+    why: (org: string) => `You got this email because an app was connected to your account in ${org} on Ackwire AI.`,
     personal: {
       body: (app: string): Text => [{ b: app }, " now has access to your account in your personal workspace."],
       why: () =>
-        "You got this email because an app was connected to your account in your personal workspace on agentes.chat.",
+        "You got this email because an app was connected to your account in your personal workspace on Ackwire AI.",
     },
   },
   accountDeleting: {
-    subject: (day: string) => `Your agentes.chat account will be deleted on ${day}`,
+    subject: (day: string) => `Your Ackwire AI account will be deleted on ${day}`,
     preheader: "You have 7 days to change your mind.",
     headline: "Your account is being deleted",
     body: (email: string, day: string, time: string): Text => [
@@ -407,10 +407,10 @@ export const en = {
     ],
     undo: "Changed your mind? Sign in before that date and press Restore.",
     button: "Sign in to restore",
-    why: "You got this email because this address has an account on agentes.chat.",
+    why: "You got this email because this address has an account on Ackwire AI.",
   },
   accountDeleted: {
-    subject: "Your agentes.chat account was deleted",
+    subject: "Your Ackwire AI account was deleted",
     preheader: "It's signed out everywhere and can't sign in again.",
     headline: "Your account was deleted",
     body: (email: string): Text => ["We deleted the account ", { b: email }, "."],
@@ -424,7 +424,7 @@ export const en = {
     ],
     support: (address: string): Text => ["If it wasn't you, write to ", { mail: address }, "."],
     noSupport: "If it wasn't you, tell the people who run this server." as Text,
-    why: "You got this email because this address had an account on agentes.chat.",
+    why: "You got this email because this address had an account on Ackwire AI.",
   },
   autonomy: {
     subject: (day: string, stalls: string, noise: string) => `Agents on ${day}: ${stalls} stalls, ${noise} noise runs`,
@@ -504,16 +504,16 @@ export const en = {
   },
   planWaiting: {
     subject: "Your team is waiting",
-    preheader: "Your workspace is ready. It needs an agentes.chat plan to start.",
+    preheader: "Your workspace is ready. It needs an Ackwire AI plan to start.",
     headline: "Your team is waiting",
     body: (agents: number, channels: number, routines: number): Text => {
       const a = plural("en", agents, { one: "1 agent", other: `${agents} agents` });
       const c = plural("en", channels, { one: "1 channel", other: `${channels} channels` });
       const r = plural("en", routines, { one: "1 routine", other: `${routines} routines` });
-      return `${routines > 0 ? `${a}, ${c} and ${r}` : `${a} and ${c}`} are ready. They need an agentes.chat plan to start.`;
+      return `${routines > 0 ? `${a}, ${c} and ${r}` : `${a} and ${c}`} are ready. They need an Ackwire AI plan to start.`;
     },
-    button: "See agentes.chat plans",
-    why: (org: string) => `You got this email because you run ${org} on agentes.chat. We send two of these, then stop.`,
+    button: "See Ackwire AI plans",
+    why: (org: string) => `You got this email because you run ${org} on Ackwire AI. We send two of these, then stop.`,
     /** A personal workspace's (ADR 0159): the person's agents and routines, no team nor channels. */
     personal: {
       subject: "Your agents are waiting",
@@ -521,9 +521,9 @@ export const en = {
       body: (agents: number, _channels: number, routines: number): Text => {
         const a = plural("en", agents, { one: "1 agent", other: `${agents} agents` });
         const r = plural("en", routines, { one: "1 routine", other: `${routines} routines` });
-        return `Ready to go: ${routines > 0 ? `${a} and ${r}` : a}. All that's missing is an agentes.chat plan.`;
+        return `Ready to go: ${routines > 0 ? `${a} and ${r}` : a}. All that's missing is an Ackwire AI plan.`;
       },
-      why: () => "You got this email because this workspace on agentes.chat is yours. We send two of these, then stop.",
+      why: () => "You got this email because this workspace on Ackwire AI is yours. We send two of these, then stop.",
     },
   },
 };

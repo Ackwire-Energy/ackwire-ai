@@ -21,7 +21,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
   const updated = new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "UTC" }).format(
     new Date(`${doc.updated}T00:00:00Z`),
   );
-  useDocumentTitle(`${doc.title} · agentes.chat`);
+  useDocumentTitle(`${doc.title} · Ackwire AI`);
 
   return (
     <div className="legal" lang={lang}>

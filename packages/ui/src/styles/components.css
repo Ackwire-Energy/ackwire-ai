@@ -901,10 +901,10 @@ textarea.ac-input {
 }
 /* The agent's outline in the agents' sky (fixed, like the pixel agents), not the --agent accent token. */
 .ac-icon .ac-brain-body {
-  stroke: #0063d1;
+  stroke: #3f7a12;
 }
 .ac-icon .ac-brain-eye {
-  fill: #0063d1;
+  fill: #3f7a12;
   stroke: none;
 }
 [data-theme="dark"] .ac-icon .ac-brain-cc {
@@ -914,10 +914,10 @@ textarea.ac-input {
   stroke: #5cc3bd;
 }
 [data-theme="dark"] .ac-icon .ac-brain-body {
-  stroke: #5aa8ff;
+  stroke: #90ed42;
 }
 [data-theme="dark"] .ac-icon .ac-brain-eye {
-  fill: #5aa8ff;
+  fill: #90ed42;
 }
 .ac-brain-icon--off {
   opacity: 0.45;
@@ -2039,15 +2039,14 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   white-space: nowrap;
 }
 
-/* Logo: the agent mark + the wordmark set in Onest */
+/* Logo: the Ackwire "A" + the wordmark, bold and tight as the brand's (Gilroy ExtraBold; the app's sans stands in) */
 .ac-logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.16em;
-  /* Funnel Display light (the landing's headings); the app falls back to its sans. */
+  gap: 0.28em;
   font-family: var(--font-brand, var(--font-display, var(--font-sans)));
-  font-weight: 300;
-  letter-spacing: -0.02em;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--ink);
   line-height: 1;
   font-size: 24px;
@@ -2057,46 +2056,23 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   height: 1.25em;
   flex: none;
 }
+/* The "A" in the accent: Solar Green on dark, its deep shade on light (Solar Green fails contrast on white). */
 .ac-logo__body {
   fill: var(--agent);
-}
-/* Eyes are white on every agent, in both themes. */
-.ac-logo__eyes {
-  fill: #ffffff;
-}
-.ac-logo__tld {
-  color: var(--ink-muted);
-  font-weight: 600;
-}
-.ac-logo__dither {
-  image-rendering: pixelated;
 }
 .ac-logo--mono .ac-logo__body {
   fill: currentColor;
 }
-.ac-logo--mono .ac-logo__dither {
-  display: none;
-}
-.ac-logo--mono .ac-logo__eyes {
-  fill: var(--surface);
-}
 .ac-logo__word {
   display: inline-flex;
   align-items: baseline;
+  gap: 0.24em;
 }
-/* ".chat" in dot matrix (Doto, rounded dots), smaller and quieter than the name. */
-.ac-logo__chat {
-  font-family: var(--font-dot, var(--font-mono));
-  font-variation-settings: "ROND" 100;
-  font-size: 0.62em;
-  font-weight: 600;
-  letter-spacing: 0;
-  margin-left: 0.08em;
-  color: var(--ink-muted);
+.ac-logo__ai {
+  color: var(--agent);
 }
-.ac-logo--mono .ac-logo__chat {
-  background: var(--ink);
-  color: var(--surface);
+.ac-logo--mono .ac-logo__ai {
+  color: inherit;
 }
 
 /* Select: our own trigger + listbox, never the native <select> */

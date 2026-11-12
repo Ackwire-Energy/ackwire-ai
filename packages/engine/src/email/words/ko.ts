@@ -10,40 +10,40 @@ import type { EmailWords } from "./index";
 export const words: EmailWords = {
   sentBy: (host) =>
     host
-      ? ["이 메일은 ", { nobr: host }, "의 agentes.chat 서버에서 보냈어요."]
-      : "이 메일은 agentes.chat에서 보냈어요.",
+      ? ["이 메일은 ", { nobr: host }, "의 Ackwire AI 서버에서 보냈어요."]
+      : "이 메일은 Ackwire AI에서 보냈어요.",
   fallback: "버튼이 작동하지 않나요? 이 주소를 브라우저에 복사해 붙여넣으세요.",
   role: { owner: "소유자", member: "멤버" },
   anAgent: "에이전트",
   someone: "누군가",
   verify: {
-    subject: "agentes.chat 이메일을 인증해 주세요",
+    subject: "Ackwire AI 이메일을 인증해 주세요",
     preheader: "클릭 한 번이면 이 주소가 인증돼요. 링크는 1시간 동안 유효해요.",
     headline: "이메일을 인증해 주세요",
     body: "이제 한 단계만 남았어요. 이 주소가 본인의 것인지 확인해 주세요.",
     button: "이메일 인증",
     small: "링크는 1시간 동안 유효해요. 가입한 적이 없다면 이 메일은 무시하세요.",
-    why: "이 주소로 agentes.chat에 가입해서 이 메일을 보내 드렸어요.",
+    why: "이 주소로 Ackwire AI에 가입해서 이 메일을 보내 드렸어요.",
   },
   reset: {
-    subject: "agentes.chat 비밀번호를 재설정하세요",
+    subject: "Ackwire AI 비밀번호를 재설정하세요",
     preheader: "새 비밀번호를 정하세요. 링크는 1시간 동안 유효해요.",
     headline: "새 비밀번호 정하기",
     body: "이 주소의 비밀번호를 재설정해 달라는 요청을 받았어요.",
     button: "새 비밀번호 정하기",
     note: "요청한 적이 없나요? 이 메일은 무시하세요. 비밀번호는 그대로예요.",
     small: "링크는 1시간 동안 유효해요.",
-    why: "누군가 agentes.chat에서 이 주소의 비밀번호 재설정을 요청해서 이 메일을 보내 드렸어요.",
+    why: "누군가 Ackwire AI에서 이 주소의 비밀번호 재설정을 요청해서 이 메일을 보내 드렸어요.",
   },
   invitation: {
-    subject: "agentes.chat 워크스페이스에 초대받았어요",
+    subject: "Ackwire AI 워크스페이스에 초대받았어요",
     preheader: "7일 안에 이 이메일 주소로 수락하세요.",
     headline: "워크스페이스에 초대받았어요",
     body: (inviter, email, org, role) =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} 님이 `, { b: org }, `에 ${role}로 초대했어요.`]
         : [{ b: org }, `에 ${role}로 초대받았어요.`],
-    what: "agentes.chat은 사람과 AI 에이전트가 함께 일하는 곳이에요.",
+    what: "Ackwire AI은 사람과 AI 에이전트가 함께 일하는 곳이에요.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "보낸 메시지: " }, `“${note}”`],
     button: "초대 수락",
     small: "초대는 7일 동안 유효해요. 이 이메일 주소로 수락하세요.",
@@ -52,8 +52,8 @@ export const words: EmailWords = {
     personal: {
       body: (inviter, email) =>
         inviter
-          ? [{ b: inviter }, `${email ? ` (${email})` : ""} 님이 agentes.chat의 개인 워크스페이스에 초대했어요.`]
-          : "agentes.chat의 개인 워크스페이스에 초대받았어요.",
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} 님이 Ackwire AI의 개인 워크스페이스에 초대했어요.`]
+          : "Ackwire AI의 개인 워크스페이스에 초대받았어요.",
       why: () =>
         "누군가 이 주소를 개인 워크스페이스에 초대해서 이 메일을 보내 드렸어요. 모르는 사람이라면 무시하세요. 수락하기 전에는 아무 일도 일어나지 않아요.",
     },
@@ -90,29 +90,29 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "agentes.chat 대기자 명단 등록을 확인해 주세요",
+    subject: "Ackwire AI 대기자 명단 등록을 확인해 주세요",
     preheader: "클릭 한 번이면 자리가 확보돼요.",
     headline: "대기자 명단 등록 확인",
     body: (email) =>
       email
-        ? [{ b: email }, " 주소를 agentes.chat 대기자 명단에 올려 달라는 요청을 받았어요."]
-        : "이 주소를 agentes.chat 대기자 명단에 올려 달라는 요청을 받았어요.",
+        ? [{ b: email }, " 주소를 Ackwire AI 대기자 명단에 올려 달라는 요청을 받았어요."]
+        : "이 주소를 Ackwire AI 대기자 명단에 올려 달라는 요청을 받았어요.",
     approve: "여기서는 중요한 일은 사람이 승인해야만 일어나요. 이 요청도 마찬가지예요.",
     button: "이메일 확인",
     small:
       "링크는 48시간 동안 유효해요. 본인이 아닌가요? 이 메일은 무시하세요. 클릭하지 않으면 명단에 올라가지 않아요.",
-    why: "이 주소가 agentes.chat 대기자 명단에 입력되어 이 메일을 보내 드렸어요.",
+    why: "이 주소가 Ackwire AI 대기자 명단에 입력되어 이 메일을 보내 드렸어요.",
   },
   earlyAccess: {
-    subject: "agentes.chat 초대가 도착했어요",
+    subject: "Ackwire AI 초대가 도착했어요",
     preheader: (days) => `${days}일 안에 이 이메일 주소로 계정을 만드세요.`,
     headline: "이용할 준비가 됐어요",
-    body: (email) => [{ b: email }, " 주소로 이제 agentes.chat에서 계정과 워크스페이스를 만들 수 있어요."],
-    what: "agentes.chat은 사람과 AI 에이전트가 함께 일하는 곳이에요.",
+    body: (email) => [{ b: email }, " 주소로 이제 Ackwire AI에서 계정과 워크스페이스를 만들 수 있어요."],
+    what: "Ackwire AI은 사람과 AI 에이전트가 함께 일하는 곳이에요.",
     button: "계정 만들기",
     small: (days) =>
       `링크는 ${days}일 동안 이 주소에서만 유효해요. 비밀번호로 가입하거나, 같은 주소의 Google, GitHub, Apple 계정으로 가입하세요.`,
-    why: "이 주소가 agentes.chat 대기자 명단에 있거나 agentes.chat에 초대받아서 이 메일을 보내 드렸어요. 가입하기 전에는 아무 일도 일어나지 않아요.",
+    why: "이 주소가 Ackwire AI 대기자 명단에 있거나 Ackwire AI에 초대받아서 이 메일을 보내 드렸어요. 가입하기 전에는 아무 일도 일어나지 않아요.",
   },
   earlyAccessAllowed: {
     subject: "이제 나만의 워크스페이스를 만들 수 있어요",
@@ -121,10 +121,10 @@ export const words: EmailWords = {
     body: (email) => [
       "이제 지금 쓰는 계정 ",
       { b: email },
-      "(으)로 agentes.chat에서 나만의 워크스페이스를 만들 수 있어요.",
+      "(으)로 Ackwire AI에서 나만의 워크스페이스를 만들 수 있어요.",
     ],
     button: "워크스페이스 만들기",
-    why: "이 계정에 agentes.chat 얼리 액세스가 열려서 이 메일을 보내 드렸어요.",
+    why: "이 계정에 Ackwire AI 얼리 액세스가 열려서 이 메일을 보내 드렸어요.",
   },
   budget: {
     subject: {
@@ -199,7 +199,7 @@ export const words: EmailWords = {
     },
     button: { ai: "AI 연결", task: "첫 작업 맡기기", create: "에이전트 만들기" },
     why: (org) =>
-      `agentes.chat에서 ${org}의 소유자여서 이 메일을 보내 드렸어요. 이 컴퓨터에 관한 메일은 이것 하나뿐이에요.`,
+      `Ackwire AI에서 ${org}의 소유자여서 이 메일을 보내 드렸어요. 이 컴퓨터에 관한 메일은 이것 하나뿐이에요.`,
     personal: {
       body: () =>
         "기다려 주셔서 감사해요. 내 에이전트의 컴퓨터가 켜졌고 설정도 끝났어요. 에이전트마다 전용 사용자가 있어요. 밤낮으로 켜져 있어서 에이전트가 언제든 일할 수 있어요.",
@@ -207,7 +207,7 @@ export const words: EmailWords = {
         task: ["첫 작업을 맡기세요.", "내 에이전트 중 하나와 대화를 열고 필요한 걸 말하세요."] as Step,
       },
       why: () =>
-        "agentes.chat의 이 워크스페이스가 내 것이어서 이 메일을 보내 드렸어요. 이 컴퓨터에 관한 메일은 이것 하나뿐이에요.",
+        "Ackwire AI의 이 워크스페이스가 내 것이어서 이 메일을 보내 드렸어요. 이 컴퓨터에 관한 메일은 이것 하나뿐이에요.",
     },
   },
   joinRequest: {
@@ -251,7 +251,7 @@ export const words: EmailWords = {
       reason: (reason) => [{ b: "남긴 메모: " }, `“${reason}”`],
       small: "착오라고 생각되면 그곳의 누군가에게 이메일로 초대해 달라고 하세요.",
     },
-    why: (org) => `이 주소로 agentes.chat의 ${org}에 참여를 요청해서 이 메일을 보내 드렸어요.`,
+    why: (org) => `이 주소로 Ackwire AI의 ${org}에 참여를 요청해서 이 메일을 보내 드렸어요.`,
     personal: {
       joined: { body: (who) => `${who} 님이 요청을 승인했어요. 이제 워크스페이스에 참여했어요.` },
       invited: { body: (who) => `${who} 님이 워크스페이스 참여 요청을 승인했어요.` },
@@ -260,25 +260,25 @@ export const words: EmailWords = {
         body: () => "요청을 받은 사람이 확인했지만 승인하지 않았어요.",
         small: "착오라고 생각되면 그 사람에게 이메일로 초대해 달라고 하세요.",
       },
-      why: () => "이 주소로 agentes.chat의 개인 워크스페이스에 참여를 요청해서 이 메일을 보내 드렸어요.",
+      why: () => "이 주소로 Ackwire AI의 개인 워크스페이스에 참여를 요청해서 이 메일을 보내 드렸어요.",
     },
   },
   joinCode: {
-    subject: (code) => `agentes.chat 인증 코드: ${code}`,
+    subject: (code) => `Ackwire AI 인증 코드: ${code}`,
     preheader: "페이지에 입력하면 참여를 요청할 수 있어요. 10분 동안 유효해요.",
     headline: "인증 코드",
     body: (org) => ["이 코드를 페이지에 입력하면 ", { b: org }, "에 참여를 요청할 수 있어요."],
     small: ["10분 동안 유효해요. 요청한 적이 없다면 ", { nobr: "이 메일은 무시하세요." }],
-    why: (org) => `누군가 agentes.chat의 ${org}에 참여하려고 이 주소를 입력해서 이 메일을 보내 드렸어요.`,
+    why: (org) => `누군가 Ackwire AI의 ${org}에 참여하려고 이 주소를 입력해서 이 메일을 보내 드렸어요.`,
     personal: {
       body: () => "이 코드를 페이지에 입력하면 이 워크스페이스에 참여를 요청할 수 있어요.",
-      why: () => "누군가 agentes.chat의 개인 워크스페이스에 참여하려고 이 주소를 입력해서 이 메일을 보내 드렸어요.",
+      why: () => "누군가 Ackwire AI의 개인 워크스페이스에 참여하려고 이 주소를 입력해서 이 메일을 보내 드렸어요.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `워크스페이스 삭제 코드: ${code}`,
     subjectAccount: (code) => `계정 전체 삭제 코드: ${code}`,
-    preheader: "agentes.chat에 입력해서 확인하세요. 10분 동안 유효해요.",
+    preheader: "Ackwire AI에 입력해서 확인하세요. 10분 동안 유효해요.",
     headline: "인증 코드",
     workspace: (org) => [
       "이 코드를 입력하면 워크스페이스 ",
@@ -297,8 +297,8 @@ export const words: EmailWords = {
     ],
     noSupport:
       "10분 동안 유효하고, 이 코드 없이는 아무것도 삭제되지 않아요. 본인이 아니라면 공유하지 말고 이 서버 운영자에게 알려 주세요.",
-    whyWorkspace: (org) => `내 계정에서 agentes.chat의 ${org} 삭제를 요청해서 이 메일을 보내 드렸어요.`,
-    whyAccount: "내 계정에서 agentes.chat 계정 삭제를 요청해서 이 메일을 보내 드렸어요.",
+    whyWorkspace: (org) => `내 계정에서 Ackwire AI의 ${org} 삭제를 요청해서 이 메일을 보내 드렸어요.`,
+    whyAccount: "내 계정에서 Ackwire AI 계정 삭제를 요청해서 이 메일을 보내 드렸어요.",
     personal: {
       workspace: (org) => [
         "이 코드를 입력하면 내 워크스페이스 ",
@@ -320,10 +320,10 @@ export const words: EmailWords = {
     owner: "마음이 바뀌었나요? 그 전에 복원하세요.",
     button: "워크스페이스 복원",
     member: "착오라면 소유자에게 복원을 요청하세요.",
-    why: (org) => `agentes.chat의 ${org}에 참여 중이어서 이 메일을 보내 드렸어요.`,
+    why: (org) => `Ackwire AI의 ${org}에 참여 중이어서 이 메일을 보내 드렸어요.`,
     personal: {
       member: "착오라면 삭제한 사람에게 복원을 요청하세요.",
-      why: () => "agentes.chat의 이 워크스페이스에 참여 중이어서 이 메일을 보내 드렸어요.",
+      why: () => "Ackwire AI의 이 워크스페이스에 참여 중이어서 이 메일을 보내 드렸어요.",
     },
   },
   restored: {
@@ -332,26 +332,26 @@ export const words: EmailWords = {
     headline: "워크스페이스가 돌아왔어요",
     body: (by, org) => [{ b: by }, " 님이 ", { b: org }, "을(를) 복원했어요. 다시 사용할 수 있어요."],
     button: "워크스페이스 열기",
-    why: (org) => `agentes.chat의 ${org}에 참여 중이어서 이 메일을 보내 드렸어요.`,
+    why: (org) => `Ackwire AI의 ${org}에 참여 중이어서 이 메일을 보내 드렸어요.`,
     personal: {
-      why: () => "agentes.chat의 이 워크스페이스에 참여 중이어서 이 메일을 보내 드렸어요.",
+      why: () => "Ackwire AI의 이 워크스페이스에 참여 중이어서 이 메일을 보내 드렸어요.",
     },
   },
   appConnected: {
-    subject: "agentes.chat 계정에 앱이 연결됐어요",
+    subject: "Ackwire AI 계정에 앱이 연결됐어요",
     preheader: "한 워크스페이스에서 나 대신 에이전트의 작업을 읽고 보낼 수 있어요.",
     headline: "앱이 연결됐어요",
     body: (app, org) => [{ b: app }, "에서 이제 ", { b: org }, "의 내 계정에 접근할 수 있어요."],
     note: "직접 연결하지 않았나요? 지금 연결을 끊고 비밀번호를 바꾸세요.",
     button: "연결된 앱 보기",
-    why: (org) => `agentes.chat의 ${org}에서 내 계정에 앱이 연결되어 이 메일을 보내 드렸어요.`,
+    why: (org) => `Ackwire AI의 ${org}에서 내 계정에 앱이 연결되어 이 메일을 보내 드렸어요.`,
     personal: {
       body: (app) => [{ b: app }, "에서 이제 개인 워크스페이스의 내 계정에 접근할 수 있어요."],
-      why: () => "agentes.chat 개인 워크스페이스에서 내 계정에 앱이 연결되어 이 메일을 보내 드렸어요.",
+      why: () => "Ackwire AI 개인 워크스페이스에서 내 계정에 앱이 연결되어 이 메일을 보내 드렸어요.",
     },
   },
   accountDeleting: {
-    subject: (day) => `agentes.chat 계정이 ${day}에 삭제돼요`,
+    subject: (day) => `Ackwire AI 계정이 ${day}에 삭제돼요`,
     preheader: "마음을 바꿀 수 있는 시간은 7일이에요.",
     headline: "계정을 삭제하고 있어요",
     body: (email, day, time) => [
@@ -362,17 +362,17 @@ export const words: EmailWords = {
     closes: (_count, names) => ["나만 있던 워크스페이스는 지금 닫혔고 같은 날 삭제돼요: ", ...names, "."],
     undo: "마음이 바뀌었나요? 그 전에 로그인해서 복원을 누르세요.",
     button: "로그인해서 복원",
-    why: "이 주소로 agentes.chat 계정이 있어서 이 메일을 보내 드렸어요.",
+    why: "이 주소로 Ackwire AI 계정이 있어서 이 메일을 보내 드렸어요.",
   },
   accountDeleted: {
-    subject: "agentes.chat 계정이 삭제됐어요",
+    subject: "Ackwire AI 계정이 삭제됐어요",
     preheader: "모든 기기에서 로그아웃됐고 다시 로그인할 수 없어요.",
     headline: "계정이 삭제됐어요",
     body: (email) => ["계정 ", { b: email }, "을(를) 삭제했어요."],
     closes: (_count, day, names) => [`나만 있던 워크스페이스는 닫혔고 ${day}에 완전히 삭제돼요: `, ...names, "."],
     support: (address) => ["본인이 아니라면 ", { mail: address }, "(으)로 연락해 주세요."],
     noSupport: "본인이 아니라면 이 서버 운영자에게 알려 주세요.",
-    why: "이 주소로 agentes.chat 계정이 있어서 이 메일을 보내 드렸어요.",
+    why: "이 주소로 Ackwire AI 계정이 있어서 이 메일을 보내 드렸어요.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `${day} 에이전트: 멈춤 ${stalls}건, 헛실행 ${noise}건`,
@@ -452,27 +452,27 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "팀이 기다리고 있어요",
-    preheader: "워크스페이스가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.",
+    preheader: "워크스페이스가 준비됐어요. 시작하려면 Ackwire AI 요금제가 필요해요.",
     headline: "팀이 기다리고 있어요",
     body: (agents, channels, routines) => {
       const a = `에이전트 ${agents}개`;
       const c = `채널 ${channels}개`;
       const r = `루틴 ${routines}개`;
       return routines > 0
-        ? `${a}, ${c}, ${r}가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.`
-        : `${a}, ${c}가 준비됐어요. 시작하려면 agentes.chat 요금제가 필요해요.`;
+        ? `${a}, ${c}, ${r}가 준비됐어요. 시작하려면 Ackwire AI 요금제가 필요해요.`
+        : `${a}, ${c}가 준비됐어요. 시작하려면 Ackwire AI 요금제가 필요해요.`;
     },
-    button: "agentes.chat 요금제 보기",
-    why: (org) => `agentes.chat에서 ${org}을(를) 운영하고 있어서 이 메일을 보내드려요. 이런 알림은 두 번만 보내요.`,
+    button: "Ackwire AI 요금제 보기",
+    why: (org) => `Ackwire AI에서 ${org}을(를) 운영하고 있어서 이 메일을 보내드려요. 이런 알림은 두 번만 보내요.`,
     personal: {
       subject: "내 에이전트가 기다리고 있어요",
       headline: "내 에이전트가 기다리고 있어요",
       body: (agents, _channels, routines) => {
         const a = `에이전트 ${agents}개`;
         const r = `루틴 ${routines}개`;
-        return `${routines > 0 ? `${a}와 ${r}` : a}가 준비됐어요. 이제 agentes.chat 요금제만 있으면 돼요.`;
+        return `${routines > 0 ? `${a}와 ${r}` : a}가 준비됐어요. 이제 Ackwire AI 요금제만 있으면 돼요.`;
       },
-      why: () => "agentes.chat의 이 워크스페이스가 내 것이어서 이 메일을 보내 드렸어요. 이런 알림은 두 번만 보내요.",
+      why: () => "Ackwire AI의 이 워크스페이스가 내 것이어서 이 메일을 보내 드렸어요. 이런 알림은 두 번만 보내요.",
     },
   },
 };

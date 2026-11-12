@@ -38,7 +38,7 @@ export const strings: Partial<PushStrings> = {
   browserHandoffBody: "Tippe, um den Bildschirm zu öffnen.",
   desktopHandoffTitle: (a) => `${a} braucht dich am Computer`,
   desktopHandoffReminderTitle: (a) => `${a} braucht dich noch am Computer`,
-  desktopHandoffBody: "Öffne agentes.chat auf einem Laptop, um zu helfen.",
+  desktopHandoffBody: "Öffne Ackwire AI auf einem Laptop, um zu helfen.",
   secretTitle: (a) => `${a} braucht ein Secret von dir`,
   secretBody: "Tippe, um es sicher zu senden.",
   widgetAlertTitle: (a, w) => (w ? `${a}: ${w}` : `${a} hat ein Widget markiert`),

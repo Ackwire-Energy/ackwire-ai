@@ -34,7 +34,7 @@ describe("computer portraits on the phone (cells for Skia)", () => {
 
   test("offline: no sky on the screen; cells become unit squares", () => {
     const sky = (state: "online" | "offline") =>
-      portraitFrame("mac", state, false, 0).some((r) => r.color === "#0063d1" || r.color === "#2f80e0");
+      portraitFrame("mac", state, false, 0).some((r) => r.color === "#3f7a12" || r.color === "#6cba2c");
     expect(sky("online")).toBe(true);
     expect(sky("offline")).toBe(false);
     expect(cellsToSvg([1, 2, 3, 4])).toBe("M1 2h1v1h-1ZM3 4h1v1h-1Z");

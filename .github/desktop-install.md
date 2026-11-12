@@ -7,7 +7,7 @@ The desktop app is in beta: the Mac build isn't notarized by Apple yet and the W
 
 ![Open the app, click Done, then Open Anyway in Privacy & Security](https://github.com/{{repo}}/raw/main/docs/images/first-open-mac.png)
 
-If the button never shows up, or macOS says the app is damaged, run `xattr -dr com.apple.quarantine /Applications/agentes.chat.app` in Terminal and open it again.
+If the button never shows up, or macOS says the app is damaged, run `xattr -dr com.apple.quarantine "/Applications/Ackwire AI.app"` in Terminal and open it again.
 
 **Windows** (`x64-setup.exe`, or `arm64-setup.exe` on an ARM computer): if your browser asks, choose **Keep**. When **Windows protected your PC** shows up, click **More info**, then **Run anyway**.
 

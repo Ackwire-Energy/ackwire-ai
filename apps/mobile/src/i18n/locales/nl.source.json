@@ -57,7 +57,7 @@
     "value": "Change"
   },
   "auth.server.title": {
-    "value": "Where is your agentes.chat?"
+    "value": "Where is your Ackwire AI?"
   },
   "auth.server.subtitle": {
     "value": "The address your team opens in the browser."
@@ -120,13 +120,13 @@
     "value": "The certificate of {{host}} isn't valid. Talk to whoever runs the server."
   },
   "auth.server.notAgentes": {
-    "value": "{{host}} isn't an agentes.chat server. Check the address."
+    "value": "{{host}} isn't an Ackwire AI server. Check the address."
   },
   "auth.server.serverTooOld": {
     "value": "{{host}} needs an update to work with this app."
   },
   "auth.server.appTooOld": {
-    "value": "Update the agentes app to use {{host}}."
+    "value": "Update the Ackwire AI app to use {{host}}."
   },
   "auth.server.down.line": {
     "value": "{{host}} didn't answer."
@@ -168,7 +168,7 @@
     "value": "Checking the server…"
   },
   "auth.connect.notALink": {
-    "value": "This link isn't from an agentes.chat server."
+    "value": "This link isn't from an Ackwire AI server."
   },
   "auth.connect.tokenFailed": {
     "value": "The code expired or was already used. Sign in with your email, or show a new code on the computer."
@@ -183,7 +183,7 @@
     "value": "Type the address"
   },
   "auth.scan.notOurs": {
-    "value": "This QR code isn't from an agentes.chat server."
+    "value": "This QR code isn't from an Ackwire AI server."
   },
   "auth.scan.cameraTitle": {
     "value": "Use the camera"

@@ -7,39 +7,39 @@ import type { EmailWords } from "./index";
  * forms with `plural("de", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? atHost("Gesendet vom agentes.chat-Server", "auf", host) : "Gesendet von agentes.chat."),
+  sentBy: (host) => (host ? atHost("Gesendet vom agentes.chat-Server", "auf", host) : "Gesendet von Ackwire AI."),
   fallback: "Der Button funktioniert nicht? Kopiere diese Adresse in deinen Browser:",
   role: { owner: "Inhaber", member: "Mitglied" },
   anAgent: "Ein Agent",
   someone: "Jemand",
   verify: {
-    subject: "Bestätige deine E-Mail-Adresse für agentes.chat",
+    subject: "Bestätige deine E-Mail-Adresse für Ackwire AI",
     preheader: "Ein Klick, um diese Adresse zu bestätigen. Der Link gilt eine Stunde lang.",
     headline: "Bestätige deine E-Mail-Adresse",
     body: "Nur noch ein Schritt: Bestätige, dass diese Adresse dir gehört.",
     button: "E-Mail-Adresse bestätigen",
     small: "Der Link gilt eine Stunde lang. Wenn du dich nicht registriert hast, kannst du diese E-Mail ignorieren.",
-    why: "Du erhältst diese E-Mail, weil mit dieser Adresse ein Konto bei agentes.chat erstellt wurde.",
+    why: "Du erhältst diese E-Mail, weil mit dieser Adresse ein Konto bei Ackwire AI erstellt wurde.",
   },
   reset: {
-    subject: "Setze dein Passwort für agentes.chat zurück",
+    subject: "Setze dein Passwort für Ackwire AI zurück",
     preheader: "Wähle ein neues Passwort. Der Link gilt eine Stunde lang.",
     headline: "Wähle ein neues Passwort",
     body: "Wir haben eine Anfrage erhalten, das Passwort für diese Adresse zurückzusetzen.",
     button: "Neues Passwort wählen",
     note: "Das warst nicht du? Ignoriere diese E-Mail. Dein Passwort bleibt, wie es ist.",
     small: "Der Link gilt eine Stunde lang.",
-    why: "Du erhältst diese E-Mail, weil jemand das Passwort für diese Adresse bei agentes.chat zurücksetzen wollte.",
+    why: "Du erhältst diese E-Mail, weil jemand das Passwort für diese Adresse bei Ackwire AI zurücksetzen wollte.",
   },
   invitation: {
-    subject: "Du bist zu einem Workspace auf agentes.chat eingeladen",
+    subject: "Du bist zu einem Workspace auf Ackwire AI eingeladen",
     preheader: "Nimm die Einladung innerhalb von 7 Tagen mit dieser E-Mail-Adresse an.",
     headline: "Du bist zu einem Workspace eingeladen",
     body: (inviter, email, org, role) =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} lädt dich ein, `, { b: org }, ` als ${role} beizutreten.`]
         : ["Du bist eingeladen, ", { b: org }, ` als ${role} beizutreten.`],
-    what: "Auf agentes.chat arbeiten Menschen und KI-Agenten zusammen.",
+    what: "Auf Ackwire AI arbeiten Menschen und KI-Agenten zusammen.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Nachricht: " }, `„${note}“`],
     button: "Einladung annehmen",
     small: "Die Einladung gilt 7 Tage lang. Nimm sie mit dieser E-Mail-Adresse an.",
@@ -50,9 +50,9 @@ export const words: EmailWords = {
         inviter
           ? [
               { b: inviter },
-              `${email ? ` (${email})` : ""} lädt dich in einen persönlichen Workspace auf agentes.chat ein.`,
+              `${email ? ` (${email})` : ""} lädt dich in einen persönlichen Workspace auf Ackwire AI ein.`,
             ]
-          : "Du bist zu einem persönlichen Workspace auf agentes.chat eingeladen.",
+          : "Du bist zu einem persönlichen Workspace auf Ackwire AI eingeladen.",
       why: () =>
         "Du erhältst diese E-Mail, weil jemand diese Adresse in einen persönlichen Workspace eingeladen hat. Wenn du die Person nicht kennst, ignoriere sie einfach. Es passiert nichts, solange du nicht annimmst.",
     },
@@ -91,29 +91,29 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "Bestätige deinen Platz auf der Warteliste von agentes.chat",
+    subject: "Bestätige deinen Platz auf der Warteliste von Ackwire AI",
     preheader: "Ein Klick und dein Platz ist gesichert.",
     headline: "Bestätige deinen Platz auf der Liste",
     body: (email) =>
       email
-        ? ["Wir haben eine Anfrage erhalten, ", { b: email }, " auf die Warteliste von agentes.chat zu setzen."]
-        : "Wir haben eine Anfrage erhalten, diese Adresse auf die Warteliste von agentes.chat zu setzen.",
+        ? ["Wir haben eine Anfrage erhalten, ", { b: email }, " auf die Warteliste von Ackwire AI zu setzen."]
+        : "Wir haben eine Anfrage erhalten, diese Adresse auf die Warteliste von Ackwire AI zu setzen.",
     approve: "Bei uns passiert nichts Wichtiges, ohne dass ein Mensch es freigibt. Das gilt auch für diese Anfrage.",
     button: "Meine E-Mail-Adresse bestätigen",
     small:
       "Der Link gilt 48 Stunden lang. Das warst nicht du? Ignoriere diese E-Mail. Ohne den Klick kommt die Adresse nie auf die Liste.",
-    why: "Du erhältst diese E-Mail, weil diese Adresse auf der Warteliste von agentes.chat eingetragen wurde.",
+    why: "Du erhältst diese E-Mail, weil diese Adresse auf der Warteliste von Ackwire AI eingetragen wurde.",
   },
   earlyAccess: {
-    subject: "Deine Einladung zu agentes.chat ist da",
+    subject: "Deine Einladung zu Ackwire AI ist da",
     preheader: (days) => `Erstelle dein Konto innerhalb von ${days} Tagen mit dieser E-Mail-Adresse.`,
     headline: "Dein Zugang ist bereit",
-    body: (email) => [{ b: email }, " kann jetzt ein Konto und einen Workspace auf agentes.chat erstellen."],
-    what: "Auf agentes.chat arbeiten Menschen und KI-Agenten zusammen.",
+    body: (email) => [{ b: email }, " kann jetzt ein Konto und einen Workspace auf Ackwire AI erstellen."],
+    what: "Auf Ackwire AI arbeiten Menschen und KI-Agenten zusammen.",
     button: "Mein Konto erstellen",
     small: (days) =>
       `Der Link gilt ${days} Tage lang und nur für diese Adresse. Registriere dich mit einem Passwort oder mit Google, GitHub oder Apple unter derselben Adresse.`,
-    why: "Du erhältst diese E-Mail, weil diese Adresse auf der Warteliste von agentes.chat steht oder zu agentes.chat eingeladen wurde. Es passiert nichts, solange du dich nicht registrierst.",
+    why: "Du erhältst diese E-Mail, weil diese Adresse auf der Warteliste von Ackwire AI steht oder zu Ackwire AI eingeladen wurde. Es passiert nichts, solange du dich nicht registrierst.",
   },
   earlyAccessAllowed: {
     subject: "Du kannst jetzt deinen eigenen Workspace erstellen",
@@ -122,10 +122,10 @@ export const words: EmailWords = {
     body: (email) => [
       "Du kannst jetzt mit ",
       { b: email },
-      ", deinem bestehenden Konto, deinen eigenen Workspace auf agentes.chat erstellen.",
+      ", deinem bestehenden Konto, deinen eigenen Workspace auf Ackwire AI erstellen.",
     ],
     button: "Meinen Workspace erstellen",
-    why: "Du erhältst diese E-Mail, weil dieses Konto frühen Zugang zu agentes.chat bekommen hat.",
+    why: "Du erhältst diese E-Mail, weil dieses Konto frühen Zugang zu Ackwire AI bekommen hat.",
   },
   budget: {
     subject: {
@@ -215,7 +215,7 @@ export const words: EmailWords = {
     },
     button: { ai: "KI verbinden", task: "Erste Aufgabe geben", create: "Agenten erstellen" },
     why: (org) =>
-      `Du erhältst diese E-Mail, weil du Inhaber von ${org} auf agentes.chat bist. Es ist die einzige E-Mail zu diesem Computer.`,
+      `Du erhältst diese E-Mail, weil du Inhaber von ${org} auf Ackwire AI bist. Es ist die einzige E-Mail zu diesem Computer.`,
     personal: {
       body: () =>
         "Danke fürs Warten. Der Computer deiner Agenten ist an und eingerichtet, mit einem eigenen Benutzer für jeden Agenten. Er läuft Tag und Nacht, damit deine Agenten jederzeit arbeiten können.",
@@ -223,7 +223,7 @@ export const words: EmailWords = {
         task: ["Gib eine erste Aufgabe.", "Öffne eine Unterhaltung mit einem deiner Agenten und sag, was du brauchst."],
       },
       why: () =>
-        "Du erhältst diese E-Mail, weil dieser Workspace auf agentes.chat dir gehört. Es ist die einzige E-Mail zu diesem Computer.",
+        "Du erhältst diese E-Mail, weil dieser Workspace auf Ackwire AI dir gehört. Es ist die einzige E-Mail zu diesem Computer.",
     },
   },
   joinRequest: {
@@ -273,7 +273,7 @@ export const words: EmailWords = {
       small: "Wenn du denkst, dass das ein Fehler ist, bitte jemanden dort, dich per E-Mail einzuladen.",
     },
     why: (org) =>
-      `Du erhältst diese E-Mail, weil mit dieser Adresse der Beitritt zu ${org} auf agentes.chat angefragt wurde.`,
+      `Du erhältst diese E-Mail, weil mit dieser Adresse der Beitritt zu ${org} auf Ackwire AI angefragt wurde.`,
     personal: {
       joined: { body: (who) => `${who} hat deine Anfrage freigegeben. Du bist jetzt im Workspace.` },
       invited: { body: (who) => `${who} hat deine Anfrage freigegeben, dem Workspace beizutreten.` },
@@ -283,27 +283,27 @@ export const words: EmailWords = {
         small: "Wenn du denkst, dass das ein Fehler ist, bitte sie, dich per E-Mail einzuladen.",
       },
       why: () =>
-        "Du erhältst diese E-Mail, weil mit dieser Adresse der Beitritt zu einem persönlichen Workspace auf agentes.chat angefragt wurde.",
+        "Du erhältst diese E-Mail, weil mit dieser Adresse der Beitritt zu einem persönlichen Workspace auf Ackwire AI angefragt wurde.",
     },
   },
   joinCode: {
-    subject: (code) => `${code} ist dein Code für agentes.chat`,
+    subject: (code) => `${code} ist dein Code für Ackwire AI`,
     preheader: "Gib ihn auf der Seite ein, um den Beitritt anzufragen. Er gilt 10 Minuten lang.",
     headline: "Dein Code",
     body: (org) => ["Gib diesen Code auf der Seite ein, um den Beitritt zu ", { b: org }, " anzufragen."],
     small: ["Er gilt 10 Minuten lang. Wenn du nichts angefragt hast, ", { nobr: "ignoriere diese E-Mail." }],
     why: (org) =>
-      `Du erhältst diese E-Mail, weil jemand diese Adresse eingegeben hat, um den Beitritt zu ${org} auf agentes.chat anzufragen.`,
+      `Du erhältst diese E-Mail, weil jemand diese Adresse eingegeben hat, um den Beitritt zu ${org} auf Ackwire AI anzufragen.`,
     personal: {
       body: () => "Gib diesen Code auf der Seite ein, um den Beitritt zu diesem Workspace anzufragen.",
       why: () =>
-        "Du erhältst diese E-Mail, weil jemand diese Adresse eingegeben hat, um den Beitritt zu einem persönlichen Workspace auf agentes.chat anzufragen.",
+        "Du erhältst diese E-Mail, weil jemand diese Adresse eingegeben hat, um den Beitritt zu einem persönlichen Workspace auf Ackwire AI anzufragen.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} ist dein Code zum Löschen eines Workspace`,
     subjectAccount: (code) => `${code} ist dein Code zum Löschen deines ganzen Kontos`,
-    preheader: "Gib ihn in agentes.chat ein, um zu bestätigen. Er gilt 10 Minuten lang.",
+    preheader: "Gib ihn in Ackwire AI ein, um zu bestätigen. Er gilt 10 Minuten lang.",
     headline: "Dein Code",
     workspace: (org) => [
       "Gib diesen Code ein, um den Workspace ",
@@ -323,8 +323,8 @@ export const words: EmailWords = {
     noSupport:
       "Er gilt 10 Minuten lang, und ohne ihn wird nichts gelöscht. Wenn du das nicht warst, gib ihn nicht weiter und sag den Leuten Bescheid, die diesen Server betreiben.",
     whyWorkspace: (org) =>
-      `Du erhältst diese E-Mail, weil über dein Konto das Löschen von ${org} auf agentes.chat angefragt wurde.`,
-    whyAccount: "Du erhältst diese E-Mail, weil über dein Konto dessen Löschung auf agentes.chat angefragt wurde.",
+      `Du erhältst diese E-Mail, weil über dein Konto das Löschen von ${org} auf Ackwire AI angefragt wurde.`,
+    whyAccount: "Du erhältst diese E-Mail, weil über dein Konto dessen Löschung auf Ackwire AI angefragt wurde.",
     personal: {
       workspace: (org) => [
         "Gib diesen Code ein, um deinen Workspace ",
@@ -346,10 +346,10 @@ export const words: EmailWords = {
     owner: "Doch anders überlegt? Stell ihn vorher wieder her.",
     button: "Workspace wiederherstellen",
     member: "Wenn das ein Fehler ist, bitte einen Inhaber, ihn wiederherzustellen.",
-    why: (org) => `Du erhältst diese E-Mail, weil du in ${org} auf agentes.chat bist.`,
+    why: (org) => `Du erhältst diese E-Mail, weil du in ${org} auf Ackwire AI bist.`,
     personal: {
       member: "Wenn das ein Fehler ist, bitte die Person, die ihn gelöscht hat, ihn wiederherzustellen.",
-      why: () => "Du erhältst diese E-Mail, weil du in diesem Workspace auf agentes.chat bist.",
+      why: () => "Du erhältst diese E-Mail, weil du in diesem Workspace auf Ackwire AI bist.",
     },
   },
   restored: {
@@ -358,9 +358,9 @@ export const words: EmailWords = {
     headline: "Der Workspace ist wieder da",
     body: (by, org) => [{ b: by }, " hat ", { b: org }, " wiederhergestellt. Er funktioniert wieder."],
     button: "Workspace öffnen",
-    why: (org) => `Du erhältst diese E-Mail, weil du in ${org} auf agentes.chat bist.`,
+    why: (org) => `Du erhältst diese E-Mail, weil du in ${org} auf Ackwire AI bist.`,
     personal: {
-      why: () => "Du erhältst diese E-Mail, weil du in diesem Workspace auf agentes.chat bist.",
+      why: () => "Du erhältst diese E-Mail, weil du in diesem Workspace auf Ackwire AI bist.",
     },
   },
   appConnected: {
@@ -371,11 +371,11 @@ export const words: EmailWords = {
     note: "Das warst nicht du? Trenne die Verbindung sofort und ändere dein Passwort.",
     button: "Verbundene Apps ansehen",
     why: (org) =>
-      `Du erhältst diese E-Mail, weil eine App mit deinem Konto in ${org} auf agentes.chat verbunden wurde.`,
+      `Du erhältst diese E-Mail, weil eine App mit deinem Konto in ${org} auf Ackwire AI verbunden wurde.`,
     personal: {
       body: (app) => [{ b: app }, " hat jetzt Zugriff auf dein Konto in deinem persönlichen Workspace."],
       why: () =>
-        "Du erhältst diese E-Mail, weil eine App mit deinem Konto in deinem persönlichen Workspace auf agentes.chat verbunden wurde.",
+        "Du erhältst diese E-Mail, weil eine App mit deinem Konto in deinem persönlichen Workspace auf Ackwire AI verbunden wurde.",
     },
   },
   accountDeleting: {
@@ -397,7 +397,7 @@ export const words: EmailWords = {
     ],
     undo: "Doch anders überlegt? Melde dich vor diesem Datum an und tippe auf Wiederherstellen.",
     button: "Anmelden und wiederherstellen",
-    why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf agentes.chat hat.",
+    why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf Ackwire AI hat.",
   },
   accountDeleted: {
     subject: "Dein agentes.chat-Konto wurde gelöscht",
@@ -414,7 +414,7 @@ export const words: EmailWords = {
     ],
     support: (address) => ["Wenn du das nicht warst, schreib an ", { mail: address }, "."],
     noSupport: "Wenn du das nicht warst, sag den Leuten Bescheid, die diesen Server betreiben.",
-    why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf agentes.chat hatte.",
+    why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf Ackwire AI hatte.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `Agenten am ${day}: ${stalls} Hänger, ${noise} Leerläufe`,
@@ -506,7 +506,7 @@ export const words: EmailWords = {
     },
     button: "agentes.chat-Tarife ansehen",
     why: (org) =>
-      `Du bekommst diese E-Mail, weil du ${org} auf agentes.chat leitest. Wir senden nur zwei solche Hinweise.`,
+      `Du bekommst diese E-Mail, weil du ${org} auf Ackwire AI leitest. Wir senden nur zwei solche Hinweise.`,
     personal: {
       subject: "Deine Agenten warten",
       headline: "Deine Agenten warten",
@@ -516,7 +516,7 @@ export const words: EmailWords = {
         return `Alles bereit: ${routines > 0 ? `${a} und ${r}` : a}. Es fehlt nur noch ein agentes.chat-Tarif.`;
       },
       why: () =>
-        "Du bekommst diese E-Mail, weil dieser Workspace auf agentes.chat dir gehört. Wir senden nur zwei solche Hinweise.",
+        "Du bekommst diese E-Mail, weil dieser Workspace auf Ackwire AI dir gehört. Wir senden nur zwei solche Hinweise.",
     },
   },
 };

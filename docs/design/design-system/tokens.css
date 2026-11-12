@@ -7,7 +7,7 @@
   --raised-2: #ffffff;
   --sunken: #f3f3f0;
   /* The app shell: the sidebar on the sky's paper (the faintest cool tint) and the work area beside it. */
-  --side: #f6f9fd;
+  --side: #f5f8f5;
   --pane: #ffffff;
   /* A sidebar row under the pointer, and the open one: one plate each, a step of ink into the paper. */
   --side-hover: color-mix(in srgb, var(--ink) 5%, var(--side));
@@ -21,9 +21,9 @@
   --ink2: #2a2a28;
   --muted: #5c5c58;
   --faint: #6f6f6a;
-  --agent: #0063d1;
-  --agent2: #3d8bff;
-  --agent-soft: #e3eefd;
+  --agent: #3f7a12;
+  --agent2: #90ed42;
+  --agent-soft: #e8f5dc;
   --on-agent: #ffffff;
   --ok: #1f7a45;
   --warn: #9a5b00;
@@ -43,17 +43,17 @@
   --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.16), inset 0 1px 1.5px rgba(0, 0, 0, 0.12);
 }
 [data-theme="dark"] {
-  --bg: #0f0f0e;
-  --raised: #1c1c1b;
-  --raised-2: #242423;
-  --sunken: #0a0a09;
+  --bg: #000000;
+  --raised: #161616;
+  --raised-2: #1f1f1f;
+  --sunken: #030303;
   /* Three columns, two steps: both sidebars a step under the chat (Discord's split). */
-  --side: #0b0d11;
-  --pane: #181817;
+  --side: #000000;
+  --pane: #0a0a0a;
   --side-hover: color-mix(in srgb, var(--ink) 6%, var(--side));
   --side-chosen: color-mix(in srgb, var(--ink) 14%, var(--side));
-  --glass: rgba(30, 30, 28, 0.86);
-  --glass-solid: #1e1e1c;
+  --glass: rgba(20, 20, 20, 0.86);
+  --glass-solid: #141414;
   --line: rgba(255, 255, 255, 0.1);
   --line2: rgba(255, 255, 255, 0.15);
   --line-strong: #71716c;
@@ -61,10 +61,10 @@
   --ink2: #d6d6d2;
   --muted: #a3a39e;
   --faint: #8f8f89;
-  --agent: #5aa8ff;
-  --agent2: #8cc3ff;
-  --agent-soft: #11253f;
-  --on-agent: #00203f;
+  --agent: #90ed42;
+  --agent2: #b8f582;
+  --agent-soft: #1a2e0c;
+  --on-agent: #031f1b;
   --ok: #5fc48a;
   --warn: #e0a84a;
   --warn-soft: #33260e;
@@ -80,7 +80,7 @@
   --scrim: rgba(0, 0, 0, 0.5);
   /* A black press shows only on a face it can darken: dark's chosen face sits lighter than a card, as light as the
      faint words on it allow (4.5:1), under light's shadow made deeper. */
-  --chosen-bg: #282827;
+  --chosen-bg: #262626;
   --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.9), inset 0 1px 1.5px rgba(0, 0, 0, 0.7);
 }
 :root,

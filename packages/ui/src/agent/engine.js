@@ -10,9 +10,9 @@
  * the eyes are the logo's: two narrow white pills.
  */
 
-/** Top and bottom of each agent color. Sky is the landing's blue, the same in both themes. */
+/** Top and bottom of each agent color. Sky (the default) is Ackwire's Solar Green, the same in both themes. */
 export const AGENT_GRADIENTS = {
-  sky: ["#8cc3ff", "#0063d1"],
+  sky: ["#b8f582", "#3f7a12"],
   indigo: ["#7d8bff", "#3f4fd6"],
   violet: ["#ae8cf7", "#6e45d1"],
   rose: ["#f58aa6", "#c9406a"],

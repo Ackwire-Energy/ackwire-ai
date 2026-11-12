@@ -28,7 +28,7 @@
     "server": {
       "line": "Servidor: {{host}} ·",
       "change": "Cambiar",
-      "title": "¿Dónde está tu agentes.chat?",
+      "title": "¿Dónde está tu Ackwire AI?",
       "subtitle": "La dirección que tu equipo abre en el navegador.",
       "label": "Dirección del servidor",
       "placeholder": "agentes.tuequipo.ts.net",
@@ -49,7 +49,7 @@
       "unreachable": "No logramos conectar con {{host}}. Revisa la dirección y tu conexión, e inténtalo de nuevo.",
       "unreachableTailscale": "No podemos llegar a {{host}}. Está en Tailscale: abre la app de Tailscale, conéctate e inténtalo de nuevo. ¿Ya estás conectado? La computadora del servidor puede estar dormida o con la app cerrada.",
       "certificate": "El certificado de {{host}} no es válido. Habla con quien administra el servidor.",
-      "notAgentes": "{{host}} no es un servidor de agentes.chat. Revisa la dirección.",
+      "notAgentes": "{{host}} no es un servidor de Ackwire AI. Revisa la dirección.",
       "serverTooOld": "{{host}} necesita una actualización para funcionar con esta app.",
       "appTooOld": "Actualiza la app de agentes para usar {{host}}.",
       "down": {
@@ -69,14 +69,14 @@
       "confirm": "Conectar",
       "notNow": "Ahora no",
       "checking": "Verificando el servidor…",
-      "notALink": "Este enlace no es de un servidor de agentes.chat.",
+      "notALink": "Este enlace no es de un servidor de Ackwire AI.",
       "tokenFailed": "El código venció o ya se usó. Inicia sesión con tu correo o muestra un código nuevo en la computadora.",
       "signInSlow": "Iniciar sesión está tardando más de lo normal. Inicia sesión con tu correo o muestra un código nuevo en la computadora."
     },
     "scan": {
       "hint": "Apunta al código QR de la computadora",
       "typeAddress": "Escribir la dirección",
-      "notOurs": "Este código QR no es de un servidor de agentes.chat.",
+      "notOurs": "Este código QR no es de un servidor de Ackwire AI.",
       "cameraTitle": "Usar la cámara",
       "cameraText": "Solo se usa para leer el código QR.",
       "allow": "Permitir la cámara",

@@ -1,6 +1,6 @@
 {
   "app.name": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "common.close": {
     "value": "Close"
@@ -72,7 +72,7 @@
     "value": "Your session ended. Sign in again to continue."
   },
   "common.newVersion": {
-    "value": "A new version of agentes.chat is out."
+    "value": "A new version of Ackwire AI is out."
   },
   "common.reload": {
     "value": "Reload"
@@ -141,7 +141,7 @@
     "value": "You're offline. Check your connection and try again."
   },
   "common.unreachable": {
-    "value": "Can't reach agentes.chat right now. Try again in a moment."
+    "value": "Can't reach Ackwire AI right now. Try again in a moment."
   },
   "roles.owner": {
     "value": "Owner"
@@ -1101,7 +1101,7 @@
     "value": "Open this server's owner link (it ends in /owner#claim=…), on this computer or on your phone."
   },
   "auth.flow.noPassword": {
-    "value": "This account signs in from the agentes.chat app."
+    "value": "This account signs in from the Ackwire AI app."
   },
   "auth.flow.noPasswordLead": {
     "value": "On the computer that runs this server, open the app and choose Add a password in Settings › Your account."
@@ -1110,7 +1110,7 @@
     "value": "Back to sign in"
   },
   "auth.flow.toAuthorizeApp": {
-    "value": "To connect an app to agentes.chat."
+    "value": "To connect an app to Ackwire AI."
   },
   "auth.desktop.browser": {
     "value": "Continue in your browser"
@@ -1137,7 +1137,7 @@
     "value": "Is this your app?"
   },
   "auth.desktop.confirmLead": {
-    "value": "This code should match the one shown by the agentes.chat app on your computer."
+    "value": "This code should match the one shown by the Ackwire AI app on your computer."
   },
   "auth.desktop.confirmYes": {
     "value": "Yes, sign the app in"
@@ -1149,7 +1149,7 @@
     "value": "All set."
   },
   "auth.desktop.doneLead": {
-    "value": "You're signed in to the agentes app. You can close this tab."
+    "value": "You're signed in to the Ackwire AI app. You can close this tab."
   },
   "auth.desktop.expired": {
     "value": "This request expired."
@@ -1197,19 +1197,19 @@
     "value": "Continue on this {{device}}"
   },
   "auth.desktopOwner.text": {
-    "value": "You set up agentes.chat on this {{device}}: no password needed."
+    "value": "You set up Ackwire AI on this {{device}}: no password needed."
   },
   "auth.server.into": {
     "value": "Signing in to <b>{{server}}</b>"
   },
   "auth.server.intoHere": {
-    "value": "Signing in to the agentes.chat <b>on this {{device}}</b>"
+    "value": "Signing in to the Ackwire AI <b>on this {{device}}</b>"
   },
   "auth.forgotHere.ownerTitle": {
     "value": "You don't need a password here."
   },
   "auth.forgotHere.ownerLead": {
-    "value": "You set up agentes.chat on this {{device}}. Sign in here, then create a new password."
+    "value": "You set up Ackwire AI on this {{device}}. Sign in here, then create a new password."
   },
   "auth.forgotHere.notOwner": {
     "value": "Not the account of whoever set it up? Ask an owner of your workspace for a new-password link."
@@ -1836,7 +1836,7 @@
     "value": "And you, what do you work on?"
   },
   "onboarding.flow.area.lead": {
-    "value": "Just so we know who uses agentes.chat."
+    "value": "Just so we know who uses Ackwire AI."
   },
   "onboarding.flow.area.skip": {
     "value": "Skip this step"
@@ -2013,7 +2013,7 @@
     "value": "<b>{{name}} plan</b>"
   },
   "onboarding.flow.plan.generic": {
-    "value": "An agentes.chat plan"
+    "value": "An Ackwire AI plan"
   },
   "onboarding.flow.plan.cancel": {
     "value": "Cancel anytime"
@@ -2157,7 +2157,7 @@
     "value": "your company"
   },
   "onboarding.purpose.title": {
-    "value": "What will you use agentes.chat for?"
+    "value": "What will you use Ackwire AI for?"
   },
   "onboarding.purpose.lead": {
     "value": "You can change this later, nothing is lost."
@@ -2328,7 +2328,7 @@
     "value": "Then paste this request into the app:"
   },
   "onboarding.import.aiApp.prompt": {
-    "value": "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in agentes.chat. First list what already exists there so nothing is duplicated."
+    "value": "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in Ackwire AI. First list what already exists there so nothing is duplicated."
   },
   "onboarding.import.aiApp.promptLabel": {
     "value": "Request for your AI app"
@@ -2346,7 +2346,7 @@
     "value": "Another app"
   },
   "onboarding.import.agenteschatName": {
-    "value": "agentes.chat"
+    "value": "Ackwire AI"
   },
   "onboarding.import.where.openbotrun": {
     "value": "Drop openbot-import.json (from Migrator by OpenBot) or openbot-transfer.json (from the instance transfer), or the .zip it came in."
@@ -2943,10 +2943,10 @@
     "value": "Sign in with your AI plan: no API key needed."
   },
   "onboarding.keyStep.paid": {
-    "value": "Your agentes.chat plan is active. Their computer is on its way."
+    "value": "Your Ackwire AI plan is active. Their computer is on its way."
   },
   "onboarding.keyStep.confirming": {
-    "value": "Confirming the payment for this workspace's agentes.chat plan."
+    "value": "Confirming the payment for this workspace's Ackwire AI plan."
   },
   "onboarding.keyStep.leadNoComputer": {
     "value": "Your agents think with an API key, or with your AI plan on a computer you connect."
@@ -2967,7 +2967,7 @@
     "value": "/month"
   },
   "onboarding.budget.noteKey": {
-    "value": "Only for API usage, charged by the key's provider, not by agentes.chat. When an agent reaches it, it stops and tells you. Plans don't count here."
+    "value": "Only for API usage, charged by the key's provider, not by Ackwire AI. When an agent reaches it, it stops and tells you. Plans don't count here."
   },
   "onboarding.budget.notePlatform": {
     "value": "Only for API usage. When an agent reaches it, it stops and tells you."
@@ -3105,7 +3105,7 @@
     "value": "Who else works with you?"
   },
   "onboarding.team.payment": {
-    "value": "You can invite your team once you choose an agentes.chat plan."
+    "value": "You can invite your team once you choose an Ackwire AI plan."
   },
   "onboarding.team.lead": {
     "value": "Invite them by email, or share the link."
@@ -3396,7 +3396,7 @@
     "value": "Right click"
   },
   "contextMenu.lookOurs": {
-    "value": "agentes.chat"
+    "value": "Ackwire AI"
   },
   "contextMenu.lookSystem": {
     "value": "System"
@@ -3462,10 +3462,10 @@
     "value": "<b>The app is in beta.</b> So the first time, your Mac asks you to confirm:"
   },
   "install.mac.drag": {
-    "value": "Drag agentes.chat to Applications."
+    "value": "Drag Ackwire AI to Applications."
   },
   "install.mac.dragLong": {
-    "value": "Open the downloaded file and drag agentes.chat to Applications."
+    "value": "Open the downloaded file and drag Ackwire AI to Applications."
   },
   "install.mac.blocked": {
     "value": "Open the app and click Done."
@@ -3534,13 +3534,13 @@
     "value": "Double-click the downloaded file and click Install, or paste this in the terminal:"
   },
   "install.linux.open": {
-    "value": "Open agentes.chat from your apps."
+    "value": "Open Ackwire AI from your apps."
   },
   "install.page.docTitle": {
-    "value": "Download the app · agentes.chat"
+    "value": "Download the app · Ackwire AI"
   },
   "install.page.title": {
-    "value": "Download the agentes.chat app"
+    "value": "Download the Ackwire AI app"
   },
   "install.page.beta": {
     "value": "Beta"
@@ -3549,7 +3549,7 @@
     "value": "Your workspace in a window of its own, with your system's notifications. With one click, agents work on this computer, in folders of their own."
   },
   "install.page.open": {
-    "value": "Open agentes.chat"
+    "value": "Open Ackwire AI"
   },
   "install.page.version": {
     "value": "Version {{version}}"
@@ -3579,7 +3579,7 @@
     "value": "Why does my computer ask to confirm?"
   },
   "install.page.whyText": {
-    "value": "agentes.chat is in beta: the Mac version isn't notarized by Apple yet, and the Windows installer doesn't carry a Microsoft certificate yet. Without them, your computer asks once before it opens an app downloaded from the internet. After that, it opens straight away and updates itself. Before the beta ends, this step goes away."
+    "value": "Ackwire AI is in beta: the Mac version isn't notarized by Apple yet, and the Windows installer doesn't carry a Microsoft certificate yet. Without them, your computer asks once before it opens an app downloaded from the internet. After that, it opens straight away and updates itself. Before the beta ends, this step goes away."
   },
   "install.page.openSource": {
     "value": "Open source"
@@ -4212,7 +4212,7 @@
     "value": "Your server"
   },
   "shell.serverHere": {
-    "value": "The agentes.chat on this {{device}}"
+    "value": "The Ackwire AI on this {{device}}"
   },
   "shell.serverStopped": {
     "value": "stopped"
@@ -4611,13 +4611,13 @@
     "value": "You already pinned 5 people. Unpin one to pin this one."
   },
   "openOnPhone.qr": {
-    "value": "QR code to sign in to the agentes app"
+    "value": "QR code to sign in to the Ackwire AI app"
   },
   "openOnPhone.making": {
     "value": "Making the code…"
   },
   "openOnPhone.stepApp": {
-    "value": "Install the agentes app on your phone."
+    "value": "Install the Ackwire AI app on your phone."
   },
   "openOnPhone.stepTailscale": {
     "value": "Install Tailscale on your phone and sign in with the same Tailscale account as this server."
@@ -4644,7 +4644,7 @@
     "value": "This server only opens on the computer it runs on, so your phone can't reach it."
   },
   "openOnPhone.localOnlyHow": {
-    "value": "In the agentes.chat app on that computer, turn on Reach it from your phone and teammates in Preferences › Servers. Then come back here."
+    "value": "In the Ackwire AI app on that computer, turn on Reach it from your phone and teammates in Preferences › Servers. Then come back here."
   },
   "team.title": {
     "value": "Team"
@@ -5733,10 +5733,10 @@
     "value": "I create your agents and connect your apps. Nothing changes unless you ask."
   },
   "rightHand.intro.heldLead": {
-    "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an agentes.chat plan."
+    "value": "Pick what your business does and the team shows up here. The agents start working once the workspace has an Ackwire AI plan."
   },
   "rightHand.intro.heldLeadPersonal": {
-    "value": "Pick what you want help with and your agents show up here. They start working once you have an agentes.chat plan."
+    "value": "Pick what you want help with and your agents show up here. They start working once you have an Ackwire AI plan."
   },
   "rightHand.intro.connect.title": {
     "value": "Connect an AI for the team"
@@ -6593,7 +6593,7 @@
     "value": "{{name}} can't answer now: the program on the plan's computer needs an update."
   },
   "noAi.rightHand.plan_tools": {
-    "value": "{{name}} stopped before answering: the plan's AI on that computer didn't stay within agentes.chat's tools."
+    "value": "{{name}} stopped before answering: the plan's AI on that computer didn't stay within Ackwire AI's tools."
   },
   "noAi.rightHand.model_limit": {
     "value": "{{name}} can't answer now: {{model}} reached its own limit on the plan. The plan's other models still work."
@@ -6617,7 +6617,7 @@
     "value": "I kept your message."
   },
   "noAi.kept.line": {
-    "value": "I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+    "value": "I'll answer here once the workspace has an Ackwire AI plan and an AI connected."
   },
   "noAi.kept.plan": {
     "value": "The plan brings the agents' computer, always on. The AI is the one you already pay for: Claude, ChatGPT and more, or an API key."
@@ -6629,7 +6629,7 @@
     "value": "Kept"
   },
   "noAi.kept.channel": {
-    "value": "Kept. The agents answer once the workspace has an agentes.chat plan."
+    "value": "Kept. The agents answer once the workspace has an Ackwire AI plan."
   },
   "noAi.receipt": {
     "value": "Nobody will answer: no AI connected"
@@ -6821,10 +6821,10 @@
     "value": "Only me"
   },
   "connectAi.billing": {
-    "value": "A plan signs in on the workspace's computer, and the computer comes with an active agentes.chat plan."
+    "value": "A plan signs in on the workspace's computer, and the computer comes with an active Ackwire AI plan."
   },
   "connectAi.billingWeb": {
-    "value": "Choose one on the web, at agentes.chat."
+    "value": "Choose one on the web, at Ackwire AI."
   },
   "connectAi.orPayGo": {
     "value": "Or pay as you go"
@@ -6932,7 +6932,7 @@
     "value": "Saved, but {{provider}} didn't answer, so the key couldn't be checked. If it fails, the chat says why."
   },
   "connectAi.key.closed": {
-    "value": "API keys open with the workspace's agentes.chat plan."
+    "value": "API keys open with the workspace's Ackwire AI plan."
   },
   "connectAi.key.notPlan": {
     "value": "A coding plan's key goes in its own option above."
@@ -8500,7 +8500,7 @@
     "value": "Clears {{when}}"
   },
   "presence.help.auto": {
-    "value": "Online while agentes.chat is open."
+    "value": "Online while Ackwire AI is open."
   },
   "presence.help.away": {
     "value": "Out for a while: people know answers may take time."
@@ -9652,7 +9652,7 @@
     "value": "Connections to {{name}}"
   },
   "vault.connections.note": {
-    "value": "Your agents read what is there when they need it. Nothing is copied into agentes.chat but names and addresses."
+    "value": "Your agents read what is there when they need it. Nothing is copied into Ackwire AI but names and addresses."
   },
   "vault.connections.error.auth_failed": {
     "value": "Sign-in refused"
@@ -11380,7 +11380,7 @@
     "value": "The exact action"
   },
   "approvals.panel.builtIn": {
-    "value": "agentes.chat tool"
+    "value": "Ackwire AI tool"
   },
   "approvals.panel.orgConnector": {
     "value": "Your workspace's connector"
@@ -11618,7 +11618,7 @@
     "value": "{{name}}'s changes saved."
   },
   "agent.builtinName": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "agent.builtinNote": {
     "value": "built-in permissions"
@@ -12449,7 +12449,7 @@
     "value": "Waiting"
   },
   "agentPage.work.steps.one": {
-    "value": "Click the agentes.chat icon by the clock"
+    "value": "Click the Ackwire AI icon by the clock"
   },
   "agentPage.work.steps.two": {
     "value": "Preferences"
@@ -12461,7 +12461,7 @@
     "value": "That's it. This page notices on its own, no reload needed."
   },
   "agentPage.work.steps.menuOpen": {
-    "value": "Open agentes"
+    "value": "Open Ackwire AI"
   },
   "agentPage.work.steps.menuPrefs": {
     "value": "Preferences…"
@@ -12927,7 +12927,7 @@
     "value": "One level per app"
   },
   "agentPage.access.builtin": {
-    "value": "Built into agentes"
+    "value": "Built into Ackwire AI"
   },
   "agentPage.access.builtinHelp": {
     "value": "Drive, tasks, memory and more"
@@ -14248,7 +14248,7 @@
     "value": "Turn the team on."
   },
   "agentSetup.firstRun.plan.todoDesc": {
-    "value": "With an agentes.chat plan, the agents start working."
+    "value": "With an Ackwire AI plan, the agents start working."
   },
   "agentSetup.firstRun.plan.action": {
     "value": "See plans"
@@ -14257,7 +14257,7 @@
     "value": "Turn your agents on."
   },
   "agentSetup.firstRun.plan.todoDescPersonal": {
-    "value": "With an agentes.chat plan, your agents start working."
+    "value": "With an Ackwire AI plan, your agents start working."
   },
   "agentSetup.firstRun.about.action": {
     "value": "Tell"
@@ -16055,13 +16055,13 @@
     "value": "This is how it reaches {{names}}"
   },
   "members.dialog.mail.from": {
-    "value": "agentes.chat · to {{to}}"
+    "value": "Ackwire AI · to {{to}}"
   },
   "members.dialog.mail.toMany": {
     "value": "{{email}} and {{count}} more"
   },
   "members.dialog.mail.subject": {
-    "value": "You're invited to a workspace on agentes.chat"
+    "value": "You're invited to a workspace on Ackwire AI"
   },
   "members.dialog.mail.headline": {
     "value": "You're invited to a workspace"
@@ -16073,7 +16073,7 @@
     "value": "<b>{{name}}:</b> “{{note}}”"
   },
   "members.dialog.mail.what": {
-    "value": "agentes.chat is where people and AI agents work together."
+    "value": "Ackwire AI is where people and AI agents work together."
   },
   "members.dialog.mail.button": {
     "value": "Accept invitation"
@@ -16527,7 +16527,7 @@
     "value": "If you ask for help, give the code {{id}}."
   },
   "empty.unreachableTitle": {
-    "value": "Can't reach agentes.chat"
+    "value": "Can't reach Ackwire AI"
   },
   "empty.unreachableText": {
     "value": "It may be restarting. This page opens by itself as soon as it's back."
@@ -18638,7 +18638,7 @@
     "value": "PR opened on GitHub"
   },
   "routines.event.issue.created": {
-    "value": "Task created in agentes"
+    "value": "Task created in Ackwire AI"
   },
   "routines.event.deploy.succeeded": {
     "value": "Deploy finished"
@@ -20218,7 +20218,7 @@
     "value": "File"
   },
   "missions.files.missionSub": {
-    "value": "Plan and rules · updated by agentes.chat"
+    "value": "Plan and rules · updated by Ackwire AI"
   },
   "missions.files.decisionsSub": {
     "value": "Approved decisions"
@@ -20395,7 +20395,7 @@
     "value": "Goal"
   },
   "missions.new.goalPlaceholder": {
-    "value": "E.g. build the agentes.chat mobile app in Expo, based on the current web app."
+    "value": "E.g. build the Ackwire AI mobile app in Expo, based on the current web app."
   },
   "missions.new.agent": {
     "value": "Agent"
@@ -22690,7 +22690,7 @@
     "value": "Jev"
   },
   "jev.about": {
-    "value": "A fast model by TypeSafe, made for quick decisions. agentes.chat asks it small questions, like who should answer. You pay TypeSafe directly."
+    "value": "A fast model by TypeSafe, made for quick decisions. Ackwire AI asks it small questions, like who should answer. You pay TypeSafe directly."
   },
   "jev.lead": {
     "value": "Helps your agents work as a team."
@@ -22920,7 +22920,7 @@
     "value": "OpenCode"
   },
   "aiAccounts.connect.needs.keys": {
-    "value": "Update agentes on the computer to use a plan's key"
+    "value": "Update Ackwire AI on the computer to use a plan's key"
   },
   "aiAccounts.connect.noComputer": {
     "value": "Accounts stay on a connected computer. Connect one of yours first."
@@ -22938,7 +22938,7 @@
     "value": "{{program}} is being updated on {{computer}}. This changes by itself when it's done."
   },
   "aiAccounts.connect.needsCloud.runnerOld": {
-    "value": "The agentes.chat program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done."
+    "value": "The Ackwire AI program on {{computer}} is out of date and an update is on its way. This changes by itself when it's done."
   },
   "aiAccounts.connect.needsCloud.execOff": {
     "value": "{{computer}} can't run {{program}} yet. We're on it, and this changes by itself."
@@ -22965,7 +22965,7 @@
     "value": "Your plans"
   },
   "aiAccounts.page.hint": {
-    "value": "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. agentes.chat keeps only its name, email and usage."
+    "value": "Each plan stays on the computer it was connected on, and whoever runs that computer can reach it. Ackwire AI keeps only its name, email and usage."
   },
   "aiAccounts.page.emptyTitle": {
     "value": "Use the AI plan you already pay for"
@@ -26044,13 +26044,13 @@
     "value": "The computer was connected without permission to run programs."
   },
   "brain.reasons.runner_old": {
-    "value": "Update the agentes.chat program on the computer to use it."
+    "value": "Update the Ackwire AI program on the computer to use it."
   },
   "brain.reasons.tool_off": {
-    "value": "{{program}} is turned off on {{computer}}. Turn it on there, in the agentes.chat app: Preferences → Tools."
+    "value": "{{program}} is turned off on {{computer}}. Turn it on there, in the Ackwire AI app: Preferences → Tools."
   },
   "brain.reasons.tool_offLinux": {
-    "value": "{{program}} is turned off on {{computer}}. Turn it on there, in the agentes.chat app or with {{command}}."
+    "value": "{{program}} is turned off on {{computer}}. Turn it on there, in the Ackwire AI app or with {{command}}."
   },
   "brain.reasons.not_installed": {
     "value": "{{program}} isn't installed on {{computer}}."
@@ -27334,7 +27334,7 @@
     "value": "Where to keep files"
   },
   "storage.agentes": {
-    "value": "agentes.chat storage"
+    "value": "Ackwire AI storage"
   },
   "storage.agentesText": {
     "value": "Your files stay in our storage, kept apart per workspace."
@@ -27358,7 +27358,7 @@
     "value": "Show the folder"
   },
   "storage.place.agentes": {
-    "value": "agentes.chat storage"
+    "value": "Ackwire AI storage"
   },
   "storage.place.server": {
     "value": "this server"
@@ -27511,10 +27511,10 @@
     "value": "GitHub repositories"
   },
   "githubApp.text": {
-    "value": "Where the agentes.chat app is installed, agents open pull requests, issues, comments and commits as the app, with the agent's name and who asked. Only {{org}} uses what you install from here."
+    "value": "Where the Ackwire AI app is installed, agents open pull requests, issues, comments and commits as the app, with the agent's name and who asked. Only {{org}} uses what you install from here."
   },
   "githubApp.install": {
-    "value": "Install the agentes.chat app"
+    "value": "Install the Ackwire AI app"
   },
   "githubApp.installMore": {
     "value": "Install on another account"
@@ -27523,7 +27523,7 @@
     "value": "No GitHub account yet."
   },
   "githubApp.usingAccount": {
-    "value": "Today agents show up on GitHub as {{account}}. Install the app so they show up as the agentes.chat app."
+    "value": "Today agents show up on GitHub as {{account}}. Install the app so they show up as the Ackwire AI app."
   },
   "githubApp.allRepos": {
     "value": "All repositories"
@@ -27550,7 +27550,7 @@
     "value": "Remove the app from {{account}}?"
   },
   "githubApp.removeText": {
-    "value": "The agentes.chat app is uninstalled from {{account}} on GitHub, and agents stop using that account's repositories through it."
+    "value": "The Ackwire AI app is uninstalled from {{account}} on GitHub, and agents stop using that account's repositories through it."
   },
   "githubApp.removeLast": {
     "value": "It's the last one, so agents lose GitHub until someone installs the app or connects an account."
@@ -27565,7 +27565,7 @@
     "value": "Open"
   },
   "githubApp.installed": {
-    "value": "agentes.chat app installed."
+    "value": "Ackwire AI app installed."
   },
   "githubApp.requested": {
     "value": "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace."
@@ -27577,7 +27577,7 @@
     "value": "That GitHub account is already linked to another workspace. Remove the app there before installing it here."
   },
   "githubApp.installedOutside": {
-    "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
+    "value": "The app was installed on that GitHub account outside Ackwire AI. Remove it on GitHub and install it again from Connectors › GitHub."
   },
   "githubApp.misconfigured": {
     "value": "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings."
@@ -27589,22 +27589,22 @@
     "value": "This server's owner can create its GitHub app here in Connectors."
   },
   "githubApp.viaApp": {
-    "value": "Through the agentes.chat app on {{accounts}}"
+    "value": "Through the Ackwire AI app on {{accounts}}"
   },
   "githubApp.disconnectApp": {
-    "value": "The agentes.chat app is also uninstalled from {{accounts}} on GitHub."
+    "value": "The Ackwire AI app is also uninstalled from {{accounts}} on GitHub."
   },
   "githubApp.disconnectKeepsApp": {
-    "value": "Agents stay on GitHub through the agentes.chat app on {{accounts}}."
+    "value": "Agents stay on GitHub through the Ackwire AI app on {{accounts}}."
   },
   "githubApp.keptApp": {
-    "value": "GitHub account disconnected. Agents stay on GitHub through the agentes.chat app."
+    "value": "GitHub account disconnected. Agents stay on GitHub through the Ackwire AI app."
   },
   "githubApp.signature.forPerson": {
-    "value": "{{agent}}, agent for {{person}} on agentes.chat"
+    "value": "{{agent}}, agent for {{person}} on Ackwire AI"
   },
   "githubApp.signature.alone": {
-    "value": "{{agent}}, an agent on agentes.chat"
+    "value": "{{agent}}, an agent on Ackwire AI"
   },
   "githubApp.manifestPage.title": {
     "value": "Creating the GitHub app"
@@ -29750,7 +29750,7 @@
     "value": "How agents reach GitHub"
   },
   "connectFlow.github.app": {
-    "value": "The agentes.chat app"
+    "value": "The Ackwire AI app"
   },
   "connectFlow.github.recommended": {
     "value": "Recommended"
@@ -29804,7 +29804,7 @@
     "value": "This server doesn't support OAuth. Connect with an API key."
   },
   "connectFlow.notApproved": {
-    "value": "{{name}} only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that."
+    "value": "{{name}} only lets apps it approved sign in, and Ackwire AI isn't approved yet. If it gives you an API key, you can connect with that."
   },
   "connectFlow.serverSaid": {
     "value": "The server answered: {{detail}}"
@@ -31343,7 +31343,7 @@
     "value": "Couldn't connect to the MCP server. Check its address and try again."
   },
   "errors.said.notApproved": {
-    "value": "This service hasn't approved agentes.chat yet."
+    "value": "This service hasn't approved Ackwire AI yet."
   },
   "errors.said.alreadyInvited": {
     "value": "This person already has an invitation."
@@ -31658,7 +31658,7 @@
     "value": "Commands are turned off on that computer."
   },
   "errors.mission.runnerOutdated": {
-    "value": "The program on the computer is too old for missions: update the agentes.chat app there, or run its install command again."
+    "value": "The program on the computer is too old for missions: update the Ackwire AI app there, or run its install command again."
   },
   "errors.mission.exists": {
     "value": "This thread already has a mission."
@@ -31904,7 +31904,7 @@
     "value": "That computer is paused. Choose another one."
   },
   "errors.machine.accountMethodUnsupported": {
-    "value": "This computer can't connect Claude this way yet. Update the agentes.chat program on it, or use an API key."
+    "value": "This computer can't connect Claude this way yet. Update the Ackwire AI program on it, or use an API key."
   },
   "errors.machine.offline": {
     "value": "{{name}} is offline right now. Try again once it's back."
@@ -32360,13 +32360,13 @@
     "value": "This server's computer"
   },
   "machines.host.desc": {
-    "value": "Where agentes.chat is installed."
+    "value": "Where Ackwire AI is installed."
   },
   "machines.host.descUsers": {
-    "value": "Where agentes.chat is installed, one user per agent."
+    "value": "Where Ackwire AI is installed, one user per agent."
   },
   "machines.host.descShared": {
-    "value": "The computer agentes.chat is installed on. Agents work as the person who installed it."
+    "value": "The computer Ackwire AI is installed on. Agents work as the person who installed it."
   },
   "machines.host.stop": {
     "value": "Stop using it in this workspace"
@@ -32393,7 +32393,7 @@
     "value": "Connect another computer"
   },
   "machines.download.text": {
-    "value": "Install the agentes.chat app on the computer."
+    "value": "Install the Ackwire AI app on the computer."
   },
   "machines.download.mac": {
     "value": "Download the app for {{system}}"
@@ -32426,7 +32426,7 @@
     "value": "The first time"
   },
   "machines.download.step1": {
-    "value": "Open the downloaded file and drag agentes.chat to Applications."
+    "value": "Open the downloaded file and drag Ackwire AI to Applications."
   },
   "machines.download.step1Install": {
     "value": "Open the downloaded file to install it."
@@ -32497,7 +32497,7 @@
     "value": "No extra folders. Each agent only uses its own folder."
   },
   "machines.access.noReport": {
-    "value": "This computer hasn't said what it allows yet. Update agentes.chat on it."
+    "value": "This computer hasn't said what it allows yet. Update Ackwire AI on it."
   },
   "machines.access.hidden": {
     "value": "Only admins and whoever connected it see this computer's folders and tools."
@@ -32614,7 +32614,7 @@
     "value": "To allow more"
   },
   "machines.access.grantText": {
-    "value": "Allowing happens on the computer itself: open the agentes.chat app there (Preferences → Folders)."
+    "value": "Allowing happens on the computer itself: open the Ackwire AI app there (Preferences → Folders)."
   },
   "machines.access.grantTextTerminal": {
     "value": "Allowing happens on the computer itself, in its Terminal:"
@@ -32887,7 +32887,7 @@
     "value": "The app on {{host}} is too old for this"
   },
   "devices.screen.outdatedText": {
-    "value": "Update agentes.chat on {{host}}, then try again."
+    "value": "Update Ackwire AI on {{host}}, then try again."
   },
   "devices.screen.unavailable": {
     "value": "This screen can't be shown"
@@ -33259,7 +33259,7 @@
     "value": "This computer"
   },
   "devices.choose.thisLine": {
-    "value": "Through the agentes.chat app"
+    "value": "Through the Ackwire AI app"
   },
   "devices.choose.openApp": {
     "value": "Open the app"
@@ -33292,7 +33292,7 @@
     "value": "Connect another computer"
   },
   "devices.computer.step1": {
-    "value": "Get the agentes.chat app on it:"
+    "value": "Get the Ackwire AI app on it:"
   },
   "devices.computer.step2": {
     "value": "Open it and sign in as yourself."
@@ -33316,10 +33316,10 @@
     "value": "Can't install the app on it? Use a terminal line"
   },
   "devices.thisApp.text": {
-    "value": "The agentes.chat app connects it in one click, and asks you first."
+    "value": "The Ackwire AI app connects it in one click, and asks you first."
   },
   "devices.thisApp.open": {
-    "value": "Open the agentes.chat app"
+    "value": "Open the Ackwire AI app"
   },
   "devices.thisApp.browserAsks": {
     "value": "Your browser asks to open it: choose Open, and Always allow if it offers."
@@ -33328,7 +33328,7 @@
     "value": "Don't have the app?"
   },
   "devices.thisApp.afterInstall": {
-    "value": "After installing, press Open the agentes.chat app again. The link works once, for 10 minutes."
+    "value": "After installing, press Open the Ackwire AI app again. The link works once, for 10 minutes."
   },
   "devices.thisApp.waiting": {
     "value": "Waiting for the app on this computer…"
@@ -33529,7 +33529,7 @@
     "value": "Do it from your phone"
   },
   "devices.android.qrCaption": {
-    "value": "Scan to open these steps in the agentes.chat app, with buttons for each setting."
+    "value": "Scan to open these steps in the Ackwire AI app, with buttons for each setting."
   },
   "devices.android.buildNumber": {
     "value": "Build number"
@@ -33637,13 +33637,13 @@
     "value": "{{computer}} can't look for phones on the Wi-Fi. Update Android platform-tools there, or use a cable."
   },
   "devices.wifiPair.fail.mdns_offMac": {
-    "value": "{{computer}} can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings › Privacy & Security › Local Network, then try again."
+    "value": "{{computer}} can't look for phones on the Wi-Fi. On that Mac, turn on Ackwire AI in System Settings › Privacy & Security › Local Network, then try again."
   },
   "devices.wifiPair.fail.same_wifi": {
     "value": "Couldn't reach the phone. It's not on the same network as {{computer}}. Put it on the same Wi-Fi and try again."
   },
   "devices.wifiPair.fail.same_wifiMac": {
-    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}}. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network."
+    "value": "Couldn't reach the phone. Put it on the same Wi-Fi as {{computer}}. On that Mac, also turn on Ackwire AI in System Settings › Privacy & Security › Local Network."
   },
   "devices.wifiPair.fail.refused": {
     "value": "The phone stopped the pairing. Keep its pairing screen open and try again."
@@ -33655,7 +33655,7 @@
     "value": "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging."
   },
   "devices.wifiPair.fail.timed_outMac": {
-    "value": "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network."
+    "value": "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as {{computer}} and scan from Wireless debugging. On that Mac, also turn on Ackwire AI in System Settings › Privacy & Security › Local Network."
   },
   "devices.wifiPair.fail.outdated": {
     "value": "Wi-Fi pairing needs Android 14 or newer with the May 2026 security update. Update the phone, or use a cable."
@@ -33664,7 +33664,7 @@
     "value": "{{computer}} has no Android platform-tools. Install Android Studio there, then try again."
   },
   "devices.wifiPair.fail.update": {
-    "value": "Wi-Fi pairing needs a newer agentes.chat on {{computer}}. Update it, then try again."
+    "value": "Wi-Fi pairing needs a newer Ackwire AI on {{computer}}. Update it, then try again."
   },
   "devices.wifiPair.fail.canceled": {
     "value": "The pairing stopped. Try again."
@@ -33676,7 +33676,7 @@
     "value": "Connect an iPhone"
   },
   "devices.iphone.lead": {
-    "value": "iPhones connect through a Mac, where the agentes.chat app does the setup."
+    "value": "iPhones connect through a Mac, where the Ackwire AI app does the setup."
   },
   "devices.iphone.mac": {
     "value": "Mac"
@@ -34222,7 +34222,7 @@
     "value": "The computer wasn't connected. If it wasn't you who opened it, nobody got access."
   },
   "connect.home": {
-    "value": "Go to agentes"
+    "value": "Go to Ackwire AI"
   },
   "apps.connect": {
     "value": "Connect an app"
@@ -34483,7 +34483,7 @@
     "value": "Open Customize › Connectors on claude.ai or Claude Desktop."
   },
   "apps.dialog.claude.step2": {
-    "value": "Click + Add, then Add custom connector, name it agentes.chat, paste the address and click Continue."
+    "value": "Click + Add, then Add custom connector, name it Ackwire AI, paste the address and click Continue."
   },
   "apps.dialog.claude.step3": {
     "value": "Choose Sign in now, click Add and authorize on the page that opens."
@@ -34546,13 +34546,13 @@
     "value": "Click {{button}}, then {{next}}."
   },
   "apps.dialog.step.name": {
-    "value": "Name it agentes.chat and paste the address."
+    "value": "Name it Ackwire AI and paste the address."
   },
   "apps.dialog.step.nameDescribe": {
-    "value": "Name it agentes.chat and add a description."
+    "value": "Name it Ackwire AI and add a description."
   },
   "apps.dialog.step.nameConnect": {
-    "value": "Name it agentes.chat and click {{button}}."
+    "value": "Name it Ackwire AI and click {{button}}."
   },
   "apps.dialog.step.paste": {
     "value": "Paste the address."
@@ -34609,7 +34609,7 @@
     "value": "To sign in, type <code>{{command}}</code> in the app."
   },
   "apps.dialog.step.signIn": {
-    "value": "Sign in with your agentes.chat account on the page that opens."
+    "value": "Sign in with your Ackwire AI account on the page that opens."
   },
   "apps.dialog.step.signInFirst": {
     "value": "The app asks you to sign in the first time you use it."
@@ -34738,7 +34738,7 @@
     "value": "Never"
   },
   "apps.consent.neverApprove": {
-    "value": "Approve agents' actions. Approvals stay with people in agentes.chat."
+    "value": "Approve agents' actions. Approvals stay with people in Ackwire AI."
   },
   "apps.consent.neverSettings": {
     "value": "Change settings, members or permissions."
@@ -34780,7 +34780,7 @@
     "value": "Nothing was shared."
   },
   "apps.consent.goHome": {
-    "value": "Go to agentes.chat"
+    "value": "Go to Ackwire AI"
   },
   "apps.consent.language": {
     "value": "Language"
@@ -35395,7 +35395,7 @@
     "value": "Approvals"
   },
   "settings.section.about": {
-    "value": "About agentes.chat"
+    "value": "About Ackwire AI"
   },
   "settings.section.generalPersonal": {
     "value": "About you"
@@ -35488,7 +35488,7 @@
     "value": "What each person here can do. The owner can do everything."
   },
   "settings.about.basedOn": {
-    "value": "Based on <site>agentes.chat</site> by Codari Global, LLC"
+    "value": "Based on <site>Ackwire AI</site> by Codari Global, LLC"
   },
   "settings.about.version": {
     "value": "Version"
@@ -35755,7 +35755,7 @@
     "value": "Usage statistics"
   },
   "settings.telemetry.label": {
-    "value": "Send anonymous usage statistics to agentes.chat"
+    "value": "Send anonymous usage statistics to Ackwire AI"
   },
   "settings.telemetry.help": {
     "value": "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites."
@@ -35764,7 +35764,7 @@
     "value": "Turned off in this server's settings (TELEMETRY=off)."
   },
   "settings.telemetry.envOffDesktop": {
-    "value": "Turned off in the agentes.chat app on this server's computer (Preferences › Servers)."
+    "value": "Turned off in the Ackwire AI app on this server's computer (Preferences › Servers)."
   },
   "settings.telemetry.see": {
     "value": "See what is sent"
@@ -37192,7 +37192,7 @@
     "value": "{{who}} commented on discussion #{{number}} ({{repo}}) on GitHub"
   },
   "chat.notice.github.opened": {
-    "value": "{{who}} called the agentes.chat app in #{{number}} ({{repo}}) on GitHub"
+    "value": "{{who}} called the Ackwire AI app in #{{number}} ({{repo}}) on GitHub"
   },
   "chat.notice.github.reviewed": {
     "value": "{{who}} reviewed PR #{{number}} ({{repo}}) on GitHub"
@@ -38370,7 +38370,7 @@
     "value": "I can't answer now: the program on my plan's computer needs an update."
   },
   "chat.body.no_ai_plan_tools": {
-    "value": "I stopped before answering: my plan's AI on that computer didn't stay within agentes.chat's tools."
+    "value": "I stopped before answering: my plan's AI on that computer didn't stay within Ackwire AI's tools."
   },
   "chat.body.no_ai_model_limit": {
     "value": "I can't answer now: {{model}} reached its own limit on my plan."
@@ -38391,7 +38391,7 @@
     "value": "I can't answer yet: my AI's program isn't installed on my computer."
   },
   "chat.body.no_ai_plan_hold": {
-    "value": "I kept your message. I'll answer here once the workspace has an agentes.chat plan and an AI connected."
+    "value": "I kept your message. I'll answer here once the workspace has an Ackwire AI plan and an AI connected."
   },
   "chat.body.no_ai_no_computer": {
     "value": "I can't answer yet: my AI needs a computer and I have none."
@@ -39252,7 +39252,7 @@
     "value": "Off"
   },
   "browser.machine.offHelp": {
-    "value": "Only someone at the computer turns it on, in the agentes.chat app: Preferences → Tools."
+    "value": "Only someone at the computer turns it on, in the Ackwire AI app: Preferences → Tools."
   },
   "browser.machine.needsCommand": {
     "value": "Needs a command"
@@ -39925,7 +39925,7 @@
     "value": "You can't create a workspace right now."
   },
   "standing.createUnpaid": {
-    "value": "You already have a workspace waiting for an agentes.chat plan. Choose its plan before creating another."
+    "value": "You already have a workspace waiting for an Ackwire AI plan. Choose its plan before creating another."
   },
   "standing.createUnpaidOpen": {
     "value": "Open {{name}}"
@@ -39973,28 +39973,28 @@
     "value": "{{name}} is paused"
   },
   "standing.notification.billing.payment": {
-    "value": "The workspace needs an agentes.chat plan"
+    "value": "The workspace needs an Ackwire AI plan"
   },
   "standing.notification.billing.unpaid": {
-    "value": "The agentes.chat plan payment didn't go through"
+    "value": "The Ackwire AI plan payment didn't go through"
   },
   "standing.notification.billing.ended": {
-    "value": "The workspace's agentes.chat plan ended"
+    "value": "The workspace's Ackwire AI plan ended"
   },
   "standing.billing.payment": {
-    "value": "This workspace doesn't have an agentes.chat plan yet. Its agents start working once it does."
+    "value": "This workspace doesn't have an Ackwire AI plan yet. Its agents start working once it does."
   },
   "standing.billing.unpaid": {
-    "value": "This workspace's agentes.chat plan payment didn't go through, and its agents stopped."
+    "value": "This workspace's Ackwire AI plan payment didn't go through, and its agents stopped."
   },
   "standing.billing.ended": {
-    "value": "This workspace's agentes.chat plan ended, and its agents stopped. Its conversations and files are still here to read and download."
+    "value": "This workspace's Ackwire AI plan ended, and its agents stopped. Its conversations and files are still here to read and download."
   },
   "standing.billing.sub": {
-    "value": "You can still read and write here. The agents come back once the agentes.chat plan is in order."
+    "value": "You can still read and write here. The agents come back once the Ackwire AI plan is in order."
   },
   "standing.billing.cta.payment": {
-    "value": "See agentes.chat plans"
+    "value": "See Ackwire AI plans"
   },
   "standing.billing.cta.unpaid": {
     "value": "Update payment"
@@ -40006,13 +40006,13 @@
     "value": "Whoever runs this workspace can sort this out."
   },
   "standing.billing.paid": {
-    "value": "Payment received. The agentes.chat plan starts in a moment."
+    "value": "Payment received. The Ackwire AI plan starts in a moment."
   },
   "standing.billing.teamReady": {
-    "value": "Your team is ready. It needs an agentes.chat plan to start."
+    "value": "Your team is ready. It needs an Ackwire AI plan to start."
   },
   "standing.billing.invites": {
-    "value": "Invitations open with the agentes.chat plan."
+    "value": "Invitations open with the Ackwire AI plan."
   },
   "standing.cloud.review": {
     "value": "Paused for a safety review, until our team looks at it. Our automated checks flagged activity that may break our Terms (section 5). To contest it, write to {{email}}."
@@ -40303,7 +40303,7 @@
     "value": "Couldn't open it now. Try again in a moment."
   },
   "billing.adminsOnly": {
-    "value": "Only the workspace's owners and admins manage its agentes.chat plan."
+    "value": "Only the workspace's owners and admins manage its Ackwire AI plan."
   },
   "billing.seeOptions": {
     "value": "See options"
@@ -40333,10 +40333,10 @@
     "value": "This workspace has {{members}} of {{limit}} people."
   },
   "limits.members.fullOne": {
-    "value": "This workspace's agentes.chat plan fits 1 person."
+    "value": "This workspace's Ackwire AI plan fits 1 person."
   },
   "limits.members.fullAdmin": {
-    "value": "To bring more people in, see the agentes.chat plan's options."
+    "value": "To bring more people in, see the Ackwire AI plan's options."
   },
   "limits.members.fullMember": {
     "value": "Ask whoever runs the workspace to make room."
@@ -40378,7 +40378,7 @@
     "value": "Uploads paused at {{limit}}. Nothing was deleted."
   },
   "limits.storage.fullAdmin": {
-    "value": "Change the agentes.chat plan, delete files you no longer use, or connect your own bucket in Settings › Storage."
+    "value": "Change the Ackwire AI plan, delete files you no longer use, or connect your own bucket in Settings › Storage."
   },
   "limits.storage.dailyFull": {
     "value": "Today's uploads reached {{limit}}. You can upload again in a few hours."
@@ -41018,7 +41018,7 @@
     "value": "{{computer}} can't show screens yet. On it:"
   },
   "agentComputer.state.outdated": {
-    "value": "Update agentes on {{computer}} to see {{name}}'s screen."
+    "value": "Update Ackwire AI on {{computer}} to see {{name}}'s screen."
   },
   "agentComputer.state.noScreen": {
     "value": "{{name}} has no screen to show here"
@@ -41066,7 +41066,7 @@
     "value": "Message {{name}}"
   },
   "agentComputer.phone.chooseOnWeb": {
-    "value": "Choose it on agentes.chat, in Settings › Devices."
+    "value": "Choose it on Ackwire AI, in Settings › Devices."
   },
   "taskManager.title": {
     "value": "Task manager"
@@ -41309,7 +41309,7 @@
     "value": "Terminal"
   },
   "taskManager.program.agentes": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "taskManager.program.thinking": {
     "value": "Thinking"
@@ -43073,7 +43073,7 @@
     "value": "Sign in"
   },
   "linkErrors.action.open": {
-    "value": "Open agentes.chat"
+    "value": "Open Ackwire AI"
   },
   "linkErrors.action.latest": {
     "value": "Open the latest version"
@@ -43520,7 +43520,7 @@
     "value": "You're early. We're glad."
   },
   "arrival.beta.text": {
-    "value": "agentes.chat is in beta: you can already do real work with it, and we're still polishing."
+    "value": "Ackwire AI is in beta: you can already do real work with it, and we're still polishing."
   },
   "arrival.beta.weekly.title": {
     "value": "It gets better every week"
@@ -43589,7 +43589,7 @@
     "value": "What was missing, broke or got in your way?"
   },
   "feedback.goesCloud": {
-    "value": "What you write goes by email to the agentes.chat team."
+    "value": "What you write goes by email to the Ackwire AI team."
   },
   "feedback.goesServer": {
     "value": "What you write goes by email to whoever runs this server."
@@ -43652,7 +43652,7 @@
     "value": "<b>Report ready</b>: {{summary}}"
   },
   "feedback.offer.goesCloud": {
-    "value": "Goes in your name to the agentes.chat team"
+    "value": "Goes in your name to the Ackwire AI team"
   },
   "feedback.offer.goesServer": {
     "value": "Goes in your name to whoever runs this server"
@@ -43673,7 +43673,7 @@
     "value": "The answer comes to your email."
   },
   "feedback.offer.sentCloud": {
-    "value": "<b>Report sent</b> to the agentes.chat team"
+    "value": "<b>Report sent</b> to the Ackwire AI team"
   },
   "feedback.offer.sentServer": {
     "value": "<b>Report sent</b> to whoever runs this server"
