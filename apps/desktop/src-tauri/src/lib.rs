@@ -571,14 +571,15 @@ async fn notch_place(app: AppHandle, width: f64, height: f64) -> Result<Option<n
     notch::place(&app, width, height)
 }
 
-/// The app was "agentes" before it became "agentes.chat", and the login item is named after the app: the old
-/// one goes and, if it was on, the new one takes its place.
+/// Login items are named after the product. Preserve open-at-login across both previous names.
 fn migrate_login_item(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Ok(home) = app.path().home_dir() {
-        let old = home.join("Library/LaunchAgents/agentes.plist");
-        if old.exists() && std::fs::remove_file(&old).is_ok() {
-            let _ = app.autolaunch().enable();
+        for name in ["agentes.plist", "agentes.chat.plist"] {
+            let old = home.join("Library/LaunchAgents").join(name);
+            if old.exists() && app.autolaunch().enable().is_ok() {
+                let _ = std::fs::remove_file(&old);
+            }
         }
     }
     #[cfg(not(target_os = "macos"))]

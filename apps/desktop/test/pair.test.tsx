@@ -163,7 +163,7 @@ describe("pairing from the app", () => {
       await until(() => el.querySelector("h1")?.textContent === "Let Estúdio Norte's agents use this Mac?");
       expect(readPref(PAIR_OFFER_PREF, null)).toBeNull();
       expect(rowOf(el, "Who can use it")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
-      expect(rowOf(el, "Keep it ready: open agentes.chat at login")?.querySelector('[role="checkbox"]')).toBeTruthy();
+      expect(rowOf(el, "Keep it ready: open Ackwire AI at login")?.querySelector('[role="checkbox"]')).toBeTruthy();
       expect(el.textContent).toContain("What agents can do here");
       expect(el.textContent).toContain("No folders of yours yet. Add them later in Preferences\u00a0›\u00a0Folders.");
       // Commands on; Claude Code, Codex and the browser as the other workspaces here have them.
@@ -216,7 +216,7 @@ describe("pairing from the app", () => {
       // No prompt asks for Full Disk Access: its button is always System Settings, and the row says what to do there.
       expect(end("Full Disk Access")).toBe("Open Settings");
       expect(rowOf(el, "Full Disk Access")?.textContent).toContain(
-        "In Settings, turn on agentes.chat in the list, or add it with +.",
+        "In Settings, turn on Ackwire AI in the list, or add it with +.",
       );
       const network = "Local network (phones over Wi-Fi)";
       expect(end(network)).toBe("Allow");
@@ -227,7 +227,7 @@ describe("pairing from the app", () => {
       await act(async () => button(rowOf(el, "Screen Recording"), "Allow")?.click());
       await until(() => end("Screen Recording") === "Open Settings");
       expect(el.textContent).toContain(
-        "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here.",
+        "When macOS asks to Quit & Reopen, choose it. Ackwire AI opens again right here.",
       );
       await act(async () => button(rowOf(el, "Screen Recording"), "Open Settings")?.click());
       expect(host.mac.panes).toEqual(["screen"]);
@@ -262,7 +262,7 @@ describe("pairing from the app", () => {
         await until(() => el.querySelector("h1")?.textContent === "Get this Mac ready");
         expect(el.textContent).toContain("Connected to Estúdio Norte.");
         await until(() => rowOf(el, "Screen Recording")?.querySelector(".ac-chip")?.textContent === "On");
-        expect(el.textContent).toContain("agentes.chat opened again with your changes.");
+        expect(el.textContent).toContain("Ackwire AI opened again with your changes.");
         expect(el.textContent).not.toContain("When macOS asks to Quit & Reopen");
         await act(async () => button(el, "Continue")?.click());
         expect(host.mac.setup).toBeNull();
@@ -373,7 +373,7 @@ describe("pairing from the app", () => {
       await until(
         () => el.textContent?.includes("Permissions") && rowOf(el, "Screen Recording")?.querySelector("button"),
       );
-      expect(el.textContent).not.toContain("agentes.chat opened again");
+      expect(el.textContent).not.toContain("Ackwire AI opened again");
       await act(async () => button(rowOf(el, "Screen Recording"), "Allow")?.click());
       await until(() => host.mac.setup?.step === "prefs");
       await until(() => el.textContent?.includes("When macOS asks to Quit & Reopen"));
@@ -383,7 +383,7 @@ describe("pairing from the app", () => {
       "prefs",
       <General />,
       async (el, host) => {
-        await until(() => el.textContent?.includes("agentes.chat opened again with your changes."));
+        await until(() => el.textContent?.includes("Ackwire AI opened again with your changes."));
         expect(host.mac.setup).toBeNull();
       },
       {
@@ -423,7 +423,7 @@ describe("pairing from the app", () => {
       );
       expect(on(norte)).toBe("false");
       expect(rowOf(el, norte)?.querySelector("small")?.textContent).toBe("Its agents don't use this Mac");
-      // agentes.chat's workspace too.
+      // Ackwire AI's workspace too.
       expect(on("Let Oficina's agents use this Mac")).toBe("false");
       // Open at login closes the card.
       const card = rowOf(el, norte)?.closest(".dk-card");

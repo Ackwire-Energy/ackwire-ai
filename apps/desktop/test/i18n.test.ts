@@ -98,7 +98,7 @@ describe("desktop strings", () => {
 
   test("a window loads only its language and English, and the next one when picked", async () => {
     const i18n = await loadDesktopI18n("pt-BR", "windows");
-    expect(i18n.t("desktop.own.here")).toBe("Rodar o agentes.chat neste PC");
+    expect(i18n.t("desktop.own.here")).toBe("Rodar o Ackwire AI neste PC");
     expect(Object.keys(i18n.store.data).sort()).toEqual(["en", "pt-BR"]);
     switchDesktopLocale(i18n, "ja", "windows");
     await new Promise<void>((done) => i18n.on("languageChanged", () => done()));
@@ -110,7 +110,7 @@ describe("desktop strings", () => {
     expect(createDesktopI18n("pt-BR", "mac").t("desktop.tray.calmBody")).toBe(
       "Os agentes usam este Mac quando precisam.",
     );
-    expect(createDesktopI18n("pt-BR", "windows").t("desktop.own.here")).toBe("Rodar o agentes.chat neste PC");
+    expect(createDesktopI18n("pt-BR", "windows").t("desktop.own.here")).toBe("Rodar o Ackwire AI neste PC");
     expect(createDesktopI18n("pt-BR", "linux").t("desktop.link.chipHere")).toBe("Este computador");
     expect(createDesktopI18n("en", "linux").t("desktop.connect.httpRefused", { host: "192.168.1.20:3000" })).toBe(
       "192.168.1.20:3000 doesn't use a secure connection (https), and only servers on this computer may go without one. Use its https address or its Tailscale one.",

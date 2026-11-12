@@ -30,7 +30,7 @@
   <true/>
   <!-- Voice messages: what the Mac says when the site first asks for the microphone. -->
   <key>NSMicrophoneUsageDescription</key>
-  <string>agentes.chat uses the microphone to record voice messages.</string>
+  <string>Ackwire AI uses the microphone to record voice messages.</string>
   <!-- What the Mac says if something the app runs opens one of these folders while Full Disk Access is off
        (ADR 0165): the agents on this Mac, the app's children, ask in the app's name. -->
   <key>NSDesktopFolderUsageDescription</key>

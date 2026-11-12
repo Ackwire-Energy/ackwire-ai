@@ -143,19 +143,19 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       "here",
       <Servers />,
       (el) =>
-        row(el, "Send anonymous usage statistics to agentes.chat") &&
+        row(el, "Send anonymous usage statistics to Ackwire AI") &&
         row(el, "Reach it from your phone and teammates")?.line === null,
       (el) => {
-        expect(row(el, "Send anonymous usage statistics to agentes.chat")).toEqual({
-          title: "Send anonymous usage statistics to agentes.chat",
+        expect(row(el, "Send anonymous usage statistics to Ackwire AI")).toEqual({
+          title: "Send anonymous usage statistics to Ackwire AI",
           hint: "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.",
           // The switch reads the hint, then what changing it does.
           switch:
-            "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. Changing it restarts agentes.chat for a moment.",
-          line: "Changing it restarts agentes.chat for a moment.",
+            "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites. Changing it restarts Ackwire AI for a moment.",
+          line: "Changing it restarts Ackwire AI for a moment.",
         });
         expect(el.textContent).not.toContain("nothing is sent");
-        expect(el.querySelector(".dk-phead .dk-lead")?.textContent).toBe("Where this app opens agentes.chat.");
+        expect(el.querySelector(".dk-phead .dk-lead")?.textContent).toBe("Where this app opens Ackwire AI.");
       },
     ));
 
@@ -358,7 +358,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
       async (el, host) => {
         expect(el.querySelector(".dk-phead .dk-lead")).toBeNull();
         // The license's attribution and legal notices, always at the end.
-        expect(el.textContent).toContain("Based on agentes.chat by Codari Global, LLC");
+        expect(el.textContent).toContain("Based on Ackwire AI by Codari Global, LLC");
         expect(el.textContent).toContain("Copyright © 2026 Codari Global, LLC and contributors");
         const acts = el.querySelector(".dk-ver__acts") as HTMLElement;
         expect(acts.textContent).toBe("Update and reopen");

@@ -306,7 +306,7 @@
     "value": "Install the app again"
   },
   "tray.incompatibleBody": {
-    "value": "One part of the app doesn't match the other. Download the latest version at agentes.chat."
+    "value": "One part of the app doesn't match the other. Download the latest version at Ackwire AI."
   },
   "tray.requests": {
     "value": "Requests"
@@ -528,7 +528,7 @@
     "value": "Reach it from your phone and teammates"
   },
   "here.reachText": {
-    "value": "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat."
+    "value": "With Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach Ackwire AI."
   },
   "here.reachOff": {
     "value": "Tailscale isn't connected."
@@ -735,7 +735,7 @@
     "value": "Servers"
   },
   "servers.lead": {
-    "value": "Where this app opens agentes.chat."
+    "value": "Where this app opens Ackwire AI."
   },
   "servers.cloud": {
     "value": "Ackwire AI"
@@ -1908,7 +1908,7 @@
     "value": "Ackwire AI isn't starting on this {{device}}"
   },
   "cover.tailnetOff": {
-    "value": "Connect Tailscale on this {{device}} to open agentes.chat."
+    "value": "Connect Tailscale on this {{device}} to open Ackwire AI."
   },
   "cover.tailnetUp": {
     "value": "In the terminal: sudo tailscale up"

@@ -226,7 +226,7 @@ fn write_env(folder: &Folder, entries: &[(&str, String)]) -> io::Result<()> {
     write_private(&folder.env(), next.as_bytes(), true)
 }
 
-const ENV_HEADER: &str = "# agentes.chat on this computer, run by the agentes.chat app. Help:\n\
+const ENV_HEADER: &str = "# Ackwire AI on this computer, run by the Ackwire AI app. Help:\n\
 # https://agentes.chat/docs/run-on-your-computer. AGENTES_SECRET encrypts the keys stored in the database: it\n\
 # travels with the folder in a backup, and changing it makes them unreadable.\n";
 
@@ -2152,7 +2152,7 @@ fn diagnostics(app: &AppHandle) -> String {
         })
         .unwrap_or_default();
     format!(
-        "agentes.chat app {} ({} {})\nserver here: {:?}, version {}, at {}, reach {}, usage statistics {}\n\n{}\n\n{}",
+        "Ackwire AI app {} ({} {})\nserver here: {:?}, version {}, at {}, reach {}, usage statistics {}\n\n{}\n\n{}",
         app.package_info().version,
         std::env::consts::OS,
         std::env::consts::ARCH,

@@ -106,7 +106,7 @@ test("Preferences › Servers: the server on the Tailscale network by Tailscale'
       ]);
       expect(rows).toEqual([
         ["agentes.tail1234.ts.net", "dk-tailscale"],
-        ["agentes.chat", "ac-icon"],
+        ["Ackwire AI", "ac-icon"],
       ]);
       // Jev's key is a server's own: nothing about it for one this app only opens.
       expect(el.textContent).not.toContain("Jev");
@@ -122,7 +122,7 @@ test("Preferences › Servers: the server here leads to Jev's key in its Setting
     // Its title's ⓘ says what Jev is, the line where its key goes, and only Open at the end.
     expect(row?.querySelector("button.ac-hint")?.getAttribute("aria-label")).toBe("About Jev");
     expect(row?.querySelector(".dk-crow__text > small")?.textContent).toBe(
-      "In agentes.chat\u00a0›\u00a0Settings\u00a0›\u00a0AI and usage.",
+      "In Ackwire AI\u00a0›\u00a0Settings\u00a0›\u00a0AI and usage.",
     );
     expect(row?.querySelector(".ac-chip")).toBeNull();
     expect([openOf(el)?.textContent, openOf(el)?.disabled]).toEqual(["Open", false]);
@@ -180,7 +180,7 @@ test("Connect to my server: what it finds on the Tailscale network by Tailscale'
       row.querySelector(".dk-logo--lg svg")?.getAttribute("class"),
     ]);
     expect(rows).toEqual([
-      ["agentes.chat is running here", "ac-icon"],
+      ["Ackwire AI is running here", "ac-icon"],
       ["On your Tailscale network", "dk-tailscale"],
     ]);
   } finally {

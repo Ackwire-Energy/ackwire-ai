@@ -205,7 +205,7 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         .and_then(|w| w.theme().ok())
         .unwrap_or(Theme::Light);
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::External(url.unwrap_or_else(|| site.clone())))
-        .title("agentes.chat")
+        .title("Ackwire AI")
         .min_inner_size(960.0, 600.0)
         // As the person left it (window_state.rs), on a screen that is still there.
         .inner_size(saved.width.unwrap_or(1240.0), saved.height.unwrap_or(800.0))
@@ -320,8 +320,12 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
 /// The window's name for the page's title: the site's own long title (sign-in, the landing) is just the app's.
 fn window_title(title: &str) -> &str {
     let title = title.trim();
-    if title.is_empty() || title.starts_with("agentes.chat ·") {
-        "agentes.chat"
+    if title.is_empty()
+        || matches!(title, "Ackwire AI" | "agentes.chat")
+        || title.starts_with("Ackwire AI ·")
+        || title.starts_with("agentes.chat ·")
+    {
+        "Ackwire AI"
     } else {
         title
     }
@@ -671,7 +675,7 @@ fn quarantine(path: &Path) {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let _ = std::process::Command::new("/usr/bin/xattr")
-        .args(["-w", "com.apple.quarantine", &format!("0081;{now:x};agentes.chat;")])
+        .args(["-w", "com.apple.quarantine", &format!("0081;{now:x};Ackwire AI;")])
         .arg(path)
         .status();
 }
@@ -1253,8 +1257,10 @@ mod tests {
             Some(r#"(window.__agentesNavigate || ((p) => location.assign(p)))("/org/o1/c/c1?m=9#x")"#)
         );
         assert_eq!(window_title("#loja · Acme"), "#loja · Acme");
-        assert_eq!(window_title("agentes.chat · Your team and your agents"), "agentes.chat");
-        assert_eq!(window_title("  "), "agentes.chat");
+        assert_eq!(window_title("Ackwire AI · Your team and your agents"), "Ackwire AI");
+        assert_eq!(window_title("agentes.chat · Your team and your agents"), "Ackwire AI");
+        assert_eq!(window_title("agentes.chat"), "Ackwire AI");
+        assert_eq!(window_title("  "), "Ackwire AI");
     }
 
     #[test]
