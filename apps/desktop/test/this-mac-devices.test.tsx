@@ -206,7 +206,10 @@ describe("the iPhone setup window", () => {
         setSystemTime();
       }
     });
-  });
+    // The window asks the Mac every 2 s and this walks six states, each seen on the next ask: up to 12 s of
+    // waiting, past the 5 s a test gets. Cut short, it went on running under the files after it (its window still
+    // mounted, the clock moved 46 s on) and failed their tests.
+  }, 30_000);
 
   test("without the ask, the welcome window is the first run", () =>
     mount("welcome", <WindowView name="welcome" />, async (el) => {
