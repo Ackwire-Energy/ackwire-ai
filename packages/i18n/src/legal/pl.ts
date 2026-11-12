@@ -5,7 +5,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Warunki korzystania",
     summary:
-      "Umowa dotycząca korzystania z agentes.chat: Twój obszar roboczy, Twoi agenci oraz zakres odpowiedzialności każdej ze stron.",
+      "Umowa dotycząca korzystania z Ackwire AI: Twój obszar roboczy, Twoi agenci oraz zakres odpowiedzialności każdej ze stron.",
     courtesy:
       "Niniejszy dokument jest tłumaczeniem grzecznościowym. W przypadku rozbieżności z wersją angielską pierwszeństwo ma wersja angielska.",
     updated: "2026-11-06",
@@ -14,7 +14,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "agreement",
         heading: "1. Umowa",
         blocks: [
-          "Niniejsze Warunki korzystania („Warunki”) stanowią wiążącą umowę między CODARI GLOBAL, LLC, spółką z ograniczoną odpowiedzialnością (limited liability company) z siedzibą w stanie Wyoming, prowadzącą działalność pod nazwą agentes.chat („agentes.chat”, „my”, „nas”), a osobą lub podmiotem, który zakłada konto lub obszar roboczy („Ty”). Zakładając konto, dołączając do obszaru roboczego lub w inny sposób korzystając z agentes.chat w przeglądarce, w aplikacji na komputery Mac lub w aplikacji na telefon („Usługa”), akceptujesz niniejsze Warunki oraz naszą Politykę prywatności. Jeżeli korzystasz z Usługi w imieniu spółki lub innego podmiotu, oświadczasz, że jesteś umocowany do zaciągania w jego imieniu zobowiązań.",
+          "Niniejsze Warunki korzystania („Warunki”) stanowią wiążącą umowę między CODARI GLOBAL, LLC, spółką z ograniczoną odpowiedzialnością (limited liability company) z siedzibą w stanie Wyoming, prowadzącą działalność pod nazwą Ackwire AI („Ackwire AI”, „my”, „nas”), a osobą lub podmiotem, który zakłada konto lub obszar roboczy („Ty”). Zakładając konto, dołączając do obszaru roboczego lub w inny sposób korzystając z Ackwire AI w przeglądarce, w aplikacji na komputery Mac lub w aplikacji na telefon („Usługa”), akceptujesz niniejsze Warunki oraz naszą Politykę prywatności. Jeżeli korzystasz z Usługi w imieniu spółki lub innego podmiotu, oświadczasz, że jesteś umocowany do zaciągania w jego imieniu zobowiązań.",
           "Aby korzystać z Usługi, musisz mieć ukończone co najmniej 18 lat i posiadać zdolność do zawarcia umowy.",
         ],
       },
@@ -115,7 +115,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "ip",
         heading: "11. Własność intelektualna i opinie",
         blocks: [
-          "Z wyjątkiem Twoich Treści Obszaru Roboczego wszelkie prawa, tytuły i udziały w Usłudze, w tym w jej oprogramowaniu, projekcie oraz nazwie i oznaczeniach agentes.chat, przysługują nam i naszym licencjodawcom. Opinie, które zdecydujesz się nam przesłać, mogą być wykorzystywane bez jakichkolwiek zobowiązań wobec Ciebie.",
+          "Z wyjątkiem Twoich Treści Obszaru Roboczego wszelkie prawa, tytuły i udziały w Usłudze, w tym w jej oprogramowaniu, projekcie oraz nazwie i oznaczeniach Ackwire AI, przysługują nam i naszym licencjodawcom. Opinie, które zdecydujesz się nam przesłać, mogą być wykorzystywane bez jakichkolwiek zobowiązań wobec Ciebie.",
         ],
       },
       {
@@ -181,7 +181,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "overview",
         heading: "1. Informacje ogólne",
         blocks: [
-          "CODARI GLOBAL, LLC, spółka z ograniczoną odpowiedzialnością (limited liability company) z siedzibą w stanie Wyoming, prowadząca działalność pod nazwą agentes.chat („agentes.chat”, „my”), prowadzi agentes.chat: obszar roboczy, w którym ludzie i agenci AI pracują wspólnie, dostępny w przeglądarce, jako aplikacja na komputery Mac oraz jako aplikacja na telefon („Usługa”). Niniejsza polityka rozróżnia dwie role:",
+          "CODARI GLOBAL, LLC, spółka z ograniczoną odpowiedzialnością (limited liability company) z siedzibą w stanie Wyoming, prowadząca działalność pod nazwą Ackwire AI („Ackwire AI”, „my”), prowadzi Ackwire AI: obszar roboczy, w którym ludzie i agenci AI pracują wspólnie, dostępny w przeglądarce, jako aplikacja na komputery Mac oraz jako aplikacja na telefon („Usługa”). Niniejsza polityka rozróżnia dwie role:",
           {
             list: [
               "W odniesieniu do **danych konta**, czyli informacji, które ludzie nam przekazują, aby założyć konto i z niego korzystać, jesteśmy administratorem danych.",
@@ -198,11 +198,11 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Dane konta:** imię i nazwisko, adres e-mail, skrót (hash) hasła, zdjęcie profilowe, język i strefa czasowa. Jeżeli logujesz się przez Google, Apple lub GitHub, otrzymujemy od tego dostawcy Twoje imię i nazwisko, adres e-mail i identyfikator konta, nigdy hasło.",
               "**Dane obszaru roboczego:** nazwa obszaru roboczego, jego członkowie, role i zaproszenia.",
-              "**Dane rozliczeniowe:** w przypadku obszaru roboczego z planem agentes.chat imię i nazwisko, adres e-mail, adres rozliczeniowy i numer identyfikacji podatkowej osoby płacącej, plan oraz związane z nim faktury i płatności. Płatności są przetwarzane przez Stripe, który obsługuje dane karty: nigdy do nas nie trafiają.",
+              "**Dane rozliczeniowe:** w przypadku obszaru roboczego z planem Ackwire AI imię i nazwisko, adres e-mail, adres rozliczeniowy i numer identyfikacji podatkowej osoby płacącej, plan oraz związane z nim faktury i płatności. Płatności są przetwarzane przez Stripe, który obsługuje dane karty: nigdy do nas nie trafiają.",
               "**Dane o korzystaniu i dzienniki:** adresy IP, przeglądarka i urządzenie, sesje logowania, zdarzenia związane z bezpieczeństwem, żądania API oraz zapis każdego wywołania modelu (model, tokeny i koszt, wraz z obszarem roboczym i agentem, do których się odnosi), który przechowujemy w celu egzekwowania budżetów i prezentowania wykorzystania. Gdy coś przestaje działać, rejestrujemy błąd, bez treści wiadomości, aby go naprawić.",
               "**Urządzenia:** w przypadku aplikacji na telefon token powiadomień push każdego urządzenia, na którym się logujesz. W przypadku podłączonych komputerów i aplikacji na komputery Mac nazwa komputera, system operacyjny i wersja aplikacji.",
-              "**Lista oczekujących:** adres e-mail i język podane przez Ciebie na agentes.chat oraz informacja, czy adres został potwierdzony.",
-              "**Analityka witryny:** na agentes.chat (witrynie publicznej, nie w obszarze roboczym) wyświetlone strony, witryna odsyłająca, typ urządzenia oraz przybliżona lokalizacja ustalona na podstawie adresu IP, zbierane za pomocą Himetrica.",
+              "**Lista oczekujących:** adres e-mail i język podane przez Ciebie na Ackwire AI oraz informacja, czy adres został potwierdzony.",
+              "**Analityka witryny:** na Ackwire AI (witrynie publicznej, nie w obszarze roboczym) wyświetlone strony, witryna odsyłająca, typ urządzenia oraz przybliżona lokalizacja ustalona na podstawie adresu IP, zbierane za pomocą Himetrica.",
             ],
           },
         ],
@@ -238,7 +238,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Konektory.** Gdy obszar roboczy podłącza usługę (taką jak GitHub, Google, Linear, Sentry, skrzynka e-mail lub dowolny serwer MCP), przechowujemy jej tokeny dostępu w postaci zaszyfrowanej i odczytujemy lub zapisujemy dane w tej usłudze wyłącznie w zakresie uprawnień, które obszar roboczy nadał każdemu agentowi. Podłączona usługa przetwarza te dane na własnych warunkach. Połączenia ze skrzynkami Gmail i Outlook oraz z Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit i WhatsApp odbywają się za pośrednictwem Composio, który przetwarza to, co agenci tam odczytują i zapisują.",
               "**Bazy danych.** Połączenia z bazami danych służą wyłącznie do odczytu. Dane uwierzytelniające są przechowywane w postaci zaszyfrowanej, a każde zapytanie jest sprawdzane przed wykonaniem.",
               "**Podłączone komputery.** Gdy ktoś podłącza komputer, agenci mogą uruchamiać na nim polecenia i korzystać z przeglądarki, w granicach folderów i uprawnień ustawionych na tym komputerze. Podgląd na żywo przeglądarki agenta przechodzi przez Cloudflare i przez pamięć operacyjną naszych serwerów i nie jest nagrywany. Podsumowanie kroków wykonanych przez agenta (takich jak odwiedzone adresy i działania) jest przechowywane wraz z jego pracą, aby zespół mógł zobaczyć, co zrobił.",
-              "**Komputer obszaru roboczego.** W agentes.chat Cloud agenci obszaru roboczego pracują na komputerze, który utrzymujemy dla tego obszaru roboczego, hostowanym przez Contabo w Unii Europejskiej. Zliczamy, ile danych przeglądarka, narzędzia AI i inne programy każdego agenta wysyłają i odbierają na nim, w ujęciu dziennym. Komputer jest czyszczony po zakończeniu planu agentes.chat obszaru roboczego, zgodnie z opisem w Warunkach korzystania.",
+              "**Komputer obszaru roboczego.** W Ackwire AI Cloud agenci obszaru roboczego pracują na komputerze, który utrzymujemy dla tego obszaru roboczego, hostowanym przez Contabo w Unii Europejskiej. Zliczamy, ile danych przeglądarka, narzędzia AI i inne programy każdego agenta wysyłają i odbierają na nim, w ujęciu dziennym. Komputer jest czyszczony po zakończeniu planu Ackwire AI obszaru roboczego, zgodnie z opisem w Warunkach korzystania.",
             ],
           },
           "Działania trudne do cofnięcia (takie jak scalanie kodu, wdrażanie lub wysyłanie w czyimś imieniu) stają się, zanim zostaną wykonane, prośbą o zatwierdzenie kierowaną do człowieka. Tekst pochodzący spoza obszaru roboczego (strony internetowe, e-maile, pliki) jest oznaczany jako niezaufany, zanim agent go przeczyta.",
@@ -246,9 +246,9 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Kiedy pracownicy agentes.chat mogą widzieć Treści Obszaru Roboczego",
+        heading: "6. Kiedy pracownicy Ackwire AI mogą widzieć Treści Obszaru Roboczego",
         blocks: [
-          "Nie przeglądamy obszarów roboczych. Osoba z agentes.chat może zobaczyć Treści Obszaru Roboczego wyłącznie:",
+          "Nie przeglądamy obszarów roboczych. Osoba z Ackwire AI może zobaczyć Treści Obszaru Roboczego wyłącznie:",
           {
             list: [
               "**Na Twoją prośbę,** aby pomóc w obsłudze zgłoszenia do wsparcia, i tylko w zakresie, jakiego wymaga zgłoszenie.",
@@ -266,7 +266,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Dane konta:** przez cały okres istnienia konta. Gdy usuniesz konto w aplikacji, zostaje ono natychmiast wylogowane wszędzie i usunięte 7 dni później, chyba że wcześniej je przywrócisz, a następnie znika z naszych kopii zapasowych w ciągu 30 dni, z wyjątkiem zapisów, które musimy przechowywać na podstawie przepisów prawa. Każdy obszar roboczy, którego byłeś jedynym członkiem, zostaje jednocześnie zamknięty, a jego treści są usuwane 7 dni później, zgodnie z opisem poniżej. Obszary robocze, do których należałeś, zachowują Twoje imię i nazwisko oraz adres e-mail w swoich dziennikach audytu przez cały okres istnienia każdego z nich.",
-              "**Treści Obszaru Roboczego:** przez cały okres istnienia obszaru roboczego, a wcześniej, gdy obszar roboczy usuwa określone treści. Gdy plan agentes.chat obszaru roboczego się kończy, jego treści pozostają dostępne przez 90 dni, a następnie są usuwane. Gdy właściciel usuwa obszar roboczy, zostaje on natychmiast zamknięty dla wszystkich, a jego treści są usuwane 7 dni później, chyba że właściciel przywróci go wcześniej, i znikają z naszych kopii zapasowych w ciągu kolejnych 30 dni, z wyjątkiem treści, które musimy przechowywać na podstawie przepisów prawa lub jako zapis nadużycia (poniżej).",
+              "**Treści Obszaru Roboczego:** przez cały okres istnienia obszaru roboczego, a wcześniej, gdy obszar roboczy usuwa określone treści. Gdy plan Ackwire AI obszaru roboczego się kończy, jego treści pozostają dostępne przez 90 dni, a następnie są usuwane. Gdy właściciel usuwa obszar roboczy, zostaje on natychmiast zamknięty dla wszystkich, a jego treści są usuwane 7 dni później, chyba że właściciel przywróci go wcześniej, i znikają z naszych kopii zapasowych w ciągu kolejnych 30 dni, z wyjątkiem treści, które musimy przechowywać na podstawie przepisów prawa lub jako zapis nadużycia (poniżej).",
               "**Dzienniki:** dzienniki żądań i bezpieczeństwa do 90 dni. Zapisy dotyczące wykorzystania modeli (tokeny i koszt) przez cały okres istnienia obszaru roboczego, ponieważ zależą od nich budżety i raporty wykorzystania.",
               "**Dane rozliczeniowe:** przez okres, w którym płacisz za obszar roboczy, a następnie tak długo, jak wymagają tego przepisy podatkowe i rachunkowe.",
               "**Lista oczekujących:** do czasu otrzymania zaproszenia i przez 12 miesięcy po nim albo do czasu, gdy poprosisz nas o usunięcie Cię z listy.",
@@ -321,7 +321,7 @@ export const legalPl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Pliki cookie i pamięć lokalna",
         blocks: [
-          "Obszar roboczy korzysta wyłącznie z plików cookie i pamięci lokalnej niezbędnych do utrzymania Twojego zalogowania, ochrony formularzy oraz zapamiętania preferencji, takich jak motyw i język. Publiczna witryna agentes.chat zapamiętuje wybrany przez Ciebie język i korzysta z analityki Himetrica (sekcja 2). Nie używamy reklamowych plików cookie ani plików cookie służących do śledzenia między witrynami.",
+          "Obszar roboczy korzysta wyłącznie z plików cookie i pamięci lokalnej niezbędnych do utrzymania Twojego zalogowania, ochrony formularzy oraz zapamiętania preferencji, takich jak motyw i język. Publiczna witryna Ackwire AI zapamiętuje wybrany przez Ciebie język i korzysta z analityki Himetrica (sekcja 2). Nie używamy reklamowych plików cookie ani plików cookie służących do śledzenia między witrynami.",
         ],
       },
       {

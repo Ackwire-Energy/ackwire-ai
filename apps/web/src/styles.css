@@ -22,17 +22,18 @@
 
 :root {
   /* The app reads in Source Sans 3, titles too; code in JetBrains Mono. */
-  --font-sans: "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  --font-sans:
+    "Gilroy", "Plus Jakarta Sans", "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
   --font-display: var(--font-sans);
-  --font-display-weight: 600;
+  --font-display-weight: 800;
   /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15. */
-  --font-size-adjust: 0.52;
+  --font-size-adjust: none;
   /* A dialog title's capitals' middle above its line's middle (18px on 24px), measured in this face: its baseline lands
      on a whole pixel, so it is 1.19px where --cap-mid says 0.37. A title in another type measures its own. */
   --title-cap-mid: 1.19px;
   /* The wordmark, and its dot-matrix ".chat". */
-  --font-brand: "Funnel Display", var(--font-sans);
+  --font-brand: var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
 }
 
@@ -40,21 +41,38 @@
    Sans 3's size adjustment is for Latin letters only. Russian needs nothing: Source Sans 3 has Cyrillic. */
 :lang(ja) {
   --font-sans:
-    "Source Sans 3 Variable", "Source Sans 3", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo,
-    "Noto Sans JP", system-ui, sans-serif;
+    "Gilroy", "Plus Jakarta Sans", "Source Sans 3 Variable", "Source Sans 3", "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic UI", Meiryo, "Noto Sans JP", system-ui, sans-serif;
 }
 :lang(ko) {
   --font-sans:
-    "Source Sans 3 Variable", "Source Sans 3", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui,
-    sans-serif;
+    "Gilroy", "Plus Jakarta Sans", "Source Sans 3 Variable", "Source Sans 3", "Apple SD Gothic Neo", "Malgun Gothic",
+    "Noto Sans KR", system-ui, sans-serif;
 }
 :lang(zh-Hans) {
   --font-sans:
-    "Source Sans 3 Variable", "Source Sans 3", "PingFang SC", "Microsoft YaHei UI", "Noto Sans SC", system-ui,
-    sans-serif;
+    "Gilroy", "Plus Jakarta Sans", "Source Sans 3 Variable", "Source Sans 3", "PingFang SC", "Microsoft YaHei UI",
+    "Noto Sans SC", system-ui, sans-serif;
 }
 :lang(ja),
 :lang(ko),
 :lang(zh-Hans) {
   --font-size-adjust: none;
+}
+
+/* Ackwire branding sits on neutral surfaces in either theme. */
+.sky-boot {
+  background: var(--bg);
+  color: var(--ink);
+}
+.sky-boot .ac-logo {
+  color: var(--ink);
+}
+.auth__horizon {
+  border-bottom: 3px solid #90ed42;
+}
+
+.sky-boot__in {
+  color: var(--ink);
+  text-shadow: none;
 }

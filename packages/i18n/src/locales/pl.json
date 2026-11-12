@@ -490,7 +490,7 @@
       "confirmYes": "Tak, zaloguj aplikację",
       "confirmNo": "To nie ja",
       "done": "Wszystko gotowe.",
-      "doneLead": "Zalogowano w aplikacji agentes. Możesz zamknąć tę kartę.",
+      "doneLead": "Zalogowano w aplikacji Ackwire AI. Możesz zamknąć tę kartę.",
       "expired": "Ta prośba wygasła.",
       "expiredLead": "Wróć do aplikacji i ponownie wybierz {{provider}}.",
       "handover": "Logowanie twoim kontem z drugiego urządzenia…",
@@ -1518,7 +1518,10 @@
       "why": "Dla Ubuntu, Debiana i podobnych systemów (x64). Linux o nic więcej nie pyta:",
       "apt": "Zainstaluj plik .deb dwukrotnym kliknięciem albo z terminala.",
       "aptLong": "Kliknij dwukrotnie pobrany plik i kliknij Zainstaluj albo wklej to w terminalu:",
-      "open": "Otwórz Ackwire AI z listy aplikacji."
+      "open": "Otwórz Ackwire AI z listy aplikacji.",
+      "otherTitle": "Używasz Archa, Fedory lub innego systemu, który nie obsługuje .deb?",
+      "otherText": "Pobierz AppImage: działa w każdej dystrybucji i sam się aktualizuje. Potem wklej to w terminalu, w folderze, w którym go zapisano:",
+      "appImage": "Pobierz AppImage"
     },
     "page": {
       "docTitle": "Pobierz aplikację · Ackwire AI",
@@ -1964,7 +1967,7 @@
     }
   },
   "openOnPhone": {
-    "qr": "Kod QR do logowania w aplikacji agentes",
+    "qr": "Kod QR do logowania w aplikacji Ackwire AI",
     "making": "Tworzę kod…",
     "stepApp": "Zainstaluj aplikację Ackwire AI na telefonie.",
     "stepTailscale": "Zainstaluj Tailscale na telefonie i zaloguj się tym samym kontem Tailscale co ten serwer.",
@@ -5389,7 +5392,7 @@
         "two": "Preferencje",
         "three": "Włącz Przeglądarkę",
         "done": "To wszystko. Ta strona zauważy to sama, bez odświeżania.",
-        "menuOpen": "Otwórz agentes",
+        "menuOpen": "Otwórz Ackwire AI",
         "menuPrefs": "Preferencje…",
         "menuPause": "Wstrzymaj",
         "menuQuit": "Zakończ",
@@ -5605,7 +5608,7 @@
       "connectors": "Konektory {{org}}",
       "connectorsPersonal": "Twoje konektory",
       "oneLevel": "Jeden poziom na aplikację",
-      "builtin": "Wbudowane w agentes",
+      "builtin": "Wbudowane w Ackwire AI",
       "builtinHelp": "Drive, zadania, pamięć i więcej",
       "noMatch": "Nic nie pasuje do „{{q}}”",
       "noneHere": "Nic w tym filtrze",
@@ -8176,7 +8179,7 @@
         "pr_opened": "Otwarty PR na GitHubie"
       },
       "issue": {
-        "created": "Zadanie utworzone w agentes"
+        "created": "Zadanie utworzone w Ackwire AI"
       },
       "deploy": {
         "succeeded": "Wdrożenie zakończone"
@@ -15002,7 +15005,7 @@
     "reconnectDoneText": "Komputer {{name}} wrócił do {{org}}.",
     "deniedTitle": "Nie połączono",
     "denied": "Komputer nie został podłączony. Jeśli to nie ty, nikt nie uzyskał dostępu.",
-    "home": "Przejdź do agentes"
+    "home": "Przejdź do Ackwire AI"
   },
   "apps": {
     "connect": "Połącz aplikację",

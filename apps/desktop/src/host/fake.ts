@@ -4,14 +4,14 @@
  * a time; `showWindow` switches it (the dev bar does too) and keeps the fake state.
  *
  * Scenarios (`?scenario=`): `first` (a Mac, nothing chosen yet), `windows` and `linux` (the same there),
- * `cloud` (agentes.chat, nothing on this computer), `selfhost` (the default: a server on Tailscale with two
- * organizations whose agents work here), `link` (a claim link waiting) and `here` (agentes.chat runs on this
+ * `cloud` (Ackwire AI, nothing on this computer), `selfhost` (the default: a server on Tailscale with two
+ * organizations whose agents work here), `link` (a claim link waiting) and `here` (Ackwire AI runs on this
  * computer, its organization's agents too); `?link=` makes any scenario start with that link waiting. A pair link
  * (`agenteschat://pair?server=…&link=ABCDEFGH`) joins Estúdio Norte once its maker lets it in, `HGFEDCBA`'s maker
  * says no, and any other code expired.
  * `?mac=ready`: Screen Recording and Full Disk Access allowed already (with Local Network asked, Prepare this Mac
  * is skipped).
- * Servers answer by host: agentes.tail1234.ts.net, agentes.chat and http://127.0.0.1:4310 are servers;
+ * Servers answer by host: agentes.tail1234.ts.net, Ackwire AI and http://127.0.0.1:4310 are servers;
  * noowner.tail1234.ts.net waits for its owner; old.example.com is too old; chat.example.com doesn't answer;
  * anything else isn't agentes.chat. `?found=0` makes discovery find nothing.
  * The server here: `?phase=` (starting, updating, stopped, failing), `?reach=1`, `?back=<version>` (an update
@@ -576,7 +576,7 @@ export function createFakeHost(
       await wait(1100);
       return "/Users/voce/.agentes/backups/agentes-2026-10-25-101500.tar.gz";
     },
-    localDiagnostics: async () => `agentes.chat app ${version} (macos aarch64)\nserver here: ${local.phase}`,
+    localDiagnostics: async () => `Ackwire AI app ${version} (macos aarch64)\nserver here: ${local.phase}`,
     syncLocalHomes: async () => {},
     onLocalReach: (cb) => {
       reachListeners.add(cb);

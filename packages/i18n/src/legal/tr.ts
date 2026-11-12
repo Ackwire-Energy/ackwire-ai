@@ -5,7 +5,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Kullanım Koşulları",
     summary:
-      "agentes.chat'in kullanımına ilişkin sözleşme: çalışma alanınız, ajanlarınız ve her bir tarafın neden sorumlu olduğu.",
+      "Ackwire AI'in kullanımına ilişkin sözleşme: çalışma alanınız, ajanlarınız ve her bir tarafın neden sorumlu olduğu.",
     courtesy:
       "Bu metin bir nezaket çevirisidir. İngilizce sürümden farklılık göstermesi hâlinde İngilizce sürüm esas alınır.",
     updated: "2026-11-06",
@@ -14,7 +14,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "agreement",
         heading: "1. Sözleşme",
         blocks: [
-          'İşbu Kullanım Koşulları ("Koşullar"), agentes.chat ticari adıyla faaliyet gösteren Wyoming eyaleti limited şirketi CODARI GLOBAL, LLC ("agentes.chat", "biz") ile bir hesap veya çalışma alanı oluşturan gerçek ya da tüzel kişi ("siz") arasında bağlayıcı bir sözleşmedir. Bir hesap oluşturarak, bir çalışma alanına katılarak veya agentes.chat\'i web üzerinde, Mac uygulamasında ya da telefon uygulamasında ("Hizmet") başka herhangi bir şekilde kullanarak işbu Koşulları ve Gizlilik Politikamızı kabul etmiş olursunuz. Hizmeti bir şirket veya başka bir kuruluş adına kullanıyorsanız, o kuruluşu bağlamaya yetkili olduğunuzu beyan etmiş olursunuz.',
+          'İşbu Kullanım Koşulları ("Koşullar"), Ackwire AI ticari adıyla faaliyet gösteren Wyoming eyaleti limited şirketi CODARI GLOBAL, LLC ("Ackwire AI", "biz") ile bir hesap veya çalışma alanı oluşturan gerçek ya da tüzel kişi ("siz") arasında bağlayıcı bir sözleşmedir. Bir hesap oluşturarak, bir çalışma alanına katılarak veya Ackwire AI\'i web üzerinde, Mac uygulamasında ya da telefon uygulamasında ("Hizmet") başka herhangi bir şekilde kullanarak işbu Koşulları ve Gizlilik Politikamızı kabul etmiş olursunuz. Hizmeti bir şirket veya başka bir kuruluş adına kullanıyorsanız, o kuruluşu bağlamaya yetkili olduğunuzu beyan etmiş olursunuz.',
           "Hizmeti kullanabilmek için en az 18 yaşında olmanız ve sözleşme yapma ehliyetine sahip olmanız gerekir.",
         ],
       },
@@ -96,7 +96,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "fees",
         heading: "10. Planlar, ödemeler ve adil kullanım",
         blocks: [
-          "Her çalışma alanı kendi agentes.chat planının ücretini öder. Aşağıdaki kurallar tüm planlar için geçerlidir:",
+          "Her çalışma alanı kendi Ackwire AI planının ücretini öder. Aşağıdaki kurallar tüm planlar için geçerlidir:",
           {
             list: [
               "**Fiyatlar.** Planlar ve fiyatları fiyatlandırma sayfamızda yer alır. Fiyatlar ABD doları cinsindendir ve uygulandığı hâllerde vergiler eklenir. Bankanız veya ödeme sağlayıcınız, Brezilya'daki IOF gibi, yurt dışından yapılan alımlar için kendi ücretlerini tahsil edebilir.",
@@ -115,7 +115,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "ip",
         heading: "11. Fikri mülkiyet ve geri bildirim",
         blocks: [
-          "Çalışma Alanı İçeriğiniz hariç olmak üzere, yazılımı, tasarımı ve agentes.chat adı ile markaları dahil olmak üzere Hizmet üzerindeki tüm hak, mülkiyet ve menfaatler bize ve lisans verenlerimize aittir. Bize göndermeyi tercih ettiğiniz geri bildirimler, size karşı herhangi bir yükümlülük doğmaksızın kullanılabilir.",
+          "Çalışma Alanı İçeriğiniz hariç olmak üzere, yazılımı, tasarımı ve Ackwire AI adı ile markaları dahil olmak üzere Hizmet üzerindeki tüm hak, mülkiyet ve menfaatler bize ve lisans verenlerimize aittir. Bize göndermeyi tercih ettiğiniz geri bildirimler, size karşı herhangi bir yükümlülük doğmaksızın kullanılabilir.",
         ],
       },
       {
@@ -164,7 +164,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "18. İletişim",
         blocks: [
-          "CODARI GLOBAL, LLC, agentes.chat ticari adıyla faaliyet gösterir. Bildirimler: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Diğer tüm konular: hello@agentes.chat",
+          "CODARI GLOBAL, LLC, Ackwire AI ticari adıyla faaliyet gösterir. Bildirimler: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Diğer tüm konular: hello@agentes.chat",
         ],
       },
     ],
@@ -181,7 +181,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "overview",
         heading: "1. Genel bakış",
         blocks: [
-          'agentes.chat ticari adıyla faaliyet gösteren Wyoming eyaleti limited şirketi CODARI GLOBAL, LLC ("agentes.chat", "biz"), insanların ve yapay zekâ ajanlarının birlikte çalıştığı, web üzerinde, Mac uygulaması olarak ve telefon uygulaması olarak sunulan bir çalışma alanı olan agentes.chat\'i ("Hizmet") işletir. Bu politika iki rolü birbirinden ayırır:',
+          'Ackwire AI ticari adıyla faaliyet gösteren Wyoming eyaleti limited şirketi CODARI GLOBAL, LLC ("Ackwire AI", "biz"), insanların ve yapay zekâ ajanlarının birlikte çalıştığı, web üzerinde, Mac uygulaması olarak ve telefon uygulaması olarak sunulan bir çalışma alanı olan Ackwire AI\'i ("Hizmet") işletir. Bu politika iki rolü birbirinden ayırır:',
           {
             list: [
               "Kişilerin bir hesap oluşturmak ve kullanmak için bize verdiği bilgiler olan **hesap verileri** bakımından veri sorumlusu biziz.",
@@ -198,11 +198,11 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Hesap verileri:** ad, e-posta adresi, parola özeti (hash), profil fotoğrafı, dil ve saat dilimi. Google, Apple veya GitHub ile oturum açarsanız, ilgili sağlayıcıdan adınızı, e-posta adresinizi ve hesap tanımlayıcınızı alırız. Parolanızı asla almayız.",
               "**Çalışma alanı verileri:** çalışma alanının adı, üyeleri, rolleri ve davetleri.",
-              "**Faturalandırma verileri:** agentes.chat planı olan bir çalışma alanı için, ödemeyi yapan kişinin adı, e-posta adresi, fatura adresi ve vergi kimlik numarası, plan ve planın faturaları ile ödemeleri. Ödemeler, kart bilgilerini işleyen Stripe tarafından gerçekleştirilir: kart bilgileri bize asla ulaşmaz.",
+              "**Faturalandırma verileri:** Ackwire AI planı olan bir çalışma alanı için, ödemeyi yapan kişinin adı, e-posta adresi, fatura adresi ve vergi kimlik numarası, plan ve planın faturaları ile ödemeleri. Ödemeler, kart bilgilerini işleyen Stripe tarafından gerçekleştirilir: kart bilgileri bize asla ulaşmaz.",
               "**Kullanım ve kayıt (log) verileri:** IP adresleri, tarayıcı ve cihaz, oturumlar, güvenlik olayları, API istekleri ve bütçeleri uygulamak ve kullanımı göstermek için sakladığımız her model çağrısının kaydı (ait olduğu çalışma alanı ve ajanla birlikte model, token ve maliyet). Bir şey bozulduğunda, düzeltmek amacıyla hatayı mesaj içeriği olmaksızın kaydederiz.",
               "**Cihazlar:** telefon uygulaması için, oturum açtığınız her cihazın anlık bildirim (push) token'ı. Bağlı bilgisayarlar ve Mac uygulaması için bilgisayarın adı, işletim sistemi ve uygulama sürümü.",
-              "**Bekleme listesi:** agentes.chat üzerinde bize verdiğiniz e-posta adresi ve dil ile bu adresi doğrulayıp doğrulamadığınız.",
-              "**Site analitiği:** agentes.chat üzerinde (çalışma alanı değil, herkese açık site), Himetrica ile toplanan, görüntülenen sayfalar, yönlendiren site, cihaz türü ve IP adresinden türetilen yaklaşık konum.",
+              "**Bekleme listesi:** Ackwire AI üzerinde bize verdiğiniz e-posta adresi ve dil ile bu adresi doğrulayıp doğrulamadığınız.",
+              "**Site analitiği:** Ackwire AI üzerinde (çalışma alanı değil, herkese açık site), Himetrica ile toplanan, görüntülenen sayfalar, yönlendiren site, cihaz türü ve IP adresinden türetilen yaklaşık konum.",
             ],
           },
         ],
@@ -238,7 +238,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
               "**Bağlayıcılar.** Çalışma alanı bir hizmeti (GitHub, Google, Linear, Sentry, bir e-posta gelen kutusu veya herhangi bir MCP sunucusu gibi) bağladığında, erişim token'larını şifrelenmiş olarak saklarız ve o hizmette yalnızca çalışma alanının her ajana verdiği kapsamlar dahilinde okuma veya yazma yaparız. Bağlı hizmet bu verileri kendi koşulları çerçevesinde işler. Gmail ve Outlook gelen kutularına ve Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit ve WhatsApp'a yapılan bağlantılar, ajanların orada okuduklarını ve yazdıklarını işleyen Composio üzerinden gerçekleşir.",
               "**Veritabanları.** Veritabanı bağlantıları salt okunurdur. Kimlik bilgileri şifrelenmiş olarak saklanır ve her sorgu çalıştırılmadan önce denetlenir.",
               "**Bağlı bilgisayarlar.** Biri bir bilgisayar bağladığında, ajanlar o bilgisayarda belirlenen klasörler ve izinler dahilinde orada komut çalıştırabilir ve bir tarayıcı kullanabilir. Bir ajanın tarayıcısının canlı görüntüsü Cloudflare'den ve sunucularımızın belleğinden geçer ve kaydedilmez. Ekibin ajanın ne yaptığını görebilmesi için ajanın attığı adımların bir özeti (ziyaret edilen adresler ve işlemler gibi) ajanın çalışmasıyla birlikte saklanır.",
-              "**Çalışma alanının bilgisayarı.** agentes.chat Cloud'da bir çalışma alanının ajanları, o çalışma alanı için işlettiğimiz ve Avrupa Birliği'nde Contabo tarafından barındırılan bir bilgisayar üzerinde çalışır. Her ajanın tarayıcısının, yapay zekâ araçlarının ve diğer programlarının orada gönderdiği ve aldığı veri miktarını günlük olarak ölçeriz. Bilgisayar, Kullanım Koşullarında açıklandığı şekilde, çalışma alanının agentes.chat planı sona erdikten sonra silinir.",
+              "**Çalışma alanının bilgisayarı.** Ackwire AI Cloud'da bir çalışma alanının ajanları, o çalışma alanı için işlettiğimiz ve Avrupa Birliği'nde Contabo tarafından barındırılan bir bilgisayar üzerinde çalışır. Her ajanın tarayıcısının, yapay zekâ araçlarının ve diğer programlarının orada gönderdiği ve aldığı veri miktarını günlük olarak ölçeriz. Bilgisayar, Kullanım Koşullarında açıklandığı şekilde, çalışma alanının Ackwire AI planı sona erdikten sonra silinir.",
             ],
           },
           "Geri alınması güç işlemler (kod birleştirme, yayına alma veya birisi adına gönderim yapma gibi), gerçekleşmeden önce bir kişiye yöneltilen onay talebine dönüşür. Çalışma alanının dışından gelen metinler (web sayfaları, e-postalar, dosyalar), bir ajan bunları okumadan önce güvenilmeyen olarak işaretlenir.",
@@ -246,9 +246,9 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. agentes.chat çalışanlarının Çalışma Alanı İçeriğini görebildiği durumlar",
+        heading: "6. Ackwire AI çalışanlarının Çalışma Alanı İçeriğini görebildiği durumlar",
         blocks: [
-          "Çalışma alanlarına göz atmayız. agentes.chat'teki bir kişi Çalışma Alanı İçeriğini yalnızca şu durumlarda görebilir:",
+          "Çalışma alanlarına göz atmayız. Ackwire AI'teki bir kişi Çalışma Alanı İçeriğini yalnızca şu durumlarda görebilir:",
           {
             list: [
               "**Sizin talebiniz üzerine,** bir destek talebine yardımcı olmak için ve yalnızca talebin gerektirdiği ölçüde.",
@@ -266,7 +266,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Hesap verileri:** hesap var olduğu sürece. Hesabınızı uygulama içinden sildiğinizde, kanunen saklamamız gereken kayıtlar hariç, her yerde oturumu derhâl kapatılır, bundan önce geri yüklemediğiniz sürece 7 gün sonra kaldırılır ve ardından 30 gün içinde yedeklerimizden çıkar. Tek üyesi olduğunuz her çalışma alanı aynı anda kapanır ve içeriği aşağıda açıklandığı şekilde 7 gün sonra silinir. Bulunduğunuz çalışma alanları, her biri var olduğu sürece adınızı ve e-posta adresinizi denetim kayıtlarında tutar.",
-              "**Çalışma Alanı İçeriği:** çalışma alanı var olduğu sürece, çalışma alanı belirli içerikleri sildiğinde ise daha erken. Bir çalışma alanının agentes.chat planı sona erdiğinde, içeriği 90 gün boyunca erişilebilir kalır ve ardından silinir. Bir sahip bir çalışma alanını sildiğinde, çalışma alanı herkes için derhâl kapanır ve içeriği, bir sahip bu süreden önce geri yüklemedikçe 7 gün sonra silinir. Bundan sonraki 30 gün içinde de, kanunen veya kötüye kullanım kaydı olarak (aşağıya bakınız) saklamamız gereken içerik hariç, yedeklerimizden çıkar.",
+              "**Çalışma Alanı İçeriği:** çalışma alanı var olduğu sürece, çalışma alanı belirli içerikleri sildiğinde ise daha erken. Bir çalışma alanının Ackwire AI planı sona erdiğinde, içeriği 90 gün boyunca erişilebilir kalır ve ardından silinir. Bir sahip bir çalışma alanını sildiğinde, çalışma alanı herkes için derhâl kapanır ve içeriği, bir sahip bu süreden önce geri yüklemedikçe 7 gün sonra silinir. Bundan sonraki 30 gün içinde de, kanunen veya kötüye kullanım kaydı olarak (aşağıya bakınız) saklamamız gereken içerik hariç, yedeklerimizden çıkar.",
               "**Kayıtlar (loglar):** istek ve güvenlik kayıtları 90 güne kadar. Model kullanım kayıtları (token ve maliyet), bütçeler ve kullanım raporları bunlara dayandığından, çalışma alanı var olduğu sürece.",
               "**Faturalandırma verileri:** bir çalışma alanı için ödeme yaptığınız sürece ve bundan sonra vergi ve muhasebe mevzuatının gerektirdiği süre boyunca.",
               "**Bekleme listesi:** davet edilene kadar ve davetten sonraki 12 ay boyunca ya da sizi listeden çıkarmamızı talep edene kadar.",
@@ -321,7 +321,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Çerezler ve yerel depolama",
         blocks: [
-          "Çalışma alanı yalnızca oturumunuzu açık tutmak, formları korumak ve tema ile dil gibi tercihleri hatırlamak için gerekli çerezleri ve yerel depolamayı kullanır. Herkese açık site agentes.chat seçtiğiniz dili hatırlar ve Himetrica analitiğini (2. Bölüm) kullanır. Reklam veya siteler arası izleme çerezleri kullanmayız.",
+          "Çalışma alanı yalnızca oturumunuzu açık tutmak, formları korumak ve tema ile dil gibi tercihleri hatırlamak için gerekli çerezleri ve yerel depolamayı kullanır. Herkese açık site Ackwire AI seçtiğiniz dili hatırlar ve Himetrica analitiğini (2. Bölüm) kullanır. Reklam veya siteler arası izleme çerezleri kullanmayız.",
         ],
       },
       {
@@ -342,7 +342,7 @@ export const legalTr: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "17. İletişim",
         blocks: [
-          "CODARI GLOBAL, LLC, agentes.chat ticari adıyla faaliyet gösterir. Bildirimler: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. AB, Birleşik Krallık ve Brezilya'ya ilişkin veri koruma soruları da aynı adresten gizlilik ekibimize ulaşır. Diğer tüm konular için hello@agentes.chat adresine yazın.",
+          "CODARI GLOBAL, LLC, Ackwire AI ticari adıyla faaliyet gösterir. Bildirimler: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. AB, Birleşik Krallık ve Brezilya'ya ilişkin veri koruma soruları da aynı adresten gizlilik ekibimize ulaşır. Diğer tüm konular için hello@agentes.chat adresine yazın.",
         ],
       },
     ],

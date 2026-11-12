@@ -3,10 +3,10 @@
 :root,
 [data-theme="light"] {
   /* Light is near white: white work area, paper sidebar; gray only in fields' tracks and chosen states. */
-  --bg: #fbfbfa;
+  --bg: #ffffff;
   --raised: #ffffff;
   --raised-2: #ffffff;
-  --sunken: #f3f3f0;
+  --sunken: #eef4ef;
   /* The app shell: the sidebar on the sky's paper (the faintest cool tint) and the work area beside it. */
   --side: #f5f8f5;
   --pane: #ffffff;
@@ -14,7 +14,7 @@
   --side-hover: color-mix(in srgb, var(--ink) 5%, var(--side));
   --side-chosen: color-mix(in srgb, var(--ink) 10%, var(--side));
   --glass: rgba(255, 255, 255, 0.88);
-  --glass-solid: #fbfbf9;
+  --glass-solid: #ffffff;
   --line: rgba(23, 23, 22, 0.07);
   --line2: rgba(23, 23, 22, 0.12);
   --line-strong: #82827d;
@@ -26,6 +26,9 @@
   --agent2: #90ed42;
   --agent-soft: #e8f5dc;
   --on-agent: #ffffff;
+  /* The main button: Solar Green with Forest ink, in both themes. */
+  --action: #90ed42;
+  --on-action: #031f1b;
   --ok: #1f7a45;
   --warn: #9a5b00;
   --warn-soft: #fbeed5;
@@ -66,6 +69,9 @@
   --agent2: #b8f582;
   --agent-soft: #1a2e0c;
   --on-agent: #031f1b;
+  /* The main button: Solar Green with Forest ink, in both themes. */
+  --action: #90ed42;
+  --on-action: #031f1b;
   --ok: #5fc48a;
   --warn: #e0a84a;
   --warn-soft: #33260e;
@@ -91,8 +97,6 @@
   --surface-raised: var(--raised);
   --surface-sunken: var(--sunken);
   --ink-muted: var(--muted);
-  --action: var(--ink);
-  --on-action: var(--bg);
   --attention: var(--warn);
   --on-attention: var(--on-warn);
   --attention-soft: var(--warn-soft);

@@ -51,7 +51,7 @@
       "certificate": "El certificado de {{host}} no es válido. Habla con quien administra el servidor.",
       "notAgentes": "{{host}} no es un servidor de Ackwire AI. Revisa la dirección.",
       "serverTooOld": "{{host}} necesita una actualización para funcionar con esta app.",
-      "appTooOld": "Actualiza la app de agentes para usar {{host}}.",
+      "appTooOld": "Actualiza la app de Ackwire AI para usar {{host}}.",
       "down": {
         "line": "{{host}} no respondió.",
         "text": "Puede estar caído o fuera de tu red. La app se abre sola cuando vuelva.",

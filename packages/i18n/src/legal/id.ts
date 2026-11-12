@@ -5,7 +5,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Ketentuan Penggunaan",
     summary:
-      "Perjanjian untuk menggunakan agentes.chat: ruang kerja Anda, agen Anda, dan apa yang menjadi tanggung jawab masing-masing pihak.",
+      "Perjanjian untuk menggunakan Ackwire AI: ruang kerja Anda, agen Anda, dan apa yang menjadi tanggung jawab masing-masing pihak.",
     courtesy:
       "Dokumen ini adalah terjemahan yang disediakan semata-mata untuk kemudahan. Apabila terdapat perbedaan dengan versi bahasa Inggris, versi bahasa Inggris yang berlaku.",
     updated: "2026-11-06",
@@ -14,7 +14,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "agreement",
         heading: "1. Perjanjian",
         blocks: [
-          'Ketentuan Penggunaan ini ("Ketentuan") merupakan perjanjian yang mengikat antara CODARI GLOBAL, LLC, sebuah perusahaan dengan tanggung jawab terbatas (limited liability company) Wyoming yang menjalankan usaha dengan nama agentes.chat ("agentes.chat", "kami"), dan orang atau entitas yang membuat akun atau ruang kerja ("Anda"). Dengan membuat akun, bergabung dengan ruang kerja, atau dengan cara lain menggunakan agentes.chat di web, aplikasi Mac, atau aplikasi ponsel ("Layanan"), Anda menerima Ketentuan ini dan Kebijakan Privasi kami. Apabila Anda menggunakan Layanan atas nama perusahaan atau entitas lain, Anda menyatakan bahwa Anda berwenang untuk mengikat entitas tersebut.',
+          'Ketentuan Penggunaan ini ("Ketentuan") merupakan perjanjian yang mengikat antara CODARI GLOBAL, LLC, sebuah perusahaan dengan tanggung jawab terbatas (limited liability company) Wyoming yang menjalankan usaha dengan nama Ackwire AI ("Ackwire AI", "kami"), dan orang atau entitas yang membuat akun atau ruang kerja ("Anda"). Dengan membuat akun, bergabung dengan ruang kerja, atau dengan cara lain menggunakan Ackwire AI di web, aplikasi Mac, atau aplikasi ponsel ("Layanan"), Anda menerima Ketentuan ini dan Kebijakan Privasi kami. Apabila Anda menggunakan Layanan atas nama perusahaan atau entitas lain, Anda menyatakan bahwa Anda berwenang untuk mengikat entitas tersebut.',
           "Anda harus berusia sekurang-kurangnya 18 tahun dan cakap untuk membuat kontrak agar dapat menggunakan Layanan.",
         ],
       },
@@ -181,7 +181,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "overview",
         heading: "1. Ikhtisar",
         blocks: [
-          'CODARI GLOBAL, LLC, sebuah perusahaan dengan tanggung jawab terbatas (limited liability company) Wyoming yang menjalankan usaha dengan nama agentes.chat ("agentes.chat", "kami"), mengoperasikan agentes.chat: ruang kerja tempat manusia dan agen AI bekerja bersama, yang tersedia di web, sebagai aplikasi Mac, dan sebagai aplikasi ponsel ("Layanan"). Kebijakan ini membedakan dua peran:',
+          'CODARI GLOBAL, LLC, sebuah perusahaan dengan tanggung jawab terbatas (limited liability company) Wyoming yang menjalankan usaha dengan nama Ackwire AI ("Ackwire AI", "kami"), mengoperasikan Ackwire AI: ruang kerja tempat manusia dan agen AI bekerja bersama, yang tersedia di web, sebagai aplikasi Mac, dan sebagai aplikasi ponsel ("Layanan"). Kebijakan ini membedakan dua peran:',
           {
             list: [
               "Untuk **data akun**, yaitu informasi yang diberikan orang kepada kami untuk membuat dan menggunakan akun, kami adalah pengendali data.",
@@ -198,11 +198,11 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Data akun:** nama, alamat email, hash kata sandi, foto profil, bahasa, dan zona waktu. Apabila Anda masuk dengan Google, Apple, atau GitHub, kami menerima nama, alamat email, dan pengenal akun Anda dari penyedia tersebut, tidak pernah kata sandinya.",
               "**Data ruang kerja:** nama ruang kerja, anggota, peran, dan undangannya.",
-              "**Data penagihan:** untuk ruang kerja dengan paket agentes.chat, nama, alamat email, alamat penagihan, dan nomor identitas pajak orang yang membayar, paketnya, serta faktur dan pembayarannya. Pembayaran diproses oleh Stripe, yang menangani detail kartu: detail tersebut tidak pernah sampai kepada kami.",
+              "**Data penagihan:** untuk ruang kerja dengan paket Ackwire AI, nama, alamat email, alamat penagihan, dan nomor identitas pajak orang yang membayar, paketnya, serta faktur dan pembayarannya. Pembayaran diproses oleh Stripe, yang menangani detail kartu: detail tersebut tidak pernah sampai kepada kami.",
               "**Data penggunaan dan log:** alamat IP, peramban dan perangkat, sesi masuk, peristiwa keamanan, permintaan API, dan catatan setiap pemanggilan model (model, token, dan biaya, beserta ruang kerja dan agen terkait), yang kami simpan untuk menegakkan anggaran dan menampilkan penggunaan. Ketika terjadi kerusakan, kami mencatat galatnya, tanpa isi pesan, untuk memperbaikinya.",
               "**Perangkat:** untuk aplikasi ponsel, token notifikasi push dari setiap perangkat tempat Anda masuk. Untuk komputer yang terhubung dan aplikasi Mac, nama komputer, sistem operasi, dan versi aplikasinya.",
-              "**Daftar tunggu:** alamat email dan bahasa yang Anda berikan kepada kami di agentes.chat, dan apakah Anda telah mengonfirmasinya.",
-              "**Analitik situs:** di agentes.chat (situs publik, bukan ruang kerja), halaman yang dilihat, situs perujuk, jenis perangkat, dan perkiraan lokasi yang diturunkan dari alamat IP, yang dikumpulkan dengan Himetrica.",
+              "**Daftar tunggu:** alamat email dan bahasa yang Anda berikan kepada kami di Ackwire AI, dan apakah Anda telah mengonfirmasinya.",
+              "**Analitik situs:** di Ackwire AI (situs publik, bukan ruang kerja), halaman yang dilihat, situs perujuk, jenis perangkat, dan perkiraan lokasi yang diturunkan dari alamat IP, yang dikumpulkan dengan Himetrica.",
             ],
           },
         ],
@@ -238,7 +238,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
               "**Konektor.** Ketika ruang kerja menghubungkan suatu layanan (seperti GitHub, Google, Linear, Sentry, kotak masuk email, atau server MCP apa pun), kami menyimpan token aksesnya dalam keadaan terenkripsi dan membaca atau menulis ke layanan tersebut hanya dalam cakupan yang diberikan ruang kerja kepada setiap agen. Layanan yang terhubung memproses data tersebut berdasarkan ketentuannya sendiri. Sambungan ke kotak masuk Gmail dan Outlook, serta ke Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit, dan WhatsApp, melewati Composio, yang memproses apa yang dibaca dan ditulis agen di sana.",
               "**Basis data.** Sambungan basis data bersifat hanya-baca. Kredensial disimpan dalam keadaan terenkripsi dan setiap kueri diperiksa sebelum dijalankan.",
               "**Komputer yang terhubung.** Ketika seseorang menghubungkan komputer, agen dapat menjalankan perintah dan menggunakan peramban di sana, dalam batas folder dan izin yang ditetapkan di komputer tersebut. Tampilan langsung peramban agen melewati Cloudflare dan memori server kami, dan tidak direkam. Ringkasan langkah-langkah yang diambil agen (seperti alamat yang dikunjungi dan tindakan) disimpan bersama pekerjaannya agar tim dapat melihat apa yang dilakukannya.",
-              "**Komputer ruang kerja.** Di agentes.chat Cloud, agen suatu ruang kerja bekerja pada komputer yang kami jalankan untuk ruang kerja tersebut, yang di-hosting oleh Contabo di Uni Eropa. Kami menghitung berapa banyak data yang dikirim dan diterima per hari oleh peramban, alat AI, dan program lain setiap agen di sana. Komputer tersebut dihapus setelah paket agentes.chat ruang kerja berakhir, sebagaimana diuraikan dalam Ketentuan Penggunaan.",
+              "**Komputer ruang kerja.** Di Ackwire AI Cloud, agen suatu ruang kerja bekerja pada komputer yang kami jalankan untuk ruang kerja tersebut, yang di-hosting oleh Contabo di Uni Eropa. Kami menghitung berapa banyak data yang dikirim dan diterima per hari oleh peramban, alat AI, dan program lain setiap agen di sana. Komputer tersebut dihapus setelah paket Ackwire AI ruang kerja berakhir, sebagaimana diuraikan dalam Ketentuan Penggunaan.",
             ],
           },
           "Tindakan yang sulit dibatalkan (seperti menggabungkan kode, melakukan deploy, atau mengirim atas nama seseorang) menjadi permintaan persetujuan kepada seseorang sebelum tindakan itu terjadi. Teks yang berasal dari luar ruang kerja (halaman web, email, berkas) ditandai sebagai tidak tepercaya sebelum agen membacanya.",
@@ -246,9 +246,9 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Kapan staf agentes.chat dapat melihat Konten Ruang Kerja",
+        heading: "6. Kapan staf Ackwire AI dapat melihat Konten Ruang Kerja",
         blocks: [
-          "Kami tidak menelusuri ruang kerja. Seseorang di agentes.chat dapat melihat Konten Ruang Kerja hanya:",
+          "Kami tidak menelusuri ruang kerja. Seseorang di Ackwire AI dapat melihat Konten Ruang Kerja hanya:",
           {
             list: [
               "**Atas permintaan Anda,** untuk membantu permintaan dukungan, dan hanya sejauh yang dibutuhkan oleh permintaan tersebut.",
@@ -266,7 +266,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Data akun:** selama akun ada. Ketika Anda menghapus akun di aplikasi, akun tersebut segera keluar dari semua perangkat dan dihapus 7 hari kemudian, kecuali Anda memulihkannya sebelum itu, lalu keluar dari cadangan kami dalam waktu 30 hari setelahnya, kecuali catatan yang wajib kami simpan menurut hukum. Setiap ruang kerja tempat Anda menjadi satu-satunya anggota ditutup pada saat yang sama, dan kontennya dihapus 7 hari kemudian sebagaimana diuraikan berikut ini. Ruang kerja tempat Anda pernah berada tetap menyimpan nama dan alamat email Anda dalam log auditnya selama masing-masing ruang kerja itu ada.",
-              "**Konten Ruang Kerja:** selama ruang kerja ada, dan lebih awal apabila ruang kerja menghapus konten tertentu. Ketika paket agentes.chat suatu ruang kerja berakhir, kontennya tetap tersedia selama 90 hari dan kemudian dihapus. Ketika seorang pemilik menghapus ruang kerja, ruang kerja itu segera ditutup bagi semua orang dan kontennya dihapus 7 hari kemudian, kecuali seorang pemilik memulihkannya sebelum itu, dan keluar dari cadangan kami dalam waktu 30 hari setelahnya, kecuali konten yang wajib kami simpan menurut hukum atau sebagai catatan penyalahgunaan (di bawah).",
+              "**Konten Ruang Kerja:** selama ruang kerja ada, dan lebih awal apabila ruang kerja menghapus konten tertentu. Ketika paket Ackwire AI suatu ruang kerja berakhir, kontennya tetap tersedia selama 90 hari dan kemudian dihapus. Ketika seorang pemilik menghapus ruang kerja, ruang kerja itu segera ditutup bagi semua orang dan kontennya dihapus 7 hari kemudian, kecuali seorang pemilik memulihkannya sebelum itu, dan keluar dari cadangan kami dalam waktu 30 hari setelahnya, kecuali konten yang wajib kami simpan menurut hukum atau sebagai catatan penyalahgunaan (di bawah).",
               "**Log:** log permintaan dan keamanan hingga 90 hari. Catatan penggunaan model (token dan biaya) selama ruang kerja ada, karena anggaran dan laporan penggunaan bergantung padanya.",
               "**Data penagihan:** selama Anda membayar suatu ruang kerja, dan setelah itu selama diwajibkan oleh hukum perpajakan dan akuntansi.",
               "**Daftar tunggu:** hingga Anda diundang dan selama 12 bulan setelahnya, atau hingga Anda meminta kami menghapus Anda.",
@@ -321,7 +321,7 @@ export const legalId: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookie dan penyimpanan lokal",
         blocks: [
-          "Ruang kerja hanya menggunakan cookie dan penyimpanan lokal yang diperlukan untuk menjaga Anda tetap masuk, melindungi formulir, dan mengingat preferensi seperti tema dan bahasa. Situs publik agentes.chat mengingat bahasa yang Anda pilih dan menggunakan analitik Himetrica (Bagian 2). Kami tidak menggunakan cookie iklan atau pelacakan lintas situs.",
+          "Ruang kerja hanya menggunakan cookie dan penyimpanan lokal yang diperlukan untuk menjaga Anda tetap masuk, melindungi formulir, dan mengingat preferensi seperti tema dan bahasa. Situs publik Ackwire AI mengingat bahasa yang Anda pilih dan menggunakan analitik Himetrica (Bagian 2). Kami tidak menggunakan cookie iklan atau pelacakan lintas situs.",
         ],
       },
       {

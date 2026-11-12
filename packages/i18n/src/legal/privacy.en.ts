@@ -9,7 +9,7 @@ export const privacyEn: LegalDocument = {
       id: "overview",
       heading: "1. Overview",
       blocks: [
-        'CODARI GLOBAL, LLC, a Wyoming limited liability company doing business as agentes.chat ("agentes.chat", "we"), operates agentes.chat: a workspace where people and AI agents work together, available on the web, as a Mac app and as a phone app (the "Service"). This policy distinguishes two roles:',
+        'CODARI GLOBAL, LLC, a Wyoming limited liability company doing business as Ackwire AI ("Ackwire AI", "we"), operates Ackwire AI: a workspace where people and AI agents work together, available on the web, as a Mac app and as a phone app (the "Service"). This policy distinguishes two roles:',
         {
           list: [
             "For **account data**, the information people give us to create and use an account, we are the data controller.",
@@ -26,11 +26,11 @@ export const privacyEn: LegalDocument = {
           list: [
             "**Account data:** name, email address, password hash, profile photo, language and time zone. If you sign in with Google, Apple or GitHub, we receive your name, email address and the account identifier from that provider, never its password.",
             "**Workspace data:** the workspace's name, members, roles and invitations.",
-            "**Billing data:** for a workspace with an agentes.chat plan, the name, email address, billing address and tax ID of the person who pays, the plan, and its invoices and payments. Payments are processed by Stripe, which handles the card details: they never reach us.",
+            "**Billing data:** for a workspace with an Ackwire AI plan, the name, email address, billing address and tax ID of the person who pays, the plan, and its invoices and payments. Payments are processed by Stripe, which handles the card details: they never reach us.",
             "**Usage and log data:** IP addresses, browser and device, sign-in sessions, security events, API requests, and the record of each model call (model, tokens and cost, with the workspace and agent it belongs to), which we keep to enforce budgets and show usage. When something breaks, we record the error, without message content, to fix it.",
             "**Devices:** for the phone app, the push notification token of each device you sign in on. For connected computers and the Mac app, the computer's name, operating system and app version.",
-            "**Waiting list:** the email address and language you give us on agentes.chat, and whether you confirmed it.",
-            "**Site analytics:** on agentes.chat (the public site, not the workspace), the pages viewed, the referring site, the device type and an approximate location derived from the IP address, collected with Himetrica.",
+            "**Waiting list:** the email address and language you give us on Ackwire AI, and whether you confirmed it.",
+            "**Site analytics:** on Ackwire AI (the public site, not the workspace), the pages viewed, the referring site, the device type and an approximate location derived from the IP address, collected with Himetrica.",
           ],
         },
       ],
@@ -66,7 +66,7 @@ export const privacyEn: LegalDocument = {
             "**Connectors.** When the workspace connects a service (such as GitHub, Google, Linear, Sentry, an email inbox or any MCP server), we store its access tokens encrypted and read or write that service only within the scopes the workspace gave each agent. The connected service processes that data under its own terms. Connections to Gmail and Outlook inboxes, and to Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit and WhatsApp, go through Composio, which processes what agents read and write there.",
             "**Databases.** Database connections are read-only. Credentials are stored encrypted and each query is checked before it runs.",
             "**Connected computers.** When someone connects a computer, agents can run commands and use a browser there, within the folders and permissions set on that computer. The live view of an agent's browser passes through Cloudflare and through our servers' memory, and is not recorded. A summary of the steps the agent took (such as addresses visited and actions) is kept with its work so the team can see what it did.",
-            "**The workspace's computer.** On agentes.chat Cloud, a workspace's agents work on a computer we run for that workspace, hosted by Contabo in the European Union. We count how much data each agent's browser, AI tools and other programs send and receive there, per day. The computer is wiped after the workspace's agentes.chat plan ends, as the Terms of Use describe.",
+            "**The workspace's computer.** On Ackwire AI Cloud, a workspace's agents work on a computer we run for that workspace, hosted by Contabo in the European Union. We count how much data each agent's browser, AI tools and other programs send and receive there, per day. The computer is wiped after the workspace's Ackwire AI plan ends, as the Terms of Use describe.",
           ],
         },
         "Actions that are hard to undo (such as merging code, deploying or sending on someone's behalf) become an approval request for a person before they happen. Text that comes from outside the workspace (web pages, emails, files) is marked as untrusted before an agent reads it.",
@@ -74,9 +74,9 @@ export const privacyEn: LegalDocument = {
     },
     {
       id: "staff-access",
-      heading: "6. When agentes.chat staff can see Workspace Content",
+      heading: "6. When Ackwire AI staff can see Workspace Content",
       blocks: [
-        "We do not browse workspaces. A person at agentes.chat can see Workspace Content only:",
+        "We do not browse workspaces. A person at Ackwire AI can see Workspace Content only:",
         {
           list: [
             "**At your request,** to help with a support request, and only as far as the request needs.",
@@ -94,7 +94,7 @@ export const privacyEn: LegalDocument = {
         {
           list: [
             "**Account data:** for the life of the account. When you delete your account in the app, it is signed out everywhere at once and removed 7 days later, unless you restore it before then, and leaves our backups within 30 days after that, except records we must keep by law. Any workspace in which you were the only member closes at the same time, and its content is deleted 7 days later as described next. The workspaces you were in keep your name and email address in their audit logs for as long as each of them exists.",
-            "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's agentes.chat plan ends, its content stays available for 90 days and is then deleted. When an owner deletes a workspace, it closes for everyone at once and its content is deleted 7 days later, unless an owner restores it before then, and leaves our backups within 30 days after that, except content we must keep by law or as a record of abuse (below).",
+            "**Workspace Content:** for the life of the workspace, and earlier when the workspace deletes specific content. When a workspace's Ackwire AI plan ends, its content stays available for 90 days and is then deleted. When an owner deletes a workspace, it closes for everyone at once and its content is deleted 7 days later, unless an owner restores it before then, and leaves our backups within 30 days after that, except content we must keep by law or as a record of abuse (below).",
             "**Logs:** request and security logs for up to 90 days. Model usage records (tokens and cost) for the life of the workspace, because budgets and usage reports depend on them.",
             "**Billing data:** while you pay for a workspace, and after that for as long as tax and accounting law requires.",
             "**Waiting list:** until you are invited and for 12 months after, or until you ask us to remove you.",
@@ -149,7 +149,7 @@ export const privacyEn: LegalDocument = {
       id: "cookies",
       heading: "14. Cookies and local storage",
       blocks: [
-        "The workspace uses only the cookies and local storage needed to keep you signed in, protect forms, and remember preferences such as theme and language. The public site agentes.chat remembers the language you chose and uses Himetrica analytics (Section 2). We do not use advertising or cross-site tracking cookies.",
+        "The workspace uses only the cookies and local storage needed to keep you signed in, protect forms, and remember preferences such as theme and language. The public site Ackwire AI remembers the language you chose and uses Himetrica analytics (Section 2). We do not use advertising or cross-site tracking cookies.",
       ],
     },
     {

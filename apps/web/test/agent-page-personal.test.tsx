@@ -50,7 +50,7 @@ describe("a personal workspace's agent page", () => {
     expect(within(bar()).getByRole("tab", { name: "Avançado" }).getAttribute("aria-selected")).toBe("true");
     expect(heading("Responsável")).not.toBeNull();
     expect(heading("Arquivar ou apagar")).not.toBeNull();
-    expect(heading("Nativos do agentes")).not.toBeNull();
+    expect(heading("Nativos do Ackwire AI")).not.toBeNull();
     expect(heading("Identidade e jeito")).toBeNull();
     const links = screen().getByRole("navigation", { name: "Atividade, arquivos e uso" });
     await act(async () => fireEvent.click(within(links).getByRole("button", { name: "Uso" })));
@@ -63,7 +63,7 @@ describe("a personal workspace's agent page", () => {
   test("Can use shows its apps; the built-in areas and skills are in Advanced", async () => {
     await go("?tab=access");
     expect(heading("Os seus conectores")).not.toBeNull();
-    expect(heading("Nativos do agentes")).toBeNull();
+    expect(heading("Nativos do Ackwire AI")).toBeNull();
     expect(heading("Skills")).toBeNull();
   });
 

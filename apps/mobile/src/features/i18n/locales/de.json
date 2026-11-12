@@ -1128,7 +1128,7 @@
     "addWorkspaceTeam": "Dem Server deines Teams beitreten",
     "addWorkspaceTeamSub": "Über seine Adresse oder den QR-Code auf dem Computer",
     "teamServer": "Server des Teams",
-    "teamServerLead": "Die agentes.chat-Adresse deines Teams, dieselbe wie im Browser.",
+    "teamServerLead": "Die Ackwire AI-Adresse deines Teams, dieselbe wie im Browser.",
     "teamServerFoot": "Du verlässt keinen Workspace: Der Server deines Teams kommt in deine Liste, mit deinem Konto dort.",
     "workspacesHoldHint": "Gedrückt halten, um den Workspace zu wechseln",
     "workspacesSheetFoot": "Du bleibst in allen angemeldet. Die Benachrichtigungen von jedem kommen hier an.",
@@ -1882,8 +1882,8 @@
       "serverText": "Eine Zeile für sein Terminal",
       "computer": "Ein anderer Computer",
       "computerText": "Installiere dort die App",
-      "appNote": "Auf einem Mac oder PC, den du nutzt, verbindet ihn auch die agentes.chat-Desktop-App.",
-      "appStep1": "Hol dir die agentes.chat-App darauf",
+      "appNote": "Auf einem Mac oder PC, den du nutzt, verbindet ihn auch die Ackwire AI-Desktop-App.",
+      "appStep1": "Hol dir die Ackwire AI-App darauf",
       "appStep2": "Öffne sie und melde dich mit deinem eigenen Konto an",
       "appStep3": "Klicke auf Erlauben, wenn sie fragt, ob die Agenten von {{org}} ihn nutzen dürfen",
       "appShows": "Er erscheint hier von selbst, nur für dich, bis du ihn teilst.",
@@ -2061,7 +2061,7 @@
     "usedBy_other": "{{names}} nutzen es",
     "fromAgent": "Dienst verbinden",
     "githubApp": {
-      "useApp": "agentes.chat-App nutzen",
+      "useApp": "Ackwire AI-App nutzen",
       "useAccount": "GitHub-Konto nutzen",
       "createInBrowser": "Im Browser erstellen"
     },

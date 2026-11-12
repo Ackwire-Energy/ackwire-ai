@@ -472,7 +472,7 @@
       "confirmYes": "Ya, masukkan aplikasinya",
       "confirmNo": "Ini bukan aku",
       "done": "Beres.",
-      "doneLead": "Kamu sudah masuk di aplikasi agentes. Kamu bisa menutup tab ini.",
+      "doneLead": "Kamu sudah masuk di aplikasi Ackwire AI. Kamu bisa menutup tab ini.",
       "expired": "Permintaan ini sudah kedaluwarsa.",
       "expiredLead": "Kembali ke aplikasi lalu pilih {{provider}} lagi.",
       "handover": "Masuk dengan akunmu dari perangkat lain…",
@@ -1171,7 +1171,7 @@
     "keyStep": {
       "title": "AI mana yang akan mereka pakai?",
       "lead": "Masuk dengan paket AI-mu: tidak perlu kunci API.",
-      "paid": "Paket agentes.chat-mu sudah aktif. Komputer mereka sedang disiapkan.",
+      "paid": "Paket Ackwire AI-mu sudah aktif. Komputer mereka sedang disiapkan.",
       "confirming": "Mengonfirmasi pembayaran untuk paket Ackwire AI ruang kerja ini.",
       "leadNoComputer": "Agenmu berpikir dengan kunci API, atau dengan paket AI-mu di komputer yang kamu hubungkan."
     },
@@ -1398,7 +1398,10 @@
       "why": "Untuk Ubuntu, Debian, dan sistem serupa (x64). Linux tidak meminta apa pun tambahan:",
       "apt": "Pasang .deb dengan klik dua kali, atau dari terminal.",
       "aptLong": "Klik dua kali file yang diunduh lalu klik Pasang, atau tempel ini di terminal:",
-      "open": "Buka Ackwire AI dari daftar aplikasimu."
+      "open": "Buka Ackwire AI dari daftar aplikasimu.",
+      "otherTitle": "Pakai Arch, Fedora, atau sistem lain yang tidak menerima .deb?",
+      "otherText": "Unduh AppImage: berjalan di distribusi apa pun dan memperbarui dirinya sendiri. Lalu tempel ini di terminal, di folder tempat Anda menyimpannya:",
+      "appImage": "Unduh AppImage"
     },
     "page": {
       "docTitle": "Unduh aplikasinya · Ackwire AI",
@@ -1808,7 +1811,7 @@
     }
   },
   "openOnPhone": {
-    "qr": "Kode QR untuk masuk ke aplikasi agentes",
+    "qr": "Kode QR untuk masuk ke aplikasi Ackwire AI",
     "making": "Membuat kode…",
     "stepApp": "Pasang aplikasi Ackwire AI di ponselmu.",
     "stepTailscale": "Pasang Tailscale di ponselmu dan masuk dengan akun Tailscale yang sama dengan server ini.",
@@ -4885,7 +4888,7 @@
         "two": "Preferensi",
         "three": "Nyalakan Browser",
         "done": "Selesai. Halaman ini mendeteksinya sendiri, tidak perlu dimuat ulang.",
-        "menuOpen": "Buka agentes",
+        "menuOpen": "Buka Ackwire AI",
         "menuPrefs": "Preferensi…",
         "menuPause": "Jeda",
         "menuQuit": "Keluar",
@@ -5062,7 +5065,7 @@
       "connectors": "Konektor {{org}}",
       "connectorsPersonal": "Konektormu",
       "oneLevel": "Satu level per aplikasi",
-      "builtin": "Bawaan agentes",
+      "builtin": "Bawaan Ackwire AI",
       "builtinHelp": "Drive, tugas, memori, dan lainnya",
       "noMatch": "Tidak ada yang cocok dengan “{{q}}”",
       "noneHere": "Tidak ada apa pun di filter ini",
@@ -7488,7 +7491,7 @@
         "pr_opened": "PR dibuka di GitHub"
       },
       "issue": {
-        "created": "Tugas dibuat di agentes"
+        "created": "Tugas dibuat di Ackwire AI"
       },
       "deploy": {
         "succeeded": "Deploy selesai"
@@ -13615,7 +13618,7 @@
     "reconnectDoneText": "{{name}} kembali ke {{org}}.",
     "deniedTitle": "Tidak terhubung",
     "denied": "Komputer tidak dihubungkan. Kalau bukan kamu yang membukanya, tidak ada yang mendapat akses.",
-    "home": "Ke agentes"
+    "home": "Ke Ackwire AI"
   },
   "apps": {
     "connect": "Hubungkan aplikasi",
@@ -13773,7 +13776,7 @@
         "mode": "Di chat, beralih ke mode {{mode}}.",
         "loginRun": "Untuk masuk, jalankan <code>{{command}}</code>.",
         "loginType": "Untuk masuk, ketik <code>{{command}}</code> di aplikasi.",
-        "signIn": "Masuk dengan akun agentes.chat-mu di halaman yang terbuka.",
+        "signIn": "Masuk dengan akun Ackwire AI-mu di halaman yang terbuka.",
         "signInFirst": "Aplikasi memintamu masuk saat pertama kali memakainya.",
         "token": "Buat token pribadi dan taruh di tempat {{placeholder}}.",
         "install": "Tambahkan ke {{app}}"
@@ -16095,7 +16098,7 @@
     "open": "Buka paket dan tagihan",
     "opening": "Membuka…",
     "failed": "Tidak bisa membukanya sekarang. Coba lagi sebentar lagi.",
-    "adminsOnly": "Hanya pemilik dan admin ruang kerja yang mengelola paket agentes.chat-nya.",
+    "adminsOnly": "Hanya pemilik dan admin ruang kerja yang mengelola paket Ackwire AI-nya.",
     "seeOptions": "Lihat opsi",
     "people": "Orang",
     "files": "File",

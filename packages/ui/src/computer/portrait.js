@@ -100,7 +100,7 @@ function screen(p, x, y, w, h, state, t, dark) {
 
 /* The brand's pixel agent: a 5×4 deep body with white eyes (they close while paused). */
 function agent(p, x, y, state, t) {
-  const body = "#04203f";
+  const body = "#23440b";
   const bob = state === "online" && Math.sin(t * 2) > 0.3 ? -1 : 0;
   p.box(x, y + bob, 5, 4, body);
   p.set(x + 4, y + 3 + bob, null);

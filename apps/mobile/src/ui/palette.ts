@@ -52,8 +52,8 @@ const NATIVE_LIGHT: Partial<ThemeColors> = {
   surfaceRaised: "#ffffff",
   surfaceSunken: "#f2f2f5",
   inkMuted: "#48484d",
-  action: "#000000",
-  onAction: "#ffffff",
+  action: "#90ed42",
+  onAction: "#031f1b",
   success: "#000000",
 };
 
@@ -61,7 +61,7 @@ export function appColors(scheme: Scheme): AppColors {
   if (scheme === "dark") {
     return {
       ...darkTokens,
-      glass: "rgba(28, 28, 27, 0.86)",
+      glass: "rgba(24, 24, 24, 0.86)",
       grouped: darkTokens.bg,
       bubble: darkTokens.raised,
       amber: "#e8ac4c",

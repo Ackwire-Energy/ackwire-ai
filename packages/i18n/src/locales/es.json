@@ -484,7 +484,7 @@
       "confirmYes": "Sí, iniciar sesión en la app",
       "confirmNo": "No fui yo",
       "done": "Todo listo.",
-      "doneLead": "Iniciaste sesión en la app de agentes. Puedes cerrar esta pestaña.",
+      "doneLead": "Iniciaste sesión en la app de Ackwire AI. Puedes cerrar esta pestaña.",
       "expired": "Esta solicitud venció.",
       "expiredLead": "Vuelve a la app y elige {{provider}} de nuevo.",
       "handover": "Iniciando sesión con tu cuenta del otro dispositivo…",
@@ -1477,7 +1477,10 @@
       "why": "Para Ubuntu, Debian y sistemas similares (x64). Linux no pide nada más:",
       "apt": "Instala el .deb con doble clic, o desde la terminal.",
       "aptLong": "Haz doble clic en el archivo descargado y luego en Instalar, o pega esto en la terminal:",
-      "open": "Abre Ackwire AI desde tus aplicaciones."
+      "open": "Abre Ackwire AI desde tus aplicaciones.",
+      "otherTitle": "¿Usas Arch, Fedora u otro sistema que no acepta .deb?",
+      "otherText": "Descarga el AppImage: funciona en cualquier distribución y se actualiza solo. Luego pega esto en la terminal, en la carpeta donde lo guardaste:",
+      "appImage": "Descargar el AppImage"
     },
     "page": {
       "docTitle": "Descarga la app · Ackwire AI",

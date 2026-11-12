@@ -32,7 +32,7 @@ export const TYPED_VALUES = { tOptions: { interpolation: { escapeValue: true } }
 const STORAGE_KEY = "agentes.locale";
 /** "1" while a choice made signed out waits for the next sign-in to reach the server. */
 const PENDING_KEY = "agentes.locale.pending";
-/** The landing's language switch (agentes.chat), shared with the app's host. */
+/** The landing's language switch (Ackwire AI), shared with the app's host. */
 const LANDING_COOKIE = "agentes_locale";
 
 function browserLanguages(): readonly string[] {

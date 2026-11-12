@@ -4,7 +4,7 @@ import type { LegalDocument, LegalKind } from "./types";
 export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "使用条款",
-    summary: "使用 agentes.chat 的协议：您的工作区、您的智能体，以及双方各自承担的责任。",
+    summary: "使用 Ackwire AI 的协议：您的工作区、您的智能体，以及双方各自承担的责任。",
     courtesy: "本文件为礼节性译本。如本译本与英文版本存在任何差异，以英文版本为准。",
     updated: "2026-11-06",
     sections: [
@@ -12,7 +12,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "agreement",
         heading: "1. 协议",
         blocks: [
-          "本使用条款（以下简称“本条款”）是 CODARI GLOBAL, LLC（一家依据怀俄明州（Wyoming）法律设立、以 agentes.chat 名义经营的有限责任公司，以下简称“agentes.chat”或“我们”）与创建账户或工作区的个人或实体（以下简称“您”）之间具有约束力的协议。一旦您创建账户、加入工作区，或以其他方式通过网页、Mac 应用或手机应用使用 agentes.chat（以下简称“本服务”），即表示您接受本条款及我们的隐私政策。如果您代表公司或其他实体使用本服务，您声明您有权代表该实体并使其受本条款约束。",
+          "本使用条款（以下简称“本条款”）是 CODARI GLOBAL, LLC（一家依据怀俄明州（Wyoming）法律设立、以 Ackwire AI 名义经营的有限责任公司，以下简称“Ackwire AI”或“我们”）与创建账户或工作区的个人或实体（以下简称“您”）之间具有约束力的协议。一旦您创建账户、加入工作区，或以其他方式通过网页、Mac 应用或手机应用使用 Ackwire AI（以下简称“本服务”），即表示您接受本条款及我们的隐私政策。如果您代表公司或其他实体使用本服务，您声明您有权代表该实体并使其受本条款约束。",
           "您必须年满 18 周岁并具备订立合同的能力，方可使用本服务。",
         ],
       },
@@ -94,7 +94,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "fees",
         heading: "10. 套餐、付款和合理使用",
         blocks: [
-          "每个工作区为其自身的 agentes.chat 套餐付费。以下规则适用于所有套餐：",
+          "每个工作区为其自身的 Ackwire AI 套餐付费。以下规则适用于所有套餐：",
           {
             list: [
               "**价格。** 套餐及其价格载于我们的价格页面。价格以美元计价，并在适用时另加税费。您的银行或支付服务提供商可能对境外购买收取其自身的费用，例如巴西的 IOF。",
@@ -113,7 +113,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "ip",
         heading: "11. 知识产权和反馈",
         blocks: [
-          "除您的工作区内容外，我们及我们的许可方保留对本服务的一切权利、所有权和权益，包括其软件、设计以及 agentes.chat 名称和标志。对于您自愿发送给我们的反馈，我们可以使用而无需对您承担任何义务。",
+          "除您的工作区内容外，我们及我们的许可方保留对本服务的一切权利、所有权和权益，包括其软件、设计以及 Ackwire AI 名称和标志。对于您自愿发送给我们的反馈，我们可以使用而无需对您承担任何义务。",
         ],
       },
       {
@@ -162,7 +162,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "18. 联系方式",
         blocks: [
-          "CODARI GLOBAL, LLC，以 agentes.chat 名义经营。通知地址：7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · 其他事宜：hello@agentes.chat",
+          "CODARI GLOBAL, LLC，以 Ackwire AI 名义经营。通知地址：7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · 其他事宜：hello@agentes.chat",
         ],
       },
     ],
@@ -177,7 +177,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "overview",
         heading: "1. 概述",
         blocks: [
-          "CODARI GLOBAL, LLC（一家依据怀俄明州（Wyoming）法律设立、以 agentes.chat 名义经营的有限责任公司，以下简称“agentes.chat”或“我们”）运营 agentes.chat：一个供人与 AI 智能体协同工作的工作区，可通过网页、Mac 应用和手机应用使用（以下简称“本服务”）。本政策区分两种角色：",
+          "CODARI GLOBAL, LLC（一家依据怀俄明州（Wyoming）法律设立、以 Ackwire AI 名义经营的有限责任公司，以下简称“Ackwire AI”或“我们”）运营 Ackwire AI：一个供人与 AI 智能体协同工作的工作区，可通过网页、Mac 应用和手机应用使用（以下简称“本服务”）。本政策区分两种角色：",
           {
             list: [
               "对于**账户数据**，即人们为创建和使用账户而向我们提供的信息，我们是数据控制者。",
@@ -194,11 +194,11 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**账户数据：** 姓名、电子邮件地址、密码哈希值、头像、语言和时区。如果您通过 Google、Apple 或 GitHub 登录，我们会从该提供商处获取您的姓名、电子邮件地址和账户标识符，但绝不会获取其密码。",
               "**工作区数据：** 工作区的名称、成员、角色和邀请。",
-              "**账单数据：** 对于拥有 agentes.chat 套餐的工作区，付款人的姓名、电子邮件地址、账单地址和税号，以及套餐及其发票和付款记录。付款由 Stripe 处理，银行卡信息由其处理，绝不会到达我们。",
+              "**账单数据：** 对于拥有 Ackwire AI 套餐的工作区，付款人的姓名、电子邮件地址、账单地址和税号，以及套餐及其发票和付款记录。付款由 Stripe 处理，银行卡信息由其处理，绝不会到达我们。",
               "**使用和日志数据：** IP 地址、浏览器和设备、登录会话、安全事件、API 请求，以及每次模型调用的记录（模型、令牌数和费用，以及其所属的工作区和智能体），我们保留这些记录以执行预算和显示用量。出现故障时，我们会记录错误（不含消息内容）以便修复。",
               "**设备：** 对于手机应用，您登录的每台设备的推送通知令牌。对于已连接的计算机和 Mac 应用，计算机的名称、操作系统和应用版本。",
-              "**候补名单：** 您在 agentes.chat 上向我们提供的电子邮件地址和语言，以及您是否已确认该地址。",
-              "**网站分析：** 在 agentes.chat（公开网站，而非工作区）上，通过 Himetrica 收集的所浏览页面、来源网站、设备类型以及根据 IP 地址推断的大致位置。",
+              "**候补名单：** 您在 Ackwire AI 上向我们提供的电子邮件地址和语言，以及您是否已确认该地址。",
+              "**网站分析：** 在 Ackwire AI（公开网站，而非工作区）上，通过 Himetrica 收集的所浏览页面、来源网站、设备类型以及根据 IP 地址推断的大致位置。",
             ],
           },
         ],
@@ -234,7 +234,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
               "**连接器。** 当工作区连接某项服务（例如 GitHub、Google、Linear、Sentry、电子邮件收件箱或任何 MCP 服务器）时，我们以加密方式存储其访问令牌，并仅在工作区授予每个智能体的范围内读取或写入该服务。已连接的服务依据其自身条款处理该等数据。与 Gmail 和 Outlook 收件箱，以及与 Google Drive、Google Calendar、Google Sheets、Google Docs、Slack、Microsoft Teams、OneDrive、HubSpot、Salesforce、Zendesk、Asana、Figma、Intercom、Dropbox、Square、Instagram、Facebook、LinkedIn、YouTube、Pinterest、Reddit 和 WhatsApp 的连接均通过 Composio 进行，由其处理智能体在其中读取和写入的内容。",
               "**数据库。** 数据库连接为只读。凭据以加密方式存储，每次查询在运行前均会经过检查。",
               "**已连接的计算机。** 当有人连接一台计算机时，智能体可以在该计算机上设定的文件夹和权限范围内运行命令和使用浏览器。智能体浏览器的实时画面经过 Cloudflare 和我们服务器的内存，且不会被录制。智能体所采取步骤的摘要（例如访问过的地址和执行的操作）会随其工作一并保存，以便团队了解其所做的事情。",
-              "**工作区的计算机。** 在 agentes.chat Cloud 上，工作区的智能体在我们为该工作区运行的一台计算机上工作，该计算机由 Contabo 托管于欧盟境内。我们按日统计每个智能体的浏览器、AI 工具和其他程序在该计算机上发送和接收的数据量。按照使用条款所述，该计算机将在工作区的 agentes.chat 套餐结束后被清除。",
+              "**工作区的计算机。** 在 Ackwire AI Cloud 上，工作区的智能体在我们为该工作区运行的一台计算机上工作，该计算机由 Contabo 托管于欧盟境内。我们按日统计每个智能体的浏览器、AI 工具和其他程序在该计算机上发送和接收的数据量。按照使用条款所述，该计算机将在工作区的 Ackwire AI 套餐结束后被清除。",
             ],
           },
           "难以撤销的操作（例如合并代码、部署或代表某人发送内容）在执行之前会转为提交给人员的审批请求。来自工作区外部的文本（网页、电子邮件、文件）在智能体读取之前会被标记为不受信任。",
@@ -242,9 +242,9 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. agentes.chat 工作人员何时可以查看工作区内容",
+        heading: "6. Ackwire AI 工作人员何时可以查看工作区内容",
         blocks: [
-          "我们不会浏览工作区。agentes.chat 的人员仅可在以下情形下查看工作区内容：",
+          "我们不会浏览工作区。Ackwire AI 的人员仅可在以下情形下查看工作区内容：",
           {
             list: [
               "**应您的要求，** 为协助处理支持请求，且仅限于该请求所需的范围。",
@@ -262,7 +262,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**账户数据：** 在账户存续期间保留。当您在应用中删除账户时，账户会立即在所有设备上退出登录，并在 7 天后被移除（除非您在此之前恢复），随后在 30 天内从我们的备份中清除，但我们依法必须保留的记录除外。您作为唯一成员的任何工作区将同时关闭，其内容将按下文所述在 7 天后删除。您曾加入的工作区会在其审计日志中保留您的姓名和电子邮件地址，保留期限为各该工作区存续的期间。",
-              "**工作区内容：** 在工作区存续期间保留。工作区删除特定内容时则提前删除。工作区的 agentes.chat 套餐结束后，其内容在 90 天内仍可使用，之后将被删除。当所有者删除工作区时，该工作区会立即对所有人关闭，其内容将在 7 天后删除（除非所有者在此之前将其恢复），并在此后 30 天内从我们的备份中清除，但我们依法必须保留或作为滥用记录（见下文）必须保留的内容除外。",
+              "**工作区内容：** 在工作区存续期间保留。工作区删除特定内容时则提前删除。工作区的 Ackwire AI 套餐结束后，其内容在 90 天内仍可使用，之后将被删除。当所有者删除工作区时，该工作区会立即对所有人关闭，其内容将在 7 天后删除（除非所有者在此之前将其恢复），并在此后 30 天内从我们的备份中清除，但我们依法必须保留或作为滥用记录（见下文）必须保留的内容除外。",
               "**日志：** 请求日志和安全日志最多保留 90 天。模型使用记录（令牌数和费用）在工作区存续期间保留，因为预算和用量报告依赖于这些记录。",
               "**账单数据：** 在您为工作区付费期间保留，此后按税务和会计法律要求的期限保留。",
               "**候补名单：** 保留至您受邀后 12 个月，或直至您要求我们将您移除。",
@@ -317,7 +317,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookie 和本地存储",
         blocks: [
-          "工作区仅使用为保持您的登录状态、保护表单以及记住主题和语言等偏好所必需的 Cookie 和本地存储。公开网站 agentes.chat 会记住您选择的语言，并使用 Himetrica 分析（见第 2 条）。我们不使用广告 Cookie 或跨站跟踪 Cookie。",
+          "工作区仅使用为保持您的登录状态、保护表单以及记住主题和语言等偏好所必需的 Cookie 和本地存储。公开网站 Ackwire AI 会记住您选择的语言，并使用 Himetrica 分析（见第 2 条）。我们不使用广告 Cookie 或跨站跟踪 Cookie。",
         ],
       },
       {
@@ -338,7 +338,7 @@ export const legalZhHans: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "17. 联系方式",
         blocks: [
-          "CODARI GLOBAL, LLC，以 agentes.chat 名义经营。通知地址：7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat。来自欧盟、英国和巴西的数据保护咨询可通过同一地址联系我们的隐私团队。其他事宜，请发送电子邮件至 hello@agentes.chat。",
+          "CODARI GLOBAL, LLC，以 Ackwire AI 名义经营。通知地址：7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat。来自欧盟、英国和巴西的数据保护咨询可通过同一地址联系我们的隐私团队。其他事宜，请发送电子邮件至 hello@agentes.chat。",
         ],
       },
     ],

@@ -484,7 +484,7 @@
       "confirmYes": "Oui, connecter l'app",
       "confirmNo": "Ce n'était pas moi",
       "done": "Tout est prêt.",
-      "doneLead": "Vous êtes connecté à l'app agentes. Vous pouvez fermer cet onglet.",
+      "doneLead": "Vous êtes connecté à l'app Ackwire AI. Vous pouvez fermer cet onglet.",
       "expired": "Cette demande a expiré.",
       "expiredLead": "Retournez dans l'app et choisissez de nouveau {{provider}}.",
       "handover": "Connexion avec votre compte depuis l'autre appareil…",
@@ -1478,7 +1478,10 @@
       "why": "Pour Ubuntu, Debian et les systèmes similaires (x64). Linux ne demande rien de plus :",
       "apt": "Installez le .deb d'un double-clic, ou depuis le terminal.",
       "aptLong": "Double-cliquez sur le fichier téléchargé puis sur Installer, ou collez ceci dans le terminal :",
-      "open": "Ouvrez Ackwire AI depuis vos applications."
+      "open": "Ouvrez Ackwire AI depuis vos applications.",
+      "otherTitle": "Vous utilisez Arch, Fedora ou un autre système qui n'accepte pas les .deb ?",
+      "otherText": "Téléchargez l'AppImage : elle fonctionne sur toutes les distributions et se met à jour toute seule. Collez ensuite ceci dans le terminal, dans le dossier où vous l'avez enregistrée :",
+      "appImage": "Télécharger l'AppImage"
     },
     "page": {
       "docTitle": "Télécharger l'app · Ackwire AI",
@@ -1912,7 +1915,7 @@
     }
   },
   "openOnPhone": {
-    "qr": "QR code pour vous connecter à l'app agentes",
+    "qr": "QR code pour vous connecter à l'app Ackwire AI",
     "making": "Création du code…",
     "stepApp": "Installez l'app Ackwire AI sur votre téléphone.",
     "stepTailscale": "Installez Tailscale sur votre téléphone et connectez-vous avec le même compte Tailscale que ce serveur.",
@@ -5215,7 +5218,7 @@
         "two": "Préférences",
         "three": "Activez Navigateur",
         "done": "C'est tout. Cette page le détecte toute seule, pas besoin de recharger.",
-        "menuOpen": "Ouvrir agentes",
+        "menuOpen": "Ouvrir Ackwire AI",
         "menuPrefs": "Préférences…",
         "menuPause": "Pause",
         "menuQuit": "Quitter",
@@ -5420,7 +5423,7 @@
       "connectors": "Connecteurs de {{org}}",
       "connectorsPersonal": "Vos connecteurs",
       "oneLevel": "Un niveau par app",
-      "builtin": "Intégré à agentes",
+      "builtin": "Intégré à Ackwire AI",
       "builtinHelp": "Drive, tâches, mémoire et plus",
       "noMatch": "Aucun résultat pour « {{q}} »",
       "noneHere": "Rien dans ce filtre",
@@ -7958,7 +7961,7 @@
         "pr_opened": "PR ouverte sur GitHub"
       },
       "issue": {
-        "created": "Tâche créée dans agentes"
+        "created": "Tâche créée dans Ackwire AI"
       },
       "deploy": {
         "succeeded": "Déploiement terminé"
@@ -14530,7 +14533,7 @@
     "reconnectDoneText": "{{name}} est de retour dans {{org}}.",
     "deniedTitle": "Non connecté",
     "denied": "L'ordinateur n'a pas été connecté. Si ce n'est pas vous qui l'avez ouvert, personne n'a obtenu l'accès.",
-    "home": "Aller sur agentes"
+    "home": "Aller sur Ackwire AI"
   },
   "apps": {
     "connect": "Connecter une app",

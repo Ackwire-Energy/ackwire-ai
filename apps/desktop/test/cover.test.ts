@@ -33,7 +33,7 @@ test("Tailscale off over the server here: the Mac's app, Windows' icon by the cl
   expect(coverTailnet("mac", { state: "off", app: false })).toBe("tailnetUp");
   // Not read: its app.
   expect(coverTailnet("mac", null)).toBe("openTailscale");
-  // What follows "Connect Tailscale on this PC to open agentes.chat.": no sudo on Windows, the command elsewhere.
+  // What follows "Connect Tailscale on this PC to open Ackwire AI.": no sudo on Windows, the command elsewhere.
   for (const { cover } of [desktopEn, desktopPtBR]) {
     expect(cover.openTailscale).toBeTruthy();
     expect(cover.tailnetTray).not.toMatch(/sudo|terminal/);

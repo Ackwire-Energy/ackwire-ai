@@ -460,7 +460,7 @@
       "openMail": "{{app}} openen",
       "ownerWaits": "Deze server wacht op zijn eigenaar.",
       "ownerWaitsLead": "Open de eigenaarslink van deze server (die eindigt op /owner#claim=…), op deze computer of op je telefoon.",
-      "noPassword": "Dit account logt in via de agentes.chat-app.",
+      "noPassword": "Dit account logt in via de Ackwire AI-app.",
       "noPasswordLead": "Open op de computer waarop deze server draait de app en kies Wachtwoord toevoegen in Instellingen › Je account.",
       "backToSignIn": "Terug naar inloggen",
       "toAuthorizeApp": "Om een app aan Ackwire AI te koppelen."
@@ -474,11 +474,11 @@
       "otherServer": "Andere server gebruiken",
       "opening": "{{provider}} openen…",
       "confirm": "Is dit jouw app?",
-      "confirmLead": "Deze code hoort overeen te komen met die in de agentes.chat-app op je computer.",
+      "confirmLead": "Deze code hoort overeen te komen met die in de Ackwire AI-app op je computer.",
       "confirmYes": "Ja, log de app in",
       "confirmNo": "Dit was ik niet",
       "done": "Helemaal klaar.",
-      "doneLead": "Je bent ingelogd in de agentes-app. Je kunt dit tabblad sluiten.",
+      "doneLead": "Je bent ingelogd in de Ackwire AI-app. Je kunt dit tabblad sluiten.",
       "expired": "Dit verzoek is verlopen.",
       "expiredLead": "Ga terug naar de app en kies opnieuw {{provider}}.",
       "handover": "Inloggen met je account van het andere apparaat…",
@@ -813,7 +813,7 @@
         "asleep": "Slaapt tot het abonnement",
         "price": "<b>Abonnement {{name}}</b> · {{price}} per maand",
         "name": "<b>Abonnement {{name}}</b>",
-        "generic": "Een agentes.chat-abonnement",
+        "generic": "Een Ackwire AI-abonnement",
         "cancel": "Altijd opzegbaar",
         "cta": "Team aanzetten",
         "all": "Alle abonnementen bekijken",
@@ -1206,8 +1206,8 @@
     "keyStep": {
       "title": "Welke AI gaan ze gebruiken?",
       "lead": "Log in met je AI-abonnement: geen API-sleutel nodig.",
-      "paid": "Je agentes.chat-abonnement is actief. Hun computer komt eraan.",
-      "confirming": "De betaling voor het agentes.chat-abonnement van deze werkruimte wordt bevestigd.",
+      "paid": "Je Ackwire AI-abonnement is actief. Hun computer komt eraan.",
+      "confirming": "De betaling voor het Ackwire AI-abonnement van deze werkruimte wordt bevestigd.",
       "leadNoComputer": "Je agents denken met een API-sleutel, of met je AI-abonnement op een computer die je koppelt."
     },
     "jev": {
@@ -1272,7 +1272,7 @@
     },
     "team": {
       "title": "Wie werkt er nog meer met je?",
-      "payment": "Je kunt je team uitnodigen zodra je een agentes.chat-abonnement kiest.",
+      "payment": "Je kunt je team uitnodigen zodra je een Ackwire AI-abonnement kiest.",
       "lead": "Nodig ze uit per e-mail, of deel de link.",
       "leadLink": "Deel de uitnodigingslink met ze.",
       "emails": "E-mailadressen",
@@ -1437,11 +1437,14 @@
       "why": "Voor Ubuntu, Debian en vergelijkbare systemen (x64). Linux vraagt niets extra:",
       "apt": "Installeer de .deb met een dubbelklik, of via de terminal.",
       "aptLong": "Dubbelklik op het gedownloade bestand en klik op Installeren, of plak dit in de terminal:",
-      "open": "Open Ackwire AI vanuit je apps."
+      "open": "Open Ackwire AI vanuit je apps.",
+      "otherTitle": "Gebruik je Arch, Fedora of een ander systeem dat geen .deb accepteert?",
+      "otherText": "Download de AppImage: die werkt op elke distributie en werkt zichzelf bij. Plak daarna dit in de terminal, in de map waar je het hebt opgeslagen:",
+      "appImage": "AppImage downloaden"
     },
     "page": {
       "docTitle": "Download de app · Ackwire AI",
-      "title": "Download de agentes.chat-app",
+      "title": "Download de Ackwire AI-app",
       "beta": "Beta",
       "text": "Je workspace in een eigen venster, met de meldingen van je systeem. Met één klik werken agents op deze computer, in hun eigen mappen.",
       "open": "Ackwire AI openen",
@@ -1859,9 +1862,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "QR-code om in te loggen in de agentes-app",
+    "qr": "QR-code om in te loggen in de Ackwire AI-app",
     "making": "Code maken…",
-    "stepApp": "Installeer de agentes-app op je telefoon.",
+    "stepApp": "Installeer de Ackwire AI-app op je telefoon.",
     "stepTailscale": "Installeer Tailscale op je telefoon en log in met hetzelfde Tailscale-account als deze server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -1870,7 +1873,7 @@
     "private": "Wie deze code scant, logt in als jou.",
     "failed": "Wie deze code scant, logt in als jij.",
     "localOnly": "Deze server opent alleen op de computer waarop hij draait, dus je telefoon kan hem niet bereiken.",
-    "localOnlyHow": "Zet in de agentes.chat-app op die computer Bereik het vanaf je telefoon en je teamgenoten aan bij Voorkeuren › Servers. Kom daarna hier terug."
+    "localOnlyHow": "Zet in de Ackwire AI-app op die computer Bereik het vanaf je telefoon en je teamgenoten aan bij Voorkeuren › Servers. Kom daarna hier terug."
   },
   "team": {
     "title": "Team",
@@ -2301,8 +2304,8 @@
       "greetingPersonal": "Hoi, ik ben {{name}}. Ik richt je agents samen met jou in.",
       "lead": "Ik maak de agents, koppel de apps en nodig de mensen uit. Niets verandert als jij het niet vraagt, en ik doe alleen wat jij mag doen.",
       "leadPersonal": "Ik maak je agents en koppel je apps. Niets verandert als jij het niet vraagt.",
-      "heldLead": "Kies wat je bedrijf doet en het team verschijnt hier. De agents gaan aan het werk zodra de workspace een agentes.chat-abonnement heeft.",
-      "heldLeadPersonal": "Kies waarbij je hulp wilt en je agents verschijnen hier. Ze gaan aan het werk zodra je een agentes.chat-abonnement hebt.",
+      "heldLead": "Kies wat je bedrijf doet en het team verschijnt hier. De agents gaan aan het werk zodra de workspace een Ackwire AI-abonnement heeft.",
+      "heldLeadPersonal": "Kies waarbij je hulp wilt en je agents verschijnen hier. Ze gaan aan het werk zodra je een Ackwire AI-abonnement hebt.",
       "connect": {
         "title": "Een AI voor het team koppelen",
         "titlePersonal": "Een AI voor je agents koppelen",
@@ -2673,11 +2676,11 @@
     },
     "kept": {
       "title": "Ik heb je bericht bewaard.",
-      "line": "Ik antwoord hier zodra de workspace een agentes.chat-abonnement en een gekoppelde AI heeft.",
+      "line": "Ik antwoord hier zodra de workspace een Ackwire AI-abonnement en een gekoppelde AI heeft.",
       "plan": "Het abonnement brengt de computer van de agents, altijd aan. De AI is die waarvoor je al betaalt: Claude, ChatGPT en andere, of een API-sleutel.",
       "active": "Abonnement actief. Koppel een AI en {{name}} antwoordt hier.",
       "receipt": "Bewaard",
-      "channel": "Bewaard. De agents antwoorden zodra de workspace een agentes.chat-abonnement heeft."
+      "channel": "Bewaard. De agents antwoorden zodra de workspace een Ackwire AI-abonnement heeft."
     },
     "receipt": "Niemand antwoordt: geen AI gekoppeld",
     "chip": "Geen AI"
@@ -2759,7 +2762,7 @@
         "unshare": "Alleen ik"
       }
     },
-    "billing": "Een abonnement meldt zich aan op de computer van de workspace, en die computer hoort bij een actief agentes.chat-abonnement.",
+    "billing": "Een abonnement meldt zich aan op de computer van de workspace, en die computer hoort bij een actief Ackwire AI-abonnement.",
     "billingWeb": "Kies er een op het web, op Ackwire AI.",
     "orPayGo": "Of betaal per gebruik",
     "pay": {
@@ -2823,7 +2826,7 @@
       "forAll": "Elke agent zonder abonnement denkt ermee.",
       "saved": "Opgeslagen. Elke agent zonder abonnement denkt ermee.",
       "savedUnchecked": "Opgeslagen, maar {{provider}} gaf geen antwoord, dus de sleutel kon niet worden gecontroleerd. Als hij faalt, staat de reden in het gesprek.",
-      "closed": "API-sleutels gaan open met het agentes.chat-abonnement van de workspace.",
+      "closed": "API-sleutels gaan open met het Ackwire AI-abonnement van de workspace.",
       "notPlan": "De sleutel van een codeerabonnement hoort bij die eigen optie hierboven.",
       "billing": "Zet facturering aan voor het project van de sleutel. Zonder facturering mag Google gebruiken wat je agents versturen.",
       "privacy": "Je privacyinstellingen in OpenRouter bepalen welke aanbieders mogen bewaren wat je agents versturen."
@@ -5067,7 +5070,7 @@
       "steps": {
         "title": "Nog één stap, op {{computer}} zelf",
         "waiting": "Wachten",
-        "one": "Klik op het agentes.chat-icoon bij de klok",
+        "one": "Klik op het Ackwire AI-icoon bij de klok",
         "two": "Voorkeuren",
         "three": "Zet Browser aan",
         "done": "Dat was het. Deze pagina merkt het vanzelf op, opnieuw laden is niet nodig.",
@@ -5265,7 +5268,7 @@
       "connectors": "Connectors van {{org}}",
       "connectorsPersonal": "Je connectors",
       "oneLevel": "Eén niveau per app",
-      "builtin": "Ingebouwd in agentes",
+      "builtin": "Ingebouwd in Ackwire AI",
       "builtinHelp": "Drive, taken, geheugen en meer",
       "noMatch": "Niets gevonden voor “{{q}}”",
       "noneHere": "Niets in dit filter",
@@ -5800,10 +5803,10 @@
       "afterPlanNext": "Dat is de stap na het abonnement.",
       "plan": {
         "todo": "Zet het team aan.",
-        "todoDesc": "Met een agentes.chat-abonnement gaan de agents aan de slag.",
+        "todoDesc": "Met een Ackwire AI-abonnement gaan de agents aan de slag.",
         "action": "Abonnementen bekijken",
         "todoPersonal": "Zet je agents aan.",
-        "todoDescPersonal": "Met een agentes.chat-abonnement gaan je agents aan de slag."
+        "todoDescPersonal": "Met een Ackwire AI-abonnement gaan je agents aan de slag."
       },
       "about": {
         "action": "Vertellen",
@@ -7751,7 +7754,7 @@
         "pr_opened": "PR geopend op GitHub"
       },
       "issue": {
-        "created": "Taak gemaakt in agentes"
+        "created": "Taak gemaakt in Ackwire AI"
       },
       "deploy": {
         "succeeded": "Deploy voltooid"
@@ -9497,7 +9500,7 @@
         "online": "{{computer}} start opnieuw op of maakt opnieuw verbinding. Dit verandert vanzelf zodra hij terug is.",
         "installing": "{{program}} wordt geïnstalleerd op {{computer}}. Dit verandert vanzelf als het klaar is.",
         "updating": "{{program}} wordt bijgewerkt op {{computer}}. Dit verandert vanzelf als het klaar is.",
-        "runnerOld": "Het agentes.chat-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
+        "runnerOld": "Het Ackwire AI-programma op {{computer}} is verouderd en een update is onderweg. Dit verandert vanzelf als het klaar is.",
         "execOff": "{{computer}} kan {{program}} nog niet uitvoeren. We zijn ermee bezig, en dit verandert vanzelf.",
         "toolOff": "{{program}} is nog niet toegestaan op {{computer}}. Dat ligt aan ons: probeer het later opnieuw.",
         "preparing": "{{computer}} wordt klaargemaakt. Dit verandert vanzelf als het klaar is.",
@@ -10729,9 +10732,9 @@
     "reasons": {
       "no_computer": "Kies een gekoppelde computer bij Computer om dit te gebruiken.",
       "exec_off": "De computer is gekoppeld zonder toestemming om programma's uit te voeren.",
-      "runner_old": "Werk het agentes.chat-programma op de computer bij om dit te gebruiken.",
-      "tool_off": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app: Voorkeuren → Tools.",
-      "tool_offLinux": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de agentes.chat-app of met {{command}}.",
+      "runner_old": "Werk het Ackwire AI-programma op de computer bij om dit te gebruiken.",
+      "tool_off": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de Ackwire AI-app: Voorkeuren → Tools.",
+      "tool_offLinux": "{{program}} staat uit op {{computer}}. Zet het daar aan, in de Ackwire AI-app of met {{command}}.",
       "not_installed": "{{program}} is niet geïnstalleerd op {{computer}}.",
       "not_reported": "{{computer}} controleert nog welke programma's erop staan. Dit verandert vanzelf als het klaar is.",
       "outdated": "De versie op {{computer}} is oud. Werk Codex bij om het te gebruiken.",
@@ -11247,7 +11250,7 @@
   "storage": {
     "title": "Opslag",
     "options": "Waar bestanden te bewaren",
-    "agentes": "agentes.chat-opslag",
+    "agentes": "Ackwire AI-opslag",
     "agentesText": "Je bestanden blijven in onze opslag, gescheiden per werkruimte.",
     "server": "Deze server",
     "serverText": {
@@ -11258,7 +11261,7 @@
     },
     "showFolder": "De map tonen",
     "place": {
-      "agentes": "agentes.chat-opslag",
+      "agentes": "Ackwire AI-opslag",
       "server": "deze server"
     },
     "s3": "Je eigen bucket",
@@ -11316,11 +11319,11 @@
   },
   "githubApp": {
     "title": "GitHub-repository's",
-    "text": "Waar de agentes.chat-app is geïnstalleerd, openen agents pull requests, issues, opmerkingen en commits als de app, met de naam van de agent en van wie het vroeg. Alleen {{org}} gebruikt wat je hier installeert.",
-    "install": "De agentes.chat-app installeren",
+    "text": "Waar de Ackwire AI-app is geïnstalleerd, openen agents pull requests, issues, opmerkingen en commits als de app, met de naam van de agent en van wie het vroeg. Alleen {{org}} gebruikt wat je hier installeert.",
+    "install": "De Ackwire AI-app installeren",
     "installMore": "Op een ander account installeren",
     "none": "Nog geen GitHub-account.",
-    "usingAccount": "Nu verschijnen agents op GitHub als {{account}}. Installeer de app zodat ze verschijnen als de agentes.chat-app.",
+    "usingAccount": "Nu verschijnen agents op GitHub als {{account}}. Installeer de app zodat ze verschijnen als de Ackwire AI-app.",
     "allRepos": "Alle repository's",
     "someRepos": "Gekozen repository's",
     "suspended": "Opgeschort op GitHub",
@@ -11329,12 +11332,12 @@
     "remove": "Verwijderen",
     "removeName": "{{account}} verwijderen",
     "removeTitle": "De app van {{account}} verwijderen?",
-    "removeText": "De agentes.chat-app wordt op GitHub van {{account}} gedeïnstalleerd, en agents gebruiken de repository's van dat account er niet meer via.",
+    "removeText": "De Ackwire AI-app wordt op GitHub van {{account}} gedeïnstalleerd, en agents gebruiken de repository's van dat account er niet meer via.",
     "removeLast": "Het is het laatste, dus agents verliezen GitHub tot iemand de app installeert of een account koppelt.",
     "removed": "App van {{account}} verwijderd en op GitHub gedeïnstalleerd.",
     "notUninstalled": "App hier verwijderd, maar GitHub heeft het deïnstalleren van {{account}} niet bevestigd. Deïnstalleer hem daar.",
     "openPage": "Openen",
-    "installed": "agentes.chat-app geïnstalleerd.",
+    "installed": "Ackwire AI-app geïnstalleerd.",
     "requested": "Alleen de eigenaar van het GitHub-account kan de app installeren. Vraag die persoon de app te installeren via Connectors › GitHub in deze werkruimte.",
     "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft.",
     "otherWorkspace": "Dat GitHub-account is al gekoppeld aan een andere werkruimte. Verwijder de app daar voordat je hem hier installeert.",
@@ -11342,10 +11345,10 @@
     "misconfigured": "De GitHub-app heeft op de server de verkeerde geheime sleutel, dus de installatie kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app.",
     "connectAccount": "Een GitHub-account koppelen",
     "ownerHint": "De eigenaar van deze server kan de GitHub-app hier bij Connectors maken.",
-    "viaApp": "Via de agentes.chat-app op {{accounts}}",
-    "disconnectApp": "De agentes.chat-app wordt op GitHub ook van {{accounts}} gedeïnstalleerd.",
-    "disconnectKeepsApp": "Agents blijven op GitHub via de agentes.chat-app op {{accounts}}.",
-    "keptApp": "GitHub-account ontkoppeld. Agents blijven op GitHub via de agentes.chat-app.",
+    "viaApp": "Via de Ackwire AI-app op {{accounts}}",
+    "disconnectApp": "De Ackwire AI-app wordt op GitHub ook van {{accounts}} gedeïnstalleerd.",
+    "disconnectKeepsApp": "Agents blijven op GitHub via de Ackwire AI-app op {{accounts}}.",
+    "keptApp": "GitHub-account ontkoppeld. Agents blijven op GitHub via de Ackwire AI-app.",
     "signature": {
       "forPerson": "{{agent}}, agent van {{person}} op Ackwire AI",
       "alone": "{{agent}}, een agent op Ackwire AI"
@@ -12298,7 +12301,7 @@
     "continueInComposio": "Verder op Composio",
     "github": {
       "how": "Hoe agents GitHub bereiken",
-      "app": "De agentes.chat-app",
+      "app": "De Ackwire AI-app",
       "recommended": "Aanbevolen",
       "appText": "Agents verschijnen als de app, en je kiest de repository's op GitHub.",
       "account": "Een GitHub-account",
@@ -13110,7 +13113,7 @@
       "noComputer": "Deze agent heeft nog geen computer voor missies.",
       "computerOffline": "De computer van de agent is offline.",
       "execDisabled": "Opdrachten staan uit op die computer.",
-      "runnerOutdated": "Het programma op de computer is te oud voor missies: werk daar de agentes.chat-app bij, of voer de installatieopdracht opnieuw uit.",
+      "runnerOutdated": "Het programma op de computer is te oud voor missies: werk daar de Ackwire AI-app bij, of voer de installatieopdracht opnieuw uit.",
       "exists": "Deze thread heeft al een missie.",
       "closed": "Deze missie is afgesloten.",
       "wrongStatus": "De missie staat niet in een status die dit toestaat.",
@@ -13204,7 +13207,7 @@
       "targetNotFound": "Die computer bestaat niet meer. Kies een andere.",
       "targetSame": "De agents staan al op die computer.",
       "targetPaused": "Die computer is gepauzeerd. Kies een andere.",
-      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het agentes.chat-programma erop bij, of gebruik een API-sleutel.",
+      "accountMethodUnsupported": "Deze computer kan Claude nog niet op deze manier koppelen. Werk het Ackwire AI-programma erop bij, of gebruik een API-sleutel.",
       "offline": "{{name}} is nu offline. Probeer het opnieuw zodra hij terug is.",
       "paused": "{{name}} is gepauzeerd: er start niets nieuws op tot hij wordt hervat.",
       "timeout": "De computer antwoordde niet op tijd. Probeer het opnieuw."
@@ -13405,7 +13408,7 @@
     },
     "download": {
       "title": "Nog een computer koppelen",
-      "text": "Installeer de agentes.chat-app op de computer.",
+      "text": "Installeer de Ackwire AI-app op de computer.",
       "mac": "Download de app voor {{system}}",
       "version": "Versie {{version}}",
       "versionSize": "Versie {{version}} · {{size}}",
@@ -13490,7 +13493,7 @@
       "disableText": "Agents gebruiken {{tool}} niet meer op deze computer. Weer aanzetten kan alleen op de computer zelf.",
       "disabled": "{{tool}} uitgezet.",
       "grantTitle": "Om meer toe te staan",
-      "grantText": "Toestaan gebeurt op de computer zelf: open daar de agentes.chat-app (Voorkeuren → Mappen).",
+      "grantText": "Toestaan gebeurt op de computer zelf: open daar de Ackwire AI-app (Voorkeuren → Mappen).",
       "grantTextTerminal": "Toestaan gebeurt op de computer zelf, in de Terminal:",
       "grantTextAdmin": "Toestaan gebeurt op de computer zelf, in de Terminal, als beheerder van die computer:",
       "grantTerminal": "Geen app? In de terminal van de computer:",
@@ -13752,7 +13755,7 @@
     },
     "computer": {
       "title": "Nog een computer koppelen",
-      "step1": "Zet de agentes.chat-app erop:",
+      "step1": "Zet de Ackwire AI-app erop:",
       "step2": "Open hem en log in met je eigen account.",
       "step3": "Klik op Toestaan als hij vraagt of de agents van {{org}} hem mogen gebruiken.",
       "shows": "Hij verschijnt hier vanzelf, alleen voor jou tot je hem deelt.",
@@ -13762,11 +13765,11 @@
       "noApp": "Kun je de app er niet op zetten? Gebruik een regel in de terminal"
     },
     "thisApp": {
-      "text": "De agentes.chat-app koppelt hem met één klik, en vraagt het je eerst.",
-      "open": "Open de agentes.chat-app",
+      "text": "De Ackwire AI-app koppelt hem met één klik, en vraagt het je eerst.",
+      "open": "Open de Ackwire AI-app",
       "browserAsks": "Je browser vraagt of hij hem mag openen: kies Openen, en Altijd toestaan als hij dat aanbiedt.",
       "noApp": "Heb je de app nog niet?",
-      "afterInstall": "Klik na het installeren nog een keer op Open de agentes.chat-app. De link werkt één keer, 10 minuten lang.",
+      "afterInstall": "Klik na het installeren nog een keer op Open de Ackwire AI-app. De link werkt één keer, 10 minuten lang.",
       "waiting": "Wachten op de app op deze computer…",
       "expired": "Deze link is verlopen.",
       "again": "Nieuwe link maken",
@@ -14125,7 +14128,7 @@
     "reconnectDoneText": "{{name}} is terug in {{org}}.",
     "deniedTitle": "Niet gekoppeld",
     "denied": "De computer is niet gekoppeld. Als jij hem niet hebt geopend, heeft niemand toegang gekregen.",
-    "home": "Naar agentes"
+    "home": "Naar Ackwire AI"
   },
   "apps": {
     "connect": "App koppelen",
@@ -14288,7 +14291,7 @@
         "mode": "Schakel in de chat over naar de modus {{mode}}.",
         "loginRun": "Voer <code>{{command}}</code> uit om in te loggen.",
         "loginType": "Typ <code>{{command}}</code> in de app om in te loggen.",
-        "signIn": "Log in met je agentes.chat-account op de pagina die opent.",
+        "signIn": "Log in met je Ackwire AI-account op de pagina die opent.",
         "signInFirst": "De app vraagt je in te loggen als je hem voor het eerst gebruikt.",
         "token": "Maak een persoonlijk token en zet het op de plek van {{placeholder}}.",
         "install": "Toevoegen aan {{app}}"
@@ -14738,7 +14741,7 @@
       "label": "Anonieme gebruiksstatistieken naar Ackwire AI sturen",
       "help": "Aantallen zoals mensen, agents, machinegroottes, gebruikte AI-tokens en hoeveel data de browsers van de agents versturen en ontvangen. Nooit berichten, bestanden, namen of sites.",
       "envOff": "Uitgezet in de instellingen van deze server (TELEMETRY=off).",
-      "envOffDesktop": "Uitgezet in de agentes.chat-app op de computer van deze server (Voorkeuren › Servers).",
+      "envOffDesktop": "Uitgezet in de Ackwire AI-app op de computer van deze server (Voorkeuren › Servers).",
       "see": "Bekijk wat er wordt verstuurd",
       "dialogTitle": "Wat er wordt verstuurd",
       "dialogText": "Eén keer per dag. Dit is precies het volgende rapport."
@@ -15338,7 +15341,7 @@
         "comment": "{{who}} reageerde op PR #{{number}} ({{repo}}) op GitHub",
         "commentIssue": "{{who}} reageerde op issue #{{number}} ({{repo}}) op GitHub",
         "commentDiscussion": "{{who}} reageerde op discussie #{{number}} ({{repo}}) op GitHub",
-        "opened": "{{who}} riep de agentes.chat-app aan in #{{number}} ({{repo}}) op GitHub",
+        "opened": "{{who}} riep de Ackwire AI-app aan in #{{number}} ({{repo}}) op GitHub",
         "reviewed": "{{who}} reviewde PR #{{number}} ({{repo}}) op GitHub",
         "approved": "{{who}} keurde PR #{{number}} ({{repo}}) goed op GitHub",
         "changes": "{{who}} vroeg om wijzigingen in PR #{{number}} ({{repo}}) op GitHub",
@@ -15759,7 +15762,7 @@
       "no_ai_plan_inactive": "Ik kan niet antwoorden: OpenCode Go is niet actief op het OpenCode-account van mijn sleutel. Controleer het Go-abonnement in OpenCode, of koppel een sleutel van het account dat Go heeft.",
       "no_ai_commands_off": "Ik kan nu niet antwoorden: opdrachten staan uit op de computer van mijn abonnement.",
       "no_ai_cli_missing": "Ik kan nog niet antwoorden: het programma van mijn AI is niet geïnstalleerd op mijn computer.",
-      "no_ai_plan_hold": "Ik heb je bericht bewaard. Ik antwoord hier zodra de workspace een agentes.chat-abonnement en een gekoppelde AI heeft.",
+      "no_ai_plan_hold": "Ik heb je bericht bewaard. Ik antwoord hier zodra de workspace een Ackwire AI-abonnement en een gekoppelde AI heeft.",
       "no_ai_no_computer": "Ik kan nog niet antwoorden: mijn AI heeft een computer nodig en ik heb er geen.",
       "redacted": "[verwijderd: leek op inloggegevens of een sleutel]",
       "action_connect_ai": "AI koppelen",
@@ -16242,7 +16245,7 @@
     "machine": {
       "ready": "Klaar",
       "off": "Uit",
-      "offHelp": "Alleen iemand bij de computer zet het aan, in de agentes.chat-app: Voorkeuren → Tools.",
+      "offHelp": "Alleen iemand bij de computer zet het aan, in de Ackwire AI-app: Voorkeuren → Tools.",
       "needsCommand": "Heeft een opdracht nodig",
       "notReady": "Nog niet klaar",
       "turnOff": "Uitzetten",
@@ -16530,7 +16533,7 @@
     "paused": "De agents in deze werkruimte zijn gepauzeerd voor controle.",
     "suspended": "Deze werkruimte is voorlopig niet beschikbaar.",
     "createRefused": "Je kunt nu geen werkruimte maken.",
-    "createUnpaid": "Je hebt al een werkruimte die wacht op een agentes.chat-abonnement. Kies daar een abonnement voordat je er nog een maakt.",
+    "createUnpaid": "Je hebt al een werkruimte die wacht op een Ackwire AI-abonnement. Kies daar een abonnement voordat je er nog een maakt.",
     "createUnpaidOpen": "{{name}} openen",
     "createInactive": "Je hebt al een werkruimte die nog niet actief is, dus je kunt voorlopig geen nieuwe maken.",
     "agentPaused": "Deze agent is voorlopig gepauzeerd.",
@@ -16550,25 +16553,25 @@
       "active": "De werkruimte werkt weer",
       "agentHold": "{{name}} is gepauzeerd",
       "billing": {
-        "payment": "De werkruimte heeft een agentes.chat-abonnement nodig",
-        "unpaid": "De betaling van het agentes.chat-abonnement is niet gelukt",
-        "ended": "Het agentes.chat-abonnement van de werkruimte is beëindigd"
+        "payment": "De werkruimte heeft een Ackwire AI-abonnement nodig",
+        "unpaid": "De betaling van het Ackwire AI-abonnement is niet gelukt",
+        "ended": "Het Ackwire AI-abonnement van de werkruimte is beëindigd"
       }
     },
     "billing": {
-      "payment": "Deze werkruimte heeft nog geen agentes.chat-abonnement. De agents gaan aan het werk zodra dat er is.",
-      "unpaid": "De betaling van het agentes.chat-abonnement van deze werkruimte is niet gelukt, en de agents zijn gestopt.",
-      "ended": "Het agentes.chat-abonnement van deze werkruimte is beëindigd, en de agents zijn gestopt. De gesprekken en bestanden zijn er nog om te lezen en te downloaden.",
-      "sub": "Je kunt hier nog lezen en schrijven. De agents komen terug zodra het agentes.chat-abonnement in orde is.",
+      "payment": "Deze werkruimte heeft nog geen Ackwire AI-abonnement. De agents gaan aan het werk zodra dat er is.",
+      "unpaid": "De betaling van het Ackwire AI-abonnement van deze werkruimte is niet gelukt, en de agents zijn gestopt.",
+      "ended": "Het Ackwire AI-abonnement van deze werkruimte is beëindigd, en de agents zijn gestopt. De gesprekken en bestanden zijn er nog om te lezen en te downloaden.",
+      "sub": "Je kunt hier nog lezen en schrijven. De agents komen terug zodra het Ackwire AI-abonnement in orde is.",
       "cta": {
-        "payment": "agentes.chat-abonnementen bekijken",
+        "payment": "Ackwire AI-abonnementen bekijken",
         "unpaid": "Betaling bijwerken",
         "ended": "Opnieuw abonneren"
       },
       "askAdmin": "Wie deze werkruimte beheert, kan dit oplossen.",
-      "paid": "Betaling ontvangen. Het agentes.chat-abonnement begint zo.",
-      "teamReady": "Je team is klaar. Er ontbreekt een agentes.chat-abonnement om te beginnen.",
-      "invites": "Uitnodigingen gaan open met het agentes.chat-abonnement."
+      "paid": "Betaling ontvangen. Het Ackwire AI-abonnement begint zo.",
+      "teamReady": "Je team is klaar. Er ontbreekt een Ackwire AI-abonnement om te beginnen.",
+      "invites": "Uitnodigingen gaan open met het Ackwire AI-abonnement."
     },
     "cloud": {
       "review": "Gepauzeerd voor een veiligheidscontrole, tot ons team ernaar kijkt. Onze automatische controles zagen activiteit die mogelijk in strijd is met onze Voorwaarden (artikel 5). Bezwaar maken? Schrijf naar {{email}}.",
@@ -16690,7 +16693,7 @@
     "open": "Abonnement en facturatie openen",
     "opening": "Openen…",
     "failed": "Kon het nu niet openen. Probeer het zo opnieuw.",
-    "adminsOnly": "Alleen de eigenaren en beheerders van de werkruimte beheren het agentes.chat-abonnement.",
+    "adminsOnly": "Alleen de eigenaren en beheerders van de werkruimte beheren het Ackwire AI-abonnement.",
     "seeOptions": "Opties bekijken",
     "people": "Mensen",
     "files": "Bestanden",
@@ -16703,8 +16706,8 @@
   "limits": {
     "members": {
       "full": "Deze werkruimte heeft {{members}} van de {{limit}} mensen.",
-      "fullOne": "Het agentes.chat-abonnement van deze werkruimte is voor 1 persoon.",
-      "fullAdmin": "Bekijk de opties van het agentes.chat-abonnement om meer mensen toe te voegen.",
+      "fullOne": "Het Ackwire AI-abonnement van deze werkruimte is voor 1 persoon.",
+      "fullAdmin": "Bekijk de opties van het Ackwire AI-abonnement om meer mensen toe te voegen.",
       "fullMember": "Vraag degene die de werkruimte beheert om ruimte te maken.",
       "fullAddSeat": "Alle betaalde plekken zijn bezet. Voeg een plek toe in Abonnement en facturatie.",
       "fullTop": "Dit abonnement heeft geen ruimte voor meer mensen. Kies een ander abonnement in Abonnement en facturatie.",
@@ -16720,7 +16723,7 @@
       "meter": "Je hebt {{used}} van {{limit}} gebruikt.",
       "near": "Je hebt {{used}} van {{limit}} gebruikt. Bij de limiet pauzeren uploads, en er wordt niets verwijderd.",
       "full": "Uploads gepauzeerd bij {{limit}}. Er is niets verwijderd.",
-      "fullAdmin": "Wijzig het agentes.chat-abonnement, verwijder bestanden die je niet meer gebruikt of koppel je eigen bucket in Instellingen › Opslag.",
+      "fullAdmin": "Wijzig het Ackwire AI-abonnement, verwijder bestanden die je niet meer gebruikt of koppel je eigen bucket in Instellingen › Opslag.",
       "dailyFull": "De uploads van vandaag hebben {{limit}} bereikt. Over een paar uur kun je weer uploaden."
     }
   },

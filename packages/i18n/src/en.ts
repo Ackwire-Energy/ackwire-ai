@@ -1536,6 +1536,11 @@ export const en = {
       apt: "Install the .deb with a double-click, or from the terminal.",
       aptLong: "Double-click the downloaded file and click Install, or paste this in the terminal:",
       open: "Open Ackwire AI from your apps.",
+      /** Under the steps: the AppImage, for a distribution without .deb packages. */
+      otherTitle: "On Arch, Fedora or another system that doesn't take a .deb?",
+      otherText:
+        "Download the AppImage: it runs on any distribution and updates itself. Then paste this in the terminal, in the folder you saved it to:",
+      appImage: "Download the AppImage",
     },
     page: {
       docTitle: "Download the app · Ackwire AI",
@@ -1847,7 +1852,7 @@ export const en = {
     drive: "Drive",
     members: "Members",
     channels: "Channels",
-    /** The channels' section in a personal workspace's sidebar (ADR 0159): only once there is one to show. */
+    /** The channels' section in a personal workspace's sidebar (ADR 0159). */
     channelsPersonal: "Group conversations",
     agents: "Agents",
     directMessages: "Direct messages",
@@ -14576,7 +14581,7 @@ export const en = {
     },
     /**
      * The license's required attribution (AGPL-3.0 section 7(b), see NOTICE): translate it, but keep
-     * "agentes.chat" and "Codari Global, LLC" and its meaning.
+     * "Ackwire AI" and "Codari Global, LLC" and its meaning.
      */
     about: {
       basedOn: "Based on <site>agentes.chat</site> by Codari Global, LLC",

@@ -576,9 +576,11 @@ async fn notch_place(app: AppHandle, width: f64, height: f64) -> Result<Option<n
 fn migrate_login_item(app: &AppHandle) {
     #[cfg(target_os = "macos")]
     if let Ok(home) = app.path().home_dir() {
-        let old = home.join("Library/LaunchAgents/agentes.plist");
-        if old.exists() && std::fs::remove_file(&old).is_ok() {
-            let _ = app.autolaunch().enable();
+        for name in ["agentes.plist", "agentes.chat.plist"] {
+            let old = home.join("Library/LaunchAgents").join(name);
+            if old.exists() && app.autolaunch().enable().is_ok() {
+                let _ = std::fs::remove_file(&old);
+            }
         }
     }
     #[cfg(not(target_os = "macos"))]

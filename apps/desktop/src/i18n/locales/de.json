@@ -183,7 +183,7 @@
     "unreachableTailnet": "Wir erreichen {{host}} nicht, der in deinem Tailscale-Netzwerk liegt. Öffne Tailscale auf diesem {{device}}, verbinde dich und versuch es noch einmal.",
     "unreachableHere": "Unter {{host}} antwortet auf diesem {{device}} nichts. Starte Ackwire AI hier und versuch es dann noch einmal.",
     "certificate": "Das Zertifikat von {{host}} ist ungültig. Sprich mit der Person, die den Server betreibt.",
-    "notAgentes": "{{host}} ist kein agentes.chat-Server. Prüf die Adresse.",
+    "notAgentes": "{{host}} ist kein Ackwire AI-Server. Prüf die Adresse.",
     "serverTooOld": "{{host}} braucht ein Update, um mit dieser App zu funktionieren.",
     "appTooOld": "Aktualisiere die App, um {{host}} zu nutzen."
   },
@@ -271,7 +271,7 @@
     "connect": "Verbinden",
     "continue": "Weiter",
     "checking": "Server wird geprüft…",
-    "notALink": "Dieser Link stammt nicht von einem agentes.chat-Server.",
+    "notALink": "Dieser Link stammt nicht von einem Ackwire AI-Server.",
     "chipTailnet": "Tailscale",
     "chipHere": "Dieser {{device}}",
     "thisServer": "Ackwire AI auf diesem {{device}}",

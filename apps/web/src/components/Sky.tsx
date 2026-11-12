@@ -315,32 +315,8 @@ export function ComputerSky({ color, clear }: { color: AgentColor; clear?: Clear
  * at the bottom, a few agents passing. Calm, so the one question above stays the subject. `clear`: the form, where a
  * short screen brings it down onto the horizon.
  */
-export function AuthHorizon({ clear }: { clear?: Clear }) {
-  const opts: SkyOptions = {
-    pixel: 4,
-    surface: "--bg",
-    palette: (bg) => softTones("sky", bg),
-    body: spriteTone("sky"),
-    near: 0,
-    ceil: 0.3,
-    light: 0.06,
-    sprites: 6,
-    clear,
-    base: (u, v, tt) => {
-      const s = Math.max(0, (v - 0.2) / 0.8);
-      const e = s * s * (3 - 2 * s);
-      return 0.78 * e + 0.05 * S(u * 4 + tt * 0.4) * e;
-    },
-    blobs: (tt) => [
-      [0.2 + 0.1 * C(tt * 0.17), 0.95, 0.06, 0.08],
-      [0.8 + 0.1 * S(tt * 0.13), 0.92, 0.06, 0.08],
-    ],
-  };
-  return (
-    <span className="auth__horizon" aria-hidden="true">
-      <PixelSky options={opts} />
-    </span>
-  );
+export function AuthHorizon(_props: { clear?: Clear }) {
+  return <span className="auth__horizon" aria-hidden="true" />;
 }
 
 /**
@@ -447,25 +423,9 @@ export function ConnectorSky({ brand }: { brand: string | null }) {
 /** The whole app loading (the workspace's first load): the sky rises and agents pass through it. */
 export function BootSplash() {
   const { t } = useTranslation();
-  const [start] = useState(() => (typeof performance === "undefined" ? 0 : performance.now()));
-  const mark = useRef<HTMLDivElement>(null);
   return (
     <div className="sky-boot" role="status" aria-live="polite">
-      <PixelSky
-        options={{
-          pixel: 4,
-          palette: SKY_TONES,
-          sprites: { area: 700, max: 40 },
-          rise: 2.2,
-          light: 0.12,
-          clear: () => [mark.current],
-          base: (u, v, tt) => {
-            const fill = Math.min(1, (performance.now() - start) / 1800);
-            return -0.3 + 1.15 * fill * (0.35 + 0.65 * v) + 0.05 * S(u * 6 + tt);
-          },
-        }}
-      />
-      <div className="sky-boot__in" ref={mark}>
+      <div className="sky-boot__in">
         <Logo size={40} />
         <span>{t("sky.boot")}</span>
       </div>

@@ -199,7 +199,7 @@ export function bodyTones(color, deep = false) {
 
 /** The small pixel agents' body: deep enough for white eyes (navy on the sky). */
 export function spriteBody(color) {
-  return !color || color === "sky" ? "#04203f" : mixHex(gradientOf(color)[1], "#000000", 0.45);
+  return !color || color === "sky" ? "#23440b" : mixHex(gradientOf(color)[1], "#000000", 0.45);
 }
 
 /** Dither cells per side for a body of `px` pixels: about 2.5–15 screen pixels per cell. */

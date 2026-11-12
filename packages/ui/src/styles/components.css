@@ -2050,10 +2050,11 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   color: var(--ink);
   line-height: 1;
   font-size: 24px;
+  white-space: nowrap;
 }
 .ac-logo__mark {
-  width: 1.25em;
-  height: 1.25em;
+  width: 1.3em;
+  height: 1.1em;
   flex: none;
 }
 /* The pixel "A": each layer in its tone of Ackwire green (PIXEL_MARK_TONES), deep on light, bright on dark. */

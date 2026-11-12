@@ -1,4 +1,4 @@
-//! The main window: the server open now, inside the app (Ackwire AI, or a server of the person's own,
+//! The main window: the server open now, inside the app (agentes.chat, or a server of the person's own,
 //! `servers.rs`). It loads the server's pages itself, so every change to the web shows here at once, and
 //! gets no access to this computer: no app command, only dragging the window by its title bar and `this_mac`
 //! (capabilities/main.json, and the same one added at runtime for another server's origin). Links to
@@ -59,7 +59,7 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
     "linux"
 };
 
-/// Whether agents may work on this computer for `origin`: any server elsewhere, Ackwire AI included (people bring
+/// Whether agents may work on this computer for `origin`: any server elsewhere, agentes.chat included (people bring
 /// their own computers there too), never a server on this computer itself, the server here included at its
 /// Tailscale address (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
@@ -320,14 +320,18 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
 /// The window's name for the page's title: the site's own long title (sign-in, the landing) is just the app's.
 fn window_title(title: &str) -> &str {
     let title = title.trim();
-    if title.is_empty() || title.starts_with("Ackwire AI ·") {
+    if title.is_empty()
+        || matches!(title, "Ackwire AI" | "agentes.chat")
+        || title.starts_with("Ackwire AI ·")
+        || title.starts_with("agentes.chat ·")
+    {
         "Ackwire AI"
     } else {
         title
     }
 }
 
-/// Tells the page the zoom (`--app-zoom`: its title bar stays 40pt and level with the window's buttons) and
+/// Tells the page the zoom (`--app-zoom`: its title bar stays 48pt and level with the window's buttons) and
 /// whether the window is full screen (no room kept for the buttons then), and puts the buttons back in the
 /// bar's middle (a resize or full screen lays them out anew). AppKit is touched on the main thread.
 pub fn fit_page(app: &AppHandle) {
@@ -582,7 +586,7 @@ thread_local! {
 
 /// The site's title bar (apps/web desktop.css), in points.
 #[cfg(target_os = "macos")]
-const TITLE_BAR: f64 = 40.0;
+const TITLE_BAR: f64 = 48.0;
 /// The close button's left edge, in points.
 #[cfg(target_os = "macos")]
 const LIGHTS_LEFT: f64 = 16.0;
@@ -590,7 +594,7 @@ const LIGHTS_LEFT: f64 = 16.0;
 /// The window's close, minimize and zoom buttons in the middle of the site's title bar, as Electron places
 /// them (`WindowButtonsProxy`): the title bar's container as tall as the bar, each button centred in it.
 /// `traffic_light_position` only makes the container taller, and macOS 26 keeps the buttons at its top (their
-/// middle at ~15pt on macOS 27, under the bar's icons at 20pt).
+/// middle at ~15pt on macOS 27, under the bar's icons at 24pt).
 #[cfg(target_os = "macos")]
 fn place_lights(window: &tauri::Window) {
     use crate::notch::native::{CGPoint, CGRect};
@@ -1254,6 +1258,8 @@ mod tests {
         );
         assert_eq!(window_title("#loja · Acme"), "#loja · Acme");
         assert_eq!(window_title("Ackwire AI · Your team and your agents"), "Ackwire AI");
+        assert_eq!(window_title("agentes.chat · Your team and your agents"), "Ackwire AI");
+        assert_eq!(window_title("agentes.chat"), "Ackwire AI");
         assert_eq!(window_title("  "), "Ackwire AI");
     }
 
@@ -1312,7 +1318,7 @@ mod tests {
 
     #[test]
     fn agents_work_here_only_for_a_server_elsewhere() {
-        assert!(agents_here("https://app.agentes.chat", false), "Ackwire AI too");
+        assert!(agents_here("https://app.agentes.chat", false), "agentes.chat too");
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
         assert!(agents_here("https://agentes.tail1234.ts.net", false));

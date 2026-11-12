@@ -170,21 +170,21 @@ describe("the look", () => {
     const lift =
       "inset 0 1px 0 rgba(255,255,255,.18),inset 0 -1px 0 rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.18),0 6px 14px -6px rgba(0,0,0,.45)";
     // The flat fill and the lift inline; the gradient only where a client reads the colour scheme.
-    expect(html).toContain(`background-color:#151514;border:1px solid #151514;border-radius:14px;box-shadow:${lift}`);
+    expect(html).toContain(`background-color:#90ed42;border:1px solid #90ed42;border-radius:14px;box-shadow:${lift}`);
     expect(html).toContain(
-      "@media (prefers-color-scheme:light){.btn{background-image:linear-gradient(180deg,#3e3e3d 0%,#151514 100%)!important}}",
+      "@media (prefers-color-scheme:light){.btn{background-image:linear-gradient(180deg,#a4f064 0%,#90ed42 100%)!important}}",
     );
     expect(html).not.toMatch(/style="[^"]*background-image/);
     expect(html).toContain("font-size:15px;line-height:20px;font-weight:600;text-decoration:none;padding:13px 15px");
     // Dark: the flat bone wherever our dark applies, and the bone gradient in a block of its own after Outlook's hooks.
-    expect(html).toContain(".btn{background:#efefec!important;color:#000000!important;border-color:#efefec!important}");
+    expect(html).toContain(".btn{background:#90ed42!important;color:#031f1b!important;border-color:#90ed42!important}");
     const gradient =
-      "<style>\n@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#c4c4c2 0%,#efefec 100%)!important}}\n</style>";
+      "<style>\n@media (prefers-color-scheme:dark){.btn{background-image:linear-gradient(180deg,#76c236 0%,#90ed42 100%)!important}}\n</style>";
     expect(html.indexOf(gradient)).toBeGreaterThan(html.lastIndexOf("[data-ogsb] "));
     // Classic Outlook: its spacers in em at the 15 px label, both labels raised alike, no exact line height on a link.
     expect(html).toContain('<i style="mso-font-width:107%;mso-text-raise:187%" hidden>&emsp;</i>');
     expect(html).toContain('<i style="mso-font-width:107%" hidden>&emsp;&#8203;</i>');
-    expect(html).toContain('<span style="mso-text-raise:93%;color:#fbfbfa">Approve</span>');
+    expect(html).toContain('<span style="mso-text-raise:93%;color:#031f1b">Approve</span>');
     expect(html).toContain('<span style="mso-text-raise:93%">Deny</span>');
     expect(html).not.toMatch(/<a [^>]*mso-line-height-rule:exactly/);
     // Deny 16 px after the button, as the app spaces its actions. Four spaces where the width is ignored.

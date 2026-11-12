@@ -28,7 +28,7 @@
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Ganti",
-      "title": "Di mana agentes.chat-mu?",
+      "title": "Di mana Ackwire AI-mu?",
       "subtitle": "Alamat yang dibuka timmu di browser.",
       "label": "Alamat server",
       "placeholder": "agentes.timkamu.ts.net",

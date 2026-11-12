@@ -32,9 +32,7 @@ export function LogoMark({ size, className, label }: { size?: number; className?
 export interface LogoProps {
   /** `main` (app) or `expanded` (the same lockup: kept so callers that ask for it still work). */
   variant?: "main" | "expanded";
-  /** One-color version. */
   mono?: boolean;
-  /** Font size in px; the mark scales with it. Below 18px use `LogoMark` alone. */
   size?: number;
   className?: string;
   style?: CSSProperties;
