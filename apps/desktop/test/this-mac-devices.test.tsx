@@ -150,7 +150,6 @@ describe("the iPhone setup window", () => {
     });
   });
 
-  // It walks every iPhone state in one window, one render each: past bun's 5 s default when the suite shares a process.
   test("every iPhone state names its way out, and a step that sits still says what most likely holds it", async () => {
     writePref(IPHONE_SETUP_PREF, true);
     await mount("welcome", <WindowView name="welcome" />, async (el, host) => {
@@ -203,7 +202,10 @@ describe("the iPhone setup window", () => {
         setSystemTime();
       }
     });
-  }, 20_000);
+    // The window asks the Mac every 2 s and this walks six states, each seen on the next ask: up to 12 s of
+    // waiting, past the 5 s a test gets. Cut short, it went on running under the files after it (its window still
+    // mounted, the clock moved 46 s on) and failed their tests.
+  }, 30_000);
 
   test("without the ask, the welcome window is the first run", () =>
     mount("welcome", <WindowView name="welcome" />, async (el) => {
