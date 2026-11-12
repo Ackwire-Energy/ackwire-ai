@@ -9,7 +9,7 @@ export const privacyPtBR: LegalDocument = {
       id: "overview",
       heading: "1. Visão geral",
       blocks: [
-        'A CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome agentes.chat ("agentes.chat", "nós"), opera o agentes.chat: um workspace onde pessoas e agentes de IA trabalham juntos, disponível na web, como app de Mac e como app de celular (o "Serviço"). Esta política distingue dois papéis:',
+        'A CODARI GLOBAL, LLC, sociedade de responsabilidade limitada do estado de Wyoming (EUA) que atua sob o nome Ackwire AI ("Ackwire AI", "nós"), opera o Ackwire AI: um workspace onde pessoas e agentes de IA trabalham juntos, disponível na web, como app de Mac e como app de celular (o "Serviço"). Esta política distingue dois papéis:',
         {
           list: [
             "Para os **dados de conta**, as informações que as pessoas nos dão para criar e usar uma conta, somos o controlador.",
@@ -26,11 +26,11 @@ export const privacyPtBR: LegalDocument = {
           list: [
             "**Dados de conta:** nome, e-mail, hash da senha, foto de perfil, idioma e fuso horário. Se você entra com Google, Apple ou GitHub, recebemos desse provedor o seu nome, e-mail e o identificador da conta, nunca a senha.",
             "**Dados do workspace:** nome do workspace, membros, papéis e convites.",
-            "**Dados de cobrança:** num workspace com plano do agentes.chat, o nome, o e-mail, o endereço de cobrança e o número de identificação fiscal de quem paga, o plano e as faturas e os pagamentos dele. Os pagamentos são processados pelo Stripe, que cuida dos dados do cartão: eles nunca chegam até nós.",
+            "**Dados de cobrança:** num workspace com plano do Ackwire AI, o nome, o e-mail, o endereço de cobrança e o número de identificação fiscal de quem paga, o plano e as faturas e os pagamentos dele. Os pagamentos são processados pelo Stripe, que cuida dos dados do cartão: eles nunca chegam até nós.",
             "**Dados de uso e registros:** endereços IP, navegador e aparelho, sessões de login, eventos de segurança, requisições à API e o registro de cada chamada de modelo (modelo, tokens e custo, com o workspace e o agente a que pertence), que guardamos para aplicar orçamentos e mostrar o uso. Quando algo quebra, registramos o erro, sem o conteúdo das mensagens, para corrigi-lo.",
             "**Aparelhos:** no app de celular, o token de notificações de cada aparelho em que você entra. Em computadores conectados e no app de Mac, o nome do computador, o sistema operacional e a versão do app.",
-            "**Lista de espera:** o e-mail e o idioma que você informa no agentes.chat, e se você confirmou o e-mail.",
-            "**Análise do site:** no agentes.chat (o site público, não o workspace), as páginas vistas, o site de origem, o tipo de aparelho e uma localização aproximada derivada do IP, coletados com a Himetrica.",
+            "**Lista de espera:** o e-mail e o idioma que você informa no Ackwire AI, e se você confirmou o e-mail.",
+            "**Análise do site:** no Ackwire AI (o site público, não o workspace), as páginas vistas, o site de origem, o tipo de aparelho e uma localização aproximada derivada do IP, coletados com a Himetrica.",
           ],
         },
       ],
@@ -39,7 +39,7 @@ export const privacyPtBR: LegalDocument = {
       id: "how-we-use",
       heading: "3. Como usamos os dados de conta",
       blocks: [
-        "Para fornecer e proteger o Serviço (inclusive detectar e impedir abusos), cobrar pelos planos do agentes.chat, aplicar orçamentos e limites, responder a pedidos de suporte, cumprir obrigações legais e enviar mensagens do serviço, como confirmação de e-mail, convites, troca de senha, pedidos de aprovação e as notificações que você ativou. Para a lista de espera, só escrevemos para confirmar o e-mail e para convidar você.",
+        "Para fornecer e proteger o Serviço (inclusive detectar e impedir abusos), cobrar pelos planos do Ackwire AI, aplicar orçamentos e limites, responder a pedidos de suporte, cumprir obrigações legais e enviar mensagens do serviço, como confirmação de e-mail, convites, troca de senha, pedidos de aprovação e as notificações que você ativou. Para a lista de espera, só escrevemos para confirmar o e-mail e para convidar você.",
         "Não vendemos dados pessoais, não usamos o Conteúdo do Workspace para treinar modelos de aprendizado de máquina e não permitimos que os nossos suboperadores façam isso.",
       ],
     },
@@ -66,7 +66,7 @@ export const privacyPtBR: LegalDocument = {
             "**Conectores.** Quando o workspace conecta um serviço (como GitHub, Google, Linear, Sentry, uma caixa de e-mail ou qualquer servidor MCP), guardamos os tokens de acesso cifrados e lemos ou escrevemos nesse serviço só dentro dos escopos que o workspace deu a cada agente. O serviço conectado trata esses dados sob os próprios termos. Conexões com caixas do Gmail e do Outlook, e com Google Drive, Google Agenda, Google Planilhas, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit e WhatsApp, passam pela Composio, que trata o que os agentes leem e escrevem nesses serviços.",
             "**Bancos de dados.** Conexões com bancos de dados são só de leitura. As credenciais ficam cifradas e cada consulta é verificada antes de rodar.",
             "**Computadores conectados.** Quando alguém conecta um computador, os agentes podem rodar comandos e usar um navegador nele, dentro das pastas e permissões definidas nesse computador. A visão ao vivo do navegador de um agente passa pela Cloudflare e pela memória dos nossos servidores, e não é gravada. Um resumo dos passos que o agente deu (como os endereços visitados e as ações) fica junto do trabalho dele, para a equipe ver o que ele fez.",
-            "**O computador do workspace.** Na agentes.chat Cloud, os agentes de um workspace trabalham num computador que mantemos para esse workspace, hospedado pela Contabo na União Europeia. Contamos o volume de dados que o navegador, as ferramentas de IA e os outros programas de cada agente enviam e recebem nele, por dia. O computador é apagado depois que o plano do agentes.chat do workspace termina, como os Termos de uso descrevem.",
+            "**O computador do workspace.** Na Ackwire AI Cloud, os agentes de um workspace trabalham num computador que mantemos para esse workspace, hospedado pela Contabo na União Europeia. Contamos o volume de dados que o navegador, as ferramentas de IA e os outros programas de cada agente enviam e recebem nele, por dia. O computador é apagado depois que o plano do Ackwire AI do workspace termina, como os Termos de uso descrevem.",
           ],
         },
         "Ações difíceis de desfazer (como fazer merge de código, publicar ou enviar em nome de alguém) viram um pedido de aprovação para uma pessoa antes de acontecer. Texto que vem de fora do workspace (páginas da web, e-mails, arquivos) é marcado como não confiável antes de um agente ler.",
@@ -74,9 +74,9 @@ export const privacyPtBR: LegalDocument = {
     },
     {
       id: "staff-access",
-      heading: "6. Quando a equipe do agentes.chat pode ver o Conteúdo do Workspace",
+      heading: "6. Quando a equipe do Ackwire AI pode ver o Conteúdo do Workspace",
       blocks: [
-        "Nós não navegamos pelos workspaces. Uma pessoa do agentes.chat só pode ver o Conteúdo do Workspace:",
+        "Nós não navegamos pelos workspaces. Uma pessoa do Ackwire AI só pode ver o Conteúdo do Workspace:",
         {
           list: [
             "**A seu pedido,** para ajudar num pedido de suporte, e só no que o pedido exige.",
@@ -94,7 +94,7 @@ export const privacyPtBR: LegalDocument = {
         {
           list: [
             "**Dados de conta:** enquanto a conta existir. Quando você exclui a sua conta no app, ela sai de todos os aparelhos na hora e é apagada 7 dias depois, a não ser que você a restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto registros que a lei nos obriga a manter. Qualquer workspace em que você era o único membro fecha no mesmo momento, e o conteúdo dele é apagado 7 dias depois, como descrito a seguir. Os workspaces em que você esteve guardam o seu nome e o seu e-mail nos registros de auditoria deles enquanto cada um existir.",
-            "**Conteúdo do Workspace:** enquanto o workspace existir, e antes disso quando o workspace apaga um conteúdo. Quando o plano do agentes.chat de um workspace termina, o conteúdo dele fica disponível por 90 dias e depois é apagado. Quando um dono exclui um workspace, ele fecha para todos na hora e o conteúdo dele é apagado 7 dias depois, a não ser que um dono o restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto o conteúdo que a lei nos obriga a manter ou que é registro de abuso (abaixo).",
+            "**Conteúdo do Workspace:** enquanto o workspace existir, e antes disso quando o workspace apaga um conteúdo. Quando o plano do Ackwire AI de um workspace termina, o conteúdo dele fica disponível por 90 dias e depois é apagado. Quando um dono exclui um workspace, ele fecha para todos na hora e o conteúdo dele é apagado 7 dias depois, a não ser que um dono o restaure antes disso, e sai dos nossos backups em até 30 dias depois disso, exceto o conteúdo que a lei nos obriga a manter ou que é registro de abuso (abaixo).",
             "**Registros:** registros de requisições e de segurança por até 90 dias. Registros de uso de modelos (tokens e custo) enquanto o workspace existir, porque os orçamentos e os relatórios de uso dependem deles.",
             "**Dados de cobrança:** enquanto você paga por um workspace e, depois disso, pelo tempo que as leis fiscais e contábeis exigirem.",
             "**Lista de espera:** até você ser convidado e por mais 12 meses, ou até você pedir para sair.",
@@ -149,7 +149,7 @@ export const privacyPtBR: LegalDocument = {
       id: "cookies",
       heading: "14. Cookies e armazenamento local",
       blocks: [
-        "O workspace usa só os cookies e o armazenamento local necessários para manter você conectado, proteger formulários e lembrar preferências como tema e idioma. O site público agentes.chat lembra o idioma que você escolheu e usa a análise da Himetrica (Seção 2). Não usamos cookies de publicidade nem de rastreamento entre sites.",
+        "O workspace usa só os cookies e o armazenamento local necessários para manter você conectado, proteger formulários e lembrar preferências como tema e idioma. O site público Ackwire AI lembra o idioma que você escolheu e usa a análise da Himetrica (Seção 2). Não usamos cookies de publicidade nem de rastreamento entre sites.",
       ],
     },
     {

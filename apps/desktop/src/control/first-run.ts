@@ -17,7 +17,7 @@ export type FirstScreen = "choose" | "own" | "connect" | "here" | "link" | "pair
 
 /**
  * Esc in the first run: back a screen, or the window closes (when a server is open already); never while
- * agentes.chat is being set up here (`busy`), which keeps going whatever the window shows.
+ * Ackwire AI is being set up here (`busy`), which keeps going whatever the window shows.
  */
 export const escapeAction = (screensBack: number, busy: boolean): "stay" | "back" | "close" =>
   busy ? "stay" : screensBack > 0 ? "back" : "close";
@@ -57,13 +57,13 @@ export interface Found extends Candidate {
   problem?: ConnectProblem;
 }
 
-/** Problems an agentes.chat server answers with: such a server is listed with its problem, never hidden. */
+/** Problems an Ackwire AI server answers with: such a server is listed with its problem, never hidden. */
 const LISTED_PROBLEMS: ReadonlySet<ServerProblem> = new Set(["server-too-old", "app-too-old", "certificate"]);
 
 /**
- * The candidates that answered as agentes.chat servers, listed by their own address, once each: usable, or with what
+ * The candidates that answered as Ackwire AI servers, listed by their own address, once each: usable, or with what
  * keeps them from being used (an update on either side, a certificate, no owner yet). Those that didn't answer, or
- * aren't agentes.chat, aren't listed.
+ * aren't Ackwire AI, aren't listed.
  */
 export function foundServers(candidates: readonly Candidate[], checks: readonly (ServerCheck | null)[]): Found[] {
   const out: Found[] = [];
@@ -138,7 +138,7 @@ const problemOf = (check: Extract<ServerCheck, { ok: false }>): ConnectProblem =
 };
 
 /**
- * `own`: the addresses of the agentes.chat this computer runs (its loopback and, with reach on, its Tailscale one).
+ * `own`: the addresses of the Ackwire AI this computer runs (its loopback and, with reach on, its Tailscale one).
  * Picked there, it opens at once at the address people use: no sheet about another host, which is still this one.
  */
 export function connectOutcome(asked: string, check: ServerCheck, own: readonly string[] = []): ConnectOutcome {
@@ -150,12 +150,12 @@ export function connectOutcome(asked: string, check: ServerCheck, own: readonly 
     : { kind: "confirm", server: check.server };
 }
 
-/** The addresses of the agentes.chat this computer runs, from its status (`connectOutcome`'s `own`). */
+/** The addresses of the Ackwire AI this computer runs, from its status (`connectOutcome`'s `own`). */
 export const ownAddresses = (status: { url: string | null; publicUrl: string | null } | null): string[] =>
   status ? [status.url, status.publicUrl].filter((u): u is string => !!u) : [];
 
 /**
- * How to start the agentes.chat installed from the terminal in `dir`, for a person to copy: the default folder in
+ * How to start the Ackwire AI installed from the terminal in `dir`, for a person to copy: the default folder in
  * the home (`~/.agentes` on a Mac or Linux, `%USERPROFILE%\.agentes` on Windows) needs no `--data`.
  */
 export const terminalStartCommand = (dir: string) =>

@@ -3,7 +3,7 @@ import { titledWithUnread, unreadTotal } from "@agenteschat/client/lib/unread";
 import { useEffect, useRef } from "react";
 
 /**
- * The tab's title carries the unread total, "(3) agentes.chat" (unread DM messages and mentions of me, what the
+ * The tab's title carries the unread total, "(3) Ackwire AI" (unread DM messages and mentions of me, what the
  * sidebar's numbers add up to; DMs with `hiddenAgents` left out, as the sidebar leaves them), over whatever title a
  * page sets.
  */

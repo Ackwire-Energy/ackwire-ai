@@ -480,7 +480,7 @@ function LinkFlow({
 }
 
 /**
- * "Open the agentes.chat app": the link to the app on this computer (`href`; null while the link is made, or once it
+ * "Open the Ackwire AI app": the link to the app on this computer (`href`; null while the link is made, or once it
  * ended), offered for as long as the dialog waits, since the person may install the app first. The browser asks
  * before it opens an app, so the words say what to choose.
  */

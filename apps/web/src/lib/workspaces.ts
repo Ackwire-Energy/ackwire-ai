@@ -37,7 +37,7 @@ export interface WorkspaceRow {
 export interface WorkspaceGroup {
   /** The server's origin. */
   server: string;
-  /** "agentes.chat" for the Cloud, its host otherwise (the app's own server is named by what it is instead). */
+  /** "Ackwire AI" for the Cloud, its host otherwise (the app's own server is named by what it is instead). */
   name: string;
   cloud: boolean;
   /** The server this page is on. */
@@ -53,8 +53,8 @@ export interface WorkspaceGroup {
   rows: WorkspaceRow[];
 }
 
-/** How a server reads in the menu: agentes.chat for the Cloud, its host otherwise. */
-export const serverLabel = (server: string) => (server === CLOUD_SERVER ? "agentes.chat" : serverHost(server));
+/** How a server reads in the menu: Ackwire AI for the Cloud, its host otherwise. */
+export const serverLabel = (server: string) => (server === CLOUD_SERVER ? "Ackwire AI" : serverHost(server));
 
 /**
  * This server's group first (its workspaces from `me`, its counts from `/me/unread` when it answered), then each other

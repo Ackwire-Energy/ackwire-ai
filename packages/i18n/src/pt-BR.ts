@@ -60,7 +60,7 @@ export const ptBR = {
     tooMany: "Muitas tentativas. Tente de novo mais tarde.",
     /** A request with no answer at all (`errorText`): the browser offline, or the server out of reach. */
     offline: "Você está sem internet. Confira a conexão e tente de novo.",
-    unreachable: "Sem conexão com o agentes.chat agora. Tente de novo em instantes.",
+    unreachable: "Sem conexão com o Ackwire AI agora. Tente de novo em instantes.",
   },
   roles: {
     owner: "Dono",
@@ -472,7 +472,7 @@ export const ptBR = {
       otherServer: "Usar outro servidor",
       opening: "Abrindo {{provider}}…",
       confirm: "É o seu app?",
-      confirmLead: "Este código tem que ser o mesmo que aparece no app agentes.chat no seu computador.",
+      confirmLead: "Este código tem que ser o mesmo que aparece no app Ackwire AI no seu computador.",
       confirmYes: "Sim, entrar no app",
       confirmNo: "Não fui eu",
       done: "Tudo certo.",
@@ -498,17 +498,17 @@ export const ptBR = {
     },
     desktopOwner: {
       continue: "Continuar neste {{device}}",
-      text: "Você instalou o agentes.chat neste {{device}}: não precisa de senha.",
+      text: "Você instalou o Ackwire AI neste {{device}}: não precisa de senha.",
     },
     /** The line over the sign-in in the desktop app: which server it signs in to (ADR 0158). */
     server: {
       into: "Entrando em <b>{{server}}</b>",
-      intoHere: "Entrando no agentes.chat <b>deste {{device}}</b>",
+      intoHere: "Entrando no Ackwire AI <b>deste {{device}}</b>",
     },
     /** "Forgot password" on a server that sends no email (ADR 0158). */
     forgotHere: {
       ownerTitle: "Aqui você não precisa de senha.",
-      ownerLead: "Você instalou o agentes.chat neste {{device}}. Entre por aqui e crie uma senha nova em seguida.",
+      ownerLead: "Você instalou o Ackwire AI neste {{device}}. Entre por aqui e crie uma senha nova em seguida.",
       notOwner: "Não é a conta de quem instalou? Peça a um dono do seu workspace um link de senha nova.",
       title: "Este servidor não manda e-mail.",
       lead: "Peça a um dono do seu workspace um link de senha nova. Ele gera em Membros, e o link vale por 1 hora.",
@@ -828,7 +828,7 @@ export const ptBR = {
         asleep: "Dormindo até o plano",
         price: "<b>Plano {{name}}</b> · {{price}} por mês",
         name: "<b>Plano {{name}}</b>",
-        generic: "Um plano do agentes.chat",
+        generic: "Um plano do Ackwire AI",
         cancel: "Cancele quando quiser",
         cta: "Ligar o time",
         all: "Ver todos os planos",
@@ -891,7 +891,7 @@ export const ptBR = {
     },
     yourCompany: "sua empresa",
     purpose: {
-      title: "Para que você vai usar o agentes.chat?",
+      title: "Para que você vai usar o Ackwire AI?",
       lead: "Dá para mudar depois, nada se perde.",
       personal: "Para mim",
       personalText: "Agentes que cuidam do seu dia.",
@@ -970,7 +970,7 @@ export const ptBR = {
           "Do seu app de IA: indisponível neste servidor, porque apps como o Claude e o ChatGPT só conectam a um endereço https público.",
       },
       otherName: "Outro app",
-      agenteschatName: "agentes.chat",
+      agenteschatName: "Ackwire AI",
       where: {
         openbotrun:
           "Solte o openbot-import.json (do Migrator by OpenBot) ou o openbot-transfer.json (da transferência da instância), ou o .zip em que ele veio.",
@@ -1220,9 +1220,9 @@ export const ptBR = {
     keyStep: {
       title: "Qual IA eles vão usar?",
       lead: "Entre com o seu plano de IA: sem\u00a0chave\u00a0de\u00a0API.",
-      paid: "Seu plano do agentes.chat está ativo. O computador deles está a caminho.",
+      paid: "Seu plano do Ackwire AI está ativo. O computador deles está a caminho.",
       /** Back from paying, for a minute at most, until the billing service lifts the workspace's hold (ADR 0079). */
-      confirming: "Confirmando o pagamento do plano do agentes.chat deste workspace.",
+      confirming: "Confirmando o pagamento do plano do Ackwire AI deste workspace.",
       leadNoComputer:
         "Os agentes pensam com uma chave\u00a0de\u00a0API, ou com o seu plano de IA num computador que você conectar.",
     },
@@ -1409,7 +1409,7 @@ export const ptBR = {
     reload: "Recarregar",
     search: "Buscar ou perguntar…",
     look: "Clique direito",
-    lookOurs: "agentes.chat",
+    lookOurs: "Ackwire AI",
     lookSystem: "Do sistema",
     markRead: "Marcar como lida",
     muteChannel: "Silenciar canal",
@@ -1435,8 +1435,8 @@ export const ptBR = {
     copied: "Copiado. Cole no terminal.",
     mac: {
       why: "<b>O app está em beta.</b> Por isso, na primeira vez, o Mac pede uma confirmação:",
-      drag: "Arraste o agentes.chat para Aplicativos.",
-      dragLong: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
+      drag: "Arraste o Ackwire AI para Aplicativos.",
+      dragLong: "Abra o arquivo baixado e arraste o Ackwire AI para Aplicativos.",
       blocked: "Abra o app e clique em Concluído.",
       blockedSub: "Não clique em Mover para o Lixo.",
       settings: "Em Ajustes\u00a0›\u00a0Privacidade e Segurança, clique em Abrir Mesmo Assim.",
@@ -1465,18 +1465,18 @@ export const ptBR = {
       why: "Para Ubuntu, Debian e derivados (x64). O Linux não pede confirmação extra:",
       apt: "Instale o .deb com dois cliques, ou pelo terminal.",
       aptLong: "Clique duas vezes no arquivo baixado e em Instalar, ou cole no terminal:",
-      open: "Abra o agentes.chat nos aplicativos.",
+      open: "Abra o Ackwire AI nos aplicativos.",
       otherTitle: "Usa Arch, Fedora ou outro sistema que não aceita .deb?",
       otherText:
         "Baixe o AppImage: ele roda em qualquer distribuição e se atualiza sozinho. Depois cole isto no terminal, na pasta onde você salvou:",
       appImage: "Baixar o AppImage",
     },
     page: {
-      docTitle: "Baixar o app · agentes.chat",
-      title: "Baixe o app do agentes.chat",
+      docTitle: "Baixar o app · Ackwire AI",
+      title: "Baixe o app do Ackwire AI",
       beta: "Beta",
       text: "O seu workspace numa janela própria, com os avisos do sistema. Com um clique, os agentes trabalham neste computador, em pastas só deles.",
-      open: "Abrir o agentes.chat",
+      open: "Abrir o Ackwire AI",
       version: "Versão {{version}}",
       versionSize: "Versão {{version}} · {{size}}",
       soon: "Ainda não há versão para {{system}}.",
@@ -1487,7 +1487,7 @@ export const ptBR = {
       system: "Sistema",
       whyTitle: "Por que o sistema pede uma confirmação?",
       whyText:
-        "O agentes.chat está em beta: a versão para Mac ainda não é notarizada pela Apple, e o instalador do Windows ainda não tem o certificado da Microsoft. Sem esses selos, o sistema pergunta uma vez antes de abrir um app baixado da internet. Depois disso, ele abre direto e se atualiza sozinho. Antes de sair do beta, esse passo deixa de existir.",
+        "O Ackwire AI está em beta: a versão para Mac ainda não é notarizada pela Apple, e o instalador do Windows ainda não tem o certificado da Microsoft. Sem esses selos, o sistema pergunta uma vez antes de abrir um app baixado da internet. Depois disso, ele abre direto e se atualiza sozinho. Antes de sair do beta, esse passo deixa de existir.",
       openSource: "Código aberto",
       onlyHere: "Publicado só aqui e nas releases do projeto",
       signedUpdates: "Atualizações assinadas",
@@ -1736,7 +1736,7 @@ export const ptBR = {
     addWorkspaceHint: "Entrar em um que já existe, criar um novo ou usar o servidor da equipe",
     yourServer: "Seu servidor",
     /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
-    serverHere: "O agentes.chat neste {{device}}",
+    serverHere: "O Ackwire AI neste {{device}}",
     serverStopped: "parado",
     serverOffline: "fora do ar desde {{time}}",
     serverSignedOut: "sem login",
@@ -1893,7 +1893,7 @@ export const ptBR = {
     failed: "Não deu para gerar o código.",
     localOnly: "Este servidor só abre no computador onde ele roda, então o celular não chega a ele.",
     localOnlyHow:
-      "No app do agentes.chat desse computador, ligue Acessar pelo celular e pela equipe em Preferências › Servidores. Depois volte aqui.",
+      "No app do Ackwire AI desse computador, ligue Acessar pelo celular e pela equipe em Preferências › Servidores. Depois volte aqui.",
   },
   team: {
     title: "Equipe",
@@ -2768,7 +2768,7 @@ export const ptBR = {
     },
     kept: {
       title: "Guardei a sua mensagem.",
-      line: "Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
+      line: "Eu respondo aqui quando o workspace tiver um plano do Ackwire AI e uma IA conectada.",
       plan: "O plano traz o computador dos agentes, sempre ligado. A IA é a que você já paga: Claude, ChatGPT e outras, ou uma chave de API.",
       active: "Plano ativo. Conecte uma IA e {{name}} responde aqui.",
       receipt: "Guardada",
@@ -2921,7 +2921,7 @@ export const ptBR = {
       saved: "Salva. Todo agente sem plano pensa com ela.",
       savedUnchecked:
         "Salva, mas {{provider}} não respondeu e a chave não pôde ser testada. Se ela falhar, a conversa diz o motivo.",
-      closed: "As chaves de API abrem com o plano do agentes.chat do workspace.",
+      closed: "As chaves de API abrem com o plano do Ackwire AI do workspace.",
       notPlan: "A chave de um plano de código vai na opção dele, acima.",
       billing: "Ative o faturamento no projeto da chave. Sem faturamento, o Google pode usar o que os agentes enviam.",
       privacy:
@@ -3578,7 +3578,7 @@ export const ptBR = {
     clearsAt: "Some às {{time}}",
     clearsOn: "Some {{when}}",
     help: {
-      auto: "Online enquanto o agentes.chat estiver aberto.",
+      auto: "Online enquanto o Ackwire AI estiver aberto.",
       away: "Fora por um tempo: as pessoas sabem que a resposta pode demorar.",
       busy: "Todo mundo vê que é melhor não interromper agora.",
       out: "Longe do trabalho (férias, folga): todo mundo vê até o seu status sumir.",
@@ -4037,7 +4037,7 @@ export const ptBR = {
       removeText_other: "Os {{count}} itens saem do Cofre e seus agentes param de usar. Nada muda no {{name}}.",
       removed: "{{name}} desconectado",
       listOf: "Conexões com {{name}}",
-      note: "Seus agentes leem o que está lá quando precisam. Nada é copiado para o agentes.chat além de nomes e endereços.",
+      note: "Seus agentes leem o que está lá quando precisam. Nada é copiado para o Ackwire AI além de nomes e endereços.",
       error: {
         auth_failed: "Acesso recusado",
         locked: "Senha errada",
@@ -4773,7 +4773,7 @@ export const ptBR = {
       eyebrow: "Pedido de aprovação",
       close: "Fechar",
       exact: "A ação exata",
-      builtIn: "Ferramenta do agentes.chat",
+      builtIn: "Ferramenta do Ackwire AI",
       orgConnector: "Conector do workspace",
       bound: "Só para estes valores: qualquer mudança precisa de nova aprovação.",
       why: "Por que",
@@ -5252,7 +5252,7 @@ export const ptBR = {
       steps: {
         title: "Falta 1 passo, no próprio {{computer}}",
         waiting: "Esperando",
-        one: "Clique no ícone do agentes.chat perto do relógio",
+        one: "Clique no ícone do Ackwire AI perto do relógio",
         two: "Preferências",
         three: "Ligue o Navegador",
         done: "Pronto. Esta página percebe sozinha, não precisa recarregar.",
@@ -6007,10 +6007,10 @@ export const ptBR = {
       afterPlanNext: "É o passo seguinte ao plano.",
       plan: {
         todo: "Ligue o time.",
-        todoDesc: "Com um plano do agentes.chat, os agentes começam a trabalhar.",
+        todoDesc: "Com um plano do Ackwire AI, os agentes começam a trabalhar.",
         action: "Ver planos",
         todoPersonal: "Ligue os seus agentes.",
-        todoDescPersonal: "Com um plano do agentes.chat, os seus agentes começam a trabalhar.",
+        todoDescPersonal: "Com um plano do Ackwire AI, os seus agentes começam a trabalhar.",
       },
       about: {
         /** A personal workspace's row 1, its button (ADR 0159). */
@@ -6849,13 +6849,13 @@ export const ptBR = {
       },
       mailFor: "Assim chega para {{names}}",
       mail: {
-        from: "agentes.chat · para {{to}}",
+        from: "Ackwire AI · para {{to}}",
         toMany: "{{email}} e mais {{count}}",
-        subject: "Você recebeu um convite para um workspace no agentes.chat",
+        subject: "Você recebeu um convite para um workspace no Ackwire AI",
         headline: "Você recebeu um convite",
         body: "<b>{{name}}</b> ({{email}}) convidou você para entrar na <b>{{org}}</b> como membro.",
         noteFrom: "<b>{{name}}:</b> “{{note}}”",
-        what: "O agentes.chat é onde pessoas e agentes de IA trabalham juntos.",
+        what: "O Ackwire AI é onde pessoas e agentes de IA trabalham juntos.",
         button: "Aceitar convite",
         small: "O convite vale por 7 dias. Aceite com este endereço de e-mail.",
       },
@@ -7046,7 +7046,7 @@ export const ptBR = {
     crashText: "Recarregue a página para continuar.",
     crashCode: "Se pedir ajuda, informe o código {{id}}.",
     /** A request that got no answer, or only the proxy's: the page opens again by itself (ErrorScreen). */
-    unreachableTitle: "Sem conexão com o agentes.chat",
+    unreachableTitle: "Sem conexão com o Ackwire AI",
     unreachableText: "Ele pode estar reiniciando. Esta página abre sozinha assim que ele voltar.",
     offlineTitle: "Você está sem internet",
     offlineText: "Esta página abre sozinha quando a internet voltar.",
@@ -8574,7 +8574,7 @@ export const ptBR = {
       title: "Arquivos da missão",
       folder: "pasta",
       tabs: "Arquivo",
-      missionSub: "Plano e regras · atualizado pelo agentes.chat",
+      missionSub: "Plano e regras · atualizado pelo Ackwire AI",
       decisionsSub: "Decisões aprovadas",
       notesSub: "Anotações do {{executor}}",
       notesSub_female: "Anotações da {{executor}}",
@@ -8648,7 +8648,7 @@ export const ptBR = {
       title: "Nova missão",
       text: "Um projeto longo para um agente. Ele propõe um plano, trabalha no computador dele e pede decisões e revisões na thread.",
       goal: "Objetivo",
-      goalPlaceholder: "Ex.: construir o app mobile do agentes.chat em Expo, com base no web atual.",
+      goalPlaceholder: "Ex.: construir o app mobile do Ackwire AI em Expo, com base no web atual.",
       agent: "Agente",
       computer: "Computador",
       noMachine: "Nenhum conectado",
@@ -9503,7 +9503,7 @@ export const ptBR = {
   jev: {
     title: "Jev",
     about:
-      "Um modelo rápido da TypeSafe, feito para decisões rápidas. O agentes.chat faz perguntas pequenas a ele, como quem deve responder. Você paga direto à TypeSafe.",
+      "Um modelo rápido da TypeSafe, feito para decisões rápidas. O Ackwire AI faz perguntas pequenas a ele, como quem deve responder. Você paga direto à TypeSafe.",
     lead: "Ajuda os agentes a trabalhar em equipe.",
     how: "Como o Jev funciona",
     why: {
@@ -9641,7 +9641,7 @@ export const ptBR = {
         installing: "O {{program}} está sendo instalado no {{computer}}. Isto muda sozinho quando terminar.",
         updating: "O {{program}} está sendo atualizado no {{computer}}. Isto muda sozinho quando terminar.",
         runnerOld:
-          "O programa do agentes.chat no {{computer}} está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.",
+          "O programa do Ackwire AI no {{computer}} está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.",
         execOff: "O {{computer}} ainda não consegue rodar o {{program}}. Já estamos cuidando, e isto muda sozinho.",
         toolOff:
           "O {{program}} ainda não está liberado no {{computer}}. Isso é do nosso lado: tente de novo mais tarde.",
@@ -9657,7 +9657,7 @@ export const ptBR = {
     },
     page: {
       title: "Seus planos",
-      hint: "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O agentes.chat guarda só o nome, o email e o uso.",
+      hint: "Cada plano fica no computador onde foi conectado, e quem administra esse computador pode acessá-lo. O Ackwire AI guarda só o nome, o email e o uso.",
       emptyTitle: "Use o plano de IA que você já paga",
       emptyViewer: "Quem cuida das IAs do workspace conecta um plano, e ele aparece aqui.",
       connect: "Conectar uma IA",
@@ -10864,12 +10864,11 @@ export const ptBR = {
     reasons: {
       no_computer: "Escolha um computador conectado em Computador para usar.",
       exec_off: "O computador foi conectado sem permissão para rodar programas.",
-      runner_old: "Atualize o programa do agentes.chat no computador para usar.",
+      runner_old: "Atualize o programa do Ackwire AI no computador para usar.",
       /** `program`: "Claude Code" or "Codex" (`brain.card`). */
       tool_off:
-        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
-      tool_offLinux:
-        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do agentes.chat ou com {{command}}.",
+        "O {{program}} está desligado no {{computer}}. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
+      tool_offLinux: "O {{program}} está desligado no {{computer}}. Ligue lá, no app do Ackwire AI ou com {{command}}.",
       not_installed: "O {{program}} não está instalado no {{computer}}.",
       not_reported: "O {{computer}} ainda está vendo quais programas tem. Isto muda sozinho quando terminar.",
       outdated: "A versão no {{computer}} é antiga. Atualize o Codex para usar.",
@@ -11378,7 +11377,7 @@ export const ptBR = {
   storage: {
     title: "Armazenamento",
     options: "Onde guardar os arquivos",
-    agentes: "Armazenamento do agentes.chat",
+    agentes: "Armazenamento do Ackwire AI",
     agentesText: "Seus arquivos ficam no nosso armazenamento, separados por workspace.",
     server: "Este servidor",
     serverText: {
@@ -11390,7 +11389,7 @@ export const ptBR = {
     showFolder: "Mostrar a pasta",
     // `{{place}}` in the lines below: each is built so no preposition has to merge with it ("neste", "no").
     place: {
-      agentes: "o armazenamento do agentes.chat",
+      agentes: "o armazenamento do Ackwire AI",
       server: "este servidor",
     },
     s3: "Seu próprio bucket",
@@ -11449,8 +11448,8 @@ export const ptBR = {
   },
   githubApp: {
     title: "Repositórios do GitHub",
-    text: "Onde o app agentes.chat está instalado, os agentes abrem pull requests, issues, comentários e commits como o app, com o nome do agente e de quem pediu. Só a {{org}} usa o que você instalar daqui.",
-    install: "Instalar o app agentes.chat",
+    text: "Onde o app Ackwire AI está instalado, os agentes abrem pull requests, issues, comentários e commits como o app, com o nome do agente e de quem pediu. Só a {{org}} usa o que você instalar daqui.",
+    install: "Instalar o app Ackwire AI",
     installMore: "Instalar em outra conta",
     none: "Nenhuma conta do GitHub ainda.",
     /** Nada instalado ainda, e os agentes usam a conta do GitHub do workspace: como eles aparecem hoje. */
@@ -11466,7 +11465,7 @@ export const ptBR = {
     removeName: "Remover {{account}}",
     removeTitle: "Remover o app de {{account}}?",
     removeText:
-      "O app agentes.chat é desinstalado de {{account}} no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
+      "O app Ackwire AI é desinstalado de {{account}} no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
     /** Depois de removeText quando é a última conta do app e nenhuma conta do GitHub está conectada. */
     removeLast: "É a última, então os agentes ficam sem GitHub até alguém instalar o app ou conectar uma conta.",
     removed: "App removido de {{account}} e desinstalado no GitHub.",
@@ -11474,7 +11473,7 @@ export const ptBR = {
     notUninstalled: "App removido daqui, mas o GitHub não confirmou a desinstalação de {{account}}. Desinstale lá.",
     /** O botão desse aviso, curto para deixar espaço às palavras ao lado dele no celular. */
     openPage: "Abrir",
-    installed: "App agentes.chat instalado.",
+    installed: "App Ackwire AI instalado.",
     /**
      * Someone without rights on that GitHub account asked its owner to install (`github_app_error=requested`).
      * Approving it on GitHub never links it here: the owner installs it from agentes.chat.
@@ -11483,7 +11482,7 @@ export const ptBR = {
       "Só o dono da conta do GitHub pode instalar o app. Peça para essa pessoa instalar em Conectores › GitHub neste workspace.",
     notVisible: "Sua conta do GitHub não vê essa instalação. Instale com uma conta que tenha acesso a ela.",
     otherWorkspace: "Essa conta do GitHub já está ligada a outro workspace. Remova o app de lá antes de instalar aqui.",
-    /** O app foi instalado no próprio GitHub, não pelo agentes.chat (`github_app_error=installed_outside`). */
+    /** O app foi instalado no próprio GitHub, não pelo Ackwire AI (`github_app_error=installed_outside`). */
     installedOutside:
       "O app foi instalado nessa conta do GitHub fora do agentes.chat. Remova o app no GitHub e instale de novo em Conectores › GitHub.",
     /**
@@ -11494,24 +11493,24 @@ export const ptBR = {
       "O app do GitHub está com a chave secreta errada no servidor, então a instalação não conclui. Quem cuida do servidor precisa trocar a chave nas configurações do app.",
     /** O GitHub é só o app: conectar uma conta também (os agentes usam onde o app não está e no GitHub Projects). */
     connectAccount: "Conectar uma conta do GitHub",
-    /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no agentes.chat). */
+    /** Para os admins que não são o dono do servidor, num servidor sem o app (nunca no Ackwire AI). */
     ownerHint: "O dono deste servidor pode criar o app do GitHub aqui em Conectores.",
     /** A linha de um GitHub conectado só pelo app: as contas onde ele está instalado. */
-    viaApp: "Pelo app agentes.chat em {{accounts}}",
-    disconnectApp: "O app agentes.chat também é desinstalado de {{accounts}} no GitHub.",
-    disconnectKeepsApp: "Os agentes continuam no GitHub pelo app agentes.chat em {{accounts}}.",
+    viaApp: "Pelo app Ackwire AI em {{accounts}}",
+    disconnectApp: "O app Ackwire AI também é desinstalado de {{accounts}} no GitHub.",
+    disconnectKeepsApp: "Os agentes continuam no GitHub pelo app Ackwire AI em {{accounts}}.",
     keptApp: "Conta do GitHub desconectada. Os agentes continuam no GitHub pelo app agentes.chat.",
     /** A linha no fim do que um agente escreve no GitHub (pull requests, issues, comentários). */
     signature: {
-      forPerson: "{{agent}}, agente de {{person}} no agentes.chat",
-      alone: "{{agent}}, agente no agentes.chat",
+      forPerson: "{{agent}}, agente de {{person}} no Ackwire AI",
+      alone: "{{agent}}, agente no Ackwire AI",
     },
     /** A página do servidor que leva o dono ao GitHub para criar o app (ela segue sozinha). */
     manifestPage: {
       title: "Criando o app do GitHub",
       continue: "Continuar no GitHub",
     },
-    /** Configurações › Conectores para o dono do servidor (nunca no agentes.chat): o app que os workspaces daqui instalam. */
+    /** Configurações › Conectores para o dono do servidor (nunca no Ackwire AI): o app que os workspaces daqui instalam. */
     server: {
       title: "App do GitHub deste servidor",
       lead: "Com ele, os agentes aparecem no GitHub como o app, não como a conta de alguém.",
@@ -12260,10 +12259,10 @@ export const ptBR = {
     namePlaceholder: "Ex.: Suporte",
     continueIn: "Continuar no {{name}}",
     continueInComposio: "Continuar na Composio",
-    /** Conectar o GitHub onde o servidor tem o app agentes.chat: o app primeiro, uma conta depois. */
+    /** Conectar o GitHub onde o servidor tem o app Ackwire AI: o app primeiro, uma conta depois. */
     github: {
       how: "Como os agentes entram no GitHub",
-      app: "O app agentes.chat",
+      app: "O app Ackwire AI",
       recommended: "Recomendado",
       appText: "Os agentes aparecem como o app, e você escolhe os repositórios no GitHub.",
       account: "Uma conta do GitHub",
@@ -12287,7 +12286,7 @@ export const ptBR = {
     withKey: "Conectar com uma chave de API",
     needsKey: "Este servidor não aceita OAuth. Conecte com uma chave de API.",
     notApproved:
-      "{{name}} só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
+      "{{name}} só deixa entrar apps que aprovou, e o Ackwire AI ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
     serverSaid: "O servidor respondeu: {{detail}}",
     nothingYet: "Nada fica disponível para os agentes até o passo 3.",
     allCanUse: "Ao conectar, todos os agentes podem usar. Dá para ajustar depois.",
@@ -13037,7 +13036,7 @@ export const ptBR = {
       computerOffline: "O computador do agente está offline.",
       execDisabled: "Os comandos estão desligados nesse computador.",
       runnerOutdated:
-        "O programa no computador é antigo demais para missões: atualize o app do agentes.chat nele, ou rode de novo o comando de instalação.",
+        "O programa no computador é antigo demais para missões: atualize o app do Ackwire AI nele, ou rode de novo o comando de instalação.",
       exists: "Esta thread já tem uma missão.",
       closed: "Esta missão está fechada.",
       wrongStatus: "A missão não está num estado que permita isso.",
@@ -13135,7 +13134,7 @@ export const ptBR = {
       targetSame: "Os agentes já estão nesse computador.",
       targetPaused: "Esse computador está pausado. Escolha outro.",
       accountMethodUnsupported:
-        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do Ackwire AI nele, ou use uma chave de API.",
       offline: "{{name}} está fora do ar agora. Tente de novo quando ele voltar.",
       paused: "{{name}} está pausado: nada novo começa nele até ele ser retomado.",
       timeout: "O computador não respondeu a tempo. Tente de novo.",
@@ -13322,12 +13321,12 @@ export const ptBR = {
       noReport: "Este {{device}} ainda não informou o que libera. Atualize o app.",
       update: "Atualizar o app",
     },
-    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine agentes.chat is installed on.
+    // The server's own computer (`HOST_COMPUTER_TOKEN`): the machine Ackwire AI is installed on.
     host: {
       label: "Computador deste servidor",
-      desc: "Onde o agentes.chat está instalado.",
-      descUsers: "Onde o agentes.chat está instalado, um usuário por agente.",
-      descShared: "O computador onde o agentes.chat está instalado. Os agentes trabalham como a pessoa que o instalou.",
+      desc: "Onde o Ackwire AI está instalado.",
+      descUsers: "Onde o Ackwire AI está instalado, um usuário por agente.",
+      descShared: "O computador onde o Ackwire AI está instalado. Os agentes trabalham como a pessoa que o instalou.",
       stop: "Parar de usar neste workspace",
       stopTitle: "Parar de usar o computador deste servidor?",
       stopText: "Os agentes deste workspace deixam de usar este computador agora. Dá para voltar a usar quando quiser.",
@@ -13338,7 +13337,7 @@ export const ptBR = {
     },
     download: {
       title: "Conectar outro computador",
-      text: "Instale o app do agentes.chat no computador.",
+      text: "Instale o app do Ackwire AI no computador.",
       mac: "Baixar o app para {{system}}",
       version: "Versão {{version}}",
       versionSize: "Versão {{version}} · {{size}}",
@@ -13349,7 +13348,7 @@ export const ptBR = {
       unavailable: "O app ainda não está disponível.",
       unavailableCommand: "O app ainda não está disponível. Por enquanto, use o comando abaixo.",
       firstTime: "Na primeira vez",
-      step1: "Abra o arquivo baixado e arraste o agentes.chat para Aplicativos.",
+      step1: "Abra o arquivo baixado e arraste o Ackwire AI para Aplicativos.",
       step1Install: "Abra o arquivo baixado para instalar.",
       otherText: "Rode no terminal do computador e confirme o código que ele mostrar.",
       waiting: "Esperando o computador conectar…",
@@ -13378,7 +13377,7 @@ export const ptBR = {
       ownFolder: "Pasta de cada agente",
       ownFolderText: "Sempre. Um agente não vê a do outro.",
       noFolders: "Nenhuma pasta a mais. Cada agente usa só a própria pasta.",
-      noReport: "Este computador ainda não informou o que libera. Atualize o agentes.chat nele.",
+      noReport: "Este computador ainda não informou o que libera. Atualize o Ackwire AI nele.",
       hidden: "Só admins e quem conectou veem as pastas e as ferramentas deste computador.",
       nobody: "Nenhum agente usa ainda",
       usedBy: "Quem usa {{folder}}",
@@ -13422,7 +13421,7 @@ export const ptBR = {
       disableText: "Os agentes deixam de usar {{tool}} neste computador. Para ligar de novo, só no próprio computador.",
       disabled: "{{tool}} desligado.",
       grantTitle: "Para liberar mais",
-      grantText: "Liberar é no próprio computador: abra o app do agentes.chat nele (Preferências → Pastas).",
+      grantText: "Liberar é no próprio computador: abra o app do Ackwire AI nele (Preferências → Pastas).",
       grantTextTerminal: "Liberar é no próprio computador, no Terminal dele:",
       grantTextAdmin: "Liberar é no próprio computador, no Terminal dele, como administrador:",
       grantTerminal: "Sem o app? No terminal do computador:",
@@ -13513,7 +13512,7 @@ export const ptBR = {
       forbidden: "Você não pode ver esta tela",
       forbiddenText: "O dono escolhe quem pode usar {{name}}.",
       outdated: "O app em {{host}} é antigo demais para isso",
-      outdatedText: "Atualize o agentes.chat em {{host}} e tente de novo.",
+      outdatedText: "Atualize o Ackwire AI em {{host}} e tente de novo.",
       unavailable: "Esta tela não pode ser mostrada",
       unavailableText: "Confira se {{host}} tem o adb ou o Xcode instalado e tente de novo.",
       needsHelper: "Termine a configuração do iPhone no Mac para ter o assistente de testes que ele precisa.",
@@ -13660,7 +13659,7 @@ export const ptBR = {
       thisMac: "Este Mac",
       thisPc: "Este PC",
       thisComputer: "Este computador",
-      thisLine: "Pelo app agentes.chat",
+      thisLine: "Pelo app Ackwire AI",
       openApp: "Abrir o app",
       server: "Um servidor ou VPS",
       serverLine: "Uma linha para colar no terminal dele",
@@ -13673,7 +13672,7 @@ export const ptBR = {
     },
     computer: {
       title: "Conectar outro computador",
-      step1: "Instale o app do agentes.chat nele:",
+      step1: "Instale o app do Ackwire AI nele:",
       step2: "Abra e entre com a sua conta.",
       step3: "Clique em Permitir quando ele perguntar se os agentes de {{org}} podem usá-lo.",
       shows: "Ele aparece aqui sozinho, só para você até você compartilhar.",
@@ -13683,8 +13682,8 @@ export const ptBR = {
       noApp: "Não dá para instalar o app nele? Use uma linha no terminal",
     },
     thisApp: {
-      text: "O app do agentes.chat conecta com um clique, e pergunta a você antes.",
-      open: "Abrir o app do agentes.chat",
+      text: "O app do Ackwire AI conecta com um clique, e pergunta a você antes.",
+      open: "Abrir o app do Ackwire AI",
       browserAsks: "O navegador pergunta se pode abrir: escolha Abrir, e Sempre permitir se ele oferecer.",
       noApp: "Não tem o app?",
       afterInstall:
@@ -13767,7 +13766,7 @@ export const ptBR = {
       },
       qrLabel: "QR code que abre estes passos no celular",
       qrLine: "Faça pelo celular",
-      qrCaption: "Escaneie para abrir estes passos no app agentes.chat, com botões para cada configuração.",
+      qrCaption: "Escaneie para abrir estes passos no app Ackwire AI, com botões para cada configuração.",
       buildNumber: "Número da versão",
       buildNumberSub: "BP2A.250605.031",
       usbRow: "Depuração USB",
@@ -13814,29 +13813,28 @@ export const ptBR = {
         mdns_off:
           "{{computer}} não consegue procurar celulares no Wi-Fi. Atualize o Android platform-tools nele, ou use um cabo.",
         mdns_offMac:
-          "{{computer}} não consegue procurar celulares no Wi-Fi. Nesse Mac, ligue o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local e tente de novo.",
+          "{{computer}} não consegue procurar celulares no Wi-Fi. Nesse Mac, ligue o Ackwire AI em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local e tente de novo.",
         same_wifi:
           "Não deu para alcançar o celular. Ele não está na mesma rede que {{computer}}. Coloque-o no mesmo Wi-Fi e tente de novo.",
         same_wifiMac:
-          "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}}. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
+          "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que {{computer}}. Nesse Mac, ligue também o Ackwire AI em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         refused: "O celular parou o pareamento. Deixe a tela de pareamento aberta e tente de novo.",
         refusedCode: "O celular não aceitou esse código. Confira o código e o endereço, e pareie de novo.",
         timed_out:
           "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi.",
         timed_outMac:
-          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
+          "Nenhum celular pareou em 2 minutos. Se a câmera escaneou o código ou o celular saiu do Wi-Fi, coloque-o no mesmo Wi-Fi que {{computer}} e escaneie pela Depuração por Wi-Fi. Nesse Mac, ligue também o Ackwire AI em Ajustes do Sistema\u00a0›\u00a0Privacidade e Segurança\u00a0›\u00a0Rede Local.",
         outdated:
           "O pareamento por Wi-Fi precisa do Android 14 ou mais novo com a atualização de segurança de maio de 2026. Atualize o celular, ou use um cabo.",
         adb_missing: "{{computer}} não tem o Android platform-tools. Instale o Android Studio nele e tente de novo.",
-        update:
-          "O pareamento por Wi-Fi precisa de um agentes.chat mais novo em {{computer}}. Atualize e tente de novo.",
+        update: "O pareamento por Wi-Fi precisa de um Ackwire AI mais novo em {{computer}}. Atualize e tente de novo.",
         canceled: "O pareamento parou. Tente de novo.",
         failed: "O pareamento não deu certo. Tente de novo, ou use um cabo.",
       },
     },
     iphone: {
       title: "Conectar um iPhone",
-      lead: "iPhones se conectam por um Mac, onde o app agentes.chat faz a configuração.",
+      lead: "iPhones se conectam por um Mac, onde o app Ackwire AI faz a configuração.",
       mac: "Mac",
       noMac: "Os agentes só usam um iPhone por um Mac, e nenhum está conectado ainda.",
       noMacNote: "Sem Mac? Peça a alguém do time para conectar o seu.",
@@ -14181,7 +14179,7 @@ export const ptBR = {
         step1:
           "Abra Personalizar\u00a0›\u00a0Conectores (Customize\u00a0›\u00a0Connectors) no claude.ai ou no Claude Desktop.",
         step2:
-          "Clique em + Adicionar e em Adicionar conector personalizado (Add custom connector), dê o nome agentes.chat, cole o endereço e clique em Continuar.",
+          "Clique em + Adicionar e em Adicionar conector personalizado (Add custom connector), dê o nome Ackwire AI, cole o endereço e clique em Continuar.",
         step3: "Escolha Entrar agora (Sign in now), clique em Adicionar e autorize na página que abrir.",
         phone: "Ele aparece no celular depois de adicionado no computador.",
         team: "Em planos Team e Enterprise, o dono da organização no Claude adiciona o conector em Configurações da organização\u00a0›\u00a0Conectores. Depois cada pessoa clica em Conectar em Personalizar\u00a0›\u00a0Conectores.",
@@ -14216,9 +14214,9 @@ export const ptBR = {
         open: "Abra {{place}}.",
         click: "Clique em {{button}}.",
         clickThen: "Clique em {{button}} e depois em {{next}}.",
-        name: "Dê o nome agentes.chat e cole o endereço.",
-        nameDescribe: "Dê o nome agentes.chat e escreva uma descrição.",
-        nameConnect: "Dê o nome agentes.chat e clique em {{button}}.",
+        name: "Dê o nome Ackwire AI e cole o endereço.",
+        nameDescribe: "Dê o nome Ackwire AI e escreva uma descrição.",
+        nameConnect: "Dê o nome Ackwire AI e clique em {{button}}.",
         paste: "Cole o endereço.",
         pasteIn: "Cole o endereço em {{field}}.",
         choosePaste: "Escolha {{option}} e cole o endereço.",
@@ -14237,7 +14235,7 @@ export const ptBR = {
         mode: "No chat, mude para o modo {{mode}}.",
         loginRun: "Para entrar, rode <code>{{command}}</code>.",
         loginType: "Para entrar, digite <code>{{command}}</code> no app.",
-        signIn: "Entre com sua conta do agentes.chat na página que abrir.",
+        signIn: "Entre com sua conta do Ackwire AI na página que abrir.",
         signInFirst: "O app pede para você entrar na primeira vez que usar.",
         token: "Crie um token pessoal e coloque no lugar de {{placeholder}}.",
         install: "Adicionar ao {{app}}",
@@ -14307,7 +14305,7 @@ export const ptBR = {
       done: "Pode voltar ao {{app}}.",
       cancelledTitle: "Conexão cancelada",
       cancelled: "Nada foi compartilhado.",
-      goHome: "Ir para o agentes.chat",
+      goHome: "Ir para o Ackwire AI",
       language: "Idioma",
       error: {
         app_desconhecido: "Não reconhecemos este app",
@@ -14553,7 +14551,7 @@ export const ptBR = {
       voice: "Voz",
       apps: "Apps de IA",
       approvals: "Aprovações",
-      about: "Sobre o agentes.chat",
+      about: "Sobre o Ackwire AI",
       generalPersonal: "Sobre você",
       keysPersonal: "IA e apps",
       membersPersonal: "Pessoas",
@@ -14588,7 +14586,7 @@ export const ptBR = {
       rolesPersonal: "O que cada pessoa daqui pode fazer. Quem é dono pode tudo.",
     },
     about: {
-      basedOn: "Baseado no <site>agentes.chat</site> da Codari Global, LLC",
+      basedOn: "Baseado no <site>Ackwire AI</site> da Codari Global, LLC",
       version: "Versão",
       license: "Software livre sob a <license>GNU Affero General Public License v3</license>, sem garantia.",
       source: "Código-fonte",
@@ -14698,11 +14696,11 @@ export const ptBR = {
     },
     telemetry: {
       title: "Estatísticas de uso",
-      label: "Enviar estatísticas de uso anônimas ao agentes.chat",
+      label: "Enviar estatísticas de uso anônimas ao Ackwire AI",
       help: "Contagens como pessoas, agentes, tamanho das máquinas, tokens de IA usados e o volume de dados que os navegadores dos agentes enviam e recebem. Nunca mensagens, arquivos, nomes ou sites.",
       envOff: "Desligado nas configurações deste servidor (TELEMETRY=off).",
       envOffDesktop:
-        "Desligado no app do agentes.chat no computador deste servidor (Preferências\u00a0›\u00a0Servidores).",
+        "Desligado no app do Ackwire AI no computador deste servidor (Preferências\u00a0›\u00a0Servidores).",
       see: "Ver o que é enviado",
       dialogTitle: "O que é enviado",
       dialogText: "Uma vez por dia. Este é o próximo envio, exatamente.",
@@ -14809,7 +14807,7 @@ export const ptBR = {
       agentOn: "{{name}} manda GIFs e figurinhas",
       agentsNever: "Com Nunca, nenhum agente manda por conta própria. Quando alguém pede, os ligados aqui mandam.",
       noAgents: "Nenhum agente no workspace ainda.",
-      /** The installation's GIPHY key, for its owner on a server that isn't agentes.chat's own (ADR 0091). */
+      /** The installation's GIPHY key, for its owner on a server that isn't Ackwire AI's own (ADR 0091). */
       giphy: {
         title: "Chave do GIPHY",
         lead: "Com ela, as pessoas mandam GIFs em todos os workspaces deste servidor.",
@@ -15328,7 +15326,7 @@ export const ptBR = {
         commentIssue: "{{who}} comentou na issue #{{number}} ({{repo}}) no GitHub",
         commentDiscussion: "{{who}} comentou na discussão #{{number}} ({{repo}}) no GitHub",
         /** Um PR, issue ou discussão novo que menciona o app. */
-        opened: "{{who}} chamou o app agentes.chat em #{{number}} ({{repo}}) no GitHub",
+        opened: "{{who}} chamou o app Ackwire AI em #{{number}} ({{repo}}) no GitHub",
         reviewed: "{{who}} revisou o PR #{{number}} ({{repo}}) no GitHub",
         approved: "{{who}} aprovou o PR #{{number}} ({{repo}}) no GitHub",
         changes: "{{who}} pediu mudanças no PR #{{number}} ({{repo}}) no GitHub",
@@ -15786,7 +15784,7 @@ export const ptBR = {
       no_ai_commands_off: "Agora não consigo responder: os comandos estão desligados no computador do meu plano.",
       no_ai_cli_missing: "Ainda não consigo responder: o programa da minha IA não está instalado no meu computador.",
       no_ai_plan_hold:
-        "Guardei a sua mensagem. Eu respondo aqui quando o workspace tiver um plano do agentes.chat e uma IA conectada.",
+        "Guardei a sua mensagem. Eu respondo aqui quando o workspace tiver um plano do Ackwire AI e uma IA conectada.",
       no_ai_no_computer: "Ainda não consigo responder: minha IA precisa de um computador e não tenho nenhum.",
       redacted: "[removido: parecia um login ou uma chave]",
       action_connect_ai: "Conectar uma IA",
@@ -16285,7 +16283,7 @@ export const ptBR = {
     machine: {
       ready: "Pronto",
       off: "Desligado",
-      offHelp: "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.",
+      offHelp: "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.",
       needsCommand: "Precisa de um comando",
       notReady: "Ainda não pronto",
       turnOff: "Desligar",
@@ -16596,31 +16594,31 @@ export const ptBR = {
       agentHold: "{{name}} está em pausa",
       /** A hold the billing service set (ADR 0079): its code, never shown as it comes. */
       billing: {
-        payment: "O workspace precisa de um plano do agentes.chat",
-        unpaid: "O pagamento do plano do agentes.chat não passou",
-        ended: "O plano do agentes.chat do workspace terminou",
+        payment: "O workspace precisa de um plano do Ackwire AI",
+        unpaid: "O pagamento do plano do Ackwire AI não passou",
+        ended: "O plano do Ackwire AI do workspace terminou",
       },
     },
     /** A hold the billing service set (ADR 0079), said in place of its code. */
     billing: {
       payment:
         "Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
-      unpaid: "O pagamento do plano do agentes.chat deste workspace não passou, e os agentes pararam.",
+      unpaid: "O pagamento do plano do Ackwire AI deste workspace não passou, e os agentes pararam.",
       ended:
-        "O plano do agentes.chat deste workspace terminou, e os agentes pararam. As conversas e os arquivos continuam aqui para ler e baixar.",
-      sub: "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
+        "O plano do Ackwire AI deste workspace terminou, e os agentes pararam. As conversas e os arquivos continuam aqui para ler e baixar.",
+      sub: "Dá para ler e escrever aqui. Os agentes voltam quando o plano do Ackwire AI estiver em dia.",
       cta: {
-        payment: "Ver planos do agentes.chat",
+        payment: "Ver planos do Ackwire AI",
         unpaid: "Atualizar o pagamento",
         ended: "Assinar de novo",
       },
       askAdmin: "Quem administra o workspace pode resolver isso.",
       /** In place of the hold's words, back from paying until the billing service lifts it. */
-      paid: "Pagamento recebido. O plano do agentes.chat começa em instantes.",
-      teamReady: "Seu time está pronto. Falta um plano do agentes.chat para ele começar.",
+      paid: "Pagamento recebido. O plano do Ackwire AI começa em instantes.",
+      teamReady: "Seu time está pronto. Falta um plano do Ackwire AI para ele começar.",
       invites: "Os convites abrem com o plano do agentes.chat.",
     },
-    /** agentes.chat Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
+    /** Ackwire AI Cloud only: what the restriction is, the Terms section and how to contest it (`restrictionLine`). */
     cloud: {
       review:
         "Pausado para uma análise de segurança, até a nossa equipe olhar o caso. As nossas verificações automáticas detectaram uma atividade que pode violar os nossos Termos (seção 5). Para contestar, escreva para {{email}}.",
@@ -16787,7 +16785,7 @@ export const ptBR = {
   limits: {
     members: {
       full: "Este workspace está com {{members}} de {{limit}} pessoas.",
-      fullOne: "No plano do agentes.chat deste workspace cabe 1 pessoa.",
+      fullOne: "No plano do Ackwire AI deste workspace cabe 1 pessoa.",
       fullAdmin: "Para chamar mais gente, veja as opções do plano do agentes.chat.",
       fullMember: "Peça a quem administra o workspace para abrir espaço.",
       /** To whoever manages billing, below the plan's top. "Plano e cobrança" is the section in Settings. */
@@ -16812,7 +16810,7 @@ export const ptBR = {
       near: "Vocês usaram {{used}} de {{limit}}. Os envios pausam no limite, e nada é apagado.",
       full: "Os envios pausaram em {{limit}}. Nada foi apagado.",
       fullAdmin:
-        "Mude o plano do agentes.chat, apague arquivos que não usam mais ou conecte o seu próprio bucket em Configurações\u00a0›\u00a0Armazenamento.",
+        "Mude o plano do Ackwire AI, apague arquivos que não usam mais ou conecte o seu próprio bucket em Configurações\u00a0›\u00a0Armazenamento.",
       dailyFull: "Os envios de hoje chegaram a {{limit}}. Dá para enviar de novo em algumas horas.",
     },
   },
@@ -17039,7 +17037,7 @@ export const ptBR = {
       notice: "Os programas do computador do {{name}} veem a tela e o que você digita ou cola.",
       notice_female: "Os programas do computador da {{name}} veem a tela e o que você digita ou cola.",
     },
-    /** The ⓘ beside the control line, on agentes.chat Cloud only (ADR 0076). */
+    /** The ⓘ beside the control line, on Ackwire AI Cloud only (ADR 0076). */
     session: {
       check: "Verificações de segurança",
       screening:
@@ -17214,7 +17212,7 @@ export const ptBR = {
       turn: "Deitar a tela",
       upright: "Voltar a tela para em pé",
       message: "Mensagem para {{name}}",
-      chooseOnWeb: "Escolha no agentes.chat, em Configurações\u00a0›\u00a0Dispositivos.",
+      chooseOnWeb: "Escolha no Ackwire AI, em Configurações\u00a0›\u00a0Dispositivos.",
     },
   },
   taskManager: {
@@ -18035,7 +18033,7 @@ export const ptBR = {
     },
     action: {
       signIn: "Entrar",
-      open: "Abrir o agentes.chat",
+      open: "Abrir o Ackwire AI",
       latest: "Abrir a versão mais recente",
       file: "Abrir o arquivo",
       retry: "Tentar de novo",
@@ -18276,7 +18274,7 @@ export const ptBR = {
     beta: {
       word: "BETA",
       title: "Você chegou cedo. Que bom.",
-      text: "O agentes.chat está em beta: já dá para trabalhar de verdade com ele, e ainda estamos lapidando.",
+      text: "O Ackwire AI está em beta: já dá para trabalhar de verdade com ele, e ainda estamos lapidando.",
       weekly: {
         title: "Melhora toda semana",
         text: "Novidades e correções saem o tempo todo.",
@@ -18335,14 +18333,14 @@ export const ptBR = {
     offer: {
       group: "Relato sobre o app",
       ready: "<b>Relato pronto</b>: {{summary}}",
-      goesCloud: "Vai no seu nome para o time do agentes.chat",
+      goesCloud: "Vai no seu nome para o time do Ackwire AI",
       goesServer: "Vai no seu nome para quem administra este servidor",
       see: "Ver o relato",
       hide: "Fechar o relato",
       send: "Enviar",
       notNow: "Agora não",
       answer: "A resposta chega no seu e-mail.",
-      sentCloud: "<b>Relato enviado</b> para o time do agentes.chat",
+      sentCloud: "<b>Relato enviado</b> para o time do Ackwire AI",
       sentServer: "<b>Relato enviado</b> para quem administra este servidor",
       sentAuto: "<b>Relato enviado sem perguntar</b>: {{summary}}",
       view: "Ver",

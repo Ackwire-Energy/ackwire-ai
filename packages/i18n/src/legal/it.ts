@@ -5,7 +5,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Termini di utilizzo",
     summary:
-      "L'accordo per l'utilizzo di agentes.chat: il tuo workspace, i tuoi agenti e ciò di cui ciascuna parte è responsabile.",
+      "L'accordo per l'utilizzo di Ackwire AI: il tuo workspace, i tuoi agenti e ciò di cui ciascuna parte è responsabile.",
     courtesy:
       "La presente è una traduzione di cortesia. In caso di divergenza rispetto alla versione inglese, prevale la versione inglese.",
     updated: "2026-11-06",
@@ -14,7 +14,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "agreement",
         heading: "1. Accordo",
         blocks: [
-          'I presenti Termini di utilizzo (i "Termini") costituiscono un accordo vincolante tra CODARI GLOBAL, LLC, società a responsabilità limitata (limited liability company) costituita nello Stato del Wyoming che opera con il nome agentes.chat ("agentes.chat", "noi"), e la persona fisica o l\'ente che crea un account o un workspace ("tu"). Creando un account, entrando in un workspace o utilizzando in altro modo agentes.chat sul web, tramite l\'app per Mac o l\'app per telefono (il "Servizio"), accetti i presenti Termini e la nostra Informativa sulla privacy. Se utilizzi il Servizio per conto di una società o di un altro ente, dichiari di avere il potere di vincolarlo.',
+          'I presenti Termini di utilizzo (i "Termini") costituiscono un accordo vincolante tra CODARI GLOBAL, LLC, società a responsabilità limitata (limited liability company) costituita nello Stato del Wyoming che opera con il nome Ackwire AI ("Ackwire AI", "noi"), e la persona fisica o l\'ente che crea un account o un workspace ("tu"). Creando un account, entrando in un workspace o utilizzando in altro modo Ackwire AI sul web, tramite l\'app per Mac o l\'app per telefono (il "Servizio"), accetti i presenti Termini e la nostra Informativa sulla privacy. Se utilizzi il Servizio per conto di una società o di un altro ente, dichiari di avere il potere di vincolarlo.',
           "Per utilizzare il Servizio devi avere almeno 18 anni ed essere in grado di concludere un contratto.",
         ],
       },
@@ -181,7 +181,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "overview",
         heading: "1. Panoramica",
         blocks: [
-          'CODARI GLOBAL, LLC, società a responsabilità limitata (limited liability company) costituita nello Stato del Wyoming che opera con il nome agentes.chat ("agentes.chat", "noi"), gestisce agentes.chat: un workspace in cui persone e agenti di IA lavorano insieme, disponibile sul web, come app per Mac e come app per telefono (il "Servizio"). La presente informativa distingue due ruoli:',
+          'CODARI GLOBAL, LLC, società a responsabilità limitata (limited liability company) costituita nello Stato del Wyoming che opera con il nome Ackwire AI ("Ackwire AI", "noi"), gestisce Ackwire AI: un workspace in cui persone e agenti di IA lavorano insieme, disponibile sul web, come app per Mac e come app per telefono (il "Servizio"). La presente informativa distingue due ruoli:',
           {
             list: [
               "Per i **dati dell'account**, ossia le informazioni che le persone ci forniscono per creare e utilizzare un account, siamo il titolare del trattamento.",
@@ -198,11 +198,11 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Dati dell'account:** nome, indirizzo e-mail, hash della password, foto del profilo, lingua e fuso orario. Se accedi con Google, Apple o GitHub, riceviamo da tale fornitore il tuo nome, il tuo indirizzo e-mail e l'identificativo dell'account, mai la relativa password.",
               "**Dati del workspace:** il nome del workspace, i membri, i ruoli e gli inviti.",
-              "**Dati di fatturazione:** per un workspace con un piano agentes.chat, il nome, l'indirizzo e-mail, l'indirizzo di fatturazione e il codice fiscale o la partita IVA della persona che paga, il piano, le relative fatture e i relativi pagamenti. I pagamenti sono elaborati da Stripe, che gestisce i dati della carta: questi non ci pervengono mai.",
+              "**Dati di fatturazione:** per un workspace con un piano Ackwire AI, il nome, l'indirizzo e-mail, l'indirizzo di fatturazione e il codice fiscale o la partita IVA della persona che paga, il piano, le relative fatture e i relativi pagamenti. I pagamenti sono elaborati da Stripe, che gestisce i dati della carta: questi non ci pervengono mai.",
               "**Dati di utilizzo e di log:** indirizzi IP, browser e dispositivo, sessioni di accesso, eventi di sicurezza, richieste API e la registrazione di ogni chiamata a un modello (modello, token e costo, con il workspace e l'agente a cui si riferisce), che conserviamo per applicare i budget e mostrare l'utilizzo. Quando qualcosa non funziona, registriamo l'errore, senza il contenuto dei messaggi, per correggerlo.",
               "**Dispositivi:** per l'app per telefono, il token per le notifiche push di ogni dispositivo su cui accedi. Per i computer collegati e l'app per Mac, il nome del computer, il sistema operativo e la versione dell'app.",
-              "**Lista d'attesa:** l'indirizzo e-mail e la lingua che ci fornisci su agentes.chat, e se lo hai confermato.",
-              "**Analisi del sito:** su agentes.chat (il sito pubblico, non il workspace), le pagine visualizzate, il sito di provenienza, il tipo di dispositivo e una posizione approssimativa ricavata dall'indirizzo IP, raccolti con Himetrica.",
+              "**Lista d'attesa:** l'indirizzo e-mail e la lingua che ci fornisci su Ackwire AI, e se lo hai confermato.",
+              "**Analisi del sito:** su Ackwire AI (il sito pubblico, non il workspace), le pagine visualizzate, il sito di provenienza, il tipo di dispositivo e una posizione approssimativa ricavata dall'indirizzo IP, raccolti con Himetrica.",
             ],
           },
         ],
@@ -238,7 +238,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
               "**Connettori.** Quando il workspace collega un servizio (come GitHub, Google, Linear, Sentry, una casella di posta elettronica o qualsiasi server MCP), conserviamo i relativi token di accesso in forma cifrata e leggiamo o scriviamo in tale servizio solo entro gli ambiti di autorizzazione (scope) che il workspace ha concesso a ciascun agente. Il servizio collegato tratta tali dati in base ai propri termini. I collegamenti alle caselle di posta Gmail e Outlook, nonché a Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit e WhatsApp, passano attraverso Composio, che tratta ciò che gli agenti vi leggono e scrivono.",
               "**Database.** I collegamenti ai database sono in sola lettura. Le credenziali sono conservate in forma cifrata e ogni query viene verificata prima di essere eseguita.",
               "**Computer collegati.** Quando qualcuno collega un computer, gli agenti possono eseguirvi comandi e utilizzarvi un browser, nell'ambito delle cartelle e delle autorizzazioni impostate su quel computer. La visualizzazione in tempo reale del browser di un agente passa attraverso Cloudflare e la memoria dei nostri server, e non viene registrata. Un riepilogo dei passaggi compiuti dall'agente (come gli indirizzi visitati e le azioni) viene conservato insieme al suo lavoro, affinché il team possa vedere che cosa ha fatto.",
-              "**Il computer del workspace.** Su agentes.chat Cloud, gli agenti di un workspace lavorano su un computer che gestiamo per quel workspace, ospitato da Contabo nell'Unione europea. Misuriamo quanti dati il browser, gli strumenti di IA e gli altri programmi di ciascun agente inviano e ricevono su di esso, giorno per giorno. Il computer viene cancellato dopo la cessazione del piano agentes.chat del workspace, come descritto nei Termini di utilizzo.",
+              "**Il computer del workspace.** Su Ackwire AI Cloud, gli agenti di un workspace lavorano su un computer che gestiamo per quel workspace, ospitato da Contabo nell'Unione europea. Misuriamo quanti dati il browser, gli strumenti di IA e gli altri programmi di ciascun agente inviano e ricevono su di esso, giorno per giorno. Il computer viene cancellato dopo la cessazione del piano Ackwire AI del workspace, come descritto nei Termini di utilizzo.",
             ],
           },
           "Le azioni difficili da annullare (come il merge di codice, il deploy o l'invio per conto di qualcuno) diventano una richiesta di approvazione rivolta a una persona prima di essere eseguite. Il testo proveniente dall'esterno del workspace (pagine web, e-mail, file) viene contrassegnato come non attendibile prima che un agente lo legga.",
@@ -246,9 +246,9 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Quando il personale di agentes.chat può vedere il Contenuto del Workspace",
+        heading: "6. Quando il personale di Ackwire AI può vedere il Contenuto del Workspace",
         blocks: [
-          "Non esploriamo i workspace. Una persona di agentes.chat può vedere il Contenuto del Workspace solo:",
+          "Non esploriamo i workspace. Una persona di Ackwire AI può vedere il Contenuto del Workspace solo:",
           {
             list: [
               "**Su tua richiesta,** per dare seguito a una richiesta di assistenza, e solo nella misura necessaria a tale richiesta.",
@@ -266,7 +266,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Dati dell'account:** per tutta la durata dell'account. Quando elimini il tuo account nell'app, esso viene disconnesso ovunque immediatamente e rimosso 7 giorni dopo, salvo che tu lo ripristini prima, ed esce dai nostri backup entro i 30 giorni successivi, fatta eccezione per i registri che siamo tenuti a conservare per legge. Qualsiasi workspace di cui eri l'unico membro viene chiuso contestualmente, e il suo contenuto viene eliminato 7 giorni dopo, come descritto di seguito. I workspace di cui facevi parte conservano il tuo nome e il tuo indirizzo e-mail nei propri registri di audit per tutto il tempo in cui ciascuno di essi esiste.",
-              "**Contenuto del Workspace:** per tutta la durata del workspace, e prima nel caso in cui il workspace elimini contenuti specifici. Alla cessazione del piano agentes.chat di un workspace, il suo contenuto resta disponibile per 90 giorni e viene poi eliminato. Quando un proprietario elimina un workspace, questo viene chiuso immediatamente per tutti e il suo contenuto viene eliminato 7 giorni dopo, salvo che un proprietario lo ripristini prima di tale termine, ed esce dai nostri backup entro i 30 giorni successivi, fatta eccezione per i contenuti che siamo tenuti a conservare per legge o come prova di un abuso (vedi sotto).",
+              "**Contenuto del Workspace:** per tutta la durata del workspace, e prima nel caso in cui il workspace elimini contenuti specifici. Alla cessazione del piano Ackwire AI di un workspace, il suo contenuto resta disponibile per 90 giorni e viene poi eliminato. Quando un proprietario elimina un workspace, questo viene chiuso immediatamente per tutti e il suo contenuto viene eliminato 7 giorni dopo, salvo che un proprietario lo ripristini prima di tale termine, ed esce dai nostri backup entro i 30 giorni successivi, fatta eccezione per i contenuti che siamo tenuti a conservare per legge o come prova di un abuso (vedi sotto).",
               "**Log:** i log delle richieste e di sicurezza fino a 90 giorni. I registri di utilizzo dei modelli (token e costo) per tutta la durata del workspace, poiché i budget e i report di utilizzo dipendono da essi.",
               "**Dati di fatturazione:** finché paghi per un workspace e, successivamente, per il tempo richiesto dalla normativa fiscale e contabile.",
               "**Lista d'attesa:** fino a quando non ricevi l'invito e per i 12 mesi successivi, oppure fino a quando non ci chiedi di essere rimosso.",
@@ -321,7 +321,7 @@ export const legalIt: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookie e archiviazione locale",
         blocks: [
-          "Il workspace utilizza solo i cookie e l'archiviazione locale necessari per mantenere l'accesso, proteggere i moduli e ricordare preferenze quali il tema e la lingua. Il sito pubblico agentes.chat ricorda la lingua che hai scelto e utilizza le analisi di Himetrica (Sezione 2). Non utilizziamo cookie pubblicitari né cookie di tracciamento tra siti.",
+          "Il workspace utilizza solo i cookie e l'archiviazione locale necessari per mantenere l'accesso, proteggere i moduli e ricordare preferenze quali il tema e la lingua. Il sito pubblico Ackwire AI ricorda la lingua che hai scelto e utilizza le analisi di Himetrica (Sezione 2). Non utilizziamo cookie pubblicitari né cookie di tracciamento tra siti.",
         ],
       },
       {

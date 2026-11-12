@@ -13,7 +13,7 @@ import { codeAndBold } from "@/lib/markdown";
 
 /**
  * "Arquivos da missão": mission.md (plan and
- * rules, written by agentes.chat), decisions.md (approved decisions) and
+ * rules, written by Ackwire AI), decisions.md (approved decisions) and
  * notes.md (the executor's notes), rendered. Lines that arrived while the
  * panel was open fade in with a faint time; an edit found on the computer
  * says we kept the approved version, with the small diff on demand.

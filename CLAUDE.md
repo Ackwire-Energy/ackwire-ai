@@ -1,8 +1,8 @@
-# agentes.chat
+# Ackwire AI
 
 A Slack/Teams-style workspace where people and AI agents work together. This file is for contributors and their coding agents: the engineering rules and where things live. Start with `README.md`, `CONTRIBUTING.md` and `SELF_HOSTING.md`; architecture decisions are in `docs/adr/`.
 
-Product name in code and docs: **agentes.chat**. Package scope `@agenteschat/*`. The product has its own design system (`docs/design`): buttons, inputs and icons are all original, so reuse its components instead of generic ones.
+Product name in the UI: **Ackwire AI**. Branding follows `docs/design/ackwire.md`. Package scope `@agenteschat/*`. The product has its own design system (`docs/design`): buttons, inputs and icons are all original, so reuse its components instead of generic ones.
 
 ## Stack
 

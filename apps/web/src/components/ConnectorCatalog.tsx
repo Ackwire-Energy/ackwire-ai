@@ -111,7 +111,7 @@ interface Entry {
   category: ConnectorCategory | "email";
   connected: boolean;
   available: boolean;
-  /** Not connected, and the vendor hasn't approved agentes.chat yet: greyed out with a lock, its tile opens nothing. */
+  /** Not connected, and the vendor hasn't approved Ackwire AI yet: greyed out with a lock, its tile opens nothing. */
   soon: boolean;
   icon: (size: "md" | "lg") => ReactNode;
   brandColor: string | null;

@@ -12,7 +12,7 @@ import { PasswordHelp } from "@/pages/AuthPage";
 
 /**
  * "Adicionar uma senha" (Configurações › Sua conta): for an account that signs in another way (Google or Apple, or
- * the agentes.chat app on the computer that runs this server), so it also signs in with its email from
+ * the Ackwire AI app on the computer that runs this server), so it also signs in with its email from
  * any browser. A password proves it's the person, so it needs a sign-in in the last 10 minutes: an older
  * session signs in again first. On an account that has one, "Create a new password" in its place (ADR 0158: the
  * server's owner after Forgot password › Continue on this Mac): every other session ends.

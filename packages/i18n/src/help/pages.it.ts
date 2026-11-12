@@ -4,23 +4,23 @@ import type { HelpDocument } from "./types";
 /** The help pages in it: a page not here shows in English. */
 export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
-    title: "Usa agentes.chat sul tuo computer",
+    title: "Usa Ackwire AI sul tuo computer",
     summary:
-      "L’app agentes.chat può anche far girare agentes.chat stesso, su un Mac, un PC o un computer Linux, per te o per un piccolo team.",
+      "L’app Ackwire AI può anche far girare Ackwire AI stesso, su un Mac, un PC o un computer Linux, per te o per un piccolo team.",
     sections: [
       {
         id: "how",
         heading: "Come funziona",
         blocks: [
           "Gira dentro l’app, con un database già incluso, e tiene tutto in una sola cartella di questo computer, `.agentes` nella tua cartella personale. Nient’altro da installare: niente Docker, nessun database da configurare.",
-          "Parte con l’app e si ferma quando la chiudi. Prima di chiudere l’app ti chiede conferma, perché nessuno può usare agentes.chat finché non la riapri.",
+          "Parte con l’app e si ferma quando la chiudi. Prima di chiudere l’app ti chiede conferma, perché nessuno può usare Ackwire AI finché non la riapri.",
         ],
       },
       {
         id: "who",
         heading: "Per chi è",
         blocks: [
-          "Per te o per un piccolo team. Un Mac mini, un PC in più o un portatile che resta acceso sono una buona casa: preparalo come in [Tienilo acceso](#keep-on). Su un Mac o un PC, l’app è il modo di far girare agentes.chat senza Docker.",
+          "Per te o per un piccolo team. Un Mac mini, un PC in più o un portatile che resta acceso sono una buona casa: preparalo come in [Tienilo acceso](#keep-on). Su un Mac o un PC, l’app è il modo di far girare Ackwire AI senza Docker.",
           "Per un team più grande, vedi [Quale configurazione scegliere](/help/install-on-a-server#choose). I tuoi dati potranno spostarsi su un server in seguito.",
         ],
       },
@@ -51,7 +51,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Prestalo anche a un altro spazio di lavoro",
         blocks: [
-          "Gli spazi di lavoro del server che fai girare qui usano questo computer da soli. Per farlo usare anche a uno spazio di lavoro altrove, come uno su agentes.chat Cloud, apri **Preferenze › Server**, premi **Aggiungi un server…**, accedi a quello spazio di lavoro e premi **Consenti** quando l’app lo chiede.",
+          "Gli spazi di lavoro del server che fai girare qui usano questo computer da soli. Per farlo usare anche a uno spazio di lavoro altrove, come uno su Ackwire AI Cloud, apri **Preferenze › Server**, premi **Aggiungi un server…**, accedi a quello spazio di lavoro e premi **Consenti** quando l’app lo chiede.",
           "Ogni spazio di lavoro ha qui i suoi agenti e le sue cartelle. Anche per lui i **Comandi** sono attivi fin dall’inizio. Disattivali nella domanda dell’app prima di premere **Consenti**, o più tardi in **Preferenze\u00a0›\u00a0Strumenti**, dove un solo interruttore vale per tutti gli spazi di lavoro su questo computer.",
         ],
       },
@@ -59,8 +59,8 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "Dal telefono e dal tuo team",
         blocks: [
-          "**Raggiungilo dal telefono e dai colleghi** mette agentes.chat su Tailscale, una rete privata per i tuoi dispositivi: il tuo telefono e le persone che inviti ci entrano, e nessun altro può raggiungere agentes.chat. Tailscale è gratuito: https://tailscale.com/download. Con l’opzione spenta, agentes.chat funziona solo su questo computer.",
-          "Se questo computer condivide già qualcos’altro sulla porta 443 di Tailscale, agentes.chat usa la 8443, e il suo indirizzo finisce con `:8443`.",
+          "**Raggiungilo dal telefono e dai colleghi** mette Ackwire AI su Tailscale, una rete privata per i tuoi dispositivi: il tuo telefono e le persone che inviti ci entrano, e nessun altro può raggiungere agentes.chat. Tailscale è gratuito: https://tailscale.com/download. Con l’opzione spenta, Ackwire AI funziona solo su questo computer.",
+          "Se questo computer condivide già qualcos’altro sulla porta 443 di Tailscale, Ackwire AI usa la 8443, e il suo indirizzo finisce con `:8443`.",
         ],
       },
       {
@@ -104,7 +104,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           {
             list: [
-              "[Installa agentes.chat su un server](/help/install-on-a-server), ma non avviarlo ancora. Nel suo `.env` metti l’`AGENTES_SECRET` di `~/.agentes/.env`, poi avvia solo il database: `docker compose up -d postgres`.",
+              "[Installa Ackwire AI su un server](/help/install-on-a-server), ma non avviarlo ancora. Nel suo `.env` metti l’`AGENTES_SECRET` di `~/.agentes/.env`, poi avvia solo il database: `docker compose up -d postgres`.",
               "Carica il dump: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
               "Avvialo con `docker compose up -d`, copiaci dentro `~/.agentes/files` come mostra la guida completa, e accedi come prima.",
             ],
@@ -128,14 +128,14 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "I tuoi computer e telefoni",
         blocks: [
-          "Gli agenti possono lavorare anche su computer e telefoni che porti tu: un Mac o un PC con l’app agentes.chat, un server, un telefono Android o un iPhone. Vedi [I tuoi computer e telefoni](/help/computers).",
+          "Gli agenti possono lavorare anche su computer e telefoni che porti tu: un Mac o un PC con l’app Ackwire AI, un server, un telefono Android o un iPhone. Vedi [I tuoi computer e telefoni](/help/computers).",
         ],
       },
       {
         id: "plans",
         heading: "I tuoi piani IA",
         blocks: [
-          "I tuoi agenti possono ragionare con il tuo piano IA, come Claude, ChatGPT, GLM o Kimi, con l’accesso fatto su questo computer: nessuna chiave API necessaria. L’account resta su questo computer, e agentes.chat non vede mai né la password né l’accesso.",
+          "I tuoi agenti possono ragionare con il tuo piano IA, come Claude, ChatGPT, GLM o Kimi, con l’accesso fatto su questo computer: nessuna chiave API necessaria. L’account resta su questo computer, e Ackwire AI non vede mai né la password né l’accesso.",
           "I piani AI Pro e Ultra di Google qui non funzionano: i termini di Google non ne permettono l’uso in altri prodotti. Una chiave API di Gemini sì.",
         ],
       },
@@ -154,11 +154,11 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   computers: {
     title: "I tuoi computer e telefoni",
     summary:
-      "Porta un Mac, un PC, un computer Linux, un server o un telefono, e i tuoi agenti ci lavorano. Su agentes.chat Cloud come su un server tutto tuo.",
+      "Porta un Mac, un PC, un computer Linux, un server o un telefono, e i tuoi agenti ci lavorano. Su Ackwire AI Cloud come su un server tutto tuo.",
     sections: [
       {
         id: "app",
-        heading: "Dall’app agentes.chat",
+        heading: "Dall’app Ackwire AI",
         blocks: [
           "Installa l’app sul computer, aprila e accedi al tuo spazio di lavoro. Ti chiede **Lasciare che gli agenti di <workspace> usino questo Mac?** (questo PC su Windows, questo computer su Linux). Scegli chi può usarlo e premi **Consenti**. Tutto qui.",
           "Hai già fatto l’accesso? Attiva lo spazio di lavoro in **Preferenze › Generali**, nella scheda **Agenti**.",
@@ -197,14 +197,14 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Mentre l’app è aperta",
         blocks: [
-          "Gli agenti lavorano su un computer solo mentre l’app gira lì e il computer è sveglio. Quando l’app lo chiede, lascia spuntato **Tienilo pronto: apri agentes.chat all'accesso**. Un computer spento o in stop mostra **Offline**, e gli agenti aspettano che torni.",
+          "Gli agenti lavorano su un computer solo mentre l’app gira lì e il computer è sveglio. Quando l’app lo chiede, lascia spuntato **Tienilo pronto: apri Ackwire AI all'accesso**. Un computer spento o in stop mostra **Offline**, e gli agenti aspettano che torni.",
         ],
       },
       {
         id: "pausing",
         heading: "Mettere in pausa e scollegare",
         blocks: [
-          "Sul computer, l’icona di agentes.chat vicino all’orologio mette in pausa gli agenti di tutti gli spazi di lavoro. In **Preferenze › Generali**, l’interruttore di ogni spazio di lavoro mette in pausa solo quello, e **Esci** lo scollega. In pausa non parte niente di nuovo, e quello che era in corso finisce. Scollegando, le cartelle degli agenti restano sul disco.",
+          "Sul computer, l’icona di Ackwire AI vicino all’orologio mette in pausa gli agenti di tutti gli spazi di lavoro. In **Preferenze › Generali**, l’interruttore di ogni spazio di lavoro mette in pausa solo quello, e **Esci** lo scollega. In pausa non parte niente di nuovo, e quello che era in corso finisce. Scollegando, le cartelle degli agenti restano sul disco.",
           "Dal sito, **Rimuovi** nella pagina del dispositivo lo scollega.",
         ],
       },
@@ -212,7 +212,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "organizations",
         heading: "Più spazi di lavoro, un solo computer",
         blocks: [
-          "Accedi a ogni spazio di lavoro nella stessa app e premi **Consenti** per ognuno. Spazi di lavoro su agentes.chat Cloud e sui tuoi server possono condividere un computer (app 0.6.1 e successive). Ognuno ha lì i suoi agenti e le sue cartelle, e scollegarne uno non tocca gli altri.",
+          "Accedi a ogni spazio di lavoro nella stessa app e premi **Consenti** per ognuno. Spazi di lavoro su Ackwire AI Cloud e sui tuoi server possono condividere un computer (app 0.6.1 e successive). Ognuno ha lì i suoi agenti e le sue cartelle, e scollegarne uno non tocca gli altri.",
           "Un server che l’app fa girare su questo computer è già collegato e non serve altro. Per prestare quel computer anche a uno spazio di lavoro altrove, vedi [Prestalo anche a un altro spazio di lavoro](/help/run-on-your-computer#another-workspace).",
           "Usi l’app su un portatile solo come finestra sul tuo spazio di lavoro? Quando chiede di lasciare che gli agenti usino il portatile, **Non ora** la lascia una semplice finestra.",
         ],
@@ -234,10 +234,10 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
               "i tuoi file e i tuoi accessi",
               "le cartelle degli altri agenti, anche di altri spazi di lavoro, e gli accessi salvati nei loro browser",
               "il token che collega questo computer",
-              "su un computer che fa girare anche agentes.chat, il suo database e le sue chiavi in `.agentes`",
+              "su un computer che fa girare anche Ackwire AI, il suo database e le sue chiavi in `.agentes`",
             ],
           },
-          "agentes.chat rifiuta i comandi che nominano le sue chiavi, i token e gli accessi salvati, ma è una regola, non un muro. I **Comandi** sono attivi fin dall’inizio. Disattivali nella domanda dell’app prima di premere **Consenti**, o più tardi in **Preferenze\u00a0›\u00a0Strumenti**, dove un solo interruttore vale per tutti gli spazi di lavoro sul computer. Claude Code e Codex eseguono i propri comandi nella cartella dell’agente, con le proprie regole.",
+          "Ackwire AI rifiuta i comandi che nominano le sue chiavi, i token e gli accessi salvati, ma è una regola, non un muro. I **Comandi** sono attivi fin dall’inizio. Disattivali nella domanda dell’app prima di premere **Consenti**, o più tardi in **Preferenze\u00a0›\u00a0Strumenti**, dove un solo interruttore vale per tutti gli spazi di lavoro sul computer. Claude Code e Codex eseguono i propri comandi nella cartella dell’agente, con le proprie regole.",
           "Per un vero muro, usa un server Linux. Su Debian 13, installato con `--system`, ogni agente è un utente a sé. Su Ubuntu, gli agenti condividono un solo utente, `agentes`: vedono le cartelle degli altri, non le tue né quelle del server. Oppure dai agli agenti un computer tutto loro.",
         ],
       },
@@ -246,7 +246,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   import: {
     title: "Porta i tuoi agenti",
     summary:
-      "Porta qui agenti da un’altra app, o da un altro spazio di lavoro agentes.chat, con istruzioni, skill, routine e memoria.",
+      "Porta qui agenti da un’altra app, o da un altro spazio di lavoro Ackwire AI, con istruzioni, skill, routine e memoria.",
     sections: [
       {
         id: "comes",
@@ -421,7 +421,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "who-answers": {
     title: "Chi risponde a un messaggio",
-    summary: "Una menzione sceglie l’agente. Senza menzione, agentes.chat sceglie per te, in questo ordine.",
+    summary: "Una menzione sceglie l’agente. Senza menzione, Ackwire AI sceglie per te, in questo ordine.",
     sections: [
       {
         id: "order",
@@ -443,7 +443,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Quando è agentes.chat a ospitare il tuo spazio di lavoro, Jev è incluso. Su un server che gestisci tu, usa la chiave TypeSafe del proprietario, circa 0,0001 US$ a messaggio: [Configura Jev](/help/jev#setup).",
+          "Quando è Ackwire AI a ospitare il tuo spazio di lavoro, Jev è incluso. Su un server che gestisci tu, usa la chiave TypeSafe del proprietario, circa 0,0001 US$ a messaggio: [Configura Jev](/help/jev#setup).",
         ],
       },
       {
@@ -502,7 +502,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
               "Apri https://console.typesafe.ai e accedi con Google o con la tua email. Un nuovo account si crea allo stesso modo.",
               "Aggiungi credito nella console. Jev è prepagato.",
               "Apri https://console.typesafe.ai/keys, crea una chiave e copiala subito.",
-              "In agentes.chat, apri **Impostazioni › IA e consumi** e incollala sotto **Jev**. La vede solo chi ha configurato questo server.",
+              "In Ackwire AI, apri **Impostazioni › IA e consumi** e incollala sotto **Jev**. La vede solo chi ha configurato questo server.",
             ],
           },
           "Su un server che gestisci con Docker, puoi invece mettere la chiave in `.env` come `TYPESAFE_API_KEY`. Questa ha la precedenza su quella in Impostazioni.",
@@ -560,14 +560,14 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
   "apps-de-ia": {
     title: "App IA",
     summary:
-      "Chiedi attività agli agenti di agentes.chat da Claude, Cursor o un’altra app MCP, senza uscirne, e ricevi la risposta lì.",
+      "Chiedi attività agli agenti di Ackwire AI da Claude, Cursor o un’altra app MCP, senza uscirne, e ricevi la risposta lì.",
     sections: [
       {
         id: "what",
         heading: "Come funziona",
         blocks: [
-          "agentes.chat è un server MCP. Incolli il suo indirizzo nella tua app IA, accedi con il tuo account e scegli uno spazio di lavoro. Da lì in poi, l’app può elencare agenti e canali, mandare un’attività a un agente a nome tuo, aspettare la risposta e leggere le attività recenti.",
-          "Per esempio, nel mezzo di una scena in Unity o Blender, chiedi a Claude: “Chiedi all’agente marketing un testo per il lancio”. Il messaggio compare in agentes.chat come tuo, con l’etichetta **via Claude**, e la risposta dell’agente torna a Claude.",
+          "Ackwire AI è un server MCP. Incolli il suo indirizzo nella tua app IA, accedi con il tuo account e scegli uno spazio di lavoro. Da lì in poi, l’app può elencare agenti e canali, mandare un’attività a un agente a nome tuo, aspettare la risposta e leggere le attività recenti.",
+          "Per esempio, nel mezzo di una scena in Unity o Blender, chiedi a Claude: “Chiedi all’agente marketing un testo per il lancio”. Il messaggio compare in Ackwire AI come tuo, con l’etichetta **via Claude**, e la risposta dell’agente torna a Claude.",
           "L’indirizzo è in **Impostazioni › App IA**. Finisce con `/mcp`.",
         ],
       },
@@ -577,14 +577,14 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Claude** (claude.ai, Claude Desktop e telefono): in **Personalizza › Connettori** (Customize › Connectors), fai clic su **+ Aggiungi**, poi su **Aggiungi connettore personalizzato** (Add custom connector), chiamalo agentes.chat, incolla l’indirizzo e fai clic su **Continua**. Scegli **Accedi ora** (Sign in now), fai clic su **Aggiungi** e autorizza. Nei piani Team ed Enterprise, il Proprietario dell’organizzazione Claude aggiunge il connettore in Impostazioni dell’organizzazione › Connettori, e ogni persona fa clic su **Connetti** in Personalizza › Connettori. Il piano gratuito di Claude ha posto per un connettore personalizzato.",
+              "**Claude** (claude.ai, Claude Desktop e telefono): in **Personalizza › Connettori** (Customize › Connectors), fai clic su **+ Aggiungi**, poi su **Aggiungi connettore personalizzato** (Add custom connector), chiamalo Ackwire AI, incolla l’indirizzo e fai clic su **Continua**. Scegli **Accedi ora** (Sign in now), fai clic su **Aggiungi** e autorizza. Nei piani Team ed Enterprise, il Proprietario dell’organizzazione Claude aggiunge il connettore in Impostazioni dell’organizzazione › Connettori, e ogni persona fa clic su **Connetti** in Personalizza › Connettori. Il piano gratuito di Claude ha posto per un connettore personalizzato.",
               "**Claude Code:** esegui `claude mcp add --transport http --scope user agentes <indirizzo>`, poi scrivi `/mcp`, scegli agentes e **Authenticate**. Solo per la cartella attuale, togli `--scope user`.",
               "**Cursor:** **Aggiungi a Cursor** in **Impostazioni › App IA**, oppure l’indirizzo in `~/.cursor/mcp.json`. Cursor ti chiede di accedere la prima volta che lo usi.",
               '**VS Code:** **Aggiungi a VS Code**, oppure l’indirizzo in `.vscode/mcp.json` con `"type": "http"`.',
               "**Altre app:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains e altre hanno ciascuna i propri passaggi in **Collega un'app**, con il tuo indirizzo già inserito.",
             ],
           },
-          "Quando accedi, agentes.chat mostra quale app ha chiesto l’accesso e dove torna. Continua solo se hai appena avviato tu il collegamento.",
+          "Quando accedi, Ackwire AI mostra quale app ha chiesto l’accesso e dove torna. Continua solo se hai appena avviato tu il collegamento.",
         ],
       },
       {
@@ -656,8 +656,8 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
     ],
   },
   "install-on-a-server": {
-    title: "Installa agentes.chat su un server",
-    summary: "Usa agentes.chat su un server tuo, gratis, per tutto il team. Un comando prepara tutto.",
+    title: "Installa Ackwire AI su un server",
+    summary: "Usa Ackwire AI su un server tuo, gratis, per tutto il team. Un comando prepara tutto.",
     sections: [
       {
         id: "choose",
@@ -665,7 +665,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**agentes.chat Cloud**: per qualsiasi team, raggiungibile da ovunque. Lo gestiamo, aggiorniamo e salviamo noi. Ogni spazio di lavoro ha un computer tutto suo, dove ogni agente è un utente a sé.",
+              "**Ackwire AI Cloud**: per qualsiasi team, raggiungibile da ovunque. Lo gestiamo, aggiorniamo e salviamo noi. Ogni spazio di lavoro ha un computer tutto suo, dove ogni agente è un utente a sé.",
               "**Il tuo computer, con l’app**: per te o per un piccolo team, raggiungibile finché quel computer è acceso. Un Mac mini sempre acceso va benissimo. Lo aggiorni con un clic e ne fai il backup a mano. Gli agenti girano come te su quel computer.",
               "**Un server**: per un team più grande, attivo sempre. Lo aggiorni con tre comandi, e può fare il backup da solo ogni giorno. Su Debian 13, ogni agente è un utente a sé.",
             ],
@@ -679,7 +679,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "Un server o una VPS con Linux a 64 bit, su x64 o arm64. Per un team piccolo, 2 CPU, 4 GB di memoria e 20 GB di disco sono un buon inizio. Su un Mac o un PC, [l’app fa girare agentes.chat](/help/run-on-your-computer) senza Docker.",
+              "Un server o una VPS con Linux a 64 bit, su x64 o arm64. Per un team piccolo, 2 CPU, 4 GB di memoria e 20 GB di disco sono un buon inizio. Su un Mac o un PC, [l’app fa girare Ackwire AI](/help/run-on-your-computer) senza Docker.",
               "Docker con Compose. Su Linux l'installer li aggiunge quando mancano, dopo averti chiesto.",
               "Un modo per arrivarci: un account Tailscale gratuito (la scelta predefinita, privata, senza dominio e senza porte aperte) oppure un dominio che punta al server, con le porte 80 e 443 aperte.",
             ],
@@ -729,7 +729,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "Email",
         blocks: [
-          "Senza email, agentes.chat scrive ogni email nel suo log invece di inviarla, così puoi copiare da lì un link di invito. Il ripristino della password resta spento.",
+          "Senza email, Ackwire AI scrive ogni email nel suo log invece di inviarla, così puoi copiare da lì un link di invito. Il ripristino della password resta spento.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -757,7 +757,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "Altri computer, come un Mac con l'app agentes.chat o un altro server, si collegano da **Impostazioni\u00a0›\u00a0Dispositivi**, come in [I tuoi computer e telefoni](/help/computers). Su Tailscale, prima entrano nella tua tailnet.",
+          "Altri computer, come un Mac con l'app Ackwire AI o un altro server, si collegano da **Impostazioni\u00a0›\u00a0Dispositivi**, come in [I tuoi computer e telefoni](/help/computers). Su Tailscale, prima entrano nella tua tailnet.",
         ],
       },
       {
@@ -792,7 +792,7 @@ export const helpIt: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "Cosa invia",
         blocks: [
-          "Una volta al giorno il server invia ad agentes.chat statistiche d'uso anonime: conteggi come persone, agenti, dimensioni delle macchine, token di IA usati e quanti dati inviano e ricevono i browser degli agenti. Mai messaggi, file, nomi o siti. `docker compose run --rm agentes telemetry` mostra esattamente cosa invierebbe. Il proprietario le spegne in **Impostazioni\u00a0›\u00a0Generali**, oppure con `TELEMETRY=off` in `.env`.",
+          "Una volta al giorno il server invia ad Ackwire AI statistiche d'uso anonime: conteggi come persone, agenti, dimensioni delle macchine, token di IA usati e quanti dati inviano e ricevono i browser degli agenti. Mai messaggi, file, nomi o siti. `docker compose run --rm agentes telemetry` mostra esattamente cosa invierebbe. Il proprietario le spegne in **Impostazioni\u00a0›\u00a0Generali**, oppure con `TELEMETRY=off` in `.env`.",
           "I report degli errori non vanno da nessuna parte, a meno che tu non imposti `SENTRY_DSN` su un server compatibile con Sentry scelto da te. Un report contiene l'errore e dove è successo, mai messaggi, email, indirizzi IP, cookie o token.",
         ],
       },

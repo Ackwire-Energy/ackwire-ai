@@ -4,23 +4,23 @@ import type { HelpDocument } from "./types";
 /** The help pages in nl: a page not here shows in English. */
 export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
-    title: "agentes.chat op je eigen computer draaien",
+    title: "Ackwire AI op je eigen computer draaien",
     summary:
-      "De agentes.chat-app kan ook agentes.chat zelf draaien, op een Mac, een pc of een Linux-computer, voor jou of een klein team.",
+      "De agentes.chat-app kan ook Ackwire AI zelf draaien, op een Mac, een pc of een Linux-computer, voor jou of een klein team.",
     sections: [
       {
         id: "how",
         heading: "Hoe het draait",
         blocks: [
           "Het draait in de app, met een eigen ingebouwde database, en bewaart alles in één map op deze computer: `.agentes` in je thuismap. Verder hoef je niets te installeren: geen Docker, geen database om in te richten.",
-          "Het start met de app en stopt als je de app afsluit. Afsluiten vraagt eerst om bevestiging, want niemand kan agentes.chat gebruiken tot de app weer opent.",
+          "Het start met de app en stopt als je de app afsluit. Afsluiten vraagt eerst om bevestiging, want niemand kan Ackwire AI gebruiken tot de app weer opent.",
         ],
       },
       {
         id: "who",
         heading: "Voor wie het is",
         blocks: [
-          "Voor jou of een klein team. Een Mac mini, een reserve-pc of een laptop die aan blijft, is een goed thuis: stel hem in zoals in [Aan laten staan](#keep-on). Op een Mac of een pc draai je agentes.chat met de app, zonder Docker.",
+          "Voor jou of een klein team. Een Mac mini, een reserve-pc of een laptop die aan blijft, is een goed thuis: stel hem in zoals in [Aan laten staan](#keep-on). Op een Mac of een pc draai je Ackwire AI met de app, zonder Docker.",
           "Voor een groter team, zie [Welke opzet je kiest](/help/install-on-a-server#choose). Je gegevens kunnen later naar een server verhuizen.",
         ],
       },
@@ -51,7 +51,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Leen hem ook uit aan een andere werkruimte",
         blocks: [
-          "De werkruimtes van de server die je hier draait, gebruiken deze computer vanzelf. Wil je dat een werkruimte ergens anders hem ook gebruikt, zoals een op agentes.chat Cloud, open dan **Voorkeuren › Servers**, druk op **Een server toevoegen…**, meld je aan bij die werkruimte en druk op **Toestaan** als de app het vraagt.",
+          "De werkruimtes van de server die je hier draait, gebruiken deze computer vanzelf. Wil je dat een werkruimte ergens anders hem ook gebruikt, zoals een op Ackwire AI Cloud, open dan **Voorkeuren › Servers**, druk op **Een server toevoegen…**, meld je aan bij die werkruimte en druk op **Toestaan** als de app het vraagt.",
           "Elke werkruimte krijgt hier eigen agents en mappen. Ook daar staan **Opdrachten** standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar één schakelaar voor alle werkruimtes op deze computer geldt.",
         ],
       },
@@ -59,8 +59,8 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "Vanaf je telefoon en voor je team",
         blocks: [
-          "**Bereik het vanaf je telefoon en je teamgenoten** zet agentes.chat op Tailscale, een privénetwerk voor je apparaten: je telefoon en de mensen die je uitnodigt doen mee, en verder kan niemand agentes.chat bereiken. Tailscale is gratis: https://tailscale.com/download. Staat het uit, dan werkt agentes.chat alleen op deze computer.",
-          "Deelt deze computer al iets anders op poort 443 van Tailscale, dan neemt agentes.chat 8443, en eindigt het adres op `:8443`.",
+          "**Bereik het vanaf je telefoon en je teamgenoten** zet Ackwire AI op Tailscale, een privénetwerk voor je apparaten: je telefoon en de mensen die je uitnodigt doen mee, en verder kan niemand Ackwire AI bereiken. Tailscale is gratis: https://tailscale.com/download. Staat het uit, dan werkt Ackwire AI alleen op deze computer.",
+          "Deelt deze computer al iets anders op poort 443 van Tailscale, dan neemt Ackwire AI 8443, en eindigt het adres op `:8443`.",
         ],
       },
       {
@@ -106,7 +106,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           {
             list: [
-              "[Installeer agentes.chat op een server](/help/install-on-a-server), maar start het nog niet. Zet in de `.env` ervan het `AGENTES_SECRET` uit `~/.agentes/.env` en start dan alleen de database: `docker compose up -d postgres`.",
+              "[Installeer Ackwire AI op een server](/help/install-on-a-server), maar start het nog niet. Zet in de `.env` ervan het `AGENTES_SECRET` uit `~/.agentes/.env` en start dan alleen de database: `docker compose up -d postgres`.",
               "Laad de dump: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
               "Start het met `docker compose up -d`, kopieer `~/.agentes/files` erin zoals de volledige gids laat zien, en log in zoals eerst.",
             ],
@@ -137,7 +137,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "plans",
         heading: "Je AI-abonnementen",
         blocks: [
-          "Je agents kunnen denken met je eigen AI-abonnement, zoals Claude, ChatGPT, GLM of Kimi, ingelogd op deze computer: geen API-sleutel nodig. Het account blijft op deze computer, en agentes.chat ziet nooit het wachtwoord of de toegang.",
+          "Je agents kunnen denken met je eigen AI-abonnement, zoals Claude, ChatGPT, GLM of Kimi, ingelogd op deze computer: geen API-sleutel nodig. Het account blijft op deze computer, en Ackwire AI ziet nooit het wachtwoord of de toegang.",
           "De abonnementen AI Pro en Ultra van Google werken hier niet: de voorwaarden van Google staan ze niet toe in andere producten. Een Gemini-API-sleutel wel.",
         ],
       },
@@ -156,7 +156,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   computers: {
     title: "Je computers en telefoons",
     summary:
-      "Breng een Mac, een pc, een Linux-computer, een server of een telefoon mee, en je agents werken erop. Op agentes.chat Cloud net zo goed als op een eigen server.",
+      "Breng een Mac, een pc, een Linux-computer, een server of een telefoon mee, en je agents werken erop. Op Ackwire AI Cloud net zo goed als op een eigen server.",
     sections: [
       {
         id: "app",
@@ -199,7 +199,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "Zolang de app open is",
         blocks: [
-          "Agents werken alleen op een computer zolang de app daar draait en de computer wakker is. Als de app het vraagt, laat **Klaar houden: agentes.chat openen bij inloggen** aangevinkt. Een computer die uit staat of slaapt, toont **Offline**, en agents wachten tot hij terug is.",
+          "Agents werken alleen op een computer zolang de app daar draait en de computer wakker is. Als de app het vraagt, laat **Klaar houden: Ackwire AI openen bij inloggen** aangevinkt. Een computer die uit staat of slaapt, toont **Offline**, en agents wachten tot hij terug is.",
         ],
       },
       {
@@ -214,7 +214,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "organizations",
         heading: "Meerdere werkruimtes, één computer",
         blocks: [
-          "Meld je in dezelfde app aan bij elke werkruimte en druk voor elk op **Toestaan**. Werkruimtes op agentes.chat Cloud en op je eigen servers kunnen een computer delen (app 0.6.1 en nieuwer). Elk heeft er eigen agents en mappen, en als je er een loskoppelt, blijven de andere ongemoeid.",
+          "Meld je in dezelfde app aan bij elke werkruimte en druk voor elk op **Toestaan**. Werkruimtes op Ackwire AI Cloud en op je eigen servers kunnen een computer delen (app 0.6.1 en nieuwer). Elk heeft er eigen agents en mappen, en als je er een loskoppelt, blijven de andere ongemoeid.",
           "Een server die de app op deze computer draait, is al gekoppeld en heeft niets nodig. Om die computer ook uit te lenen aan een werkruimte ergens anders, zie [Leen hem ook uit aan een andere werkruimte](/help/run-on-your-computer#another-workspace).",
           "Gebruik je de app op een laptop alleen als venster op je werkruimte? Als hij vraagt of agents de laptop mogen gebruiken, houdt **Niet nu** het bij een gewoon venster.",
         ],
@@ -236,10 +236,10 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "je bestanden en logins",
               "de mappen van andere agents, ook die van andere werkruimtes, en de logins die hun browsers bewaren",
               "het token dat deze computer koppelt",
-              "op een computer die ook agentes.chat draait, de database en sleutels ervan in `.agentes`",
+              "op een computer die ook Ackwire AI draait, de database en sleutels ervan in `.agentes`",
             ],
           },
-          "agentes.chat weigert opdrachten die zijn sleutels, tokens en aanmeldingen noemen, maar dat is een regel, geen muur. **Opdrachten** staan standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar één schakelaar voor alle werkruimtes op de computer geldt. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
+          "Ackwire AI weigert opdrachten die zijn sleutels, tokens en aanmeldingen noemen, maar dat is een regel, geen muur. **Opdrachten** staan standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar één schakelaar voor alle werkruimtes op de computer geldt. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
           "Voor een echte muur gebruik je een Linux-server. Op Debian 13, geïnstalleerd met `--system`, is elke agent een eigen gebruiker. Op Ubuntu delen agents één gebruiker, `agentes`: ze zien elkaars mappen, niet die van jou of van de server. Of geef de agents een eigen computer.",
         ],
       },
@@ -421,7 +421,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "who-answers": {
     title: "Wie een bericht beantwoordt",
-    summary: "Een vermelding kiest de agent. Zonder vermelding kiest agentes.chat voor je, in deze volgorde.",
+    summary: "Een vermelding kiest de agent. Zonder vermelding kiest Ackwire AI voor je, in deze volgorde.",
     sections: [
       {
         id: "order",
@@ -443,7 +443,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Als agentes.chat je werkruimte host, zit Jev erbij inbegrepen. Op een server die je zelf beheert, gebruikt hij de TypeSafe-sleutel van de eigenaar, ongeveer US$ 0,0001 per bericht: [Jev instellen](/help/jev#setup).",
+          "Als Ackwire AI je werkruimte host, zit Jev erbij inbegrepen. Op een server die je zelf beheert, gebruikt hij de TypeSafe-sleutel van de eigenaar, ongeveer US$ 0,0001 per bericht: [Jev instellen](/help/jev#setup).",
         ],
       },
       {
@@ -502,7 +502,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "Open https://console.typesafe.ai en log in met Google of je e-mailadres. Een nieuw account maak je op dezelfde manier.",
               "Zet tegoed in de console. Jev is prepaid.",
               "Open https://console.typesafe.ai/keys, maak een sleutel aan en kopieer hem meteen.",
-              "Open in agentes.chat **Instellingen › AI en gebruik** en plak hem onder **Jev**. Alleen degene die deze server heeft ingericht, ziet hem.",
+              "Open in Ackwire AI **Instellingen › AI en gebruik** en plak hem onder **Jev**. Alleen degene die deze server heeft ingericht, ziet hem.",
             ],
           },
           "Op een server die je met Docker draait, kun je de sleutel ook in `.env` zetten als `TYPESAFE_API_KEY`. Die gaat voor op de sleutel in Instellingen.",
@@ -560,14 +560,14 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   "apps-de-ia": {
     title: "AI-apps",
     summary:
-      "Vraag de agents van agentes.chat om taken vanuit Claude, Cursor of een andere MCP-app, zonder die te verlaten, en krijg het antwoord daar.",
+      "Vraag de agents van Ackwire AI om taken vanuit Claude, Cursor of een andere MCP-app, zonder die te verlaten, en krijg het antwoord daar.",
     sections: [
       {
         id: "what",
         heading: "Hoe het werkt",
         blocks: [
-          "agentes.chat is een MCP-server. Je plakt het adres in je AI-app, logt in met je account en kiest een werkruimte. Vanaf dan kan de app agents en kanalen tonen, namens jou een taak naar een agent sturen, op het antwoord wachten en recente taken lezen.",
-          "Bijvoorbeeld midden in een scène in Unity of Blender vraag je Claude: ‘Vraag de marketingagent om een tekstje voor de lancering’. Het bericht verschijnt in agentes.chat als het jouwe, gemarkeerd met **via Claude**, en het antwoord van de agent komt terug in Claude.",
+          "Ackwire AI is een MCP-server. Je plakt het adres in je AI-app, logt in met je account en kiest een werkruimte. Vanaf dan kan de app agents en kanalen tonen, namens jou een taak naar een agent sturen, op het antwoord wachten en recente taken lezen.",
+          "Bijvoorbeeld midden in een scène in Unity of Blender vraag je Claude: ‘Vraag de marketingagent om een tekstje voor de lancering’. Het bericht verschijnt in Ackwire AI als het jouwe, gemarkeerd met **via Claude**, en het antwoord van de agent komt terug in Claude.",
           "Het adres staat in **Instellingen › AI-apps**. Het eindigt op `/mcp`.",
         ],
       },
@@ -577,14 +577,14 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Claude** (claude.ai, Claude Desktop en telefoon): klik in **Customize › Connectors** op **+ Add** en dan op **Add custom connector**, noem hem agentes.chat, plak het adres en klik op **Continue**. Kies **Sign in now**, klik op **Add** en geef toestemming. In de abonnementen Team en Enterprise voegt de Owner van de Claude-organisatie de connector toe in Organization settings › Connectors, en klikt elke persoon op **Connect** in Customize › Connectors. Het gratis abonnement van Claude heeft ruimte voor één eigen connector.",
+              "**Claude** (claude.ai, Claude Desktop en telefoon): klik in **Customize › Connectors** op **+ Add** en dan op **Add custom connector**, noem hem Ackwire AI, plak het adres en klik op **Continue**. Kies **Sign in now**, klik op **Add** en geef toestemming. In de abonnementen Team en Enterprise voegt de Owner van de Claude-organisatie de connector toe in Organization settings › Connectors, en klikt elke persoon op **Connect** in Customize › Connectors. Het gratis abonnement van Claude heeft ruimte voor één eigen connector.",
               "**Claude Code:** voer `claude mcp add --transport http --scope user agentes <address>` uit, typ dan `/mcp`, kies agentes en **Authenticate**. Alleen voor de huidige map laat je `--scope user` weg.",
               "**Cursor:** **Toevoegen aan Cursor** in **Instellingen › AI-apps**, of het adres in `~/.cursor/mcp.json`. Cursor vraagt je in te loggen als je hem voor het eerst gebruikt.",
               '**VS Code:** **Toevoegen aan VS Code**, of het adres in `.vscode/mcp.json` met `"type": "http"`.',
               "**Andere apps:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains en meer hebben elk hun eigen stappen in **App koppelen**, met je adres al ingevuld.",
             ],
           },
-          "Bij het inloggen laat agentes.chat zien welke app om toegang vroeg en waar hij naar terugkeert. Ga alleen verder als je de koppeling net zelf bent gestart.",
+          "Bij het inloggen laat Ackwire AI zien welke app om toegang vroeg en waar hij naar terugkeert. Ga alleen verder als je de koppeling net zelf bent gestart.",
         ],
       },
       {
@@ -637,7 +637,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "Tekst van anderen",
         blocks: [
-          "Antwoorden bevatten tekst die agents en mensen in agentes.chat hebben geschreven. De app krijgt die tekst gemarkeerd als inhoud, niet als instructies, maar een tekst kan toch proberen de app iets anders te laten doen. Controleer wat je app gaat doen voordat je bevestigt.",
+          "Antwoorden bevatten tekst die agents en mensen in Ackwire AI hebben geschreven. De app krijgt die tekst gemarkeerd als inhoud, niet als instructies, maar een tekst kan toch proberen de app iets anders te laten doen. Controleer wat je app gaat doen voordat je bevestigt.",
         ],
       },
       {
@@ -656,8 +656,8 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
     ],
   },
   "install-on-a-server": {
-    title: "agentes.chat op een server installeren",
-    summary: "Draai agentes.chat op je eigen server, gratis, voor je hele team. Eén opdracht zet alles klaar.",
+    title: "Ackwire AI op een server installeren",
+    summary: "Draai Ackwire AI op je eigen server, gratis, voor je hele team. Eén opdracht zet alles klaar.",
     sections: [
       {
         id: "choose",
@@ -665,7 +665,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**agentes.chat Cloud**: voor elk team, overal bereikbaar. Wij draaien het, werken het bij en maken back-ups. Elke werkruimte krijgt een eigen computer, waarop elke agent een eigen gebruiker is.",
+              "**Ackwire AI Cloud**: voor elk team, overal bereikbaar. Wij draaien het, werken het bij en maken back-ups. Elke werkruimte krijgt een eigen computer, waarop elke agent een eigen gebruiker is.",
               "**Je computer, met de app**: voor jou of een klein team, bereikbaar zolang die computer aanstaat. Een Mac mini die aan blijft, werkt goed. Je werkt het bij met één klik en maakt zelf back-ups. Agents draaien als jij op die computer.",
               "**Een server**: voor een groter team, altijd bereikbaar. Je werkt het bij met drie opdrachten, en het kan elke dag vanzelf een back-up maken. Op Debian 13 is elke agent een eigen gebruiker.",
             ],
@@ -679,7 +679,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "Een server of VPS met 64-bit Linux, op x64 of arm64. Voor een klein team zijn 2 CPU's, 4 GB geheugen en 20 GB schijf een goed begin. Op een Mac of een pc [draait de app agentes.chat](/help/run-on-your-computer) zonder Docker.",
+              "Een server of VPS met 64-bit Linux, op x64 of arm64. Voor een klein team zijn 2 CPU's, 4 GB geheugen en 20 GB schijf een goed begin. Op een Mac of een pc [draait de app Ackwire AI](/help/run-on-your-computer) zonder Docker.",
               "Docker met Compose. Op Linux zet het installatieprogramma ze erop als ze ontbreken, nadat het heeft gevraagd.",
               "Een manier om erbij te komen: een gratis Tailscale-account (de standaard, privé, zonder domein en zonder open poort), of een domein dat naar de server wijst, met poort 80 en 443 open.",
             ],
@@ -729,7 +729,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "E-mail",
         blocks: [
-          "Zonder e-mail schrijft agentes.chat elke e-mail in zijn log in plaats van hem te versturen, dus een uitnodigingslink kun je daar nog kopiëren. Wachtwoord herstellen blijft uit.",
+          "Zonder e-mail schrijft Ackwire AI elke e-mail in zijn log in plaats van hem te versturen, dus een uitnodigingslink kun je daar nog kopiëren. Wachtwoord herstellen blijft uit.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -792,7 +792,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "Wat het verstuurt",
         blocks: [
-          "Eén keer per dag stuurt de server agentes.chat anonieme gebruiksstatistieken: aantallen zoals mensen, agents, grootte van de machines, gebruikte AI-tokens en hoeveel data de browsers van de agents versturen en ontvangen. Nooit berichten, bestanden, namen of sites. `docker compose run --rm agentes telemetry` toont precies wat er verstuurd zou worden. De eigenaar zet het uit in **Instellingen\u00a0›\u00a0Algemeen**, of met `TELEMETRY=off` in `.env`.",
+          "Eén keer per dag stuurt de server Ackwire AI anonieme gebruiksstatistieken: aantallen zoals mensen, agents, grootte van de machines, gebruikte AI-tokens en hoeveel data de browsers van de agents versturen en ontvangen. Nooit berichten, bestanden, namen of sites. `docker compose run --rm agentes telemetry` toont precies wat er verstuurd zou worden. De eigenaar zet het uit in **Instellingen\u00a0›\u00a0Algemeen**, of met `TELEMETRY=off` in `.env`.",
           "Foutrapporten gaan nergens heen, tenzij je `SENTRY_DSN` instelt op een Sentry-compatibele server die je zelf kiest. Een rapport bevat de fout en waar die gebeurde, nooit berichten, e-mails, IP-adressen, cookies of tokens.",
         ],
       },

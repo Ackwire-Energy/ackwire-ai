@@ -64,7 +64,7 @@ export function Prefs() {
 
   const homes = pairedHomes(snap);
   const works = homes.length > 0;
-  const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? "agentes.chat";
+  const machine = homes.find((h) => h.status?.machine)?.status?.machine?.name ?? "Ackwire AI";
   const folderCount = homes.reduce((n, h) => n + (h.access?.folders.length ?? 0), 0);
   // A tab of this computer asked for while no agents work here: General instead.
   const shown: PrefTab = works || !DEVICE_TABS.some((d) => d.id === tab) ? tab : "general";
@@ -88,7 +88,7 @@ export function Prefs() {
         <div className="dk-pnav__who">
           {works ? <MacPortrait state={macStateOf(homes)} /> : <BrandFace size="md" />}
           <span className="dk-pnav__whotext">
-            <b>{works ? machine : "agentes.chat"}</b>
+            <b>{works ? machine : "Ackwire AI"}</b>
             <small>
               {works
                 ? t("desktop.orgCount", { count: homes.length })

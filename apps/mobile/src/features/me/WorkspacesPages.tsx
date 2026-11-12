@@ -199,14 +199,14 @@ export function WorkspacesPage() {
 }
 
 /**
- * Adicionar workspace, a short sheet (the system's form sheet, sized to its two rows): a new one on agentes.chat,
+ * Adicionar workspace, a short sheet (the system's form sheet, sized to its two rows): a new one on Ackwire AI,
  * or the team's own server; one line under them says nothing is lost.
  */
 export function AddWorkspacePage() {
   const { t } = useTranslation();
   const create = () => {
     askNewWorkspace(CLOUD_SERVER);
-    // Signed in to agentes.chat already: its first run opens over the app; otherwise its sign-in comes first.
+    // Signed in to Ackwire AI already: its first run opens over the app; otherwise its sign-in comes first.
     if (serverUrl() === CLOUD_SERVER) router.dismissTo("/");
     else void openWorkspace(CLOUD_SERVER, null);
   };

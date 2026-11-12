@@ -506,7 +506,7 @@ function TeamMemoryList() {
 
 /**
  * The usage report's switch (ADR 0060 §5) and "Ver o que é enviado". Only the installation's owner gets it (the API
- * answers null to everyone else, and on agentes.chat itself).
+ * answers null to everyone else, and on Ackwire AI itself).
  */
 function UsageStatistics() {
   const { t } = useTranslation();

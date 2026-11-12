@@ -26,7 +26,7 @@
     "unknownError": "問題が発生しました。もう一度お試しください。",
     "ourSide": "こちら側で問題が発生しました。少し時間をおいてもう一度お試しください。",
     "signedOut": "セッションが終了しました。続けるには再度ログインしてください。",
-    "newVersion": "agentes.chatの新しいバージョンがあります。",
+    "newVersion": "Ackwire AIの新しいバージョンがあります。",
     "reload": "再読み込み",
     "copy": "コピー",
     "copied": "コピーしました",
@@ -49,7 +49,7 @@
     "notAllowed": "この操作の権限がありません。",
     "tooMany": "試行回数が多すぎます。しばらくしてからお試しください。",
     "offline": "オフラインです。接続を確認して、もう一度お試しください。",
-    "unreachable": "現在agentes.chatに接続できません。少し待ってからお試しください。"
+    "unreachable": "現在Ackwire AIに接続できません。少し待ってからお試しください。"
   },
   "roles": {
     "owner": "オーナー",
@@ -454,10 +454,10 @@
       "openMail": "{{app}}を開く",
       "ownerWaits": "このサーバーはオーナーを待っています。",
       "ownerWaitsLead": "このコンピューターまたはスマートフォンで、このサーバーのオーナー用リンク（末尾が/owner#claim=…）を開いてください。",
-      "noPassword": "このアカウントはagentes.chatアプリからログインします。",
+      "noPassword": "このアカウントはAckwire AIアプリからログインします。",
       "noPasswordLead": "このサーバーを動かしているコンピューターでアプリを開き、「設定 › あなたのアカウント」で「パスワードを追加」を選んでください。",
       "backToSignIn": "ログインに戻る",
-      "toAuthorizeApp": "アプリをagentes.chatに接続するために。"
+      "toAuthorizeApp": "アプリをAckwire AIに接続するために。"
     },
     "desktop": {
       "browser": "ブラウザで続ける",
@@ -468,7 +468,7 @@
       "otherServer": "別のサーバーを使う",
       "opening": "{{provider}}を開いています…",
       "confirm": "これはあなたのアプリですか？",
-      "confirmLead": "このコードは、コンピューター上のagentes.chatアプリに表示されているコードと一致するはずです。",
+      "confirmLead": "このコードは、コンピューター上のAckwire AIアプリに表示されているコードと一致するはずです。",
       "confirmYes": "はい、アプリにログインします",
       "confirmNo": "心当たりがありません",
       "done": "準備完了です。",
@@ -492,15 +492,15 @@
     },
     "desktopOwner": {
       "continue": "この{{device}}で続ける",
-      "text": "この{{device}}でagentes.chatをセットアップしたので、パスワードは不要です。"
+      "text": "この{{device}}でAckwire AIをセットアップしたので、パスワードは不要です。"
     },
     "server": {
       "into": "<b>{{server}}</b> にサインイン",
-      "intoHere": "この{{device}}の<b>agentes.chat</b>にサインイン"
+      "intoHere": "この{{device}}の<b>Ackwire AI</b>にサインイン"
     },
     "forgotHere": {
       "ownerTitle": "ここではパスワードは不要です。",
-      "ownerLead": "この{{device}}に agentes.chat をインストールしたのはあなたです。ここから入り、そのあと新しいパスワードを作成してください。",
+      "ownerLead": "この{{device}}に Ackwire AI をインストールしたのはあなたです。ここから入り、そのあと新しいパスワードを作成してください。",
       "notOwner": "インストールした人のアカウントではありませんか？ workspace のオーナーに新しいパスワードのリンクを頼んでください。",
       "title": "このサーバーはメールを送りません。",
       "lead": "workspace のオーナーに新しいパスワードのリンクを頼んでください。オーナーがメンバーで作成し、リンクは1時間有効です。",
@@ -728,7 +728,7 @@
       },
       "area": {
         "title": "あなたのお仕事の分野は？",
-        "lead": "agentes.chat を使う人を知るためだけに伺っています。",
+        "lead": "Ackwire AI を使う人を知るためだけに伺っています。",
         "skip": "このステップをスキップ",
         "options": {
           "dev": "開発",
@@ -801,7 +801,7 @@
         "asleep": "プランまでおやすみ中",
         "price": "<b>{{name}}プラン</b> · 月額{{price}}",
         "name": "<b>{{name}}プラン</b>",
-        "generic": "agentes.chatのプラン",
+        "generic": "Ackwire AIのプラン",
         "cancel": "いつでも解約できます",
         "cta": "チームを動かす",
         "all": "すべてのプランを見る",
@@ -856,7 +856,7 @@
     },
     "yourCompany": "あなたの会社",
     "purpose": {
-      "title": "agentes.chatを何に使いますか？",
+      "title": "Ackwire AIを何に使いますか？",
       "lead": "あとで変更できます。何も失われません。",
       "personal": "自分用",
       "personalText": "あなたの一日を支えるエージェント。",
@@ -934,14 +934,14 @@
         "howTo": "アプリごとの接続方法",
         "allow": "権限のページで「エージェント、ルーティン、スキルの作成と編集」を選んでください。",
         "paste": "次に、このリクエストをアプリに貼り付けてください:",
-        "prompt": "{{url}}に接続して、あなたが持っているすべてのエージェント、指示、スキル、ルーティンについて、agentes.chatに同等のものを作成してください。重複しないように、まずそこにすでにあるものを一覧にしてください。",
+        "prompt": "{{url}}に接続して、あなたが持っているすべてのエージェント、指示、スキル、ルーティンについて、Ackwire AIに同等のものを作成してください。重複しないように、まずそこにすでにあるものを一覧にしてください。",
         "promptLabel": "AIアプリへのリクエスト",
         "copy": "リクエストをコピー",
         "copied": "AIアプリに貼り付けてください。",
         "private": "AIアプリから: このサーバーでは利用できません。ClaudeやChatGPTなどのアプリは、公開されたhttpsアドレスにしか接続できないためです。"
       },
       "otherName": "別のアプリ",
-      "agenteschatName": "agentes.chat",
+      "agenteschatName": "Ackwire AI",
       "where": {
         "openbotrun": "openbot-import.json（OpenBotのMigratorから）またはopenbot-transfer.json（インスタンスの移行から）、もしくはそれが入っていた.zipをドロップしてください。",
         "openmausbot": "OpenMausBotで、チームを右クリック → チームを共有… → ファイルを保存。",
@@ -1171,8 +1171,8 @@
     "keyStep": {
       "title": "どのAIを使いますか？",
       "lead": "AIプランでログインしてください。APIキーは不要です。",
-      "paid": "agentes.chatプランが有効になりました。エージェントのコンピューターを準備しています。",
-      "confirming": "このワークスペースのagentes.chatプランの支払いを確認しています。",
+      "paid": "Ackwire AIプランが有効になりました。エージェントのコンピューターを準備しています。",
+      "confirming": "このワークスペースのAckwire AIプランの支払いを確認しています。",
       "leadNoComputer": "エージェントは、APIキーか、接続したコンピューター上のあなたのAIプランで考えます。"
     },
     "jev": {
@@ -1183,7 +1183,7 @@
       "title": "エージェントごとの支出上限",
       "label": "エージェントごとの月間上限（ドル）",
       "perMonth": "/月",
-      "noteKey": "API利用分のみが対象で、agentes.chatではなくキーのプロバイダーから請求されます。上限に達したエージェントは停止して知らせます。プランはここには含まれません。",
+      "noteKey": "API利用分のみが対象で、Ackwire AIではなくキーのプロバイダーから請求されます。上限に達したエージェントは停止して知らせます。プランはここには含まれません。",
       "notePlatform": "API利用分のみが対象です。上限に達したエージェントは停止して知らせます。"
     },
     "keySite": "{{site}}でキーを作成してください。",
@@ -1235,7 +1235,7 @@
     },
     "team": {
       "title": "ほかに一緒に働く人はいますか？",
-      "payment": "agentes.chatプランを選ぶと、チームを招待できます。",
+      "payment": "Ackwire AIプランを選ぶと、チームを招待できます。",
       "lead": "メールで招待するか、リンクを共有してください。",
       "leadLink": "招待リンクを共有してください。",
       "emails": "メールアドレス",
@@ -1345,7 +1345,7 @@
     "reload": "再読み込み",
     "search": "検索または質問…",
     "look": "右クリック",
-    "lookOurs": "agentes.chat",
+    "lookOurs": "Ackwire AI",
     "lookSystem": "システム",
     "markRead": "既読にする",
     "muteChannel": "チャンネルをミュート",
@@ -1370,8 +1370,8 @@
     "copied": "コピーしました。ターミナルに貼り付けてください。",
     "mac": {
       "why": "<b>アプリはベータ版です。</b>そのため、初回はMacが確認を求めます:",
-      "drag": "agentes.chatをアプリケーションにドラッグします。",
-      "dragLong": "ダウンロードしたファイルを開き、agentes.chatをアプリケーションにドラッグします。",
+      "drag": "Ackwire AIをアプリケーションにドラッグします。",
+      "dragLong": "ダウンロードしたファイルを開き、Ackwire AIをアプリケーションにドラッグします。",
       "blocked": "アプリを開き、「完了」をクリックします。",
       "blockedSub": "「ゴミ箱に入れる」はクリックしないでください。",
       "settings": "設定 › プライバシーとセキュリティで「このまま開く」をクリックします。",
@@ -1398,17 +1398,17 @@
       "why": "Ubuntu、Debianなどのシステム向け（x64）です。Linuxでは追加の確認はありません:",
       "apt": ".debをダブルクリックするか、ターミナルからインストールします。",
       "aptLong": "ダウンロードしたファイルをダブルクリックして「インストール」をクリックするか、これをターミナルに貼り付けます:",
-      "open": "アプリの一覧からagentes.chatを開きます。",
+      "open": "アプリの一覧からAckwire AIを開きます。",
       "otherTitle": "Arch、Fedora など、.deb を使えないシステムですか？",
       "otherText": "AppImage をダウンロードしてください。どのディストリビューションでも動作し、自動で更新されます。保存したフォルダーで、ターミナルに次を貼り付けてください:",
       "appImage": "AppImage をダウンロード"
     },
     "page": {
-      "docTitle": "アプリをダウンロード · agentes.chat",
-      "title": "agentes.chatアプリをダウンロード",
+      "docTitle": "アプリをダウンロード · Ackwire AI",
+      "title": "Ackwire AIアプリをダウンロード",
       "beta": "Beta",
       "text": "ワークスペースを専用のウィンドウで開き、システムの通知を受け取れます。クリックひとつで、エージェントがこのコンピューターのそれぞれのフォルダで作業します。",
-      "open": "agentes.chatを開く",
+      "open": "Ackwire AIを開く",
       "version": "バージョン{{version}}",
       "versionSize": "バージョン{{version}} · {{size}}",
       "soon": "{{system}}版はまだありません。",
@@ -1418,7 +1418,7 @@
       "installOn": "{{system}}にインストール",
       "system": "システム",
       "whyTitle": "コンピューターが確認を求めるのはなぜですか？",
-      "whyText": "agentes.chatはベータ版です。Mac版はまだAppleの公証を受けておらず、WindowsのインストーラーにはまだMicrosoftの証明書がありません。そのため、インターネットからダウンロードしたアプリを開く前に、コンピューターが一度だけ確認を求めます。その後はすぐに開き、自動でアップデートされます。ベータ版が終わるまでに、この手順はなくなります。",
+      "whyText": "Ackwire AIはベータ版です。Mac版はまだAppleの公証を受けておらず、WindowsのインストーラーにはまだMicrosoftの証明書がありません。そのため、インターネットからダウンロードしたアプリを開く前に、コンピューターが一度だけ確認を求めます。その後はすぐに開き、自動でアップデートされます。ベータ版が終わるまでに、この手順はなくなります。",
       "openSource": "オープンソース",
       "onlyHere": "公開はここと、プロジェクトのリリースだけです",
       "signedUpdates": "署名付きのアップデート"
@@ -1678,7 +1678,7 @@
     "addWorkspace": "ワークスペースを追加",
     "addWorkspaceHint": "既存のワークスペースに参加、新規作成、またはチームのサーバーを使う",
     "yourServer": "自分のサーバー",
-    "serverHere": "この{{device}}の agentes.chat",
+    "serverHere": "この{{device}}の Ackwire AI",
     "serverStopped": "停止中",
     "serverOffline": "{{time}} からオフライン",
     "serverSignedOut": "未サインイン",
@@ -1822,7 +1822,7 @@
     "private": "このコードをスキャンした人は、あなたとしてログインします。",
     "failed": "コードを作成できませんでした。",
     "localOnly": "このサーバーは動いているコンピューターでしか開けないため、スマートフォンからは届きません。",
-    "localOnlyHow": "そのコンピューターのagentes.chatアプリで、環境設定 › サーバーの「スマートフォンやチームメイトからアクセスする」をオンにしてから、ここに戻ってください。"
+    "localOnlyHow": "そのコンピューターのAckwire AIアプリで、環境設定 › サーバーの「スマートフォンやチームメイトからアクセスする」をオンにしてから、ここに戻ってください。"
   },
   "team": {
     "title": "チーム",
@@ -2223,8 +2223,8 @@
       "greetingPersonal": "こんにちは、{{name}}です。あなたと一緒にエージェントを用意します。",
       "lead": "エージェントを作り、アプリを接続し、メンバーを招待します。あなたが頼まない限り何も変わらず、あなたにできることだけを行います。",
       "leadPersonal": "エージェントを作り、アプリを接続します。あなたが頼まない限り何も変わりません。",
-      "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにagentes.chatのプランがあると、エージェントが作業を始めます。",
-      "heldLeadPersonal": "手伝ってほしいことを選ぶと、ここにエージェントが表示されます。agentes.chatのプランに入ると、エージェントが作業を始めます。",
+      "heldLead": "事業の内容を選ぶと、ここにチームが表示されます。ワークスペースにAckwire AIのプランがあると、エージェントが作業を始めます。",
+      "heldLeadPersonal": "手伝ってほしいことを選ぶと、ここにエージェントが表示されます。Ackwire AIのプランに入ると、エージェントが作業を始めます。",
       "connect": {
         "title": "チームのAIを接続",
         "titlePersonal": "エージェントのAIを接続",
@@ -2566,7 +2566,7 @@
       "plan_not_shared": "{{name}}と話すには自分のプランを接続してください。ワークスペースのプランは持ち主にしか応えません。",
       "plan_unattended": "{{name}}は返信しませんでした。この依頼は人からのものではなく、ワークスペースのプランは持ち主にしか応えません。",
       "runner_outdated": "{{name}}は今は返信できません。プランのコンピューターのプログラムを更新する必要があります。",
-      "plan_tools": "{{name}}は返信する前に止まりました。そのコンピューターのプランのAIがagentes.chatのツールだけにとどまりませんでした。",
+      "plan_tools": "{{name}}は返信する前に止まりました。そのコンピューターのプランのAIがAckwire AIのツールだけにとどまりませんでした。",
       "model_limit": "{{name}}は今は返信できません。{{model}}がプランでの独自の上限に達しました。プランのほかのモデルは引き続き使えます。",
       "model_region": "{{name}}は返信できません。{{model}}にはOpenCodeでGlobalリージョンをオンにする必要があります（Settings › Privacy）。",
       "model_off": "{{name}}は返信できません。OpenCodeがこのキーでの{{model}}を拒否しました。OpenCodeでモデルかアカウントをオンにするか、別のモデルを選んでください。",
@@ -2576,11 +2576,11 @@
     },
     "kept": {
       "title": "メッセージを保存しました。",
-      "line": "ワークスペースにagentes.chatのプランとAIの接続が揃ったら、ここで返信します。",
+      "line": "ワークスペースにAckwire AIのプランとAIの接続が揃ったら、ここで返信します。",
       "plan": "プランにはエージェントのコンピューターが含まれ、常に稼働します。AIはすでに支払っているものを使えます。Claude、ChatGPTなど、またはAPIキーです。",
       "active": "プランが有効です。AIを接続すると{{name}}がここで返信します。",
       "receipt": "保存済み",
-      "channel": "保存済み。ワークスペースにagentes.chatのプランがあると、エージェントが返信します。"
+      "channel": "保存済み。ワークスペースにAckwire AIのプランがあると、エージェントが返信します。"
     },
     "receipt": "誰も返信しません: AIが接続されていません",
     "chip": "AIなし"
@@ -2656,8 +2656,8 @@
         "unshare": "自分だけ"
       }
     },
-    "billing": "プランはワークスペースのコンピューターにサインインします。そのコンピューターには有効なagentes.chatプランが必要です。",
-    "billingWeb": "Webのagentes.chatで選んでください。",
+    "billing": "プランはワークスペースのコンピューターにサインインします。そのコンピューターには有効なAckwire AIプランが必要です。",
+    "billingWeb": "WebのAckwire AIで選んでください。",
     "orPayGo": "または従量課金で",
     "pay": {
       "label": "支払い方法は？",
@@ -2720,7 +2720,7 @@
       "forAll": "プランのないエージェントは、すべてこのキーで動きます。",
       "saved": "保存しました。プランのないエージェントは、すべてこのキーで動きます。",
       "savedUnchecked": "保存しましたが、{{provider}}から応答がなく、キーを確認できませんでした。失敗したときは、会話に理由が表示されます。",
-      "closed": "APIキーはワークスペースのagentes.chatプランとともに使えるようになります。",
+      "closed": "APIキーはワークスペースのAckwire AIプランとともに使えるようになります。",
       "notPlan": "コーディングプランのキーは、上の専用の項目に入力してください。",
       "billing": "キーのプロジェクトで課金を有効にしてください。課金がないと、エージェントが送った内容をGoogleが利用する場合があります。",
       "privacy": "エージェントが送った内容をどのプロバイダーが保存できるかは、OpenRouterのプライバシー設定で決まります。"
@@ -3342,7 +3342,7 @@
     "clearsAt": "{{time}}にクリア",
     "clearsOn": "{{when}}にクリア",
     "help": {
-      "auto": "agentes.chatを開いている間はオンラインです。",
+      "auto": "Ackwire AIを開いている間はオンラインです。",
       "away": "しばらく不在です。返信に時間がかかることが伝わります。",
       "busy": "今は邪魔しないほうがよいことが全員に伝わります。",
       "out": "仕事から離れています（休暇、休み）：ステータスが消えるまで全員に表示されます。",
@@ -3775,7 +3775,7 @@
       "removeText_other": "{{count}}件の項目がVaultから外れ、エージェントは使わなくなります。{{name}}側は何も変わりません。",
       "removed": "{{name}}を切断しました",
       "listOf": "{{name}}への接続",
-      "note": "エージェントは必要なときにそこにあるものを読み取ります。agentes.chatにコピーされるのは名前とアドレスだけです。",
+      "note": "エージェントは必要なときにそこにあるものを読み取ります。Ackwire AIにコピーされるのは名前とアドレスだけです。",
       "error": {
         "auth_failed": "ログインが拒否されました",
         "locked": "パスワードが違います",
@@ -4459,7 +4459,7 @@
       "eyebrow": "承認リクエスト",
       "close": "閉じる",
       "exact": "実行される操作",
-      "builtIn": "agentes.chatのツール",
+      "builtIn": "Ackwire AIのツール",
       "orgConnector": "ワークスペースのコネクタ",
       "bound": "この値に限ります。変更するには新たな承認が必要です。",
       "why": "理由",
@@ -4869,7 +4869,7 @@
       "steps": {
         "title": "あと1ステップ、{{computer}}本体で",
         "waiting": "待機中",
-        "one": "時計の横にあるagentes.chatのアイコンをクリック",
+        "one": "時計の横にあるAckwire AIのアイコンをクリック",
         "two": "環境設定",
         "three": "「ブラウザ」をオンにする",
         "done": "これで完了です。このページは自動で検知するので、再読み込みは不要です。",
@@ -5556,10 +5556,10 @@
       "afterPlanNext": "プランの次のステップです。",
       "plan": {
         "todo": "チームを動かしましょう。",
-        "todoDesc": "agentes.chatのプランがあれば、エージェントが働き始めます。",
+        "todoDesc": "Ackwire AIのプランがあれば、エージェントが働き始めます。",
         "action": "プランを見る",
         "todoPersonal": "エージェントを動かしましょう。",
-        "todoDescPersonal": "agentes.chatのプランがあれば、あなたのエージェントが働き始めます。"
+        "todoDescPersonal": "Ackwire AIのプランがあれば、あなたのエージェントが働き始めます。"
       },
       "about": {
         "action": "伝える",
@@ -6331,13 +6331,13 @@
       },
       "mailFor": "{{names}}に届くメール",
       "mail": {
-        "from": "agentes.chat · 宛先: {{to}}",
+        "from": "Ackwire AI · 宛先: {{to}}",
         "toMany": "{{email}} ほか{{count}}件",
-        "subject": "agentes.chat のワークスペースに招待されました",
+        "subject": "Ackwire AI のワークスペースに招待されました",
         "headline": "ワークスペースに招待されました",
         "body": "<b>{{name}}</b> ({{email}}) から、<b>{{org}}</b> にメンバーとして招待されました。",
         "noteFrom": "<b>{{name}}:</b> 「{{note}}」",
-        "what": "agentes.chat は、人と AI エージェントが一緒に働く場所です。",
+        "what": "Ackwire AI は、人と AI エージェントが一緒に働く場所です。",
         "button": "招待を承諾",
         "small": "招待の有効期限は7日間です。このメールアドレスで承諾してください。"
       },
@@ -6516,7 +6516,7 @@
     "crashTitle": "問題が発生しました",
     "crashText": "続けるにはページを再読み込みしてください。",
     "crashCode": "助けを求めるときは、コード{{id}}を伝えてください。",
-    "unreachableTitle": "agentes.chatに接続できません",
+    "unreachableTitle": "Ackwire AIに接続できません",
     "unreachableText": "再起動中かもしれません。復旧しだい、このページは自動で開きます。",
     "offlineTitle": "オフラインです",
     "offlineText": "オンラインに戻ると、このページは自動で開きます。"
@@ -8025,7 +8025,7 @@
       "title": "ミッションのファイル",
       "folder": "フォルダ",
       "tabs": "ファイル",
-      "missionSub": "計画とルール · agentes.chatが更新",
+      "missionSub": "計画とルール · Ackwire AIが更新",
       "decisionsSub": "承認された決定事項",
       "notesSub": "{{executor}}のメモ",
       "synced": "{{when}}に同期",
@@ -8098,7 +8098,7 @@
       "title": "新しいミッション",
       "text": "エージェントに任せる長いプロジェクトです。エージェントが計画を提案し、自分のコンピューターで作業して、スレッドで判断やレビューを求めます。",
       "goal": "目標",
-      "goalPlaceholder": "例: 今のWebアプリをもとに、Expoでagentes.chatのモバイルアプリを作る。",
+      "goalPlaceholder": "例: 今のWebアプリをもとに、ExpoでAckwire AIのモバイルアプリを作る。",
       "agent": "エージェント",
       "computer": "コンピューター",
       "noMachine": "接続されていません",
@@ -8973,7 +8973,7 @@
   },
   "jev": {
     "title": "Jev",
-    "about": "TypeSafeの高速モデルで、すばやい判断のために作られています。agentes.chatは、誰が返信するかといった小さな質問をJevに尋ねます。料金はTypeSafeに直接お支払いください。",
+    "about": "TypeSafeの高速モデルで、すばやい判断のために作られています。Ackwire AIは、誰が返信するかといった小さな質問をJevに尋ねます。料金はTypeSafeに直接お支払いください。",
     "lead": "エージェントがチームとして働けるよう手助けします。",
     "how": "Jevのしくみ",
     "why": {
@@ -9083,7 +9083,7 @@
         "online": "{{computer}}は再起動または再接続中です。戻りしだい自動で切り替わります。",
         "installing": "{{computer}}に{{program}}をインストール中です。終わりしだい自動で切り替わります。",
         "updating": "{{computer}}の{{program}}をアップデート中です。終わりしだい自動で切り替わります。",
-        "runnerOld": "{{computer}}のagentes.chatプログラムが古く、アップデートを準備中です。終わりしだい自動で切り替わります。",
+        "runnerOld": "{{computer}}のAckwire AIプログラムが古く、アップデートを準備中です。終わりしだい自動で切り替わります。",
         "execOff": "{{computer}}はまだ{{program}}を実行できません。対応中で、自動で切り替わります。",
         "toolOff": "{{computer}}では{{program}}がまだ許可されていません。こちら側の問題です。後でもう一度お試しください。",
         "preparing": "{{computer}}を準備中です。終わりしだい自動で切り替わります。",
@@ -9097,7 +9097,7 @@
     },
     "page": {
       "title": "あなたのプラン",
-      "hint": "各プランは接続したコンピューターに保存され、そのコンピューターを管理する人がアクセスできます。agentes.chatが保存するのは名前、メールアドレス、使用量だけです。",
+      "hint": "各プランは接続したコンピューターに保存され、そのコンピューターを管理する人がアクセスできます。Ackwire AIが保存するのは名前、メールアドレス、使用量だけです。",
       "emptyTitle": "すでに契約しているAIプランを使えます",
       "emptyViewer": "ワークスペースのAI担当者がプランを接続すると、ここに表示されます。",
       "connect": "AIを接続",
@@ -10247,9 +10247,9 @@
     "reasons": {
       "no_computer": "使うには「コンピューター」で接続済みのコンピューターを選んでください。",
       "exec_off": "このコンピューターは、プログラムの実行を許可せずに接続されています。",
-      "runner_old": "使うには、コンピューターのagentes.chatプログラムをアップデートしてください。",
-      "tool_off": "{{computer}}で{{program}}がオフになっています。そのコンピューターのagentes.chatアプリの「環境設定 → ツール」でオンにしてください。",
-      "tool_offLinux": "{{computer}}で{{program}}がオフになっています。そのコンピューターのagentes.chatアプリか、{{command}}でオンにしてください。",
+      "runner_old": "使うには、コンピューターのAckwire AIプログラムをアップデートしてください。",
+      "tool_off": "{{computer}}で{{program}}がオフになっています。そのコンピューターのAckwire AIアプリの「環境設定 → ツール」でオンにしてください。",
+      "tool_offLinux": "{{computer}}で{{program}}がオフになっています。そのコンピューターのAckwire AIアプリか、{{command}}でオンにしてください。",
       "not_installed": "{{computer}}に{{program}}がインストールされていません。",
       "not_reported": "{{computer}}は、入っているプログラムをまだ確認しています。終わりしだい自動で切り替わります。",
       "outdated": "{{computer}}のバージョンが古くなっています。使うにはCodexをアップデートしてください。",
@@ -10737,7 +10737,7 @@
   "storage": {
     "title": "ストレージ",
     "options": "ファイルの保存先",
-    "agentes": "agentes.chatストレージ",
+    "agentes": "Ackwire AIストレージ",
     "agentesText": "ファイルは当社のストレージに、ワークスペースごとに分けて保存されます。",
     "server": "このサーバー",
     "serverText": {
@@ -10748,7 +10748,7 @@
     },
     "showFolder": "フォルダを表示",
     "place": {
-      "agentes": "agentes.chatストレージ",
+      "agentes": "Ackwire AIストレージ",
       "server": "このサーバー"
     },
     "s3": "独自のバケット",
@@ -10806,11 +10806,11 @@
   },
   "githubApp": {
     "title": "GitHubリポジトリ",
-    "text": "agentes.chat アプリがインストールされている場所では、エージェントがアプリとしてプルリクエスト、Issue、コメント、コミットを作成し、エージェントの名前と依頼した人が添えられます。ここからインストールしたものを使うのは{{org}}だけです。",
-    "install": "agentes.chat アプリをインストール",
+    "text": "Ackwire AI アプリがインストールされている場所では、エージェントがアプリとしてプルリクエスト、Issue、コメント、コミットを作成し、エージェントの名前と依頼した人が添えられます。ここからインストールしたものを使うのは{{org}}だけです。",
+    "install": "Ackwire AI アプリをインストール",
     "installMore": "別のアカウントにインストール",
     "none": "GitHubアカウントはまだありません。",
-    "usingAccount": "現在、エージェントはGitHubで{{account}}として表示されます。アプリをインストールすると、agentes.chat アプリとして表示されます。",
+    "usingAccount": "現在、エージェントはGitHubで{{account}}として表示されます。アプリをインストールすると、Ackwire AI アプリとして表示されます。",
     "allRepos": "すべてのリポジトリ",
     "someRepos": "選択したリポジトリ",
     "suspended": "GitHubで停止中",
@@ -10819,26 +10819,26 @@
     "remove": "削除",
     "removeName": "{{account}}を削除",
     "removeTitle": "{{account}}からアプリを削除しますか？",
-    "removeText": "agentes.chat アプリはGitHubの{{account}}からアンインストールされ、エージェントはアプリ経由でそのアカウントのリポジトリを使わなくなります。",
+    "removeText": "Ackwire AI アプリはGitHubの{{account}}からアンインストールされ、エージェントはアプリ経由でそのアカウントのリポジトリを使わなくなります。",
     "removeLast": "これが最後なので、誰かがアプリをインストールするかアカウントを接続するまで、エージェントはGitHubを使えません。",
     "removed": "{{account}}からアプリを削除し、GitHubでアンインストールしました。",
     "notUninstalled": "ここではアプリを削除しましたが、GitHubは{{account}}からのアンインストールを確認していません。GitHubでアンインストールしてください。",
     "openPage": "開く",
-    "installed": "agentes.chat アプリをインストールしました。",
+    "installed": "Ackwire AI アプリをインストールしました。",
     "requested": "アプリをインストールできるのはGitHubアカウントのオーナーだけです。このワークスペースのコネクタ › GitHubからインストールするよう依頼してください。",
     "notVisible": "あなたのGitHubアカウントからは、そのインストールが見えません。アクセス権のあるアカウントでインストールしてください。",
     "otherWorkspace": "このGitHubアカウントはすでに別のワークスペースに紐づいています。そちらでアプリを削除してから、ここでインストールしてください。",
-    "installedOutside": "そのGitHubアカウントのアプリはagentes.chatの外でインストールされています。GitHubで削除してから、コネクタ › GitHubからインストールし直してください。",
+    "installedOutside": "そのGitHubアカウントのアプリはAckwire AIの外でインストールされています。GitHubで削除してから、コネクタ › GitHubからインストールし直してください。",
     "misconfigured": "サーバー上のGitHubアプリのシークレットキーが間違っているため、インストールを完了できません。サーバーの運用者がアプリの設定でキーを差し替える必要があります。",
     "connectAccount": "GitHubアカウントを接続",
     "ownerHint": "このサーバーのオーナーが、ここのコネクタでGitHubアプリを作成できます。",
-    "viaApp": "{{accounts}}の agentes.chat アプリ経由",
-    "disconnectApp": "agentes.chat アプリはGitHubの{{accounts}}からもアンインストールされます。",
-    "disconnectKeepsApp": "エージェントは{{accounts}}の agentes.chat アプリ経由でGitHubを使い続けます。",
-    "keptApp": "GitHubアカウントの接続を解除しました。エージェントは agentes.chat アプリ経由でGitHubを使い続けます。",
+    "viaApp": "{{accounts}}の Ackwire AI アプリ経由",
+    "disconnectApp": "Ackwire AI アプリはGitHubの{{accounts}}からもアンインストールされます。",
+    "disconnectKeepsApp": "エージェントは{{accounts}}の Ackwire AI アプリ経由でGitHubを使い続けます。",
+    "keptApp": "GitHubアカウントの接続を解除しました。エージェントは Ackwire AI アプリ経由でGitHubを使い続けます。",
     "signature": {
-      "forPerson": "{{agent}}、agentes.chat の {{person}} のエージェント",
-      "alone": "{{agent}}、agentes.chat のエージェント"
+      "forPerson": "{{agent}}、Ackwire AI の {{person}} のエージェント",
+      "alone": "{{agent}}、Ackwire AI のエージェント"
     },
     "manifestPage": {
       "title": "GitHub アプリを作成しています",
@@ -11768,7 +11768,7 @@
     "continueInComposio": "Composioで続ける",
     "github": {
       "how": "エージェントがGitHubを使う方法",
-      "app": "agentes.chat アプリ",
+      "app": "Ackwire AI アプリ",
       "recommended": "おすすめ",
       "appText": "エージェントはアプリとして表示され、リポジトリはGitHubで選びます。",
       "account": "GitHubアカウント",
@@ -11789,7 +11789,7 @@
     "or": "または",
     "withKey": "APIキーで接続",
     "needsKey": "このサーバーはOAuthに対応していません。APIキーで接続してください。",
-    "notApproved": "{{name}}は承認済みのアプリしかログインを許可しておらず、agentes.chatはまだ承認されていません。APIキーが発行されれば、それで接続できます。",
+    "notApproved": "{{name}}は承認済みのアプリしかログインを許可しておらず、Ackwire AIはまだ承認されていません。APIキーが発行されれば、それで接続できます。",
     "serverSaid": "サーバーの応答: {{detail}}",
     "nothingYet": "ステップ3までは、エージェントは何も使えません。",
     "allCanUse": "接続すると、すべてのエージェントが使えます。あとから調整できます。",
@@ -12424,7 +12424,7 @@
       "generalKept": "#generalは削除できません。",
       "generalStays": "全員が#generalに残ります。",
       "mcpUnreachable": "MCPサーバーに接続できませんでした。アドレスを確認して、もう一度お試しください。",
-      "notApproved": "このサービスはまだagentes.chatを承認していません。",
+      "notApproved": "このサービスはまだAckwire AIを承認していません。",
       "alreadyInvited": "この人はすでに招待を受けています。",
       "alreadyAsked": "この人についてはすでに別の人が依頼しています。",
       "mailboxConnected": "このメールボックスはすでに接続されています。",
@@ -12563,7 +12563,7 @@
       "noComputer": "このエージェントには、ミッション用のコンピューターがまだありません。",
       "computerOffline": "エージェントのコンピューターがオフラインです。",
       "execDisabled": "そのコンピューターではコマンドがオフになっています。",
-      "runnerOutdated": "コンピューター上のプログラムが古すぎてミッションに対応していません。そこでagentes.chatアプリを更新するか、インストールコマンドをもう一度実行してください。",
+      "runnerOutdated": "コンピューター上のプログラムが古すぎてミッションに対応していません。そこでAckwire AIアプリを更新するか、インストールコマンドをもう一度実行してください。",
       "exists": "このスレッドにはすでにミッションがあります。",
       "closed": "このミッションは終了しています。",
       "wrongStatus": "ミッションの今の状態では、この操作はできません。",
@@ -12657,7 +12657,7 @@
       "targetNotFound": "そのコンピューターはもう存在しません。別のものを選んでください。",
       "targetSame": "エージェントはすでにそのコンピューターにいます。",
       "targetPaused": "そのコンピューターは一時停止中です。別のものを選んでください。",
-      "accountMethodUnsupported": "このコンピューターでは、まだこの方法でClaudeを接続できません。コンピューターのagentes.chatプログラムを更新するか、APIキーを使ってください。",
+      "accountMethodUnsupported": "このコンピューターでは、まだこの方法でClaudeを接続できません。コンピューターのAckwire AIプログラムを更新するか、APIキーを使ってください。",
       "offline": "{{name}}は現在オフラインです。戻ったらもう一度お試しください。",
       "paused": "{{name}}は一時停止中です。再開されるまで新しいものは始まりません。",
       "timeout": "コンピューターが時間内に応答しませんでした。もう一度お試しください。"
@@ -12844,9 +12844,9 @@
     },
     "host": {
       "label": "このサーバーのコンピューター",
-      "desc": "agentes.chatがインストールされている場所です。",
-      "descUsers": "agentes.chatがインストールされている場所で、エージェントごとにユーザーが1つあります。",
-      "descShared": "agentes.chatがインストールされているコンピューターです。エージェントはインストールした人として作業します。",
+      "desc": "Ackwire AIがインストールされている場所です。",
+      "descUsers": "Ackwire AIがインストールされている場所で、エージェントごとにユーザーが1つあります。",
+      "descShared": "Ackwire AIがインストールされているコンピューターです。エージェントはインストールした人として作業します。",
       "stop": "このワークスペースでの使用をやめる",
       "stopTitle": "このサーバーのコンピューターの使用をやめますか？",
       "stopText": "このワークスペースのエージェントは、今からこのコンピューターを使わなくなります。いつでも再び使えます。",
@@ -12857,7 +12857,7 @@
     },
     "download": {
       "title": "別のコンピューターを接続",
-      "text": "そのコンピューターにagentes.chatアプリをインストールしてください。",
+      "text": "そのコンピューターにAckwire AIアプリをインストールしてください。",
       "mac": "{{system}}用のアプリをダウンロード",
       "version": "バージョン {{version}}",
       "versionSize": "バージョン {{version}} · {{size}}",
@@ -12868,7 +12868,7 @@
       "unavailable": "アプリはまだ利用できません。",
       "unavailableCommand": "アプリはまだ利用できません。当面は下のコマンドを使ってください。",
       "firstTime": "初回のみ",
-      "step1": "ダウンロードしたファイルを開き、agentes.chatをアプリケーションにドラッグしてください。",
+      "step1": "ダウンロードしたファイルを開き、Ackwire AIをアプリケーションにドラッグしてください。",
       "step1Install": "ダウンロードしたファイルを開いてインストールしてください。",
       "otherText": "コンピューターのターミナルでこれを実行し、表示されたコードを確認してください。",
       "waiting": "コンピューターの接続を待っています…"
@@ -12899,7 +12899,7 @@
       "ownFolder": "各エージェントのフォルダ",
       "ownFolderText": "常に許可。ほかのエージェントのフォルダは見えません。",
       "noFolders": "追加のフォルダはありません。各エージェントは専用フォルダだけを使います。",
-      "noReport": "このコンピューターは、許可している内容をまだ伝えていません。そのコンピューターのagentes.chatをアップデートしてください。",
+      "noReport": "このコンピューターは、許可している内容をまだ伝えていません。そのコンピューターのAckwire AIをアップデートしてください。",
       "hidden": "このコンピューターのフォルダとツールは、管理者と接続した人だけが見られます。",
       "nobody": "まだどのエージェントも使っていません",
       "usedBy": "{{folder}}を使っているエージェント",
@@ -12942,7 +12942,7 @@
       "disableText": "このコンピューターでエージェントは{{tool}}を使わなくなります。再びオンにできるのはコンピューター本体だけです。",
       "disabled": "{{tool}}をオフにしました。",
       "grantTitle": "さらに許可するには",
-      "grantText": "許可はコンピューター本体で行います。そのコンピューターでagentes.chatアプリを開いてください（環境設定 → フォルダ）。",
+      "grantText": "許可はコンピューター本体で行います。そのコンピューターでAckwire AIアプリを開いてください（環境設定 → フォルダ）。",
       "grantTextTerminal": "許可はコンピューター本体のターミナルで行います:",
       "grantTextAdmin": "許可はコンピューター本体のターミナルで、管理者として行います:",
       "grantTerminal": "アプリがない場合は、コンピューターのターミナルで:",
@@ -13044,7 +13044,7 @@
       "forbidden": "この画面は見られません",
       "forbiddenText": "{{name}}を使える人は所有者が決めます。",
       "outdated": "{{host}}のアプリが古すぎます",
-      "outdatedText": "{{host}}のagentes.chatを更新してから、もう一度お試しください。",
+      "outdatedText": "{{host}}のAckwire AIを更新してから、もう一度お試しください。",
       "unavailable": "この画面は表示できません",
       "unavailableText": "{{host}}にadbまたはXcodeが入っているか確認してから、もう一度お試しください。",
       "needsHelper": "MacでiPhoneの設定を完了して、必要なテストヘルパーを追加してください。",
@@ -13187,7 +13187,7 @@
       "thisMac": "このMac",
       "thisPc": "このPC",
       "thisComputer": "このコンピューター",
-      "thisLine": "agentes.chatアプリから",
+      "thisLine": "Ackwire AIアプリから",
       "openApp": "アプリを開く",
       "server": "サーバーまたはVPS",
       "serverLine": "ターミナルに1行貼り付けるだけ",
@@ -13200,7 +13200,7 @@
     },
     "computer": {
       "title": "ほかのコンピューターを接続",
-      "step1": "そのコンピューターにagentes.chatアプリを入れます:",
+      "step1": "そのコンピューターにAckwire AIアプリを入れます:",
       "step2": "アプリを開いて、自分のアカウントでログインします。",
       "step3": "{{org}}のエージェントに使わせるか聞かれたら「許可」をクリックします。",
       "shows": "ここに自動で表示されます。共有するまではあなただけが使えます。",
@@ -13210,11 +13210,11 @@
       "noApp": "アプリを入れられない場合は、ターミナルの1行を使う"
     },
     "thisApp": {
-      "text": "agentes.chatアプリならワンクリックで接続できます。先に確認があります。",
-      "open": "agentes.chatアプリを開く",
+      "text": "Ackwire AIアプリならワンクリックで接続できます。先に確認があります。",
+      "open": "Ackwire AIアプリを開く",
       "browserAsks": "ブラウザーが開いてよいか聞いてきます。「開く」を選び、表示されたら「常に許可」も選んでください。",
       "noApp": "アプリをお持ちでない場合",
-      "afterInstall": "インストールしたら、もう一度「agentes.chatアプリを開く」を押してください。リンクは1回限り、10分間有効です。",
+      "afterInstall": "インストールしたら、もう一度「Ackwire AIアプリを開く」を押してください。リンクは1回限り、10分間有効です。",
       "waiting": "このコンピューターのアプリを待っています…",
       "expired": "このリンクは期限切れです。",
       "again": "新しいリンクを作成",
@@ -13291,7 +13291,7 @@
       },
       "qrLabel": "スマートフォンでこの手順を開くQRコード",
       "qrLine": "スマートフォンから設定",
-      "qrCaption": "スキャンするとagentes.chatアプリでこの手順が開き、各設定へのボタンが表示されます。",
+      "qrCaption": "スキャンするとAckwire AIアプリでこの手順が開き、各設定へのボタンが表示されます。",
       "buildNumber": "ビルド番号",
       "buildNumberSub": "BP2A.250605.031",
       "usbRow": "USB デバッグ",
@@ -13334,23 +13334,23 @@
       "qrCaption": "カメラには agentes-… という Wi-Fi ネットワークが表示されますが、そのネットワークは存在しません。スマートフォンはコンピューターと同じ Wi-Fi のままにしてください。",
       "fail": {
         "mdns_off": "{{computer}}は Wi-Fi 上のスマートフォンを探せません。そこで Android platform-tools を更新するか、ケーブルを使ってください。",
-        "mdns_offMac": "{{computer}}は Wi-Fi 上のスマートフォンを探せません。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の agentes.chat をオンにして、もう一度試してください。",
+        "mdns_offMac": "{{computer}}は Wi-Fi 上のスマートフォンを探せません。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の Ackwire AI をオンにして、もう一度試してください。",
         "same_wifi": "スマートフォンに接続できませんでした。{{computer}}と同じネットワークにありません。同じ Wi-Fi につないで、もう一度試してください。",
-        "same_wifiMac": "スマートフォンに接続できませんでした。{{computer}}と同じ Wi-Fi につないでください。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の agentes.chat もオンにしてください。",
+        "same_wifiMac": "スマートフォンに接続できませんでした。{{computer}}と同じ Wi-Fi につないでください。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の Ackwire AI もオンにしてください。",
         "refused": "スマートフォンがペア設定を中止しました。ペア設定の画面を開いたまま、もう一度試してください。",
         "refusedCode": "スマートフォンがそのコードを受け付けませんでした。コードとアドレスを確認して、もう一度ペア設定してください。",
         "timed_out": "2 分以内にペア設定されたスマートフォンはありませんでした。カメラでコードを読み取った場合やスマートフォンが Wi-Fi から外れた場合は、{{computer}}と同じ Wi-Fi につなぎ、ワイヤレス デバッグからスキャンしてください。",
-        "timed_outMac": "2 分以内にペア設定されたスマートフォンはありませんでした。カメラでコードを読み取った場合やスマートフォンが Wi-Fi から外れた場合は、{{computer}}と同じ Wi-Fi につなぎ、ワイヤレス デバッグからスキャンしてください。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の agentes.chat もオンにしてください。",
+        "timed_outMac": "2 分以内にペア設定されたスマートフォンはありませんでした。カメラでコードを読み取った場合やスマートフォンが Wi-Fi から外れた場合は、{{computer}}と同じ Wi-Fi につなぎ、ワイヤレス デバッグからスキャンしてください。その Mac で システム設定 › プライバシーとセキュリティ › ローカルネットワーク の Ackwire AI もオンにしてください。",
         "outdated": "Wi-Fi でのペア設定には、2026 年 5 月のセキュリティ アップデートを適用した Android 14 以降が必要です。スマートフォンを更新するか、ケーブルを使ってください。",
         "adb_missing": "{{computer}}に Android platform-tools がありません。そこに Android Studio をインストールして、もう一度試してください。",
-        "update": "Wi-Fi でのペア設定には、{{computer}}の agentes.chat の更新が必要です。更新して、もう一度試してください。",
+        "update": "Wi-Fi でのペア設定には、{{computer}}の Ackwire AI の更新が必要です。更新して、もう一度試してください。",
         "canceled": "ペア設定が止まりました。もう一度試してください。",
         "failed": "ペア設定できませんでした。もう一度試すか、ケーブルを使ってください。"
       }
     },
     "iphone": {
       "title": "iPhoneを接続",
-      "lead": "iPhoneはMac経由で接続し、設定はMacのagentes.chatアプリが行います。",
+      "lead": "iPhoneはMac経由で接続し、設定はMacのAckwire AIアプリが行います。",
       "mac": "Mac",
       "noMac": "エージェントがiPhoneを使えるのはMac経由のみですが、接続済みのMacがまだありません。",
       "noMacNote": "Macがない場合は、チームメンバーにMacを接続してもらってください。",
@@ -13666,7 +13666,7 @@
       "claude": {
         "lead": "claude.ai、Claudeデスクトップ、スマートフォン: 1つのコネクタでどこでも使えます。",
         "step1": "claude.aiまたはClaudeデスクトップで「カスタマイズ › コネクタ」を開きます。",
-        "step2": "「+ 追加」、「カスタムコネクタを追加」の順にクリックし、名前をagentes.chatにしてアドレスを貼り付け、「続ける」をクリックします。",
+        "step2": "「+ 追加」、「カスタムコネクタを追加」の順にクリックし、名前をAckwire AIにしてアドレスを貼り付け、「続ける」をクリックします。",
         "step3": "「今すぐログイン」を選び、「追加」をクリックして、開いたページで承認します。",
         "phone": "コンピューターで追加すると、スマートフォンにも表示されます。",
         "team": "TeamプランとEnterpriseプランでは、Claude組織のオーナーが「組織設定 › コネクタ」でコネクタを追加します。その後、各自が「カスタマイズ › コネクタ」で「接続」をクリックします。",
@@ -13701,9 +13701,9 @@
         "open": "{{place}}を開きます。",
         "click": "「{{button}}」をクリックします。",
         "clickThen": "「{{button}}」をクリックし、次に「{{next}}」をクリックします。",
-        "name": "名前をagentes.chatにして、アドレスを貼り付けます。",
-        "nameDescribe": "名前をagentes.chatにして、説明を書きます。",
-        "nameConnect": "名前をagentes.chatにして、「{{button}}」をクリックします。",
+        "name": "名前をAckwire AIにして、アドレスを貼り付けます。",
+        "nameDescribe": "名前をAckwire AIにして、説明を書きます。",
+        "nameConnect": "名前をAckwire AIにして、「{{button}}」をクリックします。",
         "paste": "アドレスを貼り付けます。",
         "pasteIn": "「{{field}}」にアドレスを貼り付けます。",
         "choosePaste": "「{{option}}」を選んで、アドレスを貼り付けます。",
@@ -13722,7 +13722,7 @@
         "mode": "チャットで{{mode}}モードに切り替えます。",
         "loginRun": "ログインするには<code>{{command}}</code>を実行します。",
         "loginType": "ログインするには、アプリで<code>{{command}}</code>と入力します。",
-        "signIn": "開いたページでagentes.chatのアカウントにログインします。",
+        "signIn": "開いたページでAckwire AIのアカウントにログインします。",
         "signInFirst": "初回使用時にアプリからログインを求められます。",
         "token": "個人トークンを作成し、{{placeholder}}の部分に入れます。",
         "install": "{{app}}に追加"
@@ -13774,7 +13774,7 @@
       "canRead": "返信とエージェントの作業内容の閲覧。",
       "canManage": "あなたとしてエージェント、ルーティン、スキルを作成・編集します。作成されたものは通知されます。",
       "never": "できないこと",
-      "neverApprove": "エージェントの操作の承認。承認はagentes.chatで人が行います。",
+      "neverApprove": "エージェントの操作の承認。承認はAckwire AIで人が行います。",
       "neverSettings": "設定、メンバー、権限の変更。",
       "neverHidden": "あなたが見られないものの閲覧。",
       "loopbackWarning": "このコンピューター上のどのプログラムでもこのアクセスを受け取れます。Claude Codeなど、このコンピューターのアプリで今まさに開始した場合にのみ続けてください。",
@@ -13788,7 +13788,7 @@
       "done": "{{app}}に戻ってください。",
       "cancelledTitle": "接続をキャンセルしました",
       "cancelled": "何も共有されていません。",
-      "goHome": "agentes.chatへ",
+      "goHome": "Ackwire AIへ",
       "language": "言語",
       "error": {
         "app_desconhecido": "このアプリを認識できません",
@@ -14031,7 +14031,7 @@
       "voice": "音声",
       "apps": "AIアプリ",
       "approvals": "承認",
-      "about": "agentes.chat について",
+      "about": "Ackwire AI について",
       "generalPersonal": "あなたについて",
       "keysPersonal": "AIとアプリ",
       "membersPersonal": "メンバー"
@@ -14068,7 +14068,7 @@
       "rolesPersonal": "ここで各メンバーができること。オーナーはすべてできます。"
     },
     "about": {
-      "basedOn": "Codari Global, LLC の <site>agentes.chat</site> をもとにしています",
+      "basedOn": "Codari Global, LLC の <site>Ackwire AI</site> をもとにしています",
       "version": "バージョン",
       "license": "<license>GNU Affero General Public License v3</license> のもとで提供される自由ソフトウェアです。保証はありません。",
       "source": "ソースコード",
@@ -14169,10 +14169,10 @@
     },
     "telemetry": {
       "title": "利用統計",
-      "label": "匿名の利用統計をagentes.chatに送信する",
+      "label": "匿名の利用統計をAckwire AIに送信する",
       "help": "人数、エージェント数、マシンのサイズ、使用したAIトークン数、エージェントのブラウザが送受信したデータ量などの数値です。メッセージ、ファイル、名前、サイトは一切送信しません。",
       "envOff": "このサーバーの設定でオフになっています（TELEMETRY=off）。",
-      "envOffDesktop": "このサーバーのコンピューターにあるagentes.chatアプリでオフになっています（環境設定 › サーバー）。",
+      "envOffDesktop": "このサーバーのコンピューターにあるAckwire AIアプリでオフになっています（環境設定 › サーバー）。",
       "see": "送信内容を見る",
       "dialogTitle": "送信内容",
       "dialogText": "1日1回送信します。次回のレポートは以下のとおりです。"
@@ -14751,7 +14751,7 @@
         "comment": "{{who}}がGitHubでPR #{{number}}（{{repo}}）にコメントしました",
         "commentIssue": "{{who}}がGitHubでIssue #{{number}}（{{repo}}）にコメントしました",
         "commentDiscussion": "{{who}}がGitHubでディスカッション #{{number}}（{{repo}}）にコメントしました",
-        "opened": "{{who}}がGitHubの#{{number}}（{{repo}}）でagentes.chatアプリを呼びました",
+        "opened": "{{who}}がGitHubの#{{number}}（{{repo}}）でAckwire AIアプリを呼びました",
         "reviewed": "{{who}}がGitHubでPR #{{number}}（{{repo}}）をレビューしました",
         "approved": "{{who}}がGitHubでPR #{{number}}（{{repo}}）を承認しました",
         "changes": "{{who}}がGitHubでPR #{{number}}（{{repo}}）に変更を依頼しました",
@@ -15161,14 +15161,14 @@
       "no_ai_plan_not_shared": "ワークスペースのプランではお返事できません。持ち主にしか応えないためです。ご自身のプランを接続していただければお答えします。",
       "no_ai_plan_unattended": "返信しませんでした。この依頼は人からのものではなく、ワークスペースのプランは持ち主にしか応えません。",
       "no_ai_runner_outdated": "今は返信できません。私のプランのコンピューターのプログラムを更新する必要があります。",
-      "no_ai_plan_tools": "返信する前に止まりました。そのコンピューターの私のプランのAIがagentes.chatのツールだけにとどまりませんでした。",
+      "no_ai_plan_tools": "返信する前に止まりました。そのコンピューターの私のプランのAIがAckwire AIのツールだけにとどまりませんでした。",
       "no_ai_model_limit": "今は返信できません。{{model}}が私のプランでの独自の上限に達しました。",
       "no_ai_model_region": "返信できません。{{model}}にはOpenCodeでGlobalリージョンをオンにする必要があります（Settings › Privacy）。",
       "no_ai_model_off": "返信できません。OpenCodeが私のキーでの{{model}}を拒否しました。OpenCodeでモデルかアカウントをオンにするか、私のモデルを変えてください。",
       "no_ai_plan_inactive": "返信できません。私のキーのOpenCodeアカウントでOpenCode Goが有効になっていません。OpenCodeでGoのサブスクリプションを確認するか、Goがあるアカウントのキーを接続してください。",
       "no_ai_commands_off": "今は返信できません。私のプランのコンピューターでコマンドがオフになっています。",
       "no_ai_cli_missing": "まだ返信できません。私のAIのプログラムがコンピューターにインストールされていません。",
-      "no_ai_plan_hold": "メッセージを保存しました。 ワークスペースにagentes.chatのプランとAIの接続が揃ったら、ここで返信します。",
+      "no_ai_plan_hold": "メッセージを保存しました。 ワークスペースにAckwire AIのプランとAIの接続が揃ったら、ここで返信します。",
       "no_ai_no_computer": "まだ返信できません。私のAIにはコンピューターが必要ですが、ありません。",
       "redacted": "[削除済み: ログイン情報またはキーのように見えました]",
       "action_connect_ai": "AIを接続",
@@ -15640,7 +15640,7 @@
     "machine": {
       "ready": "準備完了",
       "off": "オフ",
-      "offHelp": "オンにできるのはコンピューターの前にいる人だけです。agentes.chatアプリの「環境設定 → ツール」で設定します。",
+      "offHelp": "オンにできるのはコンピューターの前にいる人だけです。Ackwire AIアプリの「環境設定 → ツール」で設定します。",
       "needsCommand": "コマンドが必要",
       "notReady": "まだ準備ができていません",
       "turnOff": "オフにする",
@@ -15887,7 +15887,7 @@
     "paused": "このワークスペースのエージェントは、確認のため一時停止されています。",
     "suspended": "このワークスペースは現在利用できません。",
     "createRefused": "現在ワークスペースを作成できません。",
-    "createUnpaid": "agentes.chatのプランを待っているワークスペースがすでにあります。別のワークスペースを作成する前に、そのプランを選んでください。",
+    "createUnpaid": "Ackwire AIのプランを待っているワークスペースがすでにあります。別のワークスペースを作成する前に、そのプランを選んでください。",
     "createUnpaidOpen": "{{name}}を開く",
     "createInactive": "まだ有効になっていないワークスペースがすでにあるため、現在は別のワークスペースを作成できません。",
     "agentPaused": "このエージェントは現在一時停止中です。",
@@ -15907,25 +15907,25 @@
       "active": "ワークスペースが再び使えるようになりました",
       "agentHold": "{{name}}は一時停止中です",
       "billing": {
-        "payment": "ワークスペースにagentes.chatのプランが必要です",
-        "unpaid": "agentes.chatのプランの支払いが完了しませんでした",
-        "ended": "ワークスペースのagentes.chatのプランが終了しました"
+        "payment": "ワークスペースにAckwire AIのプランが必要です",
+        "unpaid": "Ackwire AIのプランの支払いが完了しませんでした",
+        "ended": "ワークスペースのAckwire AIのプランが終了しました"
       }
     },
     "billing": {
-      "payment": "このワークスペースにはまだagentes.chatのプランがありません。プランに加入すると、エージェントが作業を始めます。",
-      "unpaid": "このワークスペースのagentes.chatのプランの支払いが完了せず、エージェントが停止しました。",
-      "ended": "このワークスペースのagentes.chatのプランが終了し、エージェントが停止しました。会話とファイルは引き続き閲覧・ダウンロードできます。",
-      "sub": "ここでの閲覧や書き込みは引き続きできます。agentes.chatのプランが整い次第、エージェントは戻ってきます。",
+      "payment": "このワークスペースにはまだAckwire AIのプランがありません。プランに加入すると、エージェントが作業を始めます。",
+      "unpaid": "このワークスペースのAckwire AIのプランの支払いが完了せず、エージェントが停止しました。",
+      "ended": "このワークスペースのAckwire AIのプランが終了し、エージェントが停止しました。会話とファイルは引き続き閲覧・ダウンロードできます。",
+      "sub": "ここでの閲覧や書き込みは引き続きできます。Ackwire AIのプランが整い次第、エージェントは戻ってきます。",
       "cta": {
-        "payment": "agentes.chatのプランを見る",
+        "payment": "Ackwire AIのプランを見る",
         "unpaid": "支払い情報を更新",
         "ended": "再度登録する"
       },
       "askAdmin": "このワークスペースの管理者が対応できます。",
-      "paid": "お支払いを受け付けました。まもなくagentes.chatのプランが始まります。",
-      "teamReady": "チームの準備ができました。開始にはagentes.chatのプランが必要です。",
-      "invites": "招待はagentes.chatのプランとともに使えるようになります。"
+      "paid": "お支払いを受け付けました。まもなくAckwire AIのプランが始まります。",
+      "teamReady": "チームの準備ができました。開始にはAckwire AIのプランが必要です。",
+      "invites": "招待はAckwire AIのプランとともに使えるようになります。"
     },
     "cloud": {
       "review": "安全確認のため、当社チームが確認するまで一時停止しています。自動チェックで、利用規約（第5条）に違反する可能性のあるアクティビティが検出されました。異議がある場合は{{email}}までご連絡ください。",
@@ -16044,7 +16044,7 @@
     "open": "プランと請求を開く",
     "opening": "開いています…",
     "failed": "今は開けませんでした。少し待ってからもう一度お試しください。",
-    "adminsOnly": "ワークスペースのagentes.chatプランを管理できるのは、オーナーと管理者だけです。",
+    "adminsOnly": "ワークスペースのAckwire AIプランを管理できるのは、オーナーと管理者だけです。",
     "seeOptions": "オプションを見る",
     "people": "人",
     "files": "ファイル",
@@ -16056,8 +16056,8 @@
   "limits": {
     "members": {
       "full": "このワークスペースには{{limit}}人中{{members}}人がいます。",
-      "fullOne": "このワークスペースのagentes.chatプランは1人用です。",
-      "fullAdmin": "さらに人を招待するには、agentes.chatプランのオプションをご覧ください。",
+      "fullOne": "このワークスペースのAckwire AIプランは1人用です。",
+      "fullAdmin": "さらに人を招待するには、Ackwire AIプランのオプションをご覧ください。",
       "fullMember": "ワークスペースの管理者に空きを作ってもらってください。",
       "fullAddSeat": "支払い済みの席はすべて埋まっています。「プランと請求」で席を追加してください。",
       "fullTop": "このプランではこれ以上メンバーを追加できません。「プランと請求」でプランを変更してください。",
@@ -16073,7 +16073,7 @@
       "meter": "{{limit}}中{{used}}を使用しています。",
       "near": "{{limit}}中{{used}}を使用しています。上限に達するとアップロードは一時停止しますが、何も削除されません。",
       "full": "{{limit}}に達したため、アップロードを一時停止しました。何も削除されていません。",
-      "fullAdmin": "agentes.chatプランを変更するか、使わなくなったファイルを削除するか、設定 › ストレージでご自身のバケットを接続してください。",
+      "fullAdmin": "Ackwire AIプランを変更するか、使わなくなったファイルを削除するか、設定 › ストレージでご自身のバケットを接続してください。",
       "dailyFull": "今日のアップロードが{{limit}}に達しました。数時間後にまたアップロードできます。"
     }
   },
@@ -16388,7 +16388,7 @@
       "turn": "横向きにする",
       "upright": "縦向きにする",
       "message": "{{name}}にメッセージ",
-      "chooseOnWeb": "agentes.chatの「設定 › デバイス」で選択してください。"
+      "chooseOnWeb": "Ackwire AIの「設定 › デバイス」で選択してください。"
     }
   },
   "taskManager": {
@@ -17198,7 +17198,7 @@
     },
     "action": {
       "signIn": "ログイン",
-      "open": "agentes.chat を開く",
+      "open": "Ackwire AI を開く",
       "latest": "最新のバージョンを開く",
       "file": "ファイルを開く",
       "retry": "もう一度試す"
@@ -17435,7 +17435,7 @@
     "beta": {
       "word": "BETA",
       "title": "早くから来てくれて、うれしいです。",
-      "text": "agentes.chatはベータ版です。もう実際の仕事に使えますが、まだ磨いている途中です。",
+      "text": "Ackwire AIはベータ版です。もう実際の仕事に使えますが、まだ磨いている途中です。",
       "weekly": {
         "title": "毎週よくなります",
         "text": "新しい機能や修正が次々に出ます。"
@@ -17471,7 +17471,7 @@
     "mark": "Beta",
     "open": "フィードバックを送る",
     "ask": "足りなかったこと、壊れたこと、気になったことは？",
-    "goesCloud": "書いた内容は、メールでagentes.chatのチームに届きます。",
+    "goesCloud": "書いた内容は、メールでAckwire AIのチームに届きます。",
     "goesServer": "書いた内容は、メールでこのサーバーの管理者に届きます。",
     "placeholder": "自由に書いてください",
     "report": "ここで問題を報告",
@@ -17493,14 +17493,14 @@
     "offer": {
       "group": "アプリについての報告",
       "ready": "<b>報告の準備ができました</b>: {{summary}}",
-      "goesCloud": "あなたの名前でagentes.chatのチームに届きます",
+      "goesCloud": "あなたの名前でAckwire AIのチームに届きます",
       "goesServer": "あなたの名前でこのサーバーの管理者に届きます",
       "see": "報告を見る",
       "hide": "報告を閉じる",
       "send": "送信",
       "notNow": "今はしない",
       "answer": "返信はあなたのメールに届きます。",
-      "sentCloud": "agentes.chatのチームに<b>報告を送信しました</b>",
+      "sentCloud": "Ackwire AIのチームに<b>報告を送信しました</b>",
       "sentServer": "このサーバーの管理者に<b>報告を送信しました</b>",
       "sentAuto": "<b>確認なしで報告を送信しました</b>: {{summary}}",
       "view": "見る",

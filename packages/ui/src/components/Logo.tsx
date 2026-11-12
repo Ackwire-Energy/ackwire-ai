@@ -1,85 +1,46 @@
-import { type CSSProperties, useId } from "react";
-import { bodyPath, eyeShapes } from "../agent/engine.js";
+import type { CSSProperties } from "react";
 import { cx } from "../cx";
-import { ditherUrl } from "../sky/dither";
 
-/** The domain in the expanded logo: a brand name, never translated. */
-const TLD = ".chat";
-
-/** The mark is the agent from the engine: body at (2, 2), side 28, and its eyes. */
-const BODY = bodyPath(2, 2, 28);
-const EYES = eyeShapes("round").map((e) => ({ x: 2 + e.x * 28, y: 2 + e.y * 28, w: e.w * 28, h: e.h * 28 }));
-
-/**
- * The agent mark: the square with the cut corner in the sky's dither (solid
- * `agent` under it, and alone in the mono logo) and the engine's white eyes.
- */
+/** Ackwire's original A monogram, from the Ackwire website brand assets. */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
-  const clip = `ac-logo-${useId().replace(/[^\w-]/g, "")}`;
   return (
     <svg
-      viewBox="0 0 32 32"
+      viewBox="244 0 218 164"
       className={cx("ac-logo__mark", className)}
       style={size ? { width: size, height: size } : undefined}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <defs>
-        <clipPath id={clip}>
-          <path d={BODY} />
-        </clipPath>
-      </defs>
-      <path className="ac-logo__body" d={BODY} />
-      <image
-        className="ac-logo__dither"
-        href={ditherUrl("sky", 12)}
-        x="2"
-        y="2"
-        width="28"
-        height="28"
-        preserveAspectRatio="none"
-        clipPath={`url(#${clip})`}
+      <path
+        className="ac-logo__body"
+        d="M461.02,117.93l-69.68-97.94c-4.59-6.45-10.46-11.49-17.44-14.98-6.55-3.27-13.91-5-21.28-5.01h-.03c-7.37,0-14.72,1.72-21.26,4.98-6.99,3.48-12.86,8.51-17.46,14.96l-69.8,97.85c-8.07,11.31-6.58,26.84,3.48,36.42l.15.15c11.16,10.62,28.82,10.18,39.44-.99l44.2-46.46c5.6-5.89,13.16-9.13,21.29-9.13s15.69,3.24,21.29,9.13l44.16,46.42c10.62,11.16,28.28,11.61,39.44.99h0c10.06-9.57,11.55-25.08,3.5-36.39ZM387.08,94.38c-9.07-9.53-21.31-14.78-34.46-14.78s-25.39,5.25-34.46,14.78l-50.81,53.42,62.36-77.74c5.61-6.99,13.96-11,22.92-11s17.31,4.01,22.92,11l62.36,77.74-50.82-53.42ZM389.72,58.68c-9.07-11.31-22.6-17.8-37.1-17.8s-28.03,6.49-37.1,17.8l-62.87,78.38,76.01-106.56c5.58-7.83,14.3-12.32,23.91-12.32h.02c9.62,0,18.34,4.51,23.92,12.35l73.56,103.39-60.35-75.24Z"
       />
-      <g className="ac-logo__eyes">
-        {EYES.map((e) => (
-          <rect key={e.x} x={e.x} y={e.y} width={e.w} height={e.h} rx={e.w / 2} />
-        ))}
-      </g>
     </svg>
   );
 }
 
 export interface LogoProps {
-  /** `main` (app) or `expanded` (+ ".chat" in dot matrix, where the domain matters). */
+  /** Retained for existing consumers; both variants show the full product name. */
   variant?: "main" | "expanded";
-  /** One-color version. */
   mono?: boolean;
-  /** Font size in px; the mark scales with it. Below 18px use `LogoMark` alone. */
   size?: number;
   className?: string;
   style?: CSSProperties;
 }
 
-/** "agentes" logo: mark + wordmark in Funnel Display light (".chat" in Doto). Accessible name "agentes" (or "agentes.chat" expanded). */
-export function Logo({ variant = "main", mono, size = 24, className, style }: LogoProps) {
-  const expanded = variant === "expanded";
+export function Logo({ mono, size = 24, className, style }: LogoProps) {
   return (
     <span
       className={cx("ac-logo", mono && "ac-logo--mono", className)}
       style={{ fontSize: size, ...style }}
       role="img"
-      aria-label={expanded ? "agentes.chat" : "agentes"}
+      aria-label="Ackwire AI"
     >
       <LogoMark />
-      {expanded ? (
-        <span className="ac-logo__word" aria-hidden="true">
-          <span>agentes</span>
-          <span className="ac-logo__chat">{TLD}</span>
-        </span>
-      ) : (
-        <span aria-hidden="true">agentes</span>
-      )}
+      <span className="ac-logo__word" aria-hidden="true">
+        Ackwire<span className="ac-logo__chat">AI</span>
+      </span>
     </span>
   );
 }

@@ -33,7 +33,7 @@ export interface ServerWorkspaces {
   agentsHere?: boolean;
 }
 
-/** agentes.chat, a server on this computer, one on the person's Tailscale network, or one elsewhere. */
+/** Ackwire AI, a server on this computer, one on the person's Tailscale network, or one elsewhere. */
 export type ServerKind = "cloud" | "here" | "tailnet" | "own";
 
 export function serverKind(server: string): ServerKind {
@@ -45,8 +45,8 @@ export function serverKind(server: string): ServerKind {
 /** An address as the app takes it: https, or plain http on this computer only. */
 export const appServer = (input: string) => normalizeServer(input, { allowHttp: "loopback" });
 
-/** How a server reads in the app: "agentes.chat" for the Cloud, its host otherwise. */
-export const serverName = (server: string) => (server === CLOUD_SERVER ? "agentes.chat" : serverHost(server));
+/** How a server reads in the app: "Ackwire AI" for the Cloud, its host otherwise. */
+export const serverName = (server: string) => (server === CLOUD_SERVER ? "Ackwire AI" : serverHost(server));
 
 /** The server a home is paired with, as an origin. */
 export const homeServer = (h: Home) => (h.status?.server ? appServer(h.status.server) : null);

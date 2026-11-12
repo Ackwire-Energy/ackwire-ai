@@ -35,3 +35,58 @@
   unicode-range:
     U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   ACKWIRE ENERGY — brand foundation (Brand Guidelines, 2026)
+   Colours, type and shared tokens used by every page.
+   See DESIGN-SPEC.md for usage rules.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Gilroy — the brand typeface ──────────────────────────────
+   Gilroy is a commercial font (MyFonts). Enable URL sources only after
+   the licensed web files are present in /public/fonts:
+     gilroy-light.woff2      (300 — long-form copy)
+     gilroy-semibold.woff2   (600 — sub-headings, buttons)
+     gilroy-extrabold.woff2  (800 — headings)
+   Until then, `local()` picks up an installed copy and the stack
+   falls back to Plus Jakarta Sans (open licence, self-hosted),
+   the closest free geometric match. */
+@font-face {
+  font-family: "Gilroy";
+  src: local("Gilroy-Light"), local("Gilroy Light");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gilroy";
+  src: local("Gilroy-SemiBold"), local("Gilroy SemiBold");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Gilroy";
+  src: local("Gilroy-ExtraBold"), local("Gilroy ExtraBold");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans-latin-ext.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}

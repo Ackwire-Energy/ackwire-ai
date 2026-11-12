@@ -28,7 +28,7 @@
     "server": {
       "line": "서버: {{host}} ·",
       "change": "변경",
-      "title": "내 agentes.chat은 어디에 있나요?",
+      "title": "내 Ackwire AI은 어디에 있나요?",
       "subtitle": "팀이 브라우저에서 여는 주소예요.",
       "label": "서버 주소",
       "placeholder": "agentes.yourteam.ts.net",
@@ -49,7 +49,7 @@
       "unreachable": "{{host}}에 연결할 수 없어요. 주소와 연결 상태를 확인하고 다시 시도해 주세요.",
       "unreachableTailscale": "{{host}}에 연결할 수 없어요. Tailscale에 있는 서버예요. Tailscale 앱을 열고 연결한 뒤 다시 시도하세요. 이미 연결돼 있나요? 서버 컴퓨터가 잠자기 상태이거나 앱이 닫혀 있을 수 있어요.",
       "certificate": "{{host}}의 인증서가 유효하지 않아요. 서버 관리자에게 문의해 주세요.",
-      "notAgentes": "{{host}}은(는) agentes.chat 서버가 아니에요. 주소를 확인해 주세요.",
+      "notAgentes": "{{host}}은(는) Ackwire AI 서버가 아니에요. 주소를 확인해 주세요.",
       "serverTooOld": "{{host}}을(를) 이 앱에서 쓰려면 서버 업데이트가 필요해요.",
       "appTooOld": "{{host}}을(를) 쓰려면 agentes 앱을 업데이트해 주세요.",
       "down": {
@@ -68,14 +68,14 @@
       "confirm": "연결",
       "notNow": "나중에",
       "checking": "서버를 확인하는 중…",
-      "notALink": "agentes.chat 서버의 링크가 아니에요.",
+      "notALink": "Ackwire AI 서버의 링크가 아니에요.",
       "tokenFailed": "코드가 만료되었거나 이미 사용되었어요. 이메일로 로그인하거나 컴퓨터에서 새 코드를 띄워 주세요.",
       "signInSlow": "로그인이 평소보다 오래 걸리고 있어요. 이메일로 로그인하거나 컴퓨터에서 새 코드를 띄워 주세요."
     },
     "scan": {
       "hint": "컴퓨터에 있는 QR 코드를 비춰 주세요",
       "typeAddress": "주소 입력",
-      "notOurs": "agentes.chat 서버의 QR 코드가 아니에요.",
+      "notOurs": "Ackwire AI 서버의 QR 코드가 아니에요.",
       "cameraTitle": "카메라 사용",
       "cameraText": "QR 코드를 읽을 때만 사용해요.",
       "allow": "카메라 허용",

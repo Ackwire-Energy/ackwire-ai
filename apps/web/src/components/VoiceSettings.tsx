@@ -64,7 +64,7 @@ export function VoiceSettingsSection() {
 }
 
 /**
- * The card of Configurações › Voz (ADR 0100): the workspace's switch, and on a server that isn't agentes.chat's own, for
+ * The card of Configurações › Voz (ADR 0100): the workspace's switch, and on a server that isn't Ackwire AI's own, for
  * its owner, who turns voice into text (the API answers null to everyone else). A key is tried with the provider
  * before it is kept, sealed on the server and never shown again.
  */

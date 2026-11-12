@@ -816,8 +816,8 @@ describe("Logo, Icon, Meter", () => {
         <Logo variant="expanded" />
       </>,
     );
-    expect(body().getByRole("img", { name: "agentes" })).toBeTruthy();
-    expect(body().getByRole("img", { name: "agentes.chat" }).textContent).toBe("agentes.chat");
+    expect(body().getAllByRole("img", { name: "Ackwire AI" })).toHaveLength(2);
+    expect(body().getAllByRole("img", { name: "Ackwire AI" })[1]?.textContent).toBe("AckwireAI");
     expect(container.querySelector(".ac-logo__body")).not.toBeNull();
   });
 

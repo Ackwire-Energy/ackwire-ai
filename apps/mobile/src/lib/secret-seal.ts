@@ -13,7 +13,7 @@ import { sha256 } from "@noble/hashes/sha2.js";
  * app's is `expo-crypto`, ./secret-box.ts). Pure, so `test/secret-seal.test.ts` opens what it seals with the
  * computer's own code.
  */
-const INFO = new TextEncoder().encode("agentes.chat secret v1");
+const INFO = new TextEncoder().encode("Ackwire AI secret v1");
 
 const b64 = (bytes: Uint8Array) => {
   let s = "";

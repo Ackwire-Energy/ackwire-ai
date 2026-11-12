@@ -28,7 +28,7 @@
     "server": {
       "line": "サーバー: {{host}} ·",
       "change": "変更",
-      "title": "あなたのagentes.chatはどこにありますか？",
+      "title": "あなたのAckwire AIはどこにありますか？",
       "subtitle": "チームがブラウザで開いているアドレスです。",
       "label": "サーバーのアドレス",
       "placeholder": "agentes.yourteam.ts.net",
@@ -49,7 +49,7 @@
       "unreachable": "{{host}}に接続できません。アドレスと接続を確認して、もう一度お試しください。",
       "unreachableTailscale": "{{host}}に接続できません。Tailscale上のサーバーです。Tailscaleアプリを開いて接続し、もう一度お試しください。すでに接続済みの場合は、サーバーのコンピュータがスリープ中か、アプリが閉じている可能性があります。",
       "certificate": "{{host}}の証明書が無効です。サーバーの管理者に相談してください。",
-      "notAgentes": "{{host}}はagentes.chatのサーバーではありません。アドレスを確認してください。",
+      "notAgentes": "{{host}}はAckwire AIのサーバーではありません。アドレスを確認してください。",
       "serverTooOld": "このアプリで使うには、{{host}}の更新が必要です。",
       "appTooOld": "{{host}}を使うには、agentesアプリを更新してください。",
       "down": {
@@ -68,14 +68,14 @@
       "confirm": "接続",
       "notNow": "あとで",
       "checking": "サーバーを確認中…",
-      "notALink": "このリンクはagentes.chatのサーバーのものではありません。",
+      "notALink": "このリンクはAckwire AIのサーバーのものではありません。",
       "tokenFailed": "コードの有効期限が切れたか、すでに使われています。メールアドレスでログインするか、コンピューターで新しいコードを表示してください。",
       "signInSlow": "ログインに時間がかかっています。メールアドレスでログインするか、コンピューターで新しいコードを表示してください。"
     },
     "scan": {
       "hint": "コンピューターに表示されたQRコードにかざしてください",
       "typeAddress": "アドレスを入力",
-      "notOurs": "このQRコードはagentes.chatのサーバーのものではありません。",
+      "notOurs": "このQRコードはAckwire AIのサーバーのものではありません。",
       "cameraTitle": "カメラを使う",
       "cameraText": "QRコードの読み取りにだけ使います。",
       "allow": "カメラを許可",

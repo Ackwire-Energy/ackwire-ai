@@ -272,7 +272,7 @@ export function notificationHref(
   // A device's notice (someone's agent on it, asking for it, waiting for it, a computer asking to join): the device.
   const device = deviceNoticeOf(n);
   if (device) return deviceHref(device);
-  // An agent held on agentes.chat Cloud: its page, where the hold shows. The workspace's own hold: the web's.
+  // An agent held on Ackwire AI Cloud: its page, where the hold shows. The workspace's own hold: the web's.
   if (n.kind === "org_standing") return isSafeId(s.agentId) ? `/agent/${s.agentId}` : null;
   // The month's Composio calls are counted in Uso.
   if (n.kind === "composio_limit") return "/usage";

@@ -28,7 +28,7 @@
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Cambia",
-      "title": "Dov'è il tuo agentes.chat?",
+      "title": "Dov'è il tuo Ackwire AI?",
       "subtitle": "L'indirizzo che il tuo team apre nel browser.",
       "label": "Indirizzo del server",
       "placeholder": "agentes.iltuoteam.ts.net",

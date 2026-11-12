@@ -463,7 +463,7 @@ export function AuthPage({
         ) : (
           <Trans
             i18nKey="auth.server.into"
-            values={{ server: here === CLOUD_SERVER ? "agentes.chat" : serverHost(here) }}
+            values={{ server: here === CLOUD_SERVER ? "Ackwire AI" : serverHost(here) }}
             components={{ b: <b /> }}
           />
         )}
@@ -529,7 +529,7 @@ export function AuthPage({
         {serverLine}
         <header className="auth__ask" ref={header} data-burst>
           <AgentAvatar
-            name="agentes.chat"
+            name="Ackwire AI"
             size="lg"
             state={pending || step === "browser" ? "writing" : undefined}
             expression={expression}

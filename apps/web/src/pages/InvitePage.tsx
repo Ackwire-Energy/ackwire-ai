@@ -168,7 +168,7 @@ function InviteScreen({
 /** The host: the workspace's first agent, as it looks there; the product's own face when it has none. */
 function Host({ agent, expression, busy }: { agent?: Agentish | null; expression?: Expression; busy?: boolean }) {
   const state = busy ? "writing" : undefined;
-  if (!agent) return <AgentAvatar name="agentes.chat" size="lg" expression={expression} state={state} />;
+  if (!agent) return <AgentAvatar name="Ackwire AI" size="lg" expression={expression} state={state} />;
   return <AgentAvatar name={agent.name} appearance={lookOf(agent)} size="lg" expression={expression} state={state} />;
 }
 

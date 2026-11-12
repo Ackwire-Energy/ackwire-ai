@@ -7,10 +7,10 @@ import { desktopRevealsFiles, inDesktopApp, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
- * This computer, in the agentes.chat desktop app (ADR 0036, ADR 0066): the site knows which of its
+ * This computer, in the Ackwire AI desktop app (ADR 0036, ADR 0066): the site knows which of its
  * organizations the computer it runs on works for, pairs it in one click (the app asks the person in its
  * own dialog, then hands the runner's code to the site, which confirms it with the person's session; no code
- * to read) and opens the app's Preferences where access is granted. agentes.chat included (ADR 0165). Outside the
+ * to read) and opens the app's Preferences where access is granted. Ackwire AI included (ADR 0165). Outside the
  * app, and where this computer is set up with a server of its own (a loopback address, the server the app runs
  * here), nothing.
  */
@@ -37,7 +37,7 @@ export function useIsThisMac(orgId: string, machineId: string) {
 }
 
 /**
- * Whether agents may work on this computer for this server, agentes.chat included; false until the app says so
+ * Whether agents may work on this computer for this server, Ackwire AI included; false until the app says so
  * (apps from before it said nothing, and allowed it everywhere).
  */
 export function useAgentsHere(): boolean {

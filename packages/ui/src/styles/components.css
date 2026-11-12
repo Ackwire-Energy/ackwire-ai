@@ -2039,64 +2039,41 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   white-space: nowrap;
 }
 
-/* Logo: the agent mark + the wordmark set in Onest */
+/* Ackwire wordmark and original monogram. */
 .ac-logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.16em;
-  /* Funnel Display light (the landing's headings); the app falls back to its sans. */
-  font-family: var(--font-brand, var(--font-display, var(--font-sans)));
-  font-weight: 300;
-  letter-spacing: -0.02em;
+  gap: 0.35em;
+  font-family: var(--font-brand, var(--font-sans));
+  font-weight: 800;
+  letter-spacing: -0.035em;
   color: var(--ink);
   line-height: 1;
   font-size: 24px;
+  white-space: nowrap;
 }
 .ac-logo__mark {
-  width: 1.25em;
-  height: 1.25em;
+  width: 1.3em;
+  height: 1.1em;
   flex: none;
 }
 .ac-logo__body {
   fill: var(--agent);
 }
-/* Eyes are white on every agent, in both themes. */
-.ac-logo__eyes {
-  fill: #ffffff;
-}
-.ac-logo__tld {
-  color: var(--ink-muted);
-  font-weight: 600;
-}
-.ac-logo__dither {
-  image-rendering: pixelated;
-}
 .ac-logo--mono .ac-logo__body {
   fill: currentColor;
-}
-.ac-logo--mono .ac-logo__dither {
-  display: none;
-}
-.ac-logo--mono .ac-logo__eyes {
-  fill: var(--surface);
 }
 .ac-logo__word {
   display: inline-flex;
   align-items: baseline;
+  gap: 0.22em;
 }
-/* ".chat" in dot matrix (Doto, rounded dots), smaller and quieter than the name. */
 .ac-logo__chat {
-  font-family: var(--font-dot, var(--font-mono));
-  font-variation-settings: "ROND" 100;
-  font-size: 0.62em;
+  font-family: inherit;
+  font-size: 0.7em;
   font-weight: 600;
-  letter-spacing: 0;
-  margin-left: 0.08em;
+  letter-spacing: 0.02em;
   color: var(--ink-muted);
-}
-.ac-logo--mono .ac-logo__chat {
-  background: var(--ink);
-  color: var(--surface);
 }
 
 /* Select: our own trigger + listbox, never the native <select> */

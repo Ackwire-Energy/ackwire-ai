@@ -168,7 +168,7 @@
     "value": "switching tabs"
   },
   "tray.label": {
-    "value": "agentes.chat"
+    "value": "Ackwire AI"
   },
   "tray.now": {
     "value": "Now"
@@ -228,13 +228,13 @@
     "value": "Resume the agents"
   },
   "tray.open": {
-    "value": "Open agentes.chat"
+    "value": "Open Ackwire AI"
   },
   "tray.prefs": {
     "value": "Preferences…"
   },
   "tray.quit": {
-    "value": "Quit agentes.chat"
+    "value": "Quit Ackwire AI"
   },
   "tray.pausedFor1h": {
     "value": "Paused for 1 hour"
@@ -342,13 +342,13 @@
     "value": "{{agent}} wants to use the folder {{folder}}"
   },
   "tray.quitTitle": {
-    "value": "Quit agentes.chat?"
+    "value": "Quit Ackwire AI?"
   },
   "tray.quitBody": {
     "value": "Agents can't use this {{device}} while the app is closed. What is already running finishes and sends the result when you open it again."
   },
   "tray.quitHereBody": {
-    "value": "agentes.chat stops on this {{device}}: nobody can use it, here, on your phone or your teammates', until you open the app again."
+    "value": "Ackwire AI stops on this {{device}}: nobody can use it, here, on your phone or your teammates', until you open the app again."
   },
   "tray.quitConfirm": {
     "value": "Quit"
@@ -360,7 +360,7 @@
     "value": "Chat, tasks and documents where people and AI agents work side by side."
   },
   "first.cloud": {
-    "value": "Sign in to agentes.chat"
+    "value": "Sign in to Ackwire AI"
   },
   "first.create": {
     "value": "New here?"
@@ -378,7 +378,7 @@
     "value": "The ones you have stay here, each with its own sign-in."
   },
   "first.addCloud": {
-    "value": "Create a workspace on agentes.chat"
+    "value": "Create a workspace on Ackwire AI"
   },
   "first.addNew": {
     "value": "Want a new workspace?"
@@ -393,10 +393,10 @@
     "value": "Your own server"
   },
   "own.lead": {
-    "value": "agentes.chat runs on your computers, and your data stays on them."
+    "value": "Ackwire AI runs on your computers, and your data stays on them."
   },
   "own.back": {
-    "value": "agentes.chat"
+    "value": "Ackwire AI"
   },
   "own.connect": {
     "value": "Connect to my server"
@@ -405,7 +405,7 @@
     "value": "It runs on another computer: a Mac mini, a spare laptop or a server online."
   },
   "own.here": {
-    "value": "Run agentes.chat on this {{device}}"
+    "value": "Run Ackwire AI on this {{device}}"
   },
   "own.hereText": {
     "value": "This {{device}} becomes the server, while it's on."
@@ -441,7 +441,7 @@
     "value": "On your Tailscale network"
   },
   "connect.foundHere": {
-    "value": "agentes.chat is running here"
+    "value": "Ackwire AI is running here"
   },
   "connect.foundNoOwner": {
     "value": "Waiting for its owner account"
@@ -489,13 +489,13 @@
     "value": "We can't reach {{host}}, which is on your Tailscale network. Open Tailscale on this {{device}}, connect and try again."
   },
   "connect.unreachableHere": {
-    "value": "Nothing answers at {{host}} on this {{device}}. Start agentes.chat here, then try again."
+    "value": "Nothing answers at {{host}} on this {{device}}. Start Ackwire AI here, then try again."
   },
   "connect.certificate": {
     "value": "The certificate of {{host}} isn't valid. Talk to whoever runs the server."
   },
   "connect.notAgentes": {
-    "value": "{{host}} isn't an agentes.chat server. Check the address."
+    "value": "{{host}} isn't an Ackwire AI server. Check the address."
   },
   "connect.serverTooOld": {
     "value": "{{host}} needs an update to work with this app."
@@ -504,7 +504,7 @@
     "value": "Update the app to use {{host}}."
   },
   "here.title": {
-    "value": "Run agentes.chat on this {{device}}"
+    "value": "Run Ackwire AI on this {{device}}"
   },
   "here.how": {
     "value": "It runs inside this app, with its own database built in, and keeps everything in one folder on this {{device}}."
@@ -552,7 +552,7 @@
     "value": "Tailscale asks for HTTPS to be turned on in your network. Turn it on in its page: the rest goes on by itself."
   },
   "here.reachStage.restarting": {
-    "value": "Restarting agentes.chat at its new address…"
+    "value": "Restarting Ackwire AI at its new address…"
   },
   "here.reachStage.signingIn": {
     "value": "Signing in again at the new address…"
@@ -570,16 +570,16 @@
     "value": "Get Tailscale"
   },
   "here.usage": {
-    "value": "Send anonymous usage statistics to agentes.chat"
+    "value": "Send anonymous usage statistics to Ackwire AI"
   },
   "here.usageText": {
     "value": "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites."
   },
   "here.start": {
-    "value": "Start agentes.chat"
+    "value": "Start Ackwire AI"
   },
   "here.setting": {
-    "value": "Setting up agentes.chat on this {{device}}"
+    "value": "Setting up Ackwire AI on this {{device}}"
   },
   "here.step.database": {
     "value": "Preparing the database"
@@ -612,7 +612,7 @@
     "value": "needs your attention"
   },
   "here.fail.start": {
-    "value": "agentes.chat didn't start on this {{device}}."
+    "value": "Ackwire AI didn't start on this {{device}}."
   },
   "here.fail.database": {
     "value": "The database wasn't prepared."
@@ -636,13 +636,13 @@
     "value": "you stopped waiting for HTTPS to be turned on"
   },
   "here.reason.start": {
-    "value": "agentes.chat didn't answer again at its new address"
+    "value": "Ackwire AI didn't answer again at its new address"
   },
   "here.reason.notConnected": {
     "value": "Tailscale isn't connected on this {{device}}"
   },
   "here.reason.back": {
-    "value": "agentes.chat didn't answer again on this {{device}} after access from your devices was turned off."
+    "value": "Ackwire AI didn't answer again on this {{device}} after access from your devices was turned off."
   },
   "here.serveFix": {
     "value": "Install Tailscale from tailscale.com."
@@ -663,13 +663,13 @@
     "value": "Taking a little longer than expected"
   },
   "here.notifyFailed": {
-    "value": "Setting up agentes.chat on this {{device}} didn't finish"
+    "value": "Setting up Ackwire AI on this {{device}} didn't finish"
   },
   "here.notifyFailedBody": {
-    "value": "Open agentes.chat to see what happened."
+    "value": "Open Ackwire AI to see what happened."
   },
   "here.already": {
-    "value": "agentes.chat is already installed on this {{device}}"
+    "value": "Ackwire AI is already installed on this {{device}}"
   },
   "here.alreadyText": {
     "value": "It runs on its own, installed from the terminal. Use it in this app."
@@ -681,13 +681,13 @@
     "value": "Use it"
   },
   "here.notRunning": {
-    "value": "agentes.chat is installed on this {{device}}, but it isn't running"
+    "value": "Ackwire AI is installed on this {{device}}, but it isn't running"
   },
   "here.notRunningText": {
     "value": "It was installed from the terminal, in {{path}}. To start it, run this in the terminal, then try again:"
   },
   "here.running": {
-    "value": "agentes.chat already runs on this {{device}}"
+    "value": "Ackwire AI already runs on this {{device}}"
   },
   "here.runningText": {
     "value": "This app runs it. Open it to sign in."
@@ -717,7 +717,7 @@
     "value": "Checking the server…"
   },
   "link.notALink": {
-    "value": "This link isn't from an agentes.chat server."
+    "value": "This link isn't from an Ackwire AI server."
   },
   "link.chipTailnet": {
     "value": "Tailscale"
@@ -726,7 +726,7 @@
     "value": "This {{device}}"
   },
   "link.thisServer": {
-    "value": "agentes.chat on this {{device}}"
+    "value": "Ackwire AI on this {{device}}"
   },
   "link.tailnetHelp": {
     "value": "It's on a Tailscale network: it only opens on devices connected to Tailscale with the same account."
@@ -738,7 +738,7 @@
     "value": "Where this app opens agentes.chat."
   },
   "servers.cloud": {
-    "value": "agentes.chat"
+    "value": "Ackwire AI"
   },
   "servers.cloudSub": {
     "value": "Cloud"
@@ -819,7 +819,7 @@
     "value": "{{n}} new notifications"
   },
   "server.title": {
-    "value": "agentes.chat on this {{device}}"
+    "value": "Ackwire AI on this {{device}}"
   },
   "server.running": {
     "value": "Running"
@@ -864,7 +864,7 @@
     "value": "Show QR code"
   },
   "server.usageRestart": {
-    "value": "Changing it restarts agentes.chat for a moment."
+    "value": "Changing it restarts Ackwire AI for a moment."
   },
   "server.jev": {
     "value": "Jev"
@@ -873,7 +873,7 @@
     "value": "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key."
   },
   "server.jevWhere": {
-    "value": "In agentes.chat › Settings › AI and usage."
+    "value": "In Ackwire AI › Settings › AI and usage."
   },
   "server.reachFailed": {
     "value": "Access from your devices didn't turn on: {{reason}}."
@@ -903,7 +903,7 @@
     "value": "Stop running it here…"
   },
   "server.stopHereTitle": {
-    "value": "Stop agentes.chat on this {{device}}?"
+    "value": "Stop Ackwire AI on this {{device}}?"
   },
   "server.stopHereBody": {
     "value": "It stops now and no longer starts with the app. Its data stays in {{path}}."
@@ -927,7 +927,7 @@
     "value": "Stopping cuts everyone off, the phone included."
   },
   "server.stopTitle": {
-    "value": "Stop agentes.chat on this {{device}}?"
+    "value": "Stop Ackwire AI on this {{device}}?"
   },
   "server.stopBody": {
     "value": "The phone and the team lose access until it's back."
@@ -939,7 +939,7 @@
     "value": "Stopped until you start it"
   },
   "server.reachRestart": {
-    "value": "Turning it on or off restarts agentes.chat for a moment."
+    "value": "Turning it on or off restarts Ackwire AI for a moment."
   },
   "server.reachOffTitle": {
     "value": "Turn off access from your devices?"
@@ -969,19 +969,19 @@
     "value": "Start it here"
   },
   "server.stoppedBanner": {
-    "value": "agentes.chat stopped on this {{device}}"
+    "value": "Ackwire AI stopped on this {{device}}"
   },
   "server.stoppedBody": {
     "value": "Nobody can use it until it starts again."
   },
   "server.failingBanner": {
-    "value": "agentes.chat isn't starting on this {{device}}"
+    "value": "Ackwire AI isn't starting on this {{device}}"
   },
   "server.failingBody": {
     "value": "Open the app to see what happened and try again."
   },
   "server.restartedBanner": {
-    "value": "agentes.chat restarted 3 times on this {{device}}"
+    "value": "Ackwire AI restarted 3 times on this {{device}}"
   },
   "server.restartedBody": {
     "value": "It comes back by itself. If it keeps happening, open the app to see why."
@@ -990,10 +990,10 @@
     "value": "Version {{version}}, updated with the app"
   },
   "server.updatesWithApp": {
-    "value": "Updating the app updates agentes.chat on this {{device}} too."
+    "value": "Updating the app updates Ackwire AI on this {{device}} too."
   },
   "server.updateBack": {
-    "value": "The update didn't start. agentes.chat is back on {{version}}."
+    "value": "The update didn't start. Ackwire AI is back on {{version}}."
   },
   "server.updateBackBody": {
     "value": "The new version is tried again with the app's next update."
@@ -1014,7 +1014,7 @@
     "value": "Let {{org}}'s agents use this {{device}}?"
   },
   "pair.keepReady": {
-    "value": "Keep it ready: open agentes.chat at login"
+    "value": "Keep it ready: open Ackwire AI at login"
   },
   "pair.canDo": {
     "value": "What agents can do here"
@@ -1077,7 +1077,7 @@
     "value": "Lets agents open your files without macOS asking for each folder."
   },
   "prepare.diskHow": {
-    "value": "In Settings, turn on agentes.chat in the list, or add it with +."
+    "value": "In Settings, turn on Ackwire AI in the list, or add it with +."
   },
   "prepare.network": {
     "value": "Local network (phones over Wi-Fi)"
@@ -1101,10 +1101,10 @@
     "value": "Open Settings"
   },
   "prepare.reopen": {
-    "value": "When macOS asks to Quit & Reopen, choose it. agentes.chat opens again right here."
+    "value": "When macOS asks to Quit & Reopen, choose it. Ackwire AI opens again right here."
   },
   "prepare.tookEffect": {
-    "value": "agentes.chat opened again with your changes."
+    "value": "Ackwire AI opened again with your changes."
   },
   "prepare.skip": {
     "value": "Skip for now"
@@ -1149,7 +1149,7 @@
     "value": "Commands can reach the rest of this {{device}}, other workspaces' folders included."
   },
   "tools.commandsWarnHere": {
-    "value": "Commands run as you and can reach the rest of this {{device}}, agentes.chat's own data included."
+    "value": "Commands run as you and can reach the rest of this {{device}}, Ackwire AI's own data included."
   },
   "tools.commandsSome": {
     "value": "On only for {{orgs}}. Turn it on for every workspace here."
@@ -1191,7 +1191,7 @@
     "value": "Open"
   },
   "notch.openApp": {
-    "value": "Open agentes.chat"
+    "value": "Open Ackwire AI"
   },
   "notch.someAgent": {
     "value": "An agent"
@@ -1278,7 +1278,7 @@
     "value": "Agents only use this {{device}} while the app is open."
   },
   "prefs.general.launchHere": {
-    "value": "agentes.chat on this {{device}} runs only while the app is open."
+    "value": "Ackwire AI on this {{device}} runs only while the app is open."
   },
   "prefs.general.notifySiteTitle": {
     "value": "Let me know about messages and requests"
@@ -1608,13 +1608,13 @@
     "value": "Update by hand"
   },
   "prefs.updates.step1": {
-    "value": "Quit agentes.chat (⌘Q)."
+    "value": "Quit Ackwire AI (⌘Q)."
   },
   "prefs.updates.step2": {
-    "value": "Delete the old agentes.chat from the Applications folder."
+    "value": "Delete the old Ackwire AI from the Applications folder."
   },
   "prefs.updates.step3": {
-    "value": "Open the downloaded file and drag the new agentes.chat into Applications."
+    "value": "Open the downloaded file and drag the new Ackwire AI into Applications."
   },
   "prefs.updates.installerNote": {
     "value": "Open the downloaded file: it installs the new version over the old one."
@@ -1827,7 +1827,7 @@
     "value": "Looking at this {{device}}…"
   },
   "iphone.checkingStall": {
-    "value": "This {{device}} isn't answering yet. Quit agentes.chat from its menu bar icon and open it again."
+    "value": "This {{device}} isn't answering yet. Quit Ackwire AI from its menu bar icon and open it again."
   },
   "iphone.xcodeText": {
     "value": "Install Xcode from the App Store. This step goes on by itself when it's there."
@@ -1896,16 +1896,16 @@
     "value": "Is Tailscale connected on this {{device}}?"
   },
   "cover.starting": {
-    "value": "Starting agentes.chat on this {{device}}…"
+    "value": "Starting Ackwire AI on this {{device}}…"
   },
   "cover.migrating": {
-    "value": "Updating agentes.chat on this {{device}}. This can take a minute."
+    "value": "Updating Ackwire AI on this {{device}}. This can take a minute."
   },
   "cover.stopped": {
-    "value": "agentes.chat stopped on this {{device}}"
+    "value": "Ackwire AI stopped on this {{device}}"
   },
   "cover.failing": {
-    "value": "agentes.chat isn't starting on this {{device}}"
+    "value": "Ackwire AI isn't starting on this {{device}}"
   },
   "cover.tailnetOff": {
     "value": "Connect Tailscale on this {{device}} to open agentes.chat."
@@ -1938,7 +1938,7 @@
     "value": "Use another server"
   },
   "cover.stuck": {
-    "value": "agentes.chat didn't open. Try again, or see the page as it is."
+    "value": "Ackwire AI didn't open. Try again, or see the page as it is."
   },
   "cover.showAnyway": {
     "value": "Show it anyway"
@@ -1947,10 +1947,10 @@
     "value": "Couldn't copy"
   },
   "cover.held": {
-    "value": "agentes.chat is stopped on this {{device}} until you start it."
+    "value": "Ackwire AI is stopped on this {{device}} until you start it."
   },
   "cover.heldUntil": {
-    "value": "agentes.chat is stopped on this {{device}}. It comes back by itself at {{time}}."
+    "value": "Ackwire AI is stopped on this {{device}}. It comes back by itself at {{time}}."
   },
   "cover.startNow": {
     "value": "Start now"
@@ -1965,7 +1965,7 @@
     "value": "Couldn't turn off access from your devices."
   },
   "menu.about": {
-    "value": "About agentes.chat"
+    "value": "About Ackwire AI"
   },
   "menu.updates": {
     "value": "Check for updates…"
@@ -1980,7 +1980,7 @@
     "value": "Services"
   },
   "menu.hide": {
-    "value": "Hide agentes.chat"
+    "value": "Hide Ackwire AI"
   },
   "menu.hideOthers": {
     "value": "Hide others"
@@ -1989,7 +1989,7 @@
     "value": "Show all"
   },
   "menu.quit": {
-    "value": "Quit agentes.chat"
+    "value": "Quit Ackwire AI"
   },
   "menu.servers": {
     "value": "Servers"

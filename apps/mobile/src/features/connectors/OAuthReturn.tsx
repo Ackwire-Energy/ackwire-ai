@@ -24,7 +24,7 @@ import { returnHref } from "./review";
  * A connector's sign-in that came back to the app through its link (Android opens the app with it; iOS hands
  * it to the open sheet). When the sheet that started it is still finishing, this screen just steps aside;
  * otherwise (the app was closed meanwhile) it finishes here and lands on Conectores, on a new account's tools
- * (a new sign-in for an account, or the same account again, lands on that account's screen). The agentes.chat
+ * (a new sign-in for an account, or the same account again, lands on that account's screen). The Ackwire AI
  * GitHub app's install comes back with its `installation_id` and lands on Conectores.
  */
 export function ConnectorOAuthReturn() {

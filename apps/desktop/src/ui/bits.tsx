@@ -71,7 +71,7 @@ export function CommandCopy({ command, inline = false }: { command: string; inli
 }
 
 /**
- * A help page on agentes.chat, in the app's language, as a help line's link: the browser opens it with only the
+ * A help page on Ackwire AI, in the app's language, as a help line's link: the browser opens it with only the
  * page, the language and the section, so the site never learns which server this app opens.
  */
 export function HelpLink({ slug, section, children }: { slug: HelpSlug; section?: string; children: ReactNode }) {

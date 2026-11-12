@@ -29,7 +29,7 @@ import { errorHaptic, successHaptic } from "../shared/parts";
 import { APP_RETURN_URL, authAnswerOf, doneFinishing, markFinishing, stateOf } from "./logic";
 
 /**
- * Installing the agentes.chat GitHub app from the phone (ADR 0156): GitHub's page in the browser, back to the app with
+ * Installing the Ackwire AI GitHub app from the phone (ADR 0156): GitHub's page in the browser, back to the app with
  * what GitHub sent, finished with the app's own session. `run` says whether it installed, and why not when that was a
  * failure (`error` null: the page was closed, or the account's owner was asked to install, which a toast says).
  */

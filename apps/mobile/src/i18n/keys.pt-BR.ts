@@ -40,7 +40,7 @@ export const mobilePtBR = {
       line: "Servidor: {{host}} ·",
       change: "Trocar",
       /** The question is the title; the keyboard's return key ("ir") is the action. */
-      title: "Onde fica o seu agentes.chat?",
+      title: "Onde fica o seu Ackwire AI?",
       subtitle: "O endereço que o time abre no navegador.",
       label: "Endereço do servidor",
       placeholder: "agentes.suaequipe.ts.net",
@@ -53,7 +53,7 @@ export const mobilePtBR = {
       footChoose: "Servidor e idioma",
       footServer: "Outro servidor",
       footLanguage: "Idioma",
-      /** A linha quieta do login, no agentes.chat: abre a câmera para o QR code do computador da equipe. */
+      /** A linha quieta do login, no Ackwire AI: abre a câmera para o QR code do computador da equipe. */
       footTeam: "Usa o servidor da sua equipe?",
       footTeamAction: "Entrar por ele",
       /** Num servidor da equipe: onde este login vai, e o jeito de trocar. */

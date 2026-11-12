@@ -9,7 +9,7 @@ import { useDocumentTitle } from "@/lib/desktop";
 import "./legal.css";
 
 /**
- * agentes.chat Cloud's Terms of Use and Privacy Policy (`/terms`, `/privacy` on the Cloud): public pages, the same
+ * Ackwire AI Cloud's Terms of Use and Privacy Policy (`/terms`, `/privacy` on the Cloud): public pages, the same
  * text as the landing page's (`@agenteschat/i18n/legal`). They open in English wherever the reader is, and the
  * switch shows Portuguese here only.
  */
@@ -21,7 +21,7 @@ export function LegalPage({ kind }: { kind: LegalKind }) {
   const updated = new Intl.DateTimeFormat(lang, { dateStyle: "long", timeZone: "UTC" }).format(
     new Date(`${doc.updated}T00:00:00Z`),
   );
-  useDocumentTitle(`${doc.title} · agentes.chat`);
+  useDocumentTitle(`${doc.title} · Ackwire AI`);
 
   return (
     <div className="legal" lang={lang}>

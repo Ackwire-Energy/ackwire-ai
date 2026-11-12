@@ -4,23 +4,23 @@ import type { HelpDocument } from "./types";
 /** The help pages in ja: a page not here shows in English. */
 export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
-    title: "自分のコンピューターで agentes.chat を動かす",
+    title: "自分のコンピューターで Ackwire AI を動かす",
     summary:
-      "agentes.chat アプリは、agentes.chat そのものを Mac、PC、Linux コンピューターで動かすこともできます。個人や小さなチーム向けです。",
+      "Ackwire AI アプリは、Ackwire AI そのものを Mac、PC、Linux コンピューターで動かすこともできます。個人や小さなチーム向けです。",
     sections: [
       {
         id: "how",
         heading: "動作のしくみ",
         blocks: [
           "アプリの中でデータベースごと動き、すべてをこのコンピューターの1つのフォルダ (ホームフォルダの `.agentes`) に保存します。ほかにインストールするものはありません。Docker も、データベースの設定も不要です。",
-          "アプリと一緒に起動し、アプリを終了すると止まります。アプリをもう一度開くまで誰も agentes.chat を使えなくなるため、終了する前に確認が表示されます。",
+          "アプリと一緒に起動し、アプリを終了すると止まります。アプリをもう一度開くまで誰も Ackwire AI を使えなくなるため、終了する前に確認が表示されます。",
         ],
       },
       {
         id: "who",
         heading: "向いている使い方",
         blocks: [
-          "あなた自身や小さなチーム向けです。つけたままにしておける Mac mini、余っている PC、ノートパソコンが置き場所に向いています。[つけたままにする](#keep-on) のとおりに設定してください。Mac や PC で、Docker なしで agentes.chat を動かせるのがこのアプリです。",
+          "あなた自身や小さなチーム向けです。つけたままにしておける Mac mini、余っている PC、ノートパソコンが置き場所に向いています。[つけたままにする](#keep-on) のとおりに設定してください。Mac や PC で、Docker なしで Ackwire AI を動かせるのがこのアプリです。",
           "もっと大きなチームなら、[どの方法を選ぶか](/help/install-on-a-server#choose) を見てください。データはあとからサーバーに移せます。",
         ],
       },
@@ -51,7 +51,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "ほかのワークスペースにも貸す",
         blocks: [
-          "ここで動かしているサーバーのワークスペースは、何もしなくてもこのコンピューターを使えます。agentes.chat Cloud のワークスペースなど、ほかの場所にあるワークスペースにも使わせるには、**環境設定\u00a0›\u00a0サーバー** を開いて **サーバーを追加…** を押し、そのワークスペースにサインインして、アプリに聞かれたら **許可** を押します。",
+          "ここで動かしているサーバーのワークスペースは、何もしなくてもこのコンピューターを使えます。Ackwire AI Cloud のワークスペースなど、ほかの場所にあるワークスペースにも使わせるには、**環境設定\u00a0›\u00a0サーバー** を開いて **サーバーを追加…** を押し、そのワークスペースにサインインして、アプリに聞かれたら **許可** を押します。",
           "ワークスペースごとに、ここに専用のエージェントとフォルダがあります。**コマンド** はそのワークスペースでも最初からオンです。アプリの確認画面で **許可** を押す前に、またはあとから **環境設定\u00a0›\u00a0ツール** でオフにできます。そこのスイッチ1つが、このコンピューターのすべてのワークスペースに適用されます。",
         ],
       },
@@ -59,8 +59,8 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "スマートフォンやチームから",
         blocks: [
-          "**スマートフォンやチームメイトからアクセスする** をオンにすると、agentes.chat がデバイス用のプライベートネットワーク Tailscale に参加します。あなたのスマートフォンと招待した人だけが参加でき、ほかの誰も agentes.chat にはアクセスできません。Tailscale は無料です: https://tailscale.com/download 。オフのままなら、agentes.chat はこのコンピューターでしか使えません。",
-          "このコンピューターが Tailscale のポート 443 ですでにほかのものを共有している場合、agentes.chat は 8443 を使い、アドレスの末尾が `:8443` になります。",
+          "**スマートフォンやチームメイトからアクセスする** をオンにすると、Ackwire AI がデバイス用のプライベートネットワーク Tailscale に参加します。あなたのスマートフォンと招待した人だけが参加でき、ほかの誰も Ackwire AI にはアクセスできません。Tailscale は無料です: https://tailscale.com/download 。オフのままなら、Ackwire AI はこのコンピューターでしか使えません。",
+          "このコンピューターが Tailscale のポート 443 ですでにほかのものを共有している場合、Ackwire AI は 8443 を使い、アドレスの末尾が `:8443` になります。",
         ],
       },
       {
@@ -104,7 +104,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           {
             list: [
-              "[サーバーに agentes.chat をインストール](/help/install-on-a-server)しますが、まだ起動しないでください。その `.env` に `~/.agentes/.env` の `AGENTES_SECRET` を入れ、データベースだけを起動します: `docker compose up -d postgres`。",
+              "[サーバーに Ackwire AI をインストール](/help/install-on-a-server)しますが、まだ起動しないでください。その `.env` に `~/.agentes/.env` の `AGENTES_SECRET` を入れ、データベースだけを起動します: `docker compose up -d postgres`。",
               "ダンプを読み込みます: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`。",
               "`docker compose up -d` で起動し、完全なガイドのとおりに `~/.agentes/files` をコピーして、これまでどおりサインインします。",
             ],
@@ -116,11 +116,11 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
   computers: {
     title: "あなたのコンピューターとスマートフォン",
     summary:
-      "Mac、PC、Linux コンピューター、サーバー、スマートフォンを持ち込めば、エージェントがそこで働きます。agentes.chat Cloud でも、自分のサーバーでも同じです。",
+      "Mac、PC、Linux コンピューター、サーバー、スマートフォンを持ち込めば、エージェントがそこで働きます。Ackwire AI Cloud でも、自分のサーバーでも同じです。",
     sections: [
       {
         id: "app",
-        heading: "agentes.chat アプリから",
+        heading: "Ackwire AI アプリから",
         blocks: [
           "そのコンピューターにアプリをインストールして開き、ワークスペースにサインインします。**<workspace>のエージェントにこのMacを使わせますか？** と聞かれます (Windows ではこのPC、Linux ではこのコンピューター)。使える人を選んで **許可** を押せば、それで完了です。",
           "すでにサインインしている場合は、**環境設定\u00a0›\u00a0一般** の **エージェント** カードでワークスペースをオンにします。",
@@ -159,14 +159,14 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "アプリが開いている間",
         blocks: [
-          "エージェントがコンピューターで働けるのは、そこでアプリが動いていて、コンピューターがスリープしていない間だけです。アプリが確認するときは、**準備しておく：ログイン時にagentes.chatを開く** にチェックを入れたままにしてください。電源が切れているかスリープ中のコンピューターは **オフライン** と表示され、エージェントは戻るまで待ちます。",
+          "エージェントがコンピューターで働けるのは、そこでアプリが動いていて、コンピューターがスリープしていない間だけです。アプリが確認するときは、**準備しておく：ログイン時にAckwire AIを開く** にチェックを入れたままにしてください。電源が切れているかスリープ中のコンピューターは **オフライン** と表示され、エージェントは戻るまで待ちます。",
         ],
       },
       {
         id: "pausing",
         heading: "一時停止と切断",
         blocks: [
-          "コンピューターでは、時計の横にある agentes.chat のアイコンで、すべてのワークスペースのエージェントを一時停止します。**環境設定\u00a0›\u00a0一般** では、各ワークスペースのスイッチでそのワークスペースだけを一時停止でき、**離れる** で切断します。一時停止中は新しい作業が始まらず、実行中の作業は最後まで続きます。切断しても、エージェントのフォルダはディスクに残ります。",
+          "コンピューターでは、時計の横にある Ackwire AI のアイコンで、すべてのワークスペースのエージェントを一時停止します。**環境設定\u00a0›\u00a0一般** では、各ワークスペースのスイッチでそのワークスペースだけを一時停止でき、**離れる** で切断します。一時停止中は新しい作業が始まらず、実行中の作業は最後まで続きます。切断しても、エージェントのフォルダはディスクに残ります。",
           "Web サイトからは、デバイスのページの **削除** で切断します。",
         ],
       },
@@ -174,7 +174,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "organizations",
         heading: "1台のコンピューターで複数のワークスペース",
         blocks: [
-          "同じアプリでそれぞれのワークスペースにサインインし、ワークスペースごとに **許可** を押します。agentes.chat Cloud のワークスペースと自分のサーバーのワークスペースで、1台のコンピューターを共有できます (アプリ 0.6.1 以降)。それぞれがそこに専用のエージェントとフォルダを持ち、1つを切断してもほかには影響しません。",
+          "同じアプリでそれぞれのワークスペースにサインインし、ワークスペースごとに **許可** を押します。Ackwire AI Cloud のワークスペースと自分のサーバーのワークスペースで、1台のコンピューターを共有できます (アプリ 0.6.1 以降)。それぞれがそこに専用のエージェントとフォルダを持ち、1つを切断してもほかには影響しません。",
           "このコンピューターでアプリが動かしているサーバーは最初から接続されていて、何もする必要はありません。そのコンピューターをほかの場所にあるワークスペースにも貸すには、[ほかのワークスペースにも貸す](/help/run-on-your-computer#another-workspace) を参照してください。",
           "ノートパソコンのアプリを、ワークスペースを見るためのウインドウとしてだけ使っていますか？ エージェントにノートパソコンを使わせるか聞かれたら、**今はしない** を選べば、ふつうのウインドウのままです。",
         ],
@@ -196,10 +196,10 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
               "あなたのファイルとログイン情報",
               "ほかのエージェントのフォルダ (ほかのワークスペースのものも含む) と、そのブラウザに残っているログイン",
               "このコンピューターを接続しているトークン",
-              "agentes.chat も動かしているコンピューターでは、`.agentes` にあるそのデータベースとキー",
+              "Ackwire AI も動かしているコンピューターでは、`.agentes` にあるそのデータベースとキー",
             ],
           },
-          "agentes.chat はキー、トークン、サインイン情報を指定するコマンドを拒否しますが、それはルールであって壁ではありません。**コマンド** は最初からオンです。アプリの確認画面で **許可** を押す前に、またはあとから **環境設定\u00a0›\u00a0ツール** でオフにできます。そこのスイッチ1つが、そのコンピューターのすべてのワークスペースに適用されます。Claude Code と Codex は、エージェントのフォルダで、それぞれのルールに従って自分のコマンドを実行します。",
+          "Ackwire AI はキー、トークン、サインイン情報を指定するコマンドを拒否しますが、それはルールであって壁ではありません。**コマンド** は最初からオンです。アプリの確認画面で **許可** を押す前に、またはあとから **環境設定\u00a0›\u00a0ツール** でオフにできます。そこのスイッチ1つが、そのコンピューターのすべてのワークスペースに適用されます。Claude Code と Codex は、エージェントのフォルダで、それぞれのルールに従って自分のコマンドを実行します。",
           "本当の壁が必要なら、Linux サーバーを使ってください。Debian 13 に `--system` でインストールすると、エージェントごとに専用のユーザーになります。Ubuntu では、エージェントは `agentes` という1つのユーザーを共有します。お互いのフォルダは見えますが、あなたやサーバーのものは見えません。または、エージェント専用のコンピューターを用意してください。",
         ],
       },
@@ -220,14 +220,14 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "あなたのコンピューターとスマートフォン",
         blocks: [
-          "エージェントは、あなたが持ち込んだコンピューターやスマートフォンでも働けます。agentes.chat アプリを入れた Mac や PC、サーバー、Android スマートフォン、iPhone です。[持ち込んだコンピューターとスマートフォン](/help/computers) を参照してください。",
+          "エージェントは、あなたが持ち込んだコンピューターやスマートフォンでも働けます。Ackwire AI アプリを入れた Mac や PC、サーバー、Android スマートフォン、iPhone です。[持ち込んだコンピューターとスマートフォン](/help/computers) を参照してください。",
         ],
       },
       {
         id: "plans",
         heading: "あなたの AI プラン",
         blocks: [
-          "エージェントは、このコンピューターでログインしたあなた自身の AI プラン (Claude、ChatGPT、GLM、Kimi など) で考えることができます。API キーは不要です。アカウントはこのコンピューターにとどまり、agentes.chat がパスワードやアクセス情報を見ることはありません。",
+          "エージェントは、このコンピューターでログインしたあなた自身の AI プラン (Claude、ChatGPT、GLM、Kimi など) で考えることができます。API キーは不要です。アカウントはこのコンピューターにとどまり、Ackwire AI がパスワードやアクセス情報を見ることはありません。",
           "Google の AI Pro と AI Ultra のプランはここでは使えません。Google の規約で、ほかの製品での利用が認められていないためです。Gemini の API キーなら使えます。",
         ],
       },
@@ -246,7 +246,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
   import: {
     title: "エージェントを連れてくる",
     summary:
-      "ほかのアプリや、別の agentes.chat のワークスペースから、指示、スキル、ルーティン、メモリごとエージェントを連れてこられます。",
+      "ほかのアプリや、別の Ackwire AI のワークスペースから、指示、スキル、ルーティン、メモリごとエージェントを連れてこられます。",
     sections: [
       {
         id: "comes",
@@ -419,7 +419,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "who-answers": {
     title: "誰がメッセージに答えるか",
-    summary: "メンションがあれば、そのエージェントが答えます。なければ、agentes.chat が次の順番で選びます。",
+    summary: "メンションがあれば、そのエージェントが答えます。なければ、Ackwire AI が次の順番で選びます。",
     sections: [
       {
         id: "order",
@@ -441,7 +441,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "agentes.chat がワークスペースをホストしている場合、Jev は含まれています。自分で運用するサーバーでは、オーナーの TypeSafe キーを使い、1メッセージあたり約 US$ 0.0001 かかります: [Jev を設定する](/help/jev#setup)",
+          "Ackwire AI がワークスペースをホストしている場合、Jev は含まれています。自分で運用するサーバーでは、オーナーの TypeSafe キーを使い、1メッセージあたり約 US$ 0.0001 かかります: [Jev を設定する](/help/jev#setup)",
         ],
       },
       {
@@ -500,7 +500,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
               "https://console.typesafe.ai を開き、Google かメールアドレスでログインします。新しいアカウントも同じ方法で作れます。",
               "コンソールでクレジットを追加します。Jev は前払い制です。",
               "https://console.typesafe.ai/keys を開いてキーを作成し、すぐにコピーします。",
-              "agentes.chat で **設定 › AIと使用量** を開き、**Jev** の欄に貼り付けます。キーを見られるのは、このサーバーを設定した人だけです。",
+              "Ackwire AI で **設定 › AIと使用量** を開き、**Jev** の欄に貼り付けます。キーを見られるのは、このサーバーを設定した人だけです。",
             ],
           },
           "Docker で運用しているサーバーでは、代わりに `.env` の `TYPESAFE_API_KEY` にキーを入れることもできます。その場合は設定画面のキーより優先されます。",
@@ -558,14 +558,14 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
   "apps-de-ia": {
     title: "AIアプリ",
     summary:
-      "Claude、Cursor、そのほかの MCP アプリから離れずに agentes.chat のエージェントにタスクを頼み、その場で答えを受け取れます。",
+      "Claude、Cursor、そのほかの MCP アプリから離れずに Ackwire AI のエージェントにタスクを頼み、その場で答えを受け取れます。",
     sections: [
       {
         id: "what",
         heading: "しくみ",
         blocks: [
-          "agentes.chat は MCP サーバーです。そのアドレスを AI アプリに貼り付け、あなたのアカウントでログインし、ワークスペースを選びます。それ以降、アプリはエージェントやチャンネルの一覧を見たり、あなたとしてエージェントにタスクを送ったり、返信を待ったり、最近のタスクを読んだりできます。",
-          "たとえば Unity や Blender でシーンを作っている最中に、Claude に「マーケティングのエージェントにローンチの紹介文を頼んで」と伝えます。メッセージは agentes.chat にあなたの発言として **Claude経由** の印付きで表示され、エージェントの返信が Claude に戻ってきます。",
+          "Ackwire AI は MCP サーバーです。そのアドレスを AI アプリに貼り付け、あなたのアカウントでログインし、ワークスペースを選びます。それ以降、アプリはエージェントやチャンネルの一覧を見たり、あなたとしてエージェントにタスクを送ったり、返信を待ったり、最近のタスクを読んだりできます。",
+          "たとえば Unity や Blender でシーンを作っている最中に、Claude に「マーケティングのエージェントにローンチの紹介文を頼んで」と伝えます。メッセージは Ackwire AI にあなたの発言として **Claude経由** の印付きで表示され、エージェントの返信が Claude に戻ってきます。",
           "アドレスは **設定 › AIアプリ** にあります。末尾は `/mcp` です。",
         ],
       },
@@ -575,14 +575,14 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Claude** (claude.ai、Claude Desktop、スマートフォン): **カスタマイズ › コネクタ** で **+ 追加**、続けて **カスタムコネクタを追加** をクリックし、名前を agentes.chat にしてアドレスを貼り付け、**続ける** をクリックします。**今すぐログイン** を選び、**追加** をクリックして認可します。Team と Enterprise のプランでは、Claude の組織のオーナーが 組織設定 › コネクタ でコネクタを追加し、各自が カスタマイズ › コネクタ で **接続** をクリックします。Claude の無料プランでは、カスタムコネクタを1つまで追加できます。",
+              "**Claude** (claude.ai、Claude Desktop、スマートフォン): **カスタマイズ › コネクタ** で **+ 追加**、続けて **カスタムコネクタを追加** をクリックし、名前を Ackwire AI にしてアドレスを貼り付け、**続ける** をクリックします。**今すぐログイン** を選び、**追加** をクリックして認可します。Team と Enterprise のプランでは、Claude の組織のオーナーが 組織設定 › コネクタ でコネクタを追加し、各自が カスタマイズ › コネクタ で **接続** をクリックします。Claude の無料プランでは、カスタムコネクタを1つまで追加できます。",
               "**Claude Code:** `claude mcp add --transport http --scope user agentes <address>` を実行し、`/mcp` と入力して agentes を選び、**Authenticate** を選びます。今のフォルダだけで使う場合は `--scope user` を外してください。",
               "**Cursor:** **設定 › AIアプリ** の **Cursorに追加** を使うか、`~/.cursor/mcp.json` にアドレスを書きます。初めて使うときに Cursor がログインを求めます。",
               '**VS Code:** **VS Codeに追加** を使うか、`.vscode/mcp.json` に `"type": "http"` と一緒にアドレスを書きます。',
               "**ほかのアプリ:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrainsなどは、**アプリを接続** にそれぞれの手順があり、アドレスも入力済みです。",
             ],
           },
-          "ログインするとき、agentes.chat はどのアプリがアクセスを求めているか、どこに戻るかを表示します。自分で接続を始めたばかりの場合だけ続けてください。",
+          "ログインするとき、Ackwire AI はどのアプリがアクセスを求めているか、どこに戻るかを表示します。自分で接続を始めたばかりの場合だけ続けてください。",
         ],
       },
       {
@@ -599,7 +599,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: あなたがアプリから送ったタスクと、エージェントが今していること。",
             ],
           },
-          "アプリはあなたとして動き、あなたに見えるものしか見えません。エージェントの操作を承認することはありません。エージェントが止まって承認を求めたときは、返信にそのことがリンク付きで書かれ、agentes.chat で人が判断します。設定、メンバー、権限を変えることもできません。",
+          "アプリはあなたとして動き、あなたに見えるものしか見えません。エージェントの操作を承認することはありません。エージェントが止まって承認を求めたときは、返信にそのことがリンク付きで書かれ、Ackwire AI で人が判断します。設定、メンバー、権限を変えることもできません。",
         ],
       },
       {
@@ -635,7 +635,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "ほかの人が書いたテキスト",
         blocks: [
-          "返信には、agentes.chat のエージェントや人が書いたテキストが含まれます。アプリはそのテキストを指示ではなくコンテンツとして受け取りますが、テキストがアプリに別のことをさせようとする場合もあります。確定する前に、アプリが何をしようとしているか確認してください。",
+          "返信には、Ackwire AI のエージェントや人が書いたテキストが含まれます。アプリはそのテキストを指示ではなくコンテンツとして受け取りますが、テキストがアプリに別のことをさせようとする場合もあります。確定する前に、アプリが何をしようとしているか確認してください。",
         ],
       },
       {
@@ -654,8 +654,8 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
     ],
   },
   "install-on-a-server": {
-    title: "サーバーに agentes.chat をインストールする",
-    summary: "自分のサーバーで agentes.chat を無料で動かし、チーム全員で使えます。コマンドひとつで準備できます。",
+    title: "サーバーに Ackwire AI をインストールする",
+    summary: "自分のサーバーで Ackwire AI を無料で動かし、チーム全員で使えます。コマンドひとつで準備できます。",
     sections: [
       {
         id: "choose",
@@ -663,7 +663,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**agentes.chat Cloud**: どんなチームにも向いていて、どこからでもアクセスできます。運用、アップデート、バックアップはこちらで行います。ワークスペースごとに専用のコンピューターがあり、そこでエージェントはそれぞれ専用のユーザーになります。",
+              "**Ackwire AI Cloud**: どんなチームにも向いていて、どこからでもアクセスできます。運用、アップデート、バックアップはこちらで行います。ワークスペースごとに専用のコンピューターがあり、そこでエージェントはそれぞれ専用のユーザーになります。",
               "**自分のコンピューターとアプリ**: あなた自身や小さなチーム向けで、そのコンピューターが起動している間アクセスできます。つけたままの Mac mini が向いています。アップデートはワンクリックで、バックアップは手動です。エージェントはそのコンピューターであなたとして動きます。",
               "**サーバー**: もっと大きなチーム向けで、いつも動いています。アップデートは 3 つのコマンドで、毎日自動でバックアップすることもできます。Debian 13 では、エージェントごとに専用のユーザーになります。",
             ],
@@ -677,7 +677,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "64 ビット Linux (x64 または arm64) のサーバーか VPS。小さなチームなら、2 CPU、メモリ 4 GB、ディスク 20 GB から始めるのがおすすめです。Mac や PC なら、[アプリで agentes.chat を動かせます](/help/run-on-your-computer)。Docker は不要です。",
+              "64 ビット Linux (x64 または arm64) のサーバーか VPS。小さなチームなら、2 CPU、メモリ 4 GB、ディスク 20 GB から始めるのがおすすめです。Mac や PC なら、[アプリで Ackwire AI を動かせます](/help/run-on-your-computer)。Docker は不要です。",
               "Docker と Compose。Linux では、足りなければインストーラーが確認したうえで入れます。",
               "アクセスの方法。無料の Tailscale アカウント (標準。非公開で、ドメインも開いたポートも不要) か、サーバーを指すドメインとポート 80 と 443 の開放のどちらかです。",
             ],
@@ -720,14 +720,14 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "あなたのアカウント",
         blocks: [
           "サーバーのアドレスを開いて登録します。最初のアカウントがオーナーになります。その後は登録が閉じ、ほかの人は **設定\u00a0›\u00a0メンバーと招待** からの招待で参加します。",
-          "Tailscale では、招待する人もあなたの tailnet に入る必要があります。先に https://console.tailscale.com/admin/users で招待し、それから agentes.chat で招待します。",
+          "Tailscale では、招待する人もあなたの tailnet に入る必要があります。先に https://console.tailscale.com/admin/users で招待し、それから Ackwire AI で招待します。",
         ],
       },
       {
         id: "email",
         heading: "メール",
         blocks: [
-          "メールを設定しないと、agentes.chat はメールを送らずにログに書き出すので、招待リンクはそこからコピーできます。パスワードの再設定は使えません。",
+          "メールを設定しないと、Ackwire AI はメールを送らずにログに書き出すので、招待リンクはそこからコピーできます。パスワードの再設定は使えません。",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -741,7 +741,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "Tailscale の場合は、スマートフォンに Tailscale アプリを入れ、同じ tailnet にサインインします。",
-              "agentes.chat アプリを入れます。",
+              "Ackwire AI アプリを入れます。",
               "セットアップが表示した QR コードか、**設定\u00a0›\u00a0アカウント\u00a0›\u00a0スマートフォンで開く** の QR コードを読み取ります。後者はサインインもします。",
             ],
           },
@@ -755,7 +755,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "agentes.chat アプリを入れた Mac や別のサーバーなど、ほかのコンピューターは **設定\u00a0›\u00a0デバイス** からつなぎます ([あなたのコンピューターとスマートフォン](/help/computers) を参照)。Tailscale の場合は、先にあなたの tailnet に入れます。",
+          "Ackwire AI アプリを入れた Mac や別のサーバーなど、ほかのコンピューターは **設定\u00a0›\u00a0デバイス** からつなぎます ([あなたのコンピューターとスマートフォン](/help/computers) を参照)。Tailscale の場合は、先にあなたの tailnet に入れます。",
         ],
       },
       {
@@ -790,7 +790,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "送信される情報",
         blocks: [
-          "サーバーは 1 日に 1 回、匿名の利用統計を agentes.chat に送ります。人数、エージェント数、マシンのサイズ、使った AI トークン、エージェントのブラウザーが送受信したデータ量などの数です。メッセージ、ファイル、名前、サイトは送りません。`docker compose run --rm agentes telemetry` で送られる内容をそのまま表示できます。オーナーは **設定\u00a0›\u00a0一般** か、`.env` の `TELEMETRY=off` でオフにできます。",
+          "サーバーは 1 日に 1 回、匿名の利用統計を Ackwire AI に送ります。人数、エージェント数、マシンのサイズ、使った AI トークン、エージェントのブラウザーが送受信したデータ量などの数です。メッセージ、ファイル、名前、サイトは送りません。`docker compose run --rm agentes telemetry` で送られる内容をそのまま表示できます。オーナーは **設定\u00a0›\u00a0一般** か、`.env` の `TELEMETRY=off` でオフにできます。",
           "エラーレポートは、自分で選んだ Sentry 互換サーバーを `SENTRY_DSN` に設定しない限りどこにも送られません。レポートにはエラーと発生場所が入り、メッセージ、メールアドレス、IP アドレス、Cookie、トークンは入りません。",
         ],
       },
@@ -798,7 +798,7 @@ export const helpJa: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "完全なガイド",
         blocks: [
-          "すべての設定、nginx など自前のプロキシ、Docker を使わない動かし方、自分でインストールする AI エージェント向けの手順、うまくいかないときの対処は、agentes.chat のリポジトリにある `SELF_HOSTING.md` にあります。",
+          "すべての設定、nginx など自前のプロキシ、Docker を使わない動かし方、自分でインストールする AI エージェント向けの手順、うまくいかないときの対処は、Ackwire AI のリポジトリにある `SELF_HOSTING.md` にあります。",
         ],
       },
     ],

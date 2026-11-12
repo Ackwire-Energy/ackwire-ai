@@ -254,7 +254,7 @@ export function TeamStep({
 }
 
 /**
- * Step 4, "Turn the team on" (agentes.chat Cloud, a workspace waiting for its first plan): the team asleep until it,
+ * Step 4, "Turn the team on" (Ackwire AI Cloud, a workspace waiting for its first plan): the team asleep until it,
  * what each one does (its first routine, else its role; the right hand, what it is to the person), the plan the
  * billing service recommends with its price when it says one, what comes after it (`next`: connecting an AI, ADR
  * 0162), and the way in without it, where the right hand's card keeps the plan. Back from paying (`confirming`), the

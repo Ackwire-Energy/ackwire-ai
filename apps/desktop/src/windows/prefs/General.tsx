@@ -110,7 +110,7 @@ export function General() {
     setMenuBar(on);
     if (!on && !dock) showDock(true);
   };
-  // Open at login has an ⓘ only where it changes something: agentes.chat running here, or agents working here.
+  // Open at login has an ⓘ only where it changes something: Ackwire AI running here, or agents working here.
   const launchHint = local.run ? "desktop.prefs.general.launchHere" : works ? "desktop.prefs.general.launchDesc" : null;
   const launchRow = (
     <PrefRow

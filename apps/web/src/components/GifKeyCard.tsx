@@ -24,7 +24,7 @@ import { useOrg } from "@/components/org-context";
 
 /*
  * The installation's GIPHY key (ADR 0091, amended 2026-10-31), in Settings › GIFs and stickers for its owner on a
- * server that isn't agentes.chat's own (the API answers null to everyone else). The same rows as Jev's key
+ * server that isn't Ackwire AI's own (the API answers null to everyone else). The same rows as Jev's key
  * (`ai/Jev.tsx`): its steps while there's none, its last 4 and its state once set.
  */
 

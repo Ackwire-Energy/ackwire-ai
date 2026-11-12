@@ -28,7 +28,7 @@
     "server": {
       "line": "服务器：{{host}} ·",
       "change": "更改",
-      "title": "你的 agentes.chat 在哪里？",
+      "title": "你的 Ackwire AI 在哪里？",
       "subtitle": "你的团队在浏览器中打开的地址。",
       "label": "服务器地址",
       "placeholder": "agentes.yourteam.ts.net",
@@ -49,7 +49,7 @@
       "unreachable": "无法连接到 {{host}}。请检查地址和网络连接后重试。",
       "unreachableTailscale": "无法连接 {{host}}。它在 Tailscale 上：打开 Tailscale 应用，连接后再试一次。已经连接了？服务器所在的电脑可能在睡眠，或者应用已关闭。",
       "certificate": "{{host}} 的证书无效。请联系服务器的管理者。",
-      "notAgentes": "{{host}} 不是 agentes.chat 服务器。请检查地址。",
+      "notAgentes": "{{host}} 不是 Ackwire AI 服务器。请检查地址。",
       "serverTooOld": "{{host}} 需要更新才能配合此应用使用。",
       "appTooOld": "请更新 agentes 应用以使用 {{host}}。",
       "down": {
@@ -68,14 +68,14 @@
       "confirm": "连接",
       "notNow": "以后再说",
       "checking": "正在检查服务器…",
-      "notALink": "此链接不是来自 agentes.chat 服务器。",
+      "notALink": "此链接不是来自 Ackwire AI 服务器。",
       "tokenFailed": "验证码已过期或已被使用。请用邮箱登录，或在电脑上显示新的验证码。",
       "signInSlow": "登录时间比预期长。请用邮箱登录，或在电脑上显示新的验证码。"
     },
     "scan": {
       "hint": "对准电脑上的二维码",
       "typeAddress": "输入地址",
-      "notOurs": "此二维码不是来自 agentes.chat 服务器。",
+      "notOurs": "此二维码不是来自 Ackwire AI 服务器。",
       "cameraTitle": "使用相机",
       "cameraText": "仅用于读取二维码。",
       "allow": "允许使用相机",

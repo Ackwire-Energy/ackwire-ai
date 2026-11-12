@@ -32,7 +32,7 @@ export const firstRunMounted = (wasMounted: boolean, firstRun: boolean, onInvite
 
 /**
  * The chosen organization when it is suspended (ADR 0056 §8): why, when the workspace is told, whether it is on
- * agentes.chat Cloud (how to contest it), and the person's other organizations to go to; null while it isn't (pure).
+ * Ackwire AI Cloud (how to contest it), and the person's other organizations to go to; null while it isn't (pure).
  */
 export function suspendedOf<
   O extends { id: string; standing?: { state: string; reason: string | null; cloud?: boolean } },

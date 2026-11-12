@@ -45,7 +45,7 @@ export function ResetPasswordPage({ token }: { token?: string }) {
     <AuthShell>
       <form className="auth__form" onSubmit={submit} noValidate>
         <header className="auth__ask">
-          <AgentAvatar name="agentes.chat" size="lg" state={pending ? "writing" : undefined} expression={expression} />
+          <AgentAvatar name="Ackwire AI" size="lg" state={pending ? "writing" : undefined} expression={expression} />
           <div className="auth__bubble" key={`${expired}-${done}`} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
             {lead && <p className="auth__lead">{lead}</p>}

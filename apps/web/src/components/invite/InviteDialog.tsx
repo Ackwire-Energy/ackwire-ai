@@ -854,7 +854,7 @@ function HostAsk({
         {host ? (
           <AgentAvatar name={host.name} appearance={lookOf(host)} expression={expression} />
         ) : (
-          <AgentAvatar name="agentes.chat" expression={expression} />
+          <AgentAvatar name="Ackwire AI" expression={expression} />
         )}
       </span>
       <div className="auth__bubble" aria-live="polite">

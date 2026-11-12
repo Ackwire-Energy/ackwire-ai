@@ -26,7 +26,7 @@
     "unknownError": "出了点问题，请重试。",
     "ourSide": "我们这边出了点问题，请稍后再试。",
     "signedOut": "你的会话已结束，请重新登录以继续。",
-    "newVersion": "agentes.chat 有新版本了。",
+    "newVersion": "Ackwire AI 有新版本了。",
     "reload": "重新加载",
     "copy": "复制",
     "copied": "已复制",
@@ -49,7 +49,7 @@
     "notAllowed": "你没有权限执行此操作。",
     "tooMany": "尝试次数过多，请稍后再试。",
     "offline": "你已离线，请检查网络连接后重试。",
-    "unreachable": "暂时无法连接 agentes.chat，请稍后再试。"
+    "unreachable": "暂时无法连接 Ackwire AI，请稍后再试。"
   },
   "roles": {
     "owner": "所有者",
@@ -454,10 +454,10 @@
       "openMail": "打开 {{app}}",
       "ownerWaits": "这个服务器正在等待它的所有者。",
       "ownerWaitsLead": "在这台电脑或你的手机上，打开这个服务器的所有者链接（以 /owner#claim=… 结尾）。",
-      "noPassword": "这个账号通过 agentes.chat 应用登录。",
+      "noPassword": "这个账号通过 Ackwire AI 应用登录。",
       "noPasswordLead": "在运行这个服务器的电脑上，打开应用，在 设置 › 你的账号 中选择“添加密码”。",
       "backToSignIn": "返回登录",
-      "toAuthorizeApp": "用于把应用连接到 agentes.chat。"
+      "toAuthorizeApp": "用于把应用连接到 Ackwire AI。"
     },
     "desktop": {
       "browser": "在浏览器中继续",
@@ -468,7 +468,7 @@
       "otherServer": "使用其他服务器",
       "opening": "正在打开 {{provider}}…",
       "confirm": "这是你的应用吗？",
-      "confirmLead": "这个代码应与你电脑上 agentes.chat 应用显示的代码一致。",
+      "confirmLead": "这个代码应与你电脑上 Ackwire AI 应用显示的代码一致。",
       "confirmYes": "是的，让应用登录",
       "confirmNo": "不是我",
       "done": "全部就绪。",
@@ -492,15 +492,15 @@
     },
     "desktopOwner": {
       "continue": "在这台{{device}}上继续",
-      "text": "你是在这台{{device}}上安装的 agentes.chat：无需密码。"
+      "text": "你是在这台{{device}}上安装的 Ackwire AI：无需密码。"
     },
     "server": {
       "into": "正在登录 <b>{{server}}</b>",
-      "intoHere": "正在登录<b>这台 {{device}}</b> 上的 agentes.chat"
+      "intoHere": "正在登录<b>这台 {{device}}</b> 上的 Ackwire AI"
     },
     "forgotHere": {
       "ownerTitle": "这里不需要密码。",
-      "ownerLead": "agentes.chat 是你安装在这台 {{device}} 上的。从这里进入，然后设置新密码。",
+      "ownerLead": "Ackwire AI 是你安装在这台 {{device}} 上的。从这里进入，然后设置新密码。",
       "notOwner": "不是安装者的账号？请向你的 workspace 所有者要一个新密码链接。",
       "title": "这台服务器不发送邮件。",
       "lead": "请向你的 workspace 所有者要一个新密码链接。所有者在「成员」中生成，链接 1 小时内有效。",
@@ -728,7 +728,7 @@
       },
       "area": {
         "title": "那你呢，负责哪方面的工作？",
-        "lead": "只是想了解谁在使用 agentes.chat。",
+        "lead": "只是想了解谁在使用 Ackwire AI。",
         "skip": "跳过这一步",
         "options": {
           "dev": "开发",
@@ -801,7 +801,7 @@
         "asleep": "在套餐开通前休眠中",
         "price": "<b>{{name}}套餐</b> · 每月 {{price}}",
         "name": "<b>{{name}}套餐</b>",
-        "generic": "一个 agentes.chat 套餐",
+        "generic": "一个 Ackwire AI 套餐",
         "cancel": "可随时取消",
         "cta": "开启团队",
         "all": "查看所有套餐",
@@ -856,7 +856,7 @@
     },
     "yourCompany": "你的公司",
     "purpose": {
-      "title": "你打算用 agentes.chat 做什么？",
+      "title": "你打算用 Ackwire AI 做什么？",
       "lead": "之后可以更改，不会丢失任何内容。",
       "personal": "给我自己用",
       "personalText": "照顾你一天的智能体。",
@@ -934,14 +934,14 @@
         "howTo": "逐个应用的连接方法",
         "allow": "在授权页面上，选择“创建和编辑智能体、例行工作和技能”。",
         "paste": "然后把这段请求粘贴到应用中：",
-        "prompt": "连接 {{url}}，为你拥有的每个智能体、指令、技能和例行工作，在 agentes.chat 中创建对应的内容。先列出那里已有的内容，以免重复。",
+        "prompt": "连接 {{url}}，为你拥有的每个智能体、指令、技能和例行工作，在 Ackwire AI 中创建对应的内容。先列出那里已有的内容，以免重复。",
         "promptLabel": "给你的 AI 应用的请求",
         "copy": "复制请求",
         "copied": "现在把它粘贴到你的 AI 应用中。",
         "private": "从你的 AI 应用导入：此服务器不支持，因为 Claude 和 ChatGPT 等应用只能连接公开的 https 地址。"
       },
       "otherName": "其他应用",
-      "agenteschatName": "agentes.chat",
+      "agenteschatName": "Ackwire AI",
       "where": {
         "openbotrun": "拖入 openbot-import.json（来自 OpenBot 的 Migrator）或 openbot-transfer.json（来自实例迁移），或者包含它的 .zip。",
         "openmausbot": "在 OpenMausBot 中：右键点击团队 → 分享团队… → 保存文件。",
@@ -1171,8 +1171,8 @@
     "keyStep": {
       "title": "它们将使用哪个 AI？",
       "lead": "用你的 AI 套餐登录：不需要 API 密钥。",
-      "paid": "你的 agentes.chat 套餐已生效。它们的电脑正在准备中。",
-      "confirming": "正在确认此工作区 agentes.chat 套餐的付款。",
+      "paid": "你的 Ackwire AI 套餐已生效。它们的电脑正在准备中。",
+      "confirming": "正在确认此工作区 Ackwire AI 套餐的付款。",
       "leadNoComputer": "你的智能体可以用 API 密钥思考，或者在你连接的电脑上用你的 AI 套餐思考。"
     },
     "jev": {
@@ -1183,7 +1183,7 @@
       "title": "每个智能体的支出上限",
       "label": "每个智能体每月上限（美元）",
       "perMonth": "/月",
-      "noteKey": "仅限 API 用量，由密钥的服务商收费，而不是 agentes.chat。智能体达到上限时会停下并告诉你。套餐不计入这里。",
+      "noteKey": "仅限 API 用量，由密钥的服务商收费，而不是 Ackwire AI。智能体达到上限时会停下并告诉你。套餐不计入这里。",
       "notePlatform": "仅限 API 用量。智能体达到上限时会停下并告诉你。"
     },
     "keySite": "在 {{site}} 创建密钥。",
@@ -1235,7 +1235,7 @@
     },
     "team": {
       "title": "还有谁和你一起工作？",
-      "payment": "选择 agentes.chat 套餐后，你就可以邀请团队了。",
+      "payment": "选择 Ackwire AI 套餐后，你就可以邀请团队了。",
       "lead": "通过邮件邀请他们，或分享链接。",
       "leadLink": "把邀请链接分享给他们。",
       "emails": "邮箱",
@@ -1345,7 +1345,7 @@
     "reload": "重新加载",
     "search": "搜索或提问…",
     "look": "右键菜单",
-    "lookOurs": "agentes.chat",
+    "lookOurs": "Ackwire AI",
     "lookSystem": "系统",
     "markRead": "标为已读",
     "muteChannel": "将频道设为静音",
@@ -1370,8 +1370,8 @@
     "copied": "已复制。请粘贴到终端中。",
     "mac": {
       "why": "<b>应用还在测试阶段。</b>所以第一次打开时，Mac 会要求你确认：",
-      "drag": "把 agentes.chat 拖到“应用程序”。",
-      "dragLong": "打开下载的文件，把 agentes.chat 拖到“应用程序”。",
+      "drag": "把 Ackwire AI 拖到“应用程序”。",
+      "dragLong": "打开下载的文件，把 Ackwire AI 拖到“应用程序”。",
       "blocked": "打开应用，然后点击“完成”。",
       "blockedSub": "不要点击“移到废纸篓”。",
       "settings": "在“设置 › 隐私与安全性”中点击“仍要打开”。",
@@ -1398,17 +1398,17 @@
       "why": "适用于 Ubuntu、Debian 及类似系统（x64）。Linux 不需要额外确认：",
       "apt": "双击 .deb 文件安装，或在终端中安装。",
       "aptLong": "双击下载的文件并点击“安装”，或把这段粘贴到终端中：",
-      "open": "从你的应用中打开 agentes.chat。",
+      "open": "从你的应用中打开 Ackwire AI。",
       "otherTitle": "使用 Arch、Fedora 或其他不支持 .deb 的系统？",
       "otherText": "下载 AppImage：它可在任何发行版上运行，并会自动更新。然后在保存它的文件夹中，将以下内容粘贴到终端：",
       "appImage": "下载 AppImage"
     },
     "page": {
-      "docTitle": "下载应用 · agentes.chat",
-      "title": "下载 agentes.chat 应用",
+      "docTitle": "下载应用 · Ackwire AI",
+      "title": "下载 Ackwire AI 应用",
       "beta": "Beta",
       "text": "你的工作区拥有独立的窗口，并使用系统通知。只需点击一下，智能体就能在这台电脑上各自的文件夹中工作。",
-      "open": "打开 agentes.chat",
+      "open": "打开 Ackwire AI",
       "version": "版本 {{version}}",
       "versionSize": "版本 {{version}} · {{size}}",
       "soon": "还没有 {{system}} 版本。",
@@ -1418,7 +1418,7 @@
       "installOn": "在 {{system}} 上安装",
       "system": "系统",
       "whyTitle": "为什么我的电脑要求确认？",
-      "whyText": "agentes.chat 还在测试阶段：Mac 版本还没有经过 Apple 公证，Windows 安装程序也还没有 Microsoft 证书。没有这些，电脑在打开从网上下载的应用之前会询问一次。之后它会直接打开，并自动更新。测试阶段结束前，这一步会取消。",
+      "whyText": "Ackwire AI 还在测试阶段：Mac 版本还没有经过 Apple 公证，Windows 安装程序也还没有 Microsoft 证书。没有这些，电脑在打开从网上下载的应用之前会询问一次。之后它会直接打开，并自动更新。测试阶段结束前，这一步会取消。",
       "openSource": "开源",
       "onlyHere": "只在这里和项目的发布页发布",
       "signedUpdates": "签名更新"
@@ -1678,7 +1678,7 @@
     "addWorkspace": "添加工作区",
     "addWorkspaceHint": "加入已有的工作区、创建新的，或使用团队的服务器",
     "yourServer": "你的服务器",
-    "serverHere": "这台 {{device}} 上的 agentes.chat",
+    "serverHere": "这台 {{device}} 上的 Ackwire AI",
     "serverStopped": "已停止",
     "serverOffline": "自 {{time}} 起离线",
     "serverSignedOut": "未登录",
@@ -1822,7 +1822,7 @@
     "private": "扫描此二维码的人会以你的身份登录。",
     "failed": "无法生成二维码。",
     "localOnly": "这台服务器只能在运行它的电脑上打开，所以你的手机无法访问它。",
-    "localOnlyHow": "在那台电脑的 agentes.chat 应用中，打开偏好设置 › 服务器里的“从你的手机和队友那里访问”，然后回到这里。"
+    "localOnlyHow": "在那台电脑的 Ackwire AI 应用中，打开偏好设置 › 服务器里的“从你的手机和队友那里访问”，然后回到这里。"
   },
   "team": {
     "title": "团队",
@@ -2222,8 +2222,8 @@
       "greetingPersonal": "你好，我是 {{name}}。我和你一起准备你的智能体。",
       "lead": "我创建智能体、连接应用、邀请成员。没有你的要求，什么都不会变，而且我只做你能做的事。",
       "leadPersonal": "我创建你的智能体、连接你的应用。没有你的要求，什么都不会变。",
-      "heldLead": "选择你的公司业务，团队就会出现在这里。工作区有 agentes.chat 套餐后，智能体就会开始工作。",
-      "heldLeadPersonal": "选择你想要帮忙的事，你的智能体就会出现在这里。有了 agentes.chat 套餐后，它们就会开始工作。",
+      "heldLead": "选择你的公司业务，团队就会出现在这里。工作区有 Ackwire AI 套餐后，智能体就会开始工作。",
+      "heldLeadPersonal": "选择你想要帮忙的事，你的智能体就会出现在这里。有了 Ackwire AI 套餐后，它们就会开始工作。",
       "connect": {
         "title": "为团队连接 AI",
         "titlePersonal": "为你的智能体连接 AI",
@@ -2565,7 +2565,7 @@
       "plan_not_shared": "连接你自己的套餐才能与{{name}}交谈：工作区的套餐只回复其所有者。",
       "plan_unattended": "{{name}} 没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
       "runner_outdated": "{{name}} 现在无法回复：套餐所在电脑上的程序需要更新。",
-      "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 没有只使用 agentes.chat 的工具。",
+      "plan_tools": "{{name}} 在回复前停下了：那台电脑上套餐的 AI 没有只使用 Ackwire AI 的工具。",
       "model_limit": "{{name}} 现在无法回答：{{model}} 已达到它在套餐中的自身上限。套餐中的其他模型仍可使用。",
       "model_region": "{{name}} 无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
       "model_off": "{{name}} 无法回复：OpenCode 拒绝了用这个密钥调用 {{model}}。请在 OpenCode 中开启该模型或账号，或选择其他模型。",
@@ -2575,11 +2575,11 @@
     },
     "kept": {
       "title": "我保留了你的消息。",
-      "line": "工作区有了 agentes.chat 套餐并连接 AI 后，我会在这里回复。",
+      "line": "工作区有了 Ackwire AI 套餐并连接 AI 后，我会在这里回复。",
       "plan": "套餐包含智能体的电脑，始终开机。AI 用的是你已经付费的：Claude、ChatGPT 等，或 API 密钥。",
       "active": "套餐已生效。连接 AI 后，{{name}} 会在这里回复。",
       "receipt": "已保留",
-      "channel": "已保留。工作区有 agentes.chat 套餐后，智能体就会回复。"
+      "channel": "已保留。工作区有 Ackwire AI 套餐后，智能体就会回复。"
     },
     "receipt": "没有人会回复：未连接 AI",
     "chip": "无 AI"
@@ -2657,8 +2657,8 @@
         "unshare": "仅我自己"
       }
     },
-    "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 agentes.chat 套餐才会提供。",
-    "billingWeb": "请在网页上的 agentes.chat 选择一个。",
+    "billing": "套餐登录在工作区的电脑上，而这台电脑需要有效的 Ackwire AI 套餐才会提供。",
+    "billingWeb": "请在网页上的 Ackwire AI 选择一个。",
     "orPayGo": "或按量付费",
     "pay": {
       "label": "你怎么付费？",
@@ -2721,7 +2721,7 @@
       "forAll": "所有没有套餐的智能体都用它来思考。",
       "saved": "已保存。所有没有套餐的智能体都用它来思考。",
       "savedUnchecked": "已保存，但 {{provider}} 没有回应，因此无法检查这个密钥。如果它失败，对话里会说明原因。",
-      "closed": "API 密钥随工作区的 agentes.chat 套餐开放。",
+      "closed": "API 密钥随工作区的 Ackwire AI 套餐开放。",
       "notPlan": "编程套餐的密钥请填在上方它自己的选项里。",
       "billing": "请为密钥所属的项目开通结算。不开通结算的话，Google 可能会使用你的智能体发送的内容。",
       "privacy": "你的 OpenRouter 隐私设置决定哪些服务商可以保留你的智能体发送的内容。"
@@ -3343,7 +3343,7 @@
     "clearsAt": "将于 {{time}} 清除",
     "clearsOn": "将于{{when}}清除",
     "help": {
-      "auto": "打开 agentes.chat 时显示在线。",
+      "auto": "打开 Ackwire AI 时显示在线。",
       "away": "暂时离开：大家会知道你的回复可能会慢一些。",
       "busy": "所有人都会看到现在最好不要打扰你。",
       "out": "不在工作（休假、休息日）：在你的状态消失前所有人都能看到。",
@@ -3776,7 +3776,7 @@
       "removeText_other": "{{count}} 个项目将离开 Vault，你的智能体也不再使用它们。{{name}} 中不会有任何变化。",
       "removed": "已断开 {{name}}",
       "listOf": "与 {{name}} 的连接",
-      "note": "你的智能体需要时会读取那里的内容。除名称和地址外，不会向 agentes.chat 复制任何内容。",
+      "note": "你的智能体需要时会读取那里的内容。除名称和地址外，不会向 Ackwire AI 复制任何内容。",
       "error": {
         "auth_failed": "登录被拒绝",
         "locked": "密码错误",
@@ -4464,7 +4464,7 @@
       "eyebrow": "审批请求",
       "close": "关闭",
       "exact": "具体操作",
-      "builtIn": "agentes.chat 工具",
+      "builtIn": "Ackwire AI 工具",
       "orgConnector": "你工作区的连接器",
       "bound": "仅限这些参数：任何改动都需要重新审批。",
       "why": "原因",
@@ -4896,7 +4896,7 @@
       "steps": {
         "title": "还差一步，需在 {{computer}} 本机上完成",
         "waiting": "等待中",
-        "one": "点击时钟旁的 agentes.chat 图标",
+        "one": "点击时钟旁的 Ackwire AI 图标",
         "two": "偏好设置",
         "three": "开启“浏览器”",
         "done": "完成了。此页面会自动检测，无需刷新。",
@@ -5595,10 +5595,10 @@
       "afterPlanNext": "这是开通套餐后的下一步。",
       "plan": {
         "todo": "开启团队。",
-        "todoDesc": "有了 agentes.chat 套餐，智能体就会开始工作。",
+        "todoDesc": "有了 Ackwire AI 套餐，智能体就会开始工作。",
         "action": "查看套餐",
         "todoPersonal": "开启你的智能体。",
-        "todoDescPersonal": "有了 agentes.chat 套餐，你的智能体就会开始工作。"
+        "todoDescPersonal": "有了 Ackwire AI 套餐，你的智能体就会开始工作。"
       },
       "about": {
         "action": "告诉我",
@@ -6370,13 +6370,13 @@
       },
       "mailFor": "{{names}} 收到的样子",
       "mail": {
-        "from": "agentes.chat · 收件人：{{to}}",
+        "from": "Ackwire AI · 收件人：{{to}}",
         "toMany": "{{email}} 和另外 {{count}} 人",
-        "subject": "你受邀加入 agentes.chat 上的一个工作区",
+        "subject": "你受邀加入 Ackwire AI 上的一个工作区",
         "headline": "你受邀加入一个工作区",
         "body": "<b>{{name}}</b> ({{email}}) 邀请你以成员身份加入 <b>{{org}}</b>。",
         "noteFrom": "<b>{{name}}：</b>“{{note}}”",
-        "what": "agentes.chat 是成员和 AI 智能体一起工作的地方。",
+        "what": "Ackwire AI 是成员和 AI 智能体一起工作的地方。",
         "button": "接受邀请",
         "small": "邀请 7 天内有效。请用这个邮箱地址接受。"
       },
@@ -6555,7 +6555,7 @@
     "crashTitle": "出了点问题",
     "crashText": "请重新加载页面以继续。",
     "crashCode": "如需求助，请提供代码 {{id}}。",
-    "unreachableTitle": "无法连接 agentes.chat",
+    "unreachableTitle": "无法连接 Ackwire AI",
     "unreachableText": "它可能正在重启。恢复后此页面会自动打开。",
     "offlineTitle": "你已离线",
     "offlineText": "恢复联网后此页面会自动打开。"
@@ -8070,7 +8070,7 @@
       "title": "专项任务文件",
       "folder": "文件夹",
       "tabs": "文件",
-      "missionSub": "计划和规则 · 由 agentes.chat 更新",
+      "missionSub": "计划和规则 · 由 Ackwire AI 更新",
       "decisionsSub": "已批准的决定",
       "notesSub": "{{executor}} 的笔记",
       "synced": "{{when}}已同步",
@@ -8143,7 +8143,7 @@
       "title": "新建专项任务",
       "text": "交给智能体的长期项目。它会提出计划，在自己的电脑上工作，并在话题中请你做决定和审核。",
       "goal": "目标",
-      "goalPlaceholder": "例如：基于现有的网页版，用 Expo 开发 agentes.chat 移动应用。",
+      "goalPlaceholder": "例如：基于现有的网页版，用 Expo 开发 Ackwire AI 移动应用。",
       "agent": "智能体",
       "computer": "电脑",
       "noMachine": "没有已连接的电脑",
@@ -9018,7 +9018,7 @@
   },
   "jev": {
     "title": "Jev",
-    "about": "TypeSafe 推出的快速模型，专为快速决策而生。agentes.chat 会问它一些小问题，比如该由谁来回复。费用直接付给 TypeSafe。",
+    "about": "TypeSafe 推出的快速模型，专为快速决策而生。Ackwire AI 会问它一些小问题，比如该由谁来回复。费用直接付给 TypeSafe。",
     "lead": "帮你的智能体像团队一样协作。",
     "how": "Jev 如何工作",
     "why": {
@@ -9136,7 +9136,7 @@
         "online": "{{computer}} 正在重启或重新连接。它回来后这里会自动更新。",
         "installing": "正在 {{computer}} 上安装 {{program}}。完成后这里会自动更新。",
         "updating": "正在 {{computer}} 上更新 {{program}}。完成后这里会自动更新。",
-        "runnerOld": "{{computer}} 上的 agentes.chat 程序版本较旧，更新正在路上。完成后这里会自动更新。",
+        "runnerOld": "{{computer}} 上的 Ackwire AI 程序版本较旧，更新正在路上。完成后这里会自动更新。",
         "execOff": "{{computer}} 暂时还不能运行 {{program}}。我们正在处理，这里会自动更新。",
         "toolOff": "{{computer}} 上还未允许 {{program}}。这是我们这边的问题：请稍后再试。",
         "preparing": "{{computer}} 正在准备中。完成后这里会自动更新。",
@@ -9150,7 +9150,7 @@
     },
     "page": {
       "title": "你的套餐",
-      "hint": "每个套餐都保存在连接它的那台电脑上，管理那台电脑的人可以访问它。agentes.chat 只保存它的名称、邮箱和用量。",
+      "hint": "每个套餐都保存在连接它的那台电脑上，管理那台电脑的人可以访问它。Ackwire AI 只保存它的名称、邮箱和用量。",
       "emptyTitle": "使用你已付费的 AI 套餐",
       "emptyViewer": "负责工作区 AI 的成员连接套餐后，它会显示在这里。",
       "connect": "连接 AI",
@@ -10312,9 +10312,9 @@
     "reasons": {
       "no_computer": "在“电脑”中选择一台已连接的电脑即可使用。",
       "exec_off": "这台电脑连接时没有授予运行程序的权限。",
-      "runner_old": "在电脑上更新 agentes.chat 程序即可使用。",
-      "tool_off": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 agentes.chat 应用中开启：偏好设置 → 工具。",
-      "tool_offLinux": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 agentes.chat 应用中开启，或使用 {{command}}。",
+      "runner_old": "在电脑上更新 Ackwire AI 程序即可使用。",
+      "tool_off": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 Ackwire AI 应用中开启：偏好设置 → 工具。",
+      "tool_offLinux": "{{program}} 在 {{computer}} 上已关闭。请在那台电脑的 Ackwire AI 应用中开启，或使用 {{command}}。",
       "not_installed": "{{computer}} 上没有安装 {{program}}。",
       "not_reported": "{{computer}} 还在检查有哪些程序。完成后这里会自动更新。",
       "outdated": "{{computer}} 上的版本太旧。请更新 Codex 后使用。",
@@ -10803,7 +10803,7 @@
   "storage": {
     "title": "存储",
     "options": "文件存放位置",
-    "agentes": "agentes.chat 存储",
+    "agentes": "Ackwire AI 存储",
     "agentesText": "你的文件保存在我们的存储中，每个工作区彼此隔离。",
     "server": "这台服务器",
     "serverText": {
@@ -10814,7 +10814,7 @@
     },
     "showFolder": "显示文件夹",
     "place": {
-      "agentes": "agentes.chat 存储",
+      "agentes": "Ackwire AI 存储",
       "server": "这台服务器"
     },
     "s3": "你自己的存储桶",
@@ -10872,11 +10872,11 @@
   },
   "githubApp": {
     "title": "GitHub 仓库",
-    "text": "在安装了 agentes.chat 应用的地方，智能体以应用的身份提交 pull request、issue、评论和 commit，并附上智能体的名字和提出请求的人。从这里安装的内容只有 {{org}} 使用。",
-    "install": "安装 agentes.chat 应用",
+    "text": "在安装了 Ackwire AI 应用的地方，智能体以应用的身份提交 pull request、issue、评论和 commit，并附上智能体的名字和提出请求的人。从这里安装的内容只有 {{org}} 使用。",
+    "install": "安装 Ackwire AI 应用",
     "installMore": "安装到另一个账号",
     "none": "还没有 GitHub 账号。",
-    "usingAccount": "目前智能体在 GitHub 上显示为 {{account}}。安装应用后，它们会显示为 agentes.chat 应用。",
+    "usingAccount": "目前智能体在 GitHub 上显示为 {{account}}。安装应用后，它们会显示为 Ackwire AI 应用。",
     "allRepos": "所有仓库",
     "someRepos": "已选仓库",
     "suspended": "已在 GitHub 上暂停",
@@ -10885,26 +10885,26 @@
     "remove": "移除",
     "removeName": "移除 {{account}}",
     "removeTitle": "从 {{account}} 移除应用？",
-    "removeText": "agentes.chat 应用会从 GitHub 上的 {{account}} 卸载，智能体也不再通过它使用该账号的仓库。",
+    "removeText": "Ackwire AI 应用会从 GitHub 上的 {{account}} 卸载，智能体也不再通过它使用该账号的仓库。",
     "removeLast": "这是最后一个，所以在有人安装应用或连接账号之前，智能体都无法使用 GitHub。",
     "removed": "已从 {{account}} 移除应用，并在 GitHub 上卸载。",
     "notUninstalled": "已在这里移除应用，但 GitHub 没有确认从 {{account}} 卸载。请在 GitHub 上卸载。",
     "openPage": "打开",
-    "installed": "agentes.chat 应用已安装。",
+    "installed": "Ackwire AI 应用已安装。",
     "requested": "只有该 GitHub 账号的所有者可以安装应用。请让对方在这个工作区的 连接器 › GitHub 中安装。",
     "notVisible": "你的 GitHub 账号看不到那个安装。请用有权访问它的账号安装。",
     "otherWorkspace": "这个 GitHub 账号已关联到另一个工作区。请先在那里移除应用，再在这里安装。",
-    "installedOutside": "这个 GitHub 账号上的应用是在 agentes.chat 之外安装的。请在 GitHub 上移除它，再从 连接器 › GitHub 重新安装。",
+    "installedOutside": "这个 GitHub 账号上的应用是在 Ackwire AI 之外安装的。请在 GitHub 上移除它，再从 连接器 › GitHub 重新安装。",
     "misconfigured": "服务器上的 GitHub 应用密钥不对，所以无法完成安装。运行服务器的人需要在应用的设置中更换密钥。",
     "connectAccount": "连接 GitHub 账号",
     "ownerHint": "这台服务器的所有者可以在这里的连接器中创建 GitHub 应用。",
-    "viaApp": "通过 {{accounts}} 上的 agentes.chat 应用",
-    "disconnectApp": "agentes.chat 应用也会从 GitHub 上的 {{accounts}} 卸载。",
-    "disconnectKeepsApp": "智能体会继续通过 {{accounts}} 上的 agentes.chat 应用使用 GitHub。",
-    "keptApp": "GitHub 账号已断开连接。智能体会继续通过 agentes.chat 应用使用 GitHub。",
+    "viaApp": "通过 {{accounts}} 上的 Ackwire AI 应用",
+    "disconnectApp": "Ackwire AI 应用也会从 GitHub 上的 {{accounts}} 卸载。",
+    "disconnectKeepsApp": "智能体会继续通过 {{accounts}} 上的 Ackwire AI 应用使用 GitHub。",
+    "keptApp": "GitHub 账号已断开连接。智能体会继续通过 Ackwire AI 应用使用 GitHub。",
     "signature": {
-      "forPerson": "{{agent}}，{{person}} 在 agentes.chat 上的智能体",
-      "alone": "{{agent}}，agentes.chat 上的智能体"
+      "forPerson": "{{agent}}，{{person}} 在 Ackwire AI 上的智能体",
+      "alone": "{{agent}}，Ackwire AI 上的智能体"
     },
     "manifestPage": {
       "title": "正在创建 GitHub 应用",
@@ -11830,7 +11830,7 @@
     "continueInComposio": "在 Composio 上继续",
     "github": {
       "how": "智能体如何访问 GitHub",
-      "app": "agentes.chat 应用",
+      "app": "Ackwire AI 应用",
       "recommended": "推荐",
       "appText": "智能体显示为应用，仓库在 GitHub 上选择。",
       "account": "GitHub 账号",
@@ -11851,7 +11851,7 @@
     "or": "或",
     "withKey": "用 API 密钥连接",
     "needsKey": "此服务器不支持 OAuth，请用 API 密钥连接。",
-    "notApproved": "{{name}} 只允许它批准过的应用登录，而 agentes.chat 还未获批。如果它提供 API 密钥，你可以用密钥连接。",
+    "notApproved": "{{name}} 只允许它批准过的应用登录，而 Ackwire AI 还未获批。如果它提供 API 密钥，你可以用密钥连接。",
     "serverSaid": "服务器返回：{{detail}}",
     "nothingYet": "到第 3 步之前，智能体都用不了任何功能。",
     "allCanUse": "连接后，所有智能体都可以使用。之后可以调整。",
@@ -12486,7 +12486,7 @@
       "generalKept": "#general 无法删除。",
       "generalStays": "所有人都留在 #general。",
       "mcpUnreachable": "无法连接到 MCP 服务器。请检查地址后重试。",
-      "notApproved": "这项服务尚未批准 agentes.chat。",
+      "notApproved": "这项服务尚未批准 Ackwire AI。",
       "alreadyInvited": "此人已有邀请。",
       "alreadyAsked": "已有人为此人提出申请。",
       "mailboxConnected": "这个邮箱已连接。",
@@ -12625,7 +12625,7 @@
       "noComputer": "这个智能体还没有用于专项任务的电脑。",
       "computerOffline": "智能体的电脑已离线。",
       "execDisabled": "那台电脑上的命令已关闭。",
-      "runnerOutdated": "电脑上的程序版本过旧，无法运行专项任务：请在那台电脑上更新 agentes.chat 应用，或重新运行它的安装命令。",
+      "runnerOutdated": "电脑上的程序版本过旧，无法运行专项任务：请在那台电脑上更新 Ackwire AI 应用，或重新运行它的安装命令。",
       "exists": "这个话题已经有一个专项任务。",
       "closed": "这个专项任务已关闭。",
       "wrongStatus": "专项任务当前的状态不允许此操作。",
@@ -12719,7 +12719,7 @@
       "targetNotFound": "那台电脑已不存在，请选择另一台。",
       "targetSame": "智能体已经在那台电脑上了。",
       "targetPaused": "那台电脑已暂停，请选择另一台。",
-      "accountMethodUnsupported": "这台电脑暂时无法用这种方式连接 Claude。请更新电脑上的 agentes.chat 程序，或使用 API 密钥。",
+      "accountMethodUnsupported": "这台电脑暂时无法用这种方式连接 Claude。请更新电脑上的 Ackwire AI 程序，或使用 API 密钥。",
       "offline": "{{name}} 现在离线，等它恢复后再试。",
       "paused": "{{name}} 已暂停：恢复之前不会在上面开始新的工作。",
       "timeout": "电脑没有及时响应，请重试。"
@@ -12906,9 +12906,9 @@
     },
     "host": {
       "label": "此服务器所在的电脑",
-      "desc": "agentes.chat 安装所在的位置。",
-      "descUsers": "agentes.chat 安装所在的位置，每个智能体一个用户。",
-      "descShared": "安装 agentes.chat 的电脑。智能体以安装者的身份工作。",
+      "desc": "Ackwire AI 安装所在的位置。",
+      "descUsers": "Ackwire AI 安装所在的位置，每个智能体一个用户。",
+      "descShared": "安装 Ackwire AI 的电脑。智能体以安装者的身份工作。",
       "stop": "在此工作区停止使用",
       "stopTitle": "停止使用此服务器所在的电脑？",
       "stopText": "此工作区的智能体会立即停止使用这台电脑。你随时可以再次使用它。",
@@ -12919,7 +12919,7 @@
     },
     "download": {
       "title": "连接另一台电脑",
-      "text": "在这台电脑上安装 agentes.chat 应用。",
+      "text": "在这台电脑上安装 Ackwire AI 应用。",
       "mac": "下载 {{system}} 版应用",
       "version": "版本 {{version}}",
       "versionSize": "版本 {{version}} · {{size}}",
@@ -12930,7 +12930,7 @@
       "unavailable": "应用暂未提供。",
       "unavailableCommand": "应用暂未提供。目前请使用下面的命令。",
       "firstTime": "首次使用",
-      "step1": "打开下载的文件，把 agentes.chat 拖到“应用程序”中。",
+      "step1": "打开下载的文件，把 Ackwire AI 拖到“应用程序”中。",
       "step1Install": "打开下载的文件进行安装。",
       "otherText": "在这台电脑的终端中运行以下命令，然后确认它显示的代码。",
       "waiting": "正在等待电脑连接…"
@@ -12961,7 +12961,7 @@
       "ownFolder": "每个智能体的文件夹",
       "ownFolderText": "始终允许。智能体看不到其他智能体的文件夹。",
       "noFolders": "没有额外的文件夹。每个智能体只使用自己的文件夹。",
-      "noReport": "这台电脑还没有说明它允许的内容。请在上面更新 agentes.chat。",
+      "noReport": "这台电脑还没有说明它允许的内容。请在上面更新 Ackwire AI。",
       "hidden": "只有管理员和连接者能看到这台电脑的文件夹和工具。",
       "nobody": "还没有智能体使用它",
       "usedBy": "谁在使用 {{folder}}",
@@ -13004,7 +13004,7 @@
       "disableText": "智能体会停止在这台电脑上使用 {{tool}}。要重新开启，只能在这台电脑上操作。",
       "disabled": "{{tool}} 已关闭。",
       "grantTitle": "要允许更多",
-      "grantText": "允许操作需要在这台电脑上进行：在那台电脑上打开 agentes.chat 应用（偏好设置 → 文件夹）。",
+      "grantText": "允许操作需要在这台电脑上进行：在那台电脑上打开 Ackwire AI 应用（偏好设置 → 文件夹）。",
       "grantTextTerminal": "允许操作需要在这台电脑上进行，在它的终端中：",
       "grantTextAdmin": "允许操作需要在这台电脑上进行，以管理员身份在它的终端中：",
       "grantTerminal": "没有应用？在这台电脑的终端中：",
@@ -13106,7 +13106,7 @@
       "forbidden": "你不能查看这个屏幕",
       "forbiddenText": "由所有者决定谁可以使用 {{name}}。",
       "outdated": "{{host}} 上的应用版本太旧",
-      "outdatedText": "请在 {{host}} 上更新 agentes.chat，然后重试。",
+      "outdatedText": "请在 {{host}} 上更新 Ackwire AI，然后重试。",
       "unavailable": "无法显示这个屏幕",
       "unavailableText": "请确认 {{host}} 已安装 adb 或 Xcode，然后重试。",
       "needsHelper": "请在 Mac 上完成 iPhone 设置，添加所需的测试助手。",
@@ -13249,7 +13249,7 @@
       "thisMac": "这台 Mac",
       "thisPc": "这台 PC",
       "thisComputer": "这台电脑",
-      "thisLine": "通过 agentes.chat 应用",
+      "thisLine": "通过 Ackwire AI 应用",
       "openApp": "打开应用",
       "server": "服务器或 VPS",
       "serverLine": "在它的终端里粘贴一行命令",
@@ -13262,7 +13262,7 @@
     },
     "computer": {
       "title": "连接另一台电脑",
-      "step1": "在那台电脑上安装 agentes.chat 应用：",
+      "step1": "在那台电脑上安装 Ackwire AI 应用：",
       "step2": "打开应用，用你自己的账号登录。",
       "step3": "当它询问是否让 {{org}} 的智能体使用它时，点击“允许”。",
       "shows": "它会自动出现在这里，在你共享之前只有你能用。",
@@ -13272,11 +13272,11 @@
       "noApp": "无法在上面安装应用？改用终端里的一行命令"
     },
     "thisApp": {
-      "text": "agentes.chat 应用一键即可连接，并会先征求你的同意。",
-      "open": "打开 agentes.chat 应用",
+      "text": "Ackwire AI 应用一键即可连接，并会先征求你的同意。",
+      "open": "打开 Ackwire AI 应用",
       "browserAsks": "浏览器会询问是否打开：选择“打开”，如果有“始终允许”也一并选择。",
       "noApp": "还没有应用？",
-      "afterInstall": "安装完成后，再点一次“打开 agentes.chat 应用”。链接只能用一次，10 分钟内有效。",
+      "afterInstall": "安装完成后，再点一次“打开 Ackwire AI 应用”。链接只能用一次，10 分钟内有效。",
       "waiting": "正在等待这台电脑上的应用…",
       "expired": "这个链接已过期。",
       "again": "生成新链接",
@@ -13353,7 +13353,7 @@
       },
       "qrLabel": "在手机上打开这些步骤的二维码",
       "qrLine": "在手机上操作",
-      "qrCaption": "扫码即可在 agentes.chat 应用中打开这些步骤，每项设置都有对应的按钮。",
+      "qrCaption": "扫码即可在 Ackwire AI 应用中打开这些步骤，每项设置都有对应的按钮。",
       "buildNumber": "版本号",
       "buildNumberSub": "BP2A.250605.031",
       "usbRow": "USB 调试",
@@ -13396,23 +13396,23 @@
       "qrCaption": "相机会显示一个名为 agentes-… 的 Wi-Fi 网络，但它并不存在。让手机保持连接电脑所在的 Wi-Fi。",
       "fail": {
         "mdns_off": "{{computer}} 无法在 Wi-Fi 中查找手机。请在那台电脑上更新 Android platform-tools，或改用数据线。",
-        "mdns_offMac": "{{computer}} 无法在 Wi-Fi 中查找手机。请在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 agentes.chat，然后重试。",
+        "mdns_offMac": "{{computer}} 无法在 Wi-Fi 中查找手机。请在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 Ackwire AI，然后重试。",
         "same_wifi": "无法连接到手机。它与 {{computer}} 不在同一个网络中。请把它连到同一个 Wi-Fi，然后重试。",
-        "same_wifiMac": "无法连接到手机。请把它连到与 {{computer}} 相同的 Wi-Fi。还需在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 agentes.chat。",
+        "same_wifiMac": "无法连接到手机。请把它连到与 {{computer}} 相同的 Wi-Fi。还需在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 Ackwire AI。",
         "refused": "手机停止了配对。请保持手机上的配对界面打开，然后重试。",
         "refusedCode": "手机没有接受这个配对码。请检查配对码和地址，然后重新配对。",
         "timed_out": "2 分钟内没有手机完成配对。如果是用相机扫描的二维码，或手机断开了 Wi-Fi，请把手机连到与 {{computer}} 相同的 Wi-Fi，并在无线调试中扫描。",
-        "timed_outMac": "2 分钟内没有手机完成配对。如果是用相机扫描的二维码，或手机断开了 Wi-Fi，请把手机连到与 {{computer}} 相同的 Wi-Fi，并在无线调试中扫描。还需在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 agentes.chat。",
+        "timed_outMac": "2 分钟内没有手机完成配对。如果是用相机扫描的二维码，或手机断开了 Wi-Fi，请把手机连到与 {{computer}} 相同的 Wi-Fi，并在无线调试中扫描。还需在那台 Mac 的 系统设置 › 隐私与安全性 › 本地网络 中打开 Ackwire AI。",
         "outdated": "通过 Wi-Fi 配对需要 Android 14 或更高版本，并已安装 2026 年 5 月的安全更新。请更新手机，或改用数据线。",
         "adb_missing": "{{computer}} 上没有 Android platform-tools。请在那台电脑上安装 Android Studio，然后重试。",
-        "update": "通过 Wi-Fi 配对需要 {{computer}} 上的 agentes.chat 更新到较新版本。请更新后重试。",
+        "update": "通过 Wi-Fi 配对需要 {{computer}} 上的 Ackwire AI 更新到较新版本。请更新后重试。",
         "canceled": "配对已停止。请重试。",
         "failed": "配对没有成功。请重试，或改用数据线。"
       }
     },
     "iphone": {
       "title": "连接 iPhone",
-      "lead": "iPhone 通过 Mac 连接，由 Mac 上的 agentes.chat 应用完成设置。",
+      "lead": "iPhone 通过 Mac 连接，由 Mac 上的 Ackwire AI 应用完成设置。",
       "mac": "Mac",
       "noMac": "智能体只能通过 Mac 使用 iPhone，但还没有连接任何 Mac。",
       "noMacNote": "没有 Mac？请同事连接他们的 Mac。",
@@ -13728,7 +13728,7 @@
       "claude": {
         "lead": "claude.ai、Claude Desktop 和手机：一个连接器到处可用。",
         "step1": "在 claude.ai 或 Claude Desktop 中打开 自定义 › 连接器。",
-        "step2": "点击 + 添加，然后选择“添加自定义连接器”，命名为 agentes.chat，粘贴地址并点击“继续”。",
+        "step2": "点击 + 添加，然后选择“添加自定义连接器”，命名为 Ackwire AI，粘贴地址并点击“继续”。",
         "step3": "选择“立即登录”，点击“添加”，然后在打开的页面上授权。",
         "phone": "在电脑上添加后，手机上也会显示。",
         "team": "在 Team 和 Enterprise 套餐中，由 Claude 组织的所有者在 组织设置 › 连接器 中添加连接器。然后每个人在 自定义 › 连接器 中点击“连接”。",
@@ -13763,9 +13763,9 @@
         "open": "打开 {{place}}。",
         "click": "点击“{{button}}”。",
         "clickThen": "点击“{{button}}”，然后点击“{{next}}”。",
-        "name": "命名为 agentes.chat 并粘贴地址。",
-        "nameDescribe": "命名为 agentes.chat 并写一段描述。",
-        "nameConnect": "命名为 agentes.chat 并点击“{{button}}”。",
+        "name": "命名为 Ackwire AI 并粘贴地址。",
+        "nameDescribe": "命名为 Ackwire AI 并写一段描述。",
+        "nameConnect": "命名为 Ackwire AI 并点击“{{button}}”。",
         "paste": "粘贴地址。",
         "pasteIn": "把地址粘贴到“{{field}}”。",
         "choosePaste": "选择“{{option}}”并粘贴地址。",
@@ -13784,7 +13784,7 @@
         "mode": "在聊天中切换到 {{mode}} 模式。",
         "loginRun": "要登录，请运行 <code>{{command}}</code>。",
         "loginType": "要登录，请在应用中输入 <code>{{command}}</code>。",
-        "signIn": "在打开的页面中用你的 agentes.chat 账号登录。",
+        "signIn": "在打开的页面中用你的 Ackwire AI 账号登录。",
         "signInFirst": "首次使用时，应用会要求你登录。",
         "token": "创建一个个人令牌，替换 {{placeholder}}。",
         "install": "添加到 {{app}}"
@@ -13836,7 +13836,7 @@
       "canRead": "读取回复以及智能体正在做的事。",
       "canManage": "以你的身份创建和编辑智能体、例行工作和技能。它创建的内容会通知你。",
       "never": "绝不",
-      "neverApprove": "批准智能体的操作。审批始终由 agentes.chat 中的成员负责。",
+      "neverApprove": "批准智能体的操作。审批始终由 Ackwire AI 中的成员负责。",
       "neverSettings": "更改设置、成员或权限。",
       "neverHidden": "查看你看不到的内容。",
       "loopbackWarning": "这台电脑上的任何程序都可能获得这项访问权限。只有当你刚刚在 Claude Code 或这台电脑上的其他应用中发起时，才继续。",
@@ -13850,7 +13850,7 @@
       "done": "你可以返回 {{app}} 了。",
       "cancelledTitle": "已取消连接",
       "cancelled": "没有分享任何内容。",
-      "goHome": "前往 agentes.chat",
+      "goHome": "前往 Ackwire AI",
       "language": "语言",
       "error": {
         "app_desconhecido": "无法识别这个应用",
@@ -14093,7 +14093,7 @@
       "voice": "语音",
       "apps": "AI 应用",
       "approvals": "审批",
-      "about": "关于 agentes.chat",
+      "about": "关于 Ackwire AI",
       "generalPersonal": "关于你",
       "keysPersonal": "AI 和应用",
       "membersPersonal": "成员"
@@ -14130,7 +14130,7 @@
       "rolesPersonal": "这里每个人可以做什么。所有者可以做任何事。"
     },
     "about": {
-      "basedOn": "基于 Codari Global, LLC 的 <site>agentes.chat</site>",
+      "basedOn": "基于 Codari Global, LLC 的 <site>Ackwire AI</site>",
       "version": "版本",
       "license": "依据 <license>GNU Affero General Public License v3</license> 发布的自由软件，不提供任何担保。",
       "source": "源代码",
@@ -14231,10 +14231,10 @@
     },
     "telemetry": {
       "title": "使用统计",
-      "label": "向 agentes.chat 发送匿名使用统计",
+      "label": "向 Ackwire AI 发送匿名使用统计",
       "help": "成员数、智能体数、机器规格、使用的 AI token 数，以及智能体浏览器收发的数据量等计数。绝不包括消息、文件、名称或网站。",
       "envOff": "已在此服务器的设置中关闭（TELEMETRY=off）。",
-      "envOffDesktop": "已在此服务器所在电脑上的 agentes.chat 应用中关闭（偏好设置 › 服务器）。",
+      "envOffDesktop": "已在此服务器所在电脑上的 Ackwire AI 应用中关闭（偏好设置 › 服务器）。",
       "see": "查看发送的内容",
       "dialogTitle": "发送的内容",
       "dialogText": "每天一次。下面就是下一份报告的完整内容。"
@@ -14818,7 +14818,7 @@
         "comment": "{{who}} 在 GitHub 上评论了 PR #{{number}}（{{repo}}）",
         "commentIssue": "{{who}} 在 GitHub 上评论了 issue #{{number}}（{{repo}}）",
         "commentDiscussion": "{{who}} 在 GitHub 上评论了讨论 #{{number}}（{{repo}}）",
-        "opened": "{{who}} 在 GitHub 的 #{{number}}（{{repo}}）中呼叫了 agentes.chat 应用",
+        "opened": "{{who}} 在 GitHub 的 #{{number}}（{{repo}}）中呼叫了 Ackwire AI 应用",
         "reviewed": "{{who}} 在 GitHub 上审查了 PR #{{number}}（{{repo}}）",
         "approved": "{{who}} 在 GitHub 上批准了 PR #{{number}}（{{repo}}）",
         "changes": "{{who}} 在 GitHub 上要求修改 PR #{{number}}（{{repo}}）",
@@ -15229,14 +15229,14 @@
       "no_ai_plan_not_shared": "我无法通过工作区的套餐回复你：它只回复其所有者。连接你自己的套餐后我就能回复。",
       "no_ai_plan_unattended": "我没有回复：这个请求不是由人发出的，而工作区的套餐只回复其所有者。",
       "no_ai_runner_outdated": "我现在无法回复：我的套餐所在电脑上的程序需要更新。",
-      "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 没有只使用 agentes.chat 的工具。",
+      "no_ai_plan_tools": "我在回复前停下了：那台电脑上我的套餐的 AI 没有只使用 Ackwire AI 的工具。",
       "no_ai_model_limit": "我现在无法回答：{{model}} 已达到它在我套餐中的自身上限。",
       "no_ai_model_region": "我无法回答：{{model}} 需要在 OpenCode 中开启 Global 区域（Settings › Privacy）。",
       "no_ai_model_off": "我无法回复：OpenCode 拒绝了用我的密钥调用 {{model}}。请在 OpenCode 中开启该模型或账号，或更换我的模型。",
       "no_ai_plan_inactive": "我无法回复：我的密钥所属的 OpenCode 账号没有启用 OpenCode Go。请在 OpenCode 中检查 Go 订阅，或连接拥有 Go 的账号的密钥。",
       "no_ai_commands_off": "我现在无法回答：我套餐所在电脑上的命令已关闭。",
       "no_ai_cli_missing": "我还无法回答：我的 AI 程序没有安装在我的电脑上。",
-      "no_ai_plan_hold": "我保留了你的消息。 工作区有了 agentes.chat 套餐并连接 AI 后，我会在这里回复。",
+      "no_ai_plan_hold": "我保留了你的消息。 工作区有了 Ackwire AI 套餐并连接 AI 后，我会在这里回复。",
       "no_ai_no_computer": "我还无法回答：我的 AI 需要一台电脑，而我没有。",
       "redacted": "[已删除：看起来像登录信息或密钥]",
       "action_connect_ai": "连接 AI",
@@ -15714,7 +15714,7 @@
     "machine": {
       "ready": "就绪",
       "off": "已关闭",
-      "offHelp": "只有电脑前的人可以在 agentes.chat 应用中开启：偏好设置 → 工具。",
+      "offHelp": "只有电脑前的人可以在 Ackwire AI 应用中开启：偏好设置 → 工具。",
       "needsCommand": "需要运行命令",
       "notReady": "尚未就绪",
       "turnOff": "关闭",
@@ -16001,7 +16001,7 @@
     "paused": "此工作区的智能体已暂停，等待审查。",
     "suspended": "此工作区暂时不可用。",
     "createRefused": "你现在无法创建工作区。",
-    "createUnpaid": "你已有一个工作区在等待选择 agentes.chat 套餐。请先为它选择套餐，再创建新的工作区。",
+    "createUnpaid": "你已有一个工作区在等待选择 Ackwire AI 套餐。请先为它选择套餐，再创建新的工作区。",
     "createUnpaidOpen": "打开 {{name}}",
     "createInactive": "你已有一个尚未激活的工作区，所以暂时无法创建新的工作区。",
     "agentPaused": "这个智能体暂时已暂停。",
@@ -16021,25 +16021,25 @@
       "active": "工作区已恢复正常",
       "agentHold": "{{name}} 已暂停",
       "billing": {
-        "payment": "工作区需要一个 agentes.chat 套餐",
-        "unpaid": "agentes.chat 套餐付款未成功",
-        "ended": "工作区的 agentes.chat 套餐已结束"
+        "payment": "工作区需要一个 Ackwire AI 套餐",
+        "unpaid": "Ackwire AI 套餐付款未成功",
+        "ended": "工作区的 Ackwire AI 套餐已结束"
       }
     },
     "billing": {
-      "payment": "此工作区还没有 agentes.chat 套餐。开通后，智能体就会开始工作。",
-      "unpaid": "此工作区的 agentes.chat 套餐付款未成功，智能体已停止工作。",
-      "ended": "此工作区的 agentes.chat 套餐已结束，智能体已停止工作。对话和文件仍然保留，可以阅读和下载。",
-      "sub": "你仍然可以在这里阅读和发消息。agentes.chat 套餐恢复正常后，智能体就会回来。",
+      "payment": "此工作区还没有 Ackwire AI 套餐。开通后，智能体就会开始工作。",
+      "unpaid": "此工作区的 Ackwire AI 套餐付款未成功，智能体已停止工作。",
+      "ended": "此工作区的 Ackwire AI 套餐已结束，智能体已停止工作。对话和文件仍然保留，可以阅读和下载。",
+      "sub": "你仍然可以在这里阅读和发消息。Ackwire AI 套餐恢复正常后，智能体就会回来。",
       "cta": {
-        "payment": "查看 agentes.chat 套餐",
+        "payment": "查看 Ackwire AI 套餐",
         "unpaid": "更新付款方式",
         "ended": "重新订阅"
       },
       "askAdmin": "此工作区的管理者可以解决这个问题。",
-      "paid": "已收到付款。agentes.chat 套餐马上开始。",
-      "teamReady": "你的团队已就绪。还需要一个 agentes.chat 套餐才能开始。",
-      "invites": "邀请随 agentes.chat 套餐开放。"
+      "paid": "已收到付款。Ackwire AI 套餐马上开始。",
+      "teamReady": "你的团队已就绪。还需要一个 Ackwire AI 套餐才能开始。",
+      "invites": "邀请随 Ackwire AI 套餐开放。"
     },
     "cloud": {
       "review": "已暂停以进行安全审查，直到我们的团队查看为止。我们的自动检查发现了可能违反服务条款（第 5 节）的活动。如有异议，请写信至 {{email}}。",
@@ -16158,7 +16158,7 @@
     "open": "打开套餐和账单",
     "opening": "正在打开…",
     "failed": "暂时无法打开，请稍后再试。",
-    "adminsOnly": "只有工作区的所有者和管理员可以管理 agentes.chat 套餐。",
+    "adminsOnly": "只有工作区的所有者和管理员可以管理 Ackwire AI 套餐。",
     "seeOptions": "查看选项",
     "people": "成员",
     "files": "文件",
@@ -16170,8 +16170,8 @@
   "limits": {
     "members": {
       "full": "此工作区已有 {{members}} 人，上限 {{limit}} 人。",
-      "fullOne": "此工作区的 agentes.chat 套餐只容纳 1 人。",
-      "fullAdmin": "要邀请更多人加入，请查看 agentes.chat 套餐的选项。",
+      "fullOne": "此工作区的 Ackwire AI 套餐只容纳 1 人。",
+      "fullAdmin": "要邀请更多人加入，请查看 Ackwire AI 套餐的选项。",
       "fullMember": "请联系工作区的负责人腾出名额。",
       "fullAddSeat": "已付费的席位都已占满。请在“套餐和账单”中添加席位。",
       "fullTop": "当前套餐无法再容纳更多成员。请在“套餐和账单”中更换套餐。",
@@ -16187,7 +16187,7 @@
       "meter": "已使用 {{used}}，共 {{limit}}。",
       "near": "已使用 {{used}}，共 {{limit}}。达到上限后上传会暂停，不会删除任何内容。",
       "full": "上传已在 {{limit}} 处暂停。没有删除任何内容。",
-      "fullAdmin": "更换 agentes.chat 套餐、删除不再使用的文件，或在 设置 › 存储 中连接你自己的存储桶。",
+      "fullAdmin": "更换 Ackwire AI 套餐、删除不再使用的文件，或在 设置 › 存储 中连接你自己的存储桶。",
       "dailyFull": "今天的上传量已达 {{limit}}。几小时后可以再次上传。"
     }
   },
@@ -16564,7 +16564,7 @@
       "turn": "横屏",
       "upright": "竖屏",
       "message": "给 {{name}} 发消息",
-      "chooseOnWeb": "请在 agentes.chat 的 设置 › 设备 中选择。"
+      "chooseOnWeb": "请在 Ackwire AI 的 设置 › 设备 中选择。"
     }
   },
   "taskManager": {
@@ -17374,7 +17374,7 @@
     },
     "action": {
       "signIn": "登录",
-      "open": "打开 agentes.chat",
+      "open": "打开 Ackwire AI",
       "latest": "打开最新版本",
       "file": "打开文件",
       "retry": "重试"
@@ -17611,7 +17611,7 @@
     "beta": {
       "word": "BETA",
       "title": "你来得很早，真好。",
-      "text": "agentes.chat 还在测试阶段：已经可以用它做真正的工作，我们也还在继续打磨。",
+      "text": "Ackwire AI 还在测试阶段：已经可以用它做真正的工作，我们也还在继续打磨。",
       "weekly": {
         "title": "每周都在变好",
         "text": "新功能和修复会不断推出。"
@@ -17647,7 +17647,7 @@
     "mark": "Beta",
     "open": "发送反馈",
     "ask": "缺了什么、哪里坏了，或者哪里让你不顺手？",
-    "goesCloud": "你写的内容会通过邮件发给 agentes.chat 团队。",
+    "goesCloud": "你写的内容会通过邮件发给 Ackwire AI 团队。",
     "goesServer": "你写的内容会通过邮件发给管理这台服务器的人。",
     "placeholder": "随意写就好",
     "report": "在这里报告问题",
@@ -17669,14 +17669,14 @@
     "offer": {
       "group": "关于应用的报告",
       "ready": "<b>报告已备好</b>：{{summary}}",
-      "goesCloud": "会以你的名义发给 agentes.chat 团队",
+      "goesCloud": "会以你的名义发给 Ackwire AI 团队",
       "goesServer": "会以你的名义发给管理这台服务器的人",
       "see": "查看报告",
       "hide": "收起报告",
       "send": "发送",
       "notNow": "暂时不用",
       "answer": "回复会发到你的邮箱。",
-      "sentCloud": "<b>报告已发送</b>给 agentes.chat 团队",
+      "sentCloud": "<b>报告已发送</b>给 Ackwire AI 团队",
       "sentServer": "<b>报告已发送</b>给管理这台服务器的人",
       "sentAuto": "<b>报告已直接发送，未再询问</b>：{{summary}}",
       "view": "查看",

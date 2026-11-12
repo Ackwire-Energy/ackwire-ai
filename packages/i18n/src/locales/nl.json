@@ -49,7 +49,7 @@
     "notAllowed": "Je hebt hier geen toestemming voor.",
     "tooMany": "Te veel pogingen. Probeer het later opnieuw.",
     "offline": "Je bent offline. Controleer je verbinding en probeer het opnieuw.",
-    "unreachable": "agentes.chat is nu niet bereikbaar. Probeer het zo opnieuw."
+    "unreachable": "Ackwire AI is nu niet bereikbaar. Probeer het zo opnieuw."
   },
   "roles": {
     "owner": "Eigenaar",
@@ -463,7 +463,7 @@
       "noPassword": "Dit account logt in via de agentes.chat-app.",
       "noPasswordLead": "Open op de computer waarop deze server draait de app en kies Wachtwoord toevoegen in Instellingen › Je account.",
       "backToSignIn": "Terug naar inloggen",
-      "toAuthorizeApp": "Om een app aan agentes.chat te koppelen."
+      "toAuthorizeApp": "Om een app aan Ackwire AI te koppelen."
     },
     "desktop": {
       "browser": "Ga verder in je browser",
@@ -498,15 +498,15 @@
     },
     "desktopOwner": {
       "continue": "Doorgaan op deze {{device}}",
-      "text": "Je hebt agentes.chat op deze {{device}} ingericht: geen wachtwoord nodig."
+      "text": "Je hebt Ackwire AI op deze {{device}} ingericht: geen wachtwoord nodig."
     },
     "server": {
       "into": "Aanmelden bij <b>{{server}}</b>",
-      "intoHere": "Aanmelden bij agentes.chat <b>op deze {{device}}</b>"
+      "intoHere": "Aanmelden bij Ackwire AI <b>op deze {{device}}</b>"
     },
     "forgotHere": {
       "ownerTitle": "Hier heb je geen wachtwoord nodig.",
-      "ownerLead": "Je hebt agentes.chat op deze {{device}} geïnstalleerd. Meld je hier aan en maak daarna een nieuw wachtwoord.",
+      "ownerLead": "Je hebt Ackwire AI op deze {{device}} geïnstalleerd. Meld je hier aan en maak daarna een nieuw wachtwoord.",
       "notOwner": "Niet het account van wie het installeerde? Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord.",
       "title": "Deze server verstuurt geen e-mail.",
       "lead": "Vraag een eigenaar van je workspace om een link voor een nieuw wachtwoord. Die maakt hem bij Leden, en de link werkt 1 uur.",
@@ -738,7 +738,7 @@
       },
       "area": {
         "title": "En jij, waar werk je aan?",
-        "lead": "Alleen zodat we weten wie agentes.chat gebruikt.",
+        "lead": "Alleen zodat we weten wie Ackwire AI gebruikt.",
         "skip": "Deze stap overslaan",
         "options": {
           "dev": "Ontwikkeling",
@@ -872,7 +872,7 @@
     },
     "yourCompany": "je bedrijf",
     "purpose": {
-      "title": "Waarvoor ga je agentes.chat gebruiken?",
+      "title": "Waarvoor ga je Ackwire AI gebruiken?",
       "lead": "Je kunt dit later wijzigen, er gaat niets verloren.",
       "personal": "Voor mezelf",
       "personalText": "Agents voor je agenda, rekeningen, training en alles wat je vraagt.",
@@ -957,7 +957,7 @@
         "private": "Vanuit je AI-app: niet beschikbaar op deze server, omdat apps zoals Claude en ChatGPT alleen met een openbaar https-adres verbinden."
       },
       "otherName": "Een andere app",
-      "agenteschatName": "agentes.chat",
+      "agenteschatName": "Ackwire AI",
       "where": {
         "openbotrun": "Sleep openbot-import.json (van Migrator by OpenBot) of openbot-transfer.json (van de instance-overdracht) hierheen, of de .zip waarin het kwam.",
         "openmausbot": "In OpenMausBot: klik met rechts op het team → Share team… → Save file.",
@@ -1384,7 +1384,7 @@
     "reload": "Herladen",
     "search": "Zoek of vraag…",
     "look": "Rechtsklik",
-    "lookOurs": "agentes.chat",
+    "lookOurs": "Ackwire AI",
     "lookSystem": "Systeem",
     "markRead": "Markeren als gelezen",
     "muteChannel": "Kanaal dempen",
@@ -1409,8 +1409,8 @@
     "copied": "Gekopieerd. Plak het in de terminal.",
     "mac": {
       "why": "<b>De app is in beta.</b> Daarom vraagt je Mac de eerste keer om een bevestiging:",
-      "drag": "Sleep agentes.chat naar Apps.",
-      "dragLong": "Open het gedownloade bestand en sleep agentes.chat naar Apps.",
+      "drag": "Sleep Ackwire AI naar Apps.",
+      "dragLong": "Open het gedownloade bestand en sleep Ackwire AI naar Apps.",
       "blocked": "Open de app en klik op Gereed.",
       "blockedSub": "Klik niet op Verplaats naar prullenmand.",
       "settings": "Klik in Systeeminstellingen › Privacy en beveiliging op Open toch.",
@@ -1437,17 +1437,17 @@
       "why": "Voor Ubuntu, Debian en vergelijkbare systemen (x64). Linux vraagt niets extra:",
       "apt": "Installeer de .deb met een dubbelklik, of via de terminal.",
       "aptLong": "Dubbelklik op het gedownloade bestand en klik op Installeren, of plak dit in de terminal:",
-      "open": "Open agentes.chat vanuit je apps.",
+      "open": "Open Ackwire AI vanuit je apps.",
       "otherTitle": "Gebruik je Arch, Fedora of een ander systeem dat geen .deb accepteert?",
       "otherText": "Download de AppImage: die werkt op elke distributie en werkt zichzelf bij. Plak daarna dit in de terminal, in de map waar je het hebt opgeslagen:",
       "appImage": "AppImage downloaden"
     },
     "page": {
-      "docTitle": "Download de app · agentes.chat",
+      "docTitle": "Download de app · Ackwire AI",
       "title": "Download de agentes.chat-app",
       "beta": "Beta",
       "text": "Je workspace in een eigen venster, met de meldingen van je systeem. Met één klik werken agents op deze computer, in hun eigen mappen.",
-      "open": "agentes.chat openen",
+      "open": "Ackwire AI openen",
       "version": "Versie {{version}}",
       "versionSize": "Versie {{version}} · {{size}}",
       "soon": "Er is nog geen versie voor {{system}}.",
@@ -1457,7 +1457,7 @@
       "installOn": "Installeren op {{system}}",
       "system": "Systeem",
       "whyTitle": "Waarom vraagt mijn computer om een bevestiging?",
-      "whyText": "agentes.chat is in beta: de Mac-versie is nog niet door Apple genotariseerd, en het Windows-installatieprogramma heeft nog geen Microsoft-certificaat. Zonder die twee vraagt je computer één keer om bevestiging voordat hij een app van internet opent. Daarna opent hij meteen en werkt hij zichzelf bij. Voordat de beta afloopt, verdwijnt deze stap.",
+      "whyText": "Ackwire AI is in beta: de Mac-versie is nog niet door Apple genotariseerd, en het Windows-installatieprogramma heeft nog geen Microsoft-certificaat. Zonder die twee vraagt je computer één keer om bevestiging voordat hij een app van internet opent. Daarna opent hij meteen en werkt hij zichzelf bij. Voordat de beta afloopt, verdwijnt deze stap.",
       "openSource": "Opensource",
       "onlyHere": "Alleen hier en in de releases van het project gepubliceerd",
       "signedUpdates": "Ondertekende updates"
@@ -1717,7 +1717,7 @@
     "addWorkspace": "Werkruimte toevoegen",
     "addWorkspaceHint": "Doe mee met een bestaande, maak een nieuwe of gebruik de server van je team",
     "yourServer": "Je server",
-    "serverHere": "agentes.chat op deze {{device}}",
+    "serverHere": "Ackwire AI op deze {{device}}",
     "serverStopped": "gestopt",
     "serverOffline": "offline sinds {{time}}",
     "serverSignedOut": "niet aangemeld",
@@ -3461,7 +3461,7 @@
     "clearsAt": "Wordt gewist om {{time}}",
     "clearsOn": "Wordt gewist {{when}}",
     "help": {
-      "auto": "Online zolang agentes.chat open is.",
+      "auto": "Online zolang Ackwire AI open is.",
       "away": "Even weg: mensen weten dat antwoorden wat langer kunnen duren.",
       "busy": "Iedereen ziet dat je nu liever niet gestoord wordt.",
       "out": "Niet aan het werk (vakantie, vrije dag): iedereen ziet het tot je status verdwijnt.",
@@ -3913,7 +3913,7 @@
       "removeText_other": "De {{count}} items verdwijnen uit de Vault en je agenten gebruiken ze niet meer. In {{name}} verandert niets.",
       "removed": "{{name}} ontkoppeld",
       "listOf": "Koppelingen met {{name}}",
-      "note": "Je agenten lezen wat daar staat als ze het nodig hebben. Naar agentes.chat wordt niets gekopieerd behalve namen en adressen.",
+      "note": "Je agenten lezen wat daar staat als ze het nodig hebben. Naar Ackwire AI wordt niets gekopieerd behalve namen en adressen.",
       "error": {
         "auth_failed": "Inloggen geweigerd",
         "locked": "Verkeerd wachtwoord",
@@ -4630,7 +4630,7 @@
       "eyebrow": "Goedkeuringsverzoek",
       "close": "Sluiten",
       "exact": "De exacte actie",
-      "builtIn": "Tool van agentes.chat",
+      "builtIn": "Tool van Ackwire AI",
       "orgConnector": "Connector van je werkruimte",
       "bound": "Alleen voor deze waarden: elke wijziging vraagt een nieuwe goedkeuring.",
       "why": "Waarom",
@@ -6608,13 +6608,13 @@
       },
       "mailFor": "Zo komt het aan bij {{names}}",
       "mail": {
-        "from": "agentes.chat · aan {{to}}",
+        "from": "Ackwire AI · aan {{to}}",
         "toMany": "{{email}} en {{count}} meer",
-        "subject": "Je bent uitgenodigd voor een werkruimte op agentes.chat",
+        "subject": "Je bent uitgenodigd voor een werkruimte op Ackwire AI",
         "headline": "Je bent uitgenodigd voor een werkruimte",
         "body": "<b>{{name}}</b> ({{email}}) nodigt je uit om lid te worden van <b>{{org}}</b> als lid.",
         "noteFrom": "<b>{{name}}:</b> ‘{{note}}’",
-        "what": "Op agentes.chat werken mensen en AI-agents samen.",
+        "what": "Op Ackwire AI werken mensen en AI-agents samen.",
         "button": "Uitnodiging accepteren",
         "small": "De uitnodiging werkt 7 dagen. Accepteer haar met dit e-mailadres."
       },
@@ -6798,7 +6798,7 @@
     "crashTitle": "Er ging iets mis",
     "crashText": "Herlaad de pagina om verder te gaan.",
     "crashCode": "Vraag je om hulp, geef dan de code {{id}} door.",
-    "unreachableTitle": "agentes.chat is niet bereikbaar",
+    "unreachableTitle": "Ackwire AI is niet bereikbaar",
     "unreachableText": "Misschien wordt het opnieuw opgestart. Deze pagina opent vanzelf zodra het weer werkt.",
     "offlineTitle": "Je bent offline",
     "offlineText": "Deze pagina opent vanzelf zodra je weer online bent."
@@ -8379,7 +8379,7 @@
       "title": "Bestanden van de missie",
       "folder": "map",
       "tabs": "Bestand",
-      "missionSub": "Plan en regels · bijgewerkt door agentes.chat",
+      "missionSub": "Plan en regels · bijgewerkt door Ackwire AI",
       "decisionsSub": "Goedgekeurde besluiten",
       "notesSub": "Notities van {{executor}}",
       "notesSub_female": "Notities van {{executor}}",
@@ -8457,7 +8457,7 @@
       "title": "Nieuwe missie",
       "text": "Een lang project voor een agent. Hij stelt een plan voor, werkt op zijn computer en vraagt in de thread om besluiten en reviews.",
       "goal": "Doel",
-      "goalPlaceholder": "Bijv. bouw de mobiele app van agentes.chat in Expo, op basis van de huidige web-app.",
+      "goalPlaceholder": "Bijv. bouw de mobiele app van Ackwire AI in Expo, op basis van de huidige web-app.",
       "agent": "Agent",
       "computer": "Computer",
       "noMachine": "Geen gekoppeld",
@@ -9381,7 +9381,7 @@
   },
   "jev": {
     "title": "Jev",
-    "about": "Een snel model van TypeSafe, gemaakt voor snelle beslissingen. agentes.chat stelt het kleine vragen, zoals wie moet antwoorden. Je betaalt TypeSafe rechtstreeks.",
+    "about": "Een snel model van TypeSafe, gemaakt voor snelle beslissingen. Ackwire AI stelt het kleine vragen, zoals wie moet antwoorden. Je betaalt TypeSafe rechtstreeks.",
     "lead": "Helpt je agents samen te werken als team.",
     "how": "Hoe Jev werkt",
     "why": {
@@ -9514,7 +9514,7 @@
     },
     "page": {
       "title": "Je abonnementen",
-      "hint": "Elk abonnement blijft op de computer waarop het gekoppeld is, en wie die computer beheert, kan erbij. agentes.chat bewaart alleen de naam, het e-mailadres en het gebruik.",
+      "hint": "Elk abonnement blijft op de computer waarop het gekoppeld is, en wie die computer beheert, kan erbij. Ackwire AI bewaart alleen de naam, het e-mailadres en het gebruik.",
       "emptyTitle": "Gebruik het AI-abonnement dat je al betaalt",
       "emptyViewer": "Wie de AI van de werkruimte beheert, verbindt een abonnement, en het verschijnt hier.",
       "connect": "AI koppelen",
@@ -11341,7 +11341,7 @@
     "requested": "Alleen de eigenaar van het GitHub-account kan de app installeren. Vraag die persoon de app te installeren via Connectors › GitHub in deze werkruimte.",
     "notVisible": "Je GitHub-account kan die installatie niet zien. Installeer hem met een account dat er toegang toe heeft.",
     "otherWorkspace": "Dat GitHub-account is al gekoppeld aan een andere werkruimte. Verwijder de app daar voordat je hem hier installeert.",
-    "installedOutside": "De app is buiten agentes.chat op dat GitHub-account geïnstalleerd. Verwijder hem op GitHub en installeer hem opnieuw via Connectors › GitHub.",
+    "installedOutside": "De app is buiten Ackwire AI op dat GitHub-account geïnstalleerd. Verwijder hem op GitHub en installeer hem opnieuw via Connectors › GitHub.",
     "misconfigured": "De GitHub-app heeft op de server de verkeerde geheime sleutel, dus de installatie kan niet worden afgerond. Wie de server beheert, moet de sleutel vervangen in de instellingen van de app.",
     "connectAccount": "Een GitHub-account koppelen",
     "ownerHint": "De eigenaar van deze server kan de GitHub-app hier bij Connectors maken.",
@@ -11350,8 +11350,8 @@
     "disconnectKeepsApp": "Agents blijven op GitHub via de agentes.chat-app op {{accounts}}.",
     "keptApp": "GitHub-account ontkoppeld. Agents blijven op GitHub via de agentes.chat-app.",
     "signature": {
-      "forPerson": "{{agent}}, agent van {{person}} op agentes.chat",
-      "alone": "{{agent}}, een agent op agentes.chat"
+      "forPerson": "{{agent}}, agent van {{person}} op Ackwire AI",
+      "alone": "{{agent}}, een agent op Ackwire AI"
     },
     "manifestPage": {
       "title": "GitHub-app wordt gemaakt",
@@ -12322,7 +12322,7 @@
     "or": "of",
     "withKey": "Koppelen met een API-sleutel",
     "needsKey": "Deze server ondersteunt geen OAuth. Koppel met een API-sleutel.",
-    "notApproved": "{{name}} laat alleen goedgekeurde apps inloggen, en agentes.chat is nog niet goedgekeurd. Krijg je er een API-sleutel, dan kun je daarmee koppelen.",
+    "notApproved": "{{name}} laat alleen goedgekeurde apps inloggen, en Ackwire AI is nog niet goedgekeurd. Krijg je er een API-sleutel, dan kun je daarmee koppelen.",
     "serverSaid": "De server antwoordde: {{detail}}",
     "nothingYet": "Tot stap 3 is er niets beschikbaar voor agents.",
     "allCanUse": "Na het koppelen kan elke agent het gebruiken. Dat kun je later aanpassen.",
@@ -12974,7 +12974,7 @@
       "generalKept": "#general kan niet worden verwijderd.",
       "generalStays": "Iedereen blijft in #general.",
       "mcpUnreachable": "Kon geen verbinding maken met de MCP-server. Controleer het adres en probeer het opnieuw.",
-      "notApproved": "Deze dienst heeft agentes.chat nog niet goedgekeurd.",
+      "notApproved": "Deze dienst heeft Ackwire AI nog niet goedgekeurd.",
       "alreadyInvited": "Deze persoon heeft al een uitnodiging.",
       "alreadyAsked": "Iemand heeft deze persoon al aangevraagd.",
       "mailboxConnected": "Deze mailbox is al verbonden.",
@@ -13395,9 +13395,9 @@
     },
     "host": {
       "label": "De computer van deze server",
-      "desc": "Waar agentes.chat is geïnstalleerd.",
-      "descUsers": "Waar agentes.chat is geïnstalleerd, één gebruiker per agent.",
-      "descShared": "De computer waarop agentes.chat is geïnstalleerd. Agents werken als de persoon die het heeft geïnstalleerd.",
+      "desc": "Waar Ackwire AI is geïnstalleerd.",
+      "descUsers": "Waar Ackwire AI is geïnstalleerd, één gebruiker per agent.",
+      "descShared": "De computer waarop Ackwire AI is geïnstalleerd. Agents werken als de persoon die het heeft geïnstalleerd.",
       "stop": "Niet meer gebruiken in deze werkruimte",
       "stopTitle": "De computer van deze server niet meer gebruiken?",
       "stopText": "De agents van deze werkruimte stoppen nu met deze computer. Je kunt hem weer gebruiken wanneer je wilt.",
@@ -13419,7 +13419,7 @@
       "unavailable": "De app is nog niet beschikbaar.",
       "unavailableCommand": "De app is nog niet beschikbaar. Gebruik voorlopig de opdracht hieronder.",
       "firstTime": "De eerste keer",
-      "step1": "Open het gedownloade bestand en sleep agentes.chat naar Apps.",
+      "step1": "Open het gedownloade bestand en sleep Ackwire AI naar Apps.",
       "step1Install": "Open het gedownloade bestand om het te installeren.",
       "otherText": "Voer dit uit in de terminal van de computer en bevestig dan de code die hij toont.",
       "waiting": "Wachten tot de computer verbinding maakt…"
@@ -13450,7 +13450,7 @@
       "ownFolder": "De map van elke agent",
       "ownFolderText": "Altijd. Een agent ziet die van een ander niet.",
       "noFolders": "Geen extra mappen. Elke agent gebruikt alleen zijn eigen map.",
-      "noReport": "Deze computer heeft nog niet doorgegeven wat hij toestaat. Werk agentes.chat erop bij.",
+      "noReport": "Deze computer heeft nog niet doorgegeven wat hij toestaat. Werk Ackwire AI erop bij.",
       "hidden": "Alleen beheerders en degene die hem heeft gekoppeld zien de mappen en tools van deze computer.",
       "nobody": "Nog geen agent gebruikt hem",
       "usedBy": "Wie {{folder}} gebruikt",
@@ -13596,7 +13596,7 @@
       "forbidden": "Je kunt dit scherm niet zien",
       "forbiddenText": "De eigenaar kiest wie {{name}} mag gebruiken.",
       "outdated": "De app op {{host}} is hier te oud voor",
-      "outdatedText": "Werk agentes.chat bij op {{host}} en probeer het dan opnieuw.",
+      "outdatedText": "Werk Ackwire AI bij op {{host}} en probeer het dan opnieuw.",
       "unavailable": "Dit scherm kan niet worden getoond",
       "unavailableText": "Controleer of adb of Xcode op {{host}} is geïnstalleerd en probeer het dan opnieuw.",
       "needsHelper": "Rond de iPhone-instelling op de Mac af om de testhelper toe te voegen die nodig is.",
@@ -13742,7 +13742,7 @@
       "thisMac": "Deze Mac",
       "thisPc": "Deze pc",
       "thisComputer": "Deze computer",
-      "thisLine": "Via de app van agentes.chat",
+      "thisLine": "Via de app van Ackwire AI",
       "openApp": "Open de app",
       "server": "Een server of VPS",
       "serverLine": "Eén regel om in de terminal te plakken",
@@ -13846,7 +13846,7 @@
       },
       "qrLabel": "QR-code die deze stappen op de telefoon opent",
       "qrLine": "Doe het vanaf je telefoon",
-      "qrCaption": "Scan om deze stappen te openen in de app van agentes.chat, met knoppen voor elke instelling.",
+      "qrCaption": "Scan om deze stappen te openen in de app van Ackwire AI, met knoppen voor elke instelling.",
       "buildNumber": "Buildnummer",
       "buildNumberSub": "BP2A.250605.031",
       "usbRow": "USB-foutopsporing",
@@ -13889,23 +13889,23 @@
       "qrCaption": "Die biedt een wifinetwerk aan met de naam agentes-…, dat niet bestaat. Houd de telefoon op de wifi van de computer.",
       "fail": {
         "mdns_off": "{{computer}} kan geen telefoons zoeken op de wifi. Werk daar Android platform-tools bij, of gebruik een kabel.",
-        "mdns_offMac": "{{computer}} kan geen telefoons zoeken op de wifi. Zet op die Mac agentes.chat aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk en probeer het opnieuw.",
+        "mdns_offMac": "{{computer}} kan geen telefoons zoeken op de wifi. Zet op die Mac Ackwire AI aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk en probeer het opnieuw.",
         "same_wifi": "De telefoon was niet bereikbaar. Hij zit niet op hetzelfde netwerk als {{computer}}. Zet hem op dezelfde wifi en probeer het opnieuw.",
-        "same_wifiMac": "De telefoon was niet bereikbaar. Zet hem op dezelfde wifi als {{computer}}. Zet op die Mac ook agentes.chat aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk.",
+        "same_wifiMac": "De telefoon was niet bereikbaar. Zet hem op dezelfde wifi als {{computer}}. Zet op die Mac ook Ackwire AI aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk.",
         "refused": "De telefoon stopte het koppelen. Laat het koppelscherm open en probeer het opnieuw.",
         "refusedCode": "De telefoon nam die code niet aan. Controleer de code en het adres, en koppel opnieuw.",
         "timed_out": "Binnen 2 minuten is geen telefoon gekoppeld. Als de camera de code scande of de telefoon de wifi verliet, zet hem op dezelfde wifi als {{computer}} en scan via Draadloze foutopsporing.",
-        "timed_outMac": "Binnen 2 minuten is geen telefoon gekoppeld. Als de camera de code scande of de telefoon de wifi verliet, zet hem op dezelfde wifi als {{computer}} en scan via Draadloze foutopsporing. Zet op die Mac ook agentes.chat aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk.",
+        "timed_outMac": "Binnen 2 minuten is geen telefoon gekoppeld. Als de camera de code scande of de telefoon de wifi verliet, zet hem op dezelfde wifi als {{computer}} en scan via Draadloze foutopsporing. Zet op die Mac ook Ackwire AI aan in Systeeminstellingen › Privacy en beveiliging › Lokaal netwerk.",
         "outdated": "Koppelen via wifi vraagt Android 14 of nieuwer met de beveiligingsupdate van mei 2026. Werk de telefoon bij, of gebruik een kabel.",
         "adb_missing": "{{computer}} heeft geen Android platform-tools. Installeer daar Android Studio en probeer het opnieuw.",
-        "update": "Koppelen via wifi vraagt een nieuwere agentes.chat op {{computer}}. Werk hem bij en probeer het opnieuw.",
+        "update": "Koppelen via wifi vraagt een nieuwere Ackwire AI op {{computer}}. Werk hem bij en probeer het opnieuw.",
         "canceled": "Het koppelen is gestopt. Probeer het opnieuw.",
         "failed": "Het koppelen lukte niet. Probeer het opnieuw, of gebruik een kabel."
       }
     },
     "iphone": {
       "title": "iPhone koppelen",
-      "lead": "iPhones verbinden via een Mac, waar de app van agentes.chat alles instelt.",
+      "lead": "iPhones verbinden via een Mac, waar de app van Ackwire AI alles instelt.",
       "mac": "Mac",
       "noMac": "Agents kunnen een iPhone alleen via een Mac gebruiken, en er is er nog geen gekoppeld.",
       "noMacNote": "Geen Mac? Vraag een teamgenoot de zijne te koppelen.",
@@ -14235,7 +14235,7 @@
       "claude": {
         "lead": "claude.ai, Claude Desktop en telefoon: één connector werkt overal.",
         "step1": "Open Customize › Connectors op claude.ai of in Claude Desktop.",
-        "step2": "Klik op + Add, dan op Add custom connector, noem hem agentes.chat, plak het adres en klik op Continue.",
+        "step2": "Klik op + Add, dan op Add custom connector, noem hem Ackwire AI, plak het adres en klik op Continue.",
         "step3": "Kies Sign in now, klik op Add en geef toestemming op de pagina die opent.",
         "phone": "Hij verschijnt op je telefoon zodra hij op de computer is toegevoegd.",
         "team": "Bij Team- en Enterprise-abonnementen voegt de Owner van de Claude-organisatie de connector toe in Organization settings › Connectors. Daarna klikt iedereen op Connect in Customize › Connectors.",
@@ -14270,9 +14270,9 @@
         "open": "Open {{place}}.",
         "click": "Klik op {{button}}.",
         "clickThen": "Klik op {{button}} en daarna op {{next}}.",
-        "name": "Noem hem agentes.chat en plak het adres.",
-        "nameDescribe": "Noem hem agentes.chat en voeg een beschrijving toe.",
-        "nameConnect": "Noem hem agentes.chat en klik op {{button}}.",
+        "name": "Noem hem Ackwire AI en plak het adres.",
+        "nameDescribe": "Noem hem Ackwire AI en voeg een beschrijving toe.",
+        "nameConnect": "Noem hem Ackwire AI en klik op {{button}}.",
         "paste": "Plak het adres.",
         "pasteIn": "Plak het adres in {{field}}.",
         "choosePaste": "Kies {{option}} en plak het adres.",
@@ -14357,7 +14357,7 @@
       "done": "Je kunt terug naar {{app}}.",
       "cancelledTitle": "Koppeling geannuleerd",
       "cancelled": "Er is niets gedeeld.",
-      "goHome": "Naar agentes.chat",
+      "goHome": "Naar Ackwire AI",
       "language": "Taal",
       "error": {
         "app_desconhecido": "We herkennen deze app niet",
@@ -14600,7 +14600,7 @@
       "voice": "Spraak",
       "apps": "AI-apps",
       "approvals": "Goedkeuringen",
-      "about": "Over agentes.chat",
+      "about": "Over Ackwire AI",
       "generalPersonal": "Over jou",
       "keysPersonal": "AI en apps",
       "membersPersonal": "Mensen"
@@ -14637,7 +14637,7 @@
       "rolesPersonal": "Wat ieder hier kan doen. Eigenaren kunnen alles."
     },
     "about": {
-      "basedOn": "Gebaseerd op <site>agentes.chat</site> van Codari Global, LLC",
+      "basedOn": "Gebaseerd op <site>Ackwire AI</site> van Codari Global, LLC",
       "version": "Versie",
       "license": "Vrije software onder de <license>GNU Affero General Public License v3</license>, zonder garantie.",
       "source": "Broncode",
@@ -14738,7 +14738,7 @@
     },
     "telemetry": {
       "title": "Gebruiksstatistieken",
-      "label": "Anonieme gebruiksstatistieken naar agentes.chat sturen",
+      "label": "Anonieme gebruiksstatistieken naar Ackwire AI sturen",
       "help": "Aantallen zoals mensen, agents, machinegroottes, gebruikte AI-tokens en hoeveel data de browsers van de agents versturen en ontvangen. Nooit berichten, bestanden, namen of sites.",
       "envOff": "Uitgezet in de instellingen van deze server (TELEMETRY=off).",
       "envOffDesktop": "Uitgezet in de agentes.chat-app op de computer van deze server (Voorkeuren › Servers).",
@@ -17101,7 +17101,7 @@
       "turn": "Draai liggend",
       "upright": "Draai rechtop",
       "message": "Bericht aan {{name}}",
-      "chooseOnWeb": "Kies hem op agentes.chat, in Instellingen › Apparaten."
+      "chooseOnWeb": "Kies hem op Ackwire AI, in Instellingen › Apparaten."
     }
   },
   "taskManager": {
@@ -17934,7 +17934,7 @@
     },
     "action": {
       "signIn": "Inloggen",
-      "open": "agentes.chat openen",
+      "open": "Ackwire AI openen",
       "latest": "Nieuwste versie openen",
       "file": "Bestand openen",
       "retry": "Opnieuw proberen"
@@ -18171,7 +18171,7 @@
     "beta": {
       "word": "BETA",
       "title": "Je bent er vroeg bij. Fijn dat je er bent.",
-      "text": "agentes.chat is in bèta: je kunt er al echt mee werken, en we schaven er nog aan.",
+      "text": "Ackwire AI is in bèta: je kunt er al echt mee werken, en we schaven er nog aan.",
       "weekly": {
         "title": "Het wordt elke week beter",
         "text": "Nieuwe dingen en verbeteringen komen voortdurend uit."
@@ -18229,14 +18229,14 @@
     "offer": {
       "group": "Melding over de app",
       "ready": "<b>Melding klaar</b>: {{summary}}",
-      "goesCloud": "Gaat op jouw naam naar het team van agentes.chat",
+      "goesCloud": "Gaat op jouw naam naar het team van Ackwire AI",
       "goesServer": "Gaat op jouw naam naar degene die deze server beheert",
       "see": "Melding bekijken",
       "hide": "Melding sluiten",
       "send": "Versturen",
       "notNow": "Nu niet",
       "answer": "Het antwoord komt in je e-mail.",
-      "sentCloud": "<b>Melding verstuurd</b> naar het team van agentes.chat",
+      "sentCloud": "<b>Melding verstuurd</b> naar het team van Ackwire AI",
       "sentServer": "<b>Melding verstuurd</b> naar degene die deze server beheert",
       "sentAuto": "<b>Melding verstuurd zonder te vragen</b>: {{summary}}",
       "view": "Bekijken",

@@ -28,7 +28,7 @@
     "server": {
       "line": "Server: {{host}} ·",
       "change": "Wijzigen",
-      "title": "Waar staat je agentes.chat?",
+      "title": "Waar staat je Ackwire AI?",
       "subtitle": "Het adres dat je team in de browser opent.",
       "label": "Serveradres",
       "placeholder": "agentes.jouwteam.ts.net",

@@ -16,13 +16,13 @@ const NAMES = "⁣names⁣";
 
 /**
  * Who did what, as Atividade and the island (ADR 0071 §9) say it: the sentence's pieces around the names (drawn
- * bold between them), the names, and the whole sentence (for VoiceOver). With a restriction on agentes.chat Cloud
+ * bold between them), the names, and the whole sentence (for VoiceOver). With a restriction on Ackwire AI Cloud
  * or several agents' failures of one cause, what goes under it too.
  */
 export function useNoticeTitle(n: AppNotification) {
   const { t, i18n } = useTranslation();
   const dir = useDirectory();
-  // A restriction on agentes.chat Cloud: its whole line under the headline, and a held agent's name heads it.
+  // A restriction on Ackwire AI Cloud: its whole line under the headline, and a held agent's name heads it.
   const restriction = restrictionOf(n);
   const held = restriction?.code === "agent.paused";
   const who = whoOf(n.actors, (a) => dir.nameOf({ type: a.type === "agent" ? "agent" : "person", id: a.id }));

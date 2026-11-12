@@ -329,7 +329,7 @@ export function Sidebar() {
   const waitingFor = useMemo(() => waitingAgents(outages.data), [outages.data]);
   // The agents' presence and lines (ADR 0084): the one place that polls them; every face reads the same list.
   useAgentStatuses(orgId);
-  // The tab's title: "(3) agentes.chat", what the sidebar's numbers add up to (agents it doesn't list left out).
+  // The tab's title: "(3) Ackwire AI", what the sidebar's numbers add up to (agents it doesn't list left out).
   const hiddenAgents = useMemo(() => hiddenAgentIds(org, dir.agents), [org, dir.agents]);
   useUnreadTitle(orgId, hiddenAgents);
   const dms = useDms(orgId);
@@ -2277,7 +2277,7 @@ function MenuWorkspaces() {
           </MenuItem>
         );
       })}
-      {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
+      {/* On Ackwire AI Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
       {me.user.canCreateWorkspace !== false && (
         <MenuItem icon="plus" onSelect={() => void navigate({ to: "/onboarding" })}>
           {t("shell.newWorkspace")}
@@ -2549,7 +2549,7 @@ function WorkspaceMenuOptions({ onDone }: { onDone: () => void }) {
                 </MenuOverlayItem>
               );
             })}
-            {/* On agentes.chat Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
+            {/* On Ackwire AI Cloud, while sign-up is by invitation, only an invitation makes a workspace (ADR 0078). */}
             {me.user.canCreateWorkspace !== false && (
               <>
                 <MenuOverlaySeparator />

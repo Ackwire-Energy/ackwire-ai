@@ -1,7 +1,7 @@
 /**
- * The welcome window: how the app finds its server. agentes.chat is the one big action; your own server is a
+ * The welcome window: how the app finds its server. Ackwire AI is the one big action; your own server is a
  * small line under it, leading to Connect (an address, or one found on this computer or the Tailscale
- * network, and the one-command setup for a server that has none yet) or to running agentes.chat on this
+ * network, and the one-command setup for a server that has none yet) or to running Ackwire AI on this
  * computer. A connect link (`agenteschat://connect`) opens here
  * too: the server in large type, nothing changes before Connect. Choosing a server opens the main window there
  * and closes this one. A pair link (`agenteschat://pair`) asks to connect this computer instead (`PairLinkSheet`).
@@ -93,16 +93,16 @@ export function FirstRun() {
   const [screen, setScreen] = useState<FirstScreen>("choose");
   // Opened by the site's "Add a workspace" (ADR 0154): its first screen says so.
   const [adding, setAdding] = useState(false);
-  // Adding a workspace with agentes.chat already signed in here: making one is the big button, not signing in.
+  // Adding a workspace with Ackwire AI already signed in here: making one is the big button, not signing in.
   const [cloudSignedIn, setCloudSignedIn] = useState(false);
   const [trail, setTrail] = useState<FirstScreen[]>([]);
   // `typed`: the sheet confirms an address typed or picked in Connect, so Cancel goes back there with it.
   const [link, setLink] = useState<{ raw: string; parsed: ConnectLink | null; view: LinkView; typed?: boolean } | null>(
     null,
   );
-  // This build carries the server (Mac and Linux): "Run agentes.chat on this computer" is offered.
+  // This build carries the server (Mac and Linux): "Run Ackwire AI on this computer" is offered.
   const [canRunHere, setCanRunHere] = useState(false);
-  // The agentes.chat this computer runs (the app's, or one from the terminal): named as such, never by its address,
+  // The Ackwire AI this computer runs (the app's, or one from the terminal): named as such, never by its address,
   // and its owner page opened directly while it waits for one.
   const [local, setLocal] = useState<LocalServerStatus | null>(null);
   // Connect's address: it stays when a sheet about it is cancelled (the screen comes back new).
@@ -325,9 +325,9 @@ export function FirstRun() {
 }
 
 /**
- * agentes.chat, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): signing in to
- * agentes.chat (the workspaces an account already has, or was invited to) is the big one and a new workspace the
- * line under it; with agentes.chat already signed in here, a new workspace is the big one. The team's server stays
+ * Ackwire AI, big; your own server, small. `adding` (the site's "Add a workspace", ADR 0154): signing in to
+ * Ackwire AI (the workspaces an account already has, or was invited to) is the big one and a new workspace the
+ * line under it; with Ackwire AI already signed in here, a new workspace is the big one. The team's server stays
  * the small one; the workspaces already there stay.
  */
 function Choose({
@@ -498,7 +498,7 @@ function Connect({
 }: {
   onBack: () => void;
   backLabel: "own" | "choose";
-  /** The agentes.chat this computer runs or has from the terminal (its owner claim, while it waits for one). */
+  /** The Ackwire AI this computer runs or has from the terminal (its owner claim, while it waits for one). */
   local: LocalServerStatus | null;
   /** Its addresses (`ownAddresses`). */
   own: readonly string[];
@@ -704,7 +704,7 @@ function Connect({
 }
 
 /**
- * agentes.chat on this computer, inside the app: the owner's name and email (until the owner exists), reach
+ * Ackwire AI on this computer, inside the app: the owner's name and email (until the owner exists), reach
  * through Tailscale (off), usage statistics (on; as they were, for one that ran here before), then Start, and the
  * steps as the app runs them, each problem on its own step. One installed from the terminal already runs here:
  * Use it (its owner page while it waits for one); installed but not running: it starts there. The app runs it
@@ -1118,7 +1118,7 @@ function HereSetup({
 }
 
 /**
- * L: a server in large type, asked about before anything changes. The agentes.chat this computer runs reads as such
+ * L: a server in large type, asked about before anything changes. The Ackwire AI this computer runs reads as such
  * (at its local or its Tailscale address alike), never as an address; one on a Tailscale network says what that means.
  */
 function LinkSheet({

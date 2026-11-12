@@ -4,23 +4,23 @@ import type { HelpDocument } from "./types";
 /** The help pages in ko: a page not here shows in English. */
 export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
-    title: "내 컴퓨터에서 agentes.chat 실행하기",
+    title: "내 컴퓨터에서 Ackwire AI 실행하기",
     summary:
-      "agentes.chat 앱은 Mac, PC, Linux 컴퓨터에서 agentes.chat 자체를 실행할 수도 있어요. 혼자 쓰거나 작은 팀에 알맞아요.",
+      "Ackwire AI 앱은 Mac, PC, Linux 컴퓨터에서 Ackwire AI 자체를 실행할 수도 있어요. 혼자 쓰거나 작은 팀에 알맞아요.",
     sections: [
       {
         id: "how",
         heading: "실행 방식",
         blocks: [
           "앱 안에서 실행되고 데이터베이스도 내장되어 있어요. 모든 데이터는 이 컴퓨터의 홈 폴더에 있는 `.agentes` 폴더 하나에 저장돼요. 따로 설치할 건 없어요. Docker도, 데이터베이스 설정도 필요 없어요.",
-          "앱을 열면 시작되고 종료하면 멈춰요. 앱을 다시 열 때까지 아무도 agentes.chat을 쓸 수 없어서, 종료하기 전에 먼저 물어봐요.",
+          "앱을 열면 시작되고 종료하면 멈춰요. 앱을 다시 열 때까지 아무도 Ackwire AI을 쓸 수 없어서, 종료하기 전에 먼저 물어봐요.",
         ],
       },
       {
         id: "who",
         heading: "누구에게 맞나요",
         blocks: [
-          "혼자 또는 작은 팀이 쓰기 좋아요. 계속 켜 두는 Mac mini, 남는 PC, 노트북이 잘 맞아요. [계속 켜 두기](#keep-on)처럼 설정하세요. Mac이나 PC에서는 이 앱으로 Docker 없이 agentes.chat을 실행할 수 있어요.",
+          "혼자 또는 작은 팀이 쓰기 좋아요. 계속 켜 두는 Mac mini, 남는 PC, 노트북이 잘 맞아요. [계속 켜 두기](#keep-on)처럼 설정하세요. Mac이나 PC에서는 이 앱으로 Docker 없이 Ackwire AI을 실행할 수 있어요.",
           "더 큰 팀이라면 [어떤 방식을 고를까요](/help/install-on-a-server#choose)를 보세요. 데이터는 나중에 서버로 옮길 수 있어요.",
         ],
       },
@@ -51,7 +51,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "다른 워크스페이스에도 빌려주기",
         blocks: [
-          "여기서 실행하는 서버의 워크스페이스는 따로 할 일 없이 이 컴퓨터를 써요. agentes.chat Cloud 워크스페이스처럼 다른 곳에 있는 워크스페이스도 쓰게 하려면 **환경설정\u00a0›\u00a0서버**를 열고 **서버 추가…**를 누른 다음, 그 워크스페이스에 로그인하고 앱이 물어보면 **허용**을 누르세요.",
+          "여기서 실행하는 서버의 워크스페이스는 따로 할 일 없이 이 컴퓨터를 써요. Ackwire AI Cloud 워크스페이스처럼 다른 곳에 있는 워크스페이스도 쓰게 하려면 **환경설정\u00a0›\u00a0서버**를 열고 **서버 추가…**를 누른 다음, 그 워크스페이스에 로그인하고 앱이 물어보면 **허용**을 누르세요.",
           "워크스페이스마다 여기에 자기 에이전트와 폴더가 생겨요. **명령**은 그 워크스페이스에서도 처음부터 켜져 있어요. 앱이 물어볼 때 **허용**을 누르기 전에, 또는 나중에 **환경설정\u00a0›\u00a0도구**에서 끌 수 있어요. 그 스위치 하나가 이 컴퓨터의 모든 워크스페이스에 적용돼요.",
         ],
       },
@@ -59,8 +59,8 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "휴대폰과 팀원에게서 접속",
         blocks: [
-          "**휴대폰과 팀원이 접속할 수 있게 하기**를 켜면 agentes.chat이 내 기기 전용 사설 네트워크인 Tailscale에 연결돼요. 내 휴대폰과 초대한 사람만 참여할 수 있고, 다른 사람은 agentes.chat에 접속할 수 없어요. Tailscale은 무료예요: https://tailscale.com/download. 끄면 agentes.chat은 이 컴퓨터에서만 작동해요.",
-          "이 컴퓨터가 이미 Tailscale의 443 포트로 다른 것을 공유하고 있으면 agentes.chat은 8443을 쓰고, 주소가 `:8443`으로 끝나요.",
+          "**휴대폰과 팀원이 접속할 수 있게 하기**를 켜면 Ackwire AI이 내 기기 전용 사설 네트워크인 Tailscale에 연결돼요. 내 휴대폰과 초대한 사람만 참여할 수 있고, 다른 사람은 Ackwire AI에 접속할 수 없어요. Tailscale은 무료예요: https://tailscale.com/download. 끄면 Ackwire AI은 이 컴퓨터에서만 작동해요.",
+          "이 컴퓨터가 이미 Tailscale의 443 포트로 다른 것을 공유하고 있으면 Ackwire AI은 8443을 쓰고, 주소가 `:8443`으로 끝나요.",
         ],
       },
       {
@@ -104,7 +104,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           {
             list: [
-              "[서버에 agentes.chat을 설치](/help/install-on-a-server)하되 아직 시작하지 마세요. 그 서버의 `.env`에 `~/.agentes/.env`의 `AGENTES_SECRET`을 넣고, 데이터베이스만 시작하세요: `docker compose up -d postgres`.",
+              "[서버에 Ackwire AI을 설치](/help/install-on-a-server)하되 아직 시작하지 마세요. 그 서버의 `.env`에 `~/.agentes/.env`의 `AGENTES_SECRET`을 넣고, 데이터베이스만 시작하세요: `docker compose up -d postgres`.",
               "덤프를 불러오세요: `docker compose exec -T postgres psql -U agentes -d agentes -v ON_ERROR_STOP=1 < agentes.sql`.",
               "`docker compose up -d`로 시작하고, 전체 가이드에 나온 대로 `~/.agentes/files`를 복사한 다음, 전처럼 로그인하세요.",
             ],
@@ -116,11 +116,11 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   computers: {
     title: "내 컴퓨터와 휴대폰",
     summary:
-      "Mac, PC, Linux 컴퓨터, 서버, 휴대폰을 가져오면 에이전트가 거기서 일해요. agentes.chat Cloud에서도, 내 서버에서도 똑같아요.",
+      "Mac, PC, Linux 컴퓨터, 서버, 휴대폰을 가져오면 에이전트가 거기서 일해요. Ackwire AI Cloud에서도, 내 서버에서도 똑같아요.",
     sections: [
       {
         id: "app",
-        heading: "agentes.chat 앱에서",
+        heading: "Ackwire AI 앱에서",
         blocks: [
           "그 컴퓨터에 앱을 설치해서 열고 워크스페이스에 로그인하세요. **<workspace>의 에이전트가 이 Mac을 사용하게 할까요?**라고 물어봐요(Windows에서는 이 PC, Linux에서는 이 컴퓨터). 누가 쓸 수 있는지 고르고 **허용**을 누르면 끝이에요.",
           "이미 로그인했다면 **환경설정\u00a0›\u00a0일반**의 **에이전트** 카드에서 워크스페이스를 켜세요.",
@@ -159,14 +159,14 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "open",
         heading: "앱이 열려 있는 동안",
         blocks: [
-          "에이전트는 그 컴퓨터에서 앱이 실행 중이고 컴퓨터가 깨어 있을 때만 일해요. 앱이 물어볼 때 **준비해 두기: 로그인할 때 agentes.chat 열기**를 체크한 채로 두세요. 꺼져 있거나 잠자기 중인 컴퓨터는 **오프라인**으로 보이고, 에이전트는 돌아올 때까지 기다려요.",
+          "에이전트는 그 컴퓨터에서 앱이 실행 중이고 컴퓨터가 깨어 있을 때만 일해요. 앱이 물어볼 때 **준비해 두기: 로그인할 때 Ackwire AI 열기**를 체크한 채로 두세요. 꺼져 있거나 잠자기 중인 컴퓨터는 **오프라인**으로 보이고, 에이전트는 돌아올 때까지 기다려요.",
         ],
       },
       {
         id: "pausing",
         heading: "일시 중지와 연결 해제",
         blocks: [
-          "컴퓨터에서는 시계 옆의 agentes.chat 아이콘으로 모든 워크스페이스의 에이전트를 일시 중지해요. **환경설정\u00a0›\u00a0일반**에서는 워크스페이스마다 있는 스위치로 그 워크스페이스만 일시 중지하고, **나가기**로 연결을 해제해요. 일시 중지 중에는 새 작업이 시작되지 않고, 실행 중이던 작업은 끝까지 마쳐요. 연결을 해제해도 에이전트 폴더는 디스크에 남아요.",
+          "컴퓨터에서는 시계 옆의 Ackwire AI 아이콘으로 모든 워크스페이스의 에이전트를 일시 중지해요. **환경설정\u00a0›\u00a0일반**에서는 워크스페이스마다 있는 스위치로 그 워크스페이스만 일시 중지하고, **나가기**로 연결을 해제해요. 일시 중지 중에는 새 작업이 시작되지 않고, 실행 중이던 작업은 끝까지 마쳐요. 연결을 해제해도 에이전트 폴더는 디스크에 남아요.",
           "웹사이트에서는 기기 페이지의 **삭제**로 연결을 해제해요.",
         ],
       },
@@ -174,7 +174,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "organizations",
         heading: "컴퓨터 한 대, 여러 워크스페이스",
         blocks: [
-          "같은 앱에서 워크스페이스마다 로그인하고 각각 **허용**을 누르세요. agentes.chat Cloud의 워크스페이스와 내 서버의 워크스페이스가 컴퓨터 한 대를 함께 쓸 수 있어요(앱 0.6.1 이상). 워크스페이스마다 거기에 자기 에이전트와 폴더가 있고, 하나를 연결 해제해도 나머지는 그대로예요.",
+          "같은 앱에서 워크스페이스마다 로그인하고 각각 **허용**을 누르세요. Ackwire AI Cloud의 워크스페이스와 내 서버의 워크스페이스가 컴퓨터 한 대를 함께 쓸 수 있어요(앱 0.6.1 이상). 워크스페이스마다 거기에 자기 에이전트와 폴더가 있고, 하나를 연결 해제해도 나머지는 그대로예요.",
           "앱이 이 컴퓨터에서 실행하는 서버는 이미 연결되어 있어서 따로 할 일이 없어요. 그 컴퓨터를 다른 곳에 있는 워크스페이스에도 빌려주려면 [다른 워크스페이스에도 빌려주기](/help/run-on-your-computer#another-workspace)를 보세요.",
           "노트북의 앱을 워크스페이스를 보는 창으로만 쓰나요? 에이전트가 노트북을 쓰게 할지 물어보면 **나중에**를 누르세요. 그냥 창으로 남아요.",
         ],
@@ -196,10 +196,10 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
               "내 파일과 로그인 정보",
               "다른 워크스페이스의 것을 포함한 다른 에이전트의 폴더와, 그 브라우저에 남아 있는 로그인",
               "이 컴퓨터를 연결하는 토큰",
-              "agentes.chat도 실행하는 컴퓨터라면 `.agentes`에 있는 그 데이터베이스와 키",
+              "Ackwire AI도 실행하는 컴퓨터라면 `.agentes`에 있는 그 데이터베이스와 키",
             ],
           },
-          "agentes.chat은 키, 토큰, 로그인 정보를 가리키는 명령을 거부하지만, 그건 규칙일 뿐 벽은 아니에요. **명령**은 처음부터 켜져 있어요. 앱이 물어볼 때 **허용**을 누르기 전에, 또는 나중에 **환경설정\u00a0›\u00a0도구**에서 끌 수 있어요. 그 스위치 하나가 그 컴퓨터의 모든 워크스페이스에 적용돼요. Claude Code와 Codex는 에이전트 폴더에서 자기 규칙에 따라 자기 명령을 실행해요.",
+          "Ackwire AI은 키, 토큰, 로그인 정보를 가리키는 명령을 거부하지만, 그건 규칙일 뿐 벽은 아니에요. **명령**은 처음부터 켜져 있어요. 앱이 물어볼 때 **허용**을 누르기 전에, 또는 나중에 **환경설정\u00a0›\u00a0도구**에서 끌 수 있어요. 그 스위치 하나가 그 컴퓨터의 모든 워크스페이스에 적용돼요. Claude Code와 Codex는 에이전트 폴더에서 자기 규칙에 따라 자기 명령을 실행해요.",
           "진짜 벽이 필요하면 Linux 서버를 쓰세요. Debian 13에 `--system`으로 설치하면 에이전트마다 자기 사용자가 생겨요. Ubuntu에서는 에이전트가 `agentes`라는 사용자 하나를 함께 써요. 서로의 폴더는 보이지만 내 것이나 서버의 것은 보이지 않아요. 아니면 에이전트에게 전용 컴퓨터를 주세요.",
         ],
       },
@@ -220,14 +220,14 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "내 컴퓨터와 휴대폰",
         blocks: [
-          "에이전트는 내가 가져온 컴퓨터와 휴대폰에서도 일할 수 있어요. agentes.chat 앱이 설치된 Mac이나 PC, 서버, Android 휴대폰, iPhone이요. [내가 가져온 컴퓨터와 휴대폰](/help/computers)을 보세요.",
+          "에이전트는 내가 가져온 컴퓨터와 휴대폰에서도 일할 수 있어요. Ackwire AI 앱이 설치된 Mac이나 PC, 서버, Android 휴대폰, iPhone이요. [내가 가져온 컴퓨터와 휴대폰](/help/computers)을 보세요.",
         ],
       },
       {
         id: "plans",
         heading: "내 AI 요금제",
         blocks: [
-          "에이전트는 이 컴퓨터에 로그인한 내 AI 요금제(Claude, ChatGPT, GLM, Kimi 등)로 생각할 수 있어요. API 키는 필요 없어요. 계정은 이 컴퓨터에만 남고, agentes.chat은 비밀번호나 접근 권한을 절대 보지 않아요.",
+          "에이전트는 이 컴퓨터에 로그인한 내 AI 요금제(Claude, ChatGPT, GLM, Kimi 등)로 생각할 수 있어요. API 키는 필요 없어요. 계정은 이 컴퓨터에만 남고, Ackwire AI은 비밀번호나 접근 권한을 절대 보지 않아요.",
           "Google의 AI Pro와 Ultra 요금제는 여기서 쓸 수 없어요. Google 약관상 다른 제품에서 쓸 수 없기 때문이에요. Gemini API 키는 쓸 수 있어요.",
         ],
       },
@@ -245,7 +245,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   import: {
     title: "에이전트 가져오기",
-    summary: "다른 앱이나 다른 agentes.chat 워크스페이스에서 에이전트를 지침, 스킬, 루틴, 메모리와 함께 가져오세요.",
+    summary: "다른 앱이나 다른 Ackwire AI 워크스페이스에서 에이전트를 지침, 스킬, 루틴, 메모리와 함께 가져오세요.",
     sections: [
       {
         id: "comes",
@@ -418,7 +418,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   },
   "who-answers": {
     title: "누가 메시지에 답하나요",
-    summary: "멘션하면 그 에이전트가 답해요. 멘션이 없으면 agentes.chat이 아래 순서대로 골라 줘요.",
+    summary: "멘션하면 그 에이전트가 답해요. 멘션이 없으면 Ackwire AI이 아래 순서대로 골라 줘요.",
     sections: [
       {
         id: "order",
@@ -440,7 +440,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "agentes.chat이 워크스페이스를 호스팅하면 Jev가 포함돼요. 직접 운영하는 서버에서는 소유자의 TypeSafe 키를 쓰고, 메시지당 약 US$ 0.0001이 들어요: [Jev 설정하기](/help/jev#setup).",
+          "Ackwire AI이 워크스페이스를 호스팅하면 Jev가 포함돼요. 직접 운영하는 서버에서는 소유자의 TypeSafe 키를 쓰고, 메시지당 약 US$ 0.0001이 들어요: [Jev 설정하기](/help/jev#setup).",
         ],
       },
       {
@@ -497,7 +497,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
               "TypeSafe 콘솔(https://console.typesafe.ai)을 열고 Google이나 이메일로 로그인하세요. 새 계정도 같은 방법으로 만들어져요.",
               "콘솔에서 크레딧을 충전하세요. Jev는 선불이에요.",
               "키 페이지(https://console.typesafe.ai/keys)를 열어 키를 만들고 바로 복사하세요.",
-              "agentes.chat에서 **설정 › AI와 사용량**을 열고 **Jev** 아래에 붙여넣으세요. 이 서버를 설정한 사람만 볼 수 있어요.",
+              "Ackwire AI에서 **설정 › AI와 사용량**을 열고 **Jev** 아래에 붙여넣으세요. 이 서버를 설정한 사람만 볼 수 있어요.",
             ],
           },
           "Docker로 운영하는 서버라면 대신 `.env`에 `TYPESAFE_API_KEY`로 키를 넣어도 돼요. 그 키가 설정의 키보다 우선해요.",
@@ -555,14 +555,14 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
   "apps-de-ia": {
     title: "AI 앱",
     summary:
-      "Claude, Cursor 등 MCP 앱을 떠나지 않고 agentes.chat의 에이전트에게 작업을 맡기고, 그 자리에서 답을 받으세요.",
+      "Claude, Cursor 등 MCP 앱을 떠나지 않고 Ackwire AI의 에이전트에게 작업을 맡기고, 그 자리에서 답을 받으세요.",
     sections: [
       {
         id: "what",
         heading: "작동 방식",
         blocks: [
-          "agentes.chat은 MCP 서버예요. AI 앱에 주소를 붙여넣고, 내 계정으로 로그인하고, 워크스페이스를 고르세요. 그러면 앱이 에이전트와 채널 목록을 보고, 나 대신 에이전트에게 작업을 보내고, 답을 기다리고, 최근 작업을 읽을 수 있어요.",
-          '예를 들어 Unity나 Blender에서 장면 작업을 하다가 Claude에게 "마케팅 에이전트에게 출시 소개 문구를 부탁해 줘"라고 하세요. 메시지는 agentes.chat에 내 메시지로 **Claude 경유** 표시와 함께 나타나고, 에이전트의 답은 Claude로 돌아와요.',
+          "Ackwire AI은 MCP 서버예요. AI 앱에 주소를 붙여넣고, 내 계정으로 로그인하고, 워크스페이스를 고르세요. 그러면 앱이 에이전트와 채널 목록을 보고, 나 대신 에이전트에게 작업을 보내고, 답을 기다리고, 최근 작업을 읽을 수 있어요.",
+          '예를 들어 Unity나 Blender에서 장면 작업을 하다가 Claude에게 "마케팅 에이전트에게 출시 소개 문구를 부탁해 줘"라고 하세요. 메시지는 Ackwire AI에 내 메시지로 **Claude 경유** 표시와 함께 나타나고, 에이전트의 답은 Claude로 돌아와요.',
           "주소는 **설정 › AI 앱**에 있어요. `/mcp`로 끝나요.",
         ],
       },
@@ -572,14 +572,14 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**Claude**(claude.ai, Claude Desktop, 휴대폰): **맞춤 설정 › 커넥터**(Customize › Connectors)에서 **+ 추가**를 클릭하고 **사용자 지정 커넥터 추가**(Add custom connector)를 클릭하세요. 이름을 agentes.chat으로 정하고 주소를 붙여넣은 뒤 **계속**을 클릭하세요. **지금 로그인**(Sign in now)을 고르고 **추가**를 클릭한 다음 권한을 허용하세요. Team과 Enterprise 요금제에서는 Claude 조직의 소유자가 조직 설정 › 커넥터에서 커넥터를 추가하고, 각자 맞춤 설정 › 커넥터에서 **연결**을 클릭해요. Claude 무료 요금제에서는 사용자 지정 커넥터를 하나 추가할 수 있어요.",
+              "**Claude**(claude.ai, Claude Desktop, 휴대폰): **맞춤 설정 › 커넥터**(Customize › Connectors)에서 **+ 추가**를 클릭하고 **사용자 지정 커넥터 추가**(Add custom connector)를 클릭하세요. 이름을 Ackwire AI으로 정하고 주소를 붙여넣은 뒤 **계속**을 클릭하세요. **지금 로그인**(Sign in now)을 고르고 **추가**를 클릭한 다음 권한을 허용하세요. Team과 Enterprise 요금제에서는 Claude 조직의 소유자가 조직 설정 › 커넥터에서 커넥터를 추가하고, 각자 맞춤 설정 › 커넥터에서 **연결**을 클릭해요. Claude 무료 요금제에서는 사용자 지정 커넥터를 하나 추가할 수 있어요.",
               "**Claude Code:** `claude mcp add --transport http --scope user agentes <주소>`를 실행한 다음 `/mcp`를 입력하고 agentes를 골라 **Authenticate**를 선택하세요. 현재 폴더에서만 쓰려면 `--scope user`를 빼세요.",
               "**Cursor:** **설정 › AI 앱**에서 **Cursor에 추가**를 누르거나, `~/.cursor/mcp.json`에 주소를 넣으세요. 처음 쓸 때 Cursor가 로그인을 요청해요.",
               '**VS Code:** **VS Code에 추가**를 누르거나, `.vscode/mcp.json`에 `"type": "http"`와 함께 주소를 넣으세요.',
               "**다른 앱:** ChatGPT, Gemini, Grok, Perplexity, Codex, Zed, JetBrains 등은 **앱 연결**에 각자의 단계가 있고, 주소도 미리 채워져 있어요.",
             ],
           },
-          "로그인할 때 agentes.chat이 어떤 앱이 접근을 요청했고 어디로 돌아가는지 보여 줘요. 방금 직접 연결을 시작한 경우에만 계속하세요.",
+          "로그인할 때 Ackwire AI이 어떤 앱이 접근을 요청했고 어디로 돌아가는지 보여 줘요. 방금 직접 연결을 시작한 경우에만 계속하세요.",
         ],
       },
       {
@@ -596,7 +596,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: 앱에서 보낸 작업과 에이전트가 지금 하고 있는 일.",
             ],
           },
-          "앱은 나로서 행동하고 내가 볼 수 있는 것만 봐요. 에이전트의 작업을 승인하지는 않아요. 에이전트가 승인을 요청하며 멈추면 답에 링크와 함께 그 사실이 나오고, 결정은 agentes.chat에서 사람이 해요. 설정, 멤버, 권한도 바꾸지 않아요.",
+          "앱은 나로서 행동하고 내가 볼 수 있는 것만 봐요. 에이전트의 작업을 승인하지는 않아요. 에이전트가 승인을 요청하며 멈추면 답에 링크와 함께 그 사실이 나오고, 결정은 Ackwire AI에서 사람이 해요. 설정, 멤버, 권한도 바꾸지 않아요.",
         ],
       },
       {
@@ -632,7 +632,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "다른 사람이 쓴 글",
         blocks: [
-          "답에는 agentes.chat의 에이전트와 사람이 쓴 글이 담겨요. 앱은 그 글을 지시가 아닌 콘텐츠로 표시해서 받지만, 글이 앱에게 다른 일을 하도록 유도할 수도 있어요. 확인하기 전에 앱이 하려는 일을 살펴보세요.",
+          "답에는 Ackwire AI의 에이전트와 사람이 쓴 글이 담겨요. 앱은 그 글을 지시가 아닌 콘텐츠로 표시해서 받지만, 글이 앱에게 다른 일을 하도록 유도할 수도 있어요. 확인하기 전에 앱이 하려는 일을 살펴보세요.",
         ],
       },
       {
@@ -651,8 +651,8 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
     ],
   },
   "install-on-a-server": {
-    title: "서버에 agentes.chat 설치하기",
-    summary: "내 서버에서 agentes.chat을 무료로 실행하고 팀 전체가 함께 쓰세요. 명령 하나로 준비됩니다.",
+    title: "서버에 Ackwire AI 설치하기",
+    summary: "내 서버에서 Ackwire AI을 무료로 실행하고 팀 전체가 함께 쓰세요. 명령 하나로 준비됩니다.",
     sections: [
       {
         id: "choose",
@@ -660,7 +660,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "**agentes.chat Cloud**: 어떤 팀에도 맞고 어디서나 접속할 수 있습니다. 운영, 업데이트, 백업은 저희가 합니다. 워크스페이스마다 전용 컴퓨터가 있고, 거기서 에이전트마다 자기 사용자가 있습니다.",
+              "**Ackwire AI Cloud**: 어떤 팀에도 맞고 어디서나 접속할 수 있습니다. 운영, 업데이트, 백업은 저희가 합니다. 워크스페이스마다 전용 컴퓨터가 있고, 거기서 에이전트마다 자기 사용자가 있습니다.",
               "**내 컴퓨터와 앱**: 혼자 또는 작은 팀에 맞고, 그 컴퓨터가 켜져 있는 동안 접속할 수 있습니다. 계속 켜 두는 Mac mini가 잘 맞습니다. 업데이트는 클릭 한 번으로 하고, 백업은 직접 합니다. 에이전트는 그 컴퓨터에서 내 권한으로 실행됩니다.",
               "**서버**: 더 큰 팀에 맞고, 항상 켜져 있습니다. 업데이트는 명령 3개로 하고, 매일 자동으로 백업할 수도 있습니다. Debian 13에서는 에이전트마다 자기 사용자가 있습니다.",
             ],
@@ -674,7 +674,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           {
             list: [
-              "64비트 Linux(x64 또는 arm64) 서버나 VPS. 작은 팀이라면 CPU 2개, 메모리 4 GB, 디스크 20 GB로 시작하면 좋습니다. Mac이나 PC에서는 [앱으로 agentes.chat을 실행](/help/run-on-your-computer)할 수 있고, Docker가 필요 없습니다.",
+              "64비트 Linux(x64 또는 arm64) 서버나 VPS. 작은 팀이라면 CPU 2개, 메모리 4 GB, 디스크 20 GB로 시작하면 좋습니다. Mac이나 PC에서는 [앱으로 Ackwire AI을 실행](/help/run-on-your-computer)할 수 있고, Docker가 필요 없습니다.",
               "Compose가 포함된 Docker. Linux에서는 없으면 설치 프로그램이 먼저 물어본 뒤 설치합니다.",
               "접속 방법. 무료 Tailscale 계정(기본값, 비공개, 도메인과 열린 포트 불필요)이나, 서버를 가리키는 도메인과 열린 80, 443 포트 중 하나가 필요합니다.",
             ],
@@ -717,14 +717,14 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "내 계정",
         blocks: [
           "서버 주소를 열고 가입하세요. 첫 계정이 소유자가 됩니다. 그 뒤로는 가입이 닫히고, 다른 사람은 **설정\u00a0›\u00a0멤버와 초대**에서 보낸 초대로 들어옵니다.",
-          "Tailscale에서는 초대하는 사람도 내 tailnet에 있어야 합니다. 먼저 https://console.tailscale.com/admin/users 에서 초대한 다음 agentes.chat에서 초대하세요.",
+          "Tailscale에서는 초대하는 사람도 내 tailnet에 있어야 합니다. 먼저 https://console.tailscale.com/admin/users 에서 초대한 다음 Ackwire AI에서 초대하세요.",
         ],
       },
       {
         id: "email",
         heading: "이메일",
         blocks: [
-          "이메일이 없으면 agentes.chat은 이메일을 보내는 대신 로그에 기록하므로, 초대 링크는 거기서 복사할 수 있습니다. 비밀번호 재설정은 꺼져 있습니다.",
+          "이메일이 없으면 Ackwire AI은 이메일을 보내는 대신 로그에 기록하므로, 초대 링크는 거기서 복사할 수 있습니다. 비밀번호 재설정은 꺼져 있습니다.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -738,7 +738,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "Tailscale을 쓴다면 휴대폰에 Tailscale 앱을 설치하고 같은 tailnet에 로그인하세요.",
-              "agentes.chat 앱을 설치하세요.",
+              "Ackwire AI 앱을 설치하세요.",
               "설정이 보여 준 QR 코드나 **설정\u00a0›\u00a0내 계정\u00a0›\u00a0휴대폰에서 열기**의 QR 코드를 스캔하세요. 뒤의 것은 로그인까지 해 줍니다.",
             ],
           },
@@ -752,7 +752,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "agentes.chat 앱이 있는 Mac이나 다른 서버 같은 컴퓨터는 **설정\u00a0›\u00a0기기**에서 연결합니다([내 컴퓨터와 휴대폰](/help/computers) 참고). Tailscale을 쓴다면 먼저 내 tailnet에 들어가야 합니다.",
+          "Ackwire AI 앱이 있는 Mac이나 다른 서버 같은 컴퓨터는 **설정\u00a0›\u00a0기기**에서 연결합니다([내 컴퓨터와 휴대폰](/help/computers) 참고). Tailscale을 쓴다면 먼저 내 tailnet에 들어가야 합니다.",
         ],
       },
       {
@@ -787,7 +787,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "data",
         heading: "보내는 정보",
         blocks: [
-          "서버는 하루에 한 번 agentes.chat에 익명 사용 통계를 보냅니다. 사람 수, 에이전트 수, 기기 크기, 사용한 AI 토큰, 에이전트의 브라우저가 주고받은 데이터 양 같은 숫자입니다. 메시지, 파일, 이름, 사이트는 보내지 않습니다. `docker compose run --rm agentes telemetry`는 보낼 내용을 그대로 보여 줍니다. 소유자는 **설정\u00a0›\u00a0일반**이나 `.env`의 `TELEMETRY=off`로 끌 수 있습니다.",
+          "서버는 하루에 한 번 Ackwire AI에 익명 사용 통계를 보냅니다. 사람 수, 에이전트 수, 기기 크기, 사용한 AI 토큰, 에이전트의 브라우저가 주고받은 데이터 양 같은 숫자입니다. 메시지, 파일, 이름, 사이트는 보내지 않습니다. `docker compose run --rm agentes telemetry`는 보낼 내용을 그대로 보여 줍니다. 소유자는 **설정\u00a0›\u00a0일반**이나 `.env`의 `TELEMETRY=off`로 끌 수 있습니다.",
           "오류 보고는 직접 고른 Sentry 호환 서버를 `SENTRY_DSN`에 설정하지 않는 한 어디에도 가지 않습니다. 보고에는 오류와 발생 위치가 들어가며, 메시지, 이메일, IP 주소, 쿠키, 토큰은 들어가지 않습니다.",
         ],
       },
@@ -795,7 +795,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "전체 안내",
         blocks: [
-          "모든 설정, nginx 같은 자체 프록시, Docker 없이 실행하기, 직접 설치하는 AI 에이전트를 위한 절차, 문제가 생겼을 때 할 일은 agentes.chat 저장소의 `SELF_HOSTING.md`에 있습니다.",
+          "모든 설정, nginx 같은 자체 프록시, Docker 없이 실행하기, 직접 설치하는 AI 에이전트를 위한 절차, 문제가 생겼을 때 할 일은 Ackwire AI 저장소의 `SELF_HOSTING.md`에 있습니다.",
         ],
       },
     ],

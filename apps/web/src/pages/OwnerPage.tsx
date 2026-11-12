@@ -64,7 +64,7 @@ export function OwnerPage({ claim }: { claim: string | null }) {
     <AuthShell>
       <form className="auth__form" onSubmit={submit} noValidate>
         <header className="auth__ask" ref={header} data-burst>
-          <AgentAvatar name="agentes.chat" size="lg" state={pending ? "writing" : undefined} />
+          <AgentAvatar name="Ackwire AI" size="lg" state={pending ? "writing" : undefined} />
           <div className="auth__bubble" key={problem ?? "form"} aria-live="polite">
             <h1 className="auth__title">{title}</h1>
             <p className="auth__lead">{lead}</p>

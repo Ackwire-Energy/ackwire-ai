@@ -134,7 +134,7 @@ export function DisconnectRow({ item, name, onDone }: { item: ConnectedItem; nam
   const disconnect = useDisconnect(orgId);
   const { disconnect: disconnectServer } = useCustomServerAction(orgId);
   const users = dir.agents.filter((a) => levelIn(access.byAgent.get(a.id), `connector:${item.id}`) !== "none").length;
-  // GitHub and the agentes.chat app: the app alone is uninstalled with it, an account goes and the app stays.
+  // GitHub and the Ackwire AI app: the app alone is uninstalled with it, an account goes and the app stays.
   const installations = useGitHubApp(orgId, item.def?.id === "github").data?.installations ?? [];
   const githubNote = githubDisconnectNote(t, item, installations);
   const run = () => {
