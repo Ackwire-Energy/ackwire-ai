@@ -58,7 +58,10 @@ export interface FakeMachines {
   all(): Machine[];
   /** A computer asked for a code (`POST /api/machines/device`). */
   addDevice(userCode: string, input?: Partial<DeviceRequest>): DeviceRequest;
-  /** The newest desktop build; `null` = none (404). With `targets`, only those systems have it (`darwin`, `windows`, `linux`). */
+  /**
+   * The newest desktop build; `null` = none (404). With `targets`, only those have it: a system for every chip
+   * (`darwin`, `windows`, `linux`) or one chip of it (`linux/x86_64`, `windows/aarch64`).
+   */
   setRelease(release: DesktopRelease | null, targets?: string[]): void;
   /** Offline computers and where their agents could go. */
   setOutages(outages: MachineOutages): void;
@@ -220,7 +223,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       },
       desktopLatest: async (target, arch) => {
         log("machines.desktopLatest", target, arch);
-        return release && (!releaseTargets || releaseTargets.includes(target)) ? clone(release) : null;
+        const built =
+          !releaseTargets || releaseTargets.includes(target) || releaseTargets.includes(`${target}/${arch}`);
+        return release && built ? clone(release) : null;
       },
       // Read on every workspace page (the notice): not logged, so tests' call lists stay as they were.
       outages: async () => clone(outages),

@@ -445,7 +445,8 @@ describe("Configurações → Dispositivos (self-host)", () => {
         sha256: "",
         publishedAt: "2026-11-10T12:00:00.000Z",
       },
-      ["darwin", "linux"],
+      // Builds for the Mac and Linux on x64 only: Windows and both ARM64 builds have none yet.
+      ["darwin", "linux/x86_64"],
     );
     asBrowserOn(ua);
     const app = await renderApp(`/org/${ORG_ID}/settings/devices`, { api });
@@ -469,7 +470,9 @@ describe("Configurações → Dispositivos (self-host)", () => {
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
     expect(menuItems(menu)).toEqual([
       ["Baixar para WindowsEm breve", true],
+      ["Baixar para Windows (ARM)Em breve", true],
       ["Baixar para Linux", false],
+      ["Baixar para Linux (ARM)Em breve", true],
     ]);
   });
 
@@ -480,7 +483,9 @@ describe("Configurações → Dispositivos (self-host)", () => {
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
     expect(menuItems(menu)).toEqual([
       ["Baixar para macOS", false],
+      ["Baixar para Windows (ARM)Em breve", true],
       ["Baixar para Linux", false],
+      ["Baixar para Linux (ARM)Em breve", true],
     ]);
   });
 
@@ -493,7 +498,9 @@ describe("Configurações → Dispositivos (self-host)", () => {
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Outros sistemas" }));
     expect(menuItems(menu)).toEqual([
       ["Baixar para macOS", true],
+      ["Baixar para Windows (ARM)", true],
       ["Baixar para Linux", true],
+      ["Baixar para Linux (ARM)", true],
     ]);
     expect(screen().queryByText("Em breve")).toBeNull();
   });
@@ -506,7 +513,9 @@ describe("Configurações → Dispositivos (self-host)", () => {
     const menu = await openMenu(within(dialog).getByRole("button", { name: "Andere systemen" }));
     expect(menuItems(menu)).toEqual([
       ["Downloaden voor macOS", false],
+      ["Downloaden voor Windows (ARM)Binnenkort", true],
       ["Downloaden voor Linux", false],
+      ["Downloaden voor Linux (ARM)Binnenkort", true],
     ]);
   });
 
@@ -518,7 +527,9 @@ describe("Configurações → Dispositivos (self-host)", () => {
     expect(menuItems(menu)).toEqual([
       ["Downloaden voor macOS", false],
       ["Downloaden voor WindowsBinnenkort", true],
+      ["Downloaden voor Windows (ARM)Binnenkort", true],
       ["Downloaden voor Linux", false],
+      ["Downloaden voor Linux (ARM)Binnenkort", true],
     ]);
   });
 
