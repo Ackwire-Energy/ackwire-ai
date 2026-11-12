@@ -54,7 +54,7 @@ const { users, organizations, organizationInvitations, agents, approvals } = sch
  * The sender's name when `EMAIL_FROM` is unset: the name on the logo and in the subjects. The self-host setup
  * writes the same into a new server's `.env` (`senderAt` in packages/setup/src/lib.ts).
  */
-const SENDER_NAME = "agentes.chat";
+const SENDER_NAME = "Ackwire AI";
 
 /** The sender when `EMAIL_FROM` is unset, at this server's host (`loadConfig` sets the Cloud's: ping@agentes.chat). */
 export const defaultEmailFrom = (publicUrl: string) => `${SENDER_NAME} <ping@${new URL(publicUrl).hostname}>`;
@@ -414,7 +414,7 @@ const inMode = <G extends { personal: object }>(group: G, personal: boolean | un
 
 /**
  * One email's content: our words in the subject, preheader, headline and buttons; what people typed or
- * agents wrote only in the body, made inert. `sender`: the self-hosted server's host, or null on agentes.chat.
+ * agents wrote only in the body, made inert. `sender`: the self-hosted server's host, or null on Ackwire AI.
  */
 function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
   const lang = emailLocale(t.locale);

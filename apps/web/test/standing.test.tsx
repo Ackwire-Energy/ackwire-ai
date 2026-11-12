@@ -146,25 +146,23 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
     const banner = () => screen().getByRole("region", { name: STATUS });
     // A team, waiting for its first plan: one line, no pause, no second line.
     expect(banner().textContent).toBe(
-      "Seu time está pronto. Falta um plano do agentes.chat para ele começar.Ver planos do agentes.chat",
+      "Seu time está pronto. Falta um plano do Ackwire AI para ele começar.Ver planos do Ackwire AI",
     );
     expect(banner().querySelector(".outage__icon")).toBeNull();
     // Not back from paying: nothing to wait for, so `/me` isn't asked again.
     expect(meEvery(services.queryClient)).not.toContain(5000);
-    await act(async () =>
-      fireEvent.click(within(banner()).getByRole("button", { name: "Ver planos do agentes.chat" })),
-    );
+    await act(async () => fireEvent.click(within(banner()).getByRole("button", { name: "Ver planos do Ackwire AI" })));
     await settle(4);
     expect(state.calls.find((c) => c.method === "orgs.billingLink")?.args).toEqual([ORG_ID, "hold"]);
     expect(left).toEqual(["https://billing.example.com/link?t=hold"]);
 
     await set({ state: "hold", reason: "unpaid" });
     expect(banner().textContent).toContain(
-      "Dá para ler e escrever aqui. Os agentes voltam quando o plano do agentes.chat estiver em dia.",
+      "Dá para ler e escrever aqui. Os agentes voltam quando o plano do Ackwire AI estiver em dia.",
     );
     expect(within(banner()).getByRole("button", { name: "Atualizar o pagamento" })).toBeTruthy();
     await set({ state: "hold", reason: "ended" });
-    expect(banner().textContent).toContain("O plano do agentes.chat deste workspace terminou, e os agentes pararam.");
+    expect(banner().textContent).toContain("O plano do Ackwire AI deste workspace terminou, e os agentes pararam.");
     expect(within(banner()).getByRole("button", { name: "Assinar de novo" })).toBeTruthy();
   });
 
@@ -182,7 +180,7 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
       path: `/org/${ORG_ID}?paid=1`,
     });
     const banner = () => screen().queryByRole("region", { name: STATUS });
-    expect(banner()?.textContent).toBe("Pagamento recebido. O plano do agentes.chat começa em instantes.");
+    expect(banner()?.textContent).toBe("Pagamento recebido. O plano do Ackwire AI começa em instantes.");
     expect(within(banner() as HTMLElement).queryByRole("button")).toBeNull();
     await set({ state: "active", reason: null });
     expect(banner()).toBeNull();
@@ -233,7 +231,7 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
       errorParams: { reason: "payment" },
     });
     expect(screen().getByRole("alert").textContent).toBe(
-      "Ada não respondeu. Este workspace ainda não tem um plano do agentes.chat. Os agentes começam a trabalhar quando ele tiver.",
+      "Ada não respondeu. Este workspace ainda não tem um plano do Ackwire AI. Os agentes começam a trabalhar quando ele tiver.",
     );
   });
 
@@ -248,14 +246,14 @@ describe("a billing hold (ADR 0079): its own words, and its fix for whoever runs
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Entrar na Acme" })));
     await settle(4);
     expect(screen().getByRole("alert").textContent).toBe(
-      "O pagamento do plano do agentes.chat deste workspace não passou, e os agentes pararam.",
+      "O pagamento do plano do Ackwire AI deste workspace não passou, e os agentes pararam.",
     );
   });
 });
 
 const CONTEST = "Para contestar, escreva para legal@agentes.chat.";
 
-describe("on agentes.chat Cloud: what it is, the Terms section and how to contest it", () => {
+describe("on Ackwire AI Cloud: what it is, the Terms section and how to contest it", () => {
   test("the automatic hold reads the review line, an operator's reason how to contest it, a silent hold neither", async () => {
     const { set } = await open({ state: "hold", reason: "review", cloud: true }, false, null, { cloud: true });
     const banner = () => screen().getByRole("region", { name: STATUS });

@@ -15,17 +15,17 @@ import { renderApp, screen, settle } from "./render";
 afterEach(() => cleanup());
 
 /*
- * The four people a plan's screens answer: a workspace with its agentes.chat plan, one without it for whoever pays and
+ * The four people a plan's screens answer: a workspace with its Ackwire AI plan, one without it for whoever pays and
  * for a member, and a self-hosted server, which has no such plan.
  */
 type Who = "paid" | "owner" | "member" | "selfhost";
 
-const WHY = "Um plano entra no computador do workspace, e o computador vem com um plano ativo do agentes.chat.";
+const WHY = "Um plano entra no computador do workspace, e o computador vem com um plano ativo do Ackwire AI.";
 const ASK = "Quem administra o workspace pode resolver isso.";
-const PAY = "Ver planos do agentes.chat";
+const PAY = "Ver planos do Ackwire AI";
 const KEY = "Usar uma chave de API";
-const HELD = "Os agentes usam a chave quando o plano do agentes.chat do workspace estiver ativo.";
-const CLOSED = "As chaves de API abrem com o plano do agentes.chat do workspace.";
+const HELD = "Os agentes usam a chave quando o plano do Ackwire AI do workspace estiver ativo.";
+const CLOSED = "As chaves de API abrem com o plano do Ackwire AI do workspace.";
 
 const COMPUTER: AiComputer = {
   machineId: "machine_1",
@@ -131,7 +131,7 @@ async function planPanel(dialog: HTMLElement, choice: PlanChoice) {
 const disabledButtons = (box: HTMLElement) => Array.from(box.querySelectorAll("button:disabled"));
 const buttonNamed = (box: HTMLElement, name: string) => within(box).queryByRole("button", { name });
 
-describe("a plan with no agentes.chat plan in force", () => {
+describe("a plan with no Ackwire AI plan in force", () => {
   test("whoever pays: Connect says why with the plans page, and no plan, key or sign-in to pick", async () => {
     const { dialog } = await connect("owner");
     expect(shownText(dialog)).toContain(WHY);
@@ -164,7 +164,7 @@ describe("a plan with no agentes.chat plan in force", () => {
     const { dialog } = await connect("selfhost");
     for (const choice of PLAN_CHOICES) {
       const panel = await planPanel(dialog, choice);
-      expect(shownText(panel)).not.toContain("agentes.chat");
+      expect(shownText(panel)).not.toContain("Ackwire AI");
       expect(buttonNamed(panel, PAY)).toBeNull();
     }
     await pickCard(dialog, "Chave de API");

@@ -748,7 +748,7 @@ test("ensureContainers: started when it isn't, left when it runs as it would sta
   expect(calls[0]).toEqual(show);
   const [file, description = "", ...rest] = calls[1] ?? [];
   expect(file).toBe("/usr/bin/systemd-run");
-  expect(description).toMatch(/^--description=agentes\.chat containers [0-9a-f]{16}$/);
+  expect(description).toMatch(/^--description=Ackwire AI containers [0-9a-f]{16}$/);
   expect(rest).toEqual(containersCommand(user).slice(1));
   shown = `ActiveState=active\nDescription=${description.slice("--description=".length)}\n`;
   calls.length = 0;
@@ -803,7 +803,7 @@ test("ensureContainers: one its start limit stopped stays down for the same comm
   // A stop that timed out says nothing about its next start; a changed command gets its own tries.
   for (const failed of [
     `ActiveState=failed\nDescription=${description}\nResult=timeout\n`,
-    "ActiveState=failed\nDescription=agentes.chat containers 0000000000000000\nResult=exit-code\n",
+    "ActiveState=failed\nDescription=Ackwire AI containers 0000000000000000\nResult=exit-code\n",
   ]) {
     shown = failed;
     calls.length = 0;

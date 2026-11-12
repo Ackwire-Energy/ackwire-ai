@@ -51,7 +51,7 @@
       "certificate": "{{host}} sertifikası geçerli değil. Sunucuyu yöneten kişiyle konuşun.",
       "notAgentes": "{{host}} bir Ackwire AI sunucusu değil. Adresi kontrol edin.",
       "serverTooOld": "{{host}} bu uygulamayla çalışmak için güncellenmeli.",
-      "appTooOld": "{{host}} sunucusunu kullanmak için agentes uygulamasını güncelleyin.",
+      "appTooOld": "{{host}} sunucusunu kullanmak için Ackwire AI uygulamasını güncelleyin.",
       "down": {
         "line": "{{host}} yanıt vermedi.",
         "text": "Sunucu kapalı ya da ağınızın dışında olabilir. Tekrar açıldığında uygulama kendiliğinden açılır.",

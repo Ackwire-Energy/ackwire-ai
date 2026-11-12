@@ -58,7 +58,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "reach",
         heading: "From your phone and your team",
         blocks: [
-          "**Reach it from your phone and teammates** puts Ackwire AI on Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach agentes.chat. Tailscale is free: https://tailscale.com/download. With it off, Ackwire AI works only on this computer.",
+          "**Reach it from your phone and teammates** puts Ackwire AI on Tailscale, a private network for your devices: your phone and the people you invite join it, and nobody else can reach Ackwire AI. Tailscale is free: https://tailscale.com/download. With it off, Ackwire AI works only on this computer.",
           "If this computer already shares something else on Tailscale's port 443, Ackwire AI takes 8443, and its address ends in `:8443`.",
         ],
       },
@@ -99,7 +99,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
             list: ["Quit the app, then dump the database with the app's own copy of the server. On a Mac:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -594,7 +594,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
               "`list_recent_tasks`: the tasks you sent from apps and what agents are doing now.",
             ],
           },
-          "The app acts as you and sees only what you see. It never approves agents' actions: when an agent stops to ask for approval, the reply says so with a link, and a person decides in agentes.chat. It doesn't change settings, members or permissions either.",
+          "The app acts as you and sees only what you see. It never approves agents' actions: when an agent stops to ask for approval, the reply says so with a link, and a person decides in Ackwire AI. It doesn't change settings, members or permissions either.",
         ],
       },
       {
@@ -630,7 +630,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         id: "safety",
         heading: "Other people's text",
         blocks: [
-          "Replies carry text written by agents and people in agentes.chat. The app gets that text marked as content, not instructions, but a text may still try to talk the app into something else. Check what your app is about to do before you confirm.",
+          "Replies carry text written by agents and people in Ackwire AI. The app gets that text marked as content, not instructions, but a text may still try to talk the app into something else. Check what your app is about to do before you confirm.",
         ],
       },
       {
@@ -715,7 +715,7 @@ export const helpEn: Record<HelpSlug, HelpDocument> = {
         heading: "Your account",
         blocks: [
           "Open your server's address and sign up: the first account becomes the owner. Sign-up then closes, and people join by invitation, from **Settings\u00a0›\u00a0Members and invitations**.",
-          "On Tailscale, the people you invite need your tailnet too. Invite them first at https://console.tailscale.com/admin/users and then in agentes.chat.",
+          "On Tailscale, the people you invite need your tailnet too. Invite them first at https://console.tailscale.com/admin/users and then in Ackwire AI.",
         ],
       },
       {

@@ -511,7 +511,7 @@ function writePdf(pages: string[][], title: string): Uint8Array {
       ),
     );
   }
-  const info = add(`<< /Title (${escapePdfString(title)}) /Producer (agentes.chat) >>`);
+  const info = add(`<< /Title (${escapePdfString(title)}) /Producer (Ackwire AI) >>`);
   objects[catalog - 1] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
   objects[pagesId - 1] =
     `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(" ")}] /Count ${pageIds.length} >>`;

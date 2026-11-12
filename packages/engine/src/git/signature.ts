@@ -10,11 +10,12 @@ const { accounts, organizationMembers, users } = schema;
 
 /**
  * What an agent writes on GitHub says whose agent it is (ADR 0156): every body ends with one line naming the agent and
- * the person it works for ("Theo, agente de Ana no agentes.chat", in the workspace owner's language), and commits
+ * the person it works for ("Theo, agente de Ana no Ackwire AI", in the workspace owner's language), and commits
  * credit that person (`Co-authored-by`) when they linked GitHub to sign in, never with their email.
  */
 
 /** Where the line starts in a body, so an edit can replace it. */
+// Kept as it was before the rename: comments already on GitHub carry it, and github-events reads it.
 export const SIGNATURE_MARK = "<!-- agentes.chat -->";
 
 /**

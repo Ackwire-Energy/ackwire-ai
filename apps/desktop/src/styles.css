@@ -678,7 +678,7 @@ body[data-window="popover"] {
   border-top: 1px solid var(--line);
 }
 
-/* ---------- First run (FirstRun.tsx): agentes.chat big, your own server small ---------- */
+/* ---------- First run (FirstRun.tsx): Ackwire AI big, your own server small ---------- */
 .dk-fr {
   position: relative;
   isolation: isolate;
@@ -1022,7 +1022,7 @@ body[data-window="popover"] {
 .dk-pair__group > .dk-ctitle {
   margin: 0 0 8px;
 }
-/* Run agentes.chat here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
+/* Run Ackwire AI here. The window is 600 px tall: a smaller title on one line (the Portuguese one is
    longer), and two fields side by side. */
 .dk-fr__body h1.dk-fr__h1sm {
   font-size: 28px;

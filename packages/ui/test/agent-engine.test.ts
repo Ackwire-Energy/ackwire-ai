@@ -66,7 +66,7 @@ describe("agent engine: one agent everywhere", () => {
     const tones = bodyTones("teal");
     expect(light(tones[0] ?? "")).toBeLessThan(light(tones[4] ?? ""));
     expect(light(bodyTones("teal", true)[4] ?? "")).toBeLessThan(light(tones[4] ?? ""));
-    expect(spriteBody("sky")).toBe("#04203f");
+    expect(spriteBody("sky")).toBe("#23440b");
     expect(inBody(0.5, 0.5)).toBe(true);
     expect(inBody(0.01, 0.01)).toBe(false);
     expect(inBody(0.04, 0.96)).toBe(true);

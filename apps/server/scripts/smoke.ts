@@ -105,7 +105,7 @@ async function modelSmoke(db: Database) {
   await db.insert(schema.users).values({ id: userId, name: "Smoke", email: `${userId}@smoke.invalid` });
   const { organization, general } = await createOrganization(db, userId, {
     name: `smoke ${new Date().toISOString()}`,
-    context: "This is an automated smoke test of agentes.chat.",
+    context: "This is an automated smoke test of Ackwire AI.",
   });
   orgId = organization.id;
   const credential = orgKey

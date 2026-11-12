@@ -6,7 +6,7 @@ import { recordOperatorEvent } from "./operator-events";
 import type { Stream } from "./streams";
 
 /**
- * Screening of people in control of an agent's screen on agentes.chat Cloud (ADR 0076), made only with
+ * Screening of people in control of an agent's screen on Ackwire AI Cloud (ADR 0076), made only with
  * `SESSION_SCREENING`. While a control stream is open, the computer reads the screen's text every
  * `SESSION_SCREEN_MS` (`desktop.text`: tesseract there, never an image). The text stays in this process's memory,
  * in segments of at most `SESSION_SEGMENT_MS`, each dropped `SESSION_KEEP_MS` after it ends, read or not; nothing

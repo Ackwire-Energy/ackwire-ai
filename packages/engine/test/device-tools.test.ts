@@ -288,7 +288,7 @@ describe("computer on someone else's device", () => {
     const mac = await call(ctx, "computer_status", { computer: "Sam's MacBook" });
     // Codex was never found there: nothing to turn on.
     expect(mac.content).toContain(
-      "\n  Off there: shell commands, Claude Code. Only the person at it can turn them on, in the agentes.chat app there (Preferences › Tools).\n",
+      "\n  Off there: shell commands, Claude Code. Only the person at it can turn them on, in the Ackwire AI app there (Preferences › Tools).\n",
     );
     await f.db.update(schema.machines).set({ os: "linux" }).where(machine);
     expect((await call(ctx, "computer_status", {})).content).toContain(

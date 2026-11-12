@@ -59,7 +59,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "Desde tu teléfono y tu equipo",
         blocks: [
-          "**Accede desde tu teléfono y tu equipo** pone Ackwire AI en Tailscale, una red privada para tus dispositivos: tu teléfono y las personas que invites se unen a ella, y nadie más puede acceder a agentes.chat. Tailscale es gratis: https://tailscale.com/download. Si está desactivado, Ackwire AI solo funciona en esta computadora.",
+          "**Accede desde tu teléfono y tu equipo** pone Ackwire AI en Tailscale, una red privada para tus dispositivos: tu teléfono y las personas que invites se unen a ella, y nadie más puede acceder a Ackwire AI. Tailscale es gratis: https://tailscale.com/download. Si está desactivado, Ackwire AI solo funciona en esta computadora.",
           "Si esta computadora ya comparte otra cosa en el puerto 443 de Tailscale, Ackwire AI usa el 8443, y su dirección termina en `:8443`.",
         ],
       },
@@ -102,7 +102,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
             ],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -603,7 +603,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: las tareas que enviaste desde apps y lo que los agentes están haciendo ahora.",
             ],
           },
-          "La app actúa en tu nombre y solo ve lo que tú ves. Nunca aprueba las acciones de los agentes: cuando un agente se detiene para pedir aprobación, la respuesta lo dice con un enlace, y una persona decide en agentes.chat. Tampoco cambia la configuración, los miembros ni los permisos.",
+          "La app actúa en tu nombre y solo ve lo que tú ves. Nunca aprueba las acciones de los agentes: cuando un agente se detiene para pedir aprobación, la respuesta lo dice con un enlace, y una persona decide en Ackwire AI. Tampoco cambia la configuración, los miembros ni los permisos.",
         ],
       },
       {
@@ -639,7 +639,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "Texto de otras personas",
         blocks: [
-          "Las respuestas traen texto escrito por agentes y personas en agentes.chat. La app recibe ese texto marcado como contenido, no como instrucciones, pero un texto aun así puede intentar convencer a la app de hacer otra cosa. Revisa lo que tu app está por hacer antes de confirmar.",
+          "Las respuestas traen texto escrito por agentes y personas en Ackwire AI. La app recibe ese texto marcado como contenido, no como instrucciones, pero un texto aun así puede intentar convencer a la app de hacer otra cosa. Revisa lo que tu app está por hacer antes de confirmar.",
         ],
       },
       {
@@ -724,7 +724,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Tu cuenta",
         blocks: [
           "Abre la dirección de tu servidor y regístrate: la primera cuenta es la del dueño. Después el registro se cierra y la gente entra por invitación, desde **Configuración\u00a0›\u00a0Miembros e invitaciones**.",
-          "En Tailscale, las personas que invitas también necesitan estar en tu tailnet. Invítalas primero en https://console.tailscale.com/admin/users y luego en agentes.chat.",
+          "En Tailscale, las personas que invitas también necesitan estar en tu tailnet. Invítalas primero en https://console.tailscale.com/admin/users y luego en Ackwire AI.",
         ],
       },
       {
@@ -745,7 +745,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "En Tailscale, instala la app de Tailscale en tu teléfono e inicia sesión en la misma tailnet.",
-              "Instala la app de agentes.chat.",
+              "Instala la app de Ackwire AI.",
               "Escanea el código QR que mostró la configuración, o el de **Configuración\u00a0›\u00a0Tu cuenta\u00a0›\u00a0Abrir en tu teléfono**, que además inicia tu sesión.",
             ],
           },
@@ -802,7 +802,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "La guía completa",
         blocks: [
-          "Todos los ajustes, un proxy propio como nginx, usarlo sin Docker, una guía para agentes de IA que lo instalan solos y qué hacer cuando algo falla están en `SELF_HOSTING.md`, en el repositorio de agentes.chat.",
+          "Todos los ajustes, un proxy propio como nginx, usarlo sin Docker, una guía para agentes de IA que lo instalan solos y qué hacer cuando algo falla están en `SELF_HOSTING.md`, en el repositorio de Ackwire AI.",
         ],
       },
     ],

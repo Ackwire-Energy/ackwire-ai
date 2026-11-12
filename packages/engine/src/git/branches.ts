@@ -38,7 +38,7 @@ export function pushGrantKeyOf(input: Record<string, unknown>): string | null {
 export const githubHeaders = (token: string) => ({
   authorization: `Bearer ${token}`,
   accept: "application/vnd.github+json",
-  "user-agent": "agentes.chat",
+  "user-agent": "Ackwire AI",
 });
 
 /** A branch name in a REST path: each part escaped, the slashes kept. */

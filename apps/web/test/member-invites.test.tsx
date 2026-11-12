@@ -158,8 +158,8 @@ describe("the invite dialog", () => {
     // The email as it arrives, in the server's own words.
     const mail = dialog().querySelector(".invite-mail-fig") as HTMLElement;
     expect(mail.textContent).toContain("Assim chega para Nova e Outra");
-    expect(mail.textContent).toContain("agentes.chat · para nova@acme.com e mais 1");
-    expect(mail.textContent).toContain("Você recebeu um convite para um workspace no agentes.chat");
+    expect(mail.textContent).toContain("Ackwire AI · para nova@acme.com e mais 1");
+    expect(mail.textContent).toContain("Você recebeu um convite para um workspace no Ackwire AI");
     expect(mail.textContent).toContain("Walter (walter@acme.com.br) convidou você para entrar na Acme como membro.");
     expect(mail.textContent).toContain("Walter: “Vem para a Acme”");
     expect(mail.textContent).toContain("Aceitar convite");

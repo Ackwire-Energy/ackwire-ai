@@ -901,10 +901,10 @@ textarea.ac-input {
 }
 /* The agent's outline in the agents' sky (fixed, like the pixel agents), not the --agent accent token. */
 .ac-icon .ac-brain-body {
-  stroke: #0063d1;
+  stroke: #3f7a12;
 }
 .ac-icon .ac-brain-eye {
-  fill: #0063d1;
+  fill: #3f7a12;
   stroke: none;
 }
 [data-theme="dark"] .ac-icon .ac-brain-cc {
@@ -914,10 +914,10 @@ textarea.ac-input {
   stroke: #5cc3bd;
 }
 [data-theme="dark"] .ac-icon .ac-brain-body {
-  stroke: #5aa8ff;
+  stroke: #90ed42;
 }
 [data-theme="dark"] .ac-icon .ac-brain-eye {
-  fill: #5aa8ff;
+  fill: #90ed42;
 }
 .ac-brain-icon--off {
   opacity: 0.45;
@@ -2039,14 +2039,14 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   white-space: nowrap;
 }
 
-/* Ackwire wordmark and original monogram. */
+/* Logo: the Ackwire "A" + the wordmark, bold and tight as the brand's (Gilroy ExtraBold; the app's sans stands in) */
 .ac-logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.35em;
-  font-family: var(--font-brand, var(--font-sans));
+  gap: 0.28em;
+  font-family: var(--font-brand, var(--font-display, var(--font-sans)));
   font-weight: 800;
-  letter-spacing: -0.035em;
+  letter-spacing: -0.03em;
   color: var(--ink);
   line-height: 1;
   font-size: 24px;
@@ -2057,23 +2057,41 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   height: 1.1em;
   flex: none;
 }
-.ac-logo__body {
-  fill: var(--agent);
+/* The pixel "A": each layer in its tone of Ackwire green (PIXEL_MARK_TONES), deep on light, bright on dark. */
+.ac-logo__mark {
+  --logo-1: #2f5f0d;
+  --logo-2: #3f7a12;
+  --logo-3: #5a9a1e;
 }
-.ac-logo--mono .ac-logo__body {
-  fill: currentColor;
+[data-theme="dark"] .ac-logo__mark {
+  --logo-1: #b8f582;
+  --logo-2: #90ed42;
+  --logo-3: #6cba2c;
+}
+.ac-logo__px1 {
+  fill: var(--logo-1);
+}
+.ac-logo__px2 {
+  fill: var(--logo-2);
+}
+.ac-logo__px3 {
+  fill: var(--logo-3);
+}
+.ac-logo--mono .ac-logo__mark {
+  --logo-1: currentColor;
+  --logo-2: currentColor;
+  --logo-3: currentColor;
 }
 .ac-logo__word {
   display: inline-flex;
   align-items: baseline;
-  gap: 0.22em;
+  gap: 0.24em;
 }
-.ac-logo__chat {
-  font-family: inherit;
-  font-size: 0.7em;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ink-muted);
+.ac-logo__ai {
+  color: var(--agent);
+}
+.ac-logo--mono .ac-logo__ai {
+  color: inherit;
 }
 
 /* Select: our own trigger + listbox, never the native <select> */

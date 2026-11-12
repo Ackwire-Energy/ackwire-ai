@@ -87,7 +87,7 @@ export interface Adapters {
   /** A bot check before public forms (ADR 0075): Turnstile when both of its keys are set; null/absent = none. */
   humanCheck?: HumanCheck | null;
   /**
-   * GIF search (ADR 0091): GIPHY with `GIPHY_API_KEY`, or, on a server that isn't agentes.chat's own, the provider
+   * GIF search (ADR 0091): GIPHY with `GIPHY_API_KEY`, or, on a server that isn't Ackwire AI's own, the provider
    * that follows the installation's key (`createKeyedGifs`), whose `available()` says whether it has one now;
    * null/absent = no GIFs.
    */

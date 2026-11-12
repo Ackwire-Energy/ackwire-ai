@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "닫기",
@@ -472,7 +472,7 @@
       "confirmYes": "네, 앱에 로그인할게요",
       "confirmNo": "제가 한 게 아니에요",
       "done": "모두 끝났어요.",
-      "doneLead": "agentes 앱에 로그인했어요. 이 탭은 닫아도 돼요.",
+      "doneLead": "Ackwire AI 앱에 로그인했어요. 이 탭은 닫아도 돼요.",
       "expired": "이 요청은 만료됐어요.",
       "expiredLead": "앱으로 돌아가 {{provider}}을(를) 다시 선택하세요.",
       "handover": "다른 기기의 계정으로 로그인하는 중…",
@@ -1811,9 +1811,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "agentes 앱에 로그인하는 QR 코드",
+    "qr": "Ackwire AI 앱에 로그인하는 QR 코드",
     "making": "코드를 만드는 중…",
-    "stepApp": "휴대폰에 agentes 앱을 설치하세요.",
+    "stepApp": "휴대폰에 Ackwire AI 앱을 설치하세요.",
     "stepTailscale": "휴대폰에 Tailscale을 설치하고 이 서버와 같은 Tailscale 계정으로 로그인하세요.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -4546,7 +4546,7 @@
     "noInstructions": "{{name}}에게 아직 지침이 없어요. 어떻게 일할지 알려 주세요.",
     "noInstructions_female": "{{name}}에게 아직 지침이 없어요. 어떻게 일할지 알려 주세요.",
     "savedToast": "{{name}}의 변경 사항을 저장했어요.",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "기본 제공 권한",
     "connectHint": "서비스 연결",
     "subtitle": "{{role}} · 소유자 <b>{{owner}}</b> · {{model}} {{key}}",
@@ -4871,7 +4871,7 @@
         "two": "환경설정",
         "three": "브라우저 켜기",
         "done": "끝났어요. 새로고침하지 않아도 이 페이지가 알아서 감지해요.",
-        "menuOpen": "agentes 열기",
+        "menuOpen": "Ackwire AI 열기",
         "menuPrefs": "환경설정…",
         "menuPause": "일시 중지",
         "menuQuit": "종료",
@@ -5048,7 +5048,7 @@
       "connectors": "{{org}}의 커넥터",
       "connectorsPersonal": "내 커넥터",
       "oneLevel": "앱마다 한 가지 수준",
-      "builtin": "agentes 기본 제공",
+      "builtin": "Ackwire AI 기본 제공",
       "builtinHelp": "Drive, 작업, 메모리 등",
       "noMatch": "“{{q}}”와 일치하는 항목이 없어요",
       "noneHere": "이 필터에 해당하는 항목이 없어요",
@@ -7451,7 +7451,7 @@
         "pr_opened": "GitHub에서 PR 열림"
       },
       "issue": {
-        "created": "agentes에서 작업 생성됨"
+        "created": "Ackwire AI에서 작업 생성됨"
       },
       "deploy": {
         "succeeded": "배포 완료"
@@ -9069,7 +9069,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "요금제 키를 사용하려면 컴퓨터에서 agentes를 업데이트하세요"
+        "keys": "요금제 키를 사용하려면 컴퓨터에서 Ackwire AI를 업데이트하세요"
       },
       "noComputer": "계정은 연결된 컴퓨터에 남아요. 먼저 내 컴퓨터를 하나 연결하세요.",
       "addComputer": "컴퓨터 연결",
@@ -13556,7 +13556,7 @@
     "reconnectDoneText": "{{name}}이(가) {{org}}에 돌아왔어요.",
     "deniedTitle": "연결 안 됨",
     "denied": "컴퓨터를 연결하지 않았어요. 직접 연 게 아니라면 아무도 접근 권한을 얻지 못했어요.",
-    "home": "agentes로 가기"
+    "home": "Ackwire AI로 가기"
   },
   "apps": {
     "connect": "앱 연결",
@@ -14060,7 +14060,7 @@
       "rolesPersonal": "여기 있는 사람마다 할 수 있는 일. 소유자는 모든 걸 할 수 있어요."
     },
     "about": {
-      "basedOn": "Codari Global, LLC의 <site>Ackwire AI</site> 기반",
+      "basedOn": "Codari Global, LLC의 <site>agentes.chat</site> 기반",
       "version": "버전",
       "license": "<license>GNU Affero General Public License v3</license>에 따른 자유 소프트웨어이며 보증은 없습니다.",
       "source": "소스 코드",
@@ -16362,7 +16362,7 @@
       "unavailableHelp": "잠시 후 다시 시도하세요.",
       "screensOff": "{{computer}}에서 화면이 꺼져 있어요. 그 컴퓨터에서 켜세요:",
       "screensMissing": "{{computer}}에서 아직 화면을 표시할 수 없어요. 그 컴퓨터에서:",
-      "outdated": "{{name}}의 화면을 보려면 {{computer}}에서 agentes를 업데이트하세요.",
+      "outdated": "{{name}}의 화면을 보려면 {{computer}}에서 Ackwire AI를 업데이트하세요.",
       "noScreen": "{{name}}은(는) 여기에 표시할 화면이 없어요",
       "noScreenHelp": "도구 및 접근 권한에서 화면이나 브라우저를 허용하세요.",
       "noComputer": "{{name}}의 컴퓨터를 선택하세요.",
@@ -16472,7 +16472,7 @@
       "browser": "브라우저",
       "screen": "컴퓨터 화면",
       "terminal": "터미널",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "생각 중",
       "inside": "{{program}} · {{detail}}"
     },

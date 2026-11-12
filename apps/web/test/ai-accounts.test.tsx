@@ -200,7 +200,7 @@ describe("IA e uso: the viewer's own accounts", () => {
     try {
       await signIn();
       expect(shownText(dialog)).toContain(
-        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do agentes.chat nele, ou use uma chave de API.",
+        "Este computador ainda não conecta o Claude desse jeito. Atualize o programa do Ackwire AI nele, ou use uma chave de API.",
       );
       expect(shownText(dialog)).not.toContain("não respondeu");
       api.machines.beginAccountLogin = async () => {

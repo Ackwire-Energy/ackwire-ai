@@ -9,7 +9,7 @@ import { renderUnicodeCompact } from "uqr";
 
 /** The one-line installer (install.sh at the repository's root, which calls it INSTALL_URL too). */
 export const INSTALL_URL = "https://agentes.chat/install";
-/** Every instance serves its own build's compose file there; agentes.chat's follows main, so it can be ahead of `:latest`. */
+/** Every instance serves its own build's compose file there; Ackwire AI's follows main, so it can be ahead of `:latest`. */
 export const COMPOSE_URL = `${INSTALL_URL}/docker-compose.yml`;
 /** `INSTALL_DOCS_URL` in @agenteschat/i18n, as text: this MIT package bundles none of the AGPL workspace. */
 export const GUIDE_URL = "https://agentes.chat/docs/install-on-a-server";
@@ -200,7 +200,7 @@ function isOneOf<T extends string>(value: string, list: readonly T[]): value is 
 export const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
- * A command's output line as the line under a wait shows it: no colors, and no mark of the agentes.chat look,
+ * A command's output line as the line under a wait shows it: no colors, and no mark of the Ackwire AI look,
  * in its ASCII form too (where the font lacks the marks, they are followed by two spaces).
  */
 export const outputLine = (line: string) =>
@@ -279,7 +279,7 @@ export function httpUrlProblem(url: string): string | null {
 }
 
 /** The name every email is sent under: the server's own default sender's (`SENDER_NAME` in packages/engine/src/email.ts). */
-const SENDER_NAME = "agentes.chat";
+const SENDER_NAME = "Ackwire AI";
 
 /** A sender at `domain`, as the server's default one reads. */
 export const senderAt = (domain: string) => `${SENDER_NAME} <ping@${domain}>`;
@@ -305,7 +305,7 @@ function parseUrl(url: string): URL | null {
 // ── .env ────────────────────────────────────────────────────────────────────
 
 /** The top of a .env the setup creates. */
-export const ENV_HEADER = `# agentes.chat settings, written by npx @agenteschat/setup (running it again is safe). The guide:
+export const ENV_HEADER = `# Ackwire AI settings, written by npx @agenteschat/setup (running it again is safe). The guide:
 # ${GUIDE_URL}. AGENTES_SECRET encrypts the keys stored in the
 # database: back it up apart from the database, and never change it.
 `;
@@ -688,7 +688,7 @@ export function diagnoseAppLogs(logs: string): Problem | null {
 
 /** The question's words are the web app's switch's (Settings → General), so every place says the same. */
 export const TELEMETRY_TEXT = [
-  "Send anonymous usage statistics to agentes.chat: counts such as people, agents,",
+  "Send anonymous usage statistics to Ackwire AI: counts such as people, agents,",
   "machine sizes, AI tokens used and how much data the agents' browsers send and",
   "receive. Never messages, files, names or sites.",
 ];
@@ -795,7 +795,7 @@ export async function jevStep(p: {
     },
     unchecked: {
       ok: false,
-      text: "Jev: TypeSafe didn't answer, so the key wasn't checked. agentes.chat checks it when it uses it.",
+      text: "Jev: TypeSafe didn't answer, so the key wasn't checked. Ackwire AI checks it when it uses it.",
     },
   }[state];
   return { value: state, entries: { TYPESAFE_API_KEY: p.flag }, said };
@@ -825,7 +825,7 @@ export interface ThisMachine {
   bpf: boolean;
   /** Whether apt-get is here: the computers' installer installs the screens' and browsers' packages with it. */
   apt: boolean;
-  /** Whether it's already connected to an agentes.chat as a computer (`connectedConfig`). */
+  /** Whether it's already connected to an Ackwire AI as a computer (`connectedConfig`). */
   connected: boolean;
 }
 
@@ -895,7 +895,7 @@ export function computerOffer(
   if (machine.connected) {
     // Its service would be replaced, and the server it's connected to would lose this computer.
     return no(
-      "This machine is already connected to agentes.chat as a computer, so it can't also be this server's own.",
+      "This machine is already connected to Ackwire AI as a computer, so it can't also be this server's own.",
       `Its connection stays as it is. So ${later}.`,
     );
   }
@@ -935,7 +935,7 @@ export function computerOf(content: string | null): OnOff | null {
 }
 
 /**
- * Where this machine reaches agentes.chat: the address the compose file publishes it on (`BIND_ADDRESS`,
+ * Where this machine reaches Ackwire AI: the address the compose file publishes it on (`BIND_ADDRESS`,
  * `HOST_PORT`), loopback when that's every address. Root runs the installer that answers there.
  */
 export function appOnThisMachine(content: string | null): string {
@@ -960,7 +960,7 @@ export const SIMPLE_MODE_WHY = [
 ];
 
 export interface ComputerInstall {
-  /** Where this machine reaches agentes.chat. */
+  /** Where this machine reaches Ackwire AI. */
   server: string;
   script: string;
   args: string[];
@@ -969,7 +969,7 @@ export interface ComputerInstall {
 }
 
 /**
- * The server's own installer for computers, run on this machine once agentes.chat answers, from where
+ * The server's own installer for computers, run on this machine once Ackwire AI answers, from where
  * this machine reaches it (`appOnThisMachine`): it may not reach the address people use (a tailnet name
  * served from a container). On Linux each agent gets a user and a screen; on a Mac agents work as the person.
  */
@@ -1147,7 +1147,7 @@ export function decideComputer(p: {
       return {
         problem: {
           check: "computer",
-          error: `agentes.chat doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) and ${conflict.now} together.`,
+          error: `Ackwire AI doesn't start with this machine's token (HOST_COMPUTER_TOKEN in .env) and ${conflict.now} together.`,
           fix: `Set ${conflict.off} in .env, or run the setup again with --computer no.`,
         },
       };
@@ -1255,12 +1255,12 @@ export function hostState(log: string): HostState | null {
 export const COMPUTER_PROBLEMS = {
   off: {
     check: "computer.off",
-    error: "agentes.chat runs without this machine's token (HOST_COMPUTER_TOKEN in .env).",
+    error: "Ackwire AI runs without this machine's token (HOST_COMPUTER_TOKEN in .env).",
     fix: "Run docker compose up -d --force-recreate agentes, then the setup again.",
   },
   refused: {
     check: "computer.token",
-    error: "agentes.chat refused this machine's token: host-computer-token and HOST_COMPUTER_TOKEN in .env differ.",
+    error: "Ackwire AI refused this machine's token: host-computer-token and HOST_COMPUTER_TOKEN in .env differ.",
     fix: "Run the setup again: it writes the file from .env.",
   },
   no_token: {
@@ -1325,7 +1325,7 @@ export function privateStart(p: { domain: string; port: string; ssh: SshTarget }
 // ── The end ─────────────────────────────────────────────────────────────────
 
 /**
- * The link the agentes.chat phone and desktop apps open on this server (the phone from the QR code). The web
+ * The link the Ackwire AI phone and desktop apps open on this server (the phone from the QR code). The web
  * app's "Abrir no celular" adds `&token=` for a one-time sign-in. SELF_HOSTING.md, "Your phone".
  */
 export const appLink = (origin: string) => `agenteschat://connect?${new URLSearchParams({ server: origin })}`;
@@ -1359,7 +1359,7 @@ export function theEnd(p: {
     link,
     steps,
     result: {
-      // agentes.chat is up either way, so its address and links still follow a failure of its computer.
+      // Ackwire AI is up either way, so its address and links still follow a failure of its computer.
       ok: p.failed === null,
       ...p.failed,
       network: p.network,
@@ -1423,7 +1423,7 @@ function computerStep(c: ComputerPlan): string {
 function telemetryStep(t: PlanInput["telemetry"]): string {
   if (t.kept) return `usage statistics: keep what .env has (TELEMETRY=${t.value})`;
   return t.value === "on"
-    ? "usage statistics: sent to agentes.chat (TELEMETRY=on)"
+    ? "usage statistics: sent to Ackwire AI (TELEMETRY=on)"
     : "usage statistics: not sent (TELEMETRY=off)";
 }
 
@@ -1507,7 +1507,7 @@ export function planSteps(p: PlanInput): string[] {
   const linked = p.network === "proxy" ? hasAppLink(p.publicUrl.now ?? "") : p.network !== "local";
   steps.push(
     linked
-      ? "finish: the address, the link that opens the agentes.chat phone or desktop app on it with its QR code, and what to do next"
+      ? "finish: the address, the link that opens the Ackwire AI phone or desktop app on it with its QR code, and what to do next"
       : "finish: the address and what to do next",
   );
   return steps;
@@ -1529,7 +1529,7 @@ export function nextSteps(p: {
   if (p.network === "tailscale") {
     steps.push(`On a computer or phone signed in to your tailnet, open ${p.url} and ${account}.`);
     steps.push(
-      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the agentes.chat app. Then point the camera at the QR code above, or on the app's sign-in screen ${SCAN_IN_APP}.`,
+      `Phone: install Tailscale (${TS.download}), sign in to your tailnet, and install the Ackwire AI app. Then point the camera at the QR code above, or on the app's sign-in screen ${SCAN_IN_APP}.`,
     );
     steps.push(
       `People you invite need your tailnet too: invite them to it (${TS.users}, "Invite users"), or share this server with theirs (its … menu in ${TS.machines}, "Share").`,
@@ -1543,7 +1543,7 @@ export function nextSteps(p: {
     steps.push(`Open ${p.url} and ${account}.`);
     if (hasAppLink(p.url)) {
       steps.push(
-        `Phone: point the camera at the QR code above, or on the agentes.chat app's sign-in screen ${SCAN_IN_APP}.`,
+        `Phone: point the camera at the QR code above, or on the Ackwire AI app's sign-in screen ${SCAN_IN_APP}.`,
       );
     }
   } else {

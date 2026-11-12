@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 const click = (el: Element) => act(async () => fireEvent.click(el));
-const APP_STEP = "Instale o app agentes no celular.App StoreEm breveGoogle PlayEm breve";
+const APP_STEP = "Instale o app Ackwire AI no celular.App StoreEm breveGoogle PlayEm breve";
 
 /** Configurações › Sua conta → Abrir no celular. */
 async function openPhoneDialog(state: ReturnType<typeof seedState>) {
@@ -32,7 +32,7 @@ describe("Abrir no celular", () => {
     const dialog = await openPhoneDialog(state);
     expect(state.calls.filter((c) => c.method === "account.phoneSignIn")).toHaveLength(1);
 
-    const qr = within(dialog).getByRole("img", { name: "QR code para entrar no app agentes" });
+    const qr = within(dialog).getByRole("img", { name: "QR code para entrar no app Ackwire AI" });
     const expected = encode(connectLink("https://app.agentes.chat", { token: "tok-1" }), { ecc: "M", border: 2 });
     expect(qr.getAttribute("viewBox")).toBe(`0 0 ${expected.size} ${expected.size}`);
     const modules = qr.querySelector("path")?.getAttribute("d")?.match(/M/g)?.length;
@@ -93,7 +93,7 @@ describe("Abrir no celular", () => {
     const state = seedState();
     state.phoneServer = "http://127.0.0.1:4310";
     const dialog = await openPhoneDialog(state);
-    expect(within(dialog).queryByRole("img", { name: "QR code para entrar no app agentes" })).toBeNull();
+    expect(within(dialog).queryByRole("img", { name: "QR code para entrar no app Ackwire AI" })).toBeNull();
     expect(dialog.textContent).toContain("o celular não chega a ele");
     expect(dialog.textContent).toContain("Acessar pelo celular e pela equipe");
   });

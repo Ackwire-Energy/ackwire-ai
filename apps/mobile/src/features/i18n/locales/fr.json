@@ -2258,7 +2258,7 @@
     "zoneTitle": "Fuseau horaire",
     "anotherTitle": "Comment s'appelle le nouvel espace de travail ?",
     "anotherPurpose": "À quoi servira le nouvel espace de travail ?",
-    "anotherLead": "Sur agentes.chat. Vous restez dans {{org}} et pouvez changer à tout moment.",
+    "anotherLead": "Sur Ackwire AI. Vous restez dans {{org}} et pouvez changer à tout moment.",
     "suggested": "D'après votre e-mail {{domain}}, j'ai suggéré {{org}}.",
     "create": "Créer",
     "enter": "Entrer dans l'espace de travail",

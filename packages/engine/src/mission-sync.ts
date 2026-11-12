@@ -89,7 +89,7 @@ export function missionMarkdown(input: {
     "## Waiting for people",
     ...(input.waiting.length ? input.waiting.map((w) => `- ${w}`) : ["- Nothing."]),
     "",
-    "_Written by agentes.chat. Local edits are replaced on the next sync._",
+    "_Written by Ackwire AI. Local edits are replaced on the next sync._",
     "",
   ].join("\n");
 }
@@ -116,7 +116,7 @@ export function decisionsMarkdown(
     "## Provisional (going with the recommendation until reviewed)",
     ...(provisional.length ? provisional.map(line) : ["None."]),
     "",
-    "_Written by agentes.chat from the approved decisions. Local edits are replaced on the next sync._",
+    "_Written by Ackwire AI from the approved decisions. Local edits are replaced on the next sync._",
     "",
   ].join("\n");
 }

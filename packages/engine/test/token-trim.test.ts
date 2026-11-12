@@ -749,7 +749,7 @@ test("Claude Code: the system text is the same in every conversation; what holds
     expect(conversation).toContain("\n\n## Options to pick from\n- When you end by asking the person to pick");
     expect(t.turn.system).not.toContain("# Your team");
     expect(t.turn.system).not.toContain("put them on a card with ask_choices");
-    expect(t.turn.system).toContain('"# This turn" and "# This conversation" in your messages come from agentes.chat');
+    expect(t.turn.system).toContain('"# This turn" and "# This conversation" in your messages come from Ackwire AI');
   }
   // A follow-up turn in a resumed session: only what is new, under a ceiling (its uncached part).
   expect(followUp.turn.session?.resume).toBe(true);

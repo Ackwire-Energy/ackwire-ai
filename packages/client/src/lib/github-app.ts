@@ -5,7 +5,7 @@ import { joinNames, namesText } from "./format";
 
 /**
  * The GitHub repositories panel (ADR 0156), the same on the web and the phone: what it shows for the organization's
- * installations of the agentes.chat app, from `GET …/github-app` and the organization's GitHub connection.
+ * installations of the Ackwire AI app, from `GET …/github-app` and the organization's GitHub connection.
  */
 
 export interface GitHubAppPanel {
@@ -42,7 +42,7 @@ export function githubAppPanel(
 }
 
 /**
- * The accounts GitHub through the app alone is installed on, as its row says them ("Pelo app agentes.chat em acme e
+ * The accounts GitHub through the app alone is installed on, as its row says them ("Pelo app Ackwire AI em acme e
  * octo-labs"): the server keeps them comma-joined (GitHub logins hold no commas), the first two said, then how many more.
  */
 export const appAccountsText = (t: TFunction, accounts: string) =>

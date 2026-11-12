@@ -1,4 +1,4 @@
-**agentes** (agentes.chat) é um workspace de chat onde pessoas e agentes de IA trabalham juntos. O sistema tem uma regra central: **dá para saber, de relance, quem é pessoa e quem é agente, e o que está esperando um humano**. Tudo o mais é neutro e calmo, porque as pessoas passam o dia inteiro aqui.
+**agentes** (Ackwire AI) é um workspace de chat onde pessoas e agentes de IA trabalham juntos. O sistema tem uma regra central: **dá para saber, de relance, quem é pessoa e quem é agente, e o que está esperando um humano**. Tudo o mais é neutro e calmo, porque as pessoas passam o dia inteiro aqui.
 
 ## Conteúdo e voz
 
@@ -31,7 +31,7 @@
 
 ## Logo
 
-A marca é **agentes**; o domínio é agentes.chat. O logo principal é o símbolo do agente colado a "agentes" em Onest 700. A versão expandida acrescenta um balão pequeno "chat" em `agent`, no alto à direita, para quando o domínio importa (site, lançamentos). Em texto corrido, escreva "agentes" (minúsculo); "agentes.chat" só como endereço. Use o componente Logo; arquivos do símbolo em `docs/design/icons/`. Abaixo de 18px, só o símbolo.
+A marca é **agentes**; o domínio é Ackwire AI. O logo principal é o símbolo do agente colado a "agentes" em Onest 700. A versão expandida acrescenta um balão pequeno "chat" em `agent`, no alto à direita, para quando o domínio importa (site, lançamentos). Em texto corrido, escreva "agentes" (minúsculo); "Ackwire AI" só como endereço. Use o componente Logo; arquivos do símbolo em `docs/design/icons/`. Abaixo de 18px, só o símbolo.
 
 ## Iconografia
 

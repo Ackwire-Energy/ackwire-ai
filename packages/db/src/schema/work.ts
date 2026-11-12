@@ -184,7 +184,7 @@ export const routines = pgTable(
     active: boolean().notNull().default(true),
     /**
      * What it may do while nobody watches (ADR 0053): `read` (the default) looks and reports through
-     * `hand_off`; `act` may also change things inside agentes.chat and on the agent's own branches,
+     * `hand_off`; `act` may also change things inside Ackwire AI and on the agent's own branches,
      * and asks before any change in a connected app.
      */
     access: text().notNull().default("read"),

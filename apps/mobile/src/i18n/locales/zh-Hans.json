@@ -51,7 +51,7 @@
       "certificate": "{{host}} 的证书无效。请联系服务器的管理者。",
       "notAgentes": "{{host}} 不是 Ackwire AI 服务器。请检查地址。",
       "serverTooOld": "{{host}} 需要更新才能配合此应用使用。",
-      "appTooOld": "请更新 agentes 应用以使用 {{host}}。",
+      "appTooOld": "请更新 Ackwire AI 应用以使用 {{host}}。",
       "down": {
         "line": "{{host}} 没有响应。",
         "text": "它可能已停机，或不在你的网络中。恢复后应用会自动打开。",

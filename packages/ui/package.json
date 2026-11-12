@@ -25,6 +25,7 @@
       "default": "./src/computer/portrait.js"
     },
     "./brand/marks": "./src/brand/marks.ts",
+    "./brand/ackwire": "./src/brand/ackwire.ts",
     "./presence/badge": "./src/presence/badge.ts",
     "./sfx": "./src/sfx/synth.ts",
     "./sky/engine": "./src/sky/engine.ts",

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "Tutup",
@@ -454,10 +454,10 @@
       "openMail": "Buka {{app}}",
       "ownerWaits": "Server ini menunggu pemiliknya.",
       "ownerWaitsLead": "Buka tautan pemilik server ini (berakhiran /owner#claim=…), di komputer ini atau di ponselmu.",
-      "noPassword": "Akun ini masuk dari aplikasi agentes.chat.",
+      "noPassword": "Akun ini masuk dari aplikasi Ackwire AI.",
       "noPasswordLead": "Di komputer yang menjalankan server ini, buka aplikasinya lalu pilih Tambah kata sandi di Pengaturan › Akunmu.",
       "backToSignIn": "Kembali ke halaman masuk",
-      "toAuthorizeApp": "Untuk menghubungkan aplikasi ke agentes.chat."
+      "toAuthorizeApp": "Untuk menghubungkan aplikasi ke Ackwire AI."
     },
     "desktop": {
       "browser": "Lanjutkan di browsermu",
@@ -472,7 +472,7 @@
       "confirmYes": "Ya, masukkan aplikasinya",
       "confirmNo": "Ini bukan aku",
       "done": "Beres.",
-      "doneLead": "Kamu sudah masuk di aplikasi agentes. Kamu bisa menutup tab ini.",
+      "doneLead": "Kamu sudah masuk di aplikasi Ackwire AI. Kamu bisa menutup tab ini.",
       "expired": "Permintaan ini sudah kedaluwarsa.",
       "expiredLead": "Kembali ke aplikasi lalu pilih {{provider}} lagi.",
       "handover": "Masuk dengan akunmu dari perangkat lain…",
@@ -728,7 +728,7 @@
       },
       "area": {
         "title": "Kalau kamu, mengurus bidang apa?",
-        "lead": "Hanya supaya kami tahu siapa yang memakai agentes.chat.",
+        "lead": "Hanya supaya kami tahu siapa yang memakai Ackwire AI.",
         "skip": "Lewati langkah ini",
         "options": {
           "dev": "Pengembangan",
@@ -934,7 +934,7 @@
         "howTo": "Cara menghubungkan, per aplikasi",
         "allow": "Di halaman izin, pilih Buat dan edit agen, rutinitas, dan skill.",
         "paste": "Lalu tempel permintaan ini di aplikasi:",
-        "prompt": "Hubungkan {{url}} dan, untuk setiap agen, instruksi, skill, dan rutinitas yang kamu punya, buat padanannya di agentes.chat. Pertama, tampilkan daftar yang sudah ada di sana agar tidak ada yang terduplikasi.",
+        "prompt": "Hubungkan {{url}} dan, untuk setiap agen, instruksi, skill, dan rutinitas yang kamu punya, buat padanannya di Ackwire AI. Pertama, tampilkan daftar yang sudah ada di sana agar tidak ada yang terduplikasi.",
         "promptLabel": "Permintaan untuk aplikasi AI-mu",
         "copy": "Salin permintaan",
         "copied": "Sekarang tempel di aplikasi AI-mu.",
@@ -1171,7 +1171,7 @@
     "keyStep": {
       "title": "AI mana yang akan mereka pakai?",
       "lead": "Masuk dengan paket AI-mu: tidak perlu kunci API.",
-      "paid": "Paket agentes.chat-mu sudah aktif. Komputer mereka sedang disiapkan.",
+      "paid": "Paket Ackwire AI-mu sudah aktif. Komputer mereka sedang disiapkan.",
       "confirming": "Mengonfirmasi pembayaran untuk paket Ackwire AI ruang kerja ini.",
       "leadNoComputer": "Agenmu berpikir dengan kunci API, atau dengan paket AI-mu di komputer yang kamu hubungkan."
     },
@@ -1183,7 +1183,7 @@
       "title": "Batas pengeluaran per agen",
       "label": "Batas bulanan per agen, dalam dolar",
       "perMonth": "/bulan",
-      "noteKey": "Hanya untuk penggunaan API, ditagih oleh penyedia kunci, bukan oleh agentes.chat. Saat agen mencapainya, agen berhenti dan memberitahumu. Paket tidak dihitung di sini.",
+      "noteKey": "Hanya untuk penggunaan API, ditagih oleh penyedia kunci, bukan oleh Ackwire AI. Saat agen mencapainya, agen berhenti dan memberitahumu. Paket tidak dihitung di sini.",
       "notePlatform": "Hanya untuk penggunaan API. Saat agen mencapainya, agen berhenti dan memberitahumu."
     },
     "keySite": "Buat kunci di {{site}}.",
@@ -1235,7 +1235,7 @@
     },
     "team": {
       "title": "Siapa lagi yang bekerja denganmu?",
-      "payment": "Kamu bisa mengundang timmu setelah memilih paket agentes.chat.",
+      "payment": "Kamu bisa mengundang timmu setelah memilih paket Ackwire AI.",
       "lead": "Undang mereka lewat email, atau bagikan tautannya.",
       "leadLink": "Bagikan tautan undangan kepada mereka.",
       "emails": "Email",
@@ -1811,9 +1811,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "Kode QR untuk masuk ke aplikasi agentes",
+    "qr": "Kode QR untuk masuk ke aplikasi Ackwire AI",
     "making": "Membuat kode…",
-    "stepApp": "Pasang aplikasi agentes di ponselmu.",
+    "stepApp": "Pasang aplikasi Ackwire AI di ponselmu.",
     "stepTailscale": "Pasang Tailscale di ponselmu dan masuk dengan akun Tailscale yang sama dengan server ini.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2223,8 +2223,8 @@
       "greetingPersonal": "Halo, saya {{name}}. Saya akan menyiapkan agen-agenmu bersama kamu.",
       "lead": "Saya membuat agen, menghubungkan aplikasi, dan mengundang orang. Tidak ada yang berubah tanpa permintaan Anda, dan saya hanya melakukan apa yang bisa Anda lakukan.",
       "leadPersonal": "Saya membuat agenmu dan menghubungkan aplikasimu. Tidak ada yang berubah tanpa permintaanmu.",
-      "heldLead": "Pilih bidang usahamu dan timnya muncul di sini. Agen mulai bekerja setelah workspace punya paket agentes.chat.",
-      "heldLeadPersonal": "Pilih hal yang ingin dibantu, lalu agenmu muncul di sini. Mereka mulai bekerja setelah kamu punya paket agentes.chat.",
+      "heldLead": "Pilih bidang usahamu dan timnya muncul di sini. Agen mulai bekerja setelah workspace punya paket Ackwire AI.",
+      "heldLeadPersonal": "Pilih hal yang ingin dibantu, lalu agenmu muncul di sini. Mereka mulai bekerja setelah kamu punya paket Ackwire AI.",
       "connect": {
         "title": "Hubungkan AI untuk tim",
         "titlePersonal": "Hubungkan AI untuk agenmu",
@@ -2586,7 +2586,7 @@
       "plan": "Paket ini membawa komputer agen, selalu menyala. AI-nya yang sudah kamu bayar: Claude, ChatGPT dan lainnya, atau kunci API.",
       "active": "Paket aktif. Hubungkan AI dan {{name}} menjawab di sini.",
       "receipt": "Disimpan",
-      "channel": "Disimpan. Agen menjawab setelah workspace punya paket agentes.chat."
+      "channel": "Disimpan. Agen menjawab setelah workspace punya paket Ackwire AI."
     },
     "receipt": "Tidak ada yang akan menjawab: belum ada AI yang terhubung",
     "chip": "Tanpa AI"
@@ -2665,7 +2665,7 @@
       }
     },
     "billing": "Paket masuk di komputer workspace, dan komputer itu datang dengan paket Ackwire AI yang aktif.",
-    "billingWeb": "Pilih satu di web, di agentes.chat.",
+    "billingWeb": "Pilih satu di web, di Ackwire AI.",
     "orPayGo": "Atau bayar sesuai pemakaian",
     "pay": {
       "label": "Bagaimana kamu membayar?",
@@ -4563,7 +4563,7 @@
     "noInstructions": "{{name}} belum punya instruksi. Jelaskan bagaimana dia harus bekerja.",
     "noInstructions_female": "{{name}} belum punya instruksi. Jelaskan bagaimana dia harus bekerja.",
     "savedToast": "Perubahan {{name}} tersimpan.",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "izin bawaan",
     "connectHint": "Hubungkan layanan",
     "subtitle": "{{role}} · milik <b>{{owner}}</b> · {{model}} {{key}}",
@@ -4888,7 +4888,7 @@
         "two": "Preferensi",
         "three": "Nyalakan Browser",
         "done": "Selesai. Halaman ini mendeteksinya sendiri, tidak perlu dimuat ulang.",
-        "menuOpen": "Buka agentes",
+        "menuOpen": "Buka Ackwire AI",
         "menuPrefs": "Preferensi…",
         "menuPause": "Jeda",
         "menuQuit": "Keluar",
@@ -5065,7 +5065,7 @@
       "connectors": "Konektor {{org}}",
       "connectorsPersonal": "Konektormu",
       "oneLevel": "Satu level per aplikasi",
-      "builtin": "Bawaan agentes",
+      "builtin": "Bawaan Ackwire AI",
       "builtinHelp": "Drive, tugas, memori, dan lainnya",
       "noMatch": "Tidak ada yang cocok dengan “{{q}}”",
       "noneHere": "Tidak ada apa pun di filter ini",
@@ -7491,7 +7491,7 @@
         "pr_opened": "PR dibuka di GitHub"
       },
       "issue": {
-        "created": "Tugas dibuat di agentes"
+        "created": "Tugas dibuat di Ackwire AI"
       },
       "deploy": {
         "succeeded": "Deploy selesai"
@@ -9124,7 +9124,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "Perbarui agentes di komputer untuk memakai kunci paket"
+        "keys": "Perbarui Ackwire AI di komputer untuk memakai kunci paket"
       },
       "noComputer": "Akun disimpan di komputer yang terhubung. Hubungkan salah satu komputermu dulu.",
       "addComputer": "Hubungkan komputer",
@@ -10864,7 +10864,7 @@
     "install": "Pasang aplikasi Ackwire AI",
     "installMore": "Pasang di akun lain",
     "none": "Belum ada akun GitHub.",
-    "usingAccount": "Saat ini agen muncul di GitHub sebagai {{account}}. Pasang aplikasinya agar mereka muncul sebagai aplikasi agentes.chat.",
+    "usingAccount": "Saat ini agen muncul di GitHub sebagai {{account}}. Pasang aplikasinya agar mereka muncul sebagai aplikasi Ackwire AI.",
     "allRepos": "Semua repositori",
     "someRepos": "Repositori terpilih",
     "suspended": "Ditangguhkan di GitHub",
@@ -10882,14 +10882,14 @@
     "requested": "Hanya pemilik akun GitHub itu yang bisa memasang aplikasinya. Minta dia memasangnya dari Konektor › GitHub di ruang kerja ini.",
     "notVisible": "Akun GitHub-mu tidak bisa melihat pemasangan itu. Pasang dengan akun yang punya akses ke sana.",
     "otherWorkspace": "Akun GitHub itu sudah terhubung ke ruang kerja lain. Hapus aplikasinya di sana sebelum memasangnya di sini.",
-    "installedOutside": "Aplikasinya dipasang di akun GitHub itu di luar agentes.chat. Hapus di GitHub, lalu pasang lagi dari Konektor › GitHub.",
+    "installedOutside": "Aplikasinya dipasang di akun GitHub itu di luar Ackwire AI. Hapus di GitHub, lalu pasang lagi dari Konektor › GitHub.",
     "misconfigured": "Aplikasi GitHub di server memakai kunci rahasia yang salah, jadi pemasangan tidak bisa selesai. Pengelola server perlu mengganti kunci itu di pengaturan aplikasi.",
     "connectAccount": "Hubungkan akun GitHub",
     "ownerHint": "Pemilik server ini bisa membuat aplikasi GitHub di sini, di Konektor.",
     "viaApp": "Lewat aplikasi Ackwire AI di {{accounts}}",
     "disconnectApp": "Aplikasi Ackwire AI juga dicopot dari {{accounts}} di GitHub.",
     "disconnectKeepsApp": "Agen tetap di GitHub lewat aplikasi Ackwire AI di {{accounts}}.",
-    "keptApp": "Akun GitHub diputuskan. Agen tetap di GitHub lewat aplikasi agentes.chat.",
+    "keptApp": "Akun GitHub diputuskan. Agen tetap di GitHub lewat aplikasi Ackwire AI.",
     "signature": {
       "forPerson": "{{agent}}, agen {{person}} di Ackwire AI",
       "alone": "{{agent}}, agen di Ackwire AI"
@@ -12478,7 +12478,7 @@
       "generalKept": "#general tidak bisa dihapus.",
       "generalStays": "Semua orang tetap di #general.",
       "mcpUnreachable": "Tidak bisa terhubung ke server MCP. Periksa alamatnya dan coba lagi.",
-      "notApproved": "Layanan ini belum menyetujui agentes.chat.",
+      "notApproved": "Layanan ini belum menyetujui Ackwire AI.",
       "alreadyInvited": "Orang ini sudah punya undangan.",
       "alreadyAsked": "Seseorang sudah meminta untuk orang ini.",
       "mailboxConnected": "Kotak surat ini sudah terhubung.",
@@ -13268,7 +13268,7 @@
       "open": "Buka aplikasi Ackwire AI",
       "browserAsks": "Browser akan bertanya apakah boleh membukanya: pilih Buka, dan Selalu izinkan jika ditawarkan.",
       "noApp": "Belum punya aplikasinya?",
-      "afterInstall": "Setelah terpasang, klik lagi Buka aplikasi agentes.chat. Tautan ini berlaku sekali, selama 10 menit.",
+      "afterInstall": "Setelah terpasang, klik lagi Buka aplikasi Ackwire AI. Tautan ini berlaku sekali, selama 10 menit.",
       "waiting": "Menunggu aplikasi di komputer ini…",
       "expired": "Tautan ini sudah kedaluwarsa.",
       "again": "Buat tautan baru",
@@ -13618,7 +13618,7 @@
     "reconnectDoneText": "{{name}} kembali ke {{org}}.",
     "deniedTitle": "Tidak terhubung",
     "denied": "Komputer tidak dihubungkan. Kalau bukan kamu yang membukanya, tidak ada yang mendapat akses.",
-    "home": "Ke agentes"
+    "home": "Ke Ackwire AI"
   },
   "apps": {
     "connect": "Hubungkan aplikasi",
@@ -13776,7 +13776,7 @@
         "mode": "Di chat, beralih ke mode {{mode}}.",
         "loginRun": "Untuk masuk, jalankan <code>{{command}}</code>.",
         "loginType": "Untuk masuk, ketik <code>{{command}}</code> di aplikasi.",
-        "signIn": "Masuk dengan akun agentes.chat-mu di halaman yang terbuka.",
+        "signIn": "Masuk dengan akun Ackwire AI-mu di halaman yang terbuka.",
         "signInFirst": "Aplikasi memintamu masuk saat pertama kali memakainya.",
         "token": "Buat token pribadi dan taruh di tempat {{placeholder}}.",
         "install": "Tambahkan ke {{app}}"
@@ -13828,7 +13828,7 @@
       "canRead": "Membaca balasan dan apa yang sedang dikerjakan agen.",
       "canManage": "Membuat dan mengedit agen, rutinitas, dan skill atas namamu. Kamu mendapat pemberitahuan tentang apa yang dibuatnya.",
       "never": "Tidak pernah",
-      "neverApprove": "Menyetujui tindakan agen. Persetujuan tetap di tangan orang di agentes.chat.",
+      "neverApprove": "Menyetujui tindakan agen. Persetujuan tetap di tangan orang di Ackwire AI.",
       "neverSettings": "Mengubah pengaturan, anggota, atau izin.",
       "neverHidden": "Melihat yang tidak bisa kamu lihat.",
       "loopbackWarning": "Program apa pun di komputer ini bisa menerima akses ini. Lanjutkan hanya jika kamu baru saja memulainya di Claude Code atau aplikasi lain di komputer ini.",
@@ -14122,7 +14122,7 @@
       "rolesPersonal": "Apa yang bisa dilakukan setiap orang di sini. Pemilik bisa melakukan semuanya."
     },
     "about": {
-      "basedOn": "Berdasarkan <site>Ackwire AI</site> oleh Codari Global, LLC",
+      "basedOn": "Berdasarkan <site>agentes.chat</site> oleh Codari Global, LLC",
       "version": "Versi",
       "license": "Perangkat lunak bebas di bawah <license>GNU Affero General Public License v3</license>, tanpa jaminan.",
       "source": "Kode sumber",
@@ -15941,7 +15941,7 @@
     "paused": "Agen di ruang kerja ini dijeda untuk ditinjau.",
     "suspended": "Ruang kerja ini untuk sementara tidak tersedia.",
     "createRefused": "Kamu tidak bisa membuat ruang kerja sekarang.",
-    "createUnpaid": "Kamu sudah punya ruang kerja yang menunggu paket agentes.chat. Pilih paketnya sebelum membuat yang lain.",
+    "createUnpaid": "Kamu sudah punya ruang kerja yang menunggu paket Ackwire AI. Pilih paketnya sebelum membuat yang lain.",
     "createUnpaidOpen": "Buka {{name}}",
     "createInactive": "Kamu sudah punya ruang kerja yang belum aktif, jadi untuk sementara kamu tidak bisa membuat yang lain.",
     "agentPaused": "Agen ini sedang dijeda.",
@@ -15967,7 +15967,7 @@
       }
     },
     "billing": {
-      "payment": "Ruang kerja ini belum punya paket agentes.chat. Agennya mulai bekerja setelah paketnya aktif.",
+      "payment": "Ruang kerja ini belum punya paket Ackwire AI. Agennya mulai bekerja setelah paketnya aktif.",
       "unpaid": "Pembayaran paket Ackwire AI ruang kerja ini gagal, dan agennya berhenti.",
       "ended": "Paket Ackwire AI ruang kerja ini telah berakhir, dan agennya berhenti. Percakapan dan filenya masih ada untuk dibaca dan diunduh.",
       "sub": "Kamu tetap bisa membaca dan menulis di sini. Agen kembali setelah paket Ackwire AI beres.",
@@ -15979,7 +15979,7 @@
       "askAdmin": "Pengelola ruang kerja ini bisa menyelesaikannya.",
       "paid": "Pembayaran diterima. Paket Ackwire AI akan dimulai sebentar lagi.",
       "teamReady": "Timmu sudah siap. Perlu paket Ackwire AI untuk mulai.",
-      "invites": "Undangan terbuka bersama paket agentes.chat."
+      "invites": "Undangan terbuka bersama paket Ackwire AI."
     },
     "cloud": {
       "review": "Dijeda untuk tinjauan keamanan, sampai tim kami memeriksanya. Pemeriksaan otomatis kami menandai aktivitas yang mungkin melanggar Ketentuan kami (bagian 5). Untuk mengajukan keberatan, tulis ke {{email}}.",
@@ -16098,7 +16098,7 @@
     "open": "Buka paket dan tagihan",
     "opening": "Membuka…",
     "failed": "Tidak bisa membukanya sekarang. Coba lagi sebentar lagi.",
-    "adminsOnly": "Hanya pemilik dan admin ruang kerja yang mengelola paket agentes.chat-nya.",
+    "adminsOnly": "Hanya pemilik dan admin ruang kerja yang mengelola paket Ackwire AI-nya.",
     "seeOptions": "Lihat opsi",
     "people": "Orang",
     "files": "File",
@@ -16111,7 +16111,7 @@
     "members": {
       "full": "Ruang kerja ini berisi {{members}} dari {{limit}} orang.",
       "fullOne": "Paket Ackwire AI ruang kerja ini hanya untuk 1 orang.",
-      "fullAdmin": "Untuk mengajak lebih banyak orang, lihat pilihan paket agentes.chat.",
+      "fullAdmin": "Untuk mengajak lebih banyak orang, lihat pilihan paket Ackwire AI.",
       "fullMember": "Minta pengelola ruang kerja untuk memberi tempat.",
       "fullAddSeat": "Semua kursi berbayar sudah terisi. Tambahkan kursi di Paket dan tagihan.",
       "fullTop": "Paket ini tidak bisa menampung lebih banyak orang. Ganti paket di Paket dan tagihan.",
@@ -16472,7 +16472,7 @@
       "unavailableHelp": "Coba lagi sebentar lagi.",
       "screensOff": "Layar dimatikan di {{computer}}. Nyalakan di sana:",
       "screensMissing": "{{computer}} belum bisa menampilkan layar. Di komputer itu:",
-      "outdated": "Perbarui agentes di {{computer}} untuk melihat layar {{name}}.",
+      "outdated": "Perbarui Ackwire AI di {{computer}} untuk melihat layar {{name}}.",
       "noScreen": "{{name}} tidak punya layar untuk ditampilkan di sini",
       "noScreenHelp": "Izinkan layar atau browser di Alat dan akses.",
       "noComputer": "Pilih komputer untuk {{name}}.",
@@ -16582,7 +16582,7 @@
       "browser": "Browser",
       "screen": "Layar komputer",
       "terminal": "Terminal",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "Berpikir",
       "inside": "{{program}} · {{detail}}"
     },
@@ -17573,7 +17573,7 @@
     "mark": "Beta",
     "open": "Kirim masukan",
     "ask": "Apa yang kurang, rusak, atau mengganggu?",
-    "goesCloud": "Yang kamu tulis dikirim lewat email ke tim agentes.chat.",
+    "goesCloud": "Yang kamu tulis dikirim lewat email ke tim Ackwire AI.",
     "goesServer": "Yang kamu tulis dikirim lewat email ke pengelola server ini.",
     "placeholder": "Tulis dengan caramu",
     "report": "Laporkan masalah di sini",

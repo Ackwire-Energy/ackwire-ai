@@ -27,7 +27,7 @@ export const START_PAGES = ["home", "last", "channel"] as const;
 export type StartPage = (typeof START_PAGES)[number];
 
 /**
- * Top-level tenant. agentes.chat Cloud has many; a self-hosted install usually
+ * Top-level tenant. Ackwire AI Cloud has many; a self-hosted install usually
  * has one. Every tenant-owned table carries `org_id` (docs/adr/0002-editions-and-modules.md).
  */
 export const organizations = pgTable("organizations", {

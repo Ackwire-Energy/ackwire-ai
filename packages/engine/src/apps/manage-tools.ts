@@ -141,7 +141,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
       scope: "manage",
       title: "What already exists",
       description:
-        "Lists the agents, skills, routines and channels that already exist in this agentes.chat workspace, by name. The create tools return an item with the same name as existing: true and leave it unchanged.",
+        "Lists the agents, skills, routines and channels that already exist in this Ackwire AI workspace, by name. The create tools return an item with the same name as existing: true and leave it unchanged.",
       input: z.object({}).strict(),
       readOnly: true,
       destructive: false,
@@ -169,7 +169,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
     {
       scope: "manage",
       title: "Create an agent",
-      description: `Creates an agent in agentes.chat owned by ${p.personName}, with its name, role and instructions. It thinks with the workspace's default AI, which ${p.personName} can change later. An agent with the same name comes back as existing: true, unchanged.`,
+      description: `Creates an agent in Ackwire AI owned by ${p.personName}, with its name, role and instructions. It thinks with the workspace's default AI, which ${p.personName} can change later. An agent with the same name comes back as existing: true, unchanged.`,
       input: z
         .object({
           name: z.string().trim().min(1).max(80).describe("The agent's name"),
@@ -230,7 +230,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
       scope: "manage",
       title: "Replace an agent's instructions",
       description:
-        "Replaces the instructions (system prompt) of an existing agentes.chat agent. Needs the permission to manage agents in this workspace.",
+        "Replaces the instructions (system prompt) of an existing Ackwire AI agent. Needs the permission to manage agents in this workspace.",
       input: z
         .object({ agent: AGENT_REF, instructions: z.string().max(50_000).describe("The whole new instructions") })
         .strict(),
@@ -267,7 +267,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
       scope: "manage",
       title: "Change an agent's role, name or look",
       description:
-        "Changes the role, the name or the look of an existing agentes.chat agent. What is left out stays. Needs the permission to manage agents; the look alone can also be changed by the agent's owner.",
+        "Changes the role, the name or the look of an existing Ackwire AI agent. What is left out stays. Needs the permission to manage agents; the look alone can also be changed by the agent's owner.",
       input: z
         .object({
           agent: AGENT_REF,
@@ -334,7 +334,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
     {
       scope: "manage",
       title: "List skills",
-      description: "Lists the skills installed in this agentes.chat workspace, with how many agents have each one on.",
+      description: "Lists the skills installed in this Ackwire AI workspace, with how many agents have each one on.",
       input: z.object({}).strict(),
       readOnly: true,
       destructive: false,

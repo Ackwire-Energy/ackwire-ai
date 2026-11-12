@@ -49,9 +49,9 @@
       "unreachable": "We kunnen {{host}} niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",
       "unreachableTailscale": "We kunnen {{host}} niet bereiken. Hij staat op Tailscale: open de Tailscale-app, maak verbinding en probeer het opnieuw. Al verbonden? De computer van de server slaapt misschien, of de app is gesloten.",
       "certificate": "Het certificaat van {{host}} is niet geldig. Neem contact op met wie de server beheert.",
-      "notAgentes": "{{host}} is geen agentes.chat-server. Controleer het adres.",
+      "notAgentes": "{{host}} is geen Ackwire AI-server. Controleer het adres.",
       "serverTooOld": "{{host}} heeft een update nodig om met deze app te werken.",
-      "appTooOld": "Werk de agentes-app bij om {{host}} te gebruiken.",
+      "appTooOld": "Werk de Ackwire AI-app bij om {{host}} te gebruiken.",
       "down": {
         "line": "{{host}} reageerde niet.",
         "text": "Misschien is hij offline of buiten je netwerk. De app opent vanzelf zodra hij terug is.",
@@ -69,14 +69,14 @@
       "confirm": "Verbinden",
       "notNow": "Niet nu",
       "checking": "Server controleren…",
-      "notALink": "Deze link komt niet van een agentes.chat-server.",
+      "notALink": "Deze link komt niet van een Ackwire AI-server.",
       "tokenFailed": "De code is verlopen of al gebruikt. Log in met je e-mail of toon een nieuwe code op de computer.",
       "signInSlow": "Inloggen duurt langer dan zou moeten. Log in met je e-mail of toon een nieuwe code op de computer."
     },
     "scan": {
       "hint": "Richt op de QR-code op de computer",
       "typeAddress": "Adres typen",
-      "notOurs": "Deze QR-code komt niet van een agentes.chat-server.",
+      "notOurs": "Deze QR-code komt niet van een Ackwire AI-server.",
       "cameraTitle": "De camera gebruiken",
       "cameraText": "Hij wordt alleen gebruikt om de QR-code te lezen.",
       "allow": "Camera toestaan",

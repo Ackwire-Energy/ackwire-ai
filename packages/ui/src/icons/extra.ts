@@ -327,7 +327,7 @@ export const extraIcons = {
     ["rect", { x: "3", y: "4", width: "14", height: "9.5", rx: "2" }],
     ["path", { d: "M7.5 16.5h5M10 13.5v3" }],
   ],
-  /** A cloud (agentes.chat Cloud, status). */
+  /** A cloud (Ackwire AI Cloud, status). */
   cloud: [["path", { d: "M6 15.5a3.5 3.5 0 0 1-.4-7 4.5 4.5 0 0 1 8.7-.9A3.5 3.5 0 0 1 14 15.5z" }]],
   /** "Abrir no celular". */
   phone: [

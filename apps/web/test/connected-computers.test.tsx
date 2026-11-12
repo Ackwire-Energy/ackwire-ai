@@ -842,7 +842,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     // To grant: on the computer (the app), the terminal command as a fallback; no grant button.
     expect(screen().queryByRole("button", { name: /^(Liberar|Ligar)/ })).toBeNull();
     const grant = screen().getByRole("region", { name: "Para liberar mais" });
-    expect(grant.textContent).toContain("abra o app do agentes.chat nele (Preferências → Pastas).");
+    expect(grant.textContent).toContain("abra o app do Ackwire AI nele (Preferências → Pastas).");
     expect(grant.textContent).toContain("Sem o app? No terminal do computador:");
     expect(grant.querySelector(".machine-command__code")?.textContent).toBe(
       "agentes-runner folders allow <pasta> --agent <agente>",
@@ -853,7 +853,7 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     const card = () => document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
     await open();
     expect(card().textContent).toContain(
-      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.",
+      "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.",
     );
     expect(card().querySelector(".machine-command__code")).toBeNull();
     cleanup();
@@ -871,11 +871,11 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
       return screen().getByRole("region", { name: "Para liberar mais" }).textContent;
     };
     expect(await grantText({ os: "windows", name: "PC da Ana" })).toContain(
-      "abra o app do agentes.chat nele (Preferências → Pastas).Sem o app? No terminal do computador:",
+      "abra o app do Ackwire AI nele (Preferências → Pastas).Sem o app? No terminal do computador:",
     );
     const linux = await grantText({ os: "linux", name: "Servidor", mode: "system" });
     expect(linux).toContain("Liberar é no próprio computador, no Terminal dele, como administrador:");
-    expect(linux).not.toContain("app do agentes.chat");
+    expect(linux).not.toContain("app do Ackwire AI");
   });
 
   test("read-only for someone who is neither an admin nor who connected it", async () => {

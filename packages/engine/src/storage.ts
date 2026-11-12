@@ -235,7 +235,7 @@ function failedAtFirstStep(error: string): StorageTestResult {
 /** Write, read, list and delete a small probe object. */
 async function probe(store: BlobStore, prefix: string): Promise<StorageTestResult> {
   const key = `${keyPrefix(prefix)}.agentes-probe/${randomToken(9)}`;
-  const body = new TextEncoder().encode(`agentes.chat storage check ${new Date().toISOString()}`);
+  const body = new TextEncoder().encode(`Ackwire AI storage check ${new Date().toISOString()}`);
   const steps: StorageTestResult["steps"] = [];
   const step = async (name: StorageStep, run: () => Promise<void>) => {
     if (steps.some((s) => !s.ok)) {

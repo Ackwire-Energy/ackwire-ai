@@ -6,39 +6,39 @@ import type { EmailWords } from "./index";
  * Chinese has no plural forms: `n === 1` only picks the wording English uses for a single item.
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? ["由 ", { nobr: host }, " 上的 agentes.chat 服务器发送。"] : "由 agentes.chat 发送。"),
+  sentBy: (host) => (host ? ["由 ", { nobr: host }, " 上的 Ackwire AI 服务器发送。"] : "由 Ackwire AI 发送。"),
   fallback: "按钮无法使用？把这个地址复制到浏览器中打开：",
   role: { owner: "所有者", member: "成员" },
   anAgent: "一个智能体",
   someone: "有人",
   verify: {
-    subject: "确认你在 agentes.chat 的邮箱",
+    subject: "确认你在 Ackwire AI 的邮箱",
     preheader: "点一下即可确认这个地址。链接 1 小时内有效。",
     headline: "确认你的邮箱",
     body: "只差一步：确认这个地址是你的。",
     button: "确认邮箱",
     small: "链接 1 小时内有效。如果你没有注册，忽略这封邮件即可。",
-    why: "你收到这封邮件，是因为有人用这个地址注册了 agentes.chat。",
+    why: "你收到这封邮件，是因为有人用这个地址注册了 Ackwire AI。",
   },
   reset: {
-    subject: "重置你的 agentes.chat 密码",
+    subject: "重置你的 Ackwire AI 密码",
     preheader: "设置一个新密码。链接 1 小时内有效。",
     headline: "设置新密码",
     body: "我们收到了重置这个地址密码的请求。",
     button: "设置新密码",
     note: "不是你本人操作？忽略这封邮件即可，你的密码不会改变。",
     small: "链接 1 小时内有效。",
-    why: "你收到这封邮件，是因为有人在 agentes.chat 上请求重置这个地址的密码。",
+    why: "你收到这封邮件，是因为有人在 Ackwire AI 上请求重置这个地址的密码。",
   },
   invitation: {
-    subject: "你受邀加入 agentes.chat 上的一个工作区",
+    subject: "你受邀加入 Ackwire AI 上的一个工作区",
     preheader: "请在 7 天内用这个邮箱地址接受邀请。",
     headline: "你受邀加入一个工作区",
     body: (inviter, email, org, role) =>
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} 邀请你以${role}身份加入 `, { b: org }, "。"]
         : [`你受邀以${role}身份加入 `, { b: org }, "。"],
-    what: "agentes.chat 是成员和 AI 智能体一起工作的地方。",
+    what: "Ackwire AI 是成员和 AI 智能体一起工作的地方。",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}：` : "附言：" }, `“${note}”`],
     button: "接受邀请",
     small: "邀请 7 天内有效。请用这个邮箱地址接受。",
@@ -47,8 +47,8 @@ export const words: EmailWords = {
     personal: {
       body: (inviter, email) =>
         inviter
-          ? [{ b: inviter }, `${email ? ` (${email})` : ""} 邀请你加入 agentes.chat 上的个人工作区。`]
-          : "你受邀加入 agentes.chat 上的一个个人工作区。",
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} 邀请你加入 Ackwire AI 上的个人工作区。`]
+          : "你受邀加入 Ackwire AI 上的一个个人工作区。",
       why: () =>
         "你收到这封邮件，是因为有人邀请这个地址加入个人工作区。如果你不认识对方，忽略即可。在你接受之前，什么都不会发生。",
     },
@@ -85,36 +85,36 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "确认你在 agentes.chat 候补名单上的位置",
+    subject: "确认你在 Ackwire AI 候补名单上的位置",
     preheader: "点一下，你的位置就保留下来了。",
     headline: "确认你在名单上的位置",
     body: (email) =>
       email
-        ? ["我们收到请求，要把 ", { b: email }, " 加入 agentes.chat 的候补名单。"]
-        : "我们收到请求，要把这个地址加入 agentes.chat 的候补名单。",
+        ? ["我们收到请求，要把 ", { b: email }, " 加入 Ackwire AI 的候补名单。"]
+        : "我们收到请求，要把这个地址加入 Ackwire AI 的候补名单。",
     approve: "在这里，重要的事情都要经过人的批准才会发生。这个请求也一样。",
     button: "确认我的邮箱",
     small: "链接 48 小时内有效。不是你本人？忽略这封邮件即可。不点击链接，这个地址就不会加入名单。",
-    why: "你收到这封邮件，是因为有人在 agentes.chat 候补名单中填写了这个地址。",
+    why: "你收到这封邮件，是因为有人在 Ackwire AI 候补名单中填写了这个地址。",
   },
   earlyAccess: {
-    subject: "你的 agentes.chat 邀请到了",
+    subject: "你的 Ackwire AI 邀请到了",
     preheader: (days) => `请在 ${days} 天内用这个邮箱地址创建账号。`,
     headline: "你的访问权限已就绪",
-    body: (email) => [{ b: email }, " 现在可以在 agentes.chat 上创建账号和工作区了。"],
-    what: "agentes.chat 是成员和 AI 智能体一起工作的地方。",
+    body: (email) => [{ b: email }, " 现在可以在 Ackwire AI 上创建账号和工作区了。"],
+    what: "Ackwire AI 是成员和 AI 智能体一起工作的地方。",
     button: "创建我的账号",
     small: (days) =>
       `链接 ${days} 天内有效，仅限这个地址使用。你可以用密码注册，也可以用同一地址的 Google、GitHub 或 Apple 账号注册。`,
-    why: "你收到这封邮件，是因为这个地址在 agentes.chat 的候补名单上，或者受邀加入了 agentes.chat。在你注册之前，什么都不会发生。",
+    why: "你收到这封邮件，是因为这个地址在 Ackwire AI 的候补名单上，或者受邀加入了 Ackwire AI。在你注册之前，什么都不会发生。",
   },
   earlyAccessAllowed: {
     subject: "你现在可以创建自己的工作区了",
     preheader: "用你现有的账号登录，然后完成设置。",
     headline: "创建你自己的工作区",
-    body: (email) => ["你现在可以用现有账号 ", { b: email }, " 在 agentes.chat 上创建自己的工作区了。"],
+    body: (email) => ["你现在可以用现有账号 ", { b: email }, " 在 Ackwire AI 上创建自己的工作区了。"],
     button: "创建我的工作区",
-    why: "你收到这封邮件，是因为这个账号获得了 agentes.chat 的抢先体验资格。",
+    why: "你收到这封邮件，是因为这个账号获得了 Ackwire AI 的抢先体验资格。",
   },
   budget: {
     subject: {
@@ -181,14 +181,14 @@ export const words: EmailWords = {
       create: ["创建一个智能体。", "它从一开始就在这台电脑上工作。"],
     },
     button: { ai: "连接你的 AI", task: "布置第一个任务", create: "创建智能体" },
-    why: (org) => `你收到这封邮件，是因为你是 agentes.chat 上 ${org} 的所有者。关于这台电脑，只会发这一封邮件。`,
+    why: (org) => `你收到这封邮件，是因为你是 Ackwire AI 上 ${org} 的所有者。关于这台电脑，只会发这一封邮件。`,
     personal: {
       body: () =>
         "感谢耐心等待。你的智能体的电脑已经开机并设置完毕，每个智能体都有自己的用户。它昼夜不停地运行，你的智能体随时都能工作。",
       steps: {
         task: ["布置第一个任务。", "打开和你的某个智能体的对话，说出你需要什么。"],
       },
-      why: () => "你收到这封邮件，是因为 agentes.chat 上的这个工作区是你的。关于这台电脑，只会发这一封邮件。",
+      why: () => "你收到这封邮件，是因为 Ackwire AI 上的这个工作区是你的。关于这台电脑，只会发这一封邮件。",
     },
   },
   joinRequest: {
@@ -231,7 +231,7 @@ export const words: EmailWords = {
       reason: (reason) => [{ b: "附言：" }, `“${reason}”`],
       small: "如果你觉得这是个误会，请让那里的人通过邮件邀请你。",
     },
-    why: (org) => `你收到这封邮件，是因为这个地址请求加入 agentes.chat 上的 ${org}。`,
+    why: (org) => `你收到这封邮件，是因为这个地址请求加入 Ackwire AI 上的 ${org}。`,
     personal: {
       joined: { body: (who) => `${who} 批准了你的请求。你现在已加入这个工作区。` },
       invited: { body: (who) => `${who} 批准了你加入工作区的请求。` },
@@ -240,25 +240,25 @@ export const words: EmailWords = {
         body: () => "你请求的那个人查看了你的请求，没有批准。",
         small: "如果你觉得这是个误会，请让对方通过邮件邀请你。",
       },
-      why: () => "你收到这封邮件，是因为这个地址请求加入 agentes.chat 上的一个个人工作区。",
+      why: () => "你收到这封邮件，是因为这个地址请求加入 Ackwire AI 上的一个个人工作区。",
     },
   },
   joinCode: {
-    subject: (code) => `你的 agentes.chat 验证码：${code}`,
+    subject: (code) => `你的 Ackwire AI 验证码：${code}`,
     preheader: "在页面上输入它即可请求加入。10 分钟内有效。",
     headline: "你的验证码",
     body: (org) => ["在页面上输入这个验证码，即可请求加入 ", { b: org }, "。"],
     small: "10 分钟内有效。如果不是你本人请求，忽略这封邮件即可。",
-    why: (org) => `你收到这封邮件，是因为有人输入了这个地址，请求加入 agentes.chat 上的 ${org}。`,
+    why: (org) => `你收到这封邮件，是因为有人输入了这个地址，请求加入 Ackwire AI 上的 ${org}。`,
     personal: {
       body: () => "在页面上输入这个验证码，即可请求加入这个工作区。",
-      why: () => "你收到这封邮件，是因为有人输入了这个地址，请求加入 agentes.chat 上的一个个人工作区。",
+      why: () => "你收到这封邮件，是因为有人输入了这个地址，请求加入 Ackwire AI 上的一个个人工作区。",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `删除工作区的验证码：${code}`,
     subjectAccount: (code) => `删除整个账号的验证码：${code}`,
-    preheader: "在 agentes.chat 中输入它来确认。10 分钟内有效。",
+    preheader: "在 Ackwire AI 中输入它来确认。10 分钟内有效。",
     headline: "你的验证码",
     workspace: (org) => ["输入这个验证码即可删除工作区 ", { b: org }, "。它会立即对所有人关闭，7 天后被永久删除。"],
     account: (email) => [
@@ -273,8 +273,8 @@ export const words: EmailWords = {
     ],
     noSupport:
       "验证码 10 分钟内有效，没有它什么都不会被删除。如果不是你本人操作，请不要告诉任何人，并告知这台服务器的管理人员。",
-    whyWorkspace: (org) => `你收到这封邮件，是因为你的账号请求删除 agentes.chat 上的 ${org}。`,
-    whyAccount: "你收到这封邮件，是因为你的账号请求在 agentes.chat 上删除自己。",
+    whyWorkspace: (org) => `你收到这封邮件，是因为你的账号请求删除 Ackwire AI 上的 ${org}。`,
+    whyAccount: "你收到这封邮件，是因为你的账号请求在 Ackwire AI 上删除自己。",
     personal: {
       workspace: (org) => ["输入这个验证码即可删除你的工作区 ", { b: org }, "。它会立即关闭，7 天后被永久删除。"],
     },
@@ -292,10 +292,10 @@ export const words: EmailWords = {
     owner: "改变主意了？在那之前恢复它。",
     button: "恢复工作区",
     member: "如果这是误操作，请让所有者恢复它。",
-    why: (org) => `你收到这封邮件，是因为你在 agentes.chat 上的 ${org} 中。`,
+    why: (org) => `你收到这封邮件，是因为你在 Ackwire AI 上的 ${org} 中。`,
     personal: {
       member: "如果这是误操作，请让删除它的人恢复它。",
-      why: () => "你收到这封邮件，是因为你在 agentes.chat 上的这个工作区中。",
+      why: () => "你收到这封邮件，是因为你在 Ackwire AI 上的这个工作区中。",
     },
   },
   restored: {
@@ -304,26 +304,26 @@ export const words: EmailWords = {
     headline: "工作区已恢复",
     body: (by, org) => [{ b: by }, " 恢复了 ", { b: org }, "，现在可以正常使用了。"],
     button: "打开工作区",
-    why: (org) => `你收到这封邮件，是因为你在 agentes.chat 上的 ${org} 中。`,
+    why: (org) => `你收到这封邮件，是因为你在 Ackwire AI 上的 ${org} 中。`,
     personal: {
-      why: () => "你收到这封邮件，是因为你在 agentes.chat 上的这个工作区中。",
+      why: () => "你收到这封邮件，是因为你在 Ackwire AI 上的这个工作区中。",
     },
   },
   appConnected: {
-    subject: "有应用连接到了你的 agentes.chat 账号",
+    subject: "有应用连接到了你的 Ackwire AI 账号",
     preheader: "它可以在一个工作区中以你的身份查看任务、给智能体发送任务。",
     headline: "有应用连接了",
     body: (app, org) => [{ b: app }, " 现在可以访问你在 ", { b: org }, " 的账号。"],
     note: "不是你连接的？请立即断开它，并修改密码。",
     button: "查看已连接的应用",
-    why: (org) => `你收到这封邮件，是因为有应用连接到了你在 agentes.chat 上 ${org} 的账号。`,
+    why: (org) => `你收到这封邮件，是因为有应用连接到了你在 Ackwire AI 上 ${org} 的账号。`,
     personal: {
       body: (app) => [{ b: app }, " 现在可以访问你在个人工作区中的账号。"],
-      why: () => "你收到这封邮件，是因为有应用连接到了你在 agentes.chat 个人工作区中的账号。",
+      why: () => "你收到这封邮件，是因为有应用连接到了你在 Ackwire AI 个人工作区中的账号。",
     },
   },
   accountDeleting: {
-    subject: (day) => `你的 agentes.chat 账号将于 ${day} 删除`,
+    subject: (day) => `你的 Ackwire AI 账号将于 ${day} 删除`,
     preheader: "你有 7 天时间改变主意。",
     headline: "你的账号正在删除",
     body: (email, day, time) => [
@@ -334,17 +334,17 @@ export const words: EmailWords = {
     closes: (_count, names) => ["只有你一人的工作区现已关闭，并在同一天删除：", ...names, "。"],
     undo: "改变主意了？在那之前登录并点击“恢复”。",
     button: "登录并恢复",
-    why: "你收到这封邮件，是因为这个地址在 agentes.chat 上有一个账号。",
+    why: "你收到这封邮件，是因为这个地址在 Ackwire AI 上有一个账号。",
   },
   accountDeleted: {
-    subject: "你的 agentes.chat 账号已删除",
+    subject: "你的 Ackwire AI 账号已删除",
     preheader: "它已在所有设备上退出登录，无法再次登录。",
     headline: "你的账号已删除",
     body: (email) => ["我们删除了账号 ", { b: email }, "。"],
     closes: (_count, day, names) => [`只有你一人的工作区已关闭，将于 ${day} 被永久删除：`, ...names, "。"],
     support: (address) => ["如果不是你本人操作，请写信至 ", { mail: address }, "。"],
     noSupport: "如果不是你本人操作，请告知这台服务器的管理人员。",
-    why: "你收到这封邮件，是因为这个地址在 agentes.chat 上有一个账号。",
+    why: "你收到这封邮件，是因为这个地址在 Ackwire AI 上有一个账号。",
   },
   autonomy: {
     subject: (day, stalls, noise) => `${day} 的智能体：${stalls} 次卡住，${noise} 次空转`,
@@ -422,27 +422,27 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "你的团队正在等待",
-    preheader: "你的工作区已就绪。还需要一个 agentes.chat 套餐才能开始。",
+    preheader: "你的工作区已就绪。还需要一个 Ackwire AI 套餐才能开始。",
     headline: "你的团队正在等待",
     body: (agents, channels, routines) => {
       const a = `${agents} 个智能体`;
       const c = `${channels} 个频道`;
       const r = `${routines} 个例行任务`;
       return routines > 0
-        ? `${a}、${c}和${r}已就绪。还需要一个 agentes.chat 套餐才能开始。`
-        : `${a}和${c}已就绪。还需要一个 agentes.chat 套餐才能开始。`;
+        ? `${a}、${c}和${r}已就绪。还需要一个 Ackwire AI 套餐才能开始。`
+        : `${a}和${c}已就绪。还需要一个 Ackwire AI 套餐才能开始。`;
     },
-    button: "查看 agentes.chat 套餐",
-    why: (org) => `你收到这封邮件，是因为你在 agentes.chat 上管理 ${org}。此类提醒只发送两次。`,
+    button: "查看 Ackwire AI 套餐",
+    why: (org) => `你收到这封邮件，是因为你在 Ackwire AI 上管理 ${org}。此类提醒只发送两次。`,
     personal: {
       subject: "你的智能体正在等待",
       headline: "你的智能体正在等待",
       body: (agents, _channels, routines) => {
         const a = `${agents} 个智能体`;
         const r = `${routines} 个例行任务`;
-        return `${routines > 0 ? `${a}和${r}` : a}已就绪。只差一个 agentes.chat 套餐了。`;
+        return `${routines > 0 ? `${a}和${r}` : a}已就绪。只差一个 Ackwire AI 套餐了。`;
       },
-      why: () => "你收到这封邮件，是因为 agentes.chat 上的这个工作区是你的。此类提醒只发送两次。",
+      why: () => "你收到这封邮件，是因为 Ackwire AI 上的这个工作区是你的。此类提醒只发送两次。",
     },
   },
 };

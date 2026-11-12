@@ -72,7 +72,7 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
       "Ler as respostas e o que os agentes estão fazendo.",
     ]);
     const never = page().querySelector(".consent__list--never") as HTMLElement;
-    expect(never.textContent).toContain("Aprovar ações dos agentes. Aprovações ficam com pessoas no agentes.chat.");
+    expect(never.textContent).toContain("Aprovar ações dos agentes. Aprovações ficam com pessoas no Ackwire AI.");
     expect(page().textContent).toContain("Volta para claude.ai");
     expect(page().textContent).toContain("Continue só se você começou esta conexão agora.");
     expect(within(page()).queryByRole("alert")).toBeNull();
@@ -335,7 +335,7 @@ describe("/autorizar: an AI app asks to act as this person (ADR 0119)", () => {
   test("a request unknown, already answered or expired: back to the app; it never revokes anything", async () => {
     const { state } = await open();
     expect(page().textContent).toContain("Este pedido expirou");
-    expect(within(page()).getByRole("link", { name: "Ir para o agentes.chat" }).getAttribute("href")).toBe("/");
+    expect(within(page()).getByRole("link", { name: "Ir para o Ackwire AI" }).getAttribute("href")).toBe("/");
     expect(page().querySelector(".ac-empty:not(.consent__state)")).toBeNull();
     expect(page().textContent).toContain("Volte ao app e conecte de novo.");
     expect(calls(state, "apps.decide")).toEqual([]);

@@ -1,6 +1,6 @@
 /**
  * GIF search (ADR 0091). Optional: the server has it only with a GIPHY key, `GIPHY_API_KEY` or, on a server that
- * isn't agentes.chat's own, the one the installation's owner adds in Settings (`createKeyedGifs`); without one the
+ * isn't Ackwire AI's own, the one the installation's owner adds in Settings (`createKeyedGifs`); without one the
  * app shows no GIF tab and agents send only their own stickers. The key never leaves the server, and neither does
  * the provider's address: the app loads every GIF through the server (`media`), so a viewer's browser never talks
  * to it.

@@ -11,7 +11,7 @@ export const ACCOUNT_CONTACT_JOB = "account.contact";
 let enabled = false;
 
 /**
- * On only on agentes.chat Cloud with a provider that keeps contacts: a self-hosted server never sends anything about
+ * On only on Ackwire AI Cloud with a provider that keeps contacts: a self-hosted server never sends anything about
  * its accounts, and queues no job.
  */
 export function enableAccountContacts(publicUrl: string, email: Pick<EmailSender, "saveContact">) {

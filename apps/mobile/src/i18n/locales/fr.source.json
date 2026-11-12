@@ -126,7 +126,7 @@
     "value": "{{host}} needs an update to work with this app."
   },
   "auth.server.appTooOld": {
-    "value": "Update the agentes app to use {{host}}."
+    "value": "Update the Ackwire AI app to use {{host}}."
   },
   "auth.server.down.line": {
     "value": "{{host}} didn't answer."

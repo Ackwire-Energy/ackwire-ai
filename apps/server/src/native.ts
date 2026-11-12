@@ -1,5 +1,5 @@
 /**
- * `agentes-server`: agentes.chat with nothing else to install (native mode, ADR 0060 §2). One program
+ * `agentes-server`: Ackwire AI with nothing else to install (native mode, ADR 0060 §2). One program
  * whose database is built in (PGlite: `DATABASE_URL=pglite:///<folder>`), keeping everything in one
  * folder, `--data` (`~/.agentes` by default):
  *
@@ -65,11 +65,11 @@ const LOCK_FILE = "server.lock";
  */
 const PACKAGE = resolve(import.meta.dir, "..", "..");
 
-const USAGE = `agentes-server ${version}: agentes.chat on this computer, with its database built in.
+const USAGE = `agentes-server ${version}: Ackwire AI on this computer, with its database built in.
 
 Usage:
   agentes-server [--data <folder>] [--until-stdin-ends]
-      Runs agentes.chat until it's stopped (Ctrl-C, or the end of stdin with --until-stdin-ends).
+      Runs Ackwire AI until it's stopped (Ctrl-C, or the end of stdin with --until-stdin-ends).
       The folder (default ~/.agentes) keeps everything. A new one gets its settings, in .env, the
       first time.
   agentes-server migrate [--data <folder>]
@@ -110,7 +110,7 @@ export function nativeFiles(dir: string) {
 /** Where a restore builds the new database, and where it waits once complete, before taking `db`'s place. */
 const restoreFolders = (db: string) => ({ building: `${db}.new`, complete: `${db}.restored` });
 
-const ENV_HEADER = `# agentes.chat on this computer, with its database built in (agentes-server). The guide:
+const ENV_HEADER = `# Ackwire AI on this computer, with its database built in (agentes-server). The guide:
 # ${INSTALL_DOCS_URL}. AGENTES_SECRET encrypts the keys stored in the database: it
 # travels with the folder in a backup, and changing it makes them unreadable.
 `;
@@ -245,7 +245,7 @@ async function run(dir: string, untilStdinEnds = false): Promise<number> {
     if (error instanceof PgMajorMismatchError) return fail(EXIT.upgrade, error.message);
     if (error instanceof DatabaseInUseError) return fail(EXIT.locked, error.message);
     if ((error as { code?: string }).code === "EADDRINUSE") return fail(EXIT.port, `Port ${port} is taken.`);
-    return fail(EXIT.error, `agentes.chat didn't start: ${error instanceof Error ? error.message : String(error)}`);
+    return fail(EXIT.error, `Ackwire AI didn't start: ${error instanceof Error ? error.message : String(error)}`);
   }
   process.once("exit", () => rmSync(files.ready, { force: true }));
   writeAtomic(
@@ -398,7 +398,7 @@ export function serviceDefinition(dir: string, manager: "systemd" | "launchd"): 
   return {
     unit: "agentes-server",
     label: "chat.agentes.server",
-    description: "agentes.chat",
+    description: "Ackwire AI",
     program: [join(PACKAGE, "bin", "agentes-server")],
     args: ["--data", dir],
     env: [[SERVICE_ENV, manager]],
@@ -433,11 +433,11 @@ function service(action: string | undefined, dir: string): number {
   }
   if (action !== "install") return fail(EXIT.error, USAGE);
   const [launcher = ""] = d.program;
-  if (!existsSync(launcher)) return fail(EXIT.error, `Install agentes.chat first: ${launcher} isn't there.`);
+  if (!existsSync(launcher)) return fail(EXIT.error, `Install Ackwire AI first: ${launcher} isn't there.`);
   mkdirSync(dir, { recursive: true, mode: 0o700 });
   if (process.platform === "darwin") {
     if (!startLaunchAgent(d, { print })) return EXIT.error;
-    print(`agentes.chat starts at login now. Its log: ${nativeFiles(dir).log}`);
+    print(`Ackwire AI starts at login now. Its log: ${nativeFiles(dir).log}`);
     return EXIT.ok;
   }
   if (!systemdUserAvailable()) {
@@ -447,7 +447,7 @@ function service(action: string | undefined, dir: string): number {
   // Without it, systemd stops the person's services when they log out, and starts them only at their login.
   const user = os.userInfo().username;
   const linger = Bun.spawnSync(["loginctl", "enable-linger", user], { stdout: "ignore", stderr: "ignore" });
-  print(`agentes.chat starts with this computer now. Its log: ${nativeFiles(dir).log}`);
+  print(`Ackwire AI starts with this computer now. Its log: ${nativeFiles(dir).log}`);
   if (linger.exitCode !== 0) print(`To keep it running after you log out, run as root: loginctl enable-linger ${user}`);
   return EXIT.ok;
 }

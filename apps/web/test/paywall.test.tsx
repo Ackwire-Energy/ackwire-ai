@@ -28,7 +28,7 @@ afterEach(() => {
 type State = ReturnType<typeof seedState>;
 
 const KEPT = "Guardei a sua mensagem.";
-const PLANS = "Ver planos do agentes.chat";
+const PLANS = "Ver planos do Ackwire AI";
 const HOLD: OrgStanding = { state: "hold", reason: "payment" };
 const BILLING = "https://billing.example.com";
 
@@ -84,7 +84,7 @@ describe("the wall", () => {
     state.messages.push(wall());
     await open(state);
     expect(card().textContent).toContain(KEPT);
-    expect(card().textContent).toContain("Eu respondo aqui quando o workspace tiver um plano do agentes.chat");
+    expect(card().textContent).toContain("Eu respondo aqui quando o workspace tiver um plano do Ackwire AI");
     expect(card().textContent).toContain("A IA é a que você já paga");
     expect(within(card()).getByRole("button", { name: PLANS })).toBeTruthy();
     expect(within(card()).queryByRole("button", { name: "Conectar" })).toBeNull();
@@ -228,7 +228,7 @@ describe("what stays out of reach on a hold", () => {
     await open(held(seedState()), "settings/keys");
     expect(screen().queryByRole("button", { name: "Trocar a chave" })).toBeNull();
     expect(screen().getByRole("button", { name: "Apagar" })).toBeTruthy();
-    expect(document.body.textContent).toContain("As chaves de API abrem com o plano do agentes.chat");
+    expect(document.body.textContent).toContain("As chaves de API abrem com o plano do Ackwire AI");
   });
 
   test("Membros offers no invitation link that would open on a refusal", async () => {
@@ -298,7 +298,7 @@ describe("Lodi's DM on a hold", () => {
     ]);
     expect(count()).toBe("0 de 4");
     const plan = row("Ligue o time.");
-    expect(plan.textContent).toContain("Com um plano do agentes.chat, os agentes começam a trabalhar.");
+    expect(plan.textContent).toContain("Com um plano do Ackwire AI, os agentes começam a trabalhar.");
     expect(row("Conecte uma IA.").textContent).toContain("É o passo seguinte ao plano.");
     for (const waits of ["Conecte os apps do trabalho.", "Chame quem trabalha com você."])
       expect(row(waits).textContent).toContain("Abre com o plano.");

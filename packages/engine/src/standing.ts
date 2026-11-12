@@ -17,7 +17,7 @@ const { organizations, agents, users, sessions, pushDevices, organizationMembers
 let cloudNotices = false;
 
 /**
- * From the server's own address at boot: on agentes.chat Cloud a restriction says `cloud: true` beside its code, with
+ * From the server's own address at boot: on Ackwire AI Cloud a restriction says `cloud: true` beside its code, with
  * a held agent's or a blocked account's kind, and an agent hold tells its people, so the apps add the Terms section
  * and how to contest it (ADR 0056 §9). Elsewhere its people read what they always read.
  */
@@ -25,11 +25,11 @@ export function setRestrictionNotices(publicUrl: string) {
   cloudNotices = isAgentesCloud(publicUrl);
 }
 
-/** `{ cloud: true }` on agentes.chat Cloud, nothing elsewhere: spread beside a restriction the apps put in words. */
+/** `{ cloud: true }` on Ackwire AI Cloud, nothing elsewhere: spread beside a restriction the apps put in words. */
 export const cloudNotice = () => (cloudNotices ? { cloud: true as const } : undefined);
 
 /**
- * What the people a restriction meets read of its stored reason, on agentes.chat Cloud only: an agent hold is
+ * What the people a restriction meets read of its stored reason, on Ackwire AI Cloud only: an agent hold is
  * `network` (a network rule's, `network.…`) or `operator`, an account block `abuse` (a sign-up linked to an account
  * closed for abuse), `legal` (a legal hold) or `other`. Never the reason itself.
  */
@@ -109,12 +109,12 @@ const ON_HOLD = "This workspace is on hold: ";
 const SUSPENDED = "This workspace is suspended: ";
 const DELETING = "This workspace is being deleted.";
 const AGENT_PAUSED = "This agent is paused for now.";
-/** On agentes.chat Cloud, followed by the hold's kind: a run keeps it in its error, so its line names the kind. */
+/** On Ackwire AI Cloud, followed by the hold's kind: a run keeps it in its error, so its line names the kind. */
 const AGENT_HELD = "This agent is paused: ";
 
 const FLAGGED = "automated checks flagged activity that seems to involve ";
 /**
- * On agentes.chat Cloud, what its automatic hold flagged (`review.<category>`) in the apps' English words
+ * On Ackwire AI Cloud, what its automatic hold flagged (`review.<category>`) in the apps' English words
  * (`standing.cloud.reviewWhat`), in the standing's text, which people read in an error's message and in a computer's
  * refused call. A run keeps the words in its error, and `standingErrorDetail` reads the reason back from them.
  */
@@ -134,7 +134,7 @@ export function standingText(s: Pick<OrgStanding, "state" | "reason" | "notice">
 }
 
 /**
- * The app's code of a run refused by its standing, with the reason told or the hold's kind, and on agentes.chat Cloud
+ * The app's code of a run refused by its standing, with the reason told or the hold's kind, and on Ackwire AI Cloud
  * `cloud` ("true": a run's values are text); null for any other error.
  */
 export function standingErrorDetail(error: string): { errorCode: string; errorParams?: Record<string, string> } | null {
@@ -172,7 +172,7 @@ export class OrgPausedError extends ForbiddenError {
 }
 
 /**
- * Work refused because this agent is held (`agent.paused`, 403). The workspace never reads why: on agentes.chat Cloud
+ * Work refused because this agent is held (`agent.paused`, 403). The workspace never reads why: on Ackwire AI Cloud
  * only the hold's kind (`agentHoldKind`).
  */
 export class AgentHeldError extends ForbiddenError {
@@ -449,7 +449,7 @@ async function standingWritten(
  * Holds an agent, or lets it go (the operator API): held, it starts nothing (no run, model call, computer
  * work, routine slot or bridge call) and the router never picks it, while the rest of the workspace works.
  * What it is doing now stops at its next model, computer or bridge call. At once in this process, within
- * 5 s in the others. On agentes.chat Cloud its responsible person and the workspace's admins are told, with the
+ * 5 s in the others. On Ackwire AI Cloud its responsible person and the workspace's admins are told, with the
  * hold's kind, and told again when it is held again for another kind. Letting it go closes that notice. Null when the
  * workspace has no such agent.
  */
@@ -489,7 +489,7 @@ export async function setAgentHold(
 }
 
 /**
- * Whether this account is blocked (null: it isn't), and what its sign-in may say of why: on agentes.chat Cloud the
+ * Whether this account is blocked (null: it isn't), and what its sign-in may say of why: on Ackwire AI Cloud the
  * block's kind (`accountBlockKind`) with `cloud: true`, never the reason.
  */
 export async function accountBlock(db: Executor, userId: string) {

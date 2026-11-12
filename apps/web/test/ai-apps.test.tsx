@@ -347,7 +347,7 @@ describe("Configurações › Apps de IA (ADR 0119)", () => {
   test("every guide has this workspace's address to copy and its way to sign in", async () => {
     await go();
     await click(section().getAllByRole("button", { name: "Conectar um app" })[0] as HTMLElement);
-    const SIGN_IN = "Entre com sua conta do agentes.chat na página que abrir.";
+    const SIGN_IN = "Entre com sua conta do Ackwire AI na página que abrir.";
     const FIRST = "O app pede para você entrar na primeira vez que usar.";
     const TOKEN = "Crie um token pessoal e coloque no lugar de <token>.";
     // How each app signs in: OAuth through this server's page, or a personal token where the app documents no OAuth.

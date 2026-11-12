@@ -49,9 +49,9 @@
       "unreachable": "Wir erreichen {{host}} nicht. Prüf die Adresse und deine Verbindung und versuch es noch einmal.",
       "unreachableTailscale": "Wir erreichen {{host}} nicht. Der Server läuft über Tailscale: Öffne die Tailscale-App, verbinde dich und versuch es noch einmal. Schon verbunden? Der Computer, auf dem er läuft, schläft vielleicht oder seine App ist geschlossen.",
       "certificate": "Das Zertifikat von {{host}} ist ungültig. Sprich mit der Person, die den Server betreibt.",
-      "notAgentes": "{{host}} ist kein agentes.chat-Server. Prüf die Adresse.",
+      "notAgentes": "{{host}} ist kein Ackwire AI-Server. Prüf die Adresse.",
       "serverTooOld": "{{host}} braucht ein Update, um mit dieser App zu funktionieren.",
-      "appTooOld": "Aktualisiere die agentes-App, um {{host}} zu nutzen.",
+      "appTooOld": "Aktualisiere die Ackwire AI-App, um {{host}} zu nutzen.",
       "down": {
         "line": "{{host}} hat nicht geantwortet.",
         "text": "Er ist vielleicht offline oder außerhalb deines Netzwerks. Die App öffnet sich von selbst, sobald er wieder da ist.",
@@ -69,14 +69,14 @@
       "confirm": "Verbinden",
       "notNow": "Nicht jetzt",
       "checking": "Server wird geprüft…",
-      "notALink": "Dieser Link stammt nicht von einem agentes.chat-Server.",
+      "notALink": "Dieser Link stammt nicht von einem Ackwire AI-Server.",
       "tokenFailed": "Der Code ist abgelaufen oder wurde schon benutzt. Melde dich mit deiner E-Mail an oder lass dir auf dem Computer einen neuen Code anzeigen.",
       "signInSlow": "Die Anmeldung dauert länger als sonst. Melde dich mit deiner E-Mail an oder lass dir auf dem Computer einen neuen Code anzeigen."
     },
     "scan": {
       "hint": "Richte die Kamera auf den QR-Code am Computer",
       "typeAddress": "Adresse eingeben",
-      "notOurs": "Dieser QR-Code stammt nicht von einem agentes.chat-Server.",
+      "notOurs": "Dieser QR-Code stammt nicht von einem Ackwire AI-Server.",
       "cameraTitle": "Kamera nutzen",
       "cameraText": "Sie wird nur zum Lesen des QR-Codes verwendet.",
       "allow": "Kamera erlauben",

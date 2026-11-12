@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  background: #0a3f9c;
+  background: #000000;
   color: #fff;
   font:
     500 13.5px / 1.5 "Onest Variable",
@@ -81,7 +81,7 @@
 .cover__acts button {
   font: inherit;
   font-weight: 600;
-  color: #0a3f9c;
+  color: #000000;
   background: #fff;
   border: 0;
   border-radius: 10px;

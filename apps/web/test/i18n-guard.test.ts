@@ -12,7 +12,7 @@ const ROOTS = [join(import.meta.dir, "..", "src"), join(REPO, "packages", "ui", 
 const SKIP_FILES = ["GalleryPage.tsx"];
 /** Brand names, keys, symbols and code that stay as they are. */
 const ALLOWED = [
-  /^(agentes|chat|agentes\.chat|GitHub|MCP|Drive|Sentry|Linear|Slack|Claude Code|Codex|US\$|UTC)$/,
+  /^(Ackwire|AI|Ackwire AI|agentes|chat|agentes\.chat|GitHub|MCP|Drive|Sentry|Linear|Slack|Claude Code|Codex|US\$|UTC)$/,
   /^[A-Z]$/,
   /^@\w+$/,
   /^https?:/,

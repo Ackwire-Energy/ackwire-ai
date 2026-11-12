@@ -77,7 +77,7 @@ export function AgentSearching({ className }: { className?: string }) {
     };
     // Behind the glass, the body at half its cells (each one twice as big), a touch lighter.
     for (const [x, y] of PANES)
-      cell(x, y, mixHex(tones[toneAt((gx + x) >> 1, (gy + y) >> 1, 8)] ?? "#8cc3ff", "#ffffff", 0.18));
+      cell(x, y, mixHex(tones[toneAt((gx + x) >> 1, (gy + y) >> 1, 8)] ?? "#c1f992", "#ffffff", 0.18));
     if (right) {
       ctx.save();
       ctx.beginPath();
@@ -90,7 +90,7 @@ export function AgentSearching({ className }: { className?: string }) {
       drawEyes(ctx, AGENT_X * P, 0, s, [{ ...right, x: mx - w / 2, y: (gy + 4) / 16 - h / 2, w, h }]);
       ctx.restore();
     }
-    const shine = mixHex(tones[4] ?? "#c6e1ff", "#ffffff", 0.6);
+    const shine = mixHex(tones[4] ?? "#e0fcc9", "#ffffff", 0.6);
     GLASS.forEach((row, y) => {
       [...row].forEach((ch, x) => {
         const color = ch === "*" ? shine : ACCESSORY_PALETTE[ch];

@@ -87,7 +87,7 @@ export async function listOrgRepositories(
         headers: {
           authorization: `Bearer ${token}`,
           accept: "application/vnd.github+json",
-          "user-agent": "agentes.chat",
+          "user-agent": "Ackwire AI",
         },
       });
       if (!res.ok) return;
@@ -189,7 +189,7 @@ export async function githubOrgAccess(deps: RepoListingDeps, actorId: string, or
       headers: {
         authorization: `Bearer ${token}`,
         accept: "application/vnd.github+json",
-        "user-agent": "agentes.chat",
+        "user-agent": "Ackwire AI",
       },
     })
     .catch(() => null);

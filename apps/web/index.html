@@ -10,8 +10,13 @@
     <!-- Share card (public/og.png). -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Ackwire AI" />
+    <meta property="og:url" content="https://app.agentes.chat/" />
     <meta property="og:title" content="Your team and your agents, in the same conversation." />
     <meta property="og:description" content="AI agents join the chat as teammates, work in the open in the channel and ask for your approval before anything sensitive." />
+    <meta property="og:image" content="https://app.agentes.chat/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="The Ackwire AI agent in a pixel sky, next to the title: Your team and your agents, in the same conversation." />
     <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Your team and your agents, in the same conversation." />
@@ -55,7 +60,7 @@
           it: ["Ackwire AI non si è aperto", "Una parte dell'app non si è caricata. Controlla la connessione e ricarica.", "Ricarica"],
           nl: ["Ackwire AI is niet geopend", "Een deel van de app is niet geladen. Controleer je verbinding en laad opnieuw.", "Opnieuw laden"],
           ja: ["Ackwire AI を開けませんでした", "アプリの一部が読み込まれませんでした。接続を確認して、再読み込みしてください。", "再読み込み"],
-          ko: ["agentes.chat를 열지 못했어요", "앱 일부를 불러오지 못했어요. 연결을 확인한 뒤 다시 불러오세요.", "다시 불러오기"],
+          ko: ["Ackwire AI를 열지 못했어요", "앱 일부를 불러오지 못했어요. 연결을 확인한 뒤 다시 불러오세요.", "다시 불러오기"],
           "zh-Hans": ["Ackwire AI 未能打开", "应用的部分内容未能加载。请检查网络连接，然后重新加载。", "重新加载"],
           id: ["Ackwire AI tidak terbuka", "Sebagian aplikasi tidak termuat. Periksa koneksimu, lalu muat ulang.", "Muat ulang"],
           tr: ["Ackwire AI açılmadı", "Uygulamanın bir kısmı yüklenmedi. Bağlantınızı kontrol edip yeniden yükleyin.", "Yeniden yükle"],
@@ -135,7 +140,7 @@
     </script>
     <style>
       /* Before the app's CSS: the theme's own colour, never white (packages/ui tokens.css --side). */
-      html { background: #ffffff; }
+      html { background: #f5f8f5; }
       html[data-theme="dark"] { background: #000000; }
       /* Only when the app takes long (first open, slow network): the boot sky (BootSplash) with the mark.
          Opening from the browser's cache renders the app before it shows. React replaces it. */

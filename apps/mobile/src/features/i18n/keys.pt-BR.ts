@@ -2205,7 +2205,7 @@ export const featureKeysPtBR = {
     /** A second workspace from Adicionar workspace (ADR 0154): where it lives, and that nothing is left. */
     anotherTitle: "Como se chama o workspace novo?",
     anotherPurpose: "Para que é o workspace novo?",
-    anotherLead: "No agentes.chat. Você continua na {{org}} e pode trocar a qualquer hora.",
+    anotherLead: "No Ackwire AI. Você continua na {{org}} e pode trocar a qualquer hora.",
     /** O nome do primeiro uso, sugerido pelo domínio de um e-mail de trabalho. */
     suggested: "Pelo seu e-mail da {{domain}}, sugeri {{org}}.",
     create: "Criar",

@@ -35,8 +35,8 @@ async function progressBar(progress: number, reduced: boolean) {
       const { data, width, height } = shown;
       const row = Math.floor(height / 2) * width;
       let sky = 0;
-      // The empty strip is grey; the sky (and the agent's dark blue body) is far bluer than red.
-      for (let x = 0; x < width; x++) if ((data[(row + x) * 4 + 2] ?? 0) - (data[(row + x) * 4] ?? 0) > 50) sky++;
+      // The empty strip is grey; the sky (and the agent's body) is far greener than blue.
+      for (let x = 0; x < width; x++) if ((data[(row + x) * 4 + 1] ?? 0) - (data[(row + x) * 4 + 2] ?? 0) > 50) sky++;
       return sky / width;
     },
     async step(next: number) {

@@ -7394,7 +7394,7 @@ html:not([data-pointer]) .run-continue:focus-visible {
  * The sky is the agents' world: the same blue in both themes, ink on it is
  * the deep sky ink. It shows only where the subject is the agents. */
 :root {
-  --sky-ink: #04203f;
+  --sky-ink: #23440b;
   --sky-ink2: rgba(4, 32, 63, 0.78);
   --sky-glass: rgba(241, 248, 255, 0.74);
   --sky-line: rgba(4, 32, 63, 0.12);
@@ -7523,7 +7523,7 @@ html:not([data-pointer]) .sky-welcome__close:focus-visible {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: #0a3f9c;
+  background: #000000;
 }
 .sky-boot__in {
   position: absolute;

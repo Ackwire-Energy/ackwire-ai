@@ -58,6 +58,7 @@ export {
   type BrainAgentLook,
   drawBrain,
 } from "./brain/portrait.js";
+export { ACKWIRE, BRAND_NAME, MONOGRAM_PATH, MONOGRAM_VIEWBOX } from "./brand/ackwire";
 export { channelQuery, insertChannelRef } from "./channel-refs";
 export {
   type AccessBase,

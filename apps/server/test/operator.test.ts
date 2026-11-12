@@ -460,7 +460,7 @@ test("user block: refused at once even with a cached session, signed out, no sig
   expect(await body(await op(`/users/${biaId}`))).toMatchObject({ blockedAt: null, blockedReason: null });
 });
 
-test("on agentes.chat Cloud a blocked sign-in says the block's kind, never its reason", async () => {
+test("on Ackwire AI Cloud a blocked sign-in says the block's kind, never its reason", async () => {
   setRestrictionNotices("https://agentes.chat");
   try {
     const cid = browser(t);

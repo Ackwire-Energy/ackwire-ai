@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "閉じる",
@@ -472,7 +472,7 @@
       "confirmYes": "はい、アプリにログインします",
       "confirmNo": "心当たりがありません",
       "done": "準備完了です。",
-      "doneLead": "agentesアプリにログインしました。このタブは閉じてかまいません。",
+      "doneLead": "Ackwire AIアプリにログインしました。このタブは閉じてかまいません。",
       "expired": "このリクエストは期限切れです。",
       "expiredLead": "アプリに戻って、もう一度{{provider}}を選んでください。",
       "handover": "別のデバイスのアカウントでログインしています…",
@@ -1811,9 +1811,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "agentesアプリにログインするためのQRコード",
+    "qr": "Ackwire AIアプリにログインするためのQRコード",
     "making": "コードを作成中…",
-    "stepApp": "スマートフォンにagentesアプリをインストールしてください。",
+    "stepApp": "スマートフォンにAckwire AIアプリをインストールしてください。",
     "stepTailscale": "スマートフォンにTailscaleをインストールし、このサーバーと同じTailscaleアカウントでサインインしてください。",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -4548,7 +4548,7 @@
     "noInstructions": "{{name}}にはまだ指示がありません。どのように働くか伝えましょう。",
     "noInstructions_female": "{{name}}にはまだ指示がありません。どのように働くか伝えましょう。",
     "savedToast": "{{name}}の変更を保存しました。",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "組み込みの権限",
     "connectHint": "サービスを接続",
     "subtitle": "{{role}} · オーナー: <b>{{owner}}</b> · {{model}} {{key}}",
@@ -4873,7 +4873,7 @@
         "two": "環境設定",
         "three": "「ブラウザ」をオンにする",
         "done": "これで完了です。このページは自動で検知するので、再読み込みは不要です。",
-        "menuOpen": "agentesを開く",
+        "menuOpen": "Ackwire AIを開く",
         "menuPrefs": "環境設定…",
         "menuPause": "一時停止",
         "menuQuit": "終了",
@@ -5050,7 +5050,7 @@
       "connectors": "{{org}}のコネクタ",
       "connectorsPersonal": "あなたのコネクタ",
       "oneLevel": "アプリごとに1つのレベル",
-      "builtin": "agentesに組み込み",
+      "builtin": "Ackwire AIに組み込み",
       "builtinHelp": "Drive、タスク、メモリなど",
       "noMatch": "「{{q}}」に一致するものはありません",
       "noneHere": "この絞り込みに該当するものはありません",
@@ -7454,7 +7454,7 @@
         "pr_opened": "GitHubでPRが作成されたとき"
       },
       "issue": {
-        "created": "agentesでタスクが作成されたとき"
+        "created": "Ackwire AIでタスクが作成されたとき"
       },
       "deploy": {
         "succeeded": "デプロイが完了したとき"
@@ -9075,7 +9075,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "プランのキーを使うには、コンピューターのagentesをアップデートしてください"
+        "keys": "プランのキーを使うには、コンピューターのAckwire AIをアップデートしてください"
       },
       "noComputer": "アカウントは接続済みのコンピューターに保存されます。まずあなたのコンピューターを接続してください。",
       "addComputer": "コンピューターを接続",
@@ -12039,7 +12039,7 @@
     "whatIsText": "エージェント専用のパスワードです。メールのサイトで作成し、ご自身のパスワードを変えずにいつでも削除できます。",
     "step": {
       "1": "アカウントのセキュリティページを開きます。",
-      "2": "「agentes」という名前のアプリパスワードを作成します。",
+      "2": "「Ackwire AI」という名前のアプリパスワードを作成します。",
       "3": "パスワードをコピーして、ここに貼り付けます。"
     },
     "openPage": "{{name}}のページを開く",
@@ -13564,7 +13564,7 @@
     "reconnectDoneText": "{{name}}が{{org}}に戻りました。",
     "deniedTitle": "接続されていません",
     "denied": "コンピューターは接続されませんでした。開いたのがあなたでなければ、誰もアクセスしていません。",
-    "home": "agentesへ移動"
+    "home": "Ackwire AIへ移動"
   },
   "apps": {
     "connect": "アプリを接続",
@@ -14068,7 +14068,7 @@
       "rolesPersonal": "ここで各メンバーができること。オーナーはすべてできます。"
     },
     "about": {
-      "basedOn": "Codari Global, LLC の <site>Ackwire AI</site> をもとにしています",
+      "basedOn": "Codari Global, LLC の <site>agentes.chat</site> をもとにしています",
       "version": "バージョン",
       "license": "<license>GNU Affero General Public License v3</license> のもとで提供される自由ソフトウェアです。保証はありません。",
       "source": "ソースコード",
@@ -16370,7 +16370,7 @@
       "unavailableHelp": "少し待ってからもう一度お試しください。",
       "screensOff": "{{computer}}で画面表示がオフになっています。そちらでオンにしてください:",
       "screensMissing": "{{computer}}はまだ画面を表示できません。そのコンピューターで:",
-      "outdated": "{{name}}の画面を見るには、{{computer}}のagentesをアップデートしてください。",
+      "outdated": "{{name}}の画面を見るには、{{computer}}のAckwire AIをアップデートしてください。",
       "noScreen": "{{name}}にはここに表示できる画面がありません",
       "noScreenHelp": "「ツールとアクセス」で画面またはブラウザを許可してください。",
       "noComputer": "{{name}}のコンピューターを選択してください。",
@@ -16480,7 +16480,7 @@
       "browser": "ブラウザ",
       "screen": "コンピューターの画面",
       "terminal": "ターミナル",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "考え中",
       "inside": "{{program}} · {{detail}}"
     },

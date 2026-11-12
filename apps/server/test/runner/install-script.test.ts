@@ -147,7 +147,7 @@ test("the install script quotes the server URL and is valid sh", () => {
   expect(script).toContain("grep -q '\"token\"'");
   expect(script).toContain("managedBy");
   expect(installScript("https://x.test/it's")).toContain("SERVER='https://x.test/it'\\''s'\n");
-  // The look of every agentes.chat command line, in sh (packages/setup/src/term-sh.ts).
+  // The look of every Ackwire AI command line, in sh (packages/setup/src/term-sh.ts).
   expect(script).toContain(`\n${TERM_SH}`);
   if (process.platform !== "win32") {
     const check = spawnSync("sh", ["-n"], { input: script, encoding: "utf8" });
@@ -241,7 +241,7 @@ test.skipIf(process.platform === "win32")(
     const pc = fakeComputer({ bun: fakeBun(RUNNER_BUN_VERSION, true) });
     const r = pc.install(installScript("https://x.test"));
     expect(r.status).toBe(0);
-    expect(r.out).toStartWith("agentes.chat connect this computer\n◇  Bun 1.4.4 (");
+    expect(r.out).toStartWith("Ackwire AI connect this computer\n◇  Bun 1.4.4 (");
     expect(r.out).toContain("◒  Downloading the runner from https://x.test\n◇  The runner, from https://x.test\n");
     expect(r.out).toContain(
       `●  To use the agentes-runner command, add it to your PATH:\n     export PATH="${pc.home}/.agentes-runner/bin:$PATH"\n`,
@@ -453,7 +453,7 @@ test.skipIf(process.platform === "win32")(
     writeFileSync(path.join(paired.home, ".agentes-runner/config.json"), '{ "token": "agm_x" }\n');
     const refused = paired.install(installScript("https://agentes.test"), ["--host-token-file", token]);
     expect(refused.status).toBe(1);
-    expect(refused.out).toContain("already connected to agentes.chat as a computer");
+    expect(refused.out).toContain("already connected to Ackwire AI as a computer");
     expect(refused.log).toBe("");
 
     // Linux as a user other than root: the setup's simple mode, the agents sharing that user (ADR 0153 §5).
@@ -1026,7 +1026,7 @@ test.skipIf(process.platform === "win32")(
     writeFileSync(path.join(paired.at("var"), "config.json"), '{ "mode": "system", "token": "agm_x" }\n');
     const refused = paired.run();
     expect(refused.status).toBe(1);
-    expect(refused.out).toContain("already connected to agentes.chat as a computer");
+    expect(refused.out).toContain("already connected to Ackwire AI as a computer");
     expect(refused.log).toBe("");
   },
 );
@@ -1045,10 +1045,10 @@ test("service files: systemd unit, launchd plist and the Windows task command", 
   // Restarting the runner (an update) leaves background tasks running.
   expect(unit).toContain("KillMode=process");
   expect(unit).toContain('Environment="AGENTES_RUNNER_HOME=/home/me/.agentes-runner"');
-  expect(unit).toContain("Description=agentes.chat runner (connected computer)");
+  expect(unit).toContain("Description=Ackwire AI runner (connected computer)");
   // The server's own computer as a user unit: the setup's simple mode (ADR 0153 §5).
   expect(systemdUnit(launch, ["host", "--server", "http://127.0.0.1:3000"])).toContain(
-    "Description=agentes.chat runner (this server's computer)",
+    "Description=Ackwire AI runner (this server's computer)",
   );
   // The install-time PATH, like the plist: tasks find claude, git, node.
   expect(systemdUnit({ ...launch, path: "/home/me/.local/bin:/usr/bin" })).toContain(

@@ -102,7 +102,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
             ],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -601,7 +601,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: de taken die je vanuit apps stuurde en waar agents nu mee bezig zijn.",
             ],
           },
-          "De app handelt namens jou en ziet alleen wat jij ziet. Hij keurt nooit acties van agents goed: als een agent stopt om goedkeuring te vragen, zegt het antwoord dat met een link, en beslist een mens in agentes.chat. Hij verandert ook geen instellingen, leden of rechten.",
+          "De app handelt namens jou en ziet alleen wat jij ziet. Hij keurt nooit acties van agents goed: als een agent stopt om goedkeuring te vragen, zegt het antwoord dat met een link, en beslist een mens in Ackwire AI. Hij verandert ook geen instellingen, leden of rechten.",
         ],
       },
       {
@@ -722,7 +722,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Je account",
         blocks: [
           "Open het adres van je server en meld je aan: het eerste account wordt de eigenaar. Daarna gaat aanmelden dicht, en mensen komen erbij via een uitnodiging, vanuit **Instellingen\u00a0›\u00a0Leden en uitnodigingen**.",
-          "Bij Tailscale hebben de mensen die je uitnodigt ook je tailnet nodig. Nodig ze eerst uit op https://console.tailscale.com/admin/users en daarna in agentes.chat.",
+          "Bij Tailscale hebben de mensen die je uitnodigt ook je tailnet nodig. Nodig ze eerst uit op https://console.tailscale.com/admin/users en daarna in Ackwire AI.",
         ],
       },
       {
@@ -800,7 +800,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "De volledige handleiding",
         blocks: [
-          "Alle instellingen, een eigen proxy zoals nginx, draaien zonder Docker, een draaiboek voor AI-agents die het zelf installeren en wat je doet als iets misgaat staan in `SELF_HOSTING.md`, in de repository van agentes.chat.",
+          "Alle instellingen, een eigen proxy zoals nginx, draaien zonder Docker, een draaiboek voor AI-agents die het zelf installeren en wat je doet als iets misgaat staan in `SELF_HOSTING.md`, in de repository van Ackwire AI.",
         ],
       },
     ],

@@ -100,7 +100,7 @@ export const helpKo: Partial<Record<HelpSlug, HelpDocument>> = {
             list: ["앱을 종료한 다음, 앱에 들어 있는 서버로 데이터베이스를 덤프하세요. Mac에서는:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
