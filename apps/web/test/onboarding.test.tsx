@@ -497,7 +497,7 @@ describe("the steps", () => {
   });
 });
 
-describe("the plan step (agentes.chat Cloud)", () => {
+describe("the plan step (Ackwire AI Cloud)", () => {
   test("the team asleep, the plan with its price from the billing service, the link to that plan's Checkout", async () => {
     const state = newcomer(true);
     const asked = plans(PLANS);
@@ -543,7 +543,7 @@ describe("the plan step (agentes.chat Cloud)", () => {
     const state = newcomer(true);
     plans(null);
     await throughTheTeam(state);
-    expect(document.querySelector(".onb__plan-price")?.textContent).toContain("Um plano do agentes.chat");
+    expect(document.querySelector(".onb__plan-price")?.textContent).toContain("Um plano do Ackwire AI");
     expect(screen().queryByRole("button", { name: "Ver todos os planos" })).toBeNull();
     await click(within(planCard()).getByRole("button", { name: "Ligar o time" }), 6);
     expect(calls(state, "orgs.billingLink").map((c) => c.args.length)).toEqual([2]);
@@ -872,7 +872,7 @@ describe("the person's own area, asked once per account", () => {
     await click(button("Loja online"), 4);
     await click(button("Continuar"), 14);
     expect(heading()).toBe(AREA);
-    expect(document.querySelector(".onb__lead")?.textContent).toBe("Só para a gente entender quem usa o agentes.chat.");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe("Só para a gente entender quem usa o Ackwire AI.");
     // Still "What you do" on the rail: no step of its own.
     expect(eyebrow()).toBe("Passo 2 de 5");
     expect(document.querySelector(".onb__step[aria-current='step']")?.textContent).toContain("O que vocês fazem");
@@ -1082,7 +1082,7 @@ describe("for me (ADR 0159)", () => {
     const { router } = await renderApp("/onboarding", { api });
     const landed = landings(router);
     await settle(10);
-    expect(heading()).toBe("Para que você vai usar o agentes.chat?");
+    expect(heading()).toBe("Para que você vai usar o Ackwire AI?");
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     // "For me", not "For my team", whose words start the same in Portuguese.
     await click(answer(/^Para mim(?!ha)/), 4);

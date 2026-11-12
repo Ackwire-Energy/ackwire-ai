@@ -426,7 +426,7 @@ describe("Computadores", () => {
     expect(machineFacts(t, "pt-BR", offline, NOW)).toBe("Linux · visto há 2 h");
     expect(seenText(t, "pt-BR", { online: false, lastSeenAt: null }, NOW)).toBe("ainda não conectou");
     expect(machineFacts(t, "pt-BR", machine({ id: "host", kind: "host", os: "linux" }), NOW)).toBe(
-      "Onde o agentes.chat está instalado, um usuário por agente.",
+      "Onde o Ackwire AI está instalado, um usuário por agente.",
     );
   });
 
@@ -639,7 +639,7 @@ test("the export's file name, as the web saves it", () => {
   expect(exportFileName(new Date("2026-10-28T12:00:00.000Z"))).toBe("agentes-chat-2026-10-28.json");
 });
 
-test("Sobre o agentes.chat in Você: on every self-hosted server, old ones too; never on agentes.chat Cloud", () => {
+test("Sobre o Ackwire AI in Você: on every self-hosted server, old ones too; never on Ackwire AI Cloud", () => {
   const server = (cloud?: boolean): AuthConfig => ({
     socialProviders: { google: false, github: false },
     signupOpen: false,

@@ -59,6 +59,6 @@ test("a browser that says no language of ours gets English", async () => {
   });
   expect(res.status).toBe(200);
   await t.drain();
-  expect(t.email.sent.at(-1)?.subject).toBe("Confirm your email for agentes.chat");
+  expect(t.email.sent.at(-1)?.subject).toBe("Confirm your email for Ackwire AI");
   expect(((await (await bia("/api/app/me")).json()) as { user: { locale: string | null } }).user.locale).toBeNull();
 });

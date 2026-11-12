@@ -181,7 +181,7 @@ describe("a link to a server", () => {
       button: "connect",
       leave: null,
     });
-    expect(linkView(link(), ok(BOX), "https://app.agentes.chat")).toMatchObject({ kind: "ask", leave: "agentes.chat" });
+    expect(linkView(link(), ok(BOX), "https://app.agentes.chat")).toMatchObject({ kind: "ask", leave: "Ackwire AI" });
     expect(linkView(link(), ok(BOX), BOX)).toEqual({ kind: "front", server: BOX });
   });
 
@@ -203,7 +203,7 @@ describe("a link to a server", () => {
       question: "questionClaim",
       button: "continue",
       page: `/owner#claim=${CLAIM}`,
-      leave: "agentes.chat",
+      leave: "Ackwire AI",
     });
     expect(linkView(link({ claim: CLAIM }), ok(BOX), null)).toMatchObject({ kind: "ask", question: "question" });
     // A server waiting for its owner, without the claim: the installer's link is needed.
@@ -247,7 +247,7 @@ describe("the menu bar and the labels Rust shows", () => {
         // Another server's new notifications (ADR 0154): Rust fills the count in.
         expect(labels.workspaceNewsMany).toContain("{count}");
         expect(labels.workspaceNewsOne).not.toContain("{count}");
-        expect(labels.serversCloud).toBe("agentes.chat");
+        expect(labels.serversCloud).toBe("Ackwire AI");
       }
     }
   });

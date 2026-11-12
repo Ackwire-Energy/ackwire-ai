@@ -362,13 +362,13 @@ describe("pairing over Wi-Fi", () => {
     const onMac = (reason: Parameters<typeof wifiPairText>[1]["reason"]) =>
       wifiPairText(t, { state: "failed", way: "code", reason }, "Sam's MacBook Pro", true);
     expect(onMac("same_wifi")).toBe(
-      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
+      "Couldn't reach the phone. Put it on the same Wi-Fi as Sam's MacBook Pro. On that Mac, also turn on Ackwire AI in System Settings › Privacy & Security › Local Network.",
     );
     expect(onMac("mdns_off")).toBe(
-      "Sam's MacBook Pro can't look for phones on the Wi-Fi. On that Mac, turn on agentes.chat in System Settings › Privacy & Security › Local Network, then try again.",
+      "Sam's MacBook Pro can't look for phones on the Wi-Fi. On that Mac, turn on Ackwire AI in System Settings › Privacy & Security › Local Network, then try again.",
     );
     expect(onMac("timed_out")).toEndWith(
-      "On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
+      "On that Mac, also turn on Ackwire AI in System Settings › Privacy & Security › Local Network.",
     );
     expect(onMac("refused")).toBe("The phone didn't take that code. Check the code and the address, then pair again.");
     expect([

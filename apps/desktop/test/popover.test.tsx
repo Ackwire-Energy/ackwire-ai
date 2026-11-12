@@ -19,7 +19,7 @@ import { Popover } from "../src/windows/Popover";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-// The menu checks agentes.chat for a desktop update: tests stay off the network, so no release yet. And
+// The menu checks Ackwire AI for a desktop update: tests stay off the network, so no release yet. And
 // intersections come by hand (happy-dom reports none), to the observer watching inside a given root.
 const realFetch = globalThis.fetch;
 const realObserver = globalThis.IntersectionObserver;
@@ -41,7 +41,7 @@ afterAll(() => {
 });
 
 /**
- * The menu, by default with agentes.chat on this Mac, a folder request and two jobs (taller than the menu gets),
+ * The menu, by default with Ackwire AI on this Mac, a folder request and two jobs (taller than the menu gets),
  * once `ready` says it shows what the test looks at.
  */
 async function withMenu(
@@ -96,7 +96,7 @@ test("the menu bar menu: what goes on here scrolls, and Open, Preferences and Qu
     expect(body?.querySelector(".dk-job")).toBeTruthy();
     expect(body?.querySelector("button.dk-mi")).toBeNull();
     const actions = [...(foot?.querySelectorAll("button.dk-mi") ?? [])].map((b) => b.textContent ?? "");
-    for (const label of ["Open agentes.chat", "Preferences…", "Quit agentes.chat"]) {
+    for (const label of ["Open Ackwire AI", "Preferences…", "Quit Ackwire AI"]) {
       expect(actions.some((text) => text.includes(label))).toBe(true);
     }
   }));
@@ -160,11 +160,11 @@ describe("the menu's banners say only what matters there", () => {
       );
     }));
 
-  test("agentes.chat not starting here: its title, why and where to look, Copy details, the logs and Try again", () =>
+  test("Ackwire AI not starting here: its title, why and where to look, Copy details, the logs and Try again", () =>
     withMenu(
       (el) =>
         expect(banners(el)).toContainEqual({
-          title: "agentes.chat isn't starting on this Mac",
+          title: "Ackwire AI isn't starting on this Mac",
           line: "The details say why: copy them for whoever helps you, or look at the logs. Help",
           actions: ["Copy details", "Show the logs", "Try again"],
         }),
@@ -229,9 +229,9 @@ describe("the menu's banners say only what matters there", () => {
       await until(() => !banners(el).some((b) => b.title === "Paused until you resume"));
     }));
 
-  test("Quit: what happens to the work running here, and to everyone when agentes.chat runs here", async () => {
+  test("Quit: what happens to the work running here, and to everyone when Ackwire AI runs here", async () => {
     const quit = async (el: HTMLElement) => {
-      const button = [...el.querySelectorAll("button.dk-mi")].find((b) => b.textContent?.includes("Quit agentes.chat"));
+      const button = [...el.querySelectorAll("button.dk-mi")].find((b) => b.textContent?.includes("Quit Ackwire AI"));
       await act(async () => (button as HTMLButtonElement | undefined)?.click());
       return el.querySelector(".dk-confirm p")?.textContent;
     };
@@ -244,7 +244,7 @@ describe("the menu's banners say only what matters there", () => {
     );
     await withMenu(async (el) =>
       expect(await quit(el)).toBe(
-        "agentes.chat stops on this Mac: nobody can use it, here, on your phone or your teammates', until you open the app again.",
+        "Ackwire AI stops on this Mac: nobody can use it, here, on your phone or your teammates', until you open the app again.",
       ),
     );
   });

@@ -117,7 +117,7 @@ describe("connectors gallery", () => {
     expect(suggestionsOf(catalog, items).map((d) => d.id)).toEqual(["linear", "drive", "sentry"]);
   });
 
-  test("'Em breve': a vendor that hasn't approved agentes.chat yet is last, greyed with a lock, and opens nothing", () => {
+  test("'Em breve': a vendor that hasn't approved Ackwire AI yet is last, greyed with a lock, and opens nothing", () => {
     const asana = def("asana", { kind: "remote_mcp", available: false, soon: true });
     const slack = def("slack", { available: false });
     expect(
@@ -160,17 +160,17 @@ describe("connectors gallery", () => {
   test("a server whose OAuth only lets in apps it approved says so; one with no sign-in just asks for a key", async () => {
     const pt = await translator("pt-BR");
     expect(needsKeyText(pt, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
-      "Asana só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
+      "Asana só deixa entrar apps que aprovou, e o Ackwire AI ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
     );
     expect(needsKeyText(pt, { status: "needs_key" }, "Asana")).toBe("Esse servidor pede uma chave.");
     const en = await translator("en");
     expect(needsKeyText(en, { status: "needs_key", reason: "not_approved" }, "Asana")).toBe(
-      "Asana only lets apps it approved sign in, and agentes.chat isn't approved yet. If it gives you an API key, you can connect with that.",
+      "Asana only lets apps it approved sign in, and Ackwire AI isn't approved yet. If it gives you an API key, you can connect with that.",
     );
     // The server's own words under ours: which one refused and why.
     const said = { status: "needs_key", reason: "not_approved", detail: "invalid_redirect_uri: not allowed" } as const;
     expect(needsKeyText(pt, said, "Asana")).toBe(
-      "Asana só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.\nO servidor respondeu: invalid_redirect_uri: not allowed",
+      "Asana só deixa entrar apps que aprovou, e o Ackwire AI ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.\nO servidor respondeu: invalid_redirect_uri: not allowed",
     );
     expect(needsKeyText(en, said, "Asana").split("\n")[1]).toBe(
       "The server answered: invalid_redirect_uri: not allowed",
@@ -268,7 +268,7 @@ describe("the browser round trip", () => {
     expect(authAnswerOf("agenteschat://connectors/oauth?state=abc")).toBeNull();
   });
 
-  test("the agentes.chat GitHub app's install comes back with its installation, finished with the app's session", () => {
+  test("the Ackwire AI GitHub app's install comes back with its installation, finished with the app's session", () => {
     expect(authAnswerOf("agenteschat://connectors/oauth?state=abc&code=123&installation_id=42")).toEqual({
       kind: "code",
       state: "abc",
@@ -336,7 +336,7 @@ describe("Ferramentas: Salvar stays at hand", () => {
   });
 });
 
-describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", () => {
+describe("GitHub through the Ackwire AI app (ADR 0156), as the web shows it", () => {
   const install = (login: string, over: Partial<GitHubAppInstallation> = {}): GitHubAppInstallation => ({
     id: `i-${login}`,
     installationId: login.length,
@@ -441,33 +441,30 @@ describe("GitHub through the agentes.chat app (ADR 0156), as the web shows it", 
           ? {
               reach: ["Todos os repositórios", "Repositórios escolhidos", "Suspenso no GitHub"],
               remove:
-                "O app agentes.chat é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
-              last: "O app agentes.chat é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele. É a última, então os agentes ficam sem GitHub até alguém instalar o app ou conectar uma conta.",
+                "O app Ackwire AI é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
+              last: "O app Ackwire AI é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele. É a última, então os agentes ficam sem GitHub até alguém instalar o app ou conectar uma conta.",
               removed: [
                 "App removido de acme e desinstalado no GitHub.",
                 "App removido daqui, mas o GitHub não confirmou a desinstalação de acme. Desinstale lá.",
               ],
-              row: ["Pelo app agentes.chat em acme", "Pelo app agentes.chat em org-0, org-1 e mais 10"],
-              appAlone: "O app agentes.chat também é desinstalado de acme no GitHub.",
-              account: "Os agentes continuam no GitHub pelo app agentes.chat em acme e octo-labs.",
+              row: ["Pelo app Ackwire AI em acme", "Pelo app Ackwire AI em org-0, org-1 e mais 10"],
+              appAlone: "O app Ackwire AI também é desinstalado de acme no GitHub.",
+              account: "Os agentes continuam no GitHub pelo app Ackwire AI em acme e octo-labs.",
               none: null,
               other: null,
             }
           : {
               reach: ["All repositories", "Selected repositories", "Suspended on GitHub"],
               remove:
-                "The agentes.chat app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it.",
-              last: "The agentes.chat app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it. It's the last one, so agents lose GitHub until someone installs the app or connects an account.",
+                "The Ackwire AI app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it.",
+              last: "The Ackwire AI app is uninstalled from acme on GitHub, and agents stop using that account's repositories through it. It's the last one, so agents lose GitHub until someone installs the app or connects an account.",
               removed: [
                 "App removed from acme and uninstalled on GitHub.",
                 "App removed here, but GitHub didn't confirm the uninstall from acme. Uninstall it there.",
               ],
-              row: [
-                "Through the agentes.chat app on acme",
-                "Through the agentes.chat app on org-0, org-1, and 10 more",
-              ],
-              appAlone: "The agentes.chat app is also uninstalled from acme on GitHub.",
-              account: "Agents stay on GitHub through the agentes.chat app on acme and octo-labs.",
+              row: ["Through the Ackwire AI app on acme", "Through the Ackwire AI app on org-0, org-1, and 10 more"],
+              appAlone: "The Ackwire AI app is also uninstalled from acme on GitHub.",
+              account: "Agents stay on GitHub through the Ackwire AI app on acme and octo-labs.",
               none: null,
               other: null,
             },

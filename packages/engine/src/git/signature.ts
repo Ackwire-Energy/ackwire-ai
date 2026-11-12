@@ -15,7 +15,8 @@ const { accounts, organizationMembers, users } = schema;
  */
 
 /** Where the line starts in a body, so an edit can replace it. */
-export const SIGNATURE_MARK = "<!-- Ackwire AI -->";
+// Kept as it was before the rename: comments already on GitHub carry it, and github-events reads it.
+export const SIGNATURE_MARK = "<!-- agentes.chat -->";
 
 /**
  * A line of ours left in a body the agent sends again (an edit): the mark on a line of its own, then the line. One
@@ -82,7 +83,7 @@ async function githubLogin(http: GitHubHttp, id: string, token?: string | null) 
     .fetch(`${http.apiUrl}/user/${id}`, {
       headers: {
         accept: "application/vnd.github+json",
-        "user-agent": "Ackwire AI",
+        "user-agent": "agentes.chat",
         ...(token ? { authorization: `Bearer ${token}` } : {}),
       },
     })

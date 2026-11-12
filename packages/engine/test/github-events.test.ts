@@ -199,7 +199,7 @@ describe("what happens on GitHub wakes the agent it concerns (ADR 0156)", () => 
     expect(
       await deliver("issue_comment", commentOn(12, "Bump deps", { id: 8, login: "renovate[bot]", type: "Bot" })),
     ).toBe(false);
-    const signed = signedBody("Fixed in the last commit.", "Dev, agente de ana no agentes.chat");
+    const signed = signedBody("Fixed in the last commit.", "Dev, agente de ana no Ackwire AI");
     expect(await deliver("issue_comment", commentOn(12, signed))).toBe(false);
     expect(await githubNotices()).toEqual([]);
 

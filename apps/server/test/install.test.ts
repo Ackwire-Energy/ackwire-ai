@@ -342,7 +342,7 @@ describe("install.sh", () => {
     const screen = plain(root.out);
     expect(screen).toContain("▀");
     expect(screen).toContain(
-      "┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64, as root\n◇  A terminal: the setup asks its questions there\n",
+      "┌   Ackwire AI  install plan (--plan: nothing runs)\n│\n◇  Linux on x64, as root\n◇  A terminal: the setup asks its questions there\n",
     );
     expect(screen).toContain("│\n└  Nothing ran. For the setup's own plan, run its command above with --dry-run.\n");
 
@@ -358,7 +358,7 @@ describe("install.sh", () => {
     // Its plan draws the logo and the frame, then stops where the root run would start.
     const planned = plain((await plan(user, ["--yes"], { tty: true })).out);
     expect(planned).toContain("▀");
-    expect(planned).toContain("┌   agentes.chat  install plan (--plan: nothing runs)\n│\n◇  Linux on x64\n");
+    expect(planned).toContain("┌   Ackwire AI  install plan (--plan: nothing runs)\n│\n◇  Linux on x64\n");
     expect(planned).toEndWith(
       `●  Docker needs root here: running this installer again as root\n│  $ sudo sh ${SCRIPT} --yes\n│\n└  With --plan it stops here. As root, --plan shows the rest.\n`,
     );
@@ -465,7 +465,7 @@ describe("install.sh", () => {
     // --plan runs nothing again, so it starts as any plan does, then says where it stops.
     expect(file.out).toBe(
       [
-        "agentes.chat install plan (--plan: nothing runs)",
+        "Ackwire AI install plan (--plan: nothing runs)",
         "◇  Linux on x64",
         "◇  No terminal: the setup takes its defaults and the options given",
         "●  Docker needs root here: running this installer again as root",
@@ -515,9 +515,9 @@ describe("install.sh", () => {
   test("a Mac without Docker, or with it stopped, is told what to install or start; --native isn't there yet", async () => {
     const none = await plan(mac);
     expect(none.code).toBe(1);
-    expect(none.err).toContain("This installer runs agentes.chat on Docker, and this Mac doesn't have it.");
+    expect(none.err).toContain("This installer runs Ackwire AI on Docker, and this Mac doesn't have it.");
     expect(none.err).toContain("Docker Desktop, OrbStack or Colima");
-    expect(none.err).toContain("Run agentes.chat on this Mac");
+    expect(none.err).toContain("Run Ackwire AI on this Mac");
     expect(none.out).not.toContain("Bun");
     expect(none.changes).toEqual([]);
 
@@ -534,7 +534,7 @@ describe("install.sh", () => {
     for (const machine of [mac, linuxRoot]) {
       const native = await plan(machine, ["--native"]);
       expect(native.code).toBe(1);
-      expect(native.err).toContain("can't run agentes.chat without Docker yet (--native)");
+      expect(native.err).toContain("can't run Ackwire AI without Docker yet (--native)");
       expect(native.calls).toEqual([]);
     }
   });

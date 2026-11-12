@@ -393,7 +393,7 @@ describe("Bitwarden source", () => {
       client_secret: FAKE_BW.clientSecret,
       deviceType: "21",
       deviceIdentifier: result.config.deviceId ?? "",
-      deviceName: "agentes.chat",
+      deviceName: "Ackwire AI",
     });
     // The master password never leaves the server.
     expect(JSON.stringify(fake.calls)).not.toContain(FAKE_BW.masterPassword);

@@ -1,5 +1,5 @@
 #!/bin/sh
-# agentes.chat installer: a self-hosted agentes.chat on this computer, in one command.
+# Ackwire AI installer: a self-hosted Ackwire AI on this computer, in one command.
 #
 #   curl -fsSL https://agentes.chat/install | sh
 #   curl -fsSL https://agentes.chat/install | sh -s -- --plan      prints what it would do, does nothing
@@ -46,8 +46,8 @@ main() {
       --plan | --dry-run) PLAN=1 ;;
       --yes | -y) YES=1 ;;
       --native)
-        die "This installer can't run agentes.chat without Docker yet (--native)." \
-          "On a Mac, the agentes.chat app runs it without Docker (Use your own server, then Run agentes.chat on this Mac). Or use Docker: Docker Desktop, OrbStack or Colima on a Mac. On Linux, this installer sets it up."
+        die "This installer can't run Ackwire AI without Docker yet (--native)." \
+          "On a Mac, the Ackwire AI app runs it without Docker (Use your own server, then Run Ackwire AI on this Mac). Or use Docker: Docker Desktop, OrbStack or Colima on a Mac. On Linux, this installer sets it up."
         ;;
       --dir)
         [ "$n" -gt 0 ] || die "--dir needs a folder, like --dir /srv/agentes."
@@ -100,7 +100,7 @@ main() {
       BUN_SHA256=c240d7f0ccb90c263a849fcdb09b7ee62630d921348ed6aafda86b9d577bc510
       ;;
     *)
-      die "agentes.chat installs on macOS or Linux, on x64 or arm64, and this is $OS on $ARCH." \
+      die "Ackwire AI installs on macOS or Linux, on x64 or arm64, and this is $OS on $ARCH." \
         "On Windows, run it in WSL 2. Elsewhere, the manual steps: $GUIDE"
       ;;
   esac
@@ -220,12 +220,12 @@ main() {
 }
 
 usage() {
-  printf '%s\n' "agentes.chat installer: a self-hosted agentes.chat on this computer, in one command.
+  printf '%s\n' "Ackwire AI installer: a self-hosted Ackwire AI on this computer, in one command.
 
 Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup options]
        sh install.sh [options] [setup options]
 
-  --dir <folder>      Where agentes.chat lives: /opt/agentes as root, ~/agentes otherwise.
+  --dir <folder>      Where Ackwire AI lives: /opt/agentes as root, ~/agentes otherwise.
   --yes               Start or install Docker without asking first: on Linux with Docker's own
                       script; on a Mac the Docker Desktop, OrbStack or Colima it finds, or
                       Colima with Homebrew.
@@ -344,7 +344,7 @@ linux_docker() {
   else
     t_gap
     t_ask "Docker isn't installed. Install it now with Docker's own script (get.docker.com)?" ||
-      die "agentes.chat runs on Docker here." "Install Docker yourself ($DOCKER_DOCS) and run this again."
+      die "Ackwire AI runs on Docker here." "Install Docker yourself ($DOCKER_DOCS) and run this again."
   fi
   fetch https://get.docker.com "$WORK/get-docker.sh" "Downloading Docker's install script"
   if [ "$PLAN" = 1 ]; then
@@ -449,8 +449,8 @@ mac_start() {
 # No Docker at all: Colima, its docker command and Compose with Homebrew (Homebrew first), then Colima started.
 mac_colima() {
   agree "This Mac has no Docker. Install Colima (Docker's engine, open source, no window) with Homebrew and start it?" \
-    "This installer runs agentes.chat on Docker, and this Mac doesn't have it." \
-    "Install Docker Desktop, OrbStack or Colima, start it, and run this again (--yes installs Colima with Homebrew). Or, with no Docker, open the agentes.chat app: Use your own server, then Run agentes.chat on this Mac."
+    "This installer runs Ackwire AI on Docker, and this Mac doesn't have it." \
+    "Install Docker Desktop, OrbStack or Colima, start it, and run this again (--yes installs Colima with Homebrew). Or, with no Docker, open the Ackwire AI app: Use your own server, then Run Ackwire AI on this Mac."
   BREW=$(command -v brew 2>/dev/null) || BREW=''
   for b in /opt/homebrew/bin/brew /usr/local/bin/brew; do
     if [ -z "$BREW" ] && [ -x "$b" ]; then BREW=$b; fi
@@ -510,7 +510,7 @@ compose_plugin() {
     plugins=${DOCKER_CONFIG:-$HOME/.docker}/cli-plugins
   fi
   if [ "$PLAN" = 0 ]; then
-    if [ -n "$have" ]; then t_warn "Compose $have is older than the $MIN_COMPOSE agentes.chat needs"; fi
+    if [ -n "$have" ]; then t_warn "Compose $have is older than the $MIN_COMPOSE Ackwire AI needs"; fi
   elif [ -n "$have" ]; then
     t_step "Compose $have is older than $MIN_COMPOSE: installing Compose $COMPOSE_VERSION (SHA-256 checked) in $plugins"
   else
@@ -565,7 +565,7 @@ as_root() {
 is_installer() {
   [ -f "$1" ] || return 1
   { IFS= read -r _ && IFS= read -r second; } <"$1" || return 1
-  [ "$second" = "# agentes.chat installer: a self-hosted agentes.chat on this computer, in one command." ]
+  [ "$second" = "# Ackwire AI installer: a self-hosted Ackwire AI on this computer, in one command." ]
 }
 
 get_bun() {
@@ -606,7 +606,7 @@ get_bun() {
 }
 
 # --- term.sh: packages/setup/src/term-sh.ts, kept equal by a test ---
-# The agentes.chat look for the POSIX installers, as packages/setup/src/term.ts draws it: plain where a
+# The Ackwire AI look for the POSIX installers, as packages/setup/src/term.ts draws it: plain where a
 # terminal can't take it (no color with NO_COLOR or TERM=dumb, ASCII marks and no logo on the Linux console), and
 # no line, logo or animation when the output isn't a terminal (cloud-init, CI, the setup reading it). Only
 # function definitions, so a download cut short runs nothing.
@@ -717,12 +717,12 @@ t_end() {
 # t_intro TITLE: the logo where it fits, then ┌ and the badge, and the line from here on. A log gets the title.
 t_intro() {
   if [ "$T_FRAME" = 0 ]; then
-    printf 'agentes.chat %s\n' "$1" >&"$T_FD"
+    printf 'Ackwire AI %s\n' "$1" >&"$T_FD"
     return 0
   fi
   if [ "$T_UNI" = 1 ] && [ "$T_COLS" -ge 64 ]; then t_logo; fi
-  t_b=agentes.chat
-  if [ "$T_DEPTH" != 0 ]; then t_b="$C_BADGE agentes.chat $C_OFF"; fi
+  t_b='Ackwire AI'
+  if [ "$T_DEPTH" != 0 ]; then t_b="$C_BADGE Ackwire AI $C_OFF"; fi
   T_OPEN=1
   t_style
   # The title beside the badge's columns, its wrap under the line.

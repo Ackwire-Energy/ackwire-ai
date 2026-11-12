@@ -116,7 +116,7 @@ export const clineCommand = (url: string) => `cline mcp add ${MCP_SERVER_NAME} $
 export const warpConfig = (url: string) => json({ [MCP_SERVER_NAME]: { url, headers: { Authorization: BEARER } } });
 
 export const gooseInstallLink = (url: string) =>
-  `goose://extension?url=${encodeURIComponent(url)}&type=streamable_http&id=${MCP_SERVER_NAME}&name=Ackwire AI`;
+  `goose://extension?url=${encodeURIComponent(url)}&type=streamable_http&id=${MCP_SERVER_NAME}&name=Ackwire%20AI`;
 
 export const gooseConfig = (url: string) =>
   [

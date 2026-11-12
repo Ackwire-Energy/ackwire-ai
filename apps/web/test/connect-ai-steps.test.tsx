@@ -797,7 +797,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     await choose("ChatGPT");
     expect(dialog.textContent).toContain("O Codex não está instalado no MacBook.");
     await choose("Kimi Code");
-    expect(dialog.textContent).toContain("Atualize o agentes no computador para usar a chave de um plano");
+    expect(dialog.textContent).toContain("Atualize o Ackwire AI no computador para usar a chave de um plano");
     await click(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" }));
     expect(payWith(dialog, "Com chave de API").getAttribute("aria-checked")).toBe("true");
   });
@@ -816,10 +816,10 @@ describe("Conectar uma IA: one picker, plans first", () => {
       return dialog.textContent;
     };
     expect(await reason("linux", "Servidor")).toContain(
-      "O Codex está desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable codex.",
+      "O Codex está desligado no Servidor. Ligue lá, no app do Ackwire AI ou com sudo agentes-runner tools enable codex.",
     );
     expect(await reason("darwin", "MacBook")).toContain(
-      "O Codex está desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      "O Codex está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
     );
   });
 

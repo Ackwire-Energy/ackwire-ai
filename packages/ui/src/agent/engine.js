@@ -12,7 +12,7 @@
 
 /** Top and bottom of each agent color. Sky (the default) is Ackwire's Solar Green, the same in both themes. */
 export const AGENT_GRADIENTS = {
-  sky: ["#b8f582", "#3f7a12"],
+  sky: ["#b8f582", "#3f7b14"], // the Ackwire green, a step off #3f7a12 so a custom color built from it comes back the same
   indigo: ["#7d8bff", "#3f4fd6"],
   violet: ["#ae8cf7", "#6e45d1"],
   rose: ["#f58aa6", "#c9406a"],

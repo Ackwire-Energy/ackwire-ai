@@ -204,7 +204,7 @@ describe("Configurações → Importar e exportar", () => {
         ["Hermes Agent", "/brands/hermes.svg"],
         ["OpenClaw", "/brands/openclaw.svg"],
         ["Paperclip", "/brands/paperclip.svg"],
-        ["agentes.chat", "/favicon.svg"],
+        ["Ackwire AI", "/favicon.svg"],
         // It names many apps: no one maker's logo fits.
         ["Outro app", null],
       ]);
@@ -220,7 +220,7 @@ describe("Configurações → Importar e exportar", () => {
         ["Hermes Agent", "/brands/hermes-dark.svg"],
         ["OpenClaw", "/brands/openclaw.svg"],
         ["Paperclip", "/brands/paperclip-dark.svg"],
-        ["agentes.chat", "/favicon.svg"],
+        ["Ackwire AI", "/favicon.svg"],
         ["Outro app", null],
       ]);
     } finally {
@@ -263,7 +263,7 @@ describe("Configurações → Importar e exportar", () => {
     );
     expect(text()).toContain("Na tela de permissão, escolha Criar e editar agentes, rotinas e skills.");
     expect((screen().getByLabelText("Pedido para o seu app de IA") as HTMLTextAreaElement).value).toBe(
-      `Conecte ${SERVER_URL} e, para cada agente, instrução, skill e rotina que você tem, crie o equivalente no agentes.chat. Antes, liste o que já existe lá para não duplicar.`,
+      `Conecte ${SERVER_URL} e, para cada agente, instrução, skill e rotina que você tem, crie o equivalente no Ackwire AI. Antes, liste o que já existe lá para não duplicar.`,
     );
   });
 
@@ -324,7 +324,7 @@ describe("Configurações → Importar e exportar", () => {
     expect(screen().queryByRole("button", { name: /^OpenBot$/ })).toBeNull();
     await click(button(/^OpenBot\.run$/), 1);
     expect(text()).toContain("Solte o openbot-import.json");
-    await click(button(/^agentes\.chat$/), 1);
+    await click(button(/^Ackwire AI$/), 1);
     expect(text()).toContain("Configurações → Importar e exportar → Baixar o arquivo");
 
     await pick("Pasta para importar", folder("paperclip-company"));

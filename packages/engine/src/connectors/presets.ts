@@ -15,7 +15,7 @@ import { canonicalResource } from "./oauth-mcp";
  * yet (its redirect URI or client name, or registration itself is limited to
  * clients the vendor approved); it stays `soon` until the vendor does.
  * Calendly accepts only letters, digits, hyphens and spaces in the client
- * name: `ensureOAuthClient` registers it again without the dot.
+ * name: `ensureOAuthClient` registers it again with anything else as spaces.
  *
  * Left out as servers of their own: HubSpot (its authorization server has
  * no dynamic registration: it needs an app registered with HubSpot). Slack,

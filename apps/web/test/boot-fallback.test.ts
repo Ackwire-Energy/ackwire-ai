@@ -100,7 +100,7 @@ describe("a boot whose files didn't load (index.html)", () => {
     expect(page.reloads()).toBe(0);
     expect(page.alert()?.className).toBe("boot__box");
     expect(page.words()).toEqual([
-      "O agentes.chat não abriu",
+      "O Ackwire AI não abriu",
       "Uma parte do app não carregou. Confira a conexão e recarregue.",
       "Recarregar",
     ]);
@@ -117,7 +117,7 @@ describe("a boot whose files didn't load (index.html)", () => {
       const page = boot({ retried: NOW - 1000, ...env });
       page.fail("script", "src", "/assets/index-4f2a.js");
       expect(page.words()).toEqual([
-        "agentes.chat didn't open",
+        "Ackwire AI didn't open",
         "Part of the app didn't load. Check your connection, then reload.",
         "Reload",
       ]);

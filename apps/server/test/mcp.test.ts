@@ -90,7 +90,7 @@ describe("protocol", () => {
     });
     const client = new Client({ name: "test", version: "1.0.0" });
     await client.connect(transport);
-    expect(client.getServerVersion()).toMatchObject({ name: "agentes-chat", title: "agentes.chat" });
+    expect(client.getServerVersion()).toMatchObject({ name: "agentes-chat", title: "Ackwire AI" });
     expect(client.getInstructions()).toContain('This connection acts as owner in the workspace "Acme"');
     const { tools } = await client.listTools();
     expect(tools.map((x) => x.name)).toEqual([...APP_TOOL_NAMES]);
@@ -338,7 +338,7 @@ describe("tools", () => {
     expect(openWaits()).toBe(0);
     // The agent read where it came from.
     const prompt = JSON.stringify(t.provider.calls.at(-1)?.request.messages);
-    expect(prompt).toContain("through Claude Code, an app connected to agentes.chat");
+    expect(prompt).toContain("through Claude Code, an app connected to Ackwire AI");
   });
 
   test("a fence marker inside a reply is broken up; the same idempotency key sends once", async () => {
@@ -414,7 +414,7 @@ describe("tools", () => {
     expect(recent.tasks.map((x) => x.status)).toEqual(["done"]);
   });
 
-  test("waits: still_running at the deadline, an unknown status is failed, waiting_approval links to agentes.chat", async () => {
+  test("waits: still_running at the deadline, an unknown status is failed, waiting_approval links to Ackwire AI", async () => {
     const { b, orgId } = await setup();
     const app = await connectApp(t, b, orgId);
     const sent = (await callTool(t, app.access, "send_to_agent", { agent: "dev", message: "hi", wait_seconds: 1 }))

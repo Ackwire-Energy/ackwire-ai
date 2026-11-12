@@ -59,7 +59,7 @@ describe("a personal workspace's emails (ADR 0159)", () => {
     );
     expect(render("computer_ready-task-personal.en").text).toContain("Your agents' computer is on and set up");
     // The address is made inert in the text (no link a mail app would make of it), so only the words around it here.
-    expect(render("invitation-personal.en").text).toContain("invited you to their personal workspace on agentes.chat.");
+    expect(render("invitation-personal.en").text).toContain("invited you to their personal workspace on Ackwire AI.");
     expect(render("approval_digest-one-personal.en").text).toContain(
       "One of your agents asked to do something that needs your approval.",
     );

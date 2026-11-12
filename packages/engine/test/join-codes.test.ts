@@ -428,7 +428,7 @@ describe("the code's email", () => {
     const code = await send(token, "felipe@example.com");
     await drainOutbox(fx().db, createJobHandlers({ ...fx().jobDeps, email: sender }));
     expect(sender.sent.map((m) => [m.to, m.subject])).toEqual([
-      [["felipe@example.com"], `${code} is your agentes.chat code`],
+      [["felipe@example.com"], `${code} is your Ackwire AI code`],
     ]);
     expect(sender.sent[0]?.text).toContain(`\n\n${code}\n\n`);
     expect(await codeEmails()).toEqual([]);

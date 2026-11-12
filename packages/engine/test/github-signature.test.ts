@@ -18,10 +18,10 @@ const API = "https://api.github.test";
 
 describe("the line and the credit (ADR 0156)", () => {
   test("a body gets the line once, its names inert; a commit message gets the trailer in its trailer block", () => {
-    const line = "Dev, agent for @everyone <b>x</b> on agentes.chat";
+    const line = "Dev, agent for @everyone <b>x</b> on Ackwire AI";
     const signed = signedBody("Fixes #1", line);
     expect(signed).toBe(
-      `Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev, agent for &#64;everyone &#60;b&#62;x&#60;/b&#62; on agentes.chat</sub>`,
+      `Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev, agent for &#64;everyone &#60;b&#62;x&#60;/b&#62; on Ackwire AI</sub>`,
     );
     expect(signedBody(signed, "Dev")).toBe(`Fixes #1\n\n${SIGNATURE_MARK}\n<sub>Dev</sub>`);
     // An edit that wrote on after the old line keeps all it wrote; the old line goes.
@@ -43,7 +43,7 @@ describe("the line and the credit (ADR 0156)", () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
     expect(await signatureLine(f.db, { orgId: f.org.id, agentId: f.agent.id })).toBe(
-      "Dev, agente de ana no agentes.chat",
+      "Dev, agente de ana no Ackwire AI",
     );
 
     await addChannelMember(f.db, f.owner.id, f.org.id, f.general.id, { userId: bia.id });
@@ -61,14 +61,14 @@ describe("the line and the credit (ADR 0156)", () => {
       })
       .returning();
     const ctx = { orgId: f.org.id, agentId: f.agent.id, runId: run?.id };
-    expect(await signatureLine(f.db, ctx)).toBe("Dev, agente de bia no agentes.chat");
+    expect(await signatureLine(f.db, ctx)).toBe("Dev, agente de bia no Ackwire AI");
 
     await f.db.update(schema.users).set({ locale: "en" }).where(eq(schema.users.id, f.owner.id));
-    expect(await signatureLine(f.db, ctx)).toBe("Dev, agent for bia on agentes.chat");
+    expect(await signatureLine(f.db, ctx)).toBe("Dev, agent for bia on Ackwire AI");
     await f.db.update(schema.agents).set({ ownerUserId: null }).where(eq(schema.agents.id, f.agent.id));
     await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bia.id));
     expect(await signatureLine(f.db, { orgId: f.org.id, agentId: f.agent.id, runId: run?.id })).toBe(
-      "Dev, an agent on agentes.chat",
+      "Dev, an agent on Ackwire AI",
     );
   });
 

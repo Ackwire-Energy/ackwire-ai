@@ -824,7 +824,7 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
       rechecks: true,
     });
     const runner =
-      "O programa do agentes.chat no Computador da Acme está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.";
+      "O programa do Ackwire AI no Computador da Acme está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.";
     expect(line(off("runner_old"), "cloud")).toEqual({ text: runner, rechecks: true });
     expect(line(off("keys"), "cloud")).toEqual({ text: runner, rechecks: true });
     expect(line(off("exec_off"), "cloud", "claude_code")).toEqual({

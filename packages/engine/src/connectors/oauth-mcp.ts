@@ -40,6 +40,8 @@ export interface AuthServerMetadata {
 const AUTH_METHODS: readonly string[] = ["none", "client_secret_post", "client_secret_basic"];
 
 const http = (deps: McpOAuthDeps) => deps.http ?? fetch;
+/** The name a server shows on its consent screen when we register with it (RFC 7591). */
+const CLIENT_NAME = "Ackwire AI";
 
 async function getJson(deps: McpOAuthDeps, url: string): Promise<Record<string, unknown> | null> {
   await assertPublicHttpsUrl(url, deps.resolveHost);
@@ -242,10 +244,12 @@ export async function ensureOAuthClient(
     }).catch(() => null);
     return { res, refusal: res && !res.ok ? await res.text().catch(() => "") : "" };
   };
-  let { res, refusal } = await register("Ackwire AI");
-  // Calendly takes only letters, digits, hyphens and spaces in a client's name. The others keep the brand's,
-  // the name people see on the consent screen.
-  if (res?.status === 400 && /\b(client_)?name\b/i.test(refusal)) ({ res, refusal } = await register("agentes chat"));
+  let { res, refusal } = await register(CLIENT_NAME);
+  // Calendly takes only letters, digits, hyphens and spaces in a client's name: a name with anything else goes
+  // once more with it as spaces. The others keep the brand's, the name people see on the consent screen.
+  const plain = CLIENT_NAME.replace(/[^a-z0-9 -]+/gi, " ").trim();
+  if (res?.status === 400 && plain !== CLIENT_NAME && /\b(client_)?name\b/i.test(refusal))
+    ({ res, refusal } = await register(plain));
   // RFC 7591: 400 for a redirect URI or metadata it won't take, 401 or 403 for a registration closed to us.
   if (res && [400, 401, 403].includes(res.status)) return { notApproved: true, ...refusalDetail(refusal) };
   if (!res?.ok) return null;

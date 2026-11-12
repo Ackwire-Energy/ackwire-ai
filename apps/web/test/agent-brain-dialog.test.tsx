@@ -353,7 +353,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(text).not.toContain("Nenhum computador tem");
     text = await onIt("claude_code", "tool_off");
     expect(text).toContain(
-      "O Claude Code está desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      "O Claude Code está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
     );
     expect(text).not.toContain("Nenhum computador tem");
   });
@@ -419,10 +419,10 @@ describe("Quem pensa (its dialog)", () => {
     };
     // The row names the plan; its line names the program on the computer.
     expect(await reason("darwin", "MacBook")).toContain(
-      "O Claude Code está desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      "O Claude Code está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
     );
     expect(await reason("linux", "Servidor")).toContain(
-      "O Claude Code está desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable claude.",
+      "O Claude Code está desligado no Servidor. Ligue lá, no app do Ackwire AI ou com sudo agentes-runner tools enable claude.",
     );
   });
 });

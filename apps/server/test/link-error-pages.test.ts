@@ -76,7 +76,7 @@ describe("a link opened in a browser that the API refuses: our page, same status
     expect(pageOf(html)).toEqual({
       title: "Este arquivo não está disponível para você",
       text: "Ele pode ter sido apagado ou estar só numa conversa em que você não está. Peça a quem enviou para compartilhar com você pelo botão Compartilhar do arquivo.",
-      action: ["http://localhost:3000/", "Abrir o agentes.chat"],
+      action: ["http://localhost:3000/", "Abrir o Ackwire AI"],
     });
     // The product's look: the logo and the sky of the sign-in pages.
     expect(html).toContain('class="logo"');
@@ -115,7 +115,7 @@ describe("a link opened in a browser that the API refuses: our page, same status
     expect(pageOf(await res.text())).toEqual({
       title: "Este link não está disponível para você",
       text: "Ele pode ter expirado, já ter sido usado ou levar a um lugar em que você não está. Peça um novo a quem enviou.",
-      action: ["http://localhost:3000/", "Abrir o agentes.chat"],
+      action: ["http://localhost:3000/", "Abrir o Ackwire AI"],
     });
   });
 

@@ -770,7 +770,7 @@ describe("the agent asks for help on its desktop", () => {
     ).toEqual({
       title: "Dev precisa de você no computador",
       // "a computer" alone would read as the agent's own: a laptop, where the screen is helped.
-      body: "Abra o agentes.chat num notebook para ajudar.",
+      body: "Abra o Ackwire AI num notebook para ajudar.",
     });
   });
 
