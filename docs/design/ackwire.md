@@ -10,4 +10,4 @@ Dark mode uses true black for the page and work pane, with neutral charcoal elev
 
 Canonical color tokens remain in `design-system/tokens.css`, mirrored in `packages/ui/src/styles/tokens.css` and `packages/tokens/src/index.ts` for native clients. Preserve semantic warning and error colors.
 
-Package scopes, storage keys, application identifiers and existing service URLs retain their upstream values for compatibility. These are separate from the visible product name; changing hosted endpoints requires deployment configuration.
+Package scopes, storage keys and application identifiers retain their upstream values for compatibility. These are separate from the visible product name. The apps' hosted server, the desktop app's update channel and the releases are Ackwire's own (`https://hub.ackwire.app`, ADR 0172).

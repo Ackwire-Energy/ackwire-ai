@@ -342,7 +342,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
     ));
 
   test("Updates: no lead; Update and reopen alone, and the manual way keeps what stays", async () => {
-    const latest = { version: "9.9.9", url: "https://app.agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
+    const latest = { version: "9.9.9", url: "https://hub.ackwire.app/api/desktop/download/9.9.9/agentes.dmg" };
     const update: UpdateCheck = {
       state: { latest, available: true, required: false },
       checkedAt: null,
@@ -371,7 +371,7 @@ describe("Preferences: a setting's explanation behind its ⓘ", () => {
   });
 
   test("Updates: the download with its bar and Cancel, which drops it; once whole, Installing… with no Cancel", async () => {
-    const latest = { version: "9.9.9", url: "https://app.agentes.chat/api/desktop/download/9.9.9/agentes.dmg" };
+    const latest = { version: "9.9.9", url: "https://hub.ackwire.app/api/desktop/download/9.9.9/agentes.dmg" };
     const update: UpdateCheck = {
       state: { latest, available: true, required: false },
       checkedAt: null,
