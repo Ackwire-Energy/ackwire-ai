@@ -2,7 +2,7 @@ import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
 import type { Agent, AgentBrain, AgentStatus, BrainScope, Credential, DirectMessage, Me, Model } from "../api/types";
 import { agentGrammar } from "./grammar";
-import { AUTO, keyRuns, providerLabel } from "./providers";
+import { modelForKey, providerLabel } from "./providers";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -91,12 +91,12 @@ export async function rightHandOnKey(
   api: ApiClient,
   orgId: string,
   agent: Pick<Agent, "id" | "model">,
-  key: Pick<Credential, "id" | "provider">,
+  key: Pick<Credential, "id" | "provider" | "endpoint">,
   models: readonly Model[],
 ) {
+  const model = modelForKey(key, agent.model, models);
   await api.agents.setBrain(orgId, agent.id, { scope: "workspace", brain: "model" });
-  const fits = keyRuns(key, agent.model, models);
-  await api.agents.update(orgId, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
+  await api.agents.update(orgId, agent.id, { credentialId: key.id, model });
   await api.agents.setBrain(orgId, agent.id, { brain: "model" });
 }
 

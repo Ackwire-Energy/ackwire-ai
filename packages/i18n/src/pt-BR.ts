@@ -2430,7 +2430,9 @@ export const ptBR = {
       workspace: "IA de quem não tem plano próprio",
       workspaceHelp: "Quem não tem plano próprio conversa com o {{name}} por esta IA.",
       workspaceHelp_female: "Quem não tem plano próprio conversa com a {{name}} por esta IA.",
-      noPlans: "Conecte um plano em IA e uso para usar aqui.",
+      noPlans:
+        "Use sua assinatura do Claude ou ChatGPT no workspace. Entre na conta pelo computador conectado; não precisa de chave de API.",
+      connectWorkspace: { claude: "Conectar Claude", chatgpt: "Conectar Codex" },
       lend: "Emprestar este plano a quem não tem um",
       groupMine: "Só para você",
       groupWorkspace: "Para todo o workspace",

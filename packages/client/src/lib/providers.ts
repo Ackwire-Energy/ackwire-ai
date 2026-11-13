@@ -198,10 +198,26 @@ export const keyRuns = (
   model: string | undefined,
   models: readonly Model[],
 ) =>
-  isAuto(model) ||
+  (isAuto(model) && key.provider !== "custom") ||
   models.some(
     (m) => m.id === model && m.provider === key.provider && (!m.endpoint || m.endpoint.credentialId === key.id),
   );
+
+/** Custom endpoints need an explicit model; they do not participate in Automatic routing. */
+export function modelForKey(
+  key: Pick<Credential, "id" | "provider" | "endpoint">,
+  current: string | undefined,
+  models: readonly Model[],
+): string {
+  if (current && keyRuns(key, current, models)) return current;
+  if (key.provider !== "custom") return AUTO;
+  const configured = key.endpoint?.models ?? [];
+  const preferred = configured.find((m) => m.check === "ok") ?? configured[0];
+  if (preferred) return `custom:${key.id}:${preferred.id}`;
+  const listed = models.find((m) => m.endpoint?.credentialId === key.id);
+  if (listed) return listed.id;
+  throw new Error("This endpoint has no models configured.");
+}
 
 /**
  * Whose API an agent's model runs on: the model's provider; for Automático, the one provider the workspace can use

@@ -1,4 +1,4 @@
-import type { ConnectIntent, MachineAccount } from "@agenteschat/client";
+import type { BrainScope, ConnectIntent, MachineAccount } from "@agenteschat/client";
 import {
   keys,
   useAddCredential,
@@ -122,6 +122,8 @@ export interface ConnectAiRequest {
   provider?: string;
   /** The agent to connect: the dialog is for it alone. */
   agentId?: string;
+  /** The right hand's workspace subscription, rather than the caller's personal AI. */
+  scope?: BrainScope;
   /** The agents to choose from (an agent's card names them); `agentId` is chosen first. */
   agentIds?: string[];
   /** The no-AI card or the person's message: once connected, it is answered ("Responder agora"). */
@@ -594,7 +596,7 @@ function ConnectAiDialog({
   const mayUseKeys = can(org, "manage_agents");
   const forId = one?.id ?? (agents.length === 1 ? agents[0]?.id : undefined);
   const forAgent = forId ? { id: forId, name: dir.agentById.get(forId)?.name ?? "" } : undefined;
-  const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined), poll);
+  const gates = usePlanGates(org.id, reader ?? (theirs && mayUseKeys ? one?.id : undefined), poll, request.scope);
   const credentials = useCredentials(org.id, mayUseKeys && forId !== undefined);
   // No agent of theirs yet, and it isn't opened for someone else's: a plan signs in for the agents they create.
   const bare = agents.length === 0 && !theirs && !named && !team;
@@ -745,9 +747,19 @@ function ConnectAiDialog({
         endpoint={
           <EndpointForm
             orgId={org.id}
-            onDone={() => {
-              setKeySaved(true);
-              done();
+            onDone={async (key) => {
+              try {
+                if (hand) {
+                  await rightHandOnKey(api, org.id, hand, key, models.data?.models ?? []);
+                  void qc.invalidateQueries({ queryKey: keys.agents(org.id) });
+                  void qc.invalidateQueries({ queryKey: keys.agentBrain(org.id, hand.id) });
+                  setKeyNote(thinksWithLine(t, "workspace", hand.name, key.label));
+                }
+                setKeySaved(true);
+                done();
+              } catch (error) {
+                toast.show(errorText(t, error), "error");
+              }
             }}
           />
         }

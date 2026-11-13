@@ -68,11 +68,10 @@ import {
   signInProviderOf,
 } from "@agenteschat/client/lib/plans";
 import {
-  AUTO,
   keyLine,
   keyLooksValid,
-  keyRuns,
   keyStepHint,
+  modelForKey,
   type ProviderId,
   providerLabel,
   providerOf,
@@ -124,11 +123,16 @@ import { PlanReplies, usePlanRepliesShown } from "./PlanReplies";
  * What each plan can do now for one agent (`planGate`), from its brain view, its computer's accounts row and the
  * workspace's setup. `poll`: asked again this often where no event keeps them current (the setup opens no socket).
  */
-export function usePlanGates(orgId: string, agentId: string | undefined, poll: number | false = false) {
+export function usePlanGates(
+  orgId: string,
+  agentId: string | undefined,
+  poll: number | false = false,
+  scope?: BrainScope,
+) {
   const api = useApi();
   const { org } = useOrg();
   const asks = agentId !== undefined;
-  const brain = useAgentBrain(orgId, agentId ?? "", asks, poll);
+  const brain = useAgentBrain(orgId, agentId ?? "", asks, poll, scope);
   const ai = useAiAccounts(orgId, asks, poll);
   // Codex's own sign-in is known only by a usage read with it: looked up again here (it comes back as
   // `machine.updated`, or with the next poll), so a computer's own ChatGPT sign-in shows before any turn ran.
@@ -346,6 +350,7 @@ export function useExistingAi({
       const next = await api.agents.setBrain(org.id, agent.id, {
         brain: a.kind,
         account: a.id,
+        ...(view?.scope ? { scope: view.scope } : {}),
         ...(move ? { moveAccount: true } : {}),
         ...(toEveryone ? { onlyOwner: false } : {}),
       });
@@ -371,9 +376,9 @@ export function useExistingAi({
         await rightHandOnKey(api, org.id, row, key, models.data?.models ?? []);
         return { label: key.label, choice: "key", onlyOwner: false, scope: "workspace" };
       }
-      const fits = keyRuns(key, row?.model, models.data?.models ?? []);
+      const model = modelForKey(key, row?.model, models.data?.models ?? []);
       if (view?.brain !== "model") await api.agents.setBrain(org.id, agent.id, { brain: "model" });
-      await api.agents.update(org.id, agent.id, { credentialId: key.id, ...(fits ? {} : { model: AUTO }) });
+      await api.agents.update(org.id, agent.id, { credentialId: key.id, model });
       return { label: key.label, choice: "key", onlyOwner: false };
     });
   return { rows, busy, refused, pickAccount, pickKey };
@@ -1096,7 +1101,12 @@ function PlanSteps({
     setFailed(null);
     setSaving((n) => n + 1);
     try {
-      await api.agents.setBrain(org.id, agentId, { brain: a.kind, account: a.id, ...toEveryone });
+      await api.agents.setBrain(org.id, agentId, {
+        brain: a.kind,
+        account: a.id,
+        ...(view?.scope ? { scope: view.scope } : {}),
+        ...toEveryone,
+      });
       setAssigned((x) => ({ ...x, [agentId]: a }));
       onAssigned?.(agentId, a);
       refresh([agentId]);
@@ -1147,7 +1157,10 @@ function PlanSteps({
     setReplying(true);
     try {
       const saved = [];
-      for (const id of now) saved.push(await api.agents.setBrain(org.id, id, { onlyOwner: !on }));
+      for (const id of now)
+        saved.push(
+          await api.agents.setBrain(org.id, id, { onlyOwner: !on, ...(view?.scope ? { scope: view.scope } : {}) }),
+        );
       refresh(now);
       // The server keeps "Só algumas pessoas" with nobody picked as it is: the switch shows what it saved.
       if (on && saved.every((s) => s.onlyOwner)) {

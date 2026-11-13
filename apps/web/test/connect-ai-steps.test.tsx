@@ -816,17 +816,16 @@ describe("Conectar uma IA: one picker, plans first", () => {
       return dialog.textContent;
     };
     expect(await reason("linux", "Servidor")).toContain(
-      "O Codex está desligado no Servidor. Ligue lá, no app do agentes.chat ou com sudo agentes-runner tools enable codex.",
+      "O Codex está desligado no Servidor. Ligue lá, no app do Ackwire AI ou com sudo agentes-runner tools enable codex.",
     );
     expect(await reason("darwin", "MacBook")).toContain(
-      "O Codex está desligado no MacBook. Ligue lá, no app do agentes.chat: Preferências → Ferramentas.",
+      "O Codex está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
     );
   });
 
-  test("self-host with no computer for the agent: plans dim, the key comes first, and a plan's panel says to connect one", async () => {
+  test("self-host with no computer keeps subscription setup selected and explains how to connect one", async () => {
     const { dialog, router } = await connect({ computers: [], brain: { computer: null, machines: [] } });
-    expect(payWith(dialog, "Com chave de API").getAttribute("aria-checked")).toBe("true");
-    await click(payWith(dialog, "Com um plano"));
+    expect(payWith(dialog, "Com um plano").getAttribute("aria-checked")).toBe("true");
     expect(aiSelect(dialog).querySelector(".ac-brand--off")).not.toBeNull();
     expect(dialog.textContent).toContain("As contas ficam num computador conectado. Conecte um seu primeiro.");
     await click(within(dialog).getByRole("button", { name: "Conectar um computador" }));

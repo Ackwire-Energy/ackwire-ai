@@ -75,3 +75,29 @@ test("a key for the right hand: the workspace's moves first, so a refusal leaves
     { brain: "model" },
   ]);
 });
+
+test("Lodi connects to a saved custom endpoint with an explicit model and returns to the workspace AI", async () => {
+  const calls: unknown[] = [];
+  const api = {
+    agents: {
+      setBrain: async (_o: string, _a: string, input: unknown) => void calls.push(input),
+      update: async (_o: string, _a: string, patch: unknown) => void calls.push(patch),
+    },
+  } as never;
+  await rightHandOnKey(
+    api,
+    "o",
+    { id: "lodi", model: "auto" },
+    {
+      id: "pool",
+      provider: "custom",
+      endpoint: { style: "openai", baseURL: "https://example.com/v1", models: [{ id: "gpt-5.6-luna", check: "ok" }] },
+    },
+    [],
+  );
+  expect(calls).toEqual([
+    { scope: "workspace", brain: "model" },
+    { credentialId: "pool", model: "custom:pool:gpt-5.6-luna" },
+    { brain: "model" },
+  ]);
+});

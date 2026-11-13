@@ -485,7 +485,8 @@ export const freePlanAccount = <
  * a coding plan's, which signs in with its key.
  */
 export const ownSignInFor = (choice: PlanChoice, brain: AgentBrain | undefined, computer: AiComputer | undefined) =>
-  !isPlanId(choice) && ownSignInReady(brain, computer, kindOf(choice));
+  // The right hand's personal and workspace plans require an explicit account (ADR 0137).
+  brain?.scope === undefined && !isPlanId(choice) && ownSignInReady(brain, computer, kindOf(choice));
 
 /** A plan tile reads dimmed when its plan can't sign in there at all (it still opens its panel, which says why). */
 export const gateDims = (gate: PlanGate) =>
@@ -633,14 +634,13 @@ export const choiceOfIntent = (intent: ConnectIntent | undefined): AiChoice | nu
 
 /**
  * The option chosen when the picker opens: what was asked for; the API key for someone who owns no agent but may
- * add keys, or where Claude can't sign in at all (no computer); else the plan the agent it's for thinks
+ * add keys; else the plan the agent it's for thinks
  * with (`plan`, `agentPlan`), else Claude.
  */
 export function defaultChoice({
   intent,
   ownsAgents,
   mayAddKey,
-  claudeGate,
   plan,
 }: {
   intent?: ConnectIntent;
@@ -652,7 +652,8 @@ export function defaultChoice({
   const asked = choiceOfIntent(intent);
   if (asked) return asked;
   if (!ownsAgents && mayAddKey) return "key";
-  return claudeGate.state === "missing" ? "key" : (plan ?? "claude");
+  // A missing computer is a subscription setup step, not a request to pay through the API.
+  return plan ?? "claude";
 }
 
 /** "For which agent": the one asked for, else the first with no AI, else the first. */

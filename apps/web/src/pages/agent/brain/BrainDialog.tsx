@@ -20,7 +20,7 @@ import { namesText } from "@agenteschat/client/lib/format";
 import { type AiChoice, planMark } from "@agenteschat/client/lib/no-ai";
 import { usageWhen } from "@agenteschat/client/lib/plan-usage";
 import { geminiPersonal, isPlanId, planFreeHint, signInProviderOf } from "@agenteschat/client/lib/plans";
-import { AUTO, isAuto, keyRuns, providerLabel } from "@agenteschat/client/lib/providers";
+import { AUTO, isAuto, modelForKey, providerLabel } from "@agenteschat/client/lib/providers";
 import {
   AvatarStack,
   Button,
@@ -232,8 +232,8 @@ function BrainFlow({ view, onClose, at }: { view: AgentBrain; onClose: () => voi
             });
           const cred = s.credentials.find((c) => c.id === key);
           // The agent's model where the key runs it, else Automático, which follows the key.
-          const fits = !cred || keyRuns(cred, saved.model, s.models);
-          await update.mutateAsync({ credentialId: key, ...(fits ? {} : { model: AUTO }) });
+          const model = cred ? modelForKey(cred, saved.model, s.models) : saved.model;
+          await update.mutateAsync({ credentialId: key, model });
         }
       }
       return result;

@@ -244,6 +244,11 @@ describe("planGate: what a plan's panel can do now", () => {
     expect(ownSignInFor("chatgpt", own, signedIn)).toBe(false);
     const codex: AiComputer = { ...MAC, own: { codex: { usage: { windows: [], source: "probe", at: "2026-10-30" } } } };
     expect(ownSignInFor("chatgpt", own, codex)).toBe(true);
+    // The right hand must sign in as an account, even when the host CLI is already authenticated.
+    for (const scope of ["mine", "workspace"] as const) {
+      expect(ownSignInFor("chatgpt", { ...own, scope }, codex)).toBe(false);
+      expect(ownSignInFor("claude", { ...own, scope }, signedIn)).toBe(false);
+    }
     // A coding plan signs in with its key; someone else's computer's sign-in is never the person's, nor is the
     // sign-in of a computer nobody connected (the workspace's), whatever it reports.
     expect(ownSignInFor("zai", own, signedIn)).toBe(false);
@@ -470,9 +475,9 @@ describe("defaultChoice: what the picker opens on", () => {
     }
   });
 
-  test("the key for someone who owns no agent but may add keys, and where Claude can't sign in at all", () => {
+  test("the key for someone who owns no agent but may add keys; a missing computer keeps subscription setup", () => {
     expect(defaultChoice({ ownsAgents: false, mayAddKey: true, claudeGate: ready })).toBe("key");
-    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" } })).toBe("key");
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" } })).toBe("claude");
   });
 
   test("Claude otherwise, even while its computer is prepared or the person may not add keys", () => {
@@ -498,7 +503,9 @@ describe("defaultChoice: what the picker opens on", () => {
     expect(defaultChoice({ intent: "api_key", ownsAgents: true, mayAddKey: true, claudeGate: ready, plan })).toBe(
       "key",
     );
-    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" }, plan })).toBe("key");
+    expect(defaultChoice({ ownsAgents: true, mayAddKey: true, claudeGate: { state: "missing" }, plan })).toBe(
+      "chatgpt",
+    );
   });
 });
 
@@ -824,7 +831,7 @@ describe("why a plan can't sign in yet, in plain words (`gateLine`)", () => {
       rechecks: true,
     });
     const runner =
-      "O programa do agentes.chat no Computador da Acme está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.";
+      "O programa do Ackwire AI no Computador da Acme está desatualizado e a atualização já está a caminho. Isto muda sozinho quando ela terminar.";
     expect(line(off("runner_old"), "cloud")).toEqual({ text: runner, rechecks: true });
     expect(line(off("keys"), "cloud")).toEqual({ text: runner, rechecks: true });
     expect(line(off("exec_off"), "cloud", "claude_code")).toEqual({

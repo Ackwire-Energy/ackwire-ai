@@ -53,6 +53,10 @@ test("an endpoint: its list, saved with a test per model, its models in the pick
   ]);
   expect(key.endpoint.models[0]?.prices?.input).toBe(1);
 
+  const checked = await api(`/credentials/${key.id}/check`, { json: {} });
+  expect(checked.status).toBe(200);
+  expect(await checked.json()).toEqual({ check: "ok" });
+
   const models = (await (await owner("/api/app/models")).json()) as {
     models: { id: string; provider: string; endpoint?: { credentialId: string; name: string }; unpriced?: boolean }[];
   };

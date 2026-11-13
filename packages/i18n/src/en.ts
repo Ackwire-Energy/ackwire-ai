@@ -2509,7 +2509,9 @@ export const en = {
       /** What admins set for people with no plan of their own. */
       workspace: "AI for people without their own plan",
       workspaceHelp: "People without their own plan talk to {{name}} through this AI.",
-      noPlans: "Connect a plan in AI and usage to use it here.",
+      noPlans:
+        "Use your Claude or ChatGPT subscription for the workspace. Sign in on the connected computer; no API key is needed.",
+      connectWorkspace: { claude: "Connect Claude", chatgpt: "Connect Codex" },
       /** Under the switch that lends the workspace's plan: what it does, whatever its state. */
       lend: "Lend this plan to people without one",
       /** The right hand's page, its two groups: what is the viewer's alone, and what admins set for everyone. */

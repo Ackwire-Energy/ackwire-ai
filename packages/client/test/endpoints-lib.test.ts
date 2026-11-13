@@ -14,7 +14,7 @@ import {
   withoutModel,
   withTypedModel,
 } from "../src/lib/endpoints";
-import { keyRuns, modelChoices } from "../src/lib/providers";
+import { keyRuns, modelChoices, modelForKey } from "../src/lib/providers";
 
 describe("the endpoint form", () => {
   test("a model taken off leaves the others as they were", () => {
@@ -136,4 +136,24 @@ describe("endpoint models in the pickers", () => {
     expect(modelUnpriced(models, "custom:c2:other")).toBe(false);
     expect(modelUnpriced(undefined, "custom:c1:llama")).toBe(false);
   });
+});
+
+test("connecting a custom key selects its tested model, never Automatic or another endpoint", () => {
+  const key = {
+    id: "pool",
+    provider: "custom",
+    endpoint: {
+      style: "openai" as const,
+      baseURL: "https://example.com/v1",
+      models: [
+        { id: "failed", check: "failed" as const },
+        { id: "working", check: "ok" as const },
+      ],
+    },
+  };
+  expect(keyRuns(key, "auto", [])).toBe(false);
+  expect(modelForKey(key, "auto", [])).toBe("custom:pool:working");
+  expect(modelForKey(key, "custom:other:working", [])).toBe("custom:pool:working");
+  expect(modelForKey({ ...key, provider: "openai" }, "auto", [])).toBe("auto");
+  expect(() => modelForKey({ id: "empty", provider: "custom" }, "auto", [])).toThrow("no models");
 });

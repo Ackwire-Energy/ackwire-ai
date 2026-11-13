@@ -1,10 +1,20 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { MachineAccount } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { createFakeApi, fakeAgentBrain, LODI_ID, ORG_ID, seedDm, seedState, withRightHand } from "./fake-api";
+import {
+  createFakeApi,
+  fakeAgentBrain,
+  fakeMachinesOf,
+  LODI_ID,
+  ORG_ID,
+  seedDm,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
@@ -31,6 +41,46 @@ const planOf = (ownerId: string | undefined) =>
 
 const groups = () => [...document.querySelectorAll(".rh-group .ac-grouphead__title")].map((h) => h.textContent);
 const row = (name: RegExp) => screen().getByRole("button", { name });
+
+for (const [label, kind] of [
+  ["Claude", "claude_code"],
+  ["Codex", "codex"],
+] as const) {
+  test(`connecting ${label} from workspace AI keeps workspace scope through account assignment`, async () => {
+    const state = withRightHand(seedState());
+    const api = createFakeApi(state);
+    fakeMachinesOf.get(api)?.pair({ id: "machine_1", name: "Mac mini" });
+    const account = { ...(planOf(state.me?.user.id) as MachineAccount), kind, provider: null };
+    const scopes: unknown[] = [];
+    api.agents.brain = async (_org, id, scope) => {
+      scopes.push(scope);
+      return fakeAgentBrain(id, {
+        scope: scope ?? "mine",
+        ownSignIn: false,
+        accounts: [account],
+        workspaceAi: { brain: "model", ownerId: null, servesYou: true },
+      });
+    };
+    const saved: unknown[] = [];
+    api.agents.setBrain = async (_org, id, input) => {
+      saved.push(input);
+      return fakeAgentBrain(id, { scope: input.scope, brain: kind, account: account.id });
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${LODI_ID}`, { api });
+    await settle(8);
+    await act(async () => fireEvent.click(row(/^IA de quem não tem plano próprio/)));
+    await settle(4);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: `Conectar ${label}` })));
+    await settle(8);
+    const dialog = screen().getByRole("dialog");
+    expect(within(dialog).queryByRole("region", { name: "Chave de API" })).toBeNull();
+    expect(scopes).toContain("workspace");
+    await act(async () => fireEvent.click(within(dialog).getByRole("button", { name: "Usar Trabalho" })));
+    await settle(8);
+    expect(saved).toContainEqual({ brain: kind, account: account.id, scope: "workspace" });
+    expect(saved.some((s) => (s as { scope?: string }).scope === "mine")).toBe(false);
+  });
+}
 
 test("Lodi's old settings address opens Lodi's page: two groups, the face opens the look, the fallback AI is one row that opens", async () => {
   const state = withRightHand(seedState(), { brain: { kind: "claude_code", model: "Sonnet" } });

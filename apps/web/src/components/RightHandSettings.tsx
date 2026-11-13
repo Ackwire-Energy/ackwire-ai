@@ -270,6 +270,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
   const qc = useQueryClient();
   const dir = useDirectory(org.id);
   const hold = usePlanHold();
+  const connect = useConnectAi();
   // The workspace's AI (ADR 0137 §11): what every DM thinks with while its person has no plan of their own.
   const kind = planKind(agent.brain?.kind);
   const view = useAgentBrain(org.id, agent.id, true, false, "workspace").data;
@@ -504,6 +505,21 @@ function RightHandForm({ agent }: { agent: Agent }) {
             options={choices}
           />
           {plans.length === 0 && <p className="small muted">{t("rightHand.settings.noPlans", g)}</p>}
+          {connect && !hold && (
+            <div className="ac-acts">
+              {(["claude", "chatgpt"] as const).map((plan) => (
+                <Button
+                  key={plan}
+                  onClick={() => {
+                    setChoosing(false);
+                    connect.open({ agentId: agent.id, scope: "workspace", plan });
+                  }}
+                >
+                  {t(`rightHand.settings.connectWorkspace.${plan}`)}
+                </Button>
+              ))}
+            </div>
+          )}
         </DialogBody>
       </Dialog>
       <Dialog

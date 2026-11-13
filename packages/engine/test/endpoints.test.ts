@@ -4,6 +4,7 @@ import { customModelId, ProviderError } from "@agenteschat/providers";
 import {
   allowsPrivateEndpoints,
   BudgetExceededError,
+  checkCredential,
   checkEndpoint,
   createCredential,
   type EndpointModel,
@@ -13,6 +14,7 @@ import {
   listEndpoint,
   modelInfoFor,
   pickerModels,
+  revokeCredential,
   updateAgent,
   updateEndpointModels,
 } from "../src";
@@ -231,6 +233,85 @@ describe("calls", () => {
 });
 
 describe("the test call", () => {
+  test("checking a saved custom key calls its endpoint and records usage exactly once", async () => {
+    let signal: AbortSignal | undefined;
+    f = await setup({
+      reply: (request) => {
+        signal = request.signal;
+        return { chunks: ["ok"], usage: { inputTokens: 1000, outputTokens: 100 } };
+      },
+    });
+    const cred = await addEndpoint(f);
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("ok");
+    expect(f.provider.calls).toHaveLength(1);
+    expect(f.provider.calls[0]).toMatchObject({
+      apiKey: "gw-key-1234567",
+      endpoint: { style: "openai", baseURL: "https://gw.example/v1" },
+      request: { model: customModelId(cred.id, "llama-4") },
+    });
+    expect(signal).toBeInstanceOf(AbortSignal);
+    const rows = await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.credentialId, cred.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      orgId: f.org.id,
+      agentId: null,
+      provider: "custom",
+      kind: "summary",
+      model: customModelId(cred.id, "llama-4"),
+      inputTokens: 1000,
+      outputTokens: 100,
+      costNanoUsd: 1000 * 1000 + 100 * 2000,
+    });
+  });
+
+  test.each([
+    [401, "invalid"],
+    [402, "no_credit"],
+    [403, "denied"],
+  ] as const)("custom key refusals (%s) are reported without exposing the key", async (status, refusal) => {
+    f = await setup({
+      reply: () =>
+        new ProviderError(`provider rejected the request (${status}): refused gw-key-1234567`, false, status),
+    });
+    const cred = await addEndpoint(f);
+    const error = await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id).catch((e) => e);
+    expect(error).toMatchObject({
+      code: `provider_key_${refusal}`,
+      params: { said: "refused ••••" },
+    });
+    expect(JSON.stringify(error)).not.toContain("gw-key-1234567");
+    expect(f.provider.calls).toHaveLength(1);
+  });
+
+  test.each([429, 503, 404])("an inconclusive custom endpoint failure (%s) stays unchecked", async (status) => {
+    f = await setup({ reply: () => new ProviderError("endpoint unavailable", true, status) });
+    const cred = await addEndpoint(f);
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("unchecked");
+    expect(f.provider.calls).toHaveLength(1);
+  });
+
+  test("a stored custom key stays scoped to its workspace and cannot be checked after revocation", async () => {
+    f = await setup();
+    const cred = await addEndpoint(f);
+    expect(await f.gateway.verifyStoredKey(crypto.randomUUID(), cred.id)).toBeNull();
+    await revokeCredential(f.db, f.owner.id, f.org.id, cred.id);
+    expect(await f.gateway.verifyStoredKey(f.org.id, cred.id)).toBeNull();
+    expect(f.provider.calls).toHaveLength(0);
+  });
+
+  test("a saved key check prefers a model that passed its endpoint test", async () => {
+    f = await setup({
+      reply: (request) =>
+        request.model.endsWith(":broken")
+          ? new ProviderError("model not found", false, 404)
+          : { chunks: [], toolUses: [{ name: "report_status", input: { ok: true } }] },
+    });
+    const cred = await addEndpoint(f, [{ id: "broken" }, { id: "working" }]);
+    await checkEndpoint(f.db, f.gateway, f.owner.id, f.org.id, cred.id);
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("ok");
+    expect(f.provider.calls.at(-1)?.request.model).toBe(customModelId(cred.id, "working"));
+  });
+
   test("one per model with a tool: ok, no tools, or failed in the server's words; each kept and recorded", async () => {
     f = await setup({
       reply: (request) =>

@@ -2,6 +2,7 @@ import type { ErrorReporter, KeyWrapper, PlatformCredentials, PubSub, SearchKind
 import { and, type Database, desc, type Executor, eq, gte, isNull, lt, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   costNanoUsd,
+  customModelId,
   customModelOf,
   type EmbeddingProvider,
   type EmbeddingResult,
@@ -178,6 +179,12 @@ const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /** The call's own key first: a key of an unusual shape is one no pattern knows. */
 const withoutKey = (text: string, apiKey: string) => redactCredentials(apiKey ? text.replaceAll(apiKey, "••••") : text);
+
+const failedKeyCheck = (error: unknown, apiKey: string): KeyCheck => {
+  const refusal = error instanceof ProviderError ? keyRefusalOf(error) : null;
+  if (!refusal || !(error instanceof ProviderError)) return { state: "unchecked" };
+  return { state: "refused", refusal, said: withoutKey(keyFailureWords(error.message), apiKey) };
+};
 
 /**
  * A provider failure as it leaves the gateway: its words (a refused request keeps the API's) with credentials masked,
@@ -968,9 +975,7 @@ export function createModelGateway(deps: ModelGatewayDeps) {
           },
         };
       } catch (error) {
-        const refusal = error instanceof ProviderError ? keyRefusalOf(error) : null;
-        if (!refusal || !(error instanceof ProviderError)) return { state: "unchecked" };
-        return { state: "refused", refusal, said: withoutKey(keyFailureWords(error.message), input.key.apiKey) };
+        return failedKeyCheck(error, input.key.apiKey);
       }
     },
 
@@ -979,7 +984,30 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, credentialId);
       if (!credential) return null;
       const { provider, apiKey, workspaceId, options } = credential;
-      if (provider === "custom") return { provider, result: { state: "unchecked" } as KeyCheck };
+      if (provider === "custom") {
+        const endpoint = options?.endpoint;
+        // Prefer a model that passed its tool test; checking the key only needs one real reply.
+        const model = endpoint?.models.find((m) => m.check === "ok") ?? endpoint?.models[0];
+        let result: KeyCheck = { state: "unchecked" };
+        if (model && deps.providers.custom && !(await standingRefusal(db, orgId))) {
+          try {
+            await this.complete({
+              orgId,
+              kind: "summary",
+              model: customModelId(credentialId, model.id),
+              system: "Answer with one word.",
+              messages: [{ role: "user", content: "Say ok." }],
+              maxTokens: 1024,
+              signal: AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS),
+            });
+            // `complete` already records usage against this endpoint's credential and prices.
+            result = { state: "ok", record: async () => {} };
+          } catch (error) {
+            result = failedKeyCheck(error, apiKey);
+          }
+        }
+        return { provider, result };
+      }
       const key = {
         apiKey,
         ...(workspaceId ? { workspaceId } : {}),
