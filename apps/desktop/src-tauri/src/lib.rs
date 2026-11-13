@@ -69,7 +69,7 @@ fn is_sign_in_url(url: &str) -> bool {
 
 /// The app's own builds ("Download version …" in Updates), whichever server it opens.
 fn is_app_download(url: &str) -> bool {
-    url.starts_with("https://app.agentes.chat/api/desktop/download/")
+    url.strip_prefix(servers::CLOUD).is_some_and(|path| path.starts_with("/api/desktop/download/"))
 }
 
 /// The help pages on the docs site ("Which one to choose?", "How folders work"), whichever server it opens:
@@ -844,8 +844,8 @@ mod tests {
     #[test]
     fn what_opens_in_the_browser() {
         assert!(is_sign_in_url("https://claude.ai/oauth/authorize?client_id=x"));
-        assert!(is_app_download("https://app.agentes.chat/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
-        assert!(!is_app_download("https://app.agentes.chat.evil.com/api/desktop/download/x"));
+        assert!(is_app_download("https://hub.ackwire.app/api/desktop/download/0.6.0/agentes_0.6.0_universal.dmg"));
+        assert!(!is_app_download("https://hub.ackwire.app.evil.com/api/desktop/download/x"));
         assert!(!is_sign_in_url("https://claude.ai.evil.com/oauth/authorize?"));
         assert!(is_help_page("https://agentes.chat/docs/run-on-your-computer#who"));
         assert!(is_help_page("https://agentes.chat/pt/docs/computers#folders"));

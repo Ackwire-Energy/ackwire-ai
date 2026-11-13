@@ -651,7 +651,7 @@ mod tests {
 
     #[test]
     fn only_new_unread_elsewhere_is_told() {
-        let open = "https://app.agentes.chat";
+        let open = servers::CLOUD;
         let own = "https://agentes.exemplo.com.br";
         let before = vec![server(open, true, vec![org("a", 1)]), server(own, true, vec![org("b", 2), org("c", 5)])];
         let after = vec![

@@ -604,8 +604,8 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   }
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
-    version: 8,
-    files: "b089bbc49503d787",
+    version: 9,
+    files: "dabff31b9a8bc0ce",
   });
 });
 

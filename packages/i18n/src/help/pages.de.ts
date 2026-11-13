@@ -6,7 +6,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
     title: "Ackwire AI auf deinem Computer ausführen",
     summary:
-      "Die agentes.chat-App kann Ackwire AI auch selbst ausführen, auf einem Mac, einem PC oder einem Linux-Computer, für dich oder ein kleines Team.",
+      "Die Ackwire AI-App kann Ackwire AI auch selbst ausführen, auf einem Mac, einem PC oder einem Linux-Computer, für dich oder ein kleines Team.",
     sections: [
       {
         id: "how",
@@ -130,7 +130,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "Deine eigenen Computer und Handys",
         blocks: [
-          "Agenten können auch auf Computern und Handys arbeiten, die du mitbringst: einem Mac oder PC mit der agentes.chat-App, einem Server, einem Android-Handy oder einem iPhone. Siehe [Deine Computer und Handys](/help/computers).",
+          "Agenten können auch auf Computern und Handys arbeiten, die du mitbringst: einem Mac oder PC mit der Ackwire AI-App, einem Server, einem Android-Handy oder einem iPhone. Siehe [Deine Computer und Handys](/help/computers).",
         ],
       },
       {
@@ -160,7 +160,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
     sections: [
       {
         id: "app",
-        heading: "Mit der agentes.chat-App",
+        heading: "Mit der Ackwire AI-App",
         blocks: [
           "Installiere die App auf dem Computer, öffne sie und melde dich bei deinem Workspace an. Sie fragt **Agenten von <workspace> diesen Mac nutzen lassen?** (diesen PC unter Windows, diesen Computer unter Linux). Wähle, wer ihn nutzen darf, und drück **Erlauben**. Das ist alles.",
           "Schon angemeldet? Schalte den Workspace unter **Einstellungen › Allgemein** in der Karte **Agenten** ein.",
@@ -206,7 +206,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Pausieren und trennen",
         blocks: [
-          "Auf dem Computer pausiert das agentes.chat-Symbol neben der Uhr die Agenten aller Workspaces. Unter **Einstellungen › Allgemein** pausiert der Schalter eines Workspace nur diesen einen, und **Trennen** trennt ihn. Während der Pause startet nichts Neues, und was gerade läuft, wird noch fertig. Beim Trennen bleiben die Ordner der Agenten auf der Festplatte.",
+          "Auf dem Computer pausiert das Ackwire AI-Symbol neben der Uhr die Agenten aller Workspaces. Unter **Einstellungen › Allgemein** pausiert der Schalter eines Workspace nur diesen einen, und **Trennen** trennt ihn. Während der Pause startet nichts Neues, und was gerade läuft, wird noch fertig. Beim Trennen bleiben die Ordner der Agenten auf der Festplatte.",
           "Auf der Website trennst du ein Gerät mit **Entfernen** auf seiner Seite.",
         ],
       },
@@ -248,7 +248,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
   import: {
     title: "Bring deine Agenten mit",
     summary:
-      "Hol Agenten aus einer anderen App oder einem anderen agentes.chat-Workspace, mit ihren Anweisungen, Skills, Routinen und ihrem Gedächtnis.",
+      "Hol Agenten aus einer anderen App oder einem anderen Ackwire AI-Workspace, mit ihren Anweisungen, Skills, Routinen und ihrem Gedächtnis.",
     sections: [
       {
         id: "comes",
@@ -746,7 +746,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "Bei Tailscale installiere die Tailscale-App auf deinem Handy und melde dich im selben Tailnet an.",
-              "Installiere die agentes.chat-App.",
+              "Installiere die Ackwire AI-App.",
               "Scanne den QR-Code, den die Einrichtung gezeigt hat, oder den unter **Einstellungen\u00a0›\u00a0Dein Konto\u00a0›\u00a0Auf dem Handy öffnen**, der dich auch gleich anmeldet.",
             ],
           },
@@ -760,7 +760,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "Weitere Computer, etwa ein Mac mit der agentes.chat-App oder ein anderer Server, verbindest du unter **Einstellungen\u00a0›\u00a0Geräte**, wie in [Deine Computer und Handys](/help/computers). Bei Tailscale treten sie vorher deinem Tailnet bei.",
+          "Weitere Computer, etwa ein Mac mit der Ackwire AI-App oder ein anderer Server, verbindest du unter **Einstellungen\u00a0›\u00a0Geräte**, wie in [Deine Computer und Handys](/help/computers). Bei Tailscale treten sie vorher deinem Tailnet bei.",
         ],
       },
       {

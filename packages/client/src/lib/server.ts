@@ -9,7 +9,7 @@ import type { Instance } from "../api/types";
  * agentes.chat server these apps can talk to.
  */
 
-export const CLOUD_SERVER = "https://app.agentes.chat";
+export const CLOUD_SERVER = "https://hub.ackwire.app";
 
 /**
  * A help page on the public docs site, in the reader's language, at a section. Every edition and app links there,

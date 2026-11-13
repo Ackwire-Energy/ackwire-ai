@@ -15,7 +15,7 @@ import type { ConfigContext, ExpoConfig } from "expo/config";
  */
 const variant = process.env.APP_VARIANT ?? "production";
 const suffix = variant === "production" ? "" : `.${variant}`;
-const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://app.agentes.chat";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL ?? "https://hub.ackwire.app";
 // Links to this host open the app (universal links / App Links); the server publishes the matching /.well-known
 // files (apps/server/src/app-links.ts).
 const linkHost = new URL(apiUrl).host;
@@ -118,7 +118,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundImage: "./assets/images/adaptive-icon-background.png",
-      backgroundColor: "#02060f",
+      backgroundColor: "#031f1b",
     },
     predictiveBackGestureEnabled: false,
     intentFilters: [
@@ -209,7 +209,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       // extension takes the app's name and shares its URL scheme; it reaches phones only with a new native build.
       "expo-share-intent",
       {
-        iosShareExtensionName: variant === "production" ? "agentes" : `agentes ${variant}`,
+        iosShareExtensionName: variant === "production" ? "Ackwire AI" : `Ackwire AI ${variant}`,
         iosActivationRules: {
           NSExtensionActivationSupportsText: true,
           NSExtensionActivationSupportsWebURLWithMaxCount: 1,

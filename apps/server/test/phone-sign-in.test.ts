@@ -125,7 +125,7 @@ describe("GET /api/instance", () => {
       api: 1,
       minApi: 1,
       url: ORIGIN,
-      sourceUrl: "https://github.com/agentes-chat/agentes-chat",
+      sourceUrl: "https://github.com/Ackwire-Energy/ackwire-ai",
       signIn: { email: true, google: true, github: false, apple: false },
       // Nobody yet: the first account signs up.
       signup: "open",

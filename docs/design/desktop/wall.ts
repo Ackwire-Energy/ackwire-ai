@@ -3,7 +3,7 @@
  * no pointer light, the loop stopped after the first frame) with the expanded logo over it. render.sh bundles
  * this file and screenshots wall.html.
  */
-import { bodyPath, bodySvg, eyeShapes } from "../../../packages/ui/src/agent/engine.js";
+import { PIXEL_MARK_VIEWBOX, pixelMarkRects } from "../../../packages/ui/src/brand/ackwire";
 import { drawSprite, type SkyFrame, startSky } from "../../../packages/ui/src/sky/engine";
 import { pixelOf, SKY_TONES, spriteTone } from "../../../packages/ui/src/sky/math";
 
@@ -55,11 +55,12 @@ const AGENTS: { x: number; y: number; body: "navy" | "ghost"; closed?: boolean }
 
 /**
  * The logo at the bottom left, on the pale band, centered on the dock's line (the dock spans y 844–893): below
- * 840, where a maximized window ends, so it shows whatever is open. ".chat" in the sprites' solid navy and Doto's
- * heaviest dots (wall.html): the computer dialog shows the desktop at about 0.6, where the app's lighter ink and
- * smaller dots thin out to a haze.
+ * 840, where a maximized window ends, so it shows whatever is open. The mark and "AI" in Solar Deep, "Ackwire" in
+ * Forest Green: the computer dialog shows the desktop at about 0.6, where a lighter ink thins out to a haze.
  */
-const LOGO = { left: 36, bottom: 15, size: 26, ink: "rgba(4, 32, 63, 0.8)", chat: "#04203f" };
+const LOGO = { left: 36, bottom: 15, size: 26, ink: "#031f1b", green: "#3f7a12" };
+const LOGO_FACE = `800 ${LOGO.size}px "Plus Jakarta Sans"`;
+const LOGO_TEXT = "Ackwire AI";
 
 function seeded(seed: number) {
   let a = seed >>> 0;
@@ -72,7 +73,7 @@ function seeded(seed: number) {
   };
 }
 
-/** The expanded logo (packages/ui Logo): the mark in the sky's dither with white eyes, "agentes" and ".chat". */
+/** The logo as the app draws it (packages/ui Logo): the pixel "A", then "Ackwire" and "AI". */
 function logo(): HTMLElement {
   const el = document.createElement("span");
   el.className = "logo";
@@ -80,19 +81,9 @@ function logo(): HTMLElement {
   el.style.left = `${LOGO.left}px`;
   el.style.bottom = `${LOGO.bottom}px`;
   el.style.color = LOGO.ink;
-  const body = bodyPath(2, 2, 28);
-  const dither = `data:image/svg+xml,${encodeURIComponent(bodySvg("sky", 12))}`;
-  const eyes = eyeShapes("round")
-    .map(
-      (e) =>
-        `<rect x="${2 + e.x * 28}" y="${2 + e.y * 28}" width="${e.w * 28}" height="${e.h * 28}" rx="${(e.w * 28) / 2}"/>`,
-    )
-    .join("");
   el.innerHTML =
-    `<svg viewBox="0 0 32 32" aria-hidden="true"><defs><clipPath id="b"><path d="${body}"/></clipPath></defs>` +
-    `<path d="${body}" fill="#0063d1"/><image href="${dither}" x="2" y="2" width="28" height="28" preserveAspectRatio="none" clip-path="url(#b)"/>` +
-    `<g fill="#ffffff">${eyes}</g></svg>` +
-    `<span class="word"><span>agentes</span><span class="chat" style="color:${LOGO.chat}">.chat</span></span>`;
+    `<svg viewBox="${PIXEL_MARK_VIEWBOX}" shape-rendering="crispEdges" fill="${LOGO.green}" aria-hidden="true">${pixelMarkRects()}</svg>` +
+    `<span class="word"><span>Ackwire</span><span style="color:${LOGO.green}">AI</span></span>`;
   return el;
 }
 
@@ -101,10 +92,9 @@ async function main() {
   const canvas = host?.querySelector("canvas");
   if (!host || !canvas) return;
   host.append(logo());
-  const faces = [`300 ${LOGO.size}px "Funnel Display"`, `900 ${LOGO.size}px "Doto"`];
-  await Promise.all(faces.map((face) => document.fonts.load(face, "agentes.chat")));
-  // Without the brand's fonts the logo would come out in a fallback face: the image stays black instead.
-  if (!faces.every((face) => document.fonts.check(face, "agentes.chat"))) return;
+  await document.fonts.load(LOGO_FACE, LOGO_TEXT);
+  // Without the brand's font the logo would come out in a fallback face: the image stays black instead.
+  if (!document.fonts.check(LOGO_FACE, LOGO_TEXT)) return;
   // The engine starts at a random time and spawns its own agents at random: a fixed seed keeps one frame.
   Math.random = seeded(7);
   const levels = SKY_TONES.length - 1;

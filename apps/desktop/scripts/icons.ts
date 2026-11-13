@@ -1,6 +1,6 @@
 /**
  * Draws the desktop app's icons from the Ackwire pixel "A" (packages/ui/src/brand/ackwire.ts), so the
- * tray and the app icon are the same mark as everywhere else: three stepped chevrons. Run by CI before `tauri build` (`bun apps/desktop/scripts/icons.ts`), then
+ * tray and the app icon are the same mark as everywhere else: the monogram's three arched bands. Run by CI before `tauri build` (`bun apps/desktop/scripts/icons.ts`), then
  * `tauri icon app-icon.png` makes the .icns and the PNG sizes from the 1024 px master.
  *
  * Outputs (all ignored by git):
@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { deflateSync } from "node:zlib";
-import { PIXEL_MARK, PIXEL_MARK_SIZE, PIXEL_MARK_TONES } from "../../../packages/ui/src/brand/ackwire";
+import { ACKWIRE, PIXEL_MARK, PIXEL_MARK_SIZE } from "../../../packages/ui/src/brand/ackwire";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -75,7 +75,7 @@ export function encodePng(width: number, height: number, rgba: Uint8Array): Uint
 
 /* ---------- The mark ---------- */
 
-/** The mark's layer (1 outer … 3 inner) at a point in grid units, or 0 outside it. */
+/** The mark's band (1 outer … 3 inner) at a point in grid units, or 0 outside it. */
 function layerAt(gx: number, gy: number): number {
   if (gx < 0 || gy < 0 || gx >= PIXEL_MARK_SIZE.w || gy >= PIXEL_MARK_SIZE.h) return 0;
   const cell = PIXEL_MARK[Math.floor(gy)]?.[Math.floor(gx)];
@@ -86,7 +86,7 @@ function layerAt(gx: number, gy: number): number {
 
 type TrayState = "idle" | "working" | "paused" | "offline" | "update" | "browsing" | "needs";
 const TRAY_PX = 36;
-/** The mark's grid in the 36 px canvas: 26 cells across 32 px, centered. */
+/** The mark's grid in the 36 px canvas: 28 cells across 32 px, centered. */
 const TB = { x: 2, cell: 32 / PIXEL_MARK_SIZE.w };
 const TB_Y = (TRAY_PX - PIXEL_MARK_SIZE.h * TB.cell) / 2;
 const SS = 4; // supersampling per axis
@@ -100,7 +100,7 @@ function distToSegment(px: number, py: number, ax: number, ay: number, bx: numbe
 
 function trayCoverage(state: TrayState, px: number, py: number): boolean {
   const layer = layerAt((px - TB.x) / TB.cell, (py - TB_Y) / TB.cell);
-  // Offline: the outer layer alone. Paused: the middle layer drops out.
+  // Offline: the outer band alone. Paused: the middle band drops out.
   if (state === "offline") return layer === 1;
   if (state === "paused" && layer === 2) return false;
   if (state === "browsing" || state === "needs") {
@@ -148,7 +148,7 @@ function trayPng(state: TrayState): Uint8Array {
   return encodePng(TRAY_PX, TRAY_PX, rgba);
 }
 
-/* ---------- App icon: 1024 px, the pixel "A" in Ackwire greens on a Forest Green tile ---------- */
+/* ---------- App icon: 1024 px, the pixel "A" in Solar Green on a Forest Green tile ---------- */
 
 const hex = (h: string): [number, number, number] => {
   const n = Number.parseInt(h.slice(1, 7), 16);
@@ -158,11 +158,11 @@ const hex = (h: string): [number, number, number] => {
 function appIconPng(): Uint8Array {
   const S = 1024;
   const tile = { x: 100, y: 100, s: 824, r: 185 };
-  // 26 cells of 24 px (624 px) across the tile, centered.
-  const cell = 24;
+  // 28 cells of 22 px (616 px) across the tile, centered.
+  const cell = 22;
   const mark = { x: (S - PIXEL_MARK_SIZE.w * cell) / 2, y: (S - PIXEL_MARK_SIZE.h * cell) / 2 };
-  const tones = PIXEL_MARK_TONES.dark.map(hex);
-  const bg = hex("#031f1b");
+  const green = hex(ACKWIRE.solar);
+  const bg = hex(ACKWIRE.forest);
   const rgba = new Uint8Array(S * S * 4);
   const inTile = (x: number, y: number) => {
     const cx = Math.min(Math.max(x, tile.x + tile.r), tile.x + tile.s - tile.r);
@@ -182,7 +182,7 @@ function appIconPng(): Uint8Array {
           const py = y + (sy + 0.5) / n;
           if (!inTile(px, py)) continue;
           const layer = layerAt((px - mark.x) / cell, (py - mark.y) / cell);
-          const c = layer > 0 ? (tones[layer - 1] ?? bg) : bg;
+          const c = layer > 0 ? green : bg;
           r += c[0];
           g += c[1];
           b += c[2];

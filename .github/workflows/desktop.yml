@@ -670,7 +670,7 @@ jobs:
           path: out/*
           retention-days: 14
 
-      # The AppImage opens on a virtual screen, as a first run and on agentes.chat (the site under the cover): it
+      # The AppImage opens on a virtual screen, as a first run and on Ackwire AI (the site under the cover): it
       # must still run after 25 s. The screenshots and the app's output go up as `desktop-linux-look`.
       - name: Open the app once
         shell: bash
@@ -683,7 +683,7 @@ jobs:
             home=$(mktemp -d)
             if [ "$name" = cloud ]; then
               mkdir -p "$home/.config/chat.agentes.desktop"
-              echo '{"current":"https://app.agentes.chat","servers":["https://app.agentes.chat"]}' \
+              echo '{"current":"https://hub.ackwire.app","servers":["https://hub.ackwire.app"]}' \
                 > "$home/.config/chat.agentes.desktop/servers.json"
             fi
             # Its own folders, whatever the runner sets for XDG.
@@ -739,9 +739,9 @@ jobs:
         run: |
           git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
           git tag -l --format='%(contents)' "$TAG" | sed '/^-----BEGIN PGP SIGNATURE-----/,$d' > notes.txt
-          if [ ! -s notes.txt ] || ! grep -q '[^[:space:]]' notes.txt; then echo "agentes.chat $VERSION" > notes.txt; fi
+          if [ ! -s notes.txt ] || ! grep -q '[^[:space:]]' notes.txt; then echo "Ackwire AI $VERSION" > notes.txt; fi
           # How to open it the first time while the builds aren't notarized/signed (ADR 0036 §10). It starts with
           # <!-- install -->, where the server cuts the notes the app shows on an update.
           { echo; sed -e "s|{{repo}}|$GITHUB_REPOSITORY|g" -e "s|{{version}}|$VERSION|g" .github/desktop-install.md; } >> notes.txt
           ls -l out
-          gh release create "$TAG" out/* --title "agentes.chat $VERSION" --notes-file notes.txt
+          gh release create "$TAG" out/* --title "Ackwire AI $VERSION" --notes-file notes.txt

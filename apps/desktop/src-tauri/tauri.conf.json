@@ -68,9 +68,9 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVCREU5NDA5OTVGNEMwNUEKUldSYXdQU1ZDWlRlVzU1RVZjUno1Y1B3cS9UODJQcFd5WkJnbGNsYW5TcUc4OWpZbzRJeHU2K20K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyNzI0Mzc3QTAwNEM2NTAKUldSUXhnU2dkME55VXVvbGZoOFZmWEsrdFBFWFVWVEl4MDhjSC9OWnBBR01ESm1GNWpyendjdjYK",
       "endpoints": [
-        "https://app.agentes.chat/api/desktop/update?target={{target}}&arch={{arch}}&current={{current_version}}&bundle={{bundle_type}}"
+        "https://hub.ackwire.app/api/desktop/update?target={{target}}&arch={{arch}}&current={{current_version}}&bundle={{bundle_type}}"
       ]
     }
   },

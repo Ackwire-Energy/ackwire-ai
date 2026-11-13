@@ -141,8 +141,8 @@ describe("the look's pieces", () => {
   test("links take the accent, without the sentence's period, and never half of a <placeholder> address", () => {
     const { term, text } = capture({ depth: 24 });
     term.text("Open https://agents.example.com. Or https://agentes.<your tailnet>.ts.net soon.");
-    expect(text()).toContain("\x1b[38;2;43;116;230mhttps://agents.example.com\x1b[39m.");
-    expect(text()).not.toContain("\x1b[38;2;43;116;230mhttps://agentes.");
+    expect(text()).toContain("\x1b[38;2;76;138;23mhttps://agents.example.com\x1b[39m.");
+    expect(text()).not.toContain("\x1b[38;2;76;138;23mhttps://agentes.");
   });
 
   test("widths in a terminal's columns: wide characters take two, combining marks none", () => {
@@ -195,10 +195,10 @@ describe("what each terminal gets", () => {
     term.stop();
   };
 
-  test("24-bit color: the logo, the badge on the agent blue, the line and the marks", () => {
+  test("24-bit color: the logo, the badge on Solar Green, the line and the marks", () => {
     const { term, screen, text } = capture({ depth: 24 });
     steps(term);
-    expect(text()).toContain("\x1b[48;2;0;99;209;97m Ackwire AI \x1b[0m setup");
+    expect(text()).toContain("\x1b[48;2;144;237;66;38;2;3;31;27m Ackwire AI \x1b[0m setup");
     expect(screen()).toBe(
       [
         "",

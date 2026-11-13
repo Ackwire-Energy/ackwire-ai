@@ -13,7 +13,7 @@ use tauri::ipc::CapabilityBuilder;
 use tauri::{AppHandle, Manager, Url};
 
 /// Ackwire AI Cloud.
-pub const CLOUD: &str = "https://app.agentes.chat";
+pub const CLOUD: &str = "https://hub.ackwire.app";
 const FILE: &str = "servers.json";
 /// Servers kept in the list; choosing another past this drops the oldest that isn't open.
 const MAX_SERVERS: usize = 20;

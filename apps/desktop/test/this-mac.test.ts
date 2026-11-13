@@ -99,7 +99,7 @@ test("status: only the asking server's organizations, and whether agents may wor
     agentsHere: true,
     local: false,
   });
-  expect(await answerThisMac(deps, { kind: "status", origin: "https://app.agentes.chat", agentsHere: false })).toEqual({
+  expect(await answerThisMac(deps, { kind: "status", origin: "https://hub.ackwire.app", agentsHere: false })).toEqual({
     orgs: [],
     agentsHere: false,
     local: false,

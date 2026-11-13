@@ -7,7 +7,7 @@ import type { EmailWords } from "./index";
  * forms with `plural("de", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? atHost("Gesendet vom agentes.chat-Server", "auf", host) : "Gesendet von Ackwire AI."),
+  sentBy: (host) => (host ? atHost("Gesendet vom Ackwire AI-Server", "auf", host) : "Gesendet von Ackwire AI."),
   fallback: "Der Button funktioniert nicht? Kopiere diese Adresse in deinen Browser:",
   role: { owner: "Inhaber", member: "Mitglied" },
   anAgent: "Ein Agent",
@@ -364,7 +364,7 @@ export const words: EmailWords = {
     },
   },
   appConnected: {
-    subject: "Eine App wurde mit deinem agentes.chat-Konto verbunden",
+    subject: "Eine App wurde mit deinem Ackwire AI-Konto verbunden",
     preheader: "Sie kann in einem Workspace in deinem Namen lesen und Agenten Aufgaben schicken.",
     headline: "Eine App wurde verbunden",
     body: (app, org) => [{ b: app }, " hat jetzt Zugriff auf dein Konto in ", { b: org }, "."],
@@ -378,7 +378,7 @@ export const words: EmailWords = {
     },
   },
   accountDeleting: {
-    subject: (day) => `Dein agentes.chat-Konto wird am ${day} gelöscht`,
+    subject: (day) => `Dein Ackwire AI-Konto wird am ${day} gelöscht`,
     preheader: "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
     headline: "Dein Konto wird gelöscht",
     body: (email, day, time) => [
@@ -399,7 +399,7 @@ export const words: EmailWords = {
     why: "Du erhältst diese E-Mail, weil diese Adresse ein Konto auf Ackwire AI hat.",
   },
   accountDeleted: {
-    subject: "Dein agentes.chat-Konto wurde gelöscht",
+    subject: "Dein Ackwire AI-Konto wurde gelöscht",
     preheader: "Es ist überall abgemeldet und kann sich nicht mehr anmelden.",
     headline: "Dein Konto wurde gelöscht",
     body: (email) => ["Wir haben das Konto ", { b: email }, " gelöscht."],
@@ -493,17 +493,17 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Dein Team wartet",
-    preheader: "Dein Workspace ist bereit. Zum Start fehlt ein agentes.chat-Tarif.",
+    preheader: "Dein Workspace ist bereit. Zum Start fehlt ein Ackwire AI-Tarif.",
     headline: "Dein Team wartet",
     body: (agents, channels, routines) => {
       const a = plural("de", agents, { one: `1 Agent`, other: `${agents} Agenten` });
       const c = plural("de", channels, { one: `1 Kanal`, other: `${channels} Kanäle` });
       const r = plural("de", routines, { one: `1 Routine`, other: `${routines} Routinen` });
       return routines > 0
-        ? `${a}, ${c} und ${r} sind bereit. Zum Start fehlt ein agentes.chat-Tarif.`
-        : `${a} und ${c} sind bereit. Zum Start fehlt ein agentes.chat-Tarif.`;
+        ? `${a}, ${c} und ${r} sind bereit. Zum Start fehlt ein Ackwire AI-Tarif.`
+        : `${a} und ${c} sind bereit. Zum Start fehlt ein Ackwire AI-Tarif.`;
     },
-    button: "agentes.chat-Tarife ansehen",
+    button: "Ackwire AI-Tarife ansehen",
     why: (org) =>
       `Du bekommst diese E-Mail, weil du ${org} auf Ackwire AI leitest. Wir senden nur zwei solche Hinweise.`,
     personal: {
@@ -512,7 +512,7 @@ export const words: EmailWords = {
       body: (agents, _channels, routines) => {
         const a = plural("de", agents, { one: `1 Agent`, other: `${agents} Agenten` });
         const r = plural("de", routines, { one: `1 Routine`, other: `${routines} Routinen` });
-        return `Alles bereit: ${routines > 0 ? `${a} und ${r}` : a}. Es fehlt nur noch ein agentes.chat-Tarif.`;
+        return `Alles bereit: ${routines > 0 ? `${a} und ${r}` : a}. Es fehlt nur noch ein Ackwire AI-Tarif.`;
       },
       why: () =>
         "Du bekommst diese E-Mail, weil dieser Workspace auf Ackwire AI dir gehört. Wir senden nur zwei solche Hinweise.",

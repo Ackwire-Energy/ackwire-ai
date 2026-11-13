@@ -1,4 +1,4 @@
-import { PIXEL_MARK_TONES, PIXEL_MARK_VIEWBOX, pixelMarkRuns } from "@agenteschat/ui/brand/ackwire";
+import { PIXEL_MARK_TONE, PIXEL_MARK_VIEWBOX, pixelMarkRuns } from "@agenteschat/ui/brand/ackwire";
 import Svg, { G, Rect } from "react-native-svg";
 import { useTheme } from "./theme";
 
@@ -6,12 +6,12 @@ import { useTheme } from "./theme";
 const RUNS = pixelMarkRuns();
 
 /**
- * The Ackwire "A" in the app's pixel style, as the web's (`packages/ui` `LogoMark`): three stepped chevrons,
- * each in its tone of Ackwire green. A workspace without a logo of its own wears it.
+ * The Ackwire "A" in the app's pixel style, as the web's (`packages/ui` `LogoMark`): the monogram's three arched
+ * bands in the theme's Ackwire green. A workspace without a logo of its own wears it.
  */
 export function LogoMark({ size }: { size: number }) {
   const { scheme } = useTheme();
-  const tones = PIXEL_MARK_TONES[scheme === "dark" ? "dark" : "light"];
+  const tone = PIXEL_MARK_TONE[scheme === "dark" ? "dark" : "light"];
   return (
     <Svg
       width={size}
@@ -22,7 +22,7 @@ export function LogoMark({ size }: { size: number }) {
     >
       <G shapeRendering="crispEdges">
         {RUNS.map((r) => (
-          <Rect key={`${r.x}:${r.y}`} x={r.x} y={r.y} width={r.w} height={1} fill={tones[r.layer]} />
+          <Rect key={`${r.x}:${r.y}`} x={r.x} y={r.y} width={r.w} height={1} fill={tone} />
         ))}
       </G>
     </Svg>

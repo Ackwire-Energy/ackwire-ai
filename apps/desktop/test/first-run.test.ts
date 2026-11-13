@@ -181,7 +181,7 @@ describe("a link to a server", () => {
       button: "connect",
       leave: null,
     });
-    expect(linkView(link(), ok(BOX), "https://app.agentes.chat")).toMatchObject({ kind: "ask", leave: "Ackwire AI" });
+    expect(linkView(link(), ok(BOX), "https://hub.ackwire.app")).toMatchObject({ kind: "ask", leave: "Ackwire AI" });
     expect(linkView(link(), ok(BOX), BOX)).toEqual({ kind: "front", server: BOX });
   });
 
@@ -197,7 +197,7 @@ describe("a link to a server", () => {
   });
 
   test("a claim: the owner page while the server waits for its owner; ignored once it has one", () => {
-    expect(linkView(link({ claim: CLAIM }), ok(BOX, { ownerClaim: true }), "https://app.agentes.chat")).toEqual({
+    expect(linkView(link({ claim: CLAIM }), ok(BOX, { ownerClaim: true }), "https://hub.ackwire.app")).toEqual({
       kind: "ask",
       server: BOX,
       question: "questionClaim",

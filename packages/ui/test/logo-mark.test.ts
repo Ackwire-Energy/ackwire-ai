@@ -3,7 +3,7 @@ import { expect, test } from "bun:test";
 import { LOGO_MARK } from "../../setup/src/term";
 import { eyeShapes, inBody, toneAt } from "../src/agent/engine.js";
 
-test("the command line's logo is the web's LogoMark: the engine's body, tones and eyes on its 12×12 grid", () => {
+test("the command line's logo is the agent: the engine's body, tones and eyes on a 12×12 grid", () => {
   const eyes = eyeShapes("round");
   const grid = Array.from({ length: 12 }, (_, y) =>
     Array.from({ length: 12 }, (_, x) => {

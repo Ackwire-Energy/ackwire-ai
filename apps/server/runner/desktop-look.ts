@@ -34,7 +34,7 @@ import { xmlEscape, xmlUnescape } from "./xml";
  */
 
 /** Bumped whenever what `lookFiles` writes changes. */
-export const LOOK_VERSION = 8;
+export const LOOK_VERSION = 9;
 
 /** Orchis's light theme (GTK and xfwm4), else GTK's Adwaita and xfwm4's Default. */
 export type LookTheme = "orchis" | "stock";
