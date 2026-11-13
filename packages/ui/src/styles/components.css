@@ -2052,35 +2052,16 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
   font-size: 24px;
   white-space: nowrap;
 }
+/* The pixel "A" in the theme's Ackwire green (--agent: deep on light, Solar Green on dark), the ink in the mono logo.
+   Its 28 cells take 28px at the logo's own 24px, a screen pixel each. */
 .ac-logo__mark {
-  width: 1.3em;
-  height: 1.1em;
+  width: calc(28em / 24);
+  height: calc(28em / 24);
   flex: none;
-}
-/* The pixel "A": each layer in its tone of Ackwire green (PIXEL_MARK_TONES), deep on light, bright on dark. */
-.ac-logo__mark {
-  --logo-1: #2f5f0d;
-  --logo-2: #3f7a12;
-  --logo-3: #5a9a1e;
-}
-[data-theme="dark"] .ac-logo__mark {
-  --logo-1: #b8f582;
-  --logo-2: #90ed42;
-  --logo-3: #6cba2c;
-}
-.ac-logo__px1 {
-  fill: var(--logo-1);
-}
-.ac-logo__px2 {
-  fill: var(--logo-2);
-}
-.ac-logo__px3 {
-  fill: var(--logo-3);
+  fill: var(--agent);
 }
 .ac-logo--mono .ac-logo__mark {
-  --logo-1: currentColor;
-  --logo-2: currentColor;
-  --logo-3: currentColor;
+  fill: currentColor;
 }
 .ac-logo__word {
   display: inline-flex;

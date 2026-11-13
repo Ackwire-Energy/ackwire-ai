@@ -107,12 +107,17 @@ const MARKS = {
 };
 
 /**
- * The sky blue of links, commands and the active marks: SKY_TONES[2] (#2b74e6) in 24-bit, about 4.4:1 on a
- * white terminal and 4.7:1 on a black one; xterm 32 (#0087d7) in 256 colors; the theme's bright blue in 16.
+ * The Ackwire green of links, commands and the active marks: #4c8a17 in 24-bit, between Solar Deep and Solar Green,
+ * about 4.2:1 on a white terminal and 5:1 on a black one; xterm 64 (#5f8700) in 256 colors; the theme's green in 16.
  */
-const ACCENT: Record<Depth, string> = { 24: "38;2;43;116;230", 8: "38;5;32", 4: "94", 1: "" };
-/** The badge: white on the agent blue (#0063d1, 5.7:1), whatever the terminal's background. */
-const BADGE: Record<Depth, string> = { 24: "48;2;0;99;209;97", 8: "48;5;26;38;5;231", 4: "44;97", 1: "" };
+const ACCENT: Record<Depth, string> = { 24: "38;2;76;138;23", 8: "38;5;64", 4: "32", 1: "" };
+/** The badge: Forest Green on Solar Green (#031f1b on #90ed42, 12:1), whatever the terminal's background. */
+const BADGE: Record<Depth, string> = {
+  24: "48;2;144;237;66;38;2;3;31;27",
+  8: "48;5;113;38;5;16",
+  4: "102;30",
+  1: "",
+};
 
 /**
  * The logo's mark: the agent of packages/ui/src/agent/engine.js on the 12×12 grid the web's LogoMark dithers
@@ -135,26 +140,29 @@ export const LOGO_MARK = [
   "0101010100..",
 ];
 
-/** The wordmark: "agentes" in pixels after Funnel Display Light at about 12 px (x-height 6, one-pixel strokes). */
+/** The wordmark: "Ackwire" and "AI" in pixels at about 12 px (capitals 8 high, x-height 6, one-pixel strokes). */
 const GLYPHS: Record<string, string[]> = {
-  a: ["", "", "", ".###.", "....#", ".####", "#...#", "#...#", ".####", "", "", ""],
-  g: ["", "", "", ".####", "#...#", "#...#", "#...#", "#...#", ".####", "....#", ".###.", ""],
+  A: ["", "..#..", ".#.#.", ".#.#.", "#...#", "#...#", "#####", "#...#", "#...#", "", "", ""],
+  I: ["", "###", ".#.", ".#.", ".#.", ".#.", ".#.", ".#.", "###", "", "", ""],
+  c: ["", "", "", ".####", "#....", "#....", "#....", "#....", ".####", "", "", ""],
+  k: ["", "#...", "#...", "#..#", "#.#.", "##..", "#.#.", "#..#", "#..#", "", "", ""],
+  w: ["", "", "", "#...#", "#...#", "#.#.#", "#.#.#", "#.#.#", ".#.#.", "", "", ""],
+  i: ["", "#", "", "#", "#", "#", "#", "#", "#", "", "", ""],
+  r: ["", "", "", "#.##", "##..", "#...", "#...", "#...", "#...", "", "", ""],
   e: ["", "", "", ".###.", "#...#", "#####", "#....", "#....", ".####", "", "", ""],
-  n: ["", "", "", "#.##.", "##..#", "#...#", "#...#", "#...#", "#...#", "", "", ""],
-  t: ["", ".#..", ".#..", "####", ".#..", ".#..", ".#..", ".#..", "..##", "", "", ""],
-  s: ["", "", "", ".####", "#....", ".###.", "....#", "....#", "####.", "", "", ""],
 };
 
-const TONE_RGB = ["0;61;130", "0;99;209", "70;147;232", "140;195;255", "198;225;255", "255;255;255"];
-const TONE_256 = [25, 26, 68, 111, 189, 231];
-/** 16 colors: blue for the deep tones, bright blue for the light ones, bright white for the eyes. */
-const TONE_16 = [4, 4, 12, 12, 12, 15];
+/** The agent's body tones in Ackwire green, deep to light (bodyTones("sky") in the agent engine), then its eyes. */
+const TONE_RGB = ["39;76;12", "63;123;20", "124;184;75", "184;245;130", "220;250;193", "255;255;255"];
+const TONE_256 = [22, 64, 107, 156, 194, 231];
+/** 16 colors: green for the deep tones, bright green for the light ones, bright white for the eyes. */
+const TONE_16 = [2, 2, 10, 10, 10, 15];
 
 /** The SGR parameter for tone `t` (0–4, 5 the eyes) as foreground (38) or background (48). */
 function toneSgr(depth: Depth, t: number, layer: 38 | 48): string {
   if (depth === 24) return `${layer};2;${TONE_RGB[t]}`;
   if (depth === 8) return `${layer};5;${TONE_256[t]}`;
-  const n = TONE_16[t] ?? 4;
+  const n = TONE_16[t] ?? 2;
   return String((layer === 38 ? 30 : 40) + (n >= 8 ? 60 + n - 8 : n));
 }
 
@@ -185,9 +193,25 @@ function wordRows(word: string): string[] {
   return rows;
 }
 
-/** The logo's lines (63 columns): the mark in the sky's dither beside "agentes", ".chat" muted on the baseline. */
+/** One word's rows as half blocks, a line each two rows of pixels. */
+function wordLines(word: string): string[] {
+  const rows = wordRows(word);
+  const lines: string[] = [];
+  for (let y = 0; y < 12; y += 2) {
+    const top = rows[y] as string;
+    const bottom = rows[y + 1] as string;
+    let line = "";
+    for (let x = 0; x < top.length; x++) line += halfBlock(1, top[x] === "#" ? 0 : -1, bottom[x] === "#" ? 0 : -1);
+    lines.push(line);
+  }
+  return lines;
+}
+
+/** The logo's lines (63 columns): the mark in its green dither beside "Ackwire", then "AI" in the accent. */
 export function logoLines(depth: Depth): string[] {
-  const word = wordRows("agentes");
+  const name = wordLines("Ackwire");
+  const ai = wordLines("AI");
+  const reset = depth === 1 ? "" : "\x1b[0m";
   const lines: string[] = [];
   for (let y = 0; y < 12; y += 2) {
     const top = LOGO_MARK[y] as string;
@@ -195,13 +219,10 @@ export function logoLines(depth: Depth): string[] {
     let mark = "";
     for (let x = 0; x < top.length; x++)
       mark += halfBlock(depth, toneOf(top[x] as string), toneOf(bottom[x] as string));
-    const wt = word[y] as string;
-    const wb = word[y + 1] as string;
-    let letters = "";
-    for (let x = 0; x < wt.length; x++) letters += halfBlock(1, wt[x] === "#" ? 0 : -1, wb[x] === "#" ? 0 : -1);
-    const reset = depth === 1 ? "" : "\x1b[0m";
-    const tld = y === 8 ? (depth === 1 ? " .chat" : " \x1b[2m.chat\x1b[0m") : "";
-    lines.push(`  ${mark}${reset}   ${letters.trimEnd()}${tld}`.trimEnd());
+    const second = (ai[y / 2] as string).trimEnd();
+    const accent = depth === 1 ? "" : `\x1b[${ACCENT[depth]}m`;
+    const word = second ? `${name[y / 2]}  ${accent}${second}${reset}` : (name[y / 2] as string).trimEnd();
+    lines.push(word ? `  ${mark}${reset}   ${word}` : `  ${mark}${reset}`);
   }
   return lines;
 }

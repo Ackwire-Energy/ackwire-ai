@@ -44,9 +44,9 @@ t_style() {
   if [ "$T_DEPTH" != 0 ]; then
     C_BOLD="\${E}[1m" C_DIM="\${E}[2m" C_OK="\${E}[32m" C_WARN="\${E}[33m" C_FAIL="\${E}[31m" C_OFF="\${E}[0m"
     case $T_DEPTH in
-      24) C_ACC="\${E}[38;2;43;116;230m" C_BADGE="\${E}[48;2;0;99;209;97m" ;;
-      256) C_ACC="\${E}[38;5;32m" C_BADGE="\${E}[48;5;26;38;5;231m" ;;
-      *) C_ACC="\${E}[94m" C_BADGE="\${E}[44;97m" ;;
+      24) C_ACC="\${E}[38;2;76;138;23m" C_BADGE="\${E}[48;2;144;237;66;38;2;3;31;27m" ;;
+      256) C_ACC="\${E}[38;5;64m" C_BADGE="\${E}[48;5;113;38;5;16m" ;;
+      *) C_ACC="\${E}[32m" C_BADGE="\${E}[102;30m" ;;
     esac
   fi
   T_B=' '
@@ -131,30 +131,31 @@ t_intro() {
   printf '%s\\n' "$T_B" >&"$T_FD"
 }
 
-# The logo. The mark: the agent of packages/ui/src/agent/engine.js on the 12×12 grid of the web's LogoMark,
-# rows of pixels where 0-4 are its body's tones (deep to light), w its eyes and . nothing. Beside it,
-# "agentes" in pixels after Funnel Display Light. Two rows of pixels make one line of ▀▄█.
+# The logo. The mark: the agent of packages/ui/src/agent/engine.js on a 12×12 grid, rows of pixels where 0-4 are
+# its body's tones (deep to light), w its eyes and . nothing. Beside it, "Ackwire" in pixels, then "AI" in the
+# accent. Two rows of pixels make one line of ▀▄█.
 t_logo() {
   printf '\\n' >&"$T_FD"
-  t_row=0
-  set -- ..43434343.. .3333333332. '                         ▄' \\
-    333333333233 232323232223 ' ▄▄▄   ▄▄▄▄  ▄▄▄  ▄ ▄▄  ▄█▄▄  ▄▄▄   ▄▄▄▄' \\
-    3232w23w3222 2222w22w2212 ' ▄▄▄█ █   █ █▄▄▄█ █▀  █  █   █▄▄▄█ ▀▄▄▄' \\
-    2222w22w2122 121212121112 '█   █ █   █ █     █   █  █   █         █' \\
-    212121212111 111111111101 ' ▀▀▀▀  ▀▀▀█  ▀▀▀▀ ▀   ▀   ▀▀  ▀▀▀▀ ▀▀▀▀' \\
-    11111111101. 0101010100.. '       ▀▀▀'
-  while [ $# -ge 3 ]; do
-    t_top=$1 t_bot=$2 t_word=$3
-    shift 3
+  set -- ..43434343.. .3333333332. '  ▄         ▄          ▄           ' '  ▄   ▄▄▄' \\
+    333333333233 232323232223 ' █ █   ▄▄▄▄ █  ▄ ▄   ▄ ▄ ▄ ▄▄  ▄▄▄ ' ' █ █   █' \\
+    3232w23w3222 2222w22w2212 '█   █ █     █▄▀  █ ▄ █ █ █▀   █▄▄▄█' '█   █  █' \\
+    2222w22w2122 121212121112 '█▀▀▀█ █     █ ▀▄ █ █ █ █ █    █    ' '█▀▀▀█  █' \\
+    212121212111 111111111101 '▀   ▀  ▀▀▀▀ ▀  ▀  ▀ ▀  ▀ ▀     ▀▀▀▀' '▀   ▀ ▀▀▀' \\
+    11111111101. 0101010100.. '' ''
+  while [ $# -ge 4 ]; do
+    t_top=$1 t_bot=$2 t_word=$3 t_ai=$4
+    shift 4
     t_line=''
     while [ -n "$t_top" ]; do
       t_cell "\${t_top%"\${t_top#?}"}" "\${t_bot%"\${t_bot#?}"}"
       t_line=$t_line$t_c
       t_top=\${t_top#?} t_bot=\${t_bot#?}
     done
-    t_row=$((t_row + 1))
-    if [ "$t_row" = 5 ]; then t_word="$t_word $C_DIM.chat$C_OFF"; fi
-    printf '  %s%s   %s\\n' "$t_line" "$C_OFF" "$t_word" >&"$T_FD"
+    if [ -n "$t_ai" ]; then
+      printf '  %s%s   %s  %s%s%s\\n' "$t_line" "$C_OFF" "$t_word" "$C_ACC" "$t_ai" "$C_OFF" >&"$T_FD"
+    else
+      printf '  %s%s\\n' "$t_line" "$C_OFF" >&"$T_FD"
+    fi
   done
   printf '\\n' >&"$T_FD"
 }
@@ -194,19 +195,19 @@ t_tone() {
   case $T_DEPTH in
     24)
       case $2 in
-        0) t_n='0;61;130' ;; 1) t_n='0;99;209' ;; 2) t_n='70;147;232' ;; 3) t_n='140;195;255' ;;
-        4) t_n='198;225;255' ;; *) t_n='255;255;255' ;;
+        0) t_n='39;76;12' ;; 1) t_n='63;123;20' ;; 2) t_n='124;184;75' ;; 3) t_n='184;245;130' ;;
+        4) t_n='220;250;193' ;; *) t_n='255;255;255' ;;
       esac
       t_n="$1;2;$t_n"
       ;;
     256)
-      case $2 in 0) t_n=25 ;; 1) t_n=26 ;; 2) t_n=68 ;; 3) t_n=111 ;; 4) t_n=189 ;; *) t_n=231 ;; esac
+      case $2 in 0) t_n=22 ;; 1) t_n=64 ;; 2) t_n=107 ;; 3) t_n=156 ;; 4) t_n=194 ;; *) t_n=231 ;; esac
       t_n="$1;5;$t_n"
       ;;
     *)
-      # Blue for the deep tones, bright blue for the light ones, bright white for the eyes.
+      # Green for the deep tones, bright green for the light ones, bright white for the eyes.
       case $1$2 in
-        380 | 381) t_n=34 ;; 38w) t_n=97 ;; 38?) t_n=94 ;; 480 | 481) t_n=44 ;; 48w) t_n=107 ;; *) t_n=104 ;;
+        380 | 381) t_n=32 ;; 38w) t_n=97 ;; 38?) t_n=92 ;; 480 | 481) t_n=42 ;; 48w) t_n=107 ;; *) t_n=102 ;;
       esac
       ;;
   esac

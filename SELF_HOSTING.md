@@ -579,7 +579,7 @@ computer and opens Ackwire AI, signed in.
   running, start it the way you installed it.
 - **Moving it to a server:** quit the app, dump the database with the app's own copy of the server,
   then follow Moving to Docker (below) from step 2. On a Mac:
-  `BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql`
+  `BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql`
   (on Linux, the deb's `/usr/bin/agentes-runner` in its place).
 
 **Usage statistics.** Like any self-hosted install, it sends Ackwire AI an anonymous usage report

@@ -6,7 +6,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   "run-on-your-computer": {
     title: "Ackwire AI op je eigen computer draaien",
     summary:
-      "De agentes.chat-app kan ook Ackwire AI zelf draaien, op een Mac, een pc of een Linux-computer, voor jou of een klein team.",
+      "De Ackwire AI-app kan ook Ackwire AI zelf draaien, op een Mac, een pc of een Linux-computer, voor jou of een klein team.",
     sections: [
       {
         id: "how",
@@ -130,7 +130,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "own",
         heading: "Je eigen computers en telefoons",
         blocks: [
-          "Agents kunnen ook werken op computers en telefoons die je zelf meebrengt: een Mac of een pc met de agentes.chat-app, een server, een Android-telefoon of een iPhone. Zie [Je computers en telefoons](/help/computers).",
+          "Agents kunnen ook werken op computers en telefoons die je zelf meebrengt: een Mac of een pc met de Ackwire AI-app, een server, een Android-telefoon of een iPhone. Zie [Je computers en telefoons](/help/computers).",
         ],
       },
       {
@@ -160,7 +160,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
     sections: [
       {
         id: "app",
-        heading: "Vanuit de agentes.chat-app",
+        heading: "Vanuit de Ackwire AI-app",
         blocks: [
           "Installeer de app op de computer, open hem en meld je aan bij je werkruimte. Hij vraagt **Agents van <workspace> deze Mac laten gebruiken?** (deze pc op Windows, deze computer op Linux). Kies wie hem mag gebruiken en druk op **Toestaan**. Dat is alles.",
           "Al aangemeld? Zet de werkruimte aan in **Voorkeuren › Algemeen**, in de kaart **Agents**.",
@@ -206,7 +206,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Pauzeren en loskoppelen",
         blocks: [
-          "Op de computer pauzeert het agentes.chat-icoon bij de klok de agents van alle werkruimtes. In **Voorkeuren › Algemeen** pauzeert de schakelaar van elke werkruimte alleen die ene, en **Verlaten** koppelt hem los. Tijdens een pauze start er niets nieuws, en wat al liep, maakt het af. Na het loskoppelen blijven de mappen van de agents op de schijf staan.",
+          "Op de computer pauzeert het Ackwire AI-icoon bij de klok de agents van alle werkruimtes. In **Voorkeuren › Algemeen** pauzeert de schakelaar van elke werkruimte alleen die ene, en **Verlaten** koppelt hem los. Tijdens een pauze start er niets nieuws, en wat al liep, maakt het af. Na het loskoppelen blijven de mappen van de agents op de schijf staan.",
           "Op de website koppel je een apparaat los met **Verwijderen** op de pagina ervan.",
         ],
       },
@@ -248,7 +248,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
   import: {
     title: "Je agents meenemen",
     summary:
-      "Neem agents mee uit een andere app, of uit een andere agentes.chat-werkruimte, met hun instructies, skills, routines en geheugen.",
+      "Neem agents mee uit een andere app, of uit een andere Ackwire AI-werkruimte, met hun instructies, skills, routines en geheugen.",
     sections: [
       {
         id: "comes",
@@ -743,7 +743,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "Bij Tailscale installeer je de Tailscale-app op je telefoon en log je in op dezelfde tailnet.",
-              "Installeer de agentes.chat-app.",
+              "Installeer de Ackwire AI-app.",
               "Scan de QR-code die de installatie toonde, of die in **Instellingen\u00a0›\u00a0Je account\u00a0›\u00a0Openen op je telefoon**, die je ook meteen inlogt.",
             ],
           },
@@ -757,7 +757,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
           },
-          "Meer computers, zoals een Mac met de agentes.chat-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Apparaten**, zoals in [Je computers en telefoons](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
+          "Meer computers, zoals een Mac met de Ackwire AI-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Apparaten**, zoals in [Je computers en telefoons](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
         ],
       },
       {

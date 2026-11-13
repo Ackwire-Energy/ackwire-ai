@@ -6,8 +6,8 @@ import { cx } from "../cx";
 const RUNS = pixelMarkRuns();
 
 /**
- * The Ackwire "A" in the app's pixel style: three stepped chevrons, each in its tone of Ackwire green, or in the ink
- * in the mono logo. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
+ * The Ackwire "A" in the app's pixel style: the monogram's three arched bands, in the theme's Ackwire green, or in
+ * the ink in the mono logo. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
  */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
   return (
@@ -22,7 +22,7 @@ export function LogoMark({ size, className, label }: { size?: number; className?
     >
       <g className="ac-logo__body">
         {RUNS.map((r) => (
-          <rect key={`${r.x}:${r.y}`} className={`ac-logo__px${r.layer + 1}`} x={r.x} y={r.y} width={r.w} height={1} />
+          <rect key={`${r.x}:${r.y}`} x={r.x} y={r.y} width={r.w} height={1} />
         ))}
       </g>
     </svg>

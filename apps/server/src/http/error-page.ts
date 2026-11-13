@@ -47,8 +47,8 @@ export function pageLocale(c: Context): AppLocale {
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch] ?? ch);
 
-/** The app's logo (`Logo` in packages/ui): the pixel "A", each layer in its tone of Ackwire green, then the name. */
-const LOGO = `<span class="logo" role="img" aria-label="${BRAND_NAME}"><svg viewBox="${PIXEL_MARK_VIEWBOX}" shape-rendering="crispEdges" aria-hidden="true">${pixelMarkRects(["p1", "p2", "p3"], "class")}</svg><span aria-hidden="true">Ackwire <span class="ai">AI</span></span></span>`;
+/** The app's logo (`Logo` in packages/ui): the pixel "A" in the theme's Ackwire green, then the name. */
+const LOGO = `<span class="logo" role="img" aria-label="${BRAND_NAME}"><svg viewBox="${PIXEL_MARK_VIEWBOX}" shape-rendering="crispEdges" aria-hidden="true">${pixelMarkRects()}</svg><span aria-hidden="true">Ackwire <span class="ai">AI</span></span></span>`;
 
 const vars = (t: ThemeColors) =>
   `--bg:${t.bg};--raised:${t.raised};--ink:${t.ink};--muted:${t.muted};--faint:${t.faint};--line:${t.line};--agent:${t.agent};--agent2:${t.agent2};--agent-soft:${t.agentSoft}`;
@@ -68,9 +68,7 @@ const CSS = `:root{color-scheme:light dark;${vars(light)};--font-sans:Onest,"Seg
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;min-height:100dvh;display:flex;justify-content:center;padding:96px 16px 34vh;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased}
 .logo{position:absolute;top:24px;left:28px;display:inline-flex;align-items:center;gap:.28em;font-size:24px;font-weight:800;letter-spacing:-.03em;line-height:1}
-.logo svg{width:1.25em;height:1.25em;flex:none}
-.logo .p1{fill:#2f5f0d}.logo .p2{fill:#3f7a12}.logo .p3{fill:#5a9a1e}
-@media (prefers-color-scheme:dark){.logo .p1{fill:#b8f582}.logo .p2{fill:#90ed42}.logo .p3{fill:#6cba2c}}
+.logo svg{width:28px;height:28px;flex:none;fill:var(--agent)}
 .logo .ai{color:var(--agent)}
 main{display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:min(100%,460px);margin:auto 0}
 h1{margin:0;font-size:24px;line-height:30px;font-weight:700;letter-spacing:-.03em;text-wrap:balance}

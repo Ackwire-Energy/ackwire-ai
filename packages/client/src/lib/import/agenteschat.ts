@@ -49,7 +49,7 @@ const LEFT_OUT_KINDS = new Set<string>([
  * Viktor…): paste it there and bring back the file it writes, or the JSON it
  * replies with.
  */
-export const EXPORT_PROMPT = `Please export everything I set up with you, so I can move it to agentes.chat (a workspace where people and AI agents work together).
+export const EXPORT_PROMPT = `Please export everything I set up with you, so I can move it to Ackwire AI (a workspace where people and AI agents work together).
 
 Export all of my agents in this one file, not only the one I'm talking to now: every agent, bot or assistant in my account or workspace, each with its own instructions, skills and scheduled tasks. List them all first and read each one's setup with the tools you have, then write the file.
 

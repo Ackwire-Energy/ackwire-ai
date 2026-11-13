@@ -61,7 +61,7 @@ describe("where a bundle came from", () => {
     const from = (app: string, ref: string) => bundleOrigin(bundle({ source: { app, ref, name: "x", files: [] } }));
     expect(bundleOrigin(bundle())).toEqual({ card: "openclaw", app: "OpenClaw" });
     expect(from("openbotrun", "grok-bot")).toEqual({ card: "openbotrun", app: "OpenBot.run" });
-    expect(from("agenteschat", "agenteschat:org-1")).toEqual({ card: "agenteschat", app: "agentes.chat" });
+    expect(from("agenteschat", "agenteschat:org-1")).toEqual({ card: "agenteschat", app: "Ackwire AI" });
     // The two most used apps that answer the request have cards of their own; the others share Outro app's.
     expect(from("agenteschat", "grok-bot:my-bots")).toEqual({ card: "grok-bot", app: "Grok Bot" });
     expect(from("agenteschat", "chatgpt-dots:my-dot")).toEqual({ card: "chatgpt-dots", app: "ChatGPT dots" });

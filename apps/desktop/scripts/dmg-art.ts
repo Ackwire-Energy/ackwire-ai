@@ -4,7 +4,7 @@
  * CI before `tauri build` on macOS (`bun apps/desktop/scripts/dmg-art.ts`).
  *
  * The window is 660×400 points, the app at (180, 170) and Applications at (480, 170). Finder draws the icons and
- * their names over the picture, black on a light Mac and white on a dark one: the sky under them is a mid blue,
+ * their names over the picture, black on a light Mac and white on a dark one: the sky under them is a mid green,
  * where both read. No text but the wordmark, so it suits any language the Mac is in.
  *
  * Outputs (ignored by git): src-tauri/dmg/background.png (660×400) and background@2x.png (1320×800), joined on
@@ -14,7 +14,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { agent, dither, dottedWordmark, Picture, type RGB, SKY, WHITE } from "./pixel-art";
+import { agent, dither, Picture, type RGB, SKY, WHITE, wordmark } from "./pixel-art";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -74,7 +74,7 @@ function hop(p: Picture, color: RGB, alpha: number, cell = 4) {
 
 function background(k: number): Picture {
   const p = new Picture(W * k, H * k, k);
-  // Deep at the top, two soft light patches, lighter toward the bottom; a mid blue around the icons.
+  // Deep at the top, two soft light patches, lighter toward the bottom; a mid green around the icons.
   dither(
     p,
     SKY,
@@ -102,7 +102,7 @@ function background(k: number): Picture {
   agent(p, 590, 128, 16, false, "amber", 8);
   agent(p, 612, 26, 14, false, "green", 8);
   agent(p, 44, 262, 16, false, "rose", 8);
-  dottedWordmark(p, W / 2, 64, 34);
+  wordmark(p, W / 2, 64, 30);
   hop(p, WHITE, 0.95);
   return p;
 }

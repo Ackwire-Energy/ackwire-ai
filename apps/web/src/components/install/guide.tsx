@@ -52,7 +52,7 @@ export function appImageCommand(url: string): string {
 }
 
 /** What `xattr` clears on a Mac when the button never shows: the mark every browser download carries. */
-export const QUARANTINE_FIX = "xattr -dr com.apple.quarantine /Applications/agentes.chat.app";
+export const QUARANTINE_FIX = 'xattr -dr com.apple.quarantine "/Applications/Ackwire AI.app"';
 /** System Settings › Privacy & Security, scrolled to Security (a Mac's browser asks before it opens it). */
 const MAC_SECURITY = "x-apple.systempreferences:com.apple.preference.security?Security";
 

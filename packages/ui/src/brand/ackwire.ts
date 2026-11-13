@@ -24,37 +24,41 @@ export const ACKWIRE = {
 } as const;
 
 /**
- * The "A" in the app's pixel style: the monogram's three layers as stepped chevrons on a 26×13 grid, each cell the
- * number of its layer (1 the outer, 3 the inner), "." empty. Each layer has its own tone of Ackwire green, brightest
- * outside, as light falls on the agents from above.
+ * The "A" in the app's pixel style: the monogram itself set on a 28×20 grid, its three arched bands with the two
+ * slits between them, joined in the rounded feet. Each cell is the number of its band (1 the outer, with the feet,
+ * 3 the inner), "." empty: the tray icon takes bands out to say a state, everywhere else they are one color.
  */
 export const PIXEL_MARK = [
-  "............11............",
-  "...........1111...........",
-  "..........111111..........",
-  ".........111..111.........",
-  "........111.22.111........",
-  ".......111.2222.111.......",
-  "......111.222222.111......",
-  ".....111.222..222.111.....",
-  "....111.222.33.222.111....",
-  "...111.222.3333.222.111...",
-  "..111.222.333333.222.111..",
-  ".111.222.333..333.222.111.",
-  "111.222.333....333.222.111",
+  "............1111............",
+  "..........11111111..........",
+  ".........111....111.........",
+  "........11........11........",
+  "........11........11........",
+  ".......11...2222...11.......",
+  "......11..22222222..11......",
+  "......11.222....222.11......",
+  ".....11.22........22.11.....",
+  "....11.22..........22.11....",
+  "....11.22...3333...22.11....",
+  "...11.22..33333333..22.11...",
+  "..11.22.3333....3333.22.11..",
+  "..11.22.33........33.22.11..",
+  ".11.22.33..........33.22.11.",
+  "11.22.33............33.22.11",
+  "11111111............11111111",
+  "1111111..............1111111",
+  ".11111................11111.",
+  "..111..................111..",
 ] as const;
 
 /** The pixel mark's grid, and a square box around it, centered (`viewBox`). */
-export const PIXEL_MARK_SIZE = { w: 26, h: 13 } as const;
-export const PIXEL_MARK_VIEWBOX = "0 -6.5 26 26";
+export const PIXEL_MARK_SIZE = { w: 28, h: 20 } as const;
+export const PIXEL_MARK_VIEWBOX = "0 -4 28 28";
 
-/** The three layers' tones per theme, outer to inner: deep enough on white on light, bright on black on dark. */
-export const PIXEL_MARK_TONES = {
-  light: ["#2f5f0d", "#3f7a12", "#5a9a1e"],
-  dark: ["#b8f582", "#90ed42", "#6cba2c"],
-} as const;
+/** The mark's one color per theme, as the monogram's: Solar Green on dark, its deep shade on light. */
+export const PIXEL_MARK_TONE = { light: ACKWIRE.solarDeep, dark: ACKWIRE.solar } as const;
 
-/** One row's run of cells of one layer: `layer` 0 is the outer, 2 the inner. */
+/** One row's run of cells of one band: `layer` 0 is the outer, 2 the inner. */
 export interface PixelRun {
   x: number;
   y: number;
@@ -78,11 +82,12 @@ export function pixelMarkRuns(): PixelRun[] {
 }
 
 /**
- * The pixel mark as SVG elements (for pages without React: the favicon, the error page): `fill` in the given tones
- * (outer to inner), or with `as: "class"` the given class names, for a page whose stylesheet colors them per theme.
+ * The pixel mark as SVG elements (for pages without React: the favicon, the error page), in `fill`, or with none in
+ * the color of the `<svg>` around them, for a page whose stylesheet colors it per theme.
  */
-export function pixelMarkRects(tones: readonly string[], as: "fill" | "class" = "fill"): string {
+export function pixelMarkRects(fill?: string): string {
+  const paint = fill ? ` fill="${fill}"` : "";
   return pixelMarkRuns()
-    .map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="1" ${as}="${tones[r.layer]}"/>`)
+    .map((r) => `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="1"${paint}/>`)
     .join("");
 }

@@ -7,7 +7,7 @@ import type { EmailWords } from "./index";
  * forms with `plural("nl", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) => (host ? atHost("Verstuurd door de agentes.chat-server", "op", host) : "Verstuurd door Ackwire AI."),
+  sentBy: (host) => (host ? atHost("Verstuurd door de Ackwire AI-server", "op", host) : "Verstuurd door Ackwire AI."),
   fallback: "Werkt de knop niet? Kopieer dit adres naar je browser:",
   role: { owner: "eigenaar", member: "lid" },
   anAgent: "Een agent",
@@ -364,7 +364,7 @@ export const words: EmailWords = {
     },
   },
   appConnected: {
-    subject: "Er is een app gekoppeld aan je agentes.chat-account",
+    subject: "Er is een app gekoppeld aan je Ackwire AI-account",
     preheader: "Hij kan in één werkruimte namens jou lezen en taken naar agents sturen.",
     headline: "Er is een app gekoppeld",
     body: (app, org) => [{ b: app }, " heeft nu toegang tot je account in ", { b: org }, "."],
@@ -378,7 +378,7 @@ export const words: EmailWords = {
     },
   },
   accountDeleting: {
-    subject: (day) => `Je agentes.chat-account wordt op ${day} verwijderd`,
+    subject: (day) => `Je Ackwire AI-account wordt op ${day} verwijderd`,
     preheader: "Je hebt 7 dagen om van gedachten te veranderen.",
     headline: "Je account wordt verwijderd",
     body: (email, day, time) => [
@@ -399,7 +399,7 @@ export const words: EmailWords = {
     why: "Je krijgt deze e-mail omdat dit adres een account heeft op Ackwire AI.",
   },
   accountDeleted: {
-    subject: "Je agentes.chat-account is verwijderd",
+    subject: "Je Ackwire AI-account is verwijderd",
     preheader: "Het is overal uitgelogd en kan niet meer inloggen.",
     headline: "Je account is verwijderd",
     body: (email) => ["We hebben het account ", { b: email }, " verwijderd."],
@@ -494,17 +494,17 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Je team wacht",
-    preheader: "Je werkruimte is klaar. Er is een agentes.chat-abonnement nodig om te beginnen.",
+    preheader: "Je werkruimte is klaar. Er is een Ackwire AI-abonnement nodig om te beginnen.",
     headline: "Je team wacht",
     body: (agents, channels, routines) => {
       const a = plural("nl", agents, { one: `1 agent`, other: `${agents} agents` });
       const c = plural("nl", channels, { one: `1 kanaal`, other: `${channels} kanalen` });
       const r = plural("nl", routines, { one: `1 routine`, other: `${routines} routines` });
       return routines > 0
-        ? `${a}, ${c} en ${r} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`
-        : `${a} en ${c} staan klaar. Er is een agentes.chat-abonnement nodig om te beginnen.`;
+        ? `${a}, ${c} en ${r} staan klaar. Er is een Ackwire AI-abonnement nodig om te beginnen.`
+        : `${a} en ${c} staan klaar. Er is een Ackwire AI-abonnement nodig om te beginnen.`;
     },
-    button: "agentes.chat-abonnementen bekijken",
+    button: "Ackwire AI-abonnementen bekijken",
     why: (org) =>
       `Je krijgt deze e-mail omdat je ${org} beheert op Ackwire AI. We sturen maar twee van deze berichten.`,
     personal: {
@@ -513,7 +513,7 @@ export const words: EmailWords = {
       body: (agents, _channels, routines) => {
         const a = plural("nl", agents, { one: `1 agent`, other: `${agents} agents` });
         const r = plural("nl", routines, { one: `1 routine`, other: `${routines} routines` });
-        return `Klaar: ${routines > 0 ? `${a} en ${r}` : a}. Alleen een agentes.chat-abonnement ontbreekt nog.`;
+        return `Klaar: ${routines > 0 ? `${a} en ${r}` : a}. Alleen een Ackwire AI-abonnement ontbreekt nog.`;
       },
       why: () =>
         "Je krijgt deze e-mail omdat deze werkruimte op Ackwire AI van jou is. We sturen maar twee van deze berichten.",
