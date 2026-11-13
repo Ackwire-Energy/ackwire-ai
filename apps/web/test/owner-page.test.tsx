@@ -110,7 +110,7 @@ describe("signing in", () => {
     await type(screen().getByRole("textbox", { name: "E-mail" }), "ana@acme.com");
     await click(screen().getByRole("button", { name: /^Continuar(?! com)/ }));
     await settle(4);
-    expect(heading()).toBe("Esta conta entra pelo app do agentes.chat.");
+    expect(heading()).toBe("Esta conta entra pelo app do Ackwire AI.");
     expect(document.querySelector(".auth__lead")?.textContent).toBe(
       "No computador onde este servidor roda, abra o app e escolha Adicionar uma senha em Configurações\u00a0›\u00a0Sua conta.",
     );

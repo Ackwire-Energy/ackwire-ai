@@ -89,15 +89,15 @@ const organizationOnly = (call: { tool: string; scope: string }) =>
 export function appMissMessage(target: string, miss: AppTokenMiss | "no_app" | "account_only"): string {
   switch (miss) {
     case "not_installed":
-      return `The agentes.chat GitHub app isn't installed on ${target} for this workspace, so GitHub can't be reached there. Tell the person: an admin adds ${target} to the app in Settings › Connectors › GitHub repositories (Manage on GitHub).`;
+      return `The Ackwire AI GitHub app isn't installed on ${target} for this workspace, so GitHub can't be reached there. Tell the person: an admin adds ${target} to the app in Settings › Connectors › GitHub repositories (Manage on GitHub).`;
     case "refused":
-      return `GitHub didn't let the agentes.chat app do this on ${target}: its installation there hasn't granted that permission. Tell the person: an admin accepts the app's new permissions on GitHub (Settings › Connectors › GitHub repositories › Manage on GitHub), or connects a GitHub account in Settings › Connectors, and agents then do it as that account.`;
+      return `GitHub didn't let the Ackwire AI app do this on ${target}: its installation there hasn't granted that permission. Tell the person: an admin accepts the app's new permissions on GitHub (Settings › Connectors › GitHub repositories › Manage on GitHub), or connects a GitHub account in Settings › Connectors, and agents then do it as that account.`;
     case "unreachable":
       return `GitHub didn't answer about ${target}. Nothing was done: try again in a moment.`;
     case "account_only":
-      return "This needs a GitHub account: the agentes.chat app can't do it. Tell the person: an admin connects a GitHub account in Settings › Connectors.";
+      return "This needs a GitHub account: the Ackwire AI app can't do it. Tell the person: an admin connects a GitHub account in Settings › Connectors.";
     case "no_app":
-      return "GitHub reaches this workspace only through the agentes.chat GitHub app, and this server has no app now. Tell the person: the server's owner sets the app up again in Settings › Connectors, or an admin connects a GitHub account there.";
+      return "GitHub reaches this workspace only through the Ackwire AI GitHub app, and this server has no app now. Tell the person: the server's owner sets the app up again in Settings › Connectors, or an admin connects a GitHub account there.";
   }
 }
 

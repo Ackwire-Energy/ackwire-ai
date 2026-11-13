@@ -8,34 +8,32 @@ import type { EmailWords } from "./index";
  */
 export const words: EmailWords = {
   sentBy: (host) =>
-    host
-      ? atHost("agentes.chat sunucusu tarafından gönderildi.", "Sunucu:", host)
-      : "agentes.chat tarafından gönderildi.",
+    host ? atHost("Ackwire AI sunucusu tarafından gönderildi.", "Sunucu:", host) : "Ackwire AI tarafından gönderildi.",
   fallback: "Düğme çalışmıyor mu? Bu adresi tarayıcınıza kopyalayın:",
   role: { owner: "sahip", member: "üye" },
   anAgent: "Bir ajan",
   someone: "Biri",
   verify: {
-    subject: "agentes.chat için e-postanızı onaylayın",
+    subject: "Ackwire AI için e-postanızı onaylayın",
     preheader: "Bu adresi onaylamak için tek tık yeterli. Bağlantı bir saat geçerli.",
     headline: "E-postanızı onaylayın",
     body: "Son bir adım kaldı: bu adresin size ait olduğunu onaylayın.",
     button: "E-postayı onayla",
     small: "Bağlantı bir saat geçerli. Kaydolan siz değilseniz bu e-postayı yok sayabilirsiniz.",
-    why: "Bu e-postayı, bu adresle agentes.chat'e kaydolunduğu için aldınız.",
+    why: "Bu e-postayı, bu adresle Ackwire AI'e kaydolunduğu için aldınız.",
   },
   reset: {
-    subject: "agentes.chat şifrenizi sıfırlayın",
+    subject: "Ackwire AI şifrenizi sıfırlayın",
     preheader: "Yeni bir şifre belirleyin. Bağlantı bir saat geçerli.",
     headline: "Yeni bir şifre belirleyin",
     body: "Bu adresin şifresini sıfırlamak için bir istek aldık.",
     button: "Yeni şifre belirle",
     note: "Bunu siz istemediniz mi? Bu e-postayı yok sayın. Şifreniz aynı kalır.",
     small: "Bağlantı bir saat geçerli.",
-    why: "Bu e-postayı, biri agentes.chat'te bu adresin şifresini sıfırlamak istediği için aldınız.",
+    why: "Bu e-postayı, biri Ackwire AI'te bu adresin şifresini sıfırlamak istediği için aldınız.",
   },
   invitation: {
-    subject: "agentes.chat'te bir çalışma alanına davet edildiniz",
+    subject: "Ackwire AI'te bir çalışma alanına davet edildiniz",
     preheader: "Bu e-posta adresiyle 7 gün içinde kabul edin.",
     headline: "Bir çalışma alanına davet edildiniz",
     body: (inviter, email, org, role) =>
@@ -47,7 +45,7 @@ export const words: EmailWords = {
             ` çalışma alanına ${role} olarak davet etti.`,
           ]
         : [{ b: org }, ` çalışma alanına ${role} olarak davet edildiniz.`],
-    what: "agentes.chat, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
+    what: "Ackwire AI, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Davet notu: " }, `“${note}”`],
     button: "Daveti kabul et",
     small: "Davet 7 gün geçerli. Bu e-posta adresiyle kabul edin.",
@@ -56,8 +54,8 @@ export const words: EmailWords = {
     personal: {
       body: (inviter, email) =>
         inviter
-          ? [{ b: inviter }, `${email ? ` (${email})` : ""} sizi agentes.chat'teki kişisel çalışma alanına davet etti.`]
-          : "agentes.chat'te kişisel bir çalışma alanına davet edildiniz.",
+          ? [{ b: inviter }, `${email ? ` (${email})` : ""} sizi Ackwire AI'teki kişisel çalışma alanına davet etti.`]
+          : "Ackwire AI'te kişisel bir çalışma alanına davet edildiniz.",
       why: () =>
         "Bu e-postayı, biri bu adresi kendi kişisel çalışma alanına davet ettiği için aldınız. Bu kişiyi tanımıyorsanız yok sayın. Siz kabul edene kadar hiçbir şey olmaz.",
     },
@@ -96,29 +94,29 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "agentes.chat bekleme listesindeki yerinizi onaylayın",
+    subject: "Ackwire AI bekleme listesindeki yerinizi onaylayın",
     preheader: "Tek tıkla yeriniz ayrılır.",
     headline: "Listedeki yerinizi onaylayın",
     body: (email) =>
       email
-        ? [{ b: email }, " adresini agentes.chat bekleme listesine eklemek için bir istek aldık."]
-        : "Bu adresi agentes.chat bekleme listesine eklemek için bir istek aldık.",
+        ? [{ b: email }, " adresini Ackwire AI bekleme listesine eklemek için bir istek aldık."]
+        : "Bu adresi Ackwire AI bekleme listesine eklemek için bir istek aldık.",
     approve: "Burada önemli hiçbir şey bir kişi onaylamadan olmaz. Bu istek de öyle.",
     button: "E-postamı onayla",
     small:
       "Bağlantı 48 saat geçerli. Siz değil miydiniz? Bu e-postayı yok sayın. Tıklamazsanız adres listeye hiç eklenmez.",
-    why: "Bu e-postayı, bu adres agentes.chat bekleme listesine yazıldığı için aldınız.",
+    why: "Bu e-postayı, bu adres Ackwire AI bekleme listesine yazıldığı için aldınız.",
   },
   earlyAccess: {
-    subject: "agentes.chat davetiniz geldi",
+    subject: "Ackwire AI davetiniz geldi",
     preheader: (days) => `Bu e-posta adresiyle ${days} gün içinde hesabınızı oluşturun.`,
     headline: "Erişiminiz hazır",
-    body: (email) => [{ b: email }, " artık agentes.chat'te bir hesap ve bir çalışma alanı oluşturabilir."],
-    what: "agentes.chat, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
+    body: (email) => [{ b: email }, " artık Ackwire AI'te bir hesap ve bir çalışma alanı oluşturabilir."],
+    what: "Ackwire AI, kişilerin ve yapay zeka ajanlarının birlikte çalıştığı yer.",
     button: "Hesabımı oluştur",
     small: (days) =>
       `Bağlantı ${days} gün boyunca ve yalnızca bu adres için geçerli. Bir şifreyle ya da aynı adresle Google, GitHub veya Apple üzerinden kaydolun.`,
-    why: "Bu e-postayı, bu adres agentes.chat bekleme listesinde olduğu ya da agentes.chat'e davet edildiği için aldınız. Siz kaydolana kadar hiçbir şey olmaz.",
+    why: "Bu e-postayı, bu adres Ackwire AI bekleme listesinde olduğu ya da Ackwire AI'e davet edildiği için aldınız. Siz kaydolana kadar hiçbir şey olmaz.",
   },
   earlyAccessAllowed: {
     subject: "Artık kendi çalışma alanınızı oluşturabilirsiniz",
@@ -127,10 +125,10 @@ export const words: EmailWords = {
     body: (email) => [
       "Artık mevcut hesabınız ",
       { b: email },
-      " ile agentes.chat'te kendi çalışma alanınızı oluşturabilirsiniz.",
+      " ile Ackwire AI'te kendi çalışma alanınızı oluşturabilirsiniz.",
     ],
     button: "Çalışma alanımı oluştur",
-    why: "Bu e-postayı, bu hesaba agentes.chat'e erken erişim verildiği için aldınız.",
+    why: "Bu e-postayı, bu hesaba Ackwire AI'e erken erişim verildiği için aldınız.",
   },
   budget: {
     subject: {
@@ -215,7 +213,7 @@ export const words: EmailWords = {
     },
     button: { ai: "Yapay zekayı bağla", task: "İlk görevi ver", create: "Ajan oluştur" },
     why: (org) =>
-      `Bu e-postayı, agentes.chat'teki ${org} çalışma alanının sahibi olduğunuz için aldınız. Bu bilgisayarla ilgili gönderilen tek e-posta bu.`,
+      `Bu e-postayı, Ackwire AI'teki ${org} çalışma alanının sahibi olduğunuz için aldınız. Bu bilgisayarla ilgili gönderilen tek e-posta bu.`,
     personal: {
       body: () =>
         "Beklediğiniz için teşekkürler. Ajanlarınızın bilgisayarı açık ve kurulu, her ajan için ayrı bir kullanıcısı var. Gece gündüz açık kalır, böylece ajanlarınız her an çalışabilir.",
@@ -223,7 +221,7 @@ export const words: EmailWords = {
         task: ["İlk görevi verin.", "Ajanlarınızdan biriyle bir konuşma açın ve neye ihtiyacınız olduğunu söyleyin."],
       },
       why: () =>
-        "Bu e-postayı, agentes.chat'teki bu çalışma alanı size ait olduğu için aldınız. Bu bilgisayarla ilgili gönderilen tek e-posta bu.",
+        "Bu e-postayı, Ackwire AI'teki bu çalışma alanı size ait olduğu için aldınız. Bu bilgisayarla ilgili gönderilen tek e-posta bu.",
     },
   },
   joinRequest: {
@@ -273,7 +271,7 @@ export const words: EmailWords = {
       small: "Bir yanlışlık olduğunu düşünüyorsanız oradan birinden sizi e-postayla davet etmesini isteyin.",
     },
     why: (org) =>
-      `Bu e-postayı, bu adresle agentes.chat'te ${org} çalışma alanına katılma isteği gönderildiği için aldınız.`,
+      `Bu e-postayı, bu adresle Ackwire AI'te ${org} çalışma alanına katılma isteği gönderildiği için aldınız.`,
     personal: {
       joined: { body: (who) => `${who} isteğinizi onayladı. Artık onun çalışma alanındasınız.` },
       invited: { body: (who) => `${who}, kendi çalışma alanına katılma isteğinizi onayladı.` },
@@ -283,27 +281,27 @@ export const words: EmailWords = {
         small: "Bir yanlışlık olduğunu düşünüyorsanız bu kişiden sizi e-postayla davet etmesini isteyin.",
       },
       why: () =>
-        "Bu e-postayı, bu adresle agentes.chat'te kişisel bir çalışma alanına katılma isteği gönderildiği için aldınız.",
+        "Bu e-postayı, bu adresle Ackwire AI'te kişisel bir çalışma alanına katılma isteği gönderildiği için aldınız.",
     },
   },
   joinCode: {
-    subject: (code) => `agentes.chat kodunuz: ${code}`,
+    subject: (code) => `Ackwire AI kodunuz: ${code}`,
     preheader: "Katılma isteği göndermek için sayfaya yazın. 10 dakika geçerli.",
     headline: "Kodunuz",
     body: (org) => [{ b: org }, " çalışma alanına katılma isteği göndermek için bu kodu sayfaya yazın."],
     small: ["10 dakika geçerli. Siz istemediyseniz ", { nobr: "bu e-postayı yok sayın." }],
     why: (org) =>
-      `Bu e-postayı, biri agentes.chat'te ${org} çalışma alanına katılmak için bu adresi yazdığı için aldınız.`,
+      `Bu e-postayı, biri Ackwire AI'te ${org} çalışma alanına katılmak için bu adresi yazdığı için aldınız.`,
     personal: {
       body: () => "Bu çalışma alanına katılma isteği göndermek için bu kodu sayfaya yazın.",
       why: () =>
-        "Bu e-postayı, biri agentes.chat'te kişisel bir çalışma alanına katılmak için bu adresi yazdığı için aldınız.",
+        "Bu e-postayı, biri Ackwire AI'te kişisel bir çalışma alanına katılmak için bu adresi yazdığı için aldınız.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `Çalışma alanı silme kodunuz: ${code}`,
     subjectAccount: (code) => `Hesabınızın tamamını silme kodunuz: ${code}`,
-    preheader: "Onaylamak için agentes.chat'e yazın. 10 dakika geçerli.",
+    preheader: "Onaylamak için Ackwire AI'e yazın. 10 dakika geçerli.",
     headline: "Kodunuz",
     workspace: (org) => [
       { b: org },
@@ -321,8 +319,8 @@ export const words: EmailWords = {
     noSupport:
       "10 dakika geçerli ve bu kod olmadan hiçbir şey silinmez. Bu siz değilseniz kodu kimseyle paylaşmayın ve bu sunucuyu yönetenlere haber verin.",
     whyWorkspace: (org) =>
-      `Bu e-postayı, hesabınızdan agentes.chat'te ${org} çalışma alanının silinmesi istendiği için aldınız.`,
-    whyAccount: "Bu e-postayı, hesabınızdan agentes.chat'te hesabın silinmesi istendiği için aldınız.",
+      `Bu e-postayı, hesabınızdan Ackwire AI'te ${org} çalışma alanının silinmesi istendiği için aldınız.`,
+    whyAccount: "Bu e-postayı, hesabınızdan Ackwire AI'te hesabın silinmesi istendiği için aldınız.",
     personal: {
       workspace: (org) => [
         { b: org },
@@ -343,10 +341,10 @@ export const words: EmailWords = {
     owner: "Fikrinizi mi değiştirdiniz? O zamana kadar geri yükleyin.",
     button: "Çalışma alanını geri yükle",
     member: "Bir yanlışlık varsa bir sahipten geri yüklemesini isteyin.",
-    why: (org) => `Bu e-postayı, agentes.chat'te ${org} çalışma alanında bulunduğunuz için aldınız.`,
+    why: (org) => `Bu e-postayı, Ackwire AI'te ${org} çalışma alanında bulunduğunuz için aldınız.`,
     personal: {
       member: "Bir yanlışlık varsa silen kişiden geri yüklemesini isteyin.",
-      why: () => "Bu e-postayı, agentes.chat'teki bu çalışma alanında bulunduğunuz için aldınız.",
+      why: () => "Bu e-postayı, Ackwire AI'teki bu çalışma alanında bulunduğunuz için aldınız.",
     },
   },
   restored: {
@@ -355,28 +353,28 @@ export const words: EmailWords = {
     headline: "Çalışma alanı geri geldi",
     body: (by, org) => [{ b: by }, ", ", { b: org }, " çalışma alanını geri yükledi. Yeniden çalışıyor."],
     button: "Çalışma alanını aç",
-    why: (org) => `Bu e-postayı, agentes.chat'te ${org} çalışma alanında bulunduğunuz için aldınız.`,
+    why: (org) => `Bu e-postayı, Ackwire AI'te ${org} çalışma alanında bulunduğunuz için aldınız.`,
     personal: {
-      why: () => "Bu e-postayı, agentes.chat'teki bu çalışma alanında bulunduğunuz için aldınız.",
+      why: () => "Bu e-postayı, Ackwire AI'teki bu çalışma alanında bulunduğunuz için aldınız.",
     },
   },
   appConnected: {
-    subject: "agentes.chat hesabınıza bir uygulama bağlandı",
+    subject: "Ackwire AI hesabınıza bir uygulama bağlandı",
     preheader: "Bir çalışma alanında sizin adınıza okuyabilir ve ajanlara görev gönderebilir.",
     headline: "Bir uygulama bağlandı",
     body: (app, org) => [{ b: app }, " artık ", { b: org }, " çalışma alanındaki hesabınıza erişebiliyor."],
     note: "Siz bağlamadınız mı? Hemen bağlantısını kesin ve şifrenizi değiştirin.",
     button: "Bağlı uygulamaları gör",
     why: (org) =>
-      `Bu e-postayı, agentes.chat'te ${org} çalışma alanındaki hesabınıza bir uygulama bağlandığı için aldınız.`,
+      `Bu e-postayı, Ackwire AI'te ${org} çalışma alanındaki hesabınıza bir uygulama bağlandığı için aldınız.`,
     personal: {
       body: (app) => [{ b: app }, " artık kişisel çalışma alanınızdaki hesabınıza erişebiliyor."],
       why: () =>
-        "Bu e-postayı, agentes.chat'teki kişisel çalışma alanınızda hesabınıza bir uygulama bağlandığı için aldınız.",
+        "Bu e-postayı, Ackwire AI'teki kişisel çalışma alanınızda hesabınıza bir uygulama bağlandığı için aldınız.",
     },
   },
   accountDeleting: {
-    subject: (day) => `agentes.chat hesabınız ${day} tarihinde silinecek`,
+    subject: (day) => `Ackwire AI hesabınız ${day} tarihinde silinecek`,
     preheader: "Fikrinizi değiştirmek için 7 gününüz var.",
     headline: "Hesabınız siliniyor",
     body: (email, day, time) => [
@@ -393,10 +391,10 @@ export const words: EmailWords = {
     ],
     undo: "Fikrinizi mi değiştirdiniz? Bu tarihten önce giriş yapın ve Geri yükle düğmesine basın.",
     button: "Giriş yap ve geri yükle",
-    why: "Bu e-postayı, bu adresin agentes.chat’te bir hesabı olduğu için aldınız.",
+    why: "Bu e-postayı, bu adresin Ackwire AI’te bir hesabı olduğu için aldınız.",
   },
   accountDeleted: {
-    subject: "agentes.chat hesabınız silindi",
+    subject: "Ackwire AI hesabınız silindi",
     preheader: "Her yerde oturumu kapatıldı ve bir daha giriş yapılamaz.",
     headline: "Hesabınız silindi",
     body: (email) => [{ b: email }, " hesabını sildik."],
@@ -410,7 +408,7 @@ export const words: EmailWords = {
     ],
     support: (address) => ["Bu siz değilseniz ", { mail: address }, " adresine yazın."],
     noSupport: "Bu siz değilseniz bu sunucuyu yönetenlere haber verin.",
-    why: "Bu e-postayı, bu adresin agentes.chat'te bir hesabı olduğu için aldınız.",
+    why: "Bu e-postayı, bu adresin Ackwire AI'te bir hesabı olduğu için aldınız.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `${day} tarihinde ajanlar: ${stalls} takılma, ${noise} boşa çalışma`,
@@ -490,29 +488,29 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Ekibin bekliyor",
-    preheader: "Çalışma alanın hazır. Başlamak için bir agentes.chat planı gerekiyor.",
+    preheader: "Çalışma alanın hazır. Başlamak için bir Ackwire AI planı gerekiyor.",
     headline: "Ekibin bekliyor",
     body: (agents, channels, routines) => {
       const a = plural("tr", agents, { one: `1 ajan`, other: `${agents} ajan` });
       const c = plural("tr", channels, { one: `1 kanal`, other: `${channels} kanal` });
       const r = plural("tr", routines, { one: `1 rutin`, other: `${routines} rutin` });
       return routines > 0
-        ? `${a}, ${c} ve ${r} hazır. Başlamak için bir agentes.chat planı gerekiyor.`
-        : `${a} ve ${c} hazır. Başlamak için bir agentes.chat planı gerekiyor.`;
+        ? `${a}, ${c} ve ${r} hazır. Başlamak için bir Ackwire AI planı gerekiyor.`
+        : `${a} ve ${c} hazır. Başlamak için bir Ackwire AI planı gerekiyor.`;
     },
-    button: "agentes.chat planlarını gör",
+    button: "Ackwire AI planlarını gör",
     why: (org) =>
-      `Bu e-postayı agentes.chat üzerinde ${org} alanını yönettiğin için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.`,
+      `Bu e-postayı Ackwire AI üzerinde ${org} alanını yönettiğin için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.`,
     personal: {
       subject: "Ajanların bekliyor",
       headline: "Ajanların bekliyor",
       body: (agents, _channels, routines) => {
         const a = plural("tr", agents, { one: `1 ajan`, other: `${agents} ajan` });
         const r = plural("tr", routines, { one: `1 rutin`, other: `${routines} rutin` });
-        return `Hazır: ${routines > 0 ? `${a} ve ${r}` : a}. Eksik olan tek şey bir agentes.chat planı.`;
+        return `Hazır: ${routines > 0 ? `${a} ve ${r}` : a}. Eksik olan tek şey bir Ackwire AI planı.`;
       },
       why: () =>
-        "Bu e-postayı, agentes.chat'teki bu çalışma alanı sana ait olduğu için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.",
+        "Bu e-postayı, Ackwire AI'teki bu çalışma alanı sana ait olduğu için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.",
     },
   },
 };

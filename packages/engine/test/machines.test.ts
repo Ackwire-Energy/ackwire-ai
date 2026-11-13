@@ -1176,7 +1176,7 @@ describe("tools on a connected machine", () => {
     const out = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(out).toMatchObject({ isError: true });
     expect(out.content).toContain(
-      "Commands are turned off on the computer Ana's Mac: you can only read, write, list and upload files there. Tell the people: only the person at Ana's Mac can turn commands on, in the agentes.chat app there (Preferences › Tools, Commands).",
+      "Commands are turned off on the computer Ana's Mac: you can only read, write, list and upload files there. Tell the people: only the person at Ana's Mac can turn commands on, in the Ackwire AI app there (Preferences › Tools, Commands).",
     );
     expect(out.content).not.toContain("--no-exec");
     await f.db.update(schema.machines).set({ os: "linux" }).where(eq(schema.machines.id, paired.machineId));

@@ -37,7 +37,7 @@ export const strings: Partial<PushStrings> = {
   browserHandoffBody: "タップして画面を開く",
   desktopHandoffTitle: (a) => `${a} がコンピューターであなたの助けを求めています`,
   desktopHandoffReminderTitle: (a) => `${a} がまだコンピューターであなたを待っています`,
-  desktopHandoffBody: "パソコンで agentes.chat を開いて手伝ってください。",
+  desktopHandoffBody: "パソコンで Ackwire AI を開いて手伝ってください。",
   secretTitle: (a) => `${a} がシークレットの入力を求めています`,
   secretBody: "タップして安全に送信",
   widgetAlertTitle: (a, w) => (w ? `${a}: ${w}` : `${a} がウィジェットでアラートを出しました`),

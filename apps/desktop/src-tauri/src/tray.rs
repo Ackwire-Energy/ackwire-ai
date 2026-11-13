@@ -60,7 +60,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             }
         })
         .build(app)?;
-    // Off until the popover says (`tray_visible`): with agentes.chat nothing of this computer shows.
+    // Off until the popover says (`tray_visible`): with Ackwire AI nothing of this computer shows.
     tray.set_visible(false)?;
     Ok(())
 }

@@ -160,7 +160,7 @@ describe("the look's pieces", () => {
     const run = (call: string) =>
       spawnSync("sh", ["-c", `${TERM_SH}\nt_init 1; T_FRAME=1 T_COLS=40 T_FOLD=1; ${call}`], { encoding: "utf8" });
     const intro = run('t_intro "install plan (--plan: nothing runs)"');
-    expect(intro.stdout).toBe("┌  agentes.chat install plan (--plan:\n│  nothing runs)\n│\n");
+    expect(intro.stdout).toBe("┌  Ackwire AI install plan (--plan:\n│  nothing runs)\n│\n");
     const said = "Nothing ran. For the setup's own plan, run its command above with --dry-run.";
     const end = run(`T_OPEN=1; t_style; t_end "${said}"`).stdout.trimEnd().split("\n");
     expect(end[0]).toStartWith("└  Nothing ran.");
@@ -198,13 +198,13 @@ describe("what each terminal gets", () => {
   test("24-bit color: the logo, the badge on the agent blue, the line and the marks", () => {
     const { term, screen, text } = capture({ depth: 24 });
     steps(term);
-    expect(text()).toContain("\x1b[48;2;0;99;209;97m agentes.chat \x1b[0m setup");
+    expect(text()).toContain("\x1b[48;2;0;99;209;97m Ackwire AI \x1b[0m setup");
     expect(screen()).toBe(
       [
         "",
         ...logoLines(24).map((line) => line.replace(COLORS, "")),
         "",
-        "┌   agentes.chat  setup",
+        "┌   Ackwire AI  setup",
         "│",
         "│  Setting up in /opt/agentes.",
         "◇  Docker 27.3.1",
@@ -229,7 +229,7 @@ describe("what each terminal gets", () => {
     // Only the cursor moves a wait needs: no color, bold or dim.
     expect(text().match(COLORS)).toBeNull();
     expect(text()).toContain("████ ██ ████");
-    expect(text()).toContain("┌  agentes.chat setup\n│\n");
+    expect(text()).toContain("┌  Ackwire AI setup\n│\n");
     expect(text()).toContain("◇  Docker 27.3.1");
   });
 
@@ -237,7 +237,7 @@ describe("what each terminal gets", () => {
     const { term, screen } = capture({ depth: 4, unicode: false });
     steps(term);
     expect(screen()).toStartWith(
-      "+   agentes.chat  setup\n|\n|  Setting up in /opt/agentes.\no  Docker 27.3.1\n|\n*  Create",
+      "+   Ackwire AI  setup\n|\n|  Setting up in /opt/agentes.\no  Docker 27.3.1\n|\n*  Create",
     );
     expect(screen()).toContain("!  Agents' computer");
     expect(screen()).toContain("x  It failed.\n|  Fix it.\n+  Stopped");
@@ -248,7 +248,7 @@ describe("what each terminal gets", () => {
     steps(term);
     expect(text()).toBe(
       [
-        "agentes.chat setup",
+        "Ackwire AI setup",
         "   Setting up in /opt/agentes.",
         "◇  Docker 27.3.1",
         "",
@@ -273,7 +273,7 @@ describe("what each terminal gets", () => {
     framed.term.refuse("Download failed: 404 https://x.test/runner/agentes-runner.mjs");
     framed.term.stop();
     expect(framed.screen()).toBe(
-      "┌   agentes.chat  update\n│\n■  Download failed: 404 https://x.test/runner/agentes-runner.mjs\n└  Stopped\n",
+      "┌   Ackwire AI  update\n│\n■  Download failed: 404 https://x.test/runner/agentes-runner.mjs\n└  Stopped\n",
     );
     expect(framed.keys.raw).toBe(false);
     expect(framed.errors()).toBe("");
@@ -283,7 +283,7 @@ describe("what each terminal gets", () => {
     log.term.spin("Downloading the runner");
     log.term.refuse("Download failed: 404 https://x.test/runner/agentes-runner.mjs");
     log.term.stop();
-    expect(log.text()).toBe("agentes.chat update\n◒  Downloading the runner\n");
+    expect(log.text()).toBe("Ackwire AI update\n◒  Downloading the runner\n");
     expect(log.errors()).toBe("■  Download failed: 404 https://x.test/runner/agentes-runner.mjs\n");
   });
 
@@ -292,7 +292,7 @@ describe("what each terminal gets", () => {
     term.intro("install plan (--plan: nothing runs)", false);
     term.end("Nothing ran. For the setup's own plan, run its command above with --dry-run.");
     const lines = screen().trimEnd().split("\n");
-    expect(lines.slice(0, 3)).toEqual(["┌  agentes.chat install plan (--plan:", "│  nothing runs)", "│"]);
+    expect(lines.slice(0, 3)).toEqual(["┌  Ackwire AI install plan (--plan:", "│  nothing runs)", "│"]);
     expect(lines[3]).toStartWith("└  Nothing ran.");
     for (const line of lines.slice(4)) expect(line).toStartWith("   ");
     for (const line of lines) expect(visible(line)).toBeLessThanOrEqual(40);
@@ -300,7 +300,7 @@ describe("what each terminal gets", () => {
 
   test("a log keeps each line whole, for grep", () => {
     const { term, text } = capture({ tty: false });
-    const long = `Agents' computer: set up, but it hasn't answered agentes.chat yet. It keeps trying. Its log: ${"x".repeat(60)}`;
+    const long = `Agents' computer: set up, but it hasn't answered Ackwire AI yet. It keeps trying. Its log: ${"x".repeat(60)}`;
     term.warn(long);
     term.info("Next", [long], "numbered");
     expect(text()).toBe(`▲  ${long}\n●  Next\n   1. ${long}\n`);
@@ -340,21 +340,21 @@ describe("what each terminal gets", () => {
 describe("waits", () => {
   test("a spinner turns with its time from 3 s on and its detail under it; what's said meanwhile goes above it", () => {
     const { term, wait, screen } = capture({ depth: 24 });
-    const s = term.spin("Starting agentes.chat (docker compose up -d)", "The first time downloads about 2 GB.");
-    expect(screen()).toBe("◒  Starting agentes.chat (docker compose up -d)\n│  The first time downloads about 2 GB.\n");
+    const s = term.spin("Starting Ackwire AI (docker compose up -d)", "The first time downloads about 2 GB.");
+    expect(screen()).toBe("◒  Starting Ackwire AI (docker compose up -d)\n│  The first time downloads about 2 GB.\n");
     wait(64);
     expect(screen()).toBe(
-      "◐  Starting agentes.chat (docker compose up -d)  1m 04s\n│  The first time downloads about 2 GB.\n",
+      "◐  Starting Ackwire AI (docker compose up -d)  1m 04s\n│  The first time downloads about 2 GB.\n",
     );
     s.update(null, "Container agentes-agentes-1  Started");
     term.info("Approve this server in your tailnet");
     expect(screen()).toBe(
-      "●  Approve this server in your tailnet\n◐  Starting agentes.chat (docker compose up -d)  1m 04s\n│  Container agentes-agentes-1  Started\n",
+      "●  Approve this server in your tailnet\n◐  Starting Ackwire AI (docker compose up -d)  1m 04s\n│  Container agentes-agentes-1  Started\n",
     );
-    s.done("agentes.chat 1.0.0 is up, on this server only");
-    expect(screen()).toBe("●  Approve this server in your tailnet\n◇  agentes.chat 1.0.0 is up, on this server only\n");
+    s.done("Ackwire AI 1.0.0 is up, on this server only");
+    expect(screen()).toBe("●  Approve this server in your tailnet\n◇  Ackwire AI 1.0.0 is up, on this server only\n");
     wait(1);
-    expect(screen()).toBe("●  Approve this server in your tailnet\n◇  agentes.chat 1.0.0 is up, on this server only\n");
+    expect(screen()).toBe("●  Approve this server in your tailnet\n◇  Ackwire AI 1.0.0 is up, on this server only\n");
   });
 
   test("a long label is cut to one line, so the spinner redraws in place", () => {
@@ -559,5 +559,5 @@ test("every depth draws the same layout", () => {
   });
   // Only the badge differs: its own background takes a space on each side.
   for (const shape of shapes)
-    expect(shape.replace("┌   agentes.chat  setup", "┌  agentes.chat setup")).toBe(shapes[3] as string);
+    expect(shape.replace("┌   Ackwire AI  setup", "┌  Ackwire AI setup")).toBe(shapes[3] as string);
 });

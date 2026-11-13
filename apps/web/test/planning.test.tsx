@@ -864,7 +864,9 @@ describe("Rotinas", () => {
     expect(dialog.textContent).toContain("De segunda a sexta, às 09:00");
     await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Organizar tarefas novas/);
     expect(within(dialog).getByRole("radio", { name: "Evento" }).getAttribute("aria-checked")).toBe("true");
-    expect(within(dialog).getByRole("combobox", { name: "Evento" }).textContent).toContain("Tarefa criada no agentes");
+    expect(within(dialog).getByRole("combobox", { name: "Evento" }).textContent).toContain(
+      "Tarefa criada no Ackwire AI",
+    );
     // A mailbox is the email trigger's own: the workspace has none, so its note and its link say what to do.
     await pick(within(dialog).getByRole("combobox", { name: "Começar de um modelo" }), /Preparar respostas de email/);
     expect(within(dialog).getByRole("radio", { name: "Email" }).getAttribute("aria-checked")).toBe("true");

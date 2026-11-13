@@ -1,4 +1,4 @@
-# Contributing to agentes.chat
+# Contributing to Ackwire AI
 
 Thanks for your interest. This document covers running the code, the checks a pull request must
 pass, the conventions that matter, and how contributions are licensed.
@@ -81,7 +81,7 @@ app, a package or the Docker files also boots the image with `docker-compose.yml
 
 ## Licensing of your contribution
 
-- agentes.chat is AGPL-3.0-only ([LICENSE](LICENSE)). A package published under MIT says so in
+- Ackwire AI is AGPL-3.0-only ([LICENSE](LICENSE)). A package published under MIT says so in
   its own LICENSE, and contributions to it are MIT: today that is the setup CLI, `packages/setup`
   (`@agenteschat/setup`).
 - Inbound = outbound: your contribution is licensed under the license of the code it goes into.

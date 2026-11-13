@@ -8,7 +8,7 @@ import { reviewToolsOf } from "./tool-review";
 export const CONNECTOR_MARK = /^\/connectors\/[a-z0-9-]+\.svg$/;
 /** A mark in its maker's colors the web app serves, drawn as it is. */
 export const OWN_MARK = /^\/brands\/[a-z0-9-]+\.svg$/;
-/** `Connection.authType` of GitHub through the agentes.chat app alone (mirror of `GITHUB_APP_AUTH` in the engine). */
+/** `Connection.authType` of GitHub through the Ackwire AI app alone (mirror of `GITHUB_APP_AUTH` in the engine). */
 export const GITHUB_APP_AUTH = "github_app";
 /** A server's own icon, as the backend keeps and serves it behind the session (never the server's URL). */
 export const SERVER_ICON = /^\/api\/app\/connector-icons\/[0-9a-f-]+\/[0-9a-f-]+\/[0-9a-f]{16}\.(jpg|png|webp)$/;
@@ -32,7 +32,7 @@ export interface ConnectedItem {
   /** Connected through Composio (ADR 0107): its page signs in, and no address shows. */
   viaComposio: boolean;
   /**
-   * GitHub through the agentes.chat app alone (ADR 0156): no account signed in, so nothing to reconnect; `account`
+   * GitHub through the Ackwire AI app alone (ADR 0156): no account signed in, so nothing to reconnect; `account`
    * holds the accounts it is installed on.
    */
   viaGithubApp?: boolean;

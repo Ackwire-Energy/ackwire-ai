@@ -19,8 +19,8 @@ export function skyHourOf(host: string): SkyHour {
 
 /** The hour's light end, three steps each: pale on a light surface, deeper on a dark one. */
 const STOPS: Record<SkyHour, { light: readonly string[]; dark: readonly string[] }> = {
-  day: { light: ["#cfe5ff", "#a6cfff", "#86bbff"], dark: ["#173763", "#1f4f93", "#2a69c4"] },
-  dusk: { light: ["#e3dcff", "#c9c0ff", "#aaa6f5"], dark: ["#26214f", "#352d7d", "#4a40a8"] },
+  day: { light: ["#e5fdd1", "#cffbaa", "#bef98c"], dark: ["#3a5f1b", "#558d25", "#71bc32"] },
+  dusk: { light: ["#ecfdde", "#ddfcc3", "#cbf1aa"], dark: ["#364d23", "#527931", "#70a345"] },
 };
 
 /** Whether a surface is dark (its relative luminance below the middle). */

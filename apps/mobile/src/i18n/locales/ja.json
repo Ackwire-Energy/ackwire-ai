@@ -51,7 +51,7 @@
       "certificate": "{{host}}の証明書が無効です。サーバーの管理者に相談してください。",
       "notAgentes": "{{host}}はAckwire AIのサーバーではありません。アドレスを確認してください。",
       "serverTooOld": "このアプリで使うには、{{host}}の更新が必要です。",
-      "appTooOld": "{{host}}を使うには、agentesアプリを更新してください。",
+      "appTooOld": "{{host}}を使うには、Ackwire AIアプリを更新してください。",
       "down": {
         "line": "{{host}}から応答がありませんでした。",
         "text": "停止しているか、ネットワークの外にある可能性があります。復旧すると自動でアプリが開きます。",

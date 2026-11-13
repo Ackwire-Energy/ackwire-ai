@@ -1,4 +1,4 @@
-//! The server here ("Run agentes.chat on this computer", ADR 0066): agentes.chat's native server (ADR 0060 §2,
+//! The server here ("Run Ackwire AI on this computer", ADR 0066): Ackwire AI's native server (ADR 0060 §2,
 //! one program with its database built in) as a child of the app, in `~/.agentes`. The app carries the
 //! server's files (`server/` and `web/` among its resources) and runs them with its own runner binary acting as
 //! Bun (`BUN_BE_BUN=1`), so nothing downloads and the server moves with the app's updates: on the first start
@@ -283,7 +283,7 @@ fn write_private(path: &Path, bytes: &[u8], replace: bool) -> io::Result<()> {
     }
 }
 
-/// What the person chose in "Run agentes.chat on this computer".
+/// What the person chose in "Run Ackwire AI on this computer".
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Choice {

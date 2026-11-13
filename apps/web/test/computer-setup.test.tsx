@@ -597,18 +597,18 @@ describe("a computer connected in system mode (each agent its own user)", () => 
     expect(system).not.toContain("/root/agentes");
     expect(system).toContain("Liberar é no próprio computador, no Terminal dele, como administrador:");
     expect(system).toContain("sudo agentes-runner folders allow <pasta> --agent <agente>");
-    expect(system).not.toContain("app do agentes.chat");
+    expect(system).not.toContain("app do Ackwire AI");
 
     // One user for every agent: the folder it was connected from is theirs, and the Terminal needs no sudo.
     const single = await page(laptop.id);
     expect(single).toContain("Pasta: /home/ana/agentes");
     expect(single).toContain("Liberar é no próprio computador, no Terminal dele:");
     expect(single).not.toContain("sudo");
-    expect(single).not.toContain("app do agentes.chat");
+    expect(single).not.toContain("app do Ackwire AI");
 
     // A Mac keeps the app first, the terminal as the way without it.
     const onMac = await page(mac.id);
-    expect(onMac).toContain("abra o app do agentes.chat nele (Preferências → Pastas).");
+    expect(onMac).toContain("abra o app do Ackwire AI nele (Preferências → Pastas).");
     expect(onMac).toContain("Sem o app? No terminal do computador:");
   });
 });

@@ -125,7 +125,7 @@ interface UserInstallation {
 const userHeaders = (token: string) => ({
   authorization: `Bearer ${token}`,
   accept: "application/vnd.github+json",
-  "user-agent": "agentes.chat",
+  "user-agent": "Ackwire AI",
 });
 
 /** Installations of our app the person can see on GitHub (their user token). */
@@ -241,7 +241,7 @@ export async function completeGitHubAppInstall(
     }
     const madeHere = origin.createdAt.getTime() >= row.createdAt.getTime() - CLOCK_SKEW_MS;
     if (!existing && (input.setupAction === "update" || !madeHere)) {
-      throw new ForbiddenError("This installation was made outside agentes.chat", "github_app.installed_outside");
+      throw new ForbiddenError("This installation was made outside Ackwire AI", "github_app.installed_outside");
     }
     const [saved] = existing
       ? await tx

@@ -27,7 +27,7 @@ const COUNTED = /^\(\d+\+?\) /;
 export const badgeCount = (n: number) => (n > 99 ? "99+" : String(n));
 
 /**
- * A title with the total in front, "(3) agentes.chat" (99+ past 99). `mine` is the prefix this put on last time:
+ * A title with the total in front, "(3) Ackwire AI" (99+ past 99). `mine` is the prefix this put on last time:
  * only that comes off, so a title that arrives with its own count (the Notifications page's) keeps it, untouched.
  */
 export function titledWithUnread(title: string, total: number, mine = ""): { title: string; prefix: string } {

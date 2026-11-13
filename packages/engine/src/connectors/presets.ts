@@ -15,7 +15,7 @@ import { canonicalResource } from "./oauth-mcp";
  * yet (its redirect URI or client name, or registration itself is limited to
  * clients the vendor approved); it stays `soon` until the vendor does.
  * Calendly accepts only letters, digits, hyphens and spaces in the client
- * name: `ensureOAuthClient` registers it again without the dot.
+ * name: `ensureOAuthClient` registers it again with anything else as spaces.
  *
  * Left out as servers of their own: HubSpot (its authorization server has
  * no dynamic registration: it needs an app registered with HubSpot). Slack,
@@ -45,7 +45,7 @@ export interface McpPreset {
    * Postgres user). Every other tool keeps our usual suggestion.
    */
   readTools?: readonly string[];
-  /** The vendor hasn't approved agentes.chat yet: listed greyed out ("Em breve"), not connectable in one click. */
+  /** The vendor hasn't approved Ackwire AI yet: listed greyed out ("Em breve"), not connectable in one click. */
   soon?: true;
   /**
    * The Cloud offers OAuth only, no API key: the vendor's terms forbid an app asking its users for their token

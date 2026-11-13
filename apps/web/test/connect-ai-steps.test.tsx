@@ -797,7 +797,7 @@ describe("Conectar uma IA: one picker, plans first", () => {
     await choose("ChatGPT");
     expect(dialog.textContent).toContain("O Codex não está instalado no MacBook.");
     await choose("Kimi Code");
-    expect(dialog.textContent).toContain("Atualize o agentes no computador para usar a chave de um plano");
+    expect(dialog.textContent).toContain("Atualize o Ackwire AI no computador para usar a chave de um plano");
     await click(within(dialog).getByRole("button", { name: "Usar uma chave de API agora" }));
     expect(payWith(dialog, "Com chave de API").getAttribute("aria-checked")).toBe("true");
   });

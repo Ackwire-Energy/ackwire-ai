@@ -1411,7 +1411,7 @@ describe("the agent's screen in the computer dialog", () => {
 
     const outdated = await dialog({ ...RUNNING, available: false, reason: "runner_outdated" });
     expect(outdated.sockets.desktops).toHaveLength(0);
-    expect(screen().getByText("Atualize o agentes no Servidor de casa para ver a tela da Ada.")).toBeTruthy();
+    expect(screen().getByText("Atualize o Ackwire AI no Servidor de casa para ver a tela da Ada.")).toBeTruthy();
   });
 });
 

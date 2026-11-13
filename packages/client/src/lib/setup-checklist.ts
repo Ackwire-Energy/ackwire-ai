@@ -226,7 +226,7 @@ export function setupRow(t: TFunction, step: AgentSetupStep, done: boolean, f: S
 /**
  * Its rows, one order everywhere: what the onboarding's steps leave (they made the workspace, said what it does and
  * made the team): an AI, apps, people. A personal workspace (ADR 0159) starts with what the person wants help with and
- * their agents, and has no people row. A workspace waiting for its first agentes.chat plan, its plan left in the
+ * their agents, and has no people row. A workspace waiting for its first Ackwire AI plan, its plan left in the
  * onboarding, leads with the plan (ADR 0162, amended 2026-11-10): the row with the way to pay, the rest after it.
  * "plan" is no `SetupStep`: nothing about it is stored, the row leaves when the hold lifts.
  */
@@ -247,7 +247,7 @@ export interface FirstRunPowers {
   invite: boolean;
   /** A personal workspace (ADR 0159): its first run has no people row, it is for one person. */
   personal?: boolean;
-  /** It waits for its first agentes.chat plan (a "payment" hold): the plan row leads, for whoever may pay. */
+  /** It waits for its first Ackwire AI plan (a "payment" hold): the plan row leads, for whoever may pay. */
   waitsForPlan?: boolean;
 }
 

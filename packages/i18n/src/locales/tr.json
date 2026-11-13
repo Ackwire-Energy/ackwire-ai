@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "Kapat",
@@ -478,7 +478,7 @@
       "confirmYes": "Evet, uygulamada giriş yap",
       "confirmNo": "Bu ben değildim",
       "done": "Her şey hazır.",
-      "doneLead": "agentes uygulamasında giriş yaptınız. Bu sekmeyi kapatabilirsiniz.",
+      "doneLead": "Ackwire AI uygulamasında giriş yaptınız. Bu sekmeyi kapatabilirsiniz.",
       "expired": "Bu isteğin süresi doldu.",
       "expiredLead": "Uygulamaya dönüp yeniden {{provider}} seçin.",
       "handover": "Diğer cihazdaki hesabınızla giriş yapılıyor…",
@@ -1862,9 +1862,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "agentes uygulamasına giriş yapmak için QR kodu",
+    "qr": "Ackwire AI uygulamasına giriş yapmak için QR kodu",
     "making": "Kod oluşturuluyor…",
-    "stepApp": "agentes uygulamasını telefonunuza yükleyin.",
+    "stepApp": "Ackwire AI uygulamasını telefonunuza yükleyin.",
     "stepTailscale": "Telefonunuza Tailscale'i kurun ve bu sunucuyla aynı Tailscale hesabıyla giriş yapın.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -4697,7 +4697,7 @@
     "noInstructions": "{{name}} için henüz talimat yok. Nasıl çalışması gerektiğini yazın.",
     "noInstructions_female": "{{name}} için henüz talimat yok. Nasıl çalışması gerektiğini yazın.",
     "savedToast": "{{name}} için yapılan değişiklikler kaydedildi.",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "yerleşik izinler",
     "connectHint": "Hizmetleri bağla",
     "subtitle": "{{role}} · sahibi <b>{{owner}}</b> · {{model}} {{key}}",
@@ -5030,7 +5030,7 @@
         "two": "Tercihler",
         "three": "Tarayıcıyı açın",
         "done": "Hepsi bu. Bu sayfa bunu kendisi fark eder, yenilemeye gerek yok.",
-        "menuOpen": "agentes'i aç",
+        "menuOpen": "Ackwire AI'i aç",
         "menuPrefs": "Tercihler…",
         "menuPause": "Duraklat",
         "menuQuit": "Çık",
@@ -5218,7 +5218,7 @@
       "connectors": "{{org}} bağlayıcıları",
       "connectorsPersonal": "Bağlayıcılarınız",
       "oneLevel": "Uygulama başına tek düzey",
-      "builtin": "agentes içinde yerleşik",
+      "builtin": "Ackwire AI içinde yerleşik",
       "builtinHelp": "Drive, görevler, bellek ve daha fazlası",
       "noMatch": "“{{q}}” ile eşleşen bir şey yok",
       "noneHere": "Bu filtrede bir şey yok",
@@ -7665,7 +7665,7 @@
         "pr_opened": "GitHub'da PR açıldı"
       },
       "issue": {
-        "created": "agentes'te görev oluşturuldu"
+        "created": "Ackwire AI'te görev oluşturuldu"
       },
       "deploy": {
         "succeeded": "Dağıtım tamamlandı"
@@ -9383,7 +9383,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "Plan anahtarı kullanmak için bilgisayardaki agentes uygulamasını güncelleyin"
+        "keys": "Plan anahtarı kullanmak için bilgisayardaki Ackwire AI uygulamasını güncelleyin"
       },
       "noComputer": "Hesaplar bağlı bir bilgisayarda kalır. Önce kendi bilgisayarlarınızdan birini bağlayın.",
       "addComputer": "Bilgisayar bağla",
@@ -14001,7 +14001,7 @@
     "reconnectDoneText": "{{name}}, {{org}} çalışma alanına geri döndü.",
     "deniedTitle": "Bağlanmadı",
     "denied": "Bilgisayar bağlanmadı. Onu açan siz değilseniz kimse erişim almadı.",
-    "home": "agentes'e git"
+    "home": "Ackwire AI'e git"
   },
   "apps": {
     "connect": "Uygulama bağla",
@@ -14510,7 +14510,7 @@
       "rolesPersonal": "Buradaki her kişinin neler yapabileceği. Sahip her şeyi yapabilir."
     },
     "about": {
-      "basedOn": "Codari Global, LLC tarafından geliştirilen <site>Ackwire AI</site> tabanlı",
+      "basedOn": "Codari Global, LLC tarafından geliştirilen <site>agentes.chat</site> tabanlı",
       "version": "Sürüm",
       "license": "<license>GNU Affero General Public License v3</license> kapsamında özgür yazılım, garantisi yoktur.",
       "source": "Kaynak kodu",
@@ -16836,7 +16836,7 @@
       "unavailableHelp": "Birazdan tekrar deneyin.",
       "screensOff": "{{computer}} üzerinde ekranlar kapalı. Oradan açın:",
       "screensMissing": "{{computer}} henüz ekran gösteremiyor. İlgileniyoruz:",
-      "outdated": "{{name}} ajanının ekranını görmek için {{computer}} üzerindeki agentes uygulamasını güncelleyin.",
+      "outdated": "{{name}} ajanının ekranını görmek için {{computer}} üzerindeki Ackwire AI uygulamasını güncelleyin.",
       "noScreen": "{{name}} ajanının burada gösterilecek bir ekranı yok",
       "noScreenHelp": "Araçlar ve erişim bölümünden ekrana veya tarayıcıya izin verin.",
       "noComputer": "{{name}} için bir bilgisayar seçin.",
@@ -16953,7 +16953,7 @@
       "browser": "Tarayıcı",
       "screen": "Bilgisayar ekranı",
       "terminal": "Terminal",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "Düşünüyor",
       "inside": "{{program}} · {{detail}}"
     },

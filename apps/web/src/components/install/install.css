@@ -22,7 +22,7 @@
   --wt: #1d1d1f;
   --wm: #6e6e73;
   --wl: #0000001a;
-  --blue: #0a6cff;
+  --blue: #7bf316;
   --hi: #f59e0b;
   position: relative;
   width: 400px;
@@ -84,15 +84,15 @@
 /* macOS: wallpaper, menu bar, Dock, windows, alerts */
 .isc--mac {
   background:
-    radial-gradient(120% 90% at 12% 18%, #9fc4ff 0, transparent 55%),
-    radial-gradient(90% 90% at 92% 88%, #d6b4ff 0, transparent 60%),
-    radial-gradient(80% 70% at 70% 10%, #ffd3e6 0, transparent 55%), linear-gradient(160deg, #cfe0ff, #e8dcff);
+    radial-gradient(120% 90% at 12% 18%, #cbfaa4 0, transparent 55%),
+    radial-gradient(90% 90% at 92% 88%, #d7fbb8 0, transparent 60%),
+    radial-gradient(80% 70% at 70% 10%, #ffd3e6 0, transparent 55%), linear-gradient(160deg, #e5fdd1, #ecfdde);
 }
 [data-theme="dark"] .isc--mac {
   background:
-    radial-gradient(120% 90% at 12% 18%, #23407a 0, transparent 55%),
-    radial-gradient(90% 90% at 92% 88%, #4a2a73 0, transparent 60%),
-    radial-gradient(80% 70% at 70% 10%, #5a2341 0, transparent 55%), linear-gradient(160deg, #101a33, #1c1530);
+    radial-gradient(120% 90% at 12% 18%, #4b7627 0, transparent 55%),
+    radial-gradient(90% 90% at 92% 88%, #4c6f2e 0, transparent 60%),
+    radial-gradient(80% 70% at 70% 10%, #5a2341 0, transparent 55%), linear-gradient(160deg, #203112, #212f16);
 }
 .isc-menubar {
   position: absolute;
@@ -208,7 +208,7 @@
   justify-content: space-between;
   height: 124px;
   padding: 0 40px;
-  background: linear-gradient(#ffffff, #f2f4f8);
+  background: linear-gradient(#ffffff, #f5f8f2);
 }
 [data-theme="dark"] .isc-dmg__in {
   background: linear-gradient(#2a2a2d, #222225);
@@ -248,7 +248,7 @@
   width: 22px;
   height: 9px;
   border-radius: 4px 6px 0 0;
-  background: #56a8f5;
+  background: #9fed5e;
 }
 .isc-folder::after {
   content: "";
@@ -256,7 +256,7 @@
   inset: auto 0 0;
   height: 38px;
   border-radius: 3px 7px 7px;
-  background: linear-gradient(#8cc8ff, #4ea1f3);
+  background: linear-gradient(#c1f992, #9aeb56);
 }
 .isc-folder b {
   position: absolute;
@@ -586,14 +586,14 @@
 /* Windows: wallpaper, taskbar, the browser's downloads, SmartScreen */
 .isc--win {
   background:
-    radial-gradient(70% 90% at 50% 105%, #7cc4ff 0, #2d7be0 35%, transparent 70%),
-    radial-gradient(60% 60% at 20% 20%, #b9dcff 0, transparent 70%), linear-gradient(170deg, #dceeff, #9cc6f5);
+    radial-gradient(70% 90% at 50% 105%, #b9f883 0, #80d736 35%, transparent 70%),
+    radial-gradient(60% 60% at 20% 20%, #d9fbbd 0, transparent 70%), linear-gradient(170deg, #ecfdde, #c5f1a0);
   font-family: "Segoe UI Variable", "Segoe UI", var(--font-sans), system-ui, sans-serif;
 }
 [data-theme="dark"] .isc--win {
   background:
-    radial-gradient(70% 90% at 50% 105%, #1f5fbf 0, #123d84 35%, transparent 70%),
-    linear-gradient(170deg, #0c1a33, #0a2350);
+    radial-gradient(70% 90% at 50% 105%, #69b727 0, #477e18 35%, transparent 70%),
+    linear-gradient(170deg, #1e310e, #2a4c0d);
 }
 .isc-taskbar {
   position: absolute;
@@ -627,7 +627,7 @@
 }
 .isc-taskbar__start s {
   border-radius: 1px;
-  background: #1f8fff;
+  background: #87f42a;
 }
 .isc-taskbar__clock {
   position: absolute;
@@ -730,8 +730,8 @@
   width: 18px;
   height: 22px;
   border-radius: 3px;
-  background: linear-gradient(#eef3fb, #d3def2);
-  box-shadow: inset 0 0 0 0.5px #8aa3cf;
+  background: linear-gradient(#f4faef, #e1f0d5);
+  box-shadow: inset 0 0 0 0.5px #aacc8d;
 }
 .isc-flyout__file b {
   display: block;
@@ -768,12 +768,12 @@
   width: 300px;
   height: 186px;
   padding: 14px 16px 0;
-  background: #0b5cad;
+  background: #56a513;
   box-shadow:
     0 0 0 0.5px #ffffff26,
     0 22px 50px -14px #000a;
   color: #fff;
-  --w2: #0b5cad;
+  --w2: #56a513;
 }
 .isc-smartscreen__x {
   position: absolute;
@@ -832,7 +832,7 @@
 .isc--linux {
   background:
     radial-gradient(80% 80% at 85% 90%, #f08a4b 0, transparent 60%),
-    radial-gradient(80% 80% at 15% 10%, #8b5cc4 0, transparent 60%), linear-gradient(160deg, #5b2a7a, #b2475b);
+    radial-gradient(80% 80% at 15% 10%, #8cbf61 0, transparent 60%), linear-gradient(160deg, #5b2a7a, #b2475b);
   font-family: Ubuntu, Cantarell, var(--font-sans), system-ui, sans-serif;
 }
 .isc-topbar {

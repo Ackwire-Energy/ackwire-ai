@@ -81,7 +81,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     const { billingLinks, left } = await go("settings/members", { members: { used: 2, limit: 2 } });
     const invite = await inviteDialog();
     expect(invite().textContent).toContain("Este workspace está com 2 de 2 pessoas.");
-    expect(invite().textContent).toContain("Para chamar mais gente, veja as opções do plano do agentes.chat.");
+    expect(invite().textContent).toContain("Para chamar mais gente, veja as opções do plano do Ackwire AI.");
     expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
     await click(within(invite()).getByRole("button", { name: "Abrir plano e cobrança" }));
     await settle(4);
@@ -91,7 +91,7 @@ describe("a workspace's limits (ADR 0079)", () => {
 
     await go("settings/members", { members: { used: 1, limit: 1 } }, false);
     const plain = await inviteDialog();
-    expect(plain().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
+    expect(plain().textContent).toContain("No plano do Ackwire AI deste workspace cabe 1 pessoa.");
     expect(plain().textContent).toContain("Peça a quem administra o workspace para abrir espaço.");
     expect(within(plain()).queryByRole("button", { name: "Abrir plano e cobrança" })).toBeNull();
     cleanup();
@@ -132,7 +132,7 @@ describe("a workspace's limits (ADR 0079)", () => {
   test("a new plan opens a full workspace by itself: inviting is back once the limits change, with no reload", async () => {
     const { state, sockets } = await go("settings/members", { members: { used: 1, limit: 1 } });
     const invite = await inviteDialog();
-    expect(invite().textContent).toContain("No plano do agentes.chat deste workspace cabe 1 pessoa.");
+    expect(invite().textContent).toContain("No plano do Ackwire AI deste workspace cabe 1 pessoa.");
     expect(sendButton(invite()).hasAttribute("disabled")).toBe(true);
     const socket = sockets.last();
     await act(async () => socket.open());
@@ -182,7 +182,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     });
     const near = screen().getByRole("region", { name: "Armazenamento" });
     expect(near.textContent).toContain(
-      "Vocês usaram 45 GB de 50 GB. Os envios pausam no limite, e nada é apagado.Mude o plano do agentes.chat",
+      "Vocês usaram 45 GB de 50 GB. Os envios pausam no limite, e nada é apagado.Mude o plano do Ackwire AI",
     );
     await click(within(near).getByRole("button", { name: "Ver opções" }));
     await settle(4);
@@ -213,7 +213,7 @@ describe("a workspace's limits (ADR 0079)", () => {
     await send();
     const toast = screen().getByRole("alert");
     expect(toast.textContent).toContain("Os envios pausaram em 50 GB. Nada foi apagado.");
-    expect(toast.textContent).toContain("Mude o plano do agentes.chat");
+    expect(toast.textContent).toContain("Mude o plano do Ackwire AI");
     await click(within(toast).getByRole("button", { name: "Ver opções" }));
     await settle(4);
     expect(billingLinks()).toEqual(["upload_full"]);

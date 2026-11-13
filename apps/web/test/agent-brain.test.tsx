@@ -203,7 +203,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     expect(wait.firstElementChild?.classList.contains("ac-pixspin")).toBe(true);
     expect(wait.textContent).toBe("Esperando");
     // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
-    expect(steps.textContent).toContain("Clique no ícone do agentes.chat perto do relógio");
+    expect(steps.textContent).toContain("Clique no ícone do Ackwire AI perto do relógio");
     expect(steps.querySelector(".machine-command__code")).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
@@ -228,7 +228,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio Servidor" });
     expect(steps.textContent).toContain(
-      "Só quem está no computador liga, no app do agentes.chat: Preferências → Ferramentas.Sem o app? No terminal do computador:",
+      "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.Sem o app? No terminal do computador:",
     );
     expect(steps.querySelector(".machine-command__code")?.textContent).toBe("sudo agentes-runner tools enable browser");
     expect(steps.querySelector(".brw-steps__grid")).toBeNull();

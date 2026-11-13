@@ -8,7 +8,7 @@
   --raised-2: #ffffff;
   --sunken: #eef4ef;
   /* The app shell: the sidebar on the sky's paper (the faintest cool tint) and the work area beside it. */
-  --side: #eef4ef;
+  --side: #f5f8f5;
   --pane: #ffffff;
   /* A sidebar row under the pointer, and the open one: one plate each, a step of ink into the paper. */
   --side-hover: color-mix(in srgb, var(--ink) 5%, var(--side));
@@ -23,17 +23,18 @@
   --muted: #5c5c58;
   --faint: #6f6f6a;
   --agent: #3f7a12;
-  --agent2: #3f7a12;
-  --agent-soft: #eef4ef;
+  --agent2: #90ed42;
+  --agent-soft: #e8f5dc;
+  --on-agent: #ffffff;
+  /* The main button: Solar Green with Forest ink, in both themes. */
   --action: #90ed42;
   --on-action: #031f1b;
-  --on-agent: #ffffff;
   --ok: #1f7a45;
   --warn: #9a5b00;
   --warn-soft: #fbeed5;
   --on-warn: #ffffff;
   --danger: #b42a20;
-  --info: #0a6f9e;
+  --info: #3f7a12;
   --plate: rgba(127, 127, 127, 0.1);
   --plate-soft: rgba(127, 127, 127, 0.06);
   --e1: 0 1px 1px rgba(23, 23, 22, 0.04), 0 2px 4px -1px rgba(23, 23, 22, 0.05), 0 0 0 1px var(--line);
@@ -47,16 +48,16 @@
 }
 [data-theme="dark"] {
   --bg: #000000;
-  --raised: #141414;
-  --raised-2: #202020;
-  --sunken: #080808;
+  --raised: #161616;
+  --raised-2: #1f1f1f;
+  --sunken: #030303;
   /* Three columns, two steps: both sidebars a step under the chat (Discord's split). */
-  --side: #080808;
-  --pane: #000000;
+  --side: #000000;
+  --pane: #0a0a0a;
   --side-hover: color-mix(in srgb, var(--ink) 6%, var(--side));
   --side-chosen: color-mix(in srgb, var(--ink) 14%, var(--side));
-  --glass: rgba(24, 24, 24, 0.86);
-  --glass-solid: #181818;
+  --glass: rgba(20, 20, 20, 0.86);
+  --glass-solid: #141414;
   --line: rgba(255, 255, 255, 0.1);
   --line2: rgba(255, 255, 255, 0.15);
   --line-strong: #71716c;
@@ -65,17 +66,18 @@
   --muted: #a3a39e;
   --faint: #8f8f89;
   --agent: #90ed42;
-  --agent2: #90ed42;
-  --agent-soft: #20251b;
+  --agent2: #b8f582;
+  --agent-soft: #1a2e0c;
+  --on-agent: #031f1b;
+  /* The main button: Solar Green with Forest ink, in both themes. */
   --action: #90ed42;
   --on-action: #031f1b;
-  --on-agent: #031f1b;
   --ok: #5fc48a;
   --warn: #e0a84a;
   --warn-soft: #33260e;
   --on-warn: #2a1c00;
   --danger: #f08a80;
-  --info: #5cc4ea;
+  --info: #90ed42;
   --plate: rgba(127, 127, 127, 0.14);
   --plate-soft: rgba(127, 127, 127, 0.08);
   --e1: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 0 1px var(--line);
@@ -85,7 +87,7 @@
   --scrim: rgba(0, 0, 0, 0.5);
   /* A black press shows only on a face it can darken: dark's chosen face sits lighter than a card, as light as the
      faint words on it allow (4.5:1), under light's shadow made deeper. */
-  --chosen-bg: #282828;
+  --chosen-bg: #262626;
   --chosen-press: inset 0 2px 5px rgba(0, 0, 0, 0.9), inset 0 1px 1.5px rgba(0, 0, 0, 0.7);
 }
 :root,

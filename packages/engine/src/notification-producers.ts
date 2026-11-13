@@ -1553,7 +1553,7 @@ export const resolveSkillWaiting = (deps: NotificationDeps, orgId: string, skill
 /**
  * The people who run this server held, suspended or restored the workspace, with the notice shown: its
  * owners and admins hear it, with the reason (`latest.text`), or a billing hold's code (`latest.billingHold`,
- * ADR 0079), which the apps say in the person's words, and on agentes.chat Cloud `latest.cloud`, so the apps
+ * ADR 0079), which the apps say in the person's words, and on Ackwire AI Cloud `latest.cloud`, so the apps
  * read a restriction as the restriction itself reads. One row per change.
  */
 export async function notifyOrgStanding(
@@ -1579,7 +1579,7 @@ export async function notifyOrgStanding(
 const agentHoldGroup = (agentId: string) => `org_standing:agent:${agentId}:`;
 
 /**
- * An agent was held on agentes.chat Cloud (ADR 0056 §9): its responsible person and the workspace's owners and admins
+ * An agent was held on Ackwire AI Cloud (ADR 0056 §9): its responsible person and the workspace's owners and admins
  * hear it, with the hold's kind (`latest.holdKind`), never its reason. One row each time they are told (`at`): when
  * it is held, and when it is held again for another kind.
  */

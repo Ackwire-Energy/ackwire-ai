@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "Chiudi",
@@ -26,7 +26,7 @@
     "unknownError": "Qualcosa è andato storto. Riprova.",
     "ourSide": "Qualcosa è andato storto da parte nostra. Riprova tra poco.",
     "signedOut": "La sessione è scaduta. Accedi di nuovo per continuare.",
-    "newVersion": "È disponibile una nuova versione di agentes.chat.",
+    "newVersion": "È disponibile una nuova versione di Ackwire AI.",
     "reload": "Ricarica",
     "copy": "Copia",
     "copied": "Copiato",
@@ -466,10 +466,10 @@
       "openMail": "Apri {{app}}",
       "ownerWaits": "Questo server aspetta il suo proprietario.",
       "ownerWaitsLead": "Apri il link del proprietario di questo server (finisce con /owner#claim=…), su questo computer o sul telefono.",
-      "noPassword": "Questo account accede dall'app agentes.chat.",
+      "noPassword": "Questo account accede dall'app Ackwire AI.",
       "noPasswordLead": "Sul computer che fa girare questo server, apri l'app e scegli Aggiungi una password in Impostazioni › Il tuo account.",
       "backToSignIn": "Torna all'accesso",
-      "toAuthorizeApp": "Per collegare un'app ad agentes.chat."
+      "toAuthorizeApp": "Per collegare un'app ad Ackwire AI."
     },
     "desktop": {
       "browser": "Continua nel browser",
@@ -484,7 +484,7 @@
       "confirmYes": "Sì, fai accedere l'app",
       "confirmNo": "Non sono stato io",
       "done": "Tutto pronto.",
-      "doneLead": "Hai effettuato l'accesso all'app agentes. Puoi chiudere questa scheda.",
+      "doneLead": "Hai effettuato l'accesso all'app Ackwire AI. Puoi chiudere questa scheda.",
       "expired": "Questa richiesta è scaduta.",
       "expiredLead": "Torna all'app e scegli di nuovo {{provider}}.",
       "handover": "Accesso con il tuo account dall'altro dispositivo…",
@@ -748,7 +748,7 @@
       },
       "area": {
         "title": "E tu, di cosa ti occupi?",
-        "lead": "Solo per capire chi usa agentes.chat.",
+        "lead": "Solo per capire chi usa Ackwire AI.",
         "skip": "Salta questo passaggio",
         "options": {
           "dev": "Sviluppo",
@@ -968,7 +968,7 @@
         "howTo": "Come collegarla, app per app",
         "allow": "Nella pagina dei permessi, scegli Creare e modificare agenti, routine e skill.",
         "paste": "Poi incolla questa richiesta nell'app:",
-        "prompt": "Collegati a {{url}} e, per ogni agente, istruzione, skill e routine che hai, crea l'equivalente in agentes.chat. Prima elenca ciò che esiste già lì, così non duplichi niente.",
+        "prompt": "Collegati a {{url}} e, per ogni agente, istruzione, skill e routine che hai, crea l'equivalente in Ackwire AI. Prima elenca ciò che esiste già lì, così non duplichi niente.",
         "promptLabel": "Richiesta per la tua app di IA",
         "copy": "Copia la richiesta",
         "copied": "Ora incollala nella tua app di IA.",
@@ -1255,7 +1255,7 @@
       "title": "Limite di spesa per agente",
       "label": "Limite mensile per agente, in dollari",
       "perMonth": "/mese",
-      "noteKey": "Solo per l'uso dell'API, addebitato dal provider della chiave, non da agentes.chat. Quando un agente lo raggiunge, si ferma e te lo dice. I piani non contano qui.",
+      "noteKey": "Solo per l'uso dell'API, addebitato dal provider della chiave, non da Ackwire AI. Quando un agente lo raggiunge, si ferma e te lo dice. I piani non contano qui.",
       "notePlatform": "Solo per l'uso dell'API. Quando un agente lo raggiunge, si ferma e te lo dice."
     },
     "keySite": "Crea la chiave su {{site}}.",
@@ -1311,7 +1311,7 @@
     },
     "team": {
       "title": "Chi altro lavora con te?",
-      "payment": "Potrai invitare il tuo team dopo aver scelto un piano agentes.chat.",
+      "payment": "Potrai invitare il tuo team dopo aver scelto un piano Ackwire AI.",
       "lead": "Invitali via email o condividi il link.",
       "leadLink": "Condividi con loro il link di invito.",
       "emails": "Email",
@@ -1915,9 +1915,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "Codice QR per accedere all'app agentes",
+    "qr": "Codice QR per accedere all'app Ackwire AI",
     "making": "Creazione del codice…",
-    "stepApp": "Installa l'app agentes sul telefono.",
+    "stepApp": "Installa l'app Ackwire AI sul telefono.",
     "stepTailscale": "Installa Tailscale sul telefono e accedi con lo stesso account Tailscale di questo server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -2386,8 +2386,8 @@
       "greetingPersonal": "Ciao, sono {{name}}. Preparo i tuoi agenti con te.",
       "lead": "Creo gli agenti, collego le app e invito le persone. Nulla cambia se non lo chiedi, e faccio solo quello che puoi fare tu.",
       "leadPersonal": "Creo i tuoi agenti e collego le tue app. Nulla cambia se non lo chiedi.",
-      "heldLead": "Scegli di cosa si occupa la tua azienda e il team appare qui. Gli agenti iniziano a lavorare quando il workspace ha un piano agentes.chat.",
-      "heldLeadPersonal": "Scegli in cosa vuoi aiuto e i tuoi agenti appaiono qui. Iniziano a lavorare quando hai un piano agentes.chat.",
+      "heldLead": "Scegli di cosa si occupa la tua azienda e il team appare qui. Gli agenti iniziano a lavorare quando il workspace ha un piano Ackwire AI.",
+      "heldLeadPersonal": "Scegli in cosa vuoi aiuto e i tuoi agenti appaiono qui. Iniziano a lavorare quando hai un piano Ackwire AI.",
       "connect": {
         "title": "Collega un’IA per il team",
         "titlePersonal": "Collega un'IA per i tuoi agenti",
@@ -2761,7 +2761,7 @@
       "plan_not_shared": "Collega il tuo piano per parlare con {{name}}: il piano del workspace risponde solo al suo proprietario.",
       "plan_unattended": "{{name}} non ha risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
       "runner_outdated": "{{name}} non può rispondere ora: il programma sul computer del piano va aggiornato.",
-      "plan_tools": "{{name}} si è fermato prima di rispondere: l'IA del piano su quel computer non è rimasta negli strumenti di agentes.chat.",
+      "plan_tools": "{{name}} si è fermato prima di rispondere: l'IA del piano su quel computer non è rimasta negli strumenti di Ackwire AI.",
       "model_limit": "{{name}} non può rispondere ora: {{model}} ha raggiunto il proprio limite nel piano. Gli altri modelli del piano continuano a funzionare.",
       "model_region": "{{name}} non può rispondere: {{model}} ha bisogno della regione Global attivata in OpenCode (Settings › Privacy).",
       "model_off": "{{name}} non può rispondere: OpenCode ha rifiutato {{model}} con questa chiave. Attiva il modello o l'account in OpenCode, oppure scegli un altro modello.",
@@ -2775,7 +2775,7 @@
       "plan": "Il piano porta il computer degli agenti, sempre acceso. L'IA è quella che paghi già: Claude, ChatGPT e altre, o una chiave API.",
       "active": "Piano attivo. Collega un'IA e {{name}} risponde qui.",
       "receipt": "Conservato",
-      "channel": "Conservato. Gli agenti rispondono quando il workspace ha un piano agentes.chat."
+      "channel": "Conservato. Gli agenti rispondono quando il workspace ha un piano Ackwire AI."
     },
     "receipt": "Nessuno risponderà: nessuna IA collegata",
     "chip": "Nessuna IA"
@@ -2861,7 +2861,7 @@
       }
     },
     "billing": "Un piano accede sul computer del workspace, e il computer arriva con un piano Ackwire AI attivo.",
-    "billingWeb": "Scegline uno sul web, su agentes.chat.",
+    "billingWeb": "Scegline uno sul web, su Ackwire AI.",
     "orPayGo": "Oppure paga a consumo",
     "pay": {
       "label": "Come paghi?",
@@ -4860,7 +4860,7 @@
     "noInstructions_female": "{{name}} non ha ancora istruzioni. Spiega come deve lavorare.",
     "savedToast": "Modifiche a {{name}} salvate.",
     "savedToast_female": "Modifiche a {{name}} salvate.",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "permessi integrati",
     "connectHint": "Collega servizi",
     "subtitle": "{{role}} · di <b>{{owner}}</b> · {{model}} {{key}}",
@@ -5220,7 +5220,7 @@
         "two": "Preferenze",
         "three": "Attiva Browser",
         "done": "Fatto. Questa pagina se ne accorge da sola, non serve ricaricare.",
-        "menuOpen": "Apri agentes",
+        "menuOpen": "Apri Ackwire AI",
         "menuPrefs": "Preferenze…",
         "menuPause": "Pausa",
         "menuQuit": "Esci",
@@ -5425,7 +5425,7 @@
       "connectors": "Connettori di {{org}}",
       "connectorsPersonal": "I tuoi connettori",
       "oneLevel": "Un livello per app",
-      "builtin": "Integrati in agentes",
+      "builtin": "Integrati in Ackwire AI",
       "builtinHelp": "Drive, attività, memoria e altro",
       "noMatch": "Nessun risultato per “{{q}}”",
       "noneHere": "Niente in questo filtro",
@@ -7965,7 +7965,7 @@
         "pr_opened": "PR aperta su GitHub"
       },
       "issue": {
-        "created": "Attività creata in agentes"
+        "created": "Attività creata in Ackwire AI"
       },
       "deploy": {
         "succeeded": "Deploy completato"
@@ -9799,7 +9799,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "Aggiorna agentes sul computer per usare la chiave di un piano"
+        "keys": "Aggiorna Ackwire AI sul computer per usare la chiave di un piano"
       },
       "noComputer": "Gli account restano su un computer collegato. Prima collega uno dei tuoi.",
       "addComputer": "Collega un computer",
@@ -11683,7 +11683,7 @@
     "install": "Installa l'app Ackwire AI",
     "installMore": "Installa su un altro account",
     "none": "Ancora nessun account GitHub.",
-    "usingAccount": "Oggi gli agenti compaiono su GitHub come {{account}}. Installa l'app perché compaiano come l'app agentes.chat.",
+    "usingAccount": "Oggi gli agenti compaiono su GitHub come {{account}}. Installa l'app perché compaiano come l'app Ackwire AI.",
     "allRepos": "Tutti i repository",
     "someRepos": "Repository selezionati",
     "suspended": "Sospeso su GitHub",
@@ -11701,14 +11701,14 @@
     "requested": "Solo il titolare dell'account GitHub può installare l'app. Chiedigli di installarla da Connettori › GitHub in questo spazio di lavoro.",
     "notVisible": "Il tuo account GitHub non vede quell'installazione. Installala con un account che vi abbia accesso.",
     "otherWorkspace": "Questo account GitHub è già collegato a un altro spazio di lavoro. Rimuovi l'app da lì prima di installarla qui.",
-    "installedOutside": "L'app è stata installata su questo account GitHub fuori da agentes.chat. Rimuovila su GitHub e installala di nuovo da Connettori › GitHub.",
+    "installedOutside": "L'app è stata installata su questo account GitHub fuori da Ackwire AI. Rimuovila su GitHub e installala di nuovo da Connettori › GitHub.",
     "misconfigured": "L'app GitHub ha la chiave segreta sbagliata sul server, quindi l'installazione non può finire. Chi gestisce il server deve sostituire la chiave nelle impostazioni dell'app.",
     "connectAccount": "Collega un account GitHub",
     "ownerHint": "Il proprietario di questo server può creare l'app GitHub qui in Connettori.",
     "viaApp": "Tramite l'app Ackwire AI su {{accounts}}",
     "disconnectApp": "L'app Ackwire AI viene disinstallata anche da {{accounts}} su GitHub.",
     "disconnectKeepsApp": "Gli agenti restano su GitHub tramite l'app Ackwire AI su {{accounts}}.",
-    "keptApp": "Account GitHub scollegato. Gli agenti restano su GitHub tramite l'app agentes.chat.",
+    "keptApp": "Account GitHub scollegato. Gli agenti restano su GitHub tramite l'app Ackwire AI.",
     "signature": {
       "forPerson": "{{agent}}, agente di {{person}} su Ackwire AI",
       "alone": "{{agent}}, un agente su Ackwire AI"
@@ -13375,7 +13375,7 @@
       "generalKept": "#general non si può eliminare.",
       "generalStays": "Tutti restano in #general.",
       "mcpUnreachable": "Impossibile collegarsi al server MCP. Controlla il suo indirizzo e riprova.",
-      "notApproved": "Questo servizio non ha ancora approvato agentes.chat.",
+      "notApproved": "Questo servizio non ha ancora approvato Ackwire AI.",
       "alreadyInvited": "Questa persona ha già un invito.",
       "alreadyAsked": "Qualcuno ha già chiesto per questa persona.",
       "mailboxConnected": "Questa casella è già collegata.",
@@ -13797,9 +13797,9 @@
     },
     "host": {
       "label": "Il computer di questo server",
-      "desc": "Dove è installato agentes.chat.",
+      "desc": "Dove è installato Ackwire AI.",
       "descUsers": "Dove è installato Ackwire AI, un utente per agente.",
-      "descShared": "Il computer su cui è installato agentes.chat. Gli agenti lavorano come la persona che l'ha installato.",
+      "descShared": "Il computer su cui è installato Ackwire AI. Gli agenti lavorano come la persona che l'ha installato.",
       "stop": "Smetti di usarlo in questo spazio di lavoro",
       "stopTitle": "Smettere di usare il computer di questo server?",
       "stopText": "Gli agenti di questo spazio di lavoro smettono subito di usare questo computer. Puoi riusarlo quando vuoi.",
@@ -14175,7 +14175,7 @@
       "open": "Apri l'app Ackwire AI",
       "browserAsks": "Il browser chiede se può aprirla: scegli Apri, e Consenti sempre se lo propone.",
       "noApp": "Non hai l'app?",
-      "afterInstall": "Dopo l'installazione, premi di nuovo Apri l'app agentes.chat. Il link funziona una volta, per 10 minuti.",
+      "afterInstall": "Dopo l'installazione, premi di nuovo Apri l'app Ackwire AI. Il link funziona una volta, per 10 minuti.",
       "waiting": "In attesa dell'app su questo computer…",
       "expired": "Questo link è scaduto.",
       "again": "Crea un nuovo link",
@@ -14543,7 +14543,7 @@
     "reconnectDoneText": "{{name}} è di nuovo in {{org}}.",
     "deniedTitle": "Non collegato",
     "denied": "Il computer non è stato collegato. Se non l'hai aperto tu, nessuno ha avuto accesso.",
-    "home": "Vai ad agentes"
+    "home": "Vai ad Ackwire AI"
   },
   "apps": {
     "connect": "Collega un'app",
@@ -14763,7 +14763,7 @@
       "canRead": "Leggere le risposte e cosa stanno facendo gli agenti.",
       "canManage": "Creare e modificare agenti, routine e skill a tuo nome. Ricevi un avviso di ciò che crea.",
       "never": "Mai",
-      "neverApprove": "Approvare le azioni degli agenti. Le approvazioni restano alle persone in agentes.chat.",
+      "neverApprove": "Approvare le azioni degli agenti. Le approvazioni restano alle persone in Ackwire AI.",
       "neverSettings": "Cambiare impostazioni, membri o permessi.",
       "neverHidden": "Vedere ciò che non puoi vedere tu.",
       "loopbackWarning": "Qualsiasi programma su questo computer può ricevere questo accesso. Continua solo se l'hai appena avviato in Claude Code o in un'altra app su questo computer.",
@@ -15057,7 +15057,7 @@
       "rolesPersonal": "Cosa può fare ogni persona qui. Chi è proprietario può fare tutto."
     },
     "about": {
-      "basedOn": "Basato su <site>Ackwire AI</site> di Codari Global, LLC",
+      "basedOn": "Basato su <site>agentes.chat</site> di Codari Global, LLC",
       "version": "Versione",
       "license": "Software libero sotto la <license>GNU Affero General Public License v3</license>, senza garanzia.",
       "source": "Codice sorgente",
@@ -16194,7 +16194,7 @@
       "no_ai_plan_not_shared": "Non posso risponderti con il piano del workspace: risponde solo al suo proprietario. Collega il tuo piano e ti risponderò.",
       "no_ai_plan_unattended": "Non ho risposto: la richiesta non veniva da una persona, e il piano del workspace risponde solo al suo proprietario.",
       "no_ai_runner_outdated": "Ora non posso rispondere: il programma sul computer del mio piano va aggiornato.",
-      "no_ai_plan_tools": "Mi sono fermato prima di rispondere: l'IA del mio piano su quel computer non è rimasta negli strumenti di agentes.chat.",
+      "no_ai_plan_tools": "Mi sono fermato prima di rispondere: l'IA del mio piano su quel computer non è rimasta negli strumenti di Ackwire AI.",
       "no_ai_model_limit": "Ora non posso rispondere: {{model}} ha raggiunto il proprio limite nel mio piano.",
       "no_ai_model_region": "Non posso rispondere: {{model}} ha bisogno della regione Global attivata in OpenCode (Settings › Privacy).",
       "no_ai_model_off": "Non posso rispondere: OpenCode ha rifiutato {{model}} con la mia chiave. Attiva il modello o l'account in OpenCode, oppure cambia il mio modello.",
@@ -16978,7 +16978,7 @@
     "paused": "Gli agenti di questo spazio di lavoro sono in pausa per una verifica.",
     "suspended": "Questo spazio di lavoro per ora non è disponibile.",
     "createRefused": "Al momento non puoi creare uno spazio di lavoro.",
-    "createUnpaid": "Hai già uno spazio di lavoro in attesa di un piano agentes.chat. Scegli il suo piano prima di crearne un altro.",
+    "createUnpaid": "Hai già uno spazio di lavoro in attesa di un piano Ackwire AI. Scegli il suo piano prima di crearne un altro.",
     "createUnpaidOpen": "Apri {{name}}",
     "createInactive": "Hai già uno spazio di lavoro non ancora attivo, quindi per ora non puoi crearne un altro.",
     "agentPaused": "Questo agente per ora è in pausa.",
@@ -17004,7 +17004,7 @@
       }
     },
     "billing": {
-      "payment": "Questo spazio di lavoro non ha ancora un piano agentes.chat. I suoi agenti inizieranno a lavorare quando lo avrà.",
+      "payment": "Questo spazio di lavoro non ha ancora un piano Ackwire AI. I suoi agenti inizieranno a lavorare quando lo avrà.",
       "unpaid": "Il pagamento del piano Ackwire AI di questo spazio di lavoro non è andato a buon fine e i suoi agenti si sono fermati.",
       "ended": "Il piano Ackwire AI di questo spazio di lavoro è terminato e i suoi agenti si sono fermati. Le conversazioni e i file sono ancora qui da leggere e scaricare.",
       "sub": "Puoi comunque leggere e scrivere qui. Gli agenti tornano appena il piano Ackwire AI è in regola.",
@@ -17016,7 +17016,7 @@
       "askAdmin": "Chi gestisce questo spazio di lavoro può sistemare la cosa.",
       "paid": "Pagamento ricevuto. Il piano Ackwire AI parte tra un attimo.",
       "teamReady": "Il tuo team è pronto. Manca un piano Ackwire AI per iniziare.",
-      "invites": "Gli inviti si aprono con il piano agentes.chat."
+      "invites": "Gli inviti si aprono con il piano Ackwire AI."
     },
     "cloud": {
       "review": "In pausa per una verifica di sicurezza, finché il nostro team non la esamina. I nostri controlli automatici hanno segnalato attività che potrebbero violare i nostri Termini (sezione 5). Per contestare, scrivi a {{email}}.",
@@ -17141,7 +17141,7 @@
     "open": "Apri piano e fatturazione",
     "opening": "Apertura…",
     "failed": "Impossibile aprirlo ora. Riprova tra un attimo.",
-    "adminsOnly": "Solo i proprietari e gli admin dello spazio di lavoro gestiscono il suo piano agentes.chat.",
+    "adminsOnly": "Solo i proprietari e gli admin dello spazio di lavoro gestiscono il suo piano Ackwire AI.",
     "seeOptions": "Vedi le opzioni",
     "people": "Persone",
     "files": "File",
@@ -17156,7 +17156,7 @@
     "members": {
       "full": "Questo spazio di lavoro ha {{members}} persone su {{limit}}.",
       "fullOne": "Il piano Ackwire AI di questo spazio di lavoro prevede 1 persona.",
-      "fullAdmin": "Per far entrare altre persone, guarda le opzioni del piano agentes.chat.",
+      "fullAdmin": "Per far entrare altre persone, guarda le opzioni del piano Ackwire AI.",
       "fullMember": "Chiedi a chi gestisce lo spazio di lavoro di fare spazio.",
       "fullAddSeat": "Tutti i posti pagati sono occupati. Aggiungi un posto in Piano e fatturazione.",
       "fullTop": "Questo piano non accoglie altre persone. Cambia piano in Piano e fatturazione.",
@@ -17528,8 +17528,8 @@
       "unavailableHelp": "Riprova tra un attimo.",
       "screensOff": "Gli schermi sono disattivati su {{computer}}. Attivali lì:",
       "screensMissing": "{{computer}} non può ancora mostrare gli schermi. Su quel computer:",
-      "outdated": "Aggiorna agentes su {{computer}} per vedere lo schermo di {{name}}.",
-      "outdated_female": "Aggiorna agentes su {{computer}} per vedere lo schermo di {{name}}.",
+      "outdated": "Aggiorna Ackwire AI su {{computer}} per vedere lo schermo di {{name}}.",
+      "outdated_female": "Aggiorna Ackwire AI su {{computer}} per vedere lo schermo di {{name}}.",
       "noScreen": "{{name}} non ha uno schermo da mostrare qui",
       "noScreen_female": "{{name}} non ha uno schermo da mostrare qui",
       "noScreenHelp": "Consenti lo schermo o il browser in Strumenti e accesso.",
@@ -17657,7 +17657,7 @@
       "browser": "Browser",
       "screen": "Schermo del computer",
       "terminal": "Terminale",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "Sta pensando",
       "inside": "{{program}} · {{detail}}"
     },
@@ -18677,7 +18677,7 @@
     "mark": "Beta",
     "open": "Invia feedback",
     "ask": "Cosa è mancato, si è rotto o ha dato fastidio?",
-    "goesCloud": "Quello che scrivi arriva via email al team di agentes.chat.",
+    "goesCloud": "Quello che scrivi arriva via email al team di Ackwire AI.",
     "goesServer": "Quello che scrivi arriva via email a chi gestisce questo server.",
     "placeholder": "Scrivilo a modo tuo",
     "report": "Segnala un problema qui",

@@ -67,7 +67,7 @@ describe("discovery", () => {
         authorization_servers: [ORIGIN],
         scopes_supported: ["read", "write", "manage"],
         bearer_methods_supported: ["header"],
-        resource_name: "agentes.chat",
+        resource_name: "Ackwire AI",
         resource_documentation: "https://agentes.chat/docs/apps-de-ia",
       });
     }

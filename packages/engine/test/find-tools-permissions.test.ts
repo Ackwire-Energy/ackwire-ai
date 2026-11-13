@@ -402,11 +402,11 @@ test("an app this installation can't connect says whoever runs it turns it on; o
   );
 });
 
-test("an app whose maker hasn't approved agentes.chat says so, and how an admin connects it with a key instead", async () => {
+test("an app whose maker hasn't approved Ackwire AI says so, and how an admin connects it with a key instead", async () => {
   f = await setup({ issueTools: true, catalog: { oauthApps: {} } });
   const ctx = await nothingLoaded();
   expect(await findTools(ctx, "figma")).toEndWith(
-    `\n\n${TO_GET}\n- Figma: Figma designs, components and variables. Not open to agentes.chat yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors and MCPs › Add MCP (in Portuguese, Configurações › Conectores e MCPs › Adicionar MCP).`,
+    `\n\n${TO_GET}\n- Figma: Figma designs, components and variables. Not open to Ackwire AI yet: it only lets apps it approved connect in one click. If it gives an API key, an admin connects it with that by its address, in Settings › Connectors and MCPs › Add MCP (in Portuguese, Configurações › Conectores e MCPs › Adicionar MCP).`,
   );
 });
 

@@ -324,7 +324,7 @@ describe("what only an organization's installation reaches (ADR 0156, addendum)"
 describe("what agents write on GitHub is signed (ADR 0156)", () => {
   test("bodies end with one line naming the agent and the person; an edit replaces the old one", async () => {
     const w = await world({ account: true });
-    const line = `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no agentes.chat</sub>`;
+    const line = `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no Ackwire AI</sub>`;
     const first = await w.call("github_add_issue_comment", {
       owner: "acme",
       repo: "app",

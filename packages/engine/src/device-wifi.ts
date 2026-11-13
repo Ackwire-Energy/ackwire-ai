@@ -16,7 +16,7 @@ const { machinePhones } = schema;
  * its owner's, on their adb.
  */
 
-/** A pairing as the apps see it; `update`: the computer's agentes.chat is too old to pair over Wi-Fi. */
+/** A pairing as the apps see it; `update`: the computer's Ackwire AI is too old to pair over Wi-Fi. */
 export interface WifiPairing {
   id: string;
   way: "qr" | "code";

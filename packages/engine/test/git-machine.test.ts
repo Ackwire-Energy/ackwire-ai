@@ -780,7 +780,7 @@ describe("agents' commits and the GitHub App (ADR 0156)", () => {
       .insert(schema.githubAppInstallations)
       .values({ orgId: f.org.id, installationId: 9, accountLogin: "acme", accountType: "Organization" });
     expect((await setupNow())?.author).toEqual({
-      name: "Dev (agentes.chat)",
+      name: "Dev (Ackwire AI)",
       email: "77+agentes-machine-test[bot]@users.noreply.github.com",
     });
 

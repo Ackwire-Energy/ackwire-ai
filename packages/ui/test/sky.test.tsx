@@ -72,7 +72,7 @@ describe("sky tones", () => {
 
   test("eyes are white everywhere; the pixel agents' body is the agent's deep tone", () => {
     expect(EYE).toBe("#ffffff");
-    expect(spriteTone("sky")).toBe("#04203f");
+    expect(spriteTone("sky")).toBe("#23440b");
     const light = (c: string) =>
       (Number.parseInt(c.slice(1, 3), 16) + Number.parseInt(c.slice(3, 5), 16) + Number.parseInt(c.slice(5, 7), 16)) /
       3;

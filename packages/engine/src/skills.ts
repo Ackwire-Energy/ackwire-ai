@@ -685,7 +685,7 @@ async function githubGet(
   for (let hop = 0; ; hop++) {
     const at = await assertPublicHttpsUrl(next, deps.resolveHost);
     if (!GITHUB_HOSTS.has(at.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
-    const headers: Record<string, string> = { accept, "user-agent": "agentes.chat" };
+    const headers: Record<string, string> = { accept, "user-agent": "Ackwire AI" };
     if (token && at.origin === GITHUB_API) headers.authorization = `Bearer ${token}`;
     const res = await http(at.toString(), {
       headers,

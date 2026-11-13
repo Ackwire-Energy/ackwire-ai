@@ -274,15 +274,17 @@ configs:
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
       <meta name="robots" content="noindex">
-      <title>agentes.chat will be right back</title>
+      <title>Ackwire AI will be right back</title>
       <noscript><meta http-equiv="refresh" content="30"></noscript>
-      <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3CclipPath id='m'%3E%3Cpath d='M10.12 2H21.88A8.12 8.12 0 0 1 30 10.12V21.88A8.12 8.12 0 0 1 21.88 30H3.512A1.512 1.512 0 0 1 2 28.488V10.12A8.12 8.12 0 0 1 10.12 2Z'/%3E%3C/clipPath%3E%3Cg clip-path='url(%23m)' shape-rendering='crispEdges'%3E%3Cg transform='translate(2 2) scale(2.8)'%3E%3Cpath fill='%23c6e1ff' d='M0 0h1v1H0zM2 0h1v1H2zM4 0h1v1H4zM6 0h1v1H6zM8 0h1v1H8z'/%3E%3Cpath fill='%238cc3ff' d='M1 0h1v1H1zM3 0h1v1H3zM5 0h1v1H5zM7 0h1v1H7zM9 0h1v1H9zM0 1h10v1H0zM0 2h5v1H0zM6 2h1v1H6zM8 2h1v1H8zM1 3h1v1H1zM3 3h1v1H3zM0 4h1v1H0zM2 4h1v1H2zM4 4h1v1H4z'/%3E%3Cpath fill='%234693e8' d='M5 2h1v1H5zM7 2h1v1H7zM9 2h1v1H9zM0 3h1v1H0zM2 3h1v1H2zM4 3h6v1H4zM1 4h1v1H1zM3 4h1v1H3zM5 4h5v1H5zM0 5h6v1H0zM7 5h1v1H7zM9 5h1v1H9zM0 6h1v1H0zM2 6h1v1H2zM4 6h1v1H4zM6 6h1v1H6zM8 6h1v1H8zM0 8h1v1H0z'/%3E%3Cpath fill='%230063d1' d='M6 5h1v1H6zM8 5h1v1H8zM1 6h1v1H1zM3 6h1v1H3zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM0 7h10v1H0zM1 8h9v1H1zM0 9h2v1H0zM3 9h1v1H3zM5 9h1v1H5zM7 9h1v1H7zM9 9h1v1H9z'/%3E%3Cpath fill='%23003d82' d='M2 9h1v1H2zM4 9h1v1H4zM6 9h1v1H6zM8 9h1v1H8z'/%3E%3C/g%3E%3C/g%3E%3Cg fill='%23fff'%3E%3Crect x='11.2' y='11.24' width='2.6' height='7.56' rx='1.3'/%3E%3Crect x='18.2' y='11.24' width='2.6' height='7.56' rx='1.3'/%3E%3C/g%3E%3C/svg%3E">
+      <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32' shape-rendering='crispEdges'%3E%3Ctitle%3EAckwire AI%3C/title%3E%3Crect width='32' height='32' rx='7' fill='%23031f1b' shape-rendering='auto'/%3E%3Cg transform='translate(3 9.5)'%3E%3Cpath fill='%23b8f582' d='M12 0h2v1h-2zM11 1h4v1h-4zM10 2h6v1h-6zM9 3h3v1h-3zM14 3h3v1h-3zM8 4h3v1h-3zM15 4h3v1h-3zM7 5h3v1h-3zM16 5h3v1h-3zM6 6h3v1h-3zM17 6h3v1h-3zM5 7h3v1h-3zM18 7h3v1h-3zM4 8h3v1h-3zM19 8h3v1h-3zM3 9h3v1h-3zM20 9h3v1h-3zM2 10h3v1h-3zM21 10h3v1h-3zM1 11h3v1h-3zM22 11h3v1h-3zM0 12h3v1h-3zM23 12h3v1h-3z'/%3E%3Cpath fill='%2390ed42' d='M12 4h2v1h-2zM11 5h4v1h-4zM10 6h6v1h-6zM9 7h3v1h-3zM14 7h3v1h-3zM8 8h3v1h-3zM15 8h3v1h-3zM7 9h3v1h-3zM16 9h3v1h-3zM6 10h3v1h-3zM17 10h3v1h-3zM5 11h3v1h-3zM18 11h3v1h-3zM4 12h3v1h-3zM19 12h3v1h-3z'/%3E%3Cpath fill='%236cba2c' d='M12 8h2v1h-2zM11 9h4v1h-4zM10 10h6v1h-6zM9 11h3v1h-3zM14 11h3v1h-3zM8 12h3v1h-3zM15 12h3v1h-3z'/%3E%3C/g%3E%3C/svg%3E">
       <style>
-      :root{color-scheme:light dark;--bg:#fbfbfa;--raised:#ffffff;--line:rgba(23, 23, 22, 0.07);--ink:#151514;--muted:#5c5c58;--agent:#0063d1;--agent2:#3d8bff;--agent-soft:#e3eefd;--font-sans:Onest, "Segoe UI", system-ui, sans-serif}
-      [data-theme=dark]{--bg:#0f0f0e;--raised:#1c1c1b;--line:rgba(255, 255, 255, 0.1);--ink:#efefec;--muted:#a3a39e;--agent:#5aa8ff;--agent2:#8cc3ff;--agent-soft:#11253f}
-      @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0f0f0e;--raised:#1c1c1b;--line:rgba(255, 255, 255, 0.1);--ink:#efefec;--muted:#a3a39e;--agent:#5aa8ff;--agent2:#8cc3ff;--agent-soft:#11253f}}
+      :root{color-scheme:light dark;--bg:#ffffff;--raised:#ffffff;--line:rgba(23, 23, 22, 0.07);--ink:#151514;--muted:#5c5c58;--agent:#3f7a12;--agent2:#90ed42;--agent-soft:#e8f5dc;--font-sans:Onest, "Segoe UI", system-ui, sans-serif}
+      [data-theme=dark]{--bg:#000000;--raised:#161616;--line:rgba(255, 255, 255, 0.1);--ink:#efefec;--muted:#a3a39e;--agent:#90ed42;--agent2:#b8f582;--agent-soft:#1a2e0c}
+      @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#000000;--raised:#161616;--line:rgba(255, 255, 255, 0.1);--ink:#efefec;--muted:#a3a39e;--agent:#90ed42;--agent2:#b8f582;--agent-soft:#1a2e0c}}
       *{box-sizing:border-box}
       body{margin:0;min-height:100vh;min-height:100dvh;display:flex;justify-content:center;padding:96px 16px 34vh;background:var(--bg);color:var(--ink);font:15px/1.5 var(--font-sans);-webkit-font-smoothing:antialiased}
+      .mark .p1{fill:#2f5f0d}.mark .p2{fill:#3f7a12}.mark .p3{fill:#5a9a1e}
+      [data-theme=dark] .mark .p1{fill:#b8f582}[data-theme=dark] .mark .p2{fill:#90ed42}[data-theme=dark] .mark .p3{fill:#6cba2c}
       .mark{position:absolute;top:24px;left:28px;width:28px;height:28px}
       html[data-desktop] .mark{top:56px}
       main{display:flex;flex-direction:column;align-items:flex-start;gap:12px;width:min(100%,460px);margin:auto 0}
@@ -351,9 +353,9 @@ configs:
       </script>
       </head>
       <body>
-      <svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><clipPath id="m"><path d="M10.12 2H21.88A8.12 8.12 0 0 1 30 10.12V21.88A8.12 8.12 0 0 1 21.88 30H3.512A1.512 1.512 0 0 1 2 28.488V10.12A8.12 8.12 0 0 1 10.12 2Z"/></clipPath><g clip-path="url(#m)" shape-rendering="crispEdges"><g transform="translate(2 2) scale(2.8)"><path fill="#c6e1ff" d="M0 0h1v1H0zM2 0h1v1H2zM4 0h1v1H4zM6 0h1v1H6zM8 0h1v1H8z"/><path fill="#8cc3ff" d="M1 0h1v1H1zM3 0h1v1H3zM5 0h1v1H5zM7 0h1v1H7zM9 0h1v1H9zM0 1h10v1H0zM0 2h5v1H0zM6 2h1v1H6zM8 2h1v1H8zM1 3h1v1H1zM3 3h1v1H3zM0 4h1v1H0zM2 4h1v1H2zM4 4h1v1H4z"/><path fill="#4693e8" d="M5 2h1v1H5zM7 2h1v1H7zM9 2h1v1H9zM0 3h1v1H0zM2 3h1v1H2zM4 3h6v1H4zM1 4h1v1H1zM3 4h1v1H3zM5 4h5v1H5zM0 5h6v1H0zM7 5h1v1H7zM9 5h1v1H9zM0 6h1v1H0zM2 6h1v1H2zM4 6h1v1H4zM6 6h1v1H6zM8 6h1v1H8zM0 8h1v1H0z"/><path fill="#0063d1" d="M6 5h1v1H6zM8 5h1v1H8zM1 6h1v1H1zM3 6h1v1H3zM5 6h1v1H5zM7 6h1v1H7zM9 6h1v1H9zM0 7h10v1H0zM1 8h9v1H1zM0 9h2v1H0zM3 9h1v1H3zM5 9h1v1H5zM7 9h1v1H7zM9 9h1v1H9z"/><path fill="#003d82" d="M2 9h1v1H2zM4 9h1v1H4zM6 9h1v1H6zM8 9h1v1H8z"/></g></g><g fill="#fff"><rect x="11.2" y="11.24" width="2.6" height="7.56" rx="1.3"/><rect x="18.2" y="11.24" width="2.6" height="7.56" rx="1.3"/></g></svg>
+      <svg class="mark" viewBox="0 -6.5 26 26" shape-rendering="crispEdges" aria-hidden="true"><path class="p1" d="M12 0h2v1h-2zM11 1h4v1h-4zM10 2h6v1h-6zM9 3h3v1h-3zM14 3h3v1h-3zM8 4h3v1h-3zM15 4h3v1h-3zM7 5h3v1h-3zM16 5h3v1h-3zM6 6h3v1h-3zM17 6h3v1h-3zM5 7h3v1h-3zM18 7h3v1h-3zM4 8h3v1h-3zM19 8h3v1h-3zM3 9h3v1h-3zM20 9h3v1h-3zM2 10h3v1h-3zM21 10h3v1h-3zM1 11h3v1h-3zM22 11h3v1h-3zM0 12h3v1h-3zM23 12h3v1h-3z"/><path class="p2" d="M12 4h2v1h-2zM11 5h4v1h-4zM10 6h6v1h-6zM9 7h3v1h-3zM14 7h3v1h-3zM8 8h3v1h-3zM15 8h3v1h-3zM7 9h3v1h-3zM16 9h3v1h-3zM6 10h3v1h-3zM17 10h3v1h-3zM5 11h3v1h-3zM18 11h3v1h-3zM4 12h3v1h-3zM19 12h3v1h-3z"/><path class="p3" d="M12 8h2v1h-2zM11 9h4v1h-4zM10 10h6v1h-6zM9 11h3v1h-3zM14 11h3v1h-3zM8 12h3v1h-3zM15 12h3v1h-3z"/></svg>
       <main>
-      <h1><svg class="orbit" viewBox="0 0 14 14" aria-hidden="true"><rect x="0" y="0" width="4" height="4"/><rect x="5" y="0" width="4" height="4"/><rect x="10" y="0" width="4" height="4"/><rect x="10" y="5" width="4" height="4"/><rect x="10" y="10" width="4" height="4"/><rect x="5" y="10" width="4" height="4"/><rect x="0" y="10" width="4" height="4"/><rect x="0" y="5" width="4" height="4"/></svg><span id="title">agentes.chat will be right back</span></h1>
+      <h1><svg class="orbit" viewBox="0 0 14 14" aria-hidden="true"><rect x="0" y="0" width="4" height="4"/><rect x="5" y="0" width="4" height="4"/><rect x="10" y="0" width="4" height="4"/><rect x="10" y="5" width="4" height="4"/><rect x="10" y="10" width="4" height="4"/><rect x="5" y="10" width="4" height="4"/><rect x="0" y="10" width="4" height="4"/><rect x="0" y="5" width="4" height="4"/></svg><span id="title">Ackwire AI will be right back</span></h1>
       <p id="text">The server isn't answering right now. This page opens by itself as soon as it's back.</p>
       <p id="paid" hidden>If you just paid, there's no need to pay again.</p>
       <a id="retry" class="btn" href="">Try now</a>
@@ -369,19 +371,19 @@ configs:
       (() => {
         // title, text, paid, retry. The markup is the English.
         const WORDS = {
-          "pt-BR": ["O agentes.chat já volta", "O servidor não está respondendo agora. Esta página abre sozinha assim que ele voltar.", "Se você acabou de pagar, não precisa pagar de novo.", "Tentar agora"],
-          es: ["agentes.chat vuelve enseguida", "El servidor no responde ahora. Esta página se abre sola en cuanto vuelva.", "Si acabas de pagar, no hace falta pagar de nuevo.", "Intentar ahora"],
-          fr: ["agentes.chat revient tout de suite", "Le serveur ne répond pas pour le moment. Cette page s'ouvre d'elle-même dès qu'il revient.", "Si vous venez de payer, inutile de payer à nouveau.", "Réessayer"],
-          de: ["agentes.chat ist gleich wieder da", "Der Server antwortet gerade nicht. Diese Seite öffnet sich von selbst, sobald er wieder da ist.", "Wenn du gerade bezahlt hast, musst du nicht noch einmal bezahlen.", "Jetzt versuchen"],
-          it: ["agentes.chat torna subito", "Il server non risponde in questo momento. Questa pagina si apre da sola appena torna.", "Se hai appena pagato, non serve pagare di nuovo.", "Riprova ora"],
-          nl: ["agentes.chat is zo terug", "De server reageert nu niet. Deze pagina opent vanzelf zodra hij terug is.", "Heb je net betaald? Dan hoef je niet opnieuw te betalen.", "Nu proberen"],
-          ja: ["agentes.chat はまもなく戻ります", "サーバーが現在応答していません。復旧するとこのページは自動で開きます。", "お支払いが済んでいれば、もう一度支払う必要はありません。", "今すぐ試す"],
-          ko: ["agentes.chat가 곧 돌아와요", "지금 서버가 응답하지 않아요. 서버가 돌아오면 이 페이지가 자동으로 열려요.", "방금 결제했다면 다시 결제할 필요 없어요.", "지금 시도"],
-          "zh-Hans": ["agentes.chat 马上回来", "服务器暂时没有响应。服务器恢复后，此页面会自动打开。", "如果你刚刚付过款，无需再次付款。", "立即重试"],
-          id: ["agentes.chat segera kembali", "Server sedang tidak merespons. Halaman ini akan terbuka sendiri begitu server kembali.", "Kalau kamu baru saja membayar, tidak perlu membayar lagi.", "Coba sekarang"],
-          tr: ["agentes.chat birazdan geri dönecek", "Sunucu şu anda yanıt vermiyor. Bu sayfa, sunucu geri döner dönmez kendiliğinden açılır.", "Ödemeyi az önce yaptıysanız tekrar ödemenize gerek yok.", "Şimdi dene"],
-          pl: ["agentes.chat zaraz wróci", "Serwer teraz nie odpowiada. Ta strona otworzy się sama, gdy tylko wróci.", "Jeśli płatność właśnie została zrealizowana, nie trzeba płacić ponownie.", "Spróbuj teraz"],
-          ru: ["agentes.chat скоро вернётся", "Сервер сейчас не отвечает. Эта страница откроется сама, как только он вернётся.", "Если вы только что оплатили, платить ещё раз не нужно.", "Попробовать сейчас"],
+          "pt-BR": ["O Ackwire AI já volta", "O servidor não está respondendo agora. Esta página abre sozinha assim que ele voltar.", "Se você acabou de pagar, não precisa pagar de novo.", "Tentar agora"],
+          es: ["Ackwire AI vuelve enseguida", "El servidor no responde ahora. Esta página se abre sola en cuanto vuelva.", "Si acabas de pagar, no hace falta pagar de nuevo.", "Intentar ahora"],
+          fr: ["Ackwire AI revient tout de suite", "Le serveur ne répond pas pour le moment. Cette page s'ouvre d'elle-même dès qu'il revient.", "Si vous venez de payer, inutile de payer à nouveau.", "Réessayer"],
+          de: ["Ackwire AI ist gleich wieder da", "Der Server antwortet gerade nicht. Diese Seite öffnet sich von selbst, sobald er wieder da ist.", "Wenn du gerade bezahlt hast, musst du nicht noch einmal bezahlen.", "Jetzt versuchen"],
+          it: ["Ackwire AI torna subito", "Il server non risponde in questo momento. Questa pagina si apre da sola appena torna.", "Se hai appena pagato, non serve pagare di nuovo.", "Riprova ora"],
+          nl: ["Ackwire AI is zo terug", "De server reageert nu niet. Deze pagina opent vanzelf zodra hij terug is.", "Heb je net betaald? Dan hoef je niet opnieuw te betalen.", "Nu proberen"],
+          ja: ["Ackwire AI はまもなく戻ります", "サーバーが現在応答していません。復旧するとこのページは自動で開きます。", "お支払いが済んでいれば、もう一度支払う必要はありません。", "今すぐ試す"],
+          ko: ["Ackwire AI가 곧 돌아와요", "지금 서버가 응답하지 않아요. 서버가 돌아오면 이 페이지가 자동으로 열려요.", "방금 결제했다면 다시 결제할 필요 없어요.", "지금 시도"],
+          "zh-Hans": ["Ackwire AI 马上回来", "服务器暂时没有响应。服务器恢复后，此页面会自动打开。", "如果你刚刚付过款，无需再次付款。", "立即重试"],
+          id: ["Ackwire AI segera kembali", "Server sedang tidak merespons. Halaman ini akan terbuka sendiri begitu server kembali.", "Kalau kamu baru saja membayar, tidak perlu membayar lagi.", "Coba sekarang"],
+          tr: ["Ackwire AI birazdan geri dönecek", "Sunucu şu anda yanıt vermiyor. Bu sayfa, sunucu geri döner dönmez kendiliğinden açılır.", "Ödemeyi az önce yaptıysanız tekrar ödemenize gerek yok.", "Şimdi dene"],
+          pl: ["Ackwire AI zaraz wróci", "Serwer teraz nie odpowiada. Ta strona otworzy się sama, gdy tylko wróci.", "Jeśli płatność właśnie została zrealizowana, nie trzeba płacić ponownie.", "Spróbuj teraz"],
+          ru: ["Ackwire AI скоро вернётся", "Сервер сейчас не отвечает. Эта страница откроется сама, как только он вернётся.", "Если вы только что оплатили, платить ещё раз не нужно.", "Попробовать сейчас"],
         };
         const MISS = [502, 503, 504, 520, 521, 522, 523, 524, 525, 526, 527, 530];
         const byId = (id) => document.getElementById(id);

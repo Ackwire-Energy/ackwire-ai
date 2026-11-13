@@ -7,7 +7,7 @@ const APP = join(import.meta.dir, "..");
 const ROOTS = [join(APP, "src"), join(APP, "app")];
 /** Brand names, symbols and code that stay as they are. */
 const ALLOWED = [
-  /^(agentes|chat|\.chat|agentes\.chat|GitHub|MCP|Drive|Claude Code|Codex|US\$|UTC|GIF|PDF)$/,
+  /^(Ackwire|AI|Ackwire AI|agentes|chat|\.chat|agentes\.chat|GitHub|MCP|Drive|Claude Code|Codex|US\$|UTC|GIF|PDF)$/,
   // A comparison in code (`a.length > LIMIT ? … : …`), not text.
   /^[A-Z_]+ \?$/,
   /^[A-Z]$/,

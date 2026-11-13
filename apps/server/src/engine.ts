@@ -573,7 +573,7 @@ export function buildEngine(o: EngineOptions) {
     log: o.log,
   });
   machineHub.setBrowserHooks(browserLive.hubHooks);
-  // agentes.chat Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
+  // Ackwire AI Cloud reads the screen's text while a person is in control (ADR 0076); a self-hosted server never.
   const sessions = config.SESSION_SCREENING ? createSessionScreening({ db, hub: machineHub, log: o.log }) : null;
   // Agents' desktops and terminals (ADR 0058): each person's stream paired with the runner's data socket for it,
   // its access checked again while open; control changing hands closes the views it hides. Where sessions are

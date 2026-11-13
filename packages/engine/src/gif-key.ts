@@ -8,7 +8,7 @@ const { instanceSecrets } = schema;
 
 /**
  * The installation's GIPHY key for GIFs (ADR 0091, amended 2026-10-31): `GIPHY_API_KEY`, else the one its owner adds
- * in Settings on a server that isn't agentes.chat's own, kept like the Jev key (ADR 0073): sealed, checked before it
+ * in Settings on a server that isn't Ackwire AI's own, kept like the Jev key (ADR 0073): sealed, checked before it
  * is kept, never returned, its last 4 shown. Read on every call, so a saved key works without a restart.
  */
 

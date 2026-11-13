@@ -5,7 +5,7 @@ import type { ModelProvider } from "@agenteschat/providers";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 
 /**
- * Which build of agentes.chat is running.
+ * Which build of Ackwire AI is running.
  * - `selfhost`: the open-source server, started by `apps/server/src/main.ts`.
  * - `cloud`: our hosted service: this same server, with Cloud-only behavior
  *   switched on by environment variables (ADR 0002 §5).

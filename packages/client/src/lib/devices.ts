@@ -774,7 +774,7 @@ export type PhoneScreenState =
   /** The phone needs its person first (unauthorized, replugged): opens again by itself. */
   | "notReady"
   | "forbidden"
-  /** The agentes.chat app on its computer is too old for this. */
+  /** The Ackwire AI app on its computer is too old for this. */
   | "outdated"
   /** Its computer can't show it (no adb, no Xcode, an iPhone without the test helper), or it's gone. */
   | "unavailable"

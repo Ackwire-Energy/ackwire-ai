@@ -60,7 +60,7 @@ const TONES: Record<BadgePresence, readonly [light: string, dark: string]> = {
   online: ["#2f9e5b", "#46c47a"],
   busy: ["#d92d20", "#ff6961"],
   away: ["#c98a00", "#f2b04a"],
-  out: ["#0a6f9e", "#5cc4ea"],
+  out: ["#3f7a12", "#90ed42"],
   offline: ["#8a8a8f", "#77776f"],
   hidden: ["#8a8a8f", "#77776f"],
 };

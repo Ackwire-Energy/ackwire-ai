@@ -653,7 +653,7 @@ export class RunnerDaemon implements RequestObserver {
     if (!session) {
       throw new RunnerError(
         "internal",
-        "This computer isn't connected to agentes.chat right now. Try again in a minute.",
+        "This computer isn't connected to Ackwire AI right now. Try again in a minute.",
       );
     }
     const { tools } = this.access();

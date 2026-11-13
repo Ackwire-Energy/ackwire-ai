@@ -557,7 +557,7 @@ test("a step before X that is held up (a pipe in the HOME, a hung disk) is stopp
   expect(await t.desktops.ensure(dev)).toMatchObject({ started: true });
   const [look] = t.fake.of("agentes-look");
   expect(t.fake.kills).toContainEqual([look?.pid ?? 0, "SIGTERM"]);
-  expect(t.logs).toContainEqual(expect.stringContaining("writing the agentes.chat look was stopped after 0.03 s"));
+  expect(t.logs).toContainEqual(expect.stringContaining("writing the Ackwire AI look was stopped after 0.03 s"));
   await t.desktops.stop(dev);
 
   // The prepare held up: that start fails, the display is free again, and the next start goes on.

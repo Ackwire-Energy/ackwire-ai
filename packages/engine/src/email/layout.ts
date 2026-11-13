@@ -123,7 +123,7 @@ export const EMAIL_PICTURES = [
   ...ONBOARDING_CREW.map(wholeFile),
 ];
 const FONT = "source-sans-3-latin.woff2";
-const LOGO = { width: 173, height: 36, alt: "agentes.chat" } as const;
+const LOGO = { width: 173, height: 36, alt: "Ackwire AI" } as const;
 const SKY = { width: 552, height: 27 } as const;
 /** An agent's face for its colour: a custom "#rrggbb" is the closest preset's, an unknown one is sky, as the app draws it. */
 const faceOf = (color: string) => `agent-${nearestPreset(color)}.png`;

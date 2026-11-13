@@ -51,7 +51,7 @@
       "certificate": "{{host}}의 인증서가 유효하지 않아요. 서버 관리자에게 문의해 주세요.",
       "notAgentes": "{{host}}은(는) Ackwire AI 서버가 아니에요. 주소를 확인해 주세요.",
       "serverTooOld": "{{host}}을(를) 이 앱에서 쓰려면 서버 업데이트가 필요해요.",
-      "appTooOld": "{{host}}을(를) 쓰려면 agentes 앱을 업데이트해 주세요.",
+      "appTooOld": "{{host}}을(를) 쓰려면 Ackwire AI 앱을 업데이트해 주세요.",
       "down": {
         "line": "{{host}}이(가) 응답하지 않았어요.",
         "text": "서버가 꺼져 있거나 네트워크 밖에 있을 수 있어요. 다시 켜지면 앱이 알아서 열려요.",

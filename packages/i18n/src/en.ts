@@ -4,10 +4,10 @@ import type { Widen } from "./widen";
  * English: the source language and every other language's fallback (ADR 0122). A key exists here first; the other
  * languages are checked against it (`test/locales.test.ts`).
  * Rules (docs/design/design-system/README.md): short sentences, active voice,
- * no exclamation marks, buttons start with a verb, "agentes" in lower case.
+ * no exclamation marks, buttons start with a verb, "Ackwire AI" as written.
  */
 export const en = {
-  app: { name: "agentes" },
+  app: { name: "Ackwire AI" },
   common: {
     close: "Close",
     joinSentences: "{{a}} {{b}}",
@@ -471,7 +471,7 @@ export const en = {
       noPasswordLead:
         "On the computer that runs this server, open the app and choose Add a password in Settings\u00a0›\u00a0Your account.",
       backToSignIn: "Back to sign in",
-      toAuthorizeApp: "To connect an app to agentes.chat.",
+      toAuthorizeApp: "To connect an app to Ackwire AI.",
     },
     desktop: {
       browser: "Continue in your browser",
@@ -486,7 +486,7 @@ export const en = {
       confirmYes: "Yes, sign the app in",
       confirmNo: "This wasn't me",
       done: "All set.",
-      doneLead: "You're signed in to the agentes app. You can close this tab.",
+      doneLead: "You're signed in to the Ackwire AI app. You can close this tab.",
       expired: "This request expired.",
       expiredLead: "Go back to the app and choose {{provider}} again.",
       handover: "Signing in with your account from the other device…",
@@ -782,7 +782,7 @@ export const en = {
        */
       area: {
         title: "And you, what do you work on?",
-        lead: "Just so we know who uses agentes.chat.",
+        lead: "Just so we know who uses Ackwire AI.",
         skip: "Skip this step",
         options: {
           dev: "Development",
@@ -1035,7 +1035,7 @@ export const en = {
         allow: "On the permission page, pick Create and edit agents, routines and skills.",
         paste: "Then paste this request into the app:",
         prompt:
-          "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in agentes.chat. First list what already exists there so nothing is duplicated.",
+          "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in Ackwire AI. First list what already exists there so nothing is duplicated.",
         promptLabel: "Request for your AI app",
         copy: "Copy the request",
         copied: "Now paste it into your AI app.",
@@ -1306,7 +1306,7 @@ export const en = {
       label: "Monthly limit per agent, in dollars",
       perMonth: "/month",
       noteKey:
-        "Only for API usage, charged by the key's provider, not by agentes.chat. When an agent reaches it, it stops and tells you. Plans don't count here.",
+        "Only for API usage, charged by the key's provider, not by Ackwire AI. When an agent reaches it, it stops and tells you. Plans don't count here.",
       notePlatform: "Only for API usage. When an agent reaches it, it stops and tells you.",
     },
     keySite: "Create the key at {{site}}.",
@@ -1806,7 +1806,7 @@ export const en = {
     /** In the desktop app, in place of New workspace: the app's window to add one (ADR 0154). */
     addWorkspace: "Add workspace",
     addWorkspaceHint: "Join one you already have, create one, or use your team's server",
-    /** Beside a server's name above its workspaces, when it isn't agentes.chat. */
+    /** Beside a server's name above its workspaces, when it isn't Ackwire AI. */
     yourServer: "Your server",
     /** A server's line in "Your workspaces" in the desktop app: the one on this computer, and its state (ADR 0158). */
     serverHere: "The Ackwire AI on this {{device}}",
@@ -1958,10 +1958,10 @@ export const en = {
     },
   },
   openOnPhone: {
-    qr: "QR code to sign in to the agentes app",
+    qr: "QR code to sign in to the Ackwire AI app",
     making: "Making the code…",
     /** Followed by the App Store and Google Play, each marked Soon until the app is in it. */
-    stepApp: "Install the agentes app on your phone.",
+    stepApp: "Install the Ackwire AI app on your phone.",
     stepTailscale: "Install Tailscale on your phone and sign in with the same Tailscale account as this server.",
     /** The links to Tailscale in each store, after the step: the store's own name. */
     appStore: "App Store",
@@ -2943,7 +2943,7 @@ export const en = {
     /** The Cloud's workspace on a billing hold, where a plan would sign in. */
     billing: "A plan signs in on the workspace's computer, and the computer comes with an active Ackwire AI plan.",
     /** After `billing`, on the phone, where paying isn't offered. */
-    billingWeb: "Choose one on the web, at agentes.chat.",
+    billingWeb: "Choose one on the web, at Ackwire AI.",
     orPayGo: "Or pay as you go",
     /** The two ways to pay, on a control the width of a phone: keep them short. */
     pay: {
@@ -4950,7 +4950,7 @@ export const en = {
     noInstructions: "{{name}} has no instructions yet. Say how he should work.",
     noInstructions_female: "{{name}} has no instructions yet. Say how she should work.",
     savedToast: "{{name}}'s changes saved.",
-    builtinName: "agentes",
+    builtinName: "Ackwire AI",
     builtinNote: "built-in permissions",
     connectHint: "Connect services",
     subtitle: "{{role}} · owned by <b>{{owner}}</b> · {{model}} {{key}}",
@@ -5305,7 +5305,7 @@ export const en = {
         two: "Preferences",
         three: "Turn on Browser",
         done: "That's it. This page notices on its own, no reload needed.",
-        menuOpen: "Open agentes",
+        menuOpen: "Open Ackwire AI",
         menuPrefs: "Preferences…",
         menuPause: "Pause",
         menuQuit: "Quit",
@@ -5499,7 +5499,7 @@ export const en = {
       connectors: "{{org}}'s connectors",
       connectorsPersonal: "Your connectors",
       oneLevel: "One level per app",
-      builtin: "Built into agentes",
+      builtin: "Built into Ackwire AI",
       builtinHelp: "Drive, tasks, memory and more",
       noMatch: "Nothing matching “{{q}}”",
       noneHere: "Nothing in this filter",
@@ -7945,7 +7945,7 @@ export const en = {
     event: {
       "sentry.issue_created": "New Sentry error",
       "github.pr_opened": "PR opened on GitHub",
-      "issue.created": "Task created in agentes",
+      "issue.created": "Task created in Ackwire AI",
       "deploy.succeeded": "Deploy finished",
     },
     when: { event: "When: {{event}}" },
@@ -9588,7 +9588,7 @@ export const en = {
       antigravity: "Gemini",
       opencode: "OpenCode",
       needs: {
-        keys: "Update agentes on the computer to use a plan's key",
+        keys: "Update Ackwire AI on the computer to use a plan's key",
       },
       noComputer: "Accounts stay on a connected computer. Connect one of yours first.",
       addComputer: "Connect a computer",
@@ -11425,7 +11425,7 @@ export const en = {
     /** That toast's button, short enough to leave its words room beside it on a phone. */
     openPage: "Open",
     installed: "Ackwire AI app installed.",
-    /** An installation approved on GitHub never links here: the account's owner installs it from agentes.chat. */
+    /** An installation approved on GitHub never links here: the account's owner installs it from Ackwire AI. */
     requested:
       "Only the GitHub account's owner can install the app. Ask them to install it from Connectors › GitHub in this workspace.",
     notVisible: "Your GitHub account can't see that installation. Install it with an account that has access to it.",
@@ -11433,7 +11433,7 @@ export const en = {
       "That GitHub account is already linked to another workspace. Remove the app there before installing it here.",
     /** The app was installed on GitHub itself, not from Ackwire AI (`github_app_error=installed_outside`). */
     installedOutside:
-      "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub.",
+      "The app was installed on that GitHub account outside Ackwire AI. Remove it on GitHub and install it again from Connectors › GitHub.",
     /**
      * GitHub refused this server's own GitHub App, whose client secret (or id) is wrong
      * (`github_app_error=misconfigured`): trying again can't help, only whoever runs the server can fix it.
@@ -14052,7 +14052,7 @@ export const en = {
     reconnectDoneText: "{{name}} is back in {{org}}.",
     deniedTitle: "Not connected",
     denied: "The computer wasn't connected. If it wasn't you who opened it, nobody got access.",
-    home: "Go to agentes",
+    home: "Go to Ackwire AI",
   },
   apps: {
     connect: "Connect an app",
@@ -14279,7 +14279,7 @@ export const en = {
       canRead: "Read the replies and what agents are doing.",
       canManage: "Create and edit agents, routines and skills as you. You get a notice of what it creates.",
       never: "Never",
-      neverApprove: "Approve agents' actions. Approvals stay with people in agentes.chat.",
+      neverApprove: "Approve agents' actions. Approvals stay with people in Ackwire AI.",
       neverSettings: "Change settings, members or permissions.",
       neverHidden: "See what you can't see.",
       loopbackWarning:
@@ -14586,7 +14586,7 @@ export const en = {
      * "Ackwire AI" and "Codari Global, LLC" and its meaning.
      */
     about: {
-      basedOn: "Based on <site>Ackwire AI</site> by Codari Global, LLC",
+      basedOn: "Based on <site>agentes.chat</site> by Codari Global, LLC",
       version: "Version",
       license: "Free software under the <license>GNU Affero General Public License v3</license>, with no warranty.",
       source: "Source code",
@@ -17081,7 +17081,7 @@ export const en = {
       unavailableHelp: "Try again in a moment.",
       screensOff: "Screens are off on {{computer}}. Turn them on there:",
       screensMissing: "{{computer}} can't show screens yet. On it:",
-      outdated: "Update agentes on {{computer}} to see {{name}}'s screen.",
+      outdated: "Update Ackwire AI on {{computer}} to see {{name}}'s screen.",
       noScreen: "{{name}} has no screen to show here",
       noScreenHelp: "Allow the screen or the browser in Tools and access.",
       noComputer: "Choose a computer for {{name}}.",
@@ -17204,7 +17204,7 @@ export const en = {
       browser: "Browser",
       screen: "Computer screen",
       terminal: "Terminal",
-      agentes: "agentes",
+      agentes: "Ackwire AI",
       thinking: "Thinking",
       inside: "{{program}} · {{detail}}",
     },

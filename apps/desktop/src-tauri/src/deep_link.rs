@@ -3,7 +3,7 @@
 //! newest link until the window takes it (`link_take`), and passes nothing it didn't check is one of ours.
 //! A connector's sign-in that the browser hands back (`agenteschat://desktop/connectors/oauth`) goes to the
 //! main window instead, which finishes it with its own session.
-//! A pair link (`agenteschat://pair?server=&link=`, the web's "Open the agentes.chat app") goes there too, rebuilt from
+//! A pair link (`agenteschat://pair?server=&link=`, the web's "Open the Ackwire AI app") goes there too, rebuilt from
 //! its two checked fields: the window asks the server who made the link (`pair_link_info`) and pairs this computer
 //! only after the person confirms there, and then the link's maker still lets it in on the web (ADR 0066 §3 as amended).
 //! On macOS a link reaches the running app as an event; on Windows and Linux as a second launch, which the

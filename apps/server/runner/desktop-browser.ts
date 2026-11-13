@@ -193,8 +193,8 @@ function ask(socket: string, installing: () => void, timeoutMs: number): Promise
         else if (line.startsWith("error ")) return finish(REASONS.get(line.slice("error ".length)) ?? AGAIN);
       }
     });
-    conn.on("error", () => finish("agentes.chat isn't running on this computer right now. Try again in a minute."));
-    conn.on("close", () => finish("agentes.chat stopped before it opened. Try again in a minute."));
+    conn.on("error", () => finish("Ackwire AI isn't running on this computer right now. Try again in a minute."));
+    conn.on("close", () => finish("Ackwire AI stopped before it opened. Try again in a minute."));
   });
 }
 

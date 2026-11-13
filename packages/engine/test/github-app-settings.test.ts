@@ -147,10 +147,10 @@ describe("the server's GitHub App (ADR 0156)", () => {
 });
 
 describe("GitHub's manifest flow", () => {
-  test("the manifest asks what agentes.chat's own app has, at this server's addresses", () => {
+  test("the manifest asks what Ackwire AI's own app has, at this server's addresses", () => {
     const manifest = githubAppManifest("https://chat.example.com/");
     expect(manifest).toMatchObject({
-      name: "agentes.chat (chat.example.com)",
+      name: "Ackwire AI (chat.example.com)",
       url: "https://chat.example.com",
       redirect_url: "https://chat.example.com/api/app/github-app/manifest/callback",
       callback_urls: ["https://chat.example.com/api/app/github-app/callback"],
@@ -158,7 +158,7 @@ describe("GitHub's manifest flow", () => {
       public: true,
       hook_attributes: { url: "https://chat.example.com/api/github-app/webhook", active: true },
     });
-    // Exactly agentes.chat's own app, by GitHub's manifest names: write on the repository permissions agents use,
+    // Exactly Ackwire AI's own app, by GitHub's manifest names: write on the repository permissions agents use,
     // metadata read; an organization's members read and Projects write. Never Codespaces, nor an organization's
     // administration, secrets, variables, runners or webhooks.
     expect(manifest.default_permissions).toEqual({

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "Schließen",
@@ -460,7 +460,7 @@
       "openMail": "{{app}} öffnen",
       "ownerWaits": "Dieser Server wartet auf seinen Inhaber.",
       "ownerWaitsLead": "Öffne den Inhaber-Link dieses Servers (er endet auf /owner#claim=…), auf diesem Computer oder auf deinem Handy.",
-      "noPassword": "Dieses Konto meldet sich über die agentes.chat-App an.",
+      "noPassword": "Dieses Konto meldet sich über die Ackwire AI-App an.",
       "noPasswordLead": "Öffne auf dem Computer, auf dem dieser Server läuft, die App und wähle Passwort hinzufügen unter Einstellungen › Dein Konto.",
       "backToSignIn": "Zurück zur Anmeldung",
       "toAuthorizeApp": "Um eine App mit Ackwire AI zu verbinden."
@@ -474,11 +474,11 @@
       "otherServer": "Anderen Server verwenden",
       "opening": "{{provider}} wird geöffnet…",
       "confirm": "Ist das deine App?",
-      "confirmLead": "Dieser Code sollte mit dem übereinstimmen, den die agentes.chat-App auf deinem Computer zeigt.",
+      "confirmLead": "Dieser Code sollte mit dem übereinstimmen, den die Ackwire AI-App auf deinem Computer zeigt.",
       "confirmYes": "Ja, App anmelden",
       "confirmNo": "Das war ich nicht",
       "done": "Alles bereit.",
-      "doneLead": "Du bist in der agentes-App angemeldet. Du kannst diesen Tab schließen.",
+      "doneLead": "Du bist in der Ackwire AI-App angemeldet. Du kannst diesen Tab schließen.",
       "expired": "Diese Anfrage ist abgelaufen.",
       "expiredLead": "Geh zurück zur App und wähle noch einmal {{provider}}.",
       "handover": "Anmeldung mit deinem Konto vom anderen Gerät…",
@@ -813,7 +813,7 @@
         "asleep": "Schläft bis zum Tarif",
         "price": "<b>Tarif {{name}}</b> · {{price}} pro Monat",
         "name": "<b>Tarif {{name}}</b>",
-        "generic": "Ein agentes.chat-Tarif",
+        "generic": "Ein Ackwire AI-Tarif",
         "cancel": "Jederzeit kündbar",
         "cta": "Team einschalten",
         "all": "Alle Tarife ansehen",
@@ -1206,8 +1206,8 @@
     "keyStep": {
       "title": "Welche KI sollen sie nutzen?",
       "lead": "Melde dich mit deinem KI-Abo an: kein API-Schlüssel nötig.",
-      "paid": "Dein agentes.chat-Tarif ist aktiv. Ihr Computer ist unterwegs.",
-      "confirming": "Die Zahlung für den agentes.chat-Tarif dieses Workspace wird bestätigt.",
+      "paid": "Dein Ackwire AI-Tarif ist aktiv. Ihr Computer ist unterwegs.",
+      "confirming": "Die Zahlung für den Ackwire AI-Tarif dieses Workspace wird bestätigt.",
       "leadNoComputer": "Deine Agenten denken mit einem API-Schlüssel oder mit deinem KI-Abo auf einem Computer, den du verbindest."
     },
     "jev": {
@@ -1218,7 +1218,7 @@
       "title": "Ausgabenlimit pro Agent",
       "label": "Monatslimit pro Agent, in Dollar",
       "perMonth": "/Monat",
-      "noteKey": "Nur für API-Nutzung, abgerechnet vom Anbieter des Schlüssels, nicht von agentes.chat. Erreicht ein Agent das Limit, hält er an und sagt dir Bescheid. Abos zählen hier nicht.",
+      "noteKey": "Nur für API-Nutzung, abgerechnet vom Anbieter des Schlüssels, nicht von Ackwire AI. Erreicht ein Agent das Limit, hält er an und sagt dir Bescheid. Abos zählen hier nicht.",
       "notePlatform": "Nur für API-Nutzung. Erreicht ein Agent das Limit, hält er an und sagt dir Bescheid."
     },
     "keySite": "Erstelle den Schlüssel auf {{site}}.",
@@ -1272,7 +1272,7 @@
     },
     "team": {
       "title": "Wer arbeitet noch mit dir?",
-      "payment": "Du kannst dein Team einladen, sobald du einen agentes.chat-Tarif wählst.",
+      "payment": "Du kannst dein Team einladen, sobald du einen Ackwire AI-Tarif wählst.",
       "lead": "Lade sie per E-Mail ein oder teile den Link.",
       "leadLink": "Teile den Einladungslink mit ihnen.",
       "emails": "E-Mails",
@@ -1444,7 +1444,7 @@
     },
     "page": {
       "docTitle": "App herunterladen · Ackwire AI",
-      "title": "Lade die agentes.chat-App herunter",
+      "title": "Lade die Ackwire AI-App herunter",
       "beta": "Beta",
       "text": "Dein Workspace in einem eigenen Fenster, mit den Benachrichtigungen deines Systems. Mit einem Klick arbeiten Agenten auf diesem Computer, in eigenen Ordnern.",
       "open": "Ackwire AI öffnen",
@@ -1862,9 +1862,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "QR-Code zum Anmelden in der agentes-App",
+    "qr": "QR-Code zum Anmelden in der Ackwire AI-App",
     "making": "Code wird erstellt…",
-    "stepApp": "Installiere die agentes-App auf deinem Handy.",
+    "stepApp": "Installiere die Ackwire AI-App auf deinem Handy.",
     "stepTailscale": "Installiere Tailscale auf deinem Handy und melde dich mit demselben Tailscale-Konto an wie dieser Server.",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -1873,7 +1873,7 @@
     "private": "Wer diesen Code scannt, ist als du angemeldet.",
     "failed": "Der Code konnte nicht erstellt werden.",
     "localOnly": "Dieser Server öffnet sich nur auf dem Computer, auf dem er läuft, deshalb erreicht dein Handy ihn nicht.",
-    "localOnlyHow": "Schalte in der agentes.chat-App auf diesem Computer unter Einstellungen › Server die Option Von deinem Handy und deinem Team erreichbar ein. Komm dann hierher zurück."
+    "localOnlyHow": "Schalte in der Ackwire AI-App auf diesem Computer unter Einstellungen › Server die Option Von deinem Handy und deinem Team erreichbar ein. Komm dann hierher zurück."
   },
   "team": {
     "title": "Team",
@@ -2305,8 +2305,8 @@
       "greetingPersonal": "Hallo, ich bin {{name}}. Ich richte deine Agenten mit dir ein.",
       "lead": "Ich erstelle die Agenten, verbinde die Apps und lade die Leute ein. Nichts ändert sich, ohne dass du darum bittest, und ich tue nur, was du tun darfst.",
       "leadPersonal": "Ich erstelle deine Agenten und verbinde deine Apps. Nichts ändert sich, ohne dass du darum bittest.",
-      "heldLead": "Wähle, was dein Unternehmen macht, und das Team erscheint hier. Die Agenten beginnen zu arbeiten, sobald der Workspace einen agentes.chat-Tarif hat.",
-      "heldLeadPersonal": "Wähle, wobei du Hilfe möchtest, und deine Agenten erscheinen hier. Sie beginnen zu arbeiten, sobald du einen agentes.chat-Tarif hast.",
+      "heldLead": "Wähle, was dein Unternehmen macht, und das Team erscheint hier. Die Agenten beginnen zu arbeiten, sobald der Workspace einen Ackwire AI-Tarif hat.",
+      "heldLeadPersonal": "Wähle, wobei du Hilfe möchtest, und deine Agenten erscheinen hier. Sie beginnen zu arbeiten, sobald du einen Ackwire AI-Tarif hast.",
       "connect": {
         "title": "Eine KI für das Team verbinden",
         "titlePersonal": "Eine KI für deine Agenten verbinden",
@@ -2677,11 +2677,11 @@
     },
     "kept": {
       "title": "Ich habe deine Nachricht aufgehoben.",
-      "line": "Ich antworte hier, sobald der Workspace einen agentes.chat-Tarif und eine verbundene KI hat.",
+      "line": "Ich antworte hier, sobald der Workspace einen Ackwire AI-Tarif und eine verbundene KI hat.",
       "plan": "Der Tarif bringt den Computer der Agenten, immer eingeschaltet. Die KI ist die, für die du schon zahlst: Claude, ChatGPT und andere oder ein API-Schlüssel.",
       "active": "Tarif aktiv. Verbinde eine KI und {{name}} antwortet hier.",
       "receipt": "Aufgehoben",
-      "channel": "Aufgehoben. Die Agenten antworten, sobald der Workspace einen agentes.chat-Tarif hat."
+      "channel": "Aufgehoben. Die Agenten antworten, sobald der Workspace einen Ackwire AI-Tarif hat."
     },
     "receipt": "Niemand wird antworten: keine KI verbunden",
     "chip": "Keine KI"
@@ -2761,8 +2761,8 @@
         "unshare": "Nur für mich"
       }
     },
-    "billing": "Ein Abo meldet sich auf dem Computer des Workspace an, und den Computer gibt es mit einem aktiven agentes.chat-Abo.",
-    "billingWeb": "Wähle eines im Web, auf agentes.chat.",
+    "billing": "Ein Abo meldet sich auf dem Computer des Workspace an, und den Computer gibt es mit einem aktiven Ackwire AI-Abo.",
+    "billingWeb": "Wähle eines im Web, auf Ackwire AI.",
     "orPayGo": "Oder nach Verbrauch zahlen",
     "pay": {
       "label": "Wie zahlst du?",
@@ -2825,7 +2825,7 @@
       "forAll": "Jeder Agent ohne Abo denkt damit.",
       "saved": "Gespeichert. Jeder Agent ohne Abo denkt damit.",
       "savedUnchecked": "Gespeichert, aber {{provider}} hat nicht geantwortet, der Schlüssel konnte also nicht geprüft werden. Wenn er fehlschlägt, steht der Grund im Chat.",
-      "closed": "API-Schlüssel gibt es mit dem agentes.chat-Tarif des Workspace.",
+      "closed": "API-Schlüssel gibt es mit dem Ackwire AI-Tarif des Workspace.",
       "notPlan": "Der Schlüssel eines Coding-Abos gehört in seine eigene Option oben.",
       "billing": "Aktiviere die Abrechnung für das Projekt des Schlüssels. Ohne Abrechnung darf Google nutzen, was deine Agenten senden.",
       "privacy": "Deine Datenschutzeinstellungen bei OpenRouter entscheiden, welche Anbieter behalten dürfen, was deine Agenten senden."
@@ -4714,7 +4714,7 @@
     "noInstructions": "{{name}} hat noch keine Anweisungen. Sag, wie er arbeiten soll.",
     "noInstructions_female": "{{name}} hat noch keine Anweisungen. Sag, wie sie arbeiten soll.",
     "savedToast": "Änderungen an {{name}} gespeichert.",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "integrierte Berechtigungen",
     "connectHint": "Dienste verbinden",
     "subtitle": "{{role}} · Inhaber <b>{{owner}}</b> · {{model}} {{key}}",
@@ -5043,11 +5043,11 @@
       "steps": {
         "title": "Noch ein Schritt, direkt auf {{computer}}",
         "waiting": "Warten",
-        "one": "Klicke auf das agentes.chat-Symbol neben der Uhr",
+        "one": "Klicke auf das Ackwire AI-Symbol neben der Uhr",
         "two": "Einstellungen",
         "three": "Browser einschalten",
         "done": "Das war’s. Diese Seite merkt es von selbst, kein Neuladen nötig.",
-        "menuOpen": "agentes öffnen",
+        "menuOpen": "Ackwire AI öffnen",
         "menuPrefs": "Einstellungen…",
         "menuPause": "Pausieren",
         "menuQuit": "Beenden",
@@ -5235,7 +5235,7 @@
       "connectors": "Konnektoren von {{org}}",
       "connectorsPersonal": "Deine Konnektoren",
       "oneLevel": "Eine Stufe pro App",
-      "builtin": "In agentes integriert",
+      "builtin": "In Ackwire AI integriert",
       "builtinHelp": "Drive, Aufgaben, Gedächtnis und mehr",
       "noMatch": "Nichts zu „{{q}}“",
       "noneHere": "Nichts in diesem Filter",
@@ -5763,10 +5763,10 @@
       "afterPlanNext": "Das ist der nächste Schritt nach dem Tarif.",
       "plan": {
         "todo": "Schalte das Team ein.",
-        "todoDesc": "Mit einem agentes.chat-Tarif legen die Agenten los.",
+        "todoDesc": "Mit einem Ackwire AI-Tarif legen die Agenten los.",
         "action": "Tarife ansehen",
         "todoPersonal": "Schalte deine Agenten ein.",
-        "todoDescPersonal": "Mit einem agentes.chat-Tarif legen deine Agenten los."
+        "todoDescPersonal": "Mit einem Ackwire AI-Tarif legen deine Agenten los."
       },
       "about": {
         "action": "Erzählen",
@@ -7708,7 +7708,7 @@
         "pr_opened": "PR auf GitHub geöffnet"
       },
       "issue": {
-        "created": "Aufgabe in agentes erstellt"
+        "created": "Aufgabe in Ackwire AI erstellt"
       },
       "deploy": {
         "succeeded": "Deploy abgeschlossen"
@@ -9439,7 +9439,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "Aktualisiere agentes auf dem Computer, um den Schlüssel eines Abos zu nutzen"
+        "keys": "Aktualisiere Ackwire AI auf dem Computer, um den Schlüssel eines Abos zu nutzen"
       },
       "noComputer": "Konten bleiben auf einem verbundenen Computer. Verbinde zuerst einen deiner Computer.",
       "addComputer": "Computer verbinden",
@@ -9447,7 +9447,7 @@
         "online": "{{computer}} startet neu oder verbindet sich wieder. Das ändert sich von selbst, sobald er zurück ist.",
         "installing": "{{program}} wird auf {{computer}} installiert. Das ändert sich von selbst, wenn es fertig ist.",
         "updating": "{{program}} wird auf {{computer}} aktualisiert. Das ändert sich von selbst, wenn es fertig ist.",
-        "runnerOld": "Das agentes.chat-Programm auf {{computer}} ist veraltet und ein Update ist unterwegs. Das ändert sich von selbst, wenn es fertig ist.",
+        "runnerOld": "Das Ackwire AI-Programm auf {{computer}} ist veraltet und ein Update ist unterwegs. Das ändert sich von selbst, wenn es fertig ist.",
         "execOff": "{{computer}} kann {{program}} noch nicht ausführen. Wir kümmern uns, und das ändert sich von selbst.",
         "toolOff": "{{program}} ist auf {{computer}} noch nicht freigegeben. Das liegt an uns: Versuch es später noch einmal.",
         "preparing": "{{computer}} wird gerade fertig. Das ändert sich von selbst, wenn es so weit ist.",
@@ -10667,9 +10667,9 @@
     "reasons": {
       "no_computer": "Wähle unter Computer einen verbundenen Computer, um es zu nutzen.",
       "exec_off": "Der Computer wurde ohne die Berechtigung verbunden, Programme auszuführen.",
-      "runner_old": "Aktualisiere das agentes.chat-Programm auf dem Computer, um es zu nutzen.",
-      "tool_off": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der agentes.chat-App ein: Einstellungen → Tools.",
-      "tool_offLinux": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der agentes.chat-App oder mit {{command}} ein.",
+      "runner_old": "Aktualisiere das Ackwire AI-Programm auf dem Computer, um es zu nutzen.",
+      "tool_off": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der Ackwire AI-App ein: Einstellungen → Tools.",
+      "tool_offLinux": "{{program}} ist auf {{computer}} ausgeschaltet. Schalte es dort in der Ackwire AI-App oder mit {{command}} ein.",
       "not_installed": "{{program}} ist auf {{computer}} nicht installiert.",
       "not_reported": "{{computer}} prüft noch, welche Programme vorhanden sind. Das ändert sich von selbst, wenn es so weit ist.",
       "outdated": "Die Version auf {{computer}} ist veraltet. Aktualisiere Codex, um es zu nutzen.",
@@ -11184,7 +11184,7 @@
   "storage": {
     "title": "Speicher",
     "options": "Wo Dateien liegen",
-    "agentes": "agentes.chat-Speicher",
+    "agentes": "Ackwire AI-Speicher",
     "agentesText": "Deine Dateien bleiben in unserem Speicher, pro Workspace getrennt.",
     "server": "Dieser Server",
     "serverText": {
@@ -11195,7 +11195,7 @@
     },
     "showFolder": "Ordner anzeigen",
     "place": {
-      "agentes": "agentes.chat-Speicher",
+      "agentes": "Ackwire AI-Speicher",
       "server": "dieser Server"
     },
     "s3": "Dein eigener Bucket",
@@ -11253,11 +11253,11 @@
   },
   "githubApp": {
     "title": "GitHub-Repositories",
-    "text": "Wo die agentes.chat-App installiert ist, öffnen Agenten Pull Requests, Issues, Kommentare und Commits als die App, mit dem Namen des Agenten und der Person, die gefragt hat. Was du von hier installierst, nutzt nur {{org}}.",
-    "install": "agentes.chat-App installieren",
+    "text": "Wo die Ackwire AI-App installiert ist, öffnen Agenten Pull Requests, Issues, Kommentare und Commits als die App, mit dem Namen des Agenten und der Person, die gefragt hat. Was du von hier installierst, nutzt nur {{org}}.",
+    "install": "Ackwire AI-App installieren",
     "installMore": "Auf einem weiteren Konto installieren",
     "none": "Noch kein GitHub-Konto.",
-    "usingAccount": "Heute erscheinen Agenten auf GitHub als {{account}}. Installier die App, damit sie als die agentes.chat-App erscheinen.",
+    "usingAccount": "Heute erscheinen Agenten auf GitHub als {{account}}. Installier die App, damit sie als die Ackwire AI-App erscheinen.",
     "allRepos": "Alle Repositories",
     "someRepos": "Ausgewählte Repositories",
     "suspended": "Auf GitHub gesperrt",
@@ -11266,12 +11266,12 @@
     "remove": "Entfernen",
     "removeName": "{{account}} entfernen",
     "removeTitle": "App von {{account}} entfernen?",
-    "removeText": "Die agentes.chat-App wird auf GitHub von {{account}} deinstalliert, und Agenten nutzen die Repositories dieses Kontos nicht mehr über sie.",
+    "removeText": "Die Ackwire AI-App wird auf GitHub von {{account}} deinstalliert, und Agenten nutzen die Repositories dieses Kontos nicht mehr über sie.",
     "removeLast": "Es ist das letzte, daher verlieren Agenten GitHub, bis jemand die App installiert oder ein Konto verbindet.",
     "removed": "App von {{account}} entfernt und auf GitHub deinstalliert.",
     "notUninstalled": "App hier entfernt, aber GitHub hat die Deinstallation von {{account}} nicht bestätigt. Deinstallier sie dort.",
     "openPage": "Öffnen",
-    "installed": "agentes.chat-App installiert.",
+    "installed": "Ackwire AI-App installiert.",
     "requested": "Nur die Inhaber des GitHub-Kontos können die App installieren. Bitte sie, die App in diesem Workspace über Konnektoren › GitHub zu installieren.",
     "notVisible": "Dein GitHub-Konto kann diese Installation nicht sehen. Installier sie mit einem Konto, das Zugriff darauf hat.",
     "otherWorkspace": "Dieses GitHub-Konto ist schon mit einem anderen Workspace verbunden. Entferne die App dort, bevor du sie hier installierst.",
@@ -11279,10 +11279,10 @@
     "misconfigured": "Die GitHub-App hat auf dem Server den falschen geheimen Schlüssel, deshalb kann die Installation nicht abgeschlossen werden. Die Person, die den Server betreibt, muss den Schlüssel in den Einstellungen der App ersetzen.",
     "connectAccount": "GitHub-Konto verbinden",
     "ownerHint": "Der Inhaber dieses Servers kann die GitHub-App hier unter Konnektoren erstellen.",
-    "viaApp": "Über die agentes.chat-App auf {{accounts}}",
-    "disconnectApp": "Die agentes.chat-App wird auf GitHub auch von {{accounts}} deinstalliert.",
-    "disconnectKeepsApp": "Agenten bleiben über die agentes.chat-App auf {{accounts}} mit GitHub verbunden.",
-    "keptApp": "GitHub-Konto getrennt. Agenten bleiben über die agentes.chat-App mit GitHub verbunden.",
+    "viaApp": "Über die Ackwire AI-App auf {{accounts}}",
+    "disconnectApp": "Die Ackwire AI-App wird auf GitHub auch von {{accounts}} deinstalliert.",
+    "disconnectKeepsApp": "Agenten bleiben über die Ackwire AI-App auf {{accounts}} mit GitHub verbunden.",
+    "keptApp": "GitHub-Konto getrennt. Agenten bleiben über die Ackwire AI-App mit GitHub verbunden.",
     "signature": {
       "forPerson": "{{agent}}, Agent von {{person}} auf Ackwire AI",
       "alone": "{{agent}}, ein Agent auf Ackwire AI"
@@ -12239,7 +12239,7 @@
     "continueInComposio": "Weiter bei Composio",
     "github": {
       "how": "Wie Agenten GitHub erreichen",
-      "app": "Die agentes.chat-App",
+      "app": "Die Ackwire AI-App",
       "recommended": "Empfohlen",
       "appText": "Agenten erscheinen als die App, und du wählst die Repositories auf GitHub.",
       "account": "Ein GitHub-Konto",
@@ -12520,7 +12520,7 @@
     "whatIsText": "Ein Passwort nur für die Agenten. Du erstellst es auf der Website deines E-Mail-Anbieters und kannst es jederzeit löschen, ohne dein eigenes Passwort zu ändern.",
     "step": {
       "1": "Öffne die Sicherheitsseite deines Kontos.",
-      "2": "Erstelle ein App-Passwort mit dem Namen „agentes“.",
+      "2": "Erstelle ein App-Passwort mit dem Namen „Ackwire AI“.",
       "3": "Kopiere das Passwort und füge es hier ein."
     },
     "openPage": "Seite von {{name}} öffnen",
@@ -13051,7 +13051,7 @@
       "noComputer": "Dieser Agent hat noch keinen Computer für Missionen.",
       "computerOffline": "Der Computer des Agenten ist offline.",
       "execDisabled": "Befehle sind auf diesem Computer ausgeschaltet.",
-      "runnerOutdated": "Das Programm auf dem Computer ist zu alt für Missionen: Aktualisiere dort die agentes.chat-App oder führ ihren Installationsbefehl erneut aus.",
+      "runnerOutdated": "Das Programm auf dem Computer ist zu alt für Missionen: Aktualisiere dort die Ackwire AI-App oder führ ihren Installationsbefehl erneut aus.",
       "exists": "Dieser Thread hat schon eine Mission.",
       "closed": "Diese Mission ist abgeschlossen.",
       "wrongStatus": "Die Mission ist nicht in einem Zustand, der das erlaubt.",
@@ -13145,7 +13145,7 @@
       "targetNotFound": "Diesen Computer gibt es nicht mehr. Wähl einen anderen.",
       "targetSame": "Die Agenten sind schon auf diesem Computer.",
       "targetPaused": "Dieser Computer ist pausiert. Wähl einen anderen.",
-      "accountMethodUnsupported": "Dieser Computer kann Claude noch nicht auf diese Weise verbinden. Aktualisiere das agentes.chat-Programm darauf oder verwende einen API-Schlüssel.",
+      "accountMethodUnsupported": "Dieser Computer kann Claude noch nicht auf diese Weise verbinden. Aktualisiere das Ackwire AI-Programm darauf oder verwende einen API-Schlüssel.",
       "offline": "{{name}} ist gerade offline. Versuch es noch einmal, sobald er wieder da ist.",
       "paused": "{{name}} ist pausiert: Darauf startet nichts Neues, bis er fortgesetzt wird.",
       "timeout": "Der Computer hat nicht rechtzeitig geantwortet. Versuch es noch einmal."
@@ -13346,7 +13346,7 @@
     },
     "download": {
       "title": "Weiteren Computer verbinden",
-      "text": "Installiere die agentes.chat-App auf dem Computer.",
+      "text": "Installiere die Ackwire AI-App auf dem Computer.",
       "mac": "App für {{system}} herunterladen",
       "version": "Version {{version}}",
       "versionSize": "Version {{version}} · {{size}}",
@@ -13431,7 +13431,7 @@
       "disableText": "Agenten nutzen {{tool}} auf diesem Computer nicht mehr. Wieder einschalten geht nur auf dem Computer selbst.",
       "disabled": "{{tool}} ausgeschaltet.",
       "grantTitle": "Mehr erlauben",
-      "grantText": "Erlaubt wird auf dem Computer selbst: Öffne dort die agentes.chat-App (Einstellungen → Ordner).",
+      "grantText": "Erlaubt wird auf dem Computer selbst: Öffne dort die Ackwire AI-App (Einstellungen → Ordner).",
       "grantTextTerminal": "Erlaubt wird auf dem Computer selbst, in seinem Terminal:",
       "grantTextAdmin": "Erlaubt wird auf dem Computer selbst, in seinem Terminal, als dessen Administrator:",
       "grantTerminal": "Keine App? Im Terminal des Computers:",
@@ -13680,7 +13680,7 @@
       "thisMac": "Dieser Mac",
       "thisPc": "Dieser PC",
       "thisComputer": "Dieser Computer",
-      "thisLine": "Über die agentes.chat-App",
+      "thisLine": "Über die Ackwire AI-App",
       "openApp": "App öffnen",
       "server": "Ein Server oder VPS",
       "serverLine": "Eine Zeile für sein Terminal",
@@ -13693,7 +13693,7 @@
     },
     "computer": {
       "title": "Einen anderen Computer verbinden",
-      "step1": "Hol dir die agentes.chat-App darauf:",
+      "step1": "Hol dir die Ackwire AI-App darauf:",
       "step2": "Öffne sie und melde dich mit deinem eigenen Konto an.",
       "step3": "Klicke auf Erlauben, wenn sie fragt, ob die Agenten von {{org}} ihn nutzen dürfen.",
       "shows": "Er erscheint hier von selbst, nur für dich, bis du ihn teilst.",
@@ -13703,11 +13703,11 @@
       "noApp": "Kannst du die App dort nicht installieren? Nutze eine Terminal-Zeile"
     },
     "thisApp": {
-      "text": "Die agentes.chat-App verbindet ihn mit einem Klick und fragt dich vorher.",
-      "open": "agentes.chat-App öffnen",
+      "text": "Die Ackwire AI-App verbindet ihn mit einem Klick und fragt dich vorher.",
+      "open": "Ackwire AI-App öffnen",
       "browserAsks": "Dein Browser fragt, ob er sie öffnen darf: Wähle Öffnen und Immer erlauben, wenn er es anbietet.",
       "noApp": "Du hast die App noch nicht?",
-      "afterInstall": "Klicke nach der Installation noch einmal auf agentes.chat-App öffnen. Der Link funktioniert einmal, 10 Minuten lang.",
+      "afterInstall": "Klicke nach der Installation noch einmal auf Ackwire AI-App öffnen. Der Link funktioniert einmal, 10 Minuten lang.",
       "waiting": "Warte auf die App auf diesem Computer…",
       "expired": "Dieser Link ist abgelaufen.",
       "again": "Neuen Link erstellen",
@@ -13784,7 +13784,7 @@
       },
       "qrLabel": "QR-Code, der diese Schritte auf dem Handy öffnet",
       "qrLine": "Mach es vom Handy aus",
-      "qrCaption": "Scanne ihn, um diese Schritte in der agentes.chat-App zu öffnen, mit einem Button für jede Einstellung.",
+      "qrCaption": "Scanne ihn, um diese Schritte in der Ackwire AI-App zu öffnen, mit einem Button für jede Einstellung.",
       "buildNumber": "Build-Nummer",
       "buildNumberSub": "BP2A.250605.031",
       "usbRow": "USB-Debugging",
@@ -13843,7 +13843,7 @@
     },
     "iphone": {
       "title": "iPhone verbinden",
-      "lead": "iPhones verbinden sich über einen Mac, auf dem die agentes.chat-App die Einrichtung übernimmt.",
+      "lead": "iPhones verbinden sich über einen Mac, auf dem die Ackwire AI-App die Einrichtung übernimmt.",
       "mac": "Mac",
       "noMac": "Agenten können ein iPhone nur über einen Mac nutzen, und noch ist keiner verbunden.",
       "noMacNote": "Kein Mac? Bitte jemanden aus dem Team, seinen zu verbinden.",
@@ -14066,7 +14066,7 @@
     "reconnectDoneText": "{{name}} ist wieder in {{org}}.",
     "deniedTitle": "Nicht verbunden",
     "denied": "Der Computer wurde nicht verbunden. Falls du ihn nicht geöffnet hast, hat niemand Zugriff erhalten.",
-    "home": "Zu agentes"
+    "home": "Zu Ackwire AI"
   },
   "apps": {
     "connect": "App verbinden",
@@ -14229,7 +14229,7 @@
         "mode": "Wechsle im Chat in den Modus {{mode}}.",
         "loginRun": "Zum Anmelden führe <code>{{command}}</code> aus.",
         "loginType": "Zum Anmelden gib in der App <code>{{command}}</code> ein.",
-        "signIn": "Melde dich auf der Seite, die sich öffnet, mit deinem agentes.chat-Konto an.",
+        "signIn": "Melde dich auf der Seite, die sich öffnet, mit deinem Ackwire AI-Konto an.",
         "signInFirst": "Die App bittet dich beim ersten Mal, dich anzumelden.",
         "token": "Erstelle einen persönlichen Token und setze ihn anstelle von {{placeholder}} ein.",
         "install": "Zu {{app}} hinzufügen"
@@ -14281,7 +14281,7 @@
       "canRead": "Die Antworten lesen und sehen, was Agenten tun.",
       "canManage": "Agenten, Routinen und Skills in deinem Namen erstellen und bearbeiten. Du bekommst einen Hinweis, was erstellt wurde.",
       "never": "Niemals",
-      "neverApprove": "Aktionen von Agenten freigeben. Freigaben bleiben bei Personen in agentes.chat.",
+      "neverApprove": "Aktionen von Agenten freigeben. Freigaben bleiben bei Personen in Ackwire AI.",
       "neverSettings": "Einstellungen, Mitglieder oder Berechtigungen ändern.",
       "neverHidden": "Sehen, was du nicht sehen kannst.",
       "loopbackWarning": "Jedes Programm auf diesem Computer kann diesen Zugriff erhalten. Mach nur weiter, wenn du das gerade in Claude Code oder einer anderen App auf diesem Computer gestartet hast.",
@@ -14575,7 +14575,7 @@
       "rolesPersonal": "Was jede Person hier tun kann. Inhaber können alles."
     },
     "about": {
-      "basedOn": "Basiert auf <site>Ackwire AI</site> von Codari Global, LLC",
+      "basedOn": "Basiert auf <site>agentes.chat</site> von Codari Global, LLC",
       "version": "Version",
       "license": "Freie Software unter der <license>GNU Affero General Public License v3</license>, ohne Gewährleistung.",
       "source": "Quellcode",
@@ -14679,7 +14679,7 @@
       "label": "Anonyme Nutzungsstatistiken an Ackwire AI senden",
       "help": "Zahlen wie Personen, Agenten, Maschinengrößen, verbrauchte KI-Tokens und wie viele Daten die Browser der Agenten senden und empfangen. Nie Nachrichten, Dateien, Namen oder Websites.",
       "envOff": "In den Einstellungen dieses Servers ausgeschaltet (TELEMETRY=off).",
-      "envOffDesktop": "In der agentes.chat-App auf dem Computer dieses Servers ausgeschaltet (Einstellungen › Server).",
+      "envOffDesktop": "In der Ackwire AI-App auf dem Computer dieses Servers ausgeschaltet (Einstellungen › Server).",
       "see": "Ansehen, was gesendet wird",
       "dialogTitle": "Was gesendet wird",
       "dialogText": "Einmal am Tag. Das ist genau der nächste Bericht."
@@ -15274,7 +15274,7 @@
         "comment": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub kommentiert",
         "commentIssue": "{{who}} hat Issue #{{number}} ({{repo}}) auf GitHub kommentiert",
         "commentDiscussion": "{{who}} hat Diskussion #{{number}} ({{repo}}) auf GitHub kommentiert",
-        "opened": "{{who}} hat die agentes.chat-App in #{{number}} ({{repo}}) auf GitHub gerufen",
+        "opened": "{{who}} hat die Ackwire AI-App in #{{number}} ({{repo}}) auf GitHub gerufen",
         "reviewed": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub geprüft",
         "approved": "{{who}} hat PR #{{number}} ({{repo}}) auf GitHub freigegeben",
         "changes": "{{who}} hat Änderungen an PR #{{number}} ({{repo}}) auf GitHub angefragt",
@@ -15694,7 +15694,7 @@
       "no_ai_plan_inactive": "Ich kann nicht antworten: OpenCode Go ist im OpenCode-Konto meines Schlüssels nicht aktiv. Prüfe das Go-Abo in OpenCode, oder verbinde einen Schlüssel des Kontos, das Go hat.",
       "no_ai_commands_off": "Ich kann gerade nicht antworten: Auf dem Computer meines Abos sind Befehle ausgeschaltet.",
       "no_ai_cli_missing": "Ich kann noch nicht antworten: Das Programm meiner KI ist auf meinem Computer nicht installiert.",
-      "no_ai_plan_hold": "Ich habe deine Nachricht aufgehoben. Ich antworte hier, sobald der Workspace einen agentes.chat-Tarif und eine verbundene KI hat.",
+      "no_ai_plan_hold": "Ich habe deine Nachricht aufgehoben. Ich antworte hier, sobald der Workspace einen Ackwire AI-Tarif und eine verbundene KI hat.",
       "no_ai_no_computer": "Ich kann noch nicht antworten: Meine KI braucht einen Computer, und ich habe keinen.",
       "redacted": "[entfernt: sah aus wie eine Anmeldung oder ein Schlüssel]",
       "action_connect_ai": "KI verbinden",
@@ -16171,7 +16171,7 @@
     "machine": {
       "ready": "Bereit",
       "off": "Aus",
-      "offHelp": "Nur jemand am Computer kann ihn einschalten, in der agentes.chat-App: Einstellungen → Tools.",
+      "offHelp": "Nur jemand am Computer kann ihn einschalten, in der Ackwire AI-App: Einstellungen → Tools.",
       "needsCommand": "Braucht einen Befehl",
       "notReady": "Noch nicht bereit",
       "turnOff": "Ausschalten",
@@ -16419,7 +16419,7 @@
     "paused": "Die Agenten in diesem Workspace sind zur Prüfung pausiert.",
     "suspended": "Dieser Workspace ist vorerst nicht verfügbar.",
     "createRefused": "Du kannst gerade keinen Workspace erstellen.",
-    "createUnpaid": "Du hast schon einen Workspace, der auf einen agentes.chat-Tarif wartet. Wähle seinen Tarif, bevor du einen weiteren erstellst.",
+    "createUnpaid": "Du hast schon einen Workspace, der auf einen Ackwire AI-Tarif wartet. Wähle seinen Tarif, bevor du einen weiteren erstellst.",
     "createUnpaidOpen": "{{name}} öffnen",
     "createInactive": "Du hast schon einen Workspace, der noch nicht aktiv ist, daher kannst du vorerst keinen weiteren erstellen.",
     "agentPaused": "Dieser Agent ist vorerst pausiert.",
@@ -16439,25 +16439,25 @@
       "active": "Der Workspace funktioniert wieder",
       "agentHold": "{{name}} ist pausiert",
       "billing": {
-        "payment": "Der Workspace braucht einen agentes.chat-Tarif",
-        "unpaid": "Die Zahlung für den agentes.chat-Tarif ist nicht durchgegangen",
-        "ended": "Der agentes.chat-Tarif des Workspace ist abgelaufen"
+        "payment": "Der Workspace braucht einen Ackwire AI-Tarif",
+        "unpaid": "Die Zahlung für den Ackwire AI-Tarif ist nicht durchgegangen",
+        "ended": "Der Ackwire AI-Tarif des Workspace ist abgelaufen"
       }
     },
     "billing": {
-      "payment": "Dieser Workspace hat noch keinen agentes.chat-Tarif. Seine Agenten beginnen zu arbeiten, sobald er einen hat.",
-      "unpaid": "Die Zahlung für den agentes.chat-Tarif dieses Workspace ist nicht durchgegangen, und seine Agenten wurden gestoppt.",
-      "ended": "Der agentes.chat-Tarif dieses Workspace ist abgelaufen, und seine Agenten wurden gestoppt. Seine Unterhaltungen und Dateien sind weiterhin hier zum Lesen und Herunterladen.",
-      "sub": "Du kannst hier weiterhin lesen und schreiben. Die Agenten kommen zurück, sobald der agentes.chat-Tarif in Ordnung ist.",
+      "payment": "Dieser Workspace hat noch keinen Ackwire AI-Tarif. Seine Agenten beginnen zu arbeiten, sobald er einen hat.",
+      "unpaid": "Die Zahlung für den Ackwire AI-Tarif dieses Workspace ist nicht durchgegangen, und seine Agenten wurden gestoppt.",
+      "ended": "Der Ackwire AI-Tarif dieses Workspace ist abgelaufen, und seine Agenten wurden gestoppt. Seine Unterhaltungen und Dateien sind weiterhin hier zum Lesen und Herunterladen.",
+      "sub": "Du kannst hier weiterhin lesen und schreiben. Die Agenten kommen zurück, sobald der Ackwire AI-Tarif in Ordnung ist.",
       "cta": {
-        "payment": "agentes.chat-Tarife ansehen",
+        "payment": "Ackwire AI-Tarife ansehen",
         "unpaid": "Zahlung aktualisieren",
         "ended": "Erneut abonnieren"
       },
       "askAdmin": "Wer diesen Workspace leitet, kann das klären.",
-      "paid": "Zahlung erhalten. Der agentes.chat-Tarif startet gleich.",
-      "teamReady": "Dein Team ist bereit. Zum Start fehlt ein agentes.chat-Tarif.",
-      "invites": "Einladungen gibt es mit dem agentes.chat-Tarif."
+      "paid": "Zahlung erhalten. Der Ackwire AI-Tarif startet gleich.",
+      "teamReady": "Dein Team ist bereit. Zum Start fehlt ein Ackwire AI-Tarif.",
+      "invites": "Einladungen gibt es mit dem Ackwire AI-Tarif."
     },
     "cloud": {
       "review": "Für eine Sicherheitsprüfung pausiert, bis unser Team es sich ansieht. Unsere automatischen Prüfungen haben Aktivität erkannt, die gegen unsere Bedingungen verstoßen könnte (Abschnitt 5). Um Einspruch einzulegen, schreib an {{email}}.",
@@ -16579,7 +16579,7 @@
     "open": "Tarif und Abrechnung öffnen",
     "opening": "Wird geöffnet…",
     "failed": "Konnte gerade nicht geöffnet werden. Versuch es gleich noch einmal.",
-    "adminsOnly": "Nur Inhaber und Admins des Workspace verwalten seinen agentes.chat-Tarif.",
+    "adminsOnly": "Nur Inhaber und Admins des Workspace verwalten seinen Ackwire AI-Tarif.",
     "seeOptions": "Optionen ansehen",
     "people": "Personen",
     "files": "Dateien",
@@ -16592,8 +16592,8 @@
   "limits": {
     "members": {
       "full": "Dieser Workspace hat {{members}} von {{limit}} Personen.",
-      "fullOne": "Der agentes.chat-Tarif dieses Workspace reicht für 1 Person.",
-      "fullAdmin": "Um mehr Personen dazuzuholen, sieh dir die Optionen des agentes.chat-Tarifs an.",
+      "fullOne": "Der Ackwire AI-Tarif dieses Workspace reicht für 1 Person.",
+      "fullAdmin": "Um mehr Personen dazuzuholen, sieh dir die Optionen des Ackwire AI-Tarifs an.",
       "fullMember": "Bitte die Person, die den Workspace verwaltet, Platz zu schaffen.",
       "fullAddSeat": "Alle bezahlten Plätze sind belegt. Füge unter Tarif und Abrechnung einen Platz hinzu.",
       "fullTop": "Dieser Tarif fasst keine weiteren Personen. Wechsle den Tarif unter Tarif und Abrechnung.",
@@ -16609,7 +16609,7 @@
       "meter": "Du hast {{used}} von {{limit}} genutzt.",
       "near": "Du hast {{used}} von {{limit}} genutzt. Uploads pausieren beim Limit, und nichts wird gelöscht.",
       "full": "Uploads bei {{limit}} pausiert. Nichts wurde gelöscht.",
-      "fullAdmin": "Ändere den agentes.chat-Tarif, lösche Dateien, die du nicht mehr brauchst, oder verbinde deinen eigenen Bucket unter Einstellungen › Speicher.",
+      "fullAdmin": "Ändere den Ackwire AI-Tarif, lösche Dateien, die du nicht mehr brauchst, oder verbinde deinen eigenen Bucket unter Einstellungen › Speicher.",
       "dailyFull": "Die Uploads von heute haben {{limit}} erreicht. In ein paar Stunden kannst du wieder hochladen."
     }
   },
@@ -16907,7 +16907,7 @@
       "unavailableHelp": "Versuch es gleich noch einmal.",
       "screensOff": "Bildschirme sind auf {{computer}} aus. Schalte sie dort ein:",
       "screensMissing": "{{computer}} kann noch keine Bildschirme zeigen. Dort:",
-      "outdated": "Aktualisiere agentes auf {{computer}}, um den Bildschirm von {{name}} zu sehen.",
+      "outdated": "Aktualisiere Ackwire AI auf {{computer}}, um den Bildschirm von {{name}} zu sehen.",
       "noScreen": "{{name}} hat hier keinen Bildschirm zum Anzeigen",
       "noScreenHelp": "Erlaube den Bildschirm oder den Browser unter Tools und Zugriff.",
       "noComputer": "Wähle einen Computer für {{name}}.",
@@ -17024,7 +17024,7 @@
       "browser": "Browser",
       "screen": "Bildschirm des Computers",
       "terminal": "Terminal",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "Denkt nach",
       "inside": "{{program}} · {{detail}}"
     },
@@ -18031,7 +18031,7 @@
     "mark": "Beta",
     "open": "Feedback senden",
     "ask": "Was hat gefehlt, ist kaputtgegangen oder hat gestört?",
-    "goesCloud": "Was du schreibst, geht per E-Mail an das Team von agentes.chat.",
+    "goesCloud": "Was du schreibst, geht per E-Mail an das Team von Ackwire AI.",
     "goesServer": "Was du schreibst, geht per E-Mail an die Person, die diesen Server betreibt.",
     "placeholder": "Schreib es, wie du magst",
     "report": "Hier ein Problem melden",

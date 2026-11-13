@@ -40,6 +40,8 @@ export interface AuthServerMetadata {
 const AUTH_METHODS: readonly string[] = ["none", "client_secret_post", "client_secret_basic"];
 
 const http = (deps: McpOAuthDeps) => deps.http ?? fetch;
+/** The name a server shows on its consent screen when we register with it (RFC 7591). */
+const CLIENT_NAME = "Ackwire AI";
 
 async function getJson(deps: McpOAuthDeps, url: string): Promise<Record<string, unknown> | null> {
   await assertPublicHttpsUrl(url, deps.resolveHost);
@@ -81,7 +83,7 @@ export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Pro
         jsonrpc: "2.0",
         id: 1,
         method: "initialize",
-        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "agentes.chat", version: "1" } },
+        params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "Ackwire AI", version: "1" } },
       }),
     });
   } catch {
@@ -184,7 +186,7 @@ export function oauthScope(meta: AuthServerMetadata, scopes: string[]): string |
 }
 
 /**
- * The client agentes.chat registered with this issuer for this org, or a new
+ * The client Ackwire AI registered with this issuer for this org, or a new
  * one (Dynamic Client Registration). A registration is reused only while an
  * active connection uses it: once every connection to that server is gone,
  * the server may have dropped the client (Supabase answered "Unrecognized
@@ -242,10 +244,12 @@ export async function ensureOAuthClient(
     }).catch(() => null);
     return { res, refusal: res && !res.ok ? await res.text().catch(() => "") : "" };
   };
-  let { res, refusal } = await register("agentes.chat");
-  // Calendly takes only letters, digits, hyphens and spaces in a client's name. The others keep the brand's,
-  // the name people see on the consent screen.
-  if (res?.status === 400 && /\b(client_)?name\b/i.test(refusal)) ({ res, refusal } = await register("agentes chat"));
+  let { res, refusal } = await register(CLIENT_NAME);
+  // Calendly takes only letters, digits, hyphens and spaces in a client's name: a name with anything else goes
+  // once more with it as spaces. The others keep the brand's, the name people see on the consent screen.
+  const plain = CLIENT_NAME.replace(/[^a-z0-9 -]+/gi, " ").trim();
+  if (res?.status === 400 && plain !== CLIENT_NAME && /\b(client_)?name\b/i.test(refusal))
+    ({ res, refusal } = await register(plain));
   // RFC 7591: 400 for a redirect URI or metadata it won't take, 401 or 403 for a registration closed to us.
   if (res && [400, 401, 403].includes(res.status)) return { notApproved: true, ...refusalDetail(refusal) };
   if (!res?.ok) return null;

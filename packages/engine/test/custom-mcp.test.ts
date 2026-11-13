@@ -990,7 +990,7 @@ describe("custom MCP servers", () => {
     // The registered client is reused for the next server of the same issuer.
     await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
     expect(auth.seen.registrations).toBe(1);
-    expect(auth.seen.names).toEqual(["agentes.chat"]);
+    expect(auth.seen.names).toEqual(["Ackwire AI"]);
     expect(auth.seen.authMethods).toEqual(["none"]);
     // The token is about to expire: refreshed at the issuer's token endpoint.
     const headers = await connectionHeaders(deps, connection);
@@ -1168,7 +1168,7 @@ describe("custom MCP servers", () => {
     expect(auth.seen.tokenForms).toHaveLength(2);
   });
 
-  test("a name it won't take (Calendly: letters, digits, hyphens and spaces) is sent once more without the dot", async () => {
+  test("a name it won't take (Calendly: letters, digits, hyphens and spaces) is taken as it is: the brand has nothing else in it", async () => {
     f = await setup();
     const auth = oauthServer({
       register: (body) =>
@@ -1186,7 +1186,7 @@ describe("custom MCP servers", () => {
     const started = await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
     if (started.status !== "oauth") throw new Error(`expected oauth, got ${started.status}`);
     expect(new URL(started.authorizeUrl).searchParams.get("client_id")).toBe("calendly-client");
-    expect(auth.seen.names).toEqual(["agentes.chat", "agentes chat"]);
+    expect(auth.seen.names).toEqual(["Ackwire AI"]);
   });
 
   test("OAuth that only lets in apps it approved says so in its own words, not 'no OAuth' (an outage doesn't); a key still connects", async () => {
@@ -1254,7 +1254,7 @@ describe("custom MCP servers", () => {
       const started = await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER });
       expect(started).toEqual({ status: "needs_key", reason: "not_approved", ...(detail ? { detail } : {}) });
       // Nothing about the name: asked once.
-      expect(auth.seen.names).toEqual(["agentes.chat"]);
+      expect(auth.seen.names).toEqual(["Ackwire AI"]);
     }
     // An outage at registration isn't a refusal: just a key, never "only apps it approved".
     const outages = [
@@ -1269,7 +1269,7 @@ describe("custom MCP servers", () => {
       expect(await connectCustomServer(deps, f.owner.id, f.org.id, { serverUrl: SERVER })).toEqual({
         status: "needs_key",
       });
-      expect(auth.seen.names).toEqual(["agentes.chat"]);
+      expect(auth.seen.names).toEqual(["Ackwire AI"]);
     }
     // No registration offered (an app registered with it, as HubSpot asks): not approved either.
     const closed = depsOf(f, { connect: mcp.connect, http: oauthServer({ registration: false }).http });

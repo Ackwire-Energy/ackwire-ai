@@ -34,7 +34,7 @@ import {
 export const OPENROUTER_API = "https://openrouter.ai/api/v1";
 
 /** OpenRouter's app attribution: the product's name and site, never a self-hosted server's own address. */
-const ATTRIBUTION = { "HTTP-Referer": "https://agentes.chat", "X-OpenRouter-Title": "agentes.chat" };
+const ATTRIBUTION = { "HTTP-Referer": "https://agentes.chat", "X-OpenRouter-Title": "Ackwire AI" };
 
 /** An OpenRouter model id (`z-ai/glm-5.3`, `~z-ai/glm-latest`): the catalog's ids never have a slash. */
 export const isOpenRouterModel = (model: string) => model.includes("/") && !isCustomModel(model);

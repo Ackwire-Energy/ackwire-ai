@@ -114,7 +114,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // brings its own Firebase project.
     ...(process.env.GOOGLE_SERVICES_JSON ? { googleServicesFile: process.env.GOOGLE_SERVICES_JSON } : {}),
     ...(process.env.ANDROID_VERSION_CODE ? { versionCode: Number(process.env.ANDROID_VERSION_CODE) } : {}),
-    // Two layers (the night sky, the tilted agent), so the launcher's mask and motion cut them like the iOS icon.
+    // Two layers (Ackwire's forest green, the "A"), so the launcher's mask and motion cut them like the iOS icon.
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundImage: "./assets/images/adaptive-icon-background.png",
@@ -174,14 +174,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         imageWidth: 120,
         resizeMode: "contain",
         backgroundColor: "#ffffff",
-        dark: { image: "./assets/images/splash-icon.png", backgroundColor: "#0f0f0e" },
+        dark: { image: "./assets/images/splash-icon.png", backgroundColor: "#000000" },
       },
     ],
     [
       "expo-notifications",
       {
         icon: "./assets/images/notification-icon.png",
-        color: "#0063d1",
+        color: "#3f7a12",
       },
     ],
     // Android release builds signed with the upload key from the environment (the Android build workflow).

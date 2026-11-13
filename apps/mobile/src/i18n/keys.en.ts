@@ -62,7 +62,7 @@ export const mobileEn = {
       certificate: "The certificate of {{host}} isn't valid. Talk to whoever runs the server.",
       notAgentes: "{{host}} isn't an Ackwire AI server. Check the address.",
       serverTooOld: "{{host}} needs an update to work with this app.",
-      appTooOld: "Update the agentes app to use {{host}}.",
+      appTooOld: "Update the Ackwire AI app to use {{host}}.",
       down: {
         line: "{{host}} didn't answer.",
         text: "It may be down or outside your network. The app opens on its own once it's back.",

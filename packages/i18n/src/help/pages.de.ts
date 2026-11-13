@@ -102,7 +102,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
             ],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -603,7 +603,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: die Aufgaben, die du aus Apps geschickt hast, und was Agenten gerade tun.",
             ],
           },
-          "Die App handelt in deinem Namen und sieht nur, was du siehst. Sie gibt nie Aktionen von Agenten frei: Wenn ein Agent anhält, um eine Freigabe zu erbitten, sagt die Antwort das mit einem Link, und ein Mensch entscheidet in agentes.chat. Einstellungen, Mitglieder oder Berechtigungen ändert sie auch nicht.",
+          "Die App handelt in deinem Namen und sieht nur, was du siehst. Sie gibt nie Aktionen von Agenten frei: Wenn ein Agent anhält, um eine Freigabe zu erbitten, sagt die Antwort das mit einem Link, und ein Mensch entscheidet in Ackwire AI. Einstellungen, Mitglieder oder Berechtigungen ändert sie auch nicht.",
         ],
       },
       {
@@ -725,7 +725,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Dein Konto",
         blocks: [
           "Öffne die Adresse deines Servers und registriere dich: Das erste Konto wird Inhaber. Danach ist die Registrierung zu, und Leute kommen per Einladung dazu, über **Einstellungen\u00a0›\u00a0Mitglieder und Einladungen**.",
-          "Bei Tailscale brauchen die Leute, die du einlädst, auch dein Tailnet. Lade sie zuerst unter https://console.tailscale.com/admin/users ein und dann in agentes.chat.",
+          "Bei Tailscale brauchen die Leute, die du einlädst, auch dein Tailnet. Lade sie zuerst unter https://console.tailscale.com/admin/users ein und dann in Ackwire AI.",
         ],
       },
       {
@@ -803,7 +803,7 @@ export const helpDe: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "Die vollständige Anleitung",
         blocks: [
-          "Alle Einstellungen, ein eigener Proxy wie nginx, der Betrieb ohne Docker, ein Ablauf für KI-Agenten, die ihn selbst installieren, und was zu tun ist, wenn etwas fehlschlägt, stehen in `SELF_HOSTING.md` im Repository von agentes.chat.",
+          "Alle Einstellungen, ein eigener Proxy wie nginx, der Betrieb ohne Docker, ein Ablauf für KI-Agenten, die ihn selbst installieren, und was zu tun ist, wenn etwas fehlschlägt, stehen in `SELF_HOSTING.md` im Repository von Ackwire AI.",
         ],
       },
     ],

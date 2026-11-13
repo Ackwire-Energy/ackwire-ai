@@ -16,10 +16,10 @@ afterEach(() => {
 
 const signedOut = () => createFakeApi(seedState({ me: null }));
 const OWN = { termsUrl: "https://example.com/terms", privacyUrl: "https://example.com/privacy" };
-/** A server that isn't agentes.chat's, with these legal links of its own. */
+/** A server that isn't Ackwire AI's, with these legal links of its own. */
 const ownServer = (authConfig: Partial<typeof OWN> = {}) =>
   createFakeApi(seedState({ me: null, instance: { cloud: false, url: "https://chat.example.com" }, authConfig }));
-/** agentes.chat Cloud, with the legal links its servers set by default: on another address than this browser's. */
+/** Ackwire AI Cloud, with the legal links its servers set by default: on another address than this browser's. */
 const cloud = () =>
   createFakeApi(
     seedState({
@@ -29,15 +29,15 @@ const cloud = () =>
   );
 
 test("the tab reads a legal page's title while it shows, and what it read before once it's left", async () => {
-  document.title = "agentes.chat";
+  document.title = "Ackwire AI";
   await renderPage(<LegalPage kind="terms" />, { api: signedOut() });
-  expect(document.title).toBe(`${legalDocument("terms", "en").title} · agentes.chat`);
+  expect(document.title).toBe(`${legalDocument("terms", "en").title} · Ackwire AI`);
   cleanup();
-  expect(document.title).toBe("agentes.chat");
+  expect(document.title).toBe("Ackwire AI");
 });
 
 describe("the Terms and the Privacy Policy", () => {
-  test("agentes.chat Cloud's, where the server says it is the Cloud, whatever the browser's address", async () => {
+  test("Ackwire AI Cloud's, where the server says it is the Cloud, whatever the browser's address", async () => {
     expect(window.location.origin).toBe("http://localhost:3000");
     const replace = spyOn(window.location, "replace").mockImplementation(() => {});
     try {

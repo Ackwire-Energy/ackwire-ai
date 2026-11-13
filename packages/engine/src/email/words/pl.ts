@@ -7,33 +7,32 @@ import type { EmailWords } from "./index";
  * forms with `plural("pl", n, { one, few, many, other })` from `@agenteschat/i18n/format`.
  */
 export const words: EmailWords = {
-  sentBy: (host) =>
-    host ? atHost("Wysłano z serwera agentes.chat pod", "adresem", host) : "Wysłano przez agentes.chat.",
+  sentBy: (host) => (host ? atHost("Wysłano z serwera Ackwire AI pod", "adresem", host) : "Wysłano przez Ackwire AI."),
   fallback: "Przycisk nie działa? Skopiuj ten adres do przeglądarki:",
   role: { owner: "właściciel", member: "członek" },
   anAgent: "Agent",
   someone: "Ktoś",
   verify: {
-    subject: "Potwierdź swój e-mail w agentes.chat",
+    subject: "Potwierdź swój e-mail w Ackwire AI",
     preheader: "Jedno kliknięcie, żeby potwierdzić ten adres. Link działa przez godzinę.",
     headline: "Potwierdź swój e-mail",
     body: "Został jeden krok: potwierdź, że ten adres należy do ciebie.",
     button: "Potwierdź e-mail",
     small: "Link działa przez godzinę. Jeśli to nie ty zakładasz konto, możesz zignorować tę wiadomość.",
-    why: "Otrzymujesz tę wiadomość, ponieważ ten adres został użyty do założenia konta w agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres został użyty do założenia konta w Ackwire AI.",
   },
   reset: {
-    subject: "Zresetuj hasło do agentes.chat",
+    subject: "Zresetuj hasło do Ackwire AI",
     preheader: "Ustaw nowe hasło. Link działa przez godzinę.",
     headline: "Ustaw nowe hasło",
     body: "Otrzymaliśmy prośbę o zresetowanie hasła dla tego adresu.",
     button: "Ustaw nowe hasło",
     note: "To nie ty? Zignoruj tę wiadomość. Twoje hasło się nie zmieni.",
     small: "Link działa przez godzinę.",
-    why: "Otrzymujesz tę wiadomość, ponieważ ktoś poprosił o zresetowanie hasła dla tego adresu w agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ktoś poprosił o zresetowanie hasła dla tego adresu w Ackwire AI.",
   },
   invitation: {
-    subject: "Masz zaproszenie do przestrzeni roboczej w agentes.chat",
+    subject: "Masz zaproszenie do przestrzeni roboczej w Ackwire AI",
     preheader: "Przyjmij je w ciągu 7 dni, z tego adresu e-mail.",
     headline: "Masz zaproszenie do przestrzeni roboczej",
     body: (inviter, email, org, role) =>
@@ -45,7 +44,7 @@ export const words: EmailWords = {
             ` jako ${role}.`,
           ]
         : ["Masz zaproszenie do przestrzeni roboczej ", { b: org }, ` jako ${role}.`],
-    what: "agentes.chat to miejsce, w którym osoby i agenci AI pracują razem.",
+    what: "Ackwire AI to miejsce, w którym osoby i agenci AI pracują razem.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Wiadomość: " }, `„${note}”`],
     button: "Przyjmij zaproszenie",
     small: "Zaproszenie jest ważne przez 7 dni. Przyjmij je z tego adresu e-mail.",
@@ -56,9 +55,9 @@ export const words: EmailWords = {
         inviter
           ? [
               { b: inviter },
-              `${email ? ` (${email})` : ""} zaprasza cię do swojej osobistej przestrzeni roboczej w agentes.chat.`,
+              `${email ? ` (${email})` : ""} zaprasza cię do swojej osobistej przestrzeni roboczej w Ackwire AI.`,
             ]
-          : "Masz zaproszenie do osobistej przestrzeni roboczej w agentes.chat.",
+          : "Masz zaproszenie do osobistej przestrzeni roboczej w Ackwire AI.",
       why: () =>
         "Otrzymujesz tę wiadomość, ponieważ ktoś zaprosił ten adres do swojej osobistej przestrzeni roboczej. Jeśli nie znasz tej osoby, zignoruj tę wiadomość. Nic się nie stanie, dopóki nie przyjmiesz zaproszenia.",
     },
@@ -107,41 +106,41 @@ export const words: EmailWords = {
     },
   },
   waitlist: {
-    subject: "Potwierdź swoje miejsce na liście oczekujących agentes.chat",
+    subject: "Potwierdź swoje miejsce na liście oczekujących Ackwire AI",
     preheader: "Jedno kliknięcie i twoje miejsce jest zarezerwowane.",
     headline: "Potwierdź swoje miejsce na liście",
     body: (email) =>
       email
-        ? ["Otrzymaliśmy prośbę o dopisanie adresu ", { b: email }, " do listy oczekujących agentes.chat."]
-        : "Otrzymaliśmy prośbę o dopisanie tego adresu do listy oczekujących agentes.chat.",
+        ? ["Otrzymaliśmy prośbę o dopisanie adresu ", { b: email }, " do listy oczekujących Ackwire AI."]
+        : "Otrzymaliśmy prośbę o dopisanie tego adresu do listy oczekujących Ackwire AI.",
     approve: "Tutaj nic ważnego nie dzieje się, dopóki ktoś tego nie zatwierdzi. Dotyczy to także tej prośby.",
     button: "Potwierdź mój e-mail",
     small: "Link działa przez 48 godzin. To nie ty? Zignoruj tę wiadomość. Bez kliknięcia adres nie trafi na listę.",
-    why: "Otrzymujesz tę wiadomość, ponieważ ten adres został wpisany na listę oczekujących agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres został wpisany na listę oczekujących Ackwire AI.",
   },
   earlyAccess: {
-    subject: "Twoje zaproszenie do agentes.chat już jest",
+    subject: "Twoje zaproszenie do Ackwire AI już jest",
     preheader: (days) =>
       `Załóż konto w ciągu ${plural("pl", days, { one: `${days} dnia`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}, z tego adresu e-mail.`,
     headline: "Twój dostęp jest gotowy",
-    body: (email) => ["Z adresu ", { b: email }, " możesz już założyć konto i przestrzeń roboczą w agentes.chat."],
-    what: "agentes.chat to miejsce, w którym osoby i agenci AI pracują razem.",
+    body: (email) => ["Z adresu ", { b: email }, " możesz już założyć konto i przestrzeń roboczą w Ackwire AI."],
+    what: "Ackwire AI to miejsce, w którym osoby i agenci AI pracują razem.",
     button: "Załóż konto",
     small: (days) =>
       `Link działa przez ${plural("pl", days, { one: `${days} dzień`, few: `${days} dni`, many: `${days} dni`, other: `${days} dnia` })}, tylko dla tego adresu. Zarejestruj się hasłem albo przez Google, GitHub lub Apple na ten sam adres.`,
-    why: "Otrzymujesz tę wiadomość, ponieważ ten adres jest na liście oczekujących agentes.chat albo dostał zaproszenie do agentes.chat. Nic się nie stanie, dopóki się nie zarejestrujesz.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres jest na liście oczekujących Ackwire AI albo dostał zaproszenie do Ackwire AI. Nic się nie stanie, dopóki się nie zarejestrujesz.",
   },
   earlyAccessAllowed: {
     subject: "Możesz już założyć własną przestrzeń roboczą",
     preheader: "Zaloguj się na konto, które już masz, i ją skonfiguruj.",
     headline: "Załóż własną przestrzeń roboczą",
     body: (email) => [
-      "Możesz już założyć własną przestrzeń roboczą w agentes.chat na koncie ",
+      "Możesz już założyć własną przestrzeń roboczą w Ackwire AI na koncie ",
       { b: email },
       ", które już masz.",
     ],
     button: "Załóż przestrzeń roboczą",
-    why: "Otrzymujesz tę wiadomość, ponieważ to konto dostało wczesny dostęp do agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ to konto dostało wczesny dostęp do Ackwire AI.",
   },
   budget: {
     subject: {
@@ -235,7 +234,7 @@ export const words: EmailWords = {
     },
     button: { ai: "Połącz swoje AI", task: "Daj pierwsze zadanie", create: "Utwórz agenta" },
     why: (org) =>
-      `Otrzymujesz tę wiadomość, ponieważ jesteś właścicielem przestrzeni roboczej ${org} w agentes.chat. To jedyna wiadomość o tym komputerze.`,
+      `Otrzymujesz tę wiadomość, ponieważ jesteś właścicielem przestrzeni roboczej ${org} w Ackwire AI. To jedyna wiadomość o tym komputerze.`,
     personal: {
       body: () =>
         "Dziękujemy za cierpliwość. Komputer twoich agentów jest włączony i skonfigurowany, z osobnym użytkownikiem dla każdego agenta. Działa dzień i noc, więc twoi agenci mogą pracować o każdej porze.",
@@ -243,7 +242,7 @@ export const words: EmailWords = {
         task: ["Daj pierwsze zadanie.", "Otwórz rozmowę z jednym ze swoich agentów i napisz, czego potrzebujesz."],
       },
       why: () =>
-        "Otrzymujesz tę wiadomość, ponieważ ta przestrzeń robocza w agentes.chat należy do ciebie. To jedyna wiadomość o tym komputerze.",
+        "Otrzymujesz tę wiadomość, ponieważ ta przestrzeń robocza w Ackwire AI należy do ciebie. To jedyna wiadomość o tym komputerze.",
     },
   },
   joinRequest: {
@@ -297,7 +296,7 @@ export const words: EmailWords = {
       small: "Jeśli to pomyłka, poproś kogoś z tej przestrzeni roboczej o zaproszenie e-mailem.",
     },
     why: (org) =>
-      `Otrzymujesz tę wiadomość, ponieważ z tego adresu poproszono o dołączenie do przestrzeni roboczej ${org} w agentes.chat.`,
+      `Otrzymujesz tę wiadomość, ponieważ z tego adresu poproszono o dołączenie do przestrzeni roboczej ${org} w Ackwire AI.`,
     personal: {
       joined: { body: (who) => `${who} zatwierdza twoją prośbę. Jesteś teraz w tej przestrzeni roboczej.` },
       invited: { body: (who) => `${who} zatwierdza twoją prośbę o dołączenie do tej przestrzeni roboczej.` },
@@ -307,27 +306,27 @@ export const words: EmailWords = {
         small: "Jeśli to pomyłka, poproś tę osobę o zaproszenie e-mailem.",
       },
       why: () =>
-        "Otrzymujesz tę wiadomość, ponieważ z tego adresu poproszono o dołączenie do osobistej przestrzeni roboczej w agentes.chat.",
+        "Otrzymujesz tę wiadomość, ponieważ z tego adresu poproszono o dołączenie do osobistej przestrzeni roboczej w Ackwire AI.",
     },
   },
   joinCode: {
-    subject: (code) => `${code} to twój kod do agentes.chat`,
+    subject: (code) => `${code} to twój kod do Ackwire AI`,
     preheader: "Wpisz go na stronie, żeby poprosić o dołączenie. Działa przez 10 minut.",
     headline: "Twój kod",
     body: (org) => ["Wpisz ten kod na stronie, żeby poprosić o dołączenie do przestrzeni roboczej ", { b: org }, "."],
     small: ["Działa przez 10 minut. Jeśli to nie ty, ", { nobr: "zignoruj tę wiadomość." }],
     why: (org) =>
-      `Otrzymujesz tę wiadomość, ponieważ ktoś wpisał ten adres, żeby poprosić o dołączenie do przestrzeni roboczej ${org} w agentes.chat.`,
+      `Otrzymujesz tę wiadomość, ponieważ ktoś wpisał ten adres, żeby poprosić o dołączenie do przestrzeni roboczej ${org} w Ackwire AI.`,
     personal: {
       body: () => "Wpisz ten kod na stronie, żeby poprosić o dołączenie do tej przestrzeni roboczej.",
       why: () =>
-        "Otrzymujesz tę wiadomość, ponieważ ktoś wpisał ten adres, żeby poprosić o dołączenie do osobistej przestrzeni roboczej w agentes.chat.",
+        "Otrzymujesz tę wiadomość, ponieważ ktoś wpisał ten adres, żeby poprosić o dołączenie do osobistej przestrzeni roboczej w Ackwire AI.",
     },
   },
   deletionCode: {
     subjectWorkspace: (code) => `${code} to twój kod do usunięcia przestrzeni roboczej`,
     subjectAccount: (code) => `${code} to twój kod do usunięcia całego konta`,
-    preheader: "Wpisz go w agentes.chat, żeby potwierdzić. Działa przez 10 minut.",
+    preheader: "Wpisz go w Ackwire AI, żeby potwierdzić. Działa przez 10 minut.",
     headline: "Twój kod",
     workspace: (org) => [
       "Wpisz ten kod, żeby usunąć przestrzeń roboczą ",
@@ -347,8 +346,8 @@ export const words: EmailWords = {
     noSupport:
       "Działa przez 10 minut i bez niego nic nie zostanie usunięte. Jeśli to nie ty, nikomu go nie podawaj i daj znać osobom, które prowadzą ten serwer.",
     whyWorkspace: (org) =>
-      `Otrzymujesz tę wiadomość, ponieważ z twojego konta poproszono o usunięcie przestrzeni roboczej ${org} w agentes.chat.`,
-    whyAccount: "Otrzymujesz tę wiadomość, ponieważ z twojego konta poproszono o jego usunięcie w agentes.chat.",
+      `Otrzymujesz tę wiadomość, ponieważ z twojego konta poproszono o usunięcie przestrzeni roboczej ${org} w Ackwire AI.`,
+    whyAccount: "Otrzymujesz tę wiadomość, ponieważ z twojego konta poproszono o jego usunięcie w Ackwire AI.",
     personal: {
       workspace: (org) => [
         "Wpisz ten kod, żeby usunąć swoją przestrzeń roboczą ",
@@ -370,10 +369,10 @@ export const words: EmailWords = {
     owner: "Zmiana planów? Przywróć ją przed tym terminem.",
     button: "Przywróć przestrzeń roboczą",
     member: "Jeśli to pomyłka, poproś właściciela o jej przywrócenie.",
-    why: (org) => `Otrzymujesz tę wiadomość, ponieważ jesteś w przestrzeni roboczej ${org} w agentes.chat.`,
+    why: (org) => `Otrzymujesz tę wiadomość, ponieważ jesteś w przestrzeni roboczej ${org} w Ackwire AI.`,
     personal: {
       member: "Jeśli to pomyłka, poproś osobę, która ją usunęła, o jej przywrócenie.",
-      why: () => "Otrzymujesz tę wiadomość, ponieważ jesteś w tej przestrzeni roboczej w agentes.chat.",
+      why: () => "Otrzymujesz tę wiadomość, ponieważ jesteś w tej przestrzeni roboczej w Ackwire AI.",
     },
   },
   restored: {
@@ -382,28 +381,28 @@ export const words: EmailWords = {
     headline: "Przestrzeń robocza wróciła",
     body: (by, org) => [{ b: by }, " przywraca przestrzeń roboczą ", { b: org }, ". Znów działa."],
     button: "Otwórz przestrzeń roboczą",
-    why: (org) => `Otrzymujesz tę wiadomość, ponieważ jesteś w przestrzeni roboczej ${org} w agentes.chat.`,
+    why: (org) => `Otrzymujesz tę wiadomość, ponieważ jesteś w przestrzeni roboczej ${org} w Ackwire AI.`,
     personal: {
-      why: () => "Otrzymujesz tę wiadomość, ponieważ jesteś w tej przestrzeni roboczej w agentes.chat.",
+      why: () => "Otrzymujesz tę wiadomość, ponieważ jesteś w tej przestrzeni roboczej w Ackwire AI.",
     },
   },
   appConnected: {
-    subject: "Do twojego konta agentes.chat podłączono aplikację",
+    subject: "Do twojego konta Ackwire AI podłączono aplikację",
     preheader: "Może czytać i wysyłać zadania agentom w twoim imieniu w jednej przestrzeni roboczej.",
     headline: "Podłączono aplikację",
     body: (app, org) => [{ b: app }, " ma teraz dostęp do twojego konta w przestrzeni roboczej ", { b: org }, "."],
     note: "To nie ty? Odłącz ją teraz i zmień hasło.",
     button: "Zobacz podłączone aplikacje",
     why: (org) =>
-      `Otrzymujesz tę wiadomość, ponieważ do twojego konta w przestrzeni roboczej ${org} w agentes.chat podłączono aplikację.`,
+      `Otrzymujesz tę wiadomość, ponieważ do twojego konta w przestrzeni roboczej ${org} w Ackwire AI podłączono aplikację.`,
     personal: {
       body: (app) => [{ b: app }, " ma teraz dostęp do twojego konta w twojej osobistej przestrzeni roboczej."],
       why: () =>
-        "Otrzymujesz tę wiadomość, ponieważ do twojego konta w twojej osobistej przestrzeni roboczej w agentes.chat podłączono aplikację.",
+        "Otrzymujesz tę wiadomość, ponieważ do twojego konta w twojej osobistej przestrzeni roboczej w Ackwire AI podłączono aplikację.",
     },
   },
   accountDeleting: {
-    subject: (day) => `Twoje konto agentes.chat zostanie usunięte ${day}`,
+    subject: (day) => `Twoje konto Ackwire AI zostanie usunięte ${day}`,
     preheader: "Masz 7 dni, żeby zmienić zdanie.",
     headline: "Twoje konto jest usuwane",
     body: (email, day, time) => [
@@ -422,10 +421,10 @@ export const words: EmailWords = {
     ],
     undo: "Zmieniasz zdanie? Zaloguj się przed tą datą i naciśnij Przywróć.",
     button: "Zaloguj się, aby przywrócić",
-    why: "Otrzymujesz tę wiadomość, ponieważ ten adres ma konto w agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres ma konto w Ackwire AI.",
   },
   accountDeleted: {
-    subject: "Twoje konto agentes.chat zostało usunięte",
+    subject: "Twoje konto Ackwire AI zostało usunięte",
     preheader: "Zostało wylogowane wszędzie i nie da się już na nie zalogować.",
     headline: "Twoje konto zostało usunięte",
     body: (email) => ["Usunęliśmy konto ", { b: email }, "."],
@@ -439,7 +438,7 @@ export const words: EmailWords = {
     ],
     support: (address) => ["Jeśli to nie ty, napisz na ", { mail: address }, "."],
     noSupport: "Jeśli to nie ty, daj znać osobom, które prowadzą ten serwer.",
-    why: "Otrzymujesz tę wiadomość, ponieważ ten adres miał konto w agentes.chat.",
+    why: "Otrzymujesz tę wiadomość, ponieważ ten adres miał konto w Ackwire AI.",
   },
   autonomy: {
     subject: (day, stalls, noise) => `Agenci ${day}: zastoje ${stalls}, uruchomienia na próżno ${noise}`,
@@ -519,7 +518,7 @@ export const words: EmailWords = {
   },
   planWaiting: {
     subject: "Twój zespół czeka",
-    preheader: "Twoja przestrzeń robocza jest gotowa. Do startu potrzebny jest plan agentes.chat.",
+    preheader: "Twoja przestrzeń robocza jest gotowa. Do startu potrzebny jest plan Ackwire AI.",
     headline: "Twój zespół czeka",
     body: (agents, channels, routines) => {
       const a = plural("pl", agents, {
@@ -541,11 +540,11 @@ export const words: EmailWords = {
         other: `${routines} rutyny`,
       });
       return routines > 0
-        ? `Gotowe: ${a}, ${c} i ${r}. Do startu potrzebny jest plan agentes.chat.`
-        : `Gotowe: ${a} i ${c}. Do startu potrzebny jest plan agentes.chat.`;
+        ? `Gotowe: ${a}, ${c} i ${r}. Do startu potrzebny jest plan Ackwire AI.`
+        : `Gotowe: ${a} i ${c}. Do startu potrzebny jest plan Ackwire AI.`;
     },
-    button: "Zobacz plany agentes.chat",
-    why: (org) => `Ten e-mail przyszedł, bo prowadzisz ${org} w agentes.chat. Wysyłamy tylko dwa takie powiadomienia.`,
+    button: "Zobacz plany Ackwire AI",
+    why: (org) => `Ten e-mail przyszedł, bo prowadzisz ${org} w Ackwire AI. Wysyłamy tylko dwa takie powiadomienia.`,
     personal: {
       subject: "Twoi agenci czekają",
       headline: "Twoi agenci czekają",
@@ -562,10 +561,10 @@ export const words: EmailWords = {
           many: `${routines} rutyn`,
           other: `${routines} rutyny`,
         });
-        return `Gotowe: ${routines > 0 ? `${a} i ${r}` : a}. Brakuje tylko planu agentes.chat.`;
+        return `Gotowe: ${routines > 0 ? `${a} i ${r}` : a}. Brakuje tylko planu Ackwire AI.`;
       },
       why: () =>
-        "Ten e-mail przyszedł, bo ta przestrzeń robocza w agentes.chat należy do ciebie. Wysyłamy tylko dwa takie powiadomienia.",
+        "Ten e-mail przyszedł, bo ta przestrzeń robocza w Ackwire AI należy do ciebie. Wysyłamy tylko dwa takie powiadomienia.",
     },
   },
 };

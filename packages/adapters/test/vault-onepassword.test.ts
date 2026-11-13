@@ -109,7 +109,7 @@ describe("1Password source: connect", () => {
       config: { vaultId: "vaultagents0000000000000001", vaultName: "Agents" },
       secret: { token: FAKE_OP_TOKEN },
     });
-    expect(fake.calls.createClient).toEqual([{ integrationName: "agentes.chat", integrationVersion: "v1.0.0" }]);
+    expect(fake.calls.createClient).toEqual([{ integrationName: "Ackwire AI", integrationVersion: "v1.0.0" }]);
     expect(fake.calls.vaultsList).toEqual([{ decryptDetails: true }]);
   });
 

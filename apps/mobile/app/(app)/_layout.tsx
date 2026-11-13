@@ -178,7 +178,7 @@ function AppStack() {
       <Stack.Screen name="me/workspaces" options={{ ...pushed, ...scrollUnder }} />
       {/* The same list as a sheet, from a long press on the workspace's mark in the bar (ADR 0154). */}
       <Stack.Screen name="workspaces-sheet" options={workspacesSheet} />
-      {/* Another workspace, on agentes.chat or the team's own server (ADR 0154): two choices, a short sheet. */}
+      {/* Another workspace, on Ackwire AI or the team's own server (ADR 0154): two choices, a short sheet. */}
       <Stack.Screen name="me/add-workspace" options={pushSheet} />
       {/* On the sign-in's ruler: its own sky and back circle, no bar. */}
       <Stack.Screen name="me/team-server" options={{ headerShown: false }} />

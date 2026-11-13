@@ -46,7 +46,7 @@ const ACCOUNT: SignInOptions = { account: true, password: true, providers: [], c
 const NEW: SignInOptions = { account: false, password: false, providers: [], canSignUp: true };
 
 describe("the sign-in forms when the server doesn't answer", () => {
-  const UNREACHABLE = "Sem conexão com o agentes.chat agora. Tente de novo em instantes.";
+  const UNREACHABLE = "Sem conexão com o Ackwire AI agora. Tente de novo em instantes.";
   const alertText = () => screen().getByRole("alert").textContent;
 
   test("Continuar with no answer: why, under the field, and Continuar works again", async () => {
@@ -278,7 +278,7 @@ describe("Entrar (e-mail primeiro)", () => {
     }
   });
 
-  test("on agentes.chat Cloud a blocked account reads why by the block's kind, and how to contest it", async () => {
+  test("on Ackwire AI Cloud a blocked account reads why by the block's kind, and how to contest it", async () => {
     const contest = "Para contestar, escreva para legal@agentes.chat.";
     for (const [block, says] of [
       [
@@ -356,7 +356,7 @@ describe("Entrar a caminho de algum lugar: a página diz para onde", () => {
 
     // An AI app's sign-in (ADR 0119): back to its consent page.
     await renderApp(at("/autorizar?req=0192"), { api, auth: createFakeAuth().auth });
-    expect(lead()).toBe("Para conectar um app ao agentes.chat.");
+    expect(lead()).toBe("Para conectar um app ao Ackwire AI.");
   });
 
   test("a link that no longer works, an unknown one, or anywhere else: the general line", async () => {
@@ -1058,7 +1058,7 @@ describe("Aceitar convite", () => {
   });
 });
 
-describe("A verificação contra robôs (agentes.chat Cloud)", () => {
+describe("A verificação contra robôs (Ackwire AI Cloud)", () => {
   const SITE_KEY = "1x00000000000000000000BB";
   afterEach(removeTurnstile);
 
@@ -1387,7 +1387,7 @@ describe("Onboarding: the workspace's name", () => {
     expect(button("Continuar").hasAttribute("disabled")).toBe(true);
   });
 
-  test("a workspace refused: why, with how to contest it on agentes.chat Cloud; elsewhere the plain line", async () => {
+  test("a workspace refused: why, with how to contest it on Ackwire AI Cloud; elsewhere the plain line", async () => {
     for (const [cloud, says] of [
       [
         true,
@@ -1463,11 +1463,11 @@ describe("Onboarding: the workspace's name", () => {
     await next();
     expect(screen().getByRole("heading", { name: "Como se chama o seu workspace?" })).toBeTruthy();
     const said =
-      "Você já tem um workspace esperando um plano do agentes.chat. Escolha o plano dele antes de criar outro.";
+      "Você já tem um workspace esperando um plano do Ackwire AI. Escolha o plano dele antes de criar outro.";
     expect(screen().getByRole("alert").textContent).toBe(said);
     // Said once, in place: no toast says it again.
     expect(document.body.textContent?.split(said)).toHaveLength(2);
-    await click(button("Ver planos do agentes.chat"), 6);
+    await click(button("Ver planos do Ackwire AI"), 6);
     expect(calls(state, "orgs.billingLink")[0]?.args).toEqual(["org-unpaid", "new_workspace"]);
     expect(left).toEqual(["https://billing.example.com/link?t=new_workspace"]);
   });

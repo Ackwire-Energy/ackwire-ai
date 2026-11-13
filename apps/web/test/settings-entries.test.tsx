@@ -39,11 +39,11 @@ describe("the list", () => {
       "Armazenamento",
       "Importar e exportar",
       "Auditoria",
-      "Sobre o agentes.chat",
+      "Sobre o Ackwire AI",
     ]);
   });
 
-  test("on agentes.chat Cloud Devices is the sixth entry, and Advanced holds the rest", async () => {
+  test("on Ackwire AI Cloud Devices is the sixth entry, and Advanced holds the rest", async () => {
     await go("settings", seedState({ authConfig: { cloud: true } }));
     expect(rows()).toEqual(["Sua conta", "Workspace", "Pessoas", "IA e uso", "Conectores", "Dispositivos", "Avançado"]);
     await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Avançado" })));
@@ -85,7 +85,7 @@ describe("every old address opens its new home", () => {
     ["storage", "Armazenamento", undefined],
     ["import", "Importar e exportar", undefined],
     ["audit", "Auditoria", undefined],
-    ["about", "Sobre o agentes.chat", undefined],
+    ["about", "Sobre o Ackwire AI", undefined],
   ];
   for (const [section, entry, tab] of homes)
     test(`/settings/${section} → ${entry}${tab ? ` › ${tab}` : ""}`, async () => {

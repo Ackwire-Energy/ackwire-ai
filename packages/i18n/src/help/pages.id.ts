@@ -59,7 +59,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reach",
         heading: "Dari ponselmu dan timmu",
         blocks: [
-          "**Akses dari ponselmu dan rekan tim** menaruh Ackwire AI di Tailscale, jaringan pribadi untuk perangkatmu: ponselmu dan orang yang kamu undang bergabung ke jaringan itu, dan tidak ada orang lain yang bisa menjangkau agentes.chat. Tailscale gratis: https://tailscale.com/download. Kalau dimatikan, Ackwire AI hanya bisa dipakai di komputer ini.",
+          "**Akses dari ponselmu dan rekan tim** menaruh Ackwire AI di Tailscale, jaringan pribadi untuk perangkatmu: ponselmu dan orang yang kamu undang bergabung ke jaringan itu, dan tidak ada orang lain yang bisa menjangkau Ackwire AI. Tailscale gratis: https://tailscale.com/download. Kalau dimatikan, Ackwire AI hanya bisa dipakai di komputer ini.",
           "Kalau komputer ini sudah membagikan hal lain di port 443 Tailscale, Ackwire AI memakai port 8443, dan alamatnya diakhiri `:8443`.",
         ],
       },
@@ -100,7 +100,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
             list: ["Tutup aplikasi, lalu buat dump database dengan salinan server milik aplikasi itu sendiri. Di Mac:"],
           },
           {
-            code: "BUN_BE_BUN=1 /Applications/agentes.chat.app/Contents/MacOS/agentes-runner \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql",
+            code: 'BUN_BE_BUN=1 "/Applications/Ackwire AI.app/Contents/MacOS/agentes-runner" \\\n  ~/.agentes/app/current/server/native.js db dump --data ~/.agentes --out agentes.sql',
           },
           {
             list: [
@@ -599,7 +599,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "`list_recent_tasks`: tugas yang kamu kirim dari aplikasi dan apa yang sedang dikerjakan agen.",
             ],
           },
-          "Aplikasi bertindak atas namamu dan hanya melihat apa yang kamu lihat. Aplikasi tidak pernah menyetujui tindakan agen: saat agen berhenti untuk meminta persetujuan, balasannya memberi tahu hal itu dengan tautan, dan orang yang memutuskan di agentes.chat. Aplikasi juga tidak mengubah pengaturan, anggota, atau izin.",
+          "Aplikasi bertindak atas namamu dan hanya melihat apa yang kamu lihat. Aplikasi tidak pernah menyetujui tindakan agen: saat agen berhenti untuk meminta persetujuan, balasannya memberi tahu hal itu dengan tautan, dan orang yang memutuskan di Ackwire AI. Aplikasi juga tidak mengubah pengaturan, anggota, atau izin.",
         ],
       },
       {
@@ -635,7 +635,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "safety",
         heading: "Teks dari orang lain",
         blocks: [
-          "Balasan berisi teks yang ditulis agen dan orang di agentes.chat. Aplikasi menerima teks itu bertanda sebagai konten, bukan instruksi, tetapi sebuah teks tetap bisa mencoba membujuk aplikasi melakukan hal lain. Periksa apa yang akan dilakukan aplikasimu sebelum kamu mengonfirmasi.",
+          "Balasan berisi teks yang ditulis agen dan orang di Ackwire AI. Aplikasi menerima teks itu bertanda sebagai konten, bukan instruksi, tetapi sebuah teks tetap bisa mencoba membujuk aplikasi melakukan hal lain. Periksa apa yang akan dilakukan aplikasimu sebelum kamu mengonfirmasi.",
         ],
       },
       {
@@ -720,7 +720,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Akunmu",
         blocks: [
           "Buka alamat servermu dan daftar: akun pertama menjadi pemilik. Setelah itu pendaftaran ditutup, dan orang masuk lewat undangan, dari **Pengaturan\u00a0›\u00a0Anggota dan undangan**.",
-          "Di Tailscale, orang yang kamu undang juga perlu masuk ke tailnet-mu. Undang mereka dulu di https://console.tailscale.com/admin/users lalu di agentes.chat.",
+          "Di Tailscale, orang yang kamu undang juga perlu masuk ke tailnet-mu. Undang mereka dulu di https://console.tailscale.com/admin/users lalu di Ackwire AI.",
         ],
       },
       {
@@ -741,7 +741,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
           {
             list: [
               "Di Tailscale, pasang aplikasi Tailscale di ponselmu dan masuk ke tailnet yang sama.",
-              "Pasang aplikasi agentes.chat.",
+              "Pasang aplikasi Ackwire AI.",
               "Pindai kode QR yang ditampilkan penyiapan, atau yang ada di **Pengaturan\u00a0›\u00a0Akunmu\u00a0›\u00a0Buka di ponselmu**, yang juga langsung memasukkanmu.",
             ],
           },
@@ -798,7 +798,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "reference",
         heading: "Panduan lengkap",
         blocks: [
-          "Semua pengaturan, proxy milikmu sendiri seperti nginx, menjalankan tanpa Docker, langkah-langkah untuk agen AI yang memasangnya sendiri, dan apa yang dilakukan saat ada yang gagal ada di `SELF_HOSTING.md`, di repositori agentes.chat.",
+          "Semua pengaturan, proxy milikmu sendiri seperti nginx, menjalankan tanpa Docker, langkah-langkah untuk agen AI yang memasangnya sendiri, dan apa yang dilakukan saat ada yang gagal ada di `SELF_HOSTING.md`, di repositori Ackwire AI.",
         ],
       },
     ],

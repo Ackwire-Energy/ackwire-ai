@@ -189,7 +189,7 @@ export type CustomConnectStart =
   | { status: "connected"; server: CustomServerView; outcome: ConnectOutcome }
   | { status: "oauth"; authorizeUrl: string }
   /**
-   * `not_approved`: it has OAuth but only lets in apps it approved, and agentes.chat isn't one yet. `detail`: how it
+   * `not_approved`: it has OAuth but only lets in apps it approved, and Ackwire AI isn't one yet. `detail`: how it
    * refused our registration, in its own words (`error: error_description`, short).
    */
   | { status: "needs_key"; reason?: "not_approved"; detail?: string };

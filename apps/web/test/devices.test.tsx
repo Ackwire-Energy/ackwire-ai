@@ -208,7 +208,7 @@ describe("Connect a device", () => {
     // Served over plain http here: the app wouldn't take a link to it, so this computer gets its one line.
     await click(screen().getByRole("button", { name: /This computer/ }));
     const line = screen().getByRole("dialog", { name: "Connect a computer" });
-    expect(within(line).queryByRole("link", { name: "Open the agentes.chat app" })).toBeNull();
+    expect(within(line).queryByRole("link", { name: "Open the Ackwire AI app" })).toBeNull();
   });
 
   test("this computer, from a browser: the app opens a link to this server, asks to join, the maker lets it in", async () => {
@@ -218,11 +218,11 @@ describe("Connect a device", () => {
     await click(screen().getByRole("button", { name: /This computer/ }));
     const dialog = screen().getByRole("dialog", { name: "This computer" });
     expect(calls(state, "devices.createLink")[0]?.args).toEqual([ORG_ID, "computer"]);
-    const app = within(dialog).getByRole("link", { name: "Open the agentes.chat app" });
+    const app = within(dialog).getByRole("link", { name: "Open the Ackwire AI app" });
     expect(app.getAttribute("href")).toBe("agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=7KQ2-M9X1");
     expect(dialog.textContent).toContain("Waiting for the app on this computer…");
     expect(within(dialog).getByRole("heading", { name: "Don't have the app?" })).toBeTruthy();
-    expect(dialog.textContent).toContain("After installing, press Open the agentes.chat app again.");
+    expect(dialog.textContent).toContain("After installing, press Open the Ackwire AI app again.");
 
     devices.setLink({ status: "asking", request: acmeDevices().requests[0] });
     await refetch(services);
@@ -464,7 +464,7 @@ describe("Connect a device", () => {
     await ask();
     const failed = dialog.querySelector('.dv-step[data-state="needs"]');
     expect(failed?.textContent).toContain(
-      "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as Sam's MacBook Pro and scan from Wireless debugging. On that Mac, also turn on agentes.chat in System Settings › Privacy & Security › Local Network.",
+      "No phone paired in 2 minutes. If the camera scanned the code or the phone left the Wi-Fi, put it on the same Wi-Fi as Sam's MacBook Pro and scan from Wireless debugging. On that Mac, also turn on Ackwire AI in System Settings › Privacy & Security › Local Network.",
     );
     await click(within(dialog).getByRole("button", { name: "Try again" }));
     expect(calls(state, "devices.startWifiPairing")).toHaveLength(2);
@@ -519,7 +519,7 @@ describe("Connect a device", () => {
     await click(within(dialog).getByRole("button", { name: "Usar um código de pareamento" }));
     expect(qr).toContain("Não pela câmera");
     expect(failed).toBe(
-      "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que Sam's MacBook Pro. Nesse Mac, ligue também o agentes.chat em Ajustes do Sistema › Privacidade e Segurança › Rede Local.",
+      "Não deu para alcançar o celular. Coloque-o no mesmo Wi-Fi que Sam's MacBook Pro. Nesse Mac, ligue também o Ackwire AI em Ajustes do Sistema › Privacidade e Segurança › Rede Local.",
     );
     expect(within(dialog).getByLabelText("Endereço IP e porta")).toBeTruthy();
     expect(within(dialog).getByLabelText("Código de pareamento por Wi-Fi")).toBeTruthy();

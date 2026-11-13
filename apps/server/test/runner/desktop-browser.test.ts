@@ -172,7 +172,7 @@ test.if(posix)("a browser that can't open: why, in plain words, in a note that s
   const nobody = notes();
   expect(await runDesktopBrowser(path.join(path.dirname(socketIn()), "none.sock"), { note: nobody.note })).toBe(1);
   expect(nobody.shown[0]?.text).toBe(
-    "The browser didn't open.\nagentes.chat isn't running on this computer right now. Try again in a minute.",
+    "The browser didn't open.\nAckwire AI isn't running on this computer right now. Try again in a minute.",
   );
   const slow = socketIn();
   await serve(slow, () => new Promise(() => {}));

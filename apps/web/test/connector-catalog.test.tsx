@@ -47,7 +47,7 @@ const levels = (inside: HTMLElement, groups: string[]) =>
         .queryAllByRole("radio")
         .find((r) => r.getAttribute("aria-checked") === "true")?.textContent ?? null,
   );
-/** A backend whose catalog also lists Asana as the server does today: its vendor hasn't approved agentes.chat yet. */
+/** A backend whose catalog also lists Asana as the server does today: its vendor hasn't approved Ackwire AI yet. */
 const withSoonAsana = (state: FakeState) => {
   const api = createFakeApi(state);
   const asana: ConnectorDef = {
@@ -183,7 +183,7 @@ describe("Adicionar conector: one catalog", () => {
     expect(within(empty() as HTMLElement).getByRole("button", { name: "Conectar pelo endereço" })).toBeTruthy();
   });
 
-  test("a vendor that hasn't approved agentes.chat yet: greyed, a lock and 'Em breve', last, and its tile opens nothing", async () => {
+  test("a vendor that hasn't approved Ackwire AI yet: greyed, a lock and 'Em breve', last, and its tile opens nothing", async () => {
     const state = seedState({ connections: [] });
     const { dialog } = await open(state, withSoonAsana(state));
     const tile = within(dialog).getByRole("button", { name: "Asana, em breve" }) as HTMLButtonElement;
@@ -533,7 +533,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     await click(within(flow).getByRole("button", { name: "Continuar no Linear" }));
     await settle(4);
     expect(flow.textContent).toContain(
-      "Linear só deixa entrar apps que aprovou, e o agentes.chat ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
+      "Linear só deixa entrar apps que aprovou, e o Ackwire AI ainda não foi aprovado. Se ele te der uma chave de API, dá para conectar com ela.",
     );
     // Under our words, the server's: which one refused and why.
     expect(flow.querySelector(".cflow__said")?.textContent).toBe(

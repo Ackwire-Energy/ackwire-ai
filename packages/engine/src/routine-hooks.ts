@@ -305,7 +305,7 @@ export async function sendRoutineHookTest(deps: RoutineHookDeps, routine: Routin
     throw new TooManyError("Too many calls to this routine. Try again in a minute.", "routine.webhook_rate_limited");
   }
   const body = new TextEncoder().encode(JSON.stringify(SAMPLE));
-  const headers = new Headers({ "content-type": "application/json", "user-agent": "agentes.chat" });
+  const headers = new Headers({ "content-type": "application/json", "user-agent": "Ackwire AI" });
   const answer = await accept(deps, hook, { headers, body, test: true });
   return { runId: answer.runId, hook: await routineHookView(deps, routine) };
 }

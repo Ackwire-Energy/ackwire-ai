@@ -927,7 +927,7 @@ describe("branches that aren't the agent's own", () => {
 });
 
 describe("the computer", () => {
-  test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on agentes.chat", () => {
+  test("agents commit as handle@agents.<our host>: theo@agents.agentes.chat on Ackwire AI", () => {
     expect(agentCommitEmail("https://agentes.chat", "theo")).toBe("theo@agents.agentes.chat");
     expect(agentCommitEmail("https://agentes.chat/api/git/o/c/", "theo")).toBe("theo@agents.agentes.chat");
     expect(agentCommitEmail("http://localhost:3000", "theo")).toBe("theo@agents.localhost");
@@ -981,9 +981,7 @@ describe("the computer", () => {
     const post = github.calls.find((c) => c.method === "POST");
     expect(post?.auth).toBe(`Bearer ${GH_TOKEN}`);
     // Signed for the person who asked (ADR 0156), though the model wrote no body.
-    expect(JSON.parse(post?.text ?? "{}").body).toBe(
-      `${SIGNATURE_MARK}\n<sub>Dev, agente de ana no agentes.chat</sub>`,
-    );
+    expect(JSON.parse(post?.text ?? "{}").body).toBe(`${SIGNATURE_MARK}\n<sub>Dev, agente de ana no Ackwire AI</sub>`);
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "app.name": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "common.close": {
     "value": "Close"
@@ -1110,7 +1110,7 @@
     "value": "Back to sign in"
   },
   "auth.flow.toAuthorizeApp": {
-    "value": "To connect an app to agentes.chat."
+    "value": "To connect an app to Ackwire AI."
   },
   "auth.desktop.browser": {
     "value": "Continue in your browser"
@@ -1149,7 +1149,7 @@
     "value": "All set."
   },
   "auth.desktop.doneLead": {
-    "value": "You're signed in to the agentes app. You can close this tab."
+    "value": "You're signed in to the Ackwire AI app. You can close this tab."
   },
   "auth.desktop.expired": {
     "value": "This request expired."
@@ -1836,7 +1836,7 @@
     "value": "And you, what do you work on?"
   },
   "onboarding.flow.area.lead": {
-    "value": "Just so we know who uses agentes.chat."
+    "value": "Just so we know who uses Ackwire AI."
   },
   "onboarding.flow.area.skip": {
     "value": "Skip this step"
@@ -2328,7 +2328,7 @@
     "value": "Then paste this request into the app:"
   },
   "onboarding.import.aiApp.prompt": {
-    "value": "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in agentes.chat. First list what already exists there so nothing is duplicated."
+    "value": "Connect {{url}} and, for every agent, instruction, skill and routine you have, create the equivalent in Ackwire AI. First list what already exists there so nothing is duplicated."
   },
   "onboarding.import.aiApp.promptLabel": {
     "value": "Request for your AI app"
@@ -2967,7 +2967,7 @@
     "value": "/month"
   },
   "onboarding.budget.noteKey": {
-    "value": "Only for API usage, charged by the key's provider, not by agentes.chat. When an agent reaches it, it stops and tells you. Plans don't count here."
+    "value": "Only for API usage, charged by the key's provider, not by Ackwire AI. When an agent reaches it, it stops and tells you. Plans don't count here."
   },
   "onboarding.budget.notePlatform": {
     "value": "Only for API usage. When an agent reaches it, it stops and tells you."
@@ -4620,13 +4620,13 @@
     "value": "You already pinned 5 people. Unpin one to pin this one."
   },
   "openOnPhone.qr": {
-    "value": "QR code to sign in to the agentes app"
+    "value": "QR code to sign in to the Ackwire AI app"
   },
   "openOnPhone.making": {
     "value": "Making the code…"
   },
   "openOnPhone.stepApp": {
-    "value": "Install the agentes app on your phone."
+    "value": "Install the Ackwire AI app on your phone."
   },
   "openOnPhone.stepTailscale": {
     "value": "Install Tailscale on your phone and sign in with the same Tailscale account as this server."
@@ -6833,7 +6833,7 @@
     "value": "A plan signs in on the workspace's computer, and the computer comes with an active Ackwire AI plan."
   },
   "connectAi.billingWeb": {
-    "value": "Choose one on the web, at agentes.chat."
+    "value": "Choose one on the web, at Ackwire AI."
   },
   "connectAi.orPayGo": {
     "value": "Or pay as you go"
@@ -11627,7 +11627,7 @@
     "value": "{{name}}'s changes saved."
   },
   "agent.builtinName": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "agent.builtinNote": {
     "value": "built-in permissions"
@@ -12470,7 +12470,7 @@
     "value": "That's it. This page notices on its own, no reload needed."
   },
   "agentPage.work.steps.menuOpen": {
-    "value": "Open agentes"
+    "value": "Open Ackwire AI"
   },
   "agentPage.work.steps.menuPrefs": {
     "value": "Preferences…"
@@ -12936,7 +12936,7 @@
     "value": "One level per app"
   },
   "agentPage.access.builtin": {
-    "value": "Built into agentes"
+    "value": "Built into Ackwire AI"
   },
   "agentPage.access.builtinHelp": {
     "value": "Drive, tasks, memory and more"
@@ -18647,7 +18647,7 @@
     "value": "PR opened on GitHub"
   },
   "routines.event.issue.created": {
-    "value": "Task created in agentes"
+    "value": "Task created in Ackwire AI"
   },
   "routines.event.deploy.succeeded": {
     "value": "Deploy finished"
@@ -22929,7 +22929,7 @@
     "value": "OpenCode"
   },
   "aiAccounts.connect.needs.keys": {
-    "value": "Update agentes on the computer to use a plan's key"
+    "value": "Update Ackwire AI on the computer to use a plan's key"
   },
   "aiAccounts.connect.noComputer": {
     "value": "Accounts stay on a connected computer. Connect one of yours first."
@@ -27586,7 +27586,7 @@
     "value": "That GitHub account is already linked to another workspace. Remove the app there before installing it here."
   },
   "githubApp.installedOutside": {
-    "value": "The app was installed on that GitHub account outside agentes.chat. Remove it on GitHub and install it again from Connectors › GitHub."
+    "value": "The app was installed on that GitHub account outside Ackwire AI. Remove it on GitHub and install it again from Connectors › GitHub."
   },
   "githubApp.misconfigured": {
     "value": "The GitHub app has the wrong secret key on the server, so the install can't finish. Whoever runs the server needs to replace the key in the app's settings."
@@ -34231,7 +34231,7 @@
     "value": "The computer wasn't connected. If it wasn't you who opened it, nobody got access."
   },
   "connect.home": {
-    "value": "Go to agentes"
+    "value": "Go to Ackwire AI"
   },
   "apps.connect": {
     "value": "Connect an app"
@@ -34747,7 +34747,7 @@
     "value": "Never"
   },
   "apps.consent.neverApprove": {
-    "value": "Approve agents' actions. Approvals stay with people in agentes.chat."
+    "value": "Approve agents' actions. Approvals stay with people in Ackwire AI."
   },
   "apps.consent.neverSettings": {
     "value": "Change settings, members or permissions."
@@ -35497,7 +35497,7 @@
     "value": "What each person here can do. The owner can do everything."
   },
   "settings.about.basedOn": {
-    "value": "Based on <site>Ackwire AI</site> by Codari Global, LLC"
+    "value": "Based on <site>agentes.chat</site> by Codari Global, LLC"
   },
   "settings.about.version": {
     "value": "Version"
@@ -41027,7 +41027,7 @@
     "value": "{{computer}} can't show screens yet. On it:"
   },
   "agentComputer.state.outdated": {
-    "value": "Update agentes on {{computer}} to see {{name}}'s screen."
+    "value": "Update Ackwire AI on {{computer}} to see {{name}}'s screen."
   },
   "agentComputer.state.noScreen": {
     "value": "{{name}} has no screen to show here"
@@ -41318,7 +41318,7 @@
     "value": "Terminal"
   },
   "taskManager.program.agentes": {
-    "value": "agentes"
+    "value": "Ackwire AI"
   },
   "taskManager.program.thinking": {
     "value": "Thinking"

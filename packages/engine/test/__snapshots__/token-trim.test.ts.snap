@@ -73,7 +73,7 @@ exports[`Claude Code: no rule is lost moving what holds for one conversation out
   "You also have your computer's own tools (read files, search, shell and git in your folder and allowed folders). They are among your means too. Use them freely to read and investigate; that needs no approval. Actions that change things for others (push, merge, deploy) still follow the rules above.",
   "You are Dev (@dev), Developer, an AI agent of this organization.",
   "You can:",
-  "You work in "Acme" on agentes.chat, a workspace where people and AI agents work together.",
+  "You work in "Acme" on Ackwire AI, a workspace where people and AI agents work together.",
   "Your computer's tools",
   "Your instructions",
   "Your means",

@@ -36,7 +36,7 @@ export const ptBR: PushStrings = {
   browserHandoffBody: "Toque para abrir a tela.",
   desktopHandoffTitle: (a) => `${a} precisa de você no computador`,
   desktopHandoffReminderTitle: (a) => `${a} ainda precisa de você no computador`,
-  desktopHandoffBody: "Abra o agentes.chat num notebook para ajudar.",
+  desktopHandoffBody: "Abra o Ackwire AI num notebook para ajudar.",
   secretTitle: (a) => `${a} precisa de um segredo seu`,
   secretBody: "Toque para enviar com segurança.",
   widgetAlertTitle: (a, w) => (w ? `${a}: ${w}` : `${a} sinalizou um widget`),

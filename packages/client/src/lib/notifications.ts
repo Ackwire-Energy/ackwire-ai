@@ -222,7 +222,7 @@ export function workspaceHeadline(n: Pick<AppNotification, "kind" | "latest">) {
 }
 
 /**
- * The restriction a notice of agentes.chat Cloud tells, as `restrictionLine` reads it: an agent held (its kind, as a
+ * The restriction a notice of Ackwire AI Cloud tells, as `restrictionLine` reads it: an agent held (its kind, as a
  * refused run carries it), or the workspace held or suspended with a reason (`latest.cloud`), so `review` reads as the
  * review line and an operator's reason with how to contest it. Null for any other notice, which keeps its own text.
  */
@@ -439,7 +439,7 @@ export function openTarget(n: AppNotification): OpenTarget | null {
   if (n.kind === "browser_profile_request")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   // A routine couldn't call the agent: its page, where who talks to it is set (the report's room may be private).
-  // An agent held on agentes.chat Cloud: its page too, where the hold shows.
+  // An agent held on Ackwire AI Cloud: its page too, where the hold shows.
   if ((n.kind === "agent_unreached" || n.kind === "org_standing" || n.kind === "desktop_taken") && s.agentId)
     return { to: "/org/$orgId/agents/$agentId", params: { agentId: s.agentId } };
   // The workspace held for its payment: Cobrança, where it is paid.

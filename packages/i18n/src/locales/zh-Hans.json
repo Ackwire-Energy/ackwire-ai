@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "agentes"
+    "name": "Ackwire AI"
   },
   "common": {
     "close": "关闭",
@@ -472,7 +472,7 @@
       "confirmYes": "是的，让应用登录",
       "confirmNo": "不是我",
       "done": "全部就绪。",
-      "doneLead": "你已登录 agentes 应用，可以关闭这个标签页了。",
+      "doneLead": "你已登录 Ackwire AI 应用，可以关闭这个标签页了。",
       "expired": "这个请求已过期。",
       "expiredLead": "请返回应用，重新选择 {{provider}}。",
       "handover": "正在用另一台设备上的账号登录…",
@@ -1811,9 +1811,9 @@
     }
   },
   "openOnPhone": {
-    "qr": "用于登录 agentes 应用的二维码",
+    "qr": "用于登录 Ackwire AI 应用的二维码",
     "making": "正在生成二维码…",
-    "stepApp": "在手机上安装 agentes 应用。",
+    "stepApp": "在手机上安装 Ackwire AI 应用。",
     "stepTailscale": "在手机上安装 Tailscale，并用与这台服务器相同的 Tailscale 账号登录。",
     "appStore": "App Store",
     "googlePlay": "Google Play",
@@ -4556,7 +4556,7 @@
     "noInstructions_female": "{{name}} 还没有指令。说说她应该怎么工作。",
     "savedToast": "已保存 {{name}} 的更改。",
     "savedToast_female": "已保存 {{name}} 的更改。",
-    "builtinName": "agentes",
+    "builtinName": "Ackwire AI",
     "builtinNote": "内置权限",
     "connectHint": "连接服务",
     "subtitle": "{{role}} · 所有者 <b>{{owner}}</b> · {{model}} {{key}}",
@@ -4900,7 +4900,7 @@
         "two": "偏好设置",
         "three": "开启“浏览器”",
         "done": "完成了。此页面会自动检测，无需刷新。",
-        "menuOpen": "打开 agentes",
+        "menuOpen": "打开 Ackwire AI",
         "menuPrefs": "偏好设置…",
         "menuPause": "暂停",
         "menuQuit": "退出",
@@ -5083,7 +5083,7 @@
       "connectors": "{{org}} 的连接器",
       "connectorsPersonal": "你的连接器",
       "oneLevel": "每个应用一个级别",
-      "builtin": "agentes 内置",
+      "builtin": "Ackwire AI 内置",
       "builtinHelp": "Drive、任务、记忆等",
       "noMatch": "没有与“{{q}}”匹配的内容",
       "noneHere": "此筛选下没有内容",
@@ -7499,7 +7499,7 @@
         "pr_opened": "GitHub 上创建了 PR"
       },
       "issue": {
-        "created": "在 agentes 中创建了任务"
+        "created": "在 Ackwire AI 中创建了任务"
       },
       "deploy": {
         "succeeded": "部署完成"
@@ -9128,7 +9128,7 @@
       "antigravity": "Gemini",
       "opencode": "OpenCode",
       "needs": {
-        "keys": "在电脑上更新 agentes，即可使用套餐密钥"
+        "keys": "在电脑上更新 Ackwire AI，即可使用套餐密钥"
       },
       "noComputer": "账号保存在已连接的电脑上。请先连接一台你的电脑。",
       "addComputer": "连接电脑",
@@ -13626,7 +13626,7 @@
     "reconnectDoneText": "{{name}} 已回到 {{org}}。",
     "deniedTitle": "未连接",
     "denied": "电脑没有连接。如果不是你打开的，也没有人获得访问权限。",
-    "home": "前往 agentes"
+    "home": "前往 Ackwire AI"
   },
   "apps": {
     "connect": "连接应用",
@@ -14130,7 +14130,7 @@
       "rolesPersonal": "这里每个人可以做什么。所有者可以做任何事。"
     },
     "about": {
-      "basedOn": "基于 Codari Global, LLC 的 <site>Ackwire AI</site>",
+      "basedOn": "基于 Codari Global, LLC 的 <site>agentes.chat</site>",
       "version": "版本",
       "license": "依据 <license>GNU Affero General Public License v3</license> 发布的自由软件，不提供任何担保。",
       "source": "源代码",
@@ -16541,8 +16541,8 @@
       "unavailableHelp": "请稍后再试。",
       "screensOff": "{{computer}} 上的屏幕已关闭。请在那台电脑上开启：",
       "screensMissing": "{{computer}} 暂时还不能显示屏幕。请在那台电脑上：",
-      "outdated": "在 {{computer}} 上更新 agentes，即可看到 {{name}} 的屏幕。",
-      "outdated_female": "在 {{computer}} 上更新 agentes，即可看到 {{name}} 的屏幕。",
+      "outdated": "在 {{computer}} 上更新 Ackwire AI，即可看到 {{name}} 的屏幕。",
+      "outdated_female": "在 {{computer}} 上更新 Ackwire AI，即可看到 {{name}} 的屏幕。",
       "noScreen": "{{name}} 在这里没有可显示的屏幕",
       "noScreen_female": "{{name}} 在这里没有可显示的屏幕",
       "noScreenHelp": "在“工具和权限”中允许屏幕或浏览器。",
@@ -16656,7 +16656,7 @@
       "browser": "浏览器",
       "screen": "电脑屏幕",
       "terminal": "终端",
-      "agentes": "agentes",
+      "agentes": "Ackwire AI",
       "thinking": "思考中",
       "inside": "{{program}} · {{detail}}"
     },

@@ -3,7 +3,7 @@ import { FCM_PUSH_TOKEN } from "./push-fcm";
 
 /**
  * Android pushes through the push relay (ADR 0152). The Android app is one app in the stores, built with
- * agentes.chat's Firebase project, whose service account a self-hosted server doesn't have. So the
+ * Ackwire AI's Firebase project, whose service account a self-hosted server doesn't have. So the
  * server sends through a relay that holds it: it registers itself on first use (no account, nothing to
  * configure), keeps the credentials the relay gave it, and sends the messages it would send to Firebase.
  */

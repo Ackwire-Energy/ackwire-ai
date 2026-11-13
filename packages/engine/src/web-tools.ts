@@ -56,7 +56,7 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BYTES = 2 * 1024 * 1024;
 const MAX_PAGE_CHARS = 20_000;
 const MAX_REDIRECTS = 5;
-const USER_AGENT = "Mozilla/5.0 (compatible; agentes.chat; +https://agentes.chat)";
+const USER_AGENT = "Mozilla/5.0 (compatible; Ackwire AI; +https://agentes.chat)";
 
 /** A page that is a wall, not content: a captcha, a bot check, a sign-in gate. */
 const BLOCKED_PAGE =

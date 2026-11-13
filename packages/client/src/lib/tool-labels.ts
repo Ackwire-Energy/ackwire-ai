@@ -619,7 +619,7 @@ const LABELS: Record<string, readonly [en: string, ptBR: string]> = {
   mouse_move: ["Move the mouse", "Mover o mouse"],
   screenshot: ["Take a screenshot", "Tirar uma captura de tela"],
 
-  // agentes.chat's own tools
+  // Ackwire AI's own tools
   send_dm: ["Send direct message", "Enviar mensagem direta"],
   read_conversation: ["Read conversation", "Ler conversa"],
   add_agent_to_channel: ["Add agent to a channel", "Adicionar agente a um canal"],

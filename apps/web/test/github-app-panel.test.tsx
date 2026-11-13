@@ -43,7 +43,7 @@ const OCTO = installation("octo-labs", {
   repositorySelection: "selected",
   manageUrl: "https://github.com/settings/installations/109",
 });
-/** GitHub through the agentes.chat app alone: the connection the server makes with the first installation. */
+/** GitHub through the Ackwire AI app alone: the connection the server makes with the first installation. */
 const appOnly = (accounts: string): Connection => ({
   id: "conn-gh",
   connector: "github",
@@ -57,7 +57,7 @@ const appOnly = (accounts: string): Connection => ({
 });
 const NO_APP: GitHubAppSetup = { source: null, slug: null, htmlUrl: null, state: "off", canCreate: true };
 
-describe("Conectores › GitHub with the agentes.chat app", () => {
+describe("Conectores › GitHub with the Ackwire AI app", () => {
   test("each account: what it reaches, Gerenciar no GitHub on its page there, and Remover uninstalls it after asking", async () => {
     const { state } = await go(seedState({ githubApp: { installable: true, installations: [ACME, OCTO] } }));
     const section = panel();
@@ -73,7 +73,7 @@ describe("Conectores › GitHub with the agentes.chat app", () => {
     const ask = screen().getByRole("dialog", { name: "Remover o app de acme?" });
     // An account is connected too: GitHub stays, nothing about losing it.
     expect(ask.textContent).toContain(
-      "O app agentes.chat é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
+      "O app Ackwire AI é desinstalado de acme no GitHub, e os agentes deixam de usar os repositórios dessa conta por ele.",
     );
     expect(ask.textContent).not.toContain("É a última");
     await click(within(ask).getByRole("button", { name: "Remover" }));
@@ -115,9 +115,9 @@ describe("Conectores › GitHub with the agentes.chat app", () => {
     setNavigateAway((url) => left.push(url));
     const { state } = await go(seedState({ githubApp: { installable: true, installations: [] } }));
     expect(panel().textContent).toContain(
-      "Hoje os agentes aparecem no GitHub como acme. Instale o app para eles aparecerem como o app agentes.chat.",
+      "Hoje os agentes aparecem no GitHub como acme. Instale o app para eles aparecerem como o app Ackwire AI.",
     );
-    await click(within(panel()).getByRole("button", { name: "Instalar o app agentes.chat" }));
+    await click(within(panel()).getByRole("button", { name: "Instalar o app Ackwire AI" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "githubApp.install")?.args).toEqual([ORG_ID, CONNECTORS]);
     expect(left[0]).toStartWith("https://github.com/apps/agentes-chat/installations/new");
@@ -130,7 +130,7 @@ describe("Conectores › GitHub with the agentes.chat app", () => {
     });
     await go(state);
     const conectores = screen().getByRole("region", { name: "Conectores" });
-    expect(conectores.textContent).toContain("Pelo app agentes.chat em acme e octo-labs");
+    expect(conectores.textContent).toContain("Pelo app Ackwire AI em acme e octo-labs");
     expect(conectores.textContent).not.toContain("Conectado como");
     const menu = await rowMenu("GitHub");
     expect(within(menu).queryByRole("menuitem", { name: "Reconectar" })).toBeNull();
@@ -157,17 +157,17 @@ describe("Conectores › GitHub with the agentes.chat app", () => {
     await go(seedState({ connections: [appOnly("acme")], githubApp: { installable: true, installations: [ACME] } }));
     await click(within(await rowMenu("GitHub")).getByRole("menuitem", { name: "Desconectar" }));
     expect(screen().getByRole("dialog", { name: "Desconectar GitHub?" }).textContent).toContain(
-      "O app agentes.chat também é desinstalado de acme no GitHub.",
+      "O app Ackwire AI também é desinstalado de acme no GitHub.",
     );
     cleanup();
     const { state } = await go(seedState({ githubApp: { installable: true, installations: [ACME, OCTO] } }));
     await click(within(await rowMenu("GitHub")).getByRole("menuitem", { name: "Desconectar" }));
     const ask = screen().getByRole("dialog", { name: "Desconectar GitHub?" });
-    expect(ask.textContent).toContain("Os agentes continuam no GitHub pelo app agentes.chat em acme e octo-labs.");
+    expect(ask.textContent).toContain("Os agentes continuam no GitHub pelo app Ackwire AI em acme e octo-labs.");
     await click(within(ask).getByRole("button", { name: "Desconectar" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "connectors.disconnect")?.args).toEqual([ORG_ID, "conn-gh"]);
-    expect(toasts()).toContain("Conta do GitHub desconectada. Os agentes continuam no GitHub pelo app agentes.chat.");
+    expect(toasts()).toContain("Conta do GitHub desconectada. Os agentes continuam no GitHub pelo app Ackwire AI.");
   });
 
   test("no app on this server: an admin is told its owner makes it, a member sees nothing", async () => {
@@ -185,7 +185,7 @@ describe("Conectores › GitHub with the agentes.chat app", () => {
   });
 });
 
-describe("Conectar GitHub: the agentes.chat app first", () => {
+describe("Conectar GitHub: the Ackwire AI app first", () => {
   const connect = async (state: FakeState) => {
     const r = await go(state);
     await click(screen().getAllByRole("button", { name: "Adicionar conector" })[0] as HTMLElement);
@@ -207,7 +207,7 @@ describe("Conectar GitHub: the agentes.chat app first", () => {
     const how = within(flow).getByRole("radiogroup", { name: "Como os agentes entram no GitHub" });
     const [app, account] = within(how).getAllByRole("radio");
     expect(app?.textContent).toBe(
-      "O app agentes.chatRecomendadoOs agentes aparecem como o app, e você escolhe os repositórios no GitHub.",
+      "O app Ackwire AIRecomendadoOs agentes aparecem como o app, e você escolhe os repositórios no GitHub.",
     );
     expect(app?.getAttribute("aria-checked")).toBe("true");
     expect(account?.textContent).toBe(
@@ -216,7 +216,7 @@ describe("Conectar GitHub: the agentes.chat app first", () => {
     expect(flow.textContent).toContain("Você escolhe as contas e os repositórios no GitHub e volta para cá.");
     // The account's key is the account's other way in: not offered for the app.
     expect(within(flow).queryByText("Conectar com uma chave de API")).toBeNull();
-    await click(within(flow).getByRole("button", { name: "Instalar o app agentes.chat" }));
+    await click(within(flow).getByRole("button", { name: "Instalar o app Ackwire AI" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "githubApp.install")?.args).toEqual([ORG_ID, CONNECTORS]);
     expect(state.calls.find((c) => c.method === "connectors.startOAuth")).toBeUndefined();
@@ -224,7 +224,7 @@ describe("Conectar GitHub: the agentes.chat app first", () => {
 
     await click(account as HTMLElement);
     expect(within(flow).getByText("Conectar com uma chave de API")).toBeTruthy();
-    expect(within(flow).queryByRole("button", { name: "Instalar o app agentes.chat" })).toBeNull();
+    expect(within(flow).queryByRole("button", { name: "Instalar o app Ackwire AI" })).toBeNull();
     await click(within(flow).getByRole("button", { name: "Continuar no GitHub" }));
     await settle(4);
     expect(state.calls.find((c) => c.method === "connectors.startOAuth")?.args.slice(0, 2)).toEqual([ORG_ID, "github"]);
@@ -237,7 +237,7 @@ describe("Conectar GitHub: the agentes.chat app first", () => {
   });
 });
 
-describe("Conectores › App do GitHub deste servidor (its owner, off agentes.chat)", () => {
+describe("Conectores › App do GitHub deste servidor (its owner, off Ackwire AI)", () => {
   const card = () => screen().getByRole("region", { name: "App do GitHub deste servidor" });
 
   test("none yet: Criar o app no GitHub opens this server's page that sends GitHub the manifest", async () => {

@@ -102,10 +102,10 @@ describe("Configurações → Armazenamento", () => {
     fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
     await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
     await settle(5);
-    const ours = within(section()).getByRole("radio", { name: /Armazenamento do agentes/ });
+    const ours = within(section()).getByRole("radio", { name: /Armazenamento do Ackwire AI/ });
     expect(ours.getAttribute("aria-checked")).toBe("true");
     expect(text(ours.closest("label"))).toBe(
-      "Armazenamento do agentes.chatSeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
+      "Armazenamento do Ackwire AISeus arquivos ficam no nosso armazenamento, separados por workspace.Nenhum arquivo",
     );
     expect(section().textContent).not.toContain("Este servidor");
   });
@@ -368,11 +368,11 @@ describe("Configurações → Armazenamento", () => {
 
     await back(true);
     expect(section().textContent).toContain(
-      "Copia para o seu bucket os arquivos que o armazenamento do agentes.chat ainda guarda.",
+      "Copia para o seu bucket os arquivos que o armazenamento do Ackwire AI ainda guarda.",
     );
-    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do agentes.chat" }));
-    const cloud = screen().getByRole("dialog", { name: "Voltar para o armazenamento do agentes.chat?" });
-    expect(cloud.textContent).toContain("Novos arquivos voltam para o armazenamento do agentes.chat.");
+    await click(within(section()).getByRole("button", { name: "Voltar para o armazenamento do Ackwire AI" }));
+    const cloud = screen().getByRole("dialog", { name: "Voltar para o armazenamento do Ackwire AI?" });
+    expect(cloud.textContent).toContain("Novos arquivos voltam para o armazenamento do Ackwire AI.");
   });
 });
 

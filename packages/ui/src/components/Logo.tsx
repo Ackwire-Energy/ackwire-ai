@@ -1,27 +1,36 @@
 import type { CSSProperties } from "react";
+import { BRAND_NAME, PIXEL_MARK_VIEWBOX, pixelMarkRuns } from "../brand/ackwire";
 import { cx } from "../cx";
 
-/** Ackwire's original A monogram, from the Ackwire website brand assets. */
+/** The pixel "A" never changes: its runs are computed once. */
+const RUNS = pixelMarkRuns();
+
+/**
+ * The Ackwire "A" in the app's pixel style: three stepped chevrons, each in its tone of Ackwire green, or in the ink
+ * in the mono logo. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
+ */
 export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
   return (
     <svg
-      viewBox="244 0 218 164"
+      viewBox={PIXEL_MARK_VIEWBOX}
+      shapeRendering="crispEdges"
       className={cx("ac-logo__mark", className)}
       style={size ? { width: size, height: size } : undefined}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
     >
-      <path
-        className="ac-logo__body"
-        d="M461.02,117.93l-69.68-97.94c-4.59-6.45-10.46-11.49-17.44-14.98-6.55-3.27-13.91-5-21.28-5.01h-.03c-7.37,0-14.72,1.72-21.26,4.98-6.99,3.48-12.86,8.51-17.46,14.96l-69.8,97.85c-8.07,11.31-6.58,26.84,3.48,36.42l.15.15c11.16,10.62,28.82,10.18,39.44-.99l44.2-46.46c5.6-5.89,13.16-9.13,21.29-9.13s15.69,3.24,21.29,9.13l44.16,46.42c10.62,11.16,28.28,11.61,39.44.99h0c10.06-9.57,11.55-25.08,3.5-36.39ZM387.08,94.38c-9.07-9.53-21.31-14.78-34.46-14.78s-25.39,5.25-34.46,14.78l-50.81,53.42,62.36-77.74c5.61-6.99,13.96-11,22.92-11s17.31,4.01,22.92,11l62.36,77.74-50.82-53.42ZM389.72,58.68c-9.07-11.31-22.6-17.8-37.1-17.8s-28.03,6.49-37.1,17.8l-62.87,78.38,76.01-106.56c5.58-7.83,14.3-12.32,23.91-12.32h.02c9.62,0,18.34,4.51,23.92,12.35l73.56,103.39-60.35-75.24Z"
-      />
+      <g className="ac-logo__body">
+        {RUNS.map((r) => (
+          <rect key={`${r.x}:${r.y}`} className={`ac-logo__px${r.layer + 1}`} x={r.x} y={r.y} width={r.w} height={1} />
+        ))}
+      </g>
     </svg>
   );
 }
 
 export interface LogoProps {
-  /** Retained for existing consumers; both variants show the full product name. */
+  /** `main` (app) or `expanded` (the same lockup: kept so callers that ask for it still work). */
   variant?: "main" | "expanded";
   mono?: boolean;
   size?: number;
@@ -29,17 +38,19 @@ export interface LogoProps {
   style?: CSSProperties;
 }
 
+/** "Ackwire AI" logo: the pixel "A" + "Ackwire" in the ink and "AI" in the accent, as the brand's lockup. */
 export function Logo({ mono, size = 24, className, style }: LogoProps) {
   return (
     <span
       className={cx("ac-logo", mono && "ac-logo--mono", className)}
       style={{ fontSize: size, ...style }}
       role="img"
-      aria-label="Ackwire AI"
+      aria-label={BRAND_NAME}
     >
       <LogoMark />
       <span className="ac-logo__word" aria-hidden="true">
-        Ackwire<span className="ac-logo__chat">AI</span>
+        <span>Ackwire</span>
+        <span className="ac-logo__ai">AI</span>
       </span>
     </span>
   );
