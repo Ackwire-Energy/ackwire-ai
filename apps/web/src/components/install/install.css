@@ -1426,6 +1426,9 @@
   letter-spacing: -0.01em;
 }
 @media (max-width: 760px) {
+  .dlp__bar {
+    padding: 16px 16px 0;
+  }
   .dlp__main {
     padding: 32px 16px 56px;
   }
@@ -1438,5 +1441,11 @@
   }
   .dlp__get-note {
     text-align: left;
+  }
+}
+/* A phone's bar has no room for the wordmark beside the language and the way in: the mark alone is the logo there. */
+@media (max-width: 640px) {
+  .dlp__bar .ac-logo__word {
+    display: none;
   }
 }

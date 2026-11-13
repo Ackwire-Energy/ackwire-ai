@@ -321,9 +321,10 @@ export function AuthHorizon(_props: { clear?: Clear }) {
 
 /**
  * The `/download` page's sky: the sign-in horizon turned over, soft tones at the top fading into the page, where the
- * app (the agents' home on this computer) is offered. Two agents pass; the title and the button stay clear.
+ * app (the agents' home on this computer) is offered. Two agents pass; the title and the button stay clear. `calm`:
+ * the logo on it, in the sky's own green, which the field would swallow: the sky settles on the page there.
  */
-export function DownloadSky({ clear }: { clear?: Clear }) {
+export function DownloadSky({ clear, calm }: { clear?: Clear; calm?: SkyOptions["calm"] }) {
   const opts: SkyOptions = {
     pixel: 4,
     surface: "--bg",
@@ -334,6 +335,8 @@ export function DownloadSky({ clear }: { clear?: Clear }) {
     light: 0.06,
     sprites: 2,
     clear,
+    calm,
+    calmV: 0,
     base: (u, v, tt) => {
       const s = Math.max(0, 1 - v / 0.9);
       const e = s * s * (3 - 2 * s);

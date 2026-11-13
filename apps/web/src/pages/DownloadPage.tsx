@@ -32,19 +32,20 @@ export function DownloadPage({ initial, initialArm }: { initial?: InstallSystem;
   const release = build.data ?? null;
   const name = buildName({ target: target.target, arm });
   const hero = useRef<HTMLElement>(null);
+  const logo = useRef<HTMLAnchorElement>(null);
   useDocumentTitle(t("install.page.docTitle"));
   const origin = typeof window === "undefined" ? "" : window.location.origin;
 
   return (
     <div className="dlp">
-      <DownloadSky clear={() => [hero.current]} />
+      <DownloadSky clear={() => [hero.current, logo.current]} calm={() => [logo.current]} />
       <header className="dlp__bar">
-        <Link to="/" aria-label={t("legal.home")}>
+        <Link to="/" aria-label={t("legal.home")} ref={logo}>
           <Logo size={24} />
         </Link>
         <span className="dlp__bar-end">
           <LanguageSelect signedIn={false} align="end" />
-          <Button asChild size="sm" variant="ghost">
+          <Button asChild size="sm">
             <Link to="/">{t("install.page.open")}</Link>
           </Button>
         </span>

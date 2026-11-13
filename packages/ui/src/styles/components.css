@@ -2074,6 +2074,10 @@ html:not([data-pointer]) .ac-eventpill__action:focus-visible {
 .ac-logo--mono .ac-logo__ai {
   color: inherit;
 }
+/* A logo that is a link home stays the logo: no link underline through the wordmark's foot. */
+a:has(> .ac-logo) {
+  text-decoration: none;
+}
 
 /* Select: our own trigger + listbox, never the native <select> */
 .ac-select {
