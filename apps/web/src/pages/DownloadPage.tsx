@@ -45,7 +45,7 @@ export function DownloadPage({ initial, initialArm }: { initial?: InstallSystem;
         </Link>
         <span className="dlp__bar-end">
           <LanguageSelect signedIn={false} align="end" />
-          <Button asChild size="sm" variant="ghost">
+          <Button asChild size="sm">
             <Link to="/">{t("install.page.open")}</Link>
           </Button>
         </span>
