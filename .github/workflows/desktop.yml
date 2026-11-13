@@ -92,7 +92,7 @@ jobs:
           fi
           PREV=$(git describe --tags --abbrev=0 --match 'desktop-v*' 2>/dev/null || true)
           if [ -z "$NOTES" ]; then
-            NOTES=$(git log --no-merges --format='- %s' ${PREV:+"$PREV"..HEAD} | head -40)
+            NOTES=$(git log -n 40 --no-merges --format='- %s' ${PREV:+"$PREV"..HEAD})
           fi
           # Only the version line changes (jq would reformat the whole file).
           for f in apps/desktop/src-tauri/tauri.conf.json apps/desktop/package.json; do
