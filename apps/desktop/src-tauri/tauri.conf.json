@@ -68,7 +68,7 @@
       }
     },
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDUyNzI0Mzc3QTAwNEM2NTAKUldSUXhnU2dkME55VXVvbGZoOFZmWEsrdFBFWFVWVEl4MDhjSC9OWnBBR01ESm1GNWpyendjdjYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNDQTUxODkwRjhFMzEzQjIKUldTeUUrUDRrQmlsUFA2SllWbGtEenRiUVFvYnNmY0g0UEFwVjd2bnFkaGFGcXNQbzQ3NXFtcHUK",
       "endpoints": [
         "https://hub.ackwire.app/api/desktop/update?target={{target}}&arch={{arch}}&current={{current_version}}&bundle={{bundle_type}}"
       ]
