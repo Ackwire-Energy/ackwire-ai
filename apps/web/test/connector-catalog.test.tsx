@@ -393,9 +393,9 @@ describe("Adicionar conector: one catalog", () => {
       "",
     );
     const rule = (selector: string, from = css) => from.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
-    expect(rule(".catalog .ac-dialog__head")).toContain("--title-cap-mid: 0.88px;");
+    expect(rule(".catalog .ac-dialog__head")).toContain("--title-cap-mid: -0.33px;");
     const phone = css.split("\n@media (max-width: 760px) {\n  .catalog__body {")[1] ?? "";
-    expect(rule("  .catalog .ac-dialog__head", phone)).toContain("--title-cap-mid: 0.51px;");
+    expect(rule("  .catalog .ac-dialog__head", phone)).toContain("--title-cap-mid: -0.86px;");
     expect(rule(".catalog-svc .ac-dialog__close")).toContain("translate: none");
   });
 });

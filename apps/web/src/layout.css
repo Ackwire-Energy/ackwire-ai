@@ -4672,7 +4672,7 @@ html:not([data-pointer]) .settings__link:focus-visible {
 .catalog .ac-dialog__head {
   padding-bottom: 14px;
   /* For its title's type (30px on 33px, 24px at phone width), measured as the app's 18/24 one is (styles.css). */
-  --title-cap-mid: 0.88px;
+  --title-cap-mid: -0.33px;
 }
 .catalog .ac-dialog__title {
   font-family: var(--font-display);
@@ -5101,7 +5101,7 @@ html:not([data-pointer]) .catalog-tile:focus-visible {
   }
   .catalog .ac-dialog__head {
     padding-bottom: 12px;
-    --title-cap-mid: 0.51px;
+    --title-cap-mid: -0.86px;
   }
   .catalog .ac-dialog__title {
     font-size: 24px;

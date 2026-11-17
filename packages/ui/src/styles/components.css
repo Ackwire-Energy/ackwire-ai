@@ -2238,6 +2238,10 @@ html:not([data-pointer]) .ac-chip--button:focus-visible {
   align-items: baseline;
   gap: 0.24em;
 }
+/* Centre the mark against the wordmark's capitals, independent of the font's ascent and descent. */
+.ac-logo__word > span {
+  text-box: trim-both cap alphabetic;
+}
 .ac-logo__ai {
   color: var(--agent);
 }

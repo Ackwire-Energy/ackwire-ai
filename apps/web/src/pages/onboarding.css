@@ -574,6 +574,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   min-width: 0;
 }
 @media (max-width: 760px) {
+  /* The rail's progress moves into the phone's main column, including while a resize updates React's view. */
+  .onb__rail > .onb__progress {
+    display: none;
+  }
   /* The step bar: the brand, the steps, the account's face at the end. */
   .onb__top {
     display: contents;

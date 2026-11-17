@@ -884,6 +884,17 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
   font-weight: 600;
   white-space: nowrap;
 }
+/* On a narrow phone the subscription note takes its own row, leaving the option's title and description room. */
+@media (max-width: 360px) {
+  .arrival-opts .ac-option:has(> .arrival-opts__tag) {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+  .arrival-opts__tag {
+    flex-basis: 100%;
+  }
+}
+
 .arrival-opts__tile {
   display: grid;
   place-items: center;
