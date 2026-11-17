@@ -777,16 +777,85 @@
      * title) breaks a long word at its syllables on purpose.
      */
     midword(out) {
+      // A folded preview or scrollport only shows the intersecting text, not every line in its stored message.
+      const bounds = new WeakMap();
+      const boundsOf = (el) => {
+        if (!el || el === document.body) return { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
+        if (bounds.has(el)) return bounds.get(el);
+        const parent = boundsOf(el.parentElement);
+        const s = style(el);
+        const r = el.getBoundingClientRect();
+        const own = { ...parent };
+        if (s.overflowX !== "visible") {
+          own.left = Math.max(own.left, r.left + el.clientLeft);
+          own.right = Math.min(own.right, r.left + el.clientLeft + el.clientWidth);
+        }
+        if (s.overflowY !== "visible") {
+          own.top = Math.max(own.top, r.top + el.clientTop);
+          own.bottom = Math.min(own.bottom, r.top + el.clientTop + el.clientHeight);
+        }
+        bounds.set(el, own);
+        return own;
+      };
       for (const el of document.body.querySelectorAll("*")) {
         if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table") || style(el).hyphens === "auto") continue;
+        const clip = boundsOf(el);
+        const visible = (r) =>
+          r.width > 0 &&
+          r.right > clip.left + 0.5 &&
+          r.left < clip.right - 0.5 &&
+          r.bottom > clip.top + 0.5 &&
+          r.top < clip.bottom - 0.5;
+        const nodes = [...el.childNodes].filter((n) => n.nodeType === 3);
         let count = 0;
-        const tops = new Set();
-        for (const n of el.childNodes) {
-          if (n.nodeType !== 3) continue;
-          count += n.textContent.trim().split(/\s+/).filter(Boolean).length;
-          for (const r of textRange(n).getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
+        let tops = new Set();
+        for (const n of nodes) {
+          const rects = [...textRange(n).getClientRects()];
+          const shown = rects.filter(visible);
+          if (!shown.length) continue;
+          for (const r of shown) tops.add(Math.round(r.top));
+          // Most nodes are wholly visible. In a folded preview count only words with some visible ink: hidden
+          // ordinary words must never excuse the fragments of an ordinary word above the fold.
+          if (
+            rects.every(
+              (r) =>
+                r.left >= clip.left - 0.5 &&
+                r.right <= clip.right + 0.5 &&
+                r.top >= clip.top - 0.5 &&
+                r.bottom <= clip.bottom + 0.5,
+            )
+          ) {
+            count += n.textContent.trim().split(/\s+/).filter(Boolean).length;
+          } else {
+            for (const m of n.textContent.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(n, m.index);
+              range.setEnd(n, m.index + m[0].length);
+              if ([...range.getClientRects()].some(visible)) count += 1;
+            }
+          }
         }
-        if (count >= 2 && tops.size >= 3 && tops.size > count)
+        if (count < 2 || tops.size < 3 || tops.size <= count) continue;
+        const s = style(el);
+        if (["anywhere", "break-word"].includes(s.overflowWrap) || ["break-all", "break-word"].includes(s.wordBreak)) {
+          // A token wider than an uncluttered viewport must break even in a full-width message. Omit only that
+          // token's lines: an ordinary word squeezed beside it (or beside another control) must still fail.
+          const ordinaryTops = new Set();
+          let ordinary = 0;
+          for (const n of nodes)
+            for (const m of n.textContent.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(n, m.index);
+              range.setEnd(n, m.index + m[0].length);
+              const rects = [...range.getClientRects()];
+              if (!rects.some(visible) || rects.reduce((width, r) => width + r.width, 0) > innerWidth) continue;
+              ordinary += 1;
+              for (const r of rects) if (visible(r)) ordinaryTops.add(Math.round(r.top));
+            }
+          count = ordinary;
+          tops = ordinaryTops;
+        }
+        if (count > 0 && tops.size >= 3 && tops.size > count)
           out.push({ rule: "midword", node: el, el: sig(el), box: placeOf(el), lines: tops.size, text: words(el) });
       }
     },

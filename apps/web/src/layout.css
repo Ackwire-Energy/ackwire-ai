@@ -443,10 +443,39 @@ p {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A phone's line has room for the names, the count and the time only: the subject would be a letter and its "…". */
+/* In a narrow conversation the agents keep a full line; the status and elapsed time stay together below them. */
 @container (max-width: 420px) {
-  .consult-pair__subject {
+  .consult-pair__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr);
+    column-gap: 4px;
+    row-gap: 2px;
+    padding-inline: 8px;
+  }
+  .consult-pair__lead {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+  .consult-pair__subject,
+  .consult-pair__row > .consult-pair__sep {
     display: none;
+  }
+  .consult-pair__word {
+    grid-area: 2 / 2;
+  }
+  .consult-pair__time {
+    grid-area: 2 / 3;
+  }
+  .consult-pair__row:not(:has(> .consult-pair__time)) > .consult-pair__word {
+    grid-column: 2 / 4;
+  }
+  .consult-pair__swap {
+    margin-inline: 4px;
+  }
+  .consult-pair__chev {
+    top: auto;
+    bottom: 6px;
   }
 }
 /* The faces on the capitals' middle, as an inline face (`.ac-who`): the row's type, not the face's own. */
@@ -1376,6 +1405,7 @@ span.work-line {
 /* Canais arquivados: the rows alone, each a MediaRow (the kit's `.ac-mediarow`): the channel's mark and name on one line
    with Restaurar at its end, when it was archived under them. */
 .archived-channels {
+  container: archived-channels / inline-size;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1383,9 +1413,9 @@ span.work-line {
 .archived-channels__row {
   padding-block: var(--row-py);
 }
-/* On a phone Restaurar goes under the date, from the row's start, as the kit's `.ac-mediarow__end--wrap` does in a
+/* In a narrow dialog Restaurar goes under the date, from the row's start, as the kit's `.ac-mediarow__end--wrap` does in a
    narrow box: a long name keeps the row's width instead of wrapping beside it. */
-@media (max-width: 640px) {
+@container archived-channels (max-width: 640px) {
   .archived-channels__row > .ac-mediarow__end {
     grid-area: auto / 1 / auto / -1;
     order: 1;
@@ -15014,17 +15044,21 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
 
 /* At phone width keep both agents identifiable before the optional elapsed clock and extra return faces. */
 @media (max-width: 480px) {
-  .consult-pair__time {
-    display: none;
-  }
-  .consult-pair__row {
-    padding-inline: 18px;
-  }
-  .consult-pair__swap {
-    margin-inline: 4px;
-  }
   .ac-typing[data-rest="true"] > .ac-typing__rest-mark,
   .ac-typing[data-rest="true"] > .ac-typing__avatars > .ac-typing__tok ~ .ac-typing__tok {
+    display: none;
+  }
+}
+
+/* In a phone's live bar, one face identifies each typing group; its text already says how many others there are. */
+@media (max-width: 480px) {
+  .ac-typing__group > .ac-typing__avatars > .ac-typing__tok ~ .ac-typing__tok {
+    display: none;
+  }
+}
+/* A waiting return already names its agent beside the waiting mark; give its full reply condition room on a phone. */
+@media (max-width: 480px) {
+  .ac-typing[data-rest="true"]:has(> .rq-wait) > .ac-typing__avatars {
     display: none;
   }
 }

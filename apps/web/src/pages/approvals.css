@@ -720,6 +720,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   background: none;
 }
 .ap-li__where {
+  overflow-wrap: anywhere;
   flex: 1 1 calc(100% - 20px);
   min-width: 0;
 }
@@ -981,4 +982,29 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
+}
+/* A phone's burst heading keeps its full measure; the deadline follows it instead of taking half its row. */
+@media (max-width: 480px) {
+  .ap-run > .ac-mediarow {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .ap-run > .ac-mediarow > .ac-mediarow__end {
+    grid-area: 2 / 2;
+    height: auto;
+  }
+  /* The source mark hangs into the first line, leaving later path lines the full row width. */
+  .ap-li__meta {
+    display: block;
+  }
+  .ap-li__meta > :is(.connector-icon, .ap-conn__own) {
+    float: left;
+    margin: 1px 6px 0 0;
+  }
+  .ap-li__where {
+    display: inline;
+  }
+  .ap-li__when {
+    display: block;
+    margin-top: 2px;
+  }
 }

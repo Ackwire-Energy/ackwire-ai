@@ -175,3 +175,20 @@
   max-height: none;
   aspect-ratio: auto;
 }
+/* On a phone the copied value gets its own line, alongside Copy; a command remains readable and scrollable. */
+@media (max-width: 480px) {
+  .dsk-line:has(> .dsk-got) {
+    height: auto;
+  }
+  .dsk-got {
+    flex-wrap: wrap;
+  }
+  .dsk-got > .muted {
+    flex-basis: 100%;
+  }
+  .dsk-got > q {
+    flex: 1;
+    overflow-x: auto;
+    text-overflow: clip;
+  }
+}

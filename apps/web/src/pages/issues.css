@@ -319,7 +319,8 @@ html:not([data-pointer]) .issues-layout:focus-visible {
   scroll-padding-inline: var(--page-x);
 }
 .issues-board {
-  --cw: 248px;
+  /* Long task titles and repository references keep a readable measure inside each card. */
+  --cw: 288px;
   display: flex;
   gap: 12px;
   align-items: flex-start;
@@ -1782,7 +1783,7 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 /* ── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
   .issues-board {
-    --cw: 78vw;
+    --cw: max(288px, 78vw);
   }
   .issues-boardwrap {
     scroll-snap-type: x mandatory;

@@ -126,9 +126,9 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
 });
 
 test("two agents talking is one pair row; on a reach line it ends where the list's own line ends", () => {
-  // One line: the subject gives way first; faces stay whole and names alone may end in an ellipsis.
+  // The pair stays one button; a narrow conversation gives identities and status their own lines.
   expect(value(".consult-pair__row", "white-space")).toBe("nowrap");
-  expect(value(".consult-pair__row", "display")).toBe("flex");
+  expect(value(".consult-pair__row", "display")).toBe("grid");
   expect(value(".consult-pair__row", "line-height")).toBe("18px");
   expect(value(".consult-pair__row>*", "flex")).toBe("none");
   expect(value(".consult-pair__row>.consult-pair__subject", "flex")).toBe("0 100000 auto");
@@ -137,7 +137,7 @@ test("two agents talking is one pair row; on a reach line it ends where the list
   expect(value(".consult-pair__name", "text-overflow")).toBe("ellipsis");
   expect(value(".consult-pair__lead", "display")).toBe("inline-flex");
   expect(value(".consult-pair__who>.ac-avatar", "flex")).toBe("none");
-  // On a phone the subject and optional elapsed clock leave the agents and status their room.
+  // In a narrow conversation the subject leaves room; the status and time remain on the next line.
   expect(value(".consult-pair", "container-type")).toBe("inline-size");
   expect(value(".consult-pair__subject", "display")).toBe("none");
   expect(value(".consult-pair__word", "flex")).toBeUndefined();

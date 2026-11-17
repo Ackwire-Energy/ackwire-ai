@@ -407,7 +407,7 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
 }
 .plan-source {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 150px 120px;
+  grid-template-columns: minmax(0, 1fr) 150px 180px;
   align-items: center;
   gap: 14px;
   padding: 12px 0;
