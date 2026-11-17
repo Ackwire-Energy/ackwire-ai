@@ -2488,3 +2488,9 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
 .issue-card > .issue-card__facts > [data-fact="project"] {
   hyphens: auto;
 }
+/* The full view and grouping label shares the phone's second toolbar row with Filtro and the menu. */
+@media (max-width: 480px) {
+  .issues__main > .ac-toolbar .issues-display__trigger.ac-btn {
+    padding-inline: 8px;
+  }
+}
