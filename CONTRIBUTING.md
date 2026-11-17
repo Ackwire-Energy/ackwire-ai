@@ -5,8 +5,8 @@ pass, the conventions that matter, and how contributions are licensed.
 
 ## Where things happen
 
-- **Questions and ideas:** [GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions).
-- **Bugs and concrete feature requests:** issues (please use the issue forms).
+- **Questions about the shared project:** [upstream GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions).
+- **Ackwire bugs and feature requests:** [open a fork issue](https://github.com/Ackwire-Energy/ackwire-ai/issues).
 - **Security problems:** never a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Run it for development
