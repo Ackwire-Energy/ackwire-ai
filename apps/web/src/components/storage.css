@@ -112,3 +112,13 @@ html:not([data-pointer]) button.storage-pick__row:focus-visible {
 .ac-alert b {
   font-weight: 600;
 }
+
+/* A test result's icon follows its step's first line, even when the explanation underneath wraps. */
+.ac-list__row[data-step] > .row > .ac-icon:first-child {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-list__row[data-step] > .row > .ac-icon:first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}

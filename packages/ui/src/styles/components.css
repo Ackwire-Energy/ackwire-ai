@@ -12199,6 +12199,8 @@ html:not([data-pointer]) .ac-carousel__arrow:focus-visible {
 .ac-props .ac-select__trigger {
   width: auto;
   max-width: 100%;
+  /* A face and a plain value share one 20px line, so the chevron stays on the words' first line. */
+  line-height: 20px;
 }
 /*
  * A value wider than the strip (a long name, "Ana, Bruno e mais 5") wraps inside its control instead of ending in "…":

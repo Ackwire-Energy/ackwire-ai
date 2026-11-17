@@ -416,16 +416,26 @@ p {
 .consult-pair__row > * {
   flex: none;
 }
-/* The names give way only once the subject has none left: the subject's share of any shrink is so much larger that
-   theirs rounds to nothing before then (any share at all would cut them, an ellipsis taking a whole word). Its
-   block's 2px above and below keeps the faces' rings out of the clip. */
+/* The subject gives up its room before the names. The pair's flex children keep their faces whole, while long
+   names alone may end in an ellipsis; 2px above and below leaves room for the faces' rings. */
 .consult-pair__lead {
+  display: inline-flex;
+  align-items: baseline;
   flex: 0 1 auto;
   min-width: 0;
   margin-block: -2px;
   padding-block: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+/* Faces keep their full bodies; only the names give up room when the pair is narrow. */
+.consult-pair__who {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+}
+.consult-pair__who > .ac-avatar,
+.consult-pair__faces {
+  flex: none;
+  align-self: center;
 }
 .consult-pair__row > .consult-pair__subject {
   flex: 0 100000 auto;
@@ -469,6 +479,9 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   background: var(--agent-soft);
 }
 .consult-pair__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: 600;
   color: var(--ink2);
 }
@@ -483,6 +496,7 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
 }
 /* On the capitals' middle of the words beside it, as an inline glyph (`.ac-icon--inline`). */
 .consult-pair__swap {
+  align-self: center;
   width: 15px;
   height: 15px;
   margin-inline: 6px;
@@ -3636,7 +3650,7 @@ html:not([data-pointer]) .channel-ref:focus-visible {
   width: 1em;
   height: 1em;
   margin-right: 1px;
-  vertical-align: -0.17em;
+  vertical-align: calc(var(--cap-top) - var(--cap-mid) - 7px);
   color: var(--ink-muted);
 }
 /* A long text an agent wrote, folded on a page (FoldedBody): the air between its blocks follows its smaller type. */
@@ -9585,6 +9599,10 @@ html:not([data-pointer]) .newag__addrow:focus-visible {
   line-height: 1;
   letter-spacing: -0.02em;
 }
+/* The title's capitals start on its agent tile, with the short second line staying below them. */
+.newag__role-head > .ac-avatar + .newag__role-name > b {
+  text-box: trim-start cap alphabetic;
+}
 .newag__role-name span {
   color: var(--faint);
   font-size: 12.5px;
@@ -10936,8 +10954,9 @@ html:not([data-pointer]) .agp-cell:focus-visible {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 35%, transparent);
 }
 /* Usage: the plan's line and its bar, then the budget, on one line while there is room. */
+/* This fills the value's line: a leading meter must not supply an inline box's baseline. */
 .agp-frow__usage {
-  display: inline-flex;
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 10px;
@@ -14951,4 +14970,21 @@ html:not([data-pointer]) .rh-set__face-edit:focus-visible {
 }
 .ac-workline--waiting .handed-line__state {
   color: var(--warn);
+}
+
+/* At phone width keep both agents identifiable before the optional elapsed clock and extra return faces. */
+@media (max-width: 480px) {
+  .consult-pair__time {
+    display: none;
+  }
+  .consult-pair__row {
+    padding-inline: 18px;
+  }
+  .consult-pair__swap {
+    margin-inline: 4px;
+  }
+  .ac-typing[data-rest="true"] > .ac-typing__rest-mark,
+  .ac-typing[data-rest="true"] > .ac-typing__avatars > .ac-typing__tok ~ .ac-typing__tok {
+    display: none;
+  }
 }

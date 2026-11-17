@@ -1179,3 +1179,17 @@ html:not([data-pointer]) .thread-line:focus-visible {
     padding: 6px 12px;
   }
 }
+
+/* In a narrow return list, the time follows the agent's name instead of squeezing it beside the cancel button. */
+@media (max-width: 480px) {
+  .returns-pop .thread-pop__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .returns-pop .pins-pop__time {
+    grid-area: 2 / 2;
+    height: auto;
+  }
+  .returns-pop .returns-pop__about {
+    grid-row: 3;
+  }
+}
