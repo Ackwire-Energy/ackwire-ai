@@ -556,6 +556,39 @@ jobs:
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
           docker compose run --rm -T agentes telemetry > report.json
           jq -e '.report == 1 and .install == "docker" and .host.container and .people.total == 1' report.json
+      # Rehearse the actual pgvector/Postgres upgrade as well as PGlite's unit test. Only synthetic data in
+      # two disposable databases: the running app's `agentes` database and its regular backup are never targets.
+      - name: Upgrade a legacy database and restore its pre-upgrade backup
+        timeout-minutes: 5
+        run: |
+          # Boot and use it generated this password here, never a deployment's .env or connection string.
+          password=$(sed -n 's/^POSTGRES_PASSWORD=//p' .env)
+          [[ "$password" =~ ^[a-f0-9]{32}$ ]]
+          made_upgrade=false
+          made_restored=false
+          cleanup_upgrade() {
+            if "$made_upgrade"; then docker compose exec -T postgres dropdb -U agentes --if-exists --force ackwire_upgrade_ci; fi
+            if "$made_restored"; then docker compose exec -T postgres dropdb -U agentes --if-exists --force ackwire_upgrade_restored_ci; fi
+            rm -f ci-upgrade-before.dump
+          }
+          trap cleanup_upgrade EXIT
+          rehearse() {
+            docker compose run --rm -T --no-deps --entrypoint bun \
+              -e CI=true -e UPGRADE_REHEARSAL_PHASE="$1" \
+              -e UPGRADE_REHEARSAL_DATABASE_URL="postgres://agentes:$password@postgres:5432/$2" \
+              agentes test packages/db/test/upstream-upgrade-postgres.test.ts
+          }
+          docker compose exec -T postgres createdb -U agentes ackwire_upgrade_ci
+          made_upgrade=true
+          rehearse prepare ackwire_upgrade_ci
+          docker compose exec -T postgres pg_dump -U agentes -Fc ackwire_upgrade_ci > ci-upgrade-before.dump
+          test -s ci-upgrade-before.dump
+          rehearse upgrade ackwire_upgrade_ci
+          docker compose exec -T postgres createdb -U agentes ackwire_upgrade_restored_ci
+          made_restored=true
+          docker compose exec -T postgres pg_restore -U agentes -d ackwire_upgrade_restored_ci --exit-on-error < ci-upgrade-before.dump
+          # Check restored 0251 data/schema, then prove the restored database upgrades and repeats safely too.
+          rehearse restored ackwire_upgrade_restored_ci
       # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
       # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore
