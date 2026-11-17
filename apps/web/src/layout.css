@@ -603,6 +603,19 @@ html:not([data-pointer]) .consult-pair__row:focus-visible {
   font-size: 13px;
   color: var(--ink2);
 }
+/* Proposed apps are quiet inline facts, as the channel and routine glyphs beside them are. */
+.waitcard__lines > .ac-iconline > .connector-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: none;
+  background: transparent;
+  font-size: 10px;
+}
+.waitcard__lines > .ac-iconline > .connector-icon > :is(.connector-icon__mark, .connector-icon__img) {
+  width: 14px;
+  height: 14px;
+}
 .waitcard__lines > li[data-given="true"] > .ac-icon {
   color: var(--success);
 }
@@ -12425,12 +12438,21 @@ html[data-menu-overlay] .shell {
 /* The desktop app's "Your workspaces" by server (ADR 0154): the server's name above its workspaces. */
 .sidebar__menu-server {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   padding: 10px 14px 2px;
   font-size: 12px;
   font-weight: 600;
   color: var(--ink-muted);
+}
+/* A long host or account name wraps under its first line; the server glyph stays with that line. */
+.sidebar__menu-server > .ac-icon {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .sidebar__menu-server > .ac-icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .sidebar__menu-server em {
   font-style: normal;
@@ -14429,6 +14451,22 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
     var(--top);
   font-size: 14px;
 }
+/* A read-only status uses the whole row under its icon and name, on a wide screen too. */
+.settings-row--lead:not(.settings-row--open, :has(> .settings-row__end)):has(
+  > .settings-row__text > .settings-row__status
+) {
+  row-gap: var(--space-2);
+}
+.settings-row--lead:not(.settings-row--open, :has(> .settings-row__end))
+  > .settings-row__text:has(> .settings-row__status) {
+  display: contents;
+}
+.settings-row--lead:not(.settings-row--open, :has(> .settings-row__end)) > .settings-row__text > .settings-row__label {
+  flex: 1;
+}
+.settings-row--lead:not(.settings-row--open, :has(> .settings-row__end)) > .settings-row__text > .settings-row__status {
+  flex-basis: 100%;
+}
 /* A face, or a plan maker's mark, brings its own tile. */
 .settings-row__icon:has(> .ac-avatar, > .ac-brand, > .ac-rolemark) {
   background: none;
@@ -14452,10 +14490,12 @@ html:not([data-pointer]) .ac-typing__see:focus-visible {
 /* Configurações › Aprovações (ADR 0139): a row whose box is the choice, centred on its label, on the label's first line
    when a line says under it why it is off. */
 .settings-row.rh-check {
+  flex-wrap: nowrap;
   gap: 12px;
 }
 .rh-check .ac-check {
   flex: none;
+  margin-top: 0;
 }
 .settings-row.rh-check:has(.settings-row__status) {
   align-items: flex-start;

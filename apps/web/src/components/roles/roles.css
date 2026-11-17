@@ -657,11 +657,14 @@ html:not([data-pointer]) .roles-names__more:focus-visible {
   cursor: pointer;
 }
 .roles-mail__row {
+  align-items: flex-start;
   flex-wrap: nowrap;
   padding-block: var(--space-3);
 }
 .roles-mail__row > .ac-icon {
   flex: none;
+  line-height: 20px;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
   color: var(--muted);
 }
 .roles-mail__text {

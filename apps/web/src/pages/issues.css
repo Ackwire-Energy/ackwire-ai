@@ -277,11 +277,18 @@ html:not([data-pointer]) .issues-layout:focus-visible {
 }
 .issues-display__foot > span {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
 }
 .issues-display__foot .ac-icon {
+  flex: none;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
   color: var(--ok);
+}
+@supports (top: 1lh) {
+  .issues-display__foot .ac-icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .issues-display__reset {
   flex: none;
@@ -1895,6 +1902,10 @@ html:not([data-pointer]) .issue-ask__other:focus-visible {
 .issue-new__quick > .issue-new__props {
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+/* A face stack and a plain label share the strip's 20px line, so neither grows its button's height. */
+.issue-new__props .ac-btn {
+  line-height: 20px;
 }
 .issue-new__props .ac-date__trigger {
   font-weight: 600;

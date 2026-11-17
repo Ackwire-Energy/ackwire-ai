@@ -511,6 +511,7 @@ html:not([data-pointer]) .brw-ac__tt:focus-visible {
   min-width: 0;
   color: var(--muted);
   font-size: 12.5px;
+  line-height: 18px;
   white-space: nowrap;
 }
 .brw-ac__tx small span {

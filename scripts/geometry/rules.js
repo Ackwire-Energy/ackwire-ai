@@ -511,7 +511,14 @@
         // A capped card's body cuts what runs past its height under a fade and "See more" (`useCardCut`, which a captured
         // screen can't measure): an action there is cut, not on the card's edge.
         const cut = el.closest("[data-capped] > *");
-        if (cut && row.box.contains(cut) && a.bottom > cut.getBoundingClientRect().bottom) continue;
+        if (cut && row.box.contains(cut)) {
+          const end = cut.getBoundingClientRect().bottom;
+          if (a.bottom > end) continue;
+          // With overflowing content, useCardCut will place the fade and See more at this cut. A capture taken
+          // before it measured can leave a whole action just inside the cut; that is not the card's lower rim.
+          // A body whose content fits still has a real lower edge and must keep the normal inset.
+          if (cut.scrollHeight > cut.clientHeight + 1 && a.bottom > end - EDGE_MIN) continue;
+        }
         const b = row.box.getBoundingClientRect();
         const s = style(row.box);
         const inset = {
@@ -1811,7 +1818,21 @@
                 if (Math.abs(inner.bottom - inner.top - (lines.bottom - lines.top)) <= 2) lines = inner;
               }
               const risen = n.parentElement.closest(".ac-captop");
-              const caps = risen && row.contains(risen) ? capsAt(n) : null;
+              // Range keeps the font's untrimmed ascent even when CSS removes that leading from the line's box.
+              // A block trimmed to its cap edge therefore starts at its visible capitals, as .ac-captop does.
+              let trimmed = false;
+              for (let p = n.parentElement; p && p !== row; p = p.parentElement) {
+                const ps = style(p);
+                if (
+                  /block|flow-root|list-item|table-cell/.test(ps.display) &&
+                  ["trim-start", "trim-both"].includes(ps.textBoxTrim) &&
+                  ps.textBoxEdge.split(" ")[0] === "cap"
+                ) {
+                  trimmed = true;
+                  break;
+                }
+              }
+              const caps = (risen && row.contains(risen)) || trimmed ? capsAt(n) : null;
               add(caps ? caps.top : lines.top, lines.bottom);
               continue;
             }

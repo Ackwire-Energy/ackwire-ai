@@ -499,6 +499,18 @@ html:not([data-pointer]) .tm-more:focus-visible {
   .tm-computer > .tm-computer__text {
     display: contents;
   }
+  .tm-cause > .tm-computer__icon,
+  .tm-cause > .tm-computer__text > b {
+    align-self: start;
+  }
+  .tm-cause > .tm-computer__text > b {
+    margin-block-start: calc(var(--cap-top) - 9.45px);
+  }
+  @supports (top: 1lh) {
+    .tm-cause > .tm-computer__text > b {
+      margin-block-start: calc(var(--cap-top) - 0.5lh);
+    }
+  }
   .tm-computer__text b {
     white-space: normal;
     overflow-wrap: anywhere;

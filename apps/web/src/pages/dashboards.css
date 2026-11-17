@@ -163,9 +163,20 @@ html:not([data-pointer]) .db-card:focus-visible {
 }
 .db-by {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
+}
+
+/* A creator's face follows the first line of a name that wraps. */
+.db-by > .ac-avatar {
+  line-height: inherit;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .db-by > .ac-avatar {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 
 /* An agent's request to publish the board (ADR 0135 §11): a line in its tone above the grid. */

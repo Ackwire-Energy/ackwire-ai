@@ -98,6 +98,8 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   min-width: 0;
 }
 .vlt-row__title {
+  /* Size the first line by its ink, so the title and subtitle fit the tile without raising the row's line box. */
+  text-box: trim-both cap alphabetic;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

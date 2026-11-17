@@ -382,7 +382,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
           </>
         }
       >
-        <div className="cal-page__tools">
+        <div className="cal-page__tools ac-toolbar">
           {/* biome-ignore lint/a11y/useSemanticElements: prev / today / next as one compact group */}
           <div className="cal-nav" role="group" aria-label={t("calendar.nav")}>
             <Button
@@ -405,18 +405,20 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               onClick={() => setFocus((f) => stepFocus(view, f, 1))}
             />
           </div>
-          <Segmented
-            label={t("calendar.view")}
-            size="sm"
-            value={view}
-            onValueChange={setView}
-            options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
-          />
           {view === "week" && (
             <FilterToggle pressed={businessOnly} onPressedChange={setBusinessOnly}>
               {t("calendar.businessDays")}
             </FilterToggle>
           )}
+          <div className="ac-toolbar__filters">
+            <Segmented
+              label={t("calendar.view")}
+              size="sm"
+              value={view}
+              onValueChange={setView}
+              options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
+            />
+          </div>
         </div>
         {!panel && (
           <Popover

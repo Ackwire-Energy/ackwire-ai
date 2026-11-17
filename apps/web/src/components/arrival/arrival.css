@@ -685,6 +685,11 @@ html:not([data-pointer]) .arrival-have__row[data-state="checked"]:has(.ac-radio:
   width: 20px;
   height: 20px;
 }
+/* Leads use the title's 20px line, including the smaller API-key glyph. */
+.arrival-have__row > :is(.ac-brand, .arrival-have__mark) {
+  line-height: 20px;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
 /* A key's glyph drawn 16px inside the marks' 20px box: its icon is sized 20 (`ConnectHave`), the padding takes 2. */
 .arrival-have__mark {
   padding: 2px;

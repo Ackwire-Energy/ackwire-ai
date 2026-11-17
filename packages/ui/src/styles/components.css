@@ -9342,6 +9342,10 @@ html:not([data-pointer]) .ac-recur__day:focus-visible {
   border-radius: var(--radius-item);
   cursor: pointer;
 }
+/* Mixed text sizes share their baseline without each adding a full 20px line box to the row. */
+.ac-tz__option > :is(.ac-tz__name, .ac-tz__id, .ac-tz__off) {
+  line-height: normal;
+}
 .ac-tz__option[data-active] {
   background: var(--plate-soft);
 }
@@ -11562,6 +11566,7 @@ html:not([data-pointer]) .ac-setmore__toggle:focus-visible {
   color: var(--muted);
 }
 .ac-consult__foot {
+  line-height: 18px;
   gap: 5px;
   margin: 10px 0 0;
   font-size: 12px;
