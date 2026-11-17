@@ -15,7 +15,8 @@ export interface AheadRequest {
   slot(): Promise<{ routineId: string; runAt: Date }>;
 }
 
-export type AheadOutcome = { ok: true; approval: ApprovalRow } | { ok: false; message: string };
+/** `scheduled`: the agent never asks (ADR 0173), so nobody approves it: what the agent reads instead of waiting. */
+export type AheadOutcome = { ok: true; approval: ApprovalRow; scheduled?: string } | { ok: false; message: string };
 
 /** Who is calling a tool: always an agent inside a run. */
 export interface ToolContext {
@@ -120,8 +121,27 @@ export interface ToolDefinition {
   serviceIcon?: string;
   /** What a connection's tool names start with (`stripe_2`): a big connector's directory is named with it. */
   toolPrefix?: string;
-  /** Needs a person's approval for every call. Merge, deploy and rollback always do. */
+  /** Needs a person's approval for every call. Merge, deploy and rollback do by their name too. */
   sensitive?: boolean;
+  /**
+   * Set by the gateway's listing, never by a source: this agent never asks (ADR 0173), so a call of this tool opens
+   * no card whatever its name or marks say.
+   */
+  unasked?: boolean;
+  /**
+   * Set by the gateway for one call, never by a source: every action this call runs opens a pull request, so it is
+   * judged as a connected app's own tool for that (`opensPullRequest`).
+   */
+  opensPullRequest?: boolean;
+  /**
+   * A call with this input only looks (a search before the change): an agent that always asks doesn't ask for it.
+   */
+  looksOnly?(input: Record<string, unknown>): boolean;
+  /**
+   * A `sensitive` tool's call with this input asks nobody, and needs no `why`: it runs nothing a person guards
+   * (`keep_running` listing the agent's holds or ending one).
+   */
+  asksNobody?(input: Record<string, unknown>): boolean;
   /**
    * A call that carries `why` (in the tool's own schema) asks a person's approval first: how an agent asks for
    * a command the computer held for a person (ADR 0053 §3, amended 2026-10-30).
@@ -150,9 +170,8 @@ export interface ToolDefinition {
   /** With `actions`: the scope of the connection's reads. */
   readScope?: string;
   /**
-   * The server's own name for this tool, set only where "Aprovar sempre" may be offered on its approvals (custom
-   * servers: only Composio's executor, whose `actions` say what each call does). Rules are kept by it, so they
-   * outlive a renamed connection. The gateway still decides each call (`rememberable`).
+   * The server's own name for this tool: "Aprovar sempre" rules are kept by it, so they outlive a renamed
+   * connection. Without it they are kept by the tool's listed name (`rememberKinds`).
    */
   rememberAs?: string;
   /**
@@ -163,14 +182,14 @@ export interface ToolDefinition {
   rememberTarget?(input: Record<string, unknown>): string | null;
   /**
    * A tool that runs one shell command on the agent's computer (`run_code` in bash, a shell task): the command, so
-   * "Aprovar sempre" may keep its kind for the agent (`commandKind`, no connection). Null: this call runs no plain
-   * command.
+   * "Aprovar sempre" keeps its kind for the agent (`commandKind`, no connection). Null: this call runs no plain
+   * command, and is kept by the tool itself.
    */
   rememberCommand?(input: Record<string, unknown>): string | null;
   /**
    * A connected server's tool that runs the SQL in `arg` (Supabase's `execute_sql`), by the server's own name `tool`:
-   * "Aprovar sempre leituras" may cover its calls the Postgres guard proves read-only (`provenReadOnly`), one rule per
-   * set of other arguments (the project or database the call names). A call it can't prove still asks.
+   * "Aprovar sempre leituras" covers its calls the Postgres guard proves read-only (`provenReadOnly`), one rule per
+   * set of other arguments (the project or database the call names). A call it can't prove offers the tool itself.
    */
   sqlReads?: { tool: string; arg: string };
   /**

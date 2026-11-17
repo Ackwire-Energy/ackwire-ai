@@ -77,6 +77,16 @@ describe("the line under 'Vou cuidar disso' (phone and web share it)", () => {
       workLine(t, work({ status: "canceled", state: null, finishedAt: NOW.toISOString(), canceledByUserId: "u" }), ctx)
         .text,
     ).toBe("Parado por Bia aos 12 min");
+    // The right hand stopped it at Bia's word: the line names it, as the end message in the thread does.
+    const byRightHand = work({
+      status: "canceled",
+      state: null,
+      finishedAt: NOW.toISOString(),
+      canceledByUserId: "u",
+      canceledByAgentId: "lodi",
+    });
+    expect(workLine(t, byRightHand, { ...ctx, agentNameOf: () => "Lodi" }).text).toBe("Parado por Lodi aos 12 min");
+    expect(workLine(t, byRightHand, ctx).text).toBe("Parado aos 12 min");
   });
 
   test("waiting on an answer: what it asks takes the update's place, and only then", async () => {

@@ -2,6 +2,7 @@ import { and, type Database, desc, type Executor, eq, inArray, lt, ne, or, schem
 import { recordAudit } from "./audit";
 import type { RunAuthority } from "./authority";
 import { readableChannelIds } from "./channels";
+import { serverUrlShown } from "./connectors/presets";
 import { cutText } from "./format";
 import { can, requirePermission } from "./organizations";
 import { MAKE_KEY_TOOL, REQUEST_SECRET_TOOL } from "./secrets";
@@ -125,6 +126,8 @@ export async function recordToolCall(
     secretRequestId?: string | null;
     /** A call that ran without asking under "Aprovar sempre": its rules (`approval_rules`). */
     approvalRules?: string[] | null;
+    /** A call that ran without the card its tool would open, because its agent never asks (ADR 0173). */
+    unasked?: boolean;
     about?: ToolCallSubject | null;
   },
 ) {
@@ -154,6 +157,7 @@ export async function recordToolCall(
       ...(call.approvalId ? { approvalId: call.approvalId } : {}),
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
       ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),
+      ...(call.unasked ? { approvalsLevel: "never" } : {}),
       ...(call.about ? { about: call.about } : {}),
     },
     runId: call.runId,
@@ -273,6 +277,9 @@ async function hiddenFrom(db: Database, orgId: string, userId: string, rows: Aud
   }
   return hidden;
 }
+
+/** Rows that carry a custom server's address: `view_audit` is not `manage_connectors`, so it leaves as its origin. */
+const CUSTOM_SERVER_ACTIONS: readonly string[] = ["connector.custom_connected", "connector.custom_reconnected"];
 
 /**
  * The org's audit log, newest first, for admins (`configure`): what people
@@ -400,7 +407,11 @@ export async function listAudit(
           : {}
         : r.action === TOOL_CALL
           ? r.details
-          : auditInput(r.details),
+          : auditInput(
+              CUSTOM_SERVER_ACTIONS.includes(r.action) && typeof r.details.serverUrl === "string"
+                ? { ...r.details, serverUrl: serverUrlShown(r.details.serverUrl) }
+                : r.details,
+            ),
       runId: r.runId,
       channelId: r.channelId,
       channel: (r.channelId && (channelById.get(r.channelId) as AuditRow["channel"])) || null,

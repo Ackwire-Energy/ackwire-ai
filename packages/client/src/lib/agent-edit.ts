@@ -91,8 +91,8 @@ export interface BrainChoice {
 export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
   a.brain === b.brain && (a.brain === "model" || a.model === b.model) && a.fallback === b.fallback;
 
-const sorted = (list: string[]) => [...list].sort();
-export const sameList = (a: string[], b: string[]) => sorted(a).join("\n") === sorted(b).join("\n");
+const sorted = (list: readonly string[]) => [...list].sort();
+export const sameList = (a: readonly string[], b: readonly string[]) => sorted(a).join("\n") === sorted(b).join("\n");
 export const sameAudience = (a: AgentAudience, b: AgentAudience) =>
   (a.consultable ?? true) === (b.consultable ?? true) &&
   a.mode === b.mode &&

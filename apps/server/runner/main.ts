@@ -45,10 +45,12 @@ import {
   DEFAULT_AGENT_UID_RANGE,
   effectiveAccess,
   expandHome,
+  hostOrgHomes,
   normalizeServerUrl,
   pairedConfig,
   parseService,
   parseUidRange,
+  type RunnerConfig,
   readConfig,
   readStoredConfig,
   runnerHome,
@@ -72,19 +74,23 @@ import { RotatingFile } from "./logfile";
 import { adoptLoginPath } from "./login-path";
 import { LoopbackGuard, loopbackEndpoints, runnerEndpoints } from "./loopback-guard";
 import { MCP_TOKEN_FILE, mcpSocketPath, runMcpRelay, runMcpServer } from "./mcp";
+import { runMigrate } from "./migrate";
 import {
   type DeviceGrant,
   devicePair,
   formatUserCode,
   LINK_CODE,
+  movedFrom,
   PairingError,
   redeemIssuedCode,
   takeEnrollCode,
   whoCanUse,
 } from "./pairing";
+import { askPark, parkDone } from "./park";
 import { agentWorkspace } from "./paths";
 import { connectVnc, type VncConnection, vncInit } from "./rfb";
-import { installService, installSystemService, serviceStatus, uninstallService } from "./service";
+import { installService, installSystemService, removeOwnService, serviceStatus, uninstallService } from "./service";
+import { askStandby, STANDBY_DEFAULT_MINUTES, STANDBY_MAX_MINUTES, standbyAcked } from "./standby";
 import type { DataListener, DataSocket } from "./streams";
 import { runTaskWrapper } from "./tasks";
 import { runnerTerminalUser, systemTerminalUser, Terminals, type TerminalsOptions } from "./terminal";
@@ -128,8 +134,21 @@ Usage:
       --rotate   asks for a new token for that organization's connection (the server refused its own)
   agentes-runner service install --host --server <url> --token-file <path> [--state <dir>] [--no-exec] [--no-start]
       Runs host as this computer's service: the root unit from boot on Linux, at login on macOS.
+  agentes-runner migrate [--from <app>] [--out <folder>] [--json] [--no-files]
+      Reads the agents another app keeps on this computer (openbot, openmausbot, hermes, openclaw,
+      paperclip) and writes one .zip to drop on the import screen. It only reads, and sends nothing.
   agentes-runner update
       Downloads the latest runner from the server and restarts the service (keeps the pairing).
+  agentes-runner standby [--minutes <n>]
+      For whoever pauses this computer: the running runner drops its link to the server and keeps
+      everything else running (tasks, the agents' browsers and desktops, their programs). It ends after
+      n minutes the computer is running (default 5), or with resume; ask again to keep it.
+  agentes-runner resume
+      Ends standby: the runner connects again at once.
+  agentes-runner park
+      For a server hosting this computer that runs short of memory: the running runner parks the agents'
+      desktops nobody used for an hour (each opens again as it was when next used) and eases their idle
+      browsers, keeping every tab. Prints one JSON line: {"desktops", "browsers"}.
   agentes-runner status
       The connection, the service, and whether the agents' desktops and the terminal can run here.
   agentes-runner doctor [--wait | --no-wait] [--json]
@@ -139,9 +158,9 @@ Usage:
   agentes-runner computer
       What this computer has, what is free now, and which agents use the most of it (they share it).
       Agents run it before something heavy.
-  agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...]
+  agentes-runner folders [list | allow <path> [--agent <handle>]... | remove <path> [--agent <handle>]...] [--org <id | name>]
       Folders agents may use besides their own (an agent's handle, as on the site).
-  agentes-runner tools [list | enable <tool> | disable <tool>]
+  agentes-runner tools [list | enable <tool> | disable <tool>] [--org <id | name>]
       Turns claude (Claude Code), codex (Codex), commands, browser, desktop or terminal on or off on
       this computer.
   agentes-runner services [list | allow <tcp|udp>/<port> | remove <tcp|udp>/<port>]
@@ -163,9 +182,11 @@ Usage:
   agentes-runner --help | --version
 
 Every command takes --home <dir> (default $AGENTES_RUNNER_HOME or ~/.agentes-runner).
+On the server's own computer each organization has its own connection in <home>/orgs: folders and tools
+take --org <id | name> to pick one when it serves several.
 Config: <home>/config.json, mode 600. For background tasks, optional "maxConcurrentTasks" (default 3)
 and "taskMaxSeconds" (default 14400). For agents thinking with Claude Code, optional "brainIdleMinutes"
-(default 3) and "brainMaxProcesses" (default 1). Changes apply while it runs.
+(default 20 on Linux, 3 elsewhere) and "brainMaxProcesses" (default 2 on Linux, 1 elsewhere). Changes apply while it runs.
 Background tasks keep running when the runner restarts. Their logs are in tasks/.
 Commands run as the user that runs the runner. Consider a dedicated OS user.`;
 
@@ -181,6 +202,10 @@ interface Parsed {
 
 const VALUE_FLAGS = new Set([
   "server",
+  "from",
+  "out",
+  "data",
+  "company",
   "dir",
   "name",
   "task",
@@ -195,6 +220,8 @@ const VALUE_FLAGS = new Set([
   "enroll-file",
   "rotate",
   "link",
+  "minutes",
+  "org",
 ]);
 const LIST_FLAGS = new Set(["agent", "rotate"]);
 
@@ -235,6 +262,13 @@ const DESKTOP_MANAGED =
 const HOST_MANAGED =
   "This connection is one organization's on this server's own computer: agentes-runner host keeps it (and its service). Turn it off for the organization on the site, in Settings > Computers.";
 
+/**
+ * What the server's own computer says when no organization's connection is in this home yet: `pair` refuses there (the
+ * server brings one connection per organization, `host.ts`), and each organization's switches live on the site.
+ */
+const HOST_COMPUTER_NOTE =
+  "This computer is the server's computer: each organization's connection is switched on and off on the site, in Settings > Devices > Tools.";
+
 /** Why a command can't change this home: something else keeps it. Null when nothing does. */
 const managedMessage = (stored: StoredConfig | null) =>
   stored?.managedBy === "desktop" ? DESKTOP_MANAGED : stored?.managedBy === "host" ? HOST_MANAGED : null;
@@ -246,6 +280,13 @@ function storedOrNull(home = runnerHome()): StoredConfig | null {
     return null;
   }
 }
+
+/**
+ * Whether this home is the server's own computer (`agentes-runner host`): its top-level config is the machine's
+ * (`mode: "system"`), never a connection's, so it has no token — the connections are the organizations', one per home
+ * (`hostOrgHomes`). A runner of someone's own is a system-mode home too, and always paired: its token is here.
+ */
+const isHostComputer = (stored: StoredConfig | null) => stored?.mode === "system" && !stored.token;
 
 /**
  * The device-code connection from a terminal (ADR 0036 §5): prints a code and a link, waits for the site.
@@ -383,6 +424,9 @@ async function pair(p: Parsed): Promise<number> {
   const details = [`Workspace: ${workspaceReal}${exec ? "" : " (commands off)"}`, `Config: ${configPath(home)}`];
   if (wait) wait.done(connected, ...details);
   else term.step(connected, ...details);
+  // One home holds one connection: it left the workspace it worked for, which nothing else says.
+  const left = movedFrom(prev, grant.org);
+  if (left) term.warn(left);
   // An issued code is a provisioner's (the workspace computer): its rule is the workspace's, not a person's choice.
   const who = enrollCode ? null : whoCanUse(grant, next.name ?? grant.name);
   if (who && grant.url) {
@@ -416,7 +460,7 @@ async function start(): Promise<number> {
     console.error(`This runtime has no WebSocket client (${process.version}). Use Node.js 22 or newer, or Bun.`);
     return 1;
   }
-  const lock = acquireLock(home, "start");
+  const lock = acquireLock(home, "start", { version: RUNNER_VERSION, protocol: MACHINE_PROTOCOL_VERSION });
   if (!lock.ok) {
     console.error(lockedMessage(home, lock.holder));
     return serviceSafe(4);
@@ -437,6 +481,15 @@ async function start(): Promise<number> {
       case "outdated":
         log("This runner is too old for the server. Update it: agentes-runner update");
         return serviceSafe(3);
+      case "revoked": {
+        const removed = removeOwnService({ manager: process.env.AGENTES_RUNNER_SERVICE });
+        log(
+          removed
+            ? `This computer was removed from the workspace, so its login service is gone too (${removed}). To connect it again: agentes-runner pair --server <url>`
+            : "This computer was removed from the workspace. To connect it again: agentes-runner pair --server <url>",
+        );
+        return serviceSafe(TOKEN_REFUSED_EXIT);
+      }
       default:
         log("Connect this computer again: agentes-runner pair --server <url>");
         return serviceSafe(TOKEN_REFUSED_EXIT);
@@ -476,7 +529,7 @@ async function app(): Promise<number> {
   console.debug = toLog;
   console.error = toLog;
   process.stdout.on("error", () => {});
-  const lock = acquireLock(home, "app");
+  const lock = acquireLock(home, "app", { version: RUNNER_VERSION, protocol: MACHINE_PROTOCOL_VERSION });
   const ac = new AbortController();
   process.once("SIGTERM", () => ac.abort());
   process.once("SIGINT", () => ac.abort());
@@ -489,7 +542,7 @@ async function app(): Promise<number> {
       input: process.stdin,
       output: process.stdout,
       locked: lock.ok ? null : lock.holder,
-      daemon: { log: write, logFile },
+      daemon: { log: write, logFile, refreshPath: () => adoptLoginPath() },
       signal: ac.signal,
     });
   } finally {
@@ -597,7 +650,7 @@ async function host(p: Parsed): Promise<number> {
   // Read once, then out of the environment: the organizations' runners (and their agents) never see it.
   const envToken = flags.tokenEnv ? process.env[flags.tokenEnv]?.trim() || null : null;
   if (flags.tokenEnv) delete process.env[flags.tokenEnv];
-  const lock = acquireLock(flags.state, "host");
+  const lock = acquireLock(flags.state, "host", { version: RUNNER_VERSION, protocol: MACHINE_PROTOCOL_VERSION });
   if (!lock.ok) {
     console.error(lockedMessage(flags.state, lock.holder));
     return 4;
@@ -740,6 +793,66 @@ function printed(
   return code;
 }
 
+/** How long `standby` and `resume` wait for the running runner to answer. */
+const STANDBY_ANSWER_MS = 20_000;
+
+/**
+ * `agentes-runner standby` / `resume` (ADR 0176): the ask goes in the runner's home, and the running runner answers
+ * once it applied it. Exits 0 once nothing here links to the server (in standby, or no runner running), or the
+ * runner took the resume.
+ */
+async function standby(p: Parsed, on: boolean): Promise<number> {
+  const home = runnerHome();
+  const given = flagString(p, "minutes");
+  const minutes = on ? (given === undefined ? STANDBY_DEFAULT_MINUTES : Number(given)) : 0;
+  if (on && (!Number.isInteger(minutes) || minutes < 1 || minutes > STANDBY_MAX_MINUTES)) {
+    console.error(`--minutes takes a whole number from 1 to ${STANDBY_MAX_MINUTES}`);
+    return 1;
+  }
+  const ask = askStandby(home, minutes);
+  const holder = readLock(home);
+  if (!holder || !pidAlive(holder.pid)) {
+    console.log(on ? "No runner is running here: one that starts now stays in standby." : "No runner is running here.");
+    return 0;
+  }
+  for (const until = Date.now() + STANDBY_ANSWER_MS; Date.now() < until; await sleep(100)) {
+    if (!standbyAcked(home, ask.id)) continue;
+    console.log(
+      on
+        ? `In standby for ${minutes} min of running time: no link to the server, everything else runs.`
+        : "Standby is over: connecting to the server.",
+    );
+    return 0;
+  }
+  console.error("The runner didn't answer in time.");
+  return 1;
+}
+
+/**
+ * Desktops parked one after another take a few seconds each: their processes get `KILL_WAIT_MS` to end. Kept under
+ * 90 s, how long a caller of this verb is expected to wait, so a slow park still answers in time.
+ */
+const PARK_ANSWER_MS = 85_000;
+
+/** `agentes-runner park` (`park.ts`): prints what the running runner did, `{"desktops":0,"browsers":0}` with none running. */
+async function park(): Promise<number> {
+  const home = runnerHome();
+  const holder = readLock(home);
+  if (!holder || !pidAlive(holder.pid)) {
+    console.log(JSON.stringify({ desktops: 0, browsers: 0 }));
+    return 0;
+  }
+  const ask = askPark(home);
+  for (const until = Date.now() + PARK_ANSWER_MS; Date.now() < until; await sleep(100)) {
+    const done = parkDone(home, ask.id);
+    if (!done) continue;
+    console.log(JSON.stringify({ desktops: done.desktops, browsers: done.browsers }));
+    return 0;
+  }
+  console.error("The runner didn't answer in time.");
+  return 1;
+}
+
 /** Replaces this script with the server's latest bundle; the pairing and the workspace stay. */
 async function update(): Promise<number> {
   const term = createTerm();
@@ -800,25 +913,53 @@ function status(): number {
   const home = runnerHome();
   const stored = storedOrNull(home);
   const config = readConfig(home);
+  // The server's own computer has no connection of its own: one per organization, each in its own home.
+  const orgs = !config && isHostComputer(stored) ? hostOrgHomes(home) : [];
   const bun = (process.versions as { bun?: string }).bun;
-  term.intro(
-    `agentes-runner ${RUNNER_VERSION} (protocol ${MACHINE_PROTOCOL_VERSION}) on ${bun ? `bun ${bun}` : `${process.release.name} ${process.version}`}${runningCompiled() ? " (compiled)" : ""}`,
-    false,
-  );
+  // The version worth reporting is the one of the runner serving this home, which keeps in the lock what it puts
+  // in its `hello`. This command may be another install's shim: its own constant is only the answer when no runner
+  // reports one, and then the line says whose version it is.
+  const holder = readLock(home);
+  const running = holder && pidAlive(holder.pid) ? holder : null;
+  const version = running?.version ?? RUNNER_VERSION;
+  const protocol = running?.protocol ?? MACHINE_PROTOCOL_VERSION;
+  const here = `agentes-runner ${version} (protocol ${protocol})`;
+  const build = `on ${bun ? `bun ${bun}` : `${process.release.name} ${process.version}`}${runningCompiled() ? " (compiled)" : ""}`;
+  const same = version === RUNNER_VERSION && protocol === MACHINE_PROTOCOL_VERSION;
+  const line = !running?.version
+    ? `${here} ${build} — this command's version: ${running ? "the runner here didn't report one" : "no runner is running"}`
+    : same
+      ? `${here} ${build}`
+      : `${here} running here · this command is ${RUNNER_VERSION} (protocol ${MACHINE_PROTOCOL_VERSION}) ${build}`;
+  term.intro(line, false);
   if (config) {
     term.step(
       `Connected${stored?.orgName ? ` to ${stored.orgName}` : ""} as "${config.name}"`,
       `${config.server} · workspace ${config.workspace}`,
     );
-  } else term.fail("Not connected.");
-  const holder = readLock(home);
-  if (holder && pidAlive(holder.pid)) term.step(`Running: pid ${holder.pid}${holder.mode ? ` (${holder.mode})` : ""}`);
+  } else if (orgs.length) {
+    for (const orgHome of orgs) printOrgConnection(term, orgHome);
+  } else term.fail("Not connected.", isHostComputer(stored) ? HOST_COMPUTER_NOTE : undefined);
+  if (running) term.step(`Running: pid ${running.pid}${running.mode ? ` (${running.mode})` : ""}`);
   else term.warn("Running: no");
   const service = serviceStatus(undefined, stored?.mode === "system");
   // systemd says how the unit is ("(active)", "(inactive)", "(failed)"); launchd and Windows only that it's there.
   if (service && (service.endsWith("(active)") || !service.endsWith(")"))) term.step(`Service: ${service}`);
   else term.warn(service ? `Service: ${service}` : "Service: not installed");
-  printDesktopAndTerminal(term, home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  // Each organization's agents' desktops and terminal run in its home: their switches are that home's, not this one's.
+  if (orgs.length) {
+    for (const orgHome of orgs) {
+      const org = storedOrNull(orgHome);
+      printDesktopAndTerminal(term, orgHome, org ? effectiveAccess(org).tools : undefined, org?.mode === "system");
+    }
+  } else
+    printDesktopAndTerminal(term, home, stored ? effectiveAccess(stored).tools : undefined, stored?.mode === "system");
+  if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
+    term.text(
+      "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
+      true,
+    );
+  }
   term.gap();
   term.text(`Config: ${configPath(home)}`, true);
   if (stored) {
@@ -827,6 +968,21 @@ function status(): number {
   }
   term.end();
   return 0;
+}
+
+/**
+ * `status` on the server's own computer: one organization's connection, as its own config has it (the name the server
+ * sees, the address, and that home's tools).
+ */
+function printOrgConnection(term: Term, home: string) {
+  const stored = storedOrNull(home) ?? {};
+  const tools = effectiveAccess(stored).tools;
+  term.step(
+    `Connected${stored.orgName ? ` to ${stored.orgName}` : ""} as "${stored.name ?? os.hostname()}"`,
+    `${stored.server}${stored.workspace ? ` · workspace ${stored.workspace}` : ""}`,
+    `tools ${TOOL_NAMES.map((t) => `${t} ${tools[t] ? "on" : "off"}`).join(", ")}`,
+    `Config: ${configPath(home)}`,
+  );
 }
 
 /**
@@ -848,23 +1004,48 @@ function printDesktopAndTerminal(term: Term, home: string, tools: RunnerTools | 
     else if (tools?.[tool]) term.step(`${label}: on`);
     else term.warn(`${label}: off (agentes-runner tools enable ${tool})`);
   }
-  if (!hasBunTerminal() && !runningCompiled() && process.platform !== "win32") {
-    term.text(
-      "The install command from Settings > Computers, run again, puts the runner on Bun 1.3.5 or newer (this computer stays connected).",
-      true,
-    );
-  }
 }
 
-/** For `folders` and `tools`: the paired config, or a message. */
-function pairedOrExit(home: string) {
+/**
+ * For `folders` and `tools`: the connection to change, its home, or a message. On the server's own computer the
+ * connection is the organization's, not this home's (`isHostComputer`): the only one is used as it is, and several take
+ * `--org <id or name>` (the same homes `status` lists). Nothing there: `pair` refuses, so the message says where the
+ * switches are.
+ */
+function pairedOrExit(p: Parsed, home: string): { stored: StoredConfig; config: RunnerConfig; home: string } | null {
   const stored = storedOrNull(home);
   const config = stored ? pairedConfig(stored, configPath(home)) : null;
-  if (!config || !stored) {
+  if (config && stored) return { stored, config, home };
+  if (!isHostComputer(stored)) {
     console.error("This computer isn't connected yet. Run: agentes-runner pair --server <url>");
     return null;
   }
-  return { stored, config };
+  const orgs = hostOrgHomes(home).map((orgHome) => ({ home: orgHome, stored: storedOrNull(orgHome) ?? {} }));
+  const wanted = flagString(p, "org");
+  const name = (o: (typeof orgs)[number]) => o.stored.orgName ?? "";
+  const org =
+    orgs.length === 1
+      ? orgs[0]
+      : orgs.find(
+          (o) => wanted !== undefined && (o.stored.orgId === wanted || name(o).toLowerCase() === wanted.toLowerCase()),
+        );
+  if (!org) {
+    console.error("This computer isn't connected yet. Run: agentes-runner pair --server <url>");
+    if (orgs.length === 0) console.error(HOST_COMPUTER_NOTE);
+    else
+      console.error(
+        `Use --org <id or name>. Organizations here: ${orgs
+          .map((o) => `${name(o) || "no name"} (${o.stored.orgId})`)
+          .join(", ")}`,
+      );
+    return null;
+  }
+  const orgConfig = pairedConfig(org.stored, configPath(org.home));
+  if (!orgConfig) {
+    console.error(`${org.home} isn't connected yet (no token). Start the server's computer again: agentes-runner host`);
+    return null;
+  }
+  return { stored: org.stored, config: orgConfig, home: org.home };
 }
 
 function saveAccess(home: string, access: ReturnType<typeof effectiveAccess>) {
@@ -877,12 +1058,11 @@ const unknownAgent = (given: string, agents: ReturnType<typeof readAgents>) =>
 
 /** `agentes-runner folders …`: the same config the app edits (a running runner applies it at once). */
 function folders(p: Parsed): number {
-  const home = runnerHome();
-  const paired = pairedOrExit(home);
+  const paired = pairedOrExit(p, runnerHome());
   if (!paired) return 1;
   const [, sub = "list", target] = p.positional;
   const access = effectiveAccess(paired.stored);
-  const agents = readAgents(home);
+  const agents = readAgents(paired.home);
   const nameOf = (id: string) => {
     const a = agents.find((x) => x.id === id);
     return a ? `${a.name} (@${a.handle})` : id;
@@ -911,8 +1091,8 @@ function folders(p: Parsed): number {
           console.error("Usage: agentes-runner folders allow <path> [--agent <handle>]...");
           return 1;
         }
-        const real = checkFolder(target, { runnerHome: home, workspace: paired.config.workspace });
-        saveAccess(home, addFolder(access, real, ids));
+        const real = checkFolder(target, { runnerHome: paired.home, workspace: paired.config.workspace });
+        saveAccess(paired.home, addFolder(access, real, ids));
         console.log(
           ids.length
             ? `Allowed ${real} for ${ids.map(nameOf).join(", ")}.`
@@ -934,7 +1114,7 @@ function folders(p: Parsed): number {
         let next = access;
         if (ids.length) for (const id of ids) next = removeFolder(next, found.path, id);
         else next = removeFolder(next, found.path);
-        saveAccess(home, next);
+        saveAccess(paired.home, next);
         console.log(ids.length ? `Removed ${found.path} for ${ids.map(nameOf).join(", ")}.` : `Removed ${found.path}.`);
         return 0;
       }
@@ -963,8 +1143,7 @@ function safeReal(p: string) {
 
 /** `agentes-runner tools …`. */
 function tools(p: Parsed): number {
-  const home = runnerHome();
-  const paired = pairedOrExit(home);
+  const paired = pairedOrExit(p, runnerHome());
   if (!paired) return 1;
   const [, sub = "list", tool] = p.positional;
   const access = effectiveAccess(paired.stored);
@@ -974,7 +1153,7 @@ function tools(p: Parsed): number {
   }
   if ((sub === "enable" || sub === "disable") && tool && (TOOL_NAMES as readonly string[]).includes(tool)) {
     const t = tool as keyof RunnerTools;
-    saveAccess(home, setTool(access, t, sub === "enable"));
+    saveAccess(paired.home, setTool(access, t, sub === "enable"));
     console.log(`${TOOL_LABELS[t]} ${sub === "enable" ? "on" : "off"}.`);
     return 0;
   }
@@ -1378,8 +1557,23 @@ async function main(argv: string[]): Promise<number> {
       runTaskWrapper(path.resolve(sub));
       return new Promise<number>(() => {});
     }
+    case "migrate":
+      // Reads another app's agents on this computer into a file for the import page; it needs no connection.
+      return runMigrate({
+        from: flagString(p, "from"),
+        out: flagString(p, "out"),
+        data: flagString(p, "data"),
+        company: flagString(p, "company"),
+        json: p.flags.has("json"),
+        noFiles: p.flags.has("no-files"),
+      });
     case "update":
       return update();
+    case "standby":
+    case "resume":
+      return standby(p, command === "standby");
+    case "park":
+      return park();
     case "service": {
       const stored = storedOrNull();
       const hostService = p.flags.has("host");

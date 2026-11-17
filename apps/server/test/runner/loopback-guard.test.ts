@@ -11,6 +11,7 @@ import {
   defaultRouteInterfaces,
   LoopbackGuard,
   loopbackEndpoints,
+  loopbackInterfaces,
   NO_OWNER_MARK,
   OTHER_USER_MARK,
   ROOT_MARK,
@@ -25,7 +26,14 @@ const dirs: string[] = [];
 afterEach(() => removeDirs(dirs));
 
 const RANGE: [number, number] = [20000, 29999];
-const base = { agents: [20001, 20002], uidRange: RANGE, services: [], uplinks: [], reject: true };
+const base = {
+  agents: [20001, 20002],
+  uidRange: RANGE,
+  services: [],
+  uplinks: [],
+  loopbacks: ["lo"],
+  reject: true,
+};
 
 // ── the table ─────────────────────────────────────────────────────────────
 
@@ -44,9 +52,13 @@ table inet agentes_runner {
 	set uplinks {
 		type ifname
 	}
+	set loopbacks {
+		type ifname
+		elements = { "lo" }
+	}
 	chain output {
 		type filter hook output priority filter; policy accept;
-		oif "lo" meta l4proto { tcp, udp } ct state new jump sender
+		oifname @loopbacks meta l4proto { tcp, udp } ct state new jump sender
 		ct state { new, untracked } socket cgroupv2 level 1 "agents.slice" jump agent_out
 		ct state { new, untracked } meta skuid 20000-29999 socket cgroupv2 level 1 != "agents.slice" jump agent_out
 	}
@@ -59,15 +71,15 @@ table inet agentes_runner {
 		ct mark set 0x41fffffe
 	}
 	chain agent_out {
-		oif "lo" ct state untracked goto refuse
-		oif "lo" meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse
+		oifname @loopbacks ct state untracked goto refuse
+		oifname @loopbacks meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse
 		ct status dnat ct original ip daddr 127.0.0.0/8 ct reply ip saddr != 127.0.0.0/8 goto refuse
 		ct status dnat ct original ip6 daddr ::1 ct reply ip6 saddr != ::1 goto refuse
 		meta oifkind { "bridge", "veth" } oifname != @uplinks goto refuse
 	}
 	chain input {
 		type filter hook input priority filter; policy accept;
-		iif "lo" meta l4proto { tcp, udp } ct state new jump local
+		iifname @loopbacks meta l4proto { tcp, udp } ct state new jump local
 	}
 	chain local {
 		ct mark 0x41000000 accept
@@ -90,12 +102,42 @@ table inet agentes_runner {
   ]);
 });
 
+test("the loopback interfaces: lo, plus the relay /proc/net/dev reports, and nothing else", () => {
+  const dev = [
+    "Inter-|   Receive                                                |  Transmit",
+    " face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed",
+    "    lo: 1234 12 0 0 0 0 0 0 1234 12 0 0 0 0 0 0",
+    "loopback0: 99 1 0 0 0 0 0 0 99 1 0 0 0 0 0 0",
+    "  eth0: 5 1 0 0 0 0 0 0 5 1 0 0 0 0 0 0",
+    "  docker0: 7 1 0 0 0 0 0 0 7 1 0 0 0 0 0 0",
+  ].join("\n");
+  // WSL2's mirrored networking relays its host's loopback over loopback0.
+  expect(loopbackInterfaces(dev)).toEqual(["lo", "loopback0"]);
+  // No relay: exactly the interface the rules named before, so nothing else about the table changes.
+  expect(loopbackInterfaces("")).toEqual(["lo"]);
+  expect(loopbackInterfaces("    lo: 1 2 0 0 0 0 0 0 1 2 0 0 0 0 0 0\n  eth0: 3 4 0 0 0 0 0 0")).toEqual(["lo"]);
+});
+
+test("a loopback relay is judged the way lo was: the sender, the way out and the way in", () => {
+  const onlyLo = renderRuleset({ ...base, loopbacks: ["lo"] });
+  const relayed = renderRuleset({ ...base, loopbacks: ["lo", "loopback0"] });
+  expect(onlyLo).toContain('set loopbacks {\n\t\ttype ifname\n\t\telements = { "lo" }\n\t}');
+  expect(relayed).toContain('set loopbacks {\n\t\ttype ifname\n\t\telements = { "lo", "loopback0" }\n\t}');
+  // One rule reads a sender, two judge an agent's way out, one reads its way in: all four name the set.
+  expect(relayed.match(/oifname @loopbacks/g)).toHaveLength(3);
+  expect(relayed.match(/iifname @loopbacks/g)).toHaveLength(1);
+  expect(relayed).not.toContain('if "lo"');
+  // Nothing else moves: the relay's table is lo's table with the set's elements alone changed.
+  expect(relayed.replace('elements = { "lo", "loopback0" }', 'elements = { "lo" }')).toBe(onlyLo);
+});
+
 test("the range, the services, the uplinks and the drop fallback come from what it is given", () => {
   const text = renderRuleset({
     agents: [],
     uidRange: [20000, 20999],
     services: ["tcp/11434", "UDP/8125", "tcp/53", "tcp/0", "sctp/5", "nonsense"],
     uplinks: ["vmbr0"],
+    loopbacks: ["lo"],
     reject: false,
   });
   expect(text).toContain("meta skuid 20000-20999 ct mark set 0x41ffffff return");
@@ -169,6 +211,7 @@ function computer(opts: { nft?: boolean; refuse?: (text: string) => string | nul
     tables: true,
     slices: new Map<string, string>([[AGENTS_CGROUP, "100"]]),
     route4: "",
+    dev: "",
     services: [] as string[],
     uids: [20001, 20002],
   };
@@ -203,6 +246,7 @@ function computer(opts: { nft?: boolean; refuse?: (text: string) => string | nul
       ephemeralRange: "32768 60999",
       cgroupId: (dir) => state.slices.get(dir) ?? null,
       routes: () => [state.route4, ""],
+      devices: () => state.dev,
       ...o,
     });
   };
@@ -251,6 +295,9 @@ test("a check loads it again only when what it is made of changed, or when it is
         "Iface\tDestination\tGateway\tFlags\tRefCnt\tUse\tMetric\tMask\nvmbr0\t00000000\t0101A8C0\t0003\t0\t0\t0\t00000000";
     },
     () => {
+      pc.state.dev = "    lo: 1 2 0 0 0 0 0 0 1 2 0 0 0 0 0 0\nloopback0: 3 4 0 0 0 0 0 0 3 4 0 0 0 0 0 0";
+    },
+    () => {
       pc.state.uids = [20001, 20002, 20003];
       pc.state.slices.set(agentCgroup(20003), "203");
     },
@@ -263,6 +310,7 @@ test("a check loads it again only when what it is made of changed, or when it is
   expect(pc.loaded.at(-1)).toContain('"agents.slice/agents-20003.slice" : 0x41004e23');
   expect(pc.loaded.at(-1)).toContain("tcp . 11434");
   expect(pc.loaded.at(-1)).toContain('elements = { "vmbr0" }');
+  expect(pc.loaded.at(-1)).toContain('elements = { "lo", "loopback0" }');
   // Someone deleted it (`nft flush ruleset`): back at the next check.
   pc.state.tables = false;
   g.reconcile();
@@ -364,7 +412,9 @@ test("routing exemptions precede both local-port hooks and retain cgroup ownersh
   for (const hook of ["output", "input"]) {
     const chain = marked.split(`chain ${hook} {`)[1]?.split("\t}")[0] ?? "";
     expect(chain).toContain(rule);
-    expect(chain.indexOf(rule)).toBeLessThan(chain.indexOf(hook === "output" ? 'oif "lo"' : 'iif "lo"'));
+    expect(chain.indexOf(rule)).toBeLessThan(
+      chain.indexOf(hook === "output" ? "oifname @loopbacks" : "iifname @loopbacks"),
+    );
   }
   expect(marked).not.toContain("fib daddr . mark");
   expect(marked).toContain('socket cgroupv2 level 1 "agents.slice" goto refuse');

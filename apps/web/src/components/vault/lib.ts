@@ -6,6 +6,7 @@ import type {
   VaultMatch,
   VaultScope,
 } from "@agenteschat/client";
+import { VAULT_KEY_NAME } from "@agenteschat/client/lib/vault";
 import type { IconName } from "@agenteschat/ui";
 
 /*
@@ -14,7 +15,7 @@ import type { IconName } from "@agenteschat/ui";
  */
 
 /** A key's variable name: the server's `SECRET_NAME` (UPPER_SNAKE, a letter first, 64 at most). */
-export const KEY_NAME = /^[A-Z][A-Z0-9_]{0,63}$/;
+export const KEY_NAME = VAULT_KEY_NAME;
 
 /** The contact fields, in the order a form shows them (two columns: name beside company, and so on). */
 export const CONTACT_FIELDS = [

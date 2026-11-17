@@ -35,6 +35,10 @@ const matches = (secret: string, hash: string | undefined) => Boolean(hash) && s
 
 class OwnerExists extends Error {}
 
+/** The owner key's refusals the desktop app acts on (`owner_refusal` in apps/desktop local_server.rs). */
+const OWNER_NONE = "OWNER_NONE";
+const OWNER_GONE = "OWNER_GONE";
+
 export interface OwnerSignInDeps {
   db: Database;
   config: Config;
@@ -128,10 +132,15 @@ export function ownerSignIn(deps: OwnerSignInDeps) {
             throw new APIError("UNAUTHORIZED", { message: "This isn't this server's owner key" });
           }
           let ownerId = await pinnedOwner(db);
+          // Pinned but deleted, while other accounts remain: the key never passes to them (`pinnedOwner`).
+          if (ownerId && !(await ctx.context.internalAdapter.findUserById(ownerId))) {
+            throw new APIError("CONFLICT", { code: OWNER_GONE, message: "This server's owner deleted their account" });
+          }
           if (!ownerId) {
             const { name, email } = ctx.body;
+            // No account at all (never made, or the last one deleted): the app asks who the new owner is.
             if (!name || !email)
-              throw new APIError("BAD_REQUEST", { message: "The owner's name and email are needed" });
+              throw new APIError("CONFLICT", { code: OWNER_NONE, message: "The owner's name and email are needed" });
             const id = ctx.context.generateId({ model: "user" }) || randomUUID();
             try {
               await createOwner({ id, name, email, passwordHash: null });

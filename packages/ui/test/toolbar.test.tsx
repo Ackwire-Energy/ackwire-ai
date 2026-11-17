@@ -95,6 +95,10 @@ describe("Toolbar", () => {
       ro.resize();
       // 160 + 8 + 112 fits: the search and the actions on top.
       expect(bar.getAttribute("data-stack")).toBe("");
+      width(actions as HTMLElement, 120.3);
+      ro.resize();
+      // 160 + 8 + 120.3 is a third of a pixel over: the row would wrap the actions under the search, a row of their own.
+      expect(bar.getAttribute("data-stack")).toBe("split");
     } finally {
       ro.restore();
     }

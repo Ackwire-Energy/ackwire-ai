@@ -42,15 +42,13 @@ export function AiHost({ org, me, children }: { org: OrgSummary; me: Me; childre
 
 /**
  * The dialog a pick opens. For the team (the right hand and the others), Connect for the whole team on the card picked
- * (`start`), the key's included (ADR 0160 addendum, ADR 0162). The right hand alone is its own dialog: Claude and
- * ChatGPT as the step asked for, the key as its own, any other plan as the plan to open on.
+ * (`start`), the key's included (ADR 0160 addendum, ADR 0162). The right hand alone is its own dialog, on the card
+ * picked too.
  */
 export function connectRequest(choice: AiChoice, agentIds: readonly string[]): ConnectAiRequest {
   const [first, ...rest] = agentIds;
   if (first === undefined || rest.length > 0) return { agentIds: [...agentIds], start: choice };
-  if (choice === "key") return { agentId: first, intent: "api_key" };
-  if (choice === "claude" || choice === "chatgpt") return { agentId: first, intent: choice };
-  return { agentId: first, plan: choice };
+  return { agentId: first, start: choice };
 }
 
 /**

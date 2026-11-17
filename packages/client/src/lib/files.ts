@@ -1,8 +1,14 @@
+import { SKILL_ASSET_BYTES, SKILL_TEXT_BYTES, SKILL_ZIP_BYTES } from "@agenteschat/tokens/skills";
+
 /** Same limit as the server (`ARTIFACT_LIMITS.fileBytes`): 50 MB per file version. */
 export const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
 export const MAX_UPLOAD_MB = MAX_UPLOAD_BYTES / 1024 / 1024;
-/** Same limit as the server (`SKILL_LIMITS.assetBytes`): the images and other files a skill keeps, in MB. */
-export const SKILL_ASSET_MB = 40;
+/** The text and scripts, and the images and other files, a skill keeps, in MB. */
+export const SKILL_TEXT_MB = SKILL_TEXT_BYTES / 1024 / 1024;
+export const SKILL_ASSET_MB = SKILL_ASSET_BYTES / 1024 / 1024;
+export { SKILL_ZIP_BYTES };
+/** The largest skill .zip the server takes, in whole MB: what the apps say, a little under what they let through. */
+export const SKILL_ZIP_MB = Math.floor(SKILL_ZIP_BYTES / 1024 / 1024);
 
 /** Previews bigger than this are download-only (the bytes load into memory). Videos stream instead: any size plays. */
 export const MAX_PREVIEW_BYTES = 25 * 1024 * 1024;
@@ -149,14 +155,26 @@ export function formatBytes(locale: string, bytes: number) {
     value /= 1024;
     i++;
   }
+  const digits = i === 0 || value >= 10 ? 0 : 1;
+  // Rounded here too: the phone's engine (Hermes on iOS) drops `maximumFractionDigits` for a unit and wrote 38,882 MB.
+  const rounded = Math.round(value * 10 ** digits) / 10 ** digits;
   return new Intl.NumberFormat(locale, {
     style: "unit",
     unit: units[i],
     // English's short byte is "byte" whatever the count ("820 byte"): the long one is plural where it should be.
     unitDisplay: i === 0 ? "long" : "short",
-    maximumFractionDigits: i === 0 || value >= 10 ? 0 : 1,
-  }).format(value);
+    maximumFractionDigits: digits,
+  }).format(rounded);
 }
 
 /** Within the upload limit (checked before sending; the server checks again). */
 export const fitsUpload = (file: { size: number }) => file.size <= MAX_UPLOAD_BYTES;
+
+/**
+ * A picture's width over its height, when the server read both (`width`/`height` on the file's content or on its ref
+ * in a message), kept between 1:4 and 4:1: a lone picture in a conversation takes that shape before it loads.
+ */
+export const pictureRatio = (size: { width?: number; height?: number } | null | undefined) =>
+  size?.width && size.height && size.width > 0 && size.height > 0
+    ? Math.min(4, Math.max(0.25, size.width / size.height))
+    : undefined;

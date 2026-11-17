@@ -2,7 +2,8 @@ import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gt, inArray, isNull, lt, or, rowsOf, schema, sql } from "@agenteschat/db";
 import { recordAgentActions } from "../agent-actions";
 import { runCalls } from "../continuation";
-import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
+import { dmPeople } from "../dms";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import type { Judge } from "../judge";
 import { notifySkillUpdate } from "../notification-producers";
 import { requirePermission } from "../organizations";
@@ -14,6 +15,7 @@ import {
   classifyFile,
   cleanSkillPath,
   editedByAgents,
+  personalSkillsOn,
   pinBlobs,
   requireAgentSkillChange,
   runsCode,
@@ -21,6 +23,7 @@ import {
   type SkillRow,
   skillFilesOf,
   skillFolderFiles,
+  skillsOf,
   validateSkill,
   writeSkillBody,
   writeSkillChange,
@@ -38,7 +41,8 @@ import { overlap } from "./judgments";
 import { proposeSkillChange } from "./proposals";
 import { type ContextDeps, judgeOf, resolveSummaryModel } from "./summaries";
 
-const { skills, agentSkills, contextItems, contextUsage, outcomes, agentRuns, agentActions, routines } = schema;
+const { skills, agentSkills, contextItems, contextUsage, outcomes, agentRuns, agentActions, routines, channels } =
+  schema;
 
 /** A run's context for receipts: the run, where it ran and what started it. */
 type RunCtx = Pick<ToolContext, "orgId" | "agentId" | "runId" | "channelId" | "triggerMessageId">;
@@ -161,7 +165,7 @@ export async function changeSkillAsAgent(
     if (looksLikeSecret(t)) throw new ValidationError("This looks like a credential, so it can't go in a skill.");
   const reads = await readsInRun(ctx, name);
   if (!reads.loaded) throw new ValidationError(`Load the skill ${name} with load_skill first, then change it.`);
-  const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, name);
+  const skill = await agentSkillByName(ctx.db, ctx.orgId, ctx.agentId, name, ctx.runId);
   if (!skill) throw new NotFoundError(`No skill named ${name} is enabled for you.`);
   const own = skill.origin === "agent";
   if (own) {
@@ -215,6 +219,11 @@ export async function changeSkillAsAgent(
           : (await agentsImproveSkill(ctx.db, skill))
             ? undefined
             : "person";
+  // A proposal shows the skill's text to who reviews it: a personal skill's is its person's alone.
+  if (skill.ownerUserId && (why || scripts.length > 0))
+    throw new ValidationError(
+      "This is a personal skill, and this change would need someone else's review. Show the person the change to make in their Skills.",
+    );
   const proposalIds: string[] = [];
   const propose = async (body: string, file?: { path: string; text: string }) => {
     const p = await proposeSkillChange(
@@ -278,6 +287,94 @@ export async function changeSkillAsAgent(
     scripts: scripts.map((f) => f.path),
     ...(why ? { why } : {}),
   };
+}
+
+/**
+ * Skills one agent may create when a person asks (`createSkillAsAgent`), in a run and in a day: each one is a person's
+ * request, so a few cover every real use, and a loop can't fill the workspace's Skills.
+ */
+export const SKILL_CREATE_LIMITS = { perRun: 2, perDay: 6 };
+
+/**
+ * A person asks an agent to turn what it did into a skill (ADR 0120, addendum of 2026-11-14): the skill is the
+ * agent's own, as one promoted from its how-tos (`origin agent`, `owner_agent_id`, on for that agent only, archived when
+ * unused), at once, with a `skill.created` receipt (Desfazer) that says a person asked. People give it to other agents
+ * in Skills. Only a person's run that read nothing from outside (`learnTrust` high): a skill loads as trusted
+ * instructions. The body alone, its text files later through `update_skill`; never credentials or permission rules.
+ * Where skills are the team's and each person's (`personalSkillsOn`), it is the personal skill of `person`, who asked.
+ */
+export async function createSkillAsAgent(
+  deps: { db: Database; judge?: Judge },
+  ctx: RunCtx & { db: Database },
+  input: { name: string; description: string; body: string; person?: string | null },
+): Promise<SkillRow> {
+  const name = input.name.trim().toLowerCase();
+  const description = input.description.trim();
+  const body = input.body.trim();
+  if (!body) throw new ValidationError("Write the skill's body: the steps first, then the pitfalls.");
+  validateSkill({ name, description, body });
+  if (looksLikeSecret(`${description}\n${body}`))
+    throw new ValidationError("This looks like a credential, so it can't go in a skill.");
+  const owner = input.person && (await personalSkillsOn(ctx.db, ctx.orgId)) ? input.person : null;
+  const [taken] = await ctx.db
+    .select({ id: skills.id, deletedAt: skills.deletedAt })
+    .from(skills)
+    .where(and(eq(skills.orgId, ctx.orgId), eq(skills.slug, name), skillsOf(owner)));
+  if (taken)
+    throw new ConflictError(
+      taken.deletedAt
+        ? `A removed skill keeps the name ${name}: pick another name.`
+        : `A skill named ${name} already exists here: load it and fix it with update_skill, or pick another name.`,
+    );
+  if (await changesPermissions(deps.judge, ctx.orgId, `${description}\n${body}`))
+    throw new ValidationError("A skill can't change permissions or approvals.");
+  const [made] = await ctx.db
+    .select({
+      run: sql<number>`count(*) filter (where ${agentActions.runId} = ${ctx.runId})::int`,
+      day: sql<number>`count(*)::int`,
+    })
+    .from(agentActions)
+    .where(
+      and(
+        eq(agentActions.orgId, ctx.orgId),
+        eq(agentActions.agentId, ctx.agentId),
+        eq(agentActions.kind, "skill.created"),
+        gt(agentActions.createdAt, new Date(Date.now() - 24 * 3600_000)),
+      ),
+    );
+  if ((made?.run ?? 0) >= SKILL_CREATE_LIMITS.perRun)
+    throw new ValidationError("You already made skills in this turn: put the rest in one of them with update_skill.");
+  if ((made?.day ?? 0) >= SKILL_CREATE_LIMITS.perDay)
+    throw new ValidationError("You made enough skills today: save this one with save_how_to and make it tomorrow.");
+  return ctx.db.transaction(async (tx) => {
+    const db = tx as unknown as Database;
+    const [skill] = await db
+      .insert(skills)
+      .values({
+        orgId: ctx.orgId,
+        slug: name,
+        name,
+        description,
+        body,
+        source: "manual",
+        origin: "agent",
+        ownerAgentId: ctx.agentId,
+        ownerUserId: owner,
+      })
+      .returning();
+    if (!skill) throw new Error("skill insert returned nothing");
+    await db.insert(agentSkills).values({ orgId: ctx.orgId, agentId: ctx.agentId, skillId: skill.id, enabled: true });
+    await recordAgentActions(db, ctx, [
+      {
+        kind: "skill.created",
+        target: { type: "skill", id: skill.id, title: name },
+        params: { name, asked: true },
+        before: null,
+        after: { skillId: skill.id, noteIds: [] },
+      },
+    ]);
+    return skill;
+  });
 }
 
 /**
@@ -425,6 +522,24 @@ export async function promoteHowTos(deps: ContextDeps, orgId: string, skillAfter
   return promoted;
 }
 
+/**
+ * Whose skill how-tos make: the one person they were all learned with, when each came only from DMs between that
+ * person and agents, and skills here are the team's and each person's (`personalSkillsOn`). Else the team's (null).
+ */
+async function learnedFor(db: Database, orgId: string, cluster: ContextItem[]) {
+  const ids = [...new Set(cluster.flatMap((n) => n.channelIds))];
+  if (ids.length === 0 || cluster.some((n) => n.channelIds.length === 0)) return null;
+  const rows = await db
+    .select({ kind: channels.kind, dmKey: channels.dmKey })
+    .from(channels)
+    .where(and(eq(channels.orgId, orgId), inArray(channels.id, ids)));
+  if (rows.length !== ids.length || rows.some((c) => c.kind !== "dm")) return null;
+  const people = new Set(rows.flatMap((c) => dmPeople(c.dmKey)));
+  const [person] = people;
+  if (people.size !== 1 || rows.some((c) => dmPeople(c.dmKey).length !== 1) || !person) return null;
+  return (await personalSkillsOn(db, orgId)) ? person : null;
+}
+
 async function promoteCluster(deps: ContextDeps, orgId: string, agentId: string, cluster: ContextItem[]) {
   const { db } = deps;
   const notesText = cluster.map((n, i) => `n${i + 1} ${n.title ? `${n.title}: ` : ""}${n.content}`).join("\n\n");
@@ -455,10 +570,11 @@ async function promoteCluster(deps: ContextDeps, orgId: string, agentId: string,
     .slice(0, 56);
   if (!SKILL_NAME.test(name) || !body || !description || looksLikeSecret(`${description}\n${body}`)) return false;
   if (await changesPermissions(judgeOf(deps), orgId, body)) return false;
+  const owner = await learnedFor(db, orgId, cluster);
   const taken = await db
     .select({ slug: skills.slug })
     .from(skills)
-    .where(and(eq(skills.orgId, orgId), sql`${skills.slug} like ${`${name}%`}`));
+    .where(and(eq(skills.orgId, orgId), skillsOf(owner), sql`${skills.slug} like ${`${name}%`}`));
   const slugs = new Set(taken.map((t) => t.slug));
   for (let n = 2; slugs.has(name); n++) name = `${name.replace(/-\d+$/, "")}-${n}`;
   validateSkill({ name, description, body });
@@ -490,6 +606,7 @@ async function promoteCluster(deps: ContextDeps, orgId: string, agentId: string,
         source: "manual",
         origin: "agent",
         ownerAgentId: agentId,
+        ownerUserId: owner,
       })
       .returning();
     if (!skill) throw new Error("skill insert returned nothing");

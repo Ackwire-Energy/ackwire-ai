@@ -83,7 +83,9 @@ export function MenuItem({
         icon && <Icon name={icon} />
       )}
       <span className="ac-menu__label">
-        {children}
+        {/* The name as an element: a list with faces lays name and description on one line, and a bare text node
+            there would give way to the description word by word. */}
+        {description ? <span>{children}</span> : children}
         {description && <span className="ac-menu__desc">{description}</span>}
       </span>
       {hint && <span className="ac-menu__hint">{hint}</span>}
@@ -168,8 +170,9 @@ export function MenuSub({ icon, label, children }: { icon?: IconName; label: Rea
 }
 
 /**
- * An on/off item ("Mostrar canceladas"): a check at its end when on; the menu stays open, unless `closes` (a choice
- * that settles the menu, beside checkable ones).
+ * An on/off item ("Mostrar canceladas", a person's cargos): the kit's checkbox at its end, ticked or not, and the menu
+ * stays open, so several are picked in one visit. `closes`: a choice that settles the menu (one of a list, beside
+ * checkable ones) shows the select's check instead.
  */
 export function MenuCheckboxItem({
   checked,
@@ -213,13 +216,25 @@ export function MenuCheckboxItem({
         icon && <Icon name={icon} />
       )}
       <span className="ac-menu__label">
-        {children}
+        {description ? <span>{children}</span> : children}
         {description && <span className="ac-menu__desc">{description}</span>}
       </span>
       {hint && <span className="ac-menu__hint">{hint}</span>}
-      <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
-        <path d="m5.5 10.5 3 3 6-7" />
-      </svg>
+      {closes ? (
+        <svg className="ac-menu__check" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="m5.5 10.5 3 3 6-7" />
+        </svg>
+      ) : (
+        <span className="ac-check ac-menu__box" data-state={checked ? "checked" : "unchecked"} aria-hidden="true">
+          {checked && (
+            <span className="ac-check__mark">
+              <svg viewBox="0 0 12 12" fill="none" aria-hidden="true" className="ac-check__svg">
+                <path className="ac-check__tick" d="m2.5 6.2 2.3 2.3 4.7-5" />
+              </svg>
+            </span>
+          )}
+        </span>
+      )}
     </DropdownMenu.CheckboxItem>
   );
 }

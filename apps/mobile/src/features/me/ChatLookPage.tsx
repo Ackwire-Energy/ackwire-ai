@@ -18,13 +18,24 @@ import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { GestureDetector, useExclusiveGestures, usePanGesture, useTapGesture } from "react-native-gesture-handler";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { AgentAvatar } from "@/agent/AgentAvatar";
 import { useOrg } from "@/providers/org";
-import { GroupedHeader, GroupedList, GroupedRow, haptics, Icon, Segmented, Text, useTheme, useToast } from "@/ui";
+import {
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  haptics,
+  Icon,
+  PressScale,
+  Segmented,
+  Text,
+  useTheme,
+  useToast,
+} from "@/ui";
 import {
   bubbleFill,
   CHAT_TEXT,
@@ -282,13 +293,16 @@ function StylePicker({
   onPick: (style: ChatStyle) => void;
 }) {
   const c = useColors();
+  const card = useCard();
   return (
-    <View style={[styles.card, styles.choices, { backgroundColor: c.raised }]} accessibilityRole="radiogroup">
+    <View style={[styles.card, styles.choices, card]} accessibilityRole="radiogroup">
       {CHAT_STYLES.map((s) => {
         const on = s === value;
         return (
-          <Pressable
+          // The design system's press; the pick's own selection tick is its haptic.
+          <PressScale
             key={s}
+            haptic={false}
             onPress={() => {
               if (on) return;
               haptics.selection();
@@ -297,7 +311,8 @@ function StylePicker({
             accessibilityRole="radio"
             accessibilityState={{ checked: on }}
             accessibilityLabel={names[s]}
-            style={({ pressed }) => [styles.choice, pressed && !on && styles.pressed]}
+            style={styles.choiceBox}
+            contentStyle={styles.choice}
           >
             <View style={[styles.glyphFrame, { backgroundColor: c.bg, borderColor: c.line2 }]}>
               <StyleGlyph style={s} />
@@ -315,11 +330,17 @@ function StylePicker({
             >
               {on ? <Icon name="check" size={13} color={c.raised} /> : null}
             </View>
-          </Pressable>
+          </PressScale>
         );
       })}
     </View>
   );
+}
+
+/** A card of this page that isn't a list (the styles, the size), on `GroupedList`'s surface: raised, its shadow. */
+function useCard() {
+  const { colors, shadows } = useTheme();
+  return { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` };
 }
 
 const THUMB = 26;
@@ -342,6 +363,7 @@ function SizeSlider({
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const card = useCard();
   const { reducedMotion } = useTheme();
   const last = CHAT_TEXT_SIZES.length - 1;
   const index = CHAT_TEXT_SIZES.indexOf(value);
@@ -420,7 +442,7 @@ function SizeSlider({
     onCommit(next);
   };
   return (
-    <View style={[styles.card, styles.sizeCard, { backgroundColor: c.raised }]}>
+    <View style={[styles.card, styles.sizeCard, card]}>
       <View style={styles.sizeRow}>
         <Text style={[styles.smallA, { color: c.ink2 }]} maxFontSizeMultiplier={1} importantForAccessibility="no">
           A
@@ -512,6 +534,19 @@ export function ChatLookPage() {
   return (
     <Page title={t("settings.account.chat.title")}>
       <View style={styles.gap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("settings.account.chat.fullMessages")}
+          toggle={prefs?.fullMessages === true}
+          onPress={() => save({ fullMessages: prefs?.fullMessages !== true })}
+          hint={{
+            name: t("common.about", { label: t("settings.account.chat.fullMessages") }),
+            text: t("settings.account.chat.fullMessagesHelp"),
+          }}
+        />
+      </GroupedList>
+      {/* The preview's switch, a group's room under the switch above it. */}
+      <View style={styles.switchGap} />
       <Segmented
         wide
         items={[
@@ -602,7 +637,9 @@ const glyph = StyleSheet.create({
 });
 
 const styles = StyleSheet.create({
-  gap: { height: 8 },
+  // Above the first group, as every page of Você's.
+  gap: { height: 14 },
+  switchGap: { height: 20 },
   previewGap: { height: 16 },
   // The preview: the conversation's own page color on the grouped gray, a hairline round it.
   preview: { paddingVertical: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
@@ -626,8 +663,8 @@ const styles = StyleSheet.create({
   // A grouped card, as `GroupedList`'s.
   card: { borderRadius: 14, overflow: "hidden" },
   choices: { flexDirection: "row", paddingHorizontal: 4 },
-  choice: { flex: 1, alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 4 },
-  pressed: { opacity: 0.6 },
+  choiceBox: { flex: 1 },
+  choice: { alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 4 },
   glyphFrame: {
     width: "100%",
     maxWidth: 72,

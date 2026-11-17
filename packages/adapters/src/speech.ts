@@ -46,6 +46,56 @@ export class SpeechError extends Error {
   }
 }
 
+/**
+ * The words of audio from the first of `engines` that answers (`alone`: ms an engine works by itself before the next
+ * starts beside it); null when every engine refused it, a throw when none could try.
+ */
+export function firstWords(
+  engines: SpeechEngine[],
+  input: SpeechFileInput,
+  alone: number,
+): Promise<{ engine: SpeechEngine; text: string } | null> {
+  return new Promise((resolve, reject) => {
+    // The last failure that a retry may get past: one engine busy is worth a retry even when the others refused.
+    let last: unknown = null;
+    let refused = false;
+    let next = 0;
+    let working = 0;
+    let done = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const start = () => {
+      clearTimeout(timer);
+      if (done) return;
+      const engine = engines[next++];
+      if (!engine) {
+        if (working > 0) return;
+        done = true;
+        if (refused && !last) resolve(null);
+        else reject(last ?? new Error("no speech engine on this server"));
+        return;
+      }
+      working++;
+      engine.file(input).then(
+        ({ text }) => {
+          working--;
+          if (done) return;
+          done = true;
+          clearTimeout(timer);
+          resolve({ engine, text: text.trim() });
+        },
+        (error: unknown) => {
+          working--;
+          if (error instanceof SpeechError && error.reason === "refused") refused = true;
+          else last = error;
+          start();
+        },
+      );
+      if (next < engines.length) timer = setTimeout(start, alone);
+    };
+    start();
+  });
+}
+
 export type SpeechFetch = typeof fetch;
 
 export const SPEECH_PROVIDERS = ["assemblyai", "elevenlabs", "soniox", "groq", "openai", "local", "deepinfra"] as const;

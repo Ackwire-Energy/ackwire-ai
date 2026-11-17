@@ -67,15 +67,40 @@ function withRefs(
 }
 
 function withMentions(text: string, key: string, mention?: MentionRenderer): ReactNode[] {
-  if (!mention) return [text];
+  if (!mention) return withRuns(text, key);
   const out: ReactNode[] = [];
   let last = 0;
   let n = 0;
   for (const m of text.matchAll(MENTION)) {
     const start = (m.index ?? 0) + (m[1]?.length ?? 0);
-    if (start > last) out.push(text.slice(last, start));
+    if (start > last) out.push(...withRuns(text.slice(last, start), `${key}-p${n}`));
     out.push(mention(m[2] ?? "", `${key}-m${n++}`));
     last = start + 1 + (m[2]?.length ?? 0);
+  }
+  if (last < text.length) out.push(...withRuns(text.slice(last), `${key}-p${n}`));
+  return out;
+}
+
+/** 32 or more characters with no space and a digit among them: a key, a hash or an id, never a word of a language. */
+const RUN = /\S{32,}/g;
+
+/**
+ * A code-like run (`RUN`) in the words as its own span that breaks at any letter: it fills each line to the edge as one
+ * block, where breaking only at its hyphens would leave ragged pieces and every line after cut mid-piece anyway.
+ */
+function withRuns(text: string, key: string): ReactNode[] {
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(RUN)) {
+    if (!/\d/.test(m[0])) continue;
+    const at = m.index ?? 0;
+    if (at > last) out.push(text.slice(last, at));
+    out.push(
+      <span key={`${key}-r${at}`} className="md-run">
+        {m[0]}
+      </span>,
+    );
+    last = at + m[0].length;
   }
   if (last < text.length) out.push(text.slice(last));
   return out;

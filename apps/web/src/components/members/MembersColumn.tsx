@@ -1,22 +1,40 @@
 import type { Agent, Channel, Member } from "@agenteschat/client";
-import { agentStateIn, useRoles } from "@agenteschat/client";
+import { agentStateIn, useChannels, useRoles } from "@agenteschat/client";
+import { WORK_TICK_MS, workLine, workLineText } from "@agenteschat/client/lib/agent-work";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { memberGroups } from "@agenteschat/client/lib/member-groups";
-import { agentStatusShort, isOutOfOffice } from "@agenteschat/client/lib/presence";
-import { Avatar, Button, Icon, matchesWords, PixelSpinner, RoleMark, SearchField } from "@agenteschat/ui";
+import {
+  agentFaceWord,
+  agentMemberLine,
+  agentStatusShort,
+  agentWhyKey,
+  isOutOfOffice,
+} from "@agenteschat/client/lib/presence";
+import { Avatar, Button, Icon, matchesWords, OPEN_LAYER, PixelSpinner, RoleMark, SearchField } from "@agenteschat/ui";
 import { type KeyboardEvent, type TouchEvent, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { AgentWorkLine } from "@/components/AgentWorkLine";
 import { ChannelPinsButton } from "@/components/ChannelPins";
+import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
 import { StatusLine } from "@/components/Presence";
 import { ProfileTrigger } from "@/components/ProfileCard";
 import { unshownRow } from "@/components/Sidebar";
 import { AgentTrail, colorOf } from "@/components/Sky";
 import { ChannelThreadsButton } from "@/components/threads/ThreadLines";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useModalSheet } from "@/hooks/useModalSheet";
-import { agentLine, personLine, useAgentPresence, usePersonPresence, usePresences } from "@/hooks/usePresence";
+import {
+  agentLine,
+  personLine,
+  useAgentOff,
+  useAgentPresence,
+  useAgentsWorking,
+  usePersonPresence,
+  usePresences,
+} from "@/hooks/usePresence";
 import { useStreams } from "@/realtime/context";
 import "./members.css";
 
@@ -63,7 +81,7 @@ export function MembersSheet({
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return;
-      const over = document.querySelectorAll('[role="dialog"], [role="menu"], [role="listbox"]');
+      const over = document.querySelectorAll(OPEN_LAYER);
       if (Array.from(over).some((el) => el !== sheet.current)) return;
       e.preventDefault();
       onClose();
@@ -157,13 +175,18 @@ function MembersList({ channelId, people, agents, onAdd }: Lists) {
       .join(" "),
   );
   const [allOffline, setAllOffline] = useState(false);
-  const busy = new Set(busyKey.split(" "));
+  // At work: a run this tab hears here, or its work anywhere (work handed off in two agents' DM too).
+  const atWork = useAgentsWorking();
+  const heard = new Set(busyKey.split(" "));
+  const busy = new Set([...heard, ...atWork]);
+  const off = useAgentOff();
   const groups = memberGroups({
     people,
     agents,
     roles,
     presenceOf: (id) => presences.get(id),
     busy: (id) => busy.has(id),
+    agentOff: (id) => off(id, heard.has(id)),
   });
   // ↑/↓ move between the rows (each row is a button).
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -189,7 +212,13 @@ function MembersList({ channelId, people, agents, onAdd }: Lists) {
         // ponytail: every row is in the DOM (offline capped at 100); virtualize if a channel reaches thousands.
         const rows = g.key === "offline" && !allOffline ? g.rows.slice(0, OFFLINE_CAP) : g.rows;
         return (
-          <section key={g.key} className="members-side__group" aria-label={label}>
+          <section
+            key={g.key}
+            // A state, so an attribute and not a class: the layout check samples screens by their classes.
+            className="members-side__group"
+            data-off={g.key === "offline" || undefined}
+            aria-label={label}
+          >
             <h2 className="members-side__head">
               {g.key === "owner" && <RoleMark color="violet" icon="audienceOwner" size={16} />}
               {g.role && <RoleMark color={g.role.color} icon={g.role.icon} size={16} />}
@@ -277,18 +306,44 @@ function PersonRow({ member: m, you }: { member: Member; you: boolean }) {
   );
 }
 
-/** An agent: its face, what it is doing (its line, its state here, else its role), the trail while it works. */
+/**
+ * An agent: its face, what it is doing (its work first: for whom or where, "aqui" for this conversation, what it waits
+ * on, how long; then its line, its role, its presence), the orbit and the trail while it works, anywhere.
+ */
 function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string; busy: boolean }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const dir = useDirectory(org.id);
+  const channels = useChannels(org.id).data;
   const state = useStreams((s) => agentStateIn(s, agent.id, channelId));
   const shown = useAgentPresence(agent.id);
-  const word = shown ? t(`presence.${shown.presence}`) : null;
+  const work = shown?.work ?? null;
+  const clock = useNow(work !== null, WORK_TICK_MS);
+  const now = workLine(
+    t,
+    i18n.language,
+    work,
+    {
+      agentName: (id) => dir.agentById.get(id)?.name,
+      channelName: (id) => channels?.find((c) => c.id === id)?.name,
+      here: channelId,
+    },
+    clock,
+  );
+  const word = shown ? agentFaceWord(t, shown.presence) : null;
   // One short line here; the whole one in the row's title and on its profile card.
   const line = shown?.line ? agentStatusShort(t, shown.line, i18n.language) : null;
   const full = agentLine(t, shown?.line ?? null, i18n.language)?.text;
-  const doing = state !== "idle" ? t(`channel.agentState.${state}`) : null;
-  // Under the name, one line of one height: its line (why it is out, what it is on), else its role (the agent's fixed
-  // label) as a tag, else its presence. Working here is the pixel orbit beside its name, so the row never jumps.
+  const under = agentMemberLine(now, line, shown ? agentWhyKey(shown.presence, shown.noAi) : null);
+  // What it does here now (a run this tab hears), else its work's words: the orbit's label and the row's title.
+  const doing =
+    state !== "idle"
+      ? t(`channel.agentState.${state}`)
+      : work?.state === "working"
+        ? (now && workLineText(now)) || agentFaceWord(t, "working")
+        : null;
+  // Under the name, one line of one height: `agentMemberLine`, else its role (the agent's fixed label) as a tag, else its
+  // presence. Working here is the pixel orbit beside its name, so the row never jumps.
   const shows = useId();
   return (
     <ProfileTrigger
@@ -303,7 +358,9 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
         className="members-side__inner"
         data-presence={shown?.presence}
         data-busy={busy || undefined}
-        title={[full ?? doing ?? word, agent.role].filter(Boolean).join(" · ") || undefined}
+        title={
+          [doing ?? (now && workLineText(now)) ?? full ?? word, agent.role].filter(Boolean).join(" · ") || undefined
+        }
       >
         {busy && <AgentTrail color={colorOf(agent)} />}
         <AgentAvatar
@@ -320,8 +377,12 @@ function AgentRow({ agent, channelId, busy }: { agent: Agent; channelId: string;
             <span className="members-side__label">{agent.name}</span>
             {doing && <PixelSpinner size={14} color={colorOf(agent)} label={doing} className="members-side__spin" />}
           </span>
-          {line ? (
-            <StatusLine {...line} className="members-side__line" />
+          {under?.work ? (
+            <AgentWorkLine line={under.work} className="members-side__line" />
+          ) : under?.line ? (
+            <StatusLine {...under.line} className="members-side__line" />
+          ) : under?.why ? (
+            <span className="members-side__line">{t(`presence.agentWhy.${under.why}`)}</span>
           ) : agent.role ? (
             <span className="members-side__line ac-tag">{agent.role}</span>
           ) : (

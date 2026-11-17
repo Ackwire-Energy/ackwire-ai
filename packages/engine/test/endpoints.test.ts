@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { customModelId, ProviderError } from "@agenteschat/providers";
+import { customModelId, MODEL_CATALOG, ProviderError } from "@agenteschat/providers";
 import {
+  agentAiState,
   allowsPrivateEndpoints,
   BudgetExceededError,
   checkCredential,
   checkEndpoint,
+  createAgent,
   createCredential,
   type EndpointModel,
   endpointAddress,
@@ -15,6 +17,7 @@ import {
   modelInfoFor,
   pickerModels,
   revokeCredential,
+  rotateCredential,
   updateAgent,
   updateEndpointModels,
 } from "../src";
@@ -168,6 +171,70 @@ describe("the credential", () => {
 });
 
 describe("calls", () => {
+  test("an endpoint key alone repairs an Automatic agent; explicit models are preserved", async () => {
+    f = await setup();
+    const cred = await addEndpoint(f, [{ id: "first" }, { id: "chosen" }]);
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "auto" });
+    const connected = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: cred.id });
+    expect(connected.model).toBe(customModelId(cred.id, "first"));
+    const explicit = customModelId(cred.id, "chosen");
+    const selected = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: explicit });
+    expect(selected.model).toBe(explicit);
+    const reconnected = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { credentialId: cred.id });
+    expect(reconnected.model).toBe(explicit);
+    const automatic = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "auto" });
+    expect(automatic.model).toBe(customModelId(cred.id, "first"));
+  });
+
+  test("an endpoint key on Automatic pins the model whose test called a tool, not the first one listed", async () => {
+    f = await setup({
+      reply: (request) =>
+        request.model.endsWith(":tools")
+          ? { chunks: [], toolUses: [{ name: "report_status", input: { ok: true } }] }
+          : { chunks: ["I can't call tools."] },
+    });
+    const cred = await addEndpoint(f, [{ id: "chat" }, { id: "tools" }]);
+    await checkEndpoint(f.db, f.gateway, f.owner.id, f.org.id, cred.id);
+    const agent = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "auto", credentialId: cred.id });
+    expect(agent.model).toBe(customModelId(cred.id, "tools"));
+  });
+
+  test("new agents with an endpoint key use its model, while catalog keys keep Automatic", async () => {
+    f = await setup();
+    const cred = await addEndpoint(f);
+    const agent = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Endpoint", handle: "endpoint-agent", credentialId: cred.id },
+      { model: "auto" },
+    );
+    expect(agent.model).toBe(customModelId(cred.id, "llama-4"));
+    const catalog = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "auto" });
+    expect(catalog.model).toBe("auto");
+  });
+
+  test("connecting an endpoint on Automatic selects its own model and can answer", async () => {
+    f = await setup();
+    const cred = await addEndpoint(f);
+    const agent = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, {
+      model: "auto",
+      credentialId: cred.id,
+    });
+    expect(agent.model).toBe(customModelId(cred.id, "llama-4"));
+    expect(await agentAiState({ db: f.db, gateway: f.gateway }, agent)).toMatchObject({ state: "ready" });
+    await f.gateway.stream({
+      orgId: f.org.id,
+      agentId: agent.id,
+      system: "s",
+      messages: [{ role: "user", content: "hi" }],
+      maxTokens: 100,
+      onDelta() {},
+    });
+    expect(f.provider.calls.at(-1)?.request.model).toBe(agent.model);
+    expect(f.provider.calls.at(-1)?.endpoint).toEqual({ style: "openai", baseURL: "https://gw.example/v1" });
+  });
+
   test("an agent on an endpoint model: its key and address, the admin's prices, tokens and cost recorded", async () => {
     f = await setup({ reply: () => ({ chunks: ["ok"], usage: { inputTokens: 1000, outputTokens: 100 } }) });
     const cred = await addEndpoint(f);
@@ -214,6 +281,37 @@ describe("calls", () => {
     const [record] = await f.db.select().from(schema.usageRecords);
     expect(record).toMatchObject({ inputTokens: 500, outputTokens: 50, costNanoUsd: 0 });
     await expect(run(customModelId(cred.id, "paid"))).rejects.toBeInstanceOf(BudgetExceededError);
+  });
+
+  test("a model named as the endpoint lists it gets its full id; one it doesn't list says which it has", async () => {
+    f = await setup();
+    const cred = await addEndpoint(f, [{ id: "vendor/model-a" }, { id: "model-b" }]);
+    const both = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, {
+      model: "vendor/model-a",
+      credentialId: cred.id,
+    });
+    expect(both.model).toBe(customModelId(cred.id, "vendor/model-a"));
+    // The model alone, on the agent's endpoint key.
+    const alone = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "model-b" });
+    expect(alone.model).toBe(customModelId(cred.id, "model-b"));
+    expect(alone.credentialId).toBe(cred.id);
+    await expect(
+      updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: "not-listed", credentialId: cred.id }),
+    ).rejects.toThrow("Its models: vendor/model-a, model-b");
+  });
+
+  test("a known model picked alone leaves the endpoint key, even when the endpoint lists the same id", async () => {
+    f = await setup();
+    const openai = Object.entries(MODEL_CATALOG).find(([, m]) => m.provider === "openai")?.[0];
+    if (!openai) throw new Error("no OpenAI model in the catalog");
+    const cred = await addEndpoint(f, [{ id: openai }]);
+    const onEndpoint = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, {
+      model: openai,
+      credentialId: cred.id,
+    });
+    expect(onEndpoint.model).toBe(customModelId(cred.id, openai));
+    const moved = await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { model: openai });
+    expect([moved.model, moved.credentialId]).toEqual([openai, null]);
   });
 
   test("another workspace's endpoint model is unknown here", async () => {
@@ -322,6 +420,12 @@ describe("the test call", () => {
             : { chunks: ["I can't call tools."] },
     });
     const cred = await addEndpoint(f, [{ id: "tools" }, { id: "chat" }, { id: "broken" }]);
+    // A key of an endpoint has no cheap catalog model to test it with: its own models' checks are the answer, so it is
+    // `unchecked` only while none of them has been tested (a connect flow toasts that, never a tested key).
+    expect(await f.gateway.verifyStoredKey(f.org.id, cred.id)).toMatchObject({
+      provider: "custom",
+      result: { state: "unchecked" },
+    });
     const checks = await checkEndpoint(f.db, f.gateway, f.owner.id, f.org.id, cred.id);
     expect(checks).toEqual([
       { model: "tools", check: "ok" },
@@ -333,8 +437,12 @@ describe("the test call", () => {
     );
     const [saved] = (await listCredentials(f.db, f.owner.id, f.org.id)).filter((c) => c.id === cred.id);
     expect(saved?.endpoint?.models.map((m) => m.check)).toEqual(["ok", "no_tools", "failed"]);
+    // Tested: the key answers, so nothing says it couldn't be checked.
+    expect(await f.gateway.verifyStoredKey(f.org.id, cred.id)).toMatchObject({ result: { state: "ok" } });
+    // The connect flows try a key this way before an agent is pointed at it.
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("ok");
     const rows = await f.db.select().from(schema.usageRecords).where(eq(schema.usageRecords.credentialId, cred.id));
-    expect(rows.map((r) => r.kind)).toEqual(["summary", "summary"]);
+    expect(rows.map((r) => r.kind)).toEqual(["summary", "summary", "summary"]);
     // Prices change, the checks stay with their models.
     const next = await updateEndpointModels(f.db, f.owner.id, f.org.id, cred.id, [
       { id: "tools", prices: endpointPricesFromUsd({ input: 1, output: 1 }) },
@@ -344,5 +452,20 @@ describe("the test call", () => {
     ]);
     const member = await addMember(f.db, f.org.id, "member");
     await expect(checkEndpoint(f.db, f.gateway, member.id, f.org.id, cred.id)).rejects.toThrow();
+  });
+
+  test("a new key for an endpoint clears its models' tests: the old key's answers don't vouch for it", async () => {
+    f = await setup({ reply: () => ({ chunks: [], toolUses: [{ name: "report_status", input: { ok: true } }] }) });
+    const cred = await addEndpoint(f, [{ id: "tools" }]);
+    await checkEndpoint(f.db, f.gateway, f.owner.id, f.org.id, cred.id);
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("ok");
+    await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, cred.id, { apiKey: "gw-key-7654321" });
+    const [saved] = (await listCredentials(f.db, f.owner.id, f.org.id)).filter((c) => c.id === cred.id);
+    expect(saved?.endpoint).toMatchObject({ baseURL: "https://gw.example/v1", models: [{ id: "tools" }] });
+    expect(saved?.endpoint?.models[0]?.check).toBeUndefined();
+    expect(await f.gateway.verifyStoredKey(f.org.id, cred.id)).toMatchObject({ result: { state: "unchecked" } });
+    // An explicit check makes a fresh call with the rotated key even while the model checks are empty.
+    expect(await checkCredential(f.db, f.gateway, f.owner.id, f.org.id, cred.id)).toBe("ok");
+    expect(f.provider.calls.at(-1)?.apiKey).toBe("gw-key-7654321");
   });
 });

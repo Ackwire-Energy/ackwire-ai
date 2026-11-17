@@ -14,6 +14,7 @@ import {
   useRoles,
 } from "@agenteschat/client";
 import {
+  agentProposalEnd,
   agentProposalOf,
   type ProposalLine,
   proposalLines,
@@ -34,10 +35,8 @@ import { useOrg } from "@/providers/org";
 import { AgentAvatar, Button, Icon, LineIcon, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { openConnectAi } from "../ai/NoAiCard";
-import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
+import { type AskAnswer, AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore } from "../chat/asks";
 import { requestComposerText } from "../chat/composer-request";
-import { markName } from "../chat/logic";
-import { useCardTop } from "../chat/look";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
@@ -82,7 +81,6 @@ export function AgentProposalView({
   const dir = useDirectory();
   const when = useWhen();
   const { colors } = useTheme();
-  const cardTop = useCardTop();
   const create = useCreateProposedAgent(orgId);
   const makeRoutine = useCreateProposedRoutine(orgId);
   const deny = useDenyAgentProposal(orgId);
@@ -127,17 +125,11 @@ export function AgentProposalView({
   const byRightHand =
     status === "created" && delegated && (delegate?.state === "approved" || delegate?.state === "undone");
   const outcome =
-    status === "created"
-      ? t("actionCard.agentProposal.created")
-      : status === "denied"
-        ? t("proposals.refused")
-        : status === "expired"
-          ? t("approval.expired")
-          : status === "superseded"
-            ? t("rightHand.card.superseded")
-            : decides
-              ? null
-              : t("proposals.waitingAdmin");
+    status !== "open"
+      ? agentProposalEnd(t, card, status, meId, dir.memberById.get(card.decidedByUserId ?? "")?.name)
+      : decides
+        ? null
+        : t("proposals.waitingAdmin");
   const busy = create.isPending || deny.isPending;
   const createIt = () =>
     create.mutate(
@@ -158,198 +150,166 @@ export function AgentProposalView({
     );
   const edit = () => router.push(`/new-agent?proposal=${encodeURIComponent(messageId)}` as never);
   const dismiss = () => deny.mutate(messageId, { onSuccess: () => asks?.settle(messageId), onError: failed });
-  if (status === "open") {
-    return (
-      <AskCard
-        id={messageId}
-        kind="agent"
-        agentId={proposerId ?? ""}
-        waitsFor={decides ? "you" : sends && !card.askedAt ? t("rightHand.card.onlyCreators") : null}
-        lead={why || t("actionCard.agentProposal.title", { agent: proposer })}
-        well={{
-          tile: <AgentAvatar agent={fullLook(draft.appearance)} size={20} name={draft.name} live={false} />,
-          title: draft.name,
-          detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
-          more: {
-            label: t("ask.seeChange"),
-            content: (
-              <Text variant="footnote" tone="muted">
-                {suggestedAiText(t, draft.ai)}
-              </Text>
-            ),
-          },
-        }}
-        body={
-          delegated || lines.length > 0 ? (
+  // Created, refused, expired or replaced by a newer one: the same card, how it ended where its buttons were, and
+  // what can still be done (its page, a routine left to make) under it.
+  const open = status === "open";
+  const answer: AskAnswer | null = open
+    ? null
+    : {
+        done: status === "created" && delegate?.state !== "undone",
+        words: (byRightHand ? delegated : outcome) ?? "",
+        time: card.decidedAt ? when.short(card.decidedAt) : undefined,
+        note:
+          byRightHand && delegate?.state === "approved"
+            ? delegateUndoLine(t, i18n.language, delegate, draft.name)
+            : null,
+        actions:
+          byRightHand || (status === "created" && (card.agentId || routineLeft(card))) ? (
             <>
-              {delegated ? (
-                <Text variant="footnote" tone="muted">
-                  {delegated}
-                </Text>
-              ) : null}
-              {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
-            </>
-          ) : undefined
-        }
-        expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}
-        foot={
-          <AskFoot>
-            {decides && rightHand ? (
-              <>
-                <Button
-                  variant="primary"
-                  size="card"
-                  wide
-                  icon={test ? "bolt" : undefined}
-                  label={test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
-                  disabled={busy}
-                  onPress={createIt}
-                />
-                <AskButtons
-                  primary={
-                    <Button
-                      variant="secondary"
-                      size="card"
-                      wide
-                      label={t("rightHand.card.editFirst")}
-                      disabled={busy}
-                      onPress={edit}
-                    />
-                  }
-                  secondary={
-                    <Button
-                      variant="ghost"
-                      size="card"
-                      wide
-                      label={t("rightHand.card.dismiss")}
-                      disabled={busy}
-                      onPress={dismiss}
-                    />
-                  }
-                />
-              </>
-            ) : decides ? (
-              <>
-                <AskButtons
-                  primary={
-                    <Button
-                      variant="primary"
-                      size="card"
-                      wide
-                      label={t("newAgent.create", { name: draft.name })}
-                      disabled={busy}
-                      onPress={createIt}
-                    />
-                  }
-                  secondary={
-                    <Button
-                      variant="secondary"
-                      size="card"
-                      wide
-                      label={t("actionCard.agentProposal.review")}
-                      disabled={busy}
-                      onPress={edit}
-                    />
-                  }
-                />
+              {byRightHand ? delegateUndo : null}
+              {status === "created" && card.agentId ? (
                 <Button
                   variant="ghost"
                   size="card"
-                  wide
-                  label={t("approval.refuse")}
-                  disabled={busy}
-                  onPress={dismiss}
+                  label={t("newAgent.openProfile")}
+                  onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
                 />
-              </>
-            ) : sent ? (
-              <View style={styles.sent}>
-                <LineIcon variant="small" name="send" size={15} color={colors.muted} />
-                <Text variant="small" tone="muted" style={styles.fill}>
-                  {sent}
-                </Text>
-              </View>
-            ) : sends ? (
+              ) : null}
+              {status === "created" &&
+              routineLeft(card) &&
+              (card.decidedByUserId === meId || can(org, "manage_routines")) ? (
+                // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+                <Button
+                  variant="ghost"
+                  size="card"
+                  label={t("newAgent.routineKeep", { name: draft.routine?.name })}
+                  disabled={makeRoutine.isPending}
+                  onPress={() => makeRoutine.mutate(messageId, { onError: failed })}
+                />
+              ) : null}
+            </>
+          ) : null,
+      };
+  return (
+    <AskCard
+      id={messageId}
+      kind="agent"
+      agentId={proposerId ?? ""}
+      waitsFor={decides ? "you" : sends && !card.askedAt ? t("rightHand.card.onlyCreators") : null}
+      answer={answer}
+      lead={(byRightHand && delegate?.reason) || why || t("actionCard.agentProposal.title", { agent: proposer })}
+      well={{
+        tile: <AgentAvatar agent={fullLook(draft.appearance)} size={20} name={draft.name} live={false} />,
+        title: draft.name,
+        detail: [`@${draft.handle}`, draft.role].filter(Boolean).join(" · "),
+        more: {
+          label: t("ask.seeChange"),
+          content: (
+            <Text variant="footnote" tone="muted">
+              {suggestedAiText(t, draft.ai)}
+            </Text>
+          ),
+        },
+      }}
+      body={
+        (delegated && open) || lines.length > 0 ? (
+          <>
+            {delegated && open ? (
+              <Text variant="footnote" tone="muted">
+                {delegated}
+              </Text>
+            ) : null}
+            {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
+          </>
+        ) : undefined
+      }
+      expiry={<ExpiryLine createdAt={sentAt} expiresAt={card.expiresAt} />}
+      foot={
+        <AskFoot>
+          {decides && rightHand ? (
+            <>
               <Button
                 variant="primary"
                 size="card"
                 wide
-                icon="send"
-                label={t("rightHand.card.askAdmin")}
-                loading={ask.isPending}
-                onPress={() => ask.mutate(messageId, { onError: failed })}
+                icon={test ? "bolt" : undefined}
+                label={test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
+                disabled={busy}
+                onPress={createIt}
               />
-            ) : (
-              <Text variant="small" tone="muted">
-                {outcome}
+              <AskButtons
+                primary={
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    wide
+                    label={t("rightHand.card.editFirst")}
+                    disabled={busy}
+                    onPress={edit}
+                  />
+                }
+                secondary={
+                  <Button
+                    variant="ghost"
+                    size="card"
+                    wide
+                    label={t("rightHand.card.dismiss")}
+                    disabled={busy}
+                    onPress={dismiss}
+                  />
+                }
+              />
+            </>
+          ) : decides ? (
+            <>
+              <AskButtons
+                primary={
+                  <Button
+                    variant="primary"
+                    size="card"
+                    wide
+                    label={t("newAgent.create", { name: draft.name })}
+                    disabled={busy}
+                    onPress={createIt}
+                  />
+                }
+                secondary={
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    wide
+                    label={t("actionCard.agentProposal.review")}
+                    disabled={busy}
+                    onPress={edit}
+                  />
+                }
+              />
+              <Button variant="ghost" size="card" wide label={t("approval.refuse")} disabled={busy} onPress={dismiss} />
+            </>
+          ) : sent ? (
+            <View style={styles.sent}>
+              <LineIcon variant="small" name="send" size={15} color={colors.muted} />
+              <Text variant="small" tone="muted" style={styles.fill}>
+                {sent}
               </Text>
-            )}
-          </AskFoot>
-        }
-      />
-    );
-  }
-  return (
-    <AskDone
-      done={status === "created" && delegate?.state !== "undone"}
-      words={`${byRightHand ? delegated : outcome}: ${markName(draft.name)}`}
-      time={card.decidedAt ? when.short(card.decidedAt) : undefined}
-      actions={byRightHand ? delegateUndo : null}
-      more={{
-        card: true,
-        label: t(byRightHand && delegate?.state === "approved" ? "rightHandApprovals.card.why" : "ask.seeChange"),
-        content: (
-          <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
-            <View style={styles.row}>
-              <AgentAvatar agent={fullLook(draft.appearance)} size={40} name={draft.name} live={false} />
-              <View style={styles.fill}>
-                <Text variant="body" style={styles.bold}>
-                  {draft.name}
-                </Text>
-                <Text variant="footnote" tone="muted">
-                  {[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}
-                </Text>
-              </View>
             </View>
-            {byRightHand && delegate?.reason ? (
-              <Text variant="footnote" tone="ink2">
-                {delegate.reason}
-              </Text>
-            ) : why ? (
-              <Text variant="footnote" tone="ink2">
-                {why}
-              </Text>
-            ) : null}
-            {lines.length > 0 ? <Lines lines={lines} draft={draft} /> : null}
-            <Text variant="footnote" tone="muted">
-              {byRightHand && delegate?.state === "approved"
-                ? delegateUndoLine(t, i18n.language, delegate, draft.name)
-                : suggestedAiText(t, draft.ai)}
+          ) : sends ? (
+            <Button
+              variant="primary"
+              size="card"
+              wide
+              icon="send"
+              label={t("rightHand.card.askAdmin")}
+              loading={ask.isPending}
+              onPress={() => ask.mutate(messageId, { onError: failed })}
+            />
+          ) : (
+            <Text variant="small" tone="muted">
+              {outcome}
             </Text>
-            {status === "created" && (card.agentId || routineLeft(card)) ? (
-              <View style={styles.acts}>
-                {card.agentId ? (
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    label={t("newAgent.openProfile")}
-                    onPress={() => router.push(`/agent/${encodeURIComponent(card.agentId ?? "")}` as never)}
-                  />
-                ) : null}
-                {routineLeft(card) && (card.decidedByUserId === meId || can(org, "manage_routines")) ? (
-                  // Not made with it (the agent wasn't where it reports yet): made from here once it is.
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    label={t("newAgent.routineKeep", { name: draft.routine?.name })}
-                    disabled={makeRoutine.isPending}
-                    onPress={() => makeRoutine.mutate(messageId, { onError: failed })}
-                  />
-                ) : null}
-              </View>
-            ) : null}
-          </View>
-        ),
-      }}
+          )}
+        </AskFoot>
+      }
     />
   );
 }
@@ -434,15 +394,10 @@ function Lines({ lines, draft }: { lines: ProposalLine[]; draft: AgentDraft }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, padding: 12, gap: 8, alignItems: "stretch" },
-  // The 40-point face beside a name and a line that may wrap: at the top, level with the name.
-  row: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   fill: { flex: 1, minWidth: 0 },
-  bold: { fontWeight: "600" },
   lines: { gap: 4 },
   line: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   mark: { width: 16, height: 18, alignItems: "center", justifyContent: "center" },
-  acts: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8 },
   // Its words wrap: the icon stays on the first line.
   sent: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
 });

@@ -1,14 +1,15 @@
 import type { Agent, AgentMediaLevel, GifRating, OrgSettings } from "@agenteschat/client";
 import { useAgents, useSettings, useUpdateAgent, useUpdateSettings } from "@agenteschat/client";
+import { settingsFrozen } from "@agenteschat/client/lib/deletion";
 import { shownMediaSettings } from "@agenteschat/client/lib/media";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, SkeletonList, useToast } from "@/ui";
 import { Note } from "../ai/parts";
 import { AgentFace } from "../shared/Face";
-import { useColors } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
 import { Loaded } from "../shared/parts";
 import { SettingsPage } from "./parts";
 
@@ -25,7 +26,6 @@ type MediaPatch = Partial<Pick<OrgSettings, "gifs" | "gifRating" | "agentSticker
  */
 export function MediaSettingsScreen() {
   const { t } = useTranslation();
-  const c = useColors();
   const toast = useToast();
   const { orgId, org } = useOrg();
   const settings = useSettings(orgId);
@@ -36,13 +36,7 @@ export function MediaSettingsScreen() {
   if (!settings.data) {
     return (
       <SettingsPage title={title}>
-        {settings.isError ? (
-          <View style={styles.note}>
-            <Note icon="x">{t("common.loadFailed")}</Note>
-          </View>
-        ) : (
-          <ActivityIndicator color={c.muted} style={styles.loading} />
-        )}
+        {settings.isError ? <LoadFailed onRetry={() => void settings.refetch()} /> : <SkeletonList rows={4} />}
       </SettingsPage>
     );
   }
@@ -62,7 +56,7 @@ export function MediaSettingsScreen() {
         : null;
 
   return (
-    <SettingsPage title={title}>
+    <SettingsPage title={title} frozen={settingsFrozen(org, "media")}>
       <Loaded>
         <GroupedFooter>{t("settings.sectionText.media")}</GroupedFooter>
         {!editable ? (
@@ -182,5 +176,4 @@ function AgentMediaRow({ agent }: { agent: Agent }) {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
-  loading: { marginVertical: 16 },
 });

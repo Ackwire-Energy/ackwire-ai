@@ -294,6 +294,18 @@ describe("Sua conta › Conversa", () => {
     await settle(4);
   };
 
+  test("full messages can be switched on and off without changing other chat choices", async () => {
+    const state = withChatPrefs(seedState(), { textSize: "xl" });
+    await openSettings(state);
+    const control = () => screen().getByRole("switch", { name: "Mostrar mensagens completas" });
+    expect(control().getAttribute("aria-checked")).toBe("false");
+    await click(control());
+    expect(state.me?.organizations[0]?.chatPrefs).toEqual({ textSize: "xl", fullMessages: true });
+    expect(control().getAttribute("aria-checked")).toBe("true");
+    await click(control());
+    expect(state.me?.organizations[0]?.chatPrefs).toEqual({ textSize: "xl", fullMessages: false });
+  });
+
   test("channels and DMs each save their own style; Clara and Forte show only with Bolhas", async () => {
     const state = withChatPrefs(seedState());
     await openSettings(state);

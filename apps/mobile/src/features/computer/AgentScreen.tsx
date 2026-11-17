@@ -22,7 +22,8 @@ import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { type AgentColorName, bodyTones } from "@agenteschat/ui/agent/engine";
 import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import * as Clipboard from "expo-clipboard";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { Stack } from "expo-router";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Keyboard, type LayoutChangeEvent, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import {
@@ -59,6 +60,7 @@ import {
   haptics,
   Icon,
   IconButton,
+  PictureEdge,
   PressScale,
   type SendHow,
   Text,
@@ -73,11 +75,11 @@ import { TypeBar } from "../browser/parts";
 import { useFinishHandoff } from "../browser/useFinishHandoff";
 import { AskButtons, AskCard, AskFoot, ExpiryLine } from "../chat/asks";
 import { mayStopRun } from "../chat/logic";
-import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { successHaptic, tapHaptic } from "../shared/parts";
 import { useActiveWork } from "../shared/queries";
+import { DesktopAgentPointer } from "./AgentPointer";
 import { Cover } from "./Cover";
 import { DOCK_HANG, DockDone, DockIcon, DockRule, DockText, EdgeDock } from "./EdgeDock";
 import { LiveTrail } from "./LiveTrail";
@@ -190,7 +192,8 @@ export function AgentScreen({
   canTakeOver: boolean;
   /** The agent held or its computer paused. */
   banner: ReactNode;
-  top: (sub: string, action: ReactNode, info?: ReactNode) => ReactNode;
+  /** The screen's bar, saying `sub` under its title. */
+  top: (sub: string) => ReactNode;
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -306,6 +309,14 @@ export function AgentScreen({
     mode: taking ? "control" : finishing ? "watch" : mode,
     session,
   });
+  const pointerView = useDerivedValue(() => ({
+    s: s.value,
+    x: x.value,
+    y: y.value,
+    ...desk.value,
+    boxWidth: box.value.width,
+    boxHeight: box.value.height,
+  }));
   // Opening, or a switch the stream never takes: past `STUCK_MS` it says so, with Tentar de novo.
   const waitsOn = screenWaits({ active, shown, switching: switching !== null });
   useEffect(() => {
@@ -749,10 +760,17 @@ export function AgentScreen({
     const { width, height } = e.nativeEvent.layout;
     setBoxSize({ width, height });
   };
+  // Set when they change only: the screen renders on every page event.
+  const barOptions = useMemo(() => ({ headerShown: !wide, gestureEnabled: !inControl }), [wide, inControl]);
 
   return (
-    <KeyboardAvoidingView behavior="padding" style={styles.fill}>
-      {wide ? null : top(sub, null)}
+    // Under the screen's bar: its true place on the screen, so the keys and the trackpad clear the keyboard by the
+    // bar's height too.
+    <KeyboardAvoidingView behavior="padding" style={styles.fill} automaticOffset>
+      {/* Sideways the picture takes the whole phone: no bar. In control the edge swipe is the trackpad's, never a way
+          back that would hand the screen back mid-gesture (the bar's back still leaves). */}
+      <Stack.Screen options={barOptions} />
+      {wide ? null : top(sub)}
       {inControl && !wide ? <View style={styles.notice}>{notice.text}</View> : null}
       {wide ? null : banner}
       {/* The screen and, across its bottom edge, the capsule (it hangs past the screen into this view's margin). */}
@@ -791,10 +809,21 @@ export function AgentScreen({
                   onGone={() => {
                     setReady(false);
                     setSession(null);
+                    // The page that said "live" is gone: the new one starts over, so its cover and the wait for it do.
+                    setPage("connecting");
                     setLife((n) => n + 1);
                   }}
                 />
               </Animated.View>
+              {inControl || wide ? null : <PictureEdge radius={styles.box.borderRadius} />}
+              {/* The agent's own pointer, while the person watches its screen live (theirs is drawn in control). */}
+              <DesktopAgentPointer
+                agentId={agentId}
+                name={name}
+                color={color}
+                enabled={live && !inControl && switching === null}
+                view={pointerView}
+              />
               {inControl && !wide ? (
                 <Animated.View pointerEvents="none" style={[styles.cursor, pointer]}>
                   <PixelCursor />
@@ -1449,14 +1478,20 @@ function Watching({
       <LiveTrail steps={steps} color={color} now={now} />
       {channelId ? (
         <View style={styles.composer}>
-          <Composer
-            placeholder={t("agentComputer.phone.message", { name })}
-            face={<AgentFace agentId={agentId} size={22} live={false} />}
-            working={
-              atWork ? (mayStop ? { stop: { label: t("mobile.chat.stopAgent", { name }), onStop: stop } } : {}) : null
-            }
-            onSend={send}
-          />
+          {org?.deletion ? (
+            // Being deleted, it reads as ever and takes no message (ADR 0088 §7).
+            <Text variant="footnote" tone="muted" style={styles.readOnly}>
+              {t("deleting.composer")}
+            </Text>
+          ) : (
+            <Composer
+              placeholder={t("agentComputer.phone.message", { name })}
+              working={
+                atWork ? (mayStop ? { stop: { label: t("mobile.chat.stopAgent", { name }), onStop: stop } } : {}) : null
+              }
+              onSend={send}
+            />
+          )}
         </View>
       ) : null}
     </View>
@@ -1543,4 +1578,6 @@ const styles = StyleSheet.create({
   request: { marginHorizontal: 12, marginBottom: 4 },
   // The chat's composer, at the bottom with the chat's own side margins.
   composer: { marginTop: "auto", paddingHorizontal: 10, paddingTop: 8 },
+  // In its place while the workspace is being deleted, as the chat says it.
+  readOnly: { textAlign: "center", paddingHorizontal: 16, paddingVertical: 12 },
 });

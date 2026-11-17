@@ -5,6 +5,7 @@ import { invalidateOrg } from "./cache";
 import { stopOrgWork } from "./cancel";
 import { NotFoundError } from "./errors";
 import { publishAgentsChanged, publishChannelsChanged, publishOrgEvent } from "./events";
+import { unassignGone } from "./issues";
 import { announceReleasedAccounts, releaseAgentLogin } from "./machine-accounts";
 import { publishMachineAgentsChanged } from "./machines";
 import { concludeMission, type MissionDeps, OPEN_MISSION_STATUSES } from "./missions";
@@ -55,6 +56,8 @@ export async function deleteAgent(deps: AgentDeletionDeps, actorId: string, orgI
     .returning({ name: agents.name, handle: agents.handle });
   if (!agent) throw new NotFoundError("Agent not found");
   invalidateOrg(orgId);
+  // Archived here or before, it is on no task from now on (ADR 0188).
+  await unassignGone({ db, pubsub: deps.pubsub }, orgId, { type: "agent", id: agentId }).catch(() => null);
 
   const open = await db
     .select()

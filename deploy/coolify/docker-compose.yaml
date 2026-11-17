@@ -1,0 +1,85 @@
+# documentation: https://agentes.chat
+# slogan: Open-source, self-hosted Slack alternative where your team and AI agents work together.
+# category: communication
+# tags: chat,ai-agents,slack-alternative,self-hosted,llm,mcp
+# logo: svgs/agenteschat.svg
+# port: 3000
+#
+# agentes.chat on Coolify: the app and Postgres with pgvector, and nothing else.
+#
+# The metadata above is what a Coolify one-click template needs, so this file can be copied
+# into coollabsio/coolify as templates/compose/agenteschat.yaml (SELF_HOSTING.md and the
+# README next to this file cover the rest).
+#
+# Coolify fills in what this file leaves open, and nothing here names a host:
+#   SERVICE_URL_AGENTES_3000  a domain for the app, routed to port 3000 (generated on the
+#                             first deploy, then the one set under Domains)
+#   PUBLIC_URL                that same address, without the port: the exact address people
+#                             open. Sign-in and every link the app sends come from it.
+#   SERVICE_HEX_64_...        AGENTES_SECRET, which signs sessions and encrypts the model keys
+#                             organizations store. Keep it: a database restored without it has
+#                             every stored key unreadable.
+#   SERVICE_PASSWORD_POSTGRES the database password, used only by the URL below.
+#
+# Most of what the app reads is not here: every setting it knows is listed, annotated, in the
+# repository's .env.example. Coolify writes the resource's variables into .env and passes that
+# file to every container of the resource, so a variable added under Environment Variables
+# reaches the app without editing this file.
+#
+# By hand, without Coolify: SELF_HOSTING.md ("This machine only, and by hand").
+services:
+  postgres:
+    # pgvector: the first migration creates the vector extension.
+    image: pgvector/pgvector:0.8.7-pg18@sha256:2358fcba361ed2233a5ed81b5fe4ca779ccb304120ce531a3bf51c0ed7e2bc11
+    environment:
+      POSTGRES_USER: agentes
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_POSTGRES}
+      POSTGRES_DB: agentes
+    volumes:
+      # Postgres 18 images keep their data in /var/lib/postgresql/18/docker, under this mount.
+      - pgdata:/var/lib/postgresql
+    restart: unless-stopped
+    healthcheck:
+      # Over TCP: on first start the init server listens only on the Unix socket, then restarts.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U agentes -d agentes"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  agentes:
+    image: ${AGENTES_IMAGE:-ghcr.io/ackwire-energy/agentes:latest}
+    environment:
+      - SERVICE_URL_AGENTES_3000
+      - PUBLIC_URL=${SERVICE_URL_AGENTES}
+      - DATABASE_URL=postgres://agentes:${SERVICE_PASSWORD_POSTGRES}@postgres:5432/agentes
+      - AGENTES_SECRET=${SERVICE_HEX_64_AGENTESSECRET}
+      - FILES_DIR=/data/files
+    volumes:
+      - files:/data/files
+    # No ports: the Coolify proxy reaches this container on the resource's network. Publishing
+    # a port would put the app on the host, past any firewall, in plain http.
+    expose:
+      - "3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # Runs in progress get 20 s to finish on SIGTERM (RUN_DRAIN_MS, apps/server/src/start.ts);
+    # beyond that the kernel does not wait.
+    stop_grace_period: 40s
+    init: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    # Over it, the kernel stops this container alone and Docker restarts it, instead of the
+    # machine swapping until Postgres or the Coolify proxy is killed. On a 4 GB host, set 3g.
+    mem_limit: ${AGENTES_MEMORY:-8g}
+    memswap_limit: ${AGENTES_MEMORY:-8g}
+
+volumes:
+  pgdata:
+  files:

@@ -242,7 +242,9 @@ describe("live row in the timeline", () => {
     expect(row()).toBeNull();
     expect(document.querySelector(".ac-msg--waiting, .ac-wait")).toBeNull();
     expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada pensando…");
-    expect(within(bar()).getByRole("button", { name: "Parar" })).toBeTruthy();
+    // The composer stops it; the bar has no stop of its own.
+    expect(within(bar()).queryByRole("button", { name: "Parar" })).toBeNull();
+    expect(screen().getByRole("button", { name: "Parar a Ada" })).toBeTruthy();
     // The step follows the run there.
     await ev({
       type: "agent.tool",
@@ -263,7 +265,7 @@ describe("live row in the timeline", () => {
     await settle(3);
     expect(row()).toBeNull();
     expect(bar().querySelector(".ac-typing__text")?.textContent).toBe("Ada escrevendo…");
-    expect(within(bar()).getByRole("button", { name: "Parar" })).toBeTruthy();
+    expect(screen().getByRole("button", { name: "Parar a Ada" })).toBeTruthy();
     expect(document.body.textContent).not.toContain("O login devolve 401");
     await post(ev, "m-later", "Também confere o refresh");
     await settle(3);
@@ -358,7 +360,7 @@ describe("live row in the timeline", () => {
     expect(shownText(bar())).toBe("Ada e Atlas estão trabalhando…");
   });
 
-  test("steering: 'lê na próxima pausa' → 'leu' under the message; 'Leu seu recado' in the reply's steps once it lands", async () => {
+  test("steering: no mark while it waits for the pause, 'leu' under the message once read; 'Leu seu recado' in the reply's steps once it lands", async () => {
     const { ev } = await open();
     await ev({ type: "agent.run", ...ids, status: "running" });
     await ev({ type: "agent.typing", ...ids });
@@ -367,7 +369,9 @@ describe("live row in the timeline", () => {
     await ev({ type: "agent.run.steered", ...ids, messageId: "m-steer" });
     await settle(4);
     const mine = () => document.querySelector('[data-message-id="m-steer"]') as HTMLElement;
-    expect(mine().textContent).toContain("Ada lê na próxima pausa");
+    // Waiting for the next pause: it was sent, so no mark and no words beside its time.
+    expect(mine().textContent).not.toContain("Ada lê na próxima pausa");
+    expect(mine().querySelector(".ac-receipt__check")).toBeNull();
     await ev({ type: "agent.run.read", ...ids, messageIds: ["m-steer"] });
     await settle(4);
     expect(mine().textContent).toContain("Ada leu");

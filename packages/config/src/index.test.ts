@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
-import { ConfigError, envVars, loadConfig, redactConfig, testConfig } from "./index";
+import { ConfigError, envVars, loadConfig, mcpCallerIdentity, redactConfig, testConfig } from "./index";
 import { parseFirebaseServiceAccount, parsePemKey } from "./pem";
 
 const valid = {
@@ -135,6 +135,62 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...valid, HOST_COMPUTER_TOKEN: "h".repeat(32) }).HOST_COMPUTER_TOKEN).toBe("h".repeat(32));
   });
 
+  test("the operator API's read-only token: optional, long, secret, only with the full token and never equal to it", () => {
+    const full = "o".repeat(32);
+    const read = "r".repeat(32);
+    expect(loadConfig({ ...valid, OPERATOR_API_TOKEN: full }).OPERATOR_API_READ_TOKEN).toBeUndefined();
+    const both = loadConfig({ ...valid, OPERATOR_API_TOKEN: full, OPERATOR_API_READ_TOKEN: read });
+    expect(both.OPERATOR_API_READ_TOKEN).toBe(read);
+    expect(redactConfig(both).OPERATOR_API_READ_TOKEN).toBe("********");
+    expect(() => loadConfig({ ...valid, OPERATOR_API_TOKEN: full, OPERATOR_API_READ_TOKEN: full })).toThrow(
+      /OPERATOR_API_READ_TOKEN must differ from OPERATOR_API_TOKEN/,
+    );
+    expect(() => loadConfig({ ...valid, OPERATOR_API_READ_TOKEN: read })).toThrow(
+      /OPERATOR_API_READ_TOKEN needs OPERATOR_API_TOKEN/,
+    );
+    expect(() => loadConfig({ ...valid, OPERATOR_API_TOKEN: full, OPERATOR_API_READ_TOKEN: "short" })).toThrow(
+      /OPERATOR_API_READ_TOKEN: must be at least 32 characters/,
+    );
+  });
+
+  test("MCP_CALLER_IDENTITY: host=secret pairs, a bare lower-case host and a long secret, each host once, never shown", () => {
+    const secret = "s".repeat(32);
+    const padded = `${"p".repeat(30)}==`;
+    expect(loadConfig(valid).MCP_CALLER_IDENTITY).toBeUndefined();
+    expect(mcpCallerIdentity(loadConfig({ ...valid, MCP_CALLER_IDENTITY: "" })).size).toBe(0);
+    const two = loadConfig({ ...valid, MCP_CALLER_IDENTITY: `tools.example.com=${secret},mcp.example.org=${padded}` });
+    expect([...mcpCallerIdentity(two)]).toEqual([
+      ["tools.example.com", secret],
+      ["mcp.example.org", padded],
+    ]);
+    expect(redactConfig(two).MCP_CALLER_IDENTITY).toBe("********");
+    for (const malformed of [
+      `tools.example.com=${"s".repeat(31)}`,
+      `Tools.example.com=${secret}`,
+      `https://tools.example.com=${secret}`,
+      `tools.example.com:8443=${secret}`,
+      `tools.example.com/mcp=${secret}`,
+      `tools.example.com.=${secret}`,
+      `tools.example.com=${secret}, mcp.example.org=${secret}`,
+      `tools.example.com=${secret},`,
+      "tools.example.com",
+      secret,
+    ]) {
+      expect(() => loadConfig({ ...valid, MCP_CALLER_IDENTITY: malformed })).toThrow(
+        /MCP_CALLER_IDENTITY: must be host=secret pairs/,
+      );
+    }
+    const twice = () =>
+      loadConfig({ ...valid, MCP_CALLER_IDENTITY: `tools.example.com=${secret},tools.example.com=${padded}` });
+    expect(twice).toThrow(/MCP_CALLER_IDENTITY: names a host more than once/);
+    // A refusal names the setting, never what it holds.
+    try {
+      twice();
+    } catch (error) {
+      expect(String(error)).not.toContain(secret);
+    }
+  });
+
   test("billing: the address and the link's secret together, the hold on new workspaces only with them and the operator API", () => {
     const off = loadConfig(valid);
     expect([off.BILLING_URL, off.BILLING_LINK_SECRET, off.BILLING_HOLD_NEW_WORKSPACES]).toEqual([
@@ -217,6 +273,19 @@ describe("loadConfig", () => {
     ]);
   });
 
+  test("EXTRA_TRUSTED_ORIGINS: off unless set; a list of origins, trimmed, a trailing slash dropped, never a path", () => {
+    expect(loadConfig(valid).EXTRA_TRUSTED_ORIGINS).toBeUndefined();
+    expect(
+      loadConfig({
+        ...valid,
+        EXTRA_TRUSTED_ORIGINS: " http://192.168.0.10:3000 , https://x.ts.net/, ,",
+      }).EXTRA_TRUSTED_ORIGINS,
+    ).toEqual(["http://192.168.0.10:3000", "https://x.ts.net"]);
+    for (const entry of ["x.ts.net", "https://x.ts.net/chat", "https://x.ts.net?q=1", "ftp://x.ts.net"]) {
+      expect(() => loadConfig({ ...valid, EXTRA_TRUSTED_ORIGINS: entry })).toThrow(/EXTRA_TRUSTED_ORIGINS/);
+    }
+  });
+
   test("OPS_REPORT_EMAIL: off unless set, one address or a list, each an address", () => {
     expect(loadConfig(valid).OPS_REPORT_EMAIL).toBeUndefined();
     expect(loadConfig({ ...valid, OPS_REPORT_EMAIL: " ops@example.com, ana@example.com ," }).OPS_REPORT_EMAIL).toEqual([
@@ -282,7 +351,7 @@ describe("GITHUB_APP_PRIVATE_KEY", () => {
   });
 });
 
-describe("Android push settings", () => {
+describe("phone push settings", () => {
   test("auto by default, through agentes.chat's relay unless told otherwise; the relay only over https", () => {
     const config = loadConfig(valid);
     expect(config.PUSH_SENDER).toBe("auto");
@@ -294,6 +363,42 @@ describe("Android push settings", () => {
     });
     expect(() => loadConfig({ ...valid, PUSH_SENDER: "expo" })).toThrow("PUSH_SENDER");
     expect(() => loadConfig({ ...valid, PUSH_RELAY_URL: "http://relay.example/v1" })).toThrow("PUSH_RELAY_URL");
+  });
+});
+
+describe("APNs key", () => {
+  // Made up, and put together here so the secret scan reads no key in it.
+  const pemOf = (label: string, body: string) => `-----BEGIN ${label}-----\n${body}\n-----END ${label}-----\n`;
+  const p8 = pemOf("PRIVATE KEY", "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49");
+
+  test("the .p8 as PEM or base64, its ids, and the apps it pushes to", () => {
+    const set = { APNS_KEY: p8, APNS_KEY_ID: "ABC123DEFG", APNS_TEAM_ID: "XYZ987WVUT" };
+    const config = loadConfig({ ...valid, ...set });
+    expect(config.APNS_KEY).toBe(p8.trim());
+    expect(config.APNS_KEY_ID).toBe("ABC123DEFG");
+    expect(config.APNS_TEAM_ID).toBe("XYZ987WVUT");
+    expect(config.APNS_APP_IDS).toEqual([
+      "chat.agentes.app",
+      "chat.agentes.app.preview",
+      "chat.agentes.app.development",
+    ]);
+    expect(redactConfig(config).APNS_KEY).toBe("********");
+    expect(loadConfig({ ...valid, APNS_KEY: Buffer.from(p8).toString("base64") }).APNS_KEY).toBe(p8.trim());
+    expect(loadConfig({ ...valid, APNS_APP_IDS: " com.example.app , com.example.app.beta " }).APNS_APP_IDS).toEqual([
+      "com.example.app",
+      "com.example.app.beta",
+    ]);
+    expect(loadConfig(valid).APNS_KEY).toBeUndefined();
+  });
+
+  test("anything else fails the config with a clear message", () => {
+    expect(() => loadConfig({ ...valid, APNS_KEY: "not-a-key" })).toThrow("APNS_KEY");
+    const ec = pemOf("EC PRIVATE KEY", "MHcCAQEEIA==");
+    expect(() => loadConfig({ ...valid, APNS_KEY: ec })).toThrow(".p8");
+    expect(() => loadConfig({ ...valid, APNS_KEY_ID: "short" })).toThrow("APNS_KEY_ID");
+    expect(() => loadConfig({ ...valid, APNS_TEAM_ID: "lowercase1" })).toThrow("APNS_TEAM_ID");
+    expect(() => loadConfig({ ...valid, APNS_APP_IDS: "chat.agentes.app,not a bundle id" })).toThrow("APNS_APP_IDS");
+    expect(() => loadConfig({ ...valid, APNS_APP_IDS: " , " })).toThrow("APNS_APP_IDS");
   });
 });
 

@@ -230,6 +230,7 @@ test("the tools' order: each person's own, per workspace, every tool once, besid
 
   const driveFirst = [
     "drive",
+    "waiting",
     "approvals",
     "proposals",
     "threads",

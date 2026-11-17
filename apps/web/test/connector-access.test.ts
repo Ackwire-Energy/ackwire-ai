@@ -200,6 +200,18 @@ describe("one level per agent and connection", () => {
     expect(server?.readScopes).toEqual(["custom:s1:read"]);
   });
 
+  test("a connection with no read tool offers no 'Ler': it would save nothing and come back as 'Sem acesso'", () => {
+    const onlyWrites = tree((a) => {
+      const s1 = a.connectors[1];
+      if (s1)
+        s1.scopes = [
+          { scope: "custom:s1:write", label: "", state: "off", tools: [t("exec", "custom:s1:write", "s1")] },
+        ];
+    });
+    expect(resourcesOf(onlyWrites)[1]?.levels).toEqual(["none", "write"]);
+    expect(resourcesOf(tree())[1]?.levels).toEqual(["none", "read", "write"]);
+  });
+
   test("setting a level keeps every other grant (built-ins, other connections)", () => {
     const access = tree((a) => {
       const s1 = a.connectors[1];

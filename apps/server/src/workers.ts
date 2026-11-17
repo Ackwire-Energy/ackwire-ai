@@ -1,9 +1,10 @@
-import type { PubSub } from "@agenteschat/adapters";
+import type { ErrorReporter, PubSub } from "@agenteschat/adapters";
 import { type Database, ensureMessagePartitions, schema } from "@agenteschat/db";
 import {
   type ArtifactDeps,
   type BrowserLive,
   type ContextDeps,
+  claimStuckPhoneSetups,
   clearOldOutboxPayloads,
   createOutboxPump,
   type DesktopControl,
@@ -13,8 +14,8 @@ import {
   enqueueIdleReflections,
   enqueueOverdueAccountDeletions,
   enqueueOverdueDeletions,
+  enqueueRightHandChecks,
   enqueueSkillUpdates,
-  enqueueTeamWeeks,
   enqueueVaultSyncs,
   enqueueWaitlistContacts,
   expireAgentProposalAsks,
@@ -33,11 +34,13 @@ import {
   type LaneLimits,
   LOOP_LATE_MS,
   listenForRunCancels,
+  type MachineCaller,
   type MailDeps,
   type OutboxJob,
   pollMailWatches,
   postAutonomyDigests,
   pruneDeletionCodes,
+  pruneEmailChanges,
   pruneJoinRequests,
   pruneMessageClientIds,
   pruneOperatorEvents,
@@ -47,6 +50,7 @@ import {
   purgeDeletedWikiPages,
   queueApprovalDigests,
   reapRoutineRuns,
+  recheckStuckPlans,
   reconcileComposioAccounts,
   reconcileComposioConnectors,
   reconcileWorks,
@@ -125,6 +129,8 @@ export interface WorkerDeps {
   mail?: { deps: MailDeps; pollSeconds: number };
   /** The agent browser's live view (ADR 0040): expired handoffs are told to its viewers. */
   browserLive?: BrowserLive;
+  /** Connected computers: plans stuck at their limit are read again there (`recheckStuckPlans`). */
+  machines?: Pick<MachineCaller, "call" | "status">;
   /** Agents' desktops (ADR 0058): the ones with an open handoff stay up. */
   desktops?: Pick<DesktopControl, "keepAlive">;
   /** The daily stall-and-noise report (`OPS_REPORT_EMAIL`); absent: none. */
@@ -134,6 +140,8 @@ export interface WorkerDeps {
    * the app (a worker process: `APP_JOB_KINDS`); absent: the pump's own.
    */
   outbox?: { maxInFlight: number; quickSlots: number; limits?: LaneLimits; memoryBytes?: number; skipKinds?: string[] };
+  /** Error reports (ADR 0104): phones whose setup stays stuck on one step go there, one each. */
+  errors?: ErrorReporter;
   /** The database is the built-in one (one process): the alarms advise what fits it. */
   builtInDatabase?: boolean;
   log: Logger;
@@ -188,10 +196,17 @@ export const WORKER_INTERVALS_MS = {
   skillUpdates: 3600_000,
   /** Vault connections last read over 10 minutes ago, queued once per 10-minute window (ADR 0144). */
   vaultSyncs: 5 * 60_000,
-  /** Lodi's weekly card of admins whose slot just passed (ADR 0137 §9; one per person and week: its dedupe key). */
-  teamWeek: 10 * 60_000,
+  /**
+   * What the right hand does by itself: the day's and the week's cards of whoever's slot just passed (ADR 0137 §9; one
+   * per person and day or week: its dedupe key), then each of its lanes' sweeps.
+   */
+  rightHand: 10 * 60_000,
   /** The coding plans' public lists of models, each replica for itself: also at boot. */
   planModels: 3600_000,
+  /** Plans stuck at their limit, read again on their computers (each at most every 5 or 10 minutes). */
+  planRechecks: 60_000,
+  /** Phones whose setup sat on one step for 10 minutes, each reported once (`claimStuckPhoneSetups`). */
+  phoneSetups: 60_000,
 };
 
 /**
@@ -274,7 +289,28 @@ export function startWorkers(deps: WorkerDeps) {
   });
 
   every("apps", WORKER_INTERVALS_MS.apps, () => purgeApps(db));
+  const errors = deps.errors;
+  if (errors) {
+    every("phoneSetups", WORKER_INTERVALS_MS.phoneSetups, async () => {
+      const now = Date.now();
+      for (const p of await claimStuckPhoneSetups(db)) {
+        // One issue per platform and step: never the phone's name or serial.
+        errors.capture(new Error(`Device setup stuck: ${p.platform} ${p.reason ?? p.state}`), {
+          org_id: p.orgId,
+          machine_id: p.machineId,
+          phone_state: p.state,
+          os_version: p.osVersion,
+          waited_s: Math.round((now - p.stateSince.getTime()) / 1000),
+        });
+      }
+    });
+  }
   every("planModels", WORKER_INTERVALS_MS.planModels, () => refreshPlanModels());
+  const machines = deps.machines;
+  if (machines)
+    every("planRechecks", WORKER_INTERVALS_MS.planRechecks, async () => {
+      await recheckStuckPlans({ db, hub: machines });
+    });
   every("skillUpdates", WORKER_INTERVALS_MS.skillUpdates, async () => {
     if ((await enqueueSkillUpdates(db)) > 0) void ticks.get("outbox")?.();
   });
@@ -300,6 +336,7 @@ export function startWorkers(deps: WorkerDeps) {
 
   every("deletions", WORKER_INTERVALS_MS.deletions, async () => {
     await pruneDeletionCodes(db);
+    await pruneEmailChanges(db);
     const accounts = await enqueueOverdueAccountDeletions(db);
     const due = await enqueueOverdueDeletions(db);
     if (due + accounts > 0) {
@@ -401,8 +438,8 @@ export function startWorkers(deps: WorkerDeps) {
     if (woke > 0) log.info("snoozed notifications back", { woke });
   });
 
-  every("teamWeek", WORKER_INTERVALS_MS.teamWeek, async () => {
-    if ((await enqueueTeamWeeks(db)) > 0) void ticks.get("outbox")?.();
+  every("rightHand", WORKER_INTERVALS_MS.rightHand, async () => {
+    if ((await enqueueRightHandChecks(db)) > 0) void ticks.get("outbox")?.();
   });
 
   every("routines", WORKER_INTERVALS_MS.routines, async () => {

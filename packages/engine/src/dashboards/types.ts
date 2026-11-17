@@ -8,6 +8,8 @@ import type {
   WidgetSpec,
   WidgetStatus,
 } from "@agenteschat/ui/widgets/spec";
+import type { AiStatusDeps } from "../ai-status";
+import type { ModelScope } from "../brains/select";
 import type { ContextDeps } from "../context/summaries";
 
 /**
@@ -107,6 +109,13 @@ export const DASHBOARD_ERRORS = {
   promptRequired: "widget.prompt_required",
   /** 409: a draft is confirmed only once its test build worked (`ok`, ADR 0135 §16). */
   notTested: "widget.not_tested",
+  /** 409: its agent has no AI to build it with (`params.agentName`); the widget waits for one (ADR 0135 §20). */
+  needsAi: "widget.needs_ai",
+  /**
+   * 409: Update now or Resolve while its run waits at its plan's or budget's limit, for its computer or its AI provider:
+   * nothing can run it sooner (`params`: the wait's `code`, `source`, `resetsAt`, `scope` and `model`, and `agentName`).
+   */
+  waiting: "widget.waiting",
 } as const;
 
 /**
@@ -128,6 +137,8 @@ export interface DashboardDeps {
   pubsub: PubSub;
   /** The cheap model for suggestions and the schedule's time zone helpers; absent: suggestions are empty. */
   context?: ContextDeps;
+  /** Whether a widget's agent can think before its build is queued; absent: only the run's own check says so. */
+  ai?: Omit<AiStatusDeps, "db">;
   now?: () => Date;
 }
 
@@ -205,7 +216,10 @@ export interface WidgetView {
   schedule: WidgetSchedule;
   alert: { enabled: boolean; condition: string };
   status: WidgetStatus;
-  failure: { code: string; detail: string | null } | null;
+  /** `cause`: with `failing` (stopped after failing in a row), the code of the last of those failures. */
+  failure: { code: string; detail: string | null; cause?: string } | null;
+  /** While it is `building` or `updating`: what its run waits on, the apps say it in place of a spinner. */
+  wait: WidgetWaitView | null;
   refreshedAt: string | null;
   /** Its routine's next run; null for `manual`. */
   nextRunAt: string | null;
@@ -218,6 +232,25 @@ export interface WidgetView {
   lastCostUsd: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * What a widget's refresh run waits on (ADR 0118, ADR 0135 §6): paused near its plan's or budget's limit
+ * (`usage_pause`, so Update now lets it go on), at its plan's limit (`plan_limit`), at its agent's budget (`budget`),
+ * for its computer to be back (`computer`) or to have room (`busy`), or for its AI provider to answer (`outage`).
+ * `source`: whose limit (null for the others). `resetsAt`: when it picks up by itself, an outage's next try (null: not
+ * known; a budget's: other runs hold it for a moment). `scope` and `model`: a plan's limit on its model alone
+ * (`ModelScope`), and that model's name. `since`: when a `busy` one began waiting for room (the apps say it once that is
+ * `COMPUTER_QUEUE_NOTE_MS` old, as the chat does). `canContinue`: the viewer may press Continue now on a pause.
+ */
+export interface WidgetWaitView {
+  code: "usage_pause" | "plan_limit" | "budget" | "computer" | "busy" | "outage";
+  source: "plan" | "budget" | null;
+  resetsAt: string | null;
+  scope: ModelScope | null;
+  model: string | null;
+  since: string | null;
+  canContinue: boolean;
 }
 
 export interface DashboardView extends DashboardSummaryView {

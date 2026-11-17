@@ -378,7 +378,7 @@ export function registerManageTools(deps: AppsToolDeps, p: AppPrincipal, tool: R
         : { name: args.name?.trim() ?? "", description: args.description?.trim() ?? "", body: args.markdown.trim() };
       validateSkill(parsed);
       const agent = args.agent ? await resolveAgent(args.agent) : null;
-      const skills = await listSkills(deps.db, p.userId, p.orgId);
+      const skills = (await listSkills(deps.db, p.userId, p.orgId)).filter((s) => !s.ownerUserId);
       const keyed = await madeWith(args.idempotency_key, "skill");
       let skill: { id: string; name: string } | undefined =
         skills.find((s) => s.id === keyed) ?? skills.find((s) => s.name === parsed.name);

@@ -8,6 +8,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorDeps, GITHUB_APP_AUTH } from "../connectors/connections";
+import { toolMachineId } from "../right-hand-seats";
 import { standingRefusal } from "../standing";
 import { CONNECTOR_ALL, freshGrantedKeys, grantKey, isAllowed, toolAccess } from "../tools/scopes";
 import {
@@ -261,6 +262,8 @@ async function proxyGit(
       previousHandles: agents.previousHandles,
       archivedAt: agents.archivedAt,
       machineId: agents.machineId,
+      builtin: agents.builtin,
+      orgId: agents.orgId,
     })
     .from(agents)
     .where(and(eq(agents.id, claims.agentId), eq(agents.orgId, claims.orgId)));
@@ -269,7 +272,11 @@ async function proxyGit(
     .select({ id: machines.id, tokenHash: machines.tokenHash })
     .from(machines)
     .where(and(eq(machines.id, claims.sandboxId), eq(machines.orgId, claims.orgId), isNull(machines.deletedAt)));
-  if (!machine?.tokenHash || machineGitGen(machine.tokenHash) !== claims.gen || agent?.machineId !== machine.id) {
+  if (
+    !machine?.tokenHash ||
+    machineGitGen(machine.tokenHash) !== claims.gen ||
+    (await toolMachineId(deps.db, agent)) !== machine.id
+  ) {
     return revoked();
   }
   /** What the audit names as the computer. */
@@ -423,7 +430,7 @@ async function proxyGit(
             ? ["not on GitHub", `${branch} isn't on GitHub: an approval covers updating a branch, never creating one`]
             : [
                 block === "default" ? "the default branch" : "protected",
-                `${branch} is ${block === "default" ? "the default branch" : "protected"}: push to agentes/${agent.handle}/<topic> and open a pull request; merging asks a person`,
+                `${branch} is ${block === "default" ? "the default branch" : "protected"}: push to agentes/${agent.handle}/<topic> and open a pull request; merging is a separate step`,
               ];
       reasons.set(ref, short);
       told.add(long);

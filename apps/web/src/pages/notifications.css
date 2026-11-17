@@ -121,10 +121,15 @@ html:not([data-pointer]) .nt-item:focus-visible {
   color: var(--warn);
   font-weight: 600;
 }
-/* Remind me later and Done end the footer, after the time. */
+/* Remind me later and Done end the footer, after the time. The last one's plate ends 8 from the card's edge, its
+   glyph on the edge the card's words keep. */
 .rq__end > .nt-tail.ac-acts {
   display: flex;
-  margin-right: -6px;
+}
+/* Its first plate reaches into the footer's gap (a ghost in `.ac-acts`): that room is given back here, so the plate
+   stands 8 from a button that grows up to it (a phone's Abrir). */
+.rq__end:has(> .nt-tail) {
+  padding-inline-start: var(--ghost-plate);
 }
 
 /* ── What only points somewhere: a card of the requests' shape, opened by a click on it ── */
@@ -183,10 +188,8 @@ html:not([data-pointer]) .nt-item:focus-visible {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+/* Its spinner on the first line's capitals when the words wrap (`.ac-iconline`). */
 .nt-resolved {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 13px;
   font-weight: 600;
   color: var(--ink2);
@@ -194,7 +197,7 @@ html:not([data-pointer]) .nt-item:focus-visible {
 }
 
 /* ── Day groups and items ───────────────────────────────────────────────── */
-/* The shared list card, but tooltips under the last row must not be clipped. */
+/* The shared list card, unclipped. */
 .nt-list {
   overflow: visible;
 }
@@ -551,24 +554,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
 .nt-nb__label {
   display: none;
 }
-.nt-nb[data-tip]:hover::after {
-  content: attr(data-tip);
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 5px 8px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-  color: var(--bg);
-  background: var(--ink);
-  box-shadow: var(--e2);
-  pointer-events: none;
-  animation: nt-fi 0.15s var(--out);
-  z-index: 5;
-}
 
 /* ── The mini composer, opened in place ─────────────────────────────────── */
 .nt-cmp {
@@ -607,6 +592,14 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   color: var(--muted);
   -webkit-text-fill-color: currentColor;
   cursor: not-allowed;
+}
+/* Why it takes nothing (the workspace is being deleted), where the text would start. */
+.nt-cmp__readonly {
+  margin: 0;
+  padding: 2px 4px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 .nt-cmp__row {
   display: flex;
@@ -754,9 +747,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-nb[data-act="open"] .nt-nb__label {
     display: none;
   }
-  .nt-nb[data-tip]:hover::after {
-    display: none;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .nt-item,
@@ -767,7 +757,6 @@ html:not([data-pointer]) .nt-nb:focus-visible {
   .nt-wi.is-new,
   .nt-item.is-new::after,
   .nt-item.is-pulse,
-  .nt-nb[data-tip]:hover::after,
   .nt-acts,
   .nt-nb,
   .nt-nb::after,

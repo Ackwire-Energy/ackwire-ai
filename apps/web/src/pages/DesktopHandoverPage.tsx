@@ -6,11 +6,13 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AuthShell } from "@/components/AuthLayout";
 import { takeFragmentParam } from "@/lib/fragment";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { notedSignInOnThisMac, takeReturnOnThisMac } from "@/lib/this-mac-proof";
 
 /**
  * In the app's window: the one-time sign-in a connect link carried, taken out of the address and the history
- * at once, then traded for a session of the window's own (`POST /api/auth/sign-in/one-time-token`). Refused
- * (expired, already used): the way to sign in by hand.
+ * at once, then traded for a session of the window's own (`POST /api/auth/sign-in/one-time-token`), which goes to
+ * `to`, else to the page the app was asked to sign in again from (`saveReturnOnThisMac`). Refused (expired, already
+ * used): the way to sign in by hand.
  */
 export function DesktopHandoverPage({ to }: { to?: string }) {
   const { t } = useTranslation();
@@ -30,7 +32,9 @@ export function DesktopHandoverPage({ to }: { to?: string }) {
       // A whole load: the session is new, so everything is asked again with it.
       if (r.ok) {
         storage.remove(STORAGE_KEYS.signedOut);
-        window.location.assign(to ?? "/");
+        notedSignInOnThisMac();
+        const back = takeReturnOnThisMac();
+        window.location.assign(to ?? back ?? "/");
       } else setFailed(true);
     });
   }, [auth, to]);

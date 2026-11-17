@@ -6,6 +6,7 @@ setupDom();
 import type { ApiClient } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /** ADR 0106: a routine started by a call to its own address, on its page and in the form. */
@@ -55,7 +56,9 @@ describe("Rotinas: started by a webhook", () => {
     await type(within(form).getByLabelText("O que fazer"), "Confira o pedido que chegou.");
     await type(within(form).getByLabelText("Nome (opcional)"), "Pedidos pagos");
     await click(within(form).getByRole("radio", { name: "Webhook" }));
-    expect(form.textContent).toContain("A rotina ganha um endereço só dela.");
+    expect(shownText(form)).toContain("A rotina ganha um endereço só dela.");
+    expect(shownText(form)).not.toContain("Cada POST que chegar nele");
+    expect(hintOf("Endereço", form).text).toContain("Cada POST que chegar nele aciona o agente");
     listing = false;
     await click(within(form).getByRole("button", { name: "Criar rotina" }));
     await settle(10);

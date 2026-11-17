@@ -17,6 +17,8 @@ export function createFakeAuth(
     verification?: AuthResult;
     updateName?: AuthResult;
     onSignIn?: () => void;
+    /** What signing out does to the fake server: ending its session, usually (`state.me = null`). */
+    onSignOut?: () => void;
   } = {},
 ) {
   const calls: { method: string; args: unknown[] }[] = [];
@@ -60,6 +62,7 @@ export function createFakeAuth(
     },
     signOut: async () => {
       calls.push({ method: "signOut", args: [] });
+      options.onSignOut?.();
     },
     desktopOpen: async (challenge) => {
       calls.push({ method: "desktopOpen", args: [challenge] });

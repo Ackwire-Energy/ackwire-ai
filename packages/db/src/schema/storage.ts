@@ -240,6 +240,9 @@ export const artifactVersions = pgTable(
     sha256: text().notNull(),
     /** `file` versions: the original file name (`report.pdf`). */
     fileName: text(),
+    /** A picture's own size, from its header when it was stored: drawn in its proportions before it loads. */
+    width: integer(),
+    height: integer(),
     note: text(),
     authorType: text().notNull(),
     authorId: text().notNull(),

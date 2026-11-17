@@ -79,14 +79,15 @@ export function photoContentType(
  */
 export const PHOTO_MAX_BASE64 = 2_796_000;
 
-/** "N com você" in Do workspace: open issues (not done or canceled) assigned to me. */
+/** "N com você" in Do workspace: open issues (not done or canceled) I am one of the assignees of. */
 export function openIssuesWithMe(
-  issues: readonly { status: string; assignee: { type: string; id: string } | null }[] | undefined,
+  issues: readonly { status: string; assignees: readonly { type: string; id: string }[] }[] | undefined,
   meId: string | null,
 ): number {
   if (!issues || !meId) return 0;
   return issues.filter(
-    (i) => i.assignee?.type === "person" && i.assignee.id === meId && i.status !== "done" && i.status !== "canceled",
+    (i) =>
+      i.assignees.some((a) => a.type === "person" && a.id === meId) && i.status !== "done" && i.status !== "canceled",
   ).length;
 }
 

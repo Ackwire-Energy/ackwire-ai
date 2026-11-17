@@ -65,11 +65,14 @@ export interface CommandScope {
 type Word = { text: string; op?: undefined } | { text: string; op: "pipe" | "list" | "redirect" | "input" };
 
 /**
- * Shell words with quotes removed and operators split out. `null` when the
- * line uses anything we don't follow: command substitution, process
- * substitution, variables, globs into hidden expansions, heredocs, `&` jobs.
+ * Shell words with quotes removed and operators split out, as the shell reads
+ * them: a line continuation (a backslash before a newline) is dropped, and a
+ * comment (a word opening with `#`) is left out to its line's end (`seen.comment`
+ * says one was). `null` when the line uses anything we don't follow: command
+ * substitution, process substitution, variables, globs into hidden expansions,
+ * heredocs, `&` jobs.
  */
-export function shellWords(line: string): Word[] | null {
+export function shellWords(line: string, seen?: { comment?: boolean }): Word[] | null {
   const out: Word[] = [];
   let cur = "";
   let has = false;
@@ -95,7 +98,8 @@ export function shellWords(line: string): Word[] | null {
         if (d === "$" || d === "`") return null;
         if (d === "\\" && j + 1 < line.length) {
           j++;
-          cur += line[j];
+          // A line continuation, quoted or not: the shell drops both.
+          if (line[j] !== "\n") cur += line[j];
         } else cur += d;
       }
       if (j >= line.length) return null;
@@ -105,9 +109,12 @@ export function shellWords(line: string): Word[] | null {
     }
     if (c === "\\") {
       if (i + 1 >= line.length) return null;
-      cur += line[i + 1];
-      has = true;
       i++;
+      // A line continuation: the shell drops both, and the word (or the space between two) goes on, so a `#` after
+      // it still opens a comment.
+      if (line[i] === "\n") continue;
+      cur += line[i];
+      has = true;
       continue;
     }
     if (c === "$" || c === "`" || c === "(" || c === ")" || c === "{" || c === "}") return null;
@@ -167,11 +174,67 @@ export function shellWords(line: string): Word[] | null {
       } else out.push({ text: "<", op: "input" });
       continue;
     }
+    // A word the shell opens with `#` is a comment to the line's end, quotes and all: read as a word, `ls #'` would
+    // open a quote that hid the next lines, which the shell runs. The newline after it still ends the command.
+    if (c === "#" && !has) {
+      if (seen) seen.comment = true;
+      const end = line.indexOf("\n", i);
+      if (end < 0) break;
+      i = end - 1;
+      continue;
+    }
     cur += c;
     has = true;
   }
   push();
   return out;
+}
+
+/**
+ * A script's command lines as its shell reads them, quotes kept: a line continuation (a backslash before a newline)
+ * joins two lines, a comment (a word opening with `#`) is left out to its line's end, and a newline inside quotes
+ * stays in its line. A quote left open takes the rest of the script, which then reads as nothing plain (`shellWords`).
+ * Blank lines are left out.
+ */
+function shellLines(script: string): string[] {
+  const lines: string[] = [];
+  let cur = "";
+  let word = false;
+  for (let i = 0; i < script.length; i++) {
+    const c = script[i] as string;
+    if (c === "\\") {
+      if (script[i + 1] !== "\n") {
+        cur += script.slice(i, i + 2);
+        word = true;
+      }
+      i++;
+      continue;
+    }
+    if (c === "'" || c === '"') {
+      let j = i + 1;
+      while (j < script.length && script[j] !== c) j += c === '"' && script[j] === "\\" ? 2 : 1;
+      cur += script.slice(i, j + 1);
+      word = true;
+      i = j;
+      continue;
+    }
+    if (c === "#" && !word) {
+      const end = script.indexOf("\n", i);
+      if (end < 0) break;
+      i = end - 1;
+      continue;
+    }
+    if (c === "\n") {
+      lines.push(cur);
+      cur = "";
+      word = false;
+      continue;
+    }
+    cur += c;
+    word = !/[\s;&|<>()]/.test(c);
+  }
+  lines.push(cur);
+  return lines.filter((l) => l.trim());
 }
 
 interface Simple {
@@ -246,6 +309,13 @@ const insideOrTmp = (scope: CommandScope, p: string) => {
 export const AGENT_WORKER_HOMES = "/var/lib/agentes-runner-agents";
 
 /**
+ * System mode: Grok Build's account folders (`<this>/<account id>`, 0700, the agent's user's only while lent to it).
+ * Outside `AGENT_WORKER_HOMES`, whose closed (0711) folders Grok's sandbox can't bind: it binds every folder above
+ * `GROK_HOME`, so each of them must be open to the agent's user (0755). Its folder names (account ids) are listable.
+ */
+export const GROK_ACCOUNT_HOMES = "/var/lib/agentes-runner-grok";
+
+/**
  * System mode's runner home (`install.sh --system`), and the state of the server's own computer
  * (`agentes-runner host`): every organization's machine token is in it.
  */
@@ -285,6 +355,7 @@ const SECRET_DIRS = [
   "Keychains",
   ".agentes-runner",
   path.basename(AGENT_WORKER_HOMES),
+  path.basename(GROK_ACCOUNT_HOMES),
   SYSTEM_RUNNER_HOME.slice(1),
   ".config/gh",
   ".config/gcloud",
@@ -370,7 +441,12 @@ const SECRET_VARIABLE =
   /\$\{?(CLAUDE_CONFIG_DIR|CODEX_HOME|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|CLAUDE_CODE_OAUTH_TOKEN)\b/;
 
 /** A word of a line that can't be parsed plainly, without the quotes and substitution marks around it (`$(cat`, `x)`). */
-const bareWord = (w: string) => w.replace(/^[$('"`{]+|[)'"`};]+$/g, "");
+/** The closing marks are trimmed by hand: a `+$` over a long run of quotes backtracks quadratically. */
+const bareWord = (w: string) => {
+  let end = w.length;
+  while (end > 0 && ")'\"`};".includes(w[end - 1] ?? "")) end--;
+  return w.slice(0, end).replace(/^[$('"`{]+/, "");
+};
 
 /**
  * A path or pattern names a secret (resolved in the scope when there is one, if it can leave the folder it
@@ -992,6 +1068,7 @@ export const SECRET_BASH_DENY_RULES: readonly string[] = [
   ".config/gcloud",
   ".agentes-runner",
   path.basename(AGENT_WORKER_HOMES),
+  path.basename(GROK_ACCOUNT_HOMES),
   SYSTEM_RUNNER_HOME.slice(1),
   ".git-credentials",
   ".netrc",
@@ -1215,19 +1292,22 @@ function gitMerge(rest: readonly string[]): { dir: string; ref: string } | null 
  * must stop the merge). Anything else, or anything this can't follow, is null and waits for a person: `--admin`,
  * `--delete-branch` (agents don't delete branches), `--auto` (nothing merged yet to report), a path to the program,
  * a wrapper, a pipe, a redirection, two merges (one exit code can't say which ran), a word over several lines or
- * opening with `#` (the words here are the shell's only without those: dropping a comment line can move a closing
- * quote, and the shell drops `#5 -R a/b`, so that `gh pr merge --squash #5 -R a/b` merges the folder's own branch).
+ * opening with `#`, a comment after a command, a line continuation (the words here are the shell's only without
+ * those: dropping a comment line can move a closing quote or end a line a continuation goes on, and the shell drops
+ * `#5 -R a/b`, so that `gh pr merge --squash #5 -R a/b` merges the folder's own branch).
  */
 export function loneMerge(text: string): LoneMerge | null {
+  if (/(?:^|[^\\])(?:\\\\)*\\\n/.test(text)) return null;
   const lines = text
     .split("\n")
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#"))
+    .filter((l) => l.trim() && !l.trim().startsWith("#"))
     .join("\n");
-  const words = shellWords(lines);
+  const seen: { comment?: boolean } = {};
+  const words = shellWords(lines, seen);
   const cmds = simpleCommands(lines);
   const last = cmds?.at(-1);
-  if (!words || !cmds || !last || cmds.some((s) => s.piped || s.writes.length > 0 || s.reads.length > 0)) return null;
+  if (!words || seen.comment || !cmds || !last) return null;
+  if (cmds.some((s) => s.piped || s.writes.length > 0 || s.reads.length > 0)) return null;
   if (cmds.some((s) => s.argv.some((w) => w.includes("\n") || w.startsWith("#")))) return null;
   if (words.some((w) => w.op === "list" && w.text === "||")) return null;
   let dir = ".";
@@ -1272,6 +1352,8 @@ export interface GitPush {
 
 /** A line that runs git push somehow, read or not. */
 const PUSH_MENTION = /\bgit\b.*\bpush\b/;
+/** `PUSH_MENTION` across a quoted newline or a line continuation too: a script's line (`shellLines`) may hold either. */
+const mentionsPush = (text: string) => PUSH_MENTION.test(text.replace(/\\?\n/g, " "));
 
 /** `cd`'s folder from `dir` (null: git can't tell where that is from here). */
 function cdTo(dir: string | null, to: string | undefined) {
@@ -1393,7 +1475,7 @@ function parsePush(
   const sub = argv[i];
   if (sub === undefined) return null;
   if (aliases.includes(sub.toLowerCase())) return UNREADABLE;
-  if (GIT_RUNS_COMMANDS.has(sub)) return PUSH_MENTION.test(argv.slice(i + 1).join(" ")) ? UNREADABLE : null;
+  if (GIT_RUNS_COMMANDS.has(sub)) return mentionsPush(argv.slice(i + 1).join(" ")) ? UNREADABLE : null;
   if (movesHead(sub, argv.slice(i + 1))) return MOVES_HEAD;
   if (sub !== "push") return null;
   if (redirected) return UNREADABLE;
@@ -1518,11 +1600,11 @@ export function gitPushes(script: string): GitPush[] | null {
 /** `gitPushes` for a script that starts in `from`, into `read` (a shell's `-c` script shares it); false: unreadable. */
 function readPushes(script: string, from: string | null, read: { pushes: GitPush[]; moved: boolean }): boolean {
   let dir = from;
-  for (const line of script.split("\n")) {
-    if (/^\s*#/.test(line)) continue;
+  // The lines its shell runs: a comment line is none, and a line continuation or a newline in quotes isn't an end.
+  for (const line of shellLines(script)) {
     const cmds = simpleCommands(line);
     if (!cmds) {
-      if (PUSH_MENTION.test(line)) return false;
+      if (mentionsPush(line)) return false;
       continue;
     }
     for (const { argv, piped } of cmds) {
@@ -1547,9 +1629,8 @@ function readPushes(script: string, from: string | null, read: { pushes: GitPush
         }
         continue;
       }
-      if (!PUSH_MENTION.test(line)) continue;
-      if (runsText(cmd, words, piped === true) || (!printsOnly(cmd) && PUSH_MENTION.test(words.join(" "))))
-        return false;
+      if (!mentionsPush(line)) continue;
+      if (runsText(cmd, words, piped === true) || (!printsOnly(cmd) && mentionsPush(words.join(" ")))) return false;
     }
   }
   return true;
@@ -1611,7 +1692,7 @@ export async function heldPush(push: GitPush, facts: RepoFacts, own: readonly st
     (await facts.viaProxy(await pushRemote({ remote }, facts)))
       ? { what: `${what}: ${never}`, never: true }
       : { what, ...(otherwise ? { instead: otherwise } : {}) };
-  const toPullRequest = `our git proxy never lets it through. Push to a branch of your own${own[0] ? ` (${own[0]}…)` : ""} and open a pull request; merging asks a person. ${NO_TERMINAL_COMMANDS}`;
+  const toPullRequest = `our git proxy never lets it through. Push to a branch of your own${own[0] ? ` (${own[0]}…)` : ""} and open a pull request; merging is a separate step. ${NO_TERMINAL_COMMANDS}`;
   if (push.mirror)
     return hold("This is a mirror push: it can overwrite and delete any branch", undefined, toPullRequest);
   if (push.every) return hold("This push updates every branch, the default one too", instead, toPullRequest);
@@ -1740,9 +1821,28 @@ export const ASK_AGAIN =
 /** Inside a background task nobody is there to approve anything. */
 export const ASK_AFTER_TASK = "Nobody can approve it inside a background task: stop and say so in your result.";
 
+/** The same for an edit of the brain's own, which `write_file` makes with a reason. */
+export const ASK_WITH_WRITE_FILE =
+  "To ask them, make the same change with write_file, with why set to your reason: it waits for their decision in the chat.";
+
+const WAITS_FOR_PERSON = ": a person approves it first. ";
+
 /** A refusal that names exactly why, what to do to ask a person, and what to do instead. */
 export const approvalMessage = (what: string, how: string, instead?: string) =>
-  `${what}: a person approves it first. ${how}${instead ? ` ${instead}` : ""}`;
+  `${what}${WAITS_FOR_PERSON}${how}${instead ? ` ${instead}` : ""}`;
+
+/** Whether a refusal is a command held for a person (`approvalMessage`), not a secret read nor one never run. */
+export const heldForPerson = (message: string) => message.includes(WAITS_FOR_PERSON);
+
+/**
+ * A held command's refusal as an agent that never asks reads it (ADR 0173): what it is and where it runs, with
+ * nobody to wait for. Any other refusal stays as it is.
+ */
+export const unaskedMessage = (message: string) => {
+  const at = message.indexOf(WAITS_FOR_PERSON);
+  if (at < 0) return message;
+  return `${message.slice(0, at)}: your own shell doesn't run it. Run the same command with run_code: it runs there without asking anyone.`;
+};
 
 /** Told to the agent when a call reads a secret. */
 export const SECRET_MESSAGE =
@@ -1981,12 +2081,13 @@ const KIND_WORDS = 3;
 /**
  * The kind "Aprovar sempre" keeps for one command on the agent's computer (ADR 0015, amended 2026-11-03): the program
  * and its subcommands, without arguments or values (`gh issue create --title x` → `gh issue create`, `npm test`), or
- * null when it is never offered: not exactly one plain command (a pipeline, a list, a redirection, a wrapper, a path to
- * the program, options before its subcommand), the deny list, a secret, inline code, a push, a script run by an
- * interpreter, anything that deletes, deploys, publishes, signs in or changes settings. gh's `-R`/`--repo` only pick a
- * repository and stay out of it.
+ * null when it has none: not exactly one plain command (a pipeline, a list, a redirection, a wrapper, a path to
+ * the program, options before its subcommand), a secret, inline code, a script run by an interpreter, and, unless
+ * `held`, the deny list, a push and anything that deletes, deploys, publishes, signs in or changes settings. gh's
+ * `-R`/`--repo` only pick a repository and stay out of it. `held`: the kind of a command the computer holds for a
+ * person (`gh pr merge`, `vercel deploy`), which a rule of the agent's own may still cover.
  */
-export function commandKind(command: string): string | null {
+export function commandKind(command: string, held = false): string | null {
   const cmds = simpleCommands(command);
   const s = cmds?.length === 1 ? cmds[0] : undefined;
   if (!s || s.writes.length > 0 || s.reads.length > 0) return null;
@@ -1995,8 +2096,9 @@ export function commandKind(command: string): string | null {
     return null;
   if (SYSTEM.has(program) || REMOTE.has(program) || INTERPRETERS.has(program) || WRITERS.has(program)) return null;
   const input = { command };
-  if (deniedMessage("Bash", input) || secretRead("Bash", input) || inlineCode(s.argv)) return null;
-  if (outboundCallProblem("Bash", input) || gitPushes(command)?.length !== 0) return null;
+  if (secretRead("Bash", input) || inlineCode(s.argv) || outboundCallProblem("Bash", input)) return null;
+  const denied = deniedMessage("Bash", input);
+  if (denied === SECRET_MESSAGE || (!held && (denied || gitPushes(command)?.length !== 0))) return null;
   // curl and wget only ask when they send or save: their kind would cover every upload.
   if (program === "curl" || program === "wget") return null;
   const args = program === "gh" ? ghWords(rest) : rest;
@@ -2008,7 +2110,9 @@ export function commandKind(command: string): string | null {
   }
   if (words.length === 1 && SCRIPT_RUNNERS.test(program)) return null;
   const kind = words.join(" ");
-  if (RUNS_ANY.test(kind) || NEVER_FOR_GOOD_KIND.test(kind)) return null;
+  if (RUNS_ANY.test(kind)) return null;
+  if (held) return kind;
+  if (NEVER_FOR_GOOD_KIND.test(kind)) return null;
   // Every plain word, not just the kind's: options in between still pick the subcommand (`make X=1 deploy`,
   // `cargo +nightly publish`), and a word that only names something loses the button, never a card.
   if (args.some((w) => NEVER_FOR_GOOD_WORD.test(w))) return null;

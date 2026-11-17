@@ -9,6 +9,7 @@ import {
   answerNow,
   answerQuestion,
   CONSULTATION_HUNG_MS,
+  CONSULTATION_KNOWN_WAIT_MS,
   CONSULTATION_TTL_MS,
   cancelRun,
   consultationConversation,
@@ -21,6 +22,7 @@ import {
   deleteIssue,
   deliverSecret,
   drainOutbox,
+  endWork,
   enqueue,
   expireConsultations,
   grantScopes,
@@ -37,7 +39,6 @@ import {
   recoverStaleRuns,
   releaseInbox,
   reportHandOffs,
-  runAuthority,
   STRETCH,
   sendNote,
   setAgentComputerTarget,
@@ -64,7 +65,12 @@ const inAgentDm = (req: ModelRequest) => systemText(req.system).includes("A priv
 const post = (body: string) =>
   postPersonMessage({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, f.general.id, { body });
 
-const consultations = () => f.db.select().from(schema.agentConsultations);
+/** In the order they were asked: a table read with no order follows where its rows happen to sit. */
+const consultations = () =>
+  f.db
+    .select()
+    .from(schema.agentConsultations)
+    .orderBy(asc(schema.agentConsultations.createdAt), asc(schema.agentConsultations.id));
 const runs = () => f.db.select().from(schema.agentRuns);
 
 async function addInfra() {
@@ -359,8 +365,12 @@ describe("ask_agent", () => {
       status: "answered",
       answer: "Watching the staging metrics.",
     });
+    // Infra's report reaches the person where they asked, as Infra's own message: Dev isn't woken to relay it.
     const timeline = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
-    expect(timeline.at(-1)?.body).toBe("Infra is watching the metrics.");
+    expect(timeline.find((m) => m.author.id === infra.id && m.meta.handedReport)?.body).toBe(
+      "Watching the staging metrics.",
+    );
+    expect(timeline.some((m) => m.body === "Infra is watching the metrics.")).toBe(false);
   });
 
   test("a consulted agent's secret request goes to the person behind it, where they asked", async () => {
@@ -1065,6 +1075,83 @@ describe("ask_agent", () => {
     expect((await runs()).find((r) => r.id === target.id)?.status).toBe("waiting_input");
   });
 
+  test("a plan wait with a known reset stays open past the limit, until the reset and a margin", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { handlers, target } = await asked();
+    const now = Date.now();
+    const resetsAt = new Date(now + 5 * 3600_000).toISOString();
+    const wait = { kind: "claude_code", machineId: "", code: "plan_limit", waitId: "w", since: now, resetsAt };
+    await park(target.id, { waitingForBrain: wait });
+    expect(await expireConsultations({ db: f.db }, new Date(now + CONSULTATION_HUNG_MS + CONSULTATION_TTL_MS))).toBe(0);
+    expect((await consultations())[0]?.status).toBe("open");
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("waiting_input");
+    expect(await expireConsultations({ db: f.db }, new Date(Date.parse(resetsAt) + 31 * 60_000))).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("it stayed at its plan's or budget's limit for over 5 hours");
+    await drainOutbox(f.db, handlers);
+    expect(lastText(f.provider.calls.at(-1)?.request as ModelRequest)).toContain("plan's or budget's limit");
+  });
+
+  test("deep in its plan's line, the wait holds until its own turn to resume, not just the reset", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const now = Date.now();
+    const reset = now + 5 * 3600_000;
+    const resetsAt = new Date(reset).toISOString();
+    const until = new Date(reset + 40 * 60_000).toISOString();
+    const wait = { kind: "claude_code", machineId: "", code: "plan_limit", waitId: "w", since: now, resetsAt, until };
+    await park(target.id, { waitingForBrain: wait });
+    expect(await expireConsultations({ db: f.db }, new Date(reset + 31 * 60_000))).toBe(0);
+    expect((await runs()).find((r) => r.id === target.id)?.status).toBe("waiting_input");
+    expect(await expireConsultations({ db: f.db }, new Date(Date.parse(until) + 31 * 60_000))).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("it stayed at its plan's or budget's limit for over 6 hours");
+  });
+
+  test("a plan wait whose reset was never said ends after a day", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const now = Date.now();
+    await park(target.id, { waitingForBrain: { kind: "claude_code", machineId: "", code: "plan_limit", since: now } });
+    expect(await expireConsultations({ db: f.db }, new Date(now + CONSULTATION_HUNG_MS + CONSULTATION_TTL_MS))).toBe(0);
+    expect(await expireConsultations({ db: f.db }, new Date(now + CONSULTATION_KNOWN_WAIT_MS + 60_000))).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("plan's or budget's limit for over 24 hours");
+  });
+
+  test("a plan reset days away holds it no longer than a day", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const now = Date.now();
+    const resetsAt = new Date(now + 3 * CONSULTATION_KNOWN_WAIT_MS).toISOString();
+    await park(target.id, {
+      waitingForBrain: { kind: "claude_code", machineId: "", code: "plan_limit", since: now, resetsAt },
+    });
+    expect(await expireConsultations({ db: f.db }, new Date(now + CONSULTATION_KNOWN_WAIT_MS + 60_000))).toBe(1);
+    expect((await consultations())[0]?.answer).toContain("plan's or budget's limit for over 24 hours");
+  });
+
+  test("in line on a computer that is online it stays open past the limit; a day in line still ends it", async () => {
+    f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
+    const { target } = await asked();
+    const [machine] = await f.db.insert(schema.machines).values({ orgId: f.org.id, name: "Mac" }).returning();
+    if (!machine) throw new Error("no machine");
+    const now = Date.now();
+    const busy = { kind: "claude_code", machineId: machine.id, code: "busy", waitId: Bun.randomUUIDv7() };
+    await park(target.id, { waitingForBrain: busy, roomWaitSince: now });
+    await f.db.update(schema.agentRuns).set({ waitingMachineId: machine.id }).where(eq(schema.agentRuns.id, target.id));
+    const sweepAt = async (at: Date) => {
+      await f.db
+        .update(schema.machines)
+        .set({ online: true, lastSeenAt: at })
+        .where(eq(schema.machines.id, machine.id));
+      return expireConsultations({ db: f.db }, at);
+    };
+    expect(await sweepAt(new Date(now + CONSULTATION_HUNG_MS + CONSULTATION_TTL_MS))).toBe(0);
+    expect((await consultations())[0]?.status).toBe("open");
+    expect(await sweepAt(new Date(now + CONSULTATION_KNOWN_WAIT_MS + 60_000))).toBe(1);
+    expect((await consultations())[0]?.answer).toContain(
+      "it stayed in line for room on its computer for over 24 hours",
+    );
+  });
+
   test("stopping a helper alone: its asker wakes knowing who stopped it and not to ask again", async () => {
     f = await setup({ askAgent: true, reply: consultReply(() => answer("never sent")) });
     const { handlers, target, asker } = await asked();
@@ -1348,12 +1435,12 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     threadRootId: run.threadRootId,
     triggerMessageId: run.triggerMessageId,
   });
-  const tell = (run: AgentRun, agent: string, message: string) => {
+  const tell = (run: AgentRun, agent: string, message: string, more: Record<string, unknown> = {}) => {
     if (!f.tools) throw new Error("no tools");
     return f.tools.invoke(ctxOf(run), {
       toolUseId: `tu_${crypto.randomUUID()}`,
       name: "tell_agent",
-      input: { agent, message },
+      input: { agent, message, ...more },
     });
   };
   /** The run another agent's note started (or joined). */
@@ -1465,7 +1552,7 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     ]);
   });
 
-  test("what came of it wakes the sender once, as the person's work, which may hand work on again", async () => {
+  test("what came of it reaches the person as the colleague's own report; the sender only notes it, waking nobody", async () => {
     f = await setup({
       askAgent: true,
       judge: notesMatter,
@@ -1483,24 +1570,25 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     const [back, ...more] = await notesBack();
     expect(more).toEqual([]);
     expect(back).toMatchObject({ channelId: f.general.id, authorAgentId: f.agent.id });
+    // On the record for the sender's next turn, waking nobody: the person already read it from Infra.
     expect(back?.meta.notice).toMatchObject({
       kind: "consult_reply",
       from: "@infra",
-      refs: { kind: "note", wake: "1", status: "answered", consultationId: row?.id, runId: row?.askerRunId },
+      refs: { kind: "note", status: "answered", consultationId: row?.id, runId: row?.askerRunId },
     });
-    const woken = (await runsOf(f.agent.id)).find((r) => r.triggerMessageId === back?.id);
-    if (!woken) throw new Error("the sender wasn't woken");
-    expect(woken.status).toBe("done");
-    expect(await runsOf(f.agent.id)).toHaveLength(2);
-    expect(await runAuthority(f.db, woken)).toEqual({ kind: "person", personId: f.owner.id });
-    const read = f.provider.calls
-      .map((c) => c.request)
-      .find((r) => lastText(r).includes("[What @infra did with the work you handed it]: Taxa de erro em 0,1%"));
-    if (!read) throw new Error("the result wasn't read");
-    expect(read.tools?.map((t) => t.name)).toContain("tell_agent");
-    expect(lastText(read)).toContain("Everything you handed off in that turn is back");
+    expect(refsOf(back as { meta: Record<string, unknown> }).wake).toBeUndefined();
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
+    const report = (await f.db.select().from(schema.messages)).find(
+      (m) => m.channelId === f.general.id && m.authorAgentId === infra.id,
+    );
+    expect(report?.body).toBe("Taxa de erro em 0,1%, normal.");
+    expect(report?.meta.handedReport).toBeDefined();
     // Nothing woke Infra again to read anything.
     expect(await runsOf(infra.id)).toHaveLength(1);
+    // The model calls: Dev's turn (the hand-off, then its line) and Infra's answer. No relay turn reads the result.
+    const asked = f.provider.calls.map((c) => JSON.stringify(c.request.messages));
+    expect(asked.filter((m) => m.includes("did with the work you handed it"))).toEqual([]);
+    expect(asked).toHaveLength(3);
   });
 
   test("a bare acknowledgement closes as told: no notice and no run", async () => {
@@ -1519,7 +1607,7 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await runsOf(f.agent.id)).toHaveLength(1);
   });
 
-  test("two notes of one turn come back together: the first close writes nothing, the second wakes once with both", async () => {
+  test("two notes of one turn come back together: the first close writes nothing, the second notes both, waking nobody", async () => {
     f = await setup({
       askAgent: true,
       judge: notesMatter,
@@ -1546,17 +1634,45 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
 
     await release(ops.id);
     const back = await notesBack();
+    // Each reported to the person itself (its handed work): the sender is not woken to relay them.
     expect(back.map((m) => [refsOf(m).agentId, refsOf(m).wake ?? null])).toEqual([
       [infra.id, null],
-      [ops.id, "1"],
+      [ops.id, null],
     ]);
-    const devRuns = await runsOf(f.agent.id);
-    expect(devRuns).toHaveLength(2);
-    expect(devRuns.some((r) => r.triggerMessageId === back[1]?.id)).toBe(true);
-    const read = f.provider.calls.map((c) => JSON.stringify(c.request.messages)).find((m) => m.includes("[What @ops"));
-    expect(read).toContain("[What @infra did with the work you handed it]: Taxa de erro normal.");
-    expect(read).toContain("[What @ops did with the work you handed it]: Fila vazia.");
-    expect(read?.match(/Everything you handed off in that turn is back/g)).toHaveLength(1);
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
+  });
+
+  test("a hand-off that ended with nothing posted home wakes the sender once; one that reported home only adds to it", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    await addAgent("Ops");
+    const dev = await devRun("@dev confere com o infra e o ops");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Confere a taxa de erro.");
+    await tell(dev, "@ops", "Confere a fila.");
+    const [toInfra, toOps] = await consultations();
+    // Ops's work never reached the person (as when it waited for room): its failure is Dev's to tell.
+    await f.db.delete(schema.agentWorks).where(eq(schema.agentWorks.consultationId, toOps?.id ?? ""));
+    const infraRun = await runFor(toInfra);
+    const said = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: infraRun.channelId,
+      author: { type: "agent", agentId: infraRun.agentId, runId: infraRun.id, hop: infraRun.hop },
+      body: "Taxa normal.",
+      meta: { workEnd: { id: infraRun.workId, status: "done" } },
+    });
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "done", replyMessageId: said.id })
+      .where(eq(schema.agentRuns.id, infraRun.id));
+    await endWork({ db: f.db, pubsub: f.pubsub }, await runFor(toInfra), "done");
+    await endHook(infraRun);
+    const opsRun = await runFor(toOps);
+    await f.db.update(schema.agentRuns).set({ status: "failed" }).where(eq(schema.agentRuns.id, opsRun.id));
+    await endHook(opsRun, "failed", "boom");
+    const back = await notesBack();
+    expect(back.map((m) => refsOf(m).wake ?? null)).toEqual([null, "1"]);
+    expect(await runsOf(f.agent.id)).toHaveLength(2);
   });
 
   test("closes and claims interleaved: both closes commit before either claim, and the sender still wakes once", async () => {
@@ -1628,11 +1744,9 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     const back = await notesBack();
     expect(back.map((m) => refsOf(m).agentId)).toEqual([ops.id]);
     expect((await consultations()).find((c) => c.targetAgentId === infra.id)?.status).toBe("open");
-    // The wake says who is still out, so the agent doesn't tell the people everything is back.
-    expect(back[0]?.meta.notice).toMatchObject({ refs: { wake: "1", pending: "@infra" } });
-    const read = f.provider.calls.map((c) => lastText(c.request)).find((t) => t.includes("[What @ops did"));
-    expect(read).toContain("Still out, waiting on a person or a computer: @infra.");
-    expect(read).not.toContain("Everything you handed off in that turn is back");
+    // Ops reported to the person itself: written for Dev's record, waking nobody.
+    expect(refsOf(back[0] as { meta: Record<string, unknown> }).wake).toBeUndefined();
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
     // Its approval card is where the person asked.
     const [approval] = await f.db.select().from(schema.approvals);
     expect(approval).toMatchObject({ agentId: infra.id, channelId: f.general.id, status: "pending" });
@@ -1678,7 +1792,8 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(back.map((m) => [m.channelId, refsOf(m).agentId])).toEqual([[f.general.id, infra.id]]);
     expect(await runsOf(infra.id)).toHaveLength(1);
     expect(await runsOf(ops.id)).toHaveLength(1);
-    expect(await runsOf(f.agent.id)).toHaveLength(2);
+    // Infra and Ops each reported to the person themselves: Dev is not woken to relay it.
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
   });
 
   test("what comes back while the agent that handed it on still works is read at its next step, and joins its answer even if it ends first", async () => {
@@ -1734,6 +1849,64 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
       answer: "Deploy feito; passei a fila ao Ops.\n\n[@ops, to whom @infra handed part of it]: Fila limpa.",
     });
     expect(await notesBack()).toHaveLength(1);
+  });
+
+  test("a heads-up to an agent outside the request neither holds the verdict going up nor joins it", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    const infra = await addInfra();
+    const qa = await addAgent("QA");
+    const ops = await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra para revisar o PR");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Revisa o PR 7 com o QA.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@qa", "Revisa o PR 7.");
+    await endsWith(infraRun, "Pedi a revisão ao QA.");
+    await endHook(infraRun);
+    const toQa = (await consultations()).find((c) => c.targetAgentId === qa.id);
+    const qaRun = await runFor(toQa);
+    const told = await tell(qaRun, "@ops", "O PR 7 foi aprovado.", { heads_up: true });
+    expect(JSON.stringify(told)).toContain("without waiting for it");
+    await answered(qaRun, "Aprovado.");
+
+    expect((await consultations()).find((c) => c.targetAgentId === ops.id)?.status).toBe("open");
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({
+      status: "answered",
+      answer: "Pedi a revisão ao QA.\n\n[@qa, to whom @infra handed part of it]: Aprovado.",
+    });
+    expect((await notesBack()).map((m) => [m.channelId, refsOf(m).agentId])).toEqual([[f.general.id, infra.id]]);
+
+    const toOps = (await consultations()).find((c) => c.targetAgentId === ops.id);
+    await answered(await runFor(toOps), "Anotado, vou avisar a equipe.");
+    expect((await consultations()).find((c) => c.id === toQa?.id)?.answer).toBe("Aprovado.");
+    expect((await consultations()).find((c) => c.id === toInfra?.id)?.answer).not.toContain("Anotado");
+    // Ops's reply stays where QA asked, for the record, waking nobody; the people's conversation got one result.
+    const back = await notesBack();
+    expect(back.filter((m) => m.channelId === f.general.id)).toHaveLength(1);
+    const record = back.find((m) => m.channelId === qaRun.channelId);
+    expect(record && refsOf(record)).toMatchObject({ agentId: ops.id });
+    expect(record && refsOf(record).wake).toBeUndefined();
+    expect(await runsOf(qa.id)).toHaveLength(1);
+  });
+
+  test("without heads_up, a note from a run answering another agent is part of its answer", async () => {
+    f = await setup({ askAgent: true, judge: notesMatter });
+    await addInfra();
+    const ops = await addAgent("Ops");
+    const dev = await devRun("@dev pede ao infra");
+    await ended(dev.id);
+    await tell(dev, "@infra", "Cuida do deploy.");
+    const toInfra = (await consultations())[0];
+    const infraRun = await runFor(toInfra);
+    await tell(infraRun, "@ops", "O deploy saiu.");
+    await answered(infraRun, "Deploy feito.");
+    expect((await consultations()).find((c) => c.id === toInfra?.id)?.status).toBe("open");
+    await answered(await runFor((await consultations()).find((c) => c.targetAgentId === ops.id)), "Anotado.");
+    expect((await consultations()).find((c) => c.id === toInfra?.id)).toMatchObject({
+      status: "answered",
+      answer: "Deploy feito.\n\n[@ops, to whom @infra handed part of it]: Anotado.",
+    });
   });
 
   test("two parts handed on that come back at once both join the answer", async () => {
@@ -2120,7 +2293,7 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await legacy()).toHaveLength(1);
   });
 
-  test("stopping or deleting the agent at work closes what it owed as failed, and the sender hears it once", async () => {
+  test("stopping or deleting the agent at work closes what it owed as failed; the person reads the ends, the sender notes them", async () => {
     f = await setup({
       askAgent: true,
       judge: notesMatter,
@@ -2150,6 +2323,7 @@ describe("tell_agent: what comes of work handed off comes back by itself (ADR 00
     expect(await expireConsultations({ db: f.db }, new Date(Date.now() + CONSULTATION_TTL_MS + 1000))).toBe(0);
     await drainOutbox(f.db, handlers);
     expect((await notesBack()).map((m) => refsOf(m).status)).toEqual(["failed", "failed"]);
-    expect(await runsOf(f.agent.id)).toHaveLength(2);
+    // Each work posted its end where the person asked: nothing for Dev to relay.
+    expect(await runsOf(f.agent.id)).toHaveLength(1);
   });
 });

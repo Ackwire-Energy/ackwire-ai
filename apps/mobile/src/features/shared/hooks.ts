@@ -13,13 +13,14 @@ import {
 } from "@agenteschat/client";
 import { computerEdition } from "@agenteschat/client/lib/computer";
 import { formerById } from "@agenteschat/client/lib/directory";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { clockHour } from "@agenteschat/client/lib/format";
 import { namesComputers } from "@agenteschat/client/lib/machines";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useRealtime } from "@/providers/realtime";
-import { haptics, rememberAgentLooks, useTheme } from "@/ui";
+import { haptics, rememberAgentLooks, useTheme, useToast } from "@/ui";
 import { agentLook, daysAgo, type PacedClock, pacedClock, whenKind } from "./logic";
 
 /** The current organization's id. */
@@ -112,13 +113,41 @@ export function useColors() {
   return useTheme().colors;
 }
 
+/** The formats `useWhen` writes times in, for one language. */
+interface WhenFormats {
+  time: Intl.DateTimeFormat;
+  weekday: Intl.DateTimeFormat;
+  date: Intl.DateTimeFormat;
+  day: Intl.DateTimeFormat;
+}
+
+/**
+ * Made once per language and kept: a format is costly to build (it reads the language's data), and every row of a
+ * list asks for its time through `useWhen`.
+ */
+const whenFormats = new Map<string, WhenFormats>();
+
+function whenFormatsOf(locale: string): WhenFormats {
+  let formats = whenFormats.get(locale);
+  if (!formats) {
+    formats = {
+      time: new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" }),
+      weekday: new Intl.DateTimeFormat(locale, { weekday: "short" }),
+      date: new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" }),
+      day: new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" }),
+    };
+    whenFormats.set(locale, formats);
+  }
+  return formats;
+}
+
 /** Times as the lists say them: "9:41" today, "Ontem", "seg", "12 out". */
 export function useWhen() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || "en";
   return useMemo(() => {
-    const time = (iso: string) =>
-      new Intl.DateTimeFormat(locale, { hour: clockHour(locale), minute: "2-digit" }).format(new Date(iso));
+    const formats = whenFormatsOf(locale);
+    const time = (iso: string) => formats.time.format(new Date(iso));
     const short = (iso: string) => {
       switch (whenKind(iso)) {
         case "time":
@@ -126,18 +155,16 @@ export function useWhen() {
         case "yesterday":
           return t("mobile.time.yesterday");
         case "weekday":
-          return new Intl.DateTimeFormat(locale, { weekday: "short" }).format(new Date(iso)).replace(".", "");
+          return formats.weekday.format(new Date(iso)).replace(".", "");
         case "date":
-          return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short" })
-            .format(new Date(iso))
-            .replace(".", "");
+          return formats.date.format(new Date(iso)).replace(".", "");
       }
     };
     const day = (iso: string) => {
       const d = daysAgo(iso);
       if (d <= 0) return t("mobile.time.today");
       if (d === 1) return t("mobile.time.yesterday");
-      return new Intl.DateTimeFormat(locale, { weekday: "long", day: "numeric", month: "long" }).format(new Date(iso));
+      return formats.day.format(new Date(iso));
     };
     return { time, short, day, locale };
   }, [t, locale]);
@@ -181,4 +208,14 @@ export function usePullRefresh(refetch: () => Promise<unknown>): { refreshing: b
       .finally(() => setRefreshing(false));
   }, []);
   return { refreshing, onRefresh };
+}
+
+/** A failed request's toast: its reason in the person's words (`errorText`), never a bare "try again". */
+export function useErrorToast() {
+  const { t, i18n } = useTranslation();
+  const toast = useToast();
+  return useCallback(
+    (error: unknown) => toast({ title: errorText(t, error, i18n.language), icon: "x" }),
+    [t, i18n.language, toast],
+  );
 }

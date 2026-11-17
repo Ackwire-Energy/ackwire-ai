@@ -1,4 +1,4 @@
-import type { Artifact, ArtifactContent } from "@agenteschat/client";
+import type { Artifact, ArtifactContent, ArtifactFilters, ArtifactKind } from "@agenteschat/client";
 import { documentPreview, parsePatch } from "@agenteschat/client/lib/artifacts";
 import { fileIcon, previewKind } from "@agenteschat/client/lib/files";
 import { daysBetween } from "@agenteschat/client/lib/format";
@@ -43,6 +43,69 @@ export function matchesType(a: Pick<Artifact, "kind" | "title">, type: DriveType
     case "diffs":
       return a.kind === "diff";
   }
+}
+
+/**
+ * The kinds the server narrows a type chip to: the kinds that can hold that type. An uploaded file is one kind on the
+ * server whatever it holds, so a chip that takes files gets them all and the phone keeps the ones its name says are of
+ * the type (`matchesType`).
+ */
+export function driveKinds(type: DriveType): ArtifactKind[] | undefined {
+  switch (type) {
+    case "all":
+      return undefined;
+    case "documents":
+      return ["document", "file"];
+    case "images":
+      return ["file"];
+    case "tables":
+      return ["table", "file"];
+    case "diffs":
+      return ["diff"];
+  }
+}
+
+/** What the Drive asks the server for: the words searched and the kinds the chip narrows to. */
+export function driveFilters(q: string, type: DriveType): ArtifactFilters {
+  const kinds = driveKinds(type);
+  return { ...(q ? { q } : {}), ...(kinds ? { kinds } : {}) };
+}
+
+/**
+ * Whether the Drive asks for the server's next page by itself: fewer files of the type than it shows, more pages on
+ * the server, none on its way, the first page in (not the last filter's, shown while the new one loads) and the last
+ * page asked for not failed (that one waits for the person: asking again at once would never stop).
+ */
+export function keepsLooking(at: {
+  matched: number;
+  wanted: number;
+  hasNextPage: boolean;
+  fetching: boolean;
+  placeholder: boolean;
+  failed: boolean;
+}): boolean {
+  return at.matched < at.wanted && at.hasNextPage && !at.fetching && !at.placeholder && !at.failed;
+}
+
+/**
+ * What the Drive shows: the rows' shape while it loads or while it still looks for files of the type (nothing found
+ * yet, more pages to read), why it didn't load, nothing (with or without filters), or the grid.
+ */
+export type DriveView = "loading" | "failed" | "empty" | "noMatch" | "grid";
+
+export function driveView(at: {
+  loading: boolean;
+  failed: boolean;
+  matched: number;
+  hasNextPage: boolean;
+  placeholder: boolean;
+  filtered: boolean;
+}): DriveView {
+  if (at.failed) return "failed";
+  if (at.loading) return "loading";
+  if (at.matched > 0) return "grid";
+  if (at.placeholder || at.hasNextPage) return "loading";
+  return at.filtered ? "noMatch" : "empty";
 }
 
 export type DriveSectionKey = { kind: "today" } | { kind: "week" } | { kind: "month"; year: number; month: number };

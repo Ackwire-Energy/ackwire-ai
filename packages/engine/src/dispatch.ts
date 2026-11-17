@@ -28,7 +28,7 @@ import { inChannelRun, waitsOnUsage, workKeepsThread, workTakesPersonMessage } f
 import type { AgentRun } from "./runs";
 import { holdOf, hopLimitReached, pauseStretch, personAskedLately, stretchOf, stretchStop } from "./stretch";
 
-const { agentConsultations, agents, channelMembers, channels, agentRuns, messages, outbox } = schema;
+const { agentConsultations, agents, agentWorks, channelMembers, channels, agentRuns, messages, outbox } = schema;
 
 /** The outbox job that looks again at an agent's wake waiting outside any run (`StartRunOptions.park`). */
 export const INBOX_JOB = "agent_inbox.deliver";
@@ -157,7 +157,9 @@ export async function startOrJoinRun(
           inArray(agentRuns.status, [...ACTIVE_RUN_STATUSES]),
           eq(agentRuns.background, false),
           // A person's message never goes to background work at work: a reply turn answers it (agents' still join).
-          message.authorUserId ? workTakesPersonMessage(sql`${agentRuns}`) : workKeepsThread(sql`${agentRuns}`),
+          message.authorUserId
+            ? workTakesPersonMessage(sql`${agentRuns}`, message.authorUserId)
+            : workKeepsThread(sql`${agentRuns}`),
           // In a DM the main timeline is one conversation; each thread (a mission's) is its own.
           sql`(${agentRuns.threadRootId} = ${message.threadId ?? message.id}::uuid or ${
             message.threadId
@@ -285,6 +287,24 @@ export async function deliverParked(
       out ? ("created" in out ? out.created.id : out.joined) : null,
     );
   });
+}
+
+/** The agent has no run left in its computer's line: its parked wakes look now, not at their next `INBOX_LOOK_MS`. */
+export async function kickParkedWakes(db: Executor, orgId: string, agentId: string) {
+  if ((await agentLineRank(db, orgId, agentId)) !== null) return;
+  const now = new Date();
+  await db
+    .update(outbox)
+    .set({ nextAttemptAt: now })
+    .where(
+      and(
+        eq(outbox.orgId, orgId),
+        eq(outbox.kind, INBOX_JOB),
+        eq(outbox.status, "pending"),
+        sql`${outbox.payload}->>'agentId' = ${agentId}`,
+        sql`${outbox.nextAttemptAt} > ${now}`,
+      ),
+    );
 }
 
 /**
@@ -461,7 +481,7 @@ const byPerson = async (tx: Executor, message: Pick<Message, "id" | "orgId">) =>
 /**
  * Whether a message may join a run active in its conversation (ADR 0053 §4, §9). A person's own words
  * steer the agent's run there (and put them behind an unattended one), except in the agents' DM, where a
- * run works for one person. Another agent's message for a person, and work coming back to a person's run (a
+ * run works for one person, and background work, which only its asker's join (ADR 0121). Another agent's message for a person, and work coming back to a person's run (a
  * note's reply, a task that ended, a folder decision), joins only a run working for that same person. A
  * routine's report joins only a run such news woke: never one working for a person, nor the agent's own work
  * (a mission's); it starts a run of its own. What nobody is behind still goes to whatever run works there.
@@ -476,7 +496,19 @@ export async function mayJoin(
     .from(channels)
     .where(and(eq(channels.orgId, message.orgId), eq(channels.id, message.channelId)));
   const agentsDm = !!channel && isAgentOnlyDm(channel);
-  if (!agentsDm && (await byPerson(tx, message))) return true;
+  const [author] = await tx
+    .select({ type: messages.authorType, userId: messages.authorUserId })
+    .from(messages)
+    .where(and(eq(messages.orgId, message.orgId), eq(messages.id, message.id)));
+  if (!agentsDm && author?.type === "person") {
+    // Background work acts on its asker's access: another person's own words never join it (`steerWork`).
+    const [work] = await tx
+      .select({ asker: agentWorks.requestedByUserId })
+      .from(agentRuns)
+      .innerJoin(agentWorks, eq(agentWorks.id, agentRuns.workId))
+      .where(eq(agentRuns.id, runId));
+    return !work || work.asker === author.userId;
+  }
   const root = await messageRoot(tx, message.orgId, message.id);
   if (root.kind === "agent" && !agentsDm) return true;
   const behind = await runAuthorityById(tx, message.orgId, runId);

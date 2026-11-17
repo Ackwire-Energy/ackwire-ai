@@ -109,10 +109,14 @@ const size = (r: ModelRequest) =>
  * with an approval asked by the action itself, a question answered directly, numbers computed with code, a chart for
  * compared numbers, earlier messages linked, mentions only to ask, an ok answered by a reaction alone and a question
  * card's question never written twice (ADR 0089 addendum 2026-11-10), and about 46,770 with team memory (`remember`'s
- * `for: "team"`) and a result claimed only when a call made it (ADR 0167). Where each workspace gets its own computer,
- * `workspaceComputerText` adds 447 to that (about 47,210); the ceiling leaves a little room above both.
+ * `for: "team"`) and a result claimed only when a call made it (ADR 0167), and about 46,970 with an agent asking for
+ * its own settings on its card (`request_settings_change` named, its definition on demand: up front it would add 3,800,
+ * ADR 0137), and 47,631 with recall reading the asker's own DM with the agent from anywhere they ask, an empty search
+ * never told as "the first time", and the DM rule saying what may be said of it elsewhere. Where each workspace gets its
+ * own computer, `workspaceComputerText` adds 447 to that (48,078); and a sign-in whose link or
+ * code goes to a mailbox the agent reads being its own work adds 360; the ceiling leaves a little room above both.
  */
-const OI_CEILING_CHARS = 47_500;
+const OI_CEILING_CHARS = 48_700;
 
 test("a DM 'oi' stays under the size ceiling", async () => {
   const [request] = await play(TURNS.find((t) => t.id === "greet-dm") as ScriptedTurn);

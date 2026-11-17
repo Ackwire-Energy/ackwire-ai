@@ -109,7 +109,11 @@ export function DatabaseRulesPanel({
         <AddressList
           id={id("hidden")}
           label={t("database.rule.hidden")}
-          example={t("database.rule.hiddenHelp")}
+          example={t("database.rule.hiddenExample")}
+          hint={{
+            name: t("common.about", { label: t("database.rule.hidden") }),
+            text: t("database.rule.hiddenHelp"),
+          }}
           values={policy.hiddenColumns}
           onChange={(hiddenColumns) => set({ hiddenColumns })}
           disabled={disabled}

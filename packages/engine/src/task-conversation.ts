@@ -29,7 +29,7 @@ export interface TaskConversationRef {
 }
 
 /**
- * The task's conversation, made on first use: its channel, the root, the assignee agent as a member, and the
+ * The task's conversation, made on first use: its channel, the root, the task's agent as a member, and the
  * task's old comments (`issue_activity` kind `comment`) moved into it as replies with their authors, times and
  * ids (deleted from the activity in the same transaction; its events stay there as the history). Taken under
  * the issue's row lock, so two first uses make one.
@@ -76,9 +76,9 @@ export async function ensureTaskConversation(db: Database, issueId: string): Pro
       .update(issues)
       .set({ conversationChannelId: channel.id, conversationRootId: root.id })
       .where(eq(issues.id, issue.id));
-    if (issue.assigneeType === "agent" && issue.assigneeId) {
-      await admitTaskAgents(tx, issue.orgId, channel.id, { ids: [issue.assigneeId] });
-    }
+    // The task's agent (its first assigned agent, else the creating one) answers there from the first message, and
+    // every agent that has the task is there to be named.
+    await admitTaskAgents(tx, issue.orgId, channel.id, { taskAgent: true, assigned: true });
     return { channelId: channel.id, rootId: root.id };
   });
 }

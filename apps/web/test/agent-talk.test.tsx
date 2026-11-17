@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, ORG_ID, seedState, withChatPrefs } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -34,7 +34,7 @@ const LONG = [
 ].join("\n");
 
 /** Ada's long message in #eng: to Atlas (her run answered his message) or, with `toAgent` off, to people. */
-async function open(toAgent: boolean) {
+async function open(toAgent: boolean, fullMessages = false) {
   const state = seedState();
   state.messages.push({
     id: "msg-long",
@@ -47,6 +47,7 @@ async function open(toAgent: boolean) {
     meta: toAgent ? { toAgent: ATLAS_ID } : {},
     createdAt: ago(30),
   });
+  withChatPrefs(state, { fullMessages });
   const api = createFakeApi(state);
   const r = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
   await settle(5);
@@ -57,21 +58,26 @@ async function open(toAgent: boolean) {
 }
 
 describe("a long message from one agent to another", () => {
-  test("its first paragraph and 'Ler tudo · mais N linhas', which opens it whole in its thread beside the chat", async () => {
+  test("its first paragraph and Ver mais, which opens the rest in place, for good, with no thread opening", async () => {
     const { row } = await open(true);
     expect(row.textContent).not.toContain(LAST);
-    const more = within(row).getByRole("button", { name: /Ler tudo/ });
-    expect(more.textContent).toMatch(/mais \d+ linhas/);
-    await act(async () => fireEvent.click(more));
-    await settle(4);
-    const panel = screen().getByRole("complementary", { name: "Thread" });
-    expect(panel.textContent).toContain(LAST);
-    expect(more.getAttribute("aria-pressed")).toBe("true");
+    await act(async () => fireEvent.click(within(row).getByRole("button", { name: "Ver mais" })));
+    await settle(2);
+    expect(row.textContent).toContain(LAST);
+    expect(screen().queryByRole("complementary", { name: "Thread" })).toBeNull();
+    expect(within(row).queryByRole("button", { name: /^Ver (mais|menos)$/ })).toBeNull();
+    expect(document.activeElement === row.querySelector(".ac-msg__text > .md.msg-clip")).toBe(true);
+  });
+
+  test("full messages bypasses the lead summary too", async () => {
+    const { row } = await open(true, true);
+    expect(row.textContent).toContain(LAST);
+    expect(within(row).queryByRole("button", { name: "Ver mais" })).toBeNull();
   });
 
   test("a message to people stays whole", async () => {
     const { row } = await open(false);
     expect(row.textContent).toContain(LAST);
-    expect(within(row).queryByRole("button", { name: /Ler tudo/ })).toBeNull();
+    expect(within(row).queryByRole("button", { name: "Ver mais" })).toBeNull();
   });
 });

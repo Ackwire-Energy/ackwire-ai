@@ -108,12 +108,13 @@ describe("@mention autocomplete", () => {
     expect(screen().getByText("Atlas entrou no canal.")).toBeTruthy();
   });
 
-  test("in a DM, picking an agent outside it offers nothing to add: a DM takes no new member", async () => {
+  test("in a DM the list has no channel note or sections, and picking an agent outside it offers nothing to add", async () => {
     const { state } = await go(`dm/agent/${ADA_ID}`);
     await typeIn(composer(), "@atl");
-    await click(
-      within(screen().getByRole("listbox", { name: "Pessoas e agentes" })).getByRole("option", { name: /Atlas/ }),
-    );
+    const list = screen().getByRole("listbox", { name: "Pessoas e agentes" });
+    expect(list.textContent).not.toContain("não está no canal");
+    expect(list.textContent).not.toContain("No workspace");
+    await click(within(list).getByRole("option", { name: /Atlas/ }));
     expect(composer().value).toBe("@atlas ");
     expect(document.querySelector(".mention-offer")).toBeNull();
     expect(state.calls.some((c) => c.method === "chat.addMember")).toBe(false);
@@ -209,7 +210,7 @@ describe("profile card", () => {
     expect(c.textContent).toContain("Agente · Dev");
     expect(c.textContent).toContain("Responsável");
     expect(c.textContent).toContain("João");
-    expect(c.textContent).toContain("sonnet 5.5");
+    expect(c.textContent).toContain("Claude Sonnet 5.5");
     expect(c.textContent).not.toContain("Pode");
     expect(c.textContent).toContain("31% do orçamento usado este mês");
     expect(c.textContent).not.toContain("US$");

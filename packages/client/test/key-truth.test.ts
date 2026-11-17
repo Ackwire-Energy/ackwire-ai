@@ -2,9 +2,10 @@ import { expect, test } from "bun:test";
 import { resources } from "@agenteschat/i18n";
 import i18next, { type TFunction } from "i18next";
 import { ApiError } from "../src/api/http";
+import type { Credential } from "../src/api/types";
 import { keyRemovalText } from "../src/lib/ai-accounts";
 import { keyRefusal } from "../src/lib/errors";
-import { rightHandFallback, rightHandOnKey, thinksWithLine } from "../src/lib/right-hand";
+import { rightHandFallback, rightHandOnKey, savedKeyLine, settleSavedKey, thinksWithLine } from "../src/lib/right-hand";
 
 const i18n = i18next.createInstance();
 void i18n.init({ lng: "en", resources, initAsync: false });
@@ -76,28 +77,83 @@ test("a key for the right hand: the workspace's moves first, so a refusal leaves
   ]);
 });
 
-test("Lodi connects to a saved custom endpoint with an explicit model and returns to the workspace AI", async () => {
-  const calls: unknown[] = [];
+const key = (id: string, over: Partial<Credential> = {}): Credential => ({
+  id,
+  provider: "openai",
+  label: "OpenAI",
+  keyHint: "0000",
+  createdAt: "2026-11-01T00:00:00.000Z",
+  revokedAt: null,
+  ...over,
+});
+const endpoint = (id: string, label: string, check?: "ok" | "no_tools" | "failed"): Credential =>
+  key(id, {
+    provider: "custom",
+    label,
+    endpoint: {
+      style: "openai",
+      baseURL: "https://api.example.com/v1",
+      models: [{ id: "m1", ...(check ? { check } : {}) }],
+    },
+  });
+
+/** A connect flow's API: the workspace's keys and default, and every call it makes. */
+function keyApi(keys: Credential[], defaultId: string | null) {
+  const calls: [string, ...unknown[]][] = [];
   const api = {
     agents: {
-      setBrain: async (_o: string, _a: string, input: unknown) => void calls.push(input),
-      update: async (_o: string, _a: string, patch: unknown) => void calls.push(patch),
+      credentials: async () => keys,
+      makeDefaultCredential: async (_o: string, id: string) => void calls.push(["makeDefault", id]),
+      setBrain: async (_o: string, a: string, input: unknown) => void calls.push(["setBrain", a, input]),
+      update: async (_o: string, a: string, patch: unknown) => void calls.push(["update", a, patch]),
     },
+    orgs: { settings: async () => ({ defaultCredentialId: defaultId }) },
   } as never;
-  await rightHandOnKey(
+  return { api, calls };
+}
+
+test("a key saved for one agent goes on it, and the line names the agent", async () => {
+  const saved = endpoint("k2", "Gateway Sul", "ok");
+  const { api, calls } = keyApi([saved], null);
+  const out = await settleSavedKey(
     api,
     "o",
-    { id: "lodi", model: "auto" },
-    {
-      id: "pool",
-      provider: "custom",
-      endpoint: { style: "openai", baseURL: "https://example.com/v1", models: [{ id: "gpt-5.6-luna", check: "ok" }] },
-    },
+    saved,
+    { id: "ada", name: "Ada", model: "auto", brain: "claude_code" },
     [],
   );
   expect(calls).toEqual([
-    { scope: "workspace", brain: "model" },
-    { credentialId: "pool", model: "custom:pool:gpt-5.6-luna" },
-    { brain: "model" },
+    ["setBrain", "ada", { brain: "model" }],
+    ["update", "ada", { credentialId: "k2", model: "custom:k2:m1" }],
   ]);
+  expect(savedKeyLine(t, out, saved)).toBe("Saved. Ada now thinks with Gateway Sul.");
+});
+
+test("a key saved for everyone says who really thinks with it: it, the default it replaced, or the default still", async () => {
+  const fresh = endpoint("k2", "Gateway Sul", "ok");
+  // No default yet: the newest key is what agents without their own use.
+  let run = keyApi([fresh], null);
+  let out = await settleSavedKey(run.api, "o", fresh, undefined, []);
+  expect(run.calls).toEqual([]);
+  expect(savedKeyLine(t, out, fresh)).toBe("Saved. Agents without their own AI think with it.");
+  // The default thinks: it stays, and the line names it (a button may switch).
+  const northwind = endpoint("k1", "Northwind", "ok");
+  run = keyApi([northwind, fresh], "k1");
+  out = await settleSavedKey(run.api, "o", fresh, undefined, []);
+  expect(run.calls).toEqual([]);
+  expect(out).toEqual({ kind: "other", other: "Northwind" });
+  expect(savedKeyLine(t, out, fresh)).toBe("Saved. Your agents still think with Northwind.");
+  // The default can't think and this one can: it becomes the default by itself, and says so.
+  const broken = endpoint("k1", "Northwind", "failed");
+  run = keyApi([broken, fresh], "k1");
+  out = await settleSavedKey(run.api, "o", fresh, undefined, []);
+  expect(run.calls).toEqual([["makeDefault", "k2"]]);
+  expect(out).toEqual({ kind: "made", other: "Northwind" });
+  expect(savedKeyLine(t, out, fresh)).toBe("Saved. Your agents now think with it instead of Northwind.");
+  // Neither thinks: nothing moves, and the line says none of its models passed.
+  const untested = endpoint("k2", "Gateway Sul");
+  run = keyApi([broken, untested], "k1");
+  out = await settleSavedKey(run.api, "o", untested, undefined, []);
+  expect(run.calls).toEqual([]);
+  expect(savedKeyLine(t, out, untested)).toBe("None of Gateway Sul's models has passed a test yet.");
 });

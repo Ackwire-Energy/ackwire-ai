@@ -273,6 +273,7 @@ fn pane_url(pane: &str) -> Option<String> {
         "screen" => "Privacy_ScreenCapture",
         "disk" => "Privacy_AllFiles",
         "network" => "Privacy_LocalNetwork",
+        "microphone" => "Privacy_Microphone",
         _ => return None,
     };
     Some(format!("x-apple.systempreferences:com.apple.preference.security?{anchor}"))
@@ -292,10 +293,10 @@ mod tests {
     #[test]
     fn a_setup_left_minutes_ago_comes_back_in_its_window_and_an_old_or_odd_one_does_not() {
         let at = 1_000_000;
-        let prepare = json!({ "step": "prepare", "org": "Acme", "at": at, "page": "https://app.agentes.chat/org/o1" });
+        let prepare = json!({ "step": "prepare", "org": "Acme", "at": at, "page": "https://hub.ackwire.app/org/o1" });
         assert_eq!(
             resume_of(&prepare, at + 60),
-            Some(Resume { window: "welcome", page: Some("https://app.agentes.chat/org/o1".parse().unwrap()) })
+            Some(Resume { window: "welcome", page: Some("https://hub.ackwire.app/org/o1".parse().unwrap()) })
         );
         assert_eq!(resume_of(&json!({ "step": "prefs", "at": at }), at), Some(Resume { window: "prefs", page: None }));
         assert_eq!(resume_of(&prepare, at + RESUME_WITHIN_SECS + 1), None);
@@ -334,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn only_the_three_privacy_panes_open() {
+    fn only_the_known_privacy_panes_open() {
         assert_eq!(
             pane_url("screen").as_deref(),
             Some("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
@@ -346,6 +347,10 @@ mod tests {
         assert_eq!(
             pane_url("network").as_deref(),
             Some("x-apple.systempreferences:com.apple.preference.security?Privacy_LocalNetwork")
+        );
+        assert_eq!(
+            pane_url("microphone").as_deref(),
+            Some("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
         );
         assert_eq!(pane_url("files"), None);
         assert_eq!(pane_url("x-apple.systempreferences:com.apple.Accounts"), None);

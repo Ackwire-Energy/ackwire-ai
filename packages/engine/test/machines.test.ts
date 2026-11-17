@@ -44,6 +44,7 @@ import {
   SERVER_STOP_TASK_GRACE_MS,
   type SecretRequestView,
   secretSite,
+  setAgentCoAuthor,
   setAgentComputerTarget,
   setMyLocale,
   TASK_OFFLINE_GRACE_MS,
@@ -1107,10 +1108,25 @@ describe("tools on a connected machine", () => {
     expect(runner.sent.find((s) => s.type === "request" && s.op === "push")).toMatchObject({
       url: `http://localhost:3000/api/machines/uploads/${row?.id}`,
     });
-    // Every request says which agent it's for (the runner keeps each agent in its own folder) and its name (protocol 9).
+    // Every request says which agent it's for (the runner keeps each agent in its own folder) and its name (protocol 9);
+    // a command, the agent's own line its commits end with (protocol 63, ADR 0156).
     const requests = runner.sent.filter((s) => s.type === "request");
     expect(requests.length).toBeGreaterThan(3);
-    for (const r of requests) expect(r.agent).toEqual({ id: f.agent.id, handle: "dev", name: "Dev" });
+    expect(requests.some((r) => r.op === "exec")).toBe(true);
+    for (const r of requests) {
+      expect(r.agent).toEqual({
+        id: f.agent.id,
+        handle: "dev",
+        name: "Dev",
+        ...(r.op === "exec" ? { coAuthors: ["Co-authored-by: Dev <noreply@agentes.chat>"] } : {}),
+      });
+    }
+    // A person asked to turn it off: the next command goes without it.
+    await setAgentCoAuthor(f.db, f.org.id, false);
+    await call(ctx, "run_code", { language: "python", code: "print(1)" });
+    const last = runner.sent.filter((s) => s.type === "request" && s.op === "exec").at(-1);
+    expect(last?.agent).toEqual({ id: f.agent.id, handle: "dev", name: "Dev" });
+    await setAgentCoAuthor(f.db, f.org.id, true);
 
     const status = await call(ctx, "computer_status", {});
     expect(status.content).toContain('connected computer "Build box" (Linux), online');
@@ -1176,12 +1192,16 @@ describe("tools on a connected machine", () => {
     const out = await call(ctx, "run_code", { language: "bash", code: "ls" });
     expect(out).toMatchObject({ isError: true });
     expect(out.content).toContain(
-      "Commands are turned off on the computer Ana's Mac: you can only read, write, list and upload files there. Tell the people: only the person at Ana's Mac can turn commands on, in the Ackwire AI app there (Preferences › Tools, Commands).",
+      "Commands are turned off on the computer Ana's Mac: you can only read, write, list and upload files there. Tell the people: whoever connected Ana's Mac turns commands on with the button under your reply, or in the Ackwire AI app there (Preferences › Tools, Commands).",
     );
     expect(out.content).not.toContain("--no-exec");
+    // The reply carries the switch: the chat shows its one click under the agent's words.
+    expect(out.data).toEqual({ toolOff: { machineId: paired.machineId, tool: "commands" } });
     await f.db.update(schema.machines).set({ os: "linux" }).where(eq(schema.machines.id, paired.machineId));
     const linux = await call(ctx, "run_code", { language: "bash", code: "ls" });
-    expect(linux.content).toContain("can turn commands on, with `agentes-runner tools enable commands` there.");
+    expect(linux.content).toContain(
+      "with the button under your reply, or with `agentes-runner tools enable commands` there.",
+    );
     expect(linux.content).not.toContain("--no-exec");
   });
 
@@ -2260,6 +2280,9 @@ test("the start-page language follows the responsible person and changes reach t
   await setMyLocale(f.db, f.owner.id, "pt-BR", false, f.pubsub);
   expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("pt-BR");
   expect(signals).toContainEqual({ type: "machine.agents", orgId: f.org.id });
+  // Every app language reaches the runner, not only Portuguese and English.
+  await setMyLocale(f.db, f.owner.id, "ja", false, f.pubsub);
+  expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("ja");
   await setMyLocale(f.db, f.owner.id, "en", false, f.pubsub);
   expect((await machineAgents(f.db, f.org.id, paired.machineId)).find((a) => a.id === agent.id)?.locale).toBe("en");
 });

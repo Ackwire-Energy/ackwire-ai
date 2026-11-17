@@ -228,7 +228,7 @@ mod tests {
     fn only_our_links() {
         let ok: Url = "agenteschat://connect?server=https%3A%2F%2Fagentes.tail1234.ts.net".parse().unwrap();
         assert!(accept(&ok));
-        assert!(!accept(&"https://app.agentes.chat/connect".parse().unwrap()));
+        assert!(!accept(&"https://hub.ackwire.app/connect".parse().unwrap()));
         let long: Url = format!("agenteschat://connect?server=x&pad={}", "a".repeat(MAX_LINK)).parse().unwrap();
         assert!(!accept(&long));
         assert!(in_args(&["/usr/bin/agentes".into(), "agenteschat://connect?server=x".into()]));
@@ -238,9 +238,9 @@ mod tests {
     #[test]
     fn pair_links() {
         let pair = |u: &str| pair_link(&u.parse().unwrap());
-        let ok = Some(PairLink { server: "https://app.agentes.chat".into(), code: "ABCDEFGH".into() });
-        assert_eq!(pair("agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFGH"), ok);
-        assert_eq!(pair("agenteschat://pair/?link=abcdefgh&server=https://app.agentes.chat/&utm=x"), ok);
+        let ok = Some(PairLink { server: "https://hub.ackwire.app".into(), code: "ABCDEFGH".into() });
+        assert_eq!(pair("agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFGH"), ok);
+        assert_eq!(pair("agenteschat://pair/?link=abcdefgh&server=https://hub.ackwire.app/&utm=x"), ok);
         assert_eq!(
             pair("agenteschat://pair?server=http%3A%2F%2F127.0.0.1%3A4310&link=ABCD-EFGH").map(|p| p.server),
             Some("http://127.0.0.1:4310".into())
@@ -249,22 +249,22 @@ mod tests {
             "agenteschat://pair?server=http%3A%2F%2Fagentes.example.com&link=ABCD-EFGH",
             "agenteschat://pair?server=https%3A%2F%2Fu%3Ap%40agentes.example.com&link=ABCD-EFGH",
             "agenteschat://pair?server=agentes.example.com&link=ABCD-EFGH",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFG",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFGHJ",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABC-DEFGH",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFG1",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-ÉFGH",
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFG",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFGHJ",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABC-DEFGH",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFG1",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-ÉFGH",
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app",
             "agenteschat://pair?link=ABCD-EFGH",
-            "agenteschat://pair/x?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFGH",
-            "agenteschat://connect?server=https%3A%2F%2Fapp.agentes.chat&link=ABCD-EFGH",
+            "agenteschat://pair/x?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFGH",
+            "agenteschat://connect?server=https%3A%2F%2Fhub.ackwire.app&link=ABCD-EFGH",
         ] {
             assert_eq!(pair(bad), None, "{bad}");
         }
         // The window gets only the two fields, as the server stores the code.
         assert_eq!(
-            pair_url(&PairLink { server: "https://app.agentes.chat".into(), code: "ABCDEFGH".into() }),
-            "agenteschat://pair?server=https%3A%2F%2Fapp.agentes.chat&link=ABCDEFGH"
+            pair_url(&PairLink { server: "https://hub.ackwire.app".into(), code: "ABCDEFGH".into() }),
+            "agenteschat://pair?server=https%3A%2F%2Fhub.ackwire.app&link=ABCDEFGH"
         );
     }
 
@@ -290,16 +290,16 @@ mod tests {
 
     #[test]
     fn a_connector_s_sign_in_goes_to_the_site_open_now() {
-        let site: Url = "https://app.agentes.chat".parse().unwrap();
+        let site: Url = "https://hub.ackwire.app".parse().unwrap();
         let back: Url = "agenteschat://desktop/connectors/oauth?org=o1&state=s1&code=c%202&other=x".parse().unwrap();
         assert_eq!(
             connector_page(&back, &site).unwrap().as_str(),
-            "https://app.agentes.chat/desktop/connector?org=o1&state=s1&code=c+2"
+            "https://hub.ackwire.app/desktop/connector?org=o1&state=s1&code=c+2"
         );
         let refused: Url = "agenteschat://desktop/connectors/oauth?org=o1&error=access_denied".parse().unwrap();
         assert_eq!(
             connector_page(&refused, &site).unwrap().as_str(),
-            "https://app.agentes.chat/desktop/connector?org=o1&error=access_denied"
+            "https://hub.ackwire.app/desktop/connector?org=o1&error=access_denied"
         );
         // A server of the person's own, on its own port; the phone app's link and a connect link aren't this.
         let own: Url = "http://127.0.0.1:4310/".parse().unwrap();

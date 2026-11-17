@@ -5,6 +5,7 @@ import { approvalTitle } from "./approval-words";
 import { billingHoldOf } from "./billing";
 import { reviewFlaggedOf } from "./errors";
 import { lowerFirst } from "./format";
+import { COMPUTERS_ROW } from "./roles";
 import { stepLabel, toolWhy } from "./work";
 
 /*
@@ -58,7 +59,7 @@ export function auditActorName(t: TFunction, row: AuditRow): string | null {
 }
 
 /** "Usou o Gmail", "Criou uma tarefa", "Aprovou um pedido", "Criou uma rotina". */
-export function auditPhrase(t: TFunction, row: AuditRow): string {
+export function auditPhrase(t: TFunction, row: AuditRow, locale?: string): string {
   if (row.action === TOOL_CALL) {
     const kind = auditStr(row.details.kind);
     const connector = auditStr(row.details.connector);
@@ -71,7 +72,7 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
       (guessed.kind === "consulting" || guessed.kind === "readingDrive") && kind !== "read"
         ? { kind: "usingTool" as const }
         : guessed;
-    return stepLabel(t, { ...activity, tool: row.target.id ?? "" });
+    return stepLabel(t, { ...activity, tool: row.target.id ?? "" }, locale);
   }
   if (row.action === "agent.merged_without_asking") {
     return t("audit.change.mergedWithoutAsking", { repo: row.target.id ?? "" });
@@ -84,6 +85,12 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
   if (area === "member") {
     const what = (["joined", "left", "role_changed"] as const).find((s) => s === rest);
     if (what) return t(`audit.change.member.${what}`);
+  }
+  // "Quem pode…" (ADR 0085 addendum of 2026-11-13): the row, in the permission's own words.
+  if (row.action === "role.permission_set") {
+    const key = auditStr(row.details.row);
+    if (key === COMPUTERS_ROW) return t("audit.change.role.permission_set_computers");
+    if (key) return t("audit.change.role.permission_set", { short: t(`permissions.${key}.short` as never) });
   }
   // AI apps (ADR 0119): the app's or the token's name, as it was shown when it happened.
   if (area === "apps") {
@@ -111,7 +118,7 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
 /** The sentence in two parts, so the name can be drawn bold: `name` null for the system. */
 export function auditSentence(t: TFunction, row: AuditRow, locale: string): { name: string | null; text: string } {
   const name = auditActorName(t, row);
-  const text = auditPhrase(t, row);
+  const text = auditPhrase(t, row, locale);
   return { name, text: name ? lowerFirst(text, locale) : text };
 }
 
@@ -120,8 +127,10 @@ const VAULT_ACTIONS = [
   "item_created",
   "item_changed",
   "item_deleted",
+  "item_moved",
   "item_used",
   "imported",
+  "keys_imported",
   "connection_added",
   "connection_changed",
   "connection_removed",

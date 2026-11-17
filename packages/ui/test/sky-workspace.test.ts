@@ -16,12 +16,28 @@ import {
 } from "../src/sky/workspace";
 
 describe("which sky a server gets", () => {
-  test("agentes.chat and its subdomains are the Cloud's day", () => {
-    for (const host of ["agentes.chat", "app.agentes.chat", "AGENTES.CHAT", "agentes.chat:443"])
+  test("Ackwire and compatible Cloud hosts get the day sky", () => {
+    for (const host of [
+      "ackwire.app",
+      "hub.ackwire.app",
+      "HUB.ACKWIRE.APP:443",
+      "agentes.chat",
+      "app.agentes.chat",
+      "AGENTES.CHAT",
+      "agentes.chat:443",
+    ])
       expect(skyHourOf(host)).toBe("day");
   });
   test("any other host is one's own: dusk", () => {
-    for (const host of ["macbook.tail1234.ts.net", "chat.acme.com", "localhost:5173", "notagentes.chat", ""])
+    for (const host of [
+      "macbook.tail1234.ts.net",
+      "chat.acme.com",
+      "localhost:5173",
+      "notagentes.chat",
+      "notackwire.app",
+      "ackwire.app.example.org",
+      "",
+    ])
       expect(skyHourOf(host)).toBe("dusk");
   });
 });

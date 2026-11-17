@@ -31,6 +31,8 @@ import {
   planLabel,
   startAccountLogin,
 } from "../../control/accounts";
+import { agentsPageUrl } from "../../control/devices";
+import { homeServer } from "../../control/server";
 import { type Home, orgName } from "../../control/store";
 import { OrgTile } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefRow } from "../../ui/settings";
@@ -231,12 +233,12 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
         </section>
       ))}
 
-      {adding && homeId && (
+      {adding && home && (
         <AddAccountDialog
           kind={adding}
-          homeId={homeId}
+          home={home}
           onClose={() => setAdding(null)}
-          onAdded={() => void load(homeId)}
+          onAdded={() => void load(home.homeId)}
         />
       )}
 
@@ -273,15 +275,19 @@ export function ToolAccounts({ homes, executors }: { homes: Home[]; executors: C
 /** "Adicionar conta": the CLI's sign-in in the browser, the app waiting; then which account came back. */
 function AddAccountDialog({
   kind,
-  homeId,
+  home,
   onClose,
   onAdded,
 }: {
   kind: DesktopKind;
-  homeId: string;
+  home: Home;
   onClose: () => void;
   onAdded: () => void;
 }) {
+  const homeId = home.homeId;
+  const server = homeServer(home);
+  const orgId = home.status?.org?.id;
+  const agentsUrl = server && orgId ? agentsPageUrl(server, orgId) : null;
   const { t } = useTranslation();
   const host = useHost();
   const store = useStore();
@@ -339,6 +345,16 @@ function AddAccountDialog({
           </DialogBody>
         )}
         <DialogFooter bar>
+          {agentsUrl && (
+            <Button
+              onClick={() => {
+                void host.openExternal(agentsUrl).catch(() => {});
+                onClose();
+              }}
+            >
+              {t("desktop.prefs.accounts.chooseAgents")}
+            </Button>
+          )}
           <Button variant="primary" onClick={onClose}>
             {t("desktop.prefs.accounts.ok")}
           </Button>

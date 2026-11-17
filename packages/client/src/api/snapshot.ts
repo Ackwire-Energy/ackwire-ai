@@ -1,4 +1,5 @@
-import { type DehydratedState, dehydrate, hashKey, hydrate, type Query, type QueryClient } from "@tanstack/react-query";
+import { type DehydratedState, dehydrate, hydrate, type Query, type QueryClient } from "@tanstack/react-query";
+import { ME_HASH } from "./keys";
 import { MISSIONS_WAITING_COUNT } from "./missions";
 import type { Me, Message } from "./types";
 
@@ -11,8 +12,8 @@ import type { Me, Message } from "./types";
  * Only an allow-list is kept: the signed-in person, the conversation lists,
  * agents and people, the sidebar's tools and counts, and the latest messages
  * of the most recent chats. It belongs to one person: dropped when `me` leaves
- * the cache (`qc.clear()` on sign-out, sign-in or a 401) or comes back as
- * someone else.
+ * the cache (`qc.clear()` on sign-out, sign-in or a 401), comes back as
+ * someone else, or waits for its deletion.
  */
 export interface SnapshotStorage {
   read(): Promise<string | null>;
@@ -54,15 +55,23 @@ const ORG_LISTS = new Set([
   "overview",
   "issues-view",
 ]);
-/** `["org", orgId, "channel", channelId, <part>]`: kept for the chats in the snapshot. */
-const CHAT_PARTS = new Set(["messages", "roster", "members"]);
-const ME_HASH = hashKey(["me"]);
+/**
+ * `["org", orgId, "channel", channelId, <part>]`: kept for the chats in the snapshot. With its messages, what changes
+ * their rows (the agents' questions to each other here, and the threads' links below, `chatThreads`): a chat opened
+ * from the snapshot shows its rows whole, and none grows under the person once the server answers.
+ */
+const CHAT_PARTS = new Set(["messages", "roster", "members", "consultations"]);
 
 const isMe = (key: readonly unknown[]) => key.length === 1 && key[0] === "me";
+/** `["org", orgId, "threads", "channel", channelId, "all"]`: a chat's threads, for the links under their roots. */
+const chatThreads = (key: readonly unknown[]) =>
+  key.length === 6 && key[0] === "org" && key[2] === "threads" && key[3] === "channel" && key[5] === "all"
+    ? { chat: `${key[1]}/${key[4]}`, part: "threads" }
+    : null;
 const chatPart = (key: readonly unknown[]) =>
   key.length === 5 && key[0] === "org" && key[2] === "channel" && CHAT_PARTS.has(key[4] as string)
     ? { chat: `${key[1]}/${key[3]}`, part: key[4] as string }
-    : null;
+    : chatThreads(key);
 const isOrgList = (key: readonly unknown[]) => key.length === 3 && key[0] === "org" && ORG_LISTS.has(key[2] as string);
 /** `["org", orgId, "missions", "list", <query>]`: only the sidebar's count of the missions waiting for me. */
 const WAITING_COUNT = JSON.stringify(MISSIONS_WAITING_COUNT);
@@ -99,11 +108,19 @@ export function createSnapshot(qc: QueryClient, storage: SnapshotStorage) {
 
   const save = async () => {
     timer = null;
-    const who = currentOwner();
-    if (!who) return;
+    const me = qc.getQueryData<Me | null>(["me"]);
+    if (!me) return;
+    // Waiting for its deletion: the server alone says so at every opening, never a copy from disk whose session may
+    // have ended since.
+    if (me.user.deletion) return wipe();
+    const who = me.user.id;
     owner = who;
     const picked = new Set(pickSnapshotQueries(qc.getQueryCache().getAll()).map((q) => q.queryHash));
-    const state = dehydrate(qc, { shouldDehydrateQuery: (q) => picked.has(q.queryHash) });
+    const state = dehydrate(qc, {
+      shouldDehydrateQuery: (q) => picked.has(q.queryHash),
+      // A request that waits for the network holds what it carries (a typed key, a header's value): never written.
+      shouldDehydrateMutation: () => false,
+    });
     for (const q of state.queries) {
       if (chatPart(q.queryKey)?.part === "messages" && Array.isArray(q.state.data)) {
         q.state = { ...q.state, data: trimMessages(q.state.data as Message[]) };
@@ -133,6 +150,12 @@ export function createSnapshot(qc: QueryClient, storage: SnapshotStorage) {
         return false;
       }
       if (snapshot.v !== SNAPSHOT_VERSION || Date.now() - snapshot.savedAt > SNAPSHOT_MAX_AGE_MS) {
+        await wipe();
+        return false;
+      }
+      const saved = snapshot.state.queries.find((q) => q.queryHash === ME_HASH)?.state.data as Me | null | undefined;
+      // `save` keeps no account that waits for its deletion, but a snapshot an older version of the app wrote can.
+      if (saved?.user.deletion) {
         await wipe();
         return false;
       }

@@ -3,17 +3,18 @@ import { errorCode, knownErrorText } from "@agenteschat/client/lib/errors";
 import { namesText } from "@agenteschat/client/lib/format";
 import { JOIN_NOTE_MAX, sendsEmail } from "@agenteschat/client/lib/join-requests";
 import { isEmail } from "@agenteschat/client/lib/text";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, TextInput, View } from "react-native";
+import { StyleSheet, TextInput, type TextInputInstance, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { fieldText, GROUPED_ROW, GroupedFooter, GroupedHeader, GroupedList, Text, useToast } from "@/ui";
 import { Page } from "../me/parts";
 import { useColors } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
-import { TextArea } from "../shared/TextArea";
+import { overLimit, TextArea } from "../shared/TextArea";
 import { invitersOf, suggestRefusal } from "./logic";
 
+const NOTE_LIMIT = { max: JOIN_NOTE_MAX };
 /**
  * Sugerir pessoa, for a member who may not invite (ADR 0090 §7): an address and, if they like, who it is, which reach
  * the people who invite as a request. "Mandar" in the bar; refusals said under the address, in our words.
@@ -30,9 +31,11 @@ export function SuggestPersonScreen() {
   const emails = sendsEmail(useAuthConfig().data);
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const noteField = useRef<TextInputInstance | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
+    if (overLimit(note, NOTE_LIMIT)) return;
     const address = email.trim().toLowerCase();
     if (!isEmail(address)) return setError(t("members.suggest.refused.invalid"));
     setError(null);
@@ -61,7 +64,7 @@ export function SuggestPersonScreen() {
       title={t("members.suggest.button")}
       action={{
         label: t("mobile.invitePeople.send"),
-        disabled: suggest.isPending || !email.trim(),
+        disabled: suggest.isPending || !email.trim() || overLimit(note, NOTE_LIMIT),
         onPress: () => void submit(),
       }}
       locked={suggest.isPending}
@@ -83,27 +86,33 @@ export function SuggestPersonScreen() {
             autoCorrect={false}
             autoComplete="email"
             spellCheck={false}
-            returnKeyType="done"
-            autoFocus
+            // Next goes on to who it is, the keyboard staying up between the two.
+            returnKeyType="next"
+            submitBehavior="submit"
+            onSubmitEditing={() => noteField.current?.focus()}
             accessibilityLabel={t("members.suggest.email")}
             style={[fieldText("callout"), styles.input, { color: c.ink }]}
           />
         </View>
       </GroupedList>
+      {/* Under the address, as the forms' footers: in red, read out as it comes. */}
       {error ? (
-        <Text variant="footnote" tone="danger" style={styles.error} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
+        <GroupedFooter>
+          <Text variant="footnote" tone="danger" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        </GroupedFooter>
       ) : null}
       <GroupedHeader>
         {t("common.joinSentences", { a: t("members.suggest.who"), b: t("members.dialog.optional") })}
       </GroupedHeader>
       <TextArea
+        ref={noteField}
         value={note}
         onChangeText={setNote}
         placeholder={t("members.suggest.whoPlaceholder")}
         accessibilityLabel={t("members.suggest.who")}
-        maxLength={JOIN_NOTE_MAX}
+        limit={NOTE_LIMIT}
       />
       <GroupedFooter>{t(emails ? "members.suggest.dialogText" : "members.suggest.dialogTextNoEmail")}</GroupedFooter>
     </Page>
@@ -113,5 +122,4 @@ export function SuggestPersonScreen() {
 const styles = StyleSheet.create({
   field: { minHeight: GROUPED_ROW.minHeight, paddingHorizontal: GROUPED_ROW.padX, justifyContent: "center" },
   input: { paddingVertical: GROUPED_ROW.tallPadY, paddingHorizontal: 0 },
-  error: { paddingTop: 8, paddingHorizontal: 16 },
 });

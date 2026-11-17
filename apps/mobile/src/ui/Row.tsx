@@ -9,6 +9,8 @@ import { leadBox } from "./type-scale";
 
 /** The leading column: a tile or face of up to 36 pt, centered in it. */
 const LEAD = 36;
+/** A faded row's face and words, as the web's Offline rows. */
+const FADED = 0.45;
 
 export interface RowProps {
   leading?: ReactNode;
@@ -24,6 +26,8 @@ export interface RowProps {
   divider?: boolean;
   /** Under the text, in its column (a plan's meter, a note). */
   below?: ReactNode;
+  /** Someone off for now (a members list's Offline): the face and the words dimmed, the meta as it is. */
+  faded?: boolean;
 }
 
 /** A list row: leading avatar or tile, title in ink, a muted line, meta on the right. */
@@ -37,6 +41,7 @@ export function Row({
   onPress,
   divider = false,
   below,
+  faded = false,
 }: RowProps) {
   const { colors } = useTheme();
   const fontScale = useFontScale();
@@ -69,8 +74,10 @@ export function Row({
         />
       ) : null}
       {/* One column for whatever leads (a 30 or 36 tile or face): the text and the hairline above start together. */}
-      {leading ? <View style={{ width: LEAD, alignItems: "center" }}>{leading}</View> : null}
-      <View style={{ flex: 1, minWidth: 0 }}>
+      {leading ? (
+        <View style={{ width: LEAD, alignItems: "center", opacity: faded ? FADED : 1 }}>{leading}</View>
+      ) : null}
+      <View style={{ flex: 1, minWidth: 0, opacity: faded ? FADED : 1 }}>
         <Text variant="title" numberOfLines={1}>
           {title}
         </Text>

@@ -329,7 +329,15 @@ describe("a board's notices (ADR 0135)", () => {
     expect(widgetNoticeOf(alert)).toMatchObject({ kind: "alert", widgetId: "w1", agentId: "ada", text: "Caiu 24%." });
     expect(
       widgetNoticeOf(notification({ id: "f", kind: "widget_failed", latest: { reason: "budget_exceeded" } })),
-    ).toMatchObject({ kind: "failed", reason: "budget_exceeded", text: null });
+    ).toMatchObject({ kind: "failed", reason: "budget_exceeded", detail: null });
+    // The failure's detail as the widget keeps it: the agent's words, or why its agent has no AI.
+    const failedWith = (latest: AppNotification["latest"]) =>
+      widgetNoticeOf(notification({ id: "d", kind: "widget_failed", latest }));
+    expect(failedWith({ reason: "agent_reported", text: "Sem dados." })).toMatchObject({ detail: "Sem dados." });
+    expect(failedWith({ reason: "missing_credential", detail: "not_signed_in" })).toMatchObject({
+      reason: "missing_credential",
+      detail: "not_signed_in",
+    });
     expect(
       widgetNoticeOf(
         notification({ id: "p", kind: "dashboard_proposal", latest: { statusTo: "roles", names: ["Vendas"] } }),

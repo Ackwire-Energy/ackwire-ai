@@ -15,8 +15,8 @@ import { useToast } from "@/ui";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 
 /**
- * "Fixar no topo", the web sidebar's pins on the phone: the same per-person pins (`…/me/sidebar/view`), on top of
- * Conversas' Agentes, Canais and Pessoas and of Agentes' Livres. Day one, the person's own agents.
+ * "Fixar no topo", the web sidebar's pins on the phone: the same per-person pins (`…/me/sidebar/view`), on Conversas'
+ * strip (`PinnedStrip`) and on top of Agentes' Livres. Day one, the person's own agents.
  */
 export function usePins(): {
   pins: SidebarPins;

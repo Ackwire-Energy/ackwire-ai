@@ -1,5 +1,5 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
-import { Button, Icon } from "@agenteschat/ui";
+import { Button, Chip } from "@agenteschat/ui";
 import { type ReactNode, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "@/auth/context";
@@ -50,9 +50,21 @@ export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
 }
 
 /**
- * "Continuar com Google/GitHub/Apple": the brand's mark and the words centred, as on every button. "Último usado" is a
- * line under the one used last: inside it, the note would push them off centre, or onto the words on a narrow column.
- * `onSocial` takes over the redirect (the Mac app signs in through the browser).
+ * "Último usado" on the top-right corner of the button used last, out of the flow so the button's words stay centred.
+ * Its parent is the button's `.auth-last-host`; the button points to it with `aria-describedby={id}`.
+ */
+export function LastUsed({ id }: { id: string }) {
+  const { t } = useTranslation();
+  return (
+    <Chip tone="info" className="auth-last" id={id}>
+      {t("auth.lastUsed")}
+    </Chip>
+  );
+}
+
+/**
+ * "Continuar com Google/GitHub/Apple": the brand's mark and the words centred, as on every button, "Último usado" on
+ * the corner of the one used last. `onSocial` takes over the redirect (the Mac app signs in through the browser).
  * `earlyAccess`: the early-access link's token, for the sign-up it opens.
  */
 export function SocialButtons({
@@ -79,7 +91,7 @@ export function SocialButtons({
   return (
     <div className="auth-social">
       {providers.map((p) => (
-        <div key={p} className="auth-social__item">
+        <div key={p} className="auth-last-host">
           <Button
             type="button"
             size="lg"
@@ -94,12 +106,7 @@ export function SocialButtons({
             {BRAND[p]}
             {label[p]}
           </Button>
-          {last === p && (
-            <span className="auth-social__last ac-iconline" id={lastId}>
-              <Icon name="clock" size={14} />
-              {t("auth.lastUsed")}
-            </span>
-          )}
+          {last === p && <LastUsed id={lastId} />}
         </div>
       ))}
     </div>

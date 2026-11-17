@@ -115,13 +115,16 @@ describe("the setup group", () => {
       "propose_agent",
       "propose_remove_agents",
       "propose_settings_change",
+      "request_settings_change",
     ]);
-    expect(deferrableGroups(granted).map((g) => [g.key, g.label])).toEqual([
-      [
-        "setup",
-        "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents; the right hand: approvals, people, any screen)",
-      ],
+    // An agent's own settings go with the conversation's rarer tools, whatever its setup grant (ADR 0137).
+    expect(deferrableGroups(granted).map((g) => [g.key, g.tools.length])).toEqual([
+      ["setup", 7],
+      ["more", 1],
     ]);
+    expect(deferrableGroups(granted)[0]?.label).toBe(
+      "Workspace setup (connect an AI, an app or an MCP server, invite people, create channels, propose agents, archive or delete agents; the right hand: approvals, people, any screen)",
+    );
     // Not loaded: behind find_tools; loaded: as they are.
     expect(presentTools(granted, undefined, []).map((t) => t.name)).toEqual(["find_tools", "use_tool"]);
     expect(presentTools(granted, undefined, ["setup"]).map((t) => t.name)).toEqual([
@@ -132,6 +135,8 @@ describe("the setup group", () => {
       "propose_agent",
       "propose_remove_agents",
       "propose_settings_change",
+      "find_tools",
+      "use_tool",
     ]);
     const kind = (name: string) => toolKind({ name, scope: SETUP_SCOPE, connectionId: null }).kind;
     expect(kind("offer_connect_ai")).toBe("here");
@@ -139,6 +144,8 @@ describe("the setup group", () => {
     expect(kind("propose_remove_agents")).toBe("here");
     expect(kind("offer_connect_app")).toBe("here");
     expect(kind("offer_invites")).toBe("here");
+    // An agent's own settings, as its permissions: no routine asks for them.
+    expect(kind("request_settings_change")).toBe("elsewhere");
     expect(kind("create_channel")).toBe("elsewhere");
   });
 });

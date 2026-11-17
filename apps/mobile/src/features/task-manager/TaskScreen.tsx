@@ -1,12 +1,13 @@
 import type { EndedTask, ManagedTask } from "@agenteschat/client";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { endedState, linePlace, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
+import { endedState, endedText, linePlace, taskState, taskTitle } from "@agenteschat/client/lib/task-manager";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
+  EmptyState,
+  GroupedFooter,
   GroupedHeader,
   GroupedList,
   GroupedRow,
@@ -15,27 +16,30 @@ import {
   PixelStopped,
   SCREEN_X,
   Section,
+  SkeletonList,
   Text,
   weights,
 } from "@/ui";
 import { router } from "@/ui/navigation";
 import { RunSteps } from "../chat/ToolCalls";
-import { chatHref } from "../links/logic";
 import { useOpenQueue } from "../queue/QueueSheet";
 import { AgentFace, Face, OpensAgent } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
+import { useColors, useDirectory, useMeId, useNow, usePullRefresh } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { SheetHostProvider } from "../shared/SheetHost";
-import { useStopper, useTasksToday } from "./hooks";
-import { endedText, rowState, taskSubline } from "./logic";
+import { askToStop, useStopper, useTasksToday } from "./hooks";
+import { rowState, taskHref, taskSubline } from "./logic";
 import { StateLine } from "./parts";
 
 /**
  * A task's screen (ADR 0128), pushed from the task manager or an agent's tasks: whose it is (its face running while it
- * works) and how it stands, on one head; who asked and where, a row that opens the conversation; its steps so far;
- * its place in its computer's line, when it waits for room; and "Parar tarefa" as the list's red row, confirmed by
- * a system alert that says what happens. Once it ends, how it ended and how long it took.
+ * works) and how it stands, on one head; what was asked, whole (the lists cut it to one line), with who asked and
+ * where, a row that opens the conversation; its steps so far; its place in its computer's line, when it waits for
+ * room; and "Parar tarefa" as the list's red row, confirmed by a system alert that says what happens. Once it ends,
+ * how it ended and how long it took. While the list loads, the rows' shape; one not listed today says it's gone.
+ * Pulling down asks for it again (it is also asked while the screen is on top).
  */
 export function TaskScreen({ runId }: { runId: string }) {
   return (
@@ -55,13 +59,17 @@ function Task({ runId }: { runId: string }) {
     return (
       <View style={[styles.screen, { backgroundColor: c.grouped }]}>
         <PushedHeader title="" solid={false} grouped />
-        <View style={styles.center}>
+        <ScrollView contentInsetAdjustmentBehavior="automatic">
           {tasks.isLoading ? (
-            <ActivityIndicator color={c.muted} />
+            // Loading: the rows' own shape, never a spinner.
+            <SkeletonList rows={3} />
+          ) : tasks.isError && !tasks.data ? (
+            <LoadFailed onRetry={() => void tasks.refetch()} />
           ) : (
-            <Text tone="muted">{t("mobile.taskManager.gone")}</Text>
+            // Ended before today, or out of reach: said in the page's middle, as an empty place is.
+            <EmptyState size="page" icon="clock" title={t("mobile.taskManager.gone")} />
           )}
-        </View>
+        </ScrollView>
       </View>
     );
   if (task) return <Live task={task} />;
@@ -81,20 +89,7 @@ function Live({ task }: { task: ManagedTask }) {
   const dir = useDirectory();
   const nameOf = (id: string) => dir.anyAgent(id)?.name;
   const name = nameOf(task.agentId) ?? t("channel.unknownAgent");
-  // One alert, the system's: what stops and what the agent does; a task that asked other agents stops them too.
-  const ask = () =>
-    Alert.alert(
-      t("mobile.taskManager.stopTitle", { title }),
-      task.helpers ? t("taskManager.confirm.chainBody") : t("mobile.taskManager.stopBody", agentGrammar(name)),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("taskManager.confirm.stop", { count: 1 + (task.helpers ?? 0) }),
-          style: "destructive",
-          onPress: () => stop([task.runId], undefined, true),
-        },
-      ],
-    );
+  const ask = () => askToStop(t, task, title, name, stop);
   return (
     <Page
       task={task}
@@ -116,6 +111,7 @@ function Live({ task }: { task: ManagedTask }) {
 function Ended({ task }: { task: EndedTask }) {
   const { t } = useTranslation();
   const meId = useMeId();
+  const dir = useDirectory();
   const state = endedState(task);
   const title = taskTitle(t, task);
   const took = Date.parse(task.finishedAt) - Date.parse(task.startedAt ?? task.finishedAt);
@@ -133,7 +129,7 @@ function Ended({ task }: { task: EndedTask }) {
             <PixelStopped size={10} />
           )}
           <Text variant="footnote" tone="ink2" numberOfLines={1} style={[styles.semibold, styles.shrink]}>
-            {endedText(t, task, meId)}
+            {endedText(t, task, meId, (id) => dir.anyAgent(id)?.name)}
           </Text>
           <Text variant="footnote" tone="faint" style={styles.num}>
             {`· ${formatDuration(t, took)}`}
@@ -163,12 +159,13 @@ function Page({
 }: {
   task: Pick<ManagedTask, "runId" | "agentId" | "channelId" | "threadId" | "background" | "betweenAgents"> & {
     requester?: ManagedTask["requester"];
+    delegation?: ManagedTask["delegation"];
   };
   title: string;
   /** How it stands, under the agent's name. */
   state: ReactNode;
   working: boolean;
-  /** Where it is and who asked ("#produto · Ana pediu"). */
+  /** Where it is and who asked ("#produto · Ana pediu"), under the title. */
   request: string;
   steps: { calls: number; live: boolean };
   /** It waits for room on this computer: its row opens its line (`QueueSheet`). */
@@ -183,14 +180,16 @@ function Page({
   const dir = useDirectory();
   const insets = useSafeAreaInsets();
   const openQueue = useOpenQueue();
+  const pull = usePullRefresh(useTasksToday().refetch);
   const agent = dir.anyAgent(task.agentId);
   const requester = task.requester ?? null;
-  const opens = !(task.background || task.betweenAgents);
+  const opens = taskHref(task);
   return (
     <View style={[styles.screen, { backgroundColor: c.grouped }]}>
       <PushedHeader title={title} solid={false} grouped />
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
         contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 32 }]}
       >
         {/* Whose it is and how it stands, on one head: the title is already in the bar. */}
@@ -205,27 +204,22 @@ function Page({
             {state}
           </View>
         </View>
-        {request ? (
-          <>
-            <GroupedHeader>{t("mobile.taskManager.request")}</GroupedHeader>
-            <GroupedList>
-              <GroupedRow
-                leading={
-                  requester ? (
-                    <Face who={{ type: "person", id: requester.userId }} size={28} />
-                  ) : (
-                    <AgentFace agentId={task.agentId} size={28} live={false} />
-                  )
-                }
-                label={request}
-                labelLines={2}
-                {...(opens
-                  ? { chevron: true, onPress: () => router.push(chatHref(task.channelId, task.threadId)) }
-                  : {})}
-              />
-            </GroupedList>
-          </>
-        ) : null}
+        <GroupedHeader>{t("mobile.taskManager.request")}</GroupedHeader>
+        <GroupedList>
+          <GroupedRow
+            leading={
+              requester ? (
+                <Face who={{ type: "person", id: requester.userId }} size={28} />
+              ) : (
+                <AgentFace agentId={task.agentId} size={28} live={false} />
+              )
+            }
+            label={title}
+            labelLines={0}
+            {...(request ? { sub: request, subLines: 0 } : {})}
+            {...(opens ? { chevron: true, onPress: () => router.push(opens) } : {})}
+          />
+        </GroupedList>
         <Section title={t("taskManager.panel.steps")}>
           <RunSteps runId={task.runId} color={agentLook(agent).color} calls={steps.calls} live={steps.live} />
         </Section>
@@ -241,11 +235,7 @@ function Page({
             <GroupedList>
               <GroupedRow label={t("taskManager.actions.stopTask")} danger onPress={stop} />
             </GroupedList>
-            {stopNote ? (
-              <Text variant="footnote" tone="faint" style={styles.note}>
-                {stopNote}
-              </Text>
-            ) : null}
+            {stopNote ? <GroupedFooter>{stopNote}</GroupedFooter> : null}
           </View>
         ) : null}
       </ScrollView>
@@ -257,12 +247,10 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   grow: { flex: 1, minWidth: 0, gap: 2 },
   screen: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
   scroll: { paddingTop: 4, paddingHorizontal: SCREEN_X },
   head: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 12, paddingBottom: 4 },
   row: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
   semibold: { fontWeight: weights.semibold },
   num: { fontVariant: ["tabular-nums"] },
   apart: { marginTop: 24 },
-  note: { paddingTop: 8, paddingHorizontal: 16 },
 });

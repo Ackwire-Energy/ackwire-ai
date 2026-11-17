@@ -1,11 +1,11 @@
 # 0137. The team's right hand
 
-- Status: Accepted; §6 and §7 amended 2026-11-06 by ADR 0079 §7 (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided); amended 2026-11-04 (§8, agents act on agentes.chat through their tools, never by signing in to it); amended 2026-11-04 (§4, it starts everything a person does in the app, as cards); amended 2026-11-04 (§1, §4 and §7: it thinks with a person's plan through Claude Code or OpenCode, locked down and checked before each turn; then through Codex and Cursor too, the owner accepting their residual risk); amended 2026-11-04 (§4: through Grok Build too, checked on its `init` like Claude Code, ADR 0142); amended 2026-11-04 (§4: through the Antigravity CLI too, as an agent with no tool of its own, checked on its `init` and every step, ADR 0143); amended 2026-11-04 (§9, "Semana da equipe": a weekly card in each admin's DM, from stored data); amended 2026-11-04 (§10: the team set up from three questions, one team card, team templates); amended 2026-11-04 (§4: the team map's drag posts its settings card, ADR 0148); amended 2026-11-05 (§11, each person's own AI); amended 2026-11-06 (§12, it reads the Drive and the wiki for the person); amended 2026-11-06 (§13, the one you talk to: it sees the team and hands work on)
+- Status: Accepted; §6 and §7 amended 2026-11-06 by ADR 0079 §7 (built: engine, server, the shared client, the web and the phone app); amended 2026-11-03 (§5, a person alone with the team; §4 and §6 written as decided); amended 2026-11-04 (§8, agents act on agentes.chat through their tools, never by signing in to it); amended 2026-11-04 (§4, it starts everything a person does in the app, as cards); amended 2026-11-04 (§1, §4 and §7: it thinks with a person's plan through Claude Code or OpenCode, locked down and checked before each turn; then through Codex and Cursor too, the owner accepting their residual risk); amended 2026-11-04 (§4: through Grok Build too, checked on its `init` like Claude Code, ADR 0142); amended 2026-11-04 (§4: through the Antigravity CLI too, as an agent with no tool of its own, checked on its `init` and every step, ADR 0143); amended 2026-11-04 (§9, "Semana da equipe": a weekly card in each admin's DM, from stored data); amended 2026-11-04 (§10: the team set up from three questions, one team card, team templates); amended 2026-11-04 (§4: the team map's drag posts its settings card, ADR 0148); amended 2026-11-05 (§11, each person's own AI); amended 2026-11-06 (§12, it reads the Drive and the wiki for the person); amended 2026-11-06 (§13, the one you talk to: it sees the team and hands work on); amended 2026-11-11 (§4: a teammate's skills on its settings card); amended 2026-11-12 (§4: every agent asks for its own settings on the same card, always a click); amended 2026-11-12 (§4, §12, §13: it has a normal agent's tools); amended 2026-11-12 (§1, §4, §13: a computer of its own, a seat per person, ADR 0175); amended 2026-11-12 (§11: a routine or widget a person set up thinks with that person's AI)
 - Date: 2026-11-03
 - Supersedes: ADR 0093 (the team's coordinator)
 - Amends: ADR 0081 (one-click Criar and Criar e testar on the right hand's cards), ADR 0092 §5 (a teammate's settings, on the right hand's card)
 - Extends: ADR 0053 (who is behind a run), ADR 0061 and 0129 (action cards applied as whoever clicks), ADR 0085 (an agent's audience by roles), ADR 0074 (the router)
-- Code: db `packages/db/src/schema/agents.ts` (`agents.builtin`, index `agents_one_right_hand`, migration `right_hand`), `schema/context.ts` (`proposal_target` `agent_settings`, `context_proposals.settings`, `requested_by_user_id`, `asked_at`, migration `right_hand_settings`); engine `right-hand.ts` (`ensureRightHand`, `ensureRightHands`, `followOwner`, `RIGHT_HAND_GRANTS`, `RIGHT_HAND_EDITABLE`, `refuseRightHand`, `rightHandReaches`), `right-hand-prompt.ts` (`rightHandPrompt`), `settings-proposals.ts` (`SETTING_GROUP`, `settingLines`, `applySettings`, `revertSettings`), `context/proposals.ts` (`askProposal`), `agent-proposals.ts` (`askAgentProposal`, `first_task`, superseded cards), `setup-tools.ts` (`propose_settings_change`, `offer_approvals`, `propose_member_changes`, `offer_open_page`, `APP_PAGES`, the card cap), `card-via.ts` (`cardVia`), `agents.ts` (`unarchiveAgent`), `router.ts`, `organizations.ts`, `exports.ts`; on a plan (2026-11-04): db `agents.plan_for_others` (migration `right_hand_plans`), engine `right-hand.ts` (`thinkingAgent`, `scrubRightHandReply`, `rightHandPlanRefusal`, `rightHandNoAiReason`, `RIGHT_HAND_TURN`), `brains/select.ts` (`resolveBrain`, `mayFallBack`), `brains/claude-code.ts`, `brain-settings.ts` (`settingsAgent`), `ai-status.ts`, `no-ai.ts`, `executor.ts` (`brainUnavailable`), `machines.ts` (`machineAgents`), adapters `LOCKED_BRAIN_PROTOCOL`, runner `brain.ts` (`brainProfileLaunch("chat")`, `ClaudeProcess.lock`), `mcp.ts` (`CHAT_DENIED_TOOLS`, `chatToolsBreach`), `brain-opencode.ts` (`OPENCODE_CHAT_PERMISSION`, `opencodeToolsBreach`), `brain-codex.ts` (`CODEX_CHAT_OFF`, `CODEX_CHAT_CONFIG`, `codexChatBreach`, `chatFolder`), `brain-cursor.ts` (`CURSOR_CHAT_PERMISSIONS`, `cursorChatBreach`), `handlers.ts`, engine `tool-detail.ts` (`scrubSignIns`), `right-hand-prompt.ts` ("# Your tools"), engine `brains/codex.ts` (the chat gate), `email.ts` (`queuePlanOpenedEmail`), client `lib/no-ai.ts` (`planLine`); each person's own AI (2026-11-05): db `right_hand_brains` (migration `right_hand_brains`), engine `right-hand.ts` (`personalBrain`, `withPersonalBrain`, `rightHandPerson`), `brain-settings.ts` (`BrainScope`, `personalView`, `setPersonalBrain`), `machines.ts` (`machineAgents`, `accounts`), runner `keepAccount`, client `lib/right-hand.ts` (`rightHandFallback`); server `routes/app/agents.ts`, `routes/app/memory.ts` (`POST …/proposals/{id}/ask`, `POST …/agent-proposals/{messageId}/ask`); client `api/context.ts` (`CardVia`), `lib/app-pages.ts`, `lib/action-cards.ts` (`memberRowDone`), `lib/right-hand.ts` (`isRightHand`, `rightHandOf`, `RIGHT_HAND_DEFAULT`, `finishOnboarding`, `createWorkspace`, `introCards`), `lib/proposals.ts` (`settingLineText`, `decidersOf`, `onlyKey`, `sentToText`); web `components/RightHandCards.tsx`, `RightHandIntro.tsx`, `RightHandSettings.tsx`, `Sidebar.tsx`, `pages/OnboardingPage.tsx`; phone `features/right-hand/*`, `features/chats/logic.ts` (`rightHandPin`), `features/onboarding/OnboardingFlow.tsx`
+- Code: db `packages/db/src/schema/agents.ts` (`agents.builtin`, index `agents_one_right_hand`, migration `right_hand`), `schema/context.ts` (`proposal_target` `agent_settings`, `context_proposals.settings`, `requested_by_user_id`, `asked_at`, migration `right_hand_settings`); engine `right-hand.ts` (`ensureRightHand`, `ensureRightHands`, `followOwner`, `RIGHT_HAND_GRANTS`, `RIGHT_HAND_EDITABLE`, `refuseRightHand`, `rightHandReaches`), `right-hand-prompt.ts` (`rightHandPrompt`), `settings-proposals.ts` (`SETTING_GROUP`, `settingLines`, `applySettings`, `revertSettings`), `context/proposals.ts` (`askProposal`), `agent-proposals.ts` (`askAgentProposal`, `first_task`, superseded cards), `setup-tools.ts` (`propose_settings_change`, `request_settings_change`, `offer_approvals`, `propose_member_changes`, `offer_open_page`, `APP_PAGES`, the card cap), `card-via.ts` (`cardVia`), `skills.ts` (`importSkillFromUrl`, `importPickedSkills` with `forAgentId`), `agents.ts` (`unarchiveAgent`), `router.ts`, `organizations.ts`, `exports.ts`; on a plan (2026-11-04): db `agents.plan_for_others` (migration `right_hand_plans`), engine `right-hand.ts` (`thinkingAgent`, `scrubRightHandReply`, `rightHandPlanRefusal`, `rightHandNoAiReason`, `RIGHT_HAND_TURN`), `brains/select.ts` (`resolveBrain`, `mayFallBack`), `brains/claude-code.ts`, `brain-settings.ts` (`settingsAgent`), `ai-status.ts`, `no-ai.ts`, `executor.ts` (`brainUnavailable`), `machines.ts` (`machineAgents`), adapters `LOCKED_BRAIN_PROTOCOL`, runner `brain.ts` (`brainProfileLaunch("chat")`, `ClaudeProcess.lock`), `mcp.ts` (`CHAT_DENIED_TOOLS`, `chatToolsBreach`), `brain-opencode.ts` (`OPENCODE_CHAT_PERMISSION`, `opencodeToolsBreach`), `brain-codex.ts` (`CODEX_CHAT_OFF`, `CODEX_CHAT_CONFIG`, `codexChatBreach`, `chatFolder`), `brain-cursor.ts` (`CURSOR_CHAT_PERMISSIONS`, `cursorChatBreach`), `handlers.ts`, engine `tool-detail.ts` (`scrubSignIns`), `right-hand-prompt.ts` ("# Your tools"), engine `brains/codex.ts` (the chat gate), `email.ts` (`queuePlanOpenedEmail`), client `lib/no-ai.ts` (`planLine`); each person's own AI (2026-11-05): db `right_hand_brains` (migration `right_hand_brains`), engine `right-hand.ts` (`personalBrain`, `withPersonalBrain`, `rightHandPerson`), `brain-settings.ts` (`BrainScope`, `personalView`, `setPersonalBrain`), `machines.ts` (`machineAgents`, `accounts`), runner `keepAccount`, client `lib/right-hand.ts` (`rightHandFallback`); server `routes/app/agents.ts`, `routes/app/memory.ts` (`POST …/proposals/{id}/ask`, `POST …/agent-proposals/{messageId}/ask`); client `api/context.ts` (`CardVia`), `lib/app-pages.ts`, `lib/action-cards.ts` (`memberRowDone`), `lib/right-hand.ts` (`isRightHand`, `rightHandOf`, `RIGHT_HAND_DEFAULT`, `finishOnboarding`, `createWorkspace`, `introCards`), `lib/proposals.ts` (`settingLineText`, `decidersOf`, `onlyKey`, `sentToText`); web `components/RightHandCards.tsx`, `RightHandIntro.tsx`, `RightHandSettings.tsx`, `Sidebar.tsx`, `pages/OnboardingPage.tsx`; phone `features/right-hand/*`, `features/chats/logic.ts` (`rightHandPin`), `features/onboarding/OnboardingFlow.tsx`
 
 ## Context
 
@@ -151,7 +151,7 @@ A beginner asked for a lead agent that, after the team exists, points out what i
 
 ### Decision
 
-1. **Who and when.** Each person who holds `administrator` (owners included) and may talk to Lodi gets one card a week in their DM with it, on Friday at 17h in the workspace's time zone by default. It is the one exception to "posts nothing unless someone writes to it". Each person moves or stops their own (`organization_members.team_week`, `{ off?, day?, hour? }`, migration 0218, read through `teamWeekPrefsOf`): from the card's footer ("Toda sexta às 17:00 · Mudar"), from Settings › Lodi ("Semana da equipe", on the web and the phone), or by telling Lodi (`set_team_week`, a setup tool for it alone, acting for the person behind the run).
+1. **Who and when.** Each person who holds `administrator` (owners included) and may talk to Lodi gets one card a week in their DM with it, on Friday at 17h in the workspace's time zone by default. It is the one exception to "posts nothing unless someone writes to it". Each person moves or stops their own (`organization_members.team_week`, `{ off?, day?, hour? }`, migration 0218, read through `lodiPrefsOf`, ADR 0177): from the card's footer ("Toda sexta às 17:00 · Mudar"), from Settings › Lodi ("Semana da equipe", on the web and the phone), or by telling Lodi (`set_team_week`, a setup tool for it alone, acting for the person behind the run).
 2. **The job.** A worker tick every 10 minutes (`enqueueTeamWeeks`) queues `team_week.post` in the outbox (ADR 0005) for every admin whose slot passed in the last 6 hours, in open workspaces with Lodi and at least one other agent; its dedupe key is the person and the Monday of the slot's local week, so moving the day never sends a second card that week. The handler (`postTeamWeek`) checks again who may get it, builds the card and posts it as Lodi with no run, enqueuing `notifications.message` like any agent's message in a DM. A week with nothing to say (no work done, none stuck and no row) posts nothing; no team, no card.
 3. **What it says, from stored data, with no model call** (`buildTeamWeek`): the week's work done and runs that failed, the approvals waiting for this person, the money spent this month against the team's monthly budgets added up, the busiest agent per channel this person can read and the tasks agents closed ("Funcionou"), then up to 6 rows ("Para melhorar"):
    - approvals of one agent waiting for them ("Ver e aprovar" opens them on the card as the conversation draws them, decided one by one);
@@ -297,7 +297,7 @@ After onboarding the right hand couldn't see the team: `search_context` and `rea
 - **It is a `note` row of the right hand's run** (`agent_consultations`, its channel the task's conversation). The consulted run's end settles it as in an agents' DM (`answersHandOffs`), so what came of it reaches the person's DM by itself (`reportHandOffs`), and its cards go there (`consultationOrigin`). A stop in the task's conversation is heard the same way.
 - **The chip.** The tool returns `data.handedTask`, and the reply carries `meta.tasks`: one chip per task, "#42 Campanha de Natal · Ada · Em andamento", live, that opens the task's conversation beside the chat (web) or as a thread (phone). The `issue.created` receipt of that task is left out under it: the chip is the task.
 - **The audience** stays the person and administrators (§13), which they widen on the task (ADR 0151).
-- **Resumo do dia.** The weekly card (§9) can come every day at an hour instead (`team_week.daily`), over the last day, from the same builder with no model call, on days with something to say. Anyone may turn it on, telling the right hand (`set_team_week` `daily`) or in Settings › Lodi. Anyone but an administrator gets runs counted only where they read, no money and no budget row; a fix the card can't offer them leaves no proposal behind. The weekly card stays the default, for administrators.
+- **Resumo do dia.** The weekly card (§9) can come every day at an hour instead (`team_week.daily`), over the last day, from the same builder with no model call, on days with something to say. Anyone may turn it on, telling the right hand (`set_team_week` `daily`) or in Settings › Lodi. Anyone but an administrator gets runs counted only where they read, no money and no budget row; a fix the card can't offer them leaves no proposal behind. The weekly card stays the default, for administrators. Since ADR 0177 the day's card is everyone's by default beside the week's, each with its own hour, and whatever else the right hand does by itself is decided there.
 - **The prompt** names `create_issue` assigned to an agent for real work and `tell_agent` for a small thing, and that either reports back by itself.
 
 ### Consequences
@@ -313,7 +313,7 @@ The right hand is nobody's supervisor and reports to nobody (ADR 0148's addendum
 
 ### Context
 
-Asked to create a role for a marketing person who may not merge or deploy, the right hand said it could only assign one afterwards and opened Papéis e permissões for the owner to do it by hand. It was following the amendment of 2026-11-04 (§3 there), which kept roles' permissions, a channel's settings and more as screens it only opens. The standing decision says otherwise: it does almost everything the person can do in the app, as them, with the app's own confirmations.
+Asked to create a role for a marketing person who may not merge or deploy, the right hand said it could only assign one afterwards and opened Cargos for the owner to do it by hand. It was following the amendment of 2026-11-04 (§3 there), which kept roles' permissions, a channel's settings and more as screens it only opens. The standing decision says otherwise: it does almost everything the person can do in the app, as them, with the app's own confirmations.
 
 ### Decision
 
@@ -326,7 +326,7 @@ Asked to create a role for a marketing person who may not merge or deploy, the r
 ### Consequences
 
 - Lodi's own prompt grew by about 50 characters. The tool's schema loads only with the setup group and only for it, so a DM "oi" with any other agent is unchanged.
-- The phone draws the card and its inbox entry as the web does. Its Abrir for roles now opens the phone's own roles screen (Configurações › Papéis), which `APP_PAGES` had left out.
+- The phone draws the card and its inbox entry as the web does. Its Abrir for roles now opens the phone's own roles screen (Configurações › Cargos), which `APP_PAGES` had left out.
 - The catalog's invitations and requests to join send email through the server's address and secret, passed to the setup tools and the card's route.
 - Left for later, in the audit's order: a task's or a page's audience, approval covers, deleting tasks and board columns, the language and the rest of their own settings, pins and channel categories, invitation links, the task manager's paused runs, routines' stop, duplicate and take over, models and per-person limits, the Drive, the calendar, skills, agents' extras, proposals waiting on them, apps, AI keys and computers housekeeping, knowledge and memories by hand, dashboards' extras and missions. Also not in the catalog yet: undoing another agent's change from its receipt, correcting an agent's reply (a lesson), Responder agora, an agent's request to show a board to more people, a new agent's setup checklist, and one agent's Quem pensa and Autonomia for others. Posting as the right hand elsewhere waits on the owner's call.
 - Desfazer of taking a role away gives the role back, not the seats in the channels the person left with it (they may join again through it), nor the notifications those channels cleared. Leaving a private channel through `channel_people` is undone only by someone who manages it.
@@ -346,3 +346,228 @@ adjusts for them without asking (ADR 0139 §2). "Para todo o workspace", only wi
 quem não tem um" (before "Atende outras pessoas"), its monthly budget where something bills per use, and who may use
 it. A value that changes is one row that opens its choice in a dialog (a sheet on the phone). Alone in a personal
 workspace, lending and the audience are not shown.
+
+## Amendment (2026-11-11): a teammate's skills on its settings card (§4)
+
+Asked to give an agent a skill or take one away, the right hand had no card for it: skills were left for later in the
+amendment of 2026-11-07. They are now lines of `propose_settings_change` (`add_skills`, `remove_skills`, by the name
+Settings › Skills lists, the exact name before one that differs only in punctuation), one `skill` line per skill with
+its id in `skillId`, its name in `label.to` and whether the agent has it on as `from` and `to`. They are decided as on
+the agent's page, where only who manages agents changes skills (`admin`; `setAgentSkills` also takes the agent's
+owner, the page doesn't). They apply at once with Undo when the person who asked may, else wait on the card, sent on
+with "Pedir a um admin". A name no installed skill has is refused with the names there are, and a skill removed
+before the click leaves the row out of date. The notice to the proposer and a refusal's lesson say each skill on or
+off by its name. An applied card refreshes every open agent page's skills (`agents.changed`), since that page saves
+its whole list. The right hand's own skills can't be changed (it has no skill tools), and its delegated decisions (ADR
+0139) never take a skill line. Nothing reaches its grants, the Vault or any secret: a skill is instructions an agent
+opens, under the agent's own tools.
+
+## Amendment (2026-11-12): every agent asks for its own settings, always with a click (§4)
+
+### Context
+
+An agent that needed a skill installed in the workspace but not on for it told the person to open its page and turn
+it on by hand, and said it couldn't ask on a card. `propose_settings_change` is any setup agent's tool (ADR 0139), but
+it reads as teammates' settings and loads only with the setup tools, and installing a skill from an agent's card left
+it off for that agent. The owner decided that agents edit their own settings when a person approves.
+
+### Decision
+
+- **`request_settings_change`.** Every agent but the right hand has it in every run a person is behind: no scope, like
+  `request_permission`, so a run in a channel's thread holds it without the setup tools. Like `request_permission` it
+  speaks for the agent (`ELSEWHERE` in the run policy), so a routine's run, or one fed by what a routine read, never
+  asks for it. Its definition waits with the
+  conversation's rarer tools (ADR 0043: up front, the whole card's schema would add about 3,800 characters to every
+  run) and what the agent can do names it, so the agent calls it by that name (`use_tool`). It takes any line of the
+  settings card (skills, channels and how it answers there, model, AI account, budget, owner, who talks to it, name,
+  look, who it reports to, archiving) and has no `agent` field: its only target is the agent that calls it. It posts
+  the same card, read as the agent's own (`chat.body.settings_request`, "Pede uma mudança nas próprias configurações"),
+  whose rows are decided as before (`SETTING_GROUP`, "Pedir a um admin" for whoever can't). A skill on and off at once
+  is refused, and a refusal lists at most 20 names. The right hand keeps `propose_settings_change`, its wider reach and
+  its fixed list of its own settings.
+- **Always a click.** An agent's own row never applies at once, even when the person who asked could make the change
+  and wrote it themselves: the agent may be acting on text from an email, an issue or a web page, so it never widens
+  its own settings without a person's click. Its card gets no look from the right hand either (ADR 0139 §2 already keeps
+  an agent's own settings the person's). A receipt that changed skills, from this card or the right hand's, is undone
+  or redone only by who manages agents (`requireMayUndo`): never the agent's owner, as on its page. "Desfazer tudo"
+  checks every receipt of the card before undoing any, so it never undoes part of one and then refuses.
+- **What it says.** The capabilities and the tool tell an agent that lacks a skill, a channel, a model or another
+  setting of its own to offer the card, never to list manual steps or say it can't ask. `load_skill` on a skill
+  installed here but off for the agent, and `offer_install_skill` on a link already installed, point to the card.
+- **An install from an agent's card can turn the skill on for it, in the open.** The install dialog opened from
+  `offer_install_skill`'s card shows a box, on by default, "Fica ligada para {{agent}}" (web and phone), and sends that
+  agent (`forAgentId`) only when it is checked and only on an install from the card's own link: a link typed over it, a
+  repository picked under "Escolher do GitHub conectado", or a link to the screen that merely names an agent turns
+  nothing on (`cardInstallAgent`: the card that opened it is kept in this tab's session on the web, through connecting
+  GitHub, and in memory on the phone). The box shows only for a live agent other than the right hand, the ones the
+  server would turn it on for. The server marks each pick that takes a name already used (`replaces`), and the dialog
+  says so: "Substitui a skill X já instalada" (it becomes a new version for every agent that has it) or "Substitui a
+  skill X removida". A removed skill installed again from a link comes back on for none of its old agents (their
+  assignments turn off, `source: "url"`): the link may hold anything under that name. A restore, or a save by hand or
+  from a .zip, still brings its agents back. The server turns it on for the card's agent when the installer may change
+  its skills, never for an agent archived or gone nor the right hand, and announces `agents.changed`. Otherwise the
+  install still stands and the agent asks for it on its own card.
+
+### Consequences
+
+- What the card still can't carry: connector apps (`propose_instruction_change` for teammates, `request_permission`
+  for itself), mailboxes, databases, computer access, Vault items, routines and instructions, each on its own screen
+  or tool.
+- One more line in what every agent can do (about 150 characters); the tool's definition loads when a run needs it.
+
+## Amended 2026-11-12: it has a normal agent's tools (§4, §12, §13)
+
+### Context
+
+Its tools were a short list fixed in code (§4), so the one agent everybody talks to could not read the Vault, use a
+connected app, a mailbox, a database or a skill, search the web, remember anything or post outside its DM. Asked for
+any of these it refused or handed the work on, and a grant made for it on the server did nothing: `loadScopeKeys`
+threw its rows away. The owner decided it has every tool an agent can have, by default, the Vault included.
+
+### Decision
+
+- **Every built-in scope an agent can be given, in code** (`RIGHT_HAND_GRANTS`): context, memory, the Drive (reading
+  and writing), tasks, the calendar, skills, the wiki, routines, the Vault (seeing and editing) and the setup cards,
+  with what was denied by name gone (`request_permission`, `share_artifact`, the memory tools, `web_search`,
+  `web_fetch`, `post_message`, `send_dm`, `add_agent_to_channel`, long work's tools, `comment_issue`). A test fails
+  when a new built-in scope is left out of the list.
+- **Its grant rows count on top** (`loadScopeKeys` adds them to the list instead of replacing them): the apps every
+  new connection gives every agent (`grantToEveryAgent`), a server connected by address, a mailbox, a database, a tool
+  turned off (`deny:`). `request_permission` works for it as for any agent, and the refusal that said its tools were
+  fixed is gone.
+- **Its page shows and changes them.** `/agents/{id}` has two tabs for it: its settings (as before) and the agent
+  page's own "Ferramentas e acesso" (apps, mailboxes, databases, built-in areas, approvals, skills), saved with the
+  same bar. Its built-in scopes are held in code, so an area an admin turns off there is kept as denials of its tools
+  (`setAgentAccess`), lifted when the area is turned on again; that covers the tools with no row of their own on
+  the page (`UNLISTED_TOOLS`). Its setup cards are its job and have no area to turn off. The older save of scopes
+  as a list (`setAgentScopes`) is refused for it, since it can't carry those denials. A save made from its grants as a list
+  (`replaceableGrants`, an access proposal) carries the scopes it holds in code, so it turns none of them off. On the
+  phone its profile lists what it may use, and a mailbox's owner gives or takes it there. Changing an app's level for
+  it from the phone is not there yet.
+- **Skills.** It loads the skills turned on for it. Its own skill is a line of its settings card like any agent's own
+  (always a click), and an install from its card may turn the skill on for it. A skill's script needs a computer, so
+  it reads a skill's instructions and runs none.
+
+### What stays
+
+- **No archive, no delete**, its instructions the product's, its owner the workspace's (§1). It is still in no channel
+  and answers an @mention anywhere (§2): the router still never picks it. It posts with `post_message` where the
+  person behind the run may post, a private channel included, as it already answers there by name.
+- **Its workspace powers behind cards** (§4): the team, people, approvals and `workspace_action` are its alone, applied
+  as whoever clicks.
+- **No computer yet** (replaced the same day by the next amendment and ADR 0175)**.** `sandbox:run`, `browser:use` and `desktop:use` are not on its list, a row for one gives it
+  nothing, its access tree leaves them out, `request_permission` never offers them and refuses a card that asks, and a
+  call of one answers that it has no computer and to hand the work to an agent that has one. `agents.machine_id` stays
+  null (`machines.ts`). A separate change gives it a computer of its own.
+- **The locked turn on a plan** (`RIGHT_HAND_TURN`, §4) is unchanged: the CLI gets our bridge and nothing else. Every
+  tool above is ours, served by the Tool Gateway on the server (the web tools fetch from the server, with no browser
+  to fall back on), so the lock stops none of them. Long work is the same run going on in the background. Its turn on
+  a plan is no longer told of a computer's own tools, which it never had there: not by the turn-end judge's means
+  either, and its "What you can do" names no browser, no `git_clone` (left off its list) and no way to type a Vault
+  login or pass a key (`describeCapabilities` with `noComputer`).
+- **One person's things stay that person's.** One row answers everyone, each acting as the person behind the run, so
+  what is one person's is used only in that person's own DM with it (`rightHandReader`, null anywhere else). That DM
+  has one person and no agent but the right hand. A routine's own run there counts as its creator: only a routine's
+  creator sets what it does, and only they read that DM. A run a routine's report or work woke counts as nobody.
+  - **The Vault** (`vaultPersonOfRun`): a personal item for its owner, a team item for its audience, only in that DM.
+    Called in a channel, or by a routine that reports anywhere else, it reaches only team items open to everyone and
+    shared with it.
+  - **A mailbox** (`mailboxUserCheck`): only for the person who connected it, in that DM. Being in its audience opens
+    no one else's mailbox, since its audience is everyone. Its routine watches a mailbox only when the routine's
+    creator connected it (`watchesFor`, checked when the routine is saved and again as mail arrives, so a routine
+    taken over by someone else gets none), and `create_routine` names only that person's mailboxes. The mailbox's
+    row for it tells its owner that it uses the mailbox only for them (`mail.agent.onlyYou`).
+  - **Tasks** (§13): `comment_issue` joins `list_issues`, `create_issue` and `update_issue`: in that DM, on a task
+    the person sees.
+  - **Memory**: `remember`, `update_memory`, `forget` and `save_how_to` work only in that DM, and what they save is
+    that person's alone with fields that already existed (`scope_type = 'person'`, `scope_id` the person, and that
+    DM as its only channel, a rule's too): read back in that DM for that person, never in another person's DM or in
+    a channel, and changed or forgotten only by them there. A rule it keeps holds in the runs of the person who gave
+    it and nobody else's, whoever decides its approvals (`rulesForPerson`, which filters by person before its cut of
+    30). The DM as a rule's channel keeps it out of the lists of who reviews memory. One person's items never merge
+    into another's, when saved (`findCandidates`) or in the nightly pass (`consolidateOrg`). `for: "team"` still
+    asks to share with every agent, as the person's own choice, and is the one save it makes in a channel.
+    Reflection and learning still skip its conversations (§2), so nothing is written for the team from what people
+    tell it. Its page has a Memory tab on the web and the same lists on the phone, which show each viewer only
+    their own.
+  - **The Drive, the wiki and context** already read as the person behind the run (§12, §13), and writing follows
+    the same rule.
+- **Shared by nature, as for any agent open to everyone:** a connected app or a database is the workspace's, with one
+  sign-in, so whoever may talk to it reaches what an admin gave it there. An admin narrows it on its access tab.
+
+### Consequences
+
+- This replaces §2's "its memory tools are denied", §4's "its tools are fixed in code" and "`add_agent_to_channel` is
+  denied to it" (it is any agent's tool, with the rights of the person who asked and Undo), §12's "reading only" and
+  "`request_permission` is denied", and §13's "no web or file writing, no `post_message` or `send_dm`, no long work".
+- It also replaces, in the amendments of 2026-11-11 and 2026-11-12, "the right hand's own skills can't be changed"
+  and the install box and `turnOnFor` leaving it out.
+- Its prompt's "# Your tools" says what it has, that it has no computer yet, and that what is one person's stays in
+  their own conversation with it. Its first paragraph no longer says it does no hands-on work: small things it does
+  itself, work that is a teammate's job or needs a computer it hands on.
+- It may now read a web page or an email and then act. Outside content marks the run as before (ADR 0117), so a
+  change after it waits on a card, a send still asks a person, and its replies keep the scrub of §4.
+- Its one budget on an API key (§13) now also carries the turns that read the web, write files and do long work for
+  everyone who talks to it.
+
+## Amended 2026-11-12: a computer of its own, a seat per person (§1, §4, §13)
+
+ADR 0175 gives it a computer: on the workspace's own computer, where each agent is its own OS user, each person has a
+seat (a stored id the computer takes for an agent's), with its own Linux user, home, browser profile and sign-ins.
+
+- **§1 stands in the database, not in what it can do.** `agents.machine_id` stays null (it is still what its plan's
+  settings read) and it still can't be given a computer by hand. Its tools use the workspace's own computer
+  (`toolMachineId`), as the seat of the person behind the run.
+- **Its computer's scopes are rows** it is made with (`sandbox:run`, `browser:use`, `desktop:use`), so its access tab
+  and `request_permission` treat them like any agent's. This replaces "a row for one gives it nothing", the access
+  tree leaving them out and the refusal of a card that asks.
+- **A person's own seat only in that person's own DM.** Amended 2026-11-13 (ADR 0175's amendment): everywhere else (a
+  channel, a widget, a routine that reports where others read) it works in one shared seat of the workspace, and a
+  run nobody asked for in a person's own DM (a routine that reports there included) has no seat.
+- **The locked turn on a plan is unchanged.** The CLI still gets our bridge and nothing else. The computer's tools are
+  ours, and the server sends them to the seat. The hub refuses the agent's own id for anything but that turn.
+- **Its prompt** says which of the three it has: this person's own seat, the workspace's shared one, or none yet.
+- This replaces §1's "no computer tools, no desktop, no terminal as it", §4's and §13's "no computer", and the
+  amendment above's "No computer yet" and "a skill's script needs a computer, so it runs none".
+
+## Amendment (2026-11-12): work a person set up thinks with their AI (§11)
+
+### Context
+
+§11 gave a run with nobody behind it the workspace's AI and nothing else. A widget's build and a routine's run are such runs, so in a workspace where people brought their own plans and the workspace had none (or a plan that answers only its owner), every widget of the right hand read "no AI" although the person who made it had one, the same one that answered them in their DM.
+
+### Decision
+
+- **Whose AI.** A routine's run, a widget's build, and a run their work or report woke think for a person: of the people who set the work up, in order, the first still in the workspace for whom the right hand can think now (their own AI, else the workspace's as it would answer them in their DM), else the workspace's for nobody, as before. For a routine that is its creator. For a widget: who asked the change this run carries, then the widget's person (`dashboard_widgets.created_by_user_id`), then its routine's creator, each only while they still see its board. It is never "no AI" while one of these can think: a person whose own plan is signed out or away is passed over, not waited for.
+- **Picked as it fires, kept by the run.** `rightHandWorkAi` (`ai-status.ts`) picks; a widget's check before its build (`widgetAi`) and the routine's firing use it, and the firing writes the pick on the brief (`RoutineBrief.aiUserId`, null: the workspace's). `rightHandPerson` reads it, so `resolveBrain`, `agentAiState`, the plan's refusal and the executor agree with the check that let the run start. A brief with no pick reads the rows instead (`ownAiPerson`).
+- **A widget's person is who wrote its instructions.** An agent's `create_widget` records the person behind its run. Whoever rewrites a widget's instructions or moves it to another board becomes its person (`updateWidget`), and so does who asked a change that rewrote them (`update_widget`): one editor's words never spend another's plan. "Atualizar agora" by anyone builds the instructions as they are, on their person's AI. A change request thinks with its asker's.
+- **Taking over.** "Atualizar agora" and a change request make the routine ready first (one whose creator left becomes the presser's), then check for an AI, so the person who takes it over is counted.
+- **What the apps read.** `GET …/ai-status` keeps `background` as the workspace's for nobody, and adds `widgetsReady`: the right hand's widgets waiting for an AI, or stopped for the lack of one, whose build has one now, among the boards the viewer sees. The agent's state alone can't say it, since each widget has its own people.
+
+### Consequences
+
+- This replaces §11's "A run with no person behind it thinks with the workspace's" for runs a routine feeds. `plan_unattended` is left for work no person set up, or whose people are all gone.
+- A person's plan now pays for builds nobody is watching, on the schedule they chose, and for readers of a shared board. It stops when they leave the workspace, lose sight of the board, or someone else rewrites the instructions.
+- §11's consequence "a person's plan on a computer that is away doesn't fall to the workspace's" still holds in a DM. Unattended work does fall over, since nobody is there to read why it waits.
+
+## Amendment (2026-11-15): it always has a runnable AI when the workspace has one (§7)
+
+### Context
+
+§7 (amended 2026-11-04) made the right hand the one agent that never falls back: whenever its plan couldn't think, its run failed with `no_ai`, and its routines too. A workspace could have a working AI next to it (an API key, or another plan on a computer that was online) and still read "Lodi has no AI". Two cases made that common. A plan the workspace's Claude was signed in with on a computer only (the CLI's own sign-in, which names no account, while the right hand thinks only with an account) gave its brain no computer at all. And `servingPlanFor` picked a plan by "mine, then most room", ignoring whether its computer was online or was the workspace's own, so a laptop that slept at night failed the night's routine.
+
+`agents.machine_id` is null for the right hand by design (ADR 0175), so a readout of its row shows no computer whether it works or not. Its seats (ADR 0175) are for its tools only and are made on first use: neither was the cause.
+
+### Decision
+
+- **The plan it picks by itself.** `servingPlans` ranks the plans that may think for a person: on the workspace's own computer first (`workspaceHomeId`; in Cloud the always-on one), then on a computer online now, then their own, then the most room. `servingPlanFor` takes the first, for a person and now also for work nobody is behind (only plans that serve everyone), and also when the workspace's brain is a plan with no account. A plan signed in on Cloud's computer therefore thinks for the right hand without anyone choosing it.
+- **The stand-in.** When its plan can't think now, `rightHandStandIn` (`right-hand.ts`) is the one place the order lives: another plan that serves the person on a computer online now (checked through the live status), else the workspace's API key (`modelReady`, the check the AI status uses). `agentAiState` returns `ready` with `standIn`, so the DM shows it available and routines run. `resolveBrain` returns the stand-in's plan (`BrainPlan.standIn`). Mid-turn (its computer dropped, its CLI failed) the executor hands the turn to the key as any agent's fallback does. Its CLI stopped for tools of its own (`tools_not_locked`) and a turn whose tools already ran there are never handed over.
+- **One line, never silent.** A run that thought through a stand-in posts one quiet line under its reply, at most once per conversation every 6 hours (`postStandInLine`, `bodyCode: right_hand_stand_in`): "Answered with Acme OpenAI: Claude Max needs a computer.", with "Change", which opens its settings. The reply carries no fallback note of its own.
+- **Nothing at all.** With no other plan online and no key, the run fails `no_ai` with its card as before. Its way out is the workspace's: on a billing hold the plan (`plan_hold`), otherwise Connect. There is no button of the right hand's own to give it a computer.
+- **What can't think, shown.** The dialog that picks its AI lists, dimmed under the others, the plans it can't think with now, each with why: a computer's own sign-in, and an account on a computer that is away. On self-host, who may connect computers also gets "Connect a computer".
+
+### Consequences
+
+- This replaces "It never stands in on an API key" in §7's 2026-11-04 amendment, and §11's "a person's plan on a computer that is away doesn't fall to the workspace's": a person whose own plan can't think is answered by what can, with the line saying so.
+- An API key may now be spent for the right hand without anyone choosing it, only while its plan can't think, and the line says so each time it starts. Its budget stops it as any agent's does.
+- `mayFallBack` still excludes it: other agents' fallback rules are unchanged.

@@ -159,7 +159,7 @@ describe("the code that proves it's you before deleting (ADR 0088 §2)", () => {
     });
     expect(workspace.subject).toBe("482913 is your code to delete a workspace");
     expect(workspace.text).toContain(
-      "Type this code to delete the workspace Souza Bakery. It closes for everyone at once and is deleted for good 7 days later.",
+      "Type this code to delete the workspace Souza Bakery. It turns read-only for everyone at once and is deleted for good 7 days later.",
     );
     expect(workspace.text).toContain("If it wasn't you, don't share it and write to help@agentes.chat.");
     const account = renderEmail({

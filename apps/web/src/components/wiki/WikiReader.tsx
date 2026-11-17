@@ -5,7 +5,7 @@ import { fileIcon } from "@agenteschat/client/lib/files";
 import { relativeTime, whenAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import { type AudienceChoice, EVERYONE } from "@agenteschat/client/lib/who-sees";
-import { leafTitle, wikiImportOf } from "@agenteschat/client/lib/wiki";
+import { isImportedPage, leafTitle, wikiImportOf } from "@agenteschat/client/lib/wiki";
 import {
   Avatar,
   Button,
@@ -32,6 +32,7 @@ import { renderIdRef } from "@/chat/IdRef";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usePreviewUrl } from "@/components/artifacts/FileView";
 import { MenuEntries } from "@/components/DesktopMenus";
+import { GitHubMark } from "@/components/GitHubMark";
 import { ErrorState, LoadingList, LoadingPage } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { WhoSeesButton, WhoSeesDialog } from "@/components/WhoSees";
@@ -387,10 +388,16 @@ function PageMeta({
           {t("wiki.locked")}
         </Chip>
       )}
-      {page.source?.type === "obsidian" && (
+      {isImportedPage(page.source?.type) && (
         <span className="wiki-chip">
-          <ObsidianMark size={14} />
-          {t("wiki.fromObsidian")}
+          {page.source?.type === "obsidian" ? (
+            <ObsidianMark size={14} />
+          ) : page.source?.type === "github" ? (
+            <GitHubMark size={14} />
+          ) : (
+            <Icon name="upload" size={14} />
+          )}
+          {t(`wiki.from.${page.source?.type ?? "files"}`)}
         </span>
       )}
       {page.tags.length > 0 && (
@@ -504,7 +511,7 @@ function ShortHistory({ page, onOpen }: { page: WikiPageData; onOpen: () => void
         })}
       </div>
       {page.version > 3 && (
-        <Button size="sm" variant="ghost" className="wiki-about__more" onClick={onOpen}>
+        <Button variant="link" className="wiki-about__more" onClick={onOpen}>
           {t("wiki.allVersions", { count: page.version })}
         </Button>
       )}

@@ -2,12 +2,18 @@ import { describe, expect, test } from "bun:test";
 import type { TFunction } from "i18next";
 import type { AgentBrainLine, AiAccounts, AiComputer, AiStatus, PlanAccountUsage, PlanUsage } from "../src/api/types";
 import {
+  accountKinds,
   accountOwner,
   accountShares,
   groupUsageAccounts,
+  kindFacts,
+  loginsText,
+  notSharedText,
   ownPlanLines,
   planMeterText,
+  planModelUsage,
   SHARES_SHOWN,
+  servesText,
   shareFacts,
   splitUsage,
   usageShown,
@@ -58,12 +64,15 @@ describe("what an agent's usage shows where its budget did (ADR 0063 §5)", () =
   });
 });
 
-test("the compact line names a window short; a provider's own window by its name", () => {
+test("the compact line names a window short; a known label in the app's words, another by its name", () => {
   const t = ((key: string) => key) as unknown as TFunction;
   const text = planMeterText(t, "en");
   expect(text.short({ kind: "five_hour" })).toBe("aiAccounts.usage.short.five_hour");
   expect(text.short({ kind: "seven_day_opus" })).toBe("aiAccounts.usage.short.seven_day_opus");
-  expect(text.short({ kind: "other", label: "Extra usage" })).toBe("Extra usage");
+  expect(text.short({ kind: "other", label: "Extra usage" })).toBe("aiAccounts.usage.short.extraUsage");
+  expect(text.window({ kind: "other", label: "OAuth apps" })).toBe("aiAccounts.usage.window.oauthApps");
+  expect(text.window({ kind: "other", label: "Fable" })).toBe("Fable");
+  expect(text.window({ kind: "other", label: "constructor" })).toBe("constructor");
   expect(text.short({ kind: "other" })).toBe("aiAccounts.usage.short.other");
   expect(text.window({ kind: "seven_day" })).toBe("aiAccounts.usage.window.seven_day");
 });
@@ -435,5 +444,138 @@ describe("the viewer's own logins of one account are one row (IA e uso › Conta
     const list = [row("a"), row("b")];
     expect(groupUsageAccounts(list, { accounts: [login("a"), login("b", { keyHint: "9z9z" })] })).toHaveLength(2);
     expect(groupUsageAccounts(list, undefined)).toEqual(list);
+  });
+
+  test("one seat connected by two people is one row led by the viewer's own login, with how many logins it stands for", () => {
+    const t = ((key: string, o?: Record<string, unknown>) =>
+      o ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
+    const rows = groupUsageAccounts(
+      [
+        row("a", { provider: null, ownerName: "Bia", mine: false, seat: "s1", serves: "everyone" }),
+        row("b", { provider: null, ownerName: "Caio", mine: true, seat: "s1", serves: "everyone" }),
+        row("c", { provider: null, ownerName: "Caio", mine: true, seat: "s2", serves: "owner" }),
+      ],
+      undefined,
+    );
+    // Where Bia's login stood, but Caio's own leads, so he keeps "Quem usa" on it.
+    expect(rows.map((r) => [r.accountId, r.mine, r.logins ?? 1])).toEqual([
+      ["b", true, 2],
+      ["c", true, 1],
+    ]);
+    expect(rows.map((r) => loginsText(t, r))).toEqual(['usageViews.logins {"count":2}', null]);
+  });
+
+  test("who uses a plan, in a few words: everyone, only you, only its owner; nothing for a computer's own sign-in", () => {
+    const t = ((key: string, o?: Record<string, unknown>) =>
+      o ? `${key} ${JSON.stringify(o)}` : key) as unknown as TFunction;
+    expect(servesText(t, { serves: "everyone", ownerName: "Bia Lima", mine: false })).toBe(
+      "usageViews.serves.everyone",
+    );
+    expect(servesText(t, { serves: "owner", ownerName: "Bia Lima", mine: true })).toBe("usageViews.serves.onlyYou");
+    expect(servesText(t, { serves: "owner", ownerName: "Bia Lima", mine: false })).toBe(
+      'usageViews.serves.only {"name":"Bia"}',
+    );
+    expect(servesText(t, { serves: null, ownerName: "Bia", mine: false })).toBeNull();
+  });
+});
+
+describe("the quota per model of a plan whose models have limits of their own", () => {
+  const NOW = new Date("2026-11-13T12:00:00.000Z");
+  const LATER = "2026-11-14T18:00:00.000Z";
+  const words: Record<string, string> = {
+    "aiAccounts.usage.notShared": "{{maker}} doesn't share usage here.",
+    "usageViews.models.exhausted": "No quota left · resets {{when}}",
+    "usageViews.models.exhaustedUnknown": "No quota left",
+    "usageViews.models.off": "Turned off",
+    "usageViews.models.region": "Needs the Global region",
+    "usageViews.models.inactive": "No active subscription",
+    "chat.usageWhen.at": "at {{time}}",
+    "chat.usageWhen.on": "on {{day}} at {{time}}",
+    "chat.usageWhen.date": "on {{date}}",
+  };
+  const t = ((key: string, o?: Record<string, string>) =>
+    (words[key] ?? key).replace(/{{(\w+)}}/g, (_, k: string) => o?.[k] ?? "")) as unknown as TFunction;
+  const withModels = (models: PlanUsage["models"]): PlanUsage => ({
+    ...usage([{ kind: "monthly", usedPercent: 20 }]),
+    models,
+  });
+
+  test("one line per model at a limit of its own, in the plan's order, each with what remains", () => {
+    const rows = planModelUsage(
+      t,
+      "en",
+      withModels({
+        "minimax-m3": { at: NOW.toISOString(), off: true },
+        "glm-5.3": { at: NOW.toISOString(), until: LATER },
+        // Its reset already passed: no line, never a stale "no quota left".
+        "deepseek-v4.1-pro": { at: NOW.toISOString(), until: "2026-11-13T11:00:00.000Z" },
+      }),
+      "opencode",
+      NOW,
+    );
+    expect(rows.map((r) => r.label)).toEqual(["MiniMax M3", "GLM-5.3"]);
+    expect(rows[1]?.text).toContain("No quota left");
+    expect(rows[1]?.text).toContain("resets");
+  });
+
+  test("an exhausted or switched-off model is said so, never 0% or a made-up number", () => {
+    const rows = planModelUsage(
+      t,
+      "en",
+      withModels({
+        "glm-5.3": { at: NOW.toISOString(), until: LATER },
+        "minimax-m3": { at: NOW.toISOString(), off: true },
+      }),
+      "opencode",
+      NOW,
+    );
+    expect(rows.find((r) => r.id === "glm-5.3")?.text).toMatch(/^No quota left/);
+    expect(rows.find((r) => r.id === "minimax-m3")?.text).toBe("Turned off");
+    // No percentage at all: nobody read one.
+    expect(rows.map((r) => r.text).join(" ")).not.toContain("%");
+  });
+
+  test("a plan with no usage source names its maker; another plan or no plan invents nothing", () => {
+    // MiniMax publishes no usage endpoint (`plans.ts`): nothing to list, and the line says whose usage it is.
+    expect(notSharedText(t, "minimax")).toBe("MiniMax doesn't share usage here.");
+    expect(
+      planModelUsage(t, "en", withModels({ "glm-5.3": { at: NOW.toISOString(), off: true } }), "minimax", NOW),
+    ).toEqual([]);
+    // Plans we do read, and a computer's own sign-in (its CLI reports it), aren't "no reading".
+    expect(notSharedText(t, "opencode")).toBeNull();
+    expect(notSharedText(t, null)).toBeNull();
+    expect(planModelUsage(t, "en", withModels({ "glm-5.3": { at: NOW.toISOString() } }), null, NOW)).toEqual([]);
+  });
+});
+
+describe("an account's use by kind", () => {
+  const t = ((key: string, o?: Record<string, string>) =>
+    `${key}${o ? `(${Object.values(o).join(" ")})` : ""}`) as unknown as TFunction;
+
+  test("handoffs, people, routines, in that order whatever the server's; kinds with no tokens left out", () => {
+    const kinds = accountKinds({
+      kinds: [
+        { kind: "routines", tokens: 1_400_000, percent: 7 },
+        { kind: "people", tokens: 0, percent: 0 },
+        { kind: "handoffs", tokens: 6_900_000, percent: 37 },
+      ],
+    });
+    expect(kinds.map((k) => k.kind)).toEqual(["handoffs", "routines"]);
+    expect(accountKinds({})).toEqual([]);
+  });
+
+  test("a kind with a share of the week but no tokens this month (a week that began last month) stays listed", () => {
+    const kinds = accountKinds({ kinds: [{ kind: "handoffs", tokens: 0, percent: 37 }] });
+    expect(kinds.map((k) => k.kind)).toEqual(["handoffs"]);
+    expect(kindFacts(t, "en", "week", { percent: 37, tokens: 0 })).toBe(" · week\u00a037%");
+  });
+
+  test("each fact stays whole: no breaking space inside one, a plain space around the dots", () => {
+    const facts = kindFacts(t, "en", "week", { percent: 37, tokens: 6_900_000 });
+    expect(facts.startsWith(" · week\u00a037")).toBe(true);
+    const [, share, tokens] = facts.split(" · ");
+    expect(share).not.toContain(" ");
+    expect(tokens).not.toContain(" ");
+    expect(kindFacts(t, "en", null, { percent: null, tokens: 0 })).toBe("");
   });
 });

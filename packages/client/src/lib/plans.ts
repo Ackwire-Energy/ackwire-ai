@@ -15,7 +15,7 @@ import { isAuto } from "./providers";
 
 export * from "@agenteschat/providers/plans";
 
-export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "free" | "maker"> {
+export interface BrainModelChoice extends Pick<PlanModel, "label" | "tag" | "needs" | "free" | "maker" | "images"> {
   value: string;
   /** Cursor: its CLI said the person's plan includes it (the others cost API prices there). */
   inPlan?: boolean;
@@ -28,6 +28,7 @@ const planChoice = (m: PlanModel, value: string): BrainModelChoice => ({
   ...(m.needs ? { needs: m.needs } : {}),
   ...(m.free ? { free: m.free } : {}),
   ...(m.maker ? { maker: m.maker } : {}),
+  ...(m.images === false ? { images: false as const } : {}),
 });
 
 /** How OpenCode's CLI names a model of the Go plan, which an OpenCode key runs (`OPENCODE_API_KEY`, as models.dev says). */

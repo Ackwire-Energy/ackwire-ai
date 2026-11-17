@@ -58,6 +58,17 @@ describe("/conectar: confirm a computer's code", () => {
     expect(router.state.location.pathname).toMatch(new RegExp(`^/org/${ORG_ID}/settings/devices/.+`));
   });
 
+  test("other people's agents think on it only when the person turns that on here", async () => {
+    const { state } = await open();
+    const page = document.querySelector(".connect-page") as HTMLElement;
+    const others = within(page).getByRole("switch", { name: "Agentes de outras pessoas podem pensar aqui" });
+    expect(others.getAttribute("aria-checked")).toBe("false");
+    await click(others);
+    await click(within(page).getByRole("button", { name: "Conectar" }));
+    await settle(6);
+    expect(calls(state, "devices.updateComputer").map((a) => a.at(-1))).toEqual([{ spill: { others: true } }]);
+  });
+
   test("Não fui eu: the computer isn't connected", async () => {
     const { state } = await open();
     await click(screen().getByRole("button", { name: "Não fui eu" }));

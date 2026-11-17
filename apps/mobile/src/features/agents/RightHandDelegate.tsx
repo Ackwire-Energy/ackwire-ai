@@ -4,7 +4,7 @@ import { can } from "@agenteschat/client/lib/permissions";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
-import { EventPillAction } from "@/ui";
+import { Button } from "@/ui";
 import { useFailed } from "../routines/hooks";
 import { useMeId } from "../shared/hooks";
 
@@ -31,5 +31,7 @@ function useDelegateUndo(d: CardDelegate | null | undefined) {
 export function useDelegateUndoAction(d: CardDelegate | null | undefined): ReactNode {
   const { t } = useTranslation();
   const { undo, pending } = useDelegateUndo(d);
-  return undo ? <EventPillAction label={t("rightHandApprovals.card.undo")} loading={pending} onPress={undo} /> : null;
+  return undo ? (
+    <Button variant="ghost" size="card" label={t("rightHandApprovals.card.undo")} loading={pending} onPress={undo} />
+  ) : null;
 }

@@ -29,13 +29,30 @@ describe("migrations", () => {
         select t.table_name from information_schema.tables t
         where t.table_schema = 'public' and t.table_type = 'BASE TABLE'
           and t.table_name not like 'messages\\_%'
-          and t.table_name not in ('users', 'sessions', 'accounts', 'verifications', 'organizations', 'waitlist_entries', 'push_devices', 'instance_telemetry', 'instance_secrets', 'instance_push', 'push_relay_instances', 'signup_settings', 'claude_auth_settings', 'early_access_invitations', 'oauth_app_clients')
+          and t.table_name not in ('users', 'sessions', 'accounts', 'verifications', 'organizations', 'waitlist_entries', 'partner_waitlist_entries', 'push_devices', 'instance_telemetry', 'instance_secrets', 'instance_push', 'push_relay_instances', 'signup_settings', 'claude_auth_settings', 'early_access_invitations', 'oauth_app_clients')
           and not exists (
             select 1 from information_schema.columns c
             where c.table_name = t.table_name and c.column_name = 'org_id'
           )`),
     );
     expect(rows.map((r) => r.table_name)).toEqual([]);
+  });
+});
+
+describe("agents", () => {
+  test("a new agent asks only for what is risky", async () => {
+    const { org } = await seed();
+    const [agent] = await db
+      .insert(schema.agents)
+      .values({ orgId: org.id, name: "Dev", handle: "dev", model: "claude-sonnet-5-5" })
+      .returning();
+    expect(agent?.approvalsLevel).toBe("risky");
+    const rows = rowsOf<{ is_nullable: string }>(
+      await db.execute(sql`
+        select is_nullable from information_schema.columns
+        where table_name = 'agents' and column_name = 'approvals_level'`),
+    );
+    expect(rows[0]?.is_nullable).toBe("NO");
   });
 });
 

@@ -296,6 +296,8 @@ describe("the account menu", () => {
     await settle(4);
     expect(authCalls.map((c) => c.method)).toEqual(["signOut"]);
     expect(router.state.location.pathname).toBe("/login");
+    expect(localStorage.getItem("agentes.signedOut")).toBe("1");
+    localStorage.removeItem("agentes.signedOut");
   });
 
   test("on a phone, with no room beside it, how I appear is in the menu itself", async () => {

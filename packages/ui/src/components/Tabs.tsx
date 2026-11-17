@@ -52,6 +52,17 @@ export function Tabs<V extends string>({
     ro.observe(el);
     return () => ro.disconnect();
   });
+  // A strip too narrow for its tabs scrolls sideways: the chosen tab is brought into it, also when a link chose it.
+  // By the strip's own scroll, so the page never moves.
+  useLayoutEffect(() => {
+    const el = refs.current[index];
+    const list = el?.parentElement;
+    if (!el || !list) return;
+    const tab = el.getBoundingClientRect();
+    const strip = list.getBoundingClientRect();
+    if (tab.left < strip.left) list.scrollLeft -= strip.left - tab.left;
+    else if (tab.right > strip.right) list.scrollLeft += tab.right - strip.right;
+  }, [index]);
   return (
     <RTabs.Root value={value} onValueChange={(v) => onValueChange(v as V)} style={{ display: "contents" }}>
       <RTabs.List className={seg ? "ac-seg ac-tabs--seg" : "ac-tabs"} aria-label={label}>

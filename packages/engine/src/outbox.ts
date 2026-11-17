@@ -1,5 +1,6 @@
 import { startInFlight } from "@agenteschat/adapters/in-flight";
 import { and, type Database, type Executor, eq, inArray, type SQL, schema, sql } from "@agenteschat/db";
+import { errorNumber } from "./errors";
 import { percentile } from "./format";
 
 const { outbox } = schema;
@@ -109,6 +110,10 @@ export const LONG_JOB_KINDS = [
   "channel.delete",
   "org.files.purge",
   "user.files.purge",
+  // The right hand's sweeps: a card per member at the same hour, a look at each workspace every few minutes.
+  "team_week.post",
+  "team_day.post",
+  "team_watch.check",
 ];
 
 const longJobSql = inArray(outbox.kind, LONG_JOB_KINDS);
@@ -119,16 +124,29 @@ const longJobSql = inArray(outbox.kind, LONG_JOB_KINDS);
  */
 export const APP_JOB_KINDS = ["push.send"];
 
+/** The id under `key` in a job's payload (null for a malformed payload). */
+const payloadId = (key: "runId" | "routineRunId") => {
+  const field = sql.raw(`'${key}'`);
+  return sql`case when ${outbox.payload}->>${field} ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>${field})::uuid end`;
+};
+
 /** The run an `agent_run.execute` job executes (null for a malformed payload). */
-const runOfJob = sql`case when ${outbox.payload}->>'runId' ~ '^[0-9a-fA-F-]{36}$' then (${outbox.payload}->>'runId')::uuid end`;
+const runOfJob = payloadId("runId");
 
 /**
  * Background work (ADR 0053 §10): a routine firing (`routine.run`), or the execution of a routine's
  * background run (`agent_run.execute` of a run with `agent_runs.background`). A person's message never
  * waits behind it: it holds at most half of a worker's long slots. Both kinds are in `LONG_JOB_KINDS`.
+ * A widget's test before it is made (a draft, ADR 0135 §16) isn't: its creator watches the preview build, so its
+ * routine's firing and its run take a person's slots.
  */
-const backgroundJobSql = sql`(${outbox.kind} = 'routine.run' or (${outbox.kind} = 'agent_run.execute' and exists (
-  select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.background)))`;
+const backgroundJobSql = sql`((${outbox.kind} = 'routine.run' and not exists (
+    select 1 from ${schema.routineRuns} rr join ${schema.dashboardWidgets} w on w.routine_id = rr.routine_id and w.draft
+    where rr.id = ${payloadId("routineRunId")}))
+  or (${outbox.kind} = 'agent_run.execute' and exists (
+    select 1 from ${schema.agentRuns} r where r.id = ${runOfJob} and r.background and not exists (
+      select 1 from ${schema.dashboardWidgets} w join ${schema.routineRuns} rr on rr.routine_id = w.routine_id
+      where w.org_id = r.org_id and w.draft and rr.agent_run_id = r.id))))`;
 
 /**
  * The job of a run still `running`. When its worker stops holding it without handing it back (it died, or a step
@@ -285,7 +303,7 @@ export async function renewLease(
 export async function completeJob(db: Database, job: OutboxJob, now = new Date()): Promise<boolean> {
   const rows = await db
     .update(outbox)
-    .set({ status: "done", completedAt: now, lockedUntil: null, lastError: null })
+    .set({ status: "done", completedAt: now, lockedUntil: null, lastError: null, lastErrorStatus: null })
     .where(held(job))
     .returning({ id: outbox.id });
   return rows.length > 0;
@@ -315,10 +333,12 @@ export async function failJob(
 ): Promise<"retry" | "failed"> {
   const now = options.now ?? new Date();
   const message = (error instanceof Error ? error.message : String(error)).slice(0, 2000);
+  // An adapter's error says the status its provider answered (`EmailError`, `PushError`): kept beside the words.
+  const said = { lastError: message, lastErrorStatus: errorNumber(error, "status", 100, 599) };
   if (isHandback(error)) {
     await db
       .update(outbox)
-      .set({ ...handedBack(now), lastError: message })
+      .set({ ...handedBack(now), ...said })
       .where(held(job));
     return "retry";
   }
@@ -327,10 +347,10 @@ export async function failJob(
     .update(outbox)
     .set(
       final
-        ? { status: "failed", lastError: message, lockedUntil: null }
+        ? { status: "failed", ...said, lockedUntil: null }
         : {
             status: "pending",
-            lastError: message,
+            ...said,
             lockedUntil: null,
             nextAttemptAt: new Date(now.getTime() + retryDelayMs(job.attempts)),
           },
@@ -353,9 +373,12 @@ export async function releaseJobs(db: Database, workerId: string, now = new Date
   return rows.length;
 }
 
-/** Throw from a handler to fail the job without retrying. */
+/** Throw from a handler to fail the job without retrying. `status`: the HTTP status behind it, when a provider refused. */
 export class PermanentJobError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
     super(message);
     this.name = "PermanentJobError";
   }

@@ -12,7 +12,19 @@ import {
   teamFailureText,
   templateFor,
 } from "@agenteschat/client/lib/team-plan";
-import { Button, Chip, Field, Icon, type IconName, Locked, Select, Skeleton, Spinner, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  Chip,
+  Field,
+  HintLine,
+  Icon,
+  type IconName,
+  Locked,
+  Select,
+  Skeleton,
+  Spinner,
+  Textarea,
+} from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
@@ -318,7 +330,8 @@ export function PlanStep({
           })}
         </ul>
         <div className="onb__plan-price">
-          <span>
+          {/* Why the Cloud costs, where the price is: one's own server is free, said here and nowhere louder. */}
+          <HintLine name={t("hosting.whyPaid")} hint={t("hosting.whyPaidText")}>
             {offer ? (
               <Trans
                 i18nKey={offer.price ? "onboarding.flow.plan.price" : "onboarding.flow.plan.name"}
@@ -328,7 +341,7 @@ export function PlanStep({
             ) : (
               t("onboarding.flow.plan.generic")
             )}
-          </span>
+          </HintLine>
           <span className="muted">{t("onboarding.flow.plan.cancel")}</span>
         </div>
         {confirming ? (

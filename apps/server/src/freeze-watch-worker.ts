@@ -21,7 +21,7 @@ addEventListener(
       release: start.reports?.release ?? "",
       runtime: { name: "bun", version: Bun.version },
     });
-    const log = createLogger(start.logLevel, errors);
+    const log = createLogger(start.logLevel, errors, start.logFormat);
     let beat = readInFlight(start.memory).beat;
     let beatAt = Date.now();
     let checkedAt = beatAt;

@@ -7,6 +7,13 @@ export const CONTEXT_LIMITS = [200_000, 400_000, 1_000_000] as const;
 export type ContextLimit = (typeof CONTEXT_LIMITS)[number];
 export const isContextLimit = (v: unknown): v is ContextLimit => (CONTEXT_LIMITS as readonly unknown[]).includes(v);
 
+/**
+ * "Automático" on Claude Code and Codex: they summarise here, not at the model's window, since every step of a long
+ * run re-reads the whole context. Other programs take no limit, and the model brain has its own cap.
+ */
+export const autoContextFor = (kind: string | null | undefined): ContextLimit | null =>
+  kind === "claude_code" || kind === "codex" ? 200_000 : null;
+
 /** The limits worth offering under a window: one at or past it reads the same as none. */
 export const contextLimitsFor = (windowTokens: number): ContextLimit[] =>
   CONTEXT_LIMITS.filter((n) => n <= windowTokens);

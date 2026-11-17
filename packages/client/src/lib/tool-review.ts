@@ -168,8 +168,8 @@ function noun(t: TFunction, word: string): [string, string, string] | null {
 }
 
 /**
- * A readable name: the catalog's words for the tools agents use most (`tool-labels.ts`), else the verb in the
- * person's language, then the words. When every word is known, they're ordered as the language wants
+ * A readable name: the catalog's words for the tools agents use most (the strings' `toolNames.label`), else the verb
+ * in the person's language, then the words. When every word is known, they're ordered as the language wants
  * ("Ver orçamento da campanha" / "Get campaign budget"); otherwise the words stay as the server wrote them. A name
  * with no verb reads as words, without the app it starts with: the app shows beside it.
  */

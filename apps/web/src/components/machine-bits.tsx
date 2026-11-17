@@ -49,6 +49,20 @@ function useCopy() {
   };
 }
 
+/** "Prefiro no Terminal": under a one-click button, the same switch as a command, folded until asked for. */
+export function TerminalFallback({ command }: { command: string | null }) {
+  const { t } = useTranslation();
+  if (!command) return null;
+  return (
+    <details className="cflow__more">
+      <summary>{t("machines.access.preferTerminal")}</summary>
+      <div className="cflow__key">
+        <CommandBlock command={command} />
+      </div>
+    </details>
+  );
+}
+
 /**
  * A terminal command (or anything to paste) in a code block, with Copiar; `copied`: what the toast says, `onCopied`:
  * after it reached the clipboard. `labelled`: the screen's main thing (a one-line install): Copy in words, which

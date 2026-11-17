@@ -3,7 +3,7 @@ import type { Approval, ApprovalCoverView, ApprovalRule, CardDelegate } from "..
 import { serviceKey } from "./activity";
 import { aheadPhase, approvalAction, emailTitleWords, sqlReadsTarget } from "./approval-kind";
 import { humanize } from "./custom-tools";
-import { formatShortDate, formatTime, lowerFirst, relativeDay } from "./format";
+import { formatShortDate, formatTime, isUuid, lowerFirst, relativeDay } from "./format";
 import { agentGrammar } from "./grammar";
 import { catalogLabel, labelIsName, toolKey } from "./tool-labels";
 import { partsOf, toolName } from "./tool-review";
@@ -138,6 +138,22 @@ export const approvalAskLine = (t: TFunction, mine: boolean, count?: number) =>
     ? t(mine ? "approval.askPlain" : "approval.askPlainOther")
     : t(mine ? "approval.askMany" : "approval.askManyOther", { count });
 
+/**
+ * A digest's first line (ADR 0177 §4): how many approvals wait, then how many are routine and how many are to read
+ * one by one. Nothing once none waits.
+ */
+export function digestLine(t: TFunction, counts: { waiting: number; routine: number; careful: number }): string {
+  const tt = t as unknown as Tt;
+  if (counts.waiting === 0) return "";
+  const waiting = tt("rightHand.digest.waiting", { count: counts.waiting });
+  if (counts.routine === 0) return waiting;
+  const split =
+    counts.careful === 0
+      ? tt("rightHand.digest.allRoutine")
+      : tt("rightHand.digest.split", { routine: counts.routine, careful: counts.careful });
+  return tt("common.joinSentences", { a: waiting, b: split });
+}
+
 /** What `request_permission` asks to turn on: a built-in scope in the person's language, a connector by its name. */
 function permissionLabel(t: TFunction, permission: string, title: string) {
   const fromServer = title.replace(/^Turn on: /, "");
@@ -191,12 +207,46 @@ export function approvalReadsOnly(approval: Pick<Approval, "tool" | "scope" | "p
   return verb !== null && READ_VERBS.has(verb);
 }
 
+/** Where a connector's send or reply call carries the message's text. */
+const BODY_KEYS = ["text", "body", "html", "message", "content"] as const;
+const LETTER_VERB = /(^|_)(send|reply|forward|draft)(_|$)/i;
+
+/**
+ * A connector's call that sends or answers a message (an email through a mail service): its subject and text, so its
+ * card reads as the message, not as its ids. `reply`: it answers a message, whose sender it goes to. Null for any
+ * other call, and for the built-in mailboxes' (`email`).
+ */
+export function approvalLetter(
+  approval: Pick<Approval, "params" | "connector" | "email"> & Partial<Pick<Approval, "tool">>,
+): { subject: string; body: string; to: string; reply: boolean } | null {
+  if (approval.email || !approval.connector) return null;
+  const name = innerTool(approval) ?? approval.tool ?? "";
+  if (!LETTER_VERB.test(name)) return null;
+  const inner = approval.params?.arguments;
+  const params = (inner && typeof inner === "object" && !Array.isArray(inner) ? inner : approval.params) as Record<
+    string,
+    unknown
+  >;
+  const text = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const key = BODY_KEYS.find((k) => text(params[k]));
+  if (!key) return null;
+  const body = key === "html" ? text(params[key]).replace(/<[^>]+>/g, " ") : text(params[key]);
+  const to = Array.isArray(params.to) ? params.to.filter((v) => typeof v === "string").join(", ") : text(params.to);
+  return { subject: text(params.subject), body: body.replace(/[ \t]+/g, " ").trim(), to, reply: /reply/i.test(name) };
+}
+
+/** Who a connector's message goes to, in words: its addresses, or the sender of the message it answers. */
+export const approvalLetterTo = (t: TFunction, letter: NonNullable<ReturnType<typeof approvalLetter>>) =>
+  letter.to ? t("approval.email.toList", { to: letter.to }) : letter.reply ? t("approval.email.toSender") : "";
+
 /**
  * Its values in words, label and value ("Issue id", "ACME-177"), one level into objects, without the inner
- * tool's name. Lists keep them short (`long: false`, at most `max`); the details show every one.
+ * tool's name. Lists keep them short (`long: false`, at most `max`): without ids (a UUID says nothing to a person) and,
+ * for a message (`approvalLetter`), without its subject, recipients and text, which its card shows as the message. The details
+ * show every one.
  */
 export function approvalValues(
-  approval: Pick<Approval, "params" | "connector" | "email">,
+  approval: Pick<Approval, "params" | "connector" | "email"> & Partial<Pick<Approval, "tool">>,
   {
     max = Number.POSITIVE_INFINITY,
     long = false,
@@ -216,14 +266,16 @@ export function approvalValues(
   // An email is said by its sentence and its letter; its fields aren't values.
   if (approval.email) return [];
   const skip = innerTool(approval) ? "name" : null;
+  const letter = !long && approvalLetter(approval);
   const out: [string, string][] = [];
   const plain = (v: unknown) => typeof v === "string" || typeof v === "number" || typeof v === "boolean";
   const walk = (obj: Record<string, unknown>, top: boolean) => {
     for (const [k, v] of Object.entries(obj)) {
       if (top && k === skip) continue;
+      if (letter && (k === "subject" || k === "to" || (BODY_KEYS as readonly string[]).includes(k))) continue;
       if (plain(v)) {
         const text = typeof v === "number" && formatNumber ? formatNumber(v) : String(v).trim();
-        if (text && (long || text.length <= 60)) out.push([humanize(k), text]);
+        if (text && (long || (text.length <= 60 && !isUuid(text)))) out.push([humanize(k), text]);
       } else if (Array.isArray(v) && v.length > 0 && v.every(plain)) {
         // A list of names (the branches to delete) is one value; on a card it is cut, never left out.
         const text = v.map(String).join(", ");
@@ -239,7 +291,11 @@ export function approvalValues(
  * Its values on one line ("Role: seller · Month: 2026-10 · Revenue: 97.000"): what tells apart two requests
  * for the same tool, on the card while it waits and on the line once decided. The raw call stays in the details.
  */
-export const approvalSummary = (approval: Pick<Approval, "params" | "connector" | "email">, locale: string, max = 4) =>
+export const approvalSummary = (
+  approval: Pick<Approval, "params" | "connector" | "email"> & Partial<Pick<Approval, "tool">>,
+  locale: string,
+  max = 4,
+) =>
   approvalValues(approval, { max, locale })
     .map(([label, value]) => `${label}: ${value}`)
     .join(" · ");
@@ -273,9 +329,28 @@ export function actionName(t: TFunction, slug: string) {
   return name ? `${toolName(t, partsOf(name, null, true), name)} (${known.app ?? humanize(first)})` : humanize(slug);
 }
 
-/** One of a routine's own actions (`Routine.ownActions`) in words: a Composio slug (upper case) by its app, else the tool's name. */
-export const ownActionName = (t: TFunction, name: string) =>
-  /^[A-Z0-9_]+$/.test(name) ? actionName(t, name) : toolName(t, partsOf(name), name);
+/** A routine's own action that lets its commands use a Vault key (`vault:NAME`); mirrors engine `routine-keys.ts`. */
+const VAULT_ACTION_PREFIX = "vault:";
+
+/** The Vault key of a routine's own action, or null for a connected app's action. */
+export const routineVaultKey = (action: string) =>
+  action.startsWith(VAULT_ACTION_PREFIX) ? action.slice(VAULT_ACTION_PREFIX.length) || null : null;
+
+/** A routine's own actions split: what it does in connected apps, and the Vault keys its commands may use. */
+export const splitOwnActions = (own: readonly string[]) => ({
+  apps: own.filter((a) => !routineVaultKey(a)),
+  keys: own.flatMap((a) => routineVaultKey(a) ?? []),
+});
+
+/**
+ * One of a routine's own actions (`Routine.ownActions`) in words: a Vault key by its name, a Composio slug (upper case)
+ * by its app, else the tool's name.
+ */
+export const ownActionName = (t: TFunction, name: string) => {
+  const key = routineVaultKey(name);
+  if (key) return t("routines.vaultKeys.named", { key });
+  return /^[A-Z0-9_]+$/.test(name) ? actionName(t, name) : toolName(t, partsOf(name), name);
+};
 
 /** A remembered push (`owner/repo:branch`) in words: "enviar para ana/fix em acme/app". */
 function pushWords(t: TFunction, target: string) {
@@ -375,10 +450,11 @@ export function aheadEndLine(t: TFunction, a: Pick<Approval, "runAt" | "status" 
  */
 export function decisionOutcome(
   t: TFunction,
-  a: Pick<Approval, "status" | "decidedByUserId" | "decidedForUserId">,
+  a: Pick<Approval, "status" | "decidedByUserId" | "decidedForUserId"> & Partial<Pick<Approval, "supersededById">>,
   meId: string | null,
   nameOf: (userId: string) => string | undefined,
 ): string {
+  if (a.status === "canceled" && a.supersededById) return t("approval.outcomeSuperseded");
   if (a.status === "expired" || a.status === "canceled") return t(`approvals.status.${a.status}`);
   const approved = a.status === "approved";
   const by = a.decidedByUserId;

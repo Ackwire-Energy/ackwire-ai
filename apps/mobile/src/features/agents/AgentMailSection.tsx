@@ -1,12 +1,13 @@
 import { type AgentMailbox, useAgentMail, useMailAccounts, useSetAgentMail } from "@agenteschat/client";
-import { LEVELS, type Level, nextLevel } from "@agenteschat/client/lib/access-levels";
+import type { Level } from "@agenteschat/client/lib/access-levels";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { defaultPolicy, mailAccessOf, toMailLevel } from "@agenteschat/client/lib/mail";
+import { defaultPolicy, mailAccessOf, onlyForOwner, toMailLevel } from "@agenteschat/client/lib/mail";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/providers/org";
 import { useToast } from "@/ui";
+import { pickLevel } from "../connectors/pick-level";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 
 const toLevel = (l: AgentMailbox["level"]): Level => (l === "read_write" ? "write" : l);
@@ -17,9 +18,11 @@ export interface MailboxLine {
   address: string;
   /** Its level in words, the row's value. */
   level: string;
-  /** On a mailbox someone else connected: who gives access to it. */
+  /** On a mailbox someone else connected: who gives access to it, which is why its level can't be changed here. */
   sub: string | null;
-  /** On one's own mailbox: a tap moves the agent to the next level. */
+  /** On one's own with the right hand: that it serves only them, behind the row's ⓘ. */
+  hint: { name: string; text: string } | null;
+  /** On one's own mailbox: a tap opens the app's level picker. */
   onPress: (() => void) | null;
   /** On someone else's, for admins and the agent's owner while it has access: take it away. */
   remove: { label: string; busy: boolean; onPress: () => void } | null;
@@ -27,7 +30,7 @@ export interface MailboxLine {
 
 /**
  * The agent's access to each connected mailbox (ADR 0038), as rows for its profile's "Can use" (beside its apps,
- * so what it can use is one list). Only who connected a mailbox gives access to it: on their own a tap changes the
+ * so what it can use is one list). Only who connected a mailbox gives access to it: on their own a tap picks the
  * level; on anyone else's the row says who gives it, and admins and the agent's owner may remove it. Rules stay on
  * the web. None while the mailboxes load, and none asked for while `enabled` is off (who doesn't see the agent's
  * details).
@@ -70,7 +73,20 @@ export function useAgentMailboxes(agentId: string, enabled = true): MailboxLine[
       address: account.address,
       level: t(`access.level.${level}`),
       sub: theirs ? (owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")) : null,
-      onPress: may.gives && !set.isPending ? () => save(account.id, saved, nextLevel({ levels: LEVELS }, level)) : null,
+      hint:
+        !theirs && onlyForOwner(account, agent, meId)
+          ? {
+              name: t("common.about", { label: account.address }),
+              text: t("mail.agent.onlyYou", { name: agent?.name ?? "" }),
+            }
+          : null,
+      onPress:
+        may.gives && !set.isPending
+          ? () =>
+              void pickLevel(t, account.address, level).then((picked) => {
+                if (picked && picked !== level) save(account.id, saved, picked);
+              })
+          : null,
       remove:
         !may.gives && may.removes && level !== "none"
           ? { label: t("mail.agent.remove"), busy: set.isPending, onPress: () => save(account.id, saved, "none") }

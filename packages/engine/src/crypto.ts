@@ -23,7 +23,9 @@ export type KeyPurpose =
   | "invitations"
   | "invitation-mail"
   | "routine-hooks"
-  | "github-app-manifest";
+  | "human-pass"
+  | "github-app-manifest"
+  | "operator-input-digest";
 
 function deriveKey(masterSecret: string, purpose: KeyPurpose): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, "agentes.chat", `agentes.chat/${purpose}/v1`, 32));
@@ -152,6 +154,25 @@ export function invitationMailProof(masterSecret: string, invitationId: string):
 /** The token in a routine's webhook address (ADR 0106), made the same way from its hook's key id. */
 export function routineHookToken(masterSecret: string, keyId: string): string {
   return createHmac("sha256", deriveKey(masterSecret, "routine-hooks")).update(keyId).digest("base64url");
+}
+
+/**
+ * What stands for a tool call's input in the operator API (ADR 0056): an HMAC of a hash of the input, keyed by this
+ * server's secret and tied to the call's workspace, cut to 16 hex characters. Two calls of one workspace with equal
+ * inputs have the same digest; it compares with no other workspace's or server's, and leads back to nothing.
+ */
+export function operatorInputDigest(masterSecret: string, orgId: string, inputHash: string): string {
+  return createHmac("sha256", deriveKey(masterSecret, "operator-input-digest"))
+    .update(`${orgId}:${inputHash}`)
+    .digest("hex")
+    .slice(0, 16);
+}
+
+/** A compact JWS (RFC 7515) of `claims` as a JWT, signed HS256 with the secret's UTF-8 bytes. */
+export function signJwtHs256(claims: Record<string, unknown>, secret: string): string {
+  const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const signed = `${part({ alg: "HS256", typ: "JWT" })}.${part(claims)}`;
+  return `${signed}.${createHmac("sha256", secret).update(signed).digest("base64url")}`;
 }
 
 /** URL-safe random token, e.g. for invitation links. */

@@ -436,7 +436,7 @@ test("refused credentials mark the mailbox for reconnecting and tell the model",
   expect((await m.tools.list(ctx)).filter((t) => t.name.startsWith("mail_"))).toEqual([]);
 });
 
-test("attachments are saved in the Drive as untrusted files", async () => {
+test("attachments are saved in the Drive as untrusted files and read for the agent", async () => {
   m = await mailSetup();
   const account = await imapAccount(m);
   await giveMail(m, account.id, "read");
@@ -462,6 +462,8 @@ test("attachments are saved in the Drive as untrusted files", async () => {
   const [artifact] = await m.f.db.select().from(schema.artifacts).where(eq(schema.artifacts.id, id));
   expect(artifact).toMatchObject({ kind: "file", untrusted: true, title: "report.csv" });
   expect(r.type === "result" && r.output.content).toContain("everyone in the workspace sees it");
+  // What is in it comes with the answer, read the way read_artifact reads it.
+  expect(r.output.content).toContain('<external_data source="attachment report.csv">\na,b\n');
 });
 
 test("a routine's attachment stays in its room, and the result says nobody sees it", async () => {

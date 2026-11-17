@@ -1,7 +1,19 @@
-import type { PhonePairFailure, PhonePairing, PhonePairState } from "@agenteschat/adapters";
+import {
+  IPHONE_DEV_MODE_PROTOCOL,
+  type PhonePairFailure,
+  type PhonePairing,
+  type PhonePairState,
+  type PubSub,
+  type WifiIphone,
+  XCODE_BLOCKED,
+  XCODE_FIX_PROTOCOL,
+  XCODE_FIX_STATES,
+  type XcodeFix,
+  type XcodeFixKind,
+} from "@agenteschat/adapters";
 import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { recordAudit } from "./audit";
-import { mayManageDevice } from "./devices";
+import { mayManageDevice, publishDevicesChanged } from "./devices";
 import { ForbiddenError, NotFoundError } from "./errors";
 import { type MachineCaller, MachineRequestError } from "./machine-hub";
 import { getMachine } from "./machines";
@@ -176,4 +188,149 @@ export async function lookForPhones(deps: Deps, actorId: string, orgId: string, 
   const machine = await getMachine(deps.db, orgId, machineId);
   if (!machine || machine.kind === "managed") throw new NotFoundError("Device not found", "device.not_found");
   await deps.hub.call(machine.id, { op: "phone.look" }).catch(() => undefined);
+}
+
+/**
+ * iPhones on a Mac's Wi-Fi (ADR 0042): the Mac lists the ones that trust it (they did over a cable once), and uses one
+ * only after the person who manages the Mac picks it. Only they see the list: it names phones near the Mac, which may
+ * be anyone's. `update`: the Mac's agentes.chat is too old to use iPhones over Wi-Fi.
+ */
+export interface WifiIphones {
+  available: WifiIphone[];
+  update?: true;
+}
+
+const wifiList = (r: { available?: unknown }): WifiIphone[] =>
+  (Array.isArray(r.available) ? r.available : []).slice(0, 20).flatMap((p: Record<string, unknown>) => {
+    const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
+    const serial = text(p?.serial, 200);
+    if (!serial) return [];
+    const name = text(p.name, 200);
+    return [
+      { serial, model: text(p.model, 120) || "iPhone", ...(name ? { name } : {}), osVersion: text(p.osVersion, 40) },
+    ];
+  });
+
+/** `GET …/computers/{machineId}/wifi-iphones`: an offline Mac lists none. */
+export async function wifiIphones(deps: Deps, actorId: string, orgId: string, machineId: string): Promise<WifiIphones> {
+  const machine = await pairingHost(deps.db, actorId, orgId, machineId);
+  try {
+    return { available: wifiList(await deps.hub.call(machine.id, { op: "phone.wifi", action: "list" })) };
+  } catch (error) {
+    if (tooOld(error)) return { available: [], update: true };
+    return { available: [] };
+  }
+}
+
+/**
+ * `PUT …/wifi-iphones/{serial}` (`use`) and the forget of a phone row over Wi-Fi: the Mac uses that iPhone over Wi-Fi
+ * from now on, or no longer.
+ */
+export async function pickIphoneOverWifi(
+  deps: Deps & { pubsub?: PubSub },
+  actorId: string,
+  orgId: string,
+  machineId: string,
+  serial: string,
+): Promise<WifiIphones> {
+  const machine = await pairingHost(deps.db, actorId, orgId, machineId);
+  let reply: { available?: unknown };
+  try {
+    reply = await deps.hub.call(machine.id, { op: "phone.wifi", action: "allow", serial });
+  } catch (error) {
+    if (tooOld(error)) return { available: [], update: true };
+    throw error;
+  }
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "device.iphone_wifi",
+    target: { type: "machine", id: machine.id },
+    details: { on: true },
+  });
+  await publishDevicesChanged(deps.pubsub, orgId);
+  return { available: wifiList(reply) };
+}
+
+/**
+ * Fixing a Mac's own Xcode for an iPhone's setup (`xcode.fix`): `update` (from `XCODE_FIX_PROTOCOL` on, `start`
+ * answers it): the Mac's agentes.chat is too old, the apps show the Terminal command instead. `fix: null`: none ran.
+ */
+export interface XcodeFixView {
+  fix: XcodeFix | null;
+  update?: true;
+}
+
+/** The runner's answer, checked: it comes from the person's computer. */
+function xcodeFixOf(r: { fix?: unknown } | undefined, kind: XcodeFixKind): XcodeFix | null {
+  const f = r?.fix as Record<string, unknown> | null | undefined;
+  if (!f || typeof f !== "object") return null;
+  const state = XCODE_FIX_STATES.find((s) => s === f.state) ?? "failed";
+  const step = typeof f.step === "number" && Number.isInteger(f.step) ? Math.min(3, Math.max(0, f.step)) : 0;
+  const message = typeof f.message === "string" ? f.message.slice(0, 300) : "";
+  const still = XCODE_BLOCKED.find((b) => b === f.still);
+  return {
+    kind: f.kind === "update" || f.kind === "select" ? f.kind : kind,
+    state,
+    step,
+    ...(message ? { message } : {}),
+    ...(state === "failed" && still ? { still } : {}),
+  };
+}
+
+/**
+ * `POST`, `GET` and `DELETE …/computers/{machineId}/xcode-fix` (the Mac's owner or an admin): start a fix of the Mac's
+ * Xcode, where it stands, or stop it. A `select` opens macOS's password window on that Mac: only someone there who
+ * knows its password lets it run. Offline: `MachineOfflineError` to start, none to ask about.
+ */
+export async function xcodeFix(
+  deps: Deps,
+  actorId: string,
+  orgId: string,
+  machineId: string,
+  action: "start" | "status" | "cancel",
+  kind: XcodeFixKind = "select",
+): Promise<XcodeFixView> {
+  const machine = await pairingHost(deps.db, actorId, orgId, machineId);
+  if (machine.protocol < XCODE_FIX_PROTOCOL) return { fix: null, update: true };
+  let reply: { fix?: unknown };
+  try {
+    reply = await deps.hub.call(machine.id, { op: "xcode.fix", action, kind });
+  } catch (error) {
+    if (tooOld(error)) return { fix: null, update: true };
+    if (action !== "start") return { fix: null };
+    throw error;
+  }
+  if (action === "start") {
+    await recordAudit(deps.db, {
+      orgId,
+      actor: { type: "person", id: actorId },
+      action: "device.xcode_fix",
+      target: { type: "machine", id: machine.id },
+      details: { kind },
+    });
+  }
+  return { fix: xcodeFixOf(reply, kind) };
+}
+
+/**
+ * `POST …/computers/{machineId}/xcode-open` (the Mac's owner or an admin): opens Xcode on the Mac, which shows the
+ * Developer Mode switch on a plugged iPhone that hides it. `opened: false`: the Mac's app is too old, or Xcode didn't
+ * open. Offline: `MachineOfflineError`.
+ */
+export async function openXcode(
+  deps: Deps,
+  actorId: string,
+  orgId: string,
+  machineId: string,
+): Promise<{ opened: boolean }> {
+  const machine = await pairingHost(deps.db, actorId, orgId, machineId);
+  if (machine.protocol < IPHONE_DEV_MODE_PROTOCOL) return { opened: false };
+  try {
+    const reply = await deps.hub.call(machine.id, { op: "xcode.open" });
+    return { opened: reply.opened === true };
+  } catch (error) {
+    if (tooOld(error)) return { opened: false };
+    throw error;
+  }
 }

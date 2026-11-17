@@ -1,10 +1,12 @@
-import { type CatchUpClosed, keys, type Message, useApi } from "@agenteschat/client";
+import { type CatchUpClosed, keys, type Message, useApi, useUsageQueue } from "@agenteschat/client";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   answerAnywayOpen,
   mayAnswerAnyway,
   mayContinueUsage,
+  planLimitNote,
+  usageCheckedText,
   usagePauseCardOf,
   usagePauseText,
   usageWaitFix,
@@ -20,7 +22,7 @@ import { openAgentEdit } from "../agents/AgentEditScreen";
 import { AskDone, AskWaiting } from "../chat/asks";
 import { UsageQueueSheet } from "../queue/UsageQueueSheet";
 import { useFailed } from "../routines/hooks";
-import { useDirectory, useMeId } from "../shared/hooks";
+import { useDirectory, useMeId, useNow } from "../shared/hooks";
 import { useSheetIfAny } from "../shared/SheetHost";
 import { openAgentAi } from "./AgentAiScreen";
 
@@ -50,7 +52,7 @@ function useDontRun(runId: string | null) {
 }
 
 /**
- * "Don't run it" as words only (a ghost button): put it in `textActs`. Greyed for anyone but the person behind it,
+ * "Don't run it" as words only (a text button): put it in `textActs`. Greyed for anyone but the person behind it,
  * the agent's owner and admins.
  */
 export function DontRunButton({ runId, may, count = 1 }: { runId: string | null; may: boolean; count?: number }) {
@@ -95,7 +97,7 @@ export function AnswerAnywayButton({
   const may = mayAnswerAnyway(closed, meId, owner, can(org, "manage_agents"));
   return (
     <Button
-      variant="ghost"
+      variant="text"
       size="sm"
       label={t("usageCard.answerAnyway")}
       loading={pending}
@@ -121,11 +123,15 @@ export function AnswerAnywayButton({
 export function UsageWaitCancel({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const sheet = useSheetIfAny();
-  const { org } = useOrg();
+  const { org, orgId } = useOrg();
   const dir = useDirectory();
   const meId = useMeId();
   const wait = m.author.type === "agent" ? usageWaitOf(m.meta) : null;
   const skipped = wait?.closed && !wait.continuedByUserId ? wait.closed : null;
+  const live = Boolean(wait && !skipped && !wait.canceled && !wait.ended);
+  const now = useNow(60_000);
+  const queue = useUsageQueue(orgId, m.author.id ?? "", live && planLimitNote(m.meta));
+  const checked = live ? usageCheckedText(t, m.meta, queue.data?.checkedAt, now) : null;
   if (!wait || (!skipped && (wait.canceled || wait.ended))) return null;
   const owner = dir.agentById.get(m.author.id ?? "")?.ownerUserId;
   const admin = can(org, "manage_agents");
@@ -141,6 +147,11 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
   const fix = !skipped && m.author.id ? usageWaitFix(m.meta, { admin, owner: owner === meId }) : null;
   return (
     <View style={styles.acts}>
+      {checked ? (
+        <Text variant="footnote" tone="faint">
+          {checked}
+        </Text>
+      ) : null}
       <View style={styles.textActs}>
         {fix ? (
           <Button
@@ -157,7 +168,7 @@ export function UsageWaitCancel({ message: m }: { message: Message }) {
         )}
         {m.author.id && sheet ? (
           <Button
-            variant="ghost"
+            variant="text"
             size="sm"
             label={t("queue.see")}
             onPress={() =>
@@ -268,6 +279,6 @@ export function UsagePauseCard({ message: m }: { message: Message }) {
 
 const styles = StyleSheet.create({
   acts: { gap: 2, alignItems: "flex-start" },
-  // Words-only actions: the ghost buttons' own side padding hangs outside, so their words line up with the text.
-  textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginLeft: -14 },
+  // Words-only actions: text buttons have no side padding, so the first one's words start where the text above does.
+  textActs: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", columnGap: 16 },
 });

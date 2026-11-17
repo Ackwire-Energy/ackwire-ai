@@ -2,6 +2,7 @@ import type { SidebarItem, SidebarItems, SidebarPlace, SidebarSection } from "..
 
 /** The tools at the top of the sidebar, in their order (mirrors `SIDEBAR_ITEMS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
+  "waiting",
   "approvals",
   "proposals",
   "threads",
@@ -17,6 +18,7 @@ export const SIDEBAR_ITEMS: readonly SidebarItem[] = [
 
 /** Where each tool goes for someone who never moved it. */
 export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
+  waiting: "auto",
   approvals: "auto",
   proposals: "more",
   threads: "always",
@@ -32,10 +34,11 @@ export const SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
 
 /**
  * The same in a personal workspace (ADR 0159): the sidebar is the person's conversations, so every tool starts in More
- * and only Approvals comes into sight, while something waits. Only what is in sight changes: every tool is still one
+ * and only what waits on the person comes into sight, while something does. Only what is in sight changes: every tool is still one
  * click away, and a choice the person made still wins.
  */
 export const PERSONAL_SIDEBAR_DEFAULTS: Record<SidebarItem, SidebarPlace> = {
+  waiting: "auto",
   approvals: "auto",
   proposals: "more",
   threads: "more",
@@ -57,6 +60,7 @@ export const sidebarDefaults = (personal = false) => (personal ? PERSONAL_SIDEBA
  * sidebar-items.ts): what waits for the person first, as in a team's, then Routines and Drive, the ones they use most.
  */
 export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
+  "waiting",
   "approvals",
   "proposals",
   "routines",
@@ -74,7 +78,7 @@ export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
 export const sidebarItemOrder = (personal = false) => (personal ? PERSONAL_SIDEBAR_ITEMS : SIDEBAR_ITEMS);
 
 /** The tools with a count in the sidebar: only these can wait in More until there is something (`auto`). */
-export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals", "threads"];
+export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["waiting", "approvals", "proposals", "threads"];
 
 /** The sidebar's sections in their default order (mirrors `SIDEBAR_SECTIONS`, packages/engine/src/sidebar-items.ts). */
 export const SIDEBAR_SECTIONS: readonly SidebarSection[] = ["tools", "channels", "agents", "people"];

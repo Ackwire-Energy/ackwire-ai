@@ -196,6 +196,26 @@ test("commands get the agent's secrets, and no result shows them", async () => {
   expect(textOf(out)).toBe("value=[secret]");
 });
 
+test("commands get what root's turn named for its agent (its commits' lines), the session's latest", async () => {
+  const asked: unknown[] = [];
+  const line = "Co-authored-by: Ada <noreply@agentes.chat>";
+  const { call, state, tools, scope } = setup(
+    { agent: { ...AGENT, coAuthors: [line] } },
+    {
+      secrets: async (agent) => {
+        asked.push(agent);
+        return { ...SECRETS, env: { AGENTES_CO_AUTHORS: agent?.coAuthors?.join("\n") ?? "" } };
+      },
+    },
+  );
+  state.answer = allow;
+  expect(textOf(await call("Bash", { command: 'echo "[$AGENTES_CO_AUTHORS]"' }))).toBe(`[${line}]`);
+  // Turned off: root's next turn names the agent without them.
+  tools.surface({ ...scope, agent: AGENT });
+  expect(textOf(await call("Bash", { command: 'echo "[$AGENTES_CO_AUTHORS]"' }))).toBe("[]");
+  expect(asked).toEqual([{ ...AGENT, coAuthors: [line] }, AGENT]);
+});
+
 test("output past the inline limit comes back as a preview and a file Read can page, redacted", async () => {
   const { call, state } = setup({}, { secrets: async () => SECRETS });
   state.answer = allow;
@@ -427,6 +447,32 @@ test("reads and what the turn's rules allow go on without asking", async () => {
   );
   expect(existsSync(path.join(folder, "lib", "x"))).toBe(true);
   expect(asked).toEqual([]);
+});
+
+test("an agent that always asks: only a read goes on here, an edit and an allowed command go to the prompt", async () => {
+  const { call, asked, folder } = setup({ asks: "always" });
+  writeFileSync(path.join(folder, "a.txt"), "hello\n");
+  expect(textOf(await call("Bash", { command: "cat a.txt" }))).toBe("hello");
+  expect(asked).toEqual([]);
+  expect(textOf(await call("Bash", { command: "mkdir -p lib && touch lib/x" }))).toBe("Lia said no.");
+  expect(existsSync(path.join(folder, "lib"))).toBe(false);
+  expect((await call("Write", { file_path: path.join(folder, "b.txt"), content: "x" })).isError).toBe(true);
+  expect(existsSync(path.join(folder, "b.txt"))).toBe(false);
+  expect(asked.map((a) => (a.args as { tool_name: string }).tool_name)).toEqual(["Bash", "Write"]);
+});
+
+test("an agent that never asks: a held command names where it runs, and nobody is asked", async () => {
+  const { call, asked } = setup({ asks: "never" });
+  const merge = textOf(await call("Bash", { command: "git merge main" }));
+  expect(merge).toContain("This is a merge");
+  expect(merge).toContain("Run the same command with run_code");
+  expect(merge).not.toContain("a person approves it first");
+  expect(asked).toEqual([]);
+  // A background task's executor has no run_code to go to.
+  const task = setup({ asks: "never", task: "local" });
+  const inTask = textOf(await task.call("Bash", { command: "git merge main" }));
+  expect(inTask).toContain("stop and say so in your result");
+  expect(inTask).not.toContain("run_code");
 });
 
 test("anything else goes to the prompt, and the person's word decides", async () => {

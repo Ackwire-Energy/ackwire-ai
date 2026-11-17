@@ -4,4 +4,15 @@
  * the sky blue (same in both themes); an agent's own sky uses its color.
  * The functions live in `./math` (DOM-free, shared with the phone app).
  */
-export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./math";
+export {
+  agentTones,
+  EYE,
+  glowTones,
+  mix,
+  parseColor,
+  pixelOf,
+  SKY_TONES,
+  softTones,
+  spriteTone,
+  TEAM_NIGHT,
+} from "./math";

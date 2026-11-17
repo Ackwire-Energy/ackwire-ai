@@ -206,6 +206,26 @@ test("the organization: any agent ready or waiting; archived ones don't count", 
   });
 });
 
+test("the organization: where it differs, what an agent's background work thinks with, never the fallback", async () => {
+  f = await setup();
+  let status: MachineStatus | null = statusOf();
+  const deps = { db: f.db, gateway: f.gateway, machines: { status: async () => status } };
+  const paired = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, { name: "MacBook" });
+  const set = (fields: Partial<typeof schema.agents.$inferInsert>) =>
+    f.db.update(schema.agents).set(fields).where(eq(schema.agents.id, f.agent.id));
+  const agents = async () => (await orgAiStatus(deps, f.org.id)).agents;
+  await set({ brain: "claude_code", machineId: paired.machineId });
+  expect(await agents()).toEqual([{ agentId: f.agent.id, state: "ready" }]);
+  // Signed out: a chat stands in on the key, a routine or a widget's build never does.
+  status = statusOf({ executors: { claude: { version: "2.1.300", loggedIn: false } } });
+  expect(await agents()).toEqual([{ agentId: f.agent.id, state: "ready", background: "no_ai" }]);
+  // With the fallback off, both say it.
+  await set({ brainFallback: false });
+  expect(await agents()).toEqual([
+    { agentId: f.agent.id, state: "no_ai", reason: "not_signed_in", own: "claude_code" },
+  ]);
+});
+
 describe("who picks the agents (ADR 0074)", () => {
   /** The router as `message.posted` builds it, on a computer hub that reports `status`. */
   const routingOf = (over: Partial<NonNullable<JobDeps["router"]>>, status: Partial<MachineStatus> = {}) => {

@@ -29,7 +29,7 @@ import {
   WdaClient,
   wdaScreenDriver,
 } from "../../runner/wda";
-import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
+import { fakeUsbmuxd } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 // Each fake Xcode tool is a process of its own: an iPhone helper's build, check and start take seconds on a busy machine.
@@ -43,7 +43,7 @@ afterEach(() => {
 });
 
 const FAKE = path.join(import.meta.dir, "fake-phone-tools.mjs");
-const IPHONE = "00008110-001475263AC0A01E";
+const IPHONE = "00008110-000A1B2C3D4E5F60";
 const SIM = "5C5C62E5-74E2-4E25-93AD-65E264BE78A4";
 const TEAM = { id: "A1B2C3D4E5", name: "Sam Rivera", free: true };
 
@@ -355,7 +355,7 @@ async function mac(state: Record<string, unknown> = {}) {
   const logFile = path.join(root, "log");
   const setState = (next: Record<string, unknown>) => writeFileSync(stateFile, JSON.stringify(next));
   setState(state);
-  const [wda, mjpeg] = [await freePort(), await freePort()];
+  const [wda, mjpeg] = [path.join(root, "wda.sock"), path.join(root, "mjpeg.sock")];
   const mux = await fakeUsbmuxd(root, [{ id: 5, serial: IPHONE }], { 8100: wda, 9100: mjpeg });
   closers.push(mux.close);
   let now = Date.parse("2026-11-09T04:00:00Z");
@@ -368,8 +368,8 @@ async function mac(state: Record<string, unknown> = {}) {
       PATH: bin,
       FAKE_PHONE_STATE: stateFile,
       FAKE_PHONE_LOG: logFile,
-      FAKE_WDA_PORT: String(wda),
-      FAKE_MJPEG_PORT: String(mjpeg),
+      FAKE_WDA_SOCKET: wda,
+      FAKE_MJPEG_SOCKET: mjpeg,
     },
     log: (line) => logged.push(line),
     now: () => now,
@@ -428,7 +428,7 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   const run = m.calls().find((c) => c[0] === "xcrun" && c[2] === "test-without-building") as string[];
   expect(run).toContain(`id=${IPHONE}`);
   expect(m.calls().some((c) => c[0] === "wda" && c[2] === "/status")).toBe(true);
-  expect(m.meta()).toMatchObject({ xcode: "26.3", team: TEAM.id, checkedAt: expect.any(Number) });
+  expect(m.meta()).toMatchObject({ xcode: "26.3", wda: WDA_VERSION, team: TEAM.id, checkedAt: expect.any(Number) });
   // An op: it runs until let go.
   const up = await m.helper.run("device", IPHONE, m.xcrun);
   expect((await up.client.screenshot()).subarray(1, 4).toString()).toBe("PNG");
@@ -464,6 +464,14 @@ test("a real iPhone's helper: built under the Personal Team, checked once on the
   expect(m.helper.need(IPHONE, m.xcrun)).toEqual({ state: "preparing", reason: "helper_expired" });
   expect(await m.settle(null)).toBe(null);
   expect(builds()).toBe(3);
+  // Built from an older WebDriverAgent: built again in the background, the phone ready meanwhile.
+  const { wda: _wda, ...older } = m.meta();
+  writeFileSync(metaFile, JSON.stringify(older));
+  expect(m.helper.need(IPHONE, m.xcrun)).toBe(null);
+  for (let i = 0; i < 400 && builds() < 4; i++) await Bun.sleep(25);
+  expect(builds()).toBe(4);
+  for (let i = 0; i < 400 && m.meta().wda !== WDA_VERSION; i++) await Bun.sleep(25);
+  expect(m.meta()).toMatchObject({ wda: WDA_VERSION, checkedAt: expect.any(Number) });
 });
 
 test("another runner of this user builds it or holds the phone: this one waits, running nothing", async () => {
@@ -492,7 +500,7 @@ test("another runner of this user builds it or holds the phone: this one waits, 
   // Nor does a view from this workspace start it there.
   expect(await errorCode(() => m.helper.run("device", IPHONE, m.xcrun))).toBe("phone_busy");
   rmSync(holding);
-  expect(await m.settle(null)).toBe(null);
+  expect([await m.settle(null), m.helper.unknownFailure(IPHONE)]).toEqual([null, null]);
 });
 
 test("a build that fails for a reason Xcode's words don't name says them to the agent", async () => {

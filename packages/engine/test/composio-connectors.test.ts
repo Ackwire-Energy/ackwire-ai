@@ -439,7 +439,7 @@ describe("connecting through Composio", () => {
 });
 
 describe("tools through Composio", () => {
-  test("the pinned version for the workspace's user; writes audited; sharing asks; Aprovar sempre only for a level", async () => {
+  test("the pinned version for the workspace's user; writes audited; sharing asks; Aprovar sempre by its own name", async () => {
     const w = await world();
     const { connection, code } = await w.connect("ana@acme.com");
     const gateway = createToolGateway({
@@ -471,9 +471,9 @@ describe("tools through Composio", () => {
     const share = await call(gateway, ctx, "google_drive_create_permission", { q: "f1", why: WHY });
     if (share.type !== "approval") throw new Error(`expected an approval, got ${share.type}`);
     expect(share.approval.title).toBe("Google Drive (ana@acme.com): Create permission");
-    expect(share.approval.approveAlways).toBeNull();
+    expect(share.approval.approveAlways).toEqual({ tool: "create_permission", actions: [] });
 
-    // An admin made a write ask: that one may be approved for good, by its own name.
+    // An admin made a write ask: that one may be approved for good too, by its own name.
     await saveCustomTools(w.deps, f.owner.id, f.org.id, connection.id, {
       label: connection.label,
       tools: [{ name: "create_folder", access: "approval", label: "Create folder" }],
@@ -496,7 +496,7 @@ describe("tools through Composio", () => {
     });
     const share = await call(gateway, await runOf(f), "google_drive_create_permission", { q: "f1", why: WHY });
     if (share.type !== "approval") throw new Error(`expected an approval, got ${share.type}`);
-    expect(share.approval.approveAlways).toBeNull();
+    expect(share.approval.approveAlways).toEqual({ tool: "create_permission", actions: [] });
     expect(w.fake.state.executions.map((e) => e.slug)).not.toContain("GOOGLEDRIVE_CREATE_PERMISSION");
   });
 

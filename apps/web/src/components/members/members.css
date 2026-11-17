@@ -188,10 +188,11 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__spin {
   flex: none;
 }
-.members-side__inner[data-presence="offline"] {
+/* Everyone under Offline (people, and agents out of office, held or with no AI) is faded alike, whatever its badge. */
+.members-side__group[data-off] .members-side__inner {
   opacity: 0.45;
 }
-.members-side__inner[data-presence="offline"] .members-side__name {
+.members-side__group[data-off] .members-side__name {
   font-weight: 500;
 }
 .members-side__crown {

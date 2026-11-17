@@ -7,7 +7,6 @@ import {
   appBadgeCount,
   buildConversations,
   hiddenAgentIds,
-  homeSections,
   isListedThread,
   isListKind,
   isQuietGeneral,
@@ -16,6 +15,7 @@ import {
   missionWaitingItems,
   openQuestions,
   parseCollapsed,
+  recentRows,
   rowBadge,
   rowName,
   rowPlace,
@@ -296,7 +296,7 @@ describe("Esperando você", () => {
   });
 });
 
-describe("the home by kind", () => {
+describe("the home's Recentes", () => {
   const person = (channelId: string, name: string, minutesAgo: number): DirectMessage => ({
     ...dm(channelId, name, 0, minutesAgo),
     with: { type: "person", id: `u-${name}`, name, handle: null },
@@ -317,24 +317,23 @@ describe("the home by kind", () => {
     ],
   });
 
-  test("Agentes, Canais, Pessoas: the first five by latest activity and how many in all; threads stay out", () => {
-    const s = homeSections(rows);
-    expect(s.map((x) => [x.key, x.total, x.more])).toEqual([
-      ["agents", 7, true],
-      ["channels", 1, false],
-      ["people", 1, false],
+  test("agents, people and channels in one list by latest activity, with no grouping; threads stay out", () => {
+    // A channel with no message yet goes last; threads and missions have their own tab.
+    expect(recentRows(rows).map((r) => r.key)).toEqual([
+      "d:d0",
+      "d:p1",
+      "d:d1",
+      "d:d2",
+      "d:d3",
+      "d:d4",
+      "d:d5",
+      "d:d6",
+      "c:c1",
     ]);
-    expect(s[0]?.rows.map((r) => r.key)).toEqual(["d:d0", "d:d1", "d:d2", "d:d3", "d:d4"]);
-    expect(s.flatMap((x) => x.rows).some((r) => r.kind === "thread" || r.kind === "mission")).toBe(false);
+    expect(recentRows([])).toEqual([]);
   });
 
-  test("empty sections are left out", () => {
-    const only = buildConversations({ channels: [], dms: [person("p1", "Ana", 1)], threads: [] });
-    expect(homeSections(only).map((x) => x.key)).toEqual(["people"]);
-    expect(homeSections([])).toEqual([]);
-  });
-
-  test("Agentes leaves out the agents that don't answer me, and who manages agents sees all", () => {
+  test("Recentes leaves out the agents that don't answer me, and who manages agents sees all", () => {
     const agents = [
       { id: "a-A", canTalk: false },
       { id: "a-B", canTalk: true },
@@ -345,19 +344,12 @@ describe("the home by kind", () => {
     expect([...hiddenAgentIds(member, agents)]).toEqual(["a-A"]);
     expect([...hiddenAgentIds(manager, agents)]).toEqual([]);
     const hiddenAgents = (org: OrgSummary) => hiddenAgentIds(org, agents);
-    const agentRows = (org: OrgSummary) =>
-      homeSections(buildConversations({ channels: [], dms, threads: [], hiddenAgents: hiddenAgents(org) })).map((x) => [
-        x.key,
-        x.rows.map((r) => r.key),
-      ]);
-    expect(agentRows(member)).toEqual([
-      ["agents", ["d:d1"]],
-      ["people", ["d:p1"]],
-    ]);
-    expect(agentRows(manager)).toEqual([
-      ["agents", ["d:d0", "d:d1"]],
-      ["people", ["d:p1"]],
-    ]);
+    const recentOf = (org: OrgSummary) =>
+      recentRows(buildConversations({ channels: [], dms, threads: [], hiddenAgents: hiddenAgents(org) })).map(
+        (r) => r.key,
+      );
+    expect(recentOf(member)).toEqual(["d:p1", "d:d1"]);
+    expect(recentOf(manager)).toEqual(["d:p1", "d:d0", "d:d1"]);
     // The tab's badge counts what the home lists: A's unread stays out for the member.
     expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(member) })).toBe(0);
     expect(unreadConversationCount({ channels: [], dms, hiddenAgents: hiddenAgents(manager) })).toBe(1);
@@ -388,20 +380,21 @@ describe("the home by kind", () => {
     expect(unreadThreadCount(built)).toBe(1);
   });
 
-  test("the pushed lists are the sections' Ver todos; threads are a tab", () => {
-    expect(["agents", "channels", "people"].every(isListKind)).toBe(true);
-    expect(isListKind("threads")).toBe(false);
-    expect(isListKind("nope")).toBe(false);
+  test("the pushed list is Recentes' See all; threads are a tab, and the kinds the home no longer has land home", () => {
+    expect(isListKind("recent")).toBe(true);
+    for (const kind of ["agents", "channels", "people", "category-mkt", "threads", "nope"])
+      expect({ kind, list: isListKind(kind) }).toEqual({ kind, list: false });
   });
 
   test("collapsed sections are remembered as a list; anything unreadable is none", () => {
     expect(parseCollapsed(null)).toEqual([]);
     expect(parseCollapsed("{oops")).toEqual([]);
     expect(parseCollapsed('{"a":1}')).toEqual([]);
-    expect(parseCollapsed('["people","x","agents"]')).toEqual(["agents", "people"]);
-    expect(toggleCollapsed([], "people")).toEqual(["people"]);
-    expect(toggleCollapsed(["people"], "agents")).toEqual(["agents", "people"]);
-    expect(toggleCollapsed(["agents", "people"], "agents")).toEqual(["people"]);
+    // The home's own keys, in its order; the sections it no longer has (Agentes, a category) are dropped.
+    expect(parseCollapsed('["recent","x","agents","category:mkt","widgets"]')).toEqual(["widgets", "recent"]);
+    expect(toggleCollapsed([], "pinned")).toEqual(["pinned"]);
+    expect(toggleCollapsed(["recent"], "widgets")).toEqual(["widgets", "recent"]);
+    expect(toggleCollapsed(["widgets", "recent"], "widgets")).toEqual(["recent"]);
   });
 
   test("collapsed groups of agents take any ids: one workspace's stay when another's change", () => {

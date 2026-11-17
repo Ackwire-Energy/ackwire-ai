@@ -50,8 +50,10 @@ export function createWithdrawRequestToolSource(deps: { pubsub?: PubSub } = {}):
           d,
           waiting,
           open,
-          `You withdrew this ${open.kind === "question" ? "question" : "request"} yourself${reason ? ` (${reason})` : ""}: nobody will answer it, and nobody waits on it. Go on without it; if nothing is left to do or say, ${quietEnd(waiting)}.`,
+          `You withdrew this ${open.kind === "question" ? "question" : "request"} yourself${reason ? ` (${reason})` : ""}, in your newer turn here, which answers the person: nobody will answer it, and nobody waits on it. Go on without it only with work left to do; otherwise ${quietEnd(waiting)}.`,
           reason,
+          // That newer turn has what the person said since: this one only answers them again if it does more.
+          true,
         ));
       const done =
         moot ||

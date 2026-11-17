@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Platform, Pressable, type PressableProps, StyleSheet, type TextStyle, View } from "react-native";
 import { Icon } from "./Icon";
+import { ROW_PRESS_DELAY } from "./PressScale";
 import { Text, textLineOf } from "./Text";
 import { useFontScale } from "./text-scale";
 import { useTheme } from "./theme";
@@ -92,6 +93,7 @@ export function ListRow({
   const titleLine = textLineOf("title", fontScale).height;
   return (
     <Pressable
+      unstable_pressDelay={ROW_PRESS_DELAY}
       {...press}
       style={({ pressed }) => [
         styles.row,

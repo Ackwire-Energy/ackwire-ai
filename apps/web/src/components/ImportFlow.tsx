@@ -5,14 +5,12 @@ import type {
   ImportSkipReason,
   MigrationBundle,
 } from "@agenteschat/client";
-import { keys, useApps } from "@agenteschat/client";
-import { aiAppImport } from "@agenteschat/client/lib/apps";
+import { keys, useAgents, useMe } from "@agenteschat/client";
 import { formatBytes, MAX_UPLOAD_MB } from "@agenteschat/client/lib/files";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { frontmatter } from "@agenteschat/client/lib/import/shared";
-import { can } from "@agenteschat/client/lib/permissions";
+import { frontmatter, PASTED } from "@agenteschat/client/lib/import/shared";
+import { can, makesAgents } from "@agenteschat/client/lib/permissions";
 import {
-  AffixInput,
   Alert,
   Button,
   Card,
@@ -22,40 +20,38 @@ import {
   type ChipTone,
   CountChip,
   driveFolder,
-  Field,
+  HintLine,
   Icon,
   type IconName,
-  InfoHint,
   isIdHandle,
   normalizeAppearance,
   OptionCard,
-  Spinner,
-  SwapLabel,
   Switch,
-  Textarea,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
-import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { failedOffline } from "@/chat/offline";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { HelpLink } from "@/components/HelpLink";
-import { CommandBlock } from "@/components/machine-bits";
+import { type ImportFocus, ImportSheet, type ImportSheetKind, useFocusOn } from "@/components/ImportSheet";
 import { useOrg } from "@/components/org-context";
 import {
   type AgentFile,
-  EXPORT_PROMPT,
-  IMPORT_ACCEPT,
   type ImportFile,
+  type ImportWorkflow,
   type PickedFile,
   parsePackage,
   readImportFiles,
+  type SayKey,
+  type SayValues,
 } from "@/lib/import";
 import {
   agentsArrived,
+  agentsSince,
   applyInChunks,
   blockedItems,
   bundleOrigin,
@@ -72,16 +68,14 @@ import {
   IMPORT_KINDS,
   type ImportCard,
   type ImportFailure,
+  type ImportMethod,
   importApplyErrorText,
-  importFailureText,
   isGithubLink,
   itemId,
   kindsLine,
   MANY_FILES,
   NOT_GITHUB,
   picksOf,
-  type RequestCard,
-  retryable,
   todoLine,
 } from "@/lib/import-flow";
 import { hasFiles } from "@/lib/obsidian";
@@ -103,6 +97,7 @@ const TODO_ICON: Record<BundleTodo["kind"], IconName> = {
   secret: "key",
   model: "settings",
   file: "file",
+  webhook: "link",
 };
 /** Why the agents' files stay behind, in the order they're listed. */
 const FILE_LEFT: Record<FileLeft, IconName> = {
@@ -121,9 +116,10 @@ const NAMES_SHOWN = 4;
 const FIELDS = ["name", "role", "instructions", "handle", "topic", "prompt", "title", "content", "appearance"] as const;
 /** Rows a group shows before "Mostrar mais". */
 const SHOWN = 6;
+/** How often the MCP step reads the agents again while it waits. */
+export const WATCH_POLL_MS = 5_000;
 
 type ReadInput = { files: PickedFile[] | Promise<PickedFile[]> } | { url: string } | { text: string };
-type Focus = "preview" | "report" | "drop" | null;
 
 /**
  * Bringing a workspace from another app (ADR 0055), the same in onboarding
@@ -136,7 +132,7 @@ export function useImportFlow(orgId: string | null) {
   const qc = useQueryClient();
   const { t } = useTranslation();
   const toast = useToast();
-  const [card, setCard] = useState<ImportCard | null>(null);
+  const [card, pickCard] = useState<ImportCard | null>(null);
   const [busy, setBusy] = useState<"reading" | "planning" | null>(null);
   const [failure, setFailure] = useState<ImportFailure | null>(null);
   const [planned, setPlanned] = useState<{
@@ -146,6 +142,12 @@ export function useImportFlow(orgId: string | null) {
     skipped: string[];
     /** The agents' own files, for their folders in the Drive. */
     files: AgentFile[];
+    /** System files the reader dropped (dependencies, caches, `.git`). */
+    junk: number;
+    /** What each workflow became, with its steps. */
+    workflows: ImportWorkflow[];
+    /** The agents a routine hands its answer to, by the routine's key. */
+    passes: Record<string, string[]>;
   } | null>(null);
   const [pick, setPick] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -163,7 +165,7 @@ export function useImportFlow(orgId: string | null) {
   const done = useRef(new Map<string, ImportItemResult>());
   const run = useRef(0);
   const last = useRef<ReadInput | null>(null);
-  const focus = useRef<Focus>(null);
+  const focus = useRef<ImportFocus>(null);
   const agentIds = useRef(new Map<string, string>());
   // Closing the page stops the copy (the browser sends each file): ask first.
   const copying = !!copy?.running;
@@ -175,6 +177,50 @@ export function useImportFlow(orgId: string | null) {
   }, [copying]);
   // Agents whose files were sent to the Drive, so a later apply (a retry) sends only those it brought.
   const sent = useRef(new Set<string>());
+  // Connect with MCP or Prompt only, per source, once the person picks one (until then, the source's default).
+  const [methods, setMethods] = useState<Partial<Record<ImportCard, ImportMethod>>>({});
+  // The workspace's agents as read after a source's MCP steps first showed: only the ones made since then arrived.
+  // Per source, and the flow's own imports join it, so they never count.
+  const [watching, setWatching] = useState(false);
+  const [seen, setSeen] = useState<ReadonlySet<string> | null>(null);
+  const since = useRef(0);
+  const me = useMe().data?.user.id;
+  // Kept fresh by `agents.changed` and by coming back to the tab, as from the AI app's.
+  const agents = useAgents(orgId ?? "", orgId !== null && watching);
+  // From a read that ended after watching started: the cache may miss an agent made while the socket was down.
+  const fresh = watching && !agents.isFetching && agents.dataUpdatedAt >= since.current ? agents.data : undefined;
+  useEffect(() => {
+    if (!seen && fresh) setSeen(new Set(fresh.map((a) => a.id)));
+  }, [seen, fresh]);
+  const list = agents.data;
+  const arrived = useMemo(() => (seen && list && me ? agentsSince(list, seen, me) : []), [seen, list, me]);
+  const { refetch } = agents;
+  // The first read failed: the step says so, and its Tentar de novo reads again, not the poll under it.
+  const stalled = useRef(false);
+  stalled.current = !seen && agents.isError;
+  /** Watches for the agents an AI app creates through MCP (`arrived`) until the returned stop. */
+  const watch = useCallback(() => {
+    since.current = Date.now();
+    setWatching(true);
+    void refetch();
+    // The onboarding has no workspace socket, so no `agents.changed`, and an AI app beside the window never hides the
+    // tab: the list is read again meanwhile.
+    const poll = setInterval(() => {
+      if (!stalled.current) void refetch();
+    }, WATCH_POLL_MS);
+    return () => {
+      clearInterval(poll);
+      setWatching(false);
+    };
+  }, [refetch]);
+  const setCard = (next: ImportCard | null) => {
+    if (next !== card) {
+      setSeen(null);
+      // What went wrong with one source's file isn't the next one's.
+      if (busy === null) setFailure(null);
+    }
+    pickCard(next);
+  };
 
   const read = async (input: ReadInput) => {
     if (!orgId) return;
@@ -198,7 +244,7 @@ export function useImportFlow(orgId: string | null) {
         skipped = res.skipped ?? [];
         root = githubRoot(input.url);
       } else if ("text" in input) {
-        files = [{ name: "pasted", text: input.text }];
+        files = [{ name: PASTED, text: input.text }];
       } else {
         ({ files, root, junk } = await readImportFiles(await input.files));
       }
@@ -206,7 +252,10 @@ export function useImportFlow(orgId: string | null) {
       step = "plan";
       const list = await qc.fetchQuery({ queryKey: keys.models, queryFn: () => api.agents.models() });
       step = "parse";
-      const parsed = parsePackage(files, { models: list.models.map((m) => m.id), root, junk });
+      // What the import writes for the person to read (a workflow's request) is in their language. Each key takes some
+      // of these values, which i18next's types can't check for a key picked at run time.
+      const say = (key: SayKey, values: SayValues) => String(t(`onboarding.import.say.${key}`, values as never));
+      const parsed = parsePackage(files, { models: list.models.map((m) => m.id), root, junk, say });
       const { bundle } = parsed;
       if (!current()) return;
       step = "plan";
@@ -217,7 +266,15 @@ export function useImportFlow(orgId: string | null) {
       agentIds.current = new Map();
       sent.current = new Set();
       focus.current = "preview";
-      setPlanned({ bundle, items: plan.items, skipped, files: parsed.files });
+      setPlanned({
+        bundle,
+        items: plan.items,
+        skipped,
+        files: parsed.files,
+        junk: junk.length,
+        workflows: parsed.workflows,
+        passes: parsed.passes,
+      });
       setPick(new Set(plan.items.filter(choosable).map(itemId)));
       setReport(null);
       setCopyFiles(parsed.files.filter((f) => !f.skip).length <= MANY_FILES);
@@ -292,6 +349,7 @@ export function useImportFlow(orgId: string | null) {
       setReport(items);
       const arrived = agentsArrived(planned.items, items, pick, sent.current);
       for (const [key, id] of arrived) agentIds.current.set(key, id);
+      setSeen((s) => s && new Set([...s, ...arrived.values()]));
       const theirs = planned.files.filter((f) => arrived.has(f.agent));
       if (copyFiles && theirs.length > 0) {
         for (const key of arrived.keys()) sent.current.add(key);
@@ -317,6 +375,23 @@ export function useImportFlow(orgId: string | null) {
   return {
     card,
     setCard,
+    methods,
+    /** Picks a way for a source; null goes back to choosing one (an app on the computer's list of ways). */
+    setMethod: (c: ImportCard, method: ImportMethod | null) => {
+      setFailure(null);
+      setMethods((m) => {
+        const next = { ...m };
+        if (method) next[c] = method;
+        else delete next[c];
+        return next;
+      });
+    },
+    watch,
+    /** The person's agents made since the source's MCP steps first showed: an embedder's way on, as `report` is. */
+    arrived,
+    /** The read the MCP step counts from failed: nothing can show as arrived until `refetch` works. */
+    watchError: watching && !seen && agents.isError && !agents.isFetching ? agents.error : null,
+    rewatch: () => void refetch(),
     busy,
     failure,
     planned,
@@ -361,24 +436,13 @@ export function useImportFlow(orgId: string | null) {
       setPlanned(null);
       setReport(null);
       setCopy(null);
+      setSeen(null);
     },
   };
 }
 
 export type ImportFlowState = ReturnType<typeof useImportFlow>;
 
-/** Moves focus to `el` once, when the flow asked for it (a step that replaced what had focus). */
-function useFocusOn<T extends HTMLElement>(flow: ImportFlowState, target: Exclude<Focus, null>) {
-  const el = useRef<T>(null);
-  useEffect(() => {
-    if (flow.focus.current !== target) return;
-    flow.focus.current = null;
-    el.current?.focus();
-  });
-  return el;
-}
-
-const failureText = (t: TFunction, failure: ImportFailure) => importFailureText(t, failure, failedOffline);
 const applyErrorText = (t: TFunction, error: unknown) => importApplyErrorText(t, error, failedOffline);
 
 /** Why an item doesn't come, in plain words (an existing skill or channel says which). */
@@ -406,10 +470,43 @@ export function ImportFlow({
   standalone?: boolean;
   level?: 2 | 3;
 }) {
-  if (flow.planned && flow.report)
-    return <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} linked={standalone} />;
-  if (flow.planned) return <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />;
-  return <Picker flow={flow} orgId={orgId} />;
+  // Every source has its sheet, over whichever step shows (ADR 0055, addendum 2026-11-16). Picked before this showed
+  // (the onboarding's own cards): its sheet is open from the start.
+  const [sheet, setSheet] = useState<ImportSheetKind | null>(() => (!flow.planned && flow.card ? flow.card : null));
+  const open = (kind: ImportSheetKind) => {
+    flow.setCard(kind === "file" ? null : kind);
+    setSheet(kind);
+  };
+  const close = () => {
+    // Back on the page, what it shows now takes the focus: the sheet's own opener may be gone.
+    if (flow.planned) flow.focus.current = flow.report ? "report" : "preview";
+    setSheet(null);
+  };
+  const index = useBundleIndex(flow);
+  const todo = flow.planned?.bundle.todo ?? [];
+  return (
+    <>
+      {flow.planned && flow.report ? (
+        <ImportReport flow={flow} orgId={orgId} level={level} onAnother={flow.reset} linked={standalone} />
+      ) : flow.planned ? (
+        <Preview flow={flow} orgId={orgId} standalone={standalone} level={level} />
+      ) : (
+        <Picker flow={flow} open={sheet} onOpen={open} />
+      )}
+      <ImportSheet
+        flow={flow}
+        sheet={sheet}
+        orgId={orgId}
+        onClose={close}
+        standalone={standalone}
+        todos={
+          todo.length > 0 ? (
+            <Todos todo={todo} nameOf={index.nameOf} orgId={orgId} linked={standalone && flow.report !== null} />
+          ) : null
+        }
+      />
+    </>
+  );
 }
 
 function Heading({ level, ...rest }: { level: 2 | 3 | 4 } & ComponentProps<"h2">) {
@@ -435,27 +532,28 @@ export function SourceMark({ card }: { card: ImportCard }) {
   );
 }
 
-/** Pick the app (for where its file is), then drop, choose, link or paste: the source is recognized either way. */
-function Picker({ flow, orgId }: { flow: ImportFlowState; orgId: string }) {
+/**
+ * The apps a team can come from, each opening its sheet, and one button for a file or link from any of them. A file
+ * dropped anywhere here opens that sheet already reading it.
+ */
+function Picker({
+  flow,
+  open,
+  onOpen,
+}: {
+  flow: ImportFlowState;
+  /** The sheet that is open, whose card shows pressed. */
+  open: ImportSheetKind | null;
+  onOpen: (kind: ImportSheetKind) => void;
+}) {
   const { t } = useTranslation();
-  const filesInput = useRef<HTMLInputElement>(null);
-  const folderInput = useRef<HTMLInputElement>(null);
-  const drop = useFocusOn<HTMLButtonElement>(flow, "drop");
+  // Back to the start with no sheet open: the file button. With one open, its drop zone takes it.
+  const file = useFocusOn<HTMLButtonElement>(flow, "drop", undefined, open === null);
   const [over, setOver] = useState(false);
-  const [text, setText] = useState("");
   const busy = flow.busy !== null;
-  const submit = (value: string) => {
-    const v = value.trim();
-    if (!v || busy) return;
-    void flow.read(/^https?:\/\//i.test(v) ? { url: v } : { text: v });
-  };
-  const picked = (list: FileList | null) => {
-    const files = Array.from(list ?? []);
-    if (files.length) void flow.read({ files });
-  };
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the drop zone button and the pickers are the keyboard way
+    // biome-ignore lint/a11y/noStaticElementInteractions: a bigger drop target; the file button is the keyboard way
     <div
       className="imp-pick"
       data-over={over || undefined}
@@ -474,281 +572,35 @@ function Picker({ flow, orgId }: { flow: ImportFlowState; orgId: string }) {
         if (!hasFiles(e.dataTransfer)) return;
         e.preventDefault();
         setOver(false);
-        if (!busy) void flow.read({ files: droppedFiles(e.dataTransfer) });
+        if (busy) return;
+        onOpen("file");
+        void flow.read({ files: droppedFiles(e.dataTransfer) });
       }}
     >
-      <AiAppImport orgId={orgId} />
       {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
       <div className="imp-sources" role="group" aria-label={t("onboarding.import.sourcesLabel")}>
         {IMPORT_CARDS.map((c) => (
-          <OptionCard
-            key={c}
-            stacked
-            pressed={flow.card === c}
-            onClick={() => flow.setCard(flow.card === c ? null : c)}
-            className="imp-source"
-          >
+          <OptionCard key={c} stacked pressed={open === c} onClick={() => onOpen(c)} className="imp-source">
             <SourceMark card={c} />
             <span className="ac-option__title">{cardName(t, c)}</span>
           </OptionCard>
         ))}
       </div>
-
-      {flow.card === "grok-bot" || flow.card === "chatgpt-dots" || flow.card === "other" ? (
-        <OtherApp key={flow.card} card={flow.card} />
-      ) : (
-        flow.card && (
-          <p className="imp-tip ac-iconline">
-            <Icon name="info" size={16} />
-            <span>{t(`onboarding.import.where.${flow.card}`)}</span>
-          </p>
-        )
-      )}
-
-      {busy ? (
-        <div className="imp-reading">
-          <span className="imp-reading__text" role="status">
-            <Spinner />
-            {flow.busy === "planning" ? t("onboarding.import.planning") : t("onboarding.import.reading")}
-          </span>
-          <Button size="sm" variant="ghost" onClick={flow.cancel}>
-            {t("common.cancel")}
-          </Button>
-        </div>
-      ) : (
+      {over ? (
         <div className="imp-drop">
-          <button ref={drop} type="button" className="imp-drop__area" onClick={() => filesInput.current?.click()}>
+          <div className="imp-drop__area">
             <Icon name="upload" />
-            <b>{over ? t("onboarding.import.dropping") : t("onboarding.import.drop")}</b>
-            <span>{t("onboarding.import.dropHelp")}</span>
-          </button>
-          <Button size="sm" variant="ghost" icon="drive" onClick={() => folderInput.current?.click()}>
-            {t("onboarding.import.pickFolder")}
+            <b>{t("onboarding.import.dropping")}</b>
+          </div>
+        </div>
+      ) : (
+        <div className="imp-pick__file">
+          <Button ref={file} icon="upload" onClick={() => onOpen("file")}>
+            {t("onboarding.import.haveFileButton")}
           </Button>
         </div>
       )}
-      <input
-        ref={filesInput}
-        type="file"
-        multiple
-        hidden
-        accept={IMPORT_ACCEPT}
-        aria-label={t("onboarding.import.fileLabel")}
-        onChange={(e) => {
-          picked(e.target.files);
-          e.target.value = "";
-        }}
-      />
-      <input
-        ref={folderInput}
-        type="file"
-        multiple
-        hidden
-        aria-label={t("onboarding.import.folderLabel")}
-        // biome-ignore lint/suspicious/noExplicitAny: non-standard attribute React doesn't type
-        {...({ webkitdirectory: "" } as any)}
-        onChange={(e) => {
-          picked(e.target.files);
-          e.target.value = "";
-        }}
-      />
-
-      <Field label={t("onboarding.import.paste")} id="import-paste">
-        <AffixInput
-          value={text}
-          placeholder={t("onboarding.import.pastePlaceholder")}
-          autoComplete="off"
-          spellCheck={false}
-          disabled={busy}
-          onChange={(e) => setText(e.target.value)}
-          onPaste={(e) => {
-            // A pasted reply is read right away, line breaks and all (a one-line field would drop them).
-            const pasted = e.clipboardData.getData("text");
-            if (!pasted.trim() || /^\s*https?:\/\//i.test(pasted)) return;
-            e.preventDefault();
-            setText("");
-            submit(pasted);
-          }}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter") return;
-            e.preventDefault();
-            submit(text);
-          }}
-          action={
-            <Button variant="ghost" size="sm" onClick={() => submit(text)} disabled={!text.trim() || busy}>
-              {t("onboarding.import.readPasted")}
-            </Button>
-          }
-        />
-      </Field>
-
-      {flow.failure && (
-        <div className="imp-failure">
-          <Alert>{failureText(t, flow.failure)}</Alert>
-          {retryable(flow.failure) && (
-            <Button size="sm" icon="refresh" onClick={() => void flow.retry()}>
-              {t("common.retry")}
-            </Button>
-          )}
-        </div>
-      )}
-      {/* What a person needs before dropping a folder that holds keys: said on the line, the rest in its ⓘ. */}
-      <p className="imp-note ac-iconline">
-        <Icon name="lock" size={16} />
-        <span className="ac-hintline">
-          <span>{t("onboarding.import.privacy")}</span>
-          <InfoHint name={t("common.about", { label: t("onboarding.import.privacyLabel") })}>
-            {t("onboarding.import.privacyMore")}
-          </InfoHint>
-        </span>
-      </p>
     </div>
-  );
-}
-
-/**
- * "Do seu app de IA" on top of the sources (ADR 0119): the person connects their AI app to this server and asks it to
- * create here what it has, which beats any file or copied reply. Where apps on the internet can't reach this server
- * (a self-hosted one on a private host), one line says why instead.
- */
-function AiAppImport({ orgId }: { orgId: string }) {
-  const { t } = useTranslation();
-  const option = aiAppImport(t, useApps(orgId).data);
-  const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
-  if (!option) return null;
-  if (!option.available)
-    return (
-      <p className="imp-tip ac-iconline">
-        <Icon name="info" size={16} />
-        <span>{t("onboarding.import.aiApp.private")}</span>
-      </p>
-    );
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(option.prompt);
-      setCopied("ok");
-    } catch {
-      setCopied("failed");
-    }
-  };
-  return (
-    <>
-      <OptionCard pressed={open} onClick={() => setOpen(!open)} className="imp-aiapp ac-mediarow">
-        <span className="ac-mediarow__face">
-          <span className="imp-mark" aria-hidden="true">
-            <Icon name="agent" />
-          </span>
-        </span>
-        <span className="ac-mediarow__head">
-          <span className="ac-option__title">{t("onboarding.import.aiApp.title")}</span>
-        </span>
-        <span className="ac-mediarow__body">
-          <span className="ac-option__desc">{t("onboarding.import.aiApp.lead")}</span>
-        </span>
-      </OptionCard>
-      {open && (
-        <section className="imp-other" aria-label={t("onboarding.import.aiApp.title")}>
-          <p className="imp-other__steps">{t("onboarding.import.aiApp.connect")}</p>
-          <CommandBlock command={option.url} copied={t("apps.serverCopied")} />
-          <p className="imp-help">
-            <Link className="ac-link" to="/org/$orgId/settings/$section" params={{ orgId, section: "apps" }}>
-              {t("onboarding.import.aiApp.howTo")}
-            </Link>
-          </p>
-          <p className="imp-other__steps">{t("onboarding.import.aiApp.allow")}</p>
-          <p className="imp-other__steps">{t("onboarding.import.aiApp.paste")}</p>
-          <Textarea
-            readOnly
-            rows={4}
-            value={option.prompt}
-            aria-label={t("onboarding.import.aiApp.promptLabel")}
-            className="imp-other__prompt"
-            onFocus={(e) => e.currentTarget.select()}
-          />
-          <div className="imp-other__copy">
-            <Button onClick={() => void copy()}>
-              <SwapLabel
-                icon="copy"
-                altIcon="check"
-                label={t("onboarding.import.aiApp.copy")}
-                alt={t("common.copied")}
-                showAlt={copied === "ok"}
-              />
-            </Button>
-            <span role="status" className="small muted">
-              {copied === "ok"
-                ? t("onboarding.import.aiApp.copied")
-                : copied === "failed"
-                  ? t("onboarding.import.request.copyFailed")
-                  : ""}
-            </span>
-          </div>
-        </section>
-      )}
-    </>
-  );
-}
-
-/**
- * The request to paste in the app, in Grok Bot's or ChatGPT dots' own words on their cards. For any other
- * app, where each one gives the file back is on the help page.
- */
-function OtherApp({ card }: { card: RequestCard }) {
-  const { t } = useTranslation();
-  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(EXPORT_PROMPT);
-      setCopied("ok");
-    } catch {
-      setCopied("failed");
-    }
-  };
-  return (
-    <section className="imp-other" aria-labelledby="imp-other-title">
-      <h3 id="imp-other-title" className="imp-other__title">
-        {t(`onboarding.import.request.${card}.title`)}
-      </h3>
-      <ol className="imp-other__steps">
-        <li>{t("onboarding.import.request.copyStep")}</li>
-        <li>{t(`onboarding.import.request.${card}.paste`)}</li>
-        <li>{t(`onboarding.import.request.${card}.back`)}</li>
-      </ol>
-      <Textarea
-        readOnly
-        rows={6}
-        value={EXPORT_PROMPT}
-        aria-label={t("onboarding.import.request.prompt")}
-        className="imp-other__prompt"
-        onFocus={(e) => e.currentTarget.select()}
-      />
-      <div className="imp-other__copy">
-        <Button onClick={() => void copy()}>
-          <SwapLabel
-            icon="copy"
-            altIcon="check"
-            label={t("onboarding.import.request.copy")}
-            alt={t("common.copied")}
-            showAlt={copied === "ok"}
-          />
-        </Button>
-        <span role="status" className="small muted">
-          {copied === "ok"
-            ? t(`onboarding.import.request.${card}.copied`)
-            : copied === "failed"
-              ? t("onboarding.import.request.copyFailed")
-              : ""}
-        </span>
-      </div>
-      {card === "other" && (
-        <p className="imp-help">
-          <HelpLink slug="import" section="other-apps">
-            {t("onboarding.import.request.where")}
-          </HelpLink>
-        </p>
-      )}
-    </section>
   );
 }
 
@@ -801,7 +653,7 @@ export function Preview({
     [planned, flow.pick],
   );
   if (!planned) return null;
-  const { bundle, items, skipped } = planned;
+  const { bundle, items, skipped, junk } = planned;
   const origin = bundleOrigin(bundle);
   const applying = flow.progress !== null;
   const picks = picksOf(items, flow.pick, blocked);
@@ -854,6 +706,17 @@ export function Preview({
             {t("onboarding.import.linkSkipped", { count: skipped.length })}: {skipped.join(", ")} ·{" "}
             {t("onboarding.import.linkSkippedHelp")}
           </span>
+        </p>
+      )}
+      {junk > 0 && (
+        <p className="imp-note ac-iconline">
+          <Icon name="info" size={16} />
+          <HintLine
+            name={t("common.about", { label: t("onboarding.import.systemFiles", { count: junk }) })}
+            hint={t("onboarding.import.systemFilesHelp")}
+          >
+            {t("onboarding.import.systemFiles", { count: junk })}
+          </HintLine>
         </p>
       )}
       <p className="imp-note ac-iconline">
@@ -1229,6 +1092,13 @@ function TodoLink({ kind, orgId }: { kind: BundleTodo["kind"]; orgId: string }) 
       </Link>
     );
   }
+  if (kind === "webhook") {
+    return (
+      <Link to="/org/$orgId/routines" params={{ orgId }} className="ac-link imp-todo__link">
+        {label}
+      </Link>
+    );
+  }
   return (
     <Link
       to="/org/$orgId/settings/$section"
@@ -1513,7 +1383,8 @@ export function ImportReport({
 
 /**
  * Configurações → Importar e exportar (admins): the import flow, and this workspace as a file, with what it never
- * carries (whoever shares the file needs that); the full list is on the help page.
+ * carries (whoever shares the file needs that); the full list is on the help page. A workspace being deleted takes no
+ * agent, so only its export shows.
  */
 export function ImportExportSection() {
   const { t } = useTranslation();
@@ -1524,10 +1395,12 @@ export function ImportExportSection() {
   const download = () => saveExport(api, org.id);
   return (
     <>
-      <Card aria-labelledby="imp-import-title">
-        <CardHeader icon="upload" id="imp-import-title" title={t("settings.import.title")} />
-        <ImportFlow flow={flow} orgId={org.id} standalone level={3} />
-      </Card>
+      {makesAgents(org) && (
+        <Card aria-labelledby="imp-import-title">
+          <CardHeader icon="upload" id="imp-import-title" title={t("settings.import.title")} />
+          <ImportFlow flow={flow} orgId={org.id} standalone level={3} />
+        </Card>
+      )}
       <Card aria-labelledby="imp-export-title">
         <CardHeader
           icon="download"

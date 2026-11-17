@@ -195,11 +195,12 @@ export const socialReturnText = (
 /**
  * The step after the e-mail lookup, as the web's sign-in takes it: the account's way in, else a name for a new
  * account, an early-access link that expired, or sign-up closed. `usable`: the account signs in with a provider
- * this server has.
+ * this server has. `signUp`: this phone makes accounts on this server (`signUpInApp`); where it doesn't, a new e-mail
+ * reads as sign-up closed.
  */
-export function lookUpStep(found: SignInOptions, usable: boolean) {
+export function lookUpStep(found: SignInOptions, usable: boolean, signUp = true) {
   if (found.account) return found.password ? "password" : usable ? "social" : "noPassword";
-  return found.canSignUp ? "name" : found.accessExpired ? "expired" : "closed";
+  return found.canSignUp && signUp ? "name" : found.accessExpired ? "expired" : "closed";
 }
 
 /**

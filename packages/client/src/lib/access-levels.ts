@@ -82,6 +82,9 @@ function connectorResource(c: AgentAccess["connectors"][number]): AccessResource
   const readScopes = c.custom
     ? [`custom:${c.connectionId}:read`]
     : c.scopes.filter((s) => isReadScope(s.scope) && !s.tools.some((t) => t.sensitive)).map((s) => s.scope);
+  // "Ler" on a connector with no read tool (PostHog's one `exec`) would save nothing and read back as "Sem acesso":
+  // it isn't offered. A server not reviewed yet (no tools) keeps every level.
+  const readable = tools.length === 0 || tools.some((t) => readScopes.includes(t.scope));
   return {
     id: `connector:${c.connectionId}`,
     kind: "connector",
@@ -90,7 +93,7 @@ function connectorResource(c: AgentAccess["connectors"][number]): AccessResource
     area: null,
     label: c.label,
     custom: c.custom,
-    levels: LEVELS,
+    levels: readable ? LEVELS : ["none", "write"],
     readScopes,
     writeScopes: [],
     scopes: c.scopes.map((s) => s.scope),

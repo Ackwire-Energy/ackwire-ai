@@ -38,7 +38,7 @@ export interface EndpointNet {
   resolveHost?: ResolveHost;
 }
 
-export const MAX_ENDPOINT_MODELS = 30;
+export const MAX_ENDPOINT_MODELS = 100;
 const MODEL_ID = /^[\w.:/@+-]{1,200}$/;
 /** What a key-less server (a local Ollama) is sent: the SDKs need some key. */
 export const ENDPOINT_NO_KEY = "none";
@@ -82,7 +82,7 @@ export async function endpointAddress(raw: string, style: EndpointStyle, net: En
   return `${url.origin}${base}`;
 }
 
-/** The models an admin chose, checked: ids that look like one, names and prices that make sense, at most 30. */
+/** The models an admin chose, checked: ids that look like one, names and prices that make sense, at most 100. */
 export function cleanEndpointModels(models: EndpointModel[], previous: EndpointModel[] = []): EndpointModel[] {
   if (models.length === 0) throw new ValidationError("Choose at least one model", "endpoint.no_models");
   if (models.length > MAX_ENDPOINT_MODELS)

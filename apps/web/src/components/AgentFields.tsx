@@ -1,6 +1,6 @@
 import type { Credential, Member } from "@agenteschat/client";
 import { apiPickOptions, type BrainPickOption, brainPickText } from "@agenteschat/client/lib/brain-picker";
-import { keyLine, type ModelChoice, providerLabel } from "@agenteschat/client/lib/providers";
+import { keyLine, keySource, type ModelChoice } from "@agenteschat/client/lib/providers";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import {
   AffixInput,
@@ -136,12 +136,14 @@ export function ModelSelect({
   onChange,
   options,
   className,
+  disabled,
   "aria-label": label,
 }: {
   value: string;
   onChange: (value: string) => void;
   options: SelectOption[];
   className?: string;
+  disabled?: boolean;
   "aria-label"?: string;
 }) {
   const { t } = useTranslation();
@@ -149,6 +151,7 @@ export function ModelSelect({
     <SearchSelect
       className={className}
       aria-label={label}
+      disabled={disabled}
       value={value}
       onValueChange={onChange}
       options={options}
@@ -188,9 +191,7 @@ export function keyOptions(
     {
       value: DEFAULT_KEY,
       label: t("newAgent.defaultKey"),
-      description: def
-        ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
-        : undefined,
+      description: def ? t("newAgent.defaultKeyDesc", { provider: keySource(def), hint: def.keyHint }) : undefined,
       leading:
         def || provider ? (
           <ProviderLogo id={def?.provider ?? provider ?? ""} size="sm" />
@@ -436,21 +437,17 @@ export function OwnerSelect({
   onChange,
   members,
   meId,
-  card = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   members: Member[];
   meId: string;
-  /** The agent forms' card-like picker; `false` in a stack of plain fields (a dialog), drawn as its selects are. */
-  card?: boolean;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const roles = !isPersonal(org);
   return (
     <Select
-      className={card ? "newag__sel" : undefined}
       aria-label={t("newAgent.owner")}
       value={value}
       onValueChange={onChange}
@@ -520,7 +517,6 @@ export function KeySelect({
   const { t } = useTranslation();
   return (
     <Select
-      className="newag__sel"
       aria-label={t("newAgent.key")}
       value={value}
       onValueChange={onChange}
@@ -785,7 +781,7 @@ export function InPlaceText({
 }
 
 /**
- * The agent's role as a tag: the icon "Criar agente" gives that role (`roleIcon`) and its name ("Sem cargo" when
+ * The agent's role as a tag: the icon "Criar agente" gives that role (`roleIcon`) and its name ("Sem função" when
  * empty), a pencil on hover. With `onChange`, a click turns it into a field of the same shape over the roles the app
  * knows (a combobox): every one as it opens, the one it has highlighted and marked; typing filters them and offers
  * what was typed as a role of its own. Arrows move, Enter picks the highlighted one (or what was typed), Esc puts it

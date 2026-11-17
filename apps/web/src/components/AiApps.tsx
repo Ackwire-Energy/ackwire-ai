@@ -30,7 +30,7 @@ import {
   Tabs,
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { HelpLink } from "@/components/HelpLink";
 import { ErrorState, LoadingList } from "@/components/Loading";
@@ -525,51 +525,110 @@ function OpenLink({ href, app }: { href: string; app: string }) {
   );
 }
 
-/** One app's guide from `app-clients.ts`: each step's words, then its button, address or command to copy. */
-function ClientSteps({ client, url, onToken }: { client: AppClient; url: string; onToken: () => void }) {
+/** A guide step's words, from `app-clients.ts`. */
+export function GuideWords({ step }: { step: GuideStep }) {
+  const { t } = useTranslation();
+  return (
+    <Trans
+      i18nKey={`apps.dialog.${step.text}`}
+      values={{ access: t("apps.consent.manage"), ...step.vars }}
+      components={CODE}
+      {...TYPED_VALUES}
+    />
+  );
+}
+
+/** What a guide step hands over after its words: the app to open, the address or the command to copy. */
+export function GuideExtras({
+  step,
+  client,
+  url,
+  onToken,
+}: {
+  step: GuideStep;
+  client: AppClient;
+  url: string;
+  onToken?: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {step.open && <OpenLink href={step.open} app={client.name ?? ""} />}
+      {step.address && <CommandBlock command={url} copied={t("apps.serverCopied")} />}
+      {step.code && <CommandBlock command={step.code} />}
+      {step.token && onToken && (
+        <span className="row">
+          <Button size="sm" icon="key" onClick={onToken}>
+            {t("apps.dialog.other.toTokens")}
+          </Button>
+        </span>
+      )}
+    </>
+  );
+}
+
+/** A guide's install buttons (an app that installs from a link), each in its own row. */
+export function GuideInstalls({ steps }: { steps: GuideStep[] }) {
+  return steps
+    .filter((s) => s.install)
+    .map((s) => (
+      <div key={s.text} className="row">
+        <Button asChild variant="primary">
+          <a href={s.install}>
+            <GuideWords step={s} />
+          </a>
+        </Button>
+      </div>
+    ));
+}
+
+/** A guide's notes, under its steps. */
+export function GuideNotes({ notes }: { notes: ReturnType<AppClient["guide"]>["notes"] }) {
+  return notes.map((n) => (
+    <SettingNote key={n.text} icon={n.icon}>
+      <Trans i18nKey={`apps.dialog.${n.text}`} components={CODE} />
+    </SettingNote>
+  ));
+}
+
+/**
+ * One app's guide from `app-clients.ts`: each step's words, then its button, address or command to copy. `children`:
+ * more steps of the same list, before the guide's notes.
+ */
+export function ClientSteps({
+  client,
+  url,
+  onToken,
+  children,
+}: {
+  client: AppClient;
+  url: string;
+  onToken?: () => void;
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
   const guide = client.guide(url);
-  const words = (s: GuideStep) => (
-    <Trans i18nKey={`apps.dialog.${s.text}`} values={s.vars} components={CODE} {...TYPED_VALUES} />
-  );
-  const installs = guide.steps.filter((s) => s.install);
   const steps = guide.steps.filter((s) => !s.install);
   return (
     <>
       {guide.lead && <p className="small muted apps-lead">{t(`apps.dialog.${guide.lead}`)}</p>}
-      {installs.map((s) => (
-        <div key={s.text} className="row">
-          <Button asChild variant="primary">
-            <a href={s.install}>{words(s)}</a>
-          </Button>
-        </div>
-      ))}
+      <GuideInstalls steps={guide.steps} />
       {steps.length > 0 && (
         <ol className="machine-pair__steps apps-steps small">
           {steps.map((s) => (
             <li key={`${s.text}${s.code ?? ""}`}>
               <span className="apps-step">
-                <span>{words(s)}</span>
-                {s.open && <OpenLink href={s.open} app={client.name ?? ""} />}
-                {s.address && <CommandBlock command={url} copied={t("apps.serverCopied")} />}
-                {s.code && <CommandBlock command={s.code} />}
-                {s.token && (
-                  <span className="row">
-                    <Button size="sm" icon="key" onClick={onToken}>
-                      {t("apps.dialog.other.toTokens")}
-                    </Button>
-                  </span>
-                )}
+                <span>
+                  <GuideWords step={s} />
+                </span>
+                <GuideExtras step={s} client={client} url={url} onToken={onToken} />
               </span>
             </li>
           ))}
+          {children}
         </ol>
       )}
-      {guide.notes.map((n) => (
-        <SettingNote key={n.text} icon={n.icon}>
-          <Trans i18nKey={`apps.dialog.${n.text}`} components={CODE} />
-        </SettingNote>
-      ))}
+      <GuideNotes notes={guide.notes} />
     </>
   );
 }

@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/access-levels";
 import { type ConnectedItem, connectedItems, itemName } from "@agenteschat/client/lib/connected";
 import type { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { can } from "@agenteschat/client/lib/permissions";
+import { addsConnectors, can, makesAgents } from "@agenteschat/client/lib/permissions";
 import { builtinToolText } from "@agenteschat/client/lib/scopes";
 import { labelIsName } from "@agenteschat/client/lib/tool-labels";
 import { partsOf, toolName } from "@agenteschat/client/lib/tool-review";
@@ -23,9 +23,12 @@ import {
   Card,
   CardHeader,
   Chip,
+  CountChip,
+  cx,
   EmptyState,
   Icon,
   type IconName,
+  InfoHint,
   Segmented,
 } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +44,7 @@ import { CreateAgentButton } from "@/components/new-agent/NewAgentDialog";
 import { useOrg } from "@/components/org-context";
 import { useAgentsAccess } from "@/hooks/useAgentsAccess";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
+import { softBreaks } from "@/lib/soft-breaks";
 
 type TT = (key: string, options: Record<string, string>) => string;
 
@@ -120,10 +124,10 @@ export function toolLabel(t: TFunction, r: AccessResource, tool: AccessTool) {
 
 /**
  * What a level means for a resource: a sentence for built-in areas (in the agent's own words, `agentGrammar`), the
- * tools for connectors.
+ * tools for connectors. Nothing for "Sem acesso": the control says it.
  */
 export function levelText(t: TFunction, r: AccessResource, level: LevelState, g: ReturnType<typeof agentGrammar>) {
-  if (level === "none") return t("access.noneText");
+  if (level === "none") return null;
   if (level === "custom") return t("access.customText");
   if (r.kind === "builtin") {
     const text = (t as unknown as TT)(`access.areaText.${r.area}.${level}`, {
@@ -158,38 +162,55 @@ export function useSetLevels() {
 }
 
 /**
- * One resource and its level: icon, name, what the level gives, what asks
- * for approval, and the choice (Sem acesso / Ler / Ler e escrever). Without
- * `onChange` it only shows the level. The agent page and "Criar agente".
+ * One resource and its level: icon, name and the choice (Sem acesso / Ler / Ler e escrever) on one line, what the
+ * level gives behind an ⓘ beside the name, and under them one line of facts (what asks for approval, the row's own
+ * settings). Without `onChange` it only shows the level, as a chip, or as the faded control (`locked`) in a list whose
+ * other rows can be changed. The agent page and "Criar agente".
  */
 export function LevelRow({
   icon,
   name,
-  description,
+  meta,
+  hint,
   asks = [],
   levels,
   value,
   onChange,
   tag,
+  side,
   extra,
   below,
+  belowHidden,
   changed,
+  locked,
 }: {
   icon: ReactNode;
   name: string;
-  description?: string | null;
+  /**
+   * A short fact under the name, inside the row (the account, a server's host). A list passes it on every row, `null`
+   * where there is none, so its rows share one height and one axis.
+   */
+  meta?: string | null;
+  /** What the chosen level gives, behind an ⓘ beside the name. */
+  hint?: ReactNode;
   asks?: string[];
   levels: Level[];
   value: LevelState;
   onChange?: (level: Level) => void;
   /** Next to the name ("Alterado" on the agent page). */
   tag?: ReactNode;
-  /** Under the description (what it was before). */
+  /** A quiet action before the level, on the name's line ("Regras"). */
+  side?: ReactNode;
+  /** The row's quiet facts and small settings, after what asks (what it was before, who gives the access, a switch). */
   extra?: ReactNode;
   /** A full-width part under the row (GitHub: which repositories). */
   below?: ReactNode;
+  /** `below` stays in the page, out of sight (a closed panel that keeps what was typed in it). */
+  belowHidden?: boolean;
   /** Marked as changed and not saved yet. */
   changed?: boolean;
+  /** Without `onChange`: the level control itself, faded, so the row keeps its neighbours' shape. */
+  locked?: boolean;
 }) {
   const { t } = useTranslation();
   const options = [
@@ -197,22 +218,32 @@ export function LevelRow({
     ...(value === "custom" ? [{ value: "custom" as LevelState, label: t("access.level.custom") }] : []),
   ];
   return (
-    <li className="level-row ac-mediarow" data-changed={changed || undefined}>
+    <li
+      className={cx("level-row ac-mediarow", meta !== undefined && "level-row--meta")}
+      data-changed={changed || undefined}
+    >
       <span className="ac-mediarow__face">{icon}</span>
       <span className="ac-mediarow__head">
         <span className="level-row__name">
-          {name}
+          <span className="ac-hintline">
+            {/* A long mailbox address breaks at its own joints before it breaks mid-word. */}
+            <span>{softBreaks(name, "@.")}</span>
+            {hint && <InfoHint name={t("common.about", { label: name })}>{hint}</InfoHint>}
+          </span>
           {tag}
         </span>
+        {meta && <span className="ac-mediarow__meta">{meta}</span>}
       </span>
+      {side && <span className="level-row__side">{side}</span>}
       <span className="ac-mediarow__end ac-mediarow__end--wrap">
-        {onChange ? (
+        {onChange || locked ? (
           <Segmented
             size="sm"
             className="level-row__choice"
             label={t("access.levelOf", { name })}
             value={value}
-            onValueChange={(l) => l !== "custom" && onChange(l)}
+            disabled={!onChange}
+            onValueChange={(l) => l !== "custom" && onChange?.(l)}
             options={options}
           />
         ) : (
@@ -221,22 +252,56 @@ export function LevelRow({
           </Chip>
         )}
       </span>
-      <span className="ac-mediarow__body level-row__text">
-        {description && <span className="small muted">{description}</span>}
-        {asks.length > 0 && (
-          <span className="level-row__asks">
-            {asks.slice(0, 3).map((a) => (
-              <Chip key={a} icon="lock" tone="waiting">
-                {t("access.asks", { tool: a })}
-              </Chip>
-            ))}
-            {asks.length > 3 && <span className="small muted">{t("access.asksMore", { count: asks.length - 3 })}</span>}
+      <span
+        className="ac-mediarow__body level-row__text"
+        hidden={asks.length === 0 && !extra && (!below || belowHidden)}
+      >
+        {(asks.length > 0 || extra) && (
+          <span className="level-row__facts">
+            {asks.length > 0 && (
+              <span className="level-row__asks ac-iconline">
+                <Icon name="lock" size={14} />
+                <span>
+                  {t("access.asksList", { tools: asks.slice(0, 3).join(", ") })}
+                  {asks.length > 3 && ` ${t("access.asksMore", { count: asks.length - 3 })}`}
+                </span>
+              </span>
+            )}
+            {extra}
           </span>
         )}
-        {extra}
-        {below && <div className="level-row__below">{below}</div>}
+        {below && (
+          <div className="level-row__below" hidden={belowHidden}>
+            {below}
+          </div>
+        )}
       </span>
     </li>
+  );
+}
+
+/** "Regras" on a row's name line: opens the row's rules under it, with how many there are. */
+export function RulesToggle({
+  label,
+  count,
+  open,
+  controls,
+  onToggle,
+}: {
+  label: string;
+  count: number;
+  open: boolean;
+  controls: string;
+  onToggle: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Button variant="link" aria-label={label} aria-expanded={open} aria-controls={controls} onClick={onToggle}>
+        {t("mail.agent.rules")}
+      </Button>
+      {count > 0 && <CountChip size="sm">{count}</CountChip>}
+    </>
   );
 }
 
@@ -289,7 +354,21 @@ export function AccessMatrixSection() {
         id="sec-access"
         icon="agent"
         title={t("access.matrixTitle")}
-        hint={{ name: t("common.about", { label: t("access.matrixTitle") }), text: t("access.matrixHint") }}
+        hint={{
+          name: t("common.about", { label: t("access.matrixTitle") }),
+          text: (
+            <>
+              {t("access.matrixHint")}{" "}
+              <Link
+                className="ac-link"
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: "connectors" }}
+              >
+                {t("access.openConnectors")}
+              </Link>
+            </>
+          ),
+        }}
         action={
           <Segmented
             size="sm"
@@ -311,10 +390,10 @@ export function AccessMatrixSection() {
         <EmptyState
           size="panel"
           agent={look}
-          title={t(can(org, "create_agents") ? "access.noAgentsTitle" : "team.emptyViewerTitle")}
-          actions={can(org, "create_agents") && <CreateAgentButton />}
+          title={t(makesAgents(org) ? "access.noAgentsTitle" : "team.emptyViewerTitle")}
+          actions={makesAgents(org) && <CreateAgentButton />}
         >
-          {t(can(org, "create_agents") ? "access.noAgents" : "team.emptyViewer")}
+          {t(makesAgents(org) ? "access.noAgents" : "team.emptyViewer")}
         </EmptyState>
       )}
       {first && columns.length === 0 && <NoConnectors look={look} />}
@@ -416,7 +495,7 @@ export function AccessMatrixSection() {
 export function NoConnectors({ look }: { look: AgentAppearance | true }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const admin = can(org, "manage_connectors");
+  const admin = addsConnectors(org);
   return (
     <EmptyState
       size="panel"

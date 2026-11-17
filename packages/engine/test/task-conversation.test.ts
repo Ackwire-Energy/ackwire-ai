@@ -9,6 +9,7 @@ import {
   drainOutbox,
   ForbiddenError,
   getIssue,
+  insertMessageWithRuns,
   issueFromMessage,
   listApprovals,
   listIssueActivity,
@@ -20,6 +21,7 @@ import {
   NotFoundError,
   openTaskConversation,
   postPersonMessage,
+  replyPolicyFor,
   requireChannelAccess,
   unreadTaskConversations,
   updateIssue,
@@ -36,6 +38,107 @@ const repliesIn = async (channelId: string) =>
   (await f.db.select().from(schema.messages).where(eq(schema.messages.channelId, channelId)))
     .filter((m) => m.threadId)
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+describe("a task's conversation is a DM with the task's agent", () => {
+  const runsOf = (messageId: string) =>
+    f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.triggerMessageId, messageId));
+
+  test("the agent that created a person's task answers a short status line there without a mention", async () => {
+    f = await setup({ reply: () => ({ chunks: ["Anotado: marquei o critério como feito."] }) });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const byDev = { type: "agent" as const, agentId: f.agent.id, channelId: f.general.id };
+    const issue = await createIssue(deps, byDev, f.org.id, {
+      title: "Estorno do pedido",
+      assignees: [{ type: "person", id: f.owner.id }],
+    });
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+    const m = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "reembolsado",
+      threadId: at.rootId,
+    });
+    expect(m.meta.forTask).toBe(true);
+    const [run] = await runsOf(m.id);
+    expect(run).toMatchObject({ agentId: f.agent.id, trigger: "dm", channelId: at.channelId });
+    // Like a DM: it owes an answer (a reaction counts).
+    expect(replyPolicyFor(run as NonNullable<typeof run>, { authorType: "person", meta: m.meta }).mayPass).toBe(false);
+    await drainOutbox(f.db, f.handlers);
+    expect(await f.db.select().from(schema.routingDecisions)).toEqual([]);
+    const replies = await repliesIn(at.channelId);
+    expect(replies.map((m) => m.body)).toEqual(["reembolsado", "Anotado: marquei o critério como feito."]);
+    // A quote of the task's agent's own reply is for it too.
+    const quoting = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "isso",
+      threadId: at.rootId,
+      replyTo: replies[1]?.id,
+    });
+    expect(quoting.meta.forTask).toBe(true);
+    expect((await runsOf(quoting.id)).map((r) => [r.agentId, r.trigger])).toEqual([[f.agent.id, "dm"]]);
+  });
+
+  test("the assignee agent wins over the creator; one that never joined is let in at the next message", async () => {
+    f = await setup({ reply: () => ({ chunks: ["ok"] }) });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const qa = await createAgent(f.db, f.owner.id, f.org.id, { name: "QA", handle: "qa" }, NEW_AGENT_DEFAULTS);
+    const byDev = { type: "agent" as const, agentId: f.agent.id, channelId: f.general.id };
+    const issue = await createIssue(deps, byDev, f.org.id, {
+      title: "Revisar",
+      assignees: [{ type: "agent", id: qa.id }],
+    });
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+    // A conversation made before the task's agent was let in.
+    await f.db.delete(schema.channelMembers).where(eq(schema.channelMembers.channelId, at.channelId));
+    // Written where nobody lets the agent in: no run for it, so the router still gets the message.
+    const { message: unadmitted, runs } = await insertMessageWithRuns(
+      f.db,
+      {
+        orgId: f.org.id,
+        channelId: at.channelId,
+        threadId: at.rootId,
+        author: { type: "person", userId: f.owner.id },
+        body: "alguém?",
+      },
+      { startRuns: true },
+    );
+    expect(runs).toEqual([]);
+    expect(unadmitted.meta.forTask).toBeUndefined();
+    const m = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, { body: "feito", threadId: at.rootId });
+    expect((await runsOf(m.id)).map((r) => [r.agentId, r.trigger])).toEqual([[qa.id, "dm"]]);
+    const members = await f.db
+      .select({ agentId: schema.channelMembers.agentId })
+      .from(schema.channelMembers)
+      .where(eq(schema.channelMembers.channelId, at.channelId));
+    expect(members.map((r) => r.agentId)).toEqual([qa.id]);
+  });
+
+  test("without any agent on the task, the agent that last wrote there answers; naming a person goes to them", async () => {
+    f = await setup({ reply: () => ({ chunks: ["ok"] }) });
+    const deps = { db: f.db, pubsub: f.pubsub };
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await listMembers(f.db, f.org.id);
+    const issue = await createIssue(deps, person(f.owner.id), f.org.id, { title: "Planilha de custos" });
+    const at = await openTaskConversation(f.db, person(f.owner.id), f.org.id, issue.id);
+    const first = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "sem ninguém ainda",
+      threadId: at.rootId,
+    });
+    expect(await runsOf(first.id)).toEqual([]);
+    await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, { body: "@dev olha", threadId: at.rootId });
+    await drainOutbox(f.db, f.handlers);
+    const next = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "valeu",
+      threadId: at.rootId,
+    });
+    expect((await runsOf(next.id)).map((r) => [r.agentId, r.trigger])).toEqual([[f.agent.id, "dm"]]);
+    await drainOutbox(f.db, f.handlers);
+    const toBia = await postPersonMessage(deps, f.owner.id, f.org.id, at.channelId, {
+      body: "@bia pode conferir?",
+      threadId: at.rootId,
+    });
+    expect(toBia.mentionedUserIds).toEqual([bia.id]);
+    expect(toBia.meta.forTask).toBeUndefined();
+    expect(await runsOf(toBia.id)).toEqual([]);
+  });
+});
 
 describe("a task's conversation (ADR 0145)", () => {
   test("made once on first use; a mention there wakes the agent, which answers in the same thread", async () => {

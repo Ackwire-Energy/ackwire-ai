@@ -53,6 +53,10 @@ test("the stores and the system list only ready languages, each with its iOS per
     | undefined;
   expect(localization?.[1].supportedLocales).toEqual(ready);
   expect(Object.keys(config.locales ?? {})).toEqual(ready);
+  const audio = config.plugins?.find((p) => Array.isArray(p) && p[0] === "expo-audio") as
+    | [string, { microphonePermission: string }]
+    | undefined;
+  expect(nativeEn.ios.NSMicrophoneUsageDescription).toBe(audio?.[1].microphonePermission ?? "");
   const keys = (o: object) => leaves(o).sort();
   for (const code of ready)
     expect(keys(JSON.parse(readFileSync(join(import.meta.dir, `../assets/locales/${code}.json`), "utf8")))).toEqual(
@@ -136,6 +140,7 @@ test("the plan's notifications have their own Activity line in both languages, n
       "computer_no_chrome",
       "desktop_taken",
       "plan_lent",
+      "plan_serves",
       "plan_model_dropped",
       "catch_up_closed",
       "catch_up_closed_asker",

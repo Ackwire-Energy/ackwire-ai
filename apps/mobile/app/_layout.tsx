@@ -3,34 +3,47 @@ import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { serverHost } from "@agenteschat/client/lib/server";
 import { skyHourOf } from "@agenteschat/ui/sky/workspace";
 import { useQueryClient } from "@tanstack/react-query";
-import { type Href, ThemeProvider as NavigationThemeProvider, Stack, usePathname } from "expo-router";
+import {
+  type Href,
+  type NativeStackNavigationOptions,
+  ThemeProvider as NavigationThemeProvider,
+  Stack,
+  usePathname,
+} from "expo-router";
 import * as ScreenOrientation from "expo-screen-orientation";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { Entering } from "@/features/auth/Entering";
 import { forgetInvite, loadPendingInvite, waitingAsk } from "@/features/auth/invite";
 import { resumesAsk } from "@/features/auth/invite-steps";
 import { LaunchSplash } from "@/features/launch/LaunchSplash";
 import { markLaunched } from "@/features/launch/launched";
+import { isStill, stillHref } from "@/features/links/landing";
 import { takeLink } from "@/features/links/pending";
-import { OnboardingFlow } from "@/features/onboarding/OnboardingFlow";
+import {
+  endOnboarding,
+  isRootPage,
+  ONBOARDING_ROUTE,
+  openOnboarding,
+  ROOT_PARAM,
+  useOnboardingFlow,
+} from "@/features/onboarding/draft";
 import { ServerDownPanel, useServerDown } from "@/features/server/ServerDown";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { catchGlobalErrors, setErrorScope, startErrorReports } from "@/lib/error-reports";
 import { keepLastCrash } from "@/lib/last-crash";
 import { newWorkspaceDone, newWorkspaceMade, newWorkspaceShown, useNewWorkspaceAsk } from "@/lib/new-workspace";
-import { deletingOf, enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
+import { enteringShown, firstRunMounted, suspendedOf } from "@/lib/org-choice";
 import { useServer } from "@/lib/server";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAppFonts } from "@/providers/fonts";
 import { useOrgGate } from "@/providers/org";
 import { useSession } from "@/providers/session";
 import { DeletingAccount } from "@/ui/auth/DeletingAccount";
-import { DeletingWorkspace } from "@/ui/auth/DeletingWorkspace";
 import { SuspendedWorkspace } from "@/ui/auth/SuspendedWorkspace";
-import { router, useNavigationTheme } from "@/ui/navigation";
+import { coverBarOptions, router, useNavigationTheme, usePushedOptions } from "@/ui/navigation";
 import { useTheme } from "@/ui/theme";
 
 void SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -41,9 +54,9 @@ catchGlobalErrors();
 
 /**
  * Root: the providers, then the session gate. What breaks while drawing outside `(app)`'s own boundary (the sign-in
- * screens, the server and scan screens, an invitation, a reset, connect, not-found, and the first run, splash,
- * suspended, deleting and entering overlays) gets the same screen, "Tentar de novo" drawing it again, instead of
- * the app closing.
+ * screens, the server and scan screens, an invitation, a reset, connect, not-found, the first run's steps, and the
+ * splash, suspended and entering overlays) gets the same screen, "Tentar de novo" drawing it again, instead of the app
+ * closing.
  */
 export default function RootLayout() {
   return (
@@ -88,15 +101,11 @@ function Gate() {
   const orgId = org.state?.orgId;
   useEffect(() => setErrorScope({ orgId, userId }), [orgId, userId]);
   const accountDeletion = ready && signedIn ? me.data?.user.deletion : undefined;
+  // A workspace being deleted opens as ever, read-only, under its notice (ADR 0088 §7): only a suspension covers it.
   const suspended = ready && signedIn && org.state ? suspendedOf(org.state.orgs, org.state.orgId) : null;
-  // Being deleted: its own screen, after the suspension, the stronger fact.
-  const deleting = ready && signedIn && org.state && !suspended ? deletingOf(org.state.orgs, org.state.orgId) : null;
-  // Apagar conta opened from either screen goes over it: those screens step aside while it is open.
+  // Apagar conta opened from that screen goes over it: the screen steps aside while it is open.
   const pathname = usePathname();
   const deletingAccount = pathname === "/account-delete";
-  // "Novo workspace" from a workspace being deleted: the first run, until a new workspace is chosen or they go back.
-  const [freshStart, setFreshStart] = useState(false);
-  if (freshStart && (!signedIn || (ready && deleting === null))) setFreshStart(false);
   // "Criar um workspace novo" from Adicionar workspace (ADR 0154): the first run on that server once signed in there,
   // until the new workspace is chosen or they go back.
   const server = useServer();
@@ -108,7 +117,7 @@ function Gate() {
     if (newWorkspaceMade(ask, openOrg)) newWorkspaceDone();
     else newWorkspaceShown(openOrg);
   }, [ask, server, ready, signedIn, openOrg]);
-  const fresh = freshStart || asking;
+  const fresh = asking;
 
   // Opening the app: the native launch image hands over to the animated splash on its first frame (they look
   // the same), which leaves once the app is ready. The fallback hide covers a splash that never lays out.
@@ -157,17 +166,53 @@ function Gate() {
     onInvite,
   );
   if (firstRun !== firstRunBefore) setFirstRunBefore(firstRun);
+  // No workspace to open yet (none, or one still being set up), or a new one asked for: the first run, its steps
+  // pushed over the app (ADR 0162), each a screen of its own with the system's back (a waiting invitation is accepted
+  // instead). As the app's start it comes in place with nothing under it to go back to; asked for from a workspace it
+  // slides in over it, and its first page's back goes back there. A workspace that opens without it (an invitation
+  // accepted, the first run finished on the website) takes its screens down; one it opens itself takes them down too.
+  const { id: flowId, finishing } = useOnboardingFlow();
+  const anotherName = fresh ? (org.state?.org?.name ?? null) : null;
+  useEffect(() => {
+    if (firstRun && flowId === null) {
+      openOnboarding({ another: anotherName, leave: fresh ? newWorkspaceDone : null });
+      router.push(fresh ? ONBOARDING_ROUTE : stillHref(`${ONBOARDING_ROUTE}?${ROOT_PARAM}=1`));
+    } else if (!firstRun && flowId !== null && !finishing && signedIn) {
+      endOnboarding(flowId);
+      router.dismissTo("/");
+    }
+  }, [firstRun, flowId, finishing, fresh, anotherName, signedIn]);
+  // The first run's bar: clear over its sky, the system's back on it; none on the app's start.
+  const pushed = usePushedOptions();
+  const firstRunOptions = useCallback(
+    ({ route }: { route: { params?: object } }): NativeStackNavigationOptions => ({
+      ...pushed,
+      ...coverBarOptions,
+      contentStyle: { backgroundColor: colors.bg },
+      ...(isStill(route.params) ? { animation: "none" as const } : {}),
+      ...(isRootPage(route.params) ? { gestureEnabled: false, headerBackVisible: false, headerLeft: undefined } : {}),
+    }),
+    [pushed, colors.bg],
+  );
+  // A link's own screens (an invitation and the steps pushed over it, a new password's, a connect link's), over
+  // whatever the phone shows: clear over their sky, the system's back when there is a screen under them.
+  const linkOptions = useCallback(
+    (): NativeStackNavigationOptions => ({
+      ...pushed,
+      ...coverBarOptions,
+      contentStyle: { backgroundColor: colors.bg },
+    }),
+    [pushed, colors.bg],
+  );
   const suspendedShown = suspended !== null && !deletingAccount;
-  const deletingShown = deleting !== null && !deletingAccount && !firstRun;
-  const covered = suspendedShown || deletingShown || down !== null || (firstRun && fresh) || !!accountDeletion;
+  const covered = suspendedShown || down !== null || !!accountDeletion;
 
   // The navigator is always mounted (so links and pushes can navigate); the splash covers it until ready.
   return (
     // The native bars (headers, back button tint, interface style) read React Navigation's theme: ours.
     <NavigationThemeProvider value={navigationTheme}>
       <StatusBar style={scheme === "dark" ? "light" : "dark"} />
-      {/* Under the suspended or deleting screen or the waiting splash the app stays mounted, out of screen
-          readers' reach. */}
+      {/* Under the suspended screen or the waiting splash the app stays mounted, out of screen readers' reach. */}
       <View
         style={{ flex: 1 }}
         accessibilityElementsHidden={covered}
@@ -176,34 +221,23 @@ function Gate() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
           <Stack.Protected guard={inApp} redirectTo="/sign-in">
             <Stack.Screen name="(app)" />
+            <Stack.Screen name="onboarding/index" options={firstRunOptions} />
+            <Stack.Screen name="onboarding/[step]" options={firstRunOptions} />
           </Stack.Protected>
           <Stack.Protected guard={!inApp} redirectTo="/">
             <Stack.Screen name="(auth)" />
           </Stack.Protected>
+          <Stack.Screen name="invite/[token]/index" options={linkOptions} />
+          <Stack.Screen name="invite/[token]/new-password" options={linkOptions} />
+          <Stack.Screen name="invite/[token]/forgot" options={linkOptions} />
+          <Stack.Screen name="invite/[token]/code" options={linkOptions} />
+          <Stack.Screen name="invite/[token]/you" options={linkOptions} />
+          <Stack.Screen name="reset-password" options={linkOptions} />
+          <Stack.Screen name="connect" options={linkOptions} />
         </Stack>
       </View>
-      {/* No workspace to open yet (none, or one still being set up): the first run, over the navigator (a waiting
-          invitation is accepted instead). */}
-      {firstRun ? (
-        <View style={onInvite ? { display: "none" } : StyleSheet.absoluteFill}>
-          <OnboardingFlow
-            another={fresh ? (org.state?.org?.name ?? null) : null}
-            onLeave={
-              fresh
-                ? () => {
-                    setFreshStart(false);
-                    newWorkspaceDone();
-                  }
-                : undefined
-            }
-          />
-        </View>
-      ) : null}
       {entering ? <Entering org={org.state?.org?.name ?? null} /> : null}
       {org.state && suspended && suspendedShown ? <SuspendedWorkspace state={org.state} suspended={suspended} /> : null}
-      {org.state && deleting && deletingShown ? (
-        <DeletingWorkspace state={org.state} deleting={deleting} onNewWorkspace={() => setFreshStart(true)} />
-      ) : null}
       {accountDeletion ? <DeletingAccount dueAt={accountDeletion.dueAt} /> : null}
       {launching ? (
         <LaunchSplash

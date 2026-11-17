@@ -2,11 +2,11 @@ import { type Proposal, useDecideProposals, useProposals } from "@agenteschat/cl
 import { isOpen, proposalWhy, sortProposals, staleCount } from "@agenteschat/client/lib/proposals";
 import { useTranslation } from "react-i18next";
 import { RefreshControl, StyleSheet, View } from "react-native";
-import { Button, EmptyState, Text, useToast } from "@/ui";
+import { Button, EmptyState, SkeletonList, Text, useToast } from "@/ui";
 import { ChangeRequestRow } from "../right-hand/SettingsCard";
 import { useFailed } from "../routines/hooks";
 import { confirmAction } from "../settings/parts";
-import { LoadFailed } from "../shared/FirstUse";
+import { LoadFailed, useEmptyLook } from "../shared/FirstUse";
 import { useOrgId, usePullRefresh } from "../shared/hooks";
 import { PushedLargeTitle } from "../shared/PushedLargeTitle";
 import { InstructionProposalCard } from "./InstructionProposalCard";
@@ -18,14 +18,25 @@ export function ProposalsScreen() {
   const proposals = useProposals(orgId);
   const pull = usePullRefresh(proposals.refetch);
   const open = sortProposals((proposals.data ?? []).filter(isOpen));
+  const look = useEmptyLook();
   return (
     <PushedLargeTitle
       title={t("shell.proposals")}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
+      {/* The list's own shape while it loads, never a blank page. */}
+      {proposals.isPending ? <SkeletonList rows={3} /> : null}
       {proposals.isError && !proposals.data ? <LoadFailed onRetry={() => void proposals.refetch()} /> : null}
       {proposals.isSuccess && open.length === 0 ? (
-        <EmptyState size="inline" title={t("proposals.emptyTitle")} subtitle={t("proposals.empty")} />
+        // All clear, the whole screen's: the agent at ease over the words, centered (as the audit's "Nothing to review").
+        // The compact form is a filtered list's, and left two lines stuck under the title on an empty page.
+        <EmptyState
+          size="page"
+          agent={look}
+          mood="deal"
+          title={t("proposals.emptyTitle")}
+          subtitle={t("proposals.empty")}
+        />
       ) : null}
       <View style={styles.list}>
         <DecideAll open={open} />

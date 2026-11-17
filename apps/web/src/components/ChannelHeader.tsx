@@ -12,7 +12,7 @@ import "./channel-header.css";
 
 /**
  * A channel's header, as Discord's: `#` and the name, the topic beside it while it fits whole, then icon buttons
- * (threads with their count, pins, the channel's settings, members) and the workspace search.
+ * (threads with their count, pins, the channel's settings, members) and the workspace search's icon.
  */
 export function ChannelHeader({
   channel,
@@ -22,6 +22,7 @@ export function ChannelHeader({
   agents,
   onDetails,
   onSearch,
+  searching,
   membersOpen,
   onMembers,
 }: {
@@ -35,6 +36,8 @@ export function ChannelHeader({
   onDetails: () => void;
   /** Enter in the search: its results in the panel. */
   onSearch: () => void;
+  /** Its results are showing: the search stays open. */
+  searching: boolean;
   /** The members column (a sheet on a phone) is showing. */
   membersOpen: boolean;
   onMembers: () => void;
@@ -83,7 +86,7 @@ export function ChannelHeader({
               <Icon name="members" />
             </button>
           )}
-          {isMember && <HeaderSearch channelId={channel.id} onOpen={onSearch} />}
+          {isMember && <HeaderSearch channelId={channel.id} onOpen={onSearch} searching={searching} />}
         </div>
       </div>
     </header>

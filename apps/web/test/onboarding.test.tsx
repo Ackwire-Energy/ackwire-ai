@@ -19,6 +19,7 @@ import {
   seedState,
   withRightHand,
 } from "./fake-api";
+import { createFakeAuth } from "./fake-auth";
 import { pick } from "./new-agent-flow";
 import { renderApp, screen, settle, showIn } from "./render";
 // The team step's views load on their own (`TeamSource`'s lazy import): loaded here first, so a step shows them within
@@ -233,8 +234,12 @@ describe("the steps", () => {
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
     expect(document.querySelector(".onb__say")?.textContent).toContain("Eu sou o Lodi.");
+    // The rail's first step is the question on screen until it is answered, then the team's name.
+    const firstStep = () => document.querySelector(".onb__step-name")?.textContent;
+    expect(firstStep()).toBe("Para que vai usar");
     await forATeam();
-    expect(eyebrow()).toBe("Passo 1 de 5");
+    expect(firstStep()).toBe("Nome do workspace");
+    expect(eyebrow()).toBe("Passo 1 de 6");
     // The whole path on the rail, connecting an AI last.
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Conectar uma IA");
     await type("Nome", "Ateliê Couto");
@@ -242,7 +247,7 @@ describe("the steps", () => {
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Ateliê Couto", ...zones() });
     expect(calls(state, "orgs.saveOnboarding")).toEqual([]);
     expect(heading()).toBe("O que a Ateliê Couto faz?");
-    expect(eyebrow()).toBe("Passo 2 de 5");
+    expect(eyebrow()).toBe("Passo 2 de 6");
     // A type alone is enough; its words are the context.
     expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
     await click(button("Loja online"), 4);
@@ -332,7 +337,7 @@ describe("the steps", () => {
     const orgId = state.me?.organizations[0]?.id;
     expect(calls(state, "agents.applyTeamTemplate").map((c) => c.args[1])).toEqual(["store"]);
     expect(heading()).toBe(PEOPLE);
-    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(eyebrow()).toBe("Passo 6 de 6");
     expect(router.state.location.pathname).toBe("/onboarding");
     await click(button("Convidar depois"), 16);
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([
@@ -351,7 +356,7 @@ describe("the steps", () => {
     const { router, landed } = await throughTheTeam(state);
     const orgId = state.me?.organizations[0]?.id;
     expect(heading()).toBe(CONNECT);
-    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(eyebrow()).toBe("Passo 5 de 6");
     // Not the last step: the people come after it.
     expect(document.querySelector(".onb__say")?.textContent).toBe(
       "Escolha a IA que você já usa e o time acorda. Depois, falta só chamar as pessoas.",
@@ -361,7 +366,7 @@ describe("the steps", () => {
     // Kept as left for later, so a reload resumes on the people step.
     expect(calls(state, "orgs.saveOnboarding").at(-1)?.args).toEqual([orgId, { step: "ai" }]);
     expect(heading()).toBe(PEOPLE);
-    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(eyebrow()).toBe("Passo 6 de 6");
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
     await click(button("Convidar depois"), 16);
     expect(calls(state, "orgs.saveOnboarding").at(-1)?.args).toEqual([orgId, { finished: true }]);
@@ -400,7 +405,7 @@ describe("the steps", () => {
     await settle(10);
     // The step stays on what was connected, rather than the people step taking its place.
     expect(heading()).toBe("Pronto. O time da Ateliê Couto já pensa.");
-    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(eyebrow()).toBe("Passo 5 de 6");
     expect(document.querySelector(".onb__progress-text")?.textContent).toContain("Falta 1 etapa");
     expect(document.querySelector(".onb__say")?.textContent).toBe("Agora sim. Falta só chamar quem trabalha com você.");
     expect(router.state.location.pathname).toBe("/onboarding");
@@ -502,7 +507,7 @@ describe("the plan step (Ackwire AI Cloud)", () => {
     const state = newcomer(true);
     const asked = plans(PLANS);
     await throughTheTeam(state);
-    expect(eyebrow()).toBe("Passo 4 de 6");
+    expect(eyebrow()).toBe("Passo 5 de 7");
     expect(heading()).toBe("Ligue o time");
     const card = document.querySelector(".onb__plan") as HTMLElement;
     expect(card.textContent).toContain("Plano Equipe · $49 por mês");
@@ -537,6 +542,13 @@ describe("the plan step (Ackwire AI Cloud)", () => {
     await act(async () => answer(list));
     await settle(10);
     expect(document.querySelector(".onb__plan-price")?.textContent).toContain("Plano Equipe · $49 por mês");
+    // Why it costs, behind an ⓘ on the price: one's own server is free.
+    const why = within(document.querySelector(".onb__plan-price") as HTMLElement).getByRole("button", {
+      name: "Por que pago?",
+    });
+    expect(document.getElementById(why.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+      "Rodar no seu servidor é grátis.",
+    );
   });
 
   test("with no plan data, the plan is named generically and both ways open the billing page", async () => {
@@ -723,7 +735,7 @@ describe("a team with no agents for now (ADR 0162, amended 2026-11-11)", () => {
     expect(calls(state, "agents.applyTeamTemplate")).toEqual([]);
     // Its right hand alone thinks with it: named, never a team that isn't there.
     expect(heading()).toBe("Conecte uma IA para o Lodi pensar");
-    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(eyebrow()).toBe("Passo 5 de 6");
     // The team step answered, its agents to come; Lodi alone wakes with the AI, the people still to come.
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Depois");
     expect(document.querySelector(".onb__say")?.textContent).toBe(
@@ -853,62 +865,73 @@ describe("a team with no agents for now (ADR 0162, amended 2026-11-11)", () => {
   });
 });
 
-describe("the person's own area, asked once per account", () => {
-  const AREA = "E você, cuida de quê?";
-  /** Nobody asked this account its area yet (the fake's accounts said it already). */
+describe("the person's own step, Sobre você (ADR 0162, amended 2026-11-12)", () => {
+  const YOU = "Agora, sobre você";
+  /** Nobody asked this account about itself yet (the fake's accounts said it already). */
   const unasked = (state: FakeState) => {
     if (state.me) state.me.user.workArea = null;
     return state;
   };
   const chip = (name: string) => button(name);
+  const nameField = () => screen().getByLabelText("Seu nome") as HTMLInputElement;
 
-  test("a team's, after what it does, on that step of the rail: Back keeps the answers, a chip then Continue goes on", async () => {
+  test("a team's, after what it does, on a step of its own: Back keeps the answers; the name and an area saved", async () => {
     const state = unasked(newcomer(false));
-    await renderApp("/onboarding", { api: createFakeApi(state) });
+    const fake = createFakeAuth();
+    await renderApp("/onboarding", { api: createFakeApi(state), auth: fake.auth });
     await settle(10);
     await forATeam();
     await type("Nome", "Ateliê Couto");
     await click(button("Continuar"), 14);
     await click(button("Loja online"), 4);
     await click(button("Continuar"), 14);
-    expect(heading()).toBe(AREA);
-    expect(document.querySelector(".onb__lead")?.textContent).toBe("Só para a gente entender quem usa o Ackwire AI.");
-    // Still "What you do" on the rail: no step of its own.
-    expect(eyebrow()).toBe("Passo 2 de 5");
-    expect(document.querySelector(".onb__step[aria-current='step']")?.textContent).toContain("O que vocês fazem");
-    expect(document.querySelector(".onb__say")?.textContent).toBe("Última curiosidade antes do time.");
-    expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    expect(heading()).toBe(YOU);
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Seu nome e sua foto aparecem para o time e para os agentes.",
+    );
+    expect(eyebrow()).toBe("Passo 3 de 6");
+    expect(document.querySelector(".onb__step[aria-current='step']")?.textContent).toContain("Sobre você");
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Antes do time, um pouco sobre você.");
+    // The account's name, to write properly; the photo's two ways in.
+    expect(nameField().value).toBe(state.me?.user.name ?? "");
+    expect(button("Criar um avatar")).toBeTruthy();
+    expect(button("Enviar uma foto")).toBeTruthy();
     // Back: what it does, as answered.
     await click(button("Voltar"), 8);
     expect(heading()).toBe("O que a Ateliê Couto faz?");
     expect(button("Loja online").getAttribute("aria-pressed")).toBe("true");
     await click(button("Continuar"), 14);
-    expect(heading()).toBe(AREA);
-    // One at a time; a chip only marks it.
+    expect(heading()).toBe(YOU);
+    // One area at a time; pressed again, none.
     await click(chip("Vendas"), 4);
     await click(chip("Marketing"), 4);
     expect(chip("Marketing").getAttribute("aria-pressed")).toBe("true");
     expect(chip("Vendas").getAttribute("aria-pressed")).toBe("false");
-    expect(heading()).toBe(AREA);
+    await type("Seu nome", "  Ana Souza  ");
     await click(button("Continuar"), 14);
+    expect(fake.calls.filter((c) => c.method === "updateName").map((c) => c.args[0])).toEqual(["Ana Souza"]);
     expect(calls(state, "account.setWorkArea").map((c) => c.args[0])).toEqual(["marketing"]);
     expect(heading()).toBe(ASK);
+    // Answered on the rail, with the name.
+    expect(document.querySelector(".onb__steps")?.textContent).toContain("Ana Souza");
     cleanup();
 
-    // Another visit, the area said: never asked again.
+    // Another visit, said: never asked again.
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(14);
     expect(heading()).toBe(ASK);
   });
 
-  test("Skip this step stores that it was asked; a reload before either asks again", async () => {
+  test("no area picked stores that it was asked; a name left as it was isn't saved; a reload before asks again", async () => {
     const state = unasked(settingUp({ context: "Loja online" }));
-    await renderApp("/onboarding", { api: createFakeApi(state) });
+    const fake = createFakeAuth();
+    await renderApp("/onboarding", { api: createFakeApi(state), auth: fake.auth });
     await settle(14);
     // Reloaded before answering: asked again.
-    expect(heading()).toBe(AREA);
-    await click(button("Pular esta etapa"), 14);
+    expect(heading()).toBe(YOU);
+    await click(button("Continuar"), 14);
     expect(calls(state, "account.setWorkArea").map((c) => c.args[0])).toEqual(["skipped"]);
+    expect(fake.calls.filter((c) => c.method === "updateName")).toEqual([]);
     expect(heading()).toBe(ASK);
     cleanup();
     await renderApp("/onboarding", { api: createFakeApi(state) });
@@ -916,7 +939,23 @@ describe("the person's own area, asked once per account", () => {
     expect(heading()).toBe(ASK);
   });
 
-  test("a save that fails never holds the onboarding", async () => {
+  test("an empty name can't go on; one the account refuses is said under the field, and the step stays", async () => {
+    const state = unasked(settingUp({ context: "Loja online" }));
+    const fake = createFakeAuth({
+      updateName: { ok: false, status: 400, message: "Name too long", code: "INVALID_NAME" },
+    });
+    await renderApp("/onboarding", { api: createFakeApi(state), auth: fake.auth });
+    await settle(14);
+    await type("Seu nome", "   ");
+    expect((button("Continuar") as HTMLButtonElement).disabled).toBe(true);
+    await type("Seu nome", "Ana Souza");
+    await click(button("Continuar"), 14);
+    expect(heading()).toBe(YOU);
+    expect(nameField().getAttribute("aria-invalid")).toBe("true");
+    expect(calls(state, "account.setWorkArea")).toEqual([]);
+  });
+
+  test("an area's save that fails never holds the onboarding", async () => {
     const state = unasked(settingUp({ context: "Loja online" }));
     const api = createFakeApi(state);
     api.account.setWorkArea = async () => {
@@ -929,14 +968,26 @@ describe("the person's own area, asked once per account", () => {
     expect(heading()).toBe(ASK);
   });
 
+  test("Criar um avatar opens the app's avatar builder over the step", async () => {
+    const state = unasked(settingUp({ context: "Loja online" }));
+    await renderApp("/onboarding", { api: createFakeApi(state) });
+    await settle(14);
+    await click(button("Criar um avatar"), 8);
+    expect(screen().getByRole("dialog", { name: "Seu avatar" })).toBeTruthy();
+    expect(heading()).toBe(YOU);
+  });
+
   test("a personal workspace's, after For me, before its agents; no Back to a purpose it can't change", async () => {
     const state = unasked(newcomer(false));
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(10);
     await click(answer(/^Para mim(?!ha)/), 4);
     await click(button("Continuar"), 16);
-    expect(heading()).toBe(AREA);
-    expect(document.querySelector(".onb__say")?.textContent).toBe("Última curiosidade antes dos seus agentes.");
+    expect(heading()).toBe(YOU);
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Antes dos seus agentes, um pouco sobre você.");
+    expect(document.querySelector(".onb__lead")?.textContent).toBe(
+      "Seu nome e sua foto aparecem para os seus agentes.",
+    );
     expect(screen().queryByRole("button", { name: "Voltar" })).toBeNull();
     await click(chip("Desenvolvimento"), 4);
     await click(button("Continuar"), 14);
@@ -952,7 +1003,7 @@ describe("inviting people, a team's last step (ADR 0162, amended 2026-11-11)", (
     const landed = landings(router);
     await settle(16);
     expect(heading()).toBe(PEOPLE);
-    expect(eyebrow()).toBe("Passo 5 de 5");
+    expect(eyebrow()).toBe("Passo 6 de 6");
     expect(document.querySelector(".onb__lead")?.textContent).toBe(
       "Convide as pessoas do time. Cada uma recebe um e-mail para entrar.",
     );
@@ -967,7 +1018,7 @@ describe("inviting people, a team's last step (ADR 0162, amended 2026-11-11)", (
     await act(async () => fireEvent.change(field, { target: { value: "bia@example.com, caio@example.com" } }));
     await act(async () => fireEvent.keyDown(field, { key: "Enter" }));
     await settle(4);
-    await pick(screen().getByRole("combobox", { name: "Papel de caio@example.com" }), "Admin");
+    await pick(screen().getByRole("combobox", { name: "Cargo de caio@example.com" }), "Admin");
     await click(button("Convidar 2 pessoas"), 20);
     expect(calls(state, "orgs.inviteMany").map((c) => c.args[1])).toEqual([
       {
@@ -1088,7 +1139,7 @@ describe("for me (ADR 0159)", () => {
     await click(answer(/^Para mim(?!ha)/), 4);
     expect(screen().queryByLabelText("Nome")).toBeNull();
     // Its whole path on the rail at once: what it is for, its agents, the plan, an AI.
-    expect(document.querySelectorAll(".onb__step")).toHaveLength(4);
+    expect(document.querySelectorAll(".onb__step")).toHaveLength(5);
     expect(document.querySelector(".onb__steps")?.textContent).not.toContain("O que vocês fazem");
     await click(button("Continuar"), 16);
     expect(calls(state, "orgs.create")[0]?.args[0]).toEqual({ name: "Pessoal", mode: "personal", ...zones() });
@@ -1126,12 +1177,12 @@ describe("for me (ADR 0159)", () => {
     await settle(10);
     await click(answer(/^Para mim(?!ha)/), 4);
     // Its agents, then an AI: no people to invite here.
-    expect(document.querySelectorAll(".onb__step")).toHaveLength(3);
+    expect(document.querySelectorAll(".onb__step")).toHaveLength(4);
     expect(document.querySelector(".onb__steps")?.textContent).not.toContain("Convidar pessoas");
     await click(button("Continuar"), 16);
     await noneYet("Seguir sem agentes");
     expect(heading()).toBe(CONNECT_PERSONAL);
-    expect(eyebrow()).toBe("Passo 3 de 3");
+    expect(eyebrow()).toBe("Passo 4 de 4");
     await click(button("Conectar depois"), 16);
     const orgId = state.me?.organizations.at(-1)?.id;
     expect(calls(state, "orgs.saveOnboarding").map((c) => c.args)).toEqual([

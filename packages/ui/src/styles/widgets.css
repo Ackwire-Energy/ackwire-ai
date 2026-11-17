@@ -251,14 +251,21 @@ html:not([data-pointer]) button.wg__title:focus-visible {
 .wg__dot {
   color: var(--faint);
 }
-/* A failure's reason and Resolve, in the attention tone: an `.ac-iconline`, its icon on the first line. */
-.wg__warn {
+/*
+ * A failure's reason and Resolve, in the attention tone; what a refresh waits for (and Continue now on a pause), in
+ * the calm one: an `.ac-iconline`, its icon on the first line.
+ */
+.wg__warn,
+.wg__wait {
   display: flex;
   align-items: flex-start;
   gap: 6px;
   min-width: 0;
   color: var(--warn);
   line-height: 17px;
+}
+.wg__wait {
+  color: var(--muted);
 }
 .wg__resolve {
   padding: 0;
@@ -271,6 +278,12 @@ html:not([data-pointer]) button.wg__title:focus-visible {
   text-underline-offset: 2px;
   white-space: nowrap;
   cursor: pointer;
+}
+/* Continue now for someone who may not press it: greyed, its title says who may. */
+.wg__resolve:disabled {
+  color: var(--faint);
+  text-decoration: none;
+  cursor: default;
 }
 html:not([data-pointer]) .wg__resolve:focus-visible {
   outline: none;
@@ -371,6 +384,12 @@ html:not([data-pointer]) .wg__resolve:focus-visible {
 }
 .wk-num__pct {
   margin-left: 2px;
+}
+/* A unit that is a mark ("★"): drawn around its own middle, so on the baseline it hangs under the digits' middle.
+   Raised to it (measured: the mark's middle sits 0.32em of its size under the digits'), taking no height of the line. */
+.wk-num__mark {
+  vertical-align: 0.32em;
+  line-height: 0;
 }
 .wk-sub {
   margin-top: 4px;

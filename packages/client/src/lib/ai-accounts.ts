@@ -12,6 +12,7 @@ import type {
 } from "../api/types";
 import { joinNames } from "./format";
 import { isPlanId, loginPerAgent, planName } from "./plans";
+import { shownKeys } from "./providers";
 import { isRightHand } from "./right-hand";
 
 /** One account as a row shows it: its logins, one per agent where its plan allows it (`LOGIN_PER_AGENT`). */
@@ -152,6 +153,16 @@ export function unusedCopies<A extends MachineAccount>({ logins }: Pick<PlanAcco
 }
 
 /**
+ * The logins a batch removal takes: the viewer's own of one kind, on every computer ("Remove all Grok logins", where
+ * connecting one for every agent left one per agent). Never another person's — the server refuses those anyway — and
+ * never another program's or another kind's. Whoever it thinks for keeps nothing: removing a login is what disconnects
+ * it from its agent too.
+ */
+export function removableLogins<A extends MachineAccount>(accounts: readonly A[], kind: MachineAccountKind): A[] {
+  return accounts.filter((a) => a.mine && a.kind === kind);
+}
+
+/**
  * "Use for…" an account that thinks for all of its owner's agents there (`shared`): the viewer's agents on its
  * computer that don't think with it yet. Never one on the workspace's API key: a plan makes an agent answer only
  * its owner, so that one moves on its own page.
@@ -237,7 +248,7 @@ export function accountAbout(
 }
 
 /**
- * Someone else's plan that a person who may use other people's plans (`use_others_plans`, ADR 0059 §3) can give the
+ * Someone else's plan that a person who may use other people's plans (`canUseOthersPlans`, ADR 0059 §3) can give the
  * agent named `agentName`: signed in, and thinking for nobody else or for all of its owner's agents there. It is
  * never taken from an agent that has it.
  */
@@ -288,7 +299,7 @@ export function existingAi<A extends MachineAccount>(
     const act = existingAct(choice, view.canUseOthersPlans === true);
     return act ? [{ kind: "account", choice, act }] : [];
   });
-  const live = keys.filter((k) => !k.revokedAt).map((key): ExistingAi<A> => ({ kind: "key", key }));
+  const live = shownKeys(keys).map((key): ExistingAi<A> => ({ kind: "key", key }));
   const rank = (r: ExistingAi<A>) => EXISTING_RANK[r.kind === "key" ? "key" : r.act];
   return [...accounts, ...live].sort((x, y) => rank(x) - rank(y));
 }

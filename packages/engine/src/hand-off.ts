@@ -10,6 +10,7 @@ import type { GifMedia } from "./media";
 import type { AgentGifPoster } from "./media-tools";
 import { insertMessage, type Message, unreachedAgents, unreachedNote, unreachedPeople } from "./messages";
 import { runReadOutsideById } from "./outside";
+import { isRightHandId } from "./right-hand";
 import type { RoutineBrief } from "./routine-brief";
 import { personCanPost } from "./routine-state";
 import { type AgentRun, addRunStep } from "./runs";
@@ -259,7 +260,11 @@ async function runEvidence(deps: ResourcefulDeps, ctx: ToolContext, run: RunRow)
     ?.list(ctx)
     .catch(() => []);
   const names = new Set((listed ?? []).map((x) => x.name));
-  const own = ctx.bridge ? ["your computer's own tools: shell and files"] : [];
+  // The right hand's turn is locked (`RIGHT_HAND_TURN`): a nudge toward shell or files would get it killed.
+  const own =
+    ctx.bridge && !(await isRightHandId(ctx.db, ctx.orgId, ctx.agentId))
+      ? ["your computer's own tools: shell and files"]
+      : [];
   const teammates = reachesTeammates(names) ? await teammateMeans(ctx).catch(() => []) : [];
   const means = [...turnMeans(names, teammates), ...own];
   const tried = await triedCalls(ctx.db, run, t.harnessTried);

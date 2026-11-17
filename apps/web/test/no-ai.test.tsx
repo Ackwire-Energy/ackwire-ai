@@ -14,6 +14,7 @@ import {
   createFakeApi,
   ENG_ID,
   fakeMachinesOf,
+  meWithRole,
   NOW,
   ORG_ID,
   seedState,
@@ -292,9 +293,13 @@ describe("no AI connected: above the composer", () => {
 
   /** Settings › AI accounts, with no agent at all, and these computers and accounts. */
   type Machines = NonNullable<ReturnType<typeof fakeMachinesOf.get>>;
-  const bareDialog = async (ai: (machines: Machines) => Parameters<Machines["setAiAccounts"]>[0]) => {
+  const bareDialog = async (
+    ai: (machines: Machines) => Parameters<Machines["setAiAccounts"]>[0],
+    seed?: (state: ReturnType<typeof seedState>) => void,
+  ) => {
     const state = seedState({ aiStatus: { any: false, agents: [] } });
     state.agents = [];
+    seed?.(state);
     const api = createFakeApi(state);
     const machines = fakeMachinesOf.get(api) as Machines;
     machines.setAiAccounts(ai(machines));
@@ -303,6 +308,24 @@ describe("no AI connected: above the composer", () => {
     await click(screen().getByRole("button", { name: "Conectar uma IA" }), 6);
     return { state, machines, box: dialog("Conectar uma IA") as HTMLElement };
   };
+  const CLAUDE_OF_MINE: Parameters<Machines["setAiAccounts"]>[0]["accounts"][number] = {
+    id: "acct_1",
+    kind: "claude_code",
+    label: "Claude",
+    email: "walter@example.com",
+    plan: "max",
+    status: "active",
+    ownerId: "u-walter",
+    ownerName: "Walter",
+    mine: true,
+    usedBy: [],
+    usage: null,
+    provider: null,
+    keyHint: null,
+    machineId: "machine_1",
+    computer: "Servidor",
+  };
+  const CLAUDE_CODE = { kind: "claude_code" as const, available: true, models: [], defaultModel: null };
   const SERVER = {
     machineId: "machine_1",
     name: "Servidor",
@@ -344,6 +367,38 @@ describe("no AI connected: above the composer", () => {
     expect(calls(state, "machines.beginAccountLogin")).toEqual([]);
   });
 
+  test("no agent, a plan connected: its next step is an agent made with it, over the workspace's last setup", async () => {
+    const { state, box } = await bareDialog(
+      () => ({ accounts: [CLAUDE_OF_MINE], computers: [SERVER] }),
+      (s) => {
+        s.brainMachines = [{ machineId: "machine_1", name: "Servidor", online: true, options: [CLAUDE_CODE] }];
+        s.newAgentSetup = { brain: "model", model: "claude-opus-5-5", key: null, contextTokens: null };
+      },
+    );
+    await chooseAi(box, "Claude");
+    await settle(4);
+    await click(within(box).getByRole("button", { name: "Criar um agente com este plano" }), 8);
+    expect(dialog("Conectar uma IA")).toBeNull();
+    const card = screen().getByRole("dialog", { name: "Novo agente" });
+    await click(within(card).getByRole("button", { name: /^Criar / }), 8);
+    const agentId = state.agents[0]?.id;
+    expect(calls(state, "sandbox.setTarget").map((c) => c.args)).toEqual([[ORG_ID, agentId, "machine_1"]]);
+    expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
+      [ORG_ID, agentId, { brain: "claude_code", account: "acct_1" }],
+    ]);
+  });
+
+  test("no agent, a plan connected, and no way to make agents: only Pronto", async () => {
+    const { box } = await bareDialog(
+      () => ({ accounts: [CLAUDE_OF_MINE], computers: [SERVER] }),
+      (s) => meWithRole(s, ["manage_credentials"]),
+    );
+    await chooseAi(box, "Claude");
+    await settle(4);
+    expect(within(box).queryByRole("button", { name: "Criar um agente com este plano" })).toBeNull();
+    expect(within(box).getByRole("button", { name: "Pronto" })).toBeTruthy();
+  });
+
   test("no agent, and only someone else's computer: a computer of their own is the way on, or the key", async () => {
     const { box } = await bareDialog((machines) => {
       const mac = machines.pair({ name: "MacBook da Ana", pairedBy: { id: "u-ana", name: "Ana Souza" } });
@@ -353,9 +408,31 @@ describe("no AI connected: above the composer", () => {
     await settle(4);
     const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
     expect(panel.textContent).toContain("Só Ana conecta um plano no MacBook da Ana.");
-    expect(within(panel).getByRole("button", { name: "Conectar um computador" })).toBeTruthy();
+    // Their own computer connects in place, over the plan's panel.
+    await click(within(panel).getByRole("button", { name: "Conectar meu computador" }), 4);
+    const pairing = screen().getByRole("dialog", { name: "Conectar um dispositivo" });
+    await click(within(pairing).getByRole("button", { name: "Fechar" }), 4);
+    expect(dialog("Conectar uma IA")).toBe(box);
     await click(within(panel).getByRole("button", { name: "Usar uma chave de API agora" }));
     expect(within(box).getByRole("region", { name: "Chave de API" })).toBeTruthy();
+  });
+
+  test("no agent, only someone else's computer, and no way to connect one: no Conectar meu computador", async () => {
+    const { box } = await bareDialog(
+      (machines) => {
+        const mac = machines.pair({ name: "MacBook da Ana", pairedBy: { id: "u-ana", name: "Ana Souza" } });
+        return { accounts: [], computers: [{ ...SERVER, machineId: mac.id, name: "MacBook da Ana", canAdd: false }] };
+      },
+      (s) => {
+        meWithRole(s, ["create_agents"]);
+        for (const role of s.roles ?? []) role.permissions = role.permissions.filter((p) => p !== "pair_computers");
+      },
+    );
+    await chooseAi(box, "Claude");
+    await settle(4);
+    const panel = within(box).getByRole("region", { name: "Seu plano do Claude" });
+    expect(panel.textContent).toContain("Só Ana conecta um plano no MacBook da Ana.");
+    expect(within(panel).queryByRole("button", { name: "Conectar meu computador" })).toBeNull();
   });
 
   test("a DM with an agent that has none says so for that agent; an organization with AI shows nothing in channels", async () => {
@@ -380,6 +457,12 @@ describe("no AI connected: above the composer", () => {
         .getAttribute("aria-pressed"),
     ).toBe("true");
     expect(within(whom).getByRole("button", { name: /^Ada/ }).getAttribute("aria-pressed")).toBe("false");
+    // Each card is its title and an ⓘ, no line under it: whom it covers is the card's description, one per line.
+    expect(whom.querySelectorAll(".ac-option__desc")).toHaveLength(0);
+    expect(whom.querySelectorAll(".ac-hint")).toHaveLength(2);
+    const [all, ada] = within(whom).getAllByRole("button");
+    expect(all?.getAttribute("aria-description")).toBe("Ada · Dev\nAtlas · Ops");
+    expect(ada?.getAttribute("aria-description")).toBe("Dev");
     for (const name of ["Claude", "ChatGPT", "Outro plano", "Começar grátis"])
       expect(within(team).getByRole("button", { name: new RegExp(`^${name}`) })).toBeTruthy();
     cleanup();
@@ -419,7 +502,11 @@ describe("no AI connected: above the composer", () => {
     const box = screen().getByRole("dialog");
     const whom = within(box).getByRole("group", { name: "Agentes que usam este plano" });
     // The conversation's agent leads, the right hand isn't one of them.
-    expect(within(whom).getByRole("button", { name: /^Todos os agentes/ }).textContent).toContain("Atlas e Ada");
+    expect(
+      within(whom)
+        .getByRole("button", { name: /^Todos os agentes/ })
+        .getAttribute("aria-description"),
+    ).toBe("Atlas · Ops\nAda · Dev");
     await click(within(box).getByRole("button", { name: /^Claude/ }), 8);
     // The plan's panel signs in for both, one at a time, the conversation's agent first: whose turn in words, their
     // faces in order, and the sign-in as the dialog's own action.
@@ -520,7 +607,13 @@ describe("the agent's no-AI card", () => {
       apiKey: "[redacted]",
     });
     expect(calls(state, "chat.answerNow").map((c) => c.args)).toEqual([[ORG_ID, "m-noai"]]);
-    expect(add.textContent).toContain("Salva. Todo agente sem plano pensa com ela.");
+    // Opened for Ada: the key goes on her, and the line says so.
+    expect(calls(state, "agents.update").at(-1)?.args).toEqual([
+      ORG_ID,
+      ADA_ID,
+      { credentialId: state.credentials.at(-1)?.id, model: "auto" },
+    ]);
+    expect(add.textContent).toContain("Salva. Ada agora pensa com OpenAI.");
     await click(within(add).getByRole("button", { name: "Pronto" }));
     expect(cardRow().textContent).toContain("Ada está respondendo…");
   });
@@ -676,6 +769,53 @@ describe("the agent's no-AI card", () => {
     // Nothing of that computer's to share: ChatGPT's own sign-in, from here.
     expect(within(plan).queryByRole("button", { name: /^A conta que os seus agentes dividem/ })).toBeNull();
     expect(within(plan).getByRole("button", { name: "Entrar com ChatGPT" })).toBeTruthy();
+  });
+
+  test("the open ChatGPT panel unlocks when the runner reports an upgraded Codex", async () => {
+    const state = walters(withCard({ intent: "chatgpt" }), ADA_ID);
+    const api = createFakeApi(state);
+    const brain = api.agents.brain;
+    let version = "0.149.0";
+    api.agents.brain = async (orgId, agentId) => {
+      const view = await brain(orgId, agentId);
+      return {
+        ...view,
+        ownSignIn: false,
+        options: view.options.map((option) =>
+          option.kind === "codex" && version === "0.149.0"
+            ? {
+                ...option,
+                available: false,
+                reason: "outdated",
+                codexVersion: { detected: version, minimum: "0.163.0" },
+              }
+            : option,
+        ),
+      };
+    };
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await click(within(cardRow()).getByRole("button", { name: "Conectar" }), 8);
+    const box = dialog("Conectar uma IA para a Ada") as HTMLElement;
+    await toPlan(box, "ChatGPT");
+    const panel = () => within(box).getByRole("region", { name: "Seu plano do ChatGPT" });
+    expect(panel().textContent).toContain("Codex CLI 0.149.0");
+    expect(panel().textContent).toContain("0.163.0");
+    expect(within(panel()).queryByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeNull();
+    expect(within(panel()).getByRole("link", { name: "Como atualizar o Codex CLI" })).toBeTruthy();
+    version = "0.169.0";
+    await act(async () =>
+      socket.push({
+        type: "event",
+        scope: "org",
+        event: { type: "machine.updated", machineId: "machine_1", executors: true },
+      }),
+    );
+    await settle(8);
+    expect(within(panel()).getByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeTruthy();
+    expect(panel().textContent).not.toContain("0.149.0");
   });
 
   test("Conectar asks the computers for their own sign-ins again: ChatGPT's is known by the usage read with it", async () => {
@@ -889,6 +1029,23 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(screen().queryByRole("dialog")).toBeNull();
   });
 
+  test("a 60-plus-character account name: Usar … is the foot's whole name, its words in the label a narrow dialog cuts", async () => {
+    const state = walters(withCard(), ADA_ID);
+    const long = acct({
+      id: "acct_long",
+      label: "Conta compartilhada do time de atendimento ao cliente da Acme",
+      plan: "max",
+    });
+    const { box } = await connectAda(state, { accounts: [long] });
+    const use = within(box).getByRole("button", {
+      name: "Usar Conta compartilhada do time de atendimento ao cliente da Acme · Max",
+    });
+    expect(use.closest(".ac-dialog__foot")).not.toBeNull();
+    expect(use.querySelector(":scope > .ac-btn__label")?.textContent).toBe(
+      "Usar Conta compartilhada do time de atendimento ao cliente da Acme · Max",
+    );
+  });
+
   test("Só algumas pessoas with nobody picked: Atende outras pessoas lets nobody in, so it goes back off and says why", async () => {
     const state = walters(withCard(), ADA_ID);
     for (const a of state.agents) if (a.id === ADA_ID) a.audience = { mode: "people", userIds: [] };
@@ -988,6 +1145,42 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(within(box).queryByRole("switch", { name: "Atende outras pessoas" })).toBeNull();
   });
 
+  test("an endpoint's key whose models never passed: the real cause and Testar modelos, never a toast that something didn't answer", async () => {
+    const state = onClaudeCode(walters(withCard(), ADA_ID));
+    state.credentials = [
+      {
+        id: "cred-cc",
+        provider: "custom",
+        label: "Gateway Sul",
+        keyHint: "x7Qp",
+        endpoint: { style: "openai", baseURL: "https://api.example.com/v1", models: [{ id: "deep-flash" }] },
+        createdAt: NOW.toISOString(),
+        revokedAt: null,
+      },
+    ];
+    const { api, box } = await connectAda(state, { brain: "claude_code" });
+    // The list names the endpoint's host, never the raw id "custom".
+    expect(shownText(haveRow(box, "Gateway Sul"))).toBe("Gateway Sulapi.example.com · termina em x7Qp");
+    api.agents.checkCredential = async () => ({ check: "unchecked" });
+    await useHave(box, "Gateway Sul");
+    expect(calls(state, "agents.update").map((c) => c.args)).toEqual([
+      [ORG_ID, ADA_ID, { credentialId: "cred-cc", model: "custom:cred-cc:deep-flash" }],
+    ]);
+    expect(document.querySelector(".ac-toast")).toBeNull();
+    expect(box.textContent).toContain("Nenhum modelo do Gateway Sul passou no teste ainda.");
+    expect(box.textContent).not.toContain("agora pensa com");
+    await click(within(box).getByRole("button", { name: "Testar modelos" }));
+    const models = dialog("Modelos de Gateway Sul") as HTMLElement;
+    await click(within(models).getByRole("button", { name: "Salvar e testar de novo" }), 6);
+    expect(calls(state, "agents.setEndpointModels").map((c) => c.args)).toEqual([
+      [ORG_ID, "cred-cc", [{ id: "deep-flash" }]],
+    ]);
+    await click(within(models).getByRole("button", { name: "Concluir" }), 6);
+    // The model answered its test: she thinks with the key, said plainly.
+    expect(box.textContent).toContain("Ada agora pensa com Gateway Sul.");
+    expect(box.textContent).not.toContain("Nenhum modelo");
+  });
+
   test("a stored key out of credit: the provider's reason and the page that fixes it, and she doesn't move to it", async () => {
     const state = onClaudeCode(walters(withCard(), ADA_ID));
     const { api, box } = await connectAda(state, { brain: "claude_code" });
@@ -1058,9 +1251,7 @@ describe("Conectar uma IA for an agent with no AI: what the person already has, 
     expect(shownText(theirs)).toBe("Claude MaxDe Bia");
     expect(theirs.disabled).toBe(false);
     expect((within(picker).getByRole("button", { name: /^Claude Pro/ }) as HTMLButtonElement).disabled).toBe(true);
-    expect(picker.textContent).toContain(
-      "Os planos de outras pessoas mostram de quem são. O dono recebe um e-mail e pode tirar de volta.",
-    );
+    expect(picker.textContent).toContain("Os planos que atendem o workspace todo mostram de quem são.");
     await click(theirs, 8);
     expect(calls(state, "agents.setBrain").map((c) => c.args)).toEqual([
       [ORG_ID, ADA_ID, { brain: "claude_code", account: "acct_bia" }],

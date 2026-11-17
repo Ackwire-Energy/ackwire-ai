@@ -1,5 +1,14 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -327,5 +336,67 @@ describe("deploy/backup/backup.sh", () => {
       expect(run.err).toContain(`BACKUP_INTERVAL_HOURS=${hours} is not a whole number of hours`);
       expect(run).toMatchObject({ maxAge: "26h", sleep: 16 * 3600 + 40 * 60 });
     }
+  });
+
+  // One dump right away, with stand-ins for pg_dump, age and the bucket: what went up, and under which name.
+  function once(recipient?: string) {
+    const state = mkdtempSync(join(dir, "once-"));
+    const own = join(dir, "once-bin");
+    stub(
+      own,
+      "pg_dump",
+      `#!/bin/sh\nfor a in "$@"; do case "$a" in --file=*) echo plain >"\${a#--file=}" ;; esac; done\n`,
+    );
+    stub(own, "age", `#!/bin/sh\nprintf '%s' "$*" >"$STUB_STATE/age"\n{ echo encrypted; cat; }\n`);
+    stub(
+      own,
+      "rclone",
+      `#!/bin/sh\nprintf '%s\\n' "$*" >>"$STUB_STATE/rclone"\ncase "$1" in copyto) cat "$2" >"$STUB_STATE/uploaded" ;; esac\n`,
+    );
+    const run = Bun.spawnSync(["sh", join(dir, "backup.sh"), "now"], {
+      env: {
+        PATH: `${own}:${process.env.PATH}`,
+        STUB_STATE: state,
+        DATABASE_URL: "postgres://test",
+        S3_BACKUP_BUCKET: "backups",
+        ...(recipient === undefined ? {} : { BACKUP_AGE_RECIPIENT: recipient }),
+      },
+      timeout: 10_000,
+    });
+    const read = (name: string) => (existsSync(join(state, name)) ? readFileSync(join(state, name), "utf8") : "");
+    const calls = read("rclone").split("\n").filter(Boolean);
+    return {
+      code: run.exitCode,
+      out: run.stdout.toString(),
+      age: read("age"),
+      uploaded: read("uploaded"),
+      copyto: calls.find((call) => call.startsWith("copyto")),
+      // The retention, which covers both names so a bucket that switches encryption keeps its cleanup.
+      retention: calls.find((call) => call.startsWith("delete")),
+    };
+  }
+
+  test("BACKUP_AGE_RECIPIENT encrypts the dump to that public key and uploads it as .dump.age", () => {
+    const run = once("age1test");
+    expect({ code: run.code, age: run.age, uploaded: run.uploaded }).toEqual({
+      code: 0,
+      age: "--encrypt --recipient age1test",
+      uploaded: "encrypted\nplain\n",
+    });
+    expect(run.copyto).toMatch(/^copyto \/tmp\/agentes\.dump\.age :s3:backups\/agentes-\d{8}-\d{6}\.dump\.age$/);
+    expect(run.out).toMatch(/agentes-\d{8}-\d{6}\.dump\.age uploaded/);
+    expect(run.retention).toContain("--include agentes-*.dump.age");
+  });
+
+  test("without BACKUP_AGE_RECIPIENT the dump goes up as pg_dump wrote it", () => {
+    const run = once();
+    expect({ code: run.code, age: run.age, uploaded: run.uploaded }).toEqual({
+      code: 0,
+      age: "",
+      uploaded: "plain\n",
+    });
+    expect(run.copyto).toMatch(/^copyto \/tmp\/agentes\.dump :s3:backups\/agentes-\d{8}-\d{6}\.dump$/);
+    expect(run.out).toMatch(/agentes-\d{8}-\d{6}\.dump uploaded/);
+    expect(run.retention).toContain("--include agentes-*.dump ");
   });
 });

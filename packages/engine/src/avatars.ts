@@ -20,6 +20,9 @@ export function sniffImage(bytes: Uint8Array): "image/jpeg" | "image/png" | "ima
   return null;
 }
 
+/** The biggest picture a tool hands the model: a screenshot, a file someone pasted in the chat. */
+export const MODEL_IMAGE_BYTES = 3_500_000;
+
 /** An image a model reads (PNG, JPEG, WebP or GIF) by its first bytes: the APIs refuse one sent under another type. */
 export const sniffModelImage = (bytes: Uint8Array) =>
   sniffImage(bytes) ?? (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46 ? "image/gif" : null);

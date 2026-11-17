@@ -3,6 +3,7 @@ import type { Database } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import type { MachineCaller } from "../machine-hub";
 import { REMOVED_COMPUTER_MESSAGE } from "../machines";
+import { toolMachineId } from "../right-hand-seats";
 
 /** Why the agent can't use its desktop, as a code (for the app) and a sentence (for the agent). */
 export type DesktopUseUnavailable =
@@ -47,7 +48,7 @@ export async function agentDesktopUseStatus(
     detail: null,
   });
   const agent = await getAgentCached(db, orgId, agentId);
-  const machineId = agent?.machineId ?? null;
+  const machineId = await toolMachineId(db, agent);
   if (!machineId || !hub) return none("no_machine");
   const status = await hub.status(machineId);
   if (!status || status.orgId !== orgId) return none("machine_removed", machineId);
@@ -73,9 +74,9 @@ export function desktopUseUnavailableText(s: Extract<AgentDesktopUseStatus, { av
     case "outdated":
       return `The runner on ${on} is too old for using your desktop. Tell the person: its owner should update it.`;
     case "switched_off":
-      return `The desktop is turned off on ${on}. Only the person at that computer can turn it on; tell the people.`;
+      return `The desktop is turned off on ${on}. Whoever connected it can turn it on from agentes.chat; tell the people.`;
     case "commands_off":
-      return `Commands are turned off on ${on}, and using your desktop runs them. Only the person at that computer can turn them on; tell the people.`;
+      return `Commands are turned off on ${on}, and using your desktop runs them. Whoever connected it can turn them on from agentes.chat; tell the people.`;
     case "not_ready":
       return `Your desktop can't be used on ${on}${s.detail ? `: ${s.detail}` : ""}. Tell the person.`;
     default:

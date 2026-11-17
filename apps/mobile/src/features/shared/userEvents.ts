@@ -15,7 +15,7 @@ import {
   type ThreadFollowEvent,
   type ThreadInfo,
 } from "@agenteschat/client";
-import { playSound, soundForNotification } from "@agenteschat/client/lib/sounds";
+import { playSound, soundForEvent } from "@agenteschat/client/lib/sounds";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { AppState } from "react-native";
@@ -43,12 +43,13 @@ export function useUserEvents() {
         applyNotificationEvent(qc, orgId, event);
         // The island at the top (ADR 0071 §9): what reaches me while the app is open, and what I settled elsewhere.
         feedIsland(event);
-        // Something new reached you somewhere: the conversation list's unread and last lines.
+        // Something new reached you somewhere: the conversation list's unread and last lines. A fetch under way
+        // serves a burst (the undo of "Concluir todas" restores row by row).
         if (event.type === "notification.upserted") {
-          void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
-          void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
+          void qc.invalidateQueries({ queryKey: keys.channels(orgId) }, { cancelRefetch: false });
+          void qc.invalidateQueries({ queryKey: keys.dms(orgId) }, { cancelRefetch: false });
           // Its sound (ADR 0070); the push covers the app in the background.
-          const sound = soundForNotification(event.notification, AppState.currentState !== "active");
+          const sound = soundForEvent(event, AppState.currentState !== "active");
           if (sound) playSound(sound);
         }
       }
@@ -73,9 +74,10 @@ export function useUserEvents() {
       applyWorkspaceEvent(qc, orgId, event);
       // Dashboards and widgets (ADR 0135): a board changed, a widget updated, failed or was removed.
       applyDashboardEvent(qc, orgId, event);
-      // Org event: someone changed the task board's columns. Deleting one moves its tasks, so the
-      // tasks refresh too (the columns live under the same key).
-      if (event.type === "issue.columns") void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
+      // Org event: someone changed the task board's columns or projects. Deleting a column moves its tasks and
+      // a project's name is on its cards, so the tasks refresh too (both live under the same key).
+      if (event.type === "issue.columns" || event.type === "issue.projects")
+        void qc.invalidateQueries({ queryKey: keys.issues(orgId) });
       applyIssueEvent(qc, orgId, event);
       // A change I asked the right hand for was decided by someone else (ADR 0137): "Aplicado por …" on my card.
       if (event.type === "proposal.created") void refreshProposals(qc, orgId);

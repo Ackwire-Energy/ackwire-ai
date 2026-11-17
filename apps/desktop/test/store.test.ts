@@ -20,7 +20,7 @@ function status(logoEtag?: string): ControlStatus {
 }
 
 /** A host with one running home whose runner answers from `state`. */
-function setup() {
+function setup(options: ConstructorParameters<typeof DesktopStore>[1] = {}) {
   const state = { status: status('"a.png"'), logo: PNG as string | null, logoAsks: 0 };
   let onLine: (homeId: string, line: string) => void = () => {};
   const host = {
@@ -46,7 +46,7 @@ function setup() {
       queueMicrotask(() => onLine(homeId, JSON.stringify({ type: "reply", id: req.id, ok: true, data })));
     },
   } as unknown as Host;
-  const store = new DesktopStore(host, { idPrefix: "t" });
+  const store = new DesktopStore(host, { idPrefix: "t", ...options });
   const event = (e: ControlEvent) => onLine("h1", JSON.stringify({ type: "event", event: e }));
   return { store, state, event };
 }
@@ -221,4 +221,17 @@ test("stopping: a request still waiting for its reply fails at once, so nothing 
   stop();
   expect(((await resume) as ControlError).code).toBe("closed");
   expect(store.client.inFlight).toBe(0);
+});
+
+test("a tool its owner turned on from the apps: kept on the home for the popover's Undo, told once, gone when dismissed", async () => {
+  const told: { tool: string; byName: string }[] = [];
+  const { store, event } = setup({ onToolAllowed: (_home, allowed) => told.push(allowed) });
+  store.start();
+  await settle();
+  event({ kind: "access.allowed", tool: "browser", byName: "Bia Rocha" });
+  await settle();
+  expect(store.home("h1")?.allowed).toEqual({ tool: "browser", byName: "Bia Rocha" });
+  expect(told).toEqual([{ tool: "browser", byName: "Bia Rocha" }]);
+  store.dismissAllowed("h1");
+  expect(store.home("h1")?.allowed).toBeNull();
 });

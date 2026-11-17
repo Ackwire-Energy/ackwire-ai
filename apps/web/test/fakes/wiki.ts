@@ -324,6 +324,10 @@ export function createFakeWiki(ctx: MockContext, log: (method: string, ...args: 
           ]
         : [];
     },
+    githubNotes: async (orgId, url) => {
+      log("wiki.githubNotes", orgId, url);
+      return new Blob();
+    },
     import: async (orgId, input) => {
       log("wiki.import", orgId, input);
       const list = await store(orgId);

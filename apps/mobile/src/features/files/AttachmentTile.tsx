@@ -6,20 +6,21 @@ import { LinearGradient } from "expo-linear-gradient";
 import type { TFunction } from "i18next";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
-import { Icon, type IconName, LineIcon, Text } from "@/ui";
-import { router } from "@/ui/navigation";
+import { Text as RNText, StyleSheet, View } from "react-native";
+import { Icon, type IconName, LineIcon, PressScale, Text } from "@/ui";
 import { MessageText } from "../chat/MessageText";
 import { useColors, useOrgId } from "../shared/hooks";
 import { MONO } from "../shared/parts";
-import { encodeFileList, extensionOf, fileInfo } from "./logic";
+import { extensionOf, type FileRef, fileInfo } from "./logic";
+import { openFile } from "./open";
 import { useRemoteFile } from "./source";
 
 /**
  * An attachment as a tile (as on the web): what it holds drawn small on top (its cover: a document's start, a table's
  * first rows, a change's files, a text file's first lines, else its type) and its name, whole, with its kind and size
  * under it. A picture is only the picture: its name and size are what a screen reader hears and what the picture
- * viewer's header says. A tap opens it: a picture in the picture viewer, the rest in the file screen.
+ * viewer's header says. A tap opens it (`openFile`): a picture or a video in the picture viewer, among the message's
+ * (`siblings`), the rest in the file screen.
  */
 
 /** What a cover shows of a table, a code change or a text file: the rest is in the file screen. */
@@ -64,6 +65,7 @@ export function AttachmentTile({
   picture: seen = false,
   width,
   single = false,
+  siblings,
 }: {
   file: TileFile;
   detail: ArtifactDetail | undefined;
@@ -73,6 +75,8 @@ export function AttachmentTile({
   width: number;
   /** Alone on its message: a taller cover. */
   single?: boolean;
+  /** The message's pictures and videos in the order they show: a picture's tap pages through them in the viewer. */
+  siblings?: readonly FileRef[];
 }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
@@ -88,30 +92,17 @@ export function AttachmentTile({
   const icon: IconName =
     !content || content.kind === "file" ? (picture ? "image" : fileIconOf(info?.type)) : KIND_ICON[content.kind];
   const open = () => {
-    if (!detail) return;
-    const older = detail.shownVersion < detail.version;
-    if (picture)
-      router.push({
-        pathname: "/images",
-        params: { files: encodeFileList([{ id: file.id, version: detail.shownVersion }]), at: "0" },
-      });
-    else
-      router.push({
-        pathname: "/file/[id]",
-        params: { id: file.id, ...(older ? { v: String(detail.shownVersion) } : {}) },
-      });
+    if (detail) openFile({ id: file.id, version: file.version, title: file.title, detail }, siblings);
   };
   return (
-    <Pressable
+    // Opening it is navigation: the tile gives under the finger, no tap.
+    <PressScale
+      haptic={false}
       onPress={open}
       disabled={!detail}
       accessibilityRole={picture ? "imagebutton" : "button"}
       accessibilityLabel={`${name}, ${meta}`}
-      style={({ pressed }) => [
-        styles.tile,
-        { width, backgroundColor: c.raised, borderColor: picture ? c.line : c.line2 },
-        pressed && styles.pressed,
-      ]}
+      style={[styles.tile, { width, backgroundColor: c.raised, borderColor: picture ? c.line : c.line2 }]}
     >
       <View
         style={[
@@ -143,7 +134,7 @@ export function AttachmentTile({
           </View>
         </View>
       )}
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -344,7 +335,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 4,
     borderWidth: StyleSheet.hairlineWidth,
   },
-  pressed: { opacity: 0.85 },
   cover: { overflow: "hidden" },
   coverOverFoot: { borderBottomWidth: StyleSheet.hairlineWidth },
   // The icon on the name's first line, however many lines the name wraps to.

@@ -13,6 +13,7 @@ import {
 import { handleRequest } from "../../runner/handlers";
 import { copiedFiles, missionWorktree, readProjectConfig, setupCommandFor } from "../../runner/mission-worktree";
 import { agentWorkspace } from "../../runner/paths";
+import { agentSecrets } from "../../runner/secrets";
 import { commitChanges, TaskManager } from "../../runner/tasks";
 import { errorCode, removeDirs, tempDir, waitFor } from "./helpers";
 
@@ -391,6 +392,45 @@ test.skipIf(!posix || !hasGit)(
     expect(
       parseRunnerFrame(JSON.stringify({ ...plainDone, type: "task.done", startSha: "zz", endSha: "nope" })),
     ).not.toHaveProperty("startSha");
+  },
+  30_000,
+);
+
+test.skipIf(!posix || !hasGit)(
+  "a task that carries its commits' lines: what its command commits and the commit at its end both end with them",
+  async () => {
+    const { ws, folder } = await project();
+    await ensure(folder);
+    const wt = path.join(folder, WT);
+    const home = tempDir("home-");
+    dirs.push(home);
+    const tasks = new TaskManager({
+      root: path.join(home, "tasks"),
+      workspaceReal: ws,
+      agentFolder: (agent) => agentWorkspace(ws, agent),
+      secrets: (agent) => agentSecrets(path.join(home, "secrets"), agent),
+      watchMs: 20,
+      eventEveryMs: 0,
+      claudeHome: path.join(home, "claude"),
+      caffeinate: false,
+    });
+    closers.push(() => tasks.close());
+    await tasks.init();
+    const frames: RunnerFrame[] = [];
+    tasks.attach((f) => frames.push(f));
+    const line = "Co-authored-by: Dev <noreply@agentes.chat>";
+    await tasks.start(
+      { ...AGENT, coAuthors: [line] },
+      {
+        taskId: id(9),
+        executor: "shell",
+        command: "echo a > a.txt && git add a.txt && git commit -qm 'By the task' && echo b > b.txt",
+        cwd: WT,
+        commit: { message: "agentes: build the tabs" },
+      },
+    );
+    await waitFor(() => frames.some((f) => f.type === "task.done" && f.taskId === id(9)), 10_000);
+    expect(out(wt, "log", "-2", "--format=%B")).toBe(`agentes: build the tabs\n\n${line}\n\nBy the task\n\n${line}`);
   },
   30_000,
 );

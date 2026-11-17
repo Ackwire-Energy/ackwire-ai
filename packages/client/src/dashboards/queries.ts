@@ -1,6 +1,10 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { useApi } from "../api/context";
+import { ApiError } from "../api/http";
 import { keys } from "../api/keys";
+import { useAiStatusSince } from "../api/queries";
+import { busyWidgets, widgetAiReady, widgetNeedsAi, widgetStoppedForAi } from "./lib";
 import type {
   ConfirmWidgetInput,
   CreateDashboardInput,
@@ -119,7 +123,8 @@ export const WIDGET_DRAFT_POLL_MS = 2000;
 /**
  * The live view of a widget being tested ("Test" in New widget): the draft, kept fresh by its `dashboard.widget`
  * events (to its creator only) and, while it is `building` or `updating`, asked again every `WIDGET_DRAFT_POLL_MS`.
- * Null id: nothing tested.
+ * Not while its run waits (`widgetWaiting`): a budget can wait for weeks, and its end is an event. Null id: nothing
+ * tested.
  */
 export function useWidgetDraft(orgId: string, widgetId: string | null) {
   const api = useApi();
@@ -129,8 +134,7 @@ export function useWidgetDraft(orgId: string, widgetId: string | null) {
     enabled: Boolean(widgetId),
     staleTime: 0,
     retry: false,
-    refetchInterval: (q) =>
-      q.state.data?.status === "building" || q.state.data?.status === "updating" ? WIDGET_DRAFT_POLL_MS : false,
+    refetchInterval: (q) => (q.state.data && busyWidgets([q.state.data]).length > 0 ? WIDGET_DRAFT_POLL_MS : false),
   });
 }
 
@@ -392,6 +396,43 @@ export function useRefreshWidget(orgId: string) {
     mutationFn: (widgetId: string) => api.dashboards.refreshWidget(orgId, widgetId),
     onSuccess: (widget) => cacheWidget(qc, orgId, widget),
   });
+}
+
+/** Widgets this app started once their agent had an AI: each only once, so a status the server disagrees with can't loop. */
+const builtOnceAi = new Set<string>();
+
+/**
+ * A widget waiting for an AI (`widgetNeedsAi`) starts building once its agent has one for background work, connected
+ * from wherever, on any screen showing it to someone who may update it (ADR 0135 §20), by a status read after it
+ * started waiting (`useAiStatusSince`). Nobody pressed for it (`auto`): it only queues, and the server checks again;
+ * still no AI there (`widget.needs_ai`), a later status may try once more.
+ */
+export function useBuildOnceAi(orgId: string, widget: Widget | null | undefined, canEdit: boolean) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const status = useAiStatusSince(orgId, Boolean(canEdit && widget && widgetNeedsAi(widget)));
+  const id = canEdit && widget && widgetNeedsAi(widget) && widgetAiReady(widget, status) ? widget.id : null;
+  useEffect(() => {
+    if (!id || builtOnceAi.has(id)) return;
+    builtOnceAi.add(id);
+    api.dashboards.refreshWidget(orgId, id, true).then(
+      (built) => cacheWidget(qc, orgId, built),
+      (e: unknown) => {
+        if (e instanceof ApiError && e.code === "widget.needs_ai") builtOnceAi.delete(id);
+      },
+    );
+  }, [id, api, qc, orgId]);
+}
+
+/**
+ * Whether a failed widget's way out is connecting an AI, never Resolve: one waiting for an AI, or one that stopped for
+ * the lack of one while its build still has none (the AI status read since, `widgetAiReady`). Once it has, Resolve
+ * starts it again.
+ */
+export function useWidgetLacksAi(orgId: string, widget: Widget | null | undefined): boolean {
+  const stopped = Boolean(widget && widgetStoppedForAi(widget));
+  const status = useAiStatusSince(orgId, stopped);
+  return Boolean(widget && (widgetNeedsAi(widget) || (stopped && !widgetAiReady(widget, status))));
 }
 
 /** "Ask for a change" (the widget panel's composer). */

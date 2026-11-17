@@ -11,6 +11,7 @@ import {
 } from "@agenteschat/client";
 import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { stopperName, stopperOf } from "@agenteschat/client/lib/notices";
 import { formatDuration } from "@agenteschat/client/lib/work";
 import { agentGradient, BrowserMark, BrowserStrip, Chip, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -50,8 +51,8 @@ export function BrowserTrailCard({
   name: string;
   /** `meta.browser.steps` (`browserTrailOf`), or the desktop's (`desktopTrailOf`). */
   steps: BrowserTrailStep[];
-  /** The run was stopped (`meta.canceled`): who pressed Parar, when known. */
-  stopped?: { byUserId: string | null } | null;
+  /** The run was stopped (`meta.canceled`): who pressed Parar, or the agent that did at their word, when known. */
+  stopped?: { byUserId: string | null; byAgentId?: string | null } | null;
   /** A recent message: ask the server about a take over (otherwise only what the realtime events said). */
   recent?: boolean;
   screen?: ScreenKind;
@@ -68,14 +69,18 @@ export function BrowserTrailCard({
   const last = steps.at(-1);
   if (!last || held) return null;
   const time = formatTime(i18n.language, last.at);
-  const by = stopped?.byUserId ?? null;
+  const by = stopped ? stopperOf(stopped, me.user.id) : null;
+  const person = stopperName(by, {
+    agent: (id) => dir.anyAgent(id)?.name,
+    person: (id) => dir.memberById.get(id)?.name,
+  });
   // Done needs no line (the message has its time); stopped says who and when.
   const ended = !stopped
     ? null
-    : by === me.user.id
+    : by?.kind === "you"
       ? tt("after.stoppedByYou", { time })
-      : by && dir.memberById.get(by)
-        ? tt("after.stoppedBy", { person: dir.memberById.get(by)?.name, time })
+      : person
+        ? tt("after.stoppedBy", { person, time })
         : tt("after.stoppedAt", { time });
   const hosts = browserTrailHosts(steps);
   // A shared profile (ADR 0110): its name then, before the site; the agent's own browser has none.

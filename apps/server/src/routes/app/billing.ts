@@ -22,7 +22,7 @@ export function billingRoutes(deps: AppDeps) {
       security,
       summary: "A signed link to the workspace's plan and billing (owners and admins)",
       description:
-        "Opens the billing service signed in as you, for 5 minutes and once. Allowed on hold (paying is how a billing hold ends), refused while suspended. 404 `billing.off` when this server has no billing service.",
+        "Opens the billing service signed in as you, for 5 minutes and once. Allowed on hold (paying is how a billing hold ends) and while the workspace is being deleted (its invoices and card stay within reach), refused while suspended. 404 `billing.off` when this server has no billing service.",
       request: {
         params: OrgParams,
         body: body(

@@ -27,14 +27,14 @@ const tabs = () => [...document.querySelectorAll(`${STRIP} [role="tab"]`)].map((
 const chosen = () => document.querySelector(`${STRIP} [role="tab"][aria-selected="true"]`)?.textContent;
 
 describe("the list", () => {
-  test("a self-hosted team's: five entries with no group names, then Advanced, closed, with Devices under it", async () => {
+  test("a self-hosted team's: six entries with no group names, then Advanced, closed, with Devices under it", async () => {
     await go("settings", seedState({ authConfig: { cloud: false } }));
-    expect(rows()).toEqual(["Sua conta", "Workspace", "Pessoas", "IA e uso", "Conectores", "Avançado"]);
+    expect(rows()).toEqual(["Sua conta", "Workspace", "Pessoas", "Cargos", "IA e uso", "Conectores", "Avançado"]);
     expect(marked()).toBe("Workspace");
     const advanced = within(nav()).getByRole("button", { name: "Avançado" });
     expect(advanced.getAttribute("aria-expanded")).toBe("false");
     await act(async () => fireEvent.click(advanced));
-    expect(rows().slice(6)).toEqual([
+    expect(rows().slice(7)).toEqual([
       "Dispositivos",
       "Armazenamento",
       "Importar e exportar",
@@ -43,11 +43,20 @@ describe("the list", () => {
     ]);
   });
 
-  test("on Ackwire AI Cloud Devices is the sixth entry, and Advanced holds the rest", async () => {
+  test("on Ackwire AI Cloud Devices is the seventh entry, and Advanced holds the rest", async () => {
     await go("settings", seedState({ authConfig: { cloud: true } }));
-    expect(rows()).toEqual(["Sua conta", "Workspace", "Pessoas", "IA e uso", "Conectores", "Dispositivos", "Avançado"]);
+    expect(rows()).toEqual([
+      "Sua conta",
+      "Workspace",
+      "Pessoas",
+      "Cargos",
+      "IA e uso",
+      "Conectores",
+      "Dispositivos",
+      "Avançado",
+    ]);
     await act(async () => fireEvent.click(within(nav()).getByRole("button", { name: "Avançado" })));
-    expect(rows().slice(7)).toEqual(["Armazenamento", "Importar e exportar", "Auditoria"]);
+    expect(rows().slice(8)).toEqual(["Armazenamento", "Importar e exportar", "Auditoria"]);
   });
 
   test("a member keeps the entries they open, each with only their tabs", async () => {
@@ -55,7 +64,7 @@ describe("the list", () => {
     if (state.me?.organizations[0]) state.me.organizations[0].role = "member";
     await go("settings/connectors", state);
     expect(rows()).toEqual(["Sua conta", "Pessoas", "IA e uso", "Conectores", "Dispositivos"]);
-    expect(tabs()).toEqual(["Conectores e MCPs", "Cofre"]);
+    expect(tabs()).toEqual(["Conectores e MCPs", "Skills", "Cofre"]);
   });
 
   test("the tile grid is gone from Geral", async () => {
@@ -74,8 +83,9 @@ describe("every old address opens its new home", () => {
     ["general", "Workspace", "Geral"],
     ["media", "Workspace", "GIFs e figurinhas"],
     ["voice", "Workspace", "Voz"],
-    ["members", "Pessoas", "Membros e convites"],
-    ["roles", "Pessoas", "Papéis e permissões"],
+    ["members", "Pessoas", "Membros"],
+    ["invites", "Pessoas", "Convites"],
+    ["roles", "Cargos", undefined],
     ["usage", "IA e uso", undefined],
     ["connectors", "Conectores", "Conectores e MCPs"],
     ["skills", "Conectores", "Skills"],
@@ -97,7 +107,7 @@ describe("every old address opens its new home", () => {
 
   test("the tabs of an entry are its sections, and a tab opens that section's address", async () => {
     const { router } = await go("settings/account");
-    expect(tabs()).toEqual(["Perfil", "Notificações", "Aprovações", "Apps de IA"]);
+    expect(tabs()).toEqual(["Perfil", "Notificações", "Apps do Ackwire AI", "Aprovações", "Apps de IA"]);
     await act(async () => fireEvent.mouseDown(screen().getByRole("tab", { name: "Notificações" }), { button: 0 }));
     await settle(6);
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/notifications`);

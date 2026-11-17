@@ -9,6 +9,7 @@ import {
   SECRET_NAME,
 } from "@agenteschat/adapters/secret-box";
 import { originOf } from "./browser";
+import { coAuthorEnv, coAuthorHooks, coAuthorLines } from "./co-authors";
 import { errnoCode, RunnerError } from "./errors";
 import { touchesGitInternals } from "./git-guard";
 import { agentFolderName, isInside, normalizeRequestPath, resolveInWorkspace } from "./paths";
@@ -557,9 +558,10 @@ export function handedSiteSecret(root: string, agent: AgentScope, requestId: str
 }
 
 /**
- * What commands of this agent get: env values (never a site's password: that one only its browser types), and a
- * redactor for everything that leaves the machine: every value kept, a site's password in memory, and every Vault
- * value opened here in the last 10 minutes (ADR 0144).
+ * What commands of this agent get: env values (never a site's password: that one only its browser types) and the git
+ * settings that end its commits with the request's `Co-authored-by` lines (`co-authors.ts`, in `<runner
+ * home>/git-hooks`), and a redactor for everything that leaves the machine: every value kept, a site's password in
+ * memory, and every Vault value opened here in the last 10 minutes (ADR 0144).
  */
 export async function agentSecrets(root: string | undefined, agent: AgentScope | undefined) {
   if (!agent) return null;
@@ -571,10 +573,13 @@ export async function agentSecrets(root: string | undefined, agent: AgentScope |
     ...(dir ? runnerVault.sitesOf(dir) : []).flatMap((s) => (s.value ? [{ name: s.name, value: s.value }] : [])),
     ...runnerVault.armedOf(String(agent.id ?? "")),
   ];
-  if (values.length === 0) return null;
+  const lines = coAuthorLines(agent);
+  const hooks = root && lines.length > 0 ? coAuthorHooks(path.join(path.dirname(root), "git-hooks")) : null;
+  if (values.length === 0 && !hooks) return null;
   const env: Record<string, string> = {};
   // One kept before its name was reserved still never reaches the env.
   for (const s of secrets) if (s.target.kind === "env" && !isReservedSecretName(s.name)) env[s.name] = s.value;
+  if (hooks) Object.assign(env, coAuthorEnv(lines, hooks, { ...process.env, ...env }));
   return {
     env,
     files: secrets.flatMap((s) => (s.target.kind === "file" ? [s.target.path] : [])),

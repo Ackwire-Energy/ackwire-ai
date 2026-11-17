@@ -49,15 +49,13 @@ export function sqlReadsTarget(action: string | undefined): string | null {
 }
 
 /**
- * "Aprovar sempre" shows on the card: the server offers it on this request, the person may decide it, and approving
- * takes no hold (what is high risk is never approved for good). "Sempre nesta rotina" reaches a routine's own job, a
- * send included: the server already left merges, deploys, payments and deletions out.
+ * "Aprovar sempre" shows on the card: the server offers it on this request and the person may decide it. The server
+ * says where (ADR 0173): on every request of an agent that asks only for what is risky, a merge, a deploy and a send
+ * too. "Sempre nesta rotina" reaches a routine's own job: the server left merges, deploys, payments and deletions
+ * out of that one.
  */
-export const approveAlwaysOffered = (a: Pick<Approval, "status" | "canDecide" | "approveAlways" | "tool" | "scope">) =>
-  a.status === "pending" &&
-  a.canDecide &&
-  Boolean(a.approveAlways) &&
-  (Boolean(a.approveAlways?.routineId) || approvalRisk(a) !== "high");
+export const approveAlwaysOffered = (a: Pick<Approval, "status" | "canDecide" | "approveAlways">) =>
+  a.status === "pending" && a.canDecide && Boolean(a.approveAlways);
 
 /**
  * Where an action prepared ahead (`runAt`, `schedule_action`) stands: waiting for a person (`asking`), approved and

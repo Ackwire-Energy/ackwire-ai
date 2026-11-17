@@ -24,6 +24,11 @@ test("a DM's name wraps whole on a phone, its pill 8 after it and under it when 
   // On a phone the header's search is its icon, in a DM's header as in a channel's: both hold it with their glyphs.
   const header = atRule(await read("components/channel-header.css"), "@media (max-width: 760px)");
   expect(last(header, ".channel__acts>.channel__search", "display")).toBe("none");
+  // An agent's role and its person, the one exception: one line ending in "…", whole in the tip of the button over it.
+  const top = topLevel(await read("layout.css"));
+  expect(last(top, ".dm-who__text>.channel__topic--line", "white-space")).toBe("nowrap");
+  expect(last(top, ".dm-who__text>.channel__topic--line", "text-overflow")).toBe("ellipsis");
+  expect(last(top, ".dm-who__text>.channel__topic--line", "overflow")).toBe("hidden");
   // A tag on a first line that rises keeps the line where it is, as the kit's pills do.
   expect(last(topLevel(await read("layout.css")), ".ac-captop:has(.agp-tag)", "margin-block-start")).toBe("0");
 });

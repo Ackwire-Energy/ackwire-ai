@@ -107,6 +107,9 @@ describe("the composer's row", () => {
         keysHold: "Solte para enviar",
         keysPaused: "Enter envia",
         left: (s: number) => `faltam ${s} s`,
+        askDiscard: "Apagar o áudio? O texto fica.",
+        askDelete: "Apagar",
+        askKeep: "Manter",
       };
       render(<Box voice={{ scope: "c", onTake: () => {}, onNotice: () => {}, labels }} />);
       const row = document.querySelector(".ac-composer__row") as HTMLElement;
@@ -121,18 +124,14 @@ describe("the composer's row", () => {
     }
   });
 
-  test("pills keep a line over the row, a DM's chip opens the row, and the card's empty room is the text box's", () => {
-    const { unmount } = render(<Box pills={<button type="button">Ada</button>} />);
+  test("pills keep a line over the row, and the card's empty room is the text box's", () => {
+    render(<Box pills={<button type="button">Ada</button>} />);
     const card = box().closest(".ac-composer") as HTMLElement;
     expect(card.querySelector(":scope > .ac-composer__pills")).toBeTruthy();
     expect(fireEvent.mouseDown(card.querySelector(".ac-composer__pills") as HTMLElement)).toBe(false);
     fireEvent.mouseUp(card);
     expect(document.activeElement).toBe(box());
-    unmount();
-    render(<Box inlinePills pills={<span className="ac-composer__agent">Ada</span>} />);
-    const row = document.querySelector(".ac-composer__row") as HTMLElement;
-    expect(row.firstElementChild?.className).toBe("ac-composer__pills");
-    expect(row.firstElementChild?.textContent).toBe("Ada");
+    expect(document.querySelector(".ac-composer__row > .ac-composer__pills")).toBeNull();
   });
 });
 

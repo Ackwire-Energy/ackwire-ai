@@ -37,6 +37,10 @@ export interface FilterChipProps {
   searchLabel?: string;
   searchPlaceholder?: string;
   noResults?: string;
+  /** The chip with one value shows that option's `leading` in place of the filter's icon (a project's dot). */
+  valueLeading?: boolean;
+  /** One row under the options, past a line, that makes a new one ("Novo projeto"). It closes the menu. */
+  action?: { label: string; icon: IconName; onSelect: () => void };
   className?: string;
 }
 
@@ -65,6 +69,8 @@ export function FilterChip({
   searchLabel,
   searchPlaceholder,
   noResults,
+  valueLeading,
+  action,
   className,
 }: FilterChipProps) {
   const listId = useId();
@@ -111,7 +117,7 @@ export function FilterChip({
       >
         <RPopover.Trigger asChild>
           <button type="button" className="ac-filter__trigger" aria-haspopup="listbox" aria-expanded={open}>
-            <Icon name={icon} size={14} />
+            {(valueLeading && selected.length === 1 && selected[0]?.leading) || <Icon name={icon} size={14} />}
             <span className="ac-filter__text">{text}</span>
             <svg className="ac-filter__chev" viewBox="0 0 20 20" aria-hidden="true">
               <path d="m6 8 4 4 4-4" />
@@ -142,8 +148,10 @@ export function FilterChip({
                 />
               </div>
             )}
+            {/* With an action and nothing to pick yet, the menu is that one row. */}
             <div
               className="ac-filter__list"
+              hidden={Boolean(action) && options.length === 0}
               role="listbox"
               id={listId}
               aria-label={label}
@@ -186,6 +194,22 @@ export function FilterChip({
                 );
               })}
             </div>
+            {action && (
+              <div className="ac-filter__foot">
+                {options.length > 0 && <div className="ac-menu__separator" />}
+                <button
+                  type="button"
+                  className="ac-filter__option"
+                  onClick={() => {
+                    setOpen(false);
+                    action.onSelect();
+                  }}
+                >
+                  <Icon name={action.icon} size={16} />
+                  <span className="ac-filter__label">{action.label}</span>
+                </button>
+              </div>
+            )}
           </RPopover.Content>
         </RPopover.Portal>
       </RPopover.Root>

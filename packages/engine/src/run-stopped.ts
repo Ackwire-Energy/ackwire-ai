@@ -15,15 +15,19 @@ import { type AgentRun, computerWaitOf, type RunStatus, replyThreadOf } from "./
  * asks to continue").
  */
 
-const { agentRuns, agentWorks, messages, threads, users } = schema;
+const { agentRuns, agents, agentWorks, messages, threads, users } = schema;
 
 /** A stop reason's length at most. */
 export const STOP_REASON_MAX = 500;
 
 export interface StoppedRefs {
   runId: string;
+  /** The person who stopped it, or at whose word `byAgentName` did. */
   byUserId: string;
   byName: string;
+  /** The agent that stopped it at that person's word (the right hand), and its name. */
+  byAgentId?: string;
+  byAgentName?: string;
   /** What the task was about (≤ 80). */
   label: string;
   /** What it was doing when stopped: `working`, `waiting` (an ok or an answer), `queued`. */
@@ -42,11 +46,16 @@ const wasOf = (status: RunStatus): StoppedRefs["was"] =>
 export function stoppedText(r: StoppedRefs): string {
   const doing =
     r.was === "working" ? "while you worked on it" : r.was === "queued" ? "before it started" : "while it waited";
+  const who = r.byAgentName ? `${r.byAgentName}, at ${r.byName || "a person"}'s word,` : r.byName || "A person";
   return [
-    `${r.byName || "A person"} stopped your task${r.label ? ` «${r.label}»` : ""} ${doing}.`,
+    `${who} stopped your task${r.label ? ` «${r.label}»` : ""} ${doing}.`,
     ...(r.helpers ? [`What you asked of ${r.helpers} stopped with it: nothing more comes from them.`] : []),
     "What you already did or posted stays as it is.",
-    r.reason ? `Their reason, in their words: «${r.reason}».` : "They gave no reason.",
+    r.reason
+      ? r.byAgentName
+        ? `The reason given: «${r.reason}».`
+        : `Their reason, in their words: «${r.reason}».`
+      : "They gave no reason.",
     "Don't pick it up again on your own: only when someone asks you to.",
   ].join(" ");
 }
@@ -74,7 +83,8 @@ async function labelOfRun(db: Database, run: AgentRun): Promise<string> {
 }
 
 /**
- * After `stopRun` ended a run a person stopped: the notice to its agent. Best effort (the stop already happened).
+ * After `stopRun` ended a run a person stopped (or `byAgentId` at their word): the notice to its agent. Best effort
+ * (the stop already happened).
  */
 export async function tellAgentStopped(
   deps: { db: Database; pubsub?: PubSub },
@@ -83,13 +93,16 @@ export async function tellAgentStopped(
   byUserId: string,
   reason?: string,
   helpers: string[] = [],
+  byAgentId?: string,
 ): Promise<void> {
   const { db } = deps;
   const [person] = await db.select({ name: users.name }).from(users).where(eq(users.id, byUserId));
+  const [agent] = byAgentId ? await db.select({ name: agents.name }).from(agents).where(eq(agents.id, byAgentId)) : [];
   const refs: StoppedRefs = {
     runId: run.id,
     byUserId,
     byName: person?.name ?? "",
+    ...(byAgentId ? { byAgentId, byAgentName: agent?.name ?? "" } : {}),
     label: await labelOfRun(db, run),
     was: computerWaitOf(run) ? "waiting" : wasOf(previous),
     ...(cleanReason(reason) ? { reason: cleanReason(reason) } : {}),

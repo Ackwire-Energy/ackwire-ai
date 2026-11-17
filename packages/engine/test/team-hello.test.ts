@@ -186,4 +186,15 @@ describe("with no plan to wait for", () => {
     await sayTeamHello({ db: f.db }, f.org.id, { agentId: f.agent.id, userId: f.owner.id, how: "created" });
     expect(await hellos()).toEqual([]);
   });
+
+  test("a workspace deleted before its lines went out says none", async () => {
+    f = await setup({ rightHand: true });
+    await makeStore();
+    await f.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() + 7 * 86_400_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    await drainInTime();
+    expect(await hellos()).toEqual([]);
+  });
 });

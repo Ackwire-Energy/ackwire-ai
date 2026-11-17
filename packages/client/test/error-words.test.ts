@@ -10,10 +10,14 @@ import {
   hasWordsFor,
   noAnswer,
   oauthReturnText,
+  sendFailureOf,
+  sendFailureText,
+  sendNeedsEdit,
   sendWaits,
   signInRefusalText,
   vaultConnectRefusal,
 } from "../src/lib/errors";
+import { clippedHeight, LONG_MESSAGE, MAX_MESSAGE_LENGTH, tooLongToSend } from "../src/lib/message-length";
 
 const failure = new TypeError("Failed to fetch");
 const unreachable = async () => {
@@ -145,6 +149,17 @@ describe("a failed request in the person's words (errorText)", () => {
     expect(errorText(pt, new ApiError(403, "bad_origin", "Cross-origin request refused"))).toBe("common.notAllowed");
   });
 
+  test("a 413 with no code of its own says the request was too big, with the caller's limit when it has one", () => {
+    expect(errorText(pt, new ApiError(413, "too_large", "The request is too large"))).toBe("errors.tooLarge");
+    // A proxy's own page in front of the server: no code at all.
+    expect(errorText(pt, new ApiError(413, "http_413", "Payload Too Large"))).toBe("errors.tooLarge");
+    expect(errorText(pt, new ApiError(413, "too_large", "x"), "pt-BR", { maxMb: 56 })).toBe("errors.tooLargeMax");
+    // The Drive's own code keeps its own words.
+    expect(errorText(pt, new ApiError(413, "artifact.file_too_large", "x"), "pt-BR", { maxMb: 56 })).toBe(
+      "errors.artifact.fileTooLarge",
+    );
+  });
+
   test("a runner's internal failure is for the log: the person reads it's on our side", () => {
     expect(errorText(pt, new ApiError(503, "machine.internal", "ENOENT: no such file"))).toBe("common.ourSide");
   });
@@ -167,6 +182,28 @@ describe("a failed request in the person's words (errorText)", () => {
     // Codes the app knows, 413 and 403 say what they always said.
     expect(errorText(pt, new ApiError(403, "forbidden", ""))).toBe("common.notAllowed");
     expect(errorText(pt, new ApiError(429, "rate_limited", "Slow down"))).toBe("common.tooMany");
+  });
+
+  test("Update now on a widget whose run waits says what for, in the reader's language", () => {
+    const lang = (lng: string) => {
+      const instance = i18next.createInstance();
+      void instance.init({ lng, fallbackLng: "en", resources, initAsync: false });
+      return instance.t;
+    };
+    const waiting = (params: Record<string, unknown>) =>
+      new ApiError(409, "widget.waiting", "Its run waits for its plan, budget or computer", params);
+    const budget = waiting({ code: "budget", source: "budget", resetsAt: null, agentName: "Theo" });
+    expect(errorText(lang("en"), budget)).toBe("Waiting a moment for Theo's budget");
+    expect(errorText(lang("pt-BR"), budget)).toBe("Esperando um instante pelo orçamento de Theo");
+    expect(errorText(lang("en"), waiting({ code: "computer", source: null, resetsAt: null, agentName: "Theo" }))).toBe(
+      "Waiting for Theo's computer",
+    );
+    // A limit of its model alone names the model and what it needs, never the plan's reset.
+    const region = waiting({ code: "plan_limit", source: "plan", scope: "region", model: "DeepSeek V4 Pro" });
+    expect(errorText(lang("en"), region)).toStartWith("DeepSeek V4 Pro needs the Global region turned on in OpenCode");
+    expect(errorText(lang("en"), waiting({ code: "busy", agentName: "Theo" }))).toBe(
+      "Waiting for room on Theo's computer",
+    );
   });
 
   test("a field the server's validator refused reads by its kind in every language, never the validator's English", () => {
@@ -352,6 +389,9 @@ test("a provider refused this server's own OAuth app: what's wrong and who fixes
  * hit goes in `KNOWN` instead.
  */
 const PLAIN_LINE = new Set([
+  // Only an agent names a project by a name that isn't one, and the pickers offer only projects that exist.
+  "issue_project.unknown",
+  "issue_project.not_found",
   // A portrait's recipe is written by the builder, never typed: a malformed one is a fault of the app, not a choice
   // the person can fix.
   "avatar.portrait",
@@ -360,6 +400,9 @@ const PLAIN_LINE = new Set([
   "feedback.file_too_large",
   "feedback.file_type",
   "feedback.files_many",
+  // Only the landing page's partner form meets these, and it words them itself.
+  "invalid_name",
+  "invalid_whatsapp",
   // A phone that follows its computer's rule shows the computer's, with no control of its own; only the installer
   // meets a bad connect code.
   "device.follows_host",
@@ -368,6 +411,8 @@ const PLAIN_LINE = new Set([
   "account.invalid_kind",
   "account.invalid_label",
   "account.invalid_plan",
+  // "Quem usa" offers only Todos and Só eu: another value is a client fault.
+  "account.invalid_serves",
   // A workspace change's card offers Apply, Dismiss and Send on only to whom may (`mayApplyCard`).
   "action_card.not_allowed",
   "action_card.not_requester",
@@ -417,7 +462,11 @@ const PLAIN_LINE = new Set([
   "import.too_many_items",
   "invalid_cursor",
   "invalid_request",
+  // The invite dialog offers only what may go, and words a chip refused in a race by its params (`why`).
+  "invitation.agent",
   "invitation.channel",
+  // The link's choices offer only these lists' values.
+  "invite_link.choice",
   "machine.access_nothing",
   "machine.device_not_found",
   "machine.host_none",
@@ -452,6 +501,9 @@ const PLAIN_LINE = new Set([
   "request_used",
   "right_hand.missing",
   "right_hand_approvals.budget",
+  // "Quem pode" sends only the rows and steps the cargo page draws (`areaRows`, `rowMax`): another is a client fault.
+  "role.level_invalid",
+  "role.row_unknown",
   "routine.action_always_asks",
   "routine.action_invalid",
   "routine.connector_hook",
@@ -477,6 +529,7 @@ const PLAIN_LINE = new Set([
   "storage.daily_full",
   "storage.full",
   "storage.invalid_bucket",
+  "team_week.no_skip",
   "team_week.own_path",
   "timeout",
   "tls",
@@ -506,6 +559,52 @@ function serverCodes() {
     }
   return [...codes].sort();
 }
+
+describe("a message past the length limit", () => {
+  const tooLong = new ApiError(400, "message.too_long", "Message is longer than 100000 characters", {
+    length: 120_000,
+    max: 100_000,
+  });
+
+  test("the client's limit is the server's", () => {
+    const engine = readFileSync(join(import.meta.dir, "../../engine/src/messages.ts"), "utf8");
+    const server = Number(/export const MAX_MESSAGE_LENGTH = ([\d_]+);/.exec(engine)?.[1]?.replace(/_/g, ""));
+    expect(server).toBe(MAX_MESSAGE_LENGTH);
+    expect(tooLongToSend("x".repeat(MAX_MESSAGE_LENGTH))).toBe(false);
+    expect(tooLongToSend(` ${"x".repeat(MAX_MESSAGE_LENGTH)} `)).toBe(false);
+    expect(tooLongToSend("x".repeat(MAX_MESSAGE_LENGTH + 1))).toBe(true);
+  });
+
+  test("the refusal says both sizes in the person's numbers and the way out", () => {
+    const t = i18next.createInstance();
+    void t.init({ lng: "pt-BR", resources, initAsync: false, interpolation: { escapeValue: false } });
+    const said = errorText(t.t, tooLong, "pt-BR");
+    expect(said).toBe("A mensagem tem 120.000 caracteres e o limite é 100.000. Envie o texto como arquivo.");
+  });
+
+  test("a failed row keeps the server's refusal and says it later; with none kept, that something went wrong", () => {
+    const kept = sendFailureOf(tooLong);
+    expect(kept).toEqual({ status: 400, code: "message.too_long", message: tooLong.message, params: tooLong.params });
+    expect(sendFailureOf(new TypeError("Failed to fetch"))).toBeUndefined();
+    const t = i18next.createInstance();
+    void t.init({ lng: "pt-BR", resources, initAsync: false, interpolation: { escapeValue: false } });
+    expect(sendFailureText(t.t, kept, "pt-BR")).toBe(
+      "Não enviada. A mensagem tem 120.000 caracteres e o limite é 100.000. Envie o texto como arquivo.",
+    );
+    expect(sendFailureText(t.t, sendFailureOf(new ApiError(500, "internal_error", "x")))).toBe(
+      `Não enviada. ${ptBR.common.ourSide}`,
+    );
+    expect(sendFailureText(t.t, undefined)).toBe("Não enviada. Algo deu errado.");
+    expect(sendNeedsEdit(kept)).toBe(true);
+    expect(sendNeedsEdit(undefined)).toBe(false);
+  });
+
+  test("a message shows whole up to a height, then clipped well short of it", () => {
+    expect(clippedHeight(LONG_MESSAGE.over)).toBeNull();
+    expect(clippedHeight(LONG_MESSAGE.over + 1)).toBe(LONG_MESSAGE.shows);
+    expect(LONG_MESSAGE.over - LONG_MESSAGE.shows).toBeGreaterThanOrEqual(120);
+  });
+});
 
 describe("every refusal has words", () => {
   const codes = serverCodes();

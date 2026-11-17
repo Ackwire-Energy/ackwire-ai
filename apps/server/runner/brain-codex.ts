@@ -1,9 +1,10 @@
 import { type ChildProcess, execFile, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
-import type { CommandProfile } from "@agenteschat/adapters/command-policy";
+import { type CommandProfile, shellWords } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
   type BrainEffort,
@@ -23,9 +24,16 @@ import {
   withoutSignIns,
 } from "./accounts";
 import { CODEX_ROUTE_OFF } from "./brain-route";
+import {
+  CODEX_WINDOWS_CONFIG,
+  codexLaunch,
+  codexStdinPrompt,
+  WINDOWS_SANDBOX_MESSAGE,
+  windowsMxcReady,
+} from "./codex-windows";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
-import { cachedCodexVersion, resolveCommand } from "./executors";
+import { cachedCodexVersion, envValue } from "./executors";
 import { CODEX_MCP_ENV, CODEX_MCP_SERVER, codexWritableRoots } from "./mcp";
 import { isInside, resolveForAgent } from "./paths";
 import type { Spawn } from "./scope-gate";
@@ -47,7 +55,10 @@ import { agentSecrets } from "./secrets";
  *   network: `plan` is read-only, `work` writes in its folders. `exec` can't
  *   ask for approvals (it forces approval_policy=never), so whatever the
  *   sandbox refuses stays refused; the app-server mode answers Codex's
- *   approvals with the command policy instead (`brain-codex-app.ts`).
+ *   approvals with the command policy instead (`brain-codex-app.ts`). Nothing
+ *   in the Codex home lifts the sandbox: its network and writable roots are
+ *   ours, and no one's own rules apply (`--ignore-rules`; a turn where Codex
+ *   would load some runs on exec, `codexRulesNear`).
  * - Codex picks its thread id (`thread.started`): our session id → that
  *   thread lives in `<runner home>/brain/codex-threads.json`. A runner that
  *   lost it starts a new thread (with the instructions again).
@@ -65,6 +76,10 @@ import { agentSecrets } from "./secrets";
  *   account's folder (missing: `account_missing`, never another account); its
  *   threads are remembered per account. `effort` is `-c model_reasoning_effort`
  *   (`xhigh` and `max` are `high`).
+ * - Windows (`codex-windows.ts`): the native `codex.exe`, started directly; a
+ *   `plan` or `work` turn only where MXC holds its commands (else
+ *   `windows_sandbox`), with it named in `-c` and nothing asked; a thread's
+ *   instructions lead its first prompt on stdin, never the command line.
  */
 
 /** Same as the engine's `CODEX_MIN_VERSION` (`packages/engine/src/missions.ts`): the release verified on a real machine. */
@@ -97,13 +112,18 @@ export type CodexBrainEvent =
       model?: string;
       cacheRead?: number;
       cacheWrite?: number;
+      /** App-server only: the model requests of the turn, and the most input one read (its context then). */
+      calls?: number;
+      maxContext?: number;
     }
   | { type: "limit"; resetsAt?: string }
   | { type: "done"; text: string; session?: { id: string } }
   | { type: "error"; code: string; message: string; retryable?: boolean; worked?: boolean }
   /** Protocol 15 (app-server only): messages handed with `brain.steer` that the turn read. */
   | { type: "steer_read"; uuids: string[] }
-  | { type: "speed_fallback"; message: string };
+  | { type: "speed_fallback"; message: string }
+  /** A file a tool of Codex's own made (an image), kept in the agent's folder: the server shows it with the reply. */
+  | { type: "file"; path: string };
 
 /** `brain.turn` with `kind: "codex"` (contract: "Runner"). */
 export interface CodexBrainTurnRequest {
@@ -126,7 +146,7 @@ export interface CodexBrainTurnRequest {
   /** Protocol 28: the agent's context limit in tokens. */
   contextTokens?: number;
   /** Protocol 16: the turn's permission profile (absent: `work`); protocol 41: `chat`, the team's right hand. */
-  permissions?: { mode?: "plan" | "work" | "chat" };
+  permissions?: { mode?: "plan" | "work" | "chat"; asks?: "always" | "never" };
   /** Protocol 16: false for a background turn (no app-server is kept for it). */
   keepAlive?: boolean;
 }
@@ -161,18 +181,23 @@ export const CODEX_CHAT_OFF = [
 ] as const;
 
 /**
+ * Our bridge's tools offered to the model directly. Codex's catalog makes its models `code_mode_only` (gpt-5.6 and
+ * gpt-6 in 0.164.0), which otherwise hides every MCP tool inside `exec`; some runners have no code-mode host for that
+ * `exec` to call, so the tool fails before it reaches our bridge.
+ */
+export const CODEX_DIRECT_MCP_CONFIG = `features.code_mode.direct_only_tool_namespaces=${JSON.stringify([`mcp__${CODEX_MCP_SERVER}`])}`;
+
+/**
  * A `chat` turn's `-c` overrides: no approvals (`exec` forces it anyway), no web search, no `AGENTS.md`, and our
- * bridge's tools offered to the model directly. Codex's catalog makes its models `code_mode_only` (gpt-5.6 and
- * gpt-6 in 0.164.0), which hides every MCP tool inside `exec`; with the host off that left the turn no tool at all.
- * `agents.enabled=false` drops the `collaboration` tools the catalog turns on for gpt-6 although `multi_agent_v2` is
- * off: a `spawn_agent` emits no item, and the sub-agent it starts calls our bridge unseen by the kill.
- * Codex 0.164.0 refuses an unknown value for each of these keys.
+ * bridge's tools offered to the model directly. `agents.enabled=false` drops the `collaboration` tools the catalog
+ * turns on for gpt-6 although `multi_agent_v2` is off: a `spawn_agent` emits no item, and the sub-agent it starts
+ * calls our bridge unseen by the kill. Codex 0.164.0 refuses an unknown value for each of these keys.
  */
 export const CODEX_CHAT_CONFIG = [
   'approval_policy="never"',
   'web_search="disabled"',
   "project_doc_max_bytes=0",
-  `features.code_mode.direct_only_tool_namespaces=${JSON.stringify([`mcp__${CODEX_MCP_SERVER}`])}`,
+  CODEX_DIRECT_MCP_CONFIG,
   "agents.enabled=false",
 ];
 
@@ -210,6 +235,49 @@ export const codexProfileOf = (req: { permissions?: { mode?: unknown } }): Comma
 export const codexSandbox = (profile: CommandProfile) => (profile === "plan" ? "read-only" : "workspace-write");
 
 /**
+ * The workspace sandbox without the network, whatever the Codex home's own config says (a person's `network_access =
+ * true` there would reach agents' turns on the computer's own sign-in). Its writable roots are ours the same way
+ * (`codexWritableRoots`, an empty list when the agent has no folder besides its own).
+ */
+export const CODEX_NO_NETWORK = "sandbox_workspace_write.network_access=false";
+
+/** The Codex home a turn runs in: its account's folder (ADR 0041), else the computer's own. */
+export const codexHomeOf = (account?: { home: string }) =>
+  account?.home ?? (envValue(process.env, "CODEX_HOME") || path.join(homedir(), ".codex"));
+
+/**
+ * Whether Codex would load someone's own rules for a turn in `cwd` (ADR 0053 §3): the home's `rules/*.rules` (Codex
+ * adds one when someone picks "don't ask again"), or a project's `.codex/rules/*.rules` in `cwd` or any folder above
+ * it, where the home trusts a project (Codex reads only a trusted project's; an AI account's home, the runner's own,
+ * trusts none). An allow there runs a matching command outside the sandbox and asks nobody, so such a turn runs on
+ * `codex exec --ignore-rules`: the app-server can't leave them out.
+ */
+export function codexRulesNear(home: string, cwd: string): boolean {
+  const rulesIn = (dir: string) => {
+    try {
+      return readdirSync(dir).some((name) => name.endsWith(".rules"));
+    } catch {
+      return false;
+    }
+  };
+  if (rulesIn(path.join(home, "rules"))) return true;
+  if (!trustsAProject(home)) return false;
+  for (let dir = path.resolve(cwd); ; dir = path.dirname(dir)) {
+    if (rulesIn(path.join(dir, ".codex", "rules"))) return true;
+    if (path.dirname(dir) === dir) return false;
+  }
+}
+
+/** A Codex home whose config trusts a project (`trust_level = "trusted"`), or that can't be read (it may). */
+function trustsAProject(home: string): boolean {
+  try {
+    return /\btrust_level\s*=\s*["']trusted["']/.test(readFileSync(path.join(home, "config.toml"), "utf8"));
+  } catch (err) {
+    return (err as NodeJS.ErrnoException).code !== "ENOENT";
+  }
+}
+
+/**
  * Fast mode on a `codex exec` turn. `fast` reaches the provider as `service_tier: "priority"` (codex-cli 0.166.0), and
  * a model that doesn't list the tier goes out without one. `features.` rather than `--enable`: the flag fails the turn
  * on a Codex that doesn't know the feature, the key doesn't.
@@ -238,13 +306,25 @@ const fastMayHaveFailed = (error: Extract<CodexBrainEvent, { type: "error" }>) =
   error.code === "codex_failed" && (!error.retryable || CODEX_FAST_REFUSED.test(error.message));
 
 /** The computer's own Codex is on a ChatGPT sign-in, not an API key, where Fast bills the key at a higher rate. */
-const ownChatGptSignIn = (opts: Pick<CodexTurnOptions, "bin" | "env">) =>
+const ownChatGptSignIn = (opts: Pick<CodexTurnOptions, "bin" | "env" | "platform">) =>
   new Promise<boolean>((resolve) => {
     const env = { ...process.env, ...opts.env };
+    const platform = opts.platform ?? process.platform;
+    const launch = codexLaunch(["login", "status"], {
+      ...(opts.bin ? { bin: opts.bin } : {}),
+      platform,
+      pathList: envValue(env, "PATH", platform) ?? "",
+    });
+    if ("error" in launch) return resolve(false);
     execFile(
-      resolveCommand(opts.bin ?? "codex", env.PATH),
-      ["login", "status"],
-      { env, timeout: CODEX_LOGIN_STATUS_MS },
+      launch.file,
+      launch.args,
+      {
+        env: launch.env ? { ...env, ...launch.env } : env,
+        timeout: CODEX_LOGIN_STATUS_MS,
+        windowsHide: true,
+        ...(launch.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
+      },
       (err, stdout, stderr) => resolve(!err && /logged in using chatgpt/i.test(`${stdout}${stderr}`)),
     );
   });
@@ -320,11 +400,22 @@ export class CodexThreads {
     this.save(map);
   }
 
+  /** Never throws: a thread that opened fine stays this process's, remembered at the next save. */
   private save(map: Record<string, string>) {
-    mkdirSync(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.tmp`;
-    writeFileSync(tmp, JSON.stringify(map), { mode: 0o600 });
-    renameSync(tmp, this.file);
+    const text = JSON.stringify(map);
+    try {
+      mkdirSync(path.dirname(this.file), { recursive: true });
+      const tmp = `${this.file}.tmp`;
+      writeFileSync(tmp, text, { mode: 0o600 });
+      renameSync(tmp, this.file);
+    } catch {
+      // Windows refuses to rename over a file another program holds open (an antivirus, the search indexer).
+      try {
+        writeFileSync(this.file, text, { mode: 0o600 });
+      } catch {
+        // kept in memory
+      }
+    }
   }
 }
 
@@ -382,34 +473,46 @@ export function codexTurnArgs(input: {
   speed?: BrainSpeed;
   /** Protocol 28: `-c model_auto_compact_token_limit` (anything else is left out). */
   contextTokens?: number;
-  /** Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network. */
+  /**
+   * Protocol 16: the sandbox (default `work`: workspace-write; `plan`: read-only). Never the network, nor a folder
+   * but the agent's (its own and `writableRoots`), whatever the Codex home's config says.
+   */
   profile?: CommandProfile;
   /** Protocol 41: the team's right hand. Read-only, none of the computer's config, rules or features. */
   chat?: boolean;
+  /**
+   * Windows: the instructions go on stdin (`codexStdinPrompt`), never here; a `plan` or `work` turn names its
+   * sandbox (`CODEX_WINDOWS_CONFIG`).
+   */
+  windows?: boolean;
 }): string[] {
-  const instructions = input.instructions?.trim();
+  const instructions = input.windows ? undefined : input.instructions?.trim();
   const sandbox = input.chat ? "read-only" : codexSandbox(input.profile ?? "work");
   return [
     "exec",
     "--json",
     "--skip-git-repo-check",
+    ...(input.chat ? ["--ignore-user-config"] : []),
+    // No one's own rules on any turn: an allow there runs a command outside the sandbox and asks nobody.
+    "--ignore-rules",
     ...(input.chat
-      ? [
-          "--ignore-user-config",
-          "--ignore-rules",
-          ...CODEX_CHAT_CONFIG.flatMap((c) => ["-c", c]),
-          ...CODEX_CHAT_OFF.flatMap((feature) => ["--disable", feature]),
-        ]
+      ? [...CODEX_CHAT_CONFIG.flatMap((c) => ["-c", c]), ...CODEX_CHAT_OFF.flatMap((feature) => ["--disable", feature])]
       : []),
     "-C",
     input.cwd,
     "--sandbox",
     sandbox,
-    ...(sandbox === "workspace-write" && input.writableRoots?.length
-      ? ["-c", codexWritableRoots(input.writableRoots)]
+    ...(sandbox === "workspace-write"
+      ? ["-c", CODEX_NO_NETWORK, "-c", codexWritableRoots(input.writableRoots ?? [])]
       : []),
+    ...(input.windows && !input.chat ? CODEX_WINDOWS_CONFIG.flatMap((c) => ["-c", c]) : []),
     ...(instructions && !input.thread ? ["-c", `developer_instructions=${JSON.stringify(instructions)}`] : []),
-    ...(input.mcp ? codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
+    ...(input.mcp
+      ? [
+          ...(input.chat ? [] : ["-c", CODEX_DIRECT_MCP_CONFIG]),
+          ...codexBridgeOverrides({ runId: input.runId, ...input.mcp }).flatMap((o) => ["-c", o]),
+        ]
+      : []),
     ...(isBrainEffort(input.effort)
       ? ["-c", `model_reasoning_effort=${JSON.stringify(codexEffort(input.effort))}`]
       : []),
@@ -423,10 +526,67 @@ export function codexTurnArgs(input: {
   ];
 }
 
-/** `/bin/zsh -lc "npm test"` → `npm test` (Codex wraps every command in the login shell). */
+/** A line's words as its shell reads them (`shellWords`), or null: an operator, or anything it can't follow. */
+const argvOf = (line: string) => {
+  const words = shellWords(line);
+  return words && !words.some((w) => w.op) ? words.map((w) => w.text) : null;
+};
+/** `/bin/zsh`, `'C:\…\pwsh.exe'` → `zsh`, `pwsh`. */
+const programName = (word: string | undefined) =>
+  (word ?? "")
+    .split(/[\\/]/)
+    .at(-1)
+    ?.toLowerCase()
+    .replace(/\.exe$/, "") ?? "";
+
+/**
+ * The script of the POSIX shell Codex runs a command in, exactly as that shell reads it: `/bin/zsh -lc 'ls\nrm x'` →
+ * `ls\nrm x`, where the newline ends a command as it does there. What the command policy judges: on one line it read
+ * as `ls rm x`, a plain read, while the shell ran both. Only sh, bash, zsh and dash, the shells the policy reads: a
+ * PowerShell or cmd.exe line, or one this can't read word by word, stays whole (a shell running inline code, which the
+ * policy never allows by itself).
+ */
+export function shellScript(command: string): string {
+  const line = command.trim();
+  const argv = argvOf(line);
+  if (argv?.length === 3 && /^(?:ba|z|da)?sh$/.test(programName(argv[0])) && /^-l?c$/.test(argv[1] ?? "")) {
+    return (argv[2] ?? "").trim();
+  }
+  return line;
+}
+
+/** The script of Codex's Windows shells, for a transcript: PowerShell's `-Command`, cmd.exe's `/c`. */
+function windowsScript(line: string): string | null {
+  const argv = argvOf(line);
+  if (!argv) return null;
+  const name = programName(argv[0]);
+  const after = (flag: RegExp) => {
+    let i = 1;
+    while (i < argv.length && flag.test(argv[i] ?? "")) i++;
+    return i;
+  };
+  if (name === "pwsh" || name === "powershell") {
+    const i = after(/^-(?:noprofile|nologo|noninteractive)$/i);
+    if (argv.length === i + 2 && /^-(?:command|c)$/i.test(argv[i] ?? "")) return argv[i + 1] ?? "";
+  }
+  if (name === "cmd") {
+    const i = after(/^\/[dsq]$/i);
+    if (argv.length === i + 2 && /^\/c$/i.test(argv[i] ?? "")) return argv[i + 1] ?? "";
+  }
+  return null;
+}
+
+/** `/bin/zsh -lc "npm test"` → `npm test`, on one line: a command Codex ran, as a transcript shows it. */
 export function unwrapShell(command: string) {
-  const m = /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(command.trim());
-  return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
+  const line = command.trim();
+  const script = shellScript(line);
+  const shown =
+    script !== line
+      ? script
+      : // PowerShell or cmd.exe (Windows), or a script `shellScript` doesn't read (`$HOME` in double quotes): shown
+        // without its shell all the same.
+        (windowsScript(line) ?? /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(line)?.[2] ?? line);
+  return shown.replace(/\s+/g, " ").trim();
 }
 
 const USAGE_LIMIT = /hit your usage limit|usage limit reached|usage_limit|workspace is out of credits|spend cap/i;
@@ -643,6 +803,8 @@ export interface CodexTurnOptions {
   /** How `codex exec` starts (a worker under systemd: in the agent's AI CLIs slice, `scope-gate.ts`). */
   spawn?: Spawn;
   platform?: NodeJS.Platform;
+  /** Windows: whether MXC holds Codex's commands here (default `windowsMxcReady`); null: couldn't tell. */
+  windowsSandbox?: (version: string) => Promise<boolean | null>;
   /**
    * Protocol 15: the long-lived `codex app-server` processes
    * (`brain-codex-app.ts`): the turn runs there when it can (it takes
@@ -675,6 +837,8 @@ export interface CodexTurnInput {
   folder?: string;
   /** Protocol 16: the turn's permission profile (default `work`). */
   profile?: CommandProfile;
+  /** The agent never asks (`permissions.asks`): what a held command's refusal says (`PromptContext.asks`). */
+  asks?: "never";
   /** Protocol 16: false for a background turn: its app-server closes when the turn ends. */
   keepAlive?: boolean;
   /** Protocol 41: the team's right hand (`codexTurnArgs`' `chat`), always on `codex exec`, killed at a tool of Codex's own. */
@@ -693,9 +857,6 @@ const codexVersion = cachedCodexVersion();
 export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions): Promise<void> {
   const fail = (code: string, message: string, retryable?: boolean) =>
     opts.emit({ type: "error", code, message, ...(retryable ? { retryable } : {}) });
-  if ((opts.platform ?? process.platform) === "win32") {
-    return fail("unsupported", "The Codex brain isn't supported on Windows yet.");
-  }
   const version = await (opts.codexVersion ?? codexVersion)();
   if (version === null)
     return fail("codex_failed", "Couldn't check Codex on this computer (`codex --version` didn't answer).", true);
@@ -703,10 +864,31 @@ export async function runCodexTurn(input: CodexTurnInput, opts: CodexTurnOptions
   if (!codexVersionOk(version)) {
     return fail("codex_too_old", `Codex here is ${version}. Agents need ${CODEX_MIN_VERSION} or newer.`);
   }
+  // ADR 0053 §3 on Windows: a plan or work turn runs only inside MXC, Windows' own isolation (`codex-windows.ts`).
+  const windows = (opts.platform ?? process.platform) === "win32";
+  if (windows && !input.chat) {
+    const check =
+      opts.windowsSandbox ??
+      ((v: string) =>
+        opts.runnerHome
+          ? windowsMxcReady({ runnerHome: opts.runnerHome, version: v, ...(opts.bin ? { bin: opts.bin } : {}) })
+          : Promise.resolve(null));
+    const mxc = await check(version).catch(() => null);
+    if (mxc === null) {
+      return fail(
+        "codex_failed",
+        "Couldn't check whether Windows can isolate Codex's commands on this computer.",
+        true,
+      );
+    }
+    if (!mxc) return fail("windows_sandbox", WINDOWS_SANDBOX_MESSAGE);
+  }
   // A long-lived app-server takes messages mid-turn; exec runs the turns it can't (an older CLI, a failed handshake…).
-  // A `chat` turn's flags exist only for `exec`.
+  // A `chat` turn's flags exist only for `exec`, and so does leaving someone's own Codex rules out (`--ignore-rules`),
+  // which a turn needs wherever Codex would load some (an allow there runs a command outside the sandbox, unasked).
+  const appServer = !codexRulesNear(codexHomeOf(input.account), input.cwd);
   const run = (turn: CodexTurnInput, turnOpts: CodexTurnOptions) =>
-    turnOpts.app && !turn.chat
+    turnOpts.app && !turn.chat && appServer
       ? turnOpts.app.turn({ ...turn, version }, turnOpts, () => runCodexExec(turn, turnOpts))
       : runCodexExec(turn, turnOpts);
   const { speed: _speed, ...standard } = input;
@@ -740,6 +922,8 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     opts.emit({ type: "error", code, message, ...(retryable ? { retryable } : {}) });
   const threadKey = codexThreadKey(input.sessionId, input.account?.id);
   const thread = opts.threads.get(threadKey);
+  const platform = opts.platform ?? process.platform;
+  const windows = platform === "win32";
   mkdirSync(opts.workDir, { recursive: true });
   const lastFile = path.join(opts.workDir, "last.txt");
   rmSync(lastFile, { force: true });
@@ -757,6 +941,7 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
     profile: input.profile ?? "work",
     ...(input.chat ? { chat: true } : {}),
+    ...(windows ? { windows } : {}),
   });
   const base: NodeJS.ProcessEnv = {
     ...withoutContainers(input.chat ? withoutSignIns(process.env) : process.env),
@@ -773,13 +958,23 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     ...(opts.redact ? { redact: opts.redact } : {}),
   });
 
+  const launch = codexLaunch(args, {
+    ...(opts.bin ? { bin: opts.bin } : {}),
+    platform,
+    pathList: envValue(env, "PATH", platform) ?? "",
+  });
+  if ("error" in launch) return fail(launch.missing ? "codex_missing" : "codex_failed", launch.error);
   let child: ChildProcess;
   try {
-    child = (opts.spawn ?? spawn)(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
+    child = (opts.spawn ?? spawn)(launch.file, launch.args, {
       cwd: input.cwd,
-      env,
+      env: launch.env ? { ...env, ...launch.env } : env,
       stdio: ["pipe", "pipe", "pipe"],
-      detached: true,
+      // Its own process group, so `killTree` takes what it started along. Not on Windows: there it would have no
+      // console, so every command it runs would open a window of its own, and it would outlive the runner.
+      detached: !windows,
+      windowsHide: true,
+      ...(launch.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
     });
   } catch (err) {
     return fail("codex_failed", err instanceof Error ? err.message : String(err));
@@ -810,7 +1005,8 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
     if (mapper.thread) opts.threads.set(threadKey, mapper.thread);
   });
   child.stdin?.on("error", () => {});
-  child.stdin?.end(input.prompt);
+  // Windows: a new thread's instructions lead its first prompt (`codexTurnArgs` leaves them off the command line).
+  child.stdin?.end(windows && !thread ? codexStdinPrompt(input.system, input.prompt) : input.prompt);
 
   let killTimer: ReturnType<typeof setTimeout> | undefined;
   const abort = () => {
@@ -846,17 +1042,19 @@ async function runCodexExec(input: CodexTurnInput, opts: CodexTurnOptions): Prom
   } catch {
     // none
   }
-  rmSync(opts.workDir, { recursive: true, force: true });
+  try {
+    rmSync(opts.workDir, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 });
+  } catch {
+    // Windows keeps a file a program still holds open (an antivirus, the indexer): it stays behind, the turn goes on.
+  }
 
   if (opts.signal.aborted) return fail("canceled", "The turn was canceled.");
   if (breach) return fail("tools_not_locked", breach);
-  if (exit.error) {
-    const missing = (exit.error as NodeJS.ErrnoException).code === "ENOENT";
-    return fail(
-      missing ? "codex_missing" : "codex_failed",
-      missing ? "Codex is not installed on this computer." : exit.error.message,
-    );
-  }
+  // cmd.exe's "not recognized" (a launcher of Codex's started there whose program is gone).
+  const missing =
+    (exit.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT" || (windows && exit.code === 9009);
+  if (missing) return fail("codex_missing", "Codex is not installed on this computer.");
+  if (exit.error) return fail("codex_failed", exit.error.message);
   for (const event of mapper.finish({
     exitCode: exit.code,
     lastFile: last,
@@ -977,6 +1175,7 @@ export async function handleCodexBrainTurn(
         agentId: String(req.agent.id),
         folder,
         profile: codexProfileOf(req),
+        ...(req.permissions?.asks === "never" ? { asks: "never" as const } : {}),
         ...(req.keepAlive === false ? { keepAlive: false } : {}),
         ...(chat ? { chat } : {}),
       },

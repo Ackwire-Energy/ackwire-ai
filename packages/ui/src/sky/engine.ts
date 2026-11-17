@@ -136,6 +136,8 @@ export function holdSkies(hold = true) {
   for (const changed of onHold) changed();
 }
 
+export const skiesHeld = () => held;
+
 interface Sky {
   dirty: boolean;
   /** It draws on a coming frame: it moves and is on screen, or it is still and was asked to draw again. */

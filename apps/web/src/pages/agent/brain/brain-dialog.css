@@ -340,7 +340,7 @@ html:not([data-pointer]) .bd-line:focus-visible {
 
 /* ---------- choices without a mark (the models, the computers) ---------- */
 .bd .arrival-have__row.bd-pick {
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 /* Over the account line's colour (arrival.css) by specificity, never by which sheet links last. */
 .arrival-have__line.bd-pick__hint {

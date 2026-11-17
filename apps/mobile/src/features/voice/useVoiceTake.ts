@@ -1,4 +1,4 @@
-import { newClientId } from "@agenteschat/client";
+import { type ArtifactRef, newClientId } from "@agenteschat/client";
 import { VOICE_MAX_MS, VOICE_MIN_MS } from "@agenteschat/client/lib/voice";
 import { Skia } from "@shopify/react-native-skia";
 import { useQueryClient } from "@tanstack/react-query";
@@ -16,9 +16,9 @@ import { useTranslation } from "react-i18next";
 import { Alert, AppState, Linking } from "react-native";
 import { useSharedValue } from "react-native-reanimated";
 import { haptics, useToast } from "@/ui";
-import { levelOf, peaksOf } from "./logic";
+import { levelOf, peaksOf, takeBack } from "./logic";
 import { joinM4a } from "./m4a";
-import { flushVoice, queueVoice, type VoiceRefusal } from "./outbox";
+import { flushVoice, queueVoice, type VoiceRefusal, type VoiceSend } from "./outbox";
 import { playingId, seekPlayback, startPlayback, stopPlayback } from "./playback";
 import { emptyWave, type WavePaths, wavePaths } from "./VoiceBars";
 
@@ -53,6 +53,15 @@ export interface VoiceTarget {
   /** Whether this person may record now (`/voice/allowed`); null while unknown. */
   allowed: boolean | null;
   afterSend: () => void;
+  /**
+   * Right before a take goes: what goes with it, the text typed beside it and the files waiting above the field, once
+   * they are uploaded. Null when they can't go now: the take stays, paused, and nothing is sent.
+   */
+  prepare?: (text: string) => Promise<{ text: string; artifacts: ArtifactRef[] } | null>;
+  /** While it records, held or hands free, never paused: the others see "gravando áudio…" (call it throttled). */
+  onRecording?: () => void;
+  /** The server refused a take sent from this conversation: the text typed beside it and its files, for the composer. */
+  takeBack?: (back: { text: string; artifacts: ArtifactRef[] }) => void;
 }
 
 const removeFile = (uri: string) => {
@@ -95,6 +104,9 @@ export function useVoiceTake(target: VoiceTarget) {
   /** The finger left before the recorder started. */
   const starting = useRef(false);
   const released = useRef(false);
+  /** A pause or a send is stopping the recorder (or uploading what goes with it): a second tap meanwhile would keep
+   * the same stretch twice. */
+  const ending = useRef(false);
   const targetRef = useRef(target);
   targetRef.current = target;
 
@@ -116,9 +128,11 @@ export function useVoiceTake(target: VoiceTarget) {
   );
 
   const refused = useCallback(
-    (reason: VoiceRefusal) => {
+    (reason: VoiceRefusal, item?: VoiceSend) => {
       haptics.warning();
       toast({ title: t(reason === "limit" ? "voice.limit" : "voice.notSent"), icon: "x" });
+      const back = item ? takeBack(item, targetRef.current) : null;
+      if (back) targetRef.current.takeBack?.(back);
     },
     [t, toast],
   );
@@ -180,9 +194,8 @@ export function useVoiceTake(target: VoiceTarget) {
     return out;
   }, []);
 
-  const pause = useCallback(async () => {
-    if (phaseRef.current === "idle" || phaseRef.current === "paused") return;
-    await finishStretch();
+  /** The finished stretches as one take that can be heard. */
+  const held = useCallback(async () => {
     setPhase("paused");
     await joined();
     wholeWave();
@@ -190,46 +203,82 @@ export function useVoiceTake(target: VoiceTarget) {
     const whole = Math.floor(doneMs.current / 1000);
     setSeconds(whole);
     setTotal(whole);
-  }, [finishStretch, joined, wholeWave, progress, setPhase]);
+  }, [joined, wholeWave, progress, setPhase]);
 
-  const send = useCallback(async () => {
-    const { orgId, channelId, threadId, replyTo = null, authorId, afterSend } = targetRef.current;
-    stopPlayback();
-    await finishStretch();
-    const total = doneMs.current;
-    if (total < VOICE_MIN_MS) {
-      for (const s of stretches.current) removeFile(s.uri);
-      toast({ title: t("voice.tooShort"), icon: "mic" });
+  const pause = useCallback(async () => {
+    if (phaseRef.current === "idle" || phaseRef.current === "paused" || ending.current) return;
+    ending.current = true;
+    try {
+      await finishStretch();
+    } finally {
+      ending.current = false;
+    }
+    await held();
+  }, [finishStretch, held]);
+
+  /** Whether it went; when it didn't, the caller keeps what was typed. */
+  const sendTake = useCallback(
+    async (typed: string): Promise<boolean> => {
+      const { orgId, channelId, threadId, replyTo = null, authorId, afterSend, prepare } = targetRef.current;
+      stopPlayback();
+      await finishStretch();
+      const total = doneMs.current;
+      if (total < VOICE_MIN_MS) {
+        for (const s of stretches.current) removeFile(s.uri);
+        toast({ title: t("voice.tooShort"), icon: "mic" });
+        reset();
+        return false;
+      }
+      const extra = await (prepare ? prepare(typed) : Promise.resolve({ text: typed, artifacts: [] }));
+      if (!extra) {
+        await held();
+        return false;
+      }
+      const files = await joined();
+      const all = levels.current;
+      let from = 0;
+      for (const file of files) {
+        const to = from + Math.round((file.ms / total) * all.length);
+        queueVoice(
+          qc,
+          file.uri,
+          {
+            clientId: newClientId(),
+            orgId,
+            channelId,
+            threadId,
+            replyTo,
+            authorId,
+            durationMs: Math.round(file.ms),
+            peaks: peaksOf(all.slice(from, to)),
+            language: i18n.language?.slice(0, 2) ?? null,
+            // A take that could not be joined goes in pieces: what goes with it, with the first.
+            ...(file === files[0] && extra.text ? { text: extra.text } : {}),
+            ...(file === files[0] && extra.artifacts.length > 0 ? { artifacts: extra.artifacts } : {}),
+          },
+          refused,
+        );
+        from = to;
+      }
+      haptics.light();
       reset();
-      return;
-    }
-    const files = await joined();
-    const all = levels.current;
-    let from = 0;
-    for (const file of files) {
-      const to = from + Math.round((file.ms / total) * all.length);
-      queueVoice(
-        qc,
-        file.uri,
-        {
-          clientId: newClientId(),
-          orgId,
-          channelId,
-          threadId,
-          replyTo,
-          authorId,
-          durationMs: Math.round(file.ms),
-          peaks: peaksOf(all.slice(from, to)),
-          language: i18n.language?.slice(0, 2) ?? null,
-        },
-        refused,
-      );
-      from = to;
-    }
-    haptics.light();
-    reset();
-    afterSend();
-  }, [finishStretch, i18n.language, joined, qc, refused, reset, t, toast]);
+      afterSend();
+      return true;
+    },
+    [finishStretch, held, i18n.language, joined, qc, refused, reset, t, toast],
+  );
+  const send = useCallback(
+    async (typed = ""): Promise<boolean> => {
+      if (ending.current) return false;
+      ending.current = true;
+      try {
+        return await sendTake(typed);
+      } finally {
+        ending.current = false;
+      }
+    },
+    [sendTake],
+  );
 
   const cancel = useCallback(
     async (notice = true) => {
@@ -239,7 +288,8 @@ export function useVoiceTake(target: VoiceTarget) {
       for (const s of stretches.current) removeFile(s.uri);
       if (notice) {
         haptics.warning();
-        toast({ title: t("voice.deleted"), icon: "x" });
+        // What the person did, not a failure: the trash, in the neutral tone (an × reads as an error).
+        toast({ title: t("voice.deleted"), icon: "trash" });
       }
       reset();
     },
@@ -255,6 +305,7 @@ export function useVoiceTake(target: VoiceTarget) {
       void pause();
       return;
     }
+    if (phaseNow === "hold" || phaseNow === "locked") targetRef.current.onRecording?.();
     liveMs.current = status.durationMillis;
     const ms = doneMs.current + liveMs.current;
     levels.current.push(levelOf(status.metering));
@@ -300,6 +351,8 @@ export function useVoiceTake(target: VoiceTarget) {
       haptics.medium();
       setPhase("hold");
       await record();
+      // Deleted while the recorder was starting (`cancel` found nothing to stop yet): it stops here, not never.
+      if (phaseRef.current === "idle") return void (await cancel(false));
       if (released.current) await send();
     } catch {
       toast({ title: t("voice.notSent"), icon: "x" });
@@ -307,7 +360,7 @@ export function useVoiceTake(target: VoiceTarget) {
     } finally {
       starting.current = false;
     }
-  }, [record, reset, send, setPhase, t, toast]);
+  }, [cancel, record, reset, send, setPhase, t, toast]);
 
   /** The finger came up: a hold sends; a lock already took over. */
   const release = useCallback(() => {
@@ -357,8 +410,12 @@ export function useVoiceTake(target: VoiceTarget) {
         setListening(false);
         setSeconds(Math.floor(doneMs.current / 1000));
       },
+      onError: () => {
+        setListening(false);
+        toast({ title: t("voice.noPlayback"), icon: "x" });
+      },
     });
-  }, [progress]);
+  }, [progress, t, toast]);
 
   const scrub = useCallback(
     (at: number) => {

@@ -106,7 +106,7 @@ const SYSTEM = (name: string) =>
     "- Use only the facts in `snapshot`. Never claim a result, progress or decision that isn't there. Never invent what the task found.",
     "- Never promise an action the task may not take, and never say you did something. You can't run tools, change anything or grant anything.",
     '- When the task will handle the message (a correction, a new instruction, more detail), say briefly that it\'s noted and when it will be read (e.g. "Anotado, leio assim que terminar este passo.").',
-    "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly.",
+    "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly. People can't see or use the task's tools: say in everyday words what it does, never the name of a tool (the names in `steps`), a function or a parameter.",
     "- While `waitingOn` names its computer, the task isn't working and has no step to finish: say what it waits for and that it reads the message once it gets there. Never say it is working.",
     "- If the message only asks to stop or cancel, or is small talk that needs no answer, or the conversation already answered it: pass.",
     "- Pass whenever there's nothing useful to add. Silence is fine.",

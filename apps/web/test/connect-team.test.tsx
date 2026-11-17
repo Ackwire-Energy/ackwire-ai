@@ -182,22 +182,22 @@ describe("whom it is for: the right hand never picks the computer", () => {
     expect(facesOf(dialog)).toEqual(["done", "done", "done"]);
   });
 
-  test("the right hand left without an AI: its Connect opens its own plain dialog", async () => {
+  test("the right hand left without an AI: its Connect opens the narrow dialog for it alone", async () => {
     const { machines, dialog } = await team({ hand: true });
     for (const n of [1, 2, 3]) machines?.endLogin(`login_${n}`, { state: "done", account: max(n) });
     await pickPlan(dialog, "Claude");
     for (const _ of [1, 2, 3]) await signIn(dialog);
     await click(within(dialog).getByRole("button", { name: /^Conectar (o|a) Lodi$/ }));
     await settle(4);
-    const own = screen().getByRole("dialog");
-    expect(inBand(own)).toBe(false);
-    expect(own.querySelector(".ai-picker")).toBeTruthy();
+    const own = screen().getByRole("dialog", { name: /^Conectar uma IA para (o|a) Lodi$/ });
+    expect(inBand(own)).toBe(true);
+    expect(own.querySelector(".ai-picker")).toBeNull();
   });
 
-  test("the right hand the only one to wake: one agent alone, the plain dialog", async () => {
+  test("the right hand the only one to wake: one agent alone, the narrow dialog named for it", async () => {
     const { dialog } = await team({ hand: true, ready: [ADA_ID, ATLAS_ID, LIA_ID] });
-    expect(inBand(dialog)).toBe(false);
-    expect(dialog.querySelector(".ai-picker")).toBeTruthy();
+    expect(inBand(dialog)).toBe(true);
+    expect(dialog.querySelector(".ai-picker")).toBeNull();
     // Its own dialog, named for it, never the generic one over agents that already think.
     expect(screen().getByRole("dialog", { name: /^Conectar uma IA para (o|a) Lodi$/ })).toBe(dialog);
     expect(within(dialog).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();

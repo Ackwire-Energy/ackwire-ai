@@ -82,11 +82,19 @@ export type Field = Exclude<keyof Edits, "levels"> | "levels";
 
 /**
  * Who edits what (the server's rules): admins everything; the agent's owner its look, audience, channels, computer
- * and who thinks. Channels, for both, only the ones they may put an agent in (`addsAgentsTo`). Access and
+ * and who thinks, its API model and which of the workspace's keys it uses included (connecting keys stays admins'). Channels, for both, only the ones they may put an agent in (`addsAgentsTo`). Access and
  * repositories are admins' like its scopes: giving an agent more is an admin's call.
  */
 export type Viewer = "admin" | "owner" | "member";
-export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>(["look", "audience", "channels", "machine", "brain"]);
+export const OWNER_EDITS: ReadonlySet<Field> = new Set<Field>([
+  "look",
+  "audience",
+  "channels",
+  "machine",
+  "brain",
+  "model",
+  "key",
+]);
 export const canEdit = (viewer: Viewer, field: Field) =>
   viewer === "admin" || (viewer === "owner" && OWNER_EDITS.has(field));
 

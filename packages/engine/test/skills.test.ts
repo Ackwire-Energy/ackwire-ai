@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { generateKeyPairSync } from "node:crypto";
-import { eq, schema } from "@agenteschat/db";
+import { orgTopic } from "@agenteschat/adapters";
+import { and, eq, schema } from "@agenteschat/db";
 import type { ModelRequest } from "@agenteschat/providers";
 import { systemText } from "@agenteschat/providers";
 import {
@@ -23,6 +24,7 @@ import {
   NotFoundError,
   parseSkillMarkdown,
   postPersonMessage,
+  RIGHT_HAND,
   reimportSkill,
   revokeConnection,
   SKILL_LIMITS,
@@ -31,6 +33,7 @@ import {
   setAgentAccess,
   setAgentSkills,
   type TooManyError,
+  updateSkillFromSource,
   ValidationError,
 } from "../src";
 import { toolDetail } from "../src/tool-detail";
@@ -256,6 +259,25 @@ describe("import", () => {
     expect(again.version).toBe(2);
   });
 
+  test("a folder zipped by the Mac's Finder installs: its __MACOSX copies and .DS_Store are left out", async () => {
+    f = await setup();
+    const skill = await importSkillZip(
+      skillDeps(),
+      f.owner.id,
+      f.org.id,
+      zip({
+        "relatorio-semanal/SKILL.md": SKILL_MD,
+        "relatorio-semanal/.DS_Store": "\0\0\0\x01Bud1",
+        "relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
+        "__MACOSX/relatorio-semanal/._SKILL.md": "\0\x05\x16\x07",
+        "__MACOSX/relatorio-semanal/templates/._relatorio.md": "\0\x05\x16\x07",
+        ".DS_Store": "\0\0\0\x01Bud1",
+      }),
+    );
+    expect(skill).toMatchObject({ name: "relatorio-semanal", source: "upload" });
+    expect(skill.files.map((x) => x.path)).toEqual(["templates/relatorio.md"]);
+  });
+
   test("two files that collapse to one path are refused (no shared blob key, no undercounted size)", async () => {
     f = await setup();
     // `a.md` and `./a.md` both normalize to `a.md`: without the guard the big one overwrites the small one
@@ -346,6 +368,80 @@ describe("import", () => {
     expect(github.fetched.filter((u) => /api\.github\.com|raw\.githubusercontent\.com/.test(u))).toEqual([]);
   });
 
+  test("installed from an agent's card (offer_install_skill), what the link holds goes on for that agent", async () => {
+    f = await setup({ rightHand: true });
+    const deps = { ...skillDeps(), fetch: fakeGithub().fetch, pubsub: f.pubsub };
+    const told: string[] = [];
+    f.pubsub.subscribe(orgTopic(f.org.id), (e) => {
+      if (e.type === "org.broadcast") told.push((e.event as { type: string }).type);
+    });
+    const on = async (agentId = f.agent.id) => (await enabledSkills(f.db, f.org.id, agentId)).map((k) => k.name);
+    const forAgentId = f.agent.id;
+    await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills/tree/main/team/deploy", {
+      forAgentId,
+    });
+    expect(await on()).toEqual(["deploy"]);
+    // An open agent page saves its whole list: it hears of the change and reads it again.
+    expect(told.filter((t) => t === "agents.changed")).toHaveLength(1);
+    await importPickedSkills(deps, f.owner.id, f.org.id, "https://github.com/acme/skills", ["team/review"], {
+      forAgentId,
+    });
+    expect(await on()).toEqual(["deploy", "review"]);
+    // An agent gone or archived: the install still stands, on for nobody, and nothing to hear.
+    const url = "https://github.com/acme/skills/tree/main/relatorio-semanal";
+    const [lodi] = await f.db
+      .select({ id: schema.agents.id })
+      .from(schema.agents)
+      .where(and(eq(schema.agents.orgId, f.org.id), eq(schema.agents.builtin, RIGHT_HAND)));
+    await f.db.update(schema.agents).set({ archivedAt: new Date() }).where(eq(schema.agents.id, f.agent.id));
+    told.length = 0;
+    for (const agentId of [crypto.randomUUID(), f.agent.id])
+      expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url, { forAgentId: agentId })).toMatchObject({
+        name: "relatorio-semanal",
+      });
+    expect(await on()).toEqual(["deploy", "review"]);
+    expect(await on(lodi?.id)).toEqual([]);
+    expect(told).toEqual([]);
+    // The right hand loads skills like any agent: from its own card, what installs goes on for it.
+    await importSkillFromUrl(deps, f.owner.id, f.org.id, url, { forAgentId: lodi?.id });
+    expect(await on(lodi?.id)).toEqual(["relatorio-semanal"]);
+    expect(told).toEqual(["agents.changed"]);
+  });
+
+  test("from a link or a pick, a removed skill's name comes back on for none of its old agents; the list says so", async () => {
+    f = await setup();
+    const deps = { ...skillDeps(), fetch: fakeGithub().fetch };
+    const on = async () => (await enabledSkills(f.db, f.org.id, f.agent.id)).map((k) => k.name);
+    const mine = (name: string) =>
+      saveSkill(deps, f.owner.id, f.org.id, {
+        name,
+        description: "Do time.",
+        body: "1. old",
+        metadata: {},
+        source: "manual",
+      });
+    const deploy = await mine("deploy");
+    await mine("review");
+    await setAgentSkills(f.db, f.owner.id, f.org.id, f.agent.id, [{ skillId: deploy.id, enabled: true }]);
+    await deleteSkill(f.db, f.owner.id, f.org.id, deploy.id);
+    const team = "https://github.com/acme/skills/tree/main/team";
+    const listed = await importSkillFromUrl(deps, f.owner.id, f.org.id, team);
+    expect("choices" in listed && listed.choices.map((c) => [c.name, c.replaces])).toEqual([
+      ["deploy", "removed"],
+      ["review", "installed"],
+    ]);
+    // Picked with its box unchecked: back under its name, on for nobody.
+    await importPickedSkills(deps, f.owner.id, f.org.id, team, ["team/deploy"]);
+    expect(await on()).toEqual([]);
+    // The same from the link alone, then with the box: on for the card's agent only.
+    await deleteSkill(f.db, f.owner.id, f.org.id, deploy.id);
+    await importSkillFromUrl(deps, f.owner.id, f.org.id, `${team}/deploy`);
+    expect(await on()).toEqual([]);
+    await deleteSkill(f.db, f.owner.id, f.org.id, deploy.id);
+    await importSkillFromUrl(deps, f.owner.id, f.org.id, `${team}/deploy`, { forAgentId: f.agent.id });
+    expect(await on()).toEqual(["deploy"]);
+  });
+
   test("the skills a link holds that can't be installed are listed apart with why, never offered", async () => {
     f = await setup();
     const md = (name: string, description: string) => `---\nname: ${name}\ndescription: ${description}\n---\n# ${name}`;
@@ -421,7 +517,7 @@ describe("import", () => {
     expect(skill.files.some((x) => /README|marketplace|coffee/.test(x.path))).toBe(false);
   });
 
-  test("past the limits the refusal says the skill's own number; a repository past the archive's cap has its code", async () => {
+  test("past the limits the refusal says the skill's own number", async () => {
     f = await setup();
     const url = "https://github.com/acme/skills";
     const md = "---\nname: kit\ndescription: Grande.\n---\n# Kit";
@@ -444,10 +540,6 @@ describe("import", () => {
         url,
       ),
     ).rejects.toMatchObject({ code: "skill.too_large", params: { size: 16.1, max: 16 } });
-    const archive = new Uint8Array(50 * 1024 * 1024 + 1);
-    await expect(
-      importSkillFromUrl({ ...skillDeps(), fetch: fakeGithub({ archive }).fetch }, f.owner.id, f.org.id, url),
-    ).rejects.toMatchObject({ code: "skill.repo_too_large", params: { max: 50 } });
     expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
   });
 
@@ -496,6 +588,38 @@ describe("import", () => {
     const reset = String(Math.floor(Date.now() / 1000) + 290);
     const spent = fakeGithub({ limited: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset }, status: 403 });
     expect(await refusal("https://github.com/acme/skills", spent)).toMatchObject({ params: { count: 5 } });
+  });
+
+  test("a read without credentials is limited by a 403 even with no header saying so, and by a 429", async () => {
+    f = await setup();
+    const refusal = async (github: ReturnType<typeof fakeGithub>) => {
+      const err = await importSkillFromUrl(
+        { ...skillDeps(), fetch: github.fetch },
+        f.owner.id,
+        f.org.id,
+        "https://github.com/acme/skills",
+      ).then(
+        () => null,
+        (e: unknown) => e as { constructor: { name: string }; code?: string; params?: unknown },
+      );
+      return { kind: err?.constructor.name, code: err?.code, params: err?.params };
+    };
+    // None remaining until the reset.
+    const reset = String(Math.floor(Date.now() / 1000) + 290);
+    expect(
+      await refusal(fakeGithub({ limited: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": reset }, status: 403 })),
+    ).toEqual({ kind: "TooManyError", code: "github.limited", params: { count: 5 } });
+    // The secondary limit's way: a 403 with no headers at all, which an address shared with other servers gets.
+    expect(await refusal(fakeGithub({ limited: {}, status: 403 }))).toEqual({
+      kind: "TooManyError",
+      code: "github.limited",
+      params: { count: 1 },
+    });
+    expect(await refusal(fakeGithub({ limited: {} }))).toEqual({
+      kind: "TooManyError",
+      code: "github.limited",
+      params: { count: 1 },
+    });
   });
 
   test("images and videos are kept apart from the text's limit, up to their own; past it they are only listed", async () => {
@@ -571,6 +695,40 @@ const PRIVATE = {
   "acme-private-0123abc/team/review/SKILL.md": "---\nname: review\ndescription: Revisa um pull request.\n---\n# Review",
 };
 
+/** A public repository with one skill, as its archive holds it. */
+const PUBLIC_ONE = {
+  "skills-main/relatorio-semanal/SKILL.md": SKILL_MD,
+  "skills-main/relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
+};
+
+/**
+ * Fake GitHub that limits this server's reads without credentials: every one is a 403 with no headers, the way the
+ * secondary limit answers an address shared with other servers. The API takes the workspace's token, which `sees`
+ * says whether it can read the repository (a test changes it as GitHub's side changes), and sends the archive from
+ * codeload.
+ */
+function limitedPublicGithub() {
+  const requests: { url: string; auth: string | null }[] = [];
+  const sees = new Set([CONNECTION_TOKEN]);
+  const limit = { on: true };
+  const fetch = async (url: string, init?: RequestInit) => {
+    const auth = new Headers(init?.headers).get("authorization");
+    requests.push({ url, auth });
+    if (url === "https://github.com/acme/skills/archive/HEAD.zip") {
+      if (!limit.on) return new Response(zip(PUBLIC_ONE));
+      return new Response("slow down", { status: 403 });
+    }
+    if (url === "https://codeload.github.com/acme/skills/legacy.zip/token") return new Response(zip(PUBLIC_ONE));
+    const token = auth?.replace(/^Bearer /, "") ?? "";
+    if (sees.has(token) && url === "https://api.github.com/repos/acme/skills/zipball") {
+      const location = "https://codeload.github.com/acme/skills/legacy.zip/token";
+      return new Response(null, { status: 302, headers: { location } });
+    }
+    return new Response("403: Forbidden", { status: 403 });
+  };
+  return { fetch, requests, sees, limit };
+}
+
 /**
  * Fake GitHub where acme/private is private: github.com answers 404 for it, and the API's zipball answers a token that
  * sees it with a redirect to codeload carrying a short-lived link of its own. A token GitHub doesn't take is answered
@@ -634,6 +792,51 @@ describe("private repositories", () => {
   const connectors = () => ({ db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://agentes.test" });
   const connectGithub = () =>
     createApiKeyConnection(connectors(), f.owner.id, f.org.id, { connector: "github", apiKey: CONNECTION_TOKEN });
+
+  test("a public read GitHub limits reads through the workspace's token, and the install concludes", async () => {
+    f = await setup();
+    const connection = await connectGithub();
+    const github = limitedPublicGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors() } };
+    const url = "https://github.com/acme/skills";
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, url)) as SkillDetail;
+    // The limit says nothing about who may read it: the skill stays one of a public repository.
+    expect(skill).toMatchObject({ name: "relatorio-semanal", version: 1, sourceVia: null });
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toMatchObject([{ name: "relatorio-semanal", version: 1 }]);
+    // The public read first, limited; then the token, sent to the API only, and the archive from codeload.
+    expect(github.requests).toEqual([
+      { url: "https://github.com/acme/skills/archive/HEAD.zip", auth: null },
+      { url: "https://api.github.com/repos/acme/skills/zipball", auth: `Bearer ${CONNECTION_TOKEN}` },
+      { url: "https://codeload.github.com/acme/skills/legacy.zip/token", auth: null },
+    ]);
+
+    // A 403 to the token is the token's own lack of access, never a limit: the repository is what it can't see.
+    github.sees.delete(CONNECTION_TOKEN);
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, url).catch((e) => e)).toMatchObject({
+      code: "github.repo_missing",
+      params: { repo: "acme/skills", connection: "ok", app: false },
+    });
+
+    // GitHub disconnected: while the limit lasts, updating says the limit; once it passes, it reads without one.
+    await revokeConnection(f.db, f.owner.id, f.org.id, connection.id);
+    expect(await refusalOf(reimportSkill(deps, f.owner.id, f.org.id, skill.id))).toMatchObject({
+      code: "github.limited",
+    });
+    github.limit.on = false;
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({ version: 2, sourceVia: null });
+  });
+
+  test("a limited public read says the limit when no token could be tried, the GitHub App on another account only", async () => {
+    f = await setup();
+    await installApp("someone-else");
+    const github = limitedPublicGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors: connectors(), app: APP } };
+    expect(await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/skills"))).toEqual({
+      code: "github.limited",
+      params: { count: 1 },
+    });
+    expect(github.requests.filter((r) => r.url.includes("/zipball"))).toEqual([]);
+  });
 
   test("read with the workspace's GitHub connection, its token sent to api.github.com only; updating reads through it", async () => {
     f = await setup();
@@ -699,9 +902,9 @@ describe("private repositories", () => {
       auth: `Bearer ${APP_TOKEN}`,
     });
 
-    // `list`: the one skill a folder holds, to pick, nothing installed again.
+    // `list`: the one skill a folder holds, to pick, nothing installed again; it says it replaces the one installed.
     expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, folder, { list: true })).toEqual({
-      choices: [{ path: "team/review", name: "review", description: "Revisa um pull request." }],
+      choices: [{ path: "team/review", name: "review", description: "Revisa um pull request.", replaces: "installed" }],
       via: "github_app",
     });
     expect(await listSkills(f.db, f.owner.id, f.org.id)).toMatchObject([{ name: "review", version: 1 }]);
@@ -1089,5 +1292,168 @@ describe("agent.tool detail", () => {
     expect(toolDetail("create_issue", { title: "a".repeat(200) })?.length).toBe(80);
     expect(toolDetail("search_context", { query: "salários" })).toBeUndefined();
     expect(toolDetail("load_skill", { name: 42 })).toBeUndefined();
+  });
+});
+
+/** acme/big by path from its root: one small skill among folders far past the archive's cap. */
+const BIG = {
+  "docs/video.md": "# Vídeos",
+  "skills/relatorio-semanal/SKILL.md": SKILL_MD,
+  "skills/relatorio-semanal/templates/relatorio.md": "# Semana {{n}}",
+  "skills/relatorio-semanal/build.py": "print(1)",
+  "skills/review/SKILL.md": "---\nname: review\ndescription: Revisa um pull request.\n---\n# Review",
+};
+
+/**
+ * Fake GitHub for acme/big, whose archive is past the cap (from github.com, or the API's zipball with the token): the
+ * API's tree of `{ref}:{folder}` lists the folder's files (`truncated`: cut short), raw.githubusercontent.com sends
+ * each file without a token and the API's blobs with it. `token`: the repository is private, and only it reads it.
+ */
+function bigGithub(options: { token?: string; truncated?: boolean } = {}) {
+  const requests: { url: string; auth: string | null }[] = [];
+  const archive = new Uint8Array(50 * 1024 * 1024 + 1);
+  const sha = (path: string) => Buffer.from(path).toString("hex");
+  const fetch = async (url: string, init?: RequestInit) => {
+    const auth = new Headers(init?.headers).get("authorization");
+    requests.push({ url, auth });
+    const reads = options.token ? auth === `Bearer ${options.token}` : true;
+    const codeload = { status: 302, headers: { location: "https://codeload.github.com/acme/big/zip/0123abc" } };
+    if (!options.token && url.startsWith("https://github.com/acme/big/archive/")) return new Response(null, codeload);
+    if (reads && url.startsWith("https://api.github.com/repos/acme/big/zipball")) return new Response(null, codeload);
+    if (url.startsWith("https://codeload.github.com/acme/big/")) return new Response(archive);
+    if (url === "https://github.com/acme/big") return new Response("page", { status: options.token ? 404 : 200 });
+    if (reads && url === "https://api.github.com/repos/acme/big") return Response.json({ full_name: "acme/big" });
+    const tree = /^https:\/\/api\.github\.com\/repos\/acme\/big\/git\/trees\/([^?]+)\?recursive=1$/.exec(url);
+    if (reads && tree) {
+      const folder = decodeURIComponent(tree[1] ?? "").split(":")[1] ?? "";
+      const prefix = folder ? `${folder}/` : "";
+      const inside = Object.entries(BIG).filter(([path]) => path.startsWith(prefix));
+      if (inside.length === 0) return Response.json({ message: "Not Found" }, { status: 404 });
+      const entries = inside.map(([path, text]) => ({
+        path: path.slice(prefix.length),
+        mode: "100644",
+        type: "blob",
+        sha: sha(path),
+        size: Buffer.byteLength(text),
+      }));
+      entries.push({ path: "link", mode: "120000", type: "blob", sha: sha("link"), size: 4 });
+      entries.push({ path: "vendor", mode: "160000", type: "commit", sha: sha("vendor"), size: 0 });
+      return Response.json({ sha: "tree", tree: entries, truncated: options.truncated ?? false });
+    }
+    const raw = /^https:\/\/raw\.githubusercontent\.com\/acme\/big\/[^/]+\/(.+)$/.exec(url)?.[1];
+    const blob = /^https:\/\/api\.github\.com\/repos\/acme\/big\/git\/blobs\/(\w+)$/.exec(url)?.[1];
+    const path =
+      !options.token && raw ? decodeURIComponent(raw) : reads && blob ? Buffer.from(blob, "hex").toString() : "";
+    const text = (BIG as Record<string, string>)[path];
+    if (text !== undefined) return new Response(text);
+    return new Response("404: Not Found", { status: 404 });
+  };
+  return { fetch, requests };
+}
+
+describe("a repository past the archive's cap", () => {
+  const folder = "https://github.com/acme/big/tree/main/skills/relatorio-semanal";
+
+  test("a link reads only the skill's folder; updating reads the folder again, never the archive", async () => {
+    f = await setup();
+    const github = bigGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch };
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, folder)) as SkillDetail;
+    expect(skill).toMatchObject({ name: "relatorio-semanal", version: 1, sourceUrl: folder, sourceVia: null });
+    expect(skill.files.map((x) => [x.path, x.status])).toEqual([
+      ["build.py", "script"],
+      ["templates/relatorio.md", "stored"],
+    ]);
+    // The archive, refused past its cap; then the folder's tree and its own files, no other file of the repository.
+    expect(github.requests.map((r) => r.url).sort()).toEqual([
+      "https://api.github.com/repos/acme/big/git/trees/main%3Askills%2Frelatorio-semanal?recursive=1",
+      "https://codeload.github.com/acme/big/zip/0123abc",
+      "https://github.com/acme/big/archive/main.zip",
+      "https://raw.githubusercontent.com/acme/big/main/skills/relatorio-semanal/SKILL.md",
+      "https://raw.githubusercontent.com/acme/big/main/skills/relatorio-semanal/build.py",
+      "https://raw.githubusercontent.com/acme/big/main/skills/relatorio-semanal/templates/relatorio.md",
+    ]);
+    const [row] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skill.id));
+    expect(row?.sourceByFolder).toBe(true);
+
+    const before = github.requests.length;
+    expect(await updateSkillFromSource(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({ status: "unchanged" });
+    expect(await reimportSkill(deps, f.owner.id, f.org.id, skill.id)).toMatchObject({ version: 2 });
+    const since = github.requests.slice(before).map((r) => r.url);
+    expect(since.filter((u) => u.includes("archive") || u.includes("codeload"))).toEqual([]);
+    expect(since.filter((u) => u.includes("/git/trees/"))).toHaveLength(2);
+  });
+
+  test("a link above several skills offers them; a folder it lacks has no SKILL.md; a tree GitHub cuts short says so", async () => {
+    f = await setup();
+    const deps = { ...skillDeps(), fetch: bigGithub().fetch };
+    expect(await importSkillFromUrl(deps, f.owner.id, f.org.id, "https://github.com/acme/big")).toMatchObject({
+      choices: [
+        { path: "skills/relatorio-semanal", name: "relatorio-semanal" },
+        { path: "skills/review", name: "review" },
+      ],
+    });
+    const missing = "https://github.com/acme/big/tree/main/nope";
+    expect(await refusalOf(importSkillFromUrl(deps, f.owner.id, f.org.id, missing))).toEqual({
+      code: "skill.no_skill_md",
+      params: { path: "acme/big/nope" },
+    });
+    const cut = { ...skillDeps(), fetch: bigGithub({ truncated: true }).fetch };
+    expect(await refusalOf(importSkillFromUrl(cut, f.owner.id, f.org.id, "https://github.com/acme/big"))).toEqual({
+      code: "skill.link_too_large",
+      params: undefined,
+    });
+    expect(await listSkills(f.db, f.owner.id, f.org.id)).toEqual([]);
+  });
+
+  test("a member's personal skill from it reads the folder too, and updates and reimports so", async () => {
+    f = await setup();
+    const member = await addMember(f.db, f.org.id, "member", "walter");
+    const github = bigGithub();
+    const deps = { ...skillDeps(), fetch: github.fetch };
+    const skill = (await importSkillFromUrl(deps, member.id, f.org.id, folder, { personal: true })) as SkillDetail;
+    expect(skill).toMatchObject({ name: "relatorio-semanal", ownerUserId: member.id, sourceVia: null });
+    expect(skill.files).toHaveLength(2);
+    const [row] = await f.db.select().from(schema.skills).where(eq(schema.skills.id, skill.id));
+    expect(row?.sourceByFolder).toBe(true);
+
+    const before = github.requests.length;
+    expect(await updateSkillFromSource(deps, member.id, f.org.id, skill.id)).toMatchObject({ status: "unchanged" });
+    expect(await reimportSkill(deps, member.id, f.org.id, skill.id)).toMatchObject({
+      version: 2,
+      ownerUserId: member.id,
+    });
+    const since = github.requests.slice(before).map((r) => r.url);
+    expect(since.filter((u) => u.includes("archive") || u.includes("codeload"))).toEqual([]);
+    expect(since.filter((u) => u.includes("/git/trees/"))).toHaveLength(2);
+    expect((await listSkills(f.db, f.owner.id, f.org.id)).map((s) => s.id)).not.toContain(skill.id);
+  });
+
+  test("a renamed one is read at its new name: the API and raw files redirect", async () => {
+    f = await setup();
+    const github = bigGithub();
+    const fetch = async (url: string, init?: RequestInit) =>
+      url.includes("/acme/old")
+        ? new Response(null, { status: 301, headers: { location: url.replace("/acme/old", "/acme/big") } })
+        : github.fetch(url, init);
+    const deps = { ...skillDeps(), fetch };
+    const old = "https://github.com/acme/old/tree/main/skills/relatorio-semanal";
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, old)) as SkillDetail;
+    expect(skill).toMatchObject({ name: "relatorio-semanal", sourceVia: null });
+    expect(skill.files).toHaveLength(2);
+  });
+
+  test("a private one is read through the workspace's token: the tree and each file from the API", async () => {
+    f = await setup();
+    const connectors = { db: f.db, keyWrappers: [f.keyWrapper], publicUrl: "https://agentes.test" };
+    await createApiKeyConnection(connectors, f.owner.id, f.org.id, { connector: "github", apiKey: CONNECTION_TOKEN });
+    const github = bigGithub({ token: CONNECTION_TOKEN });
+    const deps = { ...skillDeps(), fetch: github.fetch, github: { connectors } };
+    const skill = (await importSkillFromUrl(deps, f.owner.id, f.org.id, folder)) as SkillDetail;
+    expect(skill).toMatchObject({ name: "relatorio-semanal", sourceVia: "github" });
+    expect(skill.files).toHaveLength(2);
+    expect(github.requests.filter((r) => r.auth && !r.url.startsWith("https://api.github.com/"))).toEqual([]);
+    expect(github.requests.filter((r) => r.url.includes("raw.githubusercontent"))).toEqual([]);
+    expect(github.requests.filter((r) => r.url.includes("/git/blobs/") && r.auth)).toHaveLength(3);
   });
 });

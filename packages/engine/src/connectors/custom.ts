@@ -9,7 +9,7 @@ import { ConflictError, isUniqueViolation, NotFoundError, ValidationError } from
 import type { Judge } from "../judge";
 import { oneLine } from "../mail/text";
 import { assertPublicHttpsUrl } from "../net-guard";
-import { requirePermission } from "../organizations";
+import { can, requirePermission } from "../organizations";
 import { isAgentesCloud } from "../telemetry";
 import {
   classifyByRules,
@@ -26,7 +26,6 @@ import {
 } from "./classify";
 import { beginComposioConnect, composioServiceOf, forgetComposioAccount } from "./composio";
 import {
-  bearerHeaders,
   type ConnectionSecret,
   type ConnectOutcome,
   type ConnectorConnection,
@@ -38,7 +37,9 @@ import {
   noteRefusedSignIn,
   OAUTH_STATE_TTL_MS,
   oauthRedirectUri,
+  openConnectionSecret,
   prefixService,
+  secretHeaders,
   toolPrefixOf,
   toolPrefixOfConnection,
 } from "./connections";
@@ -53,7 +54,15 @@ import {
 } from "./oauth-mcp";
 import { oauthReturnTo } from "./oauth-return";
 import { seedToolPins } from "./pins";
-import { composioToolkitOf, composioToolName, type McpPreset, presetForServer } from "./presets";
+import {
+  composioToolkitOf,
+  composioToolkitTyped,
+  composioToolName,
+  type McpPreset,
+  presetForServer,
+  serverUrlShown,
+} from "./presets";
+import { checkRequestHeaders, type RequestHeader } from "./request-headers";
 import { type McpServerInfo, refreshServerIcon } from "./server-icon";
 
 const { connectorConnections, customTools, oauthStates, agentScopes, agents } = schema;
@@ -96,6 +105,8 @@ export const COMPOSIO_ANY_ACTION: ReadonlySet<string> = new Set([
   "COMPOSIO_REMOTE_BASH_TOOL",
   "COMPOSIO_PROXY_EXECUTE",
 ]);
+
+const COMPOSIO_META: ReadonlySet<string> = new Set([COMPOSIO_EXECUTOR, ...COMPOSIO_ANY_ACTION]);
 
 const COMPOSIO_SLUG = /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
@@ -170,6 +181,11 @@ export interface CustomServerView {
   /** The account as the provider names it ("Acme"), when it says; null otherwise. */
   accountLabel: string | null;
   authType: "oauth" | "api_key";
+  /**
+   * The request headers a person typed for it, by name and never by value (ADR 0186); empty when it has none, and
+   * for a reader who doesn't manage connectors.
+   */
+  headerNames: string[];
   /** The server's own icon, served by us (`/api/app/connector-icons/…`); null = a monogram. */
   iconUrl: string | null;
   /** A service through Composio (ADR 0107): its page signs in, and its address means nothing to people. */
@@ -247,15 +263,17 @@ function toolView(t: ToolRow, prefix: string | null): CustomToolView {
   };
 }
 
-function view(c: ConnectorConnection, tools: ToolRow[]): CustomServerView {
+/** `whole`: the reader manages connectors, so sees the address as it was typed and the names of its headers. */
+function view(c: ConnectorConnection, tools: ToolRow[], whole = true): CustomServerView {
   const mine = tools.filter((t) => t.connectionId === c.id);
   const prefix = sharedPrefix(mine.map((t) => t.name));
   return {
     id: c.id,
-    serverUrl: c.serverUrl,
+    serverUrl: whole ? c.serverUrl : serverUrlShown(c.serverUrl),
     label: c.label,
     accountLabel: c.accountLabel,
     authType: c.authType === "oauth" ? "oauth" : "api_key",
+    headerNames: whole ? (c.headerNames ?? []) : [],
     iconUrl: c.icon,
     ...(composioToolkitOf(c.serverUrl) ? { via: "composio" as const } : {}),
     status: c.status === "needs_reconnect" ? "needs_reconnect" : "active",
@@ -284,7 +302,7 @@ async function loadCustom(db: Database, orgId: string, id: string) {
 }
 
 export async function listCustomServers(db: Database, actorId: string, orgId: string): Promise<CustomServerView[]> {
-  await requirePermission(db, actorId, orgId, "read");
+  const whole = can(await requirePermission(db, actorId, orgId, "read"), "manage_connectors");
   const rows = await db
     .select()
     .from(connectorConnections)
@@ -300,7 +318,7 @@ export async function listCustomServers(db: Database, actorId: string, orgId: st
     db,
     rows.map((r) => r.id),
   );
-  return rows.map((r) => view(r, tools));
+  return rows.map((r) => view(r, tools, whole));
 }
 
 type AccountSpec = NonNullable<McpPreset["account"]>;
@@ -417,7 +435,12 @@ export async function storeCustomConnection(
   const reached = { serverUrl: input.serverUrl, orgId: input.orgId, composioAccountId: input.composio?.accountId };
   const account =
     input.secret || input.composio
-      ? await providerAccount(deps, preset?.account, reached, input.secret ? bearerHeaders(input.secret) : {})
+      ? await providerAccount(
+          deps,
+          preset?.account,
+          reached,
+          input.secret ? secretHeaders(input.secret, input.serverUrl) : {},
+        )
       : null;
   // Composio's name for the account when the entry's account action didn't say: a name, never an identity.
   const named = account?.name ?? input.composio?.name ?? null;
@@ -454,6 +477,7 @@ export async function storeCustomConnection(
     tokenExpiresAt: input.tokenExpiresAt ?? null,
     oauthClientId: input.oauthClientId ?? null,
     resource: input.resource ?? null,
+    headerNames: input.secret?.headers ? Object.keys(input.secret.headers) : null,
     ...(account ? { accountId: account.id, accountLabel: named } : named ? { accountLabel: named } : {}),
     // New credentials: whatever stopped working before is behind it.
     status: "active",
@@ -479,7 +503,7 @@ export async function storeCustomConnection(
       action: "connector.custom_reconnected",
       target: { type: "connector_connection", id: row.id },
       details: {
-        serverUrl: input.serverUrl,
+        serverUrl: serverUrlShown(input.serverUrl),
         authType: input.authType,
         label: row.label,
         account: row.accountLabel,
@@ -527,7 +551,7 @@ export async function storeCustomConnection(
           action: "connector.custom_connected",
           target: { type: "connector_connection", id: row.id },
           details: {
-            serverUrl: input.serverUrl,
+            serverUrl: serverUrlShown(input.serverUrl),
             authType: input.authType,
             label,
             account: named,
@@ -680,11 +704,16 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
       suggestedAccess: cls.level,
       suggestionSource: cls.source,
       suggestionReason: cls.reason,
-      sensitive: cls.sensitive,
+      // A Composio action's hint is our own rule for it (its words, its entry's `ask`), which the tool source
+      // enforces on every call, and Composio's meta tools run any action their input names: both stay locked.
+      sensitive:
+        cls.sensitive || (tool.destructiveHint === true && (composio !== null || COMPOSIO_META.has(tool.name))),
     };
     if (old) {
       const free = old.access === "read" || old.access === "write" ? old.access : null;
       const stricter = free && old.confirmedAt === null && ACCESS.indexOf(cls.level) > ACCESS.indexOf(free);
+      // A warning the server did not send when the level was chosen asks again, unlocked: the admin may set it back.
+      const warnedNow = tool.destructiveHint === true && old.destructiveHint !== true;
       await deps.db
         .update(customTools)
         .set({
@@ -692,7 +721,11 @@ export async function syncCustomTools(deps: CustomDeps, c: ConnectorConnection) 
           readOnlyHint: tool.readOnlyHint ?? null,
           destructiveHint: tool.destructiveHint ?? null,
           ...suggestion,
-          ...(free && cls.sensitive ? { access: "approval" } : stricter ? { access: cls.level } : {}),
+          ...(free && (suggestion.sensitive || warnedNow)
+            ? { access: "approval" }
+            : stricter
+              ? { access: cls.level }
+              : {}),
           removedAt: null,
         })
         .where(eq(customTools.id, old.id));
@@ -728,25 +761,63 @@ async function serverView(db: Database, orgId: string, id: string) {
 }
 
 /**
+ * The request headers an account's row names, read from its secret. A secret that can't be opened, or that holds none,
+ * is refused in words a person can act on: going on without them would drop them unsaid.
+ */
+async function savedHeaders(deps: CustomDeps, c: ConnectorConnection) {
+  const headers = (await openConnectionSecret(deps.keyWrappers, c).catch(() => null))?.headers;
+  if (!headers) {
+    throw new ValidationError(
+      "The saved request headers couldn't be read: type them again, or remove them",
+      "connector.headers_unreadable",
+    );
+  }
+  return headers;
+}
+
+/**
  * Connects an https MCP server by URL (admins): a new account, or with `connectionId` a new sign-in for that one
  * ("Reconectar", same address only). With an API key: stored and connected. Without: if it answers openly,
  * connected; if it speaks MCP OAuth with dynamic registration, the authorize URL comes back; otherwise `needs_key`.
+ * `headers` (ADR 0186) go with every request to the server, the key's `Authorization` on top; without a key the
+ * server is asked with them, and one that answers is connected by them alone. Reconectar keeps the ones the account
+ * has unless `headers` says otherwise (`[]` removes them), and is refused when it can't read them
+ * (`connector.headers_unreadable`). They never go with a sign-in, here or at Composio.
  */
 export async function connectCustomServer(
   deps: CustomDeps,
   actorId: string,
   orgId: string,
-  input: { serverUrl: string; apiKey?: string; label?: string; returnTo?: string; connectionId?: string },
+  input: {
+    serverUrl: string;
+    apiKey?: string;
+    label?: string;
+    returnTo?: string;
+    connectionId?: string;
+    headers?: RequestHeader[];
+  },
 ): Promise<CustomConnectStart> {
   await requirePermission(deps.db, actorId, orgId, "manage_connectors");
+  const signInOnly = () => new ValidationError("This service connects by signing in", "connector.oauth_only");
   // A service through Composio signs in on Composio's page: its address is never fetched.
-  if (composioToolkitOf(input.serverUrl.trim())) return beginComposioConnect(deps, actorId, orgId, input);
+  if (composioToolkitOf(input.serverUrl.trim())) {
+    if (input.headers?.length) throw signInOnly();
+    return beginComposioConnect(deps, actorId, orgId, input);
+  }
   const url = await assertPublicHttpsUrl(input.serverUrl.trim(), deps.resolveHost);
-  const serverUrl = url.toString();
+  // Composio's address spelled another way is still Composio's: nothing is sent or kept there.
+  if (composioToolkitTyped(url)) throw signInOnly();
   // Checked before anyone signs in for nothing.
-  if (input.connectionId) await reconnectTarget(deps.db, orgId, input.connectionId, serverUrl);
+  const target = input.connectionId ? await reconnectTarget(deps.db, orgId, input.connectionId, url.toString()) : null;
+  // Reconectar asks at the account's own address, however it was typed again: what it keeps goes nowhere else.
+  const serverUrl = target?.serverUrl ?? url.toString();
   const label = input.label?.trim() || presetForServer(serverUrl)?.label || url.hostname;
   const apiKey = input.apiKey?.trim();
+  // The account's own secret is opened only to carry its headers over; a list in the request replaces them unread.
+  const saved = !input.headers && target?.headerNames?.length ? await savedHeaders(deps, target) : {};
+  const typed = input.headers ?? Object.entries(saved).map(([name, value]) => ({ name, value }));
+  const checked = checkRequestHeaders(typed, Boolean(apiKey));
+  const headers = Object.keys(checked).length > 0 ? checked : undefined;
   const stored = async (authType: "api_key" | "none", secret: ConnectionSecret | null) => {
     const { connection, outcome } = await storeCustomConnection(deps, {
       orgId,
@@ -764,17 +835,23 @@ export async function connectCustomServer(
       outcome,
     };
   };
-  if (apiKey) {
-    if (apiKey.length < 8) throw new ValidationError("The key looks too short", "connector.key_too_short");
-    // The vendor's terms forbid asking for a token: on the Cloud it signs in only (ADR 0107).
-    if (presetForServer(serverUrl)?.cloudOAuthOnly && isAgentesCloud(deps.publicUrl)) {
-      throw new ValidationError("This service connects by signing in", "connector.oauth_only");
-    }
-    return stored("api_key", { apiKey });
+  if (apiKey && apiKey.length < 8) throw new ValidationError("The key looks too short", "connector.key_too_short");
+  // The vendor's terms forbid asking for a token: on the Cloud it signs in only (ADR 0107).
+  if ((apiKey || headers) && presetForServer(serverUrl)?.cloudOAuthOnly && isAgentesCloud(deps.publicUrl)) {
+    throw signInOnly();
   }
-  const probe = await probeMcpServer(deps, serverUrl);
-  if (probe.kind === "open") return stored("none", null);
+  if (apiKey) return stored("api_key", { apiKey, ...(headers ? { headers } : {}) });
+  const probe = await probeMcpServer(deps, serverUrl, secretHeaders({ headers }, serverUrl));
+  // Headers a person typed are a secret of theirs, as a key is.
+  if (probe.kind === "open") return headers ? stored("api_key", { headers }) : stored("none", null);
   if (probe.kind === "needs_key") return { status: "needs_key" };
+  if (headers) {
+    // A sign-in's token would replace them without a word.
+    throw new ValidationError(
+      "This server asks for a sign-in, which can't carry request headers",
+      "connector.headers_with_sign_in",
+    );
+  }
   return beginMcpOAuth(deps, actorId, orgId, {
     connector: "custom",
     serverUrl,

@@ -556,7 +556,7 @@ export function parseRouterJson(raw: unknown): {
 }
 
 /** Providers tried for a small model after the default key's, fastest and cheapest first. */
-const SMALL_MODEL_ORDER = ["anthropic", "openai", "deepseek", "gemini", "zai", "minimax", "openrouter"];
+const SMALL_MODEL_ORDER = ["anthropic", "openai", "deepseek", "gemini", "zai", "minimax", "commandcode", "openrouter"];
 
 /**
  * The small model that routes and judges for an organization (ADR 0074 §2), or null: its own `router_model`
@@ -1319,6 +1319,12 @@ export async function routeMessage(
       () => undefined,
     );
   };
+  // The hour's cap held a default pick back: what the cap answered where a pick below asked it.
+  let capped = false;
+  const underDefaultCap = async () => {
+    capped = await defaultCapReached();
+    return !capped;
+  };
   // Which default tier picked (R5): the agent the person talks with, the best placed agent; or the best placed
   // agent for a person alone with the team.
   let fallback: "talk" | "best" | "alone" | null = null;
@@ -1529,7 +1535,7 @@ export async function routeMessage(
         // Talking with an agent is no reason on its own: "vou almoçar agora, volto em uma hora" 15 minutes after a
         // talk needs nobody. A question, or some need, is for the agent ("Entenderam?").
         (!peopleTalking && ((talkingWith !== null && hasQuestionMark(saidText)) || needs >= DEFAULT_NEED))) &&
-      !(await defaultCapReached())
+      (await underDefaultCap())
     ) {
       const agentId = talkingWith ?? bestPlaced(scoreOf, decided.best);
       if (agentId) {
@@ -1553,7 +1559,7 @@ export async function routeMessage(
     !FOR_SOMEONE.has(socialOf(decided)) &&
     !(ack && thankedAgent()) &&
     (await aloneHere()) &&
-    !(await defaultCapReached())
+    (await underDefaultCap())
   ) {
     const agentId = bestPlaced(scoreOf, decided.best);
     if (agentId) {
@@ -1591,6 +1597,16 @@ export async function routeMessage(
             followUp && resumes && selected.length > 0 ? "last talked to" : null,
             duplicate ? "already answered by another agent" : null,
             forPeople ? "for people" : heldBack ? "held back" : null,
+            // Why nobody got it when no marker above says: the need score decided, or the hour's cap did.
+            chosen.length === 0 &&
+            !duplicate &&
+            !forPeople &&
+            !heldBack &&
+            decided.needsAgent !== undefined &&
+            decided.needsAgent < needGateOf(policy, candidates.length === 1)
+              ? UNDER_NEED_GATE
+              : null,
+            chosen.length === 0 && capped ? DEFAULT_CAP : null,
             words,
           ]
             .filter(Boolean)
@@ -1618,6 +1634,11 @@ export async function routeMessage(
 
 /** The marker a decision's `reason` starts with when the router kept the person with the agent they talk to. */
 export const FOLLOW_UP = "follow-up";
+
+/** Nobody got the message, for no reason another marker gives, and its need-any-agent score is under the gate (`needGateOf`). */
+export const UNDER_NEED_GATE = "under need gate";
+/** Nobody got the message: the default pick it would have had was past the hour's cap (`DEFAULT_PICKS_PER_HOUR`). */
+export const DEFAULT_CAP = "default cap";
 
 /** A default pick's `strategy` (R5). Decisions before ADR 0137 may also read `rule:coordinator` (reason `coordinator; default`). */
 export const DEFAULT_STRATEGY = "rule:default";

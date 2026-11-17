@@ -286,6 +286,7 @@ export const SELF_TESTED = [
   "iconmid",
   "fieldwidth",
   "corner",
+  "nest",
   "clip",
   "cascadeorder",
   "pagetop",
@@ -305,11 +306,13 @@ export const SELF_TESTED = [
   "toolheight",
   "factwrap",
   "undoinline",
+  "barend",
   "countfill",
   "calstack",
   "bleed",
   "stampout",
   "stampover",
+  "msgaside",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */

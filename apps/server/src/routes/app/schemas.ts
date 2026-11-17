@@ -22,6 +22,55 @@ export const AudienceChoice = z
   ])
   .openapi("AudienceChoice");
 
+/** How an agent's run stands for the reader (ADR 0084 addendum): an agent's line (`work`), a task manager's row. */
+export const WorkState = z.enum(["you", "working", "approval", "answer", "computer", "outage", "queued", "later"]);
+
+/** Where a return lands (a `follow_up` line's conversation). */
+const ReturnPlace = {
+  messageId: z.uuid().openapi({ description: "The return's line (`meta.notice.kind` `follow_up`)." }),
+  agentId: z.uuid(),
+  channelId: z.uuid(),
+  channelKind: z.enum(["channel", "dm", "task"]),
+  channelName: z.string().nullable().openapi({ description: "A channel's name; null for a DM or a task's." }),
+  threadId: z.uuid().nullable().openapi({ description: "Null: the conversation's main timeline." }),
+  at: z.string().openapi({ description: "When it comes (ISO)." }),
+  about: z.string().openapi({ description: "The agent's words for it, in the people's language: shown as written." }),
+};
+
+/** A return an agent set, still to come (ADR 0037, amended 2026-11-13): "Ada retorna às 00:32 · …". */
+export const PendingReturn = z
+  .object({
+    ...ReturnPlace,
+    runId: z.uuid().openapi({ description: "The run that set it." }),
+    replyMessageId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: 'That run\'s reply, once posted: where "Ver a mensagem" lands.' }),
+    held: z.boolean().openapi({
+      description:
+        "Its wake found what the agent asked there unanswered, and it waits for the answer (work nobody asked for, ADR 0131 §1). A wake that is only late isn't held.",
+    }),
+    canCancel: z
+      .boolean()
+      .openapi({ description: "You may cancel it: the person it is for, the agent's owner or an admin." }),
+  })
+  .openapi("PendingReturn");
+
+/** A return canceled ("Terminadas hoje"). */
+export const CanceledReturn = z
+  .object({
+    ...ReturnPlace,
+    canceledAt: z.string(),
+    canceledBy: z
+      .discriminatedUnion("kind", [
+        z.object({ kind: z.literal("person"), userId: z.string(), name: z.string() }),
+        z.object({ kind: z.literal("agent"), agentId: z.uuid() }),
+      ])
+      .nullable()
+      .openapi({ description: "Null: its time found it couldn't come (the agent or the person left)." }),
+  })
+  .openapi("CanceledReturn");
+
 /** A last message that was only a GIF or a sticker (ADR 0091): the apps say which, translated, in its preview. */
 export const MediaKind = z.enum(["gif", "sticker", "voice"]).nullable().openapi({
   description:
@@ -74,6 +123,9 @@ export const ChatPrefs = z
       .enum(CHAT_TEXT_SIZES)
       .optional()
       .openapi({ description: "Tamanho do texto of the messages, smallest first; absent: `md`." }),
+    fullMessages: z.boolean().optional().openapi({
+      description: "Show messages in full without See more; absent: long messages are folded.",
+    }),
     feedbackAuto: z.boolean().optional().openapi({
       description:
         "Always send: a report an agent offers about the app goes with its reply, without asking; absent: it asks.",
@@ -138,7 +190,7 @@ export const Organization = z
       .optional()
       .openapi({
         description:
-          "In `GET /me`, while an owner's deletion is pending: the workspace is closed (`org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
+          "In `GET /me`, while an owner's deletion is pending: the workspace is read-only (its changes answer `org.deleting`), and any owner can restore it until `dueAt` (`DELETE …/deletion`). Absent: not being deleted.",
       }),
     start: StartChoice.optional().openapi({
       description: "In `GET /me`: what opens when the app starts here (`PUT …/me/start`). Absent elsewhere.",
@@ -244,6 +296,18 @@ export const Credential = z
       .enum(["ok", "unchecked"])
       .optional()
       .openapi({ description: "On a key just saved: `ok` a real call passed, `unchecked` the provider didn't say." }),
+    reused: z.boolean().optional().openapi({
+      description: "On a key just saved: the workspace already had it, so that key was updated, not copied.",
+    }),
+    copies: z
+      .number()
+      .int()
+      .optional()
+      .openapi({ description: "In a list of keys: how many other saved keys are this same key (`remove-copies`)." }),
+    copyOf: z
+      .uuid()
+      .optional()
+      .openapi({ description: "In a list of keys: the key this one is a copy of, the row to show for both." }),
     createdAt: z.string(),
     revokedAt: z.string().nullable(),
   })
@@ -268,6 +332,12 @@ export const AgentAudience = z
     }),
   })
   .openapi("AgentAudience");
+
+/** How much an agent asks before acting (ADR 0173). */
+export const ApprovalsLevel = z.enum(["always", "risky", "never"]).openapi("ApprovalsLevel", {
+  description:
+    "`always`: every write to a connected app asks a person. `risky` (the default): what is marked sensitive asks. `never`: only merge, deploy, rollback and the like ask. A routine's run, and one a routine's reading feeds, ask for every write to a connected app at any level. Scopes, connector access and the budget bind at every level.",
+});
 
 /** An agent's autonomy brakes (ADR 0131): what it may start that nobody asked for directly, and whom it may call. */
 export const AgentBrakes = z
@@ -426,6 +496,11 @@ export const Agent = z
     mediaReplies: z.boolean().openapi({
       description:
         "It may send a sticker or a GIF (ADR 0091): when someone asks for one, and after a light reply as often as the workspace's `agentMedia` allows.",
+    }),
+    approvalsLevel: ApprovalsLevel,
+    approvalsLevelOwn: z.boolean().optional().openapi({
+      description:
+        "Whether `approvalsLevel` is the agent's own choice. False: it follows the workspace's (`approvalsLevel` in the workspace's settings) and changes with it.",
     }),
     builtin: z.enum(["right_hand"]).nullable().openapi({
       description:
@@ -617,7 +692,9 @@ export const WorkView = z
       .enum(["working", "waiting_approval", "waiting_input", "paused", "waiting_computer", "queued"])
       .nullable()
       .openapi({ description: "While live: what its run does now." }),
-    how: z.enum(["agent", "auto"]),
+    how: z.enum(["agent", "auto", "handed"]).openapi({
+      description: "`handed`: another agent handed it over; it reports where the person asked.",
+    }),
     anchorMessageId: z.uuid(),
     threadId: z.uuid().nullable().openapi({ description: "Where its updates are." }),
     homeThreadId: z.uuid().nullable().openapi({ description: "Where it was asked (its report goes there)." }),
@@ -642,7 +719,24 @@ export const WorkView = z
     queuePosition: z.number().nullable(),
     pausedUntil: z.string().nullable(),
     canceledByUserId: z.string().nullable(),
+    canceledByAgentId: z.string().nullable(),
     errorCode: z.string().nullable(),
+    handedBy: z
+      .object({ agentId: z.uuid(), consultationId: z.uuid() })
+      .nullable()
+      .openapi({ description: "Handed over by another agent: that agent and its hand-off." }),
+    askerRunId: z
+      .uuid()
+      .nullable()
+      .openapi({ description: "A handed work: the run that handed it; its line goes under that run's last message." }),
+    planStep: z
+      .object({ current: z.number(), total: z.number() })
+      .nullable()
+      .openapi({ description: "The first step of its plan not done, 1-based, never past the last." }),
+    result: z
+      .object({ text: z.string(), messageId: z.uuid() })
+      .nullable()
+      .openapi({ description: "Done: the first line of its report." }),
   })
   .openapi("WorkView");
 
@@ -770,6 +864,9 @@ const MessageBase = z.object({
   longWork: WorkView.optional().openapi({
     description: "A long work's anchor (`meta.longWork`, ADR 0121): its line; live via `agent.work`.",
   }),
+  handedWorks: z.array(WorkView).optional().openapi({
+    description: "On a run's last message here: the works it handed over to other agents, each with its line.",
+  }),
   createdAt: z.string(),
 });
 
@@ -858,13 +955,20 @@ export const BrainUnavailable = z.enum([
   "not_installed",
   "outdated",
   "not_reported",
+  "system",
+  "cant_start",
 ]);
+
+export const CodexVersionRequirement = z
+  .object({ detected: z.string(), minimum: z.string() })
+  .openapi("CodexVersionRequirement");
 
 export const BrainOption = z
   .object({
     kind: BrainKind,
     available: z.boolean(),
     reason: BrainUnavailable.optional().openapi({ description: "Why it can't be chosen now (computer brains)." }),
+    codexVersion: CodexVersionRequirement.optional(),
     models: z.array(
       z.object({
         value: z.string().openapi({ description: "What is stored and passed to the CLI (`opus`, `gpt-…`)." }),
@@ -950,6 +1054,10 @@ export const MachineAccount = z
       description:
         "Claude's organization it is signed in to (opaque, runner protocol 50); only for its owner. Logins of one email in two organizations are two accounts.",
     }),
+    serves: z.enum(["everyone", "owner"]).openapi({
+      description:
+        "Who it thinks for (ADR 0059 §3): everyone in the workspace (the default), or only its owner. Only its owner changes it.",
+    }),
   })
   .openapi("MachineAccount", {
     description:
@@ -981,8 +1089,14 @@ export const AgentBrain = z
           "The team's right hand: the workspace's AI, `model` for an API key (`key`, by its provider and name; null with none), else the plan's brain and owner; `servesYou`, it thinks for the caller (a key, a plan whose owner lets it serve everyone, or theirs).",
       }),
     brain: BrainKind,
-    model: z.string().nullable().openapi({ description: "As stored; null = the brain's default." }),
-    effectiveModel: z.string().nullable(),
+    model: z.string().nullable().openapi({
+      description:
+        "As stored; null = the brain's default. Always null for the `model` brain: an agent on an API key or a workspace endpoint keeps its model in the agent's own `model` (`GET …/agents/{agentId}`).",
+    }),
+    effectiveModel: z.string().nullable().openapi({
+      description:
+        'What a computer brain runs with (`model` or its default). Null for the `model` brain, which is not "no model": read the agent\'s `model` and `credentialId`.',
+    }),
     fallback: z
       .boolean()
       .openapi({ description: "When the computer can't answer, answer through the API (agent's budget)." }),
@@ -1022,7 +1136,7 @@ export const AgentBrain = z
     }),
     canUseOthersPlans: z.boolean().openapi({
       description:
-        "The caller holds `use_others_plans` (ADR 0059 §3): `accounts` lists every plan on its computer, whoever connected it, and they may give it any. Its owner is told and may take it back.",
+        "Always true since plans serve the whole workspace (ADR 0059 §3): `accounts` lists every plan on its computer that serves everyone, whoever connected it, and the caller may give it any. Older apps read it.",
     }),
     ownSignIn: z.boolean().openapi({
       description: "The computer's own sign-in can think for it: the person who connected the computer owns the agent.",
@@ -1034,6 +1148,13 @@ export const AgentBrain = z
       description:
         'Its Autonomia: the autonomy its new missions start with ("Usar como padrão"), copied with its setup.',
     }),
+    keys: z
+      .array(z.object({ id: z.string(), provider: z.string() }))
+      .optional()
+      .openapi({
+        description:
+          "The workspace's live API keys, id and provider only: the providers its owner may move it onto (only admins list the keys).",
+      }),
   })
   .openapi("AgentBrain");
 

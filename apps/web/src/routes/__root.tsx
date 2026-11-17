@@ -1,4 +1,4 @@
-import { useMe } from "@agenteschat/client";
+import { useApi, useMe } from "@agenteschat/client";
 import { Button, EmptyState } from "@agenteschat/ui";
 import { createRootRouteWithContext, Link, Outlet, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect } from "react";
@@ -8,6 +8,8 @@ import { ContextMenuHost } from "@/components/DesktopMenus";
 import { DesktopDragStrip } from "@/components/DesktopTitleBar";
 import { ErrorScreen } from "@/components/ErrorScreen";
 import { AccountDeletingScreen } from "@/components/Standing";
+import { useBackCloses } from "@/hooks/useBackCloses";
+import { switchAccount } from "@/lib/accounts";
 import { askForPhone, asksForPhone, inDesktopApp, pageReadyAfterPaint, routeNewWindowLinks } from "@/lib/desktop";
 import { dispatchPushOpen } from "@/lib/push-open";
 import { listenForPushOpens } from "@/lib/web-push";
@@ -22,15 +24,15 @@ function Root() {
   // agentes for Mac: the workspace has its title bar (org.$orgId.tsx); every other page drags from the top.
   const inWorkspace = useRouterState({ select: (s) => s.location.pathname.startsWith("/org/") });
   const router = useRouter();
-  const deletion = useMe().data?.user.deletion;
+  const me = useMe().data;
+  const deletion = me?.user.deletion;
+  const api = useApi();
+  const myId = me?.user.id ?? null;
+  useBackCloses();
   // In the app: once this first screen is on the glass, the app's cover over the window goes.
   useEffect(pageReadyAfterPaint, []);
   // In the app: a link to another site opens in the browser, one to this server in the window (main_window.rs).
-  useEffect(() => {
-    const root = document.getElementById("root");
-    if (!inDesktopApp() || !root) return;
-    return routeNewWindowLinks(root);
-  }, []);
+  useEffect(() => (inDesktopApp() ? routeNewWindowLinks() : undefined), []);
   // The app opens a page of the site that is already open (the tray, a notification, ⌘-click) without
   // loading it again: the route moves (main_window.rs). Downloads and the API go as a plain load.
   useEffect(() => {
@@ -49,9 +51,15 @@ function Root() {
   }, [router]);
   // A click on a browser notification while the app is open in a tab (ADR 0071): the open workspace opens it
   // where its inbox would (`PushOpens`); on any other page the tab moves to its address.
+  // One for another account signed in on this browser (ADR 0183): the browser moves to it, then opens it.
   useEffect(
-    () => listenForPushOpens((click) => dispatchPushOpen(click, (path) => router.history.push(path))),
-    [router],
+    () =>
+      listenForPushOpens((click) => {
+        const theirs = click.data?.user;
+        if (theirs && myId && theirs !== myId) return void switchAccount(api, theirs, click.path).catch(() => {});
+        dispatchPushOpen(click, (path) => router.history.push(path));
+      }),
+    [router, api, myId],
   );
   return (
     <>

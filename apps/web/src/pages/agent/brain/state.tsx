@@ -20,7 +20,7 @@ import {
   ownSignInTitle,
   signInOf,
 } from "@agenteschat/client/lib/ai-accounts";
-import { advancedContents, effortLevel, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
+import { advancedContents, effortOf, viewSpeedFits } from "@agenteschat/client/lib/brain-advanced";
 import { computerNameOf, setupView } from "@agenteschat/client/lib/computer";
 import { contextChoices, isContextLimit } from "@agenteschat/client/lib/context-limits";
 import { holdText } from "@agenteschat/client/lib/errors";
@@ -46,7 +46,7 @@ import {
   planModel as planModelOf,
   planOf,
 } from "@agenteschat/client/lib/plans";
-import { apiProviderOf, isAuto, keyLine, modelChoices, providerLabel } from "@agenteschat/client/lib/providers";
+import { apiProviderOf, isAuto, keyLine, keySource, modelChoices } from "@agenteschat/client/lib/providers";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import { Icon, type IconName, ProviderLogo, planState } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
@@ -290,7 +290,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   const all = models.data?.models ?? [];
   const apiProvider = apiProviderOf(saved.model, all);
   const keyMark = (provider: string | undefined) =>
-    provider ? <ProviderLogo id={provider} size="xs" /> : <Icon name="key" size={16} className="arrival-have__mark" />;
+    provider ? <ProviderLogo id={provider} size="xs" /> : <Icon name="key" size={20} className="arrival-have__mark" />;
   const keysGroup = { key: "keys", label: t("connectAi.chat.keys") };
   const keyCurrent = saved.key ?? DEFAULT_KEY;
   const keyRow = (keyId: string | undefined, title: string, about: string | undefined, provider?: string): BrainRow => {
@@ -327,7 +327,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
             DEFAULT_KEY,
             t("newAgent.defaultKey"),
             def
-              ? t("newAgent.defaultKeyDesc", { provider: providerLabel(def.provider), hint: def.keyHint })
+              ? t("newAgent.defaultKeyDesc", { provider: keySource(def), hint: def.keyHint })
               : t("agentPage.work.brain.modelText", g),
             def?.provider ?? apiProvider,
           ),
@@ -362,7 +362,11 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
   });
   const planRows = cards.filter((c) => c !== "key" && !accountsOn(c) && homeOf(c)).map((c) => planRow(c));
 
-  const every = [...accountRows, ...ownRows, ...keyRows, ...planRows];
+  // Its AI, for the switch screen's groups ("Trocar a conta" by AI, not by person): a plan by its name, keys together.
+  const apiKeys = { key: "keys", label: t("connectAi.chat.apiKeys") };
+  const every = [...accountRows, ...ownRows, ...keyRows, ...planRows].map(
+    (r): BrainRow => ({ ...r, ai: r.choice === "key" ? apiKeys : { key: r.choice, label: planLabel(t, r.choice) } }),
+  );
   // What it thinks with now always has its row, even when nothing of that plan is listed (no sign-in there yet).
   const currentRow =
     every.find((r) => r.current) ??
@@ -481,7 +485,7 @@ export function useBrainState(view: AgentBrain, opts: { added: readonly MachineA
     contextOptions,
     moreLine,
     runsOn,
-    effort: effortLevel(view.effort),
+    effort: effortOf(kind, view.effort),
     models: all,
     credentials: credentials.data ?? [],
   };

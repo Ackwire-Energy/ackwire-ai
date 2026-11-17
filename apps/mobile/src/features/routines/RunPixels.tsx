@@ -40,21 +40,19 @@ export function useRunTones(): RunTones {
 
 /**
  * The last runs as a strip of pixel columns, oldest left; a run at work flickers in the newest slot. `label` says
- * them: a screen reader hears the strip as one image. `dim`: a paused or finished routine's.
+ * them: a screen reader hears the strip as one image.
  */
 export const RunStrip = memo(function RunStrip({
   runs,
   color,
   label,
   running = false,
-  dim = false,
 }: {
   /** Newest first (`runPixels`). */
   runs: readonly RunPixel[];
   color: AgentColorName;
   label: string;
   running?: boolean;
-  dim?: boolean;
 }) {
   const tones = useRunTones();
   const reduced = useReducedMotion();
@@ -69,19 +67,14 @@ export const RunStrip = memo(function RunStrip({
   const w = stripWidth(RUN_SLOTS) * RUN_CELL;
   const h = STRIP_ROWS * RUN_CELL;
   return (
-    <View
-      style={[{ width: w, height: h }, dim ? styles.dim : null]}
-      accessible
-      accessibilityRole="image"
-      accessibilityLabel={label}
-    >
+    <View style={{ width: w, height: h }} accessible accessibilityRole="image" accessibilityLabel={label}>
       <CellCanvas runs={cells} width={w} height={h} cx={RUN_CELL} />
     </View>
   );
 });
 
 /**
- * One routine's lane on the horizon, `width` points wide: the dotted line, its past runs, its coming ones, and
+ * One agent's lane on the horizon, `width` points wide: the dotted line, its past runs, its coming ones, and
  * the agent itself on its next run (or at "now" while it runs). Decorative: the lane's words are its button's.
  */
 export const LaneTrack = memo(function LaneTrack({
@@ -166,6 +159,5 @@ function useTicker(active: boolean, ms: number): number {
 }
 
 const styles = StyleSheet.create({
-  dim: { opacity: 0.5 },
   sprite: { position: "absolute" },
 });

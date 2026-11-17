@@ -11,6 +11,7 @@ import {
   type ModelResult,
   type ModelUsage,
   type PartialUsage,
+  PDF_MEDIA_TYPE,
   ProviderError,
   promptChars,
   type StopReason,
@@ -287,7 +288,11 @@ function toInput(messages: ModelMessage[]): Step[] {
           ...(name ? { name } : {}),
           result: [
             { type: "text", text: b.content },
-            ...(b.images ?? []).map((i) => ({ type: "image", data: i.data, mime_type: i.mediaType })),
+            ...(b.images ?? []).map((i) => ({
+              type: i.mediaType === PDF_MEDIA_TYPE ? "document" : "image",
+              data: i.data,
+              mime_type: i.mediaType,
+            })),
           ],
           ...(b.isError ? { is_error: true } : {}),
         });

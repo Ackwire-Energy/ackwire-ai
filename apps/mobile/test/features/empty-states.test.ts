@@ -48,12 +48,10 @@ describe("who gets the first step", () => {
     ["issues/IssuesScreen.tsx", 'place="tasks"', 'mayCreate(useOrg().org, "task")'],
     ["routines/RoutinesScreen.tsx", 'place="routines"', 'mayCreate(useOrg().org, "routine", { ownsAgent })'],
     ["wiki/WikiScreen.tsx", 'place="wiki"', 'can(org, "edit_wiki")'],
-    ["chats/ConversationListScreen.tsx", '"channels" as const', 'mayCreate(org, "channel")'],
-    ["chats/ConversationListScreen.tsx", '"people" as const', 'mayCreate(org, "invite")'],
     ["new/ChatTargets.tsx", 'place="people"', 'mayCreate(org, "invite")'],
-    ["settings/AccessScreen.tsx", 'place="access"', 'acts={can(org, "manage_connectors")}'],
+    ["settings/AccessScreen.tsx", 'place="access"', "acts={addsConnectors(org)}"],
     ["devices/DevicesScreen.tsx", 'firstUseCopy("computers", pairs)', 'can(org, "pair_computers")'],
-    ["connectors/ConnectorsScreen.tsx", 'firstUseCopy("connectors", acts)', "<EmptyHint acts={admin} />"],
+    ["connectors/ConnectorsScreen.tsx", 'place="connectors"', "acts={admin}"],
   ])("%s gates %s on the permission", (file, place, gate) => {
     const code = source(file);
     expect(code).toContain(place);
@@ -71,8 +69,9 @@ describe("who gets the first step", () => {
 
   test("the button only ever shows with `acts`, and a screen's own add buttons follow the same gate", () => {
     expect(source("shared/FirstUse.tsx")).toContain("acts && label && onPress");
-    expect(source("issues/IssuesScreen.tsx")).toContain('const right = mayNew ? <IconButton icon="plus"');
-    expect(source("routines/RoutinesScreen.tsx")).toContain('{...(mayNew ? { right: <IconButton icon="plus"');
+    // The bar's "+" (the system's own button) shows only when the server says the person may add.
+    expect(source("issues/IssuesScreen.tsx")).toContain('{...(mayNew ? { actions: [{ icon: "plus", sf: "plus"');
+    expect(source("routines/RoutinesScreen.tsx")).toContain('{...(mayNew ? { actions: [{ icon: "plus", sf: "plus"');
   });
 });
 

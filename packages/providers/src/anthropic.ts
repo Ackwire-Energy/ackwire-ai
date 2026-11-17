@@ -10,12 +10,14 @@ import { MODEL_CATALOG } from "./catalog";
 import {
   type ContentBlock,
   deniedError,
+  hasToolImages,
   laidOut,
   type ModelMessage,
   type ModelProvider,
   type ModelRequest,
   type ModelResult,
   type PartialUsage,
+  PDF_MEDIA_TYPE,
   ProviderError,
   type StopReason,
   shortSaid,
@@ -68,14 +70,15 @@ const THINKING_BINDING_BETA = "thinking-binding-controls-2026-08-01";
  * streaming, `countTokens` and `output_config.format`. Structured output is a
  * `structured_output` tool, forced where `tool_choice: any` is honored, and
  * its input comes back as the reply's JSON text. Medium effort is sent as
- * `high`: Kimi and GLM take only low, high and max.
+ * `high`: Kimi and GLM take only low, high and max. Tool results' images are left out too, unless `compat.images`
+ * says the model reads them (Claude served by Amazon Bedrock).
  */
 export function createAnthropicProvider(
   options: {
     /** The provider's id in `PROVIDERS`. */
     id?: string;
     baseURL?: string;
-    compat?: { toolChoiceAny: boolean };
+    compat?: { toolChoiceAny: boolean; images?: boolean };
     maxRetries?: number;
     /** Tests only: scripted transport. */
     fetch?: typeof fetch;
@@ -128,6 +131,8 @@ export function createAnthropicProvider(
         outputTokens: null,
         outputChars: 0,
       };
+      const textOnly = Boolean(compat && !compat.images);
+      const leftOut = textOnly && hasToolImages(request.messages);
       const params = (withThinking: boolean) => {
         // `block_binding` is taken only with thinking on; the call made without thinking goes plain.
         const bind = withThinking && !compat && !thinkingOff;
@@ -139,12 +144,13 @@ export function createAnthropicProvider(
           model: request.model,
           max_tokens: request.maxTokens,
           system: toSystem(request, compat ? undefined : room(request)),
-          // Another company's endpoint (DeepSeek, Kimi, Z.ai, MiniMax) isn't trusted to take images.
+          // Another company's endpoint (DeepSeek, Kimi, Z.ai, MiniMax) isn't trusted to take images, unless it says it does.
           messages: toMessageParams(
-            compat ? withoutImages(request.messages) : request.messages,
+            textOnly ? withoutImages(request.messages, request.model) : request.messages,
             id,
             withThinking,
-            cacheControl(request),
+            // Anthropic behind a compatible endpoint refuses a 1-hour breakpoint after the system's 5-minute ones.
+            compat ? undefined : cacheControl(request),
           ),
           ...(compat ? {} : { cache_control: { type: "ephemeral" as const } }),
           ...(tools.length > 0 ? { tools } : {}),
@@ -246,6 +252,7 @@ export function createAnthropicProvider(
               : {}),
           },
           ...(Object.keys(dropped).length > 0 ? { thinking: { dropped } } : {}),
+          ...(leftOut ? { imagesLeftOut: true as const } : {}),
         };
       };
       const failure = (error: unknown) => {
@@ -403,14 +410,22 @@ function toBlockParam(
           content: block.images?.length
             ? [
                 { type: "text", text: block.content },
-                ...block.images.map((i) => ({
-                  type: "image" as const,
-                  source: {
-                    type: "base64" as const,
-                    media_type: i.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
-                    data: i.data,
-                  },
-                })),
+                ...block.images.map((i) =>
+                  i.mediaType === PDF_MEDIA_TYPE
+                    ? {
+                        type: "document" as const,
+                        source: { type: "base64" as const, media_type: PDF_MEDIA_TYPE, data: i.data },
+                        ...(i.name ? { title: i.name } : {}),
+                      }
+                    : {
+                        type: "image" as const,
+                        source: {
+                          type: "base64" as const,
+                          media_type: i.mediaType as "image/png" | "image/jpeg" | "image/gif" | "image/webp",
+                          data: i.data,
+                        },
+                      },
+                ),
               ]
             : block.content,
           ...(block.isError ? { is_error: true } : {}),

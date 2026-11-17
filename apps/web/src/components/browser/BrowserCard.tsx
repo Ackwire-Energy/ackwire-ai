@@ -6,6 +6,7 @@ import type {
   BrowserStep,
   DesktopViewState,
   LiveRun,
+  Machine,
   PageTarget,
   ScreenKind,
 } from "@agenteschat/client";
@@ -45,18 +46,23 @@ import {
 } from "@agenteschat/client";
 import { formatTime, lowerFirst } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { browserNoAnswerMessage, browserOffMessage, profileRefusalLine } from "@agenteschat/client/lib/machines";
+import { MAX_MESSAGE_LENGTH } from "@agenteschat/client/lib/message-length";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
+import { useSeat } from "@agenteschat/client/lib/seat-context";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import {
   agentGradient,
   Button,
   Chip,
   FilterToggle,
+  focusIdle,
   Icon,
   type IconName,
   isApple,
   Locked,
   onScreenNow,
+  overLimit,
   PixelSpinner,
   SkyStrip,
   shortcut,
@@ -79,6 +85,7 @@ import { Trans, useTranslation } from "react-i18next";
 import { withAgentFace } from "@/components/AgentAvatar";
 import { useDirectory } from "@/hooks/useDirectory";
 import { TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
+import { useTextLimit } from "@/hooks/useTextLimit";
 import { usePageVisible } from "@/hooks/useWindowActive";
 import { pastes } from "@/lib/keys";
 import { useToast } from "@/lib/toast";
@@ -89,10 +96,12 @@ import { DialogHead, FullButton, FullScreenButton, useDialogHead, useSayFailed }
 import { useOpenComputer, useOpenedComputer } from "../computer/open";
 import { DesktopView } from "../desktop/DesktopView";
 import { PASTE_MAX_BYTES, pasteBytes } from "../desktop/paste";
+import { MachineToolButton } from "../devices/ToolOneClick";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
 import { useComputerEdition } from "../WorkspaceComputer";
 import { AddressBar } from "./AddressBar";
+import { AgentCursor } from "./AgentCursor";
 import { Cover } from "./Cover";
 import { LivePicture } from "./LivePicture";
 import { requestBrowserCard, useBrowserCardRequest } from "./open";
@@ -103,8 +112,8 @@ import "./browser.css";
 export { Cover } from "./Cover";
 
 const FAIL_REASONS = ["code", "password", "blocked"] as const;
-/** The reason goes before it, in the 1000 the server takes. */
-const FAIL_NOTE_MAX = 900;
+/** The reason goes before it, in what the server takes: a message's length. */
+const FAIL_NOTE_MAX = MAX_MESSAGE_LENGTH - 100;
 /** The scroll hint goes this long after the wheel's last tick. */
 const SCROLL_HINT_IDLE_MS = 1200;
 const KEYS = ["Tab", "Enter", "Backspace", "Escape"] as const;
@@ -313,7 +322,7 @@ export function BrowserCard({
    * A shared browser profile (ADR 0110) instead of the agent's browser: its live view (`profile:<id>`), "Fazer
    * login" as the person's control of it, Devolver hands it back to its agents. `name` is the profile's.
    */
-  profile?: { id: string; name: string; agentIds: string[]; canDrive: boolean };
+  profile?: { id: string; name: string; agentIds: string[]; canDrive: boolean; machine?: Machine };
   /** Its run's browser command waits for a profile someone else has (the waiting box). */
   profileWait?: BrowserProfileWait | null;
   /** What the agent did in its browser in this run (the log); none outside a run. */
@@ -343,6 +352,8 @@ export function BrowserCard({
   const head = useDialogHead();
   const sayFailed = useSayFailed();
   const openComputer = useOpenComputer();
+  // The right hand's place this card shows (the shared one in a channel): the whole screen opens that same place.
+  const seat = useSeat(agentId);
   // The dialog over this card shows the same screen ("Ver a tela inteira"), and a hidden tab shows nothing: the card's
   // own view of it closes (one stream per person, none for nobody).
   const dialogOpen = useOpenedComputer() === agentId;
@@ -453,6 +464,7 @@ export function BrowserCard({
   const [failing, setFailing] = useState(false);
   const [reason, setReason] = useState<(typeof FAIL_REASONS)[number] | null>(null);
   const [note, setNote] = useState("");
+  const failLimit = useTextLimit(FAIL_NOTE_MAX);
   const [backNote, setBackNote] = useState("");
   const [confirmStop, setConfirmStop] = useState(false);
   const [keysOpen, setKeysOpen] = useState(false);
@@ -697,7 +709,7 @@ export function BrowserCard({
   }, [pointing, fingers]);
   // The button that opened the page leaves with the focus: keys typed at once, at a field the page shows, go there.
   useEffect(() => {
-    if (pointing && document.activeElement === document.body) pageRef.current?.focus({ preventScroll: true });
+    if (pointing && focusIdle()) pageRef.current?.focus({ preventScroll: true });
   }, [pointing]);
   // The screen's last picture, when the dialog switches from it to this page (or back), shows dimmed until the page's
   // first frame: the layout effects of the view going and of the one coming run before anything paints
@@ -783,7 +795,7 @@ export function BrowserCard({
   };
 
   const fail = () => {
-    if (!handoff) return;
+    if (!handoff || overLimit(note, failLimit)) return;
     const words = [reason ? t(`browser.live.failReasons.${reason}`) : "", note.trim()].filter(Boolean).join(". ");
     actions.failed.mutate(
       { handoffId: handoff.id, ...(words ? { note: words } : {}) },
@@ -849,6 +861,11 @@ export function BrowserCard({
 
   const unavailable = shows ? null : live.unavailable;
   const reconnecting = unavailable?.reason === "reconnecting";
+  // A profile's Chrome the computer refused to start (`unavailable`) waits for nothing: said at once, with its way out
+  // (the switch when the browser is off there). An agent's own browser retries by itself, as before.
+  const refusedHere = unavailable?.reason === "unavailable" && Boolean(profile);
+  const offHere = refusedHere && browserOffMessage(unavailable?.message);
+  const noAnswer = refusedHere && browserNoAnswerMessage(unavailable?.message);
   // What can't change by waiting is said plainly; everything else is "opening" while it retries.
   const blocker = shows
     ? null
@@ -860,7 +877,13 @@ export function BrowserCard({
           ? t(canDo(org, "own_browsers") ? "browser.inCard.forbidden" : "browser.inCard.noRole")
           : live.error === "too_many_browsers"
             ? t("browser.inCard.tooMany")
-            : null;
+            : refusedHere
+              ? offHere
+                ? t("browser.profiles.toolOff")
+                : noAnswer
+                  ? t("browser.inCard.noAnswer", g)
+                  : t("browser.live.unavailable")
+              : null;
   const starting = !shows && !frame && !blocker && !reconnecting && !closed && !opening && !hidden;
   // Opening or reconnecting for too long says so, with Try again: who may drive it restarts the browser, the
   // others watch again. Only while this view watches on an open socket: off screen or offline no page can come.
@@ -872,6 +895,12 @@ export function BrowserCard({
     setAttempt((n) => n + 1);
     // Watching again after the restart too: this view's own watch may be what the server refused.
     if (mayDrive && !profile) actions.restart.mutate(agentId, { onError: didntWork, onSettled: () => live.retry() });
+    // A profile's Chrome starts again with control taken again (the server warms it, or says why it can't).
+    else if (profile && mayDrive)
+      profileActions.takeover.mutate(profile.id, {
+        onError: (err) => sayFailed(profileRefusalLine(t, err)),
+        onSettled: () => live.retry(),
+      });
     else live.retry();
   };
 
@@ -989,7 +1018,9 @@ export function BrowserCard({
   // On the screen (ADR 0058 §7) no frame says the page: what the agent does now, or watching.
   const sub = inControl
     ? profile
-      ? t("browser.profiles.controlSub")
+      ? profile.machine
+        ? t("browser.profiles.controlSubOn", { machine: profile.machine.name })
+        : t("browser.profiles.controlSub")
       : ask
         ? host
           ? t("browser.inCard.subControl", { site: host, ...g })
@@ -1087,7 +1118,7 @@ export function BrowserCard({
       iconOnly={framed}
       aria-label={framed ? t("desktop.seeWhole") : undefined}
       title={framed ? t("desktop.seeWhole") : undefined}
-      onClick={() => openComputer(agentId)}
+      onClick={() => openComputer(agentId, seat)}
     >
       {t("desktop.seeWhole")}
     </Button>
@@ -1135,6 +1166,27 @@ export function BrowserCard({
       />
     ) : profileWait ? (
       <ProfileWaitCover wait={profileWait} waiter={{ agentId, name }} />
+    ) : blocker && refusedHere ? (
+      <Cover
+        color={color}
+        icon="alert"
+        text={blocker}
+        help={noAnswer && mayDrive ? t("browser.inCard.stuckHelp") : undefined}
+        action={
+          profile?.machine && offHere ? (
+            <MachineToolButton machine={profile.machine} tool="browser" onAllowed={retry} />
+          ) : (
+            <Button
+              size="sm"
+              icon="refresh"
+              loading={actions.restart.isPending || profileActions.takeover.isPending}
+              onClick={retry}
+            >
+              {t("common.retry")}
+            </Button>
+          )
+        }
+      />
     ) : blocker ? (
       <Cover color={color} text={blocker} />
     ) : hidden ? (
@@ -1165,7 +1217,12 @@ export function BrowserCard({
     ) : reconnecting ? (
       <Cover color={color} spinner text={t("browser.live.reconnecting")} help={t("browser.inCard.reconnectHelp", g)} />
     ) : starting ? (
-      <Cover color={color} spinner text={t("browser.inCard.openingLong", g)} help={t("browser.inCard.openingHelp")} />
+      <Cover
+        color={color}
+        spinner
+        text={profile ? t("browser.profiles.opening", { name: profile.name }) : t("browser.inCard.openingLong", g)}
+        help={t("browser.inCard.openingHelp")}
+      />
     ) : null;
 
   return (
@@ -1186,6 +1243,7 @@ export function BrowserCard({
       style={framed ? frameStyle : undefined}
       role="group"
       data-esc-layer={full ? "" : undefined}
+      data-control={inControl || undefined}
       aria-label={t("browser.inCard.group", g)}
     >
       {!surface && !framed && <SkyStrip color={color} muted={inControl} moving={live_} />}
@@ -1350,6 +1408,8 @@ export function BrowserCard({
             >
               {inControl && <textarea ref={pasteRef} className="brw-paste" tabIndex={-1} aria-hidden="true" />}
               <LivePicture frame={frame} alt={t("browser.live.page", g)} imgRef={imgRef} />
+              {/* Nobody in control: the agent works, and its cursor shows where (ADR 0040 §7.2). */}
+              {!controller && <AgentCursor agentId={agentId} name={name} color={color} pointer={live.pointer} />}
               {mark && <span key={mark.key} className="brw-mark" style={{ left: mark.x, top: mark.y }} />}
               {(sliding || scrolling) && (
                 <span className="brw-ac__capture" role="status" data-esc-layer="">
@@ -1435,14 +1495,20 @@ export function BrowserCard({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 placeholder={t("browser.live.failPlaceholder")}
-                maxLength={FAIL_NOTE_MAX}
+                limit={failLimit}
               />
               <div className="brw-ac__row">
                 <span className="brw-grow" />
                 <Button size="sm" variant="ghost" onClick={() => setFailing(false)}>
                   {t("browser.live.back")}
                 </Button>
-                <Button size="sm" variant="primary" loading={actions.failed.isPending} onClick={fail}>
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={overLimit(note, failLimit)}
+                  loading={actions.failed.isPending}
+                  onClick={fail}
+                >
                   {t("browser.live.failSend", g)}
                 </Button>
               </div>
@@ -1531,8 +1597,14 @@ export function BrowserCard({
         ) : null)}
       {inControl && !failing && (
         <HandBackFoot
-          title={profile ? t("browser.profiles.backTitle", { name: profile.name }) : t("browser.inCard.backTitle", g)}
-          label={handBackLabel}
+          title={
+            profile
+              ? profile.agentIds.length > 0
+                ? t("browser.profiles.backWhen", { count: profile.agentIds.length })
+                : t("browser.profiles.backWhenNone")
+              : t("browser.inCard.backTitle", g)
+          }
+          label={profile ? t("browser.profiles.handBack") : handBackLabel}
           grammar={g}
           {...(profile ? {} : { note: backNote, onNote: setBackNote })}
           noteFirst={handoffWantsWords(handoff)}
@@ -1545,7 +1617,7 @@ export function BrowserCard({
                 variant="ghost"
                 disabled={actions.done.isPending}
                 onClick={() => {
-                  setNote((words) => words || backNote.slice(0, FAIL_NOTE_MAX));
+                  setNote((words) => words || backNote);
                   setFailing(true);
                 }}
               >

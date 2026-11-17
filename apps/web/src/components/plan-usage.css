@@ -171,6 +171,46 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   flex-wrap: wrap;
   row-gap: var(--space-1);
 }
+/* "Usar em todos os agentes": the key's models in runs under their headings, the agents it goes to, one note. */
+.ai-keyall__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.ai-keyall__group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.ai-keyall__label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.ai-keyall__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ai-keyall__more:hover {
+  color: var(--ink);
+}
+.ai-keyall__faces {
+  display: flex;
+  flex: none;
+  gap: var(--space-1);
+  margin-left: auto;
+}
 @media (prefers-reduced-motion: reduce) {
   .plan-row__fold,
   .plan-row__chevron {
@@ -272,6 +312,27 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
 }
 .plan-shares__row:hover b {
   text-decoration: underline;
+}
+
+/* Under the agents, the account's use by kind: the same rows, an icon in the face's column, not a link. The label
+   cancels half the meter's gap, so it sits 8 above its list. */
+.plan-kinds__label {
+  margin: 0 0 calc(-1 * var(--space-2));
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.plan-kinds__icon {
+  display: inline-flex;
+  justify-content: center;
+  width: 20px;
+  color: var(--muted);
+}
+.plan-kinds .plan-shares__row {
+  cursor: default;
+}
+.plan-kinds .plan-shares__row:hover b {
+  text-decoration: none;
 }
 
 /* The API per agent. */
@@ -422,4 +483,17 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
     align-items: flex-start;
     text-align: left;
   }
+}
+/* "Quem usa" in an open row, for whoever connected the plan: its label on the left, the choice on the right. */
+.plan-serves {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+.plan-serves__label {
+  font-weight: 500;
 }

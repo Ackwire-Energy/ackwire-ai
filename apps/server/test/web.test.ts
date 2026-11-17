@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../src/app";
+import { createTestServer } from "./harness";
 
 /**
  * One process serves the API and the built web app (apps/web → WEB_DIR).
@@ -19,6 +20,10 @@ beforeAll(() => {
   writeFileSync(join(dir, "assets", "app.js"), "console.log(1)");
   mkdirSync(join(dir, "runner"));
   writeFileSync(join(dir, "runner", "agentes-runner.mjs"), "#!/usr/bin/env node\nconsole.log('runner')");
+  writeFileSync(join(dir, "sw.js"), "self.addEventListener('push', () => {})");
+  writeFileSync(join(dir, "manifest.webmanifest"), '{"name":"agentes.chat"}');
+  writeFileSync(join(dir, "favicon.svg"), "<svg xmlns='http://www.w3.org/2000/svg'/>");
+  writeFileSync(join(dir, "unavailable.html"), "<!doctype html><p>Unavailable</p>");
   app = createApp({ edition: "cloud", version: "test", modules: [], pingDatabase: async () => {}, webDir: dir });
 });
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
@@ -57,6 +62,109 @@ describe("web app serving", () => {
       const res = await app.request(path);
       expect(res.status).toBe(200);
       expect(await res.text()).toContain('<div id="root">');
+    }
+  });
+
+  test("a well-known file this build doesn't ship is a 404, never index.html", async () => {
+    for (const path of [
+      "/robots.txt",
+      "/sitemap.xml",
+      "/sitemap_index.xml",
+      "/sitemap-index.xml",
+      "/llms.txt",
+      "/llms-full.txt",
+      "/ads.txt",
+      "/app-ads.txt",
+      "/humans.txt",
+      "/security.txt",
+    ]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(404);
+      expect(await res.text()).not.toContain('<div id="root">');
+    }
+  });
+
+  test("a well-known file the build does ship is served", async () => {
+    writeFileSync(join(dir, "llms.txt"), "# agentes.chat");
+    try {
+      const res = await app.request("/llms.txt");
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("# agentes.chat");
+      expect(res.headers.get("x-robots-tag")).toBeNull();
+    } finally {
+      rmSync(join(dir, "llms.txt"));
+    }
+  });
+
+  test("an app address that ends like a file still gets index.html", async () => {
+    for (const path of [
+      "/org/abc/wiki/notes.md",
+      "/org/abc/wiki/robots.txt",
+      "/org/abc/wiki/sitemap.xml",
+      "/org/acme.example/c/def",
+      "/invite/a.b.c",
+      "/invite/sitemap.xml",
+      "/robots.txt.bak",
+      "/my-sitemap.xml",
+    ]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('<div id="root">');
+    }
+  });
+
+  test("every page of the app tells search engines not to index it", async () => {
+    for (const path of ["/", "/login", "/org/abc/c/def", "/invite/some-token", "/index.html", "/unavailable.html"]) {
+      const res = await app.request(path);
+      expect(res.status).toBe(200);
+      expect(res.headers.get("content-type")).toStartWith("text/html");
+      expect(res.headers.get("x-robots-tag")).toBe("noindex");
+    }
+  });
+
+  test("only pages say noindex: the API, build files, the service worker, the manifest and pictures don't", async () => {
+    for (const path of [
+      "/api/health",
+      "/api/app/nothing-here",
+      "/assets/app.js",
+      "/assets/missing.js",
+      "/sw.js",
+      "/manifest.webmanifest",
+      "/favicon.svg",
+      "/runner/agentes-runner.mjs",
+      "/robots.txt",
+    ]) {
+      const res = await app.request(path);
+      expect(res.headers.get("content-type")).not.toStartWith("text/html");
+      expect(res.headers.get("x-robots-tag")).toBeNull();
+    }
+  });
+
+  test("a /.well-known answer of the server's own doesn't say noindex", async () => {
+    const t = await createTestServer();
+    try {
+      const { db, auth, config, adapters } = t;
+      const full = createApp({
+        edition: "selfhost",
+        version: "test",
+        modules: [],
+        pingDatabase: async () => {},
+        services: { db, auth, config, adapters },
+        webDir: dir,
+      });
+      for (const path of ["/.well-known/oauth-protected-resource", "/.well-known/oauth-authorization-server"]) {
+        const res = await full.request(path);
+        expect(res.status).toBe(200);
+        expect(res.headers.get("content-type")).toStartWith("application/json");
+        expect(res.headers.get("x-robots-tag")).toBeNull();
+      }
+      // Not set up on this server: a 404 of its own, not the app's page.
+      const links = await full.request("/.well-known/assetlinks.json");
+      expect(links.status).toBe(404);
+      expect(links.headers.get("x-robots-tag")).toBeNull();
+      expect((await full.request("/")).headers.get("x-robots-tag")).toBe("noindex");
+    } finally {
+      await t.close();
     }
   });
 

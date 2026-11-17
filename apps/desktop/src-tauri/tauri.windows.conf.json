@@ -10,7 +10,20 @@
         "sidebarImage": "installer/side.bmp",
         "headerImage": "installer/header.bmp",
         "installerIcon": "icons/icon.ico",
-        "languages": ["English", "PortugueseBR"]
+        "languages": [
+          "English",
+          "PortugueseBR",
+          "Spanish",
+          "French",
+          "German",
+          "Italian",
+          "Dutch",
+          "Japanese",
+          "Korean",
+          "SimpChinese",
+          "Turkish",
+          "Russian"
+        ]
       }
     }
   }

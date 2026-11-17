@@ -5,7 +5,7 @@ import { settingUp } from "./guards";
 import { CODE_LENGTH, sendsEmail } from "./join-requests";
 import { matchesName } from "./text";
 
-/** Days a deleted workspace stays closed and restorable (the engine's `WORKSPACE_DELETION_DAYS`). */
+/** Days a deleted workspace stays read-only and restorable (the engine's `WORKSPACE_DELETION_DAYS`). */
 export const DELETION_DAYS = 7;
 
 /** When a workspace deleted at `now` goes for good. */
@@ -19,18 +19,45 @@ export const restorable = (org: Pick<OrgSummary, "role" | "deletion">, now = Dat
 const dueDate = (deletion: Pick<OrgDeletion, "dueAt">, now: number) =>
   deletion.dueAt && Date.parse(deletion.dueAt) > now ? deletion.dueAt : null;
 
-/** The closing screen's line: what's going on, that nothing more is needed, and when it goes while that's ahead. */
-export function deletingText(t: TFunction, locale: string, deletion: OrgDeletion, now = Date.now()): string {
+/** The line on top of a workspace being deleted: when it goes while that's ahead, else only that it's going. */
+export function deletingText(t: TFunction, locale: string, name: string, deletion: OrgDeletion, now = Date.now()) {
   const due = dueDate(deletion, now);
-  return due ? t("deleting.text", { date: formatShortDate(locale, due) }) : t("deleting.textLate");
+  return due ? t("deleting.banner", { name, date: formatShortDate(locale, due) }) : t("deleting.title", { name });
 }
 
-/** The closing screen's second line: who deleted it and when. */
-export function deletedByText(t: TFunction, locale: string, deletion: OrgDeletion): string | null {
+/** Who deleted it and when, under that line: "Você" for the person who did (`meId`). */
+export function deletedByText(t: TFunction, locale: string, deletion: OrgDeletion, meId?: string): string | null {
   if (!deletion.requestedAt) return null;
-  const by = deletion.requestedBy?.name || t("deleting.someone");
-  return t("deleting.by", { by, date: formatShortDate(locale, deletion.requestedAt) });
+  const date = formatShortDate(locale, deletion.requestedAt);
+  if (meId && deletion.requestedBy?.id === meId) return t("deleting.byYou", { date });
+  return t("deleting.by", { by: deletion.requestedBy?.name || t("deleting.someone"), date });
 }
+
+/**
+ * The settings sections (the web's ids, which the phone's share) that stay as ever while the workspace is being
+ * deleted (ADR 0088 §7): the person's own, what only reads, what is mostly read through rows and tabs (the Vault,
+ * roles, skills, the agents' access: their writes are refused in words), taking its data out (import and export) and
+ * its billing.
+ */
+export const SETTINGS_OPEN_WHILE_DELETING: ReadonlySet<string> = new Set([
+  "account",
+  "notifications",
+  "download",
+  "approvals",
+  "usage",
+  "audit",
+  "import",
+  "billing",
+  "about",
+  "vault",
+  "roles",
+  "skills",
+  "access",
+]);
+
+/** A settings section greyed out: the workspace is being deleted and the section would change it. */
+export const settingsFrozen = (org: { deletion?: unknown } | null | undefined, section: string) =>
+  !!org?.deletion && !SETTINGS_OPEN_WHILE_DELETING.has(section);
 
 /** What `settingUp` and the standing read of a workspace, and no more: the phone's lists carry narrower rows. */
 interface WorkspaceState {
@@ -41,17 +68,19 @@ interface WorkspaceState {
   standing?: { state: string };
 }
 
-/** A workspace that opens: not closed (being deleted or suspended) and not still being set up. */
-export const workspaceOpens = (org: WorkspaceState) =>
-  !org.deletion && org.standing?.state !== "suspended" && !settingUp(org);
+/**
+ * A workspace that opens: not suspended and not still being set up. One being deleted opens too, read-only until it
+ * goes (ADR 0088 §7).
+ */
+export const workspaceOpens = (org: WorkspaceState) => org.standing?.state !== "suspended" && !settingUp(org);
 
 /**
- * Whether a closed workspace's screen or the onboarding must offer deleting the account: it lives in Sua conta, inside
- * a workspace that opens, and with none this is the only way to it (App Store 5.1.1(v), ADR 0035).
+ * Whether the suspended screen or the onboarding must offer deleting the account: it lives in Sua conta, inside a
+ * workspace that opens, and with none this is the only way to it (App Store 5.1.1(v), ADR 0035).
  */
 export const accountOutOfReach = (orgs: readonly WorkspaceState[]) => !orgs.some(workspaceOpens);
 
-/** Where a closed workspace's screen sends the person: their other workspaces, none suspended, those that open first. */
+/** Where the suspended screen sends the person: their other workspaces, none suspended, those that open first. */
 export function otherWorkspaces<O extends WorkspaceState>(orgs: readonly O[], orgId: string): O[] {
   const others = orgs.filter((o) => o.id !== orgId && o.standing?.state !== "suspended");
   return [...others.filter(workspaceOpens), ...others.filter((o) => !workspaceOpens(o))];
@@ -108,24 +137,40 @@ export function accountDeletingText(t: TFunction, locale: string, dueAt: string 
     : t("accountDeleting.textLate");
 }
 
-/** What proves it's the person before deleting: a code emailed to them, their password, or a password added first. */
-export type DeletionProof = "code" | "password" | "addPassword";
+/**
+ * What proves it's the person before deleting: a code emailed to them, their password, a password added first, or a
+ * sign-in in the last 10 minutes on this Mac.
+ */
+export type DeletionProof = "code" | "password" | "addPassword" | "thisMac";
 
 /**
  * The proof deleting takes (ADR 0088 §2): a code emailed to the person where the server sends email, else their
- * password, which an account without one adds first.
+ * password, which an account without one adds first. `onThisMac`: the desktop app's owner on its own server
+ * (`confirmsOnThisMac`, in the app), whose fresh sign-in through the app is the proof instead.
  */
 export const deletionProof = (
   config: Pick<AuthConfig, "passwordReset"> | undefined,
   hasPassword: boolean | undefined,
-): DeletionProof => (sendsEmail(config) ? "code" : hasPassword === false ? "addPassword" : "password");
+  onThisMac = false,
+): DeletionProof =>
+  sendsEmail(config) ? "code" : onThisMac ? "thisMac" : hasPassword === false ? "addPassword" : "password";
 
-/** What the deletion sends as its proof, and whether it can yet: all the code's digits once one went out, or a password. */
-export function proofToSend(kind: DeletionProof, typed: { sent: boolean; code: string; password: string }) {
+/**
+ * What the deletion sends as its proof, and whether it can yet: all the code's digits once one went out, a password,
+ * or nothing once the sign-in on this Mac is `fresh`.
+ */
+export function proofToSend(
+  kind: DeletionProof,
+  typed: { sent: boolean; code: string; password: string; fresh?: boolean },
+) {
   const input: DeletionProofInput =
     kind === "code" ? { code: typed.code } : kind === "password" ? { password: typed.password } : {};
   const ready =
-    kind === "code" ? typed.sent && typed.code.length === CODE_LENGTH : kind === "password" && typed.password !== "";
+    kind === "code"
+      ? typed.sent && typed.code.length === CODE_LENGTH
+      : kind === "password"
+        ? typed.password !== ""
+        : kind === "thisMac" && typed.fresh === true;
   return { input, ready };
 }
 

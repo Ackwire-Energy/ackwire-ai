@@ -4,6 +4,7 @@ import {
   brainsNeeded,
   brainUnavailableOf,
   isOutageEvent,
+  messageToolOff,
   moveErrorOf,
   moveOutcome,
   type OutageLike,
@@ -202,5 +203,24 @@ describe("offline computers", () => {
       msg("t1", "10:05", note, "nova", "thread-1"),
     ]);
     expect([...hide].sort()).toEqual(["n1"]);
+  });
+});
+
+describe("the switch an agent's message needs (its one-click card)", () => {
+  test("a wait for its CLI or commands, a call refused for the browser or the desktop, else none", () => {
+    const wait = {
+      bodyCode: "brain_unavailable",
+      brainUnavailable: { brain: "codex", code: "tool_off", machineId: "m1" },
+    };
+    expect(messageToolOff(wait)).toEqual({ machineId: "m1", tools: ["codex"] });
+    expect(messageToolOff({ toolOff: { machineId: "m1", tool: "browser" } })).toEqual({
+      machineId: "m1",
+      tools: ["browser"],
+    });
+    // The desktop runs commands too: both switches, the card shows the ones still off.
+    expect(messageToolOff({ toolOff: { machineId: "m1", tool: "desktop" } })?.tools).toEqual(["desktop", "commands"]);
+    expect(messageToolOff({ toolOff: { machineId: "m1", tool: "rm -rf" } })).toBeNull();
+    expect(messageToolOff({})).toBeNull();
+    expect(messageToolOff(null)).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import {
   audienceModeKey,
   audienceModeTextKey,
   offersConsultable,
+  reachShortKey,
 } from "@agenteschat/client/lib/audience";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { aiStateOf, onlyOwnerReplies } from "@agenteschat/client/lib/no-ai";
@@ -17,6 +18,7 @@ import {
   Checkbox,
   Chip,
   fold,
+  HintLine,
   Icon,
   type IconName,
   InfoHint,
@@ -88,7 +90,7 @@ export function AudienceChip({ agent }: { agent: Agent }) {
 }
 
 /**
- * The three choices (Todos do workspace / Só algumas pessoas ou papéis / Só o
+ * The three choices (Todos do workspace / Só algumas pessoas ou cargos / Só o
  * responsável), with the roles and people picker under the second, and whether other agents may consult it for
  * the rest (ADR 0085 addendum).
  * `compact`: a segmented control and one line about the choice ("Criar agente").
@@ -182,7 +184,9 @@ export function AudienceChoice({
       )}
       {reach && (
         <span className="small muted">
-          {t("audience.notListed")} {t(`audience.agents.${reach}`, g)}
+          <HintLine name={t("common.about", { label: t("audience.title", g) })} hint={t(`audience.agents.${reach}`, g)}>
+            {t("audience.notListed")} {t(reachShortKey(reach))}
+          </HintLine>
         </span>
       )}
       {offersConsultable(value, onPlan) && (

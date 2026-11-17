@@ -26,7 +26,7 @@ describe("design source", () => {
     const rules = css.split("}").filter((r) => r.includes("var(--agent)"));
     const selectors = rules.map((r) => (r.split("{")[0] ?? "").replace(/\/\*[\s\S]*?\*\//g, "").trim());
     for (const selector of selectors) {
-      expect(selector).toMatch(/ac-avatar|ac-logo|ac-msg--streaming|ac-btn--agent \.ac-icon|ac-composer__agent/);
+      expect(selector).toMatch(/ac-avatar|ac-logo|ac-msg--streaming|ac-btn--agent \.ac-icon/);
     }
   });
 });

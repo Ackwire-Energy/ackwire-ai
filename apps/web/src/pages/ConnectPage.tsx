@@ -5,13 +5,26 @@ import { errorText } from "@agenteschat/client/lib/errors";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { computerKind, formatUserCode, locationText } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Alert, Button, Card, ComputerPortrait, EmptyState, Field, Input, Locked, Select } from "@agenteschat/ui";
+import {
+  Alert,
+  Button,
+  Card,
+  ComputerPortrait,
+  EmptyState,
+  Field,
+  Input,
+  Locked,
+  Select,
+  Switch,
+} from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { CenteredLayout } from "@/components/AuthLayout";
+import { useUpdateComputer } from "@/components/devices/queries";
 import { LoadingLine } from "@/components/Loading";
 import { osOf } from "@/components/machine-bits";
+import { PrefRow } from "@/components/NoticePrefs";
 
 /** A code the server no longer knows: expired, used, denied or never made. */
 export const isGoneCode = (error: unknown) =>
@@ -39,7 +52,10 @@ export function ConnectPage({ code }: { code: string }) {
   const deny = useDenyDevice();
   const orgs = (me.data?.organizations ?? []).filter((o) => can(o, "pair_computers"));
   const [orgId, setOrgId] = useState<string | undefined>(undefined);
+  const spill = useUpdateComputer(orgId ?? "");
   const [name, setName] = useState("");
+  /** Spill-over for other people's turns (`spill.others`): off unless the person turns it on here. */
+  const [others, setOthers] = useState(false);
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [expired, setExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -189,14 +205,16 @@ export function ConnectPage({ code }: { code: string }) {
             confirm.mutate(
               { orgId: org.id, userCode: code, ...(clean ? { name: clean } : {}) },
               {
-                onSuccess: (machine) =>
+                onSuccess: (machine) => {
+                  if (others) spill.mutate({ id: machine.id, spill: { others: true } });
                   setOutcome({
                     kind: "confirmed",
                     machine,
                     orgId: org.id,
                     orgName: org.name,
                     reconnected: !!reconnect && machine.id === reconnect.machineId,
-                  }),
+                  });
+                },
                 onError: fail,
               },
             );
@@ -253,6 +271,13 @@ export function ConnectPage({ code }: { code: string }) {
               >
                 <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} />
               </Field>
+              <PrefRow
+                id="connect-spill"
+                icon="audiencePeople"
+                label={t("devices.spillOthers")}
+                hint={t("devices.spillOthersHint")}
+                control={<Switch checked={others} onCheckedChange={setOthers} />}
+              />
             </Locked>
           )}
           {error && <Alert>{error}</Alert>}

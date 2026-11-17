@@ -48,7 +48,7 @@ The model proposes items (`fact | preference | decision | lesson | how_to | term
 - **`save_how_to`**: trust from `learnTrust`, channel-scoped (unchanged), a quiet `memory.saved` receipt (new), never replacing a person's item.
 - **`update_skill`** (new, `skills:read`): `{name, body}`, only after `load_skill` of that skill in the same run. Its own agent-made unlocked skill: a new version with a receipt; locked or another agent's: refused; a person's: a `skill` proposal that someone who manages agents accepts (the stored body must still match). The prompt says: fix a wrong skill before answering.
 - `HOW_YOU_WORK`: "saving what you learned (a correction, a preference someone stated, a fact about the company, how you got something working)" among the internal changes that need no permission. The branch's "look for how it was done before" line stays.
-- No skill is created in a turn: skills appear only by promotion (§4).
+- No skill is created in a turn: skills appear only by promotion (§4). Amended 2026-11-14: except when a person asks for one (`create_skill`, addendum below).
 
 ### 4. Promotion and sharing (daily consolidate)
 
@@ -159,3 +159,13 @@ Skipped: writing access facts from code when a connector, a Vault login or a mai
 ## Addendum: no memory mark
 
 The mark under a person's message is gone on web and phone. The agent's reply and its receipt already say what was saved, and the receipt opens the item, where it can be corrected or forgotten. The message list still carries `memories` and the `message.memories` event still fires, for phone builds that draw the mark.
+
+## Addendum (2026-11-14): a skill when a person asks
+
+§3 said no skill is created in a turn, so a skill came only from how-tos reused enough (§4). People ask for one outright ("transforma isso numa skill"), and the agent had no way to make it: the only way in was `offer_install_skill`, which takes a GitHub link, so agents went off to make a repository for it.
+
+- **`create_skill`** (`skills:read`, in the "more" group loaded on demand, the prompt naming it while it is there): `{name, description, body}`, the body in Markdown, the steps first and then the pitfalls. The skill is the agent's own, as a promoted one is (`origin agent`, `owner_agent_id`, `source manual`, on for that agent only, archived after 30 days unused), and is made at once with a `skill.created` receipt whose `params.asked` says a person asked (the row reads "Criei a skill …", Desfazer archives it). People give it to other agents in Skills. Text files come later through `update_skill`, which applies at once to the agent's own skill.
+- **Only a person's request:** the run needs a person behind it and must not have read outside content (`learnTrust` high), since a skill loads as trusted instructions. Otherwise it is refused with the way that remains: `save_how_to` (promotion later), or the text shown to the person for Settings › Skills.
+- **The same checks as every skill write:** kebab-case name and description limits (`validateSkill`), no credentials (`looksLikeSecret`), no permission or approval rules (the permission judge), a name nobody holds here (a removed skill keeps its name), and at most 2 a run and 6 a day per agent (`SKILL_CREATE_LIMITS`).
+- **Prompt:** the install line names it too ("Asked to make one: `create_skill`. Never a repository or your CLI's own skills folder"), one line for both since every DM's prompt carries it (the size ceiling in `turns-eval.test.ts`).
+- Code: `context/learned-skills.ts` (`createSkillAsAgent`), `skill-tools.ts` (`create_skill`), `capabilities.ts`, `tools/run-policy.ts` (area `skills`), `tools/directory.ts` (`RARE_TOOLS`).

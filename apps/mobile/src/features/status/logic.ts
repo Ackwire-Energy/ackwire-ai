@@ -1,4 +1,4 @@
-import type { AgentStatus, Availability, MemberPresence, MemberStatus, StatusInput } from "@agenteschat/client";
+import type { Availability, MemberPresence, MemberStatus, StatusInput } from "@agenteschat/client";
 import { lowerFirst } from "@agenteschat/client/lib/format";
 import { clearsText, type UntilChoice, untilFor } from "@agenteschat/client/lib/presence";
 import type { TFunction } from "i18next";
@@ -61,15 +61,4 @@ export const lineText = (s: { emoji: string | null; text: string }) => (s.emoji 
 /** A person's line with when it clears: "📅 Em reunião · some às 15:00" (nothing said without an end). */
 export function personLine(t: TFunction, language: string, s: MemberStatus, now = new Date()): string {
   return s.until ? `${lineText(s)} · ${lowerFirst(clearsText(t, language, s.until, now), language)}` : lineText(s);
-}
-
-/** What an agent's presence is from (`presence.agentWhy.*`): active, on heavy work, idle since, held, no AI. */
-export function agentWhyKey(
-  presence: AgentStatus["presence"],
-  activeAt: string | null | undefined,
-  noAi: boolean,
-): "online" | "busy" | "away" | "awayNever" | "out" | "offline" | "noAi" {
-  if (noAi) return "noAi";
-  if (presence === "away") return activeAt ? "away" : "awayNever";
-  return presence;
 }

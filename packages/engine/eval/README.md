@@ -72,6 +72,6 @@ cases with an obstacle (no dedicated tool, an empty first search, a site that bl
 errors, a missing connector, a teammate holding the information), a real blocker (a code only the person has) and no
 obstacle at all. `resilience-cases.json` adds to a behavior case `web` (the fake web: search results by words, pages by
 address, `behavior-fakes.ts` `fakeWebFetch`), `facts` (words the answer must have), `never` (words an invented answer
-would have), `blocker` and `maxCalls`. API-brain cases run the real engine path with the real turn-end judge; a
+would have), `blocker`, `maxCalls`, `onlyKey` (only a key is the person's: asked with `request_secret`, never in the chat), `oneQuestion` and `noAsk` (asked for information or advice: no key, connection or approval asked to start an offered step). API-brain cases run the real engine path with the real turn-end judge; a
 `"brain": "claude_code"` case runs this computer's `claude` headless with the agents' prompt rules and our web tools
 over MCP. It prints the success and give-up rates and the cost per success; `--repeat` passes a case on a majority.

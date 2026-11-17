@@ -1,7 +1,8 @@
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
-import path from "node:path";
+import path, { win32 } from "node:path";
+import { envValue } from "./executors";
 
 /**
  * An app opened from Finder (or by launchd at login) gets macOS's bare PATH
@@ -47,21 +48,87 @@ export function loginShellPath(shell = process.env.SHELL || "/bin/zsh"): string 
 
 /** Joins PATH lists, first wins, dropping empty and repeated entries. */
 export function mergePath(...lists: (string | null | undefined)[]): string {
+  return mergePathWith(path.delimiter, ...lists);
+}
+
+/** `mergePath` with its delimiter given (Windows' `;` wherever this runs); Windows' folders compare without case. */
+export function mergePathWith(delimiter: string, ...lists: (string | null | undefined)[]): string {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const list of lists) {
-    for (const dir of (list ?? "").split(path.delimiter)) {
-      if (!dir || seen.has(dir)) continue;
-      seen.add(dir);
+    for (const dir of (list ?? "").split(delimiter)) {
+      const key = delimiter === ";" ? dir.toLowerCase().replace(/[\\/]+$/, "") : dir;
+      if (!dir || seen.has(key)) continue;
+      seen.add(key);
       out.push(dir);
     }
   }
-  return out.join(path.delimiter);
+  return out.join(delimiter);
+}
+
+/** Where the usual installers put a CLI on Windows: Claude Code's own, npm's global launchers, Bun's. */
+export function usualWindowsDirs(env: NodeJS.ProcessEnv = process.env): string[] {
+  const home = envValue(env, "USERPROFILE", "win32") || os.homedir();
+  const appData = envValue(env, "APPDATA", "win32") || win32.join(home, "AppData", "Roaming");
+  return [win32.join(home, ".local", "bin"), win32.join(appData, "npm"), win32.join(home, ".bun", "bin")];
+}
+
+/**
+ * `reg query`'s answer for one `Path` value: its data, `%NAME%` expanded from `env` (a `REG_EXPAND_SZ` keeps them),
+ * or null when it has none.
+ */
+export function registryPathValue(output: string, env: NodeJS.ProcessEnv = process.env): string | null {
+  const data = /^\s*Path\s+REG_(?:EXPAND_)?SZ\s+(.*)$/im.exec(output)?.[1]?.trim();
+  if (!data) return null;
+  return data.replace(/%([^%;]+)%/g, (all, name: string) => envValue(env, name, "win32") ?? all);
+}
+
+/**
+ * The user's and the machine's `Path` as Windows keeps them now (`HKCU\Environment`, then the machine's): an app
+ * keeps the PATH it started with, so a folder an installer added since is in the registry only. `reg.exe` by its full
+ * path, as a bare name is looked for in the current folder first.
+ */
+export function windowsRegistryPath(env: NodeJS.ProcessEnv = process.env): string {
+  const reg = win32.join(envValue(env, "SystemRoot", "win32") || "C:\\Windows", "System32", "reg.exe");
+  const read = (key: string) => {
+    try {
+      const r = spawnSync(reg, ["query", key, "/v", "Path"], {
+        encoding: "utf8",
+        timeout: 5000,
+        windowsHide: true,
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      return registryPathValue(`${r.stdout ?? ""}`, env);
+    } catch {
+      return null;
+    }
+  };
+  return mergePathWith(
+    ";",
+    read("HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"),
+    read("HKCU\\Environment"),
+  );
+}
+
+/**
+ * Windows: what we had first (so nothing that ran keeps running something else), then the registry's `Path` and the
+ * usual folders that exist. Each look for the coding CLIs runs it again, not only the start.
+ */
+export function adoptWindowsPath(
+  env: NodeJS.ProcessEnv = process.env,
+  registry: () => string = () => windowsRegistryPath(env),
+  exists: (dir: string) => boolean = existsSync,
+): void {
+  const usual = usualWindowsDirs(env).filter((d) => exists(d));
+  env.PATH = mergePathWith(";", envValue(env, "PATH", "win32"), registry(), usual.join(";"));
 }
 
 /** Sets `process.env.PATH` to the login shell's PATH + the usual folders that exist + what we had. */
 export function adoptLoginPath(log: (line: string) => void = () => {}): void {
-  if (process.platform === "win32") return;
+  if (process.platform === "win32") {
+    adoptWindowsPath();
+    return;
+  }
   const shell = loginShellPath();
   const usual = usualDirs()
     .filter((d) => existsSync(d))

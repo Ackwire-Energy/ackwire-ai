@@ -15,8 +15,8 @@ test("the action line: words on their one-line width, actions beside them only w
   expect(rule(".ac-actline > :is(span, div):empty")).toContain("display: none");
 });
 
-test("a card's head keeps a lone switch at its end, the words wrapping beside it", () => {
-  const head = ".ac-card__head:has(> .ac-card__action > .ac-switch:only-child)";
+test("a card's head keeps a lone switch or quiet link at its end, the words wrapping beside it", () => {
+  const head = ".ac-card__head:has(> .ac-card__action > :is(.ac-switch, .ac-link--action):only-child)";
   expect(rule(head)).toContain("flex-wrap: nowrap");
   expect(rule(`${head} > .ac-card__lead`)).toContain("flex: 1 1 0%");
   expect(rule(`${head} > .ac-card__action`)).toContain("margin-inline-start: 0");
@@ -40,4 +40,14 @@ test("on a phone a lone button takes the width of what holds it, at its own heig
     "justify-self: stretch",
   );
   expect(rule(".ac-mediarow__end--wrap > .ac-btn:only-child:not(.ac-btn--ghost)")).toContain("flex: 1 1 auto");
+});
+
+test("a dialog's foot never holds a button wider than the dialog: its words end in an ellipsis", () => {
+  expect(rule(".ac-dialog__foot .ac-btn")).toContain("max-width: 100%");
+  const label = rule(".ac-dialog__foot .ac-btn__label");
+  for (const d of ["min-width: 0", "overflow: hidden", "text-overflow: ellipsis"]) expect(label).toContain(d);
+  // Beside a note, the buttons are one group no wider than the foot, which goes under the note when both can't share
+  // a line (the action line).
+  expect(rule(".ac-dialog__foot-acts")).toContain("max-width: 100%");
+  expect(rule(".ac-dialog__foot-acts")).toContain("flex: none");
 });

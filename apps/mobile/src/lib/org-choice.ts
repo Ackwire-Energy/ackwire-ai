@@ -47,19 +47,6 @@ export function suspendedOf<
 }
 
 /**
- * The chosen organization when an owner is deleting it, with the person's other organizations to go to (none
- * suspended); null while it isn't (pure). A suspension comes first (`suspendedOf`).
- */
-export function deletingOf<O extends Pick<OrgSummary, "id" | "deletion" | "standing">>(
-  orgs: readonly O[],
-  orgId: string | null,
-): { org: O; others: O[] } | null {
-  const org = orgs.find((o) => o.id === orgId);
-  if (!org?.deletion) return null;
-  return { org, others: otherWorkspaces(orgs, org.id) };
-}
-
-/**
  * Whether "Entrando…" covers the app (pure): for a moment after signing in, and for as long as a signed-in person has
  * nothing to look at. The splash leaves on the sign-in screen, so after it nothing else covers the empty screens under
  * a workspace still loading. Never signed out: over the sign-in it would have nothing to end it.

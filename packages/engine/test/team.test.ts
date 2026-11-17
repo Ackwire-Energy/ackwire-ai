@@ -6,6 +6,7 @@ import {
   addChannelMember,
   agentScopeNames,
   createAgent,
+  createAgentGroup,
   createCredential,
   drainOutbox,
   enableCaches,
@@ -16,6 +17,7 @@ import {
   rosterScopeNames,
   summarizeScopes,
   teamPrompt,
+  teamStatus,
 } from "../src";
 import { type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
@@ -50,6 +52,8 @@ test("a big team is only a count with a pointer to find_agent", () => {
     brain: "model",
     autonomyBrakes: {},
     reportsToAgentId: null,
+    groupId: null,
+    groupName: null,
   }));
   const text = teamPrompt(team, "a0", null, new Set(), NO_PERSON);
   expect(text).toContain("19 other agents work in this organization.");
@@ -179,6 +183,64 @@ test("find_agent searches by what agents do and shows what they can do", async (
   expect(out).toContain("Responsible person:");
   expect(out).not.toContain("@design");
   expect(out).not.toContain("@dev:");
+});
+
+test("a teammate's department is in the team context, by name", async () => {
+  const requests: ModelRequest[] = [];
+  f = await setup({
+    askAgent: true,
+    reply: (req) => {
+      requests.push(req);
+      return { chunks: ["ok"] };
+    },
+  });
+  const infra = await addAgent("Infra", "infra", "Infrastructure");
+  await createAgentGroup({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    name: "Plataforma",
+    agentIds: [infra.id],
+  });
+
+  await post("@dev oi");
+  await drainOutbox(f.db, f.handlers);
+
+  const prompt = systemText(requests[0]?.system ?? []);
+  expect(prompt).toContain("@infra (Infrastructure, department: Plataforma)");
+});
+
+test("find_agent says which department an agent is in", async () => {
+  const results: string[] = [];
+  f = await setup({
+    askAgent: true,
+    reply: (req) => {
+      const last = JSON.stringify(req.messages.at(-1)?.content);
+      if (last.includes("tool_result")) {
+        results.push(last);
+        return { chunks: ["done"] };
+      }
+      return { chunks: [], toolUses: [{ name: "find_agent", input: { query: "deploy" } }] };
+    },
+  });
+  const infra = await addAgent("Infra", "infra", "Infrastructure", "Cuida do deploy no Railway.");
+  await createAgentGroup({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    name: "Plataforma",
+    agentIds: [infra.id],
+  });
+
+  await post("@dev quem faz deploy?");
+  await drainOutbox(f.db, f.handlers);
+
+  expect(results[0] ?? "").toContain("Department: Plataforma");
+});
+
+test("team_status names the department of the agents it lists", async () => {
+  f = await setup();
+  const infra = await addAgent("Infra", "infra", "Infrastructure");
+  await createAgentGroup({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
+    name: "Plataforma",
+    agentIds: [infra.id],
+  });
+  const out = await teamStatus(f.db, f.org.id, f.owner.id);
+  expect(out).toContain("Departments:\n- Plataforma: @infra");
 });
 
 test("a whole-connection grant is named after its connector, not 'Connector'", async () => {

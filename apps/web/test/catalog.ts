@@ -4,8 +4,15 @@ import { screen, settle } from "./render";
 /** A service opened from "Adicionar conector": its dialog over the catalog, named after it. */
 export const service = (name: string) => screen().getByRole("dialog", { name });
 
+/** Conectores: every connected row opened (each is one line until pressed), so its details and actions are in reach. */
+export async function openConnected() {
+  for (const head of document.querySelectorAll('.connected-row > [aria-expanded="false"]'))
+    await act(async () => fireEvent.click(head));
+}
+
 /** A connected account's ⋯ in Conectores, open (Radix opens a menu from the keyboard here): its menu. */
 export async function rowMenu(name: string) {
+  await openConnected();
   const button = screen().getByRole("button", { name: `Mais ações de ${name}` });
   button.focus();
   await act(async () => {

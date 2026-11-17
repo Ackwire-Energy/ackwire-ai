@@ -24,6 +24,7 @@ import {
   listArtifacts,
   listArtifactVersions,
   listDeletedArtifacts,
+  MAX_MESSAGE_LENGTH,
   purgeArtifactNow,
   replyToBlock,
   restoreArtifact,
@@ -96,6 +97,8 @@ const FileContent = z
     size: z.number().openapi({ description: "Bytes." }),
     sha256: z.string(),
     text: z.string().optional().openapi({ description: "Small UTF-8 text files only (≤ 40k characters)." }),
+    width: z.number().int().optional().openapi({ description: "A picture's width in pixels, when known." }),
+    height: z.number().int().optional().openapi({ description: "A picture's height in pixels, when known." }),
   })
   .openapi("ArtifactFileContent", {
     description: "An uploaded file as is: metadata only; the bytes come from the download link.",
@@ -821,7 +824,7 @@ export function artifactRoutes(deps: AppDeps) {
           z.object({
             picks: z.array(z.number().int().min(0)).min(1).max(ARTIFACT_LIMITS.choiceQuestions),
             others: z
-              .array(z.string().max(ARTIFACT_LIMITS.choiceOtherChars).nullable())
+              .array(z.string().max(MAX_MESSAGE_LENGTH).nullable())
               .max(ARTIFACT_LIMITS.choiceQuestions)
               .nullable()
               .optional(),

@@ -153,6 +153,8 @@ export function AllowTalkAction({ agent, userId }: { agent: Agent; userId: strin
   return (
     <RowAction
       label={t("reach.allow", { person, context: g.context })}
+      // Off while it saves and once done: a second tap isn't offered (the toast says it took).
+      disabled={save.busy || save.done}
       onPress={() => {
         if (save.busy || save.done) return;
         tapHaptic();
@@ -182,19 +184,23 @@ export function LetMeTalkButton({ agent }: { agent: Agent }) {
   if (!audience) return null;
   const g = agentGrammar(agent.name);
   return (
-    <Button
-      variant="primary"
-      size="sm"
-      label={t("reach.allowMe", g)}
-      disabled={save.busy || save.done}
-      onPress={() => {
-        tapHaptic();
-        save
-          .saveAsync(audience, ask(audience))
-          .then((saved) => saved && toast({ title: t("reach.allowedMe", g) }))
-          .catch((error: unknown) => toast({ title: errorText(t, error), icon: "x" }));
-      }}
-    />
+    // Centered under the centered words it follows, on the agent's page and in place of the composer: a button keeps
+    // to the left by itself.
+    <View style={styles.letIn}>
+      <Button
+        variant="primary"
+        size="sm"
+        label={t("reach.allowMe", g)}
+        disabled={save.busy || save.done}
+        onPress={() => {
+          tapHaptic();
+          save
+            .saveAsync(audience, ask(audience))
+            .then((saved) => saved && toast({ title: t("reach.allowedMe", g) }))
+            .catch((error: unknown) => toast({ title: errorText(t, error), icon: "x" }));
+        }}
+      />
+    </View>
   );
 }
 
@@ -295,9 +301,14 @@ const styles = StyleSheet.create({
   unavailableRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
   grow: { flex: 1, minWidth: 0 },
   lockedText: { textAlign: "center" },
+  // A row, centered along it: the button's own `alignSelf` would beat a column's `alignItems`.
+  letIn: { alignSelf: "stretch", flexDirection: "row", justifyContent: "center" },
   bold: { fontWeight: "600" },
-  // The icon on the words' first line, the words across the card; the action under them on their column.
+  // The icon on the words' first line, the words across the card, as wide as they are; the action under them on their
+  // column.
   one: {
+    alignSelf: "flex-start",
+    maxWidth: "100%",
     gap: 4,
     paddingVertical: 12,
     ...ROW_CARD_INSET,
@@ -308,7 +319,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 6,
   },
   head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  words: { flex: 1, minWidth: 0 },
+  words: { flexShrink: 1, minWidth: 0 },
   // The text column: the icon's 15 and the 8 after it.
   act: { paddingLeft: 15 + 8, alignItems: "flex-start" },
   detail: { marginTop: 2 },

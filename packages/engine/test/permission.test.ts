@@ -107,14 +107,19 @@ test("a card asked with the old `reason` field still turns the permission on", a
   expect(await scopes()).toContain("browser:use");
 });
 
-test("the right hand can't ask: its tools are fixed in code, so an approved card would turn on nothing", async () => {
+test("the right hand asks like any agent, never for a computer: it has none, so that card would turn on nothing", async () => {
   f = await setup({ permissionTools: true, reply });
   await ensureRightHand(f.db, f.org.id);
   const [lodi] = await f.db.select().from(schema.agents).where(eq(schema.agents.builtin, RIGHT_HAND));
   const ctx = await runContext(f);
   const names = async (agentId: string) => ((await f.tools?.list({ ...ctx, agentId })) ?? []).map((t) => t.name);
   expect(await names(f.agent.id)).toContain("request_permission");
-  expect(await names(lodi?.id ?? "")).not.toContain("request_permission");
+  expect(await names(lodi?.id ?? "")).toContain("request_permission");
+  const missing = async (agentId: string) => (await missingPermissions({ ...ctx, agentId })).map((m) => m.id);
+  await f.db.delete(schema.agentScopes).where(eq(schema.agentScopes.agentId, f.agent.id));
+  expect(await missing(f.agent.id)).toEqual(expect.arrayContaining(["sandbox:run", "browser:use", "desktop:use"]));
+  // Every other built-in scope is its already.
+  expect(await missing(lodi?.id ?? "")).toEqual([]);
 });
 
 test("refused: nothing is turned on", async () => {

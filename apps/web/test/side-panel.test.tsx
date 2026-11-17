@@ -112,11 +112,11 @@ test("a click on the scrim closes it, and so does Esc, the focus back where it w
   expect(document.activeElement).toBe(reply);
 });
 
-test("over the agent's page with unsaved edits, a click on the scrim asks first and keeps the page", async () => {
-  await openThread();
+test("over the agent's page with unsaved edits, a click on the scrim or leaving its address asks first and keeps the page", async () => {
+  const { router } = await openThread();
   // From inside the thread: everything outside the panel is out of reach.
   await click(within(thread() as HTMLElement).getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
-  await settle(6);
+  await act(() => new Promise((r) => setTimeout(r, 120)));
   const card = screen().getByRole("dialog", { name: "Perfil" });
   await act(async () =>
     fireEvent.pointerDown(within(card).getByRole("button", { name: "Mais" }), { button: 0, ctrlKey: false }),
@@ -125,8 +125,9 @@ test("over the agent's page with unsaved edits, a click on the scrim asks first 
   await click(within(screen().getByRole("menu", { name: "Mais" })).getByRole("menuitem", { name: "Ver perfil" }));
   await settle(6);
   const side = screen().getByRole("complementary", { name: "Perfil da Ada" });
-  // The agent's page took the thread's place in the one panel.
+  // The agent's page took the thread's place in the one panel, and in the address.
   expect(thread()).toBeNull();
+  expect(router.state.location.search).toEqual({ agent: ADA_ID });
   expect(document.querySelectorAll(".thread-panel")).toHaveLength(1);
   expect(document.querySelectorAll(".thread-panel__scrim")).toHaveLength(1);
   // Configurações is in the tabs' More menu (Radix opens it on pointer down).
@@ -140,7 +141,15 @@ test("over the agent's page with unsaved edits, a click on the scrim asks first 
   await click(side.previousElementSibling as HTMLElement);
   await settle(2);
   expect(document.querySelector(".thread-panel--wide")).toBeTruthy();
+  await click(screen().getByRole("button", { name: "Continuar editando" }));
+  await settle(2);
+  // Back to the conversation without the page in the address asks too: a Back is a way out of the panel.
+  // Not awaited: the navigation waits on the answer.
+  await act(async () => void router.navigate({ to: ".", search: {} } as never));
+  await settle(4);
   expect(screen().getByRole("button", { name: "Continuar editando" })).toBeTruthy();
+  expect(router.state.location.search).toEqual({ agent: ADA_ID, agentTab: "settings" });
+  expect(document.querySelector(".thread-panel--wide")).toBeTruthy();
 });
 
 test("in <body>, over everything: a page's entrance can't hold it inside the page, and a toast stays live", async () => {
@@ -162,11 +171,11 @@ test("Ver perfil from a thread, then closed: the focus goes back to what opened 
   })[0] as HTMLElement;
   reply.focus();
   await click(reply);
-  // Responder takes the caret to the thread's composer a beat later (ThreadPage): a card opened before then would lose
-  // the focus to it and close.
+  // The thread's view takes the caret as it mounts, and Responder takes it again a beat after the thread loads
+  // (ThreadPage). A card opened in between keeps the focus: waiting past that beat, it is still open.
   await waitFor(() => expect(document.activeElement?.id).toBe("composer-m-1"));
   await click(within(thread() as HTMLElement).getAllByRole("button", { name: "Perfil de Ada" })[0] as HTMLElement);
-  await settle(6);
+  await act(() => new Promise((r) => setTimeout(r, 120)));
   const card = screen().getByRole("dialog", { name: "Perfil" });
   await act(async () =>
     fireEvent.pointerDown(within(card).getByRole("button", { name: "Mais" }), { button: 0, ctrlKey: false }),

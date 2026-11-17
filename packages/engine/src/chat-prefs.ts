@@ -23,6 +23,8 @@ export interface ChatPrefs {
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
   textSize?: ChatTextSize;
+  /** Show every message in full, without folding it behind See more. */
+  fullMessages?: boolean;
   /**
    * "Always send" (ADR 0160 §12): a report an agent offers about the app goes with its reply, without asking. Kept
    * here because it is theirs alone, per workspace, on every device.
@@ -42,6 +44,7 @@ export function chatPrefsOf(stored: unknown): ChatPrefs {
     dmTone: oneOf(CHAT_TONES, o.dmTone),
     openAt: oneOf(CHAT_OPEN_AT, o.openAt),
     textSize: oneOf(CHAT_TEXT_SIZES, o.textSize),
+    fullMessages: typeof o.fullMessages === "boolean" ? o.fullMessages : undefined,
     feedbackAuto: typeof o.feedbackAuto === "boolean" ? o.feedbackAuto : undefined,
   };
   return Object.fromEntries(Object.entries(picks).filter(([, v]) => v !== undefined));

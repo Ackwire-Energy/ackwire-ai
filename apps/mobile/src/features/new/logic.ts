@@ -1,5 +1,5 @@
 import type { Agent } from "@agenteschat/client";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, makesAgents } from "@agenteschat/client/lib/permissions";
 import type { ConversationRow } from "../chats/logic";
 import { matches } from "../search/logic";
 
@@ -59,17 +59,17 @@ export type CreateItem = "agent" | "channel" | "task" | "routine" | "wiki" | "in
 const CREATE_ORDER: readonly CreateItem[] = ["agent", "channel", "task", "routine", "wiki", "invite"];
 
 /**
- * Whether this person may start `item`, as the server checks it (ADR 0085): an agent (`create_agents`), a channel
- * (`create_channels`), a task (`post`), a routine (`manage_routines`, or the owner of an agent), a wiki page
- * (`edit_wiki`) and invitations (`invite_people`).
+ * Whether this person may start `item`, as the server checks it (ADR 0085): an agent (`create_agents`, and none while
+ * the workspace is being deleted, as on the web), a channel (`create_channels`), a task (`post`), a routine
+ * (`manage_routines`, or the owner of an agent), a wiki page (`edit_wiki`) and invitations (`invite_people`).
  */
 export function mayCreate(
-  org: { permissions?: readonly string[] } | null | undefined,
+  org: { permissions?: readonly string[]; deletion?: unknown } | null | undefined,
   item: CreateItem,
   { ownsAgent = false }: { ownsAgent?: boolean } = {},
 ): boolean {
   const allowed: Record<CreateItem, boolean> = {
-    agent: can(org, "create_agents"),
+    agent: makesAgents(org),
     channel: can(org, "create_channels"),
     task: can(org, "post"),
     routine: can(org, "manage_routines") || ownsAgent,
@@ -81,7 +81,7 @@ export function mayCreate(
 
 /** What this person may start from "New". */
 export function createItems(
-  org: { permissions?: readonly string[] } | null | undefined,
+  org: { permissions?: readonly string[]; deletion?: unknown } | null | undefined,
   { ownsAgent }: { ownsAgent: boolean },
 ): CreateItem[] {
   return CREATE_ORDER.filter((item) => mayCreate(org, item, { ownsAgent }));

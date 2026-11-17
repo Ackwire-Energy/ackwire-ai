@@ -196,7 +196,7 @@ export function Avatar({
   );
 }
 
-/** Overlapping avatars (channel header, invitation). */
-export function AvatarStack({ className, ...rest }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cx("ac-avatar-stack", className)} {...rest} />;
+/** Overlapping avatars (channel header, invitation). A span, so it may sit in a button (a vote's option, a pill). */
+export function AvatarStack({ className, ...rest }: HTMLAttributes<HTMLSpanElement>) {
+  return <span className={cx("ac-avatar-stack", className)} {...rest} />;
 }

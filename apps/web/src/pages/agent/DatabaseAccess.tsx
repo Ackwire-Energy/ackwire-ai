@@ -2,10 +2,10 @@ import type { AgentDatabase, DatabaseConnection, DatabasePolicy } from "@agentes
 import { useAgentDatabases, useDatabases, useSetAgentDatabase } from "@agenteschat/client";
 import type { Level } from "@agenteschat/client/lib/access-levels";
 import { databaseRulesCount, defaultDatabasePolicy } from "@agenteschat/client/lib/databases";
-import { Alert, Button, Card, CountChip, Icon } from "@agenteschat/ui";
-import { useState } from "react";
+import { Alert, Button, Card } from "@agenteschat/ui";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LevelRow } from "@/components/AccessLevels";
+import { LevelRow, RulesToggle } from "@/components/AccessLevels";
 import { DatabaseIcon } from "@/components/DatabaseConnect";
 import { DatabaseRulesPanel } from "@/components/DatabaseRules";
 import { useOrg } from "@/components/org-context";
@@ -27,12 +27,7 @@ export function DatabaseAccessCard() {
   if (list.length === 0) return null;
   return (
     <Card as="section" className="agp-card" aria-labelledby="ac-databases">
-      <CardHead
-        id="ac-databases"
-        icon="database"
-        title={t("database.agent.title")}
-        action={<span className="small muted">{t("database.agent.help", { org: org.name })}</span>}
-      />
+      <CardHead id="ac-databases" icon="database" title={t("database.agent.title")} />
       <ul className="level-list" aria-label={t("database.agent.title")}>
         {list.map((connection) => (
           <DatabaseRowAccess
@@ -78,6 +73,8 @@ function DatabaseRowAccess({
   const [edit, setEdit] = useState<{ from: string; draft: Draft } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [round, setRound] = useState(0);
+  const rulesId = useId();
+  const [rulesOpen, setRulesOpen] = useState(false);
   const reset = () => {
     setEdit(null);
     setError(null);
@@ -109,9 +106,9 @@ function DatabaseRowAccess({
     <LevelRow
       icon={<DatabaseIcon />}
       name={connection.label}
-      description={
+      hint={
         draft.level === "none"
-          ? t("access.noneText")
+          ? undefined
           : connection.wholeServer
             ? draft.policy.databases?.length
               ? t("database.agent.someDatabases", { count: draft.policy.databases.length, name: connection.label })
@@ -122,20 +119,24 @@ function DatabaseRowAccess({
       value={draft.level}
       onChange={editable && !loading ? (level) => change({ level }) : undefined}
       changed={dirty}
+      side={
+        draft.level !== "none" ? (
+          <RulesToggle
+            label={t("database.agent.rulesOf", { name: connection.label })}
+            count={count}
+            open={rulesOpen}
+            controls={rulesId}
+            onToggle={() => setRulesOpen((v) => !v)}
+          />
+        ) : undefined
+      }
+      belowHidden={!(rulesOpen && draft.level !== "none") && !dirty && !error}
       below={
-        draft.level !== "none" || dirty ? (
+        draft.level !== "none" || dirty || error ? (
           <div className="mail-agent">
+            {/* Kept in the page while closed: what was typed in it stays, and the toggle's `aria-controls` resolves. */}
             {draft.level !== "none" && (
-              <details className="mail-rules">
-                <summary aria-label={t("database.agent.rulesOf", { name: connection.label })}>
-                  <Icon name="filter" size={14} />
-                  <span>{t("mail.agent.rules")}</span>
-                  {count > 0 ? (
-                    <CountChip size="sm">{count}</CountChip>
-                  ) : (
-                    <span className="small muted">{t("mail.agent.noRules")}</span>
-                  )}
-                </summary>
+              <div id={rulesId} className="level-row__rulespanel" hidden={!rulesOpen}>
                 <DatabaseRulesPanel
                   key={round}
                   connection={connection}
@@ -143,7 +144,7 @@ function DatabaseRowAccess({
                   onChange={(policy) => change({ policy })}
                   disabled={!editable}
                 />
-              </details>
+              </div>
             )}
             {error && <Alert>{error}</Alert>}
             {dirty && editable && (

@@ -34,7 +34,7 @@ services:
     # A pg_dump a day (or every BACKUP_INTERVAL_HOURS) to an S3-compatible bucket, and the restore:
     # SELF_HOSTING.md, Backups. On with backup in COMPOSE_PROFILES and S3_BACKUP_BUCKET with the S3_*
     # credentials in .env.
-    image: "${AGENTES_BACKUP_IMAGE:-ghcr.io/agentes-chat/backup:latest}"
+    image: "${AGENTES_BACKUP_IMAGE:-ghcr.io/ackwire-energy/backup:latest}"
     profiles: ["backup"]
     # Its own variables only, not the whole .env: it has no use for the app's secrets.
     environment:
@@ -47,6 +47,7 @@ services:
       S3_BACKUP_BUCKET: "${S3_BACKUP_BUCKET:-}"
       BACKUP_RETENTION_DAYS: "${BACKUP_RETENTION_DAYS:-}"
       BACKUP_INTERVAL_HOURS: "${BACKUP_INTERVAL_HOURS:-}"
+      BACKUP_AGE_RECIPIENT: "${BACKUP_AGE_RECIPIENT:-}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +59,7 @@ services:
       - ALL
 
   agentes:
-    image: "${AGENTES_IMAGE:-ghcr.io/agentes-chat/agentes:latest}"
+    image: "${AGENTES_IMAGE:-ghcr.io/ackwire-energy/agentes:latest}"
     env_file: .env
     environment:
       DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
@@ -94,7 +95,7 @@ services:
     # SPEECH_ENGINES at once. On with speech in COMPOSE_PROFILES and LOCAL_SPEECH_URL=http://speech:8000/v1:
     # SELF_HOSTING.md, Voice messages. The models are in the image and its network reaches only the app, so the audio
     # never leaves this machine. Nothing waits for it: while it starts, or if it is down, the next engine answers.
-    image: "${AGENTES_SPEECH_IMAGE:-ghcr.io/agentes-chat/speech:latest}"
+    image: "${AGENTES_SPEECH_IMAGE:-ghcr.io/ackwire-energy/speech:latest}"
     profiles: ["speech"]
     environment:
       SPEECH_API_KEY: "${LOCAL_SPEECH_API_KEY:-}"

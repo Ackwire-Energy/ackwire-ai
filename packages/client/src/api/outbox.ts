@@ -1,8 +1,8 @@
-import { hashKey, type QueryClient } from "@tanstack/react-query";
+import type { QueryClient } from "@tanstack/react-query";
 import { useSyncExternalStore } from "react";
 import { upsertMessage } from "../lib/timeline";
 import type { ConnectionStatus } from "../realtime/connection";
-import { keys } from "./keys";
+import { keys, ME_HASH } from "./keys";
 import type { Message } from "./types";
 
 interface Waiting {
@@ -25,8 +25,6 @@ function set(next: readonly Waiting[]) {
   storage?.write(JSON.stringify(next));
   for (const l of listeners) l();
 }
-
-const ME_HASH = hashKey(keys.me);
 
 /**
  * My messages that wait for the connection (`sendWaits`): "sai quando a conexão voltar" instead of "Não enviada".

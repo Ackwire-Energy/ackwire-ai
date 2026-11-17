@@ -29,6 +29,8 @@ export interface DashboardViewer {
   admin: boolean;
   /** May show a board to others (`post`). */
   mayPublish: boolean;
+  /** Theirs, when read from it (`viewerOf`): a widget's pause says whether they may continue it. */
+  membership?: Membership;
 }
 
 export type DashboardNeed = "see" | "edit" | "manage";
@@ -46,6 +48,7 @@ export function viewerOf(membership: Membership, userId = ""): DashboardViewer {
     roleIds: membership.roleIds,
     admin: can(membership, "administrator"),
     mayPublish: can(membership, "post"),
+    membership,
   };
 }
 

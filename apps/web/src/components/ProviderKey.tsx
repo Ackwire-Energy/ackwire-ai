@@ -65,7 +65,8 @@ export function ProviderKeySelect({
 
 /**
  * Under a key field: where to create the provider's key, then for one that also sells coding plans not to use
- * that, for one whose free tier may use what is sent to turn on billing, and for a router who may keep it.
+ * that, for one whose free tier may use what is sent to turn on billing, and for one that passes calls on, who it
+ * passes them to.
  */
 export function KeySite({ provider }: { provider: ProviderId }) {
   const { t } = useTranslation();
@@ -78,7 +79,7 @@ export function KeySite({ provider }: { provider: ProviderId }) {
       </a>
       {p.plans && ` ${t("onboarding.keyNotPlan")}`}
       {p.billing && ` ${t("connectAi.key.billing")}`}
-      {p.privacy && ` ${t("connectAi.key.privacy")}`}
+      {p.privacy && ` ${t("connectAi.key.privacy", { provider: p.label })}`}
     </>
   );
 }

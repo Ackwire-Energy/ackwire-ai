@@ -1,6 +1,6 @@
 # 0025. Connected computers, provider-agnostic computers, and binary files in the Drive
 
-- Status: Accepted. Superseded in part by ADR 0077 (2026-10-28): §1's lifecycle half of `SandboxProvider`, §2's server-side upload fallback and, in §6, a null `agents.machine_id` as the cloud computer (now no computer), the `cloud` target, the organization's network mode and the tools only with Daytona
+- Status: Accepted. Superseded in part by ADR 0077 (2026-10-28): §1's lifecycle half of `SandboxProvider`, §2's server-side upload fallback and, in §6, a null `agents.machine_id` as the cloud computer (now no computer), the `cloud` target, the organization's network mode and the tools only with Daytona. Amended 2026-11-12 by ADR 0032 ("spill-over" addendum): a computer's owner may let replies people wait on think there while an agent's own computer is full (`machines.spill_own`, `spill_others`).
 - Date: 2026-10-15
 
 ## Context
@@ -95,6 +95,8 @@ A new artifact kind `file` (migration adds the enum value): any bytes, with the 
   - **Idle memory is given back first** (added 2026-11-02). Warm Claude Code processes waiting between turns (110–210 MB each, plus a 14 MB MCP bridge) used to count against room while nothing closed them for a turn. Now a turn without room first closes idle warm CLIs, one at a time, least recently used first, and checks room again after each one exits, for at most 5 s (`RECLAIM_MS`). Only then is it refused `no_slot`. The waiting turn's own session closes last, only when nothing else can (the turn would start it again at once), and a turn canceled while it waits stops closing at once. A CLI in the middle of a turn, or one holding the agent's work, never closes this way. "Holding work" means a task in the background (a dev server or a watcher, from Claude Code's `task_*` events) or a turn the CLI runs on its own. In system mode root first asks every worker which CLI it would close and when that one was last used (`brain.reclaim` with `peek` / `brain.reclaimed`, link frames only), then asks them to close in that order, oldest first, until one did: one CLI per round across all agents, not one per agent. Where memory isn't known, room is a count of turns, so nothing is closed. The server protocol doesn't change.
 
 **Across replicas.** The replica holding the socket executes requests. Another replica writes the request to `machine_rpc` and signals the holder through pub/sub; the reply comes back the same way (Postgres `NOTIFY` payloads are too small for file bodies). Live output streaming works only on the replica holding the socket; elsewhere the command reports its output at the end.
+
+*Amended 2026-11-12:* people took the line for "one agent at a time" and didn't know whether a server could work for two workspaces. A runner home holds one connection, so connecting a server from another workspace moves it there; `pair` now says which workspace it left (`movedFrom` in `pairing.ts`), and several workspaces on one computer stay the app's (one home each). The line's words say what it waits for, free memory ("Começa quando tiver memória livre", the line's rule and the note after ten minutes), and the help page on computers has a section on the line: what fits at once by memory, and that workspaces sharing a computer share its memory.
 
 ### 5a. Protocol 4: background tasks
 

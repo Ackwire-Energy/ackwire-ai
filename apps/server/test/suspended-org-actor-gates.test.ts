@@ -36,6 +36,8 @@ test("suspension closes actor-only issue, artifact, wiki, calendar, channel, and
     ["/issues", { json: { title: "Should fail" } }],
     ["/issue-columns"],
     ["/issue-columns", { json: { name: "Should fail", stage: "todo" } }],
+    ["/issue-projects"],
+    ["/issue-projects", { json: { name: "Should fail" } }],
     ["/artifacts"],
     ["/artifacts", { json: { title: "Should fail", content: { kind: "document", markdown: "x" } } }],
     ["/wiki/pages"],

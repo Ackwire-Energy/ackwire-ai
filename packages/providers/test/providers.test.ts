@@ -129,6 +129,7 @@ describe("pricing", () => {
       ["MiniMax-M3"],
       // OpenRouter's come from its list.
       [],
+      ["commandcode:zai-org/GLM-5.3"],
     ]);
   });
 
@@ -158,6 +159,7 @@ describe("pricing", () => {
       "glm-5.3-flash",
       "MiniMax-M3.1-Flash",
       null,
+      "commandcode:deepseek/deepseek-v4.1-flash",
       null,
     ]);
     const line = (provider: string) => MODEL_TIERS.map((tier) => modelForTier(provider, tier));
@@ -166,6 +168,11 @@ describe("pricing", () => {
     expect(line("moonshot")).toEqual(["kimi-k3.1-pro", "kimi-k3.1-pro", "kimi-k3.1-pro"]);
     expect(line("zai")).toEqual(["glm-5.3-flash", "glm-5.3", "glm-5.3"]);
     expect(line("minimax")).toEqual(["MiniMax-M3.1-Flash", "MiniMax-M3", "MiniMax-M3"]);
+    expect(line("commandcode")).toEqual([
+      "commandcode:deepseek/deepseek-v4.1-flash",
+      "commandcode:zai-org/GLM-5.3",
+      "commandcode:claude-sonnet-5-5",
+    ]);
   });
 
   test("routing picks one model per provider, never Kimi's (its cheapest always thinks)", () => {
@@ -178,6 +185,7 @@ describe("pricing", () => {
       "glm-5.3-flash",
       "MiniMax-M3",
       null,
+      "commandcode:claude-haiku-5-5",
       null,
     ]);
     for (const provider of PROVIDER_IDS) {

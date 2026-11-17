@@ -68,6 +68,6 @@ describe("the sidebar's defaults by the workspace's mode (ADR 0159)", () => {
   test("a saved order keeps its tools; the ones it lacks follow in the mode's order", () => {
     expect(knownToolOrder([], true)).toEqual([...PERSONAL_SIDEBAR_ITEMS]);
     expect(knownToolOrder([])).toEqual([...SIDEBAR_ITEMS]);
-    expect(knownToolOrder(["wiki"], true).slice(0, 3)).toEqual(["wiki", "approvals", "proposals"]);
+    expect(knownToolOrder(["wiki"], true).slice(0, 3)).toEqual(["wiki", "waiting", "approvals"]);
   });
 });

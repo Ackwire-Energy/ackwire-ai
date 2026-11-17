@@ -14,6 +14,8 @@ import {
   nextLabel,
   parseDayInput,
   relativeTime,
+  rosterText,
+  sentAtLine,
   shortModel,
   timeLeft,
   whenAt,
@@ -85,6 +87,10 @@ describe("format (pt-BR, machine numbers precise)", () => {
     expect(dayLabel(t, "pt-BR", at(5), now)).toBe("Hoje");
     expect(dayLabel(t, "pt-BR", at(24 * 60), now)).toBe("Ontem");
     expect(whenAt(t, "pt-BR", at(1), now)).toBe("hoje 10:43");
+    // A receipt's last line: when the message went out, for screens with no hover time.
+    expect(sentAtLine(t, "pt-BR", at(1), now)).toBe("Enviada hoje às 10:43");
+    expect(sentAtLine(t, "pt-BR", at(24 * 60), now)).toBe("Enviada ontem às 10:44");
+    expect(sentAtLine(t, "pt-BR", at(3 * 24 * 60), now)).toMatch(/^Enviada em \d+ \S+ às 10:44$/);
   });
   test("12-hour clocks have no leading zero; 24-hour ones keep theirs", () => {
     const morning = new Date(2026, 9, 14, 8, 39).toISOString();
@@ -150,6 +156,20 @@ describe("format (pt-BR, machine numbers precise)", () => {
       if (more) expect(namesText(tl, ["Ada", "Atlas", "Theo", "Lia"])).toBe(more);
     }
     expect(shortModel("Claude Sonnet 5.5")).toBe("sonnet 5.5");
+  });
+  test("a roster: one agent per line with its role, said once, then how many more", () => {
+    const team = [
+      { name: "Ada", role: "Pesquisadora" },
+      { name: "Lumen · Tradutora", role: "Tradutora" },
+      { name: "Theo", role: "" },
+      ...Array.from({ length: 37 }, (_, i) => ({ name: `Agente ${i + 1}`, role: "Revisor" })),
+    ];
+    const lines = rosterText(t, team).split("\n");
+    expect(lines.slice(0, 3)).toEqual(["Ada · Pesquisadora", "Lumen · Tradutora", "Theo"]);
+    expect(lines).toHaveLength(9);
+    expect(lines[8]).toBe("e mais 32");
+    expect(rosterText(i18n.getFixedT("en") as TFunction, team.slice(0, 9))).toEndWith("\nand 1 more");
+    expect(rosterText(t, team.slice(0, 8)).split("\n")).toHaveLength(8);
   });
 });
 

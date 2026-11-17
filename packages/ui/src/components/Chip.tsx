@@ -1,15 +1,15 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
 import { cx } from "../cx";
 import { Icon, type IconName } from "../icons/Icon";
 
-export type ChipTone = "neutral" | "waiting" | "done";
+export type ChipTone = "neutral" | "waiting" | "done" | "info";
 
 export interface ChipProps extends HTMLAttributes<HTMLSpanElement> {
   /** A state is said with an icon and a word, never a colored dot; a value ("Issue: ACME-177") goes without. */
   icon?: IconName;
   /** In place of the icon: e.g. a `PixelSpinner` in the working agent's color. */
   lead?: ReactNode;
-  /** `waiting` (attention) only for what waits on a person. */
+  /** `waiting` (attention) only for what waits on a person; `info` for a mark that points one out ("Recomendado"). */
   tone?: ChipTone;
   children: ReactNode;
 }
@@ -20,6 +20,29 @@ export function Chip({ icon, lead, tone = "neutral", className, children, ...res
       {lead ?? (icon && <Icon name={icon} size={14} />)}
       <span className="ac-chip__text">{children}</span>
     </span>
+  );
+}
+
+/**
+ * A chip that does something (a cargo row's Todos chip opens "Quem pode…"): the chip's look on a button, a plate on
+ * hover and the focus ring. A chip that only says something stays a `Chip`.
+ */
+export function ChipButton({
+  icon,
+  lead,
+  className,
+  children,
+  ...rest
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "children"> & {
+  icon?: IconName;
+  lead?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <button type="button" className={cx("ac-chip ac-chip--button", className)} {...rest}>
+      {lead ?? (icon && <Icon name={icon} size={14} />)}
+      <span className="ac-chip__text">{children}</span>
+    </button>
   );
 }
 

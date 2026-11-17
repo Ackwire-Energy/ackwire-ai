@@ -302,13 +302,38 @@ describe("Tabs", () => {
     expect(tabs[1]?.getAttribute("aria-selected")).toBe("true");
     expect(body().getByRole("tabpanel").textContent).toBe("Lista decidida");
   });
+
+  test("a chosen tab past the strip's edge is scrolled into the strip", () => {
+    // The tests' DOM lays nothing out: a 256px strip whose tabs are 150px each, from the strip's left edge.
+    const native = HTMLElement.prototype.getBoundingClientRect;
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      const at = this.getAttribute("role") === "tab" ? [...(this.parentElement?.children ?? [])].indexOf(this) : -1;
+      const left = at < 0 ? 0 : at * 150 - (this.parentElement?.scrollLeft ?? 0);
+      return { left, right: left + (at < 0 ? 256 : 150) } as DOMRect;
+    };
+    try {
+      const items = ["a", "b", "c"].map((value) => ({ value, label: value }));
+      const strip = (value: string) => (
+        <Tabs value={value} onValueChange={() => {}} label="Faixa" items={items}>
+          {null}
+        </Tabs>
+      );
+      const view = render(strip("c"));
+      const list = body().getByRole("tablist", { name: "Faixa" });
+      expect(list.scrollLeft).toBe(194);
+      view.rerender(strip("a"));
+      expect(list.scrollLeft).toBe(0);
+    } finally {
+      HTMLElement.prototype.getBoundingClientRect = native;
+    }
+  });
 });
 
 describe("PickerHeading", () => {
   test("a section's label over its description, with a real gap between them", async () => {
-    render(<PickerHeading label="Papéis" description="Quem tem o papel pode falar." />);
+    render(<PickerHeading label="Cargos" description="Quem tem o cargo pode falar." />);
     const head = document.querySelector(".ac-picker-head");
-    expect([...(head?.children ?? [])].map((c) => c.textContent)).toEqual(["Papéis", "Quem tem o papel pode falar."]);
+    expect([...(head?.children ?? [])].map((c) => c.textContent)).toEqual(["Cargos", "Quem tem o cargo pode falar."]);
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0] ?? "";
     expect(rule(".ac-picker-head")).toContain("flex-direction: column;");

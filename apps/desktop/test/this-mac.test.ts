@@ -2,7 +2,7 @@ import { expect, test } from "bun:test";
 import type { ControlEvent, ControlStatus } from "@agenteschat/adapters/runner-control";
 import { filesFolder } from "../src/control/local-server";
 import { DesktopStore, type Home } from "../src/control/store";
-import { answerThisMac, connect, toolsHere, whenHostHomeReady } from "../src/control/this-mac";
+import { answerThisMac, connect, type PrefsTab, toolsHere, whenHostHomeReady } from "../src/control/this-mac";
 import type { Host } from "../src/host/types";
 
 /**
@@ -76,7 +76,7 @@ function setup(statuses: Record<string, ControlStatus>, others = false) {
   const revealed: string[] = [];
   const deps = {
     store,
-    openPrefs: async (tab: "folders" | "tools" | "updates") => void prefs.push(tab),
+    openPrefs: async (tab: PrefsTab) => void prefs.push(tab),
     showRequests: async () => void prefs.push("requests"),
     localDir: async () => "/Users/ana/.agentes",
     revealFolder: async (path: string) => {
@@ -89,6 +89,17 @@ function setup(statuses: Record<string, ControlStatus>, others = false) {
 }
 
 const settle = () => new Promise((r) => setTimeout(r, 10));
+
+test("privacy: the page opens the microphone's or Local Network's list in System Settings; another pane, or an app without it, is refused", async () => {
+  const { deps } = setup({ h1: paired("o1") });
+  const opened: string[] = [];
+  const withPanes = { ...deps, openPrivacy: async (pane: "microphone" | "network") => void opened.push(pane) };
+  expect(await answerThisMac(withPanes, { kind: "privacy", pane: "microphone" })).toEqual({});
+  expect(await answerThisMac(withPanes, { kind: "privacy", pane: "network" })).toEqual({});
+  expect(opened).toEqual(["microphone", "network"]);
+  await expect(answerThisMac(withPanes, { kind: "privacy", pane: "disk" as never })).rejects.toThrow("not_here");
+  await expect(answerThisMac(deps, { kind: "privacy", pane: "microphone" })).rejects.toThrow("not_here");
+});
 
 test("status: only the asking server's organizations, and whether agents may work here for it", async () => {
   const { store, deps } = setup({ h1: paired("o1"), h2: unpaired, h3: paired("o3", "online", OTHER) });
@@ -256,7 +267,7 @@ test("the server here's own new home: the same open tools as any pairing, comman
   ]);
 });
 
-test("Preferences' tools: commands read on only when every organization has them, and say who does", () => {
+test("Preferences' tools: commands read on only when every organization has them", () => {
   const home = (name: string, commands: boolean) =>
     ({
       status: { org: { id: name, name } },
@@ -264,15 +275,12 @@ test("Preferences' tools: commands read on only when every organization has them
     }) as unknown as Home;
   expect(toolsHere([home("Acme", true), home("Beta", false)])).toEqual({
     tools: { claude: true, codex: false, commands: false, browser: true },
-    commandsOnlyFor: ["Acme"],
   });
   expect(toolsHere([home("Acme", true), home("Beta", true)])).toMatchObject({
     tools: { commands: true },
-    commandsOnlyFor: [],
   });
   expect(toolsHere([])).toEqual({
     tools: { claude: false, codex: false, commands: false, browser: false },
-    commandsOnlyFor: [],
   });
 });
 
@@ -290,8 +298,9 @@ test("connect: a refused organization comes back on its own home; a failure reje
 test("prefs and requests: Preferences on the asked tab, the popover", async () => {
   const { deps, prefs } = setup({});
   expect(await answerThisMac(deps, { kind: "prefs", tab: "updates" })).toEqual({});
+  expect(await answerThisMac(deps, { kind: "prefs", tab: "servers" })).toEqual({});
   expect(await answerThisMac(deps, { kind: "requests" })).toEqual({});
-  expect(prefs).toEqual(["updates", "requests"]);
+  expect(prefs).toEqual(["updates", "servers", "requests"]);
 });
 
 test("reconnect: the organization's own runner on that server; anywhere else rejects", async () => {

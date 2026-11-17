@@ -5,7 +5,9 @@ import path from "node:path";
 import type { ControlIphoneSetup } from "@agenteschat/adapters/runner-control";
 import { killTree } from "./exec";
 import { extraToolDirs, runTool, which } from "./phones";
+import { xcodeBlocked } from "./toolchains";
 import { type AppleLook, appleLook } from "./wda";
+import type { XcodeFixer } from "./xcode-fix";
 
 /**
  * The Mac's side of setting up an iPhone (the desktop app's iPhone setup, `iphone.*` control requests): Xcode's
@@ -72,6 +74,10 @@ export interface IphoneSetupOptions {
   home?: string;
   /** Tool folders after the PATH (default `extraToolDirs`). */
   dirs?: string[];
+  /** The Mac's Xcode fix (`iphone.fixXcode`), shared with the server's `xcode.fix`. */
+  fixer?: () => XcodeFixer;
+  /** Tests: the folder Xcode is looked for in (default `/Applications`). */
+  apps?: string;
 }
 
 const CHECK_MS = 15_000;
@@ -110,9 +116,24 @@ export class IphoneSetup {
   async check(): Promise<ControlIphoneSetup> {
     if (this.platform !== "darwin") return { xcode: null, platform: { state: "missing" }, account: null };
     const [xcode, account] = await Promise.all([this.xcode(), this.account()]);
-    if (!xcode) return { xcode, platform: { state: "missing" }, ...account };
+    const fix = this.opts.fixer?.().state();
+    if (!xcode) {
+      const blocked = await xcodeBlocked({
+        env: this.env,
+        platform: this.platform,
+        dirs: this.dirs,
+        ...(this.opts.apps ? { apps: this.opts.apps } : {}),
+      });
+      return {
+        xcode,
+        platform: { state: "missing" },
+        ...account,
+        ...(blocked ? { xcodeBlocked: blocked } : {}),
+        ...(fix ? { fix } : {}),
+      };
+    }
     const sdkOut = (await this.out("xcrun", ["--sdk", "iphoneos", "--show-sdk-version"]))?.trim() ?? "";
-    const step = { ...account, ...(/^\d+(\.\d+)+$/.test(sdkOut) ? { sdk: sdkOut } : {}) };
+    const step = { ...account, ...(/^\d+(\.\d+)+$/.test(sdkOut) ? { sdk: sdkOut } : {}), ...(fix ? { fix } : {}) };
     if (this.download?.state === "downloading") return { xcode, platform: this.download, ...step };
     const runtimes = await this.out("xcrun", ["simctl", "list", "runtimes", "-j"]);
     let version: string | null = null;
@@ -123,6 +144,16 @@ export class IphoneSetup {
     }
     const platform: Platform = version ? { state: "installed", version } : (this.download ?? { state: "missing" });
     return { xcode, platform, ...step };
+  }
+
+  /** Fixes Xcode here (`select`: in use, license, first launch; `update`: an iPhone's newer iOS), or stops the fix. */
+  async fixXcode(action: "start" | "cancel", kind: "select" | "update"): Promise<ControlIphoneSetup> {
+    const fixer = this.opts.fixer?.();
+    if (fixer) {
+      if (action === "start") fixer.start(kind);
+      else fixer.cancel();
+    }
+    return this.check();
   }
 
   /** Without the developer tools, macOS answers xcodebuild with an install dialog: xcode-select is asked first. */

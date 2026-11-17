@@ -79,7 +79,8 @@ describe("whether agents can use apps on their desktops", () => {
   const card = () => screen().getByRole("region", { name: "Apps nas telas dos agentes" });
 
   test("a computer's page: what is missing and the command, Linux only, or the switches to turn on", async () => {
-    const api = createFakeApi(seedState());
+    const state = seedState();
+    const api = createFakeApi(state);
     const linux = computer(api, { name: "Servidor", desktopUse: { available: false, reason: MISSING } });
     const mac = computer(api, {
       name: "MacBook",
@@ -121,6 +122,27 @@ describe("whether agents can use apps on their desktops", () => {
     expect(card().querySelector(".machine-command code")?.textContent).toBe(
       "agentes-runner tools enable desktop && agentes-runner tools enable commands",
     );
+
+    // Someone else's computer: one ask for both switches, never two buttons that say the same.
+    const theirs = computer(
+      api,
+      {
+        name: "Caixa da Bia",
+        desktopUse: { available: true, reason: null },
+        pairedBy: { id: "u-bia", name: "Bia Rocha" },
+        accessAllow: true,
+      },
+      false,
+    );
+    await page(theirs);
+    const asks = within(card()).getAllByRole("button", { name: "Pedir a Bia" });
+    expect(asks).toHaveLength(1);
+    await act(async () => fireEvent.click(asks[0] as HTMLElement));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.askTool").map((c) => c.args[2])).toEqual([
+      "desktop",
+      "commands",
+    ]);
 
     await page(ready);
     expect(card().textContent).toContain("Pronto");

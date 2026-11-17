@@ -502,7 +502,9 @@ test.if(posix && existsSync("/bin/bash"))(
   },
 );
 
-test.if(posix && existsSync("/bin/bash"))(
+// XFCE agent desktops run on Linux (desktop-session.ts); Apple's legacy Bash 3.2 does not flush at a prompt.
+// Keep the live behavior exercised on the desktop runtime and the generated hook asserted on every host above.
+test.if(process.platform === "linux" && existsSync("/bin/bash"))(
   "each command goes to the history file once it ran, while the shell still runs: a terminal killed with its computer keeps it",
   async () => {
     const home = tempDir("look-");
@@ -604,8 +606,8 @@ test("files that change come with a new LOOK_VERSION: desktops that have the loo
   }
   // Changed the look on purpose? Bump LOOK_VERSION and put the new hash here.
   expect({ version: LOOK_VERSION, files: hash.digest("hex").slice(0, 16) }).toEqual({
-    version: 9,
-    files: "dabff31b9a8bc0ce",
+    version: 10,
+    files: "0517e20ba811affb",
   });
 });
 

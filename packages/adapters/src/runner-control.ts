@@ -12,12 +12,18 @@
 import type {
   AccountKind,
   AccountLoginState,
+  CliInstall,
+  CliName,
+  InstallableCli,
   RunnerAccess,
   RunnerAccountInfo,
   RunnerExecutorInfo,
   RunnerPause,
   RunnerPhone,
   RunnerTools,
+  XcodeBlocked,
+  XcodeFix,
+  XcodeFixKind,
 } from "./machine-protocol";
 
 /** Bumped on breaking changes; the app refuses a runner whose `hello.control` it doesn't know. */
@@ -93,7 +99,8 @@ export interface ControlStatus {
   version: string;
   protocol: number;
   paused: RunnerPause;
-  executors: { claude?: RunnerExecutorInfo; codex?: RunnerExecutorInfo };
+  /** The coding CLIs found here, as `hello.executors` lists them. */
+  executors: Partial<Record<CliName, RunnerExecutorInfo>> & { broken?: Partial<Record<CliName, string>> };
   /** Absolute path of the workspace (the agents' folders live inside it). */
   workspace?: string;
   /** Agents of the organization that use this computer. */
@@ -198,6 +205,10 @@ export interface ControlIphoneSetup {
   noTeam?: true;
   /** The iPhone SDK's version ("26.2"): an iPhone on a newer iOS needs a newer Xcode. */
   sdk?: string;
+  /** With `xcode: null`: Xcode is installed but blocked, for a reason `iphone.fixXcode` fixes (`select`). */
+  xcodeBlocked?: XcodeBlocked;
+  /** The last Xcode fix started here (from this window or the web), where it stands. */
+  fix?: XcodeFix;
 }
 
 /** App → runner requests. Every request is answered by exactly one `reply` with the same `id`. */
@@ -242,6 +253,8 @@ export type ControlRequest =
   | { type: "folders.remove"; path: string; agentId?: string }
   | { type: "folders.setAgents"; path: string; agents: string[] }
   | { type: "tools.set"; tool: keyof RunnerTools; on: boolean }
+  /** Looks for Claude Code and Codex now, not at the next scheduled look. An older runner answers `bad_request`. */
+  | { type: "executors.check" }
   | { type: "access.pending" }
   | { type: "access.answer"; requestId: string; decision: "granted" | "denied"; scope: "agent" | "all" }
   /**
@@ -269,6 +282,15 @@ export type ControlRequest =
   | { type: "iphone.download" }
   /** Opens Xcode (its Accounts are only there), or Xcode's page in the App Store. */
   | { type: "iphone.open"; app: "xcode" | "appStore" }
+  /** Fixes the Mac's Xcode (macOS asks for the Mac's password for `select`), or stops the fix; answers the setup. */
+  | { type: "iphone.fixXcode"; action: "start" | "cancel"; kind: XcodeFixKind }
+  /**
+   * `CLI_INSTALL_PROTOCOL` (the status's `protocol`): installs a coding CLI here through its vendor's installer, or says
+   * where the install stands, or stops it. The machine op `cli.install`, for the app on this computer.
+   */
+  | { type: "cli.install"; action: "start" | "status" | "cancel"; tool: InstallableCli }
+  /** Reads the plugged iPhone again now; answers once the status carries what it found. */
+  | { type: "iphone.look" }
   /** Finish what's running briefly, then exit 0 (the app quits). */
   | { type: "shutdown" };
 
@@ -295,6 +317,7 @@ export interface ControlReplies {
   "folders.remove": RunnerAccess;
   "folders.setAgents": RunnerAccess;
   "tools.set": RunnerAccess;
+  "executors.check": ControlStatus;
   "access.pending": { requests: ControlAccessRequest[] };
   "access.answer": { access: RunnerAccess };
   reconnect: { reconnecting: boolean };
@@ -308,6 +331,9 @@ export interface ControlReplies {
   "iphone.setup": ControlIphoneSetup;
   "iphone.download": ControlIphoneSetup;
   "iphone.open": { opened: boolean };
+  "iphone.fixXcode": ControlIphoneSetup;
+  "cli.install": { install: CliInstall | null };
+  "iphone.look": { looking: boolean };
   shutdown: { stopping: true };
 }
 
@@ -332,7 +358,9 @@ export type ControlEvent =
   | { kind: "pair.failed"; code: "expired" | "denied" | "network" | "internal" | "link_invalid"; message: string }
   | { kind: "access.requested"; request: ControlAccessRequest }
   | { kind: "access.resolved"; requestId: string; decision: "granted" | "denied" | "expired" }
-  | { kind: "access.changed"; access: RunnerAccess };
+  | { kind: "access.changed"; access: RunnerAccess }
+  /** The computer's owner turned `tool` on from the apps (`access.allow`): the app says so, with Undo. */
+  | { kind: "access.allowed"; tool: keyof RunnerTools; byName: string };
 
 /** Runner → app. */
 export type ControlOut =

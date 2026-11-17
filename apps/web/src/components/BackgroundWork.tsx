@@ -1,12 +1,13 @@
 import { type Issue, type Message, useChannels, type WorkView } from "@agenteschat/client";
 import { heldBack } from "@agenteschat/client/lib/issues";
-import { workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
+import { handedLine, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { WorkLine, WorkLineAction, WorkPlan } from "@agenteschat/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { useChannelActions } from "@/components/channel-actions";
 import { useNow } from "@/components/missions/MissionBits";
 import { useOrg } from "@/components/org-context";
@@ -33,16 +34,66 @@ function useWorkLine(work: WorkView, inUpdatesThread = false) {
     onError: () => toast.show(t("work.stopFailed"), "error"),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["org", org.id, "channel", work.channelId] }),
   });
-  const view = workLine(t, work, {
+  const context = {
     locale: i18n.language,
     now,
     meId: me.user.id,
     agentName: agent?.name ?? t("channel.unknownAgent"),
-    nameOf: (id) => dir.memberById.get(id)?.name ?? null,
+    nameOf: (id: string) => dir.memberById.get(id)?.name ?? null,
+    agentNameOf: (id: string) => dir.anyAgent(id)?.name,
     canStop,
     inUpdatesThread,
-  });
-  return { view, stop, t };
+  };
+  const view = workLine(t, work, context);
+  return { view, handed: () => handedLine(t, work, context), agent, stop, t };
+}
+
+/**
+ * Under the reply of the agent that handed work over: "Handed to Atlas · working on it · step 3 of 5 · 2 min", the
+ * state word in the agent's colour while it works and amber while it waits on someone. Stop while it isn't over,
+ * See the result once done. Its updates and report are the delegate's own messages right below.
+ */
+export function HandedWorkLine({ work }: { work: WorkView }) {
+  const actions = useChannelActions();
+  const { handed, agent, stop, t } = useWorkLine(work, true);
+  const h = handed();
+  const name = agent?.name ?? t("channel.unknownAgent");
+  return (
+    <WorkLine
+      tone={h.tone}
+      className="handed-line"
+      text={
+        <>
+          <Trans
+            i18nKey="work.handed.lead"
+            values={{ name }}
+            components={[
+              <span key="who" className="handed-line__who">
+                <AgentAvatar agentId={work.agentId} name={name} state="idle" size="xs" />
+              </span>,
+            ]}
+          />
+          {" · "}
+          <span className="handed-line__state">{h.state}</span>
+          {h.facts.map((fact) => ` · ${fact}`).join("")}
+        </>
+      }
+      actions={
+        <>
+          {h.result && (
+            <WorkLineAction onClick={() => actions?.jumpTo?.(h.result?.messageId as string)}>
+              {h.result.label}
+            </WorkLineAction>
+          )}
+          {h.stop && (
+            <WorkLineAction danger disabled={stop.isPending} onClick={() => stop.mutate(h.stop?.runId as string)}>
+              {t("work.stop")}
+            </WorkLineAction>
+          )}
+        </>
+      }
+    />
+  );
 }
 
 /**

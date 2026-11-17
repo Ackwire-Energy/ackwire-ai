@@ -6,20 +6,21 @@
 
 /** The section whose page shows each of these as a tab (billing: as a part under AI and usage's own tabs). */
 export const SETTINGS_PARTS: Readonly<Record<string, string>> = {
+  invites: "members",
   notifications: "account",
+  download: "account",
   approvals: "account",
   apps: "account",
   media: "general",
   voice: "general",
-  roles: "members",
   billing: "usage",
   skills: "connectors",
   vault: "connectors",
   access: "connectors",
 };
 
-/** A team's entries, in order: Your account, Workspace, People, AI and usage, Connectors. */
-export const TEAM_SETTINGS = ["account", "general", "members", "usage", "connectors"] as const;
+/** A team's entries, in order: Your account, Workspace, People, Roles, AI and usage, Connectors. */
+export const TEAM_SETTINGS = ["account", "general", "members", "roles", "usage", "connectors"] as const;
 
 /**
  * A team's short list: its entries, and Devices where the workspace's computers are the product's (Cloud). Where

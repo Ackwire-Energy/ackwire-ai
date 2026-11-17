@@ -4,6 +4,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, writeFileSyn
 import path from "node:path";
 import { PUSH_ASK_RULES } from "@agenteschat/adapters/command-policy";
 import {
+  CLI_GIT_MISSING,
   MISSION_RULES,
   MISSION_RULES_NO_GIT,
   parseRunnerFrame,
@@ -94,6 +95,17 @@ test("protocol 7: hello carries the coding CLIs found; detection is best effort 
   await waitFor(() => calls.filter((c) => c === "claude").length === 6);
 });
 
+test("detection: fresh() looks now, before the TTL, and finds a CLI installed since", async () => {
+  let installed = false;
+  const run = (command: string) =>
+    command === "codex" && installed ? { status: 0, stdout: "codex-cli 0.80.0\n" } : { ...NOT_FOUND };
+  const cached = cachedExecutors({ now: () => 0, run });
+  expect(await cached.ready()).toEqual({});
+  installed = true;
+  expect(cached()).toEqual({});
+  expect(await cached.fresh()).toEqual({ codex: { version: "codex-cli 0.80.0" } });
+});
+
 const NOT_FOUND = { status: null, stdout: "", error: Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" }) };
 const TIMED_OUT = { status: null, stdout: "", error: Object.assign(new Error("timed out"), { code: "ETIMEDOUT" }) };
 
@@ -101,7 +113,7 @@ test("detection: only a missing binary is not installed; a timeout or failing ex
   const good = { claude: { version: "2.1.300", loggedIn: true }, codex: { version: "codex-cli 0.80.0" } };
   const timeouts = () => ({ ...TIMED_OUT });
   expect(await detectExecutors(timeouts, good)).toEqual({ found: good, unsure: true });
-  const failing = () => ({ status: 1, stdout: "" });
+  const failing = (c: string) => (c === "claude" || c === "codex" ? { status: 1, stdout: "" } : { ...NOT_FOUND });
   expect(await detectExecutors(failing, good)).toEqual({ found: good, unsure: true });
   // Claude Code answered its version but its login check timed out: the login last seen stands.
   const authTimeout = (c: string, args: string[]) =>
@@ -119,7 +131,43 @@ test("detection: only a missing binary is not installed; a timeout or failing ex
   for (let i = 1; i < EXECUTORS_EXIT_STRIKES; i++) {
     expect(await detectExecutors(failing, good, strikes)).toEqual({ found: good, unsure: true });
   }
-  expect(await detectExecutors(failing, good, strikes)).toEqual({ found: {}, unsure: false });
+  const said = "exit code 1";
+  expect(await detectExecutors(failing, good, strikes)).toEqual({
+    found: { broken: { claude: said, codex: said } },
+    unsure: false,
+  });
+});
+
+test("detection: a CLI that is there and won't start is broken with its error, not missing", async () => {
+  // Never seen working: said at once, the look still retried soon.
+  const run = (command: string) =>
+    command === "claude"
+      ? {
+          status: 1,
+          stdout: "",
+          stderr: "Error: Cannot find module 'node:sqlite'\n    at load (cli.js:1)\nNode.js v18.0.0\n",
+        }
+      : { ...NOT_FOUND };
+  expect(await detectExecutors(run)).toEqual({ found: { broken: { claude: "Node.js v18.0.0" } }, unsure: true });
+  // Claude Code on Windows without Git for Windows: that, not its words.
+  expect(await detectExecutors(run, {}, {}, () => true)).toEqual({
+    found: { broken: { claude: CLI_GIT_MISSING } },
+    unsure: true,
+  });
+  // `hello` carries it, and only for a CLI it doesn't list as found.
+  const hello = parseRunnerFrame(
+    JSON.stringify({
+      type: "hello",
+      token: "agm_x",
+      version: "0.7.0",
+      protocol: 66,
+      executors: { codex: { version: "codex-cli 0.80.0" }, broken: { claude: "boom", codex: "x", other: "y" } },
+    }),
+  );
+  expect((hello as { executors: unknown }).executors).toEqual({
+    codex: { version: "codex-cli 0.80.0" },
+    broken: { claude: "boom" },
+  });
 });
 
 test('Codex turn\'s own look: a timeout is "couldn\'t tell" (null), never "not installed"', async () => {

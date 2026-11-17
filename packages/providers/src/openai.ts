@@ -16,6 +16,7 @@ import {
   type ModelRequest,
   type ModelResult,
   type PartialUsage,
+  PDF_MEDIA_TYPE,
   ProviderError,
   type StopReason,
   shortSaid,
@@ -143,11 +144,19 @@ function toInput(messages: ModelMessage[]): ResponseInputItem[] {
           output: b.images?.length
             ? [
                 { type: "input_text", text: b.isError ? `ERROR: ${b.content}` : b.content },
-                ...b.images.map((i) => ({
-                  type: "input_image" as const,
-                  image_url: `data:${i.mediaType};base64,${i.data}`,
-                  detail: "auto" as const,
-                })),
+                ...b.images.map((i) =>
+                  i.mediaType === PDF_MEDIA_TYPE
+                    ? {
+                        type: "input_file" as const,
+                        filename: i.name ?? "file.pdf",
+                        file_data: `data:${PDF_MEDIA_TYPE};base64,${i.data}`,
+                      }
+                    : {
+                        type: "input_image" as const,
+                        image_url: `data:${i.mediaType};base64,${i.data}`,
+                        detail: "auto" as const,
+                      },
+                ),
               ]
             : b.isError
               ? `ERROR: ${b.content}`

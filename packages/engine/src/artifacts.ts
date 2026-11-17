@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
+import { type BlobStoreResolver, firstWords, type PubSub, type SpeechEngine } from "@agenteschat/adapters";
 import {
   and,
   type Database,
@@ -31,7 +31,12 @@ import { isAgentOnlyDm, openDm } from "./dms";
 import { markdownToDocx } from "./docx";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishListChanged } from "./events";
-import { textOfBytes } from "./format";
+import { MODEL_FILE_READ_BYTES, type ModelFile, readForModel, tooBigToReadNote, transcriptKey } from "./file-reader";
+import { formatBytes, tableToCsv } from "./format";
+import { imageSize } from "./image-size";
+
+export { tableToCsv };
+
 import { assertStorageRoom } from "./limits";
 import { can, getMembership, requireActiveMembership } from "./organizations";
 import { runItselfReadOutside } from "./outside";
@@ -86,6 +91,9 @@ export interface FileContent {
   size: number;
   sha256: string;
   text?: string;
+  /** A picture's own size, read from its header when it was stored (`imageSize`); absent for older files. */
+  width?: number;
+  height?: number;
 }
 
 export type ArtifactContent =
@@ -212,6 +220,8 @@ export interface ArtifactDeps {
   db: Database;
   blobs: BlobStoreResolver;
   pubsub?: PubSub;
+  /** Speech to text, for the words of an audio file an agent opens (`fileForModel`); absent: none on this server. */
+  speech?: () => SpeechEngine[];
 }
 
 /** Limits per kind (bytes are UTF-8 of the stored form). */
@@ -229,8 +239,6 @@ export const ARTIFACT_LIMITS = {
   choiceQuestionChars: 300,
   choiceLabelChars: 120,
   choiceDescriptionChars: 200,
-  /** A question's written answer ("Outra resposta"), in place of its options. */
-  choiceOtherChars: 1000,
   diagramBytes: 200_000,
   tableRows: 10_000,
   tableColumns: 100,
@@ -432,6 +440,74 @@ const EXTENSIONS: Record<ArtifactKind, string> = {
 
 // ── Files (ADR 0025) ─────────────────────────────────────────────────────────
 
+/** Source code and config: stored and served as plain text, whatever type the browser gave (`.ts` comes as video). */
+const CODE_EXTENSIONS = [
+  "ts",
+  "tsx",
+  "mts",
+  "cts",
+  "js",
+  "jsx",
+  "mjs",
+  "cjs",
+  "py",
+  "rb",
+  "go",
+  "rs",
+  "java",
+  "kt",
+  "kts",
+  "swift",
+  "c",
+  "h",
+  "cc",
+  "cpp",
+  "hpp",
+  "cs",
+  "php",
+  "sh",
+  "bash",
+  "zsh",
+  "fish",
+  "ps1",
+  "sql",
+  "toml",
+  "ini",
+  "cfg",
+  "conf",
+  "css",
+  "scss",
+  "sass",
+  "less",
+  "vue",
+  "svelte",
+  "lua",
+  "r",
+  "dart",
+  "scala",
+  "ex",
+  "exs",
+  "erl",
+  "hs",
+  "pl",
+  "tf",
+  "graphql",
+  "gql",
+  "proto",
+  "gradle",
+  "jsonl",
+  "ndjson",
+  "markdown",
+  "rst",
+  "tex",
+  "srt",
+  "vtt",
+  "diff",
+  "patch",
+  "env",
+  "properties",
+  "ipynb",
+];
 const CONTENT_TYPES: Record<string, string> = {
   pdf: "application/pdf",
   png: "image/png",
@@ -469,10 +545,11 @@ const CONTENT_TYPES: Record<string, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   ogg: "audio/ogg",
+  ...Object.fromEntries(CODE_EXTENSIONS.map((ext) => [ext, "text/plain; charset=utf-8"])),
 };
 
 /** Text-like extensions whose small files get `text` (beyond `text/*` types). */
-const TEXT_EXTENSIONS = new Set(["md", "csv", "tsv", "json", "txt", "log", "yaml", "yml", "xml"]);
+const TEXT_EXTENSIONS = new Set(["md", "csv", "tsv", "json", "txt", "log", "yaml", "yml", "xml", ...CODE_EXTENSIONS]);
 const TEXT_READ_BYTES = 200_000;
 
 const extensionOf = (name: string) => /\.([a-z0-9]+)$/i.exec(name)?.[1]?.toLowerCase() ?? "";
@@ -511,13 +588,17 @@ const isTextFile = (name: string, contentType: string) =>
 
 /** A `file` version as content: metadata, plus its text when it is a small UTF-8 text file. */
 function fileContent(
-  v: Pick<VersionRow, "fileName" | "contentType" | "size" | "sha256">,
+  v: Pick<VersionRow, "fileName" | "contentType" | "size" | "sha256"> & Partial<Pick<VersionRow, "width" | "height">>,
   body: Uint8Array | null,
 ): FileContent {
   const name = v.fileName ?? "file";
   // By its name first (a picture stored as plain bytes before uploads were typed by name reads as a picture).
   const contentType = fileContentType(name, v.contentType);
   const content: FileContent = { kind: "file", name, contentType, size: v.size, sha256: v.sha256 };
+  if (v.width && v.height) {
+    content.width = v.width;
+    content.height = v.height;
+  }
   if (body && isTextFile(name, v.contentType)) {
     try {
       const text = new TextDecoder("utf-8", { fatal: true }).decode(body);
@@ -536,10 +617,17 @@ const wantsFileText = (v: Pick<VersionRow, "fileName" | "contentType" | "size">)
 /** The content of a `file` version just written from `body`. */
 const storedFileContent = (
   name: string,
-  blob: { contentType: string; size: number; sha: string },
+  blob: { contentType: string; size: number; sha: string; width: number | null; height: number | null },
   body: Uint8Array,
 ) => {
-  const v = { fileName: name, contentType: blob.contentType, size: blob.size, sha256: blob.sha };
+  const v = {
+    fileName: name,
+    contentType: blob.contentType,
+    size: blob.size,
+    sha256: blob.sha,
+    width: blob.width,
+    height: blob.height,
+  };
   return fileContent(v, wantsFileText(v) ? body : null);
 };
 
@@ -564,12 +652,6 @@ function excerptOf(content: ArtifactContent): string {
                     ? [content.columns.join(" "), ...content.rows.map((r) => r.join(" "))].join("\n")
                     : content.files.map((f) => f.path).join("\n");
   return s.replace(/\s+/g, " ").trim().slice(0, 20_000);
-}
-
-/** CSV with RFC 4180 quoting. */
-export function tableToCsv(columns: string[], rows: string[][]): string {
-  const cell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-  return [columns, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
 }
 
 /** A Markdown table (for PDF export of tables). */
@@ -886,7 +968,17 @@ async function writeBlob(deps: ArtifactDeps, orgId: string, artifactId: string, 
   // loser's put overwrites the winner's committed bytes, leaving the row's size and sha not matching disk.
   const key = `${location.prefix}artifacts/${artifactId}/v${version}-${Bun.randomUUIDv7()}`;
   await location.store.put(key, body, { contentType });
-  return { storageConfigId: location.storageConfigId, key, contentType, size: body.byteLength, sha: sha256Hex(body) };
+  // A picture keeps its size, so a conversation draws its box before it loads.
+  const size = stored.fileName !== undefined && stored.fileName !== null ? imageSize(body) : null;
+  return {
+    storageConfigId: location.storageConfigId,
+    key,
+    contentType,
+    size: body.byteLength,
+    sha: sha256Hex(body),
+    width: size?.width ?? null,
+    height: size?.height ?? null,
+  };
 }
 
 /** Who may create, and where: people in the Drive or a channel they see; agents in their run's channel and thread. */
@@ -989,6 +1081,8 @@ async function insertArtifact(
       size: blob.size,
       sha256: blob.sha,
       fileName: input.stored.fileName ?? null,
+      width: blob.width,
+      height: blob.height,
       note: input.note?.trim().slice(0, 500) || null,
       authorType: author.type,
       authorId: author.id,
@@ -1051,6 +1145,8 @@ export async function insertVersion(
       size: blob.size,
       sha256: blob.sha,
       fileName: input.stored.fileName ?? null,
+      width: blob.width,
+      height: blob.height,
       note,
       authorType: author.type,
       authorId: author.id,
@@ -1486,17 +1582,66 @@ export async function storedFileOfArtifact(
   };
 }
 
-/** All the text of a `file` too long or not UTF-8 for `content.text`, which `read_artifact` reads in pages; else null. */
-export async function fileFullText(
+/**
+ * A `file` as the AI that opens it reads it (`read_artifact`, a task's or an email's files): `readForModel`, and an
+ * audio file's words from the speech service, kept beside its bytes so it is transcribed once per version.
+ */
+export async function fileForModel(
   deps: ArtifactDeps,
   actor: ArtifactActor,
   orgId: string,
   artifactId: string,
   version?: number,
-): Promise<string | null> {
+): Promise<ModelFile> {
   const a = await readable(deps, actor, orgId, artifactId);
+  if (a.kind !== "file") throw new ValidationError(`this artifact is a ${a.kind}, not an uploaded file`);
   const v = await versionRow(deps.db, a, version);
-  return isTextFile(v.fileName ?? "", v.contentType) ? textOfBytes((await readVersion(deps, a, v)).body) : null;
+  const name = v.fileName ?? "file";
+  if (v.size > MODEL_FILE_READ_BYTES) return { note: tooBigToReadNote(name, v.contentType, v.size) };
+  const { body } = await readVersion(deps, a, v);
+  const read = readForModel({ name, contentType: v.contentType, bytes: body });
+  return read.audio ? audioForModel(deps, a, v, body) : read;
+}
+
+/** The most audio an agent hears at once: what a voice note may be. */
+const AUDIO_MAX_BYTES = 25 * 1024 * 1024;
+
+async function audioForModel(deps: ArtifactDeps, a: ArtifactRow, v: VersionRow, audio: Uint8Array): Promise<ModelFile> {
+  const store = await deps.blobs.forConfig(a.orgId, v.storageConfigId);
+  const kept = await store.get(transcriptKey(v.blobKey)).catch(() => null);
+  const heard = (text: string): ModelFile => ({
+    text,
+    note: "It is an audio file: what is said in it, transcribed, follows.",
+  });
+  if (kept) return heard(new TextDecoder().decode(kept.body));
+  const engines = deps.speech?.() ?? [];
+  if (engines.length === 0) {
+    return {
+      note: "It is an audio file, and this server has no speech-to-text set up, so it can't be heard here. Tell the person exactly that: what it says written in a message would go through.",
+    };
+  }
+  if (audio.byteLength > AUDIO_MAX_BYTES) {
+    return {
+      note: `It is an audio file of ${formatBytes(audio.byteLength)}, past the ${formatBytes(AUDIO_MAX_BYTES)} transcribed at once. Tell the person exactly that: a shorter clip would go through.`,
+    };
+  }
+  // A recording's type as stored: `.webm` and `.mp4` arrive typed as video though they hold sound here.
+  const contentType = v.contentType.replace(/^video\//, "audio/");
+  try {
+    const words = await firstWords(engines, { audio, contentType, language: null, terms: [], orgId: a.orgId }, 30_000);
+    if (!words) {
+      return { note: "It is an audio file the speech service refused to transcribe. Tell the person exactly that." };
+    }
+    const text = words.text || "(no words could be made out)";
+    await store
+      .put(transcriptKey(v.blobKey), new TextEncoder().encode(text), { contentType: "text/plain; charset=utf-8" })
+      .catch(() => undefined);
+    return heard(text);
+  } catch (error) {
+    return {
+      note: `It is an audio file that couldn't be transcribed just now (${error instanceof Error ? error.message : String(error)}). Tell the person exactly that, and try again in a few minutes.`,
+    };
+  }
 }
 
 /** One artifact at `version` (default: latest), with content. */
@@ -2359,6 +2504,7 @@ async function dropVersions(deps: ArtifactDeps, list: { version: VersionRow; org
   for (const { version: v, orgId } of list) {
     const store = await deps.blobs.forConfig(orgId, v.storageConfigId).catch(() => null);
     await store?.delete(v.blobKey).catch(() => undefined);
+    await store?.delete(transcriptKey(v.blobKey)).catch(() => undefined);
     await deps.db.delete(artifactVersions).where(eq(artifactVersions.id, v.id));
   }
   return list.length;

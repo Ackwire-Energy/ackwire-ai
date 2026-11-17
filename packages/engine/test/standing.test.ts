@@ -298,6 +298,8 @@ describe("suspended", () => {
     });
     const runner = fakeRunner(hub);
     await runner.hello(paired.token);
+    const stopped: [string, string][] = [];
+    hub.setBrowserHooks({ desktopStopped: (machineId, screenId) => stopped.push([machineId, screenId]) });
     const task = async (status: "queued" | "running", extra: Partial<typeof schema.machineTasks.$inferInsert> = {}) => {
       const [row] = await f.db
         .insert(schema.machineTasks)
@@ -325,6 +327,8 @@ describe("suspended", () => {
     expect(runner.requests().filter((r) => r.op === "desktop.session.stop")).toMatchObject([
       { agent: { id: f.agent.id, handle: "dev" } },
     ]);
+    // Where the agent last pointed on it is forgotten with it (ADR 0062).
+    expect(stopped).toEqual([[paired.machineId, f.agent.id]]);
 
     expect((await runs()).map((r) => [r.status, r.error])).toEqual([
       ["canceled", "This workspace is unavailable for now."],
@@ -404,6 +408,14 @@ describe("agent hold", () => {
     expect((await of(f.agent.id)).map((r) => r.status)).toEqual(["failed", "done"]);
     expect(await ls({ id: f.agent.id, handle: "dev" })).toMatchObject({ exitCode: 0 });
     expect(await setAgentHold(f.db, crypto.randomUUID(), f.agent.id, { held: true, reason: null })).toBeNull();
+  });
+
+  test("a shared browser profile's key is no agent: only the workspace's standing is asked", async () => {
+    f = await setup();
+    const key = "profile:6f1c2a34-5b6d-4e7f-8a90-b1c2d3e4f5a6";
+    await assertCanWork(f.db, f.org.id, key);
+    await standing("suspended");
+    await expect(assertCanWork(f.db, f.org.id, key)).rejects.toMatchObject({ code: "org.suspended" });
   });
 
   test("the router never picks a held agent: the others answer", async () => {

@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { failedOffline } from "@/chat/offline";
+import { ImportFailureNote } from "@/components/ImportFailure";
 import {
   ImportFlow,
   type ImportFlowState,
@@ -24,6 +25,7 @@ import {
   SourceMark,
   useImportFlow,
 } from "@/components/ImportFlow";
+import { useImportMethod } from "@/components/ImportSheet";
 import { EXPORT_PROMPT } from "@/lib/import";
 import {
   agentsArrived,
@@ -32,11 +34,9 @@ import {
   cardName,
   IMPORT_CARDS,
   importApplyErrorText,
-  importFailureText,
   itemId,
   picksOf,
   type RequestCard,
-  retryable,
 } from "@/lib/import-flow";
 import type { TeamSourceFacts, TeamSourceState } from "./TeamSource";
 
@@ -72,6 +72,8 @@ export function TeamSourceBody({
   const qc = useQueryClient();
   const flow = useImportFlow(orgId);
   const { link, none } = state;
+  // Grok Bot's answer is pasted on the step's own view, which offers no MCP.
+  const mcp = useImportMethod(flow, orgId).method === "mcp" && !link.replyCard;
   // A clean import whose files still go to the Drive: the step waits for the copy (closing the page would stop it).
   const [awaitCopy, setAwaitCopy] = useState(false);
 
@@ -117,6 +119,7 @@ export function TeamSourceBody({
         coming: null,
         report: false,
         applying: false,
+        mcp,
       };
     const items = new Map(planned.items.map((i) => [itemId(i), i]));
     const comes = (kind: "agent" | "channel", key: string) => {
@@ -136,8 +139,9 @@ export function TeamSourceBody({
       },
       report: flow.report !== null,
       applying: bring.isPending,
+      mcp: false,
     };
-  }, [planned, flow.card, flow.pick, flow.report, bring.isPending, t]);
+  }, [planned, flow.card, flow.pick, flow.report, bring.isPending, mcp, t]);
   useEffect(() => {
     link.publish(facts);
   }, [facts, link.publish]);
@@ -436,16 +440,7 @@ function BringReply({ card, flow, after }: { card: RequestCard; flow: ImportFlow
             />
           </Field>
         )}
-        {flow.failure && (
-          <div className="imp-failure">
-            <Alert>{importFailureText(t, flow.failure, failedOffline)}</Alert>
-            {retryable(flow.failure) && (
-              <Button size="sm" icon="refresh" onClick={() => void flow.retry()}>
-                {t("common.retry")}
-              </Button>
-            )}
-          </div>
-        )}
+        {flow.failure && <ImportFailureNote failure={flow.failure} retry={flow.retry} />}
         {after}
       </div>
       <div className="onb__actions">

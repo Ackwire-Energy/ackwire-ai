@@ -4,7 +4,7 @@ import * as WebBrowser from "expo-web-browser";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Text } from "@/ui";
+import { Button, InfoHint, Text } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 
 /**
@@ -44,9 +44,15 @@ export function GithubOrgs() {
       {change ? <Text variant="small">{change}</Text> : null}
       {manageUrl ? (
         <>
-          <Text variant="small" tone="muted">
-            {t("connectFlow.githubOrgs.lead")}
-          </Text>
+          <InfoHint
+            name={t("common.about", { label: t("connectFlow.githubOrgs.title") })}
+            text={t("connectFlow.githubOrgs.lead")}
+            variant="small"
+          >
+            <Text variant="small" tone="muted">
+              {t("connectFlow.githubOrgs.short")}
+            </Text>
+          </InfoHint>
           <Button
             variant="secondary"
             label={t("connectFlow.githubOrgs.open")}

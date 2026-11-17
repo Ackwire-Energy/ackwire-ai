@@ -10,7 +10,7 @@ import {
   supervisors,
 } from "@agenteschat/client/lib/team-views";
 import { excerpt } from "@agenteschat/client/lib/text";
-import { Button, EmptyState, Icon } from "@agenteschat/ui";
+import { Button, EmptyState, HintLine, Icon } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { type DragEvent, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -286,7 +286,11 @@ export function TeamMap({ team }: { team: Team }) {
   const seen = new Set<string>();
   return (
     <section className="team-map" aria-label={t("team.view.map")}>
-      <p className="muted team-map__lead">{t("team.map.lead")}</p>
+      <p className="muted team-map__lead">
+        <HintLine name={t("common.about", { label: t("team.view.map") })} hint={t("team.map.lead")}>
+          {t("team.map.short")}
+        </HintLine>
+      </p>
       <div className="team-map__canvas" ref={box}>
         <svg className="team-map__lines" aria-hidden="true">
           {lines.map((l) => (

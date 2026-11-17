@@ -8,7 +8,11 @@ const src = (path: string) => readFileSync(join(import.meta.dir, "../../src", pa
 
 describe("Quem vê on the phone", () => {
   test("a new task and the task's sheet reach the same options; the task shows when it's limited", () => {
-    expect(src("features/issues/NewIssueForm.tsx")).toContain("audience: sees.choice");
+    // The new task's choice is made on the pushed picker, written back as each option is tapped.
+    const form = src("features/issues/NewIssueForm.tsx");
+    expect(form).toContain("useState<AudienceChoice>(EVERYONE)");
+    expect(form).toContain('pickOn({ what: "sees", value: audience, apply: setAudience })');
+    expect(src("features/issues/TaskPickScreen.tsx")).toContain("<WhoSeesRows draft={draft} />");
     const screen = src("features/issues/IssueScreen.tsx");
     expect(screen).toContain('pathname: "/who-sees"');
     expect(screen).toContain('i.audience?.mode === "people"');
@@ -16,9 +20,10 @@ describe("Quem vê on the phone", () => {
     expect(audienceKind({ mode: "people", userIds: ["me", "ana"] }, "me")).toBe("people");
   });
 
-  test("a wiki page's menu opens it, and an agent's receipt too", () => {
+  test("a wiki page's menu opens it; an agent's receipt says nothing of it (the task's screen does)", () => {
     expect(src("features/wiki/WikiScreen.tsx")).toContain('pathname: "/who-sees", params: { slug: p.slug }');
-    expect(src("features/chat/Receipts.tsx")).toContain('pathname: "/who-sees", params: { number }');
+    expect(src("features/chat/Receipts.tsx")).not.toContain("/who-sees");
+    expect(src("features/chat/Receipts.tsx")).not.toContain("whoSees.");
   });
 });
 

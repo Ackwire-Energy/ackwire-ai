@@ -41,7 +41,7 @@ test("a link holding several skills answers with them, the picked ones install, 
   t = await createTestServer({ http: gh.http, resolveHost: async () => ["140.82.112.3"] });
   const b = browser(t);
   await signUp(b, "owner@example.com");
-  const { orgId } = await seedOrg(b);
+  const { orgId, agentId } = await seedOrg(b);
   const importing = (json: unknown) => b(`/api/app/organizations/${orgId}/skills/import`, { json });
 
   const listed = await importing({ url: "https://github.com/acme/skills" });
@@ -52,9 +52,18 @@ test("a link holding several skills answers with them, the picked ones install, 
       { path: "skills/review", name: "review", description: "Use for review." },
     ],
   });
-  const picked = await importing({ url: "https://github.com/acme/skills", paths: ["skills/review"] });
+  // From an agent's card (offer_install_skill): what installs goes on for that agent.
+  const picked = await importing({
+    url: "https://github.com/acme/skills",
+    paths: ["skills/review"],
+    forAgentId: agentId,
+  });
   expect(picked.status).toBe(201);
   expect(((await picked.json()) as { skills: { name: string }[] }).skills.map((s) => s.name)).toEqual(["review"]);
+  const its = (await (await b(`/api/app/organizations/${orgId}/agents/${agentId}/skills`)).json()) as {
+    skills: { name: string; enabled: boolean }[];
+  };
+  expect(its.skills.map((s) => [s.name, s.enabled])).toEqual([["review", true]]);
   const one = await importing({ url: "https://github.com/acme/skills/tree/main/skills/deploy" });
   expect(one.status).toBe(201);
   expect(await one.json()).toMatchObject({ name: "deploy", version: 1, source: "url" });

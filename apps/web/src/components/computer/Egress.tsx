@@ -1,11 +1,12 @@
 import type { Machine } from "@agenteschat/client";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { Icon } from "@agenteschat/ui";
 import { countryFlagUrl } from "@agenteschat/ui/brand/flags";
 import { useTranslation } from "react-i18next";
 
 /** Only a recent observation from an online computer; a country is never inferred from an assigned address. */
 export function Egress({ machine, compact = false }: { machine: Machine | null | undefined; compact?: boolean }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const e = machine?.kind === "managed" && machine.online ? machine.egress : null;
   const transition = machine?.kind === "managed" ? machine.networkTransition : null;
   // A while with no way out for its agents: their connections wait, nothing is broken.
@@ -19,7 +20,7 @@ export function Egress({ machine, compact = false }: { machine: Machine | null |
     return (
       <span role="status" className="setup-line small">
         {t(transition.state === "draining" ? "machines.egress.draining" : "machines.egress.restart", {
-          when: new Date(transition.deadline).toLocaleTimeString(),
+          when: formatTime(i18n.language, transition.deadline),
         })}
       </span>
     );

@@ -93,6 +93,7 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
   runningCode: "code",
   browsing: "globe",
   pcFiles: "file",
+  creatingImage: "image",
   checkingComputer: "computer",
   checkingUsage: "chart",
   findingAgent: "search",
@@ -154,7 +155,7 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode, p
             output.reduce((n, o) => n + new TextEncoder().encode(o.text).length, 0),
           ),
         })
-      : toolPhrase(t, l);
+      : toolPhrase(t, l, locale);
   const why = toolWhy(t, l, personal);
   // What the tool answered, its own words when it failed: only in the open view, never under the line.
   const answered = l.result ?? why ?? l.why;

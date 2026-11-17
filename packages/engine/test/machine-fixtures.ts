@@ -123,6 +123,12 @@ export interface FakeRunnerOptions {
   onSecretActivated?: (requestId: string) => Promise<void>;
   /** Keeps a site's password for its browser alone, as runners do from then on (`keypair` says `sites`). */
   sites?: boolean;
+  /** `keep.start` / `keep.end` (ADR 0176): a refusal; otherwise each is held or ended. */
+  keep?: (
+    req: Extract<Request, { op: "keep.start" | "keep.end" }>,
+  ) => { fail: { code: string; message: string } } | null;
+  /** More of the first hello (`connectedComputer`): `mode: "system"`, its `holds`. */
+  hello?: Record<string, unknown>;
 }
 
 /**
@@ -249,6 +255,12 @@ export function fakeRunner(hub: MachineHub, options: FakeRunnerOptions = {}) {
           contentType: "",
         });
       }
+      case "keep.start":
+      case "keep.end": {
+        const refused = options.keep?.(req);
+        if (refused) return fail(refused.fail.code, refused.fail.message);
+        return ok(req.op === "keep.start" ? { held: true } : { ended: true });
+      }
       case "pull": {
         try {
           const data = (await options.pull?.(req)) ?? new Uint8Array();
@@ -320,6 +332,6 @@ export async function connectedComputer(f: Fixture, options: FakeRunnerOptions =
     },
     ...options,
   });
-  await runner.hello(paired.token, options.protocol ? { protocol: options.protocol } : {});
+  await runner.hello(paired.token, { ...(options.protocol ? { protocol: options.protocol } : {}), ...options.hello });
   return { paired, runner };
 }

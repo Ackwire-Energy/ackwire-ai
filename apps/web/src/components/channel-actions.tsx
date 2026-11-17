@@ -1,4 +1,5 @@
 import type { Agent, Message as MessageType } from "@agenteschat/client";
+import type { ConsultPairItem } from "@agenteschat/client/lib/consult-group";
 import { Menu, MenuItem } from "@agenteschat/ui";
 import { createContext, useContext } from "react";
 import { useTranslation } from "react-i18next";
@@ -8,6 +9,8 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 export interface ChannelActions {
   insertMention: (handle: string) => void;
   retry: (local: MessageType) => void;
+  /** A message the server refused for its text: it leaves the list and its text returns to the composer. */
+  editUnsent: (local: MessageType) => void;
   resend: (body: string) => void;
   /** "Responder" on an agent's question: type the answer in the composer. */
   focusComposer: () => void;
@@ -15,6 +18,8 @@ export interface ChannelActions {
   fillComposer?: (text: string) => void;
   /** A streaming reply grew: stay at the bottom if the person is there. */
   followBottom?: () => void;
+  /** A message opened in place ("Ver mais"): the list stops following its end, so the reader stays on the words. */
+  letGo?: () => void;
   channelAgents: Agent[];
   /**
    * "Responder": in a channel, that message's thread opens in the panel beside it (a reply there
@@ -29,9 +34,12 @@ export interface ChannelActions {
   openThread?: (threadId: string, focusMessageId?: string) => void;
   /**
    * A question an agent asked another from here ("Theo ⇄ Iris" in the reply's block): what the two said for it, in
-   * the panel beside the channel, read only (absent in a thread view: the block opens it in place).
+   * the panel beside the channel, read only (absent in a thread view: the block opens it in place). `group`: the
+   * questions of the row that opened it, when it stands for several agents: the dialog reaches each one's exchange.
    */
-  openConsultation?: (consultationId: string) => void;
+  openConsultation?: (consultationId: string, group?: readonly ConsultPairItem[]) => void;
+  /** A request card here that waits on the viewer (`PendingAsk.id`): scroll to it and light it up. */
+  seeRequest?: (askId: string) => void;
   /** "Pedir correção" after my 👎: my reply in the same conversation, quoting that message and mentioning its agent. */
   requestCorrection?: (message: MessageType, text: string) => void;
   /** A quote was clicked: scroll to the original and highlight it (paging back if needed). */

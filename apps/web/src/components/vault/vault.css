@@ -388,10 +388,8 @@ html:not([data-pointer]) .vlt-list .vlt-row:focus-visible {
   font-weight: 600;
   color: var(--muted);
 }
-/* On the label's line without making it taller: the button's own height reaches into the gap below. */
 .vlt-access__edit {
   grid-area: edit;
-  margin-block: -4px;
 }
 .vlt-access__value {
   grid-area: value;
@@ -536,6 +534,84 @@ html:not([data-pointer]) .vlt-drop__area:focus-visible {
 }
 .vlt-skipped .ac-icon {
   color: var(--faint);
+}
+
+/* "Import .env": one row per key, its name and what happens to it on the first line, its value under it. */
+.vlt-env {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0 var(--space-3);
+  list-style: none;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.vlt-env__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) 0;
+}
+.vlt-env__row + .vlt-env__row {
+  border-top: 1px solid var(--line);
+}
+/* As tall as its words: the row's 12px above them is the 12px under the value's eye. */
+.vlt-env__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+}
+.vlt-env__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+.vlt-env__row[data-state="problem"] .vlt-env__name {
+  color: var(--muted);
+}
+.vlt-env__state,
+.vlt-env__problem {
+  font-size: 13px;
+  color: var(--muted);
+}
+.vlt-env__choice {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.vlt-env__replace {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.vlt-env__value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-h-sm);
+}
+/* The eye's glyph ends on the edge the states end on, not its plate. */
+.vlt-env__value > .ac-btn {
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.vlt-env__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--ink2);
+}
+/* A small action under a label, as wide as its words, not as its column. */
+.vlt-move,
+.vlt-new__env {
+  align-self: flex-start;
 }
 
 /* Connections: a card per password manager; its steps and fields open in the card. */

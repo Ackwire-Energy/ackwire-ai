@@ -1,7 +1,7 @@
 import type { RateLimiter } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { namesLabel, namesOf } from "./approvals";
-import { FEEDBACK_MAX, FEEDBACK_PER_HOUR, queueFeedback } from "./feedback";
+import { FEEDBACK_MAX, FEEDBACK_PER_HOUR, isFeedbackRelay, queueFeedback } from "./feedback";
 import {
   agentFeedback,
   FEEDBACK_SUMMARY_MAX,
@@ -23,23 +23,24 @@ const NOBODY =
 
 /**
  * `send_feedback` (ADR 0160 §11): a person asks an agent to send their feedback, and it goes as the form's does, one
- * email to whoever runs the server (`to`, `FEEDBACK_EMAIL`), in that person's name and within their ten an hour. It
- * leaves the workspace in their name, so they approve each one, reading its text on the card; only they do. The
- * email says an agent wrote it. Listed only where the server takes feedback; a run nobody is behind (a routine's, an
- * agent's own) sends none.
+ * email to whoever runs the server (`to`: `FEEDBACK_EMAIL`, or the agentes.chat team's inbox, §13), in that person's
+ * name and within their ten an hour. It leaves the workspace in their name, so they approve each one, reading its
+ * text on the card; only they do. The email says an agent wrote it. Listed only where the server takes feedback; a
+ * run nobody is behind (a routine's, an agent's own) sends none.
  */
 export function createFeedbackToolSource(deps: {
-  /** `FEEDBACK_EMAIL`; unset, the tool is not listed. */
+  /** Where feedback goes (`feedbackDestination`); unset, the tool is not listed. */
   to?: string | null;
   /** This server's version. */
   version: string;
   /** The form's limiter, so both ways in count toward the same hour. */
   rateLimiter?: RateLimiter;
 }): ToolSource {
+  // Who reads it: the operator, or the people who make the app when it goes to their inbox (ADR 0160 §13).
+  const reader = isFeedbackRelay(deps.to) ? "the agentes.chat team, who make this app" : "whoever runs this server";
   const tool: ToolDefinition = {
     name: SEND_FEEDBACK_TOOL,
-    description:
-      "Send the person's feedback about this app itself (a bug, something confusing, an idea) to whoever runs this server, by email in their name, only when they ask you to ('manda um feedback dizendo…', 'report this bug for me'). `text`: what they want said, in their words and language, plus what you saw yourself that helps whoever reads it (what was being done, the error as it appeared). Nothing from the conversation they didn't ask to send. They read it on a card and approve it before it goes.",
+    description: `Send the person's feedback about this app itself (a bug, something confusing, an idea) to ${reader}, by email in their name, only when they ask you to ('manda um feedback dizendo…', 'report this bug for me'). \`text\`: what they want said, in their words and language, plus what you saw yourself that helps whoever reads it (what was being done, the error as it appeared). Nothing from the conversation they didn't ask to send. They read it on a card and approve it before it goes.`,
     scope: "",
     sensitive: true,
     inputSchema: {
@@ -49,7 +50,7 @@ export function createFeedbackToolSource(deps: {
       additionalProperties: false,
     },
     describe: (input) => ({
-      title: "Send feedback to whoever runs this server",
+      title: `Send feedback to ${reader}`,
       detail: typeof input.text === "string" ? input.text.trim() : "",
     }),
     // In their name, so theirs alone to approve; a call nobody is behind has nobody to ask.
@@ -109,7 +110,7 @@ export function createFeedbackToolSource(deps: {
         },
       });
       return {
-        content: "Sent to whoever runs this server, in their name; an answer goes to their email.",
+        content: `Sent to ${reader}, in their name; an answer goes to their email.`,
       };
     },
   };
@@ -121,8 +122,7 @@ export function createFeedbackToolSource(deps: {
    */
   const offer: ToolDefinition = {
     name: OFFER_FEEDBACK_TOOL,
-    description:
-      "Offer, on your own initiative, to report a problem with this app itself to whoever runs this server: a row under your reply with the report, which the person sends with one click or dismisses; nothing waits on it. Only when the app really failed: one of its own tools broke with an internal error, your browser or desktop crashed, you went in circles on the same app error, or the person complains that something of the app doesn't work and what you see confirms it. Never for an outside service's failure, a limit, a missing permission or setting, or your own mistake. `summary`: the problem in a few words, in their language, no capital letter and no period ('the browser closed while opening a page'). `text`: the report in their language: what was being done, what happened as it appeared, when; nothing else from the conversation. Still answer them as well as you can, and don't ask in words whether to send it: the row asks.",
+    description: `Offer, on your own initiative, to report a problem with this app itself to ${reader}: a row under your reply with the report, which the person sends with one click or dismisses; nothing waits on it. Only when the app really failed: one of its own tools broke with an internal error, your browser or desktop crashed, you went in circles on the same app error, or the person complains that something of the app doesn't work and what you see confirms it. Never for an outside service's failure, a limit, a missing permission or setting, or your own mistake. \`summary\`: the problem in a few words, in their language, no capital letter and no period ('the browser closed while opening a page'). \`text\`: the report in their language: what was being done, what happened as it appeared, when; nothing else from the conversation. Still answer them as well as you can, and don't ask in words whether to send it: the row asks.`,
     scope: "",
     inputSchema: {
       type: "object",

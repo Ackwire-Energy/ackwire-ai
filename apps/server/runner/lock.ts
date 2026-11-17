@@ -22,6 +22,13 @@ export interface LockInfo {
   startedAt: string;
   /** The boot of the computer it was taken in (`bootId`); absent in locks from older versions. */
   boot?: string;
+  /**
+   * What the runner holding it is: the `version` and `protocol` it puts in its `hello`. `status` reports these,
+   * never this command's own constants, so a shim from another install can't pass for the runner serving here.
+   * Absent in locks from older versions.
+   */
+  version?: string;
+  protocol?: number;
 }
 
 let thisBoot: string | undefined;
@@ -77,6 +84,8 @@ function parseLock(text: string): LockInfo | null {
       mode: typeof v.mode === "string" ? v.mode : "",
       startedAt: typeof v.startedAt === "string" ? v.startedAt : "",
       ...(typeof v.boot === "string" ? { boot: v.boot } : {}),
+      ...(typeof v.version === "string" && v.version ? { version: v.version } : {}),
+      ...(typeof v.protocol === "number" ? { protocol: v.protocol } : {}),
     };
   } catch {
     return null;
@@ -104,7 +113,15 @@ export function readLock(home: string, file = LOCK_FILE): LockInfo | null {
 export function acquireLock(
   home: string,
   mode: string,
-  opts: { pid?: number; alive?: (pid: number) => boolean; boot?: string; file?: string } = {},
+  opts: {
+    pid?: number;
+    alive?: (pid: number) => boolean;
+    boot?: string;
+    file?: string;
+    /** What this process is, for `status` to report: the version and machine protocol it puts in its `hello`. */
+    version?: string;
+    protocol?: number;
+  } = {},
 ): LockResult {
   const pid = opts.pid ?? process.pid;
   const alive = opts.alive ?? pidAlive;
@@ -112,7 +129,14 @@ export function acquireLock(
   const name = opts.file ?? LOCK_FILE;
   const file = path.join(home, name);
   mkdirSync(home, { recursive: true, mode: 0o700 });
-  const info: LockInfo = { pid, mode, startedAt: new Date().toISOString(), ...(boot ? { boot } : {}) };
+  const info: LockInfo = {
+    pid,
+    mode,
+    startedAt: new Date().toISOString(),
+    ...(boot ? { boot } : {}),
+    ...(opts.version ? { version: opts.version } : {}),
+    ...(opts.protocol === undefined ? {} : { protocol: opts.protocol }),
+  };
   const draft = `${file}.${pid}.${randomBytes(6).toString("hex")}`;
   writeFileSync(draft, JSON.stringify(info), { mode: 0o600 });
   // ponytail: three processes starting within microseconds of a takeover could still both end up holding it;

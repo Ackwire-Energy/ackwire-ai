@@ -246,6 +246,8 @@ export const messages = pgTable(
     // Deleting a person or an agent sets their messages' author to null: without these it scans every partition.
     index().on(t.authorUserId).where(sql`${t.authorUserId} is not null`),
     index().on(t.authorAgentId).where(sql`${t.authorAgentId} is not null`),
+    // A run's messages (learning from its turn, the tools that look back at what it posted): no channel to bound by.
+    index().on(t.agentRunId).where(sql`${t.agentRunId} is not null`),
     check(
       "messages_author",
       sql`(${t.authorType} = 'person' and ${t.authorAgentId} is null) or (${t.authorType} = 'agent' and ${t.authorUserId} is null)`,

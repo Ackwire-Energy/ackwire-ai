@@ -10,7 +10,7 @@ import { and, type Database, type Executor, eq, isNotNull, schema, sql } from "@
 import { serverText } from "@agenteschat/i18n";
 import { getAgentCached } from "./agents";
 import { type ArtifactDeps, cleanFileName, getArtifact, storedFileOfArtifact } from "./artifacts";
-import { sniffModelImage } from "./avatars";
+import { MODEL_IMAGE_BYTES, sniffModelImage } from "./avatars";
 import {
   checkDeviceUse,
   type DeviceComputer,
@@ -69,8 +69,6 @@ export const MAX_RECORD_SECONDS = 170;
 /** A flow with its recording may run this long. */
 export const MAX_FLOW_SECONDS = 600;
 const MAX_LOG_LINES = 2000;
-/** A screenshot the model also sees, when its PNG is at most this big. */
-const MODEL_IMAGE_BYTES = 3_500_000;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

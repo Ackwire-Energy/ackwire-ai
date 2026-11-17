@@ -192,6 +192,21 @@ export interface VaultImportResult {
   format: "chrome" | "1password" | "bitwarden" | "generic";
 }
 
+/** Several keys at once (an imported .env): one access for the new ones. A saved key keeps its own. */
+export interface VaultKeysImportInput {
+  scope: VaultScope;
+  access?: VaultAccess;
+  /** `replace`: a key already saved under this name in this scope takes the new value. Otherwise it is left. */
+  keys: { keyName: string; secret: string; replace: boolean }[];
+}
+
+export interface VaultKeysImportResult {
+  added: number;
+  replaced: number;
+  /** Already saved, and not asked to be replaced. */
+  skipped: number;
+}
+
 export interface VaultConnectInput {
   kind: string;
   scope: VaultScope;

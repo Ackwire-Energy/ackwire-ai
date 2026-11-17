@@ -11,9 +11,11 @@ import {
   ingestMail,
   insertMessage,
   listApprovals,
+  memberRoleIds,
   notifyApproval,
   type RoutineBrief,
   removeMember,
+  roleMailLoss,
   setAgentAudience,
   setAgentBrain,
   setMemberRoles,
@@ -215,7 +217,7 @@ test("an email in someone's own mailbox: they approve their own; asked by anyone
     const r = await m.tools.invoke(await runFor(userId), {
       toolUseId: `tu_${userId}`,
       name: "mail_support_send",
-      input: { to: ["client@acme.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
+      input: { to: ["client@example.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
     });
     if (r.type !== "approval") throw new Error("expected an approval");
     return r.approval;
@@ -255,6 +257,61 @@ test("an email in someone's own mailbox: they approve their own; asked by anyone
     decision: "approve",
   });
   expect(decided.status).toBe("approved");
+});
+
+test("a mailbox's card offers no Aprovar sempre, and a card that names who decides is kept for good by them alone", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write");
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: bia.id }).where(eq(schema.mailAccounts.id, account.id));
+  const asked = await m.tools.invoke(await runFor(bia.id), {
+    toolUseId: "tu_1",
+    name: "mail_support_send",
+    input: { to: ["client@example.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
+  });
+  if (asked.type !== "approval") throw new Error("expected an approval");
+  expect(asked.approval.approveAlways).toBeNull();
+  // Were such a card ever to offer it: the workspace's owner may approve this one send, never keep the kind.
+  await f.db
+    .update(schema.approvals)
+    .set({ approveAlways: { tool: "mail_support_send", actions: [] } })
+    .where(eq(schema.approvals.id, asked.approval.id));
+  await expect(
+    decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asked.approval.id, {
+      decision: "approve",
+      always: true,
+    }),
+  ).rejects.toBeInstanceOf(ConflictError);
+  expect(await f.db.select().from(schema.approvalRules)).toEqual([]);
+  const once = await decideApproval({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, asked.approval.id, {
+    decision: "approve",
+  });
+  expect(once.status).toBe("approved");
+});
+
+test("an agent that never asks sends from someone's own mailbox without a card; the mailbox's recipients still bind", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read_write", { allowedRecipients: ["@example.com"] });
+  await f.db.update(schema.mailAccounts).set({ createdByUserId: bia.id }).where(eq(schema.mailAccounts.id, account.id));
+  await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { approvalsLevel: "never" });
+  const send = async (to: string) =>
+    m.tools.invoke(await runFor(caio.id), {
+      toolUseId: `tu_${to}`,
+      name: "mail_support_send",
+      input: { to: [to], subject: "Proposta", body: "Segue a proposta." },
+    });
+  const sent = await send("client@example.com");
+  expect(sent).toMatchObject({ type: "result" });
+  expect(sent.type === "result" && sent.output.isError).toBeFalsy();
+  const outside = await send("someone@example.org");
+  expect(outside.type === "result" && outside.output.isError).toBe(true);
+  expect(await f.db.select().from(schema.approvals)).toEqual([]);
 });
 
 /** The agent answers its owner alone and holds the owner's mailbox; `carla` is an admin. */
@@ -304,6 +361,66 @@ test("someone who joins a role the agent answers gets no mailbox its owner gave 
   expect(await mailScopes()).toEqual([]);
 });
 
+test("giving a role asks first: the preview names the mailbox that would go, and one given since refuses the change", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const finance = await createRole(f.db, f.owner.id, f.org.id, { name: "Finance", permissions: ["talk_to_agents"] });
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "people", audienceRoleIds: [finance.id] })
+    .where(eq(schema.agents.id, f.agent.id));
+  // Nothing to lose yet.
+  expect(await roleMailLoss(f.db, f.owner.id, f.org.id, finance.id, [lia.id])).toEqual([]);
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+  const lost = {
+    agentId: f.agent.id,
+    agentName: f.agent.name,
+    accountId: account.id,
+    address: account.address,
+    ownerUserId: f.owner.id,
+    ownerName: f.owner.name,
+  };
+  // Once per mailbox, however many people get it, and nothing is taken.
+  expect(await roleMailLoss(f.db, f.owner.id, f.org.id, finance.id, [lia.id, caio.id, lia.id])).toEqual([lost]);
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+  // Only who may give the role asks.
+  await expect(roleMailLoss(f.db, lia.id, f.org.id, finance.id, [caio.id])).rejects.toBeInstanceOf(ForbiddenError);
+  // Told of none, the change is refused and nothing moves.
+  await expect(
+    setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [finance.id], { mailLossSeen: [] }),
+  ).rejects.toMatchObject({ code: "agent.mail_loss_changed" });
+  expect(await memberRoleIds(f.db, f.org.id, lia.id)).toEqual([]);
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+  // Told of it, the role is given and the mailbox goes.
+  await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [finance.id], { mailLossSeen: [account.id] });
+  expect(await memberRoleIds(f.db, f.org.id, lia.id)).toEqual([finance.id]);
+  expect(await mailScopes()).toEqual([]);
+  // Someone who holds it already costs nothing.
+  expect(await roleMailLoss(f.db, f.owner.id, f.org.id, finance.id, [lia.id])).toEqual([]);
+});
+
+test("swapping a role for another that opens the same agent keeps the mailbox, as the preview said", async () => {
+  m = await mailSetup();
+  const { f } = m;
+  const finance = await createRole(f.db, f.owner.id, f.org.id, { name: "Finance", permissions: ["talk_to_agents"] });
+  const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Support", permissions: ["talk_to_agents"] });
+  const lia = await addMember(f.db, f.org.id, "member", "lia");
+  await f.db
+    .update(schema.agents)
+    .set({ ownerUserId: f.owner.id, audienceMode: "people", audienceRoleIds: [finance.id, support.id] })
+    .where(eq(schema.agents.id, f.agent.id));
+  await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [finance.id]);
+  const account = await imapAccount(m);
+  await giveMail(m, account.id, "read");
+  expect(await roleMailLoss(f.db, f.owner.id, f.org.id, support.id, [lia.id])).toEqual([]);
+  await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [support.id], { mailLossSeen: [] });
+  expect(await memberRoleIds(f.db, f.org.id, lia.id)).toEqual([support.id]);
+  expect((await mailScopes()).length).toBeGreaterThan(0);
+});
+
 test("a mail watch stops feeding the routine once the agent lost the mailbox", async () => {
   m = await mailSetup();
   const { f } = m;
@@ -343,7 +460,7 @@ test("a new owner takes over a card-less mailbox approval without taking it from
   const r = await m.tools.invoke(await runFor(caio.id), {
     toolUseId: "tu_caio",
     name: "mail_support_send",
-    input: { to: ["client@acme.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
+    input: { to: ["client@example.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
   });
   if (r.type !== "approval") throw new Error("expected an approval");
   expect(r.approval.messageId).toBeNull();
@@ -371,7 +488,7 @@ async function biaAndOwnerMailboxes() {
   const r = await m.tools.invoke(await runFor(caio.id), {
     toolUseId: "tu_waiting",
     name: "mail_bia_send",
-    input: { to: ["client@acme.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
+    input: { to: ["client@example.com"], subject: "Proposta", body: "Segue a proposta.", why: WHY },
   });
   if (r.type !== "approval") throw new Error("expected an approval");
   const grantsOn = async (accountId: string) =>
@@ -400,7 +517,7 @@ test("a member who leaves the workspace takes their mailbox from every agent; th
   const refused = await m.tools.invoke(await runFor(caio.id), {
     toolUseId: "tu_after",
     name: "mail_bia_send",
-    input: { to: ["client@acme.com"], subject: "Proposta 2", body: "Segue a proposta.", why: WHY },
+    input: { to: ["client@example.com"], subject: "Proposta 2", body: "Segue a proposta.", why: WHY },
   });
   expect(refused.type === "result" && refused.output.isError).toBe(true);
   // The email waiting in her mailbox never goes, whoever would have decided it.

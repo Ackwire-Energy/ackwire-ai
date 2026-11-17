@@ -4,8 +4,11 @@ import type { EventEmitter } from "node:events";
 import { realpath } from "node:fs/promises";
 import { setTimeout as sleep } from "node:timers/promises";
 import {
+  type AgentPointer,
+  type AgentPointerAct,
   type AgentScope,
   DESKTOP_LIMITS,
+  DESKTOP_SIZE,
   DESKTOP_TEXT_MAX,
   type DesktopAction,
   type DesktopLookReply,
@@ -310,6 +313,8 @@ export interface DesktopManagerOptions {
    */
   numbered?: Map<string, { last: number }>;
   log: (line: string) => void;
+  /** Where the agent's pointer goes on its screen, said before the input: whoever watches sees it arrive. */
+  pointer?: (agentId: string, to: AgentPointer) => void;
   /** Tests: the computer. */
   system?: Pick<DesktopSystem, "platform" | "uid" | "which">;
   /** Tests: how a helper starts (default: `python3 -I -c <source>`). */
@@ -838,6 +843,8 @@ export class DesktopManager {
     let steps: HelperStep[];
     let spec = SETTLE;
     let ref: string | undefined;
+    // Where the pointer goes for it, for whoever watches (none for keys, an app opening, a window brought forward).
+    let goes: { point: Point; act: AgentPointerAct }[] = [];
     switch (a.kind) {
       case "click":
       case "double_click":
@@ -849,17 +856,28 @@ export class DesktopManager {
         const spot = await this.spot(use, a.at, a.kind);
         ref = spot.ref;
         steps = pointerSteps(a.kind, spot);
+        // A window brought forward moves no pointer, and its spot has no point (0, 0): the cursor stays where it is.
+        if (steps.some((s) => "click" in s || "move" in s)) {
+          goes = [
+            { point: spot.point, act: a.kind === "hover" ? "move" : a.kind === "double_click" ? "double" : "click" },
+          ];
+        }
         break;
       }
       case "drag": {
         const [from, to] = (await this.spots(use, [a.from, a.to], a.kind)) as [Spot, Spot];
         steps = [{ drag: [...from.point, ...to.point] }];
+        goes = [
+          { point: from.point, act: "click" },
+          { point: to.point, act: "move" },
+        ];
         break;
       }
       case "fill": {
         const spot = await this.spot(use, a.at, a.kind);
         ref = spot.ref;
         const node = spot.target?.editable ? spot.target.node : undefined;
+        goes = [{ point: spot.point, act: "type" }];
         steps = node
           ? [{ fill: node, text: a.text }]
           : [{ click: spot.point }, { key: "ctrl+a" }, a.text ? { type: a.text } : { key: "BackSpace" }];
@@ -868,6 +886,7 @@ export class DesktopManager {
       case "type": {
         const spot = a.at ? await this.spot(use, a.at, a.kind) : null;
         ref = spot?.ref;
+        if (spot) goes = [{ point: spot.point, act: "type" }];
         steps = [...(spot ? [{ click: spot.point }] : []), { type: a.text }];
         break;
       }
@@ -884,6 +903,8 @@ export class DesktopManager {
         const clicks = Math.min(WHEEL_MAX, Math.max(1, Math.round(a.pixels / WHEEL_PIXELS)));
         const signed = a.direction === "up" || a.direction === "left" ? -clicks : clicks;
         const point = spot?.point ?? this.activeCenter(use);
+        // The wheel turns where the pointer goes first.
+        goes = [{ point, act: "move" }];
         steps = [
           a.direction === "up" || a.direction === "down"
             ? { scroll: point, dy: signed }
@@ -904,6 +925,10 @@ export class DesktopManager {
         break;
     }
     let settled: boolean | undefined;
+    for (const g of goes) {
+      const [x, y] = g.point;
+      this.opts.pointer?.(use.agent.id, { x, y, ...DESKTOP_SIZE, act: g.act });
+    }
     if (steps.length > 0) settled = await this.input(use, steps, settle ? spec : null, ref);
     if (!settle) return {};
     const look = await this.lookNow(use);
@@ -1053,6 +1078,10 @@ export class DesktopManager {
     timeoutMs = this.requestMs,
     ref?: string,
   ): Promise<unknown> {
+    // Stopped under this request (`stopAll`: a switch went off): a helper started now would be one nobody stops.
+    if (this.uses.get(use.agent.id) !== use) {
+      throw new RunnerError("desktop_unavailable", "The agent's desktop stopped. Try again.");
+    }
     const helper = use.helper ?? (await this.start(use));
     try {
       const data = await helper.request(op, body, timeoutMs);

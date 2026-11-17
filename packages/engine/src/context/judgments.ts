@@ -102,6 +102,8 @@ export async function findCandidates(db: Executor, input: NewContextItem, limit 
         eq(contextItems.scopeType, input.scopeType),
         // A rule holds by its giver (`rulesForPerson`): the same words from someone else are their own rule.
         input.kind === "rule" ? eq(contextItems.createdById, input.createdById ?? "") : undefined,
+        // One person's items are never another's candidates: the judge would read them and could link the two.
+        input.scopeType === "person" ? eq(contextItems.scopeId, input.scopeId ?? "") : undefined,
       ),
     )
     .orderBy(desc(contextItems.updatedAt))

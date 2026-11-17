@@ -75,7 +75,6 @@ class Desktop(unittest.TestCase):
             window(7, 200, ("google-chrome", "agentes-browser")),
             window(8, 201, ("xfce4-terminal", "agentes-note")),
             window(9, 300, ("mousepad", "Mousepad")),
-            window(10, 301, ("someone-elses", "Someone-elses")),
             window(11, 400, ("xfce4-terminal", "Xfce4-terminal")),
         ]
 
@@ -86,8 +85,8 @@ class Desktop(unittest.TestCase):
         return k.snapshot(self.windows, self.fake.proc(others={301}), CONFIG, HOME)
 
     def test_the_list_keeps_the_apps_and_the_browser_and_leaves_out_the_rest(self):
-        # Files' two windows as two; its dialog, the session's programs, the note, the Terminal (the runner lists its
-        # shells) and another user's app left out.
+        # Files' two windows as two; its dialog, the session's programs, the note and the Terminal (the runner lists
+        # its shells) left out, and none of them makes the list `unkept`.
         self.assertEqual(
             self.state(),
             {
@@ -114,9 +113,17 @@ class Desktop(unittest.TestCase):
         self.fake.add(600, ["big"] + ["x" * 100] * 50)
         self.fake.add(601, ["gone-folder"], cwd=HOME + "/old (deleted)")
         self.windows += [window(13, 600, ("big", "Big")), window(14, 601, ("gone", "Gone"))]
-        apps = self.state()["apps"]
-        self.assertNotIn("big", [a["argv"][0] for a in apps])
-        self.assertIn({"argv": ["gone-folder"], "cwd": HOME}, apps)
+        state = self.state()
+        self.assertNotIn("big", [a["argv"][0] for a in state["apps"]])
+        self.assertIn({"argv": ["gone-folder"], "cwd": HOME}, state["apps"])
+        self.assertTrue(state["unkept"])
+
+    def test_a_window_with_no_pid_or_another_users_pid_makes_the_list_unkept(self):
+        for w in (window(15, None, ("java", "Java")), window(16, 301, ("someone-elses", "Someone-elses"))):
+            self.windows.append(w)
+            self.assertTrue(self.state()["unkept"])
+            self.windows.pop()
+        self.assertNotIn("unkept", self.state())
 
     def test_at_most_twenty_apps(self):
         for i in range(30):

@@ -6,6 +6,7 @@ import {
   createLocalKeyWrapper,
   deriveSecret,
   openSecret,
+  operatorInputDigest,
   SealedValueError,
   sealSecret,
   sha256,
@@ -18,8 +19,11 @@ test("AES-GCM round-trips and authenticates the associated data", () => {
   expect(sealed.startsWith("v1.")).toBe(true);
   expect(aesGcmDecrypt(key, sealed, "org-a").toString()).toBe("hello");
   expect(() => aesGcmDecrypt(key, sealed, "org-b")).toThrow();
-  const [v, iv, ct, tag] = sealed.split(".");
-  const tampered = [v, iv, `${ct?.slice(0, -2)}AA`, tag].join(".");
+  const [v, iv, ct = "", tag] = sealed.split(".");
+  // One bit flipped in the bytes: rewriting the text's last characters leaves them unchanged about once in 1,000 runs.
+  const bytes = Buffer.from(ct, "base64url");
+  bytes.writeUInt8(bytes.readUInt8(0) ^ 1, 0);
+  const tampered = [v, iv, bytes.toString("base64url"), tag].join(".");
   expect(() => aesGcmDecrypt(key, tampered, "org-a")).toThrow();
 });
 
@@ -57,4 +61,17 @@ test("derived secrets differ per purpose and are stable", () => {
   expect(deriveSecret(SECRET, "sessions")).toBe(deriveSecret(SECRET, "sessions"));
   expect(deriveSecret(SECRET, "sessions")).not.toBe(deriveSecret(SECRET, "provider-credentials-kek"));
   expect(sha256("x")).toHaveLength(64);
+});
+
+test("an input's digest is the same for one workspace and one hash, and another for any other", () => {
+  const [orgA, orgB] = ["0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a", "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b"];
+  const hash = sha256("an input");
+  const digest = operatorInputDigest(SECRET, orgA, hash);
+  expect(digest).toMatch(/^[0-9a-f]{16}$/);
+  expect(operatorInputDigest(SECRET, orgA, hash)).toBe(digest);
+  expect(operatorInputDigest(SECRET, orgB, hash)).not.toBe(digest);
+  expect(operatorInputDigest(SECRET, orgA, sha256("another input"))).not.toBe(digest);
+  expect(operatorInputDigest("another-secret".padEnd(48, "y"), orgA, hash)).not.toBe(digest);
+  // Keyed: nobody without the server's secret makes it from the hash.
+  expect(hash).not.toContain(digest);
 });

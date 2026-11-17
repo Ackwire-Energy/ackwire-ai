@@ -148,6 +148,14 @@ test("the proof: a code where the server sends email, else the password, which a
   expect(deletionProof({ passwordReset: false }, false)).toBe("addPassword");
 });
 
+test("the desktop app's owner on its own server: a fresh sign-in on this Mac, never where the server sends email", () => {
+  expect(deletionProof({ passwordReset: false }, false, true)).toBe("thisMac");
+  // A password they added doesn't change it: signing in again on this Mac is still the proof.
+  expect(deletionProof({ passwordReset: false }, true, true)).toBe("thisMac");
+  expect(deletionProof({ passwordReset: true }, false, true)).toBe("code");
+  expect(deletionProof({ passwordReset: false }, false, false)).toBe("addPassword");
+});
+
 test("what the proof sends: all six digits once a code went out, or a typed password; nothing to add a password", () => {
   const typed = { sent: true, code: "48291", password: "" };
   expect(proofToSend("code", typed)).toEqual({ input: { code: "48291" }, ready: false });
@@ -156,18 +164,28 @@ test("what the proof sends: all six digits once a code went out, or a typed pass
   expect(proofToSend("password", { ...typed, password: "pw" })).toEqual({ input: { password: "pw" }, ready: true });
   expect(proofToSend("password", typed).ready).toBe(false);
   expect(proofToSend("addPassword", { ...typed, password: "pw" })).toEqual({ input: {}, ready: false });
+  expect(proofToSend("thisMac", { ...typed, fresh: true })).toEqual({ input: {}, ready: true });
+  expect(proofToSend("thisMac", { ...typed, password: "pw", fresh: false })).toEqual({ input: {}, ready: false });
 });
 
-describe("a closed workspace, in words", () => {
+describe("a workspace being deleted, in words", () => {
   const now = Date.parse("2026-10-30T12:00:00Z");
   const deletion = { dueAt: "2026-11-02T12:00:00.000Z", requestedAt: "2026-10-26T12:00:00.000Z", requestedBy: null };
 
-  test("nothing more is needed, with the date while it's ahead; who deleted it is its own line", () => {
-    expect(deletingText(t, "en", deletion, now)).toBe('deleting.text {"date":"Nov 2"}');
-    expect(deletingText(t, "en", { ...deletion, dueAt: null }, now)).toBe("deleting.textLate");
-    expect(deletingText(t, "en", deletion, Date.parse("2026-11-03T12:00:00Z"))).toBe("deleting.textLate");
+  test("when it goes while that's ahead, else only that it's going; who deleted it is its own line", () => {
+    expect(deletingText(t, "en", "Acme", deletion, now)).toBe('deleting.banner {"name":"Acme","date":"Nov 2"}');
+    expect(deletingText(t, "en", "Acme", { ...deletion, dueAt: null }, now)).toBe('deleting.title {"name":"Acme"}');
+    expect(deletingText(t, "en", "Acme", deletion, Date.parse("2026-11-03T12:00:00Z"))).toBe(
+      'deleting.title {"name":"Acme"}',
+    );
     expect(deletedByText(t, "en", deletion)).toBe('deleting.by {"by":"deleting.someone","date":"Oct 26"}');
     expect(deletedByText(t, "en", { ...deletion, requestedAt: null })).toBeNull();
+  });
+
+  test("the one who deleted it reads that they did", () => {
+    const by = { ...deletion, requestedBy: { id: "u-ana", name: "Ana" } };
+    expect(deletedByText(t, "en", by, "u-ana")).toBe('deleting.byYou {"date":"Oct 26"}');
+    expect(deletedByText(t, "en", by, "u-bia")).toBe('deleting.by {"by":"Ana","date":"Oct 26"}');
   });
 });
 
@@ -179,23 +197,19 @@ describe("who still reaches account deletion from a closed screen", () => {
   const suspended = { id: "d", role: "owner", standing: { state: "suspended" } };
   const setup = { id: "e", role: "owner", onboarding: { step: "agents" } };
 
-  test("a workspace that opens is the way to Sua conta, on hold too", () => {
-    expect([live, onHold, closing, suspended, setup].map(workspaceOpens)).toEqual([true, true, false, false, false]);
-    expect(accountOutOfReach([closing, live])).toBe(false);
+  test("a workspace that opens is the way to Sua conta, on hold or being deleted too", () => {
+    expect([live, onHold, closing, suspended, setup].map(workspaceOpens)).toEqual([true, true, true, false, false]);
+    expect(accountOutOfReach([closing])).toBe(false);
     expect(accountOutOfReach([suspended, onHold])).toBe(false);
   });
 
-  test("only closed ones, one being set up or none: the screen must offer it", () => {
-    expect(accountOutOfReach([closing, suspended])).toBe(true);
-    expect(accountOutOfReach([closing, setup])).toBe(true);
+  test("only suspended ones, one being set up or none: the screen must offer it", () => {
+    expect(accountOutOfReach([suspended, setup])).toBe(true);
     expect(accountOutOfReach([])).toBe(true);
   });
 
-  test("where to go from a closed screen: none suspended, the ones that open first", () => {
-    expect(otherWorkspaces([closing, suspended, { ...closing, id: "f" }, live], "c").map((o) => o.id)).toEqual([
-      "a",
-      "f",
-    ]);
+  test("where to go from the suspended screen: none suspended, the ones that open first", () => {
+    expect(otherWorkspaces([setup, suspended, closing, live], "d").map((o) => o.id)).toEqual(["c", "a", "e"]);
   });
 
   test("what could be deleted instead: owned and not closed", () => {

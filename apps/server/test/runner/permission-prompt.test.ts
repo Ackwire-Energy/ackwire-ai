@@ -4,6 +4,7 @@ import {
   ASK_IN_CHAT,
   approvalMessage,
   DELETE_BRANCHES_POINTER,
+  unaskedMessage,
 } from "@agenteschat/adapters/command-policy";
 import {
   allowedBy,
@@ -264,6 +265,41 @@ test("over MCP: permission_prompt always answers JSON text Claude Code understan
   });
 });
 
+test("an agent that never asks: a held command is refused with where it runs, never with a wait for a person", async () => {
+  const s = server([]);
+  const out = await permissionPrompt(bash("gh pr merge 914"), s.call, { ...instant, asks: "never" });
+  expect(out).toEqual({ behavior: "deny", message: unaskedMessage(approvalMessage("This is a merge", ASK_IN_CHAT)) });
+  expect(out).toMatchObject({ message: expect.stringContaining("Run the same command with run_code") });
+  expect(out).toMatchObject({ message: expect.not.stringContaining("a person approves it first") });
+  // A background task's executor has no run_code: it is told to stop and say so, as at any level.
+  const inTask = await permissionPrompt(bash("gh pr merge 914"), s.call, { ...instant, asks: "never", task: true });
+  expect(inTask).toEqual({ behavior: "deny", message: approvalMessage("This is a merge", ASK_AFTER_TASK) });
+  // A secret read stays what it was.
+  const secret = await permissionPrompt(bash("cat ~/.ssh/id_rsa"), s.call, { ...instant, asks: "never" });
+  expect(secret).toEqual(await permissionPrompt(bash("cat ~/.ssh/id_rsa"), s.call, instant));
+  expect(s.calls).toHaveLength(0);
+  expect(mcpContextFromEnv({ AGENTES_MCP_ASKS: "never" })).toEqual({ asks: "never" });
+  expect(mcpContextFromEnv({ AGENTES_MCP_ASKS: "sometimes" })).toEqual({});
+});
+
+test("an agent that always asks: a work turn's settings allow only what reads, so every change reaches the prompt", () => {
+  const always = claudePermissionSettings("work", ["Bash(swift *)"], undefined, { asksFirst: true }).permissions;
+  expect(always.allow).toContain("mcp__agentes");
+  for (const rule of ["Bash(mkdir *)", "Bash(git commit *)", "Bash(gh pr create *)", "Bash(swift *)"]) {
+    expect({ rule, allowed: always.allow.includes(rule) }).toEqual({ rule, allowed: false });
+  }
+  expect(always.allow.some((rule) => /^(Edit|Write)/.test(rule))).toBe(false);
+  expect(always.deny).toContain("Bash(git merge *)");
+  expect(claudePermissionSettings("work").permissions.allow).toContain("Bash(mkdir *)");
+  // Brain turns send shell reads to the prompt too: nothing but our tools is allowed by rule.
+  expect(
+    claudePermissionSettings("work", [], undefined, { asksFirst: true, promptReads: true }).permissions.allow,
+  ).toEqual(["mcp__agentes"]);
+  const env = claudeMcpConfig({ command: ["node"], taskId: TASK, socketPath: "/s", token: "t", asks: "always" })
+    .mcpServers.agentes.env as Record<string, string>;
+  expect(env.AGENTES_MCP_ASKS).toBe("always");
+});
+
 test("work turns: the prompt tool flag and the mission's allowed commands in the settings (deny list kept)", () => {
   const args = missionExecutorArgs(
     "claude",
@@ -314,6 +350,15 @@ test.skipIf(!hasGit)(
     const pr = server([{ behavior: "allow" }]);
     expect((await permissionPrompt(bash("git push origin HEAD"), pr.call, turn)).behavior).toBe("allow");
     expect(pr.calls).toHaveLength(1);
+    // An agent that always asks: a push to its own branch is the server's to answer too, and a read still isn't.
+    const asks = server([{ behavior: "deny", message: "asks first" }]);
+    const always = { ...turn, asks: "always" as const };
+    expect(await permissionPrompt(bash("git push -u origin agentes/dev/fix"), asks.call, always)).toEqual({
+      behavior: "deny",
+      message: "asks first",
+    });
+    expect((await permissionPrompt(bash("git status"), asks.call, always)).behavior).toBe("allow");
+    expect(asks.calls).toHaveLength(1);
     // Inside a background task outside a mission nobody answers but this computer: an ordinary push goes
     // through, a held one says to stop and report.
     const alone = { ...turn, task: true, local: true };

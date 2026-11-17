@@ -14,6 +14,7 @@ export function AddressList({
   id,
   label,
   example,
+  hint,
   values,
   onChange,
   disabled,
@@ -28,6 +29,8 @@ export function AddressList({
   label: string;
   /** Under the field: what it takes ("Endereços ou @dominio.com"), or what was found for it. */
   example?: string;
+  /** What the field is for, behind an ⓘ beside its label. */
+  hint?: { name: string; text: string };
   values: string[];
   onChange: (values: string[]) => void;
   disabled?: boolean;
@@ -68,6 +71,7 @@ export function AddressList({
         label={label}
         id={id}
         example={example}
+        hint={hint}
         error={invalid ? (invalidText ?? t("mail.list.invalid")) : undefined}
       >
         <AffixInput

@@ -3,7 +3,7 @@ import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { type MachineRow, publishMachineUpdated } from "./machines";
 import { recordWakeWanted } from "./operator-events";
 
-const { machines, agents, agentRuns, machineTasks, browserHandoffs, organizationMembers } = schema;
+const { machines, agents, agentRuns, machineTasks, machineHolds, browserHandoffs, organizationMembers } = schema;
 
 /**
  * The workspace's own computer asleep when nobody uses it (ADR 0161). The operator puts it in standby
@@ -73,7 +73,8 @@ export async function setMachineStandby(
 /**
  * Whether the workspace's own computer is in use now (`busy`) and when it last was (`lastUsedAt`), for the operator to
  * decide when it sleeps. Busy: a run of the workspace queued or running, a run waiting for this computer, a task
- * running on it, someone in control of one of its agents' screens, or someone wanting it in the last `WANTED_BUSY_MS`.
+ * running on it, something an agent keeps running on it (a live hold, ADR 0176), someone in control of one of its
+ * agents' screens, or someone wanting it in the last `WANTED_BUSY_MS`.
  * Last used: the latest of the workspace's runs and this computer's tasks (of the last 7 days), `wanted_at`, and its
  * people's last visit. One query.
  */
@@ -84,6 +85,7 @@ export async function machineActivity(
 ): Promise<{ busy: boolean; lastUsedAt: Date | null }> {
   const { id, orgId } = machine;
   const since = sql`${new Date(now.getTime() - ACTIVITY_WINDOW_MS).toISOString()}::timestamptz`;
+  const nowAt = sql`${now.toISOString()}::timestamptz`;
   // A null never reaches a decoder: the type says it may still come back.
   const at = (v: string | Date): Date | null => new Date(v);
   const [row] = await db
@@ -95,6 +97,9 @@ export async function machineActivity(
           where ${agentRuns.waitingMachineId} = ${id} and ${agentRuns.status} = 'waiting_input')
         or exists (select 1 from ${machineTasks}
           where ${machineTasks.machineId} = ${id} and ${machineTasks.status} = 'running')
+        or exists (select 1 from ${machineHolds}
+          where ${machineHolds.machineId} = ${id} and ${machineHolds.endedAt} is null
+            and (${machineHolds.until} is null or ${machineHolds.until} > ${nowAt}))
         or exists (select 1 from ${browserHandoffs}
           where ${browserHandoffs.orgId} = ${orgId} and ${browserHandoffs.machineId} = ${id}
             and ${browserHandoffs.status} = 'active')`,

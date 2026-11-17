@@ -71,8 +71,8 @@ export function MentionPicker({
 
   return (
     <Animated.View
-      entering={reducedMotion ? undefined : FadeInDown.duration(160)}
-      exiting={reducedMotion ? undefined : FadeOut.duration(100)}
+      entering={reducedMotion ? undefined : CARD_IN}
+      exiting={reducedMotion ? undefined : CARD_OUT}
       accessibilityRole="list"
       accessibilityLabel={t("mobile.mention.list")}
       style={[
@@ -162,6 +162,9 @@ export function MentionPicker({
   );
 }
 
+/** The card comes in as the keys bring it and goes as they take it away: built once, never while it redraws. */
+const CARD_IN = FadeInDown.duration(160);
+const CARD_OUT = FadeOut.duration(100);
 /** A row's inset, its face and the gap to the name: the hairline above starts where the name does. */
 const INSET = 14;
 const FACE = OPTION_ROW.face;

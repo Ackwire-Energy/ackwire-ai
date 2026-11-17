@@ -13,9 +13,10 @@ import {
   accountKindOf,
   accountRow,
   accountSaved,
+  advancedResetInput,
   agentAccounts,
   existingRows,
-  flowBack,
+  flowStep,
   modelInput,
   modelRows,
   modelSections,
@@ -101,7 +102,10 @@ describe("the agent's AI", () => {
       "owners",
     ]);
     // Connect an AI's first rows: Bia's in one tap, whose it is under it; one another agent has stays locked.
-    const rows = existingRows(t, view, [], "Ada").map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.sub]);
+    const rows = existingRows(t, view, [], "Ada", "pt-BR").map((r) => [
+      r.row.kind === "key" ? "key" : r.row.act,
+      r.sub,
+    ]);
     expect(rows).toContainEqual(["use", "De Bia"]);
     expect(rows.filter(([act]) => act === "locked")).toHaveLength(2);
   });
@@ -165,7 +169,7 @@ describe("the agent's AI", () => {
       "Ada answers only you, on your Gemini seat.",
     );
     expect(pt("connectAi.plan.gemini.warning")).toBe(
-      "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API ou o Gemini Enterprise.",
+      "O Google diz que usar um plano pessoal do Gemini dentro de outros apps pode suspender a conta. Para não correr esse risco, use uma chave de API do Gemini ou o Gemini Enterprise.",
     );
     expect(geminiPersonal({ provider: "enterprise" })).toBe(false);
     expect(geminiPersonal(undefined)).toBe(true);
@@ -211,8 +215,26 @@ describe("the agent's AI", () => {
     expect(screen).toContain("newPlanAccountOption(brainOptions, optionsBefore)");
     expect(screen).toContain("connectedHere ?? picked");
     // For the agents I create: none of mine is offered, so a plan signs in for the new one.
-    expect(sheet).toMatch(/params\.forNew === "1"\s*\? \[\]/);
+    expect(sheet).toMatch(/ask\.forNew === "1"\s*\? \[\]/);
     expect(sheet).toContain("queryKey: keys.brainMachines(orgId)");
+  });
+
+  test("Conectar uma IA opens under the team's scene, and a new agent's app shows its account under its name", async () => {
+    const read = (path: string) => Bun.file(new URL(`../../src/features/${path}`, import.meta.url).pathname).text();
+    const [sheet, scene, screen] = await Promise.all([
+      read("ai/ConnectAi.tsx"),
+      read("ai/ConnectScene.tsx"),
+      read("agents/NewAgentScreen.tsx"),
+    ]);
+    // Over the first page only: the steps after it keep the screen for their own fields.
+    expect(sheet).toContain('{view.page === "home" && !done ? <ConnectScene /> : null}');
+    // Decoration, as every sky is: asleep until an AI is there, hidden from screen readers.
+    expect(scene).toContain('accessibilityElementsHidden importantForAccessibility="no-hide-descendants"');
+    expect(scene).toContain('mode="sleep"');
+    expect(scene).toContain("sceneTeam(agents, lead).slice(0, 2)");
+    // No team yet: no trail ending in the air beside the computer.
+    expect(scene).toContain("{team.length > 0 ? trail : null}");
+    expect(screen).toContain("{...(i.account ? { sub: i.account } : {})}");
   });
 
   test("under a hold, Uso's empty plans card says what comes first and invites no plan", async () => {
@@ -287,11 +309,24 @@ describe("the agent's AI", () => {
     expect(t("connectAi.own.shared")).toBe("A conta que os seus agentes dividem");
   });
 
+  test("a Gemini sign-in the computer can't share with every agent says so and what to use instead, no Tentar de novo", async () => {
+    // The flow is a component the tests can't render: what it wires in, as text.
+    const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+    expect(flow).toContain("const notShared = geminiNotShared(kind, result);");
+    expect(flow).toMatch(/: notShared\s+\? t\("agentPage\.work\.brain\.add\.geminiNotShared", \{ computer \}\)/);
+    expect(flow).toMatch(/\{notShared \? null : \(\s*<Button[^>]*?label=\{t\("common\.retry"\)\}/s);
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.geminiNotShared", { computer: "MacBook" })).toBe(
+      "O Gemini entrou, mas o MacBook não consegue compartilhar esse login com todos os agentes. Use uma chave de API do Gemini.",
+    );
+  });
+
   test("signing in again sends the account's own email as the hint, from Settings and from Connect an AI", async () => {
     const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
     const settings = await read("AiAccountsScreen.tsx");
     const connect = await read("ConnectAiSteps.tsx");
-    expect(settings).toMatch(/again=\{again\.id\}\s+email=\{again\.email\}/);
+    // Settings signs that exact login in again on its plan's page of Connect an AI, with its own email.
+    expect(settings).toMatch(/again: a\.id,\s+\.\.\.\(a\.email \? \{ email: a\.email \} : \{\}\),/);
     expect(connect).toMatch(
       /again=\{hint \? hint\.again : signedOut\?\.id\}\s+email=\{hint \? hint\.email : signedOut\?\.email\}/,
     );
@@ -304,6 +339,48 @@ describe("the agent's AI", () => {
     // An account already connected thinks for an agent only where one is in view: Connect an AI, never Settings.
     expect(connect).toContain("onUse={(a) => void assign(a)}");
     expect(settings).not.toContain("onUse=");
+  });
+
+  test("Settings' Sign in again and a new key open Connect an AI on that login's plan, the same login signed in", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [settings, sheet, connect, card] = await Promise.all([
+      read("AiAccountsScreen.tsx"),
+      read("ConnectAi.tsx"),
+      read("ConnectAiSteps.tsx"),
+      read("NoAiCard.tsx"),
+    ]);
+    // No sign-in drawn under the list (it never scrolled to it, and the keyboard covered it): its plan's page.
+    expect(settings).not.toContain("<AddAccount");
+    expect(settings).toContain("plan: planOfAccount(a),");
+    // For one of the person's agents that thinks with it, else on its own.
+    expect(settings).toContain("agent.ownerUserId === meId || isRightHand(agent)");
+    expect(card).toMatch(/forNew\?: string;\s+again\?: string;/);
+    // The page signs that login in again: for an agent, as a row's own sign-in; with none, by itself on its computer.
+    expect(sheet).toContain("ask.again && againChoice ? { id: ask.again, choice: againChoice");
+    expect(sheet).toContain('bare && !again && view.page === "plan"');
+    expect(connect).toContain(
+      "props.login ?? (again ? { choice, from: again.id, again: again.id, email: again.email } : undefined);",
+    );
+    expect(connect).toContain("const has = added ?? (again ? undefined : freePlanAccount(gates.accounts, choice));");
+    expect(connect).toContain('machineId={againAccount?.machineId ?? computer?.machineId ?? ""}');
+  });
+
+  test("Rename is a screen of its own and Replace the key asks in the app's own sheet, on Android as on iOS", async () => {
+    const settings = await Bun.file(
+      new URL("../../src/features/ai/AiAccountsScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(settings).not.toMatch(/Alert\.prompt|Platform\.OS/);
+    // Renaming is pushed (screens, not sheets), its field waiting for a tap and Save in the bar.
+    expect(settings).not.toContain("<PromptForm");
+    expect(settings).toContain('router.push({ pathname: "/ai-account-rename", params: { machineId, accountId } });');
+    expect(settings).toContain('action={{ label: t("common.save"), disabled: !ready, onPress: () => void save() }}');
+    expect(settings).not.toContain("autoFocus");
+    expect(settings).toMatch(/sheet\.open\(\s*<KeyPrompt\s+title=\{t\("settings\.rotateTitle"/);
+    // The key never shows as it is typed or pasted, and the button waits for the save.
+    expect(settings).toMatch(/<PasteField[^>]*\bsecret\b/);
+    expect(settings).toMatch(/label=\{submitLabel\}\s+loading=\{busy\}/);
+    expect(settings).toContain('{ label: t("aiAccounts.page.rename"), onPress: () => rename(a) },');
+    expect(settings).toContain('...(held ? [] : [{ label: t("settings.rotate"), onPress: () => rotate(k) }]),');
   });
 
   test("Claude's code goes by itself however it lands in the field; anything else waits for Enviar, with a line", async () => {
@@ -325,6 +402,44 @@ describe("the agent's AI", () => {
     expect(parts).toContain("!empty && styles.insetFull");
     const t = await translator("pt-BR");
     expect(t("agentPage.work.brain.add.notCode")).toBe("Isso não parece o código do Claude.");
+  });
+
+  test("a sign-in that ended on the computer says why by its code; Google's code field refuses its page's address", async () => {
+    // The flow is a component the tests can't render: what it wires in, as text. The codes' lines are the client's
+    // `loginFailureLine` (its tests pin them).
+    const flow = await Bun.file(new URL("../../src/features/ai/AddAccount.tsx", import.meta.url).pathname).text();
+    expect(flow).toContain("const failure = loginFailureLine(result?.code);");
+    expect(flow).toMatch(
+      /: t\(failure\.key \?\? "agentPage\.work\.brain\.add\.failed", \{\s+brand: plan\?\.label \?\? t\(/,
+    );
+    // The CLI's own words only under the two lines they explain, whole and selectable.
+    expect(flow).toContain(
+      "const said = byCode && !notShared && failure.detail ? result?.message?.trim() || null : null;",
+    );
+    expect(flow).toMatch(/<Text variant="small" tone="muted" selectable style=\{\[styles\.said,/);
+    expect(flow).not.toMatch(/styles\.said[^>]*numberOfLines/);
+    // Canceled is no failure: no line, the sign-in starts over.
+    expect(flow).toMatch(/if \(canceled\) onRetry\(\);/);
+    expect(flow).toContain('(!canceled && (result?.state === "failed" || result?.state === "expired"))');
+    // Google's page takes the code out of its address: said behind the step's ⓘ, and that address is never sent.
+    expect(flow).toContain('hint={t("agentPage.work.brain.add.codeHintGoogle")}');
+    expect(flow).toContain("key.length > 0 && !isUrlWithoutCode(key),");
+    expect(flow).toMatch(
+      /!busy && isUrlWithoutCode\(key\) \? \(\s*<Note icon="x">\{t\("agentPage\.work\.brain\.add\.notCodeGoogle"\)\}<\/Note>/,
+    );
+    const t = await translator("pt-BR");
+    expect(t("agentPage.work.brain.add.why.bad_code", { brand: "Gemini", computer: "MacBook" })).toBe(
+      "O Gemini recusou o código. Tente de novo e cole só o código que a página mostrar.",
+    );
+    expect(t("agentPage.work.brain.add.why.network", { brand: "Gemini", computer: "MacBook" })).toBe(
+      "O MacBook não conseguiu falar com o Gemini. Tente de novo.",
+    );
+    expect(t("agentPage.work.brain.add.codeHintGoogle")).toBe(
+      "Cole o código que a página do Google mostra, não o endereço da página.",
+    );
+    expect((await translator("en"))("agentPage.work.brain.add.notCodeGoogle")).toBe(
+      "That's an address with no code in it. Paste the code Google's page shows.",
+    );
   });
 
   test("while the code or the key goes and the computer signs in, the orbit and a line stand in for the field and Enviar", async () => {
@@ -353,17 +468,31 @@ describe("the agent's AI", () => {
     // One row per account (the web's choice), and "Também usada por" signs this agent in on Connect an AI.
     expect(screen).toContain("const choices = view ? accountChoices(accounts, [view.account]) : [];");
     expect(screen).toContain("{choices.map((c) => (");
-    expect(screen).toContain("row={accountRow(t, c, name)}");
+    expect(screen).toContain("row={accountRow(t, c, name, i18n.language)}");
     expect(screen).toContain("onPress={() => (c.also ? connect(c.login, true) : choose(c.login))}");
     // That account's email goes along as Claude's hint, on Claude's page only, whatever the agent's own login is.
     expect(screen).toContain("...(also && a?.email ? { email: a.email } : {}),");
-    expect(sheet).toContain("{...(params.email ? { email: params.email } : {})}");
+    expect(sheet).toContain("{...(ask.email ? { email: ask.email } : {})}");
     expect(connect).toContain('{...(choice === "claude" && props.email ? { email: props.email } : {})}');
     const t = await translator("pt-BR");
     const theo = account("t", { usedBy: ["Theo"] });
-    expect(accountRow(t, { login: theo, usedBy: ["Theo", "Lia"], also: true }, "Ada").sub).toBe(
+    expect(accountRow(t, { login: theo, usedBy: ["Theo", "Lia"], also: true }, "Ada", "pt-BR").sub).toBe(
       "Também usada por Theo e Lia",
     );
+  });
+
+  test("an account at its limit says so on its own line, in the usage words; picked, the agent's AI says it waits", async () => {
+    const t = await translator("pt-BR");
+    const row = (u: PlanUsage | null) =>
+      accountRow(t, { login: account("c", { usage: u }), usedBy: [], also: false }, "Ada", "pt-BR");
+    expect(row(usage(100)).below).toBe("No limite");
+    expect("below" in row(usage(10))).toBe(false);
+    expect("below" in row(null)).toBe(false);
+    expect(t("agentPage.work.brain.v2.fullWait", { name: "Ada", context: "female" })).toBe(
+      "Nesta conta a Ada espera até o plano renovar.",
+    );
+    const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    expect(screen).toContain('? t("agentPage.work.brain.v2.fullWait", g)');
   });
 
   test("Connect an AI starts with what the person already has: the free account, those other agents use, a workspace key, someone else's locked", async () => {
@@ -393,7 +522,7 @@ describe("the agent's AI", () => {
         account("joao", { label: "Claude Max", ownerId: "u2", ownerName: "João Silva", mine: false }),
       ],
     };
-    const rows = existingRows(t, view, [key("k1"), key("k2", "2026-10-20T00:00:00.000Z")], "Ada");
+    const rows = existingRows(t, view, [key("k1"), key("k2", "2026-10-20T00:00:00.000Z")], "Ada", "pt-BR");
     expect(
       rows.map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.label, r.sub, "below" in r ? r.below : null]),
     ).toEqual([
@@ -417,15 +546,16 @@ describe("the agent's AI", () => {
     const plans = connect.slice(connect.indexOf("function Plans("), connect.indexOf("function Makers("));
     expect(plans).toContain("<PickList");
     expect(plans).toContain("options={PLAN_CHOICES.map(");
-    expect(plans).toContain('onView({ page: "plan", choice: o.value })');
+    expect(plans).toContain("onPick={(o) => onPlan(o.value)}");
     const makers = connect.slice(connect.indexOf("function Makers("));
     expect(makers).toContain("<PickList");
     expect(makers).toContain("...PROVIDERS.map(");
     expect(connect.slice(connect.indexOf("function KeyPage("))).toContain("onPress={onMakers}");
-    expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name)");
-    // The workspace's keys only in Connect an AI (a sheet), as on the web: the first run's saved key already serves
-    // every agent with no plan.
-    expect(connect).toContain("useCredentials(orgId, mayAddKey && forAgent !== undefined && sheetTitle !== undefined)");
+    expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name, i18n.language)");
+    // The workspace's keys, for who may add them, on the flow's one screen: no sheet or inline variant is left.
+    expect(connect).toContain("useCredentials(orgId, mayAddKey && forAgent !== undefined)");
+    expect(connect).not.toContain("sheetTitle");
+    expect(connect).not.toContain("keyButton");
   });
 
   test("a card whose plan's sign-in ended: the agent says so, and Entrar de novo opens on its own plan", async () => {
@@ -486,14 +616,24 @@ describe("the agent's AI", () => {
     expect(screen).toContain(
       "const lockedHere = view !== undefined && kind !== null && !ownRow && choices.length === 0 && !adds;",
     );
-    expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock">\s*\{t\("connectAi\.accountsLocked", \{/);
+    // On the groups' footer edge, under the list it stands for.
+    expect(screen).toMatch(/\{lockedHere \? \(\s*<Note icon="lock" inset>\s*\{t\("connectAi\.accountsLocked", \{/);
     expect(grouped).toContain("if (items.length === 0) return null;");
     // Still waiting, a waiting pill (its sentence wraps to two or three lines on a phone): the breathing mark and
     // Connect tinted for who may connect, a quiet bolt and who can for anyone else.
     expect(card).toContain(
       '<AskWaiting forMe={action !== null} mark="bolt" words={title} actions={action} below={action ? null : locked} />',
     );
-    expect(card).not.toContain("<Button");
+    // No kit button in the pill: the only ones in the file are the kept card's, a house note (the plan hold), where
+    // Conectar is again only for who may connect and anyone else reads who can.
+    const [pill = "", kept = ""] = card.split("\nfunction KeptCard(");
+    expect(pill).not.toContain("<Button");
+    expect(kept).not.toContain("<AskWaiting");
+    expect(kept).toContain("const mine = mayConnectAi(agent, meId, org);");
+    expect(kept).toContain('text={mine ? t("noAi.kept.activeLine", { name }) : t("noAi.lockedAdmins")}');
+    expect(kept).toMatch(
+      /foot=\{\s*mine \? \(\s*<AskFoot>\s*<AskButtons\s*primary=\{\s*<Button[^>]*label=\{t\("noAi\.action"\)\}/,
+    );
     // "Ada's page": its Conectar opens on the plan she thinks with (`agentPlan`), ChatGPT for Codex.
     expect(profile).toContain("openConnectAi({ agentId: id, plan: agentPlan(agent) ?? undefined })");
     // A plan's page asks the computers for their own sign-ins again: Codex's is known by a usage read with it.
@@ -569,9 +709,9 @@ describe("the agent's AI", () => {
       available: true,
 
       models: [
-        { value: "opus", label: "Opus" },
-        { value: "sonnet", label: "Sonnet", recommended: true },
-        { value: "haiku", label: "Haiku" },
+        { value: "opus", label: "Opus 5.5" },
+        { value: "sonnet", label: "Sonnet 5.5", recommended: true },
+        { value: "haiku", label: "Haiku 5.5" },
       ],
       defaultModel: "sonnet",
     };
@@ -633,8 +773,8 @@ describe("the agent's AI", () => {
     expect(modelSections(modelRows(t, view("k3-256k"), planOf("kimi")))).toHaveLength(1);
     // On Claude's sign-in: its aliases; a plan's model kept from before runs Sonnet there.
     const own = modelRows(t, view("deepseek-v4.1-flash"), undefined);
-    expect(own.map((r) => r.label)).toEqual(["Automático", "Opus", "Sonnet", "Haiku"]);
-    expect(own.find((r) => r.checked)?.label).toBe("Sonnet");
+    expect(own.map((r) => r.label)).toEqual(["Automático", "Opus 5.5", "Sonnet 5.5", "Haiku 5.5"]);
+    expect(own.find((r) => r.checked)?.label).toBe("Sonnet 5.5");
     // An alias the plan leaves out runs its main model.
     expect(modelRows(t, view("opus"), planOf("zai")).find((r) => r.checked)?.label).toBe("GLM-5.3");
     // OpenCode (ADR 0132): the models its CLI listed, the free ones marked Grátis.
@@ -752,10 +892,55 @@ describe("the agent's AI", () => {
       "Ada agora pensa com a conta que os seus agentes dividem.",
     );
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
+    const save = await Bun.file(new URL("../../src/features/ai/useSaveBrain.ts", import.meta.url).pathname).text();
     expect(screen).toContain(
       "const done = (saved: AgentBrain) => accountSaved(t, i18n.language, name, a, input, saved);",
     );
-    expect(screen).toContain('toast({ title: typeof done === "string" ? done : done(saved), icon: "check" });');
+    // Said once the server answers, unless a newer pick of the same is on its way (its own toast speaks).
+    expect(save).toContain(
+      'if (newest(input)) toast({ title: typeof done === "string" ? done : done(saved), icon: "check" });',
+    );
+  });
+
+  test("a pick on the agent's AI shows on the tap, and only its own row waits for the server", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [save, screen, advanced] = await Promise.all([
+      read("useSaveBrain.ts"),
+      read("AgentAiScreen.tsx"),
+      read("AgentAdvancedScreen.tsx"),
+    ]);
+    // The fields on their way are drawn over what is saved, and each leaves once its own answer comes.
+    expect(save).toContain("put({ ...live.current, ...input });");
+    expect(save).toContain("!(k in input) || input[k as Field] !== value");
+    // No screen-wide busy: the account, the model and the switches show the pick and lock only their own row.
+    for (const source of [screen, advanced]) {
+      expect(source).toContain("useSaveBrain(agentId");
+      expect(source).not.toMatch(/disabled=\{busy|!mayPick|setBusy/);
+    }
+    expect(screen).toContain("const account = pending.account !== undefined ? pending.account : view?.account;");
+    expect(screen).toContain("checked={c.login.id === account}");
+    expect(screen).toContain("if (pending.extraUsage !== undefined) return;");
+    expect(screen).toContain("const checked = picked !== null ? r.value === picked : r.checked;");
+    expect(advanced).toContain("const shown = view && now ? withPending(view, now, pending) : null;");
+    expect(advanced).toContain("checked={shown.contextTokens === n}");
+    expect(advanced).toContain("if (pending.onlyOwner !== undefined) return;");
+    expect(advanced).toContain("pending.fallback === undefined && void save({ fallback: !shown.fallback })");
+  });
+
+  test("an AI that didn't load asks again, and the dock and the effort settle on the drawer's spring", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const files = ["AgentAiScreen.tsx", "AgentAdvancedScreen.tsx", "KeyForAllScreen.tsx", "AgentSetupScreen.tsx"];
+    for (const file of files) {
+      const source = await read(file);
+      expect([file, source.includes("<LoadFailed")]).toEqual([file, true]);
+    }
+    const [screen, ramp] = await Promise.all([read("AgentAiScreen.tsx"), read("EffortRamp.tsx")]);
+    // The dock slides as a drawer (the theme's `motion.sheet`: 300 ms, 0.8), its shared values read and set as worklets
+    // want them (`.get()`/`.set()`), the same in the ramp.
+    expect(screen).toContain("withSpring(shown ? 0 : 1, motion.sheet)");
+    expect(ramp).toContain("const FILL_SPRING = { duration: 300, dampingRatio: 0.8 };");
+    expect(`${screen}${ramp}`).not.toContain("stiffness");
+    expect(`${screen}${ramp}`).not.toMatch(/\b(out|height|pos|step|track|clock)\.value\b/);
   });
 
   test("its page: the account first (the plan choice), then the model with how to give what it needs, a refused key's own row", async () => {
@@ -782,7 +967,7 @@ describe("the agent's AI", () => {
       "Ligue a região Global no OpenCode, em Settings\u00a0›\u00a0Privacy. Sem ela, este modelo não responde.",
     );
     const refused = account("oc", { provider: "opencode", keyHint: "Ex2b", status: "signed_out" });
-    expect(accountRow(t, { login: refused, usedBy: [], also: false }, "Ada").sub).toBe(
+    expect(accountRow(t, { login: refused, usedBy: [], also: false }, "Ada", "pt-BR").sub).toBe(
       "A chave foi recusada: troque por uma nova.",
     );
     expect(t("aiAccounts.page.newKey")).toBe("Trocar a chave");
@@ -797,7 +982,9 @@ describe("the agent's AI", () => {
     expect(screen).toContain("modelSections(rows).map(");
     expect(screen).toContain("<GroupedHeader>{providerLabel(s.maker)}</GroupedHeader>");
     expect(screen).toContain('hint: { name: t("common.about", { label: r.label }), text: r.note }');
-    const route = await Bun.file(new URL("../../app/(app)/agent-model/[id].tsx", import.meta.url).pathname).text();
+    const route = await Bun.file(
+      new URL("../../app/(app)/(main)/agent-model/[id].tsx", import.meta.url).pathname,
+    ).text();
     expect(route).toContain("<AgentModelScreen agentId={id");
   });
 
@@ -896,8 +1083,32 @@ describe("the agent's AI", () => {
     );
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
     expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
-    const route = await Bun.file(new URL("../../app/(app)/agent-setup/[id].tsx", import.meta.url).pathname).text();
+    const route = await Bun.file(
+      new URL("../../app/(app)/(main)/agent-setup/[id].tsx", import.meta.url).pathname,
+    ).text();
     expect(route).toContain("<AgentSetupScreen agentId={id");
+  });
+
+  test("Voltar ao padrão on an API key gives the effort back to the model, Automático too; nothing chosen saves none", () => {
+    const base = { effort: null, speed: "standard" as const, contextTokens: null, onlyOwner: true, fallback: true };
+    const key = { brain: "model" as const, onlyOwner: true };
+    expect(advancedResetInput(key, { ...base, effort: "high", contextTokens: 400_000 }, false)).toEqual({
+      contextTokens: null,
+      effort: "auto",
+    });
+    expect(advancedResetInput(key, { ...base, effort: "high" }, true)).toEqual({ contextTokens: null, effort: "auto" });
+    expect(advancedResetInput(key, base, false)).toEqual({ contextTokens: null });
+    // On a computer, Medium, its default; "Automático" keeps picking its own.
+    const plan = { brain: "claude_code" as const, onlyOwner: true };
+    expect(advancedResetInput(plan, { ...base, effort: "high" }, false)).toEqual({
+      contextTokens: null,
+      effort: "medium",
+      fallback: true,
+    });
+    expect(advancedResetInput(plan, { ...base, effort: "high" }, true)).toEqual({
+      contextTokens: null,
+      fallback: true,
+    });
   });
 
   test("Usar em outros agentes on other people's plans asks once before saving, naming every owner", async () => {
@@ -1014,10 +1225,33 @@ describe("the agent's AI", () => {
       new URL("../../src/features/agents/NewAgentScreen.tsx", import.meta.url).pathname,
     ).text();
     expect(screen).toContain("openConnectAi({ agentId: agent.id, plan: thinks.connect })");
-    expect(screen).toContain("<BrainPickSheet");
+    // "Quem pensa" is chosen on its own pushed screen, never a sheet over the form (ADR 0135).
+    expect(screen).toContain("openBrainPick({");
+    expect(screen).toContain('router.push("/agent-brain");');
+    expect(screen).not.toContain("BrainPickSheet");
     // No last setup: a plan account of mine (one connected before I had an agent) thinks for it, as on the web.
     expect(screen).toContain("(proposed || start ? null : (ownPlan ?? null))");
     expect(screen).toContain("const ownPlan = planAccountOption(brainOptions);");
+  });
+
+  test("a plan connected with no agent yet: Criar um agente com este plano opens Criar agente thinking with it", async () => {
+    const read = (path: string) => Bun.file(new URL(`../../${path}`, import.meta.url).pathname).text();
+    const [sheet, route, screen, steps] = await Promise.all([
+      read("src/features/ai/ConnectAi.tsx"),
+      read("app/(app)/(main)/new-agent/index.tsx"),
+      read("src/features/agents/NewAgentScreen.tsx"),
+      read("src/features/ai/ConnectAiSteps.tsx"),
+    ]);
+    // For whoever may make agents, never over one being made.
+    expect(sheet).toContain('ask.forNew !== "1" && makesAgents(org) ? planAccount');
+    expect(sheet).toContain("/new-agent?account=");
+    expect(sheet).toContain("encodeURIComponent(makeWith.id)");
+    expect(route).toContain('accountId={typeof account === "string" && account ? account : null}');
+    // That account wins over the workspace's last setup; a pick made on the screen still wins over it.
+    expect(screen).toContain("connectedHere ?? picked ?? askedPlan ??");
+    // Someone else's computer: a computer of their own is the way on, for whoever may connect one.
+    expect(steps).toContain('elsewhere && can(org, "pair_computers") ?');
+    expect(steps).toContain('label={t("connectAi.connectMine")} onPress={onComputer}');
   });
 });
 
@@ -1041,15 +1275,18 @@ describe("Seus planos' rows", () => {
   });
 });
 
-describe("Back in Connect an AI", () => {
-  test("a plan picked from the list goes back to the list, a sign-in from a row of what the person has to that row", () => {
-    const plan = { page: "plan", choice: "chatgpt" } as const;
-    expect(flowBack(plan, false)).toEqual({ page: "plans" });
-    expect(flowBack(plan, true)).toEqual({ page: "home" });
-    expect(flowBack({ page: "plans" }, false)).toEqual({ page: "home" });
-    expect(flowBack({ page: "makers" }, false)).toEqual({ page: "key" });
-    expect(flowBack({ page: "key" }, false)).toEqual({ page: "home" });
-    expect(flowBack({ page: "home" }, false)).toBeNull();
+describe("Connect an AI's steps line", () => {
+  test("the two ways are step 1, every page after them step 2, a page that connected something step 3", () => {
+    expect(flowStep({ page: "home" }, false)).toBe(1);
+    for (const view of [
+      { page: "plans" },
+      { page: "plan", choice: "chatgpt" },
+      { page: "key" },
+      { page: "makers" },
+    ] as const)
+      expect(flowStep(view, false)).toBe(2);
+    expect(flowStep({ page: "key" }, true)).toBe(3);
+    expect(flowStep({ page: "home" }, true)).toBe(3);
   });
 });
 

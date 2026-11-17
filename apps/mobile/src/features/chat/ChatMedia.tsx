@@ -11,6 +11,7 @@ import { CHROME_MAX_SCALE, Text } from "@/ui";
 import { useReducedMotion } from "@/ui/theme";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
+import { useKeptWidth } from "./look";
 import { gifBox, MESSAGE_STICKER } from "./media";
 
 /**
@@ -53,7 +54,9 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
   const orgId = useOrgId();
   const c = useColors();
   const reduced = useReducedMotion();
-  const [room, setRoom] = useState(0);
+  // Kept across the list's unmounts: a row coming back draws the GIF at its size from its first frame.
+  const [width, onWidth] = useKeptWidth(`gif:${align}`);
+  const room = Math.floor(width);
   const size = reduced ? "still" : "full";
   // Stable per file, so it isn't fetched again on every render.
   const source = useMemo(() => gifImageSource(orgId, media.id, size), [orgId, media.id, size]);
@@ -62,10 +65,7 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
   const box = gifBox(media.width, media.height, room);
   const title = media.title.trim();
   return (
-    <View
-      onLayout={(e) => setRoom(Math.floor(e.nativeEvent.layout.width))}
-      style={[styles.wrap, align === "end" && styles.end]}
-    >
+    <View onLayout={onWidth} style={[styles.wrap, align === "end" && styles.end]}>
       <View
         accessible
         accessibilityRole="image"

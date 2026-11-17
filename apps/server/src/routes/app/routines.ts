@@ -269,7 +269,10 @@ const Routine = z
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
-    nextRunAt: z.string().nullable(),
+    nextRunAt: z.string().nullable().openapi({
+      description:
+        "Null while paused, for an event's routine, and while the workspace is being deleted (its slots pass).",
+    }),
     createdAt: z.string(),
     access: Access,
     report: Report,

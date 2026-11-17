@@ -170,6 +170,23 @@ describe("org storage", () => {
     expect((await getArtifact(f.artifactDeps, person(f.owner.id), f.org.id, after.id)).title).toBe("Depois");
   });
 
+  test("a migration asked for twice runs once; one that stopped moving starts over", async () => {
+    f = await setup();
+    await createArtifact(f.artifactDeps, person(f.owner.id), f.org.id, doc("Um"));
+    await testStorage(f.storage, f.owner.id, f.org.id, bucket());
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: bucket() });
+    const jobs = () => f.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "storage.migrate"));
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    // Asked again while it runs (a second click): the one running is the answer, with no second job beside it.
+    expect(await startMigration(f.storage, f.owner.id, f.org.id)).toMatchObject({ status: "running", total: 1 });
+    expect(await jobs()).toHaveLength(1);
+    // No file copied for over ten minutes: nothing is behind it any more, so asking again starts it over.
+    await f.db.update(schema.storageMigrations).set({ updatedAt: new Date(Date.now() - 11 * 60_000) });
+    await startMigration(f.storage, f.owner.id, f.org.id);
+    expect(await jobs()).toHaveLength(2);
+    expect(await f.db.select().from(schema.storageMigrations)).toHaveLength(1);
+  });
+
   test("the migration copies old files to the bucket and resumes after a failure", async () => {
     f = await setup();
     const files = [];
@@ -423,6 +440,26 @@ describe("org storage", () => {
     await expect(startMigration(f.storage, bia.id, f.org.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
+  test("the service picked in the app is kept with the settings, outside what ties a test to its activation", async () => {
+    f = await setup();
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, { ...bucket(), provider: "r2" })).ok).toBe(true);
+    // Saved under another name, it's still the same bucket that passed: it switches on, as it was tested.
+    const view = await saveStorage(f.storage, f.owner.id, f.org.id, {
+      kind: "s3",
+      s3: { ...bucket(), provider: "b2" },
+    });
+    expect(view.s3).toMatchObject({ provider: "r2", bucket: "acme-files" });
+    expect((await getStorage(f.db, f.owner.id, f.org.id)).s3?.provider).toBe("r2");
+    // An older app says none, and a name it doesn't know is none too.
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, { ...bucket(), bucket: "acme-new" })).ok).toBe(true);
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: { ...bucket(), bucket: "acme-new" } });
+    expect((await getStorage(f.db, f.owner.id, f.org.id)).s3?.provider).toBeNull();
+    const odd = { ...bucket(), prefix: "third", provider: "gcs" } as unknown as S3Input;
+    expect((await testStorage(f.storage, f.owner.id, f.org.id, odd)).ok).toBe(true);
+    await saveStorage(f.storage, f.owner.id, f.org.id, { kind: "s3", s3: odd });
+    expect((await getStorage(f.db, f.owner.id, f.org.id)).s3).toMatchObject({ provider: null, prefix: "third" });
+  });
+
   test("the SSRF guard holds: https only, no private, loopback, link-local or metadata addresses", async () => {
     f = await setup();
     const requests = f.s3.state.requests;
@@ -440,6 +477,8 @@ describe("org storage", () => {
       const result = await testStorage(f.storage, f.owner.id, f.org.id, bucket({ endpoint }));
       expect(result.ok).toBe(false);
       expect(result.steps[0]?.error).toBeTruthy();
+      // Refused before any request, still with a code the app translates.
+      expect(result.steps[0]?.code).toMatch(/^url\./);
     }
     expect(f.s3.state.requests).toBe(requests); // nothing was sent
     const blocked = ["10.1.2.3", "172.20.0.1", "192.168.1.1", "100.64.0.1", "0.0.0.0", "::ffff:127.0.0.1", "fe80::1"];

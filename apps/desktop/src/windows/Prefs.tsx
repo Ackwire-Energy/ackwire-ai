@@ -11,7 +11,7 @@ import { useHost, useSnapshot } from "../app";
 import { serverName } from "../control/server";
 import { pairedHomes } from "../control/store";
 import { macStateOf } from "../control/tray";
-import { readPref, useOnShown, useUpdateCheck, writePref } from "../hooks";
+import { readPref, useLocalServer, useOnShown, useUpdateCheck, writePref } from "../hooks";
 import { BrandFace, MacPortrait } from "../ui/bits";
 import { Activity } from "./prefs/Activity";
 import { Advanced } from "./prefs/Advanced";
@@ -47,6 +47,13 @@ export function Prefs() {
     return isTab(asked) ? asked : "general";
   });
   const [current, setCurrent] = useState<string | null>(null);
+  const local = useLocalServer();
+  const readCurrent = () => {
+    void host
+      .servers()
+      .then((l) => setCurrent(l.current))
+      .catch(() => {});
+  };
 
   // The popover can ask for a tab ("See what's new", "Manage servers…").
   useOnShown("prefs", () => {
@@ -54,13 +61,10 @@ export function Prefs() {
     if (isTab(asked)) setTab(asked);
     writePref("prefsTab", null);
     void update.check();
+    readCurrent();
   });
-  useEffect(() => {
-    void host
-      .servers()
-      .then((l) => setCurrent(l.current))
-      .catch(() => {});
-  }, [host]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: again when the server here's address moves, or it leaves
+  useEffect(readCurrent, [host, local.publicUrl, local.run]);
 
   const homes = pairedHomes(snap);
   const works = homes.length > 0;

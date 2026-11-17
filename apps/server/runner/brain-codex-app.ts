@@ -1,12 +1,16 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { EventEmitter } from "node:events";
+import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { createInterface } from "node:readline";
 import type { CommandProfile, CommandScope } from "@agenteschat/adapters/command-policy";
 import { type BrainSteerReply, type BrainSteerRequest, isBrainEffort } from "@agenteschat/adapters/machine-protocol";
 import { accountEnv, withoutContainers, yieldRoute } from "./accounts";
 import {
+  CODEX_DIRECT_MCP_CONFIG,
+  CODEX_NO_NETWORK,
   type CodexAppRunner,
   type CodexBrainEvent,
   type CodexTurnInput,
@@ -19,10 +23,11 @@ import {
   codexProblem,
   codexSandbox,
   codexThreadKey,
-  unwrapShell,
+  shellScript,
 } from "./brain-codex";
+import { CODEX_WINDOWS_CONFIG, codexLaunch } from "./codex-windows";
 import { killTree } from "./exec";
-import { resolveCommand } from "./executors";
+import { envValue } from "./executors";
 import {
   CODEX_MCP_ENV,
   codexWritableRoots,
@@ -85,6 +90,13 @@ import type { Spawn } from "./scope-gate";
  *   `CODEX_APP_MIN_VERSION`, all processes busy, an app-server that fails to
  *   start or to `initialize` (remembered for that binary and version), or one
  *   that dies mid-turn (that turn runs again with exec, resuming the thread).
+ *   A turn where Codex would load someone's own rules runs on exec as well,
+ *   which leaves them out (`codexRulesNear` in `runCodexTurn`): an allow there
+ *   would run a command outside the sandbox and never ask the runner.
+ * - Windows (`codex-windows.ts`): MXC named in `-c`, `approvalPolicy: "never"`
+ *   (nothing asks: the command policy doesn't read PowerShell, so the sandbox
+ *   is the limit, as for exec), and any approval Codex asks all the same is
+ *   declined.
  *
  * The protocol shapes below are the minimum this file reads, copied from
  * `codex app-server generate-ts` of codex-cli 0.163.0 (`ClientRequest`,
@@ -162,7 +174,8 @@ export function codexAtLeast(version: string | undefined, min = CODEX_APP_MIN_VE
 /**
  * The `codex app-server` arguments: our `-c` overrides (a process serves one folder, one set of roots
  * and one permission profile). No network in the sandbox (ADR 0053 §3): a command that needs it asks,
- * and the command policy answers.
+ * and the command policy answers. Its writable roots are ours too (none but the agent's folders),
+ * whatever the Codex home's config says.
  */
 export function codexAppServerArgs(input: {
   /** The process id: our MCP bridge is `mcp --run <id>` (`McpTaskInfo` in the bridge's registry). */
@@ -171,25 +184,37 @@ export function codexAppServerArgs(input: {
   writableRoots?: string[];
   /** Protocol 28: the agent's context limit (a process serves one). */
   contextTokens?: number;
+  /** Windows: the sandbox, named (`CODEX_WINDOWS_CONFIG`). */
+  windows?: boolean;
 }): string[] {
   return [
     "app-server",
     "-c",
     "features.fast_mode=true",
-    ...(input.writableRoots?.length ? ["-c", codexWritableRoots(input.writableRoots)] : []),
+    "-c",
+    CODEX_NO_NETWORK,
+    "-c",
+    codexWritableRoots(input.writableRoots ?? []),
+    ...(input.windows ? CODEX_WINDOWS_CONFIG.flatMap((c) => ["-c", c]) : []),
     ...codexContextOverride(input.contextTokens),
-    ...(input.mcp ? codexBridgeOverrides({ runId: input.processId, ...input.mcp }).flatMap((o) => ["-c", o]) : []),
+    ...(input.mcp
+      ? [CODEX_DIRECT_MCP_CONFIG, ...codexBridgeOverrides({ runId: input.processId, ...input.mcp })].flatMap((o) => [
+          "-c",
+          o,
+        ])
+      : []),
   ];
 }
 
 /**
  * A thread's sandbox and approval policy for the turn's profile (`thread/start`, `thread/resume`):
  * `plan` reads in a read-only sandbox, `work` writes in its folders; neither has the network. Codex
- * asks before anything else (`untrusted`), and the runner answers with the command policy.
+ * asks before anything else (`untrusted`), and the runner answers with the command policy. On Windows
+ * nothing asks (`never`): the sandbox is the limit (`codex-windows.ts`).
  */
-export const codexThreadPolicy = (profile: CommandProfile) => ({
+export const codexThreadPolicy = (profile: CommandProfile, windows = false) => ({
   sandbox: codexSandbox(profile),
-  approvalPolicy: "untrusted" as const,
+  approvalPolicy: windows ? ("never" as const) : ("untrusted" as const),
 });
 
 // ── JSON-RPC client ──────────────────────────────────────────────────────────
@@ -240,7 +265,11 @@ export class CodexAppClient {
   private readonly exitHandlers = new Set<() => void>();
   private requestHandler: ServerRequestHandler | null = null;
 
-  constructor(file: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; spawn?: Spawn }) {
+  constructor(
+    file: string,
+    args: string[],
+    opts: { cwd: string; env: NodeJS.ProcessEnv; spawn?: Spawn; windowsVerbatimArguments?: boolean },
+  ) {
     this.child = (opts.spawn ?? spawn)(file, args, {
       cwd: opts.cwd,
       env: opts.env,
@@ -248,6 +277,7 @@ export class CodexAppClient {
       // Its own process group: closing it takes the commands it runs along (`killTree`).
       detached: process.platform !== "win32",
       windowsHide: true,
+      ...(opts.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
     });
     const events = this.child as unknown as EventEmitter;
     events.on("error", (err: Error) => {
@@ -383,6 +413,61 @@ export class CodexAppClient {
 
 // ── Notifications → brain events ─────────────────────────────────────────────
 
+/** Where an image Codex made is kept in the agent's folder, for the server to fetch. */
+export const CODEX_IMAGES_FOLDER = "generated-images";
+const IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".webp"]);
+
+/**
+ * An image Codex's own tool made (`imageGeneration`). Codex keeps it in its sign-in's folder, which the conversation
+ * never sees: a copy goes to the agent's folder and a `file` event tells the server to show it with the reply.
+ * Returns the copy's path relative to `folder`, or null when there is no image to keep.
+ */
+function keepCodexImage(item: Record<string, unknown>, id: string, folder: string): string | null {
+  try {
+    const saved = str(item.savedPath);
+    const fromFile = saved !== "" && existsSync(saved);
+    // No file it could reach (another user's folder, an older Codex): the item carries the image itself.
+    const bytes = fromFile ? null : Buffer.from(str(item.result), "base64");
+    if (bytes && bytes.byteLength === 0) return null;
+    const ext = IMAGE_EXTENSIONS.has(path.extname(saved).toLowerCase()) ? path.extname(saved).toLowerCase() : ".png";
+    const stamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
+    const name = `image-${stamp}-${id.replace(/[^a-zA-Z0-9]/g, "").slice(-6) || "codex"}${ext}`;
+    const dir = path.join(folder, CODEX_IMAGES_FOLDER);
+    mkdirSync(dir, { recursive: true });
+    if (bytes) writeFileSync(path.join(dir, name), bytes);
+    else copyFileSync(saved, path.join(dir, name));
+    return `${CODEX_IMAGES_FOLDER}/${name}`;
+  } catch {
+    return null;
+  }
+}
+
+/** `imageGeneration` as an executed `tool_call`, and the `file` event of the image it made. */
+export function codexImageEvents(
+  item: Record<string, unknown>,
+  id: string,
+  folder: string | undefined,
+  clean: (text: string) => string,
+): CodexBrainEvent[] {
+  const prompt = clean(str(item.revisedPrompt)).slice(0, 500);
+  const call = (content: string, isError = false): CodexBrainEvent => ({
+    type: "tool_call",
+    id,
+    name: "image_generation",
+    input: prompt ? { prompt } : {},
+    executed: { content, ...(isError ? { isError: true } : {}) },
+  });
+  if (isObj(item.failure)) {
+    // Seconds since the epoch, as Codex's other limits say theirs.
+    const resets = typeof item.failure.resetsAt === "number" ? new Date(item.failure.resetsAt * 1000) : null;
+    const until = resets && !Number.isNaN(resets.getTime()) ? ` until ${resets.toISOString()}` : "";
+    return [call(`The plan's image limit was reached${until}.`, true)];
+  }
+  const kept = folder ? keepCodexImage(item, id, folder) : null;
+  if (!kept) return [call("Codex made no image.", true)];
+  return [call(`Saved ${kept} in your folder.`), { type: "file", path: kept }];
+}
+
 const usageDiff = (a: TokenUsageBreakdown, b: TokenUsageBreakdown): TokenUsageBreakdown => ({
   totalTokens: Math.max(0, num(a.totalTokens) - num(b.totalTokens)),
   inputTokens: Math.max(0, num(a.inputTokens) - num(b.inputTokens)),
@@ -406,12 +491,23 @@ export class CodexAppMapper {
   /** The thread's totals before this `brain.turn`, and now. */
   private base?: TokenUsageBreakdown;
   private total?: TokenUsageBreakdown;
+  /** Model requests of this `brain.turn`, and the most input one read. */
+  private calls = 0;
+  private maxContext = 0;
   /** An `error` notification Codex won't retry (the turn's own error says more). */
   lastError?: string;
   /** The turn ran a command, changed a file or called our bridge: a cut now loses work the API couldn't see. */
   private worked = false;
 
-  constructor(private readonly opts: { cwd: string; model?: string; redact?: (text: string) => string }) {}
+  constructor(
+    private readonly opts: {
+      cwd: string;
+      /** The agent's folder: where an image Codex makes is kept. */
+      folder?: string;
+      model?: string;
+      redact?: (text: string) => string;
+    },
+  ) {}
 
   private clean(t: string) {
     return this.opts.redact ? this.opts.redact(t) : t;
@@ -443,7 +539,12 @@ export class CodexAppMapper {
   /** `item/completed`: executed tool calls, the answer, and the text of a message that wasn't streamed. */
   completed(item: Record<string, unknown>): { events: CodexBrainEvent[]; text?: string } {
     const id = str(item.id) || `codex-${randomUUID()}`;
-    if (item.type === "commandExecution" || item.type === "fileChange" || item.type === "mcpToolCall")
+    if (
+      item.type === "commandExecution" ||
+      item.type === "fileChange" ||
+      item.type === "mcpToolCall" ||
+      item.type === "imageGeneration"
+    )
       this.worked = true;
     switch (item.type) {
       case "agentMessage": {
@@ -478,6 +579,8 @@ export class CodexAppMapper {
         const status = str(item.status);
         return { events: [codexFileChangeCall({ id, changes, failed: status === "failed" || status === "declined" })] };
       }
+      case "imageGeneration":
+        return { events: codexImageEvents(item, id, this.opts.folder, (t) => this.clean(t)) };
       default:
         // Our bridge's calls (`mcpToolCall`) aren't repeated (the engine ran them); the rest isn't a tool call.
         return { events: [] };
@@ -491,6 +594,11 @@ export class CodexAppMapper {
     // The first one of this `brain.turn`: the thread's totals before its first model request.
     if (!this.base) this.base = isObj(u.last) ? usageDiff(u.total, u.last) : u.total;
     // Totals, not sums: Codex says the same usage again (rate-limit updates) without counting twice.
+    if (!this.total || num(u.total.totalTokens) > num(this.total.totalTokens)) {
+      this.calls++;
+      // Codex counts cached input inside `inputTokens`: the request's whole context.
+      if (isObj(u.last)) this.maxContext = Math.max(this.maxContext, num(u.last.inputTokens));
+    }
     this.total = u.total;
   }
 
@@ -516,6 +624,8 @@ export class CodexAppMapper {
           // Codex counts cached input inside `inputTokens`.
           ...(u && u.cachedInputTokens > 0 ? { cacheRead: u.cachedInputTokens } : {}),
           ...(u && u.cacheWriteInputTokens > 0 ? { cacheWrite: u.cacheWriteInputTokens } : {}),
+          ...(this.calls > 0 ? { calls: this.calls } : {}),
+          ...(this.maxContext > 0 ? { maxContext: this.maxContext } : {}),
         },
         { type: "done", text: answer, session: { id: sessionId } },
       ];
@@ -538,9 +648,9 @@ export class CodexAppMapper {
 /** A call as the command policy reads it (Claude Code's permission prompt arguments). */
 export type PolicyCall = { tool_name: string; input: Record<string, unknown> };
 
-/** A command as Codex gives it: a line (`/bin/zsh -lc "npm test"`) or an argv. */
+/** A command as Codex gives it: a line (`/bin/zsh -lc "npm test"`) or an argv. Its script exactly (`shellScript`). */
 function commandText(raw: unknown): string {
-  if (typeof raw === "string") return unwrapShell(raw);
+  if (typeof raw === "string") return shellScript(raw);
   if (!Array.isArray(raw)) return "";
   const argv = raw.filter((a): a is string => typeof a === "string");
   // `["/bin/zsh", "-lc", "npm test"]`: the shell's line.
@@ -581,7 +691,7 @@ export function approvalCalls(
 export async function decideApproval(
   calls: PolicyCall[],
   ask: (tool: string, args: Record<string, unknown>) => Promise<IpcReply>,
-  opts: { scope: CommandScope; profile: CommandProfile; signal?: AbortSignal },
+  opts: { scope: CommandScope; profile: CommandProfile; signal?: AbortSignal; asks?: "never" },
 ): Promise<"accept" | "decline"> {
   if (calls.length === 0) return "decline";
   const sleep = (ms: number) =>
@@ -601,7 +711,12 @@ export async function decideApproval(
   const call = (tool: string, args: Record<string, unknown>): Promise<IpcReply> =>
     opts.signal?.aborted ? Promise.resolve({ ok: false, error: "The turn ended." }) : ask(tool, args);
   for (const c of calls) {
-    const answer = await permissionPrompt(c, call, { scope: opts.scope, profile: opts.profile, sleep });
+    const answer = await permissionPrompt(c, call, {
+      scope: opts.scope,
+      profile: opts.profile,
+      sleep,
+      ...(opts.asks ? { asks: opts.asks } : {}),
+    });
     if (answer.behavior !== "allow") return "decline";
   }
   return "accept";
@@ -849,19 +964,31 @@ export class CodexAppServers implements CodexAppRunner {
     };
     // ADR 0041: the account's folder is this process's Codex home, and nothing else signs it in.
     const env = input.account ? accountEnv("codex", input.account.home, base) : base;
+    const platform = opts.platform ?? process.platform;
     const args = codexAppServerArgs({
       processId: id,
       mcp: { ...(opts.mcpCommand ? { command: opts.mcpCommand } : {}) },
       ...(input.writableRoots?.length ? { writableRoots: input.writableRoots } : {}),
       ...(input.contextTokens ? { contextTokens: input.contextTokens } : {}),
+      ...(platform === "win32" ? { windows: true } : {}),
     });
     const brokenKey = `${opts.bin ?? "codex"}@${input.version}`;
+    const launch = codexLaunch(args, {
+      ...(opts.bin ? { bin: opts.bin } : {}),
+      platform,
+      pathList: envValue(env, "PATH", platform) ?? "",
+    });
+    if ("error" in launch) {
+      this.log(`codex app-server didn't start: ${launch.error}`);
+      return null;
+    }
     let client: CodexAppClient;
     try {
-      client = new CodexAppClient(resolveCommand(opts.bin ?? "codex", env.PATH), args, {
+      client = new CodexAppClient(launch.file, launch.args, {
         cwd: input.cwd,
-        env,
+        env: launch.env ? { ...env, ...launch.env } : env,
         ...(this.opts.spawn ? { spawn: this.opts.spawn } : {}),
+        ...(launch.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
       });
     } catch (err) {
       this.log(`codex app-server didn't start: ${err instanceof Error ? err.message : String(err)}`);
@@ -891,11 +1018,16 @@ export class CodexAppServers implements CodexAppRunner {
       );
       client.notify("initialized");
     } catch (err) {
-      const tail = client.stderr.trim().split("\n").slice(-2).join(" ");
+      const tail = client.stderr.trim().split(/\r?\n/).slice(-2).join(" ");
       this.log(
         `codex app-server handshake failed (${err instanceof Error ? err.message : String(err)}${tail ? `: ${tail}` : ""}); using codex exec`,
       );
       this.broken.add(brokenKey);
+      client.close(0);
+      return null;
+    }
+    // The runner began to stop during the handshake: `close` has run, and nothing would close this process.
+    if (this.closed) {
       client.close(0);
       return null;
     }
@@ -979,7 +1111,7 @@ export class CodexAppServers implements CodexAppRunner {
     const client = live.client;
     const common = {
       cwd: input.cwd,
-      ...codexThreadPolicy(input.profile ?? "work"),
+      ...codexThreadPolicy(input.profile ?? "work", (opts.platform ?? process.platform) === "win32"),
       ...(input.model ? { model: input.model } : {}),
     };
     const stored = opts.threads.get(live.threadKey);
@@ -1027,6 +1159,7 @@ export class CodexAppServers implements CodexAppRunner {
     const deltaMs = this.opts.deltaMs ?? CODEX_APP_DELTA_MS;
     const mapper = new CodexAppMapper({
       cwd: input.cwd,
+      ...(input.folder ? { folder: input.folder } : {}),
       ...(input.model ? { model: input.model } : {}),
       ...(opts.redact ? { redact: opts.redact } : {}),
     });
@@ -1216,6 +1349,11 @@ export class CodexAppServers implements CodexAppRunner {
               }
               return;
             }
+            // An image takes a while and says nothing until it is done: its call starts now (the chat shows its place).
+            if (method === "item/started" && item.type === "imageGeneration" && str(item.id)) {
+              emit({ type: "tool_started", id: str(item.id), name: "image_generation" });
+              return;
+            }
             if (method !== "item/completed") return;
             const out = mapper.completed(item);
             if (out.text) addText(out.text);
@@ -1243,18 +1381,26 @@ export class CodexAppServers implements CodexAppRunner {
       const scope: CommandScope = {
         cwd: input.cwd,
         folders: [...new Set([input.cwd, input.folder ?? input.cwd, ...(input.writableRoots ?? [])])],
-        ...(process.env.HOME ? { home: process.env.HOME } : {}),
+        // Windows has no HOME, as a rule (the home is USERPROFILE): without one, `~` would read as the agent's folder.
+        home: process.env.HOME || homedir(),
         ...(opts.runnerHome ? { runnerHome: opts.runnerHome } : {}),
       };
+      const windows = (opts.platform ?? process.platform) === "win32";
       client.onRequest((method, params) => {
         if (settled) return null;
         if (typeof params.threadId === "string" && params.threadId !== threadId) return null;
         const calls = approvalCalls(method, params, items.get(str(params.itemId)), input.cwd);
         if (calls === null) return null;
+        // Windows asks nothing (`never`); one asked all the same is a PowerShell line the command policy can't read.
+        if (windows) {
+          this.log(`codex approval declined on Windows: ${redact(JSON.stringify(calls)).slice(0, 300)}`);
+          return Promise.resolve({ result: { decision: "decline" } });
+        }
         return decideApproval(calls, ask, {
           scope,
           profile: input.profile ?? "work",
           signal: approvals.signal,
+          ...(input.asks ? { asks: input.asks } : {}),
         }).then((decision) => {
           if (decision === "decline")
             this.log(`codex approval declined: ${redact(JSON.stringify(calls)).slice(0, 300)}`);

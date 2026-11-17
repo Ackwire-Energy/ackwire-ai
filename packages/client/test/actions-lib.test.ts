@@ -1,7 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import type { TFunction } from "i18next";
+import { resources } from "@agenteschat/i18n";
+import i18next, { type TFunction } from "i18next";
 import { AGENT_ACTION_KINDS, type AgentAction } from "../src/api/types";
-import { actionErrorKey, actionTextKey, actionTextValues, formatTimeLeft, hookToCopy } from "../src/lib/actions";
+import {
+  actionErrorKey,
+  actionTextKey,
+  actionTextValues,
+  formatTimeLeft,
+  hookToCopy,
+  type ReceiptRow,
+  receiptPieces,
+  receiptRows,
+  receiptTip,
+  receiptUnder,
+  rowFiles,
+} from "../src/lib/actions";
 
 const action = (over: Partial<AgentAction> = {}): AgentAction => ({
   id: "a1",
@@ -76,10 +89,32 @@ describe("receipt sentence values", () => {
     expect(actionTextValues(self, t).context).toBe("self");
     const viewer = action({
       kind: "issue.assigned",
-      params: { number: 2, title: "T", assigneeType: "user", assigneeId: "u9", assigneeName: "Bia" },
+      params: { number: 2, title: "T", assigneeType: "person", assigneeId: "u9", assigneeName: "Bia" },
     });
     expect(actionTextValues(viewer, t, "u9").assignee).toBe("you");
     expect(actionTextValues(viewer, t, "u1").assignee).toBe("Bia");
+  });
+
+  test("assigned by name alone, as a server of several assignees says it: the names it joined, or nobody left", () => {
+    const two = action({
+      kind: "issue.assigned",
+      params: { number: 2, title: "T", fields: ["assignees"], assigneeName: "Ada, Bia", assigneeNames: ["Ada", "Bia"] },
+    });
+    expect(actionTextValues(two, t, "u1").assignee).toBe("Ada, Bia");
+    expect(actionTextValues(two, t, "u1").context).toBeUndefined();
+    const left = action({
+      kind: "issue.assigned",
+      params: { number: 2, title: "T", fields: ["assignees"], assigneeName: null, assigneeNames: ["Ada"] },
+    });
+    expect(actionTextValues(left, t).context).toBe("none");
+    const self = action({
+      kind: "issue.assigned",
+      params: { number: 2, title: "T", fields: ["assignees"], assigneeName: "Ada", assigneeIsSelf: true },
+    });
+    expect(actionTextValues(self, t).context).toBe("self");
+    // Changed with other fields: said with the words of the one field.
+    const more = action({ kind: "issue.updated", params: { number: 2, title: "T", fields: ["title", "assignees"] } });
+    expect(actionTextValues(more, t).fields).toBe("title e assignee");
   });
 
   test("a change applied at once says what it changed; a card's settings stay settings", () => {
@@ -165,5 +200,325 @@ describe("receipt sentence values", () => {
   test("every kind the app knows has its own case (the default gives no values)", () => {
     const missing = AGENT_ACTION_KINDS.filter((kind) => !Object.keys(actionTextValues(action({ kind }), t)).length);
     expect(missing).toEqual([]);
+  });
+});
+
+describe("receipts in rows, one line each", () => {
+  const lang = (lng: string) => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng, fallbackLng: "en", resources, initAsync: false, interpolation: { escapeValue: false } });
+    return instance.t;
+  };
+  const pt = lang("pt-BR");
+  const en = lang("en");
+  const task = (n: number, over: Partial<AgentAction> = {}) =>
+    action({
+      id: `a${n}`,
+      target: { type: "issue", id: `i${n}`, number: n, title: `Tarefa ${n}` },
+      params: { number: n, title: `Tarefa ${n}` },
+      ...over,
+    });
+  const memory = (id: string, text: string) =>
+    action({ id, kind: "memory.saved", target: { type: "memory", id: `m-${id}` }, params: { text } });
+  const words = (row: ReceiptRow | undefined, t = pt) =>
+    row
+      ? receiptPieces(row, t)
+          .map((p) => (p.bold ? `[${p.text}]` : p.text))
+          .join("")
+      : null;
+
+  test("tasks made together are one row, each number opening its own; another kind keeps its row, in order", () => {
+    const rows = receiptRows([task(58), memory("m1", "o deploy é às 18h"), task(59), task(60)], pt);
+    expect(rows.map((r) => words(r))).toEqual([
+      "Criei as tarefas [#58], [#59] e [#60]",
+      "Guardei na [memória]: o deploy é às 18h",
+    ]);
+    expect(receiptPieces(rows[0] as ReceiptRow, pt).flatMap((p) => (p.opens ? [p.opens.id] : []))).toEqual([
+      "a58",
+      "a59",
+      "a60",
+    ]);
+    expect(words(rows[0], en)).toBe("Created tasks [#58], [#59], and [#60]");
+  });
+
+  test("a change on its own keeps its sentence, its target in bold opening it", () => {
+    const [row] = receiptRows([task(23)], pt);
+    expect(words(row)).toBe("Criei a tarefa [#23] · Tarefa 23");
+    expect(receiptPieces(row as ReceiptRow, pt).find((p) => p.bold)?.opens?.id).toBe("a23");
+  });
+
+  test("what the changes of a row share comes first: one assignee, my own, the rule they keep", () => {
+    const assigned = (n: number, id: string, to: string) =>
+      task(n, {
+        kind: "issue.assigned",
+        params: { number: n, title: "T", assigneeType: "person", assigneeId: id, assigneeName: to },
+      });
+    // One person by id, whatever the name read; two people of one name stay apart.
+    const rows = receiptRows(
+      [assigned(1, "u-ana", "Ana"), assigned(2, "u-ana", "Ana S."), assigned(3, "u-ana2", "Ana")],
+      pt,
+    );
+    expect(rows.map((r) => words(r))).toEqual(["Passei para Ana as tarefas [#1] e [#2]", "Passei a [#3] para Ana · T"]);
+    // By the names alone, as a server of several assignees writes them: the same ones are one row.
+    const named = (n: number, to: string) =>
+      task(n, { kind: "issue.assigned", params: { number: n, title: "T", fields: ["assignees"], assigneeName: to } });
+    expect(receiptRows([named(1, "Ana, Bia"), named(2, "Ana, Bia"), named(3, "Ana")], pt).map((r) => words(r))).toEqual(
+      ["Passei para Ana, Bia as tarefas [#1] e [#2]", "Passei a [#3] para Ana · T"],
+    );
+    // The viewer reads "você".
+    const toMe = receiptRows([assigned(4, "u-me", "Eu"), assigned(5, "u-me", "Eu")], pt, "u-me")[0] as ReceiptRow;
+    expect(
+      receiptPieces(toMe, pt, "u-me")
+        .map((p) => (p.bold ? `[${p.text}]` : p.text))
+        .join(""),
+    ).toBe("Passei para você as tarefas [#4] e [#5]");
+    const mine = (n: number) =>
+      task(n, { kind: "issue.assigned", params: { number: n, title: "T", assigneeIsSelf: true } });
+    expect(words(receiptRows([mine(4), mine(5)], pt)[0])).toBe("Peguei para mim as tarefas [#4] e [#5]");
+    // What a memory keeps is words, not a name: its own sentence says them all, opening the first.
+    const rule = (id: string) => action({ ...memory(id, id), params: { text: `regra ${id}`, rule: true } });
+    const rules = receiptRows([rule("r1"), rule("r2")], pt)[0] as ReceiptRow;
+    expect(words(rules)).toBe("Guardei nas [minhas regras]: regra r1 e regra r2");
+    // Each memory's words open that memory, in the sentence's own weight; "minhas regras" opens the first.
+    expect(
+      receiptPieces(rules, pt).flatMap((p) => (p.opens ? [`${p.text}${p.bold ? "*" : ""}:${p.opens.id}`] : [])),
+    ).toEqual(["minhas regras*:r1", "regra r1:r1", "regra r2:r2"]);
+    // Saved for the whole team (no agent owns it): the team's rules, never "my rules", in a row of its own.
+    const team = (id: string, extra: Record<string, unknown>) =>
+      action({ ...memory(id, id), params: { text: `regra ${id}`, team: true, ...extra } });
+    const shared = receiptRows([team("t1", { rule: true }), rule("r3")], pt);
+    expect(shared.map((r) => words(r))).toEqual([
+      "Guardei nas [regras do time]: regra t1",
+      "Guardei nas [minhas regras]: regra r3",
+    ]);
+    expect(words(shared[0], en)).toBe("Saved to the [team's rules]: regra t1");
+    expect(words(receiptRows([team("t2", {})], pt)[0])).toBe("Guardei na [memória do time]: regra t2");
+  });
+
+  test("a change that says what changed keeps its row; the same fields changed on several say them once", () => {
+    const updated = (n: number, params: Record<string, unknown>) =>
+      task(n, { kind: "issue.updated", params: { number: n, title: "T", ...params } });
+    const moved = [
+      updated(7, { fields: ["status"], status: "done" }),
+      updated(8, { fields: ["status"], status: "done" }),
+    ];
+    expect(receiptRows(moved, pt).map((r) => words(r))).toEqual([
+      "Mudei a [#7] para feito · T",
+      "Mudei a [#8] para feito · T",
+    ]);
+    const urgent = [1, 2].map((n) => updated(n, { fields: ["priority"], priority: "urgent" }));
+    expect(receiptRows(urgent, pt).every((r) => r.refs === null)).toBe(true);
+    const titled = [
+      updated(9, { fields: ["title"] }),
+      updated(10, { fields: ["title"] }),
+      updated(11, { fields: ["labels"] }),
+    ];
+    expect(receiptRows(titled, pt).map((r) => words(r))).toEqual([
+      "Mudei o título das tarefas [#9] e [#10]",
+      "Mudei as etiquetas da [#11] · T",
+    ]);
+    const routine = (id: string, params: Record<string, unknown>) =>
+      action({ id, kind: "routine.updated", target: { type: "routine", id }, params: { name: id, ...params } });
+    const paused = [
+      routine("r1", { fields: ["active"], active: false }),
+      routine("r2", { fields: ["active"], active: false }),
+    ];
+    expect(receiptRows(paused, pt).map((r) => words(r))).toEqual(["Pausei a rotina [r1]", "Pausei a rotina [r2]"]);
+    // What a routine may do alone and when it posts are one routine's words: each keeps its row.
+    for (const field of ["access", "report"]) {
+      const own = [routine("r3", { fields: [field] }), routine("r4", { fields: [field] })];
+      expect(receiptRows(own, pt).every((r) => r.refs === null)).toBe(true);
+    }
+    const renamed = [
+      routine("r5", { fields: ["name"], name: "Resumo" }),
+      routine("r5", { fields: ["name"], name: "Resumo semanal" }),
+      routine("r6", { fields: ["name"], name: "Backup" }),
+    ].map((r, i) => ({ ...r, id: `rn${i}` }));
+    // One routine renamed twice is still one: its newest name.
+    expect(words(receiptRows(renamed, pt)[0])).toBe("Mudei o nome das rotinas [Resumo semanal] e [Backup]");
+    const settings = (id: string, field: string) =>
+      action({
+        id,
+        kind: "agent.settings_changed",
+        target: { type: "agent", id },
+        params: { agentName: id, fields: [field] },
+      });
+    expect(
+      receiptRows([settings("a1", "instructions"), settings("a2", "instructions")], pt).map((r) => words(r)),
+    ).toEqual(["Mudei as instruções de [a1]", "Mudei as instruções de [a2]"]);
+  });
+
+  test("a language without a context's sentence falls back to the kind's, alone or several", () => {
+    const instance = i18next.createInstance();
+    void instance.init({
+      lng: "xx",
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      resources: {
+        xx: {
+          translation: {
+            format: { list: "{{names, list}}" },
+            agentActions: {
+              issue: { assigned: "Gave <b>#{{number}}</b> to {{assignee}}" },
+              several: { issue: { assigned: "Gave {{assignee}} tasks {{refs}}" } },
+            },
+          },
+        },
+      },
+    });
+    const mine = (n: number) =>
+      task(n, { kind: "issue.assigned", params: { number: n, title: "T", assigneeIsSelf: true, assigneeName: "Ada" } });
+    expect(words(receiptRows([mine(1)], instance.t)[0], instance.t)).toBe("Gave [#1] to Ada");
+    expect(words(receiptRows([mine(1), mine(2)], instance.t)[0], instance.t)).toBe("Gave Ada tasks [#1] and [#2]");
+  });
+
+  test("one thing changed twice keeps a row per change; beside another, it is named once", () => {
+    const edit = (id: string, n: number) =>
+      task(n, { id, kind: "issue.updated", params: { number: n, title: "T", fields: ["title"] } });
+    expect(receiptRows([edit("x1", 9), edit("x2", 9)], pt)).toHaveLength(2);
+    const [row] = receiptRows([edit("x1", 9), edit("x2", 9), edit("x3", 10)], pt);
+    expect(words(row)).toBe("Mudei o título das tarefas [#9] e [#10]");
+    expect(row?.actions).toHaveLength(3);
+  });
+
+  test("undone ones blend only with others undone by the same person; a webhook routine keeps its own row", () => {
+    const undone = (n: number, by: string) => task(n, { undoneAt: "2026-10-18T12:00:00Z", undoneByUserId: by });
+    expect(
+      receiptRows([undone(1, "u1"), undone(2, "u1"), undone(3, "u2"), task(4)], pt).map((r) => r.actions.length),
+    ).toEqual([2, 1, 1]);
+    const hook = (id: string) =>
+      action({
+        id,
+        kind: "routine.created",
+        target: { type: "routine", id },
+        params: { name: id, trigger: "webhook" },
+      });
+    expect(receiptRows([hook("r1"), hook("r2")], pt).every((r) => r.refs === null)).toBe(true);
+  });
+
+  test("a workspace change stays a row of its own", () => {
+    const archived = (id: string) =>
+      action({
+        id,
+        kind: "workspace.changed",
+        target: { type: "channel", id },
+        params: { action: "archive_channel", channel: id },
+      });
+    expect(receiptRows([archived("c1"), archived("c2")], pt).map((r) => r.refs)).toEqual([null, null]);
+  });
+
+  test("the tip says each change whole, with the files that went with it", () => {
+    const [row] = receiptRows(
+      [task(58, { params: { number: 58, title: "Login lento", files: ["print.png"] } }), task(59)],
+      pt,
+    );
+    expect(receiptTip(row as ReceiptRow, pt)).toBe(
+      "Criei a tarefa #58 · Login lento\nAnexei print.png\nCriei a tarefa #59 · Tarefa 59",
+    );
+  });
+
+  test("two of a kind blend for every kind but a workspace change and a renamed conversation, with their real targets", () => {
+    // Each kind's target as the server writes it: a merge's is its repository, the same for every pull request there.
+    const targetOf = (kind: AgentAction["kind"], n: number): AgentAction["target"] => {
+      const [group] = kind.split(".");
+      if (kind === "pr.merged") return { type: "repository", id: "acme/app", title: "acme/app" };
+      if (kind === "channel.agent_added") return { type: "channel", id: `c${n}`, title: `c${n}` };
+      if (kind === "agent.settings_changed") return { type: "agent", id: `ag${n}` };
+      if (kind === "workspace.changed") return { type: "channel", id: `c${n}`, title: `c${n}` };
+      const type = ({ wiki: "wiki_page", issue: "issue" } as Record<string, string>)[group ?? ""] ?? group;
+      return {
+        type: type as AgentAction["target"]["type"],
+        id: `${kind}-${n}`,
+        number: n,
+        title: `T${n}`,
+        slug: `p${n}`,
+      };
+    };
+    const two = (kind: AgentAction["kind"]) =>
+      [1, 2].map((n) =>
+        action({
+          id: `${kind}-${n}`,
+          kind,
+          target: targetOf(kind, n),
+          params: {
+            number: n,
+            title: `T${n}`,
+            text: `t${n}`,
+            name: `N${n}`,
+            agentId: "ag-ada",
+            agentName: "Ada",
+            channel: `c${n}`,
+            repo: "acme/app",
+            action: "archive_channel",
+          },
+        }),
+      );
+    const blended = AGENT_ACTION_KINDS.filter((kind) => receiptRows(two(kind), pt)[0]?.refs);
+    expect(AGENT_ACTION_KINDS.filter((kind) => !blended.includes(kind))).toEqual([
+      "thread.renamed",
+      "workspace.changed",
+    ]);
+    expect(words(receiptRows(two("pr.merged"), pt)[0])).toBe("Fiz o merge em [acme/app] dos PRs [#1] e [#2]");
+    for (const t of [pt, en])
+      for (const kind of blended) expect(words(receiptRows(two(kind), t)[0], t)).not.toContain("agentActions");
+  });
+
+  test("assigned to the reader or to nobody: each language's own sentence, alone or several", () => {
+    const es = lang("es");
+    const toMe = (n: number) =>
+      task(n, {
+        kind: "issue.assigned",
+        params: { number: n, title: "T", assigneeType: "person", assigneeId: "u-me", assigneeName: "Eu" },
+      });
+    const said = (row: ReceiptRow | undefined, t = pt) =>
+      receiptPieces(row as ReceiptRow, t, "u-me")
+        .map((p) => (p.bold ? `[${p.text}]` : p.text))
+        .join("");
+    expect(said(receiptRows([toMe(1)], pt, "u-me")[0])).toBe("Passei a [#1] para você · T");
+    expect(said(receiptRows([toMe(1)], es, "u-me")[0], es)).toBe("Te asigné [#1] · T");
+    expect(said(receiptRows([toMe(1), toMe(2)], es, "u-me")[0], es)).toBe("Te asigné las tareas [#1] y [#2]");
+    const nobody = (n: number) =>
+      task(n, { kind: "issue.assigned", params: { number: n, title: "T", assigneeType: null, assigneeId: null } });
+    expect(words(receiptRows([nobody(7)], pt)[0])).toBe("Tirei o responsável da [#7] · T");
+    expect(words(receiptRows([nobody(7), nobody(8)], pt)[0])).toBe("Tirei o responsável das tarefas [#7] e [#8]");
+  });
+
+  test("a merged pull request is its number: the same one twice is one, two of one repository are two", () => {
+    const merge = (id: string, n: number) =>
+      action({
+        id,
+        kind: "pr.merged",
+        target: { type: "repository", id: "acme/app", title: "acme/app" },
+        params: { repo: "acme/app", number: n },
+      });
+    expect(receiptRows([merge("m1", 12), merge("m2", 12)], pt).every((r) => r.refs === null)).toBe(true);
+    expect(receiptRows([merge("m1", 12), merge("m2", 13)], pt)[0]?.refs?.map((r) => r.text)).toEqual(["#12", "#13"]);
+  });
+
+  test("the lines under a row: its files once, what a routine does alone, who undid it", () => {
+    const routine = action({
+      id: "rt",
+      kind: "routine.created",
+      target: { type: "routine", id: "rt" },
+      params: { name: "Resumo", ownActions: ["SLACK_SEND_MESSAGE"] },
+      undoneAt: "2026-10-18T12:00:00Z",
+      undoneByUserId: "u2",
+    });
+    expect(receiptUnder({ actions: [routine], refs: null }, pt, "Bia")).toEqual({
+      files: null,
+      own: "Faz sozinha, sem pedir: Enviar mensagem (Slack)",
+      undone: "Desfeito por Bia",
+    });
+  });
+
+  test("the line under a row names each file its changes brought, once", () => {
+    const [row] = receiptRows(
+      [
+        task(1, { params: { number: 1, title: "T", files: ["print.png", "log.txt"] } }),
+        task(2, { params: { number: 2, title: "T", files: ["print.png"] } }),
+      ],
+      pt,
+    );
+    expect(rowFiles(row as ReceiptRow)).toEqual(["print.png", "log.txt"]);
   });
 });

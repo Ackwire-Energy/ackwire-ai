@@ -82,6 +82,8 @@ export const desktopEn = {
     pause1h: "For 1 hour",
     pauseTomorrow: "Until tomorrow at 9 AM",
     pauseManual: "Until I resume",
+    /** The pause menu with several workspaces: every one of them, then each on its own. */
+    pauseAll: "All workspaces",
     pauseHint: "What is already running finishes normally.",
     /** With the Ackwire AI this computer runs: pausing the agents leaves it up (ADR 0158). */
     pauseHintServer: "What is already running finishes normally. The server stays up.",
@@ -102,6 +104,12 @@ export const desktopEn = {
     pausedUntil: "Paused until {{time}}",
     pausedUntilResume: "Paused until you resume",
     pausedBody: "No agent, from any workspace, starts anything new on this {{device}}.",
+    /** Only some workspaces paused: `orgs` is their names ("Acme and Northwind"). */
+    pausedSomeBody: "On hold: {{orgs}}. The other workspaces' agents keep working.",
+    /** Under the card of the server this computer runs: other servers' workspaces whose agents use it too. */
+    alsoWorksFor: "Also works for {{orgs}}",
+    otherWorkspaces_one: "{{count}} other workspace",
+    otherWorkspaces_other: "{{count}} other workspaces",
     resumeNow: "Resume now",
     plusHour: "+1 hour",
     updateTitle: "Version {{version}} is available",
@@ -124,6 +132,11 @@ export const desktopEn = {
     allowedAll: "{{folder}} allowed for all agents",
     denied: "Declined. {{agent}} lets them know in the chat.",
     notifTitle: "{{agent}} wants to use the folder {{folder}}",
+    allowedTitle: "{{name}} turned on {{tool}} from Ackwire AI",
+    allowedBody: "If it wasn't you, undo it here.",
+    allowedUndo: "Undo",
+    allowedOk: "OK",
+    allowedUndone: "Off again: {{tool}}",
     quitTitle: "Quit Ackwire AI?",
     quitBody:
       "Agents can't use this {{device}} while the app is closed. What is already running finishes and sends the result when you open it again.",
@@ -132,12 +145,6 @@ export const desktopEn = {
     quitConfirm: "Quit",
   },
   first: {
-    title: "Your team and your agents, together",
-    lead: "Chat, tasks and documents where people and AI agents work side by side.",
-    cloud: "Sign in to Ackwire AI",
-    create: "New here?",
-    createLink: "Create an account",
-    own: "Use your own server",
     /** The welcome window opened by the site's "Add workspace" (ADR 0154). */
     addTitle: "Add a workspace",
     addLead: "The ones you have stay here, each with its own sign-in.",
@@ -145,28 +152,47 @@ export const desktopEn = {
     /** Adding a workspace, under "Sign in to Ackwire AI": a new one instead. */
     addNew: "Want a new workspace?",
     addNewLink: "Create one",
-    addOwn: "Use your team's server",
   },
-  own: {
-    title: "Your own server",
-    lead: "Ackwire AI runs on your computers, and your data stays on them.",
-    back: "Ackwire AI",
-    connect: "Connect to my server",
-    connectText: "It runs on another computer: a Mac mini, a spare laptop or a server online.",
-    here: "Run Ackwire AI on this {{device}}",
-    hereText: "This {{device}} becomes the server, while it's on.",
-    which: "Which one to choose?",
+  /** The first screen ("Onde seu workspace vai ficar?", FirstRun.tsx): the three places, the drawing following the one picked. */
+  place: {
+    title: "Where will your workspace live?",
+    lead: "Your agents work wherever it is. You can change it later.",
+    recommended: "Recommended",
+    cloud: "In the Ackwire AI cloud",
+    cloudText: "Always on. We take care of everything, you just use it.",
+    here: "On this {{device}}",
+    hereText: "Your agents work while the app is open.",
+    box: "On a computer that's always on",
+    boxText: "A Mac mini or an office computer, installed once.",
+    goCloud: "Continue in the cloud",
+    goHere: "Get this {{device}} ready",
+    goBox: "See how to install",
+    haveOne: "Have one already?",
+    haveOneLink: "Sign in by its address",
+  },
+  /** "Num computador sempre ligado": the source installation guide, and the instructions to send to whoever installs it. */
+  install: {
+    title: "Install on a computer that's always on",
+    lead: "It's done once. Then it keeps running by itself, even with this app closed.",
+    step1: "On that computer, follow the guide to install Ackwire AI from source",
+    step2: "At the end a link shows up. Open it here and that's it.",
+    noLink: "No link?",
+    someoneElse: "Someone else will install it?",
+    copy: "Copy the instructions",
+    copied: "Instructions copied",
+    /** What "Copy the instructions" puts on the clipboard, to send to whoever installs it. */
+    text: "Install on a computer that's always on\n\n1. On that computer, follow the guide to install Ackwire AI from source:\n{{command}}\n\n2. At the end a link shows up. Open it here and that's it.",
   },
   connect: {
-    title: "Connect to my server",
+    title: "Sign in to a workspace that already exists",
     lead: "Its address, the same one you open in the browser.",
     label: "Server address",
     placeholder: "agentes.yourteam.ts.net",
-    go: "Connect",
+    go: "Sign in",
     checking: "Checking…",
     found: "Found",
     looking: "Looking for your server…",
-    foundTailnet: "On your Tailscale network",
+    foundTailnet: "On your team's network",
     foundHere: "Ackwire AI is running here",
     /** A server found on this computer that still waits for its owner account (the app opens its owner page). */
     foundNoOwner: "Waiting for its owner account",
@@ -178,8 +204,8 @@ export const desktopEn = {
     /** Under the address field: what an address looks like, and what a Tailscale one ends in. */
     addressHint: "An address with https, or its Tailscale one, which ends in .ts.net.",
     checkUpdates: "Check for updates",
-    none: "Don't have one yet? Run this on it",
-    noneText: "In the terminal of a server or a Mac mini. At the end it shows a link that connects this app to it.",
+    /** Under the found servers: none yet, so the always-on install. */
+    noneYet: "Don't have one yet?",
     invalid: "Check the address, something like agentes.yourteam.ts.net.",
     httpRefused:
       "{{host}} doesn't use a secure connection (https), and only servers on this {{device}} may go without one. Use its https address or its Tailscale one.",
@@ -196,9 +222,10 @@ export const desktopEn = {
     appTooOld: "Update the app to use {{host}}.",
   },
   here: {
-    title: "Run Ackwire AI on this {{device}}",
-    how: "It runs inside this app, with its own database built in, and keeps everything in one folder on this {{device}}.",
+    title: "Let's get this {{device}} ready",
+    how: "It takes a minute. Everything stays here, with you alone.",
     again: "It ran here before, and its data is still in {{path}}.",
+    ownerNone: "No account is left on it. Your name and email make you its new owner.",
     name: "Your name",
     nameNeeded: "Write your name.",
     email: "Your email",
@@ -226,15 +253,17 @@ export const desktopEn = {
     usage: "Send anonymous usage statistics to Ackwire AI",
     usageText:
       "Counts such as people, agents, machine sizes, AI tokens used and how much data the agents' browsers send and receive. Never messages, files, names or sites.",
-    start: "Start Ackwire AI",
-    setting: "Setting up Ackwire AI on this {{device}}",
+    start: "Start",
+    setting: "Getting everything ready",
+    /** Under the form, beside a sleeping agent: what closing the app does. */
+    rest: "When you close the app, your agents rest. They're back as soon as you open it again.",
     step: {
-      database: "Preparing the database",
+      database: "Making room for your data",
       databaseNote: "first time only",
-      start: "Starting",
+      start: "Turning Ackwire AI on",
       account: "Creating your account",
-      computer: "Getting this {{device}} ready for your agents",
-      reach: "Turning on access from your devices",
+      computer: "Calling your agents",
+      reach: "Turning on access from your phone",
     },
     /** Each step's state in words, for screen readers (the marks are drawn). */
     stepState: {
@@ -247,7 +276,7 @@ export const desktopEn = {
       start: "Ackwire AI didn't start on this {{device}}.",
       database: "The database wasn't prepared.",
       account: "Your account wasn't created.",
-      retry: "Try again in Preferences\u00a0›\u00a0Servers.",
+      retry: "Try again in Preferences",
     },
     reason: {
       https: "HTTPS is off on your Tailscale network",
@@ -281,11 +310,14 @@ export const desktopEn = {
     openIt: "Open it",
   },
   link: {
-    question: "Connect the app to this server?",
+    question: "Open this workspace in the app?",
     questionSignIn: "Sign in to this server with your account from the other device?",
-    questionClaim: "Set up this server: create its owner account.",
+    questionClaim: "Open the workspace you installed?",
+    /** Under it: what opening it does. */
+    claimLead: "You create its owner account now.",
     leave: "You leave {{current}} in this app. Your account there stays.",
     connect: "Connect",
+    open: "Open",
     continue: "Continue",
     checking: "Checking the server…",
     notALink: "This link isn't from an Ackwire AI server.",
@@ -324,6 +356,8 @@ export const desktopEn = {
     offline: "Offline since {{time}}",
     signIn: "Sign in",
     signOut: "Sign out of this server",
+    /** A server with several accounts signed in (ADR 0183): one more beside them, from its menu. */
+    addAccount: "Add account",
     signedOutDone: "You signed out of {{host}}",
     removeFromApp: "Remove from this app",
     /** The system's notification for a server not open in the window: "Oficina · agentes.exemplo.com.br". */
@@ -350,7 +384,6 @@ export const desktopEn = {
     jev: "Jev",
     jevText:
       "A fast model by TypeSafe that picks who answers, keeps memory tidy and lets agents see the screen. Optional, with your own key.",
-    jevWhere: "In Ackwire AI\u00a0›\u00a0Settings\u00a0›\u00a0AI and usage.",
     reachFailed: "Access from your devices didn't turn on: {{reason}}.",
     backup: "Back up now",
     backedUp: "Backed up: {{file}}",
@@ -391,10 +424,65 @@ export const desktopEn = {
     /** It restarted by itself 3 times in a few minutes (a notification). */
     restartedBanner: "Ackwire AI restarted 3 times on this {{device}}",
     restartedBody: "It comes back by itself. If it keeps happening, open the app to see why.",
-    version: "Version {{version}}, updated with the app",
+    installedVersion: "Installed package version",
+    internalVersion: "Internal server version",
     updatesWithApp: "Updating the app updates Ackwire AI on this {{device}} too.",
     updateBack: "The update didn't start. Ackwire AI is back on {{version}}.",
     updateBackBody: "The new version is tried again with the app's next update.",
+    backups: "Backups",
+    nightly: "Back up every night",
+    nightlyLast: "At {{at}} · last one {{time}}",
+    nightlyNone: "At {{at}} · no backup yet",
+    lastBackup: "Last one {{time}}",
+    noBackup: "No backup yet",
+    backupFailed: "The last backup didn't finish. Back up now to try again.",
+    copyTo: "Copy to",
+    copyToText:
+      "Each new backup is copied to this folder too, like a USB drive or iCloud Drive. The two newest stay there.",
+    copyToNone: "Only on this {{device}}",
+    copyToStop: "Stop copying",
+    choose: "Choose…",
+    change: "Change…",
+    copyFailed: "The last backup didn't reach this folder. Check that it's still there, or choose another.",
+    restore: "Restore…",
+    restoreTitle: "Restore a backup?",
+    restoreBody:
+      "Ackwire AI on this {{device}} goes back to that backup: messages, files and settings. It stops for a minute. What's there now is kept in the backups folder.",
+    restoreWhich: "Backup to restore",
+    backupOf: "Backup from {{time}}",
+    restoreConfirm: "Restore",
+    restored: "Restored the backup from {{time}}",
+    restoreFailed: "That backup didn't start, so Ackwire AI is back as it was. Try the other backup.",
+    restoreUnreadable: "That backup can't be opened. Try the other one.",
+    /** Preferences › Servers: it stops, its folder moves whole to a dated folder in the home folder, its agents' homes here (browser profiles, sign-ins, machine tokens) are deleted, and a new setup starts. */
+    erase: "Erase and start over…",
+    eraseTitle: "Erase Ackwire AI on this {{device}}?",
+    eraseBody:
+      "Its workspaces go for everyone who uses them, on every device. Its data moves to {{path}} and stays there. What its agents kept on this {{device}}, such as their browsers and sign-ins, is deleted. The agents' files in ~/agentes are yours and stay where they are. Then you set it up again with a new owner.",
+    eraseConfirm: "Erase it",
+    erased: "Erased. Its old data is in {{path}}.",
+    eraseMoveFailed:
+      "Its data couldn't be moved, so nothing was erased and it stays in {{path}}. It's stopped until you start it again.",
+    /** Another agentes-server, started outside the app, holds the folder's lock, so the folder can't move. */
+    eraseHeld:
+      "Another Ackwire AI server is using its folder, so nothing was erased. Stop that server, then try again.",
+    noPassword: "Add a password to sign in from your phone and other computers.",
+    addPassword: "Add a password",
+    keep: "Keep it running",
+    keepLogin: "Opens at login",
+    keepLoginOn: "Turn on",
+    keepAutoLogin: "Signs in by itself after a restart",
+    keepAutoLoginText:
+      "After a restart, this {{device}} waits at its sign-in screen and Ackwire AI doesn't open. Turn on automatic login in Users & Groups.",
+    keepAutoLoginOpen: "Open Users & Groups",
+    keepPower: "Starts after a power failure",
+    keepPowerText:
+      "After a power cut, this {{device}} stays off until someone presses its button. Energy settings can start it by itself.",
+    keepPowerOpen: "Open Energy settings",
+    keepAwake: "Doesn't sleep while serving",
+    keepAwakeText: "This {{device}} stays awake while Ackwire AI runs here. Start Ackwire AI to keep it awake.",
+    keepOn: "Done",
+    keepOff: "Not yet",
   },
   pair: {
     title: "Let agents of {{org}} work on this {{device}}?",
@@ -408,6 +496,9 @@ export const desktopEn = {
     /** Shown once after sign-in, for a workspace this computer doesn't work for yet. */
     offerTitle: "Let {{org}}'s agents use this {{device}}?",
     keepReady: "Keep it ready: open Ackwire AI at login",
+    /** The offer for a server elsewhere that this computer only opens: pairing lends it, it isn't needed to get in. */
+    offerOnlyIf:
+      "Only if you want this {{device}} to do agents' work too. With Not now you still use {{org}} here as usual.",
     /** Over the pairing's switches (Commands, Claude Code, Codex, Browser), on as they start. */
     canDo: "What agents can do here",
     foldersLater: "No folders of yours yet. Add them later in Preferences\u00a0›\u00a0Folders.",
@@ -418,7 +509,9 @@ export const desktopEn = {
     linkBody: "If you didn't ask for this, choose Not now.",
     waiting: "Waiting for {{by}} to let it in…",
     done: "Connected to {{org}}",
-    expired: "This link expired. Make a new one under Settings\u00a0›\u00a0Devices.",
+    addFolders: "Add folders",
+    expired: "This link expired. Make a new one in Devices.",
+    openDevices: "Open Devices",
     denied: "{{by}} didn't let it in. Nothing changed.",
     /** Preferences › General › This Mac: one switch per workspace. */
     letOrg: "Let {{org}}'s agents use this {{device}}",
@@ -458,9 +551,19 @@ export const desktopEn = {
   },
   tools: {
     claudeName: "Claude Code",
-    claudeDesc: "Writes and changes code in the allowed folders, with your Claude account.",
+    claudeDesc:
+      "Writes and changes code in the allowed folders, with your Claude account. Runs its own commands in the agent's folder, even with Commands off.",
     codexName: "Codex",
-    codexDesc: "Writes and changes code in the allowed folders, with your ChatGPT account.",
+    codexDesc:
+      "Writes and changes code in the allowed folders, with your ChatGPT account. Runs its own commands in the agent's folder, even with Commands off.",
+    cursorName: "Cursor",
+    cursorDesc: "Writes and changes code in the allowed folders, with your Cursor account.",
+    opencodeName: "OpenCode",
+    opencodeDesc: "Writes and changes code in the allowed folders, with OpenCode's free models or your key.",
+    grokName: "Grok Build",
+    grokDesc: "Writes and changes code in the allowed folders, with your Grok account.",
+    antigravityName: "Antigravity CLI",
+    antigravityDesc: "Writes and changes code in the allowed folders, with your Gemini account.",
     found: "Found",
     notFound: "Not found",
     loggedOut: "Not signed in",
@@ -470,6 +573,25 @@ export const desktopEn = {
     commandsWarnOrgs: "Commands can reach the rest of this {{device}}, other workspaces' folders included.",
     commandsWarnHere: "Commands run as you and can reach the rest of this {{device}}, Ackwire AI's own data included.",
     commandsSome: "On only for {{orgs}}. Turn it on for every workspace here.",
+    commandsAbout:
+      "Tests, builds and other Terminal commands. Each one shows in Activity. Commands run as you. They can read anything you can on this {{device}}, Ackwire AI's database and keys included. Turn them on only for workspaces you trust with all of it.",
+    commandsReach:
+      "Commands run as you. They can read anything you can on this {{device}}, Ackwire AI's database and keys included. Turn them on only for workspaces you trust with all of it.",
+    commandsAsk: "Turn on Commands for {{org}}?",
+    commandsTurnOn: "Turn on",
+    checkAgain: "Check again",
+    lookPath: "Ackwire AI looks in your login shell's PATH.",
+    lookPathWindows: "Ackwire AI looks in PATH.",
+    stillMissing: "{{tool}} still isn't found. Run the command above, then check again.",
+    install: "Install for me",
+    installing: "Installing {{tool}}. It takes about a minute.",
+    installFailed: "Couldn't install: {{message}}",
+    gitMissing: "{{tool}} needs Git for Windows on this computer.",
+    getGit: "Download Git for Windows",
+    cantStart: "It's here, but it won't start: {{message}}",
+    cantStartChip: "Won't start",
+    installedNotFound: "The installer finished, but {{tool}} still isn't found.",
+    notFoundYet: "{{tool}} still isn't found.",
     browserName: "Browser",
     browserDesc: "Opens websites for the agents in a browser of their own, without your logins.",
     browserLogins:
@@ -520,17 +642,31 @@ export const desktopEn = {
       launchTitle: "Open at login",
       launchDesc: "Agents only use this {{device}} while the app is open.",
       launchHere: "Ackwire AI on this {{device}} runs only while the app is open.",
+      launchWork: "Agents work only while the app is open.",
       notifySiteTitle: "Let me know about messages and requests",
       notifySiteDesc: "Mentions, direct messages and what waits for you, while the app is in the background.",
       notifyTitle: "Let me know when an agent asks for a folder",
       notifyBrowserTitle: "Let me know when an agent needs me in its browser",
       notifyBrowserDesc: "The request already reaches your phone and the site. This tells you here too.",
-      dockTitle: "Show in the Dock",
-      dockDesc:
-        "With the count of what waits for you. Off, the app stays in the menu bar only while no window is open.",
       menuBarTitle: "Show in the menu bar",
       notchTitle: "Show the agents in the notch",
       notchDesc: "On MacBooks with a notch: who is working shows around the camera.",
+      /** Linux: draw the window without the graphics card. */
+      compatTitle: "Compatibility mode",
+      compatDesc:
+        "Draws the window without the graphics card. It's slower but works on any computer. Use it if the window goes black, gets cut off or freezes.",
+      /** Toast after changing Compatibility mode: the drawing mode changes only when the app starts. */
+      compatReopen: "Takes effect when the app reopens.",
+      reopenNow: "Reopen now",
+      /** Toast once, after an opening with the graphics card never painted and the app fell back. */
+      compatFellBack: "The window didn't open with the graphics card, so it opened in compatibility mode.",
+      compatTryCard: "Try the graphics card again",
+      /** Behind the ⓘ while WEBKIT_DISABLE_DMABUF_RENDERER was set when the app started: the switch can't change it. */
+      compatOwn:
+        "WEBKIT_DISABLE_DMABUF_RENDERER decides this now. To choose here, quit the app and open it without that variable.",
+      /** Asked before Reopen now while agents work on this computer or Ackwire AI runs here. */
+      reopenTitle: "Reopen Ackwire AI?",
+      reopenBody: "Agents can't use this computer until the app opens again. What is already running finishes first.",
     },
     thisMac: {
       agents: "Agents",
@@ -554,10 +690,18 @@ export const desktopEn = {
       plug: "Plug a phone into this {{device}} to add it.",
       androidSteps: "Android steps",
       iphoneSteps: "iPhone steps",
-      wider: "Other people's agents run as {{user}} here and can read your files.",
+      wider:
+        "Only me means you, and agents working for you. Other people's agents run as {{user}} here and can read your files.",
       phoneWho: "{{who}} can use it",
       signedOut: "Sign in to {{server}} in the app to see who can use this {{device}}.",
       unreachable: "Couldn't reach {{server}}. Check the connection and try again.",
+      placeHere: "On this {{device}}",
+      placeCloud: "Ackwire AI Cloud",
+      more: "More for {{org}}",
+      otherWorkspace: "Another workspace",
+      otherWorkspaceDesc:
+        "Let a workspace on Ackwire AI Cloud or on another server use this {{device}} too. Each one keeps its own sign-in.",
+      addWorkspace: "Add a workspace…",
     },
     folders: {
       title: "Folders",
@@ -584,8 +728,7 @@ export const desktopEn = {
       connected: "Connected",
       protection: "Protection",
       protectedTitle: "Protected mode",
-      protectedDesc:
-        "Commands only write in the allowed folders and don't read the rest of the {{device}}. Some tools may get slower.",
+      protectedDesc: "Coming: commands that write only in allowed folders and can't read the rest of this {{device}}.",
       commandsOn: "Commands are on",
     },
     accounts: {
@@ -621,6 +764,8 @@ export const desktopEn = {
       addedBody: "On each agent's page, choose who uses this account.",
       addedPlan: "{{plan}} plan",
       ok: "OK",
+      /** In "Conta adicionada": the workspace's agents in the main window, to choose who uses it. */
+      chooseAgents: "Choose agents",
       failedTitle: "The account wasn't added",
       failedExpired: "Time to sign in ran out. Try again.",
       failedLogin: "The sign-in didn't finish. Try again.",
@@ -640,6 +785,9 @@ export const desktopEn = {
       downloading: "Downloading…",
       installing: "Installing…",
       installFailed: "Couldn't update on its own. Download and install it by hand.",
+      autoInstall: "Install updates by itself, at night",
+      autoInstallDesc:
+        "The server and agents restart for a minute. If the new version doesn't start, it goes back by itself.",
       download: "Download version {{version}}",
       howTitle: "Update by hand",
       step1: "Quit Ackwire AI (⌘Q).",
@@ -648,6 +796,8 @@ export const desktopEn = {
       installerNote: "Open the downloaded file: it installs the new version over the old one.",
       keepNote: "Your servers and settings stay.",
       whatsNew: "What's new in {{version}}",
+      /** The app's and the system's versions (on Linux also how it draws the app), one line to copy. */
+      systemDetails: "System details",
     },
     activity: {
       title: "Activity",

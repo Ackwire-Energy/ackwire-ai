@@ -61,16 +61,34 @@ const rowOf = (el: HTMLElement, title: string) =>
   );
 const button = (root: ParentNode | undefined, text: string) =>
   [...(root?.querySelectorAll<HTMLButtonElement>("button") ?? [])].find((b) => b.textContent === text);
+const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]') ?? undefined;
+
+/** Who can use it: the workspace's ⋯, then its item, in a dialog. */
+async function openWho(el: HTMLElement, org: string) {
+  const more = rowOf(el, org)?.querySelector<HTMLButtonElement>(`button[aria-label="More for ${org}"]`);
+  more?.focus();
+  await act(async () => more?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true })));
+  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (m) => m.textContent === "Who can use it",
+  );
+  await act(async () => item?.click());
+  await until(() => dialog());
+}
 
 describe("Preferences › This Mac", () => {
-  test("agents, commands as this user, who can use it, and each phone with its state and one way out", () =>
+  test("agents, who can use it, and each phone with its state and one way out", () =>
     mount("prefs", <OneWorkspace />, async (el, host) => {
-      await until(() => rowOf(el, "Pixel 8") && rowOf(el, "Who can use it")?.querySelector('[role="combobox"]'));
-      expect(
-        rowOf(el, "Let Acme's agents use this Mac")?.querySelector('[role="switch"]')?.getAttribute("aria-checked"),
-      ).toBe("true");
-      expect(document.getElementById("mac-commands-hint")?.textContent).toContain("They run as sam");
-      expect(rowOf(el, "Who can use it")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
+      await until(() => rowOf(el, "Pixel 8"));
+      expect(rowOf(el, "Acme")?.querySelector('[role="switch"]')?.getAttribute("aria-checked")).toBe("true");
+      // The phones' help is one line in their card.
+      expect(rowOf(el, "Pixel 8")?.closest(".dk-card")?.textContent).toContain(
+        "Plug a phone into this Mac to add it. Android steps · iPhone steps",
+      );
+      await openWho(el, "Acme");
+      await until(() => rowOf(dialog() as HTMLElement, "Acme")?.querySelector('[role="combobox"]'));
+      expect(rowOf(dialog() as HTMLElement, "Acme")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
+      await act(async () => dialog()?.querySelector<HTMLButtonElement>('button[aria-label="Close"]')?.click());
+      await until(() => !dialog());
 
       const pixel = rowOf(el, "Pixel 8");
       expect(pixel?.querySelector(".ac-chip")?.textContent).toBe("In use by Ada");
@@ -93,14 +111,32 @@ describe("Preferences › This Mac", () => {
       writePref(IPHONE_SETUP_PREF, false);
     }));
 
+  test("an iPhone on this Mac's Wi-Fi: offered, used once picked, and let go again", () =>
+    mount("prefs", <OneWorkspace />, async (el, host) => {
+      const offer = "Also on this Mac's Wi-Fi: Ana's iPhone 14";
+      await until(() => rowOf(el, offer));
+      expect(host.site.calls.some((c) => c.method === "PUT")).toBe(false);
+      await act(async () => button(rowOf(el, offer), "Use over Wi-Fi")?.click());
+      await until(() => rowOf(el, "Ana's iPhone 14"));
+      expect(rowOf(el, offer)).toBeUndefined();
+      expect(host.site.calls.find((c) => c.method === "PUT")?.path).toMatch(
+        /^\/api\/app\/organizations\/org_acme\/devices\/computers\/[^/]+\/wifi-iphones\/00008120-000A1B2C3D4E5F60$/,
+      );
+      // Over Wi-Fi now, its helper still being set up: Show me how, as for one on the cable.
+      const phone = rowOf(el, "Ana's iPhone 14");
+      expect(button(phone, "Show me how")).toBeTruthy();
+    }));
+
   test("signed out on that server: says so, with the way to sign in", () =>
     mount("prefs", <OneWorkspace />, async (el, host) => {
       host.site.signedOut = true;
-      await until(() => rowOf(el, "Who can use it")?.querySelector("small"));
-      expect(rowOf(el, "Who can use it")?.querySelector("small")?.textContent).toBe(
+      await until(() => rowOf(el, "Acme"));
+      await openWho(el, "Acme");
+      await until(() => rowOf(dialog() as HTMLElement, "Acme")?.querySelector("small"));
+      expect(rowOf(dialog() as HTMLElement, "Acme")?.querySelector("small")?.textContent).toBe(
         "Sign in to agentes.tail1234.ts.net in the app to see who can use this Mac.",
       );
-      expect(button(rowOf(el, "Who can use it"), "Open")).toBeTruthy();
+      expect(button(rowOf(dialog() as HTMLElement, "Acme"), "Open")).toBeTruthy();
     }));
 });
 
@@ -206,6 +242,38 @@ describe("the iPhone setup window", () => {
     // waiting, past the 5 s a test gets. Cut short, it went on running under the files after it (its window still
     // mounted, the clock moved 46 s on) and failed their tests.
   }, 30_000);
+
+  test("Developer Mode: a restart keeps the step, check again asks the Mac, and why the switch may be missing", async () => {
+    writePref(IPHONE_SETUP_PREF, true);
+    await mount("welcome", <WindowView name="welcome" />, async (el, host) => {
+      const step = () => el.querySelector('[aria-current="step"]');
+      await until(() => step()?.querySelector("b")?.textContent === "Turn on Developer Mode");
+      const runners = [...host.runners.values()];
+      await act(async () => button(step() ?? undefined, "I turned it on, check again")?.click());
+      await until(() => step()?.textContent?.includes("The iPhone still says Developer Mode is off."));
+      expect(runners.some((r) => r.looks === 1)).toBe(true);
+      // Why the switch may be missing, each with its one action, when asked.
+      await act(async () => button(step() ?? undefined, "Don't see the option?")?.click());
+      const causes = () => [...(step()?.querySelectorAll(".dk-ip__causes li") ?? [])].map((li) => li.textContent);
+      expect(causes()).toEqual([
+        "The iPhone hides the option until Xcode asks to show it.Open Xcode",
+        "Turned it on and the iPhone restarted? Unlock it. The alert with Turn On shows only after that.",
+      ]);
+      await act(async () => button(step() ?? undefined, "Open Xcode")?.click());
+      await until(() => causes()[0]?.startsWith("Xcode opened on"));
+
+      // It restarts and leaves the Mac's list: the step stays, under way.
+      const iphones = runners.map((r) => r.phones.filter((p) => p.platform === "ios"));
+      for (const runner of runners) runner.setPhones(runner.phones.filter((p) => p.platform !== "ios"));
+      await until(() => step()?.textContent?.includes("The iPhone is restarting."));
+      expect(step()?.querySelector("b")?.textContent).toBe("Turn on Developer Mode");
+      expect(step()?.getAttribute("data-state")).toBe("active");
+      runners.forEach((runner, i) => {
+        runner.setPhones([...runner.phones, ...(iphones[i] ?? [])]);
+      });
+      await until(() => step()?.textContent?.includes("The iPhone is back. Unlock it, tap Turn On"));
+    });
+  });
 
   test("without the ask, the welcome window is the first run", () =>
     mount("welcome", <WindowView name="welcome" />, async (el) => {

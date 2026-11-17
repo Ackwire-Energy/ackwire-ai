@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import { runMigration } from "@agenteschat/db/testing";
-import { ProviderError } from "@agenteschat/providers";
+import { customModelId, ProviderError } from "@agenteschat/providers";
 import {
   checkCredential,
   createAgent,
@@ -13,6 +13,7 @@ import {
   listCredentials,
   NEW_AGENT_DEFAULTS,
   openRouterInUse,
+  removeCredentialCopies,
   revokeCredential,
   rotateCredential,
   ValidationError,
@@ -77,7 +78,11 @@ test("only admins and owners manage credentials", async () => {
 
 test('the label migration calls keys named after the provider "Claude" and leaves names people chose', async () => {
   const add = (provider: "anthropic" | "openai", label: string) =>
-    createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, { provider, label, apiKey: "sk-test-key-5678" });
+    createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider,
+      label,
+      apiKey: `sk-test-key-${label.length}-5678`,
+    });
   const named = await add("anthropic", "Anthropic");
   const chosen = await add("anthropic", "Anthropic da Acme");
   const openai = await add("openai", "Anthropic");
@@ -283,5 +288,188 @@ describe("an OpenRouter key", () => {
       { fetch: untouched.fetcher },
     );
     expect(untouched.seen).toEqual([]);
+  });
+});
+
+describe("the same key saved again", () => {
+  const save = (input: Partial<Parameters<typeof createCredential>[4]> = {}) =>
+    createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "openai",
+      label: "OpenAI",
+      apiKey: "sk-proj-same-key-5555",
+      ...input,
+    });
+  const rows = () =>
+    f.db.select().from(schema.providerCredentials).where(eq(schema.providerCredentials.provider, "openai"));
+
+  test("updates the saved key and says so: one row, its id, a name chosen kept from a plain save", async () => {
+    const first = await save({ label: "Time de vendas" });
+    expect(first.reused).toBeUndefined();
+    const again = await save();
+    expect(again).toMatchObject({ id: first.id, reused: true, label: "Time de vendas" });
+    const renamed = await save({ label: "Vendas" });
+    expect(renamed).toMatchObject({ id: first.id, reused: true, label: "Vendas" });
+    expect(await rows()).toHaveLength(1);
+  });
+
+  test("saved again with make default, it becomes the default; saved again without, it stays the default", async () => {
+    const first = await save();
+    expect(first.isDefault).toBe(false);
+    expect(await save({ makeDefault: true })).toMatchObject({ id: first.id, reused: true, isDefault: true });
+    expect((await defaultCredentials(f.db, f.org.id)).perProvider.openai).toBe(first.id);
+    expect(await save()).toMatchObject({ id: first.id, reused: true, isDefault: true });
+    expect((await defaultCredentials(f.db, f.org.id)).perProvider.openai).toBe(first.id);
+  });
+
+  test("another OpenAI project, another workspace scope or another secret is another key", async () => {
+    await save();
+    await save({ project: "proj_other" });
+    await save({ apiKey: "sk-proj-else-key-5555" });
+    await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "anthropic",
+      label: "Claude",
+      apiKey: "sk-ant-test-key-1234",
+      workspaceId: "wrkspc_01abc",
+    });
+    expect(await rows()).toHaveLength(3);
+    expect(await listCredentials(f.db, f.owner.id, f.org.id)).toHaveLength(5);
+  });
+});
+
+describe("copies saved before", () => {
+  // A copy as one was made before a save looked for it: another key, then given the same secret.
+  const copyOf = async (label: string) => {
+    const other = await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "anthropic",
+      label,
+      apiKey: `sk-ant-other-${label}-0000`,
+    });
+    await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, other.id, { apiKey: "sk-ant-test-key-1234" });
+    return other.id;
+  };
+
+  test("the list shows one row with the count; the default stays the row shown", async () => {
+    const a = await copyOf("a");
+    const b = await copyOf("b");
+    await createCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, {
+      provider: "anthropic",
+      label: "x",
+      apiKey: "sk-ant-different-1234",
+    });
+    await f.db
+      .insert(schema.organizationSettings)
+      .values({ orgId: f.org.id, defaultCredentialId: b })
+      .onConflictDoUpdate({ target: schema.organizationSettings.orgId, set: { defaultCredentialId: b } });
+    const listed = await listCredentials(f.db, f.owner.id, f.org.id, [f.keyWrapper]);
+    const byId = new Map(listed.map((k) => [k.id, k]));
+    expect(byId.get(b)).toMatchObject({ copies: 2 });
+    expect(byId.get(b)?.copyOf).toBeUndefined();
+    expect([byId.get(a)?.copyOf, byId.get(f.credential.id)?.copyOf]).toEqual([b, b]);
+    expect(listed.filter((k) => k.copies !== undefined || k.copyOf !== undefined)).toHaveLength(3);
+    // Without the wrappers no key is opened, and none is told apart.
+    expect((await listCredentials(f.db, f.owner.id, f.org.id)).some((k) => k.copies !== undefined)).toBe(false);
+  });
+
+  test("Remover cópias moves agents, an endpoint agent's model, the defaults and past spend, then deletes", async () => {
+    const copy = await copyOf("copy");
+    const rio = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Rio", handle: "rio", role: "x", instructions: "x", credentialId: copy },
+      NEW_AGENT_DEFAULTS,
+    );
+    const defaults = { defaultCredentialId: copy, defaultCredentialIds: { anthropic: copy, openai: "x" } };
+    await f.db
+      .insert(schema.organizationSettings)
+      .values({ orgId: f.org.id, ...defaults })
+      .onConflictDoUpdate({ target: schema.organizationSettings.orgId, set: defaults });
+    await f.db.insert(schema.usageRecords).values({
+      orgId: f.org.id,
+      agentId: rio.id,
+      credentialId: copy,
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      requestedModel: "claude-sonnet-5-5",
+      inputTokens: 10,
+      outputTokens: 0,
+      costNanoUsd: 5,
+    });
+
+    expect(await removeCredentialCopies(f.db, [f.keyWrapper], f.owner.id, f.org.id, f.credential.id)).toEqual({
+      removed: 1,
+    });
+    const keys = await f.db.select().from(schema.providerCredentials);
+    expect(keys.map((k) => k.id)).toEqual([f.credential.id]);
+    const [agent] = await f.db.select().from(schema.agents).where(eq(schema.agents.id, rio.id));
+    expect(agent?.credentialId).toBe(f.credential.id);
+    expect(await defaultCredentials(f.db, f.org.id)).toEqual({
+      legacy: f.credential.id,
+      perProvider: { anthropic: f.credential.id, openai: "x" },
+    });
+    const [spent] = await f.db.select().from(schema.usageRecords);
+    expect(spent?.credentialId).toBe(f.credential.id);
+    expect(await removeCredentialCopies(f.db, [f.keyWrapper], f.owner.id, f.org.id, f.credential.id)).toEqual({
+      removed: 0,
+    });
+  });
+
+  test("an endpoint's copy: an agent's model on it moves to the kept key, which keeps offering that model", async () => {
+    const net = { allowPrivate: false, resolveHost: async () => ["93.184.216.34"] };
+    const endpoint = (label: string, apiKey: string, model: string) =>
+      createCredential(
+        f.db,
+        f.keyWrapper,
+        f.owner.id,
+        f.org.id,
+        {
+          provider: "custom",
+          label,
+          apiKey,
+          endpoint: { style: "openai", baseURL: "https://gw.example.com/v1", models: [{ id: model }] },
+        },
+        { net },
+      );
+    const kept = await endpoint("Gateway", "gw-key-1234567", "m-1");
+    const copy = await endpoint("Gateway", "gw-key-7654321", "m-2");
+    await rotateCredential(f.db, f.keyWrapper, f.owner.id, f.org.id, copy.id, { apiKey: "gw-key-1234567" });
+    const [rio] = await f.db
+      .insert(schema.agents)
+      .values({
+        orgId: f.org.id,
+        name: "Rio",
+        handle: "rio",
+        role: "x",
+        instructions: "x",
+        model: customModelId(copy.id, "m-2"),
+        credentialId: copy.id,
+      })
+      .returning();
+    const agentSetup = { brain: "model" as const, model: customModelId(copy.id, "m-2"), key: copy.id };
+    await f.db
+      .insert(schema.organizationSettings)
+      .values({ orgId: f.org.id, agentSetup })
+      .onConflictDoUpdate({ target: schema.organizationSettings.orgId, set: { agentSetup } });
+    expect(await removeCredentialCopies(f.db, [f.keyWrapper], f.owner.id, f.org.id, kept.id)).toEqual({ removed: 1 });
+    const [settings] = await f.db.select().from(schema.organizationSettings);
+    expect(settings?.agentSetup).toMatchObject({ model: customModelId(kept.id, "m-2"), key: kept.id });
+    const [agent] = await f.db
+      .select()
+      .from(schema.agents)
+      .where(eq(schema.agents.id, rio?.id ?? ""));
+    expect(agent).toMatchObject({ credentialId: kept.id, model: customModelId(kept.id, "m-2") });
+    const [row] = await f.db
+      .select()
+      .from(schema.providerCredentials)
+      .where(eq(schema.providerCredentials.id, kept.id));
+    expect(row?.options.endpoint?.models.map((m) => m.id)).toEqual(["m-1", "m-2"]);
+  });
+
+  test("an admin's step only", async () => {
+    await copyOf("copy");
+    const member = await addMember(f.db, f.org.id, "member");
+    await expect(
+      removeCredentialCopies(f.db, [f.keyWrapper], member.id, f.org.id, f.credential.id),
+    ).rejects.toBeInstanceOf(ForbiddenError);
   });
 });

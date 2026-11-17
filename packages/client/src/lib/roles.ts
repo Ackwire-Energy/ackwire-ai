@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { OrgRole, PermissionArea, Person } from "../api/types";
+import type { OrgRole, PermissionArea, Person, RowHolders } from "../api/types";
 import { joinNames } from "./format";
 import { can, type RolePermission } from "./permissions";
 
@@ -24,7 +24,7 @@ export function grants(keys: readonly string[]): Set<string> {
 
 const IMPLIED: Record<string, readonly string[]> = {
   control_computers: ["control_browsers", "own_computers", "own_browsers"],
-  control_browsers: ["own_browsers"],
+  control_browsers: ["own_computers", "own_browsers"],
   own_computers: ["own_browsers"],
 };
 
@@ -34,6 +34,7 @@ const IMPLIED: Record<string, readonly string[]> = {
  * other role for every agent (`control_*`).
  */
 export type ComputerLevel = "none" | "browser" | "full";
+/** The computers' ladder, lowest first: step n holds the n-th (`COMPUTER_STEPS` on the server), step 0 none. */
 export const COMPUTER_KEYS: readonly string[] = [
   "own_browsers",
   "own_computers",
@@ -78,6 +79,296 @@ export function withComputerLevel(role: OrgRole, level: ComputerLevel): string[]
   return level === "none" ? keep : [...keep, computerKeysOf(role)[level]];
 }
 
+/** The one row the four computer keys make (`COMPUTERS_ROW` on the server): a ladder of five steps. */
+export const COMPUTERS_ROW = "computers";
+
+/** An area's rows on the roles screen: its keys, the four computer keys as one row in their place. */
+export const areaRows = (area: Pick<PermissionArea, "keys">): string[] =>
+  area.keys.flatMap((k) => (k === COMPUTER_KEYS[0] ? [COMPUTERS_ROW] : COMPUTER_KEYS.includes(k) ? [] : [k]));
+
+/** The highest level of a row: 1 for a key, the last step for the computers. */
+export const rowMax = (row: string) => (row === COMPUTERS_ROW ? COMPUTER_KEYS.length : 1);
+
+/**
+ * A set of keys' level on a row: 0 or 1 for a key, the computers' step (0 to 4). `administrator` aside: what it gives
+ * isn't a role's own, and what is comes back when it goes off (`rowLevel` on the server).
+ */
+export function levelOn(keys: readonly string[], row: string): number {
+  const own = grants(keys.filter((k) => k !== "administrator"));
+  if (row !== COMPUTERS_ROW) return own.has(row) ? 1 : 0;
+  return COMPUTER_KEYS.reduce((step, k, i) => (own.has(k) ? i + 1 : step), 0);
+}
+
+/** `keys` with `row` at `level` (the computers: its step's key alone), the rest untouched (`withRowLevel`). */
+export function withRow(keys: readonly string[], row: string, level: number): string[] {
+  const rowKeys = row === COMPUTERS_ROW ? COMPUTER_KEYS : [row];
+  const key = row === COMPUTERS_ROW ? COMPUTER_KEYS[level - 1] : level > 0 ? row : undefined;
+  return [...keys.filter((k) => !rowKeys.includes(k)), ...(key ? [key] : [])];
+}
+
+/**
+ * A row on a role: its own level, `everyone`'s, and what its people get (the higher one). `fromEveryone`: everyone
+ * has at least as much, so the row shows the Todos chip and turning it off asks "Quem pode" (ADR 0085 addendum of
+ * 2026-11-13). On `everyone` itself, both are its own.
+ */
+export function rowState(role: OrgRole, everyone: OrgRole | undefined, row: string) {
+  const own = levelOn(role.permissions, row);
+  const base = isEveryone(role) ? own : everyone ? levelOn(everyone.permissions, row) : 0;
+  return { own, everyone: base, level: Math.max(own, base), fromEveryone: base > 0 && base >= own };
+}
+
+const isAdmin = (r: Pick<OrgRole, "kind" | "permissions">) => !isEveryone(r) && r.permissions.includes("administrator");
+
+/**
+ * The roles once a "Quem pode" change is saved, as the server applies it (`setRowHolders`): `everyone` at its level,
+ * each listed role at its level, every other role the viewer may change at 0; roles above them and Administrador
+ * roles as they were.
+ */
+export function withRowHolders(roles: readonly OrgRole[], row: string, holders: RowHolders): OrgRole[] {
+  const listed = new Map(holders.roles.map((r) => [r.id, r.level]));
+  return roles.map((r) => {
+    if (!isEveryone(r) && (!r.editable || isAdmin(r))) return r;
+    const level = isEveryone(r) ? holders.everyone : (listed.get(r.id) ?? 0);
+    return { ...r, permissions: withRow(r.permissions, row, level) };
+  });
+}
+
+/** A person's level on a row: an owner's is the highest, anyone else's the most `everyone` or a role of theirs gives. */
+const personLevel = (p: Pick<Person, "role" | "roleIds">, roles: readonly OrgRole[], row: string) =>
+  p.role === "owner"
+    ? rowMax(row)
+    : Math.max(
+        0,
+        ...roles
+          .filter((r) => isEveryone(r) || (p.roleIds ?? []).includes(r.id))
+          .map((r) => (isAdmin(r) ? rowMax(row) : levelOn(r.permissions, row))),
+      );
+
+/**
+ * Who a "Quem pode" change takes the row from, or lowers on the computers' ladder, and who it gives it to
+ * ("Deixam de poder: Carla, Diego e mais 3."). Owners always can.
+ */
+export function holdersAfter<P extends Pick<Person, "role" | "roleIds">>(
+  people: readonly P[],
+  roles: readonly OrgRole[],
+  row: string,
+  holders: RowHolders,
+) {
+  const next = withRowHolders(roles, row, holders);
+  const losing: P[] = [];
+  const gaining: P[] = [];
+  for (const p of people) {
+    const was = personLevel(p, roles, row);
+    const now = personLevel(p, next, row);
+    if (now < was) losing.push(p);
+    else if (now > was) gaining.push(p);
+  }
+  return { losing, gaining };
+}
+
+/** The rows a role adds: past what `everyone` gives (for `everyone`, every row it holds). */
+export const reachRows = (
+  role: OrgRole,
+  everyone: OrgRole | undefined,
+  areas: readonly Pick<PermissionArea, "keys">[],
+) =>
+  areas.flatMap(areaRows).filter((row) => {
+    const s = rowState(role, everyone, row);
+    return isEveryone(role) ? s.own > 0 : s.own > s.everyone;
+  });
+
+/**
+ * What a role adds, for its row in the list and its glance line ("+3 permissões · +2 canais · +1 agente"): its rows
+ * past what `everyone` gives (for `everyone`, every row it holds), its channels (those the viewer doesn't see counted
+ * too) and its agents. `all`: Administrador, which may everything.
+ */
+export function reachOf(role: OrgRole, everyone: OrgRole | undefined, areas: readonly Pick<PermissionArea, "keys">[]) {
+  return {
+    all: isAdmin(role),
+    permissions: reachRows(role, everyone, areas).length,
+    channels: (role.channelIds?.length ?? 0) + (role.hiddenChannels ?? 0),
+    agents: role.agentIds?.length ?? 0,
+  };
+}
+
+/** The roles a "Quem pode" save writes: the custom ones the viewer may change, Administrador ones aside. */
+export const writableRoles = (roles: readonly OrgRole[]) =>
+  roles.filter((r) => !isEveryone(r) && r.editable && !isAdmin(r));
+
+/**
+ * A "Quem pode" dialog's choice: everyone at `keep` (the row's level, or the computers' step Todos had), or only the
+ * ticked roles keep it while `everyone` goes to `low`. `from`: the role the change started on, set to exactly its
+ * level (a computers' step picked below Todos'). Every writable role is listed, so none goes to 0 by being left out;
+ * an unticked one keeps what it has below `keep`.
+ */
+export function rowHolders(
+  roles: readonly OrgRole[],
+  row: string,
+  choice: { everyone: boolean; ticked: ReadonlySet<string> },
+  step: { keep: number; low: number; from?: { id: string; level: number } },
+): RowHolders {
+  return {
+    everyone: choice.everyone ? step.keep : step.low,
+    roles: writableRoles(roles).map((r) => {
+      const own = levelOn(r.permissions, row);
+      const level = choice.everyone
+        ? own
+        : choice.ticked.has(r.id)
+          ? Math.max(own, step.keep)
+          : r.id === step.from?.id
+            ? step.from.level
+            : Math.max(0, Math.min(own, step.keep - 1));
+      return { id: r.id, level };
+    }),
+  };
+}
+
+/**
+ * Who a "Quem pode" dialog starts with ticked: `holders`, the writable roles that hold the row at `keep` already;
+ * `all`, every writable role; else every writable role but that one (the role it was turned off on).
+ */
+export function whoStart(
+  roles: readonly OrgRole[],
+  row: string,
+  keep: number,
+  start: "holders" | "all" | { but: string },
+) {
+  const w = writableRoles(roles);
+  const picked =
+    start === "holders"
+      ? w.filter((r) => levelOn(r.permissions, row) >= keep)
+      : start === "all"
+        ? w
+        : w.filter((r) => r.id !== start.but);
+  return new Set(picked.map((r) => r.id));
+}
+
+/** Whether a "Quem pode" choice changes anything: some role's or `everyone`'s level on the row. */
+export function rowChanges(roles: readonly OrgRole[], row: string, holders: RowHolders) {
+  const next = withRowHolders(roles, row, holders);
+  return roles.some((r, i) => levelOn(r.permissions, row) !== levelOn(next[i]?.permissions ?? [], row));
+}
+
+/** Who sees a channel: every member (public), the people of some roles (ADR 0125), or only who is added. */
+export type ChannelReach = { kind: "everyone" } | { kind: "roles"; roleIds: string[] } | { kind: "private" };
+export const channelReach = (c: { visibility: string; audienceRoleIds?: readonly string[] }): ChannelReach =>
+  c.visibility === "public"
+    ? { kind: "everyone" }
+    : c.audienceRoleIds?.length
+      ? { kind: "roles", roleIds: [...c.audienceRoleIds] }
+      : { kind: "private" };
+
+/** Whether people with `role` see a channel through it: a public one, or one limited to it (`everyone`: public). */
+export const roleSees = (
+  role: Pick<OrgRole, "id" | "kind">,
+  c: { visibility: string; audienceRoleIds?: readonly string[] },
+) => c.visibility === "public" || (!isEveryone(role) && (c.audienceRoleIds ?? []).includes(role.id));
+
+/**
+ * Who deleting a role takes out of channels (the server's `dropRoleLeavers`, ADR 0125): the members of a channel
+ * limited to it who hold none of its other roles, its creator aside. Only the channels the viewer sees.
+ */
+export function deleteLeavers<P extends Pick<Person, "userId" | "roleIds">>(
+  role: Pick<OrgRole, "id">,
+  channels: readonly {
+    id: string;
+    visibility: string;
+    audienceRoleIds?: readonly string[];
+    createdByUserId?: string | null;
+  }[],
+  membersOf: (channelId: string) => readonly string[],
+  people: readonly P[],
+) {
+  const out = new Set<P>();
+  for (const c of channels) {
+    const ids = c.audienceRoleIds ?? [];
+    if (c.visibility !== "private" || !ids.includes(role.id)) continue;
+    const kept = ids.filter((id) => id !== role.id);
+    const members = new Set(membersOf(c.id));
+    for (const p of people) {
+      const mine = p.roleIds ?? [];
+      if (
+        members.has(p.userId) &&
+        p.userId !== c.createdByUserId &&
+        mine.includes(role.id) &&
+        !kept.some((id) => mine.includes(id))
+      )
+        out.add(p);
+    }
+  }
+  return [...out];
+}
+
+/**
+ * The cargos' order once `id` moves one place up (`-1`) or down, or null when it can't: the viewer never moves a cargo
+ * above one they can't change, so those stay on top in their order. `order` is every custom cargo's id, top first.
+ */
+export function movedOrder(order: readonly string[], editable: (id: string) => boolean, id: string, by: -1 | 1) {
+  const i = order.indexOf(id);
+  const j = i + by;
+  if (i < 0 || j < 0 || j >= order.length) return null;
+  const next = [...order];
+  [next[i], next[j]] = [next[j] as string, next[i] as string];
+  return keepsFixedOnTop(next, editable) ? next : null;
+}
+
+/** Whether every cargo the viewer can't change still stands above every one they can. */
+export function keepsFixedOnTop(order: readonly string[], editable: (id: string) => boolean) {
+  const last = order.reduce((at, id, i) => (editable(id) ? at : i), -1);
+  return order.every((id, i) => i > last || !editable(id));
+}
+
+/** The cargo page's tabs, in order (`?tab=`): `everyone` has no people of its own. */
+export type RoleTab = "permissions" | "channels" | "agents" | "people";
+export const roleTabs = (role: Pick<OrgRole, "kind">): RoleTab[] =>
+  isEveryone(role) ? ["permissions", "channels", "agents"] : ["permissions", "channels", "agents", "people"];
+export const isRoleTab = (v: unknown): v is RoleTab =>
+  v === "permissions" || v === "channels" || v === "agents" || v === "people";
+
+/** Past this many cargos the list gets a search, and past as many channels, agents or people a tab does. */
+export const ROLES_SEARCH_FROM = 8;
+/** A workspace's cargos at most (`ROLES_MAX` on the server). */
+export const ROLES_MAX = 100;
+
+/**
+ * What changing a channel's roles does to people (ADR 0125; `dropRoleLeavers` on the server): `leave`, its members
+ * taken out (they hold a role it drops and none it keeps; its creator stays, and going public or invite only takes
+ * nobody out); `unsee`, everyone else who saw it and no longer does. Administrators and owners see every channel.
+ */
+export function channelLeavers<P extends Pick<Person, "userId" | "role" | "roleIds">>(
+  channel: { visibility: string; audienceRoleIds?: readonly string[]; createdByUserId?: string | null },
+  next: { visibility: string; audienceRoleIds: readonly string[] },
+  memberIds: readonly string[],
+  people: readonly P[],
+  roles: readonly OrgRole[],
+) {
+  const before = channel.audienceRoleIds ?? [];
+  const dropped = before.filter((id) => !next.audienceRoleIds.includes(id));
+  const holds = (p: P, ids: readonly string[]) => ids.some((id) => (p.roleIds ?? []).includes(id));
+  const admin = (p: P) => p.role === "owner" || roles.some((r) => isAdmin(r) && (p.roleIds ?? []).includes(r.id));
+  const sees = (p: P, c: { visibility: string; audienceRoleIds: readonly string[] }) =>
+    c.visibility === "public" || admin(p) || (c.visibility === "private" && holds(p, c.audienceRoleIds));
+  const members = new Set(memberIds);
+  const limited = next.visibility === "private" && next.audienceRoleIds.length > 0;
+  return {
+    leave: limited
+      ? people.filter(
+          (p) =>
+            members.has(p.userId) &&
+            p.userId !== channel.createdByUserId &&
+            holds(p, dropped) &&
+            !holds(p, next.audienceRoleIds),
+        )
+      : [],
+    unsee: people.filter(
+      (p) =>
+        !members.has(p.userId) &&
+        sees(p, { visibility: channel.visibility, audienceRoleIds: before }) &&
+        !sees(p, next),
+    ),
+  };
+}
+
 /** The keys the summary names first: what tells roles apart. */
 export const SUMMARY_ORDER: readonly RolePermission[] = [
   "administrator",
@@ -87,7 +378,6 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "control_browsers",
   "manage_connectors",
   "manage_credentials",
-  "use_others_plans",
   "manage_members",
   "manage_roles",
   "view_usage",
@@ -104,6 +394,7 @@ export const SUMMARY_ORDER: readonly RolePermission[] = [
   "own_computers",
   "own_browsers",
   "talk_to_agents",
+  "view_all_agents",
   "assign_work",
   "post",
   "create_channels",

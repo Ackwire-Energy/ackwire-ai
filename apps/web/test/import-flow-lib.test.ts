@@ -13,12 +13,16 @@ import { createI18n } from "@/i18n";
 import { type AgentFile, ImportError } from "@/lib/import";
 import {
   agentsArrived,
+  agentsSince,
   applyInChunks,
   blockedItems,
   bundleOrigin,
   copyAgentFiles,
+  defaultMethod,
   filesNotes,
   githubRoot,
+  IMPORT_CARDS,
+  importFailureText,
   isGithubLink,
   NOT_GITHUB,
   PER_APPLY,
@@ -389,6 +393,25 @@ describe("the agents' files to the Drive", () => {
   });
 });
 
+describe("Conectar com MCP", () => {
+  test("the default way in: MCP where the app takes it and apps reach this server; a dot asks first", () => {
+    const pick = (reachable: boolean) => IMPORT_CARDS.filter((c) => defaultMethod(c, reachable) === "mcp");
+    expect(pick(true)).toEqual(["grok-bot", "openbotrun", "openmausbot", "hermes", "openclaw", "other"]);
+    expect(pick(false)).toEqual([]);
+  });
+
+  test("arrived: my agents not there when the steps opened, never another person's", () => {
+    const list = [
+      { id: "a-old", ownerUserId: "u-me" },
+      { id: "a-new", ownerUserId: "u-me" },
+      { id: "a-theirs", ownerUserId: "u-them" },
+      { id: "a-nobody", ownerUserId: null },
+    ];
+    expect(agentsSince(list, new Set(["a-old"]), "u-me").map((a) => a.id)).toEqual(["a-new"]);
+    expect(agentsSince(list, new Set(list.map((a) => a.id)), "u-me")).toEqual([]);
+  });
+});
+
 describe("todoLine", () => {
   const pt = createI18n("pt-BR");
   const en = createI18n("en");
@@ -412,5 +435,34 @@ describe("todoLine", () => {
     expect(line(pt, { kind: "secret", label: "GH_TOKEN", agents: ["ada"] })).toBe(
       "Ada usa GH_TOKEN. Não vem no arquivo: o agente pede no chat.",
     );
+  });
+});
+
+describe("an import past a limit says which, with its numbers", () => {
+  const pt = createI18n("pt-BR");
+  const text = (limit: ConstructorParameters<typeof ImportError>[1]) =>
+    importFailureText(
+      pt.t.bind(pt) as TFunction,
+      { from: "files", step: "read", cause: new ImportError("tooLarge", limit) },
+      () => false,
+      false,
+      "pt-BR",
+    );
+  const MB = 1024 * 1024;
+  test("each limit has its own sentence", () => {
+    expect(text({ kind: "file", have: 41 * MB, max: 32 * MB, name: "export/openbot-transfer.json" })).toBe(
+      "O openbot-transfer.json tem 41 MB. Uma importação lê até 32 MB por arquivo. Peça a exportação por partes, um agente de cada vez.",
+    );
+    expect(text({ kind: "files", have: 61204, max: 50000 })).toStartWith(
+      "Fora os arquivos de sistema, são 61.204 arquivos. Uma importação lê até 50.000.",
+    );
+    expect(text({ kind: "bytes", have: 9 * 1024 * MB, max: 8 * 1024 * MB, name: "backup.zip" })).toStartWith(
+      "O backup.zip tem 9 GB. Uma importação abre até 8 GB.",
+    );
+    expect(text({ kind: "unpacked", have: 3 * 1024 * MB, max: 2 * 1024 * MB })).toStartWith(
+      "Descompactado, ele chega a 3 GB.",
+    );
+    expect(text({ kind: "text", have: 33 * MB, max: 32 * MB })).toStartWith("O texto colado tem 33 MB.");
+    expect(text(undefined)).toBe("É grande demais para ler aqui. Tente só a pasta dos agentes, sem o resto.");
   });
 });

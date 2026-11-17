@@ -11,7 +11,7 @@ import type { TFunction } from "i18next";
 import { authKind, searchCatalog } from "@/components/ConnectorCatalog";
 import { createI18n } from "@/i18n";
 import { setNavigateAway } from "@/lib/navigate";
-import { pick, rowMenu, service } from "./catalog";
+import { openConnected, pick, rowMenu, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, CATALOG, createFakeApi, type FakeState, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -251,7 +251,7 @@ describe("Adicionar conector: one catalog", () => {
     const github = service("GitHub");
     // What always asks for approval is marked.
     const asks = github.querySelector("[data-asks]");
-    expect(asks?.textContent).toBe("Merge e deploy sempre pedem sua aprovação");
+    expect(asks?.textContent).toBe("Por padrão, merge e deploy pedem sua aprovação");
     expect(github.textContent).toContain("Você autoriza na página do serviço, ou usa uma chave de API");
     // Esc: the service closes, the catalog stays; again: the catalog closes.
     await pressEsc(github);
@@ -574,6 +574,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api: createFakeApi(state) });
     await settle(8);
+    await openConnected();
     await click(screen().getByRole("button", { name: "Quem usa GitHub" }));
     await settle(4);
     const flow = screen().getByRole("dialog", { name: "Quem pode usar GitHub" });
@@ -867,6 +868,7 @@ describe("the connect flow: conectar → conectado; Ajustar → o que faz → qu
     // A server the catalog doesn't list is an MCP: its own section, under the connectors.
     const section = () => screen().getByRole("region", { name: "MCPs" });
     expect(section().textContent).toContain("1 ferramenta nova para revisar");
+    await openConnected();
     await click(within(section()).getByRole("button", { name: "Revisar Suporte" }));
     const review = screen().getByRole("dialog", { name: REVIEW });
     // The new tool comes classified (the server says it only reads), in its subject.
@@ -1033,6 +1035,7 @@ describe("several accounts of one service", () => {
   test("Quem usa is per account, and every account starts as every agent's", async () => {
     await twoAccounts();
     const who = async (name: string) => {
+      await openConnected();
       await click(within(section()).getByRole("button", { name: `Quem usa ${name}` }));
       await settle(4);
       const shown = levels(flow(), ["Nível de Ada", "Nível de Atlas"]);
@@ -1063,6 +1066,7 @@ describe("several accounts of one service", () => {
       "Zapier Loja",
     ]);
     expect(document.body.textContent).toContain("Agora se chama Zapier Loja.");
+    await openConnected();
     expect(within(section()).getByRole("button", { name: "Quem usa Zapier Loja" })).toBeTruthy();
   });
 
@@ -1119,6 +1123,7 @@ describe("the confirmation that ends connecting", () => {
     );
     // Its detail stays one click away on its row.
     const section = screen().getByRole("region", { name: "Conectores" });
+    await openConnected();
     expect(within(section).getByRole("button", { name: "Quem usa GitHub" })).toBeTruthy();
   });
 
@@ -1245,6 +1250,7 @@ describe("a server whose tools can't be read", () => {
         r.querySelector(".list-title")?.textContent?.startsWith(name),
       ) as HTMLElement;
     expect(row("GitHub").querySelector(".list-title")?.textContent).toBe("GitHubPrecisa reconectar");
+    await openConnected();
     expect(within(row("GitHub")).getByRole("button", { name: "Reconectar GitHub" })).toBeTruthy();
     expect(row(label).querySelector(".list-title")?.textContent).toBe(`${label}Sem ferramentas agora`);
   });

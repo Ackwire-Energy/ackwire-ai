@@ -1,5 +1,6 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, eq, gt, gte, inArray, ne, schema, sql } from "@agenteschat/db";
+import { planCheckedAt } from "@agenteschat/ui/plan-state";
 import { cancelRun, mayStopRun, runRequester } from "./cancel";
 import { writtenSince } from "./catch-up";
 import { ANSWER_ANYWAY_MS, type ClosedNote } from "./catch-up-triage";
@@ -59,6 +60,8 @@ export interface UsageQueue {
   plan: string | null;
   /** When it resumes, when known. */
   resetsAt: string | null;
+  /** A plan's line: when its plan was last read or asked about (`planCheckedAt`), which a limit lifted early needs. */
+  checkedAt: string | null;
   /** Other agents waiting in the same plan's line (it belongs to the sign-in, not the agent). */
   sharedWith: string[];
   rows: UsageQueueRow[];
@@ -212,18 +215,39 @@ export async function usageQueue(db: Database, viewerId: string, orgId: string, 
         )
     : [];
   const budget = head?.code === "budget" || head?.source === "budget";
+  const checkedAt = !budget && head?.waitKey ? await planKeyCheckedAt(db, orgId, head.waitKey) : null;
   const mayAll = agent.ownerUserId === viewerId || can(membership, "manage_agents");
   return {
     agentId,
     reason: head ? (budget ? "budget" : "plan") : null,
     plan: head?.plan ?? null,
     resetsAt: ordered.find((r) => r.resetsAt)?.resetsAt ?? null,
+    checkedAt,
     sharedWith: shared.map((s) => s.agentId),
     rows,
     hidden: ordered.length - shown.length,
     mayStopAll: mayAll,
     closed: await closedRows(db, viewerId, orgId, agentId, mayAll),
   };
+}
+
+/** When the plan a line waits on (`usageWaitKey`: `plan:<computer>:<kind>:<account or own>`) was last read or asked about. */
+async function planKeyCheckedAt(db: Database, orgId: string, key: string): Promise<string | null> {
+  const [, machineId, kind, account] = key.split(":");
+  if (!machineId || !kind || !account) return null;
+  if (account !== "own") {
+    const [row] = await db
+      .select({ usage: schema.machineAccounts.usage })
+      .from(schema.machineAccounts)
+      .where(and(eq(schema.machineAccounts.orgId, orgId), eq(schema.machineAccounts.id, account)));
+    return planCheckedAt(row?.usage as { at?: string; checkedAt?: string } | null | undefined);
+  }
+  const [row] = await db
+    .select({ executors: schema.machines.executors })
+    .from(schema.machines)
+    .where(and(eq(schema.machines.orgId, orgId), eq(schema.machines.id, machineId)));
+  const own = row?.executors.ownUsage as Record<string, { at?: string }> | undefined;
+  return planCheckedAt(own?.[kind]);
 }
 
 const CLOSED_SHOWN_MS = 24 * 3600_000;

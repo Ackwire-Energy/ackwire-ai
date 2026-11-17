@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { BROWSER_PROFILE_PROTOCOL, type MachineRequest } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
+import { MachineRequestError } from "@agenteschat/engine";
 import { parseBrowserClientFrame } from "../src/realtime/browser";
 import { browser, createTestServer, joinByInvitation, pairComputer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -104,6 +105,30 @@ test("Fazer login: control, open a site only while in control, Devolver; the liv
   });
   expect(parseBrowserClientFrame(JSON.stringify({ type: "browser.watch", agentId: "profile:../x" }))).toBeNull();
   void org;
+});
+
+test("Fazer login on a computer whose browser is off: 400 with the cause and the way out, and nothing held", async () => {
+  const { api, machine } = await seeded();
+  const p = await json<Profile>(
+    await api("/browser-profiles", { json: { machineId: machine.machineId, name: "Shop chat" } }),
+  );
+  const hub = t.engine.machineHub;
+  const answer = hub.call;
+  hub.call = (async (machineId: string, request: MachineRequest, options?: unknown) => {
+    if (request.op === "browser.warm")
+      throw new MachineRequestError("not_allowed", "Browser is turned off on this computer");
+    return (answer as (...a: unknown[]) => unknown)(machineId, request, options);
+  }) as typeof hub.call;
+  const refused = await api(`/browser-profiles/${p.id}/takeover`, { json: {} });
+  expect(refused.status).toBe(400);
+  expect(await refused.json()).toMatchObject({
+    error: {
+      code: "browser_profile.tool_off",
+      params: { machineId: machine.machineId, tool: "browser", outdated: true, mayAllow: false },
+    },
+  });
+  const [listed] = (await json<{ profiles: Profile[] }>(await api("/browser-profiles"))).profiles;
+  expect(listed?.holder).toBeNull();
 });
 
 test("an agent's owner asks for a profile but can't grant one", async () => {

@@ -3,11 +3,14 @@ import {
   type BrowserFrame,
   type BrowserInputEvent,
   browserFrameDataUrl,
+  type CountedPointer,
   createBrowserLiveConnection,
   createTouchInput,
   frameMetadata,
+  frameView,
   inputProblem,
   keyEvents,
+  nextPointer,
   PASTE_MAX_BYTES,
   pasteBytes,
   pasteEvents,
@@ -17,10 +20,12 @@ import { openRefusalKey } from "@agenteschat/client/lib/sites";
 import * as Clipboard from "expo-clipboard";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Image, type LayoutChangeEvent, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { Image, type LayoutChangeEvent, StyleSheet, TextInput, View } from "react-native";
 import { GestureDetector, GestureStateManager, type TouchData, useManualGesture } from "react-native-gesture-handler";
+import { useDerivedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
-import { fieldText, Icon, Locked, Text } from "@/ui";
+import { fieldText, Icon, Locked, PictureEdge, PressScale, Text } from "@/ui";
+import { AgentPointer } from "../computer/AgentPointer";
 import { useColors, useConnection } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { keyPastDraft, LIVE_KEYS, type LiveKey, type PageGap, touchOnPage } from "./logic";
@@ -37,16 +42,28 @@ export function FrameView({
   frame,
   enabled,
   onInput,
+  cursor,
+  edge,
 }: {
   frame: BrowserFrame;
   enabled: boolean;
   onInput: (events: BrowserInputEvent[]) => void;
+  /** The agent's cursor over its page (null `pointer`: none, as while someone is in control). */
+  cursor?: { agentId: string; name: string; color: string | undefined; pointer: CountedPointer | null };
+  /** The radius of the box that clips the picture: its hairline, over the picture and under the cursor. */
+  edge?: number;
 }) {
   const { t } = useTranslation();
   const raised = useSurface("e2");
   const [view, setView] = useState({ width: 0, height: 0 });
   const [sliding, setSliding] = useState(false);
   const meta = useMemo(() => frameMetadata(frame), [frame]);
+  const { deviceWidth, deviceHeight } = meta;
+  const drawn = useMemo(
+    () => ({ ...frameView(view, { deviceWidth, deviceHeight }), boxWidth: view.width, boxHeight: view.height }),
+    [view, deviceWidth, deviceHeight],
+  );
+  const pointerView = useDerivedValue(() => drawn);
   const now = useRef({ meta, view, enabled, onInput });
   now.current = { meta, view, enabled, onInput };
   const [{ down, move, up, cancel }] = useState(() => {
@@ -109,6 +126,8 @@ export function FrameView({
           resizeMode="contain"
           fadeDuration={0}
         />
+        {edge === undefined ? null : <PictureEdge radius={edge} />}
+        {cursor ? <AgentPointer {...cursor} view={pointerView} /> : null}
         {sliding ? (
           <View pointerEvents="none" style={styles.hintRow}>
             <View style={[styles.hint, raised]}>
@@ -163,46 +182,49 @@ export function TypeBar({
     onText(text);
     edit("");
   };
-  const key = (k: LiveKey) => {
-    tapHaptic();
-    onKey(k);
-  };
   /** Colar: what the person copied, into the page's focused field as it is (the field's own paste waits for Send). */
   const paste = async () => {
-    tapHaptic();
     const copied = await Clipboard.getStringAsync().catch(() => "");
     if (copied) onText(copied);
   };
   const tool = (on: boolean) => [styles.tool, { backgroundColor: on ? c.sunken : "transparent" }];
+  // The keycaps press as the agent's screen's do (`PressScale`, its haptic included).
+  const cap = [styles.keyCap, { backgroundColor: c.sunken }];
   return (
     <View style={styles.typeWrap}>
       {keys ? (
         <View style={styles.keys} accessibilityLabel={t("mobile.browser.live.keys")}>
           {LIVE_KEYS.map((k) => (
-            <Pressable
+            <PressScale
               key={k}
-              onPress={() => key(k)}
+              to={0.92}
+              fill={false}
+              onPress={() => onKey(k)}
               accessibilityRole="button"
               accessibilityLabel={t(`mobile.browser.live.key.${k}`)}
               hitSlop={KEY_SLOP}
-              style={({ pressed }) => [styles.keyCap, { backgroundColor: c.sunken }, pressed && styles.pressed]}
+              style={cap}
+              contentStyle={styles.keyCapIn}
             >
               <Text variant="footnote" tone="ink2" style={styles.medium}>
                 {KEYCAP[k]}
               </Text>
-            </Pressable>
+            </PressScale>
           ))}
-          <Pressable
+          <PressScale
+            to={0.92}
+            fill={false}
             onPress={() => void paste()}
             accessibilityRole="button"
             accessibilityLabel={t("mobile.browser.live.pasteHint")}
             hitSlop={KEY_SLOP}
-            style={({ pressed }) => [styles.keyCap, { backgroundColor: c.sunken }, pressed && styles.pressed]}
+            style={cap}
+            contentStyle={styles.keyCapIn}
           >
             <Text variant="footnote" tone="ink2" style={styles.medium}>
               {t("mobile.browser.live.paste")}
             </Text>
-          </Pressable>
+          </PressScale>
         </View>
       ) : null}
       <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line }]}>
@@ -226,35 +248,41 @@ export function TypeBar({
           onSubmitEditing={send}
           submitBehavior="submit"
         />
-        <Pressable
+        <PressScale
+          to={0.9}
           onPress={() => setSecret((s) => !s)}
           accessibilityRole="switch"
           accessibilityState={{ checked: secret }}
           accessibilityLabel={secret ? t("mobile.browser.live.secureOn") : t("mobile.browser.live.secureOff")}
           hitSlop={4}
-          style={({ pressed }) => tool(secret || pressed)}
+          style={tool(secret)}
+          contentStyle={styles.center}
         >
           <Icon name="lock" size={18} color={secret ? c.ink : c.muted} />
-        </Pressable>
-        <Pressable
+        </PressScale>
+        <PressScale
+          to={0.9}
           onPress={() => setKeys((k) => !k)}
           accessibilityRole="button"
           accessibilityState={{ expanded: keys }}
           accessibilityLabel={t("mobile.browser.live.keys")}
           hitSlop={4}
-          style={({ pressed }) => tool(keys || pressed)}
+          style={tool(keys)}
+          contentStyle={styles.center}
         >
           <Icon name="keyboard" size={18} color={keys ? c.ink : c.muted} />
-        </Pressable>
-        <Pressable
+        </PressScale>
+        <PressScale
+          to={0.9}
           onPress={send}
           disabled={!text}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.browser.live.send")}
-          style={({ pressed }) => [styles.send, { backgroundColor: c.ink, opacity: !text ? 0.35 : pressed ? 0.8 : 1 }]}
+          style={[styles.send, { backgroundColor: c.ink, opacity: text ? 1 : 0.35 }]}
+          contentStyle={styles.center}
         >
           <Icon name="send" size={18} color={c.bg} />
-        </Pressable>
+        </PressScale>
       </View>
     </View>
   );
@@ -329,18 +357,17 @@ export function AddressBar({
             returnKeyType="go"
             onSubmitEditing={() => void go()}
           />
-          <Pressable
+          <PressScale
+            to={0.9}
             onPress={() => void go()}
             disabled={!ready}
             accessibilityRole="button"
             accessibilityLabel={t("browser.inCard.go")}
-            style={({ pressed }) => [
-              styles.send,
-              { backgroundColor: c.ink, opacity: !ready ? 0.35 : pressed ? 0.8 : 1 },
-            ]}
+            style={[styles.send, { backgroundColor: c.ink, opacity: ready ? 1 : 0.35 }]}
+            contentStyle={styles.center}
           >
             <Icon name="right" size={18} color={c.bg} />
-          </Pressable>
+          </PressScale>
         </View>
       </Locked>
       {error ? (
@@ -355,6 +382,8 @@ export function AddressBar({
 export interface LiveState {
   frame: BrowserFrame | null;
   unavailable: Unavailable;
+  /** The computer's own words with `unavailable` (why it couldn't start the browser). */
+  message: string | null;
   controllerUserId: string | null;
   /** The handoff the last status carried (undefined until a status arrives). */
   handoff: { controllerUserId: string | null } | null | undefined;
@@ -367,6 +396,8 @@ export interface LiveState {
   online: boolean;
   /** The last of a person's clicks or keys that didn't reach the page: a new object each time. */
   lost: { words: NonNullable<ReturnType<typeof inputProblem>> } | null;
+  /** Where the agent's pointer last went on the page; `n` counts its gestures. */
+  pointer: CountedPointer | null;
 }
 
 /**
@@ -380,11 +411,13 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
   const connection = useConnection();
   const [frame, setFrame] = useState<BrowserFrame | null>(null);
   const [unavailable, setUnavailable] = useState<Unavailable>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [controllerUserId, setControllerUserId] = useState<string | null>(null);
   const [handoff, setHandoff] = useState<{ controllerUserId: string | null } | null | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
   const [online, setOnline] = useState(false);
   const [lost, setLost] = useState<LiveState["lost"]>(null);
+  const [pointer, setPointer] = useState<CountedPointer | null>(null);
   const liveRef = useRef<ReturnType<typeof createBrowserLiveConnection> | null>(null);
   // The rate when the watch starts; a change later goes through `setMaxFps` (never a new watch).
   const fps = useRef(maxFps);
@@ -412,7 +445,11 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
         // What the person in control does isn't ours to keep on screen either.
         if (st.hidden) setFrame(null);
       },
-      onUnavailable: (reason) => setUnavailable(reason),
+      onPointer: (p) => setPointer((was) => nextPointer(was, p)),
+      onUnavailable: (reason, words) => {
+        setUnavailable(reason);
+        setMessage(words ?? null);
+      },
       onEnded: () => setUnavailable("ended"),
       onError: (code) => {
         if (code === "forbidden" || code === "not_found") setUnavailable("forbidden");
@@ -446,6 +483,7 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
       setControllerUserId(null);
       setHandoff(undefined);
       setHidden(false);
+      setPointer(null);
     };
   }, [connection, agentId, enabled]);
 
@@ -457,7 +495,7 @@ export function useLiveConnection(agentId: string, enabled: boolean, maxFps?: nu
     liveRef.current?.sendInput(events);
   }, []);
   const retry = useCallback(() => liveRef.current?.retry(), []);
-  return { frame, unavailable, controllerUserId, handoff, hidden, sendInput, retry, online, lost };
+  return { frame, unavailable, message, controllerUserId, handoff, hidden, sendInput, retry, online, lost, pointer };
 }
 
 /** The field's height and its round buttons: the send button sits concentric in its pill end. */
@@ -484,16 +522,11 @@ const styles = StyleSheet.create({
     minHeight: FIELD,
   },
   input: { flex: 1, paddingVertical: 10 },
-  tool: { width: FIELD_BUTTON, height: FIELD_BUTTON, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-  send: {
-    width: FIELD_BUTTON,
-    height: FIELD_BUTTON,
-    borderRadius: FIELD_BUTTON / 2,
-    alignItems: "center",
-    justifyContent: "center",
-    marginLeft: 2,
-  },
+  tool: { width: FIELD_BUTTON, height: FIELD_BUTTON, borderRadius: 10 },
+  send: { width: FIELD_BUTTON, height: FIELD_BUTTON, borderRadius: FIELD_BUTTON / 2, marginLeft: 2 },
+  // What a sized button holds, in its middle.
+  center: { alignItems: "center", justifyContent: "center" },
   keys: { flexDirection: "row", gap: 6, justifyContent: "flex-end" },
-  keyCap: { minWidth: 44, alignItems: "center", paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10 },
-  pressed: { opacity: 0.6 },
+  keyCap: { borderRadius: 10 },
+  keyCapIn: { minWidth: 44, alignItems: "center", paddingVertical: 8, paddingHorizontal: 8 },
 });

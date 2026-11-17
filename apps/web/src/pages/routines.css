@@ -87,7 +87,8 @@
 /* Its face on the first line of a name that wraps (`.ac-iconline` places it), the lines in the lane's middle. */
 .routines-horizon__label {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  /* The agent's face, its name and how many routines it has. */
+  grid-template-columns: auto auto minmax(0, 1fr);
   align-items: start;
   align-content: center;
   gap: 8px;
@@ -111,6 +112,18 @@
   line-height: 16px;
   color: var(--ink2);
   overflow-wrap: anywhere;
+}
+.routines-horizon__label small {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--faint);
+}
+.routines-horizon__label[aria-pressed="true"] b {
+  color: var(--ink);
+}
+/* The lane of the agent the list is filtered by. */
+.routines-horizon__lane.is-on .routines-horizon__track {
+  background: color-mix(in srgb, var(--sunken) 80%, transparent);
 }
 .routines-horizon__label:hover b {
   color: var(--ink);
@@ -141,6 +154,39 @@ html:not([data-pointer]) .routines-horizon__label:focus-visible {
 }
 .routines-horizon__next.is-soon {
   color: var(--ink);
+}
+/* The routine that runs next, beside its time. */
+.routines-horizon__next i {
+  font-style: normal;
+  font-weight: 500;
+  color: var(--muted);
+}
+/* Near the right edge the words go before the sprite, so they stay in the card. */
+.routines-horizon__next.is-before {
+  transform: translate(calc(-100% - 14px), -50%);
+}
+/* Under the lanes: the agents that have none here, and the way to all of them. */
+.routines-horizon__rest {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 0 -16px;
+  padding: 4px 10px 4px 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.routines-horizon__rest .ac-btn {
+  margin-left: auto;
+}
+/* In "Mostrar todos" the dialog is the surface: no card of its own. */
+.routines-horizon--plain {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  overflow: visible;
 }
 /* "agora": a pixel line (2px on, 2px off) with its tag below. */
 .routines-horizon__now {
@@ -243,7 +289,10 @@ html:not([data-pointer]) .routines-horizon__label:focus-visible {
   font-size: 14.5px;
   letter-spacing: -0.01em;
   text-align: left;
-  overflow-wrap: anywhere;
+  /* One line: a long name ends in "…" and its tooltip says it whole. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -748,6 +797,7 @@ html:not([data-pointer]) .routine-row__title:focus-visible {
     --lab: 40px;
   }
   .routines-horizon__label b,
+  .routines-horizon__label small,
   .routines-horizon__legend {
     display: none;
   }

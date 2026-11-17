@@ -1,5 +1,7 @@
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { isObject } from "@agenteschat/adapters/machine-protocol";
+import { readSmallJson } from "./json-file";
 import { CODEX_MCP_SERVER } from "./mcp";
 
 /**
@@ -19,6 +21,8 @@ export const AGY_CHAT_AGENT = "agenteschat-chat";
 /** How the account signs in (`auth.type`): a personal Google account, or Gemini Enterprise. */
 export type AgyAuth = "oauth-personal" | "oauth-business";
 
+const isAgyAuth = (v: unknown): v is AgyAuth => v === "oauth-business" || v === "oauth-personal";
+
 function readSettings(home: string): Record<string, unknown> {
   try {
     const v = JSON.parse(readFileSync(settingsFile(home), "utf8"));
@@ -32,7 +36,7 @@ function readSettings(home: string): Record<string, unknown> {
 export function agyAuthOf(home: string): AgyAuth | null {
   const auth = readSettings(home).auth;
   const type = auth && typeof auth === "object" ? (auth as Record<string, unknown>).type : undefined;
-  return type === "oauth-business" || type === "oauth-personal" ? type : null;
+  return isAgyAuth(type) ? type : null;
 }
 
 /** Written whole, then renamed, when it isn't that already (600). */
@@ -53,13 +57,15 @@ function writeIfChanged(file: string, text: string) {
  * CLI saved for an Enterprise seat) kept, everything else ours. Terminal commands in the sandbox, nothing outside the
  * turn's folder, our server's tools without asking, no AI credits spent past the plan's quota. Slash commands stay on
  * here: turns pass `--disable-slash-commands`, and `/usage` and `/logout` must reach the CLI, not the model.
+ * `gcp`: the seat's project from the home whose sign-in this one copies.
  */
-export function writeAgySettings(home: string, auth?: AgyAuth) {
+export function writeAgySettings(home: string, auth?: AgyAuth, gcp?: Record<string, unknown>) {
   const was = readSettings(home);
   const kept = auth ?? agyAuthOf(home) ?? "oauth-personal";
+  const seat = gcp ?? (isObject(was.gcp) ? was.gcp : undefined);
   const settings = {
     auth: { type: kept },
-    ...(kept === "oauth-business" && was.gcp && typeof was.gcp === "object" ? { gcp: was.gcp } : {}),
+    ...(kept === "oauth-business" && seat ? { gcp: seat } : {}),
     toolPermission: "proceed-in-sandbox",
     enableTerminalSandbox: true,
     allowNonWorkspaceAccess: false,
@@ -72,6 +78,92 @@ export function writeAgySettings(home: string, auth?: AgyAuth) {
   };
   writeIfChanged(settingsFile(home), `${JSON.stringify(settings, null, 2)}\n`);
   mkdirSync(agyRuntimeDir(home), { recursive: true, mode: 0o700 });
+}
+
+/**
+ * Where the CLI keeps its Google sign-in when it reaches no keyring: plain JSON with the access and refresh tokens,
+ * written whole (600) and refreshed in place, tied to neither the OS user nor the computer (Antigravity CLI 1.5.0,
+ * read off its binary 2026-11-11). Google's refresh answers carry no new refresh token, so copies of it never sign
+ * each other out.
+ */
+export const AGY_SIGN_IN_FILE = ".gemini/antigravity-cli/antigravity-oauth-token";
+const MAX_SIGN_IN_CHARS = 64_000;
+
+/** A Gemini sign-in as root hands it to a turn (`agy_auth`): the CLI's sign-in file, and its settings' part of it. */
+export interface AgySignIn {
+  auth: Record<string, unknown>;
+  type: AgyAuth;
+  /** An Enterprise seat's Google Cloud project, as the CLI saved it in its settings. */
+  gcp?: Record<string, unknown>;
+}
+
+/** The sign-in `v` holds (a grant off root's frame); null when it holds none. */
+export function agySignInFrom(v: unknown): AgySignIn | null {
+  if (!isObject(v) || !isObject(v.auth) || !isAgyAuth(v.type) || (v.gcp !== undefined && !isObject(v.gcp))) return null;
+  if (JSON.stringify(v.auth).length + JSON.stringify(v.gcp ?? {}).length > MAX_SIGN_IN_CHARS) return null;
+  return { auth: v.auth, type: v.type, ...(v.type === "oauth-business" && v.gcp ? { gcp: v.gcp } : {}) };
+}
+
+/** The sign-in an account's home keeps; null when its CLI kept none in its file. Never through a link or a pipe. */
+export function agySignInOf(home: string): AgySignIn | null {
+  return agySignInFrom({
+    auth: readSmallJson(path.join(home, AGY_SIGN_IN_FILE), MAX_SIGN_IN_CHARS),
+    type: agyAuthOf(home) ?? "oauth-personal",
+    gcp: readSettings(home).gcp,
+  });
+}
+
+/** A copy of that sign-in in another home: its settings first, then its file. */
+export function placeAgySignIn(home: string, signIn: AgySignIn) {
+  writeAgySettings(home, signIn.type, signIn.gcp);
+  writeIfChanged(path.join(home, AGY_SIGN_IN_FILE), JSON.stringify(signIn.auth));
+}
+
+/** Turns of this process on a copy, by home. */
+const holding = new Map<string, number>();
+
+/**
+ * In an agent's worker: its copy of a sign-in root keeps, placed for a turn and gone once its last turn on it ends
+ * (`release`), so the agent's user keeps no Google sign-in between turns. A worker killed mid-turn leaves its copy
+ * until that agent's next worker starts (`dropAgySignIns`), even if the account is removed meanwhile.
+ */
+export function holdAgySignIn(home: string, signIn: AgySignIn): () => void {
+  placeAgySignIn(home, signIn);
+  holding.set(home, (holding.get(home) ?? 0) + 1);
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const left = (holding.get(home) ?? 1) - 1;
+    if (left > 0) return void holding.set(home, left);
+    holding.delete(home);
+    try {
+      rmSync(path.join(home, AGY_SIGN_IN_FILE), { force: true });
+    } catch {
+      // the turn's own shell may have put anything there, and the turn it ends already ended
+    }
+  };
+}
+
+/**
+ * A worker starting, before any turn of its own: the copies `holdAgySignIn` left in the agent's folders for Gemini
+ * accounts (`dir`, one folder per account) when its last worker was killed mid-turn go. One worker per agent runs at a
+ * time, so none of them is in use.
+ */
+export function dropAgySignIns(dir: string) {
+  let ids: string[] = [];
+  try {
+    ids = readdirSync(dir);
+  } catch {
+    // no Gemini account here yet
+  }
+  for (const id of ids) {
+    try {
+      rmSync(path.join(dir, id, AGY_SIGN_IN_FILE), { force: true });
+    } catch {
+      // not an account's folder: its own shell may have put anything there
+    }
+  }
 }
 
 /**

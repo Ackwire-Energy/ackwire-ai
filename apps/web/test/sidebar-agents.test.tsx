@@ -5,7 +5,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
+import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedRoles, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 /**
@@ -173,6 +173,25 @@ describe("Agentes and its groups", () => {
     await go(asMember(seedState()));
     const theirs = await openMenu("Opções de Agentes");
     expect(within(theirs).queryByRole("menuitemcheckbox")).toBeNull();
+  });
+
+  test("with Ver todos os agentes off on Todos, a member's sidebar points at no agent that doesn't talk to them", async () => {
+    const hidingAda = (state: State) => {
+      const ada = state.agents.find((a) => a.id === ADA_ID);
+      if (ada) Object.assign(ada, { ownerUserId: "u-other", audience: { mode: "owner", userIds: [] } });
+      return asMember(state);
+    };
+    await go(hidingAda(seedState()));
+    expect(rowsIn(section("Agentes"))).toEqual(["Atlas"]);
+    expect(within(nav()).getByRole("link", { name: "Mais 1 agente na Equipe" })).toBeTruthy();
+    cleanup();
+    const off = hidingAda(seedState());
+    off.roles = seedRoles().map((r) =>
+      r.kind === "everyone" ? { ...r, permissions: r.permissions.filter((k) => k !== "view_all_agents") } : r,
+    );
+    await go(off);
+    expect(rowsIn(section("Agentes"))).toEqual(["Atlas"]);
+    expect(nav().querySelector(".sidebar__see-all")).toBeNull();
   });
 });
 

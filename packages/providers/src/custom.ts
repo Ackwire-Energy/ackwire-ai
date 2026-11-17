@@ -145,6 +145,12 @@ export function endpointHeaders(baseURL: string, session: string, version = "dev
 }
 
 /**
+ * Claude reads images wherever it is served (Amazon Bedrock's runtime and Mantle, a gateway): its ids all name it
+ * (`global.anthropic.claude-sonnet-5-5`). Another company's model on an Anthropic-compatible endpoint isn't trusted to.
+ */
+const readsImages = (model: string) => /claude/i.test(model);
+
+/**
  * The adapter for every workspace endpoint, registered once as `custom`: each call names its endpoint
  * (`StreamOptions.endpoint`) and goes through the catalog's own adapters with that address, Anthropic's in its
  * compatible mode or the Chat Completions one OpenRouter uses. The endpoint's model id is sent, the full
@@ -169,7 +175,7 @@ export function createCustomProvider(
           ? createAnthropicProvider({
               id: "custom",
               baseURL: endpoint.baseURL,
-              compat: { toolChoiceAny: false },
+              compat: { toolChoiceAny: false, images: readsImages(parsed.model) },
               fetch: http,
               maxRetries: options.maxRetries,
             })

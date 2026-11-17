@@ -1,16 +1,19 @@
 import type { BlobStoreResolver, PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, eq, gt, inArray, isNull, lte, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, eq, gt, inArray, isNull, lte, or, type SQL, schema, sql } from "@agenteschat/db";
+import { SKILL_ASSET_BYTES, SKILL_TEXT_BYTES } from "@agenteschat/tokens/skills";
 import { getAgent } from "./agents";
 import { recordAudit } from "./audit";
 import { mapInBatches } from "./batches";
 import { activeConnections, type ConnectorDeps } from "./connectors/connections";
 import { type ErrorParams, ForbiddenError, NotFoundError, TooManyError, ValidationError } from "./errors";
+import { publishAgentsChanged } from "./events";
 import { formatBytes } from "./format";
 import { connectionToken } from "./git/branches";
 import { appTokenForRepo, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./git/github-app";
 import { assertStorageRoom } from "./limits";
 import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
-import { can, requirePermission } from "./organizations";
+import { can, type Membership, requirePermission } from "./organizations";
+import { vaultPersonOfRun } from "./vault/access";
 import { inflateZipEntry, listZip, type ZipListing } from "./zip";
 
 const { skills, skillFiles, agentSkills } = schema;
@@ -26,8 +29,8 @@ export type SkillRow = typeof skills.$inferSelect;
  */
 export const SKILL_LIMITS = {
   maxFiles: 3000,
-  maxBytes: 16 * 1024 * 1024,
-  assetBytes: 40 * 1024 * 1024,
+  maxBytes: SKILL_TEXT_BYTES,
+  assetBytes: SKILL_ASSET_BYTES,
   imageBytes: 3_750_000,
   bodyChars: 200_000,
   fileReadChars: 40_000,
@@ -215,14 +218,17 @@ export interface SkillFileInput {
 
 /** A skill folder's files → the SKILL.md (found at the root, or under one top folder) and the rest. */
 export function splitSkillFolder(files: SkillFileInput[]) {
-  const normalized = files.map((f) => ({ ...f, path: safePath(f.path) }));
+  // Dropped before the top folder is found: a folder zipped by the Mac's Finder also holds `__MACOSX/<folder>/._*`.
+  const normalized = files
+    .map((f) => ({ ...f, path: safePath(f.path) }))
+    .filter((f) => !f.path.split("/").some((p) => (p.startsWith(".") && p !== ".") || p === "__MACOSX"));
   const firstSegments = new Set(normalized.map((f) => f.path.split("/")[0]));
   let root = "";
   if (!normalized.some((f) => f.path.toLowerCase() === "skill.md") && firstSegments.size === 1) {
     root = `${[...firstSegments][0]}/`;
   }
   const inRoot = normalized
-    .filter((f) => f.path.startsWith(root) && !f.path.split("/").some((p) => p.startsWith(".") && p !== "."))
+    .filter((f) => f.path.startsWith(root))
     .map((f) => ({ ...f, path: f.path.slice(root.length) }));
   const main = inRoot.find((f) => f.path.toLowerCase() === "skill.md");
   if (!main) throw new ValidationError("No SKILL.md at the top of the skill folder", "skill.no_skill_md_zip");
@@ -257,6 +263,8 @@ export interface SkillView {
   /** `person` or `agent` (promoted from an agent's how-tos, ADR 0120). */
   origin: "person" | "agent";
   ownerAgentId: string | null;
+  /** A personal skill's person; null: the team's. */
+  ownerUserId: string | null;
   locked: boolean;
   useCount: number;
   lastUsedAt: string | null;
@@ -330,6 +338,7 @@ const view = (s: SkillRow): SkillView => ({
   metadata: s.metadata,
   origin: s.origin === "agent" ? "agent" : "person",
   ownerAgentId: s.ownerAgentId,
+  ownerUserId: s.ownerUserId,
   locked: s.locked,
   useCount: s.useCount,
   lastUsedAt: s.lastUsedAt?.toISOString() ?? null,
@@ -435,6 +444,51 @@ export async function loadSkill(db: Database, orgId: string, id: string) {
   return s;
 }
 
+/** The skills of one owner: the team's (`null`), or one person's. Names are unique within each. */
+export const skillsOf = (owner: string | null): SQL =>
+  owner ? eq(skills.ownerUserId, owner) : isNull(skills.ownerUserId);
+
+/**
+ * Who may do what with a skill (the Vault's split, ADR 0144). A personal skill is its person's alone: only they read
+ * or change it. Who manages agents may remove it without reading it, and turn it off for an agent (`setAgentSkills`).
+ * A team skill: every member reads it, who manages agents changes and removes it.
+ */
+export function maySkill(s: Pick<SkillRow, "ownerUserId">, actorId: string, membership: Membership, act: SkillAct) {
+  if (s.ownerUserId) return s.ownerUserId === actorId || (act === "remove" && can(membership, "manage_agents"));
+  return act === "read" || can(membership, "manage_agents");
+}
+
+export type SkillAct = "read" | "change" | "remove";
+
+/** The skill, refused as `maySkill` says: someone else's personal skill reads as missing, so its name isn't told. */
+export async function skillFor(db: Database, actorId: string, orgId: string, id: string, act: SkillAct) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const s = await loadSkill(db, orgId, id);
+  if (maySkill(s, actorId, membership, act)) return s;
+  if (s.ownerUserId && s.ownerUserId !== actorId && act !== "remove") throw new NotFoundError("Skill not found");
+  throw new ForbiddenError("Only people who manage agents can change the team's skills");
+}
+
+/**
+ * Whether skills split into the team's and each person's here: a workspace of one person keeps one library, as
+ * before (its agents' skills stay the team's).
+ */
+export async function personalSkillsOn(db: Database, orgId: string) {
+  const rows = await db
+    .select({ userId: schema.organizationMembers.userId })
+    .from(schema.organizationMembers)
+    .where(eq(schema.organizationMembers.orgId, orgId))
+    .limit(2);
+  return rows.length > 1;
+}
+
+/**
+ * GitHub through the workspace's connections only for who manages agents: a personal install by anyone else reads
+ * public repositories alone, so a member can't copy a private repository of the workspace into a skill of their own.
+ */
+export const githubFor = (deps: SkillDeps, membership: Membership): SkillDeps =>
+  can(membership, "manage_agents") ? deps : { ...deps, github: undefined };
+
 const MB = 1024 * 1024;
 
 /**
@@ -526,8 +580,9 @@ async function storeFiles(
 }
 
 /**
- * Installs or updates a skill from parsed content (admins, `manage_agents`).
- * The same name again is a new version of that skill; every change is audited.
+ * Installs or updates a skill from parsed content: a team skill (`owner` null) by who manages agents, a personal one
+ * by its person. The same name again, among the same owner's, is a new version of that skill; every change is audited.
+ * A new personal skill goes on for its person's own agents (the Vault's "any agent I ask, for me").
  */
 export async function saveSkill(
   deps: SkillDeps,
@@ -537,22 +592,29 @@ export async function saveSkill(
     source: "upload" | "url" | "manual";
     sourceUrl?: string | null;
     sourceVia?: SkillVia | null;
+    /** Its link was read folder by folder (`skills.sourceByFolder`). */
+    sourceByFolder?: boolean;
     /** What its link held (`skillSourceHash`), read from it. */
     sourceHash?: string;
     files?: SkillFileInput[];
     defaultForNewAgents?: boolean;
+    /** A personal skill's person (only that person saves it); null or absent: the team's. */
+    owner?: string | null;
   },
 ): Promise<SkillDetail> {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+  const owner = input.owner ?? null;
+  if (owner && owner !== actorId) throw new ForbiddenError("Only its person changes a personal skill");
+  await requirePermission(deps.db, actorId, orgId, owner ? "read" : "manage_agents");
   validateSkill(input);
   const files = await planFiles(deps, orgId, input.files ?? []);
   const [existing] = await deps.db
     .select()
     .from(skills)
-    .where(and(eq(skills.orgId, orgId), eq(skills.slug, input.name)));
+    .where(and(eq(skills.orgId, orgId), eq(skills.slug, input.name), skillsOf(owner)));
   let row: SkillRow;
   if (existing) {
-    // Same name: a new version of that skill. A deleted one comes back (with its agents' assignments).
+    // Same name: a new version of that skill. A deleted one comes back with its agents' assignments, except from a link
+    // (a pick of one too): it may hold anything under that name, so it comes back on for none of its old agents.
     const [updated] = await deps.db
       .update(skills)
       .set({
@@ -563,10 +625,13 @@ export async function saveSkill(
         sourceUrl: input.sourceUrl ?? existing.sourceUrl,
         // A link read again says how it was read; an edit or an upload keeps what updating reads through.
         sourceVia: input.source === "url" ? (input.sourceVia ?? null) : existing.sourceVia,
+        sourceByFolder: input.source === "url" ? (input.sourceByFolder ?? false) : existing.sourceByFolder,
         ...(input.sourceHash ? { sourceHash: input.sourceHash } : {}),
         // Incremented in SQL (not from the value read above) so two concurrent saves take distinct versions.
         version: sql`${skills.version} + 1`,
-        ...(input.defaultForNewAgents !== undefined ? { defaultForNewAgents: input.defaultForNewAgents } : {}),
+        ...(input.defaultForNewAgents !== undefined && !owner
+          ? { defaultForNewAgents: input.defaultForNewAgents }
+          : {}),
         deletedAt: null,
         editedSinceSource: false,
         linkBase: null,
@@ -576,6 +641,8 @@ export async function saveSkill(
       .returning();
     if (!updated) throw new Error("skill update returned nothing");
     row = updated;
+    if (existing.deletedAt && input.source === "url")
+      await deps.db.update(agentSkills).set({ enabled: false }).where(eq(agentSkills.skillId, existing.id));
   } else {
     const [created] = await deps.db
       .insert(skills)
@@ -589,13 +656,33 @@ export async function saveSkill(
         source: input.source,
         sourceUrl: input.sourceUrl ?? null,
         sourceVia: input.sourceVia ?? null,
+        sourceByFolder: input.sourceByFolder ?? false,
         sourceHash: input.sourceHash ?? null,
-        defaultForNewAgents: input.defaultForNewAgents ?? false,
+        defaultForNewAgents: owner ? false : (input.defaultForNewAgents ?? false),
         createdByUserId: actorId,
+        ownerUserId: owner,
       })
       .returning();
     if (!created) throw new Error("skill insert returned nothing");
     row = created;
+    if (owner) {
+      const own = await deps.db
+        .select({ id: schema.agents.id })
+        .from(schema.agents)
+        .where(
+          and(
+            eq(schema.agents.orgId, orgId),
+            eq(schema.agents.ownerUserId, owner),
+            isNull(schema.agents.archivedAt),
+            isNull(schema.agents.deletedAt),
+          ),
+        );
+      if (own.length > 0)
+        await deps.db
+          .insert(agentSkills)
+          .values(own.map((a) => ({ orgId, agentId: a.id, skillId: created.id, enabled: true })))
+          .onConflictDoNothing();
+    }
   }
   await storeFiles(deps, row, row.version, files);
   await recordAudit(deps.db, {
@@ -609,22 +696,30 @@ export async function saveSkill(
       source: row.source,
       sourceUrl: row.sourceUrl,
       ...(row.sourceVia ? { sourceVia: row.sourceVia } : {}),
+      ...(owner ? { personal: true } : {}),
     },
   });
   return skillDetail(deps.db, row);
 }
 
-/** Import from a zip of the skill folder (`SKILL.md` + files). */
-export async function importSkillZip(deps: SkillDeps, actorId: string, orgId: string, zip: Uint8Array) {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
+/** Import from a zip of the skill folder (`SKILL.md` + files); `personal`: the actor's own skill. */
+export async function importSkillZip(
+  deps: SkillDeps,
+  actorId: string,
+  orgId: string,
+  zip: Uint8Array,
+  options: { personal?: boolean } = {},
+) {
+  await requirePermission(deps.db, actorId, orgId, options.personal ? "read" : "manage_agents");
   const entries = listZip(zip).filter((e) => !e.symlink);
   return saveSkill(deps, actorId, orgId, {
-    ...repositorySkill(
-      zip,
+    ...(await repositorySkill(
+      async (e) => inflateZipEntry(zip, e),
       "",
       entries.map((e) => [e.path, e]),
-    ),
+    )),
     source: "upload",
+    owner: options.personal ? actorId : null,
   });
 }
 
@@ -651,12 +746,15 @@ export interface GithubFetchOptions {
 /**
  * Minutes until GitHub stops limiting this server, or null when it isn't. GitHub answers 403 or 429 and says when
  * to retry in `retry-after` (seconds), else in `x-ratelimit-reset` once none remain, else "at least one minute"
- * (docs.github.com, "Rate limits for the REST API").
+ * (docs.github.com, "Rate limits for the REST API"). Without credentials this server shares its address with every
+ * other one, and GitHub's secondary limit can answer a bare 403: without a token any 403 is the limit. With a token a
+ * 403 means the token can't read it, which the caller decides.
  */
-function githubWaitMinutes(res: Response): number | null {
+function githubWaitMinutes(res: Response, authenticated: boolean): number | null {
   const retryAfter = Number(res.headers.get("retry-after"));
   const spent = res.headers.get("x-ratelimit-remaining") === "0";
-  if (res.status !== 429 && !(res.status === 403 && (spent || retryAfter > 0))) return null;
+  const refused = res.status === 403 && (!authenticated || spent || retryAfter > 0);
+  if (res.status !== 429 && !refused) return null;
   const reset = Number(res.headers.get("x-ratelimit-reset"));
   const seconds = retryAfter > 0 ? retryAfter : spent && reset > 0 ? reset - Date.now() / 1000 : 60;
   return Math.max(1, Math.ceil(seconds / 60));
@@ -686,7 +784,8 @@ async function githubGet(
     const at = await assertPublicHttpsUrl(next, deps.resolveHost);
     if (!GITHUB_HOSTS.has(at.hostname)) throw new ValidationError("Only GitHub URLs can be imported for now");
     const headers: Record<string, string> = { accept, "user-agent": "Ackwire AI" };
-    if (token && at.origin === GITHUB_API) headers.authorization = `Bearer ${token}`;
+    const authenticated = Boolean(token) && at.origin === GITHUB_API;
+    if (authenticated) headers.authorization = `Bearer ${token}`;
     const res = await http(at.toString(), {
       headers,
       redirect: redirects > 0 ? "manual" : "error",
@@ -700,7 +799,7 @@ async function githubGet(
       next = new URL(location, at).toString();
       continue;
     }
-    const minutes = githubWaitMinutes(res);
+    const minutes = githubWaitMinutes(res, authenticated);
     if (minutes !== null) {
       throw new TooManyError(`GitHub is limiting downloads for now. Try again in ${minutes} min.`, "github.limited", {
         count: minutes,
@@ -710,8 +809,12 @@ async function githubGet(
   }
 }
 
+/** GitHub answered 404: what the URL names is missing, or hidden from a request without credentials. */
+export class GithubMissingError extends ValidationError {}
+
 /** A success's body, refused past `maxBytes` while it streams (codeload sends no length). */
 async function githubBody(res: Response, at: URL, options: GithubFetchOptions) {
+  if (res.status === 404) throw new GithubMissingError(`GitHub answered 404 for ${at.pathname}`);
   if (!res.ok) throw new ValidationError(`GitHub answered ${res.status} for ${at.pathname}`);
   const tooLarge = () => new ValidationError(options.tooLarge, options.tooLargeCode, options.tooLargeParams);
   if (Number(res.headers.get("content-length") ?? 0) > options.maxBytes) throw tooLarge();
@@ -774,10 +877,13 @@ export function parseGithubUrl(url: string) {
 
 type GithubTarget = ReturnType<typeof parseGithubUrl>;
 
-/** A repository's archive is downloaded whole: past this size a link into it can't be read. */
+/** What reading a repository with the workspace's GitHub needs: no `github`, public repositories only. */
+export type GithubReadDeps = Pick<SkillDeps, "db" | "fetch" | "resolveHost" | "github">;
+
+/** A repository's archive is downloaded whole: past this size it isn't (a skill's link reads its folder instead). */
 const ARCHIVE: GithubFetchOptions = {
   maxBytes: 50 * 1024 * 1024,
-  tooLarge: "The repository is too large to download (max 50 MB). Upload the skill's folder as a .zip instead.",
+  tooLarge: "The repository is too large to download (max 50 MB).",
   tooLargeCode: "skill.repo_too_large",
   tooLargeParams: { max: 50 },
   // github.com redirects to codeload.github.com, and first to the new name of a renamed repository.
@@ -809,6 +915,12 @@ const refMissing = (target: GithubTarget) => {
   });
 };
 
+/** A repository's files by path from its root (symbolic links left out), and how one is read. */
+interface Repository<E extends { size: number }> {
+  files: Map<string, E>;
+  read(entry: E): Promise<Uint8Array>;
+}
+
 /** An archive's files by path from the repository's root, symbolic links left out. */
 function repositoryOf(zip: Uint8Array) {
   const files = new Map<string, ZipListing>();
@@ -817,10 +929,19 @@ function repositoryOf(zip: Uint8Array) {
     const slash = entry.path.indexOf("/");
     if (!entry.symlink && slash > 0) files.set(entry.path.slice(slash + 1), entry);
   }
-  return { zip, files };
+  return { zip, files, read: async (entry: ZipListing) => inflateZipEntry(zip, entry) };
 }
 
-type GithubRepository = ReturnType<typeof repositoryOf>;
+/** How a repository is read: without credentials (null when github.com hides it), or with one of the workspace's tokens. */
+interface RepositoryReader<R> {
+  open(deps: GithubReadDeps, target: GithubTarget): Promise<R | null>;
+  withToken(deps: GithubReadDeps, target: GithubTarget, token: string): Promise<R | null | "refused">;
+}
+
+const repositoryApi = (target: GithubTarget) =>
+  `${GITHUB_API}/repos/${encodePath(target.owner)}/${encodePath(target.repo)}`;
+const repositoryPage = (target: GithubTarget) => `https://github.com/${encodePath(`${target.owner}/${target.repo}`)}`;
+const GITHUB_JSON = "application/vnd.github+json";
 
 /**
  * The repository at the link's ref, from its zip archive (`github.com/{owner}/{repo}/archive/{ref}.zip`, served by
@@ -828,8 +949,8 @@ type GithubRepository = ReturnType<typeof repositoryOf>;
  * address (60 an hour) that every workspace's imports would spend. Null when github.com hides it (private, or
  * missing).
  */
-async function publicRepository(deps: SkillDeps, target: GithubTarget) {
-  const archive = `https://github.com/${encodePath(`${target.owner}/${target.repo}`)}/archive/${encodePath(target.ref)}.zip`;
+async function publicRepository(deps: GithubReadDeps, target: GithubTarget) {
+  const archive = `${repositoryPage(target)}/archive/${encodePath(target.ref)}.zip`;
   const { res, at } = await githubGet(deps, archive, "application/zip", ARCHIVE);
   if (res.status === 404) {
     await res.body?.cancel();
@@ -846,21 +967,159 @@ async function publicRepository(deps: SkillDeps, target: GithubTarget) {
  * `refused` when GitHub no longer takes it (401). The API answers 404 alike for a ref the repository lacks and for a
  * repository the token can't see: asking for the repository tells them apart.
  */
-async function tokenRepository(deps: SkillDeps, target: GithubTarget, token: string) {
-  const repo = `${GITHUB_API}/repos/${encodePath(target.owner)}/${encodePath(target.repo)}`;
+async function tokenRepository(deps: GithubReadDeps, target: GithubTarget, token: string) {
   const ref = target.ref === "HEAD" ? "" : `/${encodePath(target.ref)}`;
-  const { res, at } = await githubGet(deps, `${repo}/zipball${ref}`, "application/vnd.github+json", ARCHIVE, token);
-  if (res.ok) return repositoryOf(await githubBody(res, at, ARCHIVE));
+  return tokenRead(
+    deps,
+    target,
+    token,
+    `zipball${ref}`,
+    ARCHIVE,
+    async (res, at) => repositoryOf(await githubBody(res, at, ARCHIVE)),
+    target.ref === "HEAD"
+      ? undefined
+      : () => {
+          throw refMissing(target);
+        },
+  );
+}
+
+/**
+ * GET `path` under the repository's API with a token, `ok` reading its success. Null when the token works and can't
+ * read it (403, or 404), `refused` when GitHub no longer takes it (401). `seen`: what a 404 is when the token sees the
+ * repository (its ref or path is what is missing), asked only then.
+ */
+async function tokenRead<R>(
+  deps: GithubReadDeps,
+  target: GithubTarget,
+  token: string,
+  path: string,
+  options: GithubFetchOptions,
+  ok: (res: Response, at: URL) => Promise<R>,
+  seen?: () => R,
+): Promise<R | null | "refused"> {
+  const repo = repositoryApi(target);
+  const { res, at } = await githubGet(deps, `${repo}/${path}`, GITHUB_JSON, options, token);
+  if (res.ok) return ok(res, at);
   await res.body?.cancel();
-  if (res.status === 404 && target.ref !== "HEAD") {
-    const seen = await githubGet(deps, repo, "application/vnd.github+json", ARCHIVE, token);
-    await seen.res.body?.cancel();
-    if (seen.res.ok) throw refMissing(target);
+  if (res.status === 404 && seen) {
+    const shown = await githubGet(deps, repo, GITHUB_JSON, options, token);
+    await shown.res.body?.cancel();
+    if (shown.res.ok) return seen();
   }
-  if (res.status === 401) return "refused" as const;
+  if (res.status === 401) return "refused";
   if (res.status === 403 || res.status === 404) return null;
   throw new ValidationError(`GitHub answered ${res.status} for ${at.pathname}`);
 }
+
+const ARCHIVE_READER: RepositoryReader<ReturnType<typeof repositoryOf>> = {
+  open: publicRepository,
+  withToken: tokenRepository,
+};
+
+/** A file of a link's folder, from its tree: its path from the repository's root, size and blob. */
+interface FolderFile {
+  path: string;
+  size: number;
+  sha: string;
+}
+
+/** The tree of a link's folder: GitHub cuts one past 100,000 entries or 7 MB (`truncated`). */
+const FOLDER_TREE: GithubFetchOptions = {
+  maxBytes: 16 * MB,
+  tooLarge: "That link's folder holds too many files to read. Link the skill's own folder.",
+  tooLargeCode: "skill.link_too_large",
+  // The API, like github.com, redirects a renamed repository to its new name.
+  redirects: 3,
+  timeoutMs: 30_000,
+};
+
+/** One file of a link's folder: no file a skill keeps is larger. */
+const FOLDER_FILE: GithubFetchOptions = {
+  maxBytes: Math.max(SKILL_LIMITS.maxBytes, SKILL_LIMITS.assetBytes),
+  tooLarge: "A file of the skill is too large to download",
+  redirects: 3,
+  timeoutMs: 30_000,
+};
+
+/** `git/trees/{ref}:{folder}?recursive=1`: the link's folder alone, every file below it. */
+const folderTreePath = (target: GithubTarget, folder: string) =>
+  `git/trees/${encodeURIComponent(folder ? `${target.ref}:${folder}` : target.ref)}?recursive=1`;
+
+/** A folder's tree answer → its files (no symbolic links or submodules) by path from the repository's root. */
+async function folderFiles(res: Response, at: URL, folder: string) {
+  const body = await githubBody(res, at, FOLDER_TREE);
+  const tree = JSON.parse(new TextDecoder().decode(body)) as {
+    tree?: { path: string; mode: string; type: string; sha: string; size?: number }[];
+    truncated?: boolean;
+  };
+  if (tree.truncated) {
+    throw new ValidationError(FOLDER_TREE.tooLarge, FOLDER_TREE.tooLargeCode);
+  }
+  const prefix = folder ? `${folder}/` : "";
+  const files = new Map<string, FolderFile>();
+  for (const e of tree.tree ?? []) {
+    if (e.type !== "blob" || e.mode === "120000") continue;
+    files.set(prefix + e.path, { path: prefix + e.path, size: e.size ?? 0, sha: e.sha });
+  }
+  return files;
+}
+
+/**
+ * A link's folder read file by file: from raw.githubusercontent.com at the link's ref without a token, else each blob
+ * from the API with it (raw.githubusercontent.com takes no token of ours).
+ */
+function folderRepository(
+  deps: GithubReadDeps,
+  target: GithubTarget,
+  files: Map<string, FolderFile>,
+  token?: string,
+): Repository<FolderFile> {
+  const raw = `https://raw.githubusercontent.com/${encodePath(`${target.owner}/${target.repo}`)}/${encodePath(target.ref)}`;
+  return {
+    files,
+    read: async (file) => {
+      const { res, at } = token
+        ? await githubGet(
+            deps,
+            `${repositoryApi(target)}/git/blobs/${encodeURIComponent(file.sha)}`,
+            "application/vnd.github.raw+json",
+            FOLDER_FILE,
+            token,
+          )
+        : await githubGet(deps, `${raw}/${encodePath(file.path)}`, "*/*", FOLDER_FILE);
+      return githubBody(res, at, FOLDER_FILE);
+    },
+  };
+}
+
+/**
+ * A link's folder, read without its repository's archive: its tree (one API call, on the token's limit where there is
+ * one, else on the server's shared one), then only its files. A folder or ref the repository lacks reads as an empty
+ * folder.
+ */
+const folderReader = (folder: string): RepositoryReader<Repository<FolderFile>> => ({
+  open: async (deps, target) => {
+    const tree = `${repositoryApi(target)}/${folderTreePath(target, folder)}`;
+    const { res, at } = await githubGet(deps, tree, GITHUB_JSON, FOLDER_TREE);
+    if (res.status !== 404) return folderRepository(deps, target, await folderFiles(res, at, folder));
+    await res.body?.cancel();
+    // The API answers 404 alike for a private repository and for a folder it lacks: github.com's page tells them apart.
+    const page = await githubGet(deps, repositoryPage(target), "text/html", REPOSITORY_PAGE);
+    await page.res.body?.cancel();
+    return page.res.ok ? folderRepository(deps, target, new Map()) : null;
+  },
+  withToken: (deps, target, token) =>
+    tokenRead(
+      deps,
+      target,
+      token,
+      folderTreePath(target, folder),
+      FOLDER_TREE,
+      async (res, at) => folderRepository(deps, target, await folderFiles(res, at, folder), token),
+      () => folderRepository(deps, target, new Map(), token),
+    ),
+});
 
 /** An account or repository name as GitHub allows it, so building an API path from one never climbs out of it. */
 const GITHUB_NAME = /^(?!\.\.?$)[A-Za-z0-9_.-]{1,100}$/;
@@ -875,7 +1134,7 @@ const tokenSafe = (target: GithubTarget) =>
  * The GitHub App's token for the repository (only from an installation on its account bound to this workspace), and
  * whether GitHub left one of the requests for it unanswered (no answer, or a 5xx).
  */
-async function appToken(deps: SkillDeps, orgId: string, app: GitHubAppConfig, target: GithubTarget) {
+async function appToken(deps: GithubReadDeps, orgId: string, app: GitHubAppConfig, target: GithubTarget) {
   const seen = { unanswered: false };
   const send = deps.fetch ?? fetch;
   const http: GitHubHttp = {
@@ -905,20 +1164,50 @@ type GithubConnectionState = "none" | "refused" | "ok";
  * a skill installed before was read, tried first and with no read without credentials before it (the other
  * connection follows it, so a skill never stays stuck on one the workspace replaced).
  *
+ * A public read GitHub limits (the server's address is shared, and its 60 an hour run out) is not about the
+ * repository: the tokens are on a limit of their own and read it next, and when no token could be tried the limit is
+ * what the refusal says. What they read keeps no `via`: the limit says nothing about who may read the repository, and
+ * a public one must go on updating without the token.
+ *
  * None reads it: `github.unreachable` when GitHub left a token request unanswered, `skill.connection_gone` when the
  * workspace no longer has the connection `through` names, else `github.repo_missing` with the connection's state and
- * whether the GitHub App is installed on some account (`app`).
+ * whether the GitHub App is installed on some account (`app`). `reader`: what is read (its archive, or one folder).
  */
-async function readRepository(deps: SkillDeps, orgId: string, target: GithubTarget, through: SkillVia | null) {
-  const repo = `${target.owner}/${target.repo}`;
+async function readRepository<R>(
+  deps: GithubReadDeps,
+  orgId: string,
+  target: GithubTarget,
+  through: SkillVia | null,
+  reader: RepositoryReader<R>,
+) {
+  let limited: TooManyError | null = null;
   if (!through) {
-    const open = await publicRepository(deps, target);
-    if (open) return { ...open, via: null };
+    try {
+      const open = await reader.open(deps, target);
+      if (open) return { ...open, via: null };
+    } catch (err) {
+      if (!(err instanceof TooManyError) || err.code !== "github.limited") throw err;
+      limited = err;
+    }
   }
+  return workspaceRepository(deps, orgId, target, through, reader, limited);
+}
+
+/** The repository read with the workspace's tokens alone, as `readRepository` says: which one read it, or why none. */
+async function workspaceRepository<R>(
+  deps: GithubReadDeps,
+  orgId: string,
+  target: GithubTarget,
+  through: SkillVia | null,
+  reader: RepositoryReader<R>,
+  limited: TooManyError | null = null,
+) {
+  const repo = `${target.owner}/${target.repo}`;
   const github = deps.github;
   const connection = github && (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
   let state: GithubConnectionState = connection ? "ok" : "none";
   let unanswered = false;
+  let tried = false;
   if (github && tokenSafe(target)) {
     const order: SkillVia[] = through === "github" ? ["github", "github_app"] : ["github_app", "github"];
     for (const via of order) {
@@ -938,10 +1227,11 @@ async function readRepository(deps: SkillDeps, orgId: string, target: GithubTarg
         if (!token && !made.failed) state = "refused";
       }
       if (!token) continue;
-      const found = await tokenRepository(deps, target, token);
+      tried = true;
+      const found = await reader.withToken(deps, target, token);
       if (found === "refused") {
         if (via === "github") state = "refused";
-      } else if (found) return { ...found, via };
+      } else if (found) return { ...found, via: limited ? null : via };
     }
   }
   if (unanswered) throw unreachable();
@@ -954,6 +1244,9 @@ async function readRepository(deps: SkillDeps, orgId: string, target: GithubTarg
   if (gone) {
     throw new ValidationError(`The GitHub connection that read ${repo} is gone`, "skill.connection_gone", { repo });
   }
+  // No token was ever tried: whether the repository exists went unanswered, and the limit is what happened. A
+  // connection whose refresh was refused says the limit too: it passes, and the next try reads without credentials.
+  if (limited && !tried) throw limited;
   throw new ValidationError(`${repo} is private or doesn't exist on GitHub`, "github.repo_missing", {
     repo,
     connection: state,
@@ -962,10 +1255,41 @@ async function readRepository(deps: SkillDeps, orgId: string, target: GithubTarg
 }
 
 /**
+ * The repository a GitHub link points into, whole, and where in it the link points: public, else through the
+ * workspace's GitHub (`deps.github`), with `readRepository`'s refusals.
+ */
+export async function linkedRepository(deps: GithubReadDeps, orgId: string, url: string) {
+  const target = parseGithubUrl(url);
+  return { target, ...(await readRepository(deps, orgId, target, null, ARCHIVE_READER)) };
+}
+
+/** github.com's page of a repository: a renamed one redirects to its new name. */
+const REPOSITORY_PAGE: GithubFetchOptions = { maxBytes: 0, tooLarge: "", redirects: 3 };
+
+/**
+ * The repository of a link whose public read answered 404, read with the workspace's tokens: null when github.com
+ * shows the repository (the link's file, folder or ref is what is missing), else as `readRepository` reads a hidden
+ * one, with its refusals.
+ */
+export async function hiddenRepository(deps: GithubReadDeps, orgId: string, target: GithubTarget) {
+  const page = repositoryPage(target);
+  let limited: TooManyError | null = null;
+  try {
+    const { res } = await githubGet(deps, page, "text/html", REPOSITORY_PAGE);
+    await res.body?.cancel();
+    if (res.ok) return null;
+  } catch (err) {
+    if (!(err instanceof TooManyError) || err.code !== "github.limited") throw err;
+    limited = err;
+  }
+  return workspaceRepository(deps, orgId, target, null, ARCHIVE_READER, limited);
+}
+
+/**
  * The skill folders at or below `folder`, each with its SKILL.md, by path. A SKILL.md inside another skill's folder
  * is a file of that skill, not a skill of its own.
  */
-function skillFolders(files: GithubRepository["files"], folder: string) {
+function skillFolders<E>(files: ReadonlyMap<string, E>, folder: string) {
   const depth = (dir: string) => (dir ? dir.split("/").length : 0);
   const prefix = folder ? `${folder}/` : "";
   const found = [...files]
@@ -973,35 +1297,43 @@ function skillFolders(files: GithubRepository["files"], folder: string) {
     .map(([path, entry]) => [parentOf(path), entry] as const)
     .filter(([dir]) => depth(dir) - depth(folder) <= SKILL_SEARCH.depth)
     .sort(([a], [b]) => depth(a) - depth(b));
-  const skills = new Map<string, ZipListing>();
+  const skills = new Map<string, E>();
   for (const [dir, entry] of found) if (folderOf(skills, dir) === undefined) skills.set(dir, entry);
   return new Map([...skills].sort(([a], [b]) => (a < b ? -1 : 1)));
 }
 
 /**
- * A skill folder of a zip (`inside`: its files), within the limits by their declared sizes before anything is
- * inflated: binaries past `SKILL_LIMITS.assetBytes` are listed, never inflated.
+ * A skill folder (`inside`: its files), within the limits by their declared sizes before anything is read: binaries
+ * past `SKILL_LIMITS.assetBytes` are listed, never read.
  */
-function repositorySkill(zip: Uint8Array, dir: string, inside: [string, ZipListing][]) {
+async function repositorySkill<E extends { size: number }>(
+  read: (entry: E) => Promise<Uint8Array>,
+  dir: string,
+  inside: [string, E][],
+) {
   const prefix = dir ? `${dir}/` : "";
   const listed = inside.map(([path, entry]) => ({ path: path.slice(prefix.length), size: entry.size, entry }));
   assertSkillSize(listed);
   const kept = keptBinaries(listed);
-  const { skillMd, files } = splitSkillFolder(
-    listed.map(({ path, size, entry }) =>
-      classifyFile(path).kind === "binary" && !kept.has(path)
-        ? { path, data: new Uint8Array(), skippedSize: size }
-        : { path, data: inflateZipEntry(zip, entry) },
-    ),
+  const loaded = await mapInBatches(listed, BLOB_BATCH, async ({ path, size, entry }) =>
+    classifyFile(path).kind === "binary" && !kept.has(path)
+      ? { path, data: new Uint8Array(), skippedSize: size }
+      : { path, data: await read(entry) },
   );
+  const { skillMd, files } = splitSkillFolder(loaded);
   return { ...parseSkillMarkdown(skillMd), files };
 }
 
-/** A skill a GitHub link holds, offered to pick when it holds several. `path`: its folder from the repository's root. */
+/**
+ * A skill a GitHub link holds, offered to pick when it holds several. `path`: its folder from the repository's root.
+ * `replaces`: a skill of this name is installed (it becomes a new version of it, for every agent that has it) or was
+ * removed (it comes back on for none of its old agents).
+ */
 export interface SkillChoice {
   path: string;
   name: string;
   description: string;
+  replaces?: "installed" | "removed";
 }
 
 /** A skill a GitHub link holds that can't be installed, with the refusal: its code, English text and params. */
@@ -1012,14 +1344,45 @@ export interface SkillSkipped {
   params?: ErrorParams;
 }
 
+/** A skill link's repository, how it was read, and whether folder by folder. */
+type LinkRepository = Repository<{ size: number }> & { via: SkillVia | null; byFolder: boolean };
+
+/**
+ * The repository a skill's link points into: from its archive, else only the link's folder (`folderReader`) when the
+ * archive is past its cap or `byFolder` (read so before, so the archive isn't downloaded again to be refused).
+ */
+async function linkRepository(
+  deps: SkillDeps,
+  orgId: string,
+  target: GithubTarget,
+  folder: string,
+  through: SkillVia | null,
+  byFolder: boolean,
+): Promise<LinkRepository> {
+  if (!byFolder) {
+    try {
+      return { ...(await readRepository(deps, orgId, target, through, ARCHIVE_READER)), byFolder: false };
+    } catch (err) {
+      if (!(err instanceof ValidationError) || err.code !== ARCHIVE.tooLargeCode) throw err;
+    }
+  }
+  return { ...(await readRepository(deps, orgId, target, through, folderReader(folder))), byFolder: true };
+}
+
 /**
  * What a GitHub link holds: the repository, how it was read, and the skill folders at or below the link (a file's:
  * its folder's).
  */
-async function readGithubLink(deps: SkillDeps, orgId: string, url: string, through: SkillVia | null = null) {
+async function readGithubLink(
+  deps: SkillDeps,
+  orgId: string,
+  url: string,
+  through: SkillVia | null = null,
+  byFolder = false,
+) {
   const target = parseGithubUrl(url);
-  const repository = await readRepository(deps, orgId, target, through);
   const folder = target.kind === "file" ? parentOf(target.path) : target.path;
+  const repository = await linkRepository(deps, orgId, target, folder, through, byFolder);
   const folders = skillFolders(repository.files, folder);
   const repo = `${target.owner}/${target.repo}`;
   if (folders.size === 0) {
@@ -1033,7 +1396,8 @@ async function readGithubLink(deps: SkillDeps, orgId: string, url: string, throu
       { max: SKILL_SEARCH.max },
     );
   }
-  const found = new Map([...folders].map(([dir, skillMd]) => [dir, { skillMd, files: [] as [string, ZipListing][] }]));
+  type Entry = { size: number };
+  const found = new Map([...folders].map(([dir, skillMd]) => [dir, { skillMd, files: [] as [string, Entry][] }]));
   // Every skill's files in one pass: no skill folder holds another.
   for (const file of repository.files) {
     const dir = folderOf(found, parentOf(file[0]));
@@ -1047,11 +1411,11 @@ async function readGithubLink(deps: SkillDeps, orgId: string, url: string, throu
     return skill;
   };
   /** The skill at `dir` from its SKILL.md alone, refused as installing it would be for its limits or its text. */
-  const about = (dir: string) =>
-    parseSkillMarkdown(new TextDecoder().decode(inflateZipEntry(repository.zip, skillIn(dir).skillMd)));
+  const about = async (dir: string) =>
+    parseSkillMarkdown(new TextDecoder().decode(await repository.read(skillIn(dir).skillMd)));
   /** The skill at `dir`, ready to save: from the link itself when it points at the skill, else from its folder. */
-  const skillAt = (dir: string) => {
-    const skill = repositorySkill(repository.zip, dir, skillIn(dir).files);
+  const skillAt = async (dir: string) => {
+    const skill = await repositorySkill(repository.read, dir, skillIn(dir).files);
     return {
       ...skill,
       sourceHash: skillSourceHash(skill),
@@ -1061,6 +1425,7 @@ async function readGithubLink(deps: SkillDeps, orgId: string, url: string, throu
           ? url
           : `https://github.com/${encodePath(repo)}/tree/${encodePath(target.ref)}/${encodePath(dir)}`,
       sourceVia: repository.via,
+      sourceByFolder: repository.byFolder,
     };
   };
   return { found, about, skillAt, via: repository.via };
@@ -1077,34 +1442,46 @@ export interface SkillPick {
 }
 
 /**
- * Import from a GitHub link, read by the backend from the repository's archive (only GitHub hosts, the SSRF guard
- * on every request, within `SKILL_LIMITS`): the skill
+ * Import from a GitHub link, read by the backend from the repository's archive or, past its cap, from the link's
+ * folder alone (only GitHub hosts, the SSRF guard on every request, within `SKILL_LIMITS`): the skill
  * folder it points at (a file's folder), or the one skill below it. A link that holds several answers with them to
  * pick from (`importPickedSkills`), nothing installed, and with those that can't be installed (past the limits, or a
  * SKILL.md that doesn't parse) apart, each with why; `list` answers so for one skill too. Installing a skill whose
  * name is already installed makes a new version. A private repository is read through the workspace's GitHub (the
  * GitHub App, else the connection): installing skills (`manage_agents`) is what lets a person read through it.
  * `through`: that connection first, with no read without credentials (a skill updated from the link it came from).
+ * `byFolder`: read its folder alone at once (`skills.sourceByFolder`).
+ * `forAgentId`: the agent whose card opened the install (`turnOnFor`). `personal`: the actor's own skill, which any
+ * member installs, from a public repository unless they manage agents (`githubFor`).
  */
 export async function importSkillFromUrl(
   deps: SkillDeps,
   actorId: string,
   orgId: string,
   url: string,
-  options: { list?: boolean; through?: SkillVia | null } = {},
+  options: {
+    list?: boolean;
+    through?: SkillVia | null;
+    byFolder?: boolean;
+    forAgentId?: string;
+    personal?: boolean;
+  } = {},
 ): Promise<SkillDetail | SkillPick> {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const link = await readGithubLink(deps, orgId, url, options.through);
+  const membership = await requirePermission(deps.db, actorId, orgId, options.personal ? "read" : "manage_agents");
+  const owner = options.personal ? actorId : null;
+  const link = await readGithubLink(githubFor(deps, membership), orgId, url, options.through, options.byFolder);
   const [only, ...more] = link.found.keys();
   if (!options.list && only !== undefined && more.length === 0) {
-    return saveSkill(deps, actorId, orgId, link.skillAt(only));
+    const skill = await saveSkill(deps, actorId, orgId, { ...(await link.skillAt(only)), owner });
+    await turnOnFor(deps, actorId, orgId, options.forAgentId, [skill.id]);
+    return skill;
   }
   const choices: SkillChoice[] = [];
   const skipped: SkillSkipped[] = [];
   let refused: unknown;
   for (const path of link.found.keys()) {
     try {
-      const { name, description } = link.about(path);
+      const { name, description } = await link.about(path);
       choices.push({ path, name, description });
     } catch (err) {
       if (!(err instanceof ValidationError)) throw err;
@@ -1113,7 +1490,49 @@ export async function importSkillFromUrl(
     }
   }
   if (choices.length === 0) throw refused;
+  const same = await deps.db
+    .select({ slug: skills.slug, deletedAt: skills.deletedAt })
+    .from(skills)
+    .where(
+      and(
+        eq(skills.orgId, orgId),
+        skillsOf(owner),
+        inArray(
+          skills.slug,
+          choices.map((c) => c.name),
+        ),
+      ),
+    );
+  for (const c of choices) {
+    const hit = same.find((k) => k.slug === c.name);
+    if (hit) c.replaces = hit.deletedAt ? "removed" : "installed";
+  }
   return { choices, ...(skipped.length > 0 ? { skipped } : {}), ...(link.via ? { via: link.via } : {}) };
+}
+
+/**
+ * Skills installed from an agent's card (`offer_install_skill`), the installer's box checked, go on for that agent when
+ * the installer may change its skills, as on its page. Not for an agent archived or gone: the install still stands,
+ * and an agent asks for them on its own settings card.
+ */
+async function turnOnFor(deps: SkillDeps, actorId: string, orgId: string, agentId: string | undefined, ids: string[]) {
+  if (!agentId || ids.length === 0) return;
+  const agent = await getAgent(deps.db, orgId, agentId);
+  if (!agent || agent.archivedAt) return;
+  try {
+    await setAgentSkills(
+      deps.db,
+      actorId,
+      orgId,
+      agentId,
+      ids.map((skillId) => ({ skillId, enabled: true })),
+    );
+  } catch (error) {
+    if (error instanceof ForbiddenError) return;
+    throw error;
+  }
+  // An open agent page saves its whole list: it reads the new one first.
+  await publishAgentsChanged(deps.pubsub, orgId);
 }
 
 /** Installs the skills picked among a link's choices (`paths`, as `importSkillFromUrl` gave them). */
@@ -1123,13 +1542,14 @@ export async function importPickedSkills(
   orgId: string,
   url: string,
   paths: string[],
+  options: { forAgentId?: string; personal?: boolean } = {},
 ) {
-  await requirePermission(deps.db, actorId, orgId, "manage_agents");
-  const link = await readGithubLink(deps, orgId, url);
+  const membership = await requirePermission(deps.db, actorId, orgId, options.personal ? "read" : "manage_agents");
+  const link = await readGithubLink(githubFor(deps, membership), orgId, url);
   /** A refusal names the skill's folder. */
-  const named = <T>(dir: string, read: () => T) => {
+  const named = async <T>(dir: string, read: () => Promise<T>) => {
     try {
-      return read();
+      return await read();
     } catch (err) {
       if (err instanceof ValidationError) throw new ValidationError(`${dir}: ${err.message}`, err.code, err.params);
       throw err;
@@ -1138,23 +1558,29 @@ export async function importPickedSkills(
   const dirs = [...new Set(paths)];
   // Every pick's limits and text are checked before any is saved, by the SKILL.md alone: its files are inflated one
   // skill at a time, since a small archive can declare the most a skill keeps for each of the 100 it may hold.
-  const names = dirs.map((dir) => {
+  const names: string[] = [];
+  for (const dir of dirs) {
     if (!link.found.has(dir)) throw new ValidationError(`That link holds no skill at ${dir}`);
-    return named(dir, () => link.about(dir).name);
-  });
+    names.push((await named(dir, () => link.about(dir))).name);
+  }
   const twin = names.find((name, i) => names.indexOf(name) !== i);
   if (twin) throw new ValidationError(`Two of the skills picked are named ${twin}. Pick one of them.`);
   const installed: SkillDetail[] = [];
   for (const dir of dirs) {
     installed.push(
-      await saveSkill(
-        deps,
-        actorId,
-        orgId,
-        named(dir, () => link.skillAt(dir)),
-      ),
+      await saveSkill(deps, actorId, orgId, {
+        ...(await named(dir, () => link.skillAt(dir))),
+        owner: options.personal ? actorId : null,
+      }),
     );
   }
+  await turnOnFor(
+    deps,
+    actorId,
+    orgId,
+    options.forAgentId,
+    installed.map((k) => k.id),
+  );
   return installed;
 }
 
@@ -1186,7 +1612,7 @@ export function runsCode(path: string) {
  */
 export async function readSkillSource(deps: SkillDeps, s: SkillRow) {
   if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a link", "skill.no_link");
-  const link = await readGithubLink(deps, s.orgId, s.sourceUrl, s.sourceVia as SkillVia | null);
+  const link = await readGithubLink(deps, s.orgId, s.sourceUrl, s.sourceVia as SkillVia | null, s.sourceByFolder);
   const [only, ...more] = link.found.keys();
   if (only === undefined || more.length > 0) {
     throw new ValidationError(
@@ -1194,7 +1620,7 @@ export async function readSkillSource(deps: SkillDeps, s: SkillRow) {
       "skill.link_holds_several",
     );
   }
-  const skill = link.skillAt(only);
+  const skill = await link.skillAt(only);
   if (skill.name !== s.name) {
     throw new ValidationError(`Its link holds the skill ${skill.name} now`, "skill.link_renamed", { name: skill.name });
   }
@@ -1207,22 +1633,37 @@ export async function readSkillSource(deps: SkillDeps, s: SkillRow) {
  * workspace no longer has the first and the other can't read it).
  */
 export async function reimportSkill(deps: SkillDeps, actorId: string, orgId: string, id: string) {
-  const s = await loadSkill(deps.db, orgId, id);
+  const s = await skillFor(deps.db, actorId, orgId, id, "change");
   if (!s.sourceUrl) throw new ValidationError("This skill wasn't imported from a URL");
   const through = s.sourceVia as SkillVia | null;
-  const again = await importSkillFromUrl(deps, actorId, orgId, s.sourceUrl, { through });
+  const again = await importSkillFromUrl(deps, actorId, orgId, s.sourceUrl, {
+    through,
+    byFolder: s.sourceByFolder,
+    personal: s.ownerUserId !== null,
+  });
   if ("choices" in again) {
     throw new ValidationError("Its link holds several skills now. Install this one again from its own folder.");
   }
   return again;
 }
 
-export async function listSkills(db: Database, actorId: string, orgId: string) {
-  await requirePermission(db, actorId, orgId, "read");
+/**
+ * The team's skills and the actor's own personal ones. `others`: also everyone else's personal skills, for who manages
+ * agents (Skills' "Pessoais de outras pessoas"), with only their name, person and agents (`othersView`).
+ */
+export async function listSkills(db: Database, actorId: string, orgId: string, options: { others?: boolean } = {}) {
+  const membership = await requirePermission(db, actorId, orgId, "read");
+  const others = options.others === true && can(membership, "manage_agents");
   const rows = await db
     .select()
     .from(skills)
-    .where(and(eq(skills.orgId, orgId), isNull(skills.deletedAt)))
+    .where(
+      and(
+        eq(skills.orgId, orgId),
+        isNull(skills.deletedAt),
+        others ? undefined : or(isNull(skills.ownerUserId), eq(skills.ownerUserId, actorId)),
+      ),
+    )
     .orderBy(asc(skills.name));
   const counts = await db
     .select({ skillId: agentSkills.skillId, n: sql<number>`count(*)::int` })
@@ -1232,12 +1673,18 @@ export async function listSkills(db: Database, actorId: string, orgId: string) {
     .groupBy(agentSkills.skillId);
   const byId = new Map(counts.map((c) => [c.skillId, Number(c.n)]));
   /** How many active agents have each skill on. */
-  return rows.map((r) => ({ ...view(r), agentsCount: byId.get(r.id) ?? 0 }));
+  return rows.map((r) => ({ ...othersView(r, actorId), agentsCount: byId.get(r.id) ?? 0 }));
+}
+
+/** A skill as `actorId` may see it: someone else's personal skill shows its name and person only, never its text. */
+function othersView(s: SkillRow, actorId: string): SkillView {
+  const v = view(s);
+  if (!s.ownerUserId || s.ownerUserId === actorId) return v;
+  return { ...v, description: "", sourceUrl: null, sourceVia: null, metadata: {}, pendingUpdate: null };
 }
 
 export async function getSkill(db: Database, actorId: string, orgId: string, id: string): Promise<SkillDetail> {
-  await requirePermission(db, actorId, orgId, "read");
-  return skillDetail(db, await loadSkill(db, orgId, id));
+  return skillDetail(db, await skillFor(db, actorId, orgId, id, "read"));
 }
 
 /** Edits by hand (a new version); renaming isn't allowed (the name is the skill's identity). */
@@ -1248,9 +1695,9 @@ export async function updateSkill(
   id: string,
   input: { description?: string; body?: string; defaultForNewAgents?: boolean },
 ) {
-  const s = await loadSkill(deps.db, orgId, id);
+  const s = await skillFor(deps.db, actorId, orgId, id, "change");
   if (input.description === undefined && input.body === undefined && input.defaultForNewAgents !== undefined) {
-    await requirePermission(deps.db, actorId, orgId, "manage_agents");
+    if (s.ownerUserId) throw new ValidationError("A personal skill goes on for its person's agents only");
     await deps.db
       .update(skills)
       .set({ defaultForNewAgents: input.defaultForNewAgents, updatedAt: new Date() })
@@ -1265,13 +1712,14 @@ export async function updateSkill(
     source: "manual",
     sourceUrl: s.sourceUrl,
     defaultForNewAgents: input.defaultForNewAgents,
+    owner: s.ownerUserId,
   });
 }
 
 export async function deleteSkill(db: Database, actorId: string, orgId: string, id: string) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
-  const s = await loadSkill(db, orgId, id);
-  // Soft delete: agents stop seeing it at once; their assignments come back if the skill is installed again.
+  const s = await skillFor(db, actorId, orgId, id, "remove");
+  // Soft delete: agents stop seeing it at once. Their assignments come back when it is restored or saved again under
+  // its name, except by an install from a link (`saveSkill`).
   await db.update(skills).set({ deletedAt: new Date() }).where(eq(skills.id, s.id));
   await recordAudit(db, {
     orgId,
@@ -1399,8 +1847,7 @@ export async function setSkillAgentsImprove(
   id: string,
   on: boolean | null,
 ) {
-  await requirePermission(db, actorId, orgId, "manage_agents");
-  const s = await loadSkill(db, orgId, id);
+  const s = await skillFor(db, actorId, orgId, id, "change");
   const [row] = await db.update(skills).set({ agentsImprove: on }).where(eq(skills.id, s.id)).returning();
   await recordAudit(db, {
     orgId,
@@ -1421,7 +1868,10 @@ async function mayChangeAgentSkill(db: Database, actorId: string, orgId: string,
 }
 
 export async function requireAgentSkillChange(db: Database, actorId: string, orgId: string, s: SkillRow) {
-  if (s.origin !== "agent") await requirePermission(db, actorId, orgId, "manage_agents");
+  if (s.ownerUserId) {
+    await requirePermission(db, actorId, orgId, "read");
+    if (s.ownerUserId !== actorId) throw new NotFoundError("Skill not found");
+  } else if (s.origin !== "agent") await requirePermission(db, actorId, orgId, "manage_agents");
   else if (!(await mayChangeAgentSkill(db, actorId, orgId, s.ownerAgentId)))
     throw new ForbiddenError("Only the agent's owner or an admin can change this");
 }
@@ -1477,7 +1927,14 @@ export async function agentMadeSkills(db: Database, actorId: string, orgId: stri
   const rows = await db
     .select()
     .from(skills)
-    .where(and(eq(skills.orgId, orgId), eq(skills.origin, "agent"), eq(skills.ownerAgentId, agentId)))
+    .where(
+      and(
+        eq(skills.orgId, orgId),
+        eq(skills.origin, "agent"),
+        eq(skills.ownerAgentId, agentId),
+        or(isNull(skills.ownerUserId), eq(skills.ownerUserId, actorId)),
+      ),
+    )
     .orderBy(sql`${skills.createdAt} desc`);
   // Each skill's latest change of its own not undone: Desfazer only while the body is still what it left.
   const changes = rows.length
@@ -1521,19 +1978,24 @@ export async function agentMadeSkills(db: Database, actorId: string, orgId: stri
   }));
 }
 
-/** The org's skills with whether this agent has each one on. */
+/**
+ * The skills the actor sees with whether this agent has each one on, and someone else's personal skill while it is on
+ * for this agent (name and person only), so who manages agents can turn it off.
+ */
 export async function agentSkillList(db: Database, actorId: string, orgId: string, agentId: string) {
   await requirePermission(db, actorId, orgId, "read");
   if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
   const [all, mine] = await Promise.all([
-    listSkills(db, actorId, orgId),
+    listSkills(db, actorId, orgId, { others: true }),
     db
       .select()
       .from(agentSkills)
       .where(and(eq(agentSkills.orgId, orgId), eq(agentSkills.agentId, agentId))),
   ]);
   const on = new Map(mine.map((m) => [m.skillId, m.enabled]));
-  return all.map((s) => ({ ...s, enabled: on.get(s.id) ?? false }));
+  return all
+    .map((s) => ({ ...s, enabled: on.get(s.id) ?? false }))
+    .filter((s) => !s.ownerUserId || s.ownerUserId === actorId || s.enabled);
 }
 
 /** Turns skills on or off for an agent (admins or its owner). */
@@ -1553,10 +2015,15 @@ export async function setAgentSkills(
   const ids = [...new Set(input.map((i) => i.skillId))];
   if (ids.length > 0) {
     const found = await db
-      .select({ id: skills.id })
+      .select({ id: skills.id, ownerUserId: skills.ownerUserId, enabled: agentSkills.enabled })
       .from(skills)
+      .leftJoin(agentSkills, and(eq(agentSkills.skillId, skills.id), eq(agentSkills.agentId, agentId)))
       .where(and(eq(skills.orgId, orgId), inArray(skills.id, ids), isNull(skills.deletedAt)));
     if (found.length !== ids.length) throw new ValidationError("Every skill must belong to this organization");
+    // Someone else's personal skill may be turned off here, never on: only its person gives it to an agent.
+    const others = new Map(found.filter((f) => f.ownerUserId && f.ownerUserId !== actorId).map((f) => [f.id, f]));
+    if (input.some((i) => i.enabled && others.has(i.skillId) && others.get(i.skillId)?.enabled !== true))
+      throw new ForbiddenError("Only its person turns a personal skill on for an agent");
   }
   for (const i of input) {
     await db
@@ -1574,10 +2041,35 @@ export async function setAgentSkills(
   return agentSkillList(db, actorId, orgId, agentId);
 }
 
-/** The agent's enabled skills (name and description only: the body loads on demand). */
-export async function enabledSkills(db: Database, orgId: string, agentId: string) {
-  return db
-    .select({ id: skills.id, name: skills.name, description: skills.description, version: skills.version })
+/**
+ * Of skills on for an agent, those a run may use: the team's, and the personal skills of the person behind it (the
+ * Vault's person of a run, ADR 0144), whose own wins over a team skill of the same name. The person is looked up only
+ * when a personal skill is among them. No run (`runId` absent): the team's alone.
+ */
+async function usableInRun<T extends { name: string; ownerUserId: string | null }>(
+  db: Database,
+  run: { orgId: string; agentId: string; runId?: string | null },
+  rows: T[],
+): Promise<T[]> {
+  if (!rows.some((r) => r.ownerUserId)) return rows;
+  const person = run.runId
+    ? (await vaultPersonOfRun(db, { orgId: run.orgId, agentId: run.agentId, runId: run.runId })).personId
+    : null;
+  const usable = rows.filter((r) => !r.ownerUserId || r.ownerUserId === person);
+  const personal = new Set(usable.filter((r) => r.ownerUserId).map((r) => r.name));
+  return usable.filter((r) => r.ownerUserId || !personal.has(r.name));
+}
+
+/** The agent's enabled skills a run may use (name and description only: the body loads on demand). */
+export async function enabledSkills(db: Database, orgId: string, agentId: string, runId?: string | null) {
+  const rows = await db
+    .select({
+      id: skills.id,
+      name: skills.name,
+      description: skills.description,
+      version: skills.version,
+      ownerUserId: skills.ownerUserId,
+    })
     .from(agentSkills)
     .innerJoin(skills, eq(skills.id, agentSkills.skillId))
     .where(
@@ -1590,11 +2082,18 @@ export async function enabledSkills(db: Database, orgId: string, agentId: string
       ),
     )
     .orderBy(asc(skills.name));
+  return (await usableInRun(db, { orgId, agentId, runId }, rows)).map(({ ownerUserId: _o, ...s }) => s);
 }
 
-/** A skill this agent has on, by name, with its files (for `load_skill` / `read_skill_file`). */
-export async function agentSkillByName(db: Database, orgId: string, agentId: string, name: string) {
-  const [row] = await db
+/** A skill this agent has on and the run may use (`usableInRun`), by name (for `load_skill` / `read_skill_file`). */
+export async function agentSkillByName(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  name: string,
+  runId?: string | null,
+) {
+  const rows = await db
     .select({ skill: skills })
     .from(agentSkills)
     .innerJoin(skills, eq(skills.id, agentSkills.skillId))
@@ -1608,7 +2107,12 @@ export async function agentSkillByName(db: Database, orgId: string, agentId: str
         isNull(skills.deletedAt),
       ),
     );
-  return row?.skill ?? null;
+  const [usable] = await usableInRun(
+    db,
+    { orgId, agentId, runId },
+    rows.map((r) => r.skill),
+  );
+  return usable ?? null;
 }
 
 /**
@@ -1669,8 +2173,7 @@ export async function getSkillFile(
   path: string,
   version?: number,
 ) {
-  await requirePermission(deps.db, actorId, orgId, "read");
-  const s = await loadSkill(deps.db, orgId, skillId);
+  const s = await skillFor(deps.db, actorId, orgId, skillId, "read");
   const text = await skillFileText(deps, s, path, version ?? s.version);
   const { mime } = classifyFile(path);
   return { path, version: version ?? s.version, mime, content: text };

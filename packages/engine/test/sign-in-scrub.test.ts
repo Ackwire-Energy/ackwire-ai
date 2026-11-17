@@ -42,3 +42,19 @@ test("plain words about sign-ins stay as they are", () => {
     expect(scrubSignIns(text, NOTE)).toEqual({ text, found: 0 });
   }
 });
+
+test("scrubbed twice it reads the same, and a value that only starts like the note is still scrubbed", () => {
+  const note = "[removed: it looked like a sign-in or a key]";
+  const once = scrubSignIns('{"refresh_token": "abcdefgh12345678"} and id_token=abcdefgh12345678', note);
+  expect(once.found).toBe(2);
+  expect(scrubSignIns(once.text, note)).toEqual({ text: once.text, found: 0 });
+  // The note in front of a real value hides nothing.
+  for (const [text, mark] of [
+    ["api_key=••••abcdefgh12345678", "••••"],
+    ["refresh_token=[removed]abcdefgh12345678", NOTE],
+  ] as const) {
+    const out = scrubSignIns(text, mark);
+    expect(out.text).not.toContain("abcdefgh12345678");
+    expect(out.found).toBe(1);
+  }
+});

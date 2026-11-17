@@ -702,6 +702,36 @@ test("a widget's page: its board, whether the person edits it, and its latest up
   expect(await codeOf(hidden)).toBe("widget.not_found");
 });
 
+test("an agent with no AI builds nothing: the widget waits for one, and Update now says why", async () => {
+  const s = await start();
+  const sales = await s.newBoard(s.owner, { title: "Sales" });
+  await t.db.update(schema.providerCredentials).set({ revokedAt: new Date() });
+  const widget = await s.newWidget(s.owner, sales.id);
+  expect(widget).toMatchObject({ status: "failed", failure: { code: "missing_credential", detail: "no_key" } });
+  const refused = await s.api(s.owner, `/widgets/${widget.id}/refresh`, { json: {} });
+  expect(refused.status).toBe(409);
+  expect(((await refused.json()) as { error: { code: string; params: unknown } }).error).toMatchObject({
+    code: "widget.needs_ai",
+    params: { agentName: "Dev" },
+  });
+  expect(await t.db.select().from(schema.routineRuns)).toEqual([]);
+  // With its key back, the apps' own build (nobody pressed for it) builds it.
+  await t.db.update(schema.providerCredentials).set({ revokedAt: null });
+  const auto = { json: { auto: true } };
+  const building = await read<Widget>(await s.api(s.owner, `/widgets/${widget.id}/refresh`, auto));
+  expect(building.status).toBe("building");
+  // Its build ran to its end: it no longer waits for an AI, so another one changes nothing.
+  await t.drain();
+  const [built] = await t.db.select().from(schema.routineRuns);
+  expect(built?.finishedAt).not.toBeNull();
+  const [after] = await t.db.select().from(schema.dashboardWidgets).where(eq(schema.dashboardWidgets.id, widget.id));
+  expect(after?.failureCode).not.toBe("missing_credential");
+  expect((await read<Widget>(await s.api(s.owner, `/widgets/${widget.id}/refresh`, auto))).status).toBe(
+    after?.status ?? "",
+  );
+  expect(await t.db.select().from(schema.routineRuns)).toHaveLength(1);
+});
+
 test("Update now, Ask for a change, change, move and remove a widget: its board's editors only", async () => {
   const s = await start();
   const sales = await s.newBoard(s.owner, { title: "Sales" });

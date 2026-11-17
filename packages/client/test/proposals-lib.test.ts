@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { en } from "@agenteschat/i18n";
 import type { TFunction } from "i18next";
 import type { Proposal } from "../src/api/types";
 import {
   appLabel,
+  cardDecidedBy,
   cardHead,
   cardOutcome,
   cardProposalIds,
@@ -125,6 +127,40 @@ describe("a name and a look on a settings card", () => {
     expect(onlyKey({ settings: [{ field: "reports_to", from: null, to: "a-bea" }] })).toBe(
       "rightHand.card.only.reports_to",
     );
+  });
+  test("a department reads by its name, or none, and only admins move an agent", () => {
+    expect(settingLineText(t, "pt-BR", { field: "group", from: "Operações", to: "Vendas" }, names)).toEqual({
+      field: "rightHand.field.group",
+      from: "Operações",
+      to: "Vendas",
+    });
+    expect(settingLineText(t, "pt-BR", { field: "group", from: "Vendas", to: null }, names)).toEqual({
+      field: "rightHand.field.group",
+      from: "Vendas",
+      to: "rightHand.value.none",
+    });
+    expect(onlyKey({ settings: [{ field: "group", from: "Vendas", to: null }] })).toBe("rightHand.card.only.group");
+  });
+});
+
+describe("a skill line on a settings card", () => {
+  const names = { model: (id: string) => id, person: () => undefined, channel: () => undefined, role: () => undefined };
+  test("reads as the skill by its name, off to on, and only admins change it, as on the agent's page", () => {
+    expect(
+      settingLineText(
+        t,
+        "pt-BR",
+        { field: "skill", skillId: "s-excel", from: false, to: true, label: { to: "excel" } },
+        names,
+      ),
+    ).toEqual({
+      field: 'rightHand.field.skill {"name":"excel"}',
+      from: "rightHand.value.skillOff",
+      to: "rightHand.value.skillOn",
+    });
+    const key = onlyKey({ settings: [{ field: "skill", skillId: "s-excel", from: true, to: false }] });
+    expect(key).toBe("rightHand.card.only.skill");
+    expect(en.rightHand.card.only.skill).toBe("Only admins change an agent's skills");
   });
 });
 
@@ -250,6 +286,35 @@ describe("how a decided card ended", () => {
       accepted: true,
       label: 'proposals.acceptedSome {"done":1,"total":2}',
     });
+  });
+});
+
+describe("who decided a card", () => {
+  const ana = { userId: "u-ana", name: "Ana" };
+
+  test("one person deciding every row the same way is named, the viewer as you", () => {
+    const rows = [row("1", { status: "accepted", decidedBy: ana }), row("2", { status: "accepted", decidedBy: ana })];
+    expect(cardDecidedBy(t, rows, "u-me")).toBe('rightHand.card.appliedBy {"name":"Ana"}');
+    expect(cardDecidedBy(t, rows, "u-ana")).toBe("rightHand.card.appliedByYou");
+    expect(cardDecidedBy(t, [row("1", { status: "refused", decidedBy: ana })], "u-me")).toBe(
+      'rightHand.card.declinedBy {"name":"Ana"}',
+    );
+    expect(cardDecidedBy(t, [row("1", { status: "refused", decidedBy: ana })], "u-ana")).toBe(
+      "rightHand.card.declinedByYou",
+    );
+  });
+
+  test("rows that ended apart, a newer text or nobody on record say only how the card ended", () => {
+    const bia = { userId: "u-bia", name: "Bia" };
+    expect(
+      cardDecidedBy(
+        t,
+        [row("1", { status: "accepted", decidedBy: ana }), row("2", { status: "accepted", decidedBy: bia })],
+        "u-me",
+      ),
+    ).toBe("proposals.accepted");
+    expect(cardDecidedBy(t, [row("1", { stale: true })], "u-me")).toBe("proposals.stale");
+    expect(cardDecidedBy(t, [row("1", { status: "accepted" })], "u-me")).toBe("proposals.accepted");
   });
 });
 

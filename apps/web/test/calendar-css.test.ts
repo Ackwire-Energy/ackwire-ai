@@ -120,11 +120,9 @@ describe("calendar items the Google Calendar way", () => {
     ).toBe("none");
   });
 
-  test("a day's +N mais list takes the room under it, not the menu's 280 that cut a dozen rows by a sliver", async () => {
+  test("a day's +N mais list takes the window's room (`.ac-popover`), not a cap of its own that cuts rows", async () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
-    expect(last(declarations(css, ".cal-more.ac-popover"), "max-height")).toBe(
-      "min(480px, var(--radix-popover-content-available-height, 480px))",
-    );
+    expect(last(declarations(css, ".cal-more.ac-popover"), "max-height")).toBeUndefined();
   });
 
   test("an all-day lane's bars share its height with their names from the top, not centred like a button's", async () => {

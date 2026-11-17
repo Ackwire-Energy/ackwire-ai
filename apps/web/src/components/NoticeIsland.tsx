@@ -7,7 +7,7 @@ import {
   opensConnectAi,
   opensOnComputer,
   openTarget,
-  replyTarget,
+  quickReply,
   waitingCardOf,
 } from "@agenteschat/client/lib/notifications";
 import { Button, CountBadge, cx, Icon, Kbd, Locked, prefersReducedMotion } from "@agenteschat/ui";
@@ -251,7 +251,9 @@ function Line({ n, className }: { n: AppNotification; className?: string }) {
   // A request's title in words, from the request itself (the notification keeps the tool's raw title), as the phone.
   const approvals = useApprovals(org.id);
   const request = n.kind === "approval" ? approvals.data?.find((a) => a.id === n.source.approvalId) : undefined;
-  const line = request ? approvalTitle(t, request) : noticeLine(n, (kind) => mediaWord(t, kind));
+  // What the right hand found is its headline: nothing under it says it again.
+  const line =
+    n.kind === "team_watch" ? "" : request ? approvalTitle(t, request) : noticeLine(n, (kind) => mediaWord(t, kind));
   return line ? <span className={className}>{line}</span> : null;
 }
 
@@ -296,10 +298,11 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
     if (typing) input.current?.focus();
   }, [typing]);
 
-  const target = replyTarget(n);
+  const { target, suggestions, readOnly } = quickReply(n, Boolean(org.deletion));
   const waiting = n.waiting ? waitingCardOf(n) : null;
-  const suggestions = n.kind === "agent_question" ? (n.latest.suggestions ?? []) : [];
   const canOpen = opener.canOpen(n);
+  // Revisar or Abrir as the main button, for a request that is opened rather than answered here.
+  const opens = Boolean(waiting && waiting.action !== "answer" && canOpen);
 
   const read = () => {
     if (!n.readAt) act.mutate({ type: "read", item: n, read: true });
@@ -326,13 +329,35 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
     answer(draft);
   };
 
+  const buttons = [
+    opens && (
+      <Button key="main" variant="primary" size="sm" onClick={open}>
+        {waiting?.action === "review" ? t("island.review") : t("island.open")}
+      </Button>
+    ),
+    target && (
+      <Button key="reply" size="sm" icon="reply" onClick={() => setTyping(true)}>
+        {suggestions.length ? t("island.otherAnswer") : t("island.reply")}
+      </Button>
+    ),
+    !opens && canOpen && (
+      <Button key="open" size="sm" onClick={open}>
+        {t("island.open")}
+      </Button>
+    ),
+  ];
+
   return (
-    <li className="ni__item">
-      <Who n={n} dir={dir} className="ni__face" />
-      <div className="ni__body">
-        <p className="ni__title ac-captop">
+    <li className="ni__item ac-mediarow">
+      <span className="ac-mediarow__face">
+        <Who n={n} dir={dir} className="ni__face" />
+      </span>
+      <span className="ac-mediarow__head ni__title">
+        <span>
           <Headline n={n} dir={dir} channelName={channelName} />
-        </p>
+        </span>
+      </span>
+      <div className="ac-mediarow__body">
         <Line n={n} className="ni__text" />
         {done ? (
           <p className="ni__done" role="status">
@@ -341,6 +366,12 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
           </p>
         ) : (
           <>
+            {readOnly && (
+              <p className="ni__readonly ac-iconline" role="status">
+                <Icon name="lock" size={16} />
+                <span>{t("deleting.composer")}</span>
+              </p>
+            )}
             {typing && target ? (
               <form className="ni__reply" onSubmit={submit}>
                 <Locked when={reply.isPending}>
@@ -377,21 +408,9 @@ function NoticeRow({ n, dir, channelName }: { n: AppNotification; dir: Dir; chan
                       {s}
                     </button>
                   ))}
-                  {waiting && waiting.action !== "answer" && canOpen && (
-                    <Button variant="primary" size="sm" onClick={open}>
-                      {waiting.action === "review" ? t("island.review") : t("island.open")}
-                    </Button>
-                  )}
-                  {target && (
-                    <Button size="sm" icon="reply" onClick={() => setTyping(true)}>
-                      {suggestions.length ? t("island.otherAnswer") : t("island.reply")}
-                    </Button>
-                  )}
-                  {!(waiting && waiting.action !== "answer") && canOpen && (
-                    <Button size="sm" onClick={open}>
-                      {t("island.open")}
-                    </Button>
-                  )}
+                  {/* Buttons alone end at the right edge with the main one last, in the page's order too, so Tab
+                      goes as the eye does. After answers to pick, Outra resposta follows them. */}
+                  {suggestions.length ? buttons : buttons.reverse()}
                 </div>
               </Locked>
             )}

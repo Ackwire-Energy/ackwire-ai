@@ -4,6 +4,7 @@
  * banners, the cover's line, Preferences' words). Pure, so it is tested without the app.
  */
 
+import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 import type { Platform } from "./platform";
 
 /** `restarting`: it stopped by itself and starts again in a moment (nobody has to start it). */
@@ -26,7 +27,10 @@ export interface LocalServerStatus {
   reach: boolean;
   /** Usage statistics on (`TELEMETRY`). */
   usage: boolean;
-  version: string | null;
+  /** The installed bundle's version, even while the server is stopped or restarting. */
+  installedVersion: string | null;
+  /** The package version reported by the running local server. */
+  serverVersion: string | null;
   dir: string;
   /** The person's name on this computer (the welcome window only). */
   systemName: string | null;
@@ -42,6 +46,30 @@ export interface LocalServerStatus {
   heldUntil: number | null;
   /** Reach is on, but Tailscale isn't connected on this computer: nobody else reaches it now. */
   tailnetDown: boolean;
+  backups: LocalBackups;
+  /** This Mac doesn't sleep while it runs (`caffeinate`). */
+  awake: boolean;
+  /** Where "Erase and start over" moves its folder today (the app's own install only). */
+  eraseTo: string | null;
+  /** Where an erase moved its folder, until a new setup makes one again. */
+  erased: string | null;
+}
+
+export interface LocalBackups {
+  /** "Back up every night" (at 3:00, local time). */
+  nightly: boolean;
+  /** "Copy to": each new backup is copied to this folder too. */
+  copyTo: string | null;
+  /** Its backups, newest first; `at` in milliseconds since 1970. */
+  files: { path: string; at: number }[];
+  /** The last backup didn't finish, or didn't reach the "Copy to" folder. */
+  problem: "backup" | "copy" | null;
+}
+
+/** What keeps the server here up after a restart or a power cut; null where the app can't tell (not a Mac, a laptop). */
+export interface KeepRunning {
+  autoLogin: boolean | null;
+  autoRestart: boolean | null;
 }
 
 /** `app`: Tailscale's Mac app is there to open, not only its command-line tool (Homebrew's). */
@@ -107,7 +135,8 @@ export const NO_SERVER: LocalServerStatus = {
   publicUrl: null,
   reach: false,
   usage: true,
-  version: null,
+  installedVersion: null,
+  serverVersion: null,
   dir: "~/.agentes",
   systemName: null,
   serving: false,
@@ -116,6 +145,10 @@ export const NO_SERVER: LocalServerStatus = {
   held: false,
   heldUntil: null,
   tailnetDown: false,
+  backups: { nightly: true, copyTo: null, files: [], problem: null },
+  awake: false,
+  eraseTo: null,
+  erased: null,
 };
 
 /** "Setting it up", in order; access from other devices only when it was asked for. */
@@ -177,10 +210,17 @@ export type HereView =
   | { kind: "stopped" };
 
 /**
+ * The app runs it, but no account is left there (its owner deleted theirs, and nobody else had one): setting it up
+ * again over its data, with a name and email, makes the new owner.
+ */
+export const ownerless = (status: LocalServerStatus) => status.installed === "app" && status.run && !status.owner;
+
+/**
  * `answering`: an Ackwire AI server that answered on this computer's loopback (Connect's discovery), when the
  * app doesn't run one itself.
  */
 export function hereView(status: LocalServerStatus, answering: string | null): HereView {
+  if (ownerless(status)) return { kind: "form", ask: true };
   if (status.run) return { kind: "running", server: status.publicUrl ?? status.url ?? "" };
   if (status.installed === "terminal")
     return status.serving && status.url
@@ -237,6 +277,10 @@ export const filesFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" :
 /** Whether `server` is the server here, at either of its addresses. */
 export const isHereServer = (status: LocalServerStatus, server: string | null) =>
   status.run && !!server && (server === status.url || server === status.publicUrl);
+
+/** Where a workspace's server runs: on this computer, on Ackwire AI's Cloud, or elsewhere. */
+export const serverPlace = (status: LocalServerStatus, server: string | null): "here" | "cloud" | "other" =>
+  isHereServer(status, server) ? "here" : server === CLOUD_SERVER ? "cloud" : "other";
 
 /**
  * The main window's cover over the server here: starting, updating, stopped, not starting, or running at its

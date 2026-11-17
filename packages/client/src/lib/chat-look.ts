@@ -1,4 +1,4 @@
-import type { Message } from "../api/types";
+import type { Message, ThreadInfo } from "../api/types";
 import { landedAfter } from "./timeline";
 
 /**
@@ -29,6 +29,8 @@ export interface ChatPrefs {
   dmTone?: ChatTone;
   openAt?: ChatOpenAt;
   textSize?: ChatTextSize;
+  /** Show every message in full, without folding it behind See more. */
+  fullMessages?: boolean;
   /** "Always send": a report an agent offers about the app goes with its reply, without asking me. */
   feedbackAuto?: boolean;
 }
@@ -111,4 +113,28 @@ export function firstUnreadId(
   const after = lastReadAt ? Date.parse(lastReadAt) : -Infinity;
   const first = messages.find((m) => landedAfter(m, after) && !(m.author.type === "person" && m.author.id === meId));
   return first?.id ?? null;
+}
+
+/**
+ * A conversation opened with something unread and nothing new at its end: the unread is a reply in a thread, which
+ * the conversation shows as one line under the thread's root, maybe far above. The root to bring into view: the
+ * thread whose last reply (not mine) is the latest after `lastReadAt`. Null: something new is in the conversation
+ * itself (`messages`, its own, no replies), or no thread has a reply since.
+ */
+export function unreadThreadRootId(
+  messages: readonly Pick<Message, "id" | "author" | "createdAt">[],
+  threads: readonly Pick<ThreadInfo, "id" | "lastMessage">[],
+  lastReadAt: string | null | undefined,
+  meId: string | null,
+): string | null {
+  if (firstUnreadId(messages, lastReadAt, meId)) return null;
+  const after = lastReadAt ? Date.parse(lastReadAt) : -Infinity;
+  let found: { id: string; at: number } | null = null;
+  for (const x of threads) {
+    const last = x.lastMessage;
+    if (!last || (last.author.type === "person" && last.author.id === meId)) continue;
+    const at = Date.parse(last.createdAt);
+    if (at > after && (!found || at > found.at)) found = { id: x.id, at };
+  }
+  return found?.id ?? null;
 }

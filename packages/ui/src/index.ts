@@ -114,13 +114,22 @@ export {
   RadioGroup,
   Switch,
 } from "./components/Checkbox";
-export { AttentionNote, Chip, type ChipProps, type ChipTone, CountBadge, CountChip } from "./components/Chip";
+export {
+  AttentionNote,
+  Chip,
+  ChipButton,
+  type ChipProps,
+  type ChipTone,
+  CountBadge,
+  CountChip,
+} from "./components/Chip";
+export { ChipField, type ChipFieldOption, type ChipFieldProps, type ChipFieldToken } from "./components/ChipField";
 export { CodeInput, type CodeInputProps } from "./components/CodeInput";
+export { ColorDot, dotTone } from "./components/ColorDot";
 export { ColorPicker, type ColorPickerLabels } from "./components/ColorPicker";
 export { CommandPalette, filterPalette, type PaletteItem } from "./components/CommandPalette";
 export {
   Composer,
-  type ComposerChoice,
   type ComposerCommand,
   type ComposerCommands,
   ComposerFile,
@@ -132,8 +141,6 @@ export {
   type ComposerWorking,
   linkQuery,
   mentionQuery,
-  type SendChoice,
-  sendChoice,
 } from "./components/Composer";
 export {
   ComputerIcon,
@@ -186,10 +193,14 @@ export {
   FormActions,
   FormStack,
   Input,
+  LimitLine,
   Locked,
+  limitShown,
+  overLimit,
   PickerHeading,
   SearchInput,
   Textarea,
+  type TextLimit,
   useAutoGrow,
   useFieldControl,
   useLocked,
@@ -201,8 +212,11 @@ export {
   type FilterChipProps,
   type FilterOption,
 } from "./components/FilterChip";
+export { FoldRow } from "./components/FoldRow";
 export { GroupHeading } from "./components/GroupHeading";
-export { InfoHint, type InfoHintProps } from "./components/InfoHint";
+export { type Hosting, HostingScene, type Place, PlaceScene } from "./components/HostingScene";
+export { HintLine, type HintLineProps, InfoHint, type InfoHintProps } from "./components/InfoHint";
+export { type Journey, JourneyScene } from "./components/JourneyScene";
 export { isApple, Kbd, modKey, shortcut } from "./components/Kbd";
 export { Logo, LogoMark, type LogoProps } from "./components/Logo";
 export {
@@ -275,6 +289,7 @@ export {
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planAttention,
   planLevel,
   planLine,
   planState,
@@ -363,7 +378,7 @@ export { type TabItem, TabPanel, Tabs } from "./components/Tabs";
 export { normalizeTime, TimeSelect, type TimeSelectProps, timeOptions } from "./components/TimeSelect";
 export { TimezoneSelect, type TimezoneSelectLabels, type TimezoneSelectProps } from "./components/TimezoneSelect";
 export { Tip, type TipProps } from "./components/Tip";
-export { Token, TokenList } from "./components/Token";
+export { Token, TokenList, type TokenProps } from "./components/Token";
 export {
   ToolBlock,
   type ToolBlockHead,
@@ -406,7 +421,19 @@ export { Reaction, Reactions, type WorkStep, WorkSummary } from "./components/Wo
 export { WorkLine, WorkLineAction, type WorkLineTone, WorkPlan } from "./components/WorkLine";
 export { COMPUTER_GRID, COMPUTER_KINDS, COMPUTER_STATES, drawComputer, PHONE_KINDS } from "./computer/portrait.js";
 export { cx } from "./cx";
-export { hoverPointer, movesByKeys, onScreenKeyboard, onScreenNow, trackInput } from "./device";
+export {
+  composes,
+  focusAtEnd,
+  focusIdle,
+  hoverPointer,
+  mayTakeFocus,
+  movesByKeys,
+  OPEN_LAYER,
+  onScreenKeyboard,
+  onScreenNow,
+  trackInput,
+  typingInField,
+} from "./device";
 export {
   EMOJI_CATEGORIES,
   EMOJIS,
@@ -415,6 +442,7 @@ export {
   emojiEntry,
   searchEmoji,
 } from "./emoji-data";
+export { placeList } from "./floating";
 export {
   applyFormat,
   codeBlock,
@@ -429,6 +457,7 @@ export {
   wrapSelection,
 } from "./format";
 export { useDarkTheme } from "./hooks/useDarkTheme";
+export { DAWN_MS, useDawn } from "./hooks/useDawn";
 export { useDragScroll } from "./hooks/useDragScroll";
 export {
   HOVER_CLOSE_MS,
@@ -437,7 +466,7 @@ export {
   type HoverCardOpen,
   useHoverCard,
 } from "./hooks/useHoverCard";
-export { matchesNow, TOUCH, useMatchMedia } from "./hooks/useMatchMedia";
+export { HOVERLESS, matchesNow, TOUCH, useMatchMedia } from "./hooks/useMatchMedia";
 export { useNow } from "./hooks/useNow";
 export { type ScrollSides, useScrollSides } from "./hooks/useScrollSides";
 export { Icon, type IconName, type IconProps, iconNames, icons } from "./icons/Icon";
@@ -486,10 +515,24 @@ export {
   type SkyFrame,
   type SkyOptions,
   SPRITE,
+  skiesHeld,
   startSky,
 } from "./sky/engine";
+export { FORMING_LOOP_S, formingField } from "./sky/forming";
 export { selectionSkyUrl } from "./sky/selection";
-export { agentTones, EYE, glowTones, mix, parseColor, pixelOf, SKY_TONES, softTones, spriteTone } from "./sky/tones";
+export { teamSky } from "./sky/team";
+export {
+  agentTones,
+  EYE,
+  glowTones,
+  mix,
+  parseColor,
+  pixelOf,
+  SKY_TONES,
+  softTones,
+  spriteTone,
+  TEAM_NIGHT,
+} from "./sky/tones";
 export {
   cloudAt,
   HEADER_AREA,
@@ -501,6 +544,7 @@ export {
   workspaceInk,
   workspaceTones,
 } from "./sky/workspace";
+export { onThemeChange, switchTheme, THEME_SWITCHING_ATTR, type Theme } from "./theme";
 export {
   allZones,
   cityOf,
@@ -516,6 +560,7 @@ export {
   zoneOption,
   zoneOptions,
 } from "./timezones";
+export { installTitleTips, TITLE_TIP_GRACE_MS, TITLE_TIP_ID, TITLE_TIP_OPEN_MS } from "./title-tips";
 export { DitherLine, fillEnds, paintCells, paintLineArea, useElementWidth } from "./widgets/ChartPieces";
 export { formatWidgetNumber, formatWithUnit, useCountUp, widgetDigits } from "./widgets/format";
 export { ditherTile, WIDGET_CELL, widgetTileVars, widgetTones } from "./widgets/tiles";

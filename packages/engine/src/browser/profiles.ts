@@ -1,13 +1,14 @@
-import { type AgentScope, BROWSER_PROFILE_PROTOCOL, type PubSub } from "@agenteschat/adapters";
+import { ACCESS_ALLOW_PROTOCOL, type AgentScope, BROWSER_PROFILE_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, asc, type Database, type Executor, eq, inArray, isNull, notInArray, schema, sql } from "@agenteschat/db";
 import { recordAudit } from "../audit";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "../errors";
-import type { MachineCaller } from "../machine-hub";
+import { type MachineCaller, MachineRequestError } from "../machine-hub";
+import { MachineOfflineError } from "../machines";
 import { type NotificationDeps, notify } from "../notifications";
-import { can, requireActiveMembership, requirePermission } from "../organizations";
+import { can, requireActiveMembership, requireChangePermission, requirePermission } from "../organizations";
 import { BROWSER_HANDOFF_TOPIC, type PageMove, pageCommand } from "./handoff";
 
-const { agents, agentRuns, browserProfiles, browserProfileGrants, machines, organizationMembers } = schema;
+const { agents, agentRuns, browserProfiles, browserProfileGrants, machines, organizationMembers, users } = schema;
 
 /** An agent's turn lasts this long after its last command (ADR 0110 §4). */
 export const PROFILE_TURN_MS = 2 * 60_000;
@@ -688,9 +689,12 @@ export async function runBrowserProfile(
   return agent?.id ?? null;
 }
 
-/** Who may drive a profile (log in, open a site, take control): `manage_connectors` with `control_browsers`. */
+/**
+ * Who may drive a profile (log in, open a site, take control, type in it): `manage_connectors` with
+ * `control_browsers`, never in a workspace being deleted.
+ */
 export async function requireProfileDriver(db: Database, userId: string, orgId: string, profileId: string) {
-  const membership = await requirePermission(db, userId, orgId, "manage_connectors");
+  const membership = await requireChangePermission(db, userId, orgId, "manage_connectors");
   if (!can(membership, "control_browsers")) throw new ForbiddenError();
   return requireProfile(db, orgId, profileId);
 }
@@ -740,6 +744,7 @@ export function profileControlRow(
     status: "active",
     requestedForUserId: holder.userId,
     controllerUserId: holder.userId,
+    seatUserId: null,
     note: null,
     expiresAt: p.heldUntil,
     pageReadAt: null,
@@ -781,15 +786,75 @@ export async function startProfileControl(deps: ProfileControlDeps, userId: stri
     target: { type: "browser_profile", id: profileId },
     details: { name: row.name },
   });
-  await deps.hub
-    ?.call(
-      row.machineId,
-      { op: "browser.warm", agent: profileScope(profileId), profile: { id: profileId } },
-      { timeoutMs: 90_000 },
-    )
-    .catch(() => {});
+  const refused = await warmRefusal(deps, row.machineId, profileId);
+  if (refused) {
+    // Nothing opens on a refusal: the row says why, with its one way out, instead of a dialog that waits forever.
+    await releaseProfileControl(deps.db, orgId, profileId, userId);
+    await announceProfile(deps, orgId, profileId);
+    throw await profileRefusalError(deps.db, userId, row.machineId, refused);
+  }
   await announceProfile(deps, orgId, profileId, true);
   return browserProfileView(deps.db, orgId, profileId);
+}
+
+/**
+ * Starts the profile's Chrome before its live view opens; the runner's refusal, if any. A timeout is no refusal: a
+ * first Chrome download goes on past it, and the live view says so meanwhile.
+ */
+async function warmRefusal(deps: ProfileControlDeps, machineId: string, profileId: string) {
+  if (!deps.hub) return null;
+  try {
+    await deps.hub.call(
+      machineId,
+      { op: "browser.warm", agent: profileScope(profileId), profile: { id: profileId } },
+      { timeoutMs: 90_000 },
+    );
+    return null;
+  } catch (err) {
+    if (err instanceof MachineOfflineError) return { code: "offline", message: err.message };
+    if (!(err instanceof MachineRequestError) || err.code === "timeout" || err.code === "canceled") return null;
+    return { code: err.code, message: err.message };
+  }
+}
+
+/**
+ * Why "Fazer login" didn't open: `browser_profile.tool_off` when the browser is off on that computer (with whether
+ * this person may turn it on there, else whom to ask), else `browser_profile.unavailable` with the computer's words.
+ */
+async function profileRefusalError(
+  db: Executor,
+  userId: string,
+  machineId: string,
+  refused: { code: string; message: string },
+) {
+  const [m] = await db
+    .select({
+      name: machines.name,
+      kind: machines.kind,
+      protocol: machines.protocol,
+      pairedByUserId: machines.pairedByUserId,
+      ownerName: users.name,
+    })
+    .from(machines)
+    .leftJoin(users, eq(users.id, machines.pairedByUserId))
+    .where(eq(machines.id, machineId));
+  if (refused.code === "not_allowed" && m) {
+    const owner = m.pairedByUserId;
+    return new ValidationError(`The browser is turned off on ${m.name}`, "browser_profile.tool_off", {
+      machineId,
+      machineName: m.name,
+      tool: "browser",
+      mayAllow: owner === userId && m.kind !== "managed" && m.protocol >= ACCESS_ALLOW_PROTOCOL,
+      outdated: owner === userId && m.protocol < ACCESS_ALLOW_PROTOCOL,
+      ownerId: owner && owner !== userId && m.kind !== "managed" ? owner : null,
+      ownerName: owner && owner !== userId ? (m.ownerName ?? "") : null,
+    });
+  }
+  return new ValidationError(refused.message.slice(0, 300), "browser_profile.unavailable", {
+    machineId,
+    machineName: m?.name ?? "",
+    cause: refused.code,
+  });
 }
 
 /** Devolver: the person's control ends; agents granted it may use it again. */
@@ -826,6 +891,8 @@ export async function openProfilePage(
       command,
       args,
       timeoutSeconds: OPEN_PAGE_SECONDS,
+      // The person in control's own move: it runs while they drive (anything else waits for them).
+      person: true,
     },
     { timeoutMs: (OPEN_PAGE_SECONDS + 30) * 1000 },
   );

@@ -171,10 +171,20 @@ describe("create_agent", () => {
     expect(made.handle).toBe("dev-2");
   });
 
-  test("a member without create_agents can't create one", async () => {
+  test("a member creates their own agent, until an admin takes Criar agentes off Todos", async () => {
     const { b, orgId } = await setup();
     const member = await joinByInvitation(t, b, orgId, "member@example.com");
+    const memberId = ((await (await member("/api/app/me")).json()) as { user: { id: string } }).user.id;
     const app = await connectApp(t, member, orgId, MANAGE);
+    expect(data(await callTool(t, app.access, "create_agent", { name: "Scout" }))).toMatchObject({ handle: "scout" });
+    const [scout] = await t.db.select().from(schema.agents).where(eq(schema.agents.name, "Scout"));
+    expect(scout?.ownerUserId).toBe(memberId);
+
+    const off = await b(`/api/app/organizations/${orgId}/permissions/create_agents`, {
+      method: "PUT",
+      json: { everyone: 0, roles: [] },
+    });
+    expect(off.status).toBe(200);
     const res = await callTool(t, app.access, "create_agent", { name: "Sneaky" });
     expect(res.isError).toBe(true);
     const rows = await t.db.select().from(schema.agents).where(eq(schema.agents.name, "Sneaky"));

@@ -1,7 +1,10 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   LAUNCH,
   LOGO,
+  launchesAtOnce,
   launchPose,
   launchSkyTones,
   SPRITES,
@@ -66,6 +69,17 @@ describe("launch splash", () => {
     const blinks = Array.from({ length: 360 }, (_, i) => spriteBlinks(s, i / 100)).filter(Boolean).length;
     expect(blinks).toBeGreaterThan(5);
     expect(blinks).toBeLessThan(20);
+  });
+
+  test("ready within its first frames it leaves at once; later its rise plays the minimum", () => {
+    expect(launchesAtOnce(0)).toBe(true);
+    expect(launchesAtOnce(LAUNCH.quick * 1000)).toBe(true);
+    expect(launchesAtOnce(LAUNCH.quick * 1000 + 1)).toBe(false);
+    expect(LAUNCH.quick).toBeLessThan(LAUNCH.min);
+    const splash = readFileSync(join(import.meta.dir, "../../src/features/launch/LaunchSplash.tsx"), "utf8");
+    expect(splash).toContain("if (!played && !launchesAtOnce(Date.now() - startedAt)) return;");
+    // Leaving, the agent holds its last pose: no frames of it on the JS thread while the app arrives under it.
+    expect(splash).toContain("const now = useFrameTime(!reduced && !leaving, heldAt);");
   });
 
   test("the sky starts from the screen's own background", () => {

@@ -1,8 +1,9 @@
 import type { Poll } from "@agenteschat/client";
 import { useArtifact, usePoll, useVote } from "@agenteschat/client";
 import { pollAnswered, pollIsOpen, pollTally, pollToggle } from "@agenteschat/client/lib/blocks";
-import { Icon, Spinner } from "@agenteschat/ui";
+import { AvatarStack, Icon, Spinner } from "@agenteschat/ui";
 import { useTranslation } from "react-i18next";
+import { PersonAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
 import { CardSky, colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -17,7 +18,7 @@ const FACES = 5;
  * page in a frame could cast one the moment it showed. Everyone sees the marks arrive (`poll.updated`).
  */
 export function PollCard({ id, version }: { id: string; version?: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const toast = useToast();
@@ -40,7 +41,7 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
   const tally = pollTally(options, poll);
   const top = Math.max(...tally.map((o) => o.voters.length));
   const nameOf = (userId: string) => dir.memberById.get(userId)?.name ?? t("blocks.someone");
-  const closes = new Date(poll.closesAt).toLocaleString([], { dateStyle: "short", timeStyle: "short" });
+  const closes = new Date(poll.closesAt).toLocaleString(i18n.language, { dateStyle: "short", timeStyle: "short" });
   return (
     <section className="live-block" aria-label={question}>
       <CardSky color={colorOf(dir.anyAgent(a.createdBy.id))} />
@@ -68,17 +69,27 @@ export function PollCard({ id, version }: { id: string; version?: number }) {
                 })
               }
             >
-              <span className="poll__fill" style={{ width: `${o.share * 100}%` }} />
-              <span className="poll__box">{mine && <Icon name="check" size={14} />}</span>
-              <span className="poll__label">{o.label}</span>
-              <span className="poll__faces" role="img" aria-label={o.voters.map(nameOf).join(", ")}>
-                {o.voters.slice(0, FACES).map((v) => (
-                  <span key={v} className="poll__face" title={nameOf(v)} aria-hidden="true">
-                    {nameOf(v).slice(0, 1).toUpperCase()}
-                  </span>
-                ))}
-                {o.voters.length > FACES && <span className="poll__face">+{o.voters.length - FACES}</span>}
+              {/* The share fills the option up to its faces, never under them: their rings stay the card's face. */}
+              <span className="poll__track">
+                <span className="poll__fill" style={{ width: `${o.share * 100}%` }} />
+                <span className="poll__box">{mine && <Icon name="check" size={14} />}</span>
+                <span className="poll__label">{o.label}</span>
               </span>
+              {o.voters.length > 0 && (
+                // Each voter's face as the conversation shows it: the photo, else the initials.
+                <span className="poll__faces" role="img" aria-label={o.voters.map(nameOf).join(", ")}>
+                  <AvatarStack>
+                    {o.voters.slice(0, FACES).map((v) => (
+                      <PersonAvatar key={v} id={v} name={nameOf(v)} size="sm" title={nameOf(v)} />
+                    ))}
+                  </AvatarStack>
+                  {o.voters.length > FACES && (
+                    <span className="poll__more" title={o.voters.slice(FACES).map(nameOf).join(", ")}>
+                      +{o.voters.length - FACES}
+                    </span>
+                  )}
+                </span>
+              )}
             </button>
           );
         })}

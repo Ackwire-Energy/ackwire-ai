@@ -196,8 +196,9 @@ export interface ProposedAccessLine {
 
 /**
  * One setting of an agent the team's right hand proposes to change (ADR 0137): its value then (`from`) and the one
- * proposed (`to`). `channel_add` / `channel_remove` / `reply_mode` name their channel in `channelId`; `label` is
- * what the card shows for a value that is an id (a model's, an account's, a person's or a channel's name).
+ * proposed (`to`). `channel_add` / `channel_remove` / `reply_mode` name their channel in `channelId`, `skill` (on or
+ * off) its skill in `skillId`; `label` is what the card shows for a value that is an id (a model's, an account's, a
+ * person's or a channel's name, the skill's). `group` holds its department's name, or null for none.
  */
 export interface ProposedSettingLine {
   field:
@@ -209,14 +210,17 @@ export interface ProposedSettingLine {
     | "channel_add"
     | "channel_remove"
     | "reply_mode"
+    | "skill"
     | "name"
     | "look"
+    | "group"
     | "reports_to"
     | "archive"
     | "delete";
   from: unknown;
   to: unknown;
   channelId?: string;
+  skillId?: string;
   label?: { from?: string; to?: string };
 }
 

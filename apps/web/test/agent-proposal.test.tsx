@@ -68,11 +68,11 @@ const click = async (el: HTMLElement, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-/** The proposal in its message: the request card while it is open, then the line that says what was decided. */
+/** The proposal in its message: the request card, open or saying what was decided. */
 const cardOf = (text: string) =>
   screen()
     .getAllByRole("article")
-    .map((a) => a.querySelector<HTMLElement>(".rq, .rq-done"))
+    .map((a) => a.querySelector<HTMLElement>(".rq"))
     .filter((card): card is HTMLElement => Boolean(card?.textContent?.includes(text)));
 const asMember = (state: State) => {
   const org = state.me?.organizations[0];
@@ -114,9 +114,11 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/c/${ENG_ID}`);
     await click(within(card).getByRole("button", { name: "Recusar" }));
     expect(state.calls.some((c) => c.method === "agents.denyProposal" && c.args[1] === "p-1")).toBe(true);
-    // Decided: one line says what was decided.
+    // Decided: the same card says who decided where its buttons were.
     const after = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
-    expect(after.textContent).toContain("Recusada: Nina");
+    expect(after.classList.contains("rq--ended")).toBe(true);
+    expect(after.querySelector(".rq__wt b")?.textContent).toBe("Nina");
+    expect(after.querySelector(".rq__answer-text")?.textContent).toBe("Recusado por você");
     expect(after.querySelector(".rq-done__mark[data-done]")).toBeNull();
     expect(within(after).queryByRole("button", { name: "Recusar" })).toBeNull();
     expect(document.querySelector('[data-ask-id="p-1"]')).toBeNull();
@@ -168,9 +170,7 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     const [made] = cardOf("Otto");
     expect(made?.textContent).toContain("Criado");
     expect(made?.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
-    // The draft and the way to the agent are behind "Ver detalhes".
-    expect(made?.textContent).not.toContain("@otto");
-    await click(within(made as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
+    // The draft and the way to the agent stay on the card.
     expect(made?.textContent).toContain("@otto");
     expect(made?.textContent).toContain("Sem IA ainda. Conecte uma depois de criar");
     expect(
@@ -182,7 +182,6 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     expect(old?.textContent).toContain("Expirou");
     expect(old?.querySelector(".rq-done__mark[data-done]")).toBeNull();
     // Refused or expired there is no agent to go to.
-    await click(within(old as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
     expect(old?.textContent).toContain("@vera");
     expect(within(old as HTMLElement).queryByRole("link", { name: "Abrir perfil" })).toBeNull();
     // In the conversation, the profile opens in the panel beside it.
@@ -218,9 +217,8 @@ describe("an agent's proposal of a new agent, in the chat", () => {
     );
     await settle(3);
     const [card] = cardOf("Nina");
-    expect(card?.textContent).toContain("Criado");
+    expect(card?.querySelector(".rq__answer-text")?.textContent).toBe("Criado por João");
     expect(within(card as HTMLElement).queryByRole("link", { name: "Revisar" })).toBeNull();
-    await click(within(card as HTMLElement).getByRole("button", { name: "Ver detalhes" }));
     expect(
       within(card as HTMLElement)
         .getByRole("link", { name: "Abrir perfil" })
@@ -284,9 +282,8 @@ describe("one request, one card: what it gets, created in one click", () => {
     expect(state.calls.some((c) => c.method === "agents.create")).toBe(false);
     const [made] = cardOf("Nina");
     if (!made) throw new Error("no card");
-    expect(made.textContent).toContain("Criado");
-    // What it got is behind "Ver detalhes", with the way to the agent.
-    await click(within(made).getByRole("button", { name: "Ver detalhes" }));
+    expect(made.querySelector(".rq__answer-text")?.textContent).toBe("Criado por você");
+    // What it got stays on the card, with the way to the agent.
     expect(within(made).getByRole("link", { name: "Abrir perfil" })).toBeTruthy();
     // What it got takes a check; João's mailbox waits for him.
     const given = [...made.querySelectorAll(".waitcard__lines > li")].map((li) => li.getAttribute("data-given"));
@@ -313,7 +310,6 @@ describe("one request, one card: what it gets, created in one click", () => {
     await settle(6);
     const [card] = cardOf("Nina");
     if (!card) throw new Error("no card");
-    await click(within(card).getByRole("button", { name: "Ver detalhes" }));
     expect(lines(card).at(-1)).toBe(
       "E-mails do dia · Todos os dias, às 12:00 (horário de Brasília) · um admin libera · não criada",
     );
@@ -422,7 +418,7 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     // Another one starts empty, without the proposal.
     await click(within(connect).getByRole("button", { name: "Fechar" }));
     await click(screen().getByRole("button", { name: "Criar outro agente" }), 8);
-    expect(title()).toBe("Qual vai ser o papel?");
+    expect(title()).toBe("Qual vai ser a função?");
   });
 
   test("no AI, and a coding plan to connect picked: Connect opens once, on that plan", async () => {
@@ -538,18 +534,18 @@ describe("Revisar: Criar agente filled in with the draft", () => {
     state.messages.push(proposal("p-1"));
     await renderApp(`/org/${ORG_ID}/agents/new?proposal=p-1`, { api: createFakeApi(state) });
     await settle(8);
-    await click(screen().getByRole("button", { name: "Editar Papel" }));
+    await click(screen().getByRole("button", { name: "Editar Função" }));
     const custom = screen().getByRole("button", { name: /^Do zero/ });
     expect(custom.getAttribute("aria-pressed")).toBe("true");
-    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Designer");
+    expect((screen().getByRole("textbox", { name: "Função" }) as HTMLInputElement).value).toBe("Designer");
     // Again on the role it has: nothing changes.
     await click(custom);
-    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Designer");
-    await typeIn(screen().getByLabelText("Cargo"), "Design de produto");
+    expect((screen().getByRole("textbox", { name: "Função" }) as HTMLInputElement).value).toBe("Designer");
+    await typeIn(screen().getByRole("textbox", { name: "Função" }), "Design de produto");
     // Another role and back: the name, the instructions and the words stay.
     await click(screen().getByRole("button", { name: /^QA/ }));
     await click(screen().getByRole("button", { name: /^Do zero/ }));
-    expect((screen().getByLabelText("Cargo") as HTMLInputElement).value).toBe("Design de produto");
+    expect((screen().getByRole("textbox", { name: "Função" }) as HTMLInputElement).value).toBe("Design de produto");
     await click(railStep("Revisar e criar"));
     await click(screen().getByRole("button", { name: "Criar Nina" }), 10);
     expect(state.calls.find((c) => c.method === "agents.create")?.args[1]).toMatchObject({

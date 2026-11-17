@@ -11,10 +11,23 @@ import { githubHookLink, SENTRY_NEW_INTEGRATION, webhookTestState } from "@agent
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, StyleSheet, TextInput, View } from "react-native";
-import { fieldText, GroupedField, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import {
+  fieldText,
+  GROUPED_ROW,
+  GroupedField,
+  GroupedFooter,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
+  SkeletonList,
+  Text,
+  useToast,
+} from "@/ui";
 import { openPage } from "../ai/parts";
 import { ConnectorIcon } from "../connectors/ConnectorIcon";
 import { CommandBlock } from "../settings/parts";
+import { AskAdminRow } from "../shared/AdminAsk";
+import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useOrgId } from "../shared/hooks";
 
 /** Repositories offered to pick before typing one: the ones pushed to last. */
@@ -68,37 +81,49 @@ export function EventWebhookSetup({ provider }: { provider: WebhookProvider }) {
               ? t("routines.setup.adminOnly", { provider: name })
               : null;
   const steps = setup?.canManage && (state !== "working" || more);
+  const title = <GroupedHeader>{t("routines.setup.title", { provider: name })}</GroupedHeader>;
+  // While it loads, its row's shape; if it can't, why, with Retry.
+  if (!setup)
+    return (
+      <>
+        {title}
+        {query.isError ? <LoadFailed onRetry={() => void query.refetch()} /> : <SkeletonList rows={1} />}
+      </>
+    );
   return (
     <>
-      <GroupedHeader>{t("routines.setup.title", { provider: name })}</GroupedHeader>
+      {title}
       <GroupedList>
         <View style={styles.status}>
           <ConnectorIcon def={def} label={name} size={28} />
-          <View style={styles.grow}>
-            {!setup ? (
-              <ActivityIndicator color={c.muted} />
-            ) : (
-              <Text
-                variant="footnote"
-                tone={state === "working" ? "ok" : state === "refused" || state === "timeout" ? "danger" : "muted"}
-                accessibilityLiveRegion="polite"
-              >
-                {status ?? t("routines.setup.title", { provider: name })}
-              </Text>
-            )}
+          <View style={styles.statusText}>
+            <Text
+              variant="footnote"
+              tone={state === "working" ? "ok" : state === "refused" || state === "timeout" ? "danger" : "muted"}
+              accessibilityLiveRegion="polite"
+            >
+              {status ?? t("routines.setup.title", { provider: name })}
+            </Text>
           </View>
+          {/* Waiting for the service's first call: the system's spinner says it is listening. */}
           {state === "waiting" ? <ActivityIndicator color={c.muted} /> : null}
         </View>
       </GroupedList>
       {action.isError ? <GroupedFooter>{errorText(t, action.error)}</GroupedFooter> : null}
-      {setup && steps ? (
+      {steps ? (
         provider === "github" ? (
           <GitHubSteps setup={setup} onAdded={test} />
         ) : (
           <SentrySteps setup={setup} />
         )
       ) : null}
-      {setup?.canManage ? (
+      {!setup.canManage && state !== "working" && state !== "waiting" ? (
+        <>
+          <View style={styles.gap} />
+          <AskAdminRow ask={{ what: "webhook", provider }} />
+        </>
+      ) : null}
+      {setup.canManage ? (
         <>
           <View style={styles.gap} />
           <GroupedList>
@@ -236,7 +261,7 @@ function SentrySteps({ setup }: { setup: WebhookSetup }) {
       <GroupedFooter>{t("routines.setup.sentry.events")}</GroupedFooter>
       <GroupedHeader>{t("routines.setup.sentry.secret")}</GroupedHeader>
       <GroupedList>
-        <View style={styles.input}>
+        <GroupedField label={t("routines.setup.sentry.secret")}>
           <TextInput
             value={secret}
             onChangeText={setSecret}
@@ -251,7 +276,7 @@ function SentrySteps({ setup }: { setup: WebhookSetup }) {
             accessibilityLabel={t("routines.setup.sentry.secret")}
             style={[fieldText("callout"), { color: c.ink }]}
           />
-        </View>
+        </GroupedField>
         <GroupedRow
           icon="check"
           label={t("routines.setup.sentry.save")}
@@ -265,8 +290,14 @@ function SentrySteps({ setup }: { setup: WebhookSetup }) {
 }
 
 const styles = StyleSheet.create({
-  status: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
-  grow: { flex: 1, minWidth: 0 },
-  input: { paddingHorizontal: 14, paddingVertical: 12 },
+  // From the top: the status wraps, and its first line sits at the mark's middle (5 points down).
+  status: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: 12,
+  },
+  statusText: { flex: 1, minWidth: 0, paddingTop: 5 },
   gap: { height: 10 },
 });

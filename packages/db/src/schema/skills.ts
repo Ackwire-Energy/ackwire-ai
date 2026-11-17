@@ -1,4 +1,16 @@
-import { boolean, index, integer, jsonb, pgTable, text, timestamp, unique, uuid } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+import {
+  boolean,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uniqueIndex,
+  uuid,
+} from "drizzle-orm/pg-core";
 import { agents } from "./agents";
 import { users } from "./auth";
 import { organizations } from "./tenancy";
@@ -43,7 +55,7 @@ export const skills = pgTable(
     orgId: uuid()
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    /** The skill's `name` (kebab-case, ≤ 64), unique in the org. */
+    /** The skill's `name` (kebab-case, ≤ 64), unique among the team's skills and among each person's. */
     slug: text().notNull(),
     name: text().notNull(),
     description: text().notNull(),
@@ -58,10 +70,20 @@ export const skills = pgTable(
      * again. Null: read with no credentials.
      */
     sourceVia: text(),
+    /**
+     * Its link is read folder by folder (the folder's file list, then its files), not from the repository's archive,
+     * which was past the archive's cap: updating skips that download.
+     */
+    sourceByFolder: boolean().notNull().default(false),
     version: integer().notNull().default(1),
     /** Enabled for agents created later. */
     defaultForNewAgents: boolean().notNull().default(false),
     createdByUserId: text().references(() => users.id, { onDelete: "set null" }),
+    /**
+     * A personal skill's person (the Vault's split, ADR 0144): only they see it, and agents use it only on runs that
+     * person is behind. Null: the team's. It leaves with them.
+     */
+    ownerUserId: text().references(() => users.id, { onDelete: "cascade" }),
     /** `person` (installed or written by people) or `agent` (promoted from an agent's how-tos, ADR 0120). */
     origin: text().notNull().default("person"),
     /** An agent-made skill's agent: the only one that may change it with `update_skill`. */
@@ -125,7 +147,11 @@ export const skills = pgTable(
     updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
     deletedAt: timestamp({ withTimezone: true }),
   },
-  (t) => [unique().on(t.orgId, t.slug), index().on(t.orgId)],
+  (t) => [
+    uniqueIndex("skills_team_slug").on(t.orgId, t.slug).where(sql`${t.ownerUserId} is null`),
+    uniqueIndex("skills_personal_slug").on(t.orgId, t.ownerUserId, t.slug).where(sql`${t.ownerUserId} is not null`),
+    index().on(t.orgId),
+  ],
 );
 
 /** A skill's supporting files (references, templates, examples, images), per version. */

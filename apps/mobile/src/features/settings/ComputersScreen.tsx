@@ -16,15 +16,16 @@ import { helpUrl } from "@agenteschat/client/lib/server";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import type { TFunction } from "i18next";
 import { Trans, useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, Text, useToast } from "@/ui";
+import { EmptyState, GroupedFooter, GroupedHeader, GroupedList, GroupedRow, SkeletonList, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { openPage } from "../ai/parts";
 import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useMeId } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
+import { useMeId } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
 import { type AgentComputerPick, agentComputerPick, NO_COMPUTER, noComputerKey } from "./logic";
 import { Gap, SettingsPage } from "./parts";
@@ -120,7 +121,6 @@ export function HostComputerOff() {
  */
 export function AgentComputers() {
   const { t } = useTranslation();
-  const c = useColors();
   const { orgId, org } = useOrg();
   const meId = useMeId();
   const admin = can(org, "manage_agents");
@@ -133,7 +133,9 @@ export function AgentComputers() {
     <>
       <GroupedHeader>{t("computers.agents.title")}</GroupedHeader>
       {agents.isLoading || machines.isLoading ? (
-        <ActivityIndicator color={c.muted} style={styles.loading} />
+        <SkeletonList rows={3} />
+      ) : agents.isError && !agents.data ? (
+        <LoadFailed onRetry={() => void agents.refetch()} />
       ) : list.length === 0 ? (
         <GroupedFooter>{t("computers.agents.empty")}</GroupedFooter>
       ) : (
@@ -168,7 +170,6 @@ export function AgentComputers() {
  */
 export function AgentComputerScreen({ agentId }: { agentId: string }) {
   const { t } = useTranslation();
-  const c = useColors();
   const toast = useToast();
   const { orgId, org } = useOrg();
   const meId = useMeId();
@@ -182,7 +183,13 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
   if (!agent) {
     return (
       <SettingsPage title={t("computers.agents.title")}>
-        {agents.isLoading ? <ActivityIndicator color={c.muted} style={styles.loading} /> : null}
+        {agents.isLoading ? (
+          <SkeletonList rows={3} />
+        ) : agents.isError ? (
+          <LoadFailed onRetry={() => void agents.refetch()} />
+        ) : (
+          <EmptyState size="inline" title={t("common.gone")} />
+        )}
       </SettingsPage>
     );
   }
@@ -238,6 +245,5 @@ export function AgentComputerScreen({ agentId }: { agentId: string }) {
 }
 
 const styles = StyleSheet.create({
-  loading: { marginVertical: 16 },
   link: { textDecorationLine: "underline" },
 });

@@ -1,13 +1,14 @@
 import type { Edition, Machine } from "@agenteschat/client";
 import { type CantShow, cantShowLine } from "@agenteschat/client/lib/agent-computer";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { commandInReason, toolOnCommand } from "@agenteschat/client/lib/machines";
+import { commandInReason, oneClickTerminal, toolOnCommand } from "@agenteschat/client/lib/machines";
 import type { AgentColor } from "@agenteschat/ui";
 import { Button } from "@agenteschat/ui";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Cover } from "../browser/Cover";
-import { CommandBlock } from "../machine-bits";
+import { MachineToolButtons, useToolOneClick } from "../devices/ToolOneClick";
+import { CommandBlock, TerminalFallback } from "../machine-bits";
 import { Egress } from "./Egress";
 
 /** The stage with nothing live on it: the screen's shape, and the cover that says why. */
@@ -66,6 +67,7 @@ export function CantShowCover({
 }) {
   const { t } = useTranslation();
   const g = agentGrammar(name);
+  const oneClick = useToolOneClick(machine);
   const again = (
     <Button size="sm" icon="refresh" onClick={onRetry}>
       {t("desktop.retry")}
@@ -77,6 +79,26 @@ export function CantShowCover({
     );
   }
   const fixer = edition === "selfhost" && machine?.canManage === true && machine.os !== "darwin";
+  // The screens' switches, one click each, for whoever connected it; anyone else asks them.
+  if (edition === "selfhost" && reason === "not_allowed" && machine && oneClick && oneClick.kind !== "outdated") {
+    const missing = (["desktop", "commands"] as const).filter((tool) => machine.access?.tools[tool] !== true);
+    return (
+      <Cover
+        color={color}
+        icon="dash"
+        text={t("agentComputer.state.screensOffOne", { computer })}
+        action={
+          <>
+            <span className="ac-acts">
+              <MachineToolButtons machine={machine} tools={missing} onAllowed={onRetry} />
+              {again}
+            </span>
+            <TerminalFallback command={oneClickTerminal(machine, oneClick, missing)} />
+          </>
+        }
+      />
+    );
+  }
   const command =
     reason === "not_allowed" && machine
       ? toolOnCommand(machine, "desktop")

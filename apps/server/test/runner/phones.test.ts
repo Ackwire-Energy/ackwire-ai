@@ -39,7 +39,7 @@ import {
 import type { DataListener, DataSocket, DataSockets } from "../../runner/streams";
 import { IosHelper, WDA_VERSION } from "../../runner/wda";
 import { pairingQr, pairOutcome, parseMdnsServices, serialOfMdnsName } from "../../runner/wifi-pair";
-import { fakeUsbmuxd, freePort } from "./fake-usbmuxd";
+import { fakeUsbmuxd } from "./fake-usbmuxd";
 import { errorCode, removeDirs, tempDir } from "./helpers";
 
 // Each fake Xcode tool is a process of its own: an iPhone helper's build, check and start take seconds on a busy machine.
@@ -54,7 +54,7 @@ const TOOLS = ["adb", "xcrun", "xcode-select", "maestro", "scrcpy", "bundletool"
 const PIXEL = "38021FDH2000AB";
 const EMU = "emulator-5554";
 const SIM = "5C5C62E5-74E2-4E25-93AD-65E264BE78A4";
-const IPHONE = "00008110-001475263AC0A01E";
+const IPHONE = "00008110-000A1B2C3D4E5F60";
 
 const PIXEL_FACTS = `model=Pixel 8
 market=
@@ -128,7 +128,7 @@ const iphone = (over: { transport?: string; pairing?: string; devMode?: string; 
     reality: "physical",
     udid: over.udid ?? IPHONE,
   },
-  identifier: "F231DD07-C736-5329-B5FE-287E4F2B2A5C",
+  identifier: "A1B2C3D4-0000-4000-8000-0000000000A1",
 });
 
 test("adb devices -l: serials, states, models, kinds and transports", () => {
@@ -436,7 +436,7 @@ test("Windows: a phone with no driver shows as no_driver only while a guide asks
   await r.manager.poll();
   expect(r.manager.list()).toEqual([]);
   expect(asked).toBe(0);
-  expect(r.manager.look()).toBe(true);
+  expect(await r.manager.look()).toBe(true);
   await r.manager.poll();
   expect(r.manager.list().map((p) => [p.serial, p.state, p.reason])).toEqual([
     ["38021FDH2000AB", "needs_you", "no_driver"],
@@ -452,7 +452,24 @@ test("Windows: a phone with no driver shows as no_driver only while a guide asks
   expect(r.manager.list()).toEqual([]);
   expect(asked).toBe(1);
   // Other systems don't look.
-  expect(rig({}, { tools: [] }).manager.look()).toBe(false);
+  expect(await rig({}, { platform: "linux", tools: [] }).manager.look()).toBe(false);
+});
+
+test("a Mac: a guide's look reads the iPhones again before it answers, between the polls' own looks", async () => {
+  const r = rig({ devicectl: { result: { devices: [iphone({ transport: "wired", devMode: "disabled" })] } } });
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => p.reason)).toEqual(["developer_mode_off"]);
+  r.setState({ devicectl: { result: { devices: [iphone({ transport: "wired" })] } } });
+  // The next poll reuses the last Apple look (`APPLE_EVERY`): still off.
+  await r.manager.poll();
+  expect(r.manager.list().map((p) => p.reason)).toEqual(["developer_mode_off"]);
+  expect(await r.manager.look()).toBe(true);
+  expect(r.manager.list().map((p) => [p.state, p.reason ?? null])).toEqual([["ready", null]]);
+  expect(r.sent.at(-1)?.map((p) => p.state)).toEqual(["ready"]);
+  // A busy Mac whose devicectl fails on that look keeps the iPhone it saw.
+  r.setState({ devicectlFail: "The operation timed out." });
+  expect(await r.manager.look()).toBe(true);
+  expect(r.manager.list().map((p) => p.serial)).toEqual([IPHONE]);
 });
 
 const ANDROID_STATE = {
@@ -785,6 +802,9 @@ test("an iPhone on iOS 16 is reported as too old, never left out; one newer than
     [{ state: "needs_you", reason: "ui_not_authorized" }, "26.2"],
     [{ state: "preparing", reason: "device_support" }, "27.0"],
     [{ state: "preparing", reason: "helper_missing" }, "26.2"],
+    // The reverse: iOS 27 under an iOS 28 SDK, named only once the helper is stuck the same way.
+    [{ state: "needs_you", reason: "ui_not_authorized" }, "28.0"],
+    [{ state: "preparing", reason: "helper_missing" }, "28.0"],
   ] as const) {
     const s = stuck(need, sdk);
     await s.manager.poll();
@@ -795,6 +815,8 @@ test("an iPhone on iOS 16 is reported as too old, never left out; one newer than
     ["needs_you", "xcode_too_old"],
     ["needs_you", "xcode_too_old"],
     ["preparing", "device_support"],
+    ["preparing", "helper_missing"],
+    ["needs_you", "ios_behind_xcode"],
     ["preparing", "helper_missing"],
   ]);
 });
@@ -843,9 +865,9 @@ test("iOS simulator: install with its bundle id, launch, screenshot, record, flo
 });
 
 test("a real iPhone: install and launch through devicectl, the rest through its test helper once it's set up", async () => {
-  const [wda, mjpeg] = [await freePort(), await freePort()];
   const muxDir = tempDir("mux-");
   dirs.push(muxDir);
+  const [wda, mjpeg] = [path.join(muxDir, "wda.sock"), path.join(muxDir, "mjpeg.sock")];
   const mux = await fakeUsbmuxd(muxDir, [{ id: 5, serial: IPHONE }], { 8100: wda, 9100: mjpeg });
   let helper: IosHelper | null = null;
   const r = rig(
@@ -867,7 +889,7 @@ test("a real iPhone: install and launch through devicectl, the rest through its 
         );
         helper = new IosHelper({
           home: root,
-          env: { ...env, FAKE_WDA_PORT: String(wda), FAKE_MJPEG_PORT: String(mjpeg) },
+          env: { ...env, FAKE_WDA_SOCKET: wda, FAKE_MJPEG_SOCKET: mjpeg },
           log: () => {},
           now,
           usbmuxSocket: mux.file,

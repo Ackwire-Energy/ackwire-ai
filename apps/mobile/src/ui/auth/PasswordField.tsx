@@ -105,7 +105,12 @@ export function PasswordMeter({ password }: { password: string }) {
           />
         ))}
       </View>
-      <Text variant="footnote" tone={state === "ok" ? "ok" : state === "long" ? "danger" : "muted"}>
+      {/* It shrinks and wraps beside the cells: a long sentence (another language, larger text) ran past the edges. */}
+      <Text
+        variant="footnote"
+        tone={state === "ok" ? "ok" : state === "long" ? "danger" : "muted"}
+        style={{ flexShrink: 1 }}
+      >
         {text}
       </Text>
     </View>

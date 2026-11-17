@@ -71,12 +71,12 @@ export function DashboardsPage() {
                 <Link
                   to="/org/$orgId/dashboards/$dashboardId"
                   params={{ orgId: org.id, dashboardId: "home" }}
-                  className="ac-card db-card"
+                  className="ac-card ac-card--interactive db-card"
                 >
                   {homeCard}
                 </Link>
               ) : (
-                <Link to="/org/$orgId/home" params={{ orgId: org.id }} className="ac-card db-card">
+                <Link to="/org/$orgId/home" params={{ orgId: org.id }} className="ac-card ac-card--interactive db-card">
                   {homeCard}
                 </Link>
               )}
@@ -159,7 +159,7 @@ function BoardCard({ board: b, onHome = false }: { board: DashboardSummary; onHo
     <Link
       to="/org/$orgId/dashboards/$dashboardId"
       params={{ orgId: org.id, dashboardId: b.id }}
-      className="ac-card db-card"
+      className="ac-card ac-card--interactive db-card"
       aria-label={b.title}
     >
       <DashboardThumb thumbs={b.thumbs} />

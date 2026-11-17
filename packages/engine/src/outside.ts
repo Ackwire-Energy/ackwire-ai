@@ -1,5 +1,5 @@
 import { and, desc, type Executor, eq, inArray, isNull, or, schema, sql } from "@agenteschat/db";
-import { type AuthorityRun, fedByRoutine, type RunAuthority, runAuthority } from "./authority";
+import { type AuthorityRun, fedByRoutine, type RunAuthority, runAuthority, transcriptKeys } from "./authority";
 import { caches, cachesEnabled } from "./cache";
 import { postedBySql } from "./message-place";
 
@@ -144,7 +144,7 @@ async function outsideRun(db: Executor, orgId: string, runId: string) {
       orgId: agentRuns.orgId,
       triggerMessageId: agentRuns.triggerMessageId,
       background: agentRuns.background,
-      transcript: agentRuns.transcript,
+      transcript: transcriptKeys("steeredBy", "harnessTried"),
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));

@@ -18,12 +18,24 @@ import { useModalSheet } from "@/hooks/useModalSheet";
 import { useHeaderSearch } from "@/hooks/useWorkspaceSearch";
 
 /**
- * The channel header's search (Discord's): a field whose mini menu offers the filters and recent searches, Enter
- * shows the results in the panel (`onOpen`). On a phone, an icon that opens the search over the whole screen. It
- * starts in the channel it sits in (an `in:` chip the person may remove). In a DM (`dm`) it stays in the DM: no chip
- * to remove, no who or where to filter by, recent searches only those that fit it.
+ * The conversation header's search (Discord's): an icon that opens, in place, a field whose mini menu offers the
+ * filters and recent searches; Enter shows the results in the panel (`onOpen`). The field closes back to its icon on
+ * Escape or when the focus leaves it with nothing in it, and stays while it holds words or a filter, or while its
+ * results show (`searching`). On a phone the icon opens the search over the whole screen. It starts in the channel it
+ * sits in (an `in:` chip the person may remove). In a DM (`dm`) it stays in the DM: no chip to remove, no who or where
+ * to filter by, recent searches only those that fit it.
  */
-export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onOpen: () => void; dm?: boolean }) {
+export function HeaderSearch({
+  channelId,
+  onOpen,
+  searching = false,
+  dm,
+}: {
+  channelId: string;
+  onOpen: () => void;
+  searching?: boolean;
+  dm?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const ws = useHeaderSearch();
@@ -31,9 +43,20 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
   const narrow = useMatchMedia(DM_SIDE_NARROW_QUERY);
   const [sheet, setSheet] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const icon = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  /** Where the focus goes once the field or its icon is on the page. */
+  const focusNext = useRef<"field" | "icon" | null>(null);
   useEffect(() => {
     if (!ws) return;
-    ws.field.current = { focus: () => (phone ? setSheet(true) : input.current?.focus()) };
+    ws.field.current = {
+      focus: () => {
+        if (phone) return setSheet(true);
+        if (input.current) return input.current.focus();
+        focusNext.current = "field";
+        setOpen(true);
+      },
+    };
     return () => {
       ws.field.current = null;
     };
@@ -55,7 +78,29 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
   useEffect(() => {
     if (ws && held && heldKey !== ws.chips.map(searchChipKey).join(" ")) ws.setChips(held);
   });
+  const shownChips = (held ? held.slice(1) : ws?.chips) ?? [];
+  // The `in:` chip it starts with is where it is, not something the person put in it.
+  const holds =
+    Boolean(ws?.input.trim()) || shownChips.some((c) => !(c.op === "in" && c.place.id === place?.id)) || searching;
+  const field = open || holds;
+  // Its results can close, or its words go, while the focus is elsewhere: no blur is left to close it then.
+  useEffect(() => {
+    if (holds) setOpen(true);
+    else if (!input.current?.closest(".search-box")?.contains(document.activeElement)) setOpen(false);
+  }, [holds]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs as the field or its icon replaces the other.
+  useEffect(() => {
+    const to = focusNext.current;
+    if (!to) return;
+    focusNext.current = null;
+    (to === "field" ? input : icon).current?.focus();
+  }, [field]);
   if (!ws) return null;
+  const close = (refocus: boolean) => {
+    if (holds) return;
+    if (refocus) focusNext.current = "icon";
+    setOpen(false);
+  };
   const submit = () => {
     if (!ws.chips.length && !ws.input.trim()) return;
     ws.remember();
@@ -90,21 +135,28 @@ export function HeaderSearch({ channelId, onOpen, dm }: { channelId: string; onO
       }
       onPickRecent={ws.pickRecent}
       onClearRecent={() => ws.saveRecent([])}
+      {...(sheetBox ? {} : { onEscape: () => close(true), onLeave: () => close(false) })}
     />
   );
   const label = t("searchPage.label");
   return (
     <>
-      <Button
-        variant="ghost"
-        iconOnly
-        icon="search"
-        aria-label={label}
-        title={label}
-        className="channel__icon channel__search-icon"
-        onClick={() => setSheet(true)}
-      />
-      {!phone && box(false)}
+      {(phone || !field) && (
+        <Button
+          ref={icon}
+          variant="ghost"
+          iconOnly
+          icon="search"
+          aria-label={label}
+          className="channel__icon channel__search-icon"
+          onClick={() => {
+            if (phone) return setSheet(true);
+            focusNext.current = "field";
+            setOpen(true);
+          }}
+        />
+      )}
+      {!phone && field && box(false)}
       {phone && sheet && <SearchSheet label={label} onClose={() => setSheet(false)} box={box(true)} />}
     </>
   );

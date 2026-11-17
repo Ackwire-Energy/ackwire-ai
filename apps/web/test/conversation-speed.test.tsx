@@ -41,7 +41,7 @@ describe("conversations load fast", () => {
     expect(asked).toContain(GENERAL_ID);
   });
 
-  test("scrolling to the top loads the previous page, older first, without losing the newer ones", async () => {
+  test("scrolling to the top loads the previous page, older first, without losing the newer ones; its rows add no cache listeners", async () => {
     const state = seedState();
     state.messages = [...history(130), ...state.messages];
     const api = createFakeApi(state);
@@ -52,10 +52,15 @@ describe("conversations load fast", () => {
         pages.push({ before: options?.before, limit: options?.limit });
       return real(orgId, channelId, options);
     };
-    await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
+    const { services } = await renderApp(`/org/${ORG_ID}/c/${GENERAL_ID}`, { api });
     await settle(8);
     expect(document.body.textContent).toContain("Mensagem antiga 129");
     expect(document.body.textContent).not.toContain("Mensagem antiga 29");
+    // The cache calls every listener on every event, each observer a row adds included: one per row makes a long
+    // conversation draw in time that grows with the square of its rows.
+    const listeners = () =>
+      (services.queryClient.getQueryCache() as unknown as { listeners: Set<unknown> }).listeners.size;
+    const before = listeners();
     const list = screen().getByRole("region", { name: "Mensagens" });
     await act(async () => {
       fireEvent.wheel(list);
@@ -65,6 +70,7 @@ describe("conversations load fast", () => {
     expect(pages.at(-1)).toEqual({ before: history(130)[30]?.createdAt, limit: 50 });
     expect(document.body.textContent).toContain("Mensagem antiga 29");
     expect(document.body.textContent).toContain("Mensagem antiga 129");
+    expect(listeners()).toBe(before);
     // 180 messages rendered twice: ~2 s on a runner, more when it's busy; past 5 s the timeout broke the next files.
   }, 15_000);
 

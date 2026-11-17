@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "approvals_level" text DEFAULT 'risky' NOT NULL;

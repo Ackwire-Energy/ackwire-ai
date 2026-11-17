@@ -12,6 +12,7 @@ import {
   workspaceHeadline,
 } from "@agenteschat/client/lib/notifications";
 import type { Words } from "@agenteschat/client/lib/routine-view";
+import { teamWatchLine } from "@agenteschat/client/lib/team-watch";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Avatar, ComputerIcon, cx, Icon } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
@@ -181,6 +182,7 @@ type WhatKey =
   | "browserProfileRequest"
   | "desktopTaken"
   | "planLent"
+  | "planServes"
   | "planModelDropped"
   | "joinSuggestion"
   | "invitationAccepted"
@@ -188,6 +190,7 @@ type WhatKey =
   | "proposalWaiting"
   | "changeRequest"
   | "changeRequestAgent"
+  | "changeRequestAction"
   | "usageLimitWarning"
   | "usageLimitReachedSelf"
   | "usageLimitReached"
@@ -199,6 +202,9 @@ type WhatKey =
   | "approvalCoverEnded"
   | "rightHandDecided"
   | "rightHandPaused"
+  | "adminAskChannel"
+  | "adminAskCreate"
+  | "adminAskWebhook"
   | "reaction";
 
 /** The line on top of a row: who did what, where. */
@@ -247,6 +253,8 @@ export function Headline({
       <Trans i18nKey={key} values={{ name: agent, title: widget.title }} components={{ b: <b /> }} {...TYPED_VALUES} />
     );
   }
+  // What the right hand found (ADR 0177 §1): the problem itself. Who found it is the row's face and its top line.
+  if (n.kind === "team_watch") return <>{teamWatchLine(t, n)}</>;
   switch (n.kind) {
     case "mention":
       if (n.source.issueId) return k("mentionComment", { name });
@@ -299,6 +307,8 @@ export function Headline({
       const agent = n.source.label ?? "";
       return k("planLent", { name, agent, plan: n.latest.plan ?? "", context: agentGrammar(agent).context });
     }
+    case "plan_serves":
+      return k("planServes", { plan: n.latest.plan ?? "" });
     case "plan_model_dropped":
       return k("planModelDropped", {
         name,
@@ -346,6 +356,8 @@ export function Headline({
     case "proposal_waiting":
       return k("proposalWaiting", { names });
     case "change_request":
+      // A card of a workspace change sent on (`source.action`): neither about an agent nor a new one.
+      if (n.source.action) return k("changeRequestAction", { name });
       return k(n.source.proposalId ? "changeRequest" : "changeRequestAgent", { name, agent: n.source.label ?? "" });
     case "usage_limit": {
       // The person's own rows say a percent only; who decides reads the amount (ADR 0141).
@@ -371,6 +383,16 @@ export function Headline({
       return k("rightHandDecided", { name, count: n.count });
     case "right_hand_paused":
       return k("rightHandPaused", { name });
+    case "admin_ask":
+      return n.latest.reason === "channel_agent"
+        ? k("adminAskChannel", {
+            name,
+            agent: (n.source.agentId && dir.anyAgent(n.source.agentId)?.name) || t("channel.unknownAgent"),
+            label: n.source.label ?? "",
+          })
+        : n.latest.reason === "webhook"
+          ? k("adminAskWebhook", { name, service: n.latest.title ?? "" })
+          : k("adminAskCreate", { name });
     case "approval_cover":
       return k(
         n.latest.statusTo === "declined"

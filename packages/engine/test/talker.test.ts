@@ -163,6 +163,8 @@ describe("talker: fast replies while the task waits", () => {
     expect(snapshot.waitingOn).toEqual([expect.stringContaining(QUESTION)]);
     expect(prompt).toContain("já fez o deploy?");
     expect(prompt).toContain("faz o deploy da versão nova");
+    // Its steps name the task's tools, which people can't see or use.
+    expect(systemText(call?.request.system ?? "")).toContain("never the name of a tool (the names in `steps`)");
     expect(call?.request.outputSchema).toMatchObject({ required: ["action", "text"] });
 
     // Posted as the agent where the run answers (the main timeline), marked as a fast reply and a notice.

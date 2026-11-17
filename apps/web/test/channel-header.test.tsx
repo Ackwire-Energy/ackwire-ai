@@ -35,7 +35,7 @@ describe("the channel header, as Discord's", () => {
       "Configurações do canal",
       "Membros do canal (4)",
     ] as never);
-    expect(within(header).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(header).getByRole("button", { name: "Buscar" })).toBeTruthy();
     expect(header.querySelectorAll(".ac-avatar")).toHaveLength(0);
     expect(within(header).queryByRole("button", { name: "Detalhes do canal" })).toBeNull();
     expect(within(header).queryByRole("link", { name: "Buscar nesta conversa" })).toBeNull();

@@ -56,6 +56,15 @@ export const STORAGE_KEYS = {
    * "Create a new password" (ADR 0158).
    */
   newPasswordAsk: "agentes.newPasswordAsk",
+  /**
+   * sessionStorage: the new address typed in Sua conta › E-mail before signing in again instead of typing the code,
+   * filled in again when the dialog comes back.
+   */
+  emailChangeAsk: "agentes.emailChangeAsk",
+  /** sessionStorage: when this tab's window last traded the desktop app's sign-in (ms), for a deletion's proof. */
+  thisMacSignedInAt: "agentes.thisMac.signedInAt",
+  /** sessionStorage (JSON `{ to, at }`): the page to come back to after the desktop app signs the window in again. */
+  thisMacReturn: "agentes.thisMac.return",
   /** "0" when the person switched off the picture viewer's hover lens (on by default). */
   imageLens: "agentes.image.lens",
   /** The Drive's view: "grid" (default) or "list". */
@@ -84,16 +93,31 @@ export const STORAGE_KEYS = {
   paidReturn: "agentes.billing.paid",
   /** Prefix (`.<orgId>`, in `sessionStore`): the agents the onboarding imported there, with their models (JSON). */
   onboardingImports: "agentes.onboarding.imports",
+  /**
+   * In `sessionStore`: the install an agent's card opened in this tab (`CardInstall`, JSON), so the agent survives
+   * connecting GitHub on its site, and a link that only names an agent turns nothing on (`cardInstallAgent`).
+   */
+  skillInstallFor: "agentes.skills.installFor",
   /** In `sessionStore`: the address this tab signed up with, when the server emailed it a confirmation link. */
   confirmationSent: "agentes.confirmation.sent",
+  /** In `sessionStore`: Criar agente's steps as filled in, while a sign-in elsewhere reloads the app (lib/flow-return.ts). */
+  newAgentDraft: "agentes.newAgent.draft",
   /** In `sessionStore`: the last page this tab showed outside a flow, where the flow's exits go (lib/return-to.ts). */
   flowReturn: "agentes.flow.return",
   /** In `sessionStore`: my messages waiting for the connection (the shared `outbox`), kept through a reload. */
   outbox: "agentes.outbox",
+  /** In `sessionStore`: this tab is loading again as another of the browser's accounts (lib/accounts.ts, ADR 0183). */
+  accountMoved: "agentes.accountMoved",
+  /** When this browser's session last became another account's: the other tabs follow (lib/accounts.ts). */
+  accountChanged: "agentes.accountChanged",
+  /** The app icon this browser's tabs show (lib/app-icon.ts, ADR 0179); the desktop app keeps its own. */
+  appIcon: "agentes.appIcon",
   /** The app's sounds on this device: "tactile" (default), "sky", "pixel" or "off" (lib/sounds.ts). */
   sounds: "agentes.sounds",
   /** In `sessionStore`, this tab's id; in `storage`, the tab the person used last (it plays sounds while hidden). */
   soundTab: "agentes.sounds.tab",
+  /** The speed voice messages play at in this browser: "1" (default), "1.5" or "2" (lib/voice-speed.ts). */
+  voiceSpeed: "agentes.voice.speed",
   /** How many times our notifications ask showed by itself in this browser (`usePushAsk`, ADR 0071). */
   pushOffers: "agentes.push.offers",
   /** In `sessionStore`: when the boot last reloaded because the app's files didn't load (index.html keeps a copy). */

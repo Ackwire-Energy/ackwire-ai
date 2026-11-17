@@ -19,6 +19,7 @@ import {
 } from "@agenteschat/client";
 import {
   actionCardOf,
+  agentProposalEnd,
   type ConnectAppCard,
   connectAiDone,
   connectAppDone,
@@ -63,9 +64,16 @@ import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { MailIcon } from "@/components/MailConnect";
 import { useOrg } from "@/components/org-context";
 import { PersonLimitCardView } from "@/components/PeopleUsage";
-import { RequestCard, RequestDone, RequestFuse, RequestOpen, useExpired } from "@/components/RequestCard";
 import {
-  ApprovalsCardView,
+  type RequestAnswer,
+  RequestCard,
+  RequestDone,
+  RequestFuse,
+  RequestOpen,
+  useExpired,
+} from "@/components/RequestCard";
+import { ApprovalsCardView } from "@/components/RightHandApprovalsCard";
+import {
   MemberChangesCardView,
   OpenPageCardView,
   SettingsProposalCardView,
@@ -82,6 +90,7 @@ import { lookOf } from "@/lib/look";
 import { inlineWords } from "@/lib/markdown";
 import { inPlaceClick } from "@/lib/navigate";
 import { proposedRoutineWhen } from "@/lib/recurrence";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 import { expiryText } from "@/pages/ApprovalsPage";
 
@@ -135,7 +144,7 @@ export function ActionCard({ message }: { message: Message }) {
   if (card.kind === "person_limit") return <PersonLimitCardView message={message} card={card} />;
   if (card.kind === "connect_app") return <ConnectAppCardView card={card} />;
   if (card.kind === "invite_people") return <InviteCardView card={card} />;
-  if (card.kind === "install_skill") return <InstallSkillCardView card={card} />;
+  if (card.kind === "install_skill") return <InstallSkillCardView card={card} agentId={message.author.id} />;
   if (card.kind === "update_skills") return <UpdateSkillsCardView message={message} card={card} />;
   if (card.kind === "autonomy_proposal") return <CostlyProposalCardView message={message} card={card} />;
   if (card.kind === "team_week") return <TeamWeekCardView message={message} card={card} />;
@@ -249,13 +258,14 @@ function ConnectAppCardView({ card }: { card: ConnectAppCard }) {
 
 /**
  * "Install a skill" (`offer_install_skill`) as a waiting pill, its why and link under it: "Install" opens Install
- * skill with the link read, its skills listed to pick; who manages agents installs there. Done once the library has a
- * skill from that link.
+ * skill with the link read, its skills listed to pick; its box turns what installs on for the agent that posted the
+ * card (`agentId`). Who manages agents installs it for the team or for themselves, anyone else as their own personal
+ * skill. Done once the library has a skill from that link.
  */
-function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
+function InstallSkillCardView({ card, agentId }: { card: InstallSkillCard; agentId?: string | null }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const may = can(org, "manage_agents");
+  const admin = can(org, "manage_agents");
   const skills = useSkills(org.id);
   const [open, setOpen] = useState(false);
   const title = t("actionCard.install_skill.title");
@@ -269,15 +279,20 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
   return (
     <>
       <RequestOpen
-        mine={may}
+        mine
         icon="book"
         label={title}
         action={
-          may ? (
-            <EventPillAction primary onClick={() => setOpen(true)}>
-              {t("actionCard.install_skill.open")}
-            </EventPillAction>
-          ) : undefined
+          <EventPillAction
+            primary
+            onClick={() => {
+              // Kept for the way back from connecting GitHub on its site (SkillsSection).
+              if (agentId) sessionStore.set(STORAGE_KEYS.skillInstallFor, JSON.stringify({ url: card.url, agentId }));
+              setOpen(true);
+            }}
+          >
+            {t("actionCard.install_skill.open")}
+          </EventPillAction>
         }
         below={
           <>
@@ -285,20 +300,19 @@ function InstallSkillCardView({ card }: { card: InstallSkillCard }) {
             <p>
               <code>{card.url}</code>
             </p>
-            {!may && <p>{t("actionCard.install_skill.adminOnly")}</p>}
           </>
         }
       >
         {title}
       </RequestOpen>
-      {may && (
-        <InstallSkillDialog
-          open={open}
-          onOpenChange={setOpen}
-          onInstalled={() => {}}
-          initialUrl={open ? card.url : undefined}
-        />
-      )}
+      <InstallSkillDialog
+        open={open}
+        onOpenChange={setOpen}
+        onInstalled={() => {}}
+        initialUrl={open ? card.url : undefined}
+        forAgentId={agentId ?? undefined}
+        scope={admin ? undefined : "personal"}
+      />
     </>
   );
 }
@@ -525,201 +539,165 @@ export function AgentProposalCardView({
       />
     );
   }
-  if (status === "open") {
-    const end = Date.parse(card.expiresAt);
-    const span = Math.max(1, end - Date.parse(sentAt) || DAY_MS);
-    return (
-      <>
-        <RequestCard
-          id={messageId}
-          kind="agent"
-          agent={agent}
-          label={title}
-          mine={decides}
-          waitingFor={t(asks && !card.askedAt ? "rightHand.card.onlyCreators" : "proposals.waitingAdmin")}
-          lead={why || title}
-          object={{
-            logo: <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />,
-            title: draft.name,
-            // The AI comes last: where the line runs out, it is what gives way.
-            detail: [`@${draft.handle}`, draft.role, suggestedAiText(t, draft.ai)].filter(Boolean).join(" · "),
-          }}
-          body={
-            delegated || lines.length > 0 ? (
-              <>
-                <DelegateNote d={delegate} />
-                {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
-              </>
-            ) : undefined
-          }
-          actions={
-            decides ? (
-              <>
-                <Button
-                  size="sm"
-                  variant="primary"
-                  loading={create.isPending}
-                  disabled={deny.isPending}
-                  icon={test ? "bolt" : undefined}
-                  onClick={() =>
-                    create.mutate(
-                      { messageId, test },
-                      {
-                        // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
-                        // created all the same, and Connect opens for it. Tried: its DM, the task in the composer.
-                        onSuccess: ({ agent: made, ai, testChannelId }) => {
-                          if (ai === "none") connect?.open({ agentId: made.id, agentIds: [made.id] });
-                          else if (testChannelId) {
-                            if (firstTask) setDraftFor(`agent:${made.id}`, firstTask);
-                            void navigate({
-                              to: "/org/$orgId/dm/agent/$agentId",
-                              params: { orgId: org.id, agentId: made.id },
-                            });
-                          }
-                        },
-                        onError: failed,
-                      },
-                    )
-                  }
-                >
-                  {test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
-                </Button>
-                <Button size="sm" disabled={busy} onClick={() => setReviewing(true)}>
-                  {t(rightHand ? "rightHand.card.editFirst" : "actionCard.agentProposal.review")}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={rightHand ? "ghost" : undefined}
-                  loading={deny.isPending}
-                  disabled={create.isPending}
-                  onClick={() => deny.mutate(messageId, { onError: failed })}
-                >
-                  {t(rightHand ? "rightHand.card.dismiss" : "approval.refuse")}
-                </Button>
-              </>
-            ) : sent ? (
-              <span className="rq__sent ac-iconline">
-                <Icon name="arrowUp" size={14} />
-                <span>{sent}</span>
-              </span>
-            ) : asks ? (
+  // Created, refused or expired: the same card, how it ended where its buttons were, and what can still be done
+  // (its page, a routine left to make) under its lines. No one decided one that ran out: it expired at its deadline.
+  const open = status === "open";
+  const byRightHand =
+    status === "created" && delegated && (delegate?.state === "approved" || delegate?.state === "undone");
+  const at = byRightHand ? delegate?.at : status === "expired" ? card.expiresAt : card.decidedAt;
+  const decider = dir.memberById.get(card.decidedByUserId ?? "")?.name;
+  const answer: RequestAnswer | undefined = open
+    ? undefined
+    : {
+        done: byRightHand ? delegate?.state === "approved" : status === "created",
+        text: byRightHand ? delegated : agentProposalEnd(t, card, status, me.user.id, decider),
+        note:
+          byRightHand && delegate?.state === "approved"
+            ? delegateUndoLine(t, i18n.language, delegate, draft.name)
+            : undefined,
+        time: at ? whenAt(t, i18n.language, at) : undefined,
+        action: byRightHand ? <DelegateUndo d={delegate} /> : undefined,
+      };
+  const after = status === "created" && (card.agentId || routineLeft(card)) && (
+    <div className="ac-acts">
+      {card.agentId && (
+        <Button asChild size="sm" variant="ghost">
+          {/* In a conversation, its page opens in the panel beside it. */}
+          <Link
+            to="/org/$orgId/agents/$agentId"
+            params={{ orgId: org.id, agentId: card.agentId }}
+            onClick={openPanel ? (e) => inPlaceClick(e, () => card.agentId && openPanel(card.agentId)) : undefined}
+          >
+            {t("newAgent.openProfile")}
+          </Link>
+        </Button>
+      )}
+      {routineLeft(card) && (card.decidedByUserId === me.user.id || can(org, "manage_routines")) && (
+        // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+        <Button
+          size="sm"
+          variant="ghost"
+          loading={makeRoutine.isPending}
+          onClick={() => makeRoutine.mutate(messageId, { onError: failed })}
+        >
+          {t("newAgent.routineKeep", { name: draft.routine?.name })}
+        </Button>
+      )}
+    </div>
+  );
+  const end = Date.parse(card.expiresAt);
+  const span = Math.max(1, end - Date.parse(sentAt) || DAY_MS);
+  return (
+    <>
+      <RequestCard
+        id={messageId}
+        kind="agent"
+        agent={agent}
+        label={title}
+        mine={decides}
+        waitingFor={t(asks && !card.askedAt ? "rightHand.card.onlyCreators" : "proposals.waitingAdmin")}
+        answer={answer}
+        lead={(byRightHand && delegate?.reason) || why || title}
+        object={{
+          logo: <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />,
+          title: draft.name,
+          // The AI comes last: where the line runs out, it is what gives way.
+          detail: [`@${draft.handle}`, draft.role, suggestedAiText(t, draft.ai)].filter(Boolean).join(" · "),
+        }}
+        body={
+          (open && delegated) || lines.length > 0 || after ? (
+            <>
+              {open && <DelegateNote d={delegate} />}
+              {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
+              {after}
+            </>
+          ) : undefined
+        }
+        actions={
+          !open ? undefined : decides ? (
+            <>
               <Button
                 size="sm"
                 variant="primary"
-                icon="arrowUp"
-                loading={ask.isPending}
-                onClick={() => ask.mutate(messageId, { onError: failed })}
+                loading={create.isPending}
+                disabled={deny.isPending}
+                icon={test ? "bolt" : undefined}
+                onClick={() =>
+                  create.mutate(
+                    { messageId, test },
+                    {
+                      // Nothing to think with yet (the clicker's accounts decide, not the suggestion): it is
+                      // created all the same, and Connect opens for it. Tried: its DM, the task in the composer.
+                      onSuccess: ({ agent: made, ai, testChannelId }) => {
+                        if (ai === "none") connect?.open({ agentId: made.id, agentIds: [made.id] });
+                        else if (testChannelId) {
+                          if (firstTask) setDraftFor(`agent:${made.id}`, firstTask);
+                          void navigate({
+                            to: "/org/$orgId/dm/agent/$agentId",
+                            params: { orgId: org.id, agentId: made.id },
+                          });
+                        }
+                      },
+                      onError: failed,
+                    },
+                  )
+                }
               >
-                {t("rightHand.card.askAdmin")}
+                {test ? t("rightHand.card.createTest") : t("newAgent.create", { name: draft.name })}
               </Button>
-            ) : undefined
-          }
-          end={<RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />}
-          what={draft.name}
-          locked={busy || ask.isPending}
-        />
-        {reviewing && (
-          // Over the conversation: creating, saying no or leaving closes it, and the person is where they were.
-          <Dialog
-            bare
-            open
-            onOpenChange={(open) => !open && setReviewing(false)}
-            title={t("actionCard.agentProposal.reviewTitle", { name: draft.name })}
-            closeLabel={t("common.close")}
-            width={1200}
-            className="newag-dialog"
-          >
-            <Suspense fallback={<Spinner />}>
-              <NewAgentPage proposalId={messageId} onClose={() => setReviewing(false)} />
-            </Suspense>
-          </Dialog>
-        )}
-      </>
-    );
-  }
-  // Created, refused or expired: one line. No one decided one that ran out: it expired at its deadline.
-  const byRightHand =
-    status === "created" && delegated && (delegate?.state === "approved" || delegate?.state === "undone");
-  const ended =
-    status === "created"
-      ? t("actionCard.agentProposal.created")
-      : t(status === "denied" ? "proposals.refused" : "approval.expired");
-  const at = status === "expired" ? card.expiresAt : card.decidedAt;
-  const details = (
-    <>
-      <span className="ac-faceline">
-        <AgentAvatar name={draft.name} appearance={lookOf(draft)} size="md" />
-        <span className="list-col">
-          <b className="ac-captop">{draft.name}</b>{" "}
-          <span className="small muted">{[`@${draft.handle}`, draft.role].filter(Boolean).join(" · ")}</span>
-        </span>
-      </span>
-      {byRightHand && delegate?.reason ? <p>{inlineWords(delegate.reason)}</p> : why && <p>{inlineWords(why)}</p>}
-      {lines.length > 0 && <ProposalLines lines={lines} draft={draft} />}
-      {byRightHand && delegate?.state === "approved" ? (
-        <span className="small muted ac-iconline">
-          <Icon name="clock" size={14} />
-          <span>{delegateUndoLine(t, i18n.language, delegate, draft.name)}</span>
-        </span>
-      ) : (
-        <span className="small muted ac-iconline">
-          <Icon name="bolt" size={14} />
-          <span>{suggestedAiText(t, draft.ai)}</span>
-        </span>
-      )}
-      {status === "created" && (card.agentId || routineLeft(card)) && (
-        <div className="ac-acts">
-          {card.agentId && (
-            <Button asChild size="sm" variant="ghost">
-              {/* In a conversation, its page opens in the panel beside it. */}
-              <Link
-                to="/org/$orgId/agents/$agentId"
-                params={{ orgId: org.id, agentId: card.agentId }}
-                onClick={openPanel ? (e) => inPlaceClick(e, () => card.agentId && openPanel(card.agentId)) : undefined}
+              <Button size="sm" disabled={busy} onClick={() => setReviewing(true)}>
+                {t(rightHand ? "rightHand.card.editFirst" : "actionCard.agentProposal.review")}
+              </Button>
+              <Button
+                size="sm"
+                variant={rightHand ? "ghost" : undefined}
+                loading={deny.isPending}
+                disabled={create.isPending}
+                onClick={() => deny.mutate(messageId, { onError: failed })}
               >
-                {t("newAgent.openProfile")}
-              </Link>
-            </Button>
-          )}
-          {routineLeft(card) && (card.decidedByUserId === me.user.id || can(org, "manage_routines")) && (
-            // Not made with it (the agent wasn't where it reports yet): made from here once it is.
+                {t(rightHand ? "rightHand.card.dismiss" : "approval.refuse")}
+              </Button>
+            </>
+          ) : sent ? (
+            <span className="rq__sent ac-iconline">
+              <Icon name="arrowUp" size={14} />
+              <span>{sent}</span>
+            </span>
+          ) : asks ? (
             <Button
               size="sm"
-              variant="ghost"
-              loading={makeRoutine.isPending}
-              onClick={() => makeRoutine.mutate(messageId, { onError: failed })}
+              variant="primary"
+              icon="arrowUp"
+              loading={ask.isPending}
+              onClick={() => ask.mutate(messageId, { onError: failed })}
             >
-              {t("newAgent.routineKeep", { name: draft.routine?.name })}
+              {t("rightHand.card.askAdmin")}
             </Button>
-          )}
-        </div>
+          ) : undefined
+        }
+        end={
+          open && <RequestFuse left={Math.max(0, end - Date.now()) / span} agent={agent} text={expiryText(t, card)} />
+        }
+        what={draft.name}
+        locked={busy || ask.isPending}
+      />
+      {reviewing && (
+        // Over the conversation: creating, saying no or leaving closes it, and the person is where they were.
+        <Dialog
+          bare
+          open
+          onOpenChange={(open) => !open && setReviewing(false)}
+          title={t("actionCard.agentProposal.reviewTitle", { name: draft.name })}
+          closeLabel={t("common.close")}
+          width={1200}
+          className="newag-dialog"
+        >
+          <Suspense fallback={<Spinner />}>
+            <NewAgentPage proposalId={messageId} onClose={() => setReviewing(false)} />
+          </Suspense>
+        </Dialog>
       )}
     </>
-  );
-  if (byRightHand)
-    return (
-      <RequestDone
-        done={delegate?.state === "approved"}
-        label={title}
-        action={<DelegateUndo d={delegate} />}
-        more={{
-          label: t(delegate?.state === "approved" ? "rightHandApprovals.card.why" : "approval.seeDetails"),
-          content: details,
-        }}
-        time={delegate?.at ? whenAt(t, i18n.language, delegate.at) : undefined}
-      >
-        <b>{draft.name}</b> · {delegated}
-      </RequestDone>
-    );
-  return (
-    <RequestDone
-      done={status === "created"}
-      label={title}
-      more={{ label: t("approval.seeDetails"), content: details }}
-      time={at ? whenAt(t, i18n.language, at) : undefined}
-    >
-      {ended}: <b>{draft.name}</b>
-    </RequestDone>
   );
 }
 

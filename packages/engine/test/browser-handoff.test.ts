@@ -1529,6 +1529,20 @@ describe("live view", () => {
     expect(b.got[0]).toMatchObject({ type: "browser.unavailable", reason: "offline" });
   });
 
+  test("a browser a person drives from here gets no keep-alive read in front of their clicks", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(20);
+    expect(calls.some((c) => c.op === "browser.stream.start" && c.mode === "control")).toBe(true);
+    const before = calls.length;
+    expect(await live.keepAlive()).toBe(0);
+    expect(calls.slice(before).some((c) => c.op === "browser.act")).toBe(false);
+    live.close();
+  });
+
   test("a handoff changed on another server reaches the live view here", async () => {
     await start();
     const { hub, calls } = fakeHub();

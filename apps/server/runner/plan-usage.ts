@@ -9,7 +9,7 @@ import {
 } from "@agenteschat/adapters/machine-protocol";
 import { type PlanId, planOf } from "@agenteschat/providers/plans";
 import { killTree } from "./exec";
-import { resolveCommand } from "./executors";
+import { cliSpawn } from "./executors";
 
 /**
  * Plan usage (protocol 19), read without touching any token: the CLIs and the
@@ -300,6 +300,11 @@ export interface UsageProbe {
   cwd: string;
   env: NodeJS.ProcessEnv;
   timeoutMs?: number;
+  /**
+   * Written to a fourth pipe (descriptor 3) and closed: a token the CLI reads there at its start
+   * (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`), so neither its environment nor its arguments hold it.
+   */
+  fd3?: string;
 }
 
 /**
@@ -314,18 +319,17 @@ export function jsonLines<T>(
   onLine: (msg: Record<string, unknown>, send: (msg: unknown) => void) => T | null | undefined,
 ): Promise<T | null> {
   return new Promise((resolve) => {
-    const [file, ...pre] = p.command;
+    const run = cliSpawn(p.command, args, p.env.PATH);
     let child: ChildProcess;
     try {
-      child = spawn(resolveCommand(file ?? "", p.env.PATH), [...pre, ...args], {
+      child = spawn(run.file, run.args, {
         cwd: p.cwd,
-        env: p.env,
-        stdio: ["pipe", "pipe", "ignore"],
+        env: run.env ? { ...p.env, ...run.env } : p.env,
+        stdio: p.fd3 === undefined ? ["pipe", "pipe", "ignore"] : ["pipe", "pipe", "ignore", "pipe"],
         windowsHide: true,
         // Its own process group: the kill reaches what it started (posix).
         detached: process.platform !== "win32",
-        // Windows finds `claude.cmd` / `codex.cmd` only through the shell (argv: fixed words).
-        shell: process.platform === "win32" && p.command.length === 1,
+        windowsVerbatimArguments: run.windowsVerbatimArguments,
       });
     } catch {
       resolve(null);
@@ -349,6 +353,11 @@ export function jsonLines<T>(
       }
     };
     child.stdin?.on("error", () => {});
+    if (p.fd3 !== undefined) {
+      const pipe = child.stdio[3] as NodeJS.WritableStream | null | undefined;
+      pipe?.on("error", () => {});
+      pipe?.end(`${p.fd3}\n`);
+    }
     (child as unknown as EventEmitter).on("error", () => finish(null));
     if (!child.stdout) return finish(null);
     const lines = createInterface({ input: child.stdout, crlfDelay: Number.POSITIVE_INFINITY });
@@ -406,6 +415,36 @@ export function probeClaudeUsage(p: UsageProbe): Promise<PlanUsage | null> {
   );
 }
 
+/** A token check: the cheapest model, no tools, a one-word answer (Claude refuses it before any token when full). */
+export const CLAUDE_TOKEN_CHECK_ARGS = [
+  ...CLAUDE_PROBE_ARGS,
+  "--model",
+  "haiku",
+  "--tools",
+  "",
+  "--system-prompt",
+  "Reply with one word.",
+];
+
+/**
+ * A Claude setup token's plan, read the only way a token allows: one turn on the cheapest model, whose
+ * `rate_limit_event` (`withRateLimit`, from `prev`) says where each window stands and whether it refused. The reading,
+ * or null when it said nothing (the CLI failed, a network error).
+ */
+export function checkClaudeToken(p: UsageProbe, prev: PlanUsage | undefined): Promise<PlanUsage | null> {
+  let reading: PlanUsage | null = null;
+  return jsonLines(
+    p,
+    CLAUDE_TOKEN_CHECK_ARGS,
+    (send) =>
+      send({ type: "user", message: { role: "user", content: "ok" }, parent_tool_use_id: null, session_id: "" }),
+    (msg) => {
+      if (msg.type === "rate_limit_event") reading = withRateLimit(reading ?? prev, msg.rate_limit_info) ?? reading;
+      return msg.type === "result" ? reading : undefined;
+    },
+  );
+}
+
 /** `account/rateLimits/read` on a short-lived `codex app-server` (after `initialize`): the snapshot, or null. */
 export function probeCodexUsage(p: UsageProbe): Promise<PlanUsage | null> {
   return jsonLines(
@@ -447,46 +486,82 @@ export function resetFromWords(text: string, now = Date.now()): string | undefin
   return ms > 0 ? iso(now + ms) : undefined;
 }
 
+/** A name without the panel's info glyphs (ⓘ), bullets and trailing punctuation. */
+const agyName = (s: string) => s.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "");
+/** A limit line of Antigravity's report: which window, and what comes before its words (Argon's own name). */
+const agyLimit = (line: string) => {
+  const m = /five[- ]hour|weekly|seven[- ]day/i.exec(line);
+  if (!m) return null;
+  return {
+    which: /^five/i.test(m[0]) ? ("five_hour" as const) : ("seven_day" as const),
+    prefix: agyName(line.slice(0, m.index)),
+  };
+};
+
 /**
- * The Antigravity CLI's `/usage` report (ADR 0143), printed in print mode: per model group, its "Five Hour Limit
- * Remaining" and "Weekly Limit Remaining" as percentages left (antigravity.google/docs/models' View Usage panel, read
- * 2026-11-04), with when each refreshes where it says. The first group's (Gemini's) are the plan's windows; another
- * group's ("Claude and GPT models") come as `other` with its name.
- * ponytail: read from the docs' panel, not a real report; the probe drops what it can't read.
+ * The Antigravity CLI's `/usage` report (ADR 0143), printed in print mode: per model group ("Gemini Models", "Claude
+ * and GPT models", "Gemini 4 Argon"), its five-hour and weekly limits, with when each refreshes. The first group's
+ * (Gemini's) are the plan's windows; every other group's come as `other` named `<group> · 5h|7d`: a model group's own
+ * quota, which binds only that group's models (`planBinding`), never the whole account (`planState`).
+ *
+ * Two shapes: the CLI's (1.5.6, read 2026-11-14), one tab-separated row per quota (`Gemini Models\tWeekly Limit
+ * Remaining\t98%\t2026-11-21T21:48:50Z`, the percent `disabled` where the plan has none, its reset an ISO time); and
+ * the docs' panel (antigravity.google/docs/models' View Usage panel), the group on a line of its own above its quotas
+ * (a group starts at any short line without a % that limit lines follow, whatever its words), a reset in words.
+ * Every percentage is what is left, whether or not the line says "Remaining" (Argon's "Weekly Limit\t99%"); only a
+ * line that says "used" counts up.
  */
 export function antigravityUsage(text: string, source: PlanUsage["source"], now = Date.now()): PlanUsage | null {
   const lines = text
     // biome-ignore lint/suspicious/noControlCharactersInRegex: the CLI's colors
     .replace(/\u001b\[[0-9;]*m/g, "")
-    .split("\n")
-    .map((l) => l.trim());
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
   const windows: PlanWindow[] = [];
   let group = "";
   let first: string | undefined;
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    const which = /five[- ]hour/i.test(line) ? "five_hour" : /weekly|seven[- ]day/i.test(line) ? "seven_day" : null;
-    if (!which) {
-      if (/\bmodels?\b/i.test(line) && !/%/.test(line) && line.length <= 60) {
-        group = line.replace(/[:]+$/, "");
-      }
-      continue;
-    }
-    const near = `${line} ${lines[i + 1] ?? ""}`;
-    const left = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(near);
-    if (!left?.[1]) continue;
-    const remaining = /remaining|left/i.test(line);
-    const used = remaining ? 100 - Number(left[1]) : Number(left[1]);
-    const at = resetFromWords(`${near} ${lines[i + 2] ?? ""}`, now);
-    first ??= group;
-    const other = group !== first && group;
+  const add = (where: string, which: "five_hour" | "seven_day", used: number, at: string | undefined) => {
+    first ??= where;
     windows.push({
-      ...(other
-        ? { kind: "other" as const, label: label(`${group} · ${which === "five_hour" ? "5h" : "7d"}`) }
+      ...(where !== first && where
+        ? { kind: "other" as const, label: label(`${where} · ${which === "five_hour" ? "5h" : "7d"}`) }
         : { kind: which }),
       usedPercent: percent(used),
       ...(at ? { resetsAt: at } : {}),
     });
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    const cells = line.split("\t").map((c) => c.trim());
+    const row = cells.length >= 3 ? agyLimit(cells[1] ?? "") : null;
+    if (row) {
+      // The CLI's row: a quota that's `disabled` (no number) is no window.
+      const left = /^(\d{1,3}(?:\.\d+)?)\s*%$/.exec(cells[2] ?? "");
+      const at = cells[3] && !Number.isNaN(Date.parse(cells[3])) ? resetIso(cells[3]) : undefined;
+      if (left?.[1]) add(cells[0] ?? "", row.which, 100 - Number(left[1]), at);
+      continue;
+    }
+    // The docs' panel.
+    const limit = agyLimit(line);
+    if (!limit) {
+      const header = !/%|\b(?:resets?|refresh)/i.test(line) && line.length <= 60;
+      if (header && agyLimit(lines[i + 1] ?? "")) group = agyName(line);
+      continue;
+    }
+    if (limit.prefix) group = limit.prefix;
+    const j = /%/.test(line) ? i : i + 1;
+    const shown = lines[j] ?? "";
+    const pct = /(\d{1,3}(?:\.\d+)?)\s*%/.exec(shown);
+    if (!pct?.[1]) continue;
+    const used = /\bused\b/i.test(`${line} ${shown}`) ? Number(pct[1]) : 100 - Number(pct[1]);
+    const after = lines[j + 1] ?? "";
+    add(
+      group,
+      limit.which,
+      used,
+      resetFromWords(`${line} ${shown} ${agyLimit(after) || /%/.test(after) ? "" : after}`, now),
+    );
   }
   return snapshot(windows, source, now);
 }

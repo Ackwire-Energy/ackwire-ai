@@ -52,6 +52,11 @@ describe("a receipt never changes a message's height", () => {
       said("p1", "Bom dia.", 20),
       said("j3", "Sobre o quê?", 19.8, { author: { type: "person", id: "u-joao" } }),
       said("p2", "Sobre a reunião.", 19.5),
+      said("j4", "Certo.", 19),
+      // An ordinary message Ada read and answered: the plain double check the read mark must equal.
+      said("p3", "Obrigado.", 18.5, {
+        receipts: { seenBy: [ADA_ID], pickedBy: [], handled: [{ agentId: ADA_ID, runId: "r0", status: "done" }] },
+      }),
     ];
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(8);
@@ -68,17 +73,29 @@ describe("a receipt never changes a message's height", () => {
       steerStore.apply({ type: "agent.run.read", channelId: ENG_ID, runId: "r1", agentId: ADA_ID, messageIds: ["s2"] });
     });
     await settle(4);
-    // My own rows: the mark ends the time's line. Waiting for the next pause: the spinner.
-    const waiting = row("s1").querySelector(".ac-msg__own-foot .ac-receipt__check");
-    expect(waiting?.getAttribute("data-steer")).toBe("waiting");
-    expect(waiting?.querySelector("canvas.ac-pixspin")).not.toBeNull();
-    // Read: Ada's face, in the same place.
+    // My own rows: the mark ends the time's line. Waiting for the next pause: no mark (it was sent; a spinner or a
+    // clock there reads as a message that never arrived).
+    expect(row("s1").querySelector(".ac-msg__own-foot .ac-receipt__check")).toBeNull();
+    expect(row("s1").querySelector("canvas.ac-pixspin")).toBeNull();
+    // Read: the double check every read message has, in the same place and size, and no face in the bubble. Who
+    // read it is in the mark's words.
     const read = row("s2").querySelector(".ac-msg__own-foot .ac-receipt__check");
     expect(read?.getAttribute("data-steer")).toBe("read");
-    expect(read?.querySelector(".ac-avatar")).not.toBeNull();
+    expect(read?.querySelector(".ac-avatar")).toBeNull();
+    const says = [
+      read?.getAttribute("aria-label"),
+      document.getElementById(read?.getAttribute("aria-describedby") ?? "")?.textContent,
+    ];
+    expect(says).toContain("Ada leu");
+    // The same drawing and no size of its own (an inline size would beat the CSS that sizes the plain check).
+    const plain = row("p3").querySelector(".ac-msg__own-foot .ac-receipt__check");
+    expect(plain?.querySelector("svg")).not.toBeNull();
+    expect(read?.querySelector("svg")?.outerHTML).toBe(plain?.querySelector("svg")?.outerHTML as string);
+    expect(read?.querySelector("svg")?.getAttribute("style")).toBeNull();
+    expect(read?.querySelectorAll("svg.ac-icon")).toHaveLength(1);
     // Nothing under the text: the same parts as the messages beside them that no task read.
     expect(parts("s1")).toEqual(parts("p1"));
-    expect(parts("s2")).toEqual(parts("p2"));
+    expect(parts("s2")).toEqual(parts("p3"));
     expect(document.querySelector(".msg-steer")).toBeNull();
   });
 
@@ -170,7 +187,7 @@ describe("a receipt never changes a message's height", () => {
     expect(
       value(
         kit,
-        ".ac-msg:has(> .ac-msg__body > .ac-msg__aside--floating:not(:empty)) > .ac-msg__body > .ac-msg__actions",
+        ".ac-msg:has(> .ac-msg__gutter--aside .ac-msg__aside:not(:empty)) > .ac-msg__body > .ac-msg__actions",
         "right",
       ),
     ).toBeUndefined();
@@ -187,10 +204,12 @@ describe("a receipt never changes a message's height", () => {
     expect(value(app, ".ac-receipt__seen", "width")).toBeUndefined();
     expect(px(value(app, ".ac-receipt__seen", "height"))).toBe(16);
     // The mark ends the first line: right after the time in the name's line (never pushed to the row's far end), or
-    // floated on a grouped message's text.
+    // in a grouped message's gutter, ending 4px short of its words.
     expect(value(kit, ".ac-msg__head > .ac-msg__aside", "align-self")).toBe("center");
     expect(value(kit, ".ac-msg__aside", "margin-left")).toBeUndefined();
-    expect(value(kit, ".ac-msg__aside--floating", "float")).toBe("right");
+    expect(value(kit, ".ac-msg__gutter--aside > .ac-msg__aside", "margin-right")).toBe(
+      "calc(var(--space-1) - var(--space-3))",
+    );
     // On my own rows it ends the time's line, no taller than the time, so it never adds a line either.
     expect(px(value(kit, ".ac-msg__own-foot > .ac-msg__aside", "height"))).toBe(16);
     expect(px(value(kit, ".ac-msg__own-time", "min-height"))).toBe(16);
@@ -227,20 +246,23 @@ describe("its words stay reachable", () => {
       steerStore.apply({ type: "agent.run.steered", channelId: ENG_ID, runId: "r2", agentId: ADA_ID, messageId: "s2" });
     });
     await settle(4);
+    // Waiting for the next pause: no mark on either (they were sent; a mark there reads as one that never arrived).
+    expect(row("s1").querySelector(".ac-receipt__check")).toBeNull();
+    expect(row("s2").querySelector(".ac-receipt__check")).toBeNull();
+    await act(async () => {
+      steerStore.apply({ type: "agent.run.read", channelId: ENG_ID, runId: "r1", agentId: ADA_ID, messageIds: ["s1"] });
+      steerStore.apply({ type: "agent.run.read", channelId: ENG_ID, runId: "r2", agentId: ADA_ID, messageIds: ["s2"] });
+    });
+    await settle(2);
     const check = row("s1").querySelector(".ac-receipt__check") as HTMLElement;
     const live = row("s1").querySelector(".ac-msg__aside .ac-visually-hidden[aria-live='polite']") as HTMLElement;
-    expect(live.textContent).toBe("Ada lê na próxima pausa");
+    expect(live.textContent).toBe("Ada leu");
     // The agents' words name the mark; what became of it in the task describes it.
     expect(check.getAttribute("aria-label")).toBe("Vista por Ada. Ada está respondendo");
     expect(check.getAttribute("aria-describedby")).toBe(live.id);
-    await act(async () => {
-      steerStore.apply({ type: "agent.run.read", channelId: ENG_ID, runId: "r1", agentId: ADA_ID, messageIds: ["s1"] });
-    });
-    await settle(2);
-    expect(live.textContent).toBe("Ada leu");
     // A message no agent was asked about: the words name the mark itself.
     const alone = row("s2").querySelector(".ac-receipt__check") as HTMLElement;
-    expect(alone.getAttribute("aria-label")).toBe("Ada lê na próxima pausa");
+    expect(alone.getAttribute("aria-label")).toBe("Ada leu");
     expect(alone.hasAttribute("aria-describedby")).toBe(false);
     // From the keyboard too: a button that opens the agents and, under them, what became of it.
     expect(check.tagName).toBe("BUTTON");

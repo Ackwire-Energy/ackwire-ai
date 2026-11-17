@@ -1,10 +1,11 @@
 import type { Dashboard, HomeTile } from "@agenteschat/client";
-import { useHomeBoard } from "@agenteschat/client";
+import { frozenBoard, useHomeBoard } from "@agenteschat/client";
 import { GroupHeading } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { NewWidgetDialog } from "@/components/dashboards/NewWidgetDialog";
+import { useOrg } from "@/components/org-context";
 import { useOpenParam } from "@/lib/open-param";
 import { BoardActionsPill } from "./parts";
 import { BoardTile, type TileOrganize, WidgetBoard } from "./WidgetBoard";
@@ -36,15 +37,16 @@ const DEFAULT_TILES: HomeTile[] = [
  */
 export function HomeMural({ orgId, waiting, working }: { orgId: string; waiting: MuralTile; working: MuralTile }) {
   const { t } = useTranslation();
+  const { org } = useOrg();
   const home = useHomeBoard(orgId);
   const [arranging, setArranging] = useState(false);
   const [adding, setAdding] = useState(false);
   const [widgetId, setWidgetId] = useOpenParam("widget");
-  const own = withTiles(home.own ?? placeholder(orgId));
-  const chosen = home.chosen;
+  const own = withTiles(frozenBoard(home.own ?? placeholder(orgId), org));
+  const chosen = home.chosen && frozenBoard(home.chosen, org);
   // While a chosen board loads, only the own home's fixed tiles; its widgets stay in "My Home".
   const tilesBoard = home.chosenId ? { ...own, widgets: [] } : own;
-  const ownEditable = Boolean(home.own?.canEdit);
+  const ownEditable = own.canEdit;
   const editable = chosen ? chosen.canEdit || ownEditable : ownEditable;
   const title = home.chosenId ? (chosen?.title ?? home.chosenTitle ?? "") : t("widgets.home");
   const count = home.chosenId ? (chosen?.widgets.length ?? 0) : own.widgets.length;

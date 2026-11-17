@@ -69,6 +69,25 @@ export function audienceWith(agent: Agent, userId: string): AgentAudience | null
   };
 }
 
+/** Whether people with `role` talk to the agent through it: it answers everyone, or its people list the role. */
+export function roleTalksTo(role: Pick<OrgRole, "id" | "kind">, agent: Agent) {
+  const a = audienceOf(agent);
+  return a.mode === "everyone" || (!isEveryone(role) && a.mode === "people" && a.roleIds.includes(role.id));
+}
+
+/** Its audience of some people with `roleId` among their roles (`on`) or out of them; the people it lists stay. */
+export function audienceWithRole(agent: Agent, roleId: string, on: boolean): AgentAudience {
+  const a = audienceOf(agent);
+  const people = a.mode === "people";
+  const roleIds = people ? a.roleIds.filter((id) => id !== roleId) : [];
+  return {
+    mode: "people",
+    userIds: people ? a.userIds : [],
+    roleIds: on ? [...roleIds, roleId] : roleIds,
+    consultable: a.consultable,
+  };
+}
+
 /** Whether I can talk to it (the server's `canTalk`; absent = yes). */
 export const canTalk = (agent: Pick<Agent, "canTalk"> | undefined) => agent?.canTalk !== false;
 
@@ -93,6 +112,13 @@ export const opensDetails = (agent: { seesDetails?: boolean; former?: unknown } 
  */
 export const listsAgent = (org: OrgSummary | null | undefined, agent: Pick<Agent, "canTalk"> | undefined) =>
   can(org, "manage_agents") || canTalk(agent);
+
+/**
+ * Whether Equipe, its sectors and the counts name every agent for me (the server's `listsAllAgents`); without it the
+ * server sends them only the agents that answer me.
+ */
+export const listsAllAgents = (org: OrgSummary | null | undefined) =>
+  can(org, "view_all_agents") || can(org, "manage_agents");
 
 /**
  * The agents my lists leave out (`listsAgent`, from the server's `canTalk`): unless I manage agents, the ones not
@@ -139,6 +165,10 @@ export const agentsReach = (
       : a.consultable === false
         ? "blocked"
         : "consulted";
+
+/** `agentsReach` in one line, which a screen shows with the reach's own sentence (`audience.agents.*`) behind an ⓘ. */
+export const reachShortKey = (reach: "consulted" | "blocked" | "plan") =>
+  reach === "consulted" ? "audience.peopleOnly" : "audience.agentsToo";
 
 /** On a plan only its owner turns the switch back on (ADR 0059 §5); anyone else may only turn it off. */
 export const consultableLocked = (saved: AgentAudience, viewer: { owner: boolean; onPlan: boolean }) =>

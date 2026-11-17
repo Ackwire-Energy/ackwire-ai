@@ -49,6 +49,10 @@ const CustomServer = z
       description: "The account as the provider names it, when it says (refreshed when tools are listed).",
     }),
     authType: z.enum(["oauth", "api_key"]),
+    headerNames: z.array(z.string()).openapi({
+      description:
+        "The request headers typed for it (ADR 0186), by name: their values are never returned. Empty when it has none, and for a reader who doesn't manage connectors.",
+    }),
     iconUrl: z
       .string()
       .nullable()
@@ -181,7 +185,7 @@ export function customConnectorRoutes(deps: AppDeps) {
       security,
       summary: "Connect an https MCP server: connected, OAuth to finish, or an API key is needed",
       description:
-        "A server's account is every agent's, whole (`connector:*`): its tools reach them once classified, and sensitive ones still ask for approval. The same address again is another account (\"Stripe 2\"), every agent's too; the same account again (the provider says) refreshes its sign-in (`outcome: same_account`). With `connectionId`, that account gets the new sign-in in place (`reconnected`); signing in to another account there is a 409 `connector.other_account`, and a sign-in whose account can't be checked a 409 `connector.account_unknown` (try again).",
+        "A server's account is every agent's, whole (`connector:*`): its tools reach them once classified, and sensitive ones still ask for approval. The same address again is another account (\"Stripe 2\"), every agent's too; the same account again (the provider says) refreshes its sign-in (`outcome: same_account`). With `connectionId`, that account gets the new sign-in in place (`reconnected`); signing in to another account there is a 409 `connector.other_account`, and a sign-in whose account can't be checked a 409 `connector.account_unknown` (try again). `headers` (ADR 0186) are sent with every request to the server, the key's `Authorization` on top; without a key, a server that answers with them is connected by them alone, and one that asks for a sign-in is a 400 `connector.headers_with_sign_in`. A header that isn't taken is a 400 whose `params` name it (`header`, and `index`, its place in the list): `connector.header_name`, `connector.header_value`, `connector.header_reserved`, `connector.header_twice`, `connector.header_and_key` (`Authorization` beside a key), or `connector.headers_too_many`. With `connectionId` and no `headers`, saved ones that can no longer be read are a 400 `connector.headers_unreadable`: send them again, or `[]`.",
       request: {
         params: OrgParams,
         body: body(
@@ -191,6 +195,13 @@ export function customConnectorRoutes(deps: AppDeps) {
             label: z.string().max(80).optional(),
             returnTo: z.string().max(500).optional(),
             connectionId: ReconnectId,
+            headers: z
+              .array(z.object({ name: z.string(), value: z.string() }))
+              .optional()
+              .openapi({
+                description:
+                  "Request headers for a server by address: at most 10, each an HTTP token for a name (64 characters) and a one-line value of printable ASCII (2,000). With `connectionId`: absent keeps the ones the account has, an empty list removes them, a list replaces them.",
+              }),
           }),
         ),
       },

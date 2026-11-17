@@ -83,6 +83,19 @@ export const strings: Partial<PushStrings> = {
   deviceAccessTitle: (a, p, d) =>
     p ? `${a}（${p} の依頼）があなたの ${d} の使用を求めています` : `${a} があなたの ${d} の使用を求めています`,
   deviceAccessBody: "タップして今回のみ許可、常に許可、または断る",
+  deviceToolTitle: (a, d) => `${a} が ${d} のツールをオンにするよう求めています`,
+  deviceToolBody: "タップしてワンクリックでオンにする",
+  deviceCliTitle: (a, d) => `${a} が ${d} にプログラムをインストールするよう求めています`,
+  deviceCliBody: "タップしてワンクリックでインストール",
+  deviceFolderTitle: (a, f, d) =>
+    f ? `${a} があなたの ${d} で ${f} を求めています` : `${a} があなたの ${d} でフォルダを求めています`,
+  deviceFolderBody: "そのコンピューターのアプリで許可してください。",
+  adminAskTitle: (a, what, l) =>
+    what === "channel_agent"
+      ? `${a} が #${l} にエージェントを追加するよう求めています`
+      : what === "create_agents"
+        ? `${a} がエージェントを作成できるよう求めています`
+        : `${a} がルーティン用の ${l} Webhook の設定を求めています`,
   deviceWaitingTitle: (p, d) => `${p} のエージェントがあなたの ${d} を待っています`,
   deviceWaitingBody: "戻ったら始まります。",
   teamWeekReady: "チームの1週間のまとめができました",
@@ -94,4 +107,5 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitlePersonal: (name) => `${name} があなたのワークスペースへの参加をリクエストしています`,
   joinSuggestionTitlePersonal: (by, name) => `${by} が ${name} の招待を提案しました`,
   teamWeekReadyPersonal: "1週間のまとめができました",
+  teamWatchStill: (n) => `${n}件があなたを待っています`,
 };

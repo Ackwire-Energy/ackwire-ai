@@ -37,6 +37,7 @@ import {
   jevStateOf,
   jevStep,
   lastLine,
+  memoryEntries,
   networkOf,
   nextSteps,
   normalizeDomain,
@@ -80,7 +81,7 @@ const DIR = "/home/ana/agentes";
 const notRoot = (dir: string) => ({
   check: "computer",
   error: "Making this machine your agents' computer needs root: the setup adds users and a service for them.",
-  fix: `Run it as root, in this folder (curl -fsSL https://agentes.chat/install | sudo sh -s -- --dir ${dir} --computer yes), or connect a computer later in Settings › Devices.`,
+  fix: `Run it as root, in this folder (curl -fsSL https://hub.ackwire.app/install | sudo sh -s -- --dir ${dir} --computer yes), or connect a computer later in Settings › Devices.`,
 });
 
 describe("options", () => {
@@ -174,7 +175,8 @@ describe("options", () => {
     // A key cut short, or pasted with a curly quote, a space or a zero-width space: never sent, never written.
     for (const key of ["ts_123", "ts_live 9f2c", "“ts_live_9f2c”", "ts_live_\u200b9f2c"])
       expect(parse(["--typesafe-key", key])).toEqual({
-        error: "--typesafe-key: that isn't a whole TypeSafe key. Copy it again from https://console.typesafe.ai/keys.",
+        error:
+          "--typesafe-key: that isn't a whole key. Copy it again from https://console.typesafe.ai/keys, or https://openrouter.ai/keys for an OpenRouter key.",
       });
     expect(parse(["--frobnicate"])).toMatchObject({ error: expect.stringContaining("--help") });
   });
@@ -198,7 +200,7 @@ describe("Jev's key (--typesafe-key)", () => {
     });
     // In --help, after --telemetry, in the options' column.
     expect(readFileSync(join(import.meta.dir, "../src/cli.ts"), "utf8")).toMatch(
-      /--telemetry <on\|off> {16}.*\n {2}--typesafe-key <key> {16}TypeSafe key for Jev, optional \(\$\{TYPESAFE_KEYS\}\)\n/,
+      /--telemetry <on\|off> {16}.*\n {2}--typesafe-key <key> {16}TypeSafe key for Jev, or an OpenRouter key \(sk-or-…\), optional \(\$\{TYPESAFE_KEYS\}\)\n/,
     );
   });
 
@@ -222,6 +224,15 @@ describe("Jev's key (--typesafe-key)", () => {
     ];
     for (const [status, body, state] of table)
       expect({ status, state: jevStateOf(status, body) }).toEqual({ status, state });
+    // Through OpenRouter (ADR 0073 §9), as the server reads it too.
+    const or = (status: number, message: string) =>
+      jevStateOf(status, { error: { code: status, message } }, "openrouter");
+    expect(or(402, "Insufficient credits")).toBe("no_credit");
+    expect(or(403, "Key limit exceeded")).toBe("no_credit");
+    expect(or(403, "Your input was flagged by moderation")).toBeNull();
+    expect(or(403, "Forbidden")).toBe("invalid");
+    expect(or(401, "No auth credentials found")).toBe("invalid");
+    expect(or(404, "Resource not found")).toBe("down");
   });
 
   test("the check: one call to TypeSafe with the key; no answer, a limit or an outage leave it unchecked", async () => {
@@ -238,6 +249,13 @@ describe("Jev's key (--typesafe-key)", () => {
     expect(await checkJevKey("ts_live_9f2c", answer(402))).toBe("no_credit");
     for (const status of [429, 529, 422, "offline"] as const)
       expect([status, await checkJevKey("ts_live_9f2c", answer(status))]).toEqual([status, "unchecked"]);
+    // An OpenRouter key asks the same Jev through OpenRouter.
+    seen.length = 0;
+    expect(await checkJevKey("sk-or-v1-live_9f2c", answer(200))).toBe("ok");
+    expect(seen).toEqual([{ url: "https://openrouter.ai/api/alpha/decisions", auth: "Bearer sk-or-v1-live_9f2c" }]);
+    expect(
+      await checkJevKey("sk-or-v1-live_9f2c", answer(402, { error: { code: 402, message: "Insufficient" } })),
+    ).toBe("no_credit");
   });
 
   test("checked before .env is written: refused writes nothing, the others write it and say how it went", async () => {
@@ -278,6 +296,21 @@ describe("Jev's key (--typesafe-key)", () => {
       },
     });
     expect(asked).toEqual(["ts_live_9f2c", "ts_wrong_0000", "ts_empty_5555", "ts_live_9f2c"]);
+    // An OpenRouter key: OpenRouter's words and pages.
+    expect(await step("invalid", "sk-or-v1-wrong_0000")).toEqual({
+      problem: {
+        check: "jev",
+        error: "OpenRouter didn't accept --typesafe-key.",
+        fix: "Copy the key again from https://openrouter.ai/keys, or leave the option out and add it later in Settings › AI accounts.",
+      },
+    });
+    expect(await step("no_credit", "sk-or-v1-empty_5555")).toMatchObject({
+      said: {
+        ok: false,
+        text: "Jev: the key works but has no credit. Add credit at https://openrouter.ai/settings/credits and Jev starts by itself.",
+      },
+    });
+    asked.length = 0;
 
     asked.length = 0;
     const env = "TYPESAFE_API_KEY=ts_live_9f2c\n";
@@ -494,6 +527,15 @@ describe(".env", () => {
     expect(Object.keys(secretEntries("AGENTES_SECRET=kept\nPOSTGRES_PASSWORD=\n"))).toEqual(["POSTGRES_PASSWORD"]);
   });
 
+  test("the app's memory limit fits a machine with less than Compose's 8g, and is never replaced", () => {
+    const GiB = 1024 ** 3;
+    // 8 GB of RAM, 7 GiB usable: under the machine's memory, so Docker restarts the app before the kernel kills at random.
+    expect(memoryEntries(null, 7 * GiB)).toEqual({ AGENTES_MEMORY: "5376m" });
+    expect(memoryEntries(null, 1 * GiB)).toEqual({ AGENTES_MEMORY: "1024m" });
+    expect(memoryEntries(null, 16 * GiB)).toEqual({});
+    expect(memoryEntries("AGENTES_MEMORY=3g\n", 4 * GiB)).toEqual({});
+  });
+
   test("covers what the app requires: .env.example's required values come from the setup or the compose file", () => {
     const required = [...readFileSync(join(root, ".env.example"), "utf8").matchAll(/^# Required\.\n(\w+)=/gm)].map(
       (m) => m[1],
@@ -628,25 +670,25 @@ describe("Docker", () => {
     // A refused image is the cause, not the "No such image" lines Compose adds about the others.
     const refused = diagnoseCompose(
       [
-        "Image ghcr.io/agentes-chat/agentes:latest Error Head",
-        '"https://ghcr.io/v2/agentes-chat/agentes/manifests/latest": denied',
+        "Image ghcr.io/ackwire-energy/agentes:latest Error Head",
+        '"https://ghcr.io/v2/ackwire-energy/agentes/manifests/latest": denied',
         "Error response from daemon: No such image: pgvector/pgvector:0.8.7-pg18",
       ].join("\n"),
       "darwin",
     );
     expect(refused).toMatchObject({
       check: "image",
-      error: "Docker couldn't download ghcr.io/agentes-chat/agentes:latest: the registry refused it.",
+      error: "Docker couldn't download ghcr.io/ackwire-energy/agentes:latest: the registry refused it.",
     });
     expect(refused?.fix).toContain("docker login ghcr.io");
     // Docker 29 says it on the image's line alone.
     expect(
       diagnoseCompose(
-        "Image ghcr.io/agentes-chat/agentes:latest Error error from registry: denied\ndenied\nError response from daemon: error from registry: denied",
+        "Image ghcr.io/ackwire-energy/agentes:latest Error error from registry: denied\ndenied\nError response from daemon: error from registry: denied",
         "linux",
       ),
     ).toMatchObject({
-      error: "Docker couldn't download ghcr.io/agentes-chat/agentes:latest: the registry refused it.",
+      error: "Docker couldn't download ghcr.io/ackwire-energy/agentes:latest: the registry refused it.",
     });
   });
 
@@ -1244,7 +1286,7 @@ describe("the plan", () => {
       "email: none for now (set SMTP_URL or MILLIONSEND_API_KEY later)",
       "agents' computer: this machine, each agent a user of its own with a screen (HOST_COMPUTER_TOKEN, also in host-computer-token)",
       "usage statistics: sent to Ackwire AI (TELEMETRY=on)",
-      "compose: download docker-compose.yml from https://agentes.chat/install/docker-compose.yml",
+      "compose: download docker-compose.yml from https://hub.ackwire.app/install/docker-compose.yml",
       "start: docker compose up -d tailscale, wait until it's on the tailnet with HTTPS",
       "PUBLIC_URL: write the address Tailscale gives it (https://<device>.<tailnet>.ts.net)",
       "start: docker compose up -d, wait for the HTTPS certificate and /api/health",

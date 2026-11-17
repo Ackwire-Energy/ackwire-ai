@@ -8,7 +8,7 @@ import {
   mergeToolEffects,
   storedTranscript,
   type ToolSideEffects,
-  takeBridgeEffects,
+  takeBridgeResult,
 } from "../src/run-tools";
 import { type Fixture, setup } from "./fixtures";
 
@@ -52,7 +52,15 @@ describe("files a run's tools leave for its reply", () => {
         status: "running",
         startedAt: new Date(),
         // A run picked up again (a retry, a resume) with what the bridge kept still on it.
-        transcript: { system: [], messages: [], postedUpTo: 0, postedCount: 0, deltaSeq: 0, bridgeEffects: kept },
+        transcript: {
+          system: [],
+          messages: [],
+          postedUpTo: 0,
+          postedCount: 0,
+          deltaSeq: 0,
+          bridgeEffects: kept,
+          bridgeCalls: 2,
+        },
       })
       .returning();
     if (!run) throw new Error("no run");
@@ -69,12 +77,22 @@ describe("files a run's tools leave for its reply", () => {
     // A save of the engine's copy (which knows nothing of it) keeps what the bridge left.
     await save({ system: [], messages: [{ role: "user", content: "x" }], postedUpTo: 1, postedCount: 0, deltaSeq: 0 });
     expect((await stored()).bridgeEffects).toEqual(kept);
+    expect((await stored()).bridgeCalls).toBe(2);
     expect((await stored()).postedUpTo).toBe(1);
     // Taken once; a later save of a stale copy that still has it doesn't bring it back.
-    expect(await takeBridgeEffects(fx.db, run.id)).toEqual(kept);
-    await save({ system: [], messages: [], postedUpTo: 2, postedCount: 0, deltaSeq: 0, bridgeEffects: kept });
+    expect(await takeBridgeResult(fx.db, run.id)).toEqual({ effects: kept, calls: 2 });
+    await save({
+      system: [],
+      messages: [],
+      postedUpTo: 2,
+      postedCount: 0,
+      deltaSeq: 0,
+      bridgeEffects: kept,
+      bridgeCalls: 2,
+    });
     expect((await stored()).bridgeEffects).toBeUndefined();
-    expect(await takeBridgeEffects(fx.db, run.id)).toBeNull();
+    expect((await stored()).bridgeCalls).toBeUndefined();
+    expect((await takeBridgeResult(fx.db, run.id)).effects).toBeNull();
   });
 });
 

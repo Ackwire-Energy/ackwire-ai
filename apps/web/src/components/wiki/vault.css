@@ -68,15 +68,15 @@ html:not([data-pointer]) .vault-drop__area:focus-visible {
   flex-wrap: wrap;
   justify-content: center;
 }
+/* The kit's small type (13/18): the ⓘ after its words is placed by the line's height, a whole number of pixels. */
 .vault-notice {
-  gap: 10px;
   margin: 0;
   padding: 12px 14px;
   border-radius: 14px;
   background: var(--plate);
   color: var(--muted);
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 18px;
 }
 .vault-reading {
   display: flex;

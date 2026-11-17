@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import { toolActivity } from "./activity";
 import { previewOf } from "./consultations";
-import { joinNames, lowerFirst } from "./format";
+import { firstName, joinNames, lowerFirst } from "./format";
 import { autoUpdateText, talkerStatusText, workEndBody } from "./long-work";
 import { mediaKindOf, mediaWord } from "./media";
 import { RIGHT_HAND_PLAN_LINES } from "./no-ai";
@@ -10,7 +10,7 @@ import { brainName } from "./outages";
 import { usageWhen } from "./plan-usage";
 import { weekDay } from "./team-week";
 import { closedNoteText, usageWaitOf, usageWindowText } from "./usage-pause";
-import { isVoiceMeta, voiceLength, voiceWord } from "./voice";
+import { isVoiceMeta, voiceLength, voiceOf, voiceWord } from "./voice";
 import { stepLabel } from "./work";
 
 /** Notes of an agent waiting on its plan's limit or its budget (`meta.usageWait`): `{{when}}` from its reset. */
@@ -67,7 +67,7 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   if (cut && typeof cut === "object" && typeof cut.text === "string") {
     const brain = brainName(typeof cut.brain === "string" ? cut.brain : null);
     const names = Array.isArray(cut.tools) ? cut.tools.filter((x): x is string => typeof x === "string") : [];
-    const done = names.map((tool) => lowerFirst(stepLabel(t, { ...toolActivity(tool), tool }), locale));
+    const done = names.map((tool) => lowerFirst(stepLabel(t, { ...toolActivity(tool), tool }, locale), locale));
     const tools = joinNames([...new Set(done)], t);
     const note = `_${t("chat.body.brain_interrupted", {
       brain,
@@ -96,7 +96,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
   const busy = waitNote?.code === "busy";
   const noAi =
     code === "no_ai"
-      ? (m.noAi as { reason?: unknown; own?: unknown; model?: unknown; why?: unknown } | undefined)
+      ? (m.noAi as
+          | { reason?: unknown; own?: unknown; model?: unknown; why?: unknown; owner?: unknown; plan?: unknown }
+          | undefined)
       : undefined;
   const signedOut = noAi?.reason === "not_signed_in";
   // The team's right hand on a plan (ADR 0137 §7): why its plan can't think now (`RIGHT_HAND_PLAN_LINES`); any agent's
@@ -165,6 +167,9 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
           })
       : body;
   // Long work's own update of a silent work (ADR 0121): what it does now, in the reader's words.
+  // The right hand answered with another AI than its plan (`postStandInLine`): its line in the reader's words.
+  if (code === "right_hand_stand_in" && typeof params.why === "string")
+    return t(`chat.standIn.${params.why}`, { via: params.via, plan: params.plan, defaultValue: body });
   if (code === "work_auto_update") return autoUpdateText(t, params);
   // The autonomy brakes (ADR 0131): a working agent's status line, a proposal of costly work, the noise digest.
   if (code === "talker_status") return talkerStatusText(t, params, locale);
@@ -203,10 +208,15 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
           : code;
   const key = `chat.body.${shown}`;
   const model = typeof noAi?.model === "string" ? { model: noAi.model } : {};
+  const notYours =
+    noAi?.reason === "plans_not_yours" && typeof noAi.owner === "string"
+      ? { owner: firstName(noAi.owner), plan: typeof noAi.plan === "string" ? noAi.plan : "Claude" }
+      : {};
   // i18next takes the first key that exists: a body with no `…NoComputer` words keeps its own.
   return t(params.computer && !namesComputer ? [`${key}NoComputer`, key] : key, {
     ...params,
     ...model,
+    ...notYours,
     ...(cliSaid ? { why: cliSaid } : {}),
     defaultValue: body,
   });
@@ -218,7 +228,10 @@ export function serverBody(t: TFunction, body: string, meta: Meta, locale?: stri
  * or a sticker with no text as its word (ADR 0091: the list's `mediaKind`, or a kind its meta carries).
  */
 export function previewBody(t: TFunction, text: string, meta: Meta | null, mediaKind?: unknown): string {
-  // Never a voice message's words, even from a server that sent them (ADR 0100).
+  // Never a voice message's words, even from a server that sent them: what was typed beside them, else its name
+  // (ADR 0100).
+  const typed = voiceOf(meta)?.text;
+  if (typed) return previewOf(typed);
   if (isVoiceMeta(meta) || mediaKindOf(mediaKind) === "voice") return voiceWord(t, voiceLength(meta));
   // What happened on GitHub, as the chat's line says it: someone's words alone, under the agent's name, would read as
   // the agent's.

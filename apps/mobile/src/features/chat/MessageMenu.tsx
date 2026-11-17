@@ -48,13 +48,15 @@ export function MessageMenu({
     <Link href={href as Href} asChild onPress={(e) => e.preventDefault()}>
       <Link.Trigger>{children}</Link.Trigger>
       <Link.Menu>
-        <Link.Menu title={reactLabel} palette inline>
-          {reactions.map((emoji) => (
-            <Link.MenuAction key={emoji} onPress={() => onReact(emoji)}>
-              {emoji}
-            </Link.MenuAction>
-          ))}
-        </Link.Menu>
+        {reactions.length > 0 ? (
+          <Link.Menu title={reactLabel} palette inline>
+            {reactions.map((emoji) => (
+              <Link.MenuAction key={emoji} onPress={() => onReact(emoji)}>
+                {emoji}
+              </Link.MenuAction>
+            ))}
+          </Link.Menu>
+        ) : null}
         {groups
           .filter((g) => g.length > 0)
           .map((group) => (
@@ -76,9 +78,14 @@ export function MessageMenu({
   );
 }
 
+/** A message still on its way has no reactions: the server doesn't know it yet. */
+const NO_REACTIONS: readonly string[] = [];
+
 /**
  * A message's row under the system's menu, with the same actions as the app's sheet (`useMessageActions`): the
- * conversation wraps each row it lets the person act on. `href` is the message's own place, never navigated to.
+ * conversation wraps every row in it, a message still on its way included (its menu holds only what works before the
+ * server has it, copying its words), so the row stays mounted when it turns sent. `href` is the message's own place,
+ * never navigated to.
  */
 export function MessageMenuFor({
   context,
@@ -104,7 +111,7 @@ export function MessageMenuFor({
   return (
     <MessageMenu
       href={href}
-      reactions={QUICK_REACTIONS}
+      reactions={context.message.local ? NO_REACTIONS : QUICK_REACTIONS}
       onReact={react}
       reactLabel={t("mobile.chat.react")}
       groups={items}

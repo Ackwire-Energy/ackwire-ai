@@ -159,14 +159,14 @@ const go = async (view?: "Dia" | "Mês" | "Agenda") => {
           number: 4521,
           title: "Ninguém pegou esta tarefa ainda",
           date: toYmd(monday),
-          assignee: null,
+          assignees: [],
         },
         {
           issueId: "iss-person",
           number: 10942,
           title: "Revisar o contrato de 2027",
           date: toYmd(addDays(monday, 1)),
-          assignee: { type: "person", id: "u-ale" },
+          assignees: [{ type: "person", id: "u-ale" }],
         },
       ],
     };

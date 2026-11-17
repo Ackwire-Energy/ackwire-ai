@@ -32,7 +32,8 @@ import {
   setAgentRepositories,
   setAgentScopes,
   type ToolContext,
-  takeBridgeEffects,
+  takeBridgeResult,
+  updateAgent,
   ValidationError,
   wrapExternal,
 } from "../src";
@@ -239,6 +240,66 @@ describe('"Pode fazer merge sem perguntar": the GitHub connector', () => {
     expect(receipt?.undoableUntil).toEqual(receipt?.createdAt);
   });
 
+  test("an agent that never asks merges in any repository it may use, with the same audit line and receipt", async () => {
+    const { github, ctx, merge } = await world();
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { approvalsLevel: "never" });
+    expect((await merge("acme/api", 9)).type).toBe("result");
+    expect(github.calls.map((c) => [c.tool, c.args.pullNumber])).toEqual([["merge_pull_request", 9]]);
+    expect(await f.db.select().from(schema.approvals)).toEqual([]);
+    const [audit] = await f.db
+      .select()
+      .from(schema.auditLog)
+      .where(eq(schema.auditLog.action, "agent.merged_without_asking"));
+    expect(audit).toMatchObject({ targetId: "acme/api", details: { pr: 9, tool: "github_merge_pull_request" } });
+    const [receipt] = await f.db.select().from(schema.agentActions).where(eq(schema.agentActions.runId, ctx.runId));
+    expect(receipt).toMatchObject({ kind: "pr.merged", params: { repo: "acme/api", number: 9 } });
+  });
+
+  test("the connector's own way to open a pull request asks nobody on a routine's run; its merge does", async () => {
+    f = await setup();
+    const github = fakeGithubMcp({ writes: true });
+    const deps = { ...depsOf(f), connect: github.connect };
+    const connection = await createApiKeyConnection(deps, f.owner.id, f.org.id, {
+      connector: "github",
+      apiKey: "ghp_secret_123456",
+    });
+    await setAgentScopes(f.db, f.owner.id, f.org.id, f.agent.id, [
+      { connectionId: connection.id, scope: "github:pr.write" },
+      { connectionId: connection.id, scope: "github:pr.merge" },
+    ]);
+    const gateway = createToolGateway({ sources: [createConnectorToolSource(deps)] });
+    const fired = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "Vigiar PRs",
+      meta: { routineBrief: { routineId: crypto.randomUUID() } },
+    });
+    const [routineRun] = await f.db.transaction((tx) =>
+      createAgentRuns(tx, fired as never, [f.agent.id], "mention", { background: true }),
+    );
+    if (!routineRun) throw new Error("no run");
+    const ctx = { ...(await runContext(f)), runId: routineRun.id };
+    const call = (name: string, input: Record<string, unknown>) =>
+      gateway.invoke(ctx, { toolUseId: crypto.randomUUID(), name, input: { owner: "acme", repo: "app", ...input } });
+    const opened = await call("github_create_pull_request", { title: "Fix", head: "agentes/ada/fix", base: "main" });
+    expect(opened.type).toBe("result");
+    expect(github.calls.map((c) => c.tool)).toEqual(["create_pull_request"]);
+    expect((await call("github_merge_pull_request", { pullNumber: 7, why: WHY })).type).toBe("approval");
+    expect(github.calls.map((c) => c.tool)).toEqual(["create_pull_request"]);
+  });
+
+  test("an agent that always asks merges nowhere alone; its repositories stay chosen for another level", async () => {
+    const { ctx } = await world();
+    await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
+    await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { approvalsLevel: "always" });
+    expect(await mergeReposOfCall(ctx)).toEqual([]);
+    for (const approvalsLevel of ["never", "risky"] as const) {
+      await updateAgent(f.db, f.owner.id, f.org.id, f.agent.id, { approvalsLevel });
+      expect(await mergeReposOfCall(ctx)).toEqual(["acme/app"]);
+    }
+  });
+
   test("a run a routine's report woke asks, here and on the computer: text nobody checked feeds it", async () => {
     const { github, ctx, gateway } = await world();
     await setAgentMergeRepositories(f.db, f.owner.id, f.org.id, f.agent.id, ["acme/app"]);
@@ -441,7 +502,10 @@ describe("enforcement in the Tool Gateway", () => {
     expect(allowed.result.isError).toBeUndefined();
     expect(mcp.calls.map((x) => `${x.tool} ${x.args.owner}/${x.args.repo}`)).toEqual(["pull_request_read acme/app"]);
     // What the engine takes at the end of the turn: the refused repository and the one it worked in.
-    expect(await takeBridgeEffects(f.db, ctx.runId)).toMatchObject({ deniedRepo: "acme/infra", repo: "acme/app" });
+    expect((await takeBridgeResult(f.db, ctx.runId)).effects).toMatchObject({
+      deniedRepo: "acme/infra",
+      repo: "acme/app",
+    });
   });
 
   test("open_pull_request outside the list never reaches GitHub", async () => {

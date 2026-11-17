@@ -1,3 +1,4 @@
+import { switchTheme } from "@agenteschat/ui";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { STORAGE_KEYS, storage } from "./storage";
 
@@ -33,7 +34,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolved = preference === "system" ? (systemDark ? "dark" : "light") : preference;
   useEffect(() => {
-    document.documentElement.dataset.theme = resolved;
+    switchTheme(resolved);
   }, [resolved]);
 
   const setPreference = useCallback((value: ThemePreference) => {

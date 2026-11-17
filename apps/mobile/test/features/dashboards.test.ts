@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { DashboardList, DashboardSummary } from "@agenteschat/client";
+import { type DashboardList, type DashboardSummary, frozenBoard } from "@agenteschat/client";
 import { type OpenTarget, targetPath } from "@agenteschat/client/lib/notifications";
 import { chartAreaTones, chartInk } from "@agenteschat/ui/sky/chart";
 import { agentPickNow, chooseAgent, closeAgentPick, openAgentPick } from "../../src/features/dashboards/agent-pick";
@@ -51,7 +51,6 @@ import {
   testPhase,
   thumbRects,
   toggledEditRoles,
-  toggleRole,
   topRoundedPath,
   widgetPlace,
   widgetPreview,
@@ -59,7 +58,16 @@ import {
   widgetTones,
   withAudience,
   withEditors,
+  withRoles,
 } from "../../src/features/dashboards/logic";
+import {
+  chooseOption,
+  closeOptionPick,
+  openOptionPick,
+  optionPickNow,
+  PICK_SEARCH_FROM,
+  pickText,
+} from "../../src/features/dashboards/option-pick";
 import { appLinkFromUrl } from "../../src/features/links/app-links";
 import {
   boardHref,
@@ -71,6 +79,7 @@ import {
 } from "../../src/features/links/logic";
 import { routineTitle, targetIcon } from "../../src/features/routines/logic";
 import { TAB_GLYPHS } from "../../src/ui/tabGlyphs";
+import { pushedByDefault } from "../main-stack";
 import { notification } from "./fixtures";
 
 const board = (over: Partial<DashboardSummary> & { id: string }): DashboardSummary => ({
@@ -326,9 +335,9 @@ describe("dashboards on the phone (ADR 0135)", () => {
     expect(fresh).toEqual({ audience: "workspace", roleIds: [], editPolicy: "viewers", editRoleIds: [] });
     const roles = { ...fresh, audience: "roles" as const };
     expect(audienceReady(roles)).toBe(false);
-    const picked = toggleRole(roles, "r1");
+    const picked = withRoles(roles, ["r1"]);
     expect(audienceReady(picked)).toBe(true);
-    expect(toggleRole(picked, "r1").roleIds).toEqual([]);
+    expect(withRoles(picked, []).roleIds).toEqual([]);
     expect(shareInputOf(picked)).toEqual({
       audience: "roles",
       roleIds: ["r1"],
@@ -372,8 +381,8 @@ describe("dashboards on the phone (ADR 0135)", () => {
       editRoleIds: ["r2"],
     });
     // A role out of who sees it leaves who edits; none left: only you and admins.
-    expect(toggleRole(draft, "r2")).toMatchObject({ roleIds: ["r1"], editPolicy: "owner", editRoleIds: [] });
-    expect(toggleRole(draft, "r1")).toMatchObject({ roleIds: ["r2"], editPolicy: "roles", editRoleIds: ["r2"] });
+    expect(withRoles(draft, ["r1"])).toMatchObject({ roleIds: ["r1"], editPolicy: "owner", editRoleIds: [] });
+    expect(withRoles(draft, ["r2"])).toMatchObject({ roleIds: ["r2"], editPolicy: "roles", editRoleIds: ["r2"] });
     expect(withAudience(draft, "private")).toMatchObject({ editPolicy: "owner", editRoleIds: [] });
     expect(withAudience(draft, "workspace")).toMatchObject({ editPolicy: "roles", editRoleIds: ["r2"] });
     expect(withEditors(draft, "viewers")).toMatchObject({ editPolicy: "viewers", editRoleIds: [] });
@@ -442,6 +451,22 @@ describe("dashboards on the phone (ADR 0135)", () => {
     expect(boardMenuKeys({ ...manager, canEdit: false, canManage: false, pinned: false })).toEqual(["home"]);
     const home = { ...manager, kind: "home" as const, audience: "private" as const, pinned: false };
     expect(boardMenuKeys(home, true)).toEqual(["organize"]);
+  });
+
+  test("a workspace being deleted offers no change to a board: only Use on Home, as on the web", () => {
+    const manager = { kind: "board" as const, canEdit: true, canManage: true, audience: "workspace" as const };
+    const deleting = { deletion: { dueAt: null, requestedAt: null, requestedBy: null } };
+    const board = frozenBoard({ ...manager, pinned: false }, deleting);
+    expect(board).toMatchObject({ canEdit: false, canManage: false });
+    expect(boardMenuKeys(board)).toEqual(["home"]);
+    expect(boardMenuKeys(frozenBoard({ ...manager, kind: "home" as const, pinned: false }, deleting), true)).toEqual(
+      [],
+    );
+    expect(frozenBoard({ ...manager, pinned: false }, { deletion: undefined })).toMatchObject({ canEdit: true });
+    // The board's screen and the home's strip read it through this, so "+", Share and a card's long press go too.
+    const read = (path: string) => readFileSync(join(import.meta.dir, "../../src/features", path), "utf8");
+    expect(read("dashboards/hooks.ts")).toContain("board: q.data && frozenBoard(q.data, org)");
+    expect(read("chats/HomeWidgets.tsx")).toContain("const board = home.board && frozenBoard(home.board, org);");
   });
 
   test("Use on Home: any board seen; on Início it offers Remove; My Home brings Início back", () => {
@@ -516,10 +541,10 @@ describe("dashboards in links, notifications and routines", () => {
   });
 
   test("Dashboards is a screen pushed from the home, never a tab; the tab bar stays as it was", () => {
-    const app = join(import.meta.dir, "..", "..", "app", "(app)");
+    const app = join(import.meta.dir, "..", "..", "app", "(app)", "(main)");
     expect(existsSync(join(app, "dashboards.tsx"))).toBe(true);
     expect(existsSync(join(app, "(tabs)", "dashboards"))).toBe(false);
-    expect(readFileSync(join(app, "_layout.tsx"), "utf8")).toContain('name="dashboards"');
+    expect(pushedByDefault("dashboards")).toBe(true);
     expect(readFileSync(join(app, "(tabs)", "_layout.tsx"), "utf8")).not.toContain("dashboards");
     expect([...TAB_GLYPHS]).toEqual(["chats", "threads", "agents", "activity", "search"]);
   });
@@ -645,5 +670,107 @@ describe("Who looks after it", () => {
     chooseAgent("a3");
     expect(applied).toEqual(["a2"]);
     expect(agentPickNow()).toBeNull();
+  });
+});
+
+describe("one of many, on a pushed screen", () => {
+  const src = (path: string) => readFileSync(join(import.meta.dir, "../../src/features", path), "utf8");
+
+  test("the pick goes back to the form at once, and nothing goes back once the form closed", () => {
+    const applied: string[] = [];
+    openOptionPick({
+      title: "Onde entrega",
+      value: "c1",
+      options: [
+        { key: "c1", label: "#geral" },
+        { key: "dm", label: "DM", sub: "Só você vê" },
+      ],
+      apply: (key) => applied.push(key),
+    });
+    chooseOption("dm");
+    expect(applied).toEqual(["dm"]);
+    expect(optionPickNow()?.value).toBe("dm");
+    closeOptionPick();
+    chooseOption("c1");
+    expect(applied).toEqual(["dm"]);
+    expect(optionPickNow()).toBeNull();
+  });
+
+  test("a pick of several checks and unchecks, and the form follows each tap", () => {
+    const applied: string[][] = [];
+    openOptionPick({
+      many: true,
+      title: "Cargos",
+      values: ["r1"],
+      options: [
+        { key: "r1", label: "Vendas" },
+        { key: "r2", label: "Suporte" },
+      ],
+      apply: (keys) => applied.push(keys),
+    });
+    chooseOption("r2");
+    chooseOption("r1");
+    expect(applied).toEqual([["r1", "r2"], ["r2"]]);
+    const now = optionPickNow();
+    expect(now?.many ? now.values : null).toEqual(["r2"]);
+    closeOptionPick();
+  });
+
+  test("a search reads an option's words, its line, its group and its keywords, from the picker sheet's count", () => {
+    expect(pickText({ key: "k", label: "Resumo", sub: "Toda manhã", group: "Equipe", keywords: "daily" })).toBe(
+      "Resumo Toda manhã Equipe daily",
+    );
+    expect(pickText({ key: "k", label: "#geral" })).toBe("#geral");
+    expect(PICK_SEARCH_FROM).toBe(9);
+  });
+
+  test("the screen is the kit's grouped list, as the agent picker, and it leaves when no form opened it", () => {
+    const screen = src("dashboards/OptionPickScreen.tsx");
+    expect(screen).toContain("<GroupedRow");
+    expect(screen).toContain("checked={checked(o.key)}");
+    expect(screen).toContain("if (!pick) goBack();");
+    expect(screen).toContain('t("filters.clearSearch")');
+    expect(existsSync(join(import.meta.dir, "../../app/(app)/(main)/option-pick.tsx"))).toBe(true);
+  });
+
+  test("New widget's board, a widget's title and alert: pushed screens, never opened in place in a card", () => {
+    const create = src("dashboards/NewWidgetScreen.tsx");
+    expect(create).toContain("openOptionPick({");
+    expect(create).not.toContain("pickDest");
+    expect(create).not.toContain("SheetHostProvider");
+    const widget = src("dashboards/WidgetScreen.tsx");
+    expect(widget).toContain('router.push(widgetEditHref(w.id, "title"))');
+    expect(widget).toContain('router.push(widgetEditHref(w.id, "alert"))');
+    expect(widget).toContain("onPress: pickSchedule");
+    expect(widget).not.toContain('open === "');
+    expect(existsSync(join(import.meta.dir, "../../app/(app)/(main)/widget-edit/[id].tsx"))).toBe(true);
+  });
+
+  test("a board's screens: no bare spinner, a way to retry, and the menu in the app's sheet", () => {
+    for (const file of [
+      "dashboards/BoardScreen.tsx",
+      "dashboards/BoardEditScreen.tsx",
+      "dashboards/ShareScreen.tsx",
+      "dashboards/OrganizeScreen.tsx",
+      "dashboards/WidgetScreen.tsx",
+      "dashboards/WidgetEditScreen.tsx",
+    ]) {
+      const code = src(file);
+      expect({ file, spinner: code.includes("ActivityIndicator"), missing: code.includes("<MissingScreen") }).toEqual({
+        file,
+        spinner: false,
+        missing: true,
+      });
+    }
+    const menu = src("dashboards/menu.tsx");
+    expect(menu).toContain("menu: items,");
+    expect(menu).toContain("chooseAction(");
+    expect(menu).not.toContain("useSheet");
+  });
+
+  test("Organize's rows move on the UI thread with the compiler-safe accessors and a settling spring", () => {
+    const organize = src("dashboards/OrganizeScreen.tsx");
+    expect(organize).not.toMatch(/\.value\b(?!s)/);
+    expect(organize).toContain("const SPRING = { duration: 400, dampingRatio: 0.8 };");
   });
 });

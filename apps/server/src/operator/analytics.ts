@@ -282,6 +282,44 @@ const workTotals = z.object({
   perTurn: z
     .object({ input: Count, output: Count, cacheRead: Count, cacheWrite: Count })
     .openapi({ description: "Tokens over `turnsWithUsage`." }),
+  waitsByCause: z
+    .array(
+      z.object({
+        cause: z.string().openapi({
+          description:
+            "`brain_unavailable:<code>` (a wait for its computer: `busy` for room, `offline`, `standby`, …) or `provider_outage`. Ignore values you don't know.",
+        }),
+        waits: Count,
+        medianSec: z.number().int().nullable(),
+        p90Sec: z.number().int().nullable(),
+      }),
+    )
+    .openapi({
+      description:
+        "Waits of turns created in the dates, most first: each lasts until the run's next step, its end or now.",
+    }),
+  computerStarts: z
+    .object({
+      turns: Count.openapi({ description: "Computer brain turns that said how they started (newer runners)." }),
+      warm: Count.openapi({ description: "Of them, on a process already open." }),
+      initMedianMs: z.number().int().nullable().openapi({ description: "A new process until it said it was ready." }),
+      initP90Ms: z.number().int().nullable(),
+      warmFirstEventMedianMs: z.number().int().nullable().openapi({ description: "Turn start to its first event." }),
+      warmFirstEventP90Ms: z.number().int().nullable(),
+      coldFirstEventMedianMs: z.number().int().nullable(),
+      coldFirstEventP90Ms: z.number().int().nullable(),
+    })
+    .openapi("OperatorWorkComputerStarts"),
+  stages: z
+    .array(
+      z.object({
+        stage: z.string().openapi({ description: "`claim`, `context`, `model` (each turn), `persist`, `events`, …" }),
+        runs: Count.openapi({ description: "Stages measured (a run has one `model` per turn)." }),
+        medianMs: z.number().int().nullable(),
+        p90Ms: z.number().int().nullable(),
+      }),
+    )
+    .openapi({ description: "Where the runs' own time went (waits for room excluded), slowest median first." }),
 });
 const workCommon = {
   from: Day,

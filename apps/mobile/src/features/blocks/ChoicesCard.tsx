@@ -1,7 +1,6 @@
 import { useAnswerChoices, useArtifact, useChoices } from "@agenteschat/client";
 import {
   answeredFirst,
-  CHOICE_OTHER_MAX,
   type ChoiceDraft,
   choiceLetter,
   choiceSummary,
@@ -10,15 +9,15 @@ import {
   otherChoice,
   pickChoice,
 } from "@agenteschat/client/lib/choices";
+import { MAX_MESSAGE_LENGTH, tooLongRefusal } from "@agenteschat/client/lib/message-length";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { Icon, MEDIA_ROW, MediaRow, Sky, Text, useToast } from "@/ui";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { Button, IconButton, MEDIA_ROW, MediaRow, PressScale, Sky, Text, useToast } from "@/ui";
 import { initialText } from "@/ui/type-scale";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
-import { tapHaptic } from "../shared/parts";
 import { useSheetIfAny } from "../shared/SheetHost";
 
 /**
@@ -27,7 +26,7 @@ import { useSheetIfAny } from "../shared/SheetHost";
  * "Outra resposta", opens a sheet to write the answer instead, as the ask card's does.
  */
 export function ChoicesCard({ id, version }: { id: string; version?: number }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
   const dir = useDirectory();
@@ -98,14 +97,12 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
 
   if (closed) {
     return (
-      <Pressable accessibilityRole="button" onPress={() => setClosed(false)} style={styles.closed}>
-        <Text variant="footnote" tone="faint">
+      <View style={styles.closed}>
+        <Text variant="footnote" tone="faint" style={styles.flex}>
           {t("mobile.choices.closed", { title: a.title })}
         </Text>
-        <Text variant="footnote" tone="ink" style={styles.bold}>
-          {t("mobile.choices.reopen")}
-        </Text>
-      </Pressable>
+        <Button variant="ghost" size="sm" label={t("mobile.choices.reopen")} onPress={() => setClosed(false)} />
+      </View>
     );
   }
 
@@ -115,13 +112,16 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   const other = otherChoice(q);
   const pick = (option: number, written?: string) => {
     if (answer.isPending) return;
-    tapHaptic();
     const next = pickChoice(d, option, written);
     setDraft(next.draft);
     if (next.send)
       answer.mutate(next.send, {
         onError: (e) => {
-          if (!answeredFirst(e)) toast({ title: t("mobile.choices.failed"), icon: "x" });
+          if (!answeredFirst(e))
+            toast({
+              title: tooLongRefusal(t, i18n.language, e, t("mobile.choices.tooLongFix")) ?? t("mobile.choices.failed"),
+              icon: "x",
+            });
           void query.refetch();
         },
       });
@@ -129,7 +129,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
   return (
     <View style={[styles.card, { backgroundColor: c.raised, borderColor: c.line2 }]}>
       {sky}
-      <View style={[styles.head, styles.row]}>
+      <View style={[styles.head, styles.row, styles.top]}>
         <View style={styles.flex}>
           <Text variant="subhead" style={styles.bold}>
             {a.title}
@@ -140,14 +140,9 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
             </Text>
           ) : null}
         </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.choices.close")}
-          hitSlop={10}
-          onPress={() => setClosed(true)}
-        >
-          <Icon name="x" size={16} color={c.faint} />
-        </Pressable>
+        <View style={styles.close}>
+          <IconButton icon="x" label={t("mobile.choices.close")} onPress={() => setClosed(true)} />
+        </View>
       </View>
       <Text variant="body" style={styles.question}>
         {q.question}
@@ -157,14 +152,17 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
         {q.options.map((o, i) => {
           const on = d.picks[d.step] === i;
           return (
-            <Pressable
+            <PressScale
               key={o.label}
+              to={0.98}
+              fill={false}
               accessibilityRole="button"
               accessibilityState={{ selected: on, disabled: answer.isPending }}
               accessibilityLabel={`${choiceLetter(i)}. ${o.label}${o.description ? `. ${o.description}` : ""}`}
               disabled={answer.isPending}
               onPress={() => pick(i)}
-              style={({ pressed }) => [styles.option, { borderColor: c.line2 }, pressed && { backgroundColor: c.line }]}
+              style={[styles.option, { borderColor: c.line2 }]}
+              contentStyle={styles.optionIn}
             >
               <MediaRow size="row" name={o.label} face={<Letter letter={choiceLetter(i)} on={on} />}>
                 {o.description ? (
@@ -173,11 +171,13 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                   </Text>
                 ) : null}
               </MediaRow>
-            </Pressable>
+            </PressScale>
           );
         })}
         {sheet ? (
-          <Pressable
+          <PressScale
+            to={0.98}
+            fill={false}
             accessibilityRole="button"
             accessibilityState={{ selected: d.picks[d.step] === other, disabled: answer.isPending }}
             accessibilityLabel={`${choiceLetter(other)}. ${t("ask.otherAnswer")}`}
@@ -189,7 +189,7 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                   placeholder={t("mobile.chat.question.placeholder")}
                   submitLabel={t("mobile.app.send")}
                   initial={d.others[d.step] ?? ""}
-                  maxLength={CHOICE_OTHER_MAX}
+                  limit={{ max: MAX_MESSAGE_LENGTH, fix: t("mobile.choices.tooLongFix") }}
                   onSubmit={(text) => {
                     sheet.close();
                     pick(other, text.trim());
@@ -197,7 +197,8 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                 />,
               )
             }
-            style={({ pressed }) => [styles.option, { borderColor: c.line2 }, pressed && { backgroundColor: c.line }]}
+            style={[styles.option, { borderColor: c.line2 }]}
+            contentStyle={styles.optionIn}
           >
             <MediaRow
               size="row"
@@ -210,22 +211,18 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
                 </Text>
               ) : null}
             </MediaRow>
-          </Pressable>
+          </PressScale>
         ) : null}
       </View>
       {questions.length > 1 ? (
         <View style={[styles.foot, { borderTopColor: c.line2 }]}>
-          <Pressable
-            accessibilityRole="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("mobile.choices.back")}
             disabled={d.step === 0}
             onPress={() => setDraft(moveStep(d, -1))}
-            // An 18-point line: 13 of slop around it gives the 44-point target.
-            hitSlop={13}
-          >
-            <Text variant="footnote" tone={d.step === 0 ? "faint" : "ink"} style={styles.bold}>
-              {t("mobile.choices.back")}
-            </Text>
-          </Pressable>
+          />
           <View style={styles.dots}>
             {questions.map((qq, i) => (
               <View
@@ -237,20 +234,13 @@ export function ChoicesCard({ id, version }: { id: string; version?: number }) {
               />
             ))}
           </View>
-          <Pressable
-            accessibilityRole="button"
+          <Button
+            variant="ghost"
+            size="sm"
+            label={t("mobile.choices.next")}
             disabled={d.step === questions.length - 1 || d.picks[d.step] === null}
             onPress={() => setDraft(moveStep(d, 1))}
-            hitSlop={13}
-          >
-            <Text
-              variant="footnote"
-              tone={d.step === questions.length - 1 || d.picks[d.step] === null ? "faint" : "ink"}
-              style={styles.bold}
-            >
-              {t("mobile.choices.next")}
-            </Text>
-          </Pressable>
+          />
         </View>
       ) : null}
     </View>
@@ -290,20 +280,18 @@ const styles = StyleSheet.create({
   sky: { position: "absolute", top: 0, left: 0, right: 0, height: 8, opacity: 0.7 },
   head: { gap: 1, paddingHorizontal: 14, paddingTop: 12 },
   row: { flexDirection: "row", alignItems: "center", gap: 10 },
+  // The head: its × on the title's first line, not between the title and the step under it; as a block's card's
+  // expand button, the 40-point button centred on that line and its icon as far in from the edge as the text.
+  top: { alignItems: "flex-start", paddingRight: 4 },
+  close: { marginTop: -10 },
   flex: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   question: { paddingHorizontal: 14, paddingTop: 6 },
   options: { gap: 6, padding: 14, paddingTop: 10 },
   sending: { opacity: 0.6 },
   // A MediaRow in its plate: the letter in the face's place, what the option adds under its line at the row's width.
-  option: {
-    minHeight: 52,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderRadius: 12,
-    borderBottomLeftRadius: 4,
-  },
+  option: { borderWidth: 1, borderRadius: 12, borderBottomLeftRadius: 4 },
+  optionIn: { minHeight: 52, paddingHorizontal: 12, paddingVertical: 12 },
   letter: {
     alignItems: "center",
     justifyContent: "center",
@@ -317,7 +305,7 @@ const styles = StyleSheet.create({
   // A long written answer wraps under the letter's top; one line sits on its middle.
   picked: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   said: { paddingTop: 2 },
-  closed: { flexDirection: "row", flexWrap: "wrap", columnGap: 8, paddingVertical: 6 },
+  closed: { flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 2 },
   foot: {
     flexDirection: "row",
     alignItems: "center",

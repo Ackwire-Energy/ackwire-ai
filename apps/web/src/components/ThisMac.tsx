@@ -3,7 +3,7 @@ import { Button, SettingNote } from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { desktopRevealsFiles, inDesktopApp, thisMac } from "@/lib/desktop";
+import { desktopRevealsFiles, inDesktopApp, type PrefsTab, thisMac } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
 
 /**
@@ -51,16 +51,22 @@ export function useAgentsHere(): boolean {
   return inDesktopApp() && here.data === true;
 }
 
-/** "Show the folder": in an app that opens it (`desktopRevealsFiles`), on the server it runs on this computer. */
-export function useRevealsFiles(): boolean {
+/** Is the page the server this app runs on this computer (its Preferences › Servers keep it)? False outside the app. */
+export function useLocalServerHere(): boolean {
   const local = useQuery({
     queryKey: THIS_MAC_KEY,
     queryFn: thisMac.status,
-    enabled: desktopRevealsFiles(),
+    enabled: inDesktopApp(),
     select: (s) => s.local === true,
     meta: { quiet: true },
   });
-  return desktopRevealsFiles() && local.data === true;
+  return inDesktopApp() && local.data === true;
+}
+
+/** "Show the folder": in an app that opens it (`desktopRevealsFiles`), on the server it runs on this computer. */
+export function useRevealsFiles(): boolean {
+  const here = useLocalServerHere();
+  return desktopRevealsFiles() && here;
 }
 
 /** An organization's name, for the app's own dialog before it pairs this computer. */
@@ -138,8 +144,8 @@ export function ThisMacButton({
   );
 }
 
-/** "Abrir no app": Preferences on `tab`, for what is decided on this Mac itself (folders, tools, updates). */
-export function OpenPrefsButton({ tab, children }: { tab: "folders" | "tools" | "updates"; children: string }) {
+/** "Abrir no app": Preferences on `tab`, for what is decided on this Mac itself (folders, tools, updates, servers). */
+export function OpenPrefsButton({ tab, children }: { tab: PrefsTab; children: string }) {
   return (
     <Button
       size="sm"

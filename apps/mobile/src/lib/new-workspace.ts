@@ -1,9 +1,12 @@
+import type { Me } from "@agenteschat/client";
+import { CLOUD_SERVER } from "@agenteschat/client/lib/server";
 import { useSyncExternalStore } from "react";
 
 /**
- * "Criar um workspace novo" from Adicionar workspace (ADR 0154): the first run opens on that server once someone is
- * signed in there (straight away, or after its sign-in), until a new workspace is chosen or they go back. `from` is
- * the workspace open when the first run showed (undefined until then): another one chosen means it was made.
+ * A new workspace asked for from Adicionar workspace (ADR 0154), on agentes.chat or on the server the app is on: the
+ * first run opens on that server once someone is signed in there (straight away, or after its sign-in), until a new
+ * workspace is chosen or they go back. `from` is the workspace open when the first run showed (undefined until then):
+ * another one chosen means it was made.
  */
 export interface NewWorkspaceAsk {
   server: string;
@@ -19,6 +22,13 @@ function set(next: NewWorkspaceAsk | null) {
 }
 
 export const askNewWorkspace = (server: string) => set({ server });
+
+/**
+ * Whether Adicionar workspace offers Novo workspace on `server`, the one the app is on (pure): any server but
+ * agentes.chat, whose own row makes one there, once `me` says the person may make one.
+ */
+export const offersNewWorkspaceHere = (server: string, me: Me | null | undefined) =>
+  server !== CLOUD_SERVER && !!me && me.user.canCreateWorkspace !== false;
 
 /** The first run showed over `from`. */
 export const newWorkspaceShown = (from: string | null) => {

@@ -6,25 +6,27 @@ setupDom();
 import { keys, messagesQuery } from "@agenteschat/client";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, ORG_ID, seedDm, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { headerSearchBox, renderApp, screen, settle } from "./render";
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
 });
 
-const box = () =>
-  within(document.querySelector(".channel__header") as HTMLElement).getByRole("combobox", {
-    name: "Buscar",
-  }) as HTMLInputElement;
+const box = () => headerSearchBox();
+/** An event on the field, opened first (outside the event's act, so it is on the page by then). */
+const onBox = async (fire: (el: HTMLInputElement) => void) => {
+  const el = box();
+  await act(async () => fire(el));
+};
 const typeIn = async (value: string) => {
-  await act(async () => fireEvent.change(box(), { target: { value } }));
+  await onBox((el) => fireEvent.change(el, { target: { value } }));
   // The search runs a beat after the last key.
   await act(() => new Promise((r) => setTimeout(r, 300)));
   await settle(4);
 };
 const enter = async () => {
-  await act(async () => fireEvent.keyDown(box(), { key: "Enter" }));
+  await onBox((el) => fireEvent.keyDown(el, { key: "Enter" }));
   await act(() => new Promise((r) => setTimeout(r, 300)));
   await settle(4);
 };
@@ -60,13 +62,81 @@ const seeded = () => {
 };
 
 describe("the header search (Discord's)", () => {
+  test("an icon that opens the field in place, focused; Esc or leaving it empty closes it back to the icon", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    const field = () => within(header).queryByRole("combobox", { name: "Buscar" }) as HTMLInputElement | null;
+    expect(field()).toBeNull();
+    await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Buscar" })));
+    expect(document.activeElement).toBe(field());
+    expect(within(header).queryByRole("button", { name: "Buscar" })).toBeNull();
+    // Esc closes its menu first, then the field, the focus back on the icon.
+    await act(async () => fireEvent.keyDown(field() as HTMLElement, { key: "Escape" }));
+    expect(field()).toBeTruthy();
+    await act(async () => fireEvent.keyDown(field() as HTMLElement, { key: "Escape" }));
+    expect(field()).toBeNull();
+    expect(document.activeElement).toBe(within(header).getByRole("button", { name: "Buscar" }));
+    // Leaving it empty closes it; with words in it, it stays.
+    await act(async () => fireEvent.click(within(header).getByRole("button", { name: "Buscar" })));
+    await act(async () => fireEvent.blur(field() as HTMLElement));
+    expect(field()).toBeNull();
+    await typeIn("zebra");
+    await act(async () => fireEvent.blur(field() as HTMLElement));
+    expect(field()?.value).toBe("zebra");
+    await act(async () => fireEvent.keyDown(field() as HTMLElement, { key: "Escape" }));
+    expect(field()).toBeTruthy();
+  });
+
+  test("its results keep it open after the words are gone; it closes once they close", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await typeIn("zebra");
+    await enter();
+    expect(results()).toBeTruthy();
+    await typeIn("");
+    await onBox((el) => fireEvent.blur(el));
+    expect(document.querySelector(".channel__header [role=combobox]")).toBeTruthy();
+    await onBox((el) => fireEvent.keyDown(el, { key: "Escape" }));
+    await settle(2);
+    expect(results()).toBeNull();
+    await onBox((el) => fireEvent.blur(el));
+    expect(document.querySelector(".channel__header [role=combobox]")).toBeNull();
+  });
+
+  test("emptied while its results show, it goes back to its icon when they close with the focus elsewhere", async () => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
+    await settle(6);
+    await typeIn("zebra");
+    await enter();
+    const group = within(results() as HTMLElement).getByRole("region", { name: /^@ada o login está devolvendo 401/ });
+    await act(async () => fireEvent.click(within(group).getByRole("button", { name: "Ir para a mensagem de Ada" })));
+    await settle(6);
+    await typeIn("");
+    const more = within(screen().getByRole("complementary", { name: "Thread" })).getByRole("button", {
+      name: "Mais ações da thread",
+    });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await settle(1);
+    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: "Ver em #eng" })));
+    await settle(4);
+    expect(results()).toBeNull();
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    expect(within(header).queryByRole("combobox", { name: "Buscar" })).toBeNull();
+    expect(within(header).getByRole("button", { name: "Buscar" })).toBeTruthy();
+  });
+
   test("Esc in the box closes the results and keeps the words", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
     await typeIn("zebra");
     await enter();
     expect(results()).toBeTruthy();
-    await act(async () => fireEvent.keyDown(box(), { key: "Escape" }));
+    await onBox((el) => fireEvent.keyDown(el, { key: "Escape" }));
     await settle(2);
     expect(results()).toBeNull();
     expect(box().value).toBe("zebra");
@@ -77,12 +147,12 @@ describe("the header search (Discord's)", () => {
     await settle(6);
     // It starts in this channel, a small chip the person may remove; then it is the whole workspace's.
     const header = document.querySelector(".channel__header") as HTMLElement;
-    expect(header.querySelector(".ac-token--sm")?.textContent).toBe("em: #eng");
     expect(box().getAttribute("placeholder")).toBe("");
-    await act(async () => fireEvent.keyDown(box(), { key: "Backspace" }));
+    expect(header.querySelector(".ac-token--sm")?.textContent).toBe("em: #eng");
+    await onBox((el) => fireEvent.keyDown(el, { key: "Backspace" }));
     expect(header.querySelector(".ac-token")).toBeNull();
     expect(box().getAttribute("placeholder")).toBe("Buscar em Acme");
-    await act(async () => fireEvent.focus(box()));
+    await onBox((el) => fireEvent.focus(el));
     const menu = screen().getByRole("listbox", { name: "Opções de busca" });
     expect(within(menu).getByRole("option", { name: /De uma pessoa ou agente\s*de: nome/ })).toBeTruthy();
     expect(within(menu).queryByRole("option", { name: /Antes de uma data/ })).toBeNull();
@@ -180,6 +250,7 @@ describe("the header search (Discord's)", () => {
   test("a reply opens its thread over the results: back keeps them, Esc too, the × closes both", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
@@ -259,6 +330,7 @@ describe("the header search (Discord's)", () => {
   test("another conversation's hit: there with the results closed, the query kept, ready for the next", async () => {
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
@@ -286,7 +358,7 @@ describe("the header search (Discord's)", () => {
     // Remembered: emptied, the box offers it under the recent searches.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar busca" })));
     await typeIn("");
-    await act(async () => fireEvent.focus(box()));
+    await onBox((el) => fireEvent.focus(el));
     expect(screen().getByRole("option", { name: "zebra" })).toBeTruthy();
     // The trash forgets them.
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Limpar buscas recentes" })));
@@ -315,6 +387,7 @@ describe("the header search (Discord's)", () => {
       if (!args[2]?.before && !args[2]?.threadId) await new Promise((r) => setTimeout(r, 60));
       return load(...args);
     });
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("recente");
     await enter();
@@ -331,6 +404,7 @@ describe("the header search (Discord's)", () => {
   test("back from a hit's thread: the focus returns to its Ir para", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
@@ -349,6 +423,7 @@ describe("the header search (Discord's)", () => {
   test("Ver em #canal in a hit's thread closes the results too", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seeded()) });
     await settle(6);
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
@@ -375,6 +450,7 @@ describe("the header search (Discord's)", () => {
     const dm = seedDm(state, { type: "agent", id: ADA_ID }, { body: "uma zebra na DM" });
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
+    box();
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Remover em: #eng" })));
     await typeIn("zebra");
     await enter();
@@ -398,7 +474,10 @@ describe("the header search (Discord's)", () => {
     const query = spyOn(api.search, "query");
     const { router } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
     await settle(6);
-    const chip = () => document.querySelector(".channel__header .ac-token")?.textContent;
+    const chip = () => {
+      box();
+      return document.querySelector(".channel__header .ac-token")?.textContent;
+    };
     expect(chip()).toBe("em: #eng");
     // The starting chip alone runs no search until the results show.
     expect(query).not.toHaveBeenCalled();
@@ -416,12 +495,12 @@ describe("the header search (Discord's)", () => {
   test("Mais filtros opens from the keyboard too", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(seedState()) });
     await settle(6);
-    await act(async () => fireEvent.focus(box()));
+    await onBox((el) => fireEvent.focus(el));
     const active = () => document.getElementById(box().getAttribute("aria-activedescendant") ?? "")?.textContent ?? "";
     for (let i = 0; i < 20 && !active().includes("Mais filtros"); i++)
-      await act(async () => fireEvent.keyDown(box(), { key: "ArrowDown" }));
+      await onBox((el) => fireEvent.keyDown(el, { key: "ArrowDown" }));
     expect(active()).toContain("Mais filtros");
-    await act(async () => fireEvent.keyDown(box(), { key: "Enter" }));
+    await onBox((el) => fireEvent.keyDown(el, { key: "Enter" }));
     expect(screen().getByRole("option", { name: /Antes de uma data/ })).toBeTruthy();
   });
 

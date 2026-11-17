@@ -136,6 +136,15 @@ test("every way the isolation isn't there fails the check, before the worker sta
   await expect(check(kernel({ connect: () => "connected" }))).rejects.toThrow(
     "An agent reached root's listener on 127.0.0.1:41000: the loopback guard isn't holding",
   );
+  // A PAM session (pam_systemd) moved it out of its slice: said as such, never as a policy a re-execution would fix.
+  const moved = kernel({ bind: () => "bound" });
+  moved.probes.cgroup = () => "/user.slice/user-20000.slice/session-4.scope";
+  expect(await failure(moved)).toEqual([
+    "The agent runs in /user.slice/user-20000.slice/session-4.scope, outside its slice: a PAM session (pam_systemd) moved it there. Update the runner.",
+    false,
+  ]);
+  moved.probes.cgroup = () => "/agents.slice/agents-20000.slice/run-r1.scope";
+  expect((await failure(moved))[1]).toBe(true);
 });
 
 test("root's listener refusing by reset, or never answering (drop), passes", async () => {

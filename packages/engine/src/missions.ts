@@ -40,6 +40,7 @@ import {
   RECENT_LINES,
   startMachineTask,
   taskModeOf,
+  taskScope,
   taskSeconds,
 } from "./machine-tasks";
 import { MachineOfflineError, machineOnline } from "./machines";
@@ -166,9 +167,12 @@ export function agentMissionApproval(agent: { missionCommandApproval?: string | 
  */
 export const CODEX_MIN_VERSION = "0.163.0";
 
-/** `codex-cli 0.163.0` → [0, 163, 0]; null when there is no version in it. */
+/**
+ * `codex-cli 0.163.0` → [0, 163, 0]; null when there is no version in it. Each part is up to nine digits: a runner
+ * reports the text, and unbounded digits would make a long run of them slow to read.
+ */
 export function versionOf(text: string | undefined): number[] | null {
-  const m = /(\d+)\.(\d+)\.(\d+)/.exec(text ?? "");
+  const m = /(\d{1,9})\.(\d{1,9})\.(\d{1,9})/.exec(text ?? "");
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
 }
 const atLeast = (have: number[], want: number[]) => {
@@ -199,6 +203,28 @@ export function machineExecutors(machine: {
   available.push("agent");
   return { available, codexTooOld };
 }
+
+/**
+ * What a computer can run a mission's items with: `machineExecutors`, less Codex on Windows, where the runner doesn't
+ * run Codex background tasks yet (ADR 0053's addendum of 2026-11-12), though Codex brain turns run there. No update
+ * changes that, so a Codex too old there isn't worth saying.
+ */
+export function missionExecutors(
+  machine: Parameters<typeof machineExecutors>[0] & { os?: string | null },
+): ReturnType<typeof machineExecutors> {
+  const found = machineExecutors(machine);
+  return machine.os === "windows"
+    ? { available: found.available.filter((e) => e !== "codex"), codexTooOld: false }
+    : found;
+}
+
+/** Codex asked for a mission's items on a Windows computer (`missionExecutors`): no update makes it run there. */
+const codexWindowsRefusal = (computer: string) =>
+  new ConflictError(
+    `Codex can't run a mission's items on ${computer} yet (Windows): choose Claude Code, the agent itself or another computer`,
+    "mission.codex_windows",
+    { computer },
+  );
 
 /** The default: Claude Code when the computer has it, else our agent. */
 export const defaultExecutor = (available: MissionExecutor[]): MissionExecutor =>
@@ -687,6 +713,7 @@ export async function missionViews(
             protocol: machines.protocol,
             execAllowed: machines.execAllowed,
             executors: machines.executors,
+            os: machines.os,
           })
           .from(machines)
           .where(inArray(machines.id, machineIds))
@@ -788,8 +815,8 @@ export async function missionViews(
             name: m.name,
             online: machineOnline(m),
             lentBy: r.machineLentBy,
-            executors: machineExecutors(m).available,
-            codexTooOld: machineExecutors(m).codexTooOld,
+            executors: missionExecutors(m).available,
+            codexTooOld: missionExecutors(m).codexTooOld,
           }
         : null,
       needsComputer,
@@ -963,7 +990,9 @@ async function usableMachine(
       computer: status.name,
     });
   }
-  const { available, codexTooOld } = machineExecutors(status);
+  const { available, codexTooOld } = missionExecutors(status);
+  // Before any update it might ask for: none makes Codex run a mission's items there.
+  if (asked === "codex" && status.os === "windows") throw codexWindowsRefusal(status.name);
   // Every mission works in its own copy of the project (ADR 0044): runner protocol 14.
   if (
     available.length === 0 ||
@@ -2331,9 +2360,10 @@ export async function setMissionMachine(
   if (machine.kind === "connected" && machine.pairedByUserId !== actorId) {
     throw new ForbiddenError("Choose a computer you paired", "mission.not_your_computer");
   }
+  if (mission.executor === "codex" && machine.os === "windows") throw codexWindowsRefusal(machine.name);
   if (
     machine.protocol < MISSION_WORKTREE_PROTOCOL ||
-    !machineExecutors(machine).available.includes(mission.executor as MissionExecutor)
+    !missionExecutors(machine).available.includes(mission.executor as MissionExecutor)
   ) {
     throw missionUpdateRefusal(machine, "can't run this mission");
   }
@@ -3313,12 +3343,13 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
     protocol: number | null;
     exec_allowed: boolean | null;
     executors: schema.MachineExecutors | string | null;
+    os: string | null;
   }>(
     await deps.db.execute(sql`select agents.id, agents.handle, agents.name, agents.owner_user_id,
         agents.mission_command_approval,
         ${audienceSql("agents", sql`${userId}::text`)} as can_talk,
         mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.protocol,
-        mc.exec_allowed, mc.executors
+        mc.exec_allowed, mc.executors, mc.os
       from ${schema.agents} agents
       left join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id and mc.deleted_at is null
       where agents.org_id = ${orgId}::uuid and agents.archived_at is null
@@ -3367,7 +3398,7 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
       };
     }
     const found = typeof r.executors === "string" ? (JSON.parse(r.executors) as schema.MachineExecutors) : r.executors;
-    const { available, codexTooOld } = machineExecutors({ protocol, execAllowed: true, executors: found });
+    const { available, codexTooOld } = missionExecutors({ protocol, execAllowed: true, executors: found, os: r.os });
     return {
       ...base,
       eligible: true,
@@ -3413,7 +3444,7 @@ export async function getTaskOutput(
       const agent = await getAgentCached(deps.db, orgId, row.agentId);
       const out = await deps.hub.call<"task.output">(
         row.machineId,
-        { op: "task.output", taskId: row.id, tail, agent: { id: row.agentId, handle: agent?.handle ?? "agent" } },
+        { op: "task.output", taskId: row.id, tail, agent: taskScope(row, agent?.handle ?? "agent") },
         { timeoutMs: 15_000 },
       );
       const lines = (Array.isArray(out?.lines) ? out.lines : []).map((l) => String(l).slice(0, 500)).slice(-tail);

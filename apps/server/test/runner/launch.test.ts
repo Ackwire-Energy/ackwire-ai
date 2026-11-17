@@ -1,9 +1,16 @@
 import { afterEach, expect, test } from "bun:test";
-import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { isBunfsPath, isCompiled, selfCommand } from "../../runner/launch";
 import { acquireLock, bootId, LOCK_FILE, readLock } from "../../runner/lock";
-import { launchdPlist, systemdUnit, windowsTaskCommand } from "../../runner/service";
+import {
+  launchdPlist,
+  launchdPlistPath,
+  removeOwnService,
+  systemdUnit,
+  systemdUnitPath,
+  windowsTaskCommand,
+} from "../../runner/service";
 import { removeDirs, tempDir } from "./helpers";
 
 const dirs: string[] = [];
@@ -135,3 +142,34 @@ test("lock: processes that try at the same moment, on a new home or a stale lock
     expect(readdirSync(home)).toEqual(["server.lock"]);
   }
 }, 30_000);
+
+test("a runner removed from its workspace takes its own login service away; one not started by a service, nothing", () => {
+  const home = tempDir("svc-");
+  dirs.push(home);
+  const plist = launchdPlistPath(home);
+  mkdirSync(path.dirname(plist), { recursive: true });
+  writeFileSync(plist, "<plist/>");
+  const ran: string[][] = [];
+  const run = (file: string, args: string[]) => {
+    ran.push([file, ...args]);
+    return { code: 0, output: "" };
+  };
+  // Started by the desktop app or a terminal: nothing to remove.
+  expect(removeOwnService({ manager: undefined, home, platform: "darwin" }, run)).toBeNull();
+  expect(existsSync(plist)).toBe(true);
+  // launchd: the file goes, no bootout (the exit code already stops it coming back).
+  expect(removeOwnService({ manager: "launchd", home, platform: "darwin" }, run)).toBe(plist);
+  expect(existsSync(plist)).toBe(false);
+  expect(ran).toEqual([]);
+  expect(removeOwnService({ manager: "launchd", home, platform: "darwin" }, run)).toBeNull();
+  // systemd's user unit: disabled, removed, reloaded.
+  const unit = systemdUnitPath(home);
+  mkdirSync(path.dirname(unit), { recursive: true });
+  writeFileSync(unit, "[Unit]");
+  expect(removeOwnService({ manager: "systemd", home, uid: 1000, platform: "linux" }, run)).toBe(unit);
+  expect(existsSync(unit)).toBe(false);
+  expect(ran).toEqual([
+    ["systemctl", "--user", "disable", "agentes-runner"],
+    ["systemctl", "--user", "daemon-reload"],
+  ]);
+});

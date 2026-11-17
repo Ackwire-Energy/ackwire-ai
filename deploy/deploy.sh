@@ -26,7 +26,7 @@
 # SPEECH_ENGINES. Over SSH,
 # a deploy key's line in authorized_keys can run this script alone, with the commit the caller sends:
 #   command="/srv/agentes/deploy/deploy.sh $SSH_ORIGINAL_COMMAND",restrict ssh-ed25519 AAAA...
-# With DEPLOY_IMAGE=ghcr.io/agentes-chat/agentes:edge before the script's path there, it pulls the
+# With DEPLOY_IMAGE=ghcr.io/ackwire-energy/agentes:edge before the script's path there, it pulls the
 # image CI publishes instead of building one.
 #
 # Back by hand to the version that ran before the current one (one step; the next deploy moves on):

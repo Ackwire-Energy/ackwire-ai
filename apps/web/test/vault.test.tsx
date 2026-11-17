@@ -13,10 +13,11 @@ import type {
   VaultOverview,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
-import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { generateSecretKeyPair } from "../../../packages/adapters/src/secret-box";
+import { defaultAccess } from "../src/components/vault/lib";
 import { ADA_ID, createFakeApi, ENG_ID, type FakeState, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { afterSealing, renderApp, screen, settle } from "./render";
 
 /*
  * Settings › Vault and the secret request card's "Save to the Vault" (ADR 0144), against a fake Vault: the lists and
@@ -176,6 +177,20 @@ function fakeVault(
     importCsv: async (orgId, input) => {
       log("importCsv", orgId, input.scope, input.dryRun);
       return { added: 2, updated: 0, skipped: [], format: "chrome" };
+    },
+    importKeys: async (orgId, input) => {
+      // Never a value in the log: what was sent, by name.
+      const sent = input.keys.map((k) => ({ keyName: k.keyName, replace: k.replace, length: k.secret.length }));
+      log("importKeys", orgId, input.scope, input.access, sent);
+      return {
+        added: sent.filter((k) => !k.replace).length,
+        replaced: sent.filter((k) => k.replace).length,
+        skipped: 0,
+      };
+    },
+    move: async (orgId, itemId, scope) => {
+      log("move", orgId, itemId, scope);
+      return structuredClone(Object.assign(find(itemId), { scope, ownerUserId: scope === "team" ? null : "u-walter" }));
     },
     connect: async (orgId, input) => {
       log("connect", orgId, input.kind, input.scope);
@@ -426,6 +441,216 @@ describe("Settings › Vault (ADR 0144)", () => {
   });
 });
 
+/** Opens the header's Import menu (Radix: keyboard) and picks one of its two files. */
+async function openImport(t: (key: string) => string, item: string) {
+  const button = screen().getByRole("button", { name: t("vault.import.open") });
+  button.focus();
+  await act(async () => {
+    fireEvent.keyDown(button, { key: "Enter" });
+    fireEvent.keyUp(button, { key: "Enter" });
+  });
+  await settle(2);
+  await click(within(screen().getByRole("menu")).getByRole("menuitem", { name: t(item) }));
+  await settle(2);
+}
+
+/** Worst case on purpose: the longest name a key takes, a value with no place to break, a multi-line one. */
+const LONG_NAME = `ACME_${"VERY_LONG_NAME_".repeat(3)}KEY`;
+const ENV_TEXT = [
+  "# what the app needs",
+  "ACME_API_KEY=fake-replacement-not-real",
+  "export ACME_DB_URL='postgres://ana@db.example.com/app'",
+  `${LONG_NAME}=${"x".repeat(180)}`,
+  'ACME_CERT="-----BEGIN-----\nline\n-----END-----"',
+  "lower_case=1",
+  "OPENAI_API_KEY=fake-openai-not-real",
+  "ACME_EMPTY=",
+  "ACME_DB_URL=postgres://bruno@db.example.com/app",
+].join("\n");
+
+describe("Import .env and moving an item (ADR 0144 §11)", () => {
+  const envRows = () => [...document.querySelectorAll<HTMLElement>(".vlt-env__row")];
+  const stateOf = (name: string) => envRows().find((r) => r.querySelector("code")?.textContent === name);
+
+  test("a pasted .env: reviewed key by key, a saved name skipped unless replaced, saved in one request", async () => {
+    const { state, t } = await openVault();
+    await openImport(t, "vault.env.open");
+    const dialog = screen().getByRole("dialog", { name: t("vault.env.title") });
+    expect(dialog.textContent).toContain(t("vault.env.text"));
+    const review = within(dialog).getByRole("button", { name: t("vault.env.review") }) as HTMLButtonElement;
+    expect(review.disabled).toBe(true);
+
+    // Nothing this reads: said in place, and the dialog stays.
+    await type(within(dialog).getByLabelText(t("vault.env.paste")), "just some words");
+    await click(review);
+    expect(within(dialog).getByRole("alert").textContent).toBe(t("vault.env.none"));
+
+    await type(within(dialog).getByLabelText(t("vault.env.paste")), ENV_TEXT);
+    await click(review);
+    await settle(2);
+    expect(envRows().map((r) => [r.querySelector("code")?.textContent, r.dataset.state])).toEqual([
+      ["ACME_API_KEY", "exists"],
+      ["ACME_DB_URL", "new"],
+      [LONG_NAME, "new"],
+      ["ACME_CERT", "new"],
+      ["lower_case", "problem"],
+      ["OPENAI_API_KEY", "problem"],
+      ["ACME_EMPTY", "problem"],
+    ]);
+    expect(dialog.textContent).toContain(t("vault.env.duplicates", { names: "ACME_DB_URL" }));
+    expect(stateOf("lower_case")?.textContent).toContain(t("vault.env.problem.name"));
+    expect(stateOf("OPENAI_API_KEY")?.textContent).toContain(t("vault.env.problem.reserved"));
+    expect(stateOf("ACME_EMPTY")?.textContent).toContain(t("vault.env.problem.empty"));
+    // Every value behind its dots until asked, one key at a time.
+    expect(dialog.textContent).not.toContain("not-real");
+    expect(dialog.textContent).not.toContain("db.example.com");
+    await click(within(dialog).getByRole("button", { name: t("vault.env.show", { name: "ACME_DB_URL" }) }));
+    expect(stateOf("ACME_DB_URL")?.textContent).toContain("postgres://bruno@db.example.com/app");
+    expect(dialog.textContent).not.toContain("not-real");
+    await click(within(dialog).getByRole("button", { name: t("vault.env.hide", { name: "ACME_DB_URL" }) }));
+    expect(dialog.textContent).not.toContain("db.example.com");
+
+    // The saved key is left by default: three new ones to import.
+    const confirm = (count: number) =>
+      within(dialog).getByRole("button", { name: t("vault.import.confirm", { count }) });
+    expect(confirm(3)).toBeTruthy();
+    const replace = within(stateOf("ACME_API_KEY") as HTMLElement).getByRole("checkbox");
+    expect(replace.getAttribute("aria-checked")).toBe("false");
+    await click(replace);
+    await click(confirm(4));
+    await settle(3);
+    const call = state.calls.find((c) => c.method === "vault.importKeys");
+    expect(call?.args.slice(1)).toEqual([
+      "team",
+      defaultAccess("team"),
+      [
+        { keyName: "ACME_API_KEY", replace: true, length: "fake-replacement-not-real".length },
+        { keyName: "ACME_DB_URL", replace: false, length: "postgres://bruno@db.example.com/app".length },
+        { keyName: LONG_NAME, replace: false, length: 180 },
+        { keyName: "ACME_CERT", replace: false, length: "-----BEGIN-----\nline\n-----END-----".length },
+      ],
+    ]);
+    expect(screen().queryByRole("dialog", { name: t("vault.env.title") })).toBeNull();
+  });
+
+  test("Personal has its own saved names: what is already saved follows where the keys go", async () => {
+    const mine = vaultItem({ id: "vi-mine", kind: "key", title: "Mine", keyName: "ACME_DB_URL", scope: "personal" });
+    const { state, t } = await openVault(seedState(), overviewOf({ items: [KEY, mine] }));
+    await openImport(t, "vault.env.open");
+    const dialog = screen().getByRole("dialog", { name: t("vault.env.title") });
+    await type(
+      within(dialog).getByLabelText(t("vault.env.paste")),
+      '{"ACME_API_KEY": "fake-json-not-real", "ACME_DB_URL": "x", "PORT": 8080}',
+    );
+    await click(within(dialog).getByRole("button", { name: t("vault.env.review") }));
+    await settle(2);
+    const states = () => envRows().map((r) => r.dataset.state);
+    expect(states()).toEqual(["exists", "new", "new"]);
+    const as = within(dialog).getByRole("radiogroup", { name: t("vault.import.as") });
+    await click(within(as).getByRole("radio", { name: t("vault.scope.personal") }));
+    expect(states()).toEqual(["new", "exists", "new"]);
+    await click(within(dialog).getByRole("button", { name: t("vault.import.confirm", { count: 2 }) }));
+    await settle(3);
+    expect(state.calls.find((c) => c.method === "vault.importKeys")?.args.slice(1, 3)).toEqual([
+      "personal",
+      defaultAccess("personal"),
+    ]);
+  });
+
+  test("a member without the team's permission gets no Team choice: the keys are theirs", async () => {
+    const member = seedState();
+    if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
+    const shared = { ...KEY, can: { edit: false, delete: false } };
+    const { t } = await openVault(member, overviewOf({ items: [shared], connections: [], canManageTeam: false }));
+    await openImport(t, "vault.env.open");
+    const dialog = screen().getByRole("dialog", { name: t("vault.env.title") });
+    await type(within(dialog).getByLabelText(t("vault.env.paste")), "ACME_API_KEY=fake-member-not-real");
+    await click(within(dialog).getByRole("button", { name: t("vault.env.review") }));
+    await settle(2);
+    expect(within(dialog).queryByRole("radiogroup", { name: t("vault.import.as") })).toBeNull();
+    expect(dialog.textContent).toContain(t("vault.import.asPersonal"));
+    // The team's key of that name isn't theirs to replace: as a personal key it is new.
+    expect(envRows().map((r) => r.dataset.state)).toEqual(["new"]);
+    await click(within(dialog).getByRole("button", { name: t("vault.import.confirm", { count: 1 }) }));
+    await settle(3);
+    expect(member.calls.find((c) => c.method === "vault.importKeys")?.args[1]).toBe("personal");
+  });
+
+  test("a new key offers Import .env in place of typing it", async () => {
+    const { t } = await openVault();
+    await click(screen().getByRole("button", { name: t("vault.new.open") }));
+    await settle(2);
+    const create = screen().getByRole("dialog", { name: t("vault.new.title") });
+    expect(within(create).queryByRole("button", { name: t("vault.env.open") })).toBeNull();
+    const what = within(create).getByRole("combobox", { name: t("vault.new.what") });
+    what.focus();
+    await act(async () => {
+      fireEvent.keyDown(what, { key: "Enter" });
+      fireEvent.keyUp(what, { key: "Enter" });
+    });
+    await settle(2);
+    await click(screen().getByRole("option", { name: new RegExp(`^${t("vault.kind.key")}`) }));
+    await settle(2);
+    await click(within(create).getByRole("button", { name: t("vault.env.open") }));
+    await settle(2);
+    expect(screen().queryByRole("dialog", { name: t("vault.new.title") })).toBeNull();
+    expect(screen().getByRole("dialog", { name: t("vault.env.title") })).toBeTruthy();
+  });
+
+  test("moving an item: one sentence on who sees it after, then the move, both ways", async () => {
+    const { state, t } = await openVault();
+    await click(rows()[1] as HTMLElement);
+    await settle(3);
+    let dialog = screen().getByRole("dialog", { name: "Payments" });
+    await click(within(dialog).getByRole("button", { name: t("vault.move.toPersonal") }));
+    let sure = screen().getByRole("dialog", { name: t("vault.move.title", { title: "Payments" }) });
+    expect(sure.textContent).toContain(t("vault.move.toPersonalText"));
+    expect(state.calls.some((c) => c.method === "vault.move")).toBe(false);
+    await click(within(sure).getByRole("button", { name: t("vault.move.toPersonal") }));
+    await settle(3);
+    expect(state.calls.find((c) => c.method === "vault.move")?.args.slice(1)).toEqual(["vi-key", "personal"]);
+    expect(screen().queryByRole("dialog", { name: "Payments" })).toBeNull();
+
+    const views = screen().getByRole("radiogroup", { name: t("vault.tab.label") });
+    await click(within(views).getByRole("radio", { name: new RegExp(`^${t("vault.tab.personal")}`) }));
+    await click(rows().find((r) => r.textContent?.includes("Billing details")) as HTMLElement);
+    await settle(3);
+    dialog = screen().getByRole("dialog", { name: "Billing details" });
+    await click(within(dialog).getByRole("button", { name: t("vault.move.toTeam") }));
+    sure = screen().getByRole("dialog", { name: t("vault.move.title", { title: "Billing details" }) });
+    expect(sure.textContent).toContain(t("vault.move.toTeamText"));
+    await click(within(sure).getByRole("button", { name: t("common.cancel") }));
+    expect(state.calls.filter((c) => c.method === "vault.move")).toHaveLength(1);
+  });
+
+  test("no move for a password manager's item", async () => {
+    const external = vaultItem({
+      id: "vi-ext",
+      kind: "login",
+      title: "Wiki",
+      connectionId: "vc-1",
+      sourceName: "1Password",
+    });
+    const { t } = await openVault(seedState(), overviewOf({ items: [external] }));
+    await click(rows()[0] as HTMLElement);
+    await settle(3);
+    const dialog = screen().getByRole("dialog", { name: "Wiki" });
+    expect(within(dialog).queryByRole("button", { name: t("vault.move.toPersonal") })).toBeNull();
+  });
+
+  test("no move for who doesn't manage the team's: their own item still deletes", async () => {
+    const member = seedState();
+    if (member.me?.organizations[0]) member.me.organizations[0].role = "member";
+    const mine = vaultItem({ id: "vi-mine", kind: "key", title: "Mine", keyName: "MY_KEY", scope: "personal" });
+    const { t } = await openVault(member, overviewOf({ items: [mine], connections: [], canManageTeam: false }));
+    await click(rows()[0] as HTMLElement);
+    await settle(3);
+    const own = screen().getByRole("dialog", { name: "Mine" });
+    expect(within(own).queryByRole("button", { name: t("vault.move.toTeam") })).toBeNull();
+    expect(within(own).getByRole("button", { name: t("vault.item.delete") })).toBeTruthy();
+  });
+});
+
 /** A pending secret request for me, with `saveToVault` on the fake api (logged as `secrets.saveToVault`). */
 async function withRequest(
   target: SecretTarget,
@@ -488,7 +713,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     expect(within(card()).getByRole("list", { name: t("vault.card.agents") }).textContent).toContain("Ada");
     await type(within(card()).getByLabelText(t("secret.labelKey", { agent: "Ada" })), "npm_live_abc123");
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
-    await settle(6);
+    await afterSealing(() => expect(card().textContent).toContain(t("vault.card.saved")));
 
     const methods = state.calls
       .map((c) => c.method)
@@ -519,7 +744,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
       "hunter2-for-the-shop",
     );
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
-    await settle(6);
+    await afterSealing(() => expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(true));
     const call = state.calls.find((c) => c.method === "secrets.saveToVault");
     // Empty: no username, not the agent's guess (absent would keep it).
     expect(call?.args[2]).toMatchObject({ value: "hunter2-for-the-shop", username: "" });
@@ -539,7 +764,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
       "hunter2-for-real",
     );
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
-    await settle(6);
+    await afterSealing(() => expect(card().classList.contains("rq--ended")).toBe(true));
     expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true);
     expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(false);
     expect(card().textContent).not.toContain(t("vault.card.saved"));
@@ -574,11 +799,7 @@ describe("the secret request card: Save to the Vault (ADR 0144)", () => {
     const filled = within(code).getAllByRole("textbox") as HTMLInputElement[];
     expect(filled.map((b) => b.value)).toEqual(["4", "8", "2", "1", "0", "7"]);
     await click(within(card()).getByRole("button", { name: t("secret.send") }));
-    // Sealing the code is WebCrypto, which runs off the JS thread: on a loaded machine it outlasts any number of
-    // ticks, so this waits for the delivery instead of counting them.
-    await waitFor(() => expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true), {
-      timeout: 10_000,
-    });
+    await afterSealing(() => expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true));
     expect(state.calls.some((c) => c.method === "secrets.saveToVault")).toBe(false);
   });
 });

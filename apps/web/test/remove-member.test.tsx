@@ -123,12 +123,18 @@ test("the confirmation says what goes with them; removing takes the row away", a
   ]);
 });
 
-test("the row: @handle beside the email, a DM button by when they were here, no … of its own", async () => {
+test("the row: @handle beside the email, and one menu by when they were here with the message and removing", async () => {
   const { router } = await members();
   const row = nameOf("João").closest(".members-person") as HTMLElement;
   expect(row.querySelector(".members-person__ids")?.textContent).toBe("@joaojoao@acme.com.br");
-  expect(within(row).queryByRole("button", { name: /^Mais ações/ })).toBeNull();
-  await click(within(row).getByRole("button", { name: "Mensagem para João" }));
+  expect(within(row).queryByRole("button", { name: "Mensagem para João" })).toBeNull();
+  // Radix opens the menu as the pointer goes down, never on the click.
+  await act(async () =>
+    fireEvent.pointerDown(within(row).getByRole("button", { name: "Mais de João" }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+  expect(screen().getByRole("menuitem", { name: "Remover do workspace" })).toBeTruthy();
+  await click(screen().getByRole("menuitem", { name: "Mensagem direta" }));
   await settle(4);
   expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/person/u-joao`);
 });

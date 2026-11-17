@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next";
 import type { Dir } from "@/components/NotificationParts";
 import { useOrg } from "@/components/org-context";
 import { useToast } from "@/lib/toast";
-import { failureText } from "./parts";
+import { failureText, useWidgetAiWay } from "./parts";
 import "./widgets.css";
 
 /**
@@ -21,7 +21,7 @@ export function widgetNoticeLine(t: TFunction, n: AppNotification, dir: Dir): st
   if (!notice) return null;
   const name = notice.agentId ? (dir.anyAgent(notice.agentId)?.name ?? t("channel.unknownAgent")) : "";
   if (notice.kind === "alert") return notice.text || null;
-  if (notice.kind === "failed") return failureText(t, { code: notice.reason, detail: notice.text }, name);
+  if (notice.kind === "failed") return failureText(t, { code: notice.reason, detail: notice.detail }, name);
   return notice.audience === "roles"
     ? t("widgets.notice.proposalRoles", { title: notice.title, roles: namesText(t, notice.roles) })
     : t("widgets.notice.proposalWorkspace", { title: notice.title });
@@ -29,7 +29,8 @@ export function widgetNoticeLine(t: TFunction, n: AppNotification, dir: Dir): st
 
 /**
  * What a board's notice lets the person do where it shows (Home, the inbox): open the widget, Resolve a failure
- * (run it again), or decide a request to publish (Publish, Keep only for me). `onOpen` opens it as the inbox would.
+ * (run it again), Connect for one waiting for an AI, or decide a request to publish (Publish, Keep only for me).
+ * `onOpen` opens it as the inbox would.
  */
 export function WidgetNoticeActions({
   n,
@@ -50,6 +51,9 @@ export function WidgetNoticeActions({
   const refresh = useRefreshWidget(org.id);
   const decide = useDecideDashboardProposal(org.id);
   const notice = widgetNoticeOf(n);
+  // Waiting for an AI: Connect, never Resolve (it builds by itself once one is there).
+  const needsAi = notice?.kind === "failed" && notice.reason === "missing_credential";
+  const aiWay = useWidgetAiWay(needsAi ? notice.agentId : null, needsAi ? notice.detail : null);
   if (!notice) return null;
   const say = (e: unknown) => toast.show(errorText(t, e, i18n.language), "error");
   const stop = (run: () => void) => (e: { stopPropagation: () => void }) => {
@@ -94,7 +98,7 @@ export function WidgetNoticeActions({
           {t("dashboards.proposal.keep")}
         </Button>
         {open && (
-          <Button size="sm" variant="ghost" onClick={stop(onOpen)}>
+          <Button variant="link" onClick={stop(onOpen)}>
             {t("widgets.notice.openBoard")}
           </Button>
         )}
@@ -102,9 +106,18 @@ export function WidgetNoticeActions({
     );
   }
   const widgetId = notice.widgetId;
+  const connects = !!aiWay && "connect" in aiWay;
+  const resolves = notice.kind === "failed" && !!widgetId && !needsAi;
+  // Nothing to press here: no empty slot left in the row's gap.
+  if (!connects && !resolves && !open) return null;
   return (
     <span className="wn-acts">
-      {notice.kind === "failed" && widgetId && (
+      {aiWay && "connect" in aiWay && (
+        <Button size="sm" variant={quiet ? undefined : "primary"} onClick={stop(aiWay.connect)}>
+          {t("noAi.action")}
+        </Button>
+      )}
+      {notice.kind === "failed" && widgetId && !needsAi && (
         <Button
           size="sm"
           variant={quiet ? undefined : "primary"}

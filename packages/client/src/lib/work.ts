@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { ConnectorDef, OrgSummary, Run, RunStep } from "../api/types";
+import type { ConnectorDef, Message, OrgSummary, Run, RunStep } from "../api/types";
 import type { LiveCode, LiveOutput, LiveRun, LiveStep, LiveWork } from "../realtime/streams";
 import { type Activity, type ActivityKind, activityVerb, appLabel, PERMISSION_TOOL, toolActivity } from "./activity";
 import { appConnector } from "./connected";
@@ -19,9 +19,9 @@ export const showsActivity = (org: Pick<OrgSummary, "showActivity"> | null | und
 export const toolLabel = (name: string) => name.replace(/[_-]+/g, " ").trim();
 
 /** A tool in "Usou a ferramenta …": the catalog's words, else its own name in words, without the app it starts with. */
-function toolWords(t: TFunction, tool: string) {
+function toolWords(t: TFunction, tool: string, locale?: string) {
   const worded = catalogLabel(t, tool);
-  return worded ? lowerFirst(worded) : toolLabel(toolKey(tool).key || tool);
+  return worded ? lowerFirst(worded, locale) : toolLabel(toolKey(tool).key || tool);
 }
 
 /** One thing the agent did (a tool call), for the work summary: what it did, in which service. */
@@ -341,9 +341,19 @@ export function workHeader(t: TFunction, w: { steps: number; connectors: string[
 }
 
 /** "Consultou o Himetrica", "Atualizou o plano", and for a tool with no words of its own "Usou a ferramenta enviar e-mail". */
-export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool">) {
-  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolWords(t, s.tool) });
+export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool">, locale?: string) {
+  return t(`chat.work.step.${s.kind}`, { app: appLabel(s), tool: toolWords(t, s.tool, locale) });
 }
+
+/**
+ * Tools only the engine reads: `pass` is how an agent stays silent (reply policy), so it is never a step a person
+ * reads ("Used the tool pass").
+ */
+const ENGINE_ONLY_TOOLS = new Set(["pass"]);
+
+/** The steps a person reads: without the engine-only ones. */
+export const shownSteps = <T extends { tool: string }>(steps: readonly T[]): T[] =>
+  steps.filter((s) => !ENGINE_ONLY_TOOLS.has(s.tool));
 
 /**
  * A step as one line: its phrase and what it worked on unless the phrase says it ("Atualizou uma tarefa · #131"). A
@@ -352,10 +362,11 @@ export function stepLabel(t: TFunction, s: Pick<WorkItem, "kind" | "app" | "tool
 export function stepPhrase(
   t: TFunction,
   step: { tool: string; detail?: string | null; outcome?: "refused" | "waiting" },
+  locale?: string,
 ) {
   const a = toolActivity(step.tool, null, step.detail);
   const state = step.outcome === "refused" ? "fail" : step.outcome === "waiting" ? "stop" : "done";
-  const label = toolPhrase(t, { ...a, tool: step.tool, state });
+  const label = toolPhrase(t, { ...a, tool: step.tool, state }, locale);
   const detail = step.detail?.trim();
   return detail && detail !== a.app ? `${label} · ${detail}` : label;
 }
@@ -374,31 +385,64 @@ export function foldSteps<T>(steps: T[], text: (step: T) => string): { step: T; 
   return lines;
 }
 
+/** Who or what stopped a run, as its stopped reply's `meta.canceled` keeps it (the engine's `stopCanceled`). */
+export interface ReplyStop {
+  byUserId: string | null;
+  /** The agent that stopped it at that person's word (the right hand). */
+  byAgentId: string | null;
+  /** Nobody stopped it: its cause (`run.agent_archived`…), in the person's words through `runErrorText`. */
+  code: string | null;
+}
+
+/** The stop of a reply's `meta.canceled` (`true` on older replies, else an object). */
+export function replyStopOf(canceled: unknown): ReplyStop {
+  const c = typeof canceled === "object" && canceled ? (canceled as Record<string, unknown>) : {};
+  const str = (v: unknown) => (typeof v === "string" && v ? v : null);
+  return { byUserId: str(c.byUserId), byAgentId: str(c.byAgentId), code: str(c.code) };
+}
+
 /**
- * A message of a stopped run (`meta.canceled`, `true` or `{ byUserId }`) ends
- * with the server's "_Interrompido por Walter._": that line leaves the text,
- * and the note is written on the client, in the UI language, from the meta.
- * `note` is the server's line (only a fallback when the meta has no person).
+ * A message of a stopped run (`meta.canceled`, `true` or an object) ends with the server's English "_Stopped by
+ * Walter._": that line leaves the text, and the apps word the stop in the person's language from the meta.
  */
-export function splitCanceled(body: string, meta: Record<string, unknown> | undefined) {
+export function splitCanceled(
+  body: string,
+  meta: Record<string, unknown> | undefined,
+): ReplyStop & { body: string; canceled: boolean } {
   const canceled = meta?.canceled;
-  if (!canceled) return { body, canceled: false, byUserId: null as string | null, note: null as string | null };
-  const byUserId =
-    typeof canceled === "object" && canceled && typeof (canceled as { byUserId?: unknown }).byUserId === "string"
-      ? ((canceled as { byUserId: string }).byUserId as string)
-      : null;
+  const stop = replyStopOf(canceled);
+  if (!canceled) return { body, canceled: false, ...stop };
   // The server also sends what the agent wrote, without the note.
-  const said = typeof canceled === "object" && canceled ? (canceled as { text?: unknown }).text : undefined;
+  const said = typeof canceled === "object" ? (canceled as { text?: unknown }).text : undefined;
+  if (typeof said === "string") return { body: said, canceled: true, ...stop };
   const match = /\n*\s*_([^_\n]+)_\s*$/.exec(body);
-  if (typeof said === "string")
-    return { body: said, canceled: true, byUserId, note: match?.[1]?.trim().replace(/\.$/, "") ?? null };
-  if (!match) return { body, canceled: true, byUserId, note: null };
-  return {
-    body: body.slice(0, match.index).trimEnd(),
-    canceled: true,
-    byUserId,
-    note: (match[1] ?? "").trim().replace(/\.$/, ""),
-  };
+  return { body: match ? body.slice(0, match.index).trimEnd() : body, canceled: true, ...stop };
+}
+
+/**
+ * The stopped replies (`meta.canceled`) with nothing left to pick up, by run: their agent works in the conversation
+ * now (`working`, agent ids), or wrote again after them in the same thread. "Continuar" leaves those: the agent went
+ * on, and an ended stop never looks live. `messages` in any order.
+ */
+export function stopsMovedOn(
+  messages: readonly Pick<Message, "author" | "agentRunId" | "threadId" | "createdAt" | "meta">[],
+  working: Iterable<string> = [],
+): Set<string> {
+  const busy = new Set(working);
+  const moved = new Set<string>();
+  const stops = messages.filter((m) => m.author.type === "agent" && m.agentRunId && m.meta?.canceled);
+  for (const stop of stops) {
+    const wroteAgain = (m: (typeof messages)[number]) =>
+      m.author.type === "agent" &&
+      m.author.id === stop.author.id &&
+      (m.threadId ?? null) === (stop.threadId ?? null) &&
+      Boolean(m.agentRunId) &&
+      m.agentRunId !== stop.agentRunId &&
+      !m.meta?.notice &&
+      m.createdAt > stop.createdAt;
+    if (busy.has(stop.author.id ?? "") || messages.some(wroteAgain)) moved.add(stop.agentRunId as string);
+  }
+  return moved;
 }
 
 // ───────────────────────────── the tool block (one per reply) ─────────────────────────────
@@ -710,14 +754,14 @@ export const toolNow = (items: ToolItem[]) => linesOf(items).at(-1) ?? null;
  * consultando o GitHub" when it failed, "Consultando o GitHub" (no dots) when the run stopped during it.
  * A command the permission check refused says so: "Recusado: Rerun the tests".
  */
-export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "tool" | "state">) {
+export function toolPhrase(t: TFunction, l: Pick<ToolLine, "kind" | "app" | "tool" | "state">, locale?: string) {
   const verb = activityVerb(t, { kind: l.kind, app: l.app });
   if (l.state === "run") return `${capitalize(verb)}…`;
   if (l.state === "stop") return capitalize(verb);
   if (l.state === "fail" && l.kind === "runningCommand") return t("chat.work.refused", { app: appLabel(l) });
   if (l.state === "fail" && l.kind === "runningCommandAny") return t("chat.work.refusedAny");
   if (l.state === "fail") return t("chat.work.erred", { activity: verb });
-  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolWords(t, l.tool) });
+  return t(`chat.work.step.${l.kind}`, { app: appLabel(l), tool: toolWords(t, l.tool, locale) });
 }
 
 /** A turn quicker than this shows nothing new: its step line says the agent's own words only past it. */
@@ -761,13 +805,7 @@ export function barStep(
   return lowerFirst(waitStep(t, run.work, long ? run.step : undefined), locale);
 }
 
-/** "1,2 s", "760 ms": a line's time, finer than the block's. */
-export function formatLineTime(locale: string, ms: number) {
-  if (ms < 1000) return `${Math.max(1, Math.round(ms))} ms`;
-  if (ms < 60_000) return `${new Intl.NumberFormat(locale, { maximumFractionDigits: 1 }).format(ms / 1000)} s`;
-  if (ms < 3600_000) return `${Math.round(ms / 60_000)} min`;
-  return `${new Intl.NumberFormat(locale, { maximumFractionDigits: ms < 10 * 3600_000 ? 1 : 0 }).format(ms / 3600_000)} h`;
-}
+export { formatLineTime } from "./format";
 
 // ───────────────────────────── one call on its own ─────────────────────────────
 
@@ -797,6 +835,15 @@ const QUIET_READS: ReadonlySet<ActivityKind> = new Set([
   "readingDashboards",
 ]);
 
+/** The computer brain's own image tool (Codex's), as the runner names its call. */
+export const IMAGE_TOOL = "image_generation";
+
+/**
+ * It is making a picture now (its own image tool's step, `agent.step`): the conversation shows where the picture will
+ * be until its reply, with the picture, takes its place.
+ */
+export const makingImage = (run: Pick<LiveRun, "step">) => run.step?.tool === IMAGE_TOOL;
+
 /** A step running this long is no quick read: its card stays. */
 const LONG_STEP_MS = 4000;
 
@@ -807,14 +854,16 @@ const LONG_STEP_MS = 4000;
 export const quietLine = (
   l: Pick<ToolLine, "tool" | "service" | "kind" | "state" | "count" | "ms" | "code" | "output">,
 ) =>
-  l.count === 1 &&
-  !l.service &&
-  (!/^mcp__/i.test(l.tool) || /^mcp__agentes__/i.test(l.tool)) &&
-  l.state === "done" &&
-  QUIET_READS.has(l.kind) &&
-  !l.code &&
-  !l.output?.length &&
-  (l.ms === null || l.ms < LONG_STEP_MS);
+  // A picture it made is in its reply: the picture says it.
+  (l.count === 1 && l.kind === "creatingImage" && l.state === "done") ||
+  (l.count === 1 &&
+    !l.service &&
+    (!/^mcp__/i.test(l.tool) || /^mcp__agentes__/i.test(l.tool)) &&
+    l.state === "done" &&
+    QUIET_READS.has(l.kind) &&
+    !l.code &&
+    !l.output?.length &&
+    (l.ms === null || l.ms < LONG_STEP_MS));
 
 /** The turn's only tool work is a quiet read (`quietLine`): no card, live, kept or saved. */
 export const quietWork = (items: ToolItem[]) => {

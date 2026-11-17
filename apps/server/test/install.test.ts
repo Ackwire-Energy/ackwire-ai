@@ -116,12 +116,30 @@ async function plan(machine: Machine, args: string[] = [], o: RunOptions = {}) {
   ]) {
     stub(name);
   }
+  // The real download path verifies the release digest before handing control to the Bun stub.
+  if (o.real) {
+    stub("curl", 'while [ "$1" != "-o" ]; do shift; done; : > "$2"');
+    stub(
+      "sha256sum",
+      `echo "${o.env?.BAD_SETUP ? "mismatch" : text.match(/^ {2}SETUP_SHA256=([a-f0-9]{64})$/m)?.[1]}  $1"`,
+    );
+  }
   // A real run keeps its work in a folder of its own.
   for (const tool of ["sleep", ...(o.real ? ["mktemp", "rm", "tty"] : [])]) {
     symlinkSync(Bun.which(tool) as string, join(bin, tool));
   }
   const argv = [...(o.real ? [] : ["--plan"]), ...args];
-  const direct = o.piped === undefined ? ["/bin/sh", SCRIPT, ...argv] : ["/bin/sh", "-s", "--", ...argv];
+  // mac_docker also looks outside PATH. Map those probes into the fixture so an installed
+  // Homebrew or Docker Desktop on the test host cannot change the simulated machine.
+  let script = SCRIPT;
+  if (machine.os === "Darwin") {
+    script = join(bin, "install.sh");
+    writeFileSync(
+      script,
+      text.replace(/(?<![A-Za-z$])\/(opt\/homebrew|Applications|usr\/local)\//g, `${home}/system/$1/`),
+    );
+  }
+  const direct = o.piped === undefined ? ["/bin/sh", script, ...argv] : ["/bin/sh", "-s", "--", ...argv];
   const cmd = o.before ? ["/bin/sh", "-c", `${o.before} && exec "$@"`, "sh", ...direct] : direct;
   const env = { PATH: bin, HOME: home, STUB_LOG: log, ...o.env };
   let out = "";
@@ -371,12 +389,22 @@ describe("install.sh", () => {
     expect(run.code).toBe(0);
     expect(run.out).toContain("◇  Docker 26.1.5\n◇  Compose 2.26.1\n");
     expect(run.out).not.toContain("$ ");
-    expect(run.out).toEndWith(
-      `\n◇  The setup, in ${dir}:\n     ${run.bin}/bun x --bun @agenteschat/setup@0.1.1 --network local\n\n`,
+    expect(run.out.replace(/\S*\/agentes-install\.[^/]+\/ackwire-setup\.js/g, "<tmp>/ackwire-setup.js")).toEndWith(
+      `\n◇  The setup, in ${dir}:\n     ${run.bin}/bun <tmp>/ackwire-setup.js --network local\n\n`,
     );
     // The setup draws in the installer's frame: no logo or badge of its own.
-    expect(run.calls).toContain("bun x --bun @agenteschat/setup@0.1.1 --network local");
+    expect(run.calls.some((line) => /^bun \S+\/ackwire-setup\.js --network local$/.test(line))).toBe(true);
     expect(run.calls).toContain("frame 1 stdin none");
+  });
+
+  test("refuses a setup bundle with a different digest before running Bun", async () => {
+    const run = await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" }, [], {
+      real: true,
+      env: { BAD_SETUP: "1" },
+    });
+    expect(run.code).toBe(1);
+    expect(run.err).toContain("SHA-256 differs");
+    expect(run.calls.some((line) => line.startsWith("frame "))).toBe(false);
   });
 
   test("on a terminal, the setup reads it by its own name: Bun on macOS can't wait for keys on /dev/tty", async () => {
@@ -384,9 +412,9 @@ describe("install.sh", () => {
     const machine = { ...linuxRoot, docker: "26.1.5", compose: "2.26.1", bun: "1.4.4" };
     const run = await plan(machine, ["--dir", dir], { real: true, tty: true });
     expect(run.code).toBe(0);
-    expect(plain(run.out)).toContain(
-      `◇  The setup, in ${dir}:\n│    ${run.bin}/bun x --bun @agenteschat/setup@0.1.1\n│\n`,
-    );
+    expect(
+      plain(run.out).replace(/\S*\/agentes-install\.[^/]+\/ackwire-setup\.js/g, "<tmp>/ackwire-setup.js"),
+    ).toContain(`◇  The setup, in ${dir}:\n│    ${run.bin}/bun <tmp>/ackwire-setup.js\n│\n`);
     expect(run.calls.find((call) => call.startsWith("frame "))).toMatch(/^frame 1 stdin \/dev\/(pts\/\d+|ttys\d+)$/);
   });
 
@@ -431,9 +459,7 @@ describe("install.sh", () => {
     expect(run.out).toContain(bunZip("linux-x64-baseline"));
     expect(run.out).toContain("$ mv <tmp>/bun-linux-x64-baseline/bun /opt/agentes/.runtime/bun");
     expect(run.out).toContain("$ cd /opt/agentes");
-    expect(run.out).toContain(
-      "$ /opt/agentes/.runtime/bun x --bun @agenteschat/setup@0.1.1 --network local </dev/null",
-    );
+    expect(run.out).toContain("$ /opt/agentes/.runtime/bun <tmp>/ackwire-setup.js --network local </dev/null");
     expect(run.changes).toEqual([]);
   });
 
@@ -481,7 +507,7 @@ describe("install.sh", () => {
     const piped = await plan({ ...user, docker: "down" }, [], { piped: text });
     expect(piped.out).toContain("●  Docker needs root here: downloading this installer to run it again as root");
     expect(piped.out).toContain(
-      "$ curl -fsSL --proto =https --retry 3 -o <tmp>/install.sh https://agentes.chat/install",
+      "$ curl -fsSL --proto =https --retry 3 -o <tmp>/install.sh https://hub.ackwire.app/install",
     );
     expect(piped.out).toContain("$ sudo sh <tmp>/install.sh");
     expect(piped.changes).toEqual([]);
@@ -532,7 +558,7 @@ describe("install.sh", () => {
     ]) {
       expect(run.code).toBe(0);
       expect(run.out).not.toContain("sudo");
-      expect(run.out).toContain("@agenteschat/setup@0.1.1 --computer ");
+      expect(run.out).toContain("<tmp>/ackwire-setup.js --computer ");
     }
   });
 
@@ -551,7 +577,7 @@ describe("install.sh", () => {
     expect(run.out).toContain("◇  Docker 28.5.1");
     expect(run.out).toContain(`◇  Bun 1.4.4 (${run.bin}/bun)`);
     expect(run.out).toContain(`$ cd ${run.home}/agentes`);
-    expect(run.out).toContain(`$ ${run.bin}/bun x --bun @agenteschat/setup@0.1.1 --network local </dev/null`);
+    expect(run.out).toContain(`$ ${run.bin}/bun <tmp>/ackwire-setup.js --network local </dev/null`);
     expect(run.out).not.toContain("--native");
     expect(run.out).not.toContain("Compose");
     expect(run.changes).toEqual([]);
@@ -630,8 +656,8 @@ describe("install.sh", () => {
       await plan({ ...linuxRoot, docker: "26.1.5", compose: "2.26.1" }, ["--email", "skip"], { piped: text }),
     ];
     for (const run of runs) {
-      const line = `${run.out}${run.err}`.split("\n").find((l) => l.includes("@agenteschat/setup@"));
-      const args = line?.split("@agenteschat/setup@0.1.1")[1]?.replace("</dev/null", "").trim().split(" ");
+      const line = `${run.out}${run.err}`.split("\n").find((l) => l.includes("/bun <tmp>/ackwire-setup.js"));
+      const args = line?.split("<tmp>/ackwire-setup.js")[1]?.replace("</dev/null", "").trim().split(" ");
       expect(args).toBeDefined();
       expect(parseOptions((args ?? []).filter(Boolean), {})).not.toHaveProperty("error");
     }
@@ -653,7 +679,7 @@ describe("install.sh", () => {
       const run = await plan(machine);
       expect(run.code).toBe(1);
       expect(run.err).toContain(`this is ${machine.os} on ${machine.arch}`);
-      expect(run.err).toContain("https://agentes.chat/docs/install-on-a-server");
+      expect(run.err).toContain("https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SELF_HOSTING.md");
     }
     const musl = await plan({ ...linuxRoot, musl: true });
     expect(musl.code).toBe(1);
@@ -671,7 +697,7 @@ describe("install.sh", () => {
       piped: text,
     });
     expect(piped.code).toBe(0);
-    expect(piped.out).toContain("@agenteschat/setup@0.1.1 --email skip </dev/null");
+    expect(piped.out).toContain("<tmp>/ackwire-setup.js --email skip </dev/null");
   });
 
   test("a local build of the setup, and --json output kept off stdout", async () => {

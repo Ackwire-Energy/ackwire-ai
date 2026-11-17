@@ -25,7 +25,7 @@ if (process.argv[2] === "setup") {
 if (process.argv[2] === "migrate") {
   const config = loadConfig();
   const database = createDatabase({ url: config.DATABASE_URL, poolMax: config.DATABASE_POOL_MAX });
-  await prepareDatabase(database, createLogger(config.LOG_LEVEL));
+  await prepareDatabase(database, createLogger(config.LOG_LEVEL, undefined, config.LOG_FORMAT));
   await database.close();
   process.exit(0);
 }

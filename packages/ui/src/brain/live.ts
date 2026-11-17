@@ -4,6 +4,8 @@
  * portraits are drawn; with reduced motion each one is drawn once, still (and
  * again when what it shows changes).
  */
+
+import { onThemeChange } from "../theme";
 import { type BrainAgentLook, type BrainPortraitKind, type BrainPortraitState, drawBrain } from "./portrait.js";
 
 export interface LiveBrain {
@@ -19,6 +21,7 @@ const brains = new Set<LiveBrain>();
 const visible = new WeakSet<Element>();
 let timer: ReturnType<typeof setTimeout> | 0 = 0;
 let observer: IntersectionObserver | null = null;
+let themeWatched = false;
 
 const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
@@ -71,6 +74,13 @@ export function addLiveBrain(b: LiveBrain): () => void {
     });
     observer.observe(b.canvas);
   } else visible.add(b.canvas);
+  // Still portraits (reduced motion) are drawn only on demand: a new theme is one.
+  if (!themeWatched) {
+    themeWatched = true;
+    onThemeChange(() => {
+      for (const one of brains) drawLiveBrain(one);
+    });
+  }
   drawLiveBrain(b);
   schedule();
   return () => {

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
-import { monthStartUtc } from "@agenteschat/engine";
+import { monthStartUtc, sealSecret } from "@agenteschat/engine";
 import {
   type Browser,
   browser,
@@ -19,14 +19,34 @@ afterEach(async () => {
 
 const SECRET_KEY = "ts_live_do_not_leak_9f2c";
 
-/** A fake TypeSafe that answers every call with `status`, and counts them. */
+/** A fake TypeSafe (or OpenRouter) that answers every call with `status`, and records who was called with what. */
 function typesafe(status = 200) {
   const calls: string[] = [];
-  const fetch = (async (_url: string, init: RequestInit) => {
+  const urls: string[] = [];
+  const fetch = (async (url: string, init: RequestInit) => {
     calls.push(new Headers(init.headers).get("authorization") ?? "");
+    urls.push(url);
     return Response.json(status < 300 ? { answers: { ok: { noul: 1 } } } : { detail: {} }, { status });
   }) as unknown as typeof globalThis.fetch;
-  return { fetch, calls };
+  return { fetch, calls, urls };
+}
+
+/** A provider key sealed as Provider keys keeps it, written straight to its table. */
+async function providerKey(t: TestServer, orgId: string, provider: string, apiKey: string, revoked = false) {
+  const id = crypto.randomUUID();
+  const sealed = await sealSecret(t.adapters.keyWrapper, apiKey, `provider-credential|${orgId}|${id}`);
+  await t.db.insert(schema.providerCredentials).values({
+    id,
+    orgId,
+    provider,
+    label: provider,
+    secretCiphertext: sealed.ciphertext,
+    wrappedDataKey: sealed.wrappedDataKey,
+    kekId: sealed.kekId,
+    keyHint: apiKey.slice(-4),
+    revokedAt: revoked ? new Date() : null,
+  });
+  return id;
 }
 
 async function server(options: { env?: Record<string, string>; status?: number } = {}) {
@@ -52,7 +72,13 @@ test("only the installation's first account reaches it: signed out 401, anyone e
   expect((await other("/api/app/jev", { method: "DELETE" })).status).toBe(404);
   const res = await owner("/api/app/jev");
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ source: null, hint: null, state: "off", month: { decisions: 0, costUsd: 0 } });
+  expect(await res.json()).toEqual({
+    source: null,
+    via: null,
+    hint: null,
+    state: "off",
+    month: { decisions: 0, costUsd: 0 },
+  });
 });
 
 test("on agentes.chat itself nobody has it", async () => {
@@ -188,4 +214,39 @@ test("once no account is left, the next first account has it", async () => {
   const next = browser(t);
   await signUp(next, "next@example.com");
   expect((await next("/api/app/jev")).status).toBe(200);
+});
+
+test("an OpenRouter key, pasted or the workspace's own, calls Jev through OpenRouter (ADR 0073 §9)", async () => {
+  const { t, owner, other, ts } = await server();
+  const acme = await org(owner, "Acme");
+  const beta = await org(other, "Beta");
+  const pasted = await owner("/api/app/jev", { method: "PUT", json: { apiKey: "sk-or-v1-pasted_do_not_leak_1a2b" } });
+  expect(pasted.status).toBe(200);
+  expect(await pasted.json()).toMatchObject({ source: "settings", via: "openrouter", hint: "1a2b", state: "ok" });
+  expect(ts.urls).toEqual(["https://openrouter.ai/api/alpha/decisions"]);
+
+  // The workspace's own: copied as Jev's key, never returned.
+  const own = await providerKey(t, acme, "openrouter", "sk-or-v1-workspace_do_not_leak_3c4d");
+  const handed = await owner("/api/app/jev", { method: "PUT", json: { orgId: acme, credentialId: own } });
+  expect(handed.status).toBe(200);
+  const text = await handed.text();
+  expect(text).not.toContain("do_not_leak");
+  expect(JSON.parse(text)).toMatchObject({ source: "settings", via: "openrouter", hint: "3c4d" });
+  expect(ts.calls.at(-1)).toBe("Bearer sk-or-v1-workspace_do_not_leak_3c4d");
+
+  // Not one of its workspace's keys, revoked, or another provider's: 404, nothing changes.
+  const anthropic = await providerKey(t, acme, "anthropic", "sk-ant-api03-not_openrouter_5e6f");
+  const revoked = await providerKey(t, acme, "openrouter", "sk-or-v1-revoked_key_7a8b", true);
+  const betaKey = await providerKey(t, beta, "openrouter", "sk-or-v1-other_workspace_9c0d");
+  for (const credentialId of [anthropic, revoked, crypto.randomUUID()]) {
+    expect((await owner("/api/app/jev", { method: "PUT", json: { orgId: acme, credentialId } })).status).toBe(404);
+  }
+  expect((await owner("/api/app/jev", { method: "PUT", json: { orgId: acme, credentialId: betaKey } })).status).toBe(
+    404,
+  );
+  // A workspace the owner isn't in: its keys aren't theirs to hand over.
+  expect((await owner("/api/app/jev", { method: "PUT", json: { orgId: beta, credentialId: betaKey } })).status).toBe(
+    403,
+  );
+  expect(await (await owner("/api/app/jev")).json()).toMatchObject({ via: "openrouter", hint: "3c4d" });
 });

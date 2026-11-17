@@ -55,13 +55,53 @@ describe("a request card at its worst", () => {
     expect(rows.find((r) => r.textContent?.includes(LONG_VALUE))?.hasAttribute("data-long")).toBe(true);
   });
 
-  test("approved ahead: when it runs is a quiet line under the pill, never the pill's time", async () => {
+  test("approved ahead: when it runs is a quiet line under who approved, never the card's time", async () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(worst("approved")) });
     await settle(4);
     const pill = screen().getByRole("group", { name: "Aprovação concluída" });
-    expect(pill.querySelector(".rq-done__note")?.textContent).toMatch(/^Agendado para /);
-    expect(pill.querySelector(".ac-eventpill__time")?.textContent).not.toMatch(/Agendado/);
+    expect(pill.querySelector(".rq__answer-note")?.textContent).toMatch(/^Agendado para /);
+    expect(pill.querySelector(".rq__answer-time")?.textContent).not.toMatch(/Agendado/);
     expect(within(pill).getByRole("button", { name: "Cancelar" })).toBeTruthy();
+  });
+
+  test("answered with a long answer that never breaks on its own: the card keeps the question and the answer whole", async () => {
+    const state = seedState();
+    const joao = state.members.find((m) => m.userId === "u-joao");
+    if (joao) joao.name = "João Guilherme de Albuquerque Vasconcelos Neto";
+    state.messages.push({
+      id: "msg-q-worst",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body: "",
+      mentionedAgentIds: [],
+      agentRunId: "r-q-worst",
+      meta: {
+        question: {
+          id: "q-worst",
+          agentId: ADA_ID,
+          channelId: ENG_ID,
+          threadId: null,
+          messageId: "msg-q-worst",
+          text: "Para qual endereço mando a nota fiscal de novembro, e quem precisa estar em cópia para o financeiro fechar o mês?",
+          choices: ["Para o financeiro", "Para o comercial"],
+          status: "answered",
+          answer: `${LONG_ADDRESS}, com cópia para ${LONG_ADDRESS}. ${LONG_VALUE}`,
+          answeredByUserId: "u-joao",
+        },
+      },
+      createdAt: new Date().toISOString(),
+    });
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(4);
+    const card = screen().getByRole("group", { name: "Pergunta de Ada" });
+    expect(card.classList.contains("rq--ended")).toBe(true);
+    expect(card.querySelector(".rq__lead")?.textContent).toContain("Para qual endereço mando a nota fiscal");
+    const answer = card.querySelector(".rq__answer-text") as HTMLElement;
+    expect(answer.textContent).toContain("Respondida por João Guilherme de Albuquerque Vasconcelos Neto");
+    expect(answer.querySelector("b")?.textContent).toContain(LONG_ADDRESS);
+    // Ended: the choices are gone and nothing in it can be pressed.
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 });
 
@@ -183,7 +223,7 @@ describe("headers at their worst: the name wraps whole, the glyphs go under it a
     const { header, line, acts } = lineOf();
     expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
     expect(within(header).getByRole("heading", { level: 1, name: LONG_PERSON })).toBeTruthy();
-    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Buscar" })).toBeTruthy();
   });
 
   test("a DM with an agent: its tasks, the search and the side panel's toggle in one group", async () => {
@@ -221,7 +261,7 @@ describe("headers at their worst: the name wraps whole, the glyphs go under it a
     expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
     expect(within(header).getByRole("heading", { level: 1, name: LONG_AGENT })).toBeTruthy();
     expect(acts.querySelector(".tm-pill")).not.toBeNull();
-    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Buscar" })).toBeTruthy();
     expect(acts.lastElementChild?.matches(".dm-side-toggle")).toBe(true);
   });
 

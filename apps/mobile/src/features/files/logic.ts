@@ -8,7 +8,7 @@ import { filePath } from "@agenteschat/client/lib/message-links";
  */
 
 /** How the app shows a file: inline picture or video, the document screen (Markdown, text, PDF), or only its card. */
-export type FileView = "image" | "video" | "markdown" | "text" | "pdf" | "other";
+export type FileView = "image" | "video" | "markdown" | "text" | "pdf" | "html" | "other";
 
 /** The word under the name ("Imagem", "PDF", "Documento"…): `mobile.files.type.<key>`. */
 export type FileTypeKey =
@@ -115,13 +115,15 @@ export function fileInfo(a: Pick<ArtifactDetail, "kind" | "title" | "content">):
     if (IMAGE_TYPES.has(mime) || (untyped && IMAGE_EXT.has(ext))) view = "image";
     else if (VIDEO_TYPES.has(mime) || (untyped && VIDEO_EXT.has(ext))) view = "video";
     else if (mime === "application/pdf" || ext === "pdf") view = "pdf";
+    // A page is shown as a page (its source isn't the point), before the text types it is one of.
+    else if (mime === "text/html" || ext === "html" || ext === "htm") view = "html";
     else if (MARKDOWN_EXT.has(ext) || mime === "text/markdown") view = "markdown";
     else if (TEXT_EXT.has(ext) || mime.startsWith("text/")) view = "text";
     return { name, view, type: fileType(name, mime, view), ext: extLabel(ext), size: c.size, mime };
   }
   const ext = KIND_EXT[c.kind];
   const name = withExtension(a.title, ext);
-  const view: FileView = c.kind === "document" ? "markdown" : "other";
+  const view: FileView = c.kind === "document" ? "markdown" : c.kind === "html" ? "html" : "other";
   const size = c.kind === "document" ? utf8Bytes(c.markdown) : null;
   return { name, view, type: KIND_TYPE[c.kind], ext: extLabel(ext), size, mime: "" };
 }
@@ -158,6 +160,21 @@ export function videoClock(seconds: number): string {
 
 /** A lone picture's height for `width`: one box (4:3), the picture whole inside it, for the video's reason. */
 export const singleImageHeight = (width: number) => Math.round(width * 0.75);
+
+/** The tallest a lone picture of known shape gets (a portrait one narrows to fit). */
+export const MAX_PICTURE_HEIGHT = 400;
+
+/**
+ * A lone picture's box at most `width` wide: in its own proportions when its size is known (`ratio`, as the web's
+ * `[data-ratio]` tile), no taller than `MAX_PICTURE_HEIGHT`; else the one 4:3 box.
+ */
+export function singleImageBox(width: number, ratio: number | undefined): { width: number; height: number } {
+  if (!ratio) return { width, height: singleImageHeight(width) };
+  const height = Math.round(width / ratio);
+  return height <= MAX_PICTURE_HEIGHT
+    ? { width, height }
+    : { width: Math.round(MAX_PICTURE_HEIGHT * ratio), height: MAX_PICTURE_HEIGHT };
+}
 
 /**
  * A safe file name for a copy in the cache (and the name the share sheet shows): no folders, no
@@ -254,8 +271,64 @@ export function pageStep(index: number, by: -1 | 1, count: number): number | nul
 }
 
 /** `id@version` pairs for the picture viewer's route (`?files=a@2,b@1`), and back. */
-export function encodeFileList(files: { id: string; version?: number }[]): string {
+export function encodeFileList(files: { id: string; version?: number | undefined }[]): string {
   return files.map((f) => (f.version ? `${f.id}@${f.version}` : f.id)).join(",");
+}
+
+/** A file as it's opened from where it shows: what's known of it before (or once) its details load. */
+export interface FileRef {
+  id: string;
+  /** The version shown there, when it's a particular one. */
+  version?: number | undefined;
+  /** Its name: "print.png" already says it's a picture while its details load. */
+  title?: string | undefined;
+  kind?: ArtifactKind | undefined;
+  /** Its details, once loaded: what it is for sure. */
+  detail?: Pick<ArtifactDetail, "kind" | "title" | "content" | "shownVersion" | "version"> | undefined;
+}
+
+/**
+ * A picture or a video, which open in the picture viewer: by its details when they're known (`fileInfo`), else by
+ * its name, as `fileInfo` reads an upload stored without a type.
+ */
+export function isMediaFile(ref: FileRef): boolean {
+  if (ref.detail) {
+    const view = fileInfo(ref.detail).view;
+    return view === "image" || view === "video";
+  }
+  if (ref.kind !== undefined && ref.kind !== "file") return false;
+  const ext = extensionOf(ref.title ?? "");
+  return IMAGE_EXT.has(ext) || VIDEO_EXT.has(ext);
+}
+
+export type FileRoute =
+  | { pathname: "/images"; params: { files: string; at: string; from?: string } }
+  | { pathname: "/file/[id]"; params: { id: string; v?: string } };
+
+/**
+ * Where a file opens, the one way in from every place that shows one: a picture or a video straight in the picture
+ * viewer, among the pictures and videos beside it (`siblings`, in the order they show, so the viewer pages through
+ * them) at the one tapped; anything else in the file screen, at an older version when that's the one shown. `from`:
+ * the deck it opened from, told where the person stops.
+ */
+export function fileRoute(ref: FileRef, siblings?: readonly FileRef[], from?: string): FileRoute {
+  if (!isMediaFile(ref)) {
+    // Its details say whether the version shown is an older one; without them, the version the place names.
+    const older = ref.detail && ref.detail.shownVersion < ref.detail.version ? ref.detail.shownVersion : undefined;
+    const v = ref.detail ? older : ref.version;
+    return { pathname: "/file/[id]", params: { id: ref.id, ...(v ? { v: String(v) } : {}) } };
+  }
+  const media = (siblings ?? []).filter(isMediaFile);
+  const at = media.findIndex((f) => f.id === ref.id);
+  const pages = at >= 0 ? media : [ref];
+  return {
+    pathname: "/images",
+    params: {
+      files: encodeFileList(pages.map((f) => ({ id: f.id, version: f.detail?.shownVersion ?? f.version }))),
+      at: String(Math.max(at, 0)),
+      ...(from ? { from } : {}),
+    },
+  };
 }
 
 export function decodeFileList(raw: string | string[] | undefined): { id: string; version?: number }[] {
@@ -266,4 +339,61 @@ export function decodeFileList(raw: string | string[] | undefined): { id: string
     const n = v ? Number(v) : Number.NaN;
     return [Number.isInteger(n) && n > 0 ? { id, version: n } : { id }];
   });
+}
+
+/** Names that are never a picture or a video: they open the file screen without asking for the details first. */
+const DOCUMENT_EXT = new Set([
+  ...["md", "markdown", "mdx", "txt", "log", "csv", "tsv", "json", "yml", "yaml", "toml", "xml", "ini", "env"],
+  ...["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "html", "htm"],
+  ...["zip", "tar", "gz", "patch", "diff", "js", "ts", "tsx", "py", "rb", "go", "rs", "java", "swift", "sql", "sh"],
+]);
+
+/**
+ * Its details, or its kind and name, already say where a file opens: a picture's or a video's name, or a document's.
+ * A name with no extension, or one the app doesn't know (a video in a rarer format), says nothing.
+ */
+export function whereKnown(ref: FileRef): boolean {
+  if (ref.detail) return true;
+  if (ref.kind !== undefined && ref.kind !== "file") return true;
+  return isMediaFile(ref) || DOCUMENT_EXT.has(extensionOf(ref.title ?? ""));
+}
+
+/**
+ * A long text in pieces of at most `lines` lines and `chars` characters each, drawn one under the other: one text view
+ * as tall as a long file goes past what the phone can draw in one piece, and showed blank. A line longer than a piece
+ * (minified code, data on one line) is cut into pieces of its own, so a cut inside a line falls between two pieces and
+ * every newline left inside a piece is the text's own.
+ */
+export function textChunks(text: string, lines = 120, chars = 6000): string[] {
+  const out: string[] = [];
+  let piece: string[] = [];
+  let size = 0;
+  for (const whole of text.split("\n")) {
+    for (const line of lineParts(whole, chars)) {
+      if (piece.length > 0 && (piece.length >= lines || size + line.length > chars)) {
+        out.push(piece.join("\n"));
+        piece = [];
+        size = 0;
+      }
+      piece.push(line);
+      size += line.length + 1;
+    }
+  }
+  if (piece.length > 0 || out.length === 0) out.push(piece.join("\n"));
+  return out;
+}
+
+/** `line` in parts of at most `size` characters, never between the two halves of one character (an emoji). */
+function lineParts(line: string, size: number): string[] {
+  const parts: string[] = [];
+  let at = 0;
+  while (line.length - at > size) {
+    let end = at + size;
+    const code = line.charCodeAt(end);
+    if (code >= 0xdc00 && code <= 0xdfff) end -= 1;
+    parts.push(line.slice(at, end));
+    at = end;
+  }
+  parts.push(line.slice(at));
+  return parts;
 }

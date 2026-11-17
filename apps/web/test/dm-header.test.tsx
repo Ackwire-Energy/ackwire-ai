@@ -15,7 +15,7 @@ import {
   seedState,
   withRightHand,
 } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { headerSearchBox, renderApp, screen, settle } from "./render";
 
 /** A DM's header: who it is with as one button to their profile, and the channel's search held to the DM. */
 
@@ -43,6 +43,17 @@ describe("who the DM is with, one button", () => {
     expect(screen().getByRole("complementary", { name: "Perfil da Ada" })).toBeTruthy();
   });
 
+  test("an agent's line keeps one line; the button over it shows the whole of it in its tip", async () => {
+    const state = seedState();
+    const ada = state.agents.find((a) => a.id === ADA_ID);
+    if (ada) ada.role = "Engenheira de plataforma, infraestrutura, deploys e observabilidade de tudo";
+    const header = await go(state, `dm/agent/${ADA_ID}`);
+    const line = header.querySelector(".dm-who .channel__topic") as HTMLElement;
+    expect(line.classList.contains("channel__topic--line")).toBe(true);
+    expect(within(header).getByRole("button", { name: "Perfil de Ada" }).getAttribute("title")).toBe(line.textContent);
+    expect(line.textContent).toContain("observabilidade de tudo · de");
+  });
+
   test("a person's opens their profile card, as their name in a message does", async () => {
     const header = await go(seedState(), "dm/person/u-joao");
     await click(within(header).getByRole("button", { name: "Perfil de João" }));
@@ -59,14 +70,14 @@ describe("the header's glyphs, one group after who it is with", () => {
     expect(line.firstElementChild?.matches(".dm-who")).toBe(true);
     const acts = line.querySelector(":scope > .channel__acts") as HTMLElement;
     expect(line.lastElementChild).toBe(acts);
-    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Buscar" })).toBeTruthy();
     expect(within(acts).getByRole("button", { name: "Detalhes" }).classList.contains("dm-side-toggle")).toBe(true);
   });
 
   test("a person's: the face, the name and the email, then the search", async () => {
     const header = await go(seedState(), "dm/person/u-joao");
     const acts = header.querySelector(":scope > .channel__line > .channel__acts") as HTMLElement;
-    expect(within(acts).getByRole("combobox", { name: "Buscar" })).toBeTruthy();
+    expect(within(acts).getByRole("button", { name: "Buscar" })).toBeTruthy();
     expect(header.querySelector(".dm-who .channel__topic")?.textContent).toBe("joao@acme.com.br");
   });
 });
@@ -92,7 +103,7 @@ describe("the DM's search is the channel's, held to the DM", () => {
     const { state, dm } = seeded();
     const header = await go(state, `dm/agent/${ADA_ID}`);
     expect(within(header).queryByRole("link", { name: "Buscar nesta conversa" })).toBeNull();
-    const box = within(header).getByRole("combobox", { name: "Buscar" }) as HTMLInputElement;
+    const box = headerSearchBox(header);
     expect(header.querySelector(".ac-token")).toBeNull();
     expect(box.getAttribute("placeholder")).toBe("Buscar nesta conversa");
     await act(async () => fireEvent.focus(box));
@@ -127,7 +138,7 @@ describe("the DM's search is the channel's, held to the DM", () => {
     );
     await settle(8);
     const header = document.querySelector(".channel__header") as HTMLElement;
-    const box = within(header).getByRole("combobox", { name: "Buscar" }) as HTMLInputElement;
+    const box = headerSearchBox(header);
     await act(async () => fireEvent.change(box, { target: { value: "zebra" } }));
     await act(async () => fireEvent.keyDown(box, { key: "Enter" }));
     await act(() => new Promise((r) => setTimeout(r, 300)));
@@ -223,5 +234,51 @@ describe("the profile in the panel closes", () => {
     await act(async () => fireEvent.keyDown(panel() as HTMLElement, { key: "Escape" }));
     await settle(2);
     expect(panel()).toBeNull();
+  });
+});
+
+describe("the profile in the panel is part of the address", () => {
+  const PANEL = { name: "Perfil da Ada" };
+  const panel = () => screen().queryByRole("complementary", PANEL);
+  const searchOf = (router: { state: { location: { search: unknown } } }) =>
+    router.state.location.search as Record<string, unknown>;
+  const tab = (name: RegExp) =>
+    within(screen().getByRole("tablist", { name: "Seções da Ada" })).getByRole("tab", { name });
+
+  test("opening adds it, a tab picked inside replaces it, and Back and Forward close and reopen it", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(seedState()) });
+    await settle(8);
+    const header = document.querySelector(".channel__header") as HTMLElement;
+    await click(within(header).getByRole("button", { name: "Perfil de Ada" }));
+    expect(searchOf(router)).toMatchObject({ agent: ADA_ID });
+    const entries = router.history.length;
+    // Radix's tabs move on the press.
+    await act(async () => fireEvent.mouseDown(tab(/^Memória/), { button: 0 }));
+    await settle(4);
+    expect(searchOf(router)).toMatchObject({ agent: ADA_ID, agentTab: "memory" });
+    expect(router.history.length).toBe(entries);
+    await act(async () => router.history.back());
+    await settle(6);
+    expect(panel()).toBeNull();
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/agent/${ADA_ID}`);
+    await act(async () => router.history.forward());
+    await settle(6);
+    expect(panel()).toBeTruthy();
+    expect(tab(/^Memória/).getAttribute("aria-selected")).toBe("true");
+  });
+
+  test("a reload, or Back from another page, opens it at its tab", async () => {
+    const { router } = await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}?agent=${ADA_ID}&agentTab=memory`, {
+      api: createFakeApi(seedState()),
+    });
+    await settle(8);
+    expect(panel()).toBeTruthy();
+    expect(tab(/^Memória/).getAttribute("aria-selected")).toBe("true");
+    await act(async () => router.navigate({ to: "/org/$orgId/notifications", params: { orgId: ORG_ID } }));
+    await settle(6);
+    expect(panel()).toBeNull();
+    await act(async () => router.history.back());
+    await settle(8);
+    expect(panel()).toBeTruthy();
   });
 });

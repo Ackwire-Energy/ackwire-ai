@@ -9,11 +9,18 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
       "La app de Ackwire AI también puede ejecutar el propio Ackwire AI, en una Mac, una PC o una computadora con Linux, para ti o un equipo pequeño.",
     sections: [
       {
+        id: "download",
+        heading: "Descarga la app",
+        blocks: [
+          "[Descarga la app de Ackwire AI](/download) para tu Mac, PC o computadora con Linux y ábrela. Elige **En tu propio servidor**, pulsa **Continuar en mi servidor** y luego **Ejecutar Ackwire AI en esta computadora**.",
+        ],
+      },
+      {
         id: "how",
         heading: "Cómo funciona",
         blocks: [
           "Se ejecuta dentro de la app, con su propia base de datos integrada, y guarda todo en una carpeta de esta computadora, `.agentes` en tu carpeta personal. No hay nada más que instalar: ni Docker, ni una base de datos que configurar.",
-          "Arranca con la app y se detiene cuando la cierras. Al cerrarla te pregunta antes, porque nadie puede usar Ackwire AI hasta que la app se vuelva a abrir.",
+          "Arranca con la app y se detiene cuando la cierras. Al cerrarla te pregunta antes, porque nadie puede usar Ackwire AI hasta que la app se vuelva a abrir. Para detenerlo un rato sin cerrar la app, haz clic en el ícono de Ackwire AI junto al reloj y elige **Detener** en el menú **⋯** de su tarjeta.",
         ],
       },
       {
@@ -28,7 +35,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "keep-on",
         heading: "Mantenerla encendida",
         blocks: [
-          "En una computadora que usan otras personas, déjala lista una vez:",
+          "En una computadora que usan otras personas, déjala lista una vez. **Mantenerlo en marcha**, en **Preferencias\u00a0›\u00a0Servidores**, muestra lo que falta y abre los ajustes correctos:",
           {
             list: [
               "**Abrir al iniciar sesión** se activa solo después de la configuración.",
@@ -51,8 +58,8 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Préstala también a otro espacio de trabajo",
         blocks: [
-          "Los espacios de trabajo del servidor que ejecutas aquí ya usan esta computadora sin que hagas nada. Para que un espacio de trabajo de otro lugar también la use, como uno en Ackwire AI Cloud, abre **Preferencias\u00a0›\u00a0Servidores**, pulsa **Agregar un servidor…**, inicia sesión en ese espacio de trabajo y pulsa **Permitir** cuando la app te lo pregunte.",
-          "Cada espacio de trabajo tiene aquí sus propios agentes y carpetas. Los **Comandos** también vienen activados para él. Desactívalos en la pregunta de la app antes de pulsar **Permitir**, o más tarde en **Preferencias\u00a0›\u00a0Herramientas**, donde un solo interruptor vale para todos los espacios de trabajo de esta computadora.",
+          "Los espacios de trabajo del servidor que ejecutas aquí ya usan esta computadora sin que hagas nada. Para que un espacio de trabajo de otro lugar también la use, como uno en Ackwire AI Cloud, pulsa **Agregar un espacio de trabajo…** al final de la primera tarjeta de **Preferencias\u00a0›\u00a0General**, o **Agregar un servidor…** en **Preferencias\u00a0›\u00a0Servidores**. Inicia sesión en ese espacio de trabajo y pulsa **Permitir** cuando la app te lo pregunte.",
+          "Cada espacio de trabajo tiene aquí sus propios agentes y carpetas. Los **Comandos** también vienen activados para él. Desactívalos en la pregunta de la app antes de pulsar **Permitir**, o más tarde en **Preferencias\u00a0›\u00a0Herramientas**, donde cada espacio de trabajo tiene su propio interruptor y la app pregunta antes de volver a activar uno.",
         ],
       },
       {
@@ -67,29 +74,49 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Iniciar sesión desde otros dispositivos",
         blocks: [
-          "El propietario empieza sin contraseña: la app inicia tu sesión en esta computadora. Para entrar desde un navegador en otra computadora, crea una en **Configuración\u00a0›\u00a0Tu cuenta**. La app del teléfono se conecta escaneando el código QR de **En tu teléfono**, en **Preferencias\u00a0›\u00a0Servidores**. Para eso, **Accede desde tu teléfono y tu equipo** tiene que estar activado.",
+          "El propietario empieza sin contraseña: la app inicia tu sesión en esta computadora. Para entrar desde un navegador en otra computadora, crea una en **Configuración\u00a0›\u00a0Tu cuenta**. Mientras no la tengas, **Preferencias\u00a0›\u00a0Servidores** te lo recuerda, y **Crear una contraseña** abre esa página. La app del teléfono se conecta escaneando el código QR de **En tu teléfono**, en **Preferencias\u00a0›\u00a0Servidores**. Para eso, **Accede desde tu teléfono y tu equipo** tiene que estar activado.",
+          "Cuando el propietario borra su cuenta, en **Configuración\u00a0›\u00a0Tu cuenta**, desaparece para siempre 7 días después, y los espacios de trabajo en los que solo estaba él se van con ella. Hasta entonces, inicia sesión y pulsa **Restaurar cuenta** para recuperarla. Cuando ya no está, si no queda ninguna cuenta, la app abre la ventana de bienvenida para crear un nuevo propietario. Si otras personas todavía tienen cuenta, cada una inicia sesión con su propio correo.",
         ],
       },
       {
         id: "updates",
         heading: "Actualizaciones",
         blocks: [
-          "La app busca actualizaciones sola, e instala una cuando pulsas **Actualizar y volver a abrir** en **Preferencias\u00a0›\u00a0Actualizaciones**. El servidor y todos los agentes se reinician con ella. Primero se copia la base de datos, y si la nueva versión no responde en 3 minutos, la app vuelve sola a la versión anterior y a sus datos.",
+          "La app busca actualizaciones sola. Con **Instalar actualizaciones solo, de noche** activado, en **Preferencias\u00a0›\u00a0Actualizaciones**, las instala entre las 3:00 y las 5:00 mientras la app está abierta. Viene activado cuando el servidor se ejecuta aquí. Si no, pulsa **Actualizar y volver a abrir**. El servidor y todos los agentes se reinician con ella. Primero se copia la base de datos, y si la nueva versión no responde en 3 minutos, la app vuelve sola a la versión anterior y a sus datos.",
         ],
       },
       {
         id: "backups",
         heading: "Copias de seguridad",
         blocks: [
-          "Todavía no se hace ninguna copia sola. **Hacer una copia ahora**, en **Preferencias\u00a0›\u00a0Servidores**, detiene el servidor un momento y guarda la base de datos, los archivos y el `.env` en `.agentes/backups`, en tu carpeta personal. Conserva las dos más recientes.",
-          "De vez en cuando, cópialas fuera de esta computadora, a un disco o a una unidad en la nube. Contienen tus claves: guárdalas en privado.",
+          "Con **Hacer una copia cada noche** activado (app 0.8.1 y posteriores), en **Preferencias\u00a0›\u00a0Servidores**, la app guarda la base de datos, los archivos y el `.env` en `.agentes/backups`, en tu carpeta personal, cada noche a las 3:00. Una computadora que estaba dormida hace la copia cuando despierta. **Hacer una copia ahora** hace lo mismo al momento. Cada copia detiene el servidor un momento, y se conservan las dos más recientes.",
+          "**Copiar en** también pone cada copia nueva en una carpeta que elijas, como una memoria USB o iCloud Drive, donde se conservan las dos más recientes. Contienen tus claves: guárdalas en privado. **Restaurar…** devuelve Ackwire AI a una copia: mensajes, archivos y ajustes. Se detiene un minuto, y lo que había antes se guarda en la carpeta de copias.",
+        ],
+      },
+      {
+        id: "uninstall",
+        heading: "Empezar de nuevo o desinstalar",
+        blocks: [
+          "Todo lo que Ackwire AI guarda en esta computadora está en carpetas de tu carpeta personal, no dentro de la app. Por eso, mover la app a la Papelera no borra nada de eso, y no detiene Ackwire AI si está en marcha.",
+          "Para empezar de nuevo, pulsa **Borrar y empezar de nuevo…** en **Preferencias\u00a0›\u00a0Servidores**. Ackwire AI se detiene aquí y todo lo que guarda pasa a una carpeta nueva en tu carpeta personal, llamada `Ackwire AI erased` con la fecha del día, donde queda hasta que la borres. Lo que sus agentes guardaban en esta computadora, como sus navegadores e inicios de sesión, se borra de `.agentes-runner`. Sus espacios de trabajo desaparecen para todos los que los usan. Luego se abre la ventana de bienvenida y lo configuras de nuevo con una nueva cuenta de propietario. Los archivos de los agentes, en `agentes` en tu carpeta personal, se quedan donde están.",
+          "Para recuperarlo más tarde, sal de la app, aparta una carpeta `.agentes` más nueva si la hay, cambia el nombre de la carpeta `Ackwire AI erased` a `.agentes`, abre la app y configúralo otra vez en esta computadora. Vuelve con sus espacios de trabajo y su propietario como estaban. Lo que sus agentes guardaban en esta computadora no vuelve, así que tienen que iniciar sesión de nuevo.",
+          "Para quitar Ackwire AI de esta computadora por completo:",
+          {
+            list: [
+              "Desactiva **Abrir al iniciar sesión** en **Preferencias\u00a0›\u00a0General**.",
+              "Sal de la app. Cerrar su ventana no basta. En una Mac, haz clic en su ícono del Dock y elige **Salir de Ackwire AI** en el menú Ackwire AI, arriba en la pantalla, o pulsa ⌘Q. En Windows y Linux, haz clic en el ícono de Ackwire AI junto al reloj y elige **Salir de Ackwire AI**. Si pregunta **¿Salir de Ackwire AI?**, pulsa **Salir**.",
+              "Borra la app. En una Mac, muévela a la Papelera. En Windows y Linux, desinstálala como cualquier otra app.",
+              "Borra estas carpetas de tu carpeta personal. Contienen tus datos, y una vez borrados no vuelven, así que guarda antes una copia en otro lugar si quizá los quieras: `.agentes` (mensajes, archivos, cuentas, ajustes y copias), cada carpeta `Ackwire AI erased`, `.agentes-runner` (lo que los agentes guardan en esta computadora, como sus navegadores e inicios de sesión) y `agentes` (los archivos de los agentes). Las carpetas cuyo nombre empieza por un punto están ocultas. En una Mac, abre tu carpeta personal en el Finder y pulsa ⇧⌘. (Mayúsculas, Comando y la tecla del punto) para verlas.",
+              "Borra las carpetas de la propia app. Solo contienen sus ajustes, las sesiones de su ventana y sus registros. En una Mac: todo lo que empiece por `chat.agentes.desktop` en las carpetas Application Support, Caches, HTTPStorages, Logs, Preferences y WebKit de `~/Library`, y `Ackwire AI.plist` en `~/Library/LaunchAgents`. En Windows: `%APPDATA%\\chat.agentes.desktop` y `%LOCALAPPDATA%\\chat.agentes.desktop`. En Linux: `~/.config/chat.agentes.desktop` y `~/.local/share/chat.agentes.desktop`. En una Mac, para abrir una de estas carpetas, pulsa ⇧⌘G en el Finder y escribe su ruta, como `~/Library/Caches`.",
+            ],
+          },
         ],
       },
       {
         id: "ai-programs",
         heading: "Claude Code y Codex",
         blocks: [
-          "La app encuentra Claude Code y Codex a través del `PATH` de tu shell de inicio de sesión, además de las carpetas habituales como `~/.local/bin`, `/opt/homebrew/bin` y `/usr/local/bin`. Si **Preferencias\u00a0›\u00a0Herramientas** dice **No encontrado**, comprueba que `claude` o `codex` funcione en una ventana nueva de Terminal, y luego cierra la app y vuelve a abrirla.",
+          "La app encuentra Claude Code y Codex a través del `PATH` de tu shell de inicio de sesión, además de las carpetas habituales como `~/.local/bin`, `/opt/homebrew/bin` y `/usr/local/bin`. Si **Preferencias\u00a0›\u00a0Herramientas** dice **No encontrado**, muestra la línea que lo instala. Ejecútala en Terminal y luego pulsa **Volver a comprobar**.",
         ],
       },
       {
@@ -163,7 +190,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Desde la app de Ackwire AI",
         blocks: [
           "Instala la app en la computadora, ábrela e inicia sesión en tu espacio de trabajo. Te pregunta **¿Dejar que los agentes de <workspace> usen esta Mac?** (esta PC en Windows, esta computadora en Linux). Elige quién puede usarla y pulsa **Permitir**. Eso es todo.",
-          "¿Ya iniciaste sesión? Activa el espacio de trabajo en **Preferencias\u00a0›\u00a0General**, en la tarjeta **Agentes**.",
+          "¿Ya iniciaste sesión? Abre **Preferencias\u00a0›\u00a0General** y pulsa **Permitir** en la fila del espacio de trabajo, en la primera tarjeta. ¿No aparece? Pulsa **Agregar un espacio de trabajo…** al final de esa tarjeta e inicia sesión.",
         ],
       },
       {
@@ -206,7 +233,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Pausar y desconectar",
         blocks: [
-          "En la computadora, el ícono de Ackwire AI junto al reloj pausa a los agentes de todos los espacios de trabajo. En **Preferencias\u00a0›\u00a0General**, el interruptor de cada espacio de trabajo pausa solo ese, y **Salir** lo desconecta. No empieza nada nuevo mientras está en pausa, y lo que estaba en marcha termina. Al desconectar, las carpetas de los agentes se quedan en el disco.",
+          "En la computadora, el ícono de Ackwire AI junto al reloj pausa a los agentes de todos los espacios de trabajo, o de uno solo. En **Preferencias\u00a0›\u00a0General**, el interruptor de cada espacio de trabajo pausa solo ese, y **Salir**, en su menú **⋯**, lo desconecta. No empieza nada nuevo mientras está en pausa, y lo que estaba en marcha termina. Al desconectar, las carpetas de los agentes se quedan en el disco.",
           "Desde el sitio web, **Quitar** en la página del dispositivo lo desconecta.",
         ],
       },
@@ -217,6 +244,15 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
           "Inicia sesión en cada espacio de trabajo en la misma app y pulsa **Permitir** para cada uno. Los espacios de trabajo en Ackwire AI Cloud y en tus propios servidores pueden compartir una computadora (app 0.6.1 y posteriores). Cada uno tiene allí sus propios agentes y carpetas, y desconectar uno no afecta a los demás.",
           "Un servidor que la app ejecuta en esta computadora ya está conectado y no necesita nada. Para prestar también esa computadora a un espacio de trabajo de otro lugar, consulta [Préstala también a otro espacio de trabajo](/help/run-on-your-computer#another-workspace).",
           "¿Usas la app en una laptop solo como ventana a tu espacio de trabajo? Cuando te pida dejar que los agentes usen la laptop, **Ahora no** la deja como una simple ventana.",
+          "Un servidor conectado con la línea de la terminal trabaja para un solo workspace. Conectarlo desde otro workspace pasa el servidor a ese otro, y el primero deja de alcanzarlo. Para varios workspaces en una computadora, usa la app.",
+        ],
+      },
+      {
+        id: "line",
+        heading: "Cuando los agentes esperan en la fila",
+        blocks: [
+          "Cada trabajo de un agente usa la memoria de la computadora. Cuando queda poca memoria libre, el siguiente espera en la fila hasta que otro termine. Las personas van primero. El número de CPU no cambia esto.",
+          "Una computadora con 4 GB de memoria ejecuta dos o tres trabajos a la vez, una con 8 GB unos nueve. Un Mac o un PC, hasta ocho. Los navegadores y escritorios que los agentes dejan abiertos también usan memoria. Para una fila más corta, usa una computadora con más memoria, o conecta otra y reparte los agentes entre ellas. Los workspaces que comparten una computadora comparten su memoria.",
         ],
       },
       {
@@ -239,7 +275,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "en una computadora que también ejecuta Ackwire AI, su base de datos y sus claves en `.agentes`",
             ],
           },
-          "Ackwire AI rechaza los comandos que nombran sus claves, tokens e inicios de sesión, pero es una regla, no un muro. Los **Comandos** vienen activados. Desactívalos en la pregunta de la app antes de pulsar **Permitir**, o más tarde en **Preferencias\u00a0›\u00a0Herramientas**, donde un solo interruptor vale para todos los espacios de trabajo de la computadora. Claude Code y Codex ejecutan sus propios comandos en la carpeta del agente, con sus propias reglas.",
+          "Ackwire AI rechaza los comandos que nombran sus claves, tokens e inicios de sesión, pero es una regla, no un muro. Los **Comandos** vienen activados. Desactívalos en la pregunta de la app antes de pulsar **Permitir**, o más tarde en **Preferencias\u00a0›\u00a0Herramientas**, donde cada espacio de trabajo tiene su propio interruptor (app 0.8.1 y posteriores) y la app pregunta antes de volver a activar uno. Claude Code y Codex ejecutan sus propios comandos en la carpeta del agente, con sus propias reglas, incluso con los comandos desactivados.",
           "Para un muro de verdad, usa un servidor Linux. En Debian 13, instalado con `--system`, cada agente es un usuario propio. En Ubuntu, los agentes comparten un usuario, `agentes`: ven las carpetas de los demás, no las tuyas ni las del servidor. O dales a los agentes una computadora propia.",
         ],
       },
@@ -272,6 +308,21 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Las claves, las contraseñas, los inicios de sesión y el historial de chat nunca se traen: los agentes piensan con la IA del espacio de trabajo. Algunas cosas todavía no tienen equivalente aquí, o nunca deberían viajar en un archivo. Puedes volver a crearlas después.",
           "Los archivos y las carpetas se leen en tu navegador. Un enlace de GitHub pasa por el servidor del espacio de trabajo. Los archivos de claves e inicios de sesión nunca se abren, y no cambia nada hasta que confirmes.",
+        ],
+      },
+      {
+        id: "mcp",
+        heading: "Conectar con MCP",
+        blocks: [
+          "MCP permite que tu app de IA acceda a este espacio de trabajo, así que crea los agentes aquí por sí sola, con sus instrucciones, habilidades y rutinas. Elige tu app, marca **Conectar con MCP** y luego:",
+          {
+            list: [
+              "Conecta la dirección que muestra el paso, con los pasos de la propia app. [Cómo conectar, app por app](/help/apps-de-ia#connect)",
+              "En la página de inicio de sesión, elige **Crear y editar agentes, rutinas y habilidades**.",
+              "Pega el pedido en la app. Los agentes aparecen en el paso a medida que llegan.",
+            ],
+          },
+          "Si una app no se puede conectar, elige **Desde un archivo** o **Solo el pedido**, lo que muestre el paso. [Desde otra app](/help/import#other-apps) explica el pedido.",
         ],
       },
       {
@@ -360,7 +411,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "permissions",
         heading: "La memoria no da permisos",
         blocks: [
-          "Nada en la memoria le permite a un agente hacer más. Lo que puede hacer sigue en sus **Herramientas y acceso**, y las acciones sensibles siempre piden aprobación.",
+          "Nada en la memoria le permite a un agente hacer más. Lo que puede hacer sigue en sus **Herramientas y acceso**.",
         ],
       },
       {
@@ -380,7 +431,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "what",
         heading: "Qué pide permiso antes",
         blocks: [
-          "Cuando un agente quiere hacer un merge, un deploy, revertir algo, enviar algo hacia afuera o borrar datos, primero pregunta, tenga el acceso que tenga. La solicitud aparece en **Aprobaciones** y en la conversación, con la acción exacta y el motivo.",
+          "Cuando un agente quiere hacer un merge, un deploy, revertir algo, enviar algo hacia afuera o borrar datos, primero pregunta. Ese es el nivel **Solo lo arriesgado**, con el que empieza todo agente. En la página del agente, en **Aprobaciones**, **Preguntar siempre** hace que pregunte antes de cambiar cualquier cosa, y **No preguntar nunca** hace que no pregunte nada, tampoco en merge, deploy, pagos y rutinas. La solicitud aparece en **Aprobaciones** y en la conversación, con la acción exacta y el motivo.",
         ],
       },
       {
@@ -388,7 +439,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Una vez, o siempre",
         blocks: [
           "Aprobar cubre una acción exacta, con sus valores. Si el agente cambia algo, vuelve a preguntar.",
-          "**Aprobar siempre** deja que el agente haga ese tipo de acción de ahora en adelante, con cualquier valor, sin preguntar. En la solicitud de una rutina, **Siempre en esta rutina** hace lo mismo solo para esa rutina. Ninguno de los dos aparece para merge, deploy, rollback y similares. Para deshacerlo, ve a **Herramientas y acceso** en la página del agente, o a los ajustes de la rutina.",
+          "**Aprobar siempre** deja que el agente haga ese tipo de acción de ahora en adelante, con cualquier valor, sin preguntar. En la solicitud de una rutina, **Siempre en esta rutina** hace lo mismo solo para esa rutina. **Aprobar siempre** aparece para cualquier tipo de acción, también merge y deploy, mientras el agente esté en **Solo lo arriesgado**. **Siempre en esta rutina** no aparece para merge, deploy, rollback y similares. Para deshacerlo, ve a **Herramientas y acceso** en la página del agente, o a los ajustes de la rutina.",
         ],
       },
       {
@@ -443,7 +494,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Cuando Ackwire AI aloja tu espacio de trabajo, Jev viene incluido. En un servidor que administras tú, usa la clave de TypeSafe del propietario, unos US$ 0.0001 por mensaje: [Configura Jev](/help/jev#setup).",
+          "Cuando Ackwire AI aloja tu espacio de trabajo, Jev viene incluido. En un servidor que administras tú, usa la clave de TypeSafe u OpenRouter del propietario, unos US$ 0.0001 por mensaje: [Configura Jev](/help/jev#setup).",
         ],
       },
       {
@@ -507,6 +558,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
               "En Ackwire AI, abre **Configuración › IA y uso** y pégala en **Jev**. Solo la persona que configuró este servidor la ve.",
             ],
           },
+          "¿Ya pagas OpenRouter? Elige **OpenRouter** en **Jev** y pega una clave de https://openrouter.ai/keys, o activa Jev con un clic usando la clave de OpenRouter del espacio de trabajo. Es el mismo Jev, cobrado a través de OpenRouter al mismo precio.",
           "En un servidor que ejecutas con Docker, también puedes poner la clave en `.env` como `TYPESAFE_API_KEY`. Esa tiene prioridad sobre la de Configuración.",
         ],
       },
@@ -541,6 +593,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe ejecuta Jev en Estados Unidos y no entrena sus modelos con lo que envías. Guarda los datos mientras los necesite para prestar el servicio. Sus planes empresariales ofrecen retención cero.",
           "La política de privacidad de TypeSafe: https://typesafe.ai/legal/privacy-policy. Su acuerdo de tratamiento de datos: https://typesafe.ai/legal/data-processing.",
+          "Con una clave de OpenRouter, las mismas solicitudes pasan por OpenRouter camino de TypeSafe, bajo los términos de OpenRouter y tu configuración de privacidad allí: https://openrouter.ai/privacy.",
         ],
       },
       {
@@ -694,13 +747,13 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "En el servidor, ejecuta:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh",
           },
           "Instala lo que falta y luego hace unas preguntas: cómo llega la gente, el correo, si este servidor también es la computadora de tus agentes y si envía estadísticas de uso anónimas. Enter acepta la respuesta sugerida. Se instala en `/opt/agentes` (`~/agentes` si tu usuario ya puede usar Docker) y la primera vez descarga unos 2 GB.",
           "Al final muestra la dirección de tu servidor y un código QR para tu teléfono. Ejecutarlo otra vez no rompe nada: conserva tus ajustes y solo completa lo que falta.",
           "Con Node.js 18 o más reciente, `npx @agenteschat/setup` en una carpeta vacía es la misma configuración. Sin Node, se ejecuta desde la imagen de la app, en la carpeta actual, y termina con los comandos que arrancan el resto:",
           {
-            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup',
           },
         ],
       },
@@ -731,7 +784,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "Correo",
         blocks: [
-          "Sin correo, Ackwire AI escribe cada correo en su registro en vez de enviarlo, así que puedes copiar de ahí un enlace de invitación. Restablecer la contraseña queda desactivado.",
+          "Sin correo, Ackwire AI escribe cada correo en su registro en vez de enviarlo, así que puedes copiar de ahí un enlace de invitación. Restablecer la contraseña queda desactivado, y un correo nuevo para una cuenta cambia al instante, sin código ni enlace.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -757,7 +810,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "La configuración puede hacer de este servidor también la computadora de tus agentes, donde ejecutan comandos, usan un navegador y guardan sus archivos. Pregunta, y sugiere que sí donde el servidor puede hacerlo bien. En Debian 13, cada agente tiene su propio usuario, con una pantalla. En Ubuntu, los agentes comparten un usuario, `agentes`. Si dijiste que no, ejecuta la instalación otra vez con `--computer yes`:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh -s -- --computer yes",
           },
           "Otras computadoras, como una Mac con la app de Ackwire AI u otro servidor, se conectan desde **Configuración\u00a0›\u00a0Dispositivos**, como en [Tus computadoras y teléfonos](/help/computers). En Tailscale, antes entran en tu tailnet.",
         ],
@@ -785,7 +838,7 @@ export const helpEs: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "En la carpeta de la instalación, ejecuta:",
           {
-            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+            code: "curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
           },
           "La base se actualiza sola cuando arranca la versión nueva. Deja tus ajustes en `.env` y nunca edites `docker-compose.yml`, porque cada actualización lo reemplaza. Haz una copia antes de un salto grande: una base que actualizó una versión más nueva no abre en una más antigua.",
         ],

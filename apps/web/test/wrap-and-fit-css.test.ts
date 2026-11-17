@@ -41,6 +41,31 @@ test("a settings row's control centres on its words, never pinned to the first l
   expect(last(panel, ".agp-card .settings-row", "flex-direction")).toBeUndefined();
 });
 
+test("on a phone a switch stays beside its words only while they keep 24 characters there, else it goes under them", () => {
+  // At 320 a long name beside its icon and a switch would get 150px, a word a line. The words keep the kit's
+  // `.ac-actrow` basis; only a line that opens something (no ⓘ, its chevron never alone on a line) lets them shrink to
+  // 160px.
+  // The build writes `flex: 1 1 24ch` as `24ch`.
+  expect(last(top, ".ac-actrow>.ac-actrow__text", "flex")).toBe("24ch");
+  const phone = atRule(css, "@media (max-width: 760px)");
+  for (const sheet of [phone, atRule(css, "@container agp-side (max-width: 479px)")])
+    for (const rule of rules(sheet))
+      for (const s of rule.selectors.filter((s) => s.endsWith(">.settings-row__text")))
+        if (rule.declarations.some(([p]) => p.startsWith("flex"))) expect(s).toContain(".settings-row--open>");
+  // With a status, the name itself takes that basis and the status goes under the switch at the row's width: a
+  // wrapping row, never a grid, whose columns keep the switch beside the name however little room that leaves.
+  const status =
+    ".settings-row--lead:has(>.settings-row__end>.ac-switch)>.settings-row__text:has(>.settings-row__status)";
+  expect(last(phone, status, "display")).toBe("contents");
+  expect(last(phone, `${status}>:first-child`, "flex")).toBe("24ch");
+  expect(last(phone, `${status}>:first-child`, "max-width")).toBe("max-content");
+  const line = ".settings-row--lead:has(>.settings-row__end>.ac-switch)>.settings-row__text>.settings-row__status";
+  expect(last(phone, line, "flex-basis")).toBe("100%");
+  expect(last(phone, line, "order")).toBe("1");
+  const grids = rules(phone).filter((r) => r.declarations.some(([p, v]) => p === "display" && v === "grid"));
+  expect(grids.flatMap((r) => r.selectors).filter((s) => s.includes(".ac-switch"))).toEqual([]);
+});
+
 test("a text field of several lines in a settings row keeps its rows: the row's one-line control height spares it", () => {
   expect(last(top, "textarea.ac-input", "height")).toBe("auto");
   // What a rule in a settings row gives a height to, a textarea (`textarea`, or an `.ac-input` not kept to inputs).

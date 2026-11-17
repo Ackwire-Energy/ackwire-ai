@@ -1,4 +1,5 @@
 import { type AuditRow, useAudit } from "@agenteschat/client";
+import { auditUnasked } from "@agenteschat/client/lib/approvals-level";
 import {
   AUDIT_HIDDEN,
   AUDIT_SHOWS,
@@ -286,6 +287,8 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
   }
   if (connector) facts.push([t("audit.panel.via"), connector]);
   if (row.approval) facts.push([t("audit.panel.approval"), auditApprovalText(t, row.approval)]);
+  else if (auditUnasked(row))
+    facts.push([t("audit.panel.approval"), t("audit.panel.unasked", { level: t("approvalsLevel.never.title") })]);
   if (row.secret) facts.push([t("audit.panel.secret"), auditSecretText(t, row.secret)]);
   facts.push([t("audit.panel.when"), whenAt(t, i18n.language, row.at)]);
 
@@ -302,7 +305,7 @@ function AuditPanel({ row, onClose }: { row: AuditRow; onClose: () => void }) {
         </span>
         <div className="thread-head__text">
           <h1 className="channel__title thread-title">
-            <span className="thread-title__text">{auditHint(t, row) ?? auditPhrase(t, row)}</span>
+            <span className="thread-title__text">{auditHint(t, row) ?? auditPhrase(t, row, i18n.language)}</span>
           </h1>
           <span className="channel__topic thread-head__meta">
             <span className="thread-head__where">{name}</span>

@@ -1,13 +1,18 @@
 // A fake Antigravity CLI (`agy`) for runner tests. Each start appends its argv, cwd and the env that matters (its home,
-// the MCP run and token, keys that must stay out) to $FAKE_AGY_LOG (one JSON line). Signed in: `fake-auth.json` in
-// $HOME/.gemini/antigravity-cli. `--version` prints a version line, `models` the models as Antigravity CLI 1.5.0 does
-// (seen on Linux, 2026-11-11): "Fetching available models..." on stderr, then one model a line on stdout, its slug and
-// name split by a tab; signed out "Please sign in…", an account Google won't serve "Eligibility check failed…", exit 1.
+// the MCP run and token, keys that must stay out) to $FAKE_AGY_LOG (one JSON line). Signed in: its token file,
+// `antigravity-oauth-token` in $HOME/.gemini/antigravity-cli, as 1.5.0 keeps it with no keyring (JSON with its tokens
+// and the home it signed in from; $FAKE_AGY_KEYRING: a file of its own instead, as a keyring would; $FAKE_AGY_BOUND:
+// a copy in another home isn't signed in). `--version` prints a version line, `models` the models as Antigravity CLI
+// 1.5.0 does (seen on Linux, 2026-11-11): "Fetching available models..." on stderr, then one model a line on stdout,
+// its slug and name split by a tab; signed out "Please sign in…", an account Google won't serve "Eligibility check
+// failed…", exit 1. $FAKE_AGY_CHECK, in a home named `.check` only (root's try of a copy): "slow" answers after a
+// minute, "offline" can't reach Google.
 // `acp --login` prints its Google sign-in link and prompt as 1.5.0 does and, as 1.5.x does, reads the pasted code only
 // from its terminal (none: "no controlling terminal", exit 1), then exchanges it: a code with "bad" in it, or with paste
 // marks it never turned on, is refused by Google (`invalid_grant`), one with "offline" can't reach Google, one with
 // "ineligible" signs in an account `models` then refuses; else "Logged in as …", exit 0. `-p /usage` prints the
-// quotas, `-p /logout` signs out. `-p <prompt> --output-format stream-json` prints one turn: init (the conversation:
+// quotas ($FAKE_AGY_REFRESH_MS: it refreshes its sign-in in place first, the file empty for that long), `-p /logout`
+// signs out. `-p <prompt> --output-format stream-json` prints one turn: init (the conversation:
 // `--conversation`'s, or a new one when it doesn't know that one; its tools: our server's alone with `--agent`, else
 // the CLI's own and ours, or $FAKE_AGY_TOOLS), a text delta, a shell step (none with "BRIDGE_ONLY"), a call to our
 // server (a tool of the CLI's own with "OWN_TOOL"), the last delta with usage and the result. "LIMIT": an AGY_ERROR
@@ -18,7 +23,13 @@ import path from "node:path";
 const args = process.argv.slice(2);
 const env = process.env;
 const dir = path.join(env.HOME ?? "/nonexistent", ".gemini", "antigravity-cli");
-const auth = path.join(dir, "fake-auth.json");
+const auth = path.join(dir, "antigravity-oauth-token");
+const keyring = path.join(dir, "fake-keyring.json");
+/** The sign-in it keeps, if any. */
+const stored = () => {
+  const file = [auth, keyring].find((f) => existsSync(f));
+  return file ? JSON.parse(readFileSync(file, "utf8")) : null;
+};
 const flag = (name) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
@@ -46,13 +57,23 @@ if (args[0] === "--version") {
 }
 if (args[0] === "models") {
   process.stderr.write("Fetching available models...\n");
-  if (!existsSync(auth)) {
+  if (path.basename(env.HOME ?? "") === ".check" && env.FAKE_AGY_CHECK === "slow") {
+    await new Promise((r) => setTimeout(r, 60_000));
+  }
+  if (path.basename(env.HOME ?? "") === ".check" && env.FAKE_AGY_CHECK === "offline") {
+    process.stderr.write(
+      'Error: Post "https://oauth2.googleapis.com/token": dial tcp: lookup oauth2.googleapis.com: no such host\n',
+    );
+    process.exit(1);
+  }
+  const token = stored();
+  if (!token || (env.FAKE_AGY_BOUND && token.home !== env.HOME)) {
     process.stderr.write(
       "Error: Please sign in to view available models. Launch the CLI without arguments to sign in.\n",
     );
     process.exit(1);
   }
-  if (readFileSync(auth, "utf8").includes("ineligible")) {
+  if (token.ineligible) {
     process.stderr.write(
       "Error: Eligibility check failed: PERMISSION_DENIED (code 403): The caller does not have permission\n",
     );
@@ -88,24 +109,35 @@ if (args[0] === "acp" && args[1] === "--login") {
     process.exit(1);
   }
   mkdirSync(dir, { recursive: true });
-  writeFileSync(auth, code.includes("ineligible") ? '{"ineligible":true}' : "{}");
+  const token = { access_token: "fake-access", refresh_token: "fake-refresh", token_type: "Bearer", home: env.HOME };
+  writeFileSync(
+    env.FAKE_AGY_KEYRING ? keyring : auth,
+    JSON.stringify(code.includes("ineligible") ? { ...token, ineligible: true } : token),
+    { mode: 0o600 },
+  );
   process.stdout.write("Logged in as ana@example.com.\r\n");
   process.exit(0);
 }
 if (args[0] === "-p" && args[1] === "/usage") {
+  if (env.FAKE_AGY_REFRESH_MS && existsSync(auth)) {
+    const whole = readFileSync(auth, "utf8");
+    writeFileSync(auth, "");
+    await new Promise((r) => setTimeout(r, Number(env.FAKE_AGY_REFRESH_MS)));
+    writeFileSync(auth, whole);
+  }
   process.stdout.write(
     "Model quotas\n\nGemini Models\nWeekly Limit Remaining\n75%\nFive Hour Limit Remaining\n40% · resets in 2h 30m\n\nClaude and GPT models\nWeekly Limit Remaining\n100%\n",
   );
   process.exit(0);
 }
 if (args[0] === "-p" && args[1] === "/logout") {
-  rmSync(auth, { force: true });
+  for (const f of [auth, keyring]) rmSync(f, { force: true });
   process.exit(0);
 }
 
 if (args[0] === "-p") {
   const prompt = args[1] ?? "";
-  if (!existsSync(auth)) {
+  if (!stored()) {
     process.stderr.write("Error: authentication required\n");
     process.exit(1);
   }

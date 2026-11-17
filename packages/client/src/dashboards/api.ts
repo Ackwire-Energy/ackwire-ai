@@ -53,8 +53,11 @@ export interface DashboardsApi {
   widget(orgId: string, widgetId: string): Promise<WidgetDetail>;
   updateWidget(orgId: string, widgetId: string, patch: UpdateWidgetInput): Promise<Widget>;
   removeWidget(orgId: string, widgetId: string): Promise<void>;
-  /** "Update now" and "Resolve". */
-  refreshWidget(orgId: string, widgetId: string): Promise<Widget>;
+  /**
+   * "Update now" and "Resolve". `auto`: the apps' own build once the agent of a widget waiting for an AI has one,
+   * which only queues (a routine paused, or whose creator no longer fits, makes the widget say so instead).
+   */
+  refreshWidget(orgId: string, widgetId: string, auto?: boolean): Promise<Widget>;
   /** "Ask for a change". */
   askWidgetChange(orgId: string, widgetId: string, text: string): Promise<Widget>;
   /** "≈ $ a day of <agent>'s budget". */
@@ -100,7 +103,8 @@ export function createDashboardsApi(request: Requester): DashboardsApi {
     updateWidget: (orgId, widgetId, patch) =>
       request<Widget>(widget(orgId, widgetId), { method: "PATCH", json: patch }),
     removeWidget: (orgId, widgetId) => request<void>(widget(orgId, widgetId), { method: "DELETE" }),
-    refreshWidget: (orgId, widgetId) => request<Widget>(`${widget(orgId, widgetId)}/refresh`, { json: {} }),
+    refreshWidget: (orgId, widgetId, auto) =>
+      request<Widget>(`${widget(orgId, widgetId)}/refresh`, { json: auto ? { auto } : {} }),
     askWidgetChange: (orgId, widgetId, text) =>
       request<Widget>(`${widget(orgId, widgetId)}/change`, { json: { text } }),
     widgetCost: (orgId, agentId, schedule) =>

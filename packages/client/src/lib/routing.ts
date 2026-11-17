@@ -59,3 +59,31 @@ export function deciderOf(t: TFunction, view: ReceiptView, names: { agent: (id: 
   const rule = by.rule === "coordinator" ? "default" : by.rule;
   return { rule, text: t(`receipts.by.${rule}`, agentGrammar(names.agent(first))) };
 }
+
+/**
+ * A person's mention of everyone that one agent answered for all of them, or that asked nothing of them
+ * (`meta.everyoneShape`): one quiet line under the message, "5 agentes viram · Ada respondeu por todos", never one
+ * reply each. Its words and who it shows, or null for any other message.
+ */
+export function everyoneLineOf(
+  t: TFunction,
+  meta: Record<string, unknown> | null | undefined,
+  view: ReceiptView,
+  names: { agent: (id: string) => string },
+): { text: string; hint: string; faces: string[] } | null {
+  const shape = meta?.everyoneShape as { answer?: unknown; by?: unknown } | undefined;
+  if (shape?.answer !== "one" && shape?.answer !== "none") return null;
+  if (view.seen.length < 2) return null;
+  const by = shape.answer === "one" && typeof shape.by === "string" && view.seen.includes(shape.by) ? shape.by : null;
+  const seen = t("receipts.everyone.seen", { count: view.seen.length });
+  if (!by) return { text: seen, hint: t("receipts.everyone.hintNone"), faces: view.seen };
+  const answered = view.status?.kind === "handled" && view.status.agents.includes(by);
+  const name = names.agent(by);
+  const who = t(answered ? "receipts.everyone.answered" : "receipts.everyone.answering", { name });
+  return {
+    text: `${seen} · ${who}`,
+    hint: t("receipts.everyone.hintOne", { name }),
+    // The one who answers first.
+    faces: [by, ...view.seen.filter((id) => id !== by)],
+  };
+}

@@ -141,17 +141,21 @@
   font-size: 12.5px;
   color: var(--muted);
 }
+/* One column of faces for every option, as wide as the widest: the bars share one scale, each its share of one track. */
 .poll__options {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
   padding: 6px 16px 16px;
 }
 .poll__option {
   position: relative;
-  display: flex;
+  display: grid;
+  grid-column: 1 / -1;
+  /* Without subgrid, each option keeps its own two columns. */
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
   align-items: center;
-  gap: 10px;
   width: 100%;
   min-height: 44px;
   padding: 6px 10px 6px 12px;
@@ -165,13 +169,31 @@
   text-align: left;
   cursor: pointer;
 }
+@supports (grid-template-columns: subgrid) {
+  .poll__option {
+    grid-template-columns: subgrid;
+  }
+}
 .poll__option:hover:not(:disabled) {
   box-shadow: inset 0 0 0 1px var(--faint);
 }
 .poll__option:disabled {
   cursor: default;
 }
-.poll__option > :not(.poll__fill) {
+/* The box and the label on the share's fill, which spans the option up to its faces: out to its left edge, top to
+   bottom. */
+.poll__track {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-self: stretch;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin: -6px 0 -6px -12px;
+  padding: 6px 0 6px 12px;
+}
+.poll__track > :not(.poll__fill) {
   position: relative;
 }
 .poll__fill {
@@ -214,23 +236,19 @@
   vertical-align: 2px;
   background: var(--ok);
 }
+/* Who voted: the kit's stack of faces, cut out of the option's face, then how many more. */
 .poll__faces {
+  --stack-ring: var(--raised);
   display: inline-flex;
+  flex: none;
+  justify-self: end;
+  align-items: center;
+  gap: var(--space-1);
 }
-.poll__face {
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 30% 30% 30% 9%;
-  font-size: 10.5px;
+.poll__more {
+  font-size: 12px;
   font-weight: 650;
-  color: var(--ink2);
-  background: var(--plate);
-  box-shadow: 0 0 0 2px var(--raised);
-}
-.poll__face + .poll__face {
-  margin-left: -3px;
+  color: var(--muted);
 }
 .poll__note {
   margin: -8px 16px 12px;

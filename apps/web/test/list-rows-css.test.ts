@@ -17,8 +17,8 @@ test("a settings row's title line is one text line, and one gap token sits under
   expect(last(top, ".ac-chip", "height")).toBe("22px");
   expect(last(top, ".list-title", "align-items")).toBe("center");
   expect(last(top, ".list-title:not(:last-child)", "margin-block-end")).toBe("var(--list-part-gap)");
-  // The rows are MediaRows: the leading tile and the name share one line, the details, who uses it and the actions go
-  // under them at the row's width (the kit's `.ac-mediarow`), so no page sheet lays the rows out on its own.
+  // The rows are the kit's: MediaRows (the leading tile and the name share one line, the rest under them at the row's
+  // width), a connected service's a FoldRow (one line that opens), so no page sheet lays the rows out on its own.
   for (const row of [".connected-row", ".app-row", ".machine-row"]) {
     for (const p of ["display", "grid-template-columns", "align-items", "gap", "column-gap"])
       expect(last(top, row, p)).toBeUndefined();
@@ -35,9 +35,7 @@ test("a settings row's title line is one text line, and one gap token sits under
 
 test("every settings list with a name and pills uses the shared title line", async () => {
   for (const file of [
-    "components/Connectors.tsx",
-    "components/MailConnect.tsx",
-    "components/DatabaseConnect.tsx",
+    "components/ConnectedRow.tsx",
     "components/GitHubAppPanel.tsx",
     "components/Machines.tsx",
     "components/AiApps.tsx",
@@ -53,7 +51,6 @@ test("every settings list with a name and pills uses the shared title line", asy
 test("Calendar's and Routines' lists show their words whole: they wrap, never end in a \"…\" that hides them", async () => {
   const top = topLevel(await builtCss("src/pages/routines.css", "src/pages/calendar.css"));
   for (const selector of [
-    ".routine-row__title",
     ".routine-row__sub",
     ".routine-row__to>span",
     ".routine-row__when-text b",
@@ -65,6 +62,9 @@ test("Calendar's and Routines' lists show their words whole: they wrap, never en
     expect([selector, last(top, selector, "text-overflow")]).toEqual([selector, undefined]);
     expect([selector, last(top, selector, "white-space")]).toEqual([selector, undefined]);
   }
+  // A routine's name is the exception: one line, ending in "…", with the whole name in its tooltip.
+  expect(last(top, ".routine-row__title", "white-space")).toBe("nowrap");
+  expect(last(top, ".routine-row__title", "text-overflow")).toBe("ellipsis");
   // Who and where it delivers keeps the row's width: its chips and its fix go under the words when there's no room.
   expect(last(top, ".routine-row__sub", "flex-wrap")).toBe("wrap");
   // A lane grows with its name, the routine's line on its middle.

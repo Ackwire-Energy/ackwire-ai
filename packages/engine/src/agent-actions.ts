@@ -67,6 +67,7 @@ export const UNDOABLE_TOOLS = new Set([
   "update_thread",
   "save_how_to",
   "update_skill",
+  "create_skill",
 ]);
 
 export type AgentActionTargetType =
@@ -301,7 +302,7 @@ export function describeAction(a: Pick<AgentActionView, "kind" | "target" | "par
     case "thread.closed":
       return `closed the thread${title}`;
     case "skill.created":
-      return `made the skill${title} from its how-tos`;
+      return p.asked === true ? `made the skill${title} as asked` : `made the skill${title} from its how-tos`;
     case "skill.updated":
       return `changed the skill${title}`;
     case "agent.settings_changed":

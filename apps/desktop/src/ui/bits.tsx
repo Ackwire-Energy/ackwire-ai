@@ -219,6 +219,7 @@ export function Banner({
 /** A row of the popover's menu. */
 export function MenuRow({
   icon,
+  lead,
   children,
   onClick,
   trailing,
@@ -226,7 +227,9 @@ export function MenuRow({
   expanded,
   disabled,
 }: {
-  icon: IconName;
+  icon?: IconName;
+  /** In place of the icon, as an organization's tile. */
+  lead?: ReactNode;
   children: ReactNode;
   onClick: () => void;
   trailing?: ReactNode;
@@ -244,7 +247,7 @@ export function MenuRow({
       disabled={disabled}
       onClick={onClick}
     >
-      <Icon name={icon} size={16} />
+      {lead ?? (icon && <Icon name={icon} size={16} />)}
       <span className="dk-mi__label">{children}</span>
       {trailing && <span className="dk-mi__end">{trailing}</span>}
     </button>

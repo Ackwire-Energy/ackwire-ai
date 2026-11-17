@@ -247,20 +247,68 @@ describe("the menu's banners say only what matters there", () => {
 });
 
 describe("the server here's Stop (ADR 0158)", () => {
-  test("in sight, with how long and what it cuts off; an hour says when it's back", () =>
+  test("in its ··· menu, with how long and what it cuts off; an hour says when it's back", () =>
     withMenu(async (el) => {
-      const stop = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Stop") as HTMLElement;
-      await act(async () => stop.click());
-      const rows = [...el.querySelectorAll(".dk-here__more button")].map((b) => b.textContent);
+      expect([...el.querySelectorAll(".dk-ph button")].some((b) => b.textContent === "Stop")).toBe(false);
+      await act(async () => (el.querySelector(".dk-ph .dk-iconbtn") as HTMLElement).click());
+      const menu = () => [...el.querySelectorAll(".dk-here__more > button")].map((b) => b.textContent);
+      expect(menu()).toEqual(["Restart", "Stop", "Preferences…"]);
+      const stop = [...el.querySelectorAll(".dk-here__more > button")].find((b) => b.textContent === "Stop");
+      await act(async () => (stop as HTMLElement).click());
+      const rows = [...el.querySelectorAll(".dk-here__stop button")].map((b) => b.textContent);
       expect(rows).toEqual(["Stop for 1 hour", "Stop until I start it", "Don't start it with the app…"]);
-      expect(el.querySelector(".dk-here__more .dk-sub__hint")?.textContent).toBe(
+      expect(el.querySelector(".dk-here__stop .dk-sub__hint")?.textContent).toBe(
         "Stopping cuts everyone off, the phone included.",
       );
-      await act(async () => (el.querySelector(".dk-here__more button") as HTMLElement).click());
+      await act(async () => (el.querySelector(".dk-here__stop button") as HTMLElement).click());
       await until(() => el.querySelector(".dk-ph small")?.textContent?.startsWith("Stopped · back at"));
       const start = [...el.querySelectorAll(".dk-ph button")].find((b) => b.textContent === "Start it");
       expect(start).toBeTruthy();
     }));
+});
+
+describe("several workspaces on this Mac", () => {
+  const menuRows = (el: HTMLElement, sel: string) => [...el.querySelectorAll(sel)].map((b) => b.textContent);
+  const press = async (el: HTMLElement, text: string) => {
+    const button = [...el.querySelectorAll<HTMLButtonElement>("button.dk-mi")].find((b) => b.textContent === text);
+    await act(async () => button?.click());
+  };
+
+  test("under the server here's card: the other servers' workspaces using this Mac too", () => {
+    const host = createFakeHost("popover", "here");
+    for (const runner of host.runners.values()) runner.server = FAKE_SERVER;
+    return withMenu(
+      (el) => expect(el.querySelector(".dk-here__also")?.textContent).toBe("Also works for Acme"),
+      host,
+      (el) => el.querySelector(".dk-here__also"),
+    );
+  });
+
+  test("Pause the agents: all of them, or one workspace with the same choices", () =>
+    withMenu(
+      async (el, store) => {
+        await press(el, "Pause the agents");
+        expect(menuRows(el, ".dk-pop__foot .dk-sub > button.dk-mi")).toEqual(["All workspaces", "Acme", "Horizonte"]);
+        await press(el, "Acme");
+        expect(menuRows(el, ".dk-sub .dk-sub > button.dk-mi")).toEqual([
+          "For 1 hour",
+          "Until tomorrow at 9 AM",
+          "Until I resume",
+        ]);
+        await press(el, "Until I resume");
+        await until(() => banners(el).some((b) => b.title === "Paused until you resume"));
+        expect(banners(el).find((b) => b.title === "Paused until you resume")?.line).toBe(
+          "On hold: Acme. The other workspaces' agents keep working.",
+        );
+        const paused = store
+          .getSnapshot()
+          .homes.filter((h) => h.status?.paused?.paused)
+          .map((h) => h.status?.org?.name);
+        expect(paused).toEqual(["Acme"]);
+      },
+      createFakeHost("popover", "selfhost"),
+      (el) => el.querySelectorAll(".dk-ohead").length === 2,
+    ));
 });
 
 test("the site's This computer: the Mac pairs with commands on, then the welcome window prepares it", async () => {

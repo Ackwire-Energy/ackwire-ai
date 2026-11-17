@@ -1,5 +1,6 @@
 import { Popover as RPopover } from "radix-ui";
 import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { cx } from "../cx";
 import { movesByKeys, trackInput } from "../device";
 import { EDGE_ROOM } from "../floating";
 import { useHoverCard } from "../hooks/useHoverCard";
@@ -91,5 +92,25 @@ export function InfoHint({ name, children, id, side = "top", align = "center" }:
         </RPopover.Content>
       </RPopover.Portal>
     </RPopover.Root>
+  );
+}
+
+export interface HintLineProps {
+  /** The one sentence that stays on screen. */
+  children: ReactNode;
+  /** The ⓘ's accessible name, translated ("About Time zone"). */
+  name: string;
+  /** What the ⓘ holds: plain sentences only. */
+  hint: ReactNode;
+  className?: string;
+}
+
+/** One sentence with the rest of its explanation behind an ⓘ at its end, inside whatever line holds it. */
+export function HintLine({ children, name, hint, className }: HintLineProps) {
+  return (
+    <span className={cx("ac-hintline", className)}>
+      <span>{children}</span>
+      <InfoHint name={name}>{hint}</InfoHint>
+    </span>
   );
 }

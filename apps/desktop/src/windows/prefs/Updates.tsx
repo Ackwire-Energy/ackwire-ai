@@ -1,12 +1,12 @@
 import { LICENSE_URL, PUBLIC_SOURCE_URL } from "@agenteschat/client/lib/about";
 import { DOCS_SITE } from "@agenteschat/i18n/docs";
-import { Button, Chip } from "@agenteschat/ui";
+import { Button, Chip, InfoHint, Switch } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useHost } from "../../app";
-import { noteLines } from "../../control/version";
-import { type UpdateCheck, useLocalServer } from "../../hooks";
-import { CardTitle, PrefCard, PrefHead } from "../../ui/settings";
+import { AUTO_UPDATE_PREF, autoUpdateOn, noteLines } from "../../control/version";
+import { type UpdateCheck, useAppInfo, useLocalServer, usePref } from "../../hooks";
+import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { clock } from "../../ui/time";
 
@@ -24,6 +24,8 @@ export function Updates({ update }: { update: UpdateCheck }) {
   const [progress, setProgress] = useState<{ got: number; total: number | null } | null>(null);
   const [manual, setManual] = useState(false);
   const local = useLocalServer();
+  const [autoPref, setAutoPref] = usePref<boolean | null>(AUTO_UPDATE_PREF, null);
+  const details = useAppInfo()?.details;
   useEffect(() => host.onUpdateProgress((got, total) => setProgress({ got, total })), [host]);
 
   const install = async () => {
@@ -46,6 +48,15 @@ export function Updates({ update }: { update: UpdateCheck }) {
   // Whole: it installs now (seconds), and there is nothing left to cancel.
   const whole = percent === 100;
 
+  const copyDetails = async (line: string) => {
+    try {
+      await navigator.clipboard.writeText(line);
+      toast(t("desktop.common.copied"), "copy");
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+    }
+  };
+
   const checkNow = async () => {
     const result = await update.check();
     if (!result) toast(t("desktop.prefs.updates.checkFailed"), "alert");
@@ -59,7 +70,7 @@ export function Updates({ update }: { update: UpdateCheck }) {
         <div className="dk-ver">
           <span className="dk-ver__big ac-num">{update.version ?? "…"}</span>
           <span className="dk-ver__text">
-            <span>
+            <span className="ac-hintline">
               {required ? (
                 <Chip icon="alert" tone="waiting">
                   {t("desktop.prefs.updates.required")}
@@ -73,6 +84,11 @@ export function Updates({ update }: { update: UpdateCheck }) {
                   {t("desktop.prefs.updates.upToDate")}
                 </Chip>
               )}
+              {local.run && (
+                <InfoHint name={t("common.about", { label: t("desktop.prefs.updates.title") })}>
+                  {t("desktop.server.updatesWithApp")}
+                </InfoHint>
+              )}
             </span>
             <small className="dk-help">
               {update.checkedAt
@@ -81,12 +97,37 @@ export function Updates({ update }: { update: UpdateCheck }) {
                   })
                 : t("desktop.prefs.updates.neverChecked")}
             </small>
-            {local.run && <small className="dk-help">{t("desktop.server.updatesWithApp")}</small>}
           </span>
           <Button size="sm" loading={update.checking} onClick={() => void checkNow()}>
             {t("desktop.prefs.updates.checkNow")}
           </Button>
         </div>
+      </PrefCard>
+      <PrefCard>
+        <PrefRow
+          htmlFor="auto-update"
+          title={t("desktop.prefs.updates.autoInstall")}
+          hint={hintFor(t, t("desktop.prefs.updates.autoInstall"), t("desktop.prefs.updates.autoInstallDesc"))}
+          end={
+            <Switch
+              id="auto-update"
+              aria-describedby="auto-update-hint"
+              checked={autoUpdateOn(autoPref, local.run)}
+              onCheckedChange={setAutoPref}
+            />
+          }
+        />
+        {details && (
+          <PrefRow
+            title={t("desktop.prefs.updates.systemDetails")}
+            desc={details}
+            end={
+              <Button variant="ghost" size="sm" icon="copy" onClick={() => void copyDetails(details)}>
+                {t("desktop.common.copy")}
+              </Button>
+            }
+          />
+        )}
       </PrefCard>
 
       {available && latest && (

@@ -38,7 +38,23 @@ export function RemoveMemberDialog({
         if (mine) {
           toast.show(t("members.remove.left", { org: org.name }));
           void navigate({ to: "/", replace: true });
-        } else toast.show(t("members.remove.done", { name, org: org.name }));
+        } else {
+          // Agents left without that person's plan: the first one's "Quem pensa", one click away.
+          const lost = p?.losePlan[0];
+          toast.show(
+            t("members.remove.done", { name, org: org.name }),
+            "success",
+            lost && {
+              label: t("usageCard.chooseBrain"),
+              run: () =>
+                void navigate({
+                  to: "/org/$orgId/agents/$agentId",
+                  params: { orgId: org.id, agentId: lost.id },
+                  search: { tab: "settings", sec: "brain", brain: "switch" },
+                }),
+            },
+          );
+        }
       },
       onError: (e) => toast.show(errorText(t, e), "error"),
     });

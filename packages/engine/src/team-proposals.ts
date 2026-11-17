@@ -721,7 +721,7 @@ async function insertSkill(db: Database, userId: string, orgId: string, s: TeamS
       await db
         .select({ slug: skills.slug })
         .from(skills)
-        .where(and(eq(skills.orgId, orgId), sql`${skills.slug} like ${`${s.name}%`}`))
+        .where(and(eq(skills.orgId, orgId), isNull(skills.ownerUserId), sql`${skills.slug} like ${`${s.name}%`}`))
     ).map((r) => r.slug),
   );
   let name = s.name;

@@ -428,7 +428,7 @@ describe("live: machine.provisioning, org.standing and org.limits", () => {
     });
   });
 
-  test("a deleting event closes that workspace in /me at once, with who deleted it and when it goes", () => {
+  test("a deleting event makes that workspace read-only in /me at once, with who deleted it and when it goes", () => {
     const qc = new QueryClient();
     const me: Me = {
       user: { id: "u1", name: "Walt", email: "w@x.co", image: null },
@@ -452,7 +452,7 @@ describe("live: machine.provisioning, org.standing and org.limits", () => {
     // Being deleted, it resumes no onboarding: GET /me leaves that out.
     expect(acme?.onboarding).toBeUndefined();
     expect(beta?.deletion).toBeUndefined();
-    // The server's own record replaces it: the socket closes right after.
+    // The server's own record replaces it: /me is read again, and the socket stays open.
     expect(qc.getQueryState(keys.me)?.isInvalidated).toBe(true);
   });
 

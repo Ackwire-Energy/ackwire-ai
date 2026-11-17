@@ -3,7 +3,8 @@ import { join } from "node:path";
 
 /**
  * The freeze watch, in a child process that blocks its own event loop: the watch's thread must say so while the loop
- * is stuck, naming what was in flight, then say when it came back.
+ * is stuck, naming what was in flight, then say when it came back. The loop beats once a second and the watch looks
+ * twice a second, so a threshold of one beat would take a beat a few milliseconds late for a freeze: two beats it is.
  */
 
 const SERVER = join(import.meta.dir, "..");
@@ -12,12 +13,12 @@ const DEADLINE_MS = 20_000;
 const CHILD = `
 const { startFreezeWatch } = await import(${JSON.stringify(join(SERVER, "src/freeze-watch.ts"))});
 const { startInFlight } = await import("@agenteschat/adapters/in-flight");
-startFreezeWatch({ logLevel: "info", freezeMs: 1000 });
+startFreezeWatch({ logLevel: "info", freezeMs: 2000 });
 startInFlight("job agent.run", "run-1");
 const done = startInFlight("tool browser_do", "run-1");
 startInFlight("tool web_search", "run-2")();
 await Bun.sleep(500);
-const until = Date.now() + 3000;
+const until = Date.now() + 4000;
 while (Date.now() < until) {}
 await Bun.sleep(1500);
 done();
@@ -50,7 +51,7 @@ test(
     expect(String(stuck[0]?.error)).toStartWith("Error: event loop stuck for ");
     const back = lines.find((l) => l.msg === "event loop back");
     expect(back).toMatchObject({ level: "warn" });
-    expect(Number(back?.stuckMs)).toBeGreaterThanOrEqual(1000);
+    expect(Number(back?.stuckMs)).toBeGreaterThanOrEqual(2000);
   },
   DEADLINE_MS + 10_000,
 );

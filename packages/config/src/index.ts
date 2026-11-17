@@ -1,7 +1,7 @@
 import { createECDH } from "node:crypto";
 import { type Config, configSchema, envVars } from "./schema";
 
-export { composioAuthConfigs, connectorOAuthApps, githubAppConfig } from "./connectors";
+export { composioAuthConfigs, connectorOAuthApps, githubAppConfig, mcpCallerIdentity } from "./connectors";
 export { type Config, type EnvVarDefinition, type EnvVarName, envVars } from "./schema";
 
 /** agentes.chat's own servers: their legal pages are their own, and their mail goes out from agentes.chat. */
@@ -56,6 +56,14 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
   // The screen's text leaves only through the operator API's review door: without it nobody could read it.
   if (config.SESSION_SCREENING && !config.OPERATOR_API_TOKEN) {
     throw new ConfigError(["SESSION_SCREENING needs OPERATOR_API_TOKEN"]);
+  }
+  // The listener exists only with the full token: alone, the read-only one would open nothing, in silence.
+  if (config.OPERATOR_API_READ_TOKEN && !config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["OPERATOR_API_READ_TOKEN needs OPERATOR_API_TOKEN"]);
+  }
+  // Equal, the token that should only read would hold every operator power.
+  if (config.OPERATOR_API_READ_TOKEN && config.OPERATOR_API_READ_TOKEN === config.OPERATOR_API_TOKEN) {
+    throw new ConfigError(["OPERATOR_API_READ_TOKEN must differ from OPERATOR_API_TOKEN"]);
   }
   if (config.MACHINE_PROVISIONING === "external" && config.HOST_COMPUTER_TOKEN) {
     throw new ConfigError([

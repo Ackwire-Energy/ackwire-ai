@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { cx } from "../cx";
 import {
+  modelQuota,
   PLAN_ALMOST,
   type PlanMeterText,
   type PlanMeterUsage,
@@ -14,6 +15,7 @@ import { Meter } from "./Surfaces";
 
 export {
   limitOffers,
+  modelQuota,
   type OfferAccount,
   PLAN_ALMOST,
   PLAN_CRITICAL,
@@ -23,6 +25,7 @@ export {
   type PlanMeterUsage,
   type PlanMeterWindow,
   type PlanState,
+  planAttention,
   planLevel,
   planLine,
   planState,
@@ -83,6 +86,7 @@ export function PlanMeter({
   }
   const rows = planWindows(usage, now);
   const { state, until, used } = planState(usage, now);
+  const sections = text.group && rows.some((w) => modelQuota(w)) ? bySection(rows) : null;
   const headline = state === "limited" ? text.limited(until) : state === "almost" ? text.almost : null;
   const renews = children ? renewals(rows, text, now) : null;
   return (
@@ -90,18 +94,22 @@ export function PlanMeter({
       {headline && <p className="ac-planmeter__state">{headline}</p>}
       {rows.length > 0 && (
         <ul className="ac-planmeter__windows">
-          {rows.map((w, i) => {
-            const name = text.window(w);
+          {(sections ?? rows.map((w) => ({ w, group: null, first: false }))).map(({ w, group, first }, i) => {
+            const quota = modelQuota(w);
+            const name =
+              sections && quota ? text.window({ kind: quota.kind, usedPercent: w.usedPercent }) : text.window(w);
             // A window that reset is empty again: its parts were the old window's.
             const fresh = !passed(w.resetsAt, now);
+            const heading = first && text.group ? text.group(group) : null;
             return (
               <li key={`${w.kind}:${w.label ?? i}`} className="ac-planmeter__window" data-level={planLevel(w.used)}>
+                {heading && <span className="ac-planmeter__group">{heading}</span>}
                 <span className="ac-planmeter__name">{name}</span>
                 <span className="ac-planmeter__pct">{w.used}%</span>
                 <Meter
                   value={w.used}
                   max={100}
-                  label={name}
+                  label={group ? `${text.group?.(group) ?? group} · ${name}` : name}
                   marks={[PLAN_ALMOST]}
                   {...(w.part !== undefined && fresh ? { part: w.part } : {})}
                   {...(w.segments && fresh ? { segments: w.segments } : {})}
@@ -119,5 +127,22 @@ export function PlanMeter({
       {children && renews && <small className="ac-planmeter__reset">{renews}</small>}
       <small className="ac-planmeter__at">{text.updated(usage.at)}</small>
     </div>
+  );
+}
+
+/**
+ * The full meter's rows by whom they bind (`modelQuota`): the account's own first, then each model group's in the
+ * order its tightest quota comes, each row's order within kept; `first` starts a section (its heading).
+ */
+function bySection<W extends { kind: string; label?: string }>(rows: readonly W[]) {
+  const groups: (string | null)[] = [];
+  for (const w of rows) {
+    const group = modelQuota(w)?.group ?? null;
+    if (!groups.includes(group)) groups.push(group);
+  }
+  // The account's own (no group) lead whatever their usage.
+  groups.sort((a, b) => Number(a !== null) - Number(b !== null));
+  return groups.flatMap((group) =>
+    rows.filter((w) => (modelQuota(w)?.group ?? null) === group).map((w, i) => ({ w, group, first: i === 0 })),
   );
 }

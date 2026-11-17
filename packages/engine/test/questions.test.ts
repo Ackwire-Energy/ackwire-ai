@@ -98,6 +98,7 @@ describe("ask_user", () => {
       choice: "staging",
     });
     expect(answered).toMatchObject({ status: "answered", answer: "staging", answeredByUserId: f.owner.id });
+    expect(Number.isNaN(Date.parse(answered.answeredAt ?? ""))).toBe(false);
     await expect(
       answerQuestion({ db: f.db }, f.owner.id, f.org.id, q?.id ?? "", { text: "again" }),
     ).rejects.toBeInstanceOf(ConflictError);

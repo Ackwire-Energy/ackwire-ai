@@ -316,7 +316,7 @@ export function impliedByWrite(scope: string) {
   return m ? `${m[1]}:write` : null;
 }
 
-/** Scopes that "all tools" (`*`) doesn't cover. */
+/** Scopes that "all tools" (`*`) doesn't cover: the agent's computer (commands, its browser, its desktop). */
 export const NOT_IN_ALL: ReadonlySet<string> = new Set(["sandbox:run", "browser:use", "desktop:use"]);
 
 export const isAllowed = (state: AccessState) => state === "granted" || state === "inherited";
@@ -353,9 +353,12 @@ async function loadScopeKeys(db: Executor, orgId: string, agentId: string): Prom
       .from(schema.agents)
       .where(and(eq(schema.agents.orgId, orgId), eq(schema.agents.id, agentId))),
   ]);
-  // The right hand's tools are fixed in code (ADR 0137): a grant row gives it nothing.
-  if (isRightHand(agent)) return new Set(RIGHT_HAND_GRANTS.map((scope) => grantKey(null, scope)));
-  return new Set(rows.map((r) => grantKey(r.connectionId, r.scope)));
+  const keys = new Set(rows.map((r) => grantKey(r.connectionId, r.scope)));
+  if (!isRightHand(agent)) return keys;
+  // The right hand (ADR 0137) holds its own grants on top of its rows. Its computer's scopes are rows like any
+  // agent's (ADR 0175), given when it is made, so an admin turns them off on its page.
+  for (const scope of RIGHT_HAND_GRANTS) keys.add(grantKey(null, scope));
+  return keys;
 }
 
 export async function hasScope(
@@ -399,10 +402,12 @@ export async function setAgentScopes(
 ) {
   await requirePermission(db, actorId, orgId, "manage_agents");
   const [agent] = await db
-    .select({ id: agents.id })
+    .select({ id: agents.id, builtin: agents.builtin })
     .from(agents)
     .where(and(eq(agents.id, agentId), eq(agents.orgId, orgId), isNull(agents.deletedAt)));
   if (!agent) throw new NotFoundError("Agent not found");
+  // What is off for the right hand is kept tool by tool (`setAgentAccess`), which a plain list of scopes can't carry.
+  if (isRightHand(agent)) throw new ValidationError("Set what it may use on its page, under what it can use");
   // Mail grants stay as they are (the mail API manages them); any sent back here are ignored.
   const mail = await mailConnectionIds(
     db,

@@ -9,11 +9,18 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
       "Aplikasi Ackwire AI juga bisa menjalankan Ackwire AI sendiri, di Mac, PC, atau komputer Linux, untukmu atau tim kecil.",
     sections: [
       {
+        id: "download",
+        heading: "Unduh aplikasinya",
+        blocks: [
+          "[Unduh aplikasi Ackwire AI](/download) untuk Mac, PC, atau komputer Linux-mu, lalu buka. Pilih **Di server sendiri**, tekan **Lanjut di server saya**, lalu **Jalankan Ackwire AI di komputer ini**.",
+        ],
+      },
+      {
         id: "how",
         heading: "Cara kerjanya",
         blocks: [
           "Ackwire AI berjalan di dalam aplikasi, dengan database bawaannya sendiri, dan menyimpan semuanya di satu folder di komputer ini, `.agentes` di folder pribadimu. Tidak ada lagi yang perlu dipasang: tanpa Docker, tanpa database yang perlu disiapkan.",
-          "Ackwire AI menyala bersama aplikasi dan berhenti saat kamu menutupnya. Aplikasi bertanya dulu sebelum ditutup, karena tidak ada yang bisa memakai Ackwire AI sampai aplikasinya dibuka lagi.",
+          "Ackwire AI menyala bersama aplikasi dan berhenti saat kamu menutupnya. Aplikasi bertanya dulu sebelum ditutup, karena tidak ada yang bisa memakai Ackwire AI sampai aplikasinya dibuka lagi. Untuk menghentikannya sebentar tanpa menutup aplikasi, klik ikon Ackwire AI di dekat jam dan pilih **Hentikan** di menu **⋯** pada kartunya.",
         ],
       },
       {
@@ -28,7 +35,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "keep-on",
         heading: "Biarkan tetap menyala",
         blocks: [
-          "Di komputer yang juga diandalkan orang lain, siapkan sekali saja:",
+          "Di komputer yang juga diandalkan orang lain, siapkan sekali saja. **Tetap berjalan**, di **Preferensi\u00a0›\u00a0Server**, menunjukkan apa yang masih kurang dan membuka pengaturan yang tepat:",
           {
             list: [
               "**Buka saat login** menyala sendiri setelah penyiapan.",
@@ -51,8 +58,8 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Pinjamkan juga ke ruang kerja lain",
         blocks: [
-          "Ruang kerja dari server yang kamu jalankan di sini memakai komputer ini dengan sendirinya. Supaya ruang kerja di tempat lain juga bisa memakainya, misalnya ruang kerja di Ackwire AI Cloud, buka **Preferensi\u00a0›\u00a0Server**, tekan **Tambah server…**, masuk ke ruang kerja itu, lalu tekan **Izinkan** saat aplikasi bertanya.",
-          "Tiap ruang kerja punya agen dan foldernya sendiri di sini. **Perintah** juga menyala sejak awal untuknya. Matikan di pertanyaan aplikasi sebelum menekan **Izinkan**, atau nanti di **Preferensi\u00a0›\u00a0Alat**, tempat satu tombol berlaku untuk semua ruang kerja di komputer ini.",
+          "Ruang kerja dari server yang kamu jalankan di sini memakai komputer ini dengan sendirinya. Supaya ruang kerja di tempat lain juga bisa memakainya, misalnya ruang kerja di Ackwire AI Cloud, tekan **Tambah ruang kerja…** di bagian bawah kartu pertama di **Preferensi\u00a0›\u00a0Umum**, atau **Tambah server…** di **Preferensi\u00a0›\u00a0Server**. Masuk ke ruang kerja itu, lalu tekan **Izinkan** saat aplikasi bertanya.",
+          "Tiap ruang kerja punya agen dan foldernya sendiri di sini. **Perintah** juga menyala sejak awal untuknya. Matikan di pertanyaan aplikasi sebelum menekan **Izinkan**, atau nanti di **Preferensi\u00a0›\u00a0Alat**, tempat tiap ruang kerja punya sakelarnya sendiri dan aplikasi bertanya dulu sebelum menyalakannya lagi.",
         ],
       },
       {
@@ -67,29 +74,49 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Masuk dari perangkat lain",
         blocks: [
-          "Awalnya pemilik tidak punya kata sandi: aplikasi memasukkanmu di komputer ini. Untuk masuk dari browser di komputer lain, tambahkan kata sandi di **Pengaturan\u00a0›\u00a0Akunmu**. Aplikasi ponsel terhubung dengan memindai kode QR di bawah **Di ponselmu**, di **Preferensi\u00a0›\u00a0Server**. Untuk itu, **Akses dari ponselmu dan rekan tim** harus menyala.",
+          "Awalnya pemilik tidak punya kata sandi: aplikasi memasukkanmu di komputer ini. Untuk masuk dari browser di komputer lain, tambahkan kata sandi di **Pengaturan\u00a0›\u00a0Akunmu**. Selama belum ada, **Preferensi\u00a0›\u00a0Server** mengingatkanmu, dan **Tambahkan kata sandi** membuka halaman itu. Aplikasi ponsel terhubung dengan memindai kode QR di bawah **Di ponselmu**, di **Preferensi\u00a0›\u00a0Server**. Untuk itu, **Akses dari ponselmu dan rekan tim** harus menyala.",
+          "Saat pemilik menghapus akunnya, di **Pengaturan\u00a0›\u00a0Akunmu**, akun itu hilang untuk selamanya 7 hari kemudian, dan ruang kerja yang hanya berisi dia ikut hilang. Sampai saat itu, masuk lalu tekan **Pulihkan akun** untuk memulihkannya. Setelah akun itu hilang, kalau tidak ada akun yang tersisa, aplikasi membuka jendela sambutan untuk membuat pemilik baru. Kalau orang lain masih punya akun, masing-masing masuk dengan email mereka sendiri.",
         ],
       },
       {
         id: "updates",
         heading: "Pembaruan",
         blocks: [
-          "Aplikasi mencari pembaruan sendiri, dan memasangnya saat kamu menekan **Perbarui dan buka ulang** di **Preferensi\u00a0›\u00a0Pembaruan**. Server dan semua agen ikut dimulai ulang. Database disalin dulu, dan kalau versi baru tidak merespons dalam 3 menit, aplikasi kembali sendiri ke versi sebelumnya beserta datanya.",
+          "Aplikasi mencari pembaruan sendiri. Kalau **Pasang pembaruan sendiri, di malam hari** menyala, di **Preferensi\u00a0›\u00a0Pembaruan**, aplikasi memasangnya antara pukul 3:00 dan 5:00 selama aplikasinya terbuka. Pengaturan ini menyala sejak awal kalau server berjalan di sini. Kalau tidak, tekan **Perbarui dan buka ulang**. Server dan semua agen ikut dimulai ulang. Database disalin dulu, dan kalau versi baru tidak merespons dalam 3 menit, aplikasi kembali sendiri ke versi sebelumnya beserta datanya.",
         ],
       },
       {
         id: "backups",
         heading: "Cadangan",
         blocks: [
-          "Belum ada yang dicadangkan otomatis. **Cadangkan sekarang**, di **Preferensi\u00a0›\u00a0Server**, menghentikan server sebentar lalu menyimpan database, file, dan `.env` di `.agentes/backups`, di folder pribadimu. Dua cadangan terbaru yang disimpan.",
-          "Sesekali salin cadangan itu ke luar komputer ini, ke disk atau penyimpanan cloud. Isinya kunci-kuncimu: jaga kerahasiaannya.",
+          "Kalau **Cadangkan setiap malam** menyala (aplikasi 0.8.1 ke atas), di **Preferensi\u00a0›\u00a0Server**, aplikasi menyimpan database, file, dan `.env` di `.agentes/backups`, di folder pribadimu, setiap malam pukul 3:00. Komputer yang sedang tidur saat itu mencadangkan begitu bangun. **Cadangkan sekarang** melakukan hal yang sama saat itu juga. Setiap pencadangan menghentikan server sebentar, dan dua cadangan terbaru yang disimpan.",
+          "**Salin ke** juga menaruh setiap cadangan baru di folder pilihanmu, seperti flashdisk atau iCloud Drive, tempat dua cadangan terbaru disimpan. Isinya kunci-kuncimu: jaga kerahasiaannya. **Pulihkan…** mengembalikan Ackwire AI ke sebuah cadangan: pesan, file, dan pengaturan. Ackwire AI berhenti selama semenit, dan isi sebelumnya tetap disimpan di folder cadangan.",
+        ],
+      },
+      {
+        id: "uninstall",
+        heading: "Mulai dari awal atau copot pemasangan",
+        blocks: [
+          "Semua yang disimpan Ackwire AI di komputer ini ada di folder-folder dalam folder pribadimu, bukan di dalam aplikasi. Jadi memindahkan aplikasi ke Tempat Sampah tidak menghapus apa pun dari situ, dan tidak menghentikan Ackwire AI kalau sedang berjalan.",
+          "Untuk mulai dari awal, tekan **Hapus dan mulai dari awal…** di **Preferensi\u00a0›\u00a0Server**. Ackwire AI di sini berhenti dan semua isinya dipindahkan ke folder baru di folder pribadimu, bernama `Ackwire AI erased` dengan tanggal hari itu, dan tetap di sana sampai kamu menghapusnya. Yang disimpan para agennya di komputer ini, seperti browser dan login mereka, dihapus dari `.agentes-runner`. Ruang kerjanya hilang bagi semua orang yang memakainya. Lalu jendela sambutan terbuka, dan kamu menyiapkannya lagi dengan akun pemilik baru. File para agen, di `agentes` dalam folder pribadimu, tetap di tempatnya.",
+          "Untuk mengembalikannya nanti, keluar dari aplikasi, singkirkan folder `.agentes` yang lebih baru kalau ada, ubah nama folder `Ackwire AI erased` menjadi `.agentes`, lalu buka aplikasi dan siapkan lagi di komputer ini. Ia berjalan lagi dengan ruang kerja dan pemiliknya seperti semula. Yang disimpan para agennya di komputer ini tidak kembali, jadi mereka perlu login lagi.",
+          "Untuk menghapus Ackwire AI dari komputer ini sepenuhnya:",
+          {
+            list: [
+              "Matikan **Buka saat login** di **Preferensi\u00a0›\u00a0Umum**.",
+              "Keluar dari aplikasi. Menutup jendelanya saja tidak cukup. Di Mac, klik ikonnya di Dock, lalu pilih **Keluar dari Ackwire AI** di menu Ackwire AI di bagian atas layar, atau tekan ⌘Q. Di Windows dan Linux, klik ikon Ackwire AI di dekat jam dan pilih **Keluar dari Ackwire AI**. Kalau muncul pertanyaan **Keluar dari Ackwire AI?**, tekan **Keluar**.",
+              "Hapus aplikasinya. Di Mac, pindahkan ke Tempat Sampah. Di Windows dan Linux, copot pemasangannya seperti aplikasi lain.",
+              "Hapus folder-folder ini di folder pribadimu. Isinya datamu, dan setelah dihapus tidak bisa kembali, jadi simpan dulu cadangan di tempat lain kalau mungkin masih kamu perlukan: `.agentes` (pesan, file, akun, pengaturan, dan cadangan), setiap folder `Ackwire AI erased`, `.agentes-runner` (yang disimpan para agen di komputer ini, seperti browser dan login mereka), dan `agentes` (file para agen). Folder yang namanya diawali titik tersembunyi. Di Mac, buka folder pribadimu di Finder lalu tekan ⇧⌘. (Shift, Command, dan tombol titik) untuk menampilkannya.",
+              "Hapus folder milik aplikasi itu sendiri. Isinya hanya pengaturannya, login jendelanya, dan log-nya. Di Mac: semua yang namanya diawali `chat.agentes.desktop` di folder Application Support, Caches, HTTPStorages, Logs, Preferences, dan WebKit di `~/Library`, serta `Ackwire AI.plist` di `~/Library/LaunchAgents`. Di Windows: `%APPDATA%\\chat.agentes.desktop` dan `%LOCALAPPDATA%\\chat.agentes.desktop`. Di Linux: `~/.config/chat.agentes.desktop` dan `~/.local/share/chat.agentes.desktop`. Di Mac, untuk membuka salah satu folder ini, tekan ⇧⌘G di Finder lalu ketik jalurnya, misalnya `~/Library/Caches`.",
+            ],
+          },
         ],
       },
       {
         id: "ai-programs",
         heading: "Claude Code dan Codex",
         blocks: [
-          "Aplikasi mencari Claude Code dan Codex lewat `PATH` shell login-mu, ditambah folder yang biasa seperti `~/.local/bin`, `/opt/homebrew/bin`, dan `/usr/local/bin`. Kalau **Preferensi\u00a0›\u00a0Alat** menampilkan **Tidak ditemukan**, pastikan `claude` atau `codex` bisa berjalan di jendela Terminal baru, lalu tutup dan buka lagi aplikasinya.",
+          "Aplikasi mencari Claude Code dan Codex lewat `PATH` shell login-mu, ditambah folder yang biasa seperti `~/.local/bin`, `/opt/homebrew/bin`, dan `/usr/local/bin`. Kalau **Preferensi\u00a0›\u00a0Alat** menampilkan **Tidak ditemukan**, di situ ada baris untuk memasangnya. Jalankan baris itu di Terminal, lalu tekan **Periksa lagi**.",
         ],
       },
       {
@@ -123,7 +150,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Dari aplikasi Ackwire AI",
         blocks: [
           "Pasang aplikasi di komputer itu, buka, lalu masuk ke ruang kerjamu. Aplikasi bertanya **Izinkan agen <workspace> memakai Mac ini?** (PC ini di Windows, komputer ini di Linux). Pilih siapa yang boleh memakainya lalu tekan **Izinkan**. Selesai.",
-          "Sudah masuk? Nyalakan ruang kerjanya di **Preferensi\u00a0›\u00a0Umum**, di kartu **Agen**.",
+          "Sudah masuk? Buka **Preferensi\u00a0›\u00a0Umum** dan tekan **Izinkan** di baris ruang kerjanya, di kartu pertama. Tidak ada? Tekan **Tambah ruang kerja…** di bagian bawah kartu itu lalu masuk.",
         ],
       },
       {
@@ -166,7 +193,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Menjeda dan memutuskan",
         blocks: [
-          "Di komputer itu, ikon Ackwire AI di dekat jam menjeda agen dari semua ruang kerja. Di **Preferensi\u00a0›\u00a0Umum**, sakelar tiap ruang kerja hanya menjeda ruang kerja itu, dan **Keluar** memutuskannya. Selama dijeda tidak ada yang baru dimulai, dan yang sedang berjalan tetap diselesaikan. Folder agen tetap tersimpan di disk setelah diputuskan.",
+          "Di komputer itu, ikon Ackwire AI di dekat jam menjeda agen dari semua ruang kerja, atau dari satu ruang kerja saja. Di **Preferensi\u00a0›\u00a0Umum**, sakelar tiap ruang kerja hanya menjeda ruang kerja itu, dan **Keluar**, di menu **⋯**-nya, memutuskannya. Selama dijeda tidak ada yang baru dimulai, dan yang sedang berjalan tetap diselesaikan. Folder agen tetap tersimpan di disk setelah diputuskan.",
           "Dari situs, **Hapus** di halaman perangkat memutuskannya.",
         ],
       },
@@ -177,6 +204,15 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
           "Masuk ke tiap ruang kerja di aplikasi yang sama lalu tekan **Izinkan** untuk masing-masing. Ruang kerja di Ackwire AI Cloud dan di server milikmu sendiri bisa berbagi satu komputer (aplikasi 0.6.1 ke atas). Masing-masing punya agen dan foldernya sendiri di sana, dan memutuskan satu ruang kerja tidak memengaruhi yang lain.",
           "Server yang dijalankan aplikasi di komputer ini sudah terhubung dan tidak perlu apa-apa. Untuk meminjamkan komputer itu juga ke ruang kerja di tempat lain, lihat [Pinjamkan juga ke ruang kerja lain](/help/run-on-your-computer#another-workspace).",
           "Memakai aplikasi di laptop hanya sebagai jendela ke ruang kerjamu? Saat aplikasi meminta izin agar agen memakai laptop itu, **Nanti saja** membuatnya tetap jadi jendela biasa.",
+          "Server yang dihubungkan dengan baris terminal bekerja untuk satu workspace. Menghubungkannya dari workspace lain memindahkan server ke workspace itu, dan workspace pertama tidak lagi menjangkaunya. Untuk beberapa workspace di satu komputer, gunakan aplikasi.",
+        ],
+      },
+      {
+        id: "line",
+        heading: "Saat agen menunggu dalam antrean",
+        blocks: [
+          "Setiap pekerjaan agen memakai memori komputer. Saat memori kosong menipis, pekerjaan berikutnya menunggu dalam antrean sampai yang lain selesai. Orang didahulukan. Jumlah CPU tidak mengubah hal ini.",
+          "Komputer dengan memori 4 GB menjalankan dua atau tiga pekerjaan sekaligus, yang 8 GB sekitar sembilan. Mac atau PC menjalankan hingga delapan. Browser dan desktop yang dibiarkan terbuka oleh agen juga memakai memori. Agar antrean lebih pendek, gunakan komputer dengan memori lebih besar, atau hubungkan satu lagi dan bagi agen di antara keduanya. Workspace yang berbagi satu komputer berbagi memorinya.",
         ],
       },
       {
@@ -199,7 +235,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "di komputer yang juga menjalankan Ackwire AI, database dan kuncinya di `.agentes`",
             ],
           },
-          "Ackwire AI menolak perintah yang menyebut kunci, token, dan data login, tapi itu aturan, bukan tembok. **Perintah** menyala sejak awal. Matikan di pertanyaan aplikasi sebelum menekan **Izinkan**, atau nanti di **Preferensi\u00a0›\u00a0Alat**, tempat satu tombol berlaku untuk semua ruang kerja di komputer itu. Claude Code dan Codex menjalankan perintahnya sendiri di folder agen, dengan aturannya sendiri.",
+          "Ackwire AI menolak perintah yang menyebut kunci, token, dan data login, tapi itu aturan, bukan tembok. **Perintah** menyala sejak awal. Matikan di pertanyaan aplikasi sebelum menekan **Izinkan**, atau nanti di **Preferensi\u00a0›\u00a0Alat**, tempat tiap ruang kerja punya sakelarnya sendiri (aplikasi 0.8.1 ke atas) dan aplikasi bertanya dulu sebelum menyalakannya lagi. Claude Code dan Codex menjalankan perintahnya sendiri di folder agen, dengan aturannya sendiri, bahkan saat Perintah mati.",
           "Untuk tembok sungguhan, pakai server Linux. Di Debian 13, kalau dipasang dengan `--system`, tiap agen jadi pengguna tersendiri. Di Ubuntu, agen berbagi satu pengguna, `agentes`: mereka bisa melihat folder satu sama lain, tapi bukan foldermu atau folder server. Atau beri agen komputer milik mereka sendiri.",
         ],
       },
@@ -272,6 +308,21 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Kunci, kata sandi, info masuk, dan riwayat chat tidak pernah dibawa: agen berpikir dengan AI milik ruang kerja. Beberapa hal belum punya padanan di sini, atau tidak boleh dipindahkan lewat file. Kamu bisa membuatnya lagi nanti.",
           "File dan folder dibaca di browsermu. Tautan GitHub diproses lewat server ruang kerja. File kunci dan info masuk tidak pernah dibuka, dan tidak ada yang berubah sampai kamu mengonfirmasi.",
+        ],
+      },
+      {
+        id: "mcp",
+        heading: "Hubungkan dengan MCP",
+        blocks: [
+          "MCP memberi aplikasi AI-mu akses ke ruang kerja ini, jadi ia membuat agen di sini sendiri, lengkap dengan instruksi, skill, dan rutinitasnya. Pilih aplikasimu dan **Hubungkan dengan MCP**, lalu:",
+          {
+            list: [
+              "Hubungkan alamat yang ditampilkan langkah ini, dengan langkah aplikasi itu sendiri. [Cara menghubungkan, per aplikasi](/help/apps-de-ia#connect)",
+              "Di halaman masuk, pilih **Membuat dan mengedit agen, rutinitas, dan skill**.",
+              "Tempel permintaannya di aplikasi. Agen muncul di langkah ini begitu tiba.",
+            ],
+          },
+          "Kalau aplikasi tidak bisa terhubung, pilih **Dari file** atau **Hanya permintaan**, sesuai yang ditampilkan langkahnya. [Dari aplikasi lain](/help/import#other-apps) menjelaskan permintaannya.",
         ],
       },
       {
@@ -358,7 +409,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "permissions",
         heading: "Memori tidak memberi izin",
         blocks: [
-          "Tidak ada isi memori yang membuat agen bisa berbuat lebih. Apa yang bisa dilakukannya tetap diatur di **Alat dan akses**, dan tindakan sensitif selalu meminta persetujuan.",
+          "Tidak ada isi memori yang membuat agen bisa berbuat lebih. Apa yang bisa dilakukannya tetap diatur di **Alat dan akses**.",
         ],
       },
       {
@@ -378,7 +429,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "what",
         heading: "Apa yang meminta izin dulu",
         blocks: [
-          "Saat agen ingin melakukan merge, deploy, rollback, mengirim sesuatu ke luar, atau menghapus data, agen meminta izin dulu, apa pun akses yang dimilikinya. Permintaannya muncul di **Persetujuan** dan di percakapan, dengan tindakan persisnya dan alasannya.",
+          "Saat agen ingin melakukan merge, deploy, rollback, mengirim sesuatu ke luar, atau menghapus data, agen meminta izin dulu. Itulah tingkat **Hanya yang berisiko**, tingkat awal setiap agen. Di halaman agen, pada **Persetujuan**, **Selalu tanya** membuat agen bertanya sebelum mengubah apa pun, dan **Jangan pernah tanya** membuatnya tidak bertanya sama sekali, termasuk untuk merge, deploy, pembayaran, dan rutinitas. Permintaannya muncul di **Persetujuan** dan di percakapan, dengan tindakan persisnya dan alasannya.",
         ],
       },
       {
@@ -386,7 +437,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Sekali, atau selalu",
         blocks: [
           "Menyetujui berlaku untuk satu tindakan persis, dengan nilai-nilainya. Kalau agen mengubah apa pun, agen meminta lagi.",
-          "**Selalu setujui** membuat agen boleh melakukan jenis tindakan itu mulai sekarang, dengan nilai apa pun, tanpa meminta. Pada permintaan rutinitas, **Selalu di rutinitas ini** melakukan hal yang sama hanya untuk rutinitas itu. Keduanya tidak pernah ditawarkan untuk merge, deploy, rollback, dan sejenisnya. Untuk membatalkannya, buka **Alat dan akses** di halaman agen, atau pengaturan rutinitas.",
+          "**Selalu setujui** membuat agen boleh melakukan jenis tindakan itu mulai sekarang, dengan nilai apa pun, tanpa meminta. Pada permintaan rutinitas, **Selalu di rutinitas ini** melakukan hal yang sama hanya untuk rutinitas itu. **Selalu setujui** ditawarkan untuk jenis tindakan apa pun, termasuk merge dan deploy, selama agen berada di tingkat **Hanya yang berisiko**. **Selalu di rutinitas ini** tidak ditawarkan untuk merge, deploy, rollback, dan sejenisnya. Untuk membatalkannya, buka **Alat dan akses** di halaman agen, atau pengaturan rutinitas.",
         ],
       },
       {
@@ -443,7 +494,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Saat Ackwire AI menjadi host ruang kerjamu, Jev sudah termasuk. Di server yang kamu jalankan sendiri, Jev memakai kunci TypeSafe milik pemilik, sekitar US$ 0,0001 per pesan: [Siapkan Jev](/help/jev#setup).",
+          "Saat Ackwire AI menjadi host ruang kerjamu, Jev sudah termasuk. Di server yang kamu jalankan sendiri, Jev memakai kunci TypeSafe atau OpenRouter milik pemilik, sekitar US$ 0,0001 per pesan: [Siapkan Jev](/help/jev#setup).",
         ],
       },
       {
@@ -503,6 +554,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
               "Di Ackwire AI, buka **Pengaturan › AI dan pemakaian** lalu tempel di bawah **Jev**. Hanya orang yang menyiapkan server ini yang bisa melihatnya.",
             ],
           },
+          "Sudah bayar OpenRouter? Pilih **OpenRouter** di **Jev** lalu tempel kunci dari https://openrouter.ai/keys, atau nyalakan Jev dengan kunci OpenRouter milik ruang kerja dalam sekali klik. Jev-nya sama, ditagih lewat OpenRouter dengan harga yang sama.",
           "Di server yang kamu jalankan dengan Docker, kamu juga bisa menaruh kuncinya di `.env` sebagai `TYPESAFE_API_KEY`. Kunci itu lebih diutamakan daripada yang ada di Pengaturan.",
         ],
       },
@@ -537,6 +589,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe menjalankan Jev di Amerika Serikat dan tidak melatih modelnya dengan apa yang kamu kirim. TypeSafe menyimpan data selama dibutuhkan untuk menjalankan layanannya. Retensi nol tersedia di paket enterprise-nya.",
           "Kebijakan privasi TypeSafe: https://typesafe.ai/legal/privacy-policy. Perjanjian pemrosesan datanya: https://typesafe.ai/legal/data-processing.",
+          "Dengan kunci OpenRouter, permintaan yang sama lewat OpenRouter sebelum sampai ke TypeSafe, di bawah ketentuan OpenRouter dan pengaturan privasimu di sana: https://openrouter.ai/privacy.",
         ],
       },
       {
@@ -690,13 +743,13 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Di server, jalankan:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh",
           },
           "Pemasang memasang yang belum ada, lalu menanyakan beberapa hal: cara orang masuk, email, apakah server ini juga jadi komputer agenmu, dan apakah mengirim statistik pemakaian anonim. Tekan Enter untuk jawaban yang disarankan. Semuanya dipasang di `/opt/agentes` (`~/agentes` untuk pengguna yang sudah bisa memakai Docker), dan pertama kali ia mengunduh sekitar 2 GB.",
           "Di akhir, ia menampilkan alamat servermu dan kode QR untuk ponselmu. Menjalankannya lagi aman: pengaturanmu tetap, dan hanya yang kurang yang dilengkapi.",
           "Dengan Node.js 18 atau lebih baru, `npx @agenteschat/setup` di folder kosong adalah penyiapan yang sama. Tanpa Node, ia berjalan dari image aplikasi, di folder saat ini, dan diakhiri dengan perintah yang menyalakan sisanya:",
           {
-            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup',
           },
         ],
       },
@@ -727,7 +780,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "Email",
         blocks: [
-          "Tanpa email, Ackwire AI menulis setiap email ke log-nya alih-alih mengirimnya, jadi tautan undangan tetap bisa disalin dari sana. Atur ulang kata sandi tetap mati.",
+          "Tanpa email, Ackwire AI menulis setiap email ke log-nya alih-alih mengirimnya, jadi tautan undangan tetap bisa disalin dari sana. Atur ulang kata sandi tetap mati, dan email baru untuk sebuah akun langsung berlaku, tanpa kode atau tautan.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -753,7 +806,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Penyiapan bisa menjadikan server ini juga komputer agenmu, tempat mereka menjalankan perintah, memakai browser, dan menyimpan file. Ia bertanya, dan menyarankan ya kalau server sanggup. Di Debian 13, setiap agen mendapat pengguna sendiri, dengan layar. Di Ubuntu, agen berbagi satu pengguna, `agentes`. Kalau kamu menjawab tidak, jalankan pemasangan lagi dengan `--computer yes`:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh -s -- --computer yes",
           },
           "Komputer lain, seperti Mac dengan aplikasi Ackwire AI atau server lain, terhubung dari **Pengaturan\u00a0›\u00a0Perangkat**, seperti di [Komputer dan ponselmu](/help/computers). Di Tailscale, komputer itu masuk ke tailnet-mu lebih dulu.",
         ],
@@ -781,7 +834,7 @@ export const helpId: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Di folder pemasangan, jalankan:",
           {
-            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+            code: "curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
           },
           "Database memperbarui dirinya sendiri saat versi baru menyala. Simpan pengaturanmu di `.env` dan jangan pernah mengubah `docker-compose.yml`, karena setiap pembaruan menggantinya. Buat cadangan sebelum lompatan besar: database yang diperbarui versi lebih baru tidak bisa dibuka di versi lebih lama.",
         ],

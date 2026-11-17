@@ -17,6 +17,7 @@ import { enqueue } from "../outbox";
 import { RIGHT_HAND } from "../right-hand";
 import { forPeople } from "../run-resume";
 import { replyThreadOf } from "../runs";
+import { closedRefusal, orgStanding } from "../standing";
 import type { ToolContext } from "../tools/types";
 import { UNTRUSTED_MAX_CHARS } from "../untrusted";
 import { parseRepo } from "./repos";
@@ -308,7 +309,8 @@ async function rightHandConversation(db: Database, orgId: string, userId: string
  * (a merge or a close only of an item the agent opened), else a mention of the app to the right hand, to hand on: in
  * the DM of the member who wrote it, or of whoever connected that GitHub account here for anyone else. A member who
  * may read that conversation and talk to the agent wakes it, behind the run; anyone else leaves a notice only
- * (`refs.outside`). A merge or a close wakes the agent whoever did it.
+ * (`refs.outside`). A merge or a close wakes the agent whoever did it. A workspace closed to changes (suspended, or
+ * being deleted) takes none.
  */
 export async function handleGitHubAppEvent(
   deps: { db: Database; pubsub?: PubSub },
@@ -316,6 +318,7 @@ export async function handleGitHubAppEvent(
   e: GitHubAppEvent,
 ): Promise<"delivered" | "ignored"> {
   const { db } = deps;
+  if (closedRefusal(await orgStanding(db, orgId))) return "ignored";
   const [item] = await db
     .select()
     .from(githubItems)

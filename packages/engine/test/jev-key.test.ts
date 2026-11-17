@@ -9,12 +9,18 @@ import {
   type JevKey,
   type JevState,
   jevStateOf,
+  jevViaOf,
+  openRouterJevModel,
   sealSecret,
 } from "../src";
 import { type Fixture, SECRET, setup } from "./fixtures";
 
 let f: Fixture;
-afterEach(() => f?.close());
+afterEach(async () => {
+  await f?.close();
+  // A test without a database after one with it doesn't close that one again.
+  f = undefined as unknown as Fixture;
+});
 
 type Answer = number | "down" | "late" | { status: number; body?: unknown; retryAfter?: string };
 
@@ -52,7 +58,7 @@ function jevKey(fetch: typeof globalThis.fetch, envKey?: string) {
 
 /** One live call, as the router and the judge make them: answered, failed, or not made (no key now). */
 const live = (key: JevKey, fetch: typeof globalThis.fetch) =>
-  callJev(key, { body: {}, timeoutMs: 2000, fetch }).then(
+  callJev(key, { body: { model: "jev-latest" }, timeoutMs: 2000, fetch }).then(
     () => "answered",
     (e: Error) => (e.name === "JevOffError" ? "off" : "failed"),
   );
@@ -96,11 +102,11 @@ describe("the key, saved and read", () => {
     const ts = typesafe(200);
     const key = jevKey(ts.fetch);
     await key.ready();
-    expect(await key.view()).toEqual({ source: null, hint: null, state: "off" });
+    expect(await key.view()).toEqual({ source: null, via: null, hint: null, state: "off" });
     expect(key.usable()).toBe(false);
 
     const view = await key.save("  ts_live_secret_9f2c  ", f.owner.id);
-    expect(view).toEqual({ source: "settings", hint: "9f2c", state: "ok" });
+    expect(view).toEqual({ source: "settings", via: "typesafe", hint: "9f2c", state: "ok" });
     expect(JSON.stringify(view)).not.toContain("secret");
     expect(ts.keys).toEqual(["ts_live_secret_9f2c"]);
     const [row] = await f.db.select().from(schema.instanceSecrets);
@@ -113,7 +119,7 @@ describe("the key, saved and read", () => {
     expect(audit[0]).toMatchObject({ actorType: "person", actorId: f.owner.id, details: { hint: "9f2c" } });
     expect(JSON.stringify(audit)).not.toContain("ts_live_secret");
 
-    expect(await key.remove(f.owner.id)).toEqual({ source: null, hint: null, state: "off" });
+    expect(await key.remove(f.owner.id)).toEqual({ source: null, via: null, hint: null, state: "off" });
     expect(await f.db.select().from(schema.instanceSecrets)).toEqual([]);
     expect(await key.key()).toBeNull();
     const removed = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "jev.key_removed"));
@@ -161,7 +167,7 @@ describe("the key, saved and read", () => {
     f = await setup();
     const key = jevKey(typesafe(200).fetch, "ts_from_env_abcd");
     await key.ready();
-    expect(await key.view()).toEqual({ source: "env", hint: "abcd", state: "ok" });
+    expect(await key.view()).toEqual({ source: "env", via: "typesafe", hint: "abcd", state: "ok" });
     expect(key.usable()).toBe(true);
     await expect(key.save("ts_other_key_1", f.owner.id)).rejects.toMatchObject({ code: "jev_key_env" });
     await expect(key.remove(f.owner.id)).rejects.toMatchObject({ code: "jev_key_env" });
@@ -176,7 +182,7 @@ describe("the key, saved and read", () => {
     const ts = typesafe(200);
     const key = jevKey(ts.fetch);
     await key.ready();
-    expect(await key.view()).toEqual({ source: "settings", hint: "ey_1", state: "invalid" });
+    expect(await key.view()).toEqual({ source: "settings", via: null, hint: "ey_1", state: "invalid" });
     expect(key.usable()).toBe(false);
     expect(await live(key, ts.fetch)).toBe("off");
     expect(ts.keys).toEqual([]);
@@ -196,7 +202,7 @@ describe("the key, saved and read", () => {
     const after = jevKey(restarted.fetch);
     await after.ready();
     expect(after.usable()).toBe(true);
-    expect(await after.view()).toEqual({ source: "settings", hint: "ey_1", state: "ok" });
+    expect(await after.view()).toEqual({ source: "settings", via: "typesafe", hint: "ey_1", state: "ok" });
     expect(restarted.keys).toEqual([]);
   });
 
@@ -294,7 +300,7 @@ describe("a broken key is skipped for a while", () => {
     await key.save("ts_new_key_1111", f.owner.id);
     release();
     expect(await call).toBe("failed");
-    expect(await key.view()).toEqual({ source: "settings", hint: "1111", state: "ok" });
+    expect(await key.view()).toEqual({ source: "settings", via: "typesafe", hint: "1111", state: "ok" });
     expect(await key.key()).toBe("ts_new_key_1111");
   });
 
@@ -309,5 +315,123 @@ describe("a broken key is skipped for a while", () => {
     ts.answers[0] = 200;
     expect((await key.check()).state).toBe("ok");
     expect(key.usable()).toBe(true);
+  });
+});
+
+/** A fake Jev endpoint that records each request: its address, headers and body. */
+function recorder(status = 200, body?: unknown) {
+  const calls: { url: string; headers: Headers; body: Record<string, unknown> }[] = [];
+  const fetch = (async (url: string, init: RequestInit) => {
+    calls.push({ url, headers: new Headers(init.headers), body: JSON.parse(String(init.body)) });
+    const answer =
+      body ??
+      (status < 300
+        ? { answers: { ok: { type: "noul", noul: 1 } }, usage: { input_tokens: 50, output_tokens: 1, cost: 0.0000021 } }
+        : { error: { code: status, message: "Provider returned error" } });
+    return Response.json(answer, { status });
+  }) as unknown as typeof globalThis.fetch;
+  return { fetch, calls };
+}
+
+describe("Jev through OpenRouter (ADR 0073 §9)", () => {
+  const call = (key: string, fetch: typeof globalThis.fetch) =>
+    callJev(key, {
+      body: { model: "jev-preview", state: "a3f1-shot", questions: {}, assets: { "a3f1-shot": { format: "png" } } },
+      headers: { "TypeSafe-Danger-Zone-Images": "true" },
+      baseURL: "https://typesafe.test",
+      timeoutMs: 2000,
+      fetch,
+    });
+
+  test("an OpenRouter key sends TypeSafe's request to OpenRouter's Decisions route, under OpenRouter's model name", async () => {
+    const or = recorder(200, {
+      model: "typesafe/jev-1.14-20261101",
+      answers: {},
+      usage: { input_tokens: 50, output_tokens: 1, cost: 0.0000021 },
+    });
+    // TypeSafe's name for the release that answered, never OpenRouter's slash id (a usage row's model).
+    expect(await call("sk-or-v1-secret", or.fetch)).toMatchObject({ model: "jev-1.14-20261101" });
+    const [sent] = or.calls;
+    expect(sent?.url).toBe("https://openrouter.ai/api/alpha/decisions");
+    expect(sent?.body).toEqual({
+      model: "~typesafe/jev-latest",
+      state: "a3f1-shot",
+      questions: {},
+      assets: { "a3f1-shot": { format: "png" } },
+    });
+    expect(sent?.headers.get("authorization")).toBe("Bearer sk-or-v1-secret");
+    expect(sent?.headers.get("http-referer")).toBe("https://agentes.chat");
+    expect(sent?.headers.get("x-openrouter-title")).toBe("agentes.chat");
+    // TypeSafe's own switch stays with TypeSafe: OpenRouter sets what Jev needs itself.
+    expect(sent?.headers.get("typesafe-danger-zone-images")).toBeNull();
+
+    const ts = recorder();
+    await call("ts_live_key_1", ts.fetch);
+    expect(ts.calls[0]?.url).toBe("https://typesafe.test/v1/systemone");
+    expect(ts.calls[0]?.body.model).toBe("jev-preview");
+    expect(ts.calls[0]?.headers.get("typesafe-danger-zone-images")).toBe("true");
+    expect(ts.calls[0]?.headers.get("x-openrouter-title")).toBeNull();
+  });
+
+  test("who a key is from, and Jev's names on OpenRouter", () => {
+    expect(jevViaOf("sk-or-v1-abc")).toBe("openrouter");
+    expect(jevViaOf("ts_live_abc")).toBe("typesafe");
+    expect(jevViaOf("sk-ant-abc")).toBe("typesafe");
+    expect(openRouterJevModel("jev-latest")).toBe("~typesafe/jev-latest");
+    expect(openRouterJevModel("jev-preview")).toBe("~typesafe/jev-latest");
+    expect(openRouterJevModel("jev-1.14")).toBe("typesafe/jev-1.14");
+  });
+
+  test("OpenRouter's errors say the same about the key as TypeSafe's", async () => {
+    const credits = {
+      error: { code: 402, message: "Insufficient credits. Add more using https://openrouter.ai/credits" },
+    };
+    expect(jevStateOf(402, credits)).toBe("no_credit");
+    expect(jevStateOf(400, { error: { code: 400, message: "Insufficient credits" } })).toBe("no_credit");
+    expect(jevStateOf(401, { error: { code: 401, message: "No auth credentials found" } })).toBe("invalid");
+    expect(jevStateOf(400, { error: { code: 400, message: "Invalid request parameters" } })).toBeNull();
+    expect(jevStateOf(529, { error: { code: 529, message: "Provider returned error" } })).toBe("down");
+    // OpenRouter's own: a key past its spending limit, input its moderation flagged, a route or a name that moved.
+    const or = (status: number, message: string) =>
+      jevStateOf(status, { error: { code: status, message } }, "openrouter");
+    expect(or(403, "Key limit exceeded")).toBe("no_credit");
+    expect(or(403, "Your input was flagged by moderation")).toBeNull();
+    expect(or(403, "Forbidden")).toBe("invalid");
+    expect(or(404, "Resource not found")).toBe("down");
+    expect(jevStateOf(404, { error: { code: 404, message: "Resource not found" } })).toBeNull();
+    expect(await checkJevKey("sk-or-v1-secret", { fetch: recorder(402).fetch })).toBe("no_credit");
+    await expect(call("sk-or-v1-secret", recorder(401).fetch)).rejects.toThrow("OpenRouter answered 401");
+  });
+
+  test("an OpenRouter key is checked there, saved, and shown as OpenRouter's", async () => {
+    f = await setup();
+    const or = recorder();
+    const key = jevKey(or.fetch);
+    await key.ready();
+    expect(await key.save("sk-or-v1-secret_7a1e", f.owner.id)).toEqual({
+      source: "settings",
+      via: "openrouter",
+      hint: "7a1e",
+      state: "ok",
+    });
+    expect(or.calls.map((c) => [c.url, c.body.model])).toEqual([
+      ["https://openrouter.ai/api/alpha/decisions", "~typesafe/jev-latest"],
+    ]);
+
+    const refused = jevKey(recorder(401).fetch);
+    await expect(refused.save("sk-or-v1-made_up_key", f.owner.id)).rejects.toMatchObject({
+      code: "jev_key_invalid",
+      message: "OpenRouter didn't accept this key.",
+    });
+  });
+
+  test("an OpenRouter key in TYPESAFE_API_KEY works the same", async () => {
+    f = await setup();
+    const or = recorder();
+    const key = jevKey(or.fetch, "sk-or-v1-from_env_beef");
+    await key.ready();
+    expect(await key.view()).toEqual({ source: "env", via: "openrouter", hint: "beef", state: "ok" });
+    expect(await live(key, or.fetch)).toBe("answered");
+    expect(or.calls[0]?.url).toBe("https://openrouter.ai/api/alpha/decisions");
   });
 });

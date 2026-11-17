@@ -14,6 +14,7 @@ import {
   type GitPush,
   githubRepo,
   gitPushes,
+  heldForPerson,
   heldPush,
   INLINE_CODE_DENY_RULES,
   inlineCode,
@@ -35,6 +36,7 @@ import {
   secretRead,
   shellWords,
   simpleCommands,
+  unaskedMessage,
 } from "../src/command-policy";
 import { ruleMatches } from "../src/machine-protocol";
 
@@ -66,6 +68,28 @@ describe("shell parsing", () => {
     ]) {
       expect(simpleCommands(line)).toBeNull();
     }
+  });
+
+  test("a comment is left out to its line's end, quotes and all; a line continuation joins two lines", () => {
+    const texts = (line: string) => shellWords(line)?.map((w) => w.text);
+    // Read as a word, `#'` opened a quote that swallowed the next line, which the shell runs.
+    expect(texts("ls #'\nrm -rf x\n#'")).toEqual(["ls", ";", "rm", "-rf", "x", ";"]);
+    expect(bash("ls #'\nrm -rf x\n#'")).toBe(false);
+    // The shell drops a line continuation, so a `#` after one still opens a comment.
+    expect(texts("ls \\\n#'\nrm -rf x\n#'")).toEqual(["ls", ";", "rm", "-rf", "x", ";"]);
+    expect(bash("ls \\\n#'\ngh pr merge 1\n#'")).toBe(false);
+    expect(deniedMessage("Bash", { command: "ls \\\n#'\ngh pr merge 1\n#'" })).not.toBeNull();
+    // Inside a word it leaves the word whole; in double quotes it's dropped too.
+    expect(texts("ls a\\\n#b")).toEqual(["ls", "a#b"]);
+    expect(texts('"g\\\nh" pr view 1')).toEqual(["gh", "pr", "view", "1"]);
+    expect(deniedMessage("Bash", { command: '"g\\\nh" pr merge 1' })).not.toBeNull();
+    // `#12` is a comment to the shell: gh gets no number. A script run before a comment is read as it runs.
+    expect(texts("gh issue view #12")).toEqual(["gh", "issue", "view"]);
+    expect(simpleCommands("bash scripts/release.sh # tag and push")?.map((s) => s.argv)).toEqual([
+      ["bash", "scripts/release.sh"],
+    ]);
+    // Inside a word or in quotes it's a character like any other.
+    expect(texts("echo 'a #b' c#d")).toEqual(["echo", "a #b", "c#d"]);
   });
 });
 
@@ -437,6 +461,7 @@ describe("secrets are refused to every read tool", () => {
     // agent's own files of those names, are fine.
     expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-old/README" }, system)).toBe(false);
     expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-agents/README" }, system)).toBe(true);
+    expect(secretRead("Read", { file_path: "/var/lib/agentes-runner-grok/0193eeee/auth.json" }, system)).toBe(true);
     expect(secretRead("Read", { file_path: "src/auth.json" }, system)).toBe(false);
     expect(secretRead("Read", { file_path: "config/provider.json" }, system)).toBe(false);
     expect(secretRead("Read", { file_path: "config/token.json" }, system)).toBe(false);
@@ -821,6 +846,16 @@ describe("where a push goes, as written", () => {
       expect([command, gitPushes(command)]).toEqual([command, null]);
     }
   });
+
+  test("a script's lines as its shell runs them: a continuation joins two, a quoted newline ends none", () => {
+    expect(one("git \\\npush --force origin main").refs).toEqual([{ branch: "main", force: true, delete: false }]);
+    // A line opening with `#` inside a quote is no comment: the push after the quote runs.
+    expect(one("echo '\n# x' ; git push origin main").refs[0]?.branch).toBe("main");
+    // Across a continuation or a quoted newline the policy can't read, a push is still named.
+    for (const command of ['x="$(git \\\npush origin main)"', "eval 'git \\\npush origin main'"]) {
+      expect([command, gitPushes(command)]).toEqual([command, null]);
+    }
+  });
 });
 
 describe("whether a push waits for a person", () => {
@@ -1028,7 +1063,7 @@ describe("whether a push waits for a person", () => {
     const proxied = facts({ proxied: ["origin"] });
     const never = async (command: string, f = proxied) => approvalNeeded(command, ASK_IN_CHAT, { own, facts: () => f });
     const toPr =
-      "our git proxy never lets it through. Push to a branch of your own (agentes/ada/…) and open a pull request; merging asks a person. Never give the person a terminal command to run.";
+      "our git proxy never lets it through. Push to a branch of your own (agentes/ada/…) and open a pull request; merging is a separate step. Never give the person a terminal command to run.";
     expect(await never("git push origin --delete cursor/pap-582-fix")).toEqual({
       message: `This deletes the remote branch cursor/pap-582-fix: ${DELETE_BRANCHES_POINTER}`,
       never: true,
@@ -1098,6 +1133,33 @@ describe('the kind "Aprovar sempre" keeps for a command', () => {
     expect(commandKind("git commit -m 'fix: x'")).toBe("git commit");
     expect(commandKind("swift build")).toBe("swift build");
     expect(commandKind("make")).toBe("make");
+  });
+
+  test("a command the computer holds has a kind too, for a rule of the agent's own; a secret and a script never", () => {
+    expect(commandKind("gh pr merge 12 --squash")).toBeNull();
+    expect(commandKind("gh pr merge 12 --squash", true)).toBe("gh pr merge");
+    expect(commandKind("vercel deploy --prod", true)).toBe("vercel deploy");
+    expect(commandKind("git push --force origin main", true)).toBe("git push");
+    expect(commandKind("gh issue create --title x", true)).toBe("gh issue create");
+    for (const command of [
+      "gh auth token",
+      "cat .env",
+      "python3 deploy.py",
+      "bash deploy.sh",
+      "gh pr merge 12 | tee log",
+    ]) {
+      expect({ command, kind: commandKind(command, true) }).toEqual({ command, kind: null });
+    }
+  });
+
+  test("a held command's refusal for an agent that never asks names where it runs, with nobody to wait for", () => {
+    const held = approvalMessage("This is a merge", ASK_IN_CHAT);
+    expect(heldForPerson(held)).toBe(true);
+    expect(unaskedMessage(held)).toBe(
+      "This is a merge: your own shell doesn't run it. Run the same command with run_code: it runs there without asking anyone.",
+    );
+    expect(heldForPerson(SECRET_MESSAGE)).toBe(false);
+    expect(unaskedMessage(SECRET_MESSAGE)).toBe(SECRET_MESSAGE);
   });
 
   test("never offered for what isn't one plain command, the deny list, secrets, pushes or what can't be undone", () => {
@@ -1219,6 +1281,9 @@ describe("loneMerge: the merge a computer may run without a person", () => {
     ["what follows a value the shell reads as a comment", 'gh pr merge 12 --body # -t "\nvercel deploy --prod\n"'],
     ["what follows a line's end the indent hid", "gh pr merge 12 --body \\  \nvercel deploy --prod"],
     ["#12: the shell drops it and -R, and gh merges the folder's branch", "gh pr merge --squash #12 -R acme/app"],
+    ["a comment after it", "gh pr merge 12 --squash # ship it"],
+    ["a line continuation", "gh pr merge 12 \\\n--squash"],
+    ["a comment line a continuation goes on to", "cd app && \\\n# x\ngh pr merge 12"],
     ["git config in front", "git -c core.sshCommand=x merge feature"],
     ["git merge --abort", "git merge --abort"],
     ["two branches", "git merge a b"],

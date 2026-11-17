@@ -1,8 +1,9 @@
 import { type NoticeCategory, useNoticePrefs, useSetNoticePref } from "@agenteschat/client";
-import { Card, CardHeader, Chip, Icon, type IconName, InfoHint, Switch } from "@agenteschat/ui";
-import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import { Button, Card, CardHeader, Chip, Icon, type IconName, InfoHint, Switch } from "@agenteschat/ui";
+import { cloneElement, isValidElement, type ReactElement, type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
+import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
 import { useBrowserNotices } from "@/components/WebPush";
 import { inDesktopApp } from "@/lib/desktop";
@@ -32,6 +33,7 @@ export function NoticePrefsSection() {
   const set = useSetNoticePref(org.id);
   const browser = useBrowserNotices();
   const phones = prefs.data?.phones ?? 0;
+  const [phoneCode, setPhoneCode] = useState(false);
 
   return (
     <>
@@ -68,12 +70,15 @@ export function NoticePrefsSection() {
                   {t("noticePrefs.on")}
                 </Chip>
               ) : (
-                <Chip>{t("noticePrefs.off")}</Chip>
+                <Button size="sm" icon="phone" onClick={() => setPhoneCode(true)}>
+                  {t("shell.openOnPhone")}
+                </Button>
               ))
             }
           />
           <PrefRow id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} hint={t("noticePrefs.macHelp")} />
         </div>
+        <OpenOnPhoneDialog open={phoneCode} onClose={() => setPhoneCode(false)} />
       </Card>
 
       <Card aria-labelledby="notice-what">
@@ -115,7 +120,8 @@ export function NoticePrefsSection() {
 /**
  * One line of the person's own settings: its icon (or their face), its name with an ⓘ for what it does (`hint`), then
  * its control, centred on each other. Under the name only what must stay in sight (`status`: why the control is off,
- * the value a line opens to); a value before the control (`value`: the plan it uses). With `onOpen` the whole line is a
+ * the value a line opens to); a value before the control (`value`: the plan it uses, a card's day and hour, on a phone
+ * under the name of a line with a switch). With `onOpen` the whole line is a
  * button that opens something, a chevron at its end, and it takes no ⓘ (a button can't hold one). With a switch a press
  * anywhere on the line toggles it, its name the switch's label. Several controls (`actions`: a day, an hour and Parar de
  * receber) go under the words when they don't fit beside them, from the words' edge; one control keeps its place.
@@ -141,7 +147,10 @@ export function PrefRow({
   hint?: ReactNode;
   /** What must stay in sight under the name: why the control is off, what it waits on, what the line opens to. */
   status?: ReactNode;
-  /** A value before the control (a plan's logo and name). */
+  /**
+   * A value before the control (a plan's logo and name, a card's day and hour selects, who a switch is for). A line
+   * that opens something says its state in `status`: beside the name, a long one sends the chevron to a line of its own.
+   */
   value?: ReactNode;
   control?: ReactNode;
   /** In place of `control`: several controls or buttons, which wrap under the words rather than keep their place. */

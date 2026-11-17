@@ -128,6 +128,15 @@ describe("message Markdown", () => {
     expect(container.textContent).toBe("oi @ada");
     expect(container.querySelector(".ac-mention")).toBeNull();
   });
+
+  test("a key or a hash in the words breaks at any letter, filling its lines; long words of a language never do", () => {
+    const key = "sk-test-0000-FAKEKEY1-FAKEKEY2-FAKEKEY3-FAKE";
+    const el = body(`usa essa ${key} @ada e ${"a".repeat(40)} Donaudampfschifffahrtsgesellschaft`, () => "Ada");
+    expect([...el.querySelectorAll(".md-run")].map((r) => r.textContent)).toEqual([key]);
+    expect(el.querySelector(".ac-mention")).toBeTruthy();
+    const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
+    expect(css).toMatch(/\.md-run \{\s*word-break: break-all;/);
+  });
 });
 
 describe("in the channel", () => {

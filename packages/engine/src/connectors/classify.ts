@@ -8,7 +8,8 @@ import { ALWAYS_SENSITIVE } from "../tools/gateway";
  * suggestion must be right on its own:
  *
  * 1. The server's annotations: `readOnlyHint` → read; `destructiveHint` →
- *    approval (and sensitive).
+ *    approval, as a suggestion an admin may change (a server's word alone
+ *    never locks a tool: only our own verbs below do).
  * 2. The verb in the tool's name: get/list/search… → read;
  *    create/update/add… → write; delete/remove/send/pay… → approval (and
  *    sensitive: such a tool may only ask for approval or be off).
@@ -177,17 +178,22 @@ export function classifyByRules(
 ): ToolClass | null {
   if (tool.readOnlyHint === true)
     return { level: "read", source: "annotation", reason: "read_only_hint", sensitive: false };
+  const words = nameWords(tool.name);
+  const verb = words[verbIndex(words, ruleVerb)];
+  const locked: ToolClass = { level: "approval", source: "verb", reason: "verb_sensitive", sensitive: true };
+  const byVerb = verb && SENSITIVE_VERBS.has(verb) ? locked : null;
+  // The server's warning only suggests asking: the lock comes from our own words. With the warning, one of them
+  // anywhere in the name locks (`create_and_send_invoice`), not only in the verb's place.
   if (tool.destructiveHint === true)
-    return { level: "approval", source: "annotation", reason: "destructive_hint", sensitive: true };
+    return words.some((w) => SENSITIVE_VERBS.has(w))
+      ? locked
+      : { level: "approval", source: "annotation", reason: "destructive_hint", sensitive: false };
   if (readTools.includes(tool.name))
     return { level: "read", source: "preset", reason: "preset_read", sensitive: false };
   if (writeTools.includes(tool.name))
     return { level: "write", source: "preset", reason: "verb_write", sensitive: false };
-  const words = nameWords(tool.name);
-  const verb = words[verbIndex(words, ruleVerb)];
   if (!verb) return null;
-  if (SENSITIVE_VERBS.has(verb))
-    return { level: "approval", source: "verb", reason: "verb_sensitive", sensitive: true };
+  if (byVerb) return byVerb;
   if (WRITE_VERBS.has(verb)) return { level: "write", source: "verb", reason: "verb_write", sensitive: false };
   return { level: "read", source: "verb", reason: "verb_read", sensitive: false };
 }

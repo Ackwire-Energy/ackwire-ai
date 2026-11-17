@@ -10,7 +10,7 @@ export type ContentBlock =
   (
     | { type: "text"; text: string; cache?: boolean }
     | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-    /** `images`: pictures the tool returned (base64), shown to models that read images. */
+    /** `images`: pictures and PDFs the tool returned (base64), shown to models that read them. */
     | { type: "tool_result"; toolUseId: string; content: string; isError?: boolean; images?: ToolImage[] }
     /**
      * A block we don't interpret (e.g. Anthropic `thinking` with its signature).
@@ -27,20 +27,42 @@ export type ContentBlock =
     restart?: string;
   };
 
-/** A picture in a tool's result: PNG, JPEG, GIF or WebP, base64. */
+/**
+ * A picture (PNG, JPEG, GIF or WebP) or a PDF (`application/pdf`) in a tool's result, base64. A PDF goes to the
+ * providers that read one as a document block; `pages` counts toward the prompt as its text would.
+ */
 export interface ToolImage {
   mediaType: string;
   data: string;
+  /** A PDF: its pages, as counted when it was read. */
+  pages?: number;
+  /** A PDF: its file name (OpenAI asks for one). */
+  name?: string;
 }
+
+export const PDF_MEDIA_TYPE = "application/pdf" as const;
 
 /** What an image counts for in prompt estimates: about the tokens of a large one (≈1,600), never its base64 length. */
 export const IMAGE_CHARS = 6400;
+/** What a PDF page counts for: its text and its picture, which the providers both send (≈2,000 tokens). */
+export const PDF_PAGE_CHARS = 8000;
+
+/** What one picture or PDF of a tool result counts for in prompt estimates. */
+export const toolImageChars = (i: ToolImage) =>
+  i.mediaType === PDF_MEDIA_TYPE ? Math.max(1, i.pages ?? 1) * PDF_PAGE_CHARS : IMAGE_CHARS;
+
+/** Whether a tool result carries a picture or a PDF. */
+export const hasToolImages = (messages: ModelMessage[]) =>
+  messages.some(
+    (m) => typeof m.content !== "string" && m.content.some((b) => b.type === "tool_result" && b.images?.length),
+  );
 
 /**
- * The messages with tool results' images left out, a note in their place: for endpoints that take text only
- * (another company's Anthropic-compatible API, OpenRouter), where an image would fail the whole request.
+ * The messages with tool results' pictures and PDFs left out, a note in their place: for endpoints that take text
+ * only (another company's Anthropic-compatible API, OpenRouter), where one would fail the whole request. The note
+ * names the AI (`model`) and the way out, so the agent tells the person the real cause.
  */
-export const withoutImages = (messages: ModelMessage[]): ModelMessage[] =>
+export const withoutImages = (messages: ModelMessage[], model?: string): ModelMessage[] =>
   messages.map((m) =>
     typeof m.content === "string"
       ? m
@@ -48,10 +70,14 @@ export const withoutImages = (messages: ModelMessage[]): ModelMessage[] =>
           ...m,
           content: m.content.map((b) => {
             if (b.type !== "tool_result" || !b.images?.length) return b;
-            const { images: _images, ...rest } = b;
+            const { images, ...rest } = b;
+            const pdf = images.some((i) => i.mediaType === PDF_MEDIA_TYPE);
+            const picture = images.some((i) => i.mediaType !== PDF_MEDIA_TYPE);
+            const what = pdf && picture ? "picture and the PDF" : pdf ? "PDF" : "picture";
+            const ai = model ? `this agent's AI (${model})` : "this agent's AI";
             return {
               ...rest,
-              content: `${b.content}\n[The image is not shown: this model connection takes text only.]`,
+              content: `${b.content}\n[The ${what} is not shown to you: ${ai} reads text only through this connection. Tell the person exactly that, and that an AI that reads ${pdf ? "pictures and PDFs" : "pictures"} (Claude, GPT or Gemini), picked in this agent's settings, would see it. Never say the file came empty.]`,
             };
           }),
         },
@@ -160,6 +186,8 @@ export interface ModelResult {
    * refusal that sent the call again without any.
    */
   thinking?: { dropped?: Record<string, number>; refused?: string };
+  /** Tool results' pictures or PDFs were left out: this connection takes text only (`withoutImages`). */
+  imagesLeftOut?: true;
 }
 
 export interface StreamOptions {
@@ -298,15 +326,15 @@ export function promptChars(request: Pick<ModelRequest, "system" | "messages" | 
   return system + messages + tools;
 }
 
-/** Characters of a message's blocks, an image as `IMAGE_CHARS`. */
+/** Characters of a message's blocks, an image as `IMAGE_CHARS` and a PDF by its pages (`toolImageChars`). */
 export function blocksChars(content: ContentBlock[]): number {
   let images = 0;
   const json = JSON.stringify(content, (key, value) => {
     if (key !== "images" || !Array.isArray(value)) return value;
-    images += value.length;
+    for (const i of value as ToolImage[]) images += toolImageChars(i);
     return undefined;
   });
-  return json.length + images * IMAGE_CHARS;
+  return json.length + images;
 }
 
 /** Tools in the order providers send them: the stable ones, then the others, each part sorted by name. */

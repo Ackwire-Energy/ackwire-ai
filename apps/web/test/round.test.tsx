@@ -154,7 +154,7 @@ describe("Criar canal", () => {
     const access = within(dialog).getByRole("combobox", { name: "Quem pode entrar" });
     access.focus();
     await act(async () => fireEvent.keyDown(access, { key: "Enter" }));
-    await click(screen().getByRole("option", { name: /Privado/ }));
+    await click(screen().getByRole("option", { name: /^Só quem for adicionado/ }));
     await type(within(dialog).getByRole("searchbox", { name: "Buscar pessoa ou agente" }), "ada");
     await click(within(dialog).getByRole("checkbox", { name: /Ada/ }));
     expect(dialog.textContent).toContain("1 selecionado");
@@ -483,9 +483,12 @@ describe("agent questions (ask_user)", () => {
     expect(document.activeElement === within(card).getByRole("textbox", { name: "Sua resposta" })).toBe(true);
     await click(within(card).getByRole("button", { name: "Depois das 18h" }));
     await settle(4);
-    // Answered: one line takes its place (another element), the answer bold, the question still in the open.
+    // Answered: the same card, the question still its words, the answer bold where the choices were.
     const done = screen().getByRole("group", { name: "Pergunta de Ada" });
-    expect(done.textContent).toContain("Você respondeu: Depois das 18h");
+    expect(done.classList.contains("rq--ended")).toBe(true);
+    expect(done.querySelector(".rq__lead")?.textContent).toBe("Faço o deploy agora ou depois das 18h?");
+    expect(done.querySelector(".rq__answer-text")?.textContent).toBe("Você respondeu: Depois das 18h");
+    expect(within(done).queryByRole("button")).toBeNull();
     expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
     expect(done.querySelector("b")?.textContent).toBe("Depois das 18h");
     expect(done.closest("article")?.textContent).toContain("Faço o deploy agora ou depois das 18h?");

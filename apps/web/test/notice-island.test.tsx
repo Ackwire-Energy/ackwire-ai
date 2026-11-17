@@ -40,6 +40,30 @@ test("the closed island ends in 'Ver', which opens the message where it happened
   expect(island.get().items.map((i) => i.n.id)).toEqual([]);
 });
 
+test("in a workspace being deleted the open island takes no answer: its quick reply's place says why", async () => {
+  const opened = async (state: ReturnType<typeof seedState>) => {
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await act(async () => island.arrive(reply));
+    await settle(3);
+    await act(async () => fireEvent.click(document.querySelector(".ni__pill") as HTMLElement));
+    await settle(3);
+    return document.querySelector(".ni__item") as HTMLElement;
+  };
+  expect(within(await opened(seedState())).getByRole("button", { name: "Responder" })).toBeTruthy();
+  cleanup();
+  island.clear();
+
+  const state = seedState();
+  for (const org of state.me?.organizations ?? [])
+    org.deletion = { dueAt: new Date(Date.now() + 6 * 86_400_000).toISOString(), requestedAt: null, requestedBy: null };
+  const row = await opened(state);
+  expect(within(row).queryByRole("button", { name: "Responder" })).toBeNull();
+  expect(within(row).getByRole("status").textContent).toBe(
+    "Você não pode enviar mensagens enquanto este workspace está sendo apagado",
+  );
+  await act(async () => island.clear());
+});
+
 test("over a thread open in the panel the island stays in reach: its 'Ver' is the island's, never the panel's", async () => {
   const state = seedState();
   state.messages.push({

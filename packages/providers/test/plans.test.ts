@@ -322,9 +322,15 @@ describe("a model OpenCode refused for the key, and what Automático runs instea
   const at = new Date(now - 60_000).toISOString();
   const off = { "minimax-m3": { at, off: true as const } };
 
-  test("off holds like the region does, then a turn asks again", () => {
+  test("off and the region hold until something changes; no subscription holds half an hour", () => {
     expect(modelLimitOf(off, "minimax-m3", now)).toEqual({ until: null, region: false, off: true, inactive: false });
-    expect(modelLimitOf(off, "minimax-m3", now + 31 * 60_000)).toBeNull();
+    expect(modelLimitOf(off, "minimax-m3", now + 30 * 86_400_000)).toMatchObject({ off: true });
+    const region = { "deepseek-v4-pro": { at, region: true as const } };
+    expect(modelLimitOf(region, "deepseek-v4-pro", now + 30 * 86_400_000)).toMatchObject({ region: true });
+    const inactive = { "minimax-m3": { at, inactive: true as const } };
+    expect(modelLimitOf(inactive, "minimax-m3", now + 31 * 60_000)).toBeNull();
+    const reset = { "glm-5.3": { at, until: new Date(now + 60_000).toISOString() } };
+    expect(modelLimitOf(reset, "glm-5.3", now + 120_000)).toBeNull();
   });
 
   test("a 403 in Claude Code's words, and nothing else, is the plan refusing", () => {
@@ -350,13 +356,33 @@ describe("a model OpenCode refused for the key, and what Automático runs instea
     expect(autoPlanModel("opencode", "auto", usage, now)).toBe("deepseek-v4.1-flash");
     // Its own model answers: it stays.
     expect(autoPlanModel("opencode", "haiku", usage, now)).toBe("haiku");
-    // Nothing known to answer, or that one held too: it stays, for its refusal to say so.
-    expect(autoPlanModel("opencode", "sonnet", { models: off }, now)).toBe("sonnet");
+    // Nothing known to answer, or that one held too: the plan's first tagged model that needs nothing and isn't held.
+    expect(autoPlanModel("opencode", "sonnet", { models: off }, now)).toBe("glm-5.3");
     const both = { ...off, "deepseek-v4.1-flash": { at, off: true as const } };
-    expect(autoPlanModel("opencode", "sonnet", { models: both, answered: "deepseek-v4.1-flash" }, now)).toBe("sonnet");
-    // A model no longer on the plan, and plans whose models share the account's limits, stay as they are.
-    expect(autoPlanModel("opencode", "sonnet", { models: off, answered: "gone-model" }, now)).toBe("sonnet");
+    expect(autoPlanModel("opencode", "sonnet", { models: both, answered: "deepseek-v4.1-flash" }, now)).toBe("glm-5.3");
+    const more = { ...both, "glm-5.3": { at, off: true as const } };
+    expect(autoPlanModel("opencode", "sonnet", { models: more }, now)).toBe("glm-5.3-flash");
+    expect(autoPlanModel("opencode", "sonnet", { models: off, answered: "gone-model" }, now)).toBe("glm-5.3");
+    // Every tagged model refused: the alias stays, for its refusal to say so.
+    const tagged = models("opencode").filter((m) => m.tag);
+    const all = { ...off, ...Object.fromEntries(tagged.map((m) => [m.id, { at, off: true as const }])) };
+    expect(autoPlanModel("opencode", "sonnet", { models: all }, now)).toBe("sonnet");
+    // Plans whose models share the account's limits stay as they are.
     expect(autoPlanModel("zai", "sonnet", usage, now)).toBe("sonnet");
+  });
+
+  test("DeepSeek reads text only, from the table and from the live list", () => {
+    const go = models("opencode");
+    expect(go.find((m) => m.id === "deepseek-v4.1-flash")?.images).toBe(false);
+    expect(go.find((m) => m.id === "glm-5.3")?.images).toBeUndefined();
+    const read = readPlanModels(CODING_PLANS.opencode, {
+      data: [
+        { id: "deepseek-v5", name: "DeepSeek V5", type: "chat", canonical_id: "deepseek/deepseek-v5" },
+        { id: "glm-6", name: "GLM-6", type: "chat", canonical_id: "zhipuai/glm-6" },
+      ],
+    });
+    expect(read.find((m) => m.id === "deepseek-v5")?.images).toBe(false);
+    expect(read.find((m) => m.id === "glm-6")?.images).toBeUndefined();
   });
 });
 

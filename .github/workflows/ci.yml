@@ -37,9 +37,9 @@ permissions:
   contents: read
 
 env:
-  APP_IMAGE: ghcr.io/agentes-chat/agentes
-  BACKUP_IMAGE: ghcr.io/agentes-chat/backup
-  SPEECH_IMAGE: ghcr.io/agentes-chat/speech
+  APP_IMAGE: ghcr.io/ackwire-energy/agentes
+  BACKUP_IMAGE: ghcr.io/ackwire-energy/backup
+  SPEECH_IMAGE: ghcr.io/ackwire-energy/speech
 
 # A newer push supersedes a running check of the same branch or pull request (on main only the newest
 # commit's image matters); a release tag's run is never cancelled. A pull request's runs and a manual run
@@ -103,8 +103,10 @@ jobs:
             backend:
               - "apps/server/**"
               - "install.sh"
+            # The layout check runs in the web tests' job, so a change to its rules alone must run that job too.
             web:
               - "apps/web/**"
+              - "scripts/geometry/**"
             mobile:
               - "apps/mobile/**"
             desktop:
@@ -310,7 +312,7 @@ jobs:
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
     runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-latest' }}
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
       WEB: ${{ needs.changes.outputs.web }}
@@ -341,7 +343,7 @@ jobs:
       # app's CSS order and the reverse one (cascadeorder).
       - name: Geometry (the layout rules on every screen the tests reach)
         if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
-        timeout-minutes: 12
+        timeout-minutes: 35
         run: GEOMETRY_BROWSERS=$(nproc) bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
@@ -405,7 +407,7 @@ jobs:
             install -m 755 /dev/null "src-tauri/binaries/$bin-x86_64-unknown-linux-gnu"
           done
           bun scripts/icons.ts
-          bun run tauri icon app-icon.png
+          bun run tauri icon app-icon-tile.png
       - name: Rust tests
         working-directory: apps/desktop/src-tauri
         run: cargo test
@@ -417,14 +419,15 @@ jobs:
   secrets:
     name: Secret scan and boundaries
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # main's whole-history scan passed 4.5 minutes on 2026-11-13 and grows with every migration snapshot.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       # Bun first: the boundaries check below still runs when the scan fails.
       - *setup-bun
-      # main and a release tag scan the whole history (about two minutes); a branch or a pull request scans the
+      # main and a release tag scan the whole history (about five minutes); a branch or a pull request scans the
       # commits it adds to main, which main's own runs have already scanned up to there.
       - name: Secret scan
         env:
@@ -747,7 +750,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release view "$TAG" > /dev/null 2>&1 ||
-            gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
+            gh release create "$TAG" --verify-tag --title "Ackwire AI ${TAG#v}" --generate-notes
           gh release upload "$TAG" install.sh --clobber
 
   # A version tag's release also carries agentes.chat without Docker (ADR 0060 §2): one package per

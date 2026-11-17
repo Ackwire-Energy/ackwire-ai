@@ -26,6 +26,8 @@ export interface HaveItem {
   whose: string;
   /** Its group, by owner: `mine`, `keys`, or another owner's key. */
   group: { key: string; label: string };
+  /** Its AI (Claude, ChatGPT…, or the API keys): its group in a list by AI (`HaveList.byAi`). */
+  ai?: { key: string; label: string };
   mark: ReactNode;
   /** Its plan's limits; null where nothing says (a key). */
   usage: PlanUsage | null;
@@ -92,7 +94,7 @@ function itemOf(t: TFunction, r: ExistingAi, agentName: string, dims: (choice: P
       about: keyLine(t, r.key),
       whose: t("connectAi.chat.keys"),
       group: { key: "keys", label: t("connectAi.chat.keys") },
-      mark: <Icon name="key" size={16} className="arrival-have__mark" />,
+      mark: <Icon name="key" size={20} className="arrival-have__mark" />,
       usage: null,
       isKey: true,
     };
@@ -119,8 +121,9 @@ function itemOf(t: TFunction, r: ExistingAi, agentName: string, dims: (choice: P
 }
 
 /**
- * One row. In a list (`RadioGroup`) its radio picks it; `still`: the one in use, shown alone with its dot, nothing to
- * pick. `whose`: it says whose it is instead of the line about it (a list of mixed owners).
+ * One row. In a list (`RadioGroup`) it is a radio, its border alone marking the one picked (no dot); `still`: the one
+ * in use, shown alone, nothing to pick. `whose`: it says whose it is instead of the line about it (a list of mixed
+ * owners).
  */
 export function HaveRow({
   item,
@@ -174,9 +177,6 @@ export function HaveRow({
   if (still) {
     return (
       <div className="arrival-have__row" data-state="checked" data-still="">
-        <span className="ac-radio" data-state="checked" aria-hidden="true">
-          <span className="ac-radio__dot" data-state="checked" />
-        </span>
         {body}
       </div>
     );
@@ -195,9 +195,26 @@ export function HaveRow({
 }
 
 /**
+ * A plan that can't be picked now, with why and its way out (`why`). Only its mark and name are dimmed: the reason
+ * and its link stay readable.
+ */
+export function HaveOffRow({ item, why }: { item: Pick<HaveItem, "title" | "mark">; why: ReactNode }) {
+  return (
+    <div className="arrival-have__row" data-disabled="" data-why="">
+      {item.mark}
+      <span className="arrival-have__text">
+        <span className="arrival-have__title">{item.title}</span>
+        <span className="arrival-have__why">{why}</span>
+      </span>
+    </div>
+  );
+}
+
+/**
  * Rows to pick one from (`HaveItem`): few are grouped (the person's, the workspace's keys, each other owner's); many
  * show the three with most room, each saying whose it is, and `all` lists every one under a search, by owner, those at
- * their limit last. `pinned`: a group over the rest whatever their number (the one in use), never in `all`.
+ * their limit last. `byAi`: those groups go by AI instead of by owner. `pinned`: a group over the rest whatever their
+ * number (the one in use), never in `all`.
  */
 export function HaveList({
   items,
@@ -208,6 +225,7 @@ export function HaveList({
   disabled = false,
   pinned,
   label,
+  byAi = false,
 }: {
   items: readonly HaveItem[];
   value: string | undefined;
@@ -217,6 +235,8 @@ export function HaveList({
   disabled?: boolean;
   pinned?: { label: string; items: readonly HaveItem[] };
   label: string;
+  /** Its groups by AI (Claude, ChatGPT…, the API keys last) instead of by owner, a row with nothing more to say saying whose it is. */
+  byAi?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
@@ -235,6 +255,12 @@ export function HaveList({
       else out.push({ key, label, rows: [i] });
     };
     const open = all ? list.filter((i) => !limited(i)) : list;
+    if (byAi) {
+      for (const i of open) if (i.ai && !i.isKey) into(i.ai.key, i.ai.label, i);
+      for (const i of open) if (!i.ai || i.isKey) into(i.ai?.key ?? i.group.key, i.ai?.label ?? i.group.label, i);
+      if (all) for (const i of list.filter(limited)) into("limit", t("connectAi.chat.atLimit"), i);
+      return out;
+    }
     for (const i of open) if (i.group.key === "mine") into(i.group.key, i.group.label, i);
     for (const i of open) if (i.group.key === "keys") into(i.group.key, i.group.label, i);
     for (const i of open) if (i.group.key !== "mine" && i.group.key !== "keys") into(i.group.key, i.group.label, i);
@@ -246,7 +272,7 @@ export function HaveList({
       {groups().map((g) => (
         <Fragment key={g.key}>
           <p className="arrival-opts__label">{g.label}</p>
-          {g.rows.map((i) => row(i, g.key === "limit"))}
+          {g.rows.map((i) => row(i, g.key === "limit" || (byAi && !i.about)))}
         </Fragment>
       ))}
     </>

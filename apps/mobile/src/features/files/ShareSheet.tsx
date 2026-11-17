@@ -1,4 +1,4 @@
-import { type ArtifactSharing, useArtifact, useRoles, useSetArtifactSharing } from "@agenteschat/client";
+import { ApiError, type ArtifactSharing, useArtifact, useRoles, useSetArtifactSharing } from "@agenteschat/client";
 import { CONVERSATION_ONLY, isPrivateArtifact, toggledSharing } from "@agenteschat/client/lib/drive";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
@@ -6,10 +6,11 @@ import { filePath } from "@agenteschat/client/lib/message-links";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
 import {
   Button,
+  EmptyState,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -17,15 +18,17 @@ import {
   Icon,
   type IconName,
   Locked,
+  RoleMark,
   SheetScreen,
+  SkeletonList,
   Text,
   textLineOf,
   useToast,
 } from "@/ui";
 import { useFontScale } from "@/ui/text-scale";
 import { leadBox } from "@/ui/type-scale";
-import { RoleMark } from "../dashboards/parts";
 import { Face } from "../shared/Face";
+import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { copyText, successHaptic } from "../shared/parts";
@@ -64,11 +67,14 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
   const a = query.data;
   if (!a) {
     return (
-      <SheetScreen fit>
-        {query.isError ? (
-          <Text tone="muted">{t("errors.artifact.notFound")}</Text>
+      // The rows' shape while the file's details come; a file that's gone says so, a failure offers to try again.
+      <SheetScreen>
+        {query.error instanceof ApiError && query.error.status === 404 ? (
+          <EmptyState size="inline" icon="file" title={t("errors.artifact.notFound")} />
+        ) : query.isError ? (
+          <LoadFailed onRetry={() => void query.refetch()} />
         ) : (
-          <ActivityIndicator color={c.faint} />
+          <SkeletonList rows={4} />
         )}
       </SheetScreen>
     );
@@ -104,7 +110,7 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
     if (await copyText(`${serverUrl().replace(/\/+$/, "")}${filePath(orgId, a.id)}`)) {
       successHaptic();
       toast({ title: t("share.copied"), icon: "link" });
-    }
+    } else toast({ title: t("mobile.app.failed"), icon: "x" });
   };
   const aud = a.audience;
   const where =
@@ -168,7 +174,7 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
                   key={r.id}
                   label={r.name}
                   sub={t("share.role")}
-                  leading={<RoleMark color={r.color} size={22} />}
+                  leading={<RoleMark color={r.color} icon={r.icon} size={22} />}
                   checked={listed.roleIds.includes(r.id)}
                   onPress={() => toggle("role", r.id)}
                 />
@@ -218,7 +224,9 @@ export function FileShareSheet({ id, onClose }: { id: string; onClose: () => voi
                     key={roleId}
                     label={name}
                     sub={t("share.role")}
-                    {...(r ? { leading: <RoleMark color={r.color} size={22} /> } : { icon: "members" as const })}
+                    {...(r
+                      ? { leading: <RoleMark color={r.color} icon={r.icon} size={22} /> }
+                      : { icon: "members" as const })}
                     {...(canShare
                       ? { remove: { label: t("share.remove", { name }), onPress: () => toggle("role", roleId) } }
                       : {})}

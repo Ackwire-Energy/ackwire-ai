@@ -25,9 +25,10 @@ import {
   useRuleDescribe,
   useRuleParse,
 } from "@agenteschat/client";
-import { approvalTitle, ownActionName } from "@agenteschat/client/lib/approval-words";
+import { approvalTitle, ownActionName, routineVaultKey, splitOwnActions } from "@agenteschat/client/lib/approval-words";
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { FIELD_LIMITS } from "@agenteschat/client/lib/field-limits";
 import { formatBytes } from "@agenteschat/client/lib/files";
 import {
   capitalize,
@@ -95,12 +96,16 @@ import {
   FilterBar,
   FilterChip,
   GroupHeading,
+  HintLine,
   Icon,
   type IconName,
   InfoHint,
   Input,
+  LimitLine,
   Locked,
+  limitShown,
   Menu,
+  overLimit,
   PageHeader,
   RecurrencePicker,
   type RecurrenceRule,
@@ -155,6 +160,7 @@ import { ZoneSelect } from "@/components/ZoneSelect";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
+import { useTextLimit } from "@/hooks/useTextLimit";
 import { copyText, type MenuEntry } from "@/lib/context-menu";
 import { entityMenu } from "@/lib/entity-menu";
 import { lookOf } from "@/lib/look";
@@ -414,7 +420,12 @@ export function RoutinesPage() {
         )}
         {list.length > 0 && (
           <>
-            <RoutineHorizon routines={list} now={now} onOpen={toggleOpen} />
+            <RoutineHorizon
+              routines={list}
+              now={now}
+              picked={agents}
+              onPick={(id) => setAgents(agents.length === 1 && agents[0] === `agent:${id}` ? [] : [`agent:${id}`])}
+            />
             <Toolbar
               search={
                 <SearchField
@@ -888,7 +899,7 @@ function RoutineRow({
     >
       <span className="routine-row__who">{actors.avatar(agent, "sm")}</span>
       <div className="routine-row__main">
-        <button type="button" className="routine-row__title" title={r.name} aria-expanded={selected} onClick={onOpen}>
+        <button type="button" className="routine-row__title" title={title} aria-expanded={selected} onClick={onOpen}>
           {title}
         </button>
         <span className="routine-row__sub">
@@ -1035,17 +1046,32 @@ function RoutineRow({
   );
 }
 
+/** How many agents the horizon shows on the page; the others are in "Mostrar todos". */
+const HORIZON_AGENTS = 5;
+
 /**
- * The next hours as a horizon: one lane per scheduled routine, its recent runs
- * as pixel columns, the next run as the agent's sprite on the line, "agora" as
- * a dotted pixel line. Future slots come from the calendar range (the server's
- * schedule math).
+ * The next hours as a horizon: one lane per agent, so its height doesn't grow with the number of routines. A lane
+ * has the recent runs of all of the agent's routines as pixel columns and the next one as the agent's sprite on the
+ * line, with its name beside it; "agora" is a dotted pixel line. The agents that run soonest come first, the ones
+ * with nothing in the window have no lane, and past `HORIZON_AGENTS` the rest opens in a dialog. A lane's label
+ * filters the list below by its agent. Future slots come from the calendar range (the server's schedule math).
  */
-function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: Date; onOpen: (id: string) => void }) {
+function RoutineHorizon({
+  routines,
+  now,
+  picked,
+  onPick,
+}: {
+  routines: Routine[];
+  now: Date;
+  picked: string[];
+  onPick: (agentId: string) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
   const look = useLook();
-  const words = useRunWords();
+  const actors = useActors();
+  const [all, setAll] = useState(false);
   // The window moves with the minute; the slots are asked once per hour (the calendar caches by start).
   const hour = Math.floor(now.getTime() / 3_600_000);
   const range = useMemo(() => {
@@ -1055,16 +1081,47 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
   const slots = useCalendar(org.id, range.from, range.to);
   const from = new Date(now.getTime() - HORIZON_BACK);
   const to = new Date(now.getTime() + HORIZON_AHEAD);
-  const lanes = routines.filter((r) => r.active && !isDoneOnce(r) && !isEventDriven(r));
-  if (lanes.length === 0) return null;
+  const scheduled = routines.filter((r) => r.active && !isDoneOnce(r) && !isEventDriven(r));
+  if (scheduled.length === 0) return null;
+  const time = (iso: string) => new Date(iso).getTime();
   const futureOf = (r: Routine) => {
     const at = (slots.data?.routines ?? [])
       .filter((s) => s.routineId === r.id && new Date(s.at) > now && new Date(s.at) <= to)
       .map((s) => s.at);
     // Before the calendar answers, the next run alone.
     if (at.length === 0 && r.nextRunAt && new Date(r.nextRunAt) <= to) return [r.nextRunAt];
-    return at.sort();
+    return at.sort((x, y) => time(x) - time(y));
   };
+  const byAgent = new Map<string, Routine[]>();
+  for (const r of scheduled) byAgent.set(r.agentId, [...(byAgent.get(r.agentId) ?? []), r]);
+  const agents = [...byAgent].map(([agentId, mine]) => {
+    const nexts = mine
+      .flatMap((r) => {
+        const at = futureOf(r)[0];
+        return at ? [{ routine: r, at }] : [];
+      })
+      .sort((x, y) => time(x.at) - time(y.at));
+    return {
+      agentId,
+      mine,
+      nexts,
+      running: mine.some(isRunning),
+      future: mine.flatMap(futureOf).sort((x, y) => time(x) - time(y)),
+      // Runs in the same minute share a column: a failed one is drawn last, so it shows.
+      past: mine
+        .flatMap((r) => runPixels(r.recentRuns).filter((x) => new Date(x.at) >= from && new Date(x.at) <= now))
+        .sort((x, y) => Number(x.status === "failed") - Number(y.status === "failed")),
+    };
+  });
+  // What is at work, then what runs soonest; an agent with nothing in the window has no lane.
+  const order = (a: (typeof agents)[number]) => (a.running ? 0 : a.nexts[0] ? time(a.nexts[0].at) : Infinity);
+  const live = agents
+    .filter((a) => a.running || a.future.length > 0 || a.past.length > 0)
+    .sort((x, y) => order(x) - order(y));
+  const idle = agents.length - live.length;
+  const hidden = Math.max(0, live.length - HORIZON_AGENTS);
+  const later = scheduled.filter((r) => futureOf(r).length === 0).length;
+  const hours = HORIZON_AHEAD / 3_600_000;
   const pos = (d: Date) => ((d.getTime() - from.getTime()) / (to.getTime() - from.getTime())) * 100;
   const scale: { at: Date; label: string; day: boolean }[] = [];
   const first = new Date(from);
@@ -1082,94 +1139,140 @@ function RoutineHorizon({ routines, now, onOpen }: { routines: Routine[]; now: D
         : formatTime(i18n.language, d.toISOString()),
     });
   }
-  const timeOf = (iso: string) => formatTime(i18n.language, iso);
-  const later = lanes.filter((r) => futureOf(r).length === 0).length;
   const nowAt = pos(now);
+  const sub = [
+    t("routines.horizon.lanes", { count: scheduled.length }),
+    ...(later > 0 ? [t("routines.horizon.later", { count: later })] : []),
+  ].join(" · ");
+  const rest = [
+    ...(hidden > 0 ? [t("routines.horizon.restLater", { count: hidden })] : []),
+    ...(idle > 0 ? [t("routines.horizon.restIdle", { count: idle, hours })] : []),
+  ].join(" · ");
+  const body = (list: typeof live, pick: (agentId: string) => void) => (
+    <div className="routines-horizon__body" style={{ "--now-k": nowAt / 100 } as CSSProperties}>
+      <span />
+      <div className="routines-horizon__scale" aria-hidden="true">
+        {scale.map((s) => (
+          <span key={s.at.getTime()} style={{ left: `${pos(s.at)}%` }} className={cx(s.day && "is-day")}>
+            {s.label}
+          </span>
+        ))}
+      </div>
+      {list.map((a) => {
+        const next = a.nexts[0];
+        const name = actors.name({ type: "agent", id: a.agentId });
+        const { color, eyes } = look(a.agentId);
+        const soon = next && time(next.at) - now.getTime() < 3_600_000;
+        // The routines that run with the first one (within half an hour of it) are counted beside its name.
+        const together = next ? a.nexts.filter((x) => time(x.at) - time(next.at) < 1_800_000).length - 1 : 0;
+        const on = picked.includes(`agent:${a.agentId}`);
+        const at = next ? pos(new Date(next.at)) : 0;
+        return (
+          <div className={cx("routines-horizon__lane", on && "is-on")} key={a.agentId}>
+            <button
+              type="button"
+              className="routines-horizon__label ac-iconline"
+              aria-pressed={on}
+              title={t("routines.horizon.pick", { name })}
+              onClick={() => pick(a.agentId)}
+            >
+              <AgentFace agentId={a.agentId} />
+              <b>{name}</b>
+              <small>{t("routines.horizon.agentRoutines", { count: a.mine.length })}</small>
+            </button>
+            <div
+              className="routines-horizon__track"
+              role="img"
+              aria-label={
+                next
+                  ? t("routines.horizon.lane", { name, when: whenAt(t, i18n.language, next.at) })
+                  : t("routines.horizon.laneNone", { name })
+              }
+            >
+              <RunLane
+                from={from}
+                to={to}
+                now={now}
+                color={color}
+                eyes={eyes}
+                running={a.running}
+                past={a.past}
+                future={a.future}
+              />
+              {next && !a.running && (
+                <span
+                  className={cx("routines-horizon__next", soon && "is-soon", at > 60 && "is-before")}
+                  style={{ left: `max(${at}%, calc(${nowAt}% + 12px))` }}
+                >
+                  {soon
+                    ? t("format.inMinutes", {
+                        count: Math.max(1, Math.floor((time(next.at) - now.getTime()) / 60_000)),
+                      })
+                    : formatTime(i18n.language, next.at)}
+                  <i>
+                    {" · "}
+                    {together > 0
+                      ? t("routines.horizon.andMore", { name: routineTitle(next.routine), count: together })
+                      : routineTitle(next.routine)}
+                  </i>
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <span className="routines-horizon__past" aria-hidden="true" />
+      <span className="routines-horizon__now" aria-hidden="true">
+        <span>{t("routines.horizon.now")}</span>
+      </span>
+    </div>
+  );
+  const legend = (
+    <span className="routines-horizon__legend" aria-hidden="true">
+      {(["ok", "silent", "failed", "next"] as const).map((k) => (
+        <span key={k}>
+          <RunKey status={k} />
+          {t(`routines.horizon.legend.${k}`)}
+        </span>
+      ))}
+    </span>
+  );
   return (
     <section className="routines-horizon" aria-label={t("routines.horizon.label")}>
       <div className="routines-horizon__head">
-        <h2>{t("routines.horizon.title", { count: HORIZON_AHEAD / 3_600_000 })}</h2>
-        <span className="routines-horizon__sub">
-          {t("routines.horizon.lanes", { count: lanes.length })}
-          {later > 0 && ` · ${t("routines.horizon.later", { count: later })}`}
-        </span>
-        <span className="routines-horizon__legend" aria-hidden="true">
-          {(["ok", "silent", "failed", "next"] as const).map((k) => (
-            <span key={k}>
-              <RunKey status={k} />
-              {t(`routines.horizon.legend.${k}`)}
-            </span>
-          ))}
-        </span>
+        <h2>{t("routines.horizon.title", { count: hours })}</h2>
+        <span className="routines-horizon__sub">{sub}</span>
+        {legend}
       </div>
-      <div className="routines-horizon__body" style={{ "--now-k": nowAt / 100 } as CSSProperties}>
-        <span />
-        <div className="routines-horizon__scale" aria-hidden="true">
-          {scale.map((s) => (
-            <span key={s.at.getTime()} style={{ left: `${pos(s.at)}%` }} className={cx(s.day && "is-day")}>
-              {s.label}
-            </span>
-          ))}
+      {body(live.slice(0, HORIZON_AGENTS), onPick)}
+      {rest && (
+        <div className="routines-horizon__rest">
+          <span>{capitalize(rest, i18n.language)}</span>
+          {hidden > 0 && (
+            <Button size="sm" variant="ghost" onClick={() => setAll(true)}>
+              {t("routines.horizon.showAll")}
+            </Button>
+          )}
         </div>
-        {lanes.map((r) => {
-          const future = futureOf(r);
-          const next = future[0];
-          const soon = next && new Date(next).getTime() - now.getTime() < 3_600_000;
-          const hourly = r.trigger.type === "schedule" && r.trigger.rule?.freq === "hourly";
-          const { color, eyes } = look(r.agentId);
-          const title = routineTitle(r);
-          return (
-            <div className="routines-horizon__lane" key={r.id}>
-              <button
-                type="button"
-                className="routines-horizon__label ac-iconline"
-                title={title}
-                onClick={() => onOpen(r.id)}
-              >
-                <AgentFace agentId={r.agentId} />
-                <b>{title}</b>
-              </button>
-              <div
-                className="routines-horizon__track"
-                role="img"
-                aria-label={
-                  next
-                    ? t("routines.horizon.lane", { name: title, when: whenAt(t, i18n.language, next) })
-                    : t("routines.horizon.laneNone", { name: title })
-                }
-                title={words.label(r)}
-              >
-                <RunLane
-                  from={from}
-                  to={to}
-                  now={now}
-                  color={color}
-                  eyes={eyes}
-                  running={isRunning(r)}
-                  past={runPixels(r.recentRuns).filter((x) => new Date(x.at) >= from && new Date(x.at) <= now)}
-                  future={future}
-                />
-                {next && !isRunning(r) && (!hourly || soon) && (
-                  <span
-                    className={cx("routines-horizon__next", soon && "is-soon")}
-                    style={{ left: `max(${pos(new Date(next))}%, calc(${nowAt}% + 12px))` }}
-                  >
-                    {soon
-                      ? t("format.inMinutes", {
-                          count: Math.max(1, Math.floor((new Date(next).getTime() - now.getTime()) / 60_000)),
-                        })
-                      : timeOf(next)}
-                  </span>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        <span className="routines-horizon__past" aria-hidden="true" />
-        <span className="routines-horizon__now" aria-hidden="true">
-          <span>{t("routines.horizon.now")}</span>
-        </span>
-      </div>
+      )}
+      <Dialog
+        open={all}
+        onOpenChange={setAll}
+        title={t("routines.horizon.title", { count: hours })}
+        description={sub}
+        closeLabel={t("common.close")}
+        width={920}
+      >
+        <DialogBody>
+          <div className="routines-horizon routines-horizon--plain">
+            <div className="routines-horizon__head">{legend}</div>
+            {body(live, (agentId) => {
+              setAll(false);
+              onPick(agentId);
+            })}
+          </div>
+        </DialogBody>
+      </Dialog>
     </section>
   );
 }
@@ -1362,6 +1465,7 @@ function RoutineDetails({ routine: r, now, onClose }: { routine: Routine; now: D
                 <OwnActions routine={r} />
               </DetailsSection>
             )}
+            {r.canSeeDetails && <VaultKeys routine={r} />}
             <DetailsSection title={t("routines.panel.nexts")}>
               {mailTrouble(r) && (
                 <Chip icon="alert" tone="waiting">
@@ -1541,6 +1645,7 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
   const ref = useFocusAtEnd<HTMLTextAreaElement>(draft !== null);
   // As tall as its text where the engine can't size it from CSS (`field-sizing`, which the Mac app's WebKit lacks).
   useAutoGrow(ref, draft ?? "", draft !== null);
+  const limit = useTextLimit(FIELD_LIMITS.routinePrompt);
   if (!r.canSeeDetails || r.prompt === null) return <p className="small muted">{t("routines.detailsHidden")}</p>;
   if (isWidgetRoutine(r))
     return (
@@ -1551,7 +1656,8 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
     );
   if (!r.canManage) return <p className="routine-details__prompt">{prompt}</p>;
   const save = () => {
-    if (draft === null) return;
+    // Past its limit it stays open, the line under it saying so: nothing is saved cut.
+    if (draft === null || overLimit(draft, limit)) return;
     const next = draft.trim();
     setDraft(null);
     if (!next || next === prompt.trim()) return;
@@ -1576,7 +1682,8 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
             className="issue-new__text routine-prompt__text"
             rows={8}
             value={draft}
-            maxLength={10_000}
+            aria-invalid={overLimit(draft, limit) || undefined}
+            aria-describedby={limitShown(draft, limit) ? `routine-prompt-${r.id}-limit` : undefined}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={save}
             onKeyDown={(e) => {
@@ -1588,6 +1695,7 @@ function RoutinePrompt({ routine: r, onSaved }: { routine: Routine; onSaved: () 
             aria-label={t("routines.form.what")}
           />
         </div>
+        <LimitLine id={`routine-prompt-${r.id}-limit`} value={draft} limit={limit} />
         <p className="issue-new__hint small muted">{t("issues.edit.hint")}</p>
         <RoutineReachWarnings prompt={draft} agentId={r.agentId} creatorUserId={r.createdByUserId} />
       </>
@@ -2002,7 +2110,9 @@ function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun
       <LoadingList count={1} avatar={false} />
     );
   }
-  const busy = (what: "address" | "secret" | "unsign" | "test") => action.isPending && action.variables === what;
+  const busy = (what: "address" | "secret" | "unsign" | "test" | "onAndTest") =>
+    action.isPending && action.variables === what;
+  const test = r.active ? "test" : "onAndTest";
   const change = (what: "address" | "secret" | "unsign") =>
     action.mutate(what, {
       onSuccess: (done) => {
@@ -2097,10 +2207,11 @@ function WebhookPanel({ routine: r, runs }: { routine: Routine; runs: RoutineRun
             type="button"
             size="sm"
             icon="send"
-            loading={busy("test")}
-            onClick={() => action.mutate("test", { onSuccess: () => toast.show(t("routines.webhook.tested")) })}
+            disabled={action.isPending}
+            loading={busy(test)}
+            onClick={() => action.mutate(test, { onSuccess: () => toast.show(t("routines.webhook.tested")) })}
           >
-            {t("routines.webhook.test")}
+            {t(r.active ? "routines.webhook.test" : "routines.webhook.turnOnAndTest")}
           </Button>
         </div>
       </div>
@@ -2299,6 +2410,7 @@ function RoutineDialog({
   const [agentId, setAgentId] = useState(routine?.agentId ?? "");
   const [target, setTarget] = useState(targetChoice(routine?.target));
   const [prompt, setPrompt] = useState(routine?.prompt ?? "");
+  const promptLimit = useTextLimit(FIELD_LIMITS.routinePrompt);
   const [name, setName] = useState(routine?.name ?? "");
   // The starting point picked, and one waiting for the person's ok to write over their words.
   const [template, setTemplate] = useState<RoutineTemplateOption>();
@@ -2505,7 +2617,7 @@ function RoutineDialog({
   };
   const submit = () => {
     setTouched(true);
-    if ((!part && !prompt.trim()) || unfilled || !agentId || !scheduleOk) return;
+    if ((!part && !prompt.trim()) || unfilled || overLimit(prompt, promptLimit) || !agentId || !scheduleOk) return;
     if (routine) {
       const all = changes(routine);
       // A part sends only its own fields (a prompt stored with spaces around it is not a change of "Quando").
@@ -2635,6 +2747,7 @@ function RoutineDialog({
                   <Textarea
                     rows={3}
                     value={prompt}
+                    limit={promptLimit}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder={t("routines.form.whatPlaceholder")}
                   />
@@ -2672,7 +2785,12 @@ function RoutineDialog({
                   ) : (
                     <p className="routine-note small ac-iconline">
                       <Icon name="link" size={14} />
-                      <span>{t("routines.webhook.newNote")}</span>
+                      <HintLine
+                        name={t("common.about", { label: t("routines.webhook.address") })}
+                        hint={t("routines.webhook.newNote")}
+                      >
+                        {t("routines.webhook.newShort")}
+                      </HintLine>
                     </p>
                   ))}
                 {kind === "schedule" && (
@@ -2683,9 +2801,7 @@ function RoutineDialog({
                       </span>
                       <Button
                         type="button"
-                        size="sm"
-                        variant="ghost"
-                        icon="repeat"
+                        variant="link"
                         aria-expanded={pickerOpen}
                         onClick={() => setPickerOpen((o) => !o)}
                       >
@@ -2789,8 +2905,13 @@ function RoutineDialog({
                   />
                 </Field>
                 <div className="ac-field">
-                  <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
-                  <OwnActions routine={routine} />
+                  <HintLine
+                    name={t("common.about", { label: t("routines.panel.ownActions") })}
+                    hint={t(routine?.ownActions?.length ? "routines.ownActions.hint" : "routines.ownActions.none")}
+                  >
+                    <span className="ac-field__label">{t("routines.panel.ownActions")}</span>
+                  </HintLine>
+                  <OwnActions routine={routine} labelled />
                 </div>
                 <RoutineReachWarnings
                   prompt={prompt}
@@ -2805,7 +2926,12 @@ function RoutineDialog({
           <Button type="button" onClick={onClose}>
             {t("routines.form.cancel")}
           </Button>
-          <Button type="submit" variant="primary" disabled={!agentId || !scheduleOk} loading={action.isPending}>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={!agentId || !scheduleOk || overLimit(prompt, promptLimit)}
+            loading={action.isPending}
+          >
             {editing ? t("routines.form.save") : t("routines.form.create")}
           </Button>
         </DialogFooter>
@@ -2835,12 +2961,32 @@ function RoutineDialog({
 }
 
 /** What a routine does in connected apps without asking (the job its creator set it up for), or that it asks for each. */
-function OwnActions({ routine }: { routine: Routine | undefined }) {
+function OwnActions({
+  routine,
+  labelled = false,
+}: {
+  routine: Routine | undefined;
+  /** Under a field's label, which carries the ⓘ: the short line is words alone, never a control in the field's place. */
+  labelled?: boolean;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const action = useRoutineAction(org.id);
-  const own = routine?.ownActions ?? [];
-  if (own.length === 0) return <p className="small muted">{t("routines.ownActions.none")}</p>;
+  const all = routine?.ownActions ?? [];
+  const own = splitOwnActions(all).apps;
+  const about = t("common.about", { label: t("routines.panel.ownActions") });
+  const line = (short: string, hint: string) => (
+    <p className="small muted">
+      {labelled ? (
+        short
+      ) : (
+        <HintLine name={about} hint={hint}>
+          {short}
+        </HintLine>
+      )}
+    </p>
+  );
+  if (own.length === 0) return line(t("routines.ownActions.noneShort"), t("routines.ownActions.none"));
   return (
     <>
       <ul className="routine-own" aria-label={t("routines.panel.ownActions")}>
@@ -2859,7 +3005,7 @@ function OwnActions({ routine }: { routine: Routine | undefined }) {
                   action.mutate({
                     type: "update",
                     id: routine.id,
-                    patch: { ownActions: own.filter((a) => a !== name) },
+                    patch: { ownActions: all.filter((a) => a !== name) },
                   })
                 }
               />
@@ -2867,8 +3013,47 @@ function OwnActions({ routine }: { routine: Routine | undefined }) {
           </li>
         ))}
       </ul>
-      <p className="small muted">{t("routines.ownActions.hint")}</p>
+      {line(t("routines.ownActions.hintShort"), t("routines.ownActions.hint"))}
     </>
+  );
+}
+
+/** "Chaves do Vault que usa": the keys its commands use without asking, each taken out with its ×. */
+function VaultKeys({ routine }: { routine: Routine }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const action = useRoutineAction(org.id);
+  const all = routine.ownActions ?? [];
+  const keys = splitOwnActions(all).keys;
+  if (keys.length === 0) return null;
+  return (
+    <DetailsSection title={t("routines.vaultKeys.title")}>
+      <ul className="routine-own" aria-label={t("routines.vaultKeys.title")}>
+        {keys.map((key) => (
+          <li key={key}>
+            <code>{key}</code>
+            {routine.canManage && (
+              <Button
+                variant="ghost"
+                size="sm"
+                iconOnly
+                icon="close"
+                aria-label={t("routines.vaultKeys.remove", { key })}
+                disabled={action.isPending}
+                onClick={() =>
+                  action.mutate({
+                    type: "update",
+                    id: routine.id,
+                    patch: { ownActions: all.filter((a) => routineVaultKey(a) !== key) },
+                  })
+                }
+              />
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="small muted">{t("routines.vaultKeys.hint")}</p>
+    </DetailsSection>
   );
 }
 

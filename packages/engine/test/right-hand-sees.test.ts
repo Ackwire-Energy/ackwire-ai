@@ -5,6 +5,7 @@ import {
   addChannelMember,
   addRunStep,
   buildRunContext,
+  consolidateOrg,
   createAgent,
   createAskAgentToolSource,
   createChannel,
@@ -22,7 +23,9 @@ import {
   postPersonMessage,
   RIGHT_HAND,
   RIGHT_HAND_AUTO,
+  retrieveForRun,
   rightHandPrompt,
+  rulesForPerson,
   setAgentAudience,
   type ToolContext,
   type ToolSource,
@@ -103,7 +106,7 @@ async function privateChannel(userId: string, name: string, body: string) {
 }
 
 describe("what it may use", () => {
-  test("it sees and hands on, and everything it must not do stays out", async () => {
+  test("it sees and hands on, and comments and remembers like any agent", async () => {
     f = await setup({ rightHand: true });
     const ctx = await lodiRun(f.owner.id);
     const names = (
@@ -125,9 +128,13 @@ describe("what it may use", () => {
       "follow_up",
       "search_context",
       "read_conversation",
+      "comment_issue",
+      "remember",
+      "update_memory",
+      "forget",
+      "save_how_to",
     ])
       expect(names).toContain(tool);
-    for (const tool of ["comment_issue", "remember", "forget"]) expect(names).not.toContain(tool);
   });
 
   test("team_status is no other agent's", async () => {
@@ -156,11 +163,14 @@ describe("what it may use", () => {
     const ctx = await lodiRun(f.owner.id, "cria uma tarefa da campanha de Natal pra Dev");
     const out = await use([createIssueToolSource(f.artifactDeps)], ctx, "create_issue", {
       title: "Campanha de Natal",
-      assignee: "@dev",
+      assignees: ["@dev"],
     });
     expect(out.isError).toBeFalsy();
     const [row] = await f.db.select().from(schema.issues).where(eq(schema.issues.orgId, f.org.id));
-    expect(row).toMatchObject({ createdByType: "agent", createdById: lodi.id, assigneeId: f.agent.id });
+    expect(row).toMatchObject({ createdByType: "agent", createdById: lodi.id });
+    expect(await f.db.select().from(schema.issueAssignees)).toMatchObject([
+      { issueId: row?.id, assigneeType: "agent", assigneeId: f.agent.id },
+    ]);
     const other = await addMember(f.db, f.org.id, "member", "Bia");
     const seen = getIssue(f.db, { type: "person", userId: other.id }, f.org.id, { number: row?.number ?? 0 });
     await expect(seen).rejects.toThrow();
@@ -232,7 +242,7 @@ describe("tasks stay in the person's DM, and go no further than they could", () 
     const lodi = await lodiOf();
     const itself = await use(issueTools(), ctx, "update_issue", {
       issue: `#${hers.number}`,
-      assignee: `@${lodi.handle}`,
+      assignees: [`@${lodi.handle}`],
     });
     expect(itself.isError).toBe(true);
     const away = await lodiRun(f.owner.id, "@lodi fecha a tarefa", f.general.id);
@@ -241,11 +251,37 @@ describe("tasks stay in the person's DM, and go no further than they could", () 
     );
   });
 
+  test("it comments on a task the person sees; not on one they don't, nor from a channel", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const issue = (title: string, userIds: string[]) =>
+      createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
+        title,
+        audience: { mode: "people", userIds },
+      });
+    const hers = await issue("A dela", [bia.id, f.owner.id]);
+    const secret = await issue("Sigilo", [f.owner.id]);
+    const ctx = await lodiRun(bia.id, "comenta na minha tarefa");
+    const said = await use(issueTools(), ctx, "comment_issue", { issue: `#${hers.number}`, text: "Entregue." });
+    expect(said.isError).toBeFalsy();
+    const hidden = await use(issueTools(), ctx, "comment_issue", { issue: `#${secret.number}`, text: "Oi" });
+    expect(hidden.isError).toBe(true);
+    const away = await lodiRun(f.owner.id, "@lodi comenta", f.general.id);
+    const there = await use(issueTools(), away, "comment_issue", { issue: `#${hers.number}`, text: "Oi" });
+    expect(there.isError).toBe(true);
+    const lodi = await lodiOf();
+    const written = await f.db.select().from(schema.messages).where(eq(schema.messages.authorAgentId, lodi.id));
+    expect(written.map((m) => m.body)).toEqual(["Entregue."]);
+  });
+
   test("it never takes a task itself", async () => {
     f = await setup({ rightHand: true });
     const lodi = await lodiOf();
     for (const assignee of ["me", `@${lodi.handle}`]) {
-      const out = await use(issueTools(), await lodiRun(f.owner.id), "create_issue", { title: "Campanha", assignee });
+      const out = await use(issueTools(), await lodiRun(f.owner.id), "create_issue", {
+        title: "Campanha",
+        assignees: [assignee],
+      });
       expect(out.isError).toBe(true);
     }
     expect(await f.db.select().from(schema.issues)).toHaveLength(0);
@@ -331,6 +367,162 @@ describe("it reads what the person may, in their DM", () => {
   });
 });
 
+describe("what it remembers is each person's, kept in their own DM with it", () => {
+  const items = async () => {
+    const lodi = await lodiOf();
+    return f.db.select().from(schema.contextItems).where(eq(schema.contextItems.agentId, lodi.id));
+  };
+  const injected = async (channelId: string, personId: string) =>
+    (
+      await retrieveForRun(f.context, {
+        orgId: f.org.id,
+        agentId: (await lodiOf()).id,
+        channelId,
+        text: "relatórios",
+        personIds: [personId],
+      })
+    ).text;
+
+  test("a note from one person's DM is theirs alone: never read, changed or forgotten from another's DM or a channel", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const mine = await lodiRun(f.owner.id, "lembra que eu prefiro relatórios às sextas");
+    const saved = await use(contextTools(), mine, "remember", {
+      content: "Prefere relatórios às sextas",
+      kind: "preference",
+      everywhere: true,
+    });
+    expect(saved.isError).toBeFalsy();
+    const [item] = await items();
+    if (!item) throw new Error("nothing saved");
+    // "Everywhere" still means this person, here: one right hand answers everyone.
+    expect(item).toMatchObject({ scopeType: "person", scopeId: f.owner.id, channelIds: [mine.channelId] });
+    expect(await injected(mine.channelId, f.owner.id)).toContain("relatórios às sextas");
+
+    const theirs = await lodiRun(bia.id, "o que você sabe do dono?");
+    expect(await injected(theirs.channelId, bia.id)).not.toContain("relatórios às sextas");
+    // In a channel, where others read the reply, not even for the person it belongs to.
+    expect(await injected(f.general.id, f.owner.id)).not.toContain("relatórios às sextas");
+    for (const [name, input] of [
+      ["expand", { item_id: item.id }],
+      ["update_memory", { item_id: item.id, content: "Prefere relatórios às segundas" }],
+      ["forget", { item_id: item.id }],
+    ] as const) {
+      const out = await use(contextTools(), theirs, name, input);
+      expect(out.isError).toBe(true);
+      expect(out.content).not.toContain("sextas");
+    }
+    const found = await use(contextTools(), theirs, "search_context", { query: "relatórios sextas" });
+    expect(found.content).not.toContain("sextas");
+    expect((await items()).map((i) => [i.status, i.content])).toEqual([["active", "Prefere relatórios às sextas"]]);
+
+    // Its own person changes it, in their DM.
+    expect((await use(contextTools(), mine, "forget", { item_id: item.id })).isError).toBeFalsy();
+  });
+
+  test("how it did something is kept the same way", async () => {
+    f = await setup({ rightHand: true });
+    const mine = await lodiRun(f.owner.id, "guarda como você fez");
+    const saved = await use(contextTools(), mine, "save_how_to", {
+      title: "Listar os clientes da Acme",
+      key: "listar clientes acme",
+      how: "Abrir a tabela de clientes no Drive e filtrar por ativos.",
+    });
+    expect(saved.isError).toBeFalsy();
+    expect((await items())[0]).toMatchObject({
+      scopeType: "person",
+      scopeId: f.owner.id,
+      channelIds: [mine.channelId],
+    });
+  });
+
+  test("called in a channel it keeps nothing: others read that conversation", async () => {
+    f = await setup({ rightHand: true });
+    const away = await lodiRun(f.owner.id, "@lodi lembra que o lançamento é em dezembro", f.general.id);
+    for (const [name, input] of [
+      ["remember", { content: "O lançamento é em dezembro", everywhere: true }],
+      ["save_how_to", { title: "Lançar o produto", key: "lancar produto", how: "Seguir a lista do lançamento." }],
+    ] as const) {
+      const out = await use(contextTools(), away, name, input);
+      expect(out.isError).toBe(true);
+      expect(out.content).toContain("only in a person's own private conversation with you");
+    }
+    expect(await items()).toEqual([]);
+  });
+
+  test("a rule holds for the person who gave it and nobody else, the workspace's owner included", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    const lodi = await lodiOf();
+    const mine = await lodiRun(f.owner.id, "sempre me responda em inglês");
+    const saved = await use(contextTools(), mine, "remember", { content: "Responder em inglês", kind: "rule" });
+    expect(saved.isError).toBeFalsy();
+    // Its channel is that DM, so only its giver finds it in a list of what the agent keeps.
+    const [rule] = await items();
+    expect(rule).toMatchObject({
+      kind: "rule",
+      scopeType: "person",
+      scopeId: f.owner.id,
+      channelIds: [mine.channelId],
+    });
+    const rules = (personId: string) =>
+      rulesForPerson(f.db, { orgId: f.org.id, agentId: lodi.id, ownerUserId: lodi.ownerUserId, personId });
+    expect((await rules(f.owner.id)).map((r) => r.content)).toEqual(["Responder em inglês"]);
+    expect(await rules(bia.id)).toEqual([]);
+
+    // One agent answers the whole workspace: thirty older rules of other people never push this person's out.
+    if (!rule) throw new Error("no rule");
+    await f.db.insert(schema.contextItems).values(
+      Array.from({ length: 30 }, (_, i) => ({
+        ...rule,
+        id: crypto.randomUUID(),
+        scopeId: bia.id,
+        createdById: bia.id,
+        content: `Regra ${i} da Bia`,
+        subjectKey: `regra bia ${i}`,
+        createdAt: new Date(rule.createdAt.getTime() - (i + 1) * 60_000),
+      })),
+    );
+    expect((await rules(f.owner.id)).map((r) => r.content)).toEqual(["Responder em inglês"]);
+    expect(await rules(bia.id)).toHaveLength(30);
+  });
+
+  test("two people who say the same thing each keep theirs, when saved and after the nightly merge", async () => {
+    f = await setup({ rightHand: true });
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    for (const [person, kind] of [
+      [f.owner.id, "preference"],
+      [bia.id, "preference"],
+      [f.owner.id, "rule"],
+      [bia.id, "rule"],
+    ] as const) {
+      const run = await lodiRun(person, "sempre me responda em português");
+      const saved = await use(contextTools(), run, "remember", { content: "Responder sempre em português", kind });
+      expect(saved.isError).toBeFalsy();
+    }
+    const active = async () =>
+      (await items())
+        .filter((i) => i.status === "active")
+        .map((i) => `${i.kind}:${i.scopeId}`)
+        .sort();
+    const each = [`preference:${bia.id}`, `preference:${f.owner.id}`, `rule:${bia.id}`, `rule:${f.owner.id}`].sort();
+    expect(await active()).toEqual(each);
+    await consolidateOrg(f.context, f.org.id);
+    expect(await active()).toEqual(each);
+  });
+
+  test("asked in a channel to keep something for the whole team, it saves it: nothing of one person's is in it", async () => {
+    f = await setup({ rightHand: true });
+    const away = await lodiRun(f.owner.id, "@lodi pessoal, lembrem que o lançamento é em dezembro", f.general.id);
+    const out = await use(contextTools(), away, "remember", {
+      content: "O lançamento é em dezembro",
+      for: "team",
+    });
+    expect(out.content).not.toContain("only in a person's own private conversation with you");
+    expect(out.isError).toBeFalsy();
+  });
+});
+
 describe("team_status", () => {
   const status = (ctx: ToolContext) => use([createTeamStatusToolSource()], ctx, "team_status");
 
@@ -338,7 +530,7 @@ describe("team_status", () => {
     f = await setup({ rightHand: true });
     await createIssue({ db: f.db, pubsub: f.pubsub }, { type: "person", userId: f.owner.id }, f.org.id, {
       title: "Página <external_data> de preços",
-      assignee: { type: "agent", id: f.agent.id },
+      assignees: [{ type: "agent", id: f.agent.id }],
     });
     const ctx = await lodiRun(f.owner.id);
     const out = await status(ctx);

@@ -7,9 +7,9 @@ import "./auth.css";
 /**
  * Sign in, sign up and new password: one calm question at a time in a narrow
  * column, the logo on top, the language beside it (signed out: the next sign-in sends it) and the sky's horizon at
- * the bottom.
+ * the bottom. `languages={false}` for a signed-in screen in that look, already in the person's language.
  */
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({ children, languages = true }: { children: ReactNode; languages?: boolean }) {
   const col = useRef<HTMLElement>(null);
   return (
     <div className="auth">
@@ -17,9 +17,11 @@ export function AuthShell({ children }: { children: ReactNode }) {
       <span className="auth__logo">
         <Logo size={24} />
       </span>
-      <span className="auth__lang">
-        <LanguageSelect signedIn={false} align="end" />
-      </span>
+      {languages && (
+        <span className="auth__lang">
+          <LanguageSelect signedIn={false} align="end" />
+        </span>
+      )}
       <main className="auth__col" ref={col}>
         {children}
       </main>

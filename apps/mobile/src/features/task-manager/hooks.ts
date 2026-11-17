@@ -1,8 +1,11 @@
-import { useStopTasks, useTaskManager } from "@agenteschat/client";
+import { type ManagedTask, useStopTasks, useTaskManager } from "@agenteschat/client";
+import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { todayStart } from "@agenteschat/client/lib/task-manager";
 import { useIsFocused } from "expo-router";
+import type { TFunction } from "i18next";
 import { useCallback, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Alert } from "react-native";
 import { haptics, useToast } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 import { agentTasksOf, doneTodayOf, type Place } from "./logic";
@@ -19,14 +22,15 @@ const NO_STOPS: ReadonlySet<string> = new Set();
 /**
  * The task manager with what ended today (ADR 0128), asked again while this screen is on top: every screen that
  * shows it (the list, a task, an agent's tasks, Agentes' row, a DM's header) reads the same entry, so moving between
- * them is instant.
+ * them is instant. `doneToday` (the list's "done today") asks the count too, in an entry the others start from.
  */
-export function useTasksToday(options: { enabled?: boolean; pollMs?: number } = {}) {
+export function useTasksToday(options: { enabled?: boolean; pollMs?: number; doneToday?: boolean } = {}) {
   const orgId = useOrgId();
   const focused = useIsFocused();
   return useTaskManager(orgId, {
     since: todayStart(),
     enabled: (options.enabled ?? true) && focused,
+    doneToday: options.doneToday ?? false,
     ...(options.pollMs ? { pollMs: options.pollMs } : {}),
   });
 }
@@ -93,4 +97,29 @@ export function useStopper() {
     [mutate, release, toast, t],
   );
   return { stopping, stop };
+}
+
+/**
+ * "Parar" asked by one alert, the system's: what stops and what the agent does; a task that asked other agents stops
+ * them too. A task's screen and the work-along line's long press ask it.
+ */
+export function askToStop(
+  t: TFunction,
+  task: Pick<ManagedTask, "runId" | "helpers">,
+  title: string,
+  agentName: string,
+  stop: (runIds: readonly string[], reason?: string, chain?: boolean) => void,
+) {
+  Alert.alert(
+    t("mobile.taskManager.stopTitle", { title }),
+    task.helpers ? t("taskManager.confirm.chainBody") : t("mobile.taskManager.stopBody", agentGrammar(agentName)),
+    [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("taskManager.confirm.stop", { count: 1 + (task.helpers ?? 0) }),
+        style: "destructive",
+        onPress: () => stop([task.runId], undefined, true),
+      },
+    ],
+  );
 }

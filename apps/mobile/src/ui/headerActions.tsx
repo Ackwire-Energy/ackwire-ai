@@ -11,7 +11,22 @@ import { useTheme } from "./theme";
 /** An SF Symbol name (the bar buttons on iOS). */
 export type SFSymbolName = Extract<NonNullable<SFSymbolIcon["sf"]>, string>;
 
-/** A button in a native header: the system bar button on iOS (glass on iOS 26), our icon button on Android. */
+/** One choice in a bar button's menu (`HeaderAction.menu`). */
+export interface HeaderMenuItem {
+  label: string;
+  /** Our line icon (Android's list of the same choices). */
+  icon: IconName;
+  /** The matching SF Symbol (iOS). */
+  sf: SFSymbolName;
+  onPress: () => void;
+  destructive?: boolean;
+}
+
+/**
+ * A button in a native header: the system bar button on iOS (glass on iOS 26), our icon button on Android. With
+ * `menu`, iOS opens the system's menu from the button itself (above any screen, a modal one included); Android calls
+ * `onPress`, where the screen lists the same choices in the app's sheet.
+ */
 export interface HeaderAction {
   /** Our line icon (Android). */
   icon: IconName;
@@ -19,9 +34,14 @@ export interface HeaderAction {
   sf: SFSymbolName;
   label: string;
   onPress: () => void;
+  /** While what it starts is under way. */
+  disabled?: boolean;
+  menu?: HeaderMenuItem[];
 }
 
 const IOS = Platform.OS === "ios";
+
+type Described = Omit<HeaderAction, "onPress" | "menu"> & { menu?: Omit<HeaderMenuItem, "onPress">[] };
 
 /**
  * Header options for a screen's actions. On iOS the right actions are native `UIBarButtonItem`s
@@ -51,23 +71,49 @@ export function useHeaderActionOptions({
   const leftSlot = useHeaderSlot(left ?? null);
   const hasLeft = left != null;
   const describe = (list: HeaderAction[] | undefined) =>
-    (list ?? []).map(({ icon, sf, label }) => ({ icon, sf, label }));
+    (list ?? []).map(({ icon, sf, label, disabled, menu }) => ({
+      icon,
+      sf,
+      label,
+      disabled,
+      menu: menu?.map(({ label: l, icon: i, sf: s, destructive }) => ({ label: l, icon: i, sf: s, destructive })),
+    }));
   const signature = JSON.stringify([describe(right), describe(leftActions)]);
   return useMemo<NativeStackNavigationOptions>(() => {
-    const [actions, lefts] = JSON.parse(signature) as Omit<HeaderAction, "onPress">[][];
+    const [actions, lefts] = JSON.parse(signature) as Described[][];
     const press = (i: number) => () => latest.current?.[i]?.onPress();
+    const pick = (i: number, j: number) => () => latest.current?.[i]?.menu?.[j]?.onPress();
     const pressLeft = (i: number) => () => latestLeft.current?.[i]?.onPress();
     const options: NativeStackNavigationOptions = {};
     if (IOS) {
       options.unstable_headerRightItems = actions.length
         ? () =>
-            actions.map((a, i) => ({
-              type: "button" as const,
-              label: a.label,
-              accessibilityLabel: a.label,
-              icon: { type: "sfSymbol" as const, name: a.sf },
-              onPress: press(i),
-            }))
+            actions.map((a, i) =>
+              a.menu
+                ? {
+                    type: "menu" as const,
+                    label: a.label,
+                    accessibilityLabel: a.label,
+                    icon: { type: "sfSymbol" as const, name: a.sf },
+                    menu: {
+                      items: a.menu.map((m, j) => ({
+                        type: "action" as const,
+                        label: m.label,
+                        icon: { type: "sfSymbol" as const, name: m.sf },
+                        destructive: m.destructive,
+                        onPress: pick(i, j),
+                      })),
+                    },
+                  }
+                : {
+                    type: "button" as const,
+                    label: a.label,
+                    accessibilityLabel: a.label,
+                    icon: { type: "sfSymbol" as const, name: a.sf },
+                    disabled: a.disabled,
+                    onPress: press(i),
+                  },
+            )
         : undefined;
       options.unstable_headerLeftItems = lefts.length
         ? () =>
@@ -96,7 +142,13 @@ export function useHeaderActionOptions({
         ? () => (
             <HeaderCapsule>
               {actions.map((a, i) => (
-                <IconButton key={`${a.icon}:${a.label}`} icon={a.icon} label={a.label} onPress={press(i)} />
+                <IconButton
+                  key={`${a.icon}:${a.label}`}
+                  icon={a.icon}
+                  label={a.label}
+                  disabled={a.disabled ?? false}
+                  onPress={press(i)}
+                />
               ))}
             </HeaderCapsule>
           )

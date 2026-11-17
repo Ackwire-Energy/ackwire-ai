@@ -12,12 +12,12 @@ import {
   useSteerState,
 } from "@agenteschat/client";
 import { errorText, runFailureLine } from "@agenteschat/client/lib/errors";
-import { joinNames } from "@agenteschat/client/lib/format";
-import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
+import { joinNames, sentAtLine } from "@agenteschat/client/lib/format";
+import { mayConnectAi, plansNotYoursOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { retryAnswer } from "@agenteschat/client/lib/retry-answer";
-import { deciderOf } from "@agenteschat/client/lib/routing";
-import { Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
+import { deciderOf, everyoneLineOf } from "@agenteschat/client/lib/routing";
+import { AvatarStack, HintLine, Icon, type IconName, PixelSpinner, Popover } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActorAvatar, AgentAvatar } from "@/components/AgentAvatar";
@@ -110,14 +110,13 @@ function KeptAnswer({ message, kept, children }: { message: Message; kept: boole
 }
 
 /**
- * What became of a message sent into a task at work: the reader's face once it read it, else the spinner while it
- * waits for the next pause, the bolt when it stopped to read, a check once handed over, the clock while an approval
- * holds it.
+ * What became of a message sent into a task at work: the double check every read message has once it was read (who
+ * read it is in the mark's description and its popover, never a face in the bubble), else the bolt when it stopped to
+ * read, a check once handed over, the clock while an approval holds it. One that waits for the next pause wears no
+ * mark (`MessageReceipts`).
  */
-function SteerMark({ steer, name, size }: { steer: SteerState; name: string; size: 14 | 16 }) {
-  if (steer.state === "read" || steer.state === "resolved")
-    return <AgentAvatar agentId={steer.agentId} name={name} size="xs" state="idle" />;
-  if (steer.state === "waiting") return <PixelSpinner size={size} />;
+function SteerMark({ steer, size }: { steer: SteerState; size?: 14 }) {
+  if (steer.state === "read" || steer.state === "resolved") return <Icon name="checks" size={size} />;
   return <Icon name={steer.state === "now" ? "bolt" : steer.state === "delivered" ? "check" : "waiting"} size={size} />;
 }
 
@@ -129,9 +128,9 @@ function SteerMark({ steer, name, size }: { steer: SteerState; name: string; siz
  * the rule that picked them. The mark is the clock, one tick or two (`receiptTicks`). While the author's own plan
  * picks, and when no agent will answer or every one it was for passed (an agent's reaction counts as acting), "Chamar
  * um agente" is in its popover: never a line in the timeline, which read as wrong beside an agent's reaction. A
- * message sent into a task at work wears what became of it there instead of the check ("Ada leu" is Ada's face), the
- * words said to screen readers as they change. Words only for what you can act on (a failure, no AI connected) or
- * what nobody can (the AI provider is down, it retries by itself; the plan or budget has to renew): then the whole
+ * message sent into a task at work wears what became of it there instead of the check ("Ada leu" is the double check,
+ * said in its description), the words said to screen readers as they change. Words only for what you can act on (a
+ * failure, no AI connected) or what nobody can (the AI provider is down, it retries by itself; the plan or budget has to renew): then the whole
  * receipt is a line under the message (`part="line"`), so the text still follows the name.
  */
 export function MessageReceipts({ message, part }: { message: Message; part: "check" | "line" }) {
@@ -149,6 +148,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
   // The pills' list (live through `message.reactions`), else the message's: an agent's reaction is its answer.
   const reactions = useReactions(org.id, message.id, false).data ?? message.reactions;
   const steer = useSteerState(org.id, message.channelId, part === "check" ? message.id : "");
+  // Waiting for the agent's next pause: no mark at all. It was sent, and a spinner or a clock beside its time reads as
+  // a message that never arrived; the agent's row says when it reads it.
+  const waits = steer?.state === "waiting";
   const steerName = steer ? dir.agentById.get(steer.agentId)?.name : undefined;
   const steered =
     steer && steerName
@@ -156,6 +158,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       : null;
   const view = receiptView(receipt);
   const status = view.status;
+  const aiStatus = useAiStatus(org.id, status?.kind === "no_ai").data;
   // One agent failed: while its failed row is in the conversation the row says why; once it's closed (its ×, a
   // reload), this line does.
   const failedAgent = status?.kind === "failed" && status.agents.length === 1 ? status.agents[0] : undefined;
@@ -181,17 +184,35 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
     (status?.kind === "failed" && actions !== null && message.author.type === "person");
   // An agent's message that called several: one strip says where each stands once they start (`fanShows`).
   const fanned = part === "line" && message.author.type === "agent" && message.mentionedAgentIds.length > 1;
-  // The mark stays where a line says the rest (a failure, no AI): what became of it in the task is its own news.
-  if (part === "line" ? !worded && !fanned : worded && !steered) return null;
-  const marked = view.seen.length > 0 || view.picking === true || steered !== null;
-  if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return null;
-
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
+  // A mention of everyone one agent answered for all: one quiet line under it, never one reply each.
+  const everyone = part === "line" ? everyoneLineOf(t, message.meta, view, { agent: name }) : null;
+  const everyoneRow = everyone && (
+    <div className="ac-receipt ac-receipt--everyone">
+      <AvatarStack aria-hidden="true">
+        {everyone.faces.slice(0, 5).map((id) => (
+          <AgentAvatar key={id} agentId={id} size="xs" name={name(id)} />
+        ))}
+      </AvatarStack>
+      <span className="ac-receipt__words">
+        <HintLine name={t("common.about", { label: t("receipts.everyone.who") })} hint={everyone.hint}>
+          {everyone.text}
+        </HintLine>
+      </span>
+    </div>
+  );
+  // The mark stays where a line says the rest (a failure, no AI): what became of it in the task is its own news.
+  if (part === "line" ? !worded && !fanned : waits || (worded && !steered)) return everyoneRow || null;
+  const marked = view.seen.length > 0 || view.picking === true || steered !== null;
+  if (!marked && status?.kind !== "no_ai" && status?.kind !== "platform_cap") return everyoneRow || null;
+
   const names = (ids: string[]) => joinNames(ids.map(name), t);
   const failure = failedAgent && !rowSaysWhy ? receipt?.failures?.[failedAgent] : undefined;
   const failedWhy = failedAgent && failure ? runFailureLine(t, name(failedAgent), failure, i18n.language) : null;
   const only = status?.kind === "no_ai" && status.agents.length === 1 ? status.agents[0] : undefined;
   const mayConnect = mayConnectAi(only ? dir.agentById.get(only) : null, me.user.id, org);
+  // Every plan here serves only someone else: the agent's card has the way out, so the line only says whose.
+  const notYours = plansNotYoursOf(aiStatus, only);
   const mentionNeeded = status?.kind === "nobody" && status.mentionNeeded === true;
   const statusText =
     status === null
@@ -238,8 +259,9 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           data-steer={steered?.steer.state}
         >
           {steered ? (
-            // Keyed by the state: each new mark swaps in.
-            <SteerMark key={steered.steer.state} steer={steered.steer} name={steered.name} size={16} />
+            // Keyed by the state: each new mark swaps in. No size of its own: the receipt's CSS sizes it as it sizes
+            // the plain check (smaller in a bubble), so the two never differ.
+            <SteerMark key={steered.steer.state} steer={steered.steer} />
           ) : (
             <Icon name={held && status?.kind === "no_ai" ? "waiting" : receiptIcon(view, receipt)} />
           )}
@@ -271,7 +293,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
       {steered && (
         <div className="who-by ac-iconline">
-          <SteerMark steer={steered.steer} name={steered.name} size={14} />
+          <SteerMark steer={steered.steer} size={14} />
           <span>{steered.text}</span>
         </div>
       )}
@@ -295,6 +317,7 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
           <HelpLink slug="who-answers">{t("routing.how")}</HelpLink>
         </div>
       )}
+      <div className="receipt-sent">{sentAtLine(t, i18n.language, message.createdAt)}</div>
     </Popover>
   );
 
@@ -366,8 +389,8 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       {status?.kind === "no_ai" && !held && (
         <KeptAnswer message={message} kept={receipt?.server?.kept === true}>
           <span className="ac-receipt__words">
-            <span>{t("noAi.receipt")}</span>
-            {connect && mayConnect && (
+            <span>{notYours ? t("noAi.notYours.receipt", notYours) : t("noAi.receipt")}</span>
+            {connect && mayConnect && !notYours && (
               <ReceiptAction>
                 <button
                   type="button"
@@ -390,7 +413,15 @@ export function MessageReceipts({ message, part }: { message: Message; part: "ch
       )}
     </div>
   );
-  if (!fanned) return words;
+  if (!fanned)
+    return everyoneRow ? (
+      <>
+        {words}
+        {everyoneRow}
+      </>
+    ) : (
+      words
+    );
   // The strip says where each agent stands; without it (fewer than two started, all done), the receipt as usual.
   return <FanOutStrip message={message} otherwise={worded ? words : null} />;
 }

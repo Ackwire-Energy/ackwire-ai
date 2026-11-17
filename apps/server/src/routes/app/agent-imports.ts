@@ -1,3 +1,4 @@
+import { connectorOAuthApps } from "@agenteschat/config";
 import {
   ARTIFACT_LIMITS,
   applyImport,
@@ -15,11 +16,13 @@ import {
 import { createRoute, z } from "@hono/zod-openapi";
 import { bodyLimit } from "hono/body-limit";
 import { apiError, errorResponse } from "../../http/errors";
+import { githubAppOf } from "../github-app";
 import {
   type AppDeps,
   body,
   createAppRouter,
   errors,
+  hookConfig,
   json,
   MULTIPART_SLACK_BYTES,
   OrgParams,
@@ -121,7 +124,10 @@ const Bundle = z
             z.object({ cron: z.string().max(200), timezone: z.string().max(64).nullable() }),
             z.object({ rule: BundleRule }),
             z.object({ at: z.string().max(40) }),
+            z.object({ webhook: z.literal(true) }),
+            z.object({ event: z.literal("github.pr_opened") }),
           ]),
+          paused: z.boolean().optional(),
         }),
       )
       .max(IMPORT_LIMITS.routines),
@@ -139,7 +145,7 @@ const Bundle = z
     todo: z
       .array(
         z.object({
-          kind: z.enum(["connection", "app", "secret", "model", "file"]),
+          kind: z.enum(["connection", "app", "secret", "model", "file", "webhook"]),
           label: z.string().max(500),
           url: z.string().max(2000).optional(),
           agents: z.array(Key).max(IMPORT_LIMITS.agents),
@@ -243,6 +249,21 @@ export function agentImportRoutes(deps: AppDeps) {
     }),
   );
 
+  // A private repository is read with the workspace's GitHub: the GitHub App's token for it, else the GitHub
+  // connection's. Tokens stay here.
+  const github = {
+    connectors: {
+      db: deps.db,
+      keyWrappers: [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers],
+      oauthApps: connectorOAuthApps(deps.config),
+      publicUrl: deps.config.PUBLIC_URL,
+      http: deps.extras?.http,
+    },
+    get app() {
+      return githubAppOf(deps);
+    },
+  };
+
   app.openapi(
     createRoute({
       method: "post",
@@ -251,7 +272,7 @@ export function agentImportRoutes(deps: AppDeps) {
       security,
       summary: "Read the files behind a GitHub link to import (nothing is saved)",
       description:
-        "A file link reads that file. A folder link reads, relative to the folder: its Markdown/JSON/YAML, `agents/` (one level of folders), `skills/` (SKILL.md and other Markdown), `cron/jobs.json` and `memory/*.md` (newest first), up to 200 files and 8 MB (4 MB per file).",
+        "A file link reads that file. A folder link reads, relative to the folder: its Markdown/JSON/YAML, `agents/` (one level of folders), `skills/` (SKILL.md and other Markdown), `cron/jobs.json` and `memory/*.md` (newest first), up to 200 files and 8 MB (4 MB per file). A private repository (github.com answers 404) is read through the workspace's GitHub for who edits any agent: the GitHub App's token for it, else the GitHub connection's, never sent to the app. `github.repo_missing` says in `connection` how the GitHub connection fared (`none`, `refused`, `ok`) and in `app` whether the GitHub App is installed on some account for the workspace.",
       request: {
         params: OrgParams,
         body: body(
@@ -274,7 +295,7 @@ export function agentImportRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const result = await readGithubImport(
-        { db: deps.db, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost },
+        { db: deps.db, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost, github },
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json").url,
@@ -311,7 +332,13 @@ export function agentImportRoutes(deps: AppDeps) {
       const blobs = deps.extras?.artifacts?.blobs;
       if (!blobs) throw new Error("storage is not configured on this server");
       const plan = await applyImport(
-        { db: deps.db, blobs, pubsub: deps.adapters.pubsub, connectors: routineConnectorDeps(deps) },
+        {
+          db: deps.db,
+          blobs,
+          pubsub: deps.adapters.pubsub,
+          connectors: routineConnectorDeps(deps),
+          hooks: hookConfig(deps.config),
+        },
         c.get("user").id,
         c.req.valid("param").orgId,
         c.req.valid("json"),

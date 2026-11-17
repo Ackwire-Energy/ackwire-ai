@@ -100,7 +100,7 @@ describe("my own messages sit on the right", () => {
     const foot = row("w3").querySelector(".ac-msg__own-foot") as HTMLElement;
     expect([...foot.children].map((part) => part.className)).toEqual(["ac-msg__own-time", "ac-msg__aside"]);
     expect(foot.querySelector(".ac-msg__aside .ac-receipt__check")?.tagName).toBe("BUTTON");
-    expect(row("w3").querySelector(".ac-msg__aside--floating")).toBeNull();
+    expect(row("w3").querySelector(".ac-msg__gutter--aside")).toBeNull();
     // The rows before a run's last: no hover time in the far-left column, where everyone else's grouped rows have it.
     for (const id of ["w1", "w2", "w3"])
       expect(row(id).querySelector(".ac-msg__gutter, .ac-msg__gutter-time")).toBeNull();
@@ -152,7 +152,8 @@ describe("my own messages sit on the right", () => {
       said("w2", "u-walter", "E o link", 0, { local: "pending", clientId: "c-2" }),
     ]);
     expect(row("w1").classList.contains("ac-msg--failed")).toBe(true);
-    expect(row("w1").textContent).toContain("Não enviada");
+    // No reason kept (a row from before a reload): it still says more than "Não enviada".
+    expect(row("w1").textContent).toContain("Não enviada. Algo deu errado.");
     expect(within(row("w1")).getByRole("button", { name: "Tentar de novo" })).toBeTruthy();
     expect(row("w2").classList.contains("ac-msg--pending")).toBe(true);
     const status = row("w2").querySelector(".ac-msg__own-time");

@@ -23,6 +23,8 @@ export interface PushOpenData {
   /** A board's notice (ADR 0135), when the push names its board and widget. */
   dashboardId?: string;
   widgetId?: string;
+  /** Whose notification it is: a browser signed in with several accounts opens it as theirs (ADR 0183). */
+  user?: string;
 }
 
 /** The ids a push carries besides its notification's, as the server names them. */
@@ -52,6 +54,7 @@ export function pushOpenDataOf(raw: unknown): PushOpenData | null {
     kind: typeof data.kind === "string" && /^[a-z_]{1,40}$/.test(data.kind) ? data.kind : null,
   };
   for (const key of PLACE_KEYS) if (isId(data[key])) out[key] = data[key];
+  if (isId(data.user)) out.user = data.user;
   return out;
 }
 
@@ -118,12 +121,17 @@ export function fallbackTarget(data: PushOpenData): OpenTarget | null {
   const kind = data.kind;
   if (kind === "approval")
     return { to: "/org/$orgId/approvals", ...(data.approvalId ? { search: { open: data.approvalId } } : {}) };
-  // Someone who joined by an invitation (ADR 0090) opens a conversation with them, from the notification
-  // (`openTarget`); a push names no person to talk to, so without it, Members, where they now are.
-  if (kind === "join_request" || kind === "invitation_accepted")
-    return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
+  // A request is answered in People › Convites (ADR 0184). Someone who joined by an invitation (ADR 0090) opens a
+  // conversation with them, from the notification (`openTarget`); a push names no person to talk to, so without it,
+  // Members, where they now are.
+  if (kind === "join_request") return { to: "/org/$orgId/settings/$section", params: { section: "invites" } };
+  if (kind === "invitation_accepted") return { to: "/org/$orgId/settings/$section", params: { section: "members" } };
   // Settings › Computers is Devices now: its old address redirects there.
   if (kind === "machine_connected" || kind === "computer_ready")
+    return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
+  // A folder waits on this person's computer (the agent asked), which is where it is allowed: that computer.
+  // Never the conversation it was asked from, which a push can't tell from a DM.
+  if (kind === "device.folder_request")
     return { to: "/org/$orgId/settings/$section", params: { section: "computers" } };
   if (kind && ROUTINE_TROUBLE.has(kind as NotificationKind)) return { to: "/org/$orgId/routines" };
   // A board's notice (ADR 0135): its board with the widget open when the push names them, else the boards.

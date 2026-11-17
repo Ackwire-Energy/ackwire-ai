@@ -95,15 +95,19 @@ pub fn is_loopback(origin: &str) -> bool {
 
 /// What may follow a chosen server's origin: its sign-in or sign-up page, a new workspace (`/onboarding`, the
 /// welcome window's "Add a workspace", ADR 0154), or a link's one-time sign-in (`/desktop/handover#token=`) or owner
-/// claim (`/owner#claim=`), whose secrets the page takes out at once.
+/// claim (`/owner#claim=`), whose secrets the page takes out at once. And the server's accounts (ADR 0183): its
+/// sign-in for one more beside those signed in (`/login?add=1`), or its first page as one of them (`/?as=<id>`).
 pub fn page_path(page: &str) -> bool {
     let secret = |s: &str| (20..=200).contains(&s.len()) && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
     match page {
-        "/login" | "/signup" | "/onboarding" => true,
-        _ => page
-            .strip_prefix("/desktop/handover#token=")
-            .or_else(|| page.strip_prefix("/owner#claim="))
-            .is_some_and(secret),
+        "/login" | "/signup" | "/onboarding" | "/login?add=1" => true,
+        _ => {
+            page.strip_prefix("/?as=").is_some_and(crate::workspaces::good_id)
+                || page
+                    .strip_prefix("/desktop/handover#token=")
+                    .or_else(|| page.strip_prefix("/owner#claim="))
+                    .is_some_and(secret)
+        }
     }
 }
 
@@ -193,6 +197,12 @@ pub fn remove(app: &AppHandle, origin: &str) {
     crate::menus::servers_changed(app);
 }
 
+/// The main window's cookies sent to `origin` go. From a thread of its own only (`cookies`).
+pub fn drop_cookies(app: &AppHandle, origin: &str) {
+    let (Some(page), Ok(url)) = (app.get_webview(crate::main_window::LABEL), origin.parse::<Url>()) else { return };
+    crate::cookies::remove(&page, move |c| crate::workspaces::sent_to(c, &url));
+}
+
 /// The main window's capability for a server other than Ackwire AI, for its own origin only.
 fn grant(app: &AppHandle, origin: &str) {
     if origin == CLOUD {
@@ -247,14 +257,9 @@ pub async fn server_remove(app: AppHandle, server: String) -> Result<(), String>
     let page = app.get_webview(crate::main_window::LABEL);
     let showing = page.as_ref().and_then(|p| p.url().ok()).is_some_and(|u| u.origin().ascii_serialization() == server);
     // Cookies are per host, not per port: on this computer they are also the other servers' here, so they stay.
-    if let (Some(page), Ok(url), false) = (page, server.parse::<Url>(), is_loopback(&server)) {
-        tauri::async_runtime::spawn_blocking(move || {
-            for cookie in page.cookies().unwrap_or_default().into_iter().filter(|c| crate::workspaces::sent_to(c, &url)) {
-                let _ = page.delete_cookie(cookie);
-            }
-        })
-        .await
-        .map_err(|e| e.to_string())?;
+    if !is_loopback(&server) {
+        let (app, server) = (app.clone(), server.clone());
+        tauri::async_runtime::spawn_blocking(move || drop_cookies(&app, &server)).await.map_err(|e| e.to_string())?;
     }
     // Its workspaces leave the window's list now, not at the next minute's read.
     crate::workspaces::trigger(&app);
@@ -284,7 +289,7 @@ pub async fn server_sign_out(app: AppHandle, server: String) -> Result<(), Strin
     let (asking, shared) = (server.clone(), is_loopback(&server));
     tauri::async_runtime::spawn_blocking(move || {
         let cookies: Vec<_> =
-            page.cookies().unwrap_or_default().into_iter().filter(|c| crate::workspaces::sent_to(c, &url)).collect();
+            crate::cookies::read(&page).into_iter().filter(|c| crate::workspaces::sent_to(c, &url)).collect();
         let cookie = crate::workspaces::cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
         if !cookie.is_empty() {
             let agent = ureq::AgentBuilder::new().timeout(std::time::Duration::from_secs(10)).redirects(0).build();
@@ -296,9 +301,7 @@ pub async fn server_sign_out(app: AppHandle, server: String) -> Result<(), Strin
                 .send_string("{}");
         }
         if !shared {
-            for cookie in cookies {
-                let _ = page.delete_cookie(cookie);
-            }
+            crate::cookies::remove(&page, move |c| crate::workspaces::sent_to(c, &url));
         }
     })
     .await
@@ -332,7 +335,7 @@ mod tests {
             "https://ana:secret@chat.example.com",
             "ftp://files.example.com",
             "agenteschat://connect?server=x",
-            "https://app.agentes.chat/ x",
+            "https://hub.ackwire.app/ x",
             "",
         ] {
             assert_eq!(origin_of(bad), None, "{bad}");
@@ -347,6 +350,10 @@ mod tests {
         assert!(page_path("/login"));
         assert!(page_path("/signup"));
         assert!(page_path("/onboarding"));
+        assert!(page_path("/login?add=1"));
+        assert!(page_path("/?as=u_1-a"));
+        assert!(!page_path("/?as="));
+        assert!(!page_path("/?as=u1&next=//evil.example"));
         assert!(page_path(&format!("/desktop/handover#token={token}")));
         assert!(page_path(&format!("/owner#claim={token}")));
         assert!(!page_path("/desktop/handover#token=short"));

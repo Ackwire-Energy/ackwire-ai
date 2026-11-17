@@ -8,10 +8,11 @@ import {
 } from "@agenteschat/client/lib/chat-look";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
-import { createContext, useContext, useMemo } from "react";
-import { StyleSheet } from "react-native";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
+import { type LayoutChangeEvent, StyleSheet, useWindowDimensions } from "react-native";
 import { useOrg } from "@/providers/org";
 import { useTheme } from "@/ui";
+import { keepSize, keptSize } from "./kept-sizes";
 import { BUBBLES_INSET, bubbleFill, CHAT_TEXT, quietInset } from "./logic";
 
 /** How this conversation's rows are drawn (`chatLookOf`, as on the web's `MessageLook`). */
@@ -57,6 +58,35 @@ export function useConversationLook(dm: boolean, agentColor?: AgentColorName): R
 
 /** This conversation's rhythm: every row and line of its list takes its room from here. */
 export const useRhythm = () => CHAT_RHYTHM[useRowLook().style];
+
+/**
+ * What a row's measured size depends on besides its content, for the sizes kept across the list's unmounts
+ * (`kept-sizes.ts`): the window's width, the system's text size, the person's Tamanho do texto and the conversation's
+ * look (its insets and faces).
+ */
+export function useLayoutKey(): string {
+  const { width, fontScale } = useWindowDimensions();
+  const { style, faces, text } = useRowLook();
+  return `${Math.round(width)}:${fontScale}:${style}:${faces ? 1 : 0}:${text?.fontSize ?? 0}`;
+}
+
+/**
+ * The width a part of a row has (its pictures' room), kept across the list's unmounts (`kept-sizes.ts`): a row coming
+ * back lays out at its size from its first frame, never at a guess first. 0 until it is first measured.
+ */
+export function useKeptWidth(part: string): [number, (e: LayoutChangeEvent) => void] {
+  const key = `${part}:${useLayoutKey()}`;
+  const [width, setWidth] = useState(() => keptSize(key) ?? 0);
+  const onLayout = useCallback(
+    (e: LayoutChangeEvent) => {
+      const measured = e.nativeEvent.layout.width;
+      keepSize(key, measured);
+      setWidth(measured);
+    },
+    [key],
+  );
+  return [width, onLayout];
+}
 
 /**
  * In a message's body, which sets what stands between its parts: the value is how far past that gap a card stands off

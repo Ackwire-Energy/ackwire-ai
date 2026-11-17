@@ -2,14 +2,14 @@ import type { LegalDocument } from "./types";
 
 export const termsEn: LegalDocument = {
   title: "Terms of Use",
-  summary: "The agreement for using Ackwire AI: your workspace, your agents, and what each side is responsible for.",
-  updated: "2026-11-06",
+  summary: "The agreement for using agentes.chat: your workspace, your agents, and what each side is responsible for.",
+  updated: "2026-11-16",
   sections: [
     {
       id: "agreement",
       heading: "1. Agreement",
       blocks: [
-        'These Terms of Use (the "Terms") are a binding agreement between CODARI GLOBAL, LLC, a Wyoming limited liability company doing business as Ackwire AI ("Ackwire AI", "we", "us"), and the person or entity that creates an account or a workspace ("you"). By creating an account, joining a workspace, or otherwise using Ackwire AI on the web, the Mac app or the phone app (the "Service"), you accept these Terms and our Privacy Policy. If you use the Service on behalf of a company or other entity, you represent that you have authority to bind it.',
+        'These Terms of Use (the "Terms") are a binding agreement between AGENTESCHAT, LLC, a Delaware limited liability company doing business as agentes.chat ("agentes.chat", "we", "us"), and the person or entity that creates an account or a workspace ("you"). By creating an account, joining a workspace, or otherwise using agentes.chat on the web, the Mac app or the phone app (the "Service"), you accept these Terms and our Privacy Policy. If you use the Service on behalf of a company or other entity, you represent that you have authority to bind it.',
         "You must be at least 18 years old and able to enter into a contract to use the Service.",
       ],
     },
@@ -91,7 +91,7 @@ export const termsEn: LegalDocument = {
       id: "fees",
       heading: "10. Plans, payments and fair use",
       blocks: [
-        "Each workspace pays for its own Ackwire AI plan. These rules apply to every plan:",
+        "Each workspace pays for its own agentes.chat plan. These rules apply to every plan:",
         {
           list: [
             "**Prices.** Plans and their prices are on our pricing page. Prices are in US dollars, and taxes are added where they apply. Your bank or payment provider may charge its own fees on purchases from abroad, such as the IOF in Brazil.",
@@ -110,7 +110,7 @@ export const termsEn: LegalDocument = {
       id: "ip",
       heading: "11. Intellectual property and feedback",
       blocks: [
-        "Except for your Workspace Content, we and our licensors keep all rights, title and interest in the Service, including its software, design and the Ackwire AI name and marks. Feedback you choose to send us may be used without obligation to you.",
+        "Except for your Workspace Content, we and our licensors keep all rights, title and interest in the Service, including its software, design and the agentes.chat name and marks. Feedback you choose to send us may be used without obligation to you.",
       ],
     },
     {
@@ -145,7 +145,7 @@ export const termsEn: LegalDocument = {
       id: "law",
       heading: "16. Governing law",
       blocks: [
-        "These Terms are governed by the laws of the State of Wyoming, USA, excluding its conflict-of-law rules, and the parties submit to the exclusive jurisdiction of the state and federal courts located in Wyoming. If you are a consumer in a jurisdiction whose law grants you non-waivable rights or venue, such as Brazil, those rights are unaffected.",
+        "These Terms are governed by the laws of the State of Delaware, USA, excluding its conflict-of-law rules, and the parties submit to the exclusive jurisdiction of the state and federal courts located in Delaware. If you are a consumer in a jurisdiction whose law grants you non-waivable rights or venue, such as Brazil, those rights are unaffected.",
       ],
     },
     {
@@ -159,7 +159,7 @@ export const termsEn: LegalDocument = {
       id: "contact",
       heading: "18. Contact",
       blocks: [
-        "CODARI GLOBAL, LLC, doing business as agentes.chat. Notices: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Everything else: hello@agentes.chat",
+        "AGENTESCHAT, LLC, doing business as agentes.chat. Notices: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · legal@agentes.chat · Everything else: hello@agentes.chat",
       ],
     },
   ],

@@ -12,6 +12,7 @@ import {
   isPlaybook,
   itemVisibleIn,
   itemWords,
+  LATER_REASONS,
   listAgentMemoryRows,
   listOrgMemoryRows,
   listProposals,
@@ -147,13 +148,14 @@ const Proposal = z
           from: z.unknown(),
           to: z.unknown(),
           channelId: z.string().optional(),
+          skillId: z.string().optional(),
           label: z.object({ from: z.string().optional(), to: z.string().optional() }).optional(),
         }),
       )
       .nullable()
       .openapi({
         description:
-          "`agent_settings`: each setting then (`from`) and proposed (`to`): `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` / `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a mention); `archive` / `delete` true (deleting is for good, ADR 0082). `label`: names for ids.",
+          "`agent_settings`: each setting then (`from`) and proposed (`to`): `model` a model id; `ai_account` `{ brain, accountId }`; `budget` nano-USD a month or null (the workspace's default); `owner` a user id; `audience` `{ mode, userIds, roleIds }`; `channel_add` / `channel_remove` / `reply_mode` its seat in `channelId` (null: not in it, else whether it answers without a mention); `skill` whether it has the skill in `skillId` on; `archive` / `delete` true (deleting is for good, ADR 0082). `label`: names for ids.",
       }),
     requestedBy: z
       .object({ userId: z.string(), name: z.string() })
@@ -168,10 +170,13 @@ const Proposal = z
     }),
     title: z.string(),
     why: z.string().openapi({ description: "Words of a person or an agent; empty when `whyCode` alone says it." }),
-    whyCode: z.enum(["refused", "corrected", "seen", "skill", "asked", "budget", "no_channel"]).nullable().openapi({
-      description:
-        "How it came, for the apps to say in the person's language (`why` holds the words it is about, if any): a refusal or a correction it was made from, `seen` (its memory is gone), `skill` (from using the skill), `asked` (in a conversation, no reason given), `budget` or `no_channel` (the week's review of the team). Null: `why` as it is.",
-    }),
+    whyCode: z
+      .enum(["refused", "corrected", "seen", "skill", "asked", "budget", "no_channel", "idle", "light_work"])
+      .nullable()
+      .openapi({
+        description:
+          "How it came, for the apps to say in the person's language (`why` holds the words it is about, if any): a refusal or a correction it was made from, `seen` (its memory is gone), `skill` (from using the skill), `asked` (in a conversation, no reason given), `budget`, `no_channel`, `idle` or `light_work` (the week's review of the team, the last two with the sentence in English in `why` for app builds from before them). Null: `why` as it is.",
+      }),
     evidence: z.array(
       z.object({
         where: z.string(),
@@ -210,7 +215,7 @@ function proposalWhy(r: ProposalRow, items: ContextItem[]) {
   if (r.target === "skill") return { why: "", whyCode: "skill" as const };
   if (r.itemIds.length > 0) return { why: "", whyCode: "seen" as const };
   const whyCode = SERVER_REASONS[r.rationale] ?? null;
-  return { why: whyCode ? "" : r.rationale, whyCode };
+  return { why: whyCode && !LATER_REASONS.has(whyCode) ? "" : r.rationale, whyCode };
 }
 
 const shortDate = (d: Date) => d.toLocaleDateString("en-US", { day: "numeric", month: "short", timeZone: "UTC" });
@@ -609,10 +614,10 @@ export function memoryRoutes(deps: AppDeps) {
       await requirePermission(db, viewerId, orgId, "read");
       if (!(await getAgent(db, orgId, agentId))) throw new NotFoundError("Agent not found");
       // Only what the viewer may see: items learned in a DM or private channel they can't read stay out.
-      const { items: rows, visible } = await listAgentMemoryRows(db, viewerId, orgId, agentId);
-      const current = rows
-        .filter((r) => !r.supersededBy)
-        .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.getTime() - a.updatedAt.getTime());
+      const { items: rows, visible } = await listAgentMemoryRows(db, viewerId, orgId, agentId, { current: true });
+      const current = rows.sort(
+        (a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.getTime() - a.updatedAt.getTime(),
+      );
       if (c.req.valid("query").about !== "me") {
         const views = await memoryViews(db, current, visible);
         const rules = new Map(current.filter((i) => i.kind === "rule").map((i) => [i.id, i]));

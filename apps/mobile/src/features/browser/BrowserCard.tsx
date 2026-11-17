@@ -18,8 +18,10 @@ import {
   useBrowserScreen,
   useBrowserStuck,
   useDesktopPicture,
+  useMachines,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { browserNoAnswerMessage, browserOffMessage, profileRefusalLine } from "@agenteschat/client/lib/machines";
 import { isBlankPage } from "@agenteschat/client/lib/sites";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -35,8 +37,9 @@ import {
 } from "react-native";
 import { useAppActive } from "@/lib/useAppActive";
 import { Sky } from "@/sky/Sky";
-import { Button, Fuse, Icon, PixelOrbit, Text, useToast } from "@/ui";
+import { Button, Fuse, Icon, IconButton, PixelOrbit, Text, useToast } from "@/ui";
 import { ScreenWatch, type ScreenWatchHandle } from "../computer/ScreenWatch";
+import { MachineToolButton } from "../devices/ToolOneClick";
 import { useColors, useDirectory, useEdition, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
@@ -72,7 +75,7 @@ export function BrowserCard({
 }: {
   agentId: string;
   /** A shared browser profile (ADR 0110) instead of the agent's browser: "Fazer login" from the computer's page. */
-  profile?: { id: string; name: string };
+  profile?: { id: string; name: string; machineId?: string };
   /** The agent's run in its browser (what it does now, the log). */
   run?: LiveRun | null;
   /** At work with no run to show here (its profile): closed, the card still shows its small live picture. */
@@ -164,6 +167,11 @@ export function BrowserCard({
     }),
     open ? undefined : BROWSER_FPS.preview,
   );
+  // A profile whose browser is off on its computer: the switch in the page's place (ADR 0036 §8).
+  const offHere = Boolean(profile) && live.unavailable === "unavailable" && browserOffMessage(live.message);
+  const noAnswer = Boolean(profile) && live.unavailable === "unavailable" && browserNoAnswerMessage(live.message);
+  const machines = useMachines(orgId, offHere);
+  const profileMachine = offHere ? machines.data?.find((m) => m.id === profile?.machineId) : undefined;
   // Closed on the agent's screen: a recent picture of it, never a stream.
   const shot = useDesktopPicture(orgId, agentId, {
     enabled: onScreen && active && asksPicture(!open && working, screen.status.data ?? null),
@@ -201,7 +209,7 @@ export function BrowserCard({
     waitsForPage(live.unavailable) &&
     !(live.frame && !live.unavailable);
   const stuck = useBrowserStuck(waitingForPage, attempt);
-  const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck);
+  const note = pageNoteOf(live.unavailable, live.hidden, mine, stuck, noAnswer);
   // biome-ignore lint/correctness/useExhaustiveDependencies: said each time, also when a try that failed fails again
   useEffect(() => {
     if (mine && live.lost) toast({ title: t(live.lost.words), icon: "x" });
@@ -279,6 +287,12 @@ export function BrowserCard({
       return;
     }
     if (mayDrive && !profile) void actions.restart(agentId).catch(failedToast).finally(live.retry);
+    // A profile's Chrome starts again with control taken again (the server warms it, or says why it can't).
+    else if (profile && mayDrive)
+      void profileActions.takeover
+        .mutateAsync(profile.id)
+        .catch((err) => toast({ title: profileRefusalLine(t, err), icon: "x" }))
+        .finally(live.retry);
     else live.retry();
   };
 
@@ -397,15 +411,7 @@ export function BrowserCard({
                     />
                   ) : null}
                   {ready && !surface && !profile ? (
-                    <Pressable
-                      onPress={stop}
-                      accessibilityRole="button"
-                      accessibilityLabel={t("mobile.browser.card.stop")}
-                      hitSlop={8}
-                      style={({ pressed }) => [styles.icon, pressed && { backgroundColor: c.sunken }]}
-                    >
-                      <Icon name="stop" size={16} color={c.muted} />
-                    </Pressable>
+                    <IconButton icon="stop" small label={t("mobile.browser.card.stop")} onPress={stop} />
                   ) : null}
                 </>
               ) : null}
@@ -431,6 +437,7 @@ export function BrowserCard({
             setPageState(state);
             screen.report(state);
           }}
+          radius={CARD - PAGE_INSET}
           style={[styles.screen, !mine && !helper && steps.length === 0 && styles.pageLast]}
         />
       ) : null}
@@ -448,7 +455,15 @@ export function BrowserCard({
               {sky ? (
                 <Sky color={color} surface="raised" depth={0.95} fade={0} style={StyleSheet.absoluteFill} />
               ) : null}
-              {live.frame ? <FrameView frame={live.frame} enabled={mine} onInput={live.sendInput} /> : null}
+              {live.frame ? (
+                <FrameView
+                  frame={live.frame}
+                  enabled={mine}
+                  onInput={live.sendInput}
+                  cursor={{ agentId, name, color, pointer: controller ? null : live.pointer }}
+                  edge={styles.page.borderRadius}
+                />
+              ) : null}
               {live.frame?.metadata.emulated ? (
                 <View style={[styles.emu, raised]}>
                   <Text variant="caption" tone="ink" style={styles.semibold}>
@@ -482,18 +497,24 @@ export function BrowserCard({
                       <Icon name="eyeoff" size={18} color={c.muted} />
                     ) : null}
                     <Text variant="small" tone="ink" style={[styles.semibold, styles.centerText]}>
-                      {note.say === "starting"
-                        ? t(`mobile.browser.card.starting${g}`, { name })
-                        : note.say === "hidden"
-                          ? hiddenNote
-                          : t(pageGapKey(note.say, g, cloud), { name })}
+                      {offHere
+                        ? t("browser.profiles.toolOff")
+                        : note.say === "starting" && profile
+                          ? t("browser.profiles.opening", { name: profile.name })
+                          : note.say === "starting"
+                            ? t(`mobile.browser.card.starting${g}`, { name })
+                            : note.say === "hidden"
+                              ? hiddenNote
+                              : t(pageGapKey(note.say, g, cloud), { name })}
                     </Text>
                     {note.help && (note.help !== "stuckHelp" || mayDrive) ? (
                       <Text variant="caption" tone="muted" style={styles.centerText}>
                         {t(`mobile.browser.live.${note.help}${g}`, { name })}
                       </Text>
                     ) : null}
-                    {note.say === "stuck" ? (
+                    {offHere && profileMachine ? (
+                      <MachineToolButton machine={profileMachine} tool="browser" onAllowed={retry} />
+                    ) : note.say === "stuck" || note.say === "noAnswer" || (note.say === "unavailable" && profile) ? (
                       <Button variant="secondary" size="sm" label={t("mobile.common.retry")} onPress={retry} />
                     ) : null}
                   </View>
@@ -522,28 +543,10 @@ export function BrowserCard({
               {/* A profile goes back to its agents, not to one. A take over asked for nothing: it only hands back. */}
               <View style={styles.ways}>
                 {profile ? null : (
-                  <Pressable
-                    onPress={finishing.leaveNote}
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
-                  >
-                    <Text variant="small" tone="muted" style={styles.medium}>
-                      {t("browser.inCard.addNote")}
-                    </Text>
-                  </Pressable>
+                  <Button variant="text" size="sm" label={t("browser.inCard.addNote")} onPress={finishing.leaveNote} />
                 )}
                 {handoff?.kind === "ask" ? (
-                  <Pressable
-                    onPress={couldnt}
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.way, pressed && styles.pressedWord]}
-                  >
-                    <Text variant="small" tone="muted" style={styles.medium}>
-                      {t("mobile.browser.live.couldnt")}
-                    </Text>
-                  </Pressable>
+                  <Button variant="text" size="sm" label={t("mobile.browser.live.couldnt")} onPress={couldnt} />
                 ) : null}
               </View>
             </View>
@@ -613,9 +616,7 @@ const styles = StyleSheet.create({
   shrink: { flexShrink: 1 },
   subRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   semibold: { fontWeight: "600" },
-  medium: { fontWeight: "500" },
   acts: { flexDirection: "row", alignItems: "center", gap: 4 },
-  icon: { width: 30, height: 30, borderRadius: 999, alignItems: "center", justifyContent: "center" },
   thumb: {
     width: 96,
     height: 60,
@@ -629,7 +630,7 @@ const styles = StyleSheet.create({
   flip: { transform: [{ rotate: "180deg" }] },
   page: { aspectRatio: 16 / 10, marginHorizontal: PAGE_INSET, borderRadius: CARD - PAGE_INSET, overflow: "hidden" },
   // The whole screen, its own shape (ScreenWatch sets it): never cropped.
-  screen: { marginHorizontal: PAGE_INSET, borderRadius: CARD - PAGE_INSET },
+  screen: { marginHorizontal: PAGE_INSET },
   pageLast: { marginBottom: PAGE_INSET },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 },
   lines: { alignItems: "center", gap: 8 },
@@ -650,11 +651,9 @@ const styles = StyleSheet.create({
   },
   control: { padding: 10, gap: 8 },
   ways: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 16 },
-  way: { paddingVertical: 4 },
   note: { paddingHorizontal: 12, paddingVertical: 10 },
   log: { paddingHorizontal: 12, paddingVertical: 6 },
   step: { flexDirection: "row", alignItems: "center", paddingVertical: 6 },
   fuse: { marginTop: 0 },
   pressed: { opacity: 0.7 },
-  pressedWord: { opacity: 0.6 },
 });

@@ -1,15 +1,18 @@
 import type { RightHandApprovals, RightHandApprovalsInput } from "@agenteschat/client";
 import { useRightHandApprovals, useSetRightHandApprovals } from "@agenteschat/client";
+import { FIELD_LIMITS } from "@agenteschat/client/lib/field-limits";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet, View } from "react-native";
+import { StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
-import { TextArea } from "../shared/TextArea";
+import { Gap } from "../settings/parts";
+import { overLimit, TextArea } from "../shared/TextArea";
 
 const USD = 1_000_000_000;
 /** The budgets offered per agent (the web takes any amount up to US$ 50). */
 const BUDGETS = [5, 10, 20, 50];
+const GUIDANCE_LIMIT = { max: FIELD_LIMITS.rightHandGuidance };
 
 /** What the right hand creates and adjusts for the person without asking, on its own screen; nothing while it loads. */
 export function RightHandApprovalsGroup() {
@@ -35,7 +38,7 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
   const budget = Math.round(view.budgetCapNanoUsd / USD);
   return (
     <>
-      <View style={styles.gap} />
+      <Gap />
       <GroupedList>
         <GroupedRow
           label={t("rightHandApprovals.title", { name })}
@@ -101,19 +104,25 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
           >
             {t("rightHandApprovals.guidanceLabel", { name })}
           </GroupedHeader>
-          <TextArea
-            value={guidance ?? view.guidance}
-            onChangeText={setGuidance}
-            onBlur={() => {
-              if (guidance !== null && guidance.trim() !== view.guidance) save({ guidance: guidance.trim() });
-              setGuidance(null);
-            }}
-            maxLength={2000}
-            minHeight={64}
-            placeholder={t("rightHandApprovals.guidancePlaceholder")}
-            accessibilityLabel={t("rightHandApprovals.guidanceLabel", { name })}
-          />
-          <View style={styles.gap} />
+          {/* A field row of the page, the list its surface, as every long field of the settings pages. */}
+          <GroupedList>
+            <TextArea
+              value={guidance ?? view.guidance}
+              onChangeText={setGuidance}
+              onBlur={() => {
+                // Past its limit it stays as typed, the line under it saying so: nothing is saved cut.
+                if (guidance === null || overLimit(guidance, GUIDANCE_LIMIT)) return;
+                if (guidance.trim() !== view.guidance) save({ guidance: guidance.trim() });
+                setGuidance(null);
+              }}
+              limit={GUIDANCE_LIMIT}
+              minHeight={64}
+              placeholder={t("rightHandApprovals.guidancePlaceholder")}
+              accessibilityLabel={t("rightHandApprovals.guidanceLabel", { name })}
+              style={styles.bare}
+            />
+          </GroupedList>
+          <Gap />
         </>
       ) : null}
     </>
@@ -121,5 +130,6 @@ function RightHandGroup({ view, name }: { view: RightHandApprovals; name: string
 }
 
 const styles = StyleSheet.create({
-  gap: { height: 16 },
+  // Inside a grouped list: the list is its surface.
+  bare: { borderWidth: 0, borderRadius: 0, backgroundColor: "transparent" },
 });

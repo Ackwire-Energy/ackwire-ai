@@ -34,7 +34,7 @@ afterEach(async () => {
 });
 
 describe("classification by the rules", () => {
-  test("annotations first: readOnlyHint → read, destructiveHint → approval (sensitive)", () => {
+  test("annotations first: readOnlyHint → read, destructiveHint → approval as a suggestion", () => {
     expect(classifyByRules({ name: "delete_preview", readOnlyHint: true })).toEqual({
       level: "read",
       source: "annotation",
@@ -45,8 +45,23 @@ describe("classification by the rules", () => {
       level: "approval",
       source: "annotation",
       reason: "destructive_hint",
+      sensitive: false,
+    });
+    // The hint alone never locks, whatever the name's other verb; a verb of ours does, hint or not.
+    expect(classifyByRules({ name: "move_task", destructiveHint: true })?.sensitive).toBe(false);
+    expect(classifyByRules({ name: "task_delete" })?.sensitive).toBe(true);
+    expect(classifyByRules({ name: "task_delete", destructiveHint: true })).toEqual({
+      level: "approval",
+      source: "verb",
+      reason: "verb_sensitive",
       sensitive: true,
     });
+    // With the hint, one of our words anywhere in the name locks; without it, only the name's verb decides.
+    expect(classifyByRules({ name: "create_and_send_invoice", destructiveHint: true })?.sensitive).toBe(true);
+    expect(classifyByRules({ name: "update_share_settings", destructiveHint: true })?.sensitive).toBe(true);
+    expect(classifyByRules({ name: "update_share_settings" })?.sensitive).toBe(false);
+    // A hinted tool with a sensitive verb stays locked even on a preset's read-only list.
+    expect(classifyByRules({ name: "task_delete", destructiveHint: true }, ["task_delete"])?.sensitive).toBe(true);
     // A preset's read-only tools.
     expect(classifyByRules({ name: "execute_sql" }, ["execute_sql"])?.level).toBe("read");
   });
@@ -112,7 +127,7 @@ describe("classification by the rules", () => {
 
 /** An ads server: read, write and sensitive verbs, two annotations and two names the verb can't decide. */
 function adsMcp() {
-  const state = { calls: [] as string[], extra: false };
+  const state = { calls: [] as string[], extra: false, warnLate: false };
   const tool = (server: McpServer, name: string, annotations: Record<string, boolean> = {}) =>
     server.registerTool(
       name,
@@ -125,7 +140,7 @@ function adsMcp() {
   const connect: McpConnect = async () => {
     const server = new McpServer({ name: "ads", version: "1" });
     tool(server, "campaign_list");
-    tool(server, "campaign_budget_update");
+    tool(server, "campaign_budget_update", state.warnLate ? { destructiveHint: true } : {});
     tool(server, "campaign_delete");
     tool(server, "report_export", { readOnlyHint: true });
     tool(server, "campaign_status_toggle", { destructiveHint: true });
@@ -217,7 +232,7 @@ describe("listing a connection's tools", () => {
     expect(row("campaign_budget_update")).toEqual(["write", "verb", "verb_write", false, false]);
     expect(row("campaign_delete")).toEqual(["approval", "verb", "verb_sensitive", true, false]);
     expect(row("report_export")).toEqual(["read", "annotation", "read_only_hint", false, false]);
-    expect(row("campaign_status_toggle")).toEqual(["approval", "annotation", "destructive_hint", true, false]);
+    expect(row("campaign_status_toggle")).toEqual(["approval", "annotation", "destructive_hint", false, false]);
     expect(row("pixel_track")).toEqual(["write", "judge", "changes_undoable", false, true]);
     expect(row("report_task_run")).toEqual(["read", "judge", "reads_only", false, true]);
     // Subjects and readable parts come from the name; nothing is decided yet.
@@ -309,7 +324,7 @@ describe("the person's choices", () => {
     await expect(
       saveCustomTools(deps, fx.owner.id, fx.org.id, server.id, {
         label: "Ads",
-        tools: [{ name: "campaign_status_toggle", access: "write", label: "x" }],
+        tools: [{ name: "campaign_delete", access: "write", label: "x" }],
       }),
     ).rejects.toThrow("can only ask for approval or be off");
 
@@ -396,5 +411,70 @@ describe("the person's choices", () => {
     // Listing again turns it back to approval.
     const again = await refreshCustomServer(deps, fx.owner.id, fx.org.id, server.id);
     expect(again.tools.find((t) => t.name === "campaign_delete")?.access).toBe("approval");
+  });
+
+  test("a tool the server only warns about starts at approval and obeys the level an admin gives it", async () => {
+    f = await setup();
+    const fx = f;
+    const mcp = adsMcp();
+    const deps = depsOf(fx, { connect: mcp.connect });
+    const server = await connectAds(fx, deps);
+    const accepted = await acceptCustomSuggestion(deps, fx.owner.id, fx.org.id, server.id);
+    expect(accepted.server.tools.find((t) => t.name === "campaign_status_toggle")).toMatchObject({
+      access: "approval",
+      sensitive: false,
+    });
+    await setAgentScopes(
+      fx.db,
+      fx.owner.id,
+      fx.org.id,
+      fx.agent.id,
+      [{ connectionId: server.id, scope: `custom:${server.id}:write` }],
+      connectorGrantValidator,
+    );
+    const gateway = createToolGateway({ sources: [createConnectorToolSource(deps)] });
+    const ctx = await runContext(fx);
+    const call = (id: string) =>
+      gateway.invoke(ctx, { toolUseId: id, name: "ads_campaign_status_toggle", input: { id: 1, why: WHY } });
+    expect((await call("t1")).type).toBe("approval");
+    expect(mcp.state.calls).toEqual([]);
+
+    await saveCustomTools(deps, fx.owner.id, fx.org.id, server.id, {
+      label: "Ads",
+      tools: [{ name: "campaign_status_toggle", access: "write", label: "Mudar status" }],
+    });
+    expect((await call("t2")).type).toBe("result");
+    expect(mcp.state.calls).toEqual(["campaign_status_toggle"]);
+    // Listing again keeps the admin's level: the server's warning is only a suggestion.
+    const again = await refreshCustomServer(deps, fx.owner.id, fx.org.id, server.id);
+    expect(again.tools.find((t) => t.name === "campaign_status_toggle")).toMatchObject({
+      access: "write",
+      sensitive: false,
+    });
+  });
+
+  test("a warning the server starts sending after the level was chosen asks again, and the admin can set it back", async () => {
+    f = await setup();
+    const fx = f;
+    const mcp = adsMcp();
+    const deps = depsOf(fx, { connect: mcp.connect });
+    const server = await connectAds(fx, deps);
+    await acceptCustomSuggestion(deps, fx.owner.id, fx.org.id, server.id);
+    const budget = (tools: { name: string; access: string | null; sensitive: boolean }[]) => {
+      const t = tools.find((x) => x.name === "campaign_budget_update");
+      return [t?.access, t?.sensitive];
+    };
+    const relist = async () => budget((await refreshCustomServer(deps, fx.owner.id, fx.org.id, server.id)).tools);
+    expect(await relist()).toEqual(["write", false]);
+
+    mcp.state.warnLate = true;
+    expect(await relist()).toEqual(["approval", false]);
+
+    const saved = await saveCustomTools(deps, fx.owner.id, fx.org.id, server.id, {
+      label: "Ads",
+      tools: [{ name: "campaign_budget_update", access: "write", label: "Mudar verba" }],
+    });
+    expect(budget(saved.tools)).toEqual(["write", false]);
+    expect(await relist()).toEqual(["write", false]);
   });
 });

@@ -32,6 +32,8 @@ export function createFakeSkills(
   github: () => "none" | "refused" | "ok" = () => "none",
 ): ApiClient["skills"] {
   const assigned = new Map<string, Set<string>>();
+  /** Names of skills removed here: a pick named like one replaces it, as the server says. */
+  const removed = new Set<string>();
   /** A waiting update a person chose, as it was: Desfazer makes it wait again. */
   const chosen = new Map<string, Pick<SkillDetail, "body" | "pendingUpdate" | "pending">>();
   /** "Agentes melhoram as skills sozinhos" per workspace (on unless saved off). */
@@ -116,6 +118,8 @@ export function createFakeSkills(
     if (!s) throw new MockNotFoundError("Skill não encontrada.");
     return s;
   };
+  /** A personal install is its installer's, as the server keeps it (`ownerUserId`). */
+  const ownerOf = async (personal?: boolean) => (personal ? { ownerUserId: (await ctx.lookup.me())?.user.id } : {});
   const make = async (
     orgId: string,
     s: Omit<SkillDetail, "id" | "metadata" | "createdAt" | "updatedAt" | "version">,
@@ -143,6 +147,17 @@ export function createFakeSkills(
     s.version += 1;
     return clone(s);
   };
+  /** The picks as the server lists them: one named like a skill installed, or removed, says it replaces it. */
+  const marked = async (orgId: string, choices: typeof CHOICES) => {
+    const names = new Set((await store(orgId)).map((s) => s.name));
+    return clone(choices).map((c) =>
+      names.has(c.name)
+        ? { ...c, replaces: "installed" as const }
+        : removed.has(c.name)
+          ? { ...c, replaces: "removed" as const }
+          : c,
+    );
+  };
   const forAgent = async (orgId: string, agentId: string) =>
     (await store(orgId)).map(({ body: _b, files: _f, ...s }) => ({
       ...clone(s),
@@ -154,6 +169,7 @@ export function createFakeSkills(
     create: async (orgId, input) => {
       log("skills.create", orgId, input);
       return make(orgId, {
+        ...(await ownerOf(input.personal)),
         name: input.name,
         description: input.description,
         body: input.body,
@@ -163,8 +179,9 @@ export function createFakeSkills(
         files: [{ path: "SKILL.md", size: input.body.length, mime: "text/markdown", status: "stored" }],
       });
     },
-    import: async (orgId, input) => {
+    import: async (orgId, input, upload) => {
       log("skills.import", orgId, input);
+      upload?.onProgress?.(1);
       const url = "url" in input ? input.url : null;
       const hidden = url?.includes("/acme/secret")
         ? "acme/secret"
@@ -180,11 +197,12 @@ export function createFakeSkills(
       }
       const via = url?.includes("/contoso/") ? { via: "github" as const } : {};
       if (url && /^https:\/\/github\.com\/[^/]+\/[^/]+\/?$/.test(url)) {
-        return { choices: clone(CHOICES), skipped: clone(SKIPPED), ...via };
+        return { choices: await marked(orgId, CHOICES), skipped: clone(SKIPPED), ...via };
       }
-      if (url && "list" in input && input.list) return { choices: clone(CHOICES.slice(0, 1)), ...via };
+      if (url && "list" in input && input.list) return { choices: await marked(orgId, CHOICES.slice(0, 1)), ...via };
       const name = url ? (url.split("/").filter(Boolean).pop() ?? "skill") : "Skill enviada";
       return make(orgId, {
+        ...(await ownerOf(input.personal)),
         name,
         description: url ? "Instalada do GitHub." : "Enviada em .zip.",
         body: `# ${name}`,
@@ -195,14 +213,22 @@ export function createFakeSkills(
         files: [{ path: "SKILL.md", size: 10, mime: "text/markdown", status: "stored" }],
       });
     },
-    importPicked: async (orgId, url, paths) => {
-      log("skills.importPicked", orgId, url, paths);
+    importPicked: async (orgId, url, paths, forAgentId, personal) => {
+      log(
+        "skills.importPicked",
+        orgId,
+        url,
+        paths,
+        ...(forAgentId ? [forAgentId] : []),
+        ...(personal ? [personal] : []),
+      );
       const installed: SkillDetail[] = [];
       for (const path of paths) {
         const choice = CHOICES.find((c) => c.path === path);
         if (!choice) throw new MockNotFoundError("Skill não encontrada.");
         installed.push(
           await make(orgId, {
+            ...(await ownerOf(personal)),
             name: choice.name,
             description: choice.description,
             body: `# ${choice.name}`,
@@ -289,6 +315,8 @@ export function createFakeSkills(
       log("skills.remove", orgId, id);
       const list = await store(orgId);
       const i = list.findIndex((x) => x.id === id);
+      const gone = list[i];
+      if (gone) removed.add(gone.name);
       if (i >= 0) list.splice(i, 1);
       for (const set of assigned.values()) set.delete(id);
     },

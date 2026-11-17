@@ -200,7 +200,7 @@ export function AgentTasksPanel({
           />
         ) : (
           <>
-            <Button size="sm" variant="ghost" onClick={openManager}>
+            <Button variant="link" onClick={openManager}>
               {t("taskManager.actions.openManager")}
             </Button>
             {stoppable.length > 1 && (
@@ -271,12 +271,12 @@ function TaskCard({
           </span>
           <span className="ac-acts">
             {place && (
-              <Button size="sm" variant="ghost" onClick={() => setQueueOf(place.machineId)}>
+              <Button variant="link" onClick={() => setQueueOf(place.machineId)}>
                 {t("queue.see")}
               </Button>
             )}
             {working && (
-              <Button size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+              <Button variant="link" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
                 {t("taskManager.panel.steps")}
                 <Icon name={open ? "chevronDown" : "chevronRight"} size={14} />
               </Button>

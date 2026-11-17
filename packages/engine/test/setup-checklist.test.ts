@@ -87,7 +87,7 @@ describe("setup checklist", () => {
 
   test("its owner confirms a step once; twice changes nothing; the order is kept", async () => {
     const w = await workspace();
-    // A member's own agent (made for them by the workspace's owner: members don't create agents by default).
+    // A member's own agent, made for them by the workspace's owner.
     const leo = await createAgent(
       w.db,
       w.owner.id,

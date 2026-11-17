@@ -9,11 +9,17 @@ import type { ControlIphoneSetup } from "@agenteschat/adapters/runner-control";
 import {
   DDIS_UPDATE,
   iosMajor,
+  isIphoneWifiReason,
   PHONE_APP_IN_STORE,
   reasonText,
   tooOldVersion,
+  useIphoneRestart,
   useStalled,
+  XCODE_FIX_COMMAND,
+  type XcodeFixStage,
+  xcodeFixStage,
 } from "@agenteschat/client/lib/devices";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { Button, Icon, InfoHint, PixelSpinner, QrCode, SettingsPath } from "@agenteschat/ui";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -28,8 +34,9 @@ import {
   iphoneStepsUrl,
 } from "../control/devices";
 import { pairedHomes } from "../control/store";
-import { useLocalServer } from "../hooks";
+import { useLocalServer, useWifiIphones } from "../hooks";
 import { hintFor } from "../ui/settings";
+import { useToast } from "../ui/Toast";
 
 /** How often the Mac is asked while the window is open: Xcode installed, the download's progress, a new account. */
 const ASK_MS = 2000;
@@ -42,6 +49,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const host = useHost();
   const store = useStore();
+  const toast = useToast();
   const local = useLocalServer();
   const home = pairedHomes(useSnapshot())[0];
   const homeId = home?.homeId;
@@ -98,22 +106,56 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   const open = (app: "xcode" | "appStore") => {
     if (homeId) void store.request(homeId, { type: "iphone.open", app }).catch(() => {});
   };
+  /** Developer Mode: whether Xcode opened from its causes (null: not asked), and a look at the iPhone under way. */
+  const [xcodeOpened, setXcodeOpened] = useState<boolean | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [checked, setChecked] = useState(false);
+  const [causesAsked, setCausesAsked] = useState(false);
+  const check = () => {
+    if (!homeId || checking) return;
+    setChecking(true);
+    void store
+      .request(homeId, { type: "iphone.look" })
+      .then(() => setChecked(true))
+      .catch((err: unknown) => toast(errorText(t, err), "alert"))
+      .finally(() => setChecking(false));
+  };
+  const openXcode = () => {
+    if (homeId)
+      void store
+        .request(homeId, { type: "iphone.open", app: "xcode" })
+        .then((r) => setXcodeOpened(r.opened))
+        .catch((err: unknown) => toast(errorText(t, err), "alert"));
+  };
+  const [terminal, setTerminal] = useState(false);
+  /** This Mac fixes its own Xcode (macOS asks for its password for `select`), or stops the fix. */
+  const fixXcode = (action: "start" | "cancel", kind: "select" | "update") => {
+    if (action === "start") setTerminal(false);
+    if (homeId)
+      void store
+        .request(homeId, { type: "iphone.fixXcode", action, kind })
+        .then(setSetup)
+        .catch((err: unknown) => toast(errorText(t, err), "alert"));
+  };
 
   const phone = iphoneHere(home?.status?.phones);
-  const { states, current, done } = iphoneSteps(setup, phone);
+  const reason = phone?.state === "ready" ? undefined : phone?.reason;
+  const restart = useIphoneRestart(phone ? { key: phone.serial, reason } : null);
+  const { states, current, done } = iphoneSteps(setup, phone, restart === "restarting");
   const mac = home?.status?.machine;
   // The server here's home points at its loopback, which a phone can't open: its public address instead.
   const server = home ? deviceServer(home, local) : null;
   const orgId = home?.status?.org?.id;
-  const reason = phone?.state === "ready" ? undefined : phone?.reason;
   const platform = setup?.platform;
   const macName = mac?.name ?? "";
   const phoneName = phone ? (phone.name ?? phone.model) : "";
   const tooOld = phone?.state === "unsupported";
   // A step that sits unchanged gets what most likely holds it. A download that moves is no stall, and an iPhone below
-  // iOS 17 gets nothing, nor a step whose own text already says what to do (a helper the person must act on, no team).
+  // iOS 17 gets nothing, nor a step whose own text already says what to do (a helper the person must act on, no team),
+  // nor one over Wi-Fi: those lines are about the cable.
   const progress = platform?.state === "downloading" ? `${platform.percent ?? ""}/${platform.done ?? ""}` : "";
   const quiet =
+    phone?.transport === "wifi" ||
     (tooOld && current === "connected") ||
     (current === "helper" && states.helper === "needs") ||
     (current === "account" && (!!setup?.noTeam || reason === "apple_team_missing"));
@@ -124,6 +166,27 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   );
   const [plugged, setPlugged] = useState(false);
   const looking = current === "connected" && !phone;
+  const near = useWifiIphones({ server, orgId: orgId ?? null, machineId: mac?.id ?? null }, looking);
+  const pickOverWifi = (serial: string) => near.pick(serial).catch((err: unknown) => toast(errorText(t, err), "alert"));
+  // iPhones on this Mac's Wi-Fi that trust it, under the step that waits for a cable.
+  const wifiOffer = near.available.map((p) => (
+    <span key={p.serial} className="dk-ip__act dk-ip__wifi">
+      <span className="ac-hintline">
+        <span>{t("devices.iphone.wifi.also", { name: p.name ?? p.model })}</span>
+        <InfoHint name={hintFor(t, t("devices.iphone.wifi.use"), t("devices.iphone.wifi.hint")).name}>
+          {t("devices.iphone.wifi.hint")}
+        </InfoHint>
+      </span>
+      <Button
+        size="sm"
+        loading={near.using === p.serial}
+        disabled={near.using !== null}
+        onClick={() => void pickOverWifi(p.serial)}
+      >
+        {t("devices.iphone.wifi.use")}
+      </Button>
+    </span>
+  ));
   const stall = (step: IphoneSetupStep) =>
     !setup
       ? t("desktop.iphone.checkingStall")
@@ -147,13 +210,115 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
   };
   const tip = hintFor(t, t("desktop.iphone.tip"), t("desktop.iphone.tipHint"));
   const title = (step: IphoneSetupStep) =>
-    step === "account" ? t("desktop.iphone.account") : t(`devices.iphone.steps.${step}`);
+    step === "account"
+      ? t("desktop.iphone.account")
+      : step === "xcode" && setup?.xcodeBlocked
+        ? t("devices.iphone.xcodeBlockedTitle")
+        : t(`devices.iphone.steps.${step}`);
+
+  const fix = setup?.fix;
+  const fixLine = (stage: XcodeFixStage, kind: "select" | "update") =>
+    stage === "asking"
+      ? t("devices.iphone.xcodeFix.asking", { mac: macName })
+      : stage === "running"
+        ? t(kind === "update" ? "devices.iphone.xcodeFix.updating" : "devices.iphone.xcodeFix.running", {
+            mac: macName,
+          })
+        : stage === "done"
+          ? t("devices.iphone.xcodeFix.done", { mac: macName })
+          : stage === "missed"
+            ? t("devices.iphone.xcodeFix.missed", { mac: macName })
+            : stage === "still"
+              ? t(
+                  fix?.still === "license"
+                    ? "devices.iphone.xcodeFix.stillLicense"
+                    : "devices.iphone.xcodeFix.stillCommandLineTools",
+                  { mac: macName },
+                )
+              : fix?.message
+                ? t("devices.iphone.xcodeFix.failed", { mac: macName, message: fix.message })
+                : t("devices.iphone.xcodeFix.failedAny", { mac: macName });
+  /** Xcode installed but not in use: this Mac fixes it behind its own password window, or the Terminal way. */
+  const blockedLine = (blocked: "command_line_tools" | "license"): ReactNode => {
+    const stage = xcodeFixStage(fix, "select", { mayFix: true, terminal });
+    if (stage === "terminal")
+      return (
+        <>
+          {t(blocked === "license" ? "devices.iphone.xcodeLicense" : "devices.iphone.xcodeCommandLineTools", {
+            mac: macName,
+          })}
+          <pre className="dk-ip__cmd">{XCODE_FIX_COMMAND}</pre>
+          <span className="dk-ip__act">
+            <Button size="sm" onClick={() => fixXcode("start", "select")}>
+              {t("devices.iphone.xcodeFix.fix")}
+            </Button>
+          </span>
+        </>
+      );
+    if (stage === "still")
+      return (
+        <>
+          {fixLine(stage, "select")}
+          <pre className="dk-ip__cmd">{XCODE_FIX_COMMAND}</pre>
+          <span className="dk-ip__act">
+            <Button size="sm" variant="primary" onClick={() => fixXcode("start", "select")}>
+              {t("desktop.common.retry")}
+            </Button>
+          </span>
+        </>
+      );
+    if (stage === "asking")
+      return (
+        <Act text={fixLine(stage, "select")}>
+          <Button size="sm" onClick={() => fixXcode("cancel", "select")}>
+            {t("desktop.common.cancel")}
+          </Button>
+        </Act>
+      );
+    if (stage === "running" || stage === "done") {
+      const step = stage === "done" ? 3 : (fix?.step ?? 0);
+      return (
+        <Act text={fixLine(stage, "select")}>
+          {(["select", "license", "firstLaunch"] as const).map((phase, i) => (
+            <span key={phase} className="ac-iconline dk-ip__phase" data-done={i < step ? "" : undefined}>
+              <Icon name={i < step ? "check" : "dash"} size={14} />
+              <span>{t(`devices.iphone.xcodeFix.phases.${phase}`)}</span>
+            </span>
+          ))}
+        </Act>
+      );
+    }
+    return (
+      <Act
+        text={
+          stage === "offer"
+            ? t(
+                blocked === "license" ? "devices.iphone.xcodeFix.license" : "devices.iphone.xcodeFix.commandLineTools",
+                {
+                  mac: macName,
+                },
+              )
+            : fixLine(stage, "select")
+        }
+      >
+        <Button size="sm" variant="primary" onClick={() => fixXcode("start", "select")}>
+          {stage === "offer" ? t("devices.iphone.xcodeFix.fix") : t("desktop.common.retry")}
+        </Button>
+        <Button size="sm" onClick={() => setTerminal(true)}>
+          {t("devices.iphone.xcodeFix.terminal")}
+        </Button>
+      </Act>
+    );
+  };
+  const updating =
+    setup?.fix?.kind === "update" ? xcodeFixStage(fix, "update", { mayFix: true, terminal: false }) : null;
 
   /** What the step under way says, and its one action. */
   const line = (step: IphoneSetupStep): ReactNode => {
     switch (step) {
       case "xcode":
         if (!setup) return t("desktop.iphone.checking");
+        if (setup.xcodeBlocked && reason !== "xcode_too_old") return blockedLine(setup.xcodeBlocked);
         return reason === "xcode_too_old" && phone?.osVersion ? (
           <>
             {t(setup.sdk ? "devices.iphone.xcodeOld" : "devices.iphone.xcodeOldAny", {
@@ -168,7 +333,20 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
               <Button size="sm" icon="external" onClick={() => open("appStore")}>
                 {t("desktop.iphone.updateXcode")}
               </Button>
+              <Button
+                size="sm"
+                disabled={updating === "running"}
+                loading={updating === "running"}
+                onClick={() => fixXcode("start", "update")}
+              >
+                {t(
+                  updating === "missed" || updating === "failed"
+                    ? "desktop.common.retry"
+                    : "devices.iphone.xcodeFix.update",
+                )}
+              </Button>
             </span>
+            {updating && updating !== "offer" && <span>{fixLine(updating, "update")}</span>}
           </>
         ) : reason === "xcode_too_old" ? (
           <Act text={reasonText(t, reason)}>
@@ -232,31 +410,75 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
       case "connected":
         return reason === "untrusted" ? (
           t("devices.iphone.trustText")
+        ) : phone && isIphoneWifiReason(reason) ? (
+          t(`devices.iphone.wifiState.${reason}`, { name: phoneName })
         ) : reason === "locked" ? (
           t("desktop.iphone.unlockText")
         ) : tooOld && phone ? (
           t("devices.iphone.tooOld", { name: phoneName, version: tooOldVersion(t, phone.osVersion) })
         ) : looking && !plugged && !stalled ? (
-          <Act text={t("devices.iphone.connectedText", { mac: macName })}>
-            <Button size="sm" onClick={() => setPlugged(true)}>
-              {t("devices.iphone.pluggedIn")}
-            </Button>
-          </Act>
+          <>
+            <Act text={t("devices.iphone.connectedText", { mac: macName })}>
+              <Button size="sm" onClick={() => setPlugged(true)}>
+                {t("devices.iphone.pluggedIn")}
+              </Button>
+            </Act>
+            {wifiOffer}
+          </>
         ) : (
-          t("devices.iphone.connectedText", { mac: macName })
+          <>
+            {t("devices.iphone.connectedText", { mac: macName })}
+            {wifiOffer}
+          </>
         );
       case "developerMode":
+        if (restart === "restarting") return t("devices.iphone.devModeRestarting");
         return (
           <>
-            {t("devices.iphone.devModeText")}
-            <SettingsPath
-              label={t("devices.onTheIphone")}
-              segments={[
-                t("devices.iphone.path.settings"),
-                t("devices.iphone.path.privacy"),
-                t("devices.iphone.path.devMode"),
-              ]}
-            />
+            {restart === "back" ? t("devices.iphone.devModeBack") : t("devices.iphone.devModeText")}
+            {restart !== "back" && (
+              <SettingsPath
+                label={t("devices.onTheIphone")}
+                segments={[
+                  t("devices.iphone.path.settings"),
+                  t("devices.iphone.path.privacy"),
+                  t("devices.iphone.path.devMode"),
+                ]}
+              />
+            )}
+            <span className="dk-ip__act">
+              <Button size="sm" icon="refresh" loading={checking} disabled={checking} onClick={check}>
+                {t("devices.iphone.devModeCheck")}
+              </Button>
+            </span>
+            {checked && <span>{t("devices.iphone.devModeStillOff")}</span>}
+            {stalled || causesAsked ? (
+              <section className="dk-ip__causes" aria-labelledby="dk-devmode-title">
+                <b id="dk-devmode-title">{t("devices.iphone.devModeMissing.title")}</b>
+                {/* biome-ignore lint/a11y/noRedundantRoles: Safari drops list semantics under list-style: none */}
+                <ul role="list">
+                  <li className="ac-actline">
+                    <span>
+                      {xcodeOpened
+                        ? t("devices.iphone.devModeMissing.opened", { mac: macName })
+                        : xcodeOpened === false
+                          ? t("devices.iphone.devModeMissing.hiddenOpen", { mac: macName })
+                          : t("devices.iphone.devModeMissing.hidden")}
+                    </span>
+                    {xcodeOpened === null && (
+                      <Button size="sm" icon="external" onClick={openXcode}>
+                        {t("devices.iphone.devModeMissing.openXcode")}
+                      </Button>
+                    )}
+                  </li>
+                  <li>{t("devices.iphone.devModeMissing.unlock")}</li>
+                </ul>
+              </section>
+            ) : (
+              <button type="button" className="ac-link" aria-expanded="false" onClick={() => setCausesAsked(true)}>
+                {t("devices.iphone.devModeMissing.title")}
+              </button>
+            )}
           </>
         );
       case "uiAutomation":
@@ -289,6 +511,8 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
             </>
           );
         if (reason === "team_limit") return t("devices.iphone.teamLimitText");
+        if (reason === "ios_behind_xcode" && phone?.osVersion && setup?.sdk)
+          return t("devices.iphone.iosBehind", { ios: phone.osVersion, sdk: setup.sdk });
         return states.helper === "active" ? t("desktop.iphone.helperBuilding") : t("desktop.iphone.helperText");
     }
   };
@@ -342,7 +566,7 @@ export function IphoneSetup({ onClose }: { onClose: () => void }) {
                       {(step === current || (step === "helper" && state === "todo")) && (
                         <span className="dk-fr__stepline" role={step === current ? "status" : undefined}>
                           {line(step)}
-                          {step === current && (stalled || (looking && plugged)) && (
+                          {step === current && step !== "developerMode" && (stalled || (looking && plugged)) && (
                             <span className="dk-ip__stall ac-iconline">
                               <Icon name="info" size={14} />
                               <span>{stall(step)}</span>

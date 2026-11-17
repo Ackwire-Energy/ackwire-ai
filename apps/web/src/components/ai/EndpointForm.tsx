@@ -5,6 +5,7 @@ import {
   CUSTOM_PROVIDER,
   checksInOrder,
   draftOfEndpoint,
+  ENDPOINT_SEARCH_FROM,
   ENDPOINT_STYLES,
   type EndpointDraft,
   emptyEndpointDraft,
@@ -12,7 +13,9 @@ import {
   endpointBaseExample,
   endpointModelsOf,
   endpointReady,
+  modelsShown,
   pricesProblem,
+  withChecks,
   withListedModels,
   withoutModel,
   withTypedModel,
@@ -29,6 +32,7 @@ import {
   Icon,
   Input,
   Locked,
+  SearchField,
   Segmented,
   SettingNote,
   Spinner,
@@ -42,7 +46,7 @@ import { useTranslation } from "react-i18next";
  * prices, then saves: the server runs one test call per model and the results show here. With `credential`, it
  * changes a saved endpoint's models and prices (its address and key stay). With `onCancel` it fills a dialog, its
  * body and footer; without, it is a block of a panel whose action comes up under it once there's something to save,
- * like the panel's own Salvar chave.
+ * like the panel's own Salvar chave. `onDone` gets the key with its models' tests just run.
  */
 export function EndpointForm({
   orgId,
@@ -56,7 +60,8 @@ export function EndpointForm({
   /** The form's first field, owned by the caller (the provider's select): locked and laid out with the rest. */
   lead?: ReactNode;
   onCancel?: () => void;
-  onDone: (saved: Credential) => void;
+  /** Its button stays busy while what it returns runs (the caller putting the key on an agent). */
+  onDone: (saved: Credential) => void | Promise<void>;
 }) {
   const { t } = useTranslation();
   const ids = useId();
@@ -67,6 +72,15 @@ export function EndpointForm({
   const [typedWrong, setTypedWrong] = useState(false);
   const typedBox = useRef<HTMLInputElement>(null);
   const [saved, setSaved] = useState<{ cred: Credential; checks: EndpointCheck[] } | null>(null);
+  const [closing, setClosing] = useState(false);
+  const [query, setQuery] = useState("");
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(new Set());
+  const search = (next: string) => {
+    setPinned(new Set(draft.models.filter((m) => m.on).map((m) => m.id)));
+    setQuery(next);
+  };
+  const searching = draft.models.length > ENDPOINT_SEARCH_FROM;
+  const shown = searching ? modelsShown(draft.models, query, pinned) : draft.models;
   const list = useEndpointModels(orgId);
   const add = useAddCredential(orgId);
   const change = useSetEndpointModels(orgId);
@@ -128,6 +142,11 @@ export function EndpointForm({
     return (
       <>
         <Body>
+          {saved.cred.reused && (
+            <SettingNote icon="check" live>
+              {t("settings.keyResaved")}
+            </SettingNote>
+          )}
           <b>{t("endpoint.results")}</b>
           <ul className="ac-iconlist endpoint-checks">
             {checksInOrder(draft, saved.checks).map((c) => {
@@ -144,7 +163,19 @@ export function EndpointForm({
           </ul>
         </Body>
         <Foot>
-          <Button variant="primary" onClick={() => onDone(saved.cred)}>
+          <Button
+            variant="primary"
+            loading={closing}
+            disabled={closing}
+            onClick={async () => {
+              setClosing(true);
+              try {
+                await onDone(withChecks(saved.cred, saved.checks));
+              } finally {
+                setClosing(false);
+              }
+            }}
+          >
             {t("endpoint.done")}
           </Button>
         </Foot>
@@ -262,7 +293,20 @@ export function EndpointForm({
               <span className="ac-field__label" id={`${ids}-choose`}>
                 {t("endpoint.choose")}
               </span>
-              {draft.models.map((m) => {
+              {searching && (
+                <SearchField
+                  aria-label={t("endpoint.search")}
+                  placeholder={t("endpoint.search")}
+                  value={query}
+                  onChange={(e) => search(e.target.value)}
+                  onClear={() => search("")}
+                  clearLabel={t("filters.clearSearch")}
+                />
+              )}
+              {searching && shown.length === 0 && (
+                <SettingNote icon="search">{t("endpoint.noMatch", { query: query.trim() })}</SettingNote>
+              )}
+              {shown.map((m) => {
                 const problem = m.on ? pricesProblem(m) : null;
                 return (
                   <div key={m.id} className="endpoint-model">

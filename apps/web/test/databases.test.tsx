@@ -5,7 +5,7 @@ setupDom();
 
 import { defaultDatabasePolicy } from "@agenteschat/client/lib/databases";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { pick, service } from "./catalog";
+import { openConnected, pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeDatabasesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -348,6 +348,7 @@ describe("Quais bancos: one database, or every database of the server", () => {
     await settle(8);
     const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
     expect(row.textContent).toContain("reader@db.acme.com · 3 bancos · bancos que começam com cliente_");
+    await openConnected();
     await click(within(row).getByRole("button", { name: "Atualizar a lista de bancos de Clientes" }));
     await settle(4);
     expect(state.calls.some((c) => c.method === "databases.serverDatabases" && c.args[2] === true)).toBe(true);
@@ -367,6 +368,7 @@ describe("Bancos of a connected database: ask before more databases open", () =>
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
     const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await openConnected();
     await click(within(row).getByRole("button", { name: "Bancos de Clientes" }));
     const updates = () => state.calls.filter((c) => c.method === "databases.update");
     return { updates };
@@ -420,6 +422,7 @@ describe("Bancos of a connected database: ask before more databases open", () =>
     await connected({}, [ADA_ID, ARCHIVED_ID]);
     await click(within(flow()).getByRole("button", { name: "Cancelar" }));
     const row = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await openConnected();
     await click(within(row).getByRole("button", { name: "Desconectar Clientes" }));
     expect(flow().textContent).toContain("1 agente perde o acesso na hora.");
     cleanup();
@@ -427,6 +430,7 @@ describe("Bancos of a connected database: ask before more databases open", () =>
     await connected({}, [ARCHIVED_ID]);
     await click(within(flow()).getByRole("button", { name: "Cancelar" }));
     const only = (await screen().findByText("Clientes")).closest(".connected-row") as HTMLElement;
+    await openConnected();
     await click(within(only).getByRole("button", { name: "Desconectar Clientes" }));
     expect(flow().textContent).toContain("Nenhum agente usa agora.");
   });

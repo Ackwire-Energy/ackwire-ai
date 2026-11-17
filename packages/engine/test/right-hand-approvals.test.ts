@@ -24,7 +24,7 @@ import {
   undoRightHandDecision,
   ValidationError,
 } from "../src";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, everyoneWithout, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -286,8 +286,9 @@ describe("the right hand approves for a person (ADR 0139 §2)", () => {
       handle: "solta",
     });
     expect(unattended.delegate).toBeNull();
-    // Bruno can't create agents: his own request with his right hand on goes to a person.
+    // Bruno can't create agents (Todos without Criar agentes): his own request with his right hand on goes to a person.
     const bruno = await addMember(f.db, f.org.id, "member", "bruno");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     await on(bruno.id);
     const his = await proposeAndDecide(await runFor({ userId: bruno.id }), { ...TRIAGEM, handle: "dele" });
     expect(his.delegate?.state).toBe("outside");
@@ -436,6 +437,11 @@ describe("the right hand approves for a person (ADR 0139 §2)", () => {
       setRightHandApprovals({ db: f.db }, f.owner.id, f.org.id, { guidance: "x".repeat(2001) }),
     ).rejects.toBeInstanceOf(ValidationError);
     const member = await addMember(f.db, f.org.id, "member", "nina");
+    expect((await getRightHandApprovals(f.db, member.id, f.org.id)).mayDecide).toEqual({
+      newAgents: true,
+      agentChanges: false,
+    });
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     expect((await getRightHandApprovals(f.db, member.id, f.org.id)).mayDecide).toEqual({
       newAgents: false,
       agentChanges: false,

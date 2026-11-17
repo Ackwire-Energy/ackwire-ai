@@ -1099,11 +1099,31 @@ describe("a person alone with the team (R2, ADR 0137)", () => {
     expect(decidedByOf("rule:alone", null)).toEqual(ALONE);
   });
 
+  /** What the router's own code stored of a decision, before any step's words. */
+  const reasonOf = async (messageId: string) =>
+    (await f.db.select().from(schema.routingDecisions).where(eq(schema.routingDecisions.messageId, messageId)))[0]
+      ?.reason;
+
   test("a thanks the step heard gets a reaction, not a run", async () => {
     await team();
     const thanks = await post("valeu");
     const thanked = scored({}, { needsAgent: 0.05, social: { react: true, emoji: "🙏" } });
     expect(await route(thanked, thanks.id)).toMatchObject({ selected: [], runs: [] });
+    // Nobody, and the decision says what decided: the need for an agent scored under the gate.
+    expect(await reasonOf(thanks.id)).toBe("under need gate");
+  });
+
+  test("nobody picked on a need score under the gate says so, before the step's words; a step without a score says nothing", async () => {
+    await team();
+    const bia = await addMember(f.db, f.org.id, "member", "Bia");
+    await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: bia.id });
+    const lunch = await post("vou almoçar, volto em uma hora");
+    const low = scored({}, { needsAgent: DEFAULT_ROUTER_POLICY.minScore - 0.3, reason: "small talk" });
+    expect(await route(low, lunch.id)).toMatchObject({ selected: [], runs: [] });
+    expect(await reasonOf(lunch.id)).toBe("under need gate; fixed: small talk");
+    const again = await post("volto em uma hora mesmo");
+    expect(await route(scored({}, { reason: "small talk" }), again.id)).toMatchObject({ selected: [], runs: [] });
+    expect(await reasonOf(again.id)).toBe("fixed: small talk");
   });
 
   test("with another person here, a greeting still wakes nobody", async () => {
@@ -1122,6 +1142,12 @@ describe("a person alone with the team (R2, ADR 0137)", () => {
     }
     const more = await post("bom dia de novo");
     expect(await route(scored({ ada: 0.3 }, greet), more.id)).toMatchObject({ selected: [], runs: [] });
+    expect(await reasonOf(more.id)).toBe("under need gate; default cap");
+    // Over the gate, it is the cap alone that left it with nobody.
+    const asked = await post("alguém pode me ajudar com uma coisa?");
+    const needed = scored({ ada: 0.3 }, { needsAgent: 0.7, reason: "no clear fit" });
+    expect(await route(needed, asked.id)).toMatchObject({ selected: [], runs: [] });
+    expect(await reasonOf(asked.id)).toBe("default cap; fixed: no clear fit");
   });
 
   test("never on an agent's greeting, a reply in another person's thread, or a greeting to a person", async () => {

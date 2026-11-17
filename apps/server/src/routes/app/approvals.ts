@@ -1,4 +1,5 @@
 import {
+  APPROVAL_REASON_MAX,
   COVER_MODES,
   cancelAheadApproval,
   decideApproval,
@@ -78,12 +79,22 @@ export const Approval = z
       description: 'Decided by someone covering this person (ADR 0139): "Aprovado por Bruno, cobrindo Ana".',
     }),
     decidedAt: z.string().nullable(),
+    supersededById: z.string().nullable().openapi({
+      description: "Canceled because the agent asked for the same action again in a later turn: that newer request.",
+    }),
     reason: z.string().nullable(),
     canDecide: z.boolean().openapi({ description: "You are the agent's owner or an admin, and it is pending." }),
     ownerUserId: z.string().nullable().openapi({ description: "The agent's owner (they and admins may decide)." }),
     executedAt: z.string().nullable().openapi({ description: "When the approved action ran." }),
     result: z
-      .object({ ok: z.boolean(), text: z.string() })
+      .object({
+        ok: z.boolean(),
+        text: z.string(),
+        notRunAfter: z.string().optional().openapi({
+          description:
+            "Not run: approved before this request, asked ahead of it on its card, was refused or expired (its id).",
+        }),
+      })
       .nullable()
       .openapi({ description: "What the action returned once it ran (raw, short)." }),
     connector: z.string().nullable().openapi({ example: "github" }),
@@ -132,6 +143,10 @@ export const Approval = z
         description:
           "Asked with `request_approval` (ADR 0126): who decides instead of the agent's owner and admins. Null: any other approval.",
       }),
+    routine: z.boolean().openapi({
+      description:
+        "Still waiting, and plain enough to approve along with others in one tap: a connected app's named action that is no merge, deploy, send, delete or payment and runs nothing its input says. The server alone decides it (`…/approvals/decide` with `only`).",
+    }),
   })
   .openapi("Approval");
 
@@ -190,7 +205,7 @@ const ApprovalParams = OrgParams.extend({ approvalId: z.uuid() });
 const AgentParams = OrgParams.extend({ agentId: z.uuid() });
 /** The card it was decided from, for the audit's "via" (ADR 0137 §4): ignored unless that card lists it. */
 const Via = z.uuid().optional().openapi({ description: "The right hand's approvals card it was decided from." });
-const Decision = z.object({ reason: z.string().max(1000).optional(), via: Via });
+const Decision = z.object({ reason: z.string().max(APPROVAL_REASON_MAX).optional(), via: Via });
 const Approve = Decision.extend({
   always: z.boolean().optional().openapi({
     description:
@@ -261,8 +276,12 @@ export function approvalRoutes(deps: AppDeps) {
           z.object({
             ids: z.array(z.uuid()).min(1).max(50),
             decision: z.enum(["approve", "refuse"]),
-            reason: z.string().max(1000).optional(),
+            reason: z.string().max(APPROVAL_REASON_MAX).optional(),
             via: Via,
+            only: z.literal("routine").optional().openapi({
+              description:
+                "Decide only the ones the server calls `routine` among these ids. Every other stays waiting and comes back in `skipped`.",
+            }),
           }),
         ),
       },
@@ -270,9 +289,10 @@ export function approvalRoutes(deps: AppDeps) {
         200: json(
           z.object({
             approvals: z.array(Approval),
-            skipped: z
-              .array(z.uuid())
-              .openapi({ description: "Not decided: already decided, not found, or not yours to decide." }),
+            skipped: z.array(z.uuid()).openapi({
+              description:
+                "Not decided: already decided, not found, not yours to decide, or not `routine` with `only`.",
+            }),
           }),
         ),
         ...errors,

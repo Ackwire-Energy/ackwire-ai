@@ -59,8 +59,10 @@ import {
   proposeChannelMove,
   publishAgentsChanged,
   publishMachineAgentsChanged,
+  removeCredentialCopies,
   requirePermission,
   revokeCredential,
+  rightHandWidgetsReady,
   SETUP_AGENTS_MAX,
   seesAgentDetails,
   setAgentAppearance,
@@ -104,6 +106,7 @@ import {
   AgentBrakes,
   AgentSetup,
   AgentSetupResult,
+  ApprovalsLevel,
   BrainEffortSetting,
   BrainKind,
   BrainMachine,
@@ -121,6 +124,7 @@ import {
   ProviderId,
   SetupStep,
   Usage,
+  WorkState,
 } from "./schemas";
 
 const tags = ["Agents"];
@@ -197,6 +201,10 @@ const AgentFields = z.object({
   }),
   brakes: AgentBrakes.partial().optional().openapi({
     description: "Its autonomy brakes (ADR 0131); the fields given change, the rest stay. Needs `manage_agents`.",
+  }),
+  approvalsLevel: ApprovalsLevel.nullable().optional().openapi({
+    description:
+      "How much it asks before acting (ADR 0173), as its own choice. Null: it follows the workspace's level again. Needs `manage_agents`. A new agent follows the workspace. It never widens what the agent may use.",
   }),
 });
 
@@ -379,6 +387,7 @@ const TeamProposalCard = z
 /** Provider credentials, agents, usage and the model catalog. */
 export function agentRoutes(deps: AppDeps) {
   const { db, adapters } = deps;
+  const keyWrappers = [adapters.keyWrapper, ...adapters.legacyKeyWrappers];
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
   app.use("/models", requireSession(deps.auth));
@@ -439,7 +448,7 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 200: json(z.object({ credentials: z.array(Credential) })), ...errors },
     }),
     async (c) => {
-      const rows = await listCredentials(db, c.get("user").id, c.req.valid("param").orgId);
+      const rows = await listCredentials(db, c.get("user").id, c.req.valid("param").orgId, keyWrappers);
       return c.json({ credentials: rows.map(credentialOut) }, 200);
     },
   );
@@ -492,7 +501,12 @@ export function agentRoutes(deps: AppDeps) {
         userId,
         orgId,
         { ...input, ...(endpoint ? { endpoint: { ...endpoint, models: endpoint.models.map(modelIn) } } : {}) },
-        { fetch: deps.extras?.http, net: endpointNet(deps), verify: (await keyTester(deps, userId))?.verifyKey },
+        {
+          fetch: deps.extras?.http,
+          net: endpointNet(deps),
+          verify: (await keyTester(deps, userId))?.verifyKey,
+          keyWrappers,
+        },
       );
       const checks = row.endpoint ? await endpointChecks(deps, userId, orgId, row.id) : undefined;
       return c.json({ ...credentialOut(row), ...(checks ? { checks } : {}) }, 201);
@@ -580,6 +594,24 @@ export function agentRoutes(deps: AppDeps) {
       if (purge) await deleteCredential(db, c.get("user").id, orgId, credentialId, { release });
       else await revokeCredential(db, c.get("user").id, orgId, credentialId);
       return c.body(null, 204);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/credentials/{credentialId}/remove-copies",
+      tags,
+      security,
+      summary: "Fold the other saved copies of this key into it (admins)",
+      description:
+        "The same key saved more than once (`copies` in the list) keeps this row: the agents, defaults, endpoint models and past spend of each copy move to it, then the copies are deleted.",
+      request: { params: OrgParams.extend({ credentialId: z.uuid() }) },
+      responses: { 200: json(z.object({ removed: z.number().int() })), ...errors },
+    }),
+    async (c) => {
+      const { orgId, credentialId } = c.req.valid("param");
+      return c.json(await removeCredentialCopies(db, keyWrappers, c.get("user").id, orgId, credentialId), 200);
     },
   );
 
@@ -692,13 +724,26 @@ export function agentRoutes(deps: AppDeps) {
                     "plan_inactive",
                     "commands_off",
                     "plan_not_shared",
+                    "plans_not_yours",
                     "runner_outdated",
                     "plan_tools",
                   ])
                   .optional(),
                 own: z.enum(["claude_code", "codex", "cursor", "opencode", "grok", "antigravity"]).optional(),
+                owner: z.string().optional().openapi({
+                  description:
+                    "With `plans_not_yours`: whose the workspace's plans are (each serves only the person who connected it).",
+                }),
+                plan: z
+                  .string()
+                  .optional()
+                  .openapi({ description: 'With `plans_not_yours`: what that plan is ("Claude").' }),
                 provider: z.string().optional().openapi({
                   description: "Ready on an API key with Automático: the maker of the key it thinks with.",
+                }),
+                background: z.enum(["ready", "no_ai", "waiting"]).optional().openapi({
+                  description:
+                    "Its state for background work (a routine, a widget's build) where that differs from `state`: background work never falls back on the model brain, and the right hand's thinks with the workspace's own AI, nobody's.",
                 }),
               }),
             ),
@@ -711,6 +756,10 @@ export function agentRoutes(deps: AppDeps) {
             apiKey: z.boolean(),
             /** Memory reflects on finished conversations: a summary model it can call (ADR 0167). */
             reflection: z.boolean(),
+            widgetsReady: z.array(z.string()).openapi({
+              description:
+                "The right hand's widgets waiting for an AI, or stopped after failing in a row, whose build has one now, among those the viewer sees: whose AI its build thinks with is each widget's own people's (who made it, its routine's creator, else the workspace's).",
+            }),
           }),
         ),
         ...errors,
@@ -722,12 +771,13 @@ export function agentRoutes(deps: AppDeps) {
       await requirePermission(db, userId, orgId, "read");
       const status = aiStatusDeps(deps);
       const context = deps.extras?.context;
-      const [ai, routing, reflection] = await Promise.all([
+      const [ai, routing, reflection, widgetsReady] = await Promise.all([
         orgAiStatus(status, orgId, userId),
         orgRouting(status, deps.extras?.router?.routing ?? null, orgId, userId),
         context ? summaryModelReady(context, orgId) : false,
+        rightHandWidgetsReady({ db, ai: status }, orgId, userId),
       ]);
-      return c.json({ ...ai, ...routing, reflection }, 200);
+      return c.json({ ...ai, ...routing, reflection, widgetsReady }, 200);
     },
   );
 
@@ -799,6 +849,39 @@ export function agentRoutes(deps: AppDeps) {
                   description:
                     "Something of its own thinks now (a run, or long work at work): drawn at work whatever its AI reads as for the viewer.",
                 }),
+                work: z
+                  .object({
+                    state: WorkState.openapi({
+                      description:
+                        "`you`: it waits on your decision (you may decide its approval) or your answer; `working`; waiting on someone else's approval or answer, on its computer or its AI provider; `queued`: in line; `later`: nothing on, and a return it set comes at `at` where you read.",
+                    }),
+                    ask: z.enum(["approval", "answer"]).nullable().openapi({ description: "With `you`: on what." }),
+                    since: z.string().openapi({
+                      description:
+                        "Working: since the hand-off (work another agent handed it), else since the run started. Waiting or in line: since the wait began.",
+                    }),
+                    runId: z.uuid(),
+                    channelId: z.uuid().nullable().openapi({
+                      description:
+                        "Where it shows when you read it: its conversation, or for work another agent handed it, where that agent handed it off. Null otherwise.",
+                    }),
+                    channelKind: z.enum(["channel", "dm", "task"]).nullable(),
+                    channelName: z.string().nullable(),
+                    threadId: z.uuid().nullable(),
+                    messageId: z
+                      .uuid()
+                      .nullable()
+                      .openapi({ description: "The reply that handed it off, once posted." }),
+                    forAgentId: z.uuid().nullable().openapi({ description: "The agent that handed it off." }),
+                    routine: z.boolean().openapi({ description: "A routine's work: no conversation holds it." }),
+                    count: z.number().int().openapi({ description: "How many runs it has on." }),
+                    at: z.string().optional().openapi({ description: "With `later`: when it comes back (ISO)." }),
+                  })
+                  .nullable()
+                  .openapi({
+                    description:
+                      "Its most important work for you (waiting on you, working, waiting on someone else, in line, a return to come; then the oldest), with where it shows if you read that conversation (ADR 0084). Null: none.",
+                  }),
               }),
             ),
           }),
@@ -965,7 +1048,7 @@ export function agentRoutes(deps: AppDeps) {
       responses: { 201: json(Agent, "Created"), ...errors },
     }),
     async (c) => {
-      const { monthlyBudgetUsd, audience, appearance, proposal, brakes: _brakes, ...input } = c.req.valid("json");
+      const { monthlyBudgetUsd, audience, appearance, proposal, brakes, ...input } = c.req.valid("json");
       const orgId = c.req.valid("param").orgId;
       const make = () =>
         createAgent(
@@ -975,6 +1058,7 @@ export function agentRoutes(deps: AppDeps) {
           {
             ...input,
             monthlyBudgetNanoUsd: budget(monthlyBudgetUsd),
+            ...(brakes ? { autonomyBrakes: brakes } : {}),
             // A restricted one is born answering only its owner, so an audience refused below never leaves it open.
             ...(audience && audience.mode !== "everyone" ? { audienceMode: "owner" as const } : {}),
           },
@@ -1891,7 +1975,7 @@ export function agentRoutes(deps: AppDeps) {
             }),
             account: z.uuid().nullable().optional().openapi({
               description:
-                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`), or anyone's there for someone with `use_others_plans` (its owner is told, `account.lent`).",
+                "An account on the agent's computer of the brain's kind (ADR 0041); null = the computer's own sign-in; omitted = keep (cleared when the brain kind changes). One of the agent's owner's accounts, chosen by its owner or an admin (`account.not_owner`), or anyone's there that serves the whole workspace (`account.lent` in the audit).",
             }),
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",

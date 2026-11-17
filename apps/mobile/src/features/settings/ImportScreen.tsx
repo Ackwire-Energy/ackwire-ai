@@ -1,5 +1,5 @@
 import { useApi } from "@agenteschat/client";
-import { can } from "@agenteschat/client/lib/permissions";
+import { can, makesAgents } from "@agenteschat/client/lib/permissions";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { Directory, File, Paths } from "expo-file-system";
 import * as Sharing from "expo-sharing";
@@ -10,6 +10,7 @@ import { appHeaders, readCookie } from "@/lib/auth";
 import { useOrg } from "@/providers/org";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
+import { IMPORT_AGENTS_HREF } from "../agents/import";
 import { Note, openPage } from "../ai/parts";
 import { successHaptic } from "../shared/parts";
 import { exportFileName } from "./logic";
@@ -18,7 +19,7 @@ import { SettingsPage } from "./parts";
 /**
  * Importar e exportar (who creates agents; the export, who manages them), as the web's, as far as a phone goes: this
  * workspace as a file (the share sheet saves it to Arquivos or sends it on), with what it never carries and what goes
- * in it. Bringing agents from another app opens Criar agente on that step.
+ * in it. Bringing agents from another app opens Criar agente on that step, never in a workspace being deleted.
  */
 export function ImportScreen() {
   const { t, i18n } = useTranslation();
@@ -86,15 +87,19 @@ export function ImportScreen() {
               <GroupedFooter>{t("settings.import.neverLine")}</GroupedFooter>
             </>
           ) : null}
-          <GroupedHeader>{t("settings.import.title")}</GroupedHeader>
-          <GroupedList>
-            <GroupedRow
-              icon="archive"
-              label={t("shell.importAgents")}
-              chevron
-              onPress={() => router.push("/new-agent?import=1" as never)}
-            />
-          </GroupedList>
+          {makesAgents(org) ? (
+            <>
+              <GroupedHeader>{t("settings.import.title")}</GroupedHeader>
+              <GroupedList>
+                <GroupedRow
+                  icon="archive"
+                  label={t("shell.importAgents")}
+                  chevron
+                  onPress={() => router.push(IMPORT_AGENTS_HREF as never)}
+                />
+              </GroupedList>
+            </>
+          ) : null}
         </>
       )}
     </SettingsPage>

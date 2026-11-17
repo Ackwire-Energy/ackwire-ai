@@ -1,6 +1,7 @@
 import type { MailAdapters } from "@agenteschat/adapters";
-import { and, type Database, eq, inArray, isNull, schema } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, inArray, isNull, schema } from "@agenteschat/db";
 import { ValidationError } from "../errors";
+import { isRightHandId } from "../right-hand";
 import { hasScope } from "../tools/scopes";
 import { composioUserId } from "./accounts";
 import { normalizeAddressRule } from "./text";
@@ -48,8 +49,17 @@ export function gmailQuery(filter: MailFilter): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
-/** The mailbox a routine may watch: connected in the org, and readable by the routine's agent. */
-export async function checkWatchable(db: Database, orgId: string, agentId: string, accountId: string) {
+/**
+ * The mailbox a routine may watch: connected in the org, and readable by the routine's agent. The right hand answers
+ * everyone and uses a mailbox only for who connected it (ADR 0137), so its routine watches only its creator's own.
+ */
+export async function checkWatchable(
+  db: Database,
+  orgId: string,
+  agentId: string,
+  accountId: string,
+  creatorId: string | null,
+) {
   const [account] = await db
     .select()
     .from(mailAccounts)
@@ -57,13 +67,27 @@ export async function checkWatchable(db: Database, orgId: string, agentId: strin
   if (!account || account.status === "pending") {
     throw new ValidationError("Pick a connected mailbox", "routine.mail_account_not_found");
   }
-  if (!(await hasScope(db, orgId, agentId, accountId, "mail:read"))) {
+  if (
+    !(await hasScope(db, orgId, agentId, accountId, "mail:read")) ||
+    !(await watchesFor(db, orgId, agentId, account, creatorId))
+  ) {
     throw new ValidationError(
       "Let the agent read this mailbox before it can watch it",
       "routine.mail_agent_cannot_read",
     );
   }
   return account;
+}
+
+/** Whether a routine of `agentId` made by `creatorId` may be handed this mailbox's mail: the right hand's only its creator's own. */
+export async function watchesFor(
+  db: Executor,
+  orgId: string,
+  agentId: string,
+  account: { createdByUserId: string | null },
+  creatorId: string | null,
+) {
+  return !(await isRightHandId(db, orgId, agentId)) || (!!creatorId && account.createdByUserId === creatorId);
 }
 
 export async function watchesOf(db: Database, routineIds: string[]) {

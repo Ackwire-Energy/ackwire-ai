@@ -1,5 +1,6 @@
-import { type BlockChange, useBlockReply, useBlockValues } from "@agenteschat/client";
+import { type BlockChange, newClientId, useBlockReply, useBlockValues } from "@agenteschat/client";
 import type { ChartSpec } from "@agenteschat/client/lib/chart";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { Button, Field, Input, Segmented, Switch, Textarea } from "@agenteschat/ui";
 import {
   type BlockViewPart,
@@ -15,6 +16,7 @@ import { ChartAccent, ChartView } from "@/components/ChartBlock";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useReveal } from "@/hooks/useReveal";
 import { useToast } from "@/lib/toast";
 import "./spec-block.css";
 
@@ -74,6 +76,8 @@ export function SpecBlock({
   );
   const [sent, setSent] = useState<Sent | null>(keptOf(blockKey).sent ?? null);
   const [open, setOpen] = useState(keptOf(blockKey).open ?? false);
+  const shown = useRef<HTMLDivElement>(null);
+  const reveal = useReveal(shown, open);
   const body = useRef<HTMLDivElement>(null);
   const [height, setHeight] = useState(0);
   useLayoutEffect(() => {
@@ -99,16 +103,17 @@ export function SpecBlock({
   }
 
   const tall = !big && height > INLINE_HEIGHT;
-  const toggleOpen = () => {
-    keptOf(blockKey).open = !open;
-    setOpen(!open);
+  const openWhole = () => {
+    reveal();
+    keptOf(blockKey).open = true;
+    setOpen(true);
   };
   const send = () => {
     const draft = view.send;
     if (!draft?.ready || reply.isPending) return;
     const text = draft.text;
     reply.mutate(
-      { text, clientId: crypto.randomUUID() },
+      { text, clientId: newClientId() },
       {
         onSuccess: () => {
           const done = { text, at: new Date().toISOString() };
@@ -124,6 +129,7 @@ export function SpecBlock({
   return (
     <ChartAccent.Provider value={colorOf(agent)}>
       <div
+        ref={shown}
         className="live-block__view"
         data-cut={(tall && !open) || undefined}
         style={big || !tall ? undefined : { height: open ? height : INLINE_HEIGHT }}
@@ -132,16 +138,10 @@ export function SpecBlock({
           <Parts parts={view.parts} values={values} />
         </div>
       </div>
-      {tall && (
+      {tall && !open && (
         <div className="live-block__more">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            aria-expanded={open}
-            onClick={toggleOpen}
-          >
-            {open ? t("blocks.showLess") : t("blocks.showAll")}
+          <Button variant="ghost" size="sm" icon="chevronDown" onClick={openWhole}>
+            {t("channel.long.more")}
           </Button>
         </div>
       )}
@@ -150,7 +150,7 @@ export function SpecBlock({
           <div className="live-block__foot">
             <span className="live-block__sent">
               <span className="live-block__mark" aria-hidden="true" />
-              {t("blocks.sentAt", { time: new Date(sent.at).toLocaleTimeString([], { timeStyle: "short" }) })}
+              {t("blocks.sentAt", { time: formatTime(i18n.language, sent.at) })}
             </span>
           </div>
         ) : (

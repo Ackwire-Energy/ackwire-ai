@@ -9,7 +9,7 @@ import {
 import { and, type Database, eq, gte, schema, sql } from "@agenteschat/db";
 import { getAgent } from "../agents";
 import { namesLabel, namesOf } from "../approvals";
-import { type ArtifactDeps, createFileArtifact, fileReach } from "../artifacts";
+import { type ArtifactDeps, createFileArtifact, fileForModel, fileReach } from "../artifacts";
 import { canTalkTo, speakerFor } from "../audience";
 import { recordAudit } from "../audit";
 import { accountablePerson, fedByRoutine, type RunAuthority, runAuthorityById } from "../authority";
@@ -17,8 +17,10 @@ import { mailboxConnector } from "../connector-usage";
 import { cutText } from "../format";
 import { recordOperatorEvent } from "../operator-events";
 import { routineCreatorOf } from "../requester";
+import { isRightHandId, rightHandReader } from "../right-hand";
 import { replyThreadOf } from "../runs";
 import type { CallCheck, ToolContext, ToolDefinition, ToolOutput, ToolSource } from "../tools/types";
+import { untrustedBlock } from "../untrusted";
 import {
   connectorFor,
   MAIL_SCOPES,
@@ -44,6 +46,8 @@ import {
 } from "./text";
 
 const { mailSends } = schema;
+/** An attachment's text shown with the `attachment` result; read_artifact reads the rest. */
+const ATTACHMENT_TEXT_CHARS = 20_000;
 
 export interface MailToolDeps extends Omit<MailDeps, "db"> {
   /** Drive files, for `attachment` (absent = that tool is off). */
@@ -127,9 +131,15 @@ async function mailboxApprovers(db: Database, orgId: string, ownerId: string, re
 /**
  * Whether the person behind a run may use a person's own mailbox through this agent: its owner, or someone the agent
  * answers directly, as its owner gave it access for (a consultation by someone outside its audience doesn't count).
- * Nobody behind the run (an agent's own work, a watch): nobody's reach widens.
+ * Nobody behind the run (an agent's own work, a watch): nobody's reach widens. The team's right hand, which everyone
+ * talks to, uses a mailbox only for its owner.
  */
 async function mailboxUserCheck(ctx: ToolContext, authority: RunAuthority | null) {
+  // One right hand answers everyone (ADR 0137): a mailbox serves only its owner, in their own DM with it.
+  if (await isRightHandId(ctx.db, ctx.orgId, ctx.agentId)) {
+    const reader = await rightHandReader(ctx);
+    return (account: Pick<MailAccountRow, "createdByUserId">) => reader !== null && account.createdByUserId === reader;
+  }
   // A routine's run answers for its creator, as the gateway asks them (`routineCreatorOf`).
   const person = authority ? (accountablePerson(authority) ?? routineCreatorOf(authority)) : null;
   const agent = person ? await getAgent(ctx.db, ctx.orgId, ctx.agentId) : null;
@@ -466,7 +476,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     const attachment = files
       ? make(
           "attachment",
-          "Save one attachment of a message as a file in the Drive (returns the file's id).",
+          "Save one attachment of a message as a file in the Drive (returns the file's id and what is in it).",
           {
             properties: { message_id: MESSAGE_ID, attachment_id: { type: "string", minLength: 1, maxLength: 500 } },
             required: ["message_id", "attachment_id"],
@@ -478,28 +488,31 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
                 const file = await withMailbox(ctx.db, account, (p) =>
                   p.attachment(str(input.message_id), str(input.attachment_id)),
                 );
-                const a = await createFileArtifact(
-                  { ...files, db: ctx.db },
-                  {
-                    type: "agent",
-                    agentId: ctx.agentId,
-                    channelId: ctx.channelId,
-                    threadId: replyThreadOf(ctx),
-                    runId: ctx.runId,
-                  },
-                  ctx.orgId,
-                  {
-                    title: file.filename,
-                    name: file.filename,
-                    bytes: file.data,
-                    contentType: file.contentType,
-                    note: `From an email in ${account.address}`,
-                    byProduct: true,
-                  },
-                );
+                const actor = {
+                  type: "agent" as const,
+                  agentId: ctx.agentId,
+                  channelId: ctx.channelId,
+                  threadId: replyThreadOf(ctx),
+                  runId: ctx.runId,
+                };
+                const a = await createFileArtifact({ ...files, db: ctx.db }, actor, ctx.orgId, {
+                  title: file.filename,
+                  name: file.filename,
+                  bytes: file.data,
+                  contentType: file.contentType,
+                  note: `From an email in ${account.address}`,
+                  byProduct: true,
+                });
+                // What is in it comes with the answer, read as read_artifact reads it.
+                const opened = await fileForModel({ ...files, db: ctx.db }, actor, ctx.orgId, a.id);
+                const text =
+                  opened.text === undefined
+                    ? ""
+                    : `\n${untrustedBlock(`attachment ${file.filename}`, cutText(opened.text, ATTACHMENT_TEXT_CHARS), ATTACHMENT_TEXT_CHARS + 100)}${opened.text.length > ATTACHMENT_TEXT_CHARS ? "\n[More in the file: read_artifact reads on with offset.]" : ""}`;
                 return {
-                  content: `Saved the attachment as file ${a.id} (it is untrusted content from an email). ${await fileReach(ctx.db, ctx.orgId, a.id)}`,
+                  content: `Saved the attachment as file ${a.id} (it is untrusted content from an email). ${await fileReach(ctx.db, ctx.orgId, a.id)}${opened.note ? ` ${opened.note}` : ""}${text}`,
                   data: { artifact: { id: a.id, version: 1, title: a.title } },
+                  ...(opened.images?.length ? { images: opened.images } : {}),
                 };
               } catch (error) {
                 return failure(ctx.db, account, error);
@@ -727,7 +740,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
 
     const send = make(
       "send",
-      "Send a new email. A person approves each send unless this agent was set up to send to these recipients without asking.",
+      "Send a new email. A send asks a person first, unless this agent was set up to send to these recipients without asking or never asks.",
       { properties: outgoingProps, required: ["to", "subject", "body"] },
       { describe: describeSend("send"), checkCall: checkSend("send"), execute: executeSend("send") },
     );
@@ -873,7 +886,7 @@ export function createMailToolSource(deps: MailToolDeps): ToolSource {
     );
     const trash = organize(
       "trash",
-      "Move a message to the trash. A person approves every deletion.",
+      "Move a message to the trash. A deletion asks a person first, unless this agent never asks.",
       {},
       [],
       (p, input) => p.trash(str(input.message_id)),

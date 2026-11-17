@@ -1123,8 +1123,11 @@ export interface WikiImportNote {
   attachments?: Record<string, string>;
 }
 
+/** Where an import's notes came from: an Obsidian vault, a GitHub link, or Markdown files. */
+export const WIKI_IMPORT_SOURCES = ["obsidian", "github", "files"] as const;
+
 export interface WikiImportInput {
-  source: { type: "obsidian"; name: string };
+  source: { type: (typeof WIKI_IMPORT_SOURCES)[number]; name: string };
   notes: WikiImportNote[];
   /** Put everything under this folder (empty = merge with the wiki's own folders). */
   folder?: string;
@@ -1143,6 +1146,13 @@ const importTitle = (name: string) =>
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, WIKI_LIMITS.title);
+
+/** An import without a name of its own. */
+const SOURCE_NAME: Record<WikiImportInput["source"]["type"], string> = {
+  obsidian: "Obsidian",
+  github: "GitHub",
+  files: "Markdown",
+};
 
 /**
  * Imports notes (an Obsidian vault, read by the app) as pages: one version
@@ -1171,7 +1181,7 @@ export async function importWikiPages(
       max: WIKI_IMPORT_MAX_NOTES,
     });
   }
-  const sourceName = input.source.name.replace(/\s+/g, " ").trim().slice(0, 80) || "Obsidian";
+  const sourceName = input.source.name.replace(/\s+/g, " ").trim().slice(0, 80) || SOURCE_NAME[input.source.type];
   const base = cleanFolder(input.folder);
   const skipped: string[] = [];
   const failed: { title: string; reason: "title" | "too_long" }[] = [];

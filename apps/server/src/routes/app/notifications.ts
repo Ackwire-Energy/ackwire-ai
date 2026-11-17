@@ -1,6 +1,8 @@
 import { SCREEN_KINDS } from "@agenteschat/adapters";
 import {
+  askAdmins,
   listNotifications,
+  markAllNotificationsDone,
   markAllNotificationsRead,
   markNotificationDone,
   markNotificationRead,
@@ -20,6 +22,49 @@ const tags = ["Notifications"];
 
 const Actor = z.object({ type: z.enum(["user", "agent"]), id: z.string() });
 
+/** Where a notification is from and what it opens. */
+export const NotificationSource = z.object({
+  channelId: z.string().optional(),
+  threadId: z.string().optional(),
+  messageId: z.string().optional(),
+  dmId: z.string().optional(),
+  issueId: z.string().optional(),
+  issueNumber: z.number().int().optional(),
+  topicId: z.string().optional(),
+  approvalId: z.string().optional(),
+  questionId: z.string().optional(),
+  missionId: z.string().optional(),
+  routineId: z.string().optional(),
+  machineId: z.string().optional(),
+  handoffId: z.string().optional(),
+  proposalId: z
+    .string()
+    .optional()
+    .openapi({ description: "`change_request`: the proposal to decide (`POST …/proposals/{id}/accept`)." }),
+  action: z.string().optional().openapi({
+    description: "`change_request` of a right hand's card (`messageId`, `GET …/action-cards/{messageId}`): its action.",
+  }),
+  screen: z.enum(SCREEN_KINDS).optional(),
+  agentId: z
+    .string()
+    .optional()
+    .openapi({ description: "`org_standing` to `agent_hold`: the agent held (its name in `label`)." }),
+  userId: z
+    .string()
+    .optional()
+    .openapi({ description: "`agent_unreached`: the routine's creator, whom the agent's owner may let in." }),
+  dashboardId: z
+    .string()
+    .optional()
+    .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135)." }),
+  widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
+  accountId: z
+    .string()
+    .optional()
+    .openapi({ description: "`plan_lent`: the plan's account (`POST …/ai-accounts/{id}/take-back`)." }),
+  label: z.string().optional(),
+});
+
 const Notification = z
   .object({
     id: z.uuid(),
@@ -27,48 +72,7 @@ const Notification = z
     waiting: z.boolean(),
     actors: z.array(Actor),
     count: z.number().int(),
-    source: z.object({
-      channelId: z.string().optional(),
-      threadId: z.string().optional(),
-      messageId: z.string().optional(),
-      dmId: z.string().optional(),
-      issueId: z.string().optional(),
-      issueNumber: z.number().int().optional(),
-      topicId: z.string().optional(),
-      approvalId: z.string().optional(),
-      questionId: z.string().optional(),
-      missionId: z.string().optional(),
-      routineId: z.string().optional(),
-      machineId: z.string().optional(),
-      handoffId: z.string().optional(),
-      proposalId: z
-        .string()
-        .optional()
-        .openapi({ description: "`change_request`: the proposal to decide (`POST …/proposals/{id}/accept`)." }),
-      action: z.string().optional().openapi({
-        description:
-          "`change_request` of a right hand's card (`messageId`, `GET …/action-cards/{messageId}`): its action.",
-      }),
-      screen: z.enum(SCREEN_KINDS).optional(),
-      agentId: z
-        .string()
-        .optional()
-        .openapi({ description: "`org_standing` to `agent_hold`: the agent held (its name in `label`)." }),
-      userId: z
-        .string()
-        .optional()
-        .openapi({ description: "`agent_unreached`: the routine's creator, whom the agent's owner may let in." }),
-      dashboardId: z
-        .string()
-        .optional()
-        .openapi({ description: "`widget_alert`, `widget_failed`, `dashboard_proposal`: the board (ADR 0135)." }),
-      widgetId: z.string().optional().openapi({ description: "`widget_alert`, `widget_failed`: the widget." }),
-      accountId: z
-        .string()
-        .optional()
-        .openapi({ description: "`plan_lent`: the plan's account (`POST …/ai-accounts/{id}/take-back`)." }),
-      label: z.string().optional(),
-    }),
+    source: NotificationSource,
     latest: z.object({
       text: z.string().optional(),
       title: z.string().optional(),
@@ -91,6 +95,10 @@ const Notification = z
         .string()
         .optional()
         .openapi({ description: "`routine_paused`: why it paused; `routine_failed`: its run's code (both coded)." }),
+      detail: z.string().optional().openapi({
+        description:
+          "`widget_failed` with `missing_credential`: why its agent has no AI (`no_key`, `not_signed_in`, `plan_not_shared`…, coded).",
+      }),
       origin: ApprovalOrigin.optional().openapi({
         description: "`approval`: asked while nobody watched, by a routine or by unattended work.",
       }),
@@ -127,6 +135,10 @@ const Notification = z
       cloud: z.boolean().optional().openapi({
         description:
           "`org_standing` on agentes.chat Cloud: the apps read `text` as the restriction, with how to contest it.",
+      }),
+      still: z.number().optional().openapi({
+        description:
+          "A reminder of what the person left unread in the waiting inbox: how many things still wait, this one included.",
       }),
     }),
     readAt: z.string().nullable(),
@@ -231,6 +243,25 @@ export function notificationRoutes(deps: AppDeps) {
   app.openapi(
     createRoute({
       method: "post",
+      path: "/organizations/{orgId}/notifications/done-all",
+      tags,
+      security,
+      summary: "Done for everything (in a filter) but what waits on you; returns the ids changed, for the undo",
+      description:
+        "Each leaves the inbox as with `POST …/{notificationId}/done` (undo it there with `done: false`). Approvals and questions waiting on you stay until answered; `waiting` and `done` change nothing.",
+      request: { params: OrgParams, body: body(z.object({ filter: Filter.optional() })) },
+      responses: { 200: json(z.object({ ids: z.array(z.uuid()) })), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { filter } = c.req.valid("json");
+      return c.json(await markAllNotificationsDone(nd, c.get("user").id, orgId, filter), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
       path: "/organizations/{orgId}/notifications/{notificationId}/read",
       tags,
       security,
@@ -318,6 +349,30 @@ export function notificationRoutes(deps: AppDeps) {
       const { category, on } = c.req.valid("json");
       return c.json(await setNoticePref(db, orgId, c.get("user").id, category, on), 200);
     },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/admin-asks",
+      tags,
+      security,
+      summary: '"Pedir a um admin": an inbox row for whoever may do it, which does it or opens where it is done',
+      description:
+        "`channel_agent` (`channelId`, `agentId`): who manages channels, an Adicionar on the row, done once the agent is added. `create_agents`: who gives roles. `webhook` (`provider`): who sets up connectors. Refused: `admin_ask.self` (409) to someone who may do it.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.discriminatedUnion("what", [
+            z.object({ what: z.literal("channel_agent"), channelId: z.uuid(), agentId: z.uuid() }),
+            z.object({ what: z.literal("create_agents") }),
+            z.object({ what: z.literal("webhook"), provider: z.enum(["github", "sentry"]) }),
+          ]),
+        ),
+      },
+      responses: { 200: json(z.object({ sent: z.number().int() })), ...errors },
+    }),
+    async (c) => c.json(await askAdmins(nd, c.get("user").id, c.req.valid("param").orgId, c.req.valid("json")), 200),
   );
 
   return app;

@@ -1,4 +1,5 @@
 import type {
+  Agent,
   AgentQuestion,
   LiveConsult,
   LiveRun,
@@ -7,6 +8,7 @@ import type {
   MessageConsultation,
   MessagePin,
   ReactionCount,
+  TypingWho,
 } from "@agenteschat/client";
 import { agentProposalOf, costlyProposalOf, stretchCardOf } from "@agenteschat/client/lib/action-cards";
 import { type ActivityEntry, barEntries, type barWords, markedPieces, markInk } from "@agenteschat/client/lib/activity";
@@ -143,6 +145,23 @@ const byTime = (a: Pick<Message, "createdAt" | "id">, b: Pick<Message, "createdA
   a.createdAt === b.createdAt ? a.id.localeCompare(b.id) : a.createdAt < b.createdAt ? -1 : 1;
 
 /** Top-level messages plus loaded thread replies (agents answer inside the thread of the message that called them). */
+/**
+ * The messages of older pages with their pin as the pins list says (`pins`, once loaded). Those pages live in the
+ * screen's own state, which no cache update reaches: pinned from its menu, an older message kept "Fixar" there and no
+ * mark. Rows whose pin is right stay the same objects, and so does the list when none changes.
+ */
+export function pinnedAsListed(older: Message[], pins: readonly { messageId: string }[] | undefined): Message[] {
+  if (!pins) return older;
+  const ids = new Set(pins.map((p) => p.messageId));
+  let changed = false;
+  const next = older.map((m) => {
+    if (ids.has(m.id) === Boolean(m.pinned)) return m;
+    changed = true;
+    return { ...m, pinned: ids.has(m.id) };
+  });
+  return changed ? next : older;
+}
+
 export function mergeTimeline(topLevel: Message[], threads: (Message[] | undefined)[]): Message[] {
   const seen = new Map<string, Message>();
   for (const m of topLevel) seen.set(m.id, m);
@@ -208,17 +227,13 @@ export function standsAlone(m: Message) {
  * routine's call written as its creator is left out, like the web's `buildTimeline`. The sticker or GIF an agent
  * adds right after its own reply (ADR 0091) always groups under that reply, whatever the reply carries.
  */
-export function buildRows(
-  messages: Message[],
-  hidden: (m: Message) => boolean = () => false,
-  /** The agents at work in this conversation: an event over once they happened is left out (`settledNotices`). */
-  working: ReadonlySet<string> = new Set(),
-): ChatRow[] {
+export function buildRows(messages: Message[], hidden: (m: Message) => boolean = () => false): ChatRow[] {
   const rows: ChatRow[] = [];
   let lastDay = "";
   let prev: Message | null = null;
   const answered = answeredNotices(messages);
-  const settled = settledNotices(messages, working);
+  // A return's line (the dock holds it), a mention its message's own line explains.
+  const settled = settledNotices(messages);
   for (const m of [...messages].sort(byTime)) {
     if (
       hidden(m) ||
@@ -249,6 +264,36 @@ export function buildRows(
   return rows;
 }
 
+/** The same fields holding the same values (each by reference). */
+function shallowSame(a: object, b: object): boolean {
+  const keys = Object.keys(a);
+  if (keys.length !== Object.keys(b).length) return false;
+  return keys.every((k) => (a as Record<string, unknown>)[k] === (b as Record<string, unknown>)[k]);
+}
+
+/**
+ * `next` with each row that holds the same as the row under its key in `prev` swapped for that very row, and `prev`
+ * itself when every row is: a list that compares its items by reference (Legend List) redraws only the rows that
+ * changed, not every row each time the conversation's rows are rebuilt (a message arriving, an agent's run event).
+ */
+export function keepSameRows<T extends { key: string }>(prev: readonly T[], next: readonly T[]): readonly T[] {
+  if (prev.length === 0) return next;
+  const byKey = new Map(prev.map((r) => [r.key, r]));
+  let changed = prev.length !== next.length;
+  const out = next.map((r, i) => {
+    const was = byKey.get(r.key);
+    const kept = was !== undefined && shallowSame(was, r) ? was : r;
+    if (kept !== prev[i]) changed = true;
+    return kept;
+  });
+  return changed ? out : prev;
+}
+
+/** `prev` when `next` holds the same items in the same order (each by reference), else `next`: memos over it keep. */
+export function sameItems<T>(prev: readonly T[], next: readonly T[]): readonly T[] {
+  return prev.length === next.length && next.every((x, i) => x === prev[i]) ? prev : next;
+}
+
 // ── Automatic lines ──────────────────────────────────────────────────────────
 
 /**
@@ -266,17 +311,14 @@ const NOTICE_ICON: Record<string, EventLineView["icon"]> = {
   consult_reply: "agent",
   agent_note: "chat",
   wait_result: "check",
-  follow_up: "clock",
   wake_skipped: "info",
 };
 
 export function eventLineOf(
   m: Pick<Message, "body" | "meta">,
   names: { author: string; agentByHandle: (handle: string) => string | null },
-  /** A follow-up's time for the reader ("18:30"), and the reader's locale for its day. */
-  when: { time: (iso: string) => string; locale: string } = { time: (iso) => iso, locale: "pt-BR" },
 ): EventLineView | null {
-  const view = noticeView(m, names, when);
+  const view = noticeView(m, names);
   const kind = noticeOf(m.meta)?.kind ?? "";
   return view ? { ...view, kind: "notice", icon: NOTICE_ICON[kind] ?? "bell" } : null;
 }
@@ -342,7 +384,7 @@ export function workStepsOf(meta: Message["meta"]): number | null {
 /** `meta.artifacts`: the files on a message. */
 export function artifactsOf(
   meta: Message["meta"],
-): { id: string; version?: number; title: string; deleted: boolean }[] {
+): { id: string; version?: number; title: string; deleted: boolean; width?: number; height?: number }[] {
   const list = meta?.artifacts;
   if (!Array.isArray(list)) return [];
   return list.flatMap((r) => {
@@ -354,6 +396,8 @@ export function artifactsOf(
         ...(typeof o.version === "number" ? { version: o.version } : {}),
         title: str(o.title),
         deleted: o.deleted === true,
+        // A picture's size (when the server read it): its box has its shape before it loads.
+        ...(typeof o.width === "number" && typeof o.height === "number" ? { width: o.width, height: o.height } : {}),
       },
     ];
   });
@@ -375,6 +419,7 @@ export function questionOf(meta: Message["meta"]): AgentQuestion | null {
     status: q.status === "answered" ? "answered" : "open",
     answer: str(q.answer) || null,
     answeredByUserId: str(q.answeredByUserId) || null,
+    answeredAt: str(q.answeredAt) || null,
     ...(str(q.requestedForUserId) ? { requestedForUserId: str(q.requestedForUserId) } : {}),
     ...(q.withdrawn === true ? { withdrawn: true as const } : {}),
     ...(q.dismissed === true ? { dismissed: true as const } : {}),
@@ -395,7 +440,8 @@ export const hidesBody = (m: Message) =>
       m.meta?.issueWork ||
       m.meta?.browserHandoff ||
       m.meta?.missionSetup ||
-      voiceOf(m.meta) ||
+      // A voice message shows only what was typed beside it as text; its words are the player's.
+      (voiceOf(m.meta) && !voiceOf(m.meta)?.text) ||
       questionOf(m.meta)?.text.trim() === m.body.trim(),
   );
 
@@ -405,13 +451,13 @@ export const hidesBody = (m: Message) =>
  * Who shows in the working line, as on the web's bar (`barEntries`): agents
  * asking another agent, then agents at work, one entry per agent even when it
  * has two runs (a provisional "thinking" row and the real run, or two tasks at
- * once), then the people typing.
+ * once), then the people typing or recording a voice message.
  */
 export function workingEntries(
   runs: LiveRun[],
   consults: LiveConsult[],
   agentName: (id: string) => string,
-  typing: string[] = [],
+  typing: TypingWho[] = [],
   personName: (id: string) => string | undefined = () => undefined,
 ): ActivityEntry[] {
   return barEntries(runs, typing, agentName, personName, consults);
@@ -464,6 +510,13 @@ export function mayStopRun(
 /** Names in a sentence: in ink, or with the agent's face (shared with the web's `WorkingLine`). */
 export const markName = markInk;
 
+/**
+ * Whether a return's words fit whole beside its sentence on the dock's line (widths in points, as laid out): they show
+ * whole or not at all, never cut.
+ */
+export const aboutFits = (room: number, sentence: number, about: number) =>
+  room > 0 && sentence > 0 && about > 0 && sentence + about <= room + 0.5;
+
 /** A marked sentence split into plain and bold (name) pieces; a faced name carries its agent's id. */
 export const markedParts = markedPieces;
 
@@ -471,6 +524,7 @@ export const markedParts = markedPieces;
 export interface LineDrawn {
   agents?: number;
   typers?: number;
+  recorders?: number;
 }
 
 /** A piece only narrows: kept to what it drew, it can't draw wider, and a narrower room cuts it again. */
@@ -481,16 +535,23 @@ export const narrowDrawn = (drawn: LineDrawn, part: keyof LineDrawn, width: numb
 export const AGENT_WORDS_MIN = 40;
 
 /**
- * The widths the working line's pieces keep (whole points) while someone types: iOS keeps a cut text's whole box,
- * a gap before what follows, so each keeps to what it drew and the next piece comes right after its "…".
+ * The widths the working line's pieces keep (whole points) while someone types or records: iOS keeps a cut text's
+ * whole box, a gap before what follows, so each keeps to what it drew and the next piece comes right after its "…".
  * `agents: null` drops the agents' words, their " · " with them, when they'd be a sliver: who types keeps the room,
  * as on the web. Alone, the agents' words keep the line as it is (nothing follows them).
  */
-export function lineFit(drawn: LineDrawn, someoneTypes: boolean): { agents?: number | null; typers?: number } {
+export function lineFit(
+  drawn: LineDrawn,
+  someoneTypes: boolean,
+): { agents?: number | null; typers?: number; recorders?: number } {
   if (!someoneTypes) return {};
   const whole = (width?: number) => (width === undefined ? undefined : Math.ceil(width));
   const sliver = drawn.agents !== undefined && drawn.agents < AGENT_WORDS_MIN;
-  return { agents: sliver ? null : whole(drawn.agents), typers: whole(drawn.typers) };
+  return {
+    agents: sliver ? null : whole(drawn.agents),
+    typers: whole(drawn.typers),
+    recorders: whole(drawn.recorders),
+  };
 }
 
 /** The working line's words in the pieces that give way in turn (`barWords`). */
@@ -715,6 +776,55 @@ export function tableColumnWidths(
   });
 }
 
+/**
+ * A table's key for its measured columns (`kept-sizes.ts`): what its cells say and how (FNV-1a over each span's kind
+ * and words, a mark between cells), so the same table finds its columns again when its row comes back.
+ */
+export function tableKey(header: Inline[][], rows: Inline[][][]): string {
+  let hash = 0x811c9dc5;
+  const mix = (code: number) => {
+    hash = Math.imul(hash ^ code, 0x01000193);
+  };
+  const cell = (spans: Inline[]) => {
+    for (const span of spans) {
+      for (const ch of `${span.kind}:${span.text}`) mix(ch.codePointAt(0) ?? 0);
+      mix(0x1e);
+    }
+    mix(0x1f);
+  };
+  for (const h of header) cell(h);
+  for (const r of rows) for (const c of r) cell(c);
+  return `${header.length}x${rows.length}:${(hash >>> 0).toString(36)}`;
+}
+
+/**
+ * Whether a table's cells hold spans drawn wider once something loads after they mount: a file, message or id pill (an
+ * icon until its query answers, then its title), a channel's name, a mention. Measured once at the icon, their column
+ * stayed narrow and the title wrapped in it for the rest of the session; such a table keeps measuring.
+ */
+export function tableResolvesLate(header: Inline[][], rows: Inline[][][]): boolean {
+  return [header, ...rows].some((r) =>
+    r.some((cell) =>
+      cell.some((s) => s.kind === "link" || s.kind === "id" || s.kind === "channel" || s.kind === "mention"),
+    ),
+  );
+}
+
+/**
+ * Whether a run is in the conversation a message is sent to (`threadId`: the thread, null for the timeline), as the
+ * server steers a message into a run under way: a thread's reply into that thread's runs (or the one answering its root
+ * in the timeline, whose own thread is its root), a message in the timeline into the timeline's. A run in another
+ * thread of the same DM (a mission's) never takes it, so it doesn't stand for the reply that will come.
+ */
+export function runInConversation(
+  run: Pick<LiveRun, "threadId" | "triggerMessageId">,
+  threadId: string | null,
+): boolean {
+  // Typed as always a thread, but null for a run in the timeline.
+  const own = (run.threadId as string | null) ?? null;
+  return threadId ? own === threadId || (own === null && run.triggerMessageId === threadId) : own === null;
+}
+
 /** Which sides of a table scrolled sideways hide columns (`x`: the scroll, `frame`: the box, `total`: the table). */
 export function tableHidden(x: number, frame: number, total: number): { left: boolean; right: boolean } {
   return { left: x > 1, right: frame > 0 && x + frame < total - 1 };
@@ -841,6 +951,33 @@ export function parseBlocks(body: string): Block[] {
   return out;
 }
 
+/** Texts whose blocks are kept, and the longest one kept (a longer one is parsed each time, never held). */
+export const BLOCKS_KEPT = 400;
+const BLOCKS_KEPT_CHARS = 20_000;
+const blocksKept = new Map<string, Block[]>();
+
+/**
+ * `parseBlocks`, kept for the texts read lately (read only: nothing changes them). The conversation's list mounts a row
+ * again each time it comes back into view, and each mount parsed its text again. Bounded: past `BLOCKS_KEPT` the text
+ * read longest ago goes first.
+ */
+export function blocksOf(body: string): Block[] {
+  const hit = blocksKept.get(body);
+  if (hit) {
+    blocksKept.delete(body);
+    blocksKept.set(body, hit);
+    return hit;
+  }
+  const blocks = parseBlocks(body);
+  if (body.length > BLOCKS_KEPT_CHARS) return blocks;
+  blocksKept.set(body, blocks);
+  if (blocksKept.size > BLOCKS_KEPT) {
+    const oldest = blocksKept.keys().next();
+    if (!oldest.done) blocksKept.delete(oldest.value);
+  }
+  return blocks;
+}
+
 function plainBlocks(body: string): Block[] {
   const out: Block[] = [];
   const parts = body.split(/```([a-zA-Z0-9_+-]*)\n?([\s\S]*?)```/g);
@@ -935,3 +1072,36 @@ export const readMark = (channelId: string, threadId: string | null | undefined)
  */
 export const messageRefWords = (t: TFunction, card: MessageCard) =>
   `${card.kind === "dm" ? `@${card.name}` : `#${card.name}`}${card.threadId ? ` › ${t("messageRefs.thread")}` : ""} › `;
+
+/** Two taps this close on a message are its double tap (the thumbs up), on its words or on a receipt under them. */
+export const DOUBLE_TAP_MS = 300;
+
+/** The arrival card's faces: a few agents first, then a few people. */
+const ARRIVAL_AGENTS = 3;
+const ARRIVAL_PEOPLE = 2;
+
+/**
+ * A newcomer's first #general (ADR 0090, 0184): the agents they talk to first, the ones pinned for them first (an
+ * invitation's agents, in its order), then a few people; the agent "Conversar com" opens, the first of those; and the
+ * channels they're in besides #general ("Você também está em #suporte").
+ */
+export function arrivalOf(args: {
+  agents: readonly Pick<Agent, "id" | "canTalk">[];
+  pinned: readonly string[];
+  people: readonly { userId: string }[];
+  meId: string;
+  channels: readonly { name: string; isMember: boolean }[];
+}) {
+  const talks = args.agents.filter((a) => a.canTalk !== false);
+  const first = args.pinned.flatMap((id) => talks.filter((a) => a.id === id));
+  const order = [...first, ...talks.filter((a) => !args.pinned.includes(a.id))];
+  return {
+    agents: order.slice(0, ARRIVAL_AGENTS).map((a) => a.id),
+    people: args.people
+      .filter((p) => p.userId !== args.meId)
+      .slice(0, ARRIVAL_PEOPLE)
+      .map((p) => p.userId),
+    host: order[0]?.id ?? null,
+    alsoIn: args.channels.filter((c) => c.isMember && c.name !== "general").map((c) => `#${c.name}`),
+  };
+}

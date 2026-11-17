@@ -14,9 +14,15 @@ import { haptics, Icon, useTheme } from "@/ui";
 
 /** How far the row follows the finger freely; past it the pull resists. */
 const TRAVEL = 72;
-/** Dragged this far the reply is on; a flick faster than `FLICK` from half way is the same intent. */
+/** Dragged this far the reply is armed (one light tap); back under `UNARM` it is off again, so a wobble at the line never flickers it. */
 const COMMIT = 52;
-const FLICK = 900;
+const UNARM = 40;
+/**
+ * How far a release's speed carries the row (seconds of travel at that speed): a quick flick that would have crossed the
+ * line answers too (900 points a second from the 20 it takes to start). Short on purpose, so a slow pull let go early
+ * stays a pull.
+ */
+const FLICK_S = 0.08;
 /** The reply mark: a plate at the row's left edge, under where the row slides from. */
 const MARK = 28;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -29,9 +35,13 @@ function rubberband(over: number, dimension: number, constant = 0.55) {
 
 /**
  * Swipe a message to the right to answer it in the conversation (the quote above the field). The row follows the
- * finger one to one on the UI thread, resists past `TRAVEL`, and commits on distance or on a flick, with one light
- * tap on the frame the reply catches; letting go springs it back with the finger's speed. A vertical move fails the
- * gesture at once, so the list scrolls as before. Off (`enabled` false) the row is just the row.
+ * finger one to one on the UI thread and resists past `TRAVEL`; crossing `COMMIT` arms the reply with one light tap
+ * (pulled back under `UNARM` it disarms), and the reply happens on letting go: armed, or flicked hard enough to have
+ * crossed the line. Letting go springs the row back with the finger's speed. A vertical move fails the gesture at once,
+ * so the list scrolls as before.
+ *
+ * Off (`enabled` false, a message still on its way) the same views stand around the row with the gesture disabled:
+ * a message turning from sending to sent keeps its row mounted instead of being drawn again.
  */
 export function SwipeReply({
   enabled,
@@ -45,8 +55,10 @@ export function SwipeReply({
   const { colors, reducedMotion } = useTheme();
   const x = useSharedValue(0);
   const armed = useSharedValue(false);
-  const catchReply = () => {
-    haptics.light();
+  const tap = () => haptics.light();
+  const reply = (tapped: boolean) => {
+    // A flick commits without having crossed the line: its tap comes with the reply.
+    if (!tapped) tap();
     onReply();
   };
   const pan = usePanGesture({
@@ -63,29 +75,32 @@ export function SwipeReply({
       "worklet";
       const tx = Math.max(0, e.translationX);
       x.value = tx <= TRAVEL ? tx : TRAVEL + rubberband(tx - TRAVEL, TRAVEL);
-      // Once, on the frame the line is crossed: the tap lands with the mark filling in.
+      // On the frame the line is crossed, the tap lands with the mark filling in; nothing else leaves the UI thread.
       if (!armed.value && tx >= COMMIT) {
         armed.value = true;
-        scheduleOnRN(catchReply);
+        scheduleOnRN(tap);
+      } else if (armed.value && tx < UNARM) {
+        armed.value = false;
       }
     },
     onDeactivate: (e) => {
       "worklet";
-      const flick = !armed.value && e.velocityX > FLICK && e.translationX >= COMMIT / 2;
-      if (flick) scheduleOnRN(catchReply);
+      const tx = Math.max(0, e.translationX);
+      const flicked = tx + Math.max(0, e.velocityX) * FLICK_S >= COMMIT;
+      const wasArmed = armed.value;
       armed.value = false;
+      if (!e.canceled && (wasArmed || flicked)) scheduleOnRN(reply, wasArmed);
       x.value = reducedMotion
         ? withTiming(0, { duration: 150, easing: EASE_OUT })
         : withSpring(0, { duration: 400, dampingRatio: 0.8, velocity: e.velocityX });
     },
   });
   const slide = useAnimatedStyle(() => ({ transform: [{ translateX: x.value }] }));
-  // The mark grows in with the pull and settles whole once the reply is on.
+  // The mark grows in with the pull and settles whole once the reply is armed.
   const mark = useAnimatedStyle(() => ({
     opacity: interpolate(x.value, [0, COMMIT * 0.6], [0, 1], "clamp"),
     transform: [{ scale: armed.value ? 1 : interpolate(x.value, [0, COMMIT], [0.95, 1], "clamp") }],
   }));
-  if (!enabled) return <>{children}</>;
   return (
     <GestureDetector gesture={pan}>
       <View>

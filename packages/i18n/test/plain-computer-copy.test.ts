@@ -70,11 +70,11 @@ const SELFHOST_ONLY = [
   "agentComputer.state.offline",
   "agentComputer.state.offlineHelpPlain",
   "agentComputer.state.screensOff",
+  "agentComputer.state.screensOffOne",
   "agentComputer.state.screensMissing",
   "agentComputer.state.outdated",
   "agentComputer.state.noComputer",
   "agentComputer.state.browserOff",
-  "agentComputer.phone.chooseOnWeb",
 ];
 
 /**

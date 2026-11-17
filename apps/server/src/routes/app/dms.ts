@@ -91,7 +91,7 @@ export function dmRoutes(deps: AppDeps) {
       security,
       summary: "Open (or create) a direct conversation with a person or an agent",
       description:
-        "`dm`: the conversation as `GET …/dms` lists it, so an app shows it there without asking again; none while it isn't in that list yet (an empty one the other person opened).",
+        "`dm`: the conversation as `GET …/dms` lists it, so an app shows it there without asking again; none while it isn't in that list yet (an empty one the other person opened). While the workspace is being deleted, a conversation it has opens as it is and a new one is refused (`org.deleting`).",
       request: {
         params: OrgParams,
         body: body(z.union([z.object({ userId: z.string() }), z.object({ agentId: z.uuid() })])),

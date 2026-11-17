@@ -44,6 +44,9 @@ export const deviceServer = (home: Home, local: { run: boolean; url: string | nu
   return local.run && server && server === local.url && local.publicUrl ? local.publicUrl : server;
 };
 
+/** The workspace's agents on the web, each one's "Quem pensa" a click away (where an account is given to agents). */
+export const agentsPageUrl = (server: string, orgId: string) => `${server}/org/${encodeURIComponent(orgId)}/team`;
+
 /** The web's Android steps for a phone plugged into this computer (its connect dialog, live with this computer). */
 export const androidStepsUrl = (server: string, orgId: string, machineId: string) =>
   `${server}/org/${encodeURIComponent(orgId)}/settings/devices/android-setup?computer=${encodeURIComponent(machineId)}`;
@@ -77,10 +80,15 @@ export const iphoneHere = (phones: readonly RunnerPhone[] | undefined) =>
 const PHONE_STEP: Partial<Record<string, IphoneSetupStep>> = {
   xcode_missing: "xcode",
   xcode_too_old: "xcode",
+  ios_behind_xcode: "helper",
   device_support: "tools",
   untrusted: "connected",
   locked: "connected",
   os_too_old: "connected",
+  wifi_away: "connected",
+  wifi_asleep: "connected",
+  tunnel_down: "connected",
+  wifi_untrusted: "connected",
   developer_mode_off: "developerMode",
   ui_automation_off: "uiAutomation",
   helper_missing: "helper",
@@ -95,11 +103,13 @@ const PHONE_STEP: Partial<Record<string, IphoneSetupStep>> = {
 /**
  * Where the setup stands: steps before the first undone one are done, that one is the Mac's to do (`active`) or the
  * person's (`needs`), the rest wait. The Mac's own steps come first; the iPhone's come from its reason, which turns
- * a step done by itself once the iPhone reports it. Null `setup`: still asking the Mac.
+ * a step done by itself once the iPhone reports it. Null `setup`: still asking the Mac. An iPhone restarting to turn
+ * Developer Mode on (`restarting`, `useIphoneRestart`) stays on that step, under way.
  */
 export function iphoneSteps(
   setup: ControlIphoneSetup | null,
   phone: RunnerPhone | null,
+  restarting = false,
 ): { states: Record<IphoneSetupStep, IphoneStepState>; current: IphoneSetupStep | null; done: number } {
   const reason = phone?.state === "ready" ? undefined : phone?.reason;
   const fromPhone = reason ? PHONE_STEP[reason] : undefined;
@@ -110,7 +120,7 @@ export function iphoneSteps(
   else if (setup.platform.state !== "installed" || fromPhone === "tools")
     [at, mac] = ["tools", setup.platform.state !== "failed"];
   else if (!setup.account || fromPhone === "account") at = "account";
-  else if (!phone) [at, mac] = ["connected", true];
+  else if (!phone) [at, mac] = [restarting ? "developerMode" : "connected", true];
   else if (fromPhone) [at, mac] = [fromPhone, fromPhone === "helper" && phone.state === "preparing"];
   else if (phone.state !== "ready") [at, mac] = ["helper", phone.state === "preparing"];
   const index = at ? IPHONE_SETUP_STEPS.indexOf(at) : IPHONE_SETUP_STEPS.length;

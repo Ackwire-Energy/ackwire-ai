@@ -51,6 +51,11 @@ export interface RoutineBrief {
    * `update_widget`, never in a conversation.
    */
   widget?: { widgetId: string; dashboardId: string };
+  /**
+   * The right hand's only (ADR 0137 §11): whose AI this firing thinks with, picked as it fired of the people who set
+   * the work up (`rightHandWorkAi`); null: the workspace's, for nobody. Absent: nothing picked.
+   */
+  aiUserId?: string | null;
 }
 
 /** The brief of a message's meta (`meta.routineBrief`), when well formed; null for any other message. */
@@ -72,6 +77,7 @@ export function routineBriefOf(meta: Record<string, unknown> | null | undefined)
     trigger: typeof b.trigger === "string" ? b.trigger : "schedule",
     dueAt: typeof b.dueAt === "string" ? b.dueAt : "",
     ...widgetOf(b.widget),
+    ...(typeof b.aiUserId === "string" || b.aiUserId === null ? { aiUserId: b.aiUserId } : {}),
   };
 }
 

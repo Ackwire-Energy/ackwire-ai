@@ -1,7 +1,7 @@
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, desc, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
 import { aiConnectIntent, type ConnectIntent } from "./ai-intent";
-import { type AgentAi, type AiStatusDeps, agentAiState, type NoAiReason, orgHasAi } from "./ai-status";
+import { type AgentAi, type AiStatusDeps, agentAiState, NO_AI_REASONS, orgHasAi } from "./ai-status";
 import { audienceError, canTalkTo, type Speaker, speakerFor } from "./audience";
 import { recordAudit } from "./audit";
 import { BRAIN_NAMES } from "./brains/types";
@@ -13,7 +13,8 @@ import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
 import { publishChannelEvent, publishMessageCreated, publishRouted } from "./events";
 import type { Judge } from "./judge";
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
-import { can, type Membership } from "./organizations";
+import { can, type Membership, requireActiveMembership } from "./organizations";
+import { type RightHandStandIn, type StandInWhy, standInWhy } from "./right-hand";
 import { type RouterDeps, routeMessage } from "./router";
 import { bodyCode } from "./run-tools";
 import { type AgentRun, NO_AI, replyThreadOf } from "./runs";
@@ -51,6 +52,8 @@ const REASON_TEXT: Partial<Record<NoAiCardReason, string>> = {
   commands_off: "I can't answer now: commands are turned off on my plan's computer.",
   plan_not_shared:
     "I can't answer you on the workspace's plan: it serves only its owner. Connect your own plan and I will.",
+  plans_not_yours:
+    "I can't answer you: the plans connected here serve only the people who connected them. Connect your own and I will.",
   plan_unattended:
     "I didn't answer: the request didn't come from a person, and the workspace's plan serves only its owner.",
   runner_outdated: "I can't answer now: the program on my plan's computer needs an update.",
@@ -65,7 +68,8 @@ const cliFailedText = (why: string) => `I can't answer now: my plan's AI stopped
  * `plan_unattended`: the right hand's run nobody is behind, on a plan that answers only its owner: no one's own plan
  * would answer it, so the card never says to connect one.
  */
-export type NoAiCardReason = NoAiReason | "plan_hold" | "plan_unattended";
+export const NO_AI_CARD_REASONS = [...NO_AI_REASONS, "plan_hold", "plan_unattended"] as const;
+export type NoAiCardReason = (typeof NO_AI_CARD_REASONS)[number];
 
 /** A conversation gets the card again only after this long (per agent; once while the organization has no AI). */
 export const NO_AI_CARD_EVERY_MS = 6 * 3600_000;
@@ -81,6 +85,9 @@ export interface NoAiCard extends ConnectIntent {
   model?: string;
   /** With `cli_failed`: what the plan's CLI said (`cliWords`), the cause the line names. */
   why?: string;
+  /** With `plans_not_yours`: whose the workspace's plans are, and what they are ("Claude"). */
+  owner?: string;
+  plan?: string;
   /** The run that couldn't think (deleted when "Responder agora" starts it again). */
   runId: string;
 }
@@ -90,8 +97,13 @@ export const noAiCardOf = (m: Pick<Message, "authorType" | "meta">): NoAiCard | 
   return m.authorType === "agent" && card && typeof card.agentId === "string" ? (card as NoAiCard) : null;
 };
 
-/** Agents with a card in this conversation within `NO_AI_CARD_EVERY_MS`. */
-async function cardsPosted(db: Executor, run: Pick<AgentRun, "orgId" | "channelId">, threadId: string | null) {
+/** Agents with a card (`code`: of that kind) in this conversation within `NO_AI_CARD_EVERY_MS`. */
+async function cardsPosted(
+  db: Executor,
+  run: Pick<AgentRun, "orgId" | "channelId">,
+  threadId: string | null,
+  code: string = NO_AI,
+) {
   const rows = await db
     .select({ agentId: messages.authorAgentId })
     .from(messages)
@@ -102,7 +114,7 @@ async function cardsPosted(db: Executor, run: Pick<AgentRun, "orgId" | "channelI
         threadId ? eq(messages.threadId, threadId) : isNull(messages.threadId),
         gt(messages.createdAt, new Date(Date.now() - NO_AI_CARD_EVERY_MS)),
         isNull(messages.deletedAt),
-        sql`${messages.meta}->>'bodyCode' = ${NO_AI}`,
+        sql`${messages.meta}->>'bodyCode' = ${code}`,
       ),
     );
   return rows.map((r) => r.agentId);
@@ -121,6 +133,7 @@ export async function postNoAiCard(
   own?: AgentAi["own"],
   model?: string,
   why?: string,
+  notYours?: Pick<AgentAi, "owner" | "plan">,
 ): Promise<Message | null> {
   const { db } = deps;
   const threadId = replyThreadOf(run);
@@ -148,6 +161,7 @@ export async function postNoAiCard(
       ...(own ? { own } : {}),
       ...(model ? { model } : {}),
       ...(why && reason === "cli_failed" ? { why } : {}),
+      ...(reason === "plans_not_yours" && notYours?.owner ? { owner: notYours.owner, plan: notYours.plan } : {}),
       ...intent,
       runId: run.id,
     };
@@ -169,6 +183,74 @@ export async function postNoAiCard(
   const [view] = await withWikiLinks(db, run.orgId, [messageView(card)]);
   if (view) await publishMessageCreated(deps.pubsub, view);
   return card;
+}
+
+/** `bodyCode` of the right hand's line that another AI answered for its plan (`postStandInLine`). */
+export const STAND_IN_LINE = "right_hand_stand_in";
+
+const STAND_IN_TEXT: Record<StandInWhy, (via: string, plan: string) => string> = {
+  needsComputer: (via, plan) => `Answered with ${via}: ${plan} needs a computer.`,
+  away: (via, plan) => `Answered with ${via}: the computer ${plan} is on is away.`,
+  notShared: (via, plan) => `Answered with ${via}: ${plan} serves only its owner.`,
+  limit: (via, plan) => `Answered with ${via}: ${plan} reached its limit.`,
+  cant: (via, plan) => `Answered with ${via}: ${plan} can't think right now.`,
+};
+
+/**
+ * The right hand answered with another AI than its plan (`rightHandStandIn`): one quiet line under its reply says with
+ * what and why, with "Change" in the apps. Once per conversation every `NO_AI_CARD_EVERY_MS`. It rides on `meta.noAi`
+ * (with `standIn`) so the apps draw it where a no-AI card goes; it is never one (`bodyCode` is its own).
+ */
+export async function postStandInLine(
+  deps: { db: Database; pubsub: PubSub },
+  run: AgentRun,
+  standIn: Pick<RightHandStandIn, "via" | "plan" | "code">,
+): Promise<Message | null> {
+  const { db } = deps;
+  const threadId = replyThreadOf(run);
+  const why = standInWhy(standIn.code);
+  const line = await db.transaction(async (tx) => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`stand-in:${run.channelId}:${threadId ?? ""}`}))`);
+    // A run that ended without a reply (it only acted, or chose to stay quiet) has nothing for the line to sit under.
+    const [reply] = await tx
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          eq(messages.channelId, run.channelId),
+          eq(messages.authorAgentId, run.agentId),
+          eq(messages.agentRunId, run.id),
+          isNull(messages.deletedAt),
+        ),
+      )
+      .limit(1);
+    if (!reply) return null;
+    if ((await cardsPosted(tx, run, threadId, STAND_IN_LINE)).includes(run.agentId)) return null;
+    const trigger = await getMessage(tx, run.orgId, run.triggerMessageId);
+    return insertMessage(tx, {
+      orgId: run.orgId,
+      channelId: run.channelId,
+      threadId,
+      author: { type: "agent", agentId: run.agentId, runId: run.id, hop: run.hop },
+      body: STAND_IN_TEXT[why](standIn.via, standIn.plan),
+      meta: {
+        ...bodyCode(STAND_IN_LINE, { via: standIn.via, plan: standIn.plan, why }),
+        noAi: {
+          agentId: run.agentId,
+          forUserId: trigger ? await requesterOf(tx, trigger) : null,
+          reason: standIn.code,
+          intent: "task",
+          standIn: { via: standIn.via, plan: standIn.plan, why },
+          runId: run.id,
+        },
+      },
+    });
+  });
+  if (!line) return null;
+  const [view] = await withWikiLinks(db, run.orgId, [messageView(line)]);
+  if (view) await publishMessageCreated(deps.pubsub, view);
+  return line;
 }
 
 export interface AnswerNowDeps extends AiStatusDeps {
@@ -373,12 +455,17 @@ export async function answerNow(
 ): Promise<{ runs: Answering }> {
   const message = await getMessage(deps.db, orgId, messageId);
   if (!message || message.deletedAt) throw new NotFoundError("Message not found");
-  const { membership } = await requireChannelAccess(deps.db, userId, orgId, message.channelId);
+  const usage = message.authorType === "agent" ? usagePauseCardOf(message.meta) : null;
+  // A long-work pause card may sit in an agents' DM (the paused run answers another agent), which no person is a
+  // member of: people open it from where they asked. Who may press it is the run's rule alone (`mayStopRun`), as
+  // for its "Don't run it" (`cancelRun`) and the task manager's line (`continuePausedRuns`).
+  const membership = usage
+    ? await requireActiveMembership(deps.db, userId, orgId)
+    : (await requireChannelAccess(deps.db, userId, orgId, message.channelId)).membership;
   // Refused here, first: a key saved earlier reads as ready, and the restarted run would only be refused again.
   await assertCanWork(deps.db, orgId);
   const paused = message.authorType === "agent" ? stretchCardOf(message.meta) : null;
   if (paused) return continueStretch(deps, userId, membership, message, paused);
-  const usage = message.authorType === "agent" ? usagePauseCardOf(message.meta) : null;
   if (usage) return continueUsagePause(deps, userId, membership, message, usage);
   const card = noAiCardOf(message);
   const found = await answeringRuns(deps.db, message, card);

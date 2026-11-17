@@ -21,7 +21,7 @@ const READY: ControlIphoneSetup = {
 };
 const iphone = (over: Partial<RunnerPhone> = {}): RunnerPhone => ({
   platform: "ios",
-  serial: "00008110-001475263AC0A01E",
+  serial: "00008110-000A1B2C3D4E5F60",
   kind: "device",
   model: "iPhone 16",
   name: "Sam's iPhone 16",
@@ -73,6 +73,12 @@ describe("the iPhone setup's checklist", () => {
     expect(ready.done).toBe(7);
   });
 
+  test("an iPhone gone from the Mac while it restarts for Developer Mode stays on that step, under way", () => {
+    const restarting = iphoneSteps(READY, null, true);
+    expect(restarting.current).toBe("developerMode");
+    expect(restarting.states).toMatchObject({ connected: "done", developerMode: "active", uiAutomation: "todo" });
+  });
+
   test("an iPhone that needs a newer Xcode, or the Mac still preparing it, goes back to that step", () => {
     expect(at(READY, iphone({ state: "needs_you", reason: "xcode_too_old" })).current).toBe("xcode");
     expect(at(READY, iphone({ state: "preparing", reason: "device_support" }))).toMatchObject({ current: "tools" });
@@ -99,6 +105,15 @@ describe("the iPhone setup's checklist", () => {
     const old = at(READY, iphone({ state: "unsupported", reason: "os_too_old", osVersion: "16.7.10" }));
     expect(old).toMatchObject({ current: "connected", state: "needs" });
     expect(old.states.helper).toBe("todo");
+  });
+
+  test("an iPhone over Wi-Fi that isn't reached, or doesn't trust the Mac, waits on being connected", () => {
+    for (const reason of ["wifi_away", "wifi_asleep", "tunnel_down", "wifi_untrusted"] as const) {
+      expect(at(READY, iphone({ state: "needs_you", reason, transport: "wifi" }))).toMatchObject({
+        current: "connected",
+        state: "needs",
+      });
+    }
   });
 
   test("the download starts by itself only when Xcode is here and nothing downloads or failed", () => {

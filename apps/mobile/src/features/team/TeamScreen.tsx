@@ -1,4 +1,4 @@
-import { type TeamAgent, useAgentGroups, useChannels, useMembers, useTeam } from "@agenteschat/client";
+import { type Agent, type TeamAgent, useAgentGroups, useChannels, useMembers, useTeam } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
 import { rightHandOf } from "@agenteschat/client/lib/right-hand";
 import {
@@ -12,7 +12,18 @@ import {
 import { useTranslation } from "react-i18next";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { EmptyState, Icon, IconButton, ListRow, SCREEN_X, SectionHeader, Text, weights } from "@/ui";
+import {
+  EmptyState,
+  Icon,
+  ListRow,
+  PressScale,
+  ROW_PRESS_DELAY,
+  SCREEN_X,
+  SectionHeader,
+  SkeletonList,
+  Text,
+  weights,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
@@ -86,13 +97,64 @@ export function TeamScreen() {
       title={t("team.title")}
       {...(arranges
         ? {
-            right: (
-              <IconButton icon="plus" label={t("agentGroups.create")} onPress={() => router.push("/sector-new")} />
-            ),
+            actions: [
+              { icon: "plus", sf: "plus", label: t("agentGroups.create"), onPress: () => router.push("/sector-new") },
+            ],
           }
         : {})}
       refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={pull.onRefresh} />}
     >
+      {team.isPending ? (
+        // The rows' own shape while the team loads, never an empty chart counting nobody.
+        <SkeletonList rows={4} />
+      ) : team.isError && !team.data ? (
+        // A team that didn't load is not an empty one: what happened, and the way to ask again.
+        <LoadFailed onRetry={() => void team.refetch()} />
+      ) : (
+        <TeamBody
+          lodi={lodi}
+          summary={summary}
+          chart={chart}
+          rooms={rooms}
+          outside={outside}
+          agents={agents}
+          channelName={channelName}
+          sectors={sectors}
+          groups={groups}
+          noSectors={noSectors}
+        />
+      )}
+    </PushedLargeTitle>
+  );
+}
+
+/** What Equipe shows once the team is in: the summary, the chart, the channels and the setores. */
+function TeamBody({
+  lodi,
+  summary,
+  chart,
+  rooms,
+  outside,
+  agents,
+  channelName,
+  sectors,
+  groups,
+  noSectors,
+}: {
+  lodi: Agent | undefined;
+  summary: string;
+  chart: ReturnType<typeof chartByPerson>;
+  rooms: ReturnType<typeof mapColumns>;
+  outside: TeamAgent[];
+  agents: TeamAgent[];
+  channelName: (id: string) => string;
+  sectors: ReturnType<typeof teamSections>;
+  groups: ReturnType<typeof useAgentGroups>;
+  noSectors: ReturnType<typeof noSectorsCopy>;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
       <Text variant="subhead" tone="muted" style={styles.summary}>
         {summary}
       </Text>
@@ -175,7 +237,7 @@ export function TeamScreen() {
           );
         })
       )}
-    </PushedLargeTitle>
+    </>
   );
 }
 
@@ -207,7 +269,9 @@ function OrgChart({
             onPress={() => router.push(`/agent/${lodi.id}`)}
             accessibilityRole="button"
             accessibilityLabel={[lodi.name, t("team.chart.lodi")].join(", ")}
-            style={({ pressed }) => [styles.lead, pressed && styles.pressed]}
+            unstable_pressDelay={ROW_PRESS_DELAY}
+            // A row of the chart: it lights under the finger as the agents' rows under it do.
+            style={({ pressed }) => [styles.lead, pressed && { backgroundColor: c.sunken }]}
           >
             <AgentFace agentId={lodi.id} size={LEAD} live={false} />
             <View style={styles.grow}>
@@ -252,6 +316,7 @@ function OrgChart({
                   onPress={() => router.push(`/agent/${a.id}`)}
                   accessibilityRole="button"
                   accessibilityLabel={[a.name, a.role].filter(Boolean).join(", ")}
+                  unstable_pressDelay={ROW_PRESS_DELAY}
                   style={({ pressed }) => [
                     styles.node,
                     { paddingLeft: depth * INDENT },
@@ -305,16 +370,14 @@ function ChannelCard({
   const { width } = useWindowDimensions();
   const more = agents.length - CHANNEL_FACES;
   return (
-    <Pressable
+    // A card answers a press as every card of the app: it eases down under the finger (`PressScale`).
+    <PressScale
       onPress={() => router.push(chatHref(channelId))}
       accessibilityRole="button"
       accessibilityLabel={`#${name}, ${agents.map((a) => a.name).join(", ")}`}
-      style={({ pressed }) => [
-        styles.card,
-        surface,
-        { width: Math.floor((width - SCREEN_X * 2 - COLUMN_GAP) / 2) },
-        pressed && styles.pressed,
-      ]}
+      fill={false}
+      style={[styles.card, surface, { width: Math.floor((width - SCREEN_X * 2 - COLUMN_GAP) / 2) }]}
+      contentStyle={styles.cardIn}
     >
       <Text variant="title" numberOfLines={1}>
         {`#${name}`}
@@ -344,7 +407,7 @@ function ChannelCard({
             ]
           : [];
       })}
-    </Pressable>
+    </PressScale>
   );
 }
 
@@ -363,12 +426,12 @@ const styles = StyleSheet.create({
   node: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 44, paddingVertical: 4, paddingRight: 4 },
   nodeLine: { position: "absolute", right: 0, top: 0, height: StyleSheet.hairlineWidth },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: COLUMN_GAP, paddingHorizontal: SCREEN_X },
-  card: { padding: 16, gap: 8, borderRadius: 20, borderBottomLeftRadius: 6 },
+  card: { borderRadius: 20, borderBottomLeftRadius: 6 },
+  cardIn: { padding: 16, gap: 8 },
   faces: { flexDirection: "row", alignItems: "center" },
   overlap: { marginLeft: -8 },
   more: { marginLeft: 6 },
   outside: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: SCREEN_X, paddingTop: 14 },
   grow: { flex: 1, minWidth: 0 },
   semibold: { fontWeight: weights.semibold },
-  pressed: { opacity: 0.7 },
 });

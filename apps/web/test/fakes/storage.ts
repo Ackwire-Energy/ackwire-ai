@@ -3,7 +3,7 @@
  * Mirrors these endpoints:
  * - `GET  /api/app/organizations/{orgId}/storage` → StorageConfig
  * - `PUT  …/storage` `{ kind: "agentes" } | { kind: "s3", s3: S3Input }` (s3 needs a passing test of the same settings)
- * - `POST …/storage/test` S3Input → `{ ok, steps: [{ step: "write" | "read" | "list" | "delete", ok, error? }] }`
+ * - `POST …/storage/test` S3Input → `{ ok, steps: [{ step: "write" | "read" | "list" | "delete", ok, error?, code? }] }`
  * - `POST …/storage/migrate` (start or resume) and `GET …/storage/migrate` (status) → StorageMigration
  * The mock never reaches a bucket. A bucket named with "negado" fails the
  * write step; with "lista" the list step; with "instavel" the copy stops at
@@ -54,16 +54,20 @@ export function createMockStorage(
   return {
     get: async (orgId) => clone(get(orgId)),
     test: async (orgId, input) => {
-      const fail: Partial<Record<StorageStep, string>> = {};
-      if (!/^https?:\/\//.test(input.endpoint)) fail.write = "Endereço inválido: use https://…";
-      else if (input.bucket.includes("negado")) fail.write = "AccessDenied: a chave não pode escrever neste bucket.";
-      else if (input.bucket.includes("lista")) fail.list = "AccessDenied: falta a permissão s3:ListBucket.";
+      // The server's English words and their code, as `testStorage` answers.
+      const fail: Partial<Record<StorageStep, { error: string; code: string }>> = {};
+      if (!/^https?:\/\//.test(input.endpoint)) fail.write = { error: "Invalid address", code: "url.invalid" };
+      else if (input.bucket.includes("negado"))
+        fail.write = { error: "The key has no permission for this operation.", code: "storage.permission" };
+      else if (input.bucket.includes("lista"))
+        fail.list = { error: "The key has no permission for this operation.", code: "storage.permission" };
       let broken = false;
       const steps = STEPS.map((step) => {
         if (broken) return { step, ok: false, error: null };
-        if (fail[step]) {
+        const failed = fail[step];
+        if (failed) {
           broken = true;
-          return { step, ok: false, error: fail[step] };
+          return { step, ok: false, ...failed };
         }
         return { step, ok: true, error: null };
       });
@@ -82,6 +86,7 @@ export function createMockStorage(
       const prev = c.s3;
       c.kind = "s3";
       c.s3 = {
+        provider: input.s3.provider ?? null,
         endpoint: input.s3.endpoint,
         region: input.s3.region,
         bucket: input.s3.bucket,

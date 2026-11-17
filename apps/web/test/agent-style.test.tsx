@@ -47,7 +47,7 @@ describe("Sua conta", () => {
 describe("the right hand asks once", () => {
   const question = "Como prefere que eu fale com você?";
 
-  test("under its greeting while the person never picked: a tap saves it and the question goes", async () => {
+  test("under its greeting while the person never picked: a tap saves it and the card says what they answered", async () => {
     const { state, org } = unpicked(withRightHand(seedState()));
     await renderApp(`/org/${ORG_ID}/dm/agent/${LODI_ID}`, { api: createFakeApi(state) });
     await settle(8);
@@ -55,7 +55,11 @@ describe("the right hand asks once", () => {
     await click(screen().getByRole("button", { name: "Simples, sem termos técnicos" }));
     expect(state.calls).toContainEqual({ method: "orgs.setAgentStyle", args: [ORG_ID, "simple"] });
     expect(org?.agentStyle).toBe("simple");
-    expect(document.body.textContent).not.toContain(question);
+    // The same card where it was: the question still there, the answer in the choices' place, nothing to press.
+    const card = screen().getByRole("group", { name: question });
+    expect(card.classList.contains("rq--ended")).toBe(true);
+    expect(card.querySelector(".rq__answer-text")?.textContent).toBe("Você respondeu: Simples, sem termos técnicos");
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 
   test("picked already (or an older server): never asked", async () => {

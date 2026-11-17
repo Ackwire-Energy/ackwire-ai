@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const SRC = join(import.meta.dir, "..", "..", "src");
-const APP = join(import.meta.dir, "..", "..", "app", "(app)");
+const APP = join(import.meta.dir, "..", "..", "app", "(app)", "(main)");
 const src = (path: string) => readFileSync(join(SRC, path), "utf8");
 
 describe("archived channels, on the phone too", () => {

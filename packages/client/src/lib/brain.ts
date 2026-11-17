@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
-import type { AgentBrainLine, BrainKind, BrainOption } from "../api/types";
+import type { Agent, AgentBrainLine, AiStatus, BrainKind, BrainOption, Model } from "../api/types";
 import { type PlanChoice, planLabel, planOfAccount } from "./no-ai";
-import { isAuto } from "./providers";
+import { apiModelName, apiProviderOf, autoMakerOf, isAuto } from "./providers";
 
 /*
  * The engine an agent thinks and works with, as its icon draws it
@@ -70,6 +70,32 @@ export function thinksWith(t: TFunction, plan: PlanChoice, model: string | null,
  * (`ProviderLogo` id: a plan account's own provider when it has one); for the API, Automático's maker (`maker`), else
  * null: the model's own provider is the caller's to read.
  */
+/**
+ * Who thinks for an agent, web and phone alike: on a plan, the model by the plan that pays for it ("Sonnet pelo plano
+ * do Claude"), else the API model, or on Automático the maker of the key it runs on ("Claude"). `mark` falls back to
+ * the API's maker.
+ */
+export function agentThinks(
+  t: TFunction,
+  agent: Pick<Agent, "id" | "brain" | "model">,
+  {
+    owner,
+    agents,
+    models = [],
+    status,
+  }: {
+    owner?: string | null;
+    agents?: readonly { brain?: Pick<AgentBrainLine, "computer"> | null }[];
+    models?: readonly Model[];
+    status?: Pick<AiStatus, "agents">;
+  },
+) {
+  const maker = autoMakerOf(status, agent.id);
+  const model = apiModelName(t, agent.model, models.find((m) => m.id === agent.model)?.label, maker);
+  const thinks = brainLine(t, agent.brain, model, { owner, ...(agents ? { agents } : {}) });
+  return { ...thinks, mark: thinks.mark ?? maker ?? apiProviderOf(agent.model, models) ?? null };
+}
+
 export function brainLine(
   t: TFunction,
   brain: AgentBrainLine | null | undefined,

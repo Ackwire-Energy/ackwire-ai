@@ -27,7 +27,7 @@ afterEach(() => {
 
 type State = ReturnType<typeof seedState>;
 
-const KEPT = "Guardei a sua mensagem.";
+const KEPT = "Guardei a sua mensagem";
 const PLANS = "Ver planos do Ackwire AI";
 const HOLD: OrgStanding = { state: "hold", reason: "payment" };
 const BILLING = "https://billing.example.com";
@@ -75,7 +75,7 @@ const click = async (el: Element, rounds = 6) => {
   await act(async () => fireEvent.click(el));
   await settle(rounds);
 };
-const card = () => document.querySelector(":is(.rq-open, .rq-done)") as HTMLElement;
+const card = () => document.querySelector(":is(.rq--note, .rq-done)") as HTMLElement;
 const calls = (state: State, method: string) => state.calls.filter((c) => c.method === method);
 
 describe("the wall", () => {
@@ -83,12 +83,23 @@ describe("the wall", () => {
     const state = held(seedState({ aiStatus: noAi(ADA_ID), authConfig: { billingUrl: BILLING } }));
     state.messages.push(wall());
     await open(state);
-    expect(card().textContent).toContain(KEPT);
-    expect(card().textContent).toContain("Eu respondo aqui quando o workspace tiver um plano do Ackwire AI");
-    expect(card().textContent).toContain("A IA é a que você já paga");
-    expect(within(card()).getByRole("button", { name: PLANS })).toBeTruthy();
+    // A title, one sentence and the button: what the plan brings waits behind the ⓘ beside the title.
+    expect(card().querySelector(".rq__title b")?.textContent).toBe(KEPT);
+    expect([...card().querySelectorAll("p:not(.rq__title)")].map((p) => p.textContent)).toEqual([
+      "Respondo aqui quando o workspace tiver um plano do Ackwire AI.",
+    ]);
+    const about = within(card()).getByRole("button", { name: `Sobre ${KEPT}` });
+    expect(about.closest(".rq__title")).toBeTruthy();
+    expect(document.getElementById(about.getAttribute("aria-describedby") ?? "")?.textContent).toContain(
+      "A IA é a que você já paga",
+    );
+    const pay = within(card()).getByRole("button", { name: PLANS });
+    expect(pay.className).toContain("ac-btn--primary");
+    expect(pay.parentElement?.className).toBe("rq__foot");
     expect(within(card()).queryByRole("button", { name: "Conectar" })).toBeNull();
     expect(document.querySelector(".noai-banner")).toBeNull();
+    await click(about, 2);
+    expect(screen().getByRole("tooltip").textContent).toContain("O plano traz o computador dos agentes");
   });
 
   test("a key saved before reads as ready and changes nothing: no answer starts, the wall stays", async () => {
@@ -103,8 +114,8 @@ describe("the wall", () => {
     const state = held(seedState({ aiStatus: noAi(ADA_ID) }), HOLD, "member");
     state.messages.push(wall());
     await open(state);
-    expect(card().textContent).toContain("Quem administra o workspace pode resolver isso.");
-    expect(within(card()).queryByRole("button")).toBeNull();
+    expect(card().textContent).toContain("Respondo aqui quando um admin resolver o plano do Ackwire AI.");
+    expect(card().querySelector(".ac-btn")).toBeNull();
   });
 
   test("an older no-AI card on a hold is the wall too: its Connect would lead nowhere", async () => {
@@ -117,11 +128,28 @@ describe("the wall", () => {
   });
 
   test("the right hand with no team also offers the templates", async () => {
-    const state = withRightHand(held(seedState({ aiStatus: noAi(LODI_ID) })));
+    const state = withRightHand(held(seedState({ aiStatus: noAi(LODI_ID), authConfig: { billingUrl: BILLING } })));
     state.agents = state.agents.filter((a) => a.id === LODI_ID);
     state.messages.push(wall(LODI_ID));
     await open(state);
-    expect(within(card()).getByRole("button", { name: "Ver modelos de time" })).toBeTruthy();
+    // One primary, the other a bare text button after it.
+    expect([...card().querySelectorAll(".rq__foot > .ac-btn")].map((b) => [b.textContent, b.className])).toEqual([
+      [PLANS, expect.stringContaining("ac-btn--primary")],
+      ["Ver modelos de time", expect.stringContaining("ac-btn--ghost")],
+    ]);
+  });
+
+  test("a lapsed plan says what brings the answer, and its fix", async () => {
+    const state = held(seedState({ aiStatus: noAi(ADA_ID), authConfig: { billingUrl: BILLING } }), {
+      state: "hold",
+      reason: "unpaid",
+    });
+    state.messages.push(wall());
+    await open(state);
+    expect(card().querySelector(".rq__note")?.textContent).toBe(
+      "Respondo aqui quando o pagamento do plano do Ackwire AI passar.",
+    );
+    expect(within(card()).getByRole("button", { name: "Atualizar o pagamento" })).toBeTruthy();
   });
 });
 
@@ -130,7 +158,10 @@ describe("after the plan", () => {
     const state = seedState({ aiStatus: noAi(ADA_ID) });
     state.messages.push(wall());
     await open(state);
-    expect(card().textContent).toContain("Plano ativo. Conecte uma IA e Ada responde aqui.");
+    expect([...card().querySelectorAll("p")].map((p) => p.textContent)).toEqual([
+      "Plano ativo",
+      "Conecte uma IA e Ada responde aqui.",
+    ]);
     await click(within(card()).getByRole("button", { name: "Conectar" }));
     expect(screen().getByRole("dialog", { name: /Conectar uma IA/ })).toBeTruthy();
   });
@@ -227,7 +258,19 @@ describe("what stays out of reach on a hold", () => {
   test("a saved key can't be changed, only removed", async () => {
     await open(held(seedState()), "settings/keys");
     expect(screen().queryByRole("button", { name: "Trocar a chave" })).toBeNull();
-    expect(screen().getByRole("button", { name: "Apagar" })).toBeTruthy();
+    const more = screen().getByRole("button", { name: "Ações de Claude da Acme" });
+    more.focus();
+    await act(async () => {
+      fireEvent.keyDown(more, { key: "Enter" });
+      fireEvent.keyUp(more, { key: "Enter" });
+    });
+    await settle(2);
+    const menu = screen().getByRole("menu");
+    expect(
+      within(menu)
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent),
+    ).toEqual(["Apagar"]);
     expect(document.body.textContent).toContain("As chaves de API abrem com o plano do Ackwire AI");
   });
 

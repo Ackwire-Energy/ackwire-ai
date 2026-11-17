@@ -65,6 +65,18 @@ describe("a block's page", () => {
     expect(BLOCK_KIT_CSS).not.toMatch(/(^|[\n}])button\{/);
   });
 
+  test("a theme change from the app reaches every part of a block in one frame, as in the app", () => {
+    expect(BLOCK_KIT_CSS).toContain(
+      "html[data-theme-switching] *,html[data-theme-switching] *::before,html[data-theme-switching] *::after{transition:none!important}",
+    );
+    const theme = BLOCK_KIT_JS.slice(BLOCK_KIT_JS.indexOf("function theme(t,live)"));
+    const on = theme.indexOf('d.setAttribute("data-theme-switching","")');
+    expect(on).toBeGreaterThan(0);
+    expect(on).toBeLessThan(theme.indexOf("d.dataset.theme=t"));
+    expect(theme).toContain('removeAttribute("data-theme-switching")');
+    expect(BLOCK_KIT_JS).toContain("if(m.theme){theme(m.theme,1);");
+  });
+
   test("what the kit shares with the app has the app's values, in both themes", () => {
     const tokens = readFileSync(join(import.meta.dir, "../../ui/src/styles/tokens.css"), "utf8");
     const brief = (v: string | undefined) =>

@@ -117,6 +117,27 @@ describe("test before creating (ADR 0135 §16)", () => {
     expect((await getDashboard(dash(), f.owner.id, f.org.id, b.id)).widgets).toEqual([]);
   });
 
+  test("a draft's build is a person's work in the job lanes: it runs with no background slot free, a widget's doesn't", async () => {
+    await setupWidgets(builds({ data: KPI, summary: "1.284 visitas", title: "Visitas no site" }));
+    const b = await board();
+    const draft = await testWidget(dash(), f.owner.id, f.org.id, b.id, ask());
+    const widget = await insertWidget(dash(), {
+      orgId: f.org.id,
+      dashboardId: b.id,
+      agentId: f.agent.id,
+      title: "Leads",
+      prompt: "Leads de hoje",
+      format: "kpi",
+      schedule: "manual",
+      createdByUserId: f.owner.id,
+    });
+    await drainOutbox(f.db, f.handlers, { maxBackground: 0 });
+    expect((await widgetOf(draft.id))?.status).toBe("ok");
+    expect((await widgetOf(widget.id))?.status).toBe("building");
+    await drainOutbox(f.db, f.handlers);
+    expect((await widgetOf(widget.id))?.status).toBe("ok");
+  });
+
   test("a draft's events go to its creator alone, even on a board the whole workspace sees", async () => {
     await setupWidgets(builds({ data: KPI, summary: "ok", title: "Visitas" }));
     const b = await board();

@@ -12,7 +12,7 @@ import {
   useBrowserHandoffMutations,
   useDesktopStatus,
 } from "@agenteschat/client";
-import { formatTime, joinNames } from "@agenteschat/client/lib/format";
+import { formatTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { Button, Icon } from "@agenteschat/ui";
 import { useQuery } from "@tanstack/react-query";
@@ -22,10 +22,9 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useNow } from "@/hooks/useNow";
 import { inlineWords } from "@/lib/markdown";
 import { useToast } from "@/lib/toast";
-import { AgentAvatar } from "../AgentAvatar";
 import { useOpenComputer } from "../computer/open";
 import { useOrg } from "../org-context";
-import { RequestCard, RequestFuse, RequestTile, useExpired } from "../RequestCard";
+import { type RequestAnswer, RequestCard, RequestFuse, RequestTile, useExpired } from "../RequestCard";
 import { BrowserCard } from "./BrowserCard";
 import { useBrowserCardRequest } from "./open";
 import "./browser.css";
@@ -67,10 +66,6 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   useNow(waiting ? 15_000 : false);
   const mineInControl = active && current.controllerUserId === me.user.id;
   const helper = current.controllerUserId ? dir.memberById.get(current.controllerUserId)?.name : undefined;
-  const people = [current.requestedForUserId, agent?.ownerUserId ?? null]
-    .filter((id, i, all): id is string => Boolean(id) && all.indexOf(id) === i)
-    .map((id) => (id === me.user.id ? null : dir.memberById.get(id)?.name))
-    .filter(Boolean) as string[];
   const settled = !waiting && !active;
   const status = current.status === "pending" ? "expired" : current.status;
   const left = handoffTimeLeft(t, current);
@@ -81,7 +76,7 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   // The agent's browser opens right here, under the request; on its screen, in the computer dialog.
   const [here, setHere] = useState(false);
   const openComputer = useOpenComputer();
-  const show = () => (opensDesktop ? openComputer(current.agentId) : setHere(true));
+  const show = () => (opensDesktop ? openComputer(current.agentId, current.seat) : setHere(true));
   const take = () =>
     actions.takeControl.mutate(current.id, {
       onSuccess: show,
@@ -107,177 +102,99 @@ export function BrowserHandoffCard({ handoff }: { handoff: BrowserHandoff }) {
   const time = current.resolvedAt ? formatTime(i18n.language, current.resolvedAt) : "";
   const screenIcon = onDesktop ? "computer" : "globe";
   const groupLabel = onDesktop ? t("desktop.card.group", g) : t("browser.card.group", g);
-  // Waiting: a request card like every other. "Ver a tela" shows the agent's browser under it (its desktop, in
-  // the computer dialog); "Abrir aqui" takes control as before.
-  if (waiting) {
-    const asked = current.requestedForUserId;
-    // Its buttons only for whom it waits on (the server checks again when they open it).
-    const mine = handoffIsMine(current, me.user.id, agent?.ownerUserId, org);
-    const askedName = asked ? dir.memberById.get(asked)?.name : undefined;
-    return (
-      <>
-        <RequestCard
-          id={current.id}
-          kind={onDesktop ? "desktop" : "browser"}
-          agent={agent}
-          label={groupLabel}
-          mine={mine}
-          waitingFor={askedName ? t("ask.waitingFor", { name: askedName }) : undefined}
-          lead={current.instructions}
-          object={{
-            logo: (
-              <RequestTile>
-                <Icon name={screenIcon} size={16} />
-              </RequestTile>
-            ),
-            title: onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g),
-            detail: agent?.handle ? `@${agent.handle}` : undefined,
-            more: t("ask.seeScreen"),
-          }}
-          open={!opensDesktop && showBrowser}
-          onOpenChange={(open) => (opensDesktop ? openComputer(current.agentId) : setHere(open))}
-          actions={
-            mine ? (
-              <Button
-                variant="primary"
-                size="sm"
-                icon={screenIcon}
-                loading={actions.takeControl.isPending}
-                onClick={take}
-                title={t("browser.inCard.openHereHint")}
-              >
-                {t("browser.inCard.openHere")}
-              </Button>
-            ) : undefined
-          }
-          end={
+  // A request card like every other, waiting, with someone helping or over. "Ver a tela" shows the agent's browser
+  // under it (its desktop, in the computer dialog); "Abrir aqui" takes control as before. Over, the same card says how
+  // it ended and who did it where its button was.
+  const asker = current.requestedForUserId;
+  // Its buttons only for whom it waits on (the server checks again when they open it).
+  const mine = waiting && handoffIsMine(current, me.user.id, agent?.ownerUserId, org);
+  const askedName = asker ? dir.memberById.get(asker)?.name : undefined;
+  const answer: RequestAnswer | undefined = settled
+    ? {
+        done: status === "done" || status === "withdrawn",
+        text:
+          status === "done"
+            ? current.controllerUserId === me.user.id
+              ? t(onDesktop ? "desktop.card.doneByYou" : "browser.card.doneByYou", { time, ...g, agent: name })
+              : t(onDesktop ? "desktop.card.doneBy" : "browser.card.doneBy", {
+                  ...g,
+                  time,
+                  agent: name,
+                  name: helper ?? "",
+                })
+            : status === "failed"
+              ? t("browser.card.failed")
+              : status === "cancelled"
+                ? t("browser.card.cancelled")
+                : status === "withdrawn"
+                  ? t("browser.card.withdrawn", g)
+                  : t("browser.card.expired", g),
+        note: status === "failed" && current.note ? <>“{inlineWords(current.note)}”</> : undefined,
+      }
+    : undefined;
+  return (
+    <>
+      <RequestCard
+        id={current.id}
+        kind={onDesktop ? "desktop" : "browser"}
+        agent={agent}
+        runId={current.runId}
+        label={groupLabel}
+        mine={mine}
+        waitingFor={
+          active
+            ? mineInControl
+              ? t("browser.card.helpingYou")
+              : t("browser.card.helping", { name: helper ?? "" })
+            : askedName
+              ? t("ask.waitingFor", { name: askedName })
+              : undefined
+        }
+        answer={answer}
+        lead={current.instructions}
+        object={{
+          logo: (
+            <RequestTile>
+              <Icon name={screenIcon} size={16} />
+            </RequestTile>
+          ),
+          title: onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g),
+          detail: agent?.handle ? `@${agent.handle}` : undefined,
+          ...(waiting ? { more: t("ask.seeScreen") } : {}),
+        }}
+        open={!opensDesktop && showBrowser}
+        onOpenChange={
+          waiting ? (open) => (opensDesktop ? openComputer(current.agentId, current.seat) : setHere(open)) : undefined
+        }
+        actions={
+          mine ? (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={screenIcon}
+              loading={actions.takeControl.isPending}
+              onClick={take}
+              title={t("browser.inCard.openHereHint")}
+            >
+              {t("browser.inCard.openHere")}
+            </Button>
+          ) : active && !showBrowser ? (
+            <Button size="sm" icon={screenIcon} onClick={show}>
+              {opensDesktop && mineInControl ? t("agentComputer.open") : t("browser.card.watch")}
+            </Button>
+          ) : undefined
+        }
+        end={
+          waiting && (
             <RequestFuse
               left={handoffFuse(current)}
               agent={agent}
               text={left !== null ? t("browser.card.left", { time: left }) : null}
             />
-          }
-          what={current.instructions}
-        />
-        {showBrowser && (
-          <BrowserCard agentId={current.agentId} name={name} handoff={current} onSettled={() => setHere(false)} />
-        )}
-      </>
-    );
-  }
-  return (
-    <>
-      {/* biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset */}
-      <div className={settled ? "brw-rq brw-rq--settled" : "brw-rq"} role="group" aria-label={groupLabel}>
-        <span className="brw-rq__face">
-          <AgentAvatar
-            agentId={current.agentId}
-            size="md"
-            state={waiting ? "waiting" : active ? "thinking" : "idle"}
-            name={name}
-          />
-        </span>
-        <div className="brw-rq__meta">
-          <b>{name}</b>
-          {settled ? (
-            <span>
-              {t(
-                status === "done"
-                  ? "browser.card.settledDone"
-                  : status === "failed"
-                    ? "browser.card.settledFailed"
-                    : status === "cancelled"
-                      ? "browser.card.settledCancelled"
-                      : status === "withdrawn"
-                        ? "browser.card.settledWithdrawn"
-                        : "browser.card.settledExpired",
-              )}
-            </span>
-          ) : (
-            <span>
-              {people.length > 0
-                ? t("browser.card.asked", { people: joinNames(people, t) })
-                : t("browser.card.askedShort")}
-            </span>
-          )}
-          <span className="brw-grow" />
-          {active && (
-            <>
-              <Icon name="person" size={14} />
-              <span>
-                {mineInControl ? t("browser.card.helpingYou") : t("browser.card.helping", { name: helper ?? "" })}
-              </span>
-            </>
-          )}
-        </div>
-        <p className="brw-rq__title">{current.instructions}</p>
-        <div className="brw-rq__body">
-          <div className="brw-exact">
-            <span className="brw-exact__ic">
-              <Icon name={screenIcon} size={16} />
-            </span>
-            <span className="brw-exact__t">
-              <b>{onDesktop ? t("desktop.card.where", g) : t("browser.card.where", g)}</b>
-              {agent?.handle && <small>@{agent.handle}</small>}
-            </span>
-          </div>
-          {status === "done" && settled && (
-            <div className="brw-rq__res brw-rq__res--ok">
-              <Icon name="check" size={16} />
-              {current.controllerUserId === me.user.id
-                ? t(onDesktop ? "desktop.card.doneByYou" : "browser.card.doneByYou", { time, ...g, agent: name })
-                : t(onDesktop ? "desktop.card.doneBy" : "browser.card.doneBy", {
-                    ...g,
-                    time,
-                    agent: name,
-                    name: helper ?? "",
-                  })}
-            </div>
-          )}
-          {status === "failed" && settled && (
-            <>
-              <div className="brw-rq__res">
-                <Icon name="close" size={16} />
-                {t("browser.card.failed")}
-              </div>
-              {current.note && <div className="brw-rq__why">“{inlineWords(current.note)}”</div>}
-            </>
-          )}
-          {status === "expired" && settled && (
-            <div className="brw-rq__res">
-              <Icon name="clock" size={16} />
-              {t("browser.card.expired", g)}
-            </div>
-          )}
-          {status === "cancelled" && settled && (
-            <div className="brw-rq__res">
-              <Icon name="close" size={16} />
-              {t("browser.card.cancelled")}
-            </div>
-          )}
-          {status === "withdrawn" && settled && (
-            <div className="brw-rq__res">
-              <Icon name="check" size={16} />
-              {t("browser.card.withdrawn", g)}
-            </div>
-          )}
-          {active && !showBrowser && (
-            <div className="brw-rq__acts">
-              <Button icon={screenIcon} onClick={show}>
-                {opensDesktop && mineInControl ? t("agentComputer.open") : t("browser.card.watch")}
-              </Button>
-            </div>
-          )}
-          {showBrowser && (
-            <div className="brw-rq__res">
-              <Icon name="person" size={16} />
-              {mineInControl
-                ? t("browser.inCard.helpingHere")
-                : t("browser.inCard.helpingOther", { person: helper ?? "" })}
-            </div>
-          )}
-        </div>
-      </div>
+          )
+        }
+        what={current.instructions}
+      />
       {showBrowser && (
         <BrowserCard agentId={current.agentId} name={name} handoff={current} onSettled={() => setHere(false)} />
       )}

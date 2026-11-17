@@ -193,15 +193,15 @@ export function crc32(data: Uint8Array) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-/** A zip of text files (UTF-8 names and contents, deflated). */
-export function zip(files: [string, string][]): Uint8Array {
+/** A zip of files (UTF-8 names; text as UTF-8 or bytes as they are, deflated). */
+export function zip(files: [string, string | Uint8Array][]): Uint8Array {
   const enc = new TextEncoder();
   const locals: Uint8Array[] = [];
   const centrals: Uint8Array[] = [];
   let offset = 0;
-  for (const [path, text] of files) {
+  for (const [path, content] of files) {
     const name = enc.encode(path);
-    const raw = enc.encode(text);
+    const raw = typeof content === "string" ? enc.encode(content) : content;
     const data = new Uint8Array(deflateRawSync(raw));
     const crc = crc32(raw);
     const local = new Uint8Array(30 + name.length + data.length);

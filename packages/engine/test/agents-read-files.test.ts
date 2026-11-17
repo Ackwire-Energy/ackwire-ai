@@ -9,10 +9,13 @@ import {
   createArtifact,
   createChannel,
   createFileArtifact,
+  createWebToolSource,
+  createWorkspaceToolSource,
   deleteArtifact,
   drainOutbox,
   getArtifact,
   invokeToolForRun,
+  missingPermissions,
   openDm,
   openPersonAgentDm,
   postPersonMessage,
@@ -323,7 +326,7 @@ describe("a file sent while the agent works", () => {
       body: "",
       attachments: [file.id],
     });
-    const line = `(attached files: "precos.html" (artifact ${file.id}))`;
+    const line = `(attached files: "precos.html" (artifact ${file.id}); open each with read_artifact before you answer about it; if one is unreadable to you, give the reason and way out the tool gave)`;
     expect((await renderSteered(f.db, f.org.id, [m.id]))[0]?.text).toContain(line);
     expect((await renderSteered(f.db, f.org.id, [m.id], { beforeStart: true }))[0]?.text).toContain(line);
   });
@@ -416,30 +419,103 @@ describe("the team's right hand", () => {
   });
 });
 
-describe("its other limits", () => {
-  test("it reads files and writes none: no copying a file elsewhere, and no card that can't give anything", async () => {
+describe("its other tools", () => {
+  test("it writes files and brings one along like any agent, and holds its computer's scopes from the start", async () => {
     f = await world();
     const lodi = await lodiOf();
     const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
     const file = await upload(dm.id);
     const run = await runOf(lodi.id, dm.id, "lê", f.owner.id, [file.id]);
+    // What a plan's locked turn gets is this list: the bridge's, checked by the Tool Gateway like any brain's.
     const listed = await listedOnBridge(run);
     expect(listed).toEqual(
-      expect.arrayContaining(["read_artifact", "list_artifacts", "search_wiki", "read_wiki_page"]),
+      expect.arrayContaining([
+        "read_artifact",
+        "list_artifacts",
+        "search_wiki",
+        "read_wiki_page",
+        "share_artifact",
+        "create_artifact",
+        "update_artifact",
+        "request_permission",
+      ]),
     );
-    // The wiki pages its person may edit it writes (ADR 0137 amendment of 2026-11-07); a Drive file never.
-    for (const name of ["share_artifact", "create_artifact", "request_permission"]) expect(listed).not.toContain(name);
-    for (const [name, input] of [
-      ["create_artifact", { title: "x", kind: "document", markdown: "x" }],
-      ["share_artifact", { artifact_id: file.id }],
-      ["request_permission", { permission: "sandbox:run", why: "x" }],
-    ] as const) {
-      const refused = await bridged(run, name, input);
-      expect(refused.isError).toBe(true);
-      expect(refused.content).toContain("your tools are fixed");
-      expect(refused.content).toContain("ask_agent");
-      expect(refused.content).not.toContain("request_permission");
-    }
+    const made = await bridged(run, "create_artifact", { title: "Resumo", kind: "document", markdown: "# Resumo" });
+    expect(made.isError).toBeUndefined();
+    // Its computer's scopes are its own from the start (ADR 0175): none is among what it could still be given.
+    const missing = await missingPermissions({ db: f.db, orgId: f.org.id, agentId: lodi.id });
+    for (const scope of ["sandbox:run", "browser:use", "desktop:use"])
+      expect(missing.map((m) => m.id)).not.toContain(scope);
+  });
+});
+
+describe("what it was denied before reaches a plan's locked turn through the bridge", () => {
+  test("the web, messages elsewhere, long work, memory, tasks, the calendar, skills: listed, and they run", async () => {
+    f = await setup({
+      rightHand: true,
+      artifactTools: true,
+      chatTools: true,
+      contextTools: true,
+      issueTools: true,
+      calendarTools: true,
+      skillTools: true,
+      workTools: true,
+      permissionTools: true,
+      toolSources: [createWebToolSource(), createWorkspaceToolSource({})],
+    });
+    const lodi = await lodiOf();
+    const dm = await openPersonAgentDm(f.db, f.org.id, f.owner.id, lodi.id);
+    const run = await runOf(lodi.id, dm.id, "avisa no geral que o relatório saiu");
+    expect(await listedOnBridge(run)).toEqual(
+      expect.arrayContaining([
+        "web_search",
+        "web_fetch",
+        "post_message",
+        "send_dm",
+        "remember",
+        "update_memory",
+        "forget",
+        "save_how_to",
+        "comment_issue",
+        "share_artifact",
+        "add_agent_to_channel",
+        "request_permission",
+        "list_events",
+        "propose_event",
+        "load_skill",
+      ]),
+    );
+    const posted = await bridged(run, "post_message", { channel: "general", text: "O relatório saiu." });
+    expect(posted.isError).toBeUndefined();
+    const [there] = await f.db
+      .select({ body: schema.messages.body })
+      .from(schema.messages)
+      .where(and(eq(schema.messages.channelId, f.general.id), eq(schema.messages.authorAgentId, lodi.id)));
+    expect(there?.body).toBe("O relatório saiu.");
+    // In no channel, it still posts in a private one the person may post in, as it answers there by name.
+    const room = await createChannel(f.db, f.owner.id, f.org.id, { name: "vendas", visibility: "private" });
+    expect((await bridged(run, "post_message", { channel: "vendas", text: "Fechamos." })).isError).toBeUndefined();
+    const kept = await bridged(run, "remember", { content: "O relatório sai às sextas", kind: "fact" });
+    expect(kept.isError).toBeUndefined();
+    const [in_] = await f.db
+      .select({ body: schema.messages.body })
+      .from(schema.messages)
+      .where(and(eq(schema.messages.channelId, room.id), eq(schema.messages.authorAgentId, lodi.id)));
+    expect(in_?.body).toBe("Fechamos.");
+
+    // Long work is its run going on in the background: offered while the run works, and it moves.
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", finishedAt: null })
+      .where(eq(schema.agentRuns.id, run.id));
+    expect(await listedOnBridge(run)).toEqual(expect.arrayContaining(["work_in_background", "post_update"]));
+    const moved = await bridged(run, "work_in_background", {
+      title: "Pesquisa de concorrentes",
+      say: "Vou pesquisar e volto com o resumo.",
+    });
+    expect(moved.isError).toBeUndefined();
+    const [work] = await f.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.agentId, lodi.id));
+    expect(work).toMatchObject({ title: "Pesquisa de concorrentes", channelId: dm.id });
   });
 });
 
@@ -654,6 +730,14 @@ describe("how a file's bytes become text", () => {
     );
     const run = await runOf(f.agent.id, dm.id, "lê");
     expect((await bridged(run, "read_artifact", { artifact_id: page.id })).content).toContain("<p>preço</p>");
-    expect((await bridged(run, "read_artifact", { artifact_id: junk.id })).content).toContain("Binary");
+    expect((await bridged(run, "read_artifact", { artifact_id: junk.id })).content).toContain(
+      "It is a binary file (.txt",
+    );
+    // Through the runner bridge a picture comes with the result, for the CLI to show.
+    const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const shot = await as("print.png", png);
+    expect((await bridged(run, "read_artifact", { artifact_id: shot.id })).images).toEqual([
+      { mediaType: "image/png", data: Buffer.from(png).toString("base64") },
+    ]);
   });
 });

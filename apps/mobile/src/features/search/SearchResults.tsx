@@ -1,16 +1,18 @@
 import { useChannels, useDms, useSearch } from "@agenteschat/client";
 import { hitText } from "@agenteschat/client/lib/media";
 import { previewBody } from "@agenteschat/client/lib/message-body";
-import { can } from "@agenteschat/client/lib/permissions";
+import { makesAgents } from "@agenteschat/client/lib/permissions";
 import { searchTerms } from "@agenteschat/client/lib/search-filters";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { EmptyState, SectionHeader, SkeletonList } from "@/ui";
+import { EmptyState, SCREEN_X, SectionHeader, SkeletonList } from "@/ui";
 import { router } from "@/ui/navigation";
+import { useOpenFile } from "../files/open";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
+import { LoadFailed } from "../shared/FirstUse";
 import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
 import { ActionList, Tile } from "../shared/parts";
@@ -30,7 +32,7 @@ export function SearchResults({ q }: { q: string }) {
   const orgId = useOrgId();
   const dir = useDirectory();
   const when = useWhen();
-  const createsAgents = can(useOrg().org, "create_agents");
+  const createsAgents = makesAgents(useOrg().org);
   const channels = useChannels(orgId);
   const dms = useDms(orgId);
   const hits = useSearch(orgId, q, SEARCH_KINDS);
@@ -54,10 +56,13 @@ export function SearchResults({ q }: { q: string }) {
     else router.navigate("/agents");
   };
   const channelName = (id: string | undefined) => (id ? channels.data?.find((x) => x.id === id)?.name : undefined);
-  // The app's own viewer (a document, an image), never the browser.
-  const openFile = (id: string) => router.push({ pathname: "/file/[id]", params: { id } });
+  // The app's own viewer (a document, an image), never the browser: a picture's name opens it straight in the pictures.
+  const openFileNow = useOpenFile();
+  const openHit = (id: string, title: string) => void openFileNow({ id, title });
   const words = Boolean(q.trim());
   const terms = searchTerms(q);
+  // The server's results didn't come: said so with a retry, never as "nothing found".
+  const failed = words && hits.isError && !hits.data;
 
   return (
     <View>
@@ -188,14 +193,15 @@ export function SearchResults({ q }: { q: string }) {
                   hint: [where ? t("mobile.chats.waitIn", { where: `#${where}` }) : null, when.short(h.createdAt)]
                     .filter(Boolean)
                     .join(" · "),
-                  onPress: () => openFile(h.sourceId),
+                  onPress: () => openHit(h.sourceId, h.title),
                 };
               })}
             />
           </Group>
         ) : null}
         {words && hits.isLoading ? <SkeletonList rows={3} /> : null}
-        {words && isEmpty(r) && !hits.isFetching ? (
+        {failed ? <LoadFailed onRetry={() => void hits.refetch()} /> : null}
+        {words && !failed && isEmpty(r) && !hits.isFetching ? (
           <EmptyState size="inline" title={t("mobile.find.nothing", { q: q.trim() })} />
         ) : null}
       </View>
@@ -215,5 +221,5 @@ function Group({ title, count, children }: { title: string; count?: number; chil
 
 const styles = StyleSheet.create({
   res: { paddingTop: 2 },
-  list: { paddingHorizontal: 16 },
+  list: { paddingHorizontal: SCREEN_X },
 });

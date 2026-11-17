@@ -81,12 +81,13 @@ scenario(
       setup: { toolSources: [openPullRequestTool()] },
       judge: { triage: (state) => (/conhecido/.test(String(state.message)) ? "noise" : "work") },
       script: {
+        // The routine posts each alert where it reports: a note told with tell_agent is a hand-off and never noise.
         sentinela: ({ n }) =>
           n === 1
             ? {
                 calls: [...fresh, ...old, ...again].map((message) => ({
-                  name: "tell_agent",
-                  input: { agent: "@lia", message },
+                  name: "post_message",
+                  input: { channel: "produto", text: `@lia ${message}` },
                 })),
               }
             : n === 2

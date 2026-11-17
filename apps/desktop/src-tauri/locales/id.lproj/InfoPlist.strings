@@ -1,0 +1,5 @@
+"NSMicrophoneUsageDescription" = "Ackwire AI memakai mikrofon untuk merekam pesan suara.";
+"NSDesktopFolderUsageDescription" = "Membuat agen yang bekerja di Mac ini bisa membuka file di Desktop-mu.";
+"NSDocumentsFolderUsageDescription" = "Membuat agen yang bekerja di Mac ini bisa membuka file di folder Dokumen.";
+"NSDownloadsFolderUsageDescription" = "Membuat agen yang bekerja di Mac ini bisa membuka file di folder Unduhan.";
+"NSLocalNetworkUsageDescription" = "Membuat agen yang bekerja di Mac ini bisa menemukan dan terhubung ke ponsel Android di Wi-Fi-mu.";

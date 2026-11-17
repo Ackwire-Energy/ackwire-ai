@@ -1,13 +1,24 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createMemoryBlobStore, type SpeechEngine, SpeechError, type SpeechProviderId } from "@agenteschat/adapters";
+import {
+  channelTopic,
+  createMemoryBlobStore,
+  type RealtimeEvent,
+  type SpeechEngine,
+  SpeechError,
+  type SpeechProviderId,
+  typingTopic,
+} from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import {
   acceptVoiceClip,
+  createFileArtifact,
   createLocalKeyWrapper,
   createSpeechSettings,
   envSpeechEngines,
+  MAX_MESSAGE_LENGTH,
   previewMediaKind,
   previewMeta,
+  publishTyping,
   readableBody,
   renderPush,
   replyExcerpt,
@@ -21,7 +32,7 @@ import {
   voiceClipAudio,
   voiceOf,
 } from "../src";
-import { type Fixture, SECRET, setup } from "./fixtures";
+import { addMember, type Fixture, SECRET, setup } from "./fixtures";
 
 const { voiceClips, messages } = schema;
 
@@ -130,6 +141,19 @@ describe("sending", () => {
     await transcribeVoiceClip(deps, first.clipId, { finalAttempt: false });
     const rows = await f.db.select().from(messages).where(eq(messages.channelId, f.general.id));
     expect(rows.filter((m) => voiceOf(m.meta))).toHaveLength(1);
+  });
+
+  test("a recording whose workspace began being deleted before its words came is dropped, never sent", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine("oi")]);
+    const { clipId } = await accept(deps);
+    await f.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() + 7 * DAY) })
+      .where(eq(schema.organizations.id, f.org.id));
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    expect((await clipOf(clipId)).status).toBe("dropped");
+    expect(await messageOf(clipId)).toBeNull();
   });
 
   test("only audio is taken, within its limits, and only with an engine", async () => {
@@ -246,6 +270,70 @@ describe("sending", () => {
   });
 });
 
+describe("“gravando áudio…” while the words are made out", () => {
+  /** A slow engine and what the conversation and the agents' quiet window hear meanwhile. */
+  const listening = async () => {
+    f = await setup();
+    let answer: (words: { text: string }) => void = () => {};
+    const slow: SpeechEngine = { ...engine(), file: () => new Promise((resolve) => (answer = resolve)) };
+    const deps = voiceDeps([slow], { beatMs: 20 });
+    const { clipId } = await accept(deps);
+    const heard: { topic: string; e: RealtimeEvent }[] = [];
+    for (const topic of [channelTopic(f.general.id), typingTopic])
+      f.pubsub.subscribe(topic, (e) => {
+        if (e.type === "user.typing" || e.type === "message.created") heard.push({ topic, e });
+      });
+    const done = transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    const beats = () => heard.filter((h) => h.e.type === "user.typing" && h.e.kind === "voice");
+    return { done, answer: (text: string) => answer({ text }), heard, beats };
+  };
+
+  test("the others keep seeing it from the upload to the message, which ends it: none comes after it", async () => {
+    const { done, answer, heard, beats } = await listening();
+    await Bun.sleep(70);
+    // At once, then every beat, to the conversation and to the agents' quiet window alike.
+    expect(beats().length).toBeGreaterThanOrEqual(6);
+    expect(beats()[0]?.e).toEqual({
+      type: "user.typing",
+      channelId: f.general.id,
+      threadId: null,
+      userId: f.owner.id,
+      ttlMs: 5000,
+      kind: "voice",
+    });
+    expect(new Set(beats().map((b) => b.topic))).toEqual(new Set([channelTopic(f.general.id), typingTopic]));
+    answer("subiu o deploy");
+    await done;
+    const message = heard.findIndex((h) => h.e.type === "message.created");
+    expect(message).toBeGreaterThan(heard.map((h) => h.e.type).lastIndexOf("user.typing"));
+    const count = heard.length;
+    await Bun.sleep(60);
+    expect(heard.length).toBe(count);
+  });
+
+  test("a long one, too big for its event, still names who sent it, so the line ends with it all the same", async () => {
+    const { done, answer, heard } = await listening();
+    await Bun.sleep(30);
+    // About five minutes of speech: more than the event carries.
+    answer("e depois a gente revisa o relatório de ontem ".repeat(160));
+    await done;
+    const created = heard.find((h) => h.e.type === "message.created")?.e;
+    expect(created).toMatchObject({ threadId: null, agentRunId: null, authorUserId: f.owner.id });
+    expect(created && "message" in created).toBe(false);
+  });
+
+  test("writing takes over: her typing in the channel ends it while the words are still on their way", async () => {
+    const { done, answer, beats } = await listening();
+    await Bun.sleep(30);
+    await publishTyping(f.pubsub, { channelId: f.general.id, threadId: null, userId: f.owner.id });
+    const count = beats().length;
+    await Bun.sleep(60);
+    expect(beats().length).toBe(count);
+    answer("e mais uma coisa");
+    await done;
+  });
+});
+
 describe("when there are no words", () => {
   test("nothing said drops the recording and tells its sender", async () => {
     f = await setup();
@@ -269,6 +357,92 @@ describe("when there are no words", () => {
     const message = await messageOf(clipId);
     expect(message?.body).toBe(VOICE_NO_WORDS_BODY);
     expect(voiceOf(message?.meta)?.noWords).toBe(true);
+  });
+});
+
+describe("typed text and files beside the take", () => {
+  const upload = (userId: string, title: string, channelId?: string) =>
+    createFileArtifact(f.artifactDeps, { type: "person", userId }, f.org.id, {
+      title,
+      name: title,
+      bytes: new TextEncoder().encode("x"),
+      ...(channelId ? { channelId } : {}),
+    });
+
+  test("one message carries them: typed text first, a blank line, the words, and the files", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine("e o deploy de ontem")]);
+    const shot = await upload(f.owner.id, "tela.png");
+    const typed = "@dev olha isto\n\nsegunda linha";
+    const { clipId } = await accept(deps, { text: `  ${typed}  `, attachments: [shot.id] });
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    const message = await messageOf(clipId);
+    expect(message?.body).toBe(`${typed}\n\ne o deploy de ontem`);
+    expect(voiceOf(message?.meta)?.text).toBe(typed);
+    expect(message?.meta.artifacts).toEqual([{ id: shot.id, version: 1, title: "tela.png" }]);
+    // The typed mention wakes the agent, as a typed message's does.
+    expect(message?.mentionedAgentIds).toEqual([f.agent.id]);
+    const rows = await f.db.select().from(messages).where(eq(messages.channelId, f.general.id));
+    expect(rows.filter((m) => m.authorUserId === f.owner.id)).toHaveLength(1);
+  });
+
+  test("a take with no words still posts the typed text and the files; one with neither is dropped", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine("  ", "  ")]);
+    const shot = await upload(f.owner.id, "tela.png");
+    const withText = await accept(deps, { text: "só o texto" });
+    await transcribeVoiceClip(deps, withText.clipId, { finalAttempt: false });
+    const posted = await messageOf(withText.clipId);
+    expect(posted?.body).toBe("só o texto");
+    expect(voiceOf(posted?.meta)?.text).toBe("só o texto");
+    const filesOnly = await accept(deps, { attachments: [shot.id] });
+    await transcribeVoiceClip(deps, filesOnly.clipId, { finalAttempt: false });
+    const files = await messageOf(filesOnly.clipId);
+    expect(files?.body).toBe("");
+    expect(files?.meta.artifacts).toHaveLength(1);
+  });
+
+  test("when no engine could make out the words, the agent reads the typed text and the placeholder", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine(new SpeechError("busy", "down"))]);
+    const { clipId } = await accept(deps, { text: "veja a tela" });
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: true });
+    const message = await messageOf(clipId);
+    expect(message?.body).toBe(`veja a tela\n\n${VOICE_NO_WORDS_BODY}`);
+    expect(voiceOf(message?.meta)).toMatchObject({ text: "veja a tela", noWords: true });
+    // Apps that predate the typed text hide a `noWords` body: this one holds the typed text, so they show it whole.
+    expect(message?.meta.voice).not.toHaveProperty("noWords");
+  });
+
+  test("typed text up to a message's limit still posts, with the words in what is left", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine("e o deploy de ontem")]);
+    const typed = "x".repeat(MAX_MESSAGE_LENGTH - 7);
+    const { clipId } = await accept(deps, { text: typed });
+    await transcribeVoiceClip(deps, clipId, { finalAttempt: false });
+    const message = await messageOf(clipId);
+    expect(message?.body).toBe(`${typed}\n\ne o d`);
+    expect(voiceOf(message?.meta)?.text).toBe(typed);
+  });
+
+  test("the text has a typed message's limit and the files a typed message's checks, before anything is stored", async () => {
+    f = await setup();
+    const deps = voiceDeps([engine("oi")]);
+    await expect(accept(deps, { text: "x".repeat(MAX_MESSAGE_LENGTH + 1) })).rejects.toMatchObject({
+      code: "message.too_long",
+    });
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const hers = await upload(bia.id, "dela.txt");
+    await expect(accept(deps, { attachments: [hers.id] })).rejects.toMatchObject({
+      code: "message.attachment_not_found",
+    });
+    await expect(accept(deps, { attachments: [crypto.randomUUID()] })).rejects.toMatchObject({
+      code: "message.attachment_not_found",
+    });
+    // A file of this channel may go, whoever uploaded it.
+    const shared = await upload(bia.id, "do-canal.txt", f.general.id);
+    await expect(accept(deps, { attachments: [shared.id] })).resolves.toMatchObject({ clipId: expect.any(String) });
+    expect((await f.db.select().from(voiceClips)).map((c) => c.attachments)).toEqual([[shared.id]]);
   });
 });
 
@@ -421,6 +595,16 @@ describe("the words stay out of what lists a message", () => {
     expect(readableBody("segredo", meta)).toBe("");
     expect(readableBody("segredo", {})).toBe("segredo");
     expect(replyExcerpt(readableBody("segredo", meta))).toBe("");
+  });
+
+  test("with typed text beside it, lists show that text and never the words, in apps that predate it too", () => {
+    const typed = { voice: { ...meta.voice, text: "olha a tela" } };
+    const body = "olha a tela\n\nsegredo";
+    expect(readableBody(body, typed)).toBe("olha a tela");
+    expect(previewMediaKind(body, typed)).toBeNull();
+    // No `voice` in the preview's meta: an older app would name it a voice message and hide the text.
+    expect(previewMeta(typed)).toBeNull();
+    expect(replyExcerpt(readableBody(body, typed))).toBe("olha a tela");
   });
 
   test("push says a voice message was sent", () => {

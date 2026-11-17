@@ -20,7 +20,7 @@ import {
   watchPushToken,
 } from "@/lib/push";
 import { readPushData } from "@/lib/push-payload";
-import { serverUrl, signedInServers } from "@/lib/server";
+import { placeAccounts, placeKey, signedInServers } from "@/lib/server";
 import { pushPlace } from "@/lib/server-choice";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
 import { router } from "@/ui/navigation";
@@ -117,7 +117,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     if (ready) void registerDeviceActions(t);
   }, [ready, t]);
 
-  // Android: FCM may hand the app a new token while it runs; it's registered again (ADR 0152).
+  // The system may hand the app a new token while it runs; it's registered again (ADR 0152, ADR 0178).
   useEffect(() => {
     if (!ready) return;
     return watchPushToken(() => localeRef.current);
@@ -131,10 +131,21 @@ export function PushProvider({ children }: { children: ReactNode }) {
       const id = response.notification.request.identifier;
       if (opened.has(id)) return;
       opened.add(id);
+      // The system keeps the last tapped notification and hands it over again on every later launch: it is cleared
+      // once taken, so opening the app by its icon doesn't land on that notification's screen again.
+      try {
+        Notifications.clearLastNotificationResponse();
+      } catch {
+        // Nothing kept to clear.
+      }
       const data = readPushData(response.notification.request.content.data);
       // From another server this phone is signed in to: the app moves there first, then opens it (ADR 0154). One
       // from a server it left opens nothing.
-      const place = pushPlace(data.server, serverUrl(), signedInServers());
+      // And as the account it is for, where this phone has several on that server (ADR 0183).
+      const place = pushPlace(data.server, placeKey(), signedInServers(), {
+        user: data.user,
+        accounts: placeAccounts(),
+      });
       if (place.kind === "gone") return;
       if (place.kind === "switch") {
         afterSwitch = response;

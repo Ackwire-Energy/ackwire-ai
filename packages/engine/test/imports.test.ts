@@ -17,7 +17,7 @@ import {
   updateMyProfile,
   ValidationError,
 } from "../src";
-import { addMember as addPerson, addUser, type Fixture, setup } from "./fixtures";
+import { addMember as addPerson, addUser, everyoneWithout, type Fixture, SECRET, setup } from "./fixtures";
 
 let f: Fixture;
 afterEach(async () => {
@@ -90,7 +90,12 @@ function bundle(over: Partial<MigrationBundle> = {}): MigrationBundle {
   };
 }
 
-const deps = () => ({ db: f.db, blobs: f.artifactDeps.blobs, pubsub: f.pubsub });
+const deps = () => ({
+  db: f.db,
+  blobs: f.artifactDeps.blobs,
+  pubsub: f.pubsub,
+  hooks: { publicUrl: "https://agentes.test", secret: SECRET },
+});
 const run = (input: Partial<ImportInput> & { bundle: MigrationBundle }, actor = f.owner.id) =>
   applyImport(deps(), actor, f.org.id, { dryRun: false, ...input }, { model: DEFAULT_MODEL });
 const byKey = <T extends { kind: string; key: string }>(items: T[]) =>
@@ -419,6 +424,41 @@ describe("planning and applying an import", () => {
     expect(once?.rule).toMatchObject({ freq: "daily", count: 1, start: day, times: ["10:00"] });
   });
 
+  test("a routine another app started by a webhook gets an address of its own; one on a pull request waits for GitHub", async () => {
+    f = await setup();
+    const routine = (key: string, trigger: MigrationBundle["routines"][number]["trigger"]) => ({
+      key,
+      name: key,
+      agent: "scout",
+      prompt: `Faça ${key}.`,
+      channel: null,
+      trigger,
+    });
+    const plan = await run({
+      bundle: bundle({ routines: [routine("hook", { webhook: true }), routine("pr", { event: "github.pr_opened" })] }),
+    });
+    const items = byKey(plan.items);
+    const row = async (key: string) =>
+      (
+        await f.db
+          .select()
+          .from(schema.routines)
+          .where(eq(schema.routines.id, items.get(`routine:${key}`)?.targetId ?? ""))
+      )[0];
+    expect(items.get("routine:hook")?.action).toBe("create");
+    expect(items.get("routine:pr")?.action).toBe("create");
+    const hook = await row("hook");
+    expect(hook).toMatchObject({ triggerType: "event", event: "webhook.received" });
+    // A new address: the other app's never comes.
+    expect(
+      await f.db
+        .select()
+        .from(schema.routineHooks)
+        .where(eq(schema.routineHooks.routineId, hook?.id ?? "")),
+    ).toHaveLength(1);
+    expect(await row("pr")).toMatchObject({ triggerType: "event", event: "github.pr_opened" });
+  });
+
   test("routines past the agent's active limit still arrive, paused, with a note saying why", async () => {
     f = await setup();
     const routines = Array.from({ length: 22 }, (_, i) => ({
@@ -448,9 +488,10 @@ describe("planning and applying an import", () => {
     }
   });
 
-  test("admins only; one apply takes at most 200 writes (a dry run any size)", async () => {
+  test("who may create agents only; one apply takes at most 200 writes (a dry run any size)", async () => {
     f = await setup();
     const member = await addPerson(f.db, f.org.id, "member");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     await expect(run({ bundle: bundle(), dryRun: true }, member.id)).rejects.toThrow(ForbiddenError);
     await expect(run({ bundle: bundle() }, member.id)).rejects.toThrow(ForbiddenError);
 

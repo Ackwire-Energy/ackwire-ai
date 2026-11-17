@@ -19,6 +19,8 @@ import {
   type ServerFrame,
   SHARED_ACCOUNTS_PROTOCOL,
   SHARED_CODEX_PROTOCOL,
+  SHARED_GEMINI_PROTOCOL,
+  SHARED_GROK_PROTOCOL,
   sealSecret,
 } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
@@ -30,6 +32,7 @@ import {
   cancelAccountLogin,
   claudeAuthMethodFor,
   claudeAuthPolicy,
+  createAgent,
   createMachineHub,
   deleteAccount,
   ForbiddenError,
@@ -473,6 +476,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       keyHint: null,
       shared: false,
       providerOrgId: null,
+      serves: "everyone",
     },
   });
   // Polled again: the same account, added once.
@@ -871,6 +875,33 @@ test("ChatGPT's sign-in is made for all of its owner's agents from runner protoc
   expect(await begun(SHARED_CODEX_PROTOCOL - 1)).toBeUndefined();
 });
 
+test("Gemini's sign-in is made for all of its owner's agents from runner protocol 58 on, never before", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine(SHARED_GEMINI_PROTOCOL);
+  const begun = async (protocol: number, provider?: string) => {
+    const runner = fakeHub(
+      machineId,
+      (req) => (req.action === "begin" ? { url: "https://accounts.google.com/o/oauth2/auth?state=s1" } : {}),
+      { protocol },
+    );
+    await beginAccountLogin(
+      runner.deps,
+      f.owner.id,
+      f.org.id,
+      machineId,
+      "antigravity",
+      undefined,
+      undefined,
+      provider,
+    );
+    return (runner.calls.find((c) => c.action === "begin") as { shared?: boolean } | undefined)?.shared;
+  };
+  expect(await begun(SHARED_GEMINI_PROTOCOL)).toBe(true);
+  // A Gemini Enterprise seat too.
+  expect(await begun(SHARED_GEMINI_PROTOCOL, "enterprise")).toBe(true);
+  expect(await begun(SHARED_GEMINI_PROTOCOL - 1)).toBeUndefined();
+});
+
 test("Claude: an account another agent thinks with signs in again as a login of its own, under the account's name", async () => {
   f = await setup();
   const { machineId } = await ownedMachine();
@@ -1238,6 +1269,50 @@ test("on a computer nobody connected, an admin removes any account; a member onl
   expect(await accountRows(machineId)).toEqual([]);
 });
 
+test("a server's own computer, recorded as its owner's: any member signs their plan in, nobody touches another's", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const caio = await addMember(f.db, f.org.id, "member", "caio");
+  const bia = await addMember(f.db, f.org.id, "member", "bia");
+  const runner = signingRunner(machineId, () => ({ loggedIn: true, email: "caio@example.com", plan: "pro" }));
+  // A computer its owner brought stays theirs to sign in on.
+  const brought = await beginAccountLogin(runner.deps, caio.id, f.org.id, machineId, "claude_code").catch((e) => e);
+  expect(brought.code).toBe("account.not_owner");
+  expect((await listAiAccounts({ db: f.db }, caio.id, f.org.id)).computers[0]?.canAdd).toBe(false);
+
+  await f.db.update(schema.machines).set({ kind: "host" }).where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, caio.id, f.org.id)).computers[0]).toMatchObject({
+    canAdd: true,
+    mine: false,
+  });
+  const { login, status } = await signIn(runner, caio.id, machineId);
+  expect(status.account).toMatchObject({ mine: true });
+  expect(await accountRow(login.loginId)).toMatchObject({ createdBy: caio.id, status: "active" });
+  expect((await getMachineAccounts({ db: f.db }, bia.id, f.org.id, machineId)).accounts).toMatchObject([
+    { id: login.loginId, email: null, mine: false },
+  ]);
+  // Another member neither signs in again to it, renames it nor removes it.
+  for (const attempt of [
+    beginAccountLogin(runner.deps, bia.id, f.org.id, machineId, "claude_code", login.loginId),
+    renameMachineAccount({ db: f.db }, bia.id, f.org.id, machineId, login.loginId, "Meu"),
+    removeMachineAccount(runner.deps, bia.id, f.org.id, machineId, login.loginId),
+  ])
+    expect(await attempt.catch((e) => e)).toBeInstanceOf(ForbiddenError);
+  // The computer's own sign-in still thinks only for its owner's agents.
+  const theirs = await createAgent(
+    f.db,
+    caio.id,
+    f.org.id,
+    { name: "Iris", handle: "iris" },
+    { model: "claude-haiku-5-5" },
+  );
+  await f.db.update(schema.agents).set({ machineId }).where(eq(schema.agents.id, theirs.id));
+  await setAgentBrain({ db: f.db }, caio.id, f.org.id, theirs.id, { brain: "claude_code", account: login.loginId });
+  expect(
+    await setAgentBrain({ db: f.db }, caio.id, f.org.id, theirs.id, { account: null }).catch((e) => e),
+  ).toBeInstanceOf(ForbiddenError);
+});
+
 test("a person who leaves or deletes their account: their accounts are signed out everywhere, never inherited", async () => {
   f = await setup();
   const hub = createMachineHub({ db: f.db, pubsub: f.pubsub, replicaId: "replica-a" });
@@ -1525,6 +1600,34 @@ test("refreshing usage: the caller's own accounts, and their computers' own sign
   expect(await refreshAiAccounts(live.deps, stranger.id, f.org.id).catch((e) => e)).toBeInstanceOf(ForbiddenError);
 });
 
+test("a Grok sign-in is asked for all agents only from protocol 67 (issue #319)", async () => {
+  f = await setup();
+  const ask = async (protocol: number) => {
+    const { machineId } = await ownedMachine(protocol);
+    const runner = fakeHub(
+      machineId,
+      (req) =>
+        req.action === "begin"
+          ? { url: "https://grok.com/device?user_code=KJ4D-9QRS" }
+          : req.action === "status"
+            ? { state: "waiting" }
+            : {},
+      { protocol },
+    );
+    await beginAccountLogin(runner.deps, f.owner.id, f.org.id, machineId, "grok");
+    return runner.calls[0] as unknown as Record<string, unknown>;
+  };
+  // An older runner lends the folder to one agent: no `shared` on the wire.
+  expect(await ask(SHARED_GROK_PROTOCOL - 1)).toEqual({
+    op: "account",
+    action: "begin",
+    kind: "grok",
+    loginId: expect.any(String),
+  });
+  // From 67: root keeps it and each agent's turn gets a copy.
+  expect(await ask(SHARED_GROK_PROTOCOL)).toMatchObject({ kind: "grok", shared: true });
+});
+
 test("one sign-in for all agents (protocol 29): asked for, it thinks for two agents, once; out and gone for both", async () => {
   f = await setup();
   const { machineId } = await ownedMachine(SHARED_ACCOUNTS_PROTOCOL);
@@ -1670,13 +1773,27 @@ test("an account the runner no longer says is for all agents: the two agents on 
   expect(taken).toMatchObject({ code: "account.in_use" });
 });
 
-test("where each agent is its own OS user, the switch decides: Claude's and ChatGPT's sign-ins and plans' keys for all", async () => {
+test("where each agent is its own OS user, the switch decides: Claude's, ChatGPT's and Gemini's sign-ins and plans' keys for all", async () => {
   f = await setup();
-  const { machineId } = await ownedMachine(SHARED_CODEX_PROTOCOL);
+  const { machineId } = await ownedMachine(SHARED_GEMINI_PROTOCOL);
   const [m] = await f.db.select().from(schema.machines).where(eq(schema.machines.id, machineId));
   await f.db
     .update(schema.machines)
     .set({ executors: { ...m?.executors, mode: "system" } })
+    .where(eq(schema.machines.id, machineId));
+  expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
+    claude_code: true,
+    codex: true,
+    cursor: false,
+    opencode: false,
+    grok: false,
+    antigravity: true,
+    key: true,
+  });
+  // A runner before protocol 58 shares Gemini's with no one.
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: SHARED_GEMINI_PROTOCOL - 1 })
     .where(eq(schema.machines.id, machineId));
   expect((await listAiAccounts({ db: f.db }, f.owner.id, f.org.id)).computers[0]?.shares).toEqual({
     claude_code: true,

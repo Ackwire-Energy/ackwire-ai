@@ -138,7 +138,7 @@ test("a runner running as root opens a shell only through a launcher that runs i
   // Said to run agents as their own users, yet given no launcher: still never as root.
   expect(await errorCode(() => asRoot(USER).open(dev, SIZE, data))).toBe("terminal_unavailable");
   expect(shells.shells).toHaveLength(0);
-  const prefix = ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
+  const prefix = ["/usr/bin/setpriv", "--reuid=ag-01a142cb", "--regid=ag-01a142cb", "--init-groups", "--"];
   const root = asRoot({ ...USER, prefix });
   opened.push(root);
   await root.open(dev, SIZE, data);
@@ -165,7 +165,16 @@ test("the agent's login shell in its folder, through its launcher, with TERM and
   }
 
   // In system mode the launcher runs it as the agent's own user.
-  const prefix = ["/usr/bin/systemd-run", "--scope", "--", "/usr/sbin/runuser", "-u", "ag-01a142cb", "--"];
+  const prefix = [
+    "/usr/bin/systemd-run",
+    "--scope",
+    "--",
+    "/usr/bin/setpriv",
+    "--reuid=ag-01a142cb",
+    "--regid=ag-01a142cb",
+    "--init-groups",
+    "--",
+  ];
   const t = setup({}, async () => ({ ...USER, prefix }));
   const { shell } = await t.open();
   expect(shell.argv).toEqual([...prefix, "/bin/sh", "-l"]);
@@ -175,7 +184,7 @@ test("system mode's terminal: root starts it in the agent's home, the agent's ow
   const home = tempDir("term-home-");
   dirs.push(home);
   const launcher = {
-    prefix: ["/usr/sbin/runuser", "-u", "ag-01a142cb", "--"],
+    prefix: ["/usr/bin/setpriv", "--reuid=ag-01a142cb", "--regid=ag-01a142cb", "--init-groups", "--"],
     env: { HOME: home, USER: "ag-01a142cb", PATH: "/usr/bin:/bin", SHELL: "/bin/bash" },
     home,
   };

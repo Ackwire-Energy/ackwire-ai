@@ -165,8 +165,37 @@ export const Widget = z
             "`agent_reported` (show `detail` as is), `no_update`, `error`, or a routine's code (`budget_exceeded`…).",
         }),
         detail: z.string().nullable(),
+        cause: z.string().optional().openapi({
+          description:
+            "With `failing` (it stopped after failing several times in a row): the code of the last of those failures, whose words and way out the apps show.",
+        }),
       })
       .nullable(),
+    wait: z
+      .object({
+        code: z.enum(["usage_pause", "plan_limit", "budget", "computer", "busy", "outage"]),
+        source: z.enum(["plan", "budget"]).nullable(),
+        resetsAt: z.string().nullable().openapi({
+          description:
+            "When it picks up by itself; an `outage`'s next try. Null: not known (a budget's: other runs hold it for a moment).",
+        }),
+        scope: z.enum(["model", "region", "off", "inactive"]).nullable().openapi({
+          description:
+            "A `plan_limit` on its model alone: that model's own limit, the region it needs, switched off, or no subscription.",
+        }),
+        model: z.string().nullable().openapi({ description: "With `scope`: that model's name." }),
+        since: z.string().nullable().openapi({
+          description: "`busy`: since when it waits for room on its computer (the apps say so after 10 minutes).",
+        }),
+        canContinue: z
+          .boolean()
+          .openapi({ description: "`usage_pause`: the viewer may let it go on now (Update now, Continue now)." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "While it is `building` or `updating`: what its run waits on (paused near its plan's or budget's limit, at that limit, for its computer to be back or have room, or for its AI provider).",
+      }),
     refreshedAt: z.string().nullable(),
     nextRunAt: z.string().nullable(),
     routineId: z.uuid().nullable(),
@@ -345,6 +374,15 @@ export const ConfirmWidgetBody = z
   .openapi("ConfirmWidget");
 
 export const WidgetChangeBody = z.object({ text: z.string().trim().min(1).max(1000) }).openapi("WidgetChange");
+
+export const WidgetRefreshBody = z
+  .object({
+    auto: z.boolean().optional().openapi({
+      description:
+        "The apps' own build once the agent of a widget waiting for an AI has one: it only queues, never taking the routine over or resuming it. A routine paused or whose creator no longer fits fails the widget with that reason instead (Resolve takes it on).",
+    }),
+  })
+  .openapi("WidgetRefresh");
 
 export const DashboardParams = z.object({
   orgId: z.uuid().openapi({ param: { name: "orgId", in: "path" } }),

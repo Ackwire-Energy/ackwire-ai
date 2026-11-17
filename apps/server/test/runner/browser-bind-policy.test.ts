@@ -293,13 +293,12 @@ test.if(process.platform !== "win32")("namespace diagnostics use the same launch
   expect(look).toHaveLength(2);
   expect(look[0]?.args).toEqual([String(user.uid), "--", "/usr/bin/ss", "-Htln", "-e"]);
   const args = pc.calls.find((c) => c.file === "/usr/bin/systemd-run")?.args ?? [];
-  expect(args.slice(args.indexOf(hook), args.indexOf(hook) + 6)).toEqual([
+  expect(args.slice(args.indexOf(hook), args.indexOf(hook) + 5)).toEqual([
     hook,
     String(user.uid),
     "--",
-    "/usr/sbin/runuser",
-    "-u",
-    user.user,
+    "/usr/bin/setpriv",
+    `--reuid=${user.user}`,
   ]);
 });
 

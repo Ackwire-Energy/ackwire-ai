@@ -1,9 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
 import {
   ACCOUNTS_PROTOCOL,
+  ASKS_PROTOCOL,
   BRAIN_PROFILES_PROTOCOL,
   BRAIN_PROTOCOL,
   brainTopic,
+  CONTEXT_LIMIT_PROTOCOL,
   CONVERSATION_PROTOCOL,
   createMemoryPubSub,
   MACHINE_PROTOCOL_VERSION,
@@ -326,6 +328,25 @@ test("a plan turn needs a runner that keeps plan to reading (ADR 0053 §3); a wo
   expect(work.calls[0]?.request).toMatchObject({ op: "brain.turn", permissions: { mode: "work" } });
 });
 
+test("an agent that always asks: a runner that reads the level gets it with a work turn, an older one a turn that only reads", async () => {
+  const sent = async (protocol: number, asks: "always" | "never") => {
+    const pubsub = createMemoryPubSub();
+    const { hub, calls } = fakeHub(pubsub, { status: status({ protocol }) });
+    const brain = createClaudeCodeBrain({
+      hub,
+      pubsub,
+      agentScope: async (t) => ({ id: t.agentId, handle: "dev" }),
+      permissions: async () => ({ mode: "work", branchPrefix: "agentes/dev/", asks }),
+      finalGraceMs: 20,
+    });
+    await collect(brain.run(turn(), io()));
+    return (calls[0]?.request as { permissions?: unknown } | undefined)?.permissions;
+  };
+  expect(await sent(ASKS_PROTOCOL, "always")).toMatchObject({ mode: "work", asks: "always" });
+  expect(await sent(ASKS_PROTOCOL - 1, "always")).toMatchObject({ mode: "plan", asks: "always" });
+  expect(await sent(ASKS_PROTOCOL - 1, "never")).toMatchObject({ mode: "work", asks: "never" });
+});
+
 test("accounts (ADR 0041): the account and effort go to a runner that knows them; a signed-out account ends the turn", async () => {
   const ACCOUNT = "0193dddd-0000-4000-8000-000000000001";
   const account = { id: ACCOUNT, label: "Trabalho", status: "active" as const };
@@ -369,6 +390,21 @@ test("accounts (ADR 0041): the account and effort go to a runner that knows them
   });
   expect(claudeCodeAvailability(ownSignedOut)?.type).toBe("error");
   expect(claudeCodeAvailability(ownSignedOut, account)).toBeNull();
+});
+
+test("context: Automático sends Claude Code 200K, a chosen limit wins, an older runner gets none", async () => {
+  const sent = async (s: MachineStatus, over: Partial<BrainTurn>) => {
+    const pubsub = createMemoryPubSub();
+    const { hub, calls } = fakeHub(pubsub, { status: s });
+    await collect(brainWith(pubsub, hub).run(turn(over), io()));
+    return calls[0]?.request as { contextTokens?: number } | undefined;
+  };
+  expect((await sent(status({ protocol: CONTEXT_LIMIT_PROTOCOL }), {}))?.contextTokens).toBe(200_000);
+  expect((await sent(status({ protocol: CONTEXT_LIMIT_PROTOCOL }), { contextTokens: 1_000_000 }))?.contextTokens).toBe(
+    1_000_000,
+  );
+  const old = await sent(status({ protocol: CONTEXT_LIMIT_PROTOCOL - 1 }), {});
+  expect(old && "contextTokens" in old).toBe(false);
 });
 
 test("a failed request becomes the turn's error (offline and old runners may fall back; a timeout doesn't)", async () => {

@@ -2,11 +2,14 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   ACCOUNTS_PROTOCOL,
   BRAIN_PROTOCOL,
+  CODEX_WINDOWS_PROTOCOL,
   CONTEXT_LIMIT_PROTOCOL,
   MISSION_PROTOCOL,
+  OPENCODE_ACP_PROTOCOL,
   SPEED_PROTOCOL,
 } from "@agenteschat/adapters";
 import { eq, schema } from "@agenteschat/db";
+import { MODEL_CATALOG } from "@agenteschat/providers";
 import { CODING_PLANS, learnPlanModels, planOf } from "@agenteschat/providers/plans";
 import {
   ConflictError,
@@ -28,14 +31,14 @@ import {
   brainModelOptions,
   brainOf,
   brainOptions,
+  CLAUDE_CODE_MODELS,
   defaultBrainModel,
   executorBrain,
   normalizeBrainModel,
 } from "../src/brain-settings";
 import { contextFields, recordPlanUsage, speedFields } from "../src/brains/claude-code";
 import { brainAccountFor, brainSpeedFor, planIsOwners } from "../src/brains/select";
-import { queuePlanLent } from "../src/email";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, everyoneWithout, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 const mac = (patch: Record<string, unknown> = {}) => ({
@@ -52,7 +55,7 @@ const mac = (patch: Record<string, unknown> = {}) => ({
 
 describe("brain settings", () => {
   test("a coding plan's models: any of them by id, its aliases named after what they run there", () => {
-    expect(brainModelOptions("claude_code").map((o) => o.label)).toEqual(["Opus", "Sonnet", "Haiku"]);
+    expect(brainModelOptions("claude_code").map((o) => o.label)).toEqual(["Opus 5.5", "Sonnet 5.5", "Haiku 5.5"]);
     expect(brainModelOptions("codex").every((o) => o.modelId?.startsWith("gpt"))).toBe(true);
     // Codex offers the catalog's OpenAI rows, GPT-6.1 Terra and GPT-6 Astra among them; GPT-6.1 Sol stays its default.
     expect(brainModelOptions("codex").map((o) => o.label)).toEqual([
@@ -71,15 +74,24 @@ describe("brain settings", () => {
     // An alias the plan leaves out, or "Automático", is its main model; the value stays an alias.
     expect(brainModelLabel("claude_code", "opus", "zai")).toBe("GLM-5.3");
     expect(brainModelLabel("claude_code", "auto", "minimax")).toBe("MiniMax M3.1 Flash");
-    expect(brainModelLabel("claude_code", "opus")).toBe("Opus");
+    expect(brainModelLabel("claude_code", "opus")).toBe("Opus 5.5");
     expect(normalizeBrainModel("claude_code", "haiku")).toBe("haiku");
     // One of a plan's other models is stored by its id and named after it there; while Claude thinks it runs Sonnet.
     expect(normalizeBrainModel("claude_code", "deepseek-v4.1-flash")).toBe("deepseek-v4.1-flash");
     expect(normalizeBrainModel("claude_code", "k3-256k")).toBe("k3-256k");
     expect(brainModelLabel("claude_code", "deepseek-v4.1-flash", "opencode")).toBe("DeepSeek V4.1 Flash");
     expect(brainModelLabel("claude_code", "deepseek-v4.1-flash", "kimi")).toBe("Kimi for Coding");
-    expect(brainModelLabel("claude_code", "deepseek-v4.1-flash")).toBe("Sonnet");
+    expect(brainModelLabel("claude_code", "deepseek-v4.1-flash")).toBe("Sonnet 5.5");
     expect(brainModelLabel("claude_code", "auto")).toBe("auto");
+  });
+
+  test("a Claude alias is named with its version from the catalog row it runs, so a new row renames it", () => {
+    for (const o of CLAUDE_CODE_MODELS) {
+      const row = MODEL_CATALOG[o.modelId ?? ""];
+      expect(row?.provider).toBe("anthropic");
+      expect(`Claude ${o.label}`).toBe(row?.label ?? "");
+      expect(o.label).toMatch(/^[A-Z][a-z]+ \d+(\.\d+)*$/);
+    }
   });
 
   test("stored values read back; executors map to brains", () => {
@@ -105,6 +117,66 @@ describe("brain settings", () => {
     expect(brainModelId("claude_code", "opus")).toBe("claude-opus-5-5");
     expect(brainModelId("claude_code", null)).toBe("claude-sonnet-5-5");
     expect(brainModelId("codex", "gpt-6.1-codex")).toBe("gpt-6.1-codex");
+  });
+
+  test("options: on Windows, Codex needs a runner that runs its turns there", () => {
+    const reasons = (m: ReturnType<typeof mac>) =>
+      brainOptions(m)
+        .slice(1, 3)
+        .map((o) => [o.kind, o.available, o.reason ?? null]);
+    const executors = { claude: { version: "2" }, codex: { version: "codex-cli 0.170.0" }, detectedAt: "x" };
+    // An older Windows runner refuses every Codex turn: "update the agentes.chat program", not "update Codex".
+    expect(reasons(mac({ os: "windows", protocol: CODEX_WINDOWS_PROTOCOL - 1, executors }))).toEqual([
+      ["claude_code", true, null],
+      ["codex", false, "runner_old"],
+    ]);
+    expect(reasons(mac({ os: "windows", protocol: CODEX_WINDOWS_PROTOCOL, executors }))).toEqual([
+      ["claude_code", true, null],
+      ["codex", true, null],
+    ]);
+    expect(reasons(mac({ os: "darwin", protocol: CODEX_WINDOWS_PROTOCOL - 1, executors }))[1]).toEqual([
+      "codex",
+      true,
+      null,
+    ]);
+  });
+
+  test("options: on Windows OpenCode needs a runner that speaks ACP; a CLI that doesn't run on the computer's system says so", () => {
+    const executors = {
+      claude: { version: "2" },
+      cursor: { version: "2026.11.01" },
+      opencode: { version: "1.19.5" },
+      grok: { version: "1.0.80" },
+      antigravity: { version: "1.2.3" },
+      detectedAt: "x",
+    };
+    const reasons = (m: ReturnType<typeof mac>) =>
+      Object.fromEntries(
+        brainOptions(m)
+          .slice(3)
+          .map((o) => [o.kind, o.reason ?? null]),
+      );
+    // An older Windows runner refuses every OpenCode turn; Cursor and Grok Build don't run on Windows; the Antigravity
+    // CLI only on Linux.
+    expect(reasons(mac({ os: "windows", protocol: OPENCODE_ACP_PROTOCOL - 1, executors }))).toEqual({
+      cursor: "system",
+      opencode: "runner_old",
+      grok: "system",
+      antigravity: "system",
+    });
+    expect(reasons(mac({ os: "windows", protocol: OPENCODE_ACP_PROTOCOL, executors })).opencode).toBeNull();
+    expect(reasons(mac({ os: "darwin", protocol: OPENCODE_ACP_PROTOCOL - 1, executors }))).toEqual({
+      cursor: null,
+      opencode: null,
+      grok: null,
+      antigravity: "system",
+    });
+    expect(reasons(mac({ os: "linux", protocol: OPENCODE_ACP_PROTOCOL, executors }))).toEqual({
+      cursor: null,
+      opencode: null,
+      grok: null,
+      antigravity: null,
+    });
   });
 
   test("options: only what the computer has; why the rest can't be chosen", () => {
@@ -151,6 +223,16 @@ describe("brain settings", () => {
       ["claude_code", false, "not_installed"],
       ["codex", false, "outdated"],
     ]);
+    expect(brainOptions(oldCodex).find((o) => o.kind === "codex")?.codexVersion).toEqual({
+      detected: "0.100.0",
+      minimum: "0.163.0",
+    });
+    // There and failing to start: said as that, never "not installed".
+    const broken = mac({ executors: { codex: { version: "0.170.0" }, broken: { claude: "boom" }, detectedAt: "x" } });
+    expect(reasons(broken).slice(1, 3)).toEqual([
+      ["claude_code", false, "cant_start"],
+      ["codex", true, null],
+    ]);
     const both = mac({ executors: { claude: { version: "2" }, codex: { version: "0.170.0" }, detectedAt: "x" } });
     expect(
       brainOptions(both).every((o) => o.available || ["cursor", "opencode", "grok", "antigravity"].includes(o.kind)),
@@ -161,6 +243,19 @@ describe("brain settings", () => {
       ["claude_code", false, "tool_off"],
       ["codex", true, null],
     ]);
+    // Not installed stays "not_installed" even when its toggle is off in the app's Tools.
+    const uninstalledOff = mac({
+      ...both,
+      protocol: OPENCODE_ACP_PROTOCOL,
+      executors: { detectedAt: "2026-01-01T00:00:00Z" },
+      access: { tools: { claude: false, codex: false, opencode: false, cursor: false } },
+    });
+    expect(reasons(uninstalledOff).slice(1, 3)).toEqual([
+      ["claude_code", false, "not_installed"],
+      ["codex", false, "not_installed"],
+    ]);
+    expect(brainOptions(uninstalledOff).find((o) => o.kind === "opencode")?.reason).toBe("not_installed");
+    expect(brainOptions(uninstalledOff).find((o) => o.kind === "cursor")?.reason).toBe("not_installed");
     expect(reasons(mac({ access: { tools: { claude: true } } }))[1]).toEqual(["claude_code", true, null]);
     // Commands off (the app's default for a new workspace) with Claude Code on: the plan still thinks there, as the
     // runner runs it; "no permission to run programs" is only for a runner that reports no tools.
@@ -232,12 +327,18 @@ async function world() {
 }
 
 describe("Criar agente: what a new agent could think with", () => {
-  test("admins see every computer with what it offers; a member can't create agents", async () => {
+  test("admins see every computer with what it offers; a member the server's own and theirs, never someone else's", async () => {
     const { fx, deps, machineId, bia, caio } = await world();
     const [mine] = await newAgentBrainMachines(deps, caio.id, fx.org.id);
     expect(mine).toMatchObject({ machineId, name: "mac" });
     expect(mine?.options.find((o) => o.kind === "claude_code")?.available).toBe(true);
     expect(mine?.options.find((o) => o.kind === "codex")).toMatchObject({ available: false, reason: "not_installed" });
+    // Ana's Mac is hers: Bia's new agent can't live there.
+    expect(await newAgentBrainMachines(deps, bia.id, fx.org.id)).toEqual([]);
+    // The server's own computer is recorded as its owner's, yet it is the workspace's: Bia's agent may live there.
+    await fx.db.update(schema.machines).set({ kind: "host" }).where(eq(schema.machines.id, machineId));
+    expect((await newAgentBrainMachines(deps, bia.id, fx.org.id)).map((m) => m.machineId)).toEqual([machineId]);
+    await everyoneWithout(fx.db, fx.org.id, "create_agents");
     await expect(newAgentBrainMachines(deps, bia.id, fx.org.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
@@ -271,9 +372,19 @@ describe("context window (Configuração avançada)", () => {
   });
 
   test("a computer turn carries it only to a runner that knows it (protocol 28)", () => {
-    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, { contextTokens: 400_000 })).toEqual({ contextTokens: 400_000 });
-    expect(contextFields(CONTEXT_LIMIT_PROTOCOL - 1, { contextTokens: 400_000 })).toEqual({});
-    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {})).toEqual({});
+    const chosen = { contextTokens: 1_000_000 };
+    for (const kind of ["claude_code", "codex", "cursor"]) {
+      expect(contextFields(CONTEXT_LIMIT_PROTOCOL, chosen, kind)).toEqual(chosen);
+      expect(contextFields(CONTEXT_LIMIT_PROTOCOL - 1, chosen, kind)).toEqual({});
+    }
+    // "Automático": Claude Code and Codex summarise at 200K; programs that take no limit get none.
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {}, "claude_code")).toEqual({ contextTokens: 200_000 });
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {}, "codex")).toEqual({ contextTokens: 200_000 });
+    expect(contextFields(undefined, {}, "codex")).toEqual({ contextTokens: 200_000 });
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {}, "cursor")).toEqual({});
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL, {}, "antigravity")).toEqual({});
+    // An older runner never sees it: it keeps compacting at the model's window.
+    expect(contextFields(CONTEXT_LIMIT_PROTOCOL - 1, {}, "claude_code")).toEqual({});
   });
 
   test("each model choice says its window: which limits are worth offering with it", () => {
@@ -444,6 +555,36 @@ describe("a plan answers its owner until it answers other people (Atende outras 
     );
   });
 
+  test("from one plan to another kind of plan it keeps answering whoever its owner let in", async () => {
+    const { fx, deps, machineId, bia, caio, row, audits } = await world();
+    await fx.db
+      .update(schema.machines)
+      .set({
+        executors: {
+          claude: { version: "2.1.304", loggedIn: true },
+          codex: { version: "0.170.0" },
+          detectedAt: new Date().toISOString(),
+        },
+      })
+      .where(eq(schema.machines.id, machineId));
+    await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [bia.id] });
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code", onlyOwner: false });
+    const changes = (await audits("agent.audience_changed")).length;
+    // Another model on the same plan, then another plan: neither is a move onto a plan.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code", model: "opus" });
+    const moved = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "codex" });
+    expect(moved).toMatchObject({ brain: "codex", onlyOwner: false });
+    const after = await row();
+    expect(after).toMatchObject({ audienceMode: "people", audienceUserIds: [bia.id] });
+    expect([canTalkTo(after, bia.id, NO_PERSON), canTalkTo(after, caio.id, NO_PERSON)]).toEqual([true, false]);
+    expect(await audits("agent.audience_changed")).toHaveLength(changes);
+    // One that answered only its owner still does on the other plan.
+    await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { onlyOwner: true });
+    expect((await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { brain: "claude_code" })).onlyOwner).toBe(
+      true,
+    );
+  });
+
   test("back on the API it still answers only its owner; letting it out brings back whoever it answered", async () => {
     const { fx, deps, bia, caio, row } = await world();
     await setAgentAudience(fx.db, fx.owner.id, fx.org.id, fx.agent.id, { mode: "people", userIds: [bia.id] });
@@ -474,12 +615,13 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
       })
       .returning();
     if (!theo) throw new Error("no agent");
-    // Without "Usar planos de outras pessoas": Dev's page lists Ana's account, never Bia's.
+    // Bia keeps hers to herself ("Só eu", ADR 0059 §3): Dev's page lists Ana's account, never Bia's.
+    await fx.db.update(schema.machineAccounts).set({ serves: "owner" }).where(eq(schema.machineAccounts.id, BIAS));
     const dan = await editor();
     const seen = await getAgentBrain(deps, dan.id, fx.org.id, fx.agent.id);
     expect(seen.accounts.map((a) => a.id)).toEqual([ANAS]);
-    expect(seen.canUseOthersPlans).toBe(false);
-    // Bia's plan thinks only for Bia's agents: whoever edits agents without the permission can't give it to Dev.
+    expect(seen.canUseOthersPlans).toBe(true);
+    // Bia's plan thinks only for Bia's agents: nobody gives it to Dev.
     const theirs = await setAgentBrain(deps, dan.id, fx.org.id, fx.agent.id, {
       brain: "claude_code",
       account: BIAS,
@@ -571,7 +713,7 @@ describe("a plan thinks only for its owner's agents, one account each", () => {
 });
 
 describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () => {
-  test("an admin gives Dev Bia's plan: billed to Bia, told to her, and she takes it back in one click", async () => {
+  test("an admin gives Dev Bia's plan: billed to Bia, and she takes it back in one click", async () => {
     const { fx, deps, machineId, bia, caio, account, row, audits } = await world();
     await account(ANAS, fx.owner.id);
     await account(BIAS, bia.id);
@@ -593,7 +735,10 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
     // The plan stays Bia's: her usage, her limits. Its turns think with her account, and only she pays extra usage.
     const agent = await row();
     expect(await planIsOwners(fx.db, agent, machineId, { id: BIAS })).toBe(true);
-    expect(await planIsOwners(fx.db, { ...agent, brainAccountLentBy: null }, machineId, { id: BIAS })).toBe(false);
+    // Kept to Bia ("Só eu"), it thinks for nobody else's agent.
+    await fx.db.update(schema.machineAccounts).set({ serves: "owner" }).where(eq(schema.machineAccounts.id, BIAS));
+    expect(await planIsOwners(fx.db, agent, machineId, { id: BIAS })).toBe(false);
+    await fx.db.update(schema.machineAccounts).set({ serves: "everyone" }).where(eq(schema.machineAccounts.id, BIAS));
     expect((await brainAccountFor(fx.db, agent, "claude_code", machineId))?.id).toBe(BIAS);
     const usage = await recordPlanUsage(fx.db, {
       orgId: fx.org.id,
@@ -612,22 +757,8 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
     const extra = await setAgentBrain(deps, fx.owner.id, fx.org.id, fx.agent.id, { extraUsage: true }).catch((e) => e);
     expect(extra.code).toBe("brain.extra_owner_only");
 
-    // Bia hears it: one inbox note and one email, from the job queued with the save.
-    const [job] = await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent.plan_lent"));
-    expect(job?.payload).toEqual({ agentId: fx.agent.id, accountId: BIAS, actorId: caio.id });
-    await queuePlanLent({ db: fx.db }, "https://agentes.test", fx.org.id, job?.id ?? "", job?.payload ?? {});
-    const notes = await fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_lent"));
-    expect(notes).toHaveLength(1);
-    expect(notes[0]).toMatchObject({
-      userId: bia.id,
-      source: { agentId: fx.agent.id, accountId: BIAS, label: "Dev" },
-      latest: { plan: "Claude" },
-    });
-    const [mail] = await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "email.send"));
-    expect(mail?.payload).toMatchObject({
-      to: [bia.email],
-      template: { kind: "plan_lent", byName: "caio", agentName: "Dev", plan: "Claude" },
-    });
+    // Her plan serves the whole workspace, as she chose: nobody is told, no note and no email.
+    expect(await fx.db.select().from(schema.outbox).where(eq(schema.outbox.kind, "agent.plan_lent"))).toEqual([]);
 
     // Only Bia takes it back; Dev goes back to the computer's own sign-in, which is its owner's.
     expect((await takeBackPlan(deps, caio.id, fx.org.id, BIAS).catch((e) => e)).code).toBe("account.not_owner");
@@ -637,8 +768,6 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
       actorId: bia.id,
       details: { agentId: fx.agent.id, lentBy: caio.id },
     });
-    const [done] = await fx.db.select().from(schema.notifications).where(eq(schema.notifications.kind, "plan_lent"));
-    expect(done?.doneAt).not.toBeNull();
   });
 
   test("a plan given keeps none of the old switches, and leaves with its own", async () => {
@@ -703,7 +832,7 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
     expect(await row(bea.id)).toMatchObject({ brainAccountId: BIAS, brainAccountLentBy: null });
   });
 
-  test("Lodi on a teammate's plan: given by an admin who may use other people's plans, not by one who may not", async () => {
+  test("Lodi on a teammate's plan: given by whoever manages it while the plan serves everyone, never one kept to its owner", async () => {
     const { fx, deps, bia, caio, account, editor } = await world();
     await account(BIAS, bia.id);
     const [lodi] = await fx.db
@@ -712,11 +841,17 @@ describe("Usar planos de outras pessoas (ADR 0059 §3, amended 2026-11-04)", () 
       .returning();
     if (!lodi) throw new Error("no agent");
     const dan = await editor();
-    const refused = await setAgentBrain(deps, dan.id, fx.org.id, lodi.id, {
+    await fx.db.update(schema.machineAccounts).set({ serves: "owner" }).where(eq(schema.machineAccounts.id, BIAS));
+    const refused = await setAgentBrain(deps, caio.id, fx.org.id, lodi.id, {
       brain: "claude_code",
       account: BIAS,
     }).catch((e) => e);
     expect(refused.code).toBe("account.not_owner");
+    await fx.db.update(schema.machineAccounts).set({ serves: "everyone" }).where(eq(schema.machineAccounts.id, BIAS));
+    expect(
+      await setAgentBrain(deps, dan.id, fx.org.id, lodi.id, { brain: "claude_code", account: BIAS }),
+    ).toMatchObject({ account: BIAS });
+    await setAgentBrain(deps, dan.id, fx.org.id, lodi.id, { brain: "model" });
     const view = await setAgentBrain(deps, caio.id, fx.org.id, lodi.id, { brain: "claude_code", account: BIAS });
     expect(view).toMatchObject({ account: BIAS, onlyOwner: true });
     const [saved] = await fx.db.select().from(schema.agents).where(eq(schema.agents.id, lodi.id));

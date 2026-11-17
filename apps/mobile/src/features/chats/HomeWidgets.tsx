@@ -1,12 +1,13 @@
-import { useHomeBoard, type Widget } from "@agenteschat/client";
+import { frozenBoard, useHomeBoard, type Widget } from "@agenteschat/client";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Text, useTheme } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Icon, ROW_PRESS_DELAY, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
-import { useColors, useOrgId } from "../shared/hooks";
+import { useColors } from "../shared/hooks";
 import { CollapsibleSection } from "./HomeSection";
 
 /** A widget's width on the strip: two show whole and the third peeks past the edge, so it reads as one that scrolls. */
@@ -21,10 +22,10 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
   const { t } = useTranslation();
   const c = useColors();
   const { shadows } = useTheme();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const home = useHomeBoard(orgId);
   if (home.loading && !home.board) return null;
-  const board = home.board;
+  const board = home.board && frozenBoard(home.board, org);
   const title = home.chosenId ? (board?.title ?? home.chosenTitle ?? "") : t("dashboards.home");
   const widgets: Widget[] = board ? widgetsInOrder(board.widgets) : [];
   const canAdd = Boolean(board?.canEdit);
@@ -72,6 +73,8 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
         </ScrollView>
       ) : canAdd ? (
         <Pressable
+          // A full-width row: it lights a beat after the finger lands, as the list's rows do.
+          unstable_pressDelay={ROW_PRESS_DELAY}
           onPress={add}
           accessibilityRole="button"
           style={({ pressed }) => [

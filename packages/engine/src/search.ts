@@ -630,10 +630,11 @@ export async function describeHits<H extends SearchHit>(
     }
     const m = h.kind === "message" ? byId.get(h.sourceId) : undefined;
     if (!m) return { ...h, messageId: null, threadId: null, threadTitle: null, author: null };
-    // A voice message is found by its words, and shows as its audio (ADR 0100).
-    const snippet = readableBody(h.snippet, m.meta);
+    // A voice message is found by its words, and shows as its audio, or as the text typed beside it (ADR 0100).
+    const voice = voiceOf(m.meta);
+    const snippet = voice ? replyExcerpt(readableBody(h.snippet, m.meta)) : readableBody(h.snippet, m.meta);
     const media = mediaOf(m.meta);
-    const mediaKind = voiceOf(m.meta) ? ("voice" as const) : media?.kind;
+    const mediaKind = voice ? (voice.text ? undefined : ("voice" as const)) : media?.kind;
     const author =
       m.authorType === "agent" && m.agentId
         ? { type: "agent" as const, id: m.agentId, name: m.agentName ?? "" }

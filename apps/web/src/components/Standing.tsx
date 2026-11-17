@@ -1,6 +1,7 @@
 import {
   type Me,
   meQuery,
+  type OrgDeletion,
   type OrgSummary,
   useApi,
   useAuthConfig,
@@ -22,22 +23,25 @@ import {
   workspaceNotes,
   workspaceOpens,
 } from "@agenteschat/client/lib/deletion";
-import { errorText, holdText, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
+import { errorText, holdText, sessionEnded, supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
 import { stepPermissions } from "@agenteschat/client/lib/home";
 import { planHoldOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
 import { isRightHand, leadsWithPlan, rightHandOf } from "@agenteschat/client/lib/right-hand";
 import type { FirstRunPowers } from "@agenteschat/client/lib/setup-checklist";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
-import { Button, Card, CardHeader, EmptyState, Icon, Spinner } from "@agenteschat/ui";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, cx, Icon, InfoHint, Spinner } from "@agenteschat/ui";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useMatchRoute, useNavigate } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { useAuth } from "@/auth/context";
+import { AgentAvatar } from "@/components/AgentAvatar";
+import { AuthShell } from "@/components/AuthLayout";
 import { BillingLinkButton } from "@/components/BillingLinkButton";
 import { DeleteAccountEntry } from "@/components/DeleteAccount";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useSignOut } from "@/hooks/useSignOut";
 import { usePaidReturn } from "@/lib/paid-return";
 import { useToast } from "@/lib/toast";
 
@@ -47,16 +51,17 @@ import { useToast } from "@/lib/toast";
  * suspended, a screen of its own in place of the shell. Both say where to ask about it. `org.standing` events
  * move both live. A billing hold (ADR 0079) says what it is in its own words, and gives its owners and admins
  * the way to fix it on the billing service, except in the right hand's DM while its card leads with the plan, whose
- * row has that way (ADR 0162). A workspace being deleted gets a screen of its own too.
+ * row has that way (ADR 0162). A workspace being deleted opens as ever, read-only, under a line of its own (ADR 0088
+ * §7). The screens in place of the app have the sign-in's look.
  */
 
 /** "Precisa de ajuda? Escreva para …", or to ask who runs the server, as `supportLineOf` says. */
-export function SupportLine() {
+export function SupportLine({ className }: { className?: string }) {
   const { t } = useTranslation();
   const line = supportLineOf(useAuthConfig().data);
   if (!line) return null;
   return (
-    <span className="support-line">
+    <span className={cx("support-line", className)}>
       {line === "ask" ? (
         t("support.ask")
       ) : (
@@ -175,142 +180,177 @@ export function HoldBanner() {
   );
 }
 
-/** Closed for now, why when told, where to ask, the person's other workspaces and Sair. */
-export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
-  const { t } = useTranslation();
+/**
+ * Being deleted (ADR 0088 §7): a line on top of the work area while the workspace reads as ever and changes nothing.
+ * When it goes and who deleted it, then Restaurar for its owners (the others read that only an owner can). Nobody
+ * hears of a restore, so `GET /me` is asked again meanwhile: a restore takes the line away, and once the workspace is
+ * gone for good it leaves the list.
+ */
+export function DeletingBanner() {
+  const { org } = useOrg();
+  return org.deletion ? <Deleting org={org} deletion={org.deletion} /> : null;
+}
+
+function Deleting({ org, deletion }: { org: OrgSummary; deletion: OrgDeletion }) {
+  const { t, i18n } = useTranslation();
+  const { me } = useOrg();
+  const toast = useToast();
+  const restore = useRestoreWorkspace(org.id);
+  useClosingMe();
+  const owner = restorable(org);
+  const due = !!deletion.dueAt && Date.parse(deletion.dueAt) > Date.now();
+  const by = deletedByText(t, i18n.language, deletion, me.user.id);
   return (
-    <div className="page page--mid suspended-page">
-      <header className="page__header">
-        <h1 className="page-title">{t("standing.screen.title")}</h1>
-      </header>
-      <EmptyState icon="lock" title={org.name} actions={<SignOutButton />}>
-        {suspendedText(t, org.standing)}
-        <SupportLine />
-      </EmptyState>
-      <OtherWorkspaces org={org} me={me} />
-      <WholeAccount me={me} />
-    </div>
+    <section className="outages" aria-label={t("standing.label")}>
+      <div className="outage hold-banner deleting-banner" role="status">
+        <Icon name="trash" size={20} className="outage__icon" />
+        <span className="outage__text">
+          <b>{deletingText(t, i18n.language, org.name, deletion)}</b>
+          {by && <span>{by}</span>}
+          {due && !owner && <span>{t("deleting.membersOnly")}</span>}
+        </span>
+        {owner && (
+          <span className="outage__acts">
+            <Button
+              size="sm"
+              variant="primary"
+              loading={restore.isPending}
+              disabled={restore.isPending}
+              onClick={() =>
+                restore.mutate(undefined, {
+                  onSuccess: () => toast.show(t("deleting.restored", { name: org.name })),
+                })
+              }
+            >
+              {t("deleting.restore")}
+            </Button>
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 
 /**
- * Being deleted: that nothing more is needed and when it goes, who deleted it, and until then Restore for its owners
- * (the others read that only an owner can). Going to another workspace is the screen's main action. Its socket is
- * closed, so `GET /me` is asked again meanwhile: a restore opens the workspace, and once it's gone it leaves the list.
+ * A screen in place of the app, in the sign-in's look: the host says what's going on (`title`, `lead`, and `hint`
+ * behind an ⓘ), then the screen's buttons at the column's width, and `foot` apart under them. Signed in: no language
+ * to pick there.
  */
-export function DeletingScreen({ org, me }: { org: OrgSummary; me: Me }) {
-  const { t, i18n } = useTranslation();
-  const toast = useToast();
-  const restore = useRestoreWorkspace(org.id);
-  useClosingMe();
-  const deletion = org.deletion;
-  const owner = restorable(org);
-  const due = !!deletion?.dueAt && Date.parse(deletion.dueAt) > Date.now();
-  const by = deletion && deletedByText(t, i18n.language, deletion);
-  const goesElsewhere = me.organizations.some((o) => o.id !== org.id && workspaceOpens(o));
+function ClosedScreen({
+  title,
+  lead,
+  hint,
+  foot,
+  children,
+}: {
+  title: string;
+  lead: string;
+  hint?: ReactNode;
+  foot?: ReactNode;
+  children: ReactNode;
+}) {
+  const { t } = useTranslation();
   return (
-    <div className="page page--mid suspended-page">
-      <header className="page__header">
-        <h1 className="page-title">{t("deleting.title", { name: org.name })}</h1>
-      </header>
-      <EmptyState
-        icon="trash"
-        actions={
-          <>
-            {owner && (
-              <Button
-                variant={goesElsewhere ? "default" : "primary"}
-                loading={restore.isPending}
-                disabled={restore.isPending}
-                onClick={() =>
-                  restore.mutate(undefined, {
-                    onSuccess: () => toast.show(t("deleting.restored", { name: org.name })),
-                  })
-                }
-              >
-                {t("deleting.restore")}
-              </Button>
-            )}
-            <SignOutButton />
-          </>
-        }
-      >
-        {deletion && deletingText(t, i18n.language, deletion)}
-        {by && <span className="deleting-page__members">{by}</span>}
-        {due && !owner && <span className="deleting-page__members">{t("deleting.membersOnly")}</span>}
-      </EmptyState>
-      <OtherWorkspaces org={org} me={me} create={me.user.canCreateWorkspace !== false} />
-      <WholeAccount me={me} />
-    </div>
+    <AuthShell languages={false}>
+      <div className="auth__form">
+        <header className="auth__ask">
+          <AgentAvatar name="Ackwire AI" size="lg" />
+          <div className="auth__bubble">
+            <h1 className="auth__title">{title}</h1>
+            <p className="auth__lead">
+              {hint ? (
+                <span className="ac-hintline">
+                  <span>{lead}</span>
+                  <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>
+                </span>
+              ) : (
+                lead
+              )}
+            </p>
+          </div>
+        </header>
+        {children}
+        {foot}
+      </div>
+    </AuthShell>
+  );
+}
+
+/** Closed for now: which workspace, why when told, where to ask, the person's other workspaces and Sair. */
+export function SuspendedScreen({ org, me }: { org: OrgSummary; me: Me }) {
+  const { t } = useTranslation();
+  const leave = useSignOut();
+  return (
+    <ClosedScreen
+      title={t("standing.screen.titleNamed", { name: org.name })}
+      lead={suspendedText(t, org.standing)}
+      foot={<WholeAccount me={me} disabled={leave.pending} />}
+    >
+      <SupportLine className="auth__fine" />
+      <OtherWorkspaces org={org} me={me} disabled={leave.pending} />
+      <SignOutButton leave={leave} />
+    </ClosedScreen>
   );
 }
 
 /**
  * The account was deleted and waits for its date: this screen in place of the whole app (`__root.tsx`), since no
- * workspace answers it. When it goes, Restaurar, and Sair. Past the date only the wait is left.
+ * workspace answers it. When it goes (what happens until then behind its ⓘ), Restaurar, and Sair. Past the date only
+ * the wait is left.
  */
 export function AccountDeletingScreen({ dueAt }: { dueAt: string | null }) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const navigate = useNavigate();
   const restore = useRestoreAccount();
+  const leave = useSignOut();
   const billing = Boolean(useAuthConfig().data?.billingUrl);
   useClosingMe();
   const due = !!dueAt && Date.parse(dueAt) > Date.now();
   return (
-    <div className="page page--mid suspended-page">
-      <header className="page__header">
-        <h1 className="page-title">{t("accountDeleting.title")}</h1>
-      </header>
-      <EmptyState
-        icon="trash"
-        actions={
-          <>
-            {due && (
-              <Button
-                variant="primary"
-                loading={restore.isPending}
-                disabled={restore.isPending}
-                onClick={() =>
-                  restore.mutate(undefined, {
-                    onSuccess: async () => {
-                      toast.show(t("accountDeleting.restored"));
-                      await navigate({ to: "/" });
-                    },
-                    onError: (error) => toast.show(errorText(t, error), "error"),
-                  })
-                }
-              >
-                {t("accountDeleting.restore")}
-              </Button>
-            )}
-            <SignOutButton disabled={restore.isPending} />
-          </>
-        }
-      >
-        {accountDeletingText(t, i18n.language, dueAt)}
-        {due && <span className="deleting-page__members">{t("accountDeleting.what")}</span>}
-        {due && billing && <span className="deleting-page__members">{t("accountDeleting.plans")}</span>}
-      </EmptyState>
-    </div>
+    <ClosedScreen
+      title={t("accountDeleting.title")}
+      lead={accountDeletingText(t, i18n.language, dueAt)}
+      hint={
+        due ? [t("accountDeleting.what"), billing && t("accountDeleting.plans")].filter(Boolean).join(" ") : undefined
+      }
+    >
+      {due && (
+        <Button
+          variant="primary"
+          size="lg"
+          block
+          loading={restore.isPending}
+          disabled={restore.isPending || leave.pending}
+          onClick={() =>
+            restore.mutate(undefined, {
+              onSuccess: async () => {
+                toast.show(t("accountDeleting.restored"));
+                await navigate({ to: "/" });
+              },
+              onError: (error) => {
+                if (!sessionEnded(error)) return toast.show(errorText(t, error), "error");
+                // Deleting the account ended its sessions, and this screen can outlast the one it was drawn with.
+                // The app takes an ended session to the sign-in and says why, except at the sign-in's own address,
+                // where it does nothing: there the screen yields (`useRestoreAccount`) and these words say why.
+                toast.show(t("common.signedOut"));
+              },
+            })
+          }
+        >
+          {t("accountDeleting.restore")}
+        </Button>
+      )}
+      <SignOutButton leave={leave} disabled={restore.isPending} />
+    </ClosedScreen>
   );
 }
 
-/** Sair, from a workspace closed to its people: out of the account, to the sign-in. */
-function SignOutButton({ disabled }: { disabled?: boolean }) {
+/** Sair, from a screen in place of the app: out of the account, to the sign-in. Working while it runs. */
+function SignOutButton({ leave, disabled }: { leave: ReturnType<typeof useSignOut>; disabled?: boolean }) {
   const { t } = useTranslation();
-  const auth = useAuth();
-  const qc = useQueryClient();
-  const navigate = useNavigate();
   return (
-    <Button
-      disabled={disabled}
-      onClick={async () => {
-        await auth.signOut();
-        qc.clear();
-        await navigate({ to: "/login" });
-      }}
-    >
+    <Button size="lg" block loading={leave.pending} disabled={disabled} onClick={() => void leave.signOut()}>
       {t("auth.signOut")}
     </Button>
   );
@@ -318,57 +358,50 @@ function SignOutButton({ disabled }: { disabled?: boolean }) {
 
 /**
  * Deleting the account, only for someone with no workspace that opens: Sua conta isn't reachable from here for them,
- * and a person must always be able to delete their account (`accountOutOfReach`). Apart from this workspace's own
- * actions and under its own heading, so it can't be read as the way to delete the workspace on screen.
+ * and a person must always be able to delete their account (`accountOutOfReach`). Apart from the screen's own actions
+ * and under its own heading, so it can't be read as the way out of the workspace on screen.
  */
-function WholeAccount({ me }: { me: Me }) {
+function WholeAccount({ me, disabled }: { me: Me; disabled?: boolean }) {
   const { t } = useTranslation();
   if (!accountOutOfReach(me.organizations)) return null;
   return (
-    <Card aria-labelledby="closed-account" className="settings-danger suspended-page__account">
-      <CardHeader
-        id="closed-account"
-        icon="trash"
-        title={t("deleteAccount.whole")}
-        subtitle={t("deleteAccount.card.text")}
-        action={
-          <DeleteAccountEntry
-            trigger={(open) => (
-              <Button size="sm" variant="danger" onClick={open}>
-                {t("deleteAccount.card.button")}
-              </Button>
-            )}
-          />
-        }
+    <section className="auth__apart" aria-labelledby="closed-account">
+      <h2 id="closed-account">{t("deleteAccount.whole")}</h2>
+      <p>{t("deleteAccount.card.text")}</p>
+      <DeleteAccountEntry
+        trigger={(open) => (
+          <Button size="sm" variant="danger" disabled={disabled} onClick={open}>
+            {t("deleteAccount.card.button")}
+          </Button>
+        )}
       />
-    </Card>
+    </section>
   );
 }
 
-/** The person's other workspaces to go to (none suspended), the first that opens as the main action; `create`: a new one. */
-function OtherWorkspaces({ org, me, create = false }: { org: OrgSummary; me: Me; create?: boolean }) {
+/** The person's other workspaces to go to (none suspended), the first that opens as the main action. */
+function OtherWorkspaces({ org, me, disabled }: { org: OrgSummary; me: Me; disabled?: boolean }) {
   const { t, i18n } = useTranslation();
   const others = otherWorkspaces(me.organizations, org.id);
   const notes = workspaceNotes(t, i18n.language, me.organizations);
-  if (others.length === 0 && !create) return null;
+  if (others.length === 0) return null;
   return (
-    <nav className="suspended-page__others" aria-label={t("standing.screen.others")}>
-      {others.length > 0 && <h2 className="ac-card__title">{t("standing.screen.others")}</h2>}
+    <nav className="auth__ways" aria-labelledby="closed-others">
+      <h2 id="closed-others">{t("standing.screen.others")}</h2>
       {others.map((o, i) => (
-        <Button key={o.id} asChild variant={i === 0 && workspaceOpens(o) ? "primary" : "default"}>
+        <Button
+          key={o.id}
+          asChild
+          size="lg"
+          block
+          disabled={disabled}
+          variant={i === 0 && workspaceOpens(o) ? "primary" : "default"}
+        >
           <Link to="/org/$orgId" params={{ orgId: o.id }}>
             {workspaceLabel(o.name, notes.get(o.id))}
           </Link>
         </Button>
       ))}
-      {create && (
-        <Button variant="ghost" asChild>
-          <Link to="/onboarding">
-            <Icon name="plus" />
-            {t("shell.newWorkspace")}
-          </Link>
-        </Button>
-      )}
     </nav>
   );
 }

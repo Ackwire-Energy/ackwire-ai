@@ -108,7 +108,7 @@ describe("the onboarding's rail (ADR 0162)", () => {
     const payment = { state: "hold", reason: "payment" } as OrgStanding;
     // A team made with no AI: the AI step; once every agent thinks, inviting people (ADR 0162, amended 2026-11-11).
     expect(railState(base)).toMatchObject({
-      steps: ["name", "business", "team", "ai", "people"],
+      steps: ["name", "business", "you", "team", "ai", "people"],
       at: "ai",
       step: "ai",
     });
@@ -117,7 +117,7 @@ describe("the onboarding's rail (ADR 0162)", () => {
     expect(railState({ ...base, funnel: { ...funnel, thinks: undefined } }).at).toBe("ai");
     // Waiting for its first plan: the plan step, then the AI step.
     expect(railState({ ...base, standing: payment })).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai", "people"],
+      steps: ["name", "business", "you", "team", "plan", "ai", "people"],
       at: "plan",
       waitsForPlan: true,
       hasPlanStep: true,
@@ -125,16 +125,16 @@ describe("the onboarding's rail (ADR 0162)", () => {
     // Paid once the plan step was shown ("computer" saved): it stays on the rail, answered, and may be gone back to.
     const paid = { ...base, funnel: { ...funnel, passed: "computer" as const } };
     expect(railState(paid)).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai", "people"],
+      steps: ["name", "business", "you", "team", "plan", "ai", "people"],
       at: "ai",
-      reached: 4,
+      reached: 5,
       waitsForPlan: false,
       hasPlanStep: true,
     });
-    expect(railState({ ...paid, picked: "plan" })).toMatchObject({ step: "plan", index: 3 });
+    expect(railState({ ...paid, picked: "plan" })).toMatchObject({ step: "plan", index: 4 });
     // A server with billing that never held the workspace: no plan step, once the workspace exists.
     expect(railState({ ...base, billingUrl: "https://billing.example.com" })).toMatchObject({
-      steps: ["name", "business", "team", "ai", "people"],
+      steps: ["name", "business", "you", "team", "ai", "people"],
       hasPlanStep: false,
     });
     // A step gone back to is shown only while it stays answered: the AI step isn't, the plan step on a hold isn't.
@@ -157,27 +157,27 @@ describe("the onboarding's rail (ADR 0162)", () => {
     };
     // Self-hosted: on to the AI step with the right hand alone; once it thinks, inviting people.
     expect(railState(base)).toMatchObject({
-      steps: ["name", "business", "team", "ai", "people"],
+      steps: ["name", "business", "you", "team", "ai", "people"],
       at: "ai",
       step: "ai",
-      reached: 3,
+      reached: 4,
     });
     expect(railState({ ...base, funnel: { thinks: true, passed: "agents" } }).at).toBe("people");
     // Waiting for its first plan: the plan step next, then the AI step; still so once the plan step showed and was paid.
     const held = { ...base, standing: { state: "hold", reason: "payment" } as OrgStanding };
     expect(railState(held)).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai", "people"],
+      steps: ["name", "business", "you", "team", "plan", "ai", "people"],
       at: "plan",
-      index: 3,
+      index: 4,
     });
     expect(railState({ ...base, funnel: { thinks: false, passed: "computer" } })).toMatchObject({
-      steps: ["name", "business", "team", "plan", "ai", "people"],
+      steps: ["name", "business", "you", "team", "plan", "ai", "people"],
       at: "ai",
     });
     // Answered, the team step may be gone back to (its question again, to bring or build a team after all).
-    expect(railState({ ...base, picked: "team" })).toMatchObject({ step: "team", index: 2, reached: 3 });
+    expect(railState({ ...base, picked: "team" })).toMatchObject({ step: "team", index: 3, reached: 4 });
     // Only past the question ("import": its templates next), the step still waits for a team.
-    expect(railState({ ...base, funnel: { ...funnel, passed: "import" } })).toMatchObject({ at: "team", reached: 2 });
+    expect(railState({ ...base, funnel: { ...funnel, passed: "import" } })).toMatchObject({ at: "team", reached: 3 });
     // The phone (no funnel) reads no stored step: a team with no agents stays on its team step, held or not.
     expect(railState({ ...base, funnel: null })).toMatchObject({ steps: ["name", "business", "team"], at: "team" });
     expect(railState({ ...held, funnel: null })).toMatchObject({
@@ -197,18 +197,18 @@ describe("the onboarding's rail (ADR 0162)", () => {
       picked: null,
       funnel,
     };
-    const fiveSteps = ["name", "business", "team", "ai", "people"];
+    const sixSteps = ["name", "business", "you", "team", "ai", "people"];
     // Every agent thinking, or "Connect later" ("ai"), answers the AI step: the people step is next.
     expect(railState({ ...base, funnel: { thinks: true, passed: "context" } })).toMatchObject({
-      steps: fiveSteps,
+      steps: sixSteps,
       at: "people",
       step: "people",
-      index: 4,
-      reached: 4,
+      index: 5,
+      reached: 5,
       thinks: true,
     });
     expect(railState({ ...base, funnel: { thinks: false, passed: "ai" } })).toMatchObject({
-      steps: fiveSteps,
+      steps: sixSteps,
       at: "people",
       thinks: false,
     });
@@ -219,22 +219,66 @@ describe("the onboarding's rail (ADR 0162)", () => {
     // Gone back from it: the AI step, answered.
     expect(railState({ ...base, funnel: { thinks: true, passed: "context" }, picked: "ai" })).toMatchObject({
       step: "ai",
-      index: 3,
-      reached: 4,
+      index: 4,
+      reached: 5,
     });
     // A step stored past the plan's lists the plan only on a server with billing, which held the workspace for it.
     expect(
       railState({ ...base, billingUrl: "https://billing.example.com", funnel: { thinks: false, passed: "ai" } }),
-    ).toMatchObject({ steps: ["name", "business", "team", "plan", "ai", "people"], at: "people", hasPlanStep: true });
+    ).toMatchObject({
+      steps: ["name", "business", "you", "team", "plan", "ai", "people"],
+      at: "people",
+      hasPlanStep: true,
+    });
     // A personal workspace ends on the AI step; the phone has neither.
     expect(railState({ ...base, team: 0, personal: true, funnel: { thinks: true, passed: "agents" } })).toMatchObject({
-      steps: ["name", "team", "ai"],
+      steps: ["name", "you", "team", "ai"],
       at: "open",
     });
     expect(railState({ ...base, funnel: null })).toMatchObject({ steps: ["name", "business", "team"], at: "open" });
     expect(
       railState({ ...base, standing: { state: "hold", reason: "payment" } as OrgStanding, funnel: null }),
     ).toMatchObject({ steps: ["name", "business", "team", "plan"], at: "plan" });
+  });
+
+  test("the person's own step, after what it does, on the web only (ADR 0162, amended 2026-11-12)", () => {
+    const base = {
+      orgId: "o1",
+      standing: undefined,
+      billingUrl: null,
+      context: "Loja online",
+      team: 0,
+      picked: null,
+      funnel: { thinks: false, passed: "context" as const, about: false },
+    };
+    // Not said yet: their step, before the team's.
+    expect(railState(base)).toMatchObject({
+      steps: ["name", "business", "you", "team", "ai", "people"],
+      at: "you",
+      step: "you",
+      index: 2,
+      reached: 2,
+    });
+    // Said (an area, or skipped), once per account: the team step is next, and theirs may be gone back to.
+    const said = { ...base, funnel: { ...base.funnel, about: true } };
+    expect(railState(said)).toMatchObject({ at: "team", reached: 3 });
+    expect(railState({ ...said, picked: "you" })).toMatchObject({ step: "you", index: 2 });
+    // A workspace already past its team asks it too, before going on.
+    expect(railState({ ...base, team: 3 }).at).toBe("you");
+    // A personal workspace has it right after its first question.
+    expect(railState({ ...base, context: "", personal: true })).toMatchObject({
+      steps: ["name", "you", "team", "ai"],
+      at: "you",
+    });
+    // The phone has no such step.
+    expect(railState({ ...base, funnel: null })).toMatchObject({ steps: ["name", "business", "team"], at: "team" });
+    expect(railSteps({ plan: false, ai: true, personal: false, you: true })).toEqual([
+      "name",
+      "business",
+      "you",
+      "team",
+      "ai",
+    ]);
   });
 
   test("the AI step's answer: every agent thinks, read only from a status that lists them all", () => {
@@ -263,14 +307,19 @@ describe("the onboarding's rail (ADR 0162)", () => {
       personal: true,
       funnel,
     };
-    // Before it exists, "For me" already shows its path; self-hosted 3 steps, agentes.chat Cloud 4.
-    expect(railState({ ...base, orgId: null }).steps).toEqual(["name", "team", "ai"]);
+    // Before it exists, "For me" already shows its path; self-hosted 4 steps, agentes.chat Cloud 5.
+    expect(railState({ ...base, orgId: null }).steps).toEqual(["name", "you", "team", "ai"]);
     expect(railState({ ...base, orgId: null, billingUrl: "https://billing.example.com" })).toMatchObject({
-      steps: ["name", "team", "plan", "ai"],
+      steps: ["name", "you", "team", "plan", "ai"],
       at: "name",
     });
     // Made, with no context and no agents: the team step's question, never "what it does".
-    expect(railState(base)).toMatchObject({ steps: ["name", "team", "ai"], at: "team", step: "team", reached: 1 });
+    expect(railState(base)).toMatchObject({
+      steps: ["name", "you", "team", "ai"],
+      at: "team",
+      step: "team",
+      reached: 2,
+    });
     // Agents brought in, or "no agents yet" saved ("agents"), answer it.
     expect(railState({ ...base, team: 2 }).at).toBe("ai");
     expect(railState({ ...base, funnel: { ...funnel, passed: "agents" } }).at).toBe("ai");
@@ -278,9 +327,9 @@ describe("the onboarding's rail (ADR 0162)", () => {
     // On a hold for its first plan: the plan step after the team's.
     const held = { ...base, standing: { state: "hold", reason: "payment" } as OrgStanding };
     expect(railState({ ...held, funnel: { ...funnel, passed: "agents" } })).toMatchObject({
-      steps: ["name", "team", "plan", "ai"],
+      steps: ["name", "you", "team", "plan", "ai"],
       at: "plan",
-      index: 2,
+      index: 3,
     });
   });
 

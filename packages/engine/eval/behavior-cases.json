@@ -2237,10 +2237,10 @@
         "chefe>rita": 1
       },
       "personSees": {
-        "maxAgentMessages": 3,
+        "maxAgentMessages": 4,
         "noteLines": 0
       },
-      "behavior": "Chefe hands the job to Rita. Asked how it went while Rita is still on it, it says Rita has it and since when, without asking or telling her again and without saying nothing happened. Once Rita is done, it reports once.",
+      "behavior": "Chefe hands the job to Rita. Asked how it went while Rita is still on it, it says Rita has it and since when, without asking or telling her again and without saying nothing happened. Once Rita is done, what came of it reaches the person from Rita and Diogo themselves, and Chefe doesn't relay it.",
       "skipJudge": ["looked_first", "next_step"],
       "rubric": [
         "Asked how it went while Rita was still working, the reply says Rita is on it and since when, and doesn't say nothing happened or that she hasn't answered."

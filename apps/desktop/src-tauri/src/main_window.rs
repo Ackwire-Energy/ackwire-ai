@@ -1,4 +1,4 @@
-//! The main window: the server open now, inside the app (agentes.chat, or a server of the person's own,
+//! The main window: the server open now, inside the app (Ackwire AI, or a server of the person's own,
 //! `servers.rs`). It loads the server's pages itself, so every change to the web shows here at once, and
 //! gets no access to this computer: no app command, only dragging the window by its title bar and `this_mac`
 //! (capabilities/main.json, and the same one added at runtime for another server's origin). Links to
@@ -59,7 +59,7 @@ pub const PLATFORM: &str = if cfg!(target_os = "macos") {
     "linux"
 };
 
-/// Whether agents may work on this computer for `origin`: any server elsewhere, agentes.chat included (people bring
+/// Whether agents may work on this computer for `origin`: any server elsewhere, Ackwire AI included (people bring
 /// their own computers there too), never a server on this computer itself, the server here included at its
 /// Tailscale address (`server_here`: its own computer is set up with it).
 /// Another server on this computer at its address for people is `discover::served_here`, which asks it.
@@ -231,10 +231,13 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // browser, the device's name in its words), that `this_mac` takes `servers` and `files` (older apps
         // refuse them, so the sign-in's other server and Storage's "Show the folder" show only where this says
         // so), that a connector's sign-in and the window's own browser sign-in come back here (`deep_link.rs`,
-        // older apps don't take them), and that it lists the other servers' workspaces (`workspaces`,
-        // ADR 0154); nothing else.
+        // older apps don't take them), that it lists the other servers' workspaces (`workspaces`,
+        // ADR 0154), that it takes the person's app icon (`appIcon`, ADR 0179) and how this computer draws
+        // (`renderer`, and Linux's `system` facts: graphics.rs); nothing else.
         .initialization_script(format!(
-            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true, workspaces: true }});"
+            "window.__agentesDesktop = Object.freeze({{ version: {version:?}, platform: {PLATFORM:?}, servers: true, files: true, connectorReturn: true, workspaces: true, appIcon: true, renderer: {renderer:?}, system: {system} }});",
+            renderer = crate::graphics::renderer(),
+            system = serde_json::to_string(&crate::graphics::system()).unwrap_or_else(|_| "null".into()),
         ))
         .on_navigation(move |url| match route_now(&on_nav, url) {
             Route::Stay => true,
@@ -266,10 +269,13 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
             NewWindowResponse::Deny
         })
         // A whole page loading again (⌘R, macOS ended it, a full navigation): the cover, never a blank window.
-        .on_page_load(move |_, payload| match payload.event() {
+        .on_page_load(move |page, payload| match payload.event() {
             PageLoadEvent::Started => crate::cover::show(&on_load, Duration::ZERO),
             // The page's own sizes follow the zoom (desktop.css), and the bar knows about full screen.
-            PageLoadEvent::Finished => fit_page(&on_load),
+            PageLoadEvent::Finished => {
+                fit_page(&on_load);
+                crate::cover::site_loaded(&on_load, &page);
+            }
         })
         .on_download(move |_, event| match event {
             DownloadEvent::Requested { destination, .. } => match downloads_path(&on_download, destination) {
@@ -302,6 +308,21 @@ pub fn open(app: &AppHandle, url: Option<Url>) -> Result<(), String> {
         // The buttons are placed by `place_lights` (on every fit), not with `traffic_light_position`.
         .hidden_title(true);
     let built = builder.build().map_err(|e| e.to_string())?;
+    // Linux's side of lib.rs `on_web_content_process_terminate` (macOS only in Tauri): a web process that died
+    // leaves the window blank, so the page loads again.
+    #[cfg(target_os = "linux")]
+    {
+        let app = app.clone();
+        let _ = built.with_webview(move |view| {
+            use webkit2gtk::WebViewExt;
+            view.inner().connect_web_process_terminated(move |view, _| {
+                crate::cover::show(&app, Duration::ZERO);
+                view.reload();
+            });
+        });
+    }
+    // A new window starts with the bundle's icon on Windows and Linux: the person's pick (ADR 0179).
+    crate::app_icon::show(app);
     let window = built.as_ref().window();
     if saved.maximized {
         let _ = window.maximize();
@@ -687,7 +708,6 @@ fn front(app: &AppHandle) -> Result<(), String> {
     let window = app.get_window(LABEL).ok_or("window not found")?;
     let _ = window.unminimize();
     window.show().map_err(|e| e.to_string())?;
-    crate::sync_dock(app);
     window.set_focus().map_err(|e| e.to_string())
 }
 
@@ -770,10 +790,37 @@ fn checked(request: &Value) -> Result<Value, String> {
             if servers::origin_of(server).as_deref() != Some(server) {
                 return Err("bad server".into());
             }
-            Ok(json!({ "kind": "openWorkspace", "server": server, "orgId": org()? }))
+            let mut out = json!({ "kind": "openWorkspace", "server": server, "orgId": org()? });
+            // Which of that server's accounts it belongs to (ADR 0183): an id, like the workspace's.
+            if let Some(account) = text("account") {
+                if !crate::workspaces::good_id(account) {
+                    return Err("bad account id".into());
+                }
+                out["account"] = json!(account);
+            }
+            Ok(out)
         }
         // The folder is the app's to know: the page names none.
         Some("files") => Ok(json!({ "kind": "files" })),
+        // The app icon (ADR 0179): one of the app's own ids, an agent the site drew (who it is and its two PNGs), or
+        // none to read the one kept.
+        Some("appIcon") => {
+            if let Some(agent) = request.get("agent") {
+                let about = crate::app_icon::about(agent).ok_or("bad agent")?;
+                let picture = |key: &str| {
+                    agent.get(key).and_then(Value::as_str).filter(|b| crate::app_icon::picture(b).is_some())
+                };
+                let (Some(dock), Some(window)) = (picture("dock"), picture("window")) else {
+                    return Err("bad picture".into());
+                };
+                return Ok(json!({ "kind": "appIcon", "agent": about, "dock": dock, "window": window }));
+            }
+            match text("icon") {
+                None => Ok(json!({ "kind": "appIcon" })),
+                Some(id) if crate::app_icon::find(id).is_some() => Ok(json!({ "kind": "appIcon", "icon": id })),
+                Some(_) => Err("unknown icon".into()),
+            }
+        }
         Some("connect") => {
             let mut out = json!({ "kind": "connect", "orgId": org()? });
             if let Some(name) = display_name(request.get("orgName")) {
@@ -850,25 +897,23 @@ fn files_gate(mut request: Value, server_here: bool) -> Result<Value, String> {
 }
 
 /// The site's notifications: at most one every 3 seconds and 60 an hour, only while the window isn't in
-/// front, and only while the person wants them (Preferences › General). Coming back to the app within 30
-/// seconds opens the last one's page.
+/// front, and only while the person wants them (Preferences › General). Only a click on one opens its page
+/// (`stop_from_notices`): coming back to the app any other way (its icon, Alt+Tab) leaves the window where it was.
 pub struct Notices(Mutex<NoticeState>);
 
 struct NoticeState {
     on: bool,
     sent: VecDeque<Instant>,
-    pending: Option<(Url, Instant)>,
 }
 
 impl Default for Notices {
     fn default() -> Self {
-        Self(Mutex::new(NoticeState { on: true, sent: VecDeque::new(), pending: None }))
+        Self(Mutex::new(NoticeState { on: true, sent: VecDeque::new() }))
     }
 }
 
 const NOTIFY_GAP: Duration = Duration::from_secs(3);
 const NOTIFY_PER_HOUR: usize = 60;
-const NOTIFY_OPENS_FOR: Duration = Duration::from_secs(30);
 
 /// Whether one more notification fits the limits at `now` (and counts it).
 fn notice_fits(sent: &mut VecDeque<Instant>, now: Instant) -> bool {
@@ -892,7 +937,7 @@ fn notify(app: &AppHandle, request: &Value, site: &Url) {
 }
 
 /// A notification with the site's limits: `url` (a page of a server of the app's list, the one open or another,
-/// ADR 0154) opens when the app comes back within 30 seconds.
+/// ADR 0154) opens when it is clicked.
 pub fn notice(app: &AppHandle, title: &str, body: &str, url: Url) {
     show_notice(app, title, body, url, None);
 }
@@ -910,7 +955,6 @@ fn show_notice(app: &AppHandle, title: &str, body: &str, url: Url, stop: Option<
         if in_front || !state.on || !notice_fits(&mut state.sent, Instant::now()) {
             return;
         }
-        state.pending = Some((url.clone(), Instant::now()));
     }
     let mut builder = app.notification().builder().title(title).body(body).extra("url", url.as_str());
     if let (Some(stop), Some(label)) = (stop, crate::menus::labels(app).get("notifyStop").cloned()) {
@@ -922,9 +966,10 @@ fn show_notice(app: &AppHandle, title: &str, body: &str, url: Url, stop: Option<
 }
 
 /// A notification's click and its Stop. With a handler registered the plugin reports every click here, and the app
-/// may not come forward by itself (`focused` would not see it): the click opens its own page. Stop: the stop the
-/// web's button makes, with the window's session for that server. When it can't (signed out, offline, no longer
-/// allowed), the phone's page opens, where Stop is.
+/// may not come forward by itself: the click opens its own page. Windows reports a click only while the toast is
+/// on screen, not from the Action Center: that one brings the app back where it was, like its icon would. Stop: the
+/// stop the web's button makes, with the window's session for that server. When it can't (signed out, offline, no
+/// longer allowed), the phone's page opens, where Stop is.
 pub fn stop_from_notices(app: &AppHandle) {
     let handle = app.clone();
     let _ = app.notification().on_action(move |performed| {
@@ -934,10 +979,8 @@ pub fn stop_from_notices(app: &AppHandle) {
         }
         let extra = |key: &str| performed.notification().and_then(|n| n.extra().get(key)).cloned();
         let app = handle.clone();
-        // Handled here: the app coming forward from this click opens nothing more.
-        app.state::<Notices>().0.lock().unwrap_or_else(|e| e.into_inner()).pending = None;
         if action == "tap" {
-            let Some(url) = extra("url").and_then(|u| u.as_str().and_then(|u| u.parse::<Url>().ok())) else { return };
+            let Some(url) = tapped_page(extra("url").as_ref()) else { return };
             std::thread::spawn(move || {
                 let _ = show_url(&app, url);
             });
@@ -959,29 +1002,19 @@ pub fn stop_from_notices(app: &AppHandle) {
     });
 }
 
-/// The main window came to the front: within 30 seconds of a notification, its page (on its server, which
-/// becomes the one open); and the other servers' workspaces are read again.
+/// The page a click on a notification opens: the one it was shown with (its `url` extra).
+fn tapped_page(url: Option<&Value>) -> Option<Url> {
+    url?.as_str()?.parse().ok()
+}
+
+/// The main window came to the front: the other servers' workspaces are read again. Its page stays as it was, even
+/// when a notification came meanwhile: only that notification's click opens its page.
 pub fn focused(app: &AppHandle) {
     keep_lights(app);
     crate::workspaces::on_focus(app);
     // Brought forward by a notification of the server here: the popover says what happened and how to fix it.
     if crate::local_server::take_notice_click() {
         let _ = crate::present(app, "popover");
-        return;
-    }
-    let pending = {
-        let notices = app.state::<Notices>();
-        let mut state = notices.0.lock().unwrap_or_else(|e| e.into_inner());
-        state.pending.take()
-    };
-    if let Some((url, at)) = pending {
-        if at.elapsed() <= NOTIFY_OPENS_FOR {
-            let app = app.clone();
-            // Another server's page loads the window anew: not from inside the focus event.
-            std::thread::spawn(move || {
-                let _ = show_url(&app, url);
-            });
-        }
     }
 }
 
@@ -1062,6 +1095,16 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             crate::dock::set_badge(&app, count("waiting"), count("unread"));
             return Ok(json!({}));
         }
+        // The app icon picked on this computer (ADR 0179): kept by the app, for every server's pages.
+        Some("appIcon") => {
+            if request.get("agent").is_some() {
+                let picture = |key: &str| request[key].as_str().and_then(crate::app_icon::picture).ok_or("bad picture");
+                crate::app_icon::set_agent(&app, request["agent"].clone(), &picture("dock")?, &picture("window")?)?;
+            } else if let Some(id) = request["icon"].as_str() {
+                crate::app_icon::set(&app, id)?;
+            }
+            return Ok(crate::app_icon::kept(&app));
+        }
         Some("orgs") => {
             // A new organization on the server here: this computer works for it within seconds. Signed in or a new
             // workspace anywhere: the workspaces are read again, so the app offers this computer to it at once.
@@ -1127,7 +1170,9 @@ pub async fn this_mac(app: AppHandle, webview: tauri::Webview, request: Value) -
             if !servers::get(&app).servers.iter().any(|s| s == server) {
                 return Err("not a server of this app".into());
             }
-            let url: Url = format!("{server}/org/{}", request["orgId"].as_str().unwrap_or_default())
+            // The page there moves the window to that account before it opens (`?as=`, ADR 0183).
+            let account = request["account"].as_str().map(|id| format!("?as={id}")).unwrap_or_default();
+            let url: Url = format!("{server}/org/{}{account}", request["orgId"].as_str().unwrap_or_default())
                 .parse()
                 .map_err(|_| "not a URL")?;
             show_url(&app, url)?;
@@ -1249,11 +1294,22 @@ mod tests {
     }
 
     #[test]
+    fn only_a_click_opens_a_notice_page() {
+        // The click opens the page the notification was shown with.
+        assert_eq!(
+            tapped_page(Some(&json!("https://hub.ackwire.app/org/o1/dm/agent/a1?m=9"))).map(|u| u.to_string()),
+            Some("https://hub.ackwire.app/org/o1/dm/agent/a1?m=9".to_string())
+        );
+        assert_eq!(tapped_page(None), None);
+        assert_eq!(tapped_page(Some(&json!("not a page"))), None);
+    }
+
+    #[test]
     fn in_page_moves_and_titles() {
         let go = |u: &str| go_in_page(&u.parse().unwrap());
-        assert_eq!(go("https://app.agentes.chat/"), None);
+        assert_eq!(go("https://hub.ackwire.app/"), None);
         assert_eq!(
-            go("https://app.agentes.chat/org/o1/c/c1?m=9#x").as_deref(),
+            go("https://hub.ackwire.app/org/o1/c/c1?m=9#x").as_deref(),
             Some(r#"(window.__agentesNavigate || ((p) => location.assign(p)))("/org/o1/c/c1?m=9#x")"#)
         );
         assert_eq!(window_title("#loja · Acme"), "#loja · Acme");
@@ -1279,7 +1335,7 @@ mod tests {
 
     #[test]
     fn routes_follow_the_server_open_now() {
-        for site in ["https://app.agentes.chat", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
+        for site in ["https://hub.ackwire.app", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
             assert_eq!(r(&format!("{site}/org/x/c/y"), site), Route::Stay);
             assert_eq!(r(&format!("{site}/desktop/sign-in?provider=google&challenge=a"), site), Route::Outside);
             assert_eq!(r(&format!("{site}/desktop/signed-in?to=%2F"), site), Route::Front);
@@ -1287,7 +1343,7 @@ mod tests {
             assert_eq!(r(&format!("blob:{site}/abc"), site), Route::Stay);
         }
         let own = "https://agentes.tail1234.ts.net";
-        assert_eq!(r("https://app.agentes.chat/org/x", own), Route::Outside);
+        assert_eq!(r("https://hub.ackwire.app/org/x", own), Route::Outside);
         assert_eq!(r("https://accounts.google.com/o/oauth2", own), Route::Outside);
         assert_eq!(r("http://agentes.tail1234.ts.net/", own), Route::Outside);
         assert_eq!(r("https://agentes.tail1234.ts.net.evil.com/", own), Route::Outside);
@@ -1297,14 +1353,14 @@ mod tests {
         for other in ["file:///etc/passwd", "smb://host/share", "tel:+5511", "vscode://file/x", "javascript:alert(1)"] {
             assert_eq!(r(other, own), Route::Drop, "{other}");
         }
-        let cloud = "https://app.agentes.chat";
-        assert_eq!(r("https://app.agentes.chat/help/memory?lang=en#learns", cloud), Route::Outside);
-        assert_eq!(r("https://app.agentes.chat/org/x", cloud), Route::Stay);
+        let cloud = "https://hub.ackwire.app";
+        assert_eq!(r("https://hub.ackwire.app/help/memory?lang=en#learns", cloud), Route::Outside);
+        assert_eq!(r("https://hub.ackwire.app/org/x", cloud), Route::Stay);
     }
 
     #[test]
     fn the_bot_check_s_frame_stays_in_the_window_and_nothing_else_of_its_host() {
-        for site in ["https://app.agentes.chat", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
+        for site in ["https://hub.ackwire.app", "https://agentes.tail1234.ts.net", "http://127.0.0.1:4310"] {
             let frame = "https://challenges.cloudflare.com/cdn-cgi/challenge-platform/h/b/turnstile/if/ov2/av0/rcv/x";
             assert_eq!(r(frame, site), Route::Stay);
             assert_eq!(r("https://challenges.cloudflare.com:443/turnstile/v0/api.js", site), Route::Stay);
@@ -1318,7 +1374,7 @@ mod tests {
 
     #[test]
     fn agents_work_here_only_for_a_server_elsewhere() {
-        assert!(agents_here("https://app.agentes.chat", false), "agentes.chat too");
+        assert!(agents_here("https://hub.ackwire.app", false), "Ackwire AI too");
         assert!(!agents_here("http://127.0.0.1:4310", false));
         assert!(!agents_here("http://localhost:3000", false));
         assert!(agents_here("https://agentes.tail1234.ts.net", false));
@@ -1328,6 +1384,22 @@ mod tests {
     #[test]
     fn bridge_requests() {
         assert_eq!(checked(&json!({ "kind": "status", "extra": 1 })), Ok(json!({ "kind": "status" })));
+        // The app icon: an id of the app's, or an agent with its two PNGs (ADR 0179).
+        assert_eq!(checked(&json!({ "kind": "appIcon", "icon": "moon" })), Ok(json!({ "kind": "appIcon", "icon": "moon" })));
+        assert!(checked(&json!({ "kind": "appIcon", "icon": "../x" })).is_err());
+        let png = "iVBORw0KGgoAAAAA";
+        let agent = json!({ "orgId": "o", "id": "a", "name": "Dev", "look": { "color": "violet" }, "dock": png, "window": png });
+        assert_eq!(
+            checked(&json!({ "kind": "appIcon", "agent": agent })),
+            Ok(json!({
+                "kind": "appIcon",
+                "agent": { "orgId": "o", "id": "a", "name": "Dev", "look": { "color": "violet" } },
+                "dock": png,
+                "window": png,
+            }))
+        );
+        let gif = json!({ "orgId": "o", "id": "a", "name": "Dev", "look": {}, "dock": "R0lGODlh", "window": png });
+        assert!(checked(&json!({ "kind": "appIcon", "agent": gif })).is_err());
         assert_eq!(
             checked(&json!({ "kind": "connect", "orgId": "org_1-a", "origin": "https://evil.example" })),
             Ok(json!({ "kind": "connect", "orgId": "org_1-a" }))
@@ -1379,6 +1451,7 @@ mod tests {
             json!({ "kind": "openWorkspace", "server": "http://evil.example", "orgId": "o-1" }),
             json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "../x" }),
             json!({ "kind": "openWorkspace", "orgId": "o-1" }),
+            json!({ "kind": "openWorkspace", "server": "https://agentes.exemplo.com.br", "orgId": "o-1", "account": "../x" }),
         ] {
             assert!(checked(&bad).is_err(), "{bad}");
         }

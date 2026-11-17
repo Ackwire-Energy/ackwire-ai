@@ -117,7 +117,8 @@ const totalsOf = (orgId: string) => ({
 
 /**
  * A signed link to the workspace's plan and billing on the billing service, for its owners and admins. A
- * suspended workspace refuses it (`org.suspended`); a held one doesn't, since paying is how a billing hold ends.
+ * suspended workspace refuses it (`org.suspended`); a held one doesn't, since paying is how a billing hold ends, nor
+ * one being deleted, whose payer still reaches its invoices and card.
  */
 export async function mintBillingLink(
   db: Database,

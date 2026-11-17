@@ -26,7 +26,6 @@ import {
   Dialog,
   DialogBody,
   DialogFooter,
-  EventPillAction,
   Field,
   Icon,
   Input,
@@ -46,7 +45,7 @@ import { useConnectAi } from "@/components/ConnectAi";
 import { useChannelActions } from "@/components/channel-actions";
 import { useInviteDialog } from "@/components/invite/InviteDialog";
 import { useOrg } from "@/components/org-context";
-import { RequestCard, RequestDone } from "@/components/RequestCard";
+import { type RequestAnswer, RequestCard } from "@/components/RequestCard";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useEdited } from "@/hooks/useEdited";
 import { lookOf } from "@/lib/look";
@@ -187,8 +186,7 @@ export function TeamPlanBody({
               )}
               {onAdjust && (
                 <Button
-                  size="sm"
-                  variant="ghost"
+                  variant="link"
                   aria-label={t("teamPlan.card.adjustName", { name: a.name })}
                   disabled={locked}
                   onClick={() => onAdjust(a)}
@@ -300,36 +298,71 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
       />
     );
   }
-  if (status === "open") {
-    const decides = can(org, "create_agents");
-    const busy = team.create.isPending || team.deny.isPending || card.state === "creating";
-    return (
-      <>
-        <RequestCard
-          id={message.id}
-          kind="team"
-          agent={agent}
-          label={title}
-          mine={decides}
-          waitingFor={t("teamPlan.card.onlyCreators")}
-          lead={plan.lead || names}
-          body={
-            <>
-              <TeamPlanBody
-                plan={plan}
-                reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
-                personal={personal}
-                onAdjust={decides ? setAdjusting : undefined}
-                locked={busy}
-              />
-              {card.error && (
-                <p className="rq__error" role="alert">
-                  {teamFailureText(t, card.error, i18n.language)}
-                </p>
-              )}
-            </>
-          }
-          actions={
+  // Created, undone, dismissed or expired: the same card, the team still there to read, and who made it, when and
+  // Desfazer where its buttons were.
+  const open = status === "open";
+  const by = card.decidedByUserId === me.user.id ? null : dir.memberById.get(card.decidedByUserId ?? "")?.name;
+  const answer: RequestAnswer | undefined = open
+    ? undefined
+    : status === "created"
+      ? {
+          done: true,
+          text: by
+            ? t(modeKey(org, "teamPlan.card.created"), { name: by })
+            : t(modeKey(org, "teamPlan.card.createdYou")),
+          time: card.decidedAt ? whenAt(t, i18n.language, card.decidedAt) : undefined,
+          action: teamUndoable(card, { userId: me.user.id, admin: can(org, "manage_agents") }) ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={team.undo.isPending}
+              onClick={() => team.undo.mutate(undefined, { onError: failed })}
+            >
+              {t("agentActions.undo")}
+            </Button>
+          ) : undefined,
+        }
+      : {
+          done: false,
+          text: t(
+            status === "undone"
+              ? modeKey(org, "teamPlan.card.undone")
+              : status === "denied"
+                ? modeKey(org, "teamPlan.card.dismissed")
+                : "approval.expired",
+          ),
+        };
+  const decides = open && can(org, "create_agents");
+  const busy = team.create.isPending || team.deny.isPending || card.state === "creating";
+  return (
+    <>
+      <RequestCard
+        id={message.id}
+        kind="team"
+        agent={agent}
+        label={title}
+        mine={decides}
+        waitingFor={t("teamPlan.card.onlyCreators")}
+        answer={answer}
+        lead={plan.lead || names}
+        body={
+          <>
+            <TeamPlanBody
+              plan={plan}
+              reviewer={dir.agents.find(isRightHand)?.name ?? RIGHT_HAND_DEFAULT.name}
+              personal={personal}
+              onAdjust={decides ? setAdjusting : undefined}
+              locked={busy}
+            />
+            {open && card.error && (
+              <p className="rq__error" role="alert">
+                {teamFailureText(t, card.error, i18n.language)}
+              </p>
+            )}
+          </>
+        }
+        actions={
+          open && (
             <>
               {decides && (
                 <Button
@@ -368,91 +401,46 @@ export function TeamPlanCardView({ message, card }: { message: Message; card: Te
                 </Button>
               )}
             </>
-          }
-          end={<span className="small muted">{countsText(t, plan, personal)}</span>}
-          what={names}
-        />
-        {adjusting && (
-          <AdjustDialog
-            agent={adjusting}
-            saving={team.adjust.isPending}
-            onClose={() => setAdjusting(null)}
-            onSave={(patch) =>
-              team.adjust.mutate(
-                { handle: adjusting.handle, patch },
-                { onSuccess: () => setAdjusting(null), onError: failed },
-              )
-            }
-          />
-        )}
-        <TeamMapDialog plan={plan} open={map} onClose={() => setMap(false)} />
-      </>
-    );
-  }
-  if (status === "created") {
-    const by = card.decidedByUserId === me.user.id ? null : dir.memberById.get(card.decidedByUserId ?? "")?.name;
-    const channels = personal
-      ? ""
-      : joinNames(
-          plan.newChannels.map((c) => `#${c}`),
-          t,
-        );
-    const counts = teamCounts(plan);
-    const madeBy = by
-      ? t(modeKey(org, "teamPlan.card.created"), { name: by })
-      : t(modeKey(org, "teamPlan.card.createdYou"));
-    const undoable = teamUndoable(card, { userId: me.user.id, admin: can(org, "manage_agents") });
-    return (
-      <>
-        <RequestDone
-          done
-          label={title}
-          action={
-            undoable ? (
-              <EventPillAction
-                disabled={team.undo.isPending}
-                onClick={() => team.undo.mutate(undefined, { onError: failed })}
-              >
-                {t("agentActions.undo")}
-              </EventPillAction>
-            ) : undefined
-          }
-          time={card.decidedAt ? whenAt(t, i18n.language, card.decidedAt) : undefined}
-        >
-          {madeBy}: <b>{names}</b>
-          {channels && ` · ${channels}`}
-          {counts.routines > 0 && ` · ${t("teamPlan.card.routineCount", { count: counts.routines })}`}
-        </RequestDone>
-        {card.created?.skipped.includes("skills") && <p className="small muted">{t("teamPlan.card.skillsWait")}</p>}
-        {card.created?.skipped.includes("weekly") && <p className="small muted">{t("teamPlan.card.weeklyWait")}</p>}
-        {wave && (
-          <div className="tp-wave" aria-hidden="true">
-            {plan.agents.map((a) => (
-              <AgentSticker
-                key={a.handle}
-                appearance={lookOf(a)}
-                mood="wave"
-                playFor={WAVE_SECONDS}
-                size={MESSAGE_STICKER}
-              />
-            ))}
-          </div>
-        )}
-        {card.decidedByUserId === me.user.id && !held && <FirstTaskCard message={message} card={card} />}
-      </>
-    );
-  }
-  return (
-    <RequestDone done={false} label={title}>
-      {t(
-        status === "undone"
-          ? modeKey(org, "teamPlan.card.undone")
-          : status === "denied"
-            ? modeKey(org, "teamPlan.card.dismissed")
-            : "approval.expired",
+          )
+        }
+        end={open && <span className="small muted">{countsText(t, plan, personal)}</span>}
+        what={names}
+      />
+      {status === "created" && (
+        <>
+          {card.created?.skipped.includes("skills") && <p className="small muted">{t("teamPlan.card.skillsWait")}</p>}
+          {card.created?.skipped.includes("weekly") && <p className="small muted">{t("teamPlan.card.weeklyWait")}</p>}
+          {wave && (
+            <div className="tp-wave" aria-hidden="true">
+              {plan.agents.map((a) => (
+                <AgentSticker
+                  key={a.handle}
+                  appearance={lookOf(a)}
+                  mood="wave"
+                  playFor={WAVE_SECONDS}
+                  size={MESSAGE_STICKER}
+                />
+              ))}
+            </div>
+          )}
+          {card.decidedByUserId === me.user.id && !held && <FirstTaskCard message={message} card={card} />}
+        </>
       )}
-      : <b>{names}</b>
-    </RequestDone>
+      {adjusting && (
+        <AdjustDialog
+          agent={adjusting}
+          saving={team.adjust.isPending}
+          onClose={() => setAdjusting(null)}
+          onSave={(patch) =>
+            team.adjust.mutate(
+              { handle: adjusting.handle, patch },
+              { onSuccess: () => setAdjusting(null), onError: failed },
+            )
+          }
+        />
+      )}
+      <TeamMapDialog plan={plan} open={map} onClose={() => setMap(false)} />
+    </>
   );
 }
 

@@ -1,21 +1,26 @@
 import {
   ApiError,
   useDeleteVaultItem,
+  useMoveVaultItem,
   useUpdateVaultItem,
+  useVault,
   useVaultItem,
   type VaultItemDetail,
   type VaultMatch,
+  type VaultScope,
 } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
+import { canMoveVaultItem } from "@agenteschat/client/lib/vault";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
-import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
+import { StyleSheet, View } from "react-native";
+import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, SkeletonList, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { Note } from "../ai/parts";
-import { confirmAction, Gap, SettingsPage } from "../settings/parts";
+import { confirmAction, Gap, NEXT_FIELD, SettingsPage, useUnsavedGuard } from "../settings/parts";
 import { Face } from "../shared/Face";
-import { useColors, useNow, useOrgId } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
+import { useNow, useOrgId } from "../shared/hooks";
 import { goBack, successHaptic } from "../shared/parts";
 import {
   accessSentence,
@@ -46,19 +51,20 @@ import { InputField, SavedValue, useVaultNames } from "./parts";
  */
 export function VaultItemScreen({ id }: { id: string }) {
   const { t } = useTranslation();
-  const c = useColors();
   const orgId = useOrgId();
   const item = useVaultItem(orgId, id);
   if (!item.data) {
     const gone = item.error instanceof ApiError && item.error.status === 404;
     return (
       <SettingsPage title={t("settings.section.vault")}>
-        {item.isError ? (
+        {item.isError && gone ? (
           <View style={styles.note}>
-            <Note icon="x">{gone ? t("mobile.vault.item.gone") : t("common.loadFailed")}</Note>
+            <Note icon="x">{t("mobile.vault.item.gone")}</Note>
           </View>
+        ) : item.isError ? (
+          <LoadFailed onRetry={() => void item.refetch()} />
         ) : (
-          <ActivityIndicator color={c.muted} style={styles.loading} />
+          <SkeletonList rows={4} />
         )}
       </SettingsPage>
     );
@@ -74,6 +80,10 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
   const now = useNow(60_000);
   const update = useUpdateVaultItem(orgId);
   const remove = useDeleteVaultItem(orgId);
+  const move = useMoveVaultItem(orgId);
+  const movable = canMoveVaultItem(item, useVault(orgId).data?.canManageTeam ?? false);
+  const moveTo: VaultScope = item.scope === "team" ? "personal" : "team";
+  const moveLabel = t(moveTo === "team" ? "vault.move.toTeam" : "vault.move.toPersonal");
   const [form, setForm] = useState<VaultForm>(() => formOf(item));
   // "Change password": the field for a new value opens only when asked.
   const [changing, setChanging] = useState(false);
@@ -82,6 +92,8 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
   const ownFields = editable && !external;
   const patch = itemPatch(item, form);
   const dirty = !patchEmpty(patch);
+  // Back with changes not saved asks first (a new password typed here exists nowhere else yet).
+  const leave = useUnsavedGuard(dirty);
   // Someone else saved it meanwhile (the page refetched): untouched fields follow.
   // biome-ignore lint/correctness/useExhaustiveDependencies: only a newer save resets the form
   useEffect(() => {
@@ -111,6 +123,25 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
       { itemId: item.id, accessFromConnection: true },
       { onSuccess: () => toast({ title: t("mobile.vault.access.saved") }), onError: failed },
     );
+  const askMove = () =>
+    confirmAction({
+      title: t("vault.move.title", { title: item.title }),
+      text: t(moveTo === "team" ? "vault.move.toTeamText" : "vault.move.toPersonalText"),
+      action: moveLabel,
+      cancel: t("mobile.common.cancel"),
+      destructive: false,
+      onConfirm: () =>
+        move.mutate(
+          { itemId: item.id, scope: moveTo },
+          {
+            onSuccess: () => {
+              successHaptic();
+              toast({ title: t("vault.move.moved") });
+            },
+            onError: failed,
+          },
+        ),
+    });
   const askDelete = () =>
     confirmAction({
       title: t("mobile.vault.item.deleteTitle", { title: item.title }),
@@ -124,6 +155,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           onSuccess: () => {
             successHaptic();
             toast({ title: t("mobile.vault.item.deleted"), icon: "trash" });
+            leave();
             goBack();
           },
           onError: failed,
@@ -141,6 +173,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
       subtitle={`${kindName} · ${scopeName}`}
       {...(editable && dirty ? { action: { label: t("common.save"), onPress: save, disabled: update.isPending } } : {})}
       locked={update.isPending}
+      toolbar={editable}
     >
       {item.missing ? (
         <View style={styles.note}>
@@ -155,6 +188,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
       ) : null}
       <Gap />
       <GroupedList>
+        {/* Return walks the group's fields (an item's title always has one after it); its last one closes the keyboard. */}
         <InputField
           label={t("mobile.vault.field.title")}
           value={form.title}
@@ -162,6 +196,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           editable={ownFields}
           maxLength={LIMITS.title}
           autoCapitalize="sentences"
+          {...NEXT_FIELD}
         />
         {item.kind === "login" ? (
           <InputField
@@ -173,6 +208,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
             keyboardType="url"
             autoCapitalize="none"
             placeholder={t("mobile.vault.field.websitePlaceholder")}
+            {...NEXT_FIELD}
           />
         ) : null}
         {item.kind === "login" ? (
@@ -184,6 +220,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
             maxLength={LIMITS.username}
             autoCapitalize="none"
             textContentType="username"
+            returnKeyType="done"
           />
         ) : null}
         {item.kind === "key" ? (
@@ -195,11 +232,12 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
             mono
             maxLength={LIMITS.keyName}
             autoCapitalize="characters"
+            returnKeyType="done"
           />
         ) : null}
         {hasValue && item.hasSecret ? <SavedValue label={valueLabel} /> : null}
         {item.kind === "contact"
-          ? CONTACT_FIELDS.map((field) => (
+          ? CONTACT_FIELDS.map((field, i) => (
               <InputField
                 key={field}
                 label={t(`mobile.vault.contact.${field}`)}
@@ -208,6 +246,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
                 editable={ownFields}
                 maxLength={LIMITS.contact}
                 {...contactKeyboard(field)}
+                {...(i < CONTACT_FIELDS.length - 1 ? NEXT_FIELD : { returnKeyType: "done" as const })}
               />
             ))
           : null}
@@ -301,6 +340,7 @@ function ItemPage({ item }: { item: VaultItemDetail }) {
           chevron={editable}
           {...(editable ? { onPress: () => router.push(vaultHref.itemAccess(item.id) as never) } : {})}
         />
+        {movable ? <GroupedRow icon="swap" label={moveLabel} disabled={move.isPending} onPress={askMove} /> : null}
         {external && editable && !item.accessFromConnection ? (
           <GroupedRow
             icon="undo"
@@ -414,5 +454,4 @@ export function contactKeyboard(field: (typeof CONTACT_FIELDS)[number]) {
 
 const styles = StyleSheet.create({
   note: { paddingHorizontal: 4, paddingTop: 10 },
-  loading: { marginVertical: 16 },
 });

@@ -1,7 +1,7 @@
-import { type Message, useMe, useOverview } from "@agenteschat/client";
-import { joinNames, whenAt } from "@agenteschat/client/lib/format";
-import { agentActivitySince, dayPart, isNewDay } from "@agenteschat/client/lib/welcome";
-import { useEffect, useState } from "react";
+import { type Message, useChannels, useMe, useMembers, useOverview, useSidebarView } from "@agenteschat/client";
+import { joinNames, namesText, whenAt } from "@agenteschat/client/lib/format";
+import { agentActivitySince, dayPart, isNewDay, welcomeClock } from "@agenteschat/client/lib/welcome";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { GestureDetector, usePanGesture } from "react-native-gesture-handler";
@@ -10,16 +10,21 @@ import { scheduleOnRN } from "react-native-worklets";
 import { readValueSync, STORED, writeValueSync } from "@/lib/storage";
 import { useOrg } from "@/providers/org";
 import { WorkspaceSky } from "@/sky/Sky";
-import { haptics, IconButton, Text, useReducedMotion } from "@/ui";
-import { AgentFace } from "../shared/Face";
+import { Button, haptics, IconButton, Text, useReducedMotion } from "@/ui";
+import { router } from "@/ui/navigation";
+import { useOpenDm } from "../new/useOpenDm";
+import { AgentFace, Face } from "../shared/Face";
 import { useDirectory, useOrgId } from "../shared/hooks";
 import { useSurface } from "../shared/parts";
+import { requestComposerText } from "./composer-request";
+import { arrivalOf } from "./logic";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 /** How long after joining someone is still arriving (ADR 0090, as on the web). */
 const ARRIVING_MS = 86_400_000;
 /** Faces on the card. */
 const CREW = 3;
+const NO_PINS: string[] = [];
 /** A swipe up this far, or a flick, puts it away. */
 const DISMISS_Y = -36;
 const FLICK = 500;
@@ -67,9 +72,12 @@ const firstNameOf = (name: string) => name.trim().split(/\s+/)[0] || name;
 
 /**
  * The top of a channel when it greets you, as the web's (ADR 0090): a newcomer's first #general welcomes them to the
- * workspace; otherwise, on the first channel of a new day, "Boa tarde, Ana." with what its agents left since your last
- * visit and the requests waiting for you. A card on the workspace's sky under the bar, with who did it; it drops in
- * once, and a swipe up or × puts it away (where it came from).
+ * workspace, says the channels they're in besides it (an invitation's, ADR 0184), shows its agents first (the ones
+ * pinned for them first) and a few people, and offers saying hi here, talking to the first agent and meeting the team;
+ * otherwise, on the first channel of a new day, "Boa tarde, Ana." with what its agents left since your last visit and
+ * the requests waiting for you. A card on the workspace's sky under the bar, with who did it; it drops in once, and a
+ * swipe up or × puts it away (where it came from). The day's greeting also goes by itself a while after the person's
+ * first touch elsewhere, never under their finger.
  */
 export function ChannelWelcome({
   channelId,
@@ -77,6 +85,7 @@ export function ChannelWelcome({
   messages,
   agentIds,
   top,
+  touched,
 }: {
   channelId: string;
   channelName: string;
@@ -85,6 +94,8 @@ export function ChannelWelcome({
   agentIds: string[];
   /** Where it sits: under the floating bar. */
   top: number;
+  /** The person touched the conversation, the box or the bar since it opened. */
+  touched: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
@@ -92,6 +103,11 @@ export function ChannelWelcome({
   const me = useMe().data;
   const dir = useDirectory();
   const overview = useOverview(orgId);
+  // The agents an invitation pinned for them (ADR 0184), in its order.
+  const pinned = useSidebarView(orgId).pins?.agents ?? NO_PINS;
+  const openDm = useOpenDm();
+  const members = useMembers(orgId).data ?? [];
+  const channels = useChannels(orgId).data ?? [];
   const reduced = useReducedMotion();
   const surface = useSurface("e2");
   const [greeting] = useState(() => claimGreeting(orgId, channelId));
@@ -126,12 +142,38 @@ export function ChannelWelcome({
       setClosed(true);
     }
   };
-  // Leaves upward, the way it came; gone from the tree once it's out.
-  const putAway = () => {
-    haptics.light();
+  // The day's greeting goes by itself on the clock the web's shares (`welcomeClock`), from the person's first touch
+  // elsewhere (a newcomer's welcome stays): a finger on it holds it, and it goes 2 s after the finger lifts.
+  const held = useRef(false);
+  const clock = useRef<ReturnType<typeof welcomeClock> | null>(null);
+  // Leaves upward, the way it came; gone from the tree once it's out. A tap or a swipe is felt; going by itself isn't.
+  const putAway = (felt = true) => {
+    if (felt) haptics.light();
     shown.set(withTiming(0, { duration: 180, easing: EASE_OUT }));
     if (!reduced) y.set(withTiming(-24, { duration: 180, easing: EASE_OUT }));
     setTimeout(close, 190);
+  };
+  const away = useRef(putAway);
+  away.current = putAway;
+  const autoCloses = Boolean(me) && greets && messages !== undefined && touched;
+  useEffect(() => {
+    if (!autoCloses) return;
+    const run = welcomeClock(
+      () => away.current(false),
+      () => held.current,
+    );
+    clock.current = run;
+    run.used();
+    return () => {
+      run.stop();
+      clock.current = null;
+      // Leaving the channel once its clock runs counts as closed.
+      if (run.running()) greeting.closed = true;
+    };
+  }, [autoCloses, greeting]);
+  const lift = () => {
+    held.current = false;
+    clock.current?.left();
   };
   const pan = usePanGesture({
     // Up only: [start, end] offsets, activating 8 above; a move down or sideways first is not this.
@@ -145,7 +187,7 @@ export function ChannelWelcome({
     },
     onDeactivate: (e) => {
       "worklet";
-      if (e.translationY < DISMISS_Y || e.velocityY < -FLICK) scheduleOnRN(putAway);
+      if (e.translationY < DISMISS_Y || e.velocityY < -FLICK) scheduleOnRN(putAway, true);
       else y.set(withSpring(0, { duration: 300, dampingRatio: 0.8, velocity: e.velocityY }));
     },
   });
@@ -158,10 +200,17 @@ export function ChannelWelcome({
   let title: string;
   let lead: string;
   let crew: string[];
+  let people: string[] = [];
+  let host: string | null = null;
   if (arriving) {
+    const arrival = arrivalOf({ agents: dir.agents, pinned, people: members, meId, channels });
     title = t("members.arrival.title", { org: org?.name ?? "", name });
-    lead = t("members.arrival.lead", { channel: channelName });
-    crew = dir.agents.slice(0, CREW).map((a) => a.id);
+    lead = arrival.alsoIn.length
+      ? t("members.arrival.alsoIn", { channels: namesText(t, arrival.alsoIn, 3) })
+      : t("members.arrival.lead", { channel: channelName });
+    crew = arrival.agents;
+    people = arrival.people;
+    host = arrival.host;
   } else {
     const since = greeting.last ?? Date.now();
     const activity = agentActivitySince(messages ?? [], since);
@@ -191,6 +240,13 @@ export function ChannelWelcome({
         style={[styles.at, { top }, style]}
         accessibilityRole="summary"
         accessibilityLabel={[when, title, lead].filter(Boolean).join(". ")}
+        // Its own touches are reading it, not using the conversation under it.
+        onTouchStart={(e) => {
+          e.stopPropagation();
+          held.current = true;
+        }}
+        onTouchEnd={lift}
+        onTouchCancel={lift}
       >
         <View style={[styles.card, surface]}>
           <WorkspaceSky style={StyleSheet.absoluteFill} />
@@ -205,16 +261,43 @@ export function ChannelWelcome({
                 {title}
               </Text>
             </View>
-            <IconButton icon="x" label={t("sky.welcome.dismiss")} onPress={putAway} />
+            <IconButton icon="x" label={t("sky.welcome.dismiss")} onPress={() => putAway()} />
           </View>
           <Text variant="subhead" tone="ink2" numberOfLines={3} style={styles.lead}>
             {lead}
           </Text>
-          {crew.length > 0 ? (
+          {crew.length + people.length > 0 ? (
             <View style={styles.crew} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
               {crew.map((id) => (
                 <AgentFace key={id} agentId={id} size={36} framed />
               ))}
+              {people.map((id) => (
+                <Face key={id} who={{ type: "person", id }} size={36} live={false} />
+              ))}
+            </View>
+          ) : null}
+          {arriving ? (
+            // The first things to do, each as wide as the card: say hi here, talk to the first agent, meet the team.
+            <View style={styles.acts}>
+              <Button
+                variant="primary"
+                wide
+                label={t("members.arrival.sayHi", { channel: channelName })}
+                onPress={() => {
+                  requestComposerText(channelId, "");
+                  putAway();
+                }}
+              />
+              {host ? (
+                <Button
+                  variant="ghost"
+                  wide
+                  label={t("members.arrival.talkTo", { name: dir.agentById.get(host)?.name ?? "" })}
+                  // Opens the conversation and nothing more: it comes in with the keyboard down, as from New.
+                  onPress={() => void openDm({ agentId: host })}
+                />
+              ) : null}
+              <Button variant="ghost" wide label={t("members.arrival.team")} onPress={() => router.push("/team")} />
             </View>
           ) : null}
         </View>
@@ -233,4 +316,5 @@ const styles = StyleSheet.create({
   grow: { flex: 1, minWidth: 0, gap: 2 },
   lead: { marginTop: -2 },
   crew: { flexDirection: "row", gap: 8, marginTop: 4 },
+  acts: { gap: 8, marginTop: 8 },
 });

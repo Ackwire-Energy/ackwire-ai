@@ -1,0 +1,5 @@
+"NSMicrophoneUsageDescription" = "Ackwire AI utilise le microphone pour enregistrer des messages vocaux.";
+"NSDesktopFolderUsageDescription" = "Permet aux agents qui travaillent sur ce Mac d'ouvrir des fichiers de votre Bureau.";
+"NSDocumentsFolderUsageDescription" = "Permet aux agents qui travaillent sur ce Mac d'ouvrir des fichiers de votre dossier Documents.";
+"NSDownloadsFolderUsageDescription" = "Permet aux agents qui travaillent sur ce Mac d'ouvrir des fichiers de votre dossier Téléchargements.";
+"NSLocalNetworkUsageDescription" = "Permet aux agents qui travaillent sur ce Mac de trouver les téléphones Android de votre réseau Wi-Fi et de s'y connecter.";

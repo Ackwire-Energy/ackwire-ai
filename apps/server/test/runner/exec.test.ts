@@ -175,6 +175,14 @@ test.skipIf(!hasGit)(
     expect(await errorCode(() => exec("git push origin develop", ["acme/app"]))).toBe("approval_needed");
     // Nothing held, nothing to report.
     expect(await exec("true", ["acme/app"])).not.toHaveProperty("merge");
+    // Approved (a person, a saved rule, an agent that never asks): the merge is named for its receipt, in any repository.
+    git("branch", "other");
+    const approved = (await handleRequest(
+      ctx,
+      { op: "exec", command: "git merge other", timeoutSeconds: 30, stream: false, approved: true },
+      scope,
+    )) as { exitCode: number; merge?: unknown };
+    expect(approved).toMatchObject({ exitCode: 0, merge: { repo: "acme/app", pr: null, ref: "other" } });
   },
   30_000,
 );

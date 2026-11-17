@@ -139,6 +139,13 @@ describe("a plan with no Ackwire AI plan in force", () => {
     expect(buttonNamed(dialog, KEY)).toBeNull();
     expect(within(dialog).queryByRole("combobox", { name: "Plano" })).toBeNull();
     expect(dialog.querySelector(".ai-picker")).toBeNull();
+    // The scene stays over the notice, still: nothing walks to the team before the plan.
+    const trails = Array.from(dialog.querySelectorAll(".connect-scene .team-scene__trail"));
+    expect(trails.length).toBeGreaterThan(0);
+    for (const trail of trails) expect(trail.hasAttribute("data-state")).toBe(false);
+    // A trail to the team only when there is a team to walk to.
+    const faces = dialog.querySelectorAll(".connect-scene .team-scene__agent").length;
+    expect(trails.length).toBe(faces > 0 ? 2 : 1);
   });
 
   test("a member: Connect says why and who can sort it out, with nothing to press", async () => {
@@ -169,7 +176,8 @@ describe("a plan with no Ackwire AI plan in force", () => {
     }
     await pickCard(dialog, "Chave de API");
     expect(shownText(dialog)).not.toContain(HELD);
-    expect(shownText(dialog)).toContain("Todo agente sem plano pensa com ela.");
+    // Opened for Ada: the key will go on her.
+    expect(shownText(dialog)).toContain("Ada vai pensar com ela.");
   });
 
   test("Ver planos goes to the real billing page, minted on the click", async () => {

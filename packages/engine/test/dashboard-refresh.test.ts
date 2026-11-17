@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import type { PubSub } from "@agenteschat/adapters";
-import { type Database, eq, schema } from "@agenteschat/db";
-import { type ModelRequest, systemText } from "@agenteschat/providers";
+import { type PubSub, userTopic } from "@agenteschat/adapters";
+import { and, type Database, eq, schema } from "@agenteschat/db";
+import { type ModelRequest, ProviderError, systemText } from "@agenteschat/providers";
 import type { FakeReply } from "@agenteschat/providers/testing";
 import { WIDGET_SCHEDULE_CRON, type WidgetSpec } from "@agenteschat/ui/widgets/spec";
 import {
@@ -33,7 +33,8 @@ import {
   WIDGET_UP_FRONT_MAX,
   widgetUpFront,
 } from "../src";
-import { widgetFailureCode } from "../src/dashboards/refresh-ledger";
+import { holdWidgetForAi, widgetFailureCode } from "../src/dashboards/refresh-ledger";
+import { monthStartUtc } from "../src/usage";
 import { addMember, type Fixture, setup } from "./fixtures";
 import {
   agentRunRow,
@@ -59,10 +60,14 @@ function lazyDashboardTools() {
 }
 
 /** A fixture whose agent answers widget runs with `widgetReply` (and any other run with "Ok."). */
-async function setupWidgets(widgetReply: (req: ModelRequest, call: number) => FakeReply) {
+async function setupWidgets(
+  widgetReply: (req: ModelRequest, call: number) => FakeReply | Error,
+  options: { budgetNanoUsd?: number; contextTools?: boolean } = {},
+) {
   const tools = lazyDashboardTools();
   let calls = 0;
   f = await setup({
+    ...options,
     toolSources: [tools.source],
     reply: (req) => {
       if (!(req.tools ?? []).some((t) => t.name === "update_widget")) return { chunks: ["Ok."] };
@@ -413,6 +418,77 @@ describe("the refresh run", () => {
     expect((await routineRow(f, routineId)).failuresInRow).toBe(1);
   });
 
+  test("the fifth failure in a row stops it: the widget says it stopped, and what the last failure was", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id, { schedule: "hour" });
+    const routineId = w.routineId ?? "";
+    await f.db.update(schema.routines).set({ failuresInRow: 4 }).where(eq(schema.routines.id, routineId));
+    const last = await fireWidget(routineId);
+    await closeRoutineRun({ db: f.db, pubsub: f.pubsub }, await agentRunRow(f, last.agentRunId), {
+      status: "failed",
+      code: "no_ai",
+    });
+    expect(await routineRow(f, routineId)).toMatchObject({ active: false, pausedReason: "failing" });
+    expect(await widgetOf(w.id)).toMatchObject({ status: "failed", failureCode: "failing" });
+    expect((await getWidget(dash(), f.owner.id, f.org.id, w.id)).failure).toMatchObject({
+      code: "failing",
+      cause: "missing_credential",
+    });
+    // A failure that didn't stop it names no other.
+    await f.db
+      .update(schema.dashboardWidgets)
+      .set({ failureCode: "timeout" })
+      .where(eq(schema.dashboardWidgets.id, w.id));
+    expect((await getWidget(dash(), f.owner.id, f.org.id, w.id)).failure).toEqual({ code: "timeout", detail: null });
+  });
+
+  test("a run that ends without update_widget is told once that only update_widget answers, then builds", async () => {
+    const nudged: boolean[] = [];
+    await setupWidgets((req, call) => {
+      if (seen(req).includes("Updated:")) return { chunks: ["Ok."] };
+      // Its numbers in its words, never through the tool: nobody would get them.
+      if (call === 0) return { chunks: ["As vendas de hoje somam R$ 18.420."] };
+      nudged.push(seen(req).includes("this run ends only through update_widget"));
+      return {
+        chunks: [],
+        toolUses: [{ name: "update_widget", input: { data: KPI, summary: "R$ 18.420", title: "Vendas" } }],
+      };
+    });
+    const b = await board();
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, {
+      agentId: f.agent.id,
+      prompt: "Vendas de hoje",
+      format: "auto",
+      schedule: "manual",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(nudged).toEqual([true]);
+    expect(await widgetOf(w.id)).toMatchObject({ status: "ok", title: "Vendas", failureCode: null });
+    // Its step says it was the widget's nudge, never an unkept promise.
+    const steps = await f.db.select().from(schema.agentRunSteps).where(eq(schema.agentRunSteps.kind, "context"));
+    expect(steps.map((s) => s.data.nudged).filter(Boolean)).toEqual(["widget"]);
+  });
+
+  test("one that still sends nothing after that one nudge fails as no_update", async () => {
+    let calls = 0;
+    await setupWidgets(() => {
+      calls++;
+      return { chunks: ["Nada mudou."] };
+    });
+    const b = await board();
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, {
+      agentId: f.agent.id,
+      prompt: "Vendas de hoje",
+      format: "auto",
+      schedule: "manual",
+    });
+    await drainOutbox(f.db, f.handlers);
+    expect(calls).toBe(2);
+    expect(await widgetOf(w.id)).toMatchObject({ status: "failed", failureCode: "no_update" });
+    expect((await f.db.select().from(schema.routineRuns))[0]).toMatchObject({ status: "failed", code: "no_update" });
+  });
+
   test("update_widget is applied once per run and only by its own run", async () => {
     await setupWidgets(() => ({ chunks: ["Ok."] }));
     const b = await board();
@@ -441,6 +517,346 @@ describe("the refresh run", () => {
         update: { spec: { kind: "bars", labels: ["a"], values: [1] }, summary: "x" },
       }),
     ).rejects.toMatchObject({ code: "widget.invalid_data" });
+  });
+});
+
+describe("an agent with no AI", () => {
+  const revokeKeys = (revokedAt: Date | null) => f.db.update(schema.providerCredentials).set({ revokedAt });
+  const checked = (): DashboardDeps => ({ ...dash(), ai: { gateway: f.gateway } });
+
+  test("gets no build run: the widget waits for an AI, quietly, and builds once it has one", async () => {
+    await setupWidgets((req) => {
+      if (seen(req).includes("Updated:")) return { chunks: ["Ok."] };
+      return {
+        chunks: [],
+        toolUses: [{ name: "update_widget", input: { data: KPI, summary: "R$ 18.420", title: "Vendas" } }],
+      };
+    });
+    const b = await board();
+    await revokeKeys(new Date());
+    const w = await createWidget(checked(), f.owner.id, f.org.id, b.id, {
+      agentId: f.agent.id,
+      prompt: "Vendas de hoje",
+      format: "auto",
+      schedule: "manual",
+    });
+    // Why, for the apps' words: no key for its model.
+    expect(w).toMatchObject({ status: "failed", failure: { code: "missing_credential", detail: "no_key" } });
+    // No run that could only fail, and nobody told: the widget says it where it was just made.
+    expect(await f.db.select().from(schema.routineRuns)).toEqual([]);
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+    expect(await notificationsOf(f, "widget_failed")).toEqual([]);
+    // Asked again, a person hears why; the widget says it once.
+    await expect(refreshWidgetNow(checked(), f.owner.id, f.org.id, w.id)).rejects.toMatchObject({
+      code: "widget.needs_ai",
+      params: { agentName: "Dev" },
+    });
+    await expect(askWidgetChange(checked(), f.owner.id, f.org.id, w.id, "Por semana")).rejects.toMatchObject({
+      code: "widget.needs_ai",
+    });
+    expect((await historyOf(w.id)).map((h) => h.failureCode)).toEqual(["missing_credential"]);
+    expect(await f.db.select().from(schema.routineRuns)).toEqual([]);
+
+    // With a key again, the next ask builds it.
+    await revokeKeys(null);
+    expect((await refreshWidgetNow(checked(), f.owner.id, f.org.id, w.id)).status).toBe("building");
+    await drainOutbox(f.db, f.handlers);
+    expect(await widgetOf(w.id)).toMatchObject({ status: "ok", title: "Vendas", failureCode: null });
+  });
+
+  test("a test of a widget (New widget's draft) waits the same way", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    await revokeKeys(new Date());
+    const draft = await testWidget(checked(), f.owner.id, f.org.id, b.id, {
+      agentId: f.agent.id,
+      prompt: "MRR em real",
+      format: "auto",
+      schedule: "hour",
+    });
+    expect(draft).toMatchObject({ draft: true, status: "failed", failure: { code: "missing_credential" } });
+    expect(await f.db.select().from(schema.routineRuns)).toEqual([]);
+  });
+
+  test("a slot is skipped, never failed: the widget that had data says it once, and its creator hears it", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id, { schedule: "hour" });
+    const routineId = w.routineId ?? "";
+    await revokeKeys(new Date());
+    for (let i = 0; i < 2; i++) {
+      const queued = await queueRoutineRun({ db: f.db }, await routineRow(f, routineId), new Date(), "manual");
+      await drainOutbox(f.db, f.handlers);
+      expect(await routineRunRow(f, queued?.id ?? "")).toMatchObject({ status: "skipped", code: "no_ai" });
+    }
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+    expect(await routineRow(f, routineId)).toMatchObject({ active: true, failuresInRow: 0, pausedReason: null });
+    // Its last data stays, under the reason.
+    const row = await widgetOf(w.id);
+    expect(row).toMatchObject({ status: "failed", failureCode: "missing_credential" });
+    expect(row.spec).toMatchObject({ kind: "kpi", value: 100 });
+    expect((await historyOf(w.id)).map((h) => h.failureCode)).toEqual(["missing_credential"]);
+    const told = await notificationsOf(f, "widget_failed");
+    expect(told).toHaveLength(1);
+    // Why, for the apps' words, apart from the text the island and the push show as it is.
+    expect(told[0]?.latest).toMatchObject({ reason: "missing_credential", detail: "no_key" });
+    expect(told[0]?.latest.text).toBeUndefined();
+  });
+
+  test("it says so again only when why changes, in its history and on the widget", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id);
+    const [row] = await f.db.select().from(schema.dashboards).where(eq(schema.dashboards.id, b.id));
+    if (!row) throw new Error("no board");
+    const hold = async (reason: string) => holdWidgetForAi(dash(), await widgetOf(w.id), row, reason);
+    await hold("no_key");
+    await hold("no_key");
+    expect((await historyOf(w.id)).map((h) => h.summary)).toEqual(["no_key"]);
+    await hold("not_signed_in");
+    expect((await historyOf(w.id)).map((h) => h.summary)).toEqual(["no_key", "not_signed_in"]);
+    expect(await widgetOf(w.id)).toMatchObject({ failureCode: "missing_credential", failureDetail: "not_signed_in" });
+    // One notice for the streak, whatever the reason does after.
+    expect(await notificationsOf(f, "widget_failed")).toHaveLength(1);
+  });
+
+  test("a run that finds no AI after all keeps why, and the widget says it", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id, { schedule: "hour" });
+    // Its slot fired while the key was there; the key went before its run thought.
+    await fireWidget(w.routineId ?? "");
+    await revokeKeys(new Date());
+    await drainOutbox(f.db, f.handlers);
+    expect((await f.db.select().from(schema.routineRuns))[0]).toMatchObject({ status: "failed", code: "no_ai" });
+    expect(await widgetOf(w.id)).toMatchObject({ failureCode: "missing_credential", failureDetail: "no_key" });
+    const [told] = await notificationsOf(f, "widget_failed");
+    expect(told?.latest).toMatchObject({ reason: "missing_credential", detail: "no_key" });
+  });
+
+  test("the apps' own build once it has an AI only queues: it never takes the routine over or resumes it", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const b = await board();
+    const w = await shownWidget(b.id, { schedule: "hour" });
+    const routineId = w.routineId ?? "";
+    const routine = (set: Partial<typeof schema.routines.$inferInsert>) =>
+      f.db.update(schema.routines).set(set).where(eq(schema.routines.id, routineId));
+    const auto = () => refreshWidgetNow(checked(), f.owner.id, f.org.id, w.id, { auto: true });
+    const waitingAuto = async () => {
+      await f.db
+        .update(schema.dashboardWidgets)
+        .set({ status: "failed", failureCode: "missing_credential", failureDetail: "no_key" })
+        .where(eq(schema.dashboardWidgets.id, w.id));
+      return auto();
+    };
+    // Its creator left: the widget says so for a person's Resolve, and the routine stays theirs.
+    await routine({ createdByUserId: bia.id });
+    await f.db.delete(schema.organizationMembers).where(eq(schema.organizationMembers.userId, bia.id));
+    expect(await waitingAuto()).toMatchObject({ status: "failed", failure: { code: "creator_left" } });
+    expect(await routineRow(f, routineId)).toMatchObject({ active: true, createdByUserId: bia.id });
+    // Not waiting for an AI any more: nothing.
+    await auto();
+    expect((await historyOf(w.id)).filter((h) => h.failureCode === "creator_left")).toHaveLength(1);
+    // Paused by itself, it stays paused. Paused by a person, the widget reads as stopped.
+    await routine({ active: false, nextRunAt: null, pausedReason: "failing", createdByUserId: f.owner.id });
+    expect(await waitingAuto()).toMatchObject({ failure: { code: "failing" } });
+    expect(await routineRow(f, routineId)).toMatchObject({ active: false, pausedReason: "failing" });
+    await routine({ pausedReason: null });
+    expect(await waitingAuto()).toMatchObject({ failure: { code: "stopped" } });
+    expect(await f.db.select().from(schema.routineRuns)).toEqual([]);
+    // On, with a creator who still fits: it builds, nothing else changes.
+    await routine({ active: true });
+    expect((await waitingAuto()).status).toBe("updating");
+    expect(await routineRow(f, routineId)).toMatchObject({ active: true, createdByUserId: f.owner.id });
+    expect((await f.db.select().from(schema.routineRuns)).map((r) => r.trigger)).toEqual(["manual"]);
+  });
+});
+
+describe("a refresh that waits (ADR 0135 §6)", () => {
+  const BUDGET = 100_000_000_000;
+  /** The agent has spent `percent` of its monthly budget. */
+  const spend = (percent: number) => {
+    const spentNanoUsd = (BUDGET * percent) / 100;
+    return f.db
+      .insert(schema.agentBudgetPeriods)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        periodStart: monthStartUtc(new Date()).toISOString().slice(0, 10),
+        spentNanoUsd,
+      })
+      .onConflictDoUpdate({
+        target: [schema.agentBudgetPeriods.agentId, schema.agentBudgetPeriods.periodStart],
+        set: { spentNanoUsd },
+      });
+  };
+  const build = { name: "update_widget", input: { data: KPI, summary: "R$ 18.420 hoje", title: "Vendas de hoje" } };
+  const ask = () => ({
+    agentId: f.agent.id,
+    prompt: "Vendas de hoje",
+    format: "kpi" as const,
+    schedule: "manual" as const,
+  });
+
+  test("at its budget's limit it says what it waits for and when, and Update now says why it can't go sooner", async () => {
+    await setupWidgets(() => ({ chunks: [], toolUses: [build] }), { budgetNanoUsd: BUDGET });
+    await spend(100);
+    const b = await board();
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, ask());
+    await drainOutbox(f.db, f.handlers);
+    const waiting = await getWidget(dash(), f.owner.id, f.org.id, w.id);
+    expect(waiting.status).toBe("building");
+    expect(waiting.wait).toEqual({
+      code: "budget",
+      source: "budget",
+      resetsAt: expect.any(String),
+      scope: null,
+      model: null,
+      since: null,
+      canContinue: false,
+    });
+    expect(Date.parse(waiting.wait?.resetsAt ?? "")).toBeGreaterThan(Date.now());
+    await expect(refreshWidgetNow(dash(), f.owner.id, f.org.id, w.id)).rejects.toMatchObject({
+      code: "widget.waiting",
+      params: { code: "budget", source: "budget", resetsAt: waiting.wait?.resetsAt, agentName: f.agent.name },
+    });
+  });
+
+  /** A refresh that grows long (eight reads before its data), so it pauses near the budget's limit. */
+  const growsLong = () =>
+    setupWidgets(
+      (req, call) => {
+        if (seen(req).includes("Updated:")) return { chunks: ["Pronto."] };
+        if (call < 8) return { chunks: [], toolUses: [{ name: "search_context", input: { query: `vendas ${call}` } }] };
+        return { chunks: [], toolUses: [build] };
+      },
+      { budgetNanoUsd: BUDGET, contextTools: true },
+    );
+
+  test("paused near its budget's limit, Update now lets it go on now, and it updates", async () => {
+    await growsLong();
+    await spend(96);
+    const b = await board();
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, ask());
+    await drainOutbox(f.db, f.handlers);
+    const paused = await getWidget(dash(), f.owner.id, f.org.id, w.id);
+    expect(paused.wait).toMatchObject({ code: "usage_pause", source: "budget", canContinue: true });
+
+    const asked = await refreshWidgetNow(dash(), f.owner.id, f.org.id, w.id);
+    expect(asked.wait).toBeNull();
+    await drainOutbox(f.db, f.handlers);
+    expect(await widgetOf(w.id)).toMatchObject({ status: "ok", title: "Vendas de hoje" });
+    const continued = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "usage.continued"));
+    expect(continued).toHaveLength(1);
+  });
+
+  test("Continue now is Continuar agora's: another editor of the board reads it greyed, and is refused", async () => {
+    await growsLong();
+    await spend(96);
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const b = await createDashboard(dash(), f.owner.id, f.org.id, {
+      title: "Vendas",
+      audience: "workspace",
+      editPolicy: "viewers",
+    });
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, ask());
+    await drainOutbox(f.db, f.handlers);
+    expect((await getWidget(dash(), f.owner.id, f.org.id, w.id)).wait).toMatchObject({
+      code: "usage_pause",
+      canContinue: true,
+    });
+    const hers = await getWidget(dash(), bia.id, f.org.id, w.id);
+    expect(hers.canEdit).toBe(true);
+    expect(hers.wait).toMatchObject({ code: "usage_pause", canContinue: false });
+    await expect(refreshWidgetNow(dash(), bia.id, f.org.id, w.id)).rejects.toMatchObject({
+      code: "run.continue_forbidden",
+    });
+    // It still waits: nothing let it go on.
+    expect((await getWidget(dash(), f.owner.id, f.org.id, w.id)).wait?.code).toBe("usage_pause");
+    const continued = await f.db.select().from(schema.auditLog).where(eq(schema.auditLog.action, "usage.continued"));
+    expect(continued).toEqual([]);
+  });
+
+  test("its AI provider down: the park stores its next try, and tells the widget", async () => {
+    await setupWidgets(() => new ProviderError("overloaded", true, 529));
+    const b = await board();
+    const statuses: string[] = [];
+    f.pubsub.subscribe(userTopic(f.org.id, f.owner.id), (e) => {
+      const event = e as { type: string; status?: string };
+      if (event.type === "dashboard.widget" && event.status) statuses.push(event.status);
+    });
+    const w = await createWidget(dash(), f.owner.id, f.org.id, b.id, ask());
+    const queued = statuses.length;
+    const outage = async () =>
+      ((await f.db.select().from(schema.agentRuns))[0]?.transcript as { outage?: unknown } | null)?.outage;
+    await drainOutbox(f.db, f.handlers);
+    // Each try fails until the run parks on the outage ladder.
+    for (let i = 0; i < 8 && !(await outage()); i++) {
+      await f.db
+        .update(schema.outbox)
+        .set({ nextAttemptAt: new Date(Date.now() - 1000) })
+        .where(and(eq(schema.outbox.kind, "agent_run.execute"), eq(schema.outbox.status, "pending")));
+      await drainOutbox(f.db, f.handlers);
+    }
+    const wait = (await getWidget(dash(), f.owner.id, f.org.id, w.id)).wait;
+    expect(wait).toMatchObject({ code: "outage", source: null });
+    expect(Date.parse(wait?.resetsAt ?? "")).toBeGreaterThan(Date.now());
+    // Its run starting, then its park: the failed tries before it said nothing.
+    expect(statuses.slice(queued)).toEqual(["building", "building"]);
+  });
+
+  test("what else holds it: its model's own limit, room on its computer, its AI provider, each said as itself", async () => {
+    await setupWidgets(() => ({ chunks: ["Ok."] }));
+    const b = await board();
+    const w = await shownWidget(b.id, { schedule: "hour" });
+    const rr = await fireWidget(w.routineId ?? "");
+    const park = (set: Partial<typeof schema.agentRuns.$inferInsert>) =>
+      f.db
+        .update(schema.agentRuns)
+        .set({ status: "waiting_input", ...set })
+        .where(eq(schema.agentRuns.id, rr.agentRunId ?? ""));
+    const waitNow = async () => (await getWidget(dash(), f.owner.id, f.org.id, w.id)).wait;
+    const refused = () => refreshWidgetNow(dash(), f.owner.id, f.org.id, w.id);
+
+    // Its model alone: the scope and the model's name, never the plan's reset.
+    await park({
+      transcript: {
+        waitingForBrain: {
+          kind: "claude_code",
+          machineId: "",
+          code: "plan_limit",
+          waitId: "w-1",
+          plan: "OpenCode Go",
+          model: "deepseek-v4-pro",
+          scope: "region",
+        },
+      },
+    });
+    const model = "DeepSeek V4 Pro";
+    expect(await waitNow()).toMatchObject({ code: "plan_limit", source: "plan", scope: "region", model });
+    await expect(refused()).rejects.toMatchObject({
+      code: "widget.waiting",
+      params: { code: "plan_limit", scope: "region", model, agentName: f.agent.name },
+    });
+
+    // In line for its computer: since when it waits for room, also while it asks the computer again.
+    const roomWaitSince = Date.now() - 11 * 60_000;
+    const machineId = crypto.randomUUID();
+    await park({ waitingMachineId: machineId, transcript: { roomWaitSince, waitingForBrain: { code: "busy" } } });
+    const since = new Date(roomWaitSince).toISOString();
+    expect(await waitNow()).toMatchObject({ code: "busy", source: null, resetsAt: null, since });
+    await park({ status: "running", waitingMachineId: machineId, transcript: { roomWaitSince } });
+    expect(await waitNow()).toMatchObject({ code: "busy", since });
+    await expect(refused()).rejects.toMatchObject({ code: "widget.waiting", params: { code: "busy" } });
+
+    // Its AI provider down: its next try. Once that passed, Update now finds it about to go on.
+    const at = Date.now() + 15 * 60_000;
+    await park({ waitingMachineId: null, transcript: { outage: { since: Date.now(), n: 1, waitId: "w-2", at } } });
+    expect(await waitNow()).toMatchObject({ code: "outage", resetsAt: new Date(at).toISOString() });
+    await expect(refused()).rejects.toMatchObject({ code: "widget.waiting", params: { code: "outage" } });
+    await park({ transcript: { outage: { since: Date.now(), n: 1, waitId: "w-2", at: Date.now() - 1_000 } } });
+    expect((await refused()).wait).toBeNull();
   });
 });
 
@@ -508,6 +924,7 @@ describe("changes, Resolve and the routine's life", () => {
     });
     const b = await board();
     const w = await shownWidget(b.id);
+    await f.db.update(schema.dashboardWidgets).set({ createdByUserId: null });
     const view = await askWidgetChange(dash(), f.owner.id, f.org.id, w.id, "Separa por canal, em barras");
     expect(view.status).toBe("updating");
     await drainOutbox(f.db, f.handlers);
@@ -519,6 +936,8 @@ describe("changes, Resolve and the routine's life", () => {
       format: "bars",
       title: "Vendas por canal",
       prompt: "Vendas de hoje por canal.",
+      // Instructions the change rewrote are its asker's from then on.
+      createdByUserId: f.owner.id,
     });
     expect((await historyOf(w.id))[0]?.change).toBe("Separa por canal, em barras");
     expect(await routineRow(f, row.routineId ?? "")).toMatchObject({

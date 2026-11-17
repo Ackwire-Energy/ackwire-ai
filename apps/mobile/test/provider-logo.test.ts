@@ -114,16 +114,26 @@ describe("the marks as the phone draws them", () => {
     expect(hint).toBe("connectAi.key.privacy");
     const pt = await translator("pt-BR");
     const en = await translator("en");
-    expect(pt(hint ?? "")).toBe(
-      "As configurações de privacidade da OpenRouter decidem quais provedores podem guardar o que seus agentes enviam.",
+    expect(pt(hint ?? "", { provider: "OpenRouter" })).toBe(
+      "O que seus agentes enviam é repassado por OpenRouter à empresa que faz ou hospeda o modelo, sob os termos e as configurações de privacidade de OpenRouter.",
     );
-    expect(en(hint ?? "")).toBe(
-      "Your OpenRouter privacy settings decide which providers may keep what your agents send.",
+    expect(en(hint ?? "", { provider: "OpenRouter" })).toBe(
+      "OpenRouter passes what your agents send to the company that makes or hosts the model, under OpenRouter's privacy terms and settings.",
     );
     expect(pt("onboarding.keyInvalid.openrouter")).toBe(
       "As chaves da OpenRouter começam com sk-or-v1-. Confira e cole de novo.",
     );
     expect(pt("connectAi.key.create", { provider: "OpenRouter" })).toBe("Crie a sua chave de API OpenRouter");
+  });
+
+  test("Command Code's key step carries the same line, naming Command Code", async () => {
+    const cc = PROVIDERS.find((p) => p.id === "commandcode");
+    const hint = cc && keyStepHint(cc);
+    expect(hint).toBe("connectAi.key.privacy");
+    const en = await translator("en");
+    expect(en(hint ?? "", { provider: cc?.label })).toBe(
+      "Command Code passes what your agents send to the company that makes or hosts the model, under Command Code's privacy terms and settings.",
+    );
   });
 
   test("an image mark has no shapes: ProviderLogo draws the phone's own copy of the web's file", async () => {

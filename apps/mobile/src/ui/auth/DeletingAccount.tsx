@@ -1,6 +1,7 @@
 import { useAuthConfig, useClosingMe, useRestoreAccount } from "@agenteschat/client";
 import { accountDeletingText } from "@agenteschat/client/lib/deletion";
-import { errorText } from "@agenteschat/client/lib/errors";
+import { errorText, sessionEnded } from "@agenteschat/client/lib/errors";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -20,6 +21,8 @@ export function DeletingAccount({ dueAt }: { dueAt: string | null }) {
   const { colors } = useTheme();
   const toast = useToast();
   const restore = useRestoreAccount();
+  // Until the session gate takes this screen away: signing out can wait on a server that doesn't answer.
+  const [leaving, setLeaving] = useState(false);
   const billing = Boolean(useAuthConfig().data?.billingUrl);
   useClosingMe();
   const due = !!dueAt && Date.parse(dueAt) > Date.now();
@@ -42,11 +45,13 @@ export function DeletingAccount({ dueAt }: { dueAt: string | null }) {
             wide
             label={t("accountDeleting.restore")}
             loading={restore.isPending}
-            disabled={restore.isPending}
+            disabled={restore.isPending || leaving}
             onPress={() =>
               restore.mutate(undefined, {
                 onSuccess: () => toast({ title: t("accountDeleting.restored") }),
-                onError: (error) => toast({ title: errorText(t, error), icon: "x" }),
+                // No session anymore (deleting the account ended them): the sign-in follows, so say that.
+                onError: (error) =>
+                  toast({ title: sessionEnded(error) ? t("common.signedOut") : errorText(t, error), icon: "x" }),
               })
             }
           />
@@ -55,8 +60,12 @@ export function DeletingAccount({ dueAt }: { dueAt: string | null }) {
           variant="ghost"
           wide
           label={t("mobile.org.signOut")}
-          disabled={restore.isPending}
-          onPress={() => void signOut()}
+          loading={leaving}
+          disabled={restore.isPending || leaving}
+          onPress={() => {
+            setLeaving(true);
+            void signOut().finally(() => setLeaving(false));
+          }}
         />
       </AuthScaffold>
     </View>

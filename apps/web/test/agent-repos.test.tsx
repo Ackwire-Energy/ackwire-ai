@@ -102,7 +102,7 @@ describe('"Pode fazer merge sem perguntar"', () => {
     await click(within(github).getByRole("radio", { name: "Ler e escrever" }));
     const row = github.closest("li") as HTMLElement;
     expect(row.textContent).toContain("Pode fazer merge sem perguntar");
-    expect(row.textContent).toContain("Nenhum repositório escolhido. Todo merge pede aprovação.");
+    expect(row.querySelectorAll(".agp-repos__line")[1]?.textContent).toContain("Nenhum repositórioEscolher");
     await click(within(row).getByRole("button", { name: "Escolher" }));
     const dialog = screen().getByRole("dialog", { name: "Onde Ada faz merge sem perguntar" });
     // Only what the agent uses.

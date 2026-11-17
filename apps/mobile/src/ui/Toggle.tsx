@@ -1,15 +1,9 @@
 import { useEffect } from "react";
 import { Pressable, StyleSheet } from "react-native";
-import Animated, {
-  interpolateColor,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { haptics } from "./haptics";
 import { Text } from "./Text";
-import { useTheme } from "./theme";
+import { motion, useTheme } from "./theme";
 
 export interface ToggleProps {
   value: boolean;
@@ -40,17 +34,21 @@ export function Toggle({ value, onChange, label }: ToggleProps) {
   );
 }
 
+/** A switch's flip: short, ease-out, no overshoot. */
+const SWITCH = { duration: 160, easing: motion.easeOut };
+
 /**
  * Only the switch (track and knob), for rows that bring their own press and
  * label (a sheet action with an icon and a hint). The row carries
  * `accessibilityRole="switch"` and the checked state.
  */
 export function ToggleSwitch({ value }: { value: boolean }) {
-  const { colors, motion, reducedMotion } = useTheme();
+  const { colors, reducedMotion } = useTheme();
   const k = useSharedValue(value ? 1 : 0);
+  // A short ease-out: a switch flipped all day never wobbles past its stop.
   useEffect(() => {
-    k.value = reducedMotion ? withTiming(value ? 1 : 0, { duration: 0 }) : withSpring(value ? 1 : 0, motion.pop);
-  }, [value, reducedMotion, motion.pop, k]);
+    k.value = reducedMotion ? (value ? 1 : 0) : withTiming(value ? 1 : 0, SWITCH);
+  }, [value, reducedMotion, k]);
   // The track fills and the knob turns with the knob's own travel, never a step ahead of it.
   const { ink, sunken, bg, raised } = colors;
   const knob = useAnimatedStyle(() => ({

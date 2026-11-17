@@ -162,6 +162,10 @@ describe("pairing from the app", () => {
     return mount("welcome", <WindowView name="welcome" />, async (el, host, store) => {
       await until(() => el.querySelector("h1")?.textContent === "Let Estúdio Norte's agents use this Mac?");
       expect(readPref(PAIR_OFFER_PREF, null)).toBeNull();
+      // A server this Mac only opens: lending it is optional.
+      expect(el.textContent).toContain(
+        "Only if you want this Mac to do agents' work too. With Not now you still use Estúdio Norte here as usual.",
+      );
       expect(rowOf(el, "Who can use it")?.querySelector('[role="combobox"]')?.textContent).toBe("Only me");
       expect(rowOf(el, "Keep it ready: open Ackwire AI at login")?.querySelector('[role="checkbox"]')).toBeTruthy();
       expect(el.textContent).toContain("What agents can do here");
@@ -315,6 +319,9 @@ describe("pairing from the app", () => {
         const norte = () => pairedHomes(store.getSnapshot()).find((h) => h.status?.org?.id === "o-norte");
         await until(() => norte()?.access?.tools.browser === true);
         expect(norte()?.access?.tools.commands).toBe(true);
+        // Folders come after pairing: one click to Preferences › Folders.
+        await act(async () => button(el, "Add folders")?.click());
+        expect(localStorage.getItem("agentes.desktop.prefsTab")).toBe('"folders"');
       },
       { link: pairLink(FAKE_LINKS.live), macReady: true },
     ));
@@ -356,8 +363,13 @@ describe("pairing from the app", () => {
       "welcome",
       <WindowView name="welcome" />,
       async (el, host) => {
-        await until(() => el.textContent?.includes("This link expired. Make a new one under Settings › Devices."));
+        await until(() => el.textContent?.includes("This link expired. Make a new one in Devices."));
         expect(button(el, "Connect")).toBeUndefined();
+        // Devices on the server that made the link, where a new one is made.
+        const opened: string[] = [];
+        host.openExternal = async (url) => void opened.push(url);
+        await act(async () => button(el, "Open Devices")?.click());
+        expect(opened).toEqual([expect.stringMatching(/\/\?open=devices$/)]);
         expect(host.runners.size).toBe(2);
         // Closed with a server open, the window hides; opened again ("Add a server…"), it starts over.
         await act(async () => button(el, "Close")?.click());
@@ -374,6 +386,10 @@ describe("pairing from the app", () => {
         () => el.textContent?.includes("Permissions") && rowOf(el, "Screen Recording")?.querySelector("button"),
       );
       expect(el.textContent).not.toContain("Ackwire AI opened again");
+      // In Preferences what each one does sits behind its ⓘ.
+      expect(rowOf(el, "Screen Recording")?.querySelector("small")).toBeNull();
+      expect(rowOf(el, "Screen Recording")?.querySelector(".dk-help")).toBeNull();
+      expect(rowOf(el, "Screen Recording")?.querySelector("button.ac-hint")).toBeTruthy();
       await act(async () => button(rowOf(el, "Screen Recording"), "Allow")?.click());
       await until(() => host.mac.setup?.step === "prefs");
       await until(() => el.textContent?.includes("When macOS asks to Quit & Reopen"));
@@ -411,42 +427,62 @@ describe("pairing from the app", () => {
     );
   });
 
-  test("Preferences: a switch for every workspace signed in to; on for one not here yet pairs it", () =>
-    mount("prefs", <General />, async (el, host, store) => {
-      const norte = "Let Estúdio Norte's agents use this Mac";
-      await until(() => rowOf(el, norte) && rowOf(el, "Let Acme's agents use this Mac")?.querySelector(".ac-chip"));
-      const on = (title: string) => rowOf(el, title)?.querySelector('[role="switch"]')?.getAttribute("aria-checked");
-      expect(on("Let Acme's agents use this Mac")).toBe("true");
-      expect(on("Let Horizonte's agents use this Mac")).toBe("true");
-      expect(rowOf(el, "Let Acme's agents use this Mac")?.querySelector("small")?.textContent).toBe(
-        "Agents can use it",
-      );
-      expect(on(norte)).toBe("false");
-      expect(rowOf(el, norte)?.querySelector("small")?.textContent).toBe("Its agents don't use this Mac");
-      // Ackwire AI's workspace too.
-      expect(on("Let Oficina's agents use this Mac")).toBe("false");
-      // Open at login closes the card.
-      const card = rowOf(el, norte)?.closest(".dk-card");
-      expect([...(card?.querySelectorAll(".dk-crow__title") ?? [])].at(-1)?.textContent).toBe("Open at login");
+  test(
+    "Preferences: a switch for every workspace here, Allow for one not here yet, which pairs it",
+    () =>
+      mount("prefs", <General />, async (el, host, store) => {
+        const norte = "Estúdio Norte";
+        await until(() => rowOf(el, norte) && rowOf(el, "Acme")?.querySelector(".ac-chip"));
+        const on = (title: string) => rowOf(el, title)?.querySelector('[role="switch"]')?.getAttribute("aria-checked");
+        expect(on("Acme")).toBe("true");
+        expect(on("Horizonte")).toBe("true");
+        // Where the workspace is, then its agents.
+        expect(rowOf(el, "Acme")?.querySelector("small")?.textContent).toMatch(/^agentes\.tail1234\.ts\.net · /);
+        // One not here yet: Allow, never a switch.
+        expect(rowOf(el, norte)?.querySelector('[role="switch"]')).toBeNull();
+        expect(rowOf(el, norte)?.querySelector("small")?.textContent).toBe(
+          "agentes.tail1234.ts.net · Its agents don't use this Mac",
+        );
+        // Ackwire AI's workspace too.
+        expect(button(rowOf(el, "Oficina"), "Allow")).toBeTruthy();
+        expect(rowOf(el, "Oficina")?.querySelector("small")?.textContent).toBe(
+          "Ackwire AI Cloud · Its agents don't use this Mac",
+        );
+        // Open at login, then Another workspace, close the card.
+        const card = rowOf(el, norte)?.closest(".dk-card");
+        expect([...(card?.querySelectorAll(".dk-crow__title") ?? [])].slice(-2).map((n) => n.textContent)).toEqual([
+          "Open at login",
+          "Another workspace",
+        ]);
+        await act(async () => button(rowOf(el, "Another workspace"), "Add a workspace…")?.click());
+        expect(host.window).toBe("welcome");
 
-      // Pausing one workspace pauses only its own agents.
-      await act(async () =>
-        rowOf(el, "Let Horizonte's agents use this Mac")?.querySelector<HTMLElement>('[role="switch"]')?.click(),
-      );
-      await until(() => on("Let Horizonte's agents use this Mac") === "false");
-      expect(on("Let Acme's agents use this Mac")).toBe("true");
+        // Pausing one workspace pauses only its own agents. Every switch waits while another request is pending, and
+        // on a slow runner the fake runner's answer can come late or fail (a toast, the switch back on): click whenever
+        // it takes clicks and still shows on, until the pause shows. A second pause is the same pause.
+        const horizonte = () => rowOf(el, "Horizonte")?.querySelector<HTMLElement>('[role="switch"]');
+        await until(() => {
+          if (on("Horizonte") === "false") return true;
+          const s = horizonte();
+          if (s && !s.hasAttribute("disabled")) s.click();
+          return false;
+        }, 20_000);
+        expect(on("Acme")).toBe("true");
 
-      // One switch at a time: the others wait for the pause to answer.
-      await until(() => !rowOf(el, norte)?.querySelector("[role=switch]")?.hasAttribute("disabled"));
-      let asked = "";
-      host.askToPair = async (_server, org) => {
-        asked = org;
-        return true;
-      };
-      await act(async () => rowOf(el, norte)?.querySelector<HTMLElement>('[role="switch"]')?.click());
-      await until(() => pairedWith(store, "o-norte") && on(norte) === "true");
-      expect(asked).toBe("Estúdio Norte");
-      expect(await host.autostart()).toBe(true);
-      expect(rowOf(el, norte)?.querySelector("small")?.textContent).toBe("Agents can use it");
-    }));
+        // One at a time: the others wait for the pause to answer.
+        await until(() => !button(rowOf(el, norte), "Allow")?.hasAttribute("disabled"));
+        let asked = "";
+        host.askToPair = async (_server, org) => {
+          asked = org;
+          return true;
+        };
+        await act(async () => button(rowOf(el, norte), "Allow")?.click());
+        await until(() => pairedWith(store, "o-norte") && on(norte) === "true");
+        expect(asked).toBe("Estúdio Norte");
+        expect(await host.autostart()).toBe(true);
+      }),
+    // Several waits, the pause's up to 20 s on a slow shared runner. Cut short, it went on running under the files
+    // after it (its window still mounted) and failed their tests.
+    45_000,
+  );
 });

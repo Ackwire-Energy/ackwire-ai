@@ -9,6 +9,15 @@ import { urlCarries } from "./vault";
  * left out and nothing paused, with network events on and no bodies kept for
  * us. Never the rest of the computer, never a URL or a header kept or logged.
  *
+ * At the browser's level it attaches to each target Chrome tells it of
+ * (`Target.setDiscoverTargets`, then `Target.attachToTarget`), never with
+ * `Target.setAutoAttach` there: measured on Chrome 156 with `agent-browser`
+ * 0.39.1, while any client auto-attaches at the browser's level, a press that
+ * opens a new window (`window.open`) never hears of its release, and the
+ * agent's click answered "CDP command timed out" 30 s later though it had
+ * landed. Under a page its frames and workers are still auto-attached, which
+ * does not do that.
+ *
  * - Received: each finished response's encoded size (headers included); for
  *   one that failed, what had arrived; nothing for a response a service worker
  *   served (the worker's own fetch is counted on its target).
@@ -42,19 +51,22 @@ import { urlCarries } from "./vault";
  * one, so a sign-in page with it could never be guarded otherwise.
  */
 
-const AUTO_ATTACH = {
-  autoAttach: true,
-  waitForDebuggerOnStart: false,
-  flatten: true,
+/** What Chrome tells of at the browser's level: every target but its own UI and the tabs' wrappers. */
+const DISCOVER = {
+  discover: true,
   filter: [{ type: "browser_ui", exclude: true }, { type: "tab", exclude: true }, {}],
 };
+/** The targets attached at the browser's level. A frame or a dedicated worker is attached under its page instead. */
+const TOP_LEVEL = new Set(["page", "background_page", "webview", "service_worker", "shared_worker"]);
 /**
  * Under a page, frame or worker: its frames and dedicated workers. Service and shared workers are the
  * browser's own targets, attached once above: attached again under each page they serve, their bytes would
  * count twice (a service worker's fetch did).
  */
 const AUTO_ATTACH_RELATED = {
-  ...AUTO_ATTACH,
+  autoAttach: true,
+  waitForDebuggerOnStart: false,
+  flatten: true,
   filter: [{ type: "service_worker", exclude: true }, { type: "shared_worker", exclude: true }, {}],
 };
 /** Bodies never cross the socket, and Chrome buffers none of them for this client. */
@@ -84,12 +96,18 @@ export interface ArmedGuard {
 }
 
 export interface TrafficCounter {
-  /** Settles once Chrome answered the first auto-attach, or the socket failed. */
+  /** Settles once Chrome told of the targets it has and each was attached (or couldn't be), or the socket failed. */
   attached: Promise<void>;
   /** The bytes counted since the last call. */
   take(): { up: number; down: number };
   /** Asks Chrome to quit as a person quits it (`Browser.close`): it writes what it holds to its profile first. */
   quit(): void;
+  /**
+   * Chrome acts as it would under the computer's own memory pressure (`Memory.simulatePressureNotification`): it drops
+   * caches and garbage in every process, and may discard background tabs, which stay in the strip and load again when
+   * shown.
+   */
+  ease(): void;
   /**
    * For `ms` from now, fails every request whose address carries one of `values` (raw or encoded) and calls
    * `onBlocked` for each (ADR 0144). Arm it before typing and type once `ready` is true.
@@ -207,11 +225,15 @@ function requestBytes(headers: unknown): number {
   return n;
 }
 
-/** Counts the Chrome whose browser endpoint is `wsUrl` (`ws://127.0.0.1:<port>/devtools/browser/<id>`). */
+/**
+ * Counts the Chrome whose browser endpoint is `wsUrl` (`ws://127.0.0.1:<port>/devtools/browser/<id>`). `onPage` hears
+ * of each tab it has or opens, and whether another page opened it (a popup: `window.open`, a sign-in window).
+ */
 export function countChromeTraffic(
   wsUrl: string,
   open: (url: string) => StreamSocket = (url) => new WebSocket(url) as unknown as StreamSocket,
   onCrash?: (page: CrashedPage) => void,
+  onPage?: (targetId: string, popup: boolean) => void,
 ): TrafficCounter {
   let up = 0;
   let down = 0;
@@ -270,6 +292,13 @@ export function countChromeTraffic(
     show: (url) => send("Page.navigate", { url }, sessionId),
   });
   let first = 0;
+  /** Chrome answered `first`: it has told of every target it had then. */
+  let discovered = false;
+  /** Targets asked to be attached and not answered yet. */
+  let attaching = 0;
+  const ready = () => {
+    if (discovered && attaching === 0) settle();
+  };
   /** Dedicated workers: no `Fetch` to enable there. */
   const workers = new Set<string>();
   const targets = () => [...sessions.keys()].filter((id) => id !== "" && !workers.has(id));
@@ -363,7 +392,10 @@ export function countChromeTraffic(
       return;
     }
     if (!isObject(msg)) return;
-    if (msg.id === first) settle();
+    if (msg.id === first) {
+      discovered = true;
+      ready();
+    }
     if (typeof msg.id === "number") {
       const then = answers.get(msg.id);
       answers.delete(msg.id);
@@ -376,12 +408,27 @@ export function countChromeTraffic(
     const p = isObject(msg.params) ? msg.params : {};
     const sessionId = typeof msg.sessionId === "string" ? msg.sessionId : "";
     switch (msg.method) {
+      case "Target.targetCreated": {
+        const target = isObject(p.targetInfo) ? p.targetInfo : {};
+        if (sessionId || typeof target.targetId !== "string" || !TOP_LEVEL.has(String(target.type))) return;
+        attaching++;
+        send("Target.attachToTarget", { targetId: target.targetId, flatten: true }, undefined, undefined, () => {
+          attaching--;
+          ready();
+        });
+        return;
+      }
       case "Target.attachedToTarget": {
         if (typeof p.sessionId !== "string") return;
         sessions.set(p.sessionId, new Map());
         const target = isObject(p.targetInfo) ? p.targetInfo : {};
         if (!sessionId && target.type === "page" && typeof target.targetId === "string") {
           pages.set(p.sessionId, target.targetId);
+          // A link's new tab (noopener, as `target=_blank` is by default) names its opener too, but can't reach it.
+          onPage?.(
+            target.targetId,
+            typeof target.openerId === "string" && target.openerId !== "" && target.canAccessOpener !== false,
+          );
           for (const c of emulation ?? []) send(c.method, c.params, p.sessionId);
         }
         if (target.type === "worker") workers.add(p.sessionId);
@@ -458,7 +505,7 @@ export function countChromeTraffic(
   try {
     socket = open(wsUrl);
     socket.onopen = () => {
-      first = send("Target.setAutoAttach", AUTO_ATTACH);
+      first = send("Target.setDiscoverTargets", DISCOVER);
     };
     socket.onmessage = (event) => onMessage(event.data);
     socket.onerror = () => settle();
@@ -490,6 +537,9 @@ export function countChromeTraffic(
     },
     quit() {
       send("Browser.close", {});
+    },
+    ease() {
+      send("Memory.simulatePressureNotification", { level: "critical" });
     },
     guard(values, ms, onBlocked, readyMs = GUARD_READY_MS) {
       const kept = [...new Set(values.filter((v) => v.length >= 4))];

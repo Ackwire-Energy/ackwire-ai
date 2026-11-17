@@ -14,6 +14,7 @@ import {
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createI18n } from "@/i18n";
 import { ADA_ID, ADMIN_ROLE_ID, createFakeApi, ENG_ID, ORG_ID, seedDm, seedRoles, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { proceed, startAs } from "./new-agent-flow";
 import { renderApp, screen, settle } from "./render";
 
@@ -47,7 +48,7 @@ describe("Quem pode falar com a Ada", () => {
         .getByRole("radio", { name: /^Todos do workspace/ })
         .getAttribute("aria-checked"),
     ).toBe("true");
-    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
+    await click(within(group).getByRole("radio", { name: /^Só algumas pessoas ou cargos/ }));
     // Nobody picked yet: only the owner (João), who isn't in the list and always can.
     expect(section.textContent).toContain("Só João, por enquanto");
     await click(within(section).getAllByLabelText(/Walter/)[0] as HTMLElement);
@@ -61,20 +62,20 @@ describe("Quem pode falar com a Ada", () => {
     });
   });
 
-  test("Só algumas pessoas ou papéis: roles first with their icon and people, one search for both, sent as roleIds", async () => {
+  test("Só algumas pessoas ou cargos: roles first with their icon and people, one search for both, sent as roleIds", async () => {
     const state = seedState();
     state.roles = seedRoles().map((r) => (r.kind === "custom" ? { ...r, name: "Suporte" } : r));
     await go(`agents/${ADA_ID}?tab=settings&sec=audience`, state);
     const section = screen().getByRole("region", { name: "Quem pode falar com a Ada" });
-    await click(within(section).getByRole("radio", { name: /^Só algumas pessoas ou papéis/ }));
-    const results = within(section).getByRole("region", { name: "Buscar papéis e pessoas" });
+    await click(within(section).getByRole("radio", { name: /^Só algumas pessoas ou cargos/ }));
+    const results = within(section).getByRole("region", { name: "Buscar cargos e pessoas" });
     // "Todos" is the first choice, never a role to pick.
     expect(results.textContent).not.toContain("everyone");
     const text = results.textContent ?? "";
-    expect(text.indexOf("Papéis")).toBeLessThan(text.indexOf("Pessoas"));
+    expect(text.indexOf("Cargos")).toBeLessThan(text.indexOf("Pessoas"));
     // Each section's heading is the kit's picker heading: the roles' description under its label, apart.
     expect([...results.querySelectorAll(".ac-picker-head")].map((h) => h.textContent)).toEqual([
-      "PapéisQuem tem o papel pode falar, inclusive quem entrar nele depois.",
+      "CargosQuem tem o cargo pode falar, inclusive quem entrar nele depois.",
       "Pessoas",
     ]);
     expect(
@@ -83,7 +84,7 @@ describe("Quem pode falar com a Ada", () => {
         .closest("label")?.textContent,
     ).toMatch(/^Suporte\d+ pessoas?$/);
     expect(results.querySelector(".ac-rolemark")).toBeTruthy();
-    const search = within(section).getByRole("searchbox", { name: "Buscar papéis e pessoas" });
+    const search = within(section).getByRole("searchbox", { name: "Buscar cargos e pessoas" });
     await act(async () => fireEvent.change(search, { target: { value: "sup" } }));
     expect(results.textContent).toContain("Suporte");
     expect(results.textContent).not.toContain("Walter");
@@ -110,11 +111,14 @@ describe("Quem pode falar com a Ada", () => {
     expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(section.textContent).toContain("ela responde só ao agente que perguntou, nunca direto à pessoa");
     // Whether it holds for agents too, said plainly under the choice.
-    expect(section.textContent).toContain(
+    expect(shownText(section)).toContain("Quem não está na lista não recebe resposta. Vale só para pessoas.");
+    expect(shownText(section)).not.toContain("Outros agentes ainda podem consultar");
+    expect(hintOf("Quem pode falar com a Ada", section).text).toBe(
       "Vale só para pessoas. Outros agentes ainda podem consultar a Ada por quem não está na lista.",
     );
     await click(toggle);
-    expect(section.textContent).toContain(
+    expect(shownText(section)).toContain("Quem não está na lista não recebe resposta. Vale para agentes também.");
+    expect(hintOf("Quem pode falar com a Ada", section).text).toBe(
       "Vale para agentes também. Nenhum outro agente consegue falar com a Ada por quem não está na lista.",
     );
     await click(

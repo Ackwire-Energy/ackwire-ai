@@ -45,7 +45,7 @@ describe("FactLine", () => {
     expect(fact).toContain("max-width: 100%");
     expect(fact).toContain("overflow-wrap: anywhere");
     // Its mark stays on the first line's middle (14 on the 20px line) when its words wrap.
-    const mark = rule(".ac-factline__fact > svg");
+    const mark = rule(".ac-factline__fact > :is(svg, .ac-colordot)");
     expect(mark).toContain("align-self: flex-start");
     expect(mark).toContain("margin-block-start: 3px");
     const label = rule('.ac-factline__fact[data-tone="label"]');

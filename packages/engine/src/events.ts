@@ -1,4 +1,4 @@
-import { channelTopic, chatActivityTopic, orgTopic, type PubSub, userTopic } from "@agenteschat/adapters";
+import { channelTopic, chatActivityTopic, orgTopic, type PubSub, typingTopic, userTopic } from "@agenteschat/adapters";
 import { modelProvider } from "@agenteschat/providers";
 import { plainLines } from "@agenteschat/ui/markdown";
 import type { AgentActionView } from "./agent-actions";
@@ -126,6 +126,8 @@ export type ChannelEvent =
       message?: MessageView;
       threadId?: string | null;
       agentRunId?: string | null;
+      /** With `message` left out: the person who wrote it (null for an agent), so their typing line ends with it. */
+      authorUserId?: string | null;
     }
   /** An agent run changed state (`running` = typing indicator). */
   | {
@@ -424,9 +426,14 @@ export type ChannelEvent =
       agentId: string;
       runId: string;
       byUserId: string;
+      /** The agent that stopped it at that person's word (the right hand). */
+      byAgentId?: string;
     }
-  /** A person is typing (client frame `typing`). Clients drop it after `ttlMs`. */
-  | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number }
+  /**
+   * A person is typing (client frame `typing`), or recording a voice message (`kind: "voice"`, also while its words
+   * are made out). Clients drop it after `ttlMs`.
+   */
+  | { type: "user.typing"; channelId: string; threadId: string | null; userId: string; ttlMs: number; kind?: "voice" }
   /** Who saw a message and who will answer (receipts). No router scores here. */
   | {
       type: "message.routed";
@@ -689,20 +696,38 @@ export async function publishChannelEvent(pubsub: PubSub | undefined, event: Cha
   }
 }
 
+/** How long "está digitando…" or "gravando áudio…" lasts without another frame. */
+export const TYPING_TTL_MS = 5000;
+
+/**
+ * "Marina está digitando…", or "Marina está gravando áudio…" with `kind: "voice"`: to the conversation's apps for
+ * `TYPING_TTL_MS`, and on `typingTopic` for an agent's quiet window (ADR 0112), which counts both alike.
+ */
+export async function publishTyping(
+  pubsub: PubSub,
+  { kind, ...where }: { channelId: string; threadId: string | null; userId: string; kind?: "voice" },
+) {
+  const event: ChannelEvent = { type: "user.typing", ...where, ttlMs: TYPING_TTL_MS, ...(kind ? { kind } : {}) };
+  await Promise.all(
+    [channelTopic(where.channelId), typingTopic].map((topic) => pubsub.publish(topic, event).catch(() => {})),
+  );
+}
+
 export async function publishMessageCreated(pubsub: PubSub, message: MessageView) {
   const inline = Buffer.byteLength(JSON.stringify(message)) <= INLINE_LIMIT;
+  const authorUserId = message.author.type === "person" ? message.author.id : null;
   await publishChannelEvent(pubsub, {
     type: "message.created",
     channelId: message.channelId,
     messageId: message.id,
-    ...(inline ? { message } : { threadId: message.threadId, agentRunId: message.agentRunId }),
+    ...(inline ? { message } : { threadId: message.threadId, agentRunId: message.agentRunId, authorUserId }),
   });
   try {
     await pubsub.publish(chatActivityTopic, {
       type: "channel.activity",
       channelId: message.channelId,
       threadId: message.threadId,
-      authorUserId: message.author.type === "person" ? message.author.id : null,
+      authorUserId,
       mentionedUserIds: message.mentionedUserIds,
     });
   } catch {
@@ -765,8 +790,8 @@ export type OrgEvent =
   | { type: "org.broadcast"; orgId: string; event: { type: string; [key: string]: unknown } };
 
 /**
- * An org broadcast: an owner (`by`) deleted the workspace. It is closed now, so its people's sockets close after this
- * event, and it goes for good at `dueAt` unless an owner restores it first.
+ * An org broadcast: an owner (`by`) deleted the workspace. It is read-only now (its people's sockets stay open), and it
+ * goes for good at `dueAt` unless an owner restores it first.
  */
 export type OrgDeletingEvent = {
   type: "org.deleting";

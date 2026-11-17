@@ -70,8 +70,9 @@ test("Codex command lines: first turn, resume by id (options before resume), pla
     extra: ["-c", "'x=1'"],
     codex: { cwd: "/w/my app", sandbox: "workspace-write", lastFile: "/r/tasks/t/last.txt" },
   });
+  // No one's own rules, and no folder but the agent's, whatever the Codex home's config says.
   expect(first).toBe(
-    "codex exec --json --skip-git-repo-check -C '/w/my app' --sandbox workspace-write -c 'sandbox_workspace_write.network_access=true' -c 'x=1' -o '/r/tasks/t/last.txt' -",
+    "codex exec --json --skip-git-repo-check --ignore-rules -C '/w/my app' --sandbox workspace-write -c 'sandbox_workspace_write.network_access=true' -c 'sandbox_workspace_write.writable_roots=[]' -c 'x=1' -o '/r/tasks/t/last.txt' -",
   );
   const resumed = executorCommand("codex", {
     platform: "linux",
@@ -86,6 +87,7 @@ test("Codex command lines: first turn, resume by id (options before resume), pla
   expect(plan).toContain("--sandbox read-only");
   expect(plan).not.toContain("network_access");
   for (const c of [first, resumed, plan]) {
+    expect(c).toContain(" --ignore-rules ");
     expect(c).not.toContain("--full-auto");
     expect(c).not.toContain("--last");
   }

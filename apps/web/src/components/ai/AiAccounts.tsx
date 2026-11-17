@@ -35,6 +35,7 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { useToast } from "@/lib/toast";
 import { AddAccount } from "./AddAccountFlow";
 import { PlanHold, usePlanHold } from "./ConnectAiSteps";
+import { UseKeyForAll } from "./UseKeyForAll";
 
 /*
  * What the owner of a plan account does with it (ADR 0059), where Configurações › IA e uso opens the account: what its
@@ -43,7 +44,7 @@ import { PlanHold, usePlanHold } from "./ConnectAiSteps";
  */
 
 type Row = AiAccountsView["accounts"][number];
-type Open = { type: "rename" | "again" | "remove"; account: PlanAccount<Row> };
+type Open = { type: "rename" | "again" | "remove" | "all"; account: PlanAccount<Row> };
 
 /** The viewer's own account's notes and actions, by one of its logins; nothing for an account that isn't theirs. */
 export function AccountActions({ machineId, accountId }: { machineId: string; accountId: string }) {
@@ -143,7 +144,7 @@ export function AccountActions({ machineId, accountId }: { machineId: string; ac
       )}
       <div className="ac-acts ai-accounts__acts">
         {give.length === 1 && give[0] ? (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => give[0] && void giveTo(give[0])}>
+          <Button variant="link" disabled={busy} onClick={() => give[0] && void giveTo(give[0])}>
             {t("aiAccounts.page.useFor", agentGrammar(give[0].name))}
           </Button>
         ) : (
@@ -151,7 +152,7 @@ export function AccountActions({ machineId, accountId }: { machineId: string; ac
             <Menu
               label={t("aiAccounts.page.useForMenu")}
               trigger={
-                <Button variant="ghost" size="sm" disabled={busy}>
+                <Button variant="link" disabled={busy}>
                   {t("aiAccounts.page.useForMenu")}
                 </Button>
               }
@@ -164,18 +165,22 @@ export function AccountActions({ machineId, accountId }: { machineId: string; ac
             </Menu>
           )
         )}
-        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpen({ type: "rename", account })}>
+        {plan && a.status === "active" && (
+          <Button variant="link" disabled={busy} onClick={() => setOpen({ type: "all", account })}>
+            {t("aiAccounts.page.useAll")}
+          </Button>
+        )}
+        <Button variant="link" disabled={busy} onClick={() => setOpen({ type: "rename", account })}>
           {t("aiAccounts.page.rename")}
         </Button>
         {(logins.some(offersSignInAgain) || plan) && (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpen({ type: "again", account })}>
+          <Button variant="link" disabled={busy} onClick={() => setOpen({ type: "again", account })}>
             {plan ? t("aiAccounts.page.newKey") : t("aiAccounts.page.signInAgain")}
           </Button>
         )}
         {copies.length > 0 && (
           <Button
-            variant="ghost"
-            size="sm"
+            variant="link"
             disabled={busy}
             onClick={() => void remove(copies, t("aiAccounts.page.copiesRemoved", { count: copies.length }))}
           >
@@ -183,9 +188,8 @@ export function AccountActions({ machineId, accountId }: { machineId: string; ac
           </Button>
         )}
         <Button
-          variant="ghost"
-          size="sm"
-          className="ac-btn--danger"
+          variant="link"
+          className="ac-link--danger"
           disabled={busy}
           onClick={() => setOpen({ type: "remove", account })}
         >
@@ -193,6 +197,7 @@ export function AccountActions({ machineId, accountId }: { machineId: string; ac
         </Button>
       </div>
 
+      {open?.type === "all" && <UseKeyForAll account={a} onClose={() => setOpen(null)} />}
       {open?.type === "rename" && open.account.logins[0] && (
         <RenameDialog
           account={open.account.logins[0]}

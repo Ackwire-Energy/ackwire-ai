@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { grantScopes, type ToolSource } from "@agenteschat/engine";
 import { type Browser, browser, createTestServer, joinByInvitation, seedOrg, signUp, type TestServer } from "./harness";
 
 const WHY = "The reporter confirmed it works now: closing the ticket ends the follow-up.";
 const closed: Record<string, unknown>[] = [];
-/** The custom server's connection (set once the workspace exists), and whether its tool may be approved for good. */
-const server = { connectionId: "", rememberable: true };
+/** The custom server's connection (set once the workspace exists). */
+const server = { connectionId: "" };
 const tickets: ToolSource = {
   name: "test-custom-server",
   tools: async () =>
@@ -19,7 +19,7 @@ const tickets: ToolSource = {
             connectionId: server.connectionId,
             connectorLabel: "Suporte",
             sensitive: true,
-            ...(server.rememberable ? { rememberAs: "close_ticket" } : {}),
+            rememberAs: "close_ticket",
             inputSchema: { type: "object", properties: { id: { type: "integer" } }, required: ["id"] },
             describe: (i) => ({ title: `Suporte: Fechar chamado #${i.id}` }),
             execute: async (input) => {
@@ -35,7 +35,6 @@ let t: TestServer;
 beforeEach(async () => {
   closed.length = 0;
   server.connectionId = "";
-  server.rememberable = true;
   t = await createTestServer({
     // The person from another workspace signs up too.
     env: { ALLOW_SIGNUP: "true" },
@@ -135,8 +134,9 @@ test("Aprovar sempre over HTTP: who decides approves for good, the next one runs
 });
 
 test("approving for good where it isn't offered is a 409, and the request stays waiting", async () => {
-  server.rememberable = false;
-  const { api, ask, owner } = await workspace();
+  const { api, ask, owner, agentId } = await workspace();
+  // An agent that always asks is offered no way around its cards.
+  await t.db.update(schema.agents).set({ approvalsLevel: "always" }).where(eq(schema.agents.id, agentId));
   const [first] = await ask("@dev fecha o 1");
   expect(first?.approveAlways).toBeNull();
   const res = await api(owner, `/approvals/${first?.id}/approve`, { json: { always: true } });

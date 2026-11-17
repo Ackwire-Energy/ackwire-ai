@@ -5,9 +5,9 @@ setupDom();
 
 import type { Message, RunStep } from "@agenteschat/client";
 import { applyChannelEvent, emptyStreams, reconcileRuns, type StreamsState } from "@agenteschat/client";
-import { splitCanceled, workFromSteps } from "@agenteschat/client/lib/work";
+import { splitCanceled, stopsMovedOn, workFromSteps } from "@agenteschat/client/lib/work";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
+import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -93,8 +93,44 @@ describe("work summary and stopped messages", () => {
   test("splitCanceled keeps the text and takes out the server's last line; the person comes from the meta", () => {
     expect(
       splitCanceled("Comecei a análise.\n\n_Interrompido por Walter._", { canceled: { byUserId: "u-walter" } }),
-    ).toEqual({ body: "Comecei a análise.", canceled: true, byUserId: "u-walter", note: "Interrompido por Walter" });
-    expect(splitCanceled("_ênfase_", {})).toEqual({ body: "_ênfase_", canceled: false, byUserId: null, note: null });
+    ).toEqual({ body: "Comecei a análise.", canceled: true, byUserId: "u-walter", byAgentId: null, code: null });
+    expect(splitCanceled("_ênfase_", {})).toEqual({
+      body: "_ênfase_",
+      canceled: false,
+      byUserId: null,
+      byAgentId: null,
+      code: null,
+    });
+  });
+});
+
+describe("stops that are over", () => {
+  const at = (minutes: number) => new Date(Date.UTC(2026, 0, 1, 12, minutes)).toISOString();
+  const row = (runId: string, minutes: number, over: Partial<Message> = {}) =>
+    ({
+      author: { type: "agent", id: "ada" },
+      agentRunId: runId,
+      threadId: null,
+      createdAt: at(minutes),
+      ...over,
+    }) as Message;
+  const stop = row("r1", 1, { meta: { canceled: { byUserId: "u" } } });
+
+  test("the agent wrote again after it in the same thread, or works here now", () => {
+    expect([...stopsMovedOn([stop])]).toEqual([]);
+    expect([...stopsMovedOn([row("r2", 2), stop])]).toEqual(["r1"]);
+    expect([...stopsMovedOn([stop], ["ada"])]).toEqual(["r1"]);
+  });
+
+  test("not what it wrote before, in another thread, in the same run, as a notice, nor another agent", () => {
+    const others = [
+      row("r0", 0),
+      row("r2", 2, { threadId: "t1" }),
+      row("r1", 2),
+      row("r3", 2, { meta: { notice: { kind: "run_stopped" } } }),
+      row("r4", 2, { author: { type: "agent", id: "atlas" } }),
+    ];
+    expect([...stopsMovedOn([stop, ...others], ["atlas"])]).toEqual([]);
   });
 });
 
@@ -123,6 +159,135 @@ describe("in the channel", () => {
     await settle(3);
     expect(state.calls.find((c) => c.method === "agents.continueRun")?.args).toEqual([ORG_ID, "r-stopped"]);
     expect(within(msg).queryByRole("button", { name: "Continuar" })).toBeNull();
+  });
+
+  /** Ada's message in the channel, `minutes` ago. */
+  const fromAda = (id: string, body: string, runId: string, minutes: number, meta?: Message["meta"]) =>
+    ({
+      id,
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "agent", id: ADA_ID },
+      body,
+      mentionedAgentIds: [],
+      agentRunId: runId,
+      ...(meta ? { meta } : {}),
+      createdAt: new Date(Date.now() - minutes * 60_000).toISOString(),
+    }) as Message;
+
+  test("a message sent with 'Parar e mandar' that stopped the task: no 'You stopped Ada', no Continuar", async () => {
+    const state = seedState();
+    // As the server leaves it: what Ada wrote before the send is a plain message, the sent one names the run.
+    state.messages.push(fromAda("m-before", "Comecei a revisar o PR.", "r-stopped", 3), {
+      id: "m-sent",
+      channelId: ENG_ID,
+      threadId: null,
+      author: { type: "person", id: "u-walter" },
+      body: "Na verdade, só o login.",
+      mentionedAgentIds: [],
+      agentRunId: null,
+      meta: { steerNow: true, stoppedRunIds: ["r-stopped"] },
+      createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+    } as Message);
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    expect(screen().getByText("Comecei a revisar o PR.")).toBeTruthy();
+    expect(document.querySelector(".run-canceled")).toBeNull();
+    expect(document.body.textContent).not.toContain("Você parou");
+    expect(screen().queryByRole("button", { name: "Continuar" })).toBeNull();
+  });
+
+  test("who stopped it, as the pill says it: the right hand at my word, someone else, or the system's cause", async () => {
+    const state = withRightHand(seedState());
+    state.messages.push(
+      // The right hand stopped it at my word: its name, never "Você parou", and Continuar still mine (the latest, so
+      // the agent has not gone on after it).
+      fromAda("m-lodi", "Comecei o relatório.\n\n_Stopped by Lodi for Walter._", "r-lodi", 1, {
+        canceled: {
+          byUserId: "u-walter",
+          byAgentId: "00000000-0000-4000-8000-0000000000a9",
+          text: "Comecei o relatório.",
+        },
+      }),
+      // João pressed Stop.
+      fromAda("m-joao", "Comecei os testes.\n\n_Stopped by João._", "r-joao", 5, {
+        canceled: { byUserId: "u-joao", text: "Comecei os testes." },
+      }),
+      // Archived: its cause in my language, never the server's English, and nothing to continue.
+      fromAda("m-archived", "Comecei o deploy.\n\n_Stopped._", "r-archived", 4, {
+        canceled: { byUserId: null, code: "run.agent_archived", text: "Comecei o deploy." },
+      }),
+      // A cause with no words of its own: the plain stop line.
+      fromAda("m-mission", "Comecei o plano.\n\n_Stopped._", "r-mission", 3, {
+        canceled: { byUserId: null, code: "run.failed", text: "Comecei o plano." },
+      }),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const lineOf = (text: string) =>
+      (screen().getByText(text).closest(".ac-msg") as HTMLElement).querySelector(".run-canceled") as HTMLElement;
+    const lodi = lineOf("Comecei o relatório.");
+    expect(lodi.textContent).toContain("Lodi parou a Ada");
+    expect(lodi.textContent).not.toContain("Você");
+    expect(within(lodi).getByRole("button", { name: "Continuar" })).toBeTruthy();
+    expect(lineOf("Comecei os testes.").textContent).toContain("João parou a Ada");
+    const archived = lineOf("Comecei o deploy.");
+    expect(archived.textContent).toContain("O agente foi arquivado.");
+    expect(within(archived).queryByRole("button", { name: "Continuar" })).toBeNull();
+    const mission = lineOf("Comecei o plano.");
+    expect(mission.textContent).toContain("Parou aqui");
+    expect(within(mission).queryByRole("button", { name: "Continuar" })).toBeNull();
+    expect(document.body.textContent).not.toContain("Stopped");
+  });
+
+  test("a stopped reply the agent wrote after keeps its pill and loses Continuar", async () => {
+    const state = seedState();
+    state.messages.push(
+      fromAda("m-stopped", "Comecei a revisar o PR.\n\n_Stopped by Walter._", "r-stopped", 3, {
+        canceled: { byUserId: "u-walter", text: "Comecei a revisar o PR." },
+      }),
+      fromAda("m-after", "Pronto, revisei o login.", "r-next", 1),
+    );
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const line = document.querySelector(".run-canceled") as HTMLElement;
+    expect(line.textContent).toContain("Você parou a Ada");
+    expect(within(line).queryByRole("button", { name: "Continuar" })).toBeNull();
+  });
+
+  test("a stopped reply never offers Continuar while its agent works in the conversation", async () => {
+    const state = seedState();
+    state.messages.push(
+      fromAda("m-stopped", "Comecei a revisar o PR.\n\n_Stopped by Walter._", "r-stopped", 3, {
+        canceled: { byUserId: "u-walter", text: "Comecei a revisar o PR." },
+      }),
+    );
+    const { sockets } = await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle(5);
+    const line = () => document.querySelector(".run-canceled") as HTMLElement;
+    expect(within(line()).getByRole("button", { name: "Continuar" })).toBeTruthy();
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    await act(async () =>
+      socket.push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          channelId: ENG_ID,
+          type: "agent.run",
+          threadId: null,
+          runId: "r-live",
+          agentId: ADA_ID,
+          status: "running",
+        },
+      }),
+    );
+    await settle(3);
+    expect(document.querySelector('.ac-typing[data-active="true"] .ac-typing__text')?.textContent).toBe(
+      "Ada pensando…",
+    );
+    expect(line().textContent).toContain("Você parou a Ada");
+    expect(within(line()).queryByRole("button", { name: "Continuar" })).toBeNull();
   });
 
   test("a reply at the step limit says so in my language, with Continuar", async () => {

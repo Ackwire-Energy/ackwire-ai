@@ -3,46 +3,67 @@ import {
   isWaitingHandoff,
   PICTURE_IDLE_MS,
   useBrowserHandoffActions,
+  useComputerSetup,
   useDesktopPicture,
 } from "@agenteschat/client";
-import { entryLine, entryState, pictureWhen } from "@agenteschat/client/lib/agent-computer";
+import { entryKind, entryLine, entryPortrait, entryState, pictureWhen } from "@agenteschat/client/lib/agent-computer";
 import { computerName } from "@agenteschat/client/lib/computer";
-import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import type { Seat } from "@agenteschat/client/lib/seat";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Image } from "expo-image";
 import { useIsFocused } from "expo-router";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native";
+import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
+import Animated from "react-native-reanimated";
+import { ComputerPortrait } from "@/computer/ComputerPortrait";
 import { useOrg } from "@/providers/org";
-import { Button, GroupedFooter, GroupedHeader, PressScale, useToast } from "@/ui";
+import { ComputerSky, GROUPED_ROW, GroupedRow, usePulse, useTheme, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
+import { AgentFace } from "../shared/Face";
 import { useDirectory, useNow } from "../shared/hooks";
+import { agentLook } from "../shared/logic";
 import { phoneEntryButton } from "./logic";
 import { useSetupWait } from "./SetupWait";
 import { useAgentComputer } from "./useAgentComputer";
 
-/** Opens an agent's computer full screen. */
-export const openComputer = (agentId: string) => router.push(`/computer/${agentId}`);
+/**
+ * Opens an agent's computer full screen. `seat`: the right hand's shared place on the workspace's computer instead
+ * of the viewer's own (ADR 0175).
+ */
+export const openComputer = (agentId: string, seat?: Seat) =>
+  router.push(seat ? { pathname: "/computer/[agentId]", params: { agentId, seat } } : `/computer/${agentId}`);
 
 /**
- * The agent's computer on its profile, beside Chat: a named secondary button as wide as Chat ("Computador"), so what
- * it does is read, never guessed from a square. Only for whoever may watch the computer, the wait included; nothing
- * while that loads; a screen reader hears the entry's status line after the word. On a request of the agent's for
- * this person it says "Ajudar" and helps (takes control, then opens): the word is the signal, no dot. It never opens a stream.
+ * The agent's computer on its profile, one card above its views (it reads first, whichever view is open): a frame on
+ * top, and under it a row with its name and the entry's status line ("On · working now"), which a button's
+ * one word couldn't carry, with when the picture was taken at its end. The frame holds the last picture of its screen
+ * when there is one and this person may see it; until then the computer itself, as the web's entry draws it: its kind
+ * (a Mac, a PC, the workspace's server) lit, dimmed or dark with its state, on the agent's own sky, as its screen opens
+ * on (no computer yet: the agent at rest, as its screen says it). While its facts load, the card's shape, so nothing
+ * jumps in under the head; nothing for whoever may not watch it, and never one edition's words before the other's.
+ * On a request of the agent's for this person the row says "Help" and helps (takes control, then opens): the word is
+ * the signal, no dot. The picture is asked for only while the screen is in view; it never opens a stream.
  */
-export function AgentComputerButton({ agentId }: { agentId: string }) {
+export function AgentComputerCard({ agentId, style }: { agentId: string; style?: StyleProp<ViewStyle> }) {
   const { t, i18n } = useTranslation();
   const { org, orgId } = useOrg();
+  const { colors, shadows } = useTheme();
   const dir = useDirectory();
   const toast = useToast();
   const actions = useBrowserHandoffActions(orgId);
-  const view = useAgentComputer(agentId);
+  const focused = useIsFocused();
+  const view = useAgentComputer(agentId, focused ? PICTURE_IDLE_MS : false);
+  // The same query the view reads its edition from: failed, there is nothing true to say, and no shape to hold.
+  const setupFailed = useComputerSetup(orgId).isError;
   const wait = useSetupWait(view.setup);
   const f = view.facts;
+  const asks = !view.forbidden && asksPicture(focused, view.desktopQ.data ?? null);
+  const shot = useDesktopPicture(orgId, agentId, { enabled: asks, working: Boolean(f?.working) });
   // A request's minutes left move on too. While the computer is on its way, the time every other line reads.
   const requestNow = useNow(f?.handoff && isWaitingHandoff(f.handoff) ? 15_000 : 60_000);
-  // Only for whoever may watch it; nothing while that loads, never one edition's words before the other's.
-  if (view.forbidden || !view.ready || !f) return null;
+  const surface = { backgroundColor: colors.raised, boxShadow: `${shadows.e1}, ${shadows.top}` };
+  if (view.forbidden) return null;
+  if (!view.ready || !f) return setupFailed ? null : <CardShape style={[styles.card, surface, style]} />;
   const now = wait.now ?? requestNow;
   const state = entryState(f, now);
   const line = entryLine(t, state, {
@@ -56,7 +77,6 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
     now: new Date(now),
   });
   const helps = phoneEntryButton(state) === "help";
-  // The press gives its own haptic (`Button`).
   const open = () => openComputer(agentId);
   const help = async () => {
     if (state.kind !== "needsYou") return;
@@ -70,57 +90,99 @@ export function AgentComputerButton({ agentId }: { agentId: string }) {
       });
     }
   };
+  const press = helps ? () => void help() : open;
+  const picture = asks ? shot.data?.picture : null;
   return (
-    <Button
-      variant="secondary"
-      wide
-      label={helps ? t("agentComputer.help") : t("agentComputer.button")}
-      // The entry's status line ("Ligado · trabalhando agora"), which the one word can't carry.
-      {...(line ? { hint: line } : {})}
-      onPress={helps ? () => void help() : open}
-    />
+    // The lists' own card (`GroupedList`'s corner and relief), at the page's width as every list under it.
+    <View style={[styles.card, surface, style]}>
+      {/* The frame opens the computer too; the row under it is what a screen reader hears. */}
+      <Pressable onPress={press} accessible={false} style={[styles.frame, { borderBottomColor: colors.line2 }]}>
+        {picture ? (
+          <Image
+            source={{ uri: `data:image/jpeg;base64,${picture.data}` }}
+            contentFit="cover"
+            contentPosition="left top"
+            style={StyleSheet.absoluteFill}
+            accessible={false}
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, styles.still, { backgroundColor: colors.sunken }]}>
+            <ComputerSky color={agentLook(dir.anyAgent(agentId)).color} style={StyleSheet.absoluteFill} />
+            {state.kind === "noComputer" ? (
+              <AgentFace agentId={agentId} size={44} framed={false} live={false} mode="rest" />
+            ) : (
+              // One still frame (lit, dimmed or dark): the sky behind it already moves, on the UI thread, and a
+              // living portrait would redraw from React all the while the page is read and scrolled.
+              <ComputerPortrait
+                kind={entryKind(f.edition, view.machine)}
+                state={entryPortrait(state, f.setup)}
+                size={96}
+                live={false}
+              />
+            )}
+          </View>
+        )}
+      </Pressable>
+      <GroupedRow
+        icon="laptop"
+        label={helps ? t("agentComputer.help") : t("agentComputer.button")}
+        {...(line ? { sub: line, subLines: 2 } : {})}
+        {...(picture ? { value: pictureWhen(t, i18n.language, picture.capturedAt, new Date(now)) } : {})}
+        chevron
+        onPress={press}
+      />
+    </View>
   );
 }
 
 /**
- * A recent picture of the agent's screen on its profile's Today, as the web's entry shows one: only while its
- * computer runs and the profile is on screen, for whoever may watch it, never a stream. A tap opens the computer;
- * under it, how old the picture is. Nothing otherwise (the button beside Chat stays the way in).
+ * The card's shape while what it says loads: the frame and a row's tile and two lines, pulsing together as the lists'
+ * own skeleton, so the card comes in where its shape already was.
  */
-export function AgentComputerPicture({ agentId }: { agentId: string }) {
-  const { t, i18n } = useTranslation();
-  const { orgId } = useOrg();
-  const dir = useDirectory();
-  const focused = useIsFocused();
-  const view = useAgentComputer(agentId, focused ? PICTURE_IDLE_MS : false);
-  const asks = !view.forbidden && asksPicture(focused, view.desktopQ.data ?? null);
-  const shot = useDesktopPicture(orgId, agentId, { enabled: asks, working: Boolean(view.facts?.working) });
-  const now = useNow(60_000);
-  const picture = asks ? shot.data?.picture : null;
-  if (!picture) return null;
-  const g = agentGrammar(dir.agentById.get(agentId)?.name ?? "");
+function CardShape({ style }: { style: StyleProp<ViewStyle> }) {
+  const { colors } = useTheme();
+  const pulse = usePulse();
+  const bone = { backgroundColor: colors.sunken };
   return (
-    <>
-      <GroupedHeader>{t("agentComputer.button")}</GroupedHeader>
-      {/* The press gives its own haptic (`PressScale`). */}
-      <PressScale
-        onPress={() => openComputer(agentId)}
-        accessibilityRole="button"
-        accessibilityLabel={t("agentComputer.openOf", g)}
-      >
-        <Image
-          source={{ uri: `data:image/jpeg;base64,${picture.data}` }}
-          contentFit="cover"
-          contentPosition="left top"
-          style={styles.picture}
-          accessible={false}
-        />
-      </PressScale>
-      <GroupedFooter>{pictureWhen(t, i18n.language, picture.capturedAt, new Date(now))}</GroupedFooter>
-    </>
+    <View style={style} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <Animated.View style={pulse}>
+        <View style={[styles.frame, bone, { borderBottomColor: colors.line2 }]} />
+        <View style={styles.shapeRow}>
+          <View style={styles.shapeLead}>
+            <View style={[styles.shapeTile, bone]} />
+          </View>
+          <View style={styles.shapeText}>
+            <View style={[styles.shapeBar, styles.shapeName, bone]} />
+            <View style={[styles.shapeBar, styles.shapeLine, bone]} />
+          </View>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
+/** A grouped row's icon tile (32, its corner 30%), as `GroupedRow` draws it. */
+const TILE = 32;
+
 const styles = StyleSheet.create({
-  picture: { width: "100%", aspectRatio: 16 / 10, borderRadius: 14 },
+  card: { borderRadius: 14, overflow: "hidden" },
+  // The screen's own proportions (the web's entry too): a picture fills it from its top left corner.
+  frame: { width: "100%", aspectRatio: 16 / 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  still: { alignItems: "center", justifyContent: "center" },
+  // A row with a small line under its label: the grouped rows' 16 at the sides, 10 above and below.
+  shapeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    minHeight: GROUPED_ROW.minHeight,
+    paddingHorizontal: GROUPED_ROW.padX,
+    paddingVertical: GROUPED_ROW.padY,
+  },
+  shapeLead: { width: GROUPED_ROW.lead, alignItems: "center" },
+  shapeTile: { width: TILE, height: TILE, borderRadius: Math.round(TILE * 0.3) },
+  shapeText: { flex: 1, minWidth: 0, gap: 8 },
+  shapeBar: { borderRadius: 6 },
+  // Where the 17-point label and the 13-point line sit.
+  shapeName: { height: 14, width: "34%" },
+  shapeLine: { height: 12, width: "62%" },
 });

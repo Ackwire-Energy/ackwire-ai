@@ -1,0 +1,31 @@
+/*
+ * Switching a workspace's mode (`WorkspaceModeDialog`): the drawing of the mode it goes to in a band over the words,
+ * on the dialog's own surface, its horizon at the band's foot; the dialog's close over it.
+ */
+.ac-dialog.mode-dialog {
+  overflow: hidden;
+}
+.mode-dialog__hero {
+  position: relative;
+  /* The horizon is drawn under the scene (`z-index: -1`): kept inside the band. */
+  isolation: isolate;
+  flex: none;
+  height: 196px;
+  border-bottom: 1px solid var(--line);
+}
+.mode-dialog__hero .onb-scene {
+  --scene-surface: var(--surface-raised);
+  height: 100%;
+}
+.mode-dialog__close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+}
+.mode-dialog__head {
+  padding: 18px var(--dialog-pad) 6px;
+}
+.mode-dialog__head .ac-dialog__title {
+  margin: 0;
+}

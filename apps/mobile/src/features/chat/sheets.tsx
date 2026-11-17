@@ -4,16 +4,12 @@ import {
   keys,
   type Message,
   type Mission,
-  type MissionEligibleAgent,
   type ThreadInfo,
   useApi,
   useChannelCategories,
   useChannels,
   useCloseMission,
-  useCreateMission,
-  useEligibleAgents,
   useFollowThread,
-  useMe,
   useMissionControl,
   usePinMessage,
   usePins,
@@ -25,30 +21,26 @@ import {
 import { textOrMedia } from "@agenteschat/client/lib/media";
 import { messagePath } from "@agenteschat/client/lib/message-links";
 import { summaryParts } from "@agenteschat/client/lib/missions";
-import { voiceOf } from "@agenteschat/client/lib/voice";
-import { modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { listedText } from "@agenteschat/client/lib/voice";
 import { chartBlocksOf } from "@agenteschat/ui/widgets/spec";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TFunction } from "i18next";
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
-import { Button, CHROME_MAX_SCALE, Count, Icon, Locked, OPTION_ROW, PressScale, Text, useToast } from "@/ui";
+import { CHROME_MAX_SCALE, Count, GroupedList, GroupedRow, Icon, PressScale, SkeletonList, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useMovesChannel } from "../categories/CategoryScreens";
 import { categoryHrefs } from "../categories/logic";
 import { setPinDraft } from "../dashboards/logic";
 import { chatHref } from "../links/logic";
-import { missionComputerText } from "../missions/logic";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useEdition, useMeId, useNamesComputers, useOrgId } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
+import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { type ActionItem, ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { TextArea } from "../shared/TextArea";
-
 import { QUICK_REACTIONS, reactionName, reactionPills } from "./logic";
 import type { MenuSymbol } from "./MessageMenu";
 
@@ -112,8 +104,8 @@ export function useMessageActions(context: MessageActionsContext, close: () => v
   const pills = reactionPills(cached.data ?? m.reactions, meId);
   const agentName = m.author.type === "agent" ? dir.nameOf(m.author) : "";
   const rootId = m.threadId ?? m.id;
-  // A voice message is its audio: no words to preview or copy here.
-  const text = voiceOf(m.meta) ? "" : previewOf(m.body);
+  // Of a voice message only what was typed beside it: its words are the audio's.
+  const text = previewOf(listedText(m.body, m.meta));
   // An agent's charts can be pinned to a dashboard as widgets (ADR 0135).
   const charts = m.local || m.author.type !== "agent" ? [] : chartBlocksOf(m.body);
   const pinChart = () => {
@@ -268,17 +260,21 @@ export function MessageActions(props: MessageActionsContext) {
       {m.local ? null : (
         <View style={[styles.emorow, surface]}>
           {QUICK_REACTIONS.map((e) => (
-            <Pressable
+            // The kit's press (the reaction's own tap is its haptic).
+            <PressScale
               key={e}
+              to={0.9}
+              haptic={false}
               onPress={() => react(e)}
               accessibilityRole="button"
               accessibilityLabel={t("mobile.chat.reactWith", { emoji: e })}
-              style={({ pressed }) => [styles.emo, pressed && styles.emoPressed]}
+              style={styles.emo}
+              contentStyle={styles.emoIn}
             >
               <Text maxFontSizeMultiplier={CHROME_MAX_SCALE} style={styles.emoText}>
                 {e}
               </Text>
-            </Pressable>
+            </PressScale>
           ))}
         </View>
       )}
@@ -674,146 +670,16 @@ export function ChannelOptions({
   );
 }
 
-// ── Nova missão ──────────────────────────────────────────────────────────────
-
-/**
- * "Começar uma missão" / "Transformar em missão": the goal, who does it (the
- * agents that can run one for you) and where; the agent makes a plan and
- * waits for "Começar".
- */
-export function NewMissionForm({
-  goal: initialGoal = "",
-  channelId,
-  threadId,
-  preferredAgentId,
-  currentThreadId,
-}: {
-  goal?: string;
-  channelId: string;
-  /** The thread that becomes its home (else a new thread in the channel). */
-  threadId?: string | null;
-  preferredAgentId?: string | null;
-  /** The thread on screen: no navigation when the mission lives there. */
-  currentThreadId?: string | null;
-}) {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
-  const c = useColors();
-  const toast = useToast();
-  const sheet = useSheet();
-  const eligible = useEligibleAgents(orgId);
-  // On the Cloud missions wait for the workspace's own computer: nobody connects one.
-  const waitCloud = useCloudMissionWait();
-  const cloud = useEdition() === "cloud";
-  const names = useNamesComputers();
-  const create = useCreateMission(orgId);
-  const [goal, setGoal] = useState(initialGoal);
-  const [picked, setPicked] = useState<string | null>(null);
-  const list = eligible.data ?? [];
-  const usable = list.filter((a) => a.eligible !== false);
-  const agentId =
-    picked ??
-    (preferredAgentId && usable.some((a) => a.agentId === preferredAgentId) ? preferredAgentId : null) ??
-    usable[0]?.agentId ??
-    null;
-  const agent = list.find((a) => a.agentId === agentId);
-  const submit = () => {
-    if (!agentId || !goal.trim() || create.isPending) return;
-    create.mutate(
-      { agentId, goal: goal.trim(), ...(threadId ? { threadId } : { channelId }) },
-      {
-        onSuccess: (mission) => {
-          sheet.close();
-          successHaptic();
-          toast({ title: t("mobile.newMission.created", { name: agent?.name ?? "" }), agentId: mission.agentId });
-          if (mission.threadId !== currentThreadId) router.push(chatHref(mission.channelId, mission.threadId));
-        },
-        onError: () => toast({ title: t("mobile.app.failed"), icon: "x" }),
-      },
-    );
-  };
-  return (
-    <>
-      <SheetTitle leading={<Tile icon="target" />} title={t("mobile.newMission.title")} />
-      <Text variant="body" tone="muted">
-        {t("mobile.newMission.intro")}
-      </Text>
-      <Locked when={create.isPending}>
-        <TextArea
-          value={goal}
-          onChangeText={setGoal}
-          placeholder={t("mobile.newMission.placeholder")}
-          accessibilityLabel={t("mobile.newMission.placeholder")}
-          autoFocus={!initialGoal}
-        />
-      </Locked>
-      {eligible.isLoading ? <ActivityIndicator color={c.muted} /> : null}
-      {list.length > 0 ? (
-        <Locked when={create.isPending}>
-          <ActionList
-            items={[
-              ...list.map((a) => ({
-                key: a.agentId,
-                leading: <AgentFace agentId={a.agentId} size={OPTION_ROW.face} live={false} />,
-                label: a.name,
-                hint: (waitCloud && !a.machine ? waitCloud : whereText(t, a, { cloud, names })) ?? undefined,
-                disabled: a.eligible === false,
-                trailing: a.agentId === agentId ? <Icon name="check" size={18} color={c.ink} /> : undefined,
-                onPress: a.eligible === false ? undefined : () => setPicked(a.agentId),
-              })),
-            ]}
-          />
-        </Locked>
-      ) : eligible.isSuccess ? (
-        <Text variant="small" tone="muted">
-          {waitCloud ?? t("mobile.newMission.noAgents")}
-        </Text>
-      ) : null}
-      <Button
-        variant="primary"
-        wide
-        icon="sparkle"
-        label={t("mobile.newMission.submit")}
-        loading={create.isPending}
-        disabled={!agentId || !goal.trim()}
-        onPress={submit}
-      />
-    </>
-  );
-}
-
-/**
- * "Missions start once Acme's computer is ready." on the Cloud (a personal workspace's: once your agents' computer is,
- * ADR 0159); null elsewhere.
- */
-function useCloudMissionWait() {
-  const { t } = useTranslation();
-  const orgId = useOrgId();
-  const org = useMe().data?.organizations.find((o) => o.id === orgId);
-  if (useEdition() !== "cloud") return null;
-  return t("missions.waitingCloud", {
-    computer: t(modeKey(org, "computerSetup.titleInSentence"), { org: org?.name ?? "" }),
-  });
-}
-
-/**
- * "MacBook do Walter · ligado" (`missionComputerText`: by name only where the workspace has more than one), or why
- * it can't do a mission for you; the Cloud's computer is never off.
- */
-function whereText(t: TFunction, a: MissionEligibleAgent, where: { cloud: boolean; names: boolean }) {
-  if (a.eligible === false && a.reason) return t(`mobile.newMission.reason.${a.reason}`);
-  if (!a.machine) return t("mobile.newMission.reason.no_computer");
-  return missionComputerText(t, a.machine, where);
-}
-
 // ── /summary of a mission ────────────────────────────────────────────────────
 
-/** Where the mission stands (only for me), in the web card's lines: the server's `text` is English. */
+/**
+ * Where the mission stands (only for me), in the web card's lines, one fact a row: the server's `text` is English.
+ * Loading, the rows' shape; failed, what happened and the way to ask again.
+ */
 export function MissionSummaryView({ missionId }: { missionId: string }) {
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
-  const c = useColors();
   const summary = useQuery({
     queryKey: keys.missionPart(orgId, missionId, "summary"),
     queryFn: () => api.missions.summary(orgId, missionId),
@@ -823,15 +689,19 @@ export function MissionSummaryView({ missionId }: { missionId: string }) {
     <>
       <SheetTitle leading={<Tile icon="sparkle" />} title={t("mobile.plus.summary")} />
       {summary.isError ? (
-        <Text tone="muted">{t("mobile.app.failed")}</Text>
+        <LoadFailed onRetry={() => void summary.refetch()} />
       ) : !summary.data ? (
-        <ActivityIndicator color={c.muted} />
+        <SkeletonList rows={2} />
       ) : (
-        <Text variant="body" tone="ink2">
-          {summaryParts(summary.data)
-            .map((p) => t(`missions.summary.${p.key}`, { count: p.count, total: p.total ?? 0 }))
-            .join("\n")}
-        </Text>
+        <GroupedList>
+          {summaryParts(summary.data).map((p) => (
+            <GroupedRow
+              key={p.key}
+              label={t(`missions.summary.${p.key}`, { count: p.count, total: p.total ?? 0 })}
+              labelLines={0}
+            />
+          ))}
+        </GroupedList>
       )}
     </>
   );
@@ -848,8 +718,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     borderRadius: 999,
   },
-  emo: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
-  emoPressed: { transform: [{ scale: 1.15 }] },
+  emo: { width: 44, height: 44, borderRadius: 22 },
+  emoIn: { alignItems: "center", justifyContent: "center" },
   emoText: { fontSize: 26, lineHeight: 34 },
   // The action groups, divided as the menu divides them.
   groups: { gap: 12 },

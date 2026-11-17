@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { GROK_PROTOCOL, LOCKED_BRAIN_PROTOCOL } from "@agenteschat/adapters";
+import { GROK_PROTOCOL, LOCKED_BRAIN_PROTOCOL, SHARED_GROK_PROTOCOL } from "@agenteschat/adapters";
 import { GROK_BUILD_MODELS, loginPerAgent, sharedSignIn } from "@agenteschat/providers/plans";
 import { brainOptions, defaultBrainModel, grokModels, isBrainKind } from "../src/brain-settings";
 import { type BrainTurnRequest, type ComputerBrainLink, GrokBrain } from "../src/brains/codex";
@@ -136,11 +136,12 @@ test("Quem pensa: Grok where its runner and CLI are, its models as the CLI liste
   ]);
 });
 
-test("a Grok sign-in is per agent and never made for all agents where each is its own OS user", () => {
+test("a Grok sign-in is one per agent too, and for all agents where each is its own OS user from protocol 67", () => {
   expect(loginPerAgent("grok")).toBe(true);
-  expect(sharedSignIn("grok")).toBe(false);
-  const system = { protocol: GROK_PROTOCOL, executors: { mode: "system" as const } };
-  expect(sharesSignIns(system as never, "grok")).toBe(false);
+  expect(sharedSignIn("grok")).toBe(true);
+  const system = (protocol: number) => ({ protocol, executors: { mode: "system" as const } });
+  expect(sharesSignIns(system(SHARED_GROK_PROTOCOL - 1) as never, "grok")).toBe(false);
+  expect(sharesSignIns(system(SHARED_GROK_PROTOCOL) as never, "grok")).toBe(true);
   expect(sharesSignIns({ protocol: GROK_PROTOCOL, executors: {} } as never, "grok")).toBe(true);
 });
 
