@@ -699,7 +699,10 @@ test("pills never wrap; the pair row before a reply is one 26px line, its questi
   expect(value(".consult-pair__row", "white-space")).toBe("nowrap");
   expect(value(".consult-pair__row", "min-height")).toBe("26px");
   expect(value(".consult-pair__row>.consult-pair__subject", "text-overflow")).toBe("ellipsis");
-  expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
+  expect(value(".consult-pair__row>.consult-pair__subject", "flex")).toBe("0 100000 auto");
+  expect(value(".consult-pair__lead", "flex")).toMatch(/^0 (1 )?auto$/);
+  expect(value(".consult-pair__name", "text-overflow")).toBe("ellipsis");
+  expect(value(".consult-pair__who>.ac-avatar", "flex")).toBe("none");
 });
 
 test("a narrow header fits: the waiting count alone beside the computer, the names give way before any button", async () => {
