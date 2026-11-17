@@ -78,6 +78,7 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".pu-table-card": "content",
   ".spec-block__table": "content",
   ".machine-command__code": "content",
+  ".dsk-got>q": "content",
   ".md__table-scroll": "content",
   ".issues-boardwrap": "content",
   ".issue-tablewrap": "content",
