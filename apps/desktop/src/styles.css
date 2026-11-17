@@ -10,6 +10,10 @@
   --font-mono: "Martian Mono Variable", "Martian Mono", ui-monospace, Menlo, monospace;
   --font-display: var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
+  /* Bundled Plus Jakarta Sans: cap height .745em, its middle .0355em below the line's middle. */
+  --cap-mid: -0.0355em;
+  --cap-top: 0.337em;
+  --title-cap-mid: -0.3px;
 }
 
 /* Japanese, Korean and Chinese read in each system's own face after Onest (no web font to download). Russian titles:

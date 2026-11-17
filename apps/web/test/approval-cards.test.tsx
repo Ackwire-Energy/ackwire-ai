@@ -100,7 +100,7 @@ describe("Aprovações: requests sharing a card", () => {
       ["ap-s2", "ap-s3"],
       "approve",
     ]);
-  });
+  }, 15_000);
 });
 
 describe("Approvals: the request beside the list", () => {

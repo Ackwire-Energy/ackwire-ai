@@ -1029,8 +1029,13 @@ test.skipIf(process.platform === "win32")(
       `CHROME_EXE='${GOOGLE_CHROME_LINUX}'`,
       `CHROME_EXE='${pc.home}/none/chrome'`,
     );
+    // This Linux fixture must not detect the real host's Chrome when the suite runs on a Mac.
+    script = script.replace(
+      '"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"',
+      `"${pc.home}/none/mac-chrome"`,
+    );
     CHROMIUM_LINUX.forEach((exe, i) => {
-      script = script.replace(` ${shQuote(exe)}`, ` ${shQuote(mine[i] as string)}`);
+      script = script.replaceAll(` ${shQuote(exe)}`, ` ${shQuote(mine[i] as string)}`);
     });
     const r = pc.install(script);
     expect(r.status).toBe(0);

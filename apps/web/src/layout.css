@@ -4289,11 +4289,11 @@ html:not([data-pointer]) .sidebar__org-button:focus-visible {
   padding: 6px 8px 6px 6px;
   border-radius: 10px;
 }
-/* The face as tall as the two lines from the name's capitals to the last baseline (28px, as the workspace's mark
-   above), so the face and the words fill the card's middle together. */
+/* The face matches the two lines from the name's capitals to the last baseline (28.6px in Plus Jakarta Sans,
+   rounded to a whole pixel), so the face and the words fill the card's middle together. */
 .sidebar__me > .sidebar__user > .ac-avatar {
-  width: 28px;
-  height: 28px;
+  width: 29px;
+  height: 29px;
   font-size: 12px;
 }
 
@@ -7685,6 +7685,11 @@ html:not([data-pointer]) .run-continue:focus-visible {
   justify-content: center;
   padding: 6px;
   border-radius: var(--control-r-md);
+}
+/* Without the text, its face matches the workspace's mark and keeps the rail's 40px button. */
+.sidebar[data-rail="true"] .sidebar__me > .sidebar__user > .ac-avatar {
+  width: 28px;
+  height: 28px;
 }
 /* A routine's "when": Horário / Evento / Email, then one quiet panel with the
    sentence, "Ajustar" and the next runs; the picker opens inside it. */

@@ -212,9 +212,10 @@ describe("the install page", () => {
     expect(helpDocsUrl(INSTALL_PAGE, "pt-BR")).toBe("https://agentes.chat/pt/docs/install-on-a-server");
   });
 
-  test("every self-hosted pointer outside this package says its URL, and none points at the repository's file", () => {
+  test("the fork installer links its own guide and shared product help links the public docs", () => {
+    const installer = readFileSync(join(REPO, "install.sh"), "utf8");
+    expect(installer).toContain("GUIDE=https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SELF_HOSTING.md");
     const files = [
-      "install.sh",
       "deploy/backup/backup.sh",
       "packages/setup/src/lib.ts",
       "packages/setup/README.md",

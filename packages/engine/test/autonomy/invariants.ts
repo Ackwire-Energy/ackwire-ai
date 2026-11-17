@@ -97,9 +97,11 @@ export async function violations(w: World): Promise<string[]> {
   }
 
   // I5: a failed run reaches someone who can act (a notification naming it or its agent), or waits to resume.
-  // A hand-off's run reaches the agent that handed it the work: its consultation failed and the asker ran again.
+  // A hand-off can instead put its failed work's end directly in the person's room, without waking a relay.
   const notifications = await w.db.select().from(schema.notifications).where(eq(schema.notifications.orgId, w.org.id));
   const handOffs = await w.db.select().from(schema.agentConsultations);
+  const works = await w.db.select().from(schema.agentWorks).where(eq(schema.agentWorks.orgId, w.org.id));
+  const messages = await w.db.select().from(schema.messages).where(eq(schema.messages.orgId, w.org.id));
   for (const r of runs.filter((r) => r.status === "failed" && !r.background)) {
     const relayed = handOffs.some(
       (c) =>
@@ -107,7 +109,23 @@ export async function violations(w: World): Promise<string[]> {
         c.status === "failed" &&
         runs.some((a) => a.agentId === c.askerAgentId && a.id !== c.askerRunId && a.createdAt >= r.createdAt),
     );
+    const reportedHome = works.some(
+      (work) =>
+        work.id === r.workId &&
+        work.agentId === r.agentId &&
+        work.status === "failed" &&
+        messages.some((message) => {
+          const end = message.meta.workEnd as { id?: string; status?: string } | undefined;
+          return (
+            message.id === work.resultMessageId &&
+            message.channelId === work.channelId &&
+            end?.id === work.id &&
+            end.status === "failed"
+          );
+        }),
+    );
     const told =
+      reportedHome ||
       relayed ||
       notifications.some((n) => {
         const text = JSON.stringify([n.source, n.latest]);

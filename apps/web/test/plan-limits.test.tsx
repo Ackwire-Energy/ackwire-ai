@@ -300,10 +300,9 @@ describe("the account card", () => {
   test("as much room over the face and the name's capitals as under the face and the last baseline", async () => {
     const layout = topLevel(await read("apps/web/src/layout.css"));
     const presence = topLevel(await read("apps/web/src/components/presence.css"));
-    const tokens = await read("packages/ui/src/styles/tokens.css");
-    // `ex` follows the app's font-size-adjust; a line's capitals' top and middle sit that many ex over its middle.
-    const adjust = px(/--font-size-adjust:\s*([\d.]+)/.exec(await read("apps/web/src/styles.css"))?.[1]);
-    const token = (name: string) => px(new RegExp(`${name}:\\s*([\\d.]+)ex`).exec(tokens)?.[1]);
+    const tokens = await read("apps/web/src/styles.css");
+    // Ackwire's cap offsets are measured in em for the bundled font, independent of its x-height or size adjustment.
+    const token = (name: string) => px(new RegExp(`${name}:\\s*([-\\d.]+)em`).exec(tokens)?.[1]);
     const capTop = token("--cap-top");
     const capMid = token("--cap-mid");
     const type = (css: string, selector: string) => ({
@@ -316,8 +315,7 @@ describe("the account card", () => {
     expect(of(presence, ".sidebar__user-line", "margin-bottom")).toBe(
       `calc(var(--cap-top) - 2 * var(--cap-mid) - ${line.line / 2}px)`,
     );
-    const lines =
-      name.line / 2 + capTop * adjust * name.size + line.line / 2 + (capTop - 2 * capMid) * adjust * line.size;
+    const lines = name.line / 2 + capTop * name.size + line.line / 2 + (capTop - 2 * capMid) * line.size;
     const face = px(of(layout, ".sidebar__me > .sidebar__user > .ac-avatar", "height"));
     expect(Math.abs(lines - face)).toBeLessThan(0.5);
     // A name alone is no taller than the face: the card keeps its height while your line loads.
@@ -331,7 +329,8 @@ describe("the account card", () => {
     const height = (selector: string) => px(of(layout, selector, "height"));
     const padding = (selector: string) => px(of(layout, selector, "padding"));
     expect(
-      height(".sidebar__me > .sidebar__user > .ac-avatar") + 2 * padding('.sidebar[data-rail="true"] .sidebar__user'),
+      height('.sidebar[data-rail="true"] .sidebar__me > .sidebar__user > .ac-avatar') +
+        2 * padding('.sidebar[data-rail="true"] .sidebar__user'),
     ).toBe(height(".sidebar__org-mark") + 2 * padding('.sidebar[data-rail="true"] .sidebar__org .sidebar__org-button'));
   });
 });

@@ -6617,7 +6617,7 @@ export const en = {
       setAll: "Change all",
       connectors: "{{org}}'s connectors",
       connectorsPersonal: "Your connectors",
-      builtin: "Built into agentes",
+      builtin: "Built into Ackwire AI",
       noMatch: "Nothing matching “{{q}}”",
       noneHere: "Nothing in this filter",
       library: "Skills library",

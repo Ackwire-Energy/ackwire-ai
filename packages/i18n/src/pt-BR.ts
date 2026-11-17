@@ -6543,7 +6543,7 @@ export const ptBR = {
       setAll: "Mudar todos",
       connectors: "Conectores da {{org}}",
       connectorsPersonal: "Os seus conectores",
-      builtin: "Nativos do agentes",
+      builtin: "Nativos do Ackwire AI",
       noMatch: "Nada com “{{q}}”",
       noneHere: "Nada neste filtro",
       library: "Biblioteca de skills",

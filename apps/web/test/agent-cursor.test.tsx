@@ -1,18 +1,21 @@
-import { afterEach, expect, jest, mock, test } from "bun:test";
+import { afterEach, beforeEach, expect, jest, test } from "bun:test";
 import path from "node:path";
-import { setupDom } from "@agenteschat/ui/testing/dom";
+import { domWindow, setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
-
-// The face is the avatar kit's own (tested there): here only where the cursor is and how it looks.
-mock.module("@/components/AgentAvatar", () => ({ AgentAvatar: () => <i className="face" /> }));
 
 import { type CountedPointer, CURSOR_IDLE_MS, CURSOR_REST_OPACITY } from "@agenteschat/client";
 import { act, cleanup, render } from "@testing-library/react";
 import { AgentCursor } from "@/components/browser/AgentCursor";
 import { declarations } from "./built-css";
 
+const originalMotion = domWindow().happyDOM.settings.device.prefersReducedMotion;
+beforeEach(() => {
+  domWindow().happyDOM.settings.device.prefersReducedMotion = "no-preference";
+});
+
 afterEach(() => {
+  domWindow().happyDOM.settings.device.prefersReducedMotion = originalMotion;
   cleanup();
   jest.useRealTimers();
 });
@@ -29,8 +32,9 @@ const at = (x: number, y: number, when: number, n = 1): CountedPointer => ({
 const cursor = () => document.querySelector(".brw-cur") as HTMLElement | null;
 const rings = () => document.querySelectorAll(".brw-cur-ring").length;
 const wait = (ms: number) => act(() => void jest.advanceTimersByTime(ms));
+// No directory lookup is needed for this decorative avatar: these tests exercise the cursor.
 const draw = (pointer: CountedPointer | null) => (
-  <AgentCursor agentId="a1" name="Atlas Example" color="sky" pointer={pointer} />
+  <AgentCursor agentId="" name="Atlas Example" color="sky" pointer={pointer} />
 );
 
 test("after the idle time it stays where it was in the quiet look, never gone", async () => {

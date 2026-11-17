@@ -1166,11 +1166,13 @@ describe("Configurações → Importar e exportar", () => {
       expect(button("Tenho um arquivo ou link")).toBeTruthy();
       await click(button("Hermes Agent"), 6);
       await click(within(sheetOf("Trazer o time do Hermes")).getByRole("button", { name: /^Com um comando/ }), 4);
+      await click(within(sheetOf("Com um comando")).getByRole("radio", { name: "Mac ou Linux" }), 2);
       expect(field(sheetOf("Com um comando"), "Pedido para o assistente de código").value).toContain("--from hermes");
       await closeSheet();
       // Paperclip has no chat to ask in nor MCP: the command is its only way, with nothing to go back to.
       await click(button("Paperclip"), 6);
       const paperclip = sheetOf("Trazer o time do Paperclip");
+      await click(within(paperclip).getByRole("radio", { name: "Mac ou Linux" }), 2);
       expect(field(paperclip, "Pedido para o assistente de código").value).toContain("--from paperclip");
       expect(within(paperclip).queryByRole("button", { name: "Voltar" })).toBeNull();
     });

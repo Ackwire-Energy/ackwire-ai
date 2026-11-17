@@ -30,7 +30,7 @@ const connectCalls = (state: ReturnType<typeof seedState>) =>
 /** What `run` scrolls into sight. There is no layout here: the call is all there is to see. */
 async function scrolledBy(run: () => Promise<void>) {
   const shown: Element[] = [];
-  const element = Element.prototype as { scrollIntoView?: (this: Element) => void };
+  const element = HTMLElement.prototype as { scrollIntoView?: (this: Element) => void };
   const scroll = element.scrollIntoView;
   element.scrollIntoView = function () {
     shown.push(this);
