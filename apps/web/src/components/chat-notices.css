@@ -80,3 +80,14 @@ html:not([data-pointer]) .cn-line__toggle:focus-visible {
   align-self: stretch;
   max-width: 520px;
 }
+/* On a phone the timestamp follows the sentence instead of reserving its width beside every line. */
+@media (max-width: 480px) {
+  .cn-pill .ac-eventpill__main {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 2px;
+  }
+  .cn-pill .ac-eventpill__time {
+    grid-column: 2;
+  }
+}

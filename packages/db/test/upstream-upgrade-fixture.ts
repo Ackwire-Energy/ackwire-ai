@@ -58,7 +58,8 @@ export async function verifyLegacyUpgradeFixture(pg: UpgradeFixtureDatabase) {
     { name: "Open team" },
     { name: "Restricted team" },
   ]);
-  expect((await pg.query("select name, permissions from org_roles order by name, org_id")).rows).toEqual([
+  // The real server uses its image's locale; PGlite uses C. Keep this fixture's comparison deterministic.
+  expect((await pg.query('select name, permissions from org_roles order by name collate "C", org_id')).rows).toEqual([
     { name: "Makers", permissions: ["create_agents"] },
     { name: "everyone", permissions: ["post"] },
     { name: "everyone", permissions: ["post"] },

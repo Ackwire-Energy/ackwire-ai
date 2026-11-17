@@ -103,3 +103,10 @@ html:not([data-pointer]) .welcome-card__close.ac-btn:focus-visible {
     height: 48px;
   }
 }
+/* Keep the greeting a heading on a phone without spending most of its sky on three short lines. */
+@media (max-width: 480px) {
+  .welcome-card__title {
+    font-size: 24px;
+    line-height: 1.15;
+  }
+}
