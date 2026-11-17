@@ -2484,3 +2484,7 @@ html:not([data-pointer]) .task-talk__summary:focus-visible {
     grid-column: 2;
   }
 }
+/* Project names are prose: in a narrow task card they hyphenate in the document’s language rather than arbitrary letters. */
+.issue-card > .issue-card__facts > [data-fact="project"] {
+  hyphens: auto;
+}
