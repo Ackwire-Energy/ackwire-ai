@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, schema, sql } from "@agenteschat/db";
 import { routineBriefOfRun } from "./background";
 import type { ToolResult } from "./brains/types";
+import { threadIsConfidential } from "./confidential";
 import { deliverNotice, publishDelivery } from "./delivery";
 import { pgSafeJson } from "./format";
 import type { Message } from "./messages";
@@ -144,12 +145,30 @@ export async function lateNoticeSent(
 const ACTIVE: AgentRun["status"][] = ["queued", "running", "waiting_approval", "waiting_input"];
 
 /**
+ * Where a run's background work reported once it ended (ADR 0121): home, the conversation it was asked in. The run
+ * itself still points at the work's own thread (the anchor's), where its updates went and nobody looks after the
+ * report. Undefined: the run has no work, its work kept the thread it was asked in, or it is still on.
+ */
+async function workHome(tx: Executor, run: Pick<AgentRun, "id" | "orgId">) {
+  const { agentWorks } = schema;
+  const [work] = await tx
+    .select({ channelId: agentWorks.channelId, threadId: agentWorks.homeThreadId, status: agentWorks.status })
+    .from(agentRuns)
+    .innerJoin(agentWorks, and(eq(agentWorks.id, agentRuns.workId), eq(agentWorks.orgId, agentRuns.orgId)))
+    .where(and(eq(agentRuns.orgId, run.orgId), eq(agentRuns.id, run.id), eq(agentWorks.ownThread, true)));
+  if (!work || work.status === "live" || work.status === "queued") return undefined;
+  return { channelId: work.channelId, threadId: work.threadId };
+}
+
+/**
  * A notice for one run (another agent's answer, a late result): while the
  * run is still active it reads it at its next step (queued on that run, in
  * its conversation); once it ended (or while it is held by a decision), the notice goes to its conversation and
  * joins the agent's run there or starts one (a self-report about the run, `SELF_REPORT_NOTICES`, only waits for its next turn), in the run's stretch: past its limits the run is held for the pause
  * card (ADR 0089), and the notice is still read by the agent's next run there. A routine's run that ended hears
- * it where the routine reports, like its approval cards: nobody reads its room. `wake: false`: only written there,
+ * it where the routine reports, like its approval cards: nobody reads its room; a run whose background work ended
+ * hears it where that work reported (`workHome`), so what it answers shows in the conversation, not in the work's
+ * thread. `wake: false`: only written there,
  * for a notice that wakes the agent right after it (`reportHandOffs`) or that no run should read. `joinRun: false`:
  * never read by the run itself, even while it is active (a routine's hand-offs, which come back where it reports). In the caller's
  * transaction; publish with `publishDelivery` after the commit.
@@ -184,7 +203,13 @@ export async function deliverNoticeToRun(
     // notice wakes the agent in a run of its own instead.
     active = Boolean(current && ACTIVE.includes(current.status) && !(await holdsMessages(tx, current)));
   }
-  const report = !active && run.background ? (await routineBriefOfRun(tx, run))?.deliverTo : undefined;
+  const elsewhere = active
+    ? undefined
+    : run.background
+      ? (await routineBriefOfRun(tx, run))?.deliverTo
+      : await workHome(tx, run);
+  // What a run of a confidential thread is told stays in that thread (ADR 0190), whoever reads the other place.
+  const report = elsewhere && (await threadIsConfidential(tx, run.orgId, run.threadRootId)) ? undefined : elsewhere;
   const into = {
     orgId: run.orgId,
     agentId: run.agentId,
@@ -195,6 +220,7 @@ export async function deliverNoticeToRun(
     notice,
     body: forPeople(notice),
     trigger: run.trigger === "dm" ? ("dm" as const) : ("mention" as const),
+    forRunId: run.id,
   };
   if (!wake) return deliverNotice(tx, { ...into, wake: false });
   const delivered = await deliverNotice(tx, { ...into, wake: !active });
@@ -219,12 +245,14 @@ export function forPeople(notice: Notice) {
 
 /**
  * The agent's computer is back (ADR 0032 §5): runs that waited for its
- * computer brain (no model credential to fall back on) are queued again.
+ * computer brain are queued again.
  * Found by `agent_runs.waiting_machine_id` (indexed, set only while a run
  * waits for its computer); one job per wait (`waitingForBrain.waitId`), so
  * reconnects while the job is still queued don't add more. A routine's run
  * whose slot is more than 12 hours old doesn't run late: it is missed
- * (`missStaleRoutineRun`, ADR 0053 §6.4). Returns the runs queued again.
+ * (`missStaleRoutineRun`, ADR 0053 §6.4). A run parked on its CLI's failure (`parkOutage`) whose agent's sign-in
+ * never answered a turn stays on its own resume: the computer coming back changes nothing there. Returns the runs
+ * queued again.
  */
 export async function resumeRunsWaitingForMachine(
   db: Database,
@@ -246,6 +274,12 @@ export async function resumeRunsWaitingForMachine(
         eq(agentRuns.status, "waiting_input"),
         // The computer coming back says nothing about a plan's limit or a budget.
         sql`coalesce(${agentRuns.transcript}->'waitingForBrain'->>'code', '') not in ('plan_limit', 'budget', 'usage_pause')`,
+        // `last_used_at` too: only a turn that answered sets it, and older rows of other CLIs than Claude Code have
+        // no `last_success_at`.
+        sql`not (${agentRuns.transcript} ? 'outage' and exists (select 1 from agents a join machine_accounts ma
+          on ma.org_id = a.org_id and ma.id = a.brain_account_id
+          where a.org_id = ${agentRuns.orgId} and a.id = ${agentRuns.agentId}
+          and coalesce(ma.last_success_at, ma.last_used_at) is null))`,
       ),
     )
     .limit(200);

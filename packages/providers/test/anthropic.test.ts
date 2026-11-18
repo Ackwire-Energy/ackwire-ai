@@ -623,6 +623,8 @@ describe("prompt cache: a stable prefix whatever tools load", () => {
     expect(body.system).toEqual([{ type: "text", text: "agent", cache_control: { type: "ephemeral" } }]);
     // A tool result's image goes as a note: these endpoints aren't trusted to take images.
     expect(JSON.stringify(body.messages)).not.toContain('"image"');
-    expect(JSON.stringify(body.messages)).toContain("The image is not shown");
+    expect(JSON.stringify(body.messages)).toContain(
+      "The picture is not shown to you: this agent's AI (deepseek-v4-pro)",
+    );
   });
 });

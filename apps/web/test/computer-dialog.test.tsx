@@ -6,6 +6,7 @@ setupDom();
 import type {
   Agent,
   AgentBrowserSettings,
+  AgentHolds,
   BrowserHandoff,
   ComputerSetup,
   DesktopStatus,
@@ -13,6 +14,8 @@ import type {
   SocketFactory,
 } from "@agenteschat/client";
 import { ApiError, keys } from "@agenteschat/client";
+import { SHARED_SEAT } from "@agenteschat/client/lib/seat";
+import { SeatContext } from "@agenteschat/client/lib/seat-context";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ComputerDialog } from "@/components/computer/ComputerDialog";
 import { useChannelRealtime } from "@/realtime/context";
@@ -79,6 +82,8 @@ interface Options {
   settings?: AgentBrowserSettings;
   handoff?: BrowserHandoff;
   forbidden?: boolean;
+  /** What Ada keeps running there (ADR 0176). */
+  holds?: AgentHolds;
 }
 
 /** Walter (an owner of Acme) opens Ada's computer. */
@@ -100,6 +105,7 @@ async function backend(o: Options = {}) {
   fake.desktops.set(ADA_ID, o.desktop ?? RUNNING);
   if (o.handoff) fake.handoffs.set(o.handoff.id, o.handoff);
   if (o.forbidden) fake.forbidden.add(ADA_ID);
+  if (o.holds) fake.holds.set(ADA_ID, o.holds);
   if (o.browser)
     fake.settings.set(ADA_ID, { allowedDomains: null, available: true, reason: null, detail: null, machine: null });
   if (o.settings) fake.settings.set(ADA_ID, o.settings);
@@ -347,6 +353,24 @@ describe("the computer dialog, live", () => {
     expect(row?.childElementCount).toBe(0);
     expect(row?.textContent).toBe("");
     expect(box().querySelector(".cmp-body")?.lastElementChild).toBe(row);
+  });
+
+  test("opened for an agent's shared place: named for it, and what it reads and shows is that place", async () => {
+    const b = await backend();
+    const ada = b.state.agents.find((a) => a.id === ADA_ID) as Agent;
+    await renderPage(
+      <SeatContext.Provider value={{ agentId: ADA_ID, seat: SHARED_SEAT }}>
+        <ComputerDialog agent={ada} open onClose={() => {}} />
+      </SeatContext.Provider>,
+      { api: b.api, org: true, createSocket: b.sockets.factory },
+    );
+    await settle(8);
+    // The name's gender is the agent's own, whatever is written beside it.
+    expect(screen().getByRole("dialog", { name: "Computador da Ada (compartilhado)" })).toBeTruthy();
+    const status = calls(b, "desktop.status");
+    expect(status.length).toBeGreaterThan(0);
+    expect(status.every((args) => args[2] === SHARED_SEAT)).toBe(true);
+    expect(b.sockets.screens.at(-1)?.url).toContain("seat=shared");
   });
 
   test("the steps' line comes under the screen while the agent works there, and goes with its run", async () => {
@@ -656,7 +680,7 @@ describe("the computer dialog, self-host", () => {
     });
     expect(box().textContent).toContain("O navegador da Ada está desligado no Mac mini");
     expect(box().textContent).toContain(
-      "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.",
+      "Quem conectou o computador liga aqui ou no app do Ackwire AI nele: Preferências → Ferramentas.",
     );
     expect(box().textContent).not.toContain("A tela da Ada não pode ser mostrada agora");
   });
@@ -761,5 +785,35 @@ describe("the profile card's computer button", () => {
   test("the Cloud's agents have the workspace's computer: the button shows with no computer of their own", async () => {
     const { card: c } = await card({ setup: {}, machine: null });
     expect(within(c).getByRole("button", { name: "Abrir o computador da Ada" })).toBeTruthy();
+  });
+});
+
+describe("what the agent keeps running (keep_running), in the dialog's head", () => {
+  const HOLD = {
+    id: "0193f6b4-1111-7000-8000-000000000001",
+    agentId: ADA_ID,
+    machineId: "machine-1",
+    what: "Bot do Telegram",
+    why: "responde o suporte",
+    kind: "program" as const,
+    since: new Date().toISOString(),
+    until: null,
+  };
+
+  test("its count, then each line and its Stop in the menu; nothing when there is none", async () => {
+    const d = await dialog({ holds: { holds: [HOLD], canStop: true } });
+    const button = view().getByRole("button", { name: "Mantido rodando · 1" });
+    // Radix menus open on pointer down.
+    await act(async () => fireEvent.pointerDown(button, { button: 0, ctrlKey: false }));
+    await settle(2);
+    // Radix names the menu after its trigger.
+    const menu = screen().getByRole("menu", { name: "Mantido rodando · 1" });
+    expect(menu.textContent).toContain("Bot do Telegram");
+    expect(menu.textContent).toMatch(/Ada · desde .+ · até parar/);
+    await click(within(menu).getByRole("menuitem", { name: "Parar “Bot do Telegram”" }));
+    expect(calls(d, "desktop.stopHold")).toEqual([[ORG_ID, ADA_ID, HOLD.id]]);
+    cleanup();
+    await dialog();
+    expect(view().queryByRole("button", { name: /Mantido rodando/ })).toBeNull();
   });
 });

@@ -9,6 +9,7 @@ import {
   eq,
   gt,
   inArray,
+  isNotNull,
   isNull,
   ne,
   not,
@@ -25,14 +26,32 @@ import { revokeMemberApps } from "./apps/revoke";
 import { recordAudit } from "./audit";
 import { caches } from "./cache";
 import { memberCardVia } from "./card-via";
-import { type ChatPrefs, chatPrefsOf, saveChatPrefs } from "./chat-prefs";
+import {
+  assertOwnWallpaper,
+  type ChatPrefs,
+  chatPrefsOf,
+  saveChatPrefs,
+  saveConversationWallpaper,
+  wallpaperOf,
+} from "./chat-prefs";
 import { invitationMailProof, invitationToken, inviteLinkToken, randomToken, safeEqual, sha256 } from "./crypto";
 import { restoreDms } from "./dms";
 import { earlyAccessLink, hasWorkspaceAllowance, recordFirstWorkspace, signupMode } from "./early-access";
-import { ConflictError, ForbiddenError, UnauthorizedError, ValidationError } from "./errors";
-import { publishOrgEvent } from "./events";
+import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError, ValidationError } from "./errors";
+import { publishOrgEvent, publishUserEvent } from "./events";
 import { deleteGifKey } from "./gif-key";
 import { deleteGitHubAppSettings } from "./git/github-app-settings";
+import {
+  forgetStarted,
+  invitableAgentIds,
+  invitableChannelIds,
+  inviteLinkFull,
+  joinChannels,
+  startWith,
+  stillInvitableAgentIds,
+  stillInvitableChannelIds,
+} from "./invite-choices";
+import { dropAssignee } from "./issue-assignees";
 import { deleteJevKey } from "./jev-key";
 import { assertMemberRoom } from "./limits";
 import { followWorkspaceName } from "./machine-provisioning";
@@ -41,6 +60,7 @@ import { recordOperatorEvent } from "./operator-events";
 import { enqueue } from "./outbox";
 import { memberKeysSql, memberRankSql, type Permission, resolvePermissions } from "./permissions";
 import { ensureRightHand, followOwner } from "./right-hand";
+import { queueWelcome } from "./right-hand-welcome";
 import { addMemberRolesInTx, createDefaultRoles, givableRoleIds, rolesStillThere, stillGivableRoleIds } from "./roles";
 import {
   accountClosed,
@@ -52,6 +72,7 @@ import {
   cloudNotice,
   isUserBlocked,
   openOrg,
+  readRefusal,
   refusesNewWorkspace,
   STANDING_COLUMNS,
   type WorkspaceStanding,
@@ -73,6 +94,7 @@ const {
   accounts,
   agents,
   instanceTelemetry,
+  orgRoles,
 } = schema;
 
 /** Whether a person owns the workspace (ADR 0085); what a member may do comes from their roles (`roles.ts`). */
@@ -96,6 +118,8 @@ export interface Membership {
   roleIds: string[];
   /** The workspace logo URL, when one was uploaded (listMemberships). */
   orgLogo?: string | null;
+  /** The workspace's accent "#rrggbb" (listMemberships, ADR 0193); null = the default. */
+  orgAccent?: string | null;
   /** When the workspace was made (listMemberships): tells apart two with the same name. */
   orgCreatedAt?: Date;
   /** The workspace's standing (`standing.ts`). */
@@ -159,6 +183,7 @@ export async function listMemberships(db: Database, userId: string): Promise<Mem
       orgName: organizations.name,
       role: organizationMembers.role,
       orgLogo: organizations.logo,
+      orgAccent: organizations.accent,
       orgCreatedAt: organizations.createdAt,
       standing: STANDING_COLUMNS,
       startPage: organizationMembers.startPage,
@@ -214,9 +239,12 @@ export async function getMembership(
   return row ? withPermissions(row) : null;
 }
 
-/** Refuses a closed workspace (suspended, or being deleted: `closedRefusal`) without changing membership lookups. */
+/**
+ * Refuses a workspace its people can't read (suspended: `readRefusal`) without changing membership lookups. One being
+ * deleted still reads: the API refuses its changes, and `workRefusal` its work.
+ */
 export function assertActiveMembership(membership: Membership): void {
-  const closed = closedRefusal(membership.standing);
+  const closed = readRefusal(membership.standing);
   if (closed) throw closed;
 }
 
@@ -229,12 +257,23 @@ export async function requireActiveMembership(db: Database, userId: string, orgI
 }
 
 /**
- * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` or `org.deleting` for
- * anyone in a closed workspace. Returns the membership.
+ * Throws ForbiddenError unless the user is a member with `permission`, and `org.suspended` for anyone in a suspended
+ * workspace. Returns the membership.
  */
 export async function requirePermission(db: Database, userId: string, orgId: string, permission: Permission) {
   const membership = await requireActiveMembership(db, userId, orgId);
   if (!can(membership, permission)) throw new ForbiddenError();
+  return membership;
+}
+
+/**
+ * `requirePermission` for a change that never passes `readOnlyWhileDeleting` (an OAuth return, a socket's input): a
+ * workspace being deleted refuses it too (`closedRefusal`).
+ */
+export async function requireChangePermission(db: Database, userId: string, orgId: string, permission: Permission) {
+  const membership = await requirePermission(db, userId, orgId, permission);
+  const closed = closedRefusal(membership.standing);
+  if (closed) throw closed;
   return membership;
 }
 
@@ -635,6 +674,8 @@ export async function listMembers(db: Database, orgId: string) {
         roleIds: MEMBER_ROLE_IDS,
         joinedAt: organizationMembers.createdAt,
         lastSeenAt: organizationMembers.lastSeenAt,
+        /** Who an outside collaborator works for (ADR 0191); null for everyone else. */
+        outsideOf: organizationMembers.outsideOf,
         handle: organizationMembers.handle,
         availability: organizationMembers.availability,
         statusText: organizationMembers.statusText,
@@ -821,9 +862,43 @@ export async function setAgentStyle(db: Database, userId: string, orgId: string,
 }
 
 /** How conversations look to the person in this workspace, on every device. Only the keys in `patch` change. */
-export async function setChatPrefs(db: Database, userId: string, orgId: string, patch: ChatPrefs) {
+export async function setChatPrefs(db: Database, userId: string, orgId: string, patch: ChatPrefs, pubsub?: PubSub) {
   await requirePermission(db, userId, orgId, "read");
-  return (await saveChatPrefs(db, orgId, userId, chatPrefsOf(patch))) ?? {};
+  // A conversation's own background changes one at a time (`setConversationWallpaper`): the map is never replaced.
+  const { wallpapers: _one, ...known } = chatPrefsOf(patch);
+  assertOwnWallpaper(known.wallpaper, userId);
+  const prefs = (await saveChatPrefs(db, orgId, userId, known)) ?? {};
+  // My other devices take it at once (`chat.prefs` on my topic).
+  await publishUserEvent(pubsub, orgId, userId, { type: "chat.prefs", chatPrefs: prefs });
+  return prefs;
+}
+
+/**
+ * Gives a conversation I'm in a background of its own, for me (null: back to the channels' or DMs'). My other devices
+ * hear `chat.prefs` with what I chose now.
+ */
+export async function setConversationWallpaper(
+  db: Database,
+  userId: string,
+  orgId: string,
+  channelId: string,
+  input: unknown,
+  pubsub?: PubSub,
+) {
+  await requirePermission(db, userId, orgId, "read");
+  const wallpaper = input === null ? null : wallpaperOf(input);
+  if (wallpaper === undefined) throw new ValidationError("That isn't a background", "wallpaper.invalid");
+  assertOwnWallpaper(wallpaper ?? undefined, userId);
+  const [member] = await db
+    .select({ id: channelMembers.id })
+    .from(channelMembers)
+    .where(
+      and(eq(channelMembers.orgId, orgId), eq(channelMembers.channelId, channelId), eq(channelMembers.userId, userId)),
+    );
+  if (!member) throw new NotFoundError("Channel not found");
+  const prefs = (await saveConversationWallpaper(db, orgId, userId, channelId, wallpaper)) ?? {};
+  await publishUserEvent(pubsub, orgId, userId, { type: "chat.prefs", chatPrefs: prefs });
+  return prefs;
 }
 
 /** The languages of the app (`users.locale`): emails and pushes are written in it. */
@@ -857,8 +932,7 @@ export async function setMyWorkArea(db: Database, userId: string, area: string) 
 }
 
 /**
- * The person's name and photo as saved (a session's cached cookie keeps the old ones for minutes after a change
- * elsewhere), their language and whether it follows each device's, and their area.
+ * The person's name and photo as saved, their language and whether it follows each device's, and their area.
  */
 export async function myAccount(db: Database, userId: string) {
   const [row] = await db
@@ -957,6 +1031,18 @@ export async function announceProfile(db: Database, pubsub: PubSub | undefined, 
   await Promise.all(rows.map((r) => announceMembers(pubsub, r.orgId)));
 }
 
+/** The server itself, acting for its operator. */
+const SYSTEM = { type: "system", id: null } as const;
+
+/** Who an outside collaborator works for (ADR 0191); null for an ordinary member, and for someone who isn't in. */
+async function outsideOfMember(db: Executor, orgId: string, userId: string) {
+  const [row] = await db
+    .select({ outsideOf: organizationMembers.outsideOf })
+    .from(organizationMembers)
+    .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
+  return row?.outsideOf ?? null;
+}
+
 /**
  * A change to who is in the workspace, in the audit log: the person's name and address as they were then
  * (the row outlives the account).
@@ -964,7 +1050,8 @@ export async function announceProfile(db: Database, pubsub: PubSub | undefined, 
 async function auditMember(
   tx: Executor,
   orgId: string,
-  actorId: string,
+  /** A person's id, or `SYSTEM` when the server acts for its operator. */
+  actor: string | typeof SYSTEM,
   action: string,
   userId: string,
   details: Record<string, unknown>,
@@ -972,7 +1059,7 @@ async function auditMember(
   const [person] = await tx.select({ name: users.name, email: users.email }).from(users).where(eq(users.id, userId));
   await recordAudit(tx, {
     orgId,
-    actor: { type: "person", id: actorId },
+    actor: typeof actor === "string" ? { type: "person", id: actor } : actor,
     action,
     target: { type: "person", id: userId },
     details: { ...(person ? { name: person.name, email: person.email } : {}), ...details },
@@ -981,7 +1068,8 @@ async function auditMember(
 
 /**
  * Makes a member an owner or takes it back (ADR 0085): only an owner does it, and nobody can demote the last
- * owner. What anyone else may do is their roles (`setMemberRoles`).
+ * owner. What anyone else may do is their roles (`setMemberRoles`). An outside collaborator never owns the
+ * workspace (`member.outside_owner`, ADR 0191).
  */
 export async function changeMemberRole(
   db: Database,
@@ -1000,6 +1088,9 @@ export async function changeMemberRole(
     await lockOrgMembers(tx, orgId);
     if (target.role === "owner" && role !== "owner" && (await ownerCount(tx, orgId)) <= 1) {
       throw new ConflictError("An organization needs at least one owner");
+    }
+    if (role === "owner" && (await outsideOfMember(tx, orgId, targetUserId)) !== null) {
+      throw new ConflictError("An outside collaborator can't own the workspace", "member.outside_owner");
     }
     await tx
       .update(organizationMembers)
@@ -1134,8 +1225,8 @@ export async function removalPreview(
  * isn't its owner's, or that has no computer left, goes back to the API.
  */
 async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
-  if (ids.length === 0) return;
-  await tx
+  if (ids.length === 0) return [];
+  const rows = await tx
     .update(agents)
     .set({ brain: "model", brainAccountId: null, updatedAt: new Date() })
     .where(
@@ -1147,7 +1238,9 @@ async function offPlansNotOwners(tx: Executor, orgId: string, ids: string[]) {
             and ${agents.ownerUserId} = case when ${agents.brainAccountId} is null then m.paired_by_user_id
               else (select a.created_by from ${schema.machineAccounts} a where a.id = ${agents.brainAccountId}) end)`,
       ),
-    );
+    )
+    .returning({ id: agents.id });
+  return rows.map((r) => r.id);
 }
 
 /**
@@ -1164,135 +1257,197 @@ export async function removeMember(
 ) {
   const target = await removableMember(db, actorId, orgId, targetUserId);
   if (!target) return;
+  await takeOut(db, actorId, orgId, target, targetUserId, options);
+}
+
+/**
+ * The server takes an outside collaborator out for its operator (ADR 0191), with everything `removeMember` does; the
+ * audit log's entry is the system's. Never an ordinary member (`outside_access.member`): only someone in the workspace
+ * removes one. False when the person isn't in the workspace.
+ */
+export async function removeOutsideMember(
+  db: Database,
+  orgId: string,
+  targetUserId: string,
+  options: { pubsub?: PubSub } = {},
+) {
+  const target = await getMembership(db, targetUserId, orgId, { includeBlocked: true });
+  if (!target) return false;
+  await takeOut(db, null, orgId, target, targetUserId, options);
+  return true;
+}
+
+/** What `removeMember` does once the removal is allowed. `remover`: who takes them out; null, the server itself. */
+async function takeOut(
+  db: Database,
+  remover: string | null,
+  orgId: string,
+  target: Membership,
+  targetUserId: string,
+  options: { pubsub?: PubSub; via?: string },
+) {
+  // What follows from a removal (their mailboxes, the approvals on them, their agents' rules) is recorded under a
+  // person: with nobody acting, the one who goes, as when an account is deleted (`deleteAccount`).
+  const actorId = remover ?? targetUserId;
   const via = await memberCardVia(db, orgId, options.via, targetUserId);
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, forgetAgents, releaseMemberAccounts } = await import("./machine-accounts");
-  const { announceRemovedMachine, detachMachine, personalMachines } = await import("./machines");
+  const { announceRemovedMachine, detachMachine, personalMachines, publishMachineAgentsChanged } = await import(
+    "./machines"
+  );
   const { releaseLeaverDevices } = await import("./devices");
   const { cancelSecretRequestsFor, publishSecret } = await import("./secrets");
+  const { wakeAgentsBrainWaits } = await import("./usage-pause");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
+  const { removeSeat } = await import("./right-hand-seats");
   const { dropMemberDashboards } = await import("./dashboards/service");
-  const { released, removed, handed, changed, heir, secrets, mailActions } = await db.transaction(async (tx) => {
-    await lockOrgMembers(tx, orgId);
-    if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
-      throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
-    }
-    await tx
-      .delete(organizationMembers)
-      .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
-    // Leaving the organization also leaves its channels.
-    await tx
-      .delete(channelMembers)
-      .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
-    // And their inbox here, snippets included: invited back later, nothing from before returns.
-    await tx
-      .delete(schema.notifications)
-      .where(and(eq(schema.notifications.orgId, orgId), eq(schema.notifications.userId, targetUserId)));
-    // And the wiki pages and folders they were named on: rejoining later doesn't give a restricted page back.
-    await tx
-      .update(schema.wikiPages)
-      .set({
-        audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})`,
-        editorUserIds: sql`array_remove(${schema.wikiPages.editorUserIds}, ${targetUserId})`,
-      })
-      .where(
-        and(
-          eq(schema.wikiPages.orgId, orgId),
-          sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds} || ${schema.wikiPages.editorUserIds})`,
-        ),
+  const { released, removed, handed, changed, heir, secrets, mailActions, toApi, tasks } = await db.transaction(
+    async (tx) => {
+      await lockOrgMembers(tx, orgId);
+      const outsideOf = await outsideOfMember(tx, orgId, targetUserId);
+      if (remover === null && outsideOf === null) {
+        throw new ConflictError(
+          "This person is a member of the workspace, not an outside collaborator: someone in the workspace removes them.",
+          "outside_access.member",
+        );
+      }
+      if (target.role === "owner" && (await ownerCount(tx, orgId)) <= 1) {
+        throw new ConflictError("An organization needs at least one owner. Transfer ownership first.");
+      }
+      await tx
+        .delete(organizationMembers)
+        .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, targetUserId)));
+      // Leaving the organization also leaves its channels.
+      await tx
+        .delete(channelMembers)
+        .where(and(eq(channelMembers.orgId, orgId), eq(channelMembers.userId, targetUserId)));
+      // And their inbox here, snippets included: invited back later, nothing from before returns.
+      await tx
+        .delete(schema.notifications)
+        .where(and(eq(schema.notifications.orgId, orgId), eq(schema.notifications.userId, targetUserId)));
+      // And the wiki pages and folders they were named on: rejoining later doesn't give a restricted page back.
+      await tx
+        .update(schema.wikiPages)
+        .set({
+          audienceUserIds: sql`array_remove(${schema.wikiPages.audienceUserIds}, ${targetUserId})`,
+          editorUserIds: sql`array_remove(${schema.wikiPages.editorUserIds}, ${targetUserId})`,
+        })
+        .where(
+          and(
+            eq(schema.wikiPages.orgId, orgId),
+            sql`${targetUserId} = any(${schema.wikiPages.audienceUserIds} || ${schema.wikiPages.editorUserIds})`,
+          ),
+        );
+      await tx
+        .update(schema.wikiFolderAudiences)
+        .set({
+          audienceUserIds: sql`array_remove(${schema.wikiFolderAudiences.audienceUserIds}, ${targetUserId})`,
+          editorUserIds: sql`array_remove(${schema.wikiFolderAudiences.editorUserIds}, ${targetUserId})`,
+        })
+        .where(
+          and(
+            eq(schema.wikiFolderAudiences.orgId, orgId),
+            sql`${targetUserId} = any(${schema.wikiFolderAudiences.audienceUserIds} || ${schema.wikiFolderAudiences.editorUserIds})`,
+          ),
+        );
+      // And the agents' "only some people" lists, for the same reason.
+      const unlisted = await tx
+        .update(schema.agents)
+        .set({ audienceUserIds: sql`array_remove(${schema.agents.audienceUserIds}, ${targetUserId})` })
+        .where(and(eq(schema.agents.orgId, orgId), sql`${targetUserId} = any(${schema.agents.audienceUserIds})`))
+        .returning({ id: schema.agents.id });
+      for (const a of unlisted) caches.agents.delete(`${orgId}:${a.id}`);
+      if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
+      // Their AI apps and personal tokens here stop now (ADR 0119).
+      await revokeMemberApps(tx, orgId, targetUserId);
+      // Their personal Vault goes with them, and they leave the team items' audiences (ADR 0144 §2). A personal
+      // connection's items cascade with it.
+      await tx
+        .delete(schema.vaultConnections)
+        .where(and(eq(schema.vaultConnections.orgId, orgId), eq(schema.vaultConnections.ownerUserId, targetUserId)));
+      await tx
+        .delete(schema.vaultItems)
+        .where(and(eq(schema.vaultItems.orgId, orgId), eq(schema.vaultItems.ownerUserId, targetUserId)));
+      await tx
+        .update(schema.vaultItems)
+        .set({ audienceUserIds: sql`array_remove(${schema.vaultItems.audienceUserIds}, ${targetUserId})` })
+        .where(
+          and(eq(schema.vaultItems.orgId, orgId), sql`${targetUserId} = any(${schema.vaultItems.audienceUserIds})`),
+        );
+      await tx
+        .update(schema.vaultConnections)
+        .set({ audienceUserIds: sql`array_remove(${schema.vaultConnections.audienceUserIds}, ${targetUserId})` })
+        .where(
+          and(
+            eq(schema.vaultConnections.orgId, orgId),
+            sql`${targetUserId} = any(${schema.vaultConnections.audienceUserIds})`,
+          ),
+        );
+      // Their home and private dashboards go, with their widgets' routines (ADR 0135).
+      await dropMemberDashboards(tx, orgId, targetUserId);
+      // They leave every task they were on (ADR 0188): a task is never assigned to someone who can't open it.
+      const tasks = await dropAssignee(tx, orgId, { type: "person", id: targetUserId });
+      // The secrets agents are waiting on from them won't come.
+      const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
+      // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
+      // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
+      const heir = await heirOf(tx, actorId, orgId, targetUserId);
+      const handed = heir
+        ? await tx
+            .update(agents)
+            .set({ ownerUserId: heir, updatedAt: new Date() })
+            .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
+            .returning()
+        : [];
+      await dropAgentRules(
+        tx,
+        orgId,
+        handed.map((a) => a.id),
+        { type: "person", id: actorId },
       );
-    await tx
-      .update(schema.wikiFolderAudiences)
-      .set({
-        audienceUserIds: sql`array_remove(${schema.wikiFolderAudiences.audienceUserIds}, ${targetUserId})`,
-        editorUserIds: sql`array_remove(${schema.wikiFolderAudiences.editorUserIds}, ${targetUserId})`,
-      })
-      .where(
-        and(
-          eq(schema.wikiFolderAudiences.orgId, orgId),
-          sql`${targetUserId} = any(${schema.wikiFolderAudiences.audienceUserIds} || ${schema.wikiFolderAudiences.editorUserIds})`,
-        ),
-      );
-    // And the agents' "only some people" lists, for the same reason.
-    const unlisted = await tx
-      .update(schema.agents)
-      .set({ audienceUserIds: sql`array_remove(${schema.agents.audienceUserIds}, ${targetUserId})` })
-      .where(and(eq(schema.agents.orgId, orgId), sql`${targetUserId} = any(${schema.agents.audienceUserIds})`))
-      .returning({ id: schema.agents.id });
-    for (const a of unlisted) caches.agents.delete(`${orgId}:${a.id}`);
-    if (unlisted.length > 0) caches.agents.delete(`${orgId}:team`);
-    // Their AI apps and personal tokens here stop now (ADR 0119).
-    await revokeMemberApps(tx, orgId, targetUserId);
-    // Their personal Vault goes with them, and they leave the team items' audiences (ADR 0144 §2). A personal
-    // connection's items cascade with it.
-    await tx
-      .delete(schema.vaultConnections)
-      .where(and(eq(schema.vaultConnections.orgId, orgId), eq(schema.vaultConnections.ownerUserId, targetUserId)));
-    await tx
-      .delete(schema.vaultItems)
-      .where(and(eq(schema.vaultItems.orgId, orgId), eq(schema.vaultItems.ownerUserId, targetUserId)));
-    await tx
-      .update(schema.vaultItems)
-      .set({ audienceUserIds: sql`array_remove(${schema.vaultItems.audienceUserIds}, ${targetUserId})` })
-      .where(and(eq(schema.vaultItems.orgId, orgId), sql`${targetUserId} = any(${schema.vaultItems.audienceUserIds})`));
-    await tx
-      .update(schema.vaultConnections)
-      .set({ audienceUserIds: sql`array_remove(${schema.vaultConnections.audienceUserIds}, ${targetUserId})` })
-      .where(
-        and(
-          eq(schema.vaultConnections.orgId, orgId),
-          sql`${targetUserId} = any(${schema.vaultConnections.audienceUserIds})`,
-        ),
-      );
-    // Their home and private dashboards go, with their widgets' routines (ADR 0135).
-    await dropMemberDashboards(tx, orgId, targetUserId);
-    // The secrets agents are waiting on from them won't come.
-    const secrets = await cancelSecretRequestsFor(tx, orgId, targetUserId);
-    // Their agents keep someone answering for them (approvals, budget alerts), before their plans are released: an
-    // agent on a computer of theirs then goes back to the API too (`releaseAgents`).
-    const heir = await heirOf(tx, actorId, orgId, targetUserId);
-    const handed = heir
-      ? await tx
-          .update(agents)
-          .set({ ownerUserId: heir, updatedAt: new Date() })
-          .where(and(eq(agents.orgId, orgId), eq(agents.ownerUserId, targetUserId)))
-          .returning()
-      : [];
-    await dropAgentRules(
-      tx,
-      orgId,
-      handed.map((a) => a.id),
-      { type: "person", id: actorId },
+      const action = remover === targetUserId ? "member.left" : "member.removed";
+      await auditMember(tx, orgId, remover ?? SYSTEM, action, targetUserId, {
+        role: target.role,
+        ...(outsideOf ? { outsideOf } : {}),
+        ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
+        ...(via ? { via } : {}),
+      });
+      if (outsideOf) {
+        await recordOperatorEvent(tx, { type: "outside_access.ended", orgId, data: { userId: targetUserId } });
+      }
+      // No agent goes on reading or sending in their name: their mailboxes leave every agent, and what waits to run there doesn't.
+      await dropMailOfOwner(tx, orgId, targetUserId, actorId);
+      // Their place on the workspace's computer for the right hand goes too (ADR 0175): coming back starts a new one.
+      await removeSeat(tx, orgId, targetUserId);
+      const mailActions = await cancelMailboxApprovals(tx, orgId, targetUserId, actorId);
+      // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
+      const released = await releaseMemberAccounts(tx, targetUserId, orgId);
+      const removed = [];
+      for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
+        removed.push({ computer, freed: await detachMachine(tx, computer) });
+      }
+      await releaseLeaverDevices(tx, orgId, targetUserId);
+      const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
+      const toApi = await offPlansNotOwners(tx, orgId, touched);
+      const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
+      await followOwner(tx, orgId);
+      return { released, removed, handed, changed, heir, secrets, mailActions, toApi, tasks };
+    },
+  );
+  if (tasks.length > 0) {
+    const { unassignGone } = await import("./issues");
+    await unassignGone({ db, pubsub: options.pubsub }, orgId, { type: "person", id: targetUserId }, tasks).catch(
+      () => {},
     );
-    const action = actorId === targetUserId ? "member.left" : "member.removed";
-    await auditMember(tx, orgId, actorId, action, targetUserId, {
-      role: target.role,
-      ...(handed.length ? { agentsTo: heir, agents: handed.map((a) => a.id) } : {}),
-      ...(via ? { via } : {}),
-    });
-    // No agent goes on reading or sending in their name: their mailboxes leave every agent, and what waits to run there doesn't.
-    await dropMailOfOwner(tx, orgId, targetUserId, actorId);
-    const mailActions = await cancelMailboxApprovals(tx, orgId, targetUserId, actorId);
-    // Their AI accounts on the organization's computers are signed out and removed (ADR 0059 §1).
-    const released = await releaseMemberAccounts(tx, targetUserId, orgId);
-    const removed = [];
-    for (const computer of await personalMachines(tx, targetUserId, [orgId])) {
-      removed.push({ computer, freed: await detachMachine(tx, computer) });
-    }
-    await releaseLeaverDevices(tx, orgId, targetUserId);
-    const touched = [...new Set([...handed.map((a) => a.id), ...removed.flatMap((r) => r.freed)])];
-    await offPlansNotOwners(tx, orgId, touched);
-    const changed = [...new Set([...touched, ...released.agents.flatMap((a) => a.agentIds)])];
-    await followOwner(tx, orgId);
-    return { released, removed, handed, changed, heir, secrets, mailActions };
-  });
+  }
   for (const row of secrets) await publishSecret({ db, pubsub: options.pubsub }, row, "secret.updated");
   for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
   forgetAgents(
     orgId,
     handed.map((a) => a.id),
   );
+  await wakeAgentsBrainWaits({ db, pubsub: options.pubsub }, orgId, toApi);
   if (handed.length) caches.agents.delete(`${orgId}:team`);
   if (heir && handed.length) {
     const { handOver } = await import("./agents");
@@ -1300,9 +1455,10 @@ export async function removeMember(
       await handOver({ db, pubsub: options.pubsub }, actorId, { ...agent, ownerUserId: targetUserId }, heir);
     }
   }
-  await announceReleasedAccounts(options.pubsub, released);
+  await announceReleasedAccounts({ db, pubsub: options.pubsub }, released);
+  const by = remover ? { type: "person" as const, id: remover } : SYSTEM;
   for (const { computer, freed } of removed) {
-    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: actorId }, freed);
+    await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, by, freed);
   }
   // Runs waiting on a device that left with them stop waiting and say so (bring your own devices).
   if (removed.length > 0) {
@@ -1312,8 +1468,10 @@ export async function removeMember(
     }
   }
   // Their open WebSocket connections lose every subscription now, not on reconnect.
-  const quiet = actorId === targetUserId ? { quiet: true as const } : {};
+  const quiet = remover === targetUserId ? { quiet: true as const } : {};
   await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId, userId: targetUserId, ...quiet });
+  // The workspace's computer hears their seat is gone: its worker and containers stop there.
+  await publishMachineAgentsChanged(options.pubsub, orgId);
   await announceMembers(options.pubsub, orgId, changed);
   const { releaseQuestionsOf } = await import("./questions");
   await releaseQuestionsOf({ db, pubsub: options.pubsub }, orgId, targetUserId);
@@ -1364,11 +1522,13 @@ export async function deleteAccount(
   const owner = await pinnedOwner(db);
   // Loaded here: these modules build on this one.
   const { announceReleasedAccounts, releaseMemberAccounts } = await import("./machine-accounts");
-  const { announceRemovedMachine, detachMachine } = await import("./machines");
+  const { announceRemovedMachine, detachMachine, publishMachineAgentsChanged } = await import("./machines");
   const { accountDeletionPlan, afterClosing, closeForDeletion, queueAccountDeletedEmail, soleOwnerRefusal } =
     await import("./workspace-deletion");
   const { cancelMailboxApprovals, publishApproval } = await import("./approvals");
   const { dropMailOfOwner } = await import("./tools/scopes");
+  const { removeSeat } = await import("./right-hand-seats");
+  const { wakeAgentsBrainWaits } = await import("./usage-pause");
   const done = await db.transaction(async (tx) => {
     // First, as creating a workspace does: one made in another tab meanwhile is in the plan below and closes with them.
     await lockWorkspacesOf(tx, userId);
@@ -1380,7 +1540,7 @@ export async function deleteAccount(
       if (!due) return null;
     }
     const mine = await tx
-      .select({ orgId: organizationMembers.orgId })
+      .select({ orgId: organizationMembers.orgId, outsideOf: organizationMembers.outsideOf })
       .from(organizationMembers)
       .where(eq(organizationMembers.userId, userId))
       .orderBy(asc(organizationMembers.orgId));
@@ -1401,12 +1561,36 @@ export async function deleteAccount(
     // Their mailboxes leave every agent there too (`removeMember`); a mailbox without an owner would be anyone's.
     const mailActions = [];
     for (const m of mine) {
+      // They leave every task they were on, as someone removed from a workspace does (ADR 0188).
+      await dropAssignee(tx, m.orgId, { type: "person", id: userId });
       await dropMailOfOwner(tx, m.orgId, userId, userId);
+      await removeSeat(tx, m.orgId, userId);
       mailActions.push(...(await cancelMailboxApprovals(tx, m.orgId, userId, userId)));
     }
     for (const org of plan.leaves) {
-      await auditMember(tx, org.id, userId, "member.left", userId, { role: org.role, accountDeleted: true });
+      const outsideOf = mine.find((m) => m.orgId === org.id)?.outsideOf;
+      await auditMember(tx, org.id, userId, "member.left", userId, {
+        role: org.role,
+        accountDeleted: true,
+        ...(outsideOf ? { outsideOf } : {}),
+      });
+      if (outsideOf) await recordOperatorEvent(tx, { type: "outside_access.ended", orgId: org.id, data: { userId } });
     }
+    // Their outside requests not yet told as over go with the account (the rows cascade): the operator hears it once.
+    const outsideAsks = await tx
+      .select({ orgId: organizationJoinRequests.orgId })
+      .from(organizationJoinRequests)
+      .where(
+        and(
+          eq(organizationJoinRequests.userId, userId),
+          eq(organizationJoinRequests.status, "pending"),
+          isNotNull(organizationJoinRequests.outsideOf),
+        ),
+      );
+    await recordOperatorEvent(
+      tx,
+      ...outsideAsks.map((r) => ({ type: "outside_access.ended" as const, orgId: r.orgId, data: { userId } })),
+    );
     const removed = [];
     for (const computer of plan.computers) {
       const freed = await detachMachine(tx, { ...computer, kind: "connected" });
@@ -1460,7 +1644,7 @@ export async function deleteAccount(
   if (!done) return false;
   const { plan, closed, released, removed, mailActions, ownerless } = done;
   for (const row of mailActions) await publishApproval({ db, pubsub: options.pubsub }, row, "approval.decided");
-  await announceReleasedAccounts(options.pubsub, released);
+  await announceReleasedAccounts({ db, pubsub: options.pubsub }, released);
   for (const { computer, freed } of removed) {
     await announceRemovedMachine({ db, pubsub: options.pubsub }, computer, { type: "person", id: userId }, freed);
   }
@@ -1468,15 +1652,18 @@ export async function deleteAccount(
   for (const org of [...plan.closes, ...plan.leaves]) {
     await publishOrgEvent(options.pubsub, { type: "membership.revoked", orgId: org.id, userId, quiet: true });
   }
+  for (const org of plan.leaves) await publishMachineAgentsChanged(options.pubsub, org.id);
   const { releaseQuestionsOf } = await import("./questions");
   for (const org of plan.leaves) {
     await releaseQuestionsOf({ db, pubsub: options.pubsub }, org.id, userId);
+    const toApi = ownerless.filter((a) => a.orgId === org.id).map((a) => a.id);
     const changed = [
       ...released.agents.filter((a) => a.orgId === org.id).flatMap((a) => a.agentIds),
       ...removed.filter((r) => r.computer.orgId === org.id).flatMap((r) => r.freed),
-      ...ownerless.filter((a) => a.orgId === org.id).map((a) => a.id),
+      ...toApi,
     ];
     for (const id of changed) caches.agents.delete(`${org.id}:${id}`);
+    await wakeAgentsBrainWaits({ db, pubsub: options.pubsub }, org.id, toApi);
     await announceMembers(options.pubsub, org.id, [...new Set(changed)]);
   }
   for (const one of closed) await afterClosing({ ...options, db }, one);
@@ -1519,9 +1706,10 @@ const ROLE_RANK: Record<MemberRole, number> = { member: 0, owner: 1 };
  * is made. With `secret` its token is derived from its id (`invitationToken`, ADR 0090): the link can be copied
  * again and sending it again keeps it. Without one (or for an invitation made before), a new random token replaces
  * the old one, whose link stops working. One still working keeps the higher of its role and this one and adds these
- * roles and channels to its own, so sending it again never demotes whoever it was meant for, and an owner's
+ * roles, channels and agents to its own, so sending it again never demotes whoever it was meant for, and an owner's
  * invitation goes out again only from an owner (`ownersOk`). Records `invitation.created`. The caller checks who
- * may invite, which roles they may give (`givableRoleIds`) and which channels (`invitableChannelIds`).
+ * may invite, which roles they may give (`givableRoleIds`), which channels (`invitableChannelIds`) and which agents
+ * (`invitableAgentIds`).
  */
 export async function sendInvitation(
   db: Executor,
@@ -1533,6 +1721,8 @@ export async function sendInvitation(
     roleIds?: string[];
     /** Channels the person joins on accepting, besides `general` (checked by the caller). */
     channelIds?: string[];
+    /** Agents the person starts with on accepting (ADR 0184, checked by the caller). */
+    agentIds?: string[];
     /** The inviter's words for the email; absent keeps the invitation's own. */
     note?: string | null;
     invitedBy: string;
@@ -1556,6 +1746,7 @@ export async function sendInvitation(
       role: organizationInvitations.role,
       roleIds: organizationInvitations.roleIds,
       channelIds: organizationInvitations.channelIds,
+      agentIds: organizationInvitations.agentIds,
       expiresAt: organizationInvitations.expiresAt,
     })
     .from(organizationInvitations)
@@ -1578,12 +1769,14 @@ export async function sendInvitation(
   const working = existing && existing.expiresAt > now;
   const keep = working ? existing.roleIds : [];
   const keepChannels = working ? existing.channelIds : [];
+  const keepAgents = working ? existing.agentIds : [];
   const id = existing?.id ?? crypto.randomUUID();
   const token = input.secret ? invitationToken(input.secret, id) : randomToken(32);
   const fresh = {
     role,
     roleIds: [...new Set([...keep, ...(input.roleIds ?? [])])],
     channelIds: [...new Set([...keepChannels, ...(input.channelIds ?? [])])],
+    agentIds: [...new Set([...keepAgents, ...(input.agentIds ?? [])])],
     ...(input.note !== undefined ? { note: input.note?.trim() || null } : {}),
     tokenHash: sha256(token),
     invitedByUserId: input.invitedBy,
@@ -1605,6 +1798,8 @@ export async function sendInvitation(
       email: invitation.email,
       role: invitation.role,
       roleIds: invitation.roleIds,
+      channelIds: invitation.channelIds,
+      agentIds: invitation.agentIds,
       ...(input.fromRequest ? { fromRequest: true } : {}),
     },
   });
@@ -1626,34 +1821,6 @@ export async function sendInvitation(
 /** The longest note an inviter writes for the invitation email (ADR 0090). */
 export const INVITE_NOTE_MAX = 300;
 
-/**
- * The channels an invitation adds someone to, besides `general` (ADR 0090): the workspace's own, not archived and
- * not a conversation, public or one the sender is in. Any other id refuses the invitation (`invitation.channel`).
- */
-export async function invitableChannelIds(db: Executor, actorId: string, orgId: string, ids: readonly string[]) {
-  const wanted = [...new Set(ids)];
-  if (wanted.length === 0) return [];
-  // The sender's own row in each channel, joined: a subquery in a single-table select names its columns bare, so
-  // `channels.id` in it would read the inner table's id.
-  const rows = await db
-    .select({ id: channels.id, visibility: channels.visibility, member: channelMembers.userId })
-    .from(channels)
-    .leftJoin(channelMembers, and(eq(channelMembers.channelId, channels.id), eq(channelMembers.userId, actorId)))
-    .where(
-      and(
-        eq(channels.orgId, orgId),
-        inArray(channels.id, wanted),
-        isNull(channels.archivedAt),
-        ne(channels.kind, "dm"),
-      ),
-    );
-  const ok = rows.filter((r) => r.visibility === "public" || r.member !== null).map((r) => r.id);
-  if (ok.length !== wanted.length) {
-    throw new ValidationError("One of these channels can't go with an invitation", "invitation.channel");
-  }
-  return ok;
-}
-
 export async function createInvitation(
   db: Database,
   actorId: string,
@@ -1663,6 +1830,7 @@ export async function createInvitation(
     role?: MemberRole;
     roleIds?: string[];
     channelIds?: string[];
+    agentIds?: string[];
     note?: string | null;
     /** `AGENTES_SECRET`: a link that can be copied again and stays the same when sent again (ADR 0090). */
     secret?: string;
@@ -1672,12 +1840,13 @@ export async function createInvitation(
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
   const roleIds = await givableRoleIds(db, actor, orgId, input.roleIds ?? []);
-  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
-  return inviteChecked(db, actor, actorId, orgId, { ...input, roleIds, channelIds }, now);
+  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? [], roleIds);
+  const agentIds = await invitableAgentIds(db, actor, actorId, orgId, input.agentIds ?? [], roleIds);
+  return inviteChecked(db, actor, actorId, orgId, { ...input, roleIds, channelIds, agentIds }, now);
 }
 
 /**
- * One invitation from a sender whose standing, roles and channels the caller checked (`createInvitation`, and
+ * One invitation from a sender whose standing, roles, channels and agents the caller checked (`createInvitation`, and
  * `inviteMany` once for its whole batch): refused for an address already in (`conflict`) and while the workspace is
  * full (`org.members_full`).
  */
@@ -1691,6 +1860,7 @@ async function inviteChecked(
     role?: MemberRole;
     roleIds: string[];
     channelIds: string[];
+    agentIds: string[];
     note?: string | null;
     secret?: string;
   },
@@ -1710,6 +1880,7 @@ async function inviteChecked(
     role: input.role ?? "member",
     roleIds: input.roleIds,
     channelIds: input.channelIds,
+    agentIds: input.agentIds,
     ...(input.note !== undefined ? { note: input.note?.slice(0, INVITE_NOTE_MAX) ?? null } : {}),
     invitedBy: actorId,
     ownersOk: can(actor, "manage_owners"),
@@ -1719,23 +1890,23 @@ async function inviteChecked(
 }
 
 /**
- * Changes the roles a pending invitation gives (ADR 0090): its link stays the same and nothing is sent. Only while it
- * still works (sending it again is what brings back one that ran out), and from a workspace that may invite.
+ * Changes what a pending invitation gives (ADR 0090, 0184): its cargos, channels and agents, each checked as when it
+ * is sent, against the cargos it will give. Omitted ones stay. Its link stays the same and nothing is sent. Only while
+ * it still works (sending it again is what brings back one that ran out), and from a workspace that may invite.
  */
-export async function setInvitationRoles(
+export async function updateInvitation(
   db: Database,
   actorId: string,
   orgId: string,
   invitationId: string,
-  roleIdsIn: string[],
+  change: { roleIds?: string[]; channelIds?: string[]; agentIds?: string[] },
   now = new Date(),
 ) {
   const actor = await requirePermission(db, actorId, orgId, "invite_people");
   assertInviting(actor);
-  const roleIds = await givableRoleIds(db, actor, orgId, roleIdsIn);
   const [row] = await db
-    .update(organizationInvitations)
-    .set({ roleIds })
+    .select()
+    .from(organizationInvitations)
     .where(
       and(
         eq(organizationInvitations.id, invitationId),
@@ -1743,17 +1914,27 @@ export async function setInvitationRoles(
         isNull(organizationInvitations.acceptedAt),
         gt(organizationInvitations.expiresAt, now),
       ),
-    )
-    .returning({ email: organizationInvitations.email });
+    );
   if (!row) throw new ConflictError("This invitation can't be changed");
+  const roleIds = change.roleIds ? await givableRoleIds(db, actor, orgId, change.roleIds) : row.roleIds;
+  const channelIds = change.channelIds
+    ? await invitableChannelIds(db, actorId, orgId, change.channelIds, roleIds)
+    : row.channelIds;
+  const agentIds = change.agentIds
+    ? await invitableAgentIds(db, actor, actorId, orgId, change.agentIds, roleIds)
+    : row.agentIds;
+  await db
+    .update(organizationInvitations)
+    .set({ roleIds, channelIds, agentIds })
+    .where(eq(organizationInvitations.id, row.id));
   await recordAudit(db, {
     orgId,
     actor: { type: "person", id: actorId },
-    action: "invitation.roles_changed",
+    action: "invitation.changed",
     target: { type: "invitation", id: invitationId },
-    details: { email: row.email, roleIds },
+    details: { email: row.email, roleIds, channelIds, agentIds },
   });
-  return { roleIds };
+  return { roleIds, channelIds, agentIds };
 }
 
 export async function listInvitations(db: Database, orgId: string, now = new Date()) {
@@ -1795,12 +1976,19 @@ export async function revokeInvitation(db: Database, actorId: string, orgId: str
 }
 
 /**
- * The workspace's invitation link (admins, ADR 0068): whoever opens it can only ask to join. One link per
- * workspace, shown again whenever needed: the newest active link whose token is still derived from
- * `secret` (`inviteLinkToken`), else a new one for 30 days (`made`). Uses the same `/invite/{token}` page as
- * email invitations.
+ * The workspace's invitation link (admins, ADR 0068, 0184): whoever opens it can only ask to join. Shown again
+ * whenever needed: the newest active plain link (made with no choices) whose token is still derived from `secret`
+ * (`inviteLinkToken`), else a new one for 30 days (`made`). `renew`: the one found works 30 days from now, as the
+ * invite dialog's "Validade" says. Uses the same `/invite/{token}` page as email invitations.
  */
-export async function inviteLink(db: Database, secret: string, actorId: string, orgId: string, now = new Date()) {
+export async function inviteLink(
+  db: Database,
+  secret: string,
+  actorId: string,
+  orgId: string,
+  now = new Date(),
+  options: { renew?: boolean } = {},
+) {
   assertInviting(await requirePermission(db, actorId, orgId, "invite_people"));
   return db.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`invite-links:${orgId}`}))`);
@@ -1810,14 +1998,22 @@ export async function inviteLink(db: Database, secret: string, actorId: string, 
       .where(
         and(
           eq(organizationInviteLinks.orgId, orgId),
+          eq(organizationInviteLinks.plain, true),
           isNull(organizationInviteLinks.revokedAt),
           gt(organizationInviteLinks.expiresAt, now),
         ),
       )
       .orderBy(desc(organizationInviteLinks.createdAt));
-    for (const link of active) {
-      const token = inviteLinkToken(secret, link.id);
-      if (link.tokenHash === sha256(token)) return { link, token, made: false };
+    for (const found of active) {
+      const token = inviteLinkToken(secret, found.id);
+      if (found.tokenHash !== sha256(token)) continue;
+      if (!options.renew) return { link: found, token, made: false };
+      const [link] = await tx
+        .update(organizationInviteLinks)
+        .set({ expiresAt: new Date(now.getTime() + INVITE_LINK_TTL_DAYS * 86_400_000) })
+        .where(eq(organizationInviteLinks.id, found.id))
+        .returning();
+      return { link: link ?? found, token, made: false };
     }
     const id = crypto.randomUUID();
     const token = inviteLinkToken(secret, id);
@@ -1868,18 +2064,21 @@ const INVITE_AGENTS = 4;
 
 /**
  * The organization's first agents (not archived), for an invitation page: name and look only, and how many more
- * work there (`moreAgents`, when some do), so the page never reads as if those were all of them.
+ * work there (`moreAgents`, when some do), so the page never reads as if those were all of them. The invitation's own
+ * agents (`first`, ADR 0184) come first, and `yours` says how many of them lead the list: the page's host is the first.
  */
-async function inviteAgents(db: Database, orgId: string) {
+async function inviteAgents(db: Database, orgId: string, first: readonly string[] = []) {
   const rows = await db
-    .select({ id: agents.id, name: agents.name, appearance: agents.appearance, total: sql<number>`count(*) over ()` })
+    .select({ id: agents.id, name: agents.name, appearance: agents.appearance })
     .from(agents)
     // Every workspace has its right hand (ADR 0137): the page names the team's own agents.
     .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
-    .orderBy(asc(agents.createdAt))
-    .limit(INVITE_AGENTS);
-  const more = Number(rows[0]?.total ?? 0) - rows.length;
-  return { agents: rows.map(({ total: _, ...agent }) => agent), ...(more > 0 ? { moreAgents: more } : {}) };
+    .orderBy(asc(agents.createdAt));
+  const theirs = first.flatMap((id) => rows.filter((r) => r.id === id));
+  const shown = [...theirs, ...rows.filter((r) => !first.includes(r.id))].slice(0, INVITE_AGENTS);
+  const more = rows.length - shown.length;
+  const yours = Math.min(theirs.length, shown.length);
+  return { agents: shown, ...(more > 0 ? { moreAgents: more } : {}), ...(yours > 0 ? { yours } : {}) };
 }
 
 /**
@@ -1958,6 +2157,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
       acceptedAt: organizationInvitations.acceptedAt,
       invitedBy: users.name,
       invitedByUserId: organizationInvitations.invitedByUserId,
+      roleIds: organizationInvitations.roleIds,
+      agentIds: organizationInvitations.agentIds,
     })
     .from(organizationInvitations)
     .innerJoin(organizations, eq(organizations.id, organizationInvitations.orgId))
@@ -1987,6 +2188,8 @@ export async function previewInvitation(db: Database, token: string, now = new D
       kind: "link" as const,
       invitedBy: creator?.name ?? null,
       mode: await workspaceMode(db, link.link.orgId),
+      // It took all the people it may (ADR 0184): the page says so before anyone asks.
+      ...(inviteLinkFull(link.link) ? { full: true as const } : {}),
       ...inviteLogo(token, link.orgLogo),
       ...(await inviteAgents(db, link.link.orgId)),
     };
@@ -2006,6 +2209,7 @@ export async function previewInvitation(db: Database, token: string, now = new D
   }
   // What accepting would give now, and who sent it only while they're still here.
   const { inviter, role } = await invitedAs(db, row);
+  const roleIds = await stillGivableRoleIds(db, inviter, row.orgId, row.roleIds);
   return {
     orgName: row.orgName,
     email: row.email,
@@ -2016,10 +2220,21 @@ export async function previewInvitation(db: Database, token: string, now = new D
     expiresAt: row.expiresAt.toISOString(),
     account: await invitedAccount(db, row.email),
     ...((await seatsFull(db, row.orgId)) ? { full: true as const } : {}),
+    roles: await roleLooks(db, row.orgId, roleIds),
     // Only while it can be accepted, as `invitedOrgId` serves it.
     ...inviteLogo(token, row.orgLogo),
-    ...(await inviteAgents(db, row.orgId)),
+    ...(await inviteAgents(db, row.orgId, row.agentIds)),
   };
+}
+
+/** The cargos an invitation gives, by name, color and icon, in its own order (ADR 0184). */
+async function roleLooks(db: Executor, orgId: string, ids: readonly string[]) {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: orgRoles.id, name: orgRoles.name, color: orgRoles.color, icon: orgRoles.icon })
+    .from(orgRoles)
+    .where(and(eq(orgRoles.orgId, orgId), inArray(orgRoles.id, [...ids])));
+  return ids.flatMap((id) => rows.filter((r) => r.id === id).map(({ id: _, ...look }) => look));
 }
 
 /**
@@ -2095,9 +2310,10 @@ function cameByEmail(invitationId: string, mail: InvitationMail | undefined): bo
 }
 
 /**
- * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`. Not for
- * a blocked account, nor into a workspace on hold, suspended or being deleted. An invitation link only lets people
- * ask (`invitation.ask_to_join`, ADR 0068). Accepted from its own email (`mail`), it confirms the address.
+ * Accepts an invitation. The signed-in user's email must match the invited one. Joins `general`, its channels and
+ * its agents (`startWith`; `agents`: the ones whose audience changed, for the caller to announce). Not for a blocked
+ * account, nor into a workspace on hold, suspended or being deleted. An invitation link only lets people ask
+ * (`invitation.ask_to_join`, ADR 0068). Accepted from its own email (`mail`), it confirms the address.
  */
 export async function acceptInvitation(
   db: Database,
@@ -2107,7 +2323,7 @@ export async function acceptInvitation(
   mail?: InvitationMail,
 ) {
   if (await accountClosed(db, user.id)) throw new ForbiddenError();
-  return db.transaction(async (tx) => {
+  const joined = await db.transaction(async (tx) => {
     const [invitation] = await tx
       .select()
       .from(organizationInvitations)
@@ -2133,34 +2349,26 @@ export async function acceptInvitation(
     const already = await getMembership(tx, user.id, invitation.orgId, { includeBlocked: true });
     const roleIds = already ? [] : await stillGivableRoleIds(tx, inviter, invitation.orgId, invitation.roleIds);
     await joinOrganization(tx, invitation.orgId, user.id, role, roleIds);
-    // The channels it named, besides `general` (ADR 0090): those still there. A private one only while whoever sent
-    // the invitation is still in it, as when it was sent (`invitableChannelIds`): leaving it, or the workspace, takes
-    // back what they could give.
-    if (invitation.channelIds.length > 0) {
-      const inviter = invitation.invitedByUserId;
-      const inviterIn = inviter
-        ? sql`exists (select 1 from ${channelMembers}
-            where ${channelMembers.channelId} = ${channels.id} and ${channelMembers.userId} = ${inviter})`
-        : undefined;
-      const still = await tx
-        .select({ id: channels.id })
-        .from(channels)
-        .where(
-          and(
-            eq(channels.orgId, invitation.orgId),
-            inArray(channels.id, invitation.channelIds),
-            isNull(channels.archivedAt),
-            ne(channels.kind, "dm"),
-            or(eq(channels.visibility, "public"), inviterIn),
-          ),
-        );
-      for (const channel of still) {
-        await tx
-          .insert(channelMembers)
-          .values({ orgId: invitation.orgId, channelId: channel.id, userId: user.id })
-          .onConflictDoNothing();
-      }
-    }
+    // The channels it named, besides `general` (ADR 0090, 0184): those whoever sent it could still give now, as when
+    // it was sent (`invitableChannelIds`). A private one only while they are still in it, or it is limited to a cargo
+    // the person got: leaving it, or the workspace, takes back what they could give.
+    const channelIds = await stillInvitableChannelIds(
+      tx,
+      invitation.invitedByUserId,
+      invitation.orgId,
+      invitation.channelIds,
+      roleIds,
+    );
+    await joinChannels(tx, invitation.orgId, user.id, channelIds);
+    // Its agents (ADR 0184), as far as whoever sent it may still open them. Someone already in starts with none.
+    const opened = already
+      ? []
+      : await startWith(tx, {
+          orgId: invitation.orgId,
+          userId: user.id,
+          giverId: invitation.invitedByUserId,
+          agentIds: invitation.agentIds,
+        });
     // From its own email, the message reached that mailbox: the address is confirmed, and no "confirm your email"
     // follows (ADR 0090). From a copied link nothing shows that, so confirming goes as for any sign-up.
     if (cameByEmail(invitation.id, mail)) {
@@ -2172,14 +2380,17 @@ export async function acceptInvitation(
     await auditMember(tx, invitation.orgId, user.id, "member.joined", user.id, {
       role,
       roleIds,
+      channelIds,
       invitedBy: invitation.invitedByUserId,
     });
     await tx
       .update(organizationInvitations)
       .set({ acceptedAt: now })
       .where(eq(organizationInvitations.id, invitation.id));
-    return { orgId: invitation.orgId, invitedBy: invitation.invitedByUserId };
+    return { orgId: invitation.orgId, invitedBy: invitation.invitedByUserId, agents: opened };
   });
+  forgetStarted(joined.orgId, joined.agents);
+  return joined;
 }
 
 /** Headers a sign-up from an email invitation's page carries its token and proof in (ADR 0090, `holdsInvitation`). */
@@ -2225,10 +2436,12 @@ export const spentClaimHash = (claimHash: string) => `spent:${sha256(claimHash)}
 
 /**
  * Adds a person to an organization (keeping an existing role), with `roleIds` (those still there), and to
- * `general`, in the caller's transaction. A request to join that they or their address had waiting closes: whoever
+ * `general`, in the caller's transaction. A new member's greeting from the right hand is queued with it. A request to join that they or their address had waiting closes: whoever
  * answers it next finds it answered. A full workspace refuses a new member (`org.members_full`), and a closed one
  * (`closedRefusal`) anyone, under the lock role changes, removals and a deletion take, so two people taking the last
- * seat at once can't both get in, and nobody gets in once a deletion committed.
+ * seat at once can't both get in, and nobody gets in once a deletion committed. `outsideOf`: who a new outside
+ * collaborator works for (ADR 0191); they take no seat, so a full workspace lets them in. Someone already in keeps
+ * their row as it is.
  */
 export async function joinOrganization(
   tx: Executor,
@@ -2236,6 +2449,7 @@ export async function joinOrganization(
   userId: string,
   role: MemberRole,
   roleIds: readonly string[] = [],
+  { outsideOf }: { outsideOf?: string } = {},
 ) {
   await lockOrgMembers(tx, orgId);
   // The row as it is now: a check before the lock may have read a cached standing.
@@ -2246,9 +2460,14 @@ export async function joinOrganization(
     .select({ userId: organizationMembers.userId })
     .from(organizationMembers)
     .where(and(eq(organizationMembers.orgId, orgId), eq(organizationMembers.userId, userId)));
-  if (!member) await assertMemberRoom(tx, orgId);
-  await tx.insert(organizationMembers).values({ orgId, userId, role }).onConflictDoNothing();
+  if (!member && !outsideOf) await assertMemberRoom(tx, orgId);
+  await tx
+    .insert(organizationMembers)
+    .values({ orgId, userId, role, outsideOf: outsideOf ?? null })
+    .onConflictDoNothing();
   await addMemberRolesInTx(tx, orgId, userId, roleIds);
+  // The right hand greets who is new here, once: its job's key is spent for good, so a rejoin gets none.
+  if (!member) await queueWelcome(tx, orgId, userId);
   // Nothing a closed request kept stays (ADR 0090): the password it chose goes, and the page's key is spent, so that
   // page reads it closed and signs in no one.
   const closing = await tx
@@ -2312,9 +2531,10 @@ export type InviteOutcome =
 const EMAIL = /^[^\s@,;:<>()[\]"]+@[^\s@,;:<>()[\]"]+\.[^\s@,;:<>()[\]"]+$/;
 
 /**
- * Invites several people at once: `invites`, each address with its own roles (the invite dialog, ADR 0090), or
- * `emails` all with `roleIds`, never both. `channelIds` and `note` go with every one. Each address gets its own
- * outcome; pending invitations are not duplicated (resend them instead).
+ * Invites several people at once: `emails` all with `roleIds` (the invite dialog, ADR 0184), or `invites`, each
+ * address with its own roles (ADR 0090), never both. `channelIds`, `agentIds` and `note` go with every one, checked
+ * against the cargos all of them get. Each address gets its own outcome; pending invitations are not duplicated
+ * (resend them instead).
  */
 export async function inviteMany(
   db: Database,
@@ -2325,6 +2545,7 @@ export async function inviteMany(
     invites?: { email: string; roleIds?: string[] }[];
     roleIds?: string[];
     channelIds?: string[];
+    agentIds?: string[];
     note?: string | null;
     /** `AGENTES_SECRET`: links that can be copied again (ADR 0090). */
     secret?: string;
@@ -2335,9 +2556,12 @@ export async function inviteMany(
   assertInviting(actor);
   if (input.emails && input.invites) throw new ValidationError("Send `emails` or `invites`, not both");
   const asked = input.invites ?? (input.emails ?? []).map((email) => ({ email, roleIds: input.roleIds }));
-  // Checked once for the batch: a role or a channel the sender may not give refuses it all.
+  // Checked once for the batch: a role, a channel or an agent the sender may not give refuses it all. A cargo's own
+  // channels and agents go only where every address gets that cargo.
   await givableRoleIds(db, actor, orgId, [...new Set(asked.flatMap((i) => i.roleIds ?? []))]);
-  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? []);
+  const shared = (asked[0]?.roleIds ?? []).filter((id) => asked.every((i) => i.roleIds?.includes(id)));
+  const channelIds = await invitableChannelIds(db, actorId, orgId, input.channelIds ?? [], shared);
+  const agentIds = await invitableAgentIds(db, actor, actorId, orgId, input.agentIds ?? [], shared);
   const rolesOf = new Map<string, string[]>();
   for (const i of asked) {
     const email = i.email.trim().toLowerCase();
@@ -2376,6 +2600,7 @@ export async function inviteMany(
           email,
           roleIds,
           channelIds,
+          agentIds,
           ...(input.note !== undefined ? { note: input.note } : {}),
           secret: input.secret,
         },
@@ -2411,13 +2636,16 @@ export async function resendInvitation(
     .where(and(eq(organizationInvitations.id, invitationId), eq(organizationInvitations.orgId, orgId)));
   if (!existing || existing.acceptedAt) throw new ConflictError("This invitation can't be resent");
   await assertMemberRoom(db, orgId);
-  // Its roles go again, expired or not: the ones still there, when the sender may give them (ADR 0085).
+  // Its roles go again, expired or not: the ones still there, when the sender may give them (ADR 0085). So do its
+  // channels and agents, as far as the sender may give them now (ADR 0184).
   const roleIds = await givableRoleIds(db, actor, orgId, await rolesStillThere(db, orgId, existing.roleIds));
   return sendInvitation(db, {
     orgId,
     email: existing.email,
     role: existing.role,
     roleIds,
+    channelIds: await stillInvitableChannelIds(db, actorId, orgId, existing.channelIds, roleIds),
+    agentIds: await stillInvitableAgentIds(db, actorId, orgId, existing.agentIds, roleIds),
     invitedBy: actorId,
     ownersOk: can(actor, "manage_owners"),
     secret,
@@ -2453,6 +2681,7 @@ export async function listInvitationsWithStatus(
       role: i.role,
       roleIds: i.roleIds,
       channelIds: i.channelIds,
+      agentIds: i.agentIds,
       status: i.expiresAt > now ? ("pending" as const) : ("expired" as const),
       expiresAt: i.expiresAt,
       createdAt: i.createdAt,

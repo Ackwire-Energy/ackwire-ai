@@ -4,6 +4,8 @@
  * visible portraits are drawn; with reduced motion each one is drawn once,
  * still (and again when its kind or state changes).
  */
+
+import { onThemeChange } from "../theme";
 import { COMPUTER_ART, type ComputerState, drawComputer, type PortraitKind } from "./portrait.js";
 
 export interface LiveComputer {
@@ -16,6 +18,7 @@ const computers = new Set<LiveComputer>();
 const visible = new WeakSet<Element>();
 let timer: ReturnType<typeof setTimeout> | 0 = 0;
 let observer: IntersectionObserver | null = null;
+let themeWatched = false;
 
 const reduced = () =>
   typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches === true;
@@ -70,6 +73,13 @@ export function addLiveComputer(c: LiveComputer): () => void {
     });
     observer.observe(c.canvas);
   } else visible.add(c.canvas);
+  // Still portraits (reduced motion) are drawn only on demand: a new theme is one.
+  if (!themeWatched) {
+    themeWatched = true;
+    onThemeChange(() => {
+      for (const one of computers) drawLiveComputer(one);
+    });
+  }
   drawLiveComputer(c);
   schedule();
   return () => {

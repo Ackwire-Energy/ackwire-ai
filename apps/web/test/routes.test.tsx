@@ -138,6 +138,15 @@ describe("route guards", () => {
     expect(screen().getByRole("heading", { name: "Página não encontrada" })).toBeTruthy();
   });
 
+  test("the sidebar's workspace line says where it lives: one's own server, not the Cloud", async () => {
+    const state = seedState();
+    state.instance = { cloud: false };
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
+    await settle();
+    const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
+    expect(nav.querySelector(".sidebar__org-where")?.textContent).toBe("Seu servidor");
+  });
+
   test("the sidebar lists channels, DMs (people and agents) and the pending approvals count, proposals in it", async () => {
     const state = seedState();
     for (const id of [ADA_ID, ATLAS_ID]) seedDm(state, { type: "agent", id });
@@ -147,6 +156,8 @@ describe("route guards", () => {
     const nav = screen().getByRole("navigation", { name: "Navegação do workspace" });
     expect(nav.textContent).toContain("Acme");
     expect(nav.textContent).toContain("2 membros · 2 agentes");
+    // Where the workspace lives, before its counts.
+    expect(nav.querySelector(".sidebar__org-where")?.textContent).toBe("Cloud");
     // Two approvals and the two proposals waiting: proposals count in Aprovações unless they have a row of their own.
     expect(screen().getByLabelText("4 aprovações pendentes").textContent).toBe("4");
     for (const name of ["Canais", "eng", "general", "Mensagens diretas", "Ada", "Atlas", "João"]) {

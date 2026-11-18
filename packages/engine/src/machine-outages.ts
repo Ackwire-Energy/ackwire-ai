@@ -9,15 +9,7 @@ import { publishQueueChanged } from "./computer-queue";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { TASK_OFFLINE_GRACE_MS } from "./machine-tasks";
-import {
-  getMachine,
-  inStandby,
-  type MachineRow,
-  machineOnline,
-  machinePause,
-  mayBeHome,
-  setAgentComputerTarget,
-} from "./machines";
+import { getMachine, type MachineRow, machinePause, mayBeHome, setAgentComputerTarget, shownOnline } from "./machines";
 import { missionTurnFor } from "./missions-engine";
 import { can, requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
@@ -137,8 +129,8 @@ export async function listMachineOutages(
     .from(machines)
     .where(and(eq(machines.orgId, orgId), isNull(machines.deletedAt)))
     .orderBy(machines.createdAt);
-  // One in standby is asleep by design, never an outage (ADR 0161).
-  const offline = rows.filter((m) => !machineOnline(m, now) && !inStandby(m));
+  // One in standby is asleep by design, never an outage, until a wake of it is overdue (ADR 0161).
+  const offline = rows.filter((m) => !shownOnline(m, now));
   const offlineIds = offline.map((m) => m.id);
 
   const [onMachines, waiting] = offlineIds.length
@@ -226,7 +218,7 @@ export async function listMachineOutages(
   const targets: OutageTarget[] = rows
     .filter((m) => !out.has(m.id) && mayBeHome(m))
     .map((m) => {
-      const online = machineOnline(m, now);
+      const online = shownOnline(m, now);
       return {
         kind: "machine" as const,
         machineId: m.id,
@@ -281,7 +273,7 @@ export async function moveAgentsFromMachine(
   }
   const to = await getMachine(db, orgId, target.machineId);
   if (!to) throw new ConflictError("That computer isn't in this organization", "machine.target_not_found");
-  if (!machineOnline(to, now)) {
+  if (!shownOnline(to, now)) {
     throw new ConflictError(`${to.name} is offline`, "machine.target_offline", { name: to.name });
   }
   if (machinePause(to, now)) {
@@ -309,7 +301,7 @@ export async function moveAgentsFromMachine(
       continue;
     }
     try {
-      await setAgentComputerTarget(deps, actorId, orgId, agentId, to.id);
+      await setAgentComputerTarget(deps, actorId, orgId, agentId, to.id, { wakeWaits: false });
       moved.push(agentId);
     } catch (error) {
       if (error instanceof ForbiddenError) skipped.push({ agentId, reason: "forbidden" });

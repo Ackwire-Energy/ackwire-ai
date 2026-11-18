@@ -84,6 +84,16 @@
   flex-direction: column;
   gap: 8px;
 }
+/* Under the account in use: it goes on with the next account of the order at a limit (ADR 0041 §6). */
+.bd-moves {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 20px;
+  color: var(--muted);
+}
+.bd-moves > .ac-icon {
+  color: var(--faint);
+}
 /* Whom a switch is for, then the account it goes to: the body's own gap between them, no margin of the cards' own. */
 .bd .arrival-for {
   margin-bottom: 0;
@@ -340,7 +350,7 @@ html:not([data-pointer]) .bd-line:focus-visible {
 
 /* ---------- choices without a mark (the models, the computers) ---------- */
 .bd .arrival-have__row.bd-pick {
-  grid-template-columns: 18px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 /* Over the account line's colour (arrival.css) by specificity, never by which sheet links last. */
 .arrival-have__line.bd-pick__hint {

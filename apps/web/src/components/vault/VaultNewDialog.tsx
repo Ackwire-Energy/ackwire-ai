@@ -44,12 +44,15 @@ export function VaultNewDialog({
   canManageTeam,
   scope: startScope,
   onClose,
+  onImportEnv,
   onCreated,
 }: {
   canManageTeam: boolean;
   /** The tab it was opened from. */
   scope: VaultScope;
   onClose: () => void;
+  /** Leaves this form for "Import .env", offered while the item is a key. */
+  onImportEnv: () => void;
   onCreated: (item: VaultItem) => void;
 }) {
   const { t } = useTranslation();
@@ -151,6 +154,11 @@ export function VaultNewDialog({
                 )}
               />
             </Field>
+            {kind === "key" && (
+              <Button size="sm" icon="upload" className="vlt-new__env" onClick={onImportEnv}>
+                {t("vault.env.open")}
+              </Button>
+            )}
             <ItemFields
               kind={kind}
               draft={draft}

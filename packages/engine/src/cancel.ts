@@ -1,26 +1,39 @@
-import { DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
+import { type AgentScope, DESKTOP_PROTOCOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, gte, inArray, schema, sql } from "@agenteschat/db";
 import { announceAgentStatus } from "./agent-status";
+import { publishApproval } from "./approvals";
 import { recordAudit } from "./audit";
 import { personOfMessage } from "./authority";
 import { lineMachineOf, publishQueueChanged } from "./computer-queue";
 import { INBOX_JOB } from "./dispatch";
 import { ConflictError, ForbiddenError, NotFoundError } from "./errors";
-import { publishChannelEvent } from "./events";
+import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { MachineHub } from "./machine-hub";
 import { cancelOrgTasks, type TaskCall } from "./machine-tasks";
+import { insertMessage, type Message, messageView } from "./messages";
 import { resolveQuestionNotifications } from "./notification-producers";
 import { can, type Membership, requireActiveMembership } from "./organizations";
 import { type AgentQuestionRow, publishQuestion, syncQuestionMessage } from "./questions";
+import { isRightHandId } from "./right-hand";
+import { seatScopes } from "./right-hand-seats";
 import { closeRoutineRun } from "./routine-ledger";
 import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
 import { tellAgentStopped } from "./run-stopped";
-import { isTerminal, type RunStatus, replyThreadOf, transitionRun } from "./runs";
+import {
+  addRunStep,
+  isTerminal,
+  type RunStatus,
+  replyThreadOf,
+  type StopActor,
+  stopError,
+  stopNote,
+  transitionRun,
+} from "./runs";
 import { cancelSecretRequests, publishSecret, type SecretRequestRow, syncSecretMessage } from "./secrets";
 import { standingErrorDetail } from "./standing";
 import { endWork } from "./works";
 
-const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels, machines } = schema;
+const { agentRuns, agents, approvals, agentQuestions, outbox, messages, channels, machines, users } = schema;
 
 /** Cross-instance: the worker running the run aborts it (LISTEN/NOTIFY with the Postgres pub/sub). */
 export const RUN_CANCEL_TOPIC = "system:run-cancel";
@@ -186,9 +199,7 @@ export async function mayStopRun(
   return (await personOfMessage(db, row.run.orgId, row.run.triggerMessageId)) === userId;
 }
 
-/** Who canceled (stored on the run as `canceled_by:{userId}`). */
-export const canceledBy = (error: string | null | undefined) =>
-  error?.startsWith("canceled_by:") ? error.slice("canceled_by:".length) : null;
+export { canceledBy } from "./runs";
 
 /**
  * Stops an agent's run (`POST …/runs/{runId}/cancel`), for who may (`mayStopRun`).
@@ -196,7 +207,7 @@ export const canceledBy = (error: string | null | undefined) =>
  * - Waiting for an approval or an answer: it ends; the approval or question is canceled.
  * - Running: the worker aborts the model stream (usage so far is recorded),
  *   stops before the next tool, kills running code, and posts what the agent
- *   wrote so far with "Stopped by …".
+ *   wrote so far with "Stopped by …" (stopped to read a message, `sendMessageId`, it says no stop).
  * The UI hears `run.canceled` at once. Audited. Messages sent to it that it hasn't read get a run
  * of their own (`releaseInbox`), except `stopMessageId`: the message that asked it to stop.
  */
@@ -205,8 +216,19 @@ export async function cancelRun(
   userId: string,
   orgId: string,
   runId: string,
-  /** `chain`: what the run asked of other agents stops with it, all the way down (`stopHelpers`). */
-  options: { stopMessageId?: string; reason?: string; tell?: boolean; chain?: boolean } = {},
+  /**
+   * `chain`: what the run asked of other agents stops with it, all the way down (`stopHelpers`).
+   * `sendMessageId`: "Parar e mandar" to a computer brain: the message it is stopped to read (`stoppedToSend`).
+   * `byAgentId`: the agent that stops it at the person's word (the right hand).
+   */
+  options: {
+    stopMessageId?: string;
+    sendMessageId?: string;
+    reason?: string;
+    tell?: boolean;
+    chain?: boolean;
+    byAgentId?: string;
+  } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus }> {
   const { db } = deps;
   const membership = await requireActiveMembership(db, userId, orgId);
@@ -231,8 +253,9 @@ export async function cancelRun(
     ? await (await import("./consultations")).stopHelpers(deps, userId, orgId, runId, options.reason)
     : [];
   // It ended as the person pressed stop, but what it asked was still on: that stopped, and its agent reads so.
+  const by = options.byAgentId;
   if (helpers.length > 0 && isTerminal(row.run.status)) {
-    await tellAgentStopped(deps, row.run, row.run.status, userId, options.reason, helpers).catch(() => null);
+    await tellAgentStopped(deps, row.run, row.run.status, userId, options.reason, helpers, by).catch(() => null);
     return { id: row.run.id, status: row.run.status, previousStatus: row.run.status };
   }
   // The agent's owner or an admin decides for the whole conversation; who asked, only for what they sent.
@@ -242,7 +265,7 @@ export async function cancelRun(
     orgId,
     row.run,
     row.channelKind,
-    { type: "person", id: userId },
+    { type: "person", id: userId, ...(by ? { agentId: by } : {}) },
     {
       ...options,
       forAll,
@@ -250,19 +273,22 @@ export async function cancelRun(
   );
   // The agent is told (ADR 0128), unless the stop came with a message to it ("Parar e mandar": that message says it)
   // or the agent stopped it itself on a person's word (`tell: false`).
-  if (!options.stopMessageId && options.tell !== false) {
-    await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason, helpers).catch(() => null);
+  if (!options.stopMessageId && !options.sendMessageId && options.tell !== false) {
+    await tellAgentStopped(deps, row.run, stopped.previousStatus, userId, options.reason, helpers, by).catch(
+      () => null,
+    );
   }
   // Its usage note's "Don't run it" speaks for every turn that note took in, each for who may stop it.
-  for (const id of stopped.joined ?? []) await cancelRun(deps, userId, orgId, id, { tell: false }).catch(() => null);
+  for (const id of stopped.joined ?? [])
+    await cancelRun(deps, userId, orgId, id, { tell: false, ...(by ? { byAgentId: by } : {}) }).catch(() => null);
   return stopped;
 }
 
 /**
  * Ends a run that hasn't finished: its pending approvals, questions and
  * secret requests close, its queued jobs are dropped, the worker running it
- * aborts, and the app hears it stopped. `actor`: the person who stopped it,
- * or the system (a consultation nobody waits for anymore, ADR 0034).
+ * aborts, and the app hears it stopped. `actor`: the person who stopped it (or the agent at their word),
+ * or the system (a consultation nobody waits for anymore, ADR 0034), kept on the run (`stopError`).
  * Its unread messages are handed on, and an agent whose question it answered
  * hears it couldn't: by the worker executing it once it has posted the stop
  * (it may restart from a "Parar e mandar"), else here.
@@ -272,12 +298,12 @@ export async function stopRun(
   orgId: string,
   start: typeof agentRuns.$inferSelect,
   channelKind: string | null,
-  actor: { type: "person"; id: string } | { type: "system"; reason: string },
+  actor: StopActor,
   /** `forAll`: the person stops a conversation's catch-up for everyone in it (the agent's owner, an admin). */
-  options: { stopMessageId?: string; forAll?: boolean } = {},
+  options: { stopMessageId?: string; sendMessageId?: string; forAll?: boolean } = {},
 ): Promise<{ id: string; status: RunStatus; previousStatus: RunStatus; joined?: string[] }> {
   const { db } = deps;
-  const error = actor.type === "person" ? `canceled_by:${actor.id}` : actor.reason;
+  const error = stopError(actor);
   let run = start;
   let previous: RunStatus = run.status;
   let line: string | null = null;
@@ -288,21 +314,80 @@ export async function stopRun(
     const status = run.status;
     let closedSecrets: SecretRequestRow[] = [];
     let closedQuestions: AgentQuestionRow[] = [];
+    let closedApprovals: (typeof approvals.$inferSelect)[] = [];
+    let heldPost: Message | null = null;
     const done = await db.transaction(async (tx) => {
       const moved = await transitionRun(tx, run.id, status, "canceled", { error });
       if (!moved) return null;
+      // Parked with a reply held for its wording, nobody runs its worker's stop (`stopCanceled`): that finished answer
+      // is posted here, already as the run would publish it, or the person never sees it. Stopped to read a message
+      // ("Parar e mandar"), it goes just before that message, as written, with no stop said.
+      const held = (moved.transcript as { heldWording?: string } | null)?.heldWording;
+      if (held && status !== "running" && !moved.background && actor.type === "person") {
+        const [sent] = options.sendMessageId
+          ? await tx
+              .select({ createdAt: messages.createdAt })
+              .from(messages)
+              .where(and(eq(messages.orgId, orgId), eq(messages.id, options.sendMessageId)))
+          : [];
+        const [person] = sent ? [] : await tx.select({ name: users.name }).from(users).where(eq(users.id, actor.id));
+        const [stopper] =
+          sent || !actor.agentId
+            ? []
+            : await tx.select({ name: agents.name }).from(agents).where(eq(agents.id, actor.agentId));
+        heldPost = await insertMessage(tx, {
+          orgId,
+          channelId: moved.channelId,
+          threadId: replyThreadOf(moved),
+          author: { type: "agent", agentId: moved.agentId, runId: moved.id, hop: moved.hop },
+          ...(sent
+            ? { body: held, createdAt: new Date(sent.createdAt.getTime() - 1) }
+            : {
+                body: `${held}\n\n${stopNote(person?.name, stopper?.name)}`,
+                meta: {
+                  canceled: {
+                    byUserId: actor.id,
+                    ...(actor.agentId ? { byAgentId: actor.agentId } : {}),
+                    text: held,
+                  },
+                },
+              }),
+        });
+        await addRunStep(tx, moved, "message", { messageId: heldPost.id, held: true });
+        await tx
+          .update(agentRuns)
+          .set({ replyMessageId: heldPost.id, transcript: sql`${agentRuns.transcript} - 'heldWording'` })
+          .where(eq(agentRuns.id, moved.id));
+      }
       // The "stop" itself needs no answer: it never gets a run of its own.
       if (options.stopMessageId) {
         await tx
           .update(agentRuns)
           .set({ pendingMessageIds: sql`array_remove(${agentRuns.pendingMessageIds}, ${options.stopMessageId}::uuid)` })
           .where(eq(agentRuns.id, run.id));
+        // A turn that took it live gives it back when it ends: marked, so it is not handed on then (`returnToInbox`).
+        await tx
+          .update(messages)
+          .set({
+            meta: sql`jsonb_set(${messages.meta}, '{stopOfRunIds}', coalesce(${messages.meta}->'stopOfRunIds', '[]'::jsonb) || to_jsonb(${run.id}::text))`,
+          })
+          .where(and(eq(messages.orgId, orgId), eq(messages.id, options.stopMessageId)));
+      }
+      // Stopped to read this message: the message says so, and the run's end posts no stop (`stoppedToSend`).
+      if (options.sendMessageId) {
+        await tx
+          .update(messages)
+          .set({
+            meta: sql`jsonb_set(${messages.meta}, '{stoppedRunIds}', coalesce(${messages.meta}->'stoppedRunIds', '[]'::jsonb) || to_jsonb(${run.id}::text))`,
+          })
+          .where(and(eq(messages.orgId, orgId), eq(messages.id, options.sendMessageId)));
       }
       const now = new Date();
-      await tx
+      closedApprovals = await tx
         .update(approvals)
         .set({ status: "canceled", decidedAt: now })
-        .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")));
+        .where(and(eq(approvals.runId, run.id), eq(approvals.status, "pending")))
+        .returning();
       // Their cards close too, or "Responder" would stay offered on a question nobody can answer anymore.
       closedQuestions = await tx
         .update(agentQuestions)
@@ -325,7 +410,14 @@ export async function stopRun(
         );
       await recordAudit(tx, {
         orgId,
-        actor: actor.type === "person" ? actor : { type: "system", id: null },
+        // The right hand's stop is its own, on behalf of the person whose word it acted on.
+        actor:
+          actor.type === "system"
+            ? { type: "system", id: null }
+            : actor.agentId
+              ? { type: "agent", id: actor.agentId }
+              : { type: "person", id: actor.id },
+        ...(actor.type === "person" && actor.agentId ? { onBehalfOfUserId: actor.id } : {}),
         action: "run.canceled",
         target: { type: "agent_run", id: run.id },
         details: { agentId: run.agentId, from: status, ...(actor.type === "system" ? { reason: actor.reason } : {}) },
@@ -334,7 +426,10 @@ export async function stopRun(
     });
     if (done) {
       run = done;
+      if (heldPost && deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(heldPost));
       for (const r of closedSecrets) await publishSecret(deps, r, "secret.updated");
+      // Their cards say canceled and they leave the inbox: nothing waits on a person for a run that stopped.
+      for (const a of closedApprovals) await publishApproval(deps, a, "approval.decided").catch(() => {});
       for (const q of closedQuestions) {
         await publishQuestion(deps.pubsub, q, "question.answered");
         // Out of everyone's inbox too: a question nobody can answer any more never waits on a person.
@@ -348,7 +443,7 @@ export async function stopRun(
     run = fresh;
   }
 
-  // The worker running it (here or on another instance) aborts and posts what was written.
+  // The worker running it (here or on another instance) aborts and posts what was written (`stopCanceled`).
   abortLocalRun(run.id);
   if (deps.pubsub) await deps.pubsub.publish(RUN_CANCEL_TOPIC, { type: "run.cancel", runId: run.id }).catch(() => {});
   // Waiting on its plan or budget: its note or card says it won't run when the limit is back.
@@ -408,7 +503,12 @@ export async function stopRun(
   };
   const bg = run.background ? { background: true as const } : {};
   if (actor.type === "person" && !run.background)
-    await publishChannelEvent(deps.pubsub, { type: "run.canceled", ...where, byUserId: actor.id });
+    await publishChannelEvent(deps.pubsub, {
+      type: "run.canceled",
+      ...where,
+      byUserId: actor.id,
+      ...(actor.agentId ? { byAgentId: actor.agentId } : {}),
+    });
   await publishChannelEvent(deps.pubsub, { type: "agent.run", ...where, ...bg, status: "canceled" });
   // Its line ends with the run (ADR 0084 §11).
   await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
@@ -510,8 +610,15 @@ export async function stopOrgWork(
         agentId ? eq(agents.id, agentId) : undefined,
       ),
     );
+  // The right hand's desktops are its people's seats on the workspace's own computer (ADR 0175).
+  const seats = !agentId || (await isRightHandId(deps.db, orgId, agentId)) ? await seatScopes(deps.db, orgId) : null;
+  const stops: { machineId: string; agent: AgentScope }[] = desktops.map(({ machineId, ...agent }) => ({
+    machineId,
+    agent,
+  }));
+  if (seats) stops.push(...seats.agents.map((agent) => ({ machineId: seats.machineId, agent })));
   await Promise.all(
-    desktops.map(({ machineId, ...agent }) =>
+    stops.map(({ machineId, agent }) =>
       hub.call(machineId, { op: "desktop.session.stop", agent }, { timeoutMs: 15_000 }).catch(() => null),
     ),
   );

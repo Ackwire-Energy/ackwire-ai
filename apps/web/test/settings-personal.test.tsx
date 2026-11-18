@@ -5,7 +5,8 @@ setupDom();
 
 import type { OrgRole } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADMIN_ROLE_ID, ATLAS_ID, createFakeApi, ORG_ID, seedRoles, seedState } from "./fake-api";
+import { ADMIN_ROLE_ID, createFakeApi, ORG_ID, seedRoles, seedState } from "./fake-api";
+import { shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 /* Settings in a personal workspace (ADR 0159 §3, §4): one short list and Advanced, About you with the Mode row, the
@@ -81,14 +82,14 @@ describe("a personal workspace's settings list", () => {
     await click(within(nav()).getByRole("button", { name: "Avançado" }));
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     const all = rows();
-    for (const name of ["Pessoas", "Auditoria", "Armazenamento"]) {
+    for (const name of ["Pessoas", "Cargos", "Auditoria", "Armazenamento"]) {
       expect(all).toContain(name);
       expect(all.indexOf(name)).toBeGreaterThan(all.indexOf("Avançado"));
     }
     expect(all.filter((name) => name === "Conectores e MCPs")).toHaveLength(1);
     expect(all.indexOf("Conectores e MCPs")).toBeLessThan(all.indexOf("Avançado"));
-    // Notifications are a tab of Your account, Skills of Connectors, Roles of People: not listed again.
-    for (const name of ["Notificações", "Skills", "Papéis e permissões"]) expect(all).not.toContain(name);
+    // Notifications are a tab of Your account, Skills of Connectors: not listed again.
+    for (const name of ["Notificações", "Skills"]) expect(all).not.toContain(name);
     cleanup();
     await go(alone(), "settings/skills");
     expect(marked()).toBe("Conectores e MCPs");
@@ -102,9 +103,9 @@ describe("a personal workspace's settings list", () => {
     expect(within(nav()).getByRole("button", { name: "Avançado" }).getAttribute("aria-expanded")).toBe("true");
     expect(marked()).toBe("Auditoria");
     cleanup();
-    // Roles is on People's page, alone under Advanced or in the list with someone else here.
+    // Cargos is a section of its own (ADR 0085 addendum of 2026-11-13), under Advanced in a personal workspace.
     await go(personal(), "settings/roles");
-    expect(marked()).toBe("Pessoas");
+    expect(marked()).toBe("Cargos");
   });
 
   test("the old address of AI accounts opens AI and usage, where the accounts and the keys are", async () => {
@@ -154,14 +155,14 @@ describe("About you", () => {
     expect(within(workspace).getByLabelText("Nome do workspace")).toBeTruthy();
     expect(within(workspace).getByRole("switch", { name: "Agentes conferem o que já foi feito" })).toBeTruthy();
     expect(within(workspace).getByText("Pessoal")).toBeTruthy();
-    expect(within(workspace).getByRole("button", { name: "Mudar para time…" })).toBeTruthy();
+    expect(within(workspace).getByRole("button", { name: "Mudar para time" })).toBeTruthy();
     expect(screen().queryByRole("region", { name: "Tudo do workspace" })).toBeNull();
     expect(within(workspace).queryByRole("button", { name: "Enviar logo" })).toBeNull();
   });
 
   test("Switch to team asks the workspace's name and switches it, with that name", async () => {
     const state = await go(personal(), "settings/general");
-    await click(screen().getByRole("button", { name: "Mudar para time…" }));
+    await click(screen().getByRole("button", { name: "Mudar para time" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar para um workspace de time" });
     expect(dialog.querySelectorAll(".deletion-lines > li")).toHaveLength(3);
     expect(dialog.textContent).toContain("Seus agentes, conversas, rotinas e arquivos continuam como estão.");
@@ -177,7 +178,7 @@ describe("About you", () => {
 
   test("an empty name can't switch to team", async () => {
     await go(personal(), "settings/general");
-    await click(screen().getByRole("button", { name: "Mudar para time…" }));
+    await click(screen().getByRole("button", { name: "Mudar para time" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar para um workspace de time" });
     await type(within(dialog).getByLabelText("Nome do workspace"), "  ");
     expect(within(dialog).getByRole("button", { name: "Mudar para time" }).hasAttribute("disabled")).toBe(true);
@@ -189,7 +190,7 @@ describe("a team's General", () => {
     const state = await go(seedState(), "settings/general");
     const workspace = screen().getByRole("region", { name: "Workspace" });
     expect(within(workspace).getByText("Time")).toBeTruthy();
-    await click(within(workspace).getByRole("button", { name: "Mudar para pessoal…" }));
+    await click(within(workspace).getByRole("button", { name: "Mudar para pessoal" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar para um workspace pessoal" });
     expect(dialog.textContent).toContain("A outra pessoa daqui também vê assim");
     expect(within(dialog).queryByLabelText("Nome do workspace")).toBeNull();
@@ -203,7 +204,7 @@ describe("a team's General", () => {
     const state = seedState();
     state.members = state.members.filter((m) => m.userId === state.me?.user.id);
     await go(state, "settings/general");
-    await click(screen().getByRole("button", { name: "Mudar para pessoal…" }));
+    await click(screen().getByRole("button", { name: "Mudar para pessoal" }));
     const dialog = screen().getByRole("dialog", { name: "Mudar para um workspace pessoal" });
     expect(dialog.textContent).not.toContain("também vê");
     expect(dialog.querySelectorAll(".deletion-lines > li")).toHaveLength(4);
@@ -246,23 +247,28 @@ describe("inviting in a personal workspace", () => {
     expect(screen().queryByRole("dialog", { name: "Quem você vai convidar?" })).toBeNull();
   });
 
-  test("a family member joins with a plain choice: uses the agents, or helps run it (Admin)", async () => {
+  test("a family member joins with a plain choice, Pode: uses the agents, or helps run it (Admin), each said behind ⓘ", async () => {
     await go(personal(), "settings/members");
     await click(screen().getAllByRole("button", { name: "Convidar pessoas" })[0] as HTMLElement);
     await click(within(question()).getByRole("button", { name: "Continuar" }));
     const dialog = screen().getByRole("dialog", { name: "Convidar alguém para o seu workspace" });
-    const emails = within(dialog).getByLabelText("E-mails");
-    await type(emails, "nova@exemplo.com.br");
-    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
-    await click(within(dialog).getByRole("button", { name: "Continuar" }));
-    expect(dialog.textContent).toContain("O que Nova pode fazer aqui?");
-    const options = [...dialog.querySelectorAll(".invite-roles .ac-option__title")].map((o) => o.textContent);
-    expect(options).toEqual(["Usa os agentes", "Ajuda a cuidar daqui"]);
+    expect([...dialog.querySelectorAll(".ac-field__label")].map((l) => l.textContent)).toEqual([
+      "Para",
+      "Pode",
+      "Conversas",
+      "Agentes",
+    ]);
+    const can = within(dialog).getByRole("combobox", { name: "Pode" });
+    expect(can.textContent).toBe("Usa os agentes");
+    can.focus();
+    await act(async () => fireEvent.keyDown(can, { key: "Enter" }));
+    const options = screen().getAllByRole("option");
+    expect(options.map((o) => shownText(o).trim())).toEqual(["Usa os agentes", "Ajuda a cuidar daqui"]);
     // What the helper sees is said, DMs left out.
-    expect(dialog.textContent).toContain("menos as suas conversas diretas");
+    expect(document.body.textContent).toContain("menos as suas conversas diretas");
   });
 
-  test("another role comes after the two by its name; the agents that answer everyone are named; Admin is sent", async () => {
+  test("another role comes after the two by its name; Admin is sent", async () => {
     const state = personal();
     const [admin, everyone] = seedRoles() as [OrgRole, OrgRole];
     state.roles = [
@@ -270,34 +276,28 @@ describe("inviting in a personal workspace", () => {
       { ...admin, id: "role-kids", name: "Crianças", permissions: ["post"], position: 1 },
       everyone,
     ];
-    const atlas = state.agents.find((a) => a.id === ATLAS_ID);
-    if (atlas) atlas.audience = { mode: "owner", userIds: [] };
     await go(state, "settings/members");
     await click(screen().getAllByRole("button", { name: "Convidar pessoas" })[0] as HTMLElement);
     await click(within(question()).getByRole("button", { name: "Continuar" }));
     const dialog = screen().getByRole("dialog", { name: "Convidar alguém para o seu workspace" });
-    const emails = within(dialog).getByLabelText("E-mails");
-    await type(emails, "nova@exemplo.com.br");
-    await act(async () => fireEvent.keyDown(emails, { key: "Enter" }));
-    await click(within(dialog).getByRole("button", { name: "Continuar" }));
-    const cards = [...dialog.querySelectorAll<HTMLElement>(".invite-roles button")];
-    expect(cards.map((c) => c.querySelector(".ac-option__title")?.textContent)).toEqual([
-      "Usa os agentes",
-      "Ajuda a cuidar daqui",
-      "Crianças",
-    ]);
-    // Ada answers everyone, Atlas only its owner: only Ada is named, a way to whom she answers.
-    expect(dialog.textContent).toContain("Ada vai responder a quem entrar.");
-    expect(dialog.textContent).not.toContain("Atlas vai");
-    expect(within(dialog).getByRole("link", { name: "Ada" }).getAttribute("href")).toContain("sec=audience");
-    await click(cards[1] as HTMLElement);
-    await click(within(dialog).getByRole("button", { name: "Continuar" }));
-    for (let i = 0; i < 2 && !within(dialog).queryByRole("button", { name: "Convidar 1 pessoa" }); i++)
-      await click(within(dialog).getByRole("button", { name: "Continuar" }));
+    const to = within(dialog).getByLabelText("Para");
+    await type(to, "nova@exemplo.com.br");
+    await act(async () => fireEvent.keyDown(to, { key: "Enter" }));
+    const can = within(dialog).getByRole("combobox", { name: "Pode" });
+    can.focus();
+    await act(async () => fireEvent.keyDown(can, { key: "Enter" }));
+    expect(
+      screen()
+        .getAllByRole("option")
+        .map((o) => shownText(o).trim()),
+    ).toEqual(["Usa os agentes", "Ajuda a cuidar daqui", "Crianças"]);
+    await click(screen().getByRole("option", { name: /Ajuda a cuidar daqui/ }));
+    await settle(2);
     await click(within(dialog).getByRole("button", { name: "Convidar 1 pessoa" }));
     await settle(6);
     expect(state.calls.find((c) => c.method === "orgs.inviteMany")?.args[1]).toMatchObject({
-      invites: [{ email: "nova@exemplo.com.br", roleIds: [ADMIN_ROLE_ID] }],
+      emails: ["nova@exemplo.com.br"],
+      roleIds: [ADMIN_ROLE_ID],
     });
   });
 });

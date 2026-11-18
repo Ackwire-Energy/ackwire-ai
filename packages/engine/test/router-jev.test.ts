@@ -18,6 +18,7 @@ import {
   insertMessage,
   JevOffError,
   jevCostNanoUsd,
+  jevCostOf,
   loadReplyPolicy,
   messageRouter,
   postPersonMessage,
@@ -941,6 +942,11 @@ describe("Jev strategy end to end", () => {
       costNanoUsd: jevCostNanoUsd(1200),
     });
     expect(jevCostNanoUsd(1_000_000)).toBe(42_000_000); // $0.042 per million input tokens
+    // Through OpenRouter, what it reports each call cost (USD) is recorded, in nano-USD.
+    expect(jevCostOf({ input_tokens: 476, cost: 0.000019992 })).toBe(19_992);
+    expect(jevCostOf({ input_tokens: 1000, cost: 0.0000000016 })).toBe(2);
+    expect(jevCostOf({ input_tokens: 1000 })).toBe(42_000);
+    expect(jevCostOf({ input_tokens: 1000, cost: -1 })).toBe(42_000);
   });
 
   test("on a Jev error the LLM strategy decides, and the decision says so", async () => {

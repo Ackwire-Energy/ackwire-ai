@@ -21,16 +21,33 @@ async function members(state: ReturnType<typeof seedState>) {
   await settle(6);
 }
 
+const LINK_ITEM = "Gerar link de senha novaPara quando a pessoa esqueceu a senha";
+
+/** Radix opens the menu as the pointer goes down, never on the click. */
+async function openMenu(name: string) {
+  await act(async () =>
+    fireEvent.pointerDown(screen().getByRole("button", { name: `Mais de ${name}` }), { button: 0, ctrlKey: false }),
+  );
+  await settle(2);
+}
+
+/** What a person's row menu offers. */
+async function itemsOf(name: string) {
+  await openMenu(name);
+  const items = screen()
+    .getAllByRole("menuitem")
+    .map((i) => i.textContent ?? "");
+  await act(async () => fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" }));
+  await settle(1);
+  return items;
+}
+
 test("an owner makes the link for a member and copies it; their own row has none", async () => {
   const state = seedState();
   state.authConfig = { passwordReset: false };
   await members(state);
-  expect(screen().queryByRole("button", { name: "Mais de Wesley" })).toBeNull();
-  // Radix opens the menu as the pointer goes down, never on the click.
-  await act(async () =>
-    fireEvent.pointerDown(screen().getByRole("button", { name: "Mais de João" }), { button: 0, ctrlKey: false }),
-  );
-  await settle(2);
+  expect(await itemsOf("Walter")).not.toContain(LINK_ITEM);
+  await openMenu("João");
   await click(screen().getByRole("menuitem", { name: /Gerar link de senha nova/ }));
   await settle(4);
   const dialog = screen().getByRole("dialog", { name: "Link de senha nova para João" });
@@ -50,11 +67,11 @@ test("not where the server emails the person their own link, nor for someone who
   const emails = seedState();
   emails.authConfig = { passwordReset: true };
   await members(emails);
-  expect(screen().queryByRole("button", { name: "Mais de João" })).toBeNull();
+  expect(await itemsOf("João")).not.toContain(LINK_ITEM);
   cleanup();
   const admin = seedState();
   admin.authConfig = { passwordReset: false };
   meAsAdmin(admin);
   await members(admin);
-  expect(screen().queryByRole("button", { name: /^Mais de/ })).toBeNull();
+  expect(await itemsOf("João")).not.toContain(LINK_ITEM);
 });

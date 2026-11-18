@@ -1,6 +1,7 @@
 import type { ConnectorCategory, ConnectorDef, CustomConnectStart } from "@agenteschat/client";
 import { hiddenWithoutComposio } from "@agenteschat/client/lib/composio";
 import { CONNECTOR_MARK, type ConnectedItem, OWN_MARK, SERVER_ICON } from "@agenteschat/client/lib/connected";
+import { heldWhole, joinNames } from "@agenteschat/client/lib/format";
 import { mixHex } from "@agenteschat/ui/agent/engine";
 import type { TFunction } from "i18next";
 
@@ -90,13 +91,31 @@ export function galleryTiles(list: ConnectorDef[], items: ConnectedItem[]) {
 
 /**
  * Why the sheet asks for a key: the server only lets in apps it approved (`not_approved`, with its own words on the
- * next line when it gave any), or it has no sign-in.
+ * next line when it gave any), it said no to the request headers sent alone (`sentHeaders`), or it has no sign-in.
  */
-export function needsKeyText(t: TFunction, start: Extract<CustomConnectStart, { status: "needs_key" }>, name: string) {
-  if (start.reason !== "not_approved") return t("mobile.connectors.needsKey");
+export function needsKeyText(
+  t: TFunction,
+  start: Extract<CustomConnectStart, { status: "needs_key" }>,
+  name: string,
+  sentHeaders = false,
+) {
+  if (start.reason !== "not_approved") {
+    return t(sentHeaders ? "connectFlow.headers.refused" : "mobile.connectors.needsKey");
+  }
   const text = t("connectFlow.notApproved", { name });
   return start.detail ? `${text}\n${t("connectFlow.serverSaid", { detail: start.detail })}` : text;
 }
+
+/**
+ * A shared line about request headers with its `<names/>` said as a list ("X-API-Key e X-Tenant"): the web draws each
+ * name as code there, the phone as words. A name never breaks at its hyphens. The names go in through a function:
+ * `$&` and `$'` in a name are its own characters, not patterns of the replacement.
+ */
+export const headerNamesText = (
+  t: TFunction,
+  key: "connectors.sendsToo" | "connectFlow.headers.saved" | "connectFlow.headers.dropping",
+  names: readonly string[],
+) => t(key, { count: names.length }).replace("<names/>", () => joinNames(names.map(heldWhole), t));
 
 /** How a service connects on the phone: signing in in the browser, a key, or either. */
 export type ConnectHow = "signIn" | "key" | "either";

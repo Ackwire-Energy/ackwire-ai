@@ -269,7 +269,10 @@ const Routine = z
       }),
     ]),
     active: z.boolean().openapi({ description: "One-off routines are inactive once they fired." }),
-    nextRunAt: z.string().nullable(),
+    nextRunAt: z.string().nullable().openapi({
+      description:
+        "Null while paused, for an event's routine, and while the workspace is being deleted (its slots pass).",
+    }),
     createdAt: z.string(),
     access: Access,
     report: Report,
@@ -308,11 +311,11 @@ const Routine = z
         plan: z.string().nullable().openapi({ description: 'The plan it waits for ("Claude"); null for a budget.' }),
         extraOff: z.boolean().openapi({
           description:
-            "A plan pause whose window is used up, on an agent whose long work may not use paid extra usage: continuing is refused.",
+            "A plan pause whose window is used up, on an agent whose long work never uses paid extra usage (someone else's plan lent to it, or the team's right hand): continuing is refused.",
         }),
         extraUsedUp: z.boolean().openapi({
           description:
-            "A plan pause whose window is used up, on an agent whose long work may use paid extra usage but the plan has none left: continuing is refused.",
+            "A plan pause whose window is used up, on an agent whose long work uses paid extra usage but the plan has none left: continuing is refused.",
         }),
       })
       .nullable()
@@ -840,7 +843,7 @@ export function routineRoutes(deps: AppDeps) {
       security,
       summary: "Continue a run paused near its plan's or budget's limit now (its creator, admins or the agent's owner)",
       description:
-        "The paused run goes on past the pause line until that window resets. Nothing is posted. With paid extra usage off it goes on up to the plan's own allowance: refused with `routine.continue_extra_off` (409) once that window is used up, or `routine.continue_extra_used_up` when the switch is on but the plan has no extra usage left. Nothing paused: the routine as it is.",
+        "The paused run goes on past the pause line until that window resets. Nothing is posted. Where its long work never uses paid extra usage (someone else's plan lent to the agent, or the team's right hand) it goes on up to the plan's own allowance: refused with `routine.continue_extra_off` (409) once that window is used up, or `routine.continue_extra_used_up` when the plan has no extra usage left. Nothing paused: the routine as it is.",
       request: { params: RoutineParams },
       responses: { 200: json(Routine), ...errors },
     }),

@@ -3,6 +3,7 @@ import type { Config } from "@agenteschat/config";
 import {
   getMigration,
   getStorage,
+  STORAGE_PROVIDERS,
   type StorageDeps,
   saveStorage,
   startMigration,
@@ -15,8 +16,14 @@ import { type AppDeps, body, createAppRouter, errors, json, OrgParams, requireSe
 
 const tags = ["Storage"];
 
+const Provider = z.enum(STORAGE_PROVIDERS).openapi("StorageProvider", {
+  description:
+    "The service picked in the app (Cloudflare R2, Amazon S3, Backblaze B2 or another): which steps it shows.",
+});
+
 const S3Input = z
   .object({
+    provider: Provider.nullable().optional(),
     endpoint: z.string().min(1).max(500),
     region: z.string().max(64),
     bucket: z.string().min(1).max(63),
@@ -56,6 +63,7 @@ const StorageConfig = z
     kind: z.enum(["agentes", "s3"]),
     s3: z
       .object({
+        provider: Provider.nullable(),
         endpoint: z.string(),
         region: z.string(),
         bucket: z.string(),
@@ -92,7 +100,16 @@ const TestResult = z
   .object({
     ok: z.boolean(),
     steps: z.array(
-      z.object({ step: z.enum(["write", "read", "list", "delete"]), ok: z.boolean(), error: z.string().nullable() }),
+      z.object({
+        step: z.enum(["write", "read", "list", "delete"]),
+        ok: z.boolean(),
+        error: z.string().nullable(),
+        code: z
+          .string()
+          .nullable()
+          .optional()
+          .openapi({ description: "Stable code of the failure (`storage.permission`…), for the app to translate." }),
+      }),
     ),
   })
   .openapi("StorageTestResult");

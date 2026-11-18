@@ -18,7 +18,7 @@ import {
   type MissionDeps,
   type MissionExecutor,
   type MissionRow,
-  machineExecutors,
+  missionExecutors,
   noMentions,
   postMissionMessage,
   proposeMission,
@@ -401,7 +401,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
     bound(run, {
       name: "request_approval",
       description:
-        "Ask a person to approve a merge, a deploy or a rollback before you do it. Never merge, deploy or roll back without an approval. Your run waits for the decision; once approved, do it.",
+        "Ask a person to approve a merge, a deploy or a rollback before you do it, whenever one is held for a person. Your run waits for the decision; once approved, do it.",
       inputSchema: mcpSchema("request_approval"),
       sensitive: true,
       describe: (input) => ({
@@ -435,7 +435,7 @@ export function createMissionToolSource(deps: Omit<MissionDeps, "db">): ToolSour
       if (agent?.machineId && !mission) {
         const status = await deps.hub.status(agent.machineId);
         if (status && status.orgId === ctx.orgId) {
-          const { available } = machineExecutors(status);
+          const { available } = missionExecutors(status);
           if (available.length > 0) out.push(proposeTool(status.name, available));
         }
       }

@@ -1,13 +1,14 @@
 import { type Message, useAuthConfig, useFeedbackOffer, useSetChatPrefs } from "@agenteschat/client";
+import { errorText } from "@agenteschat/client/lib/errors";
 import { feedbackOfferFor } from "@agenteschat/client/lib/feedback-offer";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme } from "@/ui";
-import { useMeId } from "../shared/hooks";
+import { LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
 import { boldRuns } from "./actions";
 import { useCardTop } from "./look";
+import { useRowMeId } from "./row-data";
 
 /**
  * A report about the app the agent offered on its own (`meta.feedbackOffer`, ADR 0160 §12) on the phone: under its
@@ -20,15 +21,20 @@ export function FeedbackOfferRow({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { orgId, org } = useOrg();
-  const meId = useMeId();
-  const cloud = useAuthConfig().data?.cloud === true;
+  const meId = useRowMeId();
+  const auth = useAuthConfig().data;
+  // Read by the agentes.chat team: on its own servers, and from one whose operator gave no address.
+  const cloud = auth?.cloud === true || auth?.feedbackRelay === true;
   const offer = m.author.type === "agent" ? feedbackOfferFor(m.meta, meId) : null;
   const decide = useFeedbackOffer(orgId, { channelId: m.channelId, threadId: m.threadId, messageId: m.id });
   const prefs = useSetChatPrefs(orgId);
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   // A card under the message's words: the body's card gap above it, as every card in a message.
   const cardTop = useCardTop();
   if (!offer) return null;
+  // A refusal says why: the card otherwise stayed as it was, as if the tap had done nothing.
+  const failed = (error: unknown) => toast({ title: errorText(t, error), icon: "x" });
   const sent = offer.state === "sent";
   const always = org?.chatPrefs?.feedbackAuto === true;
   const words = sent
@@ -86,12 +92,12 @@ export function FeedbackOfferRow({ message: m }: { message: Message }) {
                 strong
                 label={t("feedback.offer.send")}
                 disabled={decide.isPending}
-                onPress={() => decide.mutate("send")}
+                onPress={() => decide.mutate("send", { onError: failed })}
               />
               <RowAction
                 label={t("feedback.offer.notNow")}
                 disabled={decide.isPending}
-                onPress={() => decide.mutate("dismiss")}
+                onPress={() => decide.mutate("dismiss", { onError: failed })}
               />
             </>
           )}
@@ -104,7 +110,7 @@ export function FeedbackOfferRow({ message: m }: { message: Message }) {
             <RowAction
               label={t(always ? "feedback.offer.askFirst" : "feedback.offer.always")}
               disabled={prefs.isPending}
-              onPress={() => prefs.mutate({ feedbackAuto: !always })}
+              onPress={() => prefs.mutate({ feedbackAuto: !always }, { onError: failed })}
             />
           ) : null}
         </View>
@@ -115,7 +121,8 @@ export function FeedbackOfferRow({ message: m }: { message: Message }) {
 
 const styles = StyleSheet.create({
   bold: { fontWeight: "600" },
-  // The receipts' card (TeamChecks.tsx): a hairline, the cut corner, the icon on the first line's middle.
+  // The receipts' card (TeamChecks.tsx): a hairline, the cut corner, the icon on the first line's middle. The column's
+  // width from the start, as a request's: the report opening inside never widens it.
   one: {
     flexDirection: "row",
     alignItems: "flex-start",

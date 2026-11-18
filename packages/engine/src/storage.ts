@@ -27,8 +27,9 @@ import {
 import { recordAudit } from "./audit";
 import { openSecret, randomToken, sealSecret, sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
+import { transcriptKey } from "./file-reader";
 import { assertStorageRoom } from "./limits";
-import { assertPublicHttpsUrl, type ResolveHost } from "./net-guard";
+import { assertPublicHttpsUrl, outboundFetch, type ResolveHost } from "./net-guard";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 
@@ -37,8 +38,17 @@ const { storageConfigs, storageMigrations, artifacts, artifactVersions, skillFil
 type StorageConfigRow = typeof storageConfigs.$inferSelect;
 type MigrationRow = typeof storageMigrations.$inferSelect;
 
-/** What an admin types for "Your own bucket". Keys empty = keep the stored ones. */
+/**
+ * Where the bucket is, as the admin picked it when connecting: it only says which steps the app shows and how it names
+ * the bucket in use, never how the server reaches it.
+ */
+export const STORAGE_PROVIDERS = ["r2", "s3", "b2", "other"] as const;
+export type StorageProvider = (typeof STORAGE_PROVIDERS)[number];
+
+/** What an admin types for "Your own storage". Keys empty = keep the stored ones. */
 export interface S3Input {
+  /** The service picked in the app; absent from an older app. */
+  provider?: StorageProvider | null;
   endpoint: string;
   region: string;
   bucket: string;
@@ -61,6 +71,8 @@ export interface StorageMigrationView {
 export interface StorageView {
   kind: "agentes" | "s3";
   s3: {
+    /** Null for settings saved before the app said it. */
+    provider: StorageProvider | null;
     endpoint: string;
     region: string;
     bucket: string;
@@ -98,6 +110,7 @@ const keyPrefix = (prefix: string | null | undefined) => {
 };
 
 interface StoredOptions {
+  provider: StorageProvider | null;
   endpoint: string;
   region: string;
   bucket: string;
@@ -109,6 +122,7 @@ interface StoredOptions {
 function optionsOf(row: StorageConfigRow): StoredOptions {
   const o = row.options as Partial<StoredOptions>;
   return {
+    provider: STORAGE_PROVIDERS.find((p) => p === o.provider) ?? null,
     endpoint: String(o.endpoint ?? ""),
     region: String(o.region ?? "auto"),
     bucket: String(o.bucket ?? ""),
@@ -124,12 +138,13 @@ async function secretOf(deps: StorageDeps, row: StorageConfigRow) {
   return openSecret(deps.keyWrappers, sealed, aadFor(row.orgId, row.id));
 }
 
+/** A workspace's own bucket: every request's host is checked as it connects, the bucket's own name included. */
 function s3Store(deps: StorageDeps, settings: S3Settings) {
-  return createS3BlobStore(settings, { fetch: deps.fetch });
+  return createS3BlobStore(settings, { fetch: deps.fetch ?? outboundFetch({ resolveHost: deps.resolveHost }) });
 }
 
 async function storeOf(deps: StorageDeps, row: StorageConfigRow): Promise<BlobStore> {
-  const o = optionsOf(row);
+  const { provider: _, ...o } = optionsOf(row);
   const secretAccessKey = await secretOf(deps, row);
   return s3Store(deps, { ...o, secretAccessKey });
 }
@@ -223,11 +238,12 @@ async function resolveInput(deps: StorageDeps, orgId: string, input: S3Input) {
   return { settings, prefix, fingerprint };
 }
 
-function failedAtFirstStep(error: string): StorageTestResult {
+function failedAtFirstStep(error: string, code: string): StorageTestResult {
   const steps = (["write", "read", "list", "delete"] as const).map((step, i) => ({
     step,
     ok: false,
     error: i === 0 ? error : null,
+    code: i === 0 ? code : null,
   }));
   return { ok: false, steps };
 }
@@ -279,9 +295,9 @@ export async function testStorage(
     if (error instanceof ValidationError) return error;
     throw error;
   });
-  if (resolved instanceof ValidationError) return failedAtFirstStep(resolved.message);
+  if (resolved instanceof ValidationError) return failedAtFirstStep(resolved.message, storageErrorCode(resolved));
   const result = await probe(s3Store(deps, resolved.settings), resolved.prefix ?? "").catch((error: unknown) =>
-    failedAtFirstStep(storageErrorText(error)),
+    failedAtFirstStep(storageErrorText(error), storageErrorCode(error)),
   );
   const id = Bun.randomUUIDv7();
   const { settings } = resolved;
@@ -292,6 +308,8 @@ export async function testStorage(
       orgId,
       kind: "s3",
       options: {
+        // Not part of the fingerprint: the same bucket picked under another name is still the same bucket.
+        provider: STORAGE_PROVIDERS.find((p) => p === input.provider) ?? null,
         endpoint: settings.endpoint,
         region: settings.region,
         bucket: settings.bucket,
@@ -395,6 +413,16 @@ function migrationView(m: MigrationRow | undefined | null): StorageMigrationView
   return { status: m.status, copied: m.copied, total: m.total, error: m.error };
 }
 
+/**
+ * Whether a `running` migration has no job behind it any more (its worker died on its last attempt), so asking again
+ * starts it over instead of answering "running" forever. `runMigration` writes `updatedAt` after every file it copies.
+ */
+function migrationStalled(m: MigrationRow, now: Date): boolean {
+  // ponytail: one file that takes longer than this to copy reads as stalled, and asking again then starts a second
+  // job beside the first (as every second ask did before). A beat written while a file copies, if files get that large.
+  return now.getTime() - m.updatedAt.getTime() > 10 * 60_000;
+}
+
 async function latestMigration(db: Database, orgId: string) {
   const [m] = await db
     .select()
@@ -414,6 +442,7 @@ export async function getStorage(db: Database, actorId: string, orgId: string): 
   return {
     kind: "s3",
     s3: {
+      provider: o.provider,
       endpoint: o.endpoint,
       region: o.region,
       bucket: o.bucket,
@@ -515,6 +544,11 @@ export async function startMigration(deps: StorageDeps, actorId: string, orgId: 
   await requirePermission(deps.db, actorId, orgId, "configure");
   const target = (await activeConfig(deps.db, orgId))?.id ?? null;
   const last = await latestMigration(deps.db, orgId);
+  // A running one is returned as is (asked twice, two jobs would copy the same files and count each twice), unless
+  // nothing is behind it any more.
+  if (last?.status === "running" && !migrationStalled(last, new Date())) {
+    return migrationView(last) as StorageMigrationView;
+  }
   const [counted] = await deps.db
     .select({ n: sql<number>`count(*)::int` })
     .from(artifactVersions)
@@ -652,7 +686,10 @@ export async function runMigration(deps: StorageDeps, migrationId: string, optio
         // The row now points at the target copy. Drop the old object only when it was on our platform store,
         // so cycling off the platform frees our disk; a workspace's own bucket is theirs (and may be a backup),
         // so its copies stay. Never delete the key the row now holds (a store that overwrote in place).
-        if (v.storageConfigId === null && v.blobKey !== key) await source.delete(v.blobKey).catch(() => undefined);
+        if (v.storageConfigId === null && v.blobKey !== key) {
+          await source.delete(v.blobKey).catch(() => undefined);
+          await source.delete(transcriptKey(v.blobKey)).catch(() => undefined);
+        }
       } catch (error) {
         await db
           .update(storageMigrations)

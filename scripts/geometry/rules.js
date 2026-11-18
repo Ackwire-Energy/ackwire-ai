@@ -49,7 +49,10 @@
     "overflow-x",
   ];
 
-  const sig = (el) => {
+  /** A kit button's words sit in its label: whatever a rule finds in them, it names and places as the button. */
+  const worded = (el) => (el.matches(".ac-btn > .ac-btn__label") ? el.parentElement : el);
+  const sig = (labelOrEl) => {
+    const el = worded(labelOrEl);
     const classes = (typeof el.className === "string" ? el.className : (el.className?.baseVal ?? ""))
       .split(/\s+/)
       .filter((c) => c && !/^(ac-captop|ac-iconline|ac-actrow|is-|has-)/.test(c))
@@ -63,7 +66,7 @@
   const UTILITY = /^(ac-|row$|stack|small$|muted$|grow$|is-|has-)/;
   const kitOnly = (signature) => !(signature?.match(/\.[\w-]+/g) ?? []).some((c) => !UTILITY.test(c.slice(1)));
   const placeOf = (el) => {
-    for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+    for (let p = worded(el).parentElement; p && p !== document.body; p = p.parentElement) {
       const classes = typeof p.className === "string" ? p.className.split(/\s+/) : [];
       if (classes.some((c) => c && !UTILITY.test(c))) return sig(p);
     }
@@ -224,6 +227,15 @@
     if (svgs.length !== 1) return null;
     for (let p = svgs[0].parentElement; p && p !== el; p = p.parentElement) if (hasSurface(style(p))) return null;
     return svgs[0];
+  };
+  /** The kit's marks drawn without an svg: the working orbit (a canvas), the done, failed and stop squares, the wait. */
+  const MARKS = "canvas.ac-pixspin,.ac-pixdone,.ac-pixfail,.ac-pixstop,.rq-wait";
+  /** The mark a flow child is: one of `MARKS`, or a wordless box around one and nothing else that shows. */
+  const markOf = (el) => {
+    if (el.matches(MARKS)) return el;
+    if (el.matches("button,a,[role=button]") || visibleText(el) || hasSurface(style(el))) return null;
+    const marks = [...el.querySelectorAll(`svg,${MARKS}`)].filter(seen);
+    return marks.length === 1 && marks[0].matches(MARKS) ? marks[0] : null;
   };
   /** Where what shows of a flow child starts and ends: its glyph, its plate, or its words. */
   const inkOf = (el) => {
@@ -449,7 +461,7 @@
     if (!search || !actions) return true;
     const gap = parseFloat(style(bar).columnGap) || 0;
     const floor = parseFloat(style(search).minWidth) || 0;
-    return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+    return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth - 0.5;
   };
   const stackToolbars = () => {
     for (const bar of document.querySelectorAll(".ac-toolbar:has(> .ac-toolbar__search)")) {
@@ -499,7 +511,14 @@
         // A capped card's body cuts what runs past its height under a fade and "See more" (`useCardCut`, which a captured
         // screen can't measure): an action there is cut, not on the card's edge.
         const cut = el.closest("[data-capped] > *");
-        if (cut && row.box.contains(cut) && a.bottom > cut.getBoundingClientRect().bottom) continue;
+        if (cut && row.box.contains(cut)) {
+          const end = cut.getBoundingClientRect().bottom;
+          if (a.bottom > end) continue;
+          // With overflowing content, useCardCut will place the fade and See more at this cut. A capture taken
+          // before it measured can leave a whole action just inside the cut; that is not the card's lower rim.
+          // A body whose content fits still has a real lower edge and must keep the normal inset.
+          if (cut.scrollHeight > cut.clientHeight + 1 && a.bottom > end - EDGE_MIN) continue;
+        }
         const b = row.box.getBoundingClientRect();
         const s = style(row.box);
         const inset = {
@@ -529,7 +548,7 @@
         if (!hasSurface(s) || s.display === "inline") continue;
         const b = el.getBoundingClientRect();
         if (b.width > 320 || el.scrollWidth > el.clientWidth + 1) continue;
-        // A face at the start of a pill sits concentric with its round end, tighter than the words at the other.
+        // A face at the start of a pill sits tighter than the words at the other end (`nest` checks its corner).
         if (el.firstElementChild?.matches(".ac-avatar,.ac-rolemark,canvas,[class*='face']")) continue;
         // A frame split into segments (an event pill's actions, each after a hairline) pads each one, not the whole.
         if (el.querySelector(":scope > [class*='__actions']")) continue;
@@ -645,7 +664,9 @@
           const clips = (v) => v === "hidden" || v === "clip";
           if (clips(s.overflowX) && wide > 1 && s.textOverflow !== "ellipsis")
             out.push({ rule: "clipped", node: el, el: sig(el), px: wide, text: words(el) });
-          if (clips(s.overflowY) && tall > 2 && s.webkitLineClamp === "none" && s.textOverflow !== "ellipsis")
+          // A fold ends its words under a fade (a mask) with "Ver mais" under them: on purpose, not at a hard edge.
+          const fold = (s.maskImage || s.webkitMaskImage || "none") !== "none";
+          if (clips(s.overflowY) && tall > 2 && s.webkitLineClamp === "none" && s.textOverflow !== "ellipsis" && !fold)
             out.push({ rule: "clipped", node: el, el: sig(el), px: tall, text: words(el) });
           // Cut by a box around it instead: that box's "…" reaches only words on its own lines, not a block inside it
           // (a picker's two lines, a flex column), so they stop mid-word at its edge.
@@ -756,16 +777,85 @@
      * title) breaks a long word at its syllables on purpose.
      */
     midword(out) {
+      // A folded preview or scrollport only shows the intersecting text, not every line in its stored message.
+      const bounds = new WeakMap();
+      const boundsOf = (el) => {
+        if (!el || el === document.body) return { left: -Infinity, right: Infinity, top: -Infinity, bottom: Infinity };
+        if (bounds.has(el)) return bounds.get(el);
+        const parent = boundsOf(el.parentElement);
+        const s = style(el);
+        const r = el.getBoundingClientRect();
+        const own = { ...parent };
+        if (s.overflowX !== "visible") {
+          own.left = Math.max(own.left, r.left + el.clientLeft);
+          own.right = Math.min(own.right, r.left + el.clientLeft + el.clientWidth);
+        }
+        if (s.overflowY !== "visible") {
+          own.top = Math.max(own.top, r.top + el.clientTop);
+          own.bottom = Math.min(own.bottom, r.top + el.clientTop + el.clientHeight);
+        }
+        bounds.set(el, own);
+        return own;
+      };
       for (const el of document.body.querySelectorAll("*")) {
         if (!ownText(el) || !seen(el) || el.closest("svg,pre,code,table") || style(el).hyphens === "auto") continue;
+        const clip = boundsOf(el);
+        const visible = (r) =>
+          r.width > 0 &&
+          r.right > clip.left + 0.5 &&
+          r.left < clip.right - 0.5 &&
+          r.bottom > clip.top + 0.5 &&
+          r.top < clip.bottom - 0.5;
+        const nodes = [...el.childNodes].filter((n) => n.nodeType === 3);
         let count = 0;
-        const tops = new Set();
-        for (const n of el.childNodes) {
-          if (n.nodeType !== 3) continue;
-          count += n.textContent.trim().split(/\s+/).filter(Boolean).length;
-          for (const r of textRange(n).getClientRects()) if (r.width > 0) tops.add(Math.round(r.top));
+        let tops = new Set();
+        for (const n of nodes) {
+          const rects = [...textRange(n).getClientRects()];
+          const shown = rects.filter(visible);
+          if (!shown.length) continue;
+          for (const r of shown) tops.add(Math.round(r.top));
+          // Most nodes are wholly visible. In a folded preview count only words with some visible ink: hidden
+          // ordinary words must never excuse the fragments of an ordinary word above the fold.
+          if (
+            rects.every(
+              (r) =>
+                r.left >= clip.left - 0.5 &&
+                r.right <= clip.right + 0.5 &&
+                r.top >= clip.top - 0.5 &&
+                r.bottom <= clip.bottom + 0.5,
+            )
+          ) {
+            count += n.textContent.trim().split(/\s+/).filter(Boolean).length;
+          } else {
+            for (const m of n.textContent.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(n, m.index);
+              range.setEnd(n, m.index + m[0].length);
+              if ([...range.getClientRects()].some(visible)) count += 1;
+            }
+          }
         }
-        if (count >= 2 && tops.size >= 3 && tops.size > count)
+        if (count < 2 || tops.size < 3 || tops.size <= count) continue;
+        const s = style(el);
+        if (["anywhere", "break-word"].includes(s.overflowWrap) || ["break-all", "break-word"].includes(s.wordBreak)) {
+          // A token wider than an uncluttered viewport must break even in a full-width message. Omit only that
+          // token's lines: an ordinary word squeezed beside it (or beside another control) must still fail.
+          const ordinaryTops = new Set();
+          let ordinary = 0;
+          for (const n of nodes)
+            for (const m of n.textContent.matchAll(/\S+/g)) {
+              const range = document.createRange();
+              range.setStart(n, m.index);
+              range.setEnd(n, m.index + m[0].length);
+              const rects = [...range.getClientRects()];
+              if (!rects.some(visible) || rects.reduce((width, r) => width + r.width, 0) > innerWidth) continue;
+              ordinary += 1;
+              for (const r of rects) if (visible(r)) ordinaryTops.add(Math.round(r.top));
+            }
+          count = ordinary;
+          tops = ordinaryTops;
+        }
+        if (count > 0 && tops.size >= 3 && tops.size > count)
           out.push({ rule: "midword", node: el, el: sig(el), box: placeOf(el), lines: tops.size, text: words(el) });
       }
     },
@@ -945,15 +1035,21 @@
         }
       }
     },
-    /** A quiet line across the conversation sitting on a bubble above or under it, with no gap between them. */
+    /**
+     * A quiet line across the conversation sitting on a bubble above or under it, with no gap between them. Within one
+     * layer only: a dialog's line lies over the bubbles of the page behind it and touches none of them.
+     */
     quiet(out) {
+      const layer = (el) => el.closest("[role=dialog],[role=alertdialog]");
       const bubbles = [...document.querySelectorAll(".ac-msg__text")].filter(
         (b) => seen(b) && painted(style(b).backgroundColor),
       );
       for (const line of document.querySelectorAll(".consult-pair,.ac-divider,.channel__unread")) {
         if (!seen(line)) continue;
         const l = line.getBoundingClientRect();
+        const own = layer(line);
         for (const b of bubbles) {
+          if (layer(b) !== own) continue;
           const r = b.getBoundingClientRect();
           if (Math.min(l.right, r.right) - Math.max(l.left, r.left) <= 0) continue;
           const gap = Math.max(r.top - l.bottom, l.top - r.bottom);
@@ -1009,6 +1105,25 @@
             px: +px.toFixed(1),
             text: words(stamp),
           });
+      }
+    },
+    /**
+     * A grouped message's receipt (`.ac-msg__aside`, in its gutter) never sits under the row's bar
+     * (`.ac-msg__actions`, measured where it stands at rest, laid out though unseen) and never leaves the row on its
+     * left, at any text size.
+     */
+    msgaside(out) {
+      for (const aside of document.querySelectorAll(".ac-msg--grouped .ac-msg__aside")) {
+        if (!seen(aside)) continue;
+        const row = aside.closest(".ac-msg");
+        const a = aside.getBoundingClientRect();
+        const r = row.getBoundingClientRect();
+        const bar = row.querySelector(":scope > .ac-msg__body > .ac-msg__actions");
+        const b = bar && style(bar).display !== "none" ? bar.getBoundingClientRect() : null;
+        const ox = b ? Math.min(a.right, b.right) - Math.max(a.left, b.left) : 0;
+        const oy = b ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : 0;
+        const px = Math.max(ox > 0.5 && oy > 0.5 ? Math.min(ox, oy) : 0, r.left - a.left);
+        if (px > 0.5) out.push({ rule: "msgaside", node: aside, el: sig(aside), box: sig(row), px: +px.toFixed(1) });
       }
     },
     /**
@@ -1183,7 +1298,8 @@
      * A glyph's middle on its line's capitals' middle, within 1px, where the eye centres a sign beside words: a row's
      * lead (a glyph, or a face no taller than 1.25 lines) on its first line, and a glyph inside or after words (an svg, or
      * a wordless box around one: a hint's ⓘ, a mark) on those words, in a line of text or in a row, and a face that is a
-     * word of its line (`.ac-who`) on that line. A person's initials sit within 0.5px of their tile's middle.
+     * word of its line (`.ac-who`) on that line. The kit's marks that draw no svg (`MARKS`: the working orbit, the done,
+     * failed and stop squares, the wait) are glyphs here too. A person's initials sit within 0.5px of their tile's middle.
      */
     iconmid(out) {
       const push = (node, part, px, row) =>
@@ -1201,7 +1317,7 @@
         const nodes = flowNodes(row);
         const lead = nodes[0];
         if (lead?.nodeType !== 1) continue;
-        const mark = glyphOf(lead) ?? (lead.matches(FACE) ? lead : null);
+        const mark = glyphOf(lead) ?? markOf(lead) ?? (lead.matches(FACE) ? lead : null);
         if (!mark) continue;
         const text = nodes.slice(1).map(wordsOf).find(Boolean);
         if (!text) continue;
@@ -1222,13 +1338,14 @@
         const px = (box.top + box.bottom) / 2 - caps.mid;
         if (Math.abs(px) > 1) push(lead, "lead", px, row);
       }
-      for (const svg of document.body.querySelectorAll("svg")) {
+      const glyphs = `svg,${MARKS}`;
+      for (const svg of document.body.querySelectorAll(glyphs)) {
         if (!seen(svg) || leads.has(svg) || svg.parentElement?.closest("svg,.ac-avatar,.ac-rolemark")) continue;
         let glyph = svg;
         for (let p = svg.parentElement; p && p !== document.body; p = p.parentElement) {
           const ps = style(p);
           if (ps.display === "contents") continue;
-          if (visibleText(p) || hasSurface(ps) || [...p.querySelectorAll("svg")].filter(seen).length !== 1) break;
+          if (visibleText(p) || hasSurface(ps) || [...p.querySelectorAll(glyphs)].filter(seen).length !== 1) break;
           if (p.matches("button,a,[role=button]") && !p.matches(".ac-hint")) break;
           if (style(glyph).display.startsWith("inline") && !ps.display.startsWith("inline")) break;
           glyph = p;
@@ -1290,11 +1407,19 @@
     /**
      * In a stack of fields (a box holding two or more), each field's control is as wide as the field and as tall as the
      * stack's usual control, within 1 and 0.5px. A button that shows a value is drawn as a select, never a plain button.
+     * A control that grows with what it holds (a chip field's tokens, picks on a second line) a line or more past its
+     * min-height is measured by that min-height: its first line is the one that matches.
      */
     fieldwidth(out) {
       const LABEL = ".ac-field__label,.ac-field__label-row,.ac-hintline";
       const TOGGLE =
         "[role=checkbox],[role=radio],[role=switch],[role=radiogroup],input[type=checkbox],input[type=radio]";
+      const heightOf = (c) => {
+        const h = c.getBoundingClientRect().height;
+        if (c.matches("textarea") || c.querySelector("textarea")) return h;
+        const min = parseFloat(style(c).minHeight) || 0;
+        return min > 0 && h - min >= 16 ? min : h;
+      };
       const stacks = new Set();
       for (const field of document.querySelectorAll(".ac-field")) {
         const p = layoutParent(field);
@@ -1314,7 +1439,7 @@
         );
         const count = new Map();
         for (const [, c] of controls) {
-          const h = Math.round(c.getBoundingClientRect().height * 2) / 2;
+          const h = Math.round(heightOf(c) * 2) / 2;
           count.set(h, (count.get(h) ?? 0) + 1);
         }
         const usual = [...count].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? 0;
@@ -1327,12 +1452,76 @@
             parseFloat(fs.borderLeftWidth) -
             parseFloat(fs.borderRightWidth);
           const c = control.getBoundingClientRect();
+          const h = heightOf(control);
           const base = { rule: "fieldwidth", node: control, el: sig(control), box: sig(field) };
           if (control.matches(".ac-btn")) out.push({ ...base, drawn: "button", text: words(control) });
           if (Math.abs(c.width - inner) > 1) out.push({ ...base, side: "width", px: +(c.width - inner).toFixed(1) });
-          const tall = control.matches("textarea") || control.querySelector("textarea") || c.height > 2 * usual;
-          if (!tall && Math.abs(c.height - usual) > 0.5)
-            out.push({ ...base, side: "height", px: +(c.height - usual).toFixed(1) });
+          const tall = control.matches("textarea") || control.querySelector("textarea") || h > 2 * usual;
+          if (!tall && Math.abs(h - usual) > 0.5) out.push({ ...base, side: "height", px: +(h - usual).toFixed(1) });
+        }
+      }
+    },
+    /**
+     * Rounded inside rounded: a plate or a face near a corner of the box it sits on, with room between them, has that
+     * box's corner less the room (`outer - gap`). In a fully round pill that makes what sits at its ends fully round. A
+     * thing flush with the edge is `corner`'s. Percent corners resolve against the box, every corner clamps to half the
+     * shorter side, as the browser draws them. Only on the surfaces built to it (the notice island, toasts, the banners
+     * over the composer and the computer's stage): elsewhere a card's buttons keep the kit's own corner.
+     */
+    nest(out) {
+      const NESTED = ".ni,.ac-toast,.noai-banner,.cmp-banner";
+      const CORNERS = [
+        ["TopLeft", "Top", "Left"],
+        ["TopRight", "Top", "Right"],
+        ["BottomLeft", "Bottom", "Left"],
+        ["BottomRight", "Bottom", "Right"],
+      ];
+      const REACH = 24;
+      const radius = (s, name, r) => {
+        const v = s[`border${name}Radius`].split(" ")[0];
+        const px = v.endsWith("%") ? (parseFloat(v) / 100) * r.width : parseFloat(v);
+        return Math.min(px || 0, r.width / 2, r.height / 2);
+      };
+      for (const el of document.body.querySelectorAll("*")) {
+        if (!seen(el) || el.closest("svg")) continue;
+        const s = style(el);
+        if (!hasSurface(s) && !el.matches(FACE)) continue;
+        // What a rounded box between them clips (a face's canvas, a tile's picture) takes that box's corner, not its own.
+        let box = el.parentElement;
+        let clipped = false;
+        for (; box && box !== document.body && !hasSurface(style(box)); box = box.parentElement) {
+          const ps = style(box);
+          if (ps.overflowX !== "visible" && parseFloat(ps.borderTopLeftRadius) > 0) clipped = true;
+        }
+        if (clipped || !box || box === document.body || !box.matches(NESTED)) continue;
+        const bs = style(box);
+        const a = el.getBoundingClientRect();
+        const b = box.getBoundingClientRect();
+        const gap = {
+          Top: a.top - b.top - parseFloat(bs.borderTopWidth),
+          Bottom: b.bottom - parseFloat(bs.borderBottomWidth) - a.bottom,
+          Left: a.left - b.left - parseFloat(bs.borderLeftWidth),
+          Right: b.right - parseFloat(bs.borderRightWidth) - a.right,
+        };
+        // An agent's cut corner (`--radius-agent`) is its mark, not a curve to follow.
+        const cut = el.matches(".ac-avatar--agent:not(.ac-avatar--framed)") ? "BottomLeft" : null;
+        for (const [name, v, h] of CORNERS) {
+          if (name === cut || gap[v] > REACH || gap[h] > REACH) continue;
+          const g = Math.min(gap[v], gap[h]);
+          if (g < 1) continue;
+          const want = radius(bs, name, b) - g;
+          if (!(want > 2)) continue;
+          const own = radius(s, name, a);
+          if (Math.abs(own - want) > 1.5)
+            out.push({
+              rule: "nest",
+              node: el,
+              el: sig(el),
+              box: sig(box),
+              side: name,
+              px: +own.toFixed(1),
+              want: +want.toFixed(1),
+            });
         }
       }
     },
@@ -1609,7 +1798,7 @@
           const extra = desc
             ? grown(el.querySelector(".ac-menu__label > :first-child:not(.ac-menu__desc)")) +
               grown(el.querySelector(".ac-menu__desc"))
-            : 0;
+            : grown(el.querySelector(".ac-menu__label, .ac-filter__label"));
           const want = (faces ? (roomy ? 44 : 36) : desc ? (roomy ? 58 : 50) : roomy ? 40 : 32) + extra;
           const r = el.getBoundingClientRect();
           const base = { rule: "menuitem", node: el, el: sig(el), box: sig(menu) };
@@ -1698,7 +1887,21 @@
                 if (Math.abs(inner.bottom - inner.top - (lines.bottom - lines.top)) <= 2) lines = inner;
               }
               const risen = n.parentElement.closest(".ac-captop");
-              const caps = risen && row.contains(risen) ? capsAt(n) : null;
+              // Range keeps the font's untrimmed ascent even when CSS removes that leading from the line's box.
+              // A block trimmed to its cap edge therefore starts at its visible capitals, as .ac-captop does.
+              let trimmed = false;
+              for (let p = n.parentElement; p && p !== row; p = p.parentElement) {
+                const ps = style(p);
+                if (
+                  /block|flow-root|list-item|table-cell/.test(ps.display) &&
+                  ["trim-start", "trim-both"].includes(ps.textBoxTrim) &&
+                  ps.textBoxEdge.split(" ")[0] === "cap"
+                ) {
+                  trimmed = true;
+                  break;
+                }
+              }
+              const caps = (risen && row.contains(risen)) || trimmed ? capsAt(n) : null;
               add(caps ? caps.top : lines.top, lines.bottom);
               continue;
             }
@@ -1716,7 +1919,9 @@
               continue;
             }
             // A plate or a control as tall as the row (its whole row a button) holds the row's content: look inside.
-            const full = n.getBoundingClientRect().height >= b.height - 1;
+            // So does the line of a row that opens under it (`.ac-foldrow__head`): the row's room is above what the
+            // line holds and below what it unfolds.
+            const full = n.getBoundingClientRect().height >= b.height - 1 || n.matches(".ac-foldrow__head");
             if ((n.matches(`${HOLDS},${FACE},svg`) || hasSurface(style(n))) && !full) {
               const r = n.getBoundingClientRect();
               add(r.top, r.bottom);
@@ -2192,6 +2397,21 @@
         const parent = layoutParent(el);
         if (parent && /flex|grid/.test(style(parent).display))
           out.push({ rule: "undoinline", node: el, el: sig(el), box: sig(parent), text: words(el) });
+      }
+    },
+    /**
+     * The working line's own controls (the globe, Ver, the stop) end it at its end from the first frame: one beside
+     * words that grow nothing would jump to the end once the time comes in before it.
+     */
+    barend(out) {
+      for (const bar of document.querySelectorAll('.ac-typing[data-active="true"]')) {
+        const last = bar.lastElementChild;
+        if (!seen(bar) || !last?.matches(".stop-run-wrap, .ac-typing__browser, .ac-typing__see") || !seen(last))
+          continue;
+        const s = style(bar);
+        const end = bar.getBoundingClientRect().right - parseFloat(s.borderRightWidth) - parseFloat(s.paddingRight);
+        const free = end - last.getBoundingClientRect().right - parseFloat(style(last).marginRight);
+        if (free > 1) out.push({ rule: "barend", node: last, el: sig(last), box: sig(bar), px: +free.toFixed(1) });
       }
     },
     /**

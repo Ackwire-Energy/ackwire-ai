@@ -11,10 +11,12 @@ import { Button, Checkbox, Icon, type IconName, PixelSpinner, ProviderLogo, Sele
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
+import { isHereServer } from "../control/local-server";
 import { type LinkFailure, type LinkInfo, type PairTarget, pairWithLink, pairWithSession } from "../control/pair";
 import { allDone } from "../control/permissions";
-import { serverName } from "../control/server";
+import { serverKind, serverName } from "../control/server";
 import { type PairTools, pairTools, toolsFound } from "../control/this-mac";
+import { useLocalServer, useOpenPrefs } from "../hooks";
 import { MacPortrait, OrgTile } from "../ui/bits";
 import { MacPermissionCard, needsPrepare, useMacGrants } from "../ui/permissions";
 import { CardTitle, hintFor, PrefCard, PrefRow } from "../ui/settings";
@@ -215,8 +217,12 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
   const [tools, setTools] = useState<Partial<PairTools>>({});
   const [state, setState] = useState<"ask" | "busy" | "prepare" | "done">("ask");
   const [failed, setFailed] = useState<string | null>(null);
+  const local = useLocalServer();
   const org = target.name;
   const lead = <OrgTile logo={target.logo} size="lg" />;
+  // A server elsewhere that this computer already opens: pairing is about lending it, not about getting in.
+  const kind = serverKind(target.server);
+  const onlyOpens = (kind === "tailnet" || kind === "own") && !isHereServer(local, target.server);
 
   const allow = async () => {
     setState("busy");
@@ -270,6 +276,7 @@ export function PairOffer({ target, onClose }: { target: PairTarget; onClose: ()
           </>
         }
       >
+        {onlyOpens && <p className="dk-lead">{t("desktop.pair.offerOnlyIf", { org })}</p>}
         <PrefCard>
           <PrefRow
             lead={
@@ -351,6 +358,7 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
   const [asked, setAsked] = useState(0);
   const [tools, setTools] = useState<Partial<PairTools>>({});
   const from = serverName(server);
+  const openPrefs = useOpenPrefs();
   // The sheet gone (Cancel, Esc, a newer link): the runner stops asking, even if it hadn't started yet.
   const pairing = useRef<{ cancel: () => Promise<void> } | null>(null);
   const gone = useRef(false);
@@ -400,6 +408,12 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
       {t("desktop.common.close")}
     </Button>
   );
+  // A link that ran out is made again in the site's Devices, on the server that made it.
+  const openDevices = (
+    <Button variant="ghost" onClick={() => void host.openExternal(`${server}/?open=devices`).catch(() => {})}>
+      {t("desktop.pair.openDevices")}
+    </Button>
+  );
   if (state.kind === "checking")
     return (
       <Sheet
@@ -415,7 +429,15 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
     );
   if (state.kind === "expired")
     return (
-      <Sheet title={from} acts={close}>
+      <Sheet
+        title={from}
+        acts={
+          <>
+            {openDevices}
+            {close}
+          </>
+        }
+      >
         <Problem text={t("desktop.pair.expired")} />
       </Sheet>
     );
@@ -438,7 +460,20 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
       </Sheet>
     );
   if (state.kind === "prepare") return <Prepare org={state.org} server={server} onClose={onClose} />;
-  if (state.kind === "done") return <Sheet title={t("desktop.pair.done", { org: state.org })} acts={close} />;
+  if (state.kind === "done")
+    return (
+      <Sheet
+        title={t("desktop.pair.done", { org: state.org })}
+        acts={
+          <>
+            <Button variant="ghost" icon="drive" onClick={() => openPrefs("folders")}>
+              {t("desktop.pair.addFolders")}
+            </Button>
+            {close}
+          </>
+        }
+      />
+    );
 
   const { info } = state;
   const computer = info.computer ?? snap.homes.find((h) => h.status?.machine)?.status?.machine?.name;
@@ -487,8 +522,13 @@ export function PairLinkSheet({ server, code, onClose }: { server: string; code:
                 {t("desktop.common.retry")}
               </Button>
             </>
-          ) : (
+          ) : state.code === "denied" ? (
             close
+          ) : (
+            <>
+              {openDevices}
+              {close}
+            </>
           )
         }
       >

@@ -17,10 +17,7 @@ const open = async (state = seedState(), api = createFakeApi(state)) => {
   await settle(2);
   return { ...r, socket, state };
 };
-/**
- * The reply moved under João's post and that thread opened beside the channel: a thread view has no panel of its
- * own, so the card there opens in place (in the channel it opens the two agents' conversation in the panel).
- */
+/** The reply moved under João's post and that thread opened beside the channel. */
 const openInThread = async (state: ReturnType<typeof seedState>) => {
   const reply = state.messages.at(-1) as (typeof state.messages)[number];
   reply.threadId = "m-1";
@@ -66,9 +63,11 @@ const pairOf = (text: string) => {
   return before?.classList.contains("consult-pair") ? before : null;
 };
 const pairButton = (pair: HTMLElement | null) => pair?.querySelector("button") as HTMLElement;
+/** The two agents' conversation, opened over the conversation in the kit's dialog. */
+const consultDialog = () => document.querySelector(".ac-dialog.consult-dialog") as HTMLElement | null;
 
 describe("a reply's `meta.consulted`: the pair row before it", () => {
-  test("in a channel: the two faces and names, no preview; a click opens the panel (a toggle), never in place", async () => {
+  test("in a channel: the two faces and names, no preview; a click opens the dialog, never in place", async () => {
     await open(
       withReply({
         consulted: [
@@ -80,8 +79,9 @@ describe("a reply's `meta.consulted`: the pair row before it", () => {
     expect(pair).not.toBeNull();
     expect([...pair.querySelectorAll(".consult-pair__name")].map((n) => n.textContent)).toEqual(["Ada", "Atlas"]);
     expect(pair.textContent).not.toContain("Staging");
-    // No times on `meta.consulted`: the row says nothing after the names.
-    expect(pair.querySelector(".consult-pair__sep")).toBeNull();
+    // `meta.consulted` carries no times: the row says what was asked, nothing about how long it took.
+    expect(pair.querySelector(".consult-pair__subject")?.textContent).toBe(`·${QUESTION}`);
+    expect(pair.querySelector(".consult-pair__time")).toBeNull();
     const button = pairButton(pair);
     expect(button.getAttribute("aria-expanded")).toBeNull();
     expect(button.getAttribute("aria-pressed")).toBe("false");
@@ -89,15 +89,34 @@ describe("a reply's `meta.consulted`: the pair row before it", () => {
     await settle(3);
     expect(pair.querySelector(".consult-pair__detail")).toBeNull();
     expect(button.getAttribute("aria-pressed")).toBe("true");
+    expect(consultDialog()?.getAttribute("role")).toBe("dialog");
   });
 
-  test("in a thread (no panel): the row opens in place to the question, the answer and who saw it", async () => {
-    await openInThread(
+  test("in a thread too: a click opens the same dialog over it, and the thread stays open under it", async () => {
+    const { thread } = await openInThread(
       withReply({
         consulted: [
           { agentId: ATLAS_ID, consultationId: "k1", status: "answered", question: QUESTION, answer: ANSWER },
         ],
       }),
+    );
+    const pair = thread.querySelector(".consult-pair") as HTMLElement;
+    const button = pairButton(pair);
+    expect(button.getAttribute("aria-expanded")).toBeNull();
+    await act(async () => fireEvent.click(button));
+    await settle(3);
+    expect(pair.querySelector(".consult-pair__detail")).toBeNull();
+    expect(consultDialog()?.getAttribute("role")).toBe("dialog");
+    expect(thread.isConnected).toBe(true);
+    await act(async () => fireEvent.keyDown(consultDialog() as HTMLElement, { key: "Escape" }));
+    await settle(2);
+    expect(consultDialog()).toBeNull();
+    expect(thread.isConnected).toBe(true);
+  });
+
+  test("an old reply's question with no id: the row opens in place to the question, the answer and who saw it", async () => {
+    await open(
+      withReply({ consulted: [{ agentId: ATLAS_ID, status: "answered", question: QUESTION, answer: ANSWER }] }),
     );
     const pair = pairOf("Já subi o fix") as HTMLElement;
     expect(pair).not.toBeNull();
@@ -117,10 +136,10 @@ describe("a reply's `meta.consulted`: the pair row before it", () => {
   });
 
   test("expired: 'não respondeu' in the warning tone, the face dimmed; opened, the question and why", async () => {
-    await openInThread(
+    await open(
       withReply(
         {
-          consulted: [{ agentId: ATLAS_ID, consultationId: "k2", status: "expired", question: QUESTION, answer: null }],
+          consulted: [{ agentId: ATLAS_ID, status: "expired", question: QUESTION, answer: null }],
         },
         "O Atlas não respondeu. Quer que eu suba do jeito de sempre?",
       ),
@@ -142,18 +161,17 @@ describe("a reply's `meta.consulted`: the pair row before it", () => {
     const button = pairButton(pair);
     expect(button.getAttribute("aria-pressed")).toBeNull();
     await act(async () => fireEvent.click(button));
-    expect(document.querySelector("aside.thread-panel")).toBeNull();
+    expect(consultDialog()).toBeNull();
     expect(pair.querySelector(".consult-pair__detail")?.textContent).toContain(QUESTION);
   });
 
   test("people never read the relay line the server opens a mention to an agent with", async () => {
     const relayed = `[@ada mentioned you in #engenharia, where you aren't a member, so it reaches you here]\n\n${QUESTION}`;
-    await openInThread(
+    await open(
       withReply({
         consulted: [
           {
             agentId: ATLAS_ID,
-            consultationId: "k1",
             kind: "note",
             status: "answered",
             question: relayed,
@@ -225,15 +243,14 @@ describe("what came of work handed off (a `consult_reply` notice with `kind` `no
     return state;
   };
 
-  test("its row opened in place says what Ada wrote, not what she asked", async () => {
+  test("its row in a thread says nothing of the result, and opens the two agents' conversation in the dialog", async () => {
     const { thread } = await openInThread(withResult("answered", "Passei a pasta; o Diogo abriu."));
     const pair = thread.querySelector(".consult-pair") as HTMLElement;
     expect(pair.textContent).not.toContain("Passei a pasta");
     await act(async () => fireEvent.click(pairButton(pair)));
-    const body = pair.querySelector(".consult-pair__detail") as HTMLElement;
-    expect(body.textContent).toContain("Ada escreveu");
-    expect(body.textContent).not.toContain("Ada perguntou");
-    expect(body.textContent).toContain("Passa a pasta ao Diogo");
+    await settle(3);
+    expect(pair.querySelector(".consult-pair__detail")).toBeNull();
+    expect(consultDialog()?.getAttribute("role")).toBe("dialog");
   });
 
   test("one that couldn't be finished says so", async () => {

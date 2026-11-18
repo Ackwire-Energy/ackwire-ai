@@ -6,6 +6,7 @@ import { recordAudit } from "../audit";
 import { fedByRoutine, runAuthorityById } from "../authority";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { can, requirePermission } from "../organizations";
+import { approvalsLevelOf } from "../tools/run-policy";
 import type { ToolContext } from "../tools/types";
 
 const { agentRepositories: table, agents } = schema;
@@ -189,6 +190,8 @@ export async function mergeReposOfCall(ctx: Pick<ToolContext, "db" | "orgId" | "
   if (!ctx.runId) return [];
   const repos = await agentMergeRepos(ctx.db, ctx.orgId, ctx.agentId);
   if (repos.length === 0) return repos;
+  // An agent that always asks (ADR 0173) asks for its merges too, whatever was chosen here.
+  if ((await approvalsLevelOf(ctx.db, ctx.orgId, ctx.agentId)) === "always") return [];
   const authority = await runAuthorityById(ctx.db, ctx.orgId, ctx.runId);
   return authority.kind === "unattended" && fedByRoutine(authority) ? [] : repos;
 }

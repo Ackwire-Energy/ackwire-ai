@@ -1,11 +1,11 @@
-import { and, type Database, desc, type Executor, eq, gt, gte, inArray, schema } from "@agenteschat/db";
+import { and, type Database, desc, type Executor, eq, gt, gte, inArray, ne, schema } from "@agenteschat/db";
 import { RULE_REMOVED_AUDIT } from "../approval-rules";
 import { connectorScope } from "../connectors/catalog";
 import { type ConnectorConnection, type ConnectorDeps, connectionHeaders } from "../connectors/connections";
 import { type AppPermissions, appTokenForRepo, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { parseRepo } from "./repos";
 
-const { approvalRules, approvals, auditLog } = schema;
+const { agents, approvalRules, approvals, auditLog } = schema;
 
 /**
  * Branches that aren't the agent's own (ADR 0024, addendum of 2026-10-31): a person approves deleting them
@@ -156,7 +156,7 @@ export type PushGrant = { approvalId: string } | { ruleId: string };
 
 /**
  * What lets an agent push to branches that aren't its own through the proxy, by grant key: a rule someone approved
- * for good, or a person's approval of `request_branch_push` decided in the last 24 h (its params read through the
+ * for good (read only while the agent doesn't always ask), or a person's approval of `request_branch_push` decided in the last 24 h (its params read through the
  * same key) and after that key's rule was last removed. The proxy has no run, so any of the agent's runs may use it.
  * A key nothing grants is left out. Three queries at most, whatever the number of keys.
  */
@@ -171,6 +171,7 @@ export async function pushGrants(
   const rules = await db
     .select({ id: approvalRules.id, action: approvalRules.action })
     .from(approvalRules)
+    .innerJoin(agents, and(eq(agents.id, approvalRules.agentId), ne(agents.approvalsLevel, "always")))
     .where(
       and(
         eq(approvalRules.orgId, at.orgId),

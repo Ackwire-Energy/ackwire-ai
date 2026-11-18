@@ -3,6 +3,34 @@
 .settings-danger .ac-card__key {
   color: var(--danger);
 }
+/* Sua conta's last card: one way to delete per column (the account, and for an owner the workspace), each one sentence
+   over its button, starting under the title's words. The buttons share one line however the sentences wrap. */
+.danger-pair {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  padding-inline-start: var(--space-8);
+}
+.danger-pair__way {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.danger-pair__way > p {
+  margin: 0;
+  text-wrap: balance;
+}
+@media (max-width: 640px) {
+  .danger-pair {
+    grid-auto-flow: row;
+  }
+  .danger-pair__way > .ac-btn {
+    align-self: stretch;
+  }
+}
 /* Deleting a workspace or an account: what goes as lines with their icons, the export and the proof under them. */
 .deletion-lines {
   display: flex;

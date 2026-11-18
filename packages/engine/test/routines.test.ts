@@ -18,12 +18,15 @@ import {
   postPersonMessage,
   queueRoutineRun,
   readSchedule,
+  reapRoutineRuns,
   runAuthorityById,
   runRoutineNow,
   setRoutineActive,
   updateOrgSettings,
 } from "../src";
 import { isNoReply } from "../src/context";
+import { BRAIN_IDLE_TIMEOUT_MS } from "../src/machine-hub";
+import { ROUTINE_STALL_MS } from "../src/routine-firing";
 import { type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -624,4 +627,87 @@ test("a routine doesn't pile up while its agent's computer is away: the next run
     ["started", null],
   ]);
   expect((await f.db.select().from(schema.notifications)).map((n) => n.kind)).toEqual(["routine_stalled"]);
+});
+
+/** A routine with one run of it that started: what the two rules below need, and nothing else. */
+async function routineWithRun() {
+  const deps = { db: f.db, pubsub: f.pubsub, context: f.context };
+  const routine = await createRoutine(deps, f.owner.id, f.org.id, {
+    name: "Atendimento",
+    agentId: f.agent.id,
+    prompt: "Atenda a fila do chat.",
+    target: { type: "channel", channelId: f.general.id },
+    trigger: { type: "schedule", phrase: "todo dia às 8h" },
+  });
+  const [row] = await f.db.select().from(schema.routines).where(eq(schema.routines.id, routine.id));
+  if (!row) throw new Error("no routine");
+  const first = await queueRoutineRun(deps, row, new Date(Date.now() - 3600_000), "schedule");
+  await executeRoutineRun(deps, first?.id ?? "");
+  const id = first?.id ?? "";
+  /** Leaves its run as `status` and its agent run working, with nothing moved in it since `since`. */
+  const leave = async (status: string, since = new Date()) => {
+    await f.db.update(schema.routineRuns).set({ status, finishedAt: null }).where(eq(schema.routineRuns.id, id));
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", updatedAt: since })
+      .where(eq(schema.agentRuns.agentId, f.agent.id));
+  };
+  const ledger = async () =>
+    (await f.db.select().from(schema.routineRuns).orderBy(schema.routineRuns.createdAt)).map((r) => [r.status, r.code]);
+  return { deps, row, id, leave, ledger };
+}
+
+test("a run that already handed off holds no slot: the next one starts while its record turn still runs", async () => {
+  f = await setup();
+  const { deps, row, leave, ledger } = await routineWithRun();
+  // Its report is out (reported) and the turn left of it — the agent's own record — never ended.
+  await leave("reported");
+
+  // The card says what it did, not that it is still running: nothing of the routine is at work.
+  const [card] = await listRoutines(f.db, f.owner.id, f.org.id);
+  expect(card?.recentRuns[0]?.status).toBe("reported");
+  expect(card?.state).toBe("active");
+
+  const second = await queueRoutineRun(deps, row, new Date(), "schedule");
+  await executeRoutineRun(deps, second?.id ?? "");
+
+  // The slot ran instead of being skipped as `previous_running`, and the ended run kept its ending.
+  expect(await ledger()).toEqual([
+    ["reported", null],
+    ["started", null],
+  ]);
+});
+
+test("a run with nothing moving in it for 20 minutes is let go, and the next slot runs", async () => {
+  // A computer's turn may be silent up to the hub's own bound: only a run quiet past it is let go.
+  expect(ROUTINE_STALL_MS).toBeGreaterThan(BRAIN_IDLE_TIMEOUT_MS);
+  f = await setup();
+  const { deps, row, leave, ledger } = await routineWithRun();
+  await leave("started", new Date(Date.now() - ROUTINE_STALL_MS - 60_000));
+
+  const second = await queueRoutineRun(deps, row, new Date(), "schedule");
+  await executeRoutineRun(deps, second?.id ?? "");
+
+  // The stuck run ended (`stalled`) instead of holding the routine, and its agent run was stopped quietly.
+  expect(await ledger()).toEqual([
+    ["canceled", "stalled"],
+    ["started", null],
+  ]);
+  const runs = await f.db.select().from(schema.agentRuns).orderBy(schema.agentRuns.createdAt);
+  expect(runs.map((r) => r.status)).toEqual(["canceled", "queued"]);
+});
+
+test("the sweep lets a quiet run go even when no new slot wants its place", async () => {
+  f = await setup();
+  const { deps, leave, ledger } = await routineWithRun();
+  await leave("started", new Date(Date.now() - ROUTINE_STALL_MS - 60_000));
+
+  expect(await reapRoutineRuns(deps)).toBe(1);
+
+  expect(await ledger()).toEqual([["canceled", "stalled"]]);
+  const [rr] = await f.db.select().from(schema.routineRuns);
+  expect(rr?.finishedAt).not.toBeNull();
+  // A run still moving is left alone: the rule is silence, not age.
+  await leave("started");
+  expect(await reapRoutineRuns(deps)).toBe(0);
 });

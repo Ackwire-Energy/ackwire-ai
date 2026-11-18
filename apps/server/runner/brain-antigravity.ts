@@ -6,7 +6,16 @@ import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope, BrainEffort } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, withoutContainers, withoutSignIns } from "./accounts";
+import {
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_SIGNED_OUT,
+  type AccountFolders,
+  type AccountGrant,
+  accountEnv,
+  accountSignIn,
+  withoutContainers,
+  withoutSignIns,
+} from "./accounts";
 import { AGY_CHAT_AGENT, prepareAgyHome } from "./agy-home";
 import { LIMIT_TEXT } from "./brain";
 import { type CodexBrainEvent, CodexThreads, chatFolder, codexProfileOf, codexThreadKey } from "./brain-codex";
@@ -28,7 +37,9 @@ import { agentSecrets } from "./secrets";
  *
  * - Always an account, on Linux: its folder is the CLI's whole `HOME` (`agy-home.ts`), prepared before every turn
  *   (settings, our MCP server alone, Lodi's agent; anything an earlier turn planted removed). The run and its token
- *   reach our server through the env it inherits, so the account's turns of several agents share one config.
+ *   reach our server through the env it inherits, so the account's turns of several agents share one config. One
+ *   root keeps for all agents (protocol 58) is the agent's own folder for it instead, with a copy of root's sign-in
+ *   for as long as the agent's turns on it run (a worker killed mid-turn leaves it until the agent's next one starts).
  * - The chat: `init` names the conversation; our session → that conversation lives in
  *   `<runner home>/brain/antigravity-chats.json` (per account), resumed with `--conversation`. A new chat leads its
  *   prompt with the engine's context (`cursorPrompt`); a resume that comes back as another conversation (the CLI
@@ -460,7 +471,9 @@ export interface AntigravityBrainContext {
   chats?: CodexThreads;
   bin?: string;
   grants?: string[];
-  accounts?: { accountDir(kind: "antigravity", id: string): string | null };
+  accounts?: AccountFolders;
+  /** In a worker, a sign-in root keeps for all agents (protocol 58): the copy this turn gets (`AccountManager.grant`). */
+  grant?: AccountGrant;
   spawn?: Spawn;
   platform?: NodeJS.Platform;
 }
@@ -495,8 +508,23 @@ export async function handleAntigravityBrainTurn(
     return;
   }
   if (!isAccountId(accountId)) throw new RunnerError("bad_request", "Invalid account id");
-  const home = ctx.accounts?.accountDir("antigravity", accountId);
-  if (!home) {
+  let signIn: Awaited<ReturnType<typeof accountSignIn>>;
+  try {
+    signIn = await accountSignIn(ctx.accounts, "antigravity", accountId, ctx.grant);
+  } catch (err) {
+    scope.emit({
+      type: "error",
+      code: "antigravity_failed",
+      message: `This computer couldn't hand the agent its Gemini sign-in (${(err as Error).message}). Try again.`,
+      retryable: true,
+    });
+    return;
+  }
+  if (signIn === "signed_out") {
+    scope.emit({ type: "error", code: "not_logged_in", message: ACCOUNT_SIGNED_OUT, retryable: true });
+    return;
+  }
+  if (signIn === "missing") {
     scope.emit({
       type: "error",
       code: "account_missing",
@@ -505,43 +533,47 @@ export async function handleAntigravityBrainTurn(
     });
     return;
   }
-  // A `chat` turn starts in an empty folder of its own, whatever the request names.
-  const chat = req.permissions?.mode === "chat";
-  const folder = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : ctx.folder;
-  let cwd = folder;
-  if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
-    const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
-    if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
-    cwd = resolved.abs;
+  try {
+    // A `chat` turn starts in an empty folder of its own, whatever the request names.
+    const chat = req.permissions?.mode === "chat";
+    const folder = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : ctx.folder;
+    let cwd = folder;
+    if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
+      const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
+      if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
+      cwd = resolved.abs;
+    }
+    const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
+    const file = antigravityChatsFile(ctx.runnerHome);
+    const chats = ctx.chats ?? chatStores.get(file) ?? new CodexThreads(file);
+    chatStores.set(file, chats);
+    await runAntigravityTurn(
+      {
+        runId: req.runId,
+        sessionId: req.session.id,
+        cwd,
+        ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
+        ...(req.effort ? { effort: req.effort } : {}),
+        system: typeof req.system === "string" ? req.system : "",
+        prompt: typeof req.prompt === "string" ? req.prompt : "",
+        mcp: { token: req.mcp.token },
+        account: { id: accountId, home: signIn.home },
+        profile: codexProfileOf(req),
+        ...(chat ? { chat } : {}),
+      },
+      {
+        chats,
+        emit: scope.emit,
+        signal: scope.signal,
+        runnerHome: ctx.runnerHome,
+        ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
+        ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
+        ...(ctx.bin ? { bin: ctx.bin } : {}),
+        ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
+        ...(ctx.platform ? { platform: ctx.platform } : {}),
+      },
+    );
+  } finally {
+    signIn.release?.();
   }
-  const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
-  const file = antigravityChatsFile(ctx.runnerHome);
-  const chats = ctx.chats ?? chatStores.get(file) ?? new CodexThreads(file);
-  chatStores.set(file, chats);
-  await runAntigravityTurn(
-    {
-      runId: req.runId,
-      sessionId: req.session.id,
-      cwd,
-      ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
-      ...(req.effort ? { effort: req.effort } : {}),
-      system: typeof req.system === "string" ? req.system : "",
-      prompt: typeof req.prompt === "string" ? req.prompt : "",
-      mcp: { token: req.mcp.token },
-      account: { id: accountId, home },
-      profile: codexProfileOf(req),
-      ...(chat ? { chat } : {}),
-    },
-    {
-      chats,
-      emit: scope.emit,
-      signal: scope.signal,
-      runnerHome: ctx.runnerHome,
-      ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
-      ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
-      ...(ctx.bin ? { bin: ctx.bin } : {}),
-      ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
-      ...(ctx.platform ? { platform: ctx.platform } : {}),
-    },
-  );
 }

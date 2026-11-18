@@ -2,6 +2,7 @@ import { type Message, type Proposal, useCardProposals, useDecideProposals } fro
 import {
   appLabel,
   type ChangedLine,
+  cardDecidedBy,
   cardHead,
   cardOutcome,
   chosenRows,
@@ -19,16 +20,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Button, Chip, DiffView, haptics, Icon, LineIcon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
+import { Button, Chip, DiffView, haptics, Icon, Text, ToggleSwitch, useTheme, useToast } from "@/ui";
 import { boldRuns } from "../chat/actions";
-import { AskButtons, AskCard, AskDone, AskFoot } from "../chat/asks";
-import { markName } from "../chat/logic";
-import { useCardTop } from "../chat/look";
+import { type AskAnswer, AskButtons, AskCard, AskFoot } from "../chat/asks";
 import { MessageText } from "../chat/MessageText";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { useFailed } from "../routines/hooks";
 import { Face } from "../shared/Face";
-import { useDirectory, useWhen } from "../shared/hooks";
+import { useDirectory, useMeId, useWhen } from "../shared/hooks";
 
 /** The proposal cards an agent's message carries (`meta.memoryUpdates`, or an older `meta.proposalId`). */
 export function InstructionProposals({ message: m }: { message: Message }) {
@@ -52,7 +51,7 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const dir = useDirectory();
   const when = useWhen();
   const { colors } = useTheme();
-  const cardTop = useCardTop();
+  const meId = useMeId();
   const toast = useToast();
   const failed = useFailed();
   const rows = useCardProposals(orgId, ids);
@@ -147,40 +146,54 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
   const change =
     texts.length > 0 ? { label: t("ask.seeChange"), content: <Diffs lines={texts.map((g) => g.lines)} /> } : null;
   const only = many ? undefined : first;
-  // Waiting on the person: a request card like every other, the rows and their switches above the decision.
-  if (decides)
-    return (
-      <AskCard
-        id={ids.join(",")}
-        kind="proposal"
-        agentId={proposerOf(first)}
-        waitsFor="you"
-        lead={only ? proposalTitle(t, only, org ?? orgName, agentName) : runs.map((r) => r.text).join("")}
-        well={
-          only
-            ? {
-                tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} bare />,
-                title: proposalTarget(t, only, agentName, org ?? orgName),
-                detail:
-                  only.target.type === "agent_role"
-                    ? t("proposals.roleLine", { from: only.before, to: only.after })
-                    : firstLine?.text,
-                more: change,
-              }
-            : firstLine
-              ? { tile: <IconTile name="file" size={20} bare />, title: firstLine.text, more: change }
-              : null
-        }
-        body={
-          only ? (
-            only.target.type === "agent_access" ? (
-              <SettingChange p={only} />
-            ) : undefined
-          ) : (
-            rowList(groups.flatMap((g) => g.rows))
-          )
-        }
-        foot={
+  // A request card like every other, the rows and their switches above the decision. Waiting on someone else it
+  // says whom; decided, the same card says who decided and when where its buttons were.
+  const waiting = rows.some(isOpen);
+  const decidedAt = rows.reduce<string | null>(
+    (at, r) => (r.decidedAt && (!at || r.decidedAt > at) ? r.decidedAt : at),
+    null,
+  );
+  const answer: AskAnswer | null = waiting
+    ? null
+    : {
+        done: cardOutcome(t, rows).accepted,
+        words: cardDecidedBy(t, rows, meId ?? ""),
+        time: decidedAt ? when.short(decidedAt) : undefined,
+      };
+  return (
+    <AskCard
+      id={ids.join(",")}
+      kind="proposal"
+      agentId={proposerOf(first)}
+      waitsFor={decides ? "you" : rowStatus(t, first)}
+      answer={answer}
+      lead={only ? proposalTitle(t, only, org ?? orgName, agentName) : runs.map((r) => r.text).join("")}
+      well={
+        only
+          ? {
+              tile: <IconTile name={only.target.type === "agent_access" ? "bolt" : "file"} size={20} bare />,
+              title: proposalTarget(t, only, agentName, org ?? orgName),
+              detail:
+                only.target.type === "agent_role"
+                  ? t("proposals.roleLine", { from: only.before, to: only.after })
+                  : firstLine?.text,
+              more: change,
+            }
+          : firstLine
+            ? { tile: <IconTile name="file" size={20} bare />, title: firstLine.text, more: change }
+            : null
+      }
+      body={
+        only ? (
+          only.target.type === "agent_access" ? (
+            <SettingChange p={only} />
+          ) : undefined
+        ) : (
+          rowList(groups.flatMap((g) => g.rows))
+        )
+      }
+      foot={
+        decides ? (
           <AskFoot>
             <AskButtons
               primary={
@@ -211,49 +224,8 @@ export function InstructionProposalCard({ ids }: { ids: string[] }) {
               }
             />
           </AskFoot>
-        }
-      />
-    );
-  const card = (
-    <View style={[styles.card, { backgroundColor: colors.sunken }, cardTop]}>
-      <View style={styles.head}>
-        <LineIcon variant="subhead" name="doc" size={16} color={colors.ink2} />
-        <Text variant="subhead" tone="ink2" style={styles.fill}>
-          {runs.map((r, i) =>
-            r.bold ? (
-              <Text key={String(i)} variant="subhead" tone="ink" style={styles.bold}>
-                {r.text}
-              </Text>
-            ) : (
-              r.text
-            ),
-          )}
-        </Text>
-      </View>
-      {groups.map((section) => (
-        <View key={section.rows[0]?.id} style={styles.section}>
-          {section.kind === "text" && section.lines.length > 0 ? <ProseDiff lines={section.lines} /> : null}
-          {rowList(section.rows)}
-        </View>
-      ))}
-    </View>
-  );
-  if (rows.some(isOpen)) return card;
-  // Decided: one pill like a decided approval, with the last decision's time; the card when asked for.
-  const outcome = cardOutcome(t, rows);
-  const decidedAt = rows.reduce<string | null>(
-    (at, r) => (r.decidedAt && (!at || r.decidedAt > at) ? r.decidedAt : at),
-    null,
-  );
-  const what = many
-    ? runs.map((r) => (r.bold ? markName(r.text) : r.text)).join("")
-    : markName(proposalTitle(t, first, org ?? orgName, agentName));
-  return (
-    <AskDone
-      done={outcome.accepted}
-      words={`${outcome.label}: ${what}`}
-      time={decidedAt ? when.short(decidedAt) : undefined}
-      more={{ label: t("ask.seeChange"), content: card, card: true }}
+        ) : undefined
+      }
     />
   );
 }
@@ -284,7 +256,7 @@ function ProseDiff({ lines }: { lines: ChangedLine[] }) {
 
 const isTextRow = (p: Proposal) => p.target.type === "agent_instructions" || p.target.type === "org_context";
 
-/** What a role or access row changes: "Papel: Dev → Revisora", or a chip per app turned on or off. */
+/** What a role or access row changes: "Função: Dev → Revisora", or a chip per app turned on or off. */
 function SettingChange({ p }: { p: Proposal }) {
   const { t } = useTranslation();
   if (p.target.type === "agent_role")
@@ -308,9 +280,6 @@ function SettingChange({ p }: { p: Proposal }) {
 }
 
 const styles = StyleSheet.create({
-  card: { borderRadius: 14, padding: 12, gap: 10, alignItems: "stretch" },
-  head: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  section: { gap: 8 },
   row: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   /** A row's first line, as tall as its switch: the face, the name and the state sit centered on it. */
   line: { minHeight: 28, justifyContent: "center" },

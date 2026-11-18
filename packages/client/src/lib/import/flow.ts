@@ -9,8 +9,12 @@ import type {
   ImportSkipReason,
   MigrationBundle,
 } from "../../api/types";
+import { IMPORT_APP_CLIENTS } from "../app-clients";
 import { forbiddenText } from "../errors";
+import { formatBytes } from "../files";
 import { joinNames } from "../format";
+import { hiddenRepoOf, hiddenRepoText } from "../skills";
+import { type ComputerCard, computerChat } from "./computer";
 import {
   type AgentFile,
   type AgentFileSkip,
@@ -78,6 +82,49 @@ export const IMPORT_CARDS = [
 export type ImportCard = (typeof IMPORT_CARDS)[number];
 /** The cards that show the export request to copy. */
 export type RequestCard = Extract<ImportCard, PromptApp | "other">;
+/** The cards whose app answers the export request (pasted back), not a file. */
+export const isRequestCard = (card: ImportCard | null): card is RequestCard =>
+  card === "grok-bot" || card === "chatgpt-dots" || card === "other";
+
+/**
+ * How a source's agents come: the app creates them here through this server's MCP, the request and its reply, or (an
+ * app on the person's computer) the command that reads it there.
+ */
+export type ImportMethod = "mcp" | "prompt" | "command";
+
+/** A source's steps to connect it to this server's MCP; none for one that can't take an MCP server. */
+export const mcpClient = (card: ImportCard) => IMPORT_APP_CLIENTS.find((c) => c.id === card);
+
+/**
+ * Offered, but not the default: no document says a dot calls a custom plugin, and custom MCP on some ChatGPT plans is
+ * read-only, which can't create agents.
+ */
+const MCP_UNCONFIRMED: ReadonlySet<ImportCard> = new Set(["chatgpt-dots"]);
+
+/**
+ * The ways an app on the person's computer offers (ADR 0055, addendum 2026-11-16): the command always (it brings the
+ * most), its own agent creating them here through MCP where the app takes it and reaches this server, and its agent
+ * writing the export where it has a chat to ask in.
+ */
+export const computerPaths = (card: ComputerCard, reachable: boolean): ImportMethod[] => [
+  "command",
+  ...(reachable && mcpClient(card) ? (["mcp"] as const) : []),
+  ...(computerChat(card) ? (["prompt"] as const) : []),
+];
+
+/** MCP wherever the app takes it and apps on the internet reach this server (`aiAppImport`'s `available`). */
+export const defaultMethod = (card: ImportCard, reachable: boolean): ImportMethod =>
+  reachable && mcpClient(card) && !MCP_UNCONFIRMED.has(card) ? "mcp" : "prompt";
+
+/**
+ * The agents that arrived through MCP: not among `seen` (the ids there when its steps first showed, so the server's
+ * clock is never compared with the device's) and the person's own, made by them or by their app.
+ */
+export const agentsSince = <A extends { id: string; ownerUserId: string | null }>(
+  list: readonly A[],
+  seen: ReadonlySet<string>,
+  userId: string,
+) => list.filter((a) => !seen.has(a.id) && a.ownerUserId === userId);
 
 /** An app's own card, else any other app's. */
 const cardOf = (app: string): ImportCard => IMPORT_CARDS.find((c) => c === app) ?? "other";
@@ -239,14 +286,28 @@ export function cardName(t: TFunction, card: ImportCard): string {
 
 /**
  * What went wrong reading or planning, and what to do next. `offline` tells a request that never got an answer
- * (each app knows its own way).
+ * (each app knows its own way). A private repository none of the workspace's GitHub reads is said as
+ * Skills says it (`hiddenRepoText`), `mayConnect`: whether this person may connect GitHub.
  */
 export function importFailureText(
   t: TFunction,
   { from, step, cause }: ImportFailure,
   offline: (e: unknown) => boolean,
+  mayConnect = false,
+  locale = "en",
 ) {
   if (cause === NOT_GITHUB) return t("onboarding.import.errors.notGithub");
+  const hidden = hiddenRepoOf(cause);
+  if (hidden) return hiddenRepoText(t, hidden, mayConnect).text;
+  if (cause instanceof ImportError && cause.limit) {
+    const { kind, have, max, name } = cause.limit;
+    const size = (n: number) => (kind === "files" ? new Intl.NumberFormat(locale).format(n) : formatBytes(locale, n));
+    return t(`onboarding.import.errors.limit.${kind}`, {
+      have: size(have),
+      max: size(max),
+      name: name ? baseName(name) : "",
+    });
+  }
   if (cause instanceof ImportError) {
     return cause.code === "unknown" && from === "paste"
       ? t("onboarding.import.errors.unknownPasted")

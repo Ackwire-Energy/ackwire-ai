@@ -201,6 +201,70 @@ describe("Configurações → Auditoria", () => {
     expect(details).toContain("Scope count");
   });
 
+  // Whoever runs the server read one piece of the workspace (the reveal door): the row says who and what, the line
+  // under it at whose request or for which fault. The long name is the worst case for CI's geometry check.
+  test("the operator's read of something: who read what, at whose request and how it arrived, or for a failed run", async () => {
+    const read = (id: string, over: Partial<AuditRow>): AuditRow =>
+      row({
+        id,
+        actor: { type: "system", id: null, name: null },
+        action: "operator.content_read",
+        runId: null,
+        channelId: null,
+        channel: null,
+        onBehalfOf: null,
+        outcome: null,
+        ...over,
+      });
+    const asked = read("o1", {
+      at: at(1),
+      target: { type: "run_step", id: "run-9" },
+      details: {
+        field: "input",
+        seq: 3,
+        offset: 0,
+        limit: 2000,
+        purpose: "member_request",
+        assistedByAi: true,
+        requestId: "req-1",
+        source: "email",
+      },
+      onBehalfOf: { id: "u-walter", name: "Walter Albuquerque de Vasconcelos Neto" },
+    });
+    const fault = read("o2", {
+      at: at(2),
+      target: { type: "message", id: null },
+      details: { field: "text", direct: true, purpose: "fault", assistedByAi: false, runId: "run-9", cloud: true },
+    });
+    const { r } = await go(seedState({ audit: [asked, fault] }));
+    expect(titles()).toEqual([
+      "Quem cuida deste servidor leu uma etapa do trabalho de um agente",
+      "O suporte do Ackwire AI leu algo em uma conversa privada",
+    ]);
+    const subs = [...section().querySelectorAll(".audit-row__sub")].map((e) => e.textContent);
+    expect(subs).toEqual([
+      "a pedido de Walter Albuquerque de Vasconcelos Neto, enviado por e-mail · com um assistente de IA",
+      "para diagnosticar uma execução que falhou ou travou",
+    ]);
+    // The panel says why in the reason's place, and of the entry's details never an id nor the server's own mark.
+    await click(section().querySelector(".audit-row") as HTMLElement);
+    const panel = screen().getByRole("complementary", { name: "Detalhe da auditoria" });
+    expect(panel.querySelector(".audit-panel__reason")?.textContent).toBe(
+      "Motivo: a pedido de Walter Albuquerque de Vasconcelos Neto, enviado por e-mail · com um assistente de IA",
+    );
+    const details = panel.querySelector(".audit-panel__sent")?.textContent ?? "";
+    expect(details).toContain("input");
+    expect(details).not.toMatch(/req-1|run-9|requestId|cloud/i);
+    // The longest languages' words, for the geometry check.
+    for (const [lang, who] of [
+      ["de", "Die Person, die diesen Server betreibt, hat"],
+      ["ru", "Администратор этого сервера: просмотр"],
+    ] as const) {
+      await showIn(r.services, lang);
+      expect(document.querySelector(".audit-row__title")?.textContent).toStartWith(who);
+    }
+  });
+
   test("the panel hangs from <body>, so it stays put while the list scrolls", async () => {
     await go();
     await click(section().querySelector(".audit-row") as HTMLElement);

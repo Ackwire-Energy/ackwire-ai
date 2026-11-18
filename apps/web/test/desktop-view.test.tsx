@@ -141,7 +141,7 @@ function socketsFor() {
     desktops.push(s);
     return s as unknown as ReturnType<SocketFactory>;
   };
-  return { factory, desktops };
+  return { factory, desktops, realtime };
 }
 
 /** Ada on a Linux computer of the workspace's, which serves screens; self-host, or with `cloud` the Cloud's own. */
@@ -417,7 +417,6 @@ describe("the agent's screen in the computer dialog", () => {
     expect(rfb().options).toEqual({ shared: true });
     expect(rfb()).toMatchObject({
       viewOnly: true,
-      showDotCursor: false,
       qualityLevel: 3,
       compressionLevel: 2,
       scaleViewport: true,
@@ -437,6 +436,21 @@ describe("the agent's screen in the computer dialog", () => {
     expect(view().queryByRole("button", { name: "Recolher" })).toBeNull();
     // Watching gives no way to type into it.
     expect(view().queryByRole("textbox", { name: "Digitar no computador da Ada" })).toBeNull();
+  });
+
+  test("watching, the agent's pointer from the realtime socket draws its cursor over the screen", async () => {
+    const t = await dialog();
+    await connected();
+    const socket = t.sockets.realtime.last();
+    await act(async () => socket.open());
+    const pointer = { x: 640, y: 450, width: 1280, height: 900, act: "click" };
+    await act(async () =>
+      socket.push({ type: "event", scope: "user", event: { type: "agent.desktop.pointer", agentId: ADA_ID, pointer } }),
+    );
+    await settle(4);
+    const cursor = document.querySelector(".dsk-screen .brw-cur") as HTMLElement | null;
+    expect(cursor).not.toBeNull();
+    expect(cursor?.textContent).toContain("Ada");
   });
 
   test("Live once a picture is there: a screen that just started stays black a moment, and says Opening meanwhile", async () => {
@@ -612,7 +626,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     expect(t.sockets.desktops.at(-1)?.url).toEndWith("&mode=control");
     expect(t.sockets.desktops[0]?.closed).toBe(true);
-    expect(rfb()).toMatchObject({ viewOnly: false, showDotCursor: true, qualityLevel: 6, focusOnClick: false });
+    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, focusOnClick: false });
     await connected();
     // The person's keys go to the screen at once, through a field over it.
     expect(document.activeElement === view().getByRole("textbox", { name: "Digitar no computador da Ada" })).toBe(true);
@@ -648,7 +662,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
       "TEXTAREA",
       "1",
-      "ac-input brw-ac__note",
+      "ac-input ac-input--grow brw-ac__note",
     ]);
     expect(note.style.height).not.toBe("");
     await act(async () => fireEvent.change(note, { target: { value: "Deixei o arquivo na mesa" } }));
@@ -776,7 +790,7 @@ describe("the agent's screen in the computer dialog", () => {
     expect(ws.sent).toEqual([MODE("control")]);
     expect(rfb()).not.toBe(watching);
     expect(watching.canvas.isConnected).toBe(false);
-    expect(rfb()).toMatchObject({ viewOnly: false, showDotCursor: true, qualityLevel: 6, got: [[82, 70, 66]] });
+    expect(rfb()).toMatchObject({ viewOnly: false, qualityLevel: 6, got: [[82, 70, 66]] });
     expect(still()).not.toBeNull();
     expect(screen().getByText("Assumindo o controle…")).toBeTruthy();
     await connected();
@@ -832,7 +846,7 @@ describe("the agent's screen in the computer dialog", () => {
     await settle(4);
     expect(t.sockets.desktops).toHaveLength(1);
     expect(ws.sent).toEqual([MODE("control"), MODE("watch")]);
-    expect(rfb()).toMatchObject({ viewOnly: true, showDotCursor: false, qualityLevel: 3 });
+    expect(rfb()).toMatchObject({ viewOnly: true, qualityLevel: 3 });
     expect(sub()).toBe("Ao vivo · você está assistindo");
     expect(still()).not.toBeNull();
     expect(screen().queryByText("Abrindo o computador da Ada…")).toBeNull();

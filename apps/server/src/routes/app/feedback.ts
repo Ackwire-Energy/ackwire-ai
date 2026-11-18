@@ -1,19 +1,30 @@
 import {
   attachFeedbackFiles,
+  attachmentDisposition,
   decideFeedbackOffer,
   dropFeedbackFile,
   FEEDBACK_ABOUT_MAX,
   FEEDBACK_FACT_MAX,
   FEEDBACK_FACTS,
   FEEDBACK_FILES,
+  FEEDBACK_INBOX_ALL_PER_HOUR,
+  FEEDBACK_INBOX_PER_HOUR,
   FEEDBACK_MAX,
   FEEDBACK_PER_HOUR,
+  FEEDBACK_RELAYED_MS,
+  feedbackDestination,
   feedbackFileByToken,
   getMembership,
+  isAgentesCloud,
+  isFeedbackRelay,
   NotFoundError,
   queueFeedback,
+  recordSupportRequest,
+  reportedMessageId,
+  sendRelayedFeedback,
   sniffFeedbackFile,
   storeFeedbackFile,
+  supportAboutKind,
   TooManyError,
   ValidationError,
 } from "@agenteschat/engine";
@@ -68,8 +79,8 @@ const FeedbackOffer = z
 
 /**
  * The apps' feedback form (ADR 0160): what the person wrote goes by email to whoever runs the server
- * (`FEEDBACK_EMAIL`), through the outbox, with the pictures and the video they added. Without that address there is
- * no form and no route.
+ * (`FEEDBACK_EMAIL`), through the outbox, with the pictures and the video they added. Without that address it goes to
+ * the agentes.chat team's inbox, pictures only (§13); with neither there is no form and no route.
  */
 export function feedbackRoutes(deps: AppDeps) {
   const { db, config, adapters } = deps;
@@ -77,13 +88,17 @@ export function feedbackRoutes(deps: AppDeps) {
   app.use("/feedback", requireSession(deps.auth));
   app.use("/feedback/*", requireSession(deps.auth));
   const files = { db, blobs: adapters.platformBlobs };
+  const destination = feedbackDestination(config);
+  const relayed = isFeedbackRelay(destination);
+  // What a member wrote is kept beside their request only where the operator may later be asked to read it.
+  const keepWords = Boolean(config.OPERATOR_API_REVEAL_TOKEN);
   // Before a byte of an upload is read: is there a form at all, is this person within their hour, and does the body
   // say it is too large. Then the body is read only up to the largest file, whatever its length claimed.
   const uploadMax = FEEDBACK_FILES.videoBytes + MULTIPART_SLACK_BYTES;
   const tooLarge = (c: Context) => apiError(c, 413, "feedback.file_too_large", "The file is too large");
   app.use("/feedback/files", async (c, next) => {
     if (c.req.method !== "POST") return next();
-    if (!config.FEEDBACK_EMAIL) return apiError(c, 404, "not_found", "Not found");
+    if (!destination) return apiError(c, 404, "not_found", "Not found");
     if (Number(c.req.header("content-length") ?? 0) > uploadMax) return tooLarge(c);
     if (!(await adapters.rateLimiter.consume(`feedback-file:${c.get("user").id}`, FILES_PER_HOUR)).allowed)
       return apiError(c, 429, "rate_limited", "Too many files for now");
@@ -91,8 +106,8 @@ export function feedbackRoutes(deps: AppDeps) {
   });
   app.use("/feedback/files", bodyLimit({ maxSize: uploadMax, onError: tooLarge }));
   const address = () => {
-    if (!config.FEEDBACK_EMAIL) throw new NotFoundError("Not found");
-    return config.FEEDBACK_EMAIL;
+    if (!destination) throw new NotFoundError("Not found");
+    return destination;
   };
 
   app.openapi(
@@ -103,7 +118,7 @@ export function feedbackRoutes(deps: AppDeps) {
       summary: "Add a picture or a video to the feedback being written",
       description:
         `A picture (PNG, JPEG, GIF, WebP, HEIC; ${FEEDBACK_FILES.imageBytes / 1024 / 1024} MB) or a video (MP4, MOV, WebM; ${FEEDBACK_FILES.videoBytes / 1024 / 1024} MB), told by its own bytes. ` +
-        "Kept for an hour unless a feedback is sent with it (`files`).",
+        "Kept for an hour unless a feedback is sent with it (`files`). Pictures only where `auth-config.feedbackRelay` is true.",
       security,
       request: {
         body: {
@@ -135,7 +150,7 @@ export function feedbackRoutes(deps: AppDeps) {
       if (video && !(await adapters.rateLimiter.consume(`feedback-video:${user.id}`, VIDEOS_PER_HOUR)).allowed)
         throw new TooManyError("Too many videos for now");
       try {
-        return c.json(await storeFeedbackFile(files, user.id, { name: file.name, bytes }), 200);
+        return c.json(await storeFeedbackFile(files, user.id, { name: file.name, bytes, picturesOnly: relayed }), 200);
       } catch (error) {
         if (error instanceof ValidationError && error.code === "feedback.file_too_large")
           return apiError(c, 413, error.code, error.message, error.params);
@@ -168,7 +183,7 @@ export function feedbackRoutes(deps: AppDeps) {
       tags,
       summary: "Send feedback to whoever runs this server",
       description:
-        "One email to `FEEDBACK_EMAIL` with the text, the person's name and address (to answer them), the workspace's name when `orgId` is one of theirs, what they reported (`about`), what the app knew of where they were (`facts`), their files as links good for thirty days, and this server's version. 404 when the server takes no feedback (`auth-config.feedback` is false), 429 past ten an hour.",
+        "One email to `FEEDBACK_EMAIL` (or, where it is unset, one message to the agentes.chat team's inbox: `auth-config.feedbackRelay`) with the text, the person's name and address (to answer them), the workspace's name when `orgId` is one of theirs, what they reported (`about`), what the app knew of where they were (`facts`), their files as links good for thirty days, and this server's version. 404 when the server takes no feedback (`auth-config.feedback` is false), 429 past ten an hour.",
       security,
       request: {
         body: body(
@@ -215,6 +230,8 @@ export function feedbackRoutes(deps: AppDeps) {
           orgId: member?.orgId ?? null,
           ids: input.files ?? [],
           publicUrl: config.PUBLIC_URL,
+          // Sent on to the inbox, they are needed here only while the job may run again.
+          ...(relayed ? { keepMs: FEEDBACK_RELAYED_MS } : {}),
         });
         await queueFeedback(tx, {
           orgId: member?.orgId ?? null,
@@ -233,6 +250,20 @@ export function feedbackRoutes(deps: AppDeps) {
             version,
           },
         });
+        // A member's own request is what an operator's later read of their workspace rests on (ADR 0056).
+        if (member) {
+          await recordSupportRequest(tx, {
+            orgId: member.orgId,
+            userId: user.id,
+            source: "form",
+            ref: input.id,
+            aboutKind: supportAboutKind(input.about?.kind),
+            messageId: await reportedMessageId(tx, member.orgId, input.facts),
+            text: input.text,
+            about: input.about?.text,
+            keepWords,
+          });
+        }
       });
       deps.wakeWorkers?.();
       return c.body(null, 204);
@@ -269,7 +300,7 @@ export function feedbackRoutes(deps: AppDeps) {
     async (c) => {
       const input = c.req.valid("json");
       const offer = await decideFeedbackOffer(
-        { db, pubsub: adapters.pubsub, rateLimiter: adapters.rateLimiter, to: config.FEEDBACK_EMAIL, version },
+        { db, pubsub: adapters.pubsub, rateLimiter: adapters.rateLimiter, to: destination, version, keepWords },
         {
           orgId: input.orgId,
           messageId: c.req.valid("param").messageId,
@@ -300,11 +331,68 @@ export function registerFeedbackFiles(api: OpenAPIHono, deps: AppDeps) {
     return c.body(new Uint8Array(file.body), 200, {
       "content-type": file.contentType,
       "content-length": String(file.size),
-      "content-disposition": `attachment; filename="${file.name.replace(/["\\]/g, "")}"; filename*=UTF-8''${encodeURIComponent(file.name)}`,
+      // An ASCII fallback beside the name as is: a header can't carry macOS's "11.43.12 PM" (a narrow no-break space).
+      "content-disposition": attachmentDisposition(file.name),
       "x-content-type-options": "nosniff",
       "content-security-policy": "default-src 'none'; sandbox",
       "cache-control": "private, no-store",
       "referrer-policy": "no-referrer",
     });
+  });
+}
+
+const Inbox = z.object({
+  id: z.string().min(1).max(200),
+  feedback: z.object({
+    name: z.string().max(200),
+    email: z.email().max(200),
+    orgName: z.string().max(200).optional(),
+    text: z.string().trim().min(1).max(FEEDBACK_MAX),
+    where: z.string().max(200).optional(),
+    app: z.string().max(60).optional(),
+    about: z
+      .object({
+        kind: z.string().min(1).max(40),
+        label: z.string().max(120).optional(),
+        text: z.string().max(FEEDBACK_ABOUT_MAX).optional(),
+      })
+      .optional(),
+    facts: z
+      .array(z.tuple([z.string().min(1).max(40), z.string().max(FEEDBACK_FACT_MAX)]))
+      .max(FEEDBACK_FACTS + 4)
+      .optional(),
+    version: z.string().min(1).max(40),
+  }),
+  pictures: z
+    .array(z.object({ name: z.string().max(200), data: z.base64() }))
+    .max(FEEDBACK_FILES.images)
+    .optional(),
+});
+
+/**
+ * `POST /api/feedback/inbox` (ADR 0160 §13): where servers other people run send the feedback their operator gave no
+ * address for. Only on agentes.chat's own servers (`isAgentesCloud`), which read feedback at `FEEDBACK_EMAIL`: no
+ * other server has the route, and it needs no setting (`FEEDBACK_INBOX=false` turns it off). No session: the sender is a server, known by nothing, so it is counted by where it comes from and in all, read
+ * up to the size the global limit gives this path, mailed at once and never stored.
+ */
+export function registerFeedbackInbox(api: OpenAPIHono, deps: AppDeps) {
+  const { config, adapters } = deps;
+  const to = config.FEEDBACK_INBOX && isAgentesCloud(config.PUBLIC_URL) ? config.FEEDBACK_EMAIL : undefined;
+  if (!to) return;
+  api.post("/feedback/inbox", async (c) => {
+    const from = requestLimitIp(c.req.raw.headers, config.TRUSTED_PROXIES);
+    if (
+      !(await adapters.rateLimiter.consume(`feedback-inbox:${from}`, FEEDBACK_INBOX_PER_HOUR)).allowed ||
+      !(await adapters.rateLimiter.consume("feedback-inbox", FEEDBACK_INBOX_ALL_PER_HOUR)).allowed
+    )
+      return apiError(c, 429, "rate_limited", "Too much feedback for now");
+    const input = Inbox.safeParse(await c.req.json().catch(() => null));
+    if (!input.success) return apiError(c, 400, "invalid_request", "Not a feedback");
+    const { feedback } = input.data;
+    await sendRelayedFeedback(adapters.email, to, {
+      ...input.data,
+      feedback: { ...feedback, version: `${feedback.version} (self-hosted)` },
+    });
+    return c.body(null, 204);
   });
 }

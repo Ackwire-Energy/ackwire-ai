@@ -2,11 +2,11 @@ import {
   type ContentBlock,
   contextWindowOf,
   contextWindowWithin,
-  IMAGE_CHARS,
   type ModelMessage,
   type SystemBlock,
   type ToolSpec,
   textOf,
+  toolImageChars,
 } from "@agenteschat/providers";
 import { REQUEST_APPROVAL_TOOL } from "./approval-requests";
 import { ASK_CHOICES_TOOL, SHOW_BLOCK_TOOL, START_POLL_TOOL } from "./blocks";
@@ -62,7 +62,7 @@ export const removedPlaceholder = (chars: number) =>
   `${REMOVED_PREFIX} ${chars} chars. Call the tool again if you need it.]`;
 
 const resultChars = (b: Extract<ContentBlock, { type: "tool_result" }>) =>
-  b.content.length + (b.images?.length ?? 0) * IMAGE_CHARS;
+  b.content.length + (b.images ?? []).reduce((n, i) => n + toolImageChars(i), 0);
 
 const blockChars = (b: ContentBlock) =>
   b.type === "text"

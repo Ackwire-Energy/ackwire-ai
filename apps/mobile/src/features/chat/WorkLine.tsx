@@ -1,19 +1,27 @@
 import { type Issue, type Message, useApi, useChannels, type WorkView } from "@agenteschat/client";
+import { relativeTime } from "@agenteschat/client/lib/format";
 import { heldBack } from "@agenteschat/client/lib/issues";
-import { blockedText, workLine, workPlanProgress, workWaitsOnPerson } from "@agenteschat/client/lib/long-work";
+import {
+  blockedText,
+  handedLine,
+  workLine,
+  workPlanProgress,
+  workWaitsOnPerson,
+} from "@agenteschat/client/lib/long-work";
 import { can } from "@agenteschat/client/lib/permissions";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { createContext, type ReactNode, useContext, useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { Pressable, type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { useOrg } from "@/providers/org";
-import { haptics, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
+import { Button, haptics, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { RowPartContext, useCardTop } from "./look";
+import { useRowDirectory, useRowMeId } from "./row-data";
 
 /** The conversation's list scrolls to one of its messages (false: it doesn't show it). */
 export const JumpToMessageContext = createContext<((messageId: string) => boolean) | null>(null);
@@ -33,8 +41,8 @@ function useNow(live: boolean) {
 function useLine(work: WorkView, inUpdatesThread = false) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const manage = can(useOrg().org, "manage_agents");
   const api = useApi();
   const qc = useQueryClient();
@@ -45,19 +53,22 @@ function useLine(work: WorkView, inUpdatesThread = false) {
   // As `mayStopRun` decides (who asked, the agent's owner, an admin); the server has the last word, said in a toast.
   const stop = useMutation({
     mutationFn: (runId: string) => api.agents.cancelRun(orgId, runId),
-    onError: () => toast({ title: t("work.stopFailed"), icon: "info" }),
+    // A failure's toast, in the failure's tone (the ×), as every refusal in the app.
+    onError: () => toast({ title: t("work.stopFailed"), icon: "x" }),
     onSettled: () => void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", work.channelId] }),
   });
-  const view = workLine(t, work, {
+  const context = {
     locale: i18n.language || "pt-BR",
     now,
     meId,
     agentName: agent?.name ?? "",
-    nameOf: (id) => dir.memberById.get(id)?.name ?? null,
+    nameOf: (id: string) => dir.memberById.get(id)?.name ?? null,
+    agentNameOf: (id: string) => dir.anyAgent(id)?.name,
     canStop: manage || agent?.ownerUserId === meId || work.requestedByUserId === meId,
     inUpdatesThread,
-  });
-  return { view, stop, t };
+  };
+  const view = workLine(t, work, context);
+  return { view, handed: () => handedLine(t, work, context), agentName: agent?.name ?? "", stop, t };
 }
 
 /** The work's thread, where its updates are, on the question it waits on. */
@@ -79,17 +90,24 @@ function Line({
   onThread,
   below,
   inUpdatesThread,
+  handed: asHanded,
 }: {
   work: WorkView;
   onThread?: () => void;
   below?: ReactNode;
   inUpdatesThread?: boolean;
+  /** Under the reply that handed it: "Handed to Atlas · working on it · step 3 of 5 · 2 min", Stop or the result. */
+  handed?: boolean;
 }) {
   const c = useColors();
   const surface = useSurface();
   const cardTop = useCardTop();
   const inBody = useContext(RowPartContext) !== null;
-  const { view, stop, t } = useLine(work, inUpdatesThread);
+  const line = useLine(work, inUpdatesThread);
+  const { stop, t } = line;
+  const h = asHanded ? line.handed() : null;
+  // Handed: no task, thread or repeated question on the line (the chip, the messages and the card below say them).
+  const view = h ? { ...line.view, ...h, task: null, threadId: null, question: null, update: null } : line.view;
   const jump = useContext(JumpToMessageContext);
   // An icon per state, never a colored dot: the shape says it without the color.
   const mark =
@@ -162,7 +180,7 @@ function Line({
       {/* On the first line's reading middle. */}
       <View style={styles.mark}>
         {view.tone === "working" ? (
-          <LineIcon variant="small" size={12}>
+          <LineIcon variant="small" size={12} mark>
             <PixelOrbit color="sky" size={12} />
           </LineIcon>
         ) : (
@@ -171,7 +189,21 @@ function Line({
       </View>
       <View style={styles.body}>
         <Text variant="small" tone="ink2">
-          {view.text}
+          {h ? (
+            <>
+              <Trans i18nKey="work.handed.lead" values={{ name: line.agentName }} components={[<Text key="face" />]} />
+              {" · "}
+              <Text
+                variant="small"
+                style={[styles.bold, { color: h.tone === "working" ? c.agent : h.tone === "waiting" ? c.warn : c.ink }]}
+              >
+                {h.state}
+              </Text>
+              {h.facts.map((fact) => ` · ${fact}`).join("")}
+            </>
+          ) : (
+            view.text
+          )}
         </Text>
         {view.question ? (
           <Text variant="small" tone="ink" numberOfLines={2}>
@@ -234,18 +266,33 @@ export function MessageWorkLine({ message, threaded }: { message: Message; threa
   );
 }
 
+/** Under the reply of the agent that handed work over: one line per handed work. */
+export function HandedWorkLines({ message }: { message: Message }) {
+  const works = message.handedWorks ?? [];
+  if (works.length === 0) return null;
+  return (
+    <>
+      {works.map((w) => (
+        <Line key={w.id} work={w} handed />
+      ))}
+    </>
+  );
+}
+
 /** On a task's screen: the work's line and the agent's plan. */
 export function IssueWorkLine({ issue, style }: { issue: Issue; style?: StyleProp<ViewStyle> }) {
   const { t } = useTranslation();
   const c = useColors();
   const work = issue.backgroundWork;
   const blocked = blockedText(t, issue.blocked);
+  if (work?.how === "handed") return <HandedWork work={work} style={[styles.block, style]} />;
   if (!work && !blocked) return null;
   const progress = work ? workPlanProgress(work) : null;
   return (
     <View style={[styles.block, style]}>
+      {/* A state is its words in the state's color, never a label on a tinted plate. */}
       {blocked ? (
-        <Text variant="small" style={[styles.blocked, { backgroundColor: c.warnSoft, color: c.warn }]}>
+        <Text variant="small" style={[styles.blocked, { color: c.warn }]}>
           {blocked}
         </Text>
       ) : null}
@@ -282,13 +329,63 @@ export function IssueWorkLine({ issue, style }: { issue: Issue; style?: StylePro
 }
 
 /**
+ * A handed task's work on its screen, as the web's box: its line while it works; its question with Answer (full width)
+ * when it waits on the reader, which opens the card where it was asked; once done, who finished it, when, who handed it
+ * and the first line of what came of it.
+ */
+function HandedWork({ work, style }: { work: WorkView; style?: StyleProp<ViewStyle> }) {
+  const { t, i18n } = useTranslation();
+  const dir = useRowDirectory();
+  const surface = useSurface();
+  if (work.status === "done") {
+    const name = dir.anyAgent(work.agentId)?.name ?? t("channel.unknownAgent");
+    const by = work.handedBy ? dir.anyAgent(work.handedBy.agentId)?.name : null;
+    const when = relativeTime(t, i18n.language, work.finishedAt ?? work.startedAt);
+    return (
+      <View style={[style, styles.done, surface]}>
+        <Text variant="small" tone="ink" style={styles.bold}>
+          {t("issues.work.finishedTitle", { name })}
+        </Text>
+        <Text variant="caption" tone="muted">
+          {by ? t("issues.work.finishedMeta", { when, name: by }) : when}
+        </Text>
+        {work.result ? (
+          <Text variant="small" tone="ink2">
+            {work.result.text}
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+  const asked = work.state === "waiting_input" ? work.question : null;
+  return (
+    <View style={style}>
+      <Line work={work} handed />
+      {asked ? (
+        <View style={styles.ask}>
+          <Text variant="small" tone="ink">
+            {asked.text}
+          </Text>
+          <Button
+            variant="primary"
+            wide
+            label={t("issues.work.answer")}
+            onPress={() => router.push(chatHref(work.channelId, work.homeThreadId, asked.messageId))}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+/**
  * Mostrar para todos, for the task's "…" menu: a card a DM or a private channel holds back, for who may show it to the
  * whole workspace (who asked for the work, its creator, an admin). Null when it isn't held back or isn't yours to show.
  */
 export function useShareWork(issue: Issue): { share: () => void; pending: boolean } | null {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const meId = useMeId();
+  const meId = useRowMeId();
   const admin = can(useOrg().org, "manage_agents");
   const api = useApi();
   const qc = useQueryClient();
@@ -300,7 +397,7 @@ export function useShareWork(issue: Issue): { share: () => void; pending: boolea
       toast({ title: t("work.shared"), icon: "check" });
       void qc.invalidateQueries({ queryKey: ["org", orgId, "issues"] });
     },
-    onError: () => toast({ title: t("work.shareFailed"), icon: "info" }),
+    onError: () => toast({ title: t("work.shareFailed"), icon: "x" }),
   });
   const work = issue.backgroundWork;
   const mayShare =
@@ -342,17 +439,12 @@ const styles = StyleSheet.create({
   action: { fontWeight: "600" },
   pressed: { opacity: 0.6 },
   block: { gap: 12 },
-  blocked: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    overflow: "hidden",
-    fontWeight: "600",
-  },
+  blocked: { fontWeight: "600" },
   // Under the actions, on the card's text column.
   plan: { gap: 6, marginTop: 8 },
   step: { flexDirection: "row", gap: 8, alignItems: "flex-start" },
   grow: { flex: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
+  done: { gap: 4, padding: 14, borderRadius: 20 },
+  ask: { gap: 10, marginTop: 10 },
 });

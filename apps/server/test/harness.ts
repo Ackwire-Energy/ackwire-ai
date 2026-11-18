@@ -14,14 +14,16 @@ import {
   type DatabaseDriver,
   type ErrorReporter,
   type GifProvider,
+  type HumanAction,
   type HumanCheck,
   type MailAdapters,
   noPlatformCredentials,
   type S3Fetch,
+  TURNSTILE_SCRIPT_URL,
   type WebPushSender,
 } from "@agenteschat/adapters";
 import { testConfig } from "@agenteschat/config";
-import { eq, isNotNull, like, schema } from "@agenteschat/db";
+import { eq, isNotNull, like, rowsOf, schema, sql, tracingLogger } from "@agenteschat/db";
 import { createTestDatabase } from "@agenteschat/db/testing";
 import {
   createFakeJudge,
@@ -41,10 +43,12 @@ import { createFakeEmbeddings, createFakeProvider } from "@agenteschat/providers
 import { createApp } from "../src/app";
 import { type AppleTokenRevoker, createAuth } from "../src/auth";
 import { buildEngine } from "../src/engine";
+import { createHumanCheck } from "../src/http/human-check";
 import { createLogger } from "../src/logger";
 import { createMachineSockets } from "../src/realtime/machines";
 import { createStreamSockets } from "../src/realtime/streams";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
+import type { AppDeps } from "../src/routes/app/context";
 
 export const ORIGIN = "http://localhost:3000";
 
@@ -93,8 +97,8 @@ export async function createTestServer(
     emailArt?: EmailArt;
     /** Fake TypeSafe (checks of the Jev key). */
     jevFetch?: typeof fetch;
-    /** The bot check (Turnstile with a fake `fetch`); absent = none, as without its keys. */
-    humanCheck?: HumanCheck;
+    /** The bot check (`turnstileCheck`); absent or null = none, as without its keys. */
+    humanCheck?: HumanCheck | null;
     /** The server's own file store's kind (`disk`, `postgres`, `s3`); it keeps files in memory either way. */
     platformKind?: string;
     /** Browser push (ADR 0071); absent = a fake that records, null = off. */
@@ -115,16 +119,23 @@ export async function createTestServer(
     speechFetch?: typeof fetch;
     /** AI apps (ADR 0119): a fake fetch of apps' metadata documents (CIMD); absent = none answers. */
     appsFetchDocument?: FetchAppDocument;
+    /**
+     * `false`: a server that sends no email from its start, as Better Auth reads it then (no confirmation links, no
+     * password reset). Flipping `t.email.delivers` later reaches only the routes that read it on each request.
+     */
+    emailDelivers?: boolean;
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
   const config = testConfig({
     PUBLIC_URL: ORIGIN,
     AGENT_MAX_OUTPUT_TOKENS: "1000",
+    // Off unless a test asks: feedback would otherwise go to the agentes.chat team's inbox, over the network.
+    FEEDBACK_RELAY: "false",
     ...options.env,
   });
   const log = createLogger("error", options.errors);
-  const email = createFakeEmailSender();
+  const email = createFakeEmailSender({ delivers: options.emailDelivers ?? true });
   const push = createFakePushSender();
   const webPush = options.webPush === undefined ? createFakeWebPushSender() : options.webPush;
   const platformBlobs = createMemoryBlobStore({ kind: options.platformKind, sign: options.signedBlobs });
@@ -189,11 +200,38 @@ export async function createTestServer(
     db,
     config,
     log,
-    emailDelivers: true,
+    emailDelivers: options.emailDelivers ?? true,
     rateLimiter: adapters.rateLimiter,
     humanCheck: adapters.humanCheck,
     pubsub: adapters.pubsub,
   });
+  const services: AppDeps = {
+    db,
+    auth,
+    config,
+    adapters,
+    extras: {
+      http: options.http,
+      mcpConnect: options.mcpConnect,
+      resolveHost: options.resolveHost,
+      embed: engine.gateway.embed,
+      storage: engine.storage,
+      artifacts: engine.artifacts,
+      context: engine.context,
+      sandbox: engine.sandbox,
+      gitProxy: engine.gitProxy,
+      desktopFetch: options.desktopFetch,
+      browserLive: engine.browserLive,
+      router: engine.router,
+      streams: engine.streams,
+      jevKey: engine.jevKey,
+      gifKey,
+      githubApp: engine.githubApp,
+      speech: engine.speech,
+      voice: engine.voice,
+    },
+    log,
+  };
   const app = createApp({
     edition: "selfhost",
     version: "test",
@@ -204,32 +242,7 @@ export async function createTestServer(
       (async () => {
         throw new Error("no network in tests");
       }),
-    services: {
-      db,
-      auth,
-      config,
-      adapters,
-      extras: {
-        http: options.http,
-        mcpConnect: options.mcpConnect,
-        resolveHost: options.resolveHost,
-        embed: engine.gateway.embed,
-        storage: engine.storage,
-        artifacts: engine.artifacts,
-        context: engine.context,
-        sandbox: engine.sandbox,
-        gitProxy: engine.gitProxy,
-        desktopFetch: options.desktopFetch,
-        browserLive: engine.browserLive,
-        router: engine.router,
-        streams: engine.streams,
-        jevKey: engine.jevKey,
-        gifKey,
-        githubApp: engine.githubApp,
-        speech: engine.speech,
-        voice: engine.voice,
-      },
-    },
+    services,
     log,
   });
   const realtime = createRealtime({
@@ -262,12 +275,41 @@ export async function createTestServer(
     gifKey,
     app,
     auth,
+    /** What the routes get, for an app served apart (the chat surface bridge). */
+    services,
     realtime,
     drain: () => drainOutbox(db, handlers),
   };
 }
 
 export type TestServer = Awaited<ReturnType<typeof createTestServer>>;
+
+/**
+ * How the database would run the last statement `read` made on `table`, with its values written in. Nothing in a
+ * test is big enough for the planner to prefer an index on its own, so reading a table whole is off, and whatever
+ * else `off` names.
+ */
+export async function planOfLast(t: TestServer, table: string, read: () => Promise<unknown>, off: string[] = []) {
+  const seen: [string, unknown[]][] = [];
+  const counts = tracingLogger.logQuery;
+  tracingLogger.logQuery = (query = "", params: unknown[] = []) => {
+    seen.push([query, params]);
+    counts();
+  };
+  try {
+    await read();
+  } finally {
+    tracingLogger.logQuery = counts;
+  }
+  const [statement = "", params = []] = seen.filter(([query]) => query.includes(`from "${table}"`)).at(-1) ?? [];
+  const written = statement.replace(/\$(\d+)/g, (_, n) => `'${params[Number(n) - 1]}'`);
+  return t.db.transaction(async (tx) => {
+    for (const setting of ["enable_seqscan", ...off]) await tx.execute(sql.raw(`set local ${setting} = off`));
+    return rowsOf<{ "QUERY PLAN": string }>(await tx.execute(sql.raw(`explain (costs off) ${written}`)))
+      .map((row) => row["QUERY PLAN"])
+      .join("\n");
+  });
+}
 
 /** Starts a real Bun server on a random port (needed for WebSocket tests). */
 export function listen(t: TestServer) {
@@ -348,6 +390,45 @@ export function fakeGoogle(email: string, verified = true): typeof fetch {
     return Response.json({ access_token: "ya29.test", id_token: idToken, token_type: "Bearer", expires_in: 3600 });
   }) as typeof fetch;
 }
+
+/** What Cloudflare's test site keys hand out, and its test secret passes. */
+export const TURNSTILE_TEST_TOKEN = "XXXX.DUMMY.TOKEN.XXXX";
+
+/** A token a page made on `host` for `action`: `fakeCloudflare` passes it as a real secret passes a real one. */
+export const tokenMadeOn = (host: string, action: HumanAction) => `made-on:${host}:${action}`;
+
+/**
+ * Cloudflare: the widget's script and siteverify. With `testSecret`, it answers as its test secret does: the dummy
+ * token passes on any host. Without, as a real secret does: the dummy token is refused. A `tokenMadeOn` token passes
+ * with its host and action, and anything else is refused.
+ */
+export function fakeCloudflare() {
+  const state = { up: true, secretRefused: false, testSecret: true };
+  const fakeFetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    if (!state.up) throw new Error("connect ECONNREFUSED");
+    if (String(input) === TURNSTILE_SCRIPT_URL) return new Response("/* api.js */");
+    const { response } = JSON.parse(String(init?.body)) as { response: string };
+    if (state.secretRefused) return Response.json({ success: false, "error-codes": ["invalid-input-secret"] });
+    if (response === TURNSTILE_TEST_TOKEN && state.testSecret)
+      return Response.json({ success: true, hostname: "example.com", metadata: { result_with_testing_key: true } });
+    const [made, hostname, action] = response.split(":");
+    if (made === "made-on") return Response.json({ success: true, hostname, action });
+    return Response.json({ success: false, "error-codes": ["invalid-input-response"] });
+  }) as typeof globalThis.fetch;
+  return { state, fetch: fakeFetch };
+}
+
+/** The bot check as `start.ts` makes it from Cloudflare's test keys, for a server on `ORIGIN`, on a fake `fetch`. */
+export const turnstileCheck = (fetch: typeof globalThis.fetch, landing: { LANDING_URL?: string } = {}) =>
+  createHumanCheck(
+    {
+      PUBLIC_URL: ORIGIN,
+      ...landing,
+      TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+      TURNSTILE_SECRET_KEY: "1x0000000000000000000000000000000AA",
+    },
+    { fetch },
+  );
 
 /** Where each app's Google sign-in comes back to: the web's page, the Mac app's browser page, the phone app. */
 export const GOOGLE_BACK = {

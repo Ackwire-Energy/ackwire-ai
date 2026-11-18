@@ -177,3 +177,48 @@ test("Wi-Fi pairing over HTTP: the computer's owner only, a checked address and 
   // Cancel never fails on a computer that's gone.
   expect((await owner(`${path}/${crypto.randomUUID()}`, { method: "DELETE" })).status).toBe(204);
 });
+
+test("iPhones over Wi-Fi over HTTP: the Mac's owner only; an offline Mac offers none and can't pick one", async () => {
+  const { owner, rui } = await start();
+  const paired = await pairComputer(t, owner, { ...RUNNER, os: "darwin", exec: true }, { name: "MacBook" });
+  const path = `/devices/computers/${paired.machineId}/wifi-iphones`;
+  // A member who doesn't manage the Mac is never told which phones are near it.
+  expect((await rui(path)).status).toBe(403);
+  expect((await rui(`${path}/00008120-000A1B2C3D4E5F60`, { method: "PUT", json: {} })).status).toBe(403);
+  const offer = await owner(path);
+  expect(offer.status).toBe(200);
+  expect(await offer.json()).toEqual({ available: [] });
+  const picked = await owner(`${path}/00008120-000A1B2C3D4E5F60`, { method: "PUT", json: {} });
+  expect(picked.status).toBe(409);
+  expect(((await picked.json()) as { error: { code: string } }).error.code).toBe("machine.offline");
+  expect((await owner(`${path}/${"x".repeat(201)}`, { method: "PUT", json: {} })).status).toBe(400);
+});
+
+test("fixing a Mac's Xcode over HTTP: its owner only, a kind it knows; an old app gets the Terminal way", async () => {
+  const { owner, rui } = await start();
+  const paired = await pairComputer(t, owner, { ...RUNNER, os: "darwin", exec: true }, { name: "MacBook" });
+  const path = `/devices/computers/${paired.machineId}/xcode-fix`;
+  expect((await rui(path, { json: { kind: "select" } })).status).toBe(403);
+  expect((await rui(path)).status).toBe(403);
+  expect((await owner(path, { json: { kind: "sudo rm" } })).status).toBe(400);
+  expect((await owner(path, { json: { kind: "select", command: "x" } })).status).toBe(400);
+  // This Mac's app (protocol 54) predates the fix.
+  const old = await owner(path, { json: { kind: "select" } });
+  expect(old.status).toBe(200);
+  expect(await old.json()).toEqual({ fix: null, update: true });
+  expect(await (await owner(path)).json()).toEqual({ fix: null, update: true });
+  expect((await owner(path, { method: "DELETE" })).status).toBe(200);
+});
+
+test("opening Xcode on a Mac over HTTP: its owner only; an app too old opens nothing", async () => {
+  const { owner, rui } = await start();
+  const paired = await pairComputer(t, owner, { ...RUNNER, os: "darwin", exec: true }, { name: "MacBook" });
+  const path = `/devices/computers/${paired.machineId}/xcode-open`;
+  expect((await rui(path, { json: {} })).status).toBe(403);
+  // This Mac's app (protocol 54) predates it, and the list says so.
+  const old = await owner(path, { json: {} });
+  expect(old.status).toBe(200);
+  expect(await old.json()).toEqual({ opened: false });
+  const list = (await (await owner("/devices")).json()) as { devices: { id: string; opensXcode: boolean }[] };
+  expect(list.devices.find((d) => d.id === paired.machineId)?.opensXcode).toBe(false);
+});

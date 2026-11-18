@@ -1,12 +1,11 @@
 import { useMe } from "@agenteschat/client";
 import { membershipIn, settingUp } from "@agenteschat/client/lib/guards";
 import { can } from "@agenteschat/client/lib/permissions";
-import { Button, EmptyState } from "@agenteschat/ui";
-import { createFileRoute, Link, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Outlet, redirect, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { useTranslation } from "react-i18next";
 import { requireUserIn } from "@/app/guards";
 import { usePageTextSize } from "@/chat/look";
+import { useFollowPickedAgent } from "@/components/AppIconPicker";
 import { Arrival } from "@/components/arrival/Arrival";
 import { FeedbackHost } from "@/components/arrival/FeedbackDialog";
 import { ArtifactViewerProvider } from "@/components/artifacts/ArtifactViewer";
@@ -23,12 +22,13 @@ import { OutageNotices } from "@/components/MachineOutages";
 import { NavDrawerProvider, NavScrim, ShellBar } from "@/components/NavDrawer";
 import { NoticeIsland } from "@/components/NoticeIsland";
 import { PushOpens } from "@/components/NotificationOpen";
+import { NotMember } from "@/components/NotMember";
 import { NewAgentProvider } from "@/components/new-agent/NewAgentDialog";
 import { OrgProvider } from "@/components/org-context";
 import { RemoveMemberProvider } from "@/components/RemoveMember";
 import { Sidebar } from "@/components/Sidebar";
 import { BootSplash } from "@/components/Sky";
-import { DeletingScreen, HoldBanner, SuspendedScreen } from "@/components/Standing";
+import { DeletingBanner, HoldBanner, SuspendedScreen } from "@/components/Standing";
 import { useWebPushClear, useWebPushRefresh } from "@/components/WebPush";
 import { ComputerSetupNotice } from "@/components/WorkspaceComputer";
 import { HeaderSearchProvider } from "@/hooks/useWorkspaceSearch";
@@ -37,6 +37,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { notePlace } from "@/lib/return-to";
 import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { useWorkspaceAccent } from "@/lib/theme";
 import { RealtimeProvider } from "@/realtime/context";
 
 /** The workspace shell of an organization: sidebar + page, and its WebSocket. */
@@ -60,7 +61,6 @@ function OrgLayout() {
   // The cached person, so a new logo or workspace name shows at once, not at the next navigation.
   const me = useMe().data ?? loaded.me;
   const membership = membershipIn(me, orgId);
-  const { t } = useTranslation();
   const path = useRouterState({ select: (s) => s.location.pathname });
   const href = useRouterState({ select: (s) => s.location.href });
   // "Criar agente" is a focused flow with its own rail: no sidebar while it's open (admins only; others see why not).
@@ -71,6 +71,9 @@ function OrgLayout() {
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   usePageTextSize(membership?.chatPrefs);
+  useWorkspaceAccent(membership?.accent);
+  // An agent picked as the app icon follows its name and look in its workspace (ADR 0179).
+  useFollowPickedAgent(orgId);
   useEffect(() => {
     if (!membership) return;
     storage.set(STORAGE_KEYS.lastOrg, membership.id);
@@ -96,28 +99,7 @@ function OrgLayout() {
   const strip = inDesktopApp() && <DesktopDragStrip />;
 
   if (gone) return strip || null;
-  if (!membership) {
-    return (
-      <div className="page page--mid">
-        {strip}
-        <header className="page__header">
-          <h1 className="page-title">
-            {removedFrom ? t("members.remove.goneTitle", { org: removedFrom }) : t("empty.noOrgTitle")}
-          </h1>
-        </header>
-        <EmptyState
-          icon="members"
-          actions={
-            <Button asChild>
-              <Link to="/">{t("empty.goHome")}</Link>
-            </Button>
-          }
-        >
-          {removedFrom ? t("members.remove.goneText") : t("empty.noOrgText")}
-        </EmptyState>
-      </div>
-    );
-  }
+  if (!membership) return <NotMember me={me} orgId={orgId} removedFrom={removedFrom} strip={strip} />;
 
   // Suspended: its own screen, the socket still open so lifting it brings the workspace back at once.
   if (membership.standing?.state === "suspended") {
@@ -128,17 +110,6 @@ function OrgLayout() {
           <SuspendedScreen org={membership} me={me} />
         </RealtimeProvider>
       </OrgProvider>
-    );
-  }
-
-  // Being deleted: its own screen, after the suspension, the stronger fact. Its socket is refused, so the screen asks
-  // `GET /me` again instead.
-  if (membership.deletion) {
-    return (
-      <>
-        {strip}
-        <DeletingScreen org={membership} me={me} />
-      </>
     );
   }
 
@@ -169,11 +140,17 @@ function OrgLayout() {
                           </>
                         )}
                         {/* The work area: notices on top (agents paused, the workspace's computer on its way, a computer
-                    the agents run on went offline), then the page. */}
+                    the agents run on went offline), then the page. Being deleted, it reads as ever under one line that
+                    says so (ADR 0088 §7), in the Criar agente flow too: its work stopped, nothing else is news. */}
                         <div className={focused ? "shell__work shell__work--bare" : "shell__work"}>
-                          {!focused && <HoldBanner />}
-                          {!focused && <ComputerSetupNotice />}
-                          {!focused && <OutageNotices />}
+                          {membership.deletion && <DeletingBanner />}
+                          {!focused && !membership.deletion && (
+                            <>
+                              <HoldBanner />
+                              <ComputerSetupNotice />
+                              <OutageNotices />
+                            </>
+                          )}
                           <div className="shell__pages">
                             <ComputerDialogProvider>
                               <DetailsHost>

@@ -4,7 +4,9 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ApiClient, ImportInput, ImportItemResult, TeamTemplate } from "@agenteschat/client";
-import { act, cleanup, fireEvent } from "@testing-library/react";
+import { keys } from "@agenteschat/client";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { WATCH_POLL_MS } from "@/components/ImportFlow";
 import { createFakeApi, type FakeState, GENERAL_ID, ORG_ID, seedState, withRightHand } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 // The step's views load on their own (`TeamSource`'s lazy import): loaded here first, so each test sees them at once.
@@ -235,6 +237,80 @@ describe("bringing the team from an app that answers in its chat", () => {
     expect(document.querySelector(".onb__say")?.textContent).toBe(
       "Copie o pedido, cole no ChatGPT dots e traga a resposta. O resto é comigo.",
     );
+  });
+
+  test("an app that takes MCP: its steps in the sheet, Lodi saying so, and the agents it creates move the rail on with no socket", async () => {
+    const polls: (() => void)[] = [];
+    const realSetInterval = globalThis.setInterval;
+    globalThis.setInterval = ((fn: () => void, ms?: number) => {
+      if (ms === WATCH_POLL_MS) polls.push(fn);
+      return realSetInterval(fn, ms);
+    }) as typeof setInterval;
+    try {
+      const state = settingUp();
+      const r = await open(state, withoutAi(createFakeApi(state), state));
+      await click(answer("Outro app"), 4);
+      await click(button("Continuar"), 10);
+      expect(heading()).toBe("Traga o seu time de outro app");
+      // The import's sheet opens on its own, on the MCP steps.
+      expect(screen().getByRole("dialog", { name: "Trazer de outro app" }).textContent).toContain(
+        "Esperando os agentes chegarem…",
+      );
+      expect(document.querySelector(".onb__say")?.textContent).toBe(
+        "Siga os passos no app e ele mesmo cria os agentes aqui. Eu fico de olho.",
+      );
+      // The onboarding has no workspace socket: only the step's own reads find what the app made.
+      const base = state.agents[0] as FakeState["agents"][number];
+      state.agents.push({
+        ...base,
+        id: "a-nina",
+        name: "Nina",
+        handle: "nina",
+        builtin: null,
+        ownerUserId: state.me?.user.id ?? null,
+      });
+      expect(polls.length).toBeGreaterThan(0);
+      await act(async () => {
+        for (const poll of polls) poll();
+      });
+      await settle(24);
+      expect(heading()).toBe(CONNECT);
+      // The app may still be at it after the first one moved the rail on, with the step's own reads gone: the page
+      // keeps reading the team.
+      const query = r.services.queryClient.getQueryCache().find({ queryKey: keys.agents(ORG_ID) });
+      if (!query) throw new Error("no agents query");
+      const every = query.observers.map((o) => {
+        const ms = o.options.refetchInterval;
+        return typeof ms === "function" ? ms(query) : ms;
+      });
+      expect(every.some((ms) => typeof ms === "number" && ms > 0)).toBe(true);
+    } finally {
+      globalThis.setInterval = realSetInterval;
+    }
+  });
+
+  test("on agentes.chat Cloud, before its first plan, an app that takes MCP brings its file and says why MCP waits", async () => {
+    // A workspace on a hold refuses an app's sign-in: MCP couldn't bring anyone yet.
+    await open(settingUp({ cloud: true }));
+    await click(answer("Outro app"), 4);
+    await click(button("Continuar"), 10);
+    expect(heading()).toBe("Traga o seu time de outro app");
+    const sheet = screen().getByRole("dialog", { name: "Trazer de outro app" });
+    expect(within(sheet).queryByRole("button", { name: "Conectar com MCP" })).toBeNull();
+    expect(text()).not.toContain("Esperando os agentes chegarem…");
+    expect(sheet.querySelector(".imp-drop")).toBeTruthy();
+    expect(text()).toContain(
+      "Conectar com MCP funciona quando o plano do workspace estiver ativo. Por enquanto, traga os agentes por aqui.",
+    );
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Solte aqui o que o app exportou. O resto é comigo.");
+  });
+
+  test("with MCP switched to the request, Lodi says to drop what the app gives back", async () => {
+    await open(settingUp());
+    await click(answer("Outro app"), 4);
+    await click(button("Continuar"), 10);
+    await click(button("Prefiro colar o pedido e trazer a resposta"), 4);
+    expect(document.querySelector(".onb__say")?.textContent).toBe("Solte aqui o que o app exportou. O resto é comigo.");
   });
 
   test("on agentes.chat Cloud the team brought goes on to the plan", async () => {

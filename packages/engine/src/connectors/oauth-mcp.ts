@@ -2,7 +2,7 @@ import { and, type Database, eq, isNull, schema } from "@agenteschat/db";
 import { openSecret, sealSecret } from "../crypto";
 import { ValidationError } from "../errors";
 import { oneLine } from "../mail/text";
-import { assertPublicHttpsUrl, type ResolveHost } from "../net-guard";
+import { assertPublicHttpsUrl, outboundFetch, type ResolveHost } from "../net-guard";
 import type { ConnectorDeps } from "./connections";
 
 const { oauthClients, connectorConnections } = schema;
@@ -39,14 +39,21 @@ export interface AuthServerMetadata {
 
 const AUTH_METHODS: readonly string[] = ["none", "client_secret_post", "client_secret_basic"];
 
-const http = (deps: McpOAuthDeps) => deps.http ?? fetch;
+/** Every address here is one a server's own answers named: checked and pinned as each request connects. */
+const http = (deps: McpOAuthDeps) => deps.http ?? outboundFetch({ resolveHost: deps.resolveHost });
+/** The pinned fetch has no time limit of its own: a server that never answers ends the discovery here. */
+const waitMs = () => AbortSignal.timeout(15_000);
 /** The name a server shows on its consent screen when we register with it (RFC 7591). */
 const CLIENT_NAME = "Ackwire AI";
 
 async function getJson(deps: McpOAuthDeps, url: string): Promise<Record<string, unknown> | null> {
   await assertPublicHttpsUrl(url, deps.resolveHost);
   try {
-    const res = await http(deps)(url, { headers: { accept: "application/json" }, redirect: "error" });
+    const res = await http(deps)(url, {
+      headers: { accept: "application/json" },
+      redirect: "error",
+      signal: waitMs(),
+    });
     if (!res.ok) return null;
     return (await res.json()) as Record<string, unknown>;
   } catch {
@@ -70,15 +77,23 @@ export function canonicalResource(serverUrl: string) {
 /** One MCP address however it was typed: no trailing slash, any case (mirrors the apps' `sameServer`). */
 export const serverKey = (serverUrl: string) => serverUrl.replace(/\/+$/, "").toLowerCase();
 
-/** Asks the server who it is without credentials and reads where its OAuth lives. */
-export async function probeMcpServer(deps: McpOAuthDeps, serverUrl: string): Promise<ServerProbe> {
+/**
+ * Asks the server who it is without credentials and reads where its OAuth lives. `headers`: what a person typed for
+ * this server (ADR 0186), sent with this one request to it and never with the metadata reads that follow.
+ */
+export async function probeMcpServer(
+  deps: McpOAuthDeps,
+  serverUrl: string,
+  headers: Record<string, string> = {},
+): Promise<ServerProbe> {
   await assertPublicHttpsUrl(serverUrl, deps.resolveHost);
   let res: Response;
   try {
     res = await http(deps)(serverUrl, {
       method: "POST",
       redirect: "error",
-      headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+      signal: waitMs(),
+      headers: { ...headers, "content-type": "application/json", accept: "application/json, text/event-stream" },
       body: JSON.stringify({
         jsonrpc: "2.0",
         id: 1,
@@ -232,6 +247,7 @@ export async function ensureOAuthClient(
     const res = await http(deps)(endpoint, {
       method: "POST",
       redirect: "error",
+      signal: waitMs(),
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({
         client_name: clientName,

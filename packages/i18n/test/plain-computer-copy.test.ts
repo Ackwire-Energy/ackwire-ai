@@ -70,11 +70,11 @@ const SELFHOST_ONLY = [
   "agentComputer.state.offline",
   "agentComputer.state.offlineHelpPlain",
   "agentComputer.state.screensOff",
+  "agentComputer.state.screensOffOne",
   "agentComputer.state.screensMissing",
   "agentComputer.state.outdated",
   "agentComputer.state.noComputer",
   "agentComputer.state.browserOff",
-  "agentComputer.phone.chooseOnWeb",
 ];
 
 /**
@@ -120,8 +120,6 @@ const CLOUD_EXTRA = [
   "computers.about",
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
-  "agentPage.work.brain.fallbackTitle",
-  "agentPage.work.brain.fallbackHint",
   "agentPage.work.brain.add.stepOneHint",
   "aiAccounts.page.hint",
   "agentPage.work.brain.offCloud",

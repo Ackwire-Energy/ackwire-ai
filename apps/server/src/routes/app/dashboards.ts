@@ -26,6 +26,7 @@ import {
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AppDeps,
+  aiCheckOf,
   body,
   createAppRouter,
   errors,
@@ -58,6 +59,7 @@ import {
   WidgetCostQuery,
   WidgetDetail,
   WidgetParams,
+  WidgetRefreshBody,
   WidgetSuggestions,
 } from "./dashboard-schemas";
 
@@ -73,7 +75,12 @@ const tags = ["Dashboards"];
 export function dashboardRoutes(deps: AppDeps) {
   const app = createAppRouter(deps);
   app.use("/organizations/*", requireSession(deps.auth));
-  const boards: DashboardDeps = { db: deps.db, pubsub: deps.adapters.pubsub, context: deps.extras?.context };
+  const boards: DashboardDeps = {
+    db: deps.db,
+    pubsub: deps.adapters.pubsub,
+    context: deps.extras?.context,
+    ai: aiCheckOf(deps),
+  };
   const wake = () => deps.wakeWorkers?.();
 
   // ── Boards ──────────────────────────────────────────────────────────────────
@@ -254,7 +261,7 @@ export function dashboardRoutes(deps: AppDeps) {
       security,
       summary: "+ Widget: an agent I can talk to builds it and keeps it up to date",
       description:
-        "It starts `building`; at most 24 widgets a board and 60 updating on a schedule a workspace (`widget.scheduled_cap`, `params.max`).",
+        "It starts `building`; at most 24 widgets a board and 60 updating on a schedule a workspace (`widget.scheduled_cap`, `params.max`). An agent with no AI to build it starts no run: it comes back `failed` with `missing_credential` and builds once one is connected (Update now).",
       request: { params: DashboardParams, body: body(CreateWidgetBody) },
       responses: { 201: json(Widget, "Created"), ...errors },
     }),
@@ -274,7 +281,7 @@ export function dashboardRoutes(deps: AppDeps) {
       security,
       summary: "Test: a draft of the widget, built at once with real data by its agent, seen only by me",
       description:
-        "The same checks as + Widget (I edit the board, I may talk to the agent). The draft (`draft: true`) is on no board and under no cap; it starts `building` and its events go to me alone. I keep at most 5 drafts (the oldest go); unconfirmed ones go after a day. Confirm it with `POST …/widgets/{widgetId}/confirm` once it is `ok`; `DELETE …/widgets/{widgetId}` drops it and stops its run (ADR 0135 §16).",
+        "The same checks as + Widget (I edit the board, I may talk to the agent). The draft (`draft: true`) is on no board and under no cap; it starts `building` (`failed` with `missing_credential` while its agent has no AI, as on + Widget) and its events go to me alone. I keep at most 5 drafts (the oldest go); unconfirmed ones go after a day. Confirm it with `POST …/widgets/{widgetId}/confirm` once it is `ok`; `DELETE …/widgets/{widgetId}` drops it and stops its run (ADR 0135 §16).",
       request: { params: DashboardParams, body: body(CreateWidgetBody) },
       responses: { 202: json(Widget, "Accepted: its test build started"), ...errors },
     }),
@@ -385,12 +392,15 @@ export function dashboardRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Update now, or Resolve a failed widget: its agent redoes it",
-      request: { params: WidgetParams },
+      description:
+        "Its agent with no AI starts no run: 409 `widget.needs_ai` (`params.agentName`), and the widget says it waits for one (`failed`, `missing_credential`, the reason in `failure.detail`: `no_key`, `not_signed_in`, `no_computer`, `cli_missing`, or for the right hand `plan_not_shared` (a plan that serves only its owner takes no build) or its plan line, such as `computer_away`). While its run waits: one paused near its plan's or budget's limit goes on now, for who may continue it (`run.continue_forbidden`, 403, for anyone else; `routine.continue_*` when that would pass the plan with extra usage off). One at the limit, or waiting for its computer or its AI provider, is refused with `widget.waiting` (409, `params`: the wait's `code`, `source`, `resetsAt`, `scope` and `model`, and `agentName`).",
+      request: { params: WidgetParams, body: body(WidgetRefreshBody) },
       responses: { 200: json(Widget), ...errors },
     }),
     async (c) => {
       const { orgId, widgetId } = c.req.valid("param");
-      const widget = await refreshWidgetNow(boards, c.get("user").id, orgId, widgetId);
+      const { auto } = c.req.valid("json");
+      const widget = await refreshWidgetNow(boards, c.get("user").id, orgId, widgetId, { auto: auto === true });
       wake();
       return c.json(widget, 200);
     },
@@ -403,6 +413,7 @@ export function dashboardRoutes(deps: AppDeps) {
       tags,
       security,
       summary: "Ask its agent for a change: it redoes the widget with these words",
+      description: "Its agent with no AI starts no run: 409 `widget.needs_ai` (`params.agentName`), as Update now.",
       request: { params: WidgetParams, body: body(WidgetChangeBody) },
       responses: { 200: json(Widget), ...errors },
     }),

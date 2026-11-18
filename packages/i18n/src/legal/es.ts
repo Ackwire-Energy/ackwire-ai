@@ -4,15 +4,15 @@ import type { LegalDocument, LegalKind } from "./types";
 export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Términos de uso",
-    summary: "El acuerdo para usar Ackwire AI: su espacio de trabajo, sus agentes y de qué responde cada parte.",
+    summary: "El acuerdo para usar agentes.chat: su espacio de trabajo, sus agentes y de qué responde cada parte.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "agreement",
         heading: "1. Acuerdo",
         blocks: [
-          'Estos Términos de uso (los "Términos") constituyen un acuerdo vinculante entre CODARI GLOBAL, LLC, una sociedad de responsabilidad limitada de Wyoming que opera bajo el nombre comercial Ackwire AI ("Ackwire AI", "nosotros"), y la persona o entidad que crea una cuenta o un espacio de trabajo ("usted"). Al crear una cuenta, unirse a un espacio de trabajo o utilizar de cualquier otro modo Ackwire AI en la web, en la aplicación para Mac o en la aplicación para teléfono (el "Servicio"), usted acepta estos Términos y nuestra Política de privacidad. Si utiliza el Servicio en nombre de una empresa u otra entidad, declara que tiene facultades para obligarla.',
+          'Estos Términos de uso (los "Términos") constituyen un acuerdo vinculante entre AGENTESCHAT, LLC, una sociedad de responsabilidad limitada de Delaware que opera bajo el nombre comercial agentes.chat ("agentes.chat", "nosotros"), y la persona o entidad que crea una cuenta o un espacio de trabajo ("usted"). Al crear una cuenta, unirse a un espacio de trabajo o utilizar de cualquier otro modo agentes.chat en la web, en la aplicación para Mac o en la aplicación para teléfono (el "Servicio"), usted acepta estos Términos y nuestra Política de privacidad. Si utiliza el Servicio en nombre de una empresa u otra entidad, declara que tiene facultades para obligarla.',
           "Para utilizar el Servicio, usted debe tener al menos 18 años y capacidad para celebrar contratos.",
         ],
       },
@@ -148,7 +148,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "law",
         heading: "16. Ley aplicable",
         blocks: [
-          "Estos Términos se rigen por las leyes del Estado de Wyoming, EE. UU., con exclusión de sus normas sobre conflicto de leyes, y las partes se someten a la jurisdicción exclusiva de los tribunales estatales y federales ubicados en Wyoming. Si usted es un consumidor en una jurisdicción cuya ley le otorga derechos o un fuero irrenunciables, como Brasil, esos derechos no se ven afectados.",
+          "Estos Términos se rigen por las leyes del Estado de Delaware, EE. UU., con exclusión de sus normas sobre conflicto de leyes, y las partes se someten a la jurisdicción exclusiva de los tribunales estatales y federales ubicados en Delaware. Si usted es un consumidor en una jurisdicción cuya ley le otorga derechos o un fuero irrenunciables, como Brasil, esos derechos no se ven afectados.",
         ],
       },
       {
@@ -162,7 +162,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "18. Contacto",
         blocks: [
-          "CODARI GLOBAL, LLC, que opera bajo el nombre comercial agentes.chat. Notificaciones: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Para todo lo demás: hello@agentes.chat",
+          "AGENTESCHAT, LLC, que opera bajo el nombre comercial agentes.chat. Notificaciones: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · legal@agentes.chat · Para todo lo demás: hello@agentes.chat",
         ],
       },
     ],
@@ -172,13 +172,13 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
     summary:
       "Qué recopilamos, qué envían los agentes y adónde, quién puede ver su espacio de trabajo y qué derechos tiene usted.",
     courtesy: "Esta es una traducción de cortesía. Si difiere de la versión en inglés, prevalece la versión en inglés.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "overview",
         heading: "1. Descripción general",
         blocks: [
-          'CODARI GLOBAL, LLC, una sociedad de responsabilidad limitada de Wyoming que opera bajo el nombre comercial Ackwire AI ("Ackwire AI", "nosotros"), opera Ackwire AI: un espacio de trabajo donde personas y agentes de IA trabajan juntos, disponible en la web, como aplicación para Mac y como aplicación para teléfono (el "Servicio"). Esta política distingue dos funciones:',
+          'AGENTESCHAT, LLC, una sociedad de responsabilidad limitada de Delaware que opera bajo el nombre comercial agentes.chat ("agentes.chat", "nosotros"), opera agentes.chat: un espacio de trabajo donde personas y agentes de IA trabajan juntos, disponible en la web, como aplicación para Mac y como aplicación para teléfono (el "Servicio"). Esta política distingue dos funciones:',
           {
             list: [
               "Respecto de los **datos de cuenta**, la información que las personas nos proporcionan para crear y utilizar una cuenta, somos el responsable del tratamiento.",
@@ -195,11 +195,11 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
             list: [
               "**Datos de cuenta:** nombre, dirección de correo electrónico, hash de la contraseña, foto de perfil, idioma y zona horaria. Si inicia sesión con Google, Apple o GitHub, recibimos de ese proveedor su nombre, su dirección de correo electrónico y el identificador de la cuenta, nunca su contraseña.",
               "**Datos del espacio de trabajo:** el nombre del espacio de trabajo, sus miembros, roles e invitaciones.",
-              "**Datos de facturación:** para un espacio de trabajo con un plan de Ackwire AI, el nombre, la dirección de correo electrónico, la dirección de facturación y el número de identificación fiscal de la persona que paga, el plan, y sus facturas y pagos. Los pagos son procesados por Stripe, que gestiona los datos de la tarjeta: estos nunca llegan a nosotros.",
+              "**Datos de facturación:** para un espacio de trabajo con un plan de agentes.chat, el nombre, la dirección de correo electrónico, la dirección de facturación y el número de identificación fiscal de la persona que paga, el plan, y sus facturas y pagos. Los pagos son procesados por Stripe, que gestiona los datos de la tarjeta: estos nunca llegan a nosotros.",
               "**Datos de uso y registros:** direcciones IP, navegador y dispositivo, sesiones iniciadas, eventos de seguridad, solicitudes a la API y el registro de cada llamada a un modelo (modelo, tokens y costo, con el espacio de trabajo y el agente a los que corresponde), que conservamos para aplicar los presupuestos y mostrar el uso. Cuando algo falla, registramos el error, sin el contenido de los mensajes, para corregirlo.",
               "**Dispositivos:** para la aplicación para teléfono, el token de notificaciones push de cada dispositivo en el que inicia sesión. Para las computadoras conectadas y la aplicación para Mac, el nombre de la computadora, el sistema operativo y la versión de la aplicación.",
-              "**Lista de espera:** la dirección de correo electrónico y el idioma que nos proporciona en Ackwire AI, y si la confirmó.",
-              "**Analítica del sitio:** en Ackwire AI (el sitio público, no el espacio de trabajo), las páginas vistas, el sitio de referencia, el tipo de dispositivo y una ubicación aproximada derivada de la dirección IP, recopilados con Himetrica.",
+              "**Lista de espera:** la dirección de correo electrónico y el idioma que nos proporciona en agentes.chat, y si la confirmó.",
+              "**Analítica del sitio:** en agentes.chat (el sitio público, no el espacio de trabajo), las páginas vistas, el sitio de referencia, el tipo de dispositivo y una ubicación aproximada derivada de la dirección IP, recopilados con Himetrica.",
             ],
           },
         ],
@@ -227,15 +227,15 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
           "Los agentes son modelos de IA que leen y actúan dentro del espacio de trabajo. El Contenido del Espacio de Trabajo sale de nuestros servidores en los siguientes casos, y solo en ellos:",
           {
             list: [
-              "**Entre los dispositivos y nuestros servidores.** Todo lo que se envía entre nuestros servidores y los navegadores, aplicaciones y computadoras que se conectan a ellos, incluido el Contenido del Espacio de Trabajo, pasa por Cloudflare, que protege el Servicio frente a ataques. Para ello, Cloudflare descifra este tráfico en su centro de datos más cercano a cada dispositivo y lo gestiona por nuestra cuenta.",
-              "**Respuestas.** Cuando un agente trabaja, envía el contexto que necesita (el contexto del espacio de trabajo, las instrucciones del agente, la conversación, la memoria pertinente y los resultados de sus herramientas) al proveedor de modelos elegido para ese agente. Con una clave de API que haya añadido el espacio de trabajo, la llamada se realiza bajo la propia cuenta del espacio de trabajo y su acuerdo con ese proveedor. Con un plan de IA, como Claude o ChatGPT, conectado a un agente, el agente trabaja bajo la cuenta de la persona que conectó el plan y conforme a los términos del proveedor.",
+              "**Entre los dispositivos y nuestros servidores.** Todo lo que se envía entre nuestros servidores y los navegadores, aplicaciones y computadoras que se conectan a ellos, incluido el Contenido del Espacio de Trabajo, pasa por nuestro proveedor de red, que protege el Servicio frente a ataques. Para ello, el proveedor de red descifra este tráfico en su centro de datos más cercano a cada dispositivo y lo gestiona por nuestra cuenta.",
+              "**Respuestas.** Cuando un agente trabaja, envía el contexto que necesita (el contexto del espacio de trabajo, las instrucciones del agente, la conversación, la memoria pertinente y los resultados de sus herramientas) al proveedor de modelos elegido para ese agente. Con una clave de API que haya añadido el espacio de trabajo, la llamada se realiza bajo la propia cuenta del espacio de trabajo y su acuerdo con ese proveedor. Algunos proveedores transmiten la llamada a la empresa que desarrolla o aloja el modelo, que también la trata conforme a los términos de ese proveedor. Con un plan de IA, como Claude o ChatGPT, conectado a un agente, el agente trabaja bajo la cuenta de la persona que conectó el plan y conforme a los términos del proveedor.",
               "**Decidir quién responde.** Un modelo de enrutamiento lee un mensaje nuevo, los nombres y roles de los agentes del espacio de trabajo y la conversación reciente para decidir qué agente debe responder, si alguno. Se ejecuta en TypeSafe o, como alternativa, en el proveedor de modelos del espacio de trabajo. El enrutamiento nunca concede ningún permiso a un agente.",
               "**Memoria.** Los agentes conservan memoria de las conversaciones (resúmenes, hechos y lecciones) para mejorar con el tiempo. Algunas evaluaciones sobre la memoria (si algo merece conservarse o si contradice lo que un agente ya sabe) las realiza TypeSafe. La memoria puede verse y eliminarse en la página del agente, y se elimina junto con el espacio de trabajo.",
               "**Búsqueda.** Para encontrar mensajes y documentos relacionados, el texto puede convertirse en vectores (embeddings) mediante Voyage AI.",
               "**Conectores.** Cuando el espacio de trabajo conecta un servicio (como GitHub, Google, Linear, Sentry, una bandeja de entrada de correo electrónico o cualquier servidor MCP), almacenamos sus tokens de acceso cifrados y leemos o escribimos en ese servicio solo dentro de los alcances que el espacio de trabajo otorgó a cada agente. El servicio conectado trata esos datos conforme a sus propios términos. Las conexiones con bandejas de entrada de Gmail y Outlook, y con Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit y WhatsApp, pasan por Composio, que trata lo que los agentes leen y escriben en ellas.",
               "**Bases de datos.** Las conexiones con bases de datos son de solo lectura. Las credenciales se almacenan cifradas y cada consulta se verifica antes de ejecutarse.",
-              "**Computadoras conectadas.** Cuando alguien conecta una computadora, los agentes pueden ejecutar comandos y utilizar un navegador en ella, dentro de las carpetas y los permisos establecidos en esa computadora. La vista en directo del navegador de un agente pasa por Cloudflare y por la memoria de nuestros servidores, y no se graba. Un resumen de los pasos que siguió el agente (como las direcciones visitadas y las acciones) se conserva junto con su trabajo para que el equipo pueda ver lo que hizo.",
-              "**La computadora del espacio de trabajo.** En Ackwire AI Cloud, los agentes de un espacio de trabajo trabajan en una computadora que operamos para ese espacio de trabajo, alojada por Contabo en la Unión Europea. Contabilizamos, por día, cuántos datos envían y reciben allí el navegador, las herramientas de IA y los demás programas de cada agente. La computadora se borra después de que finaliza el plan de Ackwire AI del espacio de trabajo, según se describe en los Términos de uso.",
+              "**Computadoras conectadas.** Cuando alguien conecta una computadora, los agentes pueden ejecutar comandos y utilizar un navegador en ella, dentro de las carpetas y los permisos establecidos en esa computadora. La vista en directo del navegador de un agente pasa por nuestro proveedor de red y por la memoria de nuestros servidores, y no se graba. Un resumen de los pasos que siguió el agente (como las direcciones visitadas y las acciones) se conserva junto con su trabajo para que el equipo pueda ver lo que hizo.",
+              "**La computadora del espacio de trabajo.** En agentes.chat Cloud, los agentes de un espacio de trabajo trabajan en una computadora que operamos para ese espacio de trabajo, en nuestros servidores o en los de un proveedor de alojamiento, en la Unión Europea o en los Estados Unidos. Contabilizamos, por día, cuántos datos envían y reciben allí el navegador, las herramientas de IA y los demás programas de cada agente. La computadora se borra después de que finaliza el plan de agentes.chat del espacio de trabajo, según se describe en los Términos de uso.",
             ],
           },
           "Las acciones difíciles de deshacer (como fusionar código, desplegar o enviar algo en nombre de alguien) se convierten en una solicitud de aprobación dirigida a una persona antes de ejecutarse. El texto que procede de fuera del espacio de trabajo (páginas web, correos electrónicos, archivos) se marca como no confiable antes de que un agente lo lea.",
@@ -243,9 +243,9 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Cuándo el personal de Ackwire AI puede ver el Contenido del Espacio de Trabajo",
+        heading: "6. Cuándo el personal de agentes.chat puede ver el Contenido del Espacio de Trabajo",
         blocks: [
-          "No examinamos los espacios de trabajo. Una persona de Ackwire AI solo puede ver el Contenido del Espacio de Trabajo:",
+          "No examinamos los espacios de trabajo. Una persona de agentes.chat solo puede ver el Contenido del Espacio de Trabajo:",
           {
             list: [
               "**A petición suya,** para atender una solicitud de soporte, y solo en la medida en que la solicitud lo requiera.",
@@ -263,7 +263,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
           {
             list: [
               "**Datos de cuenta:** durante la vigencia de la cuenta. Cuando usted elimina su cuenta desde la aplicación, se cierra su sesión en todas partes de inmediato y se suprime 7 días después, salvo que usted la restaure antes, y desaparece de nuestras copias de seguridad en un plazo de 30 días desde entonces, salvo los registros que debamos conservar por ley. Cualquier espacio de trabajo del que usted fuera el único miembro se cierra al mismo tiempo, y su contenido se elimina 7 días después según se describe a continuación. Los espacios de trabajo de los que usted formaba parte conservan su nombre y su dirección de correo electrónico en sus registros de auditoría mientras cada uno de ellos exista.",
-              "**Contenido del Espacio de Trabajo:** durante la vigencia del espacio de trabajo, y antes cuando el espacio de trabajo elimina contenido concreto. Cuando finaliza el plan de Ackwire AI de un espacio de trabajo, su contenido sigue disponible durante 90 días y después se elimina. Cuando un propietario elimina un espacio de trabajo, este se cierra para todos de inmediato y su contenido se elimina 7 días después, salvo que un propietario lo restaure antes, y desaparece de nuestras copias de seguridad en los 30 días siguientes, salvo el contenido que debamos conservar por ley o como registro de un abuso (véase más abajo).",
+              "**Contenido del Espacio de Trabajo:** durante la vigencia del espacio de trabajo, y antes cuando el espacio de trabajo elimina contenido concreto. Cuando finaliza el plan de agentes.chat de un espacio de trabajo, su contenido sigue disponible durante 90 días y después se elimina. Cuando un propietario elimina un espacio de trabajo, este se cierra para todos de inmediato y su contenido se elimina 7 días después, salvo que un propietario lo restaure antes, y desaparece de nuestras copias de seguridad en los 30 días siguientes, salvo el contenido que debamos conservar por ley o como registro de un abuso (véase más abajo).",
               "**Registros:** los registros de solicitudes y de seguridad, hasta 90 días. Los registros de uso de modelos (tokens y costo), durante la vigencia del espacio de trabajo, porque los presupuestos y los informes de uso dependen de ellos.",
               "**Datos de facturación:** mientras usted pague por un espacio de trabajo y, después, durante el tiempo que exija la normativa tributaria y contable.",
               "**Lista de espera:** hasta que usted reciba una invitación y durante los 12 meses siguientes, o hasta que nos pida que le eliminemos.",
@@ -283,14 +283,14 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "transfers",
         heading: "9. Transferencias internacionales",
         blocks: [
-          "Nuestra aplicación y su base de datos funcionan en los Estados Unidos, y los proveedores mencionados en esta política tratan los datos en los Estados Unidos, excepto las computadoras de los espacios de trabajo, que Contabo aloja en la Unión Europea, y Cloudflare, que gestiona el tráfico en su centro de datos más cercano a cada dispositivo, en los Estados Unidos o en otro lugar. Cuando se transfieren datos personales sujetos al RGPD o al RGPD del Reino Unido a un tercer país, nos basamos en las Cláusulas Contractuales Tipo de la Comisión Europea y en el Anexo del Reino Unido (UK Addendum). Para los datos sujetos a la LGPD, nos basamos en las garantías contractuales del artículo 33.",
+          "Nuestra aplicación y su base de datos funcionan en los Estados Unidos, y los proveedores mencionados en esta política tratan los datos en los Estados Unidos, excepto los proveedores de modelos y los servicios conectados que elige un espacio de trabajo, y las empresas a las que estos transmiten las llamadas, que pueden tratar datos en otros países conforme a sus propios términos. Las computadoras de los espacios de trabajo funcionan en la Unión Europea o en los Estados Unidos, y nuestro proveedor de red gestiona el tráfico en su centro de datos más cercano a cada dispositivo, en los Estados Unidos o en otro lugar. Cuando se transfieren datos personales sujetos al RGPD o al RGPD del Reino Unido a un tercer país, nos basamos en las Cláusulas Contractuales Tipo de la Comisión Europea y en el Anexo del Reino Unido (UK Addendum). Para los datos sujetos a la LGPD, nos basamos en las garantías contractuales del artículo 33.",
         ],
       },
       {
         id: "apps",
         heading: "10. Aplicaciones para teléfono y Mac",
         blocks: [
-          "La aplicación para teléfono envía notificaciones a través de Expo, Apple y Google. Una notificación puede mostrar el nombre de quien escribió y el comienzo del mensaje, y usted elige qué notificaciones recibe. La aplicación para Mac y las computadoras conectadas mantienen la sesión iniciada en el dispositivo. Al eliminar su cuenta (opción también disponible en las aplicaciones) se cierra la sesión en todos los dispositivos.",
+          "La aplicación para teléfono envía notificaciones a través de Apple y Google. Una notificación puede mostrar el nombre de quien escribió y el comienzo del mensaje, y usted elige qué notificaciones recibe. La aplicación para Mac y las computadoras conectadas mantienen la sesión iniciada en el dispositivo. Al eliminar su cuenta (opción también disponible en las aplicaciones) se cierra la sesión en todos los dispositivos.",
         ],
       },
       {
@@ -318,7 +318,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookies y almacenamiento local",
         blocks: [
-          "El espacio de trabajo utiliza únicamente las cookies y el almacenamiento local necesarios para mantener su sesión iniciada, proteger los formularios y recordar preferencias como el tema y el idioma. El sitio público Ackwire AI recuerda el idioma que usted eligió y utiliza la analítica de Himetrica (Sección 2). No utilizamos cookies publicitarias ni de seguimiento entre sitios.",
+          "El espacio de trabajo utiliza únicamente las cookies y el almacenamiento local necesarios para mantener su sesión iniciada, proteger los formularios y recordar preferencias como el tema y el idioma. El sitio público agentes.chat recuerda el idioma que usted eligió y utiliza la analítica de Himetrica (Sección 2). No utilizamos cookies publicitarias ni de seguimiento entre sitios.",
         ],
       },
       {
@@ -339,7 +339,7 @@ export const legalEs: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "17. Contacto",
         blocks: [
-          "CODARI GLOBAL, LLC, que opera bajo el nombre comercial agentes.chat. Notificaciones: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. Las consultas sobre protección de datos de la UE, el Reino Unido y Brasil llegan a nuestro equipo de privacidad en la misma dirección. Para cualquier otro asunto, escriba a hello@agentes.chat.",
+          "AGENTESCHAT, LLC, que opera bajo el nombre comercial agentes.chat. Notificaciones: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · privacy@agentes.chat. Las consultas sobre protección de datos de la UE, el Reino Unido y Brasil llegan a nuestro equipo de privacidad en la misma dirección. Para cualquier otro asunto, escriba a hello@agentes.chat.",
         ],
       },
     ],

@@ -26,9 +26,11 @@ import {
   AccountManager,
   type AccountManagerOptions,
   accountEnv,
+  accountSignIn,
   agentAccountHome,
   codexAuthOf,
   grantOf,
+  grokAuthOf,
   lentAccounts,
   parseClaudeLoginUrl,
   parseClaudeStatus,
@@ -36,11 +38,13 @@ import {
   parseCodexStatus,
   parseSetupToken,
   placeCodexAuth,
+  placeGrokAuth,
   planKeyOf,
   Screen,
   stripAnsi,
   tokenOf,
   watchCodexAuth,
+  watchGrokAuth,
   withoutContainers,
 } from "../../runner/accounts";
 import { claudePlan } from "../../runner/executors";
@@ -168,7 +172,11 @@ function setup(over: Partial<AccountManagerOptions> = {}) {
   const m = new AccountManager({
     root: path.join(home, "accounts"),
     orgId: () => ORG,
-    commands: { claude_code: [process.execPath, FAKE], codex: [process.execPath, FAKE] },
+    commands: {
+      claude_code: [process.execPath, FAKE],
+      codex: [process.execPath, FAKE],
+      grok: [process.execPath, FAKE],
+    },
     onChange: () => {
       changes++;
     },
@@ -859,6 +867,12 @@ test("a terminal's screen: words apart by cursor moves, a line drawn in pieces, 
   u.write("one\r\ntwo\r\n");
   u.write(`${ESC}[2A${ESC}[2K${ESC}[1Gthree`);
   expect(u.text()).toBe("three\ntwo");
+  // A piece that ends the token's screen and clears it: the screen is seen just before each erase.
+  const seen: string[] = [];
+  const v = new Screen(undefined, () => seen.push(v.text()));
+  v.write(`Your OAuth token:\r\n${TOKEN}\r\nStore this token${ESC}[2J${ESC}[H`);
+  expect(v.text()).toBe("");
+  expect(seen.map((t) => parseSetupToken(t))).toEqual([TOKEN]);
   // Only a token after "OAuth token"; once the CLI ended, without the line under it.
   expect(parseSetupToken(`${TOKEN}\nYour OAuth token:\nStore this token`)).toBeNull();
   expect(parseSetupToken(`Your OAuth token:\n${TOKEN}`, true)).toBe(TOKEN);
@@ -976,6 +990,13 @@ test.if(posix)(
     m.probeUsage([id]);
     await new Promise((r) => setTimeout(r, 100));
     expect(runs().map((r) => r.args)).toEqual(["setup-token"]);
+    // Stuck at its limit, the server asks for a check (`list.recheck`): one turn on the cheapest model, once.
+    m.probeUsage([id], [id]);
+    await waitFor(() => runs().length > 1, 8000);
+    expect(runs()[1]?.args).toContain("--model haiku");
+    m.probeUsage([id], [id]);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(runs()).toHaveLength(2);
     // A turn's endpoint refused it: signed out for every agent, nothing to hand over, until it signs in again.
     await m.refused("claude_code", id);
     m.invalidate();
@@ -991,7 +1012,11 @@ test.if(posix)(
     expect(lines.join("\n")).not.toContain("oat01");
     // Removed: nothing runs as root (only Claude's settings end a token), the folder and its markers go.
     expect(await m.remove("claude_code", id)).toBe(true);
-    expect(runs().map((r) => r.args)).toEqual(["setup-token", "setup-token"]);
+    expect(
+      runs()
+        .map((r) => r.args)
+        .filter((a) => a === "setup-token"),
+    ).toEqual(["setup-token", "setup-token"]);
     expect(existsSync(dir)).toBe(false);
     expect(existsSync(`${dir}.shared`)).toBe(false);
     expect(existsSync(`${dir}.invalid`)).toBe(false);
@@ -1572,6 +1597,27 @@ test.if(posix)(
   20_000,
 );
 
+test.if(posix)(
+  "a look that read an account before a turn's refusal is never kept: the server hears it signed out at once",
+  async () => {
+    const { m, runs } = setup();
+    const id = LOGIN(88);
+    await signInClaude(m, id);
+    process.env.FAKE_ACCOUNT_STATUS_DELAY = "500";
+    const before = runs().length;
+    m.invalidate();
+    const stale = m.refresh();
+    // Its status look is running: it found no refusal.
+    await waitFor(() => runs().length > before, 5000);
+    await m.refused("claude_code", id);
+    m.invalidate();
+    expect((await m.refresh(true))[0]).toMatchObject({ id, loggedIn: false });
+    expect((await stale)[0]).toMatchObject({ id, loggedIn: true });
+    expect((await m.list())[0]).toMatchObject({ id, loggedIn: false });
+  },
+  20_000,
+);
+
 // ── Claude's own login for all agents: the CLI runs as the sign-in's user ────
 
 function sharedLoginSetup(ready = true, over: Partial<AccountManagerOptions> = {}) {
@@ -1799,4 +1845,132 @@ test("a computer without the feature stays as it was: no shared login option, no
     JSON.stringify({ type: "hello", token: "t", version: "1", protocol: 51, claudeLoginBlocked: "x".repeat(400) }),
   ) as { claudeLoginBlocked?: string };
   expect(hello.claudeLoginBlocked).toHaveLength(300);
+});
+
+// ── Grok Build: one sign-in for all agents (protocol 67) ────────────────────
+
+const grokAuth = (refresh: string, expires: number, user = "grok-user-fake") =>
+  JSON.stringify({
+    "https://accounts.x.ai/sign-in": {
+      key: `access-${refresh}`,
+      auth_mode: "oidc",
+      create_time: new Date(expires - 3600_000).toISOString(),
+      user_id: user,
+      email: "grok@acme.test",
+      coding_data_retention_opt_out: true,
+      refresh_token: refresh,
+      expires_at: new Date(expires).toISOString(),
+    },
+  });
+
+test.if(posix)(
+  "system mode: a Grok sign-in for all agents is a copy each agent gets, never its folder; one per agent stays lent",
+  async () => {
+    const { m, root, runs } = setup({ lending: { chown: async () => {} } });
+    const id = LOGIN(90);
+    await m.begin("grok", id, false, undefined, undefined, true);
+    await waitFor(() => m.status(id).state !== "waiting", 5000);
+    expect(m.status(id)).toEqual({
+      state: "done",
+      account: { id, kind: "grok", loggedIn: true, shared: true, authMethod: "cli_login" },
+    });
+    const granted = await m.grant("grok", id);
+    expect(granted?.kind).toBe("grok_auth");
+    expect(grantOf(granted)).toEqual(granted);
+    // Root keeps it: never lent to an agent's user.
+    expect(await m.lendTo("grok", id, 21001)).toBe(false);
+
+    // Two agents, each its own folder: both get the copy, and the CLI signs in only once.
+    const homes = [tempDir("grok-agent-"), tempDir("grok-agent-")];
+    dirs.push(...homes);
+    for (const home of homes) {
+      const signIn = await accountSignIn(
+        { ...lentAccounts(), agentHome: () => home },
+        "grok",
+        id,
+        grantOf(granted) ?? undefined,
+      );
+      expect(signIn).not.toBe("signed_out");
+      expect(signIn).not.toBe("missing");
+      if (signIn === "signed_out" || signIn === "missing") return;
+      expect(signIn.home).toBe(home);
+      const copy = JSON.parse(readFileSync(path.join(home, "auth.json"), "utf8"))["https://accounts.x.ai/sign-in"];
+      expect(copy.refresh_token).toBe("fake-grok-refresh-1");
+      expect(statSync(path.join(home, "auth.json")).mode & 0o777).toBe(0o600);
+      signIn.release?.();
+    }
+    expect(runs().filter((r) => r.args === "login --device-auth")).toHaveLength(1);
+
+    // One for one agent: its folder is lent per turn, and there is no grant.
+    const single = LOGIN(91);
+    await m.begin("grok", single);
+    await waitFor(() => m.status(single).state !== "waiting", 5000);
+    expect(m.status(single).account?.shared).toBeUndefined();
+    expect(await m.grant("grok", single)).toBeNull();
+    expect(await m.lendTo("grok", single, 21001)).toBe(true);
+    expect(existsSync(path.join(root, "grok", `${single}.shared`))).toBe(false);
+  },
+  20_000,
+);
+
+test("in an agent's worker: Grok's copy goes in unless the agent's own is newer, and a refreshed one goes back", async () => {
+  const home = tempDir("grok-home-");
+  dirs.push(home);
+  const file = path.join(home, "auth.json");
+  const entry = () => JSON.parse(readFileSync(file, "utf8"))["https://accounts.x.ai/sign-in"];
+  placeGrokAuth(home, grokAuth("r1", 1000_000));
+  expect(entry().refresh_token).toBe("r1");
+  // This agent's Grok refreshed it already: root's older copy doesn't overwrite it.
+  writeFileSync(file, grokAuth("r2", 2000_000));
+  placeGrokAuth(home, grokAuth("r1", 1000_000));
+  expect(entry().refresh_token).toBe("r2");
+  placeGrokAuth(home, grokAuth("r3", 3000_000));
+  expect(entry().refresh_token).toBe("r3");
+  // What isn't a sign-in store never goes in, and other entries in it are kept.
+  expect(grokAuthOf("{}")).toBeNull();
+  expect(
+    grokAuthOf(JSON.stringify({ "https://accounts.x.ai/sign-in": { auth_mode: "api_key", key: "xai-1" } })),
+  ).toBeNull();
+  placeGrokAuth(home, "{not json");
+  placeGrokAuth(home, JSON.stringify({ "https://accounts.x.ai/sign-in": { auth_mode: "api_key", key: "xai-1" } }));
+  expect(entry().refresh_token).toBe("r3");
+  const store = JSON.parse(readFileSync(file, "utf8"));
+  store["https://example.test/other"] = { key: "other" };
+  writeFileSync(file, JSON.stringify(store));
+  placeGrokAuth(home, grokAuth("r4", 4000_000));
+  expect(JSON.parse(readFileSync(file, "utf8"))["https://example.test/other"]).toEqual({ key: "other" });
+
+  // A copy this agent's Grok refreshed goes back to root.
+  const sent: string[] = [];
+  const watch = watchGrokAuth(home, grokAuth("r4", 4000_000), (a) => sent.push(a), 10);
+  await Bun.sleep(30);
+  expect(sent).toEqual([]);
+  writeFileSync(file, grokAuth("r5", 5000_000));
+  await waitFor(() => sent.length > 0, 2000);
+  watch.stop();
+  expect(JSON.parse(sent[0] ?? "{}")["https://accounts.x.ai/sign-in"].refresh_token).toBe("r5");
+});
+
+test("system mode: root keeps a Grok copy back only from the account it lent, newer and rotated", async () => {
+  let clock = Date.now();
+  const { m, root } = setup({ lending: { chown: async () => {} }, now: () => clock });
+  const id = LOGIN(92);
+  await m.begin("grok", id, false, undefined, undefined, true);
+  await waitFor(() => m.status(id).state !== "waiting", 5000);
+  // An hour past the token root keeps: a refresh this agent's Grok made.
+  const keptFile = path.join(root, "grok", id, "auth.json");
+  const kept = JSON.parse(readFileSync(keptFile, "utf8"))["https://accounts.x.ai/sign-in"];
+  clock = Date.parse(kept.expires_at) + 3600_000;
+  const at = clock;
+  // Hand-written in an agent's folder: another account's, older, or far ahead is never a refresh.
+  expect(m.keepGrokAuth(id, grokAuth("x", at, "someone-else"))).toBe(false);
+  expect(m.keepGrokAuth(id, grokAuth("fake-grok-refresh-1", at))).toBe(false);
+  expect(m.keepGrokAuth(id, grokAuth("x", Date.parse("2099-01-01T00:00:00Z")))).toBe(false);
+  expect(m.keepGrokAuth(id, "not json")).toBe(false);
+  expect(m.keepGrokAuth(id, grokAuth("refreshed", at))).toBe(true);
+  const after = JSON.parse(readFileSync(keptFile, "utf8"));
+  expect(after["https://accounts.x.ai/sign-in"].refresh_token).toBe("refreshed");
+  expect(statSync(path.join(root, "grok", id, "auth.json")).mode & 0o777).toBe(0o600);
+  // A copy for an account made for one agent is never taken.
+  expect(m.keepGrokAuth(LOGIN(93), grokAuth("y", at))).toBe(false);
 });

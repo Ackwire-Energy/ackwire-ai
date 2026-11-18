@@ -11,6 +11,7 @@ import {
   mailErrorOf,
   normalizePolicy,
   notIcloudMail,
+  onlyForOwner,
   splitAddresses,
 } from "../src/lib/mail";
 
@@ -172,4 +173,12 @@ test("the owner-only refusal names who connected the mailbox, or says so without
   expect(knownErrorText(t, refusal(""))).toBe(
     'errors.mail.ownerOnlyUnknown {"address":"x@y.com","ownerUserId":"","ownerName":""}',
   );
+});
+
+test("only a mailbox's owner reads that the right hand uses it for them alone", () => {
+  const box = { ownerUserId: "u-ana" };
+  expect(onlyForOwner(box, { builtin: "right_hand" }, "u-ana")).toBe(true);
+  expect(onlyForOwner(box, { builtin: "right_hand" }, "u-bia")).toBe(false);
+  expect(onlyForOwner(box, { builtin: null }, "u-ana")).toBe(false);
+  expect(onlyForOwner(box, undefined, "u-ana")).toBe(false);
 });

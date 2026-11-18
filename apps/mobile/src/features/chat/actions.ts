@@ -70,16 +70,4 @@ export function groupStart(list: readonly AgentAction[]): string | null {
   return first;
 }
 
-/** A translated sentence with `<b>…</b>` marks → plain and bold runs (React Native has no HTML). */
-export function boldRuns(text: string): { text: string; bold: boolean }[] {
-  const out: { text: string; bold: boolean }[] = [];
-  const re = /<b>([\s\S]*?)<\/b>/g;
-  let last = 0;
-  for (let m = re.exec(text); m; m = re.exec(text)) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index), bold: false });
-    if (m[1]) out.push({ text: m[1], bold: true });
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) out.push({ text: text.slice(last), bold: false });
-  return out;
-}
+export { boldRuns } from "@agenteschat/client/lib/actions";

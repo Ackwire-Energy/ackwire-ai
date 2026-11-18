@@ -55,6 +55,9 @@ test("the channel header's icons never get a plate, are 32 boxes 8 apart, and a 
   // The field: a soft plate with no line at rest, and it grows while it is used.
   expect(last(shipped, ".channel__search.search-box", "width")).toBe("220px");
   expect(last(shipped, ".channel__search.search-box:focus-within", "width")).toBe("300px");
+  // Short of room the open field gives way, never the model's chip beside it (its words would wrap).
+  expect(last(shipped, ".channel__acts>.channel__search.search-box", "min-width")).toBe("120px");
+  expect(last(shipped, ".channel__acts:has(>.channel__search)>:not(.channel__search)", "flex-shrink")).toBe("0");
   expect(last(shipped, ".channel__search .search-box__field", "background")).toBe("var(--plate-soft)");
   // The minifier writes `transparent` as `#0000`.
   expect(last(shipped, ".channel__search .search-box__field", "border-color")).toBe("#0000");
@@ -68,8 +71,9 @@ test("the channel header's icons never get a plate, are 32 boxes 8 apart, and a 
   expect(last(phone, ".channel__acts>.channel__search", "display")).toBe("none");
   // The cog stays when there is no members sheet to move it into.
   expect(last(phone, ".channel__acts:has(.channel__members-toggle)>.channel__cog", "display")).toBe("none");
-  expect(last(shipped, ".channel__search-icon.ac-btn", "display")).toBe("none");
-  expect(last(phone, ".channel__search-icon.ac-btn", "display")).toBe("inline-flex");
+  // The icon shows at every width (the field opens in its place): nothing hides it.
+  expect(last(shipped, ".channel__search-icon.ac-btn", "display")).toBeUndefined();
+  expect(last(phone, ".channel__search-icon.ac-btn", "display")).toBeUndefined();
 
   // A search hit has its own cool mark, from the info color, never a mention's tan.
   expect(last(shipped, "[data-theme=light]", "--search-hit")).toContain("var(--info)");

@@ -82,17 +82,16 @@ export function agentSearch(search: Record<string, unknown>): {
   };
 }
 
-/** "Quem pensa": the brain, its model (null = the brain's default) and the fallback to the API. */
+/** "Quem pensa": the brain and its model (null = the brain's default). */
 export interface BrainChoice {
   brain: BrainKind;
   model: string | null;
-  fallback: boolean;
 }
 export const sameBrain = (a: BrainChoice, b: BrainChoice) =>
-  a.brain === b.brain && (a.brain === "model" || a.model === b.model) && a.fallback === b.fallback;
+  a.brain === b.brain && (a.brain === "model" || a.model === b.model);
 
-const sorted = (list: string[]) => [...list].sort();
-export const sameList = (a: string[], b: string[]) => sorted(a).join("\n") === sorted(b).join("\n");
+const sorted = (list: readonly string[]) => [...list].sort();
+export const sameList = (a: readonly string[], b: readonly string[]) => sorted(a).join("\n") === sorted(b).join("\n");
 export const sameAudience = (a: AgentAudience, b: AgentAudience) =>
   (a.consultable ?? true) === (b.consultable ?? true) &&
   a.mode === b.mode &&

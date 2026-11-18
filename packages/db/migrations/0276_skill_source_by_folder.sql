@@ -1,0 +1,1 @@
+ALTER TABLE "skills" ADD COLUMN "source_by_folder" boolean DEFAULT false NOT NULL;

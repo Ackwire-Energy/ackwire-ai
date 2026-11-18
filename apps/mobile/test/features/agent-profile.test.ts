@@ -62,6 +62,29 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
     expect(free.map((l) => l.agent.id)).toEqual(["iris"]);
   });
 
+  test("at work where you don't read: under Trabalhando by its work for you, once, never over what waits on you", () => {
+    const atWork = new Map([
+      ["iris", ago(0.3)],
+      ["nina", ago(2)],
+      ["theo", ago(0.2)],
+    ]);
+    const { waiting, working, free } = teamLines(
+      agents,
+      [work("nina", ago(1))],
+      [],
+      [{ id: "a1", agentId: "theo", title: "Merge PR #128", createdAt: ago(0.1) }],
+      new Map(),
+      atWork,
+    );
+    expect(waiting.map((l) => l.agent.id)).toEqual(["theo"]);
+    // Nina's own item first, as Início lists it; Iris by its work for you alone, with since when.
+    expect(working.map((l) => [l.agent.id, l.work?.what ?? null, l.at])).toEqual([
+      ["nina", "pesquisando os preços", ago(1)],
+      ["iris", null, ago(0.3)],
+    ]);
+    expect(free).toEqual([]);
+  });
+
   test("without requests it is the old split (nothing waiting)", () => {
     const { waiting, working, free } = teamLines(agents, [work("nina", ago(1))], []);
     expect(waiting).toEqual([]);
@@ -97,7 +120,7 @@ describe("Agentes: esperando você, trabalhando, livres", () => {
   });
 });
 
-describe("Perfil: o papel numa frase", () => {
+describe("Perfil: a função numa frase", () => {
   test("skips the prompt's self-introduction and keeps what follows the comma", () => {
     expect(plainRole("Você é o Theo, desenvolvedor do Time Lumen. Cuida do repositório.")).toBe(
       "Desenvolvedor do Time Lumen",
@@ -399,6 +422,11 @@ describe("Perfil: o mês, com os limites do plano (ADR 0063 §5)", () => {
     expect(screen).toContain("label={thinksPlan ?? thinks.text}");
     expect(screen).toContain("{...(thinksUnder ? { sub: thinksUnder, subLines: 2 } : {})}");
     expect(screen).toContain("!isAuto(effortView.effectiveModel)");
+    // Its owner and admins change it on its AI page, pushed from this row; the conversation's bar has no button for it.
+    expect(screen).toContain("? { chevron: true, onPress: () => openAgentAi(agent.id) }");
+    expect(screen).not.toContain("ModelPickerSheet");
+    const chat = await Bun.file(new URL("../../src/features/chat/ChatScreen.tsx", import.meta.url).pathname).text();
+    expect(chat).not.toContain("DmModelButton");
     const t = await translator("pt-BR");
     expect(t("agentPage.work.cell.effort", { level: "médio" })).toBe("esforço médio");
   });
@@ -462,22 +490,31 @@ describe("Perfil: agora, cada coisa uma vez", () => {
     // One surface level: grouped lists on the gray, no pills, sections or cards of its own.
     expect(screen).not.toContain("NowPill");
     expect(screen).not.toMatch(/<(Section|Card|Row)\b/);
-    // Mailboxes are rows of "Can use"; the computer is a named button beside Chat, as wide as it.
+    // Mailboxes are rows of "Can use"; Chat stands alone under the name, and the computer is the card under it.
     expect(mail).toContain("export function useAgentMailboxes(agentId: string, enabled = true): MailboxLine[]");
+    expect(screen).not.toContain("AgentComputerButton");
     expect(screen).toContain(
-      "{details && !rightHand ? (\n              <View style={styles.grow}>\n                <AgentComputerButton agentId={id} />",
+      'acts: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 8 },',
     );
-    expect(computer).toContain('wide\n      label={helps ? t("agentComputer.help") : t("agentComputer.button")}');
-    // The screen's recent picture on Today; the rules people gave on Memory, under what it learned; where it merges on
-    // Access; the right hand's own AI above how it works: each in the grouped lists, none a section of its own.
-    expect(screen).toContain("      {nowBlock}\n      <AgentComputerPicture agentId={id} />");
+    expect(computer).toContain('label={helps ? t("agentComputer.help") : t("agentComputer.button")}');
+    // One card: the picture when there is one, the row with the status line always, in the lists' own relief.
+    expect(computer).toContain("{...(line ? { sub: line, subLines: 2 } : {})}");
+    expect(computer).toContain("{ backgroundColor: colors.raised, boxShadow:");
+    // The screen's views are the app's toolbar switch (as the tasks' List · Board), never a page-tall slab.
+    expect(screen).toMatch(/onChange=\{\(k\) => setTab\(k as ProfileTab\)\}\s+wide\s+\/>/);
+    // Its computer above the views, whichever is open; Today opens on what it is on now. The rules people gave on
+    // Memory, under what it learned; where it merges on Access; the right hand's own AI above how it works: each in the
+    // grouped lists, none a section of its own.
+    expect(screen).toContain(
+      "<AgentComputerCard agentId={id} style={styles.computer} />\n              <KeptRunningList agentId={id} />",
+    );
+    expect(screen.indexOf("<AgentComputerCard")).toBeLessThan(screen.indexOf("<Segmented"));
+    expect(screen).toContain("      {nowBlock}\n      {/* What it thinks with");
     expect(computer).toContain("asksPicture(focused, view.desktopQ.data ?? null)");
     expect(screen).toContain(
-      "      {knows.data ? memoryKnows : null}\n      {/* What people told it to always do, under what it learned, as the web's Memória. */}\n      <GivenRules agentId={id} name={name} />",
+      "      {knows.data ? memoryKnows : knows.isError ? memoryFailed : null}\n      {/* What people told it to always do, under what it learned, as the web's Memória. */}\n      <GivenRules agentId={id} name={name} rightHand={rightHand} />",
     );
-    expect(screen).toContain(
-      '<MergeReposSection agentId={id} name={name} mayEdit={mine || can(org, "manage_agents")} />',
-    );
+    expect(screen).toContain('<MergeReposSection agentId={id} mayEdit={mine || can(org, "manage_agents")} />');
     expect(screen).toContain(
       '<GroupedHeader>{t("rightHand.settings.mine")}</GroupedHeader>\n            <RightHandMine',
     );
@@ -556,5 +593,43 @@ describe("Perfil: the Modelo row says how it thinks on the value's line (#44)", 
     });
     // The profile names Automático by its key's maker already (`apiModelName`): the note still says Automático.
     expect(modelRow(pt, { kind: "model", model: null, maker: "anthropic" }, "Claude").valueNote).toBe("Automático");
+  });
+});
+
+describe("Perfil: the page's order and rhythm", () => {
+  const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
+
+  test("the head, the computer, the views and the lists 24 apart, at the page's sides; no checklist here", async () => {
+    const screen = await read("agents/AgentProfileScreen.tsx");
+    expect(screen).toContain("prof: { paddingHorizontal: SCREEN_X, gap: 8 },");
+    expect(screen).toContain("computer: { marginTop: 24 },");
+    expect(screen).toContain("tabs: { paddingHorizontal: SCREEN_X, paddingTop: 24 },");
+    expect(screen).toContain("page: { paddingHorizontal: SCREEN_X },");
+    expect(screen).not.toMatch(/paddingHorizontal: (16|24)\b/);
+    // A new agent's checklist is its DM's (ADR 0155 §2): never on its page.
+    expect(screen).not.toContain("AgentSetupCard");
+    expect(screen).not.toContain("styles.setup");
+  });
+
+  test("its computer is always there for whoever may watch it: its shape while it loads, the computer until a picture", async () => {
+    const card = await read("computer/AgentComputerRow.tsx");
+    // Loading: the card's shape, never nothing (only a refusal or an edition that failed to load draws nothing).
+    expect(card).toContain("if (view.forbidden) return null;");
+    expect(card).toContain(
+      "if (!view.ready || !f) return setupFailed ? null : <CardShape style={[styles.card, surface, style]} />;",
+    );
+    expect(card).toContain("const pulse = usePulse();");
+    // No picture yet: the computer itself, its kind and its state, on the agent's sky; the picture when it comes.
+    expect(card).toContain(
+      "<ComputerSky color={agentLook(dir.anyAgent(agentId)).color} style={StyleSheet.absoluteFill} />",
+    );
+    expect(card).toContain("kind={entryKind(f.edition, view.machine)}");
+    expect(card).toContain("state={entryPortrait(state, f.setup)}");
+    expect(card).toMatch(/\{picture \? \(\s+<Image/);
+    // The frame keeps the screen's proportions, picture or not, and opens the computer as the row does.
+    expect(card).toContain(
+      'frame: { width: "100%", aspectRatio: 16 / 10, borderBottomWidth: StyleSheet.hairlineWidth },',
+    );
+    expect(card).toContain("<Pressable onPress={press} accessible={false} style={[styles.frame,");
   });
 });

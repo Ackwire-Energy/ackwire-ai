@@ -95,6 +95,16 @@ export function groupByDay<T extends { at: string }>(entries: readonly T[], now:
   return groups;
 }
 
+/** A tool as a sentence names it: "o navegador", or a coding CLI's own name. */
+export function toolWords(t: TFunction, tool: string): string {
+  const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  return (
+    tt(`desktop.prefs.activity.said.tools.${tool}`, { defaultValue: "" }) ||
+    tt(`desktop.tools.${tool}Name`, { defaultValue: "" }) ||
+    tool
+  );
+}
+
 /**
  * An activity line or a job in the person's words (`desktop.prefs.activity.said.<key>`), from what the runner says it
  * was (`said`); one from an older runner, or with words this app doesn't have, reads as it came (`summary`, English).

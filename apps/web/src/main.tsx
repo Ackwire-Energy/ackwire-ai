@@ -6,14 +6,17 @@ import "./styles.css";
 import { authConfigQuery, createApiClient, createSnapshot, keys, type Me, meQuery, outbox } from "@agenteschat/client";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { holdSkies, trackInput } from "@agenteschat/ui";
+import { holdSkies, installTitleTips, trackInput } from "@agenteschat/ui";
 import { AppProviders, type AppServices } from "./app/providers";
 import { createQueryClient } from "./app/query-client";
+import { backToSignIn } from "./app/unauthorized";
 import { createBetterAuthClient } from "./auth/better-auth";
 import { copyPillAddresses } from "./chat/link-pill-copy";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { withComposerDraftsSignOut } from "./hooks/useComposerDraft";
-import { loadI18n, savedLocale } from "./i18n";
+import { brandTabTitle, loadI18n, savedLocale, translateTabTitle } from "./i18n";
+import { accountInLink, followAccountChanges, takeAccountMove, watchAccount, withoutAccount } from "./lib/accounts";
+import { showHostIcon, startAppIcon } from "./lib/app-icon";
 import {
   checkAppVersion,
   createVersionWatch,
@@ -23,7 +26,14 @@ import {
   startVersionWatch,
   VERSION_CHECK_MS,
 } from "./lib/app-version";
-import { applyDesktopDevice, askForPhone, asksForPhone, desktopPlatform } from "./lib/desktop";
+import {
+  applyDesktopDevice,
+  askForPhone,
+  asksForPhone,
+  desktopPlatform,
+  desktopRenderer,
+  inDesktopApp,
+} from "./lib/desktop";
 import { tolerateForeignDomEdits } from "./lib/dom-guard";
 import { announceConfirmation, emailConfirmedToast } from "./lib/email-confirmation";
 import { catchEarlyErrors, reportError, setErrorScope, startErrorReports } from "./lib/error-reports";
@@ -52,6 +62,16 @@ const i18n = await loadI18n(savedLocale()).catch((error: unknown) => {
   throw error;
 });
 document.documentElement.lang = i18n.language;
+translateTabTitle(i18n);
+// A registered host (ADR 0194): its name in the tabs' titles and its logo as their icon, on every page of it.
+void authConfig.then(
+  ({ host }) => {
+    if (!host) return;
+    brandTabTitle(host.name);
+    if (host.logoUrl) showHostIcon(host.logoUrl);
+  },
+  () => undefined,
+);
 // In the desktop app (ADR 0036): the site draws the window's title bar (desktop.css), with room for a Mac's
 // buttons only there; and "this Mac" is this computer's own name.
 const platform = desktopPlatform();
@@ -59,23 +79,23 @@ if (platform) {
   document.documentElement.dataset.desktop = platform;
   applyDesktopDevice(i18n, platform);
   if (asksForPhone(window.location.search)) askForPhone();
-  // Linux's WebKitGTK paints in software there: the skies stand still, or their frames keep a core busy (holdSkies).
-  if (platform === "linux") holdSkies();
+  // Painted in software (Linux's WebKitGTK): the skies stand still, or their frames keep a core busy (holdSkies), and
+  // desktop.css drops the blurs and endless loops.
+  const renderer = desktopRenderer();
+  if (renderer) document.documentElement.dataset.desktopRenderer = renderer;
+  if (renderer === "cpu") holdSkies();
 }
 // Focus rings only while the keys move the focus (`data-pointer` on <html>, read by the stylesheet).
 trackInput();
+// Every `title` and icon-only control says its words in the product's tooltip, not the browser's.
+installTitleTips();
 const toasts = createToastStore();
 // The app's sounds (ADR 0070): a click or a key switches audio on; the person's choice is in Sua conta.
 installSounds();
+// The app icon this device picked (ADR 0179): the tab's, or the desktop app's Dock.
+startAppIcon();
 
-/** A 401 anywhere means the session ended: back to sign-in, then here again. */
-function onUnauthorized() {
-  if (window.location.pathname.startsWith("/login")) return;
-  const redirect = window.location.pathname + window.location.search;
-  queryClient.clear();
-  void router.navigate({ to: "/login", search: { redirect } });
-  toasts.show(i18n.t("common.signedOut"));
-}
+const onUnauthorized = () => backToSignIn({ router, queryClient, toasts, i18n });
 
 const queryClient = createQueryClient({
   onUnauthorized,
@@ -89,6 +109,13 @@ void queryClient.prefetchQuery({ ...authConfigQuery(api), queryFn: () => authCon
 // The last lists and chats saved on this device show at once; everything revalidates as usual.
 const snapshot = createSnapshot(queryClient, snapshotStore);
 snapshot.start();
+// Another of the browser's accounts took this tab (ADR 0183), by the workspace menu or by the address the desktop app
+// opened (`?as=`): what the one before saved or left waiting to send stays behind.
+const accountMoved = takeAccountMove();
+const asAccount = accountInLink(window.location.search);
+if (accountMoved || (asAccount && inDesktopApp())) sessionStore.remove(STORAGE_KEYS.outbox);
+followAccountChanges();
+watchAccount(api, () => queryClient.getQueryData<Me | null>(keys.me)?.user.id ?? null);
 // What waits for the connection survives a reload of this tab: a new version loaded after a deploy, for one.
 outbox.keep(queryClient, {
   read: () => sessionStore.get(STORAGE_KEYS.outbox),
@@ -186,17 +213,30 @@ if (confirmation) {
 const root = document.getElementById("root");
 if (!root) throw new Error("#root element missing from index.html");
 
-const restored = snapshot.restore().then((found) => {
-  // The saved `me` let the app open without asking: ask now (no session: sign-in, and the snapshot goes).
-  if (!found) return;
-  outbox.show(queryClient);
-  void queryClient
-    .fetchQuery({ ...meQuery(api), staleTime: 0 })
-    .then((me) => {
-      if (!me) onUnauthorized();
-    })
-    .catch(() => {});
-});
+// The address names an account. In the desktop app, whose window the app itself steers, the browser moves to it
+// before anything is read; refused (not signed in on this window any more), the page opens as whoever is. In a
+// browser a link never moves the account by itself: whoever opened the address (the service worker, for a clicked
+// notification) moved it first, and the name only keeps the account before's saved start out of this load.
+if (asAccount) {
+  const { pathname, search, hash } = window.location;
+  window.history.replaceState(window.history.state, "", withoutAccount(pathname, search, hash));
+}
+const arrived =
+  asAccount && inDesktopApp() ? api.account.switchDeviceAccount(asAccount).catch(() => {}) : Promise.resolve();
+const restored = arrived
+  .then(() => (accountMoved || asAccount ? snapshotStore.remove().then(() => false) : snapshot.restore()))
+  .catch(() => false)
+  .then((found) => {
+    // The saved `me` let the app open without asking: ask now (no session: sign-in, and the snapshot goes).
+    if (!found) return;
+    outbox.show(queryClient);
+    void queryClient
+      .fetchQuery({ ...meQuery(api), staleTime: 0 })
+      .then((me) => {
+        if (!me) onUnauthorized();
+      })
+      .catch(() => {});
+  });
 /** A render error a boundary caught (the error screen) or none did: logged as React would, and reported. */
 const renderError = (error: unknown) => {
   console.error(error);
@@ -206,21 +246,24 @@ const renderError = (error: unknown) => {
 // A page's code from before a deploy is gone: the new version, with the boot sky in between (ErrorScreen).
 window.addEventListener("vite:preloadError", () => void reloadForNewVersion());
 
-void Promise.race([restored, new Promise((resolve) => setTimeout(resolve, SNAPSHOT_WAIT_MS))]).then(() => {
-  createRoot(root, { onCaughtError: renderError, onUncaughtError: renderError }).render(
-    <StrictMode>
-      {/* Above the router's own boundary: a provider that throws (theme, toasts, sign-in) gets the crash screen. */}
-      <ErrorBoundary
-        fallback={(error) => (
-          <I18nextProvider i18n={i18n}>
-            <ErrorScreen error={error as Error} reset={() => window.location.reload()} />
-          </I18nextProvider>
-        )}
-      >
-        <AppProviders services={services}>
-          <RouterProvider router={router} />
-        </AppProviders>
-      </ErrorBoundary>
-    </StrictMode>,
-  );
-});
+// The account the address names comes first, however long its answer takes: the page never opens as another one.
+void arrived
+  .then(() => Promise.race([restored, new Promise((resolve) => setTimeout(resolve, SNAPSHOT_WAIT_MS))]))
+  .then(() => {
+    createRoot(root, { onCaughtError: renderError, onUncaughtError: renderError }).render(
+      <StrictMode>
+        {/* Above the router's own boundary: a provider that throws (theme, toasts, sign-in) gets the crash screen. */}
+        <ErrorBoundary
+          fallback={(error) => (
+            <I18nextProvider i18n={i18n}>
+              <ErrorScreen error={error as Error} reset={() => window.location.reload()} />
+            </I18nextProvider>
+          )}
+        >
+          <AppProviders services={services}>
+            <RouterProvider router={router} />
+          </AppProviders>
+        </ErrorBoundary>
+      </StrictMode>,
+    );
+  });

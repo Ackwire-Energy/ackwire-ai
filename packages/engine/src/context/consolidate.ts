@@ -58,7 +58,11 @@ export async function consolidateOrg(deps: ContextDeps, orgId: string, now = new
   const groups = new Map<string, typeof active>();
   for (const item of active) {
     if (item.kind === "thread_summary" || item.kind === "period_summary" || item.kind === "entity_profile") continue;
-    const key = `${item.kind}|${item.agentId ?? ""}|${item.scopeType}`;
+    // What is kept for one person, or a rule one person gave, never merges into another person's: the survivor
+    // reads only in its own person's runs, so the other would lose theirs.
+    const person = item.scopeType === "person" ? item.scopeId : "";
+    const giver = item.kind === "rule" ? item.createdById : "";
+    const key = `${item.kind}|${item.agentId ?? ""}|${item.scopeType}|${person ?? ""}|${giver ?? ""}`;
     groups.set(key, [...(groups.get(key) ?? []), item]);
   }
   const archived = new Set<string>();
@@ -379,16 +383,23 @@ export async function enqueueIdleReflections(deps: ContextDeps, now = new Date()
     .having(sql`max(${messages.createdAt}) < ${idleBefore.toISOString()}::timestamptz and count(*) >= 2`)
     .limit(500);
   let queued = 0;
+  // Every thread's state in one read: most of a sweep's threads are already covered, and come back on each sweep for
+  // a week, so asking one at a time was up to 500 round trips every time to queue nothing.
+  const roots = threads.flatMap((t) => (t.threadId ? [t.threadId] : []));
+  const states = new Map(
+    roots.length === 0
+      ? []
+      : (await deps.db.select().from(threadReflections).where(inArray(threadReflections.threadRootId, roots))).map(
+          (s) => [s.threadRootId, s] as const,
+        ),
+  );
   // Per workspace, once a sweep: no model to reflect with, no job that would only fail (ADR 0167).
   const ready = new Map<string, boolean>();
   for (const t of threads) {
     if (!t.threadId) continue;
     if (!ready.has(t.orgId)) ready.set(t.orgId, await summaryModelReady(deps, t.orgId));
     if (!ready.get(t.orgId)) continue;
-    const [state] = await deps.db
-      .select()
-      .from(threadReflections)
-      .where(eq(threadReflections.threadRootId, t.threadId));
+    const state = states.get(t.threadId);
     if (state && (state.runs >= cfg.maxPerThread || (state.coveredUntil && state.coveredUntil >= new Date(t.last))))
       continue;
     await enqueue(deps.db, {

@@ -19,7 +19,6 @@ import {
   isPairedHome,
   isRefusedHome,
   isUnpairedHome,
-  orgName,
   pairedHomes,
   type Snapshot,
 } from "./store";
@@ -34,9 +33,14 @@ export type ThisMacRequest =
   | { kind: "reconnect"; orgId: string; origin: string; local?: boolean; also?: string }
   | { kind: "prefs"; tab: PrefsTab }
   | { kind: "requests" }
-  | { kind: "files"; local?: boolean };
+  | { kind: "files"; local?: boolean }
+  /** The page's one way out where macOS refused it something: that permission's own list in System Settings. */
+  | { kind: "privacy"; pane: PrivacyPane };
 
-export type PrefsTab = "folders" | "tools" | "updates";
+export type PrefsTab = "folders" | "tools" | "updates" | "servers";
+/** The microphone (a voice message), the Local Network list (Wi-Fi pairing of a phone). */
+type PrivacyPane = "microphone" | "network";
+const PRIVACY_PANES: readonly string[] = ["microphone", "network"] satisfies PrivacyPane[];
 
 export interface ThisMacStatus {
   orgs: { orgId: string; machineId: string | null; connection: string }[];
@@ -57,6 +61,8 @@ export interface ThisMacDeps {
   openPrefs(tab: PrefsTab): Promise<void>;
   /** The popover, where access requests are answered. */
   showRequests(): Promise<void>;
+  /** System Settings on a permission's list; absent: the page's request is refused. */
+  openPrivacy?(pane: PrivacyPane): Promise<void>;
   /** The server here's folder (`~/.agentes`), as the app runs it now. */
   localDir(): Promise<string>;
   /** A folder of this computer in Finder or the file manager; rejects when it isn't one. */
@@ -104,6 +110,11 @@ export async function answerThisMac(deps: ThisMacDeps, request: ThisMacRequest):
   }
   if (request.kind === "requests") {
     await deps.showRequests();
+    return {};
+  }
+  if (request.kind === "privacy") {
+    if (!PRIVACY_PANES.includes(request.pane) || !deps.openPrivacy) throw new Error("not_here");
+    await deps.openPrivacy(request.pane);
     return {};
   }
   if (request.kind === "files") {
@@ -210,17 +221,20 @@ export async function firstTools(store: DesktopStore, homeId: string, chosen: Pa
 }
 
 /**
- * The tools as Preferences › Tools shows them, one switch each for every organization here. Commands may be on
- * for some only (turned off at pairing, or the server here's own): the switch is on when all have them, and
- * `commandsOnlyFor` names the organizations that do while others don't.
+ * The tools as Preferences › Tools shows them: Claude Code, Codex and the browser, one switch each for every
+ * organization here. Commands are each organization's own (`home.access.tools.commands`): here, on when all have them.
  */
-export function toolsHere(homes: readonly Home[]): { tools: RunnerTools; commandsOnlyFor: string[] } {
+export function toolsHere(homes: readonly Home[]): { tools: RunnerTools } {
   const known = homes.filter((h) => h.access);
   const tools = known[0]?.access?.tools ?? { claude: false, codex: false, commands: false, browser: false };
-  const withCommands = known.filter((h) => h.access?.tools.commands);
-  const all = known.length > 0 && withCommands.length === known.length;
-  return { tools: { ...tools, commands: all }, commandsOnlyFor: all ? [] : withCommands.map(orgName) };
+  return { tools: { ...tools, commands: known.length > 0 && known.every((h) => h.access?.tools.commands) } };
 }
+
+/** The line that installs each coding CLI, shown under its row while it isn't found. */
+export const CLI_INSTALL = {
+  claude: "npm i -g @anthropic-ai/claude-code",
+  codex: "npm i -g @openai/codex",
+} as const;
 
 /**
  * Once the pairing is confirmed, the new organization's first tools (`chosen` over the defaults; null for a home that

@@ -21,17 +21,20 @@
 @import "./over-pages.css";
 
 :root {
-  /* The app reads in Source Sans 3, titles too; code in JetBrains Mono. */
+  /* Ackwire uses its local Gilroy face when available, with bundled Plus Jakarta Sans as its fallback. */
   --font-sans:
     "Gilroy", "Plus Jakarta Sans", "Source Sans 3 Variable", "Source Sans 3", "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, monospace;
   --font-display: var(--font-sans);
   --font-display-weight: 800;
-  /* Source Sans 3 draws small (x-height .486): as tall as 16px where the app says 15. */
+  /* Plus Jakarta Sans uses its natural size: x-height .536em at weight 400, .541em at 600. */
   --font-size-adjust: none;
-  /* A dialog title's capitals' middle above its line's middle (18px on 24px), measured in this face: its baseline lands
-     on a whole pixel, so it is 1.19px where --cap-mid says 0.37. A title in another type measures its own. */
-  --title-cap-mid: 1.19px;
+  /* Bundled Plus Jakarta Sans: cap height .745em and capitals' middle .0355em below the line's middle.
+     Use em because the variable font's x-height changes with weight. */
+  --cap-mid: -0.0355em;
+  --cap-top: 0.337em;
+  /* The 18px/24px dialog title's baseline rounds to 19px in Chromium. */
+  --title-cap-mid: -0.3px;
   /* The wordmark, and its dot-matrix ".chat". */
   --font-brand: var(--font-sans);
   --font-dot: "Doto", var(--font-mono);

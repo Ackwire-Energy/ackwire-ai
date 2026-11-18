@@ -1,32 +1,38 @@
 import type { BrowserProfile, Machine } from "@agenteschat/client";
 import { profileUser, useBrowserProfileMutations, useBrowserProfiles } from "@agenteschat/client";
+import { profileRefusalLine, profileToolOff, profileUnavailable } from "@agenteschat/client/lib/machines";
 import { can as canDo } from "@agenteschat/client/lib/permissions";
 import {
   AvatarStack,
   Button,
   Card,
   CardHeader,
+  cx,
   Dialog,
   DialogBody,
   DialogFooter,
   EmptyState,
   Field,
+  Icon,
   Input,
   Locked,
   Menu,
   MenuItem,
   SettingNote,
 } from "@agenteschat/ui";
-import { useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useDirectory } from "@/hooks/useDirectory";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
-import { useToast } from "@/lib/toast";
+import { useSaid, useToast } from "@/lib/toast";
 import { AgentAvatar, AgentWho } from "../AgentAvatar";
 import { AgentSwitches } from "../AgentSwitches";
+import { DialogHeadContext, type DialogHeadSlots, type KeptPicture } from "../computer/head";
+import { ToolOneClickButton } from "../devices/ToolOneClick";
 import { ErrorState, LoadingList } from "../Loading";
 import { useOrg } from "../org-context";
 import { BrowserCard } from "./BrowserCard";
+import "../computer/computer.css";
 import "./browser.css";
 
 const errorCode = (err: unknown) => (err as { code?: string } | null)?.code;
@@ -251,26 +257,131 @@ function DeleteDialog({ profile, onClose }: { profile: BrowserProfile; onClose: 
   );
 }
 
-/** A profile's live view, in control ("Fazer login") or watching ("Assistir"), in a dialog over the page. */
-function ProfileView({ profile, onClose }: { profile: BrowserProfile; onClose: () => void }) {
+/**
+ * A profile's live view, in control ("Fazer login") or watching ("Assistir"), in the computer dialog's frame: the page
+ * fills it and the card's head is the dialog's head, so the profile's name shows once, in the title.
+ */
+function ProfileView({
+  profile,
+  machine,
+  onClose,
+}: {
+  profile: BrowserProfile;
+  machine: Machine;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
+  const [sub, setSub] = useState<HTMLElement | null>(null);
+  const [acts, setActs] = useState<HTMLElement | null>(null);
+  const [full, setFull] = useState(false);
+  const picture = useRef<KeptPicture | null>(null);
+  const { said, say } = useSaid();
+  const head: DialogHeadSlots = {
+    sub,
+    actions: acts,
+    full,
+    setFull,
+    watching: "",
+    say: (text) => say(text, true),
+    picture,
+  };
+  // Opened from "Assistir" while an agent has it, else from "Fazer login".
+  const watching = profile.holder?.type === "agent";
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()} title={profile.name} closeLabel={t("common.close")} width={960}>
-      <DialogBody>
-        <BrowserCard
-          agentId={`profile:${profile.id}`}
-          name={profile.name}
-          onFold={onClose}
-          profile={{
-            id: profile.id,
-            name: profile.name,
-            agentIds: profile.agentIds,
-            canDrive: canDo(org, "manage_connectors") && canDo(org, "control_browsers"),
-          }}
-        />
-      </DialogBody>
+    <Dialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={
+        watching
+          ? t("browser.profiles.watch", { name: profile.name })
+          : t("browser.profiles.loginTitle", { name: profile.name })
+      }
+      subtitle={
+        <>
+          {said && (
+            <span key={said.at} className="cmp-said ac-iconline" role="alert">
+              <Icon name="alert" size={14} />
+              <span>{said.text}</span>
+            </span>
+          )}
+          <span ref={setSub} className="cmp-sub" hidden={said !== null} />
+        </>
+      }
+      actions={<span ref={setActs} className="cmp-acts ac-acts" />}
+      closeLabel={t("common.close")}
+      width={1280}
+      className={cx("cmp-dialog", full && "is-full")}
+    >
+      <DialogHeadContext.Provider value={head}>
+        <div className="cmp-body">
+          <BrowserCard
+            agentId={`profile:${profile.id}`}
+            name={profile.name}
+            onFold={onClose}
+            surface
+            profile={{
+              id: profile.id,
+              name: profile.name,
+              agentIds: profile.agentIds,
+              canDrive: canDo(org, "manage_connectors") && canDo(org, "control_browsers"),
+              machine,
+            }}
+          />
+          <div className="cmp-steps-row" />
+        </div>
+      </DialogHeadContext.Provider>
     </Dialog>
+  );
+}
+
+/** Why "Fazer login" didn't open, under the profile's name, with the one way out (ADR 0036 §8). */
+type Refusal = { kind: "refused"; err: unknown } | { kind: "turningOn" };
+
+function RefusalLine({
+  refusal,
+  machine,
+  pending,
+  onRetry,
+}: {
+  refusal: Refusal;
+  machine: Machine;
+  pending: boolean;
+  onRetry: () => void;
+}) {
+  const { t } = useTranslation();
+  let text: string;
+  let action: ReactNode = null;
+  if (refusal.kind === "turningOn") text = t("browser.profiles.turningOn", { machine: machine.name });
+  else {
+    text = profileRefusalLine(t, refusal.err);
+    const off = profileToolOff(refusal.err);
+    if (off)
+      action = (
+        <ToolOneClickButton
+          machineId={off.machineId}
+          machineName={off.machineName}
+          oneClick={off.oneClick}
+          tool={off.tool}
+          label={off.oneClick?.kind === "allow" ? t("browser.profiles.loginOn") : undefined}
+          onAllowed={onRetry}
+        />
+      );
+    else if (profileUnavailable(refusal.err))
+      action = (
+        <Button size="sm" icon="refresh" loading={pending} onClick={onRetry}>
+          {t("common.retry")}
+        </Button>
+      );
+  }
+  return (
+    <div className={cx("pf-line small", refusal.kind === "refused" && "is-refused")} role="status">
+      <span className="pf-line__text ac-iconline">
+        {refusal.kind === "turningOn" ? <Icon name="check" size={14} /> : <Icon name="alert" size={14} />}
+        <span>{text}</span>
+      </span>
+      {action}
+    </div>
   );
 }
 
@@ -295,14 +406,23 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
   const drive = manage && canDo(org, "control_browsers");
   const mine = (profiles.data ?? []).filter((p) => p.machineId === m.id);
   const outdated = m.browserProfiles === false;
+  const [refusals, setRefusals] = useState<Record<string, Refusal>>({});
+  const setRefusal = (id: string, r: Refusal | null) =>
+    setRefusals(({ [id]: _, ...rest }) => (r ? { ...rest, [id]: r } : rest));
   const login = (p: BrowserProfile) =>
     actions.takeover.mutate(p.id, {
-      onSuccess: (now) => setOpen({ kind: "view", profile: now }),
-      onError: (err) =>
-        toast.show(
-          (err as { status?: number }).status === 409 ? t("browser.profiles.busy") : t("browser.profiles.failed"),
-          "error",
-        ),
+      onSuccess: (now) => {
+        setRefusal(p.id, null);
+        setOpen({ kind: "view", profile: now });
+      },
+      onError: (err) => {
+        // A refusal with a cause stays on its row with its way out; anything else is a toast, as before.
+        if (profileToolOff(err) || profileUnavailable(err)) setRefusal(p.id, { kind: "refused", err });
+        else {
+          setRefusal(p.id, null);
+          toast.show(profileRefusalLine(t, err), "error");
+        }
+      },
     });
   return (
     <Card>
@@ -430,6 +550,21 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
                     </Menu>
                   )}
                 </span>
+                {refusals[p.id] && (
+                  <RefusalLine
+                    refusal={refusals[p.id] as Refusal}
+                    machine={m}
+                    pending={actions.takeover.isPending}
+                    onRetry={() => {
+                      if (
+                        refusals[p.id]?.kind === "refused" &&
+                        profileToolOff((refusals[p.id] as { err: unknown }).err)
+                      )
+                        setRefusal(p.id, { kind: "turningOn" });
+                      login(p);
+                    }}
+                  />
+                )}
               </div>
             );
           })}
@@ -449,7 +584,7 @@ export function BrowserProfilesCard({ machine: m }: { machine: Machine }) {
       {open?.kind === "rename" && <RenameProfileDialog profile={open.profile} onClose={() => setOpen(null)} />}
       {open?.kind === "agents" && <AgentsDialog profile={open.profile} onClose={() => setOpen(null)} />}
       {open?.kind === "delete" && <DeleteDialog profile={open.profile} onClose={() => setOpen(null)} />}
-      {open?.kind === "view" && <ProfileView profile={open.profile} onClose={() => setOpen(null)} />}
+      {open?.kind === "view" && <ProfileView profile={open.profile} machine={m} onClose={() => setOpen(null)} />}
     </Card>
   );
 }

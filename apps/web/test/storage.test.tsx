@@ -35,19 +35,40 @@ const poll = async (r: Rendered, times: number) => {
   }
 };
 
-const fillBucket = async (bucket: string) => {
-  const s = within(section());
-  await type(s.getByLabelText("Endpoint"), "https://s3.amazonaws.com");
-  await type(s.getByLabelText("Região"), "sa-east-1");
-  await type(s.getByLabelText("Bucket"), bucket);
-  await type(s.getByLabelText("Access key"), "AKIAEXAMPLE1234");
-  await type(s.getByLabelText("Secret"), "secret-value-9876");
+const ownStorage = () => within(section()).getByRole("radio", { name: /Seu próprio armazenamento/ });
+const dialog = (name?: string) => screen().getByRole("dialog", name ? { name } : {});
+const footer = (name: string) => within(dialog()).getByRole("button", { name });
+const fieldLabels = () => [...dialog().querySelectorAll(".ac-field__label")].map((l) => l.textContent);
+const openConnect = async () => {
+  await click(ownStorage());
+  await click(within(section()).getByRole("button", { name: "Conectar um armazenamento" }));
+  await settle(2);
 };
-const testConnection = async () => {
-  await click(within(section()).getByRole("button", { name: "Testar conexão" }));
+const pick = async (service: string) => {
+  await click(within(dialog()).getByRole("button", { name: new RegExp(service) }));
+  await settle(2);
+};
+const R2_ENDPOINT = "https://4f1c0a7e.r2.cloudflarestorage.com";
+const fillR2 = async (bucket: string) => {
+  const d = within(dialog());
+  await type(d.getByLabelText("Nome do bucket"), bucket);
+  await type(d.getByLabelText("ID da chave de acesso"), "AKIAEXAMPLE1234");
+  await type(d.getByLabelText("Chave de acesso secreta"), "secret-value-9876");
+  await type(d.getByLabelText("Endereço do R2"), R2_ENDPOINT);
+};
+const testConnection = async (name = "Testar conexão") => {
+  await click(footer(name));
   await settle(4);
 };
-const activate = () => within(section()).getByRole("button", { name: "Ativar" });
+/** "Connect storage" → Cloudflare R2 → the fields → test → Activate. */
+const connectR2 = async (bucket: string) => {
+  await openConnect();
+  await pick("Cloudflare R2");
+  await fillR2(bucket);
+  await testConnection();
+  await click(footer("Ativar"));
+  await settle(4);
+};
 
 describe("Configurações → Armazenamento", () => {
   test("members don't see it", async () => {
@@ -186,7 +207,7 @@ describe("Configurações → Armazenamento", () => {
     ]);
   });
 
-  test("on its own bucket, that option says what the bucket holds; picked and not saved, the line stays put", async () => {
+  test("on its own storage, that option says its service, bucket and what it holds; picked and not saved, the line stays put", async () => {
     await go(
       seedState({
         storageUsage: {
@@ -197,15 +218,13 @@ describe("Configurações → Armazenamento", () => {
       }),
     );
     const server = () => within(section()).getByRole("radio", { name: /Este servidor/ });
-    const bucket = () => within(section()).getByRole("radio", { name: /Seu próprio bucket/ });
-    await click(bucket());
+    await click(ownStorage());
     expect(linesOf(server())).toEqual(["Os arquivos ficam no disco dele.", "2 GB de arquivos · 40 GB livres no disco"]);
-    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3."]);
-    await fillBucket("acme-arquivos");
-    await testConnection();
-    await click(activate());
-    await settle(4);
-    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "1,2 GB de arquivos"]);
+    expect(linesOf(ownStorage())).toEqual(["Cloudflare R2, Amazon S3, Backblaze B2 ou outro compatível com S3."]);
+    // Picked, it offers the dialog: none of the bucket's fields on the page.
+    expect(within(section()).queryByLabelText("Endpoint")).toBeNull();
+    await connectR2("acme-arquivos");
+    expect(linesOf(ownStorage())).toEqual(["Cloudflare R2 · acme-arquivos", "1,2 GB de arquivos"]);
     expect(linesOf(server())).toEqual(["Os arquivos ficam no disco dele."]);
   });
 
@@ -249,63 +268,187 @@ describe("Configurações → Armazenamento", () => {
     }
   });
 
-  test("a failing step shows its error; Ativar waits for a passing test of the same settings", async () => {
+  test("Connect storage lists the services; each one's steps ask only for its own fields", async () => {
+    await go();
+    await openConnect();
+    const list = dialog("Onde fica o seu armazenamento?");
+    expect([...list.querySelectorAll(".storage-pick__name")].map((n) => n.textContent)).toEqual([
+      "Cloudflare R2",
+      "Amazon S3",
+      "Backblaze B2",
+      "Outro",
+    ]);
+    // No native Google Drive or OneDrive is coming (they connect through Conectores): never promised here either.
+    expect(list.textContent).not.toMatch(/Google Drive|OneDrive/);
+
+    await pick("Cloudflare R2");
+    expect(fieldLabels()).toEqual([
+      "Nome do bucket",
+      "ID da chave de acesso",
+      "Chave de acesso secreta",
+      "Endereço do R2",
+    ]);
+    // Under each field, what Cloudflare calls it; its page opens in a new tab.
+    expect(dialog().textContent).toContain("No Cloudflare: Access Key ID");
+    const r2 = within(dialog()).getByRole("link", { name: "Abrir o R2" });
+    expect(r2.getAttribute("target")).toBe("_blank");
+    expect(r2.getAttribute("href")).toStartWith("https://dash.cloudflare.com/");
+
+    await click(footer("Voltar"));
+    await pick("Amazon S3");
+    expect(fieldLabels()).toEqual(["Nome do bucket", "Região", "ID da chave de acesso", "Chave de acesso secreta"]);
+    // The policy waits for the bucket's name, then copies one that reaches that bucket alone.
+    let clip = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (v: string) => {
+          clip = v;
+        },
+      },
+    });
+    expect(within(dialog()).getByRole("button", { name: "Copiar a política" }).hasAttribute("disabled")).toBe(true);
+    await type(within(dialog()).getByLabelText("Nome do bucket"), "acme-arquivos");
+    await click(within(dialog()).getByRole("button", { name: "Copiar a política" }));
+    await settle(2);
+    expect(JSON.parse(clip).Statement[0].Resource).toBe("arn:aws:s3:::acme-arquivos");
+    expect(document.body.textContent).toContain("Política copiada, com o bucket acme-arquivos.");
+    // Tested with no region: it says so.
+    await testConnection();
+    expect(within(dialog()).getByText("Escolha a região")).toBeTruthy();
+    expect(dialog().textContent).toContain("Preencha este campo.");
+
+    await click(footer("Voltar"));
+    await pick("Backblaze B2");
+    // Another service is a new form: the bucket typed for Amazon S3 isn't here.
+    expect((within(dialog()).getByLabelText("Nome do bucket") as HTMLInputElement).value).toBe("");
+    expect(fieldLabels()).toEqual([
+      "Nome do bucket",
+      "Endpoint do bucket",
+      "ID da chave de acesso",
+      "Chave de acesso secreta",
+    ]);
+    expect(dialog().textContent).toContain("A chave principal da conta (master key) não funciona aqui.");
+
+    await click(footer("Voltar"));
+    await pick("Outro");
+    expect(fieldLabels()).toEqual(["Endpoint", "Região", "Bucket", "Prefixo (opcional)", "Access key", "Secret"]);
+    expect(within(dialog()).getByLabelText("Estilo de caminho")).toBeTruthy();
+  });
+
+  test("a failing step reads by its code with what to check there; Ativar waits for a passing test of the same settings", async () => {
     const { api } = await go();
-    await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
-    expect(activate().hasAttribute("disabled")).toBe(true);
-    // Until the bucket is saved, the server's option says it's still the one in use, on its title's line: the
+    await click(ownStorage());
+    // Until the storage is saved, the server's option says it's still the one in use, on its title's line: the
     // description under them keeps the card's whole width.
     const inUse = () =>
       [...section().querySelectorAll(".ac-option__head")].filter((h) => h.textContent?.endsWith("Em uso"));
     expect(inUse().map((h) => h.textContent)).toEqual(["Este servidorEm uso"]);
     expect(inUse()[0]?.nextElementSibling?.textContent).toBe("Os arquivos ficam no disco dele.");
 
+    await openConnect();
+    await pick("Cloudflare R2");
+    expect(within(dialog()).queryByRole("button", { name: "Ativar" })).toBeNull();
     // Empty form: the test does not run, fields explain why.
     await testConnection();
-    expect(section().textContent).toContain("Preencha este campo.");
-    expect(section().textContent).toContain("Informe a access key e o secret.");
+    expect(dialog().textContent).toContain("Preencha este campo.");
+    expect(dialog().textContent).toContain("Informe as duas chaves.");
 
-    await fillBucket("acme-negado");
+    await fillR2("acme-negado");
     await testConnection();
-    const steps = within(section()).getByRole("region", { name: "Resultado do teste" });
+    const steps = within(dialog()).getByRole("region", { name: "Resultado do teste" });
     const write = steps.querySelector('[data-step="write"]');
     expect(write?.textContent).toContain("Escrever");
     expect(write?.textContent).toContain("Falhou");
-    expect(write?.textContent).toContain("AccessDenied: a chave não pode escrever neste bucket.");
+    // The reason in the person's language, by its code, never the server's English.
+    expect(write?.textContent).toContain("A chave não tem permissão para esta etapa.");
+    expect(write?.textContent).not.toContain("no permission");
     expect(steps.querySelector('[data-step="read"]')?.textContent).toContain("Não testado");
-    expect(steps.textContent).toContain("A conexão não passou no teste.");
-    expect(activate().hasAttribute("disabled")).toBe(true);
+    expect(text(steps)).toContain(
+      "No Cloudflare, confira se o token tem a permissão Object Read & Write e acesso ao bucket acme-negado.",
+    );
+    expect(footer("Testar de novo")).toBeTruthy();
 
-    await type(within(section()).getByLabelText("Bucket"), "acme-arquivos");
-    expect(section().textContent).toContain("As configurações mudaram. Teste de novo antes de ativar.");
+    await type(within(dialog()).getByLabelText("Nome do bucket"), "acme-arquivos");
+    expect(dialog().textContent).toContain("As configurações mudaram. Teste de novo antes de ativar.");
     await testConnection();
-    const ok = within(section()).getByRole("region", { name: "Resultado do teste" });
-    for (const step of ["write", "read", "list", "delete"]) {
-      expect(ok.querySelector(`[data-step="${step}"]`)?.textContent).toContain("Funcionou");
-    }
-    expect(activate().hasAttribute("disabled")).toBe(false);
+    expect(dialog().textContent).toContain(
+      "Conexão funcionando: gravamos, lemos, listamos e apagamos um arquivo de teste.",
+    );
+    expect(dialog().textContent).toContain(
+      "Arquivos antigos continuam onde estão. Novos arquivos vão para o seu bucket.",
+    );
+    expect(
+      within(dialog()).queryByRole("region", { name: "Resultado do teste" })?.querySelector("[data-step]"),
+    ).toBeFalsy();
 
-    // Changing anything asks for a new test.
-    await click(within(section()).getByLabelText("Estilo de caminho"));
-    expect(activate().hasAttribute("disabled")).toBe(true);
-    await click(within(section()).getByLabelText("Estilo de caminho"));
-    expect(activate().hasAttribute("disabled")).toBe(false);
-
-    await click(activate());
+    // Changing anything asks for a new test; changing it back finds the test that passed.
+    await type(within(dialog()).getByLabelText("ID da chave de acesso"), "AKIAEXAMPLE1235");
+    expect(within(dialog()).queryByRole("button", { name: "Ativar" })).toBeNull();
+    await type(within(dialog()).getByLabelText("ID da chave de acesso"), "AKIAEXAMPLE1234");
+    await click(footer("Ativar"));
     await settle(4);
-    const s = section();
+
+    expect(screen().queryByRole("dialog")).toBeNull();
+    expect(document.body.textContent).toContain("Armazenamento trocado para o seu bucket.");
     expect(inUse()).toEqual([]);
-    expect(s.textContent).toContain("Arquivos antigos continuam onde estão. Novos arquivos vão para o seu bucket.");
-    expect(s.textContent).toContain("Usando acme-arquivos em https://s3.amazonaws.com.");
-    // Keys are masked: only hints, inputs empty.
-    expect(s.textContent).toContain("Salva, termina em 1234. Deixe em branco para manter.");
-    expect(s.textContent).toContain("Salva, termina em 9876.");
-    expect((within(s).getByLabelText("Secret") as HTMLInputElement).value).toBe("");
-    expect(within(s).getByLabelText("Secret").getAttribute("type")).toBe("password");
-    expect(s.textContent).not.toContain("secret-value-9876");
     const config = await api.storage.get(ORG_ID);
-    expect(config.kind).toBe("s3");
+    // What the server got: R2's endpoint, region auto and path-style, filled in by the app.
+    expect(config.s3).toMatchObject({
+      provider: "r2",
+      endpoint: R2_ENDPOINT,
+      region: "auto",
+      bucket: "acme-arquivos",
+      pathStyle: true,
+    });
     expect(JSON.stringify(config)).not.toContain("secret-value");
+    expect(document.body.textContent).not.toContain("secret-value-9876");
+  });
+
+  test("Edit connection opens the saved service's steps, the keys blank and kept until replaced", async () => {
+    await go();
+    await connectR2("acme-arquivos");
+    await click(within(section()).getByRole("button", { name: "Editar conexão" }));
+    await settle(2);
+    const d = within(dialog("Editar o Cloudflare R2"));
+    expect((d.getByLabelText("Nome do bucket") as HTMLInputElement).value).toBe("acme-arquivos");
+    expect((d.getByLabelText("Endereço do R2") as HTMLInputElement).value).toBe(R2_ENDPOINT);
+    // Keys are masked: only hints, inputs empty.
+    const secret = d.getByLabelText("Chave de acesso secreta") as HTMLInputElement;
+    expect(secret.value).toBe("");
+    expect(secret.getAttribute("type")).toBe("password");
+    expect(dialog().textContent).toContain("Salva, termina em 1234. Deixe em branco para manter.");
+    expect(dialog().textContent).toContain("Salva, termina em 9876.");
+    // Blank keys are the saved ones: the test runs without them, then the main button saves.
+    await testConnection();
+    expect(footer("Salvar bucket")).toBeTruthy();
+    await click(footer("Cancelar"));
+    await settle(2);
+    expect(screen().queryByRole("dialog")).toBeNull();
+  });
+
+  test("storage saved before the service was said: named by its address, edited with today's fields", async () => {
+    const api = createFakeApi(seedState());
+    const s3 = {
+      endpoint: "https://minio.acme.test",
+      region: "us-east-1",
+      bucket: "acme-antigo",
+      prefix: null,
+      pathStyle: true,
+      accessKeyId: "AKOLD1111",
+      secretAccessKey: "old-secret-2222",
+    };
+    await api.storage.test(ORG_ID, s3);
+    await api.storage.save(ORG_ID, { kind: "s3", s3 });
+    await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
+    await settle(5);
+    expect(linesOf(ownStorage())[0]).toBe("acme-antigo em minio.acme.test");
+    await click(within(section()).getByRole("button", { name: "Editar conexão" }));
+    await settle(2);
+    expect(fieldLabels()).toEqual(["Endpoint", "Região", "Bucket", "Prefixo (opcional)", "Access key", "Secret"]);
+    expect((within(dialog("Editar o armazenamento")).getByLabelText("Endpoint") as HTMLInputElement).value).toBe(
+      "https://minio.acme.test",
+    );
   });
 
   test("copy existing files shows progress, stops, resumes and finishes", async () => {
@@ -314,13 +457,8 @@ describe("Configurações → Armazenamento", () => {
         storageUsage: { platformBytes: 2 * GB, ownBucketBytes: 0, disk: { sizeBytes: 100 * GB, freeBytes: 40 * GB } },
       }),
     );
-    await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
-    await fillBucket("acme-instavel");
-    await testConnection();
-    await click(activate());
-    await settle(4);
-    const bucket = () => within(section()).getByRole("radio", { name: /Seu próprio bucket/ });
-    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "Nenhum arquivo"]);
+    await connectR2("acme-instavel");
+    expect(linesOf(ownStorage())).toEqual(["Cloudflare R2 · acme-instavel", "Nenhum arquivo"]);
     await click(within(section()).getByRole("button", { name: "Copiar arquivos existentes" }));
     await settle(2);
     expect(within(section()).getByRole("meter", { name: "Progresso da cópia" })).toBeTruthy();
@@ -336,7 +474,7 @@ describe("Configurações → Armazenamento", () => {
     expect(within(section()).getByRole("meter").getAttribute("aria-valuenow")).toBe("120");
     // The bucket's card says what the copy took there, without reopening the page.
     await settle(3);
-    expect(linesOf(bucket())).toEqual(["S3, R2, MinIO e outros compatíveis com S3.", "2 GB de arquivos"]);
+    expect(linesOf(ownStorage())).toEqual(["Cloudflare R2 · acme-instavel", "2 GB de arquivos"]);
   });
 
   test("switch back to this server after confirming, or to agentes storage on the Cloud", async () => {
@@ -346,11 +484,7 @@ describe("Configurações → Armazenamento", () => {
       if (cloud) fakeMachinesOf.get(api)?.setSetup({ state: "ready", machineId: "machine_1" });
       await renderApp(`/org/${ORG_ID}/settings/storage`, { api });
       await settle(5);
-      await click(within(section()).getByRole("radio", { name: /Seu próprio bucket/ }));
-      await fillBucket("acme-arquivos");
-      await testConnection();
-      await click(activate());
-      await settle(4);
+      await connectR2("acme-arquivos");
       return api;
     };
     const api = await back(false);

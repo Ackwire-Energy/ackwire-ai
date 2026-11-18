@@ -16,7 +16,7 @@ import {
 import { caches } from "./cache";
 import { agentSearchChannels, enqueueIndex, registerDocumentBuilder, registerReindexSource } from "./search";
 import { maskCredentials } from "./tool-detail";
-import { toolKind } from "./tools/run-policy";
+import { opensPullRequest, toolKind } from "./tools/run-policy";
 import type { ToolDefinition } from "./tools/types";
 import { untrustedBlock } from "./untrusted";
 import { isPersonalWorkspace } from "./workspace-mode";
@@ -38,7 +38,7 @@ const SUMMARY_CHARS = 300;
 
 // ── What counts ───────────────────────────────────────────────────────────
 
-/** Built-in tools that act outside though the policy table files them as internal work. */
+/** Tools that act outside though the policy table files them as internal work; a connected app's pull request too. */
 const OUTSIDE_BY_NAME = new Set(["open_pull_request"]);
 
 /**
@@ -47,7 +47,7 @@ const OUTSIDE_BY_NAME = new Set(["open_pull_request"]);
  * deleting mail touches nobody outside.
  */
 export function isOutsideTool(tool: Pick<ToolDefinition, "name" | "scope" | "connectionId" | "sensitive">): boolean {
-  if (OUTSIDE_BY_NAME.has(tool.name)) return true;
+  if (OUTSIDE_BY_NAME.has(tool.name) || opensPullRequest(tool)) return true;
   if (tool.scope.startsWith("mail:")) return tool.scope === "mail:send";
   return toolKind(tool).kind === "external";
 }

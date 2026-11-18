@@ -83,8 +83,13 @@ test("the name, its time and the clocks beside the words follow the step too", (
   }
   // A grouped row's time and check, my bubble's bar and Compacta's clock and face sit on the words' first line.
   expect(last(".ac-msg__gutter-time", "line-height")).toBe("var(--msg-line)");
-  expect(last(".ac-msg__aside--floating", "line-height")).toBe("var(--msg-line)");
+  expect(last(".ac-msg__gutter--aside > .ac-msg__aside", "line-height")).toBe("var(--msg-line)");
   expect(last(".ac-msg__clock", "top")).toContain("var(--msg-line)");
+  // A time never takes two lines, at any size: Compacta's clock grows leftwards into the row's start instead.
+  expect(last(".ac-msg__clock", "white-space")).toBe("nowrap");
+  expect(last(".ac-msg__clock", "width")).toBeUndefined();
+  expect(last(".ac-msg__gutter-time", "white-space")).toBe("nowrap");
+  expect(last(".ac-msg__gutter--aside > .ac-msg__gutter-time", "white-space")).toBeUndefined();
   expect(last('.ac-msg[data-look="compact"] .ac-msg__avatar', "top")).toContain("var(--msg-line)");
   expect(last('.ac-msg[data-look="compact"]', "min-height")).toBe("var(--msg-line)");
   // Half of the kit's 28px icon button under that middle.

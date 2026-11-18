@@ -80,7 +80,17 @@ describe("geometry check", () => {
     const rules = readFileSync(join(import.meta.dir, "rules.js"), "utf8");
     const check = readFileSync(join(import.meta.dir, "check.ts"), "utf8");
     for (const rule of ["floating", "inset", "icongap", "square"]) expect(SELF_TESTED).toContain(rule);
-    for (const rule of ["squarecol", "rim", "inlinebase", "iconmid", "fieldwidth", "corner", "clip", "cascadeorder"])
+    for (const rule of [
+      "squarecol",
+      "rim",
+      "inlinebase",
+      "iconmid",
+      "fieldwidth",
+      "corner",
+      "nest",
+      "clip",
+      "cascadeorder",
+    ])
       expect(SELF_TESTED).toContain(rule);
     for (const rule of ["pagetop", "groupedge", "menuitem", "rowpad", "emptyselect", "toolorder", "toolrow", "captop"])
       expect(SELF_TESTED).toContain(rule);
@@ -101,15 +111,32 @@ describe("geometry check", () => {
       expect(SELF_TESTED).toContain(rule);
     // A calendar item never covers another: what meets sits beside it.
     expect(SELF_TESTED).toContain("calstack");
+    // The working line's stop is at its end before its time comes, not beside its words.
+    expect(SELF_TESTED).toContain("barend");
     // A task card's line of facts wraps between facts, never inside one.
     for (const twin of ["bad-factwrap--line", "good-factwrap--line"]) expect(fixture).toContain(twin);
     // A title in a row that wraps a word a line is squeezed; one long address wrapping its full lines is not.
     for (const twin of ["bad-wordwrap--row", "good-wordwrap--url"]) expect(fixture).toContain(twin);
+    // A dialog's quiet line touches no bubble of the page behind it; on a bubble of its own dialog it does.
+    for (const twin of ["good-quiet--layers", "bad-quiet--dialog"]) expect(fixture).toContain(twin);
+    // A kit button's words sit in its label: cut by a box around it the button is named, ended by its own "…" nothing is.
+    for (const twin of ["bad-clipped--label", "good-clipped--label"]) expect(fixture).toContain(twin);
     expect(rules).toContain('".ac-facts__value, .ac-factline__fact"');
     // A word broken at its syllables in a box that hyphenates (a narrow calendar item's title) is no midword.
     expect(fixture).toContain("good-midword--hyphens");
+    // Hidden lines and unavoidable token wraps are sound; visible ordinary-word fragments still fail.
+    for (const twin of [
+      "good-midword--folded",
+      "good-midword--unbreakable",
+      "bad-midword--clipped",
+      "bad-midword--mixed",
+      "bad-midword--hiddenwords",
+    ])
+      expect(fixture).toContain(twin);
     // The face on a menu's top that changes the photo (`MenuFace`) is no row: neither its height nor its room.
     for (const twin of ["good-menuitem--face", "good-rim--face"]) expect(fixture).toContain(twin);
+    // A chip field grown to a second line of tokens is still the stack's height on its first.
+    expect(fixture).toContain("good-fieldwidth--grown");
     for (const rule of SELF_TESTED) {
       expect(fixture).toContain(`bad-${rule}`);
       expect(fixture).toContain(`good-${rule}`);
@@ -156,7 +183,7 @@ describe("geometry check", () => {
     // Stacked, the top row keeps the search at its floor beside the actions, or the search takes it alone (`split`).
     for (const part of [
       'querySelector(":scope > .ac-toolbar__actions")',
-      "floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5",
+      "floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth - 0.5",
       '"data-stack", topRowFits(',
     ]) {
       expect(rules).toContain(part);

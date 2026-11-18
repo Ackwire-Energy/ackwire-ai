@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import type { SkyPair } from "../agent/engine.js";
 import { BRAND_NAME, PIXEL_MARK_VIEWBOX, pixelMarkRuns } from "../brand/ackwire";
 import { cx } from "../cx";
 
@@ -7,15 +8,25 @@ const RUNS = pixelMarkRuns();
 
 /**
  * The Ackwire "A" in the app's pixel style: the monogram's three arched bands, in the theme's Ackwire green, or in
- * the ink in the mono logo. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
+ * the ink in the mono logo. `sky` supplies another workspace's accent without changing the monogram. A square mark: the favicon, the app icon and a workspace without a logo of its own wear it.
  */
-export function LogoMark({ size, className, label }: { size?: number; className?: string; label?: string }) {
+export function LogoMark({
+  size,
+  className,
+  label,
+  sky,
+}: {
+  size?: number;
+  className?: string;
+  label?: string;
+  sky?: SkyPair;
+}) {
   return (
     <svg
       viewBox={PIXEL_MARK_VIEWBOX}
       shapeRendering="crispEdges"
       className={cx("ac-logo__mark", className)}
-      style={size ? { width: size, height: size } : undefined}
+      style={{ width: size, height: size, "--logo-accent": sky?.[1] } as CSSProperties}
       role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}

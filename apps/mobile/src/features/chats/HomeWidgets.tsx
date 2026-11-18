@@ -1,12 +1,13 @@
-import { useHomeBoard, type Widget } from "@agenteschat/client";
+import { frozenBoard, useHomeBoard, type Widget } from "@agenteschat/client";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
-import { Icon, Text, useTheme } from "@/ui";
+import { useOrg } from "@/providers/org";
+import { Icon, RowPressable, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
 import { WidgetPeek } from "../dashboards/WidgetPeek";
-import { useColors, useOrgId } from "../shared/hooks";
+import { useColors } from "../shared/hooks";
 import { CollapsibleSection } from "./HomeSection";
 
 /** A widget's width on the strip: two show whole and the third peeks past the edge, so it reads as one that scrolls. */
@@ -21,10 +22,10 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
   const { t } = useTranslation();
   const c = useColors();
   const { shadows } = useTheme();
-  const orgId = useOrgId();
+  const { orgId, org } = useOrg();
   const home = useHomeBoard(orgId);
   if (home.loading && !home.board) return null;
-  const board = home.board;
+  const board = home.board && frozenBoard(home.board, org);
   const title = home.chosenId ? (board?.title ?? home.chosenTitle ?? "") : t("dashboards.home");
   const widgets: Widget[] = board ? widgetsInOrder(board.widgets) : [];
   const canAdd = Boolean(board?.canEdit);
@@ -71,20 +72,18 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
           </Pressable>
         </ScrollView>
       ) : canAdd ? (
-        <Pressable
+        <RowPressable
+          // A full-width row: it lights a beat after the finger lands, as the list's rows do.
           onPress={add}
           accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.empty,
-            { borderColor: c.line2 ?? c.line },
-            pressed && { backgroundColor: c.sunken },
-          ]}
+          radius={EMPTY_RADIUS}
+          style={[styles.empty, { borderColor: c.line2 ?? c.line }]}
         >
           <Icon name="plus" size={18} color={c.muted} />
           <Text variant="subhead" tone="muted" style={styles.medium}>
             {t("widgets.add.label")}
           </Text>
-        </Pressable>
+        </RowPressable>
       ) : null}
     </CollapsibleSection>
   );
@@ -92,6 +91,9 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
 
 /** Between the cards: the lists' 12. */
 const GAP = 12;
+
+/** The "add a widget" box's corner; its press light keeps it. */
+const EMPTY_RADIUS = 20;
 
 const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
@@ -108,7 +110,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 16,
     paddingVertical: 20,
-    borderRadius: 20,
+    borderRadius: EMPTY_RADIUS,
     borderWidth: 1.5,
     borderStyle: "dashed",
   },

@@ -18,8 +18,9 @@ const RECENT_SESSIONS = 10;
 // In a select list over one table drizzle writes columns without their table, so in a subquery a bare
 // "id" would be the subquery's own: the outer workspace is named in full.
 const ORG_ID = sql.raw(`"organizations"."id"`);
+// The people a limit and a plan count (`OrgLimits.members`): outside collaborators (ADR 0191) are left out.
 const memberCount = sql<number>`(select count(*) from ${organizationMembers}
-  where ${organizationMembers.orgId} = ${ORG_ID})`.mapWith(Number);
+  where ${organizationMembers.orgId} = ${ORG_ID} and ${organizationMembers.outsideOf} is null)`.mapWith(Number);
 const agentCount = sql<number>`(select count(*) from ${agents}
   where ${agents.orgId} = ${ORG_ID} and ${agents.archivedAt} is null and ${agents.builtin} is null)`.mapWith(Number);
 
@@ -85,9 +86,12 @@ export async function operatorListOrgs(db: Database, query: OperatorOrgQuery) {
  * One workspace: its owners and admins, how much is in it, its limits (ADR 0079) with what it uses of them, and its
  * deletion and the operator's deletion hold, each null when there is none. Null when there is none with that id.
  */
-/** The operator API's role names (its contract): an owner, someone holding `administrator` (ADR 0085), a member. */
-const operatorRole = (orgId: unknown, userId: unknown) =>
-  sql<"owner" | "admin" | "member">`case when ${organizationMembers.role} = 'owner' then 'owner'
+/**
+ * The operator API's role names (its contract): an owner, someone holding `administrator` (ADR 0085), a member.
+ * `role`: the membership's own role column, when the query reads `organization_members` under an alias.
+ */
+export const operatorRole = (orgId: unknown, userId: unknown, role: unknown = organizationMembers.role) =>
+  sql<"owner" | "admin" | "member">`case when ${role} = 'owner' then 'owner'
     when ${maySql(orgId, userId, "administrator")} then 'admin' else 'member' end`;
 
 export async function operatorOrg(db: Database, orgId: string) {

@@ -138,6 +138,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         id: OLD_ACCOUNT,
         kind: "codex",
         label: "ChatGPT",
+        named: false,
         email: null,
         plan: null,
         status: "signed_out",
@@ -152,6 +153,11 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         keyHint: null,
         shared: false,
         providerOrgId: null,
+        serves: "everyone",
+        useOrder: null,
+        sameAs: OLD_ACCOUNT,
+        // A login for one agent is never a next account.
+        movable: false,
       },
     ],
     canManage: true,
@@ -192,7 +198,10 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   // Rename; the agent thinks with it, at high effort.
   const renamed = await api(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "Trabalho" } });
   expect(renamed.status).toBe(200);
-  expect(((await renamed.json()) as Account).label).toBe("Trabalho");
+  const named = (await renamed.json()) as Account & { named?: boolean };
+  expect(named.label).toBe("Trabalho");
+  // A name its owner gave it: the apps title the account by it, not by its email.
+  expect(named.named).toBe(true);
   expect((await api(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "" } })).status).toBe(400);
   expect((await asAdmin(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "Meu" } })).status).toBe(
     403,
@@ -368,6 +377,48 @@ test("refreshing plan usage: 202, the computer is asked to look the caller's acc
   await runner.changed([{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true, usage } as RunnerAccountInfo]);
   const listed = (await (await api(`/machines/${mac.machineId}/accounts`)).json()) as { accounts: Account[] };
   expect(listed.accounts[0]).toMatchObject({ id: OLD_ACCOUNT, ownerId, usage });
+});
+
+test("AI accounts see Codex become available after an executor update on the same connection", async () => {
+  const { api } = await workspace();
+  const computer = { ...RUNNER, os: "windows", arch: "x64", exec: true };
+  const { token, machineId } = await pairComputer(t, api, computer, { name: "PC" });
+  const hub = t.engine.machineHub;
+  const conn = hub.open({ send() {}, close() {} });
+  const report = (version: string) => ({ codex: { version: `codex-cli ${version}` } });
+  await hub.message(
+    conn,
+    JSON.stringify({
+      type: "hello",
+      token,
+      ...computer,
+      executors: report("0.149.0"),
+      accounts: [{ id: OLD_ACCOUNT, kind: "codex", loggedIn: true }],
+    }),
+  );
+  const read = async () => {
+    const res = await api("/ai-accounts");
+    expect(res.status).toBe(200);
+    return (await res.json()) as { computers: Record<string, unknown>[] };
+  };
+  expect(await read()).toMatchObject({
+    accounts: [{ id: OLD_ACCOUNT, machineId }],
+    computers: [
+      {
+        machineId,
+        brains: { codex: false },
+        off: { codex: "outdated" },
+        codexVersion: { detected: "0.149.0", minimum: "0.163.0" },
+      },
+    ],
+  });
+  await hub.message(conn, JSON.stringify({ type: "executors.changed", executors: report("0.169.0") }));
+  const updated = await read();
+  expect(updated).toMatchObject({
+    accounts: [{ id: OLD_ACCOUNT, machineId }],
+    computers: [{ machineId, brains: { codex: true } }],
+  });
+  expect(updated.computers[0]).not.toHaveProperty("codexVersion");
 });
 
 test("Contas de IA: the caller's own accounts with their computer, and where they can add one; an unknown plan is refused", async () => {

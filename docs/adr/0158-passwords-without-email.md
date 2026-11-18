@@ -41,3 +41,5 @@ only be added to an account that had none.
   and the operator through the command line.
 - An owner who can make a link can sign in as that member until they notice; the audit log and the rule about other
   workspaces bound it.
+- The desktop app's owner needs no password to delete a workspace or the account either: a fresh Continue on this Mac
+  is the proof there (ADR 0088 §2, amended 2026-11-14).

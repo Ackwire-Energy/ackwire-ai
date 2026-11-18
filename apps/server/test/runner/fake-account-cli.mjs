@@ -23,7 +23,9 @@ const args = process.argv.slice(2).join(" ");
 // Each reads only its own variable, as the real CLIs do (`auth …` is Claude Code, the rest Codex): a
 // CLAUDE_CONFIG_DIR inherited from the shell (set when tests run inside Claude Code) must not move Codex's folder.
 const claude = args.startsWith("auth ") || args === "setup-token";
-const home = (claude ? process.env.CLAUDE_CONFIG_DIR : process.env.CODEX_HOME) ?? "";
+// Grok Build's own variables (`GROK_HOME`), and its `login --device-auth`, as Codex's has the same name.
+const grok = !claude && process.env.GROK_HOME !== undefined;
+const home = (claude ? process.env.CLAUDE_CONFIG_DIR : grok ? process.env.GROK_HOME : process.env.CODEX_HOME) ?? "";
 const marker = path.join(home, "signed-in");
 const mode = process.env.FAKE_ACCOUNT_MODE ?? "";
 const log = process.env.FAKE_ACCOUNT_LOG;
@@ -99,14 +101,11 @@ switch (args.replace(/^auth login --email \S+$/, "auth login")) {
         `${ESC}[2m${drawn("Use this token by setting: export CLAUDE_CODE_OAUTH_TOKEN=<token>")}${ESC}[22m`,
         "",
       ].join("\r\n");
-      // In two writes, cut inside the token's line: what was read so far shows half a token.
+      // In two writes, cut inside the token's line: what was read so far shows half a token. The screen goes away
+      // as the CLI ends, in the same write as the token's rest: what a reader that falls behind gets in one piece.
       const half = screen.indexOf(FAKE_TOKEN.slice(cut));
       process.stdout.write(screen.slice(0, half));
-      setTimeout(() => {
-        process.stdout.write(screen.slice(half));
-        // The screen goes away as the CLI ends.
-        setTimeout(() => end(0, `${ESC}[2J${ESC}[H`), 100);
-      }, 100);
+      setTimeout(() => end(0, `${screen.slice(half)}${ESC}[2J${ESC}[H`), 100);
     });
     break;
   }
@@ -136,6 +135,45 @@ switch (args.replace(/^auth login --email \S+$/, "auth login")) {
   case "login --device-auth": {
     if (mode === "silent") {
       waitForever();
+      break;
+    }
+    if (grok) {
+      process.stdout.write(
+        [
+          "",
+          "To sign in, open this link in your browser and enter the code below.",
+          "",
+          `  ${ESC}[94mhttps://grok.com/device?user_code=KJ4D-9QRS${ESC}[0m`,
+          "",
+          `  Code: ${ESC}[94mKJ4D-9QRS${ESC}[0m`,
+          "",
+        ].join("\n"),
+      );
+      // The person enters the code elsewhere; Grok Build writes its sign-in store and finishes by itself.
+      setTimeout(
+        () => {
+          if (mode === "fail") return end(1, "Error: the device code expired\n", process.stderr);
+          writeFileSync(marker, "");
+          writeFileSync(
+            path.join(home, "auth.json"),
+            JSON.stringify({
+              "https://accounts.x.ai/sign-in": {
+                key: "fake-grok-access",
+                auth_mode: "oidc",
+                create_time: new Date(Date.now() - 3600_000).toISOString(),
+                user_id: "grok-user-fake",
+                email: "grok@acme.test",
+                coding_data_retention_opt_out: true,
+                refresh_token: "fake-grok-refresh-1",
+                expires_at: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+              },
+            }),
+            { mode: 0o600 },
+          );
+          end(0, "Signed in to Grok.\n", process.stderr);
+        },
+        Number(process.env.FAKE_CODEX_DELAY ?? 300),
+      );
       break;
     }
     process.stdout.write(
@@ -208,9 +246,17 @@ switch (args.replace(/^auth login --email \S+$/, "auth login")) {
     if (existsSync(marker)) end(0, "Logged in using ChatGPT\n", process.stderr);
     else end(1, "Not logged in\n", process.stderr);
     break;
+  case "models":
+    // Grok Build's status look (`parseGrokStatus`): it says it isn't signed in, or says nothing against it.
+    if (existsSync(path.join(home, "auth.json")))
+      end(0, "You are logged in with grok.com.\n\nDefault model: grok-4.6\n");
+    else end(0, "You are not authenticated.\n\nDefault model: grok-4.6\n");
+    break;
   case "auth logout":
   case "logout":
     rmSync(marker, { force: true });
+    // Grok Build's sign-in store is the whole folder's credential; the runner removes the folder, this clears it.
+    if (grok) rmSync(path.join(home, "auth.json"), { force: true });
     end(0, "Successfully logged out\n");
     break;
   default:

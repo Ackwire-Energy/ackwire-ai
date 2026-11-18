@@ -56,7 +56,7 @@ checks local address type separately from the marked policy route. The
 [IPv6 FIB implementation](https://kernel.googlesource.com/pub/scm/linux/kernel/git/stable/linux-stable/+/4fa048ed72531d6c2a2147fa9b52b6a5451213a2/net/ipv6/netfilter/nft_fib_ipv6.c)
 also only includes the packet mark when explicitly requested.
 
-When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before `runuser`, after the optional network launcher.
+When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before the step that becomes the agent, after the optional network launcher.
 This also covers deployments using marked routing without a namespace launcher. The kernel bind self-check
 uses the same restriction. Existing processes must be drained or restarted before relying on it.
 

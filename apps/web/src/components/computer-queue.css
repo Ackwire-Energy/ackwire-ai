@@ -165,6 +165,13 @@ html:not([data-pointer]) .cq__open:focus-visible {
   font-size: 13px;
   line-height: 18px;
 }
+/* "Conferido há 4 min": quiet, before the note's actions, its icon on the words' middle. */
+.cq__checked {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--muted);
+}
 .cq__text > .cq-first {
   margin-top: 4px;
 }
@@ -181,6 +188,12 @@ html:not([data-pointer]) .cq__open:focus-visible {
 :where(:not(.ac-msg__body)) > .cq-turn__say {
   margin: 0;
 }
+.cq-turn__cause {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
+}
 .cq-turn__acts {
   display: flex;
   flex-wrap: wrap;
@@ -189,6 +202,12 @@ html:not([data-pointer]) .cq__open:focus-visible {
 }
 .cq-turn__acts:empty {
   display: none;
+}
+/* "Parar <agent>" carries a name of any length: it wraps instead of pushing past the row. */
+.cq-turn__stop {
+  min-width: 0;
+  white-space: normal;
+  text-align: start;
 }
 
 /* Under a message that called several agents. */
@@ -455,4 +474,49 @@ html:not([data-pointer]) .uq__open:focus-visible {
   .uq__row[data-two] .uq__act {
     padding-top: 0;
   }
+}
+
+/* "More computers, shorter line": the viewer's own computers, each with its switch. */
+.cq-spill {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.cq-spill .cq__title {
+  margin: 0;
+}
+.cq-spill__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* `.ac-iconline` puts the computer's mark on its name's line; the switch stays in the row's middle. */
+.cq-spill__row {
+  padding: 8px 0;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-muted);
+}
+.cq-spill__row > .ac-switch {
+  align-self: center;
+}
+.cq-spill__name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--ink);
+}
+.cq-spill__name b {
+  overflow-wrap: anywhere;
+}
+.cq-spill__name small {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--ink-muted);
 }

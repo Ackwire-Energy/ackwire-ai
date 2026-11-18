@@ -1,4 +1,4 @@
-import type { BlobStore, EmailSender } from "@agenteschat/adapters";
+import type { BlobStore, EmailSender, InlinePart } from "@agenteschat/adapters";
 import { and, count, type Database, type Executor, eq, gt, inArray, isNull, lt, schema } from "@agenteschat/db";
 import { randomToken, sha256 } from "./crypto";
 import { rethrowEmailError } from "./email";
@@ -10,6 +10,10 @@ import { enqueue, PermanentJobError } from "./outbox";
  * whoever runs the server set (`FEEDBACK_EMAIL`). With it go what the person chose to show (the thing they reported,
  * pictures, a video) and what the app knows of where they were. Nothing is stored beyond the outbox job and the
  * files, which expire.
+ *
+ * A server whose operator set no address sends it to the agentes.chat team instead (ADR 0160 §13): the same job posts
+ * it to that team's inbox (`FEEDBACK_URL`), pictures included, and the inbox (on agentes.chat's own servers
+ * only) mails it to its own address without keeping anything.
  */
 
 export const FEEDBACK_JOB = "feedback.send";
@@ -39,6 +43,29 @@ export const FEEDBACK_UNSENT_MS = 60 * 60_000;
 export const FEEDBACK_SENT_MS = 30 * 86_400_000;
 /** Pictures ride in the email itself up to this much; past it they are only links. */
 const INLINE_BYTES = 12 * MB;
+/** A file of a feedback that went to the inbox is only needed while its job may still run again. */
+export const FEEDBACK_RELAYED_MS = 6 * 60 * 60_000;
+/** The most the inbox reads: the pictures that fit an email, as base64 in JSON, and the text around them. */
+export const FEEDBACK_INBOX_BYTES = Math.ceil((INLINE_BYTES * 4) / 3) + 2 * MB;
+/** What the inbox takes in an hour: from one address (a whole server's people come from one), and in all. */
+export const FEEDBACK_INBOX_PER_HOUR = { limit: 30, windowMs: 60 * 60_000 } as const;
+export const FEEDBACK_INBOX_ALL_PER_HOUR = { limit: 60, windowMs: 60 * 60_000 } as const;
+const RELAY_TIMEOUT_MS = 60_000;
+
+/**
+ * Where this server's feedback goes, or undefined when it takes none: its operator's address, else the agentes.chat
+ * team's inbox unless the operator turned that off.
+ */
+export function feedbackDestination(config: {
+  FEEDBACK_EMAIL?: string;
+  FEEDBACK_RELAY: boolean;
+  FEEDBACK_URL: string;
+}) {
+  return config.FEEDBACK_EMAIL ?? (config.FEEDBACK_RELAY ? config.FEEDBACK_URL : undefined);
+}
+
+/** Whether `to` is the inbox's address (a URL) rather than an email address. */
+export const isFeedbackRelay = (to: string | null | undefined): to is string => /^https?:\/\//i.test(to ?? "");
 
 export type FeedbackFileKind = "image" | "video";
 
@@ -49,7 +76,7 @@ export interface FeedbackFileRef {
   contentType: string;
   size: number;
   kind: FeedbackFileKind;
-  /** Opens the file until `expiresAt`, for whoever has the email. */
+  /** Opens the file until `expiresAt`, for whoever has the email; empty for a picture that only rides in the email. */
   url: string;
   expiresAt: string;
 }
@@ -65,7 +92,7 @@ export interface FeedbackAbout {
 }
 
 export interface Feedback {
-  /** Whoever runs the server (`FEEDBACK_EMAIL`). */
+  /** Whoever runs the server (`FEEDBACK_EMAIL`), or the agentes.chat team's inbox (a URL, `isFeedbackRelay`). */
   to: string;
   /** Who wrote it: the reply goes to their address. */
   name: string;
@@ -133,18 +160,20 @@ export function renderFeedback(f: Feedback) {
     : null;
   const files = f.files ?? [];
   const inline = inlineOf(files);
+  const linked = files.some((x) => x.url);
   const until = files[0] ? files[0].expiresAt.slice(0, 10) : "";
+  const heading = linked ? `Files (the links open until ${until})` : "Pictures";
   const quoted = (s: string) =>
     s
       .split("\n")
       .map((l) => `> ${l}`)
       .join("\n");
-  const listed = files.map((x) => `- ${line(x.name, 80)} (${sizeOf(x.size)}): ${x.url}`).join("\n");
+  const listed = files.map((x) => `- ${line(x.name, 80)} (${sizeOf(x.size)})${x.url ? `: ${x.url}` : ""}`).join("\n");
 
   const plain = [
     text,
     ...(about ? [`About ${about.title}`, ...(about.text ? [quoted(about.text)] : [])] : []),
-    ...(files.length ? [`Files (the links open until ${until}):\n${listed}`] : []),
+    ...(files.length ? [`${heading}:\n${listed}`] : []),
     `--\n${facts.map(([k, v]) => `${k}: ${v}`).join("\n")}\n`,
   ].join("\n\n");
 
@@ -161,11 +190,12 @@ export function renderFeedback(f: Feedback) {
       ? `<blockquote style="white-space:pre-wrap;margin:0 0 20px;padding:0 0 0 12px;border-left:3px solid #e5e5e2">${escapeHtml(about.text)}</blockquote>`
       : "",
     files.length
-      ? `<p style="${quiet};margin:0 0 6px">Files (the links open until ${escapeHtml(until)})</p><ul style="margin:0 0 20px;padding-left:18px">${files
-          .map(
-            (x) =>
-              `<li><a href="${escapeHtml(x.url)}">${escapeHtml(line(x.name, 80))}</a> <span style="${quiet}">${sizeOf(x.size)}</span>${picture(x)}</li>`,
-          )
+      ? `<p style="${quiet};margin:0 0 6px">${escapeHtml(heading)}</p><ul style="margin:0 0 20px;padding-left:18px">${files
+          .map((x) => {
+            const name = escapeHtml(line(x.name, 80));
+            const title = x.url ? `<a href="${escapeHtml(x.url)}">${name}</a>` : name;
+            return `<li>${title} <span style="${quiet}">${sizeOf(x.size)}</span>${picture(x)}</li>`;
+          })
           .join("")}</ul>`
       : "",
     `<table style="${quiet};border-top:1px solid #e5e5e2;padding-top:10px">${facts
@@ -212,6 +242,124 @@ export async function sendQueuedFeedback(sender: EmailSender, payload: Record<st
       to: [f.to],
       replyTo: line(f.email, 120),
       idempotencyKey: `feedback:${String(payload.key)}`,
+      tags: [{ name: "kind", value: "feedback" }],
+    })
+    .catch(rethrowEmailError);
+}
+
+/* ---------- to the agentes.chat team, from a server someone else runs ---------- */
+
+/** What a server posts to the inbox: the feedback without an address, and its pictures as base64. */
+export interface RelayedFeedback {
+  /** The sender's own key for this message: sent again, the inbox mails it once. */
+  id: string;
+  feedback: Omit<Feedback, "to" | "files">;
+  pictures?: { name: string; data: string }[];
+}
+
+/** The pictures that go to the inbox: in the order added, while they fit an email together. Never a video. */
+function relayedFiles(files: readonly FeedbackFileRef[]) {
+  const out: FeedbackFileRef[] = [];
+  let total = 0;
+  for (const f of files) {
+    if (f.kind !== "image" || total + f.size > INLINE_BYTES) continue;
+    total += f.size;
+    out.push(f);
+  }
+  return out;
+}
+
+/**
+ * Job `feedback.send` on a server whose feedback goes to the agentes.chat team: one POST to the inbox (`to`). A
+ * refusal of what was sent fails the job; anything else (no network, the inbox busy or down) runs it again.
+ */
+export async function relayQueuedFeedback(post: typeof fetch, payload: Record<string, unknown>, blobs?: BlobStore) {
+  const f = payload.feedback as Feedback | undefined;
+  if (!f || !isFeedbackRelay(f.to) || !f.text) throw new PermanentJobError("feedback without an inbox or text");
+  const { to, files, ...feedback } = f;
+  const going = relayedFiles(files ?? []);
+  const pictures = [];
+  let left = 0;
+  for (const file of files ?? []) {
+    const blob = going.includes(file) ? await blobs?.get(feedbackBlobKey(file.id)).catch(() => null) : null;
+    if (blob) pictures.push({ name: file.name, data: Buffer.from(blob.body).toString("base64") });
+    else left++;
+  }
+  const body: RelayedFeedback = {
+    id: String(payload.key),
+    feedback: {
+      ...feedback,
+      facts: [...(feedback.facts ?? []), ...(left ? ([["Files left out", String(left)]] as [string, string][]) : [])],
+    },
+    ...(pictures.length ? { pictures } : {}),
+  };
+  const res = await post(to, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(RELAY_TIMEOUT_MS),
+  });
+  if (res.ok) return;
+  if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429)
+    throw new PermanentJobError(`the feedback inbox refused it (HTTP ${res.status})`);
+  throw new Error(`the feedback inbox answered HTTP ${res.status}`);
+}
+
+/**
+ * The inbox's side: a feedback another server posted becomes one email to `to`, its pictures riding in it. Nothing is
+ * kept. Who wrote it is only what that server said, so the email says where it came from; a picture is taken by its
+ * own bytes, as an upload is.
+ */
+export async function sendRelayedFeedback(sender: EmailSender, to: string, input: RelayedFeedback) {
+  const pictures = input.pictures ?? [];
+  if (pictures.length > FEEDBACK_FILES.images)
+    throw new ValidationError("Too many files for one feedback", "feedback.files_many");
+  const files: FeedbackFileRef[] = [];
+  const bytes = new Map<string, Uint8Array>();
+  let total = 0;
+  for (const [i, picture] of pictures.entries()) {
+    const body = new Uint8Array(Buffer.from(picture.data, "base64"));
+    const type = sniffFeedbackFile(body);
+    if (type?.kind !== "image") throw new ValidationError("Only pictures can be attached", "feedback.file_type");
+    total += body.byteLength;
+    if (body.byteLength > FEEDBACK_FILES.imageBytes || total > INLINE_BYTES)
+      throw new ValidationError("The file is too large", "feedback.file_too_large");
+    const id = `picture-${i + 1}`;
+    bytes.set(id, body);
+    files.push({
+      id,
+      name: safeName(picture.name, type.ext),
+      contentType: type.contentType,
+      size: body.byteLength,
+      kind: "image",
+      url: "",
+      expiresAt: "",
+    });
+  }
+  const f: Feedback = {
+    ...input.feedback,
+    to,
+    files,
+    facts: [
+      ...(input.feedback.facts ?? []).slice(0, FEEDBACK_FACTS - 1),
+      ["Sent from", "another server (not verified)"],
+    ],
+  };
+  // The ones an email shows where its HTML says; the rest (HEIC) are attached all the same.
+  const cids = inlineOf(files);
+  const inline: InlinePart[] = files.map((file) => ({
+    cid: cids.get(file.id) ?? `feedback-${file.id}`,
+    filename: file.name,
+    contentType: file.contentType,
+    content: bytes.get(file.id) ?? new Uint8Array(),
+  }));
+  await sender
+    .send({
+      ...renderFeedback(f),
+      ...(inline.length ? { inline } : {}),
+      to: [to],
+      replyTo: line(f.email, 120),
+      idempotencyKey: `feedback:inbox:${sha256(`${f.email}\n${input.id}`)}`,
       tags: [{ name: "kind", value: "feedback" }],
     })
     .catch(rethrowEmailError);
@@ -303,11 +451,18 @@ export interface StoredFeedbackFile {
 export async function storeFeedbackFile(
   deps: FeedbackFileDeps,
   userId: string,
-  input: { name: string; bytes: Uint8Array },
+  input: {
+    name: string;
+    bytes: Uint8Array;
+    /** Where a feedback takes no video (it goes to the inbox). */
+    picturesOnly?: boolean;
+  },
   now = new Date(),
 ): Promise<StoredFeedbackFile> {
   const type = sniffFeedbackFile(input.bytes);
   if (!type) throw new ValidationError("Only pictures and videos can be attached", "feedback.file_type");
+  if (input.picturesOnly && type.kind !== "image")
+    throw new ValidationError("Only pictures can be attached", "feedback.file_type");
   const max = type.kind === "image" ? FEEDBACK_FILES.imageBytes : FEEDBACK_FILES.videoBytes;
   if (input.bytes.byteLength > max)
     throw new ValidationError("The file is too large", "feedback.file_too_large", { mb: max / MB });
@@ -375,7 +530,14 @@ const kindOf = (contentType: string): FeedbackFileKind => (contentType.startsWit
  */
 export async function attachFeedbackFiles(
   tx: Executor,
-  input: { userId: string; orgId: string | null; ids: readonly string[]; publicUrl: string },
+  input: {
+    userId: string;
+    orgId: string | null;
+    ids: readonly string[];
+    publicUrl: string;
+    /** How long they are kept once sent; a month unless the caller needs them for less. */
+    keepMs?: number;
+  },
   now = new Date(),
 ): Promise<FeedbackFileRef[]> {
   const ids = [...new Set(input.ids)];
@@ -395,7 +557,7 @@ export async function attachFeedbackFiles(
   const videos = rows.filter((r) => kindOf(r.contentType) === "video").length;
   if (videos > FEEDBACK_FILES.videos || rows.length - videos > FEEDBACK_FILES.images)
     throw new ValidationError("Too many files for one feedback", "feedback.files_many");
-  const expiresAt = new Date(now.getTime() + FEEDBACK_SENT_MS);
+  const expiresAt = new Date(now.getTime() + (input.keepMs ?? FEEDBACK_SENT_MS));
   const base = input.publicUrl.replace(/\/$/, "");
   const out: FeedbackFileRef[] = [];
   // In the order the person added them.

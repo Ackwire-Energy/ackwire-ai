@@ -236,7 +236,11 @@ describe("external provisioning", () => {
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", expectedReadyAt: at, specs });
     const reserving = await status();
     await setProvisioning(deps(), f.org.id, { state: "preparing", step: "reserving", expectedReadyAt: at });
-    expect(await status()).toEqual({ ...reserving, secondsLeft: expect.any(Number) });
+    expect(await status()).toEqual({
+      ...reserving,
+      secondsLeft: expect.any(Number),
+      secondsWaited: expect.any(Number),
+    });
     expect(events).toHaveLength(1);
     await Bun.sleep(5);
     // A reason only goes with `waiting`; a new step with no time is the same wait, with its time.

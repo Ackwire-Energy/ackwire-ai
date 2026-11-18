@@ -123,8 +123,8 @@ test("executor commands: Claude Code with stream-json and its session; prompts n
   );
   expect(executorCommand("claude", { session: "s-1234567890", resume: true })).toContain("--resume s-1234567890");
   expect(executorCommand("shell", { command: " make test " })).toBe("make test");
-  // No `--full-auto` any more (removed from Codex): exec is unattended, the sandbox is the limit.
-  expect(executorCommand("codex", {})).toBe("codex exec --json --skip-git-repo-check -");
+  // No `--full-auto` any more (removed from Codex): exec is unattended, the sandbox is the limit, no rule lifts it.
+  expect(executorCommand("codex", {})).toBe("codex exec --json --skip-git-repo-check --ignore-rules -");
   expect(() => executorCommand("shell", {})).toThrow("needs a command");
   expect(claudeSessionFile("/h/.claude", "/Users/me/agentes/dev-0193aaaa", "abc")).toBe(
     "/h/.claude/projects/-Users-me-agentes-dev-0193aaaa/abc.jsonl",

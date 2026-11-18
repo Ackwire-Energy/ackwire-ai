@@ -8,6 +8,7 @@ import {
   type EmbeddingResult,
   type Endpoint,
   embeddingCostNanoUsd,
+  endpointKeyCheck,
   ensureOpenRouterModels,
   estimateTokens,
   isCustomModel,
@@ -44,7 +45,7 @@ import { publishUserEvent } from "./events";
 import { maySql, type RolePermission } from "./permissions";
 import { addPersonSpend, assertPersonUnderLimit, personSpendAdded } from "./person-usage";
 import { assertCanWork, standingRefusal } from "./standing";
-import { redactCredentials } from "./tool-detail";
+import { maskValues, redactCredentials } from "./tool-detail";
 import { budgetPercent, monthStartUtc, withEffectiveBudget } from "./usage";
 
 const {
@@ -178,7 +179,7 @@ export type KeyCheck =
 const periodOf = (now: Date) => monthStartUtc(now).toISOString().slice(0, 10);
 
 /** The call's own key first: a key of an unusual shape is one no pattern knows. */
-const withoutKey = (text: string, apiKey: string) => redactCredentials(apiKey ? text.replaceAll(apiKey, "••••") : text);
+const withoutKey = (text: string, apiKey: string) => redactCredentials(maskValues(text, [apiKey]));
 
 const failedKeyCheck = (error: unknown, apiKey: string): KeyCheck => {
   const refusal = error instanceof ProviderError ? keyRefusalOf(error) : null;
@@ -980,12 +981,18 @@ export function createModelGateway(deps: ModelGatewayDeps) {
     },
 
     /** `verifyKey` on a stored key; null when the org has no such key. The key stays here, only the result leaves. */
-    async verifyStoredKey(orgId: string, credentialId: string) {
+    async verifyStoredKey(orgId: string, credentialId: string, options: { live?: boolean } = {}) {
       const credential = await decryptCredential(db, deps.keyWrappers, orgId, credentialId);
       if (!credential) return null;
-      const { provider, apiKey, workspaceId, options } = credential;
+      const { provider, apiKey, workspaceId, options: credentialOptions } = credential;
       if (provider === "custom") {
-        const endpoint = options?.endpoint;
+        const endpoint = credentialOptions?.endpoint;
+        // Status reads use the models' last tests; only an explicit key check makes another billed call.
+        if (!options.live) {
+          const checked = endpointKeyCheck((endpoint?.models ?? []).map((m) => m.check)) === "ok";
+          const result: KeyCheck = checked ? { state: "ok", record: async () => {} } : { state: "unchecked" };
+          return { provider, result };
+        }
         // Prefer a model that passed its tool test; checking the key only needs one real reply.
         const model = endpoint?.models.find((m) => m.check === "ok") ?? endpoint?.models[0];
         let result: KeyCheck = { state: "unchecked" };
@@ -1011,8 +1018,8 @@ export function createModelGateway(deps: ModelGatewayDeps) {
       const key = {
         apiKey,
         ...(workspaceId ? { workspaceId } : {}),
-        ...(options?.organization ? { organization: options.organization } : {}),
-        ...(options?.project ? { project: options.project } : {}),
+        ...(credentialOptions?.organization ? { organization: credentialOptions.organization } : {}),
+        ...(credentialOptions?.project ? { project: credentialOptions.project } : {}),
       };
       return { provider, result: await this.verifyKey({ orgId, provider, key }) };
     },

@@ -86,6 +86,10 @@ describe("the notifications ask", () => {
     const text = document.body.textContent ?? "";
     expect(text.indexOf("Quer saber na hora")).toBeGreaterThan(text.indexOf("Entregamos no mesmo dia"));
     expect(localStorage.getItem("agentes.push.offers")).toBe("1");
+    // Where to change it later is a link to it, not a path.
+    const why = ask()?.querySelector(".push-ask__why");
+    expect(why?.textContent).toBe("Mesmo com a aba fechada. Você muda quando quiser em Notificações.");
+    expect(why?.querySelector("a")?.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/notifications`);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: "Agora não" })));
     await settle(4);
     expect(ask()).toBeNull();

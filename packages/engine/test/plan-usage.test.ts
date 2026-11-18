@@ -134,7 +134,9 @@ test("an account's windows split by agent and its month by agent; the email for 
   expect(pessoal?.equivalentUsd).toBeGreaterThan(0);
   // Atlas thinks with the computer's own sign-in now: it is listed, with no windows known yet.
   const own = mine.accounts.find((a) => a.accountId === null);
-  expect(own).toMatchObject({ label: null, usage: null, monthTokens: 0, ownerName: "ana", mine: true });
+  expect(own).toMatchObject({ label: null, usage: null, monthTokens: 0, ownerName: "ana", mine: true, serves: null });
+  // Who it serves (ADR 0059 §3) and its seat: an opaque key, the same for anyone who signs in to that address.
+  expect(pessoal).toMatchObject({ serves: "everyone", seat: expect.stringMatching(/^[0-9a-f]{24}$/) });
   expect(own?.agents.map((a) => [a.name, a.now])).toEqual([["Atlas", true]]);
 
   // A member: the same accounts and percentages, no email and no money anywhere.
@@ -142,7 +144,7 @@ test("an account's windows split by agent and its month by agent; the email for 
   const seen = await orgPlanUsage(f.db, bia.id, f.org.id);
   expect(seen.money).toBe(false);
   const theirs = seen.accounts.find((a) => a.accountId === PESSOAL);
-  expect(theirs).toMatchObject({ email: null, mine: false, ownerName: "ana" });
+  expect(theirs).toMatchObject({ email: null, mine: false, ownerName: "ana", seat: pessoal?.seat });
   expect(theirs?.usage?.windows.find((w) => w.kind === "five_hour")?.usedPercent).toBe(60);
   expect(JSON.stringify(seen)).not.toMatch(/usd|cost|ana@example/i);
 });
@@ -304,4 +306,164 @@ test("parts: use from before a window started stays out of it; a model without a
     ["Atlas", 25.7],
     ["Dev", 4.3],
   ]);
+});
+
+test("a plan's models at a limit of their own reach the usage views, and only those that still hold", async () => {
+  const { machineId } = await scene();
+  const at = new Date().toISOString();
+  const live = hours(48);
+  await f.db
+    .update(schema.machineAccounts)
+    .set({
+      provider: "opencode",
+      usage: {
+        ...usage([{ kind: "monthly", usedPercent: 20 }]),
+        models: {
+          "glm-5.3": { at, until: live },
+          "minimax-m3": { at, off: true },
+          // Its reset passed: the views don't show a limit that no longer holds.
+          "deepseek-v4.1-pro": { at, until: hours(-1) },
+        },
+      },
+    })
+    .where(eq(schema.machineAccounts.id, PESSOAL));
+
+  const view = await orgPlanUsage(f.db, f.owner.id, f.org.id);
+  const account = view.accounts.find((a) => a.accountId === PESSOAL);
+  expect(account?.usage?.models).toEqual({
+    "glm-5.3": { at, until: live },
+    "minimax-m3": { at, off: true },
+  });
+  // The window it was read with is on show too: the account's meters, and the models under them.
+  expect(account?.usage?.windows.map((w) => w.kind)).toEqual(["monthly"]);
+  // The agent's "Uso" tab reads the same account: the same models.
+  const dev = await agentPlanUsage(f.db, f.owner.id, f.org.id, f.agent.id);
+  expect(dev.current?.usage?.models).toEqual(account?.usage?.models);
+  expect(dev.current?.machineId).toBe(machineId);
+});
+
+/**
+ * Use by kind (what the plan's use was for): a run another agent's handoff started counts as handoffs, a routine's
+ * background run as routines, the rest (calls with no run too) as people's conversations. When handoffs lead the
+ * week with at least 30 points, the hint names the agent that took most of the handed work.
+ */
+async function kindsScene() {
+  const { machineId, atlas } = await scene();
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ usage: usage([{ kind: "seven_day", usedPercent: 80, resetsAt: hours(72) }]) })
+    .where(eq(schema.machineAccounts.id, PESSOAL));
+  const ada = await createAgent(
+    f.db,
+    f.owner.id,
+    f.org.id,
+    { name: "Ada", handle: "ada", role: "Research", instructions: "Research.", credentialId: f.agent.credentialId },
+    { model: "claude-sonnet-5-5" },
+  );
+  const run = async (agentId: string, background = false) => {
+    const [row] = await f.db
+      .insert(schema.agentRuns)
+      .values({
+        orgId: f.org.id,
+        agentId,
+        channelId: f.general.id,
+        threadRootId: crypto.randomUUID(),
+        triggerMessageId: crypto.randomUUID(),
+        trigger: "mention",
+        hop: 1,
+        background,
+      })
+      .returning({ id: schema.agentRuns.id });
+    return row?.id ?? "";
+  };
+  const spend = (agentId: string, runId: string | undefined, inputTokens: number) =>
+    recordPlanUsage(f.db, {
+      orgId: f.org.id,
+      agentId,
+      ...(runId ? { runId } : {}),
+      provider: "claude_code",
+      machineId,
+      accountId: PESSOAL,
+      model: "claude-sonnet-5-5",
+      inputTokens,
+      outputTokens: 0,
+    });
+  /** Dev hands work to `target`: the run that work started is a consultation's target. */
+  const handed = async (target: string) => {
+    const asker = await run(f.agent.id);
+    const targetRun = await run(target);
+    await f.db.insert(schema.agentConsultations).values({
+      orgId: f.org.id,
+      askerRunId: asker,
+      askerAgentId: f.agent.id,
+      targetAgentId: target,
+      channelId: f.general.id,
+      messageId: crypto.randomUUID(),
+      targetRunId: targetRun,
+      waitId: crypto.randomUUID(),
+      question: "Look into it",
+      chain: [f.agent.id],
+      kind: "note",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    });
+    return targetRun;
+  };
+  return { atlas, ada, run, spend, handed };
+}
+
+test("an account's use splits by kind: handoffs, people (calls with no run too), routines", async () => {
+  const { atlas, ada, run, spend, handed } = await kindsScene();
+  await spend(ada.id, await handed(ada.id), 30_000);
+  await spend(atlas.id, await handed(atlas.id), 10_000);
+  await spend(f.agent.id, await run(f.agent.id), 20_000);
+  await spend(f.agent.id, undefined, 10_000);
+  await spend(atlas.id, await run(atlas.id, true), 30_000);
+
+  const view = await orgPlanUsage(f.db, f.owner.id, f.org.id);
+  const pessoal = view.accounts.find((a) => a.accountId === PESSOAL);
+  // The week's 80 points split by the same weighting as the agents' parts: 40k, 30k and 30k of 100k tokens.
+  expect(pessoal?.kinds).toEqual([
+    { kind: "handoffs", tokens: 40_000, percent: 32 },
+    { kind: "people", tokens: 30_000, percent: 24 },
+    { kind: "routines", tokens: 30_000, percent: 24 },
+  ]);
+  expect((pessoal?.kinds ?? []).reduce((s, k) => s + (k.percent ?? 0), 0)).toBeCloseTo(80, 5);
+  // Handoffs lead with 32 points: Ada took most of that work.
+  expect(pessoal?.hint).toEqual({ kind: "handoffs", agentId: ada.id });
+});
+
+test("no hint under 30 points of handoffs, or when they don't lead", async () => {
+  const { ada, run, spend, handed } = await kindsScene();
+  await spend(ada.id, await handed(ada.id), 30_000);
+  await spend(f.agent.id, await run(f.agent.id), 70_000);
+  const pessoal = (await orgPlanUsage(f.db, f.owner.id, f.org.id)).accounts.find((a) => a.accountId === PESSOAL);
+  expect(pessoal?.kinds.map((k) => [k.kind, k.percent])).toEqual([
+    ["handoffs", 24],
+    ["people", 56],
+  ]);
+  expect(pessoal?.hint).toBeNull();
+});
+
+test("the hint is null for a person who may not talk to that agent", async () => {
+  const { ada, spend, handed } = await kindsScene();
+  await spend(ada.id, await handed(ada.id), 50_000);
+  await f.db.update(schema.agents).set({ audienceMode: "owner" }).where(eq(schema.agents.id, ada.id));
+  const walter = await addMember(f.db, f.org.id, "member", "Walter");
+  const asOwner = (await orgPlanUsage(f.db, f.owner.id, f.org.id)).accounts.find((a) => a.accountId === PESSOAL);
+  expect(asOwner?.hint).toEqual({ kind: "handoffs", agentId: ada.id });
+  const asWalter = (await orgPlanUsage(f.db, walter.id, f.org.id)).accounts.find((a) => a.accountId === PESSOAL);
+  expect(asWalter?.kinds.map((k) => k.kind)).toEqual(["handoffs"]);
+  expect(asWalter?.hint).toBeNull();
+});
+
+test("no hint when only a window other than the week has parts: its words speak of the week", async () => {
+  const { ada, spend, handed } = await kindsScene();
+  await f.db
+    .update(schema.machineAccounts)
+    .set({ usage: usage([{ kind: "five_hour", usedPercent: 80, resetsAt: hours(2) }]) })
+    .where(eq(schema.machineAccounts.id, PESSOAL));
+  await spend(ada.id, await handed(ada.id), 50_000);
+  const pessoal = (await orgPlanUsage(f.db, f.owner.id, f.org.id)).accounts.find((a) => a.accountId === PESSOAL);
+  expect(pessoal?.kinds).toEqual([{ kind: "handoffs", tokens: 50_000, percent: 80 }]);
+  expect(pessoal?.hint).toBeNull();
 });

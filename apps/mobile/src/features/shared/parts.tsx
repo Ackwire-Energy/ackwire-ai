@@ -3,7 +3,7 @@ import * as Clipboard from "expo-clipboard";
 import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-router";
 import { type ReactNode, useLayoutEffect, useMemo, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import { Platform, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { needsHeaderBlur, TAB_BADGE } from "@/lib/nav";
 import {
@@ -14,16 +14,20 @@ import {
   fonts,
   GROUPED_ROW,
   GroupedList,
+  type HeaderAction,
   HeaderCapsule,
   HeaderSlot,
   type HeaderSlotStore,
   haptics,
   Icon,
   type IconName,
+  IconTile,
   LivePause,
+  RowPressable,
   Text,
   ToggleSwitch,
   textLineOf,
+  useHeaderActionOptions,
   useHeaderSlot,
   useScrollUnderPushedOptions,
   useTheme,
@@ -50,9 +54,13 @@ export function MentionCount({ count }: { count: number }) {
   );
 }
 
-/** The rounded square with an icon (channels, threads, missions, sheet actions). */
+/**
+ * The rounded square with an icon (channels, threads, missions, sheet titles): the system Settings' tile (`IconTile`,
+ * the subject's color, the symbol in white). With `children` (a face, a mark of the caller's own), a neutral tile.
+ */
 export function Tile({ icon, size = 36, children }: { icon?: IconName; size?: number; children?: ReactNode }) {
   const c = useColors();
+  if (icon && children == null) return <IconTile icon={icon} size={size} />;
   return (
     <View
       style={[
@@ -60,7 +68,7 @@ export function Tile({ icon, size = 36, children }: { icon?: IconName; size?: nu
         { width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: c.sunken },
       ]}
     >
-      {children ?? (icon ? <Icon name={icon} size={Math.round(size / 2)} color={c.muted} /> : null)}
+      {children}
     </View>
   );
 }
@@ -85,9 +93,12 @@ export interface ActionItem {
   onPress?: () => void;
 }
 
+/** An action's icon: the system's symbol at about the label's size (17 points), alone, as the system's menus show it. */
+const ACTION_GLYPH = 24;
+
 /**
  * The list of actions in a sheet, a GroupedList (sheets sit on the grouped gray): an icon or a face in GroupedRow's
- * 32 pt column, the label, a hint under it; the text and the hairline above start together at 58.
+ * 36 pt column, the label, a hint under it; the text and the hairline above start together at 64.
  */
 export function ActionList({ items }: { items: ActionItem[] }) {
   const c = useColors();
@@ -99,7 +110,8 @@ export function ActionList({ items }: { items: ActionItem[] }) {
           item={it}
           // `leading`, as a GroupedRow's: GroupedList starts the hairline after its column.
           leading={
-            it.leading ?? (it.icon ? <Icon name={it.icon} size={20} color={it.danger ? c.danger : c.muted} /> : null)
+            it.leading ??
+            (it.icon ? <Icon name={it.icon} size={ACTION_GLYPH} color={it.danger ? c.danger : c.muted} /> : null)
           }
         />
       ))}
@@ -107,7 +119,7 @@ export function ActionList({ items }: { items: ActionItem[] }) {
   );
 }
 
-/** One action, on a GroupedRow's numbers: 14 pt sides, the 32 pt leading column, 12 apart, 50 tall at least. */
+/** One action, on a GroupedRow's numbers: 16 pt sides, the 36 pt leading column, 12 apart, 52 tall at least. */
 function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode }) {
   const c = useColors();
   const fontScale = useFontScale();
@@ -117,8 +129,9 @@ function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode
   const onLine = (size: number) => (tall ? leadBox(line, size) : null);
   const press = it.onPress;
   return (
-    <Pressable
-      // A switch answers the finger as it flips, as `GroupedRow`'s does.
+    <RowPressable
+      // A switch answers the finger as it flips (and with its switch, not a lit row), as `GroupedRow`'s does.
+      light={it.checked === undefined}
       onPress={
         it.checked !== undefined && press
           ? () => {
@@ -131,16 +144,11 @@ function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode
       accessibilityRole={it.checked === undefined ? "button" : "switch"}
       {...(it.checked === undefined ? {} : { accessibilityState: { checked: it.checked } })}
       accessibilityLabel={it.hint ? `${it.label}. ${it.hint}` : it.label}
-      style={({ pressed }) => [
-        styles.action,
-        tall && styles.actionTall,
-        pressed && { backgroundColor: c.sunken },
-        it.disabled && { opacity: 0.5 },
-      ]}
+      style={[styles.action, tall && styles.actionTall, it.disabled && { opacity: 0.4 }]}
     >
       {leading ? (
         <View style={styles.actionLead}>
-          {tall && !it.leading ? <View style={onLine(20)}>{leading}</View> : leading}
+          {tall && !it.leading ? <View style={onLine(ACTION_GLYPH)}>{leading}</View> : leading}
         </View>
       ) : null}
       <View style={styles.actionText}>
@@ -177,7 +185,7 @@ function ActionRow({ item: it, leading }: { item: ActionItem; leading: ReactNode
           <ToggleSwitch value={it.checked} />
         </View>
       )}
-    </Pressable>
+    </RowPressable>
   );
 }
 
@@ -205,16 +213,34 @@ export function PushedHeader({
   plate = false,
   solid = true,
   grouped = false,
+  largeTitle = false,
+  actions,
+  lead,
 }: {
   title?: ReactNode;
   subtitle?: string;
   right?: ReactNode;
   action?: HeaderWordAction;
+  /**
+   * Buttons on the right as the system's own bar buttons (iOS; a `menu` opens the system's menu from the button), our
+   * icon buttons in a capsule on Android (`useHeaderActionOptions`). In place of `right`.
+   */
+  actions?: HeaderAction[];
+  /**
+   * Our own view first among `actions`, in their group: a count beside a mark, which has no system button
+   * (`useHeaderActionOptions`).
+   */
+  lead?: ReactNode;
   /** Over a sky cover: a clear bar, the back button over the art. */
   plate?: boolean;
   solid?: boolean;
   /** The screen sits on the grouped gray (the bar matches it where it is opaque: Android). */
   grouped?: boolean;
+  /**
+   * iOS: the system's large title (a string `title`), over a scroll view that is the screen's first child: it folds
+   * into the bar as the list scrolls, and the bar takes the system's material over what passes under it.
+   */
+  largeTitle?: boolean;
 }) {
   const { colors } = useTheme();
   const scrollUnder = useScrollUnderPushedOptions();
@@ -231,12 +257,20 @@ export function PushedHeader({
   });
   const word = action?.label ?? null;
   const wordOff = action?.disabled ?? false;
+  const actionOptions = useHeaderActionOptions({ right: actions, lead });
+  const hasActions = (actions?.length ?? 0) > 0 || lead != null;
   // Stable options: `setOptions` runs when the title, subtitle or the presence of actions change, not on
   // every render of the screen (a conversation re-renders while agents stream).
   const options = useMemo<NativeStackNavigationOptions>(
     () => ({
       ...(plate ? coverBarOptions : solid ? {} : scrollUnder),
       ...(barTone && !plate ? { headerStyle: { backgroundColor: barTone } } : null),
+      // Said either way: the screen's options merge, so one set without it kept the large title an earlier render
+      // turned on (an empty band over a view that draws none, a search that never folded the title away).
+      ...(IOS ? { headerLargeTitleEnabled: largeTitle } : null),
+      ...(largeTitle && IOS
+        ? { headerLargeTitleShadowVisible: false, headerLargeTitleStyle: { color: colors.ink } }
+        : null),
       title: text,
       headerTitle: custom
         ? () => <HeaderTitle text={text} node={titleNode} subtitle={subtitle} beside={word !== null} />
@@ -254,7 +288,11 @@ export function PushedHeader({
               },
             ],
           }
-        : null),
+        : // Said either way, as the large title: a screen's options merge, so a bar that drops its system buttons for
+          // `right` would keep them from the earlier options, and they hide `right` on iOS.
+          IOS
+          ? { unstable_headerRightItems: undefined }
+          : null),
       headerRight: hasRight
         ? () => (
             <BarPressable>
@@ -272,10 +310,68 @@ export function PushedHeader({
               </View>
             )
           : undefined,
+      ...(hasActions ? withWord(actionOptions, word, wordOff, () => press.current?.()) : null),
     }),
-    [plate, solid, scrollUnder, barTone, text, custom, subtitle, titleNode, hasRight, rightNode, word, wordOff],
+    [
+      hasActions,
+      actionOptions,
+      plate,
+      solid,
+      scrollUnder,
+      barTone,
+      largeTitle,
+      colors.ink,
+      text,
+      custom,
+      subtitle,
+      titleNode,
+      hasRight,
+      rightNode,
+      word,
+      wordOff,
+    ],
   );
   return <Stack.Screen options={options} />;
+}
+
+/**
+ * A word and buttons together on a bar (a task's "Concluir" beside its "…"): the word at the bar's end, the buttons
+ * before it (the system's own on iOS; on Android our capsule, then the word's button).
+ */
+function withWord(
+  opts: NativeStackNavigationOptions,
+  word: string | null,
+  disabled: boolean,
+  onPress: () => void,
+): NativeStackNavigationOptions {
+  if (word === null) return opts;
+  if (IOS) {
+    const items = opts.unstable_headerRightItems;
+    return {
+      ...opts,
+      unstable_headerRightItems: (props) => [
+        {
+          type: "button" as const,
+          label: word,
+          accessibilityLabel: word,
+          variant: liquidGlass ? ("prominent" as const) : ("done" as const),
+          disabled,
+          onPress,
+        },
+        ...(items?.(props) ?? []),
+      ],
+    };
+  }
+  const buttons = opts.headerRight;
+  return {
+    ...opts,
+    headerRight: (props) => (
+      <View style={[styles.headerRight, styles.headerWithWord]}>
+        {buttons?.(props)}
+        <Button size="sm" variant="primary" label={word} disabled={disabled} onPress={onPress} />
+      </View>
+    ),
+  };
 }
 
 /** A word on the right of a pushed screen's bar that saves (`PushedHeader`'s `action`). */
@@ -377,15 +473,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: GROUPED_ROW.padX,
     paddingVertical: GROUPED_ROW.padY,
   },
-  // A wrapping hint: the label starts where a one-line row's does (its 22 points centred in 50), as GroupedRow's.
-  actionTall: { alignItems: "flex-start", paddingVertical: 14 },
+  // A wrapping hint: the label starts where a one-line row's does (its 22 points centred in 52), as GroupedRow's.
+  actionTall: { alignItems: "flex-start", paddingVertical: GROUPED_ROW.tallPadY },
   onLine: { justifyContent: "center" },
-  actionLead: { width: 32, alignItems: "center", justifyContent: "center" },
+  // GroupedRow's leading column: the text starts where GroupedList's hairline does.
+  actionLead: { width: GROUPED_ROW.lead, alignItems: "center", justifyContent: "center" },
   actionText: { flex: 1, minWidth: 0 },
   mono: { fontFamily: MONO, fontSize: 13 },
   headerTitle: { alignItems: Platform.OS === "ios" ? "center" : "flex-start", minWidth: 0 },
   titleText: { fontWeight: "600" },
   headerRight: { flexDirection: "row", alignItems: "center" },
+  headerWithWord: { gap: 8 },
 });
 
 /**

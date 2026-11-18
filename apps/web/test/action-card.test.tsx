@@ -5,7 +5,9 @@ setupDom();
 
 import type { Agent, Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
+import { setNavigateAway } from "@/lib/navigate";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, meWithRole, NOW, ORG_ID, seedState } from "./fake-api";
+import { hintOf } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => {
@@ -327,6 +329,7 @@ describe("what waits on a plan's limit: Não rodar", () => {
         plan: "Claude",
         resetsAt: null,
         sharedWith: [ADA_ID],
+        chain: 2,
         rows: [
           row("r-a", { state: "answering" }),
           row("r-b"),
@@ -346,6 +349,10 @@ describe("what waits on a plan's limit: Não rodar", () => {
     // One title for the phase: it answers the first one, so it is picking up. The shared plan only behind the ⓘ.
     expect(dialog.querySelector(".ac-dialog__title")?.textContent).toContain("Atlas está retomando");
     expect(within(dialog).getByRole("button", { name: "Sobre a fila" })).toBeTruthy();
+    // Every account of its order at its limit comes first behind the ⓘ.
+    expect(hintOf("a fila", dialog).text).toBe(
+      "As 2 contas do Claude chegaram ao limite. Ada usa o mesmo plano do Claude. As conversas dos dois entram na mesma fila.",
+    );
     expect(dialog.textContent).not.toContain("mensagens depois");
     expect(dialog.textContent).not.toContain("Ver conversa");
     // Nothing skipped: no switch, the list alone.
@@ -648,7 +655,7 @@ describe("an agent's card to install or update a skill", () => {
     meta: { bodyCode: "action_install_skill", actionCard: { kind, forUserId: "u-walter", params } },
   });
 
-  test("Instalar opens Instalar skill on the link, its skills read to pick; nothing installs from the card", async () => {
+  test("Instalar opens Instalar skill on the link, its skills read to pick, and its box turns them on for the agent", async () => {
     const state = seedState();
     const link = "https://github.com/acme/skills/tree/main/deploy";
     state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
@@ -659,8 +666,193 @@ describe("an agent's card to install or update a skill", () => {
     await click(within(row).getByRole("button", { name: "Instalar" }), 8);
     const install = dialog("Instalar skill") as HTMLElement;
     expect((within(install).getByRole("textbox", { name: "Link do GitHub" }) as HTMLInputElement).value).toBe(link);
+    // Reading the link installs nothing, so it names no agent.
     expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
       { url: link, list: true },
+    ]);
+    const box = within(install).getByRole("checkbox", { name: "Fica ligada para Atlas" });
+    expect(box.getAttribute("aria-checked")).toBe("true");
+    // Kept for the way back from connecting GitHub on its site.
+    expect(JSON.parse(sessionStorage.getItem("agentes.skills.installFor") ?? "null")).toEqual({
+      url: link,
+      agentId: ATLAS_ID,
+    });
+    await click(within(install).getByRole("checkbox", { name: /deploy/ }));
+    await click(within(install).getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(state.calls.find((c) => c.method === "skills.importPicked")?.args.slice(1)).toEqual([
+      link,
+      ["skills/deploy"],
+      ATLAS_ID,
+    ]);
+  });
+
+  test("unchecked, or on a link typed over the card's, what installs goes on for nobody; a same name says it replaces", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    await api.skills.create(ORG_ID, { name: "deploy", description: "O deploy de hoje.", body: "# Deploy" });
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    const install = () => within(dialog("Instalar skill") as HTMLElement);
+    expect(dialog("Instalar skill")?.textContent).toContain("Substitui a skill deploy já instalada");
+    const retype = async (value: string) => {
+      await act(async () =>
+        fireEvent.change(install().getByRole("textbox", { name: "Link do GitHub" }), { target: { value } }),
+      );
+      await settle(3);
+    };
+    await retype("https://github.com/acme/other");
+    expect(install().queryByRole("checkbox", { name: /Fica ligada/ })).toBeNull();
+    await retype(link);
+    await click(install().getByRole("checkbox", { name: "Fica ligada para Atlas" }));
+    // Back on the card's link, unchecked: the link installs at once, for nobody.
+    await click(install().getByRole("button", { name: "Instalar" }), 8);
+    expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: link, list: true },
+      { url: link },
+    ]);
+  });
+
+  test("reopened, the dialog reads the card's link again; a pick named like a removed skill says it replaces it", async () => {
+    const state = seedState();
+    const api = createFakeApi(state);
+    const old = await api.skills.create(ORG_ID, { name: "deploy", description: "O deploy antigo.", body: "# Deploy" });
+    await api.skills.remove(ORG_ID, old.id);
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api });
+    await settle(5);
+    const openIt = () => click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    await openIt();
+    expect(dialog("Instalar skill")?.textContent).toContain("Substitui a skill deploy removida");
+    await click(within(dialog("Instalar skill") as HTMLElement).getByRole("button", { name: "Cancelar" }), 4);
+    await openIt();
+    expect(dialog("Instalar skill")?.textContent).toContain("Substitui a skill deploy removida");
+    expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: link, list: true },
+      { url: link, list: true },
+    ]);
+  });
+
+  test("a card by an agent archived since shows no box and turns nothing on", async () => {
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    const installFrom = async (state: ReturnType<typeof seedState>, author: string) => {
+      state.messages.push({
+        ...offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }),
+        author: { type: "agent", id: author },
+      });
+      await open(state);
+      await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+      const install = within(dialog("Instalar skill") as HTMLElement);
+      expect(install.queryByRole("checkbox", { name: /Fica ligada/ })).toBeNull();
+      await click(install.getByRole("checkbox", { name: /deploy/ }));
+      await click(install.getByRole("button", { name: "Instalar" }));
+      await settle(6);
+      expect(state.calls.find((c) => c.method === "skills.importPicked")?.args.slice(1)).toEqual([
+        link,
+        ["skills/deploy"],
+      ]);
+      cleanup();
+    };
+    const archived = seedState();
+    const atlas = archived.agents.find((a) => a.id === ATLAS_ID);
+    archived.agents = archived.agents.filter((a) => a.id !== ATLAS_ID);
+    archived.former = [
+      { id: ATLAS_ID, name: atlas?.name ?? "Atlas", role: atlas?.role ?? "", appearance: null, deleted: false },
+    ];
+    await installFrom(archived, ATLAS_ID);
+  });
+
+  test("a link typed over the card's, or a repository picked from the connected GitHub, installs for nobody", async () => {
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    const picked = (state: ReturnType<typeof seedState>) =>
+      state.calls.filter((c) => c.method === "skills.importPicked").map((c) => c.args.slice(1));
+    const typedOver = seedState();
+    typedOver.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await open(typedOver);
+    await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    const install = () => within(dialog("Instalar skill") as HTMLElement);
+    const other = "https://github.com/acme/other";
+    await act(async () =>
+      fireEvent.change(install().getByRole("textbox", { name: "Link do GitHub" }), { target: { value: other } }),
+    );
+    await click(install().getByRole("button", { name: "Instalar" }), 8);
+    await click(install().getByRole("checkbox", { name: /deploy/ }));
+    await click(install().getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(typedOver.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: link, list: true },
+      { url: other },
+    ]);
+    expect(picked(typedOver)).toEqual([[other, ["skills/deploy"]]]);
+    cleanup();
+
+    const fromGithub = seedState();
+    const contoso = "https://github.com/contoso/skills";
+    fromGithub.githubRepos = {
+      connected: true,
+      accounts: [
+        {
+          login: "contoso",
+          type: "Organization",
+          repositories: [
+            { fullName: "contoso/skills", owner: "contoso", name: "skills", private: true, updatedAt: null },
+          ],
+        },
+      ],
+      truncated: false,
+    };
+    fromGithub.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await open(fromGithub);
+    await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    // The card's link read lists its skill; cleared, the connected GitHub's repositories are offered.
+    await act(async () =>
+      fireEvent.change(install().getByRole("textbox", { name: "Link do GitHub" }), { target: { value: "" } }),
+    );
+    await settle(3);
+    await click(install().getByRole("button", { name: "Escolher do GitHub conectado" }), 4);
+    const repo = install()
+      .getAllByRole("button")
+      .find((b) => b.classList.contains("ac-row") && b.textContent?.startsWith("contoso/skills"));
+    await click(repo as HTMLElement);
+    expect(install().queryByRole("checkbox", { name: /Fica ligada/ })).toBeNull();
+    await click(install().getByRole("checkbox", { name: /deploy/ }));
+    await click(install().getByRole("button", { name: "Instalar" }));
+    await settle(6);
+    expect(picked(fromGithub)).toEqual([[contoso, ["skills/deploy"]]]);
+  });
+
+  test("connecting GitHub from the card's dialog comes back to Skills with the agent, for its box", async () => {
+    setNavigateAway(() => {});
+    const state = seedState();
+    state.connections = [];
+    const link = "https://github.com/contoso/skills";
+    state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Lê o repositório privado." }));
+    await open(state);
+    await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    await click(within(dialog("Instalar skill") as HTMLElement).getByRole("button", { name: "Conectar o GitHub" }), 2);
+    const flow = screen().getByRole("dialog", { name: "Conectar GitHub" });
+    await click(within(flow).getByRole("button", { name: "Continuar no GitHub" }), 4);
+    expect(state.calls.find((c) => c.method === "connectors.startOAuth")?.args[2]).toEqual({
+      returnTo: `/org/${ORG_ID}/settings/skills?install=${encodeURIComponent(link)}&agent=${ATLAS_ID}`,
+      serverUrl: undefined,
+    });
+  });
+
+  test("a member who doesn't manage agents installs it as their own personal skill", async () => {
+    const state = seedState();
+    meWithRole(state, []);
+    const link = "https://github.com/acme/skills/tree/main/deploy";
+    state.messages.push(offer("c-skill", "install_skill", { url: link, why: "Faz deploys." }));
+    await open(state);
+    await click(within(cardRow("Instalar uma skill")).getByRole("button", { name: "Instalar" }), 8);
+    const install = dialog("Instalar skill") as HTMLElement;
+    expect(install.textContent).toContain("Só quem gerencia agentes adiciona skills da equipe.");
+    expect(state.calls.filter((c) => c.method === "skills.import").map((c) => c.args[1])).toEqual([
+      { url: link, list: true, personal: true },
     ]);
   });
 

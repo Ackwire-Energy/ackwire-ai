@@ -30,6 +30,8 @@ export interface PlanMeterUsage {
   /** The plan refused a request for its limit. */
   limited?: boolean;
   at: string;
+  /** Stuck at its limit: when the server last asked its computer to read it again. */
+  checkedAt?: string;
 }
 
 /** What the meter says, in the viewer's language. */
@@ -50,6 +52,11 @@ export interface PlanMeterText {
   ago(iso: string): string;
   /** The same past `PLAN_STALE_MS`: "desatualizado, de há 7 h". */
   stale(iso: string): string;
+  /**
+   * The full meter's heading over a model group's quotas (`modelQuota`): "Só Claude and GPT"; null, over the
+   * account's own, "Todos os modelos". Absent: the windows stay one list, each by its own name.
+   */
+  group?(name: string | null): string;
 }
 
 export type PlanState = "ok" | "almost" | "limited";
@@ -74,6 +81,44 @@ export const PLAN_TONE = {
 } as const satisfies Record<PlanLevel, "ink" | "warn" | "danger">;
 
 const KIND_ORDER = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet", "monthly", "other"];
+
+/** The label the runner gives a Claude plan's paid extra usage (`get_usage` `extra_usage`, `rate_limit_event` `overage`). */
+export const EXTRA_USAGE_LABEL = "Extra usage";
+
+/** `other` windows that are no model's own week. */
+const NOT_A_MODEL = new Set([EXTRA_USAGE_LABEL, "OAuth apps"]);
+
+/** A model's own quota: an `other` window named for a model or a group of them (Claude's `model_scoped`, Antigravity's groups). */
+const modelOwn = (w: { kind: string; label?: string }) => w.kind === "other" && !!w.label && !NOT_A_MODEL.has(w.label);
+
+/**
+ * A model group's own quota as the runner names it (`<group> · 5h|7d`, the Antigravity CLI's groups): the group
+ * ("Claude and GPT models" → "Claude and GPT") and the window it is. Null for any other window, a model's own week
+ * named by the model alone (Claude's `model_scoped`) included.
+ */
+export function modelQuota(w: { kind: string; label?: string }): {
+  group: string;
+  kind: "five_hour" | "seven_day";
+} | null {
+  if (!modelOwn(w) || !w.label) return null;
+  const named = /^(.+?)\s*·\s*(5h|7d)$/.exec(w.label);
+  const group = named?.[1]?.replace(/\s+models?$/i, "").trim();
+  return group ? { group, kind: named?.[2] === "5h" ? "five_hour" : "seven_day" } : null;
+}
+
+/**
+ * Whether a model's own quota (`modelOwn`) is `model`'s: its name, without the window's length and "models", each
+ * model it names (`Claude and GPT models · 7d` → claude, gpt; `Gemini 4 Argon · 7d` → gemini-4-argon; `Fable`)
+ * found in the model's id.
+ */
+const quotaOfModel = (label: string, model: string) =>
+  label
+    .toLowerCase()
+    .replace(/\s*·\s*(?:5h|7d)$/, "")
+    .replace(/\bmodels?\b/g, "")
+    .split(/\s+and\s+|,|\//)
+    .map((name) => name.trim().replace(/\s+/g, "-"))
+    .some((name) => name !== "" && model.includes(name));
 const passed = (iso: string | undefined, now: number) => iso !== undefined && Date.parse(iso) <= now;
 
 /**
@@ -81,10 +126,26 @@ const passed = (iso: string | undefined, now: number) => iso !== undefined && Da
  * `used` as it stands now: a window whose reset already passed is empty again.
  */
 export function planWindows<W extends PlanMeterWindow>(usage: { windows: readonly W[] }, now = Date.now()) {
+  // A model's own quota comes after the account's: the line leads with what every model runs on.
   return usage.windows
     .map((w) => ({ ...w, used: passed(w.resetsAt, now) ? 0 : w.usedPercent }))
-    .sort((a, b) => b.used - a.used || KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind));
+    .sort(
+      (a, b) =>
+        Number(modelOwn(a)) - Number(modelOwn(b)) ||
+        b.used - a.used ||
+        KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind),
+    );
 }
+
+/**
+ * A window of the whole plan: not an `other` one (a single model's week, extra usage, another model group's quota),
+ * which never puts the plan at its limit; a refusal it causes still does (`limited`).
+ */
+export const planOwn = (w: Pick<PlanMeterWindow, "kind">) => w.kind !== "other";
+
+/** A window of the whole plan is full now. */
+export const planFull = (usage: { windows: readonly PlanMeterWindow[] }, now = Date.now()) =>
+  planWindows(usage, now).some((w) => planOwn(w) && w.used >= 100);
 
 /**
  * Where the plan stands: at its limit (a window is full, or it refused a
@@ -95,9 +156,9 @@ export function planState(
   usage: PlanMeterUsage,
   now = Date.now(),
 ): { state: PlanState; until: string | null; used: number } {
-  const rows = planWindows(usage, now);
+  const rows = planWindows(usage, now).filter(planOwn);
   const full = rows.filter((w) => w.used >= 100);
-  const refused = usage.limited === true && !usage.windows.some((w) => w.usedPercent >= 100);
+  const refused = usage.limited === true && !usage.windows.some((w) => planOwn(w) && w.usedPercent >= 100);
   const used = rows[0]?.used ?? 0;
   if (full.length === 0 && !refused) return { state: used >= PLAN_ALMOST ? "almost" : "ok", until: null, used };
   const resets = full.flatMap((w) => (w.resetsAt ? [w.resetsAt] : []));
@@ -107,6 +168,31 @@ export function planState(
 
 /** How many windows the compact line names; every window is in its title and in the full meter. */
 const LINE_WINDOWS = 2;
+
+/**
+ * A plan's state as the one word a closed row has room for ("No limite", "Quase no limite"), with the level its bar
+ * is colored by. Null while it is fine: a row says nothing then.
+ */
+export function planAttention(
+  usage: PlanMeterUsage,
+  text: Pick<PlanMeterText, "almost" | "limited">,
+  now = Date.now(),
+): { word: string; level: Exclude<PlanLevel, "ok"> } | null {
+  const { state, used } = planState(usage, now);
+  if (state === "ok") return null;
+  const level = planLevel(used, state === "limited");
+  return { word: state === "limited" ? text.limited(null) : text.almost, level: level === "ok" ? "almost" : level };
+}
+
+/**
+ * When a plan was last read or asked about: its reading's time, or the last time the server asked its computer to read
+ * it again while it was stuck at its limit (`checkedAt`), whichever is later. Null with neither.
+ */
+export function planCheckedAt(usage: { at?: string; checkedAt?: string } | null | undefined): string | null {
+  const at = Math.max(Date.parse(usage?.at ?? "") || 0, Date.parse(usage?.checkedAt ?? "") || 0);
+  return at > 0 ? new Date(at).toISOString() : null;
+}
+
 /** From this age the compact line says how old its numbers are. */
 export const PLAN_AGE_SHOWN_MS = 10 * 60_000;
 /** Numbers older than this read as out of date. */
@@ -117,7 +203,8 @@ export const PLAN_STALE_MS = 6 * 3_600_000;
  * with its reset for the title, the tightest (`top`) for its one bar, and only near or at the limit what matters then
  * ("Quase no limite · renova às 14:00", "No limite até 14:00"). Null while no window is known: nothing, never 0%.
  * A plan that refused a request before any window was known is still at the limit: no windows, no bar, only the alert.
- * `age`: how old the numbers are, from `PLAN_AGE_SHOWN_MS` (out of date past `PLAN_STALE_MS`, `stale`); null before.
+ * `age`: how old the numbers are, from `PLAN_AGE_SHOWN_MS` and always at the limit (out of date past `PLAN_STALE_MS`,
+ * `stale`); null before.
  */
 export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.now()) {
   const rows = planWindows(usage, now);
@@ -126,13 +213,15 @@ export function planLine(usage: PlanMeterUsage, text: PlanMeterText, now = Date.
   if (!top && state !== "limited") return null;
   const reset = (w?: PlanMeterWindow) => (w?.resetsAt && !passed(w.resetsAt, now) ? text.resets(w.resetsAt) : null);
   const join = (parts: (string | null)[]) => parts.filter(Boolean).join(" · ");
-  const old = now - Date.parse(usage.at);
+  // At the limit the plan is asked again every few minutes (`planCheckedAt`): how long ago that was always shows then.
+  const at = planCheckedAt(usage) ?? usage.at;
+  const old = now - Date.parse(at);
   const stale = old > PLAN_STALE_MS;
   return {
     state,
     top,
     stale,
-    age: stale ? text.stale(usage.at) : old >= PLAN_AGE_SHOWN_MS ? text.ago(usage.at) : null,
+    age: stale ? text.stale(at) : old >= PLAN_AGE_SHOWN_MS || state === "limited" ? text.ago(at) : null,
     line: rows
       .slice(0, LINE_WINDOWS)
       .map((w) => `${text.short(w)} ${w.used}%`)
@@ -154,6 +243,10 @@ export interface OfferAccount {
   usage: PlanMeterUsage | null;
   /** It thinks for every agent its owner gives it on that computer. */
   shared?: boolean;
+  /** Its place in the workspace's order of use; null: after the placed ones. */
+  useOrder?: number | null;
+  /** The oldest login of the same account (one account may be signed in once per agent); absent: an older server. */
+  sameAs?: string;
 }
 
 /**
@@ -161,9 +254,11 @@ export interface OfferAccount {
  * same kind and plan maker (another maker's models would think instead),
  * signed in, not at their own limit, and free or made for all of the owner's
  * agents there. A login another agent thinks with is never offered (it serves
- * one agent; moving plans between agents to dodge a limit isn't). Most
- * headroom first, unknown usage last. Shared by the web's and the phone's
- * agent settings.
+ * one agent; moving plans between agents to dodge a limit isn't). Another
+ * login of the account in use shares its limit and is never offered; an
+ * account signed in once per agent is offered once. In the order of use, then
+ * most headroom first, unknown usage last. Shared by the web's and the
+ * phone's agent settings.
  */
 export function limitOffers<A extends OfferAccount>(
   accounts: readonly A[],
@@ -171,11 +266,14 @@ export function limitOffers<A extends OfferAccount>(
   current: string | null,
   now = Date.now(),
 ): { account: A; used: number | null }[] {
-  const provider = accounts.find((a) => a.id === current)?.provider ?? null;
+  const inUse = accounts.find((a) => a.id === current);
+  const provider = inUse?.provider ?? null;
+  const accountOf = (a: A) => a.sameAs ?? a.id;
   return accounts
     .filter(
       (a) =>
         a.mine &&
+        (!inUse || accountOf(a) !== accountOf(inUse)) &&
         a.kind === kind &&
         (a.provider ?? null) === provider &&
         a.id !== current &&
@@ -185,16 +283,18 @@ export function limitOffers<A extends OfferAccount>(
     .map((account) => ({ account, plan: account.usage ? planState(account.usage, now) : null }))
     .filter((o) => o.plan?.state !== "limited")
     .map((o) => ({ account: o.account, used: o.plan?.used ?? null }))
-    .sort((a, b) => (a.used ?? 101) - (b.used ?? 101));
+    .sort(
+      (a, b) =>
+        (a.account.useOrder ?? Number.POSITIVE_INFINITY) - (b.account.useOrder ?? Number.POSITIVE_INFINITY) ||
+        (a.used ?? 101) - (b.used ?? 101),
+    )
+    .filter((o, i, all) => all.findIndex((x) => accountOf(x.account) === accountOf(o.account)) === i);
 }
 
 /** From here long work pauses until the window resets (ADR 0118); replies to people go on until the limit. */
 export const PLAN_PAUSE = 95;
 /** From here an agent is told where its plan stands, so it can say a long task may pause. */
 export const PLAN_NOTICE = 90;
-
-/** The label the runner gives a Claude plan's paid extra usage (`get_usage` `extra_usage`, `rate_limit_event` `overage`). */
-export const EXTRA_USAGE_LABEL = "Extra usage";
 
 /** How long each window lasts: a reading with no reset counts for no longer than that. */
 const WINDOW_MS: Partial<Record<string, number>> = {
@@ -207,7 +307,7 @@ const WINDOW_MS: Partial<Record<string, number>> = {
   other: 7 * 86_400_000,
 };
 
-/** The paid extra usage the account has turned on with the provider (only Claude's plans report it). */
+/** Whether the provider reports paid extra usage as enabled, even when its allowance is spent. */
 export const extraUsageOn = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
   usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL) ?? false;
 
@@ -215,9 +315,6 @@ export const extraUsageOn = (usage: { windows: readonly PlanMeterWindow[] } | nu
 export const extraUsageLeft = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
   usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL && w.usedPercent < PLAN_PAUSE) ??
   false;
-
-/** `other` windows that are no model's own week. */
-const NOT_A_MODEL = new Set([EXTRA_USAGE_LABEL, "OAuth apps"]);
 
 /**
  * The window that binds long work on a run with `model`: the most used of the windows that apply to it and still
@@ -236,8 +333,7 @@ export function planBinding(
   let top: { kind: string; used: number; resetsAt?: string } | null = null;
   for (const w of usage.windows) {
     // A model's own week (Claude's `model_scoped`, stored as `other` with the model's name) counts for that model.
-    if (w.kind === "other" && (!w.label || NOT_A_MODEL.has(w.label) || !model.includes(w.label.toLowerCase())))
-      continue;
+    if (w.kind === "other" && (!w.label || NOT_A_MODEL.has(w.label) || !quotaOfModel(w.label, model))) continue;
     if (w.kind === "seven_day_opus" && !model.includes("opus")) continue;
     if (w.kind === "seven_day_sonnet" && !model.includes("sonnet")) continue;
     const length = WINDOW_MS[w.kind] ?? 0;
@@ -255,4 +351,35 @@ export function renewals(rows: readonly PlanMeterWindow[], text: PlanMeterText, 
   const due = rows.flatMap((w) => (w.resetsAt && !passed(w.resetsAt, now) ? [{ w, at: w.resetsAt }] : []));
   if (due.length <= 1) return due[0] ? text.resets(due[0].at) : null;
   return due.map(({ w, at }) => `${text.short(w)} ${text.resets(at)}`).join(" · ");
+}
+
+/** What ranks a row of accounts to pick from (`sortHave`). */
+export interface HaveRank {
+  /** Its plan's limits; null where nothing says (a key). */
+  usage: PlanMeterUsage | null;
+  /** It can't be picked. */
+  off?: boolean;
+  /** Picking it asks for a sign-in. */
+  signIn?: boolean;
+  /** A workspace key. */
+  isKey?: boolean;
+}
+
+/**
+ * Accounts to pick from, web and phone: a plan used in one click first, the one with most room on top (one that
+ * doesn't say counts as half used); then one that asks for a sign-in, the workspace's keys, a plan at its limit, and
+ * last what can't be picked.
+ */
+export function sortHave<T extends HaveRank>(items: readonly T[], now = Date.now()): T[] {
+  const rank = (i: HaveRank) => {
+    const s = i.usage ? planState(i.usage, now) : null;
+    return (
+      (i.off ? 8000 : 0) +
+      (s?.state === "limited" ? 4000 : 0) +
+      (i.isKey ? 2000 : 0) +
+      (i.signIn ? 1000 : 0) +
+      (s?.used ?? 50)
+    );
+  };
+  return [...items].sort((a, b) => rank(a) - rank(b));
 }

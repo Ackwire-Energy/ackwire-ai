@@ -97,9 +97,7 @@
 /* A message that ends on the agents' line (`.ag-rc--talk`) already holds part of the turn's gap under it. */
 .channel__messages
   > .ac-msg:has(
-    > .ac-msg__body
-      > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden, .ac-msg__aside--floating))
-      > .ag-rc--talk:last-child
+    > .ac-msg__body > .ag-rcs:nth-last-child(1 of :not(.ac-msg__actions, .ac-visually-hidden)) > .ag-rc--talk:last-child
   )
   + * {
   --row-gap: var(--msg-part-gap);

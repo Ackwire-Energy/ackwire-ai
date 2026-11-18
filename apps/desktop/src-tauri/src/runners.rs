@@ -539,6 +539,21 @@ pub fn app_homes(root: &std::path::Path, own_server: Option<&str>) -> Vec<(Strin
     out
 }
 
+/// The homes on disk that a server's own host wrote for `server` (its loopback address), by id and folder
+/// (`host_sync::is_host_home`: `managedBy: "host"` and that exact address, port included): what erasing the server
+/// here leaves behind. Homes signed in by hand, Cloud workspaces' and those of a server at another address never
+/// match; a host home of another server that once ran at this same address would.
+pub fn host_homes(app: &AppHandle, server: &str) -> Vec<(String, PathBuf)> {
+    orgs_root(app).map(|root| host_homes_in(&root, server)).unwrap_or_default()
+}
+
+fn host_homes_in(root: &std::path::Path, server: &str) -> Vec<(String, PathBuf)> {
+    app_homes(root, Some(server))
+        .into_iter()
+        .filter(|(_, dir)| home_config(dir).is_some_and(|c| crate::host_sync::is_host_home(&c, Some(server))))
+        .collect()
+}
+
 /// Homes without a config never finished signing in (the runner writes it on pairing): they go, so failed
 /// attempts don't pile up. Only while no runner runs: a pairing in progress has none yet either.
 fn drop_unpaired(root: &std::path::Path) {
@@ -578,7 +593,7 @@ fn paired_home(dir: &std::path::Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{app_homes, drop_unpaired, no_longer_ours, LineSplitter};
+    use super::{app_homes, drop_unpaired, host_homes_in, no_longer_ours, LineSplitter};
     use std::path::PathBuf;
 
     #[test]
@@ -632,6 +647,24 @@ mod tests {
         assert!(no_longer_ours(&running, &app_homes(&root, Some("http://127.0.0.1:4310"))).is_empty());
         // Stopped running here: its host home stops (and stays on disk); a pairing in progress goes on.
         assert_eq!(no_longer_ours(&running, &app_homes(&root, None)), vec![host.to_string()]);
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn erasing_the_server_here_takes_only_its_own_host_homes() {
+        let root = std::env::temp_dir().join(format!("agentes-erase-homes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let own = "0e7c1d2a-0000-4000-8000-000000000001";
+        for (id, config) in [
+            ("a1b2c3d4", r#"{"server":"http://127.0.0.1:4310","token":"agm_x"}"#),
+            (own, r#"{"server":"http://127.0.0.1:4310","managedBy":"host","token":"agm_y"}"#),
+            ("0e7c1d2a-0000-4000-8000-000000000002", r#"{"server":"http://127.0.0.1:3000","managedBy":"host"}"#),
+        ] {
+            std::fs::create_dir_all(root.join(id)).unwrap();
+            std::fs::write(root.join(id).join("config.json"), config).unwrap();
+        }
+        assert_eq!(host_homes_in(&root, "http://127.0.0.1:4310"), vec![(own.to_string(), root.join(own))]);
+        assert!(host_homes_in(&root, "http://127.0.0.1:4311").is_empty());
         std::fs::remove_dir_all(&root).unwrap();
     }
 

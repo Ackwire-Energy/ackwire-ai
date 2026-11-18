@@ -18,6 +18,7 @@ import {
   VAULT_PROTOCOL,
 } from "@agenteschat/adapters";
 import { ARTIFACT_LIMITS } from "./artifacts";
+import { ToolOffError } from "./errors";
 import { type MachineCaller, MachineRequestError, type MachineStatus } from "./machine-hub";
 import { MachineOfflineError, MachinePausedError } from "./machines";
 import { personAtComputerWay, runnerUpdateWay } from "./runner-update";
@@ -85,11 +86,15 @@ function explain(
   switch (error.code) {
     case "exec_disabled":
       // A runner that reports access (protocol 10) has a switch for it; an older one only its start flag.
-      return said(
-        status?.access
-          ? `Commands are turned off on the computer ${name}: you can only read, write, list and upload files there. Tell the people: only the person at ${name} can turn commands on, ${personAtComputerWay(status, "Tools, Commands", ["tools enable commands"])}.`
-          : `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
-      );
+      return status?.access
+        ? new ToolOffError(
+            `Commands are turned off on the computer ${name}: you can only read, write, list and upload files there. Tell the people: whoever connected ${name} turns commands on with the button under your reply, or ${personAtComputerWay(status, "Tools, Commands", ["tools enable commands"])}.`,
+            { machineId: status.id, tool: "commands" },
+            { cause: error },
+          )
+        : said(
+            `Commands are turned off on the computer ${name} (its runner was started with --no-exec): you can only read, write, list and upload files there. Tell the person; its owner can restart the runner without --no-exec.`,
+          );
     // The runner names what is wrong with the path and what to use instead.
     case "outside_workspace":
     case "not_found":

@@ -108,10 +108,13 @@ class Proc:
 def snapshot(windows, proc, config, home):
     """
     The list of what `windows` (the window manager's: xid, pid, class, types, transient) show of this user's apps.
+    `unkept` when an app window can't be listed (no pid, not this user's, arguments over the cap): the runner then
+    never parks the desktop, whose window could hold unsaved work.
     """
     browser_class = config.get("browserClass") or ""
     notes = set(config.get("notes") or [])
     browser = False
+    unkept = False
     by_pid = {}
     for w in windows:
         classes = set(w.get("class") or [])
@@ -125,6 +128,8 @@ def snapshot(windows, proc, config, home):
         pid = w.get("pid")
         if isinstance(pid, int) and pid > 0 and proc.mine(pid):
             by_pid[pid] = by_pid.get(pid, 0) + 1
+        else:
+            unkept = True
     apps = []
     for pid in sorted(by_pid):
         argv = proc.argv(pid)
@@ -141,7 +146,9 @@ def snapshot(windows, proc, config, home):
         kept = capped_argv(argv)
         if kept:
             apps.append({"argv": kept, "cwd": folder})
-    return {"v": VERSION, "browser": browser, "apps": apps[:APPS_MAX]}
+        else:
+            unkept = True
+    return {"v": VERSION, "browser": browser, "apps": apps[:APPS_MAX], **({"unkept": True} if unkept else {})}
 
 
 def size(state):

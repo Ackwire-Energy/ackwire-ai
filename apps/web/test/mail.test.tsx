@@ -7,7 +7,7 @@ import { ApiError, type MailAccount, type RoutineInput } from "@agenteschat/clie
 import { defaultPolicy } from "@agenteschat/client/lib/mail";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { setNavigateAway } from "@/lib/navigate";
-import { pick, service } from "./catalog";
+import { openConnected, pick, service } from "./catalog";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeMailOf, ORG_ID, seedState } from "./fake-api";
 import { MAIL_PROVIDERS } from "./fakes/mail";
 import { renderApp, screen, settle } from "./render";
@@ -233,6 +233,7 @@ describe("Conectores → Email", () => {
       expect.objectContaining({ level: "read", policy: expect.objectContaining({ folders: ["INBOX"] }) }),
     );
     // The new row: the mailbox, active, used by 2 agents.
+    await openConnected();
     const row = screen()
       .getByRole("button", { name: "Quem usa ana@example.com" })
       .closest(".connected-row") as HTMLElement;
@@ -249,7 +250,7 @@ describe("Conectores → Email", () => {
     const hint = () => document.getElementById(address().getAttribute("aria-describedby") ?? "")?.textContent ?? null;
     await type(address(), "Ana@Gmail.com");
     expect(hint()).toBe(
-      "Use o endereço do Mail do iCloud, como nome@icloud.com, mesmo que a sua Conta Apple use o Gmail. No iPhone ele está em Ajustes\u00a0›\u00a0seu nome\u00a0›\u00a0iCloud\u00a0›\u00a0Mail do iCloud, ou veja em icloud.com/mail.",
+      "Use o endereço do Mail do iCloud, como nome@icloud.com, mesmo que a sua Conta Apple use o Gmail.",
     );
     await type(address(), "ana@hotmail.com");
     expect(hint()).toContain("use o Outlook");
@@ -309,6 +310,7 @@ describe("Conectores → Email", () => {
     const { api, state } = mailApi([{ address: "ana@icloud.com", aliases: ["suporte@acme.com.br"] }]);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
+    await openConnected();
     await click(screen().getByRole("button", { name: "Endereços de ana@icloud.com" }));
     await settle(4);
     const dialog = screen().getByRole("dialog", { name: "Endereços de ana@icloud.com" });
@@ -465,7 +467,7 @@ describe("Conectores → Email", () => {
     await renderApp(`/org/${ORG_ID}/settings/connectors?mail=connected&account=mail-1`, { api });
     await settle(8);
     const actions = screen().getByRole("dialog", { name: "O que joao@example.com faz" });
-    expect(actions.textContent).toContain("Só João pode dar acesso: foi quem conectou esta caixa.");
+    expect(actions.textContent).toContain("Só João dá acesso a esta caixa.");
     expect(within(actions).queryByRole("radiogroup", { name: "Nível de Enviar" })).toBeNull();
     await click(within(actions).getByRole("button", { name: "Continuar" }));
     await settle(4);
@@ -491,6 +493,7 @@ describe("Conectores → Email", () => {
     ]);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
+    await openConnected();
     const row = screen()
       .getByRole("button", { name: "Quem usa ana@example.com" })
       .closest(".connected-row") as HTMLElement;
@@ -519,6 +522,7 @@ describe("Conectores → Email", () => {
     const { api, state } = mailApi([{ address: "ana@example.com" }]);
     await renderApp(`/org/${ORG_ID}/settings/connectors`, { api });
     await settle(8);
+    await openConnected();
     await click(screen().getByRole("button", { name: "Desconectar ana@example.com" }));
     const confirm = screen().getByRole("dialog", { name: "Desconectar ana@example.com?" });
     await click(within(confirm).getByRole("button", { name: "Desconectar" }));
@@ -536,7 +540,7 @@ describe("the agent's email rules", () => {
     await click(within(level).getByRole("radio", { name: "Ler e escrever" }));
     const row = level.closest("li") as HTMLElement;
     // Sends ask by default.
-    expect(row.textContent).toContain("Enviar pede aprovação");
+    expect(row.querySelector(".level-row__asks")?.textContent).toBe("Pede aprovação: Enviar, Responder, Encaminhar");
     await click(within(row).getByRole("switch", { name: /Pode apagar emails/ }));
     await click(within(row).getByLabelText("Regras de ana@example.com"));
     await settle(4);
@@ -585,22 +589,57 @@ describe("the agent's email rules", () => {
     );
     await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
     await settle(10);
-    // The level is shown, not picked.
-    expect(screen().queryByRole("radiogroup", { name: "Nível em joao@example.com" })).toBeNull();
-    const [row] = within(screen().getByRole("list", { name: "Email" })).getAllByRole("listitem") as [HTMLElement];
-    expect(row.textContent).toContain("Só João pode dar acesso: foi quem conectou esta caixa.");
-    expect(within(row).queryByRole("button", { name: "Salvar" })).toBeNull();
+    // The level is shown, not picked: the control, faded.
+    const shown = within(screen().getByRole("radiogroup", { name: "Nível em joao@example.com" })).getAllByRole("radio");
     expect(
-      within(row)
-        .getByRole("switch", { name: /Pode apagar emails/ })
-        .hasAttribute("disabled"),
-    ).toBe(true);
+      shown.map((r) => [r.textContent, r.getAttribute("aria-checked"), (r as HTMLButtonElement).disabled]),
+    ).toEqual([
+      ["Sem acesso", "false", true],
+      ["Ler", "true", true],
+      ["Ler e escrever", "false", true],
+    ]);
+    const [row] = within(screen().getByRole("list", { name: "Email" })).getAllByRole("listitem") as [HTMLElement];
+    expect(row.textContent).toContain("Só João dá acesso a esta caixa.");
+    expect(within(row).queryByRole("button", { name: "Salvar" })).toBeNull();
+    // It only reads: nothing to delete, so no switch for it.
+    expect(within(row).queryByRole("switch", { name: /Pode apagar emails/ })).toBeNull();
     await click(within(row).getByRole("button", { name: "Remover acesso" }));
     await settle(4);
     const call = state.calls.find((c) => c.method === "mail.setAgent");
     expect(call?.args.slice(1, 3)).toEqual([ADA_ID, "mail-1"]);
     expect(call?.args[3]).toEqual({ level: "none", canDelete: false, policy: defaultPolicy() });
     expect(screen().getByText("Ada não tem mais acesso a joao@example.com.")).toBeTruthy();
+  });
+
+  describe("'Pode apagar emails' under a level that only reads", () => {
+    const at = async (canDelete: boolean) => {
+      const { api, mail } = mailApi([{ address: "ana@example.com" }]);
+      mail.agentMail.set(
+        ADA_ID,
+        new Map([["mail-1", { accountId: "mail-1", level: "read", canDelete, policy: defaultPolicy() }]]),
+      );
+      await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=access`, { api });
+      await settle(10);
+      const [row] = within(screen().getByRole("list", { name: "Email" })).getAllByRole("listitem") as [HTMLElement];
+      return row;
+    };
+    test("off: no switch", async () => {
+      expect(within(await at(false)).queryByRole("switch", { name: /Pode apagar emails/ })).toBeNull();
+    });
+    test("saved on: the switch is there, on, and stays under the pointer when turned off", async () => {
+      const row = await at(true);
+      const sw = within(row).getByRole("switch", { name: /Pode apagar emails/ });
+      expect(sw.getAttribute("aria-checked")).toBe("true");
+      expect(document.getElementById(sw.getAttribute("aria-describedby") ?? "")?.textContent).toBe(
+        "Mesmo ligado, cada exclusão pede aprovação.",
+      );
+      await click(sw);
+      expect(
+        within(row)
+          .getByRole("switch", { name: /Pode apagar emails/ })
+          .getAttribute("aria-checked"),
+      ).toBe("false");
+    });
   });
 
   test("a Gmail still connecting: its name, 'Conectando' and the way to Conectores, no level to pick", async () => {
@@ -674,7 +713,7 @@ describe("the agent's email rules", () => {
     await settle(10);
     const row = screen().getByRole("radiogroup", { name: "Nível em ana@example.com" }).closest("li") as HTMLElement;
     // 4 rules: senders, window, recipients, send without asking.
-    expect(within(row).getByLabelText("Regras de ana@example.com").textContent).toContain("4");
+    expect(within(row).getByLabelText("Regras de ana@example.com").parentElement?.textContent).toBe("Regras4");
     await click(within(row).getByLabelText("Regras de ana@example.com"));
     const auto = within(row).getByRole("switch", { name: /Enviar sem pedir aprovação/ });
     expect(auto.getAttribute("aria-checked")).toBe("true");

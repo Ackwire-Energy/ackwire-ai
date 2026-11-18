@@ -15,6 +15,7 @@ import {
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { quoteExcerpt } from "@agenteschat/client/lib/reply";
+import { useSeat } from "@agenteschat/client/lib/seat-context";
 import { Button, cx, Icon, InfoHint } from "@agenteschat/ui";
 import type RFB from "@novnc/novnc";
 import { type ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -23,8 +24,9 @@ import { useDirectory } from "@/hooks/useDirectory";
 import { matchesNow, TOUCH, useMatchMedia } from "@/hooks/useMatchMedia";
 import { heldPicture, holdImage, holdPicture, liveCanvas, pictureOf, showsPicture } from "@/lib/canvas";
 import { useSaid } from "@/lib/toast";
-import { SocketFactoryContext } from "@/realtime/context";
+import { SocketFactoryContext, useDesktopPointer } from "@/realtime/context";
 import { withAgentFace } from "../AgentAvatar";
+import { AgentCursor } from "../browser/AgentCursor";
 import { Cover } from "../browser/Cover";
 import { AskActions, HandBackFoot, useAskControl } from "../computer/control";
 import { CantShowCover, ScreenNotice } from "../computer/covers";
@@ -118,6 +120,7 @@ export function DesktopView({
   const g = agentGrammar(name);
   const color = colorOf(dir.agentById.get(agentId));
   const [view, setView] = useState<DesktopViewState>("connecting");
+  const pointer = useDesktopPointer(agentId);
   const [round, setRound] = useState(0);
   const [gaveUp, setGaveUp] = useState(false);
   // Control opening over the last picture it watched, or watching again over the last one in control.
@@ -132,6 +135,8 @@ export function DesktopView({
   const attempts = useRef(0);
   // Nothing says when a screen is handed back: asked often while it may change any moment.
   const [poll, setPoll] = useState(5_000);
+  // The right hand's shared place when the view is inside one of it (the dialog opened for it).
+  const seat = useSeat(agentId);
   const status = useDesktopStatus(org.id, agentId, { poll: preview ? 30_000 : poll });
   // Access lost: React Query keeps the last good status, which would still say who may watch.
   const lost = status.error instanceof ApiError && status.error.status === 403;
@@ -248,8 +253,8 @@ export function DesktopView({
           desktopSocketUrl(
             window.location,
             preview
-              ? { orgId: org.id, agentId, mode: "watch", preview: true }
-              : { orgId: org.id, agentId, mode: opening, switches: true },
+              ? { orgId: org.id, agentId, mode: "watch", preview: true, seat }
+              : { orgId: org.id, agentId, mode: opening, switches: true, seat },
           ),
         ) as unknown as WebSocket;
         const opened = new DesktopLink(socket);
@@ -288,8 +293,6 @@ export function DesktopView({
           setScreenMode(m);
           const next = new Rfb(el, opened.channel(), { shared: true });
           next.viewOnly = !control;
-          // In control, a screen that draws no pointer of its own shows noVNC's dot, never none (watching, desktop.css).
-          next.showDotCursor = control;
           const encoding = desktopEncoding(control, network);
           next.qualityLevel = encoding.quality;
           next.compressionLevel = encoding.compression;
@@ -368,7 +371,7 @@ export function DesktopView({
       window.removeEventListener("pagehide", leave);
       end();
     };
-  }, [connect, round, org.id, agentId, createSocket, refetch, copiedThere, preview]);
+  }, [connect, round, org.id, agentId, seat, createSocket, refetch, copiedThere, preview]);
   // The page's last picture, when the dialog switches from it to the screen, waits here dimmed for the screen's
   // first one; going, the screen leaves its own for the page. Layout effects: the one leaving writes it before the one
   // coming reads it, and nothing paints in between.
@@ -578,6 +581,7 @@ export function DesktopView({
     <div
       className={cx("dsk", preview && "dsk--card", inControl && "is-control", final && "is-final")}
       data-state={shown}
+      data-control={inControl || undefined}
     >
       {!preview && (
         <DialogHead
@@ -605,7 +609,12 @@ export function DesktopView({
           className={inControl ? "dsk-screen is-control" : "dsk-screen"}
           role="img"
           aria-label={t("agentComputer.screen", g)}
-        />
+        >
+          {/* Watching the agent work: its cursor shows where it goes (noVNC's picture has no pointer in it). */}
+          {!inControl && view === "live" && (
+            <AgentCursor agentId={agentId} name={name} color={color} pointer={pointer} />
+          )}
+        </div>
         {inControl && (
           <textarea
             ref={keysRef}

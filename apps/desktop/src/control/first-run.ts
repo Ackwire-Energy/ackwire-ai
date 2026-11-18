@@ -13,7 +13,7 @@ import {
 } from "@agenteschat/client/lib/server";
 import { appServer, serverName } from "./server";
 
-export type FirstScreen = "choose" | "own" | "connect" | "here" | "link" | "pair";
+export type FirstScreen = "choose" | "install" | "connect" | "here" | "link" | "pair";
 
 /**
  * Esc in the first run: back a screen, or the window closes (when a server is open already); never while
@@ -22,21 +22,8 @@ export type FirstScreen = "choose" | "own" | "connect" | "here" | "link" | "pair
 export const escapeAction = (screensBack: number, busy: boolean): "stay" | "back" | "close" =>
   busy ? "stay" : screensBack > 0 ? "back" : "close";
 
-/**
- * Where "Use your own server ›" goes: the two ways where both exist (`canRunHere`: this build carries the
- * server), else straight to Connect.
- */
-export const ownServerScreen = (canRunHere: boolean): FirstScreen => (canRunHere ? "own" : "connect");
-
-/** The one-command setup, for a server without a screen. */
-export const INSTALL_COMMAND = "curl -fsSL https://agentes.chat/install | sh";
-
-/**
- * Whether the one-command setup works from a clean machine: it needs the repository, the setup package and the
- * image to be public. Until then Connect's "Run this on it" stays hidden, since the command
- * would fail for anyone outside.
- */
-export const INSTALL_COMMAND_LIVE = false;
+/** The fork's source installation guide, for a computer that stays on. */
+export const INSTALL_GUIDE_URL = "https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SELF_HOSTING.md#from-source";
 
 /**
  * Discovery: how long the app may take to list the candidates (this computer's ports, and `tailscale status`, which

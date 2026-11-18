@@ -16,6 +16,7 @@ import {
   PLAN_MESSAGE,
   SECRET_READ_DENY_RULES,
   simpleCommands,
+  unaskedMessage,
 } from "@agenteschat/adapters/command-policy";
 import {
   type AgentScope,
@@ -37,6 +38,7 @@ import {
   permissionPrompt,
   shellArg,
   type ToolCaller,
+  turnAsks,
 } from "./mcp";
 import { isInside, realOrNearest } from "./paths";
 import type { Spawn } from "./scope-gate";
@@ -288,6 +290,8 @@ export type ShellStatus = ToolNotice["status"];
 export interface DelegatedScope {
   /** Claude Code's session: the cwd, what was read and the background shells carry over a restarted CLI. */
   session: string;
+  /** The agent as root's turn names it: its commands' commits end with its `coAuthors` (`agentSecrets`). */
+  agent?: AgentScope;
   cwd: string;
   /** The agent's folder and the folders granted to it: edits there need nobody. */
   folder: string;
@@ -297,6 +301,8 @@ export interface DelegatedScope {
   branches?: readonly string[];
   /** What a person allowed for the whole mission. */
   allow?: readonly string[];
+  /** `PromptContext.asks`: an agent that always asks gets nothing but reads allowed here. */
+  asks?: "always" | "never";
   runnerHome?: string;
   /** A `chat` turn: none of these tools, only the server's. */
   chat?: boolean;
@@ -315,7 +321,8 @@ type Secrets = {
 } | null;
 
 export interface DelegatedToolsOptions {
-  secrets: () => Promise<Secrets>;
+  /** `agentSecrets` for the session's agent (`DelegatedScope.agent`), or the worker's own. */
+  secrets: (agent?: AgentScope) => Promise<Secrets>;
   /** `tool.notice`, to root. */
   onNotice?: (notice: ToolNotice) => void;
   /** A background task's call was refused with nobody to approve it: its task lists it when it ends. */
@@ -520,6 +527,7 @@ export class DelegatedTools {
       scope: this.commandScope(s),
       profile: scope.profile,
       ...(scope.branches?.length ? { branches: scope.branches } : {}),
+      ...(scope.asks ? { asks: scope.asks } : {}),
       ...taskContext(scope.task),
       call: (name, args, ctx) => this.call(s, name, args, ctx),
       cancel: (id) => this.stopCalls(s, id),
@@ -566,7 +574,11 @@ export class DelegatedTools {
       scope.profile === "plan" ? "plan" : "work",
       [...(scope.allow ?? [])],
       undefined,
-      { promptReads: true, ...(scope.runnerHome ? { runnerHome: scope.runnerHome } : {}) },
+      {
+        promptReads: true,
+        ...(scope.runnerHome ? { runnerHome: scope.runnerHome } : {}),
+        ...(scope.asks === "always" ? { asksFirst: true } : {}),
+      },
     ).permissions as Session["rules"];
     if (held) {
       if (held.scope.cwd !== scope.cwd) held.cwd = scope.cwd;
@@ -629,7 +641,7 @@ export class DelegatedTools {
     s.calls.set(ctx.id, call);
     let secrets: Secrets = null;
     try {
-      secrets = await this.opts.secrets();
+      secrets = await this.opts.secrets(s.scope.agent);
       return this.finished(await handler({ s, args, ask: ctx.ask, id: ctx.id, call, secrets }), secrets);
     } catch (err) {
       return this.finished(fail(err instanceof Error ? err.message : String(err)), secrets);
@@ -678,7 +690,9 @@ export class DelegatedTools {
       if (s.scope.task) this.opts.onDenied?.(s.scope.session, tool, input);
       return message;
     };
-    if (verdict?.behavior === "deny") return refuse(verdict.message);
+    if (verdict?.behavior === "deny") {
+      return refuse(s.scope.asks === "never" && !s.scope.task ? unaskedMessage(verdict.message) : verdict.message);
+    }
     if (s.rules.deny.some((rule) => ruleMatches(rule, tool, input))) {
       return refuse(`Permission to use ${tool} has been denied.`);
     }
@@ -693,6 +707,7 @@ export class DelegatedTools {
         scope,
         profile,
         ...(s.scope.branches?.length ? { branches: s.scope.branches } : {}),
+        ...(s.scope.asks ? { asks: s.scope.asks } : {}),
         ...taskContext(s.scope.task),
       }),
     );
@@ -701,6 +716,8 @@ export class DelegatedTools {
 
   /** An allow rule for each part of a command it can follow, or an edit inside the turn's folders. */
   private allowedHere(s: Session, scope: CommandScope, tool: string, input: Record<string, unknown>) {
+    // An agent that always asks: nothing but a read (`localVerdict`) is allowed here.
+    if (s.scope.asks === "always") return false;
     if (tool === "Edit" || tool === "Write") {
       return s.scope.profile === "work" && insideFolders(scope, String(input.file_path));
     }
@@ -1380,6 +1397,7 @@ export interface DelegatedBridge {
   profile: CommandProfile;
   branches?: string[];
   allow?: string[];
+  asks?: "always" | "never";
   /** The turn in progress and its server token: none between turns. */
   runId?: string;
   serverToken?: string;
@@ -1413,6 +1431,7 @@ export function parseBridge(f: Record<string, unknown>): DelegatedBridge | null 
     profile: f.profile === "plan" ? "plan" : "work",
     ...(branches ? { branches } : {}),
     ...(allow ? { allow } : {}),
+    ...(turnAsks(f.asks) ? { asks: turnAsks(f.asks) } : {}),
     ...(typeof f.runId === "string" ? { runId: f.runId } : {}),
     ...(typeof f.serverToken === "string" ? { serverToken: f.serverToken } : {}),
     ...(typeof f.socketPath === "string" && path.isAbsolute(f.socketPath) ? { socketPath: f.socketPath } : {}),
@@ -1440,12 +1459,14 @@ export function delegatedTask(
     ...(redact ? { redact } : {}),
     delegated: tools.surface({
       session: bridge.session,
+      agent: bridge.agent,
       cwd: bridge.cwd,
       folder,
       grants,
       profile: bridge.profile,
       ...(bridge.branches ? { branches: bridge.branches } : {}),
       ...(bridge.allow ? { allow: bridge.allow } : {}),
+      ...(bridge.asks ? { asks: bridge.asks } : {}),
       ...(runnerHome ? { runnerHome } : {}),
       ...(bridge.chat ? { chat: true } : {}),
       ...(bridge.task ? { task: bridge.task } : {}),

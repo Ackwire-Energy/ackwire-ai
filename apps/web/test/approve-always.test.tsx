@@ -140,15 +140,15 @@ describe("Aprovar sempre on a request", () => {
     expect(approveCalls(state)).toEqual([[ORG_ID, "ap-merge", undefined]]);
   });
 
-  test("on Aprovações: in the open request's decision bar, never on a high-risk one", async () => {
+  test("on Aprovações: in the open request's decision bar, on a high-risk one too when the server offers it", async () => {
     const state = withComposio();
     const deploy = state.approvals[1];
     if (deploy) deploy.approveAlways = { tool: "run_workflow", actions: [] };
     await renderApp(`/org/${ORG_ID}/approvals`, { api: createFakeApi(state) });
     await settle(4);
-    // The deploy, closest to expiring, opens first: high risk, so no "Always approve".
+    // The deploy, closest to expiring, opens first: high risk, and it may be approved for good like any other.
     const risky = screen().getByRole("region", { name: "Fazer um deploy" });
-    expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).toBeNull();
+    expect(within(risky).queryByRole("button", { name: "Aprovar sempre" })).not.toBeNull();
     await click(document.querySelector('.ap-li[data-id="ap-merge"]') as HTMLElement);
     const pane = screen().getByRole("region", { name: /\(GitHub\)$/ });
     // Beside Refuse and Approve, first in a bar of buttons alone: what each allows is in its tip.
@@ -266,7 +266,9 @@ describe("Ferramentas e acesso: Aprovado sempre", () => {
     cleanup();
 
     await page();
-    expect(document.body.textContent).toContain("Merge, deploy e rollback sempre pedem aprovação no chat.");
+    // The tab is up (its Aprovações row), with no card and no note beside it.
+    expect(screen().getByRole("region", { name: "Aprovações" })).toBeTruthy();
+    expect(document.querySelector(".newag__note")).toBeNull();
     expect(card()).toBeNull();
   });
 });

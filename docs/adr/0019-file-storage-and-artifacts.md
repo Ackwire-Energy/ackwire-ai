@@ -1,6 +1,6 @@
 # 0019. File storage per organization, and artifacts
 
-- Status: Accepted. Amended 2026-10-30 by ADR 0088 (deleted workspaces go at the end of their 7 days; a deleted account's photos). Amended 2026-11-01 (a page has no network)
+- Status: Accepted. Amended 2026-10-30 by ADR 0088 (deleted workspaces go at the end of their 7 days; a deleted account's photos). Amended 2026-11-01 (a page has no network). Amended 2026-11-14 (connecting a bucket service by service)
 - Date: 2026-10-14
 
 ## Decision
@@ -31,3 +31,15 @@
 - Old files keep working after a switch without a migration; the migration is optional and safe to re-run.
 - The Postgres fallback keeps development free of external services, but is meant for small files only.
 - Self-host can also keep files on local disk (`FILES_DIR`).
+
+## Addendum (2026-11-11): the address is checked again as every request connects
+
+The check when an address is saved doesn't hold for later requests: a name can answer with another address afterwards, and a workspace's own bucket with virtual-hosted addressing is reached at `bucket.endpoint`, a name the saved check never saw. So every request to an address a workspace's people, agents or connected servers named goes through one fetch, `outboundFetch` (`net-guard.ts`), which is `publicHttpsFetch` (ADR 0146): the host is resolved and checked at that request, the socket goes to the checked address, and a redirect isn't followed. It covers the workspace's own bucket, a custom MCP server's sessions (a 307 or 308 that stays on the same origin is followed, each hop checked again), MCP OAuth's discovery, registration, token exchange and refresh, the icon a server lists, and `web_fetch` (its own redirects, each hop checked). The saved check stays, for its plain errors.
+
+Addresses the operator sets by env (the platform bucket, a search or speech server) are trusted and never checked. Where the operator lets workspaces reach the server's network (`allowsPrivateEndpoints`, ADR 0146: self-hosted and closed to sign-up, or `MODEL_ENDPOINTS_PRIVATE`), `outboundFetch` is the plain `fetch`, as before, so a proxy set for the server keeps working (`allowPrivateOutbound` at boot).
+
+## Addendum (2026-11-14): connecting a bucket service by service
+
+Seven technical fields at once kept "your own bucket" for people who already knew S3. Settings › Storage now offers "Connect storage" once the option is picked, and its dialog asks first where the bucket is: Cloudflare R2, Amazon S3, Backblaze B2 or Other. Each service gets its own steps, each saying where to click in that service's dashboard (its menu names in the English the dashboards show by default) and taking only what that step gives: R2 asks for the bucket, the two keys and its endpoint; Amazon S3 for the bucket, its region from a list and the keys, with a button that copies an IAM policy reaching that bucket alone; Backblaze B2 for the bucket, its endpoint and the keys; Other keeps the seven fields. The app fills in the rest (`toS3Input` in `packages/client/src/lib/storage.ts`): R2 by its endpoint's origin, region `auto`, path-style; Amazon S3's endpoint from its region, virtual-hosted; B2's region read from its endpoint, path-style. The server still gets the same settings, tests them the same way and switches on only what passed.
+
+The service picked is kept with the settings (`provider` in the row's options: `r2`, `s3`, `b2` or `other`, null for rows saved before) and returned by `GET …/storage`, so the option in use says "Cloudflare R2 · bucket" and "Edit connection" opens that service's steps. It stays out of the fingerprint: the same bucket under another name is still the bucket that passed. A test step that fails says its reason by its code in the person's language (the first step's refusals of an address or a bucket name carry their code too), and a refused permission adds what to check in that service.

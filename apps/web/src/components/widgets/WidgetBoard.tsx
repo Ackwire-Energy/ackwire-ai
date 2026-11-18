@@ -1,5 +1,14 @@
 import type { Dashboard, HomeTile, Widget } from "@agenteschat/client";
-import { type BoardItem, boardItems, layoutOf, resizeItem, useRefreshWidget, useSaveLayout } from "@agenteschat/client";
+import {
+  type BoardItem,
+  boardItems,
+  layoutOf,
+  resizeItem,
+  useBuildOnceAi,
+  useRefreshWidget,
+  useSaveLayout,
+  widgetCardStatus,
+} from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
@@ -22,7 +31,7 @@ import { useTranslation } from "react-i18next";
 import { useNow } from "@/hooks/useNow";
 import { type GridMove, useGridDrag } from "@/lib/grid-drag";
 import { useToast } from "@/lib/toast";
-import { useWidgetAgent, WidgetFace, WidgetFoot, widgetTitle } from "./parts";
+import { useWidgetAgent, WidgetFace, WidgetFoot, widgetBodyText, widgetTitle } from "./parts";
 import { RemoveWidgetDialog } from "./RemoveWidgetDialog";
 import "./widgets.css";
 
@@ -252,7 +261,10 @@ function BoardWidget({
   const toast = useToast();
   const { name, color } = useWidgetAgent(widget.agentId);
   const refresh = useRefreshWidget(orgId);
-  const busy = widget.status === "building" || widget.status === "updating" || refresh.isPending;
+  useBuildOnceAi(orgId, widget, editable);
+  // A refresh that waits stands still: Update now on it goes on now, or says why it can't.
+  const status = widgetCardStatus(widget, now);
+  const busy = status === "building" || status === "updating" || refresh.isPending;
   const update = () =>
     refresh.mutate(widget.id, { onError: (e) => toast.show(errorText(t, e, i18n.language), "error") });
   const size = layoutToSize(widget.layout);
@@ -264,11 +276,11 @@ function BoardWidget({
       data-widget={widget.id}
       title={widgetTitle(t, widget)}
       spec={widget.spec}
-      status={widget.status}
+      status={status}
       color={color}
       size={{ w: widget.layout.w, h: widget.layout.h }}
       locale={i18n.language}
-      buildingText={t("widgets.status.building", { name })}
+      buildingText={status === widget.status ? widgetBodyText(t, widget, name) : undefined}
       face={<WidgetFace agentId={widget.agentId} name={name} />}
       onOpen={onOpen}
       board={board}
@@ -278,7 +290,7 @@ function BoardWidget({
           name={name}
           color={color}
           now={now}
-          resolving={refresh.isPending && widget.status === "failed"}
+          resolving={refresh.isPending}
           onResolve={editable ? update : undefined}
         />
       }

@@ -3,19 +3,25 @@ import {
   commentIssue,
   createIssue,
   createIssueColumn,
+  createIssueProject,
   deleteIssue,
   deleteIssueColumn,
+  deleteIssueProject,
   getIssueDetail,
   type IssueDeps,
   issueFromMessage,
   listIssueActivity,
   listIssueColumns,
+  listIssueProjects,
   listIssues,
   openTaskConversation,
+  PROJECT_NAME_MAX,
+  ROLE_COLORS,
   setCriterion,
   setIssueAudience,
   updateIssue,
   updateIssueColumn,
+  updateIssueProject,
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import {
@@ -33,6 +39,8 @@ import { AudienceChoice, WorkView } from "./schemas";
 
 const tags = ["Issues"];
 const Actor = z.object({ type: z.enum(["person", "agent"]), id: z.string() });
+/** Who has a task (ADR 0188): the whole list, in order. */
+const Assignees = z.array(Actor).max(20);
 const Status = z.enum(["todo", "in_progress", "in_review", "done", "canceled"]);
 const Priority = z.enum(["low", "normal", "high"]);
 const GithubUrl = z
@@ -44,6 +52,24 @@ const DueDate = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .nullable();
+
+const ProjectColor = z.enum(ROLE_COLORS);
+const ProjectRef = z
+  .object({
+    id: z.uuid(),
+    name: z.string(),
+    color: z.string().openapi({ description: "One of the roles' colors." }),
+    archived: z.boolean().openapi({ description: "Offered to no new task. Its tasks keep it." }),
+  })
+  .openapi("IssueProjectRef");
+const Project = ProjectRef.extend({
+  open: z.number().int().openapi({ description: "Open tasks in it that you see." }),
+}).openapi("IssueProject");
+const ProjectId = z
+  .uuid()
+  .nullable()
+  .openapi({ description: "The task's one project (`null`: none). An archived project takes no new task." });
+const ProjectParams = OrgParams.extend({ projectId: z.uuid() });
 
 const ConversationRef = z.object({
   channelId: z.uuid().openapi({ description: "The conversation's own channel (kind `task`): the chat's routes." }),
@@ -66,7 +92,11 @@ const Issue = z
     columnId: z.uuid().nullable().openapi({ description: "Its board column, always one of its stage." }),
     boardRank: z.number().openapi({ description: "Order inside the column, lowest first." }),
     priority: Priority,
-    assignee: Actor.nullable(),
+    project: ProjectRef.nullable(),
+    assignees: z.array(Actor).openapi({
+      description:
+        "Who has it, in order: people and agents; empty: nobody. The first agent answers what names nobody in its conversation.",
+    }),
     labels: z.array(z.string()),
     dueDate: z.string().nullable(),
     criteria: z.array(
@@ -128,7 +158,7 @@ const Issue = z
 
 const IssueDetail = Issue.extend({
   subIssues: z.array(
-    z.object({ id: z.uuid(), number: z.number(), title: z.string(), status: Status, assignee: Actor.nullable() }),
+    z.object({ id: z.uuid(), number: z.number(), title: z.string(), status: Status, assignees: z.array(Actor) }),
   ),
 }).openapi("IssueDetail");
 
@@ -141,6 +171,9 @@ const Activity = z
     event: z.string().optional(),
     textCode: z.string().optional(),
     textParams: z.record(z.string(), z.string()).optional(),
+    assignee: Actor.optional().openapi({
+      description: "An `assigned` event: who was put on the task, or taken off it (`textCode` `unassigned`).",
+    }),
     auto: z.boolean().optional().openapi({ description: "The system moved it on its own (runs and PRs)." }),
     attachments: z.array(z.object({ id: z.uuid(), title: z.string() })).optional(),
     createdAt: z.string(),
@@ -183,6 +216,10 @@ export function issueRoutes(deps: AppDeps) {
           q: z.string().max(200).optional(),
           status: Status.optional(),
           parentIssueId: z.uuid().optional(),
+          projectId: z
+            .union([z.uuid(), z.literal("none")])
+            .optional()
+            .openapi({ description: "Only that project's tasks. `none`: the ones with no project." }),
         }),
       },
       responses: { 200: json(z.object({ issues: z.array(Issue) })), ...errors },
@@ -194,6 +231,7 @@ export function issueRoutes(deps: AppDeps) {
         q: query.q,
         status: query.status,
         parentIssueId: query.parentIssueId,
+        projectId: query.projectId,
       });
       return c.json({ issues: list }, 200);
     },
@@ -245,10 +283,11 @@ export function issueRoutes(deps: AppDeps) {
             title: z.string().min(1).max(300),
             description: z.string().max(50_000).optional(),
             criteria: z.array(z.string().max(500)).max(50).optional(),
-            assignee: Actor.nullable().optional(),
+            assignees: Assignees.optional(),
             priority: Priority.optional(),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            projectId: ProjectId.optional(),
             githubUrl: GithubUrl.optional(),
             parentIssueId: z.uuid().nullable().optional(),
             attachmentIds: z
@@ -295,9 +334,12 @@ export function issueRoutes(deps: AppDeps) {
               .openapi({ description: "Move to a board column; the issue takes that column's stage." }),
             boardRank: z.number().optional().openapi({ description: "Its order inside the column (lowest first)." }),
             priority: Priority.optional(),
-            assignee: Actor.nullable().optional(),
+            assignees: Assignees.optional().openapi({
+              description: "The whole new list, in order: whoever is left out leaves the task.",
+            }),
             dueDate: DueDate.optional(),
             labels: z.array(z.string().max(40)).max(20).optional(),
+            projectId: ProjectId.optional(),
             githubUrl: GithubUrl.optional(),
             criteria: z
               .array(z.object({ id: z.string().optional(), text: z.string().max(500) }))
@@ -413,6 +455,93 @@ export function issueRoutes(deps: AppDeps) {
       const { orgId, columnId } = c.req.valid("param");
       const { moveTo } = c.req.valid("query");
       return c.json({ columns: await deleteIssueColumn(issues, c.get("user").id, orgId, columnId, moveTo) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "get",
+      path: "/organizations/{orgId}/issue-projects",
+      tags,
+      security,
+      summary: "The tasks' projects by name, archived ones last, with your open tasks in each",
+      request: { params: OrgParams },
+      responses: {
+        200: json(
+          z.object({
+            projects: z.array(Project),
+            unfiled: z.number().int().openapi({ description: "Open tasks you see that have no project." }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await listIssueProjects(db, c.get("user").id, orgId), 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "post",
+      path: "/organizations/{orgId}/issue-projects",
+      tags,
+      security,
+      summary: "Create a project (whoever may create tasks)",
+      description: "`issue_project.name_taken`: another project has that name, whatever its capitals.",
+      request: {
+        params: OrgParams,
+        body: body(z.object({ name: z.string().min(1).max(PROJECT_NAME_MAX), color: ProjectColor.optional() })),
+      },
+      responses: { 201: json(Project, "Created"), ...errors },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      return c.json(await createIssueProject(issues, c.get("user").id, orgId, c.req.valid("json")), 201);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "patch",
+      path: "/organizations/{orgId}/issue-projects/{projectId}",
+      tags,
+      security,
+      summary: "Rename, recolour, archive or bring back a project",
+      request: {
+        params: ProjectParams,
+        body: body(
+          z.object({
+            name: z.string().min(1).max(PROJECT_NAME_MAX).optional(),
+            color: ProjectColor.optional(),
+            archived: z.boolean().optional(),
+          }),
+        ),
+      },
+      responses: { 200: json(ProjectRef), ...errors },
+    }),
+    async (c) => {
+      const { orgId, projectId } = c.req.valid("param");
+      const project = await updateIssueProject(issues, c.get("user").id, orgId, projectId, c.req.valid("json"));
+      return c.json(project, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "delete",
+      path: "/organizations/{orgId}/issue-projects/{projectId}",
+      tags,
+      security,
+      summary: "Delete a project. Its tasks stay, with no project",
+      request: { params: ProjectParams },
+      responses: { 204: noContent[204], ...errors },
+    }),
+    async (c) => {
+      const { orgId, projectId } = c.req.valid("param");
+      await deleteIssueProject(issues, c.get("user").id, orgId, projectId);
+      return c.body(null, 204);
     },
   );
 
@@ -548,7 +677,8 @@ export function issueRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/issues/{issueId}/ask-agent",
       tags,
       security,
-      summary: '"Ask Ada to implement": assigns the agent and starts its work in the task\'s conversation',
+      summary:
+        '"Ask Ada to implement": puts the agent first among the assignees and starts its work in the task\'s conversation',
       request: { params: IssueParams, body: body(z.object({ agentId: z.uuid() })) },
       responses: { 200: json(Issue), ...errors },
     }),

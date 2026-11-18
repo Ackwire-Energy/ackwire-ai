@@ -26,6 +26,7 @@ import {
   type McpConnect,
   mcpSessionOver,
   type RoutineBrief,
+  refreshCustomServer,
   removeApprovalRule,
   revokeConnection,
   saveCustomTools,
@@ -368,12 +369,15 @@ describe("reads through Composio's executor", () => {
       }),
     );
     expect(mixed.approveAlways?.actions).toEqual(["GITHUB_LIST_PULL_REQUESTS", "GITHUB_CREATE_AN_ISSUE_COMMENT"]);
-    // Not a shape we know: nothing is guessed, and nothing can be approved for good.
+    // Not a shape we know: nothing is guessed, so approving for good keeps the tool itself, for such calls only.
     for (const input of [
       { tools: [{ tool_slug: "github_list_pull_requests", arguments: {} }], sync_response_to_workbench: false },
       exec("GITHUB_LIST_PULL_REQUESTS", WORKBENCH),
     ]) {
-      expect(asked(await invoke(gateway, ctx, EXEC, { ...input, why: WHY })).approveAlways).toBeNull();
+      expect(asked(await invoke(gateway, ctx, EXEC, { ...input, why: WHY })).approveAlways).toEqual({
+        tool: COMPOSIO_EXECUTOR,
+        actions: [],
+      });
     }
     // Write alone on the server: its reads aren't the agent's.
     await setAgentScopes(
@@ -388,7 +392,7 @@ describe("reads through Composio's executor", () => {
     expect(mcp.calls).toEqual([]);
   });
 
-  test("a routine's reads run; its writes always ask and are never approved for good", async () => {
+  test("a routine's reads run; its writes ask, and a kind approved for good runs on its runs too", async () => {
     f = await setup();
     const { mcp, gateway, serverId } = await world(f);
     const brief: RoutineBrief = {
@@ -404,6 +408,8 @@ describe("reads through Composio's executor", () => {
     };
     const ctx = await runOf(f, f.agent.id, brief);
     expect((await invoke(gateway, ctx, EXEC, exec("GITHUB_LIST_PULL_REQUESTS"))).type).toBe("result");
+    const write = asked(await invoke(gateway, ctx, EXEC, { ...exec("GITHUB_CREATE_AN_ISSUE_COMMENT"), why: WHY }));
+    expect(write.approveAlways).toEqual({ tool: COMPOSIO_EXECUTOR, actions: ["GITHUB_CREATE_AN_ISSUE_COMMENT"] });
     await f.db.insert(schema.approvalRules).values({
       orgId: f.org.id,
       agentId: f.agent.id,
@@ -411,9 +417,8 @@ describe("reads through Composio's executor", () => {
       tool: COMPOSIO_EXECUTOR,
       action: "GITHUB_CREATE_AN_ISSUE_COMMENT",
     });
-    const write = asked(await invoke(gateway, ctx, EXEC, { ...exec("GITHUB_CREATE_AN_ISSUE_COMMENT"), why: WHY }));
-    expect(write.approveAlways).toBeNull();
-    expect(mcp.calls.map((c) => c.tool)).toEqual([COMPOSIO_EXECUTOR]);
+    expect((await invoke(gateway, ctx, EXEC, exec("GITHUB_CREATE_AN_ISSUE_COMMENT"))).type).toBe("result");
+    expect(mcp.calls.map((c) => c.tool)).toEqual([COMPOSIO_EXECUTOR, COMPOSIO_EXECUTOR]);
   });
 });
 
@@ -481,11 +486,11 @@ describe("Aprovar sempre", () => {
     expect(mcp.calls).toHaveLength(1);
   });
 
-  test("merge, deploy, workflows, sends, GraphQL and SQL are never offered nor honoured, even with a rule in the table", async () => {
+  test("merge, deploy, workflows, sends, GraphQL and SQL are offered like any action, and the rule then holds", async () => {
     f = await setup();
     const { mcp, gateway, serverId } = await world(f);
     const ctx = await runOf(f);
-    for (const slug of [
+    const slugs = [
       "GITHUB_MERGE_A_PULL_REQUEST",
       "GITHUB_CREATE_A_DEPLOYMENT",
       "GITHUB_CREATE_A_WORKFLOW_DISPATCH_EVENT",
@@ -505,33 +510,21 @@ describe("Aprovar sempre", () => {
       "SUPABASE_BETA_RUN_SQL_QUERY",
       "CLOUDFLARE_EXECUTE_D1_QUERY",
       "VERCEL_EXECUTE_SANDBOX_COMMAND",
-    ]) {
-      await f.db.insert(schema.approvalRules).values({
-        orgId: f.org.id,
-        agentId: f.agent.id,
-        connectionId: serverId,
-        tool: COMPOSIO_EXECUTOR,
-        action: slug,
-      });
-      const ask = asked(await invoke(gateway, ctx, EXEC, { ...exec(slug), why: WHY }));
-      expect({ slug, offered: ask.approveAlways }).toEqual({ slug, offered: null });
-      await expect(decide(f, f.owner.id, ask.id, { decision: "approve", always: true })).rejects.toMatchObject({
-        code: "approval.always_unavailable",
-      });
-    }
-    expect(mcp.calls).toEqual([]);
-    // A pull request, its labels or a commit's comment still may be.
-    for (const slug of [
       "GITHUB_CREATE_A_PULL_REQUEST",
       "GITHUB_ADD_LABELS_TO_AN_ISSUE",
-      "GITHUB_CREATE_A_COMMIT_COMMENT",
-    ]) {
+    ];
+    for (const slug of slugs) {
       const ask = asked(await invoke(gateway, ctx, EXEC, { ...exec(slug), why: WHY }));
       expect(ask.approveAlways).toEqual({ tool: COMPOSIO_EXECUTOR, actions: [slug] });
+      await decide(f, f.owner.id, ask.id, { decision: "approve", always: true });
+      // The same action with no reason: the rule lets it run.
+      expect({ slug, ran: (await invoke(gateway, ctx, EXEC, exec(slug))).type }).toEqual({ slug, ran: "result" });
     }
+    expect(mcp.calls).toHaveLength(slugs.length);
+    expect((await rules(f)).map((r) => [r.connectionId, r.action])).toEqual(slugs.map((slug) => [serverId, slug]));
   });
 
-  test("the workbench and the proxy always ask, even set to write, and are never offered", async () => {
+  test("the workbench and the proxy ask even set to write, and are offered like any tool", async () => {
     f = await setup();
     const { mcp, gateway, deps, serverId } = await world(f);
     await saveCustomTools(deps, f.owner.id, f.org.id, serverId, {
@@ -548,9 +541,30 @@ describe("Aprovar sempre", () => {
     ];
     for (const [tool, input] of calls) {
       const ask = asked(await invoke(gateway, ctx, `composio_${tool}`, { ...input, why: WHY }));
-      expect({ tool, offered: ask.approveAlways }).toEqual({ tool, offered: null });
+      expect(ask.approveAlways).toEqual({ tool, actions: [] });
     }
     expect(mcp.calls).toEqual([]);
+  });
+
+  test("the executor a plain server only warns about stays locked: it can never be set to run unasked", async () => {
+    f = await setup();
+    const { deps, serverId } = await connectServer(f, composioMcp(), "Tools", "https://tools.example.com/mcp");
+    const executor = async () => {
+      const [row] = await f.db
+        .select()
+        .from(schema.customTools)
+        .where(and(eq(schema.customTools.connectionId, serverId), eq(schema.customTools.name, COMPOSIO_EXECUTOR)));
+      return [row?.access, row?.sensitive];
+    };
+    expect(await executor()).toEqual(["approval", true]);
+    await refreshCustomServer(deps, f.owner.id, f.org.id, serverId);
+    expect(await executor()).toEqual(["approval", true]);
+    await expect(
+      saveCustomTools(deps, f.owner.id, f.org.id, serverId, {
+        label: "Tools",
+        tools: [{ name: COMPOSIO_EXECUTOR, access: "write", label: "Executor" }],
+      }),
+    ).rejects.toThrow("can only ask for approval or be off");
   });
 
   test("a plain tool of the server is one action: approved for good, that agent runs it with any values", async () => {
@@ -576,7 +590,7 @@ describe("Aprovar sempre", () => {
     asked(await invoke(gateway, await runOf(f, other.id), "composio_close_ticket", { id: 3, why: WHY }));
   });
 
-  test("a custom server's tool asking because of its level is offered: deploys, deletes and code runners never", async () => {
+  test("a custom server's tool that asks is offered, a deploy, a delete and a code runner too", async () => {
     f = await setup();
     const mcp = imageMcp();
     const server = await connectServer(f, mcp, "Higgsfield", "https://mcp.higgsfield.example/mcp");
@@ -594,7 +608,7 @@ describe("Aprovar sempre", () => {
       ["delete_image", { id: "img-1" }],
     ] as const) {
       const other = asked(await invoke(gateway, ctx, `higgsfield_${tool}`, { ...input, why: WHY }));
-      expect({ tool, offered: other.approveAlways }).toEqual({ tool, offered: null });
+      expect(other.approveAlways).toEqual({ tool, actions: [] });
     }
     expect(mcp.calls.map((c) => c.tool)).toEqual(["generate_image"]);
   });
@@ -793,12 +807,12 @@ describe("Aprovar sempre leituras", () => {
     );
   });
 
-  test("offered only on SQL proven read-only; it then runs that project's reads and still asks for anything else", async () => {
+  test("SQL proven read-only offers that project's reads, which then run; anything else asks and offers the tool", async () => {
     f = await setup();
     const { mcp, gateway, serverId, name } = await sqlWorld(f);
     const ctx = await runOf(f);
     const write = asked(await invoke(gateway, ctx, name, sql("delete from orders")));
-    expect(write.approveAlways).toBeNull();
+    expect(write.approveAlways).toEqual({ tool: "execute_sql", actions: [] });
     const read = asked(await invoke(gateway, ctx, name, sql(READ)));
     expect(read.approveAlways).toEqual({ tool: "execute_sql", actions: ["sql-read:project_id=proj-a"] });
     await decide(f, f.owner.id, read.id, { decision: "approve", always: true });
@@ -921,18 +935,32 @@ describe("Aprovar sempre for a command on the agent's computer", () => {
     expect(again.type).toBe("result");
     expect(ran).toEqual(["gh issue create --title Outro --label bug"]);
 
-    // Another kind, a pipeline, or what is never kept: asked, and the last two never offer it.
+    // Another kind asks and offers its own. A merge is a kind too; a pipeline or a script offers the tool itself.
     expect(asked(await invoke(gateway, ctx, "run_code", bash("gh issue close 3", WHY))).approveAlways).toEqual({
       tool: COMMAND_RULE_TOOL,
       actions: ["gh issue close"],
     });
     expect(
       asked(await invoke(gateway, ctx, "run_code", bash("gh issue create --title x | sh", WHY))).approveAlways,
-    ).toBeNull();
-    expect(asked(await invoke(gateway, ctx, "run_code", bash("gh pr merge 3", WHY))).approveAlways).toBeNull();
-    expect(
-      asked(await invoke(gateway, ctx, "run_code", { language: "python", code: "print(1)", why: WHY })).approveAlways,
-    ).toBeNull();
+    ).toEqual({ tool: "run_code", actions: [] });
+    expect(asked(await invoke(gateway, ctx, "run_code", bash("gh pr merge 3", WHY))).approveAlways).toEqual({
+      tool: COMMAND_RULE_TOOL,
+      actions: ["gh pr merge"],
+    });
+    const script = asked(await invoke(gateway, ctx, "run_code", { language: "python", code: "print(1)", why: WHY }));
+    expect(script.approveAlways).toEqual({ tool: "run_code", actions: [] });
+    // Kept for the tool itself, any code runs for this agent without asking.
+    await decide(f, f.owner.id, script.id, { decision: "approve", always: true });
+    expect((await invoke(gateway, ctx, "run_code", { language: "python", code: "print(2)" })).type).toBe("result");
+    expect(ran.at(-1)).toBe("print(2)");
+    // The whole-tool rule covers what has no kind of its own, never a command that has one: a merge still asks.
+    expect(asked(await invoke(gateway, ctx, "run_code", bash("gh pr merge 9", WHY))).approveAlways).toEqual({
+      tool: COMMAND_RULE_TOOL,
+      actions: ["gh pr merge"],
+    });
+    expect(ran).not.toContain("gh pr merge 9");
+    const [whole] = (await rules(f)).filter((r) => r.tool === "run_code");
+    await removeApprovalRule(f.db, f.owner.id, f.org.id, f.agent.id, whole?.id ?? "");
 
     // Another agent asks; listed on the agent's page with no connection, and once removed it asks again.
     const other = await createAgent(

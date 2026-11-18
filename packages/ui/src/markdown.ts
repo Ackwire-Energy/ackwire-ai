@@ -140,7 +140,8 @@ export function parseMarkdown(source: string, options: ParseOptions & { ranges?:
   while (i < lines.length) {
     start = i;
     const line = lines[i] as string;
-    const fence = line.match(/^\s*```\s*([\w+-]*)\s*$/);
+    // An info string may follow the language ("```ts title=a.ts", "```c#", "```ts:src/a.ts"), never a backtick.
+    const fence = line.match(/^\s*```\s*([\w+#.-]*)[^`]*$/);
     if (fence) {
       const body: string[] = [];
       i++;
@@ -209,12 +210,15 @@ export function parseMarkdown(source: string, options: ParseOptions & { ranges?:
     const para: string[] = [];
     while (i < lines.length) {
       const l = lines[i] as string;
+      // The first line always joins: no block above took it, so it is prose even when it looks like a block's start
+      // ("```foo```", "````", a heading cut by U+2028). Breaking on it would leave `i` where it is, forever.
       if (
-        !l.trim() ||
-        /^(#{1,6})\s|^\s*```|^\s*>/.test(l) ||
-        LIST.test(l) ||
-        (para.length && tableAt(lines, i)) ||
-        (options.details && DETAILS_OPEN.test(l))
+        para.length &&
+        (!l.trim() ||
+          /^(#{1,6})\s|^\s*```|^\s*>/.test(l) ||
+          LIST.test(l) ||
+          tableAt(lines, i) ||
+          (options.details && DETAILS_OPEN.test(l)))
       )
         break;
       para.push(l.trim());

@@ -1,7 +1,8 @@
-import { type AppNotification, useNotificationAction } from "@agenteschat/client";
+import { type AppNotification, type InstallableCli, useCliInstall, useNotificationAction } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { firstName } from "@agenteschat/client/lib/format";
-import { computerKind } from "@agenteschat/client/lib/machines";
+import { cliInstallFailure, computerKind, installableCli } from "@agenteschat/client/lib/machines";
+import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { ComputerIcon } from "@/computer/ComputerPortrait";
@@ -15,6 +16,7 @@ import { WaitingCard } from "../shared/WaitingCard";
 import { type DeviceNotice, deviceHref, deviceNoticeOf, deviceNoticeTitle, joinFacts } from "./logic";
 import { JoinButtons } from "./parts";
 import { useDeviceMutation, useDevices } from "./queries";
+import { ToolOneClickButton } from "./ToolOneClick";
 
 /** Whom the agent works for, by first name ("" when it's the viewer or nobody says). */
 export function useNoticePerson(n: Pick<AppNotification, "kind" | "source" | "latest">) {
@@ -30,7 +32,107 @@ export function useNoticePerson(n: Pick<AppNotification, "kind" | "source" | "la
 export function DeviceNoticeCard({ item: n, first }: { item: AppNotification; first: boolean }) {
   const d = deviceNoticeOf(n);
   if (!d) return null;
+  if (d.kind === "device.folder_request") return <FolderNotice n={n} d={d} />;
+  if (d.kind === "device.tool_request" || d.kind === "device.cli_request") return <ToolNotice n={n} d={d} />;
   return d.kind === "device.join_request" ? <JoinNotice n={n} d={d} /> : <AccessNotice n={n} d={d} first={first} />;
+}
+
+/**
+ * An agent waits for a folder on the viewer's computer: it is allowed there, in the app on that computer (or with the
+ * runner's command), so the card only says what waits, with no button that would grant it from here.
+ */
+function FolderNotice({ n, d }: { n: AppNotification; d: DeviceNotice }) {
+  const { t } = useTranslation();
+  const when = useWhen();
+  const dir = useDirectory();
+  const agent = n.actors.find((a) => a.type === "agent");
+  const name = dir.nameOf(agent ? { type: "agent", id: agent.id } : null);
+  return (
+    <WaitingCard
+      agentId={agent?.id ?? null}
+      name={name}
+      kind={{ icon: "laptop", label: t("mobile.devices.notice.kind") }}
+      title={deviceNoticeTitle(t, d, name, "", "")}
+      where={when.short(n.updatedAt)}
+      onPress={() => router.push(deviceHref(d))}
+    >
+      {d.doing ? (
+        <Text variant="small" tone="muted">
+          {d.doing}
+        </Text>
+      ) : null}
+    </WaitingCard>
+  );
+}
+
+/** Someone asks the viewer to turn a tool on on their computer: the same one-click button as where it was needed. */
+function ToolNotice({ n, d }: { n: AppNotification; d: DeviceNotice }) {
+  const { t } = useTranslation();
+  const when = useWhen();
+  const dir = useDirectory();
+  const done = useDone(n);
+  const asker = n.actors.find((a) => a.type === "user");
+  const name = dir.nameOf(asker ? { type: "person", id: asker.id } : null);
+  return (
+    <WaitingCard
+      name={name}
+      kind={{ icon: "laptop", label: t("mobile.devices.notice.kind") }}
+      title={deviceNoticeTitle(t, d, name, "", "")}
+      where={when.short(n.updatedAt)}
+      onPress={() => router.push(deviceHref(d))}
+      decision={
+        d.kind === "device.cli_request" ? (
+          d.machineId && installableCli(d.tool ?? "") ? (
+            <CliInstallButton
+              machineId={d.machineId}
+              machineName={d.device}
+              cli={installableCli(d.tool ?? "") ?? "claude"}
+            />
+          ) : undefined
+        ) : d.machineId && d.tool ? (
+          <ToolOneClickButton
+            machineId={d.machineId}
+            machineName={d.device}
+            oneClick={{ kind: "allow" }}
+            tool={d.tool}
+            onAllowed={done}
+          />
+        ) : undefined
+      }
+    />
+  );
+}
+
+/** The one click for whoever connected the computer, when someone asked them for a coding CLI there: it installs it. */
+function CliInstallButton({
+  machineId,
+  machineName,
+  cli,
+}: {
+  machineId: string;
+  machineName: string;
+  cli: InstallableCli;
+}) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const run = useCliInstall(useOrgId(), machineId, cli, true);
+  const program = t(`brain.card.${cli === "claude" ? "claude_code" : "codex"}`);
+  // An install that ended badly says why where it was started; one that ended before this row opened says nothing.
+  const was = useRef(run.install?.state);
+  useEffect(() => {
+    const failed = was.current === "running" && cliInstallFailure(t, run.install, { program, computer: machineName });
+    if (failed) toast({ title: failed, icon: "x" });
+    was.current = run.install?.state;
+  }, [run.install, t, program, machineName, toast]);
+  return (
+    <Button
+      variant="primary"
+      size="sm"
+      label={t("connectAi.cli.install", { program })}
+      loading={run.start.isPending || run.install?.state === "running"}
+      onPress={() => run.start.mutate(undefined, { onError: (err) => toast({ title: errorText(t, err), icon: "x" }) })}
+    />
+  );
 }
 
 function useDone(n: AppNotification) {

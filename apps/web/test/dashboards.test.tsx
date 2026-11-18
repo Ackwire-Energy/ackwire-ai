@@ -103,7 +103,7 @@ describe("Dashboards: in the sidebar's More, and the list (ADR 0135 §14)", () =
     const workspace = section("Do workspace");
     expect(workspace.textContent).toContain("todo mundo vê");
     expect(within(workspace).getByRole("link", { name: "Acme hoje" }).textContent).toContain("Criado por você");
-    const roles = section("Dos seus papéis");
+    const roles = section("Dos seus cargos");
     const comercial = within(roles).getByRole("link", { name: "Comercial" });
     expect(comercial.textContent).toContain("Criado por Ada");
     expect(comercial.getAttribute("href")).toMatch(new RegExp(`^/org/${ORG_ID}/dashboards/`));
@@ -276,6 +276,53 @@ describe("a board's page", () => {
     expect(s.state.calls.find((c) => c.method === "dashboards.remove")?.args).toEqual([ORG_ID, "dash-m"]);
     expect(s.router.state.location.pathname).toBe(`/org/${ORG_ID}/dashboards`);
     expect(screen().getByText("“Metas 2027” apagado")).toBeTruthy();
+  });
+});
+
+describe("a board in a workspace being deleted (ADR 0088 §7)", () => {
+  test("offers no change: no Compartilhar, Organizar or Widget, only Usar no Início, and its widgets only open", async () => {
+    const shown = async (deleting: boolean) => {
+      const state = seedState();
+      if (deleting && state.me) {
+        const deletion = {
+          dueAt: new Date(Date.now() + 6 * 86_400_000).toISOString(),
+          requestedAt: null,
+          requestedBy: null,
+        };
+        state.me.organizations = state.me.organizations.map((o) => (o.id === ORG_ID ? { ...o, deletion } : o));
+      }
+      await open(
+        `/org/${ORG_ID}/dashboards/dash-m`,
+        (fake) => {
+          fake.addBoard({ id: "dash-m", title: "Metas", owner: { kind: "person", id: "u-walter", name: "Walter" } });
+          fake.addWidget("dash-m", { agentId: ATLAS_ID, title: "Receita hoje", layout: { position: 0, w: 1, h: 1 } });
+        },
+        state,
+      );
+      const page = {
+        share: screen().queryByRole("button", { name: "Compartilhar" }) !== null,
+        organize: screen().queryByRole("group", { name: "Metas" }) !== null,
+        refresh: screen().queryAllByRole("button", { name: "Atualizar agora" }).length > 0,
+      };
+      // The open menu hides the page from these queries: it is read last.
+      const trigger = screen()
+        .getAllByRole("button", { name: "Mais" })
+        .find((b) => b.closest(".ac-pagehead__actions")) as HTMLElement;
+      trigger.focus();
+      await key(trigger, "Enter");
+      const menu = within(screen().getByRole("menu"))
+        .getAllByRole("menuitem")
+        .map((i) => i.textContent);
+      cleanup();
+      return { ...page, menu };
+    };
+    expect(await shown(false)).toEqual({
+      share: true,
+      organize: true,
+      refresh: true,
+      menu: ["Usar no Início", "Renomear", "Fixar no topo", "Apagar painel"],
+    });
+    expect(await shown(true)).toEqual({ share: false, organize: false, refresh: false, menu: ["Usar no Início"] });
   });
 });
 

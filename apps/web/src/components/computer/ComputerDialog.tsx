@@ -21,10 +21,21 @@ import { clockAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { computerKind, isPaused } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
+import { type Seat, screenId } from "@agenteschat/client/lib/seat";
+import { SeatContext, useSeat } from "@agenteschat/client/lib/seat-context";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { Button, ComputerPortrait, cx, Dialog, gradientOf, Icon, SkyStrip } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { type EntrySignal, QueueButton, useAgentMachineId } from "@/components/ComputerQueue";
@@ -35,6 +46,7 @@ import { lookOf } from "@/lib/look";
 import { useSaid, useToast } from "@/lib/toast";
 import { BrowserCard, Cover, stepText } from "../browser/BrowserCard";
 import { DesktopView } from "../desktop/DesktopView";
+import { MachineToolButton, useToolOneClick } from "../devices/ToolOneClick";
 import { SwitchComputerDialog } from "../MachineOutages";
 import { useOrg } from "../org-context";
 import { colorOf } from "../Sky";
@@ -42,7 +54,8 @@ import { SetupWait, useWaitReader } from "../WorkspaceComputer";
 import { CantShowCover, ScreenNotice, Stage } from "./covers";
 import { type AgentComputerView, useAgentComputer } from "./facts";
 import { DialogHead, DialogHeadContext, type DialogHeadSlots, type KeptPicture } from "./head";
-import { OpenComputerContext, OpenedComputerContext, useOpenComputer } from "./open";
+import { KeptRunningButton } from "./KeptRunning";
+import { type OpenComputer, OpenComputerContext, OpenedComputerContext, useOpenComputer } from "./open";
 import "./computer.css";
 
 /**
@@ -191,8 +204,10 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
   const setAsk = useCallback((dismiss: (() => void) | null) => setDismissAsk(() => dismiss), []);
   const picture = useRef<KeptPicture | null>(null);
   useFullScreen(full, setFull);
-  const g = agentGrammar(agent.name);
-  const who = { name: agent.name, appearance: lookOf(agent) };
+  // Its shared place says so wherever the dialog names whose computer it is.
+  const name = useSeat(agent.id) ? t("rightHand.sharedName", { name: agent.name }) : agent.name;
+  const g = agentGrammar(agent.name, name);
+  const who = { name, appearance: lookOf(agent) };
   const handoff = view.facts?.handoff ?? null;
   const mine = controlledBy(handoff, me.user.id);
   const screenOnly = full && surface === "screen";
@@ -230,7 +245,13 @@ export function ComputerDialog({ agent, open, onClose }: { agent: Agent; open: b
           <span ref={setSub} className="cmp-sub" hidden={said !== null} />
         </>
       }
-      actions={<span ref={setActs} className="cmp-acts ac-acts" />}
+      actions={
+        <>
+          {/* What the agent keeps running there (ADR 0176), whatever the stage shows. */}
+          {view.ready && !view.forbidden && <KeptRunningButton agentId={agent.id} />}
+          <span ref={setActs} className="cmp-acts ac-acts" />
+        </>
+      }
       closeLabel={t("common.close")}
       width={1280}
       className={cx(
@@ -299,6 +320,8 @@ function ComputerStage({
   const flashing = useReadyFlash(surface);
   const reader = useWaitReader();
   const machine = view.machine;
+  const oneClick = useToolOneClick(machine);
+  const browserOneClick = Boolean(machine && oneClick && oneClick.kind !== "outdated");
   const computer = computerName(t, org.name, machine, isPersonal(org));
   const manages = can(org, "manage_agents") || agent.ownerUserId === me.user.id;
   // Whose role gives no browser here gets Fechar, never "Assumir o navegador" (ADR 0085 §12).
@@ -511,7 +534,7 @@ function ComputerStage({
           )}
         </>
       );
-  } else if ((!machine && f.edition === "cloud") || (machine?.standby && !machine.online)) {
+  } else if ((!machine && f.edition === "cloud") || machine?.standby) {
     // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = (
       <>
@@ -572,7 +595,8 @@ function ComputerStage({
             color={color}
             icon="globe"
             text={t("agentComputer.state.browserOff", { ...g, computer })}
-            help={t("browser.machine.offHelp")}
+            help={browserOneClick ? undefined : t("browser.machine.offHelp")}
+            action={browserOneClick && machine ? <MachineToolButton machine={machine} tool="browser" /> : undefined}
           />
         </Stage>
       </>
@@ -632,9 +656,10 @@ function Banner({
 }
 
 /**
- * "Computador" in the agent's DM header: while turns wait for its computer, "Computador · 4 aguardando" opening the
- * line (with a way on to the computer for whoever may watch it), else, for whoever may watch it, the same dialog in
- * place, with a dot while the agent needs someone (amber) or works on it (its color). `queueOnly`: just that line.
+ * The computer in the agent's DM header: while turns wait for its computer, "Computador · 4 aguardando" opening the
+ * line (with a way on to the computer for whoever may watch it), else, for whoever may watch it, the computer's icon
+ * opening the same dialog in place, with a dot while the agent needs someone (amber) or works on it (its color).
+ * `queueOnly`: just that line.
  */
 export function ComputerButton({ agent, queueOnly }: { agent: Agent; queueOnly?: boolean }) {
   const view = useAgentComputer(agent);
@@ -686,16 +711,18 @@ function WatchButton({ agent, signal }: { agent: Agent; signal: EntrySignal }) {
   const openComputer = useOpenComputer();
   return (
     <Button
-      size="sm"
+      variant="ghost"
+      iconOnly
       icon="computer"
-      className="brw-dm"
+      className="channel__icon dm-computer"
+      aria-label={t("agentComputer.button")}
+      // Its state for screen readers off the keys' focus too; the kit's tip says name and state on hover and focus.
+      aria-description={signal.line}
+      title={signal.line ? `${t("agentComputer.button")}\n${signal.line}` : undefined}
       data-state={signal.state}
       style={signal.style}
       onClick={() => openComputer(agent.id)}
-    >
-      <span className="brw-dm__label">{t("agentComputer.button")}</span>
-      {signal.line && <span className="ac-visually-hidden">{signal.line}</span>}
-    </Button>
+    />
   );
 }
 
@@ -706,13 +733,24 @@ function WatchButton({ agent, signal }: { agent: Agent; signal: EntrySignal }) {
 export function ComputerDialogProvider({ children }: { children: ReactNode }) {
   const { org } = useOrg();
   const dir = useDirectory(org.id);
-  const [agentId, setAgentId] = useState<string | null>(null);
-  const agent = agentId ? dir.agentById.get(agentId) : undefined;
-  const close = useCallback(() => setAgentId(null), []);
+  const [opened, setOpened] = useState<{ agentId: string; seat?: Seat } | null>(null);
+  const agent = opened ? dir.agentById.get(opened.agentId) : undefined;
+  const open = useCallback<OpenComputer>((agentId, seat) => setOpened({ agentId, ...(seat ? { seat } : {}) }), []);
+  const close = useCallback(() => setOpened(null), []);
+  const seatOf = useMemo(
+    () => (opened?.seat ? { agentId: opened.agentId, seat: opened.seat } : undefined),
+    [opened?.agentId, opened?.seat],
+  );
   return (
-    <OpenComputerContext.Provider value={setAgentId}>
+    <OpenComputerContext.Provider value={open}>
       <OpenedComputerContext.Provider value={agent ? agent.id : null}>{children}</OpenedComputerContext.Provider>
-      {agent && <ComputerDialog key={agent.id} agent={agent} open onClose={close} />}
+      {agent && (
+        // The right hand's shared place is another screen than the viewer's own: everything the dialog reads and does
+        // goes to the one it was opened for.
+        <SeatContext.Provider value={seatOf}>
+          <ComputerDialog key={screenId(agent.id, opened?.seat)} agent={agent} open onClose={close} />
+        </SeatContext.Provider>
+      )}
     </OpenComputerContext.Provider>
   );
 }

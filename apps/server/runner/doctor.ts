@@ -172,6 +172,7 @@ const WAIT_FOR: Partial<Record<NonNullable<RunnerPhone["reason"]>, (phone: strin
   untrusted: (phone) => `Trust on ${phone}`,
   developer_mode_off: (phone) => `Developer Mode on ${phone}`,
   locked: (phone) => `${phone} to be unlocked`,
+  ios_behind_xcode: (phone) => `${phone} to be updated`,
 };
 
 function phoneChecks(phones: DoctorPhone[]): Check[] {

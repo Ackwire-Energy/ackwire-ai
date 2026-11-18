@@ -15,6 +15,7 @@
  * element's CSS background shows.
  */
 import { onScreenNow } from "../device";
+import { PAINT_ATTRS } from "../theme";
 import {
   blobsAt,
   type CalmZone,
@@ -112,7 +113,7 @@ function watchTheme() {
     themeVersion++;
     redrawSkies();
   });
-  themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme", "class"] });
+  themeWatch.observe(document.documentElement, { attributes: true, attributeFilter: [...PAINT_ATTRS, "class"] });
 }
 
 const REDUCE = "(prefers-reduced-motion: reduce)";
@@ -135,6 +136,8 @@ export function holdSkies(hold = true) {
   held = hold;
   for (const changed of onHold) changed();
 }
+
+export const skiesHeld = () => held;
 
 interface Sky {
   dirty: boolean;

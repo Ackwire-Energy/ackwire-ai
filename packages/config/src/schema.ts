@@ -32,6 +32,7 @@ export interface EnvVarDefinition {
     | "Email for agents"
     | "Push"
     | "Operator"
+    | "Chat surfaces"
     | "Usage report"
     | "Observability";
   /** Example value for docs. Never a real secret. */
@@ -43,6 +44,21 @@ export interface EnvVarDefinition {
 /** A Sentry DSN: `https://<public key>@<host>/<project id>`. */
 const DSN = /^https?:\/\/[^@/\s]+@[^/\s]+\/(?:[^\s]*\/)?\d+$/;
 const DSN_MESSAGE = "must be a DSN such as https://<key>@errors.example.com/1";
+
+/** `host=secret` pairs: a bare lower-case host name, and a secret of 32 characters or more with no comma or space. */
+const HOST_NAME = "[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*";
+const HOST_SECRET = `${HOST_NAME}=[^\\s,]{32,}`;
+const HOST_SECRETS = new RegExp(`^${HOST_SECRET}(?:,${HOST_SECRET})*$`);
+
+/** Whether `value` is a web origin alone (http or https, host and port), the form a browser sends in `Origin`. */
+function isOrigin(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return (url.protocol === "http:" || url.protocol === "https:") && url.origin === value;
+  } catch {
+    return false;
+  }
+}
 
 /** Claude model ids accepted as defaults. Prices live in `@agenteschat/providers` (`MODEL_CATALOG`). */
 const modelId = z.string().regex(/^[a-z0-9][a-z0-9.-]*$/, "must be a model id such as claude-sonnet-5-5");
@@ -71,10 +87,34 @@ export const envVars = {
     section: "Server",
     example: "https://chat.example.com",
   },
+  EXTRA_TRUSTED_ORIGINS: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim().replace(/\/+$/, ""))
+          .filter(Boolean),
+      )
+      .pipe(
+        z
+          .array(
+            z
+              .string()
+              .refine(isOrigin, "must be an http or https origin such as https://chat.example.com, with no path"),
+          )
+          .optional(),
+      ),
+    description:
+      "Other origins this instance is opened at, comma-separated (`http://192.168.0.10:3000`, `https://agentes.tail1234.ts.net`). `PUBLIC_URL` is always trusted; these are too, for sign-in and for saving from those addresses (the sign-in origin check, the app's writes and its WebSockets). Each is http or https, host and port, with no path; a trailing slash is dropped. Unset (default): `PUBLIC_URL` only.",
+    section: "Server",
+    example: "http://192.168.0.10:3000,https://agentes.tail1234.ts.net",
+  },
   LANDING_URL: {
     schema: z.url().optional(),
     description:
-      "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting list: that origin may call it (CORS on `/api/waitlist` only), and the confirmation email links there. Unset: no waiting list.",
+      "Public URL of the agentes.chat landing page (its own site), without a trailing slash. Turns on the waiting lists, the product's and the partner program's: that origin may call them (CORS on `/api/waitlist` and `/api/partners/waitlist` only), and the confirmation email links there. With the bot check on, a token its page makes on this host counts for these lists and nothing else. Unset: no waiting lists.",
     section: "Server",
     example: "https://agentes.chat",
   },
@@ -221,13 +261,13 @@ export const envVars = {
   TURNSTILE_SITE_KEY: {
     schema: z.string().optional(),
     description:
-      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's site key. With `TURNSTILE_SECRET_KEY`, a bot check runs before email lookup, sign-in, sign-up, password reset, the code to ask to join and the waiting list. Unset: no check, and no page loads anything from Cloudflare.",
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's site key. With `TURNSTILE_SECRET_KEY`, a bot check runs before email lookup, sign-in, sign-up, password reset, the code to ask to join and the waiting lists. The widget's hostnames in Cloudflare hold `PUBLIC_URL`'s host, and `LANDING_URL`'s when it is set. Unset: no check, and no page loads anything from Cloudflare.",
     section: "Sign-in",
   },
   TURNSTILE_SECRET_KEY: {
     schema: z.string().optional(),
     description:
-      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's secret key, which this server uses to check each answer with Cloudflare. Set both keys or neither. A secret Cloudflare refuses stops the server at boot.",
+      "For agentes.chat Cloud. Unset by default. Cloudflare Turnstile's secret key, which this server uses to check each answer with Cloudflare. A token counts only for the form it was made for, on `PUBLIC_URL`'s host. One made on `LANDING_URL`'s host counts only for the waiting lists. Set both keys or neither. A secret Cloudflare refuses stops the server at boot.",
     section: "Sign-in",
     secret: true,
   },
@@ -335,7 +375,7 @@ export const envVars = {
   TYPESAFE_API_KEY: {
     schema: z.string().optional(),
     description:
-      "Your TypeSafe key for Jev (https://console.typesafe.ai/keys), optional. Jev picks who answers messages nobody @mentioned, keeps memory tidy and finds what agents look for on their screens. The installation's owner can also add it in Settings › AI accounts. This variable wins over that one. Never sent to a browser. Calls are billed to your TypeSafe account.",
+      "Your TypeSafe key for Jev (https://console.typesafe.ai/keys), optional. Jev picks who answers messages nobody @mentioned, keeps memory tidy and finds what agents look for on their screens. An OpenRouter key (sk-or-…) works too: the same Jev, called and billed through OpenRouter. The installation's owner can also add one in Settings › AI accounts. This variable wins over that one. Never sent to a browser. Calls are billed to the key's account.",
     section: "Agents",
     secret: true,
   },
@@ -415,7 +455,7 @@ export const envVars = {
   MODEL_ENDPOINTS_PRIVATE: {
     schema: z.stringbool().optional(),
     description:
-      "Whether a workspace's own model endpoint (Settings › AI keys › Other provider) may be on this server's network or over http: an Ollama, vLLM, LM Studio or LiteLLM next to it. Unset: allowed, except on agentes.chat Cloud (https://app.agentes.chat) and with `ALLOW_SIGNUP=true`, where only public https addresses are, checked again at every connection.",
+      "Whether a workspace's own model endpoint (Settings › AI keys › Other provider) may be on this server's network or over http: an Ollama, vLLM, LM Studio or LiteLLM next to it. The same switch covers the other addresses a workspace names: custom MCP servers and their sign-in, its own bucket, server icons and the pages agents read. Unset: allowed, except on agentes.chat Cloud (https://app.agentes.chat) and with `ALLOW_SIGNUP=true`, where only public https addresses are, checked again at every connection.",
     section: "Agents",
   },
   SUMMARY_MODEL: {
@@ -707,6 +747,24 @@ export const envVars = {
     section: "Connectors",
     secret: true,
   },
+  MCP_CALLER_IDENTITY: {
+    schema: z
+      .string()
+      .regex(HOST_SECRETS, {
+        error:
+          "must be host=secret pairs separated by commas, with no spaces: a lower-case host name, and a secret of at least 32 characters",
+      })
+      .refine((value) => {
+        const hosts = value.split(",").map((pair) => pair.slice(0, pair.indexOf("=")));
+        return new Set(hosts).size === hosts.length;
+      }, "names a host more than once")
+      .optional(),
+    description:
+      "MCP servers of your own that are told, verifiably, who is calling (ADR 0181), as `host=secret` pairs separated by commas: the host name of a server connected by address in Settings › Connectors (lower case, with no scheme, port or path) and a secret of at least 32 characters that the server holds too (`openssl rand -base64 48`). Every tool call an agent makes to that server carries, in the request's `params._meta[\"chat.agentes/caller\"]`, a statement signed with the secret (a JWT, HS256): this instance, the workspace, the agent, the run, the connection and the person the run acts for, good for 60 seconds. With it the server can refuse a call that doesn't come from the workspaces and agents it expects, even one that carries its key. Only over https on the default port; a host that isn't listed gets nothing. Unset (default): no call carries it.",
+    section: "Connectors",
+    example: "tools.example.com=<output of openssl rand -base64 48>",
+    secret: true,
+  },
   MILLIONSEND_API_KEY: {
     schema: z.string().optional(),
     description:
@@ -810,13 +868,6 @@ export const envVars = {
     description: "Email approvers a digest of requests still waiting after this many hours (requests expire at 24 h).",
     section: "Email",
   },
-  EXPO_ACCESS_TOKEN: {
-    schema: z.string().optional(),
-    description:
-      "Expo access token for push notifications to the iPhone app (only needed when “enhanced push security” is on in the Expo project). iPhone pushes are sent through the Expo Push API either way; Android pushes don't use Expo (`PUSH_SENDER`).",
-    section: "Push",
-    secret: true,
-  },
   FIREBASE_SERVICE_ACCOUNT: {
     schema: z
       .string()
@@ -835,10 +886,68 @@ export const envVars = {
     section: "Push",
     secret: true,
   },
+  APNS_KEY: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value, ctx) => {
+        if (value === undefined) return value;
+        try {
+          const pem = parsePemKey(value);
+          if (!pem.includes("BEGIN PRIVATE KEY")) throw new Error("must be the .p8 key (-----BEGIN PRIVATE KEY-----)");
+          return pem;
+        } catch (error) {
+          ctx.addIssue({ code: "custom", message: (error as Error).message });
+          return z.NEVER;
+        }
+      }),
+    description:
+      "iPhone pushes straight to Apple (APNs): an APNs auth key (the .p8 file from the Apple Developer account › Keys, with the Apple Push Notifications service on) as PEM, PEM with `\\n` for newlines, or base64 of the file. Set it with `APNS_KEY_ID` and `APNS_TEAM_ID`. Only for a server that sends to an iPhone app signed by its own Apple team (`PUSH_SENDER`) or runs the push relay (`PUSH_RELAY_SERVE`); the app from the App Store is reached through the relay.",
+    section: "Push",
+    secret: true,
+  },
+  APNS_KEY_ID: {
+    schema: z
+      .string()
+      .regex(/^[A-Z0-9]{10}$/, "must be the 10-character id of the APNs key")
+      .optional(),
+    description: "The id of `APNS_KEY` (10 characters, shown beside the key in the Apple Developer account).",
+    section: "Push",
+    example: "ABC123DEFG",
+  },
+  APNS_TEAM_ID: {
+    schema: z
+      .string()
+      .regex(/^[A-Z0-9]{10}$/, "must be the 10-character Apple team id")
+      .optional(),
+    description: "The Apple Developer team that owns `APNS_KEY` and the iPhone app (10 characters).",
+    section: "Push",
+    example: "XYZ987WVUT",
+  },
+  APNS_APP_IDS: {
+    schema: z
+      .string()
+      .default("chat.agentes.app,chat.agentes.app.preview,chat.agentes.app.development")
+      .transform((value, ctx) => {
+        const ids = value
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean);
+        const bad = ids.find((id) => !/^[A-Za-z][A-Za-z0-9_-]*(\.[A-Za-z0-9_-]+){1,10}$/.test(id) || id.length > 155);
+        if (ids.length === 0 || bad !== undefined) {
+          ctx.addIssue({ code: "custom", message: `must be bundle ids separated by commas${bad ? ` (${bad})` : ""}` });
+          return z.NEVER;
+        }
+        return ids;
+      }),
+    description:
+      "The iPhone apps (bundle ids, separated by commas) this server pushes to with `APNS_KEY`; a push for any other is refused, since one key signs for every app of its team. The first is used for a phone that didn't say which app it runs.",
+    section: "Push",
+  },
   PUSH_SENDER: {
     schema: z.enum(["auto", "direct", "relay", "off"]).default("auto"),
     description:
-      "How Android pushes are sent (iPhones go through Expo for now). `auto` (default): straight to Firebase when `FIREBASE_SERVICE_ACCOUNT` is set, else through the push relay. `relay`: through the agentes.chat push relay (`PUSH_RELAY_URL`), which is what lets the Android app from the stores get this server's pushes; the server registers itself there on its first push, no account needed, and each push's text passes through it. `direct`: straight to Firebase with `FIREBASE_SERVICE_ACCOUNT`, for an Android app built with your own Firebase project. `off`: no Android pushes.",
+      "How pushes to the phone app are sent, each platform on its own. `auto` (default): Android straight to Firebase when `FIREBASE_SERVICE_ACCOUNT` is set and iPhones straight to Apple when `APNS_KEY` is, else through the push relay (the server that is the relay itself sends none for a platform without its credentials). `relay`: through the agentes.chat push relay (`PUSH_RELAY_URL`), which is what lets the app from the stores get this server's pushes; the server registers itself there on its first push, no account needed, and each push's text passes through it. `direct`: straight to Firebase with `FIREBASE_SERVICE_ACCOUNT` and to Apple with `APNS_KEY`, for an app built with your own Firebase project and Apple team. `off`: no phone pushes.",
     section: "Push",
   },
   PUSH_RELAY_URL: {
@@ -846,7 +955,8 @@ export const envVars = {
       .url()
       .refine((u) => u.startsWith("https://"), "must be an https URL")
       .default("https://app.agentes.chat/api/push-relay/v1"),
-    description: "The push relay Android pushes go through with `PUSH_SENDER=relay` (or `auto` without Firebase).",
+    description:
+      "The push relay phone pushes go through with `PUSH_SENDER=relay` (or `auto` without the platform's own credentials).",
     section: "Push",
   },
   PUSH_RELAY_SERVE: {
@@ -855,7 +965,7 @@ export const envVars = {
       .transform((on) => (on ? "on" : "off") as "on" | "off")
       .default("off"),
     description:
-      "Runs the push relay at `/api/push-relay/v1` for other installations' Android pushes, sent with this server's `FIREBASE_SERVICE_ACCOUNT` (agentes.chat's own servers). `on` without the service account serves nothing.",
+      "Runs the push relay at `/api/push-relay/v1` for other installations' phone pushes, sent with this server's `FIREBASE_SERVICE_ACCOUNT` (Android) and `APNS_KEY` (iPhone): agentes.chat's own servers. `on` with neither serves nothing.",
     section: "Push",
   },
   WEB_PUSH: {
@@ -968,11 +1078,77 @@ export const envVars = {
     example: "<output of openssl rand -base64 48>",
     secret: true,
   },
+  OPERATOR_API_READ_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "A second token for the operator API that only reads, for a caller that looks things up and changes nothing: accepted for `GET` requests alone, and never under `/review` (what a run or task did). Anything else it asks for is refused (403). It still reads every workspace's and account's names, emails and IP addresses, so keep it as private as the other. Needs `OPERATOR_API_TOKEN` and must differ from it. Unset (default): only `OPERATOR_API_TOKEN` is accepted. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  OPERATOR_API_REVEAL_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "A third token for the operator API, for the one thing the other two never do: read a single piece of what a workspace wrote (a message, a step of a run, an agent's instructions), one at a time, with a stated reason, for a member who asked for help or to diagnose a run that failed or got stuck (`POST /reveal/...`, ADR 0056). Every such read is recorded first and shows in that workspace's audit log. Leave it unset unless a tool of yours needs it: setting it makes you a reader of your workspaces' content, which you must tell them, and makes the server keep what members write in the feedback form for 90 days. Needs `OPERATOR_API_TOKEN` and must differ from it and from `OPERATOR_API_READ_TOKEN`. Unset (default): every path under `/reveal` answers 403 and none of those words are kept. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
   OPERATOR_API_PORT: {
     schema: z.coerce.number().int().min(1).max(65535).default(3001),
     description:
-      "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
+      "Port of the operator API's listener, on the same `HOST`; only with `OPERATOR_API_TOKEN` or `SURFACE_BRIDGE_TOKEN`. The compose file doesn't publish it: containers on the same Docker network reach it as `agentes:3001`.",
     section: "Operator",
+  },
+  SURFACE_BRIDGE_TOKEN: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters. Generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Turns on the bridge for an outside chat surface (ADR 0187): `/api/surface/v1` on the operator API's listener (`OPERATOR_API_PORT`), called with this value as `Authorization: Bearer` by a separate service of yours that carries people's messages between a chat app and their DM with the workspace's assistant. It can post as any linked person into that DM and read every reply sent to linked people, so never publish that port or put it behind your reverse proxy. It opens nothing under `/api/operator/v1`, and the operator tokens don't open the bridge. Needs `SURFACE_NAME` and `SURFACE_OPEN_URL`, and must differ from every operator token. Unset (default): no bridge, nothing recorded, no row in the apps. Generate with `openssl rand -base64 48`.",
+    section: "Chat surfaces",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  SURFACE_NAME: {
+    schema: z.string().trim().min(1).max(32).optional(),
+    description:
+      "The chat surface's name as people and the assistant read it, in settings and in the assistant's instructions. Only with `SURFACE_BRIDGE_TOKEN`. Its lower-cased form is what stored links are keyed by: changing it (even its capitals) ends every link, silently.",
+    section: "Chat surfaces",
+    example: "Example Chat",
+  },
+  SURFACE_OPEN_URL: {
+    schema: z
+      .url({ protocol: /^https$/ })
+      .refine((url) => url.split("{text}").length === 2, "must hold {text} once")
+      .optional(),
+    description:
+      "An `https://` address that opens a chat with the surface's account with a text already typed: `{text}` (once) is replaced by the linking code. Only with `SURFACE_BRIDGE_TOKEN`.",
+    section: "Chat surfaces",
+    example: "https://chat.example.com/open?text={text}",
+  },
+  SURFACE_ONLY: {
+    schema: z
+      .string()
+      .optional()
+      .transform((value) =>
+        value
+          ?.split(",")
+          .map((entry) => entry.trim().toLowerCase())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.email()).optional()),
+    description:
+      "While you try the surface out: only the accounts with these emails (separated by commas) may link it; nobody else sees its row. Only with `SURFACE_BRIDGE_TOKEN`. Unset (default): everyone may.",
+    section: "Chat surfaces",
+    example: "you@example.com",
   },
   SUPPORT_EMAIL: {
     schema: z.email().optional(),
@@ -984,9 +1160,26 @@ export const envVars = {
   FEEDBACK_EMAIL: {
     schema: z.email().optional(),
     description:
-      "Where the apps' feedback form sends what people write (the Beta mark beside their name): one email per message, with the person's name and address to answer them, the workspace's name and the app's version, never a conversation. Unset (default): the apps show no form.",
+      "For agentes.chat Cloud. Unset by default. The address the agentes.chat team reads feedback at: what people write in the apps' feedback form there, and what other servers send to its inbox (`POST /api/feedback/inbox`, there only), one email per message, nothing kept. A self-hosted server leaves it unset: its feedback goes to that team (`FEEDBACK_RELAY`).",
     section: "Operator",
     example: "feedback@example.com",
+  },
+  FEEDBACK_RELAY: {
+    schema: z.stringbool().default(true),
+    description:
+      "What a person writes in the feedback form goes to the agentes.chat team, who make the app (`FEEDBACK_URL`), and the form says so. Only when someone presses Send, and only that message: their text, their name and address to answer them, the workspace's name, the app's version and the pictures they added, never a conversation (https://agentes.chat/docs/install-on-a-server#data). `false`: the apps show no form.",
+    section: "Operator",
+  },
+  FEEDBACK_INBOX: {
+    schema: z.stringbool().default(true),
+    description:
+      "For agentes.chat Cloud. On agentes.chat's own servers, takes the feedback other servers send (`POST /api/feedback/inbox`) and mails each one to `FEEDBACK_EMAIL`, keeping nothing. `false` stops taking it. No other server has the route.",
+    section: "Operator",
+  },
+  FEEDBACK_URL: {
+    schema: z.url().default("https://app.agentes.chat/api/feedback/inbox"),
+    description: "Where `FEEDBACK_RELAY` sends a feedback (as JSON in a POST).",
+    section: "Operator",
   },
   OPS_REPORT_EMAIL: {
     schema: z
@@ -1018,6 +1211,24 @@ export const envVars = {
       .optional(),
     description:
       "Signs the link to the billing service (HMAC-SHA256, 5 minutes). The billing service holds the same value. Generate with `openssl rand -base64 48`.",
+    section: "Operator",
+    example: "<output of openssl rand -base64 48>",
+    secret: true,
+  },
+  REFERRALS_URL: {
+    schema: z.url({ protocol: /^https$/ }).optional(),
+    description:
+      "Your referral service's address (ADR 0192). Signed-in people get Refer and earn in their menu, and `/refer`, which open it signed in as them. Needs `REFERRALS_LINK_SECRET`, or `BILLING_LINK_SECRET` when this server also has a billing service, to sign the link. Unset (default): no referrals anywhere.",
+    section: "Operator",
+    example: "https://refer.example.com",
+  },
+  REFERRALS_LINK_SECRET: {
+    schema: z
+      .string()
+      .min(32, "must be at least 32 characters; generate one with `openssl rand -base64 48`")
+      .optional(),
+    description:
+      "Signs the link to the referral service (HMAC-SHA256, 5 minutes). The referral service holds the same value. Unset (default): `BILLING_LINK_SECRET` signs it. Generate with `openssl rand -base64 48`.",
     section: "Operator",
     example: "<output of openssl rand -base64 48>",
     secret: true,
@@ -1063,6 +1274,12 @@ export const envVars = {
   LOG_LEVEL: {
     schema: z.enum(["debug", "info", "warn", "error"]).default("info"),
     description: "Minimum log level written to stdout.",
+    section: "Observability",
+  },
+  LOG_FORMAT: {
+    schema: z.enum(["json", "gcp"]).default("json"),
+    description:
+      "How each log line is written. json: time, level and msg. gcp: time, severity and message, the fields Google Cloud Logging reads.",
     section: "Observability",
   },
   SENTRY_DSN: {

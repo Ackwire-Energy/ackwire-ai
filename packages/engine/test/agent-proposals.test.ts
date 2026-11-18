@@ -28,7 +28,7 @@ import {
   type ToolContext,
   updateAgent,
 } from "../src";
-import { addMember, type Fixture, makeAdmin, setup } from "./fixtures";
+import { addMember, everyoneWithout, type Fixture, makeAdmin, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -262,6 +262,44 @@ describe("propose_agent", () => {
     );
   });
 
+  test("how it introduces itself and the catalog apps it still needs: on the draft, in its checklist made in one click", async () => {
+    f = await setup();
+    await connect(f, "github", "GitHub");
+    const ctx = await runFor(f, f.owner.id, "quero um agente de campanhas");
+    // A connected app, one the catalog doesn't have and one that can't be connected yet: refused, with why.
+    for (const [app, says] of [
+      ["github", "is connected already"],
+      ["nope-app", 'No app "nope-app" in the catalog'],
+      ["meta-ads", "can't be connected yet"],
+    ] as const) {
+      const bad = await propose(f, ctx, { ...ADA, connect_later: [app] });
+      expect(bad.isError).toBe(true);
+      expect(bad.content).toContain(says);
+    }
+    expect(await proposals(f)).toHaveLength(0);
+    const out = await propose(f, ctx, {
+      ...ADA,
+      hello: "Cuido das telas com você.",
+      connect_later: ["Klaviyo", "klaviyo"],
+    });
+    expect(out.isError).toBeUndefined();
+    const id = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
+    const { draft } = (await cardOf(f, id)).params;
+    expect(draft.hello).toBe("Cuido das telas com você.");
+    expect(draft.later).toEqual(["klaviyo"]);
+    const made = await createProposedAgent(
+      { db: f.db, pubsub: f.pubsub, gateway: f.gateway },
+      f.owner.id,
+      f.org.id,
+      id,
+    );
+    const [row] = await f.db
+      .select({ setup: schema.agents.setup })
+      .from(schema.agents)
+      .where(eq(schema.agents.id, made.agent.id));
+    expect(row?.setup).toMatchObject({ hello: "Cuido das telas com você.", apps: { klaviyo: "read" } });
+  });
+
   test("apps by name or by service: a Stripe account is 'stripe'; with two, its name says which", async () => {
     f = await setup();
     const acme = await connect(f, `custom:${crypto.randomUUID()}`, "Stripe (Acme)", "stripe");
@@ -286,6 +324,7 @@ describe("propose_agent", () => {
   test("only where someone who may create agents can open the conversation and decide it", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     // Bia's DM with @dev, and a private channel of hers: no admin or owner can read either.
     const dm = await openPersonAgentDm(f.db, f.org.id, bia.id, f.agent.id);
     const hers = await createChannel(f.db, bia.id, f.org.id, { name: "bia-notes", visibility: "private" });
@@ -307,6 +346,7 @@ describe("the AI it suggests", () => {
   test("an account of the person's that thinks for no agent, else the workspace's model, else none", async () => {
     f = await setup();
     const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     const { machineId } = await pairMachine({ db: f.db, pubsub: f.pubsub }, f.owner.id, f.org.id, {
       name: "MacBook",
       exec: true,
@@ -369,6 +409,7 @@ describe("deciding", () => {
     f = await setup();
     const id = await proposed(f);
     const bia = await addMember(f.db, f.org.id, "member", "bia");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     const caio = await addMember(f.db, f.org.id, "admin", "caio");
     for (const who of [bia, caio]) {
       await f.db.insert(schema.channelMembers).values({ orgId: f.org.id, channelId: f.general.id, userId: who.id });
@@ -930,6 +971,7 @@ describe("the right hand's agent cards (ADR 0137)", () => {
   test("in a member's DM the card is posted all the same; they send it, and an admin creates it from the inbox", async () => {
     f = await setup({ rightHand: true });
     const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     const ctx = await lodiRun(f, bia.id);
     const out = await propose(f, ctx, ADA);
     expect(out.isError).toBeUndefined();
@@ -958,6 +1000,7 @@ describe("the right hand's agent cards (ADR 0137)", () => {
   test("a sent card that runs out leaves the admins' inbox", async () => {
     f = await setup({ rightHand: true });
     const bia = await addMember(f.db, f.org.id, "member", "Bia Rocha");
+    await everyoneWithout(f.db, f.org.id, "create_agents");
     const out = await propose(f, await lodiRun(f, bia.id), ADA);
     const messageId = (out.data as { agentProposal: { messageId: string } }).agentProposal.messageId;
     await askAgentProposal({ db: f.db, pubsub: f.pubsub }, bia.id, f.org.id, messageId);

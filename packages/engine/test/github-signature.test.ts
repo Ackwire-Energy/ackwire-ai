@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { eq, schema } from "@agenteschat/db";
 import {
+  AGENT_CO_AUTHOR_EMAIL,
   addChannelMember,
+  agentCoAuthor,
   coAuthorOf,
   creditedMessage,
   postPersonMessage,
+  runCoAuthors,
   SIGNATURE_MARK,
+  setAgentCoAuthor,
   signatureLine,
   signedBody,
 } from "../src";
@@ -37,6 +41,41 @@ describe("the line and the credit (ADR 0156)", () => {
     expect(creditedMessage("Fix\n\nBody text here.\n", trailer)).toBe(`Fix\n\nBody text here.\n\n${trailer}`);
     expect(creditedMessage("Fix\n\nRefs: #2", trailer)).toBe(`Fix\n\nRefs: #2\n${trailer}`);
     expect(creditedMessage(`Fix\n\n${trailer}`, trailer)).toBe(`Fix\n\n${trailer}`);
+    // The agent's own line and the person's, each once, in any capitals, after the CLI's own.
+    const nick = "Co-authored-by: Nick <noreply@agentes.chat>";
+    const claude = "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>";
+    expect(creditedMessage("Fix", nick, trailer)).toBe(`Fix\n\n${nick}\n${trailer}`);
+    expect(creditedMessage(`Fix\n\n${claude}`, nick, trailer)).toBe(`Fix\n\n${claude}\n${nick}\n${trailer}`);
+    expect(creditedMessage(`Fix\n\n${nick.toUpperCase()}`, nick)).toBe(`Fix\n\n${nick.toUpperCase()}`);
+  });
+
+  test("the agent's own line: its name on one line at agentes.chat's address, its handle when nothing is left", () => {
+    expect(AGENT_CO_AUTHOR_EMAIL).toBe("noreply@agentes.chat");
+    expect(agentCoAuthor({ name: "Nick", handle: "nick" })).toBe("Co-authored-by: Nick <noreply@agentes.chat>");
+    expect(agentCoAuthor({ name: "Li\na <x>\u0085\u2028", handle: "lia" })).toBe(
+      "Co-authored-by: Lia x <noreply@agentes.chat>",
+    );
+    expect(agentCoAuthor({ name: " <> ", handle: "dev" })).toBe("Co-authored-by: dev <noreply@agentes.chat>");
+  });
+
+  test("a run's commits: the agent's line, then the person's credit; the agent's goes when the workspace turns it off", async () => {
+    f = await setup();
+    const http = {
+      apiUrl: API,
+      fetch: (async (_input: string | URL | Request) => Response.json({ login: "ana-gh" })) as typeof fetch,
+    };
+    const ctx = { orgId: f.org.id, agentId: f.agent.id };
+    const dev = "Co-authored-by: Dev <noreply@agentes.chat>";
+    expect(await runCoAuthors({ db: f.db, http }, ctx)).toEqual([dev]);
+    await f.db
+      .insert(schema.accounts)
+      .values({ id: crypto.randomUUID(), accountId: "9003", providerId: "github", userId: f.owner.id });
+    const ana = "Co-authored-by: ana <9003+ana-gh@users.noreply.github.com>";
+    expect(await runCoAuthors({ db: f.db, http }, ctx)).toEqual([dev, ana]);
+    await setAgentCoAuthor(f.db, f.org.id, false);
+    expect(await runCoAuthors({ db: f.db, http }, ctx)).toEqual([ana]);
+    await setAgentCoAuthor(f.db, f.org.id, true);
+    expect(await runCoAuthors({ db: f.db, http }, ctx)).toEqual([dev, ana]);
   });
 
   test("in the workspace owner's language, for the person who asked, else the agent's responsável, else nobody", async () => {

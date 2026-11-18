@@ -1,5 +1,5 @@
 import { plural } from "@agenteschat/i18n/format";
-import { atHost, type Words } from "./en";
+import { atHost, sentences, type Words } from "./en";
 
 export const ptBR: Words = {
   sentBy: (host) => (host ? atHost("Enviado pelo servidor do Ackwire AI", "em", host) : "Enviado pelo Ackwire AI."),
@@ -34,6 +34,9 @@ export const ptBR: Words = {
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} convidou você para entrar na `, { b: org }, ` como ${role}.`]
         : ["Você recebeu um convite para entrar na ", { b: org }, ` como ${role}.`],
+    starts: (channels, agents) =>
+      sentences(channels && ["Você já entra em ", ...channels, "."], agents && ["Vai trabalhar com ", ...agents, "."]),
+    more: (n) => `mais ${n}`,
     what: "O Ackwire AI é onde pessoas e agentes de IA trabalham juntos.",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}: ` : "Recado: " }, `“${note}”`],
     button: "Aceitar convite",
@@ -212,7 +215,12 @@ export const ptBR: Words = {
     preheader: "Aprove ou recuse em Membros. Nada acontece até você responder.",
     headline: "Um pedido para entrar espera por você",
     body: (org) => ["Essa pessoa abriu o link de convite da ", { b: org }, " e pediu para entrar."],
-    note: "Aprove só quem você espera. A pessoa entra como membro, a não ser que você escolha outro papel na página.",
+    outside: (by) => [
+      "Essa pessoa trabalha para ",
+      { b: by },
+      " e pede para entrar como colaborador externo. Não ocupa vaga no seu plano, e você pode removê-la a qualquer momento.",
+    ],
+    note: "Aprove só quem você espera. A pessoa entra como membro, a não ser que você escolha outro cargo na página.",
     approve: "Aprovar",
     deny: "Recusar",
     more: ["Todos os pedidos ", { nobr: "em espera estão em Membros." }],
@@ -282,7 +290,7 @@ export const ptBR: Words = {
     workspace: (org) => [
       "Digite este código para apagar o workspace ",
       { b: org },
-      ". Ele fecha para todos na hora e é apagado de vez 7 dias depois.",
+      ". Ele fica só para leitura para todos na hora e é apagado de vez 7 dias depois.",
     ],
     account: (email) => [
       "Digite este código para apagar a conta inteira ",
@@ -303,19 +311,61 @@ export const ptBR: Words = {
       workspace: (org) => [
         "Digite este código para apagar o seu workspace ",
         { b: org },
-        ". Ele fecha na hora e é apagado de vez 7 dias depois.",
+        ". Ele fica só para leitura na hora e é apagado de vez 7 dias depois.",
       ],
+    },
+  },
+  emailChange: {
+    code: {
+      subject: (code) => `${code} é seu código para mudar seu e-mail`,
+      preheader: "Digite no Ackwire AI para confirmar. Vale por 10 minutos.",
+      headline: "Seu código",
+      body: (email, newEmail) => [
+        "Digite este código para mudar o e-mail da conta ",
+        { b: email },
+        " para ",
+        { b: newEmail },
+        ".",
+      ],
+      support: (address) => [
+        "Vale por 10 minutos, e o seu e-mail não muda sem ele. Se não foi você, não passe para ninguém e escreva para ",
+        { mail: address },
+        ".",
+      ],
+      noSupport:
+        "Vale por 10 minutos, e o seu e-mail não muda sem ele. Se não foi você, não passe para ninguém e avise quem cuida deste servidor.",
+      why: "Você recebeu este e-mail porque sua conta pediu para mudar o e-mail no Ackwire AI.",
+    },
+    link: {
+      subject: "Confirme seu novo e-mail no Ackwire AI",
+      preheader: "Um clique para entrar com este endereço daqui em diante. O link vale por uma hora.",
+      headline: "Confirme seu novo e-mail",
+      body: "Falta um passo: confirmar que este endereço é seu. Daí em diante, sua conta entra com ele.",
+      button: "Confirmar novo e-mail",
+      small: "O link vale por uma hora. Se não foi você que pediu, pode ignorar este e-mail.",
+      why: "Você recebeu este e-mail porque alguém pediu para usar este endereço numa conta do Ackwire AI.",
+    },
+    changed: {
+      subject: "O e-mail da sua conta do Ackwire AI mudou",
+      preheader: "Se não foi você, dá para trazer este endereço de volta por 7 dias.",
+      headline: "Seu e-mail mudou",
+      body: (email, newEmail) => ["A conta ", { b: email }, " agora entra com ", { b: newEmail }, "."],
+      notYou:
+        "Não foi você? Aperte o botão em até 7 dias. Este endereço volta, todas as sessões são encerradas, os apps de IA são desconectados e jeitos de entrar adicionados desde então deixam de valer. A senha também é apagada, e “Esqueci a senha” cria a próxima.",
+      button: "Não fui eu",
+      small: "Se foi você, não precisa fazer nada.",
+      why: "Você recebeu este e-mail porque este endereço era o e-mail de uma conta do Ackwire AI.",
     },
   },
   deleting: {
     subject: (day) => `Um workspace em que você está vai ser apagado em ${day}`,
-    preheader: "Ele está fechado agora. Um dono ainda pode restaurar até lá.",
+    preheader: "Ele está só para leitura agora. Um dono ainda pode restaurar até lá.",
     headline: "Um workspace está sendo apagado",
     body: (by, org, day, time) => [
       { b: by },
       " apagou o workspace ",
       { b: org },
-      `. Ele está fechado agora e some de vez em ${day} às ${time}.`,
+      `. Ele está só para leitura agora e some de vez em ${day} às ${time}.`,
     ],
     owner: "Mudou de ideia? Restaure antes disso.",
     button: "Restaurar o workspace",
@@ -488,6 +538,31 @@ export const ptBR: Words = {
         return `Tudo pronto: ${routines > 0 ? `${a} e ${r}` : a}. Só falta um plano do Ackwire AI.`;
       },
       why: () => "Você recebeu este e-mail porque este workspace no Ackwire AI é seu. São só dois avisos como este.",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface} foi vinculado à sua conta do Ackwire AI`,
+      preheader: "Seu assistente responde você por lá agora. Se não foi você, desvincule.",
+      headline: (surface) => `${surface} foi vinculado`,
+      body: (surface, display, org) => [
+        { b: display },
+        ` no ${surface} agora fala com seu assistente em `,
+        { b: org },
+        ".",
+      ],
+      notYou: "Não foi você? Desvincule. As mensagens de lá param de chegar à sua conta na hora.",
+      button: "Desvincular",
+      small: "Se foi você, não precisa fazer nada. Dá para desvincular quando quiser em Configurações.",
+      why: (surface) => `Você recebeu este e-mail porque ${surface} foi vinculado à sua conta do Ackwire AI.`,
+    },
+    unlinked: {
+      subject: (surface) => `${surface} foi desvinculado da sua conta do Ackwire AI`,
+      preheader: "A identidade mudou. Vincule de novo em Configurações se foi você.",
+      headline: (surface) => `${surface} foi desvinculado`,
+      body: (surface, display) => [{ b: display }, ` no ${surface} foi desvinculado porque a identidade mudou.`],
+      small: "Vincule de novo em Configurações se foi você.",
+      why: (surface) => `Você recebeu este e-mail porque ${surface} estava vinculado à sua conta do Ackwire AI.`,
     },
   },
 };

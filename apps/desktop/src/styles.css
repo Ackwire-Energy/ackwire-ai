@@ -10,6 +10,10 @@
   --font-mono: "Martian Mono Variable", "Martian Mono", ui-monospace, Menlo, monospace;
   --font-display: var(--font-sans);
   --font-dot: "Doto", var(--font-mono);
+  /* Bundled Plus Jakarta Sans: cap height .745em, its middle .0355em below the line's middle. */
+  --cap-mid: -0.0355em;
+  --cap-top: 0.337em;
+  --title-cap-mid: -0.3px;
 }
 
 /* Japanese, Korean and Chinese read in each system's own face after Onest (no web font to download). Russian titles:
@@ -280,14 +284,25 @@ p {
     transform 0.35s var(--spring),
     opacity 0.2s;
   pointer-events: none;
-  max-width: calc(100vw - 24px);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* Long words wrap, never cut: a toast says what happened. */
+  width: max-content;
+  max-width: min(560px, calc(100vw - 24px));
+  overflow-wrap: anywhere;
 }
 .dk-toast[data-on] {
   transform: translate(-50%, 0);
   opacity: 1;
+}
+/* Its one action ("Reopen now"), pressable while it shows. */
+.dk-toast[data-action] {
+  gap: var(--space-3);
+  padding-block: var(--space-2);
+}
+.dk-toast[data-action][data-on] {
+  pointer-events: auto;
+}
+.dk-toast__act {
+  flex: none;
 }
 
 /* ---------- Popover ---------- */
@@ -678,7 +693,7 @@ body[data-window="popover"] {
   border-top: 1px solid var(--line);
 }
 
-/* ---------- First run (FirstRun.tsx): Ackwire AI big, your own server small ---------- */
+/* ---------- First run (FirstRun.tsx): where the workspace lives, then one's own server's ways ---------- */
 .dk-fr {
   position: relative;
   isolation: isolate;
@@ -705,51 +720,76 @@ body[data-window="popover"] {
   max-width: 28ch;
   text-wrap: balance;
 }
-.dk-fr__hello {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding-bottom: 92px;
-}
-.dk-fr__hello .dk-lead {
-  max-width: 44ch;
-}
-.dk-fr__mark {
-  margin-bottom: 18px;
-}
-.dk-fr__cloud {
-  margin: 28px 0 12px;
-  min-width: 320px;
-  justify-content: center;
-}
-.dk-fr__own {
-  all: unset;
-  cursor: pointer;
-  position: absolute;
-  left: 24px;
-  bottom: 18px;
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px 8px;
-  border-radius: 8px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink2);
-  background: color-mix(in srgb, var(--bg) 72%, transparent);
-}
-.dk-fr__own:hover {
-  color: var(--ink);
-}
-.dk-fr__own:focus-visible,
-.dk-fr__back:focus-visible,
-.dk-fr__card:focus-visible {
+.dk-fr__back:focus-visible {
   outline: 2px solid var(--agent2);
   outline-offset: 2px;
 }
+/* "Onde fica o seu workspace?": the team's sky on the left, the choice on the right, the window's whole height. */
+.dk-fr[data-screen="choose"] .dk-fr__body {
+  padding: 0;
+}
+.dk-choose {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+}
+.dk-choose__sky {
+  position: relative;
+  min-height: 0;
+}
+.dk-choose__brand {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: #fff;
+}
+.dk-choose__main {
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 32px;
+}
+/* One line at the window's fixed 720 wide (376 px of text): every language's hosting.title stays under ~355 px. */
+.dk-fr__body .dk-choose__main h1 {
+  font-size: 24px;
+  max-width: none;
+}
+.dk-choose__main .dk-lead {
+  margin-top: 6px;
+}
+.dk-choose__list {
+  margin-top: 20px;
+}
+.dk-choose__list .ac-optrow__title {
+  flex-wrap: wrap;
+}
+/* "Recomendado" after the Cloud's name: words in the brand's blue, never a pill. */
+.dk-choose__rec {
+  margin-left: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--agent);
+}
+.dk-choose__go {
+  width: 100%;
+  height: 48px;
+  margin-top: 20px;
+  justify-content: center;
+}
+.dk-choose__more {
+  margin-top: 12px;
+  text-align: center;
+}
+
 .dk-fr__back {
   all: unset;
   cursor: pointer;
@@ -766,56 +806,6 @@ body[data-window="popover"] {
 }
 .dk-fr__back:hover {
   color: var(--ink);
-}
-.dk-fr__cards {
-  margin-top: 28px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-.dk-fr__card {
-  all: unset;
-  box-sizing: border-box;
-  cursor: pointer;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 18px 40px 18px 18px;
-  min-height: 150px;
-  border-radius: 18px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  transition: box-shadow 0.15s;
-}
-.dk-fr__card:hover {
-  box-shadow: var(--e2), var(--top);
-}
-.dk-fr__card b {
-  font-weight: 650;
-  font-size: 15px;
-}
-.dk-fr__card small {
-  color: var(--muted);
-  font-size: 12.5px;
-  /* No word alone on the last line ("…while it's / on."). */
-  text-wrap: pretty;
-}
-.dk-fr__card-art {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  margin-bottom: 10px;
-  color: var(--ink2);
-}
-.dk-fr__card-go {
-  position: absolute;
-  right: 16px;
-  bottom: 18px;
-  color: var(--faint);
-}
-.dk-fr__which {
-  margin-top: 16px;
 }
 .dk-fr__form {
   margin-top: 24px;
@@ -865,20 +855,6 @@ body[data-window="popover"] {
 .dk-fr__foundtext small {
   color: var(--muted);
   font-size: 12.5px;
-}
-.dk-fr__none {
-  margin-top: auto;
-  padding: 16px 18px;
-  border-radius: 18px;
-  background: var(--sunken);
-  box-shadow: inset 0 0 0 1px var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.dk-fr__none h2 {
-  font-size: 13.5px;
-  font-weight: 650;
 }
 .dk-fr__cmd {
   display: flex;
@@ -957,6 +933,54 @@ body[data-window="popover"] {
   font-weight: 700;
   font-size: 13px;
   background: var(--plate);
+}
+/* The install's last line: someone else installs it, with the words to send them. */
+.dk-fr__share {
+  margin-top: auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+/* Connect's last line: none yet, so the install. */
+.dk-fr__noneyet {
+  margin-top: auto;
+  padding-top: 16px;
+}
+/* Under Run here's settings: a sleeping agent and what closing the app does. */
+.dk-fr__rest {
+  margin: 14px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--ink2);
+  text-wrap: pretty;
+}
+.dk-fr__rest .ac-avatar {
+  flex: none;
+}
+/* The setup's drawing: this computer and its team in a band of the sky. */
+.dk-fr__setupart {
+  width: 100%;
+  max-width: 320px;
+  height: 132px;
+  margin-bottom: 18px;
+  overflow: hidden;
+  border-radius: 16px 16px 16px 4px;
+  display: grid;
+  place-items: center;
+}
+.dk-fr__setupart .ac-hosting {
+  height: 100%;
+}
+/* The link from an install: the always-on computer over the question. */
+.dk-fr__sheetart {
+  align-self: center;
+  margin-bottom: 8px;
 }
 .dk-fr__end {
   margin-top: auto;
@@ -1235,6 +1259,48 @@ body[data-window="popover"] {
 .dk-ip__tip b {
   font-weight: 600;
 }
+/* A step's actions side by side, wrapping under each other when the window is narrow. */
+.dk-ip__act {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+/* The Terminal way for Xcode: the commands as they're pasted, selectable. */
+.dk-ip__cmd {
+  align-self: stretch;
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--plate);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-user-select: text;
+  user-select: text;
+}
+/* This Mac fixing its Xcode: each of its three commands, ticked once done. */
+.dk-ip__phase {
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--muted);
+}
+.dk-ip__phase[data-done] {
+  color: var(--ink2);
+}
+.dk-ip__phase[data-done] .ac-icon {
+  color: var(--ok);
+}
+/* An iPhone on this Mac's Wi-Fi: its line, then Use over Wi-Fi, side by side while they fit. */
+.dk-ip__wifi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
 .dk-ip__acts {
   margin-top: auto;
   display: flex;
@@ -1292,21 +1358,6 @@ body[data-window="popover"] {
   .dk-bar span {
     transition: none;
   }
-}
-.dk-wel__horizon {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 120px;
-  z-index: -1;
-  pointer-events: none;
-  overflow: hidden;
-}
-.dk-wel__horizon .ac-sky {
-  width: 100%;
-  height: 100%;
-  display: block;
 }
 
 /* A sign-in code (Preferences > Tools, "Add account"): big, in Doto. */
@@ -1372,35 +1423,87 @@ body[data-window="popover"] {
 .dk-under-card {
   margin-top: 12px;
 }
-/* A server's workspaces under its row in Preferences › Servers (ADR 0154): a chip each, logo and unread count. */
-.dk-ws-list {
+/* A server's workspaces under its row in Preferences › Servers (ADR 0154), when it has several: a line each, logo,
+   name and unread count. One workspace is named in the subtitle instead. */
+.dk-ws-rows {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dk-ws-rows li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.dk-ws-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A server's accounts under its row (ADR 0183), when the window is signed in there with several: who each is and the
+   way to it on one line, its workspaces under it. */
+.dk-accts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dk-accts > li {
+  display: flex;
+  flex-direction: column;
   gap: 6px;
+  min-width: 0;
+}
+.dk-accts[data-dim] {
+  opacity: 0.5;
+}
+.dk-acct {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+.dk-acct__who {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 /* A server that doesn't answer: its last workspaces dimmed, its state in the waiting color (ADR 0158). */
-.dk-ws-list[data-dim] {
+.dk-ws-rows[data-dim] {
   opacity: 0.5;
 }
 .dk-state-waiting {
   color: var(--warn);
 }
-.dk-ws-logo {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  object-fit: cover;
-  margin-right: 6px;
-  vertical-align: -3px;
-}
 .dk-ws-count {
-  margin-left: 6px;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+/* Preferences › Servers › Keep it running: a green check when it's set, an amber dot when it's not, in a tile's place. */
+.dk-keep {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: var(--ok);
+}
+.dk-keep__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--warn);
 }
 /* The server here: Restart and Stop under its card, "Stop running it here…" at the far end. */
 .dk-here__acts {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
@@ -1415,6 +1518,14 @@ body[data-window="popover"] {
 }
 .dk-here__more {
   margin-top: 0;
+}
+/* "Also works for …" under it: on the same left edge as the rows below (.dk-psec plus .dk-ohead). */
+.dk-here__also {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 10px 4px;
 }
 
 .dk-prefs {
@@ -1609,6 +1720,8 @@ body[data-window="popover"] {
   gap: 6px;
   flex-wrap: wrap;
   min-width: 0;
+  /* A long word (a system details line, a path) breaks inside its row instead of pushing past the card. */
+  overflow-wrap: anywhere;
 }
 .dk-crow__line {
   display: flex;
@@ -2096,4 +2209,24 @@ body[data-window="notch"] {
 .dk-ip__stall {
   gap: var(--space-2);
   color: var(--ink2);
+}
+/* Why Developer Mode may be missing: one cause a row, its action beside it while the words fit (`.ac-actline`). */
+.dk-ip__causes {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  color: var(--ink2);
+}
+.dk-ip__causes > b {
+  color: var(--ink);
+}
+.dk-ip__causes > ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
 }

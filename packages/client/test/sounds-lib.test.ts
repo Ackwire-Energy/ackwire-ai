@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import type { AppNotification } from "../src/api/types";
 import type { SoundName } from "../src/lib/sounds";
-import { playSound, setSoundPlayer, soundForNotification } from "../src/lib/sounds";
+import { playSound, setSoundPlayer, soundForEvent, soundForNotification } from "../src/lib/sounds";
 
 const fresh = { waiting: false, count: 1, readAt: null, doneAt: null };
 
@@ -30,6 +31,15 @@ describe("soundForNotification", () => {
 
   test("anything else waiting on you asks for attention", () => {
     expect(soundForNotification({ ...fresh, kind: "issue_assigned", waiting: true }, false)).toBe("attention");
+  });
+});
+
+describe("soundForEvent", () => {
+  test("what is not news (the person's own undo, a kind they turned off) plays nothing", () => {
+    const notification = { ...fresh, kind: "mention" } as AppNotification;
+    expect(soundForEvent({ type: "notification.upserted", notification }, false)).toBe("mention");
+    expect(soundForEvent({ type: "notification.upserted", notification, alert: true }, false)).toBe("mention");
+    expect(soundForEvent({ type: "notification.upserted", notification, alert: false }, false)).toBeNull();
   });
 });
 

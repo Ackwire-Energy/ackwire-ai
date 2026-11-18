@@ -133,6 +133,41 @@ test("a routine set to act tells another agent: it wakes, and its reply reaches 
   expect(JSON.stringify(asked)).toContain("tell_agent leaves an agent a note");
 });
 
+test("a routine's tell_agent is never set aside as noise: the colleague wakes on it, even on an alert", async () => {
+  const results: string[] = [];
+  const note = "Sentry: ResizeObserver loop limit exceeded, check whether it's the checkout one";
+  f = await setup({
+    handOff: true,
+    askAgent: true,
+    // A judge that reads every unrequested item as noise.
+    judge: (kind) => (kind === "alert_triage" ? "noise" : kind === "note_reply" ? 0.9 : undefined),
+    reply: (req) => {
+      if (req.outputSchema) return NO_ROUTE;
+      if (isRoutine(req)) {
+        if (seen(req).includes("tool_result")) results.push(seen(req));
+        return routineTurn(
+          req,
+          [{ name: "tell_agent", input: { agent: "@ops", message: note } }],
+          "Passei para o Ops.",
+        );
+      }
+      if (inAgentDm(req)) return { chunks: ["É o mesmo do checkout: já abri a correção."] };
+      return { chunks: ["O Ops respondeu: é o mesmo do checkout."] };
+    },
+  });
+  const ops = await agentIn(f, "Ops", "ops");
+  const routine = await channelRoutine(f, { access: "act", prompt: "Repasse os alertas do Sentry para o Ops." });
+  await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+  await drainOutbox(f.db, f.handlers);
+
+  expect((await runsOf(f)).filter((r) => r.agentId === ops.id).map((r) => r.status)).toEqual(["done"]);
+  const signals = await f.db.select().from(schema.autonomySignals);
+  expect(signals.filter((s) => s.kind === "digest")).toEqual([]);
+  expect(results.join("\n")).not.toContain("didn't start on it");
+  const [row] = await f.db.select().from(schema.agentConsultations);
+  expect(row?.answer ?? "").not.toContain("didn't start on it");
+});
+
 test("a routine posts only where its creator can post, and writes in a DM only to its creator; its @mention wakes the agent", async () => {
   const results: string[] = [];
   f = await setup({

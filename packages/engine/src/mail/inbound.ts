@@ -23,7 +23,7 @@ import {
 } from "./accounts";
 import { agentMailPolicy } from "./policies";
 import { formatAddress, matchesAddressRules, oneLine } from "./text";
-import type { MailFilter } from "./watches";
+import { type MailFilter, watchesFor } from "./watches";
 
 const { mailWatches, mailSeen, mailAccounts, routines, routineRuns } = schema;
 
@@ -85,6 +85,9 @@ export async function ingestMail(
   if (!account || account.revokedAt) return { added: 0, fired: false };
   // The watch outlives the agent's access (taken by the mailbox's owner, or dropped as its audience widened).
   if (!(await hasScope(db, routine.orgId, routine.agentId, account.id, "mail:read"))) return { added: 0, fired: false };
+  // The right hand's watch outlives its creator too (the routine taken over): another person never gets this mail.
+  if (!(await watchesFor(db, routine.orgId, routine.agentId, account, routine.createdByUserId)))
+    return { added: 0, fired: false };
   const policy = await agentMailPolicy(db, routine.orgId, routine.agentId, account.id);
   const now = deps.now?.() ?? new Date();
   const wanted = messages.filter(

@@ -103,7 +103,7 @@ describe("Connect an AI, the rail's last step", () => {
     const state = madeTeam();
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
-    expect(eyebrow()).toBe("Passo 4 de 5");
+    expect(eyebrow()).toBe("Passo 5 de 6");
     expect(heading()).toBe(CONNECT);
     expect(document.querySelector(".onb__steps")?.textContent).toContain("Conectar uma IA");
     for (const name of ["Claude", "ChatGPT", "Outro plano", "Chave de API", "Começar grátis"])
@@ -118,7 +118,8 @@ describe("Connect an AI, the rail's last step", () => {
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     await click(within(body()).getByRole("button", { name: /^Chave de API/ }), 12);
-    expect(screen().getByRole("dialog", { name: /^Conectar uma IA/ })).toBeTruthy();
+    // For the right hand alone, on the card's own steps.
+    expect(screen().getByRole("dialog", { name: "Adicionar uma chave de API" })).toBeTruthy();
     expect(heading()).toBe(CONNECT);
   });
 
@@ -225,7 +226,7 @@ describe("Connect an AI, the rail's last step", () => {
     const { router } = await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     expect(heading()).toBe("Ligue o time");
-    expect(eyebrow()).toBe("Passo 4 de 6");
+    expect(eyebrow()).toBe("Passo 5 de 7");
     const asked = arrivals(router);
     await click(button(/^Ligar depois/), 16);
     await settle(8);
@@ -294,9 +295,8 @@ describe("what a pick opens", () => {
     const team = [LODI_ID, "ada", "atlas"];
     for (const start of ["claude", "chatgpt", "key", "cursor"] as const)
       expect(connectRequest(start, team)).toEqual({ agentIds: team, start });
-    expect(connectRequest("claude", [LODI_ID])).toEqual({ agentId: LODI_ID, intent: "claude" });
-    expect(connectRequest("key", [LODI_ID])).toEqual({ agentId: LODI_ID, intent: "api_key" });
-    expect(connectRequest("zen", [LODI_ID])).toEqual({ agentId: LODI_ID, plan: "zen" });
+    for (const start of ["claude", "key", "zen"] as const)
+      expect(connectRequest(start, [LODI_ID])).toEqual({ agentId: LODI_ID, start });
   });
 });
 
@@ -327,16 +327,19 @@ describe("each card opens Connect for the whole team on its own steps (ADR 0162)
     });
   }
 
-  test("the right hand alone: its own plain dialog", async () => {
+  test("the right hand alone: the narrow dialog for it, on the card's steps", async () => {
     // Every other agent someone else's: only the right hand is the person's to wake.
     const state = madeTeam();
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
-    const dialog = screen().getByRole("dialog");
-    expect(inBand(dialog)).toBe(false);
-    expect(dialog.querySelector(".ai-picker")).toBeTruthy();
-    expect(screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" })).toBe(dialog);
+    const dialog = screen().getByRole("dialog", { name: "Seu plano do Claude" });
+    expect(inBand(dialog)).toBe(true);
+    expect(dialog.querySelector(".ai-picker")).toBeNull();
+    expect(within(dialog).getByRole("region", { name: "Seu plano do Claude" })).toBeTruthy();
+    // Back leads to the choices, under its own name.
+    await click(within(dialog).getByRole("button", { name: "Voltar" }), 4);
+    expect(screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" })).toBeTruthy();
   });
 
   test("the team already thinking and the right hand not: a card opens the right hand's own dialog", async () => {
@@ -352,8 +355,8 @@ describe("each card opens Connect for the whole team on its own steps (ADR 0162)
     await renderApp("/onboarding", { api: createFakeApi(state) });
     await settle(16);
     await click(within(body()).getByRole("button", { name: /^Claude/ }), 12);
-    const dialog = screen().getByRole("dialog", { name: "Conectar uma IA para o Lodi" });
-    expect(inBand(dialog)).toBe(false);
+    const dialog = screen().getByRole("dialog", { name: "Seu plano do Claude" });
+    expect(inBand(dialog)).toBe(true);
     // For the right hand alone: no For offering the agents that already think.
     expect(within(dialog).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
   });

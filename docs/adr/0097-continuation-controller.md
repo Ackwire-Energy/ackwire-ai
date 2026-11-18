@@ -76,3 +76,16 @@ After a long status reply that ended with what was left for the people (a merge,
 3. **`ASK_NUDGE`**: needing nothing from the person, the run ends its turn without another word, since its reply above stands. It used to be told to give its answer again, with no question, which the controller then turned into the card.
 
 Tests: `pointless-ask.test.ts` (the statement refused, real questions in four scripts and a choice list with no question mark asked, the controller's path ending with no card), the follow-through tests and scenarios S18, S32 and S46: a need still described or a promise repeated after the ask nudge is posted, not carded (a word-for-word repeat not at all); one asked in the text is.
+
+## Addendum (2026-11-16): a question is answered, not started
+
+Asked which way to make a video was best and cheapest, an agent answered and offered a trial run that needed a provider's key. The verdict read the offer as a secret it needed (`secret`: "it needs one from a person and hasn't asked through a secure request"), and an earlier turn's offer as a way left untried: nudged, the agent opened a secret card and a connection approval nobody had asked for, and the person had to say again that they wanted the options.
+
+1. **`done`**: when `request` asks only for information or advice (the options, the best or cheapest way, how something works) and the reply gives it, it is done, also when it offers to start one of the ways: starting is the person's choice. Work asked as a question ("can you…?", "consegue…?", "pode ver…?") is still work: offering to do it is not done, and the push to act stays as it was: everything up to the step that needs the person, then that step handed over.
+2. **`untried`** leaves out a step offered beyond information or advice (a connection, a key, a trial run); work asked as a question still counts.
+3. **`secret`** applies when the reply asks for a secret in the chat, or when the work `request` asked for can't go on without one; never when it only names the key a step it offers would need.
+4. **`SECRET_NUDGE`**: request the key securely only for work they asked for; for an offered step, ask for no key, give the answer and offer the step. The base prompt's asking rule says the same: asked for options or advice, answer it.
+5. **Where the text goes**: a computer brain asks for a secret or an approval mid-turn and writes after the call what the card is for. That text is now placed just before the first card the run posted in that turn (as a question card's lead already was), unless the card is another run's, older than `PLACE_KEPT_MS`, or someone else wrote after it (ADR 0010).
+
+Tests: the verdict's criteria are text for the judge; the prompt snapshots and the DM "oi" size in `turns-eval` move with the rule.
+

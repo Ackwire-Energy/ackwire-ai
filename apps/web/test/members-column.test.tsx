@@ -252,6 +252,81 @@ describe("the members column", () => {
     expect(screen().getByRole("dialog", { name: "Perfil" }).textContent).toContain("4 conversas esperando");
   });
 
+  test("agents out of office or paused sit under Offline, faded as the people there, saying why; a run brings one back", async () => {
+    widthIs(DESKTOP_QUERY);
+    const until = new Date(Date.now() + 60_000).toISOString();
+    const state = seedState({
+      agentStatuses: [
+        {
+          agentId: ADA_ID,
+          presence: "out",
+          status: { by: "auto", text: null, kind: "out_of_plan", subject: null, emoji: null, until },
+          activeAt: new Date().toISOString(),
+        },
+        { agentId: ATLAS_ID, presence: "offline", status: null, activeAt: null },
+      ],
+    });
+    const { sockets } = await open(state);
+    await settle(4);
+    const side = column() as HTMLElement;
+    expect(within(side).queryByRole("region", { name: "Agentes" })).toBeNull();
+    const offline = within(side).getByRole("region", { name: "Offline" });
+    expect(offline.hasAttribute("data-off")).toBe(true);
+    expect(offline.querySelector(".members-side__head")?.textContent).toBe("Offline — 3");
+    // By name with the people there.
+    expect([...offline.querySelectorAll(".members-side__label")].map((l) => l.textContent)).toEqual([
+      "Ada",
+      "Atlas",
+      "João",
+    ]);
+    const line = (name: string) => row(offline, name)?.querySelector(".members-side__line")?.textContent;
+    expect(line("Ada")).toMatch(/^Sem limite · volta às \d{1,2}:\d{2}$/);
+    // Why it is off comes before its role.
+    expect(line("Atlas")).toBe("Pausado");
+    // A run of Ada's starts: at work, she is back under Agentes, and her row and her group agree.
+    await act(async () =>
+      sockets.last().push({
+        type: "event",
+        channelId: ENG_ID,
+        event: {
+          type: "agent.run",
+          channelId: ENG_ID,
+          threadId: "m-1",
+          runId: "r9",
+          agentId: ADA_ID,
+          status: "running",
+        },
+      }),
+    );
+    await settle(2);
+    const agents = within(column() as HTMLElement).getByRole("region", { name: "Agentes" });
+    expect(row(agents, "Ada")?.querySelector(".members-side__inner")?.getAttribute("data-presence")).toBe("working");
+    expect(row(within(column() as HTMLElement).getByRole("region", { name: "Offline" }), "Ada")).toBeNull();
+  });
+
+  test("an agent with no AI, or out of office with no line, sits under Offline saying why", async () => {
+    widthIs(DESKTOP_QUERY);
+    const state = seedState({
+      aiStatus: {
+        any: true,
+        agents: [
+          { agentId: ADA_ID, state: "no_ai" },
+          { agentId: ATLAS_ID, state: "ready" },
+        ],
+      },
+      agentStatuses: [
+        { agentId: ADA_ID, presence: "online", status: null, activeAt: null },
+        { agentId: ATLAS_ID, presence: "out", status: null, activeAt: null },
+      ],
+    });
+    await open(state);
+    await settle(4);
+    const offline = within(column() as HTMLElement).getByRole("region", { name: "Offline" });
+    const line = (name: string) => row(offline, name)?.querySelector(".members-side__line")?.textContent;
+    expect(line("Ada")).toBe("Sem IA conectada");
+    expect(line("Atlas")).toBe("Sem limite agora · responde quando renovar");
+  });
+
   test("a row opens the member's card", async () => {
     widthIs(DESKTOP_QUERY);
     await open();
@@ -506,17 +581,21 @@ describe("answering without a mention, as true for my own messages as who picks 
   });
 });
 
-describe("Settings › Papéis: listed apart", () => {
+describe("Settings › Cargos: listed apart", () => {
   test("a role's switch sets whether its people get their own group in the members column", async () => {
     const state = seedState();
     await renderApp(`/org/${ORG_ID}/settings/roles`, { api: createFakeApi(state) });
     await settle(6);
     await act(async () => fireEvent.click(screen().getByRole("button", { name: /^Admin/ })));
-    await settle(4);
+    await settle(6);
+    // Behind ✎: Nome, cor e ícone, saved once.
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Mudar nome, cor e ícone" })));
+    await settle(2);
     const hoist = screen().getByRole("switch", { name: /Mostrar separado na lista de membros/ });
     expect(hoist.getAttribute("aria-checked")).toBe("true");
     await act(async () => fireEvent.click(hoist));
-    await settle(2);
+    await act(async () => fireEvent.click(screen().getByRole("button", { name: "Salvar" })));
+    await settle(4);
     expect(state.calls.find((c) => c.method === "roles.update")?.args[2]).toEqual({ hoist: false });
   });
 });

@@ -29,6 +29,7 @@ import {
   modifiersOf,
   pagePoint,
   parseBrowserLiveMessage,
+  parseBrowserPointer,
   pasteEvents,
   pressEvents,
   releaseEvent,
@@ -934,4 +935,40 @@ test("what a person's lost input says, by the server's code", () => {
   expect(inputProblem("no_field")).toBe("browser.inCard.noField");
   expect(inputProblem("rate_limited")).toBeNull();
   expect(inputProblem(null)).toBeNull();
+});
+
+test("the agent's pointer: one call per gesture, its own agent's only, and nothing for a message that isn't one", () => {
+  const went: string[] = [];
+  const replays: unknown[] = [];
+  const live = createBrowserLiveConnection({
+    send: () => {},
+    agentId: AGENT,
+    onFrame: () => {},
+    onStatus: () => {},
+    onPointer: (p) => {
+      went.push(`${p.act} ${p.x},${p.y} in ${p.width}x${p.height}`);
+      replays.push(p.replay);
+    },
+  });
+  live.start();
+  const pointer = { type: "browser.pointer", agentId: AGENT, x: 320, y: 200, width: 1280, height: 800, act: "click" };
+  live.handleMessage(pointer);
+  live.handleMessage(pointer);
+  live.handleMessage({ ...pointer, agentId: "other" });
+  live.handleMessage({ ...pointer, act: "smash" });
+  live.handleMessage({ ...pointer, width: 0 });
+  expect(went).toEqual(["click 320,200 in 1280x800", "click 320,200 in 1280x800"]);
+  // The last one, sent again as the view opens: said as such.
+  live.handleMessage({ ...pointer, replay: true });
+  expect(replays).toEqual([undefined, undefined, true]);
+  // A desktop's event carries the same shape.
+  expect(parseBrowserPointer({ x: 1, y: 2, width: 1280, height: 900, act: "type" })).toEqual({
+    x: 1,
+    y: 2,
+    width: 1280,
+    height: 900,
+    act: "type",
+  });
+  expect(parseBrowserPointer({ x: 1, y: "2", width: 1280, height: 900, act: "type" })).toBeNull();
+  expect(parseBrowserPointer(null)).toBeNull();
 });

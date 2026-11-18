@@ -9,10 +9,11 @@ import {
   useSteerState,
 } from "@agenteschat/client";
 import { listNames } from "@agenteschat/client/lib/activity";
-import { failedRunFix, runFailureLine } from "@agenteschat/client/lib/errors";
-import { mayConnectAi } from "@agenteschat/client/lib/no-ai";
+import { failedRunFix, filesTextOnlyOf, runFailureLine } from "@agenteschat/client/lib/errors";
+import { sentAtLine } from "@agenteschat/client/lib/format";
+import { mayConnectAi, plansNotYoursOf } from "@agenteschat/client/lib/no-ai";
 import { can } from "@agenteschat/client/lib/permissions";
-import { deciderOf } from "@agenteschat/client/lib/routing";
+import { deciderOf, everyoneLineOf } from "@agenteschat/client/lib/routing";
 import { helpUrl } from "@agenteschat/client/lib/server";
 import { memo, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -21,24 +22,25 @@ import Animated, { FadeIn } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import {
   Button,
-  Card,
+  GroupedHeader,
+  GroupedList,
+  GroupedRow,
   Icon,
   type IconName,
-  InkOrbit,
-  Row,
-  SectionHeader,
+  InfoHint,
   Text,
   useReducedMotion,
   useToast,
 } from "@/ui";
-import { openAgentAi } from "../ai/AgentAiScreen";
+import { openAgentAi, openAgentModel } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage, usePlanHold } from "../ai/parts";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import {
+  FACES,
   keptLine,
   markLabel,
   markOf,
@@ -50,6 +52,29 @@ import {
 } from "./agent-receipts";
 import { requestComposerText } from "./composer-request";
 import { useQuietInset } from "./look";
+import { useRowDirectory, useRowMeId } from "./row-data";
+
+/** Under a reply whose picture or PDF reached its AI as text only: "Trocar modelo", for who may change the agent. */
+export function FilesTextOnlyFix({ message: m }: { message: Message }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
+  const agentId = m.author.id;
+  const fix = agentId
+    ? failedRunFix(filesTextOnlyOf(m.meta), {
+        keys: false,
+        admin: can(org, "manage_agents"),
+        owner: meId !== null && dir.agentById.get(agentId)?.ownerUserId === meId,
+      })
+    : null;
+  if (fix !== "changeModel" || !agentId) return null;
+  return (
+    <View style={styles.fix}>
+      <Button variant="secondary" size="sm" label={t("usageCard.changeModel")} onPress={() => openAgentAi(agentId)} />
+    </View>
+  );
+}
 
 /**
  * Under a person's latest message, for what asks something of you (./agent-receipts.ts says what): the agents'
@@ -73,8 +98,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
   const sheet = useSheet();
@@ -83,6 +108,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
   const [retrying, setRetrying] = useState(false);
   const held = usePlanHold(orgId, org) !== null;
   const line = held ? keptLine(receiptLine(receipt)) : receiptLine(receipt);
+  const aiStatus = useAiStatus(orgId, line?.words?.key === "noAi.receipt").data;
   if (!receiptShows(line, Boolean(steer))) return null;
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const say = (w: ReceiptLine["label"]) =>
@@ -102,13 +128,15 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         })
       : null;
   const only = line.faces.length === 1 && line.more === 0 ? line.faces[0] : undefined;
+  // Every plan here serves only someone else: the agent's card has the way out, so the line only says whose.
+  const notYours = line.words?.key === "noAi.receipt" ? plansNotYoursOf(aiStatus, only) : null;
   // Retry sends my words again: only under my own message. Connect: for who can connect one.
   const action =
     line.action === "retry"
       ? mine
         ? "retry"
         : null
-      : line.action === "connect" && !mayConnectAi(only ? dir.agentById.get(only) : null, meId, org)
+      : line.action === "connect" && (notYours || !mayConnectAi(only ? dir.agentById.get(only) : null, meId, org))
         ? null
         : line.action;
   const connect = () => {
@@ -173,7 +201,7 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
             numberOfLines={why ? undefined : 2}
             style={styles.words}
           >
-            {why ?? say(line.words)}
+            {why ?? (notYours ? t("noAi.notYours.receipt", notYours) : say(line.words))}
           </Text>
         ) : null}
       </Pressable>
@@ -190,9 +218,13 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
         <Button
           variant="secondary"
           size="sm"
-          label={t(fix === "useKey" ? "noAi.rightHand.useKey" : "usageCard.changeModel")}
+          label={t(fix === "useKey" ? "noAi.rightHand.useKey" : `usageCard.${fix}`)}
           onPress={() =>
-            fix === "useKey" ? openConnectAi({ agentId: failedAgent, intent: "api_key" }) : openAgentAi(failedAgent)
+            fix === "useKey"
+              ? openConnectAi({ agentId: failedAgent, intent: "api_key" })
+              : fix === "changeModel"
+                ? openAgentModel(failedAgent)
+                : openAgentAi(failedAgent)
           }
         />
       ) : null}
@@ -200,6 +232,43 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
     </Animated.View>
   );
   return plain;
+});
+
+/**
+ * Under a person's mention of everyone that one agent answered for all, or that asked nothing of the agents: one
+ * quiet line, "5 agentes viram · Ada respondeu por todos", with why behind its ⓘ (as on the web).
+ */
+export const EveryoneLine = memo(function EveryoneLine({
+  message: m,
+  receipt,
+  mine,
+}: {
+  message: Message;
+  receipt: MessageReceipt | undefined;
+  mine: boolean;
+}) {
+  const { t } = useTranslation();
+  const dir = useRowDirectory();
+  const inset = useQuietInset();
+  const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
+  const line = everyoneLineOf(t, m.meta, receiptView(receipt), { agent: name });
+  if (!line) return null;
+  return (
+    <View style={[styles.line, mine ? styles.end : [styles.start, { paddingLeft: inset }]]}>
+      <InfoHint name={t("common.about", { label: t("receipts.everyone.who") })} text={line.hint} variant="caption">
+        <View style={styles.row}>
+          <View style={styles.faces}>
+            {line.faces.slice(0, FACES).map((id) => (
+              <AgentFace key={id} agentId={id} size={16} live={false} framed={false} />
+            ))}
+          </View>
+          <Text variant="caption" tone="muted" style={styles.words}>
+            {line.text}
+          </Text>
+        </View>
+      </InfoHint>
+    </View>
+  );
 });
 
 /** What this run of the app already asked to be answered (`KeptAnswer`). */
@@ -245,7 +314,7 @@ export const ReceiptMark = memo(function ReceiptMark({
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const c = useColors();
   const tint = ink ?? c.muted;
   const reduced = useReducedMotion();
@@ -280,16 +349,15 @@ export const ReceiptMark = memo(function ReceiptMark({
         {view.kind === "seen" ? (
           <Face who={{ type: "person", id: view.personId }} size={16} live={false} />
         ) : view.kind === "steer" ? (
-          // Beside the time, a 12 check: two once the agent read it, one while it waits; who read it is in the
-          // words a tap shows, never a face crowding the line.
+          // Beside the time, a 12 mark: two checks once the agent read it, one once it got it (one that waits for
+          // the next pause has no mark: `markOf`); who read it is in the words a tap shows, never a face crowding
+          // the line.
           view.state === "read" || view.state === "resolved" ? (
             <Icon name="checks" size={12} color={tint} />
           ) : view.state === "now" || view.state === "delivered" ? (
             <Icon name="check" size={12} color={tint} />
-          ) : view.state === "held" ? (
-            <Icon name="pause" size={12} color={tint} />
           ) : (
-            <InkOrbit size={10} color={tint} />
+            <Icon name="pause" size={12} color={tint} />
           )
         ) : view.mark === "none" && view.agentId ? (
           <Icon name="checks" size={12} color={tint} />
@@ -332,7 +400,7 @@ function ReceiptsSheet({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const sheet = useSheet();
   const held = usePlanHold(orgId, org) !== null;
   const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;
@@ -355,16 +423,16 @@ function ReceiptsSheet({
   return (
     <>
       <SheetTitle title={t("receipts.popoverTitle")} />
-      <Card>
+      <GroupedList>
         {rows.map((r) => (
-          <Row
+          <GroupedRow
             key={r.agentId}
             leading={<AgentFace agentId={r.agentId} size={30} live={false} />}
-            title={name(r.agentId)}
-            subtitle={t(phaseKey(r.phase, held))}
+            label={name(r.agentId)}
+            sub={t(phaseKey(r.phase, held))}
           />
         ))}
-      </Card>
+      </GroupedList>
       {by ? <Note icon={RULE_ICON[by.rule]}>{by.text}</Note> : null}
       {nobody ? (
         <Note icon="checks">
@@ -374,23 +442,24 @@ function ReceiptsSheet({
         </Note>
       ) : null}
       {callable.length > 0 ? (
-        <>
-          <SectionHeader title={t("channel.callAgent")} />
-          <Card>
+        // The header and its rows as one block of the sheet (its gap goes between blocks).
+        <View>
+          <GroupedHeader>{t("channel.callAgent")}</GroupedHeader>
+          <GroupedList>
             {callable.map((c) => (
-              <Row
+              <GroupedRow
                 key={c.agentId}
                 leading={<AgentFace agentId={c.agentId} size={30} live={false} />}
-                title={name(c.agentId)}
-                subtitle={`@${c.handle}`}
+                label={name(c.agentId)}
+                sub={`@${c.handle}`}
                 onPress={() => {
                   requestComposerText(m.channelId, `@${c.handle} `);
                   sheet.close();
                 }}
               />
             ))}
-          </Card>
-        </>
+          </GroupedList>
+        </View>
       ) : null}
       {mentionNeeded ? (
         <>
@@ -398,6 +467,7 @@ function ReceiptsSheet({
           <OpenPage href={helpUrl("who-answers", i18n.language)} label={t("routing.how")} />
         </>
       ) : null}
+      <Note icon="clock">{sentAtLine(t, i18n.language, m.createdAt)}</Note>
       {action ? (
         <Button
           variant={action === "connect" ? "primary" : "secondary"}
@@ -423,4 +493,5 @@ const styles = StyleSheet.create({
   // hold it.
   mark: { flexDirection: "row", alignItems: "center", gap: 4, height: 16 },
   pressed: { opacity: 0.6 },
+  fix: { alignItems: "flex-start" },
 });

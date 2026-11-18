@@ -6,6 +6,7 @@ import {
   createModelProviders,
   customModelId,
   customModelOf,
+  endpointModelId,
   isOpenRouterModel,
   listEndpointModels,
   maxCostNanoUsd,
@@ -34,6 +35,27 @@ const unpriced = {
 };
 
 describe("ids and the registry", () => {
+  test("the endpoint model picked when none is named: the best last test, the admin's order among equals", () => {
+    const pick = (models: { id: string; check?: "ok" | "no_tools" | "failed" }[]) => endpointModelId(CRED, models);
+    expect(pick([])).toBeNull();
+    expect(pick([{ id: "a" }, { id: "b" }])).toBe(customModelId(CRED, "a"));
+    expect(
+      pick([
+        { id: "a", check: "no_tools" },
+        { id: "b", check: "ok" },
+        { id: "c", check: "ok" },
+      ]),
+    ).toBe(customModelId(CRED, "b"));
+    expect(pick([{ id: "a", check: "failed" }, { id: "b" }])).toBe(customModelId(CRED, "b"));
+    expect(
+      pick([
+        { id: "a", check: "failed" },
+        { id: "b", check: "no_tools" },
+      ]),
+    ).toBe(customModelId(CRED, "b"));
+    expect(pick([{ id: "a", check: "failed" }])).toBe(customModelId(CRED, "a"));
+  });
+
   test("a custom id keeps its credential and the endpoint's own id, slashes and colons included", () => {
     expect(parseCustomModel(id)).toEqual({ credentialId: CRED, model: "meta-llama/llama-4:70b" });
     expect(parseCustomModel("claude-sonnet-5-5")).toBeNull();
@@ -122,6 +144,8 @@ describe("calls", () => {
     expect(req?.headers.get("http-referer")).toBeNull();
     expect(req?.body).toMatchObject({ model: "meta-llama/llama-4:70b", stream_options: { include_usage: true } });
     expect(req?.body.reasoning).toBeUndefined();
+    // The agent's effort goes as Chat Completions' own field (#432).
+    expect(req?.body.reasoning_effort).toBe("high");
     expect(req?.body.provider).toBeUndefined();
     // The endpoint said a catalog id answered: the full id comes back, so the catalog's prices never apply.
     expect(result.model).toBe(id);
@@ -130,6 +154,28 @@ describe("calls", () => {
     // Any other endpoint: no session of ours, the SDK's own User-Agent.
     expect(req?.headers.get("x-opencode-session")).toBeNull();
     expect(req?.headers.get("user-agent")).not.toStartWith("agentes.chat/");
+  });
+
+  test("Chat Completions: no effort, or none, sends no reasoning_effort", async () => {
+    for (const effort of [undefined, "none"] as const) {
+      const { fetcher, requests } = scripted(
+        chat([
+          { choices: [{ index: 0, delta: { content: "ok" }, finish_reason: "stop" }] },
+          { choices: [], usage: { prompt_tokens: 1, completion_tokens: 1 } },
+        ]),
+      );
+      await createCustomProvider({ fetch: fetcher, maxRetries: 0 }).stream(
+        {
+          model: id,
+          system: "s",
+          messages: [{ role: "user", content: "hi" }],
+          maxTokens: 100,
+          ...(effort ? { effort } : {}),
+        },
+        { apiKey: "k-123456789", endpoint: { style: "openai", baseURL: "https://gw.example/v1" }, onDelta: () => {} },
+      );
+      expect(requests[0]?.body.reasoning_effort).toBeUndefined();
+    }
   });
 
   test("OpenCode (its Go plan): our User-Agent and the conversation's session on every call, both APIs", async () => {
@@ -239,6 +285,61 @@ describe("calls", () => {
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ProviderError);
     expect((error as ProviderError).message).toContain("model llama-9 not found");
+  });
+
+  test("a tool result's image goes to Claude on an Anthropic-compatible endpoint, never to another company's model", async () => {
+    const reply = sse([
+      {
+        type: "message_start",
+        message: {
+          id: "m",
+          type: "message",
+          role: "assistant",
+          model: "x",
+          content: [],
+          stop_reason: null,
+          usage: { input_tokens: 5, output_tokens: 1 },
+        },
+      },
+      { type: "message_delta", delta: { stop_reason: "end_turn", stop_sequence: null }, usage: { output_tokens: 1 } },
+      { type: "message_stop" },
+    ]);
+    const messages = [
+      { role: "user" as const, content: "what is in the file?" },
+      { role: "assistant" as const, content: [{ type: "tool_use" as const, id: "t1", name: "read_file", input: {} }] },
+      {
+        role: "user" as const,
+        content: [
+          {
+            type: "tool_result" as const,
+            toolUseId: "t1",
+            content: "shot.png",
+            images: [{ mediaType: "image/png", data: "UE5H" }],
+          },
+        ],
+      },
+    ];
+    const send = async (model: string) => {
+      const { fetcher, requests } = scripted(reply);
+      const result = await createCustomProvider({ fetch: fetcher, maxRetries: 0 }).stream(
+        { model: customModelId(CRED, model), system: "s", messages, maxTokens: 100 },
+        {
+          apiKey: "k-123456789",
+          endpoint: { style: "anthropic", baseURL: "https://bedrock-runtime.us-east-1.amazonaws.com/anthropic" },
+          onDelta() {},
+        },
+      );
+      return { body: JSON.stringify(requests[0]?.body.messages), leftOut: result.imagesLeftOut };
+    };
+    const claude = await send("global.anthropic.claude-sonnet-5-5");
+    expect(claude.body).toContain('"type":"image"');
+    expect(claude.leftOut).toBeUndefined();
+    const other = await send("moonshotai.kimi-k2.5");
+    expect(other.leftOut).toBe(true);
+    expect(other.body).not.toContain('"type":"image"');
+    expect(other.body).toContain(
+      "The picture is not shown to you: this agent's AI (moonshotai.kimi-k2.5) reads text only",
+    );
   });
 
   test("tool calls without an index, or with object arguments, stay apart and readable", async () => {

@@ -7,6 +7,7 @@ import {
   callLogo,
   foldSteps,
   formatLineTime,
+  makingImage,
   oneCall,
   quietLine,
   quietWork,
@@ -782,6 +783,24 @@ describe("a lone quick read that only fed the answer shows no card", () => {
     for (const [why, work] of kept) expect([why, quietWork(toolItemsLive(work))]).toEqual([why, false]);
     // Lookups aren't steps: a usage check after looking the tool up is still a lone read.
     expect(quietWork(toolItemsLive([call("1", "find_tools"), call("2", "get_my_usage")]))).toBe(true);
+  });
+
+  test("a picture its own image tool made is its reply's picture: no card, however long it took; failed, it shows", () => {
+    expect(toolActivity("image_generation").kind).toBe("creatingImage");
+    expect(quietWork(toolItemsLive([call("1", "image_generation", { ms: 48_000 })]))).toBe(true);
+    expect(quietWork(toolItemsLive([call("1", "image_generation", { ms: 48_000, failed: true })]))).toBe(false);
+    expect(quietWork(toolItemsLive([call("1", "image_generation", { running: true })]))).toBe(false);
+    // Beside another call, the block stays.
+    expect(quietWork(toolItemsLive([call("1", "image_generation"), call("2", "create_issue")]))).toBe(false);
+    const saved = savedOneLine({ work: { steps: 1, calls: [{ name: "image_generation" }], durationMs: 50_000 } });
+    expect(saved && quietLine(saved)).toBe(true);
+  });
+
+  test("while it makes a picture its live run says so (`makingImage`), until another step replaces it", () => {
+    expect(makingImage({ step: { tool: "image_generation" } })).toBe(true);
+    expect(makingImage({ step: { tool: "shell" } })).toBe(false);
+    expect(makingImage({ step: { said: "Vou desenhar" } })).toBe(false);
+    expect(makingImage({})).toBe(false);
   });
 
   test("saved: the run's lone call is quiet by meta.work; calls another card shows are left out of the count", () => {

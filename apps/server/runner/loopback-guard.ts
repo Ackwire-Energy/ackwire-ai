@@ -14,9 +14,9 @@ import { AGENTS_CGROUP, agentCgroup, agentSlice, type RunCommand, runSync, syste
  *
  * On the way out, each new local TCP or UDP connection gets its sender in the conntrack mark; on the way in, the
  * kernel's own socket lookup finds where it goes (for a SYN, the listener), and it gets in only when that socket
- * is the sender's own. A connection across `lo` keeps its conntrack entry but loses its socket, so the way in
- * reads the mark the way out set. Agents get the computer's own listeners only for DNS and the listed services,
- * and no container or VM network on this computer. Ports don't matter.
+ * is the sender's own. A connection across a loopback interface keeps its conntrack entry but loses its socket, so
+ * the way in reads the mark the way out set. Agents get the computer's own listeners only for DNS and the listed
+ * services, and no container or VM network on this computer. Ports don't matter.
  *
  * nft resolves a cgroup's path to its id when it loads the table, so the table is loaded again whenever an
  * agent's slice appears or is made anew (`reconcile`, every 2 s and right after a slice starts).
@@ -97,6 +97,22 @@ export function defaultRouteInterfaces(route4: string, route6: string): string[]
   return [...found].sort();
 }
 
+/**
+ * The interfaces that carry this computer's loopback, from `/proc/net/dev`: always `lo`, and any relay the platform
+ * puts in front of it. WSL2's mirrored networking hands its host's loopback over `loopback0`, so a rule naming only
+ * `lo` judges none of an agent's local connections there and the guard stops holding.
+ */
+export function loopbackInterfaces(dev: string): string[] {
+  const found = new Set<string>(["lo"]);
+  for (const line of dev.split("\n")) {
+    const colon = line.indexOf(":");
+    if (colon <= 0) continue;
+    const name = line.slice(0, colon).trim();
+    if (name.startsWith("loopback")) found.add(name);
+  }
+  return [...found].sort();
+}
+
 export interface RulesetInput {
   /** The agents whose slice exists now. */
   agents: number[];
@@ -107,6 +123,8 @@ export interface RulesetInput {
   networkMark?: number;
   /** Interfaces with a default route (`defaultRouteInterfaces`). */
   uplinks: string[];
+  /** Interfaces that carry this computer's loopback (`loopbackInterfaces`): `lo`, and a relay such as `loopback0`. */
+  loopbacks: string[];
   /** False where the kernel has no `nft_reject_inet`: a refused connection is dropped (it hangs, then fails). */
   reject: boolean;
 }
@@ -123,6 +141,7 @@ export function renderRuleset(i: RulesetInput): string {
   const uids = span(first, last);
   const agentMarks = span(hex(agentMark(first)), hex(agentMark(last)));
   const services = [...new Set([...DNS, ...i.services].map(serviceElement).filter((s) => s !== null))];
+  const loopbacks = [...new Set(["lo", ...i.loopbacks])].sort();
   const owners = i.agents.map((uid) => `${JSON.stringify(sliceOf(uid))} : ${hex(agentMark(uid))}`);
   return [
     `table inet ${RUNNER_NFT_TABLE} {}`,
@@ -131,10 +150,11 @@ export function renderRuleset(i: RulesetInput): string {
     `\tmap agent_of {\n\t\ttypeof socket cgroupv2 level 2 : ct mark${elements(owners)}\n\t}`,
     `\tset services {\n\t\ttype inet_proto . inet_service${elements(services)}\n\t}`,
     `\tset uplinks {\n\t\ttype ifname${elements(i.uplinks.map((name) => JSON.stringify(name)))}\n\t}`,
+    `\tset loopbacks {\n\t\ttype ifname${elements(loopbacks.map((name) => JSON.stringify(name)))}\n\t}`,
     "\tchain output {",
     "\t\ttype filter hook output priority filter; policy accept;",
     ...networkMarkExemption(i.networkMark),
-    '\t\toif "lo" meta l4proto { tcp, udp } ct state new jump sender',
+    "\t\toifname @loopbacks meta l4proto { tcp, udp } ct state new jump sender",
     '\t\tct state { new, untracked } socket cgroupv2 level 1 "agents.slice" jump agent_out',
     `\t\tct state { new, untracked } meta skuid ${uids} socket cgroupv2 level 1 != "agents.slice" jump agent_out`,
     "\t}",
@@ -147,11 +167,12 @@ export function renderRuleset(i: RulesetInput): string {
     `\t\tmeta skuid 0 ct mark set ${hex(ROOT_MARK)} return`,
     `\t\tct mark set ${hex(OTHER_USER_MARK)}`,
     "\t}",
-    // In this hook `oif` is where the route went before any DNAT: a loopback port DNAT'ed into a container still
-    // reads as lo here, so it is told by its conntrack entry (where it was sent, and where it goes now).
+    // In this hook `oifname` is where the route went before any DNAT: a loopback port DNAT'ed into a container still
+    // reads as one of the loopback interfaces here, so it is told by its conntrack entry (where it was sent, and where
+    // it goes now).
     "\tchain agent_out {",
-    '\t\toif "lo" ct state untracked goto refuse',
-    '\t\toif "lo" meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse',
+    "\t\toifname @loopbacks ct state untracked goto refuse",
+    "\t\toifname @loopbacks meta l4proto != { tcp, udp, icmp, ipv6-icmp } goto refuse",
     "\t\tct status dnat ct original ip daddr 127.0.0.0/8 ct reply ip saddr != 127.0.0.0/8 goto refuse",
     "\t\tct status dnat ct original ip6 daddr ::1 ct reply ip6 saddr != ::1 goto refuse",
     // A container's or a VM's network on this computer, but for what is published on its other addresses.
@@ -160,7 +181,7 @@ export function renderRuleset(i: RulesetInput): string {
     "\tchain input {",
     "\t\ttype filter hook input priority filter; policy accept;",
     ...networkMarkExemption(i.networkMark),
-    '\t\tiif "lo" meta l4proto { tcp, udp } ct state new jump local',
+    "\t\tiifname @loopbacks meta l4proto { tcp, udp } ct state new jump local",
     "\t}",
     // Where it goes: the socket the kernel delivers it to (for a SYN, the listener).
     "\tchain local {",
@@ -199,6 +220,8 @@ export interface LoopbackGuardOptions {
   /** A cgroup's id (its inode), or null when it isn't there. */
   cgroupId?: (dir: string) => string | null;
   routes?: () => [route4: string, route6: string];
+  /** Tests: the interfaces this computer has (`/proc/net/dev`). */
+  devices?: () => string;
   /** Tests: drop from the start, as where the kernel has no `nft_reject_inet`. */
   reject?: boolean;
 }
@@ -221,9 +244,11 @@ const readOr = (file: string) => {
 
 const procRoutes = (): [string, string] => [readOr("/proc/net/route"), readOr("/proc/net/ipv6_route")];
 
+const procDevices = () => readOr("/proc/net/dev");
+
 /**
- * Keeps `table inet agentes_runner` matching the agents' slices, the services and the uplinks. Lives in the root
- * process; agents' processes can't touch nftables.
+ * Keeps `table inet agentes_runner` matching the agents' slices, the services, the uplinks and the loopback
+ * interfaces. Lives in the root process; agents' processes can't touch nftables.
  */
 export class LoopbackGuard {
   private readonly run: RunCommand;
@@ -298,8 +323,8 @@ export class LoopbackGuard {
   }
 
   /**
-   * Loads the table again when what it is made of changed (an agent, a slice made anew, the services, the uplinks)
-   * or it is gone. A load that fails keeps the table loaded before: never flushed.
+   * Loads the table again when what it is made of changed (an agent, a slice made anew, the services, the uplinks, a
+   * loopback interface that appeared) or it is gone. A load that fails keeps the table loaded before: never flushed.
    */
   reconcile(): boolean {
     const uids = this.opts.agentUids();
@@ -348,7 +373,15 @@ export class LoopbackGuard {
     }
     const services = listed.filter((s) => serviceElement(s) !== null).sort();
     const uplinks = defaultRouteInterfaces(...(this.opts.routes ?? procRoutes)());
-    const input = { agents, uidRange: this.opts.uidRange, services, uplinks, networkMark: this.opts.networkMark };
+    const loopbacks = loopbackInterfaces((this.opts.devices ?? procDevices)());
+    const input = {
+      agents,
+      uidRange: this.opts.uidRange,
+      services,
+      uplinks,
+      loopbacks,
+      networkMark: this.opts.networkMark,
+    };
     return { key: JSON.stringify({ ...input, root, ids }), input };
   }
 

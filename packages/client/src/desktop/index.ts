@@ -1,10 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useApi } from "../api/context";
 import { ApiError } from "../api/http";
 import { keys } from "../api/keys";
 import type { BrowserHandoff, DesktopPictureView, DesktopStatus } from "../api/types";
 import { handoffScreen } from "../browser";
+import { type Seat, screenId } from "../lib/seat";
+import { useSeat } from "../lib/seat-context";
 import { type SocketBase, socketUrl } from "../realtime/connection";
 
 /**
@@ -202,10 +204,11 @@ export const desktopRetryMs = (attempt: number) => RETRY_MS[Math.min(attempt, RE
  */
 export function desktopSocketUrl(
   base: SocketBase,
-  v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean; preview?: boolean },
+  v: { orgId: string; agentId: string; mode: DesktopMode; switches?: boolean; preview?: boolean; seat?: Seat },
 ) {
   // In this order, one key at a time: an optional key may not be undefined in the address's parameters.
   const params: Record<string, string | number> = { orgId: v.orgId, agentId: v.agentId };
+  if (v.seat) params.seat = v.seat;
   if (v.preview) params.preview = 1;
   else if (v.switches) params.switch = 1;
   params.mode = v.preview ? "watch" : v.mode;
@@ -229,14 +232,40 @@ export const useDesktopStatus = (
   options: { enabled?: boolean; poll?: number | false } = {},
 ) => {
   const api = useApi();
+  const seat = useSeat(agentId);
   return useQuery({
-    queryKey: keys.agentDesktop(orgId, agentId),
-    queryFn: () => api.desktop.status(orgId, agentId),
+    queryKey: keys.agentDesktop(orgId, screenId(agentId, seat)),
+    queryFn: () => api.desktop.status(orgId, agentId, seat),
     enabled: options.enabled ?? true,
     retry: false,
     refetchInterval: options.poll ?? false,
   });
 };
+
+/**
+ * What the agent keeps running on its computer (ADR 0176), for whoever may watch it (403 otherwise); a `machine.holds`
+ * event asks again.
+ */
+export const useAgentHolds = (orgId: string, agentId: string, options: { enabled?: boolean } = {}) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.agentHolds(orgId, agentId),
+    queryFn: () => api.desktop.holds(orgId, agentId),
+    enabled: options.enabled ?? true,
+    retry: false,
+  });
+};
+
+/** A person's Stop on one of them: the list is read again however it went. Its caller says a failure. */
+export function useStopHold(orgId: string, agentId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    meta: { silent: true },
+    mutationFn: (holdId: string) => api.desktop.stopHold(orgId, agentId, holdId),
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.agentHolds(orgId, agentId) }),
+  });
+}
 
 /** How often the picture of an agent's screen is asked again while it works there. */
 export const PICTURE_WORKING_MS = 5_000;
@@ -256,9 +285,10 @@ export const pictureRefreshMs = (working: boolean, last: DesktopPictureView | un
 /** A recent picture of the agent's screen, never a stream: see `asksPicture` for `enabled`. */
 export const useDesktopPicture = (orgId: string, agentId: string, options: { enabled: boolean; working: boolean }) => {
   const api = useApi();
+  const seat = useSeat(agentId);
   return useQuery({
-    queryKey: keys.agentDesktopPicture(orgId, agentId),
-    queryFn: () => api.desktop.picture(orgId, agentId),
+    queryKey: keys.agentDesktopPicture(orgId, screenId(agentId, seat)),
+    queryFn: () => api.desktop.picture(orgId, agentId, seat),
     enabled: options.enabled,
     retry: false,
     refetchInterval: (q) => pictureRefreshMs(options.working, q.state.data),

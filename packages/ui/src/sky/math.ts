@@ -11,6 +11,9 @@ import { type AgentColorName, EYE_COLOR, gradientOf, spriteBody, spriteGrid } fr
 /** The landing's sky in Ackwire's greens: black through Forest and Solar Green to Celadon Air. */
 export const SKY_TONES = ["#000000", "#031f1b", "#1f5c16", "#3f7a12", "#6cba2c", "#90ed42", "#c4f59a", "#eef4ef"];
 
+/** The night over the team while it has no AI (the connect scenes on the web and the phone): deep first. */
+export const TEAM_NIGHT = ["#050814", "#070c1e", "#0a122e", "#0e1a43", "#13245a", "#182f73", "#203f8f", "#2b53ad"];
+
 /** "#rgb", "#rrggbb" or "rgb(r, g, b)" → [r, g, b]; anything else is mid gray. */
 export function parseColor(color: string): [number, number, number] {
   const c = color.trim();

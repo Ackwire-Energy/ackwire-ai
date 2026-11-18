@@ -524,5 +524,71 @@ export const APP_CLIENTS: readonly AppClient[] = [
   },
 ];
 
+/** Grok Bot's settings have no field for an address: the bot adds a custom server when asked in its chat. */
+export const grokBotMessage = (url: string) => `Add a custom MCP server called ${MCP_SERVER_NAME} at ${url}`;
+
+/** `~/.hermes/config.yaml`. */
+export const hermesConfig = (url: string) =>
+  ["mcp_servers:", `  ${MCP_SERVER_NAME}:`, `    url: "${url}"`, "    auth: oauth"].join("\n");
+
+/** `openclaw mcp login` only runs with the Gateway stopped; pasted together, the Gateway starts again once it ends. */
+export const openclawCommands = (url: string) =>
+  [
+    "openclaw gateway stop",
+    `openclaw mcp set ${MCP_SERVER_NAME} '${JSON.stringify({ url, transport: "streamable-http", auth: "oauth" })}'`,
+    `openclaw mcp login ${MCP_SERVER_NAME}`,
+    "openclaw gateway start",
+  ].join("\n");
+
+const importClient = (id: string, steps: (url: string) => GuideStep[]): AppClient => ({
+  id,
+  mark: null,
+  group: null,
+  guide: (url) => ({ steps: steps(url), notes: [] }),
+});
+const ANY_APP: GuideStep = { text: "other.anyStep", address: true };
+/** The sign-in where the consent page asks for the access: creating agents needs `manage`, never pre-selected. */
+const SIGN_IN_MANAGE = step("signInManage");
+const chatgpt = APP_CLIENTS.find((c) => c.id === "chatgpt") as AppClient;
+
+/**
+ * The import's "Connect with MCP" steps, by source card (`IMPORT_CARDS`): each app's own words where its docs or
+ * guides give them, as of 2026-11-10. Grok Bot's come from third-party guides (xAI publishes none), which attach the
+ * server with @ before using it. A dot uses the plugins connected in ChatGPT, so it takes ChatGPT's. OpenBot.run
+ * documents no menu words. Paperclip and our own export have no entry: neither takes an MCP server.
+ */
+export const IMPORT_APP_CLIENTS: readonly AppClient[] = [
+  importClient("grok-bot", (url) => [
+    step("sendInChat", { code: grokBotMessage(url) }),
+    step("clickThen", { vars: { button: "Add it", next: "Authorize" } }),
+    SIGN_IN_MANAGE,
+    step("mention", { vars: { name: MCP_SERVER_NAME } }),
+  ]),
+  {
+    ...chatgpt,
+    id: "chatgpt-dots",
+    guide: (url) => {
+      const guide = chatgpt.guide(url);
+      return { ...guide, steps: guide.steps.map((s) => (s === SIGN_IN ? SIGN_IN_MANAGE : s)) };
+    },
+  },
+  importClient("openbotrun", () => [ANY_APP, SIGN_IN_MANAGE]),
+  importClient("openmausbot", () => [
+    step("open", { vars: { place: "Plugins\u00a0›\u00a0MCP servers" } }),
+    step("click", { vars: { button: "Add server" } }),
+    step("paste", { address: true }),
+    step("clickThen", { vars: { button: "Add", next: "Sign in" } }),
+    SIGN_IN_MANAGE,
+  ]),
+  importClient("hermes", (url) => [
+    step("file", { vars: { file: "~/.hermes/config.yaml" }, code: hermesConfig(url) }),
+    step("loginRun", { vars: { command: `hermes mcp login ${MCP_SERVER_NAME}` } }),
+    SIGN_IN_MANAGE,
+    step("reload", { vars: { command: "/reload-mcp" } }),
+  ]),
+  importClient("openclaw", (url) => [step("run", { code: openclawCommands(url) }), SIGN_IN_MANAGE]),
+  importClient("other", () => [ANY_APP, SIGN_IN_MANAGE]),
+];
+
 /** The groups in order; null is "Outro app" on its own, under no heading. */
 export const APP_CLIENT_GROUPS: readonly (AppClientGroup | null)[] = ["chat", "code", null];

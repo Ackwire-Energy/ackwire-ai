@@ -1,11 +1,11 @@
 import { useAuthConfig } from "@agenteschat/client";
-import { rightHandOf } from "@agenteschat/client/lib/right-hand";
+import { rightHandOf, sceneTeam } from "@agenteschat/client/lib/right-hand";
 import { Button, Dialog, DialogBody, DialogFooter, Icon, type IconName } from "@agenteschat/ui";
 import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useOrg } from "@/components/org-context";
 import { useDirectory } from "@/hooks/useDirectory";
-import { sceneTeam, TeamScene } from "./TeamScene";
+import { TeamScene } from "./TeamScene";
 import "./arrival.css";
 
 const POINTS: readonly { icon: IconName; key: "weekly" | "fails" | "feedback" }[] = [

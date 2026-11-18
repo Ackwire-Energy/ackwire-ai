@@ -181,6 +181,47 @@ export async function loadI18n(lng: LocaleCode): Promise<I18n> {
   return instance;
 }
 
+/** The product's name in the tabs' titles, where a registered host shows its own (ADR 0194). */
+const PRODUCT_NAME = "Ackwire AI";
+let tabBrand: string | null = null;
+let retitle = () => {};
+const branded = (title: string) => {
+  const brand = tabBrand;
+  return brand ? title.replaceAll(PRODUCT_NAME, () => brand) : title;
+};
+
+/** Every tab title from now on names `name` where it names the product (a registered host's pages, ADR 0194). */
+export function brandTabTitle(name: string) {
+  // A name holding the product's own would be replaced again on every change.
+  tabBrand = name.includes(PRODUCT_NAME) ? null : name;
+  retitle();
+}
+
+/**
+ * The tab's default title in the app's language (index.html's is English). A page with its own title puts back the
+ * one it found when it goes, which may be an earlier language's default: that one is swapped for today's wherever it
+ * shows, so a page's own title stays, and so does the unread count in front of the default.
+ */
+export function translateTabTitle(instance: I18n) {
+  const earlier = new Set<string>();
+  let shown = instance.t("app.tabTitle");
+  const swap = () => {
+    let title = document.title;
+    for (const was of earlier) title = title.replace(branded(was), shown).replace(was, shown);
+    title = branded(title);
+    if (title !== document.title) document.title = title;
+  };
+  retitle = swap;
+  document.title = branded(shown);
+  instance.on("languageChanged", () => {
+    earlier.add(shown);
+    shown = instance.t("app.tabTitle");
+    earlier.delete(shown);
+    swap();
+  });
+  new MutationObserver(swap).observe(document.head, { subtree: true, childList: true, characterData: true });
+}
+
 /** An instance with every language loaded at once (tests). */
 export function createI18n(lng: LocaleCode = DEFAULT_LOCALE): I18n {
   const instance = i18n.createInstance();

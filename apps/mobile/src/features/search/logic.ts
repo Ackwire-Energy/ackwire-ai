@@ -26,6 +26,9 @@ export const SEARCH_ACTIONS: SearchAction[] = ["newConversation", "newTask", "ne
 /** What the search API is asked for. */
 export const SEARCH_KINDS: SearchKind[] = ["action", "message", "file"];
 
+/** The root of every search of a workspace (`packages/client/src/api/keys.ts`): a pull asks them all again. */
+export const searchQueryRoot = (orgId: string) => ["org", orgId, "search"] as const;
+
 /** The chips over the results. */
 export type SearchFilter = "all" | "chats" | "team" | "messages" | "files";
 export const SEARCH_FILTERS: SearchFilter[] = ["all", "chats", "team", "messages", "files"];

@@ -1,7 +1,7 @@
 # Support
 
-**[GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions) is the support channel.**
-Ask anything there: self-hosting, model keys, connectors, agent computers, development.
+Report Ackwire bugs and request features in the [Ackwire issue tracker](https://github.com/Ackwire-Energy/ackwire-ai/issues).
 
-Issues are for confirmed bugs and concrete feature requests (the issue forms will guide you).
-Security reports go through [SECURITY.md](SECURITY.md), never a public issue.
+For questions about self-hosting, connectors and other features shared with agentes-chat, use [upstream GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions).
+
+For security reports, follow the [private reporting instructions](SECURITY.md).

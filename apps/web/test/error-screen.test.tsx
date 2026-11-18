@@ -286,6 +286,27 @@ describe("a request that got no answer, or only the proxy's", () => {
     expect(await said(null)).toBe(failedLoad);
   });
 
+  test("Tentar de novo only where a try can change it: never for what is gone or a workspace being deleted", async () => {
+    const offered = async (error: unknown) => {
+      await renderPage(<ErrorState error={error} onRetry={() => {}} />, { api: createFakeApi() });
+      const said = {
+        text: document.querySelector(".ac-empty__text")?.textContent,
+        retry: document.querySelector(".ac-empty button")?.textContent ?? null,
+      };
+      cleanup();
+      return said;
+    };
+    expect(await offered(undefined)).toEqual({
+      text: "Não foi possível carregar. Confira a conexão e tente de novo.",
+      retry: "Tentar de novo",
+    });
+    expect(await offered(new ApiError(403, "org.deleting", "The workspace is being deleted"))).toEqual({
+      text: "Este workspace está sendo apagado.",
+      retry: null,
+    });
+    expect((await offered(new ApiError(404, "not_found", "Not found"))).retry).toBeNull();
+  });
+
   test("a crash asks nothing of the server", async () => {
     const fetch = spyOn(globalThis, "fetch");
     try {

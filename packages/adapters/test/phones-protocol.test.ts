@@ -73,6 +73,15 @@ test("toolchains.changed carries the whole list, each field checked like hello's
   });
   const odd = parseRunnerFrame(JSON.stringify({ type: "toolchains.changed", toolchains: { appleAccount: "maybe" } }));
   expect(odd).toEqual({ type: "toolchains.changed", toolchains: {} });
+  // Xcode installed but blocked: one of the known reasons, nothing else.
+  const blocked = (xcodeBlocked: string) =>
+    parseRunnerFrame(JSON.stringify({ type: "toolchains.changed", toolchains: { xcodeBlocked } }));
+  expect(blocked("command_line_tools")).toEqual({
+    type: "toolchains.changed",
+    toolchains: { xcodeBlocked: "command_line_tools" },
+  });
+  expect(blocked("license")).toEqual({ type: "toolchains.changed", toolchains: { xcodeBlocked: "license" } });
+  expect(blocked("rm -rf /")).toEqual({ type: "toolchains.changed", toolchains: {} });
   expect(parseRunnerFrame(JSON.stringify({ type: "toolchains.changed", toolchains: "nope" }))).toBeNull();
 });
 

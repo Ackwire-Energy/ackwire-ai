@@ -13,6 +13,8 @@ export const mobilePtBR = {
     continue: "Continuar",
     done: "Pronto",
     retry: "Tentar de novo",
+    /** Opens this app's page in the phone's Settings, where a permission it was refused is given. */
+    openSettings: "Abrir Ajustes",
     loading: "Carregando",
     or: "ou",
   },
@@ -53,10 +55,8 @@ export const mobilePtBR = {
       footChoose: "Servidor e idioma",
       footServer: "Outro servidor",
       footLanguage: "Idioma",
-      /** A linha quieta do login, no Ackwire AI: abre a câmera para o QR code do computador da equipe. */
-      footTeam: "Usa o servidor da sua equipe?",
-      footTeamAction: "Entrar por ele",
-      /** Num servidor da equipe: onde este login vai, e o jeito de trocar. */
+      /** A linha quieta do login: onde ele vai (o Cloud ou um servidor), e o jeito de trocar. */
+      footCloud: "Entrando no Ackwire AI Cloud",
       footOn: "Entrando em {{host}}",
       footSwitch: "Trocar",
       now: "Agora em {{host}}",
@@ -133,7 +133,7 @@ export const mobilePtBR = {
       on: "Ativar avisos",
       later: "Agora não",
       done: "Avisos ativados",
-      failed: "Não deu para ativar os avisos. Tente de novo em Você\u00a0›\u00a0Notificações.",
+      failed: "Não deu para ativar os avisos neste celular.",
       someone: "Um agente",
       examples: "Exemplos de avisos",
       now: "agora",

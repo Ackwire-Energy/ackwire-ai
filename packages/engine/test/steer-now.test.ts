@@ -19,6 +19,8 @@ import {
   type ToolSource,
 } from "../src";
 import type { Transcript } from "../src/executor";
+import { returnToInbox } from "../src/live-steer";
+import { stoppedToSend } from "../src/run-inbox";
 import { addMember, type Fixture, setup } from "./fixtures";
 
 let f: Fixture;
@@ -33,6 +35,13 @@ const ask = (body: string, extra: { threadId?: string; steer?: "now" } = {}) =>
   postPersonMessage(deps(), f.owner.id, f.org.id, f.general.id, { body, ...extra });
 const runs = () => f.db.select().from(schema.agentRuns);
 const runById = async (id: string) => (await runs()).find((r) => r.id === id);
+
+/** Only a plain "para" is a stop. */
+const judge: Judge = {
+  name: "fake",
+  ask: async (request): Promise<Record<string, JudgeAnswer>> =>
+    request.kind === "stop_request" ? { stop: { noul: request.state.message === "para" ? 0.95 : 0.05 } } : {},
+};
 
 /** Runs `fn` once, the first time an event of `type` reaches the channel. */
 function onFirst(type: string, fn: (event: Record<string, unknown>) => void) {
@@ -93,6 +102,62 @@ describe('"Leu": a message sent while it works', () => {
 });
 
 describe('"Parar e mandar" (steer: "now")', () => {
+  /** A task at work on a computer brain, in a turn that takes no message; `meanwhile` runs while the judge thinks. */
+  async function judgedSend(body: string, meanwhile: (runId: string) => Promise<unknown>) {
+    f = await setup();
+    const question = await ask("@dev analisa os logs");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", brain: "claude_code" })
+      .where(eq(schema.agentRuns.id, run.id));
+    const slow: Judge = {
+      name: "slow",
+      ask: async (request) => {
+        await meanwhile(run.id);
+        return judge.ask(request);
+      },
+    };
+    const said = await postPersonMessage({ ...deps(), judge: slow }, f.owner.id, f.org.id, f.general.id, {
+      body,
+      threadId: question.id,
+      steer: "now",
+    });
+    await stopChecksSettled();
+    const [shown] = (await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id })).filter(
+      (m) => m.id === said.id,
+    );
+    return { run, said, meta: shown?.meta };
+  }
+
+  test("a task that parked on its plan while the judge thought keeps its wait", async () => {
+    const { run, meta } = await judgedSend("na verdade só os 3 primeiros", (runId) =>
+      f.db
+        .update(schema.agentRuns)
+        .set({ status: "waiting_input", transcript: { waitingForBrain: { code: "plan_limit" } } })
+        .where(eq(schema.agentRuns.id, runId)),
+    );
+    expect((await runById(run.id))?.status).toBe("waiting_input");
+    expect(meta?.stoppedRunIds).toBeUndefined();
+  });
+
+  test("a task that read the message while the judge thought is not stopped for it", async () => {
+    const { run, meta } = await judgedSend("na verdade só os 3 primeiros", (runId) =>
+      f.db.update(schema.agentRuns).set({ pendingMessageIds: [] }).where(eq(schema.agentRuns.id, runId)),
+    );
+    expect((await runById(run.id))?.status).toBe("running");
+    expect(meta?.stoppedRunIds).toBeUndefined();
+    expect(await runs()).toHaveLength(1);
+  });
+
+  test("a plain 'stop' the turn had taken is not handed to a new run when the turn gives it back", async () => {
+    const { run, said } = await judgedSend("para", async () => undefined);
+    expect((await runById(run.id))?.status).toBe("canceled");
+    await returnToInbox(f.db, f.pubsub, run, [said.id]);
+    expect(await runs()).toHaveLength(1);
+  });
+
   test("cuts the current model call (not the run): the text so far stays, the message is read at once", async () => {
     const { hold, release } = holdFirstCall();
     f = await setup({
@@ -333,6 +398,177 @@ describe('"Continuar" after a stop', () => {
     );
     // Once: the message is now a run's trigger.
     expect(await restartAfterStopAndSend(deps(), stopped.id, reply, transcript)).toBeNull();
+  });
+
+  test("'Parar e mandar' that stops a computer brain's task says no stop anywhere: it sent a message", async () => {
+    const { hold, release } = holdFirstCall();
+    f = await setup({
+      reply: (_req: ModelRequest, call: number) =>
+        call > 1 ? { chunks: ["Certo, só os 3."] } : { chunks: ["Analisando o log. ", "nunca chega"], hold },
+    });
+    const question = await ask("@dev analisa os logs");
+    const events = f.listen(f.general.id);
+    let saidId = "";
+    onFirst("agent.typing", (e) => {
+      const send = async () => {
+        try {
+          // The run thinks with Claude Code, in a turn that takes no message: the send stops the task.
+          await f.db
+            .update(schema.agentRuns)
+            .set({ brain: "claude_code" })
+            .where(eq(schema.agentRuns.id, String(e.runId)));
+          // As the server does it: the judge says first that this is no plain "stop", then the task stops.
+          const said = await postPersonMessage({ ...deps(), judge }, f.owner.id, f.org.id, f.general.id, {
+            body: "na verdade só os 3 primeiros",
+            threadId: question.id,
+            steer: "now",
+          });
+          saidId = said.id;
+          await stopChecksSettled();
+        } finally {
+          release();
+        }
+      };
+      void send();
+    });
+    await drainOutbox(f.db, f.handlers);
+
+    const all = await runs();
+    const stopped = all.find((r) => r.triggerMessageId === question.id);
+    const next = all.find((r) => r.triggerMessageId === saidId);
+    expect(stopped).toMatchObject({ status: "canceled", error: `canceled_by:${f.owner.id}` });
+    expect(next?.status).toBe("done");
+    const shown = [
+      ...(await listMessages(f.db, f.owner.id, f.org.id, f.general.id)),
+      ...(await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id })),
+    ];
+    // The message says which task it stopped; nothing says a person stopped the agent, and no notice tells it so.
+    expect(shown.find((m) => m.id === saidId)?.meta.stoppedRunIds).toEqual([stopped?.id]);
+    expect(shown.filter((m) => m.meta.canceled || m.meta.notice)).toEqual([]);
+    expect(shown.some((m) => m.body.includes("Stopped"))).toBe(false);
+    // What it wrote before the send stays, as a message like any other, and it answers the new one.
+    const written = shown.find((m) => m.agentRunId === stopped?.id);
+    expect(written?.body).toBe("Analisando o log.");
+    // Placed before the message that cut it: after it, the cut text would read as the answer.
+    const at = (id: string | undefined) => new Date(shown.find((m) => m.id === id)?.createdAt ?? 0).getTime();
+    expect(at(written?.id)).toBeLessThan(at(saidId));
+    expect(shown.some((m) => m.agentRunId === next?.id && m.body === "Certo, só os 3.")).toBe(true);
+    expect(events.some((e) => e.type === "run.continued")).toBe(false);
+    expect(events).toContainEqual(
+      expect.objectContaining({ type: "agent.run.read", runId: stopped?.id, messageIds: [saidId] }),
+    );
+  });
+
+  test("one message that stops two tasks marks both: neither says a stop", async () => {
+    f = await setup();
+    await ask("@dev analisa os logs");
+    const other = await ask("e o PR");
+    const said = await ask("na verdade só os 3 primeiros");
+    const [one] = await runs();
+    if (!one) throw new Error("no run");
+    // Another task at work in the same channel (another agent's, in life), which the same message went into.
+    const [two] = await f.db
+      .insert(schema.agentRuns)
+      .values({ ...one, id: Bun.randomUUIDv7(), triggerMessageId: other.id, threadRootId: other.id })
+      .returning();
+    if (!two) throw new Error("no second run");
+    await cancelRun(deps(), f.owner.id, f.org.id, one.id, { sendMessageId: said.id });
+    await cancelRun(deps(), f.owner.id, f.org.id, two.id, { sendMessageId: said.id });
+    expect((await stoppedToSend(f.db, one))?.id).toBe(said.id);
+    expect((await stoppedToSend(f.db, two))?.id).toBe(said.id);
+    // A task stopped for itself is no such stop.
+    await ask("@dev compila");
+    const three = (await runs()).find((r) => r.id !== one.id && r.id !== two.id && r.status === "queued");
+    if (!three) throw new Error("third run expected");
+    await cancelRun(deps(), f.owner.id, f.org.id, three.id);
+    expect(await stoppedToSend(f.db, three)).toBeNull();
+  });
+
+  test("a message the stopped turn gave back is kept for the restart, never handed to a run that knows nothing", async () => {
+    f = await setup();
+    const question = await ask("@dev analisa os logs");
+    const [run] = await runs();
+    if (!run) throw new Error("no run");
+    await f.db
+      .update(schema.agentRuns)
+      .set({ status: "running", brain: "claude_code" })
+      .where(eq(schema.agentRuns.id, run.id));
+    const said = await ask("na verdade só os 3 primeiros", { threadId: question.id, steer: "now" });
+    expect((await runById(run.id))?.status).toBe("canceled");
+    // The turn had taken the inbox when the stop landed, and gives the message back unread.
+    await f.db.update(schema.agentRuns).set({ pendingMessageIds: [] }).where(eq(schema.agentRuns.id, run.id));
+    await returnToInbox(f.db, f.pubsub, run, [said.id]);
+    expect(await runs()).toHaveLength(1);
+    expect((await runById(run.id))?.pendingMessageIds).toEqual([said.id]);
+    // Its worker then starts it again from that message, with what the stopped run knows.
+    const transcript = { system: "", messages: [], postedUpTo: 0, postedCount: 0 } as unknown as Transcript;
+    const next = await restartAfterStopAndSend(deps(), run.id, { id: null, threadId: null }, transcript);
+    expect((await runById(next as string))?.triggerMessageId).toBe(said.id);
+  });
+
+  test("a message the turn read as the stop landed still gets its answer: the restart starts from it", async () => {
+    const { question, stopped } = await stoppedRun();
+    const said = await ask("na verdade só os 3 primeiros", { threadId: question.id, steer: "now" });
+    await f.db
+      .update(schema.agentRuns)
+      .set({ brain: "claude_code", pendingMessageIds: [] })
+      .where(eq(schema.agentRuns.id, stopped.id));
+    const transcript = stopped.transcript as unknown as Transcript;
+    const reply = { id: null, threadId: null };
+    // Gone from the inbox and not known as read: another run has it.
+    expect(await restartAfterStopAndSend(deps(), stopped.id, reply, transcript)).toBeNull();
+    const runId = await restartAfterStopAndSend(deps(), stopped.id, { ...reply, read: said.id }, transcript);
+    expect((await runById(runId as string))?.triggerMessageId).toBe(said.id);
+  });
+
+  test("a plain 'stop' sent with 'Parar e mandar' to a computer brain is a stop: it says so and starts nothing", async () => {
+    const { hold, release } = holdFirstCall();
+    f = await setup({
+      reply: (_req: ModelRequest, call: number) =>
+        call > 1 ? { chunks: ["Certo."] } : { chunks: ["Analisando o log. ", "nunca chega"], hold },
+    });
+    const question = await ask("@dev analisa os logs");
+    let saidId = "";
+    onFirst("agent.typing", (e) => {
+      const send = async () => {
+        try {
+          await f.db
+            .update(schema.agentRuns)
+            .set({ brain: "claude_code" })
+            .where(eq(schema.agentRuns.id, String(e.runId)));
+          const said = await postPersonMessage({ ...deps(), judge }, f.owner.id, f.org.id, f.general.id, {
+            body: "para",
+            threadId: question.id,
+            steer: "now",
+          });
+          saidId = said.id;
+          await stopChecksSettled();
+        } finally {
+          release();
+        }
+      };
+      void send();
+    });
+    await drainOutbox(f.db, f.handlers);
+
+    const all = await runs();
+    expect(all.find((r) => r.triggerMessageId === question.id)?.status).toBe("canceled");
+    expect(all.some((r) => r.triggerMessageId === saidId)).toBe(false);
+    const shown = [
+      ...(await listMessages(f.db, f.owner.id, f.org.id, f.general.id)),
+      ...(await listMessages(f.db, f.owner.id, f.org.id, f.general.id, { threadId: question.id })),
+    ];
+    expect(shown.find((m) => m.id === saidId)?.meta.stoppedRunIds).toBeUndefined();
+    expect(shown.find((m) => m.meta.canceled)?.meta.canceled).toMatchObject({ byUserId: f.owner.id });
+  });
+
+  test("the stop button still says who stopped it, with the notice the agent reads", async () => {
+    const { stopped } = await stoppedRun();
+    const main = await listMessages(f.db, f.owner.id, f.org.id, f.general.id);
+    const reply = main.find((m) => m.id === stopped.replyMessageId);
+    expect(reply?.meta.canceled).toMatchObject({ byUserId: f.owner.id, text: "Analisando o log." });
+    expect(reply?.body).toContain("_Stopped by");
+    expect(main.some((m) => (m.meta.notice as { kind?: string } | undefined)?.kind === "run_stopped")).toBe(true);
   });
 
   test("permissions and 409s: same people as stopping it; busy agent; never a run nobody stopped", async () => {

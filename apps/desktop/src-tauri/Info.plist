@@ -2,9 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- A menu bar app: no Dock icon and no app menu, even before the Rust side sets the activation policy. -->
-  <key>LSUIElement</key>
-  <true/>
   <!-- The ready languages of @agenteschat/i18n/locale (the Mac App Store lists them): the system's own menus (text fields, sharing, dialogs) follow
        the Mac's language instead of staying in English. -->
   <key>CFBundleDevelopmentRegion</key>
@@ -28,6 +25,8 @@
   </array>
   <key>CFBundleAllowMixedLocalizations</key>
   <true/>
+  <!-- The usage descriptions below are English; every other language's are in locales/<lang>.lproj/InfoPlist.strings,
+       copied into the bundle by tauri.macos.conf.json. A change here goes there too. -->
   <!-- Voice messages: what the Mac says when the site first asks for the microphone. -->
   <key>NSMicrophoneUsageDescription</key>
   <string>Ackwire AI uses the microphone to record voice messages.</string>

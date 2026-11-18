@@ -1,18 +1,18 @@
 import { type SignInProvider, useAuthConfig } from "@agenteschat/client";
 import { jwtEmail } from "@agenteschat/client/lib/text";
 import * as AppleAuthentication from "expo-apple-authentication";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Platform, View } from "react-native";
+import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
 import { earlyAccessRequests, socialRefusalText, socialReturnText } from "@/features/auth/human-check";
 import { authClient, signInWithBrowser } from "@/lib/auth";
-import { writeValue } from "@/lib/storage";
+import { readValueSync, writeValue } from "@/lib/storage";
 import { Button } from "../Button";
+import { Text } from "../Text";
 import { useTheme } from "../theme";
 import { OrDivider } from "./AuthLink";
+import { socialProvidersOn } from "./providers-on";
 import { SocialMark } from "./SocialMarks";
-
-const ORDER: SignInProvider[] = ["apple", "google", "github"];
 
 /**
  * How this phone signed in last. Kept out of `STORED` on purpose: signing out clears those, and this one is for the
@@ -20,13 +20,62 @@ const ORDER: SignInProvider[] = ["apple", "google", "github"];
  */
 const LAST_SIGN_IN = "last-sign-in";
 export const rememberSignIn = (method: SignInProvider | "email") => void writeValue(LAST_SIGN_IN, method);
+/** How this phone signed in last, or null. */
+export const lastSignIn = () => readValueSync(LAST_SIGN_IN);
 
-/** The providers the server has configured, or only `only` (the ones an account is linked to). */
+/**
+ * "Último usado" on the top-right corner of the way used last (the web's), half over its border. The wrapper is what
+ * it sits on: a native button (Apple's) takes no children.
+ */
+export function LastUsed({ children, on }: { children: ReactNode; on: boolean }) {
+  const { t } = useTranslation();
+  const { colors } = useTheme();
+  if (!on) return <>{children}</>;
+  return (
+    <View>
+      {children}
+      <View
+        pointerEvents="none"
+        style={[styles.last, { backgroundColor: colors.agentSoft, borderColor: `${colors.agent}59` }]}
+      >
+        <Text variant="caption" style={[styles.lastText, { color: colors.agent }]}>
+          {t("auth.lastUsed")}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  last: {
+    position: "absolute",
+    top: -9,
+    right: 8,
+    height: 18,
+    paddingHorizontal: 7,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    justifyContent: "center",
+  },
+  lastText: { fontSize: 11, lineHeight: 14, fontWeight: "600" },
+  // Apple's own button, dimmed and untouchable while a sign-in is out; its spinner centred over it while it is Apple's.
+  appleBusy: { opacity: 0.5 },
+  appleSpinner: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
+
+/** The providers this phone signs in with (`socialProvidersOn`), or only `only` (the ones an account is linked to). */
 export function useSocialProviders(only?: SignInProvider[]): SignInProvider[] {
   const config = useAuthConfig();
   const on = config.data?.socialProviders as Partial<Record<SignInProvider, boolean>> | undefined;
-  if (!on) return [];
-  return ORDER.filter((p) => on[p] === true && (!only || only.includes(p)));
+  return socialProvidersOn(on, Platform.OS, only);
 }
 
 /**
@@ -61,7 +110,10 @@ export function SocialButtons({
   const requests = earlyAccessRequests(earlyAccess);
   const { scheme } = useTheme();
   const [nativeApple, setNativeApple] = useState(false);
-  const [busy, setBusy] = useState(false);
+  // The provider whose sign-in is out: its button spins, every other one waits.
+  const [pending, setPending] = useState<SignInProvider | null>(null);
+  const busy = pending !== null;
+  const [last] = useState(lastSignIn);
 
   useEffect(() => {
     if (Platform.OS !== "ios") return;
@@ -73,8 +125,8 @@ export function SocialButtons({
   if (providers.length === 0) return null;
 
   const browser = async (provider: SignInProvider) => {
-    setBusy(true);
-    rememberSignIn(provider);
+    if (busy) return;
+    setPending(provider);
     try {
       // A refusal comes back to the app too, so the browser sheet closes on it.
       const res = await signInWithBrowser({
@@ -84,15 +136,22 @@ export function SocialButtons({
       const signedIn = !res.error && Boolean((await authClient().getSession()).data);
       const said = socialReturnText(t, res, signedIn, emails);
       if (said) onError(said);
-      else onSignedIn?.();
+      else {
+        // "Last used" names a way that worked, never one that was only tried.
+        rememberSignIn(provider);
+        onSignedIn?.();
+      }
     } catch {
       onError(t("mobile.auth.errors.network"));
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   };
 
   const appleNative = async () => {
+    // The system's button can't be turned off: a second press while a sign-in is out is dropped here.
+    if (busy) return;
+    setPending("apple");
     try {
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
@@ -101,16 +160,17 @@ export function SocialButtons({
         ],
       });
       if (!credential.identityToken) return onError(t("mobile.auth.social.failed"));
-      setBusy(true);
-      rememberSignIn("apple");
       const res = await authClient().signIn.social(requests.apple(credential.identityToken));
       if (res.error) onError(socialRefusalText(t, res.error, emails), jwtEmail(credential.identityToken));
-      else onSignedIn?.();
+      else {
+        rememberSignIn("apple");
+        onSignedIn?.();
+      }
     } catch (e) {
       // Closing Apple's sheet is not an error.
       if ((e as { code?: string })?.code !== "ERR_REQUEST_CANCELED") onError(t("mobile.auth.social.failed"));
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   };
 
@@ -128,41 +188,59 @@ export function SocialButtons({
     <View style={{ gap: 8 }}>
       {divider ? <OrDivider label={t("mobile.common.or")} /> : null}
       {apple ? (
-        nativeApple ? (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-            buttonStyle={
-              scheme === "dark"
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={15}
-            style={{ height: 48, alignSelf: "stretch" }}
-            onPress={() => void appleNative()}
-          />
-        ) : (
-          <Button
-            variant="secondary"
-            wide
-            leading={(color) => <SocialMark provider="apple" color={color} />}
-            label={label("apple", false)}
-            disabled={busy}
-            onPress={() => void browser("apple")}
-          />
-        )
+        <LastUsed on={last === "apple"}>
+          {nativeApple ? (
+            <View
+              pointerEvents={busy ? "none" : "auto"}
+              accessibilityState={{ disabled: busy, busy: pending === "apple" }}
+            >
+              <View style={busy ? styles.appleBusy : null}>
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonStyle={
+                    scheme === "dark"
+                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                  }
+                  cornerRadius={15}
+                  style={{ height: 48, alignSelf: "stretch" }}
+                  onPress={() => void appleNative()}
+                />
+              </View>
+              {pending === "apple" ? (
+                <View style={styles.appleSpinner} pointerEvents="none">
+                  <ActivityIndicator color={scheme === "dark" ? "#000000" : "#ffffff"} />
+                </View>
+              ) : null}
+            </View>
+          ) : (
+            <Button
+              variant="secondary"
+              wide
+              leading={(color) => <SocialMark provider="apple" color={color} />}
+              label={label("apple", false)}
+              disabled={busy && pending !== "apple"}
+              loading={pending === "apple"}
+              onPress={() => void browser("apple")}
+            />
+          )}
+        </LastUsed>
       ) : null}
       {others.length > 0 ? (
         <View style={{ flexDirection: "row", gap: 8 }}>
           {others.map((p) => (
             <View key={p} style={{ flex: 1 }}>
-              <Button
-                variant="secondary"
-                wide
-                leading={(color) => <SocialMark provider={p} color={color} />}
-                label={label(p, others.length > 1)}
-                disabled={busy}
-                onPress={() => void browser(p)}
-              />
+              <LastUsed on={last === p}>
+                <Button
+                  variant="secondary"
+                  wide
+                  leading={(color) => <SocialMark provider={p} color={color} />}
+                  label={label(p, others.length > 1)}
+                  disabled={busy && pending !== p}
+                  loading={pending === p}
+                  onPress={() => void browser(p)}
+                />
+              </LastUsed>
             </View>
           ))}
         </View>

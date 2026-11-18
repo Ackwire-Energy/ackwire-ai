@@ -23,6 +23,10 @@ export function fromNow(at: Date, now = Date.now()) {
 export const andList = (xs: string[]) =>
   xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`;
 
+/** The first `max` items, then how many more ("a, b, +3 more"). */
+export const firstOf = (items: string[], max: number) =>
+  items.length > max ? `${items.slice(0, max).join(", ")}, +${items.length - max} more` : items.join(", ");
+
 /**
  * Whether `text` asks something by its punctuation, in any script: `?`, the full-width `？`, the Arabic `؟`, the
  * Spanish `¿`. Greek's `;` is left out: it is also a semicolon.
@@ -47,6 +51,10 @@ export const cutTextEnd = (text: string, max: number) =>
 /** The strings of an untrusted value: its string items when it is an array, else none. */
 export const stringsOf = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
+/** `value` when it is a whole number from `min` to `max`, else null: a stored hour or weekday that may hold anything. */
+export const wholeIn = (value: unknown, min: number, max: number): number | null =>
+  typeof value === "number" && Number.isInteger(value) && value >= min && value <= max ? value : null;
 
 /** Postgres text and jsonb refuse NUL and lone UTF-16 surrogates: `text` without either. */
 export const pgSafeText = (text: string) =>
@@ -150,3 +158,55 @@ export function percentile(values: readonly number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length, Math.max(1, Math.ceil(p * sorted.length))) - 1] as number;
 }
+
+const XML_ENTITIES: Record<string, string> = { amp: "&", lt: "<", gt: ">", quot: '"', apos: "'" };
+
+/** The text of XML character data: the five named entities and numeric ones (`&#233;`, `&#xE9;`) decoded. */
+export const decodeXmlEntities = (s: string) =>
+  s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, e: string) => {
+    if (e[0] !== "#") return XML_ENTITIES[e] ?? whole;
+    const code = e[1] === "x" || e[1] === "X" ? Number.parseInt(e.slice(2), 16) : Number(e.slice(1));
+    return code > 0 && code <= 0x10ffff ? String.fromCodePoint(code) : whole;
+  });
+
+/** CSV with RFC 4180 quoting. */
+export function tableToCsv(columns: string[], rows: string[][]): string {
+  const cell = (v: string) => (/[",\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  return [columns, ...rows].map((r) => r.map(cell).join(",")).join("\r\n");
+}
+
+/**
+ * A Markdown link or image: its words, its address. Every part is bounded or stops at the next `[`, so a text of
+ * nothing but brackets is read once, not once per bracket: this runs in the server's own thread on text a model wrote.
+ */
+const LINK = /!?\[([^\][]*)\]\(([^)\s]{0,2048})\)/g;
+
+/**
+ * Text with nothing an app turns into a link, whatever grammar the app reads it by. Two things hold for what comes
+ * back, anywhere in it, code included: no `](`, so nothing reads as a Markdown link, and no `://` with something
+ * right after it, so nothing reads as an address. Each app pairs backticks and fences its own way, so what one shows
+ * as code another shows as words: an address wrapped as code would be a link there.
+ *
+ * An address loses its `http://` or `https://`. Outside code a link or an image keeps its words alone (its address
+ * when it has none). What this takes for code is for looks only: there a link stays as typed, its joint pulled apart.
+ */
+export function inertLinks(text: string): string {
+  return (
+    text
+      .split(/(```[\s\S]*?```|`[^`\n]+`)/)
+      .map((part, i) =>
+        i % 2 ? part : part.replace(LINK, (_, words: string, address: string) => words.trim() || address),
+      )
+      .join("")
+      .replace(/https?:\/\//gi, "")
+      // What dropping a scheme put together again ("hthttps://tps://"), and any other scheme: pulled apart, which
+      // only adds a space and so puts nothing together.
+      .replace(/:\/\/(?=\S)/g, ":// ")
+      // Last: a scheme dropped between "]" and "(" makes a joint.
+      .replaceAll("](", "] (")
+  );
+}
+
+/** A JSON value with every string in it made inert (`inertLinks`). */
+export const inertJson = <T>(value: T): T =>
+  JSON.parse(JSON.stringify(value, (_key, v) => (typeof v === "string" ? inertLinks(v) : v)));

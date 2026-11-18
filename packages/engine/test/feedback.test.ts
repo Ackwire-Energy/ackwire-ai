@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { createFakeEmailSender, createMemoryBlobStore } from "@agenteschat/adapters";
+import { createFakeEmailSender, createMemoryBlobStore, createPostgresBlobStore } from "@agenteschat/adapters";
 import { schema } from "@agenteschat/db";
 import {
   attachFeedbackFiles,
@@ -186,6 +186,25 @@ describe("feedback files", () => {
     await purgeFeedbackFile(deps, video.id, later(FEEDBACK_UNSENT_MS + 60_000));
     expect(blobs.objects.size).toBe(0);
     expect(await f.db.select().from(schema.feedbackFiles)).toEqual([]);
+  });
+
+  test("a server with no bucket keeps them in Postgres, read back through the link and taken back", async () => {
+    f = await setup();
+    const deps = { db: f.db, blobs: createPostgresBlobStore(f.db) };
+    const ana = await addUser(f.db, "ana");
+
+    const shot = await storeFeedbackFile(deps, ana.id, { name: "shot.png", bytes: PNG }, NOW);
+    const [ref] = await attachFeedbackFiles(
+      f.db,
+      { userId: ana.id, orgId: null, ids: [shot.id], publicUrl: "https://chat.example.com/" },
+      NOW,
+    );
+    const token = ref?.url.split("/").pop() ?? "";
+    expect(await feedbackFileByToken(deps, token, NOW)).toMatchObject({ name: "shot.png", body: PNG });
+
+    const other = await storeFeedbackFile(deps, ana.id, { name: "other.png", bytes: PNG }, NOW);
+    await dropFeedbackFile(deps, ana.id, other.id);
+    expect(await deps.blobs.list(feedbackBlobKey(""))).toEqual([feedbackBlobKey(shot.id)]);
   });
 
   test("a person holds only so many files not sent yet", async () => {

@@ -9,13 +9,7 @@ import {
   usesBrowser,
 } from "@agenteschat/client";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import {
-  allowsInApp,
-  canReduceAccess,
-  commandInReason,
-  machineReasonText,
-  toolOnCommand,
-} from "@agenteschat/client/lib/machines";
+import { canReduceAccess, commandInReason, machineReasonText } from "@agenteschat/client/lib/machines";
 import { Button, Card, CardHeader, Chip, Icon } from "@agenteschat/ui";
 import { useQueries } from "@tanstack/react-query";
 import { useState } from "react";
@@ -23,9 +17,9 @@ import { useTranslation } from "react-i18next";
 import { useToast } from "@/lib/toast";
 import { useStreams } from "@/realtime/context";
 import { AgentAvatar } from "../AgentAvatar";
+import { ToolOffWayOut } from "../devices/ToolOneClick";
 import { CommandBlock } from "../machine-bits";
 import { useOrg } from "../org-context";
-import { OpenPrefsButton, useIsThisMac } from "../ThisMac";
 import { BrowserCard } from "./BrowserCard";
 import "./browser.css";
 
@@ -41,8 +35,6 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
   const toast = useToast();
   const actions = useBrowserHandoffMutations(org.id);
   const [confirming, setConfirming] = useState<string | null>(null);
-  // In the app, on this very Mac: the browser is turned on in Preferences → Ferramentas (ADR 0036).
-  const here = useIsThisMac(org.id, m.id);
   const [seeing, setSeeing] = useState<string | null>(null);
   const agentIds = m.agents.map((a) => a.id);
   const handoffs = useQueries({
@@ -132,31 +124,7 @@ export function MachineBrowserCard({ machine: m, onTurnOff }: { machine: Machine
         )}
         {ready && m.browser?.version && <span className="small muted">{m.browser.chrome ?? ""}</span>}
       </div>
-      {!switchedOn &&
-        (here ? (
-          <div className="brw-note brw-note--act">
-            <span className="brw-note__text ac-iconline">
-              <Icon name="computer" size={16} />
-              <span>{t("machines.thisMac.toolsHere")}</span>
-            </span>
-            <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-          </div>
-        ) : allowsInApp(m.os) ? (
-          <div className="brw-note ac-iconline">
-            <Icon name="computer" size={16} />
-            <div>{t("browser.machine.offHelp")}</div>
-          </div>
-        ) : (
-          // A Linux computer may be a server without the app: the command too.
-          <div className="brw-note ac-iconline">
-            <Icon name="computer" size={16} />
-            <div className="stack-4" style={{ flex: 1, minWidth: 0, gap: 6 }}>
-              <span>{t("browser.machine.offHelp")}</span>
-              <span>{t("machines.access.grantTerminal")}</span>
-              <CommandBlock command={toolOnCommand(m, "browser")} />
-            </div>
-          </div>
-        ))}
+      {!switchedOn && <ToolOffWayOut machine={m} tool="browser" />}
       {switchedOn && !ready && m.browser?.reason && (
         <div className="brw-note ac-iconline">
           <Icon name="alert" size={16} />

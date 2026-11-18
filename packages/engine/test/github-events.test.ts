@@ -165,6 +165,20 @@ describe("what happens on GitHub wakes the agent it concerns (ADR 0156)", () => 
     expect(refsOf((await githubNotices())[0])).not.toHaveProperty("answeredBy");
   });
 
+  test("a workspace being deleted takes no news: no notice and no run, a merge or a member's comment", async () => {
+    const { ctx } = await world();
+    await recordGitHubItem(ctx, { repo: "acme/app", number: 12, authored: true });
+    await f.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() + 7 * 86_400_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    await deliver("issue_comment", commentOn(12, "Can you rebase it?"));
+    const merged = { number: 12, merged: true, html_url: "https://github.com/acme/app/pull/12" };
+    await deliver("pull_request", { ...base(MEMBER_GH), action: "closed", pull_request: merged });
+    expect(await githubNotices()).toEqual([]);
+    expect(await f.db.select().from(schema.agentRuns)).toEqual([]);
+  });
+
   test("a stranger's comment leaves a notice only; a member asks the agent to answer it, once", async () => {
     const { ctx } = await world();
     await recordGitHubItem(ctx, { repo: "acme/app", number: 12, authored: true });

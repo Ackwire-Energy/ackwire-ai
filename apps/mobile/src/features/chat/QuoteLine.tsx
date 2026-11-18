@@ -2,11 +2,16 @@ import type { ReplyRef } from "@agenteschat/client";
 import { quoteText } from "@agenteschat/client/lib/media";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
-import { Icon, Text } from "@/ui";
+import { Icon, Text, TOUCH } from "@/ui";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors } from "../shared/hooks";
 import { rowBodyInset } from "./logic";
 import type { RowLook } from "./look";
+import { useRowDirectory } from "./row-data";
+
+/** The quote's line (`styles.line`), and the reply bar's × glyph. */
+const LINE = 20;
+const X = 16;
 
 /** What a reply answers, in one line (the web's `QuotedMessage`): face, name and words; a tap goes to the original. */
 export function QuoteLine({
@@ -20,7 +25,7 @@ export function QuoteLine({
   ink?: string;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const color = ink ? { color: ink } : undefined;
   if (reply.deleted) {
     return (
@@ -36,6 +41,8 @@ export function QuoteLine({
       onPress={() => onJump?.(reply)}
       accessibilityRole="button"
       accessibilityLabel={t("channel.quoteOf", { name, excerpt })}
+      // A 20-point line: 12 above and below make the 44 a finger needs (the row under it keeps its own touches).
+      hitSlop={{ top: (TOUCH - LINE) / 2, bottom: (TOUCH - LINE) / 2 }}
       style={({ pressed }) => [styles.line, pressed && styles.pressed]}
     >
       {reply.author.id ? <Face who={reply.author} size={16} live={false} /> : null}
@@ -111,17 +118,18 @@ export function QuoteBar({ name, onCancel }: { name: string; onCancel: () => voi
         onPress={onCancel}
         accessibilityRole="button"
         accessibilityLabel={t("channel.cancelReply")}
-        hitSlop={10}
+        // A 16-point ×: 14 around it makes the 44 a finger needs.
+        hitSlop={(TOUCH - X) / 2}
         style={({ pressed }) => pressed && styles.pressed}
       >
-        <Icon name="x" size={16} color={c.muted} />
+        <Icon name="x" size={X} color={c.muted} />
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  line: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 20 },
+  line: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: LINE },
   pressed: { opacity: 0.6 },
   who: { flexShrink: 0, maxWidth: "50%", fontWeight: "600" },
   words: { flexShrink: 1 },

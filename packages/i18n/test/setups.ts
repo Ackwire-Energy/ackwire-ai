@@ -99,6 +99,11 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "noAi.kept.plan",
   ],
   selfhost: [
+    // A server that sends no e-mail can't confirm a new address: only there (`email.no_mail`).
+    "shell.email.noMail",
+    // Who read a piece of the workspace: off agentes.chat's own servers, whoever runs this one (`details.cloud`).
+    "audit.operatorRead.who.server",
+    "audit.operatorRead.request.operator",
     "auth.owner.",
     "auth.flow.ownerWaits",
     "auth.flow.ownerWaitsLead",
@@ -108,11 +113,15 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "agentPage.work.browserDialog.noComputer",
     "agentPage.work.computer.connect",
     "aiAccounts.connect.addComputer",
+    // The way out for the right hand's plan on a computer that is away: Cloud's own computer is always on.
+    "rightHand.unusable.connect",
     "aiAccounts.connect.noComputer",
     "brain.reasons.no_computer",
     "browser.inCard.noComputer",
     "browser.live.noComputer",
     "computers.hostMissing",
+    // Lodi's computer row on a self-hosted server (`rightHandNoComputer` with `selfHosted`).
+    "rightHand.computerNoHomeServer",
     "connectAi.wait.connecting",
     "errors.mission.unavailable",
     // The feedback form's line on who reads it, where the server isn't one of agentes.chat's own (`auth-config.cloud`).
@@ -124,7 +133,6 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "members.requests.copyText",
     "missions.new.connect",
     "missions.new.connectComputer",
-    "missions.new.needsMachine",
     "missions.new.noEligibleText",
     "missions.new.reason.no_computer",
     "missions.pinned.noComputers",
@@ -150,6 +158,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "help.selfhost.",
     // A server other than the Cloud with no terms or privacy page of its own: the Cloud always shows its documents.
     "legal.none.",
+    // Only to the owner of a server the desktop app runs (`confirmsOnThisMac`), which has no password.
+    "mobile.delete.onThisComputer",
     "mobile.newMission.noAgents",
     "mobile.newMission.reason.no_computer",
     // The Jev card and its setup screen render only for the installation's owner on self-host
@@ -173,6 +183,9 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     // and the link's refusals.
     "auth.forgotHere.",
     "errors.passwordLink.",
+    // Continue on this Mac's refusals: only on the server the desktop app runs on the person's computer.
+    "auth.desktopOwner.gone",
+    "auth.desktopOwner.none",
     // The catalog's line for a server without Composio (`composioOffText`): the Cloud always has its key.
     "connectors.composio.off_one",
     "connectors.composio.off_other",
@@ -182,6 +195,8 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "githubApp.ownerHint",
   ],
   email: [
+    // Said once the link to a new address went out, which only a server that sends e-mail does.
+    "shell.email.sent",
     "auth.newLinkSent",
     "invite.ask.approvedEmail",
     "invite.ask.sentEmail",
@@ -196,8 +211,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "proof.willSend",
     "proof.sent",
     "errors.reauth.code",
+    // An address held for an account that just left it (`changeAccountEmail`): only a server that sends e-mail holds it.
+    "auth.flow.emailHeld",
   ],
-  apiKey: ["agentPage.work.brain.fallbackTitle"],
+  apiKey: [],
   // A message nobody mentions still gets an agent: routing.mine (the chip and its help line), routing.by (Settings),
   // or the receipt of a message a rule sent to its one candidate.
   routing: ["channelMembers.replyAloneHelp", "routing.by.jev", "routing.by.model", "receipts.by.only_agent"],
@@ -208,9 +225,13 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "help.any.computers.sections.0.blocks.0",
     "help.any.computers.sections.1.blocks.1.list.0",
     // The moving steps' command is the Mac's, said so in the step above it.
-    "help.selfhost.run-on-your-computer.sections.10.blocks.1.code",
-    "desktop.prefs.general.dockDesc",
+    "help.selfhost.run-on-your-computer.sections.12.blocks.1.code",
+    // Uninstalling: how Finder shows hidden folders and opens one by its path, each after "On a Mac".
+    "help.selfhost.run-on-your-computer.sections.10.blocks.4.list.3",
+    "help.selfhost.run-on-your-computer.sections.10.blocks.4.list.4",
     "desktop.prefs.general.menuBarTitle",
+    // The app icon's hint shows only in the Mac's desktop app (AppIconPicker.tsx): its Dock and Finder.
+    "appIcon.hintMac",
     "desktop.prefs.updates.",
     "desktop.server.reveal",
     "desktop.cover.tailnetUp",
@@ -228,6 +249,11 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "devices.fix.device_support",
     "devices.fix.helper_missing",
     "devices.fix.helper_expired",
+    // An iPhone over Wi-Fi is reached through its Mac, on the Mac's network.
+    "devices.reason.wifi_away",
+    "devices.reason.wifi_untrusted",
+    "devices.fix.wifi_away",
+    "devices.fix.tunnel_down",
     "devices.who.followsHint",
     "devices.choose.thisMac",
     "devices.screen.needsHelper",
@@ -236,6 +262,10 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
     "mobile.devices.reason.device_support",
     "mobile.devices.reason.apple_account_missing",
     "mobile.devices.reason.apple_team_missing",
+    "mobile.devices.reason.wifi_away",
+    "mobile.devices.reason.wifi_asleep",
+    "mobile.devices.reason.tunnel_down",
+    "mobile.devices.iphone.wifi.",
     // The iPhone setup window opens only on a Mac.
     "desktop.iphone.checkingStall",
   ],
@@ -244,6 +274,7 @@ export const SHOWN_ONLY: Record<Condition, readonly string[]> = {
 /** Keys whose server words mean another server (an MCP or database server, one the person picks): every setup. */
 export const ANYWHERE: readonly string[] = [
   "connectFlow.needsKey",
+  "errors.connector.headersWithSignIn",
   "database.error.blocked_host",
   "database.error.no_databases",
   "database.scopeAll",
@@ -254,15 +285,21 @@ export const ANYWHERE: readonly string[] = [
   "mobile.auth.server.",
   "mobile.auth.connect.",
   "desktop.first.",
-  "desktop.own.",
+  // The desktop app's first screen and its install: the Cloud, this computer and one always on, side by side.
+  "desktop.place.",
+  "desktop.install.",
   "desktop.connect.",
   "desktop.link.",
   "desktop.servers.",
   // The desktop app's workspaces by server: the line under a server that isn't agentes.chat, whichever server this is.
   "shell.yourServer",
+  // "Onde fica o seu workspace?": the Cloud and one's own server compared side by side, each named, whichever this is.
+  "hosting.",
   // People connect their own computers and phones in every setup, the Cloud included.
   "devices.",
   "mobile.devices.",
+  // The right hand's plan that needs a computer: the workspace's way out is connecting one, in every setup.
+  "rightHand.brain.unusable.connect",
 ];
 
 /** A key's agent-gender variant (`_female`, ADR 0122) goes where its base key goes. */

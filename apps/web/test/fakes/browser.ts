@@ -4,7 +4,7 @@
  * without a browser or a desktop (they have no computer); tests put handoffs in
  * `fake.handoffs`, settings in `fake.settings` and desktops in `fake.desktops`.
  */
-import type { AgentBrowserSettings, ApiClient, BrowserHandoff, DesktopStatus } from "@agenteschat/client";
+import type { AgentBrowserSettings, AgentHolds, ApiClient, BrowserHandoff, DesktopStatus } from "@agenteschat/client";
 import { ApiError, handoffScreen } from "@agenteschat/client";
 
 export interface FakeBrowser {
@@ -20,6 +20,8 @@ export interface FakeBrowser {
   watchOnly: Set<string>;
   /** Agents whose Chrome shows on their desktop: the desktop's state names the browser's open handoff too. */
   sameWindow: Set<string>;
+  /** What each agent keeps running (ADR 0176); none by default. A Stop takes it off. */
+  holds: Map<string, AgentHolds>;
 }
 
 const NO_DESKTOP: DesktopStatus = {
@@ -56,6 +58,7 @@ export function createFakeBrowser(
   const forbidden = new Set<string>();
   const watchOnly = new Set<string>();
   const sameWindow = new Set<string>();
+  const holds = new Map<string, AgentHolds>();
   const openOn = (agentId: string, screen: BrowserHandoff["screen"] = "browser") =>
     [...handoffs.values()].find(
       (h) => h.agentId === agentId && handoffScreen(h) === screen && (h.status === "pending" || h.status === "active"),
@@ -84,8 +87,8 @@ export function createFakeBrowser(
       settings.set(agentId, next);
       return next;
     },
-    agentHandoff: async (orgId, agentId, screen) => {
-      log("browser.agentHandoff", orgId, agentId);
+    agentHandoff: async (orgId, agentId, screen, seat) => {
+      log("browser.agentHandoff", orgId, agentId, ...(seat ? [seat] : []));
       return openOn(agentId, screen);
     },
     agentControl: async (_orgId, agentId) => !watchOnly.has(agentId),
@@ -108,8 +111,15 @@ export function createFakeBrowser(
       log("browser.cancel", orgId, handoffId);
       return end(handoffId, "cancelled");
     },
-    takeover: async (orgId, agentId, runId, screen) => {
-      log("browser.takeover", orgId, agentId, ...(runId ? [runId] : []), ...(screen ? [screen] : []));
+    takeover: async (orgId, agentId, runId, screen, seat) => {
+      log(
+        "browser.takeover",
+        orgId,
+        agentId,
+        ...(runId ? [runId] : []),
+        ...(screen ? [screen] : []),
+        ...(seat ? [seat] : []),
+      );
       const h: BrowserHandoff = {
         id: `takeover-${handoffs.size + 1}`,
         agentId,
@@ -162,8 +172,8 @@ export function createFakeBrowser(
     },
   };
   const desktop: ApiClient["desktop"] = {
-    status: async (orgId, agentId) => {
-      log("desktop.status", orgId, agentId);
+    status: async (orgId, agentId, seat) => {
+      log("desktop.status", orgId, agentId, ...(seat ? [seat] : []));
       if (forbidden.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's desktop");
       const open = openOn(agentId, "desktop") ?? (sameWindow.has(agentId) ? openOn(agentId, "browser") : null);
       return {
@@ -180,6 +190,17 @@ export function createFakeBrowser(
       const picture = { data: "c2NyZWVu", width: 1280, height: 800, capturedAt: new Date().toISOString() };
       return desktops.get(agentId)?.running ? { picture, reason: null } : { picture: null, reason: "stopped" };
     },
+    holds: async (orgId, agentId) => {
+      log("desktop.holds", orgId, agentId);
+      if (forbidden.has(agentId)) throw new ApiError(403, "forbidden", "You can't use this agent's desktop");
+      return holds.get(agentId) ?? { holds: [], canStop: false };
+    },
+    stopHold: async (orgId, agentId, holdId) => {
+      log("desktop.stopHold", orgId, agentId, holdId);
+      const now = holds.get(agentId);
+      if (!now?.canStop) throw new ApiError(403, "forbidden", "You can't stop what this agent keeps running");
+      holds.set(agentId, { ...now, holds: now.holds.filter((h) => h.id !== holdId) });
+    },
   };
-  return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly, sameWindow };
+  return { client, desktop, settings, handoffs, desktops, forbidden, watchOnly, sameWindow, holds };
 }

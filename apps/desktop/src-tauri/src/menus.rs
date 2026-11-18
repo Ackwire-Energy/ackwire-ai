@@ -207,7 +207,7 @@ fn build_app_menu(
         .version(Some(app.package_info().version.to_string()))
         // The license's required attribution (NOTICE, AGPL-3.0 section 7(b)); never removed.
         .copyright(Some(
-            "Based on agentes.chat by Codari Global, LLC\n\
+            "Based on Ackwire AI by Codari Global, LLC\n\
              Copyright © 2026 Codari Global, LLC and contributors\n\
              AGPL-3.0-only, with no warranty",
         ))

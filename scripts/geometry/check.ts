@@ -230,7 +230,14 @@ export async function launch(bin: string, profile: string) {
       waiting.set(id, { ok: ok as (v: never) => void, fail });
       ws.send(JSON.stringify({ id, method, params, sessionId }));
     });
-  return { send, close: () => chrome.kill() };
+  return {
+    send,
+    close: () => {
+      // Close the DevTools socket too: after Chrome exits Bun may otherwise keep its client alive.
+      ws.close();
+      chrome.kill();
+    },
+  };
 }
 
 type Send = Awaited<ReturnType<typeof launch>>["send"];
@@ -286,6 +293,7 @@ export const SELF_TESTED = [
   "iconmid",
   "fieldwidth",
   "corner",
+  "nest",
   "clip",
   "cascadeorder",
   "pagetop",
@@ -305,11 +313,13 @@ export const SELF_TESTED = [
   "toolheight",
   "factwrap",
   "undoinline",
+  "barend",
   "countfill",
   "calstack",
   "bleed",
   "stampout",
   "stampover",
+  "msgaside",
 ];
 
 /** Rules about a desktop layout only (panes floating beside the conversation, a toolbar's one row): a phone has none. */

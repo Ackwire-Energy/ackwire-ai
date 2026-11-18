@@ -20,20 +20,22 @@ export interface PickRow {
 /**
  * People and agents of the org as pickable rows, minus `exclude`, filtered by `query`. Agents only as far as my lists
  * show them (`listsAgent`), plus the ones in `keep` (already picked), so they can still be taken out. For a channel
- * (`channel`), only the agents that join channels (`joinsChannels`).
+ * (`channel`), only the agents that join channels (`joinsChannels`). I am left out, as a channel adds who creates it
+ * by itself; `me` lists me too, first (a task's assignees).
  */
 export function useMemberRows(
   query: string,
   exclude: Set<PickKey> = new Set(),
   keep?: Set<PickKey>,
-  { channel = false }: { channel?: boolean } = {},
+  { channel = false, me: withMe = false }: { channel?: boolean; me?: boolean } = {},
 ) {
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const q = query.trim().toLowerCase();
   const rows: PickRow[] = [
     ...dir.members
-      .filter((m) => m.userId !== me.user.id)
+      .filter((m) => withMe || m.userId !== me.user.id)
+      .sort((a, b) => Number(b.userId === me.user.id) - Number(a.userId === me.user.id))
       .map((m) => ({
         key: `person:${m.userId}` as PickKey,
         kind: "person" as const,
@@ -102,6 +104,7 @@ export function PeoplePicker({
   selected,
   onChange,
   channel = false,
+  me = false,
 }: {
   label: string;
   searchLabel: string;
@@ -112,11 +115,13 @@ export function PeoplePicker({
   onChange: (next: Set<PickKey>) => void;
   /** Picking a channel's members: `useMemberRows`'s `channel`. */
   channel?: boolean;
+  /** I am one of the rows too: `useMemberRows`'s `me`. */
+  me?: boolean;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
-  const rows = useMemberRows(query, undefined, selected, { channel });
-  const all = useMemberRows("", undefined, selected, { channel });
+  const rows = useMemberRows(query, undefined, selected, { channel, me });
+  const all = useMemberRows("", undefined, selected, { channel, me });
   const picked = all.filter((r) => selected.has(r.key));
   const toggle = (key: PickKey, on: boolean) => {
     const next = new Set(selected);

@@ -38,6 +38,11 @@ export const words: EmailWords = {
       inviter
         ? [{ b: inviter }, `${email ? ` (${email})` : ""} 邀请你以${role}身份加入 `, { b: org }, "。"]
         : [`你受邀以${role}身份加入 `, { b: org }, "。"],
+    starts: (channels, agents) => [
+      ...(channels ? ["你会直接加入 ", ...channels, "。"] : []),
+      ...(agents ? ["你将和 ", ...agents, " 一起工作。"] : []),
+    ],
+    more: (n) => `另外${n}个`,
     what: "Ackwire AI 是成员和 AI 智能体一起工作的地方。",
     noteFrom: (inviter, note) => [{ b: inviter ? `${inviter}：` : "附言：" }, `“${note}”`],
     button: "接受邀请",
@@ -196,6 +201,7 @@ export const words: EmailWords = {
     preheader: "在“成员”中批准或拒绝。在你回复之前，什么都不会发生。",
     headline: "有一个加入请求等你处理",
     body: (org) => ["对方打开了 ", { b: org }, " 的邀请链接，并请求加入。"],
+    outside: (by) => ["对方为 ", { b: by }, " 工作，申请以外部协作者身份加入。不占用你套餐的席位，你可以随时移除。"],
     note: "只批准你认识的人。除非你在页面上选择其他角色，否则对方会以成员身份加入。",
     approve: "批准",
     deny: "拒绝",
@@ -260,7 +266,7 @@ export const words: EmailWords = {
     subjectAccount: (code) => `删除整个账号的验证码：${code}`,
     preheader: "在 Ackwire AI 中输入它来确认。10 分钟内有效。",
     headline: "你的验证码",
-    workspace: (org) => ["输入这个验证码即可删除工作区 ", { b: org }, "。它会立即对所有人关闭，7 天后被永久删除。"],
+    workspace: (org) => ["输入这个验证码即可删除工作区 ", { b: org }, "。它会立即对所有人变为只读，7 天后被永久删除。"],
     account: (email) => [
       "输入这个验证码即可删除整个账号 ",
       { b: email },
@@ -276,18 +282,54 @@ export const words: EmailWords = {
     whyWorkspace: (org) => `你收到这封邮件，是因为你的账号请求删除 Ackwire AI 上的 ${org}。`,
     whyAccount: "你收到这封邮件，是因为你的账号请求在 Ackwire AI 上删除自己。",
     personal: {
-      workspace: (org) => ["输入这个验证码即可删除你的工作区 ", { b: org }, "。它会立即关闭，7 天后被永久删除。"],
+      workspace: (org) => ["输入这个验证码即可删除你的工作区 ", { b: org }, "。它会立即变为只读，7 天后被永久删除。"],
+    },
+  },
+  emailChange: {
+    code: {
+      subject: (code) => `更改邮箱的验证码：${code}`,
+      preheader: "在 Ackwire AI 中输入它来确认。10 分钟内有效。",
+      headline: "你的验证码",
+      body: (email, newEmail) => ["输入这个验证码，即可把账号 ", { b: email }, " 的邮箱改为 ", { b: newEmail }, "。"],
+      support: (address) => [
+        "验证码 10 分钟内有效，没有它邮箱不会改变。如果不是你本人操作，请不要告诉任何人，并写信至 ",
+        { mail: address },
+        "。",
+      ],
+      noSupport:
+        "验证码 10 分钟内有效，没有它邮箱不会改变。如果不是你本人操作，请不要告诉任何人，并告知这台服务器的管理人员。",
+      why: "你收到这封邮件，是因为你的账号请求在 Ackwire AI 上更改邮箱。",
+    },
+    link: {
+      subject: "确认你在 Ackwire AI 的新邮箱",
+      preheader: "点一下，以后就用这个地址登录。链接一小时内有效。",
+      headline: "确认你的新邮箱",
+      body: "只差一步：确认这个地址属于你。之后你的账号就用它登录。",
+      button: "确认新邮箱",
+      small: "链接一小时内有效。如果不是你请求的，可以忽略这封邮件。",
+      why: "你收到这封邮件，是因为有人请求把这个地址用于一个 Ackwire AI 账号。",
+    },
+    changed: {
+      subject: "你的 Ackwire AI 账号邮箱已更改",
+      preheader: "如果不是你本人操作，7 天内可以把这个地址改回来。",
+      headline: "你的邮箱已更改",
+      body: (email, newEmail) => ["账号 ", { b: email }, " 现在用 ", { b: newEmail }, " 登录。"],
+      notYou:
+        "不是你本人操作？请在 7 天内按下按钮。我们会改回这个地址，退出所有会话，断开 AI 应用的连接，并让此后添加的登录方式失效。密码也会被清除，下一个密码可通过“忘记密码”设置。",
+      button: "不是我",
+      small: "如果是你本人操作，无需任何处理。",
+      why: "你收到这封邮件，是因为这个地址曾是一个 Ackwire AI 账号的邮箱。",
     },
   },
   deleting: {
     subject: (day) => `你所在的一个工作区将于 ${day} 删除`,
-    preheader: "它现在已关闭。在那之前，所有者仍可恢复它。",
+    preheader: "它现在只读。在那之前，所有者仍可恢复它。",
     headline: "一个工作区正在被删除",
     body: (by, org, day, time) => [
       { b: by },
       " 删除了工作区 ",
       { b: org },
-      `。它现在已关闭，将于 ${day} ${time} 被永久删除。`,
+      `。它现在只读，将于 ${day} ${time} 被永久删除。`,
     ],
     owner: "改变主意了？在那之前恢复它。",
     button: "恢复工作区",
@@ -443,6 +485,26 @@ export const words: EmailWords = {
         return `${routines > 0 ? `${a}和${r}` : a}已就绪。只差一个 Ackwire AI 套餐了。`;
       },
       why: () => "你收到这封邮件，是因为 Ackwire AI 上的这个工作区是你的。此类提醒只发送两次。",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface} 已关联到你的 Ackwire AI 账号`,
+      preheader: "你的助手现在会在那里回复你。如果不是你，请解除关联。",
+      headline: (surface) => `${surface} 已关联`,
+      body: (surface, display, org) => [{ b: display }, `（${surface}）现在可以和你在 `, { b: org }, " 的助手对话。"],
+      notYou: "不是你？请解除关联。来自那里的消息会立即不再进入你的账号。",
+      button: "解除关联",
+      small: "如果是你本人，无需任何操作。你可以随时在设置中解除关联。",
+      why: (surface) => `你收到这封邮件，是因为 ${surface} 关联到了你的 Ackwire AI 账号。`,
+    },
+    unlinked: {
+      subject: (surface) => `${surface} 已与你的 Ackwire AI 账号解除关联`,
+      preheader: "对方的身份已变更。如果是你，请在设置中重新关联。",
+      headline: (surface) => `${surface} 已解除关联`,
+      body: (surface, display) => [{ b: display }, `（${surface}）因身份变更已解除关联。`],
+      small: "如果是你，请在设置中重新关联。",
+      why: (surface) => `你收到这封邮件，是因为 ${surface} 曾关联到你的 Ackwire AI 账号。`,
     },
   },
 };

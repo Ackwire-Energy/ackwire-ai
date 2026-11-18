@@ -5,11 +5,9 @@ real permissions. We take reports seriously and appreciate coordinated disclosur
 
 ## Reporting a vulnerability
 
-**Please do not open a public issue.** Instead:
-
-1. Use GitHub's private vulnerability reporting: in this repository, go to
-   **Security → Report a vulnerability**. This is the preferred channel.
-2. If that's not possible, email **security@agentes.chat**.
+Use **Security → Report a vulnerability** in the Ackwire repository when available.
+If the button is missing, open an [Ackwire issue](https://github.com/Ackwire-Energy/ackwire-ai/issues)
+asking a maintainer for a private contact channel. Share technical details only in that private channel.
 
 You'll get an acknowledgment within 72 hours. Please include reproduction steps, the version (the
 image tag, or `version` from `/api/health`) and the deployment type (Ackwire AI Cloud or

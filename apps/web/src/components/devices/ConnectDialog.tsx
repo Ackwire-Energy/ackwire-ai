@@ -2,7 +2,7 @@ import { type DeviceJoinRequest, useMe } from "@agenteschat/client";
 import { joinFacts, linkPhase, newComputerOf } from "@agenteschat/client/lib/devices";
 import { computerKind, isHandheld, platformOf } from "@agenteschat/client/lib/machines";
 import { can } from "@agenteschat/client/lib/permissions";
-import { appPairsWith, pairLink } from "@agenteschat/client/lib/server";
+import { appPairsWith, pairLink, plainHttpServer } from "@agenteschat/client/lib/server";
 import {
   Button,
   ComputerPortrait,
@@ -132,16 +132,38 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
   const { org } = useOrg();
   const platform = platformOf(navigator.userAgent);
   const agentsHere = useAgentsHere();
-  const option = (step: ConnectStep, mark: ReactNode, title: string, line: ReactNode) => (
-    <button type="button" className="dv-option" onClick={() => onPick(step)}>
-      {mark}
-      <span className="dv-option__text">
-        <span className="dv-option__title ac-captop">{title}</span>
-        <span className="dv-option__line">{line}</span>
-      </span>
-      <Icon name="chevronRight" size={16} className="dv-option__arrow" />
-    </button>
-  );
+  const option = (step: ConnectStep, mark: ReactNode, title: string, line: ReactNode, how?: ReactNode) =>
+    how ? (
+      // A link can't sit inside a button: the title is the button, stretched over the row, and the link sits above it.
+      <div className="dv-option dv-option--stretch">
+        {mark}
+        <span className="dv-option__text">
+          <button
+            type="button"
+            className="dv-option__title dv-option__hit ac-captop"
+            aria-describedby={`dv-line-${step}`}
+            onClick={() => onPick(step)}
+          >
+            {title}
+          </button>
+          <span className="dv-option__line" id={`dv-line-${step}`}>
+            <span>
+              {line} {how}
+            </span>
+          </span>
+        </span>
+        <Icon name="chevronRight" size={16} className="dv-option__arrow" />
+      </div>
+    ) : (
+      <button type="button" className="dv-option" onClick={() => onPick(step)}>
+        {mark}
+        <span className="dv-option__text">
+          <span className="dv-option__title ac-captop">{title}</span>
+          <span className="dv-option__line">{line}</span>
+        </span>
+        <Icon name="chevronRight" size={16} className="dv-option__arrow" />
+      </button>
+    );
   const thisMark = <ProviderLogo id={systemMark(platform)} size="sm" className="dv-tile" />;
   // Inside the desktop app that may host agents, one click (below). In a browser, the app on this computer through
   // a link, where the app takes one; a phone's browser has no computer to connect. Elsewhere (an app that runs this
@@ -170,6 +192,16 @@ function Chooser({ onPick, onClose }: { onPick: (step: ConnectStep) => void; onC
                   <ThisMacButton orgId={org.id} canPair={can(org, "pair_computers")} />
                 </span>
               </div>
+            ) : thisStep === "link" && plainHttpServer(window.location.origin) ? (
+              option(
+                thisStep,
+                thisMark,
+                t(thisLabel(platform)),
+                t("devices.choose.httpLine"),
+                <HelpLink slug="install-on-a-server" section="reach">
+                  {t("devices.choose.httpHow")}
+                </HelpLink>,
+              )
             ) : (
               thisStep &&
               option(

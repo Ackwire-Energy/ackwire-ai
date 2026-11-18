@@ -25,6 +25,7 @@ export function Popover({
   onOpenChange,
   hover,
   moveFocus = hover?.open !== "hover",
+  sideOffset = 6,
 }: {
   /** A focusable element (a button with an accessible name). */
   trigger: ReactNode;
@@ -45,6 +46,8 @@ export function Popover({
    * in) keeps it.
    */
   moveFocus?: boolean;
+  /** How far from its trigger it opens (px): past a column the trigger sits in, so it covers none of it. */
+  sideOffset?: number;
 }) {
   // How far it moves over its trigger to fit the window (`pullToFit`): only ever for a card the room on its side cuts.
   const [pull, setPull] = useState(0);
@@ -106,7 +109,8 @@ export function Popover({
         onOpenChange?.(o);
       }}
     >
-      <RPopover.Trigger asChild {...hover?.trigger}>
+      {/* A hover card says more than a tip would: its trigger gets none (`installTitleTips`). */}
+      <RPopover.Trigger asChild {...hover?.trigger} data-no-tip={hover ? "" : undefined}>
         {trigger}
       </RPopover.Trigger>
       <RPopover.Portal>
@@ -114,7 +118,7 @@ export function Popover({
           className={cx("ac-menu ac-popover", className)}
           side={side}
           align={align}
-          sideOffset={6 - pull}
+          sideOffset={sideOffset - pull}
           collisionPadding={EDGE_ROOM}
           aria-label={label}
           role="dialog"

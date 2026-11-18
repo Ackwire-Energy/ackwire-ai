@@ -360,6 +360,93 @@ test("importing a passwords file: a dry run only counts; HTTPS logins with a pas
   );
 });
 
+test("several keys in one save: all or none, the team's only with the permission, and never a value back", async () => {
+  const w = await workspace();
+  const keys = [
+    { keyName: "ACME_DB_URL", secret: "fake-db-value-not-real", replace: false },
+    { keyName: "ACME_TOKEN", secret: "fake-token-value-not-real", replace: false },
+  ];
+  // A member without the team's permission: refused for the team, saved as their own.
+  const refused = await w.ana(`${w.vault}/keys`, { json: { scope: "team", keys } });
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("vault.team_needs_permission");
+  expect((await overviewOf(w.owner, w.vault)).overview.items).toEqual([]);
+  const mine = await w.ana(`${w.vault}/keys`, { json: { scope: "personal", keys } });
+  expect(mine.status).toBe(200);
+  const mineText = await mine.text();
+  expect(JSON.parse(mineText)).toEqual({ added: 2, replaced: 0, skipped: 0 });
+  expect(mineText).not.toContain("not-real");
+  const seen = await overviewOf(w.ana, w.vault);
+  expect(seen.text).not.toContain("not-real");
+  expect(seen.overview.items.map((i) => [i.scope, i.keyName]).sort()).toEqual([
+    ["personal", "ACME_DB_URL"],
+    ["personal", "ACME_TOKEN"],
+  ]);
+
+  // One bad name refuses the whole save, and the answer never repeats a value.
+  const bad = await w.owner(`${w.vault}/keys`, {
+    json: { scope: "team", keys: [...keys, { keyName: "lower_case", secret: "fake-other-not-real", replace: false }] },
+  });
+  expect(bad.status).toBe(400);
+  expect(await bad.text()).not.toContain("not-real");
+  expect((await w.owner(`${w.vault}/keys`, { json: { scope: "team", keys: [] } })).status).toBe(400);
+  expect((await overviewOf(w.owner, w.vault)).overview.items).toEqual([]);
+
+  const team = await w.owner(`${w.vault}/keys`, { json: { scope: "team", keys } });
+  expect(await team.json()).toEqual({ added: 2, replaced: 0, skipped: 0 });
+  const again = await w.owner(`${w.vault}/keys`, {
+    json: { scope: "team", keys: [{ ...keys[0], replace: true }, keys[1]] },
+  });
+  expect(await again.json()).toEqual({ added: 0, replaced: 1, skipped: 1 });
+  const audit = await (await w.owner(`/api/app/organizations/${w.orgId}/audit?kind=change`)).text();
+  expect(audit).toContain("vault.keys_imported");
+  expect(audit).not.toContain("not-real");
+});
+
+test("moving an item between Personal and Team: who manages the team's, both ways, never a password manager's", async () => {
+  const w = await workspace();
+  const move = (b: Browser, id: string, scope: string) => b(`${w.vault}/items/${id}/move`, { json: { scope } });
+  const anas = await create(w.ana, w.vault, {
+    kind: "key",
+    scope: "personal",
+    title: "",
+    keyName: "ANA_KEY",
+    secret: KEY_VALUE,
+  });
+  const owners = await create(w.owner, w.vault, {
+    kind: "key",
+    scope: "personal",
+    title: "",
+    keyName: "OPS_KEY",
+    secret: TOKEN_VALUE,
+  });
+  const anasId = anas.item?.id ?? "";
+  const ownersId = owners.item?.id ?? "";
+
+  // A member can't write to the team, and nobody moves what isn't theirs to see.
+  const refused = await move(w.ana, anasId, "team");
+  expect(refused.status).toBe(403);
+  expect(((await refused.json()) as { error: { code: string } }).error.code).toBe("vault.team_needs_permission");
+  expect((await move(w.owner, anasId, "team")).status).toBe(404);
+  expect((await move(w.owner, ownersId, "elsewhere")).status).toBe(400);
+
+  const toTeam = await move(w.owner, ownersId, "team");
+  expect(toTeam.status).toBe(200);
+  const toTeamText = await toTeam.text();
+  expect(toTeamText).not.toContain(TOKEN_VALUE);
+  expect(JSON.parse(toTeamText)).toMatchObject({ id: ownersId, scope: "team", ownerUserId: null, hasSecret: true });
+  // The member now sees it, and still can't take it.
+  expect((await overviewOf(w.ana, w.vault)).overview.items.some((i) => i.id === ownersId)).toBe(true);
+  expect((await move(w.ana, ownersId, "personal")).status).toBe(403);
+
+  const back = await move(w.owner, ownersId, "personal");
+  expect(await back.json()).toMatchObject({ scope: "personal", ownerUserId: w.ownerId });
+  expect((await overviewOf(w.ana, w.vault)).overview.items.some((i) => i.id === ownersId)).toBe(false);
+  const audit = await (await w.owner(`/api/app/organizations/${w.orgId}/audit?kind=change`)).text();
+  expect(audit).toContain("vault.item_moved");
+  expect(audit).not.toContain(TOKEN_VALUE);
+});
+
 test("a connected password manager: its credentials and passwords never come back, its refusals have codes", async () => {
   const w = await workspace();
   const TOKEN = "service-token-c0ffee77";

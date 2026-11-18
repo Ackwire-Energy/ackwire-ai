@@ -52,7 +52,6 @@ const PARTS = [
   "rq-open",
   "cn-pill",
   "ac-eventpill",
-  "brw-rq",
   "consult-pair",
   "channel__unread",
 ];
@@ -152,7 +151,7 @@ test("a message's body sets what stands between its parts, and no part sets it f
     // A part's insides and its place in a card or a page are its own business; the body's rule, a look's too.
     .filter(
       (s) =>
-        !/^\.(ac-msg__error-row\s*>|issue|mi-delivery|ac-msg\s\.ac-msg__body|ac-msg\.ac-msg(\[data-look=[^\]]+\])?\s\.ac-msg__body)/.test(
+        !/^\.(ac-msg__(error-row|unsent)\s*>|issue|mi-delivery|ac-msg\s\.ac-msg__body|ac-msg\.ac-msg(\[data-look=[^\]]+\])?\s\.ac-msg__body)/.test(
           s,
         ),
     );

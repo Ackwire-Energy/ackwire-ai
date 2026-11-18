@@ -105,8 +105,17 @@ describe("calendar items the Google Calendar way", () => {
 
   test("six meetings at once: their side room gives way to keep the faces, and narrower than a face a block is its tint", async () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
-    const room = last(declarations(css, ".cal-week__col > .cal-chip--block"), "padding-inline");
+    const room = last(declarations(topLevel(css), ".cal-week__col > .cal-chip--block"), "padding-inline");
     expect(room).toBe("clamp(2px, calc(17px - var(--cols) * 2.5px), 6px)");
+    expect(
+      last(
+        declarations(atRule(css, "@media (max-width: 480px)"), ".cal-week__col > .cal-chip--block"),
+        "padding-inline",
+      ),
+    ).toBe("2px");
+    const narrow = atRule(css, "@container (45.5px < width <= 63.5px)");
+    expect(last(declarations(narrow, ".cal-chip--block > .cal-chip__title"), "font-size")).toBe("11.5px");
+    expect(last(declarations(narrow, ".cal-chip--block > .cal-chip__title > .ac-who"), "display")).toBe("none");
     // A 131px day (a week at 1280): six blocks of 19.5px keep 15.5 for the face (14.4, 1.15em of a block's 12.5px).
     const padding = (cols: number) => Math.min(6, Math.max(2, 17 - cols * 2.5));
     const content = (day: number, cols: number) => (day - 2 * (cols + 1)) / cols - 2 * padding(cols);
@@ -120,11 +129,9 @@ describe("calendar items the Google Calendar way", () => {
     ).toBe("none");
   });
 
-  test("a day's +N mais list takes the room under it, not the menu's 280 that cut a dozen rows by a sliver", async () => {
+  test("a day's +N mais list takes the window's room (`.ac-popover`), not a cap of its own that cuts rows", async () => {
     const css = await sheet("apps/web/src/pages/calendar.css");
-    expect(last(declarations(css, ".cal-more.ac-popover"), "max-height")).toBe(
-      "min(480px, var(--radix-popover-content-available-height, 480px))",
-    );
+    expect(last(declarations(css, ".cal-more.ac-popover"), "max-height")).toBeUndefined();
   });
 
   test("an all-day lane's bars share its height with their names from the top, not centred like a button's", async () => {

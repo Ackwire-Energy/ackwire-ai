@@ -5,8 +5,13 @@ import { idlePose, mixHex, type Pose } from "@agenteschat/ui/agent/engine";
  * Native imports. Times in seconds.
  */
 export const LAUNCH = {
-  /** The shortest it plays before it may leave. */
+  /** The shortest it plays before it may leave, once its rise is under way. */
   min: 0.9,
+  /**
+   * Ready this soon (its first frames: the session and the workspace kept from last time), it leaves at once, with no
+   * minimum to sit through: its rise had barely begun.
+   */
+  quick: 0.15,
   /** The sky rising and the agent lifting with it. */
   rise: 0.85,
   /** Leaving: the agent and the name go up and out first, the sky sinks, the screen fades into the app. */
@@ -33,6 +38,9 @@ export const NATIVE_IMAGE = 120;
 export const LOGO = (NATIVE_IMAGE * 400) / 512;
 /** The agent in the logo (the same as the app icon). */
 export const LOGO_LOOK = { color: "sky", eyes: "round" } as const;
+
+/** Whether the app, ready `readyMs` after the splash came up, skips its minimum (`LAUNCH.quick`). */
+export const launchesAtOnce = (readyMs: number) => readyMs <= LAUNCH.quick * 1000;
 
 /** The line under the name while it waits: none at first, then why (no network, or just slow). */
 export function waitLine(late: boolean, offline: boolean): "offline" | "slow" | null {

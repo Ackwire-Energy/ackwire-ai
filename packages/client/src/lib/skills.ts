@@ -131,9 +131,13 @@ export function skillUpdateErrorText(t: TFunction, code: string) {
   const key = code.replace(/^skill\./, "");
   if (key === "no_skill_md" || key === "connection_gone" || key === "link_holds_several" || key === "link_renamed")
     return t(`skills.updateFailed.${key}`);
-  if (key === "auto_update_owner_gone" || code === "forbidden") return t("skills.updateFailed.owner_gone");
+  if (relightsSkillUpdate(code)) return t("skills.updateFailed.owner_gone");
   return t("skills.updateFailed.other");
 }
+
+/** A daily update refused for its starter's rights: "Ligar de novo" turns it on again with the presser's. */
+export const relightsSkillUpdate = (code: string | null | undefined) =>
+  code === "skill.auto_update_owner_gone" || code === "auto_update_owner_gone" || code === "forbidden";
 
 /** The update from its link that waits for a person (not kept out), or null. */
 export const waitingUpdate = (s: Pick<Skill, "pendingUpdate">) =>
@@ -252,3 +256,23 @@ export function skillRemovalText(t: TFunction, users: readonly { name: string }[
       : t("skills.removeNone");
   return t("common.joinSentences", { a: who, b: t("skills.removeGone") });
 }
+
+/**
+ * A list of skills split as the Vault splits its items (ADR 0144): the team's, the person's own personal ones, and
+ * other people's (only who manages agents gets those, name and person only).
+ */
+export function skillScopes<T extends Pick<Skill, "ownerUserId">>(skills: readonly T[], userId: string) {
+  const team: T[] = [];
+  const mine: T[] = [];
+  const others: T[] = [];
+  for (const s of skills) (s.ownerUserId ? (s.ownerUserId === userId ? mine : others) : team).push(s);
+  return { team, mine, others };
+}
+
+/** The skills a person may turn on for an agent: the team's and their own personal ones. */
+export const skillsToGive = <T extends Pick<Skill, "ownerUserId">>(skills: readonly T[], userId: string) =>
+  skills.filter((s) => !s.ownerUserId || s.ownerUserId === userId);
+
+/** Whether Skills shows "Equipe | Pessoal": a workspace of one person keeps one library, unless personal ones exist. */
+export const skillsSplit = (members: number, skills: readonly Pick<Skill, "ownerUserId">[]) =>
+  members > 1 || skills.some((s) => s.ownerUserId);

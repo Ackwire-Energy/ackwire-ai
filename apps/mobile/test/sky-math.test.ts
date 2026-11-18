@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { AGENT_GRADIENTS, mixHex } from "@agenteschat/ui/agent/engine";
+import { FORMING_LOOP_S, formingField } from "@agenteschat/ui/sky/forming";
 import { phoneField } from "@agenteschat/ui/sky/workspace";
 import {
   BAYER,
@@ -97,7 +98,18 @@ describe("palettes", () => {
 });
 
 test("every shader declares the uniforms the component passes", () => {
-  for (const kind of ["sky", "computer", "fuse", "bar", "track", "sweep", "pill", "horizon", "workspace"] as const) {
+  for (const kind of [
+    "sky",
+    "computer",
+    "fuse",
+    "bar",
+    "track",
+    "sweep",
+    "pill",
+    "horizon",
+    "workspace",
+    "forming",
+  ] as const) {
     const src = shaderSource(kind);
     for (const u of ["size", "px", "t", "last", "fade", "clear", "pal"])
       expect(src).toMatch(new RegExp(`uniform \\w+ ${u}\\b`));
@@ -136,6 +148,23 @@ test("the working line's sweep: a band that crosses left to right every 5 s, ove
   expect(sweepField(0.5, 0, 0, 0, 0)).toBeLessThan(0.1);
   expect(sweepField(0.2, 0, 5, 0, 0)).toBeCloseTo(sweepField(0.2, 0, 0, 0, 0), 5);
   expect(shaderSource("sweep")).toContain("mod(t * 0.32, 1.6) - 0.3");
+});
+
+test("a picture forming out of the sky: from the bottom-left, deeper at the bottom; drawn still, whole", () => {
+  // 1.5 s in: the bottom-left corner has arrived, the top-right not yet.
+  expect(formingField(0.05, 0.95, 1.5)).toBeGreaterThan(0);
+  expect(formingField(0.95, 0.05, 1.5)).toBe(0);
+  // Whole before the loop's end, then fading out.
+  expect(formingField(0.95, 0.05, 6.5)).toBeGreaterThan(0);
+  expect(formingField(0.3, 0.3, 7.9)).toBeLessThan(formingField(0.3, 0.3, 6.5));
+  expect(formingField(0.4, 0.6, 1.5 + FORMING_LOOP_S)).toBeCloseTo(formingField(0.4, 0.6, 1.5), 5);
+  // Still (reduced motion): the whole picture, deeper at the bottom.
+  expect(formingField(0.5, 1, null)).toBeGreaterThan(formingField(0.5, 0, null));
+  // The phone draws the same field.
+  const src = shaderSource("forming");
+  expect(src).toContain("float p = mod(t, 8.0) / 6.0;");
+  expect(src).toContain("float deep = 0.16 + 0.44 * v;");
+  expect(src).toContain("hash2(floor(u * 50.0), floor(v * 50.0)) * 0.16");
 });
 
 test("the header pill: sky only at its right end; working, a sweep that crosses it", () => {

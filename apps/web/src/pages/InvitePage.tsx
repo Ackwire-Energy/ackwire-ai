@@ -22,7 +22,18 @@ import {
   webmailOf,
 } from "@agenteschat/client/lib/text";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
-import { Button, cx, type Expression, Field, Icon, Input, Locked, PixelSpinner, Textarea } from "@agenteschat/ui";
+import {
+  Button,
+  cx,
+  type Expression,
+  Field,
+  Icon,
+  Input,
+  Locked,
+  overLimit,
+  PixelSpinner,
+  Textarea,
+} from "@agenteschat/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import { type FormEvent, type KeyboardEvent, type ReactNode, type Ref, useEffect, useRef, useState } from "react";
@@ -35,6 +46,7 @@ import { OrgMark } from "@/components/ProfilePhoto";
 import { prepareBurst } from "@/components/Sky";
 import { rememberSignIn, SocialButtons, useSocialProviders } from "@/components/SocialButtons";
 import { useNow } from "@/hooks/useNow";
+import { useTextLimit } from "@/hooks/useTextLimit";
 import { TYPED_VALUES } from "@/i18n";
 import { inDesktopApp } from "@/lib/desktop";
 import { useHumanCheck } from "@/lib/human-check";
@@ -76,6 +88,8 @@ interface OrgFacts {
   by?: string | null;
   agents?: Agentish[];
   more?: number;
+  /** How many of `agents`, from the first, the invitation starts the person with (ADR 0184). */
+  yours?: number;
   /** A personal workspace (ADR 0159): its name ("Personal") says nothing to who is invited, whose space it is does. */
   personal?: boolean;
 }
@@ -86,6 +100,7 @@ const orgOf = (preview: InvitationPreview): OrgFacts => ({
   by: preview.invitedBy,
   agents: preview.agents ?? [],
   more: preview.moreAgents ?? 0,
+  yours: preview.yours ?? 0,
   personal: isPersonal(preview),
 });
 
@@ -177,16 +192,26 @@ function OrgLine({ org }: { org: OrgFacts }) {
   const { t } = useTranslation();
   const agents = org.agents ?? [];
   const more = org.more ?? 0;
+  // The agents the invitation starts the person with, by name ("Max vai trabalhar com você"); else who works there.
+  const yours = agents.slice(0, org.yours ?? 0);
   const crew =
-    agents.length > 0
-      ? t("invite.crew", {
-          count: agents.length + more,
+    yours.length > 0
+      ? t("invite.crewYours", {
+          count: yours.length,
           names: joinNames(
-            [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
+            yours.map((a) => a.name),
             t,
           ),
         })
-      : null;
+      : agents.length > 0
+        ? t("invite.crew", {
+            count: agents.length + more,
+            names: joinNames(
+              [...agents.map((a) => a.name), ...(more ? [t("invite.ask.moreAgents", { count: more })] : [])],
+              t,
+            ),
+          })
+        : null;
   // A personal workspace goes by whose it is (ADR 0159), which already says who invited.
   const name = !org.personal
     ? org.name
@@ -614,9 +639,28 @@ function EmailInvitation({
   };
 
   const first = name.trim().split(/\s+/)[0] ?? "";
-  const calledYou = by
-    ? t(modeKey(preview, "invite.calledYou"), { name: by, org })
-    : t(modeKey(preview, "invite.calledYouNoName"), { org });
+  // A team's invitation that gives cargos says them (ADR 0184): "…para a Acme, como Suporte."
+  const cargos =
+    !isPersonal(preview) && preview.roles?.length
+      ? joinNames(
+          preview.roles.map((r) => r.name),
+          t,
+        )
+      : null;
+  const calledYou = cargos
+    ? by
+      ? t("invite.calledYouAs", { name: by, org, roles: cargos })
+      : t("invite.calledYouAsNoName", { org, roles: cargos })
+    : by
+      ? t(modeKey(preview, "invite.calledYou"), { name: by, org })
+      : t(modeKey(preview, "invite.calledYouNoName"), { org });
+  const hello = cargos
+    ? by
+      ? t("invite.helloAs", { name: by, org, roles: cargos })
+      : t("invite.helloAsNoName", { org, roles: cargos })
+    : by
+      ? t(modeKey(preview, "invite.hello"), { name: by, org })
+      : t(modeKey(preview, "invite.helloNoName"), { org });
   const providerNames = providers.map((p) => t(`auth.provider.${p}`)).join(" · ");
   const signInStep = account.password ? "password" : "social";
   const mail = webmailOf(invited);
@@ -626,10 +670,7 @@ function EmailInvitation({
       t("invite.otherTitle", { email: invited }),
       t(modeKey(preview, "invite.otherLead"), { other: otherEmail, org }),
     ],
-    name: [
-      by ? t(modeKey(preview, "invite.hello"), { name: by, org }) : t(modeKey(preview, "invite.helloNoName"), { org }),
-      t(modeKey(preview, "invite.nameLead")),
-    ],
+    name: [hello, t(modeKey(preview, "invite.nameLead"))],
     newPassword: [
       first ? t("auth.flow.newPasswordNamed", { name: first }) : t("auth.flow.newPassword"),
       t(modeKey(preview, "invite.newPasswordLead"), { org }),
@@ -831,6 +872,21 @@ function ClosedInvitation({ preview }: { preview: InvitationPreview }) {
   );
 }
 
+/** A link that took all its people (ADR 0184): only that, and whom to ask for a new one. */
+function FullLink({ preview }: { preview: InvitationPreview }) {
+  const { t } = useTranslation();
+  const by = preview.invitedBy ? firstName(preview.invitedBy) : null;
+  return (
+    <InviteScreen
+      org={orgOf(preview)}
+      expression="closed"
+      title={t("invite.ask.fullTitle")}
+      lead={by ? t("invite.ask.fullLead", { name: by }) : t("invite.ask.fullLeadNoName")}
+      step="link-full"
+    />
+  );
+}
+
 /** No seat left: said before anyone makes an account, and the same link works once one opens (ADR 0090). */
 function FullWorkspace({ preview }: { preview: InvitationPreview }) {
   const { t } = useTranslation();
@@ -975,6 +1031,8 @@ function LinkInvitation({ token, preview }: { token: string; preview: Invitation
   const [asked, setAsked] = useState<Asked | null>(() => readAsked(token));
   // Waiting goes on while it signs in, so the page never flashes the account's own form on the way in.
   if (asked) return <Waiting token={token} preview={preview} asked={asked} />;
+  // A link that took all the people it may (ADR 0184): said before anyone asks, with whom to ask for another.
+  if (preview.full) return <FullLink preview={preview} />;
   if (user) return <AskAsAccount token={token} preview={preview} />;
   if (preview.closed) return <ClosedInvitation preview={preview} />;
   if (!emails) return <AskForm token={token} preview={preview} />;
@@ -1174,6 +1232,7 @@ function AskSteps({
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [note, setNote] = useState("");
+  const noteLimit = useTextLimit(JOIN_NOTE_MAX);
   // A code proves one address: another address starts over.
   const [proof, setProof] = useState<{ email: string; code: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1388,7 +1447,7 @@ function AskSteps({
             className="auth__big"
             aria-label={t("invite.ask.noteField")}
             rows={3}
-            maxLength={JOIN_NOTE_MAX}
+            limit={noteLimit}
             placeholder={t("invite.ask.notePlaceholder")}
             value={note}
             onChange={(e) => setNote(e.target.value)}
@@ -1617,6 +1676,8 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
   });
   const [step, setStep] = useState<"form" | "code">("form");
   const [note, setNote] = useState("");
+  const noteLimit = useTextLimit(JOIN_NOTE_MAX);
+  const noteTooLong = overLimit(note, noteLimit);
   const [error, setError] = useState<string | null>(null);
   const [wrong, setWrong] = useState(false);
   const [pending, setPending] = useState(false);
@@ -1668,7 +1729,7 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (step !== "form" || pending || codes.pending || capped) return;
+    if (step !== "form" || pending || codes.pending || capped || noteTooLong) return;
     if (proofNeeded) void toCode();
     else void ask(proof);
   };
@@ -1805,14 +1866,21 @@ function AskAsAccount({ token, preview }: { token: string; preview: InvitationPr
         className="auth__big"
         aria-label={t("invite.ask.note")}
         rows={3}
-        maxLength={JOIN_NOTE_MAX}
+        limit={noteLimit}
         placeholder={t("invite.ask.noteHelp")}
         value={note}
         onChange={(e) => setNote(e.target.value)}
       />
       {proofNeeded && human.slot}
       <ErrorLine error={error ?? (capped ? t("errors.code.limit") : null)} />
-      <Button type="submit" variant="primary" size="lg" block loading={pending || codes.pending} disabled={capped}>
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        block
+        loading={pending || codes.pending}
+        disabled={capped || noteTooLong}
+      >
         {proofNeeded ? t("auth.flow.continue") : t("invite.ask.send")}
       </Button>
       <button type="button" className="auth__quiet" onClick={() => void signOutHere()}>
@@ -1832,11 +1900,12 @@ function AskForm({ token, preview }: { token: string; preview: InvitationPreview
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [note, setNote] = useState("");
+  const noteLimit = useTextLimit(JOIN_NOTE_MAX);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [sent, setSent] = useState<AskToJoinResult | null>(null);
   const fix = emailTypoFix(email);
-  const ready = name.trim() !== "" && isEmail(email);
+  const ready = name.trim() !== "" && isEmail(email) && !overLimit(note, noteLimit);
 
   const ask = async () => {
     setPending(true);
@@ -1905,7 +1974,7 @@ function AskForm({ token, preview }: { token: string; preview: InvitationPreview
         <Textarea
           className="auth__big"
           rows={3}
-          maxLength={JOIN_NOTE_MAX}
+          limit={noteLimit}
           placeholder={t("invite.ask.noteHelp")}
           value={note}
           onChange={(e) => setNote(e.target.value)}

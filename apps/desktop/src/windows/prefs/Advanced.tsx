@@ -3,22 +3,26 @@ import { Button, Segmented } from "@agenteschat/ui";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../../app";
+import type { Platform } from "../../control/platform";
 import { orgName, pairedHomes } from "../../control/store";
 import { OrgTile, Stepper } from "../../ui/bits";
 import { CardTitle, hintFor, PrefCard, PrefHead, PrefRow } from "../../ui/settings";
 import { useToast } from "../../ui/Toast";
 import { shortPath } from "../../ui/time";
 
-/** The runner's defaults (the same numbers `agentes-runner` uses when the config has none). */
-export const DEFAULT_LIMITS: Required<Omit<ControlConfigPatch, "name">> = {
+/**
+ * The runner's defaults (the same numbers `agentes-runner`'s `DEFAULT_LIMITS` uses when the config has none): on
+ * Linux, where it reads free memory and closes idle conversations for a turn that needs room, they stay open longer.
+ */
+export const defaultLimits = (platform: Platform): Required<Omit<ControlConfigPatch, "name">> => ({
   maxConcurrentTasks: 3,
   taskMaxSeconds: 4 * 3600,
-  brainMaxProcesses: 1,
-  brainIdleMinutes: 3,
-};
+  brainMaxProcesses: platform === "linux" ? 2 : 1,
+  brainIdleMinutes: platform === "linux" ? 20 : 3,
+});
 
 const TASK_MAX = ["3600", "14400", "28800"] as const;
-const IDLE = ["3", "5", "10", "30"] as const;
+const idleChoices = (platform: Platform) => (platform === "linux" ? ["3", "10", "20", "30"] : ["3", "5", "10", "30"]);
 
 export function Advanced() {
   const { t } = useTranslation();
@@ -42,7 +46,9 @@ export function Advanced() {
     };
   }, [store, first]);
 
-  const limits = { ...DEFAULT_LIMITS, ...(config ?? {}) };
+  const defaults = defaultLimits(host.platform);
+  const idle = idleChoices(host.platform);
+  const limits = { ...defaults, ...(config ?? {}) };
 
   // Limits apply to each organization: the same numbers go to every one.
   const change = async (patch: ControlConfigPatch, done?: string) => {
@@ -66,7 +72,7 @@ export function Advanced() {
             size="sm"
             variant="ghost"
             disabled={disabled}
-            onClick={() => void change(DEFAULT_LIMITS, t("desktop.prefs.advanced.defaultsDone"))}
+            onClick={() => void change(defaults, t("desktop.prefs.advanced.defaultsDone"))}
           >
             {t("desktop.prefs.advanced.defaults")}
           </Button>
@@ -131,14 +137,10 @@ export function Advanced() {
             <Segmented
               size="sm"
               label={t("desktop.prefs.advanced.brainIdle")}
-              value={
-                (IDLE as readonly string[]).includes(String(limits.brainIdleMinutes))
-                  ? String(limits.brainIdleMinutes)
-                  : ""
-              }
+              value={idle.includes(String(limits.brainIdleMinutes)) ? String(limits.brainIdleMinutes) : ""}
               onValueChange={(v) => void change({ brainIdleMinutes: Number(v) })}
-              options={IDLE.map((m) => ({
-                value: m as string,
+              options={idle.map((m) => ({
+                value: m,
                 label: t("desktop.common.minutes", { count: Number(m) }),
               }))}
             />

@@ -46,8 +46,6 @@ describe("permissions", () => {
       "configure",
       "manage_agents",
       "manage_credentials",
-      // Using other people's plans (ADR 0059 §3): owners and admins, never "Todos".
-      "use_others_plans",
       // Mentioning everyone (`@todos`): owners and admins, never "Todos".
       "mention_everyone",
       "view_usage",
@@ -86,6 +84,7 @@ describe("permissions", () => {
         rank: null,
         roleIds: [],
         orgLogo: null,
+        orgAccent: null,
         standing: { state: "active", reason: null, notice: "shown", deletionDueAt: null },
         start: { page: "home", channelId: null },
         showActivity: false,

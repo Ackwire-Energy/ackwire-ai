@@ -6,6 +6,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useNow } from "@/components/missions/MissionBits";
+import { OpenPrefsButton } from "@/components/ThisMac";
+import { inDesktopApp } from "@/lib/desktop";
 
 /** A new code this long before the one on screen expires, so a scan never meets an expired one. */
 const RENEW_BEFORE_MS = 20_000;
@@ -68,7 +70,14 @@ function PhoneCode() {
     return (
       <div className="stack-4" style={{ gap: 12 }}>
         <Alert>{t("openOnPhone.localOnly")}</Alert>
-        <span className="small muted">{t("openOnPhone.localOnlyHow")}</span>
+        {inDesktopApp() ? (
+          <div className="ac-actline">
+            <span className="small muted">{t("openOnPhone.localOnlyHere")}</span>
+            <OpenPrefsButton tab="servers">{t("machines.thisMac.openServers")}</OpenPrefsButton>
+          </div>
+        ) : (
+          <span className="small muted">{t("openOnPhone.localOnlyHow")}</span>
+        )}
       </div>
     );
 

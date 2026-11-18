@@ -27,6 +27,7 @@ import { audienceSql } from "./audience";
 import { TYPING_GRACE_MS, typesInApp, typingLogFor } from "./burst";
 import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
+import { isConfidential } from "./confidential";
 import { quotedLine } from "./context";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { createAgentRuns, requesterOf } from "./dispatch";
@@ -556,7 +557,7 @@ export function parseRouterJson(raw: unknown): {
 }
 
 /** Providers tried for a small model after the default key's, fastest and cheapest first. */
-const SMALL_MODEL_ORDER = ["anthropic", "openai", "deepseek", "gemini", "zai", "minimax", "openrouter"];
+const SMALL_MODEL_ORDER = ["anthropic", "openai", "deepseek", "gemini", "zai", "minimax", "commandcode", "openrouter"];
 
 /**
  * The small model that routes and judges for an organization (ADR 0074 §2), or null: its own `router_model`
@@ -963,7 +964,9 @@ export async function routeMessage(
           and r.trigger_message_id = ${messages.id} and ${inArray(sql`r.status`, [...ACTIVE_RUN_STATUSES])})`,
         threadId: messages.threadId,
         // As text, which every driver reads the same way.
-        replyTo: sql<string | null>`(${messages.meta}->'replyTo')::text`,
+        // The quote a message carries is a copy of the quoted words: none out of a confidential thread (ADR 0190).
+        replyTo: sql<string | null>`case when coalesce(${messages.meta}->>'confidential', '') = 'true' then null
+          else (${messages.meta}->'replyTo')::text end`,
         createdAt: messages.createdAt,
       })
       .from(messages)
@@ -1206,7 +1209,10 @@ export async function routeMessage(
   // What it decides on, one line per message, and everyone those name. Of the `ROUTER_MESSAGE_CHARS` a step
   // reads, the message takes what it needs; the lines before it, cut like the slice's, fill the rest, newest
   // first, a line break each.
-  const ownLine = { body: `${quotedLine(message.meta)}${message.body}`, names: namesOf(message).map((n) => n.label) };
+  const ownLine = {
+    body: `${isConfidential(message.meta) ? "" : quotedLine(message.meta)}${message.body}`,
+    names: namesOf(message).map((n) => n.label),
+  };
   const runLines = run.map(lineOf);
   const saidNames = [...new Set([...runLines, ownLine].flatMap((l) => l.names ?? []))];
   const said = [...sliced(null, runLines, ROUTER_MESSAGE_CHARS - ownLine.body.length - runLines.length), ownLine];
@@ -1318,6 +1324,12 @@ export async function routeMessage(
       () => ({ agentId, reaction }),
       () => undefined,
     );
+  };
+  // The hour's cap held a default pick back: what the cap answered where a pick below asked it.
+  let capped = false;
+  const underDefaultCap = async () => {
+    capped = await defaultCapReached();
+    return !capped;
   };
   // Which default tier picked (R5): the agent the person talks with, the best placed agent; or the best placed
   // agent for a person alone with the team.
@@ -1529,7 +1541,7 @@ export async function routeMessage(
         // Talking with an agent is no reason on its own: "vou almoçar agora, volto em uma hora" 15 minutes after a
         // talk needs nobody. A question, or some need, is for the agent ("Entenderam?").
         (!peopleTalking && ((talkingWith !== null && hasQuestionMark(saidText)) || needs >= DEFAULT_NEED))) &&
-      !(await defaultCapReached())
+      (await underDefaultCap())
     ) {
       const agentId = talkingWith ?? bestPlaced(scoreOf, decided.best);
       if (agentId) {
@@ -1553,7 +1565,7 @@ export async function routeMessage(
     !FOR_SOMEONE.has(socialOf(decided)) &&
     !(ack && thankedAgent()) &&
     (await aloneHere()) &&
-    !(await defaultCapReached())
+    (await underDefaultCap())
   ) {
     const agentId = bestPlaced(scoreOf, decided.best);
     if (agentId) {
@@ -1591,6 +1603,16 @@ export async function routeMessage(
             followUp && resumes && selected.length > 0 ? "last talked to" : null,
             duplicate ? "already answered by another agent" : null,
             forPeople ? "for people" : heldBack ? "held back" : null,
+            // Why nobody got it when no marker above says: the need score decided, or the hour's cap did.
+            chosen.length === 0 &&
+            !duplicate &&
+            !forPeople &&
+            !heldBack &&
+            decided.needsAgent !== undefined &&
+            decided.needsAgent < needGateOf(policy, candidates.length === 1)
+              ? UNDER_NEED_GATE
+              : null,
+            chosen.length === 0 && capped ? DEFAULT_CAP : null,
             words,
           ]
             .filter(Boolean)
@@ -1618,6 +1640,11 @@ export async function routeMessage(
 
 /** The marker a decision's `reason` starts with when the router kept the person with the agent they talk to. */
 export const FOLLOW_UP = "follow-up";
+
+/** Nobody got the message, for no reason another marker gives, and its need-any-agent score is under the gate (`needGateOf`). */
+export const UNDER_NEED_GATE = "under need gate";
+/** Nobody got the message: the default pick it would have had was past the hour's cap (`DEFAULT_PICKS_PER_HOUR`). */
+export const DEFAULT_CAP = "default cap";
 
 /** A default pick's `strategy` (R5). Decisions before ADR 0137 may also read `rule:coordinator` (reason `coordinator; default`). */
 export const DEFAULT_STRATEGY = "rule:default";

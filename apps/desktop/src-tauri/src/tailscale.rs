@@ -3,6 +3,7 @@
 //! inside the tailnet only; never Funnel). The tool is looked up at the places it installs itself, never at a
 //! path from a page.
 
+use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::Duration;
@@ -73,10 +74,34 @@ pub fn cli() -> Option<PathBuf> {
     fixed.iter().map(PathBuf::from).find(|p| p.is_file())
 }
 
+/// The environment the tool is started with. On a Mac, its app binary decides between being the command-line
+/// tool and opening the app's own window by its environment: told nothing (and with no terminal), it opens the
+/// window, prints that it couldn't run the command and still ends with code 0, so `status --json` isn't JSON.
+/// `term`: whether this process has a `TERM` of its own to pass on.
+fn cli_env(macos: bool, term: bool) -> Vec<(&'static str, &'static OsStr)> {
+    if !macos {
+        return Vec::new();
+    }
+    let mut env: Vec<(&'static str, &'static OsStr)> = vec![("TAILSCALE_BE_CLI", OsStr::new("1"))];
+    if !term {
+        env.push(("TERM", OsStr::new("dumb")));
+    }
+    env
+}
+
+/// The tool, set up to run as the command-line tool (see `cli_env`).
+fn command_for(cli: &Path) -> Command {
+    let mut command = Command::new(cli);
+    for (key, value) in cli_env(cfg!(target_os = "macos"), std::env::var_os("TERM").is_some()) {
+        command.env(key, value);
+    }
+    command
+}
+
 /// Runs the tool with `args`: whether it ended well, and what it printed (stdout, then stderr); None when it isn't
 /// there or couldn't start. Taking longer than `wait` stops it (what it printed so far is kept).
 fn run(args: &[&str], wait: Duration) -> Option<(bool, String)> {
-    let ran = crate::run_program(Command::new(cli()?).args(args), wait, &|| false).ok()?;
+    let ran = crate::run_program(command_for(&cli()?).args(args), wait, &|| false).ok()?;
     Some((ran.code == Some(0), ran.out + &ran.err))
 }
 
@@ -174,7 +199,7 @@ pub fn serve(port: u16, asks: &mut dyn FnMut(&str), stopped: &dyn Fn() -> bool) 
             Watch::Wait
         }
     };
-    let mut command = Command::new(cli);
+    let mut command = command_for(&cli);
     command.args(["serve", "--bg", flag.as_str(), target.as_str()]);
     let ran = crate::run_watched(&mut command, SERVE_WAIT, &mut watch).map_err(|_| ServeError::Serve)?;
     match ran.cut {
@@ -251,6 +276,19 @@ mod tests {
         let odd = json!({ "BackendState": "Running", "Self": { "DNSName": "evil name/../x." } });
         assert_eq!(tailnet_of(Some(&odd), true, true), Tailnet::Off { app: true });
         assert_eq!(serde_json::to_value(Tailnet::Off { app: false }).unwrap(), json!({ "state": "off", "app": false }));
+    }
+
+    #[test]
+    fn the_tool_is_told_to_be_the_command_line_one_on_a_mac() {
+        let env = cli_env(true, false);
+        assert!(env.contains(&("TAILSCALE_BE_CLI", OsStr::new("1"))));
+        // No terminal of its own: one is made up, so the Mac app doesn't take the missing `TERM` for a window.
+        assert!(env.contains(&("TERM", OsStr::new("dumb"))));
+        // A `TERM` already there (a terminal, or a person's own) is passed on untouched.
+        assert_eq!(cli_env(true, true), vec![("TAILSCALE_BE_CLI", OsStr::new("1"))]);
+        // Elsewhere the tool needs nothing told: Linux and Windows stay as they were.
+        assert!(cli_env(false, false).is_empty());
+        assert!(cli_env(false, true).is_empty());
     }
 
     #[test]

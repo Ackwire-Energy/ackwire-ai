@@ -134,7 +134,7 @@ describe("Lodi's page: what it does for me without asking (ADR 0139 §2)", () =>
 });
 
 describe("a card the right hand looked at", () => {
-  test("approved for me: one line, Desfazer, and Por quê? opens its reason and what Desfazer does", async () => {
+  test("approved for me: the card stays with its reason, who approved, what Desfazer does, and Desfazer", async () => {
     const state = seedState();
     withRightHand(state);
     const me = state.me?.user.id ?? "";
@@ -156,10 +156,12 @@ describe("a card the right hand looked at", () => {
     await renderApp(`/org/${ORG_ID}/c/${ENG_ID}`, { api: createFakeApi(state) });
     await settle(6);
     const line = screen().getByRole("group", { name: "Atlas propõe um novo agente" });
-    expect(line.textContent).toContain("Nina · Aprovado por Lodi em seu nome");
-    await click(within(line).getByRole("button", { name: "Por quê?" }));
-    expect(line.textContent).toContain("Veio do seu pedido e não há outro igual.");
-    expect(line.textContent).toContain("Desfazer arquiva Nina. Vale até");
+    // The same card: its reason as its words, who approved where the buttons were, and what Desfazer does under it.
+    expect(line.classList.contains("rq--ended")).toBe(true);
+    expect(line.querySelector(".rq__wt b")?.textContent).toBe("Nina");
+    expect(line.querySelector(".rq__lead")?.textContent).toBe("Veio do seu pedido e não há outro igual.");
+    expect(line.querySelector(".rq__answer-text")?.textContent).toContain("Aprovado por Lodi em seu nome");
+    expect(line.querySelector(".rq__answer-note")?.textContent).toContain("Desfazer arquiva Nina. Vale até");
     await click(within(line).getByRole("button", { name: "Desfazer" }));
     expect(last(state, "approvals.undoRightHand")).toEqual([ORG_ID, "d-1"]);
   });

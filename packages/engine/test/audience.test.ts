@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { BRAIN_PROTOCOL, createFakeEmailSender, userTopic } from "@agenteschat/adapters";
-import { eq, rowsOf, schema, sql } from "@agenteschat/db";
+import { and, eq, rowsOf, schema, sql } from "@agenteschat/db";
 import {
   acceptInvitation,
   addChannelMember,
@@ -8,6 +8,7 @@ import {
   audienceSql,
   canTalkTo,
   createAgent,
+  createAgentGroup,
   createJobHandlers,
   createOrganization,
   createRole,
@@ -21,11 +22,13 @@ import {
   getTeam,
   insertMessageWithRuns,
   inviteMany,
+  listAgentGroups,
   listAgents,
   listRoutines,
   NO_PERSON,
   NotFoundError,
   openDm,
+  orgOverview,
   PLAN_OPENED_JOB,
   postPersonMessage,
   type RouterStrategy,
@@ -33,14 +36,14 @@ import {
   routeMessage,
   setAgentAudience,
   setAgentBrain,
-  setInvitationRoles,
   setMemberRoles,
   speakerFor,
   updateAgent,
+  updateInvitation,
   updateOrgSettings,
   ValidationError,
 } from "../src";
-import { addMember, addUser, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
+import { addMember, addUser, everyoneWithout, type Fixture, makeAdmin, SECRET, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 let f: Fixture;
@@ -224,7 +227,7 @@ describe("who can talk to the agent", () => {
     const support = await createRole(f.db, f.owner.id, f.org.id, { name: "Suporte" });
     const [sent] = await inviteMany(f.db, f.owner.id, f.org.id, { emails: ["teo@example.com"], secret: SECRET });
     if (sent?.status !== "invited") throw new Error("expected an invitation");
-    await setInvitationRoles(f.db, f.owner.id, f.org.id, sent.invitationId, [support.id]);
+    await updateInvitation(f.db, f.owner.id, f.org.id, sent.invitationId, { roleIds: [support.id] });
     await f.db.insert(schema.users).values({ id: "u_teo", name: "Teo", email: "teo@example.com" });
     await acceptInvitation(f.db, { id: "u_teo", email: "teo@example.com" }, sent.token);
     await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "people", userIds: [bia.id] });
@@ -658,5 +661,64 @@ describe("who can talk to the agent", () => {
     expect(again.notices).toBeUndefined();
     expect(await runsOf(again.id)).toHaveLength(1);
     expect((await openDm(f.db, cara.id, f.org.id, { agentId: f.agent.id })).kind).toBe("dm");
+  });
+});
+
+describe("who sees every agent in Equipe's lists (view_all_agents)", () => {
+  const listing = async (userId: string) => ({
+    team: (await getTeam(f.db, userId, f.org.id)).agents.map((a) => a.name).sort(),
+    groups: (await listAgentGroups(f.db, userId, f.org.id)).map((g) => `${g.name}:${g.agentIds.length}`),
+    count: (await orgOverview(f.db, userId, f.org.id)).agents,
+  });
+
+  test("on for everyone by default; off, a member lists only the agents that answer them, admins still all", async () => {
+    f = await setup();
+    const bento = await createAgent(
+      f.db,
+      f.owner.id,
+      f.org.id,
+      { name: "Bento", handle: "bento", credentialId: f.credential.id },
+      { model: "claude-sonnet-5-5" },
+    );
+    await setAgentAudience(f.db, f.owner.id, f.org.id, bento.id, { mode: "owner", userIds: [], roleIds: [] });
+    await setAgentAudience(f.db, f.owner.id, f.org.id, f.agent.id, { mode: "everyone", userIds: [], roleIds: [] });
+    await createAgentGroup({ db: f.db }, f.owner.id, f.org.id, { name: "Time", agentIds: [f.agent.id] });
+    await createAgentGroup({ db: f.db }, f.owner.id, f.org.id, { name: "Privado", agentIds: [bento.id] });
+    const walt = await addMember(f.db, f.org.id, "member", "walt");
+    const all = await listing(f.owner.id);
+    expect(all.team).toEqual(["Bento", "Dev"]);
+    expect(all.groups).toEqual(["Time:1", "Privado:1"]);
+    expect(await listing(walt.id)).toEqual(all);
+
+    await everyoneWithout(f.db, f.org.id, "view_all_agents");
+    expect(await listing(walt.id)).toEqual({ team: ["Dev"], groups: ["Time:1"], count: all.count - 1 });
+    expect(await listing(f.owner.id)).toEqual(all);
+    // A cargo that holds the key, or manages agents, lists every agent again.
+    for (const permissions of [["view_all_agents"], ["manage_agents"]] as const) {
+      const role = await createRole(f.db, f.owner.id, f.org.id, {
+        name: permissions[0],
+        permissions: [...permissions],
+      });
+      const lia = await addMember(f.db, f.org.id, "member", `lia-${permissions[0]}`);
+      await setMemberRoles(f.db, f.owner.id, f.org.id, lia.id, [role.id]);
+      expect(await listing(lia.id)).toEqual(all);
+    }
+    // It narrows lists only: Bento's public card still reaches the member, to draw its messages.
+    expect((await listAgents(f.db, walt.id, f.org.id)).map((a) => a.id)).toContain(bento.id);
+  });
+
+  test("the migration gives the key back to every workspace's base role, once", async () => {
+    f = await setup();
+    await everyoneWithout(f.db, f.org.id, "view_all_agents");
+    const migration = sql.raw(
+      await Bun.file(new URL("../../db/migrations/0275_view_all_agents.sql", import.meta.url)).text(),
+    );
+    await f.db.execute(migration);
+    await f.db.execute(migration);
+    const [base] = await f.db
+      .select({ permissions: schema.orgRoles.permissions })
+      .from(schema.orgRoles)
+      .where(and(eq(schema.orgRoles.orgId, f.org.id), eq(schema.orgRoles.kind, "everyone")));
+    expect(base?.permissions.filter((k) => k === "view_all_agents")).toEqual(["view_all_agents"]);
   });
 });

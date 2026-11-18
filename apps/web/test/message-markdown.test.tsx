@@ -101,6 +101,30 @@ describe("message Markdown", () => {
     expect(el.querySelector("strong")?.textContent).toBe("<iframe src=//evil.example>");
   });
 
+  test("a confidential thread's message as the server stores it (`inertLinks`, ADR 0190) holds no link", () => {
+    const links = (text: string) => body(text).querySelectorAll("a").length;
+    // A fence in the middle of a line is no code block here, and the first two lone backticks pair: the link after
+    // them is live as typed.
+    const typed = [
+      "Summary ``` a ` b [open the report](https://example.com/?q=WORDS) ```",
+      "Summary ``` a ` b https://example.com/?q=WORDS ```",
+      "a ` b https://example.com/?q=WORDS",
+      "<https://example.com/?q=WORDS>",
+      "[the report][r]\n\n[r]: https://example.com/?q=WORDS",
+    ];
+    expect(typed.map(links)).toEqual([1, 1, 1, 1, 1]);
+    const stored = [
+      "Summary ``` a ` b [open the report] (example.com/?q=WORDS) ```",
+      "Summary ``` a ` b example.com/?q=WORDS ```",
+      "a ` b example.com/?q=WORDS",
+      "<example.com/?q=WORDS>",
+      "[the report][r]\n\n[r]: example.com/?q=WORDS",
+      "https:// example.com/?q=WORDS",
+      "[open] (mailto:ana@example.com?subject=WORDS)",
+    ];
+    expect(stored.map(links)).toEqual(stored.map(() => 0));
+  });
+
   test("a table scrolls inside its box, which says which side has more columns (that side fades)", () => {
     const el = body(["| Destino | Hoje | 7 dias |", "| --- | ---: | ---: |", "| Paris | 14 | 129 |"].join("\n"));
     const box = el.querySelector(".md--message > .md__table") as HTMLElement;
@@ -127,6 +151,15 @@ describe("message Markdown", () => {
     const { container } = render(<p>{renderInline("oi @ada")}</p>);
     expect(container.textContent).toBe("oi @ada");
     expect(container.querySelector(".ac-mention")).toBeNull();
+  });
+
+  test("a key or a hash in the words breaks at any letter, filling its lines; long words of a language never do", () => {
+    const key = "sk-test-0000-FAKEKEY1-FAKEKEY2-FAKEKEY3-FAKE";
+    const el = body(`usa essa ${key} @ada e ${"a".repeat(40)} Donaudampfschifffahrtsgesellschaft`, () => "Ada");
+    expect([...el.querySelectorAll(".md-run")].map((r) => r.textContent)).toEqual([key]);
+    expect(el.querySelector(".ac-mention")).toBeTruthy();
+    const css = readFileSync(join(import.meta.dir, "../src/layout.css"), "utf8");
+    expect(css).toMatch(/\.md-run \{\s*word-break: break-all;/);
   });
 });
 

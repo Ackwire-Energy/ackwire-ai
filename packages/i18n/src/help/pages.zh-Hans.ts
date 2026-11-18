@@ -8,11 +8,18 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
     summary: "Ackwire AI 应用也可以在 Mac、PC 或 Linux 电脑上直接运行 Ackwire AI，供你自己或小团队使用。",
     sections: [
       {
+        id: "download",
+        heading: "下载应用",
+        blocks: [
+          "为你的 Mac、PC 或 Linux 电脑[下载 Ackwire AI 应用](/download)并打开。选择**在你自己的服务器上**，点击**继续使用我的服务器**，然后点击**在这台电脑上运行 Ackwire AI**。",
+        ],
+      },
+      {
         id: "how",
         heading: "运行方式",
         blocks: [
           "它在应用内运行，自带数据库，所有内容都保存在这台电脑的一个文件夹里，也就是你主文件夹中的 `.agentes`。无需安装其他东西：不用 Docker，也不用配置数据库。",
-          "它随应用启动，退出应用时停止。退出前会先询问你，因为在应用重新打开之前，谁都无法使用 Ackwire AI。",
+          "它随应用启动，退出应用时停止。退出前会先询问你，因为在应用重新打开之前，谁都无法使用 Ackwire AI。要在不退出应用的情况下暂时停止它，请点按时钟旁的 Ackwire AI 图标，在它卡片的 **⋯** 菜单中选择 **停止**。",
         ],
       },
       {
@@ -27,7 +34,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "keep-on",
         heading: "保持开机",
         blocks: [
-          "如果这台电脑也有别人在用，请设置一次：",
+          "如果这台电脑也有别人在用，请设置一次。**偏好设置\u00a0›\u00a0服务器** 中的 **保持运行** 会显示还缺什么，并打开对应的设置：",
           {
             list: [
               "设置完成后，**登录时打开** 会自动开启。",
@@ -50,8 +57,8 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "也借给其他工作区",
         blocks: [
-          "你在这里运行的服务器上的工作区会自动使用这台电脑。要让别处的工作区也使用它，比如 Ackwire AI Cloud 上的工作区，请打开 **偏好设置\u00a0›\u00a0服务器**，点 **添加服务器…**，登录那个工作区，在应用询问时点 **允许**。",
-          "每个工作区在这里都有自己的智能体和文件夹。**命令** 对它也默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里的一个开关对这台电脑上的所有工作区生效。",
+          "你在这里运行的服务器上的工作区会自动使用这台电脑。要让别处的工作区也使用它，比如 Ackwire AI Cloud 上的工作区，请点 **偏好设置\u00a0›\u00a0通用** 第一张卡片底部的 **添加工作区…**，或 **偏好设置\u00a0›\u00a0服务器** 中的 **添加服务器…**。登录那个工作区，在应用询问时点 **允许**。",
+          "每个工作区在这里都有自己的智能体和文件夹。**命令** 对它也默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里每个工作区都有自己的开关，重新开启前应用会先询问你。",
         ],
       },
       {
@@ -66,29 +73,49 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "从其他设备登录",
         blocks: [
-          "所有者一开始没有密码：在这台电脑上，应用会帮你登录。要在另一台电脑的浏览器中登录，请在 **设置\u00a0›\u00a0你的账号** 中添加密码。手机应用扫描 **偏好设置\u00a0›\u00a0服务器** 中 **在你的手机上** 下方的二维码即可连接。这需要开启 **从你的手机和队友那里访问**。",
+          "所有者一开始没有密码：在这台电脑上，应用会帮你登录。要在另一台电脑的浏览器中登录，请在 **设置\u00a0›\u00a0你的账号** 中添加密码。在你添加之前，**偏好设置\u00a0›\u00a0服务器** 会提醒你，点 **添加密码** 就会打开那个页面。手机应用扫描 **偏好设置\u00a0›\u00a0服务器** 中 **在你的手机上** 下方的二维码即可连接。这需要开启 **从你的手机和队友那里访问**。",
+          "所有者在 **设置\u00a0›\u00a0你的账号** 中删除账号后，账号会在 7 天后彻底删除，只有所有者一人的工作区也会随之删除。在此之前，登录并点按 **恢复账号** 即可恢复。删除后，如果一个账号都不剩，应用会打开欢迎窗口来创建新的所有者。如果其他人还有账号，每个人用自己的邮箱登录。",
         ],
       },
       {
         id: "updates",
         heading: "更新",
         blocks: [
-          "应用会自动检查更新，在 **偏好设置\u00a0›\u00a0更新** 中点 **更新并重新打开** 后安装。服务器和所有智能体会随之重启。数据库会先复制一份，如果新版本在 3 分钟内没有响应，应用会自动回到上一个版本及其数据。",
+          "应用会自动检查更新。在 **偏好设置\u00a0›\u00a0更新** 中开启 **夜间自动安装更新** 后，只要应用开着，它就会在 3:00 到 5:00 之间安装。服务器在这里运行时，这一项默认开启。否则请点 **更新并重新打开**。服务器和所有智能体会随之重启。数据库会先复制一份，如果新版本在 3 分钟内没有响应，应用会自动回到上一个版本及其数据。",
         ],
       },
       {
         id: "backups",
         heading: "备份",
         blocks: [
-          "目前还没有自动备份。**偏好设置\u00a0›\u00a0服务器** 中的 **立即备份** 会让服务器暂停片刻，把数据库、文件和 `.env` 保存到你主文件夹的 `.agentes/backups` 中。它保留最新的两份。",
-          "时不时把它们复制到这台电脑以外的地方，比如移动硬盘或云盘。里面有你的密钥：请妥善保管，不要给别人。",
+          "在 **偏好设置\u00a0›\u00a0服务器** 中开启 **每晚备份** 后（应用 0.8.1 及以上版本），应用每晚 3:00 会把数据库、文件和 `.env` 保存到你主文件夹的 `.agentes/backups` 中。那时处于睡眠的电脑会在醒来后备份。**立即备份** 会马上做同样的事。每次备份都会让服务器暂停片刻，并保留最新的两份。",
+          "**复制到** 会把每份新备份也放进你选的文件夹，比如 U 盘或 iCloud 云盘，那里同样保留最新的两份。里面有你的密钥：请妥善保管，不要给别人。**恢复…** 会把 Ackwire AI 恢复到某份备份：消息、文件和设置。它会停止一分钟左右，之前的内容会留在备份文件夹中。",
+        ],
+      },
+      {
+        id: "uninstall",
+        heading: "重新开始或卸载",
+        blocks: [
+          "Ackwire AI 在这台电脑上保存的所有内容都在你主文件夹的文件夹里，而不在应用里面。所以把应用移到废纸篓不会删除其中任何内容，也不会停止正在运行的 Ackwire AI。",
+          "要重新开始，请在 **偏好设置\u00a0›\u00a0服务器** 中点按 **清除并重新开始…**。这台电脑上的 Ackwire AI 会停止，里面的所有内容会移到你主文件夹中的一个新文件夹（名为 `Ackwire AI erased` 加上当天日期），并留在那里，直到你删除它。它的智能体在这台电脑上保存的内容，比如它们的浏览器和登录信息，会从 `.agentes-runner` 中删除。它的工作区会对所有使用者消失。之后欢迎窗口会打开，你用新的所有者账号重新设置。智能体的文件在你主文件夹的 `agentes` 中，会留在原处。",
+          "以后要恢复它，请退出应用，如果有更新的 `.agentes` 文件夹就先把它移开，把 `Ackwire AI erased` 文件夹重新命名为 `.agentes`，然后打开应用，在这台电脑上重新设置。它会带着原来的工作区和所有者启动。它的智能体在这台电脑上保存的内容不会恢复，所以它们需要重新登录。",
+          "要把 Ackwire AI 从这台电脑上彻底移除：",
+          {
+            list: [
+              "在 **偏好设置\u00a0›\u00a0通用** 中关闭 **登录时打开**。",
+              "退出应用。只关闭窗口是不够的。在 Mac 上，点按它在程序坞中的图标，然后在屏幕顶部的 Ackwire AI 菜单中选择 **退出 Ackwire AI**，或按 ⌘Q。在 Windows 和 Linux 上，点按时钟旁的 Ackwire AI 图标，选择 **退出 Ackwire AI**。如果它询问 **退出 Ackwire AI？**，点按 **退出**。",
+              "删除应用。在 Mac 上，把它移到废纸篓。在 Windows 和 Linux 上，像卸载其他应用一样卸载它。",
+              "删除你主文件夹中的这些文件夹。它们保存着你的数据，删除后无法恢复，所以如果以后可能还需要，请先在别处留一份备份：`.agentes`（消息、文件、账号、设置和备份）、每个 `Ackwire AI erased` 文件夹、`.agentes-runner`（智能体在这台电脑上保存的内容，比如它们的浏览器和登录信息）以及 `agentes`（智能体的文件）。名称以点开头的文件夹是隐藏的。在 Mac 上，在访达中打开你的主文件夹，按 ⇧⌘.（Shift、Command 和句点键）即可显示。",
+              "删除应用自己的文件夹。里面只有它的设置、窗口的登录信息和日志。在 Mac 上：`~/Library` 中 Application Support、Caches、HTTPStorages、Logs、Preferences 和 WebKit 文件夹里名称以 `chat.agentes.desktop` 开头的所有内容，以及 `~/Library/LaunchAgents` 中的 `Ackwire AI.plist`。在 Windows 上：`%APPDATA%\\chat.agentes.desktop` 和 `%LOCALAPPDATA%\\chat.agentes.desktop`。在 Linux 上：`~/.config/chat.agentes.desktop` 和 `~/.local/share/chat.agentes.desktop`。在 Mac 上，要打开其中一个文件夹，请在访达中按 ⇧⌘G，然后输入它的路径，比如 `~/Library/Caches`。",
+            ],
+          },
         ],
       },
       {
         id: "ai-programs",
         heading: "Claude Code 和 Codex",
         blocks: [
-          "应用通过你登录 shell 的 `PATH`，以及 `~/.local/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 等常用文件夹来查找 Claude Code 和 Codex。如果 **偏好设置\u00a0›\u00a0工具** 显示 **未找到**，请确认 `claude` 或 `codex` 能在新的终端窗口中运行，然后退出并重新打开应用。",
+          "应用通过你登录 shell 的 `PATH`，以及 `~/.local/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 等常用文件夹来查找 Claude Code 和 Codex。如果 **偏好设置\u00a0›\u00a0工具** 显示 **未找到**，那里会显示安装它的命令。在终端中运行这条命令，然后点 **重新检查**。",
         ],
       },
       {
@@ -122,7 +149,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "通过 Ackwire AI 应用",
         blocks: [
           "在那台电脑上安装并打开应用，登录你的工作区。它会问 **允许 <workspace> 的智能体使用这台 Mac？**（Windows 上是这台 PC，Linux 上是这台电脑）。选择谁可以使用，然后点 **允许**。就这么简单。",
-          "已经登录了？在 **偏好设置\u00a0›\u00a0通用** 的 **智能体** 卡片中打开这个工作区。",
+          "已经登录了？打开 **偏好设置\u00a0›\u00a0通用**，在第一张卡片中这个工作区的那一行点 **允许**。没有看到？点那张卡片底部的 **添加工作区…** 并登录。",
         ],
       },
       {
@@ -165,7 +192,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "暂停和断开",
         blocks: [
-          "在电脑上，时钟旁的 Ackwire AI 图标会暂停所有工作区的智能体。在 **偏好设置\u00a0›\u00a0通用** 中，每个工作区的开关只暂停那一个，**离开** 则断开它。暂停期间不会开始新工作，正在运行的会照常完成。断开后，智能体的文件夹仍保留在磁盘上。",
+          "在电脑上，时钟旁的 Ackwire AI 图标可以暂停所有工作区的智能体，也可以只暂停其中一个。在 **偏好设置\u00a0›\u00a0通用** 中，每个工作区的开关只暂停那一个，它 **⋯** 菜单中的 **离开** 则断开它。暂停期间不会开始新工作，正在运行的会照常完成。断开后，智能体的文件夹仍保留在磁盘上。",
           "在网站上，设备页面上的 **移除** 会断开它。",
         ],
       },
@@ -176,6 +203,15 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
           "在同一个应用中分别登录每个工作区，并为每个工作区点 **允许**。Ackwire AI Cloud 上的工作区和你自己服务器上的工作区可以共用一台电脑（应用 0.6.1 及以上版本）。每个工作区在上面都有自己的智能体和文件夹，断开其中一个不会影响其他工作区。",
           "应用在这台电脑上运行的服务器已经连接好，无需任何操作。如果还想把这台电脑借给别处的工作区，请看 [也借给其他工作区](/help/run-on-your-computer#another-workspace)。",
           "只把笔记本电脑上的应用当作打开工作区的窗口？当它询问是否让智能体使用这台笔记本电脑时，点 **以后再说**，它就仍然只是一个窗口。",
+          "用终端命令行连接的服务器只为一个工作区工作。从另一个工作区连接它，服务器就会转到那个工作区，原来的工作区将无法再使用它。要在一台电脑上使用多个工作区，请使用应用。",
+        ],
+      },
+      {
+        id: "line",
+        heading: "智能体排队等待时",
+        blocks: [
+          "智能体的每项工作都会占用电脑的内存。可用内存不足时，下一项工作会排队等待，直到另一项结束。人优先。CPU 的数量不影响这一点。",
+          "4 GB 内存的电脑可同时运行两到三项工作，8 GB 约九项。Mac 或 PC 最多八项。智能体保持打开的浏览器和桌面也会占用内存。想缩短排队，请使用内存更大的电脑，或再连接一台并把智能体分配到两台电脑上。共用一台电脑的工作区也共用它的内存。",
         ],
       },
       {
@@ -198,7 +234,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "如果这台电脑也运行 Ackwire AI，还有 `.agentes` 中它的数据库和密钥",
             ],
           },
-          "Ackwire AI 会拒绝提到密钥、令牌和登录信息的命令，但这只是一条规则，不是一堵墙。**命令** 默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里的一个开关对这台电脑上的所有工作区生效。Claude Code 和 Codex 在智能体的文件夹中按自己的规则运行自己的命令。",
+          "Ackwire AI 会拒绝提到密钥、令牌和登录信息的命令，但这只是一条规则，不是一堵墙。**命令** 默认开启。你可以在应用询问时、按 **允许** 之前关闭，或之后在 **偏好设置\u00a0›\u00a0工具** 中关闭，那里每个工作区都有自己的开关（应用 0.8.1 及以上版本），重新开启前应用会先询问你。即使命令关闭，Claude Code 和 Codex 也会在智能体的文件夹中按自己的规则运行自己的命令。",
           "如果需要一堵真正的墙，请使用 Linux 服务器。在 Debian 13 上用 `--system` 安装时，每个智能体都是一个独立的用户。在 Ubuntu 上，智能体共用一个用户 `agentes`：它们能看到彼此的文件夹，但看不到你的或服务器的。或者给智能体一台专用电脑。",
         ],
       },
@@ -268,6 +304,21 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "密钥、密码、登录信息和聊天记录永远不会带过来：智能体用工作区的 AI 来思考。有些东西在这里还没有对应项，或者本来就不该放在文件里传递。你可以之后再重新创建。",
           "文件和文件夹在你的浏览器中读取。GitHub 链接会经过工作区的服务器。密钥和登录文件永远不会被打开，在你确认之前什么都不会改变。",
+        ],
+      },
+      {
+        id: "mcp",
+        heading: "通过 MCP 连接",
+        blocks: [
+          "MCP 让你的 AI 应用能访问本工作区，它会自己在这里创建智能体，连同它们的指令、技能和例行工作。选择你的应用，选中 **通过 MCP 连接**，然后：",
+          {
+            list: [
+              "按该应用自己的步骤，连接这一步显示的地址。[逐个应用的连接方法](/help/apps-de-ia#connect)",
+              "在登录页面选择 **创建和编辑智能体、例行工作和技能**。",
+              "把请求粘贴到应用中。智能体到达后会显示在这一步中。",
+            ],
+          },
+          "如果应用无法连接，请按步骤显示的选项选择 **从文件导入** 或 **仅请求**。请求的用法见 [从其他应用导入](/help/import#other-apps)。",
         ],
       },
       {
@@ -347,9 +398,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "permissions",
         heading: "记忆不授予任何权限",
-        blocks: [
-          "记忆中的任何内容都不会让智能体能做更多事。它能做什么，始终由 **工具和权限** 决定，敏感操作永远需要审批。",
-        ],
+        blocks: ["记忆中的任何内容都不会让智能体能做更多事。它能做什么，始终由 **工具和权限** 决定。"],
       },
       {
         id: "proposals",
@@ -368,7 +417,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "what",
         heading: "哪些操作要先询问",
         blocks: [
-          "当智能体想要合并、部署、回滚、向外部发送内容或删除数据时，无论它有什么权限，都会先询问。请求会出现在 **审批** 和对话中，附有具体操作和原因。",
+          "当智能体想要合并、部署、回滚、向外部发送内容或删除数据时，会先询问。这是每个智能体起始的级别 **仅有风险的操作**。在智能体页面的 **审批** 中，选择 **始终询问** 会让它在更改任何内容前先询问，选择 **从不询问** 则什么都不问，包括合并、部署、付款和例程。请求会出现在 **审批** 和对话中，附有具体操作和原因。",
         ],
       },
       {
@@ -376,7 +425,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "一次，还是始终",
         blocks: [
           "批准只涵盖一个具体操作及其参数值。如果智能体改动了任何内容，它会重新询问。",
-          "**始终批准** 让智能体从现在起执行这类操作时不再询问，参数值不限。在例行工作的请求上，**在此例行工作中始终批准** 只对这个例行工作生效。合并、部署、回滚等操作不会提供这两个选项。要撤销，请到智能体页面的 **工具和权限**，或例行工作的设置。",
+          "**始终批准** 让智能体从现在起执行这类操作时不再询问，参数值不限。在例行工作的请求上，**在此例行工作中始终批准** 只对这个例行工作生效。只要智能体处于 **仅有风险的操作** 级别，**始终批准** 对任何类型的操作都会提供，包括合并和部署。合并、部署、回滚等操作不会提供 **在此例行工作中始终批准**。要撤销，请到智能体页面的 **工具和权限**，或例行工作的设置。",
         ],
       },
       {
@@ -431,7 +480,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "由 Ackwire AI 托管你的工作区时，Jev 已包含在内。在你自己运行的服务器上，它使用所有者的 TypeSafe 密钥，每条消息约 0.0001 美元：[设置 Jev](/help/jev#setup)。",
+          "由 Ackwire AI 托管你的工作区时，Jev 已包含在内。在你自己运行的服务器上，它使用所有者的 TypeSafe 或 OpenRouter 密钥，每条消息约 0.0001 美元：[设置 Jev](/help/jev#setup)。",
         ],
       },
       {
@@ -490,6 +539,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
               "在 Ackwire AI 中打开 **设置 › AI 和用量**，把它粘贴到 **Jev** 下面。只有设置这台服务器的人能看到它。",
             ],
           },
+          "已经在用 OpenRouter？在 **Jev** 下选择 **OpenRouter**，粘贴 https://openrouter.ai/keys 的密钥，或一键用工作区的 OpenRouter 密钥开启 Jev。还是同一个 Jev，以同样的价格通过 OpenRouter 计费。",
           "在用 Docker 运行的服务器上，你也可以把密钥写进 `.env` 的 `TYPESAFE_API_KEY`。它优先于设置中的密钥。",
         ],
       },
@@ -524,6 +574,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe 在美国运行 Jev，不会用你发送的内容训练它的模型。它只在提供服务所需的时间内保留数据。它的企业版套餐提供零数据保留。",
           "TypeSafe 的隐私政策：https://typesafe.ai/legal/privacy-policy 。它的数据处理协议：https://typesafe.ai/legal/data-processing 。",
+          "使用 OpenRouter 密钥时，同样的请求会经由 OpenRouter 发往 TypeSafe，适用 OpenRouter 的条款和你在那里的隐私设置：https://openrouter.ai/privacy。",
         ],
       },
       {
@@ -676,13 +727,13 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "在服务器上运行：",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh",
           },
           "它会装好缺少的东西，然后问几个问题：大家怎么访问、邮件、这台服务器是否也当作智能体的电脑，以及是否发送匿名使用统计。按 Enter 采用建议的答案。它装在 `/opt/agentes`（已经能用 Docker 的用户装在 `~/agentes`），第一次会下载大约 2 GB。",
           "最后它会显示服务器的地址和一个给手机用的二维码。再运行一次也没关系：它会保留你的设置，只补上缺少的部分。",
           "有 Node.js 18 或更新版本时，在空文件夹里运行 `npx @agenteschat/setup` 是同样的设置。没有 Node 的话，它可以从应用的镜像在当前文件夹里运行，最后会给出启动其余部分的命令：",
           {
-            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup',
           },
         ],
       },
@@ -713,7 +764,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "邮件",
         blocks: [
-          "没有配置邮件时，Ackwire AI 会把每封邮件写进日志而不是发出去，所以邀请链接可以从日志里复制。重置密码不可用。",
+          "没有配置邮件时，Ackwire AI 会把每封邮件写进日志而不是发出去，所以邀请链接可以从日志里复制。重置密码不可用，账号换新邮箱会立即生效，无需验证码或链接。",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -739,7 +790,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "设置可以把这台服务器也当作智能体的电脑，它们在上面运行命令、使用浏览器、存放文件。设置会先问你，在服务器能胜任时建议选是。在 Debian 13 上，每个智能体都有自己的用户和屏幕。在 Ubuntu 上，智能体共用一个用户 `agentes`。如果你选了否，加上 `--computer yes` 再运行一次安装：",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh -s -- --computer yes",
           },
           "其他电脑，比如装了 Ackwire AI 应用的 Mac 或另一台服务器，在 **设置\u00a0›\u00a0设备** 里连接，详见 [你的电脑和手机](/help/computers)。使用 Tailscale 时，它们要先加入你的 tailnet。",
         ],
@@ -767,7 +818,7 @@ export const helpZhHans: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "在安装文件夹里运行：",
           {
-            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+            code: "curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
           },
           "新版本启动时，数据库会自动更新。把设置放在 `.env` 里，不要修改 `docker-compose.yml`，每次升级都会替换它。大版本跨越前先备份：被新版本更新过的数据库，旧版本打不开。",
         ],

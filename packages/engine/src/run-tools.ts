@@ -1,12 +1,13 @@
 import { PERMISSION_TOOL, type PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, type SQL, schema, sql } from "@agenteschat/db";
 import { linkRunActions, publishMessageActions } from "./agent-actions";
-import { followWork } from "./agent-status";
-import { openApprovalCard, publishApproval } from "./approvals";
+import { announceAgentStatus, followWork } from "./agent-status";
+import { openApprovalCard, publishApproval, supersedeApprovals } from "./approvals";
 import { runAuthorityById } from "./authority";
 import type { BrainTool, ToolResult } from "./brains/types";
 import { readableChannelIds } from "./channels";
-import { consultationCardThread, consultationOrigin } from "./consultations";
+import { isConfidential, threadIsConfidential } from "./confidential";
+import { announceConsultationChange, consultationCardThread, consultationOrigin } from "./consultations";
 import { NotFoundError } from "./errors";
 import { type MemoryUpdate, publishChannelEvent, publishMessageCreated, takeStepWords } from "./events";
 import { type PendingFeedbackOffer, pendingFeedbackOfferOf } from "./feedback-offers";
@@ -25,6 +26,7 @@ import {
   questionView,
   syncQuestionMessage,
 } from "./questions";
+import { PASS_TOOL } from "./reply-policy";
 import { routineBriefOf } from "./routine-brief";
 import type { BridgeIdentity } from "./run-tool-tokens";
 import { type AgentRun, replyThreadOf } from "./runs";
@@ -36,7 +38,7 @@ import { WIDGET_UP_FRONT_MAX, widgetUpFront, withWhy } from "./tools/run-policy"
 import type { ToolContext, ToolDefinition, ToolOutput } from "./tools/types";
 import { withWikiLinks } from "./wiki-links";
 
-const { agentRuns, agents, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
+const { agentRuns, agents, agentWorks, approvals, agentQuestions, secretRequests, machineTasks, messages } = schema;
 
 /**
  * Tool access for runs, shared by the engine loop and the runner's `agentes`
@@ -130,6 +132,8 @@ export interface ToolSideEffects {
   tasks?: HandedTask[];
   /** A report it offered about the app (`offer_feedback`, ADR 0160 §12), for its next reply (`meta.feedbackOffer`). */
   feedbackOffer?: PendingFeedbackOffer;
+  /** A call refused for a switch off on its computer (`ToolOffError`): its reply's one-click card (`meta.toolOff`). */
+  toolOff?: { machineId: string; tool: string };
 }
 
 /** A task handed on, as a reply's chip reads it: the task, its agent and its conversation's root (the thread). */
@@ -205,7 +209,14 @@ export function absorbBrowserCall(
  * the conversation (context.ts `ownFilesNote`), from the meta written at post time, so "send it to Ana" finds that
  * file instead of a search. People's attachments carry the same shape (`attachmentRefsFor` in messages.ts).
  */
-export type ArtifactLink = { id: string; version: number; title: string };
+export type ArtifactLink = {
+  id: string;
+  version: number;
+  title: string;
+  /** A picture's size (`pictureSize`): its card's box before it loads. */
+  width?: number;
+  height?: number;
+};
 
 /** Adds files to the reply's cards: one per file, its newest version in the first one's place. */
 function withArtifacts(list: ArtifactLink[] | undefined, more: ArtifactLink[]): ArtifactLink[] {
@@ -267,6 +278,9 @@ export function absorbToolData(t: ToolSideEffects, data: Record<string, unknown>
     t.tasks = [...(t.tasks ?? []).filter((x) => x.issueId !== task.issueId), task];
   const offer = pendingFeedbackOfferOf(data.feedbackOffer);
   if (offer) t.feedbackOffer = offer;
+  const off = data.toolOff as { machineId?: unknown; tool?: unknown } | undefined;
+  if (off && typeof off.machineId === "string" && typeof off.tool === "string")
+    t.toolOff = { machineId: off.machineId, tool: off.tool };
   const update = data.memoryUpdate as MemoryUpdate | undefined;
   if (update) t.memoryUpdates = [...(t.memoryUpdates ?? []), update];
   return update ?? null;
@@ -288,6 +302,7 @@ export function mergeToolEffects(t: ToolSideEffects, e: ToolSideEffects | null |
   if (e.desktop?.length) t.desktop = withTrail(t.desktop, e.desktop);
   if (e.tasks?.length) t.tasks = [...(t.tasks ?? []), ...e.tasks];
   if (e.feedbackOffer) t.feedbackOffer = e.feedbackOffer;
+  if (e.toolOff) t.toolOff = e.toolOff;
 }
 
 const hasEffects = (e: ToolSideEffects) =>
@@ -304,16 +319,19 @@ const hasEffects = (e: ToolSideEffects) =>
       e.browser?.length ||
       e.desktop?.length ||
       e.tasks?.length ||
-      e.feedbackOffer,
+      e.feedbackOffer ||
+      e.toolOff,
   );
 
 /** The transcript key where the bridge leaves a computer-brain turn's side effects for the engine. */
 const BRIDGE_EFFECTS = "bridgeEffects";
+/** How many calls the runner made through the bridge during the turn. */
+const BRIDGE_CALLS = "bridgeCalls";
 
 /**
  * A bridged call's side effects (a computer brain's tool through the runner
  * bridge): kept on the run (`transcript.bridgeEffects`) until the engine ends
- * the turn and takes them (`takeBridgeEffects`), exactly as the loop keeps its
+ * the turn and takes them (`takeBridgeResult`), exactly as the loop keeps its
  * own (`absorbToolData`): the reply carries the cards, and a `react` closes the
  * turn silently. The memory update is announced now.
  */
@@ -321,13 +339,14 @@ async function recordBridgeEffects(
   deps: RunToolsDeps,
   run: AgentRun,
   where: RunWhere,
-  call: { name: string; input: unknown },
+  call: { id: string; name: string; input: unknown },
   outcome: InvokeResult,
 ) {
   const effects: ToolSideEffects = {};
   absorbBrowserCall(effects, call, outcome.type === "result" && outcome.output.isError === true);
   const update = outcome.type === "result" ? absorbToolData(effects, outcome.output.data) : null;
-  if (!hasEffects(effects)) return;
+  const executed = outcome.type === "result" ? 1 : 0;
+  if (!hasEffects(effects) && executed === 0) return;
   await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .select({ transcript: agentRuns.transcript })
@@ -339,9 +358,17 @@ async function recordBridgeEffects(
     if (!t) return;
     const kept = { ...((t[BRIDGE_EFFECTS] ?? {}) as ToolSideEffects) };
     mergeToolEffects(kept, effects);
+    const calls = (typeof t[BRIDGE_CALLS] === "number" ? t[BRIDGE_CALLS] : 0) + executed;
     await tx
       .update(agentRuns)
-      .set({ transcript: { ...t, [BRIDGE_EFFECTS]: kept }, updatedAt: new Date() })
+      .set({
+        transcript: {
+          ...t,
+          ...(hasEffects(kept) ? { [BRIDGE_EFFECTS]: kept } : {}),
+          ...(calls > 0 ? { [BRIDGE_CALLS]: calls } : {}),
+        },
+        updatedAt: new Date(),
+      })
       .where(eq(agentRuns.id, run.id));
   });
   if (update) await publishChannelEvent(deps.pubsub, { type: "memory.updated", ...where, update });
@@ -355,12 +382,21 @@ async function recordBridgeEffects(
  * drop ones kept since. The row's value stays as it is.
  */
 export function storedTranscript(t: object): SQL {
-  const { [BRIDGE_EFFECTS]: _kept, ...rest } = t as Record<string, unknown>;
-  return sql`(${pgSafeStringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text)))`;
+  const { [BRIDGE_EFFECTS]: _kept, [BRIDGE_CALLS]: _calls, ...rest } = t as Record<string, unknown>;
+  return sql`(${pgSafeStringify(rest)}::jsonb || jsonb_strip_nulls(jsonb_build_object(
+    ${BRIDGE_EFFECTS}::text, ${agentRuns.transcript} -> ${BRIDGE_EFFECTS}::text,
+    ${BRIDGE_CALLS}::text, ${agentRuns.transcript} -> ${BRIDGE_CALLS}::text
+  )))`;
 }
 
-/** Takes (and clears) the side effects the bridge kept for this run (`recordBridgeEffects`). */
-export async function takeBridgeEffects(db: Database, runId: string): Promise<ToolSideEffects | null> {
+/** What the bridge kept on a run while the engine held its own copy. */
+export interface BridgeResult {
+  effects: ToolSideEffects | null;
+  calls: number;
+}
+
+/** Takes (and clears) both the calls and side effects the bridge kept for this run. */
+export async function takeBridgeResult(db: Database, runId: string): Promise<BridgeResult> {
   return db.transaction(async (tx) => {
     const [row] = await tx
       .select({ transcript: agentRuns.transcript })
@@ -369,10 +405,11 @@ export async function takeBridgeEffects(db: Database, runId: string): Promise<To
       .for("update");
     const t = row?.transcript as Record<string, unknown> | null | undefined;
     const kept = t?.[BRIDGE_EFFECTS] as ToolSideEffects | undefined;
-    if (!t || !kept) return null;
-    const { [BRIDGE_EFFECTS]: _taken, ...rest } = t;
+    const calls = typeof t?.[BRIDGE_CALLS] === "number" ? t[BRIDGE_CALLS] : 0;
+    if (!t || (!kept && calls === 0)) return { effects: null, calls: 0 };
+    const { [BRIDGE_EFFECTS]: _taken, [BRIDGE_CALLS]: _counted, ...rest } = t;
     await tx.update(agentRuns).set({ transcript: rest, updatedAt: new Date() }).where(eq(agentRuns.id, runId));
-    return kept;
+    return { effects: kept ?? null, calls };
   });
 }
 
@@ -497,7 +534,9 @@ export async function invokeWithChip(
   const command = toolCommand(use.name, input);
   // The agent's line follows what it does now (ADR 0084 §10), beside the call, never in its way.
   if (def) void followWork(deps, ctx, def).catch(() => {});
-  const said = takeStepWords(where.runId);
+  const words = takeStepWords(where.runId);
+  // What it wrote before staying quiet was never meant for people: shown, it would vanish with the pass.
+  const said = use.name === PASS_TOOL ? undefined : words;
   await publishChannelEvent(deps.pubsub, {
     type: "agent.tool",
     ...where,
@@ -594,6 +633,7 @@ async function locate(db: Database, id: BridgeIdentity): Promise<Located> {
       threadRootId: run.threadRootId,
       triggerMessageId: run.triggerMessageId,
       ...(id.machineId ? { bridge: { machineId: id.machineId } } : {}),
+      ...(run.brain ? { thinksWith: run.brain } : {}),
       // Tools on demand (ADR 0043): the same list the run's turns see.
       loadedGroups: loadedGroupsOf(run.transcript),
       ...(run.background ? { background: true } : {}),
@@ -677,7 +717,11 @@ export async function invokeToolForRun(
   if (outcome.type === "result") {
     const isError = outcome.output.isError === true;
     return {
-      result: { content: outcome.output.content, ...(isError ? { isError: true } : {}) },
+      result: {
+        content: outcome.output.content,
+        ...(isError ? { isError: true } : {}),
+        ...(outcome.output.images?.length ? { images: outcome.output.images } : {}),
+      },
       ...(isError ? { code: codeOf(outcome.output.content, outcome.output.data) } : {}),
     };
   }
@@ -727,6 +771,8 @@ export interface PostedPause {
   secrets: SecretRequestRow[];
   /** Cards that took the run's receipts (`message.actions` goes out with them). */
   withReceipts: string[];
+  /** Older requests the new ones replaced (`supersedeApprovals`). */
+  superseded: Approval[];
 }
 
 /** A run's trigger, as its messages and cards read it. */
@@ -788,12 +834,22 @@ export function runMessageMeta(
  * Runs inside the caller's transaction; nothing is published here (`publishPauseCards`).
  */
 export async function postPauseCards(tx: Executor, run: AgentRun, requests: PauseRequests): Promise<PostedPause> {
-  const out: PostedPause = { messages: [], approvals: [], questions: [], secrets: [], withReceipts: [] };
+  const out: PostedPause = {
+    messages: [],
+    approvals: [],
+    questions: [],
+    secrets: [],
+    withReceipts: [],
+    superseded: [],
+  };
   if (requests.approvals.length + requests.questions.length + requests.secretRequestIds.length === 0) return out;
   const trigger = await runTriggerOf(tx, run);
   const extra = runMessageMeta(run, trigger);
   const brief = run.background ? routineBriefOf(trigger?.meta) : null;
-  const home = brief?.deliverTo ?? { channelId: run.channelId, threadId: replyThreadOf(run) };
+  // A question is answered by a reply where it was asked: in a confidential thread (ADR 0190) that is under its
+  // root. The message that asked carries the thread's mark, and only then is the thread's row read.
+  const confidential = isConfidential(trigger?.meta) && (await threadIsConfidential(tx, run.orgId, run.threadRootId));
+  const home = brief?.deliverTo ?? { channelId: run.channelId, threadId: replyThreadOf({ ...run, confidential }) };
   // A consulted run asks from the agents' DM, which no person reads: its questions and secret requests go where
   // the person behind it asked, like its approvals (the gateway already placed those). Only a DM run answers one.
   const origin =
@@ -852,13 +908,18 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
     }
   }
 
+  // A work's question names no one: it is its asker's, or another person's answer would move it on their access.
+  const [work] = run.workId
+    ? await tx.select({ asker: agentWorks.requestedByUserId }).from(agentWorks).where(eq(agentWorks.id, run.workId))
+    : [];
+  // Someone who can't read where the card goes could never answer it: it waits on the room instead.
+  const reader = async (userId: string | null | undefined) =>
+    userId && (await readableChannelIds(tx, run.orgId, userId, [asked.channelId])).size > 0 ? userId : null;
   for (const ask of requests.questions) {
-    // Someone who can't read where the card goes could never answer it: it waits on the room instead.
     const requestedForUserId =
-      ask.requestedForUserId &&
-      (await readableChannelIds(tx, run.orgId, ask.requestedForUserId, [asked.channelId])).size > 0
-        ? ask.requestedForUserId
-        : await impliedAddressee(tx, run, asked, ask.text);
+      (await reader(ask.requestedForUserId)) ??
+      (await impliedAddressee(tx, run, asked, ask.text)) ??
+      (await reader(work?.asker));
     const [inserted] = await tx
       .insert(agentQuestions)
       .values({
@@ -926,6 +987,7 @@ export async function postPauseCards(tx: Executor, run: AgentRun, requests: Paus
       .where(eq(approvals.id, approval.id))
       .returning();
     out.approvals.push(linked ?? approval);
+    out.superseded.push(...(await supersedeApprovals(tx, linked ?? approval)));
   }
   return out;
 }
@@ -946,6 +1008,7 @@ export async function publishPauseCards(deps: { db: Database; pubsub?: PubSub },
       if (card.missionId) await notifyMissionApproval({ db, pubsub }, card).catch(() => undefined);
     }
   }
+  for (const old of posted.superseded) await publishApproval({ db, pubsub }, old, "approval.decided").catch(() => {});
   for (const q of posted.questions) {
     await publishQuestion(pubsub, q, "question.asked");
     await notifyQuestion({ db, pubsub } as Parameters<typeof notifyQuestion>[0], q).catch(() => {});
@@ -1083,6 +1146,10 @@ export async function suspendRunForTool(
       status: posted.status,
       ...(run.background ? { background: true as const } : {}),
     });
+    // It parked mid-turn: its face and lists say so now, and so does the conversation that handed it the work (its
+    // own events reach only the agents' DM, which nobody has open). The turn's end says it again.
+    await announceAgentStatus(deps.pubsub, run.orgId, run.agentId).catch(() => {});
+    await announceConsultationChange(deps, run).catch(() => {});
   }
 
   if (gated.type === "approval") {

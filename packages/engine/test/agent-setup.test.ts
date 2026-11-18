@@ -18,7 +18,7 @@ import {
   updateAgent,
   ValidationError,
 } from "../src";
-import { addMember, type Fixture, setup } from "./fixtures";
+import { addMember, everyoneWithout, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
 /*
@@ -54,6 +54,8 @@ async function world() {
   };
   const mac = await pair("MacBook");
   const pc = await pair("PC");
+  // Bia is a member of a workspace whose admins took Criar agentes off Todos.
+  await everyoneWithout(fx.db, fx.org.id, "create_agents");
   const bia = await addMember(fx.db, fx.org.id, "member", "bia");
   const caio = await addMember(fx.db, fx.org.id, "admin", "caio");
   await fx.db.insert(schema.machineAccounts).values([
@@ -124,7 +126,6 @@ const ANA_CLAUDE = (mac: string) => ({
   account: ANAS,
   model: "opus",
   effort: "high",
-  fallback: true,
 });
 
 describe("Usar em outros agentes", () => {
@@ -137,7 +138,7 @@ describe("Usar em outros agentes", () => {
       { agentId: w.theo, status: "applied" },
       { agentId: w.lia, status: "skipped", reason: "other_computer", params: { computer: "PC" } },
       // Zoe keeps Bia's GLM Coding plan, which has no Opus.
-      { agentId: w.zoe, status: "skipped", reason: "model_missing", params: { plan: "GLM Coding", model: "Opus" } },
+      { agentId: w.zoe, status: "skipped", reason: "model_missing", params: { plan: "GLM Coding", model: "Opus 5.5" } },
     ];
     const preview = await applyAgentSetup(deps, fx.owner.id, fx.org.id, {
       setup: ANA_CLAUDE(w.mac),
@@ -172,7 +173,6 @@ describe("Usar em outros agentes", () => {
       account: ANAS,
       effort: "high",
       contextTokens: null,
-      fallback: true,
       autonomy: null,
     });
     // Again: they already think so.
@@ -336,10 +336,18 @@ describe("new agents start with the last setup", () => {
       key: null,
       contextTokens: null,
       computer: { machineId: w.mac, name: "MacBook" },
-      account: { id: ANAS, label: "Claude", provider: null, mine: true, free: true },
+      account: {
+        id: ANAS,
+        label: "Claude",
+        named: false,
+        email: null,
+        plan: null,
+        provider: null,
+        mine: true,
+        free: true,
+      },
       ownSignIn: true,
       effort: "high",
-      fallback: true,
       autonomy: null,
     });
     // Anyone else sees whose it is: a plan thinks only for its owner's agents.
@@ -447,7 +455,7 @@ describe("the Autonomia goes with the setup", () => {
         agentId: w.zoe,
         status: "skipped",
         reason: "model_missing",
-        params: { plan: "GLM Coding", model: "Opus" },
+        params: { plan: "GLM Coding", model: "Opus 5.5" },
         autonomy: { from: "low_risk_auto", to: "never" },
       },
     ];

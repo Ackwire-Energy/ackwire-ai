@@ -88,6 +88,11 @@ describe("New: what its Create list offers", () => {
   test("a routine also for the owner of an agent", () => {
     expect(createItems({ permissions: ["post"] }, { ownsAgent: true })).toEqual(["task", "routine"]);
   });
+
+  test("no new agent in a workspace being deleted, as on the web", () => {
+    const deletion = { dueAt: null, requestedAt: null, requestedBy: null };
+    expect(createItems({ permissions: all, deletion }, { ownsAgent: false })).not.toContain("agent");
+  });
 });
 
 describe("New agent: the suggested name", () => {

@@ -9,7 +9,7 @@ import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, Tile } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
-import { arrangesCategories, categoryHrefs, movesChannel } from "./logic";
+import { categoryHrefs, movesChannel } from "./logic";
 
 const NO_CHANNELS: never[] = [];
 
@@ -23,27 +23,19 @@ export interface RowAction {
 }
 
 /**
- * The home's long presses (ADR 0080), as short sheets: a row's "Fixar no topo" (a channel, an agent's or a person's
- * DM) and a channel's "Mover para…" (only where `movesChannel`), and a category header's Renomear, Categorias and
- * Nova categoria (admins; undefined otherwise, so the header has no long press at all).
+ * The long press of a conversation on the home (its row, or its face on the pinned strip), as a short sheet: "Fixar no
+ * topo" or "Tirar do topo" (a channel, an agent's or a person's DM) and a channel's "Mover para…" (only where
+ * `movesChannel`, ADR 0080). The same actions fill iOS's own menu under the conversation's preview.
  */
-export function useCategoryMenus() {
+export function useRowMenus() {
   const { t } = useTranslation();
   const orgId = useOrgId();
   const { org } = useOrg();
   const meId = useMeId();
   const sheet = useSheet();
   const channels = useChannels(orgId).data ?? NO_CHANNELS;
-  const admin = arrangesCategories(org);
   const dir = useDirectory();
   const pins = usePins();
-  const go = useCallback(
-    (href: Parameters<typeof router.push>[0]) => {
-      sheet.close();
-      router.push(href);
-    },
-    [sheet],
-  );
   // What a row's long press offers: pin it on top (a channel, an agent's or a person's DM) or take it off, and move
   // a channel (only where `movesChannel`). The same list fills the app's sheet and iOS's own menu.
   const rowActions = (r: ConversationRow): RowAction[] => {
@@ -101,42 +93,10 @@ export function useCategoryMenus() {
       </>,
     );
   };
-  const categoryMenu = (categoryId: string, name: string) => {
-    if (!admin) return undefined;
-    return () =>
-      sheet.open(
-        <>
-          <SheetTitle title={name} />
-          <ActionList
-            items={[
-              {
-                key: "rename",
-                icon: "pen",
-                label: t("channelCategories.rename"),
-                onPress: () => go(categoryHrefs.edit(categoryId)),
-              },
-              {
-                key: "manage",
-                icon: "list",
-                label: t("mobile.categories.title"),
-                hint: t("mobile.categories.manageHint"),
-                onPress: () => go(categoryHrefs.manage),
-              },
-              {
-                key: "new",
-                icon: "plus",
-                label: t("channelCategories.newCategory"),
-                onPress: () => go(categoryHrefs.create()),
-              },
-            ]}
-          />
-        </>,
-      );
-  };
   // One function for every render (the rows are memoized), always running the latest menu.
   const latest = useRef({ rowMenu, rowActions });
   latest.current = { rowMenu, rowActions };
   const openRowMenu = useCallback((r: ConversationRow) => latest.current.rowMenu(r), []);
   const rowActionsOf = useCallback((r: ConversationRow) => latest.current.rowActions(r), []);
-  return { openRowMenu, rowActionsOf, categoryMenu };
+  return { openRowMenu, rowActionsOf };
 }

@@ -17,7 +17,7 @@ import { cleanOutside } from "./untrusted";
 import { liveWorksByAgent } from "./works";
 import { isPersonalWorkspace } from "./workspace-mode";
 
-const { agentQuestions, agentRuns, agents, channels } = schema;
+const { agentGroups, agentQuestions, agentRuns, agents, channels } = schema;
 
 export const TEAM_STATUS_TOOL = "team_status";
 
@@ -60,13 +60,17 @@ export async function teamStatus(
   only?: SupervisorScope,
 ) {
   const membership = await getMembership(db, personId, orgId);
+  // The department's name comes with the row: one join, never a query per agent.
   const team = (
     await db
-      .select()
+      .select({ agent: agents, groupName: agentGroups.name })
       .from(agents)
+      .leftJoin(agentGroups, eq(agentGroups.id, agents.groupId))
       .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), isNull(agents.builtin)))
       .orderBy(agents.createdAt)
-  ).filter((a) => !only || only.agentIds.has(a.id));
+  )
+    .map((r) => ({ ...r.agent, groupName: r.groupName }))
+    .filter((a) => !only || only.agentIds.has(a.id));
   const visible = team.filter((a) => seesAgentDetails(a, personId, membership));
   const seen = visible.slice(0, TEAM_MAX);
   const ids = seen.map((a) => a.id);
@@ -112,7 +116,7 @@ export async function teamStatus(
       : [],
   ]);
   const reportsTask = (t: (typeof allTasks)[number]) =>
-    t.assignee?.type === "agent" && !!only?.agentIds.has(t.assignee.id);
+    t.assignees.some((a) => a.type === "agent" && !!only?.agentIds.has(a.id));
   let tasks = only ? allTasks.filter(reportsTask) : allTasks;
   if (only?.shared) {
     const named = await Promise.all(tasks.map((t) => nameableIn(db, only.channelId, t)));
@@ -175,14 +179,19 @@ export async function teamStatus(
     else quiet.push(`@${a.handle}`);
   }
 
+  const agentsOn = (t: (typeof tasks)[number]) => t.assignees.filter((a) => a.type === "agent");
   const owner = (t: (typeof tasks)[number]) =>
-    t.assignee?.type === "agent" ? ` (@${handle.get(t.assignee.id) ?? "an agent"})` : "";
+    agentsOn(t).length
+      ? ` (${agentsOn(t)
+          .map((a) => `@${handle.get(a.id) ?? "an agent"}`)
+          .join(", ")})`
+      : "";
   const task = (t: (typeof tasks)[number]) =>
     `- #${t.number} ${clean(t.title)}${owner(t)} ${appPageLink(orgId, `/issues/${t.number}`)}`;
   const open = tasks.filter((t) => ["todo", "in_progress", "in_review"].includes(t.status));
   const moved = (t: (typeof tasks)[number]) => new Date(t.updatedAt).getTime();
   const stuck = open.filter(
-    (t) => t.assignee?.type === "agent" && t.status !== "todo" && now.getTime() - moved(t) > STUCK_MS,
+    (t) => agentsOn(t).length > 0 && t.status !== "todo" && now.getTime() - moved(t) > STUCK_MS,
   );
   const done = tasks.filter((t) => t.status === "done" && now.getTime() - moved(t) < LATELY_MS);
 
@@ -202,11 +211,20 @@ export async function teamStatus(
   ].filter(Boolean);
   const hidden = team.length - visible.length;
 
+  // Which department each listed agent is in, so the report can route work to the right one (ADR 0083).
+  const departments = new Map<string, string[]>();
+  for (const a of seen)
+    if (a.groupName) departments.set(a.groupName, [...(departments.get(a.groupName) ?? []), `@${a.handle}`]);
+
   const section = (title: string, lines: string[]) => (lines.length ? `${title}\n${lines.join("\n")}` : "");
   return [
     "Tell it in one message with three short parts, in the person's language: done, in progress, needs you. Each line starts with the agent's name and links to the work. Leave out what has nothing.",
     section("Working now:", working),
     quiet.length ? `Quiet: ${quiet.join(", ")}.` : "",
+    section(
+      "Departments:",
+      [...departments].map(([name, handles]) => `- ${name}: ${handles.join(", ")}`),
+    ),
     section(`Open tasks (${open.length}):`, open.slice(0, TASKS_LISTED).map(task)),
     section("Stuck for hours:", stuck.slice(0, TASKS_LISTED).map(task)),
     section("Tasks done today:", done.slice(0, TASKS_LISTED).map(task)),

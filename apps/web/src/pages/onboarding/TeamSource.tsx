@@ -48,9 +48,19 @@ export interface TeamSourceFacts {
   report: boolean;
   /** The apply is running. */
   applying: boolean;
+  /** The import's "Connect with MCP" steps are on screen: the app creates the agents here itself. */
+  mcp: boolean;
 }
 
-const NO_FACTS: TeamSourceFacts = { card: null, app: null, count: 0, coming: null, report: false, applying: false };
+const NO_FACTS: TeamSourceFacts = {
+  card: null,
+  app: null,
+  count: 0,
+  coming: null,
+  report: false,
+  applying: false,
+  mcp: false,
+};
 
 /**
  * The apps that answer the export request in their own chat, so the step asks for that answer pasted. The others hand
@@ -189,8 +199,9 @@ export function useTeamSource(
           ? t(o.personal ? "onboarding.flow.team.bring.titlePersonal" : "onboarding.flow.team.bring.title", { app })
           : t(o.personal ? "onboarding.flow.team.bring.titleOtherPersonal" : "onboarding.flow.team.bring.titleOther"),
         lead: t("onboarding.flow.team.bring.lead"),
-        say:
-          asksFirst(facts.card) && app
+        say: facts.mcp
+          ? t("onboarding.flow.lodi.bringMcp")
+          : asksFirst(facts.card) && app
             ? t("onboarding.flow.lodi.bring", { app })
             : t("onboarding.flow.lodi.bringFiles"),
       };

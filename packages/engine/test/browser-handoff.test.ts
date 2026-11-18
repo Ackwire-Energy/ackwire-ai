@@ -1527,6 +1527,28 @@ describe("live view", () => {
     const b = viewer(f.owner.id);
     expect((await remote.watch(b.viewer, f.org.id, f.agent.id)).streaming).toBe(false);
     expect(b.got[0]).toMatchObject({ type: "browser.unavailable", reason: "offline" });
+    // The workspace's own computer asleep in standby: coming back, never offline (ADR 0161).
+    await f.db
+      .update(schema.machines)
+      .set({ kind: "managed", standbyAt: new Date() })
+      .where(eq(schema.machines.id, machine.machineId));
+    const c = viewer(f.owner.id);
+    expect((await remote.watch(c.viewer, f.org.id, f.agent.id)).streaming).toBe(false);
+    expect(c.got[0]).toMatchObject({ type: "browser.unavailable", reason: "reconnecting" });
+  });
+
+  test("a browser a person drives from here gets no keep-alive read in front of their clicks", async () => {
+    await start();
+    const { hub, calls } = fakeHub();
+    const live = createBrowserLive({ db: f.db, pubsub: f.pubsub, hub });
+    await live.watch(viewer(f.owner.id).viewer, f.org.id, f.agent.id);
+    await startTakeover(live.handoffDeps, f.owner.id, f.org.id, f.agent.id);
+    await Bun.sleep(20);
+    expect(calls.some((c) => c.op === "browser.stream.start" && c.mode === "control")).toBe(true);
+    const before = calls.length;
+    expect(await live.keepAlive()).toBe(0);
+    expect(calls.slice(before).some((c) => c.op === "browser.act")).toBe(false);
+    live.close();
   });
 
   test("a handoff changed on another server reaches the live view here", async () => {

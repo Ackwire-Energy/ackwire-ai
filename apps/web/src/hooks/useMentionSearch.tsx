@@ -18,7 +18,8 @@ type Row = ComposerSuggestion & { inChannel: boolean; rank: number; hay: string 
 /**
  * "@" suggestions: the channel's members first (people and agents), then the
  * rest of the workspace. Agents outside the channel say so (`note`).
- * Without `members` (an issue), everyone is one list. `kind`: a channel's or a DM's (`mentionReaches`).
+ * Without `members` (an issue) or in a DM (no channel to be in), everyone is one list with no note.
+ * `kind`: a channel's or a DM's (`mentionReaches`).
  * `everyone`: the person may mention everyone here (`offersEveryone`), so `@todos`, in their language, comes first.
  */
 export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "dm" = "channel", everyone = false) {
@@ -28,6 +29,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
   return useCallback(
     (query: string): ComposerSuggestion[] => {
       const q = fold(query);
+      const sections = Boolean(members) && kind === "channel";
       const inChannel = (type: "person" | "agent", id: string) =>
         !members || members.some((m) => m.type === type && m.id === id);
       const rows: Row[] = [
@@ -42,7 +44,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
               .filter(Boolean)
               .join(" · "),
             leading: <AgentAvatar agentId={a.id} size="sm" name={a.name} />,
-            note: here ? undefined : t("mentions.notInChannel"),
+            note: here || !sections ? undefined : t("mentions.notInChannel"),
             inChannel: here,
             rank: fold(a.name).startsWith(q) || fold(a.handle).startsWith(q) ? 0 : 1,
             hay: `${fold(a.name)} ${fold(a.handle)}`,
@@ -72,7 +74,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
       );
       const listed = sorted.slice(0, LIMIT).map(({ inChannel: on, rank: _r, hay: _h, ...s }) => ({
         ...s,
-        group: members ? (on ? here : rest) : undefined,
+        group: sections ? (on ? here : rest) : undefined,
       }));
       const word = everyone ? everyoneSuggestion(query, i18n.language) : null;
       if (!word) return listed;
@@ -82,7 +84,7 @@ export function useMentionSearch(members?: ChannelMember[], kind: "channel" | "d
         label: `@${word}`,
         description: t("mentions.everyone"),
         leading: <Icon name="members" size={16} />,
-        group: members ? here : undefined,
+        group: sections ? here : undefined,
       };
       return [everyoneRow, ...listed];
     },

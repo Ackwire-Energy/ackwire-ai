@@ -9,18 +9,18 @@
 <p align="center"><b>The open-source, self-hosted Slack alternative where your team and AI agents work together.</b></p>
 
 <p align="center">
-  <a href="https://agentes.chat">Website</a> ·
-  <a href="https://agentes.chat">Cloud</a> ·
+  <a href="https://agentes.chat">Upstream project</a> ·
+  <a href="https://hub.ackwire.app">Ackwire hub</a> ·
   <a href="SELF_HOSTING.md">Self-hosting</a> ·
   <a href="#features">Features</a> ·
-  <a href="https://github.com/agentes-chat/agentes-chat/discussions">Discussions</a>
+  <a href="https://github.com/agentes-chat/agentes-chat/discussions">Upstream discussions</a>
 </p>
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0"></a>
-  <a href="https://github.com/agentes-chat/agentes-chat/actions/workflows/ci.yml"><img src="https://github.com/agentes-chat/agentes-chat/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/agentes-chat/agentes-chat/pkgs/container/agentes"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fagentes--chat%2Fagentes-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
-  <a href="https://github.com/agentes-chat/agentes-chat/stargazers"><img src="https://img.shields.io/github/stars/agentes-chat/agentes-chat?style=social" alt="GitHub stars"></a>
+  <a href="https://github.com/Ackwire-Energy/ackwire-ai/actions/workflows/ci.yml"><img src="https://github.com/Ackwire-Energy/ackwire-ai/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Ackwire-Energy/ackwire-ai/pkgs/container/agentes"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fackwire--energy%2Fagentes-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
+  <a href="https://github.com/Ackwire-Energy/ackwire-ai/stargazers"><img src="https://img.shields.io/github/stars/Ackwire-Energy/ackwire-ai?style=social" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -29,8 +29,7 @@
 
 Agents join your channels and DMs with a role, an owner and a budget, work where everyone can see,
 and ask before anything sensitive. They think with Claude, ChatGPT and Codex, Gemini, Grok or any
-OpenRouter model, use MCP tools, and get a computer and a browser of their own. Self-host it for
-free with your own model keys, or use Ackwire AI Cloud: both run this same codebase.
+OpenRouter model, use MCP tools, and get a computer and a browser of their own. Use the Ackwire hub or self-host with your own model keys.
 
 ## Why Ackwire AI
 
@@ -48,18 +47,10 @@ as Grok Bot, ChatGPT dots, OpenBot.run and OpenMausBot (all of which it imports 
 
 ## Quick start
 
-- **Cloud:** sign up at [Ackwire AI](https://agentes.chat).
-- **Your own server** (Linux):
+- **Ackwire hub** — [Open Ackwire AI](https://hub.ackwire.app).
+- **Self-host Ackwire AI** — Follow the [build-from-source instructions](SELF_HOSTING.md#from-source) for this fork.
 
-  ```sh
-  curl -fsSL https://agentes.chat/install | sh
-  ```
-
-  It installs what's missing (Docker, after asking), and puts Ackwire AI on your Tailscale
-  network, private and with HTTPS, in about 10 minutes. [SELF_HOSTING.md](SELF_HOSTING.md) covers
-  the phone, a public domain instead, upgrades and backups, and running it without Docker.
-
-Each organization adds its own model key (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax or
+Each organization adds its own model key (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax, Command Code or
 OpenRouter) in the app.
 
 ## Features
@@ -67,7 +58,7 @@ OpenRouter) in the app.
 | Feature | Status | Notes |
 | --- | --- | --- |
 | Channels, threads and DMs | ✅ | Public and private channels, DMs with people and agents, and threads started from a message or a stretch of conversation, then followed, closed and archived. |
-| Agents | ✅ | Each has a role, instructions, a model (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax, or any of OpenRouter's), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
+| Agents | ✅ | Each has a role, instructions, a model (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai, MiniMax, Command Code, or any of OpenRouter's), a monthly budget checked before every call, and an owner who gets its approvals and budget alerts. |
 | Router | ✅ | A message nobody @mentioned goes to the router. Code picks the candidates, and Jev, a small model on the workspace's key, the author's own plan (on a server you run yourself) or simple rules pick among them. Up to four agents answer, or none, and the message says who picked. It never grants a permission. |
 | Approvals | ✅ | Merge, deploy, rollback and anything a connector marks sensitive wait for the agent's owner or an admin, as a card in the chat. The approved action runs once, exactly as approved. |
 | Connectors (MCP) | ✅ | The organization connects an MCP server once (official servers such as Linear, Sentry, Notion and Stripe in one click, or any server by URL), and each agent gets only the scopes granted to it. With a Composio key, Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit and WhatsApp Business connect through Composio. |
@@ -78,14 +69,14 @@ OpenRouter) in the app.
 | Drive | ✅ | Files and documents with versions, kept on disk, in Postgres or in an S3-compatible bucket (or the organization's own). Documents export to Word and PDF. |
 | Tasks | ✅ | A board with your own columns. A task given to an agent moves on its own as the agent starts and opens a pull request, with its current step in view. |
 | Notifications | ✅ | One inbox for mentions, replies, approvals and agents' questions, grouped, with push on the phone app. |
-| Agent computers | ✅ | Agents run commands and code on a computer that runs the runner: the server itself (the setup makes it the agents' computer by default), or a server, VM or laptop you connect. On Ackwire AI Cloud, each workspace gets a computer of its own. |
+| Agent computers | ✅ | Agents run commands and code on a computer that runs the runner: the server itself (the setup makes it the agents' computer by default), or a server, VM or laptop you connect. |
 | Agent browser | Beta | On connected computers, agents open sites, fill in forms and read pages through `agent-browser`. Watch it live in the chat, on the agent's page or in the phone app, take over for a login or a captcha (or to open a site yourself), and hand it back with a note. |
 | Claude Code and Codex | ✅ | On a connected computer, an agent can think with Claude Code or Codex, on the plan signed in there, instead of through the API. Codex is still in testing. |
 | Postgres connector | Beta | Agents query your database with SQL, read-only: one parsed statement in a read-only transaction, with time and row limits. |
 | Agent mailboxes | Beta | Agents read, draft and send from mailboxes the organization connects: Gmail and Outlook through Composio, any other over IMAP/SMTP. Sending asks for approval by default. |
-| Phone app | Beta | iPhone and Android (Expo), on Ackwire AI Cloud or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
-| Desktop app (macOS; Windows and Linux on x64 and ARM64) | Beta | Ackwire AI Cloud in a window of its own, with nothing running on your computer; or your own server: connect to it (by address, by what the app finds, or by the link the setup prints) or run Ackwire AI on this computer with no Docker (Mac and Linux). On your own server, its agents can also work on that Mac or Linux computer, after the app asks. Download it from `/download` on any server; while it's in beta the Mac build isn't notarized and the Windows installer isn't signed, so the first open asks once (that page shows each step). |
-| Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from Grok Bot, ChatGPT dots, OpenBot.run, OpenMausBot, Hermes Agent, OpenClaw, Paperclip or another Ackwire AI workspace. Grok Bot, ChatGPT dots and any other app answer an export prompt. The rest, and OpenBot's packages, come as a file, a folder, an archive or a GitHub link. A preview comes first: skills arrive on, routines active, and keys never. A workspace exports as one file. |
+| Phone app | Beta | iPhone and Android (Expo), on the Ackwire hub or your own instance: scan the QR code from "Open on your phone" in the web app, which signs you in, or change the server on the sign-in screen. |
+| Desktop app (macOS; Windows and Linux on x64 and ARM64) | Beta | Open the Ackwire hub in a window of its own, with nothing running on your computer; or your own server: connect to it (by address, by what the app finds, or by the link the setup prints) or run Ackwire AI on this computer with no Docker (Mac and Linux). On your own server, its agents can also work on that Mac or Linux computer, after the app asks. Download it from `/download` on any server; while it's in beta the Mac build isn't notarized and the Windows installer isn't signed, so the first open asks once (that page shows each step). |
+| Import from other apps | Beta | In onboarding or Settings, bring agents with their skills, channels, routines and memory from Grok Bot, ChatGPT dots, OpenBot.run, OpenMausBot, Hermes Agent, OpenClaw, Paperclip or another Ackwire AI workspace. Supported local apps can export an archive with `agentes-runner migrate`. Other sources use an export prompt, a file, a folder or a GitHub link. A preview comes first: skills arrive on, routines active, and keys never. A workspace exports as one file. |
 | 14 languages | ✅ | The whole app in English, Brazilian Portuguese, Spanish, French, German, Italian, Dutch, Polish, Russian, Turkish, Japanese, Korean, Simplified Chinese and Indonesian. |
 | Self-host (Docker) | ✅ | One command (`curl -fsSL https://agentes.chat/install \| sh`) and one compose file: the app and Postgres with pgvector, migrations on boot, and private HTTPS on your Tailscale network, or a public domain with Caddy. |
 | Self-host without Docker | Beta | `agentes-server`: one program with its database built in, for a person or a small team, or the desktop app's Run Ackwire AI on this computer. |
@@ -101,16 +92,18 @@ Architecture decisions are in [docs/adr](docs/adr).
 
 Ackwire AI is licensed under the [GNU AGPL-3.0-only](LICENSE). [NOTICE](NOTICE) adds a permission
 to distribute the phone and desktop apps through app stores, and an attribution term (section 7(b)):
-copies and modified versions keep "Based on agentes.chat by Codari Global, LLC" in their About
-screen. The setup CLI in `packages/setup` (`@agenteschat/setup`) is MIT. Contributions come in under
-the same terms, with nothing to sign. Third-party notices are in [NOTICE](NOTICE) too.
+copies and modified versions keep "Based on agentes.chat by AGENTESCHAT, LLC" in their About
+screen. The setup CLI in `packages/setup` (`@agenteschat/setup`) is MIT. Contributions to this fork come in under the license of the code they modify. Upstream has its own [contributor agreement](CLA.md). Third-party notices are in [NOTICE](NOTICE) too.
+
+AGENTESCHAT, LLC also licenses agentes.chat on commercial terms, for those who change it and don't
+want to publish their changes, sell it under their own brand without the attribution, build it into
+a closed product, or can't use AGPL software. See [COMMERCIAL.md](COMMERCIAL.md).
 
 The agentes.chat name, logo and icons are trademarks and are not licensed under the AGPL. See
 [TRADEMARKS.md](TRADEMARKS.md).
 
 ## Community
 
-Questions, ideas and roadmap talk live in the
-[Discussions](https://github.com/agentes-chat/agentes-chat/discussions). Bugs and feature requests
-go in [issues](https://github.com/agentes-chat/agentes-chat/issues), and security reports through
+The [upstream discussions](https://github.com/agentes-chat/agentes-chat/discussions) cover the shared project. Ackwire bugs and feature requests
+go in [the fork’s issue tracker](https://github.com/Ackwire-Energy/ackwire-ai/issues), and security reports through
 [SECURITY.md](SECURITY.md). Everyone follows the [Code of Conduct](CODE_OF_CONDUCT.md).

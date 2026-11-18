@@ -1,11 +1,11 @@
 # 0160. The arrival after the onboarding, and feedback by email
 
-- Status: Accepted
+- Status: Accepted. Amended 2026-11-16 (the addendum on support requests: a record that a member asked, and where their words are kept)
 - Date: 2026-11-09
 - Code: web `components/arrival/*` (`Arrival`, `BetaDialog`, `TeamScene`, `ConnectChoices`, `FeedbackDialog`,
   `FeedbackMark`), `components/ConnectAi.tsx` (`ConnectAiRequest.arrival`), `pages/OnboardingPage.tsx`
   (`?arrival=1`); server `routes/app/feedback.ts` (`POST /api/app/feedback`, `…/feedback/files`, `GET /api/feedback-files/{token}`), `auth.ts` (`auth-config.feedback`);
-  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`), `feedback-tools.ts` (`send_feedback`, `offer_feedback`), `feedback-offers.ts` (`decideFeedbackOffer`, `APP_FAULT_HINT`); server `POST …/feedback/offers/{messageId}`; web `components/FeedbackOffer.tsx`, phone `features/chat/FeedbackOffer.tsx`; config `FEEDBACK_EMAIL`; web
+  engine `feedback.ts` (jobs `feedback.send`, `feedback.file.purge`), `feedback-tools.ts` (`send_feedback`, `offer_feedback`), `feedback-offers.ts` (`decideFeedbackOffer`, `APP_FAULT_HINT`); server `POST …/feedback/offers/{messageId}`; web `components/FeedbackOffer.tsx`, phone `features/chat/FeedbackOffer.tsx`; config `FEEDBACK_EMAIL`, `FEEDBACK_RELAY`, `FEEDBACK_URL`, `FEEDBACK_INBOX`; the inbox `POST /api/feedback/inbox` (`registerFeedbackInbox`, `relayQueuedFeedback`, `sendRelayedFeedback`); web
   `lib/feedback.ts`, `lib/context-menu.ts` (`setMenuReporter`); table `feedback_files` (migration 0246)
 
 ## Context
@@ -42,7 +42,8 @@ with Postgres alone, and must not need a third-party widget in the apps.
 
 5. **Feedback is an email to whoever runs the server.** `FEEDBACK_EMAIL` names the address. Unset, which is the
    default, the apps show no form and the route answers 404: a self-hosted server sends nothing anywhere unless its
-   operator asks for it. agentes.chat sets it to its own address.
+   operator asks for it. agentes.chat sets it to its own address. (Superseded for the unset case by §13: it then
+   goes to the agentes.chat team, when a person sends one.)
 
 6. **What a feedback carries.** The text the person typed; their name and address (the email's reply-to, so the
    answer goes to them); the workspace's name and their role when they are a member of the one the app named; what
@@ -128,10 +129,40 @@ with Postgres alone, and must not need a third-party widget in the apps.
     - **Not here yet.** A run that dies before any reply (the server's own error) has no message for the row to ride
       on, so it offers nothing.
 
+13. **With no address, it goes to the agentes.chat team** (added 2026-11-12). Almost no self-hosted server set
+    `FEEDBACK_EMAIL`, and one that did also needed outgoing email, so the people most likely to hit a rough edge
+    had no way to say so. A feedback is not like a report the server sends by itself: a person writes it, reads who
+    will get it, and presses Send. So §5's default changes.
+    - **Where it goes.** To the agentes.chat team's inbox (`FEEDBACK_URL`), unless `FEEDBACK_RELAY=false`, which
+      is §5's old default (no form, no route, no tools). The feedback is about the app, so its makers read it:
+      `FEEDBACK_EMAIL` is no longer something a self-hosted server sets. It is the team's own address, on
+      agentes.chat's servers; a server that does set it still mails its feedback there and sends nothing out. `auth-config.feedbackRelay` tells the apps, which then say "to the
+      agentes.chat team" wherever they said "to whoever runs this server", in the form and on an agent's offer.
+    - **Same job, another way out.** The route still only queues `feedback.send`; where the destination is the
+      inbox the job posts the feedback as JSON instead of mailing it, so the server needs no email of its own. A
+      refusal fails the job; an inbox that can't be reached is tried again with the outbox's backoff, then dropped.
+    - **Pictures only, inside the message.** A link to a file on a server in someone's private network opens for
+      nobody outside it, so the pictures travel with the feedback, as many as fit an email together, and the form
+      there offers no video. The sending server keeps them only while the job may run again (six hours).
+    - **The inbox** is a route of the same image, on only on agentes.chat's own servers (the ones `isAgentesCloud`
+      names, which already read feedback at `FEEDBACK_EMAIL`). It needs no setting; `FEEDBACK_INBOX=false` turns it off. It needs no session, since its sender is a server it knows nothing of, so it
+      counts requests by where they come from (thirty an hour) and in all (sixty), reads at most what the
+      pictures of one email weigh, takes a picture by its own bytes as an upload is, and mails the feedback at
+      once to its own address, never one it was sent. It stores nothing: no row, no file. The email says it came
+      from another server and that who wrote it is not verified.
+    - **What is not sent.** Nothing that names the server: no address of its own, no installation id. The usage
+      report's random id (ADR 0060 §5) stays out on purpose, so a report that holds no names is never tied to a
+      person's.
+
 ## Consequences
 
-- A server with no `FEEDBACK_EMAIL` has no feedback channel in the apps; its people use whatever its operator gives
-  them.
+- A server with neither `FEEDBACK_EMAIL` nor the relay has no feedback channel in the apps; its people use whatever
+  its operator gives them.
+- A self-hosted server's feedback reaches agentes.chat by default, with the name and address of the person who sent
+  it. The form says so before they send, and `SELF_HOSTING.md` lists what it holds and how to turn it off.
+- Whoever can reach the inbox can write to the team's address, within its hourly limits; the email marks it as
+  unverified.
+- A feedback sent while the server has no way out for about forty minutes is lost, though the form said it went.
 - Whoever has a feedback's email can open its files for thirty days without signing in: the email is the key.
 - On a server with neither S3 nor a files folder, a 50 MB video sits in Postgres until it expires.
 - The phone app has neither the arrival nor the form yet.
@@ -164,3 +195,22 @@ Connect opened for several agents or for none (the channel's notice, Settings �
 - The plain dialog stays for every way in that names one thing or has its own: someone else's agent (locked), one agent alone (the right hand's own AI among them), a plan to sign in to again (`plan`), a key asked for (`intent`) or pasted, an agent still being made, a billing hold, and nobody to wake (no agent of the person's yet, or every one already thinks).
 - On a page with no socket (the onboarding) the dialog reads the AI status, the computers and the plans' state again every few seconds while it is open.
 - New strings under `connectAi.team`.
+
+### Amended 2026-11-12: the right hand alone, and a program switched off on the computer
+
+Someone on a self-hosted server opened Connect for the team's right hand, the only agent there, and got the plain dialog, whose Claude panel said only that Claude Code was "off" on their computer and to turn it on "there, in the app: Preferences → Tools". They looked for the way for twenty minutes.
+
+- The right hand alone is the narrow dialog too, named for it: opened for it (`agentId`), from its conversation, or as the only one left without an AI. It is everyone's to connect (ADR 0137 §11) and has no computer, so it is never "all agents". This supersedes "one agent alone (the right hand's own AI among them)" in the plain dialog's list above; the rest of that list stays.
+- A card already picked (`start`) opens on its steps for one agent as for the team, so the onboarding's AI step sends `start` for the right hand alone as well.
+- A plan whose program is switched off on a computer the person connected (`tool_off`, self-host) says what that means (the computer is connected, the program is switched off on it, and it can only be turned on there), then shows the way under the computer's name (`ToolOffSteps`): three plain lines for the app's three clicks (the icon by the clock, Preferences, the switch under Tools), what to look for in bold, the switch drawn at the end of the last one, and on a PC that the icon may be behind the taskbar's arrow. Lines between hairlines, nothing sunken: three small drawings side by side did not fit the narrow dialog. On a computer that may have no app, the command; when the page runs in the app on that very computer, one button to its Tools. The dialog says it waits and changes by itself, which it does, since a computer's switches come back as its own event. The key stays offered under it. The browser's steps on the agent's Work tab are unchanged.
+
+## Addendum (2026-11-16): a feedback from a member is also a record that they asked
+
+A feedback was one email and nothing else: "Nothing is stored beyond the outbox job and the files". Whoever runs the server may now be allowed to read one piece of a workspace's content for a member who asked for help (ADR 0056, the addendum of 2026-11-16), and that needs a record that the member did ask. So a feedback from a member also writes a row.
+
+- **When.** The form (`POST /api/app/feedback`), when the person is a member of the workspace the app named, and a person's own send of a report an agent offered (`decideFeedbackOffer`), each in the transaction that queues the email. A feedback that names no workspace, or one the person is not in, writes none. Neither does anything an agent sends: `send_feedback`, or a report that goes with a reply because the person chose "Always send" (§11, §12).
+- **What, on every server.** `support_requests`: the workspace, the account, how it arrived (`form` or `offer`), the form's own id for it (a retry is one request), the time, and two facts about the thing reported: what kind of thing it was, from a list of four (`message`, `agent_message`, `card`, `other`; the form's own word is never stored), and the reported message's id when it is a message of that workspace. For an offer: the reply it rode on. Ids and listed words: what the form's email already carried, kept as nobody's words.
+- **The words, only where the operator set `OPERATOR_API_REVEAL_TOKEN`.** There the row also keeps what the person wrote and what the thing they reported says, up to 4,000 characters each. Everywhere else, which is every server by default, it keeps neither: of what a person wrote, nothing is stored there, as before. Never the pictures or the video, on any server.
+- **For how long.** The words 90 days, the row a year (a daily sweep). It goes with its workspace or with the person's account. Words kept while the token was set stay their 90 days when it is taken away: the door is closed then, so nothing reads them, and the sweep drops them by their age.
+- **Who reads it.** Nobody in the apps. The operator API lists a workspace's requests without their words, and gives the words only through its reveal door, one at a time, on record, and shown in the workspace's audit log.
+- **What the form says is unchanged**: who reads the feedback. On a server that keeps the words, its operator owes its workspaces that notice (ADR 0056).

@@ -13,13 +13,13 @@ import { type RoutineFix, routineChannelOf, runPixels, type Words } from "@agent
 import { browserTimezone, onceParts, routineHookUrl, timezoneName } from "@agenteschat/client/lib/routines";
 import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActionSheetIOS, Alert, Platform } from "react-native";
-import { type IconName, useToast } from "@/ui";
+import { Alert } from "react-native";
+import { type HeaderAction, type HeaderMenuItem, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
-import { routineHref, widgetHref } from "../links/logic";
+import { widgetHref } from "../links/logic";
+import { chooseAction } from "../settings/parts";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { type ActionItem, ActionList, copyText, errorHaptic, successHaptic } from "../shared/parts";
-import { useSheet } from "../shared/SheetHost";
+import { copyText, errorHaptic, successHaptic } from "../shared/parts";
 import { everyMinutes, isInbox, isRunning, nextLine, RUN_SLOTS, routineTitle, runCaption, toastParts } from "./logic";
 import { fromApiRule, nextLabel, ruleSentence } from "./rule";
 
@@ -192,15 +192,15 @@ export function useTargetLabel() {
  * error haptic, so a write that didn't take is felt as well as read.
  */
 export function useFailed() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const toast = useToast();
   return useCallback(
     (error: unknown) => {
       errorHaptic();
-      const known = knownErrorText(t, error);
+      const known = knownErrorText(t, error, i18n.language);
       toast({ title: t("mobile.app.failed"), ...(known ? { subtitle: known } : {}), icon: "x" });
     },
-    [t, toast],
+    [t, i18n.language, toast],
   );
 }
 
@@ -272,25 +272,16 @@ export function useRoutineControls(r: Routine) {
   };
 }
 
-interface MenuItem {
-  key: string;
-  icon: IconName;
-  label: string;
-  danger?: boolean;
-  run: () => void;
-}
-
 /**
- * The routine's "…": Editar, Ver execuções (from the list), Duplicar, Copiar URL do webhook and Apagar (with a
- * confirmation), only what the viewer may do. iOS shows the system's action sheet; Android's alert takes three
- * buttons at most, so there it is the app's own list in a sheet (the screen hosts it: `SheetHostProvider`).
- * `onDeleted`: after Apagar worked (a routine's screen goes back).
+ * The routine's "…" in its screen's bar: Abrir widget or Editar, Duplicar, Copiar URL do webhook and Apagar (with the
+ * system's confirmation), only what the viewer may do. On iOS the system's own menu opens from the bar button
+ * (`PushedHeader actions`); Android lists the same choices in the app's sheet (`chooseAction`). Null with nothing to
+ * offer. `onDeleted`: after Apagar worked (the screen goes back).
  */
-export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: () => void) {
+export function useRoutineMenu(r: Routine, onDeleted?: () => void): HeaderAction | null {
   const { t } = useTranslation();
   const toast = useToast();
   const failed = useFailed();
-  const sheet = useSheet();
   const action = useRoutineAction(useOrgId());
   const title = routineTitle(r);
   const remove = () =>
@@ -336,67 +327,40 @@ export function useRoutineMenu(r: Routine, from: "list" | "screen", onDeleted?: 
     const ok = await copyText(hookUrl ?? "");
     toast(ok ? { title: t("routines.webhookCopied") } : { title: t("mobile.app.failed"), icon: "x" });
   };
-  const items: MenuItem[] = [];
+  const items: HeaderMenuItem[] = [];
   // A widget's routine is changed from its widget (ADR 0135): "Open widget" stands for Edit, and it isn't duplicated.
   const widget = r.target.type === "widget" ? r.target : null;
   if (widget)
     items.push({
-      key: "widget",
       icon: "chart",
+      sf: "square.grid.2x2",
       label: t("widgets.notice.openWidget"),
-      run: () => router.push(widgetHref(widget.widgetId, widget.dashboardId)),
+      onPress: () => router.push(widgetHref(widget.widgetId, widget.dashboardId)),
     });
   else if (r.canManage)
     items.push({
-      key: "edit",
       icon: "pen",
+      sf: "pencil",
       label: t("routines.edit"),
-      run: () => router.push(editRoutineHref(r.id)),
-    });
-  // Everyone sees the runs ("Ver execuções" opens the routine's screen).
-  if (from === "list")
-    items.push({
-      key: "runs",
-      icon: "list",
-      label: t("routines.runs"),
-      run: () => router.push(routineHref(r.id)),
+      onPress: () => router.push(editRoutineHref(r.id)),
     });
   if (r.canManage && !widget)
-    items.push({ key: "duplicate", icon: "copy", label: t("routines.duplicate"), run: duplicate });
+    items.push({ icon: "copy", sf: "plus.square.on.square", label: t("routines.duplicate"), onPress: duplicate });
   if (r.canManage && hookUrl)
-    items.push({
-      key: "webhook",
-      icon: "share",
-      label: t("routines.copyWebhook"),
-      run: () => void copyWebhook(),
-    });
-  if (r.canManage) items.push({ key: "delete", icon: "x", label: t("routines.delete"), danger: true, run: remove });
-  const open = () => {
-    if (items.length === 0) return;
-    if (Platform.OS === "ios") {
-      const danger = items.findIndex((i) => i.danger);
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          title,
-          options: [...items.map((i) => i.label), t("mobile.common.cancel")],
-          cancelButtonIndex: items.length,
-          ...(danger >= 0 ? { destructiveButtonIndex: danger } : {}),
-        },
-        (i) => items[i]?.run(),
-      );
-      return;
-    }
-    const list: ActionItem[] = items.map((i) => ({
-      key: i.key,
-      icon: i.icon,
-      label: i.label,
-      ...(i.danger ? { danger: true } : {}),
-      onPress: () => {
-        sheet.close();
-        i.run();
-      },
-    }));
-    sheet.open(<ActionList items={list} />);
+    items.push({ icon: "link", sf: "link", label: t("routines.copyWebhook"), onPress: () => void copyWebhook() });
+  if (r.canManage)
+    items.push({ icon: "trash", sf: "trash", label: t("routines.delete"), destructive: true, onPress: remove });
+  if (items.length === 0) return null;
+  return {
+    icon: "more",
+    sf: "ellipsis",
+    label: t("routines.more", { name: title }),
+    menu: items,
+    onPress: () =>
+      chooseAction(
+        title,
+        items.map((i) => ({ label: i.label, icon: i.icon, destructive: i.destructive, onPress: i.onPress })),
+        t("mobile.common.cancel"),
+      ),
   };
-  return { open, any: items.length > 0, label: t("routines.more", { name: title }) };
 }

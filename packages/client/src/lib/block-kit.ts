@@ -20,6 +20,7 @@ export const blockBoot = (json: string) => `window.__block=${json}`;
 export const BLOCK_KIT_CSS = `:root{--ink:#151514;--ink2:#2a2a28;--muted:#5c5c58;--faint:#6f6f6a;--line:rgba(23,23,22,.07);--line2:rgba(23,23,22,.12);--raised:#fff;--sunken:#eef4ef;--well:#fbfbf9;--plate:rgba(127,127,127,.1);--plate2:rgba(127,127,127,.06);--ok:#1f7a45;--warn:#9a5b00;--danger:#b42a20;--cut:4px;--on-s:#fff;--focus:rgba(154,237,83,.35);--e1:0 1px 1px rgba(23,23,22,.04),0 2px 4px -1px rgba(23,23,22,.05),0 0 0 1px var(--line);--e2:0 1px 1px rgba(23,23,22,.04),0 6px 16px -4px rgba(23,23,22,.1),0 0 0 1px var(--line);--top:inset 0 1px 0 rgba(255,255,255,.9);--lit:rgba(255,255,255,.18);color-scheme:light}
 html[data-theme=dark]{--ink:#efefec;--ink2:#d6d6d2;--muted:#a3a39e;--faint:#8f8f89;--line:rgba(255,255,255,.1);--line2:rgba(255,255,255,.15);--raised:#161616;--sunken:#030303;--well:#141413;--plate:rgba(127,127,127,.14);--plate2:rgba(127,127,127,.08);--ok:#5fc48a;--warn:#e0a84a;--danger:#f08a80;--focus:rgba(154,237,83,.45);--e1:0 1px 2px rgba(0,0,0,.5),0 0 0 1px var(--line);--e2:0 8px 20px -6px rgba(0,0,0,.6),0 0 0 1px var(--line);--top:inset 0 1px 0 rgba(255,255,255,.08);--lit:rgba(255,255,255,.12);color-scheme:dark}
 *{box-sizing:border-box}
+html[data-theme-switching] *,html[data-theme-switching] *::before,html[data-theme-switching] *::after{transition:none!important}
 html{overflow:hidden auto;-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{margin:0;background:transparent}
 body{display:flex;flex-direction:column;gap:14px;padding:6px 16px 16px;color:var(--ink);font:400 14px/1.5 var(--font,Onest),"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-wrap:break-word}
@@ -171,8 +172,8 @@ var agentes=window.agentes={get state(){return view()},set:function(k,v){var j=j
   send:function(text,label,ready){post({type:"draft",text:text,label:label||L.send,ready:ready!==false})},
   draw:function(name,options){post({type:"draw",name:String(name),options:Array.prototype.slice.call(options||[]),used:used})},
   who:function(name){var c=who[name];return c?{name:c.name,at:c.at,drawn:!!c.drawn}:null}};
-var ramp=function(){return R.ramp||["#e5fdd1","#cbfaa3","#a6f762","#97f547","#61c70a","#408307"]};
-function theme(t){var d=document.documentElement,r=ramp();d.dataset.theme=t;(t==="dark"?[r[3],r[5],r[4],r[2],r[1],r[0]]:[r[4],r[3],r[5],r[2],r[1],r[0]]).forEach(function(c,i){if(c)d.style.setProperty("--s"+(i+1),c)})}
+var ramp=function(){return R.ramp||["#cfe2ff","#9ec5ff","#5aa8ff","#3d8bff","#0063d1","#00408a"]};
+function theme(t,live){var d=document.documentElement,r=ramp();if(live){d.setAttribute("data-theme-switching","");requestAnimationFrame(function(){requestAnimationFrame(function(){d.removeAttribute("data-theme-switching")})})}d.dataset.theme=t;(t==="dark"?[r[3],r[5],r[4],r[2],r[1],r[0]]:[r[4],r[3],r[5],r[2],r[1],r[0]]).forEach(function(c,i){if(c)d.style.setProperty("--s"+(i+1),c)})}
 theme(R.theme||"light");
 if(R.ramp)document.documentElement.style.setProperty("--c",R.ramp[4]);
 var ink=function(){return document.documentElement.dataset.theme==="dark"?ramp()[2]:ramp()[4]};
@@ -213,7 +214,7 @@ E("ac-card",class extends Base{build(){var n=this.a("name"),self=this;if(this.a(
 E("ac-result",class extends Base{build(){this.innerHTML='<div class="ac-result"><span>'+esc(this.a("label",""))+'</span><b></b></div>'}sync(v){var x=this.a("bind")?v[this.a("bind")]:this.a("value");this.querySelector("b").textContent=fmt(x,this.a("format"),this.a("unit"))}});
 E("ac-table",class extends Base{sync(v){var c=opts(this.a("columns")).map(function(x){var p=x.split(":");return{t:p[0],k:p[1],f:p[2]}}),d=v[this.a("bind")]||[];this.innerHTML='<table class="ac-t"><thead><tr>'+c.map(function(x){return'<th>'+esc(x.t)+'</th>'}).join("")+'</tr></thead><tbody>'+d.map(function(r){return'<tr>'+c.map(function(x){return'<td>'+esc(fmt(r[x.k],x.f))+'</td>'}).join("")+'</tr>'}).join("")+'</tbody></table>'}});
 function height(){post({type:"height",height:Math.ceil(document.body.getBoundingClientRect().height)})}
-function host(m){if(!m)return;if(m.theme){theme(m.theme);repaint.forEach(function(f){f()})}if(m.state&&typeof m.state==="object"){Object.assign(state,m.state);Object.keys(m.state).forEach(function(k){seen[k]=json(m.state[k])});if(m.who)who=m.who;touch()}}
+function host(m){if(!m)return;if(m.theme){theme(m.theme,1);repaint.forEach(function(f){f()})}if(m.state&&typeof m.state==="object"){Object.assign(state,m.state);Object.keys(m.state).forEach(function(k){seen[k]=json(m.state[k])});if(m.who)who=m.who;touch()}}
 window.__agentesHost=host;
 addEventListener("message",function(e){if(e.source===parent&&e.source!==window)host(e.data)});
 addEventListener("error",function(e){post({type:"error",message:String(e.message||"").slice(0,200)})});

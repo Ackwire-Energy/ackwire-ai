@@ -320,11 +320,82 @@ a.dv-row__detail {
 .dv-step__more > .machine-command {
   align-self: stretch;
 }
+/* A step's command wraps between words on a phone: a line's end (an `&&` that chains the next) stays in sight. */
+.dv-step__more > .machine-command > .machine-command__code {
+  white-space: pre-wrap;
+}
 .dv-step__acts {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
+}
+/* A Mac fixing its own Xcode: its three commands on one line, each ticked once done, wrapping on a phone. */
+.dv-fix-phases {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--ink-muted);
+}
+.dv-fix-phases > [data-done] {
+  color: var(--ink);
+}
+.dv-fix-phases > [data-done] > .ac-icon {
+  color: var(--ok);
+}
+/* macOS's password window as the Mac shows it: a picture, nothing in it is pressed here. */
+.dv-mac-ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 300px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--raised-2);
+  box-shadow: var(--e2);
+  font-size: var(--text-xs);
+  color: var(--ink-muted);
+  pointer-events: none;
+  user-select: none;
+}
+.dv-mac-ask > b {
+  color: var(--ink);
+  font-weight: 600;
+}
+.dv-mac-ask__lock {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  color: var(--ink);
+}
+.dv-mac-ask__field {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.dv-mac-ask__buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.dv-mac-ask__buttons > span {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--sunken);
+  color: var(--ink);
+}
+.dv-mac-ask__buttons > [data-default] {
+  background: var(--agent);
+  color: var(--on-agent);
 }
 /* This computer from a browser: Open the app with its words, then getting the app, under a line. */
 .dv-app {
@@ -425,10 +496,11 @@ a.dv-row__detail {
   font-weight: 600;
   color: var(--ink);
 }
+/* 12 between causes, more than the 8 under a cause's words to its own button, so each button reads as its cause's. */
 .dv-slow__list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-3);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -457,6 +529,17 @@ a.dv-row__detail {
 }
 .dv-slow__list .dv-links {
   margin-top: var(--space-1);
+}
+/* A cause's one line of words, and its bullet, stand on the middle of the small button beside it, as a dialog's title does. */
+.dv-slow__list .ac-actline > :first-child:not(:only-child) {
+  padding-block: calc((var(--control-h-sm) - 18px) / 2);
+}
+.dv-slow__list > li:has(> .ac-actline > :nth-child(2))::before {
+  top: calc((var(--control-h-sm) - 18px) / 2);
+}
+/* A cause's command under its action line, 8 below as the line's own rows stand. */
+.dv-slow__list .machine-command {
+  margin-top: var(--space-2);
 }
 
 /* A tiny drawing of the phone's own setting row, in the app's look: the row to find is ringed, with a
@@ -730,6 +813,40 @@ button.dv-option {
 }
 html:not([data-pointer]) :is(a, button).dv-option:focus-visible {
   outline: none;
+  box-shadow: var(--focus-ring-inset);
+}
+/* A row with a link in its line: the title's button covers the row, the link stays above it. */
+.dv-option--stretch {
+  position: relative;
+}
+.dv-option__hit {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.dv-option__hit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+.dv-option--stretch .ac-link {
+  position: relative;
+  z-index: 1;
+}
+.dv-option--stretch:has(.dv-option__hit:hover) {
+  background: var(--plate-soft);
+}
+.dv-option--stretch:has(.dv-option__hit:hover) .dv-option__arrow {
+  color: var(--ink);
+}
+html:not([data-pointer]) .dv-option__hit:focus-visible {
+  outline: none;
+}
+html:not([data-pointer]) .dv-option--stretch:has(.dv-option__hit:focus-visible) {
   box-shadow: var(--focus-ring-inset);
 }
 .dv-option__text {
@@ -1199,4 +1316,25 @@ html:not([data-pointer]) .dv-screen:focus-visible {
 .dv-step__stall {
   margin: 0;
   color: var(--ink2);
+}
+
+/* iPhones on a Mac's Wi-Fi it could use: one line each, the phone's name and its button, wrapping under on a phone. */
+.dv-wifi {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dv-wifi__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-3);
+}
+.dv-wifi__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

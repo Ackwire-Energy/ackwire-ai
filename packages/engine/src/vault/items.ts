@@ -20,7 +20,7 @@ import {
   viewerManages,
   viewerSees,
 } from "./access";
-import { sealItemValue } from "./seal";
+import { openItemValue, sealItemValue } from "./seal";
 import {
   CONTACT_FIELDS,
   VAULT_ITEM_KINDS,
@@ -502,6 +502,78 @@ export async function updateVaultItem(
   });
   await publishVaultChanged(deps.pubsub, orgId);
   return itemView(deps, row, connection, viewer);
+}
+
+/**
+ * Moves an item kept here between Personal and Team (ADR 0144 §11). Either way takes `manage_credentials`: to the
+ * team it is the permission to write there, from the team it is the permission to edit what is there. To Personal
+ * it becomes the mover's own. Its agents stay as they were, a team item starts seen by everyone, and a personal one
+ * has no audience. The seal names the owner, so every value it holds is opened and sealed again for the new one.
+ */
+export async function moveVaultItem(
+  deps: VaultDeps,
+  userId: string,
+  orgId: string,
+  itemId: string,
+  to: VaultScope,
+): Promise<VaultItem> {
+  const { db } = deps;
+  const viewer = await vaultViewer(db, userId, orgId);
+  const scope = cleanScope(to);
+  const { item, connection } = await managedItem(db, orgId, itemId, viewer);
+  if (item.connectionId) {
+    const source = connection ? sourceNameOf(deps.sources, connection.kind) : "its password manager";
+    throw new ValidationError(`This item comes from ${source}. Move it there.`, "vault.external_read_only");
+  }
+  if (!viewer.manages) throw teamNeedsPermission();
+  const from: VaultScope = item.ownerUserId ? "personal" : "team";
+  if (from === scope) return itemView(deps, item, undefined, viewer);
+  const ownerUserId = scope === "personal" ? userId : null;
+  if (item.keyName) await assertKeyNameFree(db, orgId, ownerUserId, item.keyName, item.id);
+
+  const moved = { orgId, id: item.id, ownerUserId };
+  const reseal = async (sealed: ItemRow["previousSecrets"][number]) => {
+    const value = await openItemValue(deps, { ...item, ...sealed });
+    return value === null ? null : sealItemValue(deps, moved, sealed.secretVersion, value);
+  };
+  let value: string | null;
+  try {
+    value = await openItemValue(deps, item);
+  } catch {
+    throw new ConflictError("Its saved value can't be read here. Save it again, then move it.", "vault.unreadable");
+  }
+  const version = item.secretVersion + 1;
+  const previousSecrets: ItemRow["previousSecrets"] = [];
+  // An earlier value that no longer opens has nothing to bring back: it is left behind.
+  for (const kept of item.previousSecrets) {
+    const again = await reseal(kept).catch(() => null);
+    if (again) previousSecrets.push(again);
+  }
+  const set: Partial<typeof vaultItems.$inferInsert> = {
+    ownerUserId,
+    audienceEveryone: scope === "team",
+    audienceRoleIds: [],
+    audienceUserIds: [],
+    previousSecrets,
+    secretVersion: version,
+    ...(value === null ? {} : await sealItemValue(deps, moved, version, value)),
+    updatedAt: vaultNow(deps),
+  };
+  const row = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(vaultItems)
+      .set(set)
+      .where(
+        and(eq(vaultItems.orgId, orgId), eq(vaultItems.id, item.id), eq(vaultItems.secretVersion, item.secretVersion)),
+      )
+      .returning();
+    if (!updated) throw new ConflictError("It changed meanwhile. Open it again.", "vault.changed_meanwhile");
+    await recordPersonUse(tx, { orgId, itemId: item.id, userId, action: "edit" });
+    await auditItem(tx, orgId, userId, "vault.item_moved", updated, { from });
+    return updated;
+  });
+  await publishVaultChanged(deps.pubsub, orgId);
+  return itemView(deps, row, undefined, viewer);
 }
 
 /** Deletes a built-in item, or an external one gone from its source (one still there comes back at the next sync). */

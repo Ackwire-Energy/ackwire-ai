@@ -1,5 +1,5 @@
 import type { WikiPageSummary } from "@agenteschat/client";
-import { Button, Icon, type IconName, Kbd, Menu, MenuItem, modKey, useLocked } from "@agenteschat/ui";
+import { Button, Icon, type IconName, Kbd, Menu, MenuItem, modKey, placeList, useLocked } from "@agenteschat/ui";
 import {
   type ClipboardEvent,
   forwardRef,
@@ -154,7 +154,14 @@ export const WikiRichEditor = forwardRef<
   const listId = useId();
   const [kind, setKind] = useState<Kind>("p");
   const [marks, setMarks] = useState({ bold: false, italic: false, strike: false });
-  const [menu, setMenu] = useState<{ kind: "link" | "block"; query: string; x: number; y: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    kind: "link" | "block";
+    query: string;
+    x: number;
+    top: number;
+    bottom: number;
+  } | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
   const [selection, setSelection] = useState<{ x: number; y: number } | null>(null);
   const [tableAt, setTableAt] = useState<{ left: number; top: number } | null>(null);
@@ -313,7 +320,8 @@ export const WikiRichEditor = forwardRef<
   const openMenu = (kindOf: "link" | "block", query = "") => {
     const r = getSelection()?.rangeCount ? getSelection()?.getRangeAt(0).getBoundingClientRect() : undefined;
     const fallback = box.current?.getBoundingClientRect();
-    setMenu({ kind: kindOf, query, x: r?.left || fallback?.left || 0, y: (r?.bottom || fallback?.top || 0) + 6 });
+    const top = r?.top || fallback?.top || 0;
+    setMenu({ kind: kindOf, query, x: r?.left || fallback?.left || 0, top, bottom: r?.bottom || top });
     setActive(0);
   };
 
@@ -336,6 +344,19 @@ export const WikiRichEditor = forwardRef<
       : [];
   const count = menu?.kind === "link" ? linkOptions.length : blockOptions.length;
   const current = Math.min(active, Math.max(0, count - 1));
+  // On the side with room, as tall as it lets it, inside the window: measured with its rows in, before it paints.
+  useLayoutEffect(() => {
+    const el = listRef.current;
+    if (!el || !menu || !count) return;
+    const at = placeList(
+      { left: menu.x, top: menu.top, bottom: menu.bottom },
+      { width: el.offsetWidth, height: el.scrollHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+    );
+    el.style.left = `${at.left}px`;
+    el.style.top = `${at.top}px`;
+    el.style.maxHeight = `${at.maxHeight}px`;
+  }, [menu, count]);
 
   /** Takes out the `[[que` or `/que` typed, then links the page or runs the block. */
   const pick = (i: number) => {
@@ -580,11 +601,11 @@ export const WikiRichEditor = forwardRef<
       )}
       {menu && count > 0 && (
         <div
-          className="wiki-suggest wiki-suggest--float ac-glass"
+          className="ac-menu wiki-suggest wiki-suggest--float"
           role="listbox"
           id={listId}
           aria-label={menu.kind === "link" ? t("wiki.editor.suggest") : t("wiki.rich.blockLabel")}
-          style={{ left: menu.x, top: menu.y }}
+          ref={listRef}
         >
           {menu.kind === "link"
             ? linkOptions.map((p, i) => (

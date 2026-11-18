@@ -323,6 +323,16 @@ html:not([data-pointer]) .cal-chip:focus-visible {
     display: inline;
   }
 }
+/* A narrow meeting gives its full name priority over its owner's decorative face. The compact type matches its time. */
+@container (45.5px < width <= 63.5px) {
+  .cal-chip--block > .cal-chip__title {
+    font-size: 11.5px;
+    letter-spacing: -0.01em;
+  }
+  .cal-chip--block > .cal-chip__title > .ac-who {
+    display: none;
+  }
+}
 /*
  * A meeting keeps its name in half a week's day at 1280 (two at once) and beside a run at 1440 with the side panel
  * open: it wraps there, a long word at its syllables. Narrower (a phone's week, three at once, two beside the panel at
@@ -805,18 +815,14 @@ html:not([data-pointer]) .cal-band:focus-visible {
 .cal-month__more:hover {
   background: var(--plate-soft);
 }
-/*
- * Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). A day's whole list, up
- * to the room under its trigger: the menu's 280 cut a dozen rows by a sliver they scrolled for.
- */
+/* Its chips on the menu's concentric rule: the box is their corner plus its room (`.ac-menu`). */
 .cal-more.ac-popover {
   --menu-pad: var(--space-2);
   width: 260px;
-  max-height: min(480px, var(--radix-popover-content-available-height, 480px));
   padding: var(--menu-pad);
 }
 .cal-more__title {
-  margin: 0 0 6px;
+  margin: 0 0 var(--space-2);
   font-weight: 600;
 }
 /* Only the first letter: `capitalize` raised every word ("Novembro De 2026"). */
@@ -1064,5 +1070,11 @@ html:not([data-pointer]) .cal-mini__day:focus-visible {
   .cal-page[data-panel] .cal-side {
     overflow: visible;
     padding-inline: 0;
+  }
+}
+/* A phone's single meeting gives its title the column's width before spending room on the owner's decorative face. */
+@media (max-width: 480px) {
+  .cal-week__col > .cal-chip--block {
+    padding-inline: 2px;
   }
 }

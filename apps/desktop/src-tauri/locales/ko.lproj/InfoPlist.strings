@@ -1,0 +1,5 @@
+"NSMicrophoneUsageDescription" = "Ackwire AI은 음성 메시지를 녹음할 때 마이크를 사용해요.";
+"NSDesktopFolderUsageDescription" = "이 Mac에서 일하는 에이전트가 데스크탑의 파일을 열 수 있어요.";
+"NSDocumentsFolderUsageDescription" = "이 Mac에서 일하는 에이전트가 문서 폴더의 파일을 열 수 있어요.";
+"NSDownloadsFolderUsageDescription" = "이 Mac에서 일하는 에이전트가 다운로드 폴더의 파일을 열 수 있어요.";
+"NSLocalNetworkUsageDescription" = "이 Mac에서 일하는 에이전트가 Wi-Fi에 있는 Android 휴대폰을 찾아 연결할 수 있어요.";

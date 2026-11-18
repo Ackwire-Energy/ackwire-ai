@@ -1,6 +1,6 @@
 import { ApiError, useThreadInfo, useThreadMission } from "@agenteschat/client";
 import { isOpenMission } from "@agenteschat/client/lib/missions";
-import { EmptyState } from "@agenteschat/ui";
+import { EmptyState, OPEN_LAYER } from "@agenteschat/ui";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState } from "@/components/Loading";
@@ -49,10 +49,13 @@ export function ThreadPage({
   // A thread with a mission (ADR 0029): the mission header; who only reads gets a note.
   const mission = useThreadMission(org.id, threadId).data ?? null;
   const loaded = Boolean(thread);
-  // "Responder" (a closed thread's line, a message in the channel): straight to the composer.
+  // "Responder" (a closed thread's line, a message in the channel): straight to the composer. Never out of a card,
+  // menu or list the person opened meanwhile: losing the focus would close it under them.
   useEffect(() => {
     if (!reply || !loaded) return;
-    const timer = setTimeout(() => document.getElementById(`composer-${threadId}`)?.focus(), 80);
+    const timer = setTimeout(() => {
+      if (!document.activeElement?.closest(OPEN_LAYER)) document.getElementById(`composer-${threadId}`)?.focus();
+    }, 80);
     return () => clearTimeout(timer);
   }, [reply, loaded, threadId]);
   const gone = info.error instanceof ApiError && (info.error.status === 404 || info.error.status === 403);

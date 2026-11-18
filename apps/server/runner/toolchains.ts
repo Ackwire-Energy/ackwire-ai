@@ -1,3 +1,4 @@
+import { existsSync, readdirSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { RunnerToolchains } from "@agenteschat/adapters/machine-protocol";
@@ -24,9 +25,24 @@ export interface ToolchainsProbe {
   dirs?: string[];
   /** Tests: the teams of Xcode's Apple Accounts, or the whole look (default `appleLook`). */
   teams?: () => Promise<AppleTeam[] | AppleLook>;
+  /** Tests: the folder Xcode is looked for in (default `/Applications`, as `findXcodeApp`). */
+  apps?: string;
 }
 
-type AppleKeys = Pick<RunnerToolchains, "xcode" | "xcodeSdk" | "appleTeam" | "appleAccount">;
+type AppleKeys = Pick<RunnerToolchains, "xcode" | "xcodeSdk" | "appleTeam" | "appleAccount" | "xcodeBlocked">;
+
+/** `/Applications/Xcode.app`, else the newest-named other Xcode there (`Xcode-beta.app`, `Xcode_27.2.app`). */
+export function findXcodeApp(apps = "/Applications"): string | null {
+  if (existsSync(path.join(apps, "Xcode.app"))) return path.join(apps, "Xcode.app");
+  let names: string[] = [];
+  try {
+    names = readdirSync(apps).filter((n) => /^Xcode.*\.app$/.test(n));
+  } catch {
+    return null;
+  }
+  const name = names.sort((a, b) => b.localeCompare(a, "en", { numeric: true }))[0];
+  return name ? path.join(apps, name) : null;
+}
 
 /** The first version-looking word after `prefix` in `text`. */
 const version = (text: string, prefix: RegExp) =>
@@ -59,12 +75,33 @@ async function appleKeys(opts: ToolchainsProbe, devTools?: boolean): Promise<App
   ]);
   const look = Array.isArray(found) ? appleLookOf(found, 0) : found;
   const sdk = /^\s*(\d+(?:\.\d+)+)\s*$/.exec(sdkV)?.[1];
+  const xcode = version(xcodeV, /Xcode/);
   return {
-    xcode: version(xcodeV, /Xcode/),
+    xcode,
     xcodeSdk: sdk,
     appleTeam: look.teams[0] ? teamLabel(look.teams[0]) : undefined,
     appleAccount: look.account,
+    xcodeBlocked: xcode ? undefined : await xcodeBlocked(opts),
   };
+}
+
+/**
+ * Why Xcode is on the Mac yet `xcodebuild` doesn't answer, when it's something the person fixes with one command:
+ * the developer folder still on the Command Line Tools (installed before Xcode, `xcode-select` never moved), or
+ * Xcode's license not agreed to. Neither is "install Xcode", which the setup would otherwise say.
+ */
+export async function xcodeBlocked(opts: ToolchainsProbe): Promise<RunnerToolchains["xcodeBlocked"]> {
+  const { env, find, say } = finder(opts);
+  const selected = await say(find("xcode-select"), ["-p"]);
+  // No developer tools at all: macOS's /usr/bin/xcodebuild stub would open an install dialog.
+  if (!selected) return undefined;
+  if (/CommandLineTools/.test(selected) && findXcodeApp(opts.apps)) return "command_line_tools";
+  const xcodebuild = find("xcodebuild");
+  if (!xcodebuild) return undefined;
+  const r = await runTool(xcodebuild, ["-version"], { timeoutMs: 20_000, env });
+  // "You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' …", exit 69.
+  const said = `${r.stdout.toString("utf8")}\n${r.stderr}`;
+  return r.code !== 0 && /xcodebuild -license|license agreement/i.test(said) ? "license" : undefined;
 }
 
 const defined = <T extends object>(o: T) =>
@@ -103,26 +140,30 @@ export async function probeToolchains(opts: ToolchainsProbe = {}): Promise<Runne
 }
 
 /**
- * The last look, and a fresh one in the background now and every `TOOLCHAINS_TTL_MS` (written to `file`). `apple`
- * (a Mac): Xcode's part every `APPLE_LOOK_MS`; when it differs from what the server heard, `onChange` gets the whole
- * list (false: not sent, tried again the next minute).
+ * The last look, and a fresh one in the background now and every `TOOLCHAINS_TTL_MS` (written to `file`). `apple.look`
+ * (a Mac): Xcode's part every `APPLE_LOOK_MS`. Whenever a look differs from what the server heard, `onChange` gets the
+ * whole list (false: not sent, tried again the next minute).
  */
 export function cachedToolchains(
   file: string,
   probe: () => Promise<RunnerToolchains> = () => probeToolchains(),
-  apple: { look: () => Promise<AppleKeys>; onChange: (toolchains: RunnerToolchains) => unknown } | null = null,
+  apple: { look?: () => Promise<AppleKeys>; onChange: (toolchains: RunnerToolchains) => unknown } | null = null,
 ) {
   let current = readJson<RunnerToolchains>(file);
-  const appleOf = (t: RunnerToolchains | null) =>
-    JSON.stringify([t?.xcode, t?.xcodeSdk, t?.appleTeam, t?.appleAccount]);
-  /** Xcode's part as the server last heard it (`hello` reads `get`, or a frame that went out). */
-  let told = appleOf(current);
+  const said = (t: RunnerToolchains | null) => JSON.stringify(t ?? {});
+  /** The list as the server last heard it (`hello` reads `get`, or a frame that went out). */
+  let told = said(current);
+  const tell = (t: RunnerToolchains) => {
+    if (apple && said(t) !== told && apple.onChange(t) !== false) told = said(t);
+  };
   let looking: Promise<void> | null = null;
   const look = () =>
     (looking ??= probe()
       .then((found) => {
         current = found;
         writeJson(file, found);
+        // `hello` went out with the last look's list: a git, adb or Node found since reaches the server now.
+        tell(found);
       })
       .catch(() => undefined)
       .finally(() => {
@@ -134,7 +175,7 @@ export function cachedToolchains(
   let appleLooking = false;
   /** One look at Xcode's part; resolves once it is stored (and told, when it changed). */
   const lookApple = async () => {
-    if (!apple || appleLooking || looking) return;
+    if (!apple?.look || appleLooking || looking) return;
     appleLooking = true;
     try {
       const keys = defined(await apple.look());
@@ -145,6 +186,7 @@ export function cachedToolchains(
         xcodeSdk: undefined,
         appleTeam: undefined,
         appleAccount: undefined,
+        xcodeBlocked: undefined,
         ...keys,
       });
       if (JSON.stringify(next) !== JSON.stringify(before)) {
@@ -152,18 +194,18 @@ export function cachedToolchains(
         writeJson(file, next);
       }
       // Against what the server heard, not the last look: a hello sent before the start's full look finished.
-      if (appleOf(next) !== told && apple.onChange(next) !== false) told = appleOf(next);
+      tell(next);
     } catch {
       // the next minute's look
     } finally {
       appleLooking = false;
     }
   };
-  const appleTimer = apple ? setInterval(() => void lookApple(), APPLE_LOOK_MS) : null;
+  const appleTimer = apple?.look ? setInterval(() => void lookApple(), APPLE_LOOK_MS) : null;
   appleTimer?.unref?.();
   return {
     get: () => {
-      told = appleOf(current);
+      told = said(current);
       return current ?? undefined;
     },
     look,

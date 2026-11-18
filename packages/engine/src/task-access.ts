@@ -2,7 +2,7 @@ import { and, type Executor, eq, isNotNull, rowsOf, type SQL, schema, sql } from
 import { caches } from "./cache";
 import { maySql } from "./permissions";
 
-const { issues, channels, channelMembers, agents } = schema;
+const { issues, issueAssignees, channels, channelMembers, agents } = schema;
 
 /** Who a task or a wiki page is for (ADR 0151): "only me" is a list of one. Administrators always see it. */
 export type Audience = { mode: "everyone" } | { mode: "people"; userIds: string[] };
@@ -92,26 +92,54 @@ export async function taskReadersAmong(db: Executor, issueId: string, userIds: r
 }
 
 /**
+ * The task's agent of the task conversation `channelId` (ADR 0145): the first agent among its assignees, in their
+ * order (ADR 0188), else the agent that created it, else the agent that last wrote in its conversation; archived ones never. Its conversation is a DM
+ * with that agent: a message there that names nobody is for it (`insertMessageWithRuns`). A uuid, or null.
+ */
+export const taskAgentSql = (channelId: SQL) => sql`(select coalesce(
+    (select ta.id from ${issueAssignees} tia
+      join ${agents} ta on ta.id::text = tia.assignee_id and ta.org_id = ti.org_id and ta.archived_at is null
+      where tia.issue_id = ti.id and tia.assignee_type = 'agent'
+      order by tia.position, tia.created_at limit 1),
+    (select ta.id from ${agents} ta where ti.created_by_type = 'agent' and ta.id::text = ti.created_by_id
+      and ta.org_id = ti.org_id and ta.archived_at is null),
+    (select tm.author_agent_id from ${schema.messages} tm
+      join ${agents} ta on ta.id = tm.author_agent_id and ta.archived_at is null
+      where tm.org_id = ti.org_id and tm.channel_id = ti.conversation_channel_id and tm.author_type = 'agent'
+        and tm.deleted_at is null
+      order by tm.created_at desc limit 1))
+  from ${issues} ti where ti.conversation_channel_id = ${channelId})`;
+
+/**
  * Agents join a task's conversation as members (so a mention there reaches them like anywhere else) when they see
  * the task: one of the whole workspace, one limited to people (who mentioned it reads it, and an agent reaches what
- * they reach), or one of a channel they are in (or a public one), by current handle (a person's mention). By id: the
- * task's assignee, whoever assigned it saw the task. Returns the agents added now.
+ * they reach), or one of a channel they are in (or a public one), by current handle (a person's mention). By id: an
+ * assignee of the task, whoever assigned it saw the task. Returns the agents added now.
  */
 export async function admitTaskAgents(
   db: Executor,
   orgId: string,
   channelId: string,
-  who: { handles?: string[]; ids?: string[] },
+  /**
+   * `taskAgent`: the task's agent too (`taskAgentSql`), whoever created or took the task before. `assigned`: every
+   * agent that has the task.
+   */
+  who: { handles?: string[]; ids?: string[]; taskAgent?: boolean; assigned?: boolean },
 ): Promise<string[]> {
   const handles = (who.handles ?? []).filter((h) => /^[a-z0-9_-]+$/.test(h));
   const ids = (who.ids ?? []).filter((v) => /^[0-9a-f-]{36}$/i.test(v));
-  if (handles.length === 0 && ids.length === 0) return [];
+  const taskAgent = who.taskAgent === true;
+  const assigned = who.assigned === true;
+  if (handles.length === 0 && ids.length === 0 && !taskAgent && !assigned) return [];
   const rows = rowsOf<{ agent_id: string }>(
     await db.execute(sql`insert into ${channelMembers} (org_id, channel_id, agent_id)
       select a.org_id, ${channelId}::uuid, a.id from ${agents} a
       join ${issues} i on i.conversation_channel_id = ${channelId}::uuid and i.org_id = a.org_id
       where a.org_id = ${orgId}::uuid and a.archived_at is null
         and (a.id = any(${`{${ids.join(",")}}`}::uuid[])
+          or (${taskAgent}::boolean and a.id = ${taskAgentSql(sql`${channelId}::uuid`)})
+          or (${assigned}::boolean and exists (select 1 from ${issueAssignees} ia where ia.issue_id = i.id
+            and ia.assignee_type = 'agent' and ia.assignee_id = a.id::text))
           or (a.handle = any(${`{${handles.join(",")}}`}::text[]) and (i.restricted or i.channel_id is null
             or exists (select 1 from ${channelMembers} am where am.channel_id = i.channel_id and am.agent_id = a.id)
             or exists (select 1 from ${channels} ac where ac.id = i.channel_id and ac.visibility = 'public'

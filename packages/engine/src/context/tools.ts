@@ -19,11 +19,12 @@ import type { ContentBlock, ModelMessage } from "@agenteschat/providers";
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
-import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
+import { type AgentsDmReads, agentsDmReads, readerOfMessage, readerOfRun } from "../agents-dm-reads";
 import { runAuthorityById, UUID } from "../authority";
 import { caches } from "../cache";
 import { isChannelMember, peopleAllIn, personReach } from "../channels";
-import { consultationOrigin } from "../consultations";
+import { CONFIDENTIAL_STUB, confidentialThreadSql, isConfidential } from "../confidential";
+import { agentsDmsOf, consultationOrigin } from "../consultations";
 import { personAgentDmKey } from "../dms";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -33,7 +34,7 @@ import { quietNoticeSql } from "../notices";
 import { can, getMembership } from "../organizations";
 import { personWords, runReadOutsideById, UNASKED_DESTINATION, unaskedDestination } from "../outside";
 import { personBehindCall, wikiActorOfCall } from "../requester";
-import { rightHandReader } from "../right-hand";
+import { isRightHandId, rightHandReader } from "../right-hand";
 import { agentSearchChannels, agentVisibleChannels, indexSource, searchForUser, searchVisible } from "../search";
 import { closedRefusal } from "../standing";
 import { noAgentText } from "../team";
@@ -162,19 +163,26 @@ function toolCallText(messages: ModelMessage[], id: string): string | null {
  * but search in the agents' DM also reads the agent's DM with the person its run acts for.
  */
 export function createContextToolSource(deps: ContextDeps): ToolSource {
-  /** The right hand in a person's DM reads what they may (ADR 0137 §13); anywhere else, the rule above. */
-  const visible = async (ctx: ToolContext) => {
+  /**
+   * The right hand in a person's DM reads what they may (ADR 0137 §13); anywhere else, the rule above, and the asker's
+   * own DM with this agent (`askerDm`). `own`: without that DM.
+   */
+  const recallScope = async (ctx: ToolContext) => {
     const reader = await rightHandReader(ctx);
-    return reader
-      ? personReach(ctx.db, ctx.orgId, reader)
-      : agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId);
+    if (reader) return { channels: await personReach(ctx.db, ctx.orgId, reader), own: null, asker: null };
+    const [own, asker] = await Promise.all([
+      agentSearchChannels(ctx.db, ctx.orgId, ctx.agentId, ctx.channelId),
+      askerDm(ctx),
+    ]);
+    const channels = asker && !own.includes(asker.channelId) ? [...own, asker.channelId] : own;
+    return { channels, own, asker };
   };
 
   const tools: ToolDefinition[] = [
     {
       name: "search_context",
       description:
-        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, what the team did outside (emails sent, pull requests opened, posts: kind `action`) and, without `kinds`, your own earlier tool calls (commands, requests, scripts). Use it before answering questions about past work and before a task you or a teammate may have done before.",
+        "Search this organization's messages, summaries, decisions, facts and lessons that you can see, what the team did outside (emails sent, pull requests opened, posts: kind `action`) and, without `kinds`, your own earlier tool calls (commands, requests, scripts). Use it before answering questions about past work and before a task you or a teammate may have done before. Outside your direct messages with the person who asked, it also reads them (marked private).",
       scope: "context:read",
       inputSchema: {
         type: "object",
@@ -193,29 +201,45 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         additionalProperties: false,
       },
       async execute(input, ctx) {
-        const [channels, person, reader] = await Promise.all([
-          visible(ctx),
+        const [{ channels, own: ownScope, asker }, person, reader] = await Promise.all([
+          recallScope(ctx),
           personRequester(ctx),
           rightHandReader(ctx),
         ]);
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         // Only where no person reads the answer: a channel never gets what someone said in their DM.
         const theirDm = dm ? await dmWithRunPerson(ctx) : null;
+        const handed = !reader && !dm && person ? await handedReach(ctx, person) : [];
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
         const limit = typeof input.limit === "number" ? input.limit : 8;
-        const [found, steps] = await Promise.all([
+        const wordsOnly = ctx.confidential === true;
+        const [usual, steps, handedHits] = await Promise.all([
           (reader
-            ? searchForUser(deps, reader, ctx.orgId, { text: str(input.query), kinds, limit, reach: channels })
+            ? searchForUser(deps, reader, ctx.orgId, {
+                text: str(input.query),
+                kinds,
+                limit,
+                reach: channels,
+                wordsOnly,
+              })
             : searchVisible(deps, {
                 orgId: ctx.orgId,
                 text: str(input.query),
                 visibleChannelIds: theirDm && !channels.includes(theirDm) ? [...channels, theirDm] : channels,
                 kinds,
                 limit,
+                wordsOnly,
               })
           ).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
-          kinds ? [] : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, channels, str(input.query), dm),
+          kinds
+            ? []
+            : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, ownScope ?? channels, str(input.query), dm),
+          handed.length > 0 && person && (!kinds || kinds.includes("message" as never))
+            ? searchHandedFor(deps, ctx, handed, person, { text: str(input.query), limit, wordsOnly })
+            : [],
         ]);
+        const usualIds = new Set(usual.map((h) => h.sourceId));
+        const found = [...usual, ...handedHits.filter((h) => !usualIds.has(h.sourceId))];
         if (found.length === 0 && steps.length === 0) return { content: "No results." };
         const items = new Map(
           (
@@ -271,13 +295,17 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             const item = items.get(h.sourceId);
             const label = item ? itemLabel(item, speakers.get(item.id)) : `[${h.kind}]`;
             const m = said.get(h.sourceId);
-            const by = m ? ` ${m.who} in ${m.where} ${m.link}` : "";
-            const text = `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)})${by} ${h.snippet.replace(/\s+/g, " ")}`;
+            const theirs = asker && h.channelIds.includes(asker.channelId) ? privateFrom(asker.name) : null;
+            const by = m ? ` ${m.who} in ${theirs ?? m.where} ${m.link}` : theirs ? ` from ${theirs}` : "";
+            // The index's own copy of a message may be older than its thread's mark (ADR 0190).
+            const snippet = isConfidential(m?.meta) ? CONFIDENTIAL_STUB : h.snippet.replace(/\s+/g, " ");
+            const text = `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)})${by} ${snippet}`;
             // Only what came from outside stays in the envelope (ADR 0167): the team's trusted memory, its messages
             // that relay nothing from outside and the wiki read as the team's.
             const inside = item ? item.trust === "low" : m ? m.meta?.readOutside === true : h.kind !== "wiki";
             return { text, inside };
           });
+        if (shown.length === 0 && steps.length === 0) return { content: "No results." };
         const own = shown.filter((l) => !l.inside).map((l) => neutralizeUntrusted(l.text));
         const outside = [...shown.filter((l) => l.inside).map((l) => l.text), ...steps];
         return {
@@ -291,7 +319,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
     {
       name: "save_how_to",
       description:
-        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value, name or where it is kept) and where the script is on your computer. Write the method only, without private details from this conversation. Saving again under the same key replaces the old version. It comes back in your memory when a later request is about it. Save it on your own, before you answer; no one needs to ask.",
+        "Save how you did something that took figuring out (several tries, a new API, a script you wrote), so next time you do it right away: what it is for, the exact way (address, command, parameters, which key it needs from a person through request_secret, never a secret's value) and where the script and any key file are on your computer. Write the method only, without private details from this conversation. Saving again under the same key replaces the old version. It comes back when a later request is about it. Save it on your own, before you answer.",
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -317,6 +345,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       describe: (input) => ({ title: `Save how to: ${str(input.title)}` }),
       async execute(input, ctx) {
         try {
+          const kept = await rightHandKeeps(ctx);
+          if ("refused" in kept) return { content: kept.refused, isError: true };
           // Read from a page, an email or a routine's input, a how-to is only data until a person stands behind a
           // run that read nothing from outside (ADR 0120).
           const { trust } = await learnTrust(ctx);
@@ -330,8 +360,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             {
               orgId: ctx.orgId,
               kind: "note",
-              scopeType: "agent",
-              scopeId: ctx.agentId,
+              scopeType: kept.person ? "person" : "agent",
+              scopeId: kept.person ?? ctx.agentId,
               agentId: ctx.agentId,
               title,
               subject: howToSubject(str(input.key).trim() || title),
@@ -376,9 +406,11 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           .select({ channelId: messages.channelId })
           .from(messages)
           .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, threadId)));
-        if (!root || !(await visible(ctx)).includes(root.channelId)) {
+        const { channels: readable, asker } = await recallScope(ctx);
+        if (!root || !readable.includes(root.channelId)) {
           return { content: "Thread not found.", isError: true };
         }
+        const from = asker?.channelId === root.channelId ? `From ${privateFrom(asker.name)}: ` : "";
         const dm = await agentsDmReads(ctx.db, ctx.orgId, root.channelId, () => readerOfCall(ctx));
         if (dm) {
           const thread = await ctx.db
@@ -389,7 +421,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         }
         const summary = await ensureThreadSummary(deps, ctx.orgId, threadId, { force: true });
         return summary
-          ? { content: `${itemLabel(summary)} ${summary.content}` }
+          ? { content: `${from}${itemLabel(summary)} ${summary.content}` }
           : { content: "Nothing to summarize yet." };
       },
     },
@@ -421,7 +453,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
                 eq(agentRuns.orgId, ctx.orgId),
                 or(
                   eq(agentRuns.id, ctx.runId),
-                  and(eq(agentRuns.agentId, ctx.agentId), inArray(agentRuns.brainSessionId, session)),
+                  and(eq(agentRuns.agentId, ctx.agentId), eq(agentRuns.brainSessionId, sql`(${session})`)),
                 ),
                 sql`${agentRuns.transcript} -> 'messages' @> ${JSON.stringify([{ content: [{ type: "tool_use", id }] }])}::jsonb`,
               ),
@@ -431,8 +463,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           const text = toolCallText((run?.transcript as { messages?: ModelMessage[] } | null)?.messages ?? [], id);
           if (text !== null) return { content: text };
         }
-        const allowed = await visible(ctx);
+        const { channels: allowed, asker } = await recallScope(ctx);
         if (!/^[0-9a-f-]{36}$/i.test(id)) return { content: "Not found.", isError: true };
+        const from = (channelIds: string[]) =>
+          asker && channelIds.includes(asker.channelId) ? `From ${privateFrom(asker.name)}:\n` : "";
         const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         if (!item) {
@@ -448,7 +482,9 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           ) {
             return { content: "Not found.", isError: true };
           }
-          return { content: message.meta?.readOutside === true ? neutralizeUntrusted(message.body) : message.body };
+          return {
+            content: `${from([message.channelId])}${message.meta?.readOutside === true ? neutralizeUntrusted(message.body) : message.body}`,
+          };
         }
         const person = await personRequester(ctx);
         if (
@@ -482,7 +518,10 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           `status=${item.status}${item.supersededBy ? ` superseded_by=${item.supersededBy}` : ""} confidence=${item.confidence.toFixed(2)} seen=${item.recurrence}`,
           ...srcMessages
             .filter((m) => allowed.includes(m.channelId))
-            .map((m) => `source message ${m.id} (${m.createdAt.toISOString().slice(0, 10)}): ${cutText(m.body, 500)}`),
+            .map(
+              (m) =>
+                `source message ${m.id} (${m.createdAt.toISOString().slice(0, 10)})${asker?.channelId === m.channelId ? ` from ${privateFrom(asker.name)}` : ""}: ${cutText(m.body, 500)}`,
+            ),
           ...srcOutcomes.map((o) => `source outcome ${o.id}: ${o.polarity} ${o.kind} ${o.subject} ${o.summary}`),
         ];
         return { content: lines.join("\n") };
@@ -512,7 +551,7 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const limit = typeof input.limit === "number" ? Math.min(input.limit, CONVERSATION_MAX) : 20;
         const around = str(input.around) ? new Date(str(input.around)) : null;
         if (around && Number.isNaN(around.getTime())) return { content: "around: an ISO date-time.", isError: true };
-        const allowed = await visible(ctx);
+        const { channels: allowed, asker } = await recallScope(ctx);
         let place: { channelId: string; threadId: string | null } = { channelId: ctx.channelId, threadId: null };
         let pivot = around;
         let focus: string | null = null;
@@ -585,13 +624,17 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
           const mine = await Promise.all(rows.map((m) => dm.ofMessages([m.id])));
           rows = rows.filter((_, i) => mine[i]);
         }
+        // The asker's own DM, read from elsewhere: each line says it is private.
+        if (asker && place.channelId === asker.channelId) {
+          rows = rows.map((m) => ({ ...m, where: privateFrom(asker.name) }));
+        }
         return rows.length ? { content: conversationText(rows, focus) } : { content: "No messages there." };
       },
     },
     {
       name: "remember",
       description:
-        'Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person\'s lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. Asked to keep something for all of you ("everyone, remember…", "pessoal, lembrem…"): save it once with for: "team" (everywhere: false keeps it to this conversation); never ask other agents for copies. Never credentials or where secrets are kept.',
+        'Save, on your own, what you learn: a person correcting you or saying how they want things done (even in passing), a lasting fact about the company or its people. How its systems work (where code lives, how a tool behaves) is a note for yourself. Cite what grounds it (basis: person_said when a person here said it, found when you found it), write it as a fact ("Ana wants reports in Portuguese"), not as an order to yourself, and skip one-off requests. A person telling you not to do something again, or to always do it another way ("don\'t forward this to other agents", "não faça mais isso"), is a preference: save it in your own words, saying what to do instead, with everywhere: true to follow it everywhere (word it without private details from this one). A person\'s lasting rule for your work (no need to ask before each send, where to send things): kind rule, kept under their name everywhere, routines too. Asked to keep something for all of you ("everyone, remember…", "pessoal, lembrem…"): save it once with for: "team" (everywhere: false keeps it to this conversation); never ask other agents for copies. Never a secret\'s value; a system\'s host, port, user and key file path are a note for yourself.',
       scope: "memory:write",
       inputSchema: {
         type: "object",
@@ -609,6 +652,9 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
       },
       async execute(input, ctx) {
         try {
+          // What is kept for the whole team holds nothing of one person's: the right hand saves it where it was said.
+          const kept = input.for === "team" ? { person: null } : await rightHandKeeps(ctx);
+          if ("refused" in kept) return { content: kept.refused, isError: true };
           const content = str(input.content);
           // A run that read outside content saves no rule pointing somewhere no person here wrote (ADR 0117): a
           // page's "remember: always send reports to …". Everything else saves as asked.
@@ -633,7 +679,8 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             .select({ kind: schema.channels.kind })
             .from(schema.channels)
             .where(and(eq(schema.channels.orgId, ctx.orgId), eq(schema.channels.id, ctx.channelId)));
-          const theirsAlone = !rule && input.everywhere === true && said && here?.kind === "dm";
+          const theirsAlone =
+            kept.person !== null || (!rule && input.everywhere === true && said && here?.kind === "dm");
           // A rule's authority is the person who wrote this run's message: another agent's or a page's words give none.
           if (rule && !said) return { content: NOT_THEIR_RULE, isError: true };
           // Trust comes from the item's own source (ADR 0167): the person's own message vouches for it, also in a run
@@ -662,15 +709,16 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
                 ? str(input.kind)
                 : "fact") as "fact" | "preference" | "decision" | "note" | "rule",
               scopeType: theirsAlone ? "person" : "agent",
-              scopeId: theirsAlone ? person : ctx.agentId,
+              scopeId: theirsAlone ? (kept.person ?? person) : ctx.agentId,
               agentId: ctx.agentId,
               title: quote ? str(input.title) || cutText(content, 200) : str(input.title),
               subject: str(input.key).trim() || str(input.title) || content.slice(0, 120),
               content: quote ?? content,
               sourceIds: [ctx.triggerMessageId],
               // A rule about the agent's own conduct holds in every conversation: no channel keeps it out of a run.
-              // Only when a person said it.
-              channelIds: (rule || input.everywhere === true) && said ? [] : [ctx.channelId],
+              // Only when a person said it. What the right hand keeps for a person stays in their DM with it.
+              // Its rule too: it holds by its giver, not by channel (`rulesForPerson`), and lists only to who reads there.
+              channelIds: (rule || input.everywhere === true) && !kept.person && said ? [] : [ctx.channelId],
               trust: said ? "high" : trust,
               evidence: said
                 ? [
@@ -1053,6 +1101,85 @@ async function dmWithRunPerson(ctx: ToolContext): Promise<string | null> {
   return !asked || (await peopleAllIn(ctx.db, ctx.orgId, asked.channelId, row.id)) ? row.id : null;
 }
 
+/** How many hits of the agents' DMs are read before keeping this person's: every person's exchanges share them. */
+const HANDED_SEARCH_POOL = 20;
+
+/**
+ * Messages of the agents' DMs `handed` made for `person`, at most `limit`, searched apart from the usual reach so
+ * other people's exchanges there never take its places.
+ */
+async function searchHandedFor(
+  deps: ContextDeps,
+  ctx: ToolContext,
+  handed: string[],
+  person: string,
+  { text, limit, wordsOnly }: { text: string; limit: number; wordsOnly: boolean },
+) {
+  // ponytail: a person's hit behind HANDED_SEARCH_POOL better ones of other people is missed; filter in SQL if it bites.
+  const pool = await searchVisible(deps, {
+    orgId: ctx.orgId,
+    text,
+    visibleChannelIds: handed,
+    kinds: ["message"],
+    limit: HANDED_SEARCH_POOL,
+    wordsOnly,
+  });
+  const theirs = await Promise.all(
+    pool.map((h) =>
+      readerOfMessage(ctx.db, ctx.orgId, h.sourceId).then(
+        (r) => r === person,
+        () => false,
+      ),
+    ),
+  );
+  return pool.filter((_, i) => theirs[i]).slice(0, limit);
+}
+
+/**
+ * In this agent's 1:1 DM with `person`, its DMs with other agents, where they asked or handed it work for that person
+ * (`handedFor`): its search there reads them too, keeping only what was made for that person. Empty anywhere else.
+ */
+async function handedReach(ctx: ToolContext, person: string): Promise<string[]> {
+  const [here] = await ctx.db
+    .select({ id: schema.channels.id })
+    .from(schema.channels)
+    .where(
+      and(
+        eq(schema.channels.orgId, ctx.orgId),
+        eq(schema.channels.id, ctx.channelId),
+        eq(schema.channels.dmKey, personAgentDmKey(person, ctx.agentId)),
+      ),
+    );
+  return here ? (await agentsDmsOf(ctx.db, ctx.agentId)).map((c) => c.id) : [];
+}
+
+/**
+ * The 1:1 DM between this agent and the person whose own message started the run, which its recall tools read from
+ * anywhere else that person talks to it: to them it is one agent, not one per conversation. Only for that person's
+ * own words (not text read from outside), never another person's DM, never a routine's run or one another agent's
+ * message started. What comes from it is marked private (`privateFrom`). Files, tasks and calendars keep their scope.
+ */
+async function askerDm(ctx: ToolContext): Promise<{ channelId: string; name: string } | null> {
+  if (!UUID.test(ctx.runId) || !UUID.test(ctx.triggerMessageId)) return null;
+  const [trigger] = await ctx.db
+    .select({ authorType: messages.authorType, authorUserId: messages.authorUserId, meta: messages.meta })
+    .from(messages)
+    .where(and(eq(messages.orgId, ctx.orgId), eq(messages.id, ctx.triggerMessageId)));
+  const person = trigger?.authorType === "person" ? trigger.authorUserId : null;
+  if (!person || trigger?.meta?.readOutside === true || (await personBehindCall(ctx)) !== person) return null;
+  const dms = schema.channels;
+  const [row] = await ctx.db
+    .select({ id: dms.id, name: schema.users.name })
+    .from(dms)
+    .innerJoin(schema.users, eq(schema.users.id, person))
+    .where(and(eq(dms.orgId, ctx.orgId), eq(dms.dmKey, personAgentDmKey(person, ctx.agentId)), isNull(dms.archivedAt)));
+  return row && row.id !== ctx.channelId ? { channelId: row.id, name: row.name } : null;
+}
+
+/** Where a line from the asker's own DM read elsewhere comes from (`askerDm`), and what the agent may do with it. */
+const privateFrom = (name: string) =>
+  `your DM with ${name} (private: you may say you know it from there, and give its details here only if ${name} asks)`;
+
 /** Whom the call's run works for in the agents' DM (`readerOf`); the trigger's person without a run. */
 const readerOfCall = (ctx: ToolContext): Promise<string | null> =>
   ctx.runId ? readerOfRun(ctx.db, ctx.orgId, ctx.runId) : personBehindCall(ctx);
@@ -1092,6 +1219,18 @@ async function triggerFromAgent(ctx: ToolContext) {
   return m?.type === "agent";
 }
 
+/**
+ * Whose memory the right hand keeps in this run (ADR 0137): one agent answers everyone, so what it saves is the
+ * person's alone and only from their own DM with it, where nobody else reads. `person` null: any other agent.
+ */
+async function rightHandKeeps(ctx: ToolContext): Promise<{ person: string | null } | { refused: string }> {
+  if (!(await isRightHandId(ctx.db, ctx.orgId, ctx.agentId))) return { person: null };
+  const person = await rightHandReader(ctx);
+  return person
+    ? { person }
+    : { refused: "You keep memory only in a person's own private conversation with you: others read this one." };
+}
+
 const RELAYED_SAVE =
   "Not saved: this came from another agent, so the person's own words aren't here, and a copy saved here would hold only in this conversation. Tell that agent to save it once for the whole team (remember with for: \"team\"), where the person said it.";
 const TEAM_NOT_THEIRS =
@@ -1102,7 +1241,7 @@ const TEAM_NOT_THEIRS =
  * reaches all the agent's runs; one from a private channel or a DM stays there.
  */
 async function whereItHolds(ctx: ToolContext, item: ContextItem) {
-  if (item.scopeType === "person") return "in all your conversations with this person";
+  if (item.scopeType === "person" && item.channelIds.length === 0) return "in all your conversations with this person";
   const [channel] = item.channelIds.length
     ? await ctx.db
         .select({ kind: schema.channels.kind, name: schema.channels.name, visibility: schema.channels.visibility })
@@ -1224,6 +1363,8 @@ async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
       params: {
         text: cutText(line, 500),
         ...(res.item.kind === "rule" ? { rule: true } : {}),
+        // No agent owns it (`saveForTeam`): the team's, never "my rules".
+        ...(res.item.agentId === null ? { team: true } : {}),
         ...(replaced ? { previousText: cutText(replaced.title || replaced.content, 500) } : {}),
       },
       before: replaced ? { itemId: replaced.id } : null,
@@ -1238,12 +1379,17 @@ async function recordSave(ctx: ToolContext, res: ConsolidateResult) {
  */
 async function changeableItem(ctx: ToolContext, id: string, requester: string | null): Promise<ContextItem | string> {
   if (!/^[0-9a-f-]{36}$/i.test(id)) return "Not found.";
+  const kept = await rightHandKeeps(ctx);
+  if ("refused" in kept) return kept.refused;
   const [item] = await getContextItems(ctx.db, ctx.orgId, [id]);
   const allowed = await agentVisibleChannels(ctx.db, ctx.orgId, ctx.agentId);
   if (item?.status !== "active" || item.supersededBy || !item.channelIds.every((c) => allowed.includes(c))) {
     return "Not found.";
   }
   if (item.agentId && item.agentId !== ctx.agentId) return "That memory belongs to another agent.";
+  // The right hand is in every person's DM: of its own memory, only this person's is theirs to change.
+  if (kept.person && item.agentId && !(item.scopeType === "person" && item.scopeId === kept.person))
+    return "Not found.";
   // A rule's authority: the person who wrote this run's message, and one who may change it (`requireEdit`).
   if (item.kind === "rule") {
     const author = (await triggerPerson(ctx))?.id;
@@ -1714,6 +1860,8 @@ async function ownPastSteps(
           sql`, `,
         )})
         and r.created_at > now() - make_interval(days => ${STEP_DAYS})
+        -- What a run of a confidential thread called may repeat what it read there (ADR 0190).
+        and not ${confidentialThreadSql(sql`r.org_id`, sql`r.thread_root_id`)}
         and s.kind = 'tool_call'
         and coalesce(s.data->>'name', '') not in (${sql.join(
           STEP_NOISE.map((n) => sql`${n}`),

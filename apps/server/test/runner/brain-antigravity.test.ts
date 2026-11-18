@@ -1,13 +1,36 @@
 import { afterEach, expect, test } from "bun:test";
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { accountCodeAad } from "@agenteschat/adapters/machine-protocol";
 import { cutAtWord } from "@agenteschat/adapters/redact";
 import { sealSecret } from "@agenteschat/adapters/secret-box";
-import { AccountManager, accountEnv, loginFailureOf, parseAgyLoginUrl, parseAgyStatus } from "../../runner/accounts";
-import { AGY_CHAT_AGENT, AGY_PLANTED, agyAuthOf, agyRuntimeDir, prepareAgyHome } from "../../runner/agy-home";
 import {
+  ACCOUNT_SIGNED_OUT,
+  type AccountFolders,
+  AccountManager,
+  accountEnv,
+  accountSignIn,
+  agentAccountHome,
+  agentAccountsDir,
+  grantOf,
+  loginFailureOf,
+  parseAgyLoginUrl,
+  parseAgyStatus,
+} from "../../runner/accounts";
+import {
+  AGY_CHAT_AGENT,
+  AGY_PLANTED,
+  AGY_SIGN_IN_FILE,
+  agyAuthOf,
+  agyRuntimeDir,
+  agySignInOf,
+  dropAgySignIns,
+  prepareAgyHome,
+  writeAgySettings,
+} from "../../runner/agy-home";
+import {
+  type AntigravityBrainContext,
   type AntigravityBrainTurnRequest,
   antigravityChatBreach,
   antigravityChatsFile,
@@ -30,6 +53,10 @@ afterEach(async () => {
   for (const m of managers.splice(0)) await m.close();
   delete process.env.FAKE_AGY_LOG;
   delete process.env.FAKE_AGY_TOOLS;
+  delete process.env.FAKE_AGY_BOUND;
+  delete process.env.FAKE_AGY_KEYRING;
+  delete process.env.FAKE_AGY_REFRESH_MS;
+  delete process.env.FAKE_AGY_CHECK;
   removeDirs(dirs);
 });
 
@@ -63,7 +90,7 @@ test("command line: headless stream-json in the sandbox; work takes edits, plan 
 test("the account's home: what a turn planted goes, our settings, our server alone and Lodi's agent; the sign-in stays", () => {
   const home = tempDir("agy-home-");
   dirs.push(home);
-  for (const rel of [".gemini/config/hooks.json", ".gemini/GEMINI.md", ".gemini/antigravity-cli/secrets.json"]) {
+  for (const rel of [".gemini/config/hooks.json", ".gemini/GEMINI.md", AGY_SIGN_IN_FILE]) {
     mkdirSync(path.dirname(path.join(home, rel)), { recursive: true });
     writeFileSync(path.join(home, rel), "x");
   }
@@ -71,7 +98,7 @@ test("the account's home: what a turn planted goes, our settings, our server alo
   prepareAgyHome(home, ["/usr/bin/agentes-runner"]);
   for (const rel of AGY_PLANTED.filter((r) => !r.endsWith("/agents")))
     expect(existsSync(path.join(home, rel))).toBe(false);
-  expect(existsSync(path.join(home, ".gemini/antigravity-cli/secrets.json"))).toBe(true);
+  expect(existsSync(path.join(home, AGY_SIGN_IN_FILE))).toBe(true);
   const mcp = JSON.parse(readFileSync(path.join(home, ".gemini/config/mcp_config.json"), "utf8"));
   // The run and the token only through the env: never in the shared file.
   expect(mcp).toEqual({
@@ -178,6 +205,24 @@ test("the CLI's words: its models, its sign-in status, its sign-in link and its 
   expect(resetFromWords("Resets at 2026-11-05T10:00:00Z")).toBe("2026-11-05T10:00:00.000Z");
 });
 
+test("the CLI's real /usage: one tab-separated row per quota, each model group its own, disabled ones skipped", () => {
+  // `agy -p /usage` of Antigravity CLI 1.5.6, 2026-11-14: group, quota, percent left (or "disabled"), its reset.
+  const report = [
+    "Gemini Models\tWeekly Limit Remaining\t98%\t2026-11-21T21:48:50Z",
+    "Gemini Models\tFive Hour Limit Remaining\t97%\t2026-11-15T02:48:50Z",
+    "Claude and GPT models\tWeekly Limit Remaining\t0%\t2026-11-17T04:21:04Z",
+    "Claude and GPT models\tFive Hour Limit Remaining\tdisabled\t",
+    "Gemini 4 Argon\tGemini 4 Argon Weekly Limit\t99%\t2026-11-21T21:45:50Z",
+    "",
+  ].join("\n");
+  expect(antigravityUsage(report, "probe", NOW)?.windows).toEqual([
+    { kind: "seven_day", usedPercent: 2, resetsAt: "2026-11-21T21:48:50.000Z" },
+    { kind: "five_hour", usedPercent: 3, resetsAt: "2026-11-15T02:48:50.000Z" },
+    { kind: "other", label: "Claude and GPT models · 7d", usedPercent: 100, resetsAt: "2026-11-17T04:21:04.000Z" },
+    { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 1, resetsAt: "2026-11-21T21:45:50.000Z" },
+  ]);
+});
+
 test("an account's folder is the CLI's whole home: no keyring, no Gemini key or ADC from the runner, no updates", () => {
   const env = accountEnv("antigravity", "/acc/x", {
     PATH: "/bin",
@@ -249,9 +294,12 @@ function turnContext(root: string) {
   };
 }
 
+/** What the CLI keeps once signed in, as the fake writes it. */
+const TOKEN = { access_token: "fake-access", refresh_token: "fake-refresh", token_type: "Bearer" };
+
 const signIn = (accountDir: string) => {
-  mkdirSync(path.join(accountDir, ".gemini", "antigravity-cli"), { recursive: true });
-  writeFileSync(path.join(accountDir, ".gemini", "antigravity-cli", "fake-auth.json"), "{}");
+  mkdirSync(path.dirname(path.join(accountDir, AGY_SIGN_IN_FILE)), { recursive: true });
+  writeFileSync(path.join(accountDir, AGY_SIGN_IN_FILE), JSON.stringify(TOKEN));
 };
 
 const turn = (over: Partial<AntigravityBrainTurnRequest> = {}): AntigravityBrainTurnRequest => ({
@@ -267,7 +315,7 @@ const turn = (over: Partial<AntigravityBrainTurnRequest> = {}): AntigravityBrain
   ...over,
 });
 
-async function run(ctx: ReturnType<typeof turnContext>["ctx"], req: AntigravityBrainTurnRequest) {
+async function run(ctx: AntigravityBrainContext, req: AntigravityBrainTurnRequest) {
   const events: CodexBrainEvent[] = [];
   await handleAntigravityBrainTurn(ctx, req, { signal: new AbortController().signal, emit: (e) => events.push(e) });
   return events;
@@ -476,4 +524,229 @@ test.skipIf(!posix)(
     expect(lines.join("\n")).not.toContain("4/0A");
   },
   30_000,
+);
+
+test("a Gemini sign-in for all agents as a turn gets it: root's file and seat, in the agent's folder while its turns run", async () => {
+  const root = tempDir("agy-share-");
+  dirs.push(root);
+  // Root's folder signed in to an Enterprise seat: the CLI's file, and the project it saved in its settings.
+  const kept = path.join(root, "kept");
+  writeAgySettings(kept, "oauth-business", { project: "acme-gemini" });
+  signIn(kept);
+  const signedIn = { auth: TOKEN, type: "oauth-business" as const, gcp: { project: "acme-gemini" } };
+  expect(agySignInOf(kept)).toEqual(signedIn);
+  expect(agySignInOf(path.join(root, "nothing"))).toBeNull();
+  // Over the worker link as root sent it; anything else is no grant.
+  const grant = grantOf(JSON.parse(JSON.stringify({ kind: "agy_auth", ...signedIn }))) ?? undefined;
+  expect(grant).toEqual({ kind: "agy_auth", ...signedIn });
+  expect(grantOf({ kind: "agy_auth", auth: "fake-access", type: "oauth-personal" })).toBeNull();
+  expect(grantOf({ kind: "agy_auth", auth: TOKEN, type: "api-key" })).toBeNull();
+
+  const worker = path.join(root, "worker");
+  const folders: AccountFolders = { accountDir: () => null, agentHome: (k, id) => agentAccountHome(worker, k, id) };
+  const own = agentAccountHome(worker, "antigravity", ACCOUNT) as string;
+  const file = path.join(own, AGY_SIGN_IN_FILE);
+  const one = await accountSignIn(folders, "antigravity", ACCOUNT, grant);
+  const two = await accountSignIn(folders, "antigravity", ACCOUNT, grant);
+  if (typeof one === "string" || typeof two === "string") throw new Error("no sign-in");
+  expect(one.home).toBe(own);
+  expect(JSON.parse(readFileSync(file, "utf8"))).toEqual(TOKEN);
+  expect(statSync(file).mode & 0o777).toBe(0o600);
+  expect(agyAuthOf(own)).toBe("oauth-business");
+  const settings = JSON.parse(readFileSync(path.join(own, ".gemini/antigravity-cli/settings.json"), "utf8"));
+  expect(settings.gcp).toEqual({ project: "acme-gemini" });
+  // The agent's last turn on it takes the copy with it.
+  one.release?.();
+  one.release?.();
+  expect(existsSync(file)).toBe(true);
+  two.release?.();
+  expect(existsSync(file)).toBe(false);
+  expect(await accountSignIn(folders, "antigravity", ACCOUNT, { kind: "none" })).toBe("signed_out");
+  // A worker killed mid-turn leaves its copy: the next one to start takes it away, whatever else is there.
+  const left = await accountSignIn(folders, "antigravity", ACCOUNT, grant);
+  if (typeof left === "string") throw new Error("no sign-in");
+  writeFileSync(path.join(agentAccountsDir(worker, "antigravity"), "stray"), "x");
+  dropAgySignIns(agentAccountsDir(worker, "antigravity"));
+  expect(existsSync(file)).toBe(false);
+  expect(agyAuthOf(own)).toBe("oauth-business");
+  left.release?.();
+  dropAgySignIns(path.join(root, "nothing"));
+  // The agent's own shell put a file where the CLI's folder was: the turn that ends still ends as it did.
+  const odd = await accountSignIn(folders, "antigravity", ACCOUNT, grant);
+  if (typeof odd === "string") throw new Error("no sign-in");
+  rmSync(path.dirname(file), { recursive: true, force: true });
+  writeFileSync(path.dirname(file), "x");
+  expect(() => odd.release?.()).not.toThrow();
+});
+
+test.skipIf(!posix)(
+  "system mode: one Gemini sign-in for all agents, root's and never lent, tried as a copy, a copy in each agent's turn",
+  async () => {
+    const home = tempDir("agy-accounts-");
+    dirs.push(home);
+    const log = path.join(home, "agy.log");
+    process.env.FAKE_AGY_LOG = log;
+    const m = new AccountManager({
+      root: path.join(home, "accounts"),
+      orgId: () => ORG,
+      platform: "linux",
+      commands: { antigravity: [process.execPath, FAKE] },
+      lending: { chown: async () => {} },
+    });
+    managers.push(m);
+    const dir = path.join(home, "accounts", "antigravity", ACCOUNT);
+    const begun = await m.begin("antigravity", ACCOUNT, false, undefined, undefined, true);
+    const aad = accountCodeAad(ACCOUNT, ORG);
+    await m.code(ACCOUNT, aad, await sealSecret(begun.publicKey as string, "4/0AbCdEf-code", aad));
+    await waitFor(() => m.status(ACCOUNT).state !== "waiting", 8000);
+    const account = {
+      id: ACCOUNT,
+      kind: "antigravity" as const,
+      loggedIn: true,
+      shared: true,
+      authMethod: "cli_login" as const,
+    };
+    expect(m.status(ACCOUNT)).toEqual({ state: "done", account });
+    // Its CLI in root's folder, then a copy of the sign-in in a home of its own, gone after.
+    expect(
+      logOf(log)
+        .filter((l) => l.args[0] === "models")
+        .map((l) => l.home),
+    ).toEqual([dir, path.join(dir, ".check")]);
+    expect(existsSync(path.join(dir, ".check"))).toBe(false);
+    expect(await m.lendTo("antigravity", ACCOUNT, 21001)).toBe(false);
+    m.invalidate();
+    expect(await m.list()).toEqual([account]);
+    // Its plan's usage, from its CLI in root's folder, which refreshes the sign-in in place meanwhile: a turn's copy is
+    // read once the file is whole again, never as an empty one that would sign every agent out.
+    process.env.FAKE_AGY_REFRESH_MS = "500";
+    m.probeUsage([ACCOUNT]);
+    await waitFor(() => statSync(path.join(dir, AGY_SIGN_IN_FILE)).size === 0, 5000);
+    const grant = (await m.grant("antigravity", ACCOUNT)) ?? undefined;
+    expect(grant).toEqual({ kind: "agy_auth", auth: { ...TOKEN, home: dir }, type: "oauth-personal" });
+    await waitFor(() => m.snapshot()?.[0]?.usage !== undefined, 5000);
+    delete process.env.FAKE_AGY_REFRESH_MS;
+    const worker = (n: number, given: typeof grant) => {
+      const { ctx, home: runner } = turnContext(path.join(home, `agent-${n}`));
+      const folders: AccountFolders = { accountDir: () => null, agentHome: (k, id) => agentAccountHome(runner, k, id) };
+      return {
+        ctx: { ...ctx, accounts: folders, grant: given },
+        own: agentAccountHome(runner, "antigravity", ACCOUNT),
+      };
+    };
+    // Two agents, each in its own folder for the account, with a copy only while its turn runs.
+    for (const n of [1, 2]) {
+      const { ctx, own } = worker(n, grant);
+      const events = await run(ctx, turn({ runId: RUN.replace(/1$/, String(n + 1)) }));
+      expect(events.at(-1)).toMatchObject({ type: "done" });
+      expect(logOf(log).at(-1)?.home).toBe(own as string);
+      expect(existsSync(path.join(own as string, AGY_SIGN_IN_FILE))).toBe(false);
+    }
+    // Refused in a turn: every agent's next turn says it is signed out.
+    await m.refused("antigravity", ACCOUNT);
+    expect(await m.grant("antigravity", ACCOUNT)).toEqual({ kind: "none" });
+    const out = await run(worker(3, { kind: "none" }).ctx, turn());
+    expect(out.at(-1)).toEqual({ type: "error", code: "not_logged_in", message: ACCOUNT_SIGNED_OUT, retryable: true });
+  },
+  30_000,
+);
+
+test.skipIf(!posix)(
+  "a Gemini sign-in for all agents whose copy doesn't sign in fails and says why; for one agent the same CLI signs in",
+  async () => {
+    const home = tempDir("agy-accounts-");
+    dirs.push(home);
+    const m = new AccountManager({
+      root: path.join(home, "accounts"),
+      orgId: () => ORG,
+      platform: "linux",
+      commands: { antigravity: [process.execPath, FAKE] },
+      lending: { chown: async () => {} },
+    });
+    managers.push(m);
+    const signInAs = async (n: number, shared: boolean, again = false) => {
+      const id = `0193eeee-0000-7000-8000-0000000000f${n}`;
+      const begun = await m.begin("antigravity", id, again, undefined, undefined, shared);
+      const aad = accountCodeAad(id, ORG);
+      await m.code(id, aad, await sealSecret(begun.publicKey as string, "4/0AbCdEf-code", aad));
+      await waitFor(() => m.status(id).state !== "waiting", 8000);
+      return { id, status: m.status(id) };
+    };
+    // A CLI whose sign-in holds only in the home it signed in from.
+    process.env.FAKE_AGY_BOUND = "1";
+    const bound = await signInAs(1, true);
+    expect(bound.status).toMatchObject({
+      state: "failed",
+      code: "not_kept",
+      message: "Error: Please sign in to view available models. Launch the CLI without arguments to sign in.",
+    });
+    expect(bound.status.error).toContain("a copy of that sign-in doesn't sign in, so it can't think for every agent");
+    await waitFor(() => !existsSync(path.join(home, "accounts", "antigravity", bound.id)), 3000);
+    expect((await signInAs(2, false)).status).toMatchObject({ state: "done", account: { loggedIn: true } });
+    // A CLI that keeps its sign-in somewhere else than its file, as in a keyring.
+    delete process.env.FAKE_AGY_BOUND;
+    process.env.FAKE_AGY_KEYRING = "1";
+    const elsewhere = await signInAs(3, true);
+    expect(elsewhere.status).toMatchObject({ state: "failed", code: "not_kept" });
+    expect(elsewhere.status.error).toContain(`no ${AGY_SIGN_IN_FILE}`);
+    expect(elsewhere.status.message).toBeUndefined();
+    // Signed in again, one whose copy doesn't sign in leaves the account signed out for every agent, never as signed in
+    // with a copy that fails each agent's next turn.
+    delete process.env.FAKE_AGY_KEYRING;
+    expect((await signInAs(4, true)).status).toMatchObject({ state: "done" });
+    process.env.FAKE_AGY_BOUND = "1";
+    const again = await signInAs(4, true, true);
+    expect(again.status).toMatchObject({ state: "failed", code: "not_kept" });
+    expect(await m.grant("antigravity", again.id)).toEqual({ kind: "none" });
+    m.invalidate();
+    expect((await m.list()).find((a) => a.id === again.id)).toMatchObject({ loggedIn: false, shared: true });
+  },
+  45_000,
+);
+
+test.skipIf(!posix)(
+  "a Gemini sign-in for all agents whose copy says nothing for sure fails with Try again, and signs no agent out",
+  async () => {
+    const home = tempDir("agy-accounts-");
+    dirs.push(home);
+    const m = new AccountManager({
+      root: path.join(home, "accounts"),
+      orgId: () => ORG,
+      platform: "linux",
+      commands: { antigravity: [process.execPath, FAKE] },
+      lending: { chown: async () => {} },
+      statusTimeoutMs: 2000,
+    });
+    managers.push(m);
+    const signInAs = async (n: number, again = false) => {
+      const id = `0193eeee-0000-7000-8000-0000000000e${n}`;
+      const begun = await m.begin("antigravity", id, again, undefined, undefined, true);
+      const aad = accountCodeAad(id, ORG);
+      await m.code(id, aad, await sealSecret(begun.publicKey as string, "4/0AbCdEf-code", aad));
+      await waitFor(() => m.status(id).state !== "waiting", 8000);
+      return { id, status: m.status(id) };
+    };
+    // Root's own CLI signed in; its copy, in the empty home, didn't answer in time.
+    process.env.FAKE_AGY_CHECK = "slow";
+    const slow = await signInAs(1);
+    expect(slow.status).toMatchObject({ state: "failed", code: "status_unknown" });
+    expect(slow.status.error).toContain("a copy of that sign-in didn't answer in time");
+    expect(slow.status.error).toContain("Try again.");
+    // Signed in again, its copy couldn't reach Google: what each agent's turn gets stays as it was.
+    delete process.env.FAKE_AGY_CHECK;
+    expect((await signInAs(2)).status).toMatchObject({ state: "done" });
+    process.env.FAKE_AGY_CHECK = "offline";
+    const offline = await signInAs(2, true);
+    expect(offline.status).toMatchObject({
+      state: "failed",
+      code: "status_unknown",
+      message:
+        'Error: Post "https://oauth2.googleapis.com/token": dial tcp: lookup oauth2.googleapis.com: no such host',
+    });
+    expect(offline.status.error).toContain("a copy of that sign-in didn't say whether it signs in");
+    expect(await m.grant("antigravity", offline.id)).toMatchObject({ kind: "agy_auth" });
+    m.invalidate();
+    expect((await m.list()).find((a) => a.id === offline.id)).toMatchObject({ loggedIn: true, shared: true });
+  },
+  45_000,
 );

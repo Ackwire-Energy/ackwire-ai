@@ -62,7 +62,6 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".onb__steps": "strip",
   ".newag .onb__steps": "strip",
   ".newag__tips": "strip",
-  ".issues-now__list": "strip",
   ".threads-tabs": "strip",
   ".nt-segwrap": "strip",
   ".mi-files__tabs": "strip",
@@ -79,8 +78,10 @@ const SIDEWAYS: Record<string, "strip" | "content"> = {
   ".pu-table-card": "content",
   ".spec-block__table": "content",
   ".machine-command__code": "content",
+  ".dsk-got>q": "content",
   ".md__table-scroll": "content",
   ".issues-boardwrap": "content",
+  ".issue-tablewrap": "content",
   ".team-tree": "content",
   ".mi-log": "content",
   ".mi-cmd__line": "content",
@@ -341,6 +342,7 @@ describe("columns that scroll on their own", () => {
     ".cal-side",
     ".cal-agenda",
     ".cal-week__scroll",
+    ".onb",
   ];
   test("each hides its thumb until the pointer or the keyboard is on it, with its room kept", async () => {
     const layout = topLevel(await read("apps/web/src/layout.css"));

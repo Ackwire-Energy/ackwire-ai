@@ -1,0 +1,1 @@
+ALTER TABLE "organization_settings" ADD COLUMN "agent_co_author" boolean DEFAULT true NOT NULL;

@@ -83,6 +83,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
     },
   });
   const proof = useDeletionProof(open, null, del.error);
+  const pending = del.isPending || proof.thisMac.pending;
   const { reset } = del;
   useEffect(() => {
     if (open) reset();
@@ -105,7 +106,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
   return (
     <Dialog
       open={open}
-      onOpenChange={(o) => !o && onClose()}
+      onOpenChange={(o) => !o && !pending && onClose()}
       title={t("deleteAccount.title")}
       description={t("deleteAccount.intro")}
       closeLabel={t("common.close")}
@@ -118,7 +119,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
           if (ready && proof.ready && !del.isPending) del.mutate(proof.input);
         }}
       >
-        <Locked when={del.isPending}>
+        <Locked when={pending}>
           <DialogBody>
             {plan.isError ? (
               <ErrorState error={plan.error} onRetry={() => void plan.refetch()} />
@@ -141,7 +142,9 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
                       </DeletionLine>
                     ) : (
                       <DeletionLine key={o.id} icon="stageTodo">
-                        {t("deleteAccount.soleOwner", { name: named(o) })}
+                        {t(o.onlyOutside ? "deleteAccount.soleOwnerOutside" : "deleteAccount.soleOwner", {
+                          name: named(o),
+                        })}
                         <span className="deletion-acts">
                           <Link
                             className="ac-link"
@@ -200,7 +203,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
           </DialogBody>
         </Locked>
         <DialogFooter>
-          <Button type="button" onClick={onClose}>
+          <Button type="button" onClick={onClose} disabled={pending}>
             {blockers.length > 0 ? t("common.close") : t("common.cancel")}
           </Button>
           {ready && (

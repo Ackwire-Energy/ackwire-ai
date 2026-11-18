@@ -1141,7 +1141,7 @@
 }
 .ifr__nav {
   display: flex;
-  gap: 2px;
+  gap: 8px;
   margin-top: -4px;
 }
 .ifr__more {

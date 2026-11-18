@@ -1,6 +1,6 @@
 import type { BrainSpeed, PlanUsage } from "@agenteschat/client";
 import { SPEEDS } from "@agenteschat/client/lib/brain-advanced";
-import { type ContextLimit, contextSize } from "@agenteschat/client/lib/context-limits";
+import { autoContextLine, type ContextLimit, contextSize } from "@agenteschat/client/lib/context-limits";
 import { planMeterText } from "@agenteschat/client/lib/plan-usage";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import {
@@ -26,6 +26,7 @@ import {
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { PlanModels } from "@/components/PlanModels";
 
 /*
  * The pieces of "Quem pensa" (ADR 0032 §5, addendum 2026-11-10), drawn like the rest of the dialogs under the sky: no
@@ -34,33 +35,38 @@ import { useTranslation } from "react-i18next";
 
 /**
  * The account's limits under its row, one line per window: its name, a bar, how much is used and when it renews
- * ("Semana ▬ 86% renova sáb 18:00"). Numbers out of date say how old they are.
+ * ("Semana ▬ 86% renova sáb 18:00"). Numbers out of date say how old they are. A plan whose models have limits of
+ * their own (`models`) lists them under the windows: the quota per model, which the account's windows can't show.
  */
-export function PlanWindows({ usage }: { usage: PlanUsage }) {
+export function PlanWindows({ usage, provider }: { usage: PlanUsage; provider?: string | null }) {
   const { t, i18n } = useTranslation();
   const text = planMeterText(t, i18n.language);
   const now = Date.now();
   const rows = planWindows(usage, now);
   const line = planLine(usage, text, now);
-  if (rows.length === 0) return null;
+  const models = <PlanModels usage={usage} provider={provider ?? null} />;
+  if (rows.length === 0) return models;
   return (
-    <div className="bd-wins">
-      {rows.map((w, i) => {
-        const name = text.window(w);
-        const renews = w.resetsAt && Date.parse(w.resetsAt) > now ? text.resets(w.resetsAt) : null;
-        return (
-          <div key={`${w.kind}:${w.label ?? i}`} className="bd-win" data-level={planLevel(w.used)}>
-            <span className="bd-win__name">{name}</span>
-            <span className="bd-win__bar" aria-hidden="true">
-              <i style={{ "--used": `${Math.min(100, w.used)}%` } as CSSProperties} />
-            </span>
-            <span className="bd-win__n">{w.used}%</span>
-            <small className="bd-win__at">{renews}</small>
-          </div>
-        );
-      })}
-      {line?.stale && line.age && <small className="bd-wins__age">{line.age}</small>}
-    </div>
+    <>
+      <div className="bd-wins">
+        {rows.map((w, i) => {
+          const name = text.window(w);
+          const renews = w.resetsAt && Date.parse(w.resetsAt) > now ? text.resets(w.resetsAt) : null;
+          return (
+            <div key={`${w.kind}:${w.label ?? i}`} className="bd-win" data-level={planLevel(w.used)}>
+              <span className="bd-win__name">{name}</span>
+              <span className="bd-win__bar" aria-hidden="true">
+                <i style={{ "--used": `${Math.min(100, w.used)}%` } as CSSProperties} />
+              </span>
+              <span className="bd-win__n">{w.used}%</span>
+              <small className="bd-win__at">{renews}</small>
+            </div>
+          );
+        })}
+        {line?.stale && line.age && <small className="bd-wins__age">{line.age}</small>}
+      </div>
+      {models}
+    </>
   );
 }
 
@@ -189,10 +195,13 @@ export function SpeedField({ value, onChange }: { value: BrainSpeed; onChange: (
 export function ContextField({
   value,
   options,
+  kind,
   onChange,
 }: {
   value: ContextLimit | null;
   options: readonly ContextLimit[];
+  /** The agent's program: "Automático" says where it summarises. */
+  kind: string;
   onChange: (value: ContextLimit | null) => void;
 }) {
   const { t } = useTranslation();
@@ -209,7 +218,9 @@ export function ContextField({
           ...options.map((n) => ({ value: String(n), label: contextSize(n) })),
         ]}
       />
-      <p className="bd-fold__hint">{t(`agentPage.work.brain.contextText.${shown ?? "auto"}`)}</p>
+      <p className="bd-fold__hint">
+        {shown === null ? autoContextLine(t, kind) : t(`agentPage.work.brain.contextText.${shown}`)}
+      </p>
     </>
   );
 }
@@ -231,8 +242,8 @@ export interface PickOption {
 const PICKS_SEARCHED = 10;
 
 /**
- * Choices as rows with a radio, the same rows as the accounts' without a mark: grouped under their maker where there
- * are several, a long list under a search.
+ * Choices as rows, the same rows as the accounts' without a mark (the border marks the one picked, no radio dot):
+ * grouped under their maker where there are several, a long list under a search.
  */
 export function PickList({
   options,
@@ -361,4 +372,21 @@ export function useGlide<T extends HTMLElement>(key: unknown) {
     return () => watch.disconnect();
   }, []);
   return ref;
+}
+
+/** "Só esta conta" (ADR 0041 §6): at a limit the agent waits for its own account instead of going on with the next. */
+export function PinAccount({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const { t } = useTranslation();
+  const id = useId();
+  return (
+    <div className="plan-replies">
+      <span className="ac-hintline">
+        <label htmlFor={id}>{t("agentPage.work.brain.pinned")}</label>
+        <InfoHint name={t("common.about", { label: t("agentPage.work.brain.pinned") })}>
+          {t("agentPage.work.brain.pinnedHint")}
+        </InfoHint>
+      </span>
+      <Switch id={id} checked={on} onCheckedChange={onChange} />
+    </div>
+  );
 }

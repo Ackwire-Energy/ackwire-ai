@@ -4,6 +4,7 @@ import { systemText } from "@agenteschat/providers";
 import {
   addChannelMember,
   archiveAgent,
+  BUILTIN_SCOPES,
   buildRunContext,
   changeMemberRole,
   createAgent,
@@ -14,18 +15,23 @@ import {
   ensureRightHand,
   ensureRightHands,
   exportBundle,
+  freshGrantedKeys,
   grantedScopeKeys,
   grantKey,
   insertMessage,
+  isAllowed,
+  NOT_IN_ALL,
   openPersonAgentDm,
   postPersonMessage,
   RIGHT_HAND,
+  RIGHT_HAND_GRANTS,
   reflectThread,
   rightHandPrompt,
   setAgentAudience,
   setAgentChannels,
   setAgentComputerTarget,
   setBillingHold,
+  toolAccess,
   updateAgent,
 } from "../src";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
@@ -109,17 +115,49 @@ test("it can't be archived, deleted or given other instructions; its name, model
   expect((await exportBundle(f.db, f.owner.id, f.org.id)).agents.map((a) => a.handle)).toEqual(["dev"]);
 });
 
-test("its tools are fixed in code: a grant row gives it nothing, and its memory tools are off", async () => {
+test("it holds every built-in scope an agent can be given, a computer's as rows it is made with, and its grant rows count on top", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);
   if (!lodi) throw new Error("no right hand");
-  await f.db.insert(schema.agentScopes).values({ orgId: f.org.id, agentId: lodi.id, scope: "sandbox:run" });
+  // A new built-in scope joins its list, or this fails: only a computer's stay out, which are rows.
+  expect([...RIGHT_HAND_GRANTS].sort()).toEqual(
+    Object.keys(BUILTIN_SCOPES)
+      .filter((scope) => !NOT_IN_ALL.has(scope))
+      .sort(),
+  );
+  const connectionId = crypto.randomUUID();
+  await f.db.insert(schema.agentScopes).values([
+    { orgId: f.org.id, agentId: lodi.id, connectionId, scope: "connector:*" },
+    { orgId: f.org.id, agentId: lodi.id, scope: "deny:send_dm" },
+  ]);
   const keys = await grantedScopeKeys(f.db, f.org.id, lodi.id);
-  expect(keys.has(grantKey(null, "sandbox:run"))).toBe(false);
-  expect(keys.has(grantKey(null, "setup:write"))).toBe(true);
-  expect(keys.has(grantKey(null, "deny:remember"))).toBe(true);
-  expect(keys.has(grantKey(null, "deny:web_fetch"))).toBe(true);
-  expect(keys.has(grantKey(null, "deny:add_agent_to_channel"))).toBe(true);
+  for (const scope of RIGHT_HAND_GRANTS) expect(keys.has(grantKey(null, scope))).toBe(true);
+  // An app given to it and a tool an admin turned off are rows, and both hold.
+  expect(keys.has(grantKey(connectionId, "connector:*"))).toBe(true);
+  expect(toolAccess(keys, { name: "send_dm", scope: "" })).toBe("denied");
+  // Its computer's scopes are rows it is made with, so an admin takes one away like any agent's.
+  for (const scope of NOT_IN_ALL) expect(keys.has(grantKey(null, scope))).toBe(true);
+  await f.db
+    .delete(schema.agentScopes)
+    .where(and(eq(schema.agentScopes.agentId, lodi.id), eq(schema.agentScopes.scope, "desktop:use")));
+  expect((await freshGrantedKeys(f.db, f.org.id, lodi.id)).has(grantKey(null, "desktop:use"))).toBe(false);
+  // What was denied to it is on like any agent's.
+  for (const [name, scope] of [
+    ["remember", "memory:write"],
+    ["web_fetch", ""],
+    ["post_message", ""],
+    ["work_in_background", ""],
+    ["add_agent_to_channel", ""],
+    ["request_permission", ""],
+    ["comment_issue", "issues:write"],
+    ["share_artifact", "drive:read"],
+    ["create_artifact", "drive:write"],
+    ["load_skill", "skills:read"],
+    ["vault_list", "vault:read"],
+    ["list_events", "calendar:read"],
+  ] as const)
+    expect(isAllowed(toolAccess(keys, { name, scope }))).toBe(true);
+  expect(toolAccess(keys, { name: "run_code", scope: "sandbox:run" })).toBe("granted");
 });
 
 test("it is in no channel and on no computer, whoever asks", async () => {
@@ -182,12 +220,14 @@ test("its prompt says what the person may do, and shows only the agents they may
   expect(member).not.toContain("@cofre");
   expect(member).toContain("(1 more agent this person can't see.)");
   expect(member).toContain("Never ask for a key, password or token in the chat");
-  // Its own tools only, whichever CLI thinks for it (ADR 0137 §4).
+  // Only our tools, whichever CLI thinks for it (ADR 0137 §4), and no computer of its own.
+  expect(member).toContain("Your tools are the agentes tools listed to you, the same an agent here can have");
   expect(member).toContain(
-    "You use only your agentes tools, which read files people give you, the Drive and the wiki.",
+    "You have no computer here, so you run no commands, keep no files on a machine and open no browser",
   );
-  expect(member).toContain("Never run commands, touch a computer's files");
+  expect(member).toContain("Use nothing that isn't an agentes tool");
   expect(member).toContain("never write out tokens, keys, passwords or sign-in data");
+  expect(member).not.toContain("No hands-on work");
   // Money only for who may see usage (ADR 0063).
   expect(owner).toMatch(/@dev \(Dev\)[^\n]*budget US\$/);
   expect(member).toMatch(/@dev \(Dev\)[^\n]*% of its monthly budget used/);
@@ -272,7 +312,7 @@ test("its setup checklist names the workspace's context and a computer until the
   expect(await prompt()).toContain("No computer is ready for the agents yet");
 });
 
-test("nothing said to it becomes memory", async () => {
+test("nothing said to it is reflected into the team's memory", async () => {
   f = await setup({ rightHand: true });
   const [lodi] = await rightHandOf(f.org.id);
   if (!lodi) throw new Error("no right hand");
@@ -383,7 +423,8 @@ test("with nobody behind its run (another agent's message), it still keeps to it
   const text = systemText(
     (await buildRunContext(f.db, { ...run, triggerMessageId: byAgent.id }, lodi, { maxMessages: 10 })).system,
   );
-  expect(text).toContain("# Your tools\nYou use only your agentes tools,");
+  expect(text).toContain("# Your tools\nYour tools are the agentes tools listed to you");
+  expect(text).toContain("Use nothing that isn't an agentes tool");
 });
 
 test("in no channel, an @mention in any channel still reaches it, and only that", async () => {

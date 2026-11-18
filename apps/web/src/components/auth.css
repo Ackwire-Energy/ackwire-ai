@@ -153,14 +153,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* The desktop app's line over the sign-in: which server it signs in to (ADR 0158), the server's name in the ink. */
-.auth__server {
-  color: var(--muted);
-}
-.auth__server b {
-  font-weight: 600;
-  color: var(--ink);
-}
 .auth__who-change,
 .auth__fix,
 .auth__quiet {
@@ -278,19 +270,18 @@ html:not([data-pointer]) .auth__quiet:focus-visible {
   height: 20px;
   flex: none;
 }
-/* "Último usado" belongs to the button above it: tight under it, the next button at the list's own gap. */
-.auth-social__item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+/* "Último usado" sits on the button's top-right corner, half over its border, out of the flow. */
+.auth-last-host {
+  position: relative;
 }
-.auth-social__last {
-  justify-content: center;
-  gap: 4px;
-  font-size: 12.5px;
-  line-height: 18px;
-  font-weight: 500;
-  color: var(--muted);
+.auth-last {
+  position: absolute;
+  top: -9px;
+  right: var(--space-3);
+  height: 18px;
+  font-size: 11px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--agent) 35%, transparent);
+  pointer-events: none;
 }
 .auth__fine {
   margin: 0;
@@ -316,6 +307,33 @@ html:not([data-pointer]) .auth__quiet:focus-visible {
 .auth__fine a {
   color: var(--muted);
 }
+/* A screen in place of the app (a suspended workspace, an account waiting for its deletion): the other workspaces
+   stacked under their heading, and deleting the account apart at the foot (ADR 0088 §10). */
+.auth__ways,
+.auth__apart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.auth__ways > h2,
+.auth__apart > h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--muted);
+}
+.auth__apart {
+  align-items: flex-start;
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+}
+.auth__apart > p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
 /* "Já tem conta? Entrar" under a form (the invitation page) */
 .auth__foot {
   margin: 8px 0 0;
@@ -332,4 +350,104 @@ html:not([data-pointer]) .auth__quiet:focus-visible {
   .auth__title {
     font-size: 19px;
   }
+}
+
+/* A registered host's look (ADR 0194). Its lockup stays in the flow, clear of the language on the right, so a long name
+   wraps above the column, never over it: under a one-line lockup the column still starts 96 from the top (80 on a
+   phone). */
+.auth--host {
+  flex-direction: column;
+  align-items: center;
+  padding-top: 24px;
+}
+.auth--host .auth__logo {
+  position: static;
+  align-self: stretch;
+  padding: 0 192px 44px 12px;
+}
+.auth__host-logo {
+  display: block;
+  height: 28px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  object-position: left center;
+}
+.auth__host-name {
+  display: block;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+/* "Powered by agentes.chat": one quiet line under the form. */
+.auth__powered {
+  margin: var(--space-8) 0 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+  text-align: center;
+}
+.auth__powered .ac-link {
+  color: inherit;
+}
+@media (max-width: 560px) {
+  .auth--host .auth__logo {
+    padding: 0 184px 28px 0;
+  }
+}
+
+/* The line under every sign-in: which server it signs in to (ADR 0158), the place in the ink, then Trocar. */
+.auth__place {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--faint);
+  text-align: center;
+}
+.auth__place .ac-icon {
+  flex: none;
+}
+.auth__place b {
+  font-weight: 600;
+  color: var(--muted);
+}
+.auth__place-where {
+  overflow-wrap: anywhere;
+}
+.auth__place-change {
+  font-size: inherit;
+}
+
+/* A screen in place of a workspace someone isn't in (`NotMember`): the mark, what happened, one line on how to get in,
+   and the way back, centred in the column. */
+.auth__notice {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-4);
+  max-width: 380px;
+  margin: 0 auto;
+  text-align: center;
+}
+.auth__notice > h1 {
+  margin: var(--space-1) 0 0;
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.auth__notice > p {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-1);
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--muted);
+  text-wrap: pretty;
 }

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { PubSub } from "@agenteschat/adapters";
-import { type Database, eq, schema } from "@agenteschat/db";
+import { type Database, eq, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText } from "@agenteschat/providers";
 import type { FakeReply } from "@agenteschat/providers/testing";
 import {
@@ -29,10 +29,10 @@ type Call = { name: string; input: Record<string, unknown> };
 
 /**
  * A fixture whose agent, in a run that isn't a widget's, calls `calls` once (in order, one per turn) and then answers
- * that it is done; `results` gets each tool result it read.
+ * that it is done; `results` gets each tool result it read. `ai`: what the tools check a widget's build against.
  */
-async function setupAgent(calls: (req: ModelRequest) => Call[], results: string[] = []) {
-  const deps = { db: undefined as unknown as Database, pubsub: undefined as unknown as PubSub } as DashboardDeps;
+async function setupAgent(calls: (req: ModelRequest) => Call[], results: string[] = [], ai?: DashboardDeps["ai"]) {
+  const deps = { db: undefined as unknown as Database, pubsub: undefined as unknown as PubSub, ai } as DashboardDeps;
   const source = createDashboardToolSource(deps);
   f = await setup({
     toolSources: [source],
@@ -69,6 +69,7 @@ async function roleFor(userId: string, name = "Vendas") {
   return role;
 }
 
+const KPI = { kind: "kpi", value: 18420, prefix: "R$" };
 const WHY = "O time de vendas acompanha a Black Friday pelo mesmo painel.";
 
 describe("create_dashboard", () => {
@@ -225,7 +226,8 @@ describe("create_widget", () => {
       alertEnabled: true,
       alertCondition: "cair 20% abaixo de ontem",
       alertUserId: f.owner.id,
-      createdByUserId: null,
+      // The person behind the run that made it.
+      createdByUserId: f.owner.id,
     });
     expect(shown?.createdByRunId).not.toBeNull();
     expect(shown?.routineId).not.toBeNull();
@@ -284,6 +286,94 @@ describe("create_widget", () => {
     await ask("põe no outro painel");
     expect(results.at(-1)).toContain(`No dashboard ${other}`);
     expect(await widgets()).toHaveLength(1);
+  });
+
+  test("its agent with no AI for its build: it waits for one, and the reply says why and who fixes it", async () => {
+    const results = await setupAgent(
+      (req) =>
+        JSON.stringify(req.messages.at(-1)?.content).includes("visitas")
+          ? [{ name: "create_widget", input: { title: "Visitas", prompt: "Visitas do site hoje", schedule: "day" } }]
+          : [],
+      [],
+      // The chat thinks on its key; where a build looks, there's none.
+      { gateway: { hasModelCredential: async () => false } },
+    );
+    await ask("mostra as visitas do site no meu início");
+    const [made] = await widgets();
+    expect(made).toMatchObject({ status: "failed", failureCode: "missing_credential", failureDetail: "no_key" });
+    expect(await f.db.select().from(schema.routineRuns)).toEqual([]);
+    expect(results[0]).toContain("It can't be built yet");
+    expect(results[0]).toContain("you have no AI to think with. Tell ana to connect one on your page");
+    expect(results[0]).not.toContain("builds it in the background shortly");
+  });
+
+  test("made in a routine's run, nobody is behind it: it names no person, and its routine is its creator's", async () => {
+    await setupAgent((req) =>
+      isRoutineRun(req)
+        ? [{ name: "create_widget", input: { title: "Vendas", prompt: "Vendas de hoje", schedule: "day", data: KPI } }]
+        : [],
+    );
+    const routine = await channelRoutine(f, { prompt: "Monte o widget de vendas." });
+    await runRoutineNow(routineDeps(f), f.owner.id, f.org.id, routine.id);
+    await drainOutbox(f.db, f.handlers);
+    const [made] = await widgets();
+    expect(made).toMatchObject({ title: "Vendas", createdByUserId: null });
+    expect(made?.createdByRunId).not.toBeNull();
+    const [its] = await f.db
+      .select()
+      .from(schema.routines)
+      .where(eq(schema.routines.id, made?.routineId ?? ""));
+    expect(its?.createdByUserId).toBe(f.owner.id);
+  });
+
+  test("the backfill names the person whose message started the run; the rest stay unnamed, a Home's too", async () => {
+    let boardId = "";
+    await setupAgent((req) =>
+      JSON.stringify(req.messages).includes("vendas")
+        ? [
+            {
+              name: "create_widget",
+              input: { dashboard_id: boardId, title: "Vendas", prompt: "Vendas de hoje", schedule: "day", data: KPI },
+            },
+          ]
+        : [],
+    );
+    const bia = await addMember(f.db, f.org.id, "member", "bia");
+    const shared = await createDashboard(dash(), bia.id, f.org.id, {
+      title: "Loja",
+      audience: "workspace",
+      editPolicy: "viewers",
+    });
+    boardId = shared.id;
+    const [home] = await f.db
+      .insert(schema.dashboards)
+      .values({ orgId: f.org.id, kind: "home", title: "", ownerUserId: bia.id })
+      .returning();
+    await ask("quero as vendas no painel Loja");
+    const [asked] = await widgets();
+    expect(asked?.dashboardId).toBe(shared.id);
+    const row = (dashboardId: string) => ({
+      orgId: f.org.id,
+      dashboardId,
+      agentId: f.agent.id,
+      title: "Pedidos",
+      createdByRunId: Bun.randomUUIDv7(),
+    });
+    // Made by runs that are gone: one on a person's Home, one on a board many people use.
+    const [onHome] = await f.db
+      .insert(schema.dashboardWidgets)
+      .values(row(home?.id ?? ""))
+      .returning();
+    const [onShared] = await f.db.insert(schema.dashboardWidgets).values(row(shared.id)).returning();
+    await f.db.update(schema.dashboardWidgets).set({ createdByUserId: null });
+    const text = await Bun.file(
+      new URL("../../db/migrations/0257_widget_creator_backfill.sql", import.meta.url).pathname,
+    ).text();
+    for (const statement of text.split("--> statement-breakpoint")) await f.db.execute(sql.raw(statement));
+    const by = new Map((await widgets()).map((w) => [w.id, w.createdByUserId]));
+    expect(by.get(asked?.id ?? "")).toBe(f.owner.id);
+    expect(by.get(onHome?.id ?? "")).toBeNull();
+    expect(by.get(onShared?.id ?? "")).toBeNull();
   });
 
   test("invalid data is refused with what to fix", async () => {

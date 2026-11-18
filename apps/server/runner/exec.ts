@@ -1,6 +1,7 @@
 import { type ChildProcess, spawn } from "node:child_process";
 import type { EventEmitter } from "node:events";
 import { constants } from "node:os";
+import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
 import type { MachineReplies } from "@agenteschat/adapters/machine-protocol";
 
@@ -98,13 +99,30 @@ export function shellCommand(command: string): { file: string; args: string[]; v
   return { file: "/bin/sh", args: ["-c", command], verbatim: false };
 }
 
+/** `taskkill` by its full path: a bare name is looked for in the current folder first. */
+export const windowsTaskkill = () =>
+  path.win32.join(process.env.SystemRoot || "C:\\Windows", "System32", "taskkill.exe");
+
 /** Kills the command and everything it started. */
-export function killTree(child: { pid?: number; kill(signal: NodeJS.Signals): unknown }, signal: NodeJS.Signals) {
+export function killTree(
+  child: {
+    pid?: number;
+    exitCode?: number | null;
+    signalCode?: NodeJS.Signals | null;
+    kill(signal: NodeJS.Signals): unknown;
+  },
+  signal: NodeJS.Signals,
+) {
   const pid = child.pid;
   if (pid === undefined) return;
   if (process.platform === "win32") {
+    // Already ended: its pid may be another process's now. (`taskkill /T` follows a tree only while its root lives.)
+    if (typeof child.exitCode === "number" || child.signalCode) return;
     try {
-      const killer = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+      const killer = spawn(windowsTaskkill(), ["/pid", String(pid), "/T", "/F"], {
+        stdio: "ignore",
+        windowsHide: true,
+      });
       (killer as unknown as EventEmitter).on("error", () => {});
     } catch {
       // already gone
@@ -119,6 +137,44 @@ export function killTree(child: { pid?: number; kill(signal: NodeJS.Signals): un
     } catch {
       // already gone
     }
+  }
+}
+
+const PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+/** Milliseconds between 1601-01-01 (a Windows FILETIME's zero) and the Unix epoch. */
+const FILETIME_EPOCH_MS = 11_644_473_600_000;
+let kernel32: ReturnType<typeof openKernel32> | undefined;
+async function openKernel32() {
+  const { dlopen, FFIType, ptr } = await import("bun:ffi");
+  const { symbols } = dlopen("kernel32.dll", {
+    OpenProcess: { args: [FFIType.u32, FFIType.i32, FFIType.u32], returns: FFIType.ptr },
+    GetProcessTimes: { args: [FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr, FFIType.ptr], returns: FFIType.i32 },
+    CloseHandle: { args: [FFIType.ptr], returns: FFIType.i32 },
+  });
+  return { ...symbols, ptr };
+}
+
+/**
+ * When a process started (ms since the epoch), on Windows; null elsewhere, or when it is gone or can't be read.
+ * Windows hands a freed pid to the next process at once: a pid with its start time names one process. A direct
+ * system call, since asking PowerShell takes about a second.
+ */
+export async function processStartedAt(pid: number): Promise<number | null> {
+  if (process.platform !== "win32") return null;
+  try {
+    kernel32 ??= openKernel32();
+    const k = await kernel32;
+    const handle = k.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+    if (!handle) return null;
+    try {
+      const times = new BigUint64Array(4);
+      const ok = k.GetProcessTimes(handle, k.ptr(times), k.ptr(times, 8), k.ptr(times, 16), k.ptr(times, 24));
+      return ok ? Number((times[0] ?? 0n) / 10_000n) - FILETIME_EPOCH_MS : null;
+    } finally {
+      k.CloseHandle(handle);
+    }
+  } catch {
+    return null;
   }
 }
 

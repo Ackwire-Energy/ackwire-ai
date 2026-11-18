@@ -84,14 +84,39 @@ describe("the rows follow the same choice as the web", () => {
 
   test("a DM drops the name only where a bubble stands: a card alone keeps it ahead of its time", async () => {
     const row = await read("chat/MessageRow.tsx");
-    expect(row).toContain("{!inBubble || look.names ? (");
+    // Another agent helping in an agent's DM keeps its name: the DM names only its own agent.
+    expect(row).toContain("{!inBubble || look.names || helping ? (");
     expect(row).not.toContain("{!bubbled || look.names ? (");
   });
 
   test("opening at the last read message goes to the line, once, with no glide", async () => {
     const chat = await read("chat/ChatScreen.tsx");
-    expect(chat).toContain("firstUnreadId(list, from.at, meId)");
-    expect(chat).toContain("holdAt(id ?? undefined, 0, false);");
+    expect(chat).toContain("firstUnreadId(list, openFrom.at, meId)");
+    expect(chat).toContain("void openAtLine(key).then(() => {");
+    // The "Novas" line itself, at the top of the room under the bar: sent to the list's top as it was, it landed
+    // behind the bar, the line and the first new message hidden.
+    expect(chat).toContain("const line = list?.getState().indexByKey(DIVIDER_KEY);");
+    expect(chat).toContain("const viewOffset = band.current.top + BAND_GAP;");
+    expect(chat).toContain(
+      "void list.scrollToIndex({ index, animated: false, viewPosition: 0, viewOffset }).finally(landed);",
+    );
+    expect(chat).toContain("band.current = { top: hasPin ? 0 : headerHeight, lift };");
+    // The list shows once it is there, never its end first, and with the rows that load beside the messages (the
+    // threads' links, the agents' questions) already in: none grows under the person. Those two hold it at most
+    // `ROWS_WAIT_MS` once the messages are in; its fallback still shows it. Messages already on the phone show at once,
+    // never held behind those two reads.
+    expect(chat).toContain("onReady={onListReady}");
+    expect(chat).toMatch(
+      /if \(\s*listReady\.current &&\s*atReadDone\.current &&\s*!goingToLine\.current &&\s*\(rowsCompleteRef\.current \|\| rowsWaitOver\.current\)\s*\)\s*revealList\(\);/,
+    );
+    expect(chat).toContain("const ROWS_WAIT_MS = 200;");
+    expect(chat).toMatch(/rowsWaitOver\.current = true;\s*revealOpened\(\);\s*\}, ROWS_WAIT_MS\);/);
+    expect(chat).toMatch(
+      /const rowsComplete =\s*openedOnPhone \|\| \(\(isThread \|\| !readable \|\| channelThreads\.isFetched\) && consultations\.isFetched\);/,
+    );
+    expect(chat).toContain("const timer = setTimeout(revealList, SHOW_LIST_MS);");
+    // Never over a message the screen was asked to open at.
+    expect(chat).toContain("!isThread && !focusId && opensAtLastRead(");
   });
 
   test("a DM whose sides say who spoke has no face: its bodies and quiet rows start at the rows' own padding", () => {
@@ -149,9 +174,9 @@ describe("the rows follow the same choice as the web", () => {
     expect(page).toContain("save(dm ? { dmStyle: s } : { channelStyle: s })");
   });
 
-  test("a conversation opens at the last read message until the person picks the newest, as on the web", async () => {
-    expect(openAtOf(undefined)).toBe("read");
-    expect(openAtOf({ openAt: "latest" })).toBe("latest");
+  test("a conversation opens at the newest message until the person picks the last read, as on the web", async () => {
+    expect(openAtOf(undefined)).toBe("latest");
+    expect(openAtOf({ openAt: "read" })).toBe("read");
     expect(await read("me/ChatLookPage.tsx")).toContain("const openAt = openAtOf(prefs);");
     expect(await read("chat/ChatScreen.tsx")).toContain("opensAtLastRead(org?.chatPrefs");
   });
@@ -204,7 +229,9 @@ describe("Tamanho do texto on the phone", () => {
     const page = await read("me/ChatLookPage.tsx");
     // A stepped slider (small A, five steps, big A) the preview follows while it moves; saved when it lands.
     expect(page).toContain("save({ textSize: v })");
-    expect(page).toContain("<ChatPreview style={style} tone={tone} size={shownSize} dm={dm} />");
+    expect(page).toContain(
+      "<ChatPreview style={style} tone={tone} size={shownSize} dm={dm} wallpaper={shownWallpaper} />",
+    );
     expect(page).toContain('accessibilityRole="adjustable"');
     expect(page).toContain("accessibilityValue={{ text: labels[value] }}");
     expect(page).toContain("{labels[DEFAULT_TEXT_SIZE]}");

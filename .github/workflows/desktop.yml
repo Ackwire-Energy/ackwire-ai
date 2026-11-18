@@ -13,7 +13,7 @@ name: Desktop
 #            updater bundle)
 #   Linux    agentes_<v>_{amd64,arm64}.deb (+ .sha256), agentes_<v>_{amd64,arm64}.AppImage (+ .sha256, + .sig)
 # Every app carries the runner and agent-browser (ADR 0040), and the server's own files, built once from the
-# same commit (the `server` job: JavaScript and WebAssembly, the same on every system), for "Run agentes.chat
+# same commit (the `server` job: JavaScript and WebAssembly, the same on every system), for "Run Ackwire AI
 # on this computer" (ADR 0066; tauri.native.conf.json adds them to the resources). `none` only builds the
 # current version as artifacts. `platforms` can leave systems out, also from a release: the server gives each
 # system the newest release that has its download. macOS runners cost about 10x
@@ -92,6 +92,8 @@ jobs:
           fi
           PREV=$(git describe --tags --abbrev=0 --match 'desktop-v*' 2>/dev/null || true)
           if [ -z "$NOTES" ]; then
+            # -n, not `| head`: with more than 40 commits head closes the pipe, git log dies of it and
+            # pipefail ends the step (exit 141).
             NOTES=$(git log -n 40 --no-merges --format='- %s' ${PREV:+"$PREV"..HEAD})
           fi
           # Only the version line changes (jq would reformat the whole file).
@@ -132,7 +134,7 @@ jobs:
           echo "tag=${RELEASE_TAG:-}" >> "$GITHUB_OUTPUT"
           echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-  # "Run agentes.chat on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit, built
+  # "Run Ackwire AI on this computer" (ADR 0066): the server's server/ and web/ folders, from this commit, built
   # once on Linux (the same files on every system; on Windows the build's own paths would lose the bundled
   # packages' licenses) and shipped among each app's resources (tauri.native.conf.json), signed with the app.
   server:
@@ -480,7 +482,7 @@ jobs:
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
-          bun run tauri icon app-icon.png
+          bun run tauri icon app-icon-tile.png
           bun scripts/installer-art.ts
 
       # The cached target may keep an older build's installer (another version): only this build's may be there.
@@ -625,7 +627,7 @@ jobs:
         working-directory: apps/desktop
         run: |
           bun scripts/icons.ts
-          bun run tauri icon app-icon.png
+          bun run tauri icon app-icon-tile.png
 
       - name: Build the app (AppImage, deb)
         uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
@@ -637,7 +639,8 @@ jobs:
         with:
           projectPath: apps/desktop
           tauriScript: bun run tauri
-          args: --config src-tauri/tauri.native.conf.json
+          # --verbose: without it a failed AppImage says only "failed to run linuxdeploy", never which file or step.
+          args: --config src-tauri/tauri.native.conf.json --verbose
 
       - name: Name the build files and the checksums
         shell: bash

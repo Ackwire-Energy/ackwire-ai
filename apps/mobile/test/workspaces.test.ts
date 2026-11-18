@@ -1,19 +1,27 @@
 import { describe, expect, test } from "bun:test";
-import type { OrgSummary } from "@agenteschat/client";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Me, OrgSummary } from "@agenteschat/client";
 import { workspacesBeyond } from "../src/features/me/logic";
 import { orderedServers, unreadElsewhere, workspacesOf } from "../src/features/me/workspaces-logic";
-import { newWorkspaceMade } from "../src/lib/new-workspace";
+import { newWorkspaceMade, offersNewWorkspaceHere } from "../src/lib/new-workspace";
 import { readPushData } from "../src/lib/push-payload";
 import {
+  accountsFrom,
   claimedPrefixes,
   cookieTo,
   perServerName,
+  placeFor,
+  placeFrom,
   prefixesFrom,
   pushPlace,
   serverAfter,
   serverListFrom,
+  serverOf,
   serverSlug,
   serverToReturn,
+  sharedAccounts,
+  twinPlace,
   withoutServer,
   withPrefix,
   withServer,
@@ -172,6 +180,21 @@ describe("Workspaces", () => {
     expect(newWorkspaceMade({ server: cloud, from: "a" }, "new")).toBe(true);
     expect(newWorkspaceMade({ server: cloud, from: null }, "new")).toBe(true);
   });
+
+  test("Adicionar workspace on a server of one's own makes one there first, when the person may", () => {
+    const me = (canCreateWorkspace?: boolean) => ({ user: { canCreateWorkspace } }) as Me;
+    expect(offersNewWorkspaceHere(box, me(true))).toBe(true);
+    // An older server doesn't say: it may.
+    expect(offersNewWorkspaceHere(box, me())).toBe(true);
+    expect(offersNewWorkspaceHere(box, me(false))).toBe(false);
+    expect(offersNewWorkspaceHere(box, undefined)).toBe(false);
+    // On agentes.chat its own row makes one there.
+    expect(offersNewWorkspaceHere(cloud, me(true))).toBe(false);
+    const sheet = readFileSync(join(import.meta.dir, "../src/features/me/WorkspacesPages.tsx"), "utf8");
+    expect(sheet).toContain("{offersNewWorkspaceHere(server, me) ? (");
+    expect(sheet).toContain('label={t("shell.newWorkspace")}');
+    expect(sheet).toContain("askNewWorkspace(server);");
+  });
 });
 
 describe("Você's workspace row", () => {
@@ -196,5 +219,55 @@ describe("Você's workspace row", () => {
       others: 0,
       servers: 1,
     });
+  });
+});
+
+// Several accounts on one server (ADR 0183).
+describe("accounts on one server", () => {
+  const second = placeFor(cloud, "b2c3");
+  const ana = { id: "u-ana", name: "Ana", email: "ana@example.com" };
+  const bia = { id: "u-bia", name: "Bia", email: "bia@example.com" };
+
+  test("a place is a server or one of its accounts, and only its server is an address", () => {
+    expect(serverOf(cloud)).toBe(cloud);
+    expect(serverOf(second)).toBe(cloud);
+    expect(placeFrom(`${cloud}/#b2c3`)).toBe(second);
+    expect(placeFrom(`${cloud}#not an id`)).toBeNull();
+    expect(placeFrom("not a server#b2c3")).toBeNull();
+    expect(serverListFrom(JSON.stringify([cloud, second, second, `${box}#`]))).toEqual([cloud, second]);
+  });
+
+  test("who is at each place is read back as saved, anything else dropped", () => {
+    const saved = JSON.stringify({ [cloud]: ana, [second]: bia, "not a server": ana, [box]: { name: "No id" } });
+    expect(accountsFrom(saved)).toEqual({ [cloud]: ana, [second]: bia });
+    expect(accountsFrom("{")).toEqual({});
+  });
+
+  test("signing in to an added account as someone already there lands on theirs", () => {
+    const accounts = { [cloud]: ana, [second]: bia };
+    const third = placeFor(cloud, "c3d4");
+    expect(twinPlace(third, "u-ana", [cloud, second], accounts)).toBe(cloud);
+    expect(twinPlace(third, "u-new", [cloud, second], accounts)).toBeNull();
+    // The same person on another server is another account.
+    expect(twinPlace(box, "u-ana", [cloud, second], accounts)).toBeNull();
+    expect(twinPlace(cloud, "u-ana", [cloud, second], accounts)).toBeNull();
+  });
+
+  test("the accounts of one server share the phone's push token there", () => {
+    const accounts = { [cloud]: ana, [second]: bia, [box]: ana };
+    expect(sharedAccounts(cloud, [cloud, second, box], accounts)).toEqual(["u-bia"]);
+    expect(sharedAccounts(box, [cloud, second, box], accounts)).toEqual([]);
+  });
+
+  test("a push opens as the account it is for", () => {
+    const who = (user: string | undefined) => ({ user, accounts: { [cloud]: ana, [second]: bia } });
+    expect(pushPlace(cloud, cloud, [cloud, second], who("u-ana"))).toEqual({ kind: "here" });
+    expect(pushPlace(cloud, cloud, [cloud, second], who("u-bia"))).toEqual({ kind: "switch", server: second });
+    expect(pushPlace(cloud, second, [cloud, second], who("u-bia"))).toEqual({ kind: "here" });
+    // Someone this phone signed out of since.
+    expect(pushPlace(cloud, cloud, [cloud, second], who("u-gone"))).toEqual({ kind: "gone" });
+    // An older server names nobody: on that server, as before.
+    expect(pushPlace(cloud, second, [cloud, second], who(undefined))).toEqual({ kind: "here" });
+    expect(pushPlace(box, second, [cloud, second, box], who(undefined))).toEqual({ kind: "switch", server: box });
   });
 });

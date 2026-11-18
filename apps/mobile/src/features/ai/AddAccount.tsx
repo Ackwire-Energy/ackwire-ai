@@ -1,11 +1,14 @@
 import type { AccountLoginStart, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountInLine, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   beginLogin,
   freeDuplicate,
+  geminiNotShared,
   isSignInCode,
+  isUrlWithoutCode,
+  loginFailureLine,
   loginRead,
   loginReadPasses,
   otherThanHint,
@@ -13,12 +16,12 @@ import {
 import { GEMINI_ENTERPRISE_PROVIDER, planKeyFits, signInKey } from "@agenteschat/client/lib/plans";
 import { accountCodeAad } from "@agenteschat/client/lib/secret-box";
 import { useQueryClient } from "@tanstack/react-query";
-import * as Clipboard from "expo-clipboard";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AccessibilityInfo, ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, Platform, StyleSheet, View } from "react-native";
 import { sealSecret } from "@/lib/secret-box";
-import { Button, InkOrbit, Text, useTheme } from "@/ui";
+import { Button, fonts, InkOrbit, SkeletonList, Text, useTheme } from "@/ui";
+import { copyText, successHaptic } from "../shared/parts";
 import { useAiOrg } from "./org";
 import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waiting } from "./parts";
 
@@ -37,6 +40,8 @@ import { Note, OpenPage, openPage, PasteField, Step, StepsCard, StepText, Waitin
 
 /** Where ChatGPT allows signing in with a code (Settings › Security): Codex's device sign-in needs it. */
 const CHATGPT_SECURITY = "https://chatgpt.com/#settings/Security";
+/** How long "Copied" stays beside a device code before it says "Copy" again (as the invitation screens). */
+const COPIED_MS = 1800;
 
 export interface AddAccountProps {
   machineId: string;
@@ -78,7 +83,6 @@ export interface AddAccountProps {
 export function AddAccount(props: AddAccountProps) {
   const { t } = useTranslation();
   const { orgId } = useAiOrg();
-  const { colors: c } = useTheme();
   // "Tentar de novo" starts over with a new sign-in.
   const [attempt, setAttempt] = useState(0);
   // A new sign-in where the person already has that plan's account on that computer, as on the web: Entrar de novo
@@ -95,9 +99,10 @@ export function AddAccount(props: AddAccountProps) {
       : undefined;
     setReuse(found ?? null);
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
-  if (reuse === undefined) return <ActivityIndicator color={c.muted} />;
+  // Whether there is an account to sign in again first: the steps' shape until it's known.
+  if (reuse === undefined) return <SkeletonList rows={2} />;
   const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
-  const label = reuse ? accountTitle(reuse) : "";
+  const label = reuse ? accountInLine(t, reuse) : "";
   const another = (
     <Button size="sm" variant="secondary" label={t("connectAi.another")} onPress={() => setPick("new")} />
   );
@@ -235,8 +240,17 @@ function AddAccountFlow({
   }, [result, hint, onAdded]);
 
   const noAnswer = startFailed !== null || read === "noAnswer";
+  const failure = loginFailureLine(result?.code);
+  // Canceled from somewhere else: nothing went wrong, so no line; the sign-in starts over.
+  const canceled = (result?.state === "failed" || result?.state === "expired") && failure.key === null;
+  useEffect(() => {
+    if (canceled) onRetry();
+  }, [canceled, onRetry]);
   const ended =
-    other !== null || noAnswer || read === "failed" || result?.state === "failed" || result?.state === "expired";
+    other !== null ||
+    noAnswer ||
+    read === "failed" ||
+    (!canceled && (result?.state === "failed" || result?.state === "expired"));
   // The code or the key on its way to the computer, then the computer signing in with it: a line stands in for the
   // field and Enviar until the sign-in ends.
   const busy = (sending || sent) && !ended;
@@ -287,10 +301,16 @@ function AddAccountFlow({
   };
 
   const copy = async () => {
-    if (!login?.userCode) return;
-    await Clipboard.setStringAsync(login.userCode).catch(() => undefined);
+    if (!login?.userCode || !(await copyText(login.userCode))) return;
+    successHaptic();
     setCopied(true);
   };
+  // "Copied" for a moment, then "Copy" again, as the invitation's link says it.
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), COPIED_MS);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   const waiting = (
     <Waiting
@@ -326,7 +346,8 @@ function AddAccountFlow({
             variant="primary"
             wide
             label={t("agentPage.work.brain.add.send", { computer })}
-            disabled={!valid || !ready || loading}
+            loading={loading}
+            disabled={!valid || !ready}
             onPress={() => void send()}
           />
         </View>
@@ -346,6 +367,10 @@ function AddAccountFlow({
   // Not the account it was for: a new login that came back as another (`other`), or signing in again as another,
   // which the server keeps signed out, saying which came back.
   const otherEmail = other?.email ?? (hint ? result?.signedInAs : undefined);
+  // The computer's own reason is the line only when nothing nearer the person explains it.
+  const byCode = !otherEmail && !noAnswer && result?.state !== "expired" && !result?.duplicate;
+  // Trying again would end the same way: no Tentar de novo, the words say what to use instead.
+  const notShared = geminiNotShared(kind, result);
   const why = otherEmail
     ? t(`connectAi.otherAccount.${kind}`, { email: otherEmail, account: hint })
     : noAnswer
@@ -356,9 +381,16 @@ function AddAccountFlow({
           ? plan
             ? t("aiAccounts.add.duplicateKey", { account: result.duplicate.label })
             : t(`agentPage.work.brain.add.duplicate.${kind}`, {
-                account: result.duplicate.account?.email ?? result.duplicate.label,
+                account: result.duplicate.account ? accountInLine(t, result.duplicate.account) : result.duplicate.label,
               })
-          : t("agentPage.work.brain.add.failed");
+          : notShared
+            ? t("agentPage.work.brain.add.geminiNotShared", { computer })
+            : t(failure.key ?? "agentPage.work.brain.add.failed", {
+                brand: plan?.label ?? t(`aiAccounts.connect.${kind}`),
+                computer,
+              });
+  // What the provider's own program said, under the line about it.
+  const said = byCode && !notShared && failure.detail ? result?.message?.trim() || null : null;
 
   const key = code.trim();
   const keyOk = plan ? planKeyFits(plan, key) : key.length > 0;
@@ -372,13 +404,15 @@ function AddAccountFlow({
   const openAgain = (url: string) => (
     <OpenPage href={url} label={t("agentPage.work.brain.add.openAgain")} onOpened={() => setOpened(true)} />
   );
+  // The computer starting the sign-in, or the page still asking about it: the button's own spinner.
   const startButton = (label: string, disabled: boolean) => (
     <Button
       size="sm"
       variant="primary"
       icon="out"
       label={label}
-      disabled={disabled || starting || loading}
+      loading={starting || loading}
+      disabled={disabled}
       onPress={() => void start()}
     />
   );
@@ -495,6 +529,7 @@ function AddAccountFlow({
             n={2}
             divider
             title={t("agentPage.work.brain.add.stepTwoGoogle")}
+            hint={t("agentPage.work.brain.add.codeHintGoogle")}
             side={read === "reconnecting" ? waiting : undefined}
           >
             {busy
@@ -503,8 +538,11 @@ function AddAccountFlow({
                   t("agentPage.work.brain.add.codeLabelGoogle"),
                   t("agentPage.work.brain.add.codeLabelGoogle"),
                   false,
-                  key.length > 0,
+                  key.length > 0 && !isUrlWithoutCode(key),
                 )}
+            {!busy && isUrlWithoutCode(key) ? (
+              <Note icon="x">{t("agentPage.work.brain.add.notCodeGoogle")}</Note>
+            ) : null}
           </Step>
         ) : null}
       </>
@@ -595,17 +633,24 @@ function AddAccountFlow({
           <Note icon="x" live>
             {why}
           </Note>
-          <Button
-            size="sm"
-            variant="secondary"
-            icon="undo"
-            label={t("common.retry")}
-            onPress={() => {
-              // A new login that came back as another account goes; one signed in again stays the person's account.
-              if (other && !again) void api.machines.removeAccount(orgId, machineId, other.id).catch(() => undefined);
-              onRetry();
-            }}
-          />
+          {said ? (
+            <Text variant="small" tone="muted" selectable style={[styles.said, { backgroundColor: c.plate }]}>
+              {said}
+            </Text>
+          ) : null}
+          {notShared ? null : (
+            <Button
+              size="sm"
+              variant="secondary"
+              icon="undo"
+              label={t("common.retry")}
+              onPress={() => {
+                // A new login that came back as another account goes; one signed in again stays the person's account.
+                if (other && !again) void api.machines.removeAccount(orgId, machineId, other.id).catch(() => undefined);
+                onRetry();
+              }}
+            />
+          )}
           {other ? (
             <Button
               size="sm"
@@ -625,7 +670,6 @@ function AddAccountFlow({
       ) : (
         <StepsCard>{steps}</StepsCard>
       )}
-      {(starting || loading) && !busy ? <ActivityIndicator color={c.muted} style={styles.spinner} /> : null}
     </View>
   );
 }
@@ -641,5 +685,6 @@ const styles = StyleSheet.create({
   code: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 10, marginVertical: 4 },
   // 22, tabular, spaced: read off one screen and typed on another, character by character.
   codeText: { fontWeight: "700", letterSpacing: 2, fontVariant: ["tabular-nums"] },
-  spinner: { alignSelf: "flex-start" },
+  // The provider's own words, whole: mono in a well, never cut.
+  said: { alignSelf: "stretch", fontFamily: fonts.mono, padding: 10, borderRadius: 8, overflow: "hidden" },
 });

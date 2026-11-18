@@ -131,6 +131,16 @@ describe("Dialog", () => {
     expect(head.querySelector(".ac-dialog__acts")).toBeNull();
   });
 
+  test("after the head's own actions, the close is a whole plate 8 from the one before it", async () => {
+    const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
+    expect(css).toContain(
+      ".ac-actline:has(> .ac-dialog__acts) + .ac-dialog__close {\n  margin-inline-start: calc(var(--space-2) + 2 * var(--ghost-plate) - var(--space-3));\n}",
+    );
+    expect(css).toContain(
+      ".ac-actline:has(> .ac-dialog__acts) + .ac-dialog__close > .ac-btn--glyph {\n  --glyph-air: 0px;\n}",
+    );
+  });
+
   test("beside a title alone, its close sits on the title's capitals' middle (with a line under it, on the pair's)", async () => {
     render(
       <Dialog open onOpenChange={() => {}} title="Conectar Banco de dados" closeLabel="Fechar">
@@ -237,7 +247,10 @@ describe("Dialog", () => {
       <>
         <div className="ac-toasts">
           <div className="ac-toast">
-            Salvo <button type="button">Dispensar</button>
+            Salvo{" "}
+            <button type="button" className="ac-btn ac-btn--ghost ac-btn--sm">
+              Dispensar
+            </button>
           </div>
         </div>
         <Dialog open onOpenChange={() => closes++} title="Orçamento mensal" closeLabel="Fechar">

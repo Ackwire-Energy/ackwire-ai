@@ -9,11 +9,18 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
       "De Ackwire AI-app kan ook Ackwire AI zelf draaien, op een Mac, een pc of een Linux-computer, voor jou of een klein team.",
     sections: [
       {
+        id: "download",
+        heading: "Download de app",
+        blocks: [
+          "[Download de agentes.chat-app](/download) voor je Mac, pc of Linux-computer en open hem. Kies **Op je eigen server**, druk op **Verder met mijn server** en dan op **Ackwire AI draaien op deze computer**.",
+        ],
+      },
+      {
         id: "how",
         heading: "Hoe het draait",
         blocks: [
           "Het draait in de app, met een eigen ingebouwde database, en bewaart alles in één map op deze computer: `.agentes` in je thuismap. Verder hoef je niets te installeren: geen Docker, geen database om in te richten.",
-          "Het start met de app en stopt als je de app afsluit. Afsluiten vraagt eerst om bevestiging, want niemand kan Ackwire AI gebruiken tot de app weer opent.",
+          "Het start met de app en stopt als je de app afsluit. Afsluiten vraagt eerst om bevestiging, want niemand kan Ackwire AI gebruiken tot de app weer opent. Wil je het even stoppen zonder de app af te sluiten, klik dan op het agentes.chat-icoon bij de klok en kies **Stoppen** in het **⋯**-menu van de kaart.",
         ],
       },
       {
@@ -28,7 +35,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "keep-on",
         heading: "Aan laten staan",
         blocks: [
-          "Op een computer die anderen gebruiken, stel je dit één keer in:",
+          "Op een computer die anderen gebruiken, stel je dit één keer in. **Laten draaien**, in **Voorkeuren\u00a0›\u00a0Servers**, laat zien wat er nog ontbreekt en opent de juiste instellingen:",
           {
             list: [
               "**Openen bij inloggen** gaat na de installatie vanzelf aan.",
@@ -51,8 +58,8 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Leen hem ook uit aan een andere werkruimte",
         blocks: [
-          "De werkruimtes van de server die je hier draait, gebruiken deze computer vanzelf. Wil je dat een werkruimte ergens anders hem ook gebruikt, zoals een op Ackwire AI Cloud, open dan **Voorkeuren › Servers**, druk op **Een server toevoegen…**, meld je aan bij die werkruimte en druk op **Toestaan** als de app het vraagt.",
-          "Elke werkruimte krijgt hier eigen agents en mappen. Ook daar staan **Opdrachten** standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar één schakelaar voor alle werkruimtes op deze computer geldt.",
+          "De werkruimtes van de server die je hier draait, gebruiken deze computer vanzelf. Wil je dat een werkruimte ergens anders hem ook gebruikt, zoals een op Ackwire AI Cloud, druk dan op **Werkruimte toevoegen…** onderaan de eerste kaart in **Voorkeuren\u00a0›\u00a0Algemeen**, of op **Een server toevoegen…** in **Voorkeuren\u00a0›\u00a0Servers**. Meld je aan bij die werkruimte en druk op **Toestaan** als de app het vraagt.",
+          "Elke werkruimte krijgt hier eigen agents en mappen. Ook daar staan **Opdrachten** standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar elke werkruimte een eigen schakelaar heeft en de app het eerst vraagt voordat er een weer aangaat.",
         ],
       },
       {
@@ -67,29 +74,49 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Inloggen vanaf andere apparaten",
         blocks: [
-          "De eigenaar begint zonder wachtwoord: de app logt je in op deze computer. Om in te loggen vanuit een browser op een andere computer, stel je er een in bij **Instellingen › Je account**. De telefoonapp maakt verbinding als je de QR-code scant onder **Op je telefoon**, in **Voorkeuren › Servers**. Daarvoor moet **Bereik het vanaf je telefoon en je teamgenoten** aan staan.",
+          "De eigenaar begint zonder wachtwoord: de app logt je in op deze computer. Om in te loggen vanuit een browser op een andere computer, stel je er een in bij **Instellingen\u00a0›\u00a0Je account**. Tot je dat doet, meldt **Voorkeuren\u00a0›\u00a0Servers** het, en **Wachtwoord toevoegen** opent die pagina. De telefoonapp maakt verbinding als je de QR-code scant onder **Op je telefoon**, in **Voorkeuren\u00a0›\u00a0Servers**. Daarvoor moet **Bereik het vanaf je telefoon en je teamgenoten** aan staan.",
+          "Als de eigenaar zijn account verwijdert, bij **Instellingen\u00a0›\u00a0Je account**, is het 7 dagen later voorgoed weg, en de werkruimtes waar alleen hij in zat gaan mee. Tot dan log je in en druk je op **Account herstellen** om het terug te halen. Is het weg en is er geen account meer over, dan opent de app het welkomstvenster om een nieuwe eigenaar aan te maken. Hebben anderen nog een account, dan logt ieder in met zijn eigen e-mailadres.",
         ],
       },
       {
         id: "updates",
         heading: "Updates",
         blocks: [
-          "De app zoekt zelf naar updates en installeert er een als je op **Bijwerken en opnieuw openen** drukt in **Voorkeuren › Updates**. De server en alle agents starten mee opnieuw op. Eerst wordt de database gekopieerd, en als de nieuwe versie niet binnen 3 minuten reageert, gaat de app vanzelf terug naar de vorige versie en de gegevens daarvan.",
+          "De app zoekt zelf naar updates. Met **Updates 's nachts vanzelf installeren** aan, in **Voorkeuren\u00a0›\u00a0Updates**, installeert hij ze tussen 3:00 en 5:00 zolang de app open is. Dat staat standaard aan als de server hier draait. Anders druk je op **Bijwerken en opnieuw openen**. De server en alle agents starten mee opnieuw op. Eerst wordt de database gekopieerd, en als de nieuwe versie niet binnen 3 minuten reageert, gaat de app vanzelf terug naar de vorige versie en de gegevens daarvan.",
         ],
       },
       {
         id: "backups",
         heading: "Back-ups",
         blocks: [
-          "Er wordt nog niets vanzelf geback-upt. **Nu een back-up maken**, in **Voorkeuren › Servers**, stopt de server even en bewaart de database, de bestanden en `.env` in `.agentes/backups`, in je thuismap. De twee nieuwste blijven bewaard.",
-          "Kopieer ze af en toe van deze computer af, naar een schijf of een clouddrive. Ze bevatten je sleutels: houd ze privé.",
+          "Met **Elke nacht een back-up maken** aan (app 0.8.1 en nieuwer), in **Voorkeuren\u00a0›\u00a0Servers**, bewaart de app elke nacht om 3:00 de database, de bestanden en `.env` in `.agentes/backups`, in je thuismap. Een computer die toen sliep, maakt de back-up zodra hij wakker is. **Nu een back-up maken** doet hetzelfde meteen. Elke back-up stopt de server even, en de twee nieuwste blijven bewaard.",
+          "**Kopiëren naar** zet elke nieuwe back-up ook in een map die je kiest, zoals een USB-stick of iCloud Drive, waar de twee nieuwste blijven. Ze bevatten je sleutels: houd ze privé. **Terugzetten…** zet Ackwire AI terug naar een back-up: berichten, bestanden en instellingen. Het stopt een minuut, en wat er eerst stond, blijft bewaard in de back-upmap.",
+        ],
+      },
+      {
+        id: "uninstall",
+        heading: "Opnieuw beginnen of de-installeren",
+        blocks: [
+          "Alles wat Ackwire AI op deze computer bewaart, staat in mappen in je thuismap, niet in de app. Als je de app naar de prullenmand sleept, verdwijnt daar dus niets van, en stopt Ackwire AI niet als het draait.",
+          "Wil je opnieuw beginnen, druk dan op **Wissen en opnieuw beginnen…** in **Voorkeuren\u00a0›\u00a0Servers**. Ackwire AI stopt hier en alles wat erin staat gaat naar een nieuwe map in je thuismap, `Ackwire AI erased` met de datum van die dag, waar het blijft tot je de map verwijdert. Wat de agenten op deze computer bewaarden, zoals hun browsers en logins, wordt uit `.agentes-runner` verwijderd. Zijn werkruimtes verdwijnen voor iedereen die ze gebruikt. Daarna opent het welkomstvenster en stel je het opnieuw in met een nieuw eigenaarsaccount. De bestanden van de agenten, in `agentes` in je thuismap, blijven waar ze zijn.",
+          "Wil je het later terughalen, sluit dan de app af, zet een nieuwere map `.agentes` opzij als die er is, hernoem de map `Ackwire AI erased` naar `.agentes`, open de app en stel het opnieuw in op deze computer. Het start met zijn werkruimtes en zijn eigenaar zoals ze waren. Wat de agenten op deze computer bewaarden komt niet terug, dus ze moeten opnieuw inloggen.",
+          "Zo haal je Ackwire AI helemaal van deze computer:",
+          {
+            list: [
+              "Zet **Openen bij inloggen** uit in **Voorkeuren\u00a0›\u00a0Algemeen**.",
+              "Sluit de app af. Het venster sluiten is niet genoeg. Klik op een Mac op het icoon in het Dock en kies **Ackwire AI afsluiten** in het menu Ackwire AI bovenaan het scherm, of druk op ⌘Q. Klik op Windows en Linux op het agentes.chat-icoon bij de klok en kies **Ackwire AI afsluiten**. Vraagt hij **Ackwire AI afsluiten?**, druk dan op **Afsluiten**.",
+              "Verwijder de app. Sleep hem op een Mac naar de prullenmand. Verwijder hem op Windows en Linux zoals elke andere app.",
+              "Verwijder deze mappen in je thuismap. Ze bevatten je gegevens, en eenmaal verwijderd komen die niet terug, dus bewaar eerst ergens anders een back-up als je ze misschien nog wilt: `.agentes` (berichten, bestanden, accounts, instellingen en back-ups), elke map `Ackwire AI erased`, `.agentes-runner` (wat de agenten op deze computer bewaren, zoals hun browsers en logins) en `agentes` (de bestanden van de agenten). Mappen waarvan de naam met een punt begint, zijn verborgen. Open op een Mac je thuismap in de Finder en druk op ⇧⌘. (Shift, Command en de punttoets) om ze te tonen.",
+              "Verwijder de mappen van de app zelf. Daarin staan alleen de instellingen, de logins van het venster en de logboeken. Op een Mac: alles waarvan de naam begint met `chat.agentes.desktop` in de mappen Application Support, Caches, HTTPStorages, Logs, Preferences en WebKit van `~/Library`, en `Ackwire AI.plist` in `~/Library/LaunchAgents`. Op Windows: `%APPDATA%\\chat.agentes.desktop` en `%LOCALAPPDATA%\\chat.agentes.desktop`. Op Linux: `~/.config/chat.agentes.desktop` en `~/.local/share/chat.agentes.desktop`. Open op een Mac een van deze mappen door in de Finder op ⇧⌘G te drukken en het pad te typen, zoals `~/Library/Caches`.",
+            ],
+          },
         ],
       },
       {
         id: "ai-programs",
         heading: "Claude Code en Codex",
         blocks: [
-          "De app vindt Claude Code en Codex via de `PATH` van je login-shell, plus de gebruikelijke mappen zoals `~/.local/bin`, `/opt/homebrew/bin` en `/usr/local/bin`. Staat er in **Voorkeuren › Tools** **Niet gevonden**, controleer dan of `claude` of `codex` werkt in een nieuw Terminal-venster, en sluit de app daarna af en open hem opnieuw.",
+          "De app vindt Claude Code en Codex via de `PATH` van je login-shell, plus de gebruikelijke mappen zoals `~/.local/bin`, `/opt/homebrew/bin` en `/usr/local/bin`. Staat er in **Voorkeuren\u00a0›\u00a0Tools** **Niet gevonden**, dan zie je daar de regel die het installeert. Voer die uit in Terminal en druk daarna op **Opnieuw controleren**.",
         ],
       },
       {
@@ -163,7 +190,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Vanuit de Ackwire AI-app",
         blocks: [
           "Installeer de app op de computer, open hem en meld je aan bij je werkruimte. Hij vraagt **Agents van <workspace> deze Mac laten gebruiken?** (deze pc op Windows, deze computer op Linux). Kies wie hem mag gebruiken en druk op **Toestaan**. Dat is alles.",
-          "Al aangemeld? Zet de werkruimte aan in **Voorkeuren › Algemeen**, in de kaart **Agents**.",
+          "Al aangemeld? Open **Voorkeuren\u00a0›\u00a0Algemeen** en druk op **Toestaan** in de rij van de werkruimte, in de eerste kaart. Staat hij er niet? Druk op **Werkruimte toevoegen…** onderaan die kaart en meld je aan.",
         ],
       },
       {
@@ -206,7 +233,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Pauzeren en loskoppelen",
         blocks: [
-          "Op de computer pauzeert het Ackwire AI-icoon bij de klok de agents van alle werkruimtes. In **Voorkeuren › Algemeen** pauzeert de schakelaar van elke werkruimte alleen die ene, en **Verlaten** koppelt hem los. Tijdens een pauze start er niets nieuws, en wat al liep, maakt het af. Na het loskoppelen blijven de mappen van de agents op de schijf staan.",
+          "Op de computer pauzeert het agentes.chat-icoon bij de klok de agents van alle werkruimtes, of van één. In **Voorkeuren\u00a0›\u00a0Algemeen** pauzeert de schakelaar van elke werkruimte alleen die ene, en **Verlaten**, in het **⋯**-menu ervan, koppelt hem los. Tijdens een pauze start er niets nieuws, en wat al liep, maakt het af. Na het loskoppelen blijven de mappen van de agents op de schijf staan.",
           "Op de website koppel je een apparaat los met **Verwijderen** op de pagina ervan.",
         ],
       },
@@ -217,6 +244,15 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           "Meld je in dezelfde app aan bij elke werkruimte en druk voor elk op **Toestaan**. Werkruimtes op Ackwire AI Cloud en op je eigen servers kunnen een computer delen (app 0.6.1 en nieuwer). Elk heeft er eigen agents en mappen, en als je er een loskoppelt, blijven de andere ongemoeid.",
           "Een server die de app op deze computer draait, is al gekoppeld en heeft niets nodig. Om die computer ook uit te lenen aan een werkruimte ergens anders, zie [Leen hem ook uit aan een andere werkruimte](/help/run-on-your-computer#another-workspace).",
           "Gebruik je de app op een laptop alleen als venster op je werkruimte? Als hij vraagt of agents de laptop mogen gebruiken, houdt **Niet nu** het bij een gewoon venster.",
+          "Een server die met de terminalregel is verbonden, werkt voor één workspace. Verbind je hem vanuit een andere workspace, dan gaat de server naar die workspace en bereikt de eerste hem niet meer. Gebruik de app voor meerdere workspaces op één computer.",
+        ],
+      },
+      {
+        id: "line",
+        heading: "Als agenten in de rij wachten",
+        blocks: [
+          "Elk werk van een agent gebruikt geheugen van de computer. Als er weinig vrij geheugen is, wacht het volgende in de rij tot een ander klaar is. Mensen gaan voor. Het aantal CPU's verandert dit niet.",
+          "Een computer met 4 GB geheugen draait twee of drie tegelijk, een met 8 GB ongeveer negen. Een Mac of pc draait er tot acht. Browsers en bureaubladen die agenten open laten, gebruiken ook geheugen. Voor een kortere rij gebruik je een computer met meer geheugen, of verbind je er nog een en verdeel je de agenten over beide. Workspaces die een computer delen, delen het geheugen ervan.",
         ],
       },
       {
@@ -239,7 +275,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "op een computer die ook Ackwire AI draait, de database en sleutels ervan in `.agentes`",
             ],
           },
-          "Ackwire AI weigert opdrachten die zijn sleutels, tokens en aanmeldingen noemen, maar dat is een regel, geen muur. **Opdrachten** staan standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar één schakelaar voor alle werkruimtes op de computer geldt. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels.",
+          "Ackwire AI weigert opdrachten die zijn sleutels, tokens en aanmeldingen noemen, maar dat is een regel, geen muur. **Opdrachten** staan standaard aan. Zet ze uit in de vraag van de app voordat je op **Toestaan** drukt, of later in **Voorkeuren\u00a0›\u00a0Tools**, waar elke werkruimte een eigen schakelaar heeft (app 0.8.1 en nieuwer) en de app het eerst vraagt voordat er een weer aangaat. Claude Code en Codex voeren hun eigen opdrachten uit in de map van de agent, volgens hun eigen regels, ook als Opdrachten uit staan.",
           "Voor een echte muur gebruik je een Linux-server. Op Debian 13, geïnstalleerd met `--system`, is elke agent een eigen gebruiker. Op Ubuntu delen agents één gebruiker, `agentes`: ze zien elkaars mappen, niet die van jou of van de server. Of geef de agents een eigen computer.",
         ],
       },
@@ -272,6 +308,21 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Sleutels, wachtwoorden, logins en chatgeschiedenis komen nooit mee: de agents denken met de AI van de werkruimte. Sommige dingen hebben hier nog geen tegenhanger, of horen nooit in een bestand te reizen. Je kunt ze later opnieuw aanmaken.",
           "Bestanden en mappen worden in je browser gelezen. Een GitHub-link gaat via de server van de werkruimte. Sleutel- en loginbestanden worden nooit geopend, en er verandert niets tot je bevestigt.",
+        ],
+      },
+      {
+        id: "mcp",
+        heading: "Verbinden met MCP",
+        blocks: [
+          "Met MCP kan je AI-app bij deze werkruimte, zodat die de agents hier zelf aanmaakt, met hun instructies, skills en routines. Kies je app, selecteer **Verbinden met MCP** en dan:",
+          {
+            list: [
+              "Koppel het adres dat de stap toont, met de stappen van de app zelf. [Zo koppel je het, per app](/help/apps-de-ia#connect)",
+              "Kies op de inlogpagina **Agents, routines en skills maken en bewerken**.",
+              "Plak het verzoek in de app. De agents verschijnen in de stap zodra ze binnenkomen.",
+            ],
+          },
+          "Kan een app niet koppelen, kies dan **Uit een bestand** of **Alleen het verzoek**, afhankelijk van wat de stap toont. [Uit een andere app](/help/import#other-apps) legt het verzoek uit.",
         ],
       },
       {
@@ -359,9 +410,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
       {
         id: "permissions",
         heading: "Geheugen geeft geen toestemming",
-        blocks: [
-          "Niets in het geheugen laat een agent meer doen. Wat hij mag, blijft in zijn **Tools en toegang**, en gevoelige acties vragen altijd om goedkeuring.",
-        ],
+        blocks: ["Niets in het geheugen laat een agent meer doen. Wat hij mag, blijft in zijn **Tools en toegang**."],
       },
       {
         id: "proposals",
@@ -380,7 +429,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "what",
         heading: "Wat eerst vraagt",
         blocks: [
-          "Als een agent wil mergen, deployen, terugdraaien, iets naar buiten sturen of gegevens verwijderen, vraagt hij het eerst, welke toegang hij ook heeft. Het verzoek verschijnt in **Goedkeuringen** en in het gesprek, met de precieze actie en de reden.",
+          "Als een agent wil mergen, deployen, terugdraaien, iets naar buiten sturen of gegevens verwijderen, vraagt hij het eerst. Dat is het niveau **Alleen wat riskant is**, waarmee elke agent begint. Op de pagina van de agent, onder **Goedkeuringen**, laat **Altijd vragen** hem vragen voordat er iets verandert, en met **Nooit vragen** vraagt hij niets, ook niet bij merge, deploy, betalingen en routines. Het verzoek verschijnt in **Goedkeuringen** en in het gesprek, met de precieze actie en de reden.",
         ],
       },
       {
@@ -388,7 +437,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Eén keer, of altijd",
         blocks: [
           "Goedkeuren geldt voor één precieze actie, met haar waarden. Verandert de agent iets, dan vraagt hij het opnieuw.",
-          "**Altijd goedkeuren** laat de agent dat soort actie vanaf nu doen, met elke waarde, zonder te vragen. Bij het verzoek van een routine doet **Altijd in deze routine** hetzelfde, alleen voor die routine. Geen van beide wordt aangeboden voor mergen, deployen, terugdraaien en dergelijke. Ongedaan maken doe je in **Tools en toegang** op de pagina van de agent, of in de instellingen van de routine.",
+          "**Altijd goedkeuren** laat de agent dat soort actie vanaf nu doen, met elke waarde, zonder te vragen. Bij het verzoek van een routine doet **Altijd in deze routine** hetzelfde, alleen voor die routine. **Altijd goedkeuren** wordt aangeboden voor elk soort actie, ook mergen en deployen, zolang de agent op het niveau **Alleen wat riskant is** staat. **Altijd in deze routine** wordt niet aangeboden voor mergen, deployen, terugdraaien en dergelijke. Ongedaan maken doe je in **Tools en toegang** op de pagina van de agent, of in de instellingen van de routine.",
         ],
       },
       {
@@ -443,7 +492,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Als Ackwire AI je werkruimte host, zit Jev erbij inbegrepen. Op een server die je zelf beheert, gebruikt hij de TypeSafe-sleutel van de eigenaar, ongeveer US$ 0,0001 per bericht: [Jev instellen](/help/jev#setup).",
+          "Als Ackwire AI je werkruimte host, zit Jev erbij inbegrepen. Op een server die je zelf beheert, gebruikt hij de TypeSafe- of OpenRouter-sleutel van de eigenaar, ongeveer US$ 0,0001 per bericht: [Jev instellen](/help/jev#setup).",
         ],
       },
       {
@@ -505,6 +554,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
               "Open in Ackwire AI **Instellingen › AI en gebruik** en plak hem onder **Jev**. Alleen degene die deze server heeft ingericht, ziet hem.",
             ],
           },
+          "Betaal je al bij OpenRouter? Kies **OpenRouter** onder **Jev** en plak een sleutel van https://openrouter.ai/keys, of zet Jev met één klik aan met de OpenRouter-sleutel van de werkruimte. Het is dezelfde Jev, gefactureerd via OpenRouter voor dezelfde prijs.",
           "Op een server die je met Docker draait, kun je de sleutel ook in `.env` zetten als `TYPESAFE_API_KEY`. Die gaat voor op de sleutel in Instellingen.",
         ],
       },
@@ -539,6 +589,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe draait Jev in de Verenigde Staten en traint zijn modellen niet op wat je stuurt. Het bewaart gegevens zo lang als nodig is om de dienst te leveren. Met de enterprise-abonnementen kun je ervoor kiezen dat er niets wordt bewaard.",
           "Het privacybeleid van TypeSafe: https://typesafe.ai/legal/privacy-policy. De verwerkersovereenkomst: https://typesafe.ai/legal/data-processing.",
+          "Met een OpenRouter-sleutel gaan dezelfde verzoeken via OpenRouter naar TypeSafe, onder de voorwaarden van OpenRouter en je privacyinstellingen daar: https://openrouter.ai/privacy.",
         ],
       },
       {
@@ -692,13 +743,13 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Voer op de server uit:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh",
           },
           "Het installeert wat ontbreekt en stelt dan een paar vragen: hoe mensen erbij komen, e-mail, of deze server ook de computer van je agents is en of het anonieme gebruiksstatistieken stuurt. Enter neemt het voorgestelde antwoord. Het komt in `/opt/agentes` (`~/agentes` voor een gebruiker die Docker al kan gebruiken), en de eerste keer downloadt het ongeveer 2 GB.",
           "Aan het eind toont het het adres van je server en een QR-code voor je telefoon. Het opnieuw uitvoeren kan geen kwaad: je instellingen blijven, en alleen wat ontbreekt wordt aangevuld.",
           "Met Node.js 18 of nieuwer is `npx @agenteschat/setup` in een lege map dezelfde installatie. Zonder Node draait die vanuit de image van de app, in de huidige map, en eindigt met de opdrachten die de rest starten:",
           {
-            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup',
           },
         ],
       },
@@ -729,7 +780,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "E-mail",
         blocks: [
-          "Zonder e-mail schrijft Ackwire AI elke e-mail in zijn log in plaats van hem te versturen, dus een uitnodigingslink kun je daar nog kopiëren. Wachtwoord herstellen blijft uit.",
+          "Zonder e-mail schrijft Ackwire AI elke e-mail in zijn log in plaats van hem te versturen, dus een uitnodigingslink kun je daar nog kopiëren. Wachtwoord herstellen blijft uit, en een nieuw e-mailadres voor een account geldt meteen, zonder code of link.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -755,7 +806,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "De installatie kan van deze server ook de computer van je agents maken, waar ze opdrachten uitvoeren, een browser gebruiken en hun bestanden bewaren. Ze vraagt het, en stelt ja voor waar de server het goed kan. Op Debian 13 krijgt elke agent een eigen gebruiker, met een scherm. Op Ubuntu delen agents één gebruiker, `agentes`. Zei je nee, voer de installatie dan opnieuw uit met `--computer yes`:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh -s -- --computer yes",
           },
           "Meer computers, zoals een Mac met de Ackwire AI-app of een andere server, koppel je via **Instellingen\u00a0›\u00a0Apparaten**, zoals in [Je computers en telefoons](/help/computers). Bij Tailscale komen ze eerst in je tailnet.",
         ],
@@ -783,7 +834,7 @@ export const helpNl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Voer in de installatiemap uit:",
           {
-            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+            code: "curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
           },
           "De database werkt zichzelf bij als de nieuwe versie start. Houd je instellingen in `.env` en bewerk `docker-compose.yml` nooit, want elke update vervangt het. Maak een back-up vóór een grote sprong: een database die een nieuwere versie heeft bijgewerkt, opent niet in een oudere.",
         ],

@@ -1,8 +1,9 @@
 /*
  * Importing from another app (onboarding step and Configurações → Importar e
- * exportar): source cards, one drop zone for files, folders and archives, the
- * plan in groups with a status chip per row, then the report. Neutral surfaces;
- * state is a chip with an icon and a word, never a color alone.
+ * exportar): source cards, each opening its sheet (ImportSheet.tsx), and one
+ * button for a file or link; the plan in groups with a status chip per row,
+ * then the report. Neutral surfaces; state is a chip with an icon and a word,
+ * never a color alone.
  */
 .imp-pick,
 .imp-preview,
@@ -15,6 +16,10 @@
 .imp-pick[data-over] .imp-drop__area {
   border-color: var(--ink);
   background: var(--plate);
+}
+/* "I have a file or link", under the cards: as wide as its words. */
+.imp-pick__file {
+  display: flex;
 }
 
 /* ── Source cards ───────────────────────────────────────────────────────── */
@@ -58,7 +63,6 @@
 }
 /* `.ac-iconline` rows: the icon on the first line's capitals, on a whole-pixel line (a fractional one rounds the
    text's baseline off by a pixel). */
-.imp-tip,
 .imp-note {
   margin: 0;
   color: var(--muted);
@@ -71,12 +75,6 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.5;
-}
-.imp-tip {
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: var(--plate);
-  color: var(--ink2);
 }
 
 /* ── "Outro app": the request to paste there ────────────────────────────── */
@@ -114,6 +112,20 @@
 }
 .imp-other p {
   margin: 0;
+}
+/* Connect with MCP takes focus where the drop zone it replaced had it (Trocar arquivo, Importar outro). */
+.imp-other:focus {
+  outline: none;
+}
+
+/* Connect with MCP: the agents the app creates, as they arrive. */
+.imp-arrivals {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.imp-arrivals__line {
+  font-size: 13.5px;
 }
 
 /* ── Drop zone, reading, paste ──────────────────────────────────────────── */
@@ -445,11 +457,6 @@ html:not([data-pointer]) .imp-link:focus-visible {
   .imp-todo__link {
     margin-left: 24px;
   }
-}
-
-/* ── "Do seu app de IA": the most reliable way, on top of the sources ───── */
-.imp-aiapp {
-  text-align: left;
 }
 
 /* "Arquivos que ficaram de fora": each reason's chip and its files on one line, on one baseline, wrapping as words. */

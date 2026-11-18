@@ -94,3 +94,54 @@ test("the chat's band fits an AI and four apps at 360px and at 300px, and scroll
   expect(declarations(wide, ".nac-band__path")).toContainEqual(["overflow-x", "auto"]);
   expect(declarations(wide, '.nac-band__path[data-fade-end="true"]')).toEqual([["--nac-band-fade-end", "24px"]]);
 });
+
+test("the step's head keeps its gap: the onboarding's unlayered head rule never reaches Criar agente", async () => {
+  // layout.css is in a cascade layer and onboarding.css is not: an unscoped rule there wins whatever the selector.
+  const onboarding = rules(await sheet("pages/onboarding.css")).flatMap((r) => r.selectors);
+  expect(onboarding.filter((s) => s.includes(".onb__head") && !s.includes(".onb--rail"))).toEqual([]);
+  const layout = topLevel(await sheet("layout.css"));
+  expect(declarations(layout, ".newag .onb__head")).toEqual([["margin-bottom", "var(--space-6)"]]);
+  // A section's label: 24 over, 8 under, centred with its ⓘ and its action (never on an icon's baseline).
+  const sect = declarations(layout, ".newag__sect");
+  expect(sect).toContainEqual(["margin", "var(--space-6) 0 var(--space-2)"]);
+  expect(sect).toContainEqual(["align-items", "center"]);
+});
+
+test("a select's trigger is the kit's one control tall: no screen class sets its height, bar the two-line row", async () => {
+  const sheets = `${await sheet("layout.css")}\n${await sheet("pages/new-agent.css")}`;
+  const tall = rules(sheets)
+    .filter((r) => r.declarations.some(([p]) => p === "min-height" || p === "height"))
+    .flatMap((r) => r.selectors.filter((s) => /\.(newag__sel|agp-brainsel)\b.*\.ac-select__trigger/.test(s)));
+  expect(tall).toEqual([".agp-brainsel.agp-advrow .ac-select__trigger"]);
+});
+
+test("the review's rows: kit steps, and the name, the value and Editar start on one line height", async () => {
+  const review = topLevel(await sheet("pages/new-agent.css"));
+  const row = declarations(review, ".newag__rv");
+  expect(row).toContainEqual(["padding", "var(--space-3) 0"]);
+  expect(row).toContainEqual(["line-height", "var(--rv-line)"]);
+  expect(declarations(review, ".newag__rv-k")).toContainEqual(["min-height", "var(--rv-line)"]);
+});
+
+test("a review row stacks by the room the review has, not the window's: narrow beside the app's sidebar too", async () => {
+  const css = await sheet("pages/new-agent.css");
+  expect(declarations(topLevel(css), ".newag__review")).toContainEqual(["container", "newag-review / inline-size"]);
+  const narrow = atRule(css, "@container newag-review (max-width: 520px)");
+  expect(declarations(narrow, ".newag__rv")).toContainEqual(["grid-template-areas", '"k end" "v v"']);
+  expect(declarations(narrow, ".newag__rv-v")).toEqual([["grid-area", "v"]]);
+  // Only there, so no window width decides it: a laptop's window is wide while the flow's column is a phone's.
+  const stacked = rules(css).filter(
+    (r) => r.selectors.includes(".newag__rv") && r.declarations.some(([prop]) => prop === "grid-template-areas"),
+  );
+  expect(stacked).toHaveLength(1);
+});
+
+test("the kit: an option's ⓘ follows its words, and a text button has no box", async () => {
+  const kit = topLevel(await Bun.file(join(import.meta.dir, "../../../packages/ui/src/styles/components.css")).text());
+  expect(declarations(kit, ".ac-hint.ac-menu__hint").find(([p]) => p === "margin")?.[1]).toBe("-5px 0");
+  expect(declarations(kit, ".ac-hint.ac-menu__hint + .ac-menu__check")).toEqual([["margin-left", "auto"]]);
+  const link = declarations(kit, ".ac-link--action").map(([p]) => p);
+  for (const box of ["padding", "height", "min-height", "border", "background"]) expect(link).not.toContain(box);
+  // Busy, the spinner is over the words, out of the flow: the button keeps its width and its neighbours their place.
+  expect(declarations(kit, ".ac-link--loading > .ac-btn__spinner")).toContainEqual(["position", "absolute"]);
+});

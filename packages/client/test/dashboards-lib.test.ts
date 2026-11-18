@@ -1,8 +1,11 @@
 import { describe, expect, test } from "bun:test";
+import { resources } from "@agenteschat/i18n";
 import { QueryClient } from "@tanstack/react-query";
+import i18next from "i18next";
 import {
   applyDashboardEvent,
   boardItems,
+  busyWidgets,
   createHttpApi,
   type Dashboard,
   type DashboardEditPolicy,
@@ -19,12 +22,25 @@ import {
   resizeItem,
   roleSeesBoard,
   toggleEditRole,
+  WIDGET_LINE_NOTE_MS,
   type Widget,
+  widgetAiReady,
+  widgetCardStatus,
   widgetCostLine,
+  widgetFailureCause,
   widgetFailureKey,
+  widgetFailureText,
+  widgetNeedsAi,
   widgetStepWords,
+  widgetStoppedForAi,
+  widgetWaitFix,
+  widgetWaiting,
+  widgetWaitOf,
+  widgetWaitText,
   withEditRoles,
 } from "../src/index";
+import { planKeyIntent } from "../src/lib/no-ai";
+import { usageWhen } from "../src/lib/plan-usage";
 
 const summary = (over: Partial<DashboardSummary>): DashboardSummary => ({
   id: "d",
@@ -66,6 +82,7 @@ const widget = (id: string, position: number, w: 1 | 2 = 1): Widget => ({
   alert: { enabled: false, condition: "" },
   status: "ok",
   failure: null,
+  wait: null,
   refreshedAt: null,
   nextRunAt: null,
   routineId: null,
@@ -223,6 +240,87 @@ describe("words", () => {
     expect(widgetFailureKey("no_update")).toBe("widgets.failure.no_update");
     expect(widgetFailureKey("budget_exceeded")).toBe("widgets.failure.budget_exceeded");
     expect(widgetFailureKey("something_new")).toBe("widgets.failure.error");
+    // Waiting for an AI, the reason it was held for: no key keeps the code's words.
+    expect(widgetFailureKey("missing_credential", "not_signed_in")).toBe("widgets.needsAi.not_signed_in");
+    expect(widgetFailureKey("missing_credential", "cli_missing")).toBe("widgets.needsAi.cli_missing");
+    expect(widgetFailureKey("missing_credential", "no_key")).toBe("widgets.failure.missing_credential");
+    expect(widgetFailureKey("no_update", "not_signed_in")).toBe("widgets.failure.no_update");
+    // The right hand on a plan that serves only its owner, as the hold and as its run say it.
+    expect(widgetFailureKey("missing_credential", "plan_not_shared")).toBe("widgets.needsAi.plan_not_shared");
+    expect(widgetFailureKey("missing_credential", "plan_unattended")).toBe("widgets.needsAi.plan_not_shared");
+    // Its plan away or held: a widget's own words where it has them, else the plan's line.
+    expect(widgetFailureKey("missing_credential", "computer_away")).toBe("widgets.failure.waiting_computer");
+    expect(widgetFailureKey("missing_credential", "plan_limit")).toBe("widgets.failure.waiting_plan");
+    expect(widgetFailureKey("missing_credential", "commands_off")).toBe("noAi.rightHand.commands_off");
+    // Nothing a widget doesn't know, nor what any object has.
+    expect(widgetFailureKey("missing_credential", "toString")).toBe("widgets.failure.missing_credential");
+  });
+
+  test("Connect for a widget waiting on the right hand's plan opens on a key, the one AI its build can use", () => {
+    const hand = { builtin: "right_hand" as const, ownerUserId: "u-walter" };
+    expect(planKeyIntent(hand, "plan_not_shared")).toEqual({ intent: "api_key" });
+    expect(planKeyIntent(hand, "computer_away")).toEqual({ intent: "api_key" });
+    // No AI at all, or signed out: the plain dialog, whose plan or key fixes it.
+    expect(planKeyIntent(hand, "no_key")).toEqual({});
+    expect(planKeyIntent(hand, "not_signed_in")).toEqual({});
+    expect(planKeyIntent({ builtin: null, ownerUserId: "u-walter" }, "plan_not_shared")).toEqual({});
+  });
+
+  test("a widget whose agent has no AI waits for one, and may build once the AI status says it has one", () => {
+    const waiting: Widget = {
+      ...widget("w", 0),
+      status: "failed",
+      failure: { code: "missing_credential", detail: null },
+    };
+    const failed: Widget = { ...waiting, failure: { code: "no_update", detail: null } };
+    expect(widgetNeedsAi(waiting)).toBe(true);
+    expect(widgetNeedsAi(failed)).toBe(false);
+    expect(widgetNeedsAi({ ...waiting, status: "building" })).toBe(false);
+    // Stopped after failing in a row: what the last failure needs.
+    const stopped = (cause?: string): Widget => ({
+      ...waiting,
+      failure: { code: "failing", detail: null, ...(cause ? { cause } : {}) },
+    });
+    // It waits for nothing (nothing builds it by itself): stopped for the lack of an AI is its own state.
+    expect(widgetNeedsAi(stopped("missing_credential"))).toBe(false);
+    expect(widgetStoppedForAi(stopped("missing_credential"))).toBe(true);
+    expect(widgetStoppedForAi(stopped("timeout"))).toBe(false);
+    expect(widgetStoppedForAi(stopped())).toBe(false);
+    expect(widgetStoppedForAi(waiting)).toBe(false);
+    expect(widgetFailureCause({ code: "failing", detail: null, cause: "failing" }).code).toBe("failing");
+    // Its line, as the web and the phone say it: that it stopped, then the last failure's own words.
+    const said = i18next.createInstance();
+    void said.init({ lng: "pt-BR", resources, initAsync: false });
+    expect(widgetFailureText(said.t, stopped("missing_credential").failure, "Lodi")).toBe(
+      "Parou depois de 5 falhas seguidas. A última: Lodi está sem chave ou plano de IA para trabalhar.",
+    );
+    expect(
+      widgetFailureText(said.t, { code: "failing", detail: "A loja não respondeu.", cause: "agent_reported" }, "Lodi"),
+    ).toBe("Parou depois de 5 falhas seguidas. A última: A loja não respondeu.");
+    expect(widgetFailureText(said.t, stopped().failure, "Lodi")).toBe("Falhou várias vezes seguidas e parou.");
+    const status = (state: "ready" | "no_ai" | "waiting") => ({ any: true, agents: [{ agentId: "theo", state }] });
+    expect(widgetAiReady(waiting, status("ready"))).toBe(true);
+    // Its computer away is no missing AI: the build waits for it as any run does.
+    expect(widgetAiReady(waiting, status("waiting"))).toBe(true);
+    expect(widgetAiReady(waiting, status("no_ai"))).toBe(false);
+    // Not known yet, or another agent's: nothing starts.
+    expect(widgetAiReady(waiting, undefined)).toBe(false);
+    expect(widgetAiReady({ ...waiting, agentId: "ada" }, status("ready"))).toBe(false);
+    expect(widgetAiReady(failed, status("ready"))).toBe(false);
+    // One stopped for the lack of an AI has one again: Resolve comes back.
+    expect(widgetAiReady(stopped("missing_credential"), status("ready"))).toBe(true);
+    expect(widgetAiReady(stopped("timeout"), status("ready"))).toBe(false);
+    // The right hand's: the server names the widgets whose own people's AI can build them, whatever its state reads.
+    expect(widgetAiReady(waiting, { ...status("no_ai"), widgetsReady: ["w"] })).toBe(true);
+    expect(widgetAiReady(waiting, { ...status("no_ai"), widgetsReady: ["other"] })).toBe(false);
+    // What a build thinks with decides: ready for chat through the fallback is no AI for it, and the right hand
+    // shown on someone's own AI may still build on the workspace's.
+    const apart = (state: "ready" | "no_ai", background: "ready" | "no_ai") => ({
+      any: true,
+      agents: [{ agentId: "theo", state, background }],
+    });
+    expect(widgetAiReady(waiting, apart("ready", "no_ai"))).toBe(false);
+    expect(widgetAiReady(waiting, apart("no_ai", "ready"))).toBe(true);
   });
 
   test("the cost line follows the schedule and who pays", () => {
@@ -366,5 +464,129 @@ describe("a build's step line", () => {
     expect(widgetStepWords(t, step("web_search"))).toBe("Chat.activity.searchingWeb");
     expect(widgetStepWords(t, step("permission_prompt"))).toBe("Chat.activity.runningCommandAny");
     expect(widgetStepWords(t, step("update_widget"))).toBe("dashboards.newWidget.finishing");
+  });
+});
+
+describe("a refresh that waits (ADR 0135 §6)", () => {
+  const resetsAt = "2026-11-12T16:00:00.000Z";
+  const now = new Date("2026-11-12T12:00:00.000Z");
+  const base = { source: null, resetsAt: null, scope: null, model: null, since: null, canContinue: false } as const;
+  const plan = { ...base, code: "plan_limit", source: "plan", resetsAt } as const;
+  const busy = (wait: Widget["wait"]): Widget => ({ ...widget("w", 0), status: "updating", wait });
+  const t = (() => {
+    const instance = i18next.createInstance();
+    void instance.init({ lng: "en", fallbackLng: "en", resources, initAsync: false });
+    return instance.t;
+  })();
+
+  test("it holds while its reset is ahead or unknown, and its card stands still meanwhile", () => {
+    expect(widgetWaiting(busy(plan), now.getTime())).toEqual(plan);
+    expect(widgetCardStatus(busy(plan), now.getTime())).toBe("ok");
+    expect(widgetWaiting(busy({ ...plan, resetsAt: null }), now.getTime())?.code).toBe("plan_limit");
+    // Past its reset it is about to go on: at work again.
+    expect(widgetWaiting(busy(plan), Date.parse(resetsAt) + 1)).toBeNull();
+    expect(widgetCardStatus(busy(plan), Date.parse(resetsAt) + 1)).toBe("updating");
+    // Done, or nothing waits: no wait.
+    expect(widgetWaiting({ ...busy(plan), status: "ok" }, now.getTime())).toBeNull();
+    expect(widgetWaiting(busy(null), now.getTime())).toBeNull();
+    expect(widgetCardStatus(busy(null), now.getTime())).toBe("updating");
+  });
+
+  test("room on its computer is a wait only once it lasted as long as the chat's note waits", () => {
+    const since = (ms: number) =>
+      ({ ...base, code: "busy", since: new Date(now.getTime() - ms).toISOString() }) as const;
+    expect(widgetWaiting(busy(since(WIDGET_LINE_NOTE_MS - 1)), now.getTime())).toBeNull();
+    expect(widgetWaiting(busy(since(WIDGET_LINE_NOTE_MS)), now.getTime())?.code).toBe("busy");
+    expect(widgetWaiting(busy({ ...base, code: "busy" }), now.getTime())).toBeNull();
+  });
+
+  test("a waiting widget isn't busy: nothing polls it while it waits", () => {
+    const waiting = { ...busy(plan), id: "a" };
+    const working = { ...busy(null), id: "b" };
+    const inLine = { ...busy({ ...base, code: "busy", since: now.toISOString() }), id: "c" };
+    expect(busyWidgets([waiting, working, inLine], now.getTime()).map((w) => w.id)).toEqual(["b", "c"]);
+    expect(busyWidgets([waiting], Date.parse(resetsAt) + 1).map((w) => w.id)).toEqual(["a"]);
+  });
+
+  test("a wait as the server sends it, read safely", () => {
+    expect(widgetWaitOf({ code: "budget", source: "budget", resetsAt, agentName: "Theo" })).toEqual({
+      ...base,
+      code: "budget",
+      source: "budget",
+      resetsAt,
+    });
+    expect(widgetWaitOf({ code: "plan_limit", source: "plan", scope: "region", model: "DeepSeek V4 Pro" })).toEqual({
+      ...base,
+      code: "plan_limit",
+      source: "plan",
+      scope: "region",
+      model: "DeepSeek V4 Pro",
+    });
+    expect(widgetWaitOf({ code: "outage", resetsAt, scope: "nonsense", canContinue: "yes" })).toEqual({
+      ...base,
+      code: "outage",
+      resetsAt,
+    });
+    expect(widgetWaitOf({ code: "work_queue" })).toBeNull();
+    expect(widgetWaitOf(null)).toBeNull();
+  });
+
+  test("in the reader's words: what it waits for, and when it picks up", () => {
+    const when = usageWhen(t, "en", resetsAt, now);
+    expect(widgetWaitText(t, "en", plan, "Theo", now)).toBe(`Waiting for Theo's plan to reset ${when}`);
+    expect(widgetWaitText(t, "en", { ...plan, code: "usage_pause", source: "budget" }, "Theo", now)).toBe(
+      `Waiting for Theo's budget to renew ${when}`,
+    );
+    expect(widgetWaitText(t, "en", { ...plan, resetsAt: null }, "Theo", now)).toBe("Waiting for Theo's plan to reset");
+    // A budget with no reset is other runs holding it, not the month.
+    expect(widgetWaitText(t, "en", { ...base, code: "budget", source: "budget" }, "Theo", now)).toBe(
+      "Waiting a moment for Theo's budget",
+    );
+    expect(widgetWaitText(t, "en", { ...base, code: "computer" }, "Theo", now)).toBe("Waiting for Theo's computer");
+    expect(widgetWaitText(t, "en", { ...base, code: "busy" }, "Theo", now)).toBe("Waiting for room on Theo's computer");
+    expect(widgetWaitText(t, "en", { ...base, code: "outage", resetsAt }, "Theo", now)).toBe(
+      `Waiting for Theo's AI provider, next try ${when}`,
+    );
+  });
+
+  test("a limit of its model alone reads as that model's, as the brain card says it, never as the plan's", () => {
+    const own = (scope: "model" | "region" | "off" | "inactive", reset: string | null = null) => ({
+      ...plan,
+      scope,
+      model: "DeepSeek V4 Pro",
+      resetsAt: reset,
+    });
+    expect(widgetWaitText(t, "en", own("region"), "Theo", now)).toBe(
+      "DeepSeek V4 Pro needs the Global region turned on in OpenCode (Settings\u00a0›\u00a0Privacy). The plan's other models keep working.",
+    );
+    expect(widgetWaitText(t, "en", own("off"), "Theo", now)).toStartWith(
+      "OpenCode refused DeepSeek V4 Pro with this key",
+    );
+    expect(widgetWaitText(t, "en", own("inactive"), "Theo", now)).toStartWith("OpenCode Go isn't active");
+    expect(widgetWaitText(t, "en", own("model", resetsAt), "Theo", now)).toBe(
+      `DeepSeek V4 Pro hit its own limit on this plan and resets ${usageWhen(t, "en", resetsAt, now)}. The plan's other models keep working.`,
+    );
+    expect(widgetWaitText(t, "en", own("model"), "Theo", now)).toBe(
+      "DeepSeek V4 Pro hit its own limit on this plan. The plan's other models keep working.",
+    );
+  });
+
+  test("its way out, for who may take it: a budget for admins, a model for its owner and admins, its computer", () => {
+    const admin = { admin: true, owner: false };
+    const owner = { admin: false, owner: true };
+    const member = { admin: false, owner: false };
+    const month = { ...base, code: "budget", source: "budget", resetsAt } as const;
+    expect(widgetWaitFix(month, admin)).toBe("raiseBudget");
+    expect(widgetWaitFix(month, owner)).toBeNull();
+    // Other runs hold it for a moment: no raise needed.
+    expect(widgetWaitFix({ ...month, resetsAt: null }, admin)).toBeNull();
+    const region = { ...plan, scope: "region", model: "DeepSeek V4 Pro" } as const;
+    expect(widgetWaitFix(region, owner)).toBe("changeModel");
+    expect(widgetWaitFix(region, member)).toBeNull();
+    // Only time ends the plan's own limit.
+    expect(widgetWaitFix(plan, admin)).toBeNull();
+    expect(widgetWaitFix({ ...base, code: "computer" }, member)).toBe("openComputer");
+    expect(widgetWaitFix({ ...base, code: "busy" }, member)).toBe("openComputer");
+    expect(widgetWaitFix({ ...base, code: "outage", resetsAt }, admin)).toBeNull();
   });
 });

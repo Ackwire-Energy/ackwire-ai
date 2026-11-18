@@ -86,7 +86,7 @@ export function useConversations() {
   };
 }
 
-/** The badge of Conversas: channels and DMs with something unread (the home's sections; threads have their tab). */
+/** The badge of Conversas: channels and DMs with something unread (the home's Recent list; threads have their tab). */
 export function useUnreadConversations() {
   const orgId = useOrgId();
   const channels = useChannels(orgId);

@@ -75,6 +75,20 @@ export interface DeviceInfo {
   link?: string;
 }
 
+/**
+ * A home holds one connection, so connecting from another workspace moves the computer there: the sentence that says
+ * which one it left; null when it had no connection, or stays in the same workspace.
+ */
+export function movedFrom(
+  prev: { token?: string; orgId?: string; orgName?: string } | null | undefined,
+  org: { id: string; name: string },
+): string | null {
+  if (!prev?.token || !prev.orgId || !org.id || prev.orgId === org.id) return null;
+  const from = prev.orgName || "another workspace";
+  const to = org.name || "this workspace";
+  return `This computer was connected to ${from}. It works for ${to} now, and ${from} no longer reaches it. One connection serves one workspace: for several, use the agentes.chat app.`;
+}
+
 /** Who may use the computer it just connected, in a sentence; null from a server that doesn't say. */
 export function whoCanUse(grant: DeviceGrant, name: string): string | null {
   switch (grant.audience) {

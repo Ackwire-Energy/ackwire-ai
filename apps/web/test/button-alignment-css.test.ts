@@ -19,7 +19,8 @@ test("a button centres its icon and words; only the rows dressed as buttons star
   expect(left.sort()).toEqual([".sidebar__create.ac-btn"]);
 });
 
-test("the sign-in's 'Último usado' ships as a centred line under its provider's button", async () => {
+test("the sign-in's 'Último usado' ships on its button's corner, out of the flow, so the words stay centred", async () => {
   const css = await builtCss("src/components/auth.css");
-  expect(declarations(css, ".auth-social__last")).toContainEqual(["justify-content", "center"]);
+  expect(declarations(css, ".auth-last")).toContainEqual(["position", "absolute"]);
+  expect(declarations(css, ".auth-last-host")).toContainEqual(["position", "relative"]);
 });

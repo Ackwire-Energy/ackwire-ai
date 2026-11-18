@@ -5,16 +5,16 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Nutzungsbedingungen",
     summary:
-      "Die Vereinbarung über die Nutzung von Ackwire AI: Ihr Workspace, Ihre Agenten und wofür jede Seite verantwortlich ist.",
+      "Die Vereinbarung über die Nutzung von agentes.chat: Ihr Workspace, Ihre Agenten und wofür jede Seite verantwortlich ist.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "agreement",
         heading: "1. Vereinbarung",
         blocks: [
-          "Diese Nutzungsbedingungen (die „Bedingungen“) sind eine verbindliche Vereinbarung zwischen der CODARI GLOBAL, LLC, einer Gesellschaft mit beschränkter Haftung (limited liability company) nach dem Recht des Bundesstaates Wyoming, die unter dem Namen Ackwire AI geschäftlich tätig ist („Ackwire AI“, „wir“, „uns“), und der natürlichen oder juristischen Person, die ein Konto oder einen Workspace anlegt („Sie“). Indem Sie ein Konto anlegen, einem Workspace beitreten oder Ackwire AI auf andere Weise im Web, in der Mac-App oder in der Smartphone-App (der „Dienst“) nutzen, akzeptieren Sie diese Bedingungen und unsere Datenschutzerklärung. Wenn Sie den Dienst im Namen eines Unternehmens oder einer anderen Organisation nutzen, sichern Sie zu, dass Sie befugt sind, diese rechtlich zu verpflichten.",
+          "Diese Nutzungsbedingungen (die „Bedingungen“) sind eine verbindliche Vereinbarung zwischen der AGENTESCHAT, LLC, einer Gesellschaft mit beschränkter Haftung (limited liability company) nach dem Recht des Bundesstaates Delaware, die unter dem Namen agentes.chat geschäftlich tätig ist („agentes.chat“, „wir“, „uns“), und der natürlichen oder juristischen Person, die ein Konto oder einen Workspace anlegt („Sie“). Indem Sie ein Konto anlegen, einem Workspace beitreten oder agentes.chat auf andere Weise im Web, in der Mac-App oder in der Smartphone-App (der „Dienst“) nutzen, akzeptieren Sie diese Bedingungen und unsere Datenschutzerklärung. Wenn Sie den Dienst im Namen eines Unternehmens oder einer anderen Organisation nutzen, sichern Sie zu, dass Sie befugt sind, diese rechtlich zu verpflichten.",
           "Um den Dienst zu nutzen, müssen Sie mindestens 18 Jahre alt und in der Lage sein, einen Vertrag zu schließen.",
         ],
       },
@@ -150,7 +150,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "law",
         heading: "16. Anwendbares Recht",
         blocks: [
-          "Diese Bedingungen unterliegen dem Recht des Bundesstaates Wyoming, USA, unter Ausschluss seiner kollisionsrechtlichen Bestimmungen, und die Parteien unterwerfen sich der ausschließlichen Zuständigkeit der einzelstaatlichen Gerichte und der Bundesgerichte mit Sitz in Wyoming. Wenn Sie Verbraucher in einer Rechtsordnung sind, deren Recht Ihnen unabdingbare Rechte oder einen unabdingbaren Gerichtsstand gewährt, wie etwa Brasilien, bleiben diese Rechte unberührt.",
+          "Diese Bedingungen unterliegen dem Recht des Bundesstaates Delaware, USA, unter Ausschluss seiner kollisionsrechtlichen Bestimmungen, und die Parteien unterwerfen sich der ausschließlichen Zuständigkeit der einzelstaatlichen Gerichte und der Bundesgerichte mit Sitz in Delaware. Wenn Sie Verbraucher in einer Rechtsordnung sind, deren Recht Ihnen unabdingbare Rechte oder einen unabdingbaren Gerichtsstand gewährt, wie etwa Brasilien, bleiben diese Rechte unberührt.",
         ],
       },
       {
@@ -164,7 +164,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "18. Kontakt",
         blocks: [
-          "CODARI GLOBAL, LLC, geschäftlich tätig unter dem Namen agentes.chat. Mitteilungen: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Alles andere: hello@agentes.chat",
+          "AGENTESCHAT, LLC, geschäftlich tätig unter dem Namen agentes.chat. Mitteilungen: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · legal@agentes.chat · Alles andere: hello@agentes.chat",
         ],
       },
     ],
@@ -175,13 +175,13 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       "Welche Daten wir erheben, was Agenten wohin senden, wer Ihren Workspace sehen kann und welche Rechte Sie haben.",
     courtesy:
       "Dies ist eine unverbindliche Übersetzung. Weicht sie von der englischen Fassung ab, ist die englische Fassung maßgeblich.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "overview",
         heading: "1. Überblick",
         blocks: [
-          "Die CODARI GLOBAL, LLC, eine Gesellschaft mit beschränkter Haftung (limited liability company) nach dem Recht des Bundesstaates Wyoming, die unter dem Namen Ackwire AI geschäftlich tätig ist („Ackwire AI“, „wir“), betreibt Ackwire AI: einen Workspace, in dem Menschen und KI-Agenten zusammenarbeiten, verfügbar im Web, als Mac-App und als Smartphone-App (der „Dienst“). Diese Erklärung unterscheidet zwei Rollen:",
+          "Die AGENTESCHAT, LLC, eine Gesellschaft mit beschränkter Haftung (limited liability company) nach dem Recht des Bundesstaates Delaware, die unter dem Namen agentes.chat geschäftlich tätig ist („agentes.chat“, „wir“), betreibt agentes.chat: einen Workspace, in dem Menschen und KI-Agenten zusammenarbeiten, verfügbar im Web, als Mac-App und als Smartphone-App (der „Dienst“). Diese Erklärung unterscheidet zwei Rollen:",
           {
             list: [
               "Für **Kontodaten**, also die Informationen, die Personen uns zum Anlegen und Nutzen eines Kontos übermitteln, sind wir der Verantwortliche.",
@@ -201,8 +201,8 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
               "**Abrechnungsdaten:** für einen Workspace mit einem agentes.chat-Tarif Name, E-Mail-Adresse, Rechnungsadresse und Steuernummer der zahlenden Person, der Tarif sowie dessen Rechnungen und Zahlungen. Zahlungen werden von Stripe abgewickelt, das die Kartendaten verarbeitet: Diese erreichen uns nie.",
               "**Nutzungs- und Protokolldaten:** IP-Adressen, Browser und Gerät, Anmeldesitzungen, Sicherheitsereignisse, API-Anfragen sowie der Datensatz jedes Modellaufrufs (Modell, Tokens und Kosten, mit dem zugehörigen Workspace und Agenten), den wir speichern, um Budgets durchzusetzen und die Nutzung anzuzeigen. Wenn etwas fehlschlägt, erfassen wir den Fehler ohne Nachrichteninhalte, um ihn zu beheben.",
               "**Geräte:** für die Smartphone-App das Push-Benachrichtigungstoken jedes Geräts, auf dem Sie sich anmelden. Für angebundene Computer und die Mac-App Name, Betriebssystem und App-Version des Computers.",
-              "**Warteliste:** die E-Mail-Adresse und die Sprache, die Sie uns auf Ackwire AI angeben, und ob Sie die Adresse bestätigt haben.",
-              "**Website-Analyse:** auf Ackwire AI (der öffentlichen Website, nicht dem Workspace) die aufgerufenen Seiten, die verweisende Website, der Gerätetyp und ein aus der IP-Adresse abgeleiteter ungefährer Standort, erhoben mit Himetrica.",
+              "**Warteliste:** die E-Mail-Adresse und die Sprache, die Sie uns auf agentes.chat angeben, und ob Sie die Adresse bestätigt haben.",
+              "**Website-Analyse:** auf agentes.chat (der öffentlichen Website, nicht dem Workspace) die aufgerufenen Seiten, die verweisende Website, der Gerätetyp und ein aus der IP-Adresse abgeleiteter ungefährer Standort, erhoben mit Himetrica.",
             ],
           },
         ],
@@ -230,15 +230,15 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
           "Agenten sind KI-Modelle, die innerhalb des Workspace lesen und handeln. Workspace-Inhalte verlassen unsere Server in den folgenden Fällen, und nur in diesen:",
           {
             list: [
-              "**Zwischen Geräten und unseren Servern.** Alles, was zwischen unseren Servern und den Browsern, Apps und Computern übertragen wird, die sich mit ihnen verbinden, einschließlich der Workspace-Inhalte, läuft über Cloudflare, das den Dienst vor Angriffen schützt. Dazu entschlüsselt Cloudflare diesen Datenverkehr in seinem dem jeweiligen Gerät nächstgelegenen Rechenzentrum und verarbeitet ihn in unserem Auftrag.",
-              "**Antworten.** Wenn ein Agent arbeitet, sendet er den benötigten Kontext (den Kontext des Workspace, die Anweisungen des Agenten, die Unterhaltung, relevante Erinnerungen und die Ergebnisse seiner Werkzeuge) an den für diesen Agenten gewählten Modellanbieter. Mit einem API-Schlüssel, den der Workspace hinterlegt hat, erfolgt der Aufruf über das eigene Konto des Workspace und auf Grundlage seiner eigenen Vereinbarung mit diesem Anbieter. Ist mit einem Agenten ein KI-Abonnement wie Claude oder ChatGPT verbunden, arbeitet der Agent über das Konto der Person, die das Abonnement verbunden hat, und zu den Bedingungen des Anbieters.",
+              "**Zwischen Geräten und unseren Servern.** Alles, was zwischen unseren Servern und den Browsern, Apps und Computern übertragen wird, die sich mit ihnen verbinden, einschließlich der Workspace-Inhalte, läuft über unseren Netzwerkanbieter, der den Dienst vor Angriffen schützt. Dazu entschlüsselt der Netzwerkanbieter diesen Datenverkehr in seinem dem jeweiligen Gerät nächstgelegenen Rechenzentrum und verarbeitet ihn in unserem Auftrag.",
+              "**Antworten.** Wenn ein Agent arbeitet, sendet er den benötigten Kontext (den Kontext des Workspace, die Anweisungen des Agenten, die Unterhaltung, relevante Erinnerungen und die Ergebnisse seiner Werkzeuge) an den für diesen Agenten gewählten Modellanbieter. Mit einem API-Schlüssel, den der Workspace hinterlegt hat, erfolgt der Aufruf über das eigene Konto des Workspace und auf Grundlage seiner eigenen Vereinbarung mit diesem Anbieter. Einige Anbieter leiten den Aufruf an das Unternehmen weiter, das das Modell entwickelt oder hostet, und dieses verarbeitet ihn dann ebenfalls zu den Bedingungen dieses Anbieters. Ist mit einem Agenten ein KI-Abonnement wie Claude oder ChatGPT verbunden, arbeitet der Agent über das Konto der Person, die das Abonnement verbunden hat, und zu den Bedingungen des Anbieters.",
               "**Entscheidung, wer antwortet.** Ein Routing-Modell liest eine neue Nachricht, die Namen und Rollen der Agenten des Workspace und die jüngste Unterhaltung, um zu entscheiden, welcher Agent gegebenenfalls antworten soll. Es läuft bei TypeSafe oder, ersatzweise, beim Modellanbieter des Workspace. Das Routing gewährt einem Agenten niemals eine Berechtigung.",
               "**Erinnerungen.** Agenten bewahren Erinnerungen aus Unterhaltungen auf (Zusammenfassungen, Fakten und Erkenntnisse), damit sie sich mit der Zeit verbessern. Einige Beurteilungen von Erinnerungen (ob etwas aufbewahrenswert ist oder im Widerspruch zu dem steht, was ein Agent bereits weiß) nimmt TypeSafe vor. Erinnerungen können auf der Seite des Agenten eingesehen und entfernt werden und werden mit dem Workspace gelöscht.",
               "**Suche.** Um verwandte Nachrichten und Dokumente zu finden, kann Text von Voyage AI in Vektoren (Embeddings) umgewandelt werden.",
               "**Konnektoren.** Wenn der Workspace einen Dienst anbindet (etwa GitHub, Google, Linear, Sentry, ein E-Mail-Postfach oder einen beliebigen MCP-Server), speichern wir dessen Zugriffstoken verschlüsselt und lesen oder schreiben in diesem Dienst nur innerhalb der Berechtigungsumfänge, die der Workspace jedem Agenten erteilt hat. Der angebundene Dienst verarbeitet diese Daten zu seinen eigenen Bedingungen. Verbindungen zu Gmail- und Outlook-Postfächern sowie zu Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit und WhatsApp laufen über Composio, das verarbeitet, was Agenten dort lesen und schreiben.",
               "**Datenbanken.** Datenbankverbindungen sind schreibgeschützt. Zugangsdaten werden verschlüsselt gespeichert, und jede Abfrage wird vor ihrer Ausführung geprüft.",
-              "**Angebundene Computer.** Wenn jemand einen Computer anbindet, können Agenten dort Befehle ausführen und einen Browser nutzen, innerhalb der Ordner und Berechtigungen, die auf diesem Computer festgelegt sind. Die Live-Ansicht des Browsers eines Agenten läuft über Cloudflare und über den Arbeitsspeicher unserer Server und wird nicht aufgezeichnet. Eine Zusammenfassung der Schritte, die der Agent ausgeführt hat (etwa besuchte Adressen und Aktionen), wird zusammen mit seiner Arbeit gespeichert, damit das Team sehen kann, was er getan hat.",
-              "**Der Computer des Workspace.** Bei Ackwire AI Cloud arbeiten die Agenten eines Workspace auf einem Computer, den wir für diesen Workspace betreiben und der von Contabo in der Europäischen Union gehostet wird. Wir erfassen pro Tag, wie viele Daten der Browser, die KI-Werkzeuge und die anderen Programme jedes Agenten dort senden und empfangen. Der Computer wird nach dem Ende des agentes.chat-Tarifs des Workspace gelöscht, wie in den Nutzungsbedingungen beschrieben.",
+              "**Angebundene Computer.** Wenn jemand einen Computer anbindet, können Agenten dort Befehle ausführen und einen Browser nutzen, innerhalb der Ordner und Berechtigungen, die auf diesem Computer festgelegt sind. Die Live-Ansicht des Browsers eines Agenten läuft über unseren Netzwerkanbieter und über den Arbeitsspeicher unserer Server und wird nicht aufgezeichnet. Eine Zusammenfassung der Schritte, die der Agent ausgeführt hat (etwa besuchte Adressen und Aktionen), wird zusammen mit seiner Arbeit gespeichert, damit das Team sehen kann, was er getan hat.",
+              "**Der Computer des Workspace.** Bei agentes.chat Cloud arbeiten die Agenten eines Workspace auf einem Computer, den wir für diesen Workspace in der Europäischen Union oder in den Vereinigten Staaten betreiben, auf unseren Servern oder denen eines Hosting-Anbieters. Wir erfassen pro Tag, wie viele Daten der Browser, die KI-Werkzeuge und die anderen Programme jedes Agenten dort senden und empfangen. Der Computer wird nach dem Ende des agentes.chat-Tarifs des Workspace gelöscht, wie in den Nutzungsbedingungen beschrieben.",
             ],
           },
           "Aktionen, die schwer rückgängig zu machen sind (etwa das Zusammenführen von Code, ein Deployment oder das Senden im Namen einer Person), werden vor ihrer Ausführung zu einer Freigabeanfrage an eine Person. Text, der von außerhalb des Workspace stammt (Webseiten, E-Mails, Dateien), wird als nicht vertrauenswürdig gekennzeichnet, bevor ein Agent ihn liest.",
@@ -246,9 +246,9 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Wann Mitarbeitende von Ackwire AI Workspace-Inhalte sehen können",
+        heading: "6. Wann Mitarbeitende von agentes.chat Workspace-Inhalte sehen können",
         blocks: [
-          "Wir durchsuchen keine Workspaces. Eine Person bei Ackwire AI kann Workspace-Inhalte nur sehen:",
+          "Wir durchsuchen keine Workspaces. Eine Person bei agentes.chat kann Workspace-Inhalte nur sehen:",
           {
             list: [
               "**Auf Ihre Anfrage,** um bei einer Supportanfrage zu helfen, und nur soweit die Anfrage es erfordert.",
@@ -286,14 +286,14 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "transfers",
         heading: "9. Internationale Übermittlungen",
         blocks: [
-          "Unsere Anwendung und ihre Datenbank laufen in den Vereinigten Staaten, und die in dieser Erklärung genannten Anbieter verarbeiten Daten in den Vereinigten Staaten, mit Ausnahme der Computer der Workspaces, die Contabo in der Europäischen Union hostet, und von Cloudflare, das den Datenverkehr in seinem dem jeweiligen Gerät nächstgelegenen Rechenzentrum verarbeitet, in den Vereinigten Staaten oder anderswo. Werden personenbezogene Daten, die der DSGVO oder der UK GDPR unterliegen, in ein Drittland übermittelt, stützen wir uns auf die Standardvertragsklauseln der Europäischen Kommission und das UK Addendum. Für Daten, die dem LGPD unterliegen, stützen wir uns auf die vertraglichen Garantien nach Artikel 33.",
+          "Unsere Anwendung und ihre Datenbank laufen in den Vereinigten Staaten, und die in dieser Erklärung genannten Anbieter verarbeiten Daten in den Vereinigten Staaten, ausgenommen die Modellanbieter und angebundenen Dienste, die ein Workspace wählt, sowie die Unternehmen, an die diese Aufrufe weiterleiten, die Daten zu ihren eigenen Bedingungen in anderen Ländern verarbeiten können. Die Computer der Workspaces laufen in der Europäischen Union oder in den Vereinigten Staaten, und unser Netzwerkanbieter verarbeitet den Datenverkehr in seinem dem jeweiligen Gerät nächstgelegenen Rechenzentrum, in den Vereinigten Staaten oder anderswo. Werden personenbezogene Daten, die der DSGVO oder der UK GDPR unterliegen, in ein Drittland übermittelt, stützen wir uns auf die Standardvertragsklauseln der Europäischen Kommission und das UK Addendum. Für Daten, die dem LGPD unterliegen, stützen wir uns auf die vertraglichen Garantien nach Artikel 33.",
         ],
       },
       {
         id: "apps",
         heading: "10. Smartphone- und Mac-Apps",
         blocks: [
-          "Die Smartphone-App sendet Benachrichtigungen über Expo, Apple und Google. Eine Benachrichtigung kann den Namen der verfassenden Person und den Anfang der Nachricht anzeigen, und Sie wählen aus, welche Benachrichtigungen Sie erhalten. Die Mac-App und angebundene Computer speichern ihre Anmeldung auf dem Gerät. Das Löschen Ihres Kontos (auch in den Apps möglich) meldet alle Geräte ab.",
+          "Die Smartphone-App sendet Benachrichtigungen über Apple und Google. Eine Benachrichtigung kann den Namen der verfassenden Person und den Anfang der Nachricht anzeigen, und Sie wählen aus, welche Benachrichtigungen Sie erhalten. Die Mac-App und angebundene Computer speichern ihre Anmeldung auf dem Gerät. Das Löschen Ihres Kontos (auch in den Apps möglich) meldet alle Geräte ab.",
         ],
       },
       {
@@ -321,7 +321,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookies und lokaler Speicher",
         blocks: [
-          "Der Workspace verwendet nur die Cookies und den lokalen Speicher, die erforderlich sind, um Sie angemeldet zu halten, Formulare zu schützen und Einstellungen wie Design und Sprache zu speichern. Die öffentliche Website Ackwire AI speichert die von Ihnen gewählte Sprache und verwendet Himetrica-Analysen (Abschnitt 2). Wir verwenden keine Werbe-Cookies und keine Cookies zum websiteübergreifenden Tracking.",
+          "Der Workspace verwendet nur die Cookies und den lokalen Speicher, die erforderlich sind, um Sie angemeldet zu halten, Formulare zu schützen und Einstellungen wie Design und Sprache zu speichern. Die öffentliche Website agentes.chat speichert die von Ihnen gewählte Sprache und verwendet Himetrica-Analysen (Abschnitt 2). Wir verwenden keine Werbe-Cookies und keine Cookies zum websiteübergreifenden Tracking.",
         ],
       },
       {
@@ -342,7 +342,7 @@ export const legalDe: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "17. Kontakt",
         blocks: [
-          "CODARI GLOBAL, LLC, geschäftlich tätig unter dem Namen agentes.chat. Mitteilungen: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. Datenschutzanfragen aus der EU, dem Vereinigten Königreich und Brasilien erreichen unser Datenschutzteam unter derselben Adresse. Für alles andere schreiben Sie an hello@agentes.chat.",
+          "AGENTESCHAT, LLC, geschäftlich tätig unter dem Namen agentes.chat. Mitteilungen: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · privacy@agentes.chat. Datenschutzanfragen aus der EU, dem Vereinigten Königreich und Brasilien erreichen unser Datenschutzteam unter derselben Adresse. Für alles andere schreiben Sie an hello@agentes.chat.",
         ],
       },
     ],

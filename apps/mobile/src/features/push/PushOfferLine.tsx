@@ -30,7 +30,13 @@ export function PushOfferLine({ agent, onDone }: { agent: string; onDone?: () =>
     setAsking(false);
     onDone?.();
     if (ok) toast({ title: t("mobile.push.ask.done"), icon: "bell" });
-    else if (allowed) toast({ title: t("mobile.push.ask.failed"), icon: "x" });
+    // Its way out right there: asking again registers this phone again.
+    else if (allowed)
+      toast({
+        title: t("mobile.push.ask.failed"),
+        icon: "x",
+        action: { label: t("mobile.common.retry"), onPress: () => void ask().catch(() => false) },
+      });
   };
 
   return (
@@ -49,6 +55,7 @@ export function PushOfferLine({ agent, onDone }: { agent: string; onDone?: () =>
 
 const styles = StyleSheet.create({
   // The event line's column: text starts at 62, like a message's.
-  line: { flexDirection: "row", alignItems: "center", gap: 12, paddingLeft: 62, paddingRight: 16, paddingTop: 12 },
+  // From the top: the bell stays on the words' first line when Ativar drops under them.
+  line: { flexDirection: "row", alignItems: "flex-start", gap: 12, paddingLeft: 62, paddingRight: 16, paddingTop: 12 },
   text: { flex: 1, minWidth: 0, alignItems: "center", columnGap: 16, rowGap: 8 },
 });

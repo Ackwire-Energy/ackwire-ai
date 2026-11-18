@@ -6,6 +6,7 @@ import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
 import { ApiError } from "../api/http";
 import type {
+  Agent,
   AgentMailbox,
   MailAccount,
   MailActionName,
@@ -15,6 +16,7 @@ import type {
   ToolDecision,
 } from "../api/types";
 import type { Level } from "./access-levels";
+import { isRightHand } from "./right-hand";
 import { webmailOf } from "./text";
 import type { ReviewTool } from "./tool-review";
 
@@ -143,6 +145,16 @@ export function mailAccessOf(
   const owns = !!viewer.userId && account.ownerUserId === viewer.userId;
   return { gives: owns && viewer.talks, removes: owns || viewer.managesAgent };
 }
+
+/**
+ * Whether a mailbox's row for this agent says it is used only for the viewer: their own mailbox with the team's right
+ * hand, which everyone talks to and which uses a mailbox only for who connected it (ADR 0137).
+ */
+export const onlyForOwner = (
+  account: Pick<MailAccount, "ownerUserId">,
+  agent: Pick<Agent, "builtin"> | undefined,
+  userId: string | null,
+) => isRightHand(agent) && !!userId && account.ownerUserId === userId;
 
 /** A new agent's rules for a mailbox: every folder, anyone, asks before each send. */
 export const defaultPolicy = (): MailPolicy => ({

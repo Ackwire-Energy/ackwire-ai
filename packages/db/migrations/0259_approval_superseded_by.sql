@@ -1,0 +1,1 @@
+ALTER TABLE "approvals" ADD COLUMN "superseded_by_id" uuid;

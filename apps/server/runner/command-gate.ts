@@ -211,20 +211,27 @@ async function remoteRepo(dir: string): Promise<string | null> {
 }
 
 /**
- * The merge a held command is, when it is nothing but that (`loneMerge`, the script it runs included) and its
- * repository is one of `repos`, the agent's "merge without asking" list; null: it stays held. A repository nobody
- * can tell is never in the list.
+ * The merge a command is, when it is nothing but that (`loneMerge`, the script it runs included) and its repository
+ * can be told; null otherwise.
+ */
+export async function mergeOf(command: string, cwd: string): Promise<MergeDone | null> {
+  const script = await scriptOf(command, cwd);
+  const merge = script?.code || script?.cut ? null : loneMerge(script?.text ?? command);
+  if (!merge) return null;
+  const repo = merge.repo ?? (await remoteRepo(path.resolve(cwd, merge.dir)));
+  return repo ? { repo, pr: merge.pr, ref: merge.ref } : null;
+}
+
+/**
+ * The merge a held command is (`mergeOf`), when its repository is one of `repos`, the agent's "merge without asking"
+ * list; null: it stays held. A repository nobody can tell is never in the list.
  */
 export async function allowedMerge(
   command: string,
   opts: { cwd: string; repos: readonly string[] },
 ): Promise<MergeDone | null> {
-  const script = await scriptOf(command, opts.cwd);
-  const merge = script?.code || script?.cut ? null : loneMerge(script?.text ?? command);
-  if (!merge) return null;
-  const repo = merge.repo ?? (await remoteRepo(path.resolve(opts.cwd, merge.dir)));
-  if (!repo || !opts.repos.some((r) => r.toLowerCase() === repo.toLowerCase())) return null;
-  return { repo, pr: merge.pr, ref: merge.ref };
+  const merge = await mergeOf(command, opts.cwd);
+  return merge && opts.repos.some((r) => r.toLowerCase() === merge.repo.toLowerCase()) ? merge : null;
 }
 
 /** A push (nothing held) that goes through our git proxy, where the server decides it with a person's grant. */

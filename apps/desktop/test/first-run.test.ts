@@ -6,10 +6,9 @@ import {
   connectOutcome,
   escapeAction,
   foundServers,
-  INSTALL_COMMAND,
+  INSTALL_GUIDE_URL,
   linkView,
   ownAddresses,
-  ownServerScreen,
   PROBLEM_TEXT,
   terminalStartCommand,
   typedServer,
@@ -37,20 +36,16 @@ const ok = (server: string, over: Record<string, unknown> = {}): ServerCheck =>
 const down = (server: string): ServerCheck => ({ ok: false, server, problem: "unreachable" });
 
 describe("which screen", () => {
-  test("your own server: the two ways where both exist, else straight to Connect", () => {
-    expect(ownServerScreen(true)).toBe("own");
-    // A build without the server (development): no card that can't work.
-    expect(ownServerScreen(false)).toBe("connect");
-  });
-
   test("the system from the web view's own user agent", () => {
     expect(platformOf("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15")).toBe("mac");
     expect(platformOf("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Edg/130.0")).toBe("windows");
     expect(platformOf("Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/605.1.15")).toBe("linux");
   });
 
-  test("the setup's command", () => {
-    expect(INSTALL_COMMAND).toBe("curl -fsSL https://agentes.chat/install | sh");
+  test("the source installation guide", () => {
+    expect(INSTALL_GUIDE_URL).toBe(
+      "https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SELF_HOSTING.md#from-source",
+    );
   });
 
   test("Esc: back a screen, or the window closes; never while Ackwire AI is being set up here", () => {
@@ -221,12 +216,11 @@ describe("a link to a server", () => {
 });
 
 describe("the menu bar and the labels Rust shows", () => {
-  test("the menu bar icon: the person's choice, else while agents work here, and always without the Dock", () => {
-    expect(menuBarShown(null, true, false)).toBe(false);
-    expect(menuBarShown(null, true, true)).toBe(true);
-    expect(menuBarShown(true, true, false)).toBe(true);
-    expect(menuBarShown(false, true, true)).toBe(false);
-    expect(menuBarShown(false, false, false)).toBe(true);
+  test("the menu bar icon: the person's choice, else while agents work here", () => {
+    expect(menuBarShown(null, false)).toBe(false);
+    expect(menuBarShown(null, true)).toBe(true);
+    expect(menuBarShown(true, false)).toBe(true);
+    expect(menuBarShown(false, true)).toBe(false);
   });
 
   // Rust refuses the whole set when one label is too long, so every language counts, not only the two written here.

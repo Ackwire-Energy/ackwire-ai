@@ -21,7 +21,15 @@ export {
 } from "./agents";
 export { connectVaultSource, deleteVaultConnection, syncVaultConnection, updateVaultConnection } from "./connections";
 export { importVaultCsv } from "./csv";
-export { createVaultItem, deleteVaultItem, getVaultItem, listVault, updateVaultItem } from "./items";
+export {
+  createVaultItem,
+  deleteVaultItem,
+  getVaultItem,
+  listVault,
+  moveVaultItem,
+  updateVaultItem,
+} from "./items";
+export { importVaultKeys } from "./keys";
 export {
   VaultRefusal,
   type VaultRefusalCode,

@@ -3,6 +3,7 @@ import {
   type CSSProperties,
   type HTMLAttributes,
   type ReactNode,
+  type Ref,
   useEffect,
   useState,
 } from "react";
@@ -209,13 +210,15 @@ export function EmptyState({
   );
 }
 
-/** Inline error (or neutral notice) with an icon. */
+/** Inline error (or neutral notice) with an icon: `info` for a notice that suggests rather than warns. */
 export function Alert({
   tone = "danger",
+  icon = "alert",
   children,
   className,
 }: {
   tone?: "danger" | "neutral";
+  icon?: IconName;
   children: ReactNode;
   className?: string;
 }) {
@@ -224,7 +227,7 @@ export function Alert({
       role={tone === "danger" ? "alert" : "status"}
       className={cx("ac-alert ac-iconline", tone === "neutral" && "ac-alert--neutral", className)}
     >
-      <Icon name="alert" />
+      <Icon name={icon} />
       <span>{children}</span>
     </p>
   );
@@ -301,7 +304,8 @@ export function OptionCard({
   disabled,
   children,
   className,
-}: {
+  ...rest
+}: Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClick"> & {
   pressed: boolean;
   onClick: () => void;
   /** Cut corner: the option creates an agent. */
@@ -311,9 +315,12 @@ export function OptionCard({
   disabled?: boolean;
   children: ReactNode;
   className?: string;
+  /** A `Tip` in button mode hands its handlers and ref through here. */
+  ref?: Ref<HTMLButtonElement>;
 }) {
   return (
     <button
+      {...rest}
       type="button"
       aria-pressed={pressed}
       onClick={onClick}

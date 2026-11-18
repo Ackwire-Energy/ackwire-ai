@@ -13,6 +13,7 @@ export function pageScrollReset() {
   return {
     selectors: [
       () => (pathChanged ? document.querySelector("main.shell__main") : null),
+      () => (pathChanged ? document.querySelector("div.onb") : null),
       () => (pathChanged ? document.querySelector("main.shell__main .page-split > :last-child") : null),
     ],
     track: (e: { pathChanged: boolean }) => {

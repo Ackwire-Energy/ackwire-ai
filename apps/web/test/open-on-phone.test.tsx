@@ -96,6 +96,29 @@ describe("Abrir no celular", () => {
     expect(within(dialog).queryByRole("img", { name: "QR code para entrar no app Ackwire AI" })).toBeNull();
     expect(dialog.textContent).toContain("o celular não chega a ele");
     expect(dialog.textContent).toContain("Acessar pelo celular e pela equipe");
+    expect(within(dialog).queryByRole("button", { name: "Abrir Servidores" })).toBeNull();
+    cleanup();
+    // In the app that runs it, on that computer: the switch's tab one click away, its path gone from the words.
+    const win = window as { __agentesDesktop?: unknown; __TAURI_INTERNALS__?: unknown };
+    const asked: Record<string, unknown>[] = [];
+    win.__agentesDesktop = { version: "0.8.6" };
+    win.__TAURI_INTERNALS__ = {
+      invoke: async (cmd: string, args: { request?: Record<string, unknown> }) => {
+        if (cmd !== "this_mac" || !args.request) return {};
+        asked.push(args.request);
+        return args.request.kind === "status" ? { orgs: [], agentsHere: true, local: true } : {};
+      },
+    };
+    try {
+      const inApp = await openPhoneDialog(state);
+      expect(inApp.textContent).toContain("Ligue Acessar pelo celular e pela equipe. Depois volte aqui.");
+      expect(inApp.textContent).not.toContain("Preferências");
+      await click(within(inApp).getByRole("button", { name: "Abrir Servidores" }));
+      expect(asked).toContainEqual({ kind: "prefs", tab: "servers" });
+    } finally {
+      delete win.__agentesDesktop;
+      delete win.__TAURI_INTERNALS__;
+    }
   });
 
   test("back on the tab after the code ran low, a new one takes its place", async () => {

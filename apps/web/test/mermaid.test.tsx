@@ -214,8 +214,9 @@ describe("the frame mermaid draws in", () => {
   });
 
   test("the time allowed counts from the frame's load, however slow mermaid's bundle is to arrive", async () => {
-    const drawing = drawWithMermaid("slow", FLOW, false, 30);
-    await new Promise((resolve) => setTimeout(resolve, 90));
+    // Twice the time allowed passes before the load; after it, a busy CI runner still answers well within it.
+    const drawing = drawWithMermaid("slow", FLOW, false, 250);
+    await new Promise((resolve) => setTimeout(resolve, 500));
     const made = await readyFrame();
     expect(made.removed).toBe(false);
     post(made.win, { id: "slow", svg: SVG });

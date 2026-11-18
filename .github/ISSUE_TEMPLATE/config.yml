@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Question or idea
+  - name: Upstream project discussions
     url: https://github.com/agentes-chat/agentes-chat/discussions
-    about: Questions, setup help and open-ended ideas belong in Discussions.
+    about: Discuss setup and features shared with the upstream project.
   - name: Security vulnerability
-    url: https://github.com/agentes-chat/agentes-chat/security/advisories/new
-    about: Report it privately, never in a public issue.
+    url: https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SECURITY.md
+    about: Find out how to report an Ackwire vulnerability privately.

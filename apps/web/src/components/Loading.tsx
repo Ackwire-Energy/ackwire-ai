@@ -1,4 +1,4 @@
-import { errorText, isGone, knownErrorText } from "@agenteschat/client/lib/errors";
+import { errorCode, errorText, isGone, knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   Button,
   EmptyState,
@@ -10,8 +10,8 @@ import {
   TopProgress,
   useDelayed,
 } from "@agenteschat/ui";
-import { useIsFetching } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { notifyManager, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 
 /** Placeholder rows for a list (members, routines, PCs, search results…). */
@@ -111,10 +111,14 @@ export function useStepText(active: boolean, steps: string[]) {
   return steps[stepAt(since, now, steps.length)];
 }
 
-/** A friendly line and one action: "Tentar de novo", unless what it loads is gone, which no try brings back. */
+/**
+ * A friendly line and one action: "Tentar de novo", unless what it loads is gone or its workspace is being deleted,
+ * which no try changes.
+ */
 export function ErrorState({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
   const { t, i18n } = useTranslation();
   const gone = isGone(error);
+  const final = gone || errorCode(error) === "org.deleting";
   // A query's `error` is null when it holds none: nothing to read, so the load just failed.
   const message =
     error == null
@@ -126,7 +130,7 @@ export function ErrorState({ error, onRetry }: { error?: unknown; onRetry?: () =
     <EmptyState
       icon="alert"
       actions={
-        onRetry && !gone ? (
+        onRetry && !final ? (
           <Button size="sm" onClick={onRetry}>
             {t("common.retry")}
           </Button>
@@ -145,8 +149,23 @@ export function ErrorState({ error, onRetry }: { error?: unknown; onRetry?: () =
  */
 export function RefetchBar() {
   const { t } = useTranslation();
-  const refreshing = useIsFetching({
-    predicate: (q) => q.state.data !== undefined && q.meta?.quiet !== true,
-  });
-  return <TopProgress active={refreshing > 0} label={t("common.refreshing")} />;
+  const cache = useQueryClient().getQueryCache();
+  // Not `useIsFetching`: it scans every query on every cache event, each row's observers coming and going included,
+  // and with a long conversation on screen that is most of the work of drawing it. A fetch starting or ending is an
+  // `updated` event.
+  const subscribe = useCallback(
+    (change: () => void) => {
+      const batched = notifyManager.batchCalls(change);
+      return cache.subscribe((e) => {
+        if (e.type === "updated" || e.type === "removed") batched();
+      });
+    },
+    [cache],
+  );
+  const refreshing = useSyncExternalStore(subscribe, () =>
+    cache
+      .getAll()
+      .some((q) => q.state.fetchStatus === "fetching" && q.state.data !== undefined && q.meta?.quiet !== true),
+  );
+  return <TopProgress active={refreshing} label={t("common.refreshing")} />;
 }

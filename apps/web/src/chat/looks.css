@@ -66,6 +66,17 @@
 .ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside) {
   --stamp-room: 38px;
 }
+/* A source glyph before the time (`.ac-msg__mark`) adds its 14px and the stamp's 4px gap. */
+.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark) {
+  --stamp-room: 38px;
+}
+.ac-msg--own[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark),
+.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark):has(.ac-msg__stamp .ac-msg__aside) {
+  --stamp-room: 56px;
+}
+.ac-msg__stamp > .ac-msg__mark {
+  color: inherit;
+}
 /* The bubble is the plate: it lights on hover, the row doesn't. */
 .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) {
   background: none;
@@ -395,12 +406,29 @@
 .ac-msg[data-look="compact"] .ac-avatar__badge {
   display: none;
 }
+/* A grouped row's receipt stands in the small face's column; the clock already says the time. */
+.ac-msg[data-look="compact"] .ac-msg__gutter--aside {
+  position: absolute;
+  top: var(--msg-block);
+  left: 62px;
+  display: flex;
+  justify-content: center;
+  width: 18px;
+}
+.ac-msg[data-look="compact"] .ac-msg__gutter--aside > .ac-msg__gutter-time {
+  display: none;
+}
+.ac-msg[data-look="compact"] .ac-msg__gutter--aside > .ac-msg__aside {
+  margin-right: 0;
+}
 /* The clock and the small face centre on the words' first line (20px at the default size), under the row's 1px plate. */
 .ac-msg__clock {
   position: absolute;
   top: calc(var(--msg-line) / 2 - 7px);
-  left: 14px;
-  width: 40px;
+  /* Its end 54px in, on one line: a longer time ("11:43 PM") grows into the row's start, never onto a second line. */
+  right: calc(100% - 54px);
+  min-width: 40px;
+  white-space: nowrap;
   font-size: max(11px, calc(var(--msg-text) - 3px));
   line-height: 17px;
   text-align: right;

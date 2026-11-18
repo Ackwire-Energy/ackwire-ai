@@ -9,8 +9,9 @@ import {
   pushOffersFrom,
 } from "@agenteschat/client/lib/push-offer";
 import { Button, Icon } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import { createContext, useCallback, useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
+import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
@@ -188,6 +189,7 @@ export function PushAskInline({
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
   const api = useApi();
   const toast = useToast();
   const publicKey = useWebPushKey(offered()).data;
@@ -203,7 +205,8 @@ export function PushAskInline({
         // Chrome's quieter prompts may keep it as a crossed-out bell by the address, with no answer.
         else if (state === "default") toast.show(t("shell.browserNoticesUnanswered"));
       })
-      .catch(() => toast.show(t("webPushAsk.failed"), "error"))
+      // Its way out right there: the toast's button asks again, from that click.
+      .catch(() => toast.show(t("webPushAsk.failed"), "error", { label: t("common.retry"), run: turnOn }))
       .finally(() => {
         setAsking(false);
         onClose();
@@ -225,7 +228,21 @@ export function PushAskInline({
         <span className="ac-mediarow__end ac-mediarow__meta">{t("webPushAsk.now")}</span>
         <span className="ac-mediarow__body web-push-ask__body">{t("webPushAsk.finished.body")}</span>
       </div>
-      <p className="push-ask__why">{t("webPushAsk.inline.why")}</p>
+      <p className="push-ask__why">
+        <Trans
+          i18nKey="webPushAsk.inline.why"
+          components={{
+            link: (
+              <Link
+                className="ac-link"
+                to="/org/$orgId/settings/$section"
+                params={{ orgId: org.id, section: "notifications" }}
+                search={{}}
+              />
+            ),
+          }}
+        />
+      </p>
       <div className="push-ask__acts">
         <Button size="sm" variant="primary" icon="bell" loading={asking} onClick={turnOn}>
           {t("webPushAsk.on")}

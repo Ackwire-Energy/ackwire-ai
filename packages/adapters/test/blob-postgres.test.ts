@@ -41,9 +41,23 @@ test("an org's files and logo carry the org and go with it; a person's photo bel
   expect(await store.get(photo)).toBeNull();
 });
 
+test("a feedback's file belongs to no org and is listed under feedback/", async () => {
+  const store = createPostgresBlobStore(db);
+  const shot = "feedback/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b";
+  await store.put(shot, bytes("shot"), png);
+
+  expect(await store.get(shot)).toEqual({ body: bytes("shot"), contentType: "image/png" });
+  expect(await store.list("feedback/")).toEqual([shot]);
+  expect(await db.select({ orgId: schema.blobs.orgId }).from(schema.blobs)).toEqual([{ orgId: null }]);
+  await store.delete(shot);
+  expect(await store.list("feedback/")).toEqual([]);
+});
+
 test("any other key is refused", async () => {
   const store = createPostgresBlobStore(db);
-  for (const key of ["skills/s1/v1/a.md", "orgs/acme/a", "org-logos/acme/a.png", "avatars//a.png", "avatars/u1", ""]) {
+  const keys = ["skills/s1/v1/a.md", "orgs/acme/a", "org-logos/acme/a.png", "avatars//a.png", "avatars/u1", ""];
+  keys.push("feedback/abc", "feedback/0190a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b/x.png");
+  for (const key of keys) {
     await expect(store.put(key, bytes("x"), { contentType: "text/plain" })).rejects.toThrow(/blob key/);
   }
   expect(await db.select().from(schema.blobs)).toEqual([]);

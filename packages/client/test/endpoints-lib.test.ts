@@ -7,16 +7,39 @@ import {
   endpointAddressLooksValid,
   endpointModelsOf,
   endpointReady,
+  modelsShown,
   modelUnpriced,
   parsePrice,
   pricesProblem,
+  withChecks,
   withListedModels,
   withoutModel,
   withTypedModel,
 } from "../src/lib/endpoints";
-import { keyRuns, modelChoices, modelForKey } from "../src/lib/providers";
+import { keyRuns, modelChoices, modelOnKey } from "../src/lib/providers";
 
 describe("the endpoint form", () => {
+  test("a search shows the models ticked when it began first, whatever is typed, then the others that match", () => {
+    const models = ["qwen-8b", "deepseek-v4", "qwen-32b", "kimi-k2"].map((id) => ({ id }));
+    const pinned = new Set(["deepseek-v4"]);
+    expect(modelsShown(models, " QWEN ", pinned).map((m) => m.id)).toEqual(["deepseek-v4", "qwen-8b", "qwen-32b"]);
+    expect(modelsShown(models, "", pinned).map((m) => m.id)).toEqual(["deepseek-v4", "qwen-8b", "qwen-32b", "kimi-k2"]);
+    expect(modelsShown(models, "zzz", new Set())).toEqual([]);
+  });
+
+  test("a save's tests go into the key's models, as the server keeps them", () => {
+    const key: Pick<Credential, "id" | "endpoint"> = {
+      id: "k",
+      endpoint: { style: "openai", baseURL: "https://api.example.com/v1", models: [{ id: "a" }, { id: "b" }] },
+    };
+    const bare: Pick<Credential, "id" | "endpoint"> = { id: "k" };
+    expect(withChecks(key, [{ model: "b", check: "ok" }]).endpoint?.models).toEqual([
+      { id: "a" },
+      { id: "b", check: "ok" },
+    ]);
+    expect(withChecks(bare, [{ model: "b", check: "ok" }])).toEqual({ id: "k" });
+  });
+
   test("a model taken off leaves the others as they were", () => {
     const d = withListedModels(emptyEndpointDraft(), [{ id: "a" }, { id: "b" }]);
     expect(withoutModel(d, "a").models.map((m) => m.id)).toEqual(["b"]);
@@ -131,10 +154,61 @@ describe("endpoint models in the pickers", () => {
 
   test("an endpoint's model runs on its own key only; the budget's note for an unpriced one", () => {
     expect(keyRuns(cred("c1"), "custom:c1:llama", models)).toBe(true);
+    expect(keyRuns(cred("c1"), "auto", models)).toBe(false);
+    expect(keyRuns(cred("k", "anthropic"), "auto", models)).toBe(true);
     expect(keyRuns(cred("c2"), "custom:c1:llama", models)).toBe(false);
     expect(modelUnpriced(models, "custom:c1:llama")).toBe(true);
     expect(modelUnpriced(models, "custom:c2:other")).toBe(false);
     expect(modelUnpriced(undefined, "custom:c1:llama")).toBe(false);
+  });
+
+  test("the model a key saves with: an endpoint's own, never Automático, keeping a pinned one it offers", () => {
+    // Real credential ids: only these parse as `custom:<credential>:<model>`.
+    const a = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    const b = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
+    const endpointKey = (id: string, own: { id: string; check?: "ok" | "no_tools" | "failed" }[]): Credential => ({
+      ...cred(id),
+      endpoint: { style: "openai", baseURL: "https://gw.example/v1", models: own },
+    });
+    const listed: Model[] = [
+      ...models,
+      { ...models[1], id: `custom:${a}:llama`, endpoint: { credentialId: a, name: "OpenGateway" } } as Model,
+      { ...models[1], id: `custom:${b}:first`, endpoint: { credentialId: b, name: "Elsewhere" } } as Model,
+      { ...models[1], id: `custom:${b}:llama`, endpoint: { credentialId: b, name: "Elsewhere" } } as Model,
+    ];
+    // A model that already runs on the key is left alone.
+    expect(modelOnKey(cred(a), `custom:${a}:llama`, listed)).toEqual({});
+    expect(modelOnKey(cred("k", "anthropic"), "auto", listed)).toEqual({});
+    // Another line's model: Automático on a catalog key (it follows the key), the endpoint's own on an endpoint key.
+    expect(modelOnKey(cred("k", "anthropic"), `custom:${a}:llama`, listed)).toEqual({ model: "auto" });
+    expect(modelOnKey(endpointKey(b, [{ id: "other" }]), `custom:${a}:llama`, listed)).toEqual({
+      model: `custom:${b}:other`,
+    });
+    // A pinned model this endpoint offers too stays, even when it isn't the one it would pick.
+    expect(
+      modelOnKey(endpointKey(b, [{ id: "first", check: "ok" }, { id: "llama" }]), `custom:${a}:llama`, listed),
+    ).toEqual({ model: `custom:${b}:llama` });
+    // The key without its endpoint: the models listed for it, the pinned one kept there too.
+    expect(modelOnKey(cred(b), `custom:${a}:llama`, listed)).toEqual({ model: `custom:${b}:llama` });
+    expect(modelOnKey(cred(b), "claude-sonnet-5-5", listed)).toEqual({ model: `custom:${b}:first` });
+    // Nothing known of its models: Automático, which the server pins to one of the endpoint's.
+    expect(modelOnKey(cred(b), "claude-sonnet-5-5", models)).toEqual({ model: "auto" });
+    // Best last test first: ok, then never tested, then no tools, then failed.
+    const pick = (own: { id: string; check?: "ok" | "no_tools" | "failed" }[]) =>
+      modelOnKey(endpointKey(b, own), "auto", listed);
+    expect(
+      pick([
+        { id: "slow", check: "failed" },
+        { id: "good", check: "ok" },
+      ]),
+    ).toEqual({ model: `custom:${b}:good` });
+    expect(pick([{ id: "slow", check: "failed" }, { id: "new" }])).toEqual({ model: `custom:${b}:new` });
+    expect(
+      pick([
+        { id: "slow", check: "failed" },
+        { id: "chat", check: "no_tools" },
+      ]),
+    ).toEqual({ model: `custom:${b}:chat` });
   });
 });
 
@@ -152,8 +226,9 @@ test("connecting a custom key selects its tested model, never Automatic or anoth
     },
   };
   expect(keyRuns(key, "auto", [])).toBe(false);
-  expect(modelForKey(key, "auto", [])).toBe("custom:pool:working");
-  expect(modelForKey(key, "custom:other:working", [])).toBe("custom:pool:working");
-  expect(modelForKey({ ...key, provider: "openai" }, "auto", [])).toBe("auto");
-  expect(() => modelForKey({ id: "empty", provider: "custom" }, "auto", [])).toThrow("no models");
+  expect(modelOnKey(key, "auto", [])).toEqual({ model: "custom:pool:working" });
+  expect(modelOnKey(key, "custom:other:working", [])).toEqual({ model: "custom:pool:working" });
+  expect(modelOnKey({ ...key, provider: "openai" }, "auto", [])).toEqual({});
+  // An older server may omit the endpoint models; it pins Automatic when the key is saved.
+  expect(modelOnKey({ id: "empty", provider: "custom" }, "auto", [])).toEqual({ model: "auto" });
 });

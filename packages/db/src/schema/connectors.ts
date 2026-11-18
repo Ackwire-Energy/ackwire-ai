@@ -79,6 +79,11 @@ export const connectorConnections = pgTable(
     /** A service through Composio: its connected account (`ca_…`). */
     composioAccountId: text(),
     /**
+     * A server by address: the names of the request headers a person typed for it (ADR 0186), in their order. Their
+     * values are in the sealed secret only; the names are here so a screen says what is sent without opening it.
+     */
+    headerNames: text().array(),
+    /**
      * A catalog connector's OAuth sign-in: the scopes it granted, space-separated. Fewer than the catalog asks for
      * now: Reconectar adds the rest. Null: a key, a server's own sign-in or Composio.
      */

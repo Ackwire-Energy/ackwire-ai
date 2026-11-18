@@ -5,8 +5,8 @@ pass, the conventions that matter, and how contributions are licensed.
 
 ## Where things happen
 
-- **Questions and ideas:** [GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions).
-- **Bugs and concrete feature requests:** issues (please use the issue forms).
+- **Questions about the shared project:** [upstream GitHub Discussions](https://github.com/agentes-chat/agentes-chat/discussions).
+- **Ackwire bugs and feature requests:** [open a fork issue](https://github.com/Ackwire-Energy/ackwire-ai/issues).
 - **Security problems:** never a public issue. See [SECURITY.md](SECURITY.md).
 
 ## Run it for development
@@ -59,6 +59,14 @@ app, a package or the Docker files also boots the image with `docker-compose.yml
 
 - **Migrations are immutable.** Change the schema in `packages/db/src/schema`, then run
   `bun run db:generate <name>`. A committed migration never changes; a fix is a new migration.
+  An index of a table written all the time (`outbox`, `agent_run_steps`) is declared with
+  `.concurrently()`, so that building it holds no write. Its migration runs outside a transaction,
+  and all of it runs again after a failure: by hand, give its other statements `IF NOT EXISTS` and
+  put a `DROP INDEX CONCURRENTLY IF EXISTS` before each concurrent build (`migrateInSteps` in
+  `packages/db/src/client.ts`), with its `-- deploy-safe:` comment on the line before
+  (`bun run check:migrations`). Generate such an index in a migration of its own: nothing else in
+  that migration is undone on a failure either. Not on `messages`: Postgres builds no index
+  concurrently on a partitioned table.
 - **Environment variables** are declared only in `packages/config/src/schema.ts`. Then run
   `bun run docs:env`, which regenerates `.env.example`.
 - **Drizzle operators** come from `@agenteschat/db`, never from `drizzle-orm` directly.
@@ -84,13 +92,7 @@ app, a package or the Docker files also boots the image with `docker-compose.yml
 - Ackwire AI is AGPL-3.0-only ([LICENSE](LICENSE)). A package published under MIT says so in
   its own LICENSE, and contributions to it are MIT: today that is the setup CLI, `packages/setup`
   (`@agenteschat/setup`).
-- Inbound = outbound: your contribution is licensed under the license of the code it goes into.
-  Here that is AGPL-3.0-only together with the additional permission under section 7 for app
-  stores (at the top of [NOTICE](NOTICE)), so your code ships in the phone and desktop apps
-  like the rest. [GitHub's Terms of Service](https://docs.github.com/en/site-policy/github-terms/github-terms-of-service)
-  (section D.6) already license contributions under the repository's license.
-- There is no contributor license agreement to sign and no DCO sign-off. You keep the copyright in
-  your contribution.
+- Contributions to this fork use the license of the code they modify. The [upstream contributor agreement](CLA.md) and its signature workflow apply to contributions submitted to agentes-chat/agentes-chat.
 - Submit only your own code, or code under MIT, BSD, ISC, Apache-2.0 or MPL-2.0 (whole files, with
   their notices). Never GPL, AGPL, unlicensed or proprietary code.
 - AI-assisted code is fine. You answer for its origin.

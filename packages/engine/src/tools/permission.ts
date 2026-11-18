@@ -1,6 +1,5 @@
 import { and, eq, isNull, schema, sql } from "@agenteschat/db";
 import { grantBrowserProfile, onSingleModeMachine } from "../browser/profiles";
-import { FIXED_GRANTS } from "../right-hand";
 import {
   ALL_TOOLS,
   BUILTIN_SCOPES,
@@ -33,7 +32,6 @@ export interface MissingPermission {
  */
 export async function missingPermissions(ctx: Pick<ToolContext, "db" | "orgId" | "agentId">) {
   const granted = await grantedScopeKeys(ctx.db, ctx.orgId, ctx.agentId);
-  if (granted.has(grantKey(null, FIXED_GRANTS))) return [];
   const all = granted.has(grantKey(null, ALL_TOOLS));
   const out: MissingPermission[] = [];
   for (const [scope, info] of Object.entries(BUILTIN_SCOPES)) {

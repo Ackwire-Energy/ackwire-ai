@@ -1,8 +1,9 @@
 #!/bin/sh
 # The `backup` service of docker-compose.yml: every day at 03:00 UTC (or every BACKUP_INTERVAL_HOURS
 # hours from then), a pg_dump of the database to an S3-compatible bucket, deleting dumps older than
-# BACKUP_RETENTION_DAYS (14 by default). Settings and the restore:
-# https://agentes.chat/docs/install-on-a-server#backups
+# BACKUP_RETENTION_DAYS (14 by default). With BACKUP_AGE_RECIPIENT set, an age public key, the dump is
+# encrypted to it before it leaves the server, and the bucket alone is not enough to read it. Settings
+# and the restore: https://agentes.chat/docs/install-on-a-server#backups
 #   backup.sh             the schedule (what the service runs)
 #   backup.sh now         one dump, right away
 #   backup.sh list        the dumps in the bucket
@@ -27,17 +28,31 @@ export RCLONE_S3_SECRET_ACCESS_KEY="${S3_SECRET_ACCESS_KEY:-}"
 export RCLONE_S3_NO_CHECK_BUCKET=true
 bucket=":s3:${S3_BACKUP_BUCKET}"
 
-# This service's dumps only, at the top of the bucket: anything else there is left alone.
-dumps() { rclone "$@" --max-depth 1 --include 'agentes-*.dump' "$bucket"; }
+# This service's dumps only, at the top of the bucket: anything else there is left alone. Both names
+# count, encrypted (.dump.age) or not, so a bucket that switches encryption keeps its retention.
+dumps() {
+  rclone "$@" --max-depth 1 --include 'agentes-*.dump' --include 'agentes-*.dump.age' "$bucket"
+}
 
 case "${1:-}" in
   now)
-    name="agentes-$(date -u +%Y%m%d-%H%M%S).dump"
+    stamp=$(date -u +%Y%m%d-%H%M%S)
+    dump=/tmp/agentes.dump
+    name="agentes-${stamp}.dump"
+    if [ -n "${BACKUP_AGE_RECIPIENT:-}" ]; then
+      name="${name}.age"
+    fi
     echo "backup: dumping the database to ${name}"
-    pg_dump --format=custom --file=/tmp/agentes.dump "$DATABASE_URL"
+    pg_dump --format=custom --file="$dump" "$DATABASE_URL"
+    if [ -n "${BACKUP_AGE_RECIPIENT:-}" ]; then
+      # Only the public key sits on this server: the dump is readable where the private key is, not here.
+      age --encrypt --recipient "$BACKUP_AGE_RECIPIENT" <"$dump" >"${dump}.age"
+      rm "$dump"
+      dump="${dump}.age"
+    fi
     # rclone fails unless the uploaded object's size and checksum match the file.
-    rclone copyto /tmp/agentes.dump "${bucket}/${name}"
-    rm /tmp/agentes.dump
+    rclone copyto "$dump" "${bucket}/${name}"
+    rm "$dump"
     dumps delete --min-age "${BACKUP_RETENTION_DAYS:-14}d"
     echo "backup: ${name} uploaded"
     ;;

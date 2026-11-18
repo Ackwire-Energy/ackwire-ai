@@ -1,4 +1,5 @@
 import {
+  ACCESS_ALLOW_PROTOCOL,
   ACCESS_LIMITS,
   ACCESS_PROTOCOL,
   grantedTo,
@@ -13,12 +14,13 @@ import { and, type Database, eq, isNull, schema, sql } from "@agenteschat/db";
 import { getAgentCached } from "./agents";
 import { recordAudit } from "./audit";
 import { createAgentRuns, eligibleChannelAgents } from "./dispatch";
-import { ForbiddenError, ValidationError } from "./errors";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishMessageCreated } from "./events";
 import type { MachineCaller } from "./machine-hub";
 import { taskRequester } from "./machine-tasks";
 import {
   assertNotPaused,
+  getMachine,
   getMachineById,
   MachineOfflineError,
   machineOnline,
@@ -27,6 +29,8 @@ import {
   requireMachineManager,
 } from "./machines";
 import { insertMessage, messageView } from "./messages";
+import { type NotificationDeps, notify, resolveNotifications } from "./notifications";
+import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { replyThreadOf } from "./runs";
 import { hopLimitReached, runStretchOf } from "./stretch";
@@ -56,6 +60,12 @@ export function agentFolders(access: RunnerAccess | null | undefined, agentId: s
   return access.folders.filter((f) => grantedTo(f, agentId)).map((f) => f.path);
 }
 
+const toolRequestKey = (machineId: string, tool: string) => `device-tool:${machineId}:${tool}`;
+/** One inbox row per computer and program for its owner (`device.cli_request`, `askMachineCliInstall`). */
+export const cliRequestKey = (machineId: string, tool: string) => `device-cli:${machineId}:${tool}`;
+/** One inbox row per folder an agent waits for (`device.folder_request`), done when the machine answers it. */
+export const folderRequestKey = (requestId: string) => `device-folder:${requestId}`;
+
 /** The runner's report, stored as is (the machine is the source of truth), and told to the org. */
 export async function storeMachineAccess(deps: AccessDeps, machineId: string, access: RunnerAccess) {
   const [row] = await deps.db
@@ -64,16 +74,25 @@ export async function storeMachineAccess(deps: AccessDeps, machineId: string, ac
     .set({ access, execAllowed: access.tools.commands === true, updatedAt: new Date() })
     .where(eq(machines.id, machineId))
     .returning({ orgId: machines.orgId });
+  if (!row) return;
   // Members refetch; the folders themselves are only in the API, for admins and the pairer.
-  if (row) await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { access: true });
+  await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { access: true });
+  // A tool on, from the apps or the computer's own switch, answers whoever asked for it.
+  for (const [tool, on] of Object.entries(access.tools)) {
+    if (on !== true) continue;
+    await resolveNotifications(deps, row.orgId, {
+      groupKey: toolRequestKey(machineId, tool),
+      kind: "device.tool_request",
+    }).catch(() => 0);
+  }
 }
 
-/** What `machines.executors` keeps of the coding CLIs: each one found and when they were looked up. */
+/** What `machines.executors` keeps of the coding CLIs: each one found, those that can't start, and when they were looked up. */
 export function storedExecutors(stored: schema.MachineExecutors | null | undefined): schema.MachineExecutors {
   if (!stored) return {};
-  const { claude, codex, cursor, opencode, grok, antigravity, detectedAt } = stored;
+  const { claude, codex, cursor, opencode, grok, antigravity, broken, detectedAt } = stored;
   return Object.fromEntries(
-    Object.entries({ claude, codex, cursor, opencode, grok, antigravity, detectedAt }).filter(
+    Object.entries({ claude, codex, cursor, opencode, grok, antigravity, broken, detectedAt }).filter(
       ([, v]) => v !== undefined,
     ),
   );
@@ -92,12 +111,21 @@ export async function storeMachineExecutors(
   const [row] = await deps.db
     .update(machines)
     .set({
-      executors: sql`(coalesce(${machines.executors}, '{}'::jsonb) - 'claude' - 'codex' - 'cursor' - 'opencode' - 'grok' - 'antigravity') || ${next}::jsonb`,
+      executors: sql`(coalesce(${machines.executors}, '{}'::jsonb) - 'claude' - 'codex' - 'cursor' - 'opencode' - 'grok' - 'antigravity' - 'broken') || ${next}::jsonb`,
       updatedAt: new Date(),
     })
     .where(eq(machines.id, machineId))
     .returning({ orgId: machines.orgId });
-  if (row) await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { executors: true });
+  if (!row) return;
+  await publishMachineUpdated(deps.pubsub, row.orgId, machineId, { executors: true });
+  // A program installed, from the apps or by hand, answers whoever asked for it.
+  for (const tool of ["claude", "codex"] as const) {
+    if (!executors[tool]) continue;
+    await resolveNotifications(deps, row.orgId, {
+      groupKey: cliRequestKey(machineId, tool),
+      kind: "device.cli_request",
+    }).catch(() => 0);
+  }
 }
 
 /** `toolchains.changed`: what `hello.toolchains` said, replaced whole; the rest of `executors` stays. */
@@ -174,6 +202,97 @@ export async function reduceMachineAccess(
     },
   });
   return reply.access;
+}
+
+/**
+ * `POST …/machines/{machineId}/access/allow` (ADR 0036 §8): the person who paired the computer turns one of its
+ * tools on from the apps, in one click where something needed it. Only they may: it is their computer, and an admin
+ * still only turns tools off. The runner applies it as its own switch and tells whoever is at the computer, with
+ * Undo. The workspace's own computer stays as it is.
+ */
+export async function allowMachineTool(
+  deps: AccessDeps & { hub: Pick<MachineCaller, "call" | "status"> },
+  actorId: string,
+  orgId: string,
+  machineId: string,
+  tool: keyof RunnerTools,
+): Promise<RunnerAccess> {
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const machine = await getMachine(deps.db, orgId, machineId);
+  if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
+  if (machine.kind === "managed") {
+    throw new ForbiddenError(
+      "This is the workspace's own computer: its tools stay as they are",
+      "machine.managed_access",
+    );
+  }
+  if (machine.pairedByUserId !== actorId) {
+    throw new ForbiddenError("Only the person who connected this computer can turn its tools on", "machine.not_owner", {
+      ownerId: machine.pairedByUserId ?? null,
+    });
+  }
+  if (machine.protocol < ACCESS_ALLOW_PROTOCOL) {
+    throw new ValidationError(
+      "This computer's app is too old to turn tools on from here. Update the app on it.",
+      "machine.access_outdated",
+      { name: machine.name },
+    );
+  }
+  const status = await deps.hub.status(machine.id);
+  if (!status?.online) throw new MachineOfflineError(machine.name, machine.kind);
+  const [me] = await deps.db.select({ name: schema.users.name }).from(schema.users).where(eq(schema.users.id, actorId));
+  const reply = await deps.hub.call(machine.id, { op: "access.allow", tool, by: actorId, byName: me?.name ?? "" });
+  await storeMachineAccess(deps, machine.id, reply.access);
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "machine.access_allow",
+    target: { type: "machine", id: machine.id },
+    details: { tool },
+  });
+  return reply.access;
+}
+
+/**
+ * `POST …/machines/{machineId}/access/ask`: someone else needs a tool on a person's computer ("Pedir ao Rui"). Its
+ * owner gets one inbox row per computer and tool (`device.tool_request`) with the same one-click button; done once
+ * the tool is on (`storeMachineAccess`). Refused to the owner themselves (they turn it on).
+ */
+export async function askMachineTool(
+  deps: AccessDeps & Pick<NotificationDeps, "now">,
+  actorId: string,
+  orgId: string,
+  machineId: string,
+  tool: keyof RunnerTools,
+): Promise<{ ownerId: string }> {
+  await requirePermission(deps.db, actorId, orgId, "read");
+  const machine = await getMachine(deps.db, orgId, machineId);
+  if (!machine) throw new NotFoundError("Computer not found", "machine.not_found");
+  const ownerId = machine.pairedByUserId;
+  if (machine.kind === "managed" || !ownerId) {
+    throw new ForbiddenError("This computer's tools stay as they are", "machine.managed_access");
+  }
+  if (ownerId === actorId) {
+    throw new ConflictError("It's your computer: turn it on yourself", "machine.ask_self");
+  }
+  await notify(deps, {
+    orgId,
+    userIds: [ownerId],
+    kind: "device.tool_request",
+    groupKey: toolRequestKey(machine.id, tool),
+    waiting: true,
+    actor: { type: "user", id: actorId },
+    source: { machineId: machine.id, label: machine.name },
+    latest: { reason: tool },
+  });
+  await recordAudit(deps.db, {
+    orgId,
+    actor: { type: "person", id: actorId },
+    action: "machine.access_ask",
+    target: { type: "machine", id: machine.id },
+    details: { tool },
+  });
+  return { ownerId };
 }
 
 /** An absolute path on macOS, Linux or Windows (`~/…` too: the runner expands it). */
@@ -281,8 +400,19 @@ export async function requestFolderAccess(
     await deps.db
       .update(machineAccessRequests)
       .set({ status: "failed", decidedAt: new Date() })
-      .where(eq(machineAccessRequests.id, row.id));
+      // The call can fail after the computer got it (a lost reply): an answer its person already gave stands.
+      .where(and(eq(machineAccessRequests.id, row.id), eq(machineAccessRequests.status, "pending")));
     throw error;
+  }
+  // The agent now waits, up to a day, for whoever is at the computer: its owner hears about it in the inbox, waiting.
+  await notifyFolderRequest(deps, row, machine).catch(() => undefined);
+  const [settled] = await deps.db
+    .select({ status: machineAccessRequests.status })
+    .from(machineAccessRequests)
+    .where(eq(machineAccessRequests.id, row.id));
+  // The answer reached us while the row was being written: nothing waits any more.
+  if (settled && settled.status !== "pending") {
+    await resolveNotifications(deps, row.orgId, { groupKey: folderRequestKey(row.id) }).catch(() => 0);
   }
   await recordAudit(deps.db, {
     orgId: ctx.orgId,
@@ -293,6 +423,38 @@ export async function requestFolderAccess(
   }).catch(() => undefined);
   await postRequestedNote(deps, row, machine.name, agent?.handle ?? "agent").catch(() => undefined);
   return { status: "pending", requestId: row.id, path };
+}
+
+/**
+ * The owner of the computer hears about the folder an agent waits for (`device.folder_request`): one waiting row per
+ * request, the agent as actor, the computer and the folder in it. Nobody else can answer it (it happens on the
+ * machine), so the row has no button of its own: it opens the computer, and `access.decided` ends it.
+ */
+async function notifyFolderRequest(
+  deps: AccessDeps,
+  row: AccessRequestRow,
+  machine: { id: string; name: string; pairedByUserId: string | null },
+) {
+  const ownerId = machine.pairedByUserId;
+  if (!ownerId) return;
+  await notify(deps, {
+    orgId: row.orgId,
+    userIds: [ownerId],
+    kind: "device.folder_request",
+    groupKey: folderRequestKey(row.id),
+    waiting: true,
+    actor: { type: "agent", id: row.agentId },
+    source: {
+      machineId: machine.id,
+      label: machine.name,
+      agentId: row.agentId,
+      requestId: row.id,
+      channelId: row.channelId,
+      ...(row.threadRootId ? { threadId: row.threadRootId } : {}),
+      ...(row.requestedByUserId ? { userId: row.requestedByUserId } : {}),
+    },
+    latest: { title: row.path, text: row.reason },
+  });
 }
 
 /** The terminal command that allows the folder on a machine without the app (ADR 0036 §8). */
@@ -331,7 +493,7 @@ export async function applyAccessDecided(
   machineId: string,
   frame: Extract<RunnerFrame, { type: "access.decided" }>,
 ) {
-  return deps.db.transaction(async (tx) => {
+  const row = await deps.db.transaction(async (tx) => {
     const [row] = await tx
       .update(machineAccessRequests)
       .set({
@@ -357,6 +519,10 @@ export async function applyAccessDecided(
     });
     return row;
   });
+  if (!row) return null;
+  // The owner answered it (or it ran out): the row waiting on them in the inbox is done.
+  await resolveNotifications(deps, row.orgId, { groupKey: folderRequestKey(row.id) }).catch(() => 0);
+  return row;
 }
 
 /** The note in the thread (English; the app shows `bodyCode` in the person's language). */

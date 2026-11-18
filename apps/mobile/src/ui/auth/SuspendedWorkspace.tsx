@@ -1,6 +1,7 @@
 import { useAuthConfig } from "@agenteschat/client";
 import { workspaceLabel, workspaceNotes, workspaceOpens } from "@agenteschat/client/lib/deletion";
 import { supportLineOf, suspendedText } from "@agenteschat/client/lib/errors";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Linking, StyleSheet, View } from "react-native";
 import { signOut } from "@/features/account";
@@ -28,10 +29,14 @@ export function SuspendedWorkspace({
 }) {
   const { t, i18n } = useTranslation();
   const { colors } = useTheme();
+  // Until the session gate takes this screen away: signing out can wait on a server that doesn't answer.
+  const [leaving, setLeaving] = useState(false);
   const notes = workspaceNotes(t, i18n.language, state.orgs);
+  const name = state.orgs.find((o) => o.id === state.orgId)?.name;
+  const title = name ? t("standing.screen.titleNamed", { name }) : t("standing.screen.title");
   return (
     <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.bg }]} accessibilityViewIsModal>
-      <AuthScaffold title={t("standing.screen.title")} subtitle={suspendedText(t, suspended)}>
+      <AuthScaffold title={title} subtitle={suspendedText(t, suspended)}>
         <SupportLine />
         {suspended.others.map((o, i) => (
           <Button
@@ -39,11 +44,22 @@ export function SuspendedWorkspace({
             variant={i === 0 && workspaceOpens(o) ? "primary" : "secondary"}
             wide
             label={workspaceLabel(o.name, notes.get(o.id))}
+            disabled={leaving}
             onPress={() => state.setOrgId(o.id)}
           />
         ))}
-        <Button variant="ghost" wide label={t("mobile.org.signOut")} onPress={() => void signOut()} />
-        <WholeAccount orgs={state.orgs} onDelete={() => router.push("/account-delete")} />
+        <Button
+          variant="ghost"
+          wide
+          label={t("mobile.org.signOut")}
+          loading={leaving}
+          disabled={leaving}
+          onPress={() => {
+            setLeaving(true);
+            void signOut().finally(() => setLeaving(false));
+          }}
+        />
+        <WholeAccount orgs={state.orgs} disabled={leaving} onDelete={() => router.push("/account-delete")} />
       </AuthScaffold>
     </View>
   );

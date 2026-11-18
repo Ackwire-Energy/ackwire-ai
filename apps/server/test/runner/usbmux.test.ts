@@ -11,7 +11,7 @@ afterEach(() => {
   removeDirs(dirs);
 });
 
-const UDID = "00008110-001475263AC0A01E";
+const UDID = "00008110-000A1B2C3D4E5F60";
 
 test("plists: what usbmuxd is asked, and what it answers (nested, escaped, every type)", () => {
   const xml = plistXml({ MessageType: "Connect", DeviceID: 7, ProgName: "a&b <c>" });
@@ -57,7 +57,7 @@ test("a port on the iPhone: found by its UDID over the cable only, reached throu
   const mux = await fakeUsbmuxd(
     dir,
     [
-      { id: 3, serial: "00008110001475263AC0A01E" },
+      { id: 3, serial: "00008110000A1B2C3D4E5F60" },
       { id: 4, serial: "00008030-AAAA", type: "Network" },
     ],
     { 8100: (echo.address() as net.AddressInfo).port },

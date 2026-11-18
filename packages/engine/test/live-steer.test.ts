@@ -194,7 +194,9 @@ test("a message during a computer turn is handed to it live; read ones join it, 
 });
 
 test("a burst before the first computer turn (ADR 0112): one turn whose prompt has all of it, as conversation lines", async () => {
-  f = await setup({ quietMs: 400 });
+  // The window is measured from the message's own time, and a run claimed after it ends skips it: it has to outlast
+  // the claim on a loaded runner, or the follow-ups come after a turn already over.
+  f = await setup({ quietMs: 2000 });
   const fx = f;
   await computerAgent(fx);
   const seen: BrainTurn[] = [];
@@ -213,8 +215,11 @@ test("a burst before the first computer turn (ADR 0112): one turn whose prompt h
   await post(fx, "@dev oi");
   const drained = drainOutbox(fx.db, handlers);
   const start = Date.now();
-  while (!(await fx.db.select().from(schema.agentRuns)).some((r) => r.status === "running")) {
-    if (Date.now() - start > 5000) throw new Error("the run never started");
+  for (;;) {
+    const status = (await fx.db.select().from(schema.agentRuns))[0]?.status;
+    if (status === "running") break;
+    if (status === "done") throw new Error("the run was claimed after its quiet window and answered alone");
+    if (Date.now() - start > 15000) throw new Error("the run never started");
     await new Promise((r) => setTimeout(r, 5));
   }
   // No @ needed: the same person's follow-ups go to the agent still answering them (the floor).

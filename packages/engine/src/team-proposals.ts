@@ -682,7 +682,9 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     if (ai.kind === "none") noAi.push(agent.id);
     if (ai.kind !== "account") continue;
     try {
-      await setAgentComputerTarget({ db: deps.db, pubsub: deps.pubsub }, userId, orgId, agent.id, ai.machineId);
+      await setAgentComputerTarget({ db: deps.db, pubsub: deps.pubsub }, userId, orgId, agent.id, ai.machineId, {
+        wakeWaits: false,
+      });
       await setAgentBrain({ db: deps.db }, userId, orgId, agent.id, {
         brain: ai.brain,
         account: ai.accountId,
@@ -721,7 +723,7 @@ async function insertSkill(db: Database, userId: string, orgId: string, s: TeamS
       await db
         .select({ slug: skills.slug })
         .from(skills)
-        .where(and(eq(skills.orgId, orgId), sql`${skills.slug} like ${`${s.name}%`}`))
+        .where(and(eq(skills.orgId, orgId), isNull(skills.ownerUserId), sql`${skills.slug} like ${`${s.name}%`}`))
     ).map((r) => r.slug),
   );
   let name = s.name;

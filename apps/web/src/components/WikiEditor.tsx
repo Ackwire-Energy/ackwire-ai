@@ -213,7 +213,7 @@ export function WikiEditor({
               onKeyDown={onKeyDown}
             />
             {open && (
-              <div className="wiki-suggest ac-glass" role="listbox" id={listId} aria-label={t("wiki.editor.suggest")}>
+              <div className="ac-menu wiki-suggest" role="listbox" id={listId} aria-label={t("wiki.editor.suggest")}>
                 {suggestions.map((p, i) => (
                   <div
                     key={p.slug}

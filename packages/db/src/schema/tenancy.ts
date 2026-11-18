@@ -40,6 +40,8 @@ export const organizations = pgTable("organizations", {
   context: text().notNull().default(""),
   /** The workspace logo (`/api/app/org-logos/{orgId}/{hash}.{ext}`), uploaded by an admin; null = the agent mark. */
   logo: text(),
+  /** The workspace's accent, a lower-case "#rrggbb" (ADR 0193): the agent colors its apps derive; null = the default. */
+  accent: text(),
   /**
    * Set by the people who run this server through the operator API (ADR 0056): `hold` stops its agents,
    * `suspended` the whole workspace. With the notice `silent` the workspace is told only that it is paused,
@@ -82,8 +84,8 @@ export const organizations = pgTable("organizations", {
   platformAlertMonth: text(),
   platformAlertPercent: smallint(),
   /**
-   * Set while an owner's deletion is pending: when the workspace goes for good. It is closed meanwhile, like a
-   * suspended one (`closedRefusal`, `openOrg` in `standing.ts`), and restoring it clears the three.
+   * Set while an owner's deletion is pending: when the workspace goes for good. It is read-only meanwhile, its work
+   * stopped (`closedRefusal`, `openOrg` in `standing.ts`), and restoring it clears the three.
    */
   deletionDueAt: timestamp({ withTimezone: true }),
   deletionRequestedAt: timestamp({ withTimezone: true }),
@@ -174,11 +176,16 @@ export const organizationMembers = pgTable(
      */
     homeDashboardId: uuid(),
     /**
-     * Lodi's weekly card for this person (ADR 0137 §9): `{ off?, day?, hour? }` (day 0 = Sunday, the hour in the
-     * workspace's time zone); a key not here keeps the default, Friday at 17h. Read through `teamWeekPrefsOf`
-     * (packages/engine/src/team-week.ts).
+     * What this person lets the right hand do for them by itself (ADR 0177): when its daily and weekly cards come or
+     * that they are off, its other switches of theirs and the suggestions they put away. A key not here keeps its
+     * default. Read through `lodiPrefsOf` and saved by merging (packages/engine/src/right-hand-prefs.ts).
      */
     teamWeek: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+    /**
+     * Who the person works for, when they come from outside the workspace (ADR 0191): shown beside their name. Not
+     * null marks an outside collaborator, who never counts toward the workspace's limit of people (`limits.ts`).
+     */
+    outsideOf: text(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -268,6 +275,11 @@ export const organizationInvitations = pgTable(
     channelIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     /** The inviter's words, in the invitation email (ADR 0090). */
     note: text(),
+    /**
+     * The agents the person starts with (ADR 0184): pinned on joining, and a restricted one starts answering them while
+     * whoever sent it may still open it. Ids no longer there are skipped.
+     */
+    agentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     acceptedAt: timestamp({ withTimezone: true }),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -276,11 +288,12 @@ export const organizationInvitations = pgTable(
 );
 
 /**
- * An organization-wide invite link (ADR 0068): whoever opens it can only ask to join
- * (`organization_join_requests`), until it expires (30 days) or is turned off. Its token is an HMAC of
- * its id (`inviteLinkToken`), so it can be shown again; only the token's hash is stored. Links made
- * before that carry a random token and can't be shown again. `uses` counts the people approved
- * through it; `role` is unused (the role is picked at approval).
+ * An invite link (ADR 0068, 0184): whoever opens it can only ask to join (`organization_join_requests`), until it
+ * expires or is turned off. A workspace has many; the `plain` one is the workspace's link.
+ * Its token is an HMAC of its id (`inviteLinkToken`), so it can be shown again; only the token's hash is stored. Links
+ * made before that carry a random token and can't be shown again. `uses` counts the people approved through it;
+ * `role` is unused (the role is picked at approval). "Não expira" is a far-future `expires_at`
+ * (`INVITE_LINK_NEVER`), so every `expires_at > now` check holds.
  */
 export const organizationInviteLinks = pgTable(
   "organization_invite_links",
@@ -295,6 +308,22 @@ export const organizationInviteLinks = pgTable(
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     revokedAt: timestamp({ withTimezone: true }),
     uses: integer().notNull().default(0),
+    /** Cargos an approval starts on (ADR 0184); ids no longer there are skipped. */
+    roleIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Channels an approval adds, besides `general`, as far as the approver may give them. */
+    channelIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /** Agents an approval starts the person with, as an invitation's. */
+    agentIds: uuid().array().notNull().default(sql`'{}'::uuid[]`),
+    /**
+     * Approvals it takes, then asking (`join.link_full`) and approving (`join.link_full_approval`) through it are
+     * refused. Null: no limit.
+     */
+    maxUses: integer(),
+    /**
+     * The workspace's own link (`inviteLink`): made with no choice of cargo, channel, agent, expiry or maximum. One made
+     * or edited with any is a link of its own, which the dialog's defaults never pick up nor renew.
+     */
+    plain: boolean().notNull().default(true),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index().on(t.orgId)],
@@ -345,6 +374,12 @@ export const organizationJoinRequests = pgTable(
     passwordHash: text(),
     /** sha256 of the key the asking page keeps, traded once for a sign-in after an approval (ADR 0090). */
     claimHash: text(),
+    /**
+     * Who the person works for, on a request the operator API filed for an outside collaborator (ADR 0191): an
+     * approval lets `userId` in with it, past the workspace's limit of people. Unlike other requests, one that ran out
+     * is stored as `closed` by the daily sweep, which tells the operator once.
+     */
+    outsideOf: text(),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },

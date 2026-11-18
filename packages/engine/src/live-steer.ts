@@ -2,9 +2,10 @@ import { randomUUID } from "node:crypto";
 import type { PubSub } from "@agenteschat/adapters";
 import { and, type Database, type Executor, eq, inArray, isNull, schema, sql } from "@agenteschat/db";
 import type { SteerMessage, SteerReply } from "./brains/types";
+import { confidentialThread, isConfidential, stubOf, thinksAsThread, unsealed } from "./confidential";
 import { attachedLine, taskNotice } from "./context";
 import { publishChannelEvent } from "./events";
-import { ACTIVE_RUN_STATUSES, releaseInbox } from "./run-inbox";
+import { ACTIVE_RUN_STATUSES, releaseInbox, stoppedToSend } from "./run-inbox";
 import type { AgentRun } from "./runs";
 
 const { agentRuns, messages, users, agents } = schema;
@@ -101,22 +102,37 @@ export interface SteeredText {
 }
 
 /**
+ * What a background work reads under a message passed on to it with `steer_work` (`meta.steeredWorkIds`): only its
+ * asker's reach it (`steerWork`, `workTakesPersonMessage`).
+ */
+export const PASSED_ON_NOTE =
+  "This is now part of your work: do what it asks before you finish, and say in your report what you did with it, or why not.";
+
+/**
  * Messages people (or events) sent while the run worked, oldest first, as the
  * agent reads them: "[New message from Ada, while you were working]: …", or
  * the notice a task or event carries. Deleted ones are left out. `beforeStart`:
  * read before its first model call (the rest of a burst, `waitForBurst`), they
- * are plain conversation lines, "[Ada]: …", part of the same request.
+ * are plain conversation lines, "[Ada]: …", part of the same request. `workId`:
+ * the reading run's own background work, which reads what was passed on to it
+ * as part of its job.
  */
 export async function renderSteered(
   db: Executor,
   orgId: string,
   ids: string[],
-  options: { beforeStart?: boolean } = {},
+  options: {
+    beforeStart?: boolean;
+    workId?: string | null;
+    /** The reading run thinks through the Model Gateway: its thread, and what it thinks with (`thinksAsThread`). */
+    unseal?: { threadRootId: string; thinksWith: string | undefined };
+  } = {},
 ): Promise<SteeredText[]> {
   if (ids.length === 0) return [];
-  const rows = await db
+  const stored = await db
     .select({
       id: messages.id,
+      threadId: messages.threadId,
       body: messages.body,
       meta: messages.meta,
       name: sql<string | null>`coalesce(${users.name}, ${agents.name})`,
@@ -126,19 +142,37 @@ export async function renderSteered(
     .leftJoin(users, eq(users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
     .where(and(eq(messages.orgId, orgId), inArray(messages.id, ids), isNull(messages.deletedAt)));
+  // A confidential message (ADR 0190): its words only for a run of its own thread that the lock holds and that
+  // thinks with what first read the thread. For any other reader the stub, with nothing of its meta (a notice's
+  // text is there).
+  const own = options.unseal;
+  const mine = (m: { id: string; threadId: string | null }) =>
+    own !== undefined && (m.threadId === own.threadRootId || m.id === own.threadRootId);
+  const thread =
+    own && stored.some((m) => isConfidential(m.meta) && mine(m))
+      ? await confidentialThread(db, orgId, own.threadRootId)
+      : null;
+  const reads = thread !== null && thinksAsThread(thread, own?.thinksWith);
+  const rows = stored.map((m) => (!isConfidential(m.meta) ? m : reads && mine(m) ? unsealed(m) : stubOf(m)));
   // Messages written in one transaction share its time (a report's notices): their ids keep the order.
   rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || (a.id < b.id ? -1 : 1));
-  return rows.map((m) => ({
-    id: m.id,
-    // A background task that ended while it worked: the notice with its result.
-    text:
-      taskNotice({ body: m.body, meta: m.meta }, true) ??
-      `${
-        options.beforeStart
-          ? `[${m.name ?? "someone"}]: ${m.body}`
-          : `[New message from ${m.name ?? "someone"}, while you were working]: ${m.body}`
-      }${attachedLine(m)}`,
-  }));
+  return rows.map((m) => {
+    const name = m.name ?? "someone";
+    const works = m.meta.steeredWorkIds;
+    const passedOn = Boolean(options.workId) && Array.isArray(works) && works.includes(options.workId);
+    const line = passedOn
+      ? `[New message from ${name}, passed on to your background work, while you were working]: ${m.body}`
+      : options.beforeStart
+        ? `[${name}]: ${m.body}`
+        : `[New message from ${name}, while you were working]: ${m.body}`;
+    return {
+      id: m.id,
+      // A background task that ended while it worked: the notice with its result.
+      text:
+        taskNotice({ body: m.body, meta: m.meta }, true) ??
+        `${line}${attachedLine(m)}${passedOn ? `\n${PASSED_ON_NOTE}` : ""}`,
+    };
+  });
 }
 
 /** The run fields `releaseInbox` needs. */
@@ -149,7 +183,8 @@ type InboxRun = Pick<
 
 /**
  * Puts taken messages back at the front of the run's inbox (read with its next step). A run that
- * ended meanwhile (stopped while its turn ran) hands them on at once, as every ending does.
+ * ended meanwhile (stopped while its turn ran) hands them on at once, as every ending does, unless it was stopped
+ * to read a message: that one restarts from it.
  */
 export async function returnToInbox(db: Database, pubsub: PubSub | undefined, run: InboxRun, ids: string[]) {
   if (ids.length === 0) return;
@@ -161,9 +196,25 @@ export async function returnToInbox(db: Database, pubsub: PubSub | undefined, ru
     .update(agentRuns)
     .set({ pendingMessageIds: sql`${list} || ${agentRuns.pendingMessageIds}` })
     .where(eq(agentRuns.id, run.id))
-    .returning({ status: agentRuns.status });
+    .returning({ status: agentRuns.status, background: agentRuns.background, createdAt: agentRuns.createdAt });
   if (row && !(ACTIVE_RUN_STATUSES as readonly string[]).includes(row.status)) {
-    await releaseInbox(db, pubsub, run, { reason: "interrupted" });
+    // Stopped to read a message ("Parar e mandar"): its worker starts it again from that message with what it knows,
+    // then hands on the rest (the executor's `stopCanceled`). Handing them on here would answer in a run that
+    // knows nothing of this one.
+    if (!row.background && (await stoppedToSend(db, { ...run, createdAt: row.createdAt }))) return;
+    // The "stop" that ended it needs no answer (`stopRun` marks it).
+    const stops = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(
+        and(
+          eq(messages.orgId, run.orgId),
+          inArray(messages.id, ids),
+          sql`${messages.meta}->'stopOfRunIds' @> to_jsonb(${run.id}::text)`,
+        ),
+      );
+    const exclude = stops.map((m) => m.id);
+    await releaseInbox(db, pubsub, run, { reason: "interrupted", ...(exclude.length ? { exclude } : {}) });
   }
 }
 
@@ -172,6 +223,8 @@ type Steer = (messages: SteerMessage[]) => Promise<SteerReply>;
 export interface LiveSteeringHooks {
   /** Takes the run's inbox (the loop's own: the same messages are never taken twice). */
   take(): Promise<string[]>;
+  /** The background work the run is now (`renderSteered`): it may move there mid-turn. */
+  workId?(): string | null;
   /** Handed to the turn (not read yet): a "stop and send" for them has nothing more to do. */
   onHanded?(ids: string[]): void;
   /** Back in the inbox (never confirmed read). */
@@ -225,7 +278,7 @@ export function listenLiveSteering(
     if (!turn || turn !== steer || refused) return false;
     const ids = await hooks.take();
     if (ids.length === 0) return false;
-    const rows = await renderSteered(deps.db, run.orgId, ids);
+    const rows = await renderSteered(deps.db, run.orgId, ids, { workId: hooks.workId?.() ?? null });
     if (rows.length === 0) return false;
     const sent = rows.map((r) => ({ row: r, uuid: randomUUID() }));
     const reply = await turn(

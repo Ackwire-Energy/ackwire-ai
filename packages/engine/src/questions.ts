@@ -44,6 +44,8 @@ export interface AgentQuestion {
   status: "open" | "answered";
   answer: string | null;
   answeredByUserId: string | null;
+  /** When a person answered or skipped it. */
+  answeredAt: string | null;
   /** The agent took it back (`withdraw_request`): it no longer needs an answer. Kept on the card by later syncs. */
   withdrawn?: true;
   /** A person skipped it (`answeredByUserId`): the agent went on without an answer. */
@@ -65,6 +67,7 @@ export function questionView(q: AgentQuestionRow): AgentQuestion {
     status: q.status === "open" ? "open" : "answered",
     answer: q.answer,
     answeredByUserId: q.answeredByUserId,
+    answeredAt: q.answeredAt?.toISOString() ?? null,
     ...(q.status === "dismissed" ? { dismissed: true as const } : {}),
   };
 }
@@ -288,7 +291,7 @@ export async function answerQuestion(
   await requireChannelAccess(db, actorId, orgId, current.channelId);
   requireAddressee(current, actorId);
   const choice = input.choice?.trim() || null;
-  const text = input.text?.trim().slice(0, 4000) || null;
+  const text = input.text?.trim() || null;
   if (!choice && !text) throw new ValidationError("Send a choice or a text answer");
   if (choice && !(current.choices ?? []).includes(choice)) throw new ValidationError("That is not one of the choices");
   const answer = choice && text ? `${choice} (${text})` : (choice ?? text ?? "");

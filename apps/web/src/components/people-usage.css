@@ -236,7 +236,9 @@ th.pu-num .pu-sort {
   line-height: 22px;
 }
 .pu-live__row > .ac-avatar {
-  margin-top: 1px;
+  /* Keep the face on the first line when the work description wraps. */
+  line-height: 22px;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
 }
 
 /* The person's month, at the side: the dialog becomes a sheet on the right edge, the page dimmed behind it. */
@@ -424,4 +426,9 @@ th.pu-num .pu-sort {
 /* Right under a waiting row's card, as a change request's card is. */
 .nt-wr > .pu-asks {
   margin-top: 0;
+}
+
+/* A role's name shares its icon's 28px line when its budget picker wraps underneath. */
+.settings-row:has(> .settings-row__end > .pu-pick) .settings-row__label {
+  line-height: 28px;
 }

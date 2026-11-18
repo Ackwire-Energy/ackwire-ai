@@ -13,7 +13,7 @@ afterEach(closeWorlds);
 
 const consultations = (w: World) => w.db.select().from(schema.agentConsultations);
 
-scenario("S13", "a note's reply comes back to the agent for the person, and both legs can act", async () => {
+scenario("S13", "a note reports back to the person directly, and both legs act for that person", async () => {
   const w = await world({
     agents: ["ada", "rui"],
     setup: { toolSources: [openPullRequestTool()] },
@@ -21,7 +21,6 @@ scenario("S13", "a note's reply comes back to the agent for the person, and both
       ada: [
         { calls: [{ name: "tell_agent", input: { agent: "@rui", message: "Roda a migração 0141, por favor." } }] },
         { text: "Pedi ao Rui para rodar a migração." },
-        { text: "Ana, o Rui rodou a migração 0141 e abriu o PR." },
       ],
       rui: [
         { calls: [{ name: "open_pull_request", input: { repo: "acme/app", title: "Migração 0141" } }] },
@@ -34,9 +33,15 @@ scenario("S13", "a note's reply comes back to the agent for the person, and both
   await w.settle();
   expect((await w.calls("rui")).map((c) => [c.name, c.isError])).toEqual([["open_pull_request", false]]);
   const adaRuns = await w.runs("ada");
-  expect(adaRuns).toHaveLength(2);
-  expect((await runAuthority(w.db, adaRuns[1] as NonNullable<(typeof adaRuns)[1]>)).kind).toBe("person");
-  expect((await w.posts("ada")).filter((m) => m.body.includes("rodou"))).toHaveLength(1);
+  // Handed work reports in the person's room itself: no extra run wakes Ada merely to relay it.
+  expect(adaRuns).toHaveLength(1);
+  const ruiRuns = await w.runs("rui");
+  expect(ruiRuns).toHaveLength(1);
+  expect((await runAuthority(w.db, ruiRuns[0] as NonNullable<(typeof ruiRuns)[0]>)).kind).toBe("person");
+  const reports = (await w.posts("rui")).filter((m) => m.channelId === w.channelId);
+  expect(reports).toHaveLength(1);
+  expect(reports[0]?.body).toContain("Rodei a migração 0141 e abri o PR #230.");
+  expect(reports[0]?.meta.handedReport).toBeDefined();
   await assertInvariants(w);
 });
 
@@ -180,7 +185,6 @@ scenario(
         bia: [
           { calls: [{ name: "tell_agent", input: { agent: "@vera", message: "Gera as imagens do release." } }] },
           { text: "Pedi à Vera as imagens." },
-          { text: "A Vera não conseguiu gerar as imagens; faço eu." },
         ],
         vera: () => ({ error: new ProviderError("invalid request", false, 400) }),
       },
@@ -191,7 +195,12 @@ scenario(
     expect((await consultations(w)).map((c) => c.status)).toEqual(["failed"]);
     const failed = (await w.db.select().from(schema.notifications)).filter((n) => n.kind === "run_failed");
     expect(failed).toEqual([]);
-    expect((await w.posts("bia")).at(-1)?.body).toContain("não conseguiu");
+    expect(await w.runs("bia")).toHaveLength(1);
+    const [work] = await w.db.select().from(schema.agentWorks);
+    expect(work).toMatchObject({ agentId: w.agents.vera?.id, channelId: w.channelId, status: "failed", how: "handed" });
+    const report = (await w.db.select().from(schema.messages)).find((message) => message.id === work?.resultMessageId);
+    expect(report).toMatchObject({ channelId: w.channelId });
+    expect(report?.meta.workEnd).toMatchObject({ id: work?.id, status: "failed" });
     await assertInvariants(w);
   },
 );

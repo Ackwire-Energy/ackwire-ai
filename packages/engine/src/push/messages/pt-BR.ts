@@ -80,6 +80,18 @@ export const ptBR: PushStrings = {
   deviceInUseBody: "Toque para parar.",
   deviceAccessTitle: (a, p, d) => (p ? `${a} (para ${p}) pede para usar seu ${d}` : `${a} pede para usar seu ${d}`),
   deviceAccessBody: "Toque para permitir uma vez, sempre, ou dizer não.",
+  deviceToolTitle: (a, d) => `${a} pede para você ligar uma ferramenta no seu ${d}`,
+  deviceToolBody: "Toque para ligar com um clique.",
+  deviceCliTitle: (a, d) => `${a} pede para você instalar um programa no seu ${d}`,
+  deviceCliBody: "Toque para instalar com um clique.",
+  deviceFolderTitle: (a, f, d) => (f ? `${a} pede ${f} no seu ${d}` : `${a} pede uma pasta no seu ${d}`),
+  deviceFolderBody: "Libere no app do computador.",
+  adminAskTitle: (a, what, l) =>
+    what === "channel_agent"
+      ? `${a} pede para adicionar um agente a #${l}`
+      : what === "create_agents"
+        ? `${a} pede para poder criar agentes`
+        : `${a} pede para ligar o webhook do ${l} para rotinas`,
   deviceWaitingTitle: (p, d) => `O agente de ${p} está esperando seu ${d}`,
   deviceWaitingBody: "Começa quando ele voltar.",
   teamWeekReady: "Sua semana da equipe está pronta",
@@ -91,4 +103,5 @@ export const ptBR: PushStrings = {
   joinRequestTitlePersonal: (name) => `${name} pede para entrar no seu workspace`,
   joinSuggestionTitlePersonal: (by, name) => `${by} sugeriu convidar ${name}`,
   teamWeekReadyPersonal: "Sua semana está pronta",
+  teamWatchStill: (n) => (n === 1 ? "1 coisa ainda espera você" : `${n} coisas ainda esperam você`),
 };

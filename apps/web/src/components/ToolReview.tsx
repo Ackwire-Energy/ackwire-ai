@@ -1,4 +1,5 @@
 import type { ToolDecision } from "@agenteschat/client";
+import { formatInt } from "@agenteschat/client/lib/format";
 import {
   bySubject,
   countLevels,
@@ -275,7 +276,7 @@ function DoneCard({
   reviewable: number;
   onReview: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   return (
     <section className="tr-done" aria-label={t("toolReview.doneTitle")}>
       <HappyAgent className="tr-done__agent" />
@@ -288,7 +289,7 @@ function DoneCard({
         {REVIEW_LEVELS.filter((l) => l !== "off" || counts.off > 0).map((l) => (
           <span key={l} data-level={l}>
             <ToolLevelSwatch level={l} />
-            <b>{counts[l].toLocaleString()}</b> {t(`toolReview.legend.${l}`, { count: counts[l] })}
+            <b>{formatInt(i18n.language, counts[l])}</b> {t(`toolReview.legend.${l}`, { count: counts[l] })}
           </span>
         ))}
       </div>

@@ -108,8 +108,7 @@ export function GitHubAppPanel({ onConnectAccount }: { onConnectAccount: () => v
                     </Button>
                   )}
                   <Button
-                    size="sm"
-                    variant="ghost"
+                    variant="link"
                     aria-label={t("githubApp.removeName", { account: i.accountLogin })}
                     onClick={() => setRemoving(i)}
                   >
@@ -268,7 +267,7 @@ export function GitHubAppServerCard() {
                   </Button>
                 )}
                 {setup.source === "settings" && (
-                  <Button size="sm" variant="ghost" className="ac-btn--danger" onClick={() => setRemoving(true)}>
+                  <Button variant="link" className="ac-link--danger" onClick={() => setRemoving(true)}>
                     {t("githubApp.server.remove")}
                   </Button>
                 )}

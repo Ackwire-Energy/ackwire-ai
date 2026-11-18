@@ -86,7 +86,8 @@ test("an agent's proposal of a new agent: created from the card with what the pe
   const asMember = (path: string, init?: Parameters<typeof member>[1]) =>
     member(`/api/app/organizations/${orgId}${path}`, init);
   await asMember(`/channels/${channelId}/join`, { json: {} });
-  // Read-only for who can't create agents.
+  // Read-only for who can't create agents: an admin took Criar agentes off Todos.
+  await api("/permissions/create_agents", { method: "PUT", json: { everyone: 0, roles: [] } });
   expect(((await (await asMember(`/agent-proposals/${first}`)).json()) as Proposal).canDecide).toBe(false);
   expect((await asMember(`/agent-proposals/${first}/deny`, { json: {} })).status).toBe(403);
   expect((await asMember("/agents", { json: { name: "Ada", handle: "ada", proposal: first } })).status).toBe(403);
@@ -132,6 +133,7 @@ test("Criar on the card: the agent as proposed in one click, with its channel an
 
   const member = await joinByInvitation(t, owner, orgId, "bia@example.com");
   await member(`/api/app/organizations/${orgId}/channels/${channelId}/join`, { json: {} });
+  await api("/permissions/create_agents", { method: "PUT", json: { everyone: 0, roles: [] } });
   expect((await member(`/api/app/organizations/${orgId}/agent-proposals/${card}/create`, { json: {} })).status).toBe(
     403,
   );

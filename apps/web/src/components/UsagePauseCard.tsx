@@ -1,5 +1,5 @@
 import type { CatchUpClosed, Message } from "@agenteschat/client";
-import { keys, useApi } from "@agenteschat/client";
+import { keys, useApi, useUsageQueue } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { clockAt } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
@@ -7,12 +7,14 @@ import {
   answerAnywayOpen,
   mayAnswerAnyway,
   mayContinueUsage,
+  planLimitNote,
   type UsagePauseCard,
   type UsageWait,
+  usageCheckedText,
   usagePauseText,
   usageWaitFix,
 } from "@agenteschat/client/lib/usage-pause";
-import { EventPillAction, Locked } from "@agenteschat/ui";
+import { EventPillAction, Icon, Locked, useNow } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { type ButtonHTMLAttributes, useState } from "react";
@@ -113,6 +115,7 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
   const fix = usageWaitFix(message.meta, { admin, owner: owner === me.user.id });
   return (
     <span className="cq__acts">
+      {message.author.id && <UsageChecked message={message} agentId={message.author.id} />}
       {fix && message.author.id && (
         <Link
           to="/org/$orgId/agents/$agentId"
@@ -125,6 +128,22 @@ export function UsageWaitCancel({ message, wait }: { message: Message; wait: Usa
       )}
       <DontRunButton runId={wait.runId} may={may} count={wait.count} />
       {message.author.id && <SeeUsageQueue agentId={message.author.id} />}
+    </span>
+  );
+}
+
+/** "Conferido há 4 min" under a plan limit's wait note: the server reads the plan again by itself, no button. */
+function UsageChecked({ message, agentId }: { message: Message; agentId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const now = useNow(60_000);
+  const queue = useUsageQueue(org.id, agentId, planLimitNote(message.meta));
+  const text = usageCheckedText(t, message.meta, queue.data?.checkedAt, now);
+  if (!text) return null;
+  return (
+    <span className="cq__checked">
+      <Icon name="waiting" size={14} />
+      {text}
     </span>
   );
 }

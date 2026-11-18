@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { agentsByAnyHandle } from "@agenteschat/client/lib/directory";
+import type { ImportCard } from "@agenteschat/client/lib/import/flow";
 import {
   handleAfterRename,
   handleProblemText,
@@ -11,6 +12,8 @@ import {
   ROLE_IDS,
   takenHandles,
 } from "@agenteschat/client/lib/new-agent";
+import { gradientOf, hsvToHex } from "@agenteschat/ui/agent/engine";
+import { hsvRgb, rgbHex, tileOf } from "../../src/features/agents/color-pick";
 import {
   type AgentDraft,
   agentChanges,
@@ -19,7 +22,14 @@ import {
   sameLook,
   shuffleLook,
 } from "../../src/features/agents/edit";
-import { firstBlockedStep, NEW_AGENT_PHONE_STEPS, roleLine, stepBlocked } from "../../src/features/agents/new-agent";
+import {
+  firstBlockedStep,
+  IMPORT_MARKS,
+  importMarkCards,
+  NEW_AGENT_PHONE_STEPS,
+  roleLine,
+  stepBlocked,
+} from "../../src/features/agents/new-agent";
 import { AGENT_ACCESSORIES, AGENT_COLORS, AGENT_EYES, agentLook } from "../../src/features/shared/logic";
 import { translator } from "./fixtures";
 
@@ -224,6 +234,26 @@ describe("creating an agent on the phone", () => {
     expect(presetChannels("assistant", channels)).toEqual(["2"]);
   });
 
+  test("the import row's tile: the first source apps with a logo, three at most, in the import's order", async () => {
+    expect(importMarkCards((c): c is ImportCard => true)).toEqual(["grok-bot", "chatgpt-dots", "openbotrun"]);
+    expect(IMPORT_MARKS).toBe(3);
+    // One without a logo of its own gives its place to the next; none at all leaves the tile empty.
+    expect(importMarkCards((c): c is ImportCard => c !== "grok-bot")).toEqual([
+      "chatgpt-dots",
+      "openbotrun",
+      "openmausbot",
+    ]);
+    expect(importMarkCards((c): c is ImportCard => c.length === 0)).toEqual([]);
+    // The row sits right under "Do zero" with the web card's words, and the channels say what marking one does.
+    const screen = await Bun.file(
+      new URL("../../src/features/agents/NewAgentScreen.tsx", import.meta.url).pathname,
+    ).text();
+    expect(screen).toContain('label={t("newAgent.importCard")}');
+    expect(screen).toContain('sub={t("newAgent.importCardLine")}');
+    expect(screen.indexOf("<ImportMarks />")).toBeLessThan(screen.indexOf("newAgent.roleGroups.personal"));
+    expect(screen).toContain('<GroupedHeader>{t("newAgent.channelsJoin")}</GroupedHeader>');
+  });
+
   test("a preset's line: what it does, then who it starts as, the agent's name kept as written", () => {
     expect(roleLine("Programa, revisa PRs e investiga bugs.", "Começa como Ada", "Ada", "pt-BR")).toBe(
       "Programa, revisa PRs e investiga bugs · começa como Ada",
@@ -237,33 +267,68 @@ describe("creating an agent on the phone", () => {
     );
   });
 
-  test("Create agent on the grouped gray: the step said once, presets as checked rows, a level picked from a list", async () => {
+  test("Create agent on the grouped gray: the step in the bar, presets as checked rows, a level picked from a list", async () => {
     // The screens are components the tests can't render: what they wire in, as text.
     const read = (f: string) => Bun.file(new URL(`../../src/features/agents/${f}`, import.meta.url).pathname).text();
     const [screen, look] = await Promise.all([read("NewAgentScreen.tsx"), read("LookPicker.tsx")]);
-    // Not in the header's subtitle: once, under the bar ("2 of 4 · Who it is").
+    // Where the step stands is the native bar's subtitle ("2 of 4"), never a bar of its own drawn under it.
     expect(screen).not.toContain("newAgent.stepOf");
-    expect(screen).toContain('t("mobile.choices.step", { step: index + 1, total })');
+    expect(screen).toContain('return at ? t("mobile.choices.step", at) : undefined;');
+    expect(screen).toContain("{...(subtitle ? { subtitle } : {})}");
+    expect(screen).not.toContain("function StepBar");
     // A role is a row with the check, never a ringed card; with none chosen yet there is no bar to press.
     expect(screen).toContain("checked={role === id}");
     expect(screen).not.toContain("RoleCard");
-    expect(screen).toContain("const footer = importing || backs || goes;");
+    expect(screen).toMatch(/bar=\{\s*change \|\| role !== null \?/);
     // A proposal's levels come from the app's picker of the three, never cycled by taps.
     expect(screen).not.toContain("nextLevel");
     expect(screen).toContain("const chooseLevel = (title: string, current: string, choose: (level: Level) => void) =>");
-    expect(screen).toContain("chooseLevel(app, level, (l) => setProposedLevels((p) => ({ ...p, [i.id]: l })))");
-    // The look in the list: swatches checked inside, the eyes and the accessory each in a sheet of checked rows.
-    expect(screen).toContain("<LookList look={look} onChange={setLook} />");
+    expect(screen).toContain("chooseLevel(app, level, (l) => setProposedLevel(i.id, l))");
+    // The look in the list: swatches checked inside, the eyes and the accessory each on a pushed screen of checked
+    // rows (ADR 0135: screens, never sheets).
+    expect(screen).toContain("<LookList look={look} onChange={(value) => editNewAgent({ look: value })} />");
     expect(look).toContain("checked={o.key === value}");
+    expect(look).toContain('router.push("/agent-look");');
+    expect(look).not.toContain("<Sheet");
   });
 
   test("the custom color sheet: starts from the current color, applies it on done, keeps the drag from the scroll", async () => {
     // The sheet is a component the tests can't render: what it wires in, as text.
     const sheet = await Bun.file(new URL("../../src/features/agents/ColorSheet.tsx", import.meta.url).pathname).text();
     expect(sheet).toContain("hexToHsv(pickerStart(value))");
-    expect(sheet).toContain("onResponderTerminationRequest: () => false");
-    expect(sheet).toMatch(/const done = \(\) => \{\s*onChange\(hex as `#\$\{string\}`\);\s*onClose\(\);/);
-    expect(sheet).toContain('label={t("look.useColor")} onPress={done}');
+    expect(sheet).toMatch(
+      /const done = \(\) => \{\s*\(onDone \?\? onChange\)\(hex as `#\$\{string\}`\);\s*onClose\(\);/,
+    );
+    expect(sheet).toContain('label={doneLabel ?? t("look.useColor")} onPress={done}');
     expect(sheet).toContain("onSubmitEditing={done}");
+  });
+
+  test("a drag on the color sheet runs on the UI thread and tells the form once, when the finger lets go", async () => {
+    const sheet = await Bun.file(new URL("../../src/features/agents/ColorSheet.tsx", import.meta.url).pathname).text();
+    // A pan from the first touch, never the JS responder: the sheet's scroll can't take the drag over mid-way.
+    expect(sheet).not.toMatch(/onResponder(Grant|Move)/);
+    expect(sheet.match(/usePanGesture\(\{\s*minDistance: 0,/g)).toHaveLength(2);
+    // Each move writes shared values only; the form hears the color on release, never per move.
+    expect(
+      sheet.match(
+        /onFinalize: \(\) => \{\s*"worklet";\s*scheduleOnRN\(commit, hue\.get\(\), sat\.get\(\), val\.get\(\)\);/g,
+      ),
+    ).toHaveLength(2);
+    expect(sheet).not.toMatch(/onUpdate: \(e\) => \{[^}]*(setHsv|onChange|scheduleOnRN)/);
+    // The thumbs move by transform, the tile is drawn from the color on the UI thread.
+    expect(sheet).toContain("{ translateX: sat.get() * areaW.get() - THUMB / 2 }");
+    expect(sheet).toContain("const tile = useDerivedValue(() => tileOf(hue.get(), sat.get(), val.get()));");
+  });
+
+  test("the color sheet's UI-thread tile is the engine's own, over the whole picker", () => {
+    const steps = Array.from({ length: 21 }, (_, i) => i / 20);
+    const hues = [...Array.from({ length: 52 }, (_, i) => i * 7), 359, 359.5];
+    for (const h of hues)
+      for (const s of steps)
+        for (const v of steps) {
+          const hex = hsvToHex(h, s, v);
+          expect(rgbHex(hsvRgb(h, s, v))).toBe(hex);
+          expect(tileOf(h, s, v)).toEqual(gradientOf(hex));
+        }
   });
 });

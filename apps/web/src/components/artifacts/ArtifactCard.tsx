@@ -1,7 +1,7 @@
 import type { Artifact, ArtifactContent, ArtifactFileContent, ArtifactRef } from "@agenteschat/client";
 import { useArtifact } from "@agenteschat/client";
 import { documentStart, KIND_ICON, parseDelimited, patchCounts } from "@agenteschat/client/lib/artifacts";
-import { fileIcon, formatBytes, previewKind, previewKindOfName } from "@agenteschat/client/lib/files";
+import { fileIcon, formatBytes, pictureRatio, previewKind, previewKindOfName } from "@agenteschat/client/lib/files";
 import { Button, Icon, type IconName, Menu, Tip } from "@agenteschat/ui";
 import type { TFunction } from "i18next";
 import { type CSSProperties, type ReactNode, useEffect, useId, useRef, useState } from "react";
@@ -34,7 +34,8 @@ const COVER_CHARS = 1200;
  * its kind and size under it. A click opens the viewer; Download and More show over the cover on hover, and the
  * desktop app's right click has the same actions. A picture is only the picture, as is a video its player: their name
  * and size are in their tip and in the viewer's header. A picture alone on its message shows whole inside its tile
- * (CSS: `.artifact-cards > :only-child`). Every tile has its size before what it holds loads (`LoadingTile`).
+ * (CSS: `.artifact-cards > :only-child`), in its own proportions when its size is known (`pictureRatio`). Every tile
+ * has its size before what it holds loads (`LoadingTile`).
  */
 export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   const { t, i18n } = useTranslation();
@@ -61,7 +62,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
       </div>
     );
   }
-  if (!a) return <LoadingTile title={ref.title} />;
+  if (!a) return <LoadingTile title={ref.title} ratio={pictureRatio(ref)} />;
   // What lives in the conversation isn't a file: the thing itself, not a tile that opens it (ADR 0113).
   if (a.kind === "block") return <LiveBlockCard id={a.id} version={a.shownVersion} />;
   if (a.kind === "poll") return <PollCard id={a.id} version={a.shownVersion} />;
@@ -99,7 +100,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
         ] as const)
       : []),
   ];
-  const tile = (props: Pick<TileProps, "icon" | "meta" | "cover" | "media">) => (
+  const tile = (props: Pick<TileProps, "icon" | "meta" | "cover" | "media" | "ratio">) => (
     <>
       <Tile artifact={a} actions={actions} onOpen={open} onDownload={save} {...props} />
       {remove.dialog}
@@ -146,6 +147,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
   if (kind === "image" && content.size <= MAX_THUMB_BYTES)
     return tile({
       media: true,
+      ratio: pictureRatio(content) ?? pictureRatio(ref),
       icon: "image",
       meta,
       cover: <PictureCover content={content} artifactId={a.id} version={a.shownVersion} title={a.title} />,
@@ -158,7 +160,7 @@ export function ArtifactCard({ artifact: ref }: { artifact: ArtifactRef }) {
  * picture or a video by its name ("tela.png"), as the phone reads it; anything else a cover over its name, which wraps
  * as it will.
  */
-function LoadingTile({ title = "" }: { title?: string }) {
+function LoadingTile({ title = "", ratio }: { title?: string; ratio?: number }) {
   const kind = previewKindOfName(title);
   if (kind === "video")
     return (
@@ -169,7 +171,12 @@ function LoadingTile({ title = "" }: { title?: string }) {
       </div>
     );
   return (
-    <div className="artifact-tile artifact-tile--loading" data-media={kind === "image" || undefined} aria-busy="true">
+    <div
+      className="artifact-tile artifact-tile--loading"
+      data-media={kind === "image" || undefined}
+      {...(kind === "image" ? ratioProps(ratio) : {})}
+      aria-busy="true"
+    >
       <div className="artifact-tile__cover" />
       {kind !== "image" && (
         <div className="artifact-tile__foot ac-iconline" aria-hidden="true">
@@ -183,6 +190,10 @@ function LoadingTile({ title = "" }: { title?: string }) {
     </div>
   );
 }
+
+/** A tile in a picture's proportions: alone on its message it is that shape (CSS: `[data-ratio]`). */
+const ratioProps = (ratio: number | undefined) =>
+  ratio ? { "data-ratio": true, style: { "--ratio": String(ratio) } as CSSProperties } : {};
 
 const extOf = (name: string) => /\.([a-z0-9]{1,8})$/i.exec(name.trim())?.[1]?.toLowerCase() ?? "";
 
@@ -219,12 +230,14 @@ interface TileProps {
   cover: ReactNode;
   /** A picture: only the picture, its name and size in its tip; alone on its message it shows whole. */
   media?: boolean;
+  /** A picture's width over its height: alone on its message, its tile takes that shape. */
+  ratio?: number;
   actions: () => MenuEntry[];
   onOpen: () => void;
   onDownload: () => void;
 }
 
-function Tile({ artifact: a, icon, meta, cover, media, actions, onOpen, onDownload }: TileProps) {
+function Tile({ artifact: a, icon, meta, cover, media, ratio, actions, onOpen, onDownload }: TileProps) {
   const { t } = useTranslation();
   const sizeId = useId();
   // The whole tile opens the viewer; the actions sit above it.
@@ -243,6 +256,7 @@ function Tile({ artifact: a, icon, meta, cover, media, actions, onOpen, onDownlo
       className="artifact-tile"
       data-kind={a.kind}
       data-media={media || undefined}
+      {...(media ? ratioProps(ratio) : {})}
       onContextMenu={contextMenuHandler(() => [{ kind: "header", label: a.title }, ...actions()])}
     >
       {media ? (
@@ -418,9 +432,13 @@ function PictureCover({
 }) {
   const { t } = useTranslation();
   const { url, failed } = usePreviewUrl(artifactId, version, content.contentType, true);
+  // Fetched after it showed (a picture just made or sent, not one read again from the cache): it comes in softly.
+  const fresh = useRef(url === null);
   if (failed) return <TypeCover content={content} />;
   return (
-    <span className="artifact-tile__picture">{url && <img src={url} alt={t("files.imageAlt", { title })} />}</span>
+    <span className="artifact-tile__picture">
+      {url && <img src={url} alt={t("files.imageAlt", { title })} data-fresh={fresh.current || undefined} />}
+    </span>
   );
 }
 

@@ -9,6 +9,7 @@ import {
   cx,
   drawSprite,
   EYE,
+  formingField,
   HEADER_AREA,
   headerField,
   Icon,
@@ -32,6 +33,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { useOrg } from "@/components/org-context";
+import { useCloseAfterUse } from "@/hooks/useCloseAfterUse";
 import { useDirectory } from "@/hooks/useDirectory";
 import { usePrefersReducedMotion } from "@/hooks/usePrefersReducedMotion";
 import { lookOf } from "@/lib/look";
@@ -66,7 +68,10 @@ function claimGreeting(orgId: string, channelId: string) {
   return g;
 }
 
-/** The sky band at the top of a channel on the first visit of the day: a greeting and what its agents did since. */
+/**
+ * The sky band at the top of a channel on the first visit of the day: a greeting and what its agents did since. It
+ * closes by itself a while after the person starts using the page, never under the pointer, gliding shut.
+ */
 export function ChannelWelcome({
   channelId,
   messages,
@@ -82,14 +87,33 @@ export function ChannelWelcome({
   const overview = useOverview(org.id);
   const [greeting] = useState(() => claimGreeting(org.id, channelId));
   const [closed, setClosed] = useState(greeting.closed ?? false);
+  const reduced = usePrefersReducedMotion();
+  const box = useRef<HTMLElement>(null);
   const text = useRef<HTMLDivElement>(null);
   const faces = useRef<HTMLDivElement>(null);
   const shut = useRef<HTMLButtonElement>(null);
-  if (!greeting.show || greeting.channelId !== channelId || closed || !messages || greeting.last === null) return null;
+  const shows =
+    greeting.show && greeting.channelId === channelId && !closed && messages !== undefined && greeting.last !== null;
+  // Glides shut: its height and the room above it fold to nothing as it fades, the conversation takes the room (the
+  // list keeps what is read in place), then it leaves. With reduced motion it only fades.
   const close = () => {
+    if (greeting.closed) return;
     greeting.closed = true;
-    setClosed(true);
+    const el = box.current;
+    if (!el || typeof el.animate !== "function") return setClosed(true);
+    const gone = () => setClosed(true);
+    const fold = [
+      { height: `${el.offsetHeight}px`, minHeight: "0px", marginTop: getComputedStyle(el).marginTop, opacity: 1 },
+      { height: "0px", minHeight: "0px", marginTop: "0px", opacity: 0 },
+    ];
+    el.animate(reduced ? [{ opacity: 1 }, { opacity: 0 }] : fold, {
+      duration: reduced ? 160 : 240,
+      easing: "ease-out",
+      fill: "forwards",
+    }).finished.then(gone, gone);
   };
+  useCloseAfterUse(box, close, shows);
+  if (!shows || greeting.last === null || !messages) return null;
   const since = greeting.last;
   const activity = agentActivitySince(messages, since);
   const names = joinNames(
@@ -100,7 +124,7 @@ export function ChannelWelcome({
   const firstName = me.user.name.split(/\s+/)[0] ?? me.user.name;
   const crew = (activity.agentIds.length ? activity.agentIds : agents.map((a) => a.id)).slice(0, 3);
   return (
-    <section className="sky-welcome" aria-label={t("sky.welcome.label")}>
+    <section className="sky-welcome" aria-label={t("sky.welcome.label")} ref={box}>
       <PixelSky
         options={{
           pixel: 4,
@@ -356,24 +380,22 @@ export function DownloadSky({ clear, calm }: { clear?: Clear; calm?: SkyOptions[
 
 /* ---------- Small moments ---------- */
 
-/** A thin dithered strip sweeping in the agent's color behind the activity bar ("Theo está pensando…"). */
-export function ActivitySky({ color }: { color: AgentColor }) {
+/**
+ * Where a picture an agent is making will show (`ImageMaking`): the picture forming out of the agent's sky, in its
+ * soft tones over the conversation's background (`formingField`); whole and still with reduced motion.
+ */
+export function ImageSky({ color }: { color: AgentColor }) {
+  const reduced = usePrefersReducedMotion();
   return (
-    <span className="ac-typing__sky" aria-hidden="true">
-      <PixelSky
-        options={{
-          pixel: 3,
-          surface: "--raised",
-          palette: (bg) => softTones(color, bg),
-          light: 0,
-          base: (u, _v, tt) => {
-            const c = ((tt * 0.32) % 1.6) - 0.3;
-            const d = u - c;
-            return 0.08 + 0.5 * Math.exp(-(d * d) / 0.035);
-          },
-        }}
-      />
-    </span>
+    <PixelSky
+      options={{
+        pixel: 4,
+        surface: "--bg",
+        palette: (bg) => softTones(color, bg),
+        light: 0,
+        base: (u, v, t) => formingField(u, v, reduced ? null : t),
+      }}
+    />
   );
 }
 
@@ -677,6 +699,36 @@ export function OnboardingHorizon({ progress, clear }: { progress: number; clear
 }
 
 /**
+ * Behind the onboarding on a wide window, where the rail is a card in the middle of the window (onboarding.css): the
+ * agents' sky as the whole window's horizon, low and in soft tones, with no agents of its own (Lodi stands on the
+ * card's). Hidden below that width, where it draws nothing.
+ */
+export function OnboardingStageSky() {
+  const opts: SkyOptions = {
+    pixel: 4,
+    surface: "--pane",
+    // On a dark window the soft tones climb to the sky's light blue, far louder than in light: there it stops at the
+    // surface's mix at 42%, as quiet as the light one.
+    palette: (bg) => {
+      const tones = softTones("sky", bg);
+      const [r, g, b] = parseColor(bg);
+      return r * 0.3 + g * 0.59 + b * 0.11 < 128 ? tones.slice(0, 4) : tones;
+    },
+    light: 0.04,
+    base: (u, v, tt) => {
+      const s = Math.max(0, (v - 0.05) / 0.95);
+      const e = s * s * (3 - 2 * s);
+      return 0.78 * e + 0.05 * S(u * 9 + tt * 0.3) * e + 0.03 * S(u * 23 - tt * 0.2) * e;
+    },
+  };
+  return (
+    <span className="onb__stage-sky" aria-hidden="true">
+      <PixelSky options={opts} />
+    </span>
+  );
+}
+
+/**
  * The onboarding's progress at the top of the rail: a strip of pixel sky that fills as steps get done, with a pixel
  * agent walking at its front. `progress` is 0..1.
  */
@@ -706,7 +758,8 @@ export function OnboardingProgress({ progress }: { progress: number }) {
     },
     base: (u, v, t) => {
       const now = level.current.now;
-      if (u > now) return 0.12;
+      // What is still to go is the bare track: no dotted fill, and no lit first column before a step is done.
+      if (now < 0.01 || u > now) return 0;
       const head = Math.max(0, 1 - (now - u) * 12);
       return Math.min(1, 0.45 + 0.4 * v + 0.08 * S(u * 22 + t * 1.2) + 0.2 * head);
     },

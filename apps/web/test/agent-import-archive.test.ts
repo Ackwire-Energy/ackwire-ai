@@ -26,6 +26,14 @@ const failure = async (run: () => Promise<unknown>) => {
   }
   return null;
 };
+const limitOf = async (run: () => Promise<unknown>) => {
+  try {
+    await run();
+  } catch (err) {
+    return err instanceof ImportError ? (err.limit?.kind ?? null) : String(err);
+  }
+  return "none";
+};
 /** Runs with lower limits, then puts them back. */
 async function withLimits<T>(limits: Partial<typeof ARCHIVE_LIMITS>, run: () => Promise<T>): Promise<T> {
   const saved = { ...ARCHIVE_LIMITS };
@@ -141,6 +149,70 @@ describe("archives", () => {
     const entry = (await read).find((e) => e.name === "a/a.bin");
     await expect(entry?.read() ?? Promise.resolve()).rejects.toThrow("too_large");
     expect(await failure(() => readImportFiles([archive(bomb2, "a.zip")]))).toBe("tooLarge");
+  });
+
+  test("system files and dependencies never count against the caps; each cap says which it is", async () => {
+    const manifest = readFileSync(join(DIR, "openbot-run/openbot-import.json"), "utf8");
+    const install: Record<string, string> = { "openbot/openbot-import.json": manifest };
+    for (let i = 0; i < 40; i++) install[`openbot/node_modules/pkg${i}/index.js`] = "module.exports = 1";
+    for (let i = 0; i < 20; i++) install[`openbot/.git/objects/${i}`] = "x";
+    const read = await withLimits({ entries: 5, unpacked: Buffer.byteLength(manifest) }, () =>
+      readImportFiles([archive(zip(install), "openbot.zip")]),
+    );
+    expect(read.junk).toHaveLength(60);
+    expect(parseImport(read.files).agents.length).toBeGreaterThan(0);
+    const tarred = tar(Object.entries(install).map(([name, data]) => ({ name, data })));
+    const fromTar = await withLimits({ entries: 5 }, () => readImportFiles([archive(tarred, "openbot.tar")]));
+    expect(fromTar.junk).toHaveLength(60);
+
+    const three = { "a/SOUL.md": "x", "a/USER.md": "y", "a/MEMORY.md": "z" };
+    expect(await withLimits({ entries: 2 }, () => limitOf(() => readImportFiles([archive(zip(three), "a.zip")])))).toBe(
+      "files",
+    );
+    expect(await withLimits({ bytes: 100 }, () => limitOf(() => readImportFiles([archive(zip(three), "a.zip")])))).toBe(
+      "bytes",
+    );
+    expect(
+      await withLimits({ unpacked: 2 }, () => limitOf(() => readImportFiles([archive(zip(three), "a.zip")]))),
+    ).toBe("unpacked");
+  });
+
+  test("a zip is read by slices: never the whole file at once", async () => {
+    const bytes = zip({ "a/SOUL.md": "soul", "a/big.bin": new Uint8Array(256 * 1024) });
+    const real = new Blob([bytes.slice()]);
+    const sliced: number[] = [];
+    const lazy = {
+      size: real.size,
+      slice: (from: number, to: number) => {
+        sliced.push(to - from);
+        return real.slice(from, to);
+      },
+      arrayBuffer: () => Promise.reject(new Error("read whole")),
+    } as unknown as Blob;
+    const entries = await readZip(lazy);
+    expect(new TextDecoder().decode(await entries.find((e) => e.name === "a/SOUL.md")?.read())).toBe("soul");
+    expect(Math.max(...sliced)).toBeLessThan(bytes.length);
+  });
+
+  test("a whole-team manifest is read past the 4 MB cap of other files, up to the import's 32 MB", async () => {
+    const manifest = readFileSync(join(DIR, "openbot-run/openbot-import.json"), "utf8");
+    const padded = manifest + " ".repeat(5 * 1024 * 1024);
+    const { files } = await readImportFiles([archive(zip({ "openbot-import.json": padded }), "export.zip")]);
+    expect(files[0]?.text.length).toBe(padded.length);
+    expect(parseImport(files).agents.length).toBeGreaterThan(0);
+    // Any other text file that big, alone, is too large: said with its name and size, not "empty".
+    let caught: unknown;
+    try {
+      parsePackage([{ name: "notes/MEMORY.md", text: "", size: 5 * 1024 * 1024 }]);
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught instanceof ImportError && caught.limit).toEqual({
+      kind: "file",
+      have: 5 * 1024 * 1024,
+      max: 4 * 1024 * 1024,
+      name: "notes/MEMORY.md",
+    });
   });
 
   test("a zip from an old Windows tool keeps its accented names (CP850 when not flagged UTF-8)", async () => {

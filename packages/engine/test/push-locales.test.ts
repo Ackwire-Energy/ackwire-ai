@@ -24,6 +24,7 @@ const KINDS = [
   "secret_request",
   "join_request",
   "device.join_request",
+  "device.folder_request",
   "widget_alert",
   "widget_failed",
   "dashboard_proposal",

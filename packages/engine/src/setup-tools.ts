@@ -28,32 +28,38 @@ import { ownWords } from "./context/learn";
 import { decideProposal, proposeSettings, type SettingsProposalCard } from "./context/proposals";
 import type { ContextDeps } from "./context/summaries";
 import { publishMessageCreated } from "./events";
+import { firstOf } from "./format";
 import { insertMessage, messageView } from "./messages";
 import { can, getMembership } from "./organizations";
 import type { RolePermission } from "./permissions";
 import { personBehindCall } from "./requester";
 import { isRightHand } from "./right-hand";
 import { queueRightHandLook } from "./right-hand-approvals";
+import { liveLodiSwitches } from "./right-hand-lane";
+import { type LodiPrefsPatch, setLodiPrefs } from "./right-hand-prefs";
 import { bodyCode } from "./run-tools";
 import { REPORT_SCHEMA, SCHEDULE_INPUT } from "./schedule-tools";
 import { deletes, type WantedLine } from "./settings-proposals";
 import { noAgentText } from "./team";
 import { OFFER_ANSWERS_TOOL, PROPOSE_TEAM_SCHEMA_PERSONAL, PROPOSE_TEAM_TOOL, teamTools } from "./team-proposals";
-import { SET_TEAM_WEEK_TOOL, setTeamWeekPrefs } from "./team-week";
+import { SET_TEAM_WEEK_TOOL } from "./team-week";
 import { OFFER_CONNECT_APP_TOOL } from "./tools/connector-first";
 import { APPROVAL_TTL_MS } from "./tools/gateway";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
   actNow,
   changesThisRun,
+  INVITE_ACTION,
   MAX_ACTIONS_PER_RUN,
+  MAX_INVITES_PER_CARD,
+  offerWorkspaceAction,
   type ServerLinks,
   workspaceAction,
   workspaceActionTool,
 } from "./workspace-actions";
 import { isPersonalWorkspace } from "./workspace-mode";
 
-const { agentActions, agentRuns, channels, machineAccounts, messages, orgRoles } = schema;
+const { agentActions, agentGroups, agentRuns, channels, machineAccounts, messages, orgRoles, skills } = schema;
 
 /** The setup tools' scope: a tool group of its own, loaded when a message is about setting up (ADR 0043). */
 export const SETUP_SCOPE = "setup:write";
@@ -66,8 +72,10 @@ export const OFFER_INVITES_TOOL = "offer_invites";
 export const PROPOSE_REMOVE_AGENTS_TOOL = "propose_remove_agents";
 /** At most this many agents on one removal card. */
 export const MAX_REMOVALS_PER_CARD = 20;
-/** The right hand's settings card (ADR 0137): no other agent has it. */
+/** Teammates' settings on one card (ADR 0137): the right hand's, and any agent's with setup tools (ADR 0139). */
 export const PROPOSE_SETTINGS_TOOL = "propose_settings_change";
+/** An agent asking for its own settings on that card, in any run: every agent but the right hand (ADR 0137). */
+export const REQUEST_SETTINGS_TOOL = "request_settings_change";
 /** The right hand's cards for what a person does elsewhere in the app (ADR 0137 §4): no other agent has them. */
 export const OFFER_APPROVALS_TOOL = "offer_approvals";
 export const PROPOSE_MEMBER_CHANGES_TOOL = "propose_member_changes";
@@ -140,6 +148,8 @@ export const MAX_CARDS_PER_RUN = 3;
 export const MAX_CARDS_PER_RUN_RIGHT_HAND = 10;
 /** A settings card's `bodyCode` (`chat.body.settings_proposal`, with `names`). */
 export const SETTINGS_PROPOSAL_CARD = "settings_proposal";
+/** An agent's own settings card's `bodyCode` (`chat.body.settings_request`): no names, it is the author's. */
+export const SETTINGS_REQUEST_CARD = "settings_request";
 export const MAX_CHANNELS_PER_RUN = 5;
 /** A Connect card's `bodyCode` (the apps say it with `chat.body.action_connect_ai`). */
 export const CONNECT_AI_CARD = "action_connect_ai";
@@ -148,8 +158,6 @@ export const CONNECT_APP_CARD = "action_connect_app";
 export const ADD_MCP_CARD = "action_add_mcp";
 /** An invite card's `bodyCode` (`chat.body.action_invite_people`). */
 export const INVITE_CARD = "action_invite_people";
-/** Addresses one invite card fills in. */
-export const MAX_INVITES_PER_CARD = 20;
 
 export type ConnectAiStep = "claude" | "chatgpt" | "api_key";
 
@@ -200,7 +208,8 @@ export interface InviteCard {
 export interface ApprovalsCard {
   kind: "approvals";
   forUserId: string;
-  params: { approvalIds: string[]; why: string };
+  /** `digest`: the right hand posted it by itself, as the summary of what waits on this person. */
+  params: { approvalIds: string[]; why: string; digest?: boolean };
 }
 
 /**
@@ -299,7 +308,10 @@ export async function hopOf(ctx: ToolContext) {
   return run?.hop ?? 0;
 }
 
-/** What the right hand puts to the person for an answer: one a turn (`cardsLeft`). */
+/**
+ * What the right hand puts to the person for an answer: one a turn (`cardsLeft`). Its own invite card is a catalog
+ * action's (`INVITE_ACTION`), counted beside these.
+ */
 const ASKING_CARDS = ["connect_ai", "connect_app", "invite_people", "team_proposal"];
 
 /**
@@ -320,7 +332,14 @@ export async function cardsLeft(ctx: ToolContext, asks = false): Promise<ToolOut
       .where(
         and(
           here,
-          or(sql`${messages.meta} ? 'replyChips'`, inArray(sql`${messages.meta}->'actionCard'->>'kind'`, ASKING_CARDS)),
+          or(
+            sql`${messages.meta} ? 'replyChips'`,
+            inArray(sql`${messages.meta}->'actionCard'->>'kind'`, ASKING_CARDS),
+            and(
+              sql`${messages.meta}->'actionCard'->>'kind' = 'workspace_action'`,
+              sql`${messages.meta}->'actionCard'->'params'->>'action' = ${INVITE_ACTION}`,
+            ),
+          ),
         ),
       ),
     getAgentCached(ctx.db, ctx.orgId, ctx.agentId),
@@ -621,6 +640,19 @@ export function createSetupToolSource(deps: {
             required: ["schedule", "prompt"],
             additionalProperties: false,
           },
+          hello: {
+            type: "string",
+            maxLength: 300,
+            description:
+              "How it introduces itself on the card, in its own voice and the person's language, without its name: one or two short sentences on what it will do (e.g. 'Vou planejar as campanhas e acompanhar os resultados.').",
+          },
+          connect_later: {
+            type: "array",
+            items: { type: "string", minLength: 1, maxLength: 80 },
+            maxItems: 6,
+            description:
+              "Apps from the catalog its job needs that the workspace hasn't connected (catalog ids, e.g. hubspot): the card lists them for after it is created, and its chat asks to connect them. A connected app goes in `access` instead.",
+          },
           why: {
             type: "string",
             minLength: 1,
@@ -898,35 +930,17 @@ export function createSetupToolSource(deps: {
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
-        properties: {
-          emails: {
-            type: "array",
-            items: { type: "string", minLength: 3, maxLength: 254 },
-            minItems: 1,
-            maxItems: MAX_INVITES_PER_CARD,
-          },
-          why: {
-            type: "string",
-            minLength: 1,
-            maxLength: 300,
-            description:
-              "One short line on the card for the person, in their language: who they are or why invite them.",
-          },
-        },
+        properties: { emails: inviteEmails(), why: INVITE_WHY },
         required: ["emails", "why"],
         additionalProperties: false,
       },
       async execute(input, ctx) {
         try {
-          const why = str(input.why).trim();
-          if (!why) return { content: "Say in `why` why to invite them: one short line.", isError: true };
-          const emails = [
-            ...new Set((Array.isArray(input.emails) ? input.emails : []).map((e) => str(e).trim().toLowerCase())),
-          ];
-          const bad = emails.filter((e) => !EMAIL.test(e));
-          if (bad.length > 0) return { content: `Not an email address: ${bad.join(", ")}.`, isError: true };
+          const asked = inviteInput(input);
+          if ("content" in asked) return asked;
+          const { why, emails } = asked;
           const forUserId = await personBehindCall(ctx);
-          if (!forUserId) return { content: "Only a person's request can lead to invitations.", isError: true };
+          if (!forUserId) return ONLY_A_PERSON_INVITES;
           const at = await cardPlace(ctx);
           if (!at) return NOBODY_READS;
           const acts = await whoActs(ctx, forUserId, "invite_people", at.channelId);
@@ -961,8 +975,12 @@ export function createSetupToolSource(deps: {
   // Any agent that may set the team up proposes teammates' settings too: the right hand decides another agent's card
   // for the person who asked (ADR 0139), never its own.
   const all = [...tools, settingsTool(deps)];
+  // The right hand changes its own settings with the card above; every other agent asks for its own here.
+  const others = [...all, settingsTool(deps, true)];
+  // The right hand's own invite card takes the place of the dialog's.
+  const lodiInvites = rightHandInvites(deps);
   const rightHand = [
-    ...all,
+    ...all.map((t) => (t.name === OFFER_INVITES_TOOL ? lodiInvites : t)),
     ...rightHandCards(deps),
     ...teamTools({ ...deps, cardsLeft, hopOf }),
     workspaceActionTool({ ...deps, cardsLeft, hopOf }),
@@ -973,13 +991,98 @@ export function createSetupToolSource(deps: {
     // words (ADR 0159): the same tools, for one person and their agents, whose team card may leave an agent's channel
     // out (it lives in its DM with the person). Only words and that one field: a read that fails keeps the team's.
     tools: async (ctx) => {
-      const listed = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId)) ? rightHand : all;
+      const lodi = isRightHand(await getAgentCached(ctx.db, ctx.orgId, ctx.agentId));
+      const listed = lodi ? rightHand : others;
       if (!(await isPersonalWorkspace(ctx.db, ctx.orgId).catch(() => false))) return listed;
       return listed.map((t) => {
-        const description = SETUP_TOOLS_PERSONAL[t.name];
+        const description =
+          t.name === SET_TEAM_WEEK_TOOL
+            ? setTeamWeekDoes(true, liveOwnSwitches())
+            : lodi && t.name === OFFER_INVITES_TOOL
+              ? RIGHT_HAND_INVITES_PERSONAL
+              : SETUP_TOOLS_PERSONAL[t.name];
         const worded = description ? { ...t, description } : t;
         return t.name === PROPOSE_TEAM_TOOL ? { ...worded, inputSchema: PROPOSE_TEAM_SCHEMA_PERSONAL } : worded;
       });
+    },
+  };
+}
+
+/**
+ * `offer_invites`' addresses and line as its two cards take them. A function: the catalog's file and this one import
+ * each other, so its constant is read once both are loaded.
+ */
+const inviteEmails = () =>
+  ({
+    type: "array",
+    items: { type: "string", minLength: 3, maxLength: 254 },
+    minItems: 1,
+    maxItems: MAX_INVITES_PER_CARD,
+  }) as const;
+const INVITE_WHY = {
+  type: "string",
+  minLength: 1,
+  maxLength: 300,
+  description: "One short line on the card for the person, in their language: who they are or why invite them.",
+} as const;
+const ONLY_A_PERSON_INVITES: ToolOutput = {
+  content: "Only a person's request can lead to invitations.",
+  isError: true,
+};
+
+/** What `offer_invites` was given, each address once in lowercase, or what is wrong with it. */
+function inviteInput(input: Record<string, unknown>): { why: string; emails: string[] } | ToolOutput {
+  const why = str(input.why).trim();
+  if (!why) return { content: "Say in `why` why to invite them: one short line.", isError: true };
+  const emails = [
+    ...new Set((Array.isArray(input.emails) ? input.emails : []).map((e) => str(e).trim().toLowerCase())),
+  ];
+  const bad = emails.filter((e) => !EMAIL.test(e));
+  return bad.length > 0 ? { content: `Not an email address: ${bad.join(", ")}.`, isError: true } : { why, emails };
+}
+
+const RIGHT_HAND_INVITES_PERSONAL =
+  "Offer to invite someone the person trusts (family, a partner, someone who helps them) to this workspace with a card in this conversation that lists every address: a person who may invite sends them with one tap on the card, as themselves. You send nothing. Use it when they ask to invite or add someone by email, never on your own.";
+
+/**
+ * The right hand's `offer_invites`: the catalog's invite card (`INVITE_ACTION`), with every address and role on it,
+ * sent in one tap by whoever may invite, as themselves. Every other agent's card opens the invite dialog.
+ */
+function rightHandInvites(deps: { pubsub?: PubSub }): ToolDefinition {
+  return {
+    name: OFFER_INVITES_TOOL,
+    description:
+      "Offer to invite people to the workspace with a card in this conversation that lists every address and the roles each gets (`roles`, only when the person named them). A person who may invite sends them with one tap on the card, as themselves, and one who can't sends the card on to whoever may. You send nothing. Use it when someone asks to invite or add people by email.",
+    scope: SETUP_SCOPE,
+    inputSchema: {
+      type: "object",
+      properties: {
+        emails: inviteEmails(),
+        roles: {
+          type: "array",
+          items: { type: "string", minLength: 1, maxLength: 80 },
+          maxItems: 20,
+          description: "Role names every address gets. Leave it out for plain members.",
+        },
+        why: INVITE_WHY,
+      },
+      required: ["emails", "why"],
+      additionalProperties: false,
+    },
+    async execute(input, ctx) {
+      try {
+        const asked = inviteInput(input);
+        if ("content" in asked) return asked;
+        const person = await personBehindCall(ctx);
+        const a = workspaceAction(INVITE_ACTION);
+        if (!person || !a) return ONLY_A_PERSON_INVITES;
+        const resolved = await a.resolve(ctx, person, { emails: asked.emails, roles: input.roles ?? [] });
+        if (typeof resolved === "string") return { content: resolved, isError: true };
+        const out = await offerWorkspaceAction({ ...deps, cardsLeft, hopOf }, ctx, person, a, resolved, asked.why);
+        return { ...out, content: out.content.replace(`Posted a card to ${INVITE_ACTION}`, "Posted the invite card") };
+      } catch (error) {
+        return failed(error);
+      }
     },
   };
 }
@@ -995,10 +1098,8 @@ const SETUP_TOOLS_PERSONAL: Record<string, string> = {
     "Propose archiving agents (or deleting them for good) with one card in this conversation that lists them all: whoever may archive or delete agents applies it from the card as themselves, all at once or leaving some out, and archiving has Undo. A person who can't sends it from the card to an admin. Use it when someone asks to remove, archive, delete or start their agents over ('apaga os outros agentes'). Never you or the workspace's assistant. Nothing changes until someone clicks: never say it is done. To set up new agents after, propose them with propose_agent.",
   [OFFER_INVITES_TOOL]:
     "Offer to invite someone the person trusts (family, a partner, someone who helps them) to this workspace with a card in this conversation: its button opens the app's invite dialog with these addresses filled in, as members. A person who may invite sends it there (and may change roles); you send nothing. Use it when they ask to invite or add someone by email, never on your own.",
-  [SET_TEAM_WEEK_TOOL]:
-    "Stop, start again or move the card you post in this person's DM: the weekly look at how their agents did (Fridays at 17h in the workspace's time zone), or 'Resumo do dia', the same card every day at an hour ('me manda isso todo dia às 9h'). Use it when they ask you to stop it, send it again, or on another day or hour. It changes only their card.",
   [PROPOSE_SETTINGS_TOOL]:
-    "Change agents' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
+    "Change agents' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, the skills it has on, its name, its look, its department, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
   [OFFER_ANSWERS_TOOL]:
     "Ask the person one short question with answers to tap under it, in this conversation: each tap sends the answer as their own message (several at once with `multiple`), and they can always type instead. Use it for the questions that set their agents up (what they want help with, what takes most of their time, when they want to hear from their agents), one per turn, with `step` and `of` ('Pergunta 2 de 3'). The question shows as your message: write nothing else in this turn and end it. Their answer comes as their next message.",
   [PROPOSE_TEAM_TOOL]:
@@ -1043,6 +1144,7 @@ async function rolesByName(ctx: ToolContext, wanted: string[]): Promise<string[]
  * whoever clicks, checked at the click, with the confirmation that screen asks for; it decides and moves nothing itself.
  */
 function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
+  const ownSwitches = liveOwnSwitches();
   return [
     {
       name: OFFER_APPROVALS_TOOL,
@@ -1272,16 +1374,25 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     },
     {
       name: SET_TEAM_WEEK_TOOL,
-      description:
-        "Stop, start again or move the card you post in this person's DM: the weekly 'Semana da equipe' (admins get it by default, Fridays at 17h in the workspace's time zone), or 'Resumo do dia', the same card every day at an hour, which anyone may ask for ('me manda isso todo dia às 9h'). Use it when they ask you to stop it, send it again, or on another day or hour. It changes only their card.",
+      description: setTeamWeekDoes(false, ownSwitches),
       scope: SETUP_SCOPE,
       inputSchema: {
         type: "object",
         properties: {
+          card: {
+            type: "string",
+            enum: ["day", "week"],
+            description: "Which card `off` and `hour` are about. Left out, `off` stops or starts both.",
+          },
           off: { type: "boolean", description: "True stops it; false starts it again." },
-          daily: { type: "boolean", description: "True: every day at `hour`; false: back to weekly." },
-          day: { type: "string", enum: [...WEEK_DAYS] },
-          hour: { type: "integer", minimum: 0, maximum: 23, description: "In the workspace's time zone." },
+          day: { type: "string", enum: [...WEEK_DAYS], description: "The weekly card's day." },
+          hour: { type: "integer", minimum: 0, maximum: 23 },
+          ...Object.fromEntries(
+            ownSwitches.map((o) => [
+              o.input,
+              { type: "boolean", description: `False stops ${o.does}; true starts it.` },
+            ]),
+          ),
         },
         additionalProperties: false,
       },
@@ -1289,21 +1400,40 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
         try {
           const forUserId = await personBehindCall(ctx);
           if (!forUserId) return { content: "Only a person's request changes their card.", isError: true };
-          const day = WEEK_DAYS.indexOf(str(input.day) as (typeof WEEK_DAYS)[number]);
-          const next = await setTeamWeekPrefs(ctx.db, ctx.orgId, forUserId, {
-            ...(typeof input.off === "boolean" ? { off: input.off } : {}),
-            ...(typeof input.daily === "boolean" ? { daily: input.daily } : {}),
-            ...(day >= 0 ? { day } : {}),
-            ...(typeof input.hour === "number" ? { hour: input.hour } : {}),
-          });
           const admin = can(await getMembership(ctx.db, forUserId, ctx.orgId), "administrator");
+          // Only the day's card comes to someone who administers nothing.
+          const card = input.card === "day" || input.card === "week" ? input.card : admin ? null : "day";
+          if (card === "week" && !admin)
+            return { content: "The weekly card is for admins. They get the daily one: use card: day.", isError: true };
+          if (typeof input.hour === "number" && !card)
+            return { content: "Say which card the hour is for: card: day or card: week.", isError: true };
+          const day = WEEK_DAYS.indexOf(str(input.day) as (typeof WEEK_DAYS)[number]);
+          const patch: LodiPrefsPatch = {
+            ...(typeof input.off === "boolean" && card !== "day" ? { weekOff: input.off } : {}),
+            ...(typeof input.off === "boolean" && card !== "week" ? { dayOff: input.off } : {}),
+            ...(day >= 0 ? { day } : {}),
+            ...(typeof input.hour === "number" ? { [card === "day" ? "dayHour" : "weekHour"]: input.hour } : {}),
+            ...Object.fromEntries(
+              ownSwitches.flatMap((o) => (typeof input[o.input] === "boolean" ? [[o.pref, !input[o.input]]] : [])),
+            ),
+          };
+          const next = await setLodiPrefs(ctx.db, ctx.orgId, forUserId, patch);
           return {
-            content:
-              next.off || (!next.daily && !admin)
-                ? "Stopped: no card for them until they ask again or turn it on in Settings › Lodi."
-                : next.daily
-                  ? `Their 'Resumo do dia' now comes every day at ${next.hour}:00 (${next.timezone}), on days with something to say.`
-                  : `Their weekly card now comes every ${WEEK_DAYS[next.day]} at ${next.hour}:00 (${next.timezone}), when there is something to say.`,
+            content: [
+              "Saved, for them only.",
+              next.dayOff
+                ? "Daily summary: off."
+                : `Daily summary: every day at ${next.dayHour}:00 (${next.dayTimezone}), on days with something to say.`,
+              !admin
+                ? ""
+                : next.weekOff
+                  ? "Weekly card: off."
+                  : `Weekly card: every ${WEEK_DAYS[next.day]} at ${next.weekHour}:00 (${next.timezone}), when there is something to say.`,
+              ...ownSwitches.map((o) => `${o.name}: ${next[o.pref] ? "off" : "on"}.`),
+              "They can change each in Settings › Lodi.",
+            ]
+              .filter(Boolean)
+              .join(" "),
           };
         } catch (error) {
           return failed(error);
@@ -1312,6 +1442,43 @@ function rightHandCards(deps: { pubsub?: PubSub }): ToolDefinition[] {
     },
   ];
 }
+
+/** `OWN_SWITCHES` whose feature is built. */
+const liveOwnSwitches = () => {
+  const live = liveLodiSwitches();
+  return OWN_SWITCHES.filter((o) => live.includes(o.switch));
+};
+
+/**
+ * `set_team_week` as the right hand reads it, in a team's workspace or a personal one (ADR 0159): the two cards, then
+ * the switches it also flips.
+ */
+const setTeamWeekDoes = (personal: boolean, own: readonly { does: string }[]) =>
+  `Stop, start again or move the cards you post in this person's DM by yourself: 'Resumo do dia' (\`card: day\`, ${
+    personal ? "" : "everyone gets it, "
+  }every day at an hour in their own time zone, 9h unless they moved it) and the weekly ${
+    personal ? "look at how their agents did (`card: week`" : "'Semana da equipe' (`card: week`, admins only"
+  }, Fridays at 17h in the workspace's time zone).${
+    own.length ? ` Also turns ${own.map((o) => o.does).join(" and ")} off or on.` : ""
+  } Use it when they ask you to stop one, send it again, or on another day or hour ('me manda isso todo dia às 8h'). It changes only what they get.`;
+
+/** The right hand's own switches a person may ask it to flip, as `set_team_week` takes them. */
+const OWN_SWITCHES = [
+  {
+    switch: "digest",
+    input: "digest",
+    pref: "digestOff",
+    name: "Summary of approvals waiting",
+    does: "your summary of approvals waiting on them",
+  },
+  {
+    switch: "reminders",
+    input: "reminders",
+    pref: "remindOff",
+    name: "Reminders of what you agreed on",
+    does: "your reminders of what you two agreed on",
+  },
+] as const;
 
 const WEEK_DAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"] as const;
 
@@ -1327,13 +1494,18 @@ interface SettingsChangeInput {
   join?: unknown;
   leave?: unknown;
   replies?: unknown;
+  add_skills?: unknown;
+  remove_skills?: unknown;
   name?: unknown;
   look?: unknown;
+  group?: unknown;
   reports_to?: unknown;
   archive?: unknown;
 }
 
 const NANO_PER_USD = 1_000_000_000;
+/** Names a refusal lists, at most: a workspace may have hundreds of skills. */
+const NAMES_SHOWN = 20;
 const names = (v: unknown) => (Array.isArray(v) ? v.map((x) => str(x).trim()).filter(Boolean) : []);
 
 /** Each change's names read as ids (people, channels, roles, AI accounts), or why one can't be. */
@@ -1427,9 +1599,55 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   for (const r of replies)
     if (!names(change.join).some((n) => channelOf(n)?.id === channelOf(str(r.channel))?.id))
       seat("reply_mode", str(r.channel), r.without_mention === true);
+  const wantedSkills = [...names(change.add_skills), ...names(change.remove_skills)];
+  if (wantedSkills.length > 0) {
+    const installed = await ctx.db
+      .select({ id: skills.id, name: skills.name })
+      .from(skills)
+      .where(and(eq(skills.orgId, ctx.orgId), isNull(skills.deletedAt), isNull(skills.ownerUserId)))
+      .orderBy(skills.name);
+    // Exactly as written first: the slug drops hyphens, so "pdftools" would also match "pdf-tools".
+    const skillOf = (n: string) =>
+      installed.find((k) => k.name === n.trim().toLowerCase()) ?? installed.find((k) => slug(k.name) === slug(n));
+    const unknown = wantedSkills.filter((n) => !skillOf(n));
+    if (unknown.length > 0) {
+      const install = "offer to install it with offer_install_skill, by its GitHub link";
+      const here = installed.map((k) => k.name);
+      return installed.length
+        ? `No skill ${firstOf(unknown, NAMES_SHOWN)}. Skills here: ${firstOf(here, NAMES_SHOWN)}. One not installed yet: ${install}.`
+        : `No skill is installed here yet: ${install}.`;
+    }
+    const added = new Set(names(change.add_skills).map((n) => skillOf(n)?.id));
+    const both = names(change.remove_skills).filter((n) => added.has(skillOf(n)?.id));
+    if (both.length > 0)
+      return `Each skill goes on or off, not both: ${firstOf(both, NAMES_SHOWN)} is in add_skills and remove_skills.`;
+    for (const [list, on] of [
+      [names(change.add_skills), true],
+      [names(change.remove_skills), false],
+    ] as const)
+      for (const n of list) {
+        const k = skillOf(n);
+        if (k) lines.push({ field: "skill", skillId: k.id, to: on, label: { to: k.name } });
+      }
+  }
   if (typeof change.name === "string")
     lines.push({ field: "name", to: change.name.trim(), label: { to: change.name } });
   if (change.look) lines.push({ field: "look", to: change.look });
+  if (typeof change.group === "string") {
+    const wanted = change.group.trim();
+    // "none" takes the agent out of every sector; any other name is stored as the workspace writes it, so the card,
+    // its apply and Undo all find the same sector however the model typed its case.
+    // Two names that differ only in case: the one typed exactly, else the name as typed (the card refuses a guess).
+    const found =
+      wanted.toLowerCase() === "none"
+        ? []
+        : await ctx.db
+            .select({ name: agentGroups.name })
+            .from(agentGroups)
+            .where(and(eq(agentGroups.orgId, ctx.orgId), sql`lower(${agentGroups.name}) = ${wanted.toLowerCase()}`));
+    const group = found.find((g) => g.name === wanted) ?? (found.length === 1 ? found[0] : undefined);
+    lines.push({ field: "group", to: group?.name ?? (wanted.toLowerCase() === "none" ? null : wanted) });
+  }
   if (typeof change.reports_to === "string") {
     const wanted = change.reports_to.trim().replace(/^@/, "").toLowerCase();
     if (wanted === "none") lines.push({ field: "reports_to", to: null });
@@ -1443,109 +1661,150 @@ async function wantedLines(ctx: ToolContext, change: SettingsChangeInput): Promi
   return lines;
 }
 
+/** What one agent's change may hold, for both settings tools. */
+const CHANGE_PROPERTIES = {
+  model: { type: "string", minLength: 1, maxLength: 200, description: 'A model id, or "auto".' },
+  ai_account: {
+    type: "string",
+    minLength: 1,
+    maxLength: 200,
+    description: "A Claude or ChatGPT plan signed in on a computer, by its name: only its owner gives it.",
+  },
+  budget_usd: { type: "number", minimum: 0, maximum: 100_000, description: "Monthly, in US dollars." },
+  budget_default: { type: "boolean", description: "True: back to the workspace's default budget." },
+  owner: {
+    type: "string",
+    minLength: 1,
+    maxLength: 200,
+    description: "A person's @handle, email or name.",
+  },
+  who_talks: {
+    type: "object",
+    properties: {
+      everyone: { type: "boolean" },
+      roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
+      people: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
+    },
+    additionalProperties: false,
+    description: "Everyone, or only people with these roles (by name) and these people (@handle, email or name).",
+  },
+  join: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
+  leave: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
+  replies: {
+    type: "array",
+    maxItems: 10,
+    items: {
+      type: "object",
+      properties: {
+        channel: { type: "string", minLength: 1, maxLength: 81 },
+        without_mention: { type: "boolean", description: "False: it answers there only when @mentioned." },
+      },
+      required: ["channel", "without_mention"],
+      additionalProperties: false,
+    },
+  },
+  add_skills: {
+    type: "array",
+    items: { type: "string", minLength: 1, maxLength: 80 },
+    maxItems: 20,
+    description: "Skills to turn on for it, by name as the Skills screen lists them.",
+  },
+  remove_skills: {
+    type: "array",
+    items: { type: "string", minLength: 1, maxLength: 80 },
+    maxItems: 20,
+    description: "Skills to turn off for it.",
+  },
+  name: { type: "string", minLength: 1, maxLength: 80 },
+  look: {
+    type: "object",
+    properties: {
+      color: { type: "string", description: `${AGENT_LOOK.colors.join(", ")}, or #rrggbb.` },
+      eyes: { enum: [...AGENT_LOOK.eyes] },
+      accessory: { enum: [...AGENT_LOOK.accessories] },
+    },
+    required: ["color", "eyes"],
+    additionalProperties: false,
+  },
+  reports_to: {
+    type: "string",
+    minLength: 1,
+    maxLength: 64,
+    description:
+      'Responde a: the @handle of the agent it reports to, or "none". It says who it tells, never what it may do.',
+  },
+  group: {
+    type: "string",
+    minLength: 1,
+    maxLength: 80,
+    description:
+      'Its department (setor), by the name the team screen shows, or "none" to take it out of its department. It says where it sits in the workspace, never what it may do.',
+  },
+  archive: { type: "boolean", description: "True: archive it (it stops working; Undo brings it back)." },
+};
+
+const REASON = {
+  type: "string",
+  minLength: 1,
+  maxLength: 500,
+  description: "One short line on the card, in the person's language: why.",
+};
+
 /**
  * `propose_settings_change` (ADR 0137, amending 0092 §5): a teammate's settings as one card in this conversation,
  * one row per agent and whoever decides it, applied by who clicks Aplicar. Rows the person who asked may decide, in
  * their own words (`ownWords`), apply as the card is posted: it shows them done with Desfazer. Never an agent's own row
  * (ADR 0139: an agent raising its own budget is the person's), nor deleting, which has no Undo.
+ *
+ * `own`: `request_settings_change`, the same card for the calling agent's own settings and nobody else's, granted in
+ * every run of every agent but the right hand (no scope, as `request_permission`; on demand, `RARE_TOOLS`). Its rows
+ * always wait for a click, and the right hand never looks at them for the person (ADR 0139 §2 keeps an agent's own
+ * settings the person's).
  */
-function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
+function settingsTool(deps: { pubsub?: PubSub }, own = false): ToolDefinition {
   return {
-    name: PROPOSE_SETTINGS_TOOL,
-    description:
-      "Change teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, its name, its look, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
-    scope: SETUP_SCOPE,
-    inputSchema: {
-      type: "object",
-      properties: {
-        changes: {
-          type: "array",
-          minItems: 1,
-          maxItems: 10,
-          items: {
-            type: "object",
-            properties: {
-              agent: { type: "string", minLength: 1, maxLength: 64, description: "Its @handle." },
-              model: { type: "string", minLength: 1, maxLength: 200, description: 'A model id, or "auto".' },
-              ai_account: {
-                type: "string",
-                minLength: 1,
-                maxLength: 200,
-                description: "A Claude or ChatGPT plan signed in on a computer, by its name: only its owner gives it.",
-              },
-              budget_usd: { type: "number", minimum: 0, maximum: 100_000, description: "Monthly, in US dollars." },
-              budget_default: { type: "boolean", description: "True: back to the workspace's default budget." },
-              owner: {
-                type: "string",
-                minLength: 1,
-                maxLength: 200,
-                description: "A person's @handle, email or name.",
-              },
-              who_talks: {
+    name: own ? REQUEST_SETTINGS_TOOL : PROPOSE_SETTINGS_TOOL,
+    description: own
+      ? "Ask a person to change a setting of your own, with one card in this conversation: turn on or off a skill installed here, join or leave a channel or how you answer there, your model, the AI account you think with, your monthly budget, your owner, who may talk to you, your name, your look, the department you are in or who you report to. Use it whenever a request needs a setting of yours you don't have, instead of telling the person how to change it by hand or saying you can't ask. Nothing changes until a person clicks, even when the person who asked could change it: the card waits for whoever may (they send one they can't decide from there), and the result says which. Apps and permissions: request_permission. A skill not installed yet: offer_install_skill."
+      : "Change teammates' settings with one card in this conversation: the model, the AI account it thinks with, its monthly budget, its owner, who may talk to it, the channels it joins or leaves and whether it answers there without a mention, the skills it has on, its name, its look, its department, who it reports to, or archiving it. A change the person who asked may make, with nothing read from outside this turn, applies at once with Undo. Any other waits on the card for who may make it, and one they can't make they send from there. The result says which: never say it is done before it does. Instructions, a role or apps go through propose_instruction_change.",
+    scope: own ? "" : SETUP_SCOPE,
+    inputSchema: own
+      ? {
+          type: "object",
+          properties: { ...CHANGE_PROPERTIES, reason: REASON },
+          required: ["reason"],
+          additionalProperties: false,
+        }
+      : {
+          type: "object",
+          properties: {
+            changes: {
+              type: "array",
+              minItems: 1,
+              maxItems: 10,
+              items: {
                 type: "object",
                 properties: {
-                  everyone: { type: "boolean" },
-                  roles: { type: "array", items: { type: "string", minLength: 1, maxLength: 80 }, maxItems: 20 },
-                  people: { type: "array", items: { type: "string", minLength: 1, maxLength: 200 }, maxItems: 20 },
+                  agent: { type: "string", minLength: 1, maxLength: 64, description: "Its @handle." },
+                  ...CHANGE_PROPERTIES,
                 },
-                additionalProperties: false,
-                description:
-                  "Everyone, or only people with these roles (by name) and these people (@handle, email or name).",
-              },
-              join: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
-              leave: { type: "array", items: { type: "string", minLength: 1, maxLength: 81 }, maxItems: 10 },
-              replies: {
-                type: "array",
-                maxItems: 10,
-                items: {
-                  type: "object",
-                  properties: {
-                    channel: { type: "string", minLength: 1, maxLength: 81 },
-                    without_mention: { type: "boolean", description: "False: it answers there only when @mentioned." },
-                  },
-                  required: ["channel", "without_mention"],
-                  additionalProperties: false,
-                },
-              },
-              name: { type: "string", minLength: 1, maxLength: 80 },
-              look: {
-                type: "object",
-                properties: {
-                  color: { type: "string", description: `${AGENT_LOOK.colors.join(", ")}, or #rrggbb.` },
-                  eyes: { enum: [...AGENT_LOOK.eyes] },
-                  accessory: { enum: [...AGENT_LOOK.accessories] },
-                },
-                required: ["color", "eyes"],
+                required: ["agent"],
                 additionalProperties: false,
               },
-              reports_to: {
-                type: "string",
-                minLength: 1,
-                maxLength: 64,
-                description:
-                  'Responde a: the @handle of the agent it reports to, or "none". It says who it tells, never what it may do.',
-              },
-              archive: { type: "boolean", description: "True: archive it (it stops working; Undo brings it back)." },
             },
-            required: ["agent"],
-            additionalProperties: false,
+            reason: REASON,
           },
+          required: ["changes", "reason"],
+          additionalProperties: false,
         },
-        reason: {
-          type: "string",
-          minLength: 1,
-          maxLength: 500,
-          description: "One short line on the card, in the person's language: why.",
-        },
-      },
-      required: ["changes", "reason"],
-      additionalProperties: false,
-    },
     async execute(input, ctx) {
       try {
         const forUserId = await personBehindCall(ctx);
         if (!forUserId) return { content: "Only a person's request can propose a change.", isError: true };
-        const changes = (Array.isArray(input.changes) ? input.changes : []) as SettingsChangeInput[];
+        const self = own ? await getAgentCached(ctx.db, ctx.orgId, ctx.agentId) : null;
+        const changes = (
+          own ? [{ ...input, agent: self?.handle }] : Array.isArray(input.changes) ? input.changes : []
+        ) as SettingsChangeInput[];
         const named = await agentsByHandle(
           ctx.db,
           ctx.orgId,
@@ -1562,7 +1821,8 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
         if (!at) return NOBODY_READS;
         const full = await cardsLeft(ctx);
         if (full) return full;
-        const atOnce = (await ownWords(ctx)) === forUserId;
+        // An agent's own row never applies at once (below): its own settings need no look at the person's words.
+        const atOnce = !own && (await ownWords(ctx)) === forUserId;
         const { proposals, skipped } = await proposeSettings(
           { db: ctx.db },
           {
@@ -1586,8 +1846,13 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
           orgId: ctx.orgId,
           ...at,
           author: { type: "agent", agentId: ctx.agentId, runId: ctx.runId, hop: await hopOf(ctx) },
-          body: `Proposed a change to ${who}: ${str(input.reason).trim()}`,
-          meta: { ...bodyCode(SETTINGS_PROPOSAL_CARD, { names: who }), actionCard: card },
+          body: own
+            ? `Asks for a change to its own settings: ${str(input.reason).trim()}`
+            : `Proposed a change to ${who}: ${str(input.reason).trim()}`,
+          meta: {
+            ...(own ? bodyCode(SETTINGS_REQUEST_CARD) : bodyCode(SETTINGS_PROPOSAL_CARD, { names: who })),
+            actionCard: card,
+          },
         });
         // Before the card is announced, so it reads as done from its first frame; its receipts need the message.
         const open: typeof proposals = [];
@@ -1604,7 +1869,7 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
         if (deps.pubsub) await publishMessageCreated(deps.pubsub, messageView(message));
         if (open.length < proposals.length)
           await publishMessageActions({ db: ctx.db, pubsub: deps.pubsub }, ctx.orgId, message.id);
-        if (open.length > 0) await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
+        if (open.length > 0 && !own) await queueRightHandLook(ctx.db, ctx.orgId, message.id, forUserId);
         const decides = open.filter((p) => p.canDecide).length;
         const applied = open.length < proposals.length;
         const rest = applied ? "the rest" : "it";
@@ -1616,8 +1881,11 @@ function settingsTool(deps: { pubsub?: PubSub }): ToolDefinition {
               : decides === 0
                 ? `the person who asked can't apply ${rest}: the card lets them send it to whoever may.`
                 : "the person who asked applies some rows; the card lets them send the rest to whoever may.";
+        const yours = open.some((p) => p.canDecide && p.agentId === ctx.agentId)
+          ? " Your own settings wait for that click even when they could change them: say it waits for it."
+          : "";
         return {
-          content: `Posted the card for ${who}; ${applied ? "applied at once, with Undo on the card, so say it is done. " : ""}${whoDecides}${applied ? "" : " Nothing has changed yet."}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
+          content: `Posted the card for ${own ? "your settings" : who}; ${applied ? "applied at once, with Undo on the card, so say it is done. " : ""}${whoDecides}${yours}${applied ? "" : " Nothing has changed yet."}${skipped.length ? ` Left off the card: ${skipped.join(" ")}` : ""}`,
           data: { actionCard: { messageId: message.id } },
         };
       } catch (error) {

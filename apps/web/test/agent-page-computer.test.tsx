@@ -4,7 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 setupDom();
 
 import type { ComputerSetup, DesktopStatus, Machine } from "@agenteschat/client";
-import { cleanup, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, meAsAdmin, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
 
@@ -142,5 +142,86 @@ describe("the agent page's one entry: its status line", () => {
     const free = await entryOf();
     expect(line(free)).toBe("Disponível · ninguém usando agora");
     expect(free?.querySelector(".cmp-entry__line")?.className).toBe("cmp-entry__line");
+  });
+});
+
+describe("what the agent keeps running (keep_running), under its computer", () => {
+  const HOLD = {
+    id: "0193f6b4-1111-7000-8000-000000000001",
+    agentId: ADA_ID,
+    machineId: "m1",
+    what: "Bot do Telegram do suporte",
+    why: "responde os clientes em um minuto",
+    kind: "program" as const,
+    since: "2026-10-21T09:00:00.000Z",
+    until: null,
+  };
+
+  async function pageWith(holds: { canStop: boolean; until?: string | null }) {
+    setSystemTime(MIDDAY);
+    const state = seedState();
+    const api = createFakeApi(state);
+    const fake = fakeBrowserOf.get(api);
+    const machines = fakeMachinesOf.get(api);
+    if (!fake || !machines) throw new Error("no fakes");
+    const m = machines.pair({ name: "Mac mini", os: "linux" });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
+    fake.desktops.set(ADA_ID, { available: true, reason: null, running: true });
+    fake.holds.set(ADA_ID, { holds: [{ ...HOLD, until: holds.until ?? null }], canStop: holds.canStop });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await settle(10);
+    return { fake, row: screen().queryByRole("region", { name: "Mantido rodando" }) };
+  }
+
+  test("one line per hold: what, which agent, since when, until when; never words about the computer sleeping", async () => {
+    const { row } = await pageWith({ canStop: true });
+    expect(row).toBeTruthy();
+    const text = row?.textContent ?? "";
+    expect(text).toContain("Bot do Telegram do suporte");
+    expect(text).toMatch(/Ada · desde .+ · até parar/);
+    expect(text).not.toMatch(/acordad|dorm|pausa/i);
+  });
+
+  test("Stop is in the hold's ⋯ for who may use the computer, and takes it off", async () => {
+    const { fake, row } = await pageWith({ canStop: true, until: "2026-10-24T18:00:00.000Z" });
+    expect(row?.textContent).toMatch(/até .+18:00/);
+    const more = within(row as HTMLElement).getByRole("button", { name: "Ações de “Bot do Telegram do suporte”" });
+    // Radix menus open on pointer down.
+    await act(async () => fireEvent.pointerDown(more, { button: 0, ctrlKey: false }));
+    await settle(2);
+    await act(async () => fireEvent.click(screen().getByRole("menuitem", { name: "Parar" })));
+    await settle(10);
+    expect(fake.holds.get(ADA_ID)?.holds).toEqual([]);
+    expect(screen().queryByRole("region", { name: "Mantido rodando" })).toBeNull();
+  });
+
+  test("the worst case: ten holds, an unbroken name as long as it may be, each line whole with its ⋯", async () => {
+    setSystemTime(MIDDAY);
+    const state = seedState();
+    const api = createFakeApi(state);
+    const fake = fakeBrowserOf.get(api);
+    const machines = fakeMachinesOf.get(api);
+    if (!fake || !machines) throw new Error("no fakes");
+    const m = machines.pair({ name: "Mac mini", os: "linux" });
+    await api.sandbox.setTarget(ORG_ID, ADA_ID, m.id);
+    fake.desktops.set(ADA_ID, { available: true, reason: null, running: true });
+    const holds = Array.from({ length: 10 }, (_, i) => ({
+      ...HOLD,
+      id: `0193f6b4-1111-7000-8000-00000000001${i}`,
+      what: i === 0 ? "W".repeat(80) : `Servidor de webhooks número ${i} que responde aos pedidos dos clientes`,
+      until: i % 2 ? "2026-10-27T18:00:00.000Z" : null,
+    }));
+    fake.holds.set(ADA_ID, { holds, canStop: true });
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}`, { api });
+    await settle(10);
+    const row = screen().getByRole("region", { name: "Mantido rodando" });
+    expect(row.querySelectorAll(".cmp-kept__item")).toHaveLength(10);
+    expect(within(row).getAllByRole("button")).toHaveLength(10);
+  });
+
+  test("who may only watch sees the lines, with no Stop", async () => {
+    const { row } = await pageWith({ canStop: false });
+    expect(row).toBeTruthy();
+    expect(within(row as HTMLElement).queryByRole("button")).toBeNull();
   });
 });

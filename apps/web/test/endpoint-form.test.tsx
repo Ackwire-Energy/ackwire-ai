@@ -79,6 +79,28 @@ describe("Outro provedor in Settings › Chaves de IA", () => {
     return { add, api };
   };
 
+  test("the same endpoint and key saved again: the saved one is updated, and the results say so", async () => {
+    const saved = {
+      id: "cred-gw",
+      provider: "custom",
+      label: "OpenGateway",
+      keyHint: "4567",
+      endpoint: { style: "openai" as const, baseURL: "https://gw.example/v1", models: [{ id: "m-1" }] },
+      createdAt: "2026-11-01T10:00:00.000Z",
+      revokedAt: null,
+    };
+    const state = seedState({ credentials: [saved] });
+    const { add } = await openForm(state);
+    await type(within(add).getByLabelText("Nome"), "OpenGateway");
+    await type(within(add).getByLabelText("Endereço"), "https://gw.example/v1");
+    await type(within(add).getByLabelText("Chave de API"), "gw-key-1234567");
+    await type(within(add).getByLabelText("Adicionar um modelo"), "m-1");
+    await click(within(add).getByRole("button", { name: "Adicionar" }));
+    await click(within(add).getByRole("button", { name: "Salvar e testar" }));
+    expect(add.textContent).toContain("Essa chave já estava salva. Atualizei os dados.");
+    expect(state.credentials.map((c) => c.id)).toEqual(["cred-gw"]);
+  });
+
   test("laid out as a dialog: its fields in the body, Buscar modelos on the label's line, Cancelar then the save in the footer", async () => {
     const { add } = await openForm();
     const body = add.querySelector(".ac-dialog__body") as HTMLElement;
@@ -124,6 +146,44 @@ describe("Outro provedor in Settings › Chaves de IA", () => {
     const fetch = within(add).getByRole("button", { name: "Buscar modelos" }) as HTMLButtonElement;
     expect(fetch.disabled).toBe(false);
     expect(fetch.compareDocumentPosition(typed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test("a long list gets a search over it: ticked models stay on top, the rest filter by their id, no select-all", async () => {
+    const ids = [
+      ...["deepseek-v4", "deepseek-r2", "kimi-k2", "glm-5", "minimax-m2"],
+      ...Array.from({ length: 10 }, (_, i) => `qwen3-${i + 1}b`),
+    ];
+    const { add } = await openForm(
+      seedState({ endpointList: { baseURL: "https://gw.example/v1", models: ids.map((id) => ({ id })) } }),
+    );
+    await type(within(add).getByLabelText("Endereço"), "https://gw.example/v1");
+    await click(within(add).getByRole("button", { name: "Buscar modelos" }));
+    const rows = () => [...add.querySelectorAll(".endpoint-model label")].map((l) => l.textContent);
+    expect(rows()).toHaveLength(15);
+    await click(within(add).getByRole("checkbox", { name: "kimi-k2" }));
+    const search = within(add).getByRole("searchbox", { name: "Buscar modelo" });
+    await type(search, "QWEN3-1");
+    // What is ticked stays on top, whatever is typed.
+    expect(rows()).toEqual(["kimi-k2", "qwen3-1b", "qwen3-10b"]);
+    // Ticking a match doesn't move it under the pointer.
+    await click(within(add).getByRole("checkbox", { name: "qwen3-10b" }));
+    expect(rows()).toEqual(["kimi-k2", "qwen3-1b", "qwen3-10b"]);
+    await type(search, "nada");
+    expect(rows()).toEqual(["kimi-k2", "qwen3-10b"]);
+    expect(within(add).queryByRole("checkbox", { name: /todos/i })).toBeNull();
+    await click(within(add).getByRole("button", { name: "Limpar busca" }));
+    expect(rows()).toHaveLength(15);
+  });
+
+  test("twelve models or fewer: no search over them", async () => {
+    const ids = Array.from({ length: 12 }, (_, i) => `m-${i}`);
+    const { add } = await openForm(
+      seedState({ endpointList: { baseURL: "https://gw.example/v1", models: ids.map((id) => ({ id })) } }),
+    );
+    await type(within(add).getByLabelText("Endereço"), "https://gw.example/v1");
+    await click(within(add).getByRole("button", { name: "Buscar modelos" }));
+    expect(add.querySelectorAll(".endpoint-model")).toHaveLength(12);
+    expect(within(add).queryByRole("searchbox")).toBeNull();
   });
 
   test("Enter adds a typed model, its × takes it off, and while saving every control is off", async () => {

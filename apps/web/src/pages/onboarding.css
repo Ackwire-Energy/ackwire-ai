@@ -114,14 +114,58 @@ html:not([data-pointer]) .onb__me:focus-visible {
   min-width: 0;
 }
 /*
- * A step taller than the window (bringing a team from another app) scrolls the page, and the scrollbar takes its room
- * from this pane's right edge, which moved the centred column half of it to the left of every other step's. The same
- * room on the left keeps the column in place: `100vw` counts the scrollbar and this pane (`100%`, beside the rail's
- * 280px column in layout.css) doesn't, so it is 0 while nothing scrolls or where scrollbars take no room.
+ * A wide window: one stage in its middle instead of a rail on its edge and a column adrift in the rest. The rail is a
+ * card the window's height (28px from each edge) with its steps on top and Lodi on its own horizon at its foot; the
+ * question and the preview stand beside it, the preview's frame on the card's top line, and the window's own horizon
+ * (`OnboardingStageSky`) runs behind them all. 72px from the card to the question and 56px from the question to the
+ * preview, the body's gutter included. Below this width, the rail on the edge as before.
  */
-@media (min-width: 761px) {
+.onb__stage-sky {
+  display: none;
+}
+@media (min-width: 1400px) {
+  .onb--rail {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    gap: calc(72px - var(--onb-gutter, 32px));
+    --onb-gutter: 32px;
+  }
+  .onb--rail > .onb__stage-sky {
+    display: block;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 30%;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .onb--rail > .onb__rail {
+    position: sticky;
+    top: 28px;
+    z-index: 1;
+    flex: 0 0 280px;
+    height: calc(var(--onb-h, 100dvh) - 56px);
+    margin-block: 28px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-section);
+    box-shadow: var(--e1);
+  }
   .onb--rail > .onb__main {
-    padding-left: calc(100vw - 100% - 280px);
+    position: relative;
+    z-index: 1;
+    flex: 0 1 auto;
+  }
+  .onb--rail .onb__cols {
+    width: auto;
+    gap: calc(56px - var(--onb-gutter));
+  }
+  .onb--rail .onb-preview {
+    padding-top: 28px;
   }
 }
 /* The step's column and, on wide screens, the workspace's preview beside it. */
@@ -181,7 +225,8 @@ html:not([data-pointer]) .onb__me:focus-visible {
     }
   }
 }
-.onb__head {
+/* Only the onboarding's: this file is unlayered, so an unscoped rule would beat Criar agente's own head (layout.css). */
+.onb--rail .onb__head {
   gap: 6px;
   margin: 0;
 }
@@ -289,10 +334,6 @@ html:not([data-pointer]) .onb__back:focus-visible {
   height: var(--space-4);
   background: linear-gradient(to bottom, transparent, var(--pane));
   pointer-events: none;
-}
-/* A field being typed in stays clear of the action: the page scrolls it above the bar. */
-html:has(.onb) {
-  scroll-padding-bottom: 104px;
 }
 .onb__error {
   margin: 0;
@@ -464,15 +505,17 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   top: 0;
   padding-top: 40px;
 }
+/* As tall as what the workspace has so far, the person's row right under it: never a tall frame with a hole. */
 .onb-preview__frame {
-  height: min(600px, calc(100dvh - 120px));
+  max-height: calc(100dvh - 120px);
   overflow: hidden;
   border-radius: var(--radius-section);
   box-shadow: var(--e2);
 }
 .onb-preview__side.sidebar {
   width: 100%;
-  height: 100%;
+  height: auto;
+  max-height: inherit;
 }
 .onb-preview__side .sidebar__item {
   cursor: default;
@@ -531,6 +574,10 @@ html:not([data-pointer]) .onb__logo:focus-visible {
   min-width: 0;
 }
 @media (max-width: 760px) {
+  /* The rail's progress moves into the phone's main column, including while a resize updates React's view. */
+  .onb__rail > .onb__progress {
+    display: none;
+  }
   /* The step bar: the brand, the steps, the account's face at the end. */
   .onb__top {
     display: contents;
@@ -887,4 +934,39 @@ html:not([data-pointer]) .onb__logo:focus-visible {
     transition: none;
     animation: none;
   }
+}
+
+/*
+ * The person's own step (ADR 0162, amended 2026-11-12): their face beside its label and its two ways in. The label's
+ * capitals start on the face's top (`.ac-captop` lifts its 18px line by half less its caps), and the face is as tall as
+ * the label and the buttons together, so its foot meets the buttons': half the label's line, its caps, the gap and a
+ * button. The face is measured in the label's 13px, so `--cap-top` is the label's; its initials keep their own size.
+ */
+.onb-you {
+  --onb-you-face: calc(9px + var(--cap-top) + var(--space-2) + var(--control-h-md));
+  display: flex;
+  /* Where the two buttons don't fit beside the face (a phone), the label and the buttons go under it, full width. */
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+.onb-you__face.ac-avatar {
+  flex: none;
+  width: var(--onb-you-face);
+  height: var(--onb-you-face);
+  font-size: 13px;
+}
+.onb-you__face .ac-avatar__initials {
+  font-size: 24px;
+}
+.onb-you__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.onb-you__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

@@ -1,0 +1,6 @@
+# A migration is recorded in the database by the sha256 of its SQL file, and the server refuses a
+# database whose recorded migrations differ from the build's (packages/db/src/migration-guard.ts).
+# A checkout that turns line endings into CRLF (Git for Windows' default) would build an image whose
+# migrations hash differently from every other build's, so these files are LF everywhere.
+packages/db/migrations/*.sql text eol=lf
+packages/db/migrations/meta/*.json text eol=lf

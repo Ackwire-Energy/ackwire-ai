@@ -4,6 +4,7 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
+import { ApiError } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, ATLAS_ID, createFakeApi, fakeBrowserOf, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
 import { renderApp, screen, settle } from "./render";
@@ -253,4 +254,101 @@ test.each([
   expect(within(d).queryByRole("radiogroup", { name: "Qual perfil do navegador a Ada usa?" })).toBeNull();
   expect(within(d).queryByRole("button", { name: "Pedir mais um perfil" })).toBeNull();
   expect(d.textContent).toContain("fica com o login");
+});
+
+test("Fazer login refused because the browser is off: the row says so, Ligar e fazer login turns it on and opens the profile", async () => {
+  const s = withProfiles();
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, {
+    pairedBy: { id: "u-walter", name: "Walter White" },
+    accessAllow: true,
+    access: { folders: [], tools: { claude: false, codex: false, commands: true, browser: false } },
+  });
+  const takeover = s.api.browserProfiles?.takeover;
+  if (!s.api.browserProfiles || !takeover) throw new Error("no profiles api");
+  let browserOn = false;
+  s.api.browserProfiles.takeover = async (o, id) => {
+    if (!browserOn)
+      throw new ApiError(400, "browser_profile.tool_off", "The browser is turned off on Servidor", {
+        machineId: s.machine.id,
+        machineName: "Servidor",
+        tool: "browser",
+        mayAllow: true,
+        outdated: false,
+        ownerId: null,
+        ownerName: null,
+      });
+    return takeover(o, id);
+  };
+  const allowed: string[] = [];
+  const allowTool = s.api.machines.allowTool;
+  s.api.machines.allowTool = async (o, machineId, tool) => {
+    allowed.push(tool);
+    browserOn = true;
+    return allowTool(o, machineId, tool);
+  };
+  await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });
+  await settle(8);
+  const card = screen().getByRole("heading", { name: "Perfis do navegador" }).closest(".ac-card") as HTMLElement;
+  const row = card.querySelector(".pf-list > .machine-page__agent-row") as HTMLElement;
+  await click(within(row).getByRole("button", { name: "Fazer login" }));
+  // Nothing opens: the cause under the profile's name, with its one way out.
+  expect(screen().queryByRole("dialog")).toBeNull();
+  expect(row.querySelector(".pf-line")?.textContent).toContain("O navegador está desligado nesse computador.");
+  await click(within(row).getByRole("button", { name: "Ligar e fazer login" }));
+  await settle(4);
+  expect(allowed).toEqual(["browser"]);
+  expect(screen().getByRole("dialog", { name: "Fazer login no perfil Empresa A" })).toBeTruthy();
+  expect(row.querySelector(".pf-line")).toBeNull();
+});
+
+test("someone else's computer: the row names whose it is and Pedir sends them the button", async () => {
+  const s = withProfiles();
+  fakeMachinesOf.get(s.api)?.patch(s.machine.id, { pairedBy: { id: "u-rui", name: "Rui Tanaka" }, accessAllow: true });
+  if (!s.api.browserProfiles) throw new Error("no profiles api");
+  s.api.browserProfiles.takeover = async () => {
+    throw new ApiError(400, "browser_profile.tool_off", "The browser is turned off on Servidor", {
+      machineId: s.machine.id,
+      machineName: "Servidor",
+      tool: "browser",
+      mayAllow: false,
+      outdated: false,
+      ownerId: "u-rui",
+      ownerName: "Rui Tanaka",
+    });
+  };
+  const asked: string[] = [];
+  s.api.machines.askTool = async (_o, _m, tool) => void asked.push(tool);
+  await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });
+  await settle(8);
+  const card = screen().getByRole("heading", { name: "Perfis do navegador" }).closest(".ac-card") as HTMLElement;
+  const row = card.querySelector(".pf-list > .machine-page__agent-row") as HTMLElement;
+  await click(within(row).getByRole("button", { name: "Fazer login" }));
+  expect(row.querySelector(".pf-line")?.textContent).toContain("O navegador está desligado no computador de Rui.");
+  await click(within(row).getByRole("button", { name: "Pedir a Rui" }));
+  expect(asked).toEqual(["browser"]);
+});
+
+test("a profile's browser that didn't answer says so at once, with Tentar de novo, instead of opening forever", async () => {
+  const s = withProfiles();
+  const r = await renderApp(`/org/${ORG_ID}/settings/computers/${s.machine.id}`, { api: s.api });
+  await settle(8);
+  const socket = r.sockets.last();
+  await act(async () => socket.open());
+  const card = screen().getByRole("heading", { name: "Perfis do navegador" }).closest(".ac-card") as HTMLElement;
+  const row = card.querySelector(".pf-list > .machine-page__agent-row") as HTMLElement;
+  await click(within(row).getByRole("button", { name: "Fazer login" }));
+  const dialog = screen().getByRole("dialog", { name: "Fazer login no perfil Empresa A" });
+  const cover = () => dialog.querySelector(".brw-dim__box")?.textContent ?? "";
+  await act(async () =>
+    socket.push({
+      type: "browser.unavailable",
+      agentId: "profile:p-free",
+      reason: "unavailable",
+      message: "The browser didn't answer within 15 s",
+    }),
+  );
+  expect(cover()).toContain("O navegador da Empresa A não respondeu.");
+  expect(cover()).toContain("Tentar de novo reinicia o navegador. Os logins continuam salvos.");
+  await click(within(dialog).getByRole("button", { name: "Tentar de novo" }));
+  expect(s.calls.filter((c) => c.method === "takeover").map((c) => c.args)).toEqual([["p-free"], ["p-free"]]);
 });

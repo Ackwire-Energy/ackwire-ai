@@ -51,6 +51,11 @@ export interface RoutineBrief {
    * `update_widget`, never in a conversation.
    */
   widget?: { widgetId: string; dashboardId: string };
+  /**
+   * The right hand's only (ADR 0137 §11): whose AI this firing thinks with, picked as it fired of the people who set
+   * the work up (`rightHandWorkAi`); null: the workspace's, for nobody. Absent: nothing picked.
+   */
+  aiUserId?: string | null;
 }
 
 /** The brief of a message's meta (`meta.routineBrief`), when well formed; null for any other message. */
@@ -72,6 +77,7 @@ export function routineBriefOf(meta: Record<string, unknown> | null | undefined)
     trigger: typeof b.trigger === "string" ? b.trigger : "schedule",
     dueAt: typeof b.dueAt === "string" ? b.dueAt : "",
     ...widgetOf(b.widget),
+    ...(typeof b.aiUserId === "string" || b.aiUserId === null ? { aiUserId: b.aiUserId } : {}),
   };
 }
 
@@ -82,11 +88,14 @@ function widgetOf(raw: unknown): Pick<RoutineBrief, "widget"> {
   return { widget: { widgetId: w.widgetId, dashboardId: w.dashboardId } };
 }
 
+export const ROUTINE_ROOM_PREFIX = "routine|";
+
 /**
  * The routine room's key (`channels.dm_key`): an agent-only conversation of one, one per routine, never
  * a person's. A run reads only its own routine's room, never another routine's briefs or events.
  */
-export const routineRoomKey = (agentId: string, routineId: string) => `routine|a:${agentId}|r:${routineId}`;
+export const routineRoomKey = (agentId: string, routineId: string) =>
+  `${ROUTINE_ROOM_PREFIX}a:${agentId}|r:${routineId}`;
 
 /** Whether a channel's `dm_key` is a routine room (hidden from people and from agents' channel lists). */
-export const isRoutineRoomKey = (dmKey: string | null | undefined) => Boolean(dmKey?.startsWith("routine|"));
+export const isRoutineRoomKey = (dmKey: string | null | undefined) => Boolean(dmKey?.startsWith(ROUTINE_ROOM_PREFIX));

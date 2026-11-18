@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 /** A touch screen: the main pointer is a finger. */
 export const TOUCH = "(pointer: coarse)";
 
+/** A screen whose main pointer can't rest over anything (a phone, a tablet): no hover, so no tooltip shows. */
+export const HOVERLESS = "(hover: none)";
+
 /** Whether `query` (a CSS media query) matches at this moment. */
 export const matchesNow = (query: string) =>
   typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia(query).matches;

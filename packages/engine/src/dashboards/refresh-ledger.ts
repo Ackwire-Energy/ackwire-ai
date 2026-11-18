@@ -42,11 +42,14 @@ const WIDGET_CODES = new Set<string>([
   "invalid_data",
 ]);
 
+/** Its agent has no AI or key to think with. */
+const NEEDS_AI = "missing_credential";
+
 /** Run codes said in a widget's words: no AI or key to think with, too slow, came back too late. */
 const FOLDED: Readonly<Record<string, string>> = {
-  no_ai: "missing_credential",
-  credential_revoked: "missing_credential",
-  credential_wrong_provider: "missing_credential",
+  no_ai: NEEDS_AI,
+  credential_revoked: NEEDS_AI,
+  credential_wrong_provider: NEEDS_AI,
   computer_timeout: "timeout",
   stale: "waiting_computer",
   waiting_plan_late: "waiting_plan",
@@ -150,6 +153,7 @@ async function failureRecipient(db: Executor, widget: WidgetRow, board: Dashboar
  * Fails a widget (ADR 0135 §6): `failed` with its reason, a failed row in its history, and, on the first failure of a
  * streak (it had no failure since its last good update), one `widget_failed` to its creator. `fatigued`: this failure
  * pauses its routine (the fifth in a row), so the widget says it stopped (`failing`) and its history keeps why.
+ * `quiet`: nobody is told, the widget alone says it.
  */
 export async function failWidget(
   deps: LedgerDeps,
@@ -162,6 +166,7 @@ export async function failWidget(
     agentRunId?: string | null;
     change?: string | null;
     fatigued?: boolean;
+    quiet?: boolean;
   },
 ) {
   const { db } = deps;
@@ -187,7 +192,7 @@ export async function failWidget(
   });
   await trimWidgetHistory(db, widget.orgId, widget.id);
   // A draft's failure shows in the test's preview only: nobody is told (ADR 0135 §16).
-  if (firstOfStreak && !widget.draft) {
+  if (firstOfStreak && !widget.draft && !failure.quiet) {
     await notifyWidgetFailed(deps, {
       orgId: widget.orgId,
       userId: await failureRecipient(db, widget, board),
@@ -198,10 +203,25 @@ export async function failWidget(
       streakKey: failure.routineRunId ?? String(Date.now()),
       reason: shown,
       text: code === WIDGET_FAILURES.agentReported ? detail : null,
+      detail: shown === NEEDS_AI ? detail : null,
     }).catch(() => {});
   }
   await publishWidgetChanged(deps.pubsub, board, widgetEvent(widget, "failed")).catch(() => {});
   return row;
+}
+
+/** The widget waits for its agent to have an AI to think with: its build doesn't start until then (ADR 0135 §20). */
+export const widgetNeedsAi = (w: Pick<WidgetRow, "status" | "failureCode">) =>
+  w.status === "failed" && w.failureCode === NEEDS_AI;
+
+/**
+ * Its agent has no AI, so no build starts (it would only fail): the widget says so once while it waits (again when
+ * `reason` changes, its failure's detail: `AgentAi.reason`, the apps' words for it), quietly while it never had data
+ * (whoever made it sees it right there), with the one `widget_failed` of a streak once it had.
+ */
+export async function holdWidgetForAi(deps: LedgerDeps, widget: WidgetRow, board: DashboardRow, reason: string | null) {
+  if (widgetNeedsAi(widget) && widget.failureDetail === reason) return;
+  await failWidget(deps, widget, board, { code: NEEDS_AI, detail: reason, quiet: !widget.spec });
 }
 
 /**
@@ -275,7 +295,12 @@ export async function widgetRoutineEnded(
     // Deleted with its widget or board, or in Routines (`widgetRoutineGone` settles the widget): nothing to say.
     if (!widget || !board || board.deletedAt || routine.deletedAt) return end.status;
     const [rr] = await db
-      .select({ agentRunId: routineRuns.agentRunId, code: routineRuns.code, event: routineRuns.event })
+      .select({
+        agentRunId: routineRuns.agentRunId,
+        code: routineRuns.code,
+        event: routineRuns.event,
+        summary: routineRuns.summary,
+      })
       .from(routineRuns)
       .where(and(eq(routineRuns.id, end.routineRunId), eq(routineRuns.orgId, end.orgId)));
     const agentRunId = end.agentRunId ?? rr?.agentRunId ?? null;
@@ -338,6 +363,8 @@ export async function widgetRoutineEnded(
         if (applied) return "failed";
         await failWidget(deps, widget, board, {
           code: end.code ?? WIDGET_FAILURES.error,
+          // Its run found no AI after all: why, as the run kept it (`AgentAi.reason`), for the apps' words.
+          detail: end.code === "no_ai" ? rr?.summary : null,
           routineRunId: end.routineRunId,
           agentRunId,
           change,

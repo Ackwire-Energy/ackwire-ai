@@ -3,6 +3,7 @@ import { and, type Database, desc, type Executor, eq, gt, schema, sql } from "@a
 import { type Agent, getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
 import { endsAsking } from "./brakes";
+import { threadIsConfidential } from "./confidential";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { landedAfterSql } from "./message-place";
@@ -52,7 +53,8 @@ export type TalkerSkip =
   | "ended"
   | "held"
   | "answered"
-  | "no_agent";
+  | "no_agent"
+  | "confidential";
 
 /**
  * Whether the conversation layer is worth a model call at all (code decides;
@@ -106,7 +108,7 @@ const SYSTEM = (name: string) =>
     "- Use only the facts in `snapshot`. Never claim a result, progress or decision that isn't there. Never invent what the task found.",
     "- Never promise an action the task may not take, and never say you did something. You can't run tools, change anything or grant anything.",
     '- When the task will handle the message (a correction, a new instruction, more detail), say briefly that it\'s noted and when it will be read (e.g. "Anotado, leio assim que terminar este passo.").',
-    "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly.",
+    "- A question you can answer from the snapshot (status, what it's doing, what it waits on): answer it plainly. People can't see or use the task's tools: say in everyday words what it does, never the name of a tool (the names in `steps`), a function or a parameter.",
     "- While `waitingOn` names its computer, the task isn't working and has no step to finish: say what it waits for and that it reads the message once it gets there. Never say it is working.",
     "- If the message only asks to stop or cancel, or is small talk that needs no answer, or the conversation already answered it: pass.",
     "- Pass whenever there's nothing useful to add. Silence is fine.",
@@ -232,7 +234,7 @@ export function createTalker(deps: TalkerDeps): Talker {
       ]);
       const skip = talkerPolicy({
         run: landed,
-        // The brain this run thinks with, not the agent's stored one (a fallback runs on the model).
+        // The brain this run thinks with, not the agent's stored one (a mission's may differ).
         brain: runBrainOf(landed, agent),
         message,
         waited,
@@ -244,6 +246,9 @@ export function createTalker(deps: TalkerDeps): Talker {
       // The run as it is now (a wait may have moved it); the policy judged it as the message found it.
       const [run] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, landed.id));
       if (!run || isTerminal(run.status)) return decide("ended");
+      // The snapshot is made of the run's own steps and words: in a confidential thread (ADR 0190) those go to the
+      // run's model and to no other, so nobody answers for it meanwhile.
+      if (await threadIsConfidential(deps.db, run.orgId, run.threadRootId)) return decide("confidential");
       // No model call for a reply that can't be posted (checked again before posting: it may pause meanwhile).
       if (await heldOrHandedOn(deps.db, run, message.id)) return decide("held");
       try {

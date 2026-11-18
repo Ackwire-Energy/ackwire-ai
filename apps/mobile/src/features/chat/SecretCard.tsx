@@ -26,7 +26,6 @@ import {
   Button,
   Chip,
   CodeInput,
-  EventPillAction,
   fieldText,
   haptics,
   Icon,
@@ -41,13 +40,13 @@ import { router } from "@/ui/navigation";
 import { IconTile } from "../connectors/ConnectorIcon";
 import { chatHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useOrgId, useWhen } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
 import { useSheetIfAny } from "../shared/SheetHost";
 import { codeComplete, codeLength, LIMITS, secretToVaultInput, vaultSaveOffered } from "../vault/logic";
 import { AgentPickSheet } from "../vault/parts";
-import { AskButtons, AskCard, AskDone, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
-import { markName } from "./logic";
+import { type AskAnswer, AskButtons, AskCard, AskFoot, ExpiryLine, useAskStore, useExpired } from "./asks";
+import { useRowDirectory, useRowMeId } from "./row-data";
 
 type AgentPick = Pick<VaultAccess, "allAgents" | "agentIds">;
 
@@ -69,8 +68,8 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const api = useApi();
   const orgId = useOrgId();
   const { org } = useOrg();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const when = useWhen();
   const c = useColors();
   const toast = useToast();
@@ -206,237 +205,234 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   ]
     .filter(Boolean)
     .join(" ");
-  // Closed: one pill, how it ended and which secret, never its value, and when; what it was for when asked.
+  // Closed: the same card, how it ended and when where the field and the buttons were, never its value.
   const endedAt = secretEndedAt(r);
-  if (!pending)
-    return (
-      <>
-        <AskDone
-          done={r.status === "delivered"}
-          words={`${secretOutcome(t, r, mine, person, agentName)}: ${markName(label)}`}
-          time={endedAt ? when.short(endedAt) : undefined}
-          actions={
-            r.supersededBy ? <EventPillAction label={t("secret.seeNewer")} onPress={() => void showNewer()} /> : null
-          }
-          more={{
-            label: t("approval.seeDetails"),
-            content: (
-              <Text variant="small" tone="muted">
-                {[r.purpose, where, kept === "saved" ? t("mobile.vault.card.saved") : null].filter(Boolean).join("\n")}
-              </Text>
-            ),
-          }}
-        />
-        {kept === "failed" || kept === "dropped" || (kept === "saving" && retry.current) ? (
-          <View style={styles.retry}>
-            <Icon name="x" size={13} color={c.danger} />
-            <Text variant="footnote" tone="muted" style={styles.grow}>
-              {t("mobile.vault.card.notSaved")}
-            </Text>
-            {kept === "dropped" ? null : (
-              <Button
-                variant="ghost"
-                size="sm"
-                label={t("common.retry")}
-                loading={kept === "saving"}
-                onPress={() => {
-                  if (retry.current) void keep(retry.current);
-                }}
-              />
-            )}
-          </View>
-        ) : null}
-      </>
-    );
+  const answer: AskAnswer | null = pending
+    ? null
+    : {
+        done: r.status === "delivered",
+        words: secretOutcome(t, r, mine, person, agentName),
+        time: endedAt ? when.short(endedAt) : undefined,
+        note: kept === "saved" ? t("mobile.vault.card.saved") : null,
+        actions: r.supersededBy ? (
+          <Button variant="ghost" size="card" label={t("secret.seeNewer")} onPress={() => void showNewer()} />
+        ) : null,
+      };
 
   return (
-    <AskCard
-      id={r.id}
-      kind="secret"
-      agentId={r.agentId}
-      waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
-      lead={r.purpose}
-      well={{ tile: <IconTile name="lock" size={20} bare />, title: label, detail: where }}
-      body={
-        mine ? (
-          <Locked when={busy !== null} style={styles.body}>
-            {code ? (
-              <CodeInput
-                length={code}
-                value={value}
-                onChange={(v) => {
-                  setValue(v);
-                  setError(null);
-                }}
-                label={label}
-                error={Boolean(error)}
-                onSubmit={() => void send()}
-              />
-            ) : (
-              <View style={[styles.field, { backgroundColor: c.raised, borderColor: error ? c.danger : c.line2 }]}>
-                <TextInput
+    <>
+      <AskCard
+        id={r.id}
+        kind="secret"
+        agentId={r.agentId}
+        waitsFor={mine ? "you" : t("ask.waitingFor", { name: person })}
+        answer={answer}
+        lead={r.purpose}
+        well={{ tile: <IconTile name="lock" size={20} bare />, title: label, detail: where }}
+        body={
+          mine && pending ? (
+            <Locked when={busy !== null} style={styles.body}>
+              {code ? (
+                <CodeInput
+                  length={code}
                   value={value}
-                  onChangeText={(v) => {
+                  onChange={(v) => {
                     setValue(v);
                     setError(null);
                   }}
-                  placeholder={t("secret.placeholder")}
-                  placeholderTextColor={c.faint}
-                  accessibilityLabel={label}
-                  style={[styles.input, { color: c.ink }]}
-                  secureTextEntry
-                  textContentType="none"
-                  autoComplete="off"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  returnKeyType="send"
-                  onSubmitEditing={() => void send()}
-                  submitBehavior="submit"
+                  label={label}
+                  error={Boolean(error)}
+                  onSubmit={() => void send()}
                 />
+              ) : (
+                <View style={[styles.field, { backgroundColor: c.raised, borderColor: error ? c.danger : c.line2 }]}>
+                  <TextInput
+                    value={value}
+                    onChangeText={(v) => {
+                      setValue(v);
+                      setError(null);
+                    }}
+                    placeholder={t("secret.placeholder")}
+                    placeholderTextColor={c.faint}
+                    accessibilityLabel={label}
+                    style={[styles.input, { color: c.ink }]}
+                    secureTextEntry
+                    textContentType="none"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    returnKeyType="send"
+                    onSubmitEditing={() => void send()}
+                    submitBehavior="submit"
+                  />
+                </View>
+              )}
+              {error ? (
+                <Text variant="footnote" tone="danger">
+                  {error}
+                </Text>
+              ) : null}
+              <View style={styles.note}>
+                <LineIcon variant="footnote" name="lock" size={13} color={c.muted} />
+                <Text variant="footnote" tone="muted" style={styles.grow}>
+                  {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
+                </Text>
               </View>
-            )}
-            {error ? (
-              <Text variant="footnote" tone="danger">
-                {error}
-              </Text>
-            ) : null}
-            <View style={styles.note}>
-              <LineIcon variant="footnote" name="lock" size={13} color={c.muted} />
-              <Text variant="footnote" tone="muted" style={styles.grow}>
-                {code ? t("mobile.vault.card.codeNote") : t("secret.private")}
-              </Text>
-            </View>
-            {offered ? (
-              <View style={[styles.save, { borderTopColor: c.line2 }]}>
-                <Pressable
-                  onPress={() => {
-                    haptics.selection();
-                    setSave((s) => !s);
-                  }}
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: save }}
-                  accessibilityLabel={t("mobile.vault.card.save")}
-                  accessibilityHint={t("mobile.vault.card.saveText")}
-                  style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
-                >
-                  <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
-                  <View style={styles.grow}>
-                    <Text variant="subhead" style={styles.semibold}>
-                      {t("mobile.vault.card.save")}
-                    </Text>
-                    <Text variant="footnote" tone="muted">
-                      {t("mobile.vault.card.saveText")}
-                    </Text>
-                  </View>
-                  <ToggleSwitch value={save} />
-                </Pressable>
-                {save ? (
-                  <>
-                    {canTeam ? (
-                      <Segmented
-                        items={[
-                          { key: "personal", label: t("mobile.vault.tab.personal") },
-                          { key: "team", label: t("mobile.vault.tab.team") },
-                        ]}
-                        value={scope}
-                        onChange={(k) => setScope(k === "team" ? "team" : "personal")}
-                      />
-                    ) : (
-                      <Text variant="footnote" tone="muted">
-                        {t("mobile.vault.card.personalOnly")}
+              {offered ? (
+                <View style={[styles.save, { borderTopColor: c.line2 }]}>
+                  <Pressable
+                    onPress={() => {
+                      haptics.selection();
+                      setSave((s) => !s);
+                    }}
+                    accessibilityRole="switch"
+                    accessibilityState={{ checked: save }}
+                    accessibilityLabel={t("mobile.vault.card.save")}
+                    accessibilityHint={t("mobile.vault.card.saveText")}
+                    style={({ pressed }) => [styles.saveRow, pressed && styles.pressed]}
+                  >
+                    <LineIcon variant="subhead" name={site ? "globe" : "key"} size={16} color={c.muted} />
+                    <View style={styles.grow}>
+                      <Text variant="subhead" style={styles.semibold}>
+                        {t("mobile.vault.card.save")}
                       </Text>
-                    )}
-                    <View style={styles.agents}>
-                      {pick.allAgents ? (
-                        <Chip icon="agent" label={t("mobile.vault.access.allAgents")} />
-                      ) : pick.agentIds.length === 0 ? (
-                        <Text variant="footnote" tone="muted">
-                          {t("mobile.vault.access.noAgent")}
-                        </Text>
-                      ) : (
-                        pick.agentIds.map((id) => (
-                          <Chip
-                            key={id}
-                            leading={<AgentFace agentId={id} size={16} live={false} />}
-                            label={dir.anyAgent(id)?.name ?? t("channel.unknownAgent")}
-                          />
-                        ))
-                      )}
-                      {sheet ? (
-                        <Pressable
-                          onPress={chooseAgents}
-                          accessibilityRole="button"
-                          hitSlop={12}
-                          style={({ pressed }) => pressed && styles.pressed}
-                        >
-                          <Text variant="subhead" tone="ink2" style={styles.semibold}>
-                            {t("mobile.vault.card.choose")}
-                          </Text>
-                        </Pressable>
-                      ) : null}
+                      <Text variant="footnote" tone="muted">
+                        {t("mobile.vault.card.saveText")}
+                      </Text>
                     </View>
-                    {site ? (
-                      <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line2 }]}>
-                        <TextInput
-                          value={username}
-                          onChangeText={setUsername}
-                          maxLength={LIMITS.username}
-                          placeholder={t("mobile.vault.field.username")}
-                          placeholderTextColor={c.faint}
-                          accessibilityLabel={t("mobile.vault.field.username")}
-                          style={[styles.input, { color: c.ink }]}
-                          textContentType="username"
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          spellCheck={false}
+                    <ToggleSwitch value={save} />
+                  </Pressable>
+                  {save ? (
+                    <>
+                      {canTeam ? (
+                        <Segmented
+                          items={[
+                            { key: "personal", label: t("mobile.vault.tab.personal") },
+                            { key: "team", label: t("mobile.vault.tab.team") },
+                          ]}
+                          value={scope}
+                          onChange={(k) => setScope(k === "team" ? "team" : "personal")}
                         />
+                      ) : (
+                        <Text variant="footnote" tone="muted">
+                          {t("mobile.vault.card.personalOnly")}
+                        </Text>
+                      )}
+                      <View style={styles.agents}>
+                        {pick.allAgents ? (
+                          <Chip icon="agent" label={t("mobile.vault.access.allAgents")} />
+                        ) : pick.agentIds.length === 0 ? (
+                          <Text variant="footnote" tone="muted">
+                            {t("mobile.vault.access.noAgent")}
+                          </Text>
+                        ) : (
+                          pick.agentIds.map((id) => (
+                            <Chip
+                              key={id}
+                              leading={<AgentFace agentId={id} size={16} live={false} />}
+                              label={dir.anyAgent(id)?.name ?? t("channel.unknownAgent")}
+                            />
+                          ))
+                        )}
+                        {sheet ? (
+                          <Pressable
+                            onPress={chooseAgents}
+                            accessibilityRole="button"
+                            hitSlop={12}
+                            style={({ pressed }) => pressed && styles.pressed}
+                          >
+                            <Text variant="subhead" tone="ink2" style={styles.semibold}>
+                              {t("mobile.vault.card.choose")}
+                            </Text>
+                          </Pressable>
+                        ) : null}
                       </View>
-                    ) : null}
-                  </>
-                ) : null}
-              </View>
-            ) : null}
-          </Locked>
-        ) : null
-      }
-      expiry={<ExpiryLine expiresAt={r.expiresAt} />}
-      foot={
-        <AskFoot>
-          {mine ? (
-            <AskButtons
-              primary={
-                <Button
-                  variant="primary"
-                  size="card"
-                  wide
-                  icon="lock"
-                  label={t("secret.send")}
-                  loading={busy === "send"}
-                  disabled={busy !== null}
-                  onPress={() => void send()}
-                />
-              }
-              secondary={
-                <Button
-                  variant="secondary"
-                  size="card"
-                  wide
-                  label={t("approval.notNow")}
-                  loading={busy === "decline"}
-                  disabled={busy !== null}
-                  onPress={() => void decline()}
-                />
-              }
+                      {site ? (
+                        <View style={[styles.field, { backgroundColor: c.raised, borderColor: c.line2 }]}>
+                          <TextInput
+                            value={username}
+                            onChangeText={setUsername}
+                            maxLength={LIMITS.username}
+                            placeholder={t("mobile.vault.field.username")}
+                            placeholderTextColor={c.faint}
+                            accessibilityLabel={t("mobile.vault.field.username")}
+                            style={[styles.input, { color: c.ink }]}
+                            textContentType="username"
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                            spellCheck={false}
+                            // The card's last field: its return key sends, as the secret's own does.
+                            returnKeyType="send"
+                            onSubmitEditing={() => void send()}
+                            submitBehavior="submit"
+                          />
+                        </View>
+                      ) : null}
+                    </>
+                  ) : null}
+                </View>
+              ) : null}
+            </Locked>
+          ) : null
+        }
+        expiry={<ExpiryLine expiresAt={r.expiresAt} />}
+        foot={
+          <AskFoot>
+            {mine ? (
+              <AskButtons
+                primary={
+                  <Button
+                    variant="primary"
+                    size="card"
+                    wide
+                    icon="lock"
+                    label={t("secret.send")}
+                    loading={busy === "send"}
+                    disabled={busy !== null}
+                    onPress={() => void send()}
+                  />
+                }
+                secondary={
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    wide
+                    label={t("approval.notNow")}
+                    loading={busy === "decline"}
+                    disabled={busy !== null}
+                    onPress={() => void decline()}
+                  />
+                }
+              />
+            ) : (
+              <Text variant="small" tone="muted">
+                {t("secret.waitingFor", { person })}
+              </Text>
+            )}
+          </AskFoot>
+        }
+      />
+      {!pending && (kept === "failed" || kept === "dropped" || (kept === "saving" && retry.current)) ? (
+        <View style={styles.retry}>
+          <Icon name="x" size={13} color={c.danger} />
+          <Text variant="footnote" tone="muted" style={styles.grow}>
+            {t("mobile.vault.card.notSaved")}
+          </Text>
+          {kept === "dropped" ? null : (
+            <Button
+              variant="ghost"
+              size="sm"
+              label={t("common.retry")}
+              loading={kept === "saving"}
+              onPress={() => {
+                if (retry.current) void keep(retry.current);
+              }}
             />
-          ) : (
-            <Text variant="small" tone="muted">
-              {t("secret.waitingFor", { person })}
-            </Text>
           )}
-        </AskFoot>
-      }
-    />
+        </View>
+      ) : null}
+    </>
   );
 }
 

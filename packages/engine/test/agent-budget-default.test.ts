@@ -10,6 +10,7 @@ import {
   canViewCost,
   createAgent,
   DEFAULT_AGENT_BUDGET_NANO_USD,
+  ForbiddenError,
   getOrgSettings,
   orgOverview,
   updateAgent,
@@ -72,6 +73,27 @@ test("the default budget must be above zero and only admins change it", async ()
   ).rejects.toThrow();
   await updateOrgSettings(f.db, f.owner.id, f.org.id, { defaultAgentBudgetNanoUsd: 5_000_000_000 });
   expect((await getOrgSettings(f.db, f.owner.id, f.org.id)).defaultAgentBudgetNanoUsd).toBe(5_000_000_000);
+});
+
+test("a member's new agent takes at most the workspace's default budget; only an admin gives one more", async () => {
+  const fx = await setup();
+  f = fx;
+  await updateOrgSettings(f.db, f.owner.id, f.org.id, { defaultAgentBudgetNanoUsd: 20_000_000_000 });
+  const member = await addMember(f.db, f.org.id, "member", "nina");
+  const make = (by: string, handle: string, monthlyBudgetNanoUsd: number | null) =>
+    createAgent(fx.db, by, fx.org.id, { name: handle, handle, monthlyBudgetNanoUsd }, { model: "claude-sonnet-5-5" });
+  await expect(make(member.id, "big", 20_000_000_001)).rejects.toBeInstanceOf(ForbiddenError);
+  expect(await f.db.select().from(schema.agents).where(eq(schema.agents.handle, "big"))).toEqual([]);
+  expect((await make(member.id, "same", 20_000_000_000)).ownerUserId).toBe(member.id);
+  expect((await make(member.id, "less", 5_000_000_000)).monthlyBudgetNanoUsd).toBe(5_000_000_000);
+  const plain = await make(member.id, "plain", null);
+  expect(plain.monthlyBudgetNanoUsd).toBeNull();
+  expect((await make(f.owner.id, "admins", 90_000_000_000)).monthlyBudgetNanoUsd).toBe(90_000_000_000);
+  // Afterwards a budget stays an admin's, even on the member's own agent.
+  await expect(
+    updateAgent(f.db, member.id, f.org.id, plain.id, { monthlyBudgetNanoUsd: 90_000_000_000 }),
+  ).rejects.toBeInstanceOf(ForbiddenError);
+  await updateAgent(f.db, f.owner.id, f.org.id, plain.id, { monthlyBudgetNanoUsd: 90_000_000_000 });
 });
 
 test("the workspace's 100% is the sum of every agent's budget (own or default)", async () => {

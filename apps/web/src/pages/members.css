@@ -2,25 +2,31 @@
  * Configurações › Membros e convites (ADR 0068, 0085, 0090). Tokens only, so light and dark follow the theme.
  */
 
-/* Here the faces are a step bigger and sit in the middle of their two lines, not on the name's line (layout.css). */
-.members-page .ac-list__row:has(> .ac-avatar:first-child + .list-col > :nth-child(2)) {
-  align-items: center;
-}
-.members-page .ac-list__row > .ac-avatar:first-child:has(+ .list-col > :nth-child(2)) {
-  translate: none;
-}
-/* The 12px the bigger face takes come off the words' basis, so a row breaks onto two lines at the width it did. */
-.members-page .ac-list__row > .ac-avatar:first-child + .list-col {
-  flex-basis: 188px;
-}
-
 /* A request, an invitation or a suggestion, a MediaRow: the face and who on one line, the actions at its end (under
    everything where the list is under 480px), what it is and its state under them, a note in a well last. */
 .ac-list:has(> .members-row) {
   container-type: inline-size;
 }
+/* A request, a link or an invitation keeps the app's row room, as the people under Membros do: 12 above its face and
+   below its last line. */
+.ac-list__row.members-row {
+  padding-block: var(--space-3);
+}
 .members-row__name {
   overflow-wrap: anywhere;
+}
+/* What a request's link gives, and when the link is full, under who asked. Its channels' names are held whole
+   (`heldWhole`): one longer than the line breaks anywhere rather than run past the row. */
+.members-row__more {
+  gap: var(--space-1);
+  overflow-wrap: anywhere;
+}
+/* "Mostrar mais 30" at a group's end, its words on the rows' own edge. */
+.members-more {
+  padding-block: var(--space-2);
+}
+.members-more > .ac-btn--ghost {
+  margin-inline-start: calc(-1 * var(--ghost-plate));
 }
 .members-row__line {
   display: flex;
@@ -39,6 +45,8 @@
 .members-row__state {
   flex: 0 1 auto;
   min-width: 0;
+  /* What it says may hold typed text with no place to break (who an outside collaborator works for). */
+  overflow-wrap: anywhere;
   font-size: 12.5px;
   color: var(--muted);
 }
@@ -77,7 +85,7 @@
 /* What the person wrote: last, as quoted, in a well at the row's width. */
 .members-row__note {
   order: 2;
-  margin: 0 0 2px;
+  margin: 0;
   padding: 8px 12px;
   border-radius: 12px 12px 12px 3px;
   background: var(--card-well);
@@ -91,40 +99,48 @@
   font-size: 14px;
 }
 
-/* A person's roles (ADR 0085): the owner's chip, their roles' chips, a "+" to give or take them. */
+/* A person's roles (ADR 0085): the owner's chip and their roles' chips. They change in the row's menu. */
 .members-roles {
-  flex: 0 1 280px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
+  gap: var(--space-1) var(--space-2);
   min-width: 0;
 }
-/* A person: the name beside the face, when they were last here on the right, their roles under the name, on its edge. */
-/* A face line (`.ac-faceline`): the face at the row's top, the name's capitals on its top edge (`.ac-captop`), when they
-   were last here and the DM button on the name's line (`.ac-captail`) however the @handle and email wrap. */
+/* Who an outside collaborator works for, after their chip: up to 80 characters, any of them a place to wrap. */
+.members-roles__of {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A person, a face line (`.ac-faceline`): the face at the row's top, the name's capitals on its top edge
+   (`.ac-captop`), when they were last here and the row's menu on the name's line (`.ac-captail`) however the @handle
+   and email wrap, their roles one step under those. The kit gives a list's face line its padding. */
+.ac-list:has(> .members-person) {
+  container-type: inline-size;
+}
 .ac-list__row.members-person {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  /* The room a taller face asks for goes under the words, not between their lines. */
+  grid-template-rows: auto auto 1fr;
   align-items: start;
   gap: 0 var(--space-3);
-  /* Room above the risen name's line for the 32px button centred on it. */
-  padding-block: var(--row-py);
 }
 /* The name and the @handle and email are cells of the row: the line under the name runs under the end of the name's
-   line too, so its buttons never squeeze an address to a few letters a line on a phone. */
+   line too, so its menu never squeezes an address to a few letters a line on a phone. */
 .members-person > .list-col {
   display: contents;
 }
+/* Beside every line, the roles' too: a face taller than the name and the addresses never pushes the roles down. */
 .members-person > :first-child {
-  grid-row: 1 / span 2;
+  grid-row: 1 / -1;
 }
 .members-person__name {
   grid-area: 1 / 2;
   align-self: flex-start;
   font-weight: 600;
   text-align: start;
+  overflow-wrap: anywhere;
 }
 /* @handle, then the email, on one line that wraps between them. */
 .members-person__ids {
@@ -134,21 +150,45 @@
   gap: 0 var(--space-2);
   overflow-wrap: anywhere;
 }
-/* When they were last here, then the DM button and the ⋯, 8 apart, on the name's line at the row's right. */
-.members-person__end {
-  grid-area: 1 / 3;
-  gap: var(--space-2);
-}
+/* When they were last here, on the name's line before the menu. */
 .members-person__seen {
+  grid-area: 1 / 3;
   white-space: nowrap;
 }
-.members-person > .members-roles {
-  grid-column: 2 / -1;
-  justify-content: flex-start;
-  margin-block-start: 6px;
+/* The row's menu ends the name's line. A row with none keeps its room, so every row's time ends on one edge: as wide
+   as the button less the plate that reaches past the row's padding line. */
+.members-person__menu {
+  grid-area: 1 / 4;
+  min-width: calc(var(--control-h-sm) - var(--ghost-plate));
+  margin-inline-start: calc(-1 * var(--space-1));
 }
-.members-person > .members-roles:empty {
-  display: none;
+.members-person > .members-roles {
+  grid-area: 3 / 2 / auto / -1;
+  margin-block-start: var(--space-1);
+}
+/* A narrow list: the name keeps its line to itself and the menu, and when they were here goes under the addresses. */
+@container (max-width: 479px) {
+  .ac-list__row.members-person {
+    grid-template-rows: auto auto auto 1fr;
+  }
+  .members-person__seen {
+    grid-area: 3 / 2 / auto / -1;
+    height: auto;
+    margin-block-start: 0;
+  }
+  .members-person > .members-roles {
+    grid-row: 4;
+  }
+}
+
+/* An agent, the kit's FoldRow: its glyph, its name and who answers for it on one line, its plan's word at the end only
+   when it needs someone. Its account and usage open under it. */
+.ac-list:has(> .members-agent) {
+  container-type: inline-size;
+}
+/* The bar reads as a meter, not a rule across the list. */
+.members-agent__usage {
+  max-width: 320px;
 }
 
 /* Remover do workspace: what goes with the person, one fact per line. */

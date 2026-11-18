@@ -7,14 +7,16 @@ import {
 } from "@agenteschat/adapters";
 import { and, type Database, eq, gte, inArray, isNull, or, schema, sql } from "@agenteschat/db";
 import { catalogModelOf, nanoUsdToUsd, summedCostNanoUsd } from "@agenteschat/providers";
-import { agentIdsWithDetails } from "./audience";
+import { modelLimitOf } from "@agenteschat/providers/plans";
+import { agentIdsWithDetails, canTalkTo, speakerFor } from "./audience";
+import { sha256 } from "./crypto";
 import { NotFoundError } from "./errors";
-import { LISTED_ACCOUNT_STATUSES } from "./machine-accounts";
+import { isDefaultAccountLabel, LISTED_ACCOUNT_STATUSES, type PlanServes, servesOf } from "./machine-accounts";
 import { requirePermission } from "./organizations";
 import { agentBudgetsThisMonth, budgetPercent, canViewCost, monthStartUtc } from "./usage";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 
-const { usageRecords, agents, machines, machineAccounts, users } = schema;
+const { usageRecords, agents, agentRuns, agentConsultations, machines, machineAccounts, users } = schema;
 
 /*
  * The usage views (ADR 0063): Configurações › Uso (every plan account by
@@ -61,6 +63,8 @@ export interface PlanAccountInfo {
   accountId: string | null;
   /** Null for the computer's own sign-in (the app names it). */
   label: string | null;
+  /** Its owner gave it its name (`isDefaultAccountLabel`); false for the computer's own sign-in. */
+  named: boolean;
   plan: string | null;
   /** A key account's coding plan (`zai`, `kimi`…). */
   provider: string | null;
@@ -71,14 +75,44 @@ export interface PlanAccountInfo {
   /** Its owner's eyes only. */
   email: string | null;
   signedOut: boolean;
+  /** Who it thinks for (ADR 0059 §3); null for the computer's own sign-in, which thinks for its pairer's agents. */
+  serves: PlanServes | null;
+  /**
+   * The same seat signed in on one computer by anyone in the workspace (its maker, plan and email, opaque): logins with
+   * one `seat` are one account, whoever connected them. Per computer, as "Quem usa" changes a computer's logins
+   * (`sameLogins`). Null where that isn't known (a key, or no email yet).
+   */
+  seat: string | null;
 }
 
+/**
+ * What a plan's use was for: work one agent handed another (the run a consultation started), a routine's run (in the
+ * background, no long work behind it), or the rest, people's conversations (calls with no run too: the router).
+ */
+export type UseKind = "handoffs" | "people" | "routines";
+const USE_KINDS: readonly UseKind[] = ["handoffs", "people", "routines"];
+/** The share of the week (in points of its percent) handoffs must reach, leading the other kinds, to suggest asking the agent directly. */
+const HANDOFF_HINT_PERCENT = 30;
+
 export interface PlanAccountUsage extends PlanAccountInfo {
-  /** The plan's windows as last reported, each with the agents' parts; null: not known yet. */
+  /**
+   * The plan's windows as last reported, each with the agents' parts, and the models at a limit of their own that
+   * still hold (`models`: the quota per model, which the windows can't show); null: not known yet.
+   */
   usage: (Omit<PlanUsage, "windows"> & { windows: PlanWindowParts[] }) | null;
   /** This month per agent, biggest first; `now`: the agent thinks with this account today. */
   agents: { agentId: string; name: string; tokens: number; now: boolean }[];
   monthTokens: number;
+  /**
+   * This month's tokens by what they were for, with each kind's estimated part of the window the agents' list splits
+   * (the week, else the first with parts; null: none has parts). Kinds with neither are left out.
+   */
+  kinds: { kind: UseKind; tokens: number; percent: number | null }[];
+  /**
+   * Handoffs between agents led the week with at least 30 points: the agent that took most of that handed work,
+   * for the viewer to ask directly. Null otherwise, or when the viewer may not talk to it.
+   */
+  hint: { kind: "handoffs"; agentId: string } | null;
   /** `view_usage` only: what the month's tokens would cost through the API; null when no model has a price. */
   equivalentUsd?: number | null;
 }
@@ -121,6 +155,7 @@ interface UsageRow extends Counts {
   plan: boolean;
   machineId: string | null;
   kind: string;
+  use: UseKind;
   model: string | null;
   costNano: number;
   /** `YYYY-MM-DD`, or `YYYY-MM-DDTHH` by hour (UTC). */
@@ -136,6 +171,12 @@ async function readUsage(
   // A literal, never a parameter: Postgres must see the same expression in the select and the group by.
   const fmt = sql.raw(opts.hourly ? `'YYYY-MM-DD"T"HH24'` : `'YYYY-MM-DD'`);
   const bucket = sql<string>`to_char(${usageRecords.createdAt} at time zone 'UTC', ${fmt})`;
+  // Literals inline for the same reason as `fmt`. The join is on the runs' primary key, within the org, so only its runs are read.
+  const use = sql<UseKind>`case
+    when ${usageRecords.runId} is null then 'people'
+    when exists (select 1 from ${agentConsultations} where ${agentConsultations.targetRunId} = ${usageRecords.runId}) then 'handoffs'
+    when ${agentRuns.background} and ${agentRuns.workId} is null then 'routines'
+    else 'people' end`;
   const rows = await db
     .select({
       agentId: usageRecords.agentId,
@@ -145,6 +186,7 @@ async function readUsage(
       provider: usageRecords.provider,
       model: usageRecords.model,
       bucket,
+      use,
       input: sql<string>`sum(${usageRecords.inputTokens})`,
       output: sql<string>`sum(${usageRecords.outputTokens})`,
       cacheRead: sql<string>`sum(${usageRecords.cacheReadTokens})`,
@@ -152,6 +194,7 @@ async function readUsage(
       cost: sql<string>`sum(${usageRecords.costNanoUsd})`,
     })
     .from(usageRecords)
+    .leftJoin(agentRuns, and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, usageRecords.runId)))
     .where(
       and(
         eq(usageRecords.orgId, orgId),
@@ -173,6 +216,7 @@ async function readUsage(
       usageRecords.provider,
       usageRecords.model,
       bucket,
+      use,
     );
   return rows.map((r) => {
     const plan = r.billedTo === "plan";
@@ -182,6 +226,7 @@ async function readUsage(
       plan,
       machineId: plan ? r.machineId : null,
       kind: r.provider,
+      use: r.use,
       model: r.model,
       costNano: Number(r.cost),
       bucket: r.bucket,
@@ -215,6 +260,10 @@ interface Context {
       accountId: string | null;
       ownerId: string | null;
       archived: boolean;
+      audience: Pick<
+        typeof agents.$inferSelect,
+        "audienceMode" | "audienceUserIds" | "audienceRoleIds" | "ownerUserId" | "consultable" | "brain"
+      >;
     }
   >;
 }
@@ -246,6 +295,14 @@ async function loadContext(db: Database, orgId: string): Promise<Context> {
         accountId: agents.brainAccountId,
         ownerId: agents.ownerUserId,
         archivedAt: agents.archivedAt,
+        audience: {
+          audienceMode: agents.audienceMode,
+          audienceUserIds: agents.audienceUserIds,
+          audienceRoleIds: agents.audienceRoleIds,
+          ownerUserId: agents.ownerUserId,
+          consultable: agents.consultable,
+          brain: agents.brain,
+        },
       })
       .from(agents)
       .where(eq(agents.orgId, orgId)),
@@ -275,6 +332,7 @@ async function loadContext(db: Database, orgId: string): Promise<Context> {
           accountId: a.accountId,
           ownerId: a.ownerId,
           archived: a.archivedAt !== null,
+          audience: a.audience,
         },
       ]),
     ),
@@ -310,12 +368,15 @@ function accountOf(ctx: Context, key: string, viewerId: string | null): FoundAcc
         kind,
         accountId: null,
         label: null,
+        named: false,
         plan: kind === "claude_code" ? machine.claudePlan : null,
         provider: null,
         ownerName: machine.pairerName,
         mine: viewerId !== null && machine.pairer === viewerId,
         email: null,
         signedOut: kind === "claude_code" && machine.claudeOut,
+        serves: null,
+        seat: null,
       },
       usage: machine.own[kind] ?? null,
     };
@@ -332,12 +393,20 @@ function accountOf(ctx: Context, key: string, viewerId: string | null): FoundAcc
       kind,
       accountId: row.id,
       label: row.label,
+      named: !isDefaultAccountLabel(kind, row.label, row.provider),
       plan: row.plan,
       provider: row.provider,
       ownerName,
       mine,
       email: mine ? row.email : null,
       signedOut: row.status === "signed_out",
+      serves: servesOf(row.serves),
+      seat:
+        row.email && !row.provider
+          ? sha256(
+              `${row.orgId}:${row.machineId}:${row.kind}:${row.email.toLowerCase()}:${row.providerOrgId ?? ""}`,
+            ).slice(0, 24)
+          : null,
     },
     usage: row.usage ?? null,
   };
@@ -350,17 +419,31 @@ function windowStart(w: PlanWindow, now: number): number | null {
   return (w.resetsAt ? Date.parse(w.resetsAt) : now) - minutes * 60_000;
 }
 
-/** Each agent's part of a window: its percent × the agent's API-priced share of the account's use since it started. */
-function partsOf(ctx: Context, w: PlanWindow, key: string, hourly: UsageRow[], now: number): PlanWindowParts["agents"] {
+/** The account's rows by hour since a window started (`only` its model's); null for a window of unknown length. */
+function windowRows(w: PlanWindow, key: string, hourly: UsageRow[], now: number): UsageRow[] | null {
   const start = windowStart(w, now);
   if (start === null) return null;
-  // A window that already reset is empty again: its parts are the next window's to tell.
-  if (w.usedPercent <= 0 || (w.resetsAt && Date.parse(w.resetsAt) <= now)) return [];
   const from = new Date(start).toISOString().slice(0, 13);
   const only = WINDOW_MODEL[w.kind];
-  const rows = hourly
-    .filter((r) => r.key === key && r.bucket >= from && (!only || r.model?.includes(only)))
-    .map((r) => ({ agentId: r.agentId, tokens: tokensOf(r), nano: apiNano(r.model, r) }));
+  return hourly.filter((r) => r.key === key && r.bucket >= from && (!only || r.model?.includes(only)));
+}
+
+/**
+ * Each part of a window, by `by` (an agent, a kind of use): its percent × that part's API-priced share of the
+ * account's use since it started, biggest first; null for a window of unknown length.
+ */
+function partsOf(
+  w: PlanWindow,
+  key: string,
+  hourly: UsageRow[],
+  now: number,
+  by: (r: UsageRow) => string,
+): { id: string; percent: number }[] | null {
+  const inWindow = windowRows(w, key, hourly, now);
+  if (inWindow === null) return null;
+  // A window that already reset is empty again: its parts are the next window's to tell.
+  if (w.usedPercent <= 0 || (w.resetsAt && Date.parse(w.resetsAt) <= now)) return [];
+  const rows = inWindow.map((r) => ({ id: by(r), tokens: tokensOf(r), nano: apiNano(r.model, r) }));
   // A model without a price (Codex with no model chosen is stored as `codex`) weighs its tokens at the window's
   // average priced rate: a price is thousands of nano-USD per token, so a bare token count would weigh nothing.
   let pricedNano = 0;
@@ -375,16 +458,11 @@ function partsOf(ctx: Context, w: PlanWindow, key: string, hourly: UsageRow[], n
   let total = 0;
   for (const r of rows) {
     const weight = r.nano ?? r.tokens * rate;
-    weights.set(r.agentId, (weights.get(r.agentId) ?? 0) + weight);
+    weights.set(r.id, (weights.get(r.id) ?? 0) + weight);
     total += weight;
   }
   return [...weights]
-    .map(([agentId, weight]) => ({
-      agentId,
-      // Archived agents too: their use still counts, and the app no longer lists them.
-      name: ctx.agents.get(agentId)?.name ?? "",
-      percent: Math.round(((w.usedPercent * weight) / total) * 10) / 10,
-    }))
+    .map(([id, weight]) => ({ id, percent: Math.round(((w.usedPercent * weight) / total) * 10) / 10 }))
     .filter((p) => p.percent > 0)
     .sort((a, b) => b.percent - a.percent);
 }
@@ -397,6 +475,84 @@ async function hourlySince(db: Database, orgId: string, usages: (PlanUsage | nul
   return readUsage(db, orgId, new Date(earliest), { hourly: true, planOnly: true });
 }
 
+/**
+ * A plan's reading as the usage views show it: its windows with each agent's estimated part, and the models at a
+ * limit of their own that still hold (`modelLimitOf`). The rest of the engine's bookkeeping stays where it is: this
+ * is a reading for the person, never the switch ("Automático" and its turns decide by themselves).
+ */
+function usageForView(
+  ctx: Context,
+  key: string,
+  usage: PlanUsage,
+  hourly: UsageRow[],
+  now: Date,
+): NonNullable<PlanAccountUsage["usage"]> {
+  const { models = {}, ...rest } = usage;
+  const held = Object.entries(models).filter(([id]) => modelLimitOf(models, id, now.getTime()));
+  return {
+    ...rest,
+    windows: usage.windows.map((w) => ({
+      ...w,
+      agents:
+        partsOf(w, key, hourly, now.getTime(), (r) => r.agentId)?.map((p) => ({
+          agentId: p.id,
+          // Archived agents too: their use still counts, and the app no longer lists them.
+          name: ctx.agents.get(p.id)?.name ?? "",
+          percent: p.percent,
+        })) ?? null,
+    })),
+    ...(held.length > 0 ? { models: Object.fromEntries(held) } : {}),
+  };
+}
+
+/**
+ * The kinds of use of an account, and the hint. The window is the one the agents' list splits (`accountShares` in
+ * the client): the week while it has parts, else the first window with parts.
+ */
+function kindsOf(
+  usage: PlanUsage | null,
+  key: string,
+  rows: UsageRow[],
+  hourly: UsageRow[],
+  now: number,
+  mayTalk: (agentId: string) => boolean,
+): Pick<PlanAccountUsage, "kinds" | "hint"> {
+  const parted = (usage?.windows ?? []).flatMap((w) => {
+    const parts = partsOf(w, key, hourly, now, (r) => r.use);
+    return parts && parts.length > 0 ? [{ w, parts }] : [];
+  });
+  const shown = parted.find((p) => p.w.kind === "seven_day") ?? parted[0] ?? null;
+  const percentOf = (kind: UseKind) => (shown ? (shown.parts.find((p) => p.id === kind)?.percent ?? 0) : null);
+  const kinds = USE_KINDS.map((kind) => ({
+    kind,
+    tokens: rows.filter((r) => r.use === kind).reduce((s, r) => s + tokensOf(r), 0),
+    percent: percentOf(kind),
+  })).filter((k) => k.tokens > 0 || (k.percent ?? 0) > 0);
+  const handoffs = percentOf("handoffs") ?? 0;
+  // The hint's words say "this week": another window's lead says nothing about the week.
+  const leads =
+    shown?.w.kind === "seven_day" &&
+    handoffs >= HANDOFF_HINT_PERCENT &&
+    handoffs >= (percentOf("people") ?? 0) &&
+    handoffs >= (percentOf("routines") ?? 0);
+  if (!leads) return { kinds, hint: null };
+  const handed = new Map<string, number>();
+  for (const r of windowRows(shown.w, key, hourly, now) ?? [])
+    if (r.use === "handoffs") handed.set(r.agentId, (handed.get(r.agentId) ?? 0) + tokensOf(r));
+  const top = [...handed].sort((a, b) => b[1] - a[1])[0]?.[0];
+  return { kinds, hint: top && mayTalk(top) ? { kind: "handoffs", agentId: top } : null };
+}
+
+/** Who the viewer may message among the workspace's agents (null viewer: nobody). */
+async function talkableBy(db: Database, orgId: string, ctx: Context, viewer: string | null) {
+  if (!viewer) return () => false;
+  const speaker = await speakerFor(db, orgId, viewer);
+  return (agentId: string) => {
+    const a = ctx.agents.get(agentId);
+    return !!a && !a.archived && canTalkTo(a.audience, viewer, speaker);
+  };
+}
+
 function accountUsage(
   ctx: Context,
   { info, usage }: FoundAccount,
@@ -404,6 +560,7 @@ function accountUsage(
   month: UsageRow[],
   hourly: UsageRow[],
   now: Date,
+  mayTalk: (agentId: string) => boolean,
 ): PlanAccountUsage {
   const rows = month.filter((r) => r.key === info.key);
   const tokens = new Map<string, number>();
@@ -419,16 +576,13 @@ function accountUsage(
     }))
     .sort((a, b) => b.tokens - a.tokens || Number(b.now) - Number(a.now) || a.name.localeCompare(b.name));
   const equivalent = equivalentNano(rows);
+  const shown = usage ? usageForView(ctx, info.key, usage, hourly, now) : null;
   return {
     ...info,
-    usage: usage
-      ? {
-          ...usage,
-          windows: usage.windows.map((w) => ({ ...w, agents: partsOf(ctx, w, info.key, hourly, now.getTime()) })),
-        }
-      : null,
+    usage: shown,
     agents: list,
     monthTokens: list.reduce((s, a) => s + a.tokens, 0),
+    ...kindsOf(usage, info.key, rows, hourly, now.getTime(), mayTalk),
     ...(money ? { equivalentUsd: equivalent === null ? null : nanoUsdToUsd(equivalent) } : {}),
   };
 }
@@ -498,14 +652,17 @@ export async function orgPlanUsage(
     if (key) keys.add(key);
   }
   const found = [...keys].flatMap((k) => accountOf(ctx, k, userId) ?? []);
-  const hourly = await hourlySince(
-    db,
-    orgId,
-    found.map((a) => a.usage),
-    now,
-  );
+  const [hourly, mayTalk] = await Promise.all([
+    hourlySince(
+      db,
+      orgId,
+      found.map((a) => a.usage),
+      now,
+    ),
+    talkableBy(db, orgId, ctx, userId),
+  ]);
   const accounts = found
-    .map((a) => accountUsage(ctx, a, money, month, hourly, now))
+    .map((a) => accountUsage(ctx, a, money, month, hourly, now, mayTalk))
     .sort(
       (a, b) =>
         a.machineName.localeCompare(b.machineName) ||
@@ -666,11 +823,12 @@ export async function agentUsageFor(
   const found = curKey ? accountOf(ctx, curKey, viewer) : null;
   let current: PlanAccountUsage | null = null;
   if (found) {
-    const [month, hourly] = await Promise.all([
+    const [month, hourly, mayTalk] = await Promise.all([
       readUsage(db, orgId, since, { planOnly: true }),
       hourlySince(db, orgId, [found.usage], now),
+      talkableBy(db, orgId, ctx, viewer),
     ]);
-    current = accountUsage(ctx, found, money, month, hourly, now);
+    current = accountUsage(ctx, found, money, month, hourly, now, mayTalk);
   }
   const view: AgentPlanUsageView = {
     month: since.toISOString().slice(0, 7),

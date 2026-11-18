@@ -24,28 +24,20 @@ import { computerName } from "@agenteschat/client/lib/computer";
 import { ErrorBoundary } from "@agenteschat/client/lib/error-boundary";
 import { formatPercent, formatUsd, relativeTime } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
-import { STATUS_ICON } from "@agenteschat/client/lib/issues";
+import { isAssignee, STATUS_ICON } from "@agenteschat/client/lib/issues";
 import { can } from "@agenteschat/client/lib/permissions";
 import { usageShown } from "@agenteschat/client/lib/plan-usage";
+import { agentFaceWord } from "@agenteschat/client/lib/presence";
 import { isRightHand } from "@agenteschat/client/lib/right-hand";
 import { siteHost } from "@agenteschat/client/lib/secret-requests";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
-import {
-  BrainIcon,
-  Button,
-  ComputerPortrait,
-  GroupHeading,
-  Icon,
-  InfoHint,
-  PresenceBadge,
-  ProviderLogo,
-  Switch,
-} from "@agenteschat/ui";
+import { Button, ComputerPortrait, GroupHeading, Icon, InfoHint, PresenceBadge, Switch } from "@agenteschat/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { usd } from "@/components/AgentFields";
+import { ModelPickerButton } from "@/components/ai/ModelPicker";
 import { stepText } from "@/components/browser/BrowserCard";
 import { useAgentComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
@@ -168,7 +160,7 @@ function AgentHead({ agent }: { agent: Agent }) {
   const shown = useAgentPresence(agent.id);
   const busy = useStreams((s) => agentStateIn(s, agent.id) !== "idle");
   const line = agentLine(t, shown?.line ?? null, i18n.language);
-  const word = busy ? t("team.workingNow") : shown ? t(`presence.${shown.presence}`) : null;
+  const word = busy ? t("team.workingNow") : shown ? agentFaceWord(t, shown.presence) : null;
   // The right hand's one role name, as the sidebar and its DM's header say it.
   const role = isRightHand(agent) ? t("rightHand.labelCapitalized") : agent.role || `@${agent.handle}`;
   return (
@@ -188,8 +180,8 @@ function AgentHead({ agent }: { agent: Agent }) {
       ) : (
         word && (
           <p className="dm-side__status">
-            {/* The presence's own badge, as beside its face everywhere: away wears its clock, offline its outline. */}
-            <PresenceBadge presence={busy ? "online" : (shown?.presence ?? "offline")} ring={false} />
+            {/* The face's own badge, as beside its face everywhere: at work its dots, offline its outline. */}
+            <PresenceBadge presence={busy ? "working" : (shown?.presence ?? "offline")} ring={false} />
             {word}
           </p>
         )
@@ -417,9 +409,8 @@ function ThinksSection({ agent }: { agent: Agent }) {
         {thinks?.text && (
           <div>
             <dt>{t("agentSide.thinksWith")}</dt>
-            <dd className="ac-iconline">
-              {thinks.mark ? <ProviderLogo id={thinks.mark} size="xs" /> : <BrainIcon kind={thinks.kind} size={14} />}
-              {thinks.text}
+            <dd>
+              <ModelPickerButton agent={agent} size="row" />
               {agent.brain?.speed && ` · ${t("agentPage.work.brain.speeds.fast")}`}
             </dd>
           </div>
@@ -451,7 +442,7 @@ function TasksSection({ agent }: { agent: Agent }) {
   const { org } = useOrg();
   const issues = useIssues(org.id);
   const recent = (issues.data ?? [])
-    .filter((i) => i.assignee?.type === "agent" && i.assignee.id === agent.id)
+    .filter((i) => isAssignee(i, "agent", agent.id))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, ROWS);
   if (recent.length === 0) return null;

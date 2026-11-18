@@ -1,4 +1,4 @@
-import { and, asc, type Database, eq, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, schema } from "@agenteschat/db";
 import { serverText } from "@agenteschat/i18n";
 import { getAgentCached } from "../agents";
 import { accountablePerson, runAuthorityById } from "../authority";
@@ -6,13 +6,17 @@ import { emailLocale } from "../email";
 import { getMembership } from "../organizations";
 import type { GitHubHttp } from "./github-app";
 
-const { accounts, organizationMembers, users } = schema;
+const { accounts, organizationMembers, organizationSettings, users } = schema;
 
 /**
  * What an agent writes on GitHub says whose agent it is (ADR 0156): every body ends with one line naming the agent and
  * the person it works for ("Theo, agente de Ana no Ackwire AI", in the workspace owner's language), and commits
- * credit that person (`Co-authored-by`) when they linked GitHub to sign in, never with their email.
+ * credit that person (`Co-authored-by`) when they linked GitHub to sign in, never with their email. Every commit also
+ * ends with the agent's own line (`agentCoAuthor`), unless a person asked an agent to turn it off for the workspace.
  */
+
+/** The agents' address in their own line: GitHub shows the account that verified it, agentes.chat's. */
+export const AGENT_CO_AUTHOR_EMAIL = "noreply@agentes.chat";
 
 /** Where the line starts in a body, so an edit can replace it. */
 // Kept as it was before the rename: comments already on GitHub carry it, and github-events reads it.
@@ -40,14 +44,51 @@ export function signedBody(body: string, line: string) {
 export const signedByAgent = (body: string) =>
   /(?:^|\n)[ \t]*<!-- agentes\.chat -->[ \t]*\r?\n<sub>[^<\r\n]*<\/sub>$/.test(body.trimEnd());
 
-/** `message` with the trailer on its last line, inside its trailer block when it ends with one; once. */
-export function creditedMessage(message: string, trailer: string) {
-  if (message.includes(trailer)) return message;
-  const text = message.trimEnd();
-  const paragraphs = text.split(/\n[ \t]*\n/);
-  const last = paragraphs.at(-1) ?? "";
-  const block = paragraphs.length > 1 && last.split("\n").every((l) => /^[A-Za-z][A-Za-z-]*: \S/.test(l));
-  return `${text}${block ? "\n" : "\n\n"}${trailer}`;
+/**
+ * `message` with each trailer on a last line of its own, inside its trailer block when it ends with one; each once,
+ * whatever its capitals (Claude Code writes `Co-Authored-By`).
+ */
+export function creditedMessage(message: string, ...trailers: string[]) {
+  let out = message;
+  for (const trailer of trailers) {
+    if (out.toLowerCase().includes(trailer.toLowerCase())) continue;
+    const text = out.trimEnd();
+    const paragraphs = text.split(/\n[ \t]*\n/);
+    const last = paragraphs.at(-1) ?? "";
+    const block = paragraphs.length > 1 && last.split("\n").every((l) => /^[A-Za-z][A-Za-z-]*: \S/.test(l));
+    out = `${text}${block ? "\n" : "\n\n"}${trailer}`;
+  }
+  return out;
+}
+
+/** A name in a trailer: one line, nothing that ends it early (`<`, `>`) or breaks it (control characters). */
+const trailerName = (name: string) =>
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters would break the trailer
+  name.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029<>]/g, "").trim();
+
+/** `Co-authored-by: Nick <noreply@agentes.chat>`: the agent's own line on its commits (its handle when its name is empty). */
+export const agentCoAuthor = (agent: { name: string; handle: string }) =>
+  `Co-authored-by: ${trailerName(agent.name) || agent.handle} <${AGENT_CO_AUTHOR_EMAIL}>`;
+
+/** Whether the workspace's agents end their commits with their own line: on unless a person asked to turn it off. */
+export async function agentCoAuthorOn(db: Executor, orgId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ on: organizationSettings.agentCoAuthor })
+    .from(organizationSettings)
+    .where(eq(organizationSettings.orgId, orgId));
+  return row?.on ?? true;
+}
+
+export async function setAgentCoAuthor(db: Executor, orgId: string, on: boolean) {
+  await db
+    .insert(organizationSettings)
+    .values({ orgId, agentCoAuthor: on })
+    .onConflictDoUpdate({ target: organizationSettings.orgId, set: { agentCoAuthor: on, updatedAt: new Date() } });
+}
+
+/** The agent's own line, or null where the workspace turned it off. */
+export async function agentCoAuthorLine(db: Executor, orgId: string, agent: { name: string; handle: string }) {
+  return (await agentCoAuthorOn(db, orgId)) ? agentCoAuthor(agent) : null;
 }
 
 /** The person behind a call: who asked (or a routine's creator), else the agent's responsável; members only. */
@@ -111,9 +152,7 @@ export async function coAuthorOf(
   if (!row || !/^\d{1,20}$/.test(row.githubId)) return null;
   const login = await githubLogin(deps.http, row.githubId, deps.token);
   if (!login) return null;
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters would break the trailer
-  const name = row.name.replace(/[\u0000-\u001f\u007f<>]/g, "").trim() || login;
-  return `Co-authored-by: ${name} <${row.githubId}+${login}@users.noreply.github.com>`;
+  return `Co-authored-by: ${trailerName(row.name) || login} <${row.githubId}+${login}@users.noreply.github.com>`;
 }
 
 /** The line under what this agent writes on GitHub in this run. */
@@ -126,12 +165,19 @@ export async function signatureLine(db: Database, ctx: { orgId: string; agentId:
   return serverText(await workspaceLocale(db, ctx.orgId), key, vars);
 }
 
-/** The credit for this run's commits through GitHub's API: the person behind it (as `signatureLine` names them). */
-export async function runCoAuthor(
+/**
+ * The lines this run's commits end with: the agent's own, unless the workspace turned it off, then the credit for the
+ * person behind the run (as `signatureLine` names them).
+ */
+export async function runCoAuthors(
   deps: { db: Database; http: GitHubHttp; token?: string | null },
   ctx: { orgId: string; agentId: string; runId?: string },
-) {
+): Promise<string[]> {
   const agent = await getAgentCached(deps.db, ctx.orgId, ctx.agentId);
   const personId = await personBehind(deps.db, ctx, agent?.ownerUserId ?? null);
-  return personId ? coAuthorOf(deps, personId) : null;
+  const lines = await Promise.all([
+    agent ? agentCoAuthorLine(deps.db, ctx.orgId, agent) : null,
+    personId ? coAuthorOf(deps, personId) : null,
+  ]);
+  return lines.filter((l): l is string => l !== null);
 }

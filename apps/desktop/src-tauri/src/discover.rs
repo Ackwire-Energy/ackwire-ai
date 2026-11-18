@@ -1,4 +1,4 @@
-//! "Found" on Connect: where an agentes.chat server may be. This computer first (a server installed from the
+//! "Found" on Connect: where an Ackwire AI server may be. This computer first (a server installed from the
 //! terminal writes `~/.agentes/server.json`; the usual ports otherwise), then the person's Tailscale network
 //! when its command-line tool answers: the setup's default name, `agentes.<the tailnet>`, and online devices
 //! whose name starts with "agentes". Only addresses: the welcome window asks each one whether it is a server.

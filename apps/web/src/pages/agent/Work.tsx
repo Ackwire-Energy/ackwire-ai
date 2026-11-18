@@ -15,7 +15,7 @@ import {
 import { saveLevels } from "@agenteschat/client/lib/access-levels";
 import type { BrainScreen } from "@agenteschat/client/lib/agent-edit";
 import { ownSignInName } from "@agenteschat/client/lib/ai-accounts";
-import { effortLevel } from "@agenteschat/client/lib/brain-advanced";
+import { effortOf } from "@agenteschat/client/lib/brain-advanced";
 import { computerNameOf, setupPortrait, WORKSPACE_COMPUTER_KIND } from "@agenteschat/client/lib/computer";
 import {
   allowsInApp,
@@ -60,16 +60,10 @@ import { useTranslation } from "react-i18next";
 import { NO_COMPUTER, useNoComputer } from "@/components/AgentComputer";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ToolOffWayOut, useToolOneClick } from "@/components/devices/ToolOneClick";
 import { CommandBlock } from "@/components/machine-bits";
 import { useOrg } from "@/components/org-context";
-import {
-  OpenPrefsButton,
-  ReconnectThisMacButton,
-  ThisMacButton,
-  useAgentsHere,
-  useIsThisMac,
-  useThisMac,
-} from "@/components/ThisMac";
+import { ReconnectThisMacButton, ThisMacButton, useAgentsHere, useIsThisMac, useThisMac } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { inDesktopApp } from "@/lib/desktop";
@@ -229,12 +223,12 @@ export function WorkCard({
     ai === "key"
       ? t("brain.foot.api")
       : [accountWord, planWord(t, i18n.language, usage)].filter(Boolean).join(" · ") || null;
-  // Automático picks the effort with the model: only a fixed model says its effort.
+  // Automático picks the effort with the model: only a fixed model says its effort. On a key, only one chosen (none
+  // leaves it to the provider).
+  const level = view ? effortOf(kind, view.effort) : null;
   const effort =
-    kind !== "model" && view && !isAuto(shownPlanModel)
-      ? t("agentPage.work.cell.effort", {
-          level: t(`agentPage.work.brain.effortsLower.${effortLevel(view.effort)}`),
-        })
+    level && !isAuto(kind !== "model" ? shownPlanModel : saved.model)
+      ? t("agentPage.work.cell.effort", { level: t(`agentPage.work.brain.effortsLower.${level}`) })
       : null;
   const speed = agent.brain?.speed ? t("agentPage.work.brain.speeds.fast") : null;
   const target = work.target;
@@ -300,7 +294,7 @@ export function WorkCard({
                 : t("agentPage.work.cell.brainWith", { plan: planLabel(t, ai) })
             }
             value={ai === "key" ? orgModel : planModel}
-            more={ai === "key" ? null : [effort, speed].filter(Boolean).join(" · ")}
+            more={ai === "key" ? effort : [effort, speed].filter(Boolean).join(" · ")}
             sub={sub}
             open={open === "brain"}
             openLabel={t("agentPage.work.open.brain")}
@@ -399,27 +393,23 @@ function StepsHead({ title }: { title: string }) {
 }
 
 /**
- * What turns the computer's browser on, there; the page notices by itself. The app's three clicks, drawn small; on a
- * Linux computer, which may be a server without the app, the command too. In agentes for Mac on this very Mac: one
- * button to Preferences → Ferramentas instead (ADR 0036). Nothing once its switch is on, or on the workspace's own
- * computer, which nobody here reaches.
+ * What turns the computer's browser on, there; the page notices by itself: its way out (`ToolOffWayOut`) for whoever
+ * connected it, anyone else, an app too old, and this very computer. With nobody behind it, the app's three clicks
+ * drawn small, or on a Linux computer, which may be a server without the app, the command. Nothing once its switch is
+ * on, or on the workspace's own computer, which nobody here reaches.
  */
 export function BrowserSteps({ computer, machineId }: { computer: string; machineId?: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const here = useIsThisMac(org.id, machineId ?? "");
   const row = useMachines(org.id).data?.find((m) => m.id === machineId);
+  const oneClick = useToolOneClick(row);
   if (row?.kind === "managed" || row?.access?.tools.browser) return null;
-  if (here) {
+  if (row && (oneClick || here)) {
     return (
-      <section className="brw-steps" aria-label={t("machines.thisMac.browserTitle")}>
-        <StepsHead title={t("machines.thisMac.browserTitle")} />
-        <div className="row" style={{ gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <span className="small muted" style={{ flex: 1, minWidth: 200 }}>
-            {t("machines.thisMac.browserText")}
-          </span>
-          <OpenPrefsButton tab="tools">{t("machines.thisMac.openTools")}</OpenPrefsButton>
-        </div>
+      <section className="brw-steps" aria-label={t("agentPage.work.steps.title", { computer })}>
+        <StepsHead title={t("agentPage.work.steps.title", { computer })} />
+        <ToolOffWayOut machine={row} tool="browser" />
       </section>
     );
   }
@@ -449,7 +439,6 @@ export function BrowserSteps({ computer, machineId }: { computer: string; machin
       <StepsHead title={t("agentPage.work.steps.title", { computer })} />
       {row && !allowsInApp(row.os) ? (
         <div className="stack-4" style={{ gap: 6 }}>
-          <span className="small">{t("browser.machine.offHelp")}</span>
           <span className="small muted">{t("machines.access.grantTerminal")}</span>
           <CommandBlock command={toolOnCommand(row, "browser")} />
         </div>

@@ -1,6 +1,8 @@
 name: Release setup
 
-# Publishes packages/setup (@agenteschat/setup, the self-host setup) to npm through Trusted Publishing
+# Ackwire publishes the pinned standalone installer as a versioned GitHub release asset.
+# Its tag stays separate from the latest application release.
+# Upstream publishes packages/setup (@agenteschat/setup, the self-host setup) to npm through Trusted Publishing
 # (OIDC), only from a `setup-v<version>` tag that matches packages/setup/package.json. No token is stored.
 #
 # npmjs.com, package @agenteschat/setup → Settings → Trusted Publisher → GitHub Actions:
@@ -12,7 +14,7 @@ name: Release setup
 # Trusted Publisher be set on a package that already exists, so a maintainer publishes the first version
 # from a laptop (`npm publish` in packages/setup).
 #
-# Two jobs: build installs the monorepo, tests and packs the tarball without an OIDC token, so no
+# The build job installs the monorepo, tests and packs the tarball without an OIDC token, so no
 # dependency's install script can publish; publish holds the token and only runs `npm publish` on that
 # tarball, with no install and no lifecycle scripts.
 on:
@@ -50,6 +52,20 @@ jobs:
           cd "$(mktemp -d)"
           node "$GITHUB_WORKSPACE/packages/setup/dist/index.js" --dry-run --json | jq -e '.ok and .dryRun'
           bun "$GITHUB_WORKSPACE/packages/setup/dist/index.js" --dry-run --json | jq -e '.ok and .dryRun'
+      - name: Build and check the standalone Ackwire installer
+        if: github.repository == 'Ackwire-Energy/ackwire-ai'
+        run: |
+          bun build packages/setup/src/index.ts --target=bun --minify --outfile "$RUNNER_TEMP/ackwire-setup.js"
+          checksum=$(sed -n 's/^  SETUP_SHA256=//p' install.sh)
+          cd "$RUNNER_TEMP"
+          echo "$checksum  ackwire-setup.js" | sha256sum --check
+          bun ackwire-setup.js --dry-run --json | jq -e '.ok and .dryRun'
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.repository == 'Ackwire-Energy/ackwire-ai'
+        with:
+          name: ackwire-setup
+          path: ${{ runner.temp }}/ackwire-setup.js
+          if-no-files-found: error
       # The bundle just tested, as is: no prepublishOnly rebuild.
       - name: Pack
         working-directory: packages/setup
@@ -64,7 +80,26 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+  publish-ackwire:
+    if: github.repository == 'Ackwire-Energy/ackwire-ai'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: ackwire-setup
+      - name: Publish the versioned installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" ||
+            gh release create "$GITHUB_REF_NAME" --latest=false --verify-tag --repo "$GITHUB_REPOSITORY" --title "Ackwire setup ${GITHUB_REF_NAME#setup-v}" --notes "Standalone installer for Ackwire AI."
+          gh release upload "$GITHUB_REF_NAME" ackwire-setup.js --repo "$GITHUB_REPOSITORY" --clobber
+
   publish:
+    if: github.repository == 'agentes-chat/agentes-chat'
     needs: build
     # A GitHub-hosted runner: npm's Trusted Publishing accepts no other kind.
     runs-on: ubuntu-latest

@@ -9,6 +9,7 @@ import {
   deviceName,
   deviceRows,
   iosOf,
+  iphoneOverWifi,
   joinFacts,
   phoneLine,
   statusDetail,
@@ -345,7 +346,9 @@ export function DeviceRowView({
                 >
                   {row.kind === "computer" && row.device.machineKind === "host"
                     ? t("machines.host.stop")
-                    : t(row.kind === "phone" ? "devices.forget" : "devices.remove")}
+                    : row.kind === "phone" && iphoneOverWifi(row.device)
+                      ? t("devices.iphone.wifi.stop")
+                      : t(row.kind === "phone" ? "devices.forget" : "devices.remove")}
                 </MenuItem>
               </>
             )}
@@ -396,12 +399,14 @@ export function DeviceRemoveDialog({
   const remove = useRemoveComputer(org.id);
   const forget = useForgetPhone(org.id);
   const phone = target?.kind === "phone";
+  const wifi = target?.kind === "phone" && iphoneOverWifi(target.device);
   const pending = phone ? forget.isPending : remove.isPending;
   return (
     <RemoveDeviceDialog
       open={target !== null}
       name={target?.device.name ?? ""}
       phone={phone}
+      wifi={wifi}
       host={target?.kind === "computer" && target.device.machineKind === "host"}
       onClose={onClose}
       removing={pending}
@@ -413,7 +418,7 @@ export function DeviceRemoveDialog({
             toast.show(
               target.kind === "computer" && target.device.machineKind === "host"
                 ? t("machines.host.stopped")
-                : t(phone ? "devices.forgotten" : "devices.removed", { name }),
+                : t(wifi ? "devices.iphone.wifi.stopped" : phone ? "devices.forgotten" : "devices.removed", { name }),
             );
             onClose();
             onRemoved?.();

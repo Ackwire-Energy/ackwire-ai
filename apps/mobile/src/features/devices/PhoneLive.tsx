@@ -240,41 +240,45 @@ export function PhoneLive({ phone: p, host }: { phone: PhoneDevice; host: string
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={[styles.full, { backgroundColor: c.bg, paddingTop: insets.top, paddingBottom: insets.bottom }]}
+          style={[styles.full, { backgroundColor: c.bg, paddingTop: insets.top }]}
         >
-          <View style={styles.bar}>
-            <Text variant="title" tone="ink" style={styles.grow} numberOfLines={2}>
-              {t("devices.screen.yours")}
-            </Text>
-            <Button variant="primary" size="sm" label={t("devices.screen.give")} onPress={() => setMode("watch")} />
-          </View>
-          <View style={styles.stage}>{mode === "control" ? screen(true) : null}</View>
-          <View style={styles.tools}>
-            {p.platform === "android" ? (
-              <>
-                <IconButton icon="back" label={t("common.back")} onPress={() => send({ type: "key", key: "back" })} />
-                <IconButton
-                  icon="home"
-                  label={t("devices.screen.home")}
-                  onPress={() => send({ type: "key", key: "home" })}
-                />
-              </>
-            ) : null}
-            <TextInput
-              value={text}
-              onChangeText={setText}
-              onSubmitEditing={typeIt}
-              placeholder={t("devices.screen.typeLabel", { name: p.name })}
-              placeholderTextColor={c.faint}
-              accessibilityLabel={t("devices.screen.typeLabel", { name: p.name })}
-              returnKeyType="send"
-              autoCorrect={false}
-              autoCapitalize="none"
-              blurOnSubmit={false}
-              editable={live}
-              style={[fieldText("callout"), styles.input, { color: c.ink, backgroundColor: c.sunken }]}
-            />
-            <IconButton icon="send" label={t("mobile.app.send")} onPress={typeIt} disabled={!live || !text} />
+          {/* The home indicator's room on a view of its own: with `padding`, the keyboard view replaces its own
+              bottom padding, and the field and Send sat on the indicator. */}
+          <View style={[styles.full, { paddingBottom: insets.bottom }]}>
+            <View style={styles.bar}>
+              <Text variant="title" tone="ink" style={styles.grow} numberOfLines={2}>
+                {t("devices.screen.yours")}
+              </Text>
+              <Button variant="primary" size="sm" label={t("devices.screen.give")} onPress={() => setMode("watch")} />
+            </View>
+            <View style={styles.stage}>{mode === "control" ? screen(true) : null}</View>
+            <View style={styles.tools}>
+              {p.platform === "android" ? (
+                <>
+                  <IconButton icon="back" label={t("common.back")} onPress={() => send({ type: "key", key: "back" })} />
+                  <IconButton
+                    icon="home"
+                    label={t("devices.screen.home")}
+                    onPress={() => send({ type: "key", key: "home" })}
+                  />
+                </>
+              ) : null}
+              <TextInput
+                value={text}
+                onChangeText={setText}
+                onSubmitEditing={typeIt}
+                placeholder={t("devices.screen.typeLabel", { name: p.name })}
+                placeholderTextColor={c.faint}
+                accessibilityLabel={t("devices.screen.typeLabel", { name: p.name })}
+                returnKeyType="send"
+                autoCorrect={false}
+                autoCapitalize="none"
+                blurOnSubmit={false}
+                editable={live}
+                style={[fieldText("callout"), styles.input, { color: c.ink, backgroundColor: c.sunken }]}
+              />
+              <IconButton icon="send" label={t("mobile.app.send")} onPress={typeIt} disabled={!live || !text} />
+            </View>
           </View>
         </KeyboardAvoidingView>
       </Modal>

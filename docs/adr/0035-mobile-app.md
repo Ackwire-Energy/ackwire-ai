@@ -45,7 +45,7 @@ We want a phone app with the same identity and behavior as the web. Today all cl
 - Sign in with Apple is a social provider when `APPLE_CLIENT_ID`/`APPLE_TEAM_ID`/`APPLE_KEY_ID`/`APPLE_PRIVATE_KEY` are set, and `authConfig` lists it (App Store 4.8, required because we offer Google).
 - The app sells nothing. Plans are bought on the web.
 
-- Push receipts: each send that got tickets schedules a `push.receipts` job about 15 minutes later; it asks Expo (`/--/api/v2/push/getReceipts`) and deletes the tokens whose receipt says `DeviceNotRegistered`.
+- Push receipts: each send that got tickets schedules a `push.receipts` job about 15 minutes later; it asks Expo (`/--/api/v2/push/getReceipts`) and deletes the tokens whose receipt says `DeviceNotRegistered`. *Amended 2026-11-13 (ADR 0178):* no phone push goes through Expo any more, Firebase and Apple answer each message at once, and the receipts job is gone.
 - Deleting an account that signed in with Apple revokes its Apple token (`https://appleid.apple.com/auth/revoke`, the refresh token when Better Auth kept one, else the access token), best effort, after the account is gone, with a client secret signed for the call.
 
 **Known gaps (follow-ups):** the Apple client secret used for sign-in is signed at boot and lasts 150 days, so the server must restart within that window. A native iOS sign-in (id token only) stores no Apple token, so there is nothing to revoke for it.
@@ -68,3 +68,13 @@ Adds to decision 3. The browser that runs a provider's page is not the app: it s
 - The app asks for the trade after every browser sign-in. A server from before this answers 404 and has already sent the session in the link, so a new app signs in on an old server as before.
 
 **Apps from before the challenge.** They send none and expect the session in the link, so the server still sends it there while `LEGACY_PHONE_SIGN_IN` (same file) is `true`. Their browser gets no session either. What stays as it was for them: the link back carries the session, so another app on the same phone that takes the `agenteschat://` scheme could read it. Setting the constant to `false` retires them: the proxy refuses a sign-in without a challenge and no link carries a session; a person on an old build then updates the app or signs in another way. Apple's native sign-in on iOS never goes through the browser and is unchanged.
+
+## Addendum (2026-11-17): on iOS the icons, lists and row presses are the system's
+
+The app already used the platform's tab bar, headers and sheets, with our line icons drawn into them. On iOS that mix read as a web page in a native frame, so the platform's own parts now go all the way down:
+
+- **Icons.** `Icon` draws the system's SF Symbol through expo-image's `sf:` source (already in the app, so no new native module), at a point size and weight read from its style. The table from our icon names to the system's symbols is `apps/mobile/src/ui/icons.sf.ts`. Our line icon stays where the system has no such drawing (the agent, the waiting fuse, the read checks, the computers' marks), if a symbol can't be drawn on an older iOS, and on Android. The bar buttons and the tab bar show the system's symbols too; the Agents tab keeps our agent.
+- **Lists.** A grouped list is flat, with the current iOS corner, the system's separator, values at body size in its secondary label, and its chevron, menu mark and check. Icon tiles are the system Settings' (`IconTile`): one system color per subject (`TILE_TINTS`), the filled symbol in white. The agent's tile is the only place the brand's blue goes.
+- **Presses.** A list row (`RowPressable`) lights at once in the system's gray, goes out over 0.3 s, and a row that opens a screen stays lit until that screen covers it, so the list is plain again on the way back. A row tap gives no haptic, as the system's lists give none; switches, picks and swipes keep theirs.
+
+Android keeps our line icons for now; the colored tiles and the row presses apply there too.

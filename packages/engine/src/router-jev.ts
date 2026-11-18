@@ -1,3 +1,4 @@
+import { usdToNanoUsd } from "@agenteschat/providers";
 import { cutText } from "./format";
 import { callJev, type JevKeySource, JevOffError } from "./jev-key";
 import {
@@ -35,6 +36,8 @@ export interface JevUsage {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  /** What the call cost, from `jevCostOf`. */
+  costNanoUsd: number;
 }
 
 /**
@@ -43,6 +46,15 @@ export interface JevUsage {
  */
 export const JEV_NANO_USD_PER_INPUT_TOKEN = 42;
 export const jevCostNanoUsd = (inputTokens: number) => Math.round(inputTokens * JEV_NANO_USD_PER_INPUT_TOKEN);
+
+/**
+ * What a Jev call cost: OpenRouter's charge for it (`usage.cost`, in USD, as its models' calls record it, ADR 0087
+ * §6), else Jev's price for its input tokens (TypeSafe reports no cost).
+ */
+export const jevCostOf = (usage?: { input_tokens?: number; cost?: unknown }) =>
+  typeof usage?.cost === "number" && Number.isFinite(usage.cost) && usage.cost >= 0
+    ? usdToNanoUsd(usage.cost)
+    : jevCostNanoUsd(usage?.input_tokens ?? 0);
 
 const NONE = "none";
 
@@ -182,7 +194,7 @@ export function createJevRouterStrategy(options: {
       const body = await callJev<{
         model?: string;
         answers?: Record<string, JevAnswer>;
-        usage?: { input_tokens?: number; output_tokens?: number };
+        usage?: { input_tokens?: number; output_tokens?: number; cost?: number };
       }>(options.key, {
         fetch: options.fetch,
         baseURL: options.baseURL,
@@ -195,6 +207,7 @@ export function createJevRouterStrategy(options: {
           model: body.model ?? options.model ?? "jev-latest",
           inputTokens: body.usage?.input_tokens ?? 0,
           outputTokens: body.usage?.output_tokens ?? 0,
+          costNanoUsd: jevCostOf(body.usage),
         })
         .catch(() => {});
       const answers = body.answers ?? {};

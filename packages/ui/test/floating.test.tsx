@@ -19,7 +19,7 @@ import {
   timeOptions,
 } from "../src";
 import { TIP_OPEN_MS } from "../src/components/Tip";
-import { EDGE_ROOM, placeTip, pullToFit, TIP_GAP } from "../src/floating";
+import { EDGE_ROOM, placeList, placeTip, pullToFit, TIP_GAP } from "../src/floating";
 
 const body = () => within(document.body);
 const key = async (el: Element, k: string) => {
@@ -271,5 +271,41 @@ describe("Token", () => {
     );
     await click(body().getByRole("button", { name: "Remover Ada" }));
     expect(removed).toEqual(["ada"]);
+  });
+});
+
+describe("a list opened by typing (placeList)", () => {
+  const caret = { left: 100, top: 400, bottom: 420 };
+  const win = { width: 1280, height: 900 };
+  const list = (height: number) => ({ width: 300, height });
+  test("under the caret, as tall as the room under it, not a fixed cap", () => {
+    expect(placeList(caret, list(300), win)).toEqual({
+      left: 100,
+      top: 420 + TIP_GAP,
+      maxHeight: 900 - EDGE_ROOM - 420 - TIP_GAP,
+    });
+  });
+  test("over the caret when it doesn't fit under and over has more room, its foot on the caret", () => {
+    const low = { left: 100, top: 700, bottom: 720 };
+    expect(placeList(low, list(300), win)).toEqual({
+      left: 100,
+      top: 700 - TIP_GAP - 300,
+      maxHeight: 700 - TIP_GAP - EDGE_ROOM,
+    });
+  });
+  test("taller than the window: on the roomier side, held to its room, so it scrolls only then", () => {
+    const low = { left: 100, top: 700, bottom: 720 };
+    expect(placeList(low, list(2000), win)).toEqual({
+      left: 100,
+      top: EDGE_ROOM,
+      maxHeight: 700 - TIP_GAP - EDGE_ROOM,
+    });
+    expect(placeList(caret, list(2000), win).top).toBe(420 + TIP_GAP);
+  });
+  test("a caret at either side of a phone: the list moves along to stay EDGE_ROOM inside the window", () => {
+    const phone = { width: 320, height: 700 };
+    const narrow = { width: 200, height: 200 };
+    expect(placeList({ ...caret, left: 0 }, narrow, phone).left).toBe(EDGE_ROOM);
+    expect(placeList({ ...caret, left: 250 }, narrow, phone).left).toBe(320 - EDGE_ROOM - 200);
   });
 });

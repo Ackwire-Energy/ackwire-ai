@@ -165,6 +165,9 @@ No new server env vars: availability comes from the machine and the scope, and J
 6. The trail on the message, an eval (`eval:desktop:micro`) and `SELF_HOSTING.md`.
 7. End to end on a real Linux machine: a folder made in the file manager, a command's output read from a terminal, a costly dialog, Log Out refused, an icon found only on the image, a person taking control mid-plan, pt-BR text, an app started, a forged window title.
 
+
+The agent's cursor over the desktop (2026-11-14): before an input that has a point the runner says where the pointer goes (`desktop.pointer`), and the web draws the agent's cursor there for whoever watches (ADR 0040 §7.2).
+
 ## Consequences
 
 - An agent works in any desktop app in one or two turns of its model, with the browser's targets, checks and reports.

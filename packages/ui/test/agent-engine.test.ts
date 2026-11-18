@@ -185,3 +185,39 @@ describe("an agent's @mention tone", () => {
     expect(contrastOf("#ffffff", "#ffffff")).toBe(1);
   });
 });
+
+describe("a workspace's accent is its default agent color (ADR 0193)", () => {
+  test("sky resolves to the accent's pair everywhere it is drawn, back to Ackwire green when cleared", async () => {
+    const {
+      AGENT_GRADIENTS: G,
+      gradientOf,
+      mentionTone,
+      setSkyColors,
+      spriteBody,
+    } = await import("../src/agent/engine.js");
+    const { accentSky, contrastRatio } = await import("@agenteschat/tokens/accent");
+    const sky = gradientOf("sky");
+    const rose = gradientOf("rose");
+    const custom = gradientOf("#123456");
+    const pair = accentSky("#7c3aed");
+    setSkyColors(pair);
+    try {
+      expect(gradientOf("sky")).toEqual(pair);
+      expect(gradientOf(undefined)).toEqual(pair);
+      expect(agentGradient()).toEqual(pair);
+      expect(spriteBody("sky")).not.toBe("#23440b");
+      expect(mentionTone("sky").ink).not.toBe(mentionTone("rose").ink);
+      // An agent's own color stays its own.
+      expect(gradientOf("rose")).toEqual(rose);
+      expect(gradientOf("#123456")).toEqual(custom);
+    } finally {
+      setSkyColors(null);
+    }
+    expect(gradientOf("sky")).toEqual(sky);
+    expect(G.sky).toEqual(["#b8f582", "#3f7b14"]);
+    expect(spriteBody("sky")).toBe("#23440b");
+    // Agents' white eyes and text read on the bottom whatever was picked.
+    for (const hex of ["#fdfdfd", "#050505", "#ffff00"])
+      expect(contrastRatio(accentSky(hex)[1], "#ffffff")).toBeGreaterThanOrEqual(4.5);
+  });
+});

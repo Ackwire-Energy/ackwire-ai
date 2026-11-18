@@ -166,6 +166,9 @@ export function markOf(
   seenBy: string | null | undefined,
   receipt: MessageReceipt | undefined,
 ): ReceiptMarkView | null {
+  // Waiting for the agent's next pause: no mark. It was sent, and a spinner or a clock beside its time reads as a
+  // message that never arrived.
+  if (steer?.state === "waiting") return null;
   if (steer) return { kind: "steer", agentId: steer.agentId, state: steer.state, words: steerWords(steer, receipt) };
   if (seenBy) return { kind: "seen", personId: seenBy };
   const line = receiptLine(receipt);
@@ -186,16 +189,20 @@ export function markLabel(
 }
 
 /**
- * Where someone else's receipt mark goes: the end of the name line of the turn its message ends. A grouped row has
- * no name line, and its text runs to the edge.
+ * The row that wears a receipt's mark: its own message's, a grouped one in its face's place or its bubble's corner.
+ * A grouped row with neither (no faces, and no bubble: no faces in another look, or no words) hands it to the name
+ * line of the turn it ends.
  */
-export function turnHeadId(
+export function markRowId(
   rows: readonly { kind: string; message?: Message; grouped?: boolean }[],
   messageId: string,
+  look: { faces: boolean; bubbles: boolean },
 ): string | null {
   let at = rows.findIndex((r) => r.kind === "message" && r.message?.id === messageId);
   if (at < 0) return null;
-  while (at > 0 && rows[at]?.grouped && rows[at - 1]?.kind === "message") at--;
+  const m = rows[at]?.message;
+  const bubbled = look.bubbles && Boolean(m?.body) && !m?.meta?.choiceReply;
+  if (!look.faces && !bubbled) while (at > 0 && rows[at]?.grouped && rows[at - 1]?.kind === "message") at--;
   return rows[at]?.message?.id ?? null;
 }
 

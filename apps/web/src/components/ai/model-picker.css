@@ -1,0 +1,197 @@
+/* The model picker: the agent's AI and model in place (a DM's header, its profile card, its side panel). */
+
+/* The button: what it thinks with, its maker's mark first, a chevron. 32 tall on one line; a name that wraps (a narrow
+   card, the side panel) grows it, with the mark and the chevron on its first line. */
+.mp-trigger,
+.mp-label {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  color: var(--ink2);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 20px;
+}
+.mp-trigger > :not(.mp-label__text),
+.mp-label > :not(.mp-label__text) {
+  flex: none;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+.mp-trigger {
+  min-height: var(--control-h-sm);
+  padding: calc((var(--control-h-sm) - 20px) / 2) var(--space-2) calc((var(--control-h-sm) - 20px) / 2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.mp-trigger:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent);
+  color: var(--ink);
+}
+.mp-trigger[aria-expanded="true"] {
+  box-shadow: var(--chosen-shadow);
+  background: var(--chosen-bg);
+}
+.mp-trigger[data-size="row"] {
+  padding-inline: var(--space-2);
+  margin-left: calc(-1 * var(--space-2));
+  background: transparent;
+  box-shadow: none;
+}
+.mp-trigger[data-size="row"]:hover {
+  background: var(--plate);
+}
+.mp-label__text {
+  /* Expose the text's baseline when the picker sits inside a sentence, instead of its leading icon's. */
+  align-self: baseline;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.mp-trigger__chevron {
+  flex: none;
+  color: var(--muted);
+}
+
+/* The popover: wider than a menu, never past the window, scrolling inside past its room. */
+.ac-popover.mp {
+  width: min(420px, calc(100vw - 32px));
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 0;
+  overflow: hidden auto;
+  border-radius: var(--radius-lg, 16px);
+}
+.mp__loading {
+  height: 220px;
+}
+.mp__body {
+  display: flex;
+  flex-direction: column;
+}
+/* Over the scene's own fill-the-box height, whichever sheet comes first. */
+.team-scene.mp__sky {
+  flex: none;
+  height: 96px;
+}
+.mp__body > :not(.mp__sky) {
+  margin-inline: var(--space-3);
+}
+
+/* One logo tile per AI: they wrap to a second line, never scroll. The one shown is held down. */
+.mp__tiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+.mp__tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--raised);
+  box-shadow: inset 0 0 0 1px var(--line2);
+  color: var(--ink2);
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    background 0.15s;
+}
+.mp__tile:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 35%, transparent);
+}
+.mp__tile[aria-pressed="true"] {
+  background: var(--chosen-bg);
+  box-shadow:
+    var(--chosen-shadow),
+    inset 0 0 0 2px var(--ink);
+}
+
+/* The AI's name and account on one line, its use as one quiet line under them. */
+.mp__head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-3);
+}
+.mp__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+}
+.mp__plan,
+.mp__account {
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+.mp__account {
+  max-width: 100%;
+  padding: 0 var(--space-4) 0 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--ink2);
+  cursor: pointer;
+}
+.mp__usage {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+.mp__usage[data-state="limited"] {
+  color: var(--danger, var(--ink2));
+}
+.mp__search {
+  margin-top: var(--space-3);
+}
+
+/* The models: the kit's menu rows (`.ac-menu__item`), Automático first, the one it runs checked, a
+   refused one dimmed. */
+.mp__models {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--space-2);
+}
+.mp__model[data-refused] .ac-menu__label {
+  opacity: 0.55;
+}
+.mp__model .ac-menu__label {
+  flex: 1;
+}
+.mp__model-name {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.mp__effort {
+  padding-top: var(--space-3);
+  margin-top: var(--space-2);
+  border-top: 1px solid var(--line);
+}
+.mp__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-2) var(--space-3);
+  margin-top: var(--space-2);
+  color: var(--muted);
+}
+
+/* A phone's header: the mark alone (its words are the button's name), so the header's glyphs keep their line. */
+@media (max-width: 560px) {
+  .channel__acts .mp-trigger .mp-label__text {
+    display: none;
+  }
+}

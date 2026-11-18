@@ -6,20 +6,27 @@ const { blobs } = schema;
 const ORG_KEY = /^(?:orgs|org-logos)\/([0-9a-f-]{36})\//i;
 /** A person's photo (`avatars/{userId}/…`): theirs in every org, so it belongs to none. */
 const PERSON_KEY = /^avatars\/[^/]+\//;
+/**
+ * A file added to a feedback (`feedback/{fileId}`): kept before any workspace is named, and removed by the
+ * feedback's own purge and sweep, so it belongs to no org either.
+ */
+const FEEDBACK_KEY = /^feedback\/[0-9a-f-]{36}$/i;
 
 /**
  * Platform storage in Postgres, for deployments without a bucket. A key
  * starts with `orgs/{orgId}/` or `org-logos/{orgId}/` (the row carries that
- * org and is deleted with it) or `avatars/{userId}/` (no org); any other key
- * is refused. Can't sign URLs: downloads are streamed by the server after its
- * checks.
+ * org and is deleted with it), `avatars/{userId}/` or is `feedback/{fileId}`
+ * (no org); any other key is refused. Can't sign URLs: downloads are streamed
+ * by the server after its checks.
  */
 export function createPostgresBlobStore(db: Database): BlobStore {
   const orgOf = (key: string) => {
     const orgId = ORG_KEY.exec(key)?.[1];
     if (orgId) return orgId;
-    if (PERSON_KEY.test(key)) return null;
-    throw new Error(`blob key must start with orgs/{orgId}/, org-logos/{orgId}/ or avatars/{userId}/: ${key}`);
+    if (PERSON_KEY.test(key) || FEEDBACK_KEY.test(key)) return null;
+    throw new Error(
+      `blob key must start with orgs/{orgId}/, org-logos/{orgId}/ or avatars/{userId}/, or be feedback/{fileId}: ${key}`,
+    );
   };
   return {
     kind: "postgres",

@@ -10,8 +10,15 @@ import {
   drainOutbox,
   ForbiddenError,
   listMessages,
+  OrgDeletingError,
   postPersonMessage,
+  SYSTEM_STOP_REASONS,
+  type SystemStopReason,
+  standingText,
   stopChecksSettled,
+  stopError,
+  stopOf,
+  stopOrgWork,
   type ToolSource,
 } from "../src";
 import { addMember, type Fixture, setup } from "./fixtures";
@@ -125,6 +132,7 @@ describe("canceling a run", () => {
     await drainOutbox(f.db, f.handlers);
     expect(f.provider.calls).toHaveLength(0);
     expect((await runOf())?.status).toBe("canceled");
+    expect(stopOf((await runOf())?.error)).toEqual({ by: "person", userId: f.owner.id, agentId: null, reason: null });
     expect(events.find((e) => e.type === "run.finished")).toMatchObject({ status: "canceled" });
     // It never answered: "didn't reply", live and after a reload.
     expect(events.find((e) => e.type === "message.handled")).toMatchObject({ status: "canceled", passed: true });
@@ -158,6 +166,65 @@ describe("canceling a run", () => {
     await ask("@bot oi");
     const [other] = (await f.db.select().from(schema.agentRuns)).filter((r) => r.agentId === hers.id);
     expect((await cancelRun(deps(), caio.id, f.org.id, other?.id ?? "")).status).toBe("canceled");
+  });
+});
+
+describe("who or what stopped a run, from its error", () => {
+  const system = (reason: SystemStopReason): ReturnType<typeof stopOf> => ({
+    by: "system",
+    userId: null,
+    agentId: null,
+    reason,
+  });
+
+  test("a person, the agent that stopped it at their word, or the system with a listed reason", () => {
+    const agentId = "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a";
+    expect(stopOf(stopError({ type: "person", id: "user-1" }))).toEqual({
+      by: "person",
+      userId: "user-1",
+      agentId: null,
+      reason: null,
+    });
+    expect(stopOf(stopError({ type: "person", id: "user-1", agentId }))).toEqual({
+      by: "agent",
+      userId: "user-1",
+      agentId,
+      reason: null,
+    });
+    for (const reason of SYSTEM_STOP_REASONS) {
+      expect(stopOf(stopError({ type: "system", reason }))).toEqual(system(reason));
+    }
+    // A closed workspace's stop holds the refusal's sentence, with a reason someone may have written: never returned.
+    const closed = (state: "hold" | "suspended", reason: string | null) =>
+      stopOf(standingText({ state, reason, notice: reason ? "shown" : "silent" }));
+    expect(closed("hold", null)).toEqual(system("workspace_paused"));
+    expect(closed("hold", "Lena wrote this reason")).toEqual(system("workspace_paused"));
+    expect(closed("suspended", null)).toEqual(system("workspace_suspended"));
+    expect(closed("suspended", "Lena wrote this reason")).toEqual(system("workspace_suspended"));
+    expect(stopOf(new OrgDeletingError(null).message)).toEqual(system("workspace_deleting"));
+    // A reason the list doesn't hold, and anything else in its place.
+    for (const unknown of ["routine_some_new_code", "mission_some_new_reason", "Lena wrote this"]) {
+      expect(stopOf(unknown)).toEqual(system("other"));
+    }
+    // An older row's stop by a mission with nobody behind it is no person's.
+    expect(stopOf("canceled_by:mission")).toEqual(system("other"));
+    // No error kept: nothing says who stopped it.
+    for (const none of ["", null, undefined]) expect(stopOf(none)).toBeNull();
+  });
+
+  test("a workspace put on hold stops its runs, and each says so", async () => {
+    f = await setup();
+    await ask("@dev oi");
+    const said = standingText({ state: "hold", reason: "Lena wrote this reason", notice: "shown" });
+    await stopOrgWork(deps(), f.org.id, said);
+    const run = await runOf();
+    expect([run?.status, run?.error]).toEqual(["canceled", said]);
+    expect(stopOf(run?.error)).toEqual(system("workspace_paused"));
+    const [audited] = (await f.db.select().from(schema.auditLog)).filter((a) => a.action === "run.canceled");
+    expect(audited).toMatchObject({
+      actorType: "system",
+      details: { agentId: f.agent.id, from: "queued", reason: said },
+    });
   });
 });
 

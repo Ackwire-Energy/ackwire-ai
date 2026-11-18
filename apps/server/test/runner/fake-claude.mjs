@@ -340,6 +340,15 @@ async function answer(line) {
     if (!controlAnswer) await waitForLine(3000);
   }
   if (prompt.includes("SLOW")) await sleep(300);
+  // $FAKE_CLAUDE_RATE_INFO: a `rate_limit_event` before anything else, its `rate_limit_info` as given (JSON).
+  if (process.env.FAKE_CLAUDE_RATE_INFO) {
+    const info = JSON.parse(process.env.FAKE_CLAUDE_RATE_INFO);
+    out({ type: "rate_limit_event", rate_limit_info: info });
+    if (info.status === "rejected") {
+      out({ type: "result", subtype: "success", is_error: true, result: "You've hit your limit" });
+      return;
+    }
+  }
   if (prompt.includes("COMPACT")) out({ type: "system", subtype: "compact_boundary", parent_tool_use_id: null });
   if (prompt.includes("RATE")) {
     out({

@@ -1,14 +1,12 @@
-import type { Agent, AgentAudience, AgentProposal } from "@agenteschat/client";
+import type { Agent, AgentAudience } from "@agenteschat/client";
 import {
-  ApiError,
-  useAgentProposal,
   useAgents,
   useAiAccounts,
   useBrainMachines,
+  useCatalog,
   useChannels,
   useCreateAgent,
   useCredentials,
-  useDenyAgentProposal,
   useDms,
   useMailAccounts,
   useMembers,
@@ -20,7 +18,6 @@ import {
   useSkills,
 } from "@agenteschat/client";
 import { LEVELS, type Level, saveLevels, sharedLevel } from "@agenteschat/client/lib/access-levels";
-import { draftLevels, draftMailLevels } from "@agenteschat/client/lib/action-cards";
 import {
   autonomyName,
   autonomyWords,
@@ -29,6 +26,7 @@ import {
   newAgentStart,
   newAgentStartText,
 } from "@agenteschat/client/lib/agent-setup";
+import { accountInLine } from "@agenteschat/client/lib/ai-accounts";
 import { thinksWith } from "@agenteschat/client/lib/brain";
 import {
   type BrainPickOption,
@@ -41,6 +39,7 @@ import {
 } from "@agenteschat/client/lib/brain-picker";
 import { type ConnectedItem, itemName } from "@agenteschat/client/lib/connected";
 import { errorText as failureText } from "@agenteschat/client/lib/errors";
+import { FIELD_LIMITS } from "@agenteschat/client/lib/field-limits";
 import { joinNames } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { choiceOf, defaultPolicy, MAIL_ACTIONS, toMailLevel } from "@agenteschat/client/lib/mail";
@@ -69,13 +68,13 @@ import {
   Locked,
   Logo,
   modKey,
+  overLimit,
   ProviderLogo,
   prefersReducedMotion,
   randomAppearance,
   Segmented,
   SettingNote,
   SettingRow,
-  Spinner,
   Switch,
   Textarea,
 } from "@agenteschat/ui";
@@ -84,6 +83,7 @@ import { type ReactNode, type RefObject, useEffect, useMemo, useRef, useState } 
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { LevelRow, useConnectedById } from "@/components/AccessLevels";
+import { AskAdminButton } from "@/components/AdminAsk";
 import { AudienceChoice } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import {
@@ -102,16 +102,21 @@ import {
 } from "@/components/AgentFields";
 import { usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi } from "@/components/ConnectAi";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { ImportFlow, useImportFlow } from "@/components/ImportFlow";
 import { MailIcon } from "@/components/MailConnect";
 import { useMediaQuery } from "@/components/NavDrawer";
+import { AppsPickerDialog } from "@/components/new-agent/AppsPicker";
 import { useOrg } from "@/components/org-context";
-import { SkillPicker } from "@/components/Skills";
+import { InstallSkillDialog, SkillPicker } from "@/components/Skills";
 import { AgentBornSky, AgentPreviewSky, OnboardingHorizon } from "@/components/Sky";
 import { StepRail } from "@/components/StepRail";
 import { useFlowExit } from "@/hooks/useFlowExit";
 import { useKeeperName, usePersonalView } from "@/hooks/usePersonalView";
+import { useTextLimit } from "@/hooks/useTextLimit";
+import { flowReturn } from "@/lib/flow-return";
+import { CARD_MARK, IMPORT_CARDS } from "@/lib/import-flow";
 import {
   BLANK_LOOK,
   cleanHandle,
@@ -138,7 +143,8 @@ import {
   stepErrors,
   takenHandles,
 } from "@/lib/new-agent";
-import { proposedRoutineWhen } from "@/lib/recurrence";
+import { STORAGE_KEYS } from "@/lib/storage";
+import { useTheme } from "@/lib/theme";
 import { useToast } from "@/lib/toast";
 import "./new-agent.css";
 
@@ -185,95 +191,69 @@ interface Created {
   channels: { id: string; name: string }[];
 }
 
+/** The steps as filled in, kept while a sign-in on another site reloads the app (`flowReturn`). */
+interface SavedDraft {
+  index: number;
+  reached: number;
+  role: RoleId | null;
+  starter: PersonalStarter["id"] | null;
+  roleText: string;
+  name: string;
+  handle: string;
+  handleTouched: boolean;
+  look: Required<AgentAppearance>;
+  instructions: string;
+  levels: Record<string, Level>;
+  mailLevels: Record<string, Level>;
+  skillIds: string[] | null;
+  channelIds: string[];
+  owner: string;
+  audience: AgentAudience;
+  model: string;
+  plan: PlanChoice | null;
+  connectPlan: AiPlan | null;
+  key: string;
+  budget: string;
+  aiPicked: boolean;
+  withAutonomy: boolean;
+}
+const wizardReturn = flowReturn<SavedDraft>(STORAGE_KEYS.newAgentDraft);
+
 /** No step passed over (a team's workspace). */
 const NO_SKIP: readonly NewAgentStep[] = [];
 
 /**
- * "Criar agente": the steps on a rail, a live preview of the agent on the right. With `proposalId` (an agent's
- * proposal card, ADR 0081) it opens filled in with the draft, on its last step, while the proposal is open. With
- * `onClose` it is the card's review, in a dialog over the conversation: creating, saying no or leaving closes it.
+ * "Criar agente": the steps on a rail, a live preview of the agent on the right. The app creates agents in the new
+ * agent's dialog (ADR 0164), an agent's proposal too; this page stays for the import and a link that still names it.
  */
 export function NewAgentPage({
-  proposalId = null,
   channelId = null,
-  onClose,
 }: {
-  proposalId?: string | null;
   /** A channel's "Criar agente" (its Adicionar dialog): the agent starts in that channel. */
   channelId?: string | null;
-  onClose?: () => void;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const proposal = useAgentProposal(org.id, proposalId);
-  const exit = useFlowExit(org.id);
-  // The draft as it was when it opened: once created here the proposal is closed, and the flow stays on.
-  const opened = useRef<AgentProposal | null>(null);
-  if (proposal.data?.canDecide && opened.current?.messageId !== proposal.data.messageId) opened.current = proposal.data;
-  const from = opened.current?.messageId === proposalId ? opened.current : null;
   const allowed = can(org, "create_agents");
-  const closed = proposalId !== null && !from;
   const keeper = useKeeperName();
-  if (!allowed || closed) {
+  if (!allowed) {
     return (
       <main className="shell__main">
         <div className="page page--narrow">
           <header className="page__header">
             <h1 className="page-title">{t("newAgent.title")}</h1>
           </header>
-          {!allowed ? (
-            <EmptyState icon="agent">
-              {t(keeperKey(org, keeper, "newAgent.adminsOnly"), { org: org.name, keeper })}
-            </EmptyState>
-          ) : proposal.isPending ? (
-            <Spinner />
-          ) : (
-            <EmptyState
-              icon="agent"
-              actions={
-                onClose ? (
-                  <Button onClick={onClose}>{t("newAgent.backToChat")}</Button>
-                ) : (
-                  <Button asChild>
-                    {proposal.data ? (
-                      <Link
-                        to="/org/$orgId/c/$channelId"
-                        params={{ orgId: org.id, channelId: proposal.data.channelId }}
-                      >
-                        {t("newAgent.backToChat")}
-                      </Link>
-                    ) : (
-                      <a {...exit}>{t("newAgent.backToChat")}</a>
-                    )}
-                  </Button>
-                )
-              }
-            >
-              {proposal.error instanceof ApiError && proposal.error.status === 403
-                ? t("newAgent.proposalNoAccess")
-                : t("newAgent.proposalClosed")}
-            </EmptyState>
-          )}
+          <EmptyState icon="agent" actions={<AskAdminButton ask={{ what: "create_agents" }} variant="primary" />}>
+            {t(keeperKey(org, keeper, "newAgent.adminsOnly"), { org: org.name, keeper })}
+          </EmptyState>
         </div>
       </main>
     );
   }
-  return from ? (
-    <NewAgentFlow key={from.messageId} from={from} onClose={onClose} />
-  ) : (
-    <NewAgentFlow channelId={channelId} />
-  );
+  return <NewAgentFlow channelId={channelId} />;
 }
 
-function NewAgentFlow({
-  from,
-  channelId = null,
-  onClose,
-}: {
-  from?: AgentProposal;
-  channelId?: string | null;
-  onClose?: () => void;
-}) {
+function NewAgentFlow({ channelId = null }: { channelId?: string | null }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language;
   const { org, me } = useOrg();
@@ -294,7 +274,6 @@ function NewAgentFlow({
   const settings = useSettings(org.id);
   const library = useSkills(org.id);
   const create = useCreateAgent(org.id);
-  const deny = useDenyAgentProposal(org.id);
   const connected = useConnectedById();
   const connectedList = useMemo(() => [...connected.values()], [connected]);
   const mail = useMailAccounts(org.id);
@@ -315,64 +294,63 @@ function NewAgentFlow({
   // starts without access (the server's rule, ADR 0085 §5).
   const managesAgents = can(org, "manage_agents");
 
-  // An agent's proposal starts on the last step, filled in: its role as written, its look, levels and channels.
-  const draft = from?.params.draft;
-  const review = NEW_AGENT_STEPS.length - 1;
+  // Back from signing in on another site for an app or a skill's repository: every step as it was.
+  const [returned] = useState(() => wizardReturn.take(org.id));
+  const was = returned?.draft;
   // Navigation
-  const [index, setIndex] = useState(draft ? review : 0);
-  const [reached, setReached] = useState(draft ? review : 0);
+  const [index, setIndex] = useState(was?.index ?? 0);
+  const [reached, setReached] = useState(was?.reached ?? 0);
   const [tried, setTried] = useState<Set<NewAgentStep>>(new Set());
   const [created, setCreated] = useState<Created | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   // Bringing agents from another app, in place of the role cards (the same flow as Configurações → Importar).
   const [importing, setImporting] = useState(false);
   const importFlow = useImportFlow(org.id);
+  // Connecting another app and installing a skill open over the steps: nothing here leaves for Settings.
+  const catalog = useCatalog();
+  const [picking, setPicking] = useState(false);
+  const [connecting, setConnecting] = useState<FlowState | null>(null);
+  // Back from GitHub's sign-in for a skill's repository: Instalar skill again, on that link.
+  const installLink = returned?.params.install;
+  const [installing, setInstalling] = useState(Boolean(installLink));
   // The draft
-  const [role, setRole] = useState<RoleId | null>(draft ? "custom" : null);
+  const [role, setRole] = useState<RoleId | null>(was ? was.role : null);
   // A personal workspace's starting point (one of its template agents), on top of "custom" (ADR 0159 §3).
-  const [starter, setStarter] = useState<PersonalStarter["id"] | null>(null);
-  const [roleText, setRoleText] = useState(draft?.role ?? "");
-  const [name, setName] = useState(draft?.name ?? "");
-  const [handle, setHandle] = useState(draft?.handle ?? "");
-  const [handleTouched, setHandleTouched] = useState(Boolean(draft));
-  const [look, setLook] = useState<Required<AgentAppearance>>(
-    (draft?.appearance as Required<AgentAppearance> | null) ?? BLANK_LOOK,
-  );
-  const [instructions, setInstructions] = useState(draft?.instructions ?? "");
-  const [levels, setLevels] = useState<Record<string, Level>>(draft && managesAgents ? draftLevels(draft) : {});
-  // A proposal's own mailboxes of mine come at its level: only a mailbox's owner gives an agent access to it.
-  const [mailLevels, setMailLevels] = useState<Record<string, Level>>(draft ? draftMailLevels(draft, me.user.id) : {});
-  // The routine a proposal came with: made once the agent is where it reports.
-  const [withRoutine, setWithRoutine] = useState(Boolean(draft?.routine));
-  const [skillIds, setSkillIds] = useState<Set<string> | null>(null);
+  const [starter, setStarter] = useState<PersonalStarter["id"] | null>(was?.starter ?? null);
+  const [roleText, setRoleText] = useState(was?.roleText ?? "");
+  const [name, setName] = useState(was?.name ?? "");
+  const [handle, setHandle] = useState(was?.handle ?? "");
+  const [handleTouched, setHandleTouched] = useState(was?.handleTouched ?? false);
+  const [look, setLook] = useState<Required<AgentAppearance>>(was?.look ?? BLANK_LOOK);
+  const [instructions, setInstructions] = useState(was?.instructions ?? "");
+  const instructionsLimit = useTextLimit(FIELD_LIMITS.instructions);
+  const [levels, setLevels] = useState<Record<string, Level>>(was?.levels ?? {});
+  // Mailboxes of mine at their levels: only a mailbox's owner gives an agent access to it.
+  const [mailLevels, setMailLevels] = useState<Record<string, Level>>(was?.mailLevels ?? {});
+  const [skillIds, setSkillIds] = useState<Set<string> | null>(was?.skillIds ? new Set(was.skillIds) : null);
   // The channel it was asked for stays picked whatever role is chosen (the roles' presets add theirs).
   const asked = channelId ? [channelId] : [];
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(draft?.channelIds ?? asked));
-  const [owner, setOwner] = useState(me.user.id);
+  const [channelIds, setChannelIds] = useState<Set<string>>(new Set(was?.channelIds ?? asked));
+  const [owner, setOwner] = useState(was?.owner ?? me.user.id);
   // A personal workspace's new agent answers only its owner until they say otherwise (ADR 0159), as the server makes
   // its agents; a team's answers everyone.
   // A personal workspace's agent starts with every app at write, custom ones too (ADR 0159 §3a).
   const personal = isPersonal(org);
   const audienceAtFirst = (): AgentAudience => ({ mode: personal ? "owner" : "everyone", userIds: [] });
-  const [audience, setAudience] = useState<AgentAudience>(audienceAtFirst);
+  const [audience, setAudience] = useState<AgentAudience>(was?.audience ?? audienceAtFirst);
   // Alone in a personal workspace there is nobody else to own it or talk to it: its owner and who talks to it leave
   // the screen while they hold that default (ADR 0159). Its page's Settings still has both.
   const { solo } = usePersonalView();
   const keeper = useKeeperName();
   // "Automático" for every new agent: each task gets its model and effort; a fixed model is one click away.
-  const [model, setModel] = useState<string>(AUTO);
-  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists. A proposal
-  // starts on the account the server suggests for this person, if any.
-  const [plan, setPlan] = useState<PlanChoice | null>(
-    draft?.ai.kind === "account"
-      ? { kind: draft.ai.brain, machineId: draft.ai.machineId, accountId: draft.ai.accountId, label: draft.ai.label }
-      : null,
-  );
+  const [model, setModel] = useState<string>(was?.model ?? AUTO);
+  // Or a plan (Claude Code, Codex) on a computer: saved as its "Quem pensa" once the agent exists.
+  const [plan, setPlan] = useState<PlanChoice | null>(was ? was.plan : null);
   // Or a plan with nothing to think with yet (a coding plan's key): made on Automático, Connect opens on it after.
-  const [connectPlan, setConnectPlan] = useState<AiPlan | null>(null);
-  const [key, setKey] = useState(DEFAULT_KEY);
+  const [connectPlan, setConnectPlan] = useState<AiPlan | null>(was?.connectPlan ?? null);
+  const [key, setKey] = useState(was?.key ?? DEFAULT_KEY);
   // Empty = the workspace default budget (every agent has one).
-  const [budget, setBudget] = useState("");
+  const [budget, setBudget] = useState(was?.budget ?? "");
 
   const step = NEW_AGENT_STEPS[index] ?? "role";
   const total = NEW_AGENT_STEPS.length;
@@ -380,14 +358,10 @@ function NewAgentFlow({
   const skipped = personal ? PERSONAL_SKIPPED_STEPS : NO_SKIP;
   const walked = NEW_AGENT_STEPS.filter((s) => !skipped.includes(s));
   const dmChannels = useMemo(() => new Set((dms.data ?? []).map((d) => d.channelId)), [dms.data]);
-  // Mine, and the ones a proposal names: only where I may put an agent (in it and posting, or managing it).
+  // Mine: only where I may put an agent (in it and posting, or managing it).
   const myChannels = useMemo(
-    () =>
-      (channels.data ?? []).filter(
-        (c) =>
-          (c.isMember || draft?.channelIds.includes(c.id)) && !dmChannels.has(c.id) && addsAgentsTo(c, me.user.id, org),
-      ),
-    [channels.data, dmChannels, draft, me.user.id, org],
+    () => (channels.data ?? []).filter((c) => c.isMember && !dmChannels.has(c.id) && addsAgentsTo(c, me.user.id, org)),
+    [channels.data, dmChannels, me.user.id, org],
   );
   const choices = useMemo(
     () => modelChoices(models.data?.models ?? [], credentials.data ?? [], platform.data ?? false),
@@ -411,14 +385,12 @@ function NewAgentFlow({
 
   // What it starts thinking with (ADR 0094): the last setup saved or used on other agents, where it can think for it.
   const startOf = (ownerId: string | null): NewAgentStart | null =>
-    from
-      ? null
-      : newAgentStart(lastSetup.data, {
-          ownerIsMe: ownerId === me.user.id,
-          admin: can(org, "manage_agents"),
-          usable,
-          keys: credentials.data ?? [],
-        });
+    newAgentStart(lastSetup.data, {
+      ownerIsMe: ownerId === me.user.id,
+      admin: can(org, "manage_agents"),
+      usable,
+      keys: credentials.data ?? [],
+    });
   const startWith = (start: NewAgentStart | null) => {
     const api = start?.brain === "model" ? start : null;
     setModel(api?.model ?? AUTO);
@@ -429,16 +401,16 @@ function NewAgentFlow({
         ? {
             kind: start.brain,
             machineId: start.machineId,
-            ...(start.account ? { accountId: start.account.id, label: start.account.label } : {}),
+            ...(start.account ? { accountId: start.account.id, label: accountInLine(t, start.account) } : {}),
             model: start.input.model ?? AUTO,
           }
         : null,
     );
   };
   // Until the person picks what it thinks with, it follows whose it is.
-  const [aiPicked, setAiPicked] = useState(Boolean(from));
+  const [aiPicked, setAiPicked] = useState(was?.aiPicked ?? false);
   // "Levar a autonomia" off: the last setup's AI with the default Autonomia.
-  const [withAutonomy, setWithAutonomy] = useState(true);
+  const [withAutonomy, setWithAutonomy] = useState(was?.withAutonomy ?? true);
   const startsReady = lastSetup.isFetched && models.isFetched && credentials.isFetched && platform.isFetched;
   const started = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, when what it starts with is known
@@ -462,6 +434,43 @@ function NewAgentFlow({
     });
   }, [connectedList, role, managesAgents, personal]);
 
+  // Before a sign-in on another site may reload the app.
+  const keepForReturn = () => {
+    wizardReturn.save(org.id, {
+      index,
+      reached,
+      role,
+      starter,
+      roleText,
+      name,
+      handle,
+      handleTouched,
+      look,
+      instructions,
+      levels,
+      mailLevels,
+      skillIds: skillIds ? [...skillIds] : null,
+      channelIds: [...channelIds],
+      owner,
+      audience,
+      model,
+      plan,
+      connectPlan,
+      key,
+      budget,
+      aiPicked,
+      withAutonomy,
+    });
+  };
+  const openInstall = () => {
+    keepForReturn();
+    setInstalling(true);
+  };
+
+  const connectedApps = useMemo(
+    () => new Set(connectedList.flatMap((i) => (i.def ? [i.def.id] : []))),
+    [connectedList],
+  );
   const ownerId = owner === NO_OWNER ? null : owner;
   // Alone, both are the person's and leave the screen while they hold that: mine, answering only me.
   const ownerHidden = solo && ownerId === me.user.id;
@@ -483,7 +492,7 @@ function NewAgentFlow({
   const connectHere = () => {
     if (!connect) return;
     setOptionsBefore(ownerId === me.user.id ? new Set(brainOptions.map((o) => o.value)) : null);
-    connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key" });
+    connect.open(ownerId === me.user.id ? { forNewAgent: true } : { intent: "api_key", overDraft: true });
   };
   const connectedHere = optionsBefore ? newPlanAccountOption(brainOptions, optionsBefore) : undefined;
   // A plan account of mine that can think for it (one connected in place from the model step, or before I had any
@@ -641,7 +650,6 @@ function NewAgentFlow({
       credentialId: key !== DEFAULT_KEY ? key : null,
       monthlyBudgetUsd: amount,
       appearance: look,
-      ...(from ? { proposal: from.messageId } : {}),
       ...(autonomy ? { autonomy } : {}),
     });
     // A plan thinks on its computer: the agent goes there, then thinks with it (an automatic model stays automatic).
@@ -660,7 +668,15 @@ function NewAgentFlow({
         // person's own, its plan's sign-in opens once it's created: only the owner signs a plan in for it.
         signIn = ownerId === me.user.id && needsOwnSignIn(aiAccounts.data?.computers, plan);
       } catch {
-        toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error");
+        toast.show(t("newAgent.planNotSaved", { ...g, brain: t(`brain.card.${plan.kind}`) }), "error", {
+          label: t("usageCard.chooseBrain"),
+          run: () =>
+            void navigate({
+              to: "/org/$orgId/agents/$agentId",
+              params: { orgId: org.id, agentId: agent.id },
+              search: { tab: "settings", sec: "brain", brain: "switch" },
+            }),
+        });
       }
     } else if (start?.brain === "model" && onStart && start.contextTokens !== null) {
       await api.agents.setBrain(org.id, agent.id, { brain: "model", contextTokens: start.contextTokens });
@@ -715,14 +731,6 @@ function NewAgentFlow({
     });
     mood.react("happy", 2200);
     scrollTop();
-    // The routine it came with, now that the agent is where it reports; the card says when it is made.
-    if (from?.params.draft.routine && withRoutine) {
-      void api.agents
-        .proposalRoutine(org.id, from.messageId)
-        .catch((error) => toast.show(t("newAgent.routineNotMade", { reason: failureText(t, error) }), "error"));
-    }
-    // Reviewed over the conversation: it closes on it, as it was.
-    onClose?.();
     // On a billing hold nothing connects before the plan.
     if (held) return;
     if (plan && signIn) connect?.open({ agentId: agent.id, plan: planOfKind(plan.kind) });
@@ -731,6 +739,10 @@ function NewAgentFlow({
   };
   const next = () => {
     if (created || create.isPending || importing) return;
+    if (overLimit(instructions, instructionsLimit)) {
+      goTo(NEW_AGENT_STEPS.indexOf("instructions"));
+      return;
+    }
     if (stepErrors(step, check).length > 0) {
       fail(step);
       setTimeout(() => root.current?.querySelector<HTMLElement>("[aria-invalid='true']")?.focus());
@@ -775,8 +787,8 @@ function NewAgentFlow({
   };
 
   // Keyboard: Enter goes on (⌘/Ctrl+Enter inside the instructions), Esc goes back (or leaves a field).
-  const keyboard = useRef({ next, back, dialog: Boolean(onClose) });
-  keyboard.current = { next, back, dialog: Boolean(onClose) };
+  const keyboard = useRef({ next, back });
+  keyboard.current = { next, back };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.isComposing) return;
@@ -793,7 +805,6 @@ function NewAgentFlow({
         e.preventDefault();
         keyboard.current.next();
       } else if (e.key === "Escape") {
-        if (keyboard.current.dialog) return;
         if (tag === "INPUT" || tag === "TEXTAREA") {
           target?.blur();
           return;
@@ -819,8 +830,6 @@ function NewAgentFlow({
     });
     mood.react(id === "custom" ? "wink" : "happy", 1400);
     if (id === "custom") setTimeout(() => document.getElementById("ag-role")?.focus());
-    // A proposal keeps its draft: only the role changes.
-    if (from) return;
     const preset = ROLE_PRESETS[id];
     const agentName = id === "custom" ? "" : t(`newAgent.roles.${id}.agent`);
     setRoleText("");
@@ -876,33 +885,20 @@ function NewAgentFlow({
 
   /* ---------- The step's content ---------- */
 
-  const head = (title: string, lead?: string, hint?: string, after?: ReactNode) => {
-    const h1 = (
+  const head = (title: string, lead?: string) => (
+    <header className="onb__head">
+      <p className="onb__eyebrow">
+        {t("newAgent.stepOf", {
+          n: NEW_AGENT_STEPS.filter((s, i) => i <= index && !skipped.includes(s)).length,
+          total: walked.length,
+        })}
+      </p>
       <h1 className="onb__title newag__title" ref={heading} tabIndex={-1}>
         {title}
       </h1>
-    );
-    return (
-      <header className="onb__head">
-        <p className="onb__eyebrow">
-          {t("newAgent.stepOf", {
-            n: NEW_AGENT_STEPS.filter((s, i) => i <= index && !skipped.includes(s)).length,
-            total: walked.length,
-          })}
-        </p>
-        {hint ? (
-          <div className="ac-hintline">
-            {h1}
-            <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>
-          </div>
-        ) : (
-          h1
-        )}
-        {lead && <p className="onb__lead">{lead}</p>}
-        {after}
-      </header>
-    );
-  };
+      {lead && <p className="onb__lead">{lead}</p>}
+    </header>
+  );
   const errorLine = (e: DraftError | undefined) =>
     e ? (
       <span className="newag__err" role="alert">
@@ -945,6 +941,12 @@ function NewAgentFlow({
     const roles = (roleList.data?.roles ?? []).filter((r) => audience.roleIds?.includes(r.id)).map((r) => r.name);
     return names.length + roles.length ? joinNames([...roles, ...names], t) : t("audience.summary.nobody");
   };
+  // For who can't give access here: why, beside the list's own line.
+  const accessHint = managesAgents ? null : (
+    <InfoHint name={t("common.about", { label: t("newAgent.steps.tools.title") })}>
+      {t(keeperKey(org, keeper, "newAgent.accessAdmins"), { keeper })}
+    </InfoHint>
+  );
   const ownerTitle = (
     <h2>
       <Icon name="person" />
@@ -973,39 +975,38 @@ function NewAgentFlow({
       );
       return (
         <>
-          {head(
-            t("newAgent.steps.role.title"),
-            t("newAgent.steps.role.lead"),
-            undefined,
-            !from && (
-              <p className="ac-iconline newag__import">
-                <Icon name="archiveBox" size={16} />
-                <button type="button" className="ac-link" onClick={() => setImporting(true)}>
-                  {t("shell.importAgents")}
-                </button>
-              </p>
-            ),
-          )}
+          {head(t("newAgent.steps.role.title"), t("newAgent.steps.role.lead"))}
           {/* biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset */}
           <div className="newag__role-groups" role="group" aria-label={t("newAgent.steps.role.name")}>
             <div className="newag__scratch">
-              <button
-                type="button"
-                className="newag__role newag__role--blank"
-                aria-pressed={role === "custom" && !starter}
-                onClick={() => pickRole("custom")}
-              >
-                <span className="newag__check" aria-hidden="true">
-                  <Icon name="check" size={14} />
-                </span>
-                {roleHead(
-                  <span className="newag__blank-icon" aria-hidden="true">
-                    <Icon name="plus" />
-                  </span>,
-                  t("newAgent.roles.custom.name"),
-                  t("newAgent.roles.custom.desc"),
-                )}
-              </button>
+              <div className="newag__roles">
+                <button
+                  type="button"
+                  className="newag__role newag__role--blank"
+                  aria-pressed={role === "custom" && !starter}
+                  onClick={() => pickRole("custom")}
+                >
+                  <span className="newag__check" aria-hidden="true">
+                    <Icon name="check" size={14} />
+                  </span>
+                  {roleHead(
+                    <span className="newag__blank-icon" aria-hidden="true">
+                      <Icon name="plus" />
+                    </span>,
+                    t("newAgent.roles.custom.name"),
+                    t("newAgent.roles.custom.desc"),
+                  )}
+                </button>
+                {/* Not a choice of role: it opens the import in this step, so it is never pressed-in. */}
+                <button
+                  type="button"
+                  className="newag__role newag__role--blank newag__role--import"
+                  aria-label={t("shell.importAgents")}
+                  onClick={() => setImporting(true)}
+                >
+                  {roleHead(<ImportMarks />, t("newAgent.importCard"), t("newAgent.importCardLine"))}
+                </button>
+              </div>
               {role === "custom" && !starter && (
                 <Card as="div" className="newag__card">
                   <Field label={t("agent.roleLabel")} id="ag-role" example={t(modeKey(org, "agent.roleHelp"))}>
@@ -1194,23 +1195,27 @@ function NewAgentFlow({
       const changed = role !== null && role !== "custom" && instructions !== original;
       return (
         <>
-          {head(
-            t("newAgent.steps.instructions.title", g),
-            t("newAgent.steps.instructions.lead"),
-            t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
-          )}
-          <Textarea
-            className="newag__textarea"
-            rows={9}
-            maxLength={50_000}
-            aria-label={t("newAgent.instructions")}
-            placeholder={t("newAgent.instructionsPlaceholder")}
-            value={instructions}
-            onChange={(e) => {
-              setInstructions(e.target.value);
-              mood.onTyping();
+          {head(t("newAgent.steps.instructions.title", g), t("newAgent.steps.instructions.lead"))}
+          <Field
+            label={t("newAgent.instructions")}
+            id="ag-instructions"
+            hint={{
+              name: t("common.about", { label: t("newAgent.instructions") }),
+              text: t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
             }}
-          />
+          >
+            <Textarea
+              className="newag__textarea"
+              rows={9}
+              limit={instructionsLimit}
+              placeholder={t("newAgent.instructionsPlaceholder")}
+              value={instructions}
+              onChange={(e) => {
+                setInstructions(e.target.value);
+                mood.onTyping();
+              }}
+            />
+          </Field>
           <div className="newag__ta-meta">
             <span className="newag__origin">
               {role && role !== "custom" ? (
@@ -1257,14 +1262,14 @@ function NewAgentFlow({
           managesAgents
             ? t("newAgent.steps.tools.lead", { ...g, org: org.name })
             : t("newAgent.steps.tools.leadNoAccess", g),
-          managesAgents ? undefined : t(keeperKey(org, keeper, "newAgent.accessAdmins"), { keeper }),
         )}
         <Card as="div" className="newag__card">
           {connectedList.length + mailboxes.length > 0 ? (
             <>
               <div className="newag__list-head">
-                <span className="small muted">
-                  {t("newAgent.connectedCount", { count: connectedList.length + mailboxes.length })}
+                <span className="small muted ac-hintline">
+                  <span>{t("newAgent.connectedCount", { count: connectedList.length + mailboxes.length })}</span>
+                  {accessHint}
                 </span>
                 {managesAgents && (
                   <span className="newag__quick">
@@ -1304,7 +1309,7 @@ function NewAgentFlow({
                       key={item.id}
                       icon={<ConnectorIcon def={item.def} image={item.image} label={n} />}
                       name={n}
-                      description={item.account}
+                      meta={item.account}
                       asks={level === "write" ? asksOf(item) : []}
                       levels={LEVELS}
                       value={level}
@@ -1319,7 +1324,7 @@ function NewAgentFlow({
                       key={account.id}
                       icon={<MailIcon choice={choiceOf(account)} />}
                       name={account.address}
-                      description={account.label || null}
+                      meta={account.label || null}
                       asks={level === "write" ? mailAsks : []}
                       levels={LEVELS}
                       value={level}
@@ -1337,18 +1342,16 @@ function NewAgentFlow({
               </ul>
             </>
           ) : (
-            <p className="small muted">{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</p>
+            <p className="small muted ac-hintline">
+              <span>{t(managesAgents ? "access.noConnectors" : "access.noConnectorsViewer")}</span>
+              {accessHint}
+            </p>
           )}
           {managesAgents && (
-            <Link
-              className="newag__addrow"
-              to="/org/$orgId/settings/$section"
-              params={{ orgId: org.id, section: "connectors" }}
-            >
+            <button type="button" className="newag__addrow ac-iconline" onClick={() => setPicking(true)}>
               <Icon name="plug" />
               {t("newAgent.connectOther")}
-              <span className="newag__addrow-aside">{t("newAgent.opensConnectors")}</span>
-            </Link>
+            </button>
           )}
         </Card>
         <p className="newag__note ac-iconline">
@@ -1358,21 +1361,33 @@ function NewAgentFlow({
             {ownerFirst ? t("newAgent.approverOwner", { name: ownerFirst }) : t("newAgent.approverAdmins")}
           </span>
         </p>
-        {(library.data ?? []).length > 0 && (
+        {/* Who manages agents installs one from here, so the section shows for them with an empty library too. */}
+        {(managesAgents || (library.data ?? []).length > 0) && (
           <section className="newag__section" aria-labelledby="ag-skills">
             <div className="newag__sect">
-              <h2 id="ag-skills">
-                <Icon name="book" />
-                {t("skills.step")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
-              </h2>
-              <span className="small muted">{t("newAgent.skillsHelp", g)}</span>
+              <div className="ac-hintline">
+                <h2 id="ag-skills">
+                  <Icon name="book" />
+                  {t("newAgent.skillsTitle")} <span className="newag__opt-label">{t("newAgent.optional")}</span>
+                </h2>
+                <InfoHint name={t("common.about", { label: t("newAgent.skillsTitle") })}>
+                  {t("newAgent.skillsHelp", g)}
+                </InfoHint>
+              </div>
+              {managesAgents && (
+                <Button size="sm" icon="plus" onClick={openInstall}>
+                  {t("skills.install")}
+                </Button>
+              )}
             </div>
-            <SkillPicker
-              skills={library.data ?? []}
-              selected={skillIds ?? new Set()}
-              onChange={setSkillIds}
-              idPrefix="ag-skill"
-            />
+            {(library.data ?? []).length > 0 && (
+              <SkillPicker
+                skills={library.data ?? []}
+                selected={skillIds ?? new Set()}
+                onChange={setSkillIds}
+                idPrefix="ag-skill"
+              />
+            )}
           </section>
         )}
       </>
@@ -1381,11 +1396,15 @@ function NewAgentFlow({
       <>
         {head(t("newAgent.steps.where.title"), t(modeKey(org, "newAgent.steps.where.lead"), g))}
         <div className="newag__sect newag__sect--first">
-          <h2>
-            <Icon name="channel" />
-            {t("newAgent.channels")}
-          </h2>
-          <span className="small muted">{t("newAgent.channelsHelp")}</span>
+          <div className="ac-hintline">
+            <h2>
+              <Icon name="channel" />
+              {t("newAgent.channelsJoin")}
+            </h2>
+            <InfoHint name={t("common.about", { label: t("newAgent.channelsJoin") })}>
+              {t("newAgent.channelsHelp")}
+            </InfoHint>
+          </div>
         </div>
         {myChannels.length > 0 ? (
           <div className="newag__pills">
@@ -1409,34 +1428,27 @@ function NewAgentFlow({
         {!ownerHidden && (
           <>
             <div className="newag__sect">
-              {managesAgents ? (
-                ownerTitle
-              ) : (
-                <div className="ac-hintline">
-                  {ownerTitle}
-                  <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>
-                    {t("newAgent.ownerYours")}
-                  </InfoHint>
-                </div>
-              )}
+              <div className="ac-hintline">
+                {ownerTitle}
+                <InfoHint name={t("common.about", { label: t("newAgent.owner") })}>
+                  {`${managesAgents ? "" : `${t("newAgent.ownerYours")} `}${ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}`}
+                </InfoHint>
+              </div>
             </div>
-            <Card as="div" className="newag__card">
-              {managesAgents ? (
-                <OwnerSelect
-                  value={owner}
-                  members={members.data ?? []}
-                  meId={me.user.id}
-                  onChange={(v) => {
-                    setOwner(v);
-                    if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
-                    if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
-                  }}
-                />
-              ) : (
-                <OwnerValue member={ownerMember} meId={me.user.id} />
-              )}
-              <span className="small muted">{ownerId ? t("newAgent.ownerHelp") : t("newAgent.noOwnerHelp")}</span>
-            </Card>
+            {managesAgents ? (
+              <OwnerSelect
+                value={owner}
+                members={members.data ?? []}
+                meId={me.user.id}
+                onChange={(v) => {
+                  setOwner(v);
+                  if (!aiPicked) startWith(startOf(v === NO_OWNER ? null : v));
+                  if (v !== NO_OWNER) setAudience((a) => ({ ...a, userIds: a.userIds.filter((id) => id !== v) }));
+                }}
+              />
+            ) : (
+              <OwnerValue member={ownerMember} meId={me.user.id} />
+            )}
           </>
         )}
         {!audienceHidden && (
@@ -1554,18 +1566,29 @@ function NewAgentFlow({
             </div>
           </div>
           <Card as="div" className="newag__card">
-            <BudgetField
-              id="ag-budget"
-              value={budget}
-              onChange={setBudget}
-              defaultBudget={defaultBudget}
-              error={errorOf("budget") ? errorText(errorOf("budget") as DraftError) : undefined}
-            />
-            {!errorOf("budget") && (
+            {managesAgents ? (
+              <>
+                <BudgetField
+                  id="ag-budget"
+                  value={budget}
+                  onChange={setBudget}
+                  defaultBudget={defaultBudget}
+                  error={errorOf("budget") ? errorText(errorOf("budget") as DraftError) : undefined}
+                />
+                {!errorOf("budget") && (
+                  <span className="small muted">
+                    {defaultBudget === undefined
+                      ? t("agent.budgetDefaultHelp")
+                      : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}
+                  </span>
+                )}
+              </>
+            ) : (
+              // More than the workspace's default is an admin's to give (the server's rule): no field to raise it.
               <span className="small muted">
                 {defaultBudget === undefined
-                  ? t("agent.budgetDefaultHelp")
-                  : t("agent.budgetDefaultHelpAmount", { amount: usd(t, locale, defaultBudget) })}
+                  ? t("newAgent.budgetCapped")
+                  : t("newAgent.budgetCappedAmount", { amount: usd(t, locale, defaultBudget) })}
               </span>
             )}
           </Card>
@@ -1581,9 +1604,7 @@ function NewAgentFlow({
           </span>
           <div className="newag__rv-v">{value}</div>
           <Button
-            size="sm"
-            variant="ghost"
-            icon="edit"
+            variant="link"
             aria-label={t("newAgent.editSection", { section: label })}
             onClick={() => goTo(NEW_AGENT_STEPS.indexOf(to))}
           >
@@ -1664,26 +1685,6 @@ function NewAgentFlow({
                 <span>{ownerMember?.name ?? t("newAgent.noOwnerAdmins")}</span>,
               )}
             {!audienceHidden && row("where", "message", t("audience.section"), <span>{audienceText()}</span>)}
-            {draft?.routine && (
-              <div className="newag__rv">
-                <span className="newag__rv-k">
-                  <Icon name="routines" size={16} />
-                  {t("newAgent.routine")}
-                </span>
-                <div className="newag__rv-v">
-                  <span>
-                    {draft.routine.name}{" "}
-                    <span className="muted">· {proposedRoutineWhen(t, locale, draft.routine)}</span>
-                  </span>
-                  <span className="newag__quote">{draft.routine.prompt}</span>
-                </div>
-                <Switch
-                  checked={withRoutine}
-                  onCheckedChange={setWithRoutine}
-                  aria-label={t("newAgent.routineKeep", { name: draft.routine.name })}
-                />
-              </div>
-            )}
             {row(
               "model",
               "bolt",
@@ -1711,18 +1712,7 @@ function NewAgentFlow({
         <NewAgentRail index={total} reached={total} total={total} onGo={() => {}} done />
         <main className="newag__main">
           <div className="newag__content newag__content--done">
-            <CreatedMoment
-              created={created}
-              phone={phone}
-              face={mood.face}
-              // Another one starts empty, without the proposal (it is decided).
-              onAgain={
-                from
-                  ? () => void navigate({ to: "/org/$orgId/agents/new", params: { orgId: org.id }, search: {} })
-                  : reset
-              }
-              heading={heading}
-            />
+            <CreatedMoment created={created} phone={phone} face={mood.face} onAgain={reset} heading={heading} />
           </div>
         </main>
       </div>
@@ -1762,18 +1752,10 @@ function NewAgentFlow({
 
   return (
     <div className="onb newag" ref={root}>
-      <NewAgentRail
-        index={index}
-        reached={reached}
-        total={total}
-        onGo={goTo}
-        done={false}
-        onLeave={onClose}
-        skipped={skipped}
-      />
+      <NewAgentRail index={index} reached={reached} total={total} onGo={goTo} done={false} skipped={skipped} />
       <div className="newag__work">
         <main className="newag__main">
-          <Locked when={create.isPending || deny.isPending}>
+          <Locked when={create.isPending}>
             <div className="newag__content" key={step}>
               {views[step]()}
             </div>
@@ -1790,42 +1772,12 @@ function NewAgentFlow({
               )}
             </span>
             {index > 0 || importing ? (
-              <Button
-                variant="ghost"
-                size="lg"
-                icon="chevronLeft"
-                disabled={create.isPending || deny.isPending}
-                onClick={back}
-              >
+              <Button variant="ghost" size="lg" icon="chevronLeft" disabled={create.isPending} onClick={back}>
                 {t("common.back")}
-              </Button>
-            ) : onClose ? (
-              <Button variant="ghost" size="lg" onClick={onClose}>
-                {t("common.cancel")}
               </Button>
             ) : (
               <Button asChild variant="ghost" size="lg">
                 <a {...exit}>{t("common.cancel")}</a>
-              </Button>
-            )}
-            {from && last && (
-              <Button
-                variant="ghost"
-                size="lg"
-                loading={deny.isPending}
-                onClick={() =>
-                  deny.mutate(from.messageId, {
-                    onSuccess: () =>
-                      onClose
-                        ? onClose()
-                        : void navigate({
-                            to: "/org/$orgId/c/$channelId",
-                            params: { orgId: org.id, channelId: from.channelId },
-                          }),
-                  })
-                }
-              >
-                {t("approval.refuse")}
               </Button>
             )}
             {!importing && (
@@ -1946,7 +1898,67 @@ function NewAgentFlow({
           </aside>
         )}
       </div>
+      {picking && (
+        <AppsPickerDialog
+          agentName={name.trim()}
+          connectors={catalog.data?.connectors ?? []}
+          suggested={Object.entries(rolePreset?.levels ?? {}).flatMap(([id, level]) => (level === "none" ? [] : [id]))}
+          connected={connectedApps}
+          // Every connected app is a row of the step's list already.
+          onCard={connectedApps}
+          inList
+          canConnect={can(org, "manage_connectors")}
+          onUse={() => {}}
+          onConnect={(def) => {
+            keepForReturn();
+            setConnecting({ step: 0, def });
+          }}
+          onClose={() => setPicking(false)}
+        />
+      )}
+      <ConnectFlow
+        flow={connecting}
+        onChange={setConnecting}
+        onClose={() => {
+          setConnecting(null);
+          wizardReturn.forget();
+        }}
+        returnTo={wizardReturn.path()}
+      />
+      {managesAgents && (
+        <InstallSkillDialog
+          open={installing}
+          onOpenChange={(open) => {
+            setInstalling(open);
+            if (!open) wizardReturn.forget();
+          }}
+          onInstalled={(id) => setSkillIds((prev) => new Set(prev).add(id))}
+          initialUrl={installLink}
+          connected={Boolean(returned?.params.connected)}
+          returnTo={(url) => wizardReturn.path({ install: url })}
+        />
+      )}
     </div>
+  );
+}
+
+/** Up to three of the apps agents come from, their marks overlapping: the import card's tile. */
+function ImportMarks() {
+  // The app's own theme, which can differ from the system's: so not a `<picture>` with a media query.
+  const dark = useTheme().resolved === "dark";
+  return (
+    <span className="newag__marks" aria-hidden="true">
+      {IMPORT_CARDS.filter((card) => card !== "other")
+        .slice(0, 3)
+        .map((card) => {
+          const mark = CARD_MARK[card];
+          return (
+            <span key={card} className="imp-mark">
+              <img src={dark && mark.dark ? mark.dark : mark.icon} alt="" className="imp-mark__img" />
+            </span>
+          );
+        })}
+    </span>
   );
 }
 
@@ -1966,7 +1978,6 @@ function NewAgentRail({
   total,
   onGo,
   done,
-  onLeave,
   skipped = NO_SKIP,
 }: {
   index: number;
@@ -1974,8 +1985,6 @@ function NewAgentRail({
   total: number;
   onGo: (i: number) => void;
   done: boolean;
-  /** Over the conversation: × closes the review there. */
-  onLeave?: () => void;
   /** Steps passed over (a personal workspace's technical ones): not in the rail. */
   skipped?: readonly NewAgentStep[];
 }) {
@@ -1989,15 +1998,11 @@ function NewAgentRail({
         <span className="onb__brand">
           <Logo size={22} />
         </span>
-        {onLeave ? (
-          <Button variant="ghost" size="sm" iconOnly icon="close" aria-label={t("newAgent.leave")} onClick={onLeave} />
-        ) : (
-          <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
-            <a {...exit} title={t("newAgent.leave")}>
-              <Icon name="close" />
-            </a>
-          </Button>
-        )}
+        <Button asChild variant="ghost" size="sm" iconOnly aria-label={t("newAgent.leave")}>
+          <a {...exit} title={t("newAgent.leave")}>
+            <Icon name="close" />
+          </a>
+        </Button>
       </div>
       <div className="newag__rail-title">
         <b>{t("newAgent.title")}</b>

@@ -1,4 +1,5 @@
 import { ApiError } from "@agenteschat/client";
+import { sessionEnded } from "@agenteschat/client/lib/errors";
 import { LiveQueryClient } from "@agenteschat/client/lib/live-query-client";
 import { MutationCache, QueryCache } from "@tanstack/react-query";
 
@@ -22,12 +23,12 @@ export function createQueryClient(handlers: {
     },
     queryCache: new QueryCache({
       onError: (error) => {
-        if (error instanceof ApiError && error.status === 401) handlers.onUnauthorized();
+        if (sessionEnded(error)) handlers.onUnauthorized();
       },
     }),
     mutationCache: new MutationCache({
       onError: (error, _vars, _ctx, mutation) => {
-        if (error instanceof ApiError && error.status === 401) return handlers.onUnauthorized();
+        if (sessionEnded(error)) return handlers.onUnauthorized();
         // Mutations that show their own inline error opt out with `meta: { silent: true }`.
         if (mutation.meta?.silent) return;
         handlers.onMutationError(handlers.describeError(error));

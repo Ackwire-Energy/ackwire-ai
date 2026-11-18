@@ -16,6 +16,7 @@ import {
   type Saved,
 } from "@/lib/agent-edit";
 import { ADA_ID, createFakeApi, ENG_ID, GENERAL_ID, NOW, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -257,12 +258,37 @@ describe("agent page: its usage (ADR 0063)", () => {
     expect(week.getAttribute("aria-valuenow")).toBe("41");
     expect(week.querySelector(".ac-meter__part")?.getAttribute("style")).toContain("width: 30%");
     expect(now.textContent).toContain("Parte da Ada: ≈ 30%");
-    expect(now.textContent).toContain("é uma estimativa");
-    // It informs: changing the account is "Quem pensa"'s.
-    expect(within(now).queryByRole("button")).toBeNull();
+    expect(shownText(now)).toContain("Estimativa.");
+    expect(shownText(now)).not.toContain("é uma estimativa");
+    expect(hintOf("Agora", now).text).toContain("a parte de cada agente é uma estimativa");
+    // It informs: changing the account is "Quem pensa"'s. Its one button is the ⓘ.
+    expect(within(now).getAllByRole("button")).toEqual([hintOf("Agora", now).button]);
     const sources = screen().getByRole("region", { name: "Por conta, este mês" });
     expect(sources.textContent).toContain("≈ US$\u00a076,00 pelo preço da API");
     expect(sources.textContent).toContain("US$\u00a00,80 pagos");
+  });
+
+  test("Agora lists the plan's models at a limit of their own under the account's windows", async () => {
+    const api = createFakeApi(seedState());
+    const seeded = api.agents.planUsage;
+    const at = new Date().toISOString();
+    api.agents.planUsage = async (...args) => {
+      const view = await seeded(...args);
+      const current = view.current?.usage && {
+        ...view.current,
+        provider: "opencode",
+        usage: {
+          ...view.current.usage,
+          models: { "glm-5.3": { at, until: "2099-01-01T15:40:00.000Z" }, "minimax-m3": { at, off: true as const } },
+        },
+      };
+      return { ...view, current: current ?? null };
+    };
+    await renderApp(`/org/${ORG_ID}/agents/${ADA_ID}?tab=usage`, { api });
+    await settle(8);
+    const now = screen().getByRole("region", { name: "Agora" });
+    const rows = [...now.querySelectorAll(".plan-model")].map((r) => r.textContent);
+    expect(rows).toEqual(["MiniMax M3Desligado", expect.stringMatching(/^GLM-5\.3Sem cota · renova /)]);
   });
 
   test("a member sees the tokens and the percentages, never money", async () => {
@@ -507,8 +533,8 @@ describe("agent page: inline editing and the save bar", () => {
   test("changes add up in one bar: count, names, Ver (old → new, Desfazer), Alterado on the card, Descartar", async () => {
     await go("?tab=instructions");
     const box = screen().getByRole("textbox", { name: "Instruções" });
-    // The server's cap: typing stops there, never a refusal after saving.
-    expect(box.getAttribute("maxlength")).toBe("50000");
+    // Nothing typed or pasted is cut: the limit shows near it, never a native cap.
+    expect(box.getAttribute("maxlength")).toBeNull();
     await type(box, "Instruções de Ada.\nAbre PRs pequenos.");
     const card = box.closest("section") as HTMLElement;
     expect(card.getAttribute("data-changed")).toBe("true");
@@ -606,17 +632,18 @@ describe("agent page: inline editing and the save bar", () => {
         .getAllByRole("radio")
         .find((r) => r.getAttribute("aria-checked") === "true")?.textContent;
     expect([level("GitHub"), level("Suporte")]).toEqual(["Sem acesso", "Ler"]);
-    // One control over the list, from its own edge: no level chosen while the rows differ.
-    const all = screen().getByRole("radiogroup", { name: "Conectores" });
-    expect(all.closest(".newag__quick")).toBeTruthy();
+    // One quiet action over the list, in the card's head, with the rows' own words.
+    const all = screen().getByRole("button", { name: "Mudar todos" });
+    expect(all.closest(".ac-card__action")).toBeTruthy();
+    await act(async () => fireEvent.pointerDown(all, { button: 0, ctrlKey: false }));
+    await settle(2);
+    const menu = screen().getByRole("menu", { name: "Mudar todos" });
     expect(
-      within(all)
-        .getAllByRole("radio")
+      within(menu)
+        .getAllByRole("menuitem")
         .map((r) => r.textContent),
-    ).toEqual(["Sem acesso", "Só ler", "Ler e escrever"]);
-    expect(within(all).queryByRole("radio", { checked: true })).toBeNull();
-    await click(within(all).getByRole("radio", { name: "Ler e escrever" }));
-    expect(within(all).getByRole("radio", { checked: true }).textContent).toBe("Ler e escrever");
+    ).toEqual(["Sem acesso", "Ler", "Ler e escrever"]);
+    await click(within(menu).getByRole("menuitem", { name: "Ler e escrever" }));
     expect([level("GitHub"), level("Suporte")]).toEqual(["Ler e escrever", "Ler e escrever"]);
     expect(saveBar()?.textContent).toContain("2 alterações");
     await click(within(saveBar() as HTMLElement).getByRole("button", { name: /^Salvar/ }));
@@ -776,12 +803,13 @@ describe("agent page: memory and proposals", () => {
     expect(within(card()).getByText("Um admin decide.")).toBeTruthy();
   });
 
-  test("the side column is one link to how memory works", async () => {
+  test("one column, and under its cards one link to how memory works", async () => {
     await go("?tab=memory");
     const link = screen().getByRole("link", { name: "Como a memória funciona" });
     expect(link.getAttribute("href")).toBe("https://agentes.chat/pt/docs/memory");
     expect(link.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(link.closest(".agp-col")?.textContent).toBe("Como a memória funciona");
+    expect(link.closest(".agp-cols")?.querySelectorAll(".agp-col")).toHaveLength(1);
+    expect(link.closest(".page__note")?.textContent).toBe("Como a memória funciona");
     const card = screen().getByRole("article", { name: "Atualizar as instruções da Ada" });
     expect(card.textContent).toContain("Recusar ensina a Ada a não propor isso de novo.");
   });
@@ -792,7 +820,7 @@ describe("agent page: memory and proposals", () => {
     expect(
       within(kinds)
         .getAllByRole("radio")
-        // The count is a separate chip (CountChip): no text space between label and number.
+        // The count is a quiet number after the label: no text space between them.
         .map((r) => r.textContent?.replace(/(\D)(\d+)$/, "$1 $2")),
     ).toEqual(["Fatos e decisões 4", "Lições 2", "Aprendizados", "Arquivados 1"]);
     await type(screen().getByRole("searchbox", { name: "Buscar" }), "zzz-nada");
@@ -816,7 +844,8 @@ describe("agent page: memory and proposals", () => {
     );
     const row = screen().getByText("GET the models with the key.").closest("li") as HTMLElement;
     expect(row.textContent).toContain("Como fazer");
-    expect(row.textContent).toContain("Não verificado");
+    // Not verified is the lack of a chip, with Confirmar to change it.
+    expect(row.querySelector(".ac-chip")).toBeNull();
     await click(within(row).getByRole("button", { name: "Esquecer" }));
     expect(state.memories.find((m) => m.id === mine.id)?.archived).toBe(true);
   });

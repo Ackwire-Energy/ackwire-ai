@@ -121,6 +121,9 @@ export function replay(canvas: SkCanvas, ops: readonly CompiledOp[]): void {
       case "scale":
         canvas.scale(op.x, op.y);
         break;
+      case "rotate":
+        canvas.rotate(op.degrees, 0, 0);
+        break;
       case "rects": {
         const path = Skia.Path.MakeFromSVGString(rectsToSvg(op.rects));
         if (path) canvas.drawPath(path, fillPaint(op.color));

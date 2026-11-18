@@ -22,10 +22,11 @@ import type { Level } from "./access-levels";
 import { workspaceActionContext, workspaceActionWords } from "./actions";
 import { type AppPage, isAppPage } from "./app-pages";
 import type { ConnectedItem } from "./connected";
-import { isHttpsUrl, sameServer } from "./custom-tools";
+import { isHttpsUrl, serverCovers } from "./custom-tools";
 import { formatUsd, joinNames } from "./format";
 import { aiStateOf, PLAN_BRAIN } from "./no-ai";
 import type { Permission } from "./permissions";
+import { COMPUTER_KEYS, COMPUTERS_ROW } from "./roles";
 import { type TeamWeekCard, teamWeekCardOf } from "./team-week";
 import { type UsagePauseCard, usagePauseCardOf } from "./usage-pause";
 
@@ -173,6 +174,8 @@ export interface ApprovalsCard {
   forUserId: string | null;
   approvalIds: string[];
   why: string;
+  /** The right hand posted it by itself: the summary of what waits on this person. */
+  digest?: boolean;
 }
 
 /** One person's change on a people card (`propose_member_changes`). */
@@ -325,6 +328,34 @@ export function proposalStatus(
   return Date.parse(card.expiresAt) <= now ? "expired" : "open";
 }
 
+/**
+ * How a proposal of a new agent ended and who did it, for its card: "Criado por você", "Recusado por Ana", "Expirou"
+ * (nobody decided one that ran out), or that a newer card took its place. `decider`: the name of who decided, when
+ * the viewer can read it; without one it says only how it ended.
+ */
+export function agentProposalEnd(
+  t: TFunction,
+  card: AgentProposalCard,
+  status: Exclude<ReturnType<typeof proposalStatus>, "open">,
+  meId: string | null,
+  decider: string | undefined,
+): string {
+  if (status === "expired") return t("approval.expired");
+  if (status === "superseded") return t("rightHand.card.superseded");
+  const mine = card.decidedByUserId !== null && card.decidedByUserId === meId;
+  if (status === "created")
+    return mine
+      ? t("actionCard.agentProposal.createdByYou")
+      : decider
+        ? t("actionCard.agentProposal.createdBy", { name: decider })
+        : t("actionCard.agentProposal.created");
+  return mine
+    ? t("rightHand.card.declinedByYou")
+    : decider
+      ? t("rightHand.card.declinedBy", { name: decider })
+      : t("proposals.refused");
+}
+
 /** "Pensa com Claude Max", "Pensa pela API", "Sem IA ainda…": the AI a proposal suggests. */
 export const suggestedAiText = (t: TFunction, ai: SuggestedAi) =>
   ai.kind === "account"
@@ -469,7 +500,9 @@ export function actionCardOf(meta: Record<string, unknown> | null | undefined): 
   }
   if (card.kind === "approvals") {
     const approvalIds = strings(p.approvalIds);
-    return approvalIds.length > 0 ? { kind: "approvals", forUserId, approvalIds, why } : null;
+    return approvalIds.length > 0
+      ? { kind: "approvals", forUserId, approvalIds, why, ...(p.digest === true ? { digest: true } : {}) }
+      : null;
   }
   if (card.kind === "member_changes") {
     const rows = (Array.isArray(p.rows) ? p.rows : []).flatMap((r): MemberChangeRow[] => {
@@ -537,7 +570,7 @@ export const connectAppDone = (
   const working = items.filter((i) => !i.needsReconnect);
   return card.connector
     ? working.some((i) => i.def?.id === card.connector)
-    : Boolean(card.url) && working.some((i) => sameServer(i.server?.serverUrl, card.url));
+    : Boolean(card.url) && working.some((i) => serverCovers(i.server?.serverUrl, card.url));
 };
 
 const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
@@ -555,6 +588,39 @@ export function memberRowDone(row: MemberChangeRow, members: readonly Pick<Membe
   return row.addRoleIds.every((id) => has.has(id)) && row.removeRoleIds.every((id) => !has.has(id));
 }
 
+/**
+ * What a people card's row does, in the reader's words: "Gets Owner", "Loses Sales", "Gets Sales · Loses Support",
+ * "Remove from workspace". A role that is gone is left out.
+ */
+export function memberRowText(t: TFunction, row: MemberChangeRow, roleName: (id: string) => string | undefined) {
+  if ("remove" in row) return t("members.remove.item");
+  if ("role" in row)
+    return t(row.role === "owner" ? "rightHand.people.gets" : "rightHand.people.loses", { roles: t("roles.owner") });
+  const names = (ids: string[]) => ids.flatMap((id) => roleName(id) || []).join(", ");
+  return [
+    row.addRoleIds.length ? t("rightHand.people.gets", { roles: names(row.addRoleIds) }) : "",
+    row.removeRoleIds.length ? t("rightHand.people.loses", { roles: names(row.removeRoleIds) }) : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+/**
+ * The key a row's change asks of whoever applies it, as the members screen does: owners make and unmake owners and
+ * remove one, who manages members does the rest. The server checks again at the click.
+ */
+export const memberRowNeeds = (
+  row: MemberChangeRow,
+  members: readonly Pick<Member, "userId" | "role">[],
+): Permission =>
+  "role" in row || ("remove" in row && members.find((m) => m.userId === row.userId)?.role === "owner")
+    ? "manage_owners"
+    : "manage_members";
+
+/** Why a viewer who may apply no open row can't: a row only owners apply, else one for who manages members. */
+export const memberRowsBlocked = (open: readonly MemberChangeRow[], may: (row: MemberChangeRow) => boolean) =>
+  open.some((r) => "role" in r && !may(r)) ? "rightHand.people.onlyOwners" : "rightHand.people.onlyAdmins";
+
 /** The roles a row leaves the person with: theirs now, with its roles given and taken. */
 export const rolesAfter = (row: { addRoleIds: string[]; removeRoleIds: string[] }, now: readonly string[] = []) => [
   ...new Set([...now.filter((id) => !row.removeRoleIds.includes(id)), ...row.addRoleIds]),
@@ -569,6 +635,30 @@ export const inviteDone = (card: InviteCard, invited: readonly string[]) => {
 /** Done once the library has a skill installed from the card's link. */
 export const installSkillDone = (card: InstallSkillCard, skills: readonly Pick<Skill, "sourceUrl">[]) =>
   skills.some((s) => s.sourceUrl === card.url);
+
+/** The install an agent's card opened: its own link and the agent that posted it (kept by the app that opened it). */
+export interface CardInstall {
+  url: string;
+  agentId: string;
+}
+
+/** A kept `CardInstall` read back (JSON), or null when it isn't one. */
+export function cardInstallOf(raw: string | null | undefined): CardInstall | null {
+  try {
+    const v = JSON.parse(raw ?? "null") as Partial<CardInstall> | null;
+    return typeof v?.url === "string" && typeof v.agentId === "string" ? { url: v.url, agentId: v.agentId } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The agent that what installs may go on for: only the one whose card opened the install, named by the screen it
+ * opened (`agent`), and only for that card's own link. A link typed over it or a repository picked instead goes on for
+ * nobody, and so does a link to the screen that merely names an agent.
+ */
+export const cardInstallAgent = (from: CardInstall | null | undefined, url?: string, agent?: string) =>
+  from && agent && from.agentId === agent && from.url === url?.trim() ? agent : undefined;
 
 /**
  * Where a skill of an update card stands: `waiting` (its update changes files that run), `done` (its link was read
@@ -609,21 +699,41 @@ export function workspaceActionCardOf(raw: unknown): WorkspaceActionCard | null 
   };
 }
 
-/** The card's sentence: `rightHand.action.{action}`, or the plain one for an action this build doesn't know. */
+/** The addresses an applied invite card sent an invitation to: its sentence then says what happened. */
+const invitedBy = (card: WorkspaceActionCard) =>
+  card.params.action === "invite_people" && card.state === "applied" ? listed(card.params.words.invited) : [];
+
+/**
+ * Whether the card's sentence says what happened (an applied invite card's "Convites enviados para …"): nothing over
+ * it then says that it proposes a change.
+ */
+export const actionCardSaysDone = (card: WorkspaceActionCard) => invitedBy(card).length > 0;
+
+/**
+ * The card's sentence: `rightHand.action.{action}`, or the plain one for an action this build doesn't know. An invite
+ * card that was applied says who got an invitation instead of what it would do.
+ */
 export const actionCardKey = (card: WorkspaceActionCard) =>
-  (WORKSPACE_ACTION_IDS as readonly string[]).includes(card.params.action)
-    ? `rightHand.action.${workspaceActionContext(card.params.action, card.params.words)}`
-    : "rightHand.action.other";
+  actionCardSaysDone(card)
+    ? "rightHand.action.invite_people_sent"
+    : (WORKSPACE_ACTION_IDS as readonly string[]).includes(card.params.action)
+      ? `rightHand.action.${workspaceActionContext(card.params.action, card.params.words)}`
+      : "rightHand.action.other";
 
 /** The values of the card's sentence, in the reader's language (`workspaceActionWords`). */
-export const actionCardWords = (card: WorkspaceActionCard, t: TFunction) =>
-  workspaceActionWords(card.params.action, card.params.words, t);
+export const actionCardWords = (card: WorkspaceActionCard, t: TFunction): Record<string, string | number> => {
+  const invited = invitedBy(card);
+  return invited.length > 0
+    ? { emails: joinNames(invited, t), count: invited.length }
+    : workspaceActionWords(card.params.action, card.params.words, t);
+};
 
 /**
  * Everything else the card changes, under its sentence, so whoever applies it from their inbox sees all of it: what a
  * role or a channel's exception gives or takes in the permissions' own words ("conversar, dar missões e editar a wiki";
  * "+ editar a wiki, − aprovar ações"), a new name, where a role moves, a channel turned private, a new budget. Empty when
- * the sentence says it all.
+ * the sentence says it all. An invite card's lines are each their own (a line break between them), its roles a
+ * sentence ("Com os cargos Vendas e Suporte.").
  */
 export function actionCardDetail(card: WorkspaceActionCard, t: TFunction, locale = "en"): string {
   const input = card.params.input;
@@ -641,6 +751,24 @@ export function actionCardDetail(card: WorkspaceActionCard, t: TFunction, locale
       return parts(renamed, change(input.add_permissions, input.remove_permissions));
     case "move_role":
       return `${input.above === true ? "↑" : "↓"} ${card.params.words.other ?? ""}`.trim();
+    case "set_permission_holders": {
+      // Who has it once applied: everyone, then each role named; on the computers' ladder, each with its step, a line
+      // each.
+      const roles = (Array.isArray(input.roles) ? input.roles : []) as { name?: unknown; level?: unknown }[];
+      const holders = [
+        ...(Number(input.everyone) > 0
+          ? [{ name: t("rolesPage.everyoneName") as string, level: Number(input.everyone) }]
+          : []),
+        ...roles.filter((r) => Number(r.level) > 0).map((r) => ({ name: text(r.name), level: Number(r.level) })),
+      ];
+      if (holders.length === 0) return t("rightHand.action.holdersOwnersOnly") as string;
+      return input.row === COMPUTERS_ROW
+        ? holders.map((h) => `${h.name}: ${short(COMPUTER_KEYS[h.level - 1] ?? "")}`).join("\n")
+        : joinNames(
+            holders.map((h) => h.name),
+            t,
+          );
+    }
     case "set_channel_permissions":
       return change(input.allow, input.deny) || (t("channel.perms.clear") as string);
     case "update_channel":
@@ -665,10 +793,51 @@ export function actionCardDetail(card: WorkspaceActionCard, t: TFunction, locale
             .map((n) => `+ ${n}`)
             .join(", ")
         : text(input.reason);
+    case "invite_people":
+      // The roles every address gets and, once sent, each address left out with why, a line each. Nothing on the
+      // card resends: an address that held an invitation is only said.
+      return [
+        keys(input.roleNames).length > 0 &&
+          (t("rightHand.action.invite_roles", {
+            roles: joinNames(keys(input.roleNames), t),
+            count: keys(input.roleNames).length,
+          }) as string),
+        ...INVITE_LEFT_OUT.flatMap((status) =>
+          listed(card.params.words[status]).map(
+            (email) => t(`members.batch.${status === "already_invited" ? "had_invite" : status}`, { email }) as string,
+          ),
+        ),
+      ]
+        .filter(Boolean)
+        .join("\n");
+    case "remove_ai_key":
+      return text(card.params.words.provider);
     default:
       return "";
   }
 }
+
+/**
+ * Why an address on an applied invite card got no invitation, as the server's words name it (`words.{status}`).
+ * `already_invited` comes only in the answer to the tap of whoever applied it: the stored card never says it.
+ */
+const INVITE_LEFT_OUT = ["already_invited", "already_member", "invalid_email"] as const;
+/** The addresses of one of the server's words ("a@example.com, b@example.com"). */
+const listed = (word: string | undefined) => (word ? word.split(", ").filter(Boolean) : []);
+
+/** The mark beside the card's sentence, by what it changes: a channel, people, an AI key, else the workspace. */
+export const actionCardMark = (card: WorkspaceActionCard): "channel" | "members" | "key" | "shield" => {
+  const { action } = card.params;
+  if (action.includes("channel")) return "channel";
+  return action === "invite_people" ? "members" : action === "remove_ai_key" ? "key" : "shield";
+};
+
+/** A change nothing brings back (a role, a channel or a key deleted): its button reads as a danger. */
+export const actionCardDestroys = (card: WorkspaceActionCard) => /^(delete|remove)_/.test(card.params.action);
+
+/** The words of the button that does what the card says: "Apagar" on one that deletes, else "Aplicar". */
+export const actionCardApplyKey = (card: WorkspaceActionCard) =>
+  actionCardDestroys(card) ? "rightHand.card.delete" : "rightHand.card.apply";
 
 /**
  * Whether this viewer gets Aplicar on the card: the key its screen asks for, unless they are the person it was for and

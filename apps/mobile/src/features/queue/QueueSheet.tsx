@@ -2,6 +2,7 @@ import {
   type ComputerQueue,
   type QueueWaiting,
   type QueueWorking,
+  useAiAccounts,
   useChannels,
   useDms,
   useMachineQueue,
@@ -22,15 +23,35 @@ import {
   queueView,
   queueWhereText,
 } from "@agenteschat/client/lib/computer-queue";
+import { errorText } from "@agenteschat/client/lib/errors";
+import { devicePlanName } from "@agenteschat/client/lib/no-ai";
 import { type ReactNode, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeOut, LayoutAnimationConfig, LinearTransition } from "react-native-reanimated";
-import { Button, CHROME_MAX_SCALE, Chip, Count, Icon, type IconName, PressScale, Text, useReducedMotion } from "@/ui";
+import {
+  Button,
+  CHROME_MAX_SCALE,
+  Chip,
+  Count,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  type IconName,
+  PressScale,
+  SHEET_X,
+  SkeletonList,
+  Text,
+  useReducedMotion,
+  useToast,
+} from "@/ui";
 import { router } from "@/ui/navigation";
 import { useComputerSays, useWatchableComputer } from "../chat/DmComputerButton";
 import { openComputer } from "../computer/AgentComputerRow";
+import { StatusLine } from "../devices/parts";
+import { useDeviceMutation, useDevices } from "../devices/queries";
 import { AgentFace, OpensAgent } from "../shared/Face";
+import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useNow, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
@@ -125,9 +146,12 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
   const reduced = useReducedMotion();
   if (!q.data) {
     return q.isError ? (
-      <Text tone="muted">{t("mobile.app.failed")}</Text>
+      <LoadFailed onRetry={() => void q.refetch()} />
     ) : (
-      <ActivityIndicator color={c.muted} style={styles.loading} />
+      // Loading: the line's own rows (a face and two lines), at the sheet's edges as a list's rows, never a spinner.
+      <View style={styles.bleed}>
+        <SkeletonList rows={3} />
+      </View>
     );
   }
   const view = queueView(q.data, meId ?? "");
@@ -180,8 +204,57 @@ export function QueueSheet({ machineId, computer }: { machineId: string; compute
       <Text variant="caption" tone="faint" style={styles.rule}>
         {t("queue.rule")}
       </Text>
+      <SpillHere machineId={machineId} />
       {computer ? <OpenComputer {...computer} /> : null}
     </>
+  );
+}
+
+/**
+ * "More computers, shorter line": my other online computers, each with its switch for my replies to start there while
+ * this one is full (`spill.own`). Nothing when I have none.
+ */
+function SpillHere({ machineId }: { machineId: string }) {
+  const { t } = useTranslation();
+  const c = useColors();
+  const meId = useMeId();
+  const toast = useToast();
+  const devices = useDevices();
+  const accounts = useAiAccounts(useOrgId()).data;
+  const spill = useDeviceMutation((api, orgId, input: { id: string; own: boolean }) =>
+    api.devices.updateComputer(orgId, input.id, { spill: { own: input.own } }),
+  );
+  const mine = (devices.data?.devices ?? []).filter(
+    (d) => d.id !== machineId && d.ownerUserId === meId && d.machineKind === "connected" && !d.systemMode,
+  );
+  if (mine.length === 0) return null;
+  const plan = (name: string | null) => (name ? t("queue.spill.plan", { plan: name }) : undefined);
+  return (
+    <View style={[styles.group, styles.nextGroup, { borderTopColor: c.line }]}>
+      <GroupHead title={t("queue.spill.title")} />
+      <GroupedList>
+        {mine.map((d) => (
+          <GroupedRow
+            key={d.id}
+            icon="laptop"
+            label={d.name}
+            below={<StatusLine status={d.status} />}
+            belowText={plan(devicePlanName(t, accounts, d.id))}
+            toggle={d.spill.own}
+            disabled={spill.isPending}
+            onPress={() =>
+              spill.mutate(
+                { id: d.id, own: !d.spill.own },
+                { onError: (err) => toast({ title: errorText(t, err), icon: "x" }) },
+              )
+            }
+          />
+        ))}
+      </GroupedList>
+      <Text variant="caption" tone="faint">
+        {t("queue.spill.text")}
+      </Text>
+    </View>
   );
 }
 
@@ -413,7 +486,7 @@ const ROW_IN = FadeIn.duration(160);
 const ROW_OUT = FadeOut.duration(120);
 
 const styles = StyleSheet.create({
-  loading: { marginVertical: 24 },
+  bleed: { marginHorizontal: -SHEET_X },
   button: { height: 40, borderRadius: 20 },
   counted: { flexGrow: 1, flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10 },
   head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },

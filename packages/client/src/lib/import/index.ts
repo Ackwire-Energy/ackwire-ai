@@ -11,18 +11,23 @@ import * as openmausbot from "./openmausbot";
 import * as paperclip from "./paperclip";
 import {
   Draft,
+  type FlowStep,
   holdsKey,
-  IMPORT_MAX_BYTES,
   ImportError,
   type ImportFile,
+  type ImportLimit,
+  type ImportWorkflow,
+  importFileCap,
   isSecretPath,
   type LeftOut,
   type LeftOutKind,
   normalizePath,
+  PASTED,
   type ParseOptions,
   scrubSecrets,
   slug,
   splitNote,
+  TEXT_PATH,
 } from "./shared";
 
 /**
@@ -36,13 +41,21 @@ import {
 export { EXPORT_PROMPT } from "./agenteschat";
 export { interpolateEnv } from "./openbot";
 export {
+  type FlowStep,
   IMPORT_MAX_BYTES,
+  IMPORT_TEXT_MAX_BYTES,
   ImportError,
   type ImportErrorCode,
   type ImportFile,
+  type ImportLimit,
+  type ImportWorkflow,
+  importFileCap,
   type LeftOut,
   type LeftOutKind,
+  PASTED,
   type ParseOptions,
+  type SayKey,
+  type SayValues,
   scrubSecrets,
   uniqueHandle,
 } from "./shared";
@@ -150,21 +163,44 @@ export function detectSource(files: ImportFile[]): ImportSource | null {
 export const parseImport = (files: ImportFile[], options: ParseOptions = {}): MigrationBundle =>
   parsePackage(files, options).bundle;
 
-/** `parseImport`, with the agents' own files beside the bundle (they never travel in it). */
-export function parsePackage(
-  files: ImportFile[],
-  options: ParseOptions = {},
-): { bundle: MigrationBundle; files: AgentFile[] } {
+/** What a read finds: the bundle, and what goes beside it (never sent with it). */
+export interface ParsedPackage {
+  bundle: MigrationBundle;
+  /** The agents' own files, for their folders in the Drive. */
+  files: AgentFile[];
+  /** What each workflow became (a routine or a skill in the bundle), with its steps. */
+  workflows: ImportWorkflow[];
+  /** The agents a routine hands its answer to, by the routine's key. */
+  passes: Record<string, string[]>;
+}
+
+/** `parseImport`, with the agents' own files and the workflows beside the bundle (they never travel in it). */
+export function parsePackage(files: ImportFile[], options: ParseOptions = {}): ParsedPackage {
   const all = prepare(files);
-  if (
-    all.some((f) => f.text.length > IMPORT_MAX_BYTES || new TextEncoder().encode(f.text).byteLength > IMPORT_MAX_BYTES)
-  ) {
-    throw new ImportError("tooLarge");
+  for (const f of all) {
+    const max = importFileCap(f.name);
+    const have = f.text.length > max ? f.text.length : new TextEncoder().encode(f.text).byteLength;
+    if (have > max)
+      throw new ImportError("tooLarge", { kind: f.name === PASTED ? "text" : "file", have, max, name: f.name });
   }
   const usable = readable(all);
-  if (usable.length === 0) throw new ImportError("empty");
-  const source = DETECTION.find((id) => PARSERS[id].detect(usable));
-  if (!source) throw new ImportError("unknown");
+  const source = usable.length > 0 ? DETECTION.find((id) => PARSERS[id].detect(usable)) : undefined;
+  if (!source) {
+    // A format's text file the reader left unread for its size explains an empty or unknown read better.
+    const skipped = all.find(
+      (f) => !f.text && TEXT_PATH.test(f.name) && !isSecretPath(f.name) && (f.size ?? 0) > importFileCap(f.name),
+    );
+    if (skipped) {
+      const limit: ImportLimit = {
+        kind: "file",
+        have: skipped.size ?? 0,
+        max: importFileCap(skipped.name),
+        name: skipped.name,
+      };
+      throw new ImportError("tooLarge", limit);
+    }
+    throw new ImportError(usable.length === 0 ? "empty" : "unknown");
+  }
   const d = new Draft(usable, options);
   PARSERS[source].parse(usable, d);
   return finish(d, source, all);
@@ -203,7 +239,7 @@ function agentFile(agent: string, path: string, f: ImportFile): AgentFile {
 }
 
 /** Checks references, scrubs every text, splits long notes and lists what was not read. */
-function finish(d: Draft, app: ImportSource, files: ImportFile[]): { bundle: MigrationBundle; files: AgentFile[] } {
+function finish(d: Draft, app: ImportSource, files: ImportFile[]): ParsedPackage {
   const leftOut: LeftOut[] = [...d.leftOut];
   const left = (kind: LeftOutKind, label: string) => {
     if (label) leftOut.push({ kind, label });
@@ -363,7 +399,35 @@ function finish(d: Draft, app: ImportSource, files: ImportFile[]): { bundle: Mig
         return true;
       }),
   };
-  return { bundle, files: agentFiles };
+  // What a workflow became, for what made it into the bundle; its steps' words as scrubbed as the request.
+  const routineKeys = new Set(routines.map((r) => r.key));
+  const skillSet = new Set(skills.map((s) => s.key));
+  const step = (s: FlowStep): FlowStep => {
+    switch (s.kind) {
+      case "text":
+        return { ...s, text: label(s.text) };
+      case "do":
+        return { ...s, task: label(s.task) };
+      case "media":
+        return { ...s, prompt: label(s.prompt) };
+      case "if":
+        return { ...s, rule: label(s.rule), otherwise: s.otherwise.map(step) };
+      case "approval":
+        return { ...s, question: label(s.question) };
+      default:
+        return s;
+    }
+  };
+  const workflows = d.workflows
+    .filter((w) => agentKeys.has(w.agent) && (w.item.kind === "routine" ? routineKeys : skillSet).has(w.item.key))
+    .map((w) => ({ ...w, title: label(w.title), steps: w.steps.map(step) }));
+  const passes = Object.fromEntries(
+    [...d.passes]
+      .filter(([key]) => routineKeys.has(key))
+      .map(([key, to]) => [key, to.filter((k) => agentKeys.has(k))] as const)
+      .filter(([, to]) => to.length > 0),
+  );
+  return { bundle, files: agentFiles, workflows, passes };
 }
 
 /** The model an imported agent is created with: its own when it's in the catalog, else the suggestion. */

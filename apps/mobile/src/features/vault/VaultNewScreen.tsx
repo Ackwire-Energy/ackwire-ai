@@ -10,7 +10,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
-import { Gap, SettingsPage } from "../settings/parts";
+import { Gap, NEXT_FIELD, SettingsPage, useUnsavedGuard } from "../settings/parts";
 import { useOrgId } from "../shared/hooks";
 import { successHaptic } from "../shared/parts";
 import {
@@ -60,12 +60,24 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
     setTouched(null);
   };
   const problem = formProblem(form, true);
+  // Back with something typed and not saved asks first (a password typed here exists nowhere else yet).
+  const typed = [
+    form.title,
+    form.website,
+    form.username,
+    form.secret,
+    form.keyName,
+    form.description,
+    ...Object.values(form.contact),
+  ].some((v) => (v ?? "").trim() !== "");
+  const leave = useUnsavedGuard(typed);
   const save = () => {
     if (problem) return;
     create.mutate(itemInput(form, scope, access), {
       onSuccess: (item) => {
         successHaptic();
         toast({ title: t("mobile.vault.savedToVault"), icon: "lock" });
+        leave();
         router.replace(vaultHref.item(item.id) as never);
       },
       onError: (err) => toast({ title: errorText(t, err, i18n.language), icon: "x" }),
@@ -86,6 +98,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
       title={t("mobile.vault.newItem")}
       action={{ label: t("common.save"), onPress: save, disabled: problem !== null || create.isPending }}
       locked={create.isPending}
+      toolbar
     >
       <GroupedHeader>{t("mobile.vault.kindTitle")}</GroupedHeader>
       <GroupedList>
@@ -118,6 +131,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               keyboardType="url"
               autoCapitalize="none"
               placeholder={t("mobile.vault.field.websitePlaceholder")}
+              {...NEXT_FIELD}
             />
             <InputField
               label={t("mobile.vault.field.username")}
@@ -126,6 +140,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               maxLength={LIMITS.username}
               autoCapitalize="none"
               textContentType="username"
+              {...NEXT_FIELD}
             />
             <InputField
               label={t("mobile.vault.field.password")}
@@ -135,6 +150,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               textContentType="none"
               autoComplete="off"
               autoCapitalize="none"
+              {...NEXT_FIELD}
             />
             <InputField
               label={t("mobile.vault.field.title")}
@@ -143,6 +159,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               maxLength={LIMITS.title}
               autoCapitalize="sentences"
               placeholder={hostOf(websiteOrigin(form.website)) || t("mobile.vault.field.titleOptional")}
+              returnKeyType="done"
             />
           </GroupedList>
           {typedWebsite && !websiteOrigin(form.website) ? (
@@ -163,6 +180,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               maxLength={LIMITS.keyName}
               autoCapitalize="characters"
               placeholder={t("mobile.vault.field.keyNamePlaceholder")}
+              {...NEXT_FIELD}
             />
             <InputField
               label={t("mobile.vault.field.value")}
@@ -172,6 +190,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               textContentType="none"
               autoComplete="off"
               autoCapitalize="none"
+              {...NEXT_FIELD}
             />
             <InputField
               label={t("mobile.vault.field.description")}
@@ -180,6 +199,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
               maxLength={LIMITS.description}
               autoCapitalize="sentences"
               placeholder={t("mobile.vault.field.descriptionPlaceholder")}
+              returnKeyType="done"
             />
           </GroupedList>
           <GroupedFooter>{keyHint}</GroupedFooter>
@@ -189,7 +209,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
       {form.kind === "contact" ? (
         <>
           <GroupedList>
-            {CONTACT_FIELDS.map((field) => (
+            {CONTACT_FIELDS.map((field, i) => (
               <InputField
                 key={field}
                 label={t(`mobile.vault.contact.${field}`)}
@@ -197,6 +217,7 @@ export function VaultNewScreen({ scope: asked }: { scope: VaultScope }) {
                 onChange={(v) => setForm((f) => ({ ...f, contact: { ...f.contact, [field]: v } }))}
                 maxLength={LIMITS.contact}
                 {...contactKeyboard(field)}
+                {...(i < CONTACT_FIELDS.length - 1 ? NEXT_FIELD : { returnKeyType: "done" as const })}
               />
             ))}
           </GroupedList>

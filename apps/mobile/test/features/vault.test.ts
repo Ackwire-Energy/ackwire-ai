@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type {
   SecretRequest,
@@ -9,6 +9,7 @@ import type {
   VaultSourceInfo,
   VaultUse,
 } from "@agenteschat/client";
+import { webSettingsUrl } from "@agenteschat/client/lib/server";
 import { vaultNoAgents } from "@agenteschat/client/lib/vault";
 import type { TFunction } from "i18next";
 import {
@@ -536,11 +537,13 @@ describe("the request card and the screens", () => {
   });
 
   test("every Vault screen is a route of the app, and the org event refreshes the Vault's queries", () => {
-    const app = join(import.meta.dir, "..", "..", "app", "(app)");
+    const app = join(import.meta.dir, "..", "..", "app", "(app)", "(main)");
     const hrefs = [
       vaultHref.list,
       vaultHref.item("i1"),
       vaultHref.create("team"),
+      vaultHref.env("team"),
+      vaultHref.envReview,
       vaultHref.itemAccess("i1"),
       vaultHref.connectionAccess("c1"),
       vaultHref.connect("bitwarden"),
@@ -557,6 +560,14 @@ describe("the request card and the screens", () => {
     expect(isVaultChanged({ type: "vault.changed" })).toBe(true);
     expect(isVaultChanged({ type: "secret.updated" })).toBe(false);
     expect(vaultQueryRoot("o1")).toEqual(["org", "o1", "vault"]);
+  });
+
+  test("Importar de um computador opens the web's Cofre, where importing is", () => {
+    expect(webSettingsUrl("https://box.example.com/", "o 1", "vault")).toBe(
+      "https://box.example.com/org/o%201/settings/vault",
+    );
+    const screen = readFileSync(join(import.meta.dir, "../../src/features/vault/VaultScreen.tsx"), "utf8");
+    expect(screen).toContain('onPress={() => openPage(webSettingsUrl(serverUrl(), orgId, "vault"))}');
   });
 
   test("route parameters", () => {

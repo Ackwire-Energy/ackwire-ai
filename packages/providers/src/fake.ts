@@ -28,6 +28,8 @@ export interface FakeReply {
   thinking?: ModelResult["thinking"];
   /** What the provider says the call cost (OpenRouter's reported cost). */
   costNanoUsd?: number;
+  /** The connection left tool results' pictures out (`ModelResult.imagesLeftOut`). */
+  imagesLeftOut?: true;
   /**
    * Fail after streaming `chunks`. `inputTokens` simulates the start-of-stream
    * usage event (null = the stream died before it).
@@ -126,6 +128,7 @@ export function createFakeProvider(reply?: (request: ModelRequest, call: number)
         },
         ...(r.costNanoUsd !== undefined ? { costNanoUsd: r.costNanoUsd } : {}),
         ...(r.thinking ? { thinking: r.thinking } : {}),
+        ...(r.imagesLeftOut ? { imagesLeftOut: r.imagesLeftOut } : {}),
       };
     },
     async countTokens(request) {

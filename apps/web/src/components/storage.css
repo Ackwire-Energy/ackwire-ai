@@ -1,0 +1,124 @@
+/* Settings › Storage: "Connect storage" and its dialog (StorageSettings.tsx). */
+
+/* The service in use on its option: its mark, then "Cloudflare R2 · bucket". */
+.storage-inuse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A service's mark: its one-color icon as a mask in its brand color, at an icon's size. */
+.storage-mark {
+  flex: none;
+}
+.storage-mark--brand {
+  background: var(--connector-color, var(--ink));
+  -webkit-mask: var(--connector-icon) center / contain no-repeat;
+  mask: var(--connector-icon) center / contain no-repeat;
+}
+
+/* The list of services: whole rows to press, the mark centred on the name's line, who it suits under the name, a
+   chevron. */
+button.storage-pick__row {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  transition: background-color 0.15s var(--out);
+}
+/* The mark and its words: one `.ac-iconline` inside the row, so the row's own layout (a list row's) stays as it is. */
+.storage-pick__main {
+  flex: 1;
+  min-width: 0;
+}
+button.storage-pick__row:hover {
+  background: var(--plate-soft);
+}
+html:not([data-pointer]) button.storage-pick__row:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-inset);
+}
+.storage-pick__name {
+  font-weight: 600;
+}
+.storage-pick__go {
+  flex: none;
+  margin-left: auto;
+  margin-top: 3px;
+  color: var(--faint);
+}
+
+/* Numbered steps, flat: the number on the title's line, what to do under the title, the step's fields under that. */
+.storage-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.storage-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  column-gap: 12px;
+}
+.storage-step__n {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.storage-step__main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.storage-step__title {
+  margin: 0;
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 600;
+}
+.storage-step__text {
+  margin: -8px 0 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: pretty;
+}
+.storage-step__text b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* A link to the service's page: the external mark after the words. */
+.storage-out > .ac-icon {
+  margin-left: 6px;
+}
+
+.ac-alert b {
+  font-weight: 600;
+}
+
+/* A test result's icon follows its step's first line, even when the explanation underneath wraps. */
+.ac-list__row[data-step] > .row > .ac-icon:first-child {
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .ac-list__row[data-step] > .row > .ac-icon:first-child {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
+}

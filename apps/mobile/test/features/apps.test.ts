@@ -16,6 +16,7 @@ import { appVia } from "@agenteschat/client/lib/via";
 import { markOf } from "@agenteschat/ui/brand/marks";
 import { notificationHref } from "../../src/features/links/logic";
 import { visibleSections } from "../../src/features/settings/logic";
+import { pushedByDefault } from "../main-stack";
 import { notification, translator } from "./fixtures";
 
 const NOW = new Date("2026-11-01T12:00:00Z");
@@ -78,8 +79,7 @@ describe("Apps de IA on the phone (ADR 0119)", () => {
   });
 
   test("the screen is in the stack, pushed", () => {
-    const layout = readFileSync(join(import.meta.dir, "..", "..", "app", "(app)", "_layout.tsx"), "utf8");
-    expect(layout).toContain(`name="settings/apps" options={{ ...pushed, ...scrollUnder }}`);
+    expect(pushedByDefault("settings/apps")).toBe(true);
   });
 
   test("what an AI app created, in one line in both languages, opening the newest agent or routine", async () => {
@@ -103,18 +103,36 @@ describe("Apps de IA on the phone (ADR 0119)", () => {
     });
   });
 
-  test("the import's AI app option: the address and the request, or unavailable on a private server", async () => {
+  test("the import's AI app option: the address and the request, or unavailable on a private server or a held workspace", async () => {
     const pt = await translator("pt-BR");
-    expect(aiAppImport(pt, undefined)).toBeNull();
-    expect(aiAppImport(pt, { serverUrl: "http://10.0.0.5/mcp", serverPublic: false })).toEqual({ available: false });
-    const ready = aiAppImport(pt, { serverUrl: "https://app.agentes.chat/mcp", serverPublic: true });
-    expect(ready?.available && ready.prompt).toStartWith("Conecte https://app.agentes.chat/mcp e, para cada agente");
+    const open = { serverUrl: "https://app.agentes.chat/mcp", serverPublic: true };
+    expect(aiAppImport(pt, undefined, undefined)).toBeNull();
+    expect(aiAppImport(pt, { serverUrl: "http://10.0.0.5/mcp", serverPublic: false }, undefined)).toEqual({
+      available: false,
+      note: "Conectar com MCP não está disponível neste servidor, porque apps na internet só alcançam um endereço https público.",
+    });
+    // A hold refuses an app's sign-in and its calls (`workRefusal`): a new Cloud workspace waits for its first plan.
+    expect(aiAppImport(pt, open, { state: "hold", reason: "payment" })).toEqual({
+      available: false,
+      note: "Conectar com MCP funciona quando o plano do workspace estiver ativo. Por enquanto, traga os agentes por aqui.",
+    });
+    expect(aiAppImport(pt, open, { state: "suspended", reason: null })).toEqual({
+      available: false,
+      note: "Conectar com MCP fica desligado enquanto este workspace está pausado. Por enquanto, traga os agentes por aqui.",
+    });
+    const ready = aiAppImport(pt, open, { state: "active", reason: null });
+    expect(ready?.available && ready.prompt).toStartWith(
+      "Use o servidor MCP do Ackwire AI que você acabou de conectar (https://app.agentes.chat/mcp)",
+    );
     // The phone shows the request itself, selectable, not only a Copiar button.
     const card = readFileSync(
       join(import.meta.dir, "..", "..", "src", "features", "agents", "ImportAgents.tsx"),
       "utf8",
     );
-    expect(card).toMatch(/<Text selectable[^>]*>\s*\{option\.prompt\}/);
+    expect(card).toContain('{ text: t("onboarding.import.aiApp.paste"), copy: prompt }');
+    // A command carried in the step's words (Hermes' `hermes mcp login`, `/reload-mcp`) is copied from under it too.
+    expect(card).toContain("copy: s.address ? url : (s.code ?? s.vars?.command)");
+    expect(card).toMatch(/<Text selectable[^>]*>\s*\{text\}/);
   });
 
   test("the consent picks write when asked, never manage: that one is opt-in", () => {

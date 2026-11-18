@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import { useHost } from "../app";
 import { REASON_TEXT, type ReachStage, type ServeProblem, type Tailnet, tailscaleFrom } from "../control/local-server";
 import type { ServerKind } from "../control/server";
+import { useOpenPrefs } from "../hooks";
 import { CommandCopy } from "./bits";
 import { hintFor, PrefRow } from "./settings";
 import { useToast } from "./Toast";
@@ -157,6 +158,7 @@ export function ReachProgress({ stage }: { stage: ReachStage }) {
 export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "fail" | "prefs" }) {
   const { t } = useTranslation();
   const host = useHost();
+  const openPrefs = useOpenPrefs();
   const reason = t(REASON_TEXT[problem.reason]);
   const connectFrom =
     problem.reason === "notConnected" ? tailscaleFrom(host.platform, { state: "off", app: problem.app }) : null;
@@ -216,7 +218,9 @@ export function ReachProblem({ problem, text }: { problem: ServeProblem; text: "
         {text === "fail" && (
           <>
             {" "}
-            <span className="dk-fr__retry">{t("desktop.here.fail.retry")}</span>
+            <button type="button" className="ac-link dk-link dk-fr__retry" onClick={() => openPrefs("servers")}>
+              {t("desktop.here.fail.retry")}
+            </button>
           </>
         )}
       </span>

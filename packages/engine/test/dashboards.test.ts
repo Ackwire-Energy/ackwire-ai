@@ -737,6 +737,33 @@ describe("widgets", () => {
     expect(view.widgets.map((w) => w.layout.position)).toEqual([0, 1, 2, 3, 4, 5, 6, 7]);
     expect(view.widgets[0]?.nextRunAt).toBeNull();
   });
+
+  test("in a workspace being deleted no widget says when it refreshes next: its routine's slots pass", async () => {
+    const made = await board(f.owner.id);
+    const [routine] = await f.db
+      .insert(schema.routines)
+      .values({
+        orgId: f.org.id,
+        agentId: f.agent.id,
+        name: "Revenue today",
+        prompt: "Revenue",
+        target: { type: "widget", widgetId: crypto.randomUUID(), dashboardId: made.id },
+        triggerType: "schedule",
+        cron: "0 * * * *",
+        nextRunAt: new Date(Date.now() + 3600_000),
+        createdByUserId: f.owner.id,
+      })
+      .returning();
+    if (!routine) throw new Error("no routine");
+    await widgetRow(made.id, { routineId: routine.id, schedule: "hour" });
+    const next = async () => (await getDashboard(deps, f.owner.id, f.org.id, made.id)).widgets[0]?.nextRunAt;
+    expect(await next()).toBe(routine.nextRunAt?.toISOString() ?? "");
+    await f.db
+      .update(schema.organizations)
+      .set({ deletionDueAt: new Date(Date.now() + 7 * 86_400_000) })
+      .where(eq(schema.organizations.id, f.org.id));
+    expect(await next()).toBeNull();
+  });
 });
 
 describe("someone leaving (ADR 0135 Consequences)", () => {

@@ -1,5 +1,15 @@
 import { describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { AGENT_ACTION_KINDS, type AgentAction, type AgentActionKind } from "@agenteschat/client";
+import {
+  type ReceiptRow,
+  receiptLines,
+  receiptPieces,
+  receiptRows,
+  receiptUnder,
+  rowFiles,
+} from "@agenteschat/client/lib/actions";
 import {
   boldRuns,
   groupStart,
@@ -8,6 +18,7 @@ import {
   receiptLayout,
   targetHref,
 } from "../../src/features/chat/actions";
+import { translator } from "./fixtures";
 
 const action = (over: Partial<AgentAction> = {}): AgentAction => ({
   id: "a1",
@@ -70,5 +81,102 @@ describe("receipts under an agent's reply", () => {
     expect(Object.keys(RECEIPT_ICONS).sort()).toEqual([...AGENT_ACTION_KINDS].sort());
     expect(receiptIcon("channel.created")).toBe("hash");
     expect(receiptIcon("something.new" as AgentActionKind)).toBe("checkc");
+  });
+});
+
+describe("receipts as on the web", () => {
+  const task = (n: number) =>
+    action({
+      id: `a${n}`,
+      target: {
+        type: "issue",
+        id: `i${n}`,
+        number: n,
+        title: `Página de preços: o botão Assinar não responde no tablet ${n}`,
+      },
+      params: {
+        number: n,
+        title: `Página de preços: o botão Assinar não responde no tablet ${n}`,
+        audience: "everyone",
+      },
+    });
+
+  test("tasks made together are one row, each number opening its own task", async () => {
+    const t = await translator("pt-BR");
+    const [row, ...rest] = receiptRows([task(58), task(59), task(60)], t);
+    expect(rest).toEqual([]);
+    const pieces = receiptPieces(row as never, t);
+    expect(pieces.map((p) => p.text).join("")).toBe("Criei as tarefas #58, #59 e #60");
+    expect(pieces.flatMap((p) => (p.opens ? [[p.text, targetHref(p.opens.target, "c1")]] : []))).toEqual([
+      ["#58", "/issues/58"],
+      ["#59", "/issues/59"],
+      ["#60", "/issues/60"],
+    ]);
+    const en = await translator("en");
+    expect(
+      receiptPieces(receiptRows([task(58), task(59)], en)[0] as never, en)
+        .map((p) => p.text)
+        .join(""),
+    ).toBe("Created tasks #58 and #59");
+  });
+
+  test("a tap on a row's words lists each change whole, each opening its own; one with nothing to open is words", async () => {
+    const t = await translator("pt-BR");
+    const merged = action({
+      id: "pr",
+      kind: "pr.merged",
+      target: { type: "repository", id: "acme/loja", title: "acme/loja" },
+      params: { repo: "acme/loja", number: 12 },
+    });
+    const files = action({ ...task(61), params: { ...task(61).params, files: ["print.png"] } });
+    const [tasks, merge] = receiptRows([task(58), files, merged], t);
+    const sheet = (row: ReceiptRow | undefined) =>
+      receiptLines(row as ReceiptRow, t).map((l) => [l.text, l.files, targetHref(l.action.target, "c1")]);
+    expect(sheet(tasks)).toEqual([
+      ["Criei a tarefa #58 · Página de preços: o botão Assinar não responde no tablet 58", null, "/issues/58"],
+      [
+        "Criei a tarefa #61 · Página de preços: o botão Assinar não responde no tablet 61",
+        "Anexei print.png",
+        "/issues/61",
+      ],
+    ]);
+    expect(sheet(merge)).toEqual([["Fiz o merge do PR #12 em acme/loja", null, null]]);
+    // The line under the row names the files once.
+    expect(rowFiles(tasks as ReceiptRow)).toEqual(["print.png"]);
+  });
+
+  test("a row wraps whole and opens its sheet; the message's double tap and long press still work on it", () => {
+    // No renderer for the phone's components in these tests: what only the source can say is read from it.
+    const src = readFileSync(join(import.meta.dir, "../../src/features/chat/Receipts.tsx"), "utf8");
+    const sentence = src.slice(src.indexOf("function Sentence("), src.indexOf("function ChangesSheet("));
+    expect(sentence).not.toContain("numberOfLines");
+    // A second tap in the message's window is its double tap, so the sheet waits for that window first.
+    expect(sentence).toContain("onPress={whole || onTap ? press : undefined}");
+    expect(sentence).toContain("}, DOUBLE_TAP_MS);");
+    expect(sentence.match(/onLongPress=\{onLongPress\}/g)).toHaveLength(1);
+    expect(sentence).toContain("onLongPress={href ? onLongPress : undefined}");
+    // The sheet is the sheets' own list: a change that opens its thing closes the sheet first, then goes there.
+    expect(src).toContain("onPress: () => close(() => router.push(href)),");
+    const sheet = src.slice(src.indexOf("function ChangesSheet("), src.indexOf("function CopyHook("));
+    expect(sheet).toContain("<ActionList");
+    expect(sheet).not.toContain("<Card>");
+    expect(src).not.toContain("WhoSeesLine");
+    const row = readFileSync(join(import.meta.dir, "../../src/features/chat/MessageRow.tsx"), "utf8");
+    expect(row).toContain("<Receipts message={m} onTap={onTap} onLongPress={press} />");
+  });
+
+  test("the sheet ends with the row's own lines whole: what a routine does alone, who undid it", async () => {
+    const t = await translator("pt-BR");
+    const made = action({
+      id: "rt",
+      kind: "routine.created",
+      target: { type: "routine", id: "rt" },
+      params: { name: "Resumo semanal", ownActions: ["GMAIL_SEND_EMAIL"] },
+      undoneAt: "2026-10-18T12:00:00Z",
+      undoneByUserId: "u2",
+    });
+    const [row] = receiptRows([made], t);
+    const lines = receiptUnder(row as ReceiptRow, t, "Marina");
+    expect([lines.own, lines.undone]).toEqual(["Faz sozinha, sem pedir: Enviar e-mail (Gmail)", "Desfeito por Marina"]);
   });
 });

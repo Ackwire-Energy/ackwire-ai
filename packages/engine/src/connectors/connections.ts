@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import type { KeyWrapper } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, isNull, lt, or, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, isNull, lt, ne, or, schema, sql } from "@agenteschat/db";
 import { StreamableHTTPError } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { type AuditEntry, recordAudit } from "../audit";
 import { caches } from "../cache";
 import { openSecret, randomToken, sealSecret, sha256 } from "../crypto";
 import { ConflictError, ForbiddenError, MisconfiguredError, NotFoundError, ValidationError } from "../errors";
 import { forgetInstallationTokens } from "../git/github-app";
-import type { ResolveHost } from "../net-guard";
-import { requirePermission } from "../organizations";
+import { outboundFetch, type ResolveHost } from "../net-guard";
+import { requireChangePermission, requirePermission } from "../organizations";
 import { CONNECTOR_ALL } from "../tools/scopes";
 import { CONNECTOR_CATALOG, type ConnectorDefinition } from "./catalog";
 import { type ComposioConnectors, completeComposioOAuth, forgetComposioAccount } from "./composio";
@@ -97,10 +97,18 @@ export async function checkLabel(tx: Executor, orgId: string, label: string, con
   return name;
 }
 
-/** The headers a sign-in or a key opens the server with. */
-export function bearerHeaders(secret: ConnectionSecret): Record<string, string> {
-  const token = secret.apiKey ?? secret.accessToken;
-  return token ? { authorization: `Bearer ${token}` } : {};
+/**
+ * What a stored secret sends to its own server, and nowhere else (ADR 0186): the headers a person typed, then the
+ * key's or the sign-in's `authorization` on top. Names go in lower case, as HTTP reads them, so a typed
+ * `Authorization` never travels beside ours.
+ */
+export function secretHeaders(secret: ConnectionSecret, serverUrl: string): Record<string, string> {
+  const sent = new Map<string, string>();
+  for (const [name, value] of Object.entries(secret.headers ?? {})) sent.set(name.toLowerCase(), value);
+  const scheme = presetForServer(serverUrl)?.keyScheme ?? "Bearer";
+  if (secret.apiKey) sent.set("authorization", `${scheme} ${secret.apiKey}`);
+  else if (secret.accessToken) sent.set("authorization", `Bearer ${secret.accessToken}`);
+  return Object.fromEntries(sent);
 }
 
 /**
@@ -148,6 +156,8 @@ export interface ConnectionSecret {
   accessToken?: string;
   refreshToken?: string;
   apiKey?: string;
+  /** A server by address: the request headers a person typed for it, names as typed (ADR 0186). */
+  headers?: Record<string, string>;
 }
 
 export interface ConnectorDeps {
@@ -671,6 +681,13 @@ interface TokenResponse {
  */
 export const clientRefused = (error: unknown) => error === "invalid_client" || error === "incorrect_client_credentials";
 
+/**
+ * The fetch for a token endpoint an authorization server's metadata named (MCP OAuth), where a built-in connector's
+ * fixed one goes straight: checked and pinned at every exchange and refresh, and a redirect is never followed, so
+ * the form (the code, the refresh token, the client's secret) only goes to a public address.
+ */
+const namedTokenFetch = (deps: ConnectorDeps) => deps.http ?? outboundFetch({ resolveHost: deps.resolveHost });
+
 /** `ownApp`: the connector, when the client is this server's own OAuth app for it (`oauthApps`). */
 async function tokenRequest(
   deps: ConnectorDeps,
@@ -678,10 +695,12 @@ async function tokenRequest(
   form: Record<string, string | undefined>,
   headers: Record<string, string> = {},
   ownApp?: ConnectorDefinition,
+  http: typeof fetch = deps.http ?? fetch,
 ): Promise<TokenResponse> {
-  const http = deps.http ?? fetch;
   const res = await http(url, {
     method: "POST",
+    // The form carries the code, the refresh token and the client's secret: they go to the address asked, never on.
+    redirect: "error",
     // Well inside a refresh's 30 s lease (`refreshOnce`), which the other calls for that connection wait on.
     signal: AbortSignal.timeout(15_000),
     headers: { "content-type": "application/x-www-form-urlencoded", accept: "application/json", ...headers },
@@ -720,7 +739,14 @@ export async function markToReconnect(
   await db
     .update(connectorConnections)
     .set({ status: "needs_reconnect", lastError: reason.slice(0, 300), updatedAt: new Date() })
-    .where(and(eq(connectorConnections.id, connection.id), isNull(connectorConnections.revokedAt)));
+    // A mark repeated on a connection that already waits moves nothing: its row's last change is when it broke.
+    .where(
+      and(
+        eq(connectorConnections.id, connection.id),
+        isNull(connectorConnections.revokedAt),
+        ne(connectorConnections.status, "needs_reconnect"),
+      ),
+    );
   caches.connections.delete(`${connection.orgId}:active`);
 }
 
@@ -783,8 +809,8 @@ export async function completeOAuth(
     .where(and(eq(oauthStates.id, row.id), isNull(oauthStates.usedAt)))
     .returning({ id: oauthStates.id });
   if (claimed.length === 0) throw new ConflictError("This authorization link was already used", "oauth.link_used");
-  // Still an admin? (Roles can change during the round trip.)
-  await requirePermission(deps.db, user.id, row.orgId, "manage_connectors");
+  // Still an admin, in a workspace not being deleted? Both can change during the round trip.
+  await requireChangePermission(deps.db, user.id, row.orgId, "manage_connectors");
 
   if (row.composioAccountId) return completeComposioOAuth(deps, user, row, input.code);
   if (row.oauthClientId) return completeMcpOAuth(deps, user, row, input.code, at);
@@ -832,11 +858,8 @@ const refreshing = new Map<string, Promise<ConnectionSecret | null>>();
 export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnection): Promise<Record<string, string>> {
   const secret = await openConnectionSecret(deps.keyWrappers, c);
   if (!secret) return {};
-  if (secret.apiKey) {
-    return { authorization: `${presetForServer(c.serverUrl)?.keyScheme ?? "Bearer"} ${secret.apiKey}` };
-  }
   const at = deps.now?.() ?? new Date();
-  if (!expiring(c, secret, at)) return bearer(secret);
+  if (!expiring(c, secret, at)) return secretHeaders(secret, c.serverUrl);
   let pending = refreshing.get(c.id);
   if (!pending) {
     pending = refreshOnce(deps, c.id, at).finally(() => refreshing.delete(c.id));
@@ -844,14 +867,11 @@ export async function connectionHeaders(deps: ConnectorDeps, c: ConnectorConnect
   }
   const fresh = await pending;
   caches.connections.delete(`${c.orgId}:active`);
-  return fresh ? bearer(fresh) : {};
+  return fresh ? secretHeaders(fresh, c.serverUrl) : {};
 }
 
 const expiring = (c: ConnectorConnection, secret: ConnectionSecret, at: Date) =>
   Boolean(secret.refreshToken && c.tokenExpiresAt && c.tokenExpiresAt.getTime() - at.getTime() < 60_000);
-
-const bearer = (secret: ConnectionSecret): Record<string, string> =>
-  secret.accessToken ? { authorization: `Bearer ${secret.accessToken}` } : {};
 
 /**
  * One refresh at a time per connection, across processes: many servers rotate the refresh token, so a second
@@ -922,6 +942,8 @@ async function refreshTokens(
       client.tokenEndpoint,
       { ...refresh, resource: c.resource ?? undefined, ...auth.form },
       auth.headers,
+      undefined,
+      namedTokenFetch(deps),
     );
   } else {
     const def = c.connector.startsWith("custom:") ? null : connectorDefinition(c.connector);
@@ -934,6 +956,7 @@ async function refreshTokens(
     });
   }
   const next: ConnectionSecret = {
+    ...secret,
     accessToken: token.access_token,
     refreshToken: token.refresh_token ?? secret.refreshToken,
   };
@@ -1042,6 +1065,8 @@ async function completeMcpOAuth(
       ...auth.form,
     },
     auth.headers,
+    undefined,
+    namedTokenFetch(deps),
   );
   const secret = { accessToken: token.access_token, refreshToken: token.refresh_token };
   const tokenExpiresAt = token.expires_in ? new Date(at.getTime() + token.expires_in * 1000) : null;

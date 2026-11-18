@@ -2,6 +2,7 @@ import type { ServerCheck } from "@agenteschat/client/lib/server";
 import type { HelloLine } from "../control/client";
 import type { Candidate } from "../control/first-run";
 import type {
+  KeepRunning,
   LocalChoice,
   LocalServerStatus,
   ReachResult,
@@ -49,6 +50,17 @@ export interface AppInfo {
   arch: string;
   /** The system's own version where the app reads it (macOS: `15.1`). */
   system?: string | null;
+  /** The line to copy: versions, and on Linux how it draws ("Ackwire AI 0.8.9 · Linux · Ubuntu 26.04 LTS · …"). */
+  details: string;
+}
+
+/** Linux's Compatibility mode (graphics.rs): drawing without the graphics card at the next opening. */
+export interface CompatMode {
+  on: boolean;
+  /** This opening fell back: the last one, with the graphics card, never painted. True for the first ask only. */
+  fellBack: boolean;
+  /** WEBKIT_DISABLE_DMABUF_RENDERER was set when the app started: it decides (`on` says what it does), not the switch. */
+  own: boolean;
 }
 
 /** A server's answer to `siteFetch`: its status and body as text. */
@@ -112,8 +124,14 @@ export interface Host {
    * code (`site_fetch` in workspaces.rs allows only those).
    */
   siteFetch(server: string, method: string, path: string, body?: string): Promise<SiteAnswer>;
-  /** How the welcome window opens, taken once: `add` from the site's "Add a workspace", else null. */
-  welcomeMode(): Promise<"add" | null>;
+  /**
+   * How the welcome window opens, taken once: `add` from the site's "Add a workspace", `owner` when the app opened it
+   * on Run here's form to make a new owner (no account is left on the server it runs, or it was just erased), else
+   * null.
+   */
+  welcomeMode(): Promise<"add" | "owner" | null>;
+  /** The welcome window in its adding mode ("Add a workspace", from Preferences). */
+  addWorkspace(): Promise<void>;
   /** Takes `server` out of the list (the server and the account there stay as they are). */
   removeServer(server: string): Promise<void>;
   /** Signs the app out of `server`, which stays in the list (signed out); a window on it goes to its sign-in. */
@@ -136,6 +154,11 @@ export interface Host {
   hideWindow(name: WindowName): Promise<void>;
   quit(): Promise<void>;
   appInfo(): Promise<AppInfo>;
+  /** Linux: Compatibility mode as the next opening will have it. */
+  compatMode(): Promise<CompatMode>;
+  setCompatMode(on: boolean): Promise<void>;
+  /** Quits and opens the app again, for a setting read only when it starts. */
+  reopen(): Promise<void>;
   autostart(): Promise<boolean>;
   setAutostart(on: boolean): Promise<void>;
   notify(title: string, body: string): Promise<void>;
@@ -168,8 +191,6 @@ export interface Host {
   onMenuAction(cb: (action: MenuAction) => void): () => void;
   /** The popover listens for the site's requests now (requests sent before that wait, main_window.rs). */
   thisMacListening(): Promise<void>;
-  /** Preferences → "Show in the Dock" (dock.rs): off, the app lives in the menu bar while no window shows. */
-  setDock(show: boolean): Promise<void>;
   /** Preferences › "Let me know about messages and requests": whether the site's notifications show. */
   setSiteNotify(on: boolean): Promise<void>;
   /** The Dock's counts whenever the site changes them. */
@@ -203,6 +224,21 @@ export interface Host {
   setLocalUsage(on: boolean): Promise<void>;
   /** "Back up now": the file it wrote. */
   backupLocalServer(): Promise<string>;
+  /** The nightly backup's switch and the "Copy to" folder (null: none). */
+  setLocalBackups(nightly: boolean, copyTo: string | null): Promise<void>;
+  /** The server here goes back to one of its backups; rejects with `start` when that backup didn't start. */
+  restoreLocalServer(file: string): Promise<void>;
+  /**
+   * "Erase and start over": it stops, its folder moves whole to `eraseTo`, the app forgets it and the welcome window
+   * opens. Resolves with where its data went; when the folder couldn't move (its data stays where it was), rejects with
+   * `held` (another server uses the folder), `move` (the move itself failed; it stays stopped) or `running` (it started
+   * again meanwhile).
+   */
+  eraseLocalServer(): Promise<string>;
+  /** Automatic login and start after a power failure (macOS). */
+  keepRunning(): Promise<KeepRunning>;
+  /** System Settings at Users & Groups or Energy (macOS). */
+  openSystemSettings(page: "users" | "energy"): Promise<void>;
   /** What "Copy details" copies. */
   localDiagnostics(): Promise<string>;
   /** The server here's homes again, with new tokens for the organizations in `rotate`. */
@@ -221,8 +257,8 @@ export interface Host {
   diskAccess(): Promise<boolean>;
   /** macOS: a short Bonjour browse, which raises the Local Network prompt the first time. Nothing says the answer. */
   askLocalNetwork(): Promise<void>;
-  /** System Settings › Privacy & Security on the permission's own list. */
-  openPrivacy(pane: MacPermission): Promise<void>;
+  /** System Settings › Privacy & Security on the permission's own list (the microphone: for voice messages). */
+  openPrivacy(pane: MacPermission | "microphone"): Promise<void>;
   /** The setup macOS may quit the app in the middle of, kept until it is finished (`prepare.rs`). */
   setupState(): Promise<SetupState | null>;
   /** Keeps it (with the main window's page, to open there again) or, null, forgets it. */

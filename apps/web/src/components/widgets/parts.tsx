@@ -1,10 +1,25 @@
-import type { Widget, WidgetFailure, WidgetKind } from "@agenteschat/client";
-import { widgetFailureKey } from "@agenteschat/client";
+import type { Widget, WidgetKind, WidgetWait } from "@agenteschat/client";
+import {
+  useDesktopStatus,
+  useWidgetLacksAi,
+  widgetFailureText,
+  widgetNeedsAi,
+  widgetWaitFix,
+  widgetWaiting,
+  widgetWaitText,
+} from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
+import { maySetAgentAi, noAiLockedLine, planKeyIntent } from "@agenteschat/client/lib/no-ai";
+import { can } from "@agenteschat/client/lib/permissions";
 import { type AgentColor, Icon, PixelSpinner } from "@agenteschat/ui";
+import { Link } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
+import type { MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { usePlanHold } from "@/components/ai/ConnectAiSteps";
+import { useConnectAi } from "@/components/ConnectAi";
+import { useOpenComputer } from "@/components/computer/open";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
@@ -39,17 +54,62 @@ export function widgetTitle(t: TFunction, w: Pick<Widget, "title" | "prompt" | "
   return neutralWidgetTitle(t, w.kind ?? (w.format === "auto" ? null : w.format));
 }
 
-/** Why a widget stopped updating, in the reader's words (the agent's own when it said why). */
-export function failureText(t: TFunction, failure: WidgetFailure | null, name: string): string {
-  if (!failure) return t("widgets.failure.error");
-  if (failure.code === "agent_reported" && failure.detail) return failure.detail;
-  const key = widgetFailureKey(failure.code === "agent_reported" ? "error" : failure.code);
-  return t(key, { name, detail: failure.detail ?? "" });
+/** Why a widget stopped updating, in the reader's words (`widgetFailureText`). */
+export const failureText = widgetFailureText;
+
+/** The words over a widget with no data yet: its agent building it, or waiting for an AI to build it with. */
+export const widgetBodyText = (t: TFunction, widget: Pick<Widget, "status" | "failure">, name: string) =>
+  widgetNeedsAi(widget) ? t("widgets.needsAi.body", { name }) : t("widgets.status.building", { name });
+
+/**
+ * What a widget waiting for an AI offers the viewer (the board, its panel, its notice, New widget's test): Connect to
+ * whoever may set its agent's AI (for the right hand the workspace's, which a build falls back to when the AI of
+ * whoever made the widget can't think; on a plan that can't take it, `reason` a plan line, a key: `planKeyIntent`),
+ * else who can. Nothing on a billing hold (an AI comes after the plan, which the hold's own banner says).
+ */
+export function useWidgetAiWay(
+  agentId: string | null | undefined,
+  reason?: string | null,
+): { connect: () => void } | { locked: string } | null {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const connect = useConnectAi();
+  const held = usePlanHold() !== null;
+  const agent = agentId ? dir.agentById.get(agentId) : undefined;
+  if (!agent || !connect || held) return null;
+  if (maySetAgentAi(agent, me.user.id, org))
+    return { connect: () => connect.open({ agentId: agent.id, ...planKeyIntent(agent, reason) }) };
+  const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
+  return { locked: noAiLockedLine(t, agent.name, owner) };
+}
+
+/** After the reason of a widget waiting for an AI: Connect, or who can connect it (`useWidgetAiWay`). */
+function NeedsAiWay({ agentId, reason }: { agentId: string; reason: string | null }) {
+  const { t } = useTranslation();
+  const way = useWidgetAiWay(agentId, reason);
+  if (!way) return null;
+  if (!("connect" in way)) return way.locked;
+  return (
+    <button
+      type="button"
+      className="wg__resolve"
+      onClick={(e) => {
+        e.stopPropagation();
+        way.connect();
+      }}
+    >
+      {t("noAi.action")}
+    </button>
+  );
 }
 
 /**
  * A widget's footer on a board (ADR 0135): who looks after it, when it last updated and how often; while it is built
- * or updated, the agent at it; failed, why, with Resolve (an update asked now).
+ * or updated, the agent at it, or what its run waits for, with Continue now on a pause near the limit (greyed for
+ * anyone but Continuar agora's people) or what ends the wait sooner (`WaitFix`); failed, why, with Resolve (an update
+ * asked now); waiting for an AI, why, with Connect or who can connect it (it builds by itself once one is there,
+ * `useBuildOnceAi`); stopped for the lack of one, Connect while there is none, then Resolve (`useWidgetLacksAi`).
  */
 export function WidgetFoot({
   widget,
@@ -63,12 +123,47 @@ export function WidgetFoot({
   name: string;
   color: AgentColor;
   now: number;
-  /** Resolve: run it again (only for whoever may). */
+  /** Resolve, or Continue now on a pause: an update asked now (only for whoever may). */
   onResolve?: () => void;
+  /** An update asked now is on its way. */
   resolving?: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const { org } = useOrg();
+  const needsAi = useWidgetLacksAi(org.id, widget);
   const schedule = t(`widgets.schedulesInline.${widget.schedule}`);
+  const waiting = resolving ? null : widgetWaiting(widget, now);
+  if (waiting)
+    return (
+      <span className="wg__wait ac-iconline" role="status">
+        <Icon name="pause" size={14} />
+        <span>
+          {widgetWaitText(t, i18n.language, waiting, name, new Date(now))}{" "}
+          {waiting.code !== "usage_pause" ? (
+            <WaitFix agentId={widget.agentId} wait={waiting} />
+          ) : onResolve ? (
+            <button
+              type="button"
+              className="wg__resolve"
+              disabled={!waiting.canContinue}
+              title={t(
+                !waiting.canContinue
+                  ? "usageCard.forbidden"
+                  : waiting.source === "budget"
+                    ? "usageCard.hintBudget"
+                    : "usageCard.hint",
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                onResolve();
+              }}
+            >
+              {t("usageCard.continue")}
+            </button>
+          ) : null}
+        </span>
+      </span>
+    );
   if (widget.status === "building")
     return (
       <>
@@ -85,27 +180,32 @@ export function WidgetFoot({
         <span className="wg__when">{t("widgets.status.updating", { name })}</span>
       </>
     );
-  if (widget.status === "failed")
+  if (widget.status === "failed") {
     return (
       <span className="wg__warn ac-iconline" role="status">
-        <Icon name="alert" size={14} />
+        <Icon name={needsAi ? "plug" : "alert"} size={14} />
         <span>
           {failureText(t, widget.failure, name)}{" "}
-          {onResolve && (
-            <button
-              type="button"
-              className="wg__resolve"
-              onClick={(e) => {
-                e.stopPropagation();
-                onResolve();
-              }}
-            >
-              {t("widgets.failure.resolve")}
-            </button>
+          {needsAi ? (
+            <NeedsAiWay agentId={widget.agentId} reason={widget.failure?.detail ?? null} />
+          ) : (
+            onResolve && (
+              <button
+                type="button"
+                className="wg__resolve"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onResolve();
+                }}
+              >
+                {t("widgets.failure.resolve")}
+              </button>
+            )
           )}
         </span>
       </span>
     );
+  }
   // The agent's face leads the card's title (`WidgetCard`'s `face`): the footer only says who and when.
   return (
     <span className="wg__when">
@@ -118,6 +218,46 @@ export function WidgetFoot({
       )}{" "}
       <span className="wg__dot">·</span> {schedule}
     </span>
+  );
+}
+
+/**
+ * What ends a widget's wait sooner, beside its words, for who may do it (`widgetWaitFix`): the agent's budget or model
+ * on its page, or its computer opened in place for whoever may watch it.
+ */
+function WaitFix({ agentId, wait }: { agentId: string; wait: WidgetWait }) {
+  const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
+  const openComputer = useOpenComputer();
+  const owner = dir.anyAgent(agentId)?.ownerUserId === me.user.id;
+  const fix = widgetWaitFix(wait, { admin: can(org, "manage_agents"), owner });
+  const watches = useDesktopStatus(org.id, agentId, { enabled: fix === "openComputer" }).isSuccess;
+  const stop = (e: MouseEvent) => e.stopPropagation();
+  if (fix === "openComputer")
+    return watches ? (
+      <button
+        type="button"
+        className="wg__resolve"
+        onClick={(e) => {
+          stop(e);
+          openComputer(agentId);
+        }}
+      >
+        {t("queue.openComputer")}
+      </button>
+    ) : null;
+  if (!fix) return null;
+  return (
+    <Link
+      to="/org/$orgId/agents/$agentId"
+      params={{ orgId: org.id, agentId }}
+      search={{ tab: "settings", sec: fix === "raiseBudget" ? "budget" : "brain" }}
+      className="wg__resolve"
+      onClick={stop}
+    >
+      {t(`usageCard.${fix}`)}
+    </Link>
   );
 }
 

@@ -1,4 +1,11 @@
-import type { BrainEffort, BrainSpeed, ProviderFailureCause } from "@agenteschat/adapters";
+import type {
+  BrainEffort,
+  BrainSpeed,
+  BrainTurnRequest,
+  BrainTurnTimings,
+  ProviderFailureCause,
+} from "@agenteschat/adapters";
+import type { ToolImage } from "@agenteschat/providers";
 import { planOf } from "@agenteschat/providers/plans";
 import type { CodeSetup } from "../git/machine";
 
@@ -17,6 +24,18 @@ export const BRAIN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   antigravity: "Antigravity CLI",
 };
 
+/**
+ * Whether a computer brain runs on a computer's system (`hello.os`), as its runner allows: Cursor and Grok Build not on
+ * Windows yet, the Antigravity CLI on Linux only (ADR 0143: elsewhere it keeps its sign-in in the computer user's one
+ * keychain). A system nobody reported passes: the runner says.
+ */
+export function brainRunsOn(kind: ComputerBrainKind, os: string | null | undefined): boolean {
+  if (!os) return true;
+  if (kind === "antigravity") return os === "linux";
+  if (kind === "cursor" || kind === "grok") return os !== "windows";
+  return true;
+}
+
 /** The plan each computer brain thinks with, as people buy it. */
 export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   claude_code: "Claude",
@@ -26,6 +45,19 @@ export const BRAIN_PLAN_NAMES: Readonly<Record<ComputerBrainKind, string>> = {
   grok: "Grok",
   antigravity: "Gemini",
 };
+
+/**
+ * A turn's permissions as its brain can keep them for an agent that always asks (ADR 0173). `prompts`: every call of
+ * the CLI's own tools can reach our prompt (Claude Code on a runner that reads `permissions.asks`). Any other brain,
+ * and an older runner, gets a `plan` turn: its own tools only read, so every change goes through our tools, which ask.
+ */
+export function askingPermissions(
+  permissions: BrainTurnRequest["permissions"],
+  prompts: boolean,
+): BrainTurnRequest["permissions"] {
+  if (permissions?.asks !== "always" || prompts || (permissions.mode ?? "work") !== "work") return permissions;
+  return { ...permissions, mode: "plan" };
+}
 
 /** Brains that run on the agent's computer with a person's plan. */
 export const isComputerBrain = (v: unknown): v is ComputerBrainKind =>
@@ -126,6 +158,8 @@ export interface BrainTurn {
 export interface ToolResult {
   content: string;
   isError?: boolean;
+  /** Pictures and PDFs the tool returned, for the CLI to show (`MCP_IMAGES_PROTOCOL`). */
+  images?: ToolImage[];
   /** The call is gated: the run pauses until a person decides (ADR 0015 approval or ask_user). */
   pause?: { kind: "approval" | "input"; id: string };
 }
@@ -175,12 +209,13 @@ export type BrainEvent =
       model?: string;
       cacheRead?: number;
       cacheWrite?: number;
-      /** Claude Code: the API calls the turn made, and the most uncached input one of them read. */
+      /** Computer brains: the API calls the turn made, and the most uncached input and whole input one of them read. */
       calls?: number;
       maxUncached?: number;
+      maxContext?: number;
     }
   | { type: "limit"; resetsAt?: string }
-  | { type: "done"; text: string; session?: { id: string } }
+  | { type: "done"; text: string; session?: { id: string }; timings?: BrainTurnTimings }
   | {
       type: "error";
       code: string;
@@ -199,7 +234,9 @@ export type BrainEvent =
   /** Fast failed (`message`: the provider's words) and this turn answered at standard speed. */
   | { type: "speed_fallback"; message: string }
   /** A computer brain started a call of its own: shown only, its `tool_call` with `executed` follows. */
-  | { type: "tool_started"; id: string; name: string };
+  | { type: "tool_started"; id: string; name: string }
+  /** A file a tool of the brain's own made, in the agent's folder (Codex's image generation): shown with the reply. */
+  | { type: "file"; path: string };
 
 export interface Brain {
   kind: BrainKind;

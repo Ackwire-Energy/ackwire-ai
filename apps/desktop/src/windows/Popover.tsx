@@ -7,11 +7,21 @@
  * and raises the notifications for folder requests (it lives, hidden, for as long as the app runs).
  */
 import type { ControlAccessRequest, ControlBrowser, ControlJob } from "@agenteschat/adapters/runner-control";
+import { joinNames } from "@agenteschat/client/lib/format";
 import { Button, Icon, Kbd, normalizeAppearance, PixelSpinner, Segmented } from "@agenteschat/ui";
-import { type CSSProperties, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  type CSSProperties,
+  Fragment,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { useHost, useSnapshot, useStore } from "../app";
-import { saidText } from "../control/activity";
+import { saidText, toolWords } from "../control/activity";
 import {
   BROWSER_NOTIFY_PREF,
   browserRowState,
@@ -20,8 +30,8 @@ import {
   newHelpRequests,
   siteLink,
 } from "../control/browser";
-import { DOCK_PREF, MENU_BAR_PREF, menuBarShown } from "../control/dock";
-import { hereBanner, hereLine, type LocalServerStatus } from "../control/local-server";
+import { MENU_BAR_PREF, menuBarShown } from "../control/dock";
+import { hereBanner, hereLine, isHereServer, type LocalServerStatus } from "../control/local-server";
 import { menuLabels } from "../control/menu-labels";
 import { NOTCH_PREF } from "../control/notch";
 import { SITE_NOTIFY_PREF } from "../control/notify";
@@ -32,6 +42,7 @@ import { homeServer, type ServerList, type ServerWorkspaces, serverName } from "
 import { type Home, isIncompatible, isRefusedHome, orgName, pairedHomes } from "../control/store";
 import { answerThisMac, type PrefsTab, whenHostHomeReady } from "../control/this-mac";
 import { isOnline, macStateOf, trayStateOf } from "../control/tray";
+import { AUTO_UPDATE_PREF, autoUpdateOn, installNight } from "../control/version";
 import { agentOf, readPref, useLocalServer, useOnShown, usePending, useUpdateCheck, writePref } from "../hooks";
 import type { BadgeCounts } from "../host/types";
 import { AgentFace, Banner, BrandFace, Count, HelpLink, MacPortrait, MenuRow, OrgTile } from "../ui/bits";
@@ -53,6 +64,8 @@ export function Popover() {
   const toast = useToast();
   const update = useUpdateCheck(true);
   const [pauseMenu, setPauseMenu] = useState(false);
+  /** Which workspace's choices are open in the pause menu: "all" or a home's id. */
+  const [pauseFor, setPauseFor] = useState<string | null>(null);
   const [pending, run] = usePending<"resume" | "reconnect" | "plus">();
   const [confirmQuit, setConfirmQuit] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -62,6 +75,8 @@ export function Popover() {
 
   const homes = pairedHomes(snap);
   const pause = combinedPause(homes.map((h) => h.status?.paused ?? { paused: false }));
+  const pausedHomes = homes.filter((h) => h.status?.paused?.paused);
+  const allPaused = pausedHomes.length === homes.length;
   const allOffline = homes.length > 0 && homes.every((h) => !isOnline(h));
   const jobs = homes.flatMap((h) => h.jobs);
   const runningJobs = useRef(0);
@@ -137,8 +152,7 @@ export function Popover() {
   const works = homes.length > 0;
   const busyHere = works || local.run;
   const [menuBarPref, setMenuBarPref] = useState(() => readPref<boolean | null>(MENU_BAR_PREF, null));
-  const [dockPref, setDockPref] = useState(() => readPref(DOCK_PREF, true));
-  const iconShown = menuBarShown(menuBarPref, dockPref, busyHere);
+  const iconShown = menuBarShown(menuBarPref, busyHere);
   useEffect(() => {
     void host.setTrayVisible(iconShown).catch(() => {});
   }, [host, iconShown]);
@@ -176,8 +190,21 @@ export function Popover() {
     return () => clearInterval(timer);
   }, []);
 
+  // Preferences › Updates › "Install updates by itself, at night": the update the check found installs in the
+  // night's window once no agent works on this Mac, with "Update and reopen"'s path (its rollback included). A
+  // night's try is made once: one that fails or finds nothing waits for the next night.
+  const triedNight = useRef<string | null>(null);
+  useEffect(() => {
+    const night = installNight(new Date(now));
+    if (!night || triedNight.current === night || !update.state.available || jobs.length > 0) return;
+    if (!autoUpdateOn(readPref<boolean | null>(AUTO_UPDATE_PREF, null), local.run)) return;
+    triedNight.current = night;
+    void host.installUpdate().catch(() => {});
+  }, [now, update.state.available, jobs.length, local.run, host]);
+
   useOnShown("popover", () => {
     setPauseMenu(false);
+    setPauseFor(null);
     setConfirmQuit(false);
     setNow(Date.now());
     readList();
@@ -186,7 +213,6 @@ export function Popover() {
   useEffect(() => {
     const reread = () => {
       setMenuBarPref(readPref<boolean | null>(MENU_BAR_PREF, null));
-      setDockPref(readPref(DOCK_PREF, true));
       readList();
     };
     window.addEventListener("storage", reread);
@@ -243,7 +269,18 @@ export function Popover() {
           })
           .catch(() => {});
       };
-      answerThisMac({ store, openPrefs: openPrefsOn, showRequests, localDir, revealFolder, onPaired }, request)
+      answerThisMac(
+        {
+          store,
+          openPrefs: openPrefsOn,
+          showRequests,
+          localDir,
+          revealFolder,
+          onPaired,
+          openPrivacy: (pane) => host.openPrivacy(pane),
+        },
+        request,
+      )
         .then(
           (data) => host.thisMacReply(id, true, data ?? null),
           (err: unknown) => host.thisMacReply(id, false, err instanceof Error ? err.message : String(err)),
@@ -255,9 +292,8 @@ export function Popover() {
     return off;
   }, [host, store]);
 
-  // In the Dock like Slack, unless the person took it out (Preferences › General); the site's notifications too.
+  // The site's notifications, unless the person turned them off (Preferences › General).
   useEffect(() => {
-    void host.setDock(readPref(DOCK_PREF, true)).catch(() => {});
     void host.setSiteNotify(readPref(SITE_NOTIFY_PREF, true)).catch(() => {});
   }, [host]);
 
@@ -343,10 +379,13 @@ export function Popover() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  const doPause = async (choice: PauseChoice) => {
+  /** Pauses every workspace's agents here, or only `home`'s. */
+  const doPause = async (choice: PauseChoice, home?: Home) => {
     setPauseMenu(false);
+    setPauseFor(null);
+    const request = { type: "pause", until: pauseUntil(choice) } as const;
     try {
-      await store.requestAll({ type: "pause", until: pauseUntil(choice) });
+      await (home ? store.request(home.homeId, request) : store.requestAll(request));
       toast(
         t(
           choice === "1h"
@@ -383,8 +422,10 @@ export function Popover() {
   pauseRef.current = (choice) => (choice === "resume" ? resume() : void doPause(choice));
   const plusHour = async () => {
     if (!pause) return;
+    const request = { type: "pause", until: extendPause(pause) } as const;
     try {
-      await store.requestAll({ type: "pause", until: extendPause(pause) });
+      // Only the paused ones: the others keep working.
+      await Promise.all(pausedHomes.map((h) => store.request(h.homeId, request)));
     } catch {
       toast(t("desktop.common.error"), "alert");
     }
@@ -463,7 +504,52 @@ export function Popover() {
     </section>
   );
 
-  const hereCard = local.run && <HereCard local={local} onPrefs={() => openPrefs("servers")} />;
+  // Workspaces of other servers that use this Mac too, said under the server here's card.
+  const others = homes.filter((h) => !isHereServer(local, homeServer(h)));
+  const also = others.length > 0 && (
+    <p className="dk-help dk-here__also">
+      {others.slice(0, 2).map((h) => (
+        <OrgTile key={h.homeId} logo={h.logo} size="sm" />
+      ))}
+      <span>
+        {t("desktop.tray.alsoWorksFor", {
+          orgs:
+            others.length > 2
+              ? t("desktop.tray.otherWorkspaces", { count: others.length })
+              : joinNames(others.map(orgName), t),
+        })}
+      </span>
+    </p>
+  );
+  const hereCard = local.run && <HereCard local={local} also={also} onPrefs={() => openPrefs("servers")} />;
+  /** For 1 hour, Until tomorrow at 9 AM, Until I resume: for every workspace, or only `home`'s. */
+  const pauseChoices = (home?: Home) => (
+    <>
+      <MenuRow icon="clock" onClick={() => void doPause("1h", home)}>
+        {t("desktop.tray.pause1h")}
+      </MenuRow>
+      <MenuRow icon="calendar" onClick={() => void doPause("tomorrow", home)}>
+        {t("desktop.tray.pauseTomorrow")}
+      </MenuRow>
+      <MenuRow icon="pause" onClick={() => void doPause("manual", home)}>
+        {t("desktop.tray.pauseManual")}
+      </MenuRow>
+    </>
+  );
+  /** A workspace (or all of them) in the pause menu, its choices open under it. */
+  const pauseTarget = (key: string, lead: ReactNode, label: string, home?: Home) => (
+    <Fragment key={key}>
+      <MenuRow
+        lead={lead}
+        expanded={pauseFor === key}
+        onClick={() => setPauseFor((v) => (v === key ? null : key))}
+        trailing={<Icon name={pauseFor === key ? "chevronDown" : "chevronRight"} size={14} />}
+      >
+        {label}
+      </MenuRow>
+      {pauseFor === key && <div className="dk-sub">{pauseChoices(home)}</div>}
+    </Fragment>
+  );
 
   // Nothing of this computer works for agents: the way into the app, and what waits there.
   if (!works) {
@@ -617,7 +703,9 @@ export function Popover() {
                 </>
               }
             >
-              {t("desktop.tray.pausedBody")}
+              {allPaused
+                ? t("desktop.tray.pausedBody")
+                : t("desktop.tray.pausedSomeBody", { orgs: joinNames(pausedHomes.map(orgName), t) })}
             </Banner>
           )}
           {!update.state.required && update.state.available && update.state.latest && (
@@ -631,6 +719,8 @@ export function Popover() {
               }
             />
           )}
+
+          {homes.map((h) => h.allowed && <AllowedBanner key={h.homeId} home={h} />)}
 
           {requests.length > 0 && (
             <section className="dk-psec">
@@ -661,39 +751,43 @@ export function Popover() {
 
         <div className="dk-pop__foot dk-pop__foot--ruled">
           <section className="dk-psec">
-            {pause ? (
+            {pause && (
               <MenuRow icon="play" disabled={pending !== null} onClick={resume}>
                 {t("desktop.tray.resume")}
               </MenuRow>
-            ) : (
-              homes.length > 0 && (
-                <>
-                  <MenuRow
-                    icon="pause"
-                    expanded={pauseMenu}
-                    onClick={() => setPauseMenu((v) => !v)}
-                    trailing={<Icon name={pauseMenu ? "chevronDown" : "chevronRight"} size={14} />}
-                  >
-                    {t("desktop.tray.pause")}
-                  </MenuRow>
-                  {pauseMenu && (
-                    <div className="dk-sub">
-                      <MenuRow icon="clock" onClick={() => void doPause("1h")}>
-                        {t("desktop.tray.pause1h")}
-                      </MenuRow>
-                      <MenuRow icon="calendar" onClick={() => void doPause("tomorrow")}>
-                        {t("desktop.tray.pauseTomorrow")}
-                      </MenuRow>
-                      <MenuRow icon="pause" onClick={() => void doPause("manual")}>
-                        {t("desktop.tray.pauseManual")}
-                      </MenuRow>
-                      <span className="dk-help dk-sub__hint">
-                        {t(local.run ? "desktop.tray.pauseHintServer" : "desktop.tray.pauseHint")}
-                      </span>
-                    </div>
-                  )}
-                </>
-              )
+            )}
+            {/* Some workspaces still running: each can be paused on its own. */}
+            {homes.length > 0 && !allPaused && (
+              <>
+                <MenuRow
+                  icon="pause"
+                  expanded={pauseMenu}
+                  onClick={() => {
+                    setPauseFor(null);
+                    setPauseMenu((v) => !v);
+                  }}
+                  trailing={<Icon name={pauseMenu ? "chevronDown" : "chevronRight"} size={14} />}
+                >
+                  {t("desktop.tray.pause")}
+                </MenuRow>
+                {pauseMenu && (
+                  <div className="dk-sub">
+                    {homes.length > 1 ? (
+                      <>
+                        {pauseTarget("all", <Icon name="layers" size={16} />, t("desktop.tray.pauseAll"))}
+                        {homes
+                          .filter((h) => !h.status?.paused?.paused)
+                          .map((h) => pauseTarget(h.homeId, <OrgTile logo={h.logo} size="sm" />, orgName(h), h))}
+                      </>
+                    ) : (
+                      pauseChoices()
+                    )}
+                    <span className="dk-help dk-sub__hint">
+                      {t(local.run ? "desktop.tray.pauseHintServer" : "desktop.tray.pauseHint")}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
             {homes.length > 0 && (
               <MenuRow icon="refresh" disabled={pending !== null} onClick={reconnect}>
@@ -710,12 +804,12 @@ export function Popover() {
 }
 
 /**
- * The server here, on top: its state in a few words, Stop or Start in sight (Stop opens how long: an hour, until
- * Start, or not with the app; ADR 0158), `···` with Restart and Preferences (inline, as the pause menu: the popover is
- * a window of its own size), and its banners: stopped (Start it), not starting (why, Copy details, the logs, Try
- * again), an update that went back (until dismissed).
+ * The server here, on top: its state in a few words, Start in sight while it's stopped, `···` with Restart, Stop
+ * (how long: an hour, until Start, or not with the app; ADR 0158) and Preferences (inline, as the pause menu: the
+ * popover is a window of its own size), `also` (the other workspaces using this computer), and its banners: stopped
+ * (Start it), not starting (why, Copy details, the logs, Try again), an update that went back (until dismissed).
  */
-function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () => void }) {
+function HereCard({ local, also, onPrefs }: { local: LocalServerStatus; also?: ReactNode; onPrefs: () => void }) {
   const { t, i18n } = useTranslation();
   const host = useHost();
   const toast = useToast();
@@ -753,20 +847,7 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
           <b>{t("desktop.server.title")}</b>
           <small className={running && local.phase !== "running" ? "dk-shimmer" : undefined}>{line}</small>
         </span>
-        {running ? (
-          <Button
-            size="sm"
-            icon="stop"
-            aria-expanded={stopMenu}
-            disabled={busy}
-            onClick={() => {
-              setMore(false);
-              setStopMenu((v) => !v);
-            }}
-          >
-            {t("desktop.server.stop")}
-          </Button>
-        ) : (
+        {!running && (
           <Button size="sm" variant="primary" icon="play" loading={busy} onClick={act(() => host.startLocalServer())}>
             {t("desktop.server.start")}
           </Button>
@@ -784,39 +865,52 @@ function HereCard({ local, onPrefs }: { local: LocalServerStatus; onPrefs: () =>
           <Icon name="more" size={16} />
         </button>
       </header>
-      {stopMenu && (
-        <div className="dk-sub dk-here__more">
-          <MenuRow icon="clock" onClick={act(() => host.stopLocalServer(false, 60))}>
-            {t("desktop.server.stopFor1h")}
-          </MenuRow>
-          <MenuRow icon="stop" onClick={act(() => host.stopLocalServer(false))}>
-            {t("desktop.server.stopUntilStart")}
-          </MenuRow>
-          {/* Not with the app any more: Preferences asks first and says where its data stays. */}
-          <MenuRow
-            icon="power"
-            onClick={() => {
-              setStopMenu(false);
-              onPrefs();
-            }}
-          >
-            {t("desktop.server.stopForget")}
-          </MenuRow>
-          <span className="dk-help dk-sub__hint">{t("desktop.server.stopNote")}</span>
-        </div>
-      )}
       {more && (
         <div className="dk-sub dk-here__more">
           {running && (
-            <MenuRow icon="refresh" onClick={act(() => host.restartLocalServer())}>
-              {t("desktop.server.restart")}
-            </MenuRow>
+            <>
+              <MenuRow icon="refresh" disabled={busy} onClick={act(() => host.restartLocalServer())}>
+                {t("desktop.server.restart")}
+              </MenuRow>
+              <MenuRow
+                icon="stop"
+                disabled={busy}
+                expanded={stopMenu}
+                onClick={() => setStopMenu((v) => !v)}
+                trailing={<Icon name={stopMenu ? "chevronDown" : "chevronRight"} size={14} />}
+              >
+                {t("desktop.server.stop")}
+              </MenuRow>
+              {stopMenu && (
+                <div className="dk-sub dk-here__stop">
+                  <MenuRow icon="clock" onClick={act(() => host.stopLocalServer(false, 60))}>
+                    {t("desktop.server.stopFor1h")}
+                  </MenuRow>
+                  <MenuRow icon="stop" onClick={act(() => host.stopLocalServer(false))}>
+                    {t("desktop.server.stopUntilStart")}
+                  </MenuRow>
+                  {/* Not with the app any more: Preferences asks first and says where its data stays. */}
+                  <MenuRow
+                    icon="power"
+                    onClick={() => {
+                      setMore(false);
+                      setStopMenu(false);
+                      onPrefs();
+                    }}
+                  >
+                    {t("desktop.server.stopForget")}
+                  </MenuRow>
+                  <span className="dk-help dk-sub__hint">{t("desktop.server.stopNote")}</span>
+                </div>
+              )}
+            </>
           )}
           <MenuRow icon="settings" onClick={onPrefs}>
             {t("desktop.tray.prefs")}
           </MenuRow>
         </div>
       )}
+      {also}
       {/* Stopped by the person, the header already says until when, with Start: no banner over it. */}
       {banner === "stopped" && !local.held && (
         <Banner
@@ -1082,6 +1176,46 @@ function JobRow({ home, job, now }: { home: Home; job: ControlJob; now: number }
       </span>
       <span className="dk-job__end">{since(job.startedAt, t, now)}</span>
     </div>
+  );
+}
+
+/** Its owner turned a tool on from the apps: said here until seen, with Undo (it goes off again on this computer). */
+function AllowedBanner({ home }: { home: Home }) {
+  const { t } = useTranslation();
+  const store = useStore();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const allowed = home.allowed;
+  if (!allowed) return null;
+  const tool = toolWords(t, allowed.tool);
+  const undo = async () => {
+    setBusy(true);
+    try {
+      await store.request(home.homeId, { type: "tools.set", tool: allowed.tool, on: false });
+      store.dismissAllowed(home.homeId);
+      toast(t("desktop.tray.allowedUndone", { tool }), "check");
+    } catch {
+      toast(t("desktop.common.error"), "alert");
+      setBusy(false);
+    }
+  };
+  return (
+    <Banner
+      icon="check"
+      title={t("desktop.tray.allowedTitle", { name: allowed.byName || orgName(home), tool })}
+      actions={
+        <>
+          <Button size="sm" disabled={busy} onClick={() => void undo()}>
+            {t("desktop.tray.allowedUndo")}
+          </Button>
+          <Button size="sm" variant="ghost" disabled={busy} onClick={() => store.dismissAllowed(home.homeId)}>
+            {t("desktop.tray.allowedOk")}
+          </Button>
+        </>
+      }
+    >
+      {t("desktop.tray.allowedBody")}
+    </Banner>
   );
 }
 

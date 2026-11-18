@@ -1,6 +1,7 @@
 import type { TFunction } from "i18next";
 import type { WorkspaceLimits } from "../api/types";
 import { formatBytes } from "./files";
+import { tooLongText } from "./message-length";
 
 /**
  * A workspace's limits in the apps (ADR 0079): numbers a billing service set, said without a plan, price or
@@ -64,7 +65,8 @@ export function storageLevel(limits: WorkspaceLimits | undefined) {
 
 /**
  * A refusal by a limit in the person's words: a full workspace (`org.members_full`), the storage limit
- * (`storage.full`) or the day's uploads (`storage.daily_full`). Null for any other code.
+ * (`storage.full`), the day's uploads (`storage.daily_full`) or a message past its length (`message.too_long`).
+ * Null for any other code.
  */
 export function limitRefusalText(
   t: TFunction,
@@ -76,6 +78,12 @@ export function limitRefusalText(
   if (code === "org.members_full") {
     const [members, limit] = [num("members"), num("limit")];
     return members !== null && limit !== null ? membersFullText(t, members, limit) : null;
+  }
+  if (code === "message.too_long") {
+    const [length, max] = [num("length"), num("max")];
+    return length !== null && max !== null
+      ? `${tooLongText(t, locale, length, max)} ${t("channel.tooLong.fix")}`
+      : null;
   }
   const limitBytes = num("limitBytes");
   if (limitBytes === null) return null;

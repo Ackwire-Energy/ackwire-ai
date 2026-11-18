@@ -9,7 +9,6 @@ import {
 import { and, eq, schema } from "@agenteschat/db";
 import {
   agentCommitEmail,
-  ConflictError,
   type ConnectorDeps,
   connectorGrantValidator,
   createApiKeyConnection,
@@ -713,6 +712,13 @@ describe("branches that aren't the agent's own", () => {
     expect(await push()).toContain("unpack ok");
     const [pushed] = await audits("git.push");
     expect(pushed?.details.grants).toEqual({ "refs/heads/release-x": { ruleId: rule?.id } });
+    // While the agent always asks its rules are not read, here as in the gateway. Back to the default, they are.
+    const level = (approvalsLevel: "always" | "risky") =>
+      f.db.update(schema.agents).set({ approvalsLevel }).where(eq(schema.agents.id, f.agent.id));
+    await level("always");
+    expect(await push()).toContain("release-x isn't your branch");
+    await level("risky");
+    expect(await push()).toContain("unpack ok");
     // Turned off for the agent, by the name its access lists, the rule lets nothing through; back on, it does.
     const listed = (await getAgentAccess(f.db, f.owner.id, f.org.id, f.agent.id)).connectors.flatMap((c) =>
       c.scopes.flatMap((s) => s.tools.map((tool) => tool.name)),
@@ -768,7 +774,7 @@ describe("branches that aren't the agent's own", () => {
         })
       ).text();
     expect(await push("refs/heads/main")).toContain(
-      "agentes: main is the default branch: push to agentes/dev/<topic> and open a pull request; merging asks a person",
+      "agentes: main is the default branch: push to agentes/dev/<topic> and open a pull request; merging is a separate step",
     );
     github.options.branches = { main: {}, "ana/fix": { protected: true } };
     expect(await push("refs/heads/ana/fix")).toContain("ng refs/heads/ana/fix protected");
@@ -793,7 +799,7 @@ describe("branches that aren't the agent's own", () => {
     expect(receivePacks(w)).toBe(1);
   });
 
-  test("delete_branches: one card for the whole batch, never Aprovar sempre; deleted only once a person approves", async () => {
+  test("delete_branches: one card for the whole batch, Aprovar sempre keeps the tool; deleted only once a person approves", async () => {
     const names = ["old-1", "old-2", "old-3", "old-4", "old-5", "old-6", "guarded"];
     const w = await world(
       undefined,
@@ -839,10 +845,9 @@ describe("branches that aren't the agent's own", () => {
       title: "Apagar 7 branches em acme/app",
       detail: names.join("\n"),
       scope: "github:git.write",
-      approveAlways: null,
+      approveAlways: { tool: "delete_branches", actions: [] },
     });
     expect(deletes(w)).toEqual([]);
-    await expect(t.decide(request.id, true)).rejects.toBeInstanceOf(ConflictError);
     await t.decide(request.id);
     const out = await t.runApproved(request.id);
     expect(out).toMatchObject({ content: `Deleted on GitHub: ${names.join(", ")}.` });
@@ -893,7 +898,7 @@ describe("branches that aren't the agent's own", () => {
     expect(last?.details.reason).toContain("Not deleted: c (GitHub answered 422)");
   });
 
-  test("request_branch_push: refused for its own, a missing, the default or a protected branch; a routine never remembers", async () => {
+  test("request_branch_push: refused for its own, a missing, the default or a protected branch; a routine's card offers the same branch", async () => {
     const w = await world(undefined, fakeGitHub({ branches: { main: {}, rel: { protected: true }, "ana/fix": {} } }));
     const t = await toolsOf(w);
     const refusal = async (branch: string) =>
@@ -903,7 +908,7 @@ describe("branches that aren't the agent's own", () => {
       "nope isn't on GitHub, and an approval only covers updating an existing branch, never creating one. Push to agentes/dev/<topic> and open a pull request.",
     );
     expect(await refusal("main")).toBe(
-      "main is the default branch: push to agentes/dev/<topic> and open a pull request; merging asks a person.",
+      "main is the default branch: push to agentes/dev/<topic> and open a pull request; merging is a separate step.",
     );
     expect(await refusal("rel")).toContain("rel is protected");
     expect(await f.db.select().from(schema.approvals)).toEqual([]);
@@ -922,7 +927,7 @@ describe("branches that aren't the agent's own", () => {
     const fromRoutine = asked(
       await routine.invoke("request_branch_push", { repo: "acme/app", branch: "ana/fix", why: WHY }),
     );
-    expect(fromRoutine.approveAlways).toBeNull();
+    expect(fromRoutine.approveAlways).toEqual({ tool: "request_branch_push", actions: ["acme/app:ana/fix"] });
   });
 });
 

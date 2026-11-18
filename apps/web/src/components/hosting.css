@@ -1,0 +1,84 @@
+/* "Onde fica o seu workspace?" (HostingChoice.tsx): the sky band, the two options, the address. */
+.ac-dialog.hosting-sheet {
+  overflow: hidden;
+}
+.hosting-sheet__hero {
+  position: relative;
+  flex: none;
+  height: 148px;
+}
+/* On the sky: white, whatever the theme. */
+.hosting-sheet__close {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
+  color: #fff;
+}
+.hosting-sheet__close:hover {
+  background: #ffffff2e;
+  color: #fff;
+}
+.hosting-sheet__title {
+  margin: 0;
+  padding: var(--space-6) var(--dialog-pad) var(--space-3);
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 26px;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+/* The pill ends the title's line, the name keeps its words on one line. */
+.hosting-sheet .ac-optrow__title {
+  flex-wrap: wrap;
+}
+.hosting-tag {
+  margin-left: auto;
+}
+.hosting-points {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-top: var(--space-1);
+}
+.hosting-points .ac-icon {
+  color: var(--muted);
+}
+.hosting-points__foot {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+.hosting-sheet__none {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.hosting-sheet .ac-dialog__foot .ac-btn {
+  width: 100%;
+}
+
+/* "Ter o seu próprio servidor": two ways, each its words and its links. */
+.hosting-get {
+  gap: var(--space-4);
+}
+.hosting-get__way {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--line2);
+}
+.hosting-get__head {
+  gap: var(--space-2);
+}
+.hosting-get__head .ac-icon {
+  color: var(--muted);
+}
+.hosting-get__text {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.hosting-get__acts {
+  margin-top: var(--space-2);
+}

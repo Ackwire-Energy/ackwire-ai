@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, setSystemTime, test } from "bun:test";
-import type { AgentBrain, AiComputer, MachineAccount } from "@agenteschat/client";
+import type { AgentBrain, AiComputer, Machine, MachineAccount } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { setupDom } from "@agenteschat/ui/testing/dom";
 
@@ -214,6 +214,10 @@ describe("Quem pensa (its dialog)", () => {
     const rows = brainRows(d);
     expect(rows.find(notInUse("Claude"))?.lines).toEqual(["Usa o plano do Claude de Walter"]);
     expect(rows.find(notInUse("ChatGPT"))?.lines).toEqual(["Usa o plano do ChatGPT de Walter"]);
+    // Grouped by AI, not by whose they are: where to switch provider is the group's name.
+    expect(rows.find(notInUse("Claude"))?.group).toBe("Claude");
+    expect(rows.find(notInUse("ChatGPT"))?.group).toBe("ChatGPT");
+    expect(rows.some((r) => r.group === "De Walter")).toBe(false);
     await pickRow(d, notInUse("Claude"));
     await confirmScreen(d);
     await settle(6);
@@ -221,7 +225,7 @@ describe("Quem pensa (its dialog)", () => {
     expect(shownText(d)).toContain("A Ada agora pensa com Claude e só atende Walter.");
   });
 
-  test("the fallback to the API is a switch in Mais opções, its ⓘ saying what it does; with no API key anywhere there is none", async () => {
+  test("Mais opções has no switch to answer through the API, with an API key in the workspace or without one", async () => {
     const plan = async (state: ReturnType<typeof seedState>) => {
       const api = createFakeApi(state);
       api.agents.brain = async () => fakeAgentBrain(ADA_ID, { brain: "claude_code", effectiveModel: "sonnet" });
@@ -230,16 +234,9 @@ describe("Quem pensa (its dialog)", () => {
       await toScreen(d, "Mais opções");
       return d;
     };
-    const SWITCH = "Usar a chave de API se o plano parar";
     const d = await plan(seedState());
-    const fallback = within(d).getByRole("switch", { name: SWITCH });
-    expect(fallback.getAttribute("aria-checked")).toBe("true");
-    const hint = hintOf(SWITCH, d);
-    expect(hint.text).toBe(
-      "Responde pela API e conta no orçamento da Ada. Se não, a Ada avisa quem chamou e espera o computador voltar.",
-    );
-    expect(fallback.getAttribute("aria-describedby")).toBe(hint.button.getAttribute("aria-describedby"));
-    expect(shownText(d)).not.toContain("avisa quem chamou");
+    expect(within(d).getAllByRole("switch")).toHaveLength(1);
+    expect(d.textContent).not.toContain("chave de API se o plano parar");
     cleanup();
     const none = await plan(
       seedState({
@@ -251,7 +248,6 @@ describe("Quem pensa (its dialog)", () => {
         },
       }),
     );
-    expect(within(none).queryByRole("switch", { name: SWITCH })).toBeNull();
     expect(none.textContent).not.toContain("chave de API se o plano parar");
   });
 
@@ -332,7 +328,7 @@ describe("Quem pensa (its dialog)", () => {
       cleanup();
       const state = seedState();
       const api = createFakeApi(state);
-      fakeMachinesOf.get(api)?.pair({ id: "machine_1", name: "MacBook", os: "darwin" });
+      fakeMachinesOf.get(api)?.pair({ id: "machine_1", name: "MacBook", os: "darwin", cliInstall: true });
       const computer = { machineId: "machine_1", name: "MacBook", online: true };
       // The computer's own sign-in thinks for it (the default): the row in use is that sign-in, not the plan.
       const base = fakeAgentBrain(ADA_ID, {
@@ -349,12 +345,14 @@ describe("Quem pensa (its dialog)", () => {
     };
     // Why it can't think there and what to do, never only that no computer has it.
     let text = await onIt("codex", "not_installed");
-    expect(text).toContain("O Codex não está instalado no MacBook.");
+    // Not there: installed from here by whoever connected it, or looked for again.
+    expect(text).toContain("O Codex ainda não está no MacBook.");
+    expect(text).toContain("Instalar o Codex para mim");
+    expect(text).toContain("Já instalei, verificar de novo");
     expect(text).not.toContain("Nenhum computador tem");
     text = await onIt("claude_code", "tool_off");
-    expect(text).toContain(
-      "O Claude Code está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
-    );
+    expect(text).toContain("O Claude Code está desligado no MacBook.");
+    expect(text).not.toContain("Preferências");
     expect(text).not.toContain("Nenhum computador tem");
   });
 
@@ -364,7 +362,14 @@ describe("Quem pensa (its dialog)", () => {
       const state = seedState();
       const api = createFakeApi(state);
       const machines = fakeMachinesOf.get(api);
-      machines?.pair({ id: "machine_1", name: "MacBook", os: "linux", mode: "system" });
+      machines?.pair({
+        id: "machine_1",
+        name: "MacBook",
+        os: "linux",
+        mode: "system",
+        kind: "managed",
+        pairedBy: null,
+      });
       machines?.setSetup({ state: "ready", machineId: "machine_1", since: new Date().toISOString() });
       // The workspace's computer: nobody signs in at its terminal, so the row in use is the plan itself.
       const base = fakeAgentBrain(ADA_ID, {
@@ -396,13 +401,13 @@ describe("Quem pensa (its dialog)", () => {
     );
   });
 
-  test("a tool turned off says where it turns on: the app on a Mac, the app or the command on Linux", async () => {
-    const reason = async (os: string, name: string) => {
+  test("a tool turned off: the row says it once, its way out goes under it, by whose computer it is", async () => {
+    const reason = async (machine: Partial<Machine> & { name: string }) => {
       cleanup();
       const state = seedState();
       const api = createFakeApi(state);
-      fakeMachinesOf.get(api)?.pair({ id: "machine_1", name, os, mode: "system" });
-      const computer = { machineId: "machine_1", name, online: true };
+      fakeMachinesOf.get(api)?.pair({ id: "machine_1", os: "darwin", mode: "system", ...machine });
+      const computer = { machineId: "machine_1", name: machine.name, online: true };
       // No sign-in of Claude there yet: the row in use is the plan itself.
       const base = fakeAgentBrain(ADA_ID, {
         brain: "claude_code",
@@ -415,15 +420,25 @@ describe("Quem pensa (its dialog)", () => {
       );
       api.agents.brain = async () => ({ ...base, options, machines: [{ ...computer, options }] });
       await open(state, api);
-      return shownText(await brainDialog());
+      const d = await brainDialog();
+      return { d, text: shownText(d), state };
     };
-    // The row names the plan; its line names the program on the computer.
-    expect(await reason("darwin", "MacBook")).toContain(
-      "O Claude Code está desligado no MacBook. Ligue lá, no app do Ackwire AI: Preferências → Ferramentas.",
-    );
-    expect(await reason("linux", "Servidor")).toContain(
-      "O Claude Code está desligado no Servidor. Ligue lá, no app do Ackwire AI ou com sudo agentes-runner tools enable claude.",
-    );
+    // Whoever connected it: the cause once, in the row, and the one click under it.
+    let r = await reason({ name: "MacBook", accessAllow: true });
+    expect(inUse(r.d)).toMatchObject({ lines: ["O Claude Code está desligado no MacBook."] });
+    expect(r.text.split("está desligado")).toHaveLength(2);
+    expect(r.text).not.toMatch(/Preferências|Ligue lá/);
+    await click(within(r.d).getByRole("button", { name: "Ligar o Claude Code" }));
+    expect(r.state.calls.filter((c) => c.method === "machines.allowTool")).toHaveLength(1);
+    // Someone else's computer: an admin asks whoever connected it, never turns it on.
+    r = await reason({ name: "MacBook", accessAllow: true, pairedBy: { id: "u-rui", name: "Rui Prado" } });
+    expect(within(r.d).queryByRole("button", { name: "Ligar o Claude Code" })).toBeNull();
+    expect(within(r.d).getByRole("button", { name: "Pedir a Rui" })).toBeTruthy();
+    // An app too old on a server: update it there, the command behind "Prefiro no Terminal".
+    r = await reason({ name: "Servidor", os: "linux" });
+    expect(r.text).toContain("Atualize o app do Ackwire AI no Servidor para ligar daqui.");
+    expect(r.text).toContain("Prefiro no Terminal");
+    expect(r.d.textContent).toContain("sudo agentes-runner tools enable claude");
   });
 });
 
@@ -847,7 +862,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     // The account it signed in thinks for Ada at once: the last screen says so.
     expect(within(d).queryByRole("region", { name: "Adicionar conta do ChatGPT" })).toBeNull();
     expect(brainScreen(d)).toBe("Pronto");
-    expect(shownText(d)).toContain("A Ada agora pensa com Pessoal · Plus.");
+    expect(shownText(d)).toContain("A Ada agora pensa com Pessoal.");
     expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
     expect(brainCalls(state)).toEqual([{ brain: "codex", account: "acct_codex" }]);
   });
@@ -906,7 +921,7 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     fakeMachinesOf.get(api)?.endLogin("login_1", { state: "done", account: codex });
     await ask(22_000);
     expect(brainScreen(d)).toBe("Pronto");
-    expect(shownText(d)).toContain("A Ada agora pensa com Pessoal · Plus.");
+    expect(shownText(d)).toContain("A Ada agora pensa com Pessoal.");
     expect(d.textContent).not.toMatch(/Não deu para entrar|não respondeu/);
     expect(state.calls.filter((c) => c.method === "machines.beginAccountLogin")).toHaveLength(1);
     expect(state.calls.some((c) => c.method === "machines.cancelAccountLogin")).toBe(false);
@@ -977,29 +992,70 @@ describe("Quem pensa: the account on the computer and the effort (ADR 0041)", ()
     await toScreen(d, "Trocar de conta");
     const best = brainRows(d).filter((r) => r.group === "Com mais folga agora");
     expect(best.map((r) => [r.title, r.room])).toEqual([
-      ["Folga · Max", "5%"],
-      ["Pessoal · Max", "40%"],
-      ["Trabalho · Max", "70%"],
+      // Names their owner gave them: the name alone, the email and plan on the line under it.
+      ["Folga", "5%"],
+      ["Pessoal", "40%"],
+      ["Trabalho", "70%"],
     ]);
     // How full each one is is read with its row, below 80% too: only the bar is hidden from a screen reader.
-    expect(within(d).getByRole("radio", { name: /Pessoal · Max.*40\s?%/ })).toBeTruthy();
+    expect(within(d).getByRole("radio", { name: /Pessoal.*40\s?%/ })).toBeTruthy();
     for (const pct of d.querySelectorAll(".arrival-have__pct")) expect(pct.closest("[aria-hidden]")).toBeNull();
     expect(best[0]?.checked).toBe(true);
-    expect(mainButton(d)?.textContent).toBe("Trocar para Folga · Max");
+    expect(mainButton(d)?.textContent).toBe("Trocar para Folga");
     await toScreen(d, "Ver as");
     expect(brainScreen(d)).toBe("Todas as contas");
-    expect(brainRows(d).some((r) => r.title === "Reserva · Max")).toBe(true);
+    expect(brainRows(d).some((r) => r.title === "Reserva")).toBe(true);
     await act(async () =>
       fireEvent.change(within(d).getByRole("searchbox", { name: "Buscar conta ou pessoa" }), {
         target: { value: "reserva" },
       }),
     );
     await settle(2);
-    expect(brainRows(d).map((r) => r.title)).toEqual(["Reserva · Max"]);
+    expect(brainRows(d).map((r) => r.title)).toEqual(["Reserva"]);
     await pickRow(d, "Reserva");
     await confirmScreen(d);
     await settle(6);
     expect(brainCalls(state)).toEqual([{ brain: "claude_code", account: "acct_d" }]);
     expect(brainScreen(d)).toBe("Pronto");
+  });
+
+  test("an account at its limit says until when in the list; picked, one line says the agent waits, with Ver uso, and the switch still goes", async () => {
+    const until = new Date(Date.now() + 25 * 86_400_000).toISOString();
+    const at = new Date().toISOString();
+    const { state } = await onMac({
+      accounts: [
+        work,
+        {
+          ...work,
+          id: "acct_full",
+          label: "Cheia",
+          email: "cheia@example.com",
+          usage: { windows: [{ kind: "seven_day", usedPercent: 100, resetsAt: until }], source: "probe", at },
+        },
+        {
+          ...work,
+          id: "acct_free",
+          label: "Folga",
+          email: "folga@example.com",
+          usage: { windows: [{ kind: "seven_day", usedPercent: 5 }], source: "probe", at },
+        },
+      ],
+      account: "acct_work",
+    });
+    const d = await brainDialog();
+    await toScreen(d, "Trocar de conta");
+    const full = within(d).getByRole("radio", { name: /Cheia/ }).closest("label") as HTMLElement;
+    expect(full.textContent).toContain("No limite até");
+    // The one with room comes picked: nothing waits, nothing to say.
+    expect(within(d).queryByText(/espera até o plano renovar/)).toBeNull();
+    await pickRow(d, notInUse("Cheia"));
+    const line = within(d).getByText(/Nesta conta a Ada espera até o plano renovar\./);
+    const link = within(line.closest("p") as HTMLElement).getByRole("link", { name: "Ver uso" });
+    expect(link.getAttribute("href")).toBe(`/org/${ORG_ID}/settings/usage`);
+    expect(mainButton(d)?.textContent).toBe("Trocar para Cheia");
+    expect((mainButton(d) as HTMLButtonElement).disabled).toBe(false);
+    await confirmScreen(d);
+    await settle(6);
+    expect(brainCalls(state)).toEqual([{ brain: "claude_code", account: "acct_full" }]);
   });
 });

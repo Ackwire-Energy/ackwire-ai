@@ -7,11 +7,11 @@ import { readFileSync } from "node:fs";
 import type { SecretBox, SecretRequest, SecretTarget } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
 import { secretAad } from "@agenteschat/client/lib/secret-box";
-import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, within } from "@testing-library/react";
 // The computer's side, from the server code: what the card seals must open there.
 import { generateSecretKeyPair, openSecret } from "../../../packages/adapters/src/secret-box";
 import { ADA_ID, createFakeApi, ENG_ID, ORG_ID, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { afterSealing, renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -83,7 +83,11 @@ describe("secret requests (ADR 0027)", () => {
     expect(field.type).toBe("password");
     await type(field, "npm_live_abc123");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(6);
+    await afterSealing(() =>
+      expect(screen().getByRole("group", { name: "Pedido de segredo de Ada" }).classList.contains("rq--ended")).toBe(
+        true,
+      ),
+    );
 
     const call = state.calls.find((c) => c.method === "secrets.deliver");
     expect(call?.args.slice(0, 2)).toEqual([ORG_ID, secretRequest.id]);
@@ -93,10 +97,13 @@ describe("secret requests (ADR 0027)", () => {
     const aad = secretAad({ requestId: secretRequest.id, orgId: ORG_ID, name: "NPM_TOKEN", target: { kind: "env" } });
     expect(await openSecret(pair.privateKey, box, aad)).toBe("npm_live_abc123");
 
-    // Once sent, one line takes its place (another element): look it up again.
+    // Once sent, the same card: which secret and what for stay, and how it ended stands where the field was.
     const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    expect(done.classList.contains("rq--ended")).toBe(true);
     expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
-    expect(done.textContent).toContain(`${KEY_LABEL} · Entregue por você`);
+    expect(done.querySelector(".rq__wt b")?.textContent).toBe(KEY_LABEL);
+    expect(done.querySelector(".rq__answer-text")?.textContent).toContain("Entregue por você");
+    expect(within(done).queryByRole("button")).toBeNull();
     expect(done.textContent).not.toContain("NPM_TOKEN");
     expect(within(done).queryByLabelText(KEY_LABEL)).toBeNull();
     expect(done.hasAttribute("data-ask-id")).toBe(false);
@@ -113,7 +120,7 @@ describe("secret requests (ADR 0027)", () => {
     expect(card.textContent).not.toContain("variável");
     await type(within(card).getByLabelText("Senha de shop.example.com"), "hunter2-for-real");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(6);
+    await afterSealing(() => expect(state.calls.some((c) => c.method === "secrets.deliver")).toBe(true));
     const box = state.calls.find((c) => c.method === "secrets.deliver")?.args[2] as SecretBox;
     const aad = (target: SecretTarget) =>
       secretAad({ requestId: secretRequest.id, orgId: ORG_ID, name: "SHOP_PASSWORD", target });
@@ -184,7 +191,7 @@ describe("secret requests (ADR 0027)", () => {
 
   test("what the card says isn't cut: its title, where it goes and its ended line wrap", () => {
     const css = readFileSync(new URL("../src/components/request-card.css", import.meta.url), "utf8");
-    for (const selector of [".rq__wt b,\n.rq__wt small", ".rq-done__text"]) {
+    for (const selector of [".rq__wt b,\n.rq__wt small", ".rq-done__text", ".rq__answer-text"]) {
       const rule = css.slice(css.indexOf(`${selector} {`), css.indexOf("}", css.indexOf(`${selector} {`)));
       expect(rule).toContain("overflow-wrap: anywhere");
       expect(rule).not.toContain("ellipsis");
@@ -241,10 +248,9 @@ describe("secret requests (ADR 0027)", () => {
     const kept = state.messages.find((m) => m.id === "msg-s")?.meta?.secretRequest as SecretRequest;
     Object.assign(kept, { ...secretRequest, status: "canceled", endReason: "withdrawn", publicKey: null });
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(6);
-    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(done.textContent).toContain("Ada não precisa mais disso.");
-    expect(within(done).queryByLabelText(KEY_LABEL)).toBeNull();
+    const done = () => screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    await afterSealing(() => expect(done().textContent).toContain("Ada não precisa mais disso."));
+    expect(within(done()).queryByLabelText(KEY_LABEL)).toBeNull();
     expect(screen().queryByDisplayValue("npm_live_abc123")).toBeNull();
   });
 
@@ -259,10 +265,9 @@ describe("secret requests (ADR 0027)", () => {
     const card = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
     await type(within(card).getByLabelText(KEY_LABEL), "npm_live_abc123");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(6);
-    const done = screen().getByRole("group", { name: "Pedido de segredo de Ada" });
-    expect(done.textContent).toContain("o computador que pediu mudou");
-    expect(done.textContent).not.toContain("fechou antes da resposta");
+    const done = () => screen().getByRole("group", { name: "Pedido de segredo de Ada" });
+    await afterSealing(() => expect(done().textContent).toContain("o computador que pediu mudou"));
+    expect(done().textContent).not.toContain("fechou antes da resposta");
   });
 
   test("a 409 on a request still open keeps it open and says to send again, never that it closed", async () => {
@@ -273,8 +278,7 @@ describe("secret requests (ADR 0027)", () => {
     const field = within(card).getByLabelText(KEY_LABEL) as HTMLInputElement;
     await type(field, "npm_live_abc123");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    await settle(6);
-    expect(card.textContent).toContain("Este pedido mudou enquanto você respondia.");
+    await afterSealing(() => expect(card.textContent).toContain("Este pedido mudou enquanto você respondia."));
     expect(field.value).toBe("npm_live_abc123");
   });
 
@@ -286,10 +290,7 @@ describe("secret requests (ADR 0027)", () => {
     const field = within(card).getByLabelText(KEY_LABEL) as HTMLInputElement;
     await type(field, "npm_live_abc123");
     await click(within(card).getByRole("button", { name: "Enviar" }));
-    // The value is sealed (WebCrypto, off the JS thread) before it is sent: no number of ticks waits for that.
-    await waitFor(() => expect(card.textContent).toContain("O computador de Ada não está respondendo agora."), {
-      timeout: 10_000,
-    });
+    await afterSealing(() => expect(card.textContent).toContain("O computador de Ada não está respondendo agora."));
     expect(card.textContent).not.toContain("respondido ou expirou");
     expect(field.value).toBe("npm_live_abc123");
     expect(within(card).getByRole("button", { name: "Enviar" })).not.toBeNull();

@@ -11,6 +11,8 @@
  *   (the same one when the code's `reconnect` names a machine of that organization)
  * - `POST   /api/app/machines/device/{userCode}/deny` → 204
  * - `POST   …/machines/{id}/access/reduce` `{ removeFolder?, disableTool? }` → the new access
+ * - `POST   …/machines/{id}/clis/check` → 200; `POST|GET|DELETE …/machines/{id}/cli-install` → `{ install }`
+ *   (`running` once started, until a test calls `setCliInstall()`); `POST …/cli-install/ask` → 200
  * - `GET    /api/desktop/latest?target=&arch=` → the release, or 404 (`null`)
  * - `GET    …/machines/outages` → `{ outages, targets }` (offline computers agents wait for)
  * - `GET    …/machines/{id}/queue` → the computer's line (`setQueue()`; nothing working or waiting by default)
@@ -28,22 +30,82 @@
  */
 import type {
   AccountLoginStatus,
+  AccountOrderGroup,
   AiAccounts,
   ApiClient,
+  CliInstall,
   ComputerQueue,
   ComputerSetup,
   DesktopRelease,
   DeviceRequest,
   HostComputer,
   Machine,
+  MachineAccount,
   MachineAccountKind,
   MachineOutages,
   MoveAgentsResult,
   SecretBox,
 } from "@agenteschat/client";
 import { ApiError } from "@agenteschat/client";
+import { orderAccounts } from "@agenteschat/client/lib/ai-accounts";
 import { isPlanId, planOf } from "@agenteschat/client/lib/plans";
 import { clone, type MockContext, MockNotFoundError } from "./context";
+
+/** The server's automatic names (`defaultAccountLabel`): the maker, or a coding plan's name. */
+const AUTO_NAMES: Record<string, string> = {
+  claude_code: "Claude",
+  codex: "ChatGPT",
+  cursor: "Cursor",
+  opencode: "OpenCode",
+  grok: "Grok",
+  antigravity: "Gemini",
+};
+const OLD_LABEL_WORDS = /^(code|pro\+?|max|ultra|team|teams|enterprise|plus|business|free)$/i;
+
+/**
+ * An account as the server sends it (`isDefaultAccountLabel`): `named` false while its name is the automatic one
+ * ("Claude", "Claude 2", an older "Claude Max 2"), true for any other. A test that sets `named` keeps it.
+ */
+export function withNamed<A extends Pick<MachineAccount, "label" | "kind" | "provider" | "named">>(a: A): A {
+  if (a.named !== undefined) return a;
+  const base = planOf(a.provider)?.label ?? AUTO_NAMES[a.kind] ?? "";
+  const rest = a.label.startsWith(base) ? a.label.slice(base.length).trim().split(/\s+/).filter(Boolean) : null;
+  if (rest && rest.length > 0 && /^\d+$/.test(rest[rest.length - 1] ?? "")) rest.pop();
+  const auto =
+    rest !== null &&
+    (rest.length === 0 || (rest.length === 1 && OLD_LABEL_WORDS.test(rest[0] ?? "") && a.label[base.length] === " "));
+  return { ...a, named: !auto };
+}
+
+/** A run may move to it (`movable`): a fixture's own say, else shared and signed in. */
+const movable = (a: AiAccounts["accounts"][number]) => a.movable ?? (a.shared === true && a.status === "active");
+
+/**
+ * The order of use as the server lists it: the viewer's Claude and ChatGPT sign-ins, by computer and kind, those a run
+ * never moves to last.
+ */
+function orderGroups(ai: AiAccounts): AccountOrderGroup[] {
+  const groups: AccountOrderGroup[] = [];
+  const listed = ai.accounts
+    .map((a, i) => ({ a, i }))
+    .filter(({ a }) => (a.kind === "claude_code" || a.kind === "codex") && a.provider === null)
+    .sort(
+      (x, y) =>
+        Number(movable(y.a)) - Number(movable(x.a)) ||
+        (x.a.useOrder ?? Infinity) - (y.a.useOrder ?? Infinity) ||
+        x.i - y.i,
+    );
+  for (const { a } of listed) {
+    let g = groups.find((x) => x.machineId === a.machineId && x.kind === a.kind);
+    if (!g) {
+      g = { machineId: a.machineId, computer: a.computer, kind: a.kind, accounts: [] };
+      groups.push(g);
+    }
+    // An admin may move anyone's: a fixture says so with its own `canMove`.
+    g.accounts.push({ ...a, movable: movable(a), canMove: (a as { canMove?: boolean }).canMove ?? a.mine });
+  }
+  return groups;
+}
 
 export interface FakeMachines {
   client: ApiClient["machines"];
@@ -65,6 +127,8 @@ export interface FakeMachines {
   setOutages(outages: MachineOutages): void;
   /** A computer's line (`queue`); unset: nothing working or waiting on it. */
   setQueue(queue: ComputerQueue): void;
+  /** Where a computer's install of a coding CLI stands (`null`: none ran). */
+  setCliInstall(machineId: string, install: CliInstall | null): void;
   /** What `moveAgents` answers (default: every agent moved, nothing else). */
   setMoveResult(result: MoveAgentsResult | null): void;
   /** The server's own computer in the organization; `null` (default): it has none. */
@@ -112,6 +176,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
   type Login = { loginId: string; kind: MachineAccountKind; box: SecretBox | null; cancelled: boolean };
   let ai: AiAccounts = { accounts: [], computers: [] };
   const logins: Login[] = [];
+  const installs = new Map<string, CliInstall | null>();
   const loginStatus = new Map<string, AccountLoginStatus>();
   const login = (loginId: string) => {
     const l = logins.find((x) => x.loginId === loginId && !x.cancelled);
@@ -219,6 +284,37 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         m.access = { folders, tools };
         return clone(m.access);
       },
+      allowTool: async (orgId, machineId, tool) => {
+        log("machines.allowTool", orgId, machineId, tool);
+        const m = find(machineId);
+        const access = m.access ?? { folders: [], tools: { claude: false, codex: false, commands: false } };
+        m.access = { ...access, tools: { ...access.tools, [tool]: true } };
+        return clone(m.access);
+      },
+      askTool: async (orgId, machineId, tool) => {
+        log("machines.askTool", orgId, machineId, tool);
+      },
+      checkClis: async (orgId, machineId) => {
+        log("machines.checkClis", orgId, machineId);
+        find(machineId);
+      },
+      cliInstall: async (orgId, machineId, tool, action) => {
+        log("machines.cliInstall", orgId, machineId, tool, action);
+        find(machineId);
+        if (action === "start") installs.set(machineId, { tool, state: "running" });
+        const now = installs.get(machineId) ?? null;
+        if (action === "cancel" && now?.state === "running") installs.set(machineId, { ...now, state: "canceled" });
+        return { install: clone(installs.get(machineId) ?? null) };
+      },
+      askCliInstall: async (orgId, machineId, tool) => {
+        log("machines.askCliInstall", orgId, machineId, tool);
+      },
+      setPause: async (orgId, machineId, input) => {
+        log("machines.setPause", orgId, machineId, input);
+        const m = find(machineId);
+        m.paused = input === "resume" ? null : { until: input.until, by: { id: "u-me", name: "You" } };
+        return m.paused ? clone(m.paused) : null;
+      },
       desktopLatest: async (target, arch) => {
         log("machines.desktopLatest", target, arch);
         const build = arch === "aarch64" && target !== "darwin" ? `${target}-arm64` : target;
@@ -278,7 +374,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
       accountLogin: async (_orgId, _machineId, loginId) => {
         login(loginId);
         const waiting: AccountLoginStatus = { state: "waiting" };
-        return clone(loginStatus.get(loginId) ?? waiting);
+        const st = clone(loginStatus.get(loginId) ?? waiting);
+        // The account it signed in as the server sends it: whether its name is the automatic one.
+        return st.account ? { ...st, account: withNamed(st.account) } : st;
       },
       cancelAccountLogin: async (orgId, machineId, loginId) => {
         log("machines.cancelAccountLogin", orgId, machineId, loginId);
@@ -289,10 +387,32 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
         log("machines.refreshAccountUsage", orgId);
       },
       // Read whenever an accounts screen renders: not logged.
-      aiAccounts: async () => clone(ai),
+      aiAccounts: async () => {
+        const all = clone(ai);
+        return { ...all, accounts: all.accounts.map(withNamed) };
+      },
       takeBackPlan: async (orgId, accountId, agentId) => {
         log("machines.takeBackPlan", orgId, accountId, agentId);
         return { agentIds: agentId ? [agentId] : [] };
+      },
+      setAccountServes: async (orgId, accountId, serves) => {
+        log("machines.setAccountServes", orgId, accountId, serves);
+        return { serves, agentIds: [] };
+      },
+      // Read whenever an order renders: not logged.
+      accountOrder: async () => ({ groups: clone(orderGroups(ai)) }),
+      moveAccountInOrder: async (orgId, accountId, index) => {
+        log("machines.moveAccountInOrder", orgId, accountId, index);
+        const group = orderGroups(ai).find((g) => g.accounts.some((a) => a.id === accountId && a.movable));
+        if (!group) throw new MockNotFoundError("Conta não encontrada.");
+        // As the server: a place is an account's among those with one, its logins (`sameAs`) move together.
+        const accounts = orderAccounts(group.accounts.filter((a) => a.movable));
+        const moved = accounts.find((b) => b.some((a) => a.id === accountId)) ?? [];
+        const others = accounts.filter((b) => b !== moved);
+        others.splice(Math.min(index, others.length), 0, moved);
+        const ids = others.flat().map((a) => a.id);
+        for (const a of ai.accounts) if (ids.includes(a.id)) a.useOrder = ids.indexOf(a.id);
+        return clone(orderGroups(ai).find((g) => g.machineId === group.machineId && g.kind === group.kind) ?? group);
       },
       renameAccount: async (orgId, machineId, accountId, label) => {
         log("machines.renameAccount", orgId, machineId, accountId, label);
@@ -302,6 +422,7 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
           [...loginStatus.values()].find((st) => st.account?.id === accountId)?.account;
         if (!a) throw new MockNotFoundError("Conta não encontrada.");
         a.label = label;
+        a.named = true;
         return clone(a);
       },
       removeAccount: async (orgId, machineId, accountId) => {
@@ -325,6 +446,9 @@ export function createFakeMachines(ctx: MockContext, log: (method: string, ...ar
     },
     setQueue: (next) => {
       queues.set(next.machineId, clone(next));
+    },
+    setCliInstall: (machineId, install) => {
+      installs.set(machineId, install ? clone(install) : null);
     },
     setMoveResult: (next) => {
       moveResult = next;

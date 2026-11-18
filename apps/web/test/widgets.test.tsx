@@ -6,7 +6,17 @@ setupDom();
 import type { Dashboard, DashboardLayoutInput, Widget, WidgetSpec } from "@agenteschat/client";
 import { box, place } from "@agenteschat/ui/testing";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
-import { ADA_ID, createFakeApi, ENG_ID, type FakeState, fakeDashboardsOf, ORG_ID, seedState } from "./fake-api";
+import {
+  ADA_ID,
+  createFakeApi,
+  ENG_ID,
+  type FakeState,
+  fakeDashboardsOf,
+  LODI_ID,
+  ORG_ID,
+  seedState,
+  withRightHand,
+} from "./fake-api";
 import type { FakeDashboards } from "./fakes/dashboards";
 import { notification } from "./fakes/notifications";
 import { pick } from "./new-agent-flow";
@@ -20,6 +30,17 @@ afterEach(() => {
 const click = (el: Element) => act(async () => fireEvent.click(el));
 const ago = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
 const soon = (m: number) => new Date(Date.now() + m * 60_000).toISOString();
+/** A refresh's wait as the server sends it. */
+const waitOf = (over: Partial<NonNullable<Widget["wait"]>>): Widget["wait"] => ({
+  code: "plan_limit",
+  source: "plan",
+  resetsAt: null,
+  scope: null,
+  model: null,
+  since: null,
+  canContinue: false,
+  ...over,
+});
 
 const SALES: WidgetSpec = {
   kind: "kpi",
@@ -75,7 +96,7 @@ function setup(state: FakeState = seedState()) {
 const open = async (path: string, s = setup()) => {
   const view = await renderApp(path, { api: s.api });
   await settle(8);
-  return { ...s, router: view.router };
+  return { ...s, router: view.router, services: view.services };
 };
 
 const mural = () => screen().getByRole("region", { name: "Meu Início" });
@@ -155,6 +176,256 @@ describe("My Home as a mural (ADR 0135)", () => {
     expect(widget("Vendas hoje").getAttribute("data-state")).toBe("updating");
     // The last data stays under the sweep while it updates.
     expect(widget("Vendas hoje").querySelector(".wk-num")?.textContent).toBe("R$18.420");
+  });
+
+  test("a widget stopped after failing in a row says so, then the last failure and that failure's one way out", async () => {
+    const stoppedBy = (cause: string, ai: "ready" | "no_ai" = "no_ai") => {
+      const s = setup();
+      Object.assign(s.builds, { status: "failed", failure: { code: "failing", detail: null, cause } });
+      s.state.aiStatus = {
+        any: ai === "ready",
+        agents: s.state.agents.map((a) =>
+          ai === "ready" ? { agentId: a.id, state: ai } : { agentId: a.id, state: ai, reason: "no_key" as const },
+        ),
+      };
+      return s;
+    };
+    // No AI: Conectar, never Resolver (an update would only fail again).
+    const noAi = await open(`/org/${ORG_ID}/home`, stoppedBy("missing_credential"));
+    const card = widget("Tempo de build");
+    expect(card.textContent).toContain(
+      "Parou depois de 5 falhas seguidas. A última: Ada está sem chave ou plano de IA para trabalhar.",
+    );
+    expect(within(card).queryByRole("button", { name: "Resolver" })).toBeNull();
+    expect(calls(noAi.state, "dashboards.refreshWidget")).toEqual([]);
+    await click(within(card).getByRole("button", { name: "Conectar" }));
+    expect(screen().getByRole("dialog", { name: /Conectar uma IA/ })).toBeTruthy();
+    cleanup();
+
+    // An AI is there again: nothing starts it by itself (it stopped), and Resolver does, never Conectar.
+    const back = await open(`/org/${ORG_ID}/home`, stoppedBy("missing_credential", "ready"));
+    await settle(3);
+    const ready = widget("Tempo de build");
+    expect(ready.textContent).toContain("Parou depois de 5 falhas seguidas. A última: Ada está sem chave");
+    expect(calls(back.state, "dashboards.refreshWidget")).toEqual([]);
+    expect(within(ready).queryByRole("button", { name: "Conectar" })).toBeNull();
+    await click(within(ready).getByRole("button", { name: "Resolver" }));
+    await settle(3);
+    expect(last(back.state, "dashboards.refreshWidget")).toEqual([ORG_ID, back.builds.id]);
+    cleanup();
+
+    // Any other: trying again.
+    const slow = await open(`/org/${ORG_ID}/home`, stoppedBy("timeout"));
+    const again = widget("Tempo de build");
+    expect(again.textContent).toContain("Parou depois de 5 falhas seguidas. A última: A atualização demorou demais.");
+    expect(within(again).queryByRole("button", { name: "Conectar" })).toBeNull();
+    await click(within(again).getByRole("button", { name: "Resolver" }));
+    await settle(3);
+    expect(last(slow.state, "dashboards.refreshWidget")).toEqual([ORG_ID, slow.builds.id]);
+  });
+
+  test("a widget whose agent has no AI says why with Conectar (or who can), and builds with no click once it has one", async () => {
+    const waitingFor = (ai: "ready" | "no_ai", detail: string | null = null) => {
+      const s = setup();
+      const visits = s.fake.addWidget(s.home.id, {
+        agentId: ADA_ID,
+        title: "Visitas",
+        spec: null,
+        schedule: "manual",
+        layout: { position: 5, w: 1, h: 1 },
+      });
+      Object.assign(visits, { status: "failed", failure: { code: "missing_credential", detail } });
+      s.state.aiStatus = {
+        any: ai === "ready",
+        agents: s.state.agents.map((a) => ({
+          agentId: a.id,
+          state: ai,
+          ...(ai === "no_ai" ? { reason: "no_key" as const } : {}),
+        })),
+      };
+      return { s, visits };
+    };
+    const none = waitingFor("no_ai");
+    const { state } = await open(`/org/${ORG_ID}/home`, none.s);
+    const card = widget("Visitas");
+    expect(card.textContent).toContain("Ada está sem chave ou plano de IA para trabalhar.");
+    expect(card.textContent).toContain("Ada monta o widget assim que uma IA for conectada.");
+    expect(within(card).queryByRole("button", { name: "Resolver" })).toBeNull();
+    // Nothing is asked of the server while there's no AI: a build would only fail.
+    expect(calls(state, "dashboards.refreshWidget")).toEqual([]);
+    await click(within(card).getByRole("button", { name: "Conectar" }));
+    expect(screen().getByRole("dialog", { name: /Conectar uma IA/ })).toBeTruthy();
+    cleanup();
+
+    // Someone who may not connect Ada's AI reads the real cause and who can, in place of a Conectar.
+    const member = waitingFor("no_ai", "not_signed_in");
+    const mine = member.s.state.me?.organizations[0];
+    if (mine) mine.role = "member";
+    await open(`/org/${ORG_ID}/home`, member.s);
+    const locked = widget("Visitas");
+    expect(locked.textContent).toContain("O plano de Ada foi desconectado.");
+    expect(locked.textContent).toContain(
+      "Quem conecta a IA de Ada: um admin, com uma chave de API, ou João, com o próprio plano.",
+    );
+    expect(within(locked).queryByRole("button", { name: "Conectar" })).toBeNull();
+    cleanup();
+
+    // The build nobody pressed for (`auto`): the server only queues it.
+    const back = waitingFor("ready");
+    const again = await open(`/org/${ORG_ID}/home`, back.s);
+    expect(last(again.state, "dashboards.refreshWidget")).toEqual([ORG_ID, back.visits.id, true]);
+    expect(calls(again.state, "dashboards.refreshWidget")).toHaveLength(1);
+    expect(widget("Visitas").getAttribute("data-state")).toBe("building");
+  });
+
+  test("a widget that starts waiting while the AI status read before still says ready builds only on a newer one", async () => {
+    const s = setup();
+    const visits = s.fake.addWidget(s.home.id, {
+      agentId: ADA_ID,
+      title: "Visitas",
+      spec: SALES,
+      schedule: "hour",
+      layout: { position: 5, w: 1, h: 1 },
+    });
+    const status = (ai: "ready" | "no_ai") => ({
+      any: ai === "ready",
+      agents: s.state.agents.map((a) => ({
+        agentId: a.id,
+        state: ai,
+        ...(ai === "no_ai" ? { reason: "not_signed_in" as const } : {}),
+      })),
+    });
+    s.state.aiStatus = status("ready");
+    const { state, services } = await open(`/org/${ORG_ID}/home`, s);
+    // Read a minute ago, while Ada's plan was still signed in.
+    const aiKey = ["org", ORG_ID, "credentials", "ai-status"];
+    services.queryClient.setQueryData(aiKey, status("ready"), { updatedAt: Date.now() - 60_000 });
+    // Her plan signs out, and the next slot holds the widget.
+    state.aiStatus = status("no_ai");
+    Object.assign(visits, { status: "failed", failure: { code: "missing_credential", detail: "not_signed_in" } });
+    await act(() => services.queryClient.invalidateQueries({ queryKey: ["org", ORG_ID, "dashboards"] }));
+    await settle(8);
+    expect(widget("Visitas").textContent).toContain("O plano de Ada foi desconectado.");
+    expect(calls(state, "dashboards.refreshWidget")).toEqual([]);
+    // Signed in again: the status read after that builds it, once.
+    state.aiStatus = status("ready");
+    await act(() => services.queryClient.invalidateQueries({ queryKey: aiKey }));
+    await settle(8);
+    expect(calls(state, "dashboards.refreshWidget").map((c) => c.args)).toEqual([[ORG_ID, visits.id, true]]);
+  });
+
+  test("the right hand's widget on a plan that serves only its owner: Conectar opens on a key, a member reads who can", async () => {
+    const onPlan = () => {
+      const s = setup(withRightHand(seedState(), { ownerUserId: "u-joao" }));
+      const recap = s.fake.addWidget(s.home.id, {
+        agentId: LODI_ID,
+        title: "Resumo",
+        spec: null,
+        schedule: "manual",
+        layout: { position: 5, w: 1, h: 1 },
+      });
+      Object.assign(recap, { status: "failed", failure: { code: "missing_credential", detail: "plan_not_shared" } });
+      // Ready in a chat with it, never for a build: nobody is behind one.
+      s.state.aiStatus = {
+        any: true,
+        agents: s.state.agents.map((a) => ({
+          agentId: a.id,
+          state: "ready" as const,
+          ...(a.id === LODI_ID ? { background: "no_ai" as const } : {}),
+        })),
+      };
+      return s;
+    };
+    const { state } = await open(`/org/${ORG_ID}/home`, onPlan());
+    const card = widget("Resumo");
+    expect(card.textContent).toContain("O plano de Lodi só atende o próprio dono, então não atualiza widgets.");
+    expect(calls(state, "dashboards.refreshWidget")).toEqual([]);
+    await click(within(card).getByRole("button", { name: "Conectar" }));
+    expect(within(screen().getByRole("dialog", { name: /Conectar uma IA/ })).getByLabelText("Cole aqui")).toBeTruthy();
+    cleanup();
+
+    // A member's own plan answers only their chats with it, so no Conectar: who can, in its place.
+    const member = onPlan();
+    const mine = member.state.me?.organizations[0];
+    if (mine) mine.role = "member";
+    await open(`/org/${ORG_ID}/home`, member);
+    const locked = widget("Resumo");
+    expect(within(locked).queryByRole("button", { name: "Conectar" })).toBeNull();
+    expect(locked.textContent).toContain(
+      "Quem conecta a IA de Lodi: um admin, com uma chave de API, ou João, com o próprio plano.",
+    );
+  });
+
+  test("a refresh that waits says what for and stands still; Update now on it says why it can't go sooner", async () => {
+    const s = setup();
+    Object.assign(s.sales, { status: "updating", wait: waitOf({ resetsAt: soon(90) }) });
+    const { state } = await open(`/org/${ORG_ID}/home`, s);
+    const card = widget("Vendas hoje");
+    expect(card.getAttribute("data-state")).toBe("ok");
+    expect(card.getAttribute("aria-busy")).toBeNull();
+    expect(card.querySelector(".wg__wait")?.textContent).toContain("Esperando o plano de Ada renovar");
+    // Its data as it was, and no Continue now: only time ends a limit.
+    expect(card.querySelector(".wk-num")?.textContent).toBe("R$18.420");
+    expect(within(card).queryByRole("button", { name: "Continuar agora" })).toBeNull();
+    const update = within(card).getByRole("button", { name: "Atualizar agora" });
+    expect(update.hasAttribute("disabled")).toBe(false);
+    await click(update);
+    await settle(3);
+    expect(last(state, "dashboards.refreshWidget")).toEqual([ORG_ID, s.sales.id]);
+    const toasts = [...document.querySelectorAll(".ac-toast")].map((t) => t.textContent ?? "");
+    expect(toasts.some((t) => t.includes("Esperando o plano de Ada renovar"))).toBe(true);
+  });
+
+  test("a refresh paused near its plan's limit: Continue now lets it go on", async () => {
+    const s = setup();
+    const wait = waitOf({ code: "usage_pause", resetsAt: soon(90), canContinue: true });
+    Object.assign(s.sales, { status: "updating", wait });
+    const { state } = await open(`/org/${ORG_ID}/home`, s);
+    await click(within(widget("Vendas hoje")).getByRole("button", { name: "Continuar agora" }));
+    await settle(3);
+    expect(last(state, "dashboards.refreshWidget")).toEqual([ORG_ID, s.sales.id]);
+    expect(widget("Vendas hoje").getAttribute("data-state")).toBe("updating");
+    expect(widget("Vendas hoje").querySelector(".wg__wait")).toBeNull();
+  });
+
+  test("Continue now is greyed for an editor who may not continue it, and says who may", async () => {
+    const s = setup();
+    Object.assign(s.sales, { status: "updating", wait: waitOf({ code: "usage_pause", resetsAt: soon(90) }) });
+    const { state } = await open(`/org/${ORG_ID}/home`, s);
+    const go = within(widget("Vendas hoje")).getByRole("button", { name: "Continuar agora" });
+    expect(go.hasAttribute("disabled")).toBe(true);
+    expect(go.getAttribute("title")).toBe("Só quem pediu, o dono do agente ou um admin pode continuar agora");
+    await click(go);
+    await settle(3);
+    expect(last(state, "dashboards.refreshWidget")).toBeUndefined();
+  });
+
+  test("a limit of its model alone says what it needs, never the plan's reset, with Change model for an admin", async () => {
+    const s = setup();
+    const wait = waitOf({ scope: "region", model: "DeepSeek V4 Pro", resetsAt: soon(90) });
+    Object.assign(s.sales, { status: "updating", wait });
+    await open(`/org/${ORG_ID}/home`, s);
+    const line = widget("Vendas hoje").querySelector(".wg__wait");
+    expect(line?.textContent).toContain("O DeepSeek V4 Pro precisa da região Global ligada no OpenCode");
+    expect(line?.textContent).not.toContain("renovar");
+    const change = within(widget("Vendas hoje")).getByRole("link", { name: "Trocar modelo" });
+    expect(change.getAttribute("href")).toContain(`/agents/${ADA_ID}`);
+    expect(change.getAttribute("href")).toContain("sec=brain");
+  });
+
+  test("in line for its computer: at work at first, then, ten minutes in, it says it waits for room", async () => {
+    const s = setup();
+    Object.assign(s.sales, { status: "updating", wait: waitOf({ code: "busy", source: null, since: ago(2) }) });
+    await open(`/org/${ORG_ID}/home`, s);
+    expect(widget("Vendas hoje").getAttribute("data-state")).toBe("updating");
+    expect(widget("Vendas hoje").querySelector(".wg__wait")).toBeNull();
+    cleanup();
+    Object.assign(s.sales, { wait: waitOf({ code: "busy", source: null, since: ago(11) }) });
+    await open(`/org/${ORG_ID}/home`, s);
+    expect(widget("Vendas hoje").getAttribute("data-state")).toBe("ok");
+    expect(widget("Vendas hoje").querySelector(".wg__wait")?.textContent).toContain(
+      "Esperando vaga no computador de Ada",
+    );
   });
 
   test("Organize: size, grip arrows and drag, each saved at once; Remove takes it off", async () => {

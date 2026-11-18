@@ -5,6 +5,7 @@ import { approvalTitle } from "./approval-words";
 import { billingHoldOf } from "./billing";
 import { reviewFlaggedOf } from "./errors";
 import { lowerFirst } from "./format";
+import { COMPUTERS_ROW } from "./roles";
 import { stepLabel, toolWhy } from "./work";
 
 /*
@@ -13,6 +14,8 @@ import { stepLabel, toolWhy } from "./work";
  */
 
 export const TOOL_CALL = "tool.call";
+/** Whoever runs the server read one piece of what the workspace wrote, for a stated purpose (the reveal door). */
+export const OPERATOR_READ = "operator.content_read";
 
 /** The shortcuts over the list: one view at a time. */
 export type AuditShow = "all" | "problems" | "waiting" | "people";
@@ -42,6 +45,7 @@ const notThrough = (row: AuditRow) =>
  * its refusal's code (`details.refusal`, as its line in the chat): what the tool said goes to the technical part.
  */
 export function auditReason(t: TFunction, row: AuditRow): string | null {
+  if (row.action === OPERATOR_READ) return operatorReadWhy(t, row);
   if (notThrough(row)) return toolWhy(t, { refusal: auditStr(row.details.refusal) });
   const reason = auditStr(row.details.reason);
   if (!reason || row.action !== "organization.standing_changed" || row.details.to !== "hold") return reason;
@@ -58,7 +62,7 @@ export function auditActorName(t: TFunction, row: AuditRow): string | null {
 }
 
 /** "Usou o Gmail", "Criou uma tarefa", "Aprovou um pedido", "Criou uma rotina". */
-export function auditPhrase(t: TFunction, row: AuditRow): string {
+export function auditPhrase(t: TFunction, row: AuditRow, locale?: string): string {
   if (row.action === TOOL_CALL) {
     const kind = auditStr(row.details.kind);
     const connector = auditStr(row.details.connector);
@@ -71,8 +75,16 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
       (guessed.kind === "consulting" || guessed.kind === "readingDrive") && kind !== "read"
         ? { kind: "usingTool" as const }
         : guessed;
-    return stepLabel(t, { ...activity, tool: row.target.id ?? "" });
+    return stepLabel(t, { ...activity, tool: row.target.id ?? "" }, locale);
   }
+  if (row.action === OPERATOR_READ) {
+    const what = row.details.direct === true ? "direct" : (READ_KINDS.find((k) => k === row.target.type) ?? "other");
+    return t("audit.operatorRead.sentence", {
+      who: t(row.details.cloud === true ? "audit.operatorRead.who.cloud" : "audit.operatorRead.who.server"),
+      what: t(`audit.operatorRead.what.${what}`),
+    });
+  }
+  if (row.action === "organization.accent_changed") return t("audit.change.accentChanged");
   if (row.action === "agent.merged_without_asking") {
     return t("audit.change.mergedWithoutAsking", { repo: row.target.id ?? "" });
   }
@@ -81,9 +93,19 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
     const status = (["approved", "refused", "expired"] as const).find((s) => s === rest);
     if (status) return t(`audit.change.approval.${status}`);
   }
+  // An outside collaborator (ADR 0191): who they work for, as it was when it happened.
+  const outsideOf = auditStr(row.details.outsideOf);
+  const outside = OUTSIDE_ACTIONS[row.action];
+  if (outsideOf && outside) return t(`audit.change.outside.${outside}`, { outsideOf });
   if (area === "member") {
     const what = (["joined", "left", "role_changed"] as const).find((s) => s === rest);
     if (what) return t(`audit.change.member.${what}`);
+  }
+  // "Quem pode…" (ADR 0085 addendum of 2026-11-13): the row, in the permission's own words.
+  if (row.action === "role.permission_set") {
+    const key = auditStr(row.details.row);
+    if (key === COMPUTERS_ROW) return t("audit.change.role.permission_set_computers");
+    if (key) return t("audit.change.role.permission_set", { short: t(`permissions.${key}.short` as never) });
   }
   // AI apps (ADR 0119): the app's or the token's name, as it was shown when it happened.
   if (area === "apps") {
@@ -111,17 +133,66 @@ export function auditPhrase(t: TFunction, row: AuditRow): string {
 /** The sentence in two parts, so the name can be drawn bold: `name` null for the system. */
 export function auditSentence(t: TFunction, row: AuditRow, locale: string): { name: string | null; text: string } {
   const name = auditActorName(t, row);
-  const text = auditPhrase(t, row);
+  const text = auditPhrase(t, row, locale);
   return { name, text: name ? lowerFirst(text, locale) : text };
 }
+
+/** What the operator can read one piece of, as the entry's target names it. */
+const READ_KINDS = [
+  "message",
+  "run_step",
+  "agent",
+  "routine",
+  "task",
+  "channel",
+  "connection",
+  "support_request",
+] as const;
+
+/**
+ * Why the operator read it: at whose request and how that request arrived, or to diagnose a run, and whether an AI
+ * assistant read with them. Never the operator's own words: the entry holds none.
+ */
+function operatorReadWhy(t: TFunction, row: AuditRow): string | null {
+  const name = row.onBehalfOf?.name ?? t("audit.removed");
+  const source = auditStr(row.details.source);
+  const how =
+    source === "form" || source === "offer"
+      ? "app"
+      : source === "email"
+        ? "email"
+        : source === "operator"
+          ? row.details.cloud === true
+            ? "support"
+            : "operator"
+          : "plain";
+  const why =
+    row.details.purpose === "fault"
+      ? t("audit.operatorRead.fault")
+      : row.details.purpose === "member_request"
+        ? t(`audit.operatorRead.request.${how}`, { name })
+        : null;
+  return (
+    [why, row.details.assistedByAi === true ? t("audit.operatorRead.ai") : null].filter(Boolean).join(" · ") || null
+  );
+}
+
+/** The actions whose details carry `outsideOf` (ADR 0191), by their sentence. */
+const OUTSIDE_ACTIONS: Record<string, "approved" | "removed" | "left"> = {
+  "join_request.approved": "approved",
+  "member.removed": "removed",
+  "member.left": "left",
+};
 
 /** The Vault's actions (ADR 0144), each with a sentence of its own. */
 const VAULT_ACTIONS = [
   "item_created",
   "item_changed",
   "item_deleted",
+  "item_moved",
   "item_used",
   "imported",
+  "keys_imported",
   "connection_added",
   "connection_changed",
   "connection_removed",
@@ -245,6 +316,7 @@ export function auditBehind(t: TFunction, row: AuditRow) {
 
 /** The line under the sentence: about what · who asked · where. */
 export function auditSubLine(t: TFunction, row: AuditRow) {
+  if (row.action === OPERATOR_READ) return operatorReadWhy(t, row) ?? "";
   return [auditHint(t, row), auditBehind(t, row), auditWhere(t, row)].filter(Boolean).join(" · ");
 }
 
@@ -325,7 +397,7 @@ export function auditSecretText(t: TFunction, s: NonNullable<AuditRow["secret"]>
 export const AUDIT_HIDDEN = "***";
 
 /** A change's details worth showing: never an id (`connectionId`, `agentIds`…), nor the call's own fields. */
-const HIDDEN_DETAILS = new Set(["kind", "behind", "input", "reason", "refusal", "routine"]);
+const HIDDEN_DETAILS = new Set(["kind", "behind", "input", "reason", "refusal", "routine", "cloud"]);
 const AN_ID = /(?:^ids?|Ids?|_ids?)$/;
 export function auditDetailEntries(details: Record<string, unknown>): [string, unknown][] {
   return Object.entries(details).filter(([k, v]) => !HIDDEN_DETAILS.has(k) && !AN_ID.test(k) && v !== null && v !== "");

@@ -33,12 +33,14 @@ import {
   machineOnline,
   publishMachineStatus,
 } from "./machines";
+
 import { getMessage, insertMessage, type Message, messageView } from "./messages";
 import { blockedOfTask, missionAllowRules, recordTaskDenials } from "./mission-command-rules";
 import { MISSION_RULES } from "./mission-rules";
 import { recordTaskFinished } from "./operator-events";
 import { enqueue } from "./outbox";
 import { lineLocale, personBehindCall } from "./requester";
+import { seatLive } from "./right-hand-seats";
 import { routineBriefOf } from "./routine-brief";
 import { issueRunToolToken } from "./run-tool-tokens";
 import { runnerUpdateWay } from "./runner-update";
@@ -61,11 +63,9 @@ const { machineTasks, agentRuns } = schema;
 export type MachineTaskRow = typeof machineTasks.$inferSelect;
 export type MachineTaskStatus = MachineTaskRow["status"];
 
-/**
- * Running tasks of a machine that went offline become `interrupted` after this (it may just be a network blip
- * or a runner dialing again); it is also when an offline computer becomes an outage people see.
- */
-export const TASK_OFFLINE_GRACE_MS = 2 * 60_000;
+/** Defined in `machines.ts` for `shownStandby` there: that module can't import this one (an import cycle). */
+export { TASK_OFFLINE_GRACE_MS } from "./machines";
+
 /**
  * A start may still be underway on the computer this long after it began (its journal doesn't list the task
  * yet): a hello in that time says nothing about it.
@@ -220,9 +220,17 @@ export interface TaskDeps {
   pubsub?: PubSub;
 }
 
+/** The agent as a task's computer knows it: the agent, or the seat its task runs in (`scopeId`). */
+export const taskScope = (task: { agentId: string; scopeId?: string | null }, handle: string) => ({
+  id: task.scopeId ?? task.agentId,
+  handle,
+});
+
 export interface StartTaskInput {
   orgId: string;
   agent: { id: string; handle: string };
+  /** The id the computer knows the agent by when it isn't its own: a seat of the right hand (ADR 0175). */
+  scopeId?: string | null;
   machineId: string;
   /** The runner's protocol (from the machine's last hello): older than 4 can't run tasks. */
   protocol: number;
@@ -408,6 +416,7 @@ async function insertTask(
     .values({
       orgId: input.orgId,
       agentId: input.agent.id,
+      scopeId: input.scopeId ?? null,
       machineId: input.machineId,
       channelId: input.channelId,
       threadRootId: input.threadRootId,
@@ -464,7 +473,7 @@ export async function launchTask(
         })
       : null;
     const started = await deps.call<"task.start">(input.machineId, {
-      agent: input.agent,
+      agent: input.scopeId ? { ...input.agent, id: input.scopeId } : input.agent,
       op: "task.start",
       taskId: row.id,
       executor: input.executor,
@@ -889,7 +898,9 @@ export async function settleInterruptedTask(
         .from(schema.missions)
         .where(eq(schema.missions.id, claimed.missionId))
     : [];
-  const resumable = resumesByItself(claimed, machine, mission) && Boolean(deps.start);
+  // A seat's task (ADR 0175) starts again only while the seat is still its person's: never for someone who left.
+  const seated = !claimed.scopeId || (await seatLive(deps.db, claimed.scopeId));
+  const resumable = seated && resumesByItself(claimed, machine, mission) && Boolean(deps.start);
   if (resumable && deps.start && machine) {
     const handle = (await deps.db
       .select({ handle: schema.agents.handle })
@@ -903,6 +914,7 @@ export async function settleInterruptedTask(
       const again = {
         orgId: claimed.orgId,
         agent: { id: claimed.agentId, handle: handle ?? "agent" },
+        scopeId: claimed.scopeId,
         machineId: claimed.machineId,
         protocol: machine.protocol,
         machineName: machine.name,
@@ -1159,7 +1171,7 @@ export async function cancelOrgTasks(
         deps.call && !task.startRequest
           ? await deps
               .call<"task.cancel">(task.machineId, {
-                agent: { id: task.agentId, handle },
+                agent: taskScope(task, handle),
                 op: "task.cancel",
                 taskId: task.id,
               })
@@ -1261,7 +1273,7 @@ export async function checkCutTaskStart(
     .where(eq(schema.agents.id, row.agentId));
   const reply = await deps
     .call<"task.status">(row.machineId, {
-      agent: { id: row.agentId, handle: agent?.handle ?? "agent" },
+      agent: taskScope(row, agent?.handle ?? "agent"),
       op: "task.status",
       taskId: row.id,
     })

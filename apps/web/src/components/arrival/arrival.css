@@ -119,6 +119,50 @@
     background: #ffffff40;
   }
 }
+/* A one-colour mark stays dark on the white plate, on a dark page too. */
+.team-scene__mark .ac-brand--mono {
+  color: inherit;
+}
+
+/* ---------- the band over Conectar uma IA: the team, their computer, the AIs ---------- */
+.team-scene.connect-scene {
+  height: 132px;
+  border-radius: var(--radius-lg);
+}
+.connect-scene .team-scene__row {
+  gap: var(--space-3);
+}
+.connect-scene .ac-computer {
+  flex: none;
+}
+.connect-scene__marks {
+  display: flex;
+  flex: none;
+}
+.connect-scene__marks > .team-scene__mark {
+  width: 36px;
+  height: 36px;
+  animation: none;
+}
+/* Each plate over the one before by less than the room around its mark: no mark is covered. */
+.connect-scene__marks > .team-scene__mark + .team-scene__mark {
+  margin-inline-start: calc(-1 * var(--space-2));
+}
+/* A phone: two faces and three pixels a trail, so nothing is cut at the band's edges. */
+@media (max-width: 520px) {
+  .connect-scene .team-scene__row {
+    gap: var(--space-2);
+  }
+  .connect-scene .team-scene__agent:nth-child(3),
+  .connect-scene .team-scene__trail i:nth-child(n + 4) {
+    display: none;
+  }
+}
+@media (max-width: 359px) {
+  .connect-scene .team-scene__trail {
+    display: none;
+  }
+}
 
 /* ---------- the dialogs ---------- */
 .ac-dialog.arrival {
@@ -340,25 +384,67 @@
   padding-bottom: var(--dialog-pad);
 }
 
-/* Whom it is for: two cards side by side, the faces over the name. */
+/* Whom it is for (`AudienceCard`): two cards side by side and as tall as each other, the faces over the title. The
+   picked one is marked by its border, as an account row is: the kit's corner check would sit on the faces. */
 .arrival-for {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  grid-auto-rows: 1fr;
+  gap: var(--space-2);
   margin-bottom: 6px;
 }
 .arrival-for .ac-option {
   flex-direction: column;
-  gap: 8px;
-  min-width: 0;
+  gap: var(--space-2);
 }
-.arrival-for .ac-option__text {
-  min-width: 0;
+.arrival-for .ac-option[aria-pressed="true"] {
+  --pressed: inset 0 0 0 2px var(--ink);
 }
-.arrival-for .ac-option__desc {
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+.arrival-for .ac-option[aria-pressed="true"]::after {
+  content: none;
+}
+.arrival-for .ac-option[aria-pressed="true"] .ac-option__title {
+  padding-right: 0;
+}
+/* On a phone the halves are too narrow for a name: one card over the other, the faces before the title. */
+@media (max-width: 640px) {
+  .arrival-for {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .arrival-for .ac-option {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-3);
+  }
+  .arrival-for .ac-option > :first-child {
+    flex: none;
+  }
+}
+/* A title in parts ("Lumen · Tradutora") breaks between its parts, never beside the dot. Each part after the
+   first draws its dot in room taken back from the gap before it, so a part that starts a line puts its dot before
+   the title's start, where the clip hides it. */
+.arrival-for__title {
+  --sep: 0.8em;
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: var(--sep);
+  min-width: 0;
+  overflow-x: clip;
+}
+.arrival-for__title > * + * {
+  margin-inline-start: calc(-1 * var(--sep));
+  padding-inline-start: var(--sep);
+}
+.arrival-for__title > * + *::before {
+  content: "·";
+  display: inline-block;
+  width: var(--sep);
+  margin-inline-start: calc(-1 * var(--sep));
+  text-align: center;
+}
+/* The agents it is for, one per line. */
+.arrival-for__tip {
+  white-space: pre-line;
 }
 
 /* For the whole team (ADR 0160, addendum): one line says for whom (their faces, how many, the way to pick), then the
@@ -400,16 +486,11 @@
   color: var(--ink-muted);
 }
 /* Whom of them: one row each, a long name whole (it wraps, never cut; ADR 0160 addendum) with the box and the face on
-   its first line, the list scrolling inside the dialog and fading at its foot, as every account's does. */
+   its first line. No box of its own: the dialog's body scrolls it, only when the window can't hold it, the foot in
+   sight. */
 .arrival-picks {
   display: flex;
   flex-direction: column;
-  max-height: 296px;
-  overflow-y: auto;
-  margin: 0 -6px;
-  padding: 0 6px 18px;
-  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent), var(--scroll-strip);
-  mask-image: linear-gradient(#000 calc(100% - 28px), transparent), var(--scroll-strip);
 }
 .arrival-pick {
   display: grid;
@@ -533,16 +614,17 @@
   font-size: 14px;
 }
 
-/* What is already connected. A row: the radio, the mark, the name and how full the plan is on one line; who else
-   thinks with it and its state in words under the name. */
+/* What is already connected. A row: the mark, the name and how full the plan is on one line; who else thinks with it
+   and its state in words under the name. Its radio is hidden: the border alone marks the one picked. */
 .arrival-have {
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .arrival-have__row {
+  position: relative;
   display: grid;
-  grid-template-columns: 18px 20px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   column-gap: 12px;
   align-items: start;
   padding: 12px 14px;
@@ -552,20 +634,82 @@
   cursor: pointer;
 }
 .arrival-have__row[data-state="checked"] {
-  box-shadow: inset 0 0 0 2px var(--ink);
+  --have-chosen: inset 0 0 0 2px var(--ink);
+  box-shadow: var(--have-chosen);
 }
 .arrival-have__row[data-disabled] {
   opacity: 0.55;
   cursor: default;
 }
+/* A row that says why it can't be picked keeps its words at full strength: only its mark and name are dimmed. */
+.arrival-have__row[data-why] {
+  opacity: 1;
+}
+.arrival-have__row[data-why] > :first-child,
+.arrival-have__row[data-why] .arrival-have__title {
+  opacity: 0.55;
+}
+.arrival-have__why {
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+/* Out of sight and out of the grid, still the row's keyboard stop and its state for screen readers. */
 .arrival-have__row > .ac-radio {
-  margin-top: 1px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+html:not([data-pointer]) .arrival-have__row:has(.ac-radio:focus-visible) {
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--field-ring);
+}
+html:not([data-pointer]) .arrival-have__row[data-state="checked"]:has(.ac-radio:focus-visible) {
+  box-shadow: var(--have-chosen), var(--field-ring);
+}
+fieldset.arrival-have {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* A row that acts once picked is a button: the label's look, its own ring. */
+button.arrival-have__row {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+}
+html:not([data-pointer]) button.arrival-have__row:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    var(--field-ring);
+}
+html:not([data-pointer]) button.arrival-have__row[data-state="checked"]:focus-visible {
+  box-shadow: var(--have-chosen), var(--field-ring);
 }
 .arrival-have__row > .ac-brand,
 .arrival-have__mark {
   width: 20px;
   height: 20px;
 }
+/* Leads use the title's 20px line, including the smaller API-key glyph. */
+.arrival-have__row > :is(.ac-brand, .arrival-have__mark) {
+  line-height: 20px;
+  translate: 0 calc(10px - var(--cap-mid) - 50%);
+}
+/* A key's glyph drawn 16px inside the marks' 20px box: its icon is sized 20 (`ConnectHave`), the padding takes 2. */
 .arrival-have__mark {
   padding: 2px;
   box-sizing: border-box;
@@ -577,16 +721,67 @@
   gap: 1px;
   min-width: 0;
 }
+/* What tells one account from the next (its name, its email, whose it is) wraps whole, never cut. */
+.arrival-have__title,
+.arrival-have__line {
+  overflow-wrap: anywhere;
+}
 .arrival-have__title {
   font-size: 15px;
   font-weight: 600;
   line-height: 20px;
-  overflow-wrap: anywhere;
 }
 .arrival-have__line {
   color: var(--ink-muted);
   font-size: 13px;
   line-height: 18px;
+}
+/* The title and, after it, the pencil that names the account (ADR 0059 §4): one line. */
+.arrival-have__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+/* "Unnamed account": quieter than a name or an email, until its owner names it. */
+.arrival-have__title[data-unnamed] {
+  color: var(--ink-muted);
+}
+.arrival-have__edit {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-block: -2px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+.arrival-have__edit:hover {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  color: var(--ink);
+}
+html:not([data-pointer]) .arrival-have__edit:focus-visible {
+  outline: none;
+  box-shadow: var(--field-ring);
+}
+/* The row while its name changes: the field and Save where the title stood. */
+.arrival-have__row[data-renaming] {
+  cursor: default;
+}
+.arrival-have__rename {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.arrival-have__rename > :first-child {
+  flex: 1;
+  min-width: 0;
 }
 /* The state is the words; the colour only follows them. */
 .arrival-have__line[data-plan="almost"] {
@@ -636,7 +831,8 @@
   display: grid;
   grid-template-columns: 16px minmax(0, 1fr) 16px;
   gap: 12px;
-  align-items: center;
+  /* A label that wraps on a narrow phone ("Entrar com outra conta do ChatGPT") keeps its marks on its first line. */
+  align-items: start;
   padding: 12px 14px;
   border: 0;
   background: none;
@@ -646,6 +842,15 @@
   font-weight: 600;
   text-align: start;
   cursor: pointer;
+}
+.arrival-have__link > .ac-icon {
+  /* The kit's `.ac-iconline` offset: on the first line's capitals. Browsers without lh: the page's 22px line. */
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .arrival-have__link > .ac-icon {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 .arrival-have__link:hover {
   color: var(--ink);
@@ -686,16 +891,19 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
 .arrival-have__search:focus-within {
   box-shadow: inset 0 0 0 2px var(--ink);
 }
+/* Every account under the search, as tall as they are: the dialog's body scrolls them, only when the window can't
+   hold them, the foot in sight. */
 .arrival-have__scroll {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 304px;
-  overflow-y: auto;
-  margin: 0 -6px;
-  padding: 2px 6px 18px;
-  -webkit-mask-image: linear-gradient(#000 calc(100% - 28px), transparent), var(--scroll-strip);
-  mask-image: linear-gradient(#000 calc(100% - 28px), transparent), var(--scroll-strip);
+  gap: var(--space-2);
+}
+/* Under a person's group: their accounts only they can give, said once. */
+.arrival-have__note {
+  margin: 0 2px;
+  color: var(--ink-muted);
+  font-size: 13px;
+  line-height: 18px;
 }
 .arrival-have__none {
   margin: 12px 2px;
@@ -764,6 +972,17 @@ html:not([data-pointer]) .arrival-have__link:focus-visible {
   font-weight: 600;
   white-space: nowrap;
 }
+/* On a narrow phone the subscription note takes its own row, leaving the option's title and description room. */
+@media (max-width: 360px) {
+  .arrival-opts .ac-option:has(> .arrival-opts__tag) {
+    flex-wrap: wrap;
+    row-gap: var(--space-2);
+  }
+  .arrival-opts__tag {
+    flex-basis: 100%;
+  }
+}
+
 .arrival-opts__tile {
   display: grid;
   place-items: center;

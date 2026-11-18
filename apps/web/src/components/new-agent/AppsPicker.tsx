@@ -6,6 +6,7 @@ import { Button, Dialog, DialogBody, DialogFooter, GroupHeading, Icon, SearchFie
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ConnectorIcon, searchCatalog } from "@/components/ConnectorCatalog";
+import "./new-agent-card.css";
 
 /**
  * "Outro app" on a new agent's card (ADR 0164): the catalog as rows, its starting point's apps on top. A connected
@@ -18,6 +19,7 @@ export function AppsPickerDialog({
   suggested,
   connected,
   onCard,
+  inList = false,
   canConnect,
   onUse,
   onConnect,
@@ -32,6 +34,8 @@ export function AppsPickerDialog({
   connected: Set<string>;
   /** Catalog ids already on the card. */
   onCard: Set<string>;
+  /** Over a form that lists its apps (Criar agente's steps) instead of a card: the words say "list". */
+  inList?: boolean;
   /** Whoever opened it may connect apps for the workspace. */
   canConnect: boolean;
   onUse: (def: ConnectorDef) => void;
@@ -68,7 +72,7 @@ export function AppsPickerDialog({
     onCard.has(d.id) ? (
       <span className="nac-pick__on ac-iconline">
         <Icon name="check" size={16} />
-        <span>{t("newAgentCard.picker.added")}</span>
+        <span>{t(inList ? "newAgentCard.picker.addedList" : "newAgentCard.picker.added")}</span>
       </span>
     ) : connected.has(d.id) ? (
       <Button size="sm" onClick={() => onUse(d)}>
@@ -99,7 +103,7 @@ export function AppsPickerDialog({
       open
       onOpenChange={(o) => !o && onClose()}
       title={agentName ? t("newAgentCard.picker.title", g) : t("newAgentCard.picker.titleBlank")}
-      description={t("newAgentCard.picker.lead")}
+      description={t(inList ? "newAgentCard.picker.leadList" : "newAgentCard.picker.lead")}
       closeLabel={t("common.close")}
       width={560}
       className="nac-pick"

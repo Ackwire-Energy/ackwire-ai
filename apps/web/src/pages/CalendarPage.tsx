@@ -8,6 +8,7 @@ import {
   collapseRoutines,
   type ItemSource,
   isBarItem,
+  itemOwners,
   myRsvp,
   onDay,
   rangeLabel,
@@ -33,6 +34,7 @@ import {
   type IconName,
   Kbd,
   ListRow,
+  OPEN_LAYER,
   offsetMinutes,
   PageHeader,
   Popover,
@@ -89,7 +91,7 @@ const shortcutsFree = (e: KeyboardEvent) => {
   if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return false;
   const el = e.target as HTMLElement | null;
   if (el?.closest("input, textarea, select, [contenteditable='true'], [role='combobox']")) return false;
-  return !document.querySelector('[role="dialog"], [role="menu"], [role="listbox"]');
+  return !document.querySelector(OPEN_LAYER);
 };
 
 /**
@@ -147,7 +149,8 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
     all.filter((it) => filters[it.source]),
     days,
   );
-  const ownerShown = (it: CalItem) => !it.owner || !hidden.has(actorKey(it.owner));
+  // An item of several (a task due) shows while one of them does.
+  const ownerShown = (it: CalItem) => !it.owner || itemOwners(it).some((o) => !hidden.has(actorKey(o)));
   const items = sourced.filter(ownerShown).map((it) => {
     const r = it.routineId ? routineById.get(it.routineId) : undefined;
     if (!r) return it;
@@ -379,7 +382,7 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
           </>
         }
       >
-        <div className="cal-page__tools">
+        <div className="cal-page__tools ac-toolbar">
           {/* biome-ignore lint/a11y/useSemanticElements: prev / today / next as one compact group */}
           <div className="cal-nav" role="group" aria-label={t("calendar.nav")}>
             <Button
@@ -402,18 +405,20 @@ export function CalendarPage({ today: todayProp, day }: { today?: Date; day?: st
               onClick={() => setFocus((f) => stepFocus(view, f, 1))}
             />
           </div>
-          <Segmented
-            label={t("calendar.view")}
-            size="sm"
-            value={view}
-            onValueChange={setView}
-            options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
-          />
           {view === "week" && (
             <FilterToggle pressed={businessOnly} onPressedChange={setBusinessOnly}>
               {t("calendar.businessDays")}
             </FilterToggle>
           )}
+          <div className="ac-toolbar__filters">
+            <Segmented
+              label={t("calendar.view")}
+              size="sm"
+              value={view}
+              onValueChange={setView}
+              options={VIEWS.map((v) => ({ value: v, label: t(`calendar.views.${v}`) }))}
+            />
+          </div>
         </div>
         {!panel && (
           <Popover

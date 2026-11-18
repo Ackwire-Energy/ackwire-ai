@@ -216,28 +216,30 @@ export function VaultImportDialog({
           )}
         </DialogBody>
       </Locked>
-      <DialogFooter>
+      <DialogFooter
+        // As a note, so a narrow dialog puts it over Cancel and Import instead of splitting those two.
+        note={
+          stage === "review" ? (
+            <Button
+              variant="ghost"
+              disabled={importer.busy}
+              onClick={() => {
+                setStage("pick");
+                setCsv(null);
+                setPreview(null);
+              }}
+            >
+              {t("vault.import.another")}
+            </Button>
+          ) : undefined
+        }
+      >
         {stage === "done" ? (
           <Button variant="primary" onClick={onClose}>
             {t("vault.import.close")}
           </Button>
         ) : (
           <>
-            {stage === "review" && (
-              <Locked when={importer.busy}>
-                <Button
-                  variant="ghost"
-                  className="vlt-foot__start"
-                  onClick={() => {
-                    setStage("pick");
-                    setCsv(null);
-                    setPreview(null);
-                  }}
-                >
-                  {t("vault.import.another")}
-                </Button>
-              </Locked>
-            )}
             <Button onClick={onClose}>{t("common.cancel")}</Button>
             {stage === "review" && (
               <Button

@@ -56,9 +56,6 @@
   "categories.itsChannels": {
     "value": "Channels"
   },
-  "categories.seeAll": {
-    "value": "See all"
-  },
   "blocks.send": {
     "value": "Send"
   },
@@ -145,6 +142,9 @@
   },
   "choices.failed": {
     "value": "Your pick didn't go through. Try again."
+  },
+  "choices.tooLongFix": {
+    "value": "Shorten the answer."
   },
   "chart.table": {
     "value": "Table"
@@ -452,23 +452,14 @@
   "chats.serverError.kept": {
     "value": "Showing what was already in the app."
   },
-  "chats.section.agents": {
-    "value": "Agents"
+  "chats.pinned": {
+    "value": "Pinned"
   },
-  "chats.section.channels": {
-    "value": "Channels"
+  "chats.recent": {
+    "value": "Recent"
   },
-  "chats.section.people": {
-    "value": "People"
-  },
-  "chats.seeAll.agents": {
-    "value": "See all agents"
-  },
-  "chats.seeAll.channels": {
-    "value": "See all channels"
-  },
-  "chats.seeAll.people": {
-    "value": "See all people"
+  "chats.seeAll": {
+    "value": "See all chats"
   },
   "chats.wait.verb.approval": {
     "value": "needs your ok"
@@ -599,12 +590,6 @@
   "chats.swipe.unmute": {
     "value": "Unmute"
   },
-  "chats.firstRunLine": {
-    "value": "{{name}} is setting up the team · {{done}} of {{total}}"
-  },
-  "chats.firstRunLinePersonal": {
-    "value": "{{name}} is setting up your agents · {{done}} of {{total}}"
-  },
   "chats.first.title": {
     "value": "Start with your first agent"
   },
@@ -708,7 +693,7 @@
     "value": "An agent"
   },
   "along.waits": {
-    "value": "{{name}} is waiting for your ok"
+    "value": "{{name}} · waiting for you"
   },
   "along.on": {
     "value": "{{name}} · {{what}}"
@@ -857,11 +842,32 @@
       "other": "{{count}} here"
     }
   },
+  "chat.membersAdd": {
+    "value": "Add"
+  },
+  "chat.membersAdded": {
+    "value": {
+      "one": "{{count}} added to #{{channel}}",
+      "other": "{{count}} added to #{{channel}}"
+    }
+  },
+  "chat.memberRemoved": {
+    "value": "{{name}} is out of #{{channel}}"
+  },
+  "chat.muted": {
+    "value": "#{{channel}} muted"
+  },
+  "chat.unmuted": {
+    "value": "#{{channel}} unmuted"
+  },
   "chat.headerAgent": {
     "value": "{{who}}. Open the profile"
   },
   "chat.headerChannel": {
     "value": "{{who}}. Options"
+  },
+  "chat.headerMembers": {
+    "value": "{{who}}. See who is here"
   },
   "chat.switchHint": {
     "value": "Hold to switch conversations"
@@ -892,12 +898,6 @@
   },
   "chat.sending": {
     "value": "Sending…"
-  },
-  "chat.failed": {
-    "value": "Not sent · Try again"
-  },
-  "chat.notSent": {
-    "value": "The message wasn't sent."
   },
   "chat.toLatest": {
     "value": "Go to the latest messages"
@@ -1076,9 +1076,6 @@
   "chat.react": {
     "value": "React"
   },
-  "chat.attach.more": {
-    "value": "Add another photo or file"
-  },
   "chat.attach.remove": {
     "value": "Remove {{name}}"
   },
@@ -1088,26 +1085,17 @@
   "chat.attach.sending": {
     "value": "{{name}}, sending"
   },
+  "chat.attach.failed": {
+    "value": "{{name}}, didn't go: send to try again"
+  },
+  "chat.attach.preparing": {
+    "value": "Getting the files ready…"
+  },
   "chat.attach.tooMany": {
     "value": "Up to {{count}} files per message."
   },
   "chat.swipeReply": {
     "value": "Swipe right to reply"
-  },
-  "chat.intent.suggest.merge": {
-    "value": "Go ahead and merge"
-  },
-  "chat.intent.suggest.review": {
-    "value": "Ask {{name}} to review first"
-  },
-  "chat.intent.suggest.seeChange": {
-    "value": "Show me what changed"
-  },
-  "chat.intent.suggest.summarize": {
-    "value": "Sum it up in 3 points"
-  },
-  "chat.intent.suggest.nextStep": {
-    "value": "What's the next step?"
   },
   "chat.intent.arrived": {
     "value": "{{name}} joined the team"
@@ -1403,9 +1391,6 @@
   "remind.submit": {
     "value": "Remind me at this time"
   },
-  "remind.quick": {
-    "value": "See quick times"
-  },
   "remind.done": {
     "value": "Reminder set"
   },
@@ -1546,6 +1531,9 @@
   },
   "newMission.placeholder": {
     "value": "What needs to get done?"
+  },
+  "newMission.who": {
+    "value": "Who does it"
   },
   "newMission.submit": {
     "value": "Ask for a plan"
@@ -1881,7 +1869,7 @@
     "value": "Nothing in progress"
   },
   "agents.state.waitsYou": {
-    "value": "waits for your OK"
+    "value": "waiting for you"
   },
   "agents.state.noAi": {
     "value": "No AI connected"
@@ -1933,15 +1921,6 @@
   },
   "agentEdit.keepEditing": {
     "value": "Keep editing"
-  },
-  "newAgent.leaveTitle": {
-    "value": "Leave without creating?"
-  },
-  "newAgent.leaveText": {
-    "value": "The agent you started won't be created."
-  },
-  "newAgent.keepGoing": {
-    "value": "Keep creating"
   },
   "newAgent.identityQuestion": {
     "value": "Who is the agent?"
@@ -2010,9 +1989,6 @@
   "newAgent.import.also": {
     "value": "Also comes along"
   },
-  "newAgent.import.change": {
-    "value": "Change"
-  },
   "newAgent.import.arrived": {
     "value": {
       "one": "{{name}} arrived",
@@ -2076,6 +2052,13 @@
   "agent.taskSent": {
     "value": "Task sent"
   },
+  "agent.brakes.forgetTitle": {
+    "value": "Forget these answers?"
+  },
+  "agent.brakes.forgetText": {
+    "value": "{{name}} asks again before this kind of work.",
+    "female": "{{name}} asks again before this kind of work."
+  },
   "activity.title": {
     "value": "Activity"
   },
@@ -2096,6 +2079,12 @@
   },
   "activity.undo": {
     "value": "Undo"
+  },
+  "activity.doneAllToast": {
+    "value": {
+      "one": "{{count}} moved to Done",
+      "other": "{{count}} moved to Done"
+    }
   },
   "activity.day.today": {
     "value": "Today"
@@ -2198,6 +2187,15 @@
       "one": "Couldn't finish",
       "other": "Couldn't finish"
     }
+  },
+  "activity.kind.admin_ask_channel_agent": {
+    "value": "{{names}} asks you to add {{agent}} to #{{label}}"
+  },
+  "activity.kind.admin_ask_create_agents": {
+    "value": "{{names}} asks to be able to create agents"
+  },
+  "activity.kind.admin_ask_webhook": {
+    "value": "{{names}} asks you to set up the {{service}} webhook for routines"
   },
   "activity.kind.routine_paused": {
     "value": {
@@ -2373,6 +2371,12 @@
     "female": {
       "one": "{{names}} connected your {{plan}} plan to {{agent}}",
       "other": "{{names}} connected your {{plan}} plan to {{agent}}"
+    }
+  },
+  "activity.kind.plan_serves": {
+    "value": {
+      "one": "Your {{plan}} now serves the whole workspace",
+      "other": "Your {{plan}} now serves the whole workspace"
     }
   },
   "activity.kind.plan_model_dropped": {
@@ -2789,6 +2793,15 @@
   "me.addWorkspaceFoot": {
     "value": "You don't leave any workspace."
   },
+  "me.addAccount": {
+    "value": "Sign in to another account"
+  },
+  "me.addAccountSub": {
+    "value": "On {{host}}, without leaving this one"
+  },
+  "me.accountNoWorkspace": {
+    "value": "No workspace yet"
+  },
   "me.teamServerLeadShort": {
     "value": "What your team opens in the browser."
   },
@@ -2836,6 +2849,12 @@
   },
   "me.account.email": {
     "value": "Email"
+  },
+  "me.account.emailWebLead": {
+    "value": "Sign in again on the website and change it there, without the code."
+  },
+  "me.account.emailWeb": {
+    "value": "Sign in again on the website"
   },
   "me.account.inWorkspace": {
     "value": "In this workspace · {{org}}"
@@ -2912,6 +2931,9 @@
   "delete.addPasswordWeb": {
     "value": "Add a password on the website"
   },
+  "delete.onThisComputer": {
+    "value": "Delete it in the Ackwire AI app on the computer that runs this server."
+  },
   "delete.otherAccount": {
     "value": "You signed in to another account. Nothing was deleted."
   },
@@ -2957,8 +2979,8 @@
   "files.more": {
     "value": "More options"
   },
-  "files.send": {
-    "value": "Send"
+  "files.sendCopy": {
+    "value": "Send a copy"
   },
   "files.savePhotos": {
     "value": "Save to Photos"
@@ -2999,6 +3021,9 @@
   "files.next": {
     "value": "Next picture"
   },
+  "files.noPreviewTitle": {
+    "value": "No preview"
+  },
   "files.noPreview": {
     "value": "This file doesn't open in the app. Send it to another app to open it."
   },
@@ -3025,6 +3050,9 @@
   },
   "files.video.open": {
     "value": "Open"
+  },
+  "files.video.cantPlay": {
+    "value": "This video can't play on this phone."
   },
   "issues.title": {
     "value": "Tasks"
@@ -3251,9 +3279,6 @@
   "drive.search": {
     "value": "Search the Drive"
   },
-  "drive.types": {
-    "value": "File types"
-  },
   "drive.type.all": {
     "value": "All"
   },
@@ -3295,9 +3320,6 @@
   },
   "drive.noResults": {
     "value": "Nothing with these filters."
-  },
-  "drive.loadFailed": {
-    "value": "Couldn't load the Drive."
   },
   "drive.more": {
     "value": "Show more"
@@ -3355,9 +3377,6 @@
   },
   "memory.confirmed": {
     "value": "Confirmed by a person"
-  },
-  "memory.unconfirmed": {
-    "value": "Not confirmed yet"
   },
   "memory.confirm": {
     "value": "Confirm"
@@ -3470,12 +3489,6 @@
   "wiki.openExisting": {
     "value": "Open the page"
   },
-  "routines.loadFailed": {
-    "value": "Couldn't load the routines."
-  },
-  "routines.anyAgent": {
-    "value": "All agents"
-  },
   "routines.create": {
     "value": "Create"
   },
@@ -3538,7 +3551,7 @@
     "value": "finished a task"
   },
   "homeNow.rowWait.approval": {
-    "value": "waits for your ok"
+    "value": "waiting for you"
   },
   "homeNow.rowWait.question": {
     "value": "waits for your answer"
@@ -3613,7 +3626,7 @@
     "value": "Waiting on you"
   },
   "intentAgents.waitingLine": {
-    "value": "{{title}} · needs your ok"
+    "value": "{{title}} · waiting for you"
   },
   "intentAgents.waitingMore": {
     "value": {
@@ -3622,7 +3635,7 @@
     }
   },
   "intentAgents.waitingLabel": {
-    "value": "{{name}}, needs your ok"
+    "value": "{{name}}, waiting for you"
   },
   "intentAgents.owner": {
     "value": "Owner: {{name}}"
@@ -3631,7 +3644,7 @@
     "value": "Owner: you"
   },
   "intentAgents.nowWaiting": {
-    "value": "Needs your ok: {{title}}"
+    "value": "Waiting for you: {{title}}"
   },
   "intentAgents.did.title": {
     "value": "What he did for you",
@@ -3677,7 +3690,7 @@
     "value": "File"
   },
   "intentAgents.did.waitingOnYou": {
-    "value": "Needs your ok"
+    "value": "Waiting for you"
   },
   "intentAgents.did.youApproved": {
     "value": "You approved"
@@ -3864,13 +3877,13 @@
     "value": "Computer screen"
   },
   "intentAgents.uses.asksYou": {
-    "value": "Merging and publishing always ask for your approval, at any level."
+    "value": "Merging and publishing ask for your approval, unless the agent never asks."
   },
   "intentAgents.uses.asksOwner": {
-    "value": "Merging and publishing always ask for {{name}}'s approval, at any level."
+    "value": "Merging and publishing ask for {{name}}'s approval, unless the agent never asks."
   },
   "intentAgents.uses.asksAdmins": {
-    "value": "Merging and publishing always ask for an admin's approval, at any level."
+    "value": "Merging and publishing ask for an admin's approval, unless the agent never asks."
   },
   "intentAgents.uses.empty": {
     "value": "For now, only conversation."
@@ -4073,65 +4086,20 @@
   "outage.cloudSub": {
     "value": "We're on it"
   },
-  "browser.card.needs": {
-    "value": "{{name}} needs help"
-  },
-  "browser.card.needsFor": {
-    "value": "{{name}} needs help · {{time}}"
-  },
-  "browser.card.inControlAt": {
-    "value": "You're in control · {{host}}"
-  },
-  "browser.card.doing": {
-    "value": "{{name}} · {{doing}}"
-  },
-  "browser.card.startingF": {
-    "value": "Opening {{name}}'s browser…"
-  },
-  "browser.card.startingM": {
-    "value": "Opening {{name}}'s browser…"
-  },
   "browser.card.stopAskF": {
     "value": "Close {{name}}'s browser?"
   },
   "browser.card.stopAskM": {
     "value": "Close {{name}}'s browser?"
   },
-  "browser.card.whereF": {
-    "value": "In {{name}}'s browser"
-  },
-  "browser.card.whereM": {
-    "value": "In {{name}}'s browser"
-  },
   "browser.card.open": {
     "value": "Open"
-  },
-  "browser.card.expandHint": {
-    "value": "Tap to expand"
   },
   "browser.card.stop": {
     "value": "Stop"
   },
   "browser.card.giveUp": {
     "value": "Give up"
-  },
-  "browser.card.done": {
-    "value": "Done: {{title}}"
-  },
-  "browser.card.failed": {
-    "value": "Couldn't: {{title}}"
-  },
-  "browser.card.failedNote": {
-    "value": "Couldn't: {{note}}"
-  },
-  "browser.card.expired": {
-    "value": "Nobody opened it in time: {{title}}"
-  },
-  "browser.card.cancelled": {
-    "value": "Canceled: {{title}}"
-  },
-  "browser.card.withdrawn": {
-    "value": "{{name}} no longer needs this: {{title}}"
   },
   "browser.live.inControl": {
     "value": "You're in control"
@@ -4141,9 +4109,6 @@
   },
   "browser.live.watchOnly": {
     "value": "{{name}} is in control. You're only watching."
-  },
-  "browser.live.takeOver": {
-    "value": "Take over"
   },
   "browser.live.done": {
     "value": "Done"
@@ -4204,9 +4169,6 @@
   },
   "browser.live.stuckHelpM": {
     "value": "Try again restarts the browser. Logins stay saved."
-  },
-  "browser.live.hidden": {
-    "value": "{{name}} is in control · screen hidden"
   },
   "browser.live.key.Tab": {
     "value": "Tab"
@@ -4285,6 +4247,12 @@
   },
   "browser.live.unavailable.stuckM": {
     "value": "Couldn't open {{name}}'s browser."
+  },
+  "browser.live.unavailable.noAnswerF": {
+    "value": "{{name}}'s browser didn't answer."
+  },
+  "browser.live.unavailable.noAnswerM": {
+    "value": "{{name}}'s browser didn't answer."
   },
   "browser.live.unavailable.tooManyF": {
     "value": "Too many browsers open at once. This one shows when another one closes."
@@ -4403,6 +4371,9 @@
   "devices.reason.xcode_too_old": {
     "value": "Xcode is too old for this iPhone"
   },
+  "devices.reason.ios_behind_xcode": {
+    "value": "Update this iPhone's iOS"
+  },
   "devices.reason.device_support": {
     "value": "The Mac is preparing this iPhone"
   },
@@ -4441,6 +4412,18 @@
   },
   "devices.reason.adb_offline": {
     "value": "Unplug the cable and plug it in again"
+  },
+  "devices.reason.wifi_away": {
+    "value": "Join the Mac's Wi-Fi on this iPhone, or plug it in"
+  },
+  "devices.reason.wifi_asleep": {
+    "value": "Wake and unlock this iPhone, and keep it near the Mac"
+  },
+  "devices.reason.tunnel_down": {
+    "value": "The Wi-Fi link dropped. Keep this iPhone near the Mac, or plug it in"
+  },
+  "devices.reason.wifi_untrusted": {
+    "value": "Plug it in once and tap Trust"
   },
   "devices.reason.other": {
     "value": "Not ready yet"
@@ -4847,11 +4830,62 @@
   "devices.iphone.pluggedIn": {
     "value": "It's plugged in"
   },
+  "devices.iphone.wifi.also": {
+    "value": "Also on the Wi-Fi of {{host}}: {{name}}"
+  },
+  "devices.iphone.wifi.use": {
+    "value": "Use over Wi-Fi"
+  },
+  "devices.iphone.wifi.hint": {
+    "value": "Only an iPhone that trusted the Mac over a cable shows up here. The Mac reaches it through Apple's own encrypted link, the one Xcode uses."
+  },
+  "devices.iphone.wifi.stop": {
+    "value": "Stop using over Wi-Fi"
+  },
+  "devices.iphone.wifi.stopTitle": {
+    "value": "Stop using {{name}} over Wi-Fi?"
+  },
+  "devices.iphone.wifi.stopText": {
+    "value": "Agents can't reach it any more. Pick it again with {{host}} to use it."
+  },
+  "devices.iphone.wifi.stopped": {
+    "value": "{{name}} isn't used over Wi-Fi any more"
+  },
   "devices.iphone.stall.plug": {
     "value": "{{host}} doesn't see this iPhone yet. Use a cable that carries data, not only power, keep this iPhone unlocked and tap Trust if it asks."
   },
-  "devices.iphone.stall.devmode": {
-    "value": "Developer Mode turns on only after this iPhone restarts. Tap Restart, then Turn On once it's back. No switch there? Unplug this iPhone and plug it in again."
+  "devices.iphone.devMode.restarting": {
+    "value": "{{host}} doesn't see this iPhone again yet after its restart. Keep it plugged in."
+  },
+  "devices.iphone.devMode.back": {
+    "value": "Tap Turn On in the alert on this iPhone and enter your passcode."
+  },
+  "devices.iphone.devMode.check": {
+    "value": "I turned it on, check again"
+  },
+  "devices.iphone.devMode.stillOff": {
+    "value": "{{host}} still sees Developer Mode off."
+  },
+  "devices.iphone.devMode.missing": {
+    "value": "Don't see the option?"
+  },
+  "devices.iphone.devMode.hidden": {
+    "value": "This iPhone hides the option until Xcode asks to show it."
+  },
+  "devices.iphone.devMode.hiddenOpen": {
+    "value": "This iPhone hides the option until Xcode asks to show it. Open Xcode on {{host}} with this iPhone plugged in."
+  },
+  "devices.iphone.devMode.openXcode": {
+    "value": "Open Xcode"
+  },
+  "devices.iphone.devMode.opened": {
+    "value": "Xcode opened on {{host}}. Look in Settings again, then close Xcode there."
+  },
+  "devices.iphone.devMode.unlock": {
+    "value": "Turned it on and it restarted? The alert with Turn On shows once this iPhone is unlocked."
+  },
+  "devices.iphone.devMode.outdated": {
+    "value": "The Ackwire AI app on {{host}} is out of date. Update it on that Mac."
   },
   "devices.notice.kind": {
     "value": "Devices"
@@ -4876,6 +4910,15 @@
   },
   "devices.notice.waitingFor": {
     "value": "{{names}} is waiting for {{device}} for {{person}}"
+  },
+  "devices.notice.tool_request": {
+    "value": "{{names}} asks you to turn on {{tool}} on your {{device}}"
+  },
+  "devices.notice.cli_request": {
+    "value": "{{names}} asks you to install {{tool}} on your {{device}}"
+  },
+  "devices.notice.folder_request": {
+    "value": "{{names}} asks for the folder {{path}} on your {{device}}"
   },
   "devices.notice.allowOnce": {
     "value": "Allow once"
@@ -4909,6 +4952,12 @@
   },
   "devices.wait.none": {
     "value": "No other device you can use is ready."
+  },
+  "devices.wait.tried": {
+    "value": "Trying {{device}} again."
+  },
+  "devices.wait.stopped": {
+    "value": "No longer waiting for {{device}}."
   },
   "connectors.title": {
     "value": "Connectors"
@@ -5046,7 +5095,10 @@
     "value": "The {{name}} account stopped working. Agents can't use it until someone reconnects it."
   },
   "connectors.noTools": {
-    "value": "{{name}}'s tools couldn't be read. Agents go without them until they're read again, in Tools."
+    "value": "{{name}}'s tools couldn't be read. Agents go without them until they're read again."
+  },
+  "connectors.readAgain": {
+    "value": "Read again"
   },
   "connectors.accountTitle": {
     "value": "Account"
@@ -5202,32 +5254,11 @@
   "joinRequests.share": {
     "value": "Share the link"
   },
-  "joinRequests.roles": {
-    "value": "Roles"
-  },
-  "joinRequests.rolesHint": {
-    "value": "They join with the roles turned on. With none, they may do what Everyone may."
-  },
   "humanCheck.title": {
     "value": "Quick check"
   },
   "humanCheck.blocked": {
     "value": "The check didn't load. Try another network."
-  },
-  "invitePeople.emailsHelp": {
-    "value": "Paste a list or type. Each person gets an email and joins right away."
-  },
-  "invitePeople.here": {
-    "value": "Already here"
-  },
-  "invitePeople.invited": {
-    "value": "Already invited"
-  },
-  "invitePeople.fix": {
-    "value": "Check this"
-  },
-  "invitePeople.channels": {
-    "value": "Channels"
   },
   "invitePeople.optional": {
     "value": "Optional"
@@ -5237,12 +5268,6 @@
   },
   "invitePeople.noteHelp": {
     "value": "It shows in the email with your name. Up to {{max}} characters."
-  },
-  "invitePeople.roleHelp": {
-    "value": "Changes what the person gets on joining."
-  },
-  "invitePeople.remove": {
-    "value": "Take off the list"
   },
   "invitePeople.sendAgain": {
     "value": "Send again"
@@ -5426,9 +5451,6 @@
   "ai.keyRowSub": {
     "value": "You pay per use, straight to the maker"
   },
-  "ai.already": {
-    "value": "Already at {{org}}"
-  },
   "ai.stepOf": {
     "value": "{{step}} of {{total}}"
   },
@@ -5484,13 +5506,13 @@
     "value": "You have 7 days to change your mind."
   },
   "settings.deleteAlert": {
-    "value": "Everyone is out right away. It can be restored for 7 days."
+    "value": "Everyone can only read it from now on. It can be restored for 7 days."
   },
   "settings.deleteAction": {
     "value": "Delete"
   },
   "settings.deleteIntro": {
-    "value": "{{name}} closes for everyone right away and is deleted for good in 7 days."
+    "value": "{{name}} turns read-only for everyone right away and is deleted for good in 7 days."
   },
   "settings.holdDelete": {
     "value": "Hold to delete"
@@ -5508,22 +5530,404 @@
     "value": "That image is too big. Try another one."
   },
   "settings.machine.toolsHow": {
-    "value": "Tap a tool that's on to turn it off. Turning it back on happens only on the computer itself."
+    "value": "Tap a tool that's on to turn it off. To turn it back on: on the computer itself, or here by whoever connected it."
   },
-  "settings.roles.onComputer": {
-    "value": "The roles' order and each role's icon change on the computer."
-  },
-  "settings.roles.items": {
-    "value": "Item by item"
-  },
-  "settings.roles.create": {
-    "value": "Create"
+  "settings.machine.toolsHowOwner": {
+    "value": "Tap a tool to turn it on or off."
   },
   "settings.import.preparing": {
     "value": "Preparing the file…"
   },
   "settings.import.failed": {
     "value": "Couldn't download the file. Try again."
+  },
+  "roles.create": {
+    "value": "Create"
+  },
+  "roles.search": {
+    "value": "Search roles"
+  },
+  "roles.baseHint": {
+    "value": "Applies to every person in the workspace. Roles add to it."
+  },
+  "roles.orderHint": {
+    "value": "Whoever is higher manages the roles and the people below. Each person's name color comes from their highest role."
+  },
+  "roles.order": {
+    "value": "Reorder"
+  },
+  "roles.orderDone": {
+    "value": "Done"
+  },
+  "roles.up": {
+    "value": "Move {{name}} up"
+  },
+  "roles.down": {
+    "value": "Move {{name}} down"
+  },
+  "roles.orderChanged": {
+    "value": "The roles changed while you were moving them. Reload and try again."
+  },
+  "roles.none": {
+    "value": "No roles yet. Create one to give some people more."
+  },
+  "roles.noMatch": {
+    "value": "No role matches “{{q}}”."
+  },
+  "roles.tooMany": {
+    "value": "This workspace already has 100 roles. Delete one to create another."
+  },
+  "roles.loadFailed": {
+    "value": "Couldn't load the roles. {{cause}}"
+  },
+  "roles.nobody": {
+    "value": "Nobody"
+  },
+  "roles.reach.permissions": {
+    "value": {
+      "one": "{{count}} permission",
+      "other": "{{count}} permissions"
+    }
+  },
+  "roles.reach.channels": {
+    "value": {
+      "one": "{{count}} channel",
+      "other": "{{count}} channels"
+    }
+  },
+  "roles.reach.agents": {
+    "value": {
+      "one": "{{count}} agent",
+      "other": "{{count}} agents"
+    }
+  },
+  "roles.reach.more": {
+    "value": "+{{what}}"
+  },
+  "roles.reach.all": {
+    "value": "Can do everything"
+  },
+  "roles.reach.owner": {
+    "value": "Can do everything, always"
+  },
+  "roles.reach.none": {
+    "value": "Only what Everyone can"
+  },
+  "roles.reach.baseNone": {
+    "value": "Read only"
+  },
+  "roles.tabs.permissions": {
+    "value": "Permissions"
+  },
+  "roles.tabs.channels": {
+    "value": "Channels"
+  },
+  "roles.tabs.agents": {
+    "value": "Agents"
+  },
+  "roles.addOwners": {
+    "value": "Add owners"
+  },
+  "roles.icons.shield": {
+    "value": "Shield"
+  },
+  "roles.icons.code": {
+    "value": "Code"
+  },
+  "roles.icons.wallet": {
+    "value": "Wallet"
+  },
+  "roles.icons.mail": {
+    "value": "Email"
+  },
+  "roles.icons.bolt": {
+    "value": "Bolt"
+  },
+  "roles.icons.flag": {
+    "value": "Flag"
+  },
+  "roles.icons.book": {
+    "value": "Book"
+  },
+  "roles.icons.chart": {
+    "value": "Chart"
+  },
+  "roles.icons.bulb": {
+    "value": "Light bulb"
+  },
+  "roles.icons.globe": {
+    "value": "Globe"
+  },
+  "roles.icons.pullRequest": {
+    "value": "Pull request"
+  },
+  "roles.icons.calendar": {
+    "value": "Calendar"
+  },
+  "roles.icons.message": {
+    "value": "Message"
+  },
+  "roles.icons.eye": {
+    "value": "Eye"
+  },
+  "roles.icons.plug": {
+    "value": "Plug"
+  },
+  "roles.icons.person": {
+    "value": "Person"
+  },
+  "roles.inviteWith": {
+    "value": "Invite with this role"
+  },
+  "roles.searchPermission": {
+    "value": "Search permissions"
+  },
+  "roles.everyoneCan": {
+    "value": "Everyone can"
+  },
+  "roles.only": {
+    "value": "Only {{names}}"
+  },
+  "roles.notHeld": {
+    "value": "You don't have this permission."
+  },
+  "roles.noPermissionMatch": {
+    "value": "No permission matches “{{q}}”."
+  },
+  "roles.advanced": {
+    "value": "Advanced"
+  },
+  "roles.peopleOnly": {
+    "value": "Roles are for people. Each agent has its own permissions, on its page."
+  },
+  "roles.nowAbove": {
+    "value": "This role is now above yours. Only someone higher changes it."
+  },
+  "roles.admin.title": {
+    "value": "Turn on Administrator for {{name}}?"
+  },
+  "roles.admin.text": {
+    "value": "Everyone with {{name}} can then do everything but what only the owner does."
+  },
+  "roles.admin.count": {
+    "value": {
+      "one": "That's {{count}} person.",
+      "other": "That's {{count}} people."
+    }
+  },
+  "roles.admin.on": {
+    "value": "Turn on Administrator"
+  },
+  "roles.admin.note": {
+    "value": "With Administrator, {{name}} can do everything but what only the owner does."
+  },
+  "roles.computers.title": {
+    "value": "Agents' computers"
+  },
+  "roles.computers.hint": {
+    "value": "Browser: the browser and the sign-in requests. Computer: also the whole screen and the terminal. Their own agents: the ones the person looks after and the computers they connected."
+  },
+  "roles.computers.steps.0": {
+    "value": "Doesn't use"
+  },
+  "roles.computers.steps.1": {
+    "value": "Their own agents' browser"
+  },
+  "roles.computers.steps.2": {
+    "value": "Their own agents' computer"
+  },
+  "roles.computers.steps.3": {
+    "value": "Any agent's browser"
+  },
+  "roles.computers.steps.4": {
+    "value": "Any agent's computer"
+  },
+  "roles.computers.stepsIn.1": {
+    "value": "their own agents' browser"
+  },
+  "roles.computers.stepsIn.2": {
+    "value": "their own agents' computer"
+  },
+  "roles.computers.stepsIn.3": {
+    "value": "any agent's browser"
+  },
+  "roles.computers.stepsIn.4": {
+    "value": "any agent's computer"
+  },
+  "roles.computers.everyoneTo": {
+    "value": "Everyone gets {{step}}."
+  },
+  "roles.computers.everyoneNone": {
+    "value": "Everyone stops using the agents' computers."
+  },
+  "roles.whoCan": {
+    "value": "Who can"
+  },
+  "roles.everyoneSub": {
+    "value": "Every person in the workspace"
+  },
+  "roles.someRoles": {
+    "value": "Only some roles"
+  },
+  "roles.losing": {
+    "value": "Losing it: {{names}}."
+  },
+  "roles.nobodyLoses": {
+    "value": "Nobody loses it."
+  },
+  "roles.everyoneGets": {
+    "value": "Everyone gets it."
+  },
+  "roles.ownersAlways": {
+    "value": "Owners always can."
+  },
+  "roles.noOtherRoles": {
+    "value": "There are no other roles yet."
+  },
+  "roles.channels.header": {
+    "value": "People with {{name}} see"
+  },
+  "roles.channels.headerBase": {
+    "value": "Everyone sees"
+  },
+  "roles.channels.hint": {
+    "value": "This is about people. An agent joins a channel when someone adds it."
+  },
+  "roles.channels.search": {
+    "value": "Search channels"
+  },
+  "roles.channels.everyone": {
+    "value": "Everyone sees it"
+  },
+  "roles.channels.private": {
+    "value": "Private"
+  },
+  "roles.channels.general": {
+    "value": "Everyone stays in #general."
+  },
+  "roles.channels.locked": {
+    "value": "Only whoever created #{{channel}} or arranges channels changes who sees it."
+  },
+  "roles.channels.leaveTitle": {
+    "value": "Remove #{{channel}} from {{name}}?"
+  },
+  "roles.channels.leave": {
+    "value": {
+      "one": "{{names}} leaves the channel.",
+      "other": "{{names}} leave the channel."
+    }
+  },
+  "roles.channels.leaveAction": {
+    "value": "Remove"
+  },
+  "roles.channels.openTitle": {
+    "value": "Open #{{channel}} to {{name}}?"
+  },
+  "roles.channels.openText": {
+    "value": "People with {{name}} see the channel and all its history, and can join."
+  },
+  "roles.channels.openAction": {
+    "value": "Open"
+  },
+  "roles.channels.openAllTitle": {
+    "value": "Open #{{channel}} to everyone?"
+  },
+  "roles.channels.openAllText": {
+    "value": "All its history opens to the workspace."
+  },
+  "roles.channels.admin": {
+    "value": "With Administrator, people with {{name}} see every channel."
+  },
+  "roles.channels.onlyGeneral": {
+    "value": "There's only #general for now."
+  },
+  "roles.channels.noMatch": {
+    "value": "No channel matches “{{q}}”."
+  },
+  "roles.channels.ungrouped": {
+    "value": "Channels"
+  },
+  "roles.channels.whoSees": {
+    "value": "Who sees"
+  },
+  "roles.channels.allSub": {
+    "value": "Anyone in the workspace sees it and can join."
+  },
+  "roles.channels.invited": {
+    "value": "Only who is added"
+  },
+  "roles.channels.invitedSub": {
+    "value": "Nobody new sees it. Who's in stays."
+  },
+  "roles.channels.unsee": {
+    "value": "Who's in stays. No longer see it: {{names}}."
+  },
+  "roles.agents.header": {
+    "value": "People with {{name}} talk to"
+  },
+  "roles.agents.headerBase": {
+    "value": "Everyone talks to"
+  },
+  "roles.agents.hint": {
+    "value": "This is about people. What each agent does is on its page."
+  },
+  "roles.agents.everyone": {
+    "value": "Everyone talks to it"
+  },
+  "roles.agents.gate": {
+    "value": "People with only {{name}} don't talk to agents."
+  },
+  "roles.agents.gateOn": {
+    "value": "Turn on Talk to agents"
+  },
+  "roles.agents.locked": {
+    "value": "Only {{owner}}, who looks after {{name}}, or someone who edits any agent changes it.",
+    "female": "Only {{owner}}, who looks after {{name}}, or someone who edits any agent changes it."
+  },
+  "roles.agents.lockedNoOwner": {
+    "value": "Only someone who edits any agent changes it."
+  },
+  "roles.agents.none": {
+    "value": "No agents yet."
+  },
+  "roles.agents.some": {
+    "value": "Only some roles and people"
+  },
+  "roles.agents.addPerson": {
+    "value": "Add a person"
+  },
+  "roles.agents.losing": {
+    "value": "No longer talk to {{agent}}: {{names}}."
+  },
+  "roles.people.removed": {
+    "value": "{{person}} no longer has {{name}}"
+  },
+  "roles.people.selfTitle": {
+    "value": "Take yourself out of {{name}}?"
+  },
+  "roles.people.selfText": {
+    "value": "You lose what only {{name}} gives. Only someone above you gives it back."
+  },
+  "roles.mail.title": {
+    "value": {
+      "one": "An agent loses a mailbox",
+      "other": "Agents lose {{count}} mailboxes"
+    }
+  },
+  "roles.mail.loses": {
+    "value": "{{agent}} loses {{address}}, {{owner}}'s mailbox."
+  },
+  "roles.mail.losesAddress": {
+    "value": "{{agent}} loses the mailbox {{address}}."
+  },
+  "roles.mail.only": {
+    "value": "Only whoever gave a mailbox gives it again."
+  },
+  "roles.mail.addAnyway": {
+    "value": "Add anyway"
+  },
+  "roles.mail.giveAnyway": {
+    "value": "Give it anyway"
   },
   "vault.newItem": {
     "value": "New item"
@@ -5604,7 +6008,7 @@
     "value": "Import from a computer"
   },
   "vault.import.text": {
-    "value": "To bring passwords from a browser or a password manager, open Settings, Vault on the web and choose Import."
+    "value": "To bring passwords from a browser or a password manager, import them on the web."
   },
   "vault.connections.text": {
     "value": "Connect a password manager and your agents use the logins kept there. Nothing is copied: a password is read only when it's used."
@@ -6098,9 +6502,6 @@
   "dashboards.homeRow": {
     "value": "Only you · your own widgets"
   },
-  "dashboards.loadFailed": {
-    "value": "Couldn't load the dashboards."
-  },
   "dashboards.create": {
     "value": "Create"
   },
@@ -6178,9 +6579,6 @@
   },
   "dashboards.formatAuto": {
     "value": "{{name}} picks the best one"
-  },
-  "dashboards.newWidget.titleHint": {
-    "value": "Title · {{name}} suggests one when testing"
   },
   "dashboards.newWidget.alerts": {
     "value": "Alerts"
@@ -6544,5 +6942,17 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
+  },
+  "surface.on": {
+    "value": "On"
+  },
+  "surface.codeText": {
+    "value": "Send the message that opens there, then come back here."
+  },
+  "surface.openFailed": {
+    "value": "Couldn't open {{surface}} on this phone. Send it the code below instead."
+  },
+  "surface.orType": {
+    "value": "Or send this code there"
   }
 }

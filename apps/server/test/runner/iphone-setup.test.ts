@@ -10,6 +10,7 @@ import {
   XCODE_APP_STORE,
 } from "../../runner/iphone-setup";
 import { parseXcodeTeams } from "../../runner/wda";
+import { XcodeFixer } from "../../runner/xcode-fix";
 import { removeDirs, tempDir, waitFor } from "./helpers";
 
 const dirs: string[] = [];
@@ -40,7 +41,11 @@ const TEAMS = {
 };
 
 /** A Mac with fake Xcode tools on its PATH. */
-function rig(state: Record<string, unknown>, platform: NodeJS.Platform = "darwin") {
+function rig(
+  state: Record<string, unknown>,
+  platform: NodeJS.Platform = "darwin",
+  over: Partial<ConstructorParameters<typeof IphoneSetup>[0]> = {},
+) {
   const root = tempDir("iphone-");
   dirs.push(root);
   const bin = path.join(root, "bin");
@@ -60,6 +65,7 @@ function rig(state: Record<string, unknown>, platform: NodeJS.Platform = "darwin
     env: { PATH: bin, HOME: root, FAKE_XCODE_STATE: stateFile, FAKE_XCODE_LOG: logFile, FAKE_XCODE_GO: go },
     platform,
     dirs: [],
+    ...over,
   });
   setups.push(setup);
   const calls = () =>
@@ -177,4 +183,27 @@ test("opens Xcode, or its App Store page", async () => {
     ["open", "-a", "Xcode"],
     ["open", XCODE_APP_STORE],
   ]);
+});
+
+test("Xcode installed but the Command Line Tools still selected: the window says so, and fixes it through the Mac's fix", async () => {
+  const apps = tempDir("apps-");
+  dirs.push(apps);
+  mkdirSync(path.join(apps, "Xcode.app"));
+  const fixer = new XcodeFixer({ log: () => {}, platform: "darwin", uid: 501, apps, bin: () => "/nonexistent/tool" });
+  const { setup } = rig({ selected: "/Library/Developer/CommandLineTools" }, "darwin", {
+    apps,
+    fixer: () => fixer,
+  });
+  expect(await setup.check()).toEqual({
+    xcode: null,
+    platform: { state: "missing" },
+    account: null,
+    xcodeBlocked: "command_line_tools",
+  });
+  // The fix's own state rides along (here its osascript is missing, so it fails at once).
+  const started = await setup.fixXcode("start", "select");
+  expect(started.fix?.kind).toBe("select");
+  await waitFor(() => fixer.state()?.state === "failed");
+  expect((await setup.check()).fix?.state).toBe("failed");
+  fixer.stop();
 });

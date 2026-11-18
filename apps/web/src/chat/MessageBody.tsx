@@ -21,6 +21,7 @@ export function MessageBody({
   channelRefs,
   accent = "sky",
   pinFrom = null,
+  className,
 }: {
   body: string;
   /** A handle's name here; null for a handle of no one in this workspace (an X username), which stays plain text. */
@@ -37,6 +38,8 @@ export function MessageBody({
   accent?: AgentColor;
   /** An agent's saved message: its charts can be pinned to a board (ADR 0135). */
   pinFrom?: { messageId: string; agentId: string } | null;
+  /** On the words' root, beside the Markdown's own. */
+  className?: string;
 }) {
   const mention = useCallback(
     (handle: string, key: string) => {
@@ -65,6 +68,7 @@ export function MessageBody({
           channel={channel}
           wikiLink={wikiLink}
           idRef={renderIdRef}
+          className={className}
         />
       </ChartMessage.Provider>
     </ChartAccent.Provider>

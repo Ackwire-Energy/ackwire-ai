@@ -64,6 +64,7 @@ import {
   jevStep,
   lastLine,
   MIN_COMPOSE,
+  memoryEntries,
   type Network,
   networkOf,
   normalizeDomain,
@@ -140,7 +141,7 @@ It asks only for what it needs and fills in only what's missing, so running it a
   --requirements <all|none|list>      What to install there for the agents when missing, without
                                       asking: ${REQUIREMENTS.join(", ")} (default: asked, yes each)
   --telemetry <on|off>                Send anonymous usage statistics to Ackwire AI (default on)
-  --typesafe-key <key>                TypeSafe key for Jev, optional (${TYPESAFE_KEYS})
+  --typesafe-key <key>                TypeSafe key for Jev, or an OpenRouter key (sk-or-…), optional (${TYPESAFE_KEYS})
   --no-start                          Write .env and docker-compose.yml, start nothing
   --timeout <seconds>                 How long each wait may take (default 300)
   --tailscale-status <file|->         Finish from \`tailscale status --json\` (setup inside the image)
@@ -229,7 +230,7 @@ interface AskOptions {
   description?: string[];
   initial?: string;
   placeholder?: string;
-  /** Typed unseen, and shown cut short once answered. */
+  /** Typed unseen, and never shown once answered. */
   secret?: boolean;
   /** Without an answer: asked again on a terminal, this problem when piped. */
   missing?: Problem;
@@ -344,7 +345,7 @@ function createUi(opts: Options) {
           const answer = (line ?? "").trim() || o.initial || "";
           const problem = answer ? (o.validate?.(answer) ?? null) : o.missing ? "an answer is needed." : null;
           if (!problem) {
-            term.answered(title, o.secret ? `${answer.slice(0, 12)}…` : answer, o.label ? `${o.label}: ` : "");
+            term.answered(title, answer, o.label ? `${o.label}: ` : "", o.secret);
             return answer;
           }
           if (!interactive || line === null) {
@@ -676,6 +677,7 @@ async function run(opts: Options, ui: Ui, image: boolean): Promise<Result> {
 
   const entries: Record<string, string> = secretEntries(content);
   const newSecrets = Object.keys(entries);
+  Object.assign(entries, memoryEntries(content, machine.memory));
   const hostname = opts.hostname ?? (envValue(content, "TS_HOSTNAME") || DEFAULT_HOSTNAME);
   const port = envValue(content, "HOST_PORT") || "3000";
   let tailscale: "given" | "env" | "joined" | "ask" | "missing" = "missing";

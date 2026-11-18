@@ -4,8 +4,10 @@ import { eq, schema, sql } from "@agenteschat/db";
 import { type ModelRequest, systemText, textOf } from "@agenteschat/providers";
 import {
   ANSWER_NUDGE,
+  type Brain,
   createAgent,
   createAgentRuns,
+  createJobHandlers,
   createPassToolSource,
   drainOutbox,
   insertMessage,
@@ -414,4 +416,78 @@ test("sessionFor: a conversation never picks up a background or routine run's se
   const fresh = await resolveBrain({ db: f.db }, agent, background, f.general.id);
   expect(fresh.session?.id).not.toBe("s-conversation");
   expect(fresh.session?.resume).toBe(false);
+});
+
+describe("a pass leaves no words on its step line", () => {
+  const saidOf = (events: RealtimeEvent[]) =>
+    events.flatMap((e) => (e.type === "agent.tool" && "said" in e && e.said ? [e.said] : []));
+  const NOT_NEEDED = "O Theo já respondeu isso acima com o link dos builds.";
+
+  test("brought in by the router, it writes a sentence and passes: the sentence never shows", async () => {
+    f = await setup({
+      toolSources: [createPassToolSource()],
+      reply: () => ({ chunks: [NOT_NEEDED], toolUses: [{ name: "pass", input: { reason: "já respondido" } }] }),
+    });
+    const events = f.listen(f.general.id);
+    await routed("alguém sabe onde rodam os builds?");
+    await Bun.sleep(5);
+    expect(events.some((e) => e.type === "agent.tool")).toBe(true);
+    expect(saidOf(events)).toEqual([]);
+    expect(JSON.stringify(events)).not.toContain("Theo");
+    expect(events.some((e) => e.type === "agent.passed")).toBe(true);
+    expect(await agentMessages()).toEqual([]);
+  });
+
+  test("on a computer brain too", async () => {
+    const brain: Brain = {
+      kind: "claude_code",
+      async *run() {
+        yield { type: "text_delta", text: NOT_NEEDED };
+        yield { type: "tool_call", id: "p1", name: "pass", input: { reason: "já respondido" } };
+        yield { type: "done", text: NOT_NEEDED };
+      },
+    };
+    f = await setup({ toolSources: [createPassToolSource()] });
+    const events = f.listen(f.general.id);
+    const message = await insertMessage(f.db, {
+      orgId: f.org.id,
+      channelId: f.general.id,
+      author: { type: "person", userId: f.owner.id },
+      body: "alguém sabe onde rodam os builds?",
+    });
+    await f.db.transaction((tx) => createAgentRuns(tx, message, [f.agent.id], "router"));
+    await drainOutbox(f.db, createJobHandlers({ ...f.jobDeps, brains: { model: () => brain } }));
+    await Bun.sleep(5);
+    expect(events.some((e) => e.type === "agent.tool")).toBe(true);
+    expect(saidOf(events)).toEqual([]);
+    expect(events.some((e) => e.type === "agent.passed")).toBe(true);
+    expect(await agentMessages()).toEqual([]);
+  });
+
+  test("another tool keeps the words written before it", async () => {
+    const look: ToolSource = {
+      name: "work",
+      tools: async () => [
+        {
+          name: "look",
+          description: "Look at the builds",
+          scope: "",
+          inputSchema: { type: "object", properties: {} },
+          execute: async () => ({ content: "2 builds" }),
+        },
+      ],
+    };
+    f = await setup({
+      toolSources: [createPassToolSource(), look],
+      reply: (_req, n) =>
+        n === 1
+          ? { chunks: ["Vou olhar os builds."], toolUses: [{ name: "look", input: {} }] }
+          : { chunks: ["Dois na fila."] },
+    });
+    const events = f.listen(f.general.id);
+    await routed("como estão os builds?");
+    await Bun.sleep(5);
+    expect(saidOf(events).join(" ")).toContain("Vou olhar os builds");
+    expect(await agentMessages()).toEqual(["Dois na fila."]);
+  });
 });

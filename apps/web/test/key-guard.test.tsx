@@ -64,7 +64,12 @@ describe("an API key in a message: nothing goes out until the person chooses", (
     expect(state.calls.find((c) => c.method === "agents.addCredential")?.args[1]).toMatchObject({
       provider: "anthropic",
     });
-    expect(add.textContent).toContain("Salva. Todo agente sem plano pensa com ela.");
+    // The workspace's key is another one: said, with the way to switch, which makes this one everyone's.
+    expect(add.textContent).toContain("Salva. Os agentes ainda pensam com Claude da Acme.");
+    await click(within(add).getByRole("button", { name: "Usar esta chave para todos" }));
+    expect(state.calls.filter((c) => c.method === "agents.makeDefaultCredential")).toHaveLength(1);
+    expect(state.defaultCredentialId).toBe(state.credentials.at(-1)?.id);
+    expect(add.textContent).toContain("Salva. Os agentes sem uma IA própria pensam com ela.");
     await click(within(add).getByRole("button", { name: "Pronto" }));
     expect(composer().value).toBe("minha chave");
     expect(posts(state)).toEqual([]);

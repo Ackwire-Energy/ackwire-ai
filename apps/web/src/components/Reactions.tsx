@@ -1,6 +1,6 @@
 import type { ReactionCount } from "@agenteschat/client";
 import { useReactions, useToggleReaction } from "@agenteschat/client";
-import { formatInt, joinNames } from "@agenteschat/client/lib/format";
+import { formatInt, joinNames, keepWhole } from "@agenteschat/client/lib/format";
 import {
   Button,
   EMOJI_CATEGORIES,
@@ -131,7 +131,8 @@ export function MessageReactions({
         const agentIds = r.agentIds ?? [];
         const who = t("reactions.who", {
           count: r.count,
-          names: joinNames([...r.userIds.map(nameOf), ...agentIds.map(agentName)], t),
+          // In the chip's tip a line breaks between names, never inside one.
+          names: joinNames([...r.userIds.map(nameOf), ...agentIds.map(agentName)].map(keepWhole), t),
           emoji,
         });
         return (

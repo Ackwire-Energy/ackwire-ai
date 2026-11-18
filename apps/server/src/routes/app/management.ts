@@ -18,12 +18,20 @@ import {
   getMembership,
   getOrgSettings,
   getRun,
+  INVITE_CHOICES_MAX,
   INVITE_NOTE_MAX,
+  ISSUE_COLUMN_WIDTHS,
+  type ISSUE_LIST_COLUMNS,
+  ISSUES_DONE,
   ISSUES_GROUPS,
   ISSUES_LAYOUTS,
   ISSUES_SORTS,
   ISSUES_VIEW_ASSIGNEE,
+  ISSUES_VIEW_GROUP,
+  ISSUES_VIEW_LABEL_MAX,
   ISSUES_VIEW_MAX_ASSIGNEES,
+  ISSUES_VIEW_MAX_COLLAPSED,
+  ISSUES_VIEW_MAX_LABELS,
   ISSUES_VIEW_PRIORITIES,
   inviteMany,
   listAgentChannels,
@@ -60,7 +68,7 @@ import {
   setAgentChannels,
   setAgentStyle,
   setChatPrefs,
-  setInvitationRoles,
+  setConversationWallpaper,
   setMyIssuesView,
   setMySidebarItem,
   setMySidebarItems,
@@ -71,10 +79,12 @@ import {
   setShowActivity,
   setStartPage,
   setStopReason,
+  setWorkspaceApprovalsLevel,
   sidebarPlaceAllowed,
   speakerOf,
   taskManager,
   taskSteps,
+  updateInvitation,
   updateMyProfile,
   updateOrgSettings,
   usageReport,
@@ -91,6 +101,7 @@ import {
   json,
   keyTester,
   OrgParams,
+  requestBaseUrl,
   requireSession,
   security,
 } from "./context";
@@ -98,13 +109,19 @@ import { credentialOut } from "./credential-view";
 import {
   AgentAppearance,
   AgentAudience,
+  ApprovalsLevel,
+  CanceledReturn,
   ChatPrefs,
   Credential,
   Model,
   ModelTier,
+  OutsideOf,
+  PendingReturn,
   ProviderId,
   Role,
   StartChoice,
+  Wallpaper,
+  WorkState,
 } from "./schemas";
 
 const usd = (nano: number | null) => (nano === null ? null : nanoUsdToUsd(nano));
@@ -122,6 +139,8 @@ const SidebarItems = z
 
 /** What a card shows besides its number and title (`ISSUE_CARD_FIELDS`). */
 const IssueCardFields = z.object({
+  // An app from before projects saves its view without it.
+  project: z.boolean().default(true),
   assignee: z.boolean(),
   priority: z.boolean(),
   due: z.boolean(),
@@ -129,6 +148,19 @@ const IssueCardFields = z.object({
   pullRequest: z.boolean(),
   label: z.boolean(),
 });
+
+const columnWidth = (column: (typeof ISSUE_LIST_COLUMNS)[number]) =>
+  z.number().int().min(ISSUE_COLUMN_WIDTHS[column].min).max(ISSUE_COLUMN_WIDTHS[column].max).optional();
+const IssueColumnWidths = {
+  title: columnWidth("title"),
+  project: columnWidth("project"),
+  label: columnWidth("label"),
+  priority: columnWidth("priority"),
+  due: columnWidth("due"),
+  criteria: columnWidth("criteria"),
+  pullRequest: columnWidth("pullRequest"),
+  assignee: columnWidth("assignee"),
+} satisfies Record<(typeof ISSUE_LIST_COLUMNS)[number], unknown>;
 
 const IssuesView = z
   .object({
@@ -138,11 +170,18 @@ const IssuesView = z
     fields: IssueCardFields,
     assignees: z.array(z.string().regex(ISSUES_VIEW_ASSIGNEE)).max(ISSUES_VIEW_MAX_ASSIGNEES),
     priorities: z.array(z.enum(ISSUES_VIEW_PRIORITIES)).max(ISSUES_VIEW_PRIORITIES.length),
+    // Absent from an app of before them: each at its default.
+    labels: z.array(z.string().trim().min(1).max(ISSUES_VIEW_LABEL_MAX)).max(ISSUES_VIEW_MAX_LABELS).default([]),
+    done: z.enum(ISSUES_DONE).default("all"),
     showCanceled: z.boolean(),
+    hideEmpty: z.boolean().default(false),
+    collapsed: z.array(z.string().regex(ISSUES_VIEW_GROUP)).max(ISSUES_VIEW_MAX_COLLAPSED).default([]),
+    // Only the columns the person changed. A column the app doesn't know or a width past its column's ends: refused.
+    widths: z.strictObject(IssueColumnWidths).default({}),
   })
   .openapi("IssuesView", {
     description:
-      "How you look at Tarefas in one workspace: `board` or `list`, grouped by `stage`, `assignee` or `priority`, in `manual` order (the board's) or by `priority` or `due` date, what the cards show (`fields`), the assignee filter (`agent:<id>`, `person:<id>`, `none`) and the priority filter (empty: every task), and whether canceled tasks show.",
+      "How you look at Tarefas in one workspace: `board` or `list`, grouped by `stage`, `assignee` or `priority`, in `manual` order (the board's), by `priority`, by `due` date or by the last change (`updated`), what the cards show (`fields`), the assignee filter (`agent:<id>`, `person:<id>`, `none`), the priority filter and the label filter (empty: every task), which finished tasks show (`all`, `recent`: changed in the last 7 days, `hidden`), whether canceled tasks show, whether groups with no task show (`hideEmpty`), the groups folded shut (`collapsed`: column ids, assignee keys or priorities), and the widths given to the list's columns in pixels (`widths`: `title` and the card fields; only the ones changed, each between its column's least and most).",
   });
 
 const Settings = z
@@ -192,6 +231,17 @@ const Settings = z
     mode: z.enum(WORKSPACE_MODES).openapi({
       description:
         "Who the workspace is for (ADR 0159): `team` (the default) or `personal`. It changes the apps' defaults and words, never what anyone may do; a change is audited (`organization.mode_changed`) and reaches every member's apps (`org.mode`).",
+    }),
+    teamWatch: z.boolean().openapi({
+      description:
+        "The right hand watches for what stops the team (an ended AI sign-in, an app to reconnect) and tells the one person who can fix it. On by default.",
+    }),
+    welcomePeople: z.boolean().openapi({
+      description: "The right hand greets each person who joins the workspace, once. On by default.",
+    }),
+    approvalsLevel: ApprovalsLevel.openapi({
+      description:
+        "What every agent without its own choice asks before acting (ADR 0173). `risky` by default. Set with `PUT …/approvals-level`.",
     }),
     voiceAvailable: z.boolean().openapi({
       description: "Read only: this server has a speech engine now, from its environment or from its owner's Settings.",
@@ -254,6 +304,7 @@ const Person = z
     roleIds: z.array(z.string()).openapi({ description: "Their roles (`org_roles` ids), not `everyone`." }),
     joinedAt: z.string(),
     lastSeenAt: z.string().nullable(),
+    outsideOf: OutsideOf,
     online: z.boolean().openapi({ description: "Seen as connected: `presence` is online, away or busy." }),
     presence: z.enum(["online", "away", "busy", "out", "hidden", "offline"]).openapi({
       description:
@@ -277,6 +328,7 @@ const InvitationWithStatus = z
     role: Role,
     roleIds: z.array(z.string()),
     channelIds: z.array(z.string()).openapi({ description: "Channels it adds them to, besides #general (ADR 0090)." }),
+    agentIds: z.array(z.string()).openapi({ description: "Agents they start with (ADR 0184), pinned on joining." }),
     status: z.enum(["pending", "expired"]),
     expiresAt: z.string(),
     createdAt: z.string(),
@@ -411,9 +463,27 @@ const ManagedTask = z
           z.object({ kind: z.literal("routine"), name: z.string() }),
           z.object({ kind: z.literal("agent") }),
         ]),
+        from: z
+          .object({
+            channelId: z.uuid(),
+            channelKind: z.enum(["channel", "dm", "task"]),
+            channelName: z.string().nullable(),
+            threadId: z.uuid().nullable(),
+            messageId: z.uuid().nullable(),
+            label: z.string().nullable().openapi({ description: "The thread's title; null without one." }),
+          })
+          .nullable()
+          .openapi({
+            description:
+              "Where it was handed off, when you read that conversation: its thread and the reply that handed it (once posted).",
+          }),
       })
       .nullable()
-      .openapi({ description: "Another agent asked it: who, and what started the chain." }),
+      .openapi({ description: "Another agent asked it: who, what started the chain and where." }),
+    subject: z.string().nullable().openapi({
+      description:
+        "What the latest agent to ask it asked, as one line of at most 120 characters; null unless you read the conversation it was handed off from (`delegation.from`).",
+    }),
     helpers: z
       .number()
       .int()
@@ -467,6 +537,20 @@ const ManagedTask = z
         description:
           "Why a `waiting_input` run waits: its code, the plan or budget (`key` groups the runs on the same one), how far a pause got, since when it waits on its plan or budget (`since`, null when unknown), when the limit resets, and whether you may press Continuar agora.",
       }),
+    work: z
+      .object({
+        state: WorkState,
+        since: z.string(),
+        card: z
+          .uuid()
+          .nullable()
+          .openapi({ description: "The card it waits on, when it waits on a person: its message." }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "How it stands for you, as an agent's line says it: `you` (it waits on your decision or answer), `working`, a wait on someone or something else, or `queued`, and since when (a wait from its own start). Null: it waits on its plan or budget (`held`).",
+      }),
   })
   .openapi("ManagedTask");
 const EndedTask = z
@@ -480,7 +564,13 @@ const EndedTask = z
     routine: Routine,
     startedAt: z.string().nullable(),
     finishedAt: z.string(),
-    stoppedBy: z.object({ userId: z.string(), name: z.string() }).nullable(),
+    stoppedBy: z
+      .object({
+        userId: z.string(),
+        name: z.string(),
+        agentId: z.string().optional().openapi({ description: "The agent that stopped it at their word." }),
+      })
+      .nullable(),
   })
   .openapi("EndedTask");
 
@@ -501,6 +591,15 @@ const TaskManagerView = z
     activity: z
       .record(z.string(), z.array(z.number().int()))
       .openapi({ description: "Per agent: tool calls per minute over the last 60 minutes, oldest first." }),
+    followUps: z
+      .array(PendingReturn)
+      .openapi({ description: '"Retornos": returns agents set, still to come, where you read; the soonest first.' }),
+    canceledFollowUps: z
+      .array(CanceledReturn)
+      .openapi({ description: "Returns canceled since `since`, the latest first." }),
+    doneToday: z.number().int().optional().openapi({
+      description: "Your tasks done since `since`, all of them (`ended` is cut at 50). Only when asked (`doneToday`).",
+    }),
   })
   .openapi("TaskManagerView");
 
@@ -576,6 +675,8 @@ export function managementRoutes(deps: AppDeps) {
             agentStickers: z.boolean().optional(),
             agentMedia: z.enum(AGENT_MEDIA_LEVELS).optional(),
             mode: z.enum(WORKSPACE_MODES).optional().openapi({ description: "`team` or `personal` (ADR 0159)." }),
+            teamWatch: z.boolean().optional(),
+            welcomePeople: z.boolean().optional(),
           }),
         ),
       },
@@ -596,6 +697,45 @@ export function managementRoutes(deps: AppDeps) {
       const seesCost = await canViewCost(db, actor, orgId);
       // Only who configures the workspace gets here (`updateOrgSettings`).
       return c.json({ ...settingsFor(settings, seesCost, true), ...(await mediaAvailable()) }, 200);
+    },
+  );
+
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/approvals-level",
+      tags: ["Organization"],
+      security,
+      summary: "Set how much the workspace's agents ask before acting (who manages agents)",
+      description:
+        "Every agent that follows the workspace takes the level at once; an agent with its own choice keeps it unless `everyAgent` is true, which clears every agent's own choice.",
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            level: ApprovalsLevel,
+            everyAgent: z.boolean().optional().openapi({ description: "Also clear every agent's own choice." }),
+          }),
+        ),
+      },
+      responses: {
+        200: json(
+          z.object({
+            level: ApprovalsLevel,
+            ownAgents: z.number().openapi({ description: "Agents that keep their own choice." }),
+          }),
+        ),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const { orgId } = c.req.valid("param");
+      const { level, everyAgent } = c.req.valid("json");
+      const out = await setWorkspaceApprovalsLevel(db, c.get("user").id, orgId, level, {
+        everyAgent,
+        pubsub: adapters.pubsub,
+      });
+      return c.json(out, 200);
     },
   );
 
@@ -793,7 +933,47 @@ export function managementRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      return c.json(await setChatPrefs(db, c.get("user").id, orgId, c.req.valid("json")), 200);
+      return c.json(await setChatPrefs(db, c.get("user").id, orgId, c.req.valid("json"), adapters.pubsub), 200);
+    },
+  );
+
+  const wallpaperRoute = {
+    path: "/organizations/{orgId}/channels/{channelId}/wallpaper",
+    tags: ["Members"],
+    security,
+    description:
+      'Yours alone, on every device: it wins over `wallpaper` in `chatPrefs` and comes back in `chatPrefs.wallpapers` (by channel id). `{ kind: "none" }` is no background here even where the others have one. A photo has to be one of yours (`PUT …/me/wallpaper-photo`): 400 `wallpaper.photo_not_yours`. Members only. Your other devices hear `chat.prefs`.',
+    responses: { 200: json(ChatPrefs), ...errors },
+  };
+  app.openapi(
+    createRoute({
+      ...wallpaperRoute,
+      method: "put",
+      summary: "Give a conversation you're in a background of its own, for you",
+      request: {
+        params: OrgParams.extend({ channelId: z.uuid() }),
+        body: body(z.object({ wallpaper: Wallpaper })),
+      },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      const { wallpaper } = c.req.valid("json");
+      return c.json(
+        await setConversationWallpaper(db, c.get("user").id, orgId, channelId, wallpaper, adapters.pubsub),
+        200,
+      );
+    },
+  );
+  app.openapi(
+    createRoute({
+      ...wallpaperRoute,
+      method: "delete",
+      summary: "Let a conversation follow your channels' or DMs' background again",
+      request: { params: OrgParams.extend({ channelId: z.uuid() }) },
+    }),
+    async (c) => {
+      const { orgId, channelId } = c.req.valid("param");
+      return c.json(await setConversationWallpaper(db, c.get("user").id, orgId, channelId, null, adapters.pubsub), 200);
     },
   );
 
@@ -1035,7 +1215,7 @@ export function managementRoutes(deps: AppDeps) {
     },
   );
 
-  const inviteUrl = (token: string) => `${config.PUBLIC_URL.replace(/\/$/, "")}/invite/${token}`;
+  const inviteUrl = (base: string, token: string) => `${base}/invite/${token}`;
 
   app.openapi(
     createRoute({
@@ -1050,6 +1230,7 @@ export function managementRoutes(deps: AppDeps) {
     async (c) => {
       const { orgId } = c.req.valid("param");
       const rows = await listInvitationsWithStatus(db, c.get("user").id, orgId, new Date(), config.AGENTES_SECRET);
+      const base = await requestBaseUrl(deps, c.req.raw.headers);
       return c.json(
         {
           invitations: rows.map((i) => ({
@@ -1058,11 +1239,12 @@ export function managementRoutes(deps: AppDeps) {
             role: i.role,
             roleIds: i.roleIds,
             channelIds: i.channelIds,
+            agentIds: i.agentIds,
             status: i.status,
             expiresAt: i.expiresAt.toISOString(),
             createdAt: i.createdAt.toISOString(),
             invitedBy: i.invitedBy,
-            url: i.token ? inviteUrl(i.token) : null,
+            url: i.token ? inviteUrl(base, i.token) : null,
           })),
         },
         200,
@@ -1078,9 +1260,10 @@ export function managementRoutes(deps: AppDeps) {
       security,
       summary: "Invite several emails at once",
       description:
-        "One outcome per email: exactly one of `invites`, each address with its own roles (ADR 0090), or `emails`, " +
-        "all with `roleIds`. `channelIds` and `note` go with every one. Only a hash of each token is stored " +
-        "(7-day expiry); the link can be copied again from the list.",
+        "One outcome per email: exactly one of `emails`, all with `roleIds` (ADR 0184), or `invites`, each address " +
+        "with its own roles (ADR 0090). `channelIds`, `agentIds` and `note` go with every one, checked against the " +
+        "cargos all of them get: `invitation.channel` and `invitation.agent` (400) name the one refused, with `why`. " +
+        "Only a hash of each token is stored (7-day expiry); the link can be copied again from the list.",
       request: {
         params: OrgParams,
         body: body(
@@ -1104,9 +1287,22 @@ export function managementRoutes(deps: AppDeps) {
                 .openapi({ description: "Roles they get on accepting, below your own (ADR 0085)." }),
               channelIds: z
                 .array(z.string().uuid())
-                .max(20)
+                .max(INVITE_CHOICES_MAX)
                 .optional()
-                .openapi({ description: "Channels they join on accepting, besides #general (ADR 0090)." }),
+                .openapi({
+                  description:
+                    "Channels they join on accepting, besides #general (ADR 0090): public ones, ones you are in, and " +
+                    "private ones limited to a cargo they get (ADR 0184).",
+                }),
+              agentIds: z
+                .array(z.string().uuid())
+                .max(INVITE_CHOICES_MAX)
+                .optional()
+                .openapi({
+                  description:
+                    "Agents they start with (ADR 0184): pinned on joining, and a restricted one you may open starts " +
+                    "answering them. Never one holding someone else's mailbox, nor one keeping its plan for its owner.",
+                }),
               note: z
                 .string()
                 .max(INVITE_NOTE_MAX)
@@ -1143,6 +1339,7 @@ export function managementRoutes(deps: AppDeps) {
         ...c.req.valid("json"),
         secret: config.AGENTES_SECRET,
       });
+      const base = await requestBaseUrl(deps, c.req.raw.headers);
       for (const r of results) {
         if (r.status !== "invited") continue;
         await queueInvitationEmail(db, {
@@ -1150,7 +1347,7 @@ export function managementRoutes(deps: AppDeps) {
           invitationId: r.invitationId,
           email: r.email,
           role: "member",
-          url: inviteUrl(r.token),
+          url: inviteUrl(base, r.token),
           inviterId: c.get("user").id,
           secret: config.AGENTES_SECRET,
         });
@@ -1160,7 +1357,7 @@ export function managementRoutes(deps: AppDeps) {
         {
           results: results.map((r) =>
             r.status === "invited"
-              ? { email: r.email, status: r.status, invitationId: r.invitationId, url: inviteUrl(r.token) }
+              ? { email: r.email, status: r.status, invitationId: r.invitationId, url: inviteUrl(base, r.token) }
               : { email: r.email, status: r.status, ...(r.invitationId ? { invitationId: r.invitationId } : {}) },
           ),
         },
@@ -1190,17 +1387,18 @@ export function managementRoutes(deps: AppDeps) {
         new Date(),
         config.AGENTES_SECRET,
       );
+      const base = await requestBaseUrl(deps, c.req.raw.headers);
       await queueInvitationEmail(db, {
         orgId,
         invitationId,
         email: invitation.email,
         role: invitation.role,
-        url: inviteUrl(token),
+        url: inviteUrl(base, token),
         inviterId: c.get("user").id,
         secret: config.AGENTES_SECRET,
       });
       deps.wakeWorkers?.();
-      return c.json({ url: inviteUrl(token), expiresAt: invitation.expiresAt.toISOString() }, 200);
+      return c.json({ url: inviteUrl(base, token), expiresAt: invitation.expiresAt.toISOString() }, 200);
     },
   );
 
@@ -1210,16 +1408,34 @@ export function managementRoutes(deps: AppDeps) {
       path: "/organizations/{orgId}/invitations/{invitationId}",
       tags: ["Members"],
       security,
-      summary: "Change the roles a pending invitation gives (ADR 0090): the same link, nothing is sent",
+      summary: "Change what a pending invitation gives (ADR 0090, 0184): the same link, nothing is sent",
+      description:
+        "Its cargos, channels and agents, each checked as when sending it; an omitted one stays. Only while it still " +
+        "works (409 once it ran out: send it again).",
       request: {
         params: OrgParams.extend({ invitationId: z.uuid() }),
-        body: body(z.object({ roleIds: z.array(z.string().uuid()).max(50) })),
+        body: body(
+          z
+            .object({
+              roleIds: z.array(z.string().uuid()).max(50).optional(),
+              channelIds: z.array(z.string().uuid()).max(INVITE_CHOICES_MAX).optional(),
+              agentIds: z.array(z.string().uuid()).max(INVITE_CHOICES_MAX).optional(),
+            })
+            .refine((b) => b.roleIds || b.channelIds || b.agentIds, {
+              message: "Send `roleIds`, `channelIds` or `agentIds`",
+            }),
+        ),
       },
-      responses: { 200: json(z.object({ roleIds: z.array(z.string()) })), ...errors },
+      responses: {
+        200: json(
+          z.object({ roleIds: z.array(z.string()), channelIds: z.array(z.string()), agentIds: z.array(z.string()) }),
+        ),
+        ...errors,
+      },
     }),
     async (c) => {
       const { orgId, invitationId } = c.req.valid("param");
-      const result = await setInvitationRoles(db, c.get("user").id, orgId, invitationId, c.req.valid("json").roleIds);
+      const result = await updateInvitation(db, c.get("user").id, orgId, invitationId, c.req.valid("json"));
       return c.json(result, 200);
     },
   );
@@ -1674,13 +1890,23 @@ export function managementRoutes(deps: AppDeps) {
       summary: "The task manager (ADR 0128): what the agents are doing now, what each uses, and what ended",
       description:
         "Tasks in the conversations you are in (the `active-runs` rule), plus routines' background runs and agents' private conversations for admins and the agent's owner; the rest only as counts (`hidden`). No cost. `since` (default: the last 24 h) bounds `ended`.",
-      request: { params: OrgParams, query: z.object({ since: z.iso.datetime().optional() }) },
+      request: {
+        params: OrgParams,
+        query: z.object({
+          since: z.iso.datetime().optional(),
+          doneToday: z
+            .stringbool()
+            .optional()
+            .openapi({ description: "Also count your tasks done since `since` (`doneToday`)." }),
+        }),
+      },
       responses: { 200: json(TaskManagerView), ...errors },
     }),
     async (c) => {
-      const since = c.req.valid("query").since;
+      const { since, doneToday } = c.req.valid("query");
       const view = await taskManager(db, c.get("user").id, c.req.valid("param").orgId, {
         ...(since ? { since: new Date(since) } : {}),
+        doneToday: doneToday ?? false,
       });
       return c.json(view, 200);
     },

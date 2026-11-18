@@ -4,6 +4,8 @@
 //! every minute and when the window comes to the front. The site's workspace menu lists them by server
 //! (`this_mac` `workspaces`), Preferences › Servers shows them under each server, and a server not open in the window
 //! that has new unread notifications says so with the system's notification, named after the workspace and server.
+//! A server the window is signed in to with several accounts (ADR 0183) names them all with their workspaces
+//! (`GET /api/app/device-accounts`), and an account the window isn't on tells its new notifications the same way.
 
 use std::collections::HashMap;
 use std::io::Read;
@@ -44,6 +46,18 @@ pub struct Org {
     pub pair: bool,
 }
 
+/// One of a server's accounts signed in on the window (ADR 0183), with its workspaces.
+#[derive(Clone, Debug, Default, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Account {
+    pub user_id: String,
+    pub name: String,
+    pub email: String,
+    /// The account the window is on at that server.
+    pub current: bool,
+    pub orgs: Vec<Org>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerWorkspaces {
@@ -51,6 +65,9 @@ pub struct ServerWorkspaces {
     /// Its session in the window's cookies still answers; false lists no workspace (sign in there again).
     pub signed_in: bool,
     pub orgs: Vec<Org>,
+    /// Every account signed in there, the window's own first (ADR 0183); empty from a server that names none.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub accounts: Vec<Account>,
     /// It didn't answer (offline, an error) since this time (Unix milliseconds): what it said last stays, marked.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offline_since: Option<u64>,
@@ -149,10 +166,11 @@ fn refresh(app: &AppHandle) {
     let mut logos = lock(app).logos.clone();
     let before = list(app);
     let mut next = Vec::with_capacity(file.servers.len());
+    // Read once for every server, and never with Tauri's own read (cookies.rs: it stops the app on macOS).
+    let window_cookies = crate::cookies::read(&page);
     for server in &file.servers {
         let Ok(url) = server.parse::<Url>() else { continue };
-        let cookies: Vec<_> = page.cookies().unwrap_or_default().into_iter().filter(|c| sent_to(c, &url)).collect();
-        let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
+        let cookie = cookie_header(window_cookies.iter().filter(|c| sent_to(*c, &url)).map(|c| (c.name(), c.value())));
         let here = crate::local_server::is_here(app, server);
         let agents_here = main_window::agents_here(server, here)
             && home.as_ref().is_some_and(|h| !crate::discover::served_here(h, server));
@@ -168,6 +186,7 @@ fn refresh(app: &AppHandle) {
     }
     let changed = next != before;
     let told = news(&before, &next, open.as_deref());
+    let told_accounts = account_news(&before, &next);
     {
         let mut state = lock(app);
         state.list = next;
@@ -175,7 +194,10 @@ fn refresh(app: &AppHandle) {
         state.checked = Some(Instant::now());
     }
     for (server, org, count) in told {
-        tell(app, &server, &org, count);
+        tell(app, &server, &org, count, None);
+    }
+    for (server, account, org, count) in told_accounts {
+        tell(app, &server, &org, count, Some(&account));
     }
     if changed {
         let _ = app.emit(CHANGED_EVENT, ());
@@ -205,7 +227,7 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
     // A server from before ADR 0154 has no `/me/unread`: its workspaces show without counts.
     let unread = get_json(agent, &format!("{server}/api/app/me/unread"), cookie).ok().flatten();
     let counts = unread.as_ref().map(parse_unread).unwrap_or_default();
-    let orgs = parse_me(&me)
+    let orgs: Vec<Org> = parse_me(&me)
         .into_iter()
         .map(|(id, name, logo, pair)| {
             let (unread, waiting) = counts.get(&id).copied().unwrap_or((0, 0));
@@ -213,7 +235,31 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
             Org { id, name, logo, unread, waiting, pair }
         })
         .collect();
-    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, ..Default::default() })
+    // A server from before ADR 0183 has no `/device-accounts`: only the window's own account is known there.
+    let listed = get_json(agent, &format!("{server}/api/app/device-accounts"), cookie).ok().flatten();
+    let accounts = listed
+        .as_ref()
+        .map(parse_accounts)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|a| {
+            // The window's own account: its workspaces as read above, logos included. Another one's logos are its
+            // own session's to read, so they show the workspace's mark.
+            let theirs = if a.current {
+                orgs.clone()
+            } else {
+                a.orgs
+                    .into_iter()
+                    .map(|(id, name, _, pair)| {
+                        let (unread, waiting) = a.counts.get(&id).copied().unwrap_or((0, 0));
+                        Org { id, name, logo: None, unread, waiting, pair }
+                    })
+                    .collect()
+            };
+            Account { user_id: a.user_id, name: a.name, email: a.email, current: a.current, orgs: theirs }
+        })
+        .collect();
+    Some(ServerWorkspaces { server: server.to_string(), signed_in: true, orgs, accounts, ..Default::default() })
 }
 
 /// Who the main window is signed in as on `server` (the account's id), read with its cookies there as the minute's
@@ -221,7 +267,7 @@ fn ask(agent: &ureq::Agent, server: &str, cookie: &str, logos: &mut HashMap<Stri
 pub fn window_user(app: &AppHandle, server: &str) -> Option<String> {
     let page = app.get_webview(main_window::LABEL)?;
     let url = server.parse::<Url>().ok()?;
-    let cookies: Vec<_> = page.cookies().ok()?.into_iter().filter(|c| sent_to(c, &url)).collect();
+    let cookies: Vec<_> = crate::cookies::read(&page).into_iter().filter(|c| sent_to(c, &url)).collect();
     let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
     if cookie.is_empty() {
         return None;
@@ -355,10 +401,56 @@ pub fn parse_me(me: &Value) -> Vec<(String, String, Option<String>, bool)> {
         .collect()
 }
 
+/// An account of `GET /api/app/device-accounts` (ADR 0183), as read: who it is, whether the window is on it, its
+/// workspaces (as `parse_me` reads them) and their counts.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct ListedAccount {
+    pub user_id: String,
+    pub name: String,
+    pub email: String,
+    pub current: bool,
+    pub orgs: Vec<(String, String, Option<String>, bool)>,
+    pub counts: HashMap<String, (u64, u64)>,
+}
+
+/// Accounts kept per server (a browser keeps five signed in).
+const MAX_ACCOUNTS: usize = 8;
+
+/// The accounts of `GET /api/app/device-accounts`: one with a bad id, no name or no address is left out.
+pub fn parse_accounts(body: &Value) -> Vec<ListedAccount> {
+    let Some(accounts) = body.get("accounts").and_then(Value::as_array) else { return vec![] };
+    accounts
+        .iter()
+        .filter_map(|a| {
+            let user = a.get("user")?;
+            let user_id = user.get("id")?.as_str()?;
+            let name: String = user.get("name")?.as_str()?.trim().chars().take(80).collect();
+            let email: String = user.get("email")?.as_str()?.trim().chars().take(254).collect();
+            let clean = |text: &str| !text.is_empty() && !text.chars().any(char::is_control);
+            if !good_id(user_id) || !clean(&name) || !clean(&email) || email.contains(char::is_whitespace) {
+                return None;
+            }
+            Some(ListedAccount {
+                user_id: user_id.to_string(),
+                name,
+                email,
+                current: a.get("current").and_then(Value::as_bool).unwrap_or(false),
+                orgs: parse_me(a),
+                counts: counts_of(a.get("unread")),
+            })
+        })
+        .take(MAX_ACCOUNTS)
+        .collect()
+}
+
 /// `GET /api/app/me/unread`: unread and waiting by workspace.
 pub fn parse_unread(body: &Value) -> HashMap<String, (u64, u64)> {
-    body.get("organizations")
-        .and_then(Value::as_array)
+    counts_of(body.get("organizations"))
+}
+
+/// A list of `{ orgId, unread, waiting }` as counts by workspace.
+fn counts_of(list: Option<&Value>) -> HashMap<String, (u64, u64)> {
+    list.and_then(Value::as_array)
         .map(|orgs| {
             orgs.iter()
                 .filter_map(|o| {
@@ -377,12 +469,39 @@ pub fn parse_unread(body: &Value) -> HashMap<String, (u64, u64)> {
 pub fn news(before: &[ServerWorkspaces], after: &[ServerWorkspaces], open: Option<&str>) -> Vec<(String, Org, u64)> {
     let Some(open) = open else { return vec![] };
     let mut told = Vec::new();
+    // The account the window is on at a server (ADR 0183); None from a server that names none.
+    let on = |s: &ServerWorkspaces| s.accounts.iter().find(|a| a.current).map(|a| a.user_id.clone());
     for now in after.iter().filter(|s| s.server != open && s.signed_in) {
         let Some(then) = before.iter().find(|s| s.server == now.server && s.signed_in) else { continue };
+        // The window moved to another account there: its workspaces are another person's, not news.
+        if on(now) != on(then) {
+            continue;
+        }
         for org in &now.orgs {
             if let Some(old) = then.orgs.iter().find(|o| o.id == org.id) {
                 if org.unread > old.unread {
                     told.push((now.server.clone(), org.clone(), org.unread - old.unread));
+                }
+            }
+        }
+    }
+    told
+}
+
+/// What's new on the accounts the window isn't on (ADR 0183), on any server, the one open included: each workspace
+/// whose unread count grew, with whose account it is and how many more. An account or workspace seen for the first
+/// time tells nothing. The account the window is on at a server is `news`'s (or the page's own, on the one open).
+pub fn account_news(before: &[ServerWorkspaces], after: &[ServerWorkspaces]) -> Vec<(String, String, Org, u64)> {
+    let mut told = Vec::new();
+    for now in after.iter().filter(|s| s.signed_in) {
+        let Some(then) = before.iter().find(|s| s.server == now.server && s.signed_in) else { continue };
+        for account in now.accounts.iter().filter(|a| !a.current) {
+            let Some(old_account) = then.accounts.iter().find(|a| a.user_id == account.user_id) else { continue };
+            for org in &account.orgs {
+                if let Some(old) = old_account.orgs.iter().find(|o| o.id == org.id) {
+                    if org.unread > old.unread {
+                        told.push((now.server.clone(), account.user_id.clone(), org.clone(), org.unread - old.unread));
+                    }
                 }
             }
         }
@@ -420,18 +539,21 @@ pub fn notice_text(
     Some((title, body.replace("{count}", &count.to_string())))
 }
 
-fn tell(app: &AppHandle, server: &str, org: &Org, count: u64) {
+/// `account`: the account it belongs to, when the window isn't on it (the address says which, `?as=`).
+fn tell(app: &AppHandle, server: &str, org: &Org, count: u64, account: Option<&str>) {
     let labels = crate::menus::labels(app);
     let here = crate::local_server::is_here(app, server);
     let Some((title, body)) = notice_text(&labels, server, here, &org.name, count) else { return };
-    let Ok(url) = format!("{server}/org/{}/notifications", org.id).parse::<Url>() else { return };
+    let query = account.map(|id| format!("?as={id}")).unwrap_or_default();
+    let Ok(url) = format!("{server}/org/{}/notifications{query}", org.id).parse::<Url>() else { return };
     main_window::notice(app, &title, &body, url);
 }
 
-/// Preferences › Servers: every server's workspaces (the app's own windows only).
+/// Preferences › Servers, the popover and the welcome window's "Add a workspace": every server's workspaces (the
+/// app's own windows only).
 #[tauri::command]
 pub fn workspaces_get(app: AppHandle, window: tauri::Window) -> Result<Vec<ServerWorkspaces>, String> {
-    if !matches!(window.label(), "prefs" | "popover") {
+    if !matches!(window.label(), "prefs" | "popover" | "welcome") {
         return Err("only the app's own windows ask this".into());
     }
     if stale(&app) {
@@ -446,6 +568,10 @@ pub fn workspaces_get(app: AppHandle, window: tauri::Window) -> Result<Vec<Serve
 pub fn site_path_allowed(method: &str, path: &str) -> bool {
     if path.len() > 512 || path.contains(['?', '#', '%', '\\']) {
         return false;
+    }
+    // Whether the person has a password (Preferences' "Add a password" note on the server here).
+    if method == "GET" && path == "/api/app/me" {
+        return true;
     }
     let parts: Vec<&str> = path.split('/').collect();
     let ["", "api", "app", "organizations", org, rest @ ..] = parts.as_slice() else { return false };
@@ -487,7 +613,7 @@ pub fn with_session(
     }
     let url: Url = format!("{server}{path}").parse().map_err(|_| "bad address")?;
     let page = app.get_webview(main_window::LABEL).ok_or("signed_out")?;
-    let cookies = page.cookies_for_url(url.clone()).unwrap_or_default();
+    let cookies: Vec<_> = crate::cookies::read(&page).into_iter().filter(|c| sent_to(c, &url)).collect();
     let cookie = cookie_header(cookies.iter().map(|c| (c.name(), c.value())));
     if cookie.is_empty() {
         return Err("signed_out".into());
@@ -541,6 +667,17 @@ pub fn welcome_mode_take(app: AppHandle, window: tauri::Window) -> Result<Option
         return Err("only the welcome window asks this".into());
     }
     Ok(app.state::<WelcomeMode>().0.lock().unwrap_or_else(|e| e.into_inner()).take().map(str::to_string))
+}
+
+/// "Add a workspace…" and "Add a server…" in Preferences: the welcome window, in its adding mode.
+/// Async, as `show_window`: the welcome window may be made here.
+#[tauri::command]
+pub async fn welcome_add(app: AppHandle, window: tauri::Window) -> Result<(), String> {
+    if window.label() != "prefs" {
+        return Err("only Preferences asks this".into());
+    }
+    *app.state::<WelcomeMode>().0.lock().unwrap_or_else(|e| e.into_inner()) = Some("add");
+    crate::present(&app, "welcome")
 }
 
 #[cfg(test)]
@@ -602,6 +739,47 @@ mod tests {
     }
 
     #[test]
+    fn accounts_from_device_accounts() {
+        let body = json!({ "accounts": [
+            { "current": true, "user": { "id": "u1", "name": " Ana ", "email": "ana@example.com", "image": null },
+              "organizations": [{ "id": "o-1", "name": "Acme", "logo": null, "permissions": ["pair_computers"] }],
+              "unread": [{ "orgId": "o-1", "unread": 2, "waiting": 1 }] },
+            { "current": false, "user": { "id": "u2", "name": "Bia", "email": "bia@example.com" },
+              "organizations": [], "unread": [] },
+            { "current": false, "user": { "id": "../x", "name": "Bad", "email": "bad@example.com" } },
+            { "current": false, "user": { "id": "u3", "name": "", "email": "none@example.com" } },
+        ]});
+        let accounts = parse_accounts(&body);
+        assert_eq!(accounts.len(), 2);
+        assert_eq!((accounts[0].user_id.as_str(), accounts[0].name.as_str(), accounts[0].current), ("u1", "Ana", true));
+        assert_eq!(accounts[0].orgs, vec![("o-1".into(), "Acme".into(), None, true)]);
+        assert_eq!(accounts[0].counts.get("o-1"), Some(&(2, 1)));
+        assert_eq!((accounts[1].email.as_str(), accounts[1].current), ("bia@example.com", false));
+        assert!(parse_accounts(&json!({})).is_empty());
+    }
+
+    #[test]
+    fn news_of_an_account_the_window_is_not_on() {
+        let account = |id: &str, current: bool, unread: u64| Account {
+            user_id: id.into(),
+            name: id.into(),
+            email: format!("{id}@example.com"),
+            current,
+            orgs: vec![org("o-1", unread)],
+        };
+        let at = |accounts: Vec<Account>| ServerWorkspaces {
+            accounts,
+            ..server("https://agentes.exemplo.com.br", true, vec![])
+        };
+        let before = vec![at(vec![account("u1", true, 1), account("u2", false, 1)])];
+        let after = vec![at(vec![account("u1", true, 5), account("u2", false, 3), account("u3", false, 9)])];
+        // The window's own account is told elsewhere; one seen for the first time isn't news.
+        let told = account_news(&before, &after);
+        assert_eq!(told.len(), 1);
+        assert_eq!((told[0].1.as_str(), told[0].2.id.as_str(), told[0].3), ("u2", "o-1", 2));
+    }
+
+    #[test]
     fn counts_from_me_unread() {
         let counts = parse_unread(&json!({ "organizations": [
             { "orgId": "o-1", "unread": 3, "waiting": 1 },
@@ -617,6 +795,8 @@ mod tests {
     fn only_the_devices_paths_go_with_the_session() {
         let org = "/api/app/organizations/o-1";
         assert!(site_path_allowed("GET", &format!("{org}/devices")));
+        assert!(site_path_allowed("GET", "/api/app/me"));
+        assert!(!site_path_allowed("PATCH", "/api/app/me"));
         assert!(site_path_allowed("GET", &format!("{org}/members")));
         assert!(site_path_allowed("GET", &format!("{org}/roles")));
         assert!(site_path_allowed("PATCH", &format!("{org}/devices/computers/m-1")));
@@ -633,7 +813,6 @@ mod tests {
             ("GET", format!("{org}/devices/")),
             ("PATCH", format!("{org}/devices/phones/../stop")),
             ("GET", "/api/app/organizations/../x/devices".into()),
-            ("GET", "/api/app/me".into()),
             ("GET", format!("{org}/channels")),
             ("POST", format!("{org}/devices/phones/p%2F1/stop")),
         ] {
@@ -651,7 +830,7 @@ mod tests {
 
     #[test]
     fn only_new_unread_elsewhere_is_told() {
-        let open = servers::CLOUD;
+        let open = "https://hub.ackwire.app";
         let own = "https://agentes.exemplo.com.br";
         let before = vec![server(open, true, vec![org("a", 1)]), server(own, true, vec![org("b", 2), org("c", 5)])];
         let after = vec![

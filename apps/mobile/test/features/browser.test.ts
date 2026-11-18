@@ -3,24 +3,28 @@ import {
   type BrowserHandoff,
   type BrowserInputEvent,
   browserHandoffOf,
+  browserSiteUrl,
   controlledBy,
   createTouchInput,
+  frameView,
   handoffIsMine,
   heldTakeoversHere,
   machineProfiles,
+  pointerInView,
+  pointerShare,
 } from "@agenteschat/client";
+import { hostAndPath } from "@agenteschat/client/lib/browser-card";
+import { siteName } from "@agenteschat/client/lib/sites";
 import { sortWaiting, waitingCardOf } from "../../src/features/activity/logic";
 import {
   browserGranted,
   cardStateOf,
   framesWanted,
-  hostOf,
   keyPastDraft,
   type PageGap,
   pageNoteOf,
-  siteLetter,
-  siteOf,
   skyBehind,
+  stepIcon,
   touchOnPage,
   waitsForPage,
 } from "../../src/features/browser/logic";
@@ -64,10 +68,10 @@ describe("the help request card", () => {
     for (const keys of [featureKeysPtBR, featureKeysEn]) expect(keys.browser.card).not.toHaveProperty("computer");
   });
 
-  test("the site's host", () => {
-    expect(hostOf("https://Dashboard.Stripe.com/login?x=1")).toBe("dashboard.stripe.com");
-    expect(hostOf("about:blank")).toBe("");
-    expect(hostOf(undefined)).toBe("");
+  test("the site's host and path, as the web's card splits them", () => {
+    expect(hostAndPath("https://painel.acme.example/login?x=1")).toEqual(["painel.acme.example", "/login"]);
+    expect(hostAndPath("https://loja.exemplo/")).toEqual(["loja.exemplo", ""]);
+    expect(hostAndPath(undefined)).toEqual(["", ""]);
   });
 });
 
@@ -101,21 +105,29 @@ describe("whose help request it is", () => {
 });
 
 describe("the browser card", () => {
-  test("names the live page's site, else the last page the agent opened", () => {
+  test("names the live page's site, else the last page the agent opened (the web's rule, shared)", () => {
     const steps = [
-      { tool: "browser_open", detail: "https://www.loja.exemplo/checkout" },
-      { tool: "mcp__agentes__browser_click", detail: null },
+      { id: "s1", tool: "browser_open", detail: "https://www.loja.exemplo/checkout", running: false },
+      { id: "s2", tool: "browser_click", detail: null, running: false },
     ];
-    expect(siteOf("https://Dashboard.Stripe.com/login", steps)).toBe("dashboard.stripe.com");
-    expect(siteOf(null, steps)).toBe("www.loja.exemplo");
-    expect(siteOf(null, [{ tool: "mcp__agentes__browser_open", detail: "loja.exemplo" }])).toBe("loja.exemplo");
-    expect(siteOf(undefined, [])).toBe("");
+    expect(hostAndPath(browserSiteUrl("https://painel.acme.example/login", steps))[0]).toBe("painel.acme.example");
+    expect(hostAndPath(browserSiteUrl(null, steps))).toEqual(["www.loja.exemplo", "/checkout"]);
+    // A blank page says nothing: the last page the agent opened does.
+    expect(hostAndPath(browserSiteUrl("about:blank", steps))[0]).toBe("www.loja.exemplo");
+    expect(browserSiteUrl(undefined, [])).toBeNull();
   });
 
-  test("its letter tile", () => {
-    expect(siteLetter("www.loja.exemplo")).toBe("L");
-    expect(siteLetter("dashboard.stripe.com")).toBe("D");
-    expect(siteLetter("")).toBe("");
+  test("the site as people say it, for its title and its letter", () => {
+    expect(siteName("www.loja.exemplo")).toBe("loja.exemplo");
+    expect(siteName("web.acme.example")).toBe("acme.example");
+    expect(siteName("painel.acme.example")).toBe("painel.acme.example");
+  });
+
+  test("each step of its history has an icon; one it doesn't know is the browser's", () => {
+    expect(stepIcon("browser_open")).toBe("globe");
+    expect(stepIcon("mcp__agentes__browser_click")).toBe("right");
+    expect(stepIcon("browser_something_new")).toBe("globe");
+    expect(stepIcon("constructor")).toBe("globe");
   });
 });
 
@@ -185,8 +197,18 @@ describe("the page box with no page to show", () => {
     expect(skyBehind(pageNoteOf(null, false, false, true))).toBe(false);
   });
 
+  test("a profile's browser that didn't answer says so at once, with Try again; a hidden page keeps its words", () => {
+    expect(pageNoteOf("unavailable", false, true, false, true)).toEqual({
+      say: "noAnswer",
+      spin: false,
+      help: "stuckHelp",
+    });
+    expect(pageNoteOf("unavailable", false, true, true, true).say).toBe("noAnswer");
+    expect(pageNoteOf("unavailable", true, false, false, true).say).toBe("unavailable");
+  });
+
   test("every reason has its words in both languages (the key is built from the reason)", () => {
-    const reasons: (PageGap | "stuck")[] = [
+    const reasons: (PageGap | "stuck" | "noAnswer")[] = [
       "reconnecting",
       "offline",
       "no_computer",
@@ -196,6 +218,7 @@ describe("the page box with no page to show", () => {
       "ended",
       "tooMany",
       "stuck",
+      "noAnswer",
     ];
     for (const keys of [featureKeysPtBR, featureKeysEn]) {
       const words = keys.browser.live.unavailable as Record<string, string>;
@@ -388,4 +411,20 @@ test("the computer's screen lists its browser profiles only on a single-mode com
   expect(machineProfiles(profiles, { id: "m1", mode: "system" })).toEqual([]);
   // The Cloud's computer still being prepared: no hello yet, so its view says single, but it's managed.
   expect(machineProfiles(profiles, { id: "m1", mode: "single", kind: "managed" })).toEqual([]);
+});
+
+describe("the agent's pointer over the open card's page", () => {
+  test("its tip lands on the drawn page, past the letterbox band above it", () => {
+    const box = { width: 360, height: 300 };
+    const page = { deviceWidth: 1272, deviceHeight: 653 };
+    const view = frameView(box, page);
+    const at = pointerInView(pointerShare({ x: 630, y: 608, width: 1272, height: 653, act: "click" }), view);
+    const scale = 360 / 1272;
+    const band = (300 - 653 * scale) / 2;
+    expect(band).toBeGreaterThan(50);
+    expect(at.x).toBeCloseTo(630 * scale, 6);
+    expect(at.y).toBeCloseTo(band + 608 * scale, 6);
+    // The touch input reads the same picture back to the same page point.
+    expect(touchOnPage(at, box, page, false)).toEqual({ x: 630, y: 608 });
+  });
 });

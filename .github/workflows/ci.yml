@@ -37,9 +37,9 @@ permissions:
   contents: read
 
 env:
-  APP_IMAGE: ghcr.io/agentes-chat/agentes
-  BACKUP_IMAGE: ghcr.io/agentes-chat/backup
-  SPEECH_IMAGE: ghcr.io/agentes-chat/speech
+  APP_IMAGE: ghcr.io/ackwire-energy/agentes
+  BACKUP_IMAGE: ghcr.io/ackwire-energy/backup
+  SPEECH_IMAGE: ghcr.io/ackwire-energy/speech
 
 # A newer push supersedes a running check of the same branch or pull request (on main only the newest
 # commit's image matters); a release tag's run is never cancelled. A pull request's runs and a manual run
@@ -103,8 +103,10 @@ jobs:
             backend:
               - "apps/server/**"
               - "install.sh"
+            # The layout check runs in the web tests' job, so a change to its rules alone must run that job too.
             web:
               - "apps/web/**"
+              - "scripts/geometry/**"
             mobile:
               - "apps/mobile/**"
             desktop:
@@ -310,7 +312,7 @@ jobs:
       needs.changes.outputs.shared == 'true' || needs.changes.outputs.web == 'true' ||
       needs.changes.outputs.mobile == 'true' || needs.changes.outputs.desktop == 'true'
     runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-latest' }}
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       SHARED: ${{ needs.changes.outputs.shared }}
       WEB: ${{ needs.changes.outputs.web }}
@@ -334,14 +336,14 @@ jobs:
         run: |
           cores=$(nproc)
           workers=$(( cores * 3 / 4 )); [ "$workers" -ge 1 ] || workers=1
-          bun test --parallel="$workers" --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
+          bun test --parallel="$workers" --timeout 30000 --preload ./scripts/geometry/capture.ts apps/web packages/ui 2>&1 | tee test.log
       # Lays those screens out in the runner's Chrome at 1280, 320 and 390 px and fails on an offender that isn't in
       # scripts/geometry/baseline.json: an action on its row's edge, uneven padding in a chip, a row wrapping word by word.
       # A screen with messages also at the smallest and largest Tamanho do texto. Each screen is laid out twice, in the
       # app's CSS order and the reverse one (cascadeorder).
       - name: Geometry (the layout rules on every screen the tests reach)
         if: (success() || failure()) && (env.SHARED == 'true' || env.WEB == 'true')
-        timeout-minutes: 12
+        timeout-minutes: 35
         run: GEOMETRY_BROWSERS=$(nproc) bun run check:geometry "$RUNNER_TEMP/geometry" --report geometry-report.md --text-size xs,xl
       # The "Novo evento" dialog tests once aborted the whole DOM process (exit 134), so the main run
       # skips them (RUN_NEW_EVENT) and they run alone here. Alone they pass, so a failure is real.
@@ -405,7 +407,7 @@ jobs:
             install -m 755 /dev/null "src-tauri/binaries/$bin-x86_64-unknown-linux-gnu"
           done
           bun scripts/icons.ts
-          bun run tauri icon app-icon.png
+          bun run tauri icon app-icon-tile.png
       - name: Rust tests
         working-directory: apps/desktop/src-tauri
         run: cargo test
@@ -417,14 +419,15 @@ jobs:
   secrets:
     name: Secret scan and boundaries
     runs-on: ${{ vars.CI_RUNNER || 'ubuntu-latest' }}
-    timeout-minutes: 5
+    # main's whole-history scan passed 4.5 minutes on 2026-11-13 and grows with every migration snapshot.
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       # Bun first: the boundaries check below still runs when the scan fails.
       - *setup-bun
-      # main and a release tag scan the whole history (about two minutes); a branch or a pull request scans the
+      # main and a release tag scan the whole history (about five minutes); a branch or a pull request scans the
       # commits it adds to main, which main's own runs have already scanned up to there.
       - name: Secret scan
         env:
@@ -553,6 +556,44 @@ jobs:
           curl -fs -b cookies.txt "$URL/api/app/me" | jq -e '.organizations | length == 1'
           docker compose run --rm -T agentes telemetry > report.json
           jq -e '.report == 1 and .install == "docker" and .host.container and .people.total == 1' report.json
+      # Rehearse the actual pgvector/Postgres upgrade as well as PGlite's unit test. Only synthetic data in
+      # two disposable databases: the running app's `agentes` database and its regular backup are never targets.
+      - name: Upgrade a legacy database and restore its pre-upgrade backup
+        timeout-minutes: 5
+        run: |
+          # Boot and use it generated this password here, never a deployment's .env or connection string.
+          password=$(sed -n 's/^POSTGRES_PASSWORD=//p' .env)
+          [[ "$password" =~ ^[a-f0-9]{32}$ ]]
+          made_upgrade=false
+          made_restored=false
+          cleanup_upgrade() {
+            if "$made_upgrade"; then docker compose exec -T postgres dropdb -U agentes --if-exists --force ackwire_upgrade_ci; fi
+            if "$made_restored"; then docker compose exec -T postgres dropdb -U agentes --if-exists --force ackwire_upgrade_restored_ci; fi
+            rm -f ci-upgrade-before.dump
+          }
+          trap cleanup_upgrade EXIT
+          rehearse() {
+            docker compose run --rm -T --no-deps --entrypoint bun \
+              -e CI=true -e UPGRADE_REHEARSAL_PHASE="$1" -e UPGRADE_REHEARSAL_BASELINE="$baseline" \
+              -e UPGRADE_REHEARSAL_DATABASE_URL="postgres://agentes:$password@postgres:5432/$2" \
+              agentes test packages/db/test/upstream-upgrade-postgres.test.ts
+          }
+          for baseline in 0251 0285; do
+            docker compose exec -T postgres createdb -U agentes ackwire_upgrade_ci
+            made_upgrade=true
+            rehearse prepare ackwire_upgrade_ci
+            docker compose exec -T postgres pg_dump -U agentes -Fc ackwire_upgrade_ci > ci-upgrade-before.dump
+            test -s ci-upgrade-before.dump
+            rehearse upgrade ackwire_upgrade_ci
+            docker compose exec -T postgres createdb -U agentes ackwire_upgrade_restored_ci
+            made_restored=true
+            docker compose exec -T postgres pg_restore -U agentes -d ackwire_upgrade_restored_ci --exit-on-error < ci-upgrade-before.dump
+            # Verify the chosen baseline after restore, then upgrade and repeat its migrations.
+            rehearse restored ackwire_upgrade_restored_ci
+            cleanup_upgrade
+            made_upgrade=false
+            made_restored=false
+          done
       # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
       # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore
@@ -747,7 +788,7 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           gh release view "$TAG" > /dev/null 2>&1 ||
-            gh release create "$TAG" --verify-tag --title "agentes.chat ${TAG#v}" --generate-notes
+            gh release create "$TAG" --verify-tag --title "Ackwire AI ${TAG#v}" --generate-notes
           gh release upload "$TAG" install.sh --clobber
 
   # A version tag's release also carries agentes.chat without Docker (ADR 0060 §2): one package per

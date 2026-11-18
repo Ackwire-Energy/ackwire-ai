@@ -1,4 +1,10 @@
-import { CONTEXT_LIMITS, type ContextLimit, contextLimitsFor } from "@agenteschat/providers/context-limits";
+import {
+  autoContextFor,
+  CONTEXT_LIMITS,
+  type ContextLimit,
+  contextLimitsFor,
+} from "@agenteschat/providers/context-limits";
+import type { TFunction } from "i18next";
 
 export * from "@agenteschat/providers/context-limits";
 
@@ -18,4 +24,12 @@ export function contextChoices(
 ): readonly ContextLimit[] {
   const window = model?.contextWindow ?? planWindow(model?.modelId);
   return window ? contextLimitsFor(window) : CONTEXT_LIMITS;
+}
+
+/** The line under "Automático" for an agent's program: where it summarises, when we set that, else the model's window. */
+export function autoContextLine(t: TFunction, kind: string | null | undefined): string {
+  const tokens = autoContextFor(kind);
+  return tokens
+    ? t("agentPage.work.brain.contextText.autoSummarizes", { size: contextSize(tokens) })
+    : t("agentPage.work.brain.contextText.auto");
 }

@@ -69,7 +69,7 @@ const openCard = async (name: string) => {
   return card();
 };
 const chips = (c: HTMLElement) =>
-  [...within(c).getByRole("region", { name: "Papéis" }).querySelectorAll(".ac-token")].map((t) => ({
+  [...within(c).getByRole("region", { name: "Cargos" }).querySelectorAll(".ac-token")].map((t) => ({
     name: t.querySelector(".ac-token__label")?.textContent,
     mark: Boolean(t.querySelector(".ac-rolemark")),
     removable: Boolean(t.querySelector(".ac-token__remove")),
@@ -91,8 +91,8 @@ describe("a person's card", () => {
       { name: "Diretoria", mark: true, removable: false },
       { name: "Admin", mark: true, removable: true },
     ]);
-    await press(within(c).getByRole("button", { name: "Papéis de João" }));
-    const picker = screen().getByRole("menu", { name: "Papéis de João" });
+    await press(within(c).getByRole("button", { name: "Cargos de João" }));
+    const picker = screen().getByRole("menu", { name: "Cargos de João" });
     const options = within(picker).getAllByRole("menuitemcheckbox");
     expect(options.map((o) => [o.textContent, o.getAttribute("aria-checked")])).toEqual([
       ["Admin", "true"],
@@ -128,7 +128,7 @@ describe("a person's card", () => {
     await go(state);
     const c = await openCard("João");
     expect(chips(c).map((x) => x.removable)).toEqual([false, false]);
-    expect(within(c).queryByRole("button", { name: "Papéis de João" })).toBeNull();
+    expect(within(c).queryByRole("button", { name: "Cargos de João" })).toBeNull();
     expect(c.textContent).toContain("@joao");
     expect(c.textContent).toContain("No workspace desde");
   });
@@ -144,6 +144,22 @@ describe("a person's card", () => {
     const post = state.calls.find((x) => x.method === "chat.post");
     expect((post?.args[2] as { body: string } | undefined)?.body).toBe("Bom dia!");
     expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/dm/person/u-joao`);
+  });
+
+  test("in a workspace being deleted the box says why nothing can be sent there", async () => {
+    const state = seedState();
+    for (const org of state.me?.organizations ?? [])
+      org.deletion = {
+        dueAt: new Date(Date.now() + 6 * 86_400_000).toISOString(),
+        requestedAt: null,
+        requestedBy: null,
+      };
+    await go(state);
+    const c = await openCard("João");
+    expect(within(c).queryByRole("textbox", { name: "Mensagem para João" })).toBeNull();
+    expect(
+      within(c).getByText("Você não pode enviar mensagens enquanto este workspace está sendo apagado"),
+    ).toBeTruthy();
   });
 
   test("⋯ lists the right click's entries, Copiar ID last", async () => {

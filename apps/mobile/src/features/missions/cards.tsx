@@ -21,6 +21,7 @@ import {
   CHROME_MAX_SCALE,
   Chip,
   Count,
+  Disclosure,
   Icon,
   LineIcon,
   PixelOrbit,
@@ -91,18 +92,23 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
           {t("mobile.mission.kind")}
         </Text>
         <View style={styles.grow} />
-        <Chip
-          {...(working
-            ? { leading: <PixelOrbit color={color} size={11} /> }
-            : m.status === "done"
-              ? { icon: "checkc" as const }
-              : m.status === "paused"
-                ? { icon: "pause" as const }
-                : {})}
-          label={
-            working ? t("mobile.mission.working", { name: agent?.name ?? "" }) : t(`mobile.mission.status.${m.status}`)
-          }
-        />
+        {/* The chip shrinks only inside something that can: a long agent's name ran past the card's edge. */}
+        <View style={styles.chip}>
+          <Chip
+            {...(working
+              ? { leading: <PixelOrbit color={color} size={11} /> }
+              : m.status === "done"
+                ? { icon: "checkc" as const }
+                : m.status === "paused"
+                  ? { icon: "pause" as const }
+                  : {})}
+            label={
+              working
+                ? t("mobile.mission.working", { name: agent?.name ?? "" })
+                : t(`mobile.mission.status.${m.status}`)
+            }
+          />
+        </View>
       </View>
       <Text variant="body" style={[styles.bold, pinned ? styles.titlePinned : styles.title]} numberOfLines={2}>
         {m.title}
@@ -120,7 +126,7 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
           </Text>
         ) : null}
         <View style={styles.grow} />
-        <Icon name="right" size={16} color={c.faint} />
+        <Disclosure />
       </View>
     </Pressable>
   );
@@ -661,6 +667,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   row: { flexDirection: "row", alignItems: "center", gap: 8 },
   grow: { flex: 1, minWidth: 0 },
+  chip: { flexShrink: 1, minWidth: 0 },
   bold: { fontWeight: "600" },
   title: { marginTop: 6, marginBottom: 10 },
   titlePinned: { marginTop: 4, marginBottom: 8 },

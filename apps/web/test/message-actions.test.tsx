@@ -190,9 +190,9 @@ describe("message action bars", () => {
       expect(row(id).querySelector(".ac-msg__head .ac-receipt, .ac-msg__aside .ac-receipt")).toBeNull();
     }
     expect(row("w2").className).toContain("ac-msg--grouped");
-    // A check alone: at the end of the name's line, or of a grouped message's first line; nothing under the text.
+    // A check alone: at the end of the name's line, or in a grouped message's gutter; nothing under the text.
     expect(row("j1").querySelector(".ac-msg__head .ac-msg__aside .ac-receipt__check")).not.toBeNull();
-    expect(row("j2").querySelector(".ac-msg__aside--floating .ac-receipt__check")).not.toBeNull();
+    expect(row("j2").querySelector(".ac-msg__gutter--aside .ac-msg__aside .ac-receipt__check")).not.toBeNull();
     // The part a message doesn't use is left empty, which the kit hides: no row's bar moves for what ends its line.
     for (const id of ["j1", "j2"]) expect(row(id).querySelector(".ac-msg__foot")?.childNodes.length).toBe(0);
     for (const id of ["w1", "w2"]) expect(row(id).querySelector(".ac-msg__aside")?.childNodes.length ?? 0).toBe(0);

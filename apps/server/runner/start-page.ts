@@ -20,10 +20,9 @@ import HTML from "./assets/start/start.html.txt" with { type: "text" };
 import JS from "./assets/start/start.js.txt" with { type: "text" };
 import { desktopName } from "./desktop-look";
 import { SYSTEM_BROWSER_DIR } from "./install-script";
+import { pageLocale, START_WORDS } from "./page-words";
 
 export const systemStartPage = (uid: number) => path.join(SYSTEM_BROWSER_DIR, "start", String(uid));
-export const startLocale = (locale?: string | null): "pt-BR" | "en" =>
-  /^pt(?:-|$)/i.test(locale ?? "") ? "pt-BR" : "en";
 export interface StartPageData {
   locale?: string;
   egress?: MachineEgress | null;
@@ -37,10 +36,11 @@ export interface StartPageData {
  * keeps that bubble off this page alone; real sites still get it.
  */
 export function startPageHtml(agent: Pick<AgentScope, "name" | "handle">, data: StartPageData = {}): string {
-  const locale = startLocale(data.locale);
+  const locale = pageLocale(data.locale);
   const json = JSON.stringify({
     name: desktopName(agent),
     locale,
+    words: START_WORDS[locale],
     egress: data.egress ?? null,
     flag: countryFlagUrl(data.egress?.country),
   }).replace(/</g, "\\u003c");
@@ -52,6 +52,21 @@ export function startPageHtml(agent: Pick<AgentScope, "name" | "handle">, data: 
     LANG: locale,
   };
   return HTML.replace(/\{\{(CSS|JS|DATA|MARK|LANG)\}\}/g, (_, key: string) => parts[key] ?? "");
+}
+
+/**
+ * Whether the start page's folder could be someone else's or written by others: not a folder, not this user's, or
+ * writable by its group or everyone. Windows reports a mode made up from the read-only attribute alone (0o666 for any
+ * ordinary folder) and no owner id, so neither says anything there, where access is in the folder's ACL.
+ */
+export function unsafeStartFolder(
+  st: { isDirectory(): boolean; uid: number; mode: number },
+  platform: NodeJS.Platform = process.platform,
+  uid: number | undefined = process.getuid?.(),
+) {
+  if (!st.isDirectory()) return true;
+  if (platform === "win32") return false;
+  return (uid !== undefined && st.uid !== uid) || (st.mode & 0o022) !== 0;
 }
 
 /**
@@ -67,8 +82,7 @@ export function prepareStartPage(
   mkdirSync(path.dirname(directory), { recursive: true, mode: 0o755 });
   mkdirSync(directory, { recursive: true, mode: gid === undefined ? 0o755 : 0o750 });
   const st = lstatSync(directory);
-  if (!st.isDirectory() || (process.getuid && st.uid !== process.getuid()) || st.mode & 0o022)
-    throw new Error("Unsafe start page folder");
+  if (unsafeStartFolder(st)) throw new Error("Unsafe start page folder");
   if (gid !== undefined) {
     if (st.gid !== gid) chownSync(directory, 0, gid);
     if ((st.mode & 0o777) !== 0o750) chmodSync(directory, 0o750);

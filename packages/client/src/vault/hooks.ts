@@ -9,6 +9,7 @@ import type {
   VaultItemDetail,
   VaultItemInput,
   VaultItemPatch,
+  VaultKeysImportInput,
   VaultScope,
 } from "./types";
 
@@ -103,6 +104,32 @@ export function useImportVault(orgId: string) {
     gcTime: 0,
     onSuccess: (_result, { dryRun }) => {
       if (!dryRun) void refresh();
+    },
+  });
+}
+
+/** Several keys in one save (an imported .env): the values go once and are forgotten with the mutation. */
+export function useImportVaultKeys(orgId: string) {
+  const api = useApi();
+  const refresh = useVaultRefresh(orgId);
+  return useMutation({
+    mutationFn: (input: VaultKeysImportInput) => vaultOf(api).importKeys(orgId, input),
+    meta: { silent: true },
+    gcTime: 0,
+    onSuccess: () => void refresh(),
+  });
+}
+
+export function useMoveVaultItem(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  const refresh = useVaultRefresh(orgId);
+  return useMutation({
+    mutationFn: ({ itemId, scope }: { itemId: string; scope: VaultScope }) => vaultOf(api).move(orgId, itemId, scope),
+    meta: { silent: true },
+    onSuccess: (item) => {
+      qc.setQueryData<VaultItemDetail>(keys.vaultItem(orgId, item.id), (open) => (open ? { ...open, ...item } : open));
+      void refresh();
     },
   });
 }

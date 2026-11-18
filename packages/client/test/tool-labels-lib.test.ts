@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { resources } from "@agenteschat/i18n";
+import { en as enStrings, resources, STRINGS } from "@agenteschat/i18n";
+import { type AppLocale, LOCALE_CODES, localeInfo } from "@agenteschat/i18n/locale";
+import { checkLocale } from "@agenteschat/i18n/testing";
 import i18next, { type TFunction } from "i18next";
+import identical from "../../i18n/test/identical.json";
 import type { Approval } from "../src/index";
 import {
   actionName,
@@ -9,9 +12,9 @@ import {
   approvalTitle,
   approveAlwaysWords,
 } from "../src/lib/approval-words";
-import { catalogLabel, labelIsName, TOOL_LABELS, toolKey } from "../src/lib/tool-labels";
+import { catalogLabel, labelIsName, toolKey } from "../src/lib/tool-labels";
 import { partsOf, toolName } from "../src/lib/tool-review";
-import { toolLineHint } from "../src/lib/work";
+import { stepLabel, toolLineHint } from "../src/lib/work";
 
 const tOf = (lng: string): TFunction => {
   const instance = i18next.createInstance();
@@ -21,6 +24,10 @@ const tOf = (lng: string): TFunction => {
 const pt = tOf("pt-BR");
 const en = tOf("en");
 const es = tOf("es");
+
+/** The catalog: a tool's own name → its words, in each language's strings. */
+const labelsOf = (code: AppLocale) => (STRINGS[code].toolNames as { label: Record<string, string> }).label;
+const KEYS = Object.keys(enStrings.toolNames.label);
 
 const approval = (over: Partial<Approval>): Approval =>
   ({
@@ -36,17 +43,34 @@ const approval = (over: Partial<Approval>): Approval =>
 
 describe("the catalog of tool names", () => {
   test("every key is a name as written once its app is off; every label a verb phrase in plain copy", () => {
-    const bad: string[] = [];
-    for (const [key, labels] of Object.entries(TOOL_LABELS)) {
-      if (toolKey(key).key !== key) bad.push(`${key}: key reads as ${toolKey(key).key}`);
-      for (const label of labels) {
-        if (!/^\p{Lu}/u.test(label)) bad.push(`${key}: "${label}" starts in lower case`);
-        if (/[;"“”«»]|\.$/.test(label)) bad.push(`${key}: "${label}" has a semicolon, a quote or a full stop`);
-        if (/_/.test(label)) bad.push(`${key}: "${label}" reads like code`);
+    const bad = KEYS.filter((key) => toolKey(key).key !== key).map((key) => `${key}: key reads as ${toolKey(key).key}`);
+    for (const code of LOCALE_CODES) {
+      // Chinese, Japanese and Korean have no capitals.
+      const cased = localeInfo(code).script !== "cjk";
+      for (const [key, label] of Object.entries(labelsOf(code))) {
+        if (cased && !/^\p{Lu}/u.test(label)) bad.push(`${code} ${key}: "${label}" starts in lower case`);
+        if (/[;"“”«»]|[.。]$/.test(label))
+          bad.push(`${code} ${key}: "${label}" has a semicolon, a quote or a full stop`);
+        if (/_/.test(label)) bad.push(`${code} ${key}: "${label}" reads like code`);
       }
     }
     expect(bad).toEqual([]);
-    expect(Object.keys(TOOL_LABELS).length).toBeGreaterThan(400);
+    expect(KEYS.length).toBeGreaterThan(400);
+  });
+
+  test("every language has its own words for every tool, the same as English only where listed", () => {
+    const source = { toolNames: { label: labelsOf("en") } };
+    const same: Record<string, string[]> = identical.app;
+    for (const code of LOCALE_CODES) {
+      const labels = labelsOf(code);
+      const t = tOf(code);
+      // Missing, empty, left in English, a glossary name reworded: the strings' own check, on the catalog alone.
+      const target = { toolNames: { label: labels } };
+      const problems = code === "en" ? [] : checkLocale({ source, target, code, ready: true, identical: same[code] });
+      // What the screens get: the lookup itself, for every key.
+      const unread = KEYS.filter((key) => !labels[key] || catalogLabel(t, key) !== labels[key]);
+      expect({ code, problems, unread }).toEqual({ code, problems: [], unread: [] });
+    }
   });
 
   test("found however the server writes the name, without its app, account or articles", () => {
@@ -74,10 +98,49 @@ describe("the catalog of tool names", () => {
     expect(catalogLabel(pt, "frobnicate_widget")).toBeNull();
   });
 
-  test("another language builds the name from its own verbs and nouns", () => {
-    expect(catalogLabel(es, "create_issue")).toBeNull();
-    expect(toolName(es, partsOf("create_issue"), "create_issue")).toStartWith(es("toolNames.verb.create"));
-    expect(es("toolNames.verb.create")).not.toBe("Create");
+  test("each language's own words through the lookup, however the name is written", () => {
+    const cases: [AppLocale, string, string, string][] = [
+      ["es", "Hacer merge de un pull request", "Crear repositorio", "Enviar mensaje"],
+      ["fr", "Fusionner une pull request", "Créer un dépôt", "Envoyer un message"],
+      ["de", "Pull Request mergen", "Repository erstellen", "Nachricht senden"],
+      ["it", "Unisci una pull request", "Crea repository", "Invia messaggio"],
+      ["nl", "Pull request mergen", "Repository maken", "Bericht sturen"],
+      ["ja", "プルリクエストをマージ", "リポジトリを作成", "メッセージを送信"],
+      ["ko", "풀 리퀘스트 병합", "저장소 생성", "메시지 보내기"],
+      ["zh-Hans", "合并 PR", "创建仓库", "发送消息"],
+      ["id", "Merge pull request", "Buat repositori", "Kirim pesan"],
+      ["tr", "Pull request'i birleştir", "Depo oluştur", "Mesaj gönder"],
+      ["pl", "Scal pull request", "Utwórz repozytorium", "Wyślij wiadomość"],
+      ["ru", "Объединить pull request", "Создать репозиторий", "Отправить сообщение"],
+    ];
+    for (const [code, merge, create, send] of cases) {
+      const t = tOf(code);
+      expect({
+        code,
+        merge: catalogLabel(t, "github.merge_pull_request"),
+        create: toolName(t, partsOf("create_repository"), "create_repository"),
+        send: toolName(t, partsOf("SLACK_SEND_MESSAGE"), "SLACK_SEND_MESSAGE"),
+      }).toEqual({ code, merge, create, send });
+    }
+  });
+
+  test("a tool the catalog has no words for gets a name built from the language's own verbs and nouns", () => {
+    expect(catalogLabel(es, "list_widgets")).toBeNull();
+    expect(toolName(es, partsOf("list_widgets"), "list_widgets")).toBe(`${es("toolNames.verb.list")} widgets`);
+    expect(es("toolNames.verb.list")).not.toBe("List");
+    // A name that is also a property of every object finds no words, and reads as itself.
+    expect(catalogLabel(en, "constructor")).toBeNull();
+    expect(catalogLabel(en, "…")).toBeNull();
+    expect(toolName(en, partsOf("constructor"), "constructor")).toBe("Constructor");
+  });
+
+  test("inside a sentence the words keep the language's capitals: German nouns, the Turkish dotted i", () => {
+    const step = (tool: string) => ({ kind: "usingTool" as const, tool });
+    expect(stepLabel(en, step("git_clone"), "en")).toBe("Used the clone repository tool");
+    expect(stepLabel(tOf("de"), step("git_clone"), "de")).toBe("Das Tool Repository klonen genutzt");
+    expect(stepLabel(tOf("tr"), step("add_comment_to_pending_review"), "tr")).toBe(
+      "incelemeye yorum ekle aracını kullandı",
+    );
   });
 
   test("a name the catalog doesn't know reads as words, its verb in the language, without the app beside it", () => {
@@ -117,10 +180,9 @@ describe("tool names where people see them", () => {
     expect(approvalTitle(en, deletion)).toBe("Delete the repository acme/old");
     expect(catalogLabel(pt, "github_discussion_comment_write")).toBe("Comentar numa discussão");
     expect(catalogLabel(en, "github_get_secret_scanning_alert")).toBe("See leaked secret alert");
-    // A language without a column builds them from its own verbs and nouns, none left in English.
     const name = "list_repository_security_advisories";
-    expect(toolName(es, partsOf(name), name)).toBe("Listar avisos de seguridad del repositorio");
-    expect(toolName(es, partsOf("get_dependabot_alert"), "get_dependabot_alert")).toBe("Obtener alerta de Dependabot");
+    expect(toolName(es, partsOf(name), name)).toBe("Listar los avisos de seguridad de un repositorio");
+    expect(toolName(es, partsOf("get_dependabot_alert"), "get_dependabot_alert")).toBe("Ver alerta de dependencia");
   });
 
   test("a custom server's tool: worded unless someone named it on the review", () => {

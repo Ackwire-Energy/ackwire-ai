@@ -7,7 +7,7 @@ beforeEach(async () => {
 });
 afterEach(() => t.close());
 
-type Me = { organizations: { id: string; chatPrefs?: Record<string, string> }[] };
+type Me = { organizations: { id: string; chatPrefs?: Record<string, string | boolean> }[] };
 
 test("how conversations look: only what the person chose, each person's own, merged key by key", async () => {
   const owner = browser(t);
@@ -15,7 +15,7 @@ test("how conversations look: only what the person chose, each person's own, mer
   const { orgId } = await seedOrg(owner);
   const prefsOf = async (b: typeof owner) =>
     ((await (await b("/api/app/me")).json()) as Me).organizations.find((o) => o.id === orgId)?.chatPrefs;
-  const put = (b: typeof owner, json: Record<string, string>) =>
+  const put = (b: typeof owner, json: Record<string, string | boolean>) =>
     b(`/api/app/organizations/${orgId}/me/chat`, { method: "PUT", json });
 
   expect(await prefsOf(owner)).toEqual({});
@@ -46,6 +46,15 @@ test("how conversations look: only what the person chose, each person's own, mer
   });
   expect((await prefsOf(owner))?.textSize).toBe("xl");
   expect(await prefsOf(member)).toEqual({});
+
+  // Full messages is a boolean, saved per person and merged with the other choices.
+  expect((await put(owner, { fullMessages: "true" })).status).toBe(400);
+  expect((await put(owner, { fullMessages: true })).status).toBe(200);
+  expect((await prefsOf(owner))?.fullMessages).toBe(true);
+  expect((await prefsOf(owner))?.textSize).toBe("xl");
+  expect(await prefsOf(member)).toEqual({});
+  expect((await put(owner, { fullMessages: false })).status).toBe(200);
+  expect((await prefsOf(owner))?.fullMessages).toBe(false);
 
   const stranger = browser(t);
   await signUp(stranger, "stranger@example.com");

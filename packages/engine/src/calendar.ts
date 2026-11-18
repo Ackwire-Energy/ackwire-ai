@@ -6,6 +6,7 @@ import { zonedParts, zonedTime } from "./cron";
 import { type EmailLocale, emailLocale, modeStamp, queueEmail } from "./email";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishListChanged, publishMessageCreated, publishUserEvent } from "./events";
+import { assigneesOf } from "./issue-assignees";
 import { getOrgSettings } from "./management";
 import { insertMessage, messageView } from "./messages";
 import { can, requireActiveMembership, requirePermission } from "./organizations";
@@ -14,6 +15,7 @@ import { endRuleBefore, localDate, normalizeRule, ruleOccurrences, type Schedule
 import { bodyCode } from "./run-tools";
 import { replyThreadOf } from "./runs";
 import { userVisibleChannels } from "./search";
+import { closedRefusal } from "./standing";
 import { taskSeenSql } from "./task-access";
 
 const {
@@ -904,7 +906,7 @@ async function visibleEvents(db: Database, userId: string, orgId: string, from: 
 /** The calendar view: events (with recurrences expanded), routine runs, reminders, issue deadlines and my pending proposals. */
 export async function calendarRange(deps: CalendarDeps, userId: string, orgId: string, fromIso: string, toIso: string) {
   const { db } = deps;
-  await requirePermission(db, userId, orgId, "read");
+  const membership = await requirePermission(db, userId, orgId, "read");
   const from = new Date(fromIso);
   const to = new Date(toIso);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to <= from) {
@@ -920,18 +922,22 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
     .map((o) => view(o.row, attendees, o))
     .sort((a, b) => a.start.localeCompare(b.start));
 
-  const routineRows = await db
-    .select()
-    .from(routines)
-    .where(
-      and(
-        eq(routines.orgId, orgId),
-        eq(routines.active, true),
-        eq(routines.triggerType, "schedule"),
-        // A widget's refreshes aren't slots on a calendar (every 30 minutes would fill it; ADR 0135 §4).
-        sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
-      ),
-    );
+  // Being deleted, its routines and reminders run at none of their times, so none shows (ADR 0088 §7).
+  const closed = closedRefusal(membership.standing) !== null;
+  const routineRows = closed
+    ? []
+    : await db
+        .select()
+        .from(routines)
+        .where(
+          and(
+            eq(routines.orgId, orgId),
+            eq(routines.active, true),
+            eq(routines.triggerType, "schedule"),
+            // A widget's refreshes aren't slots on a calendar (every 30 minutes would fill it; ADR 0135 §4).
+            sql`coalesce(${routines.target}->>'type', '') <> 'widget'`,
+          ),
+        );
   const routineRuns: { routineId: string; name: string; agentId: string; at: string; target: unknown }[] = [];
   const sees = await routineSeer(db, orgId, userId);
   for (const r of routineRows) {
@@ -949,8 +955,6 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
       number: issues.number,
       title: issues.title,
       date: issues.dueDate,
-      assigneeType: issues.assigneeType,
-      assigneeId: issues.assigneeId,
     })
     .from(issues)
     .where(
@@ -963,16 +967,17 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
       ),
     )
     .orderBy(issues.dueDate, issues.number);
-  // Who has each task: the calendar opens its due date with their face.
+  // Who has each task: the calendar opens its due date with their faces.
+  const assignees = await assigneesOf(
+    db,
+    due.map((d) => d.id),
+  );
   const deadlines = due.map((d) => ({
     issueId: d.id,
     number: d.number,
     title: d.title,
     date: d.date ?? "",
-    assignee:
-      d.assigneeType && d.assigneeId
-        ? { type: d.assigneeType as CalendarActor["type"], id: d.assigneeId }
-        : (null as CalendarActor | null),
+    assignees: (assignees.get(d.id) ?? []) as CalendarActor[],
   }));
 
   const proposals = (
@@ -988,7 +993,7 @@ export async function calendarRange(deps: CalendarDeps, userId: string, orgId: s
       )
   ).map(proposalView);
   const mine = new Set(await userVisibleChannels(db, orgId, userId, { archived: true }));
-  const reminders = await calendarReminders(db, userId, orgId, from, to, mine, sees);
+  const reminders = closed ? [] : await calendarReminders(db, userId, orgId, from, to, mine, sees);
   return { events, routines: routineRuns, reminders, deadlines, proposals };
 }
 
@@ -1180,32 +1185,47 @@ export async function confirmCalendarProposal(deps: CalendarDeps, userId: string
     ...(p.participants as CalendarActor[]),
     ...(agent ? [{ type: "agent" as const, id: agent.id }] : []),
   ];
-  const event = await createCalendarEvent(deps, userId, orgId, {
-    title: p.title,
-    description: p.description,
-    start: p.startAt.toISOString(),
-    end: p.endAt.toISOString(),
-    rule: (p.rule as EventRule | null) ?? null,
-    participants,
-    channelId: null,
-  });
+  // Claimed before the event is made: two confirmations at once make one event, not two.
+  await claimProposal(deps.db, p.id, "confirmed");
+  let event: Awaited<ReturnType<typeof createCalendarEvent>>;
+  try {
+    event = await createCalendarEvent(deps, userId, orgId, {
+      title: p.title,
+      description: p.description,
+      start: p.startAt.toISOString(),
+      end: p.endAt.toISOString(),
+      rule: (p.rule as EventRule | null) ?? null,
+      participants,
+      channelId: null,
+    });
+  } catch (error) {
+    // No event came of it: the proposal can be answered again.
+    await deps.db.update(calendarProposals).set({ status: "pending" }).where(eq(calendarProposals.id, p.id));
+    throw error;
+  }
   const [row] = await deps.db
     .update(calendarProposals)
-    .set({ status: "confirmed", eventId: event.id })
+    .set({ eventId: event.id })
     .where(eq(calendarProposals.id, p.id))
     .returning();
   if (row) await syncProposalCard(deps, row);
   return event;
 }
 
+/** `pending` → the decision, only while it is still pending: the one of two answers at once that loses is told. */
+async function claimProposal(db: Database, id: string, status: "confirmed" | "dismissed") {
+  const [row] = await db
+    .update(calendarProposals)
+    .set({ status })
+    .where(and(eq(calendarProposals.id, id), eq(calendarProposals.status, "pending")))
+    .returning();
+  if (!row) throw new ValidationError("This proposal was already decided");
+  return row;
+}
+
 export async function dismissCalendarProposal(deps: CalendarDeps, userId: string, orgId: string, id: string) {
   const p = await decideProposalRow(deps.db, userId, orgId, id);
-  const [row] = await deps.db
-    .update(calendarProposals)
-    .set({ status: "dismissed" })
-    .where(eq(calendarProposals.id, p.id))
-    .returning();
-  if (row) await syncProposalCard(deps, row);
+  await syncProposalCard(deps, await claimProposal(deps.db, p.id, "dismissed"));
 }
 
 /** Resolves `@ana` / `@dev` handles (or ids) to people and agents of the org. */

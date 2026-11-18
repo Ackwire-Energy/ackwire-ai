@@ -1,15 +1,15 @@
 #!/bin/sh
 # Ackwire AI installer: a self-hosted Ackwire AI on this computer, in one command.
 #
-#   curl -fsSL https://agentes.chat/install | sh
-#   curl -fsSL https://agentes.chat/install | sh -s -- --plan      prints what it would do, does nothing
+#   curl -fsSL https://hub.ackwire.app/install | sh
+#   curl -fsSL https://hub.ackwire.app/install | sh -s -- --plan      prints what it would do, does nothing
 #
 # --plan (--dry-run too) is this installer's own plan: it runs nothing, the setup included. The setup
 # writes and starts nothing until its last question is answered: for its plan, stop it at its first
 # question (Ctrl-C), then run the setup command this printed again with --dry-run (with sudo if this
 # ran itself again with sudo).
 #
-# To read it before it runs: curl -fsSLo install.sh https://agentes.chat/install, then sh install.sh.
+# To read it before it runs: curl -fsSLo install.sh https://hub.ackwire.app/install, then sh install.sh.
 #
 # It gets this computer ready, then hands over to the setup (@agenteschat/setup), which asks its few
 # questions, writes .env and starts everything. On Linux it makes sure of Docker and its Compose
@@ -26,11 +26,12 @@ main() {
   # The setup this installer hands over to, the Bun it runs on, and the Compose plugin it installs
   # when Docker has none (or one older than the 2.23.1 the compose file needs).
   SETUP_VERSION=0.1.1
+  SETUP_SHA256=b5dec8805bb8b9dfe68fa65192c8a17fd0f8e6fca704e319dd73f29d46070cca
   BUN_VERSION=1.4.4
   COMPOSE_VERSION=5.5.1
   MIN_COMPOSE=2.23.1
-  INSTALL_URL=https://agentes.chat/install
-  GUIDE=https://agentes.chat/docs/install-on-a-server
+  INSTALL_URL=https://hub.ackwire.app/install
+  GUIDE=https://github.com/Ackwire-Energy/ackwire-ai/blob/main/SELF_HOSTING.md
   DOCKER_DOCS=https://docs.docker.com/engine/install/
   BREW_INSTALL=https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh
 
@@ -191,22 +192,21 @@ main() {
   fi
   case $DIR in /*) ;; *) DIR=$PWD/$DIR ;; esac
 
-  SETUP="@agenteschat/setup@$SETUP_VERSION"
+  SETUP=$WORK/ackwire-setup.js
   if [ -n "${AGENTES_INSTALL_SETUP:-}" ]; then
     case $AGENTES_INSTALL_SETUP in /*) ;; *) AGENTES_INSTALL_SETUP=$PWD/$AGENTES_INSTALL_SETUP ;; esac
     [ -f "$AGENTES_INSTALL_SETUP" ] ||
       die "AGENTES_INSTALL_SETUP is $AGENTES_INSTALL_SETUP, which isn't a file." \
         "Point it at a build of the setup (packages/setup/dist/index.js), or unset it."
     SETUP=$AGENTES_INSTALL_SETUP
+  else
+    fetch "https://github.com/Ackwire-Energy/ackwire-ai/releases/download/setup-v$SETUP_VERSION/ackwire-setup.js" "$SETUP" "Downloading Ackwire setup $SETUP_VERSION"
+    verify "$SETUP" "$SETUP_SHA256"
   fi
 
   get_bun
 
-  if [ -n "${AGENTES_INSTALL_SETUP:-}" ]; then
-    set -- "$BUN" "$SETUP" "$@"
-  else
-    set -- "$BUN" x --bun "$SETUP" "$@"
-  fi
+  set -- "$BUN" "$SETUP" "$@"
   if [ "$PLAN" = 1 ]; then
     t_step "The setup, in $DIR:"
     t_shell "mkdir -p $DIR"
@@ -221,19 +221,17 @@ main() {
   t_step "The setup, in $DIR:"
   t_cmd "$*"
   t_gap
-  rm -rf "$WORK"
-  trap - EXIT
   cd "$DIR"
   # The setup draws in this frame: no logo or ┌ of its own, and it closes the frame (packages/setup/src/term.ts).
   AGENTES_FRAME=1
   export AGENTES_FRAME
-  exec "$@" <"$SETUP_IN"
+  "$@" <"$SETUP_IN"
 }
 
 usage() {
   printf '%s\n' "Ackwire AI installer: a self-hosted Ackwire AI on this computer, in one command.
 
-Usage: curl -fsSL https://agentes.chat/install | sh -s -- [options] [setup options]
+Usage: curl -fsSL https://hub.ackwire.app/install | sh -s -- [options] [setup options]
        sh install.sh [options] [setup options]
 
   --dir <folder>      Where Ackwire AI lives: /opt/agentes as root, ~/agentes otherwise.
@@ -295,7 +293,7 @@ verify() {
   if [ "${sum%% *}" != "$2" ]; then
     rm -f "$1"
     die "The download of ${1##*/} isn't the file this installer expects (its SHA-256 differs), so it was deleted, not run." \
-      "Run this again. If it happens again, open an issue: https://github.com/agentes-chat/agentes-chat/issues"
+      "Run this again. If it happens again, open an issue: https://github.com/Ackwire-Energy/ackwire-ai/issues"
   fi
 }
 
@@ -640,7 +638,13 @@ t_init() {
         *) case ${TERM:-} in *256color*) T_DEPTH=256 ;; *) T_DEPTH=16 ;; esac ;;
       esac
     fi
-    T_COLS=$( (stty size </dev/tty | cut -d ' ' -f 2) 2>/dev/null) || :
+    # tput only reads the terminal. uutils' stty (Ubuntu 26.04) writes it back even for `size`, and a write from
+    # outside the foreground stops the installer for good: `curl ... | sudo sh` under sudo-rs runs it there.
+    if command -v tput >/dev/null 2>&1; then
+      { T_COLS=$(tput cols <&4 2>/dev/null) || :; } 4<&"$T_FD"
+    else
+      T_COLS=$( (stty size </dev/tty | cut -d ' ' -f 2) 2>/dev/null) || :
+    fi
   fi
   case $T_COLS in '' | *[!0-9]*) T_COLS=80 ;; esac
   if [ "$T_COLS" -gt 80 ]; then T_COLS=80; fi
@@ -659,9 +663,9 @@ t_style() {
   if [ "$T_DEPTH" != 0 ]; then
     C_BOLD="${E}[1m" C_DIM="${E}[2m" C_OK="${E}[32m" C_WARN="${E}[33m" C_FAIL="${E}[31m" C_OFF="${E}[0m"
     case $T_DEPTH in
-      24) C_ACC="${E}[38;2;43;116;230m" C_BADGE="${E}[48;2;0;99;209;97m" ;;
-      256) C_ACC="${E}[38;5;32m" C_BADGE="${E}[48;5;26;38;5;231m" ;;
-      *) C_ACC="${E}[94m" C_BADGE="${E}[44;97m" ;;
+      24) C_ACC="${E}[38;2;76;138;23m" C_BADGE="${E}[48;2;144;237;66;38;2;3;31;27m" ;;
+      256) C_ACC="${E}[38;5;64m" C_BADGE="${E}[48;5;113;38;5;16m" ;;
+      *) C_ACC="${E}[32m" C_BADGE="${E}[102;30m" ;;
     esac
   fi
   T_B=' '
@@ -746,30 +750,31 @@ t_intro() {
   printf '%s\n' "$T_B" >&"$T_FD"
 }
 
-# The logo. The mark: the agent of packages/ui/src/agent/engine.js on the 12×12 grid of the web's LogoMark,
-# rows of pixels where 0-4 are its body's tones (deep to light), w its eyes and . nothing. Beside it,
-# "agentes" in pixels after Funnel Display Light. Two rows of pixels make one line of ▀▄█.
+# The logo. The mark: the agent of packages/ui/src/agent/engine.js on a 12×12 grid, rows of pixels where 0-4 are
+# its body's tones (deep to light), w its eyes and . nothing. Beside it, "Ackwire" in pixels, then "AI" in the
+# accent. Two rows of pixels make one line of ▀▄█.
 t_logo() {
   printf '\n' >&"$T_FD"
-  t_row=0
-  set -- ..43434343.. .3333333332. '                         ▄' \
-    333333333233 232323232223 ' ▄▄▄   ▄▄▄▄  ▄▄▄  ▄ ▄▄  ▄█▄▄  ▄▄▄   ▄▄▄▄' \
-    3232w23w3222 2222w22w2212 ' ▄▄▄█ █   █ █▄▄▄█ █▀  █  █   █▄▄▄█ ▀▄▄▄' \
-    2222w22w2122 121212121112 '█   █ █   █ █     █   █  █   █         █' \
-    212121212111 111111111101 ' ▀▀▀▀  ▀▀▀█  ▀▀▀▀ ▀   ▀   ▀▀  ▀▀▀▀ ▀▀▀▀' \
-    11111111101. 0101010100.. '       ▀▀▀'
-  while [ $# -ge 3 ]; do
-    t_top=$1 t_bot=$2 t_word=$3
-    shift 3
+  set -- ..43434343.. .3333333332. '  ▄         ▄          ▄           ' '  ▄   ▄▄▄' \
+    333333333233 232323232223 ' █ █   ▄▄▄▄ █  ▄ ▄   ▄ ▄ ▄ ▄▄  ▄▄▄ ' ' █ █   █' \
+    3232w23w3222 2222w22w2212 '█   █ █     █▄▀  █ ▄ █ █ █▀   █▄▄▄█' '█   █  █' \
+    2222w22w2122 121212121112 '█▀▀▀█ █     █ ▀▄ █ █ █ █ █    █    ' '█▀▀▀█  █' \
+    212121212111 111111111101 '▀   ▀  ▀▀▀▀ ▀  ▀  ▀ ▀  ▀ ▀     ▀▀▀▀' '▀   ▀ ▀▀▀' \
+    11111111101. 0101010100.. '' ''
+  while [ $# -ge 4 ]; do
+    t_top=$1 t_bot=$2 t_word=$3 t_ai=$4
+    shift 4
     t_line=''
     while [ -n "$t_top" ]; do
       t_cell "${t_top%"${t_top#?}"}" "${t_bot%"${t_bot#?}"}"
       t_line=$t_line$t_c
       t_top=${t_top#?} t_bot=${t_bot#?}
     done
-    t_row=$((t_row + 1))
-    if [ "$t_row" = 5 ]; then t_word="$t_word $C_DIM.chat$C_OFF"; fi
-    printf '  %s%s   %s\n' "$t_line" "$C_OFF" "$t_word" >&"$T_FD"
+    if [ -n "$t_ai" ]; then
+      printf '  %s%s   %s  %s%s%s\n' "$t_line" "$C_OFF" "$t_word" "$C_ACC" "$t_ai" "$C_OFF" >&"$T_FD"
+    else
+      printf '  %s%s\n' "$t_line" "$C_OFF" >&"$T_FD"
+    fi
   done
   printf '\n' >&"$T_FD"
 }
@@ -809,19 +814,19 @@ t_tone() {
   case $T_DEPTH in
     24)
       case $2 in
-        0) t_n='0;61;130' ;; 1) t_n='0;99;209' ;; 2) t_n='70;147;232' ;; 3) t_n='140;195;255' ;;
-        4) t_n='198;225;255' ;; *) t_n='255;255;255' ;;
+        0) t_n='39;76;12' ;; 1) t_n='63;123;20' ;; 2) t_n='124;184;75' ;; 3) t_n='184;245;130' ;;
+        4) t_n='220;250;193' ;; *) t_n='255;255;255' ;;
       esac
       t_n="$1;2;$t_n"
       ;;
     256)
-      case $2 in 0) t_n=25 ;; 1) t_n=26 ;; 2) t_n=68 ;; 3) t_n=111 ;; 4) t_n=189 ;; *) t_n=231 ;; esac
+      case $2 in 0) t_n=22 ;; 1) t_n=64 ;; 2) t_n=107 ;; 3) t_n=156 ;; 4) t_n=194 ;; *) t_n=231 ;; esac
       t_n="$1;5;$t_n"
       ;;
     *)
-      # Blue for the deep tones, bright blue for the light ones, bright white for the eyes.
+      # Green for the deep tones, bright green for the light ones, bright white for the eyes.
       case $1$2 in
-        380 | 381) t_n=34 ;; 38w) t_n=97 ;; 38?) t_n=94 ;; 480 | 481) t_n=44 ;; 48w) t_n=107 ;; *) t_n=104 ;;
+        380 | 381) t_n=32 ;; 38w) t_n=97 ;; 38?) t_n=92 ;; 480 | 481) t_n=42 ;; 48w) t_n=107 ;; *) t_n=102 ;;
       esac
       ;;
   esac

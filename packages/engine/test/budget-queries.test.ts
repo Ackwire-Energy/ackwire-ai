@@ -1,5 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
-import { currentQueryCount } from "@agenteschat/db";
+import { currentQueryCount, eq, schema } from "@agenteschat/db";
 import {
   createChannel,
   createJobHandlers,
@@ -45,7 +45,7 @@ async function mentionRun(options: { askAgent?: boolean } = {}) {
     const said = await postPersonMessage(deps, f.owner.id, f.org.id, secret.id, { body: `Cofre ${n}` });
     const issue = await issueFromMessage(deps, f.owner.id, f.org.id, said.id);
     await updateIssue(deps, { type: "person", userId: f.owner.id }, f.org.id, issue.id, {
-      assignee: { type: "agent", id: f.agent.id },
+      assignees: [{ type: "agent", id: f.agent.id }],
     });
   }
   enableCaches();
@@ -68,7 +68,7 @@ async function mentionRun(options: { askAgent?: boolean } = {}) {
   expect(p.stages.map((s) => s.stage)).toEqual(["claim", "context", "model#1", "persist", "events"]);
   // Its status line is still picked, in a request of its own beside the run (ADR 0084 §8), counted in neither.
   await until(() => statusPicked.has(p.runId), "the run's status pick");
-  return { beforeModel, total: p.total.queries };
+  return { beforeModel, total: p.total.queries, runId: p.runId };
 }
 
 test("claim → model request stays within 18 statements; a whole mention run within 39", async () => {
@@ -98,7 +98,7 @@ test("claim → model request stays within 18 statements; a whole mention run wi
   expect(run.total).toBeLessThanOrEqual(39);
 });
 
-test("with tools, as every production run has them (find_agent among them): within 23 before the model call, 44 in all", async () => {
+test("with tools, as every production run has them (find_agent among them): within 24 before the model call, 46 in all", async () => {
   const run = await mentionRun({ askAgent: true });
   // 4 more, all for the tool list and the prompt: who is behind the run (2, the Tool Gateway's policy), the connectors
   // it lacks (1) and whether the person may talk to agents ("# Your team", 1, beside the context's other reads).
@@ -108,7 +108,8 @@ test("with tools, as every production run has them (find_agent among them): with
   // 21 with the background work in this conversation (ADR 0121).
   // 22 with the person's app language (ADR 0122).
   // 23 with the devices people connected (one statement the prompt's list and the tool lists share, `deviceRoster`).
-  expect(run.beforeModel).toBeLessThanOrEqual(23);
+  // 24 with what other agents already asked the person behind the message (ADR 0172; one statement, read beside them).
+  expect(run.beforeModel).toBeLessThanOrEqual(24);
   // 36: the browser profile release above, and the turn-end judge naming the teammates the person may reach (ADR 0109):
   // whether they may talk to agents, read again because a resumed run has no context of its own to carry it from.
   // Who is behind the run comes from the run in memory, and the calls it tried are read only when it made some.
@@ -116,5 +117,24 @@ test("with tools, as every production run has them (find_agent among them): with
   // 42 with the secrets above and the finished turn's learning reads (ADR 0120).
   // 43 with the background work read before the model call above.
   // 44 with the app language read before the model call above.
-  expect(run.total).toBeLessThanOrEqual(44);
+  // 45 with what already waits on the person, read before the model call above.
+  // 46 with the agent's approvals level, read fresh where its tools are listed (ADR 0173).
+  expect(run.total).toBeLessThanOrEqual(46);
+});
+
+test("the run keeps its stage profile in its transcript, for the operator's analytics, and adds no step", async () => {
+  const run = await mentionRun();
+  const [row] = await f.db
+    .select({ transcript: schema.agentRuns.transcript })
+    .from(schema.agentRuns)
+    .where(eq(schema.agentRuns.id, run.runId));
+  const kept = row?.transcript?.profiles as { stages: StageTiming[] }[] | undefined;
+  expect(kept?.map((p) => p.stages.map((s) => s.stage))).toEqual([
+    ["claim", "context", "model#1", "persist", "events"],
+  ]);
+  const steps = await f.db
+    .select({ data: schema.agentRunSteps.data })
+    .from(schema.agentRunSteps)
+    .where(eq(schema.agentRunSteps.runId, run.runId));
+  expect(steps.some((s) => "profile" in s.data)).toBe(false);
 });

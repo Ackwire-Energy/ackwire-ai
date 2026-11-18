@@ -5,7 +5,7 @@ import { applyMembershipEvent, applyWorkspaceEvent, readUnknownMembers } from ".
 
 const stale = (qc: QueryClient, key: readonly unknown[]) => qc.getQueryState(key)?.isInvalidated;
 
-test("agents.changed: the team's lists, the DMs that name them and the open agent's page are read again", () => {
+test("agents.changed: the team's lists, the DMs that name them, the open agent's page and its skills are read again", () => {
   const qc = new QueryClient();
   const lists = [
     keys.agents("o1"),
@@ -13,6 +13,8 @@ test("agents.changed: the team's lists, the DMs that name them and the open agen
     keys.dms("o1"),
     keys.team("o1"),
     keys.agentDetail("o1", "a1"),
+    keys.skills("o1"),
+    keys.agentSkills("o1", "a1"),
   ];
   for (const key of lists) qc.setQueryData(key, []);
   qc.setQueryData(keys.agents("o2"), []);

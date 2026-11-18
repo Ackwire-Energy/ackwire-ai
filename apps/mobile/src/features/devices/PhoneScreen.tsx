@@ -1,14 +1,16 @@
 import { computerName } from "@agenteschat/client/lib/computer";
-import { personInControl } from "@agenteschat/client/lib/devices";
+import { iphoneOverWifi, personInControl } from "@agenteschat/client/lib/devices";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Platform, StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { EmptyState, GroupedFooter, GroupedList, GroupedRow, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
+import { RowBones } from "../roles/parts";
 import { confirmAction, Gap, SettingsPage } from "../settings/parts";
-import { useColors, useMeId } from "../shared/hooks";
+import { LoadFailed } from "../shared/FirstUse";
+import { useMeId } from "../shared/hooks";
 import { goBack } from "../shared/parts";
 import { openThisPhone } from "./DevicesScreen";
 import { findDevice, phoneFacts } from "./logic";
@@ -23,7 +25,6 @@ import { useDeviceMutation, useDevices } from "./queries";
  */
 export function PhoneScreen({ phoneId }: { phoneId: string }) {
   const { t } = useTranslation();
-  const c = useColors();
   const toast = useToast();
   const { org } = useOrg();
   const meId = useMeId();
@@ -37,11 +38,18 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
     return (
       <SettingsPage title={t("mobile.devices.title")}>
         {list.isLoading ? (
-          <ActivityIndicator color={c.muted} style={styles.loading} />
+          // The rows' shape while they load: nothing jumps when they come.
+          <>
+            <Gap />
+            <GroupedList>
+              <RowBones />
+              <RowBones name={56} />
+            </GroupedList>
+          </>
+        ) : list.isError && !list.data ? (
+          <LoadFailed onRetry={() => void list.refetch()} />
         ) : (
-          <View style={styles.missing}>
-            <EmptyState title={t("mobile.devices.page.notFound")} subtitle={t("mobile.devices.page.notFoundText")} />
-          </View>
+          <EmptyState title={t("mobile.devices.page.notFound")} subtitle={t("mobile.devices.page.notFoundText")} />
         )}
       </SettingsPage>
     );
@@ -62,16 +70,25 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
   // The guide is for the phone in hand: an iPhone's steps on an iPhone, Android's on Android.
   const guide =
     s.kind === "needs_you" && (Platform.OS === "ios") === (p.platform === "ios") && p.phoneKind === "device";
+  // An iPhone over Wi-Fi is let go, not forgotten: it comes back only if picked again.
+  const wifi = iphoneOverWifi(p);
   const askForget = () =>
     confirmAction({
-      title: t("mobile.devices.page.forgetTitle", { name: p.name }),
-      text: t("mobile.devices.page.forgetText", { host }),
-      action: t("mobile.devices.page.forget"),
+      title: wifi
+        ? t("mobile.devices.iphone.wifi.stopTitle", { name: p.name })
+        : t("mobile.devices.page.forgetTitle", { name: p.name }),
+      text: wifi ? t("mobile.devices.iphone.wifi.stopText", { host }) : t("mobile.devices.page.forgetText", { host }),
+      action: wifi ? t("mobile.devices.iphone.wifi.stop") : t("mobile.devices.page.forget"),
       cancel: t("common.cancel"),
       onConfirm: () =>
         forget.mutate(p.id, {
           onSuccess: () => {
-            toast({ title: t("mobile.devices.page.forgotten", { name: p.name }), icon: "check" });
+            toast({
+              title: wifi
+                ? t("mobile.devices.iphone.wifi.stopped", { name: p.name })
+                : t("mobile.devices.page.forgotten", { name: p.name }),
+              icon: "check",
+            });
             goBack();
           },
           onError: (err) => toast({ title: errorText(t, err), icon: "x" }),
@@ -150,7 +167,7 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
             {p.mayManage ? (
               <GroupedRow
                 icon="x"
-                label={t("mobile.devices.page.forget")}
+                label={wifi ? t("mobile.devices.iphone.wifi.stop") : t("mobile.devices.page.forget")}
                 danger
                 disabled={forget.isPending}
                 onPress={askForget}
@@ -164,8 +181,6 @@ export function PhoneScreen({ phoneId }: { phoneId: string }) {
 }
 
 const styles = StyleSheet.create({
-  loading: { marginVertical: 16 },
-  missing: { paddingTop: 40 },
   head: { alignItems: "center", gap: 8, paddingTop: 10, paddingBottom: 6, paddingHorizontal: 8 },
   center: { textAlign: "center" },
 });

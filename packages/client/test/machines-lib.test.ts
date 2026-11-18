@@ -9,6 +9,11 @@ import {
   allowFolderCommand,
   allowsInApp,
   beginLogin,
+  brainTool,
+  browserNoAnswerMessage,
+  browserOffMessage,
+  cliInstallFailure,
+  cliOneClick,
   commandInReason,
   computerKind,
   computerState,
@@ -18,23 +23,32 @@ import {
   foldersOfAgent,
   formatUserCode,
   freeDuplicate,
+  geminiNotShared,
+  installableCli,
   installCommand,
   isHandheld,
   isPaused,
+  isUrlWithoutCode,
   LOGIN_RECONNECT_MS,
   LoginReadError,
   locationText,
+  loginFailureLine,
   loginRead,
   loginReadPasses,
   machineReasonText,
   normalizeUserCode,
+  oneClickTerminal,
   otherThanHint,
+  pausedByText,
+  pauseUntil,
   platformOf,
+  profileRefusalLine,
+  profileToolOff,
   sharedFolderFacts,
   sharedFolderOf,
   shellQuote,
-  toolOffReason,
   toolOnCommand,
+  toolOneClick,
 } from "../src/lib/machines";
 import { openTarget, workspaceHeadline } from "../src/lib/notifications";
 import { accessOf, applyComputerEvent, applyMachineEvent, pauseOf } from "../src/realtime/machines";
@@ -126,6 +140,13 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(isPaused({ paused: null })).toBe(false);
     expect(pauseOf({ paused: false, until: "x" })).toEqual({ paused: false });
     expect(pauseOf("yes")).toBeUndefined();
+    // Who paused it from the apps comes along only when the event says so.
+    expect(pauseOf({ until: null, by: { id: "u1", name: "Ana" } })).toEqual({
+      paused: true,
+      until: null,
+      by: { id: "u1", name: "Ana" },
+    });
+    expect(pauseOf({ until: null, by: "u1" })).toEqual({ paused: true, until: null });
     expect(accessOf(null)).toBeNull();
     expect(accessOf({ folders: "no" })).toBeUndefined();
   });
@@ -160,7 +181,7 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect([android, iphone, linux, mac].map(isHandheld)).toEqual([true, true, false, false]);
   });
 
-  test("a tool turned off: the app's Preferences on a Mac or a PC, the command too elsewhere (sudo in system mode)", () => {
+  test("a tool turned off: its command (sudo in system mode), the app only on a Mac or a PC, a brain's switch by name", () => {
     expect(toolOnCommand({ mode: "single" }, "browser")).toBe("agentes-runner tools enable browser");
     expect(toolOnCommand({ mode: "system" }, "desktop")).toBe("sudo agentes-runner tools enable desktop");
     expect([allowsInApp("darwin"), allowsInApp("windows"), allowsInApp("linux"), allowsInApp("other")]).toEqual([
@@ -169,18 +190,8 @@ describe("connected computers helpers (ADR 0036)", () => {
       false,
       false,
     ]);
-    expect(toolOffReason({ os: "darwin", mode: "single" }, "claude_code")).toEqual({
-      key: "brain.reasons.tool_off",
-      command: "",
-    });
-    expect(toolOffReason({ os: "windows", mode: "single" }, "codex").key).toBe("brain.reasons.tool_off");
-    expect(toolOffReason({ os: "linux", mode: "system" }, "claude_code")).toEqual({
-      key: "brain.reasons.tool_offLinux",
-      command: "sudo agentes-runner tools enable claude",
-    });
-    expect(toolOffReason({ os: "linux", mode: "single" }, "codex").command).toBe("agentes-runner tools enable codex");
-    // Not known yet: the app's line, as before.
-    expect(toolOffReason(undefined, "codex").key).toBe("brain.reasons.tool_off");
+    expect(brainTool("claude_code")).toBe("claude");
+    expect(brainTool("opencode")).toBe("opencode");
   });
 
   test("portraits: the kind from the machine's os, the state with pause over online", () => {
@@ -252,6 +263,47 @@ describe("connected computers helpers (ADR 0036)", () => {
     applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
     applyComputerEvent(qc, "o1", { type: "agent.computer", agentId: "a1" } as { type: string });
     expect(qc.getQueryState(picture)?.isInvalidated).toBe(false);
+  });
+
+  test("a computer in standby going quiet reads online still; its hello ends the standby", () => {
+    const qc = new QueryClient();
+    const list = keys.machines("o1");
+    qc.setQueryData(list, [{ id: "m1", kind: "managed", online: true, standby: true, lastSeenAt: null }]);
+    const m1 = () => (qc.getQueryData(list) as { online: boolean; standby: boolean }[])[0];
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+    expect(m1()).toMatchObject({ online: true, standby: true });
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: true } as { type: string });
+    expect(m1()).toMatchObject({ online: true, standby: false });
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+    expect(m1()?.online).toBe(false);
+  });
+
+  test("put in standby after it went quiet: the list and its agents' computer read online again", () => {
+    const qc = new QueryClient();
+    const list = keys.machines("o1");
+    const target = keys.computers("o1");
+    qc.setQueryData(list, [{ id: "m1", kind: "managed", online: true, standby: false, lastSeenAt: null }]);
+    qc.setQueryData(target, { target: { kind: "machine", machineId: "m1", name: "Box", online: true } });
+    const m1 = () => (qc.getQueryData(list) as { online: boolean; standby: boolean }[])[0];
+    const t1 = () => (qc.getQueryData(target) as { target: { online: boolean } }).target;
+    applyMachineEvent(qc, "o1", { type: "machine.status", machineId: "m1", online: false } as { type: string });
+    expect(m1()?.online).toBe(false);
+    expect(t1().online).toBe(false);
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", standby: true } as { type: string });
+    expect(m1()).toMatchObject({ online: true, standby: true });
+    expect(t1().online).toBe(true);
+  });
+
+  test("a wake that failed (or the standby taken back): no longer waking, and the list and its agents' computer refetch", () => {
+    const qc = new QueryClient();
+    const list = keys.machines("o1");
+    const target = keys.computers("o1");
+    qc.setQueryData(list, [{ id: "m1", kind: "managed", online: true, standby: true, lastSeenAt: null }]);
+    qc.setQueryData(target, { target: { kind: "machine", machineId: "m1", name: "Box", online: true } });
+    applyMachineEvent(qc, "o1", { type: "machine.updated", machineId: "m1", standby: false } as { type: string });
+    expect((qc.getQueryData(list) as { standby: boolean }[])[0]?.standby).toBe(false);
+    expect(qc.getQueryState(list)?.isInvalidated).toBe(true);
+    expect(qc.getQueryState(target)?.isInvalidated).toBe(true);
   });
 
   test("a plan's usage moving on a computer refetches the agent list, which carries each plan's limits", () => {
@@ -327,6 +379,15 @@ describe("connected computers helpers (ADR 0036)", () => {
     expect(freeDuplicate(failed({ label: "Claude Max" }))).toBeNull();
     expect(freeDuplicate({ state: "failed" })).toBeNull();
     expect(freeDuplicate(undefined)).toBeNull();
+  });
+
+  test("a Gemini sign-in the computer couldn't share with every agent: trying again ends the same way", () => {
+    expect(geminiNotShared("antigravity", { state: "failed", code: "not_kept" })).toBe(true);
+    // Claude's token the computer couldn't write, and Gemini's other failures, may pass on another try.
+    expect(geminiNotShared("claude_code", { state: "failed", code: "not_kept" })).toBe(false);
+    expect(geminiNotShared("antigravity", { state: "failed", code: "bad_code" })).toBe(false);
+    expect(geminiNotShared("antigravity", { state: "failed" })).toBe(false);
+    expect(geminiNotShared("antigravity", undefined)).toBe(false);
   });
 
   test("a new sign-in is another account only when its hint named a different email", () => {
@@ -456,5 +517,179 @@ describe("the shared folder (ADR 0115)", () => {
       'machines.shared.size{"size":"3.2 GB"} · machines.shared.free{"free":"43 GB"}',
     );
     expect(sharedFolderFacts(t, "en", null)).toBe("machines.shared.measuring");
+  });
+
+  test("why a sign-in ended: a line per code, the CLI's words under three of them, none when canceled", () => {
+    const add = "agentPage.work.brain.add";
+    const worded = [
+      "not_installed",
+      "no_tty",
+      "network",
+      "bad_code",
+      "cli_exit",
+      "not_signed_in_after_login",
+      "status_unknown",
+      "no_token",
+      "not_kept",
+      "sandbox",
+    ];
+    for (const code of worded) {
+      expect(loginFailureLine(code)).toEqual({
+        key: `${add}.why.${code}`,
+        detail: code === "cli_exit" || code === "not_signed_in_after_login" || code === "sandbox",
+      } as never);
+    }
+    // Too long is what an expired sign-in already says.
+    expect(loginFailureLine("timeout")).toEqual({ key: `${add}.expired`, detail: false });
+    expect(loginFailureLine("canceled")).toEqual({ key: null, detail: false });
+    // An older runner sends no code, a newer one may send one this app doesn't know: the plain line.
+    for (const code of [undefined, null, "", "something_new", "toString"]) {
+      expect(loginFailureLine(code)).toEqual({ key: `${add}.failed`, detail: false });
+    }
+  });
+
+  test("a pasted address without a code is told from a code and from an address that carries one", () => {
+    for (const url of [
+      "https://example.com/oauth-callback",
+      " https://example.com/oauth-callback?state=abc ",
+      "http://localhost:8085/?code=",
+      "HTTPS://example.com/#code=4/0Afake",
+      "https://",
+    ]) {
+      expect(isUrlWithoutCode(url)).toBe(true);
+    }
+    for (const ok of [
+      "",
+      "4/0AfakeCode",
+      "https://example.com/callback?code=4%2F0Afake&state=abc",
+      "code=abc",
+      "http",
+    ]) {
+      expect(isUrlWithoutCode(ok)).toBe(false);
+    }
+  });
+});
+
+describe("pausing from the apps", () => {
+  test("an hour, tomorrow at 9:00 local time, or until resumed", () => {
+    const now = new Date(2026, 10, 11, 15, 30);
+    expect(pauseUntil("1h", now)).toBe(new Date(2026, 10, 11, 16, 30).toISOString());
+    expect(pauseUntil("tomorrow", now)).toBe(new Date(2026, 10, 12, 9, 0).toISOString());
+    expect(pauseUntil("manual", now)).toBeNull();
+  });
+
+  test("the line says who paused it, and nothing for a pause on the computer", () => {
+    const t = ((key: string, o?: Record<string, unknown>) => `${key}${o ? JSON.stringify(o) : ""}`) as never;
+    expect(pausedByText(t, "en", { until: null }, "u1")).toBeNull();
+    expect(pausedByText(t, "en", { until: null, by: { id: "u1", name: "Ana" } }, "u1")).toBe(
+      "machines.remotePause.byYou",
+    );
+    expect(pausedByText(t, "en", { until: null, by: { id: "u2", name: "Bia" } }, "u1")).toBe(
+      'machines.remotePause.byName{"name":"Bia"}',
+    );
+  });
+});
+
+describe("one click where a tool is off (ADR 0036 §8)", () => {
+  const bia = { id: "u-bia", name: "Bia Rocha" };
+  const mac = { kind: "connected", pairedBy: bia, accessAllow: true } as Pick<
+    Machine,
+    "kind" | "pairedBy" | "accessAllow"
+  >;
+
+  test("whoever connected it turns it on; anyone else asks them; an old app updates first; the Cloud's never", () => {
+    expect(toolOneClick(mac, "u-bia")).toEqual({ kind: "allow" });
+    expect(toolOneClick({ ...mac, accessAllow: false }, "u-bia")).toEqual({ kind: "outdated" });
+    expect(toolOneClick(mac, "u-caio")).toEqual({ kind: "ask", ownerId: "u-bia", ownerName: "Bia Rocha" });
+    expect(toolOneClick({ ...mac, kind: "managed" }, "u-bia")).toBeNull();
+    expect(toolOneClick({ ...mac, pairedBy: null }, "u-caio")).toBeNull();
+    expect(toolOneClick(null, "u-bia")).toBeNull();
+  });
+
+  test("a coding CLI: whoever connected it installs it, anyone else asks, never where no installer runs", () => {
+    const pc = { kind: "connected", pairedBy: bia, cliInstall: true, os: "windows", mode: "single" } as Pick<
+      Machine,
+      "kind" | "pairedBy" | "cliInstall" | "os" | "mode"
+    >;
+    expect(cliOneClick(pc, "u-bia", "claude")).toEqual({ kind: "allow" });
+    expect(cliOneClick({ ...pc, cliInstall: false }, "u-bia", "claude")).toEqual({ kind: "outdated" });
+    expect(cliOneClick(pc, "u-caio", "claude")).toEqual({ kind: "ask", ownerId: "u-bia", ownerName: "Bia Rocha" });
+    // OpenAI's Windows build has no installer of its own; root's agents get theirs from the computer's setup.
+    expect(cliOneClick(pc, "u-bia", "codex")).toBeNull();
+    expect(cliOneClick({ ...pc, os: "darwin" }, "u-bia", "codex")).toEqual({ kind: "allow" });
+    expect(cliOneClick({ ...pc, os: "linux", mode: "system" }, "u-bia", "claude")).toBeNull();
+    expect(cliOneClick({ ...pc, kind: "managed" }, "u-bia", "claude")).toBeNull();
+    expect(installableCli("claude_code")).toBe("claude");
+    const words = { program: "Claude Code", computer: "PC" };
+    const said = (k: string, v?: Record<string, unknown>) => `${k} ${JSON.stringify(v)}`;
+    const t = said as unknown as Parameters<typeof cliInstallFailure>[0];
+    expect(cliInstallFailure(t, { tool: "claude", state: "running" }, words)).toBeNull();
+    expect(cliInstallFailure(t, { tool: "claude", state: "failed", cause: "git_missing" }, words)).toContain(
+      "connectAi.cli.gitMissing",
+    );
+    expect(cliInstallFailure(t, { tool: "claude", state: "failed", message: "curl: (6)" }, words)).toBe(
+      'connectAi.cli.failed {"computer":"PC","message":"curl: (6)"}',
+    );
+    expect(installableCli("cursor")).toBeNull();
+  });
+
+  test("Prefiro no Terminal: the same switches as one command, only for who turns them on, where there may be no app", () => {
+    const linux: Pick<Machine, "mode" | "os"> = { mode: "single", os: "linux" };
+    expect(oneClickTerminal(linux, { kind: "allow" }, ["desktop", "commands"])).toBe(
+      "agentes-runner tools enable desktop && agentes-runner tools enable commands",
+    );
+    expect(oneClickTerminal({ ...linux, mode: "system" }, { kind: "allow" }, ["browser"])).toBe(
+      "sudo agentes-runner tools enable browser",
+    );
+    expect(oneClickTerminal({ ...linux, os: "darwin" }, { kind: "allow" }, ["browser"])).toBeNull();
+    expect(oneClickTerminal(linux, { kind: "ask", ownerId: "u-bia", ownerName: "Bia" }, ["browser"])).toBeNull();
+    expect(oneClickTerminal(linux, { kind: "allow" }, [])).toBeNull();
+  });
+
+  test("a refused Fazer login reads its cause and what this person can do", () => {
+    const t = ((key: string, o?: Record<string, unknown>) => `${key}${o ? JSON.stringify(o) : ""}`) as never;
+    const off = (params: Record<string, unknown>) =>
+      new ApiError(400, "browser_profile.tool_off", "The browser is turned off on Mac", {
+        machineId: "m1",
+        machineName: "Bia's Mac",
+        tool: "browser",
+        ...params,
+      });
+    expect(profileToolOff(off({ mayAllow: true }))).toEqual({
+      machineId: "m1",
+      machineName: "Bia's Mac",
+      tool: "browser",
+      oneClick: { kind: "allow" },
+    });
+    expect(profileToolOff(off({ outdated: true }))?.oneClick).toEqual({ kind: "outdated" });
+    const ask = off({ ownerId: "u-bia", ownerName: "Bia Rocha" });
+    expect(profileToolOff(ask)?.oneClick).toEqual({ kind: "ask", ownerId: "u-bia", ownerName: "Bia Rocha" });
+    expect(profileRefusalLine(t, ask)).toBe('browser.profiles.toolOffOther{"name":"Bia"}');
+    expect(profileRefusalLine(t, off({ mayAllow: true }))).toBe("browser.profiles.toolOff");
+    const other = new ApiError(400, "browser_profile.unavailable", "Chrome isn't installed", { machineName: "Mac" });
+    expect(profileToolOff(other)).toBeNull();
+    expect(profileRefusalLine(t, other)).toBe('browser.profiles.notOpened{"machine":"Mac"}');
+    expect(profileRefusalLine(t, new ApiError(409, "browser_profile.busy", "busy"))).toBe("browser.profiles.busy");
+    expect(profileToolOff(new Error("boom"))).toBeNull();
+  });
+
+  test("the runner's refusal of a browser that is off is read in every runner version's words", () => {
+    expect(
+      browserOffMessage("Browser is turned off on this computer (its owner can turn it on from agentes.chat)"),
+    ).toBe(true);
+    expect(
+      browserOffMessage(
+        "Browser is turned off on this computer (its owner can turn it on in the agentes app (Preferences > Tools))",
+      ),
+    ).toBe(true);
+    expect(browserOffMessage("The browser is turned off on this computer")).toBe(true);
+    expect(browserOffMessage("Too many browsers are open")).toBe(false);
+    expect(browserOffMessage(undefined)).toBe(false);
+  });
+
+  test("the runner's own timeout is told apart from the computer's", () => {
+    expect(browserNoAnswerMessage("The browser didn't answer within 15 s")).toBe(true);
+    expect(browserNoAnswerMessage("the computer Desk did not answer within 120 s")).toBe(false);
+    expect(browserNoAnswerMessage(null)).toBe(false);
   });
 });

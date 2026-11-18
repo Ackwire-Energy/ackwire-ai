@@ -12,6 +12,7 @@ import type {
 import { useVaultItem } from "@agenteschat/client";
 import { relativeTime } from "@agenteschat/client/lib/format";
 import { MAX_SECRET_BYTES } from "@agenteschat/client/lib/secret-box";
+import { canMoveVaultItem } from "@agenteschat/client/lib/vault";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Button,
@@ -374,7 +375,7 @@ function SecretValue({
         )}
         <span className="vlt-secret__acts">
           {canChange && (
-            <Button size="sm" variant="ghost" icon="edit" onClick={() => onValue("")}>
+            <Button variant="link" onClick={() => onValue("")}>
               {item.hasSecret ? t("vault.item.change") : t("vault.item.add")}
             </Button>
           )}
@@ -457,6 +458,7 @@ export function VaultItemDialog({
       usesFailed={detail.isError}
       fieldsPending={fieldsPending}
       unreadable={detail.data?.unreadable === true}
+      movable={canMoveVaultItem(item, overview.canManageTeam)}
       connection={connection}
       onClose={onClose}
     />
@@ -470,6 +472,7 @@ function ItemDialog({
   usesFailed,
   fieldsPending,
   unreadable,
+  movable,
   connection,
   onClose,
 }: {
@@ -482,6 +485,8 @@ function ItemDialog({
   fieldsPending: boolean;
   /** A contact whose saved fields can't be read on the server: who manages it types them again. */
   unreadable: boolean;
+  /** This person may move it between Personal and Team. */
+  movable: boolean;
   connection: VaultConnection | undefined;
   onClose: () => void;
 }) {
@@ -495,6 +500,9 @@ function ItemDialog({
   const [secret, setSecret] = useState<string | null>(null);
   const [tried, setTried] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [moving, setMoving] = useState(false);
+  const moveTo: VaultScope = item.scope === "team" ? "personal" : "team";
+  const moveLabel = moveTo === "team" ? t(modeKey(org, "vault.move.toTeam")) : t("vault.move.toPersonal");
   const patch = patchOf(item, draft, secret, external);
   const dirty = Object.keys(patch).length > 0;
   const errors = tried ? draftErrors(t, item.kind, draft, secret ?? undefined, secret !== null) : {};
@@ -516,6 +524,12 @@ function ItemDialog({
   const follow = async (on: boolean) => {
     const saved = await actions.update(item.id, on ? { accessFromConnection: true } : { access: item.access });
     if (saved) toast.show(t("vault.access.saved"));
+  };
+  const move = async () => {
+    if (!(await actions.move(item.id, moveTo))) return;
+    setMoving(false);
+    toast.show(t("vault.move.moved"));
+    onClose();
   };
   const remove = async () => {
     if (!(await actions.remove(item.id))) return;
@@ -608,6 +622,11 @@ function ItemDialog({
           <aside className="vlt-aside">
             <DetailsSection title={t("vault.access.title")}>
               <ScopeLine scope={item.scope} />
+              {movable && (
+                <Button size="sm" className="vlt-move" disabled={actions.moving} onClick={() => setMoving(true)}>
+                  {moveLabel}
+                </Button>
+              )}
               <AccessBlock
                 scope={item.scope}
                 access={item.access}
@@ -651,6 +670,21 @@ function ItemDialog({
           </aside>
         </Locked>
       </div>
+      <Dialog
+        open={moving}
+        onOpenChange={setMoving}
+        title={t("vault.move.title", { title: item.title })}
+        description={t(moveTo === "team" ? "vault.move.toTeamText" : "vault.move.toPersonalText")}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setMoving(false)}>{t("common.cancel")}</Button>
+          <Button variant="primary" loading={actions.moving} disabled={actions.moving} onClick={() => void move()}>
+            {moveLabel}
+          </Button>
+        </DialogFooter>
+      </Dialog>
       <Dialog
         open={deleting}
         onOpenChange={setDeleting}

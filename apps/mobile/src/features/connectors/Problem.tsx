@@ -16,7 +16,7 @@ export function Problem({ text }: { text: string }) {
         {/* The page's own color on the red: white on dark's light red was hard to read. */}
         <Icon name="x" size={16} color={colors.bg} />
       </View>
-      <Text variant="small" style={styles.grow}>
+      <Text variant="small" style={styles.text}>
         {text}
       </Text>
     </Animated.View>
@@ -24,11 +24,12 @@ export function Problem({ text }: { text: string }) {
 }
 
 const styles = StyleSheet.create({
-  grow: { flex: 1, minWidth: 0 },
+  // The words wrap: their first line sits at the badge's middle (4 points down), the badge never at theirs.
+  text: { flex: 1, minWidth: 0, paddingTop: 4 },
   // A neutral card with a colored badge, as the sheet's other outcomes.
   notice: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 12,
     padding: 12,
     borderRadius: 14,

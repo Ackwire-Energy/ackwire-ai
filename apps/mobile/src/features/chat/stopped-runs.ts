@@ -47,3 +47,14 @@ export function useStoppedRun(runId: string | null | undefined): StoppedRun | nu
   const runs = useContext(StoppedRunsContext);
   return (runId && runs.get(runId)) || null;
 }
+
+/** What redraws the rows that read which stops are over: one more or one fewer, never every new message. */
+export const movedOnKey = (runs: ReadonlySet<string>) => [...runs].sort().join(" ");
+
+const NO_RUNS: ReadonlySet<string> = new Set();
+
+/** The stopped runs whose agent went on here (`stopsMovedOn`): it works now, or wrote again after the stop. */
+export const StopsMovedOnContext = createContext<ReadonlySet<string>>(NO_RUNS);
+
+/** Whether a stopped run has nothing left for "Continue" in this conversation. */
+export const useStopMovedOn = (runId: string) => useContext(StopsMovedOnContext).has(runId);

@@ -5,11 +5,14 @@ import { type McpConnect, mcpSessionOver } from "../src";
 
 /**
  * An in-process MCP server shaped like GitHub's (no network). Records every
- * call and the auth headers each session was opened with.
+ * call, the auth headers each session was opened with, and every request a
+ * session sent as it left (`requests`: the handshake and listings too, each
+ * with its `params._meta`).
  */
 export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean } = {}) {
   const calls: { tool: string; args: Record<string, unknown> }[] = [];
   const sessions: { serverUrl: string; headers: Record<string, string> }[] = [];
+  const requests: { method: string; params?: Record<string, unknown> }[] = [];
   const pr = { owner: z.string(), repo: z.string(), pullNumber: z.number().int() };
 
   const build = () => {
@@ -20,7 +23,10 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
     });
     server.registerTool(
       "merge_pull_request",
-      { description: "Merge a pull request", inputSchema: { ...pr, merge_method: z.string().optional() } },
+      {
+        description: "Merge a pull request",
+        inputSchema: { ...pr, merge_method: z.string().optional(), commit_message: z.string().optional() },
+      },
       async (args) => {
         calls.push({ tool: "merge_pull_request", args });
         return { content: [{ type: "text", text: `Merged PR #${args.pullNumber}` }] };
@@ -71,6 +77,13 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
           body: z.string().optional(),
         },
         push_files: { ...repo, branch: z.string(), files: z.array(z.unknown()), message: z.string() },
+        create_or_update_file: {
+          ...repo,
+          branch: z.string(),
+          path: z.string(),
+          content: z.string(),
+          message: z.string(),
+        },
         list_issue_types: { owner: z.string() },
         projects_list: { owner: z.string() },
         label_write: { ...repo, method: z.string(), name: z.string() },
@@ -105,8 +118,13 @@ export function fakeGithubMcp(options: { issueWrite?: boolean; writes?: boolean 
   const connect: McpConnect = async (connection, headers) => {
     sessions.push({ serverUrl: connection.serverUrl, headers });
     const [client, server] = InMemoryTransport.createLinkedPair();
+    const send = client.send.bind(client);
+    client.send = (message, options) => {
+      if ("method" in message) requests.push({ method: message.method, params: message.params });
+      return send(message, options);
+    };
     await build().connect(server);
     return mcpSessionOver(client);
   };
-  return { connect, calls, sessions };
+  return { connect, calls, sessions, requests };
 }

@@ -254,7 +254,7 @@ test("approvals API: the right hand approves for me, within what I set (ADR 0139
     newAgents: true,
     agentChanges: true,
     budgetCapNanoUsd: 20_000_000_000,
-    mayDecide: { newAgents: false },
+    mayDecide: { newAgents: true, agentChanges: false },
     caps: { decisionsPerDay: 10, newAgentsPerDay: 2, monthNanoUsd: 50_000_000_000 },
   });
   expect((await ana(path, { method: "PUT", json: { budgetCapNanoUsd: 60_000_000_000 } })).status).toBe(400);

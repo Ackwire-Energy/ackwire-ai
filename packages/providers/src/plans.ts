@@ -51,6 +51,8 @@ export interface PlanModel {
   needs?: PlanModelNeed;
   /** It costs nothing on the plan (its maker's list prices it at 0): the pickers mark it "Free". */
   free?: true;
+  /** It reads text only (no images or PDFs): the pickers say so, and an agent that must see screenshots needs another. */
+  images?: false;
   /**
    * Who makes it, on a plan that sells several makers' models (the picker groups them): an API provider's id
    * (`@agenteschat/providers`: its name and logo), else the maker's name.
@@ -181,13 +183,14 @@ export const CODING_PLANS = {
         { id: "qwen3.8-max", label: "Qwen3.8 Max", tag: "smart", maker: "Alibaba" },
         { id: "qwen3.8-flash", label: "Qwen3.8 Flash", tag: "cheap", maker: "Alibaba" },
         { id: "qwen3.7-plus", label: "Qwen3.7 Plus", tag: "cheap", maker: "Alibaba" },
-        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", needs: "globalRegion", maker: "deepseek" },
+        { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro", needs: "globalRegion", maker: "deepseek", images: false },
         {
           id: "deepseek-v4.1-flash",
           label: "DeepSeek V4.1 Flash",
           tag: "cheap",
           needs: "globalRegion",
           maker: "deepseek",
+          images: false,
         },
         { id: "mimo-v2.6-pro", label: "MiMo V2.6 Pro", maker: "Xiaomi" },
         { id: "mimo-v2.6-flash", label: "MiMo V2.6 Flash", tag: "cheap", maker: "Xiaomi" },
@@ -331,6 +334,7 @@ export function readPlanModels(plan: CodingPlan, body: unknown): PlanModel[] {
     const free = raw.cost?.text?.input?.price === 0 && raw.cost.text.output?.price === 0;
     const trains = /contributor/i.test(id) ? (free ? "freeTraining" : "paidTraining") : undefined;
     const needs = known?.needs ?? (maker === "deepseek" ? "globalRegion" : trains);
+    const textOnly = known ? known.images === false : maker === "deepseek";
     const name = typeof raw.name === "string" ? raw.name.trim() : "";
     listed.set(id, {
       id,
@@ -340,6 +344,7 @@ export function readPlanModels(plan: CodingPlan, body: unknown): PlanModel[] {
       ...(known?.tag ? { tag: known.tag } : {}),
       ...(needs ? { needs } : {}),
       ...(free ? { free } : {}),
+      ...(textOnly ? { images: false as const } : {}),
     });
   }
   if (listed.size === 0) return [];
@@ -400,14 +405,15 @@ export function ownLimitsModel(provider: unknown, value: string | null | undefin
   return plan?.limitsPerModel && value ? planModel(plan, value) : null;
 }
 
-/** How long a model's own limit with no known reset (or the region it needs, or its refusal) holds once seen: then a turn asks again. */
+/** How long a model's own limit with no known reset (or no subscription) holds once seen: then a turn asks again. */
 export const MODEL_LIMIT_HOLD_MS = 30 * 60_000;
 
 /**
  * The model's own limit in `models` (`PlanUsage.models`, kept by the server) that still holds: until its reset, else
  * `MODEL_LIMIT_HOLD_MS` after it was seen. `region`: it needs the account's Global region; `off`: the plan refused it
- * for this key (the model or the account turned off there); `inactive`: the key's workspace has no active
- * subscription, which every model of the plan answers the same way.
+ * for this key (the model or the account turned off there); both hold until something changes (a new key, someone
+ * choosing the model again, a turn on it going through), since asking again only gets the same refusal. `inactive`:
+ * the key's workspace has no active subscription, which every model of the plan answers the same way.
  */
 export function modelLimitOf(
   models:
@@ -420,7 +426,9 @@ export function modelLimitOf(
   if (!l) return null;
   const until = l.until ? Date.parse(l.until) : Number.NaN;
   if (until > now) return { until, region: false, off: false, inactive: false };
-  return !l.until && now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS
+  if (l.until) return null;
+  const fixed = l.region === true || l.off === true;
+  return fixed || now - Date.parse(l.at) < MODEL_LIMIT_HOLD_MS
     ? { until: null, region: l.region === true, off: l.off === true, inactive: l.inactive === true }
     : null;
 }
@@ -440,8 +448,9 @@ export const PLAN_INACTIVE_TEXT = /Account\.Disabled|active (?:OpenCode )?Go sub
 
 /**
  * What "Automático" runs for `value` (an alias, or `auto`) on a plan whose models have limits of their own: the model
- * it maps to, unless that one is held now (`modelLimitOf`), then the model that last answered with this key
- * (`answered`, kept by the server) while that one isn't. Anything else stays as it is.
+ * it maps to, unless that one is held now (`modelLimitOf`); then the model that last answered with this key
+ * (`answered`, kept by the server) while that one isn't; else the plan's first model tagged cheap or smart that needs
+ * nothing from the account and isn't held. Anything else stays as it is.
  */
 export function autoPlanModel(
   provider: unknown,
@@ -450,12 +459,14 @@ export function autoPlanModel(
   now = Date.now(),
 ): string | undefined {
   const own = ownLimitsModel(provider, value);
-  const answered = usage?.answered;
   const held = own ? modelLimitOf(usage?.models, own.id, now) : null;
   // No active subscription refuses every model alike: another one would only be refused too.
-  if (!own || !answered || answered === own.id || !held || held.inactive) return value;
-  const known = planOf(provider)?.claudeCode.models.some((m) => m.id === answered);
-  return known && !modelLimitOf(usage?.models, answered, now) ? answered : value;
+  if (!own || !held || held.inactive) return value;
+  const models = planOf(provider)?.claudeCode.models ?? [];
+  const free = (id: string) => id !== own.id && !modelLimitOf(usage?.models, id, now);
+  const answered = usage?.answered;
+  if (answered && models.some((m) => m.id === answered) && free(answered)) return answered;
+  return models.find((m) => (m.tag === "cheap" || m.tag === "smart") && !m.needs && !m.free && free(m.id))?.id ?? value;
 }
 
 /** A coding plan's model by its id, whichever plan has it. */
@@ -526,20 +537,34 @@ export const loginPerAgent = (kind: string, provider?: string | null) =>
  * Where each agent is its own OS user (system mode), whether a new sign-in is made once for every agent of its
  * owner on that computer (ADR 0059 §2, amended 2026-10-30, protocol 29): root keeps it and hands each turn what
  * its CLI needs. For Claude that is the token `claude setup-token` makes, which the runner then keeps; for ChatGPT
- * (protocol 38) a copy of the `auth.json` root signed in to, whose refreshed copies come back to root. Set a kind
- * to false to go back to one login per agent there. Where every agent is the runner's own user, any sign-in thinks
+ * (protocol 38) a copy of the `auth.json` root signed in to, whose refreshed copies come back to root; for Gemini
+ * (protocol 58) a copy of the Google sign-in root's Antigravity CLI keeps; for Grok Build (protocol 67, amended
+ * 2026-11-12) a copy of the `auth.json` in root's `GROK_HOME`, whose refreshed copies come back to root too (its
+ * sign-in is a grok.com session token with a refresh token, and `GROK_HOME` is its whole store). Set a kind to
+ * false to go back to one login per agent there. Where every agent is the runner's own user, any sign-in thinks
  * for all of them, as the computer's own always has. Accounts made for all agents keep thinking when a kind is
  * switched off, until signed in again or removed.
  */
-export const SHARED_SIGN_INS: Readonly<Record<"claude_code" | "codex" | "key", boolean>> = {
+export const SHARED_SIGN_INS: Readonly<Record<"claude_code" | "codex" | "antigravity" | "grok" | "key", boolean>> = {
   claude_code: true,
   codex: true,
+  antigravity: true,
+  grok: true,
   key: true,
 };
 
+/**
+ * The kinds whose subscriptions a run may go on with at a plan's limit, each within its own kind (ADR 0041 §6). Never
+ * Antigravity: Google forbids automating account rotation (ADR 0143). Not Grok, Cursor or OpenCode.
+ */
+export const NEXT_ACCOUNT_KINDS: readonly string[] = ["claude_code", "codex"];
+
 /** Whether a new sign-in of an account (its CLI's kind, and a coding plan's `provider`) is made for all agents. */
 export const sharedSignIn = (kind: string, provider?: string | null) =>
-  isPlanId(provider) ? SHARED_SIGN_INS.key : (kind === "claude_code" || kind === "codex") && SHARED_SIGN_INS[kind];
+  isPlanId(provider)
+    ? SHARED_SIGN_INS.key
+    : (kind === "claude_code" || kind === "codex" || kind === "antigravity" || kind === "grok") &&
+      SHARED_SIGN_INS[kind];
 
 /**
  * OpenCode's free tier (ADR 0132): models OpenCode serves at no cost and only to its own CLI ("Free-tier chat models

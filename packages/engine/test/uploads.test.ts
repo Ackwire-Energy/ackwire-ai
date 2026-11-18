@@ -419,6 +419,9 @@ describe("upload_file", () => {
     const read = await call(ctx, "read_artifact", { artifact_id: a?.id });
     expect(read.content).toContain(`File chart.png (image/png, ${PNG.byteLength} bytes`);
     expect(read.content).toContain("untrusted file");
+    // A picture goes to the model as a picture, not only as its name and size.
+    expect(read.content).toContain("shown to you with this result");
+    expect(read.images).toEqual([{ mediaType: "image/png", data: Buffer.from(PNG).toString("base64") }]);
 
     const table = await call(ctx, "create_artifact", { title: "T", kind: "table", columns: ["a"], rows: [["1"]] });
     const tableId = (table.data as { artifact: { id: string } }).artifact.id;

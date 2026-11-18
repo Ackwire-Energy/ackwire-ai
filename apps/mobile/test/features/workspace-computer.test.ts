@@ -1,11 +1,18 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { accountOutOfReach, deletedByText, deletingText, restorable } from "@agenteschat/client/lib/deletion";
+import {
+  accountOutOfReach,
+  deletedByText,
+  deletingText,
+  restorable,
+  settingsFrozen,
+} from "@agenteschat/client/lib/deletion";
 import { suspendedText } from "@agenteschat/client/lib/errors";
 import { type OutageTargetLike, targetOptions } from "@agenteschat/client/lib/machine-outages";
+import { quickReply } from "@agenteschat/client/lib/notifications";
 import { computerIcon, type MachineOutage, targetText } from "../../src/features/outages/logic";
-import { deletingOf, suspendedOf } from "../../src/lib/org-choice";
-import { translator } from "./fixtures";
+import { suspendedOf } from "../../src/lib/org-choice";
+import { notification, translator } from "./fixtures";
 
 /** The workspace's own computer (ADR 0056 §10): the server names it ("Computador da Acme"), its system never said. */
 const managed: OutageTargetLike = {
@@ -45,31 +52,83 @@ describe("the workspace's own computer on the phone (the switch sheet's card)", 
 });
 
 describe("an organization being deleted on the phone", () => {
+  const read = (path: string) => readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
   const deletion = {
     dueAt: new Date(Date.now() + 86_400_000).toISOString(),
     requestedAt: new Date().toISOString(),
     requestedBy: { id: "u2", name: "Bia" },
   };
-  const orgs = [
-    { id: "a", name: "Acme", role: "member" as const, deletion },
-    { id: "b", name: "Beta", role: "owner" as const },
-    { id: "c", name: "Casa", role: "owner" as const, standing: { state: "suspended" as const, reason: null } },
-  ];
+  const orgs = [{ id: "a", name: "Acme", role: "member" as const, deletion }];
 
-  test("the chosen one: its screen, and where else to go (none suspended)", () => {
-    expect(deletingOf(orgs, "a")).toEqual({ org: orgs[0], others: [orgs[1]] });
-    expect(deletingOf(orgs, "b")).toBeNull();
+  test("it opens as ever, its notice first on Conversas, its message boxes saying why nothing goes", () => {
+    const layout = readFileSync(new URL("../../app/_layout.tsx", import.meta.url), "utf8");
+    expect(layout).not.toContain("DeletingWorkspace");
+    const home = read("features/chats/ChatsScreen.tsx");
+    expect(home.indexOf("<DeletingNotice />")).toBeLessThan(home.indexOf("<SetupNotice />"));
+    expect(read("features/chat/ChatScreen.tsx")).toContain('{t("deleting.composer")}');
   });
 
-  test("who deleted it and when it goes; only owners restore it, and only before that", async () => {
+  test("the island takes no answer: no Responder, no choices, the line in their place; Abrir stays", () => {
+    const question = notification({
+      id: "n1",
+      kind: "agent_question",
+      waiting: true,
+      source: { questionId: "q1" },
+      latest: { text: "Publico agora?", suggestions: ["Sim", "Depois"] },
+    });
+    expect(quickReply(question, false)).toEqual({
+      target: { kind: "question", questionId: "q1" },
+      suggestions: ["Sim", "Depois"],
+      readOnly: false,
+    });
+    expect(quickReply(question, true)).toEqual({ target: null, suggestions: [], readOnly: true });
+    // Nothing it could answer says nothing either: an approval only opens, as ever.
+    const approval = notification({ id: "n2", kind: "approval", waiting: true, source: { approvalId: "a1" } });
+    expect(quickReply(approval, true)).toEqual({ target: null, suggestions: [], readOnly: false });
+    // Responder and the choices come from it alone, the line from `readOnly`.
+    const island = read("features/island/NoticeIsland.tsx");
+    expect(island).toContain("quickReply(n, Boolean(useOrg().org?.deletion))");
+    expect(island).not.toContain("replyTarget(");
+    expect(island).toMatch(/\{readOnly \? \([\s\S]*?\{t\("deleting\.composer"\)\}/);
+  });
+
+  test("Settings greys out what would change it, as the web does; the person's own and what reads stay", () => {
+    for (const section of ["general", "media", "members", "connectors", "apps", "devices", "storage"])
+      expect(settingsFrozen(orgs[0], section)).toBe(true);
+    for (const section of ["usage", "audit", "import", "vault", "roles", "skills", "access"])
+      expect(settingsFrozen(orgs[0], section)).toBe(false);
+    expect(settingsFrozen({ deletion: undefined }, "general")).toBe(false);
+  });
+
+  test("each settings screen greys out exactly what the shared rule freezes, by its own section", () => {
+    const screens = {
+      general: "settings/GeneralScreen.tsx",
+      media: "settings/MediaSettingsScreen.tsx",
+      members: "members/MembersPage.tsx",
+      connectors: "connectors/ConnectorsScreen.tsx",
+      apps: "settings/AppsScreen.tsx",
+      devices: "devices/DevicesScreen.tsx",
+      storage: "settings/StorageScreen.tsx",
+      access: "settings/AccessScreen.tsx",
+      usage: "usage/UsageScreen.tsx",
+      audit: "settings/AuditScreen.tsx",
+      import: "settings/ImportScreen.tsx",
+      vault: "vault/VaultScreen.tsx",
+      roles: "roles/RolesScreen.tsx",
+      skills: "settings/SkillsScreen.tsx",
+    };
+    for (const [section, file] of Object.entries(screens)) {
+      const greys = read(`features/${file}`).includes(`settingsFrozen(org, "${section}")`);
+      expect({ section, greys }).toEqual({ section, greys: settingsFrozen(orgs[0], section) });
+    }
+  });
+
+  test("when it goes and who deleted it; only owners restore it, and only before that", async () => {
     const t = await translator("pt-BR");
-    expect(deletingText(t, "pt-BR", deletion)).toMatch(
-      /^Este workspace já está sendo apagado\. Não precisa fazer nada, ele some em .+\.$/,
-    );
-    expect(deletingText(t, "pt-BR", { ...deletion, dueAt: null })).toBe(
-      "Este workspace já está sendo apagado. Não precisa fazer nada.",
-    );
+    expect(deletingText(t, "pt-BR", "Acme", deletion)).toMatch(/^Acme vai ser apagado em .+$/);
+    expect(deletingText(t, "pt-BR", "Acme", { ...deletion, dueAt: null })).toBe("Acme está sendo apagado");
     expect(deletedByText(t, "pt-BR", deletion)).toMatch(/^Bia apagou em .+\.$/);
+    expect(deletedByText(t, "pt-BR", deletion, "u2")).toMatch(/^Você apagou em .+\.$/);
     expect(deletedByText(t, "pt-BR", { ...deletion, requestedBy: null })).toMatch(/^Alguém apagou em .+\.$/);
     expect(restorable(orgs[0])).toBe(false);
     expect(restorable({ role: "owner", deletion })).toBe(true);
@@ -81,20 +140,19 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
   const read = (path: string) => readFileSync(new URL(`../../src/${path}`, import.meta.url), "utf8");
   const deletion = { dueAt: new Date(Date.now() + 86_400_000).toISOString(), requestedAt: null, requestedBy: null };
 
-  test("offered only with no workspace that opens", () => {
+  test("offered only with no workspace that opens: one being deleted opens", () => {
     const closing = { id: "a", role: "owner" as const, deletion };
-    expect(accountOutOfReach([closing, { id: "b", role: "member" as const }])).toBe(false);
-    expect(accountOutOfReach([closing])).toBe(true);
+    const suspended = { id: "b", role: "member" as const, standing: { state: "suspended" } };
+    expect(accountOutOfReach([closing])).toBe(false);
+    expect(accountOutOfReach([suspended])).toBe(true);
     expect(accountOutOfReach([])).toBe(true);
   });
 
   test("every entry goes through WholeAccount, which asks that, after Sair", () => {
     expect(read("ui/auth/WholeAccount.tsx")).toContain("if (!accountOutOfReach(orgs)) return null;");
-    for (const screen of ["ui/auth/DeletingWorkspace.tsx", "ui/auth/SuspendedWorkspace.tsx"]) {
-      const code = read(screen);
-      expect(code).not.toContain('label={t("deleteAccount.menu")}');
-      expect(code.indexOf("<WholeAccount")).toBeGreaterThan(code.indexOf('t("mobile.org.signOut")'));
-    }
+    const code = read("ui/auth/SuspendedWorkspace.tsx");
+    expect(code).not.toContain('label={t("deleteAccount.menu")}');
+    expect(code.indexOf("<WholeAccount")).toBeGreaterThan(code.indexOf('t("mobile.org.signOut")'));
     // The first run shows nothing destructive, yet deleting the account stays reachable (App Store 5.1.1(v)): its
     // quiet Sair offers Sair and, after it, Apagar conta in red.
     const first = read("features/onboarding/OnboardingFlow.tsx");
@@ -106,24 +164,34 @@ describe("Apagar conta on the phone's closed screens and first run", () => {
     expect(first).not.toContain("onboarding.deleteLink");
   });
 
-  test("the first workspace that opens is the main action, Restaurar only with nowhere else to go", () => {
-    expect(read("ui/auth/DeletingWorkspace.tsx")).toContain(
-      'variant={others.some(workspaceOpens) ? "secondary" : "primary"}',
+  test("the first workspace that opens is the main action", () => {
+    expect(read("ui/auth/SuspendedWorkspace.tsx")).toContain(
+      'variant={i === 0 && workspaceOpens(o) ? "primary" : "secondary"}',
     );
-    for (const screen of ["ui/auth/DeletingWorkspace.tsx", "ui/auth/SuspendedWorkspace.tsx"])
-      expect(read(screen)).toContain('variant={i === 0 && workspaceOpens(o) ? "primary" : "secondary"}');
   });
 
   test("the lists and the deletion screen say closed and same-named apart", () => {
     // Workspaces, every server's (ADR 0154): the note first, else the role.
     expect(read("features/me/WorkspacesPages.tsx")).toContain("sub={notes.get(o.id) ?? ");
     const screen = read("features/me/DeleteAccountScreen.tsx");
-    expect(screen).toContain('t("deleteAccount.title")');
     expect(screen).toContain('t("deleteAccount.intro")');
     expect(screen).toContain('t("deleteAccount.oneWorkspace")');
     expect(screen).toContain("notes,\n");
     expect(screen).toContain('t("deleteAccount.deleteOrg", { name: named(o) })');
-    expect(read("features/me/AccountPage.tsx")).toContain('"deleteAccount.card.leaveWorkspace"');
+    // Conta: the account's row for everyone, the workspace's own for an owner, each with one sentence and no link row.
+    const account = read("features/me/AccountPage.tsx");
+    expect(account).toContain('label={t("deleteOrg.card.title")}');
+    expect(account).not.toContain("labelLines={2}\n          chevron");
+    // The workspace's row is its red words alone, behind the same confirmation the workspace's settings show first.
+    const at = account.indexOf('label={t("deleteOrg.card.title")}');
+    const row = account.slice(account.lastIndexOf("<GroupedRow", at), account.indexOf("/>", at));
+    expect(row).toContain('onPress={() => confirmDeleteWorkspace(t, org.org?.name ?? "")}');
+    expect(row).not.toMatch(/icon=|chevron/);
+    const settings = read("features/settings/WorkspaceScreen.tsx");
+    expect(settings).toContain("onPress={() => confirmDeleteWorkspace(t, name)}");
+    const confirm = settings.slice(settings.indexOf("export function confirmDeleteWorkspace("));
+    expect(confirm).toContain("confirmAction({");
+    expect(confirm).toContain('router.push("/settings/delete")');
   });
 });
 

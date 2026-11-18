@@ -13,8 +13,9 @@ const { agentRuns, messages, routineRuns } = schema;
  * - `person`: a person asked, directly or through a chain of agents (an agent's message counts for the
  *   person behind the run that wrote it), or work came back to a run of theirs (an answer, a note's
  *   reply, the end of a wait or of a background task, a decision on a folder or on a proposed agent, a
- *   follow-up), or they wrote on GitHub with their linked account (a `github_event` notice's server-set
- *   `refs.personId`). Tools act on their behalf, within their permissions and the agent's scopes.
+ *   follow-up), or they wrote on GitHub with their linked account, or a background work ended after taking on what
+ *   they passed on to it (a `github_event` or `work_follow_up` notice's server-set `refs.personId`). Tools act on
+ *   their behalf, within their permissions and the agent's scopes.
  * - `routine`: a routine's background run. Nobody is behind it: its creator set it up and stays
  *   accountable (notifications, approvals), but the run never acts as them. What it may do comes only
  *   from the agent's own permissions, like any run (ADR 0109), within a routine's bounds (`run-policy.ts`).
@@ -138,8 +139,9 @@ async function walkRoot(db: Executor, orgId: string, messageId: string, walked: 
       return { kind: "routine_report", backgroundRunId: typeof runId === "string" ? runId : null };
     }
     // What happened on GitHub (`git/github-events.ts`): the member whose linked account wrote it, or who asked the
-    // agent to answer it; nobody for anyone else.
-    if (notice?.kind === "github_event") {
+    // agent to answer it; nobody for anyone else. What a person passed on to a work that ended (`followUpWork`): that
+    // person, not who asked for the work.
+    if (notice?.kind === "github_event" || notice?.kind === "work_follow_up") {
       const personId = notice.refs?.personId;
       return typeof personId === "string" && personId ? { kind: "person", personId } : { kind: "agent" };
     }
@@ -222,18 +224,31 @@ export async function runChain(
  */
 export async function steeredByOthers(db: Executor, orgId: string, forUserId: string, runIds: string[]) {
   const runs = await db
-    .select({ channelId: agentRuns.channelId, createdAt: agentRuns.createdAt })
+    .select({ channelId: agentRuns.channelId, createdAt: agentRuns.createdAt, triggerId: agentRuns.triggerMessageId })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, orgId), inArray(agentRuns.id, runIds)));
   if (runs.length === 0) return false;
   const since = new Date(Math.min(...runs.map((r) => r.createdAt.getTime())));
+  // Where they were asked too: a run sent on elsewhere (`moveRun`) keeps what reached it there.
+  const asked = await db
+    .select({ channelId: messages.channelId })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(
+          messages.id,
+          runs.map((r) => r.triggerId),
+        ),
+      ),
+    );
   const written = await db
     .select({ id: messages.id, authorType: messages.authorType, authorUserId: messages.authorUserId })
     .from(messages)
     .where(
       and(
         eq(messages.orgId, orgId),
-        inArray(messages.channelId, [...new Set(runs.map((r) => r.channelId))]),
+        inArray(messages.channelId, [...new Set([...runs, ...asked].map((r) => r.channelId))]),
         gte(messages.createdAt, since),
         sql`${messages.meta} -> 'steeredRunIds' ?| ${`{${runIds.join(",")}}`}::text[]`,
       ),
@@ -272,6 +287,16 @@ export type AuthorityRun = {
   background: boolean;
   transcript?: Record<string, unknown> | null;
 };
+
+/**
+ * Only these keys of a run's transcript, in its place in a select: a transcript holds the whole conversation (tens of
+ * KB), and the lookups that read a key or two would otherwise ship and parse all of it.
+ */
+export const transcriptKeys = (...keys: string[]) =>
+  sql<Record<string, unknown> | null>`jsonb_build_object(${sql.join(
+    keys.map((k) => sql`${k}::text, ${agentRuns.transcript}->${k}::text`),
+    sql`, `,
+  )})`;
 
 /** The person who wrote into an unattended run while it worked (`Transcript.steeredBy`), if any. */
 export const steeredByOf = (transcript: Record<string, unknown> | null | undefined) =>
@@ -320,7 +345,8 @@ export async function feedingBrief(
 /**
  * Whether what a routine read feeds this run: a routine's own run, or a run nobody is behind that its report or its
  * work woke. Such text may come from outside (inbound mail, a webhook, the web) through the routine, so the run
- * never sends a credential, its writes to connected apps and its mail sends always ask a person (ADR 0038, 0053 §3).
+ * never sends a credential, its writes to connected apps and its mail sends always ask a person (ADR 0038, 0053 §3),
+ * except the routine's own actions on its own run and on the runs its report or a teammate's answer woke (`onOwnJob`).
  */
 export const fedByRoutine = (authority: RunAuthority | null): boolean =>
   authority?.kind === "routine" || (authority?.kind === "unattended" && authority.reason !== "agent");
@@ -334,7 +360,7 @@ export async function runAuthorityById(db: Executor, orgId: string, runId: strin
       orgId: agentRuns.orgId,
       triggerMessageId: agentRuns.triggerMessageId,
       background: agentRuns.background,
-      transcript: agentRuns.transcript,
+      transcript: transcriptKeys("steeredBy"),
     })
     .from(agentRuns)
     .where(and(eq(agentRuns.orgId, orgId), eq(agentRuns.id, runId)));

@@ -39,12 +39,16 @@ export function SettingsSection({
   );
 }
 
-/** A quiet line with an icon under a list (an example, a rule that always holds, a count, a lock reason). */
+/**
+ * A quiet line with an icon under a list (an example, a rule that always holds, a count, a lock reason). `action`: its
+ * one way out (a button), laid out as an action line: beside the words while they fit on one line, else under them.
+ */
 export function SettingNote({
   icon,
   quiet,
   live,
   className,
+  action,
   children,
 }: {
   icon: IconName;
@@ -53,9 +57,10 @@ export function SettingNote({
   /** It changes with the choice above (announced politely, fades in). */
   live?: boolean;
   className?: string;
+  action?: ReactNode;
   children: ReactNode;
 }) {
-  return (
+  const note = (
     <p
       className={cx("ac-setnote ac-iconline", quiet && "ac-setnote--quiet", live && "ac-setnote--live", className)}
       aria-live={live ? "polite" : undefined}
@@ -63,6 +68,13 @@ export function SettingNote({
       <Icon name={icon} size={14} />
       <span>{children}</span>
     </p>
+  );
+  if (!action) return note;
+  return (
+    <div className="ac-actline ac-setnote-line">
+      {note}
+      <span>{action}</span>
+    </div>
   );
 }
 

@@ -11,6 +11,7 @@ import type { TFunction } from "i18next";
 import type { ReactElement, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Alert, Linking, Pressable, StyleSheet, TextInput, View } from "react-native";
+import { paysHere } from "@/lib/store";
 import {
   Button,
   fieldText,
@@ -27,6 +28,7 @@ import {
   useTheme,
 } from "@/ui";
 import { BUTTON_SIZES } from "@/ui/Button";
+import { router } from "@/ui/navigation";
 import { usePersonalView } from "../settings/hooks";
 import { useColors } from "../shared/hooks";
 
@@ -39,10 +41,21 @@ export const usePlanHold = (orgId: string, org: OrgSummary | null | undefined) =
   planHoldOf(computerEdition(useComputerSetup(orgId).data), org?.standing);
 
 /** A plan this workspace's billing hold stops, said where it would sign in (`planHoldPhoneLine`). */
-export function PlanHoldNote({ org, keys }: { org: OrgSummary | null | undefined; keys?: boolean }) {
+export function PlanHoldNote({
+  org,
+  keys,
+  inset = false,
+}: {
+  org: OrgSummary | null | undefined;
+  keys?: boolean;
+  /** On a grouped screen: on the groups' header and footer edge (`Note`'s `inset`). */
+  inset?: boolean;
+}) {
   const { t } = useTranslation();
   return (
-    <Note icon="pause">{planHoldPhoneLine(t, org ? can(org, "manage_billing") : false, keys ? "keys" : "plan")}</Note>
+    <Note icon="pause" inset={inset}>
+      {planHoldPhoneLine(t, org ? paysHere(can(org, "manage_billing")) : false, keys ? "keys" : "plan")}
+    </Note>
   );
 }
 
@@ -55,46 +68,65 @@ export function AiRow({
   checked,
   disabled,
   onPress,
+  onRename,
 }: {
-  row: { label: string; sub?: string; below?: string; mark: string; off: boolean };
+  row: { label: string; sub?: string; below?: string; mark: string; off: boolean; unnamed?: boolean };
   checked?: boolean;
   disabled?: boolean;
   onPress: () => void;
+  /** The viewer's own account: the pencil at the row's end opens its name (`openRenameAiAccount`). */
+  onRename?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <GroupedRow
       leading={<ProviderLogo id={row.mark} size="sm" off={row.off} />}
       label={row.label}
+      faint={row.unnamed === true}
       {...(row.sub ? { sub: row.sub } : {})}
       {...(row.below ? { belowText: row.below } : {})}
       {...(checked !== undefined ? { checked } : {})}
+      {...(onRename
+        ? {
+            buttons: [
+              { icon: "pen" as const, label: t("aiAccounts.rename.action", { label: row.label }), onPress: onRename },
+            ],
+          }
+        : {})}
       disabled={disabled}
       onPress={onPress}
     />
   );
 }
 
+/** Opens the name of one of the person's AI accounts (its computer's and its own id), from any list that shows it. */
+export const openRenameAiAccount = (machineId: string, accountId: string) =>
+  router.push({ pathname: "/ai-account-rename", params: { machineId, accountId } });
+
 /**
  * A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. `icon` may be
- * a mark of its own, 15 pt (the orbit of work under way).
+ * a mark of its own, 15 pt (the orbit of work under way). `inset`: on a grouped screen, where it reads as a group's
+ * footer: its words start on the groups' headers and footers (16 in from the cards' side), 8 under the card above.
  */
 export function Note({
   icon,
   children,
   live = false,
+  inset = false,
 }: {
   icon: IconName | ReactElement;
   children: ReactNode;
   live?: boolean;
+  inset?: boolean;
 }) {
   const c = useColors();
   return (
-    <View style={styles.note} accessibilityLiveRegion={live ? "polite" : undefined}>
-      {/* On the words' first line, where the eye reads it, never at the line's top. */}
+    <View style={[styles.note, inset && styles.noteInset]} accessibilityLiveRegion={live ? "polite" : undefined}>
+      {/* On the words' first line, where the eye reads it, never at the line's top; a mark on its capitals. */}
       {typeof icon === "string" ? (
         <LineIcon name={icon} variant="small" size={15} color={icon === "x" ? c.danger : c.muted} />
       ) : (
-        <LineIcon variant="small" size={15}>
+        <LineIcon variant="small" size={15} mark>
           {icon}
         </LineIcon>
       )}
@@ -399,6 +431,8 @@ const PASTE_INSET = (FIELD - BUTTON_SIZES.sm.height) / 2;
 
 const styles = StyleSheet.create({
   note: { flexDirection: "row", alignItems: "flex-start", gap: 8, paddingHorizontal: 4 },
+  // As a group's footer (`GroupedFooter`): the same sides and the same room under the card.
+  noteInset: { paddingHorizontal: 16, paddingTop: 8 },
   // As a group's footer (`GroupedFooter`).
   foot: { paddingTop: 8, paddingHorizontal: 16 },
   grow: { flex: 1, minWidth: 0 },

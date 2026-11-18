@@ -350,12 +350,15 @@ describe("⌘K palette", () => {
 });
 
 describe("composer in a DM", () => {
-  test("the target agent pill; '/' commands insert a ready request", async () => {
+  test("no chip for the DM's agent, nor for one the draft calls; '/' commands insert a ready request", async () => {
     await renderApp(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, { api: createFakeApi(seedState()) });
     await settle(8);
     const composer = screen().getByRole("combobox", { name: "Mensagem para Ada" }) as HTMLTextAreaElement;
     const card = composer.closest(".ac-composer") as HTMLElement;
-    expect(card.querySelector(".ac-composer__agent")?.textContent).toContain("Ada");
+    expect(card.querySelector(".ac-composer__pills")).toBeNull();
+    await type(composer, "@atlas olha isso");
+    expect(card.querySelector(".ac-composer__pills")).toBeNull();
+    await act(async () => fireEvent.change(composer, { target: { value: "" } }));
     await type(composer, "/");
     const menu = screen().getByRole("listbox", { name: "Comandos" });
     expect(

@@ -1,10 +1,12 @@
 import {
+  decryptCredential,
   isAgentesCloud,
   type JevKey,
   type JevKeyView,
   jevMonth,
   NotFoundError,
   pinnedOwner,
+  requirePermission,
   ValidationError,
 } from "@agenteschat/engine";
 import { nanoUsdToUsd } from "@agenteschat/providers";
@@ -20,9 +22,14 @@ const Jev = z
       .enum(["env", "settings"])
       .nullable()
       .openapi({ description: "`env`: `TYPESAFE_API_KEY`, read-only here. `settings`: added here. Null: none." }),
+    via: z.enum(["typesafe", "openrouter"]).nullable().openapi({
+      description:
+        "Who the key is from: Jev is called and paid through TypeSafe, or through OpenRouter with an OpenRouter key. Null: no key, or a saved one this server can't open.",
+    }),
     hint: z.string().nullable().openapi({ description: "The key's last 4 characters. The key is never returned." }),
     state: z.enum(["off", "ok", "invalid", "no_credit"]).openapi({
-      description: "What its owner can fix: TypeSafe refused the key, or its account is out of credit. Else `ok`.",
+      description:
+        "What its owner can fix: TypeSafe or OpenRouter refused the key, or its account is out of credit. Else `ok`.",
     }),
     month: z
       .object({ decisions: z.number().int(), costUsd: z.number() })
@@ -30,12 +37,21 @@ const Jev = z
   })
   .openapi("JevKey");
 
-const ApiKey = z.object({
-  apiKey: z.string().trim().min(8).max(512).openapi({
-    description:
-      "The TypeSafe key, checked with TypeSafe before it is stored. Printable ASCII with no spaces, else 422 `jev_key_invalid` before any check, like a key TypeSafe refuses.",
+const ApiKey = z.union([
+  z.object({
+    apiKey: z.string().trim().min(8).max(512).openapi({
+      description:
+        "A TypeSafe key, or an OpenRouter key (`sk-or-…`), checked with a tiny Jev call before it is stored. Printable ASCII with no spaces, else 422 `jev_key_invalid` before any check, like a key that is refused.",
+    }),
   }),
-});
+  z.object({
+    orgId: z.uuid(),
+    credentialId: z.uuid().openapi({
+      description:
+        "An OpenRouter key the workspace already has (Provider keys), copied as Jev's key. Needs `manage_credentials` there; 404 for a key that isn't the workspace's, is revoked or isn't OpenRouter's.",
+    }),
+  }),
+]);
 
 /** Limits checking keys through this server, so it can't test keys in bulk. */
 const WRITES = { limit: 10, windowMs: 60_000 };
@@ -83,13 +99,13 @@ export function jevRoutes(deps: AppDeps) {
       path: "/jev",
       tags,
       summary: "Add or replace the Jev key",
-      description: `${notFound} Checked with TypeSafe first: a key it refuses is not stored (422 \`jev_key_invalid\`). 409 \`jev_key_env\` while \`TYPESAFE_API_KEY\` is set. Recorded in every workspace's audit log, with the key's last 4 characters.`,
+      description: `${notFound} A TypeSafe key, or an OpenRouter key (pasted, or the workspace's own) that calls the same Jev through OpenRouter. Checked first: a refused key is not stored (422 \`jev_key_invalid\`). 409 \`jev_key_env\` while \`TYPESAFE_API_KEY\` is set. Recorded in every workspace's audit log, with the key's last 4 characters.`,
       security,
       request: { body: body(ApiKey) },
       responses: {
         200: json(Jev),
         ...errors,
-        422: errorResponse("TypeSafe refused the key, or it can't be one (`jev_key_invalid`)"),
+        422: errorResponse("TypeSafe or OpenRouter refused the key, or it can't be one (`jev_key_invalid`)"),
         ...tooMany,
       },
     }),
@@ -97,8 +113,21 @@ export function jevRoutes(deps: AppDeps) {
       const user = c.get("user");
       const jev = await ownerOnly(user.id);
       if (!(await allowed(user.id))) return apiError(c, 429, "rate_limited", "Too many tries. Wait a minute.");
+      const input = c.req.valid("json");
+      let apiKey: string;
+      let from: { orgId: string; credentialId: string } | undefined;
+      if ("apiKey" in input) apiKey = input.apiKey;
+      else {
+        // The workspace's own OpenRouter key: its admins may already spend it, so its owner may hand it to Jev.
+        await requirePermission(db, user.id, input.orgId, "manage_credentials");
+        const keyWrappers = [deps.adapters.keyWrapper, ...deps.adapters.legacyKeyWrappers];
+        const credential = await decryptCredential(db, keyWrappers, input.orgId, input.credentialId);
+        if (credential?.provider !== "openrouter" || credential.options?.endpoint) throw new NotFoundError();
+        apiKey = credential.apiKey;
+        from = { orgId: input.orgId, credentialId: input.credentialId };
+      }
       try {
-        return c.json(await withMonth(await jev.save(c.req.valid("json").apiKey, user.id)), 200);
+        return c.json(await withMonth(await jev.save(apiKey, user.id, from)), 200);
       } catch (error) {
         if (error instanceof ValidationError && error.code === "jev_key_invalid") {
           return apiError(c, 422, error.code, error.message);
@@ -113,7 +142,7 @@ export function jevRoutes(deps: AppDeps) {
       method: "post",
       path: "/jev/check",
       tags,
-      summary: "Check the Jev key with TypeSafe again",
+      summary: "Check the Jev key again, with TypeSafe or OpenRouter",
       description: `${notFound} An answer that says nothing about the key (a limit, an outage) leaves its state as it was.`,
       security,
       responses: { 200: json(Jev), 401: errors[401], 404: errors[404], ...tooMany },

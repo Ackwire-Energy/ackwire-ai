@@ -9,9 +9,13 @@ import {
   parsePlanUsage,
   parseRunnerFrame,
 } from "@agenteschat/adapters/machine-protocol";
+import { planState } from "@agenteschat/ui/plan-state";
 import { AccountManager, type AccountManagerOptions } from "../../runner/accounts";
 import {
+  antigravityUsage,
   CLAUDE_PROBE_ARGS,
+  CLAUDE_TOKEN_CHECK_ARGS,
+  checkClaudeToken,
   claudeUsage,
   codexUsage,
   fetchPlanKeyUsage,
@@ -199,6 +203,56 @@ test("Codex's rate limits: windows told apart by their length, else primary is t
     { kind: "seven_day", usedPercent: 100 },
   ]);
   expect(codexUsage({ primary: null, secondary: null }, "turn", NOW)).toBeNull();
+});
+
+/** Google's usage panel for an Antigravity sign-in, line by line: every percentage is what is left. */
+const agyPanel = (gemini: { week: number; five: number }, argon = 100, info = "", color = (s: string) => s) =>
+  [
+    color("Gemini Models"),
+    `Weekly Limit Remaining${info}`,
+    color(`${gemini.week}%`),
+    `Five Hour Limit Remaining${info}`,
+    color(`${gemini.five}%`),
+    "",
+    color(`Claude and GPT models${info}`),
+    `Weekly Limit Remaining${info}`,
+    color("100%"),
+    `Five Hour Limit Remaining${info}`,
+    color("100%"),
+    "",
+    color(`Gemini 4 Argon${info}`),
+    `Gemini 4 Argon Weekly Limit${info}`,
+    color(`${argon}%`),
+  ].join("\n");
+const ansi = (s: string) => `\u001b[1;36m${s}\u001b[0m`;
+
+test("Antigravity's panel: every percentage is what is left; only Gemini's group is the plan's, the others are named", () => {
+  for (const text of [agyPanel({ week: 100, five: 100 }), agyPanel({ week: 100, five: 100 }, 100, " ⓘ", ansi)]) {
+    const usage = antigravityUsage(text, "probe", NOW);
+    expect(usage?.windows).toEqual([
+      { kind: "seven_day", usedPercent: 0 },
+      { kind: "five_hour", usedPercent: 0 },
+      { kind: "other", label: "Claude and GPT models · 7d", usedPercent: 0 },
+      { kind: "other", label: "Claude and GPT models · 5h", usedPercent: 0 },
+      { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 0 },
+    ]);
+    expect(planState(usage as PlanUsage, NOW).state).toBe("ok");
+  }
+  // Gemini's week spent: the plan is at its limit.
+  const spent = antigravityUsage(agyPanel({ week: 0, five: 100 }, 100, " ⓘ", ansi), "probe", NOW) as PlanUsage;
+  expect(spent.windows[0]).toEqual({ kind: "seven_day", usedPercent: 100 });
+  expect(planState(spent, NOW).state).toBe("limited");
+  // Argon's own week spent: shown under its name, never the plan's limit.
+  const argon = antigravityUsage(agyPanel({ week: 80, five: 100 }, 0), "probe", NOW) as PlanUsage;
+  expect(argon.windows.at(-1)).toEqual({ kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 100 });
+  expect(planState(argon, NOW)).toEqual({ state: "ok", until: null, used: 20 });
+  // One line per limit, and a line that says "used" counts up.
+  expect(
+    antigravityUsage("Gemini Models\nWeekly Limit: 30% used\nFive Hour Limit Remaining 90%", "probe", NOW)?.windows,
+  ).toEqual([
+    { kind: "seven_day", usedPercent: 30 },
+    { kind: "five_hour", usedPercent: 10 },
+  ]);
 });
 
 test("people hear at once only when a limit is hit or cleared or a window crosses 80, 90 (its bar turns red) or 100", () => {
@@ -393,6 +447,68 @@ test.if(posix)(
     // Not installed: null, at once.
     expect(
       await probeClaudeUsage({ command: [path.join(home, "no-such-cli")], cwd: home, env: process.env }),
+    ).toBeNull();
+  },
+);
+
+test.if(posix)(
+  "a setup token's check: one turn on the cheapest model, the token on descriptor 3, the reading from its rate limit event",
+  async () => {
+    const { home, log } = probeSetup();
+    const token = "sk-ant-oat01-fake-token-for-tests-only";
+    const env = { ...process.env, CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR: "3" };
+    const prev: PlanUsage = {
+      windows: [{ kind: "seven_day", usedPercent: 100, resetsAt: "2030-01-05T00:00:00.000Z" }],
+      limited: true,
+      source: "turn",
+      at: "2030-01-01T00:00:00.000Z",
+    };
+    try {
+      process.env.FAKE_CLAUDE_RATE_INFO = JSON.stringify({
+        status: "allowed",
+        unifiedWindows: {
+          seven_day: { utilization: 0.1, resetsAt: RESET },
+          five_hour: { utilization: 0, resetsAt: RESET },
+        },
+      });
+      const room = await checkClaudeToken(
+        {
+          command: [process.execPath, FAKE_CLAUDE],
+          cwd: home,
+          env: { ...env, ...{ FAKE_CLAUDE_RATE_INFO: process.env.FAKE_CLAUDE_RATE_INFO } },
+          fd3: token,
+        },
+        prev,
+      );
+      expect(room?.limited).toBeUndefined();
+      expect(room?.windows.find((w) => w.kind === "seven_day")?.usedPercent).toBe(10);
+      const [run] = logged(log);
+      expect(run?.args).toEqual(CLAUDE_TOKEN_CHECK_ARGS);
+      expect(run?.args).toEqual(expect.arrayContaining(["--model", "haiku", "--tools", ""]));
+      expect(run?.oauthToken).toBe(token);
+      expect(run?.oauthEnv).toBeNull();
+      expect(JSON.stringify(run?.args)).not.toContain(token);
+
+      const refused = (before: PlanUsage) =>
+        checkClaudeToken(
+          {
+            command: [process.execPath, FAKE_CLAUDE],
+            cwd: home,
+            env: { ...env, FAKE_CLAUDE_RATE_INFO: JSON.stringify({ status: "rejected", resetsAt: RESET }) },
+            fd3: token,
+          },
+          before,
+        );
+      // Still full, as last read: nothing new to say.
+      expect(await refused(prev)).toBeNull();
+      // Read with room before, refused now: at the limit.
+      expect((await refused({ ...prev, limited: undefined }))?.limited).toBe(true);
+    } finally {
+      delete process.env.FAKE_CLAUDE_RATE_INFO;
+    }
+    // Nothing said (no rate limit event): no reading.
+    expect(
+      await checkClaudeToken({ command: [process.execPath, FAKE_CLAUDE], cwd: home, env, fd3: token }, prev),
     ).toBeNull();
   },
 );

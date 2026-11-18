@@ -38,6 +38,7 @@ import { sectionName, useSectionOrder } from "./SidebarOrder";
 
 /** The tools at the top of the sidebar: the page each opens and its icon. */
 export const SIDEBAR_TOOLS = {
+  waiting: { to: "/org/$orgId/waiting", icon: "question" },
   approvals: { to: "/org/$orgId/approvals", icon: "waiting" },
   proposals: { to: "/org/$orgId/proposals", icon: "bulb" },
   threads: { to: "/org/$orgId/threads", icon: "thread" },

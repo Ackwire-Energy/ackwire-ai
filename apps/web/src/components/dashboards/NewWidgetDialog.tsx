@@ -1,6 +1,7 @@
 import type { Agent, PinnableBlock, Widget, WidgetFormat, WidgetSchedule, WidgetSize } from "@agenteschat/client";
 import {
   useAgents,
+  useAiStatusSince,
   useConfirmWidget,
   useDashboards,
   useHomeDashboard,
@@ -11,7 +12,11 @@ import {
   useWidgetDraft,
   useWidgetSuggestions,
   WIDGET_STILL_MS,
+  widgetAiReady,
+  widgetNeedsAi,
   widgetStepWords,
+  widgetWaiting,
+  widgetWaitText,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -49,10 +54,12 @@ import { type ReactNode, useEffect, useId, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentPickerDialog } from "@/components/agents/AgentPickerDialog";
+import { COMPACT_QUERY } from "@/components/NavDrawer";
 import { useOrg } from "@/components/org-context";
 import { colorOf } from "@/components/Sky";
-import { failureText } from "@/components/widgets/parts";
+import { failureText, useWidgetAiWay } from "@/components/widgets/parts";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useMatchMedia } from "@/hooks/useMatchMedia";
 import { useToast } from "@/lib/toast";
 import "@/pages/dashboards.css";
 
@@ -78,10 +85,10 @@ export interface NewWidgetDialogProps {
  * to follow is written in its body (with the agent's suggestions), the agent's face in its footer opens the list of
  * agents, the schedule beside it how often it updates, the bell in its head the alert, S/M/L its size; its title is
  * edited in place. Test has the agent build it there with real data (a draft), and only a draft that worked for what
- * is asked now can be created; while it builds the card says the step its agent is in and for how long, and Stop
- * ends the build with the ask as it was written; after the test the ask folds into one line that opens it again. Or
- * a chart an agent already sent in the chat is pinned. Under the card, the board it goes on. Used by a board's page
- * and by Home.
+ * is asked now can be created; while it builds the card says the step its agent is in (or what its run waits for)
+ * and for how long, and Stop ends the build with the ask as it was written; after the test the ask folds into one
+ * line that opens it again. Or a chart an agent already sent in the chat is pinned. Under the card, the board it goes
+ * on. Used by a board's page and by Home.
  */
 export function NewWidgetDialog({ orgId, open, onClose, dashboardId, tab = "ask" }: NewWidgetDialogProps) {
   const { t } = useTranslation();
@@ -151,6 +158,8 @@ function NewWidgetBody({
   const [condition, setCondition] = useState("");
   const [alertOpen, setAlertOpen] = useState(false);
   const [size, setSize] = useState<WidgetSize>("m");
+  // A phone's card and the small size have no room for the whole hint beside the face and the bell.
+  const compact = useMatchMedia(COMPACT_QUERY);
   const [dest, setDest] = useState<string>(dashboardId ?? HOME);
   const [block, setBlock] = useState<number | null>(null);
   const [choosing, setChoosing] = useState(false);
@@ -181,6 +190,12 @@ function NewWidgetBody({
   const detail = useWidgetDraft(orgId, draftId).data;
   const live = detail ?? (test.data?.id === draftId ? test.data : undefined);
   const draft = draftId && live?.id === draftId ? live : undefined;
+  // Its agent has no AI: the test waits for one (no build started), and runs again once one is connected.
+  const needsAi = Boolean(draft && widgetNeedsAi(draft));
+  const aiStatus = useAiStatusSince(orgId, needsAi);
+  const aiBack = Boolean(draft && widgetAiReady(draft, aiStatus));
+  const retested = useRef(false);
+  const aiWay = useWidgetAiWay(draft?.agentId, draft?.failure?.detail);
 
   // A draft nobody created is deleted when the dialog closes or another test replaces it (the server sweeps any
   // left behind after a day). `pending` is the draft still to delete; one being created is kept.
@@ -228,6 +243,8 @@ function NewWidgetBody({
     mode === "ask" ? phaseOf(sending, draft, draftId, draftId !== null && testedFor !== askKey) : "none";
   const clock = useNow(phase === "testing" ? 1000 : false);
   const elapsed = phase === "testing" ? Math.max(0, clock - since) : 0;
+  // The test's run waits (its plan, its budget, its computer): the card says what for instead of a build at work.
+  const waiting = phase === "testing" && draft ? widgetWaiting(draft, clock) : null;
   const stepWords = widgetStepWords(t, detail?.id === draftId ? detail?.step : null, i18n.language);
   // The draft's data, still shown (dimmed) once the ask changed since the test.
   const built = draft?.status === "ok" && draft.spec ? draft : null;
@@ -302,6 +319,13 @@ function NewWidgetBody({
     // Its promise, not the mutation's callbacks: those don't run once the dialog is gone, and the draft must go then.
     void test.mutateAsync(input).then(made, refused);
   };
+  // Once per dialog: a status the server still disagrees with can't test again and again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `runTest` changes each render; once its agent has an AI
+  useEffect(() => {
+    if (!aiBack || retested.current) return;
+    retested.current = true;
+    runTest();
+  }, [aiBack]);
 
   /** Stop: the build ends (its draft goes, and its run with it) and the ask is back as it was written. */
   const stop = () => {
@@ -638,18 +662,41 @@ function NewWidgetBody({
       )
     ) : phase === "testing" ? (
       <div className="wk-build nw-build">
-        <BuildingDither color={color} />
+        <BuildingDither color={color} still={waiting !== null} />
         <div className="nw-build__words">
           <p className="nw-build__step" role="status">
-            <span key={stepWords}>{stepWords}</span>
+            {waiting ? (
+              <span>{widgetWaitText(t, i18n.language, waiting, name, new Date(clock))}</span>
+            ) : (
+              <span key={stepWords}>{stepWords}</span>
+            )}
           </p>
           <div
             className="nw-build__still"
-            data-on={elapsed >= WIDGET_STILL_MS || undefined}
-            aria-hidden={elapsed < WIDGET_STILL_MS}
+            data-on={(!waiting && elapsed >= WIDGET_STILL_MS) || undefined}
+            aria-hidden={waiting !== null || elapsed < WIDGET_STILL_MS}
           >
             <p>{t("dashboards.newWidget.stillWorking")}</p>
           </div>
+        </div>
+      </div>
+    ) : phase === "failed" && needsAi ? (
+      <div className="nw-fail ac-iconline" role="status">
+        <Icon name="plug" size={18} />
+        <div>
+          <b>{failureText(t, draft?.failure ?? null, name)}</b>
+          <p>{t("widgets.needsAi.body", { name })}</p>
+          {aiWay && "locked" in aiWay && <p>{aiWay.locked}</p>}
+          <span className="nw-fail__acts">
+            {aiWay && "connect" in aiWay && (
+              <Button size="sm" onClick={aiWay.connect}>
+                {t("noAi.action")}
+              </Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+              {t("dashboards.newWidget.editAsk")}
+            </Button>
+          </span>
         </div>
       </div>
     ) : phase === "failed" ? (
@@ -662,7 +709,7 @@ function NewWidgetBody({
             <Button size="sm" icon="refresh" disabled={!canTest} onClick={runTest}>
               {t("dashboards.newWidget.tryAgain")}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            <Button variant="link" onClick={() => setEditing(true)}>
               {t("dashboards.newWidget.editAsk")}
             </Button>
           </span>
@@ -721,8 +768,10 @@ function NewWidgetBody({
   const foot: ReactNode =
     phase === "testing" ? (
       <>
-        <PixelSpinner size={14} color={color} />
-        <span className="wg__when nwc-building">{t("dashboards.newWidget.buildingFoot", { name })}</span>
+        {waiting ? <Icon name="pause" size={14} /> : <PixelSpinner size={14} color={color} />}
+        <span className="wg__when nwc-building">
+          {waiting ? name : t("dashboards.newWidget.buildingFoot", { name })}
+        </span>
         <span className="nwc-clock" role="timer">
           {taskClock(elapsed)}
         </span>
@@ -753,9 +802,11 @@ function NewWidgetBody({
             </span>
           )
         )}
-        <span className="wg__dot" aria-hidden="true">
-          ·
-        </span>
+        {(mode === "ask" || owner) && (
+          <span className="wg__dot" aria-hidden="true">
+            ·
+          </span>
+        )}
         {scheduleSelect}
         {tested && <span className="nwc-when">{testedWhen}</span>}
       </>
@@ -769,10 +820,10 @@ function NewWidgetBody({
       data-size={size}
       data-w={layout.w}
       data-h={layout.h}
-      data-state={phase === "testing" ? "building" : "ok"}
+      data-state={phase === "testing" && !waiting ? "building" : "ok"}
       data-stale={(stale && !editing) || undefined}
       aria-label={title.trim() || t("dashboards.newWidget.title")}
-      aria-busy={phase === "testing" || undefined}
+      aria-busy={(phase === "testing" && !waiting) || undefined}
       style={widgetTileVars(color, dark)}
     >
       <span className="wg__sweep" aria-hidden="true" />
@@ -790,7 +841,9 @@ function NewWidgetBody({
           autoComplete="off"
           aria-label={t("dashboards.newWidget.titleField")}
           placeholder={
-            mode === "pin" ? t("dashboards.newWidget.titleField") : t("dashboards.newWidget.titlePlaceholder", { name })
+            mode === "pin" || compact || size === "s"
+              ? t("dashboards.newWidget.titleField")
+              : t("dashboards.newWidget.titlePlaceholder", { name })
           }
           onChange={(e) => setTitleEdit(e.target.value)}
         />
@@ -867,8 +920,8 @@ function NewWidgetBody({
         {t("dashboards.newWidget.pin")}
       </Button>
     ) : phase === "testing" ? (
-      <Button variant="primary" disabled loading>
-        {t("dashboards.newWidget.testingShort")}
+      <Button variant="primary" disabled loading={!waiting}>
+        {waiting ? t("dashboards.newWidget.create") : t("dashboards.newWidget.testingShort")}
       </Button>
     ) : stale ? (
       <Button variant="primary" icon="refresh" disabled={!canTest} onClick={runTest}>

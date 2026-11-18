@@ -23,6 +23,8 @@ export const cachesEnabled = () => enabled;
 
 export class TtlCache<V> {
   private readonly entries = new Map<string, { value: V; expires: number }>();
+  /** Bumped by every invalidation, so a load that began before one never stores what it read. */
+  private generation = 0;
   constructor(
     private readonly ttlMs: number,
     private readonly max = 5000,
@@ -67,18 +69,23 @@ export class TtlCache<V> {
 
   /** An invalidation, here only: another process's, which it already told everyone. */
   apply(op: CacheOp, key: string) {
+    this.generation++;
     if (op === "clear") this.entries.clear();
     else if (op === "delete") this.entries.delete(key);
     else for (const k of this.entries.keys()) if (k.startsWith(key)) this.entries.delete(k);
   }
 
-  /** Returns the cached value or loads, caches and returns it (`undefined`/null results are cached too). */
+  /**
+   * Returns the cached value or loads, caches and returns it (`undefined`/null results are cached too). A load an
+   * invalidation overtook (here or from another process) is returned but not kept: its read may predate the write.
+   */
   async getOrLoad(key: string, load: () => Promise<V>): Promise<V> {
     if (!enabled) return load();
     const hit = this.entries.get(key);
     if (hit && hit.expires >= Date.now()) return hit.value;
+    const started = this.generation;
     const value = await load();
-    this.set(key, value);
+    if (this.generation === started) this.set(key, value);
     return value;
   }
 }
@@ -113,6 +120,8 @@ export const caches = {
   readOutsideRuns: new TtlCache<true>(3600_000, 20_000),
   /** The workspace's devices by name (`deviceRoster`): a run's prompt and its tool lists read it once. */
   deviceRoster: new TtlCache<unknown>(5_000),
+  /** Registered hosts by name (`hostLook`, ADR 0194), read by the origin check of every write. */
+  hosts: new TtlCache<unknown>(TTL_MS),
 };
 
 /** `caches.contextPresence`'s key for whether an agent holds a rule people gave (`rulesForRun`). */

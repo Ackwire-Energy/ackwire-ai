@@ -21,8 +21,8 @@ import { useAuth } from "@/auth/context";
 import { AppMark } from "@/components/AiApps";
 import { CenteredLayout } from "@/components/AuthLayout";
 import { LoadingLine } from "@/components/Loading";
+import { signOutByHand } from "@/hooks/useSignOut";
 import { DEFAULT_LOCALE, type LocaleCode, locales, TYPED_VALUES, usePageT } from "@/i18n";
-import { STORAGE_KEYS, storage } from "@/lib/storage";
 import "@/components/ai-apps.css";
 
 /** How long "Pronto" shows before the browser goes back to the app. */
@@ -284,10 +284,9 @@ function ConsentForm({
               type="button"
               className="ac-link"
               onClick={async () => {
-                await auth.signOut();
-                storage.set(STORAGE_KEYS.signedOut, "1");
-                qc.clear();
-                window.location.assign(signInPath(window.location.pathname + window.location.search));
+                await signOutByHand(auth, qc);
+                // `add`: the sign-in shows even when another of the browser's accounts is the one in now (ADR 0183).
+                window.location.assign(`${signInPath(window.location.pathname + window.location.search)}&add=1`);
               }}
             >
               {t("apps.consent.switchAccount")}

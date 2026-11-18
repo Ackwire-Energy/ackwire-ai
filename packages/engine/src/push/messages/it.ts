@@ -82,6 +82,18 @@ export const strings: Partial<PushStrings> = {
   deviceAccessTitle: (a, p, d) =>
     p ? `${a} (per ${p}) chiede di usare il tuo ${d}` : `${a} chiede di usare il tuo ${d}`,
   deviceAccessBody: "Tocca per consentire una volta, sempre, o dire di no.",
+  deviceToolTitle: (a, d) => `${a} ti chiede di attivare uno strumento sul tuo ${d}`,
+  deviceToolBody: "Tocca per attivarlo con un clic.",
+  deviceCliTitle: (a, d) => `${a} ti chiede di installare un programma sul tuo ${d}`,
+  deviceCliBody: "Tocca per installarlo con un clic.",
+  deviceFolderTitle: (a, f, d) => (f ? `${a} chiede ${f} sul tuo ${d}` : `${a} chiede una cartella sul tuo ${d}`),
+  deviceFolderBody: "Consentilo nell'app su quel computer.",
+  adminAskTitle: (a, what, l) =>
+    what === "channel_agent"
+      ? `${a} ti chiede di aggiungere un agente a #${l}`
+      : what === "create_agents"
+        ? `${a} chiede di poter creare agenti`
+        : `${a} ti chiede di configurare il webhook di ${l} per le routine`,
   deviceWaitingTitle: (p, d) => `L'agente di ${p} sta aspettando il tuo ${d}`,
   deviceWaitingBody: "Inizia quando torna.",
   teamWeekReady: "La settimana del tuo team è pronta",
@@ -94,4 +106,5 @@ export const strings: Partial<PushStrings> = {
   joinRequestTitlePersonal: (name) => `${name} chiede di entrare nel tuo spazio di lavoro`,
   joinSuggestionTitlePersonal: (by, name) => `${by} ha proposto di invitare ${name}`,
   teamWeekReadyPersonal: "La tua settimana è pronta",
+  teamWatchStill: (n) => (n === 1 ? "1 cosa ti aspetta ancora" : `${n} cose ti aspettano ancora`),
 };

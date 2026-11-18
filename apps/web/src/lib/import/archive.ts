@@ -1,8 +1,9 @@
 import {
   ARCHIVE_PATH,
-  IMPORT_MAX_BYTES,
+  IMPORT_TEXT_MAX_BYTES,
   ImportError,
   type ImportFile,
+  importFileCap,
   isSecretPath,
   normalizePath,
   TEXT_PATH,
@@ -13,7 +14,7 @@ import { readZip, ZipError } from "@agenteschat/client/lib/zip";
  * The async step before `parseImport`: picked or dropped files (a folder keeps
  * its relative paths), or one archive (.zip, .tar.gz, .tgz, .tar) unpacked in
  * the browser. Only text files the formats use are read; a credential store,
- * a binary or a file over 4 MB comes back with empty text, so it can be
+ * a binary or a file over its cap (`importFileCap`) comes back with empty text, so it can be
  * listed without being read. Other small text files (a script, a config) come
  * back with a `peek`, only to look for keys in them before they go to the
  * Drive. Every file keeps its size and a way to read its
@@ -22,16 +23,21 @@ import { readZip, ZipError } from "@agenteschat/client/lib/zip";
  * back, as `junk`.
  */
 
+/**
+ * `entries` and `unpacked` count only the files kept (system files and dependencies never count). A zip is read by
+ * slices, so its size costs no memory; a tar streams, and `raw`/`ratio` cap all it unpacks to (a gzip bomb).
+ */
 export const ARCHIVE_LIMITS = {
   /** The archive file. */
-  bytes: 512 * 1024 * 1024,
+  bytes: 8 * 1024 * 1024 * 1024,
   entries: 50_000,
-  /** What it may unpack to, and how much larger than itself past `ratioFrom` bytes. */
   unpacked: 2 * 1024 * 1024 * 1024,
+  /** All a tar unpacks to, system files included, and how much larger than itself past `ratioFrom` bytes. */
+  raw: 8 * 1024 * 1024 * 1024,
   ratio: 200,
   ratioFrom: 64 * 1024 * 1024,
-  /** Text read in all: what one import may send (IMPORT_LIMITS.bodyBytes in packages/engine/src/imports.ts). */
-  text: 32 * 1024 * 1024,
+  /** Text read in all: what one import may send. */
+  text: IMPORT_TEXT_MAX_BYTES,
   /** Files no format reads, looked at for keys: each, and in all. */
   peekFile: 1024 * 1024,
   peek: 32 * 1024 * 1024,
@@ -77,7 +83,9 @@ export async function readImportFiles(
 }
 
 async function readArchive(blob: Blob, path: string) {
-  if (blob.size > ARCHIVE_LIMITS.bytes) throw new ImportError("tooLarge");
+  if (blob.size > ARCHIVE_LIMITS.bytes) {
+    throw new ImportError("tooLarge", { kind: "bytes", have: blob.size, max: ARCHIVE_LIMITS.bytes, name: path });
+  }
   const head = new Uint8Array(await blob.slice(0, 2).arrayBuffer());
   const zip = head[0] === 0x50 && head[1] === 0x4b;
   const gzip = head[0] === 0x1f && head[1] === 0x8b;
@@ -97,7 +105,7 @@ function budget() {
       if (
         isSecretPath(path) ||
         !TEXT_PATH.test(path) ||
-        size > IMPORT_MAX_BYTES ||
+        size > importFileCap(path) ||
         total + size > ARCHIVE_LIMITS.text
       ) {
         return false;
@@ -151,22 +159,18 @@ async function fromZip(blob: Blob): Promise<Read> {
   const entries = await readZip(blob).catch(() => {
     throw new ImportError("corrupt");
   });
-  const declared = entries.reduce((sum, e) => sum + e.size, 0);
-  if (
-    entries.length > ARCHIVE_LIMITS.entries ||
-    declared > ARCHIVE_LIMITS.unpacked ||
-    (declared > ARCHIVE_LIMITS.ratioFrom && declared > blob.size * ARCHIVE_LIMITS.ratio)
-  ) {
-    throw new ImportError("tooLarge");
-  }
-  const { wants, peeks } = budget();
   const out: Read = { files: [], junk: [] };
-  for (const entry of entries) {
+  const kept = entries.flatMap((entry) => {
     const path = safePath(entry.name);
-    if (JUNK.test(path)) {
-      out.junk.push(path);
-      continue;
-    }
+    if (!JUNK.test(path)) return [{ entry, path }];
+    out.junk.push(path);
+    return [];
+  });
+  // Declared sizes cost nothing here: an entry is read only when wanted, and never past its declared size.
+  const declared = kept.reduce((sum, { entry }) => sum + entry.size, 0);
+  keptWithin(kept.length, declared);
+  const { wants, peeks } = budget();
+  for (const { entry, path } of kept) {
     // An entry larger than its declared size is a zip bomb or a broken archive: the reader stops there.
     const bytes = () =>
       entry.read().catch((error: unknown) => {
@@ -192,6 +196,15 @@ async function fromZip(blob: Blob): Promise<Read> {
   return out;
 }
 
+function keptWithin(count: number, unpacked: number) {
+  if (count > ARCHIVE_LIMITS.entries) {
+    throw new ImportError("tooLarge", { kind: "files", have: count, max: ARCHIVE_LIMITS.entries });
+  }
+  if (unpacked > ARCHIVE_LIMITS.unpacked) {
+    throw new ImportError("tooLarge", { kind: "unpacked", have: unpacked, max: ARCHIVE_LIMITS.unpacked });
+  }
+}
+
 /** The bytes of a stream, taken or skipped in order, without keeping what is skipped. */
 class Bytes {
   private queue: Uint8Array[] = [];
@@ -213,10 +226,11 @@ class Bytes {
     if (done || !value) return false;
     this.total += value.length;
     if (
-      this.total > ARCHIVE_LIMITS.unpacked ||
+      this.total > ARCHIVE_LIMITS.raw ||
       (this.total > ARCHIVE_LIMITS.ratioFrom && this.total > this.packed * ARCHIVE_LIMITS.ratio)
     ) {
-      throw new ImportError("tooLarge");
+      const max = this.total > ARCHIVE_LIMITS.raw ? ARCHIVE_LIMITS.raw : this.packed * ARCHIVE_LIMITS.ratio;
+      throw new ImportError("tooLarge", { kind: "unpacked", have: this.total, max });
     }
     this.queue.push(value);
     this.queued += value.length;
@@ -293,12 +307,13 @@ async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
   const { wants, peeks } = budget();
   const out: Read = { files: [], junk: [] };
   let longName = "";
+  let kept = 0;
+  let keptBytes = 0;
   try {
     for (let count = 0; ; count++) {
       const header = await bytes.take(512);
       if (!header && count === 0) throw new ImportError("corrupt");
       if (!header || header.every((b) => b === 0)) break;
-      if (count >= ARCHIVE_LIMITS.entries) throw new ImportError("tooLarge");
       let sum = 0;
       for (let i = 0; i < 512; i++) sum += i >= 148 && i < 156 ? 32 : (header[i] as number);
       if (sum !== numeric(header, 148, 8)) throw new ImportError("corrupt");
@@ -322,6 +337,11 @@ async function fromTar(blob: Blob, gzip: boolean): Promise<Read> {
       if (regular) end = Math.max(end, at + size);
       if (regular && JUNK.test(path)) out.junk.push(path);
       const own = regular && !JUNK.test(path) && !path.endsWith("/");
+      if (own) {
+        kept++;
+        keptBytes += size;
+        keptWithin(kept, keptBytes);
+      }
       if (own && wants(path, size)) {
         const data = await bytes.take(padded);
         if (!data) throw new ImportError("corrupt");

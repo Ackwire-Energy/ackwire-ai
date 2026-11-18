@@ -144,7 +144,7 @@ function ColumnCards({
           <div
             key={e.item.id}
             className="issues-col__slot"
-            data-slot={e.item.id}
+            data-slot={dnd.slot(e.item, g.id)}
             hidden={e.state === "hidden" || undefined}
             data-landing={e.state === "landing" || undefined}
           >
@@ -163,6 +163,34 @@ function ColumnCards({
 }
 
 /**
+ * A folded group's cards: none, only where one would land. A card picked with the keyboard and moved here still shows,
+ * so the focus has where to stay (its column opens around it, issues.css).
+ */
+function FoldedCards({
+  group: g,
+  dnd,
+  renderCard,
+}: {
+  group: IssueGroup;
+  dnd: IssueDrag<Issue>;
+  renderCard: (issue: Issue, group: string, state: CardState) => ReactNode;
+}) {
+  return (
+    <div className="issues-col__cards" data-drop={g.id}>
+      {dnd.entries(g.id).map(
+        (e) =>
+          e.kind === "card" &&
+          e.state === "picked" && (
+            <div key={e.item.id} className="issues-col__slot" data-slot={dnd.slot(e.item, g.id)}>
+              {renderCard(e.item, g.id, e.state)}
+            </div>
+          ),
+      )}
+    </div>
+  );
+}
+
+/**
  * The board. Grouped by stage: the org's columns, each in a fixed stage, with stage headers only when the board is
  * customized, each column's menu, and "+" in the head of A fazer's columns (`onNew`, for who may create tasks).
  * Grouped by assignee or priority: one column each. Cards move between and inside columns (`useIssueDrag`).
@@ -174,6 +202,9 @@ export function Board({
   dnd,
   renderCard,
   onNew,
+  hideEmpty,
+  collapsed,
+  onFold,
 }: {
   groups: IssueGroup[];
   /** Grouped by stage: the stages with their columns (each column one of `groups`); else null. */
@@ -183,7 +214,13 @@ export function Board({
   renderCard: (issue: Issue, group: string, state: CardState) => ReactNode;
   /** "Nova tarefa" in that column of A fazer; none for who may not create tasks. */
   onNew?: (columnId: string) => void;
+  /** Columns with no card take no room, except while one moves (somewhere to drop it). */
+  hideEmpty: boolean;
+  /** The columns folded to a strip: their mark, count and name. */
+  collapsed: string[];
+  onFold: (group: string, folded: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const stageName = useStageName();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ afterId: string | null } | null>(null);
@@ -192,17 +229,57 @@ export function Board({
   const byId = new Map(groups.map((g) => [g.id, g]));
   const wrap = useRef<HTMLDivElement>(null);
   useDragScroll(wrap, BOARD_SPACE);
-  const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus) => (
-    <section
-      key={g.id}
-      className={cx("issues-col", dnd.over === g.id && "is-over", stage === "canceled" && "is-canceled")}
-      aria-label={g.name}
-      data-col
-    >
-      {head}
-      <ColumnCards group={g} dnd={dnd} renderCard={renderCard} />
-    </section>
+  const shows = (id: string) => !hideEmpty || dnd.active || dnd.count(id) > 0;
+  const folded = (id: string) => collapsed.includes(id);
+  const column = (g: IssueGroup, head: ReactNode, stage?: IssueStatus) =>
+    folded(g.id) ? (
+      <section
+        key={g.id}
+        className={cx("issues-col is-folded", dnd.over === g.id && "is-over", stage === "canceled" && "is-canceled")}
+        aria-label={g.name}
+        data-col
+      >
+        <button
+          type="button"
+          className="issues-col__unfold"
+          aria-expanded={false}
+          aria-label={t("issues.fold.open", { name: g.name })}
+          title={t("issues.fold.open", { name: g.name })}
+          onClick={() => onFold(g.id, false)}
+        >
+          {g.lead}
+          <span className="tabular" data-count={g.id}>
+            {dnd.count(g.id)}
+          </span>
+          <span className="issues-col__vname">{g.name}</span>
+        </button>
+        <FoldedCards group={g} dnd={dnd} renderCard={renderCard} />
+      </section>
+    ) : (
+      <section
+        key={g.id}
+        className={cx("issues-col", dnd.over === g.id && "is-over", stage === "canceled" && "is-canceled")}
+        aria-label={g.name}
+        data-col
+      >
+        {head}
+        <ColumnCards group={g} dnd={dnd} renderCard={renderCard} />
+      </section>
+    );
+  const foldButton = (g: IssueGroup) => (
+    <Button
+      variant="ghost"
+      size="sm"
+      iconOnly
+      icon="shrink"
+      aria-label={t("issues.fold.close", { name: g.name })}
+      title={t("issues.fold.close", { name: g.name })}
+      onClick={() => onFold(g.id, true)}
+    />
   );
+  /** How wide a set of columns stands at least: the open ones whole, the folded ones as strips (issues.css). */
+  const widths = (ids: string[]) =>
+    ({ "--n": ids.filter((id) => !folded(id)).length, "--f": ids.filter(folded).length }) as CSSProperties;
 
   return (
     <>
@@ -213,61 +290,71 @@ export function Board({
         <div ref={wrap} className="issues-boardwrap" data-scroll-restoration-id="issues-board">
           <div className={cx("issues-board", grouped && "is-grouped")}>
             {stages ? (
-              stages.map(({ stage, columns: cols }) => (
-                <section
-                  key={stage}
-                  className="issues-stage"
-                  style={{ "--n": cols.length } as CSSProperties}
-                  // A named region only when it groups columns (a plain board names each column).
-                  aria-label={grouped ? stageName(stage) : undefined}
-                >
-                  {grouped && (
-                    <div className="issues-stage__head">
-                      <Icon name={STATUS_ICON[stage]} size={16} />
-                      <h2>{stageName(stage)}</h2>
-                      <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+              stages.map(({ stage, columns: all }) => {
+                const cols = all.filter((c) => shows(c.id));
+                if (cols.length === 0) return null;
+                return (
+                  <section
+                    key={stage}
+                    className="issues-stage"
+                    style={widths(cols.map((c) => c.id))}
+                    // A named region only when it groups columns (a plain board names each column).
+                    aria-label={grouped ? stageName(stage) : undefined}
+                  >
+                    {grouped && (
+                      <div className="issues-stage__head">
+                        <Icon name={STATUS_ICON[stage]} size={16} />
+                        <h2>{stageName(stage)}</h2>
+                        <span>{cols.reduce((n, c) => n + dnd.count(c.id), 0)}</span>
+                      </div>
+                    )}
+                    <div className="issues-stage__cols">
+                      {cols.map((col) => {
+                        const g = byId.get(col.id);
+                        if (!g) return null;
+                        return column(
+                          g,
+                          <ColumnHead
+                            column={col}
+                            siblings={all}
+                            index={all.indexOf(col)}
+                            count={dnd.count(col.id)}
+                            showIcon={!grouped}
+                            renaming={renaming === col.id}
+                            onRename={() => setRenaming(col.id)}
+                            onRenamed={() => setRenaming(null)}
+                            onAddAfter={() => setAdding({ afterId: col.id })}
+                            onDelete={() => setDeleting(col)}
+                            onNew={onNew && col.stage === "todo" ? () => onNew(col.id) : undefined}
+                            onFold={() => onFold(col.id, true)}
+                            fold={foldButton(g)}
+                          />,
+                          stage,
+                        );
+                      })}
                     </div>
-                  )}
-                  <div className="issues-stage__cols">
-                    {cols.map((col, k) => {
-                      const g = byId.get(col.id);
-                      if (!g) return null;
-                      return column(
-                        g,
-                        <ColumnHead
-                          column={col}
-                          siblings={cols}
-                          index={k}
-                          count={dnd.count(col.id)}
-                          showIcon={!grouped}
-                          renaming={renaming === col.id}
-                          onRename={() => setRenaming(col.id)}
-                          onRenamed={() => setRenaming(null)}
-                          onAddAfter={() => setAdding({ afterId: col.id })}
-                          onDelete={() => setDeleting(col)}
-                          onNew={onNew && col.stage === "todo" ? () => onNew(col.id) : undefined}
-                        />,
-                        stage,
-                      );
-                    })}
-                  </div>
-                </section>
-              ))
+                  </section>
+                );
+              })
             ) : (
-              <section className="issues-stage" style={{ "--n": groups.length } as CSSProperties}>
+              <section className="issues-stage" style={widths(groups.filter((g) => shows(g.id)).map((g) => g.id))}>
                 <div className="issues-stage__cols">
-                  {groups.map((g) =>
-                    column(
-                      g,
-                      <div className="issues-col__head">
-                        {g.lead}
-                        <h2>{g.name}</h2>
-                        <span className="tabular" data-count={g.id}>
-                          {dnd.count(g.id)}
-                        </span>
-                      </div>,
-                    ),
-                  )}
+                  {groups
+                    .filter((g) => shows(g.id))
+                    .map((g) =>
+                      column(
+                        g,
+                        <div className="issues-col__head">
+                          {g.lead}
+                          <h2>{g.name}</h2>
+                          <span className="tabular" data-count={g.id}>
+                            {dnd.count(g.id)}
+                          </span>
+                          <span className="issues-col__grow" />
+                          {foldButton(g)}
+                        </div>,
+                      ),
+                    )}
                 </div>
               </section>
             )}
@@ -310,6 +397,8 @@ function ColumnHead({
   onAddAfter,
   onDelete,
   onNew,
+  onFold,
+  fold,
 }: {
   column: IssueColumn;
   siblings: IssueColumn[];
@@ -322,6 +411,9 @@ function ColumnHead({
   onAddAfter: () => void;
   onDelete: () => void;
   onNew?: () => void;
+  /** "Fold column", in its menu; `fold`: the same as a button, for the column with no menu (the canceled one). */
+  onFold: () => void;
+  fold: ReactNode;
 }) {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -393,6 +485,7 @@ function ColumnHead({
               onClick={onNew}
             />
           )}
+          {col.stage === "canceled" && fold}
           {col.stage !== "canceled" && (
             <Menu
               align="end"
@@ -414,6 +507,9 @@ function ColumnHead({
               </MenuItem>
               <MenuItem icon="layers" onSelect={onAddAfter}>
                 {t("issues.columns.addAfter")}
+              </MenuItem>
+              <MenuItem icon="shrink" onSelect={onFold}>
+                {t("issues.fold.column")}
               </MenuItem>
               <MenuItem
                 icon="chevronLeft"

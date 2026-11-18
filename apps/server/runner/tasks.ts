@@ -53,10 +53,12 @@ import {
   withSignIn,
   yieldRoute,
 } from "./accounts";
-import { codexThreadKey } from "./brain-codex";
+import { codexThreadKey, unwrapShell } from "./brain-codex";
+import { coAuthorLines } from "./co-authors";
 import { commandApproval, ownBranches } from "./command-gate";
 import { RunnerError } from "./errors";
-import { shellCommand } from "./exec";
+import { shellCommand, windowsTaskkill } from "./exec";
+import { envValue, findOnWindowsPath, NO_CWD_LOOKUP, winQuote } from "./executors";
 import { readJson, writeJson } from "./json-file";
 import {
   CODEX_MCP_ENV,
@@ -187,6 +189,8 @@ interface Entry {
   /** Protocol 14: commit what changed at the end with this message; `HEAD` when it started. */
   commit?: string;
   startSha?: string;
+  /** Protocol 63: the lines its commits end with (`AgentScope.coAuthors`), for that commit and a start again. */
+  coAuthors?: string[];
   /** Protocol 31: the agent's account its CLI signs in with (absent: the computer's own sign-in). */
   account?: string;
   /** Its CLI is root's: there is no wrapper, and `pid` is this worker's own, never one to signal. */
@@ -196,6 +200,13 @@ interface Entry {
   /** Why the runner canceled it: what its agent reads first in the result. */
   canceledWhy?: string;
 }
+
+/** The task's agent as its start named it, for what its commits get (`agentSecrets`). */
+const scopeOf = (t: Entry): AgentScope => ({
+  id: t.agentId,
+  handle: t.agentHandle,
+  ...(t.coAuthors ? { coAuthors: t.coAuthors } : {}),
+});
 
 interface Journal {
   tasks: Entry[];
@@ -361,7 +372,8 @@ writeFileSync(file("child.pid"), String(child.pid ?? ""));
 const kill = (signal) => {
   if (!child.pid) return;
   if (process.platform === "win32") {
-    try { spawn("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on("error", () => {}); } catch {}
+    // By its full path: a bare name is looked for in the task's folder first.
+    try { spawn(path.win32.join(process.env.SystemRoot || "C:/Windows", "System32", "taskkill.exe"), ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore", windowsHide: true }).on("error", () => {}); } catch {}
     return;
   }
   try { process.kill(-child.pid, signal); } catch { try { child.kill(signal); } catch {} }
@@ -493,6 +505,8 @@ export function executorCommand(
     extra?: string[];
     /** Claude Code's permission mode (default `acceptEdits`; a mission's plan turn runs `dontAsk`). */
     permissionMode?: "acceptEdits" | "dontAsk";
+    /** Claude Code as the line starts it (default `claude`; on Windows its full path, quoted). */
+    program?: string;
     /** Codex: where it works (`-C`), its sandbox, the file for its last message, the thread to resume. */
     codex?: { cwd: string; sandbox: "read-only" | "workspace-write"; lastFile: string; thread?: string };
     /**
@@ -513,7 +527,8 @@ export function executorCommand(
   if (executor === "codex") {
     // `codex exec` (JSONL events) runs unattended with approval_policy=never: the sandbox is the limit, so
     // workspace-write with network (git push, installs) for work, read-only for a plan. No `--full-auto` (removed).
-    // Global options go before `resume`; the prompt comes on stdin (`-`). Always resumed by id, never `--last`.
+    // Nothing in the Codex home lifts it: no one's own rules (an allow there runs a command outside it), no folder
+    // but the agent's. Global options go before `resume`; the prompt comes on stdin (`-`). Always resumed by id.
     const q = (v: string) => shellArg(v, options.platform);
     const c = options.codex;
     return [
@@ -521,9 +536,11 @@ export function executorCommand(
       "exec",
       "--json",
       "--skip-git-repo-check",
+      "--ignore-rules",
       ...(c ? ["-C", q(c.cwd), "--sandbox", c.sandbox] : []),
-      ...(c?.sandbox === "workspace-write" ? ["-c", q("sandbox_workspace_write.network_access=true")] : []),
-      ...(c?.sandbox === "workspace-write" && addDirs.length ? ["-c", q(codexWritableRoots(addDirs))] : []),
+      ...(c?.sandbox === "workspace-write"
+        ? ["-c", q("sandbox_workspace_write.network_access=true"), "-c", q(codexWritableRoots(addDirs))]
+        : []),
       ...(options.extra ?? []),
       ...(c ? ["-o", q(c.lastFile)] : []),
       ...(c?.thread ? ["resume", c.thread] : []),
@@ -531,7 +548,7 @@ export function executorCommand(
     ].join(" ");
   }
   const parts = [
-    "claude",
+    options.program ?? "claude",
     "-p",
     "--output-format",
     "stream-json",
@@ -762,12 +779,6 @@ export function parseCodexEvent(
     default:
       return {};
   }
-}
-
-/** `/bin/zsh -lc "npm test"` → `npm test` (Codex wraps every command in the login shell). */
-function unwrapShell(command: string) {
-  const m = /^\S*(?:sh|bash|zsh)\s+-l?c\s+(["'])([\s\S]*)\1$/.exec(command.trim());
-  return (m ? (m[2] ?? "") : command).replace(/\s+/g, " ").trim();
 }
 
 /** The end of a log (at most `max` bytes) and whether there was more before it. */
@@ -1010,9 +1021,11 @@ export class TaskManager {
     }
     const [file, ...args] = command;
     const start = (executor !== "shell" && this.opts.spawnCli) || spawn;
+    // On Windows nothing a CLI task starts is looked for in its folder: cmd.exe's lookups, npm's launcher's bare `node`.
+    const taskEnv = process.platform === "win32" && executor !== "shell" ? { ...env, ...NO_CWD_LOOKUP } : env;
     const child = start(file as string, [...args, dir], {
       cwd: dir,
-      env,
+      env: taskEnv,
       stdio: token ? ["ignore", "ignore", "ignore", "pipe"] : "ignore",
       detached: true,
       windowsHide: true,
@@ -1059,11 +1072,27 @@ export class TaskManager {
       );
     }
     const executor: TaskExecutor = req.executor === "claude" || req.executor === "codex" ? req.executor : "shell";
+    // A Codex task is `codex exec` with the network for its work, on a line cmd.exe would read: none of the Windows
+    // sandbox its turns run in (`codex-windows.ts`, ADR 0053 §3) holds it yet.
+    if (executor === "codex" && process.platform === "win32") {
+      throw new RunnerError(
+        "not_allowed",
+        "Background Codex tasks don't run on Windows yet. Do this work in your own turn instead (run_code).",
+      );
+    }
     const session = typeof req.session === "string" && SESSION_ID.test(req.session) ? req.session : undefined;
     const prompt = typeof req.prompt === "string" ? req.prompt : "";
     if (executor !== "shell" && !prompt.trim())
       throw new RunnerError("bad_request", `A ${executor} task needs a prompt`);
     const hosted = executor === "claude" && grant?.kind === "hosted";
+    // On Windows Claude Code by its full path: cmd.exe looks for a bare name in the task's folder first (the agent's,
+    // where it writes), so a `claude.cmd` left there would run as the person.
+    let program: string | undefined;
+    if (executor === "claude" && !hosted && process.platform === "win32") {
+      const found = findOnWindowsPath("claude", envValue(process.env, "PATH") ?? "", envValue(process.env, "PATHEXT"));
+      if (!found) throw new RunnerError("not_found", "Claude Code is not installed on this computer.");
+      program = winQuote(found);
+    }
     const signIn = executor === "shell" || hosted ? null : await this.signIn(executor, req.account, grant);
     if (signIn?.release) this.releases.set(taskId, signIn.release);
     const keyPlan = executor === "claude" && signIn?.planKey ? planOf(signIn.planKey.provider) : undefined;
@@ -1263,6 +1292,7 @@ export class TaskManager {
       : executorCommand(executor, {
           command: req.command,
           ...(readOnly && executor === "claude" ? { permissionMode: "dontAsk" as const } : {}),
+          ...(program ? { program } : {}),
           session,
           resume,
           extra,
@@ -1340,6 +1370,7 @@ export class TaskManager {
     }
     // An allowed folder outside the agent's own (protocol 10) is reported by its absolute path.
     const rel = isInside(folder, cwd) ? path.relative(folder, cwd).split(path.sep).join("/") : cwd;
+    const coAuthors = coAuthorLines(agent);
     const entry: Entry = {
       taskId,
       agentId: String(agent.id),
@@ -1356,6 +1387,7 @@ export class TaskManager {
       ...(mcpToken ? { mcpToken } : {}),
       ...(mcpToken && isRunToolToken(req.mission?.mcpToken) ? { serverToken: req.mission.mcpToken } : {}),
       ...(commitMessage && startSha ? { commit: commitMessage, startSha } : {}),
+      ...(coAuthors.length > 0 ? { coAuthors } : {}),
       ...(signIn ? { account: signIn.account } : {}),
       ...(hosted ? { account: String(req.account), hosted: true as const } : {}),
       ...(plan && signIn?.planKey ? { planKey: true } : {}),
@@ -1554,7 +1586,7 @@ export class TaskManager {
       for (const pid of [childPid, t.pid]) {
         if (!pid) continue;
         try {
-          spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
+          spawn(windowsTaskkill(), ["/pid", String(pid), "/T", "/F"], { stdio: "ignore", windowsHide: true });
         } catch {}
       }
       return;
@@ -1686,7 +1718,7 @@ export class TaskManager {
       });
       for (const f of ["exit.json", "alive", "child.pid", "cancel"]) rmSync(path.join(dir, f), { force: true });
       for (const f of ["stdout.log", "stderr.log"]) writeFileSync(path.join(dir, f), "", { mode: 0o600 });
-      const secrets = (await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null)) ?? null;
+      const secrets = (await this.opts.secrets?.(scopeOf(t)).catch(() => null)) ?? null;
       const env = launch?.env ?? (secrets ? { ...process.env, ...secrets.env } : process.env);
       const child = this.spawnWrapper(dir, env, t.executor, launch?.token);
       (child as unknown as EventEmitter).on("error", () => {});
@@ -1720,7 +1752,7 @@ export class TaskManager {
     const ok = exit !== null && exit.exitCode === 0 && !exit.reason;
     const message = ok ? t.commit : `${t.commit} (stopped)`;
     void (async () => {
-      const secrets = await this.opts.secrets?.({ id: t.agentId, handle: t.agentHandle }).catch(() => null);
+      const secrets = await this.opts.secrets?.(scopeOf(t)).catch(() => null);
       let commit: { startSha: string; endSha: string; error?: string };
       try {
         commit = await commitChanges(t.cwd, message, {

@@ -385,17 +385,21 @@ const CORE_TOOLS: ReadonlySet<string> = new Set(["read_wiki_page", "search_wiki"
  */
 export const RARE_TOOLS: ReadonlySet<string> = new Set([
   "propose_instruction_change",
+  // Its schema is the whole settings card: up front in every run it outweighs what it saves (ADR 0137, 2026-11-12).
+  "request_settings_change",
   "send_sticker",
   "read_skill_file",
   "find_agent",
   "get_my_usage",
   "set_status",
   "set_reply_style",
+  "commit_co_author",
   "add_agent_to_channel",
   "update_thread",
   "cancel_follow_up",
   "offer_install_skill",
   "update_skill_from_source",
+  "create_skill",
   "read_conversation",
   "send_feedback",
   "offer_feedback",
@@ -427,7 +431,7 @@ export const isStableTool = (tool: Pick<ToolDefinition, "name" | "scope" | "conn
 /** How a group is named for the model and the judge ("Browser", "GitHub", a connector's label). */
 const GROUP_LABELS: Record<string, string> = {
   [RARE_GROUP]:
-    "More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes, feedback on this app)",
+    "More of the conversation (reading a channel or a message by its link, stickers, your status, reply style, threads, adding agents to channels, the agents' directory, your usage, instruction changes, your own settings, the agents' line on commits, feedback on this app)",
   drive: "Files (Drive)",
   [DASHBOARD_GROUP]: "Dashboards and widgets (numbers and charts kept up to date, boards to share)",
   issues: "Issues",

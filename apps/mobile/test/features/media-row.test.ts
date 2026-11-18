@@ -59,10 +59,10 @@ describe("MediaRow", () => {
 
   test("a grouped row with a lead and lines under its label: lead, label and end on one line, the rest under", () => {
     const grouped = src("ui/Grouped.tsx");
-    expect(grouped).toContain("const flat = media && Boolean(icon || leading) && Boolean(sub || below || belowText);");
+    expect(grouped).toContain("const flat = media && Boolean(icon || leading);");
     // The head holds the lead, the label and what ends it; what was under the label goes under the head, whole width.
     expect(grouped).toMatch(
-      /<View style=\{styles\.mediaHead\}>\s*\{lead\}\s*<View style=\{styles\.grow\}>\{labelText\}<\/View>\s*\{end\}\s*<\/View>\s*<View>\{under\}<\/View>/,
+      /<View style=\{styles\.mediaHead\}>\s*\{lead\}\s*<View style=\{styles\.grow\}>\{labelText\}<\/View>\s*\{end\}\s*<\/View>\s*\{hasUnder \? <View>\{under\}<\/View> : null\}/,
     );
     expect(grouped).toContain('media: { flexDirection: "column", alignItems: "stretch", gap: MEDIA_ROW.under }');
     expect(grouped).toContain('mediaHead: { flexDirection: "row", alignItems: "center", gap: 12 }');
@@ -75,18 +75,25 @@ describe("MediaRow", () => {
       ["features/settings/MachineScreen.tsx", 6],
       ["features/chats/ArchivedChannelsScreen.tsx", 1],
       ["features/routines/RoutineScreen.tsx", 1],
-      ["features/members/MembersPage.tsx", 3],
-      ["features/members/InviteLinkRows.tsx", 1],
-      ["features/settings/RolesScreen.tsx", 7],
+      ["features/members/MembersPage.tsx", 1],
+      // Convites: who waits, the links and the e-mail invitations, the web's rows in two lines.
+      ["features/members/InvitesScreen.tsx", 3],
+      ["features/roles/RolesScreen.tsx", 3],
+      ["features/roles/RoleScreen.tsx", 1],
+      ["features/roles/PermissionsScreen.tsx", 1],
+      ["features/roles/ChannelsScreen.tsx", 2],
+      ["features/roles/AgentsScreen.tsx", 3],
+      ["features/roles/PeopleScreen.tsx", 3],
+      ["features/roles/LookScreen.tsx", 1],
       ["features/vault/VaultScreen.tsx", 3],
       ["features/vault/parts.tsx", 3],
     ];
     for (const [file, count] of uses)
       expect([file, src(file).match(/^\s*media(: true,)?$/gm)?.length ?? 0]).toEqual([file, count]);
     // An invitation's or a suggestion's address wraps instead of ending in "…".
-    const members = src("features/members/MembersPage.tsx");
-    expect(members).toMatch(/label=\{inv\.email\}\s*labelLines=\{2\}/);
-    expect(members).toMatch(/label=\{s\.email\}\s*labelLines=\{2\}/);
+    // A 64-letter address takes three lines in a row's label column.
+    expect(src("features/members/InvitesScreen.tsx")).toMatch(/label=\{inv\.email\}\s*labelLines=\{3\}/);
+    expect(src("features/members/MembersPage.tsx")).toMatch(/label=\{s\.email\}\s*labelLines=\{2\}/);
   });
 
   test("usage: an agent's API row and a plan account's head keep their mark on the name's line, the rest under", () => {

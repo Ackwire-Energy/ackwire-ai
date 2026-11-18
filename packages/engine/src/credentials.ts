@@ -1,7 +1,8 @@
 import type { KeyWrapper } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, isNull, schema, sql } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNull, like, schema, sql } from "@agenteschat/db";
 import {
   checkOpenRouterKey,
+  customModelId,
   customModelOf,
   customModelsOf,
   type EndpointStyle,
@@ -57,6 +58,12 @@ export interface CredentialSummary {
   usedBy?: { id: string; name: string }[];
   /** On a key just saved: `ok` a real call passed, `unchecked` the provider gave no answer about the key. */
   check?: KeyCheckState;
+  /** On a key just saved: the workspace already had this key, so the saved one was updated instead of adding a copy. */
+  reused?: boolean;
+  /** In a list of keys: how many other saved keys are this very key (`sameKey`), which "Remover cópias" folds into it. */
+  copies?: number;
+  /** In a list of keys: the key this one is a copy of, the row the list shows for both. */
+  copyOf?: string;
   createdAt: Date;
   revokedAt: Date | null;
 }
@@ -197,8 +204,11 @@ export async function createCredential(
     /** `custom` only, and required there: the endpoint's address, API style and models (ADR 0146). */
     endpoint?: { style: EndpointStyle; baseURL: string; models: EndpointModel[] };
   },
-  /** Outbound HTTP for the provider's key check (tests: a fake); `net`: how endpoints may be reached. */
-  opts: { fetch?: typeof fetch; net?: EndpointNet; verify?: KeyVerifier } = {},
+  /**
+   * Outbound HTTP for the provider's key check (tests: a fake); `net`: how endpoints may be reached; `keyWrappers`:
+   * every wrapper saved keys may be sealed with, to find this key among them (default: `keyWrapper` alone).
+   */
+  opts: { fetch?: typeof fetch; net?: EndpointNet; verify?: KeyVerifier; keyWrappers?: KeyWrapper[] } = {},
 ): Promise<CredentialSummary> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   await assertKeysOpen(db, orgId);
@@ -227,29 +237,36 @@ export async function createCredential(
           key: { apiKey, ...(workspaceId ? { workspaceId } : {}), ...options },
         }),
       );
-  const id = crypto.randomUUID();
-  const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, id));
-  const row = await db.transaction(async (tx) => {
-    const [r] = await tx
-      .insert(providerCredentials)
-      .values({
-        id,
-        orgId,
-        provider: input.provider,
-        label: input.label,
-        secretCiphertext: sealed.ciphertext,
-        wrappedDataKey: sealed.wrappedDataKey,
-        kekId: sealed.kekId,
-        keyHint: apiKey === ENDPOINT_NO_KEY ? "" : apiKey.slice(-4),
-        workspaceId,
-        options: { ...options, ...(endpoint ? { endpoint } : {}) },
-        createdByUserId: actorId,
-      })
-      .returning();
-    if (input.makeDefault) await setDefault(tx, orgId, input.provider, id);
-    if (r) await auditCredential(tx, orgId, actorId, "credential.added", r);
-    return r;
-  });
+  const keyHint = apiKey === ENDPOINT_NO_KEY ? "" : apiKey.slice(-4);
+  const fresh = {
+    provider: input.provider,
+    keyHint,
+    workspaceId,
+    options: { ...options, ...(endpoint ? { endpoint } : {}) },
+  };
+  const [same] = await savedCopies(db, opts.keyWrappers ?? [keyWrapper], orgId, fresh, apiKey);
+  const row = same
+    ? await resave(db, actorId, orgId, same, { ...input, endpoint })
+    : await db.transaction(async (tx) => {
+        const id = crypto.randomUUID();
+        const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, id));
+        const [r] = await tx
+          .insert(providerCredentials)
+          .values({
+            id,
+            orgId,
+            label: input.label,
+            secretCiphertext: sealed.ciphertext,
+            wrappedDataKey: sealed.wrappedDataKey,
+            kekId: sealed.kekId,
+            ...fresh,
+            createdByUserId: actorId,
+          })
+          .returning();
+        if (input.makeDefault) await setDefault(tx, orgId, input.provider, id);
+        if (r) await auditCredential(tx, orgId, actorId, "credential.added", r);
+        return r;
+      });
   if (!row) throw new Error("credential insert returned nothing");
   invalidateDefaults(orgId);
   if (input.provider === "openrouter") {
@@ -260,10 +277,101 @@ export async function createCredential(
   await passed?.record(row.id);
   return {
     ...summary(row),
-    isDefault: input.makeDefault === true,
+    isDefault:
+      input.makeDefault === true || (same !== undefined && isDefaultOf(await defaultCredentials(db, orgId), row)),
     ...(custom ? {} : { check: passed ? ("ok" as const) : ("unchecked" as const) }),
+    ...(same ? { reused: true } : {}),
   };
 }
+
+type CredentialRow = typeof providerCredentials.$inferSelect;
+type KeyShape = Pick<CredentialRow, "provider" | "keyHint" | "workspaceId" | "options">;
+
+/**
+ * What must match, besides the secret, for two saved keys to be the same key: the provider, its last characters, the
+ * workspace it is scoped to, an OpenAI organization and project, and an endpoint's address. One secret set up two ways
+ * is two keys.
+ */
+const shapeOf = (r: KeyShape) =>
+  JSON.stringify([
+    r.provider,
+    r.keyHint,
+    r.workspaceId ?? null,
+    r.options?.organization ?? null,
+    r.options?.project ?? null,
+    r.options?.endpoint?.baseURL ?? null,
+  ]);
+
+/** A saved key's secret, or null when no wrapper here opens it (then it is never taken for a copy). */
+async function secretOf(keyWrappers: KeyWrapper[], row: CredentialRow) {
+  try {
+    return await openSecret(
+      keyWrappers,
+      { ciphertext: row.secretCiphertext, wrappedDataKey: row.wrappedDataKey, kekId: row.kekId },
+      aadFor(row.orgId, row.id),
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The workspace's live keys that are `key` with this `secret`, oldest first. Only rows of the same shape are opened,
+ * so a list with no look-alikes opens none.
+ */
+async function savedCopies(db: Executor, keyWrappers: KeyWrapper[], orgId: string, key: KeyShape, secret: string) {
+  const rows = await db
+    .select()
+    .from(providerCredentials)
+    .where(
+      and(
+        eq(providerCredentials.orgId, orgId),
+        eq(providerCredentials.provider, key.provider),
+        eq(providerCredentials.keyHint, key.keyHint),
+        isNull(providerCredentials.revokedAt),
+      ),
+    )
+    .orderBy(asc(providerCredentials.createdAt));
+  const shape = shapeOf(key);
+  const out: CredentialRow[] = [];
+  for (const r of rows) if (shapeOf(r) === shape && (await secretOf(keyWrappers, r)) === secret) out.push(r);
+  return out;
+}
+
+/**
+ * Saving a key the workspace already has: the saved one takes the new details (its name, unless the new one is just
+ * the provider's; an endpoint's API and models, keeping a model's last test while its API stays) and keeps its id, so
+ * its agents, default and spend stay on it.
+ */
+async function resave(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  row: CredentialRow,
+  input: { provider: ProviderId; label: string; makeDefault?: boolean; endpoint?: StoredEndpoint | undefined },
+) {
+  const before = row.options.endpoint;
+  const endpoint = input.endpoint && {
+    ...input.endpoint,
+    models: cleanEndpointModels(input.endpoint.models, before?.style === input.endpoint.style ? before.models : []),
+  };
+  const label = input.label === PROVIDERS[input.provider].label ? row.label : input.label;
+  return db.transaction(async (tx) => {
+    const [r] = await tx
+      .update(providerCredentials)
+      .set({ label, ...(endpoint ? { options: { ...row.options, endpoint } } : {}) })
+      .where(and(eq(providerCredentials.id, row.id), eq(providerCredentials.orgId, orgId)))
+      .returning();
+    if (input.makeDefault) await setDefault(tx, orgId, input.provider, row.id);
+    if (r) await auditCredential(tx, orgId, actorId, "credential.resaved", r);
+    caches.credentials.delete(`${orgId}:${row.id}`);
+    return r;
+  });
+}
+
+/** Whether a key is the one its provider's calls take by default: its provider's default, else the single default. */
+const isDefaultOf = (defaults: Awaited<ReturnType<typeof defaultCredentials>>, r: { id: string; provider: string }) =>
+  defaults.perProvider[r.provider] ? defaults.perProvider[r.provider] === r.id : defaults.legacy === r.id;
 
 /**
  * Tries a stored key again (admins), before an agent is pointed at it: a key kept before this check, or one whose
@@ -277,7 +385,7 @@ export async function checkCredential(
   credentialId: string,
 ): Promise<KeyCheckState> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
-  const stored = await gateway.verifyStoredKey(orgId, credentialId);
+  const stored = await gateway.verifyStoredKey(orgId, credentialId, { live: true });
   if (!stored) throw new NotFoundError("Credential not found");
   const passed = passedCheck(stored.provider, stored.result);
   await passed?.record(credentialId);
@@ -387,7 +495,16 @@ export function providerKeyOf<K extends { id: string; provider: string; revokedA
   return live.find((r) => r.id === chosen) ?? live.find((r) => r.id === defaults.legacy) ?? live.at(-1) ?? null;
 }
 
-export async function listCredentials(db: Database, actorId: string, orgId: string): Promise<CredentialSummary[]> {
+/**
+ * The workspace's keys, oldest first. With `keyWrappers`, the same key saved more than once is told (`copies` on the
+ * row a list shows, `copyOf` on the others): the default first, else the one most agents use, else the oldest.
+ */
+export async function listCredentials(
+  db: Database,
+  actorId: string,
+  orgId: string,
+  keyWrappers?: KeyWrapper[],
+): Promise<CredentialSummary[]> {
   await requirePermission(db, actorId, orgId, "manage_credentials");
   const [rows, defaults, agents, autoProvider] = await Promise.all([
     db
@@ -408,8 +525,6 @@ export async function listCredentials(db: Database, actorId: string, orgId: stri
       .where(and(eq(schema.agents.orgId, orgId), isNull(schema.agents.archivedAt))),
     orgModelProvider(db, orgId),
   ]);
-  const isDefault = (r: typeof providerCredentials.$inferSelect) =>
-    defaults.perProvider[r.provider] ? defaults.perProvider[r.provider] === r.id : defaults.legacy === r.id;
   // An agent with no key of its own thinks with its provider's key all the same: removing that one changes it too.
   const keyOf = (a: (typeof agents)[number]) => {
     const own = parseCustomModel(a.model)?.credentialId ?? a.credentialId;
@@ -417,7 +532,34 @@ export async function listCredentials(db: Database, actorId: string, orgId: stri
     return providerKeyOf(rows, defaults, isAutoModel(a.model) ? autoProvider : modelProvider(a.model))?.id;
   };
   const usedBy = (id: string) => agents.filter((a) => keyOf(a) === id).map((a) => ({ id: a.id, name: a.name }));
-  return rows.map((r) => ({ ...summary(r), isDefault: isDefault(r), usedBy: usedBy(r.id) }));
+  const out = rows.map((r) => ({ ...summary(r), isDefault: isDefaultOf(defaults, r), usedBy: usedBy(r.id) }));
+  if (!keyWrappers) return out;
+  const byId = new Map(out.map((k) => [k.id, k]));
+  const rank = (k: CredentialSummary) => (k.isDefault ? 1_000_000 : 0) + (k.usedBy?.length ?? 0);
+  for (const group of await copyGroups(keyWrappers, rows)) {
+    const keys = group.flatMap((r) => byId.get(r.id) ?? []);
+    const kept = keys.reduce((best, k) => (rank(k) > rank(best) ? k : best));
+    kept.copies = keys.length - 1;
+    for (const k of keys) if (k !== kept) k.copyOf = kept.id;
+  }
+  return out;
+}
+
+/** The live keys saved more than once, each group the rows of one key. Only rows of a shared shape are opened. */
+async function copyGroups(keyWrappers: KeyWrapper[], rows: readonly CredentialRow[]) {
+  const shapes = new Map<string, CredentialRow[]>();
+  for (const r of rows) if (!r.revokedAt) shapes.set(shapeOf(r), [...(shapes.get(shapeOf(r)) ?? []), r]);
+  const groups: CredentialRow[][] = [];
+  for (const alike of shapes.values()) {
+    if (alike.length < 2) continue;
+    const bySecret = new Map<string, CredentialRow[]>();
+    for (const r of alike) {
+      const secret = await secretOf(keyWrappers, r);
+      if (secret !== null) bySecret.set(secret, [...(bySecret.get(secret) ?? []), r]);
+    }
+    groups.push(...[...bySecret.values()].filter((g) => g.length > 1));
+  }
+  return groups;
 }
 
 /** Revoked keys stay stored (usage records point at them) but can no longer be decrypted for calls. */
@@ -462,8 +604,9 @@ export async function usableCredentialRow(db: Executor, orgId: string, credentia
 }
 
 /**
- * Decrypts a credential for a model call. Backend-only: the Model Gateway is
- * its only caller. Org-scoped: a credential id from another org is not found.
+ * Decrypts a credential for a model call. Backend-only: the Model Gateway, and
+ * Jev's key route when a server's owner hands Jev the workspace's OpenRouter key
+ * (ADR 0073 §9). Org-scoped: a credential id from another org is not found.
  */
 export async function decryptCredential(
   db: Database,
@@ -541,6 +684,7 @@ export async function rotateCredential(
         }),
       );
   const sealed = await sealSecret(keyWrapper, apiKey, aadFor(orgId, credentialId));
+  const endpoint = current.options.endpoint;
   const [row] = await db
     .update(providerCredentials)
     .set({
@@ -549,9 +693,15 @@ export async function rotateCredential(
       kekId: sealed.kekId,
       keyHint: apiKey.slice(-4),
       ...values,
-      // An endpoint's address and models stay as they are.
-      ...(values.options && current.options.endpoint
-        ? { options: { ...values.options, endpoint: current.options.endpoint } }
+      // An endpoint's address and models stay as they are. Their test calls were made with the old key, and an endpoint
+      // key's background check is read from them (`verifyStoredKey`), so they are cleared until tested again.
+      ...(endpoint
+        ? {
+            options: {
+              ...(values.options ?? current.options),
+              endpoint: { ...endpoint, models: endpoint.models.map(({ check: _check, ...m }) => m) },
+            },
+          }
         : {}),
     })
     .where(
@@ -621,6 +771,118 @@ export async function deleteCredential(
   caches.credentials.delete(`${orgId}:${credentialId}`);
   for (const u of users) caches.agents.delete(`${orgId}:${u.id}`);
   invalidateDefaults(orgId);
+}
+
+/**
+ * "Remover cópias": the other saved copies of this key fold into it, in one step the person confirmed. Everything that
+ * names a copy moves to the kept key first (agents, the model id of an agent on an endpoint, the workspace's defaults,
+ * router and summary models, the new-agent setup, past spend, an endpoint's models), so no agent loses its AI and the
+ * spend history keeps which key paid. Then the copies are deleted.
+ */
+export async function removeCredentialCopies(
+  db: Database,
+  keyWrappers: KeyWrapper[],
+  actorId: string,
+  orgId: string,
+  credentialId: string,
+): Promise<{ removed: number }> {
+  await requirePermission(db, actorId, orgId, "manage_credentials");
+  const [kept] = await db
+    .select()
+    .from(providerCredentials)
+    .where(
+      and(
+        eq(providerCredentials.id, credentialId),
+        eq(providerCredentials.orgId, orgId),
+        isNull(providerCredentials.revokedAt),
+      ),
+    );
+  if (!kept) throw new NotFoundError("Credential not found");
+  const secret = await secretOf(keyWrappers, kept);
+  const copies =
+    secret === null ? [] : (await savedCopies(db, keyWrappers, orgId, kept, secret)).filter((r) => r.id !== kept.id);
+  if (copies.length === 0) return { removed: 0 };
+  const ids = copies.map((r) => r.id);
+  const { agents, usageRecords, organizationSettings } = schema;
+  const renamed = (model: string | null) => {
+    const parsed = model ? parseCustomModel(model) : null;
+    return parsed && ids.includes(parsed.credentialId) ? customModelId(kept.id, parsed.model) : model;
+  };
+  const moved = await db.transaction(async (tx) => {
+    const movedAgents = await tx
+      .update(agents)
+      .set({ credentialId: kept.id })
+      .where(and(eq(agents.orgId, orgId), inArray(agents.credentialId, ids)))
+      .returning({ id: agents.id });
+    for (const id of ids) {
+      const from = customModelId(id, "");
+      const to = customModelId(kept.id, "");
+      const swap = (col: typeof agents.model | typeof usageRecords.model | typeof usageRecords.requestedModel) =>
+        sql`${to} || substr(${col}, ${from.length + 1})`;
+      movedAgents.push(
+        ...(await tx
+          .update(agents)
+          .set({ model: swap(agents.model) })
+          .where(and(eq(agents.orgId, orgId), like(agents.model, `${from}%`)))
+          .returning({ id: agents.id })),
+      );
+      await tx
+        .update(usageRecords)
+        .set({ credentialId: kept.id })
+        .where(and(eq(usageRecords.orgId, orgId), eq(usageRecords.credentialId, id)));
+      await tx
+        .update(usageRecords)
+        .set({ model: swap(usageRecords.model) })
+        .where(and(eq(usageRecords.orgId, orgId), like(usageRecords.model, `${from}%`)));
+      await tx
+        .update(usageRecords)
+        .set({ requestedModel: swap(usageRecords.requestedModel) })
+        .where(and(eq(usageRecords.orgId, orgId), like(usageRecords.requestedModel, `${from}%`)));
+    }
+    const [settings] = await tx.select().from(organizationSettings).where(eq(organizationSettings.orgId, orgId));
+    if (settings) {
+      const swapId = (id: string) => (ids.includes(id) ? kept.id : id);
+      const perProvider: Record<string, string> = {};
+      for (const [provider, id] of Object.entries(settings.defaultCredentialIds))
+        if (id) perProvider[provider] = swapId(id);
+      const setup = settings.agentSetup;
+      await tx
+        .update(organizationSettings)
+        .set({
+          defaultCredentialId: settings.defaultCredentialId && swapId(settings.defaultCredentialId),
+          defaultCredentialIds: perProvider,
+          routerModel: renamed(settings.routerModel),
+          summaryModel: renamed(settings.summaryModel),
+          agentSetup: setup && {
+            ...setup,
+            model: renamed(setup.model),
+            ...(setup.key ? { key: swapId(setup.key) } : {}),
+          },
+          updatedAt: new Date(),
+        })
+        .where(eq(organizationSettings.orgId, orgId));
+    }
+    // A model an agent picked on a copy stays offered on the kept key.
+    const endpoint = kept.options.endpoint;
+    if (endpoint) {
+      const models = [...endpoint.models];
+      for (const m of copies.flatMap((r) => r.options.endpoint?.models ?? []))
+        if (!models.some((o) => o.id === m.id)) models.push(m);
+      await tx
+        .update(providerCredentials)
+        .set({ options: { ...kept.options, endpoint: { ...endpoint, models } } })
+        .where(eq(providerCredentials.id, kept.id));
+    }
+    await tx
+      .delete(providerCredentials)
+      .where(and(eq(providerCredentials.orgId, orgId), inArray(providerCredentials.id, ids)));
+    for (const r of copies) await auditCredential(tx, orgId, actorId, "credential.copy_removed", r);
+    return movedAgents;
+  });
+  for (const id of [kept.id, ...ids]) caches.credentials.delete(`${orgId}:${id}`);
+  for (const a of moved) caches.agents.delete(`${orgId}:${a.id}`);
+  invalidateDefaults(orgId);
+  return { removed: ids.length };
 }
 
 /** How many active agents use each credential. */

@@ -210,7 +210,14 @@ export async function checkDeviceUse(
       message: `${name} is ${ruleText}, not for ${forWhom}. Nobody can be asked for it: an admin can change who uses it under Settings › Devices. Use another device.`,
     };
   }
-  const requestId = await askDeviceOwner(deps, ctx, target, { owner, requester, why, requesterName: forWhom });
+  // From a confidential thread (ADR 0190) the owner is asked with none of the run's words: they may not be in the
+  // conversation, and neither the request nor its notification goes with the thread's prune.
+  const requestId = await askDeviceOwner(deps, ctx, target, {
+    owner,
+    requester,
+    why: ctx.confidential ? "" : why,
+    requesterName: forWhom,
+  });
   return {
     ok: false,
     requester,
@@ -356,6 +363,11 @@ export function phoneReasonText(
         text: `${phone} runs an iOS newer than Xcode on ${host} can drive. Ask the person to install the Xcode matching the iPhone's iOS (27 for iOS 27), then run \`xcrun devicectl manage ddis update\`.`,
         byItself: false,
       };
+    case "ios_behind_xcode":
+      return {
+        text: `${phone} runs an iOS older than the one Xcode on ${host} is for. Ask the person to update the iPhone: Settings → General → Software Update.`,
+        byItself: false,
+      };
     case "helper_missing":
       return {
         text: `${host} is still setting up the test helper on ${phone} (a few minutes the first time).`,
@@ -445,10 +457,13 @@ export async function decideDeviceAccess(
   if (rule.ownerUserId !== actorId) throw new ForbiddenError("Only the device's owner can answer this");
   if (row.status !== "pending") throw new ValidationError("This request was already answered");
   const status = decision === "no" ? "denied" : decision;
-  await deps.db
+  // Only while it is still pending: of two answers at once (two of the owner's screens), one stands.
+  const [decided] = await deps.db
     .update(deviceAccessRequests)
     .set({ status, decidedByUserId: actorId, decidedAt: new Date() })
-    .where(eq(deviceAccessRequests.id, row.id));
+    .where(and(eq(deviceAccessRequests.id, row.id), eq(deviceAccessRequests.status, "pending")))
+    .returning({ id: deviceAccessRequests.id });
+  if (!decided) throw new ValidationError("This request was already answered");
   if (decision === "always") {
     // The requester joins the rule the owner reads (the phone's own, or for an iPhone its host's).
     const followsHost = phone ? phone.followsHost : true;

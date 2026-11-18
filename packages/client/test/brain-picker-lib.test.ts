@@ -9,9 +9,17 @@ import {
   brainPickOptions,
   brainPickText,
   brainPickValue,
+  keyModelFirst,
+  keyModelGroups,
+  mayPickModel,
+  modelPickerModels,
+  modelPickerSave,
+  modelPickerTiles,
+  modelPickerUndo,
   needsOwnSignIn,
   newPlanAccountOption,
   pickGroups,
+  planAccountOptionOf,
 } from "../src/lib/brain-picker";
 import { brainModelChoices, CODING_PLANS, planFreeHint } from "../src/lib/plans";
 import { AUTO, modelChoices } from "../src/lib/providers";
@@ -333,4 +341,189 @@ test("the plan account just connected: one not among the options when Conectar u
   expect(newPlanAccountOption(after, new Set(before.map((o: { value: string }) => o.value)))?.value).toBe(
     "claude@m1#new/auto",
   );
+});
+
+test("a plan account by its id: its Automático option, never another account's or a disabled one", () => {
+  const row = (value: string, accountId: string, disabled = false) =>
+    ({ value, disabled, pick: { kind: "claude_code", machineId: "m1", model: AUTO, accountId } }) as never;
+  const options = [row("claude@m1#a/auto", "a"), row("claude@m1#b/auto", "b"), row("claude@m1#c/auto", "c", true)];
+  expect(planAccountOptionOf(options, "b")?.value).toBe("claude@m1#b/auto");
+  expect(planAccountOptionOf(options, "c")).toBeUndefined();
+  expect(planAccountOptionOf(options, "missing")).toBeUndefined();
+});
+
+test("a key's models for every agent: the one that answered, the refused ones and why, the rest not tried", () => {
+  const at = new Date().toISOString();
+  const until = new Date(Date.now() + 3600_000).toISOString();
+  const groups = keyModelGroups(CODING_PLANS.opencode, {
+    answered: "deepseek-v4.1-flash",
+    models: {
+      "minimax-m3": { at, off: true },
+      "deepseek-v4-pro": { at, region: true },
+      "glm-5.3": { at, until },
+    },
+  });
+  expect(groups.works).toEqual([
+    {
+      value: "deepseek-v4.1-flash",
+      id: "deepseek-v4.1-flash",
+      label: "DeepSeek V4.1 Flash",
+      maker: "deepseek",
+      textOnly: true,
+    },
+  ]);
+  expect(groups.refused.map((m) => [m.value, m.refused])).toEqual([
+    ["sonnet", "off"],
+    ["deepseek-v4-pro", "region"],
+  ]);
+  expect(groups.untested.some((m) => m.value === "glm-5.3" && !m.textOnly)).toBe(true);
+  const total = groups.works.length + groups.refused.length + groups.untested.length;
+  expect(total).toBe(CODING_PLANS.opencode.claudeCode.models.length);
+  expect(keyModelGroups(CODING_PLANS.opencode, null).works).toEqual([]);
+  // Where it starts: the model asked for by value or by the plan's id, unless refused, else the one that works.
+  expect(keyModelFirst(groups, "glm-5.3")).toBe("glm-5.3");
+  expect(keyModelFirst(groups, "minimax-m3")).toBe("deepseek-v4.1-flash");
+  expect(keyModelFirst(groups)).toBe("deepseek-v4.1-flash");
+});
+
+test("who changes an agent's model in place: an admin or its owner, never on the right hand", () => {
+  const agent = { builtin: null, ownerUserId: "u1" };
+  expect(mayPickModel(agent, "u1", false)).toBe(true);
+  expect(mayPickModel(agent, "u2", false)).toBe(false);
+  expect(mayPickModel(agent, "u2", true)).toBe(true);
+  expect(mayPickModel({ builtin: "right_hand", ownerUserId: "u1" }, "u1", true)).toBe(false);
+  expect(mayPickModel(undefined, "u1", true)).toBe(false);
+});
+
+describe("the model picker: the agent's AI changed in place", () => {
+  const at = new Date().toISOString();
+  const go = {
+    ...goKey,
+    usage: { windows: [], source: "turn" as const, at, models: { "minimax-m3": { at, off: true as const } } },
+  };
+  const otherClaude = {
+    ...goKey,
+    id: "acc-claude",
+    label: "Max",
+    provider: null,
+    usage: { windows: [{ kind: "five_hour" as const, usedPercent: 10 }], source: "probe" as const, at },
+  };
+  const someoneElses = { ...otherClaude, id: "acc-theirs", mine: false, ownerId: "u9" };
+  const view = {
+    brain: "claude_code" as const,
+    model: "auto",
+    effectiveModel: "sonnet",
+    options: [claudeCode, codexOff],
+    accounts: [go, otherClaude, someoneElses],
+    account: "acc-go",
+    ownSignIn: true,
+    ownUsage: {},
+    effort: "medium" as const,
+  };
+  const api = modelChoices(MODELS, [{ id: "k0", provider: "anthropic" } as never], false);
+
+  test("tiles: the plans the computer runs with the owner's accounts and its own sign-in, then the keys", () => {
+    const tiles = modelPickerTiles(t, view, "u1", api, "auto", MODELS);
+    expect(tiles.map((x) => [x.key, x.current])).toEqual([
+      ["claude", false],
+      ["opencode", true],
+      ["api:anthropic", false],
+    ]);
+    // Someone else's account isn't the owner's to pick; the computer's own sign-in is. The most room first.
+    expect(tiles[0]?.accounts.map((a) => a.id)).toEqual([null, "acc-claude"]);
+    // Without a computer brain that runs, no plan tile.
+    expect(
+      modelPickerTiles(
+        t,
+        { ...view, options: [codexOff], brain: "model", account: null },
+        "u1",
+        api,
+        "auto",
+        MODELS,
+      ).map((x) => x.key),
+    ).toEqual(["api:anthropic"]);
+  });
+
+  test("models: Automático first, the one it runs checked on its own tile, a refused one dimmed", () => {
+    const tiles = modelPickerTiles(t, view, "u1", api, "auto", MODELS);
+    const goTile = tiles.find((x) => x.key === "opencode");
+    if (!goTile) throw new Error("no OpenCode tile");
+    const rows = modelPickerModels(t, "pt-BR", view, goTile, goTile.accounts[0], api, "auto");
+    expect(rows[0]).toMatchObject({ value: "auto", auto: true, checked: false });
+    expect(rows.find((r) => r.checked)?.value).toBe("sonnet");
+    expect(rows.find((r) => r.value === "sonnet")?.refused).toBe(true);
+    expect(rows.find((r) => r.value === "deepseek-v4.1-flash")?.textOnly).toBe(true);
+    // Another tile: nothing checked there.
+    const claudeTile = tiles.find((x) => x.key === "claude");
+    if (!claudeTile) throw new Error("no Claude tile");
+    const claude = modelPickerModels(t, "pt-BR", view, claudeTile, claudeTile.accounts[1], api, "auto");
+    expect(claude.map((r) => r.label)).toEqual(["brain.auto.label", "Opus", "Sonnet", "Haiku"]);
+    expect(claude.some((r) => r.checked)).toBe(false);
+    const keys = tiles.find((x) => x.key === "api:anthropic");
+    if (!keys) throw new Error("no key tile");
+    expect(modelPickerModels(t, "pt-BR", view, keys, undefined, api, "auto").map((r) => r.value)).toEqual([
+      "auto",
+      "claude-sonnet-5-5",
+    ]);
+  });
+
+  test("a pick saves the model in place, switches the plan or account, or moves onto the API", () => {
+    const tiles = modelPickerTiles(t, view, "u1", api, "auto", MODELS);
+    const [claudeTile, goTile, keys] = tiles;
+    if (!claudeTile || !goTile || !keys) throw new Error("missing tiles");
+    expect(modelPickerSave(view, goTile, goTile.accounts[0], "glm-5.3")).toEqual({
+      brain: { brain: "claude_code", model: "glm-5.3" },
+    });
+    expect(modelPickerSave(view, goTile, goTile.accounts[0], "auto")).toEqual({
+      brain: { brain: "claude_code", model: "auto", effort: "auto" },
+    });
+    expect(modelPickerSave(view, claudeTile, claudeTile.accounts[1], "opus")).toEqual({
+      brain: { brain: "claude_code", account: "acc-claude", model: "opus" },
+    });
+    expect(modelPickerSave(view, claudeTile, claudeTile.accounts[0], "auto")).toEqual({
+      brain: { brain: "claude_code", account: null, model: "auto", effort: "auto" },
+    });
+    expect(modelPickerSave(view, keys, undefined, "claude-sonnet-5-5")).toEqual({
+      brain: { brain: "model" },
+      model: "claude-sonnet-5-5",
+    });
+  });
+
+  test("Desfazer puts back only what the pick saved, whatever the agent thinks with by then", () => {
+    const plan = { brain: "claude_code" as const, account: "acc-go", model: "auto", effort: "medium" as const };
+    const onPlan = { ...plan, apiModel: "auto" };
+    // From a plan onto the API: the plan comes back, and the API model it had.
+    expect(modelPickerUndo(onPlan, { brain: { brain: "model" }, model: "claude-sonnet-5-5" })).toEqual({
+      brain: plan,
+      model: "auto",
+    });
+    expect(modelPickerUndo(onPlan, { brain: { brain: "model" }, model: "auto" })).toEqual({ brain: plan });
+    // From the API onto a plan: back on the API.
+    const onApi = { brain: "model" as const, account: null, model: null, effort: null, apiModel: "gpt-6" };
+    expect(modelPickerUndo(onApi, { brain: { brain: "claude_code", model: "opus" } })).toEqual({
+      brain: { brain: "model" },
+    });
+    // Another model on the same key: only the model.
+    expect(modelPickerUndo(onApi, { brain: null, model: "claude-sonnet-5-5" })).toEqual({
+      brain: null,
+      model: "gpt-6",
+    });
+  });
+});
+
+describe("pickGroups", () => {
+  test("two groups of the same heading stay two where their keys differ (two owners of one first name)", () => {
+    const groups = pickGroups([
+      { group: "De João", groupKey: "owner:u1" },
+      { group: "De João", groupKey: "owner:u2" },
+      { group: "De João", groupKey: "owner:u2" },
+      { group: "Claude" },
+      { group: "Claude" },
+    ]);
+    expect(groups.map((g) => [g.key, g.group, g.options.length])).toEqual([
+      ["owner:u1", "De João", 1],
+      ["owner:u2", "De João", 2],
+      ["Claude", "Claude", 2],
+    ]);
+  });
 });

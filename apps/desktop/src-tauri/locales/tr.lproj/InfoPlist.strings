@@ -1,0 +1,5 @@
+"NSMicrophoneUsageDescription" = "Ackwire AI, sesli mesaj kaydetmek için mikrofonu kullanır.";
+"NSDesktopFolderUsageDescription" = "Bu Mac'te çalışan ajanların Masaüstü'nüzdeki dosyaları açmasını sağlar.";
+"NSDocumentsFolderUsageDescription" = "Bu Mac'te çalışan ajanların Belgeler klasörünüzdeki dosyaları açmasını sağlar.";
+"NSDownloadsFolderUsageDescription" = "Bu Mac'te çalışan ajanların İndirilenler klasörünüzdeki dosyaları açmasını sağlar.";
+"NSLocalNetworkUsageDescription" = "Bu Mac'te çalışan ajanların Wi-Fi ağınızdaki Android telefonları bulup onlara bağlanmasını sağlar.";

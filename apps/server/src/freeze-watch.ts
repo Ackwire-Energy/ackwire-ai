@@ -1,5 +1,5 @@
 import { beatInFlight, inFlightMemory } from "@agenteschat/adapters/in-flight";
-import type { Logger } from "./logger";
+import type { LogFormat, Logger } from "./logger";
 
 /** How often this thread's event loop beats for the watch. */
 const BEAT_MS = 1000;
@@ -8,6 +8,8 @@ export const FREEZE_MS = 5000;
 
 export interface FreezeWatchOptions {
   logLevel: "debug" | "info" | "warn" | "error";
+  /** The shape of its log lines (`LOG_FORMAT`), the same as the main thread's. */
+  logFormat?: LogFormat;
   /** Where the error goes besides the log (`SENTRY_DSN`); absent: the log line only. */
   reports?: { dsn: string; environment: string; release: string };
   freezeMs?: number;

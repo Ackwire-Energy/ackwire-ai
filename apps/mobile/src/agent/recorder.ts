@@ -26,6 +26,8 @@ export type DrawCmd =
   | { op: "restore" }
   | { op: "translate"; x: number; y: number }
   | { op: "scale"; x: number; y: number }
+  /** Clockwise, in degrees, around the origin. */
+  | { op: "rotate"; degrees: number }
   | { op: "fillRect"; x: number; y: number; w: number; h: number; color: string }
   | { op: "fill"; path: PathCmd[]; color: string }
   | { op: "stroke"; path: PathCmd[]; color: string; width: number; cap: CanvasLineCap; join: CanvasLineJoin }
@@ -118,6 +120,11 @@ export class RecordingContext {
 
   scale(x: number, y: number): void {
     this.commands.push({ op: "scale", x, y });
+  }
+
+  /** Canvas `rotate`: clockwise, in radians. */
+  rotate(angle: number): void {
+    this.commands.push({ op: "rotate", degrees: angle * DEG });
   }
 
   beginPath(): void {

@@ -9,10 +9,12 @@ import {
 import { questionWaitsOn } from "@agenteschat/client/lib/agent-questions";
 import { formatTime, whenAt } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
+import { MAX_MESSAGE_LENGTH } from "@agenteschat/client/lib/message-length";
 import { messagePath } from "@agenteschat/client/lib/message-links";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   appLabel,
+  cardDecidedBy,
   cardHead,
   cardOutcome,
   cardProposalIds,
@@ -37,25 +39,15 @@ import {
   secretWhere,
 } from "@agenteschat/client/lib/secret-requests";
 import { secretEndedAt, secretOutcome } from "@agenteschat/client/lib/secret-words";
-import {
-  Button,
-  Chip,
-  CodeInput,
-  diffLines,
-  EventPillAction,
-  Field,
-  Icon,
-  Input,
-  MessageText,
-  Switch,
-  Textarea,
-} from "@agenteschat/ui";
+import { Button, Chip, CodeInput, diffLines, Field, Icon, Input, overLimit, Switch, Textarea } from "@agenteschat/ui";
 import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import type { TFunction } from "i18next";
+import { useEffect, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { useDirectory } from "@/hooks/useDirectory";
+import { useTextLimit } from "@/hooks/useTextLimit";
 import { TYPED_VALUES } from "@/i18n";
 import { inPlaceClick } from "@/lib/navigate";
 import { useToast } from "@/lib/toast";
@@ -66,9 +58,9 @@ import { SiteIcon } from "./browser/SiteIcon";
 import { useOrg } from "./org-context";
 import { ProseDiff } from "./ProseDiff";
 import {
+  type RequestAnswer,
   RequestCard,
   RequestChoices,
-  RequestDone,
   RequestKeys,
   RequestTile,
   showRequest,
@@ -145,7 +137,7 @@ export function MemoryChangeCard({ update, agentId }: { update: MemoryUpdate; ag
   );
 }
 
-/** What a role or access proposal changes: "Papel: Dev → Revisora", or a chip per app turned on or off. */
+/** What a role or access proposal changes: "Função: Dev → Revisora", or a chip per app turned on or off. */
 export function SettingChange({ p }: { p: Proposal }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -190,8 +182,8 @@ const hasDiff = (p: Proposal) => isText(p) || p.target.type === "skill";
  * Aceitar / Editar / Recusar; a role or an app is taken as proposed, so it has no Editar.
  */
 export function InlineProposal({ proposalId }: { proposalId: string }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const [p] = useCardProposals(org.id, [proposalId]);
   const decide = useDecideProposal(org.id);
@@ -216,141 +208,110 @@ export function InlineProposal({ proposalId }: { proposalId: string }) {
     <ProseDiff label={t("proposals.changeLabel")} lines={diffLines(p.before.split("\n"), text.split("\n"))} />
   );
 
-  // Waiting: a request card, the change behind "Ver a mudança" (a text is edited there before accepting).
-  if (pending) {
-    const before = new Set(p.before.split("\n"));
-    const firstNew = hasDiff(p)
-      ? p.after
-          .split("\n")
-          .find((line) => line.trim() && !before.has(line))
-          ?.trim()
-      : undefined;
-    return (
-      <RequestCard
-        id={p.id}
-        kind="proposal"
-        agent={dir.anyAgent(proposerOf(p))}
-        label={t("inlineProposal.group", { name })}
-        mine={p.canDecide}
-        waitingFor={rowStatus(t, p) ?? undefined}
-        lead={proposalTitle(t, p, org, agentName)}
-        object={{
-          logo: (
-            <RequestTile>
-              <Icon name={p.target.type === "agent_access" ? "layers" : "file"} size={16} />
-            </RequestTile>
-          ),
-          title: target,
-          detail: p.target.type === "agent_role" ? t("proposals.roleLine", { from: p.before, to: p.after }) : firstNew,
-          ...(hasDiff(p) ? { more: t("ask.seeChange") } : {}),
-        }}
-        details={
-          hasDiff(p) ? (
-            <>
-              {editing ? (
-                <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
-                  <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
-                </Field>
-              ) : (
-                diff
-              )}
-              <div className="ac-acts">
-                {p.canDecide && isText(p) && (
-                  <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
-                    {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
-                  </Button>
-                )}
-                <ProposalsLink agentId={p.agentId} />
-              </div>
-            </>
-          ) : undefined
-        }
-        // A new role reads in the well; the apps are chips, under it. Neither has anything to open.
-        body={
-          p.target.type === "agent_access" ? (
-            <div className="rq__field">
-              <SettingChange p={p} />
-            </div>
-          ) : undefined
-        }
-        actions={
-          p.canDecide ? (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={decide.isPending || (isText(p) && !text.trim())}
-                loading={decide.isPending && decide.variables?.decision === "accept"}
-                onClick={() =>
-                  decide.mutate(
-                    { id: p.id, decision: "accept", text: edited ? (draft ?? undefined) : undefined },
-                    { onError },
-                  )
-                }
-              >
-                {edited ? t("proposals.acceptEdited") : t("proposals.accept")}
-              </Button>
-              <Button
-                size="sm"
-                disabled={decide.isPending}
-                loading={decide.isPending && decide.variables?.decision === "refuse"}
-                onClick={() => decide.mutate({ id: p.id, decision: "refuse" }, { onError })}
-              >
-                {t("proposals.refuse")}
-              </Button>
-            </>
-          ) : undefined
-        }
-        what={target}
-        locked={decide.isPending}
-      />
-    );
-  }
-
-  // Decided, or overtaken by a newer text: one line, the change as it was behind "Ver a mudança".
+  // A request card, the change behind "Ver a mudança" (a text is edited there before accepting). Decided, or
+  // overtaken by a newer text, it is the same card: how it ended where its buttons were.
+  const before = new Set(p.before.split("\n"));
+  const firstNew = hasDiff(p)
+    ? p.after
+        .split("\n")
+        .find((line) => line.trim() && !before.has(line))
+        ?.trim()
+    : undefined;
   return (
-    <ProposalDone
+    <RequestCard
+      id={p.id}
+      kind="proposal"
+      agent={dir.anyAgent(proposerOf(p))}
       label={t("inlineProposal.group", { name })}
-      what={<b>{proposalTitle(t, p, org, agentName)}</b>}
-      rows={[p]}
-    >
-      {hasDiff(p) ? diff : <SettingChange p={p} />}
-      <div className="ac-acts">
-        <ProposalsLink agentId={p.agentId} />
-      </div>
-    </ProposalDone>
+      mine={p.canDecide}
+      waitingFor={rowStatus(t, p) ?? undefined}
+      answer={pending ? undefined : proposalAnswer(t, i18n.language, [p], me.user.id)}
+      lead={proposalTitle(t, p, org, agentName)}
+      object={{
+        logo: (
+          <RequestTile>
+            <Icon name={p.target.type === "agent_access" ? "layers" : "file"} size={16} />
+          </RequestTile>
+        ),
+        title: target,
+        detail: p.target.type === "agent_role" ? t("proposals.roleLine", { from: p.before, to: p.after }) : firstNew,
+        ...(hasDiff(p) ? { more: t("ask.seeChange") } : {}),
+      }}
+      details={
+        hasDiff(p) ? (
+          <>
+            {editing && pending ? (
+              <Field label={t("proposals.finalText")} id={`inline-prop-${p.id}`}>
+                <Textarea rows={6} value={text} onChange={(e) => setDraft(e.target.value)} />
+              </Field>
+            ) : (
+              diff
+            )}
+            <div className="ac-acts">
+              {pending && p.canDecide && isText(p) && (
+                <Button variant="ghost" size="sm" onClick={() => setEditing((v) => !v)}>
+                  {editing ? t("proposals.viewDiff") : t("inlineProposal.edit")}
+                </Button>
+              )}
+              <ProposalsLink agentId={p.agentId} />
+            </div>
+          </>
+        ) : undefined
+      }
+      // A new role reads in the well; the apps are chips, under it. Neither has anything to open.
+      body={
+        p.target.type === "agent_access" ? (
+          <div className="rq__field">
+            <SettingChange p={p} />
+          </div>
+        ) : undefined
+      }
+      actions={
+        pending && p.canDecide ? (
+          <>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={decide.isPending || (isText(p) && !text.trim())}
+              loading={decide.isPending && decide.variables?.decision === "accept"}
+              onClick={() =>
+                decide.mutate(
+                  { id: p.id, decision: "accept", text: edited ? (draft ?? undefined) : undefined },
+                  { onError },
+                )
+              }
+            >
+              {edited ? t("proposals.acceptEdited") : t("proposals.accept")}
+            </Button>
+            <Button
+              size="sm"
+              disabled={decide.isPending}
+              loading={decide.isPending && decide.variables?.decision === "refuse"}
+              onClick={() => decide.mutate({ id: p.id, decision: "refuse" }, { onError })}
+            >
+              {t("proposals.refuse")}
+            </Button>
+          </>
+        ) : undefined
+      }
+      what={target}
+      locked={decide.isPending}
+    />
   );
 }
 
-/** A decided proposal's line: what it was, how it ended and when the last row was decided; the rest when asked for. */
-function ProposalDone({
-  label,
-  what,
-  rows,
-  children,
-}: {
-  label: string;
-  what: ReactNode;
-  rows: Proposal[];
-  children: ReactNode;
-}) {
-  const { t, i18n } = useTranslation();
-  const outcome = cardOutcome(t, rows);
+/** How a card of proposals ended, for its footer: who decided it, and when the last row was decided. */
+function proposalAnswer(t: TFunction, locale: string, rows: Proposal[], meId: string): RequestAnswer {
   // A row overtaken by a newer text was never decided.
   const at = rows
     .flatMap((p) => p.decidedAt ?? [])
     .sort()
     .at(-1);
-  return (
-    <RequestDone
-      done={outcome.accepted}
-      label={label}
-      more={{ label: t("ask.seeChange"), content: children }}
-      time={at ? whenAt(t, i18n.language, at) : undefined}
-    >
-      {outcome.label}: {what}
-    </RequestDone>
-  );
+  return {
+    done: cardOutcome(t, rows).accepted,
+    text: cardDecidedBy(t, rows, meId),
+    time: at ? whenAt(t, locale, at) : undefined,
+  };
 }
 
 function ProposalsLink({ agentId }: { agentId: string }) {
@@ -371,8 +332,8 @@ function ProposalsLink({ agentId }: { agentId: string }) {
  * the viewer may decide and left on. Each row applies on its own, so one that went stale never stops the rest.
  */
 export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
-  const { t } = useTranslation();
-  const { org } = useOrg();
+  const { t, i18n } = useTranslation();
+  const { org, me } = useOrg();
   const dir = useDirectory(org.id);
   const rows = useCardProposals(org.id, proposalIds);
   const decide = useDecideProposals(org.id);
@@ -449,89 +410,73 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
   );
   const groups = proposalSections(rows);
 
-  // Waiting: a request card like every other, the rows and their switches above its decision.
-  if (rows.some(isOpen)) {
-    const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
-    const texts = groups.flatMap((g) => (g.kind === "text" && g.lines.length > 0 ? [g] : []));
-    const firstLine = firstChange(texts[0]?.lines);
-    return (
-      <RequestCard
-        id={first.id}
-        kind="proposal"
-        agent={dir.anyAgent(proposerOf(first))}
-        label={label}
-        mine={decides}
-        lead={who}
-        object={
-          firstLine
-            ? {
-                logo: (
-                  <RequestTile>
-                    <Icon name="file" size={16} />
-                  </RequestTile>
-                ),
-                title: firstLine.text,
-                more: t("ask.seeChange"),
-              }
-            : undefined
-        }
-        details={
-          texts.length > 0 ? (
-            <>
-              {texts.map((g) => (
-                <ProseDiff key={g.rows[0]?.id} label={t("proposals.changeLabel")} lines={g.lines} />
-              ))}
-              <div className="ac-acts">
-                <ProposalsLink agentId={first.agentId} />
-              </div>
-            </>
-          ) : undefined
-        }
-        body={rowList(groups.flatMap((g) => g.rows))}
-        actions={
-          decides ? (
-            <>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={decide.isPending || chosen.length === 0}
-                loading={decide.isPending && decide.variables?.decision === "accept"}
-                onClick={() => run("accept")}
-              >
-                {all ? t("proposals.acceptAll") : t("proposals.acceptSome", { count: chosen.length })}
-              </Button>
-              <Button
-                size="sm"
-                disabled={decide.isPending || chosen.length === 0}
-                loading={decide.isPending && decide.variables?.decision === "refuse"}
-                onClick={() => run("refuse")}
-              >
-                {t("proposals.refuse")}
-              </Button>
-            </>
-          ) : undefined
-        }
-        what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
-        locked={decide.isPending}
-      />
-    );
-  }
-
-  // Decided, or overtaken by a newer text.
+  // A request card like every other, the rows and their switches above its decision. Decided, the same card: each
+  // row says how it ended, and the footer who decided and when.
+  const waiting = rows.some(isOpen);
+  const tt = t as unknown as (key: string, options: Record<string, unknown>) => string;
+  const texts = groups.flatMap((g) => (g.kind === "text" && g.lines.length > 0 ? [g] : []));
+  const firstLine = firstChange(texts[0]?.lines);
   return (
-    <ProposalDone label={label} what={who} rows={rows}>
-      {groups.map((section) => (
-        <div key={section.rows[0]?.id} className="proposal-section">
-          {section.kind === "text" && section.lines.length > 0 && (
-            <ProseDiff label={t("proposals.changeLabel")} lines={section.lines} />
-          )}
-          {rowList(section.rows)}
-        </div>
-      ))}
-      <div className="ac-acts">
-        <ProposalsLink agentId={first.agentId} />
-      </div>
-    </ProposalDone>
+    <RequestCard
+      id={first.id}
+      kind="proposal"
+      agent={dir.anyAgent(proposerOf(first))}
+      label={label}
+      mine={decides}
+      answer={waiting ? undefined : proposalAnswer(t, i18n.language, rows, me.user.id)}
+      lead={who}
+      object={
+        firstLine
+          ? {
+              logo: (
+                <RequestTile>
+                  <Icon name="file" size={16} />
+                </RequestTile>
+              ),
+              title: firstLine.text,
+              more: t("ask.seeChange"),
+            }
+          : undefined
+      }
+      details={
+        texts.length > 0 ? (
+          <>
+            {texts.map((g) => (
+              <ProseDiff key={g.rows[0]?.id} label={t("proposals.changeLabel")} lines={g.lines} />
+            ))}
+            <div className="ac-acts">
+              <ProposalsLink agentId={first.agentId} />
+            </div>
+          </>
+        ) : undefined
+      }
+      body={rowList(groups.flatMap((g) => g.rows))}
+      actions={
+        waiting && decides ? (
+          <>
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={decide.isPending || chosen.length === 0}
+              loading={decide.isPending && decide.variables?.decision === "accept"}
+              onClick={() => run("accept")}
+            >
+              {all ? t("proposals.acceptAll") : t("proposals.acceptSome", { count: chosen.length })}
+            </Button>
+            <Button
+              size="sm"
+              disabled={decide.isPending || chosen.length === 0}
+              loading={decide.isPending && decide.variables?.decision === "refuse"}
+              onClick={() => run("refuse")}
+            >
+              {t("proposals.refuse")}
+            </Button>
+          </>
+        ) : undefined
+      }
+      what={tt(head.key, head.values).replace(/<\/?b>/g, "")}
+      locked={decide.isPending}
+    />
   );
 }
 
@@ -542,8 +487,8 @@ export function ProposalGroup({ proposalIds }: { proposalIds: string[] }) {
  * in the panel, a consultation, a channel whose composer posts elsewhere), so
  * it never depends on which composer is on screen.
  */
-export function QuestionCard({ question }: { question: AgentQuestion }) {
-  const { t } = useTranslation();
+export function QuestionCard({ question, asker }: { question: AgentQuestion; asker?: string }) {
+  const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
   const dir = useDirectory(org.id);
@@ -553,6 +498,8 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const [error, setError] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const [text, setText] = useState("");
+  const limit = useTextLimit(MAX_MESSAGE_LENGTH, "choices.tooLongFix");
+  const tooLong = overLimit(text, limit);
   const reopen = useRef<HTMLButtonElement>(null);
   // Refused because it ended (someone answered, its run stopped): the card closes here, even if no event came.
   const [ended, setEnded] = useState(false);
@@ -583,132 +530,13 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
   const name = agent?.name ?? t("channel.unknownAgent");
   const done = current.status === "answered";
   const who = current.answeredByUserId === me.user.id ? null : dir.memberById.get(current.answeredByUserId ?? "")?.name;
-  // Open: a request card, the choices a list in its body, each with its number key, and "Outra resposta" the list's
-  // last line, opening a field to write one. For someone else, it says who it waits for and nothing else.
-  if (!done) {
-    const mine = questionWaitsOn(current, me.user.id);
-    const choices = current.choices ?? [];
-    const send = () => {
-      if (text.trim() && !busy) answer.mutate({ text: text.trim() });
-    };
-    const pick = (choice: string | undefined) => {
-      if (choice !== undefined && !busy) answer.mutate({ choice });
-    };
-    const picking = (choice: string) =>
-      answer.isPending && "choice" in answer.variables && answer.variables.choice === choice;
-    const errorLine = error ? (
-      <p className="rq__error" role="alert">
-        {error}
-      </p>
-    ) : null;
-    const field = writing && (
-      <div className="rq__field">
-        <Textarea
-          rows={2}
-          autoGrow
-          autoFocus
-          value={text}
-          placeholder={t("question.placeholder")}
-          aria-label={t("question.placeholder")}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              send();
-            }
-          }}
-        />
-      </div>
-    );
-    return (
-      <RequestCard
-        id={question.id}
-        kind="question"
-        agent={agent}
-        label={t("question.group", { agent: name })}
-        mine={mine}
-        waitingFor={t("ask.waitingFor", {
-          name: dir.memberById.get(current.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson"),
-        })}
-        lead={current.text}
-        body={
-          (mine && choices.length > 0) || field || errorLine ? (
-            <>
-              {mine && choices.length > 0 && (
-                <RequestChoices
-                  choices={choices.map((label) => ({ label, busy: picking(label) }))}
-                  onPick={(i) => pick(choices[i])}
-                  disabled={busy}
-                  other={
-                    writing ? undefined : { label: t("ask.otherAnswer"), onClick: () => setWriting(true), ref: reopen }
-                  }
-                />
-              )}
-              {field}
-              {errorLine}
-            </>
-          ) : undefined
-        }
-        actions={
-          mine &&
-          (writing ? (
-            <>
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={!text.trim() || skip.isPending || (answer.isPending && !("text" in answer.variables))}
-                loading={answer.isPending && "text" in answer.variables}
-              >
-                {t("channel.send")}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                disabled={busy}
-                onClick={() => {
-                  setWriting(false);
-                  setText("");
-                  setError(null);
-                  // The button leaves with the field: focus goes back to the one that opened it.
-                  requestAnimationFrame(() => reopen.current?.focus());
-                }}
-              >
-                {t("common.cancel")}
-              </Button>
-            </>
-          ) : choices.length > 1 ? (
-            <RequestKeys count={choices.length} />
-          ) : choices.length === 0 ? (
-            <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
-              {t("question.answer")}
-            </Button>
-          ) : undefined)
-        }
-        end={
-          mine && (
-            <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
-              {t("question.skip")}
-            </Button>
-          )
-        }
-        what={current.text}
-        onSubmit={writing ? send : undefined}
-        locked={busy}
-      />
-    );
-  }
-  // Answered: the question stays in the open as the agent's words; one line says who answered and what. Closed
-  // with no answer (its run stopped, or it expired): it says so instead.
+  // Answered, or closed with no answer (its run stopped, it expired): the same card, the question still its words,
+  // and who answered what, and when, where the choices and the footer were.
   const answerText = current.answer ?? "";
-  return (
-    <>
-      {/* A row's name and time stay on its own words: this one follows them. */}
-      <MessageText opens={false} closes={false}>
-        {current.text}
-      </MessageText>
-      <RequestDone done label={t("question.group", { agent: name })}>
-        {current.withdrawn ? (
+  const how: RequestAnswer | undefined = done
+    ? {
+        done: current.answer !== null && !current.withdrawn && !current.dismissed,
+        text: current.withdrawn ? (
           t("question.withdrawn", agentGrammar(name))
         ) : current.dismissed ? (
           who ? (
@@ -732,9 +560,128 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
             components={{ b: <b /> }}
             {...TYPED_VALUES}
           />
-        )}
-      </RequestDone>
-    </>
+        ),
+        time: current.answeredAt ? whenAt(t, i18n.language, current.answeredAt) : undefined,
+      }
+    : undefined;
+  // Open: a request card, the choices a list in its body, each with its number key, and "Outra resposta" the list's
+  // last line, opening a field to write one. For someone else, it says who it waits for and nothing else.
+  const mine = !done && questionWaitsOn(current, me.user.id);
+  const choices = current.choices ?? [];
+  const send = () => {
+    if (text.trim() && !tooLong && !busy) answer.mutate({ text: text.trim() });
+  };
+  const pick = (choice: string | undefined) => {
+    if (choice !== undefined && !busy) answer.mutate({ choice });
+  };
+  const picking = (choice: string) =>
+    answer.isPending && "choice" in answer.variables && answer.variables.choice === choice;
+  const errorLine = error ? (
+    <p className="rq__error" role="alert">
+      {error}
+    </p>
+  ) : null;
+  const field = writing && (
+    <div className="rq__field">
+      <Textarea
+        rows={2}
+        autoGrow
+        autoFocus
+        value={text}
+        limit={limit}
+        placeholder={t("question.placeholder")}
+        aria-label={t("question.placeholder")}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+            e.preventDefault();
+            send();
+          }
+        }}
+      />
+    </div>
+  );
+  return (
+    <RequestCard
+      id={question.id}
+      kind="question"
+      agent={agent}
+      asker={asker}
+      runId={question.runId ?? null}
+      label={t("question.group", { agent: name })}
+      mine={mine}
+      waitingFor={t("ask.waitingFor", {
+        name: dir.memberById.get(current.requestedForUserId ?? "")?.name ?? t("channel.unknownPerson"),
+      })}
+      lead={current.text}
+      answer={how}
+      body={
+        (mine && choices.length > 0) || (mine && field) || errorLine ? (
+          <>
+            {mine && choices.length > 0 && (
+              <RequestChoices
+                choices={choices.map((label) => ({ label, busy: picking(label) }))}
+                onPick={(i) => pick(choices[i])}
+                disabled={busy}
+                other={
+                  writing ? undefined : { label: t("ask.otherAnswer"), onClick: () => setWriting(true), ref: reopen }
+                }
+              />
+            )}
+            {mine && field}
+            {errorLine}
+          </>
+        ) : undefined
+      }
+      actions={
+        mine &&
+        (writing ? (
+          <>
+            <Button
+              type="submit"
+              variant="primary"
+              size="sm"
+              disabled={
+                !text.trim() || tooLong || skip.isPending || (answer.isPending && !("text" in answer.variables))
+              }
+              loading={answer.isPending && "text" in answer.variables}
+            >
+              {t("channel.send")}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              onClick={() => {
+                setWriting(false);
+                setText("");
+                setError(null);
+                // The button leaves with the field: focus goes back to the one that opened it.
+                requestAnimationFrame(() => reopen.current?.focus());
+              }}
+            >
+              {t("common.cancel")}
+            </Button>
+          </>
+        ) : choices.length > 1 ? (
+          <RequestKeys count={choices.length} />
+        ) : choices.length === 0 ? (
+          <Button ref={reopen} variant="primary" size="sm" onClick={() => setWriting(true)}>
+            {t("question.answer")}
+          </Button>
+        ) : undefined)
+      }
+      end={
+        mine && (
+          <Button variant="ghost" size="sm" disabled={busy} loading={skip.isPending} onClick={() => skip.mutate()}>
+            {t("question.skip")}
+          </Button>
+        )
+      }
+      what={current.text}
+      onSubmit={writing ? send : undefined}
+      locked={busy}
+    />
   );
 }
 
@@ -744,7 +691,14 @@ export function QuestionCard({ question }: { question: AgentQuestion }) {
  * browser, to the key the computer made, so it never reaches our server, the
  * chat or the agent. Everyone else sees who was asked.
  */
-export function SecretCard({ request }: { request: SecretRequest }) {
+export function SecretCard({
+  request,
+  runId = null,
+}: {
+  request: SecretRequest;
+  /** The run that asked (its message's). */
+  runId?: string | null;
+}) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const api = useApi();
@@ -880,17 +834,38 @@ export function SecretCard({ request }: { request: SecretRequest }) {
   const where = secretWhere(t, current, agentName);
   const label = secretLabel(t, current, agentName);
   const until = t("secret.until", { time: formatTime(i18n.language, current.expiresAt) });
-  // Waiting: a request card; only the person asked gets the field (the whole card is its form).
-  if (pending) {
-    const host = hostOf(current.site);
-    return (
+  // A request card; only the person asked gets the field (the whole card is its form). Closed, the same card: how it
+  // ended and when where the field and the buttons were, never its value.
+  const ended = secretEndedAt(current);
+  const how: RequestAnswer | undefined = pending
+    ? undefined
+    : {
+        done: current.status === "delivered",
+        text: (
+          <>
+            {secretOutcome(t, current, mine, person, agentName)}
+            {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
+          </>
+        ),
+        time: ended ? whenAt(t, i18n.language, ended) : undefined,
+        action: current.supersededBy ? (
+          <Button size="sm" variant="ghost" onClick={() => void showNewer()}>
+            {t("secret.seeNewer")}
+          </Button>
+        ) : undefined,
+      };
+  const host = hostOf(current.site);
+  return (
+    <>
       <RequestCard
         id={current.id}
         kind="secret"
         agent={agent}
+        runId={runId}
         label={t("secret.group", { agent: agentName })}
         mine={mine}
         waitingFor={t("ask.waitingFor", { name: person })}
+        answer={how}
         lead={current.purpose}
         object={{
           logo: <RequestTile>{host ? <SiteIcon host={host} /> : <Icon name="lock" size={16} />}</RequestTile>,
@@ -900,7 +875,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
             : where,
         }}
         body={
-          mine ? (
+          mine && pending ? (
             <>
               <div className="rq__field">
                 {codeDigits ? (
@@ -953,7 +928,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           ) : undefined
         }
         actions={
-          mine ? (
+          mine && pending ? (
             <>
               <Button
                 type="submit"
@@ -978,29 +953,9 @@ export function SecretCard({ request }: { request: SecretRequest }) {
         }
         end={until}
         what={label}
-        onSubmit={mine ? submit : undefined}
+        onSubmit={mine && pending ? submit : undefined}
         locked={deliver.isPending || decline.isPending}
       />
-    );
-  }
-  // Closed: one line, how it ended and which secret, never its value; what it was for behind "Ver detalhes".
-  const ended = secretEndedAt(current);
-  return (
-    <>
-      <RequestDone
-        done={current.status === "delivered"}
-        label={t("secret.group", { agent: agentName })}
-        more={{ label: t("approval.seeDetails"), content: `${current.purpose}\n${where}` }}
-        action={
-          current.supersededBy ? (
-            <EventPillAction onClick={() => void showNewer()}>{t("secret.seeNewer")}</EventPillAction>
-          ) : undefined
-        }
-        time={ended ? whenAt(t, i18n.language, ended) : undefined}
-      >
-        <b>{label}</b> · {secretOutcome(t, current, mine, person, agentName)}
-        {vaultSave === "saved" && ` · ${t("vault.card.saved")}`}
-      </RequestDone>
       {(vaultSave === "failed" || vaultSave === "dropped") && (
         <div className="vlt-save__failed">
           <p className="rq__note ac-iconline">
@@ -1014,7 +969,7 @@ export function SecretCard({ request }: { request: SecretRequest }) {
           )}
         </div>
       )}
-      {error && (
+      {!pending && error && (
         <p className="rq__error" role="alert">
           {error}
         </p>

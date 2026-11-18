@@ -182,22 +182,22 @@ describe("whom it is for: the right hand never picks the computer", () => {
     expect(facesOf(dialog)).toEqual(["done", "done", "done"]);
   });
 
-  test("the right hand left without an AI: its Connect opens its own plain dialog", async () => {
+  test("the right hand left without an AI: its Connect opens the narrow dialog for it alone", async () => {
     const { machines, dialog } = await team({ hand: true });
     for (const n of [1, 2, 3]) machines?.endLogin(`login_${n}`, { state: "done", account: max(n) });
     await pickPlan(dialog, "Claude");
     for (const _ of [1, 2, 3]) await signIn(dialog);
     await click(within(dialog).getByRole("button", { name: /^Conectar (o|a) Lodi$/ }));
     await settle(4);
-    const own = screen().getByRole("dialog");
-    expect(inBand(own)).toBe(false);
-    expect(own.querySelector(".ai-picker")).toBeTruthy();
+    const own = screen().getByRole("dialog", { name: /^Conectar uma IA para (o|a) Lodi$/ });
+    expect(inBand(own)).toBe(true);
+    expect(own.querySelector(".ai-picker")).toBeNull();
   });
 
-  test("the right hand the only one to wake: one agent alone, the plain dialog", async () => {
+  test("the right hand the only one to wake: one agent alone, the narrow dialog named for it", async () => {
     const { dialog } = await team({ hand: true, ready: [ADA_ID, ATLAS_ID, LIA_ID] });
-    expect(inBand(dialog)).toBe(false);
-    expect(dialog.querySelector(".ai-picker")).toBeTruthy();
+    expect(inBand(dialog)).toBe(true);
+    expect(dialog.querySelector(".ai-picker")).toBeNull();
     // Its own dialog, named for it, never the generic one over agents that already think.
     expect(screen().getByRole("dialog", { name: /^Conectar uma IA para (o|a) Lodi$/ })).toBe(dialog);
     expect(within(dialog).queryByRole("combobox", { name: "Agentes que usam este plano" })).toBeNull();
@@ -274,7 +274,8 @@ describe("the end: who woke, why the others stayed, what they think with", () =>
     await click(within(dialog).getByRole("button", { name: "Pular o Atlas" }));
     await signIn(dialog);
     expect(shownText(dialog)).toContain("2 agentes acordaram");
-    expect(shownText(dialog)).toContain("Eles já pensam com o seu Claude Max");
+    // An account with the automatic name ("Claude Max"): the sentence says the plan's.
+    expect(shownText(dialog)).toContain("Eles já pensam com o seu Claude");
     expect(shownText(dialog)).toContain("Atlas: Não deu para entrar nessa conta. Tente de novo.");
     machines?.endLogin("login_4", { state: "done", account: max(4) });
     await click(within(dialog).getByRole("button", { name: "Conectar o Atlas" }));
@@ -282,7 +283,8 @@ describe("the end: who woke, why the others stayed, what they think with", () =>
     await settle(8);
     expect(calls(state, "agents.setBrain").map((c) => c.args[1])).toEqual([ADA_ID, LIA_ID, ATLAS_ID]);
     expect(shownText(dialog)).toContain("O time acordou");
-    expect(shownText(dialog)).toContain("Eles já pensam com o seu Claude Max");
+    // An account with the automatic name ("Claude Max"): the sentence says the plan's.
+    expect(shownText(dialog)).toContain("Eles já pensam com o seu Claude");
     expect(shownText(dialog)).not.toContain("Não deu para entrar");
     expect(facesOf(dialog)).toEqual(["done", "done", "done"]);
   });
@@ -300,7 +302,8 @@ describe("the end: who woke, why the others stayed, what they think with", () =>
     await pickPlan(dialog, "Claude");
     await withPopup(() => click(within(dialog).getByRole("button", { name: "Entrar com Claude" })));
     await settle(8);
-    expect(shownText(dialog)).toContain("A Ada já pensa com o seu Claude Team");
+    // An account with the automatic name ("Claude Team"): the sentence says the plan's.
+    expect(shownText(dialog)).toContain("A Ada já pensa com o seu Claude");
     expect(shownText(dialog)).toContain("1 agente acordou");
     expect(hintOf("os termos do plano", dialog).text).toContain("Cada assento do");
   });
@@ -358,6 +361,17 @@ describe("the team dialog's styles", () => {
     expect(css).not.toContain(
       ".arrival-opts .ac-option > :is(.ac-brand, .arrival-opts__tile):first-child + .ac-option__text > .ac-option__title {",
     );
+  });
+
+  test("an account row's name and lines wrap whole, never cut", async () => {
+    const css = await stylesheet("../src/components/arrival/arrival.css");
+    const rule = css.split("\n.arrival-have__title,\n.arrival-have__line {")[1]?.split("}")[0] ?? "";
+    expect(rule).toContain("overflow-wrap: anywhere");
+    for (const sel of [".arrival-have__title {", ".arrival-have__line {"]) {
+      for (const block of css.split(`\n${sel}`).slice(1)) {
+        expect(block.split("}")[0]).not.toMatch(/ellipsis|nowrap/);
+      }
+    }
   });
 
   test("Choose keeps long names whole, the box and the face on the name's first line", async () => {

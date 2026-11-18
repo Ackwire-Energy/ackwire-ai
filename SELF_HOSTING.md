@@ -1,5 +1,11 @@
 # Self-hosting Ackwire AI
 
+Build from the [fork checkout](#from-source) before the first Ackwire server and setup releases. Released installers on the hub download the standalone CLI from the matching `setup-v*` release in Ackwire-Energy/ackwire-ai. The public `@agenteschat/setup` npm package belongs to the upstream distribution.
+
+Upstream self-hosting is free: AGPL-3.0, no license key. agentes.chat Cloud is the paid,
+hosted option. Changing it without publishing your changes, or reselling it under your own brand,
+takes a [commercial license](COMMERCIAL.md).
+
 Ackwire AI runs as two containers: Postgres 18 with the pgvector extension, and the app, one Bun
 process that serves the web app, the API and the WebSockets and runs the background workers. A
 third, Tailscale, puts it on your private network with HTTPS. Migrations run when the app starts.
@@ -9,10 +15,12 @@ Everything it keeps is in Postgres, except uploaded files, which the compose fil
 (`https://agentes.tail1234.ts.net`, `https://chat.example.com`, or `http://localhost:3000` on your
 own machine). The setup writes it for you. Sign-in cookies, the only browser origin allowed to change
 anything, and every link the app sends come from it. Opened at any other address, sign-in fails with
-"Invalid origin" and saving fails with `bad_origin`.
+"Invalid origin" and saving fails with `bad_origin`. To reach the same instance at more than one
+address (the machine's LAN IP and a tunnel hostname, say), list the others in
+`EXTRA_TRUSTED_ORIGINS`, comma-separated; `PUBLIC_URL` stays trusted either way.
 
 The server needs no model key of its own. Each organization adds its own keys (Claude, OpenAI,
-Gemini, DeepSeek, Kimi, Z.ai, MiniMax or OpenRouter) in **Settings → AI and usage**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
+Gemini, DeepSeek, Kimi, Z.ai, MiniMax, Command Code or OpenRouter) in **Settings → AI and usage**. Keys are stored encrypted with a key derived from `AGENTES_SECRET` and are
 never sent to browsers.
 
 **Requirements**
@@ -24,7 +32,7 @@ never sent to browsers.
   Without Docker, it also runs as one program with its database built in (On this computer, without
   Docker).
 - Nothing else: the installer fetches the Bun it runs the setup on. With Node.js 18 or newer,
-  `npx @agenteschat/setup` is the same setup, and it also runs from the app's image.
+  The Ackwire setup also runs from the app image.
 - Sizing has not been measured yet. As a starting point for a small team: 2 vCPUs, 4 GB of RAM and
   20 GB of disk. The image is large (about 2 GB of dependencies), and the database and the files
   volume grow with use.
@@ -53,7 +61,7 @@ tailnet can open it: no domain, no open port, nothing on the public internet.
 4. **Install.** On the server:
 
    ```sh
-   curl -fsSL https://agentes.chat/install | sh
+   curl -fsSL https://hub.ackwire.app/install | sh
    ```
 
    It installs what's missing, then runs the setup in `/opt/agentes` (`~/agentes` for a user who
@@ -101,7 +109,7 @@ it runs itself again with `sudo` before anything else when it has no access to D
 nothing. To read it before it runs:
 
 ```sh
-curl -fsSLo install.sh https://agentes.chat/install
+curl -fsSLo install.sh https://hub.ackwire.app/install
 less install.sh
 sh install.sh
 ```
@@ -111,7 +119,7 @@ nothing, `--yes` installs Docker without asking, `--dir <folder>` installs elsew
 option of the setup passes through (`--network local`, `--email skip`):
 
 ```sh
-curl -fsSL https://agentes.chat/install | sh -s -- --plan
+curl -fsSL https://hub.ackwire.app/install | sh -s -- --plan
 ```
 
 That's the installer's own plan: it runs nothing, not even the setup, so it can't show what the setup
@@ -122,11 +130,10 @@ it at its first question (Ctrl-C), then run the setup command the installer prin
 Without a terminal (cloud-init, a CI job) nothing is asked: the setup takes its defaults and the
 options given, and Docker is installed only with `--yes`.
 
-Without the installer, the same setup runs with `npx @agenteschat/setup` in an empty directory
-(Node.js 18 or newer), or from the app's image, on the current directory:
+Without the installer, run the setup from the app's image, on the current directory:
 
 ```sh
-docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup
+docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup
 ```
 
 Inside a container it can't start the others, so it ends with the three commands to run; the second
@@ -200,9 +207,9 @@ sign-in.
   this Mac** (**Use this PC** on Windows, **Use this computer** on Linux). The app asks first, in its
   own dialog naming the instance and the organization. Its agents start with commands, the browser and
   Claude Code or Codex when the computer has them, and no folders of yours. Commands are on by
-  default. Turn them off in the app's **Preferences › Tools**, where one switch counts for every
-  workspace on the computer. Folders are added in **Preferences › Folders**. The app pairs a computer
-  with Ackwire AI Cloud the same way. Until you pair it,
+  default. Turn them off in the app's **Preferences › Tools**, where each workspace on the computer
+  has its own switch. Folders are added in **Preferences › Folders**. The app pairs a computer
+  with the Ackwire hub the same way. Until you pair it,
   nothing of the computer is used. The app never offers the computer that runs the instance: its agents
   work there through the instance itself (This server as the agents' computer, below).
 - **Linux, a server or a VM:** **Settings › Devices › Connect a device** shows the command, and
@@ -280,7 +287,7 @@ setup's plan as JSON comes from the setup itself, with `--dry-run --json`: throu
 server the installer set up, the setup command it printed, with `--dry-run --json`.
 
 ```sh
-curl -fsSL https://agentes.chat/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json
+curl -fsSL https://hub.ackwire.app/install | AGENTES_SETUP_TAILSCALE_KEY='tskey-client-…' sh -s -- --yes --network tailscale --email skip --json
 ```
 
 - Every answer is a flag or an `AGENTES_SETUP_<OPTION>` variable; `--help` lists them, and a flag
@@ -346,7 +353,7 @@ A failure names the check, what happened and the fix:
 
 | `check` | What happened | Fix |
 | --- | --- | --- |
-| `docker`, `docker.compose` | Docker, or Compose v2 2.23.1 or newer, is missing | Linux: the installer installs both (`curl -fsSL https://agentes.chat/install \| sh -s -- --yes`). Mac and Windows: Docker Desktop. |
+| `docker`, `docker.compose` | Docker, or Compose v2 2.23.1 or newer, is missing | Linux: the installer installs both (`curl -fsSL https://hub.ackwire.app/install \| sh -s -- --yes`). Mac and Windows: Docker Desktop. |
 | `docker.daemon`, `docker.permission` | Docker isn't running, or this user can't use it | `sudo systemctl start docker`; `sudo usermod -aG docker $USER`, then log in again. |
 | `tailscale.key` | No key, or Tailscale refused it: expired, revoked, or a one-off key already used | A new auth key, or the OAuth client secret. |
 | `tailscale.approval` | The server waits for device approval | Machines page: the server marked **Needs approval**, its **⋯** menu, **Approve**. A pre-approved key or an OAuth client secret skips this. |
@@ -478,7 +485,7 @@ The setup's **This machine only** choice runs Ackwire AI at http://localhost:300
 laptop. By hand, in an empty directory:
 
 ```sh
-curl -fsSLO https://agentes.chat/install/docker-compose.yml
+curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml
 (umask 077 && printf 'AGENTES_SECRET=%s\nPOSTGRES_PASSWORD=%s\nPUBLIC_URL=http://localhost:3000\n' "$(openssl rand -base64 48)" "$(openssl rand -hex 24)" > .env)
 docker compose up -d
 ```
@@ -564,14 +571,40 @@ computer and opens Ackwire AI, signed in.
 - **Agents with Commands on can reach everything on this Mac**, the server's data in `~/.agentes`
   included. Commands are on by default. Turn them off in the app's **Preferences › Tools**.
 - **No password:** the app signs you in, and on its sign-in screen **Continue on this Mac** does it again
-  whenever your session ends. For a browser on another device, add one in **Settings › Your account**, **Add
-  a password**.
+  whenever your session ends, for as long as your account exists. For a browser on another device, add one in
+  **Settings › Your account**, **Add a password**.
+- **When the owner deletes their account** (**Settings › Your account**), it goes for good 7 days later,
+  with the workspaces only they were in; before then, signing in and pressing **Restore account** brings it
+  back. After that, with no account left, the app opens its welcome window on the account step to make a new
+  owner. With other accounts left, **Continue on this Mac** signs no one in, and each person signs in with
+  their own email.
 - **Preferences › Servers › Ackwire AI on this Mac:** reach (Tailscale needs HTTPS turned on for your
   tailnet, which **Turn it on** opens; on Linux, connect Tailscale with `sudo tailscale up`, and run
   `sudo tailscale set --operator=$USER` once), the phone's QR code, usage statistics, **Back up now**
   (`~/.agentes/backups/agentes-<date>.tar.gz`, with the database, the files and `.env`), Restart, Stop,
   and **Stop running it here…**, which keeps its data and stops its agents here; **Start it here** there
   brings both back.
+- **Erase and start over…**, beside it: stops it, moves `~/.agentes` whole to
+  `~/Ackwire AI erased <YYYY-MM-DD>` (a number after it when that name is taken), deletes its agents'
+  homes for this computer in `~/.agentes-runner/orgs`, forgets its addresses and their sign-ins in the
+  app, and opens the welcome window for a new setup with a new owner. Its workspaces go for everyone; the
+  agents' files in `~/agentes` stay. Only for the folder the app made, never a terminal install's.
+  To bring it back: quit the app, move a newer `~/.agentes` out of the way, rename the erased folder to
+  `~/.agentes`, and set it up on this computer again. It starts with its workspaces and its owner (the
+  owner key is in the folder); its agents' homes are gone, so they sign in again.
+- **The Trash removes nothing.** All of the above lives outside the app, so trashing it leaves every folder
+  and doesn't stop a running app. To remove it entirely, in this order: turn off **Open at login**
+  (**Preferences › General**), quit the app (**Quit agentes.chat**: on a Mac in the agentes.chat menu or
+  ⌘Q, on Windows and Linux from its icon by the clock; **Quit** if it asks; closing the window only hides
+  it), delete the app, stop a server you installed in `~/.agentes` from the terminal with its own
+  `~/.agentes/app/<version>/bin/agentes-server service uninstall` (quitting the app doesn't stop it), then
+  delete your data, `~/.agentes`, every `~/Ackwire AI erased …`, `~/.agentes-runner`
+  (the agents' homes: their browsers and sign-ins) and `~/agentes` (the agents' files), and the app's own
+  settings, window sign-ins and logs: on a Mac every `chat.agentes.desktop*` in
+  `~/Library/Application Support`, `Caches`, `HTTPStorages`, `Logs`, `Preferences` and `WebKit`, and
+  `~/Library/LaunchAgents/Ackwire AI.plist`; on Windows `%APPDATA%\chat.agentes.desktop` and
+  `%LOCALAPPDATA%\chat.agentes.desktop`; on Linux `~/.config/chat.agentes.desktop` and
+  `~/.local/share/chat.agentes.desktop`.
 - **Something went wrong?** **Copy details** copies what the app knows, the setup's steps and the end of
   `~/.agentes/logs/server.log`.
 - A server you installed in `~/.agentes` from the terminal stays the terminal's: while it runs, the app
@@ -752,11 +785,12 @@ ones a self-hosted instance usually touches:
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `PUBLIC_URL` | `http://localhost:3000` | The exact address people open. |
+| `EXTRA_TRUSTED_ORIGINS` | | Other addresses this instance is opened at, comma-separated, each an origin such as `http://192.168.0.10:3000` or `https://agentes.tail1234.ts.net`. Sign-in and saving work from them too; `PUBLIC_URL` is always trusted. |
 | `AGENTES_SECRET` | required | Master secret, at least 32 characters. Never change it on an instance in use. |
 | `POSTGRES_PASSWORD` | required | Database password. Read by the compose file only. |
-| `AGENTES_IMAGE` | `ghcr.io/agentes-chat/agentes:latest` | The image to run. A version tag or a digest holds a version. |
+| `AGENTES_IMAGE` | `ghcr.io/ackwire-energy/agentes:latest` | The image to run. A version tag or a digest holds a version. |
 | `BIND_ADDRESS`, `HOST_PORT` | `127.0.0.1`, `3000` | Where the compose file publishes the app. |
-| `AGENTES_MEMORY` | `8g` | The most memory the app's container may take, swap included. Over it, the kernel stops the app alone and Docker restarts it, instead of the machine swapping until something else is killed. The speech server's is `SPEECH_MEMORY` (Voice messages). |
+| `AGENTES_MEMORY` | `8g` | The most memory the app's container may take, swap included. Over it, the kernel stops the app alone and Docker restarts it, instead of the machine swapping until something else is killed. On a machine with less than 10 GiB of memory, the setup writes three quarters of it here instead: a limit above the machine's memory never fires. The speech server's is `SPEECH_MEMORY` (Voice messages). |
 | `COMPOSE_PROFILES` | | How people reach it: `tailscale` (the setup's default), `https` (Caddy for `DOMAIN`), or neither (this machine only). Comma-separated, with other optional services: `backup` (Backups and restore), `speech` (Voice messages), `embeddings` (Search across languages). |
 | `DOMAIN` | | The public domain Caddy gets a certificate for. |
 | `TS_AUTHKEY` | | The auth key or OAuth client secret the server joins your tailnet with, read only until it has joined. The setup empties it then. |
@@ -778,13 +812,15 @@ ones a self-hosted instance usually touches:
 | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | | Files in an S3-compatible bucket instead, when all four are set. `S3_REGION` (default `auto`); `S3_PATH_STYLE=true` for MinIO and Garage. |
 | `RUN_MIGRATIONS_ON_BOOT` | `true` | `false` only if you run `docker compose run --rm agentes migrate` yourself before each start. |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error`. |
+| `LOG_FORMAT` | `json` | `gcp` for Google Cloud Logging (`severity` and `message`). |
 | `TELEMETRY` | `on` | `off` stops the anonymous usage report (Optional services and what they receive). |
-| `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev (AI: plans and keys). Wins over the key added in Settings → AI and usage. |
+| `FEEDBACK_RELAY` | `true` | The apps' feedback form sends what a person writes to the agentes.chat team. `false`: no form (Optional services and what they receive). |
+| `TYPESAFE_API_KEY` | | Your TypeSafe key for Jev, or an OpenRouter key (`sk-or-…`) to call the same Jev through OpenRouter (AI: plans and keys). Wins over the key added in Settings → AI and usage. |
 | `COMPOSIO_API_KEY`, `COMPOSIO_WEBHOOK_SECRET` | | Your Composio project: Gmail and Outlook mailboxes and the services connected through Composio (below). |
 | `COMPOSIO_AUTH_CONFIGS`, `COMPOSIO_CALLS_PER_MONTH` | `0` for the cap (none) | Auth configs of your own per toolkit (`googledrive=ac_…`), and the Composio calls a workspace may make per month. |
 
 **Model keys.** Each organization adds its own keys (Claude, OpenAI, Gemini, DeepSeek, Kimi, Z.ai,
-MiniMax or OpenRouter) in **Settings → AI and usage**, and each agent uses one of them. Usage and cost are recorded per agent.
+MiniMax, Command Code or OpenRouter) in **Settings → AI and usage**, and each agent uses one of them. Usage and cost are recorded per agent.
 
 **Your own models.** **Other provider** there takes any server that speaks OpenAI's Chat Completions or
 Anthropic's Messages: an Ollama, vLLM, LM Studio or LiteLLM next to this server, or a gateway. Give its base
@@ -825,9 +861,18 @@ links, and budget and approval alerts. `MILLIONSEND_API_KEY` wins when both are 
 **Password reset** needs email, so it shows only with `SMTP_URL` or `MILLIONSEND_API_KEY` set: "Forgot
 my password" on the sign-in page emails a link to the web app's reset page (`/reset-password`).
 
+**Changing an account's email** (Settings › Your account › Email). With email set up, the person types the new
+address, then a code sent to the current one, or signs in again when they can't open that inbox (or when the account
+never confirmed that address, which gets no code). The address changes when they open the link sent to the new one
+(once, and only the newest one asked), and the old one, only for an address the account had confirmed, gets a notice
+with **This wasn't me**: for 7 days, its page puts the old address back, signs every session out, disconnects the AI
+apps, removes the ways to sign in added since the change and clears the password ("Forgot my password" sets the next
+one). Nobody can sign up with that address meanwhile. Without email the address changes at once, with no code or link,
+except one a sign-in provider confirmed, which needs email to change.
+
 **Voice messages.** People hold the microphone and send audio; agents read its words, and the audio's words stay hidden until someone opens them on that message. The microphone shows only with a speech engine. As the server's owner, pick a provider and paste its key in **Settings**, or set it in the environment: `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`, `SONIOX_API_KEY`, `GROQ_API_KEY`, `OPENAI_SPEECH_API_KEY` or `DEEPINFRA_API_KEY`, with `SPEECH_ENGINES` for the order they are tried. With any of these, the audio goes to that provider to become text. DeepInfra is the cheapest of them, with the same Whisper as Groq. `LOCAL_SPEECH_URL` points at a server of your own that speaks the OpenAI format (Speaches, a local Whisper or Parakeet), and the audio stays with you: `LOCAL_SPEECH_API_KEY` if it asks for a key, and `LOCAL_SPEECH_WARM=on` if it loads its model on demand and can start when someone presses the microphone (`POST <LOCAL_SPEECH_URL>/warm`). Every request to it names the workspace in `X-Agentes-Org`, and one that takes more than half a minute plus twice the recording goes to the next engine. A self-hosted server has no limit on minutes. Engines hear the language in the audio: the app's language goes only to Soniox, as a hint.
 
-**Voice messages on this machine.** The `speech` profile runs NVIDIA's Parakeet on this server, as Ackwire AI's Cloud does: add `speech` to `COMPOSE_PROFILES` and set `LOCAL_SPEECH_URL=http://speech:8000/v1`, then `docker compose up -d`. The first pull is about 1 GB, its models included; once it has started, it needs no internet, and its network reaches only the app. Parakeet knows 25 European languages and picks the one spoken, once a language guess gives them together at least `SPEECH_LANGUAGE_MIN` (0.7); another language, an unsure guess, a recording it hears no words in, or one that arrives when every worker is taken, goes to the next engine at once, so give it one: `SPEECH_ENGINES=local,deepinfra` with `DEEPINFRA_API_KEY`, for example. Without one, a recording in another language goes out as audio with no words, and a busy server's wait for the job's retries; `SPEECH_LANGUAGE_MIN=0` then gives Parakeet every recording, unsure ones included. By default it takes up to 4 CPUs and 4 GB of memory (`SPEECH_CPUS`, `SPEECH_MEMORY`; Docker refuses more CPUs than the machine has, so set `SPEECH_CPUS=2` on a 2-CPU server), runs 2 recordings at once on 2 threads each (`SPEECH_WORKERS`, `SPEECH_THREADS`) and lets 4 more wait up to 3 seconds each (`SPEECH_QUEUE`, `SPEECH_WAIT_SECONDS`); a short note takes a few seconds. `LOCAL_SPEECH_API_KEY`, when set, is the key both sides use. The service runs `ghcr.io/agentes-chat/speech`, published with each release under the app's tags, and `AGENTES_SPEECH_IMAGE` holds a version; from a checkout, `docker build -t agentes-speech:local deploy/speech` builds it (downloading the models from Hugging Face), with `AGENTES_SPEECH_IMAGE=agentes-speech:local`.
+**Voice messages on this machine.** The `speech` profile runs NVIDIA's Parakeet on this server, as Ackwire AI's Cloud does: add `speech` to `COMPOSE_PROFILES` and set `LOCAL_SPEECH_URL=http://speech:8000/v1`, then `docker compose up -d`. The first pull is about 1 GB, its models included; once it has started, it needs no internet, and its network reaches only the app. Parakeet knows 25 European languages and picks the one spoken, once a language guess gives them together at least `SPEECH_LANGUAGE_MIN` (0.7); another language, an unsure guess, a recording it hears no words in, or one that arrives when every worker is taken, goes to the next engine at once, so give it one: `SPEECH_ENGINES=local,deepinfra` with `DEEPINFRA_API_KEY`, for example. Without one, a recording in another language goes out as audio with no words, and a busy server's wait for the job's retries; `SPEECH_LANGUAGE_MIN=0` then gives Parakeet every recording, unsure ones included. By default it takes up to 4 CPUs and 4 GB of memory (`SPEECH_CPUS`, `SPEECH_MEMORY`; Docker refuses more CPUs than the machine has, so set `SPEECH_CPUS=2` on a 2-CPU server), runs 2 recordings at once on 2 threads each (`SPEECH_WORKERS`, `SPEECH_THREADS`) and lets 4 more wait up to 3 seconds each (`SPEECH_QUEUE`, `SPEECH_WAIT_SECONDS`); a short note takes a few seconds. `LOCAL_SPEECH_API_KEY`, when set, is the key both sides use. The service runs `ghcr.io/ackwire-energy/speech`, published with each release under the app's tags, and `AGENTES_SPEECH_IMAGE` holds a version; from a checkout, `docker build -t agentes-speech:local deploy/speech` builds it (downloading the models from Hugging Face), with `AGENTES_SPEECH_IMAGE=agentes-speech:local`.
 
 Recordings are kept with your files, outside the Drive, for `VOICE_RETENTION_DAYS` (90 by default; 0 keeps them forever). A daily sweep then deletes the audio; the message and its words stay for agents and search, and the player says the recording is gone.
 
@@ -867,13 +912,54 @@ creator accounts only, and WhatsApp a WhatsApp Business account, whose id Compos
 Composio's own LinkedIn and YouTube apps share their rate limits and daily quota with all of Composio's
 customers: with heavy use, give them OAuth apps of your own in `COMPOSIO_AUTH_CONFIGS`.
 
+**Your own MCP servers know who is calling (optional).** An MCP server you run for your own workspace
+(an internal tool your agents use) gets nothing with a call but its key, and a key that leaks works from
+any other workspace and from anywhere on the internet. List the server's host with a secret the server
+holds too, and every tool call an agent makes to it says, verifiably, who is calling:
+`MCP_CALLER_IDENTITY=tools.example.com=<secret>` (a bare lower-case host name; a secret of at least 32
+characters, `openssl rand -base64 48`; several pairs separated by commas, with no spaces), then restart.
+Connect the server as usual, by its address in **Settings → Connectors**. Each `tools/call` to it then
+carries, in the request's `params._meta["chat.agentes/caller"]`, a JWT signed with the secret (HS256):
+
+| Claim | What it is |
+| --- | --- |
+| `iss` | This instance: the origin of `PUBLIC_URL` |
+| `aud` | The server's host |
+| `org`, `agent`, `conn` | The ids of the workspace, the agent and the connection |
+| `run` | The run's id (absent for the rare call made outside a run) |
+| `user` | The id of the person the run acts for; absent when nobody is behind it, as in a routine's run |
+| `brain` | What thinks for the run: `model` for a model this server calls, else the kind of the program on a computer (`claude_code`, `codex`, …) |
+| `provider` | With `brain: "model"`, the provider that model is at (`anthropic`, `openai`, …; `custom` for a workspace's own endpoint) |
+| `channel`, `thread` | The ids of the conversation the run answers in and of the root message of its thread |
+| `iat`, `exp`, `jti` | When it was made, 60 seconds later, and an id that is new for every call |
+
+In your server: check the signature with the algorithm pinned to HS256, that `aud` is your host and `iss`
+your instance, that `exp` hasn't passed and that this `jti` wasn't used before; then serve only the `org`
+and `agent` you expect. Refuse a call with a tool error, not HTTP 401, which marks the connection as
+needing to be reconnected. Listing the tools carries no statement, since no agent is calling yet, so keep
+the tools' names and descriptions free of anything private. A host that isn't listed gets nothing, and
+neither does a server over http or on a port other than 443. [ADR 0181](docs/adr/0181-mcp-caller-identity.md)
+has the rest.
+
+**A listed server can mark an answer as confidential (optional).** When a tool of such a server answers
+with somebody's private text (a secret, a person's record), it can add
+`"_meta": { "chat.agentes/confidential": true }` to that result. The run that read it goes on reading and
+answers in a thread under the message that asked it, and sends nothing elsewhere: no message, mail or
+post in another place, no file, task or memory, no command, browser or web. Outside that thread no agent
+is given the thread's text, and neither is a person's connected AI app or a review through the operator
+API. It is in no search, summary or notification, and it is removed 60 days later.
+A program on a computer (Claude Code, Codex) can't be held to that, so it gets a placeholder in place of
+the answer: check `brain` in the statement above before you hand such text out. The thread's text also
+stays with the `provider` that first read it: an agent named there that thinks with another one stops
+before it reads anything, and says so. A routine's own run that read such an answer delivers no report.
+The same key from a server you did not list changes nothing. [ADR 0190](docs/adr/0190-confidential-results.md) has the rest.
+
 **Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
-code emailed to them (with no email set up, their password instead): it closes for everyone at once,
-its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
+code emailed to them (with no email set up, their password instead): it turns read-only for everyone at
+once, its agents stop, and it is deleted for good 7 days later. Until then any owner can restore it. An
 account is deleted from **Settings → Your account**, or the account page on the phone, with the same
 proof: it is signed out everywhere at once and deleted for good 7 days later, and signing in before
-then restores it. The workspaces where it was the only member close at the same time and go on the
-same date. With Sign in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
+then restores it. The workspaces where it was the only member are deleted with it, on the same date. With Sign in with Apple, register `EMAIL_FROM`'s domain in Apple Developer › Sign in with Apple for Email
 Communication (SPF and DKIM passing): someone who hid their address gets mail only from senders
 registered there, so without it they would get no code. What lives outside the server stays:
 the agents' folders on connected computers until the runner is removed, files in a workspace's own
@@ -886,6 +972,36 @@ then a second listener on `OPERATOR_API_PORT` (3001) serves `/api/operator/v1`, 
 `Authorization: Bearer <token>`, and its OpenAPI document is at `/api/operator/v1/openapi.json`. That
 port reaches every workspace, so never publish it or put it behind your proxy: the compose file
 doesn't publish it, and containers on the same Docker network reach it as `http://agentes:3001`.
+For a caller that only looks things up, set `OPERATOR_API_READ_TOKEN` too (a different value, same
+length): it is accepted for `GET` requests alone and never for `GET /review/...`, and anything else
+it asks for is refused (403). It still reads names, emails and IP addresses, so keep it as private.
+`GET /users?q=` finds an account by part of its address or name, `GET /resolve?ref=` says what a
+pasted link, an `@handle` or an id names, and `GET /orgs/{orgId}/members`, `/channels` and `/agents`
+list who and what is in a workspace, never what was written there.
+`GET /orgs/{orgId}/runs` lists a workspace's runs with what each waits for or failed with,
+`GET /runs/{runId}/trace` shows one run step by step, `GET /orgs/{orgId}/timeline` puts a conversation's
+messages, routing decisions and runs in order, and `GET /messages/{messageId}/explain` says why a message
+did or did not start a run: ids, codes, times and sizes, never a message's text or what a tool was given
+or answered. `GET /orgs/{orgId}/tool-calls` lists the tools a workspace's agents called (`?groupBy=tool`
+for counts): which tool, whether it is the server's own or a connected app's, and how each call ended.
+`GET /orgs/{orgId}/connections` lists what a workspace connected (apps, mailboxes, databases) with each
+one's state and last error, `GET /orgs/{orgId}/audit` its audit log without the entries' details,
+`GET /orgs/{orgId}/asks` what its agents asked of people and of each other (`?open=true` for what still
+waits) and `GET /orgs/{orgId}/routines` its routines with their latest firings: never a credential, what
+was asked or answered, or a routine's name or instructions. A connection's `label` is what its workspace
+calls it, which is a mailbox's address or a database's host when nobody named it; an audit entry's
+`targetId` is a name where the target has no id (a tool, a repository, a wiki folder).
+`GET /orgs/{orgId}/notifications?userId=` lists what one person was notified of and the pushes that
+carried it, never a notification's words; `GET /orgs/{orgId}/access?userId=&targetKind=&targetId=` says
+whether a person reaches an agent, a channel, a task, a file or a computer, and the rule that decides;
+`GET /orgs/{orgId}/unanswered` lists people's messages no run answered, each with why (`?summary=true`
+for counts); and `GET /email-jobs?to=` lists the emails queued to one address with their state, never
+the address, a subject or a link.
+`GET /jobs` lists the job queue without the jobs' payloads (`?stuck=true` for the ones nobody took,
+`?summary=true` for counts by kind and status), `GET /usage` adds up the tokens and cost of model calls
+for the instance, a workspace, an agent or a run, and `GET /orgs/{orgId}/machines` and
+`GET /machines/{machineId}` say what is on a computer and what waits for it: its runner and CLI versions,
+its AI accounts, open tasks and waiting runs, never a token, a hostname or an address.
 With the token set, the server also keeps 90 days of events for it to read (`GET /events`: sign-ups
 with their email, sign-ins with their IP address and browser, workspaces, invitations, agents, emails
 sent and runs finished, as metadata), and `GET /review/...` shows what one run or task did, with
@@ -906,6 +1022,28 @@ far each one is, and asks for a single-use code that the computer connects with
 (`POST /orgs/{orgId}/machines`): write it to a file only the runner's user can read and run
 `agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
 which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
+
+**Reading what a workspace wrote (optional, off).** The operator API never returns what anyone wrote,
+with one exception you have to switch on: `OPERATOR_API_REVEAL_TOKEN` (a third value, different from
+the other two). Leave it unset unless a tool of yours needs it. Set, `POST /reveal/orgs/{orgId}` reads
+one field of one record at a time (a message, a step of a run, an agent's instructions, a routine, a
+task, a connection's error, what a member wrote to you), at most 2,000 characters a call, with a
+reason in one line, for one of two purposes the server checks for itself. For a member who asked for
+help (`member_request` with the id of their support request, 30 days at most): only what that member
+reads in the app. To diagnose a run that failed or got stuck (`fault` with the run's id, 14 days at
+most): only what hangs on that run. Never a file or a credential, and of a direct conversation only
+for a member who is in it. Every read is recorded before any text leaves, in the events feed with
+your reason and in that workspace's own audit log (**Settings → Audit log**: who read what, at whose
+request or for which failed run, never your reason), credentials are masked, and the door takes 30
+calls a minute and 100 reads of one workspace a day. `GET /orgs/{orgId}/support-requests` lists who
+asked for help and when, and `POST` there records a request that reached you another way (a mail, a
+call), which the audit log then shows as recorded by you. Setting the token makes you a reader of
+your workspaces' content: tell them before the first read, and say whether an AI assistant reads
+with you (`assistedByAi`). It also makes the server keep what members write in the feedback form,
+and what the thing they reported says, for 90 days beside their request. Unset, every path under
+`/reveal` answers 403 and the server keeps neither: of a member's feedback it keeps only that they
+asked (who, when, and which message), for a year. If you set the token and later take it away, the
+door closes at once and no new words are kept; the ones already kept stay until their 90 days are up.
 
 **Stall-and-noise report (optional).** With `OPS_REPORT_EMAIL` set (one address, or several separated by
 commas) and email set up, the server emails the previous UTC day's report every day at about 01:00 UTC: for
@@ -960,10 +1098,24 @@ either way:
 - The switch in **Settings → General → Usage statistics**. Only the installation's first account (the
   person who set it up) sees it.
 
-**Downloads and updates.** Installing and updating fetch files from Ackwire AI, and those requests
+**Feedback.** The apps have a feedback form (**Send feedback**, at the bottom of the sidebar), and an
+agent can send one when a person asks it to or agrees to its offer. Each one
+goes to the agentes.chat team, who make the app, and the form says so before the person sends it.
+Nothing goes by itself: only when someone presses **Send**, and only that message, as JSON in a POST to
+`FEEDBACK_URL` (`https://app.agentes.chat/api/feedback/inbox`), through Cloudflare like the usage
+report. It holds what the person wrote; their name and email address, to answer them; the workspace's
+name and their role in it; the thing they reported and its words, when they right-clicked one and left
+it in; the screen they were on (its path, with its ids), the agent open and what it thinks with, the
+language, the browser, the window, the app's build and its last errors; the server's version; and up
+to three pictures they added (a video isn't offered). Never a conversation, and nothing that says which
+server it came from beyond the request's own address. agentes.chat mails it to its team and keeps no
+copy on the server that received it. To turn it off, set `FEEDBACK_RELAY=false` in `.env` and start the
+server again: the apps show no form and agents can't send any.
+
+**Downloads and updates.** Installing and updating fetch files from agentes.chat, and those requests
 carry nothing about the instance beyond what any download does: the installer
-(`curl -fsSL https://agentes.chat/install`), the compose file the setup fetches into a folder that has
-none (`https://agentes.chat/install/docker-compose.yml`), the packages that run it without Docker
+(`curl -fsSL https://hub.ackwire.app/install`), the compose file the setup fetches into a folder that has
+none (`https://hub.ackwire.app/install/docker-compose.yml`), the packages that run it without Docker
 (`https://app.agentes.chat/api/native/latest` names them, `/api/native/download/…` serves them), and
 the desktop app's own updates: a check at start and every 6 hours
 (`https://app.agentes.chat/api/desktop/latest`, naming its system and processor) and, when it installs
@@ -988,19 +1140,19 @@ party only when you turn that service on:
 
 | Service | Turned on by | What it receives |
 | --- | --- | --- |
-| Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
+| Claude (Anthropic), OpenAI, Gemini (Google), DeepSeek, Kimi, Z.ai, MiniMax, Command Code | An organization's key | What an agent reads to answer: its instructions, the organization's context, recent messages, and the files and tool results it opens. Summaries and memory upkeep use the same key. |
 | Another provider (OpenAI- or Anthropic-compatible) | An organization's endpoint (Settings → AI and usage → Other provider) | What the other model providers receive, sent to the address the organization typed. When it is saved, the server also reads that address's model list and makes one small test call per model. |
 | OpenRouter | An organization's key | What the other model providers receive, passed on by OpenRouter to the model's own provider (the organization's OpenRouter privacy settings decide which may keep it). While a workspace has an OpenRouter key, the server also reads OpenRouter's public model list, with no key: about once an hour, and up to once a minute while agents' runs ask for a model the list lacks. |
 | OpenCode | Always on | Nothing of yours: the server reads OpenCode Go's public model list, with no key, at boot and about once an hour, so that plan's model picker stays current. If the list is out of reach, the picker uses the list built into this version. |
-| TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI and usage** (the variable wins). Either way it is your own TypeSafe key, so TypeSafe bills your account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
+| TypeSafe Jev | `TYPESAFE_API_KEY`, or the key the owner adds in **Settings → AI and usage** (the variable wins). Either way it is your own key, so TypeSafe bills your account; with an OpenRouter key (`sk-or-…`) the same requests go through OpenRouter, which passes them on to TypeSafe and bills your OpenRouter account. | To pick which agent answers a message nobody @mentioned: the channel's name and topic, the message (up to 4,000 characters), recent messages (up to 800 each), and the name, role, description and tools of the channel's agents. To pick an agent's model or the tools it loads: its name, role and instructions (up to 1,500 characters), the message (up to 2,000) and recent messages (up to 400 each). Also the messages and memory items it is asked to judge (a request to stop, a hand-off, a permission change, whether to archive a memory), a long run's task and latest words with the tool calls and the start of the results it may set aside, a mission's commands it is asked to rate with the mission's goal and current step, the names and descriptions of a connector's tools, and, when a message meets no AI connected, that message (up to 4,000 characters), to tell whether it asks to connect one. On agents' computers, what is on the screen it is asked to look at: the page's address, its text and a screenshot. Without it, a small model on one of the organization's API keys picks and judges instead, each person's own plan picks for their own messages, and simple rules do the rest. Some memory and tool decisions go back to what they did before Jev, nothing guesses what to connect, and nothing is read from images. |
 | Voyage AI, DeepInfra, OpenAI or another embeddings server | `EMBEDDINGS_PROVIDER=voyage` with `VOYAGE_API_KEY`, or `EMBEDDINGS_PROVIDER=openai` with `EMBEDDINGS_URL` | The text of what `EMBEDDINGS_KINDS` lists (memory items by default) as it is indexed, up to 8,000 characters each, and search queries. The `embeddings` profile keeps them on this machine. Without one, search is full-text only. |
 | Web search for agents | Always on: DuckDuckGo's HTML page with no key, unless `BRAVE_SEARCH_API_KEY` (Brave Search) or `SEARXNG_URL` (your own SearXNG) is set; an agent with a browser on its computer searches there instead (Google, then Bing or DuckDuckGo) | The words an agent searches for (`web_search`). `web_fetch` opens the public pages an agent asks for, from this server: never an internal or private address. |
 | Composio | `COMPOSIO_API_KEY` | Gmail and Outlook mailboxes for agents, and the services connected through it (Google Drive, Calendar, Sheets and Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit and WhatsApp Business): Composio holds those connections, and what agents read or write there passes through it, files included. IMAP mailboxes and the other connectors connect directly. |
 | MillionSend or Resend | `MILLIONSEND_API_KEY` | Each email the app sends: recipients, subject and body, links included. `SMTP_URL` uses your own mail server instead. |
-| Expo | An iPhone signed in to the instance | For each push to that iPhone: its push token, a title (up to 80 characters) and a line of text (up to 180), through Expo's push service. |
-| Ackwire AI push relay | An Android phone signed in to the instance, unless `FIREBASE_SERVICE_ACCOUNT` is set or `PUSH_SENDER` is `direct` or `off` | Once, to register the instance: its version. Then, for each push to that phone: its FCM token, a title (up to 80 characters), a line of text (up to 180) and what the notification opens (ids of the workspace, conversation or request), which the relay passes to Firebase Cloud Messaging without keeping them. |
+| agentes.chat push relay | A phone signed in to the instance: an Android phone unless `FIREBASE_SERVICE_ACCOUNT` is set, an iPhone unless `APNS_KEY` is, neither when `PUSH_SENDER` is `direct` or `off` | Once, to register the instance: its version. Then, for each push to that phone: its push token (FCM's or Apple's; for an iPhone also the app's bundle id), a title (up to 80 characters), a line of text (up to 180) and what the notification opens (ids of the workspace, conversation or request), which the relay passes to Firebase Cloud Messaging or to Apple without keeping them. |
 | Firebase Cloud Messaging (Google) | An Android phone signed in to the instance (through the relay above, or directly with `FIREBASE_SERVICE_ACCOUNT`) | For each push to that phone: its FCM token, the title, the line of text and what the notification opens. Directly, also a request signed with the service account's key, for an access token. |
-| Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else Ackwire AI's site. |
+| Apple Push Notification service | An iPhone signed in to the instance (through the relay above, or directly with `APNS_KEY`) | For each push to that iPhone: its device token, the app's bundle id, the title, the line of text and what the notification opens. Directly, each request also carries a token signed with the APNs key. |
+| Your browser's push service (Google, Mozilla, Apple, Microsoft) | Someone turns on **Notifications in this browser** (`WEB_PUSH=off` hides it) | For each push to that browser: the notification encrypted to that browser (RFC 8291), which the push service can't read, the instance's public key, and a contact for the instance: `PUBLIC_URL` when it is a public https address, else the `EMAIL_FROM` address, else agentes.chat's site. |
 | A Sentry-compatible server you choose | `SENTRY_DSN`, `SENTRY_WEB_DSN`, `SENTRY_MOBILE_DSN` | Error reports, below. |
 | Tailscale | `COMPOSE_PROFILES=tailscale`, or the desktop app's **Reach it from your phone and teammates** | Its coordination server keeps the server's name, tailnet addresses and public keys, as for any device in your tailnet. Connections are encrypted end to end (WireGuard), through Tailscale's relays when no direct path exists; with Funnel, visitors' connections pass through Tailscale's servers, still encrypted to this server. The HTTPS certificate comes from Let's Encrypt, which publishes the server's name in the public Certificate Transparency log. |
 
@@ -1037,6 +1189,15 @@ GitHub App, they do it as the app: pull requests, issues, comments and commits c
 body ends with one line naming the agent and the person it works for, and commits credit that person
 (`Co-authored-by`) when they signed in with GitHub. Where the app isn't installed, the account connection is
 used, as before.
+
+Every commit an agent makes, through GitHub or with git on its computer, ends with its own line too:
+`Co-authored-by: <agent's name> <noreply@agentes.chat>`, next to the coding CLI's own (`Co-Authored-By: Claude …`)
+and the person's, never twice. It is on by default; to turn it off for the whole workspace, ask any agent ("stop
+adding your co-author line to commits"), and ask again to turn it back on. On a computer the runner adds it with git
+hooks of its own, handed only to the agents' processes through their environment: your own git, outside them, is
+never touched, each repository's own hooks (husky's included) still run first, and Git LFS still sends the files
+the agents push. That needs a runner from this release on (protocol 63); with an older one, only a chat turn's
+instruction asks the agent to add it.
 
 There are two ways to set the app up:
 
@@ -1237,6 +1398,24 @@ Chrome is missing. Since its agents run as the
 person who connected it, a computer leaves the organization with them when they leave, are removed or
 delete their account; one installed with `--system` is the team's and stays.
 
+**Lodi's computer.** Lodi, the built-in agent every member talks to, works on the workspace's own computer (the
+server's own, set up with `--system`), where each person gets a place of their own: a separate user with its
+own files, browser, desktop and sign-ins, which only that person can watch or take control of, from Lodi's
+page. A computer that runs every agent as one user (the simple mode, a Mac, a computer a person connected)
+can't keep people's places apart, so Lodi has no computer there, and its page says so. Turn its commands,
+browser or desktop off for everyone on its page, under what it can use. The computer's shared folder is
+still shared: every agent and every person's Lodi reads and writes it. Lodi's browser needs that setup
+(This server as the agents' computer, below): without it, Lodi has no browser, and its page links here.
+
+Where others read what Lodi does (a channel, a dashboard widget, a routine that reports to a channel) it works in
+one more place, shared by the whole workspace: one more user on that computer, "Lodi (shared)". Nothing of a
+person's own place reaches it. A person's own place is used only for what that person asks Lodi in their own
+conversation with it: a routine that reports there, or anything else nobody asked for there, has no computer.
+Whoever may open any agent's computer (the admins of computers) opens it from the computer's page in Settings,
+Computers. Turning all three of Lodi's computer permissions off ends that place and stops what runs there, and
+turning one back on starts an empty one. The ended place's files stay on the computer's disk under a user nothing
+runs as, until you delete that user.
+
 **What an agent reaches on its computer (`--system`).** Each agent reaches the local ports its own
 processes open (any port, port 0 included, on 127.0.0.1, ::1 or the computer's own addresses), and
 nobody else's: another agent's listeners refuse it at once, so two agents can run dev servers, test
@@ -1278,7 +1457,13 @@ computer), plus swap for a third of that, which keeps the rest for the system, t
 the server. At that limit the kernel stops one process, usually the biggest (Chrome's pages first), and
 only that process: the command it belonged to fails, and the agent is told it was most likely memory
 (with systemd 253 or newer; a desktop or a task already running when you update gets this when it next
-starts).
+starts). What agents leave in `/tmp` holds RAM until they delete it or the computer restarts. To keep
+it on disk instead, add `"agentTmpOnDisk": true` to `/var/lib/agentes-runner/config.json` as root (on
+this server's own computer too, for all its organizations): each agent takes it at its first launch
+after the next boot (until then it keeps the `/tmp` it has). The agents' `/tmp` is then a filesystem of
+their own, made anew at every boot in `/var/cache/agentes-runner-tmp` with half of what the system disk
+has free, so they can't fill that disk or take its inodes. It needs loop devices and `mkfs.ext4`
+(e2fsprogs), which an unprivileged container doesn't have.
 `agentes-runner computer`, which any agent (or you) can run, prints what the computer has, what is free
 for new work and which agents use the most; agents are told to run it before something heavy, to tell
 the person when another agent's work leaves no room, and to stop what a finished build left running.
@@ -1391,9 +1576,11 @@ a terminal, yes). System mode's installer brings the browser and the screens its
 and Codex are asked about there. It installs them as root with the computers' installer
 (`curl -fsSL http://127.0.0.1:3000/api/machines/install.sh | sh -s -- --requirements browser,desktop,claude,codex`,
 which also works by hand): Chromium from Debian's apt, or Ubuntu's snap where apt has none; Claude Code
-with Anthropic's installer, copied to `/usr/local/bin`; Codex from the latest release of OpenAI's
-`codex` on GitHub, to `/usr/local/bin`. Running the setup again installs nothing that's there; Claude
-Code and Codex update themselves where they can, or with that command.
+with Anthropic's installer, copied to `/usr/local/bin`; Codex's whole package from the latest release
+of OpenAI's `codex` on GitHub, in `/usr/local/lib/codex`, linked from `/usr/local/bin`. Running the
+setup again installs nothing that's there; Claude Code and Codex update themselves where they can, or
+with that command. A Codex an earlier setup installed as its lone binary can't run code mode (its
+agents fail on a missing `codex-code-mode-host`): `--requirements codex` installs it again, whole.
 
 By hand on Linux (a server set up before, say): set a token in `.env` and give the same one to the
 agents' computer, as root, in the folder with `.env` (3000 is the app's port, `HOST_PORT` if you
@@ -1437,7 +1624,9 @@ memory spots repeats said in other words, and agents find buttons from a descrip
 screenshots. The person who set up the server adds the key in **Settings → AI and usage** (the setup
 asks once), or puts it in `.env` as `TYPESAFE_API_KEY`, which wins. It is stored encrypted like
 provider keys and never sent back to a browser. TypeSafe bills your account: US$ 0.042 per million
-tokens read, about US$ 0.0001 per routed message. Without it, see https://agentes.chat/docs/jev#without.
+tokens read, about US$ 0.0001 per routed message. An OpenRouter key (`sk-or-…`) works too: the same
+Jev, called and billed through OpenRouter at the same price, and the open workspace's OpenRouter key
+can turn it on with one press. Without it, see https://agentes.chat/docs/jev#without.
 
 **Plans.** An agent can think with a Claude or ChatGPT subscription instead of a key, on a connected
 computer: Claude Code or Codex signs in there with the provider's own flow. Each account is a folder
@@ -1467,9 +1656,11 @@ kept in the account's folder (`token.json`, mode 600), which only root opens, an
 stays in `provider.json` there the same way. Each turn's Claude Code runs in a folder of that agent's
 own and reads the token on a file descriptor as it starts, never from its environment, so the
 commands it runs don't get it; a key goes in its environment. When the agent moves to another account
-or brain, or the account is disconnected, the processes that had it close. A ChatGPT sign-in there
-still thinks for one agent. Disconnecting a Claude account deletes its token from the computer: to
-end it on Claude too, revoke it in Claude's settings.
+or brain, or the account is disconnected, the processes that had it close. A ChatGPT sign-in made for
+all agents is Codex's own `auth.json` there, and a Gemini one the Antigravity CLI's own sign-in file:
+each turn gets a copy in the agent's own folder (Gemini's goes when that agent's turns on it end, or,
+if its worker was killed mid-turn, when its next worker starts). Disconnecting a Claude account
+deletes its token from the computer: to end it on Claude too, revoke it in Claude's settings.
 
 **Who can reach an account.** With every agent running as the runner's own user (the default
 install), any agent on that computer could reach every account folder there; the runner keeps them
@@ -1498,7 +1689,7 @@ docker compose pull
 docker compose up -d
 ```
 
-`https://agentes.chat/install/docker-compose.yml`, the one the setup downloads, is the file of the
+`https://hub.ackwire.app/install/docker-compose.yml`, the one the setup downloads, is the file of the
 build Ackwire AI runs, which follows `main` and can be ahead of the latest release.
 
 Keep your settings in `.env` and never edit `docker-compose.yml`, so replacing it loses nothing.
@@ -1506,13 +1697,13 @@ Anything a variable can't set goes in a `docker-compose.override.yml` beside it,
 on its own.
 
 Migrations run when the new version starts, so that is the whole upgrade for a small instance. The
-compose file runs `ghcr.io/agentes-chat/agentes:latest`, the latest release, for amd64 and arm64;
+compose file runs `ghcr.io/ackwire-energy/agentes:latest`, the latest release, for amd64 and arm64;
 `:1.2.3` and `:1.2` tags exist alongside it, and `:edge` is built from every push to `main` that
 passes CI. To hold a version, set `AGENTES_IMAGE` in `.env` to a version tag or a digest
-(`ghcr.io/agentes-chat/agentes@sha256:…`), and keep that version's compose file. This prints the digest you have:
+(`ghcr.io/ackwire-energy/agentes@sha256:…`), and keep that version's compose file. This prints the digest you have:
 
 ```sh
-docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/agentes-chat/agentes:latest
+docker image inspect --format '{{index .RepoDigests 0}}' ghcr.io/ackwire-energy/agentes:latest
 ```
 
 For a big jump, migrate first from a throwaway container. If a migration fails, the running version
@@ -1523,6 +1714,13 @@ docker compose pull
 docker compose run --rm agentes migrate
 docker compose up -d
 ```
+
+A migration that builds an index on a big table does it without stopping writes. It can take minutes
+with nothing in the log after `applying database migrations`, and it waits for a dump or another long
+transaction to end; cut short, it runs whole again at the next start. If `migrate` stands still and
+the app is down, the app restarted while it ran: on 0.1.1 or older, a starting app waits for the
+migration in a way the migration waits for too, so neither ends. Stop `migrate` with Ctrl-C and run
+`docker compose up -d`: the new version finishes the migration as it starts.
 
 Migrations only go forward, and a version refuses to start on a database that a newer one migrated.
 Take a dump before a big jump (Backups below): rolling back is the previous pin plus that dump.
@@ -1580,7 +1778,7 @@ app is up:
 
 ```yaml
   agentes-worker:
-    image: "${AGENTES_IMAGE:-ghcr.io/agentes-chat/agentes:latest}"
+    image: "${AGENTES_IMAGE:-ghcr.io/ackwire-energy/agentes:latest}"
     env_file: .env
     environment:
       DATABASE_URL: "postgres://agentes:${POSTGRES_PASSWORD}@postgres:5432/agentes"
@@ -1619,6 +1817,7 @@ to one process and takes no worker.
 
 </details>
 
+<a id="from-source"></a>
 <details>
 <summary><b>From source</b></summary>
 
@@ -1627,11 +1826,11 @@ setup from a checkout. You need Git, Docker and [Bun](https://bun.sh) (`packageM
 package.json names the version):
 
 ```sh
-git clone https://github.com/agentes-chat/agentes-chat.git
-cd agentes-chat
+git clone https://github.com/Ackwire-Energy/ackwire-ai.git
+cd ackwire-ai
 bun install
 bun run --filter '@agenteschat/setup' build
-docker build -t ghcr.io/agentes-chat/agentes:latest .
+docker build -t ghcr.io/ackwire-energy/agentes:latest .
 mkdir -p ~/agentes && cp docker-compose.yml ~/agentes/
 AGENTES_INSTALL_SETUP=$PWD/packages/setup/dist/index.js sh install.sh --dir ~/agentes
 ```
@@ -1642,7 +1841,7 @@ compose file it finds and downloads one only when the folder has none. `AGENTES_
 install.sh run your build of the setup with its pinned Bun instead of the published package. When
 Docker needs root on Linux, run that line as `sudo env AGENTES_INSTALL_SETUP=… sh install.sh …`:
 sudo drops the variable otherwise. For the backup profile, build its image too:
-`docker build -t ghcr.io/agentes-chat/backup:latest deploy/backup`.
+`docker build -t ghcr.io/ackwire-energy/backup:latest deploy/backup`.
 
 To upgrade, `git pull`, build the image again, copy `docker-compose.yml` again, then
 `docker compose up -d` in `~/agentes`. Skip `docker compose pull` with a local image: it replaces it
@@ -1679,13 +1878,29 @@ S3_SECRET_ACCESS_KEY=...
 S3_BACKUP_BUCKET=agentes-backups
 ```
 
+**Encrypted dumps (optional).** A dump leaves the server as `pg_dump` wrote it unless
+`BACKUP_AGE_RECIPIENT` holds an [age](https://age-encryption.org) public key (`age1…`): then each dump
+is encrypted to that key before it is uploaded, as `agentes-<stamp>.dump.age`, and the bucket's key
+alone can't read it. Only the public key sits on the server, so create the pair somewhere else
+(`age-keygen -o key.txt`, which prints the public key and keeps the private one in `key.txt`) and keep
+the private key apart from the server and from the bucket: a dump whose key is lost can't be restored.
+Add the public key to `.env` and run `docker compose up -d`:
+
+```sh
+BACKUP_AGE_RECIPIENT=age1...
+```
+
+Restoring needs `age` on the machine that restores (`apk add age`, `apt install age` or
+`brew install age`) and that private key. Switching either way is safe: `list` and the retention cover
+both names, and the dumps already in the bucket stay as they are.
+
 Add `backup` to `COMPOSE_PROFILES` too, comma-separated: `COMPOSE_PROFILES=tailscale,backup` on
 Tailscale (the setup's default), `https,backup` with Caddy, or `backup` alone. Running the setup
 again keeps it. Run `docker compose up -d`: the first dump runs right away, unless the bucket has one
 from the last 26 hours (the interval plus 2), and `docker compose logs backup` shows each one. These
 `S3_*` values also serve file storage when `S3_BUCKET` is set, so the key then needs both buckets.
 Outside R2, set `S3_PROVIDER` to rclone's name for the store (`AWS`, `Minio`, `Other` and so on) and
-`S3_REGION` if it needs one. The service runs `ghcr.io/agentes-chat/backup`, published with each
+`S3_REGION` if it needs one. The service runs `ghcr.io/ackwire-energy/backup`, published with each
 release under the app's tags; `AGENTES_BACKUP_IMAGE` holds a version the way `AGENTES_IMAGE` does.
 
 ```sh
@@ -1712,7 +1927,15 @@ start the line with `cd /path/to/compose/dir && umask 077;` and write `\%F`).
 
 **Restore** with the app stopped, so nothing writes in between, into an emptied database: tables that
 a newer version added aren't in an older dump and would keep it from replacing the rest. A dump in
-the bucket comes down to the server first, under a name from `list`:
+the bucket comes down to the server first, under a name from `list`. An encrypted one (`.dump.age`)
+is decrypted with the private key, which the server doesn't have:
+
+```sh
+(umask 077 && docker compose run --rm -T backup fetch agentes-20261020-030000.dump.age > agentes-2026-10-20.dump.age)
+age -d -i key.txt agentes-2026-10-20.dump.age > agentes-2026-10-20.dump
+```
+
+A dump without `.age` is ready as it comes down:
 
 ```sh
 (umask 077 && docker compose run --rm -T backup fetch agentes-20261020-030000.dump > agentes-2026-10-20.dump)

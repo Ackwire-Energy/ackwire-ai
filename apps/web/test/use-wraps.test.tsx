@@ -103,7 +103,7 @@ describe("a connect flow's title", () => {
     // One line: the tile rises to the title's capitals' middle, as measured for the app's 18/24 title.
     expect(rule(".cflow__title > :first-child")).toContain("translate: 0 calc(-1 * var(--title-cap-mid))");
     const app = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
-    expect(app).toContain("--title-cap-mid: 1.19px;");
+    expect(app).toContain("--title-cap-mid: -0.3px;");
     expect(rule(".cflow__title:has(> .ac-captop)")).toContain("align-items: flex-start");
     expect(rule(".cflow__title:has(> .ac-captop) > :first-child")).toContain("translate: none");
   });

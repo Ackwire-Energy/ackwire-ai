@@ -3,6 +3,7 @@
  * (go offline, raise a folder request), and a frame the size of each real window. `?bare=1` drops the bar
  * (screenshots). Not product UI.
  */
+import { switchTheme } from "@agenteschat/ui";
 import { useEffect, useReducer } from "react";
 import type { FakeHost } from "../host/fake";
 import type { WindowName } from "../host/types";
@@ -22,10 +23,7 @@ export function DevFrame({ host }: { host: FakeHost }) {
   const size = SIZES[name];
   const first = [...host.runners.values()][0];
   const bare = new URLSearchParams(window.location.search).get("bare") === "1";
-  const toggleTheme = () => {
-    const r = document.documentElement;
-    r.dataset.theme = r.dataset.theme === "dark" ? "light" : "dark";
-  };
+  const toggleTheme = () => switchTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
   return (
     <div className="dk-dev" data-bare={bare || undefined}>
       {!bare && (

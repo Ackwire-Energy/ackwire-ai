@@ -46,6 +46,23 @@ export function shortPath(path: string): string {
   return m ? `~${m[1] ?? ""}` : path;
 }
 
+/** A folder as the person knows it: iCloud Drive by that name, its folders after "›", else `shortPath`. */
+export function folderLabel(path: string): string {
+  const m = /^\/Users\/[^/]+\/Library\/Mobile Documents\/com~apple~CloudDocs(\/.*)?$/.exec(path);
+  if (!m) return shortPath(path);
+  return ["iCloud Drive", ...(m[1] ?? "").split("/").filter(Boolean)].join("\u00a0›\u00a0");
+}
+
+/** Where the server here keeps its backups (`backups/` in its folder `dir`), with the folder's own separator. */
+export const backupsFolder = (dir: string) => `${dir}${dir.includes("\\") ? "\\" : "/"}backups`;
+
+/** Today at 3:00 on this computer's clock, the nightly backup's time. */
+export function nightAt(): Date {
+  const at = new Date();
+  at.setHours(3, 0, 0, 0);
+  return at;
+}
+
 /** "Ada, Bento e Lia" / "Ada, Bento and Lia". */
 export function listNames(names: readonly string[], locale: string): string {
   try {

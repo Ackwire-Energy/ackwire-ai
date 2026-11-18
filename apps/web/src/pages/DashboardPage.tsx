@@ -1,5 +1,6 @@
 import type { Dashboard } from "@agenteschat/client";
 import {
+  frozenBoard,
   useDashboard,
   useDashboards,
   useDeleteDashboard,
@@ -91,7 +92,7 @@ export function DashboardPage({ dashboardId }: { dashboardId: string }) {
     );
   }
   if (board.kind === "home" && !homeElsewhere) return null;
-  return <Board board={board} widgetId={widgetId} onWidget={setWidgetId} />;
+  return <Board board={frozenBoard(board, org)} widgetId={widgetId} onWidget={setWidgetId} />;
 }
 
 function BackCrumb() {

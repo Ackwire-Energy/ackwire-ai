@@ -1,5 +1,10 @@
 import { afterEach, expect, test } from "bun:test";
-import { BROWSER_PROFILE_PROTOCOL, channelTopic, type MachineRequest } from "@agenteschat/adapters";
+import {
+  ACCESS_ALLOW_PROTOCOL,
+  BROWSER_PROFILE_PROTOCOL,
+  channelTopic,
+  type MachineRequest,
+} from "@agenteschat/adapters";
 import { and, eq, schema, sql } from "@agenteschat/db";
 import {
   absorbBrowserCall,
@@ -16,9 +21,11 @@ import {
   grantScopes,
   listBrowserProfiles,
   type MachineCaller,
+  MachineRequestError,
   type MachineStatus,
   missingPermissions,
   requestBrowserProfile,
+  requireProfileDriver,
   requireProfileWatcher,
   setAgentBrowserProfile,
   setBrowserProfileAgents,
@@ -460,6 +467,71 @@ test("a person in control holds the profile: agents wait, Devolver frees it; wat
   await expect(requireProfileWatcher(f.db, asker.id, f.org.id, p.id)).rejects.toBeInstanceOf(ForbiddenError);
   await f.db.update(schema.agents).set({ ownerUserId: asker.id }).where(eq(schema.agents.id, b.bia.id));
   expect((await requireProfileWatcher(f.db, asker.id, f.org.id, p.id)).id).toBe(p.id);
+});
+
+test("Fazer login the computer refuses opens nothing: the browser off there says who turns it on; other causes say theirs", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([b.bia.id]);
+  let refusal: MachineRequestError | Error | null = new MachineRequestError(
+    "not_allowed",
+    "Browser is turned off on this computer (its owner can turn it on from agentes.chat)",
+  );
+  const hub: MachineCaller = {
+    status: b.hub.status,
+    call: async (id, request, options) => {
+      if ((request as MachineRequest).op === "browser.warm" && refusal) throw refusal;
+      return b.hub.call(id, request, options);
+    },
+  };
+  const holder = async () =>
+    (await f.db.select().from(schema.browserProfiles).where(eq(schema.browserProfiles.id, p.id)))[0]?.heldByUserId;
+  const login = (userId: string) => startProfileControl({ db: f.db, hub }, userId, f.org.id, p.id);
+
+  // Whoever connected it, on an app too old to turn it on from here: update it first. Control isn't kept.
+  await expect(login(f.owner.id)).rejects.toMatchObject({
+    code: "browser_profile.tool_off",
+    params: { machineId: b.machineId, tool: "browser", mayAllow: false, outdated: true, ownerId: null },
+  });
+  expect(await holder()).toBeNull();
+
+  // A newer app: they turn it on themselves. Someone else is told whose computer it is.
+  await f.db
+    .update(schema.machines)
+    .set({ protocol: ACCESS_ALLOW_PROTOCOL })
+    .where(eq(schema.machines.id, b.machineId));
+  await expect(login(f.owner.id)).rejects.toMatchObject({ params: { mayAllow: true, outdated: false } });
+  const admin = await addMember(f.db, f.org.id, "admin", "Rui Admin");
+  await expect(login(admin.id)).rejects.toMatchObject({
+    code: "browser_profile.tool_off",
+    params: { mayAllow: false, ownerId: f.owner.id, ownerName: expect.any(String) },
+  });
+  expect(await holder()).toBeNull();
+
+  // Another refusal: the computer's words.
+  refusal = new MachineRequestError("browser_unavailable", "Chrome isn't installed on this computer");
+  await expect(login(f.owner.id)).rejects.toMatchObject({
+    code: "browser_profile.unavailable",
+    message: "Chrome isn't installed on this computer",
+    params: { cause: "browser_unavailable" },
+  });
+
+  // A first Chrome download past the wait isn't a refusal: the live view opens and says it's opening.
+  refusal = new MachineRequestError("timeout", "The computer didn't answer in time");
+  expect((await login(f.owner.id)).holder).toMatchObject({ type: "person", userId: f.owner.id });
+  expect(await holder()).toBe(f.owner.id);
+});
+
+test("a workspace being deleted: its profiles are still watched, never driven (the socket's typing checks this too)", async () => {
+  const b = await profilesSetup();
+  const p = await b.profile([b.bia.id]);
+  await f.db
+    .update(schema.organizations)
+    .set({ deletionDueAt: new Date(Date.now() + 7 * 86_400_000) })
+    .where(eq(schema.organizations.id, f.org.id));
+  expect((await requireProfileWatcher(f.db, f.owner.id, f.org.id, p.id)).id).toBe(p.id);
+  await expect(requireProfileDriver(f.db, f.owner.id, f.org.id, p.id)).rejects.toMatchObject({
+    code: "org.deleting",
+  });
 });
 
 test("request_permission offers profiles apart from 'all tools'; approving grants one", async () => {

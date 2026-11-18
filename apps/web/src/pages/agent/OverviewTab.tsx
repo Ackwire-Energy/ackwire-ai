@@ -105,12 +105,7 @@ export function OverviewTab() {
               text: t(modeKey(org, "agent.instructionsHelp"), { ...g, org: org.name }),
             }}
             action={
-              <Button
-                size="sm"
-                variant="ghost"
-                icon={can("instructions") ? "edit" : undefined}
-                onClick={() => goTo("instructions")}
-              >
+              <Button variant="link" onClick={() => goTo("instructions")}>
                 {can("instructions") ? t("agent.edit") : t("agentPage.overview.readAll")}
               </Button>
             }
@@ -133,7 +128,7 @@ export function OverviewTab() {
             title={t("agentPage.overview.recent")}
             action={
               decides ? (
-                <Button size="sm" variant="ghost" onClick={() => goTo("activity")}>
+                <Button variant="link" onClick={() => goTo("activity")}>
                   {t("agentPage.overview.seeAll")}
                 </Button>
               ) : null

@@ -59,7 +59,15 @@ import {
 import { forgetCodeEmail } from "./email-codes";
 import { type DecidedBy, publishListChanged, publishRouted } from "./events";
 import { executeRun, type RunExecutorDeps } from "./executor";
-import { FEEDBACK_FILE_PURGE_JOB, FEEDBACK_JOB, purgeFeedbackFile, sendQueuedFeedback } from "./feedback";
+import {
+  FEEDBACK_FILE_PURGE_JOB,
+  FEEDBACK_JOB,
+  type Feedback,
+  isFeedbackRelay,
+  purgeFeedbackFile,
+  relayQueuedFeedback,
+  sendQueuedFeedback,
+} from "./feedback";
 import { FOLLOW_UP_JOB, wakeFollowUp } from "./follow-through";
 import { cutText } from "./format";
 import type { GitHubAppAccess } from "./git/github-call";
@@ -78,6 +86,7 @@ import {
   type TaskCall,
   wakeConversationForTask,
 } from "./machine-tasks";
+import { WAKE_OVERDUE_JOB, wakeOverdue } from "./machine-wake";
 import { isMediaAfterReply, isMediaOnly } from "./media";
 import { getMessage, referencedOf } from "./messages";
 import { checkMissionDone } from "./mission-delivery";
@@ -90,11 +99,13 @@ import { ORG_FILES_PURGE_ATTEMPTS, ORG_FILES_PURGE_JOB, USER_FILES_PURGE_JOB } f
 import { outOfOfficeIds } from "./out-of-office";
 import { enqueue, type JobHandlers, type OutboxJob, PermanentJobError } from "./outbox";
 import { checkParkedRun, EARLY_CHECK_JOB, scheduleParkedChecks } from "./parked-asks";
+import { PARTNER_WAITLIST_CONTACT_JOB, savePartnerWaitlistContact } from "./partner-waitlist";
 import { notifyPersonLimit, PERSON_LIMIT_JOB } from "./person-usage";
-import { checkPushReceipts, deliverPush, pushTicketsOf } from "./push";
+import { deliverPush } from "./push";
 import { reachOf, settleReach } from "./reach";
 import { routineCreatorOf } from "./requester";
 import { considerCard, RIGHT_HAND_DECIDE_JOB } from "./right-hand-approvals";
+import { lodiLaneHandlers } from "./right-hand-lanes";
 import {
   createLlmRouterStrategy,
   DEFAULT_ROUTER_POLICY,
@@ -103,7 +114,7 @@ import {
   routeMessage,
   smallModelFor,
 } from "./router";
-import { createJevRouterStrategy, jevCostNanoUsd, routeChain } from "./router-jev";
+import { createJevRouterStrategy, routeChain } from "./router-jev";
 import { createPlanRouterStrategy } from "./router-plan";
 import { executeRoutineRun } from "./routines";
 import { type AgentRun, NO_AI } from "./runs";
@@ -115,14 +126,15 @@ import type { SkillDeps } from "./skills";
 import { TEAM_HELLO_JOB } from "./standing";
 import { purgeOrgFiles, purgeUserFiles, runMigration, type StorageDeps } from "./storage";
 import { postStretchCard, STRETCH_JOB, type StretchHold } from "./stretch";
+import { fallBack, queueSurfaceDelivery, SURFACE_FALLBACK_JOB } from "./surfaces/deliveries";
 import { sayTeamHello } from "./team-templates";
-import { postTeamWeek, TEAM_WEEK_JOB } from "./team-week";
+import { postTeamWeek, TEAM_DAY_JOB, TEAM_WEEK_JOB } from "./team-week";
 import { isAgentesCloud } from "./telemetry";
 import { assessThread } from "./thread-assess";
 import { runVaultSync, VAULT_SYNC_JOB, type VaultDeps } from "./vault";
 import { transcribeVoiceClip, VOICE_JOB, type VoiceDeps } from "./voice";
 import { saveWaitlistContact } from "./waitlist";
-import { checkInWork, WORK_CHECK_IN_JOB } from "./works";
+import { checkInWork, followUpWork, WORK_CHECK_IN_JOB, WORK_FOLLOW_UP_JOB } from "./works";
 import {
   ACCOUNT_DELETE_JOB,
   type DeletionDeps,
@@ -158,6 +170,8 @@ export interface JobDeps extends RunExecutorDeps {
   email?: EmailSender;
   /** Where feedback's pictures and videos are kept (jobs `feedback.send`, `feedback.file.purge`). */
   feedbackBlobs?: BlobStore;
+  /** How a feedback reaches the agentes.chat team's inbox (ADR 0160 §13); the network's own by default. */
+  feedbackFetch?: typeof fetch;
   /** Where emails get their pictures (`emailArtFor`); absent: from each link's own server. */
   emailArt?: EmailArt;
   /** Push to the phone app (job `push.send`); absent = push off. */
@@ -259,7 +273,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
                 model: u.model,
                 inputTokens: u.inputTokens,
                 outputTokens: u.outputTokens,
-                costNanoUsd: jevCostNanoUsd(u.inputTokens),
+                costNanoUsd: u.costNanoUsd,
               });
             },
           }),
@@ -277,8 +291,7 @@ export function messageRouter(deps: JobDeps): RouterDeps | null {
       maxHops: deps.maxHops,
     },
     hasAi: (orgId) => orgHasAi({ db: deps.db, gateway: deps.gateway, machines: deps.machines }, orgId),
-    outOfOffice: (orgId, ids) =>
-      outOfOfficeIds(deps.db, orgId, ids, { hasModel: (agent) => deps.gateway.hasModelCredential(agent) }),
+    outOfOffice: (orgId, ids) => outOfOfficeIds(deps.db, orgId, ids),
     routing: { jev: () => jevPicks(jev?.key), smallModel, plans },
     quietMs: router.quietMs,
     quietByTyping: router.quietByTyping,
@@ -741,6 +754,8 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       if (Array.isArray(message.meta.steeredRunIds)) return;
       // A reply in an agent's background work thread: its reply turn started with the message.
       if (message.meta.forWork) return;
+      // For the task's agent in its task's conversation: its run started with the message, as in a DM.
+      if (message.meta.forTask) return;
       const channel = where;
       if (channel?.kind === "dm") {
         await dispatchDm(deps.db, message, { maxHops: deps.maxHops }); // idempotent safety net
@@ -832,6 +847,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         ...(typeof job.payload.due === "number" ? { due: job.payload.due } : {}),
       });
     },
+    // A long work ended after people passed messages on to it: its agent follows each one's up, once (ADR 0121).
+    [WORK_FOLLOW_UP_JOB]: async (job) => {
+      const ids = Array.isArray(job.payload.messageIds) ? job.payload.messageIds : [];
+      await followUpWork(deps, orgOf(job), {
+        workId: String(job.payload.workId),
+        runId: String(job.payload.runId),
+        messageIds: ids.filter((id): id is string => typeof id === "string"),
+        stopped: job.payload.stopped === true,
+      });
+    },
     "secret.activate": async (job) => {
       if (!deps.sandbox) throw new Error("Computer secret delivery is unavailable");
       await activateDeliveredSecret(
@@ -890,7 +915,12 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     "routine.run": async (job) => {
       await executeRoutineRun(
-        { db: deps.db, pubsub: deps.pubsub, context: deps.context },
+        {
+          db: deps.db,
+          pubsub: deps.pubsub,
+          context: deps.context,
+          ai: { gateway: deps.gateway, machines: deps.machines ?? null },
+        },
         String(job.payload.routineRunId),
       );
     },
@@ -970,6 +1000,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
       await sayTeamHello(deps, orgOf(job), job.payload);
     },
     [FEEDBACK_JOB]: async (job) => {
+      if (isFeedbackRelay((job.payload.feedback as Feedback | undefined)?.to)) {
+        await relayQueuedFeedback(deps.feedbackFetch ?? fetch, job.payload, deps.feedbackBlobs);
+        return;
+      }
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await sendQueuedFeedback(deps.email, job.payload, deps.feedbackBlobs);
     },
@@ -999,6 +1033,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     "waitlist.contact": async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
       await saveWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
+    },
+    [PARTNER_WAITLIST_CONTACT_JOB]: async (job) => {
+      if (!deps.email) throw new PermanentJobError("no email sender configured");
+      await savePartnerWaitlistContact(deps.db, deps.email, String(job.payload.entryId));
     },
     [ACCOUNT_CONTACT_JOB]: async (job) => {
       if (!deps.email) throw new PermanentJobError("no email sender configured");
@@ -1050,6 +1088,10 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         statusOnly: job.payload.statusOnly === true,
       });
     },
+    // A computer in standby wanted awake a grace ago: still asleep, people see it down (ADR 0161).
+    [WAKE_OVERDUE_JOB]: async (job) => {
+      await wakeOverdue({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.machineId));
+    },
     // A task start cut by a drop, once it can't still be underway: the agent's journal on its computer settles it.
     "machine.task_start_check": async (job) => {
       const hub = missions.hub;
@@ -1077,10 +1119,16 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         { orgId: orgOf(job), messageId: String(job.payload.messageId) },
       );
     },
-    // A person's monthly AI limit neared or reached (ADR 0141): the person hears 80%, who decides hears 100%.
+    // The right hand's cards: the week's, and the day's under its own kind (`TEAM_DAY_JOB`).
     [TEAM_WEEK_JOB]: async (job) => {
       await postTeamWeek({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload);
     },
+    [TEAM_DAY_JOB]: async (job) => {
+      await postTeamWeek({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), job.payload);
+    },
+    // What else the right hand does by itself: each lane's own jobs (`right-hand-lane.ts`).
+    ...lodiLaneHandlers(deps),
+    // A person's monthly AI limit neared or reached (ADR 0141): the person hears 80%, who decides hears 100%.
     [PERSON_LIMIT_JOB]: async (job) => {
       await notifyPersonLimit({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), {
         personId: String(job.payload.personId),
@@ -1090,10 +1138,15 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
     },
     // In-app notifications of a message: mentions, thread replies, DMs.
     "notifications.message": async (job) => {
-      await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+      const messageId = String(job.payload.messageId);
+      // A reply read on an outside chat surface goes there instead (ADR 0187); it falls back to this if not sent.
+      if (!(await queueSurfaceDelivery(deps.db, orgOf(job), messageId))) {
+        await notifyMessage({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), messageId);
+      }
       // A reply in a task's conversation (ADR 0145): the board's card counts it.
-      await announceTaskConversation({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.messageId));
+      await announceTaskConversation({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), messageId);
     },
+    [SURFACE_FALLBACK_JOB]: (job) => fallBack({ db: deps.db, pubsub: deps.pubsub }, String(job.payload.deliveryId)),
     // A request for help in an agent's browser nobody answered within the hour: the people asked hear it again, once.
     [HANDOFF_REMIND_JOB]: async (job) => {
       await remindBrowserHandoff({ db: deps.db, pubsub: deps.pubsub }, orgOf(job), String(job.payload.handoffId));
@@ -1105,10 +1158,6 @@ export function createJobHandlers(deps: JobDeps): JobHandlers {
         String(job.payload.notificationId),
         { held: job.payload.held === true },
       );
-    },
-    // Receipts of a push ~15 min later: tokens whose device is gone are deleted.
-    "push.receipts": async (job) => {
-      await checkPushReceipts({ db: deps.db, push: deps.push }, pushTicketsOf(job.payload.tickets));
     },
     // A workspace's skills that update by themselves from their links, once a day.
     [SKILL_UPDATES_JOB]: async (job) => {

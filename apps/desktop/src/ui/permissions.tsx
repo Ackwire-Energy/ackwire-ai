@@ -81,9 +81,18 @@ export function useMacGrants(beforeQuit?: () => Promise<void>): MacGrants {
  * three lines or more, which a picture's column would squeeze. Under them, once Screen Recording or Full Disk Access
  * was asked and is still off, what to do when macOS asks to quit and reopen the app; `resumed`: it just did, so the
  * line says it took effect. Local Network shows only whether it was asked, never a green it can't know, and only on a
- * macOS that has it (15 and later).
+ * macOS that has it (15 and later). `hinted` (Preferences): what each lets agents do goes behind its ⓘ, only the
+ * Full Disk Access fix stays in sight.
  */
-export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; resumed?: boolean }) {
+export function MacPermissionCard({
+  mac,
+  resumed = false,
+  hinted = false,
+}: {
+  mac: MacGrants;
+  resumed?: boolean;
+  hinted?: boolean;
+}) {
   const { t } = useTranslation();
   const { grants, pending, ask } = mac;
   // Opened again by macOS: Preferences starts at its top, so the card the person left comes back into view.
@@ -111,23 +120,31 @@ export function MacPermissionCard({ mac, resumed = false }: { mac: MacGrants; re
         {MAC_PERMISSIONS.filter((p) => grants?.[p] !== "none").map((p) => {
           const grant = grants?.[p];
           const title = t(`desktop.prepare.${p}`);
-          const under =
+          const desc = t(`desktop.prepare.${p}Desc`);
+          const more =
             p === "screen"
               ? t("desktop.prepare.screenAgain")
-              : p === "disk" && grant !== "on"
-                ? t("desktop.prepare.diskHow")
+              : p === "network"
+                ? t("desktop.prepare.networkHint")
                 : null;
+          const fix = p === "disk" && grant !== "on" ? t("desktop.prepare.diskHow") : null;
+          const under = hinted ? fix : p === "screen" ? more : fix;
+          const hint = hinted
+            ? hintFor(t, title, more ? t("common.joinSentences", { a: desc, b: more }) : desc)
+            : p === "network" && more
+              ? hintFor(t, title, more)
+              : undefined;
           return (
             <PrefRow
               key={p}
               title={title}
-              hint={p === "network" ? hintFor(t, title, t("desktop.prepare.networkHint")) : undefined}
+              hint={hint}
               chip={
                 p === "network" && grant ? (
                   <Chip>{t(grant === "asked" ? "desktop.prepare.asked" : "desktop.prepare.notAsked")}</Chip>
                 ) : undefined
               }
-              desc={t(`desktop.prepare.${p}Desc`)}
+              desc={hinted ? undefined : desc}
               under={under && <span className="dk-help">{under}</span>}
               end={
                 grant === "on" ? (

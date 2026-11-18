@@ -1,12 +1,19 @@
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
-import { AGENT_GRADIENTS, type AgentColorName, bodyTones, mixHex, spriteGrid } from "@agenteschat/ui/agent/engine";
+import {
+  AGENT_GRADIENTS,
+  type AgentColorName,
+  bodyTones,
+  mixHex,
+  type SkyPair,
+  spriteGrid,
+} from "@agenteschat/ui/agent/engine";
 import { CellGrid, type CellRun, column } from "../browser/trail-pixels";
 
 /**
  * A routine's runs in pixels on the phone, the web's drawings (`RunStrip` and `RunLane` in `@agenteschat/ui`
  * `RunPixels.tsx`) as cell lists a Skia canvas replays (./RunPixels.tsx): each run a dithered column in the
  * agent's tones as tall as its cost (`weight`), nothing new a stub, a failure in the danger tone, a skip a short
- * warm one; a run at work flickers in the sky's light. On the horizon, a lane per routine: a dotted line, the
+ * warm one; a run at work flickers in the sky's light. On the horizon, a lane per agent: a dotted line, the
  * past runs as small columns, the next ones as pixels and the agent itself on its next run. Same grid, tones and
  * Bayer order as the web. Pure TypeScript, so it runs in `bun test`.
  */
@@ -178,7 +185,12 @@ export function spritePose(
 }
 
 /** The agent as a 9×9 sprite: its body dithered in its tones, its eyes (writing while it runs, or blinking). */
-export function spriteCells(color: AgentColorName, eyes: string, running: boolean, blink: boolean): CellRun[] {
+export function spriteCells(
+  color: AgentColorName | SkyPair,
+  eyes: string,
+  running: boolean,
+  blink: boolean,
+): CellRun[] {
   const tones = bodyTones(color);
   const out = new CellGrid();
   spriteGrid(SPRITE, eyes).forEach((row, y) => {

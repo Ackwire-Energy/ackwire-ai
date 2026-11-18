@@ -90,6 +90,33 @@ beforeAll(async () => {
   const answered = await run(await message("person", ago(2)), { createdAt: ago(2), status: "done" });
   const reply = await message("agent", ago(1));
   await db.update(schema.agentRuns).set({ replyMessageId: reply.id }).where(eq(schema.agentRuns.id, answered.id));
+  // It waited a minute on its provider, then kept its stage profile and how its two computer turns started.
+  await step(answered.id, 1, ago(2), { reason: "provider_outage", message: "x", parked: 1 });
+  await db
+    .insert(schema.agentRunSteps)
+    .values({ orgId: org.id, runId: answered.id, seq: 2, kind: "model_call", data: {}, createdAt: ago(1) });
+  await db
+    .update(schema.agentRuns)
+    .set({
+      transcript: {
+        profiles: [
+          {
+            stages: [
+              { stage: "claim", ms: 10, queries: 1 },
+              { stage: "context", ms: 200, queries: 5 },
+              { stage: "model#1", ms: 3000, queries: 0 },
+              { stage: "model#2", ms: 1000, queries: 0 },
+            ],
+            total: { ms: 4210, queries: 6 },
+            brain: [
+              { warm: false, initMs: 4000, firstEventMs: 6000 },
+              { warm: true, firstEventMs: 800 },
+            ],
+          },
+        ],
+      },
+    })
+    .where(eq(schema.agentRuns.id, answered.id));
   // Agent to agent, three times: another agent's message, a reply two hops deep, and another agent's answer
   // that the asker posts to itself.
   await run(await message("agent", ago(28)), { agentId: rio.id, createdAt: ago(28), status: "done", hop: 2 });
@@ -237,6 +264,37 @@ test("turns by origin and outcome, waits, replies and tokens by who pays, fleet-
   expect(got.workspaces.map((w) => w.waits.peakWaiting)).toEqual([2, 2]);
   expect(got.workspaces[1]?.tokens.input).toBe(7);
   expect(got.more).toBe(false);
+});
+
+test("waits by cause, how computer turns started and where a run's time went", async () => {
+  const { totals } = await operatorWorkAnalytics(f.db, range);
+  const busy = totals.waitsByCause.find((c) => c.cause === "brain_unavailable:busy");
+  expect(busy?.waits).toBe(4);
+  expect(busy?.medianSec).toBeGreaterThanOrEqual(270);
+  expect(totals.waitsByCause.find((c) => c.cause === "provider_outage")).toEqual({
+    cause: "provider_outage",
+    waits: 1,
+    medianSec: 60,
+    p90Sec: 60,
+  });
+  expect(totals.computerStarts).toEqual({
+    turns: 2,
+    warm: 1,
+    initMedianMs: 4000,
+    initP90Ms: 4000,
+    warmFirstEventMedianMs: 800,
+    warmFirstEventP90Ms: 800,
+    coldFirstEventMedianMs: 6000,
+    coldFirstEventP90Ms: 6000,
+  });
+  expect(totals.stages).toEqual([
+    { stage: "model", runs: 2, medianMs: 2000, p90Ms: 2800 },
+    { stage: "context", runs: 1, medianMs: 200, p90Ms: 200 },
+    { stage: "claim", runs: 1, medianMs: 10, p90Ms: 10 },
+  ]);
+  const theirs = await operatorOrgWorkAnalytics(f.db, nova.id, range);
+  expect(theirs.totals.computerStarts.turns).toBe(0);
+  expect(theirs.totals.stages).toEqual([]);
 });
 
 test("one workspace, per agent; by day past two days; at most 90 days", async () => {

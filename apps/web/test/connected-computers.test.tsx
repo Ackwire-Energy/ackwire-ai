@@ -849,19 +849,55 @@ describe("the computer page: pause, folders and tools (ADR 0036)", () => {
     );
   });
 
-  test("the browser off: whoever is at the computer turns it on in the app, or on Linux with the command", async () => {
+  test("the browser off on an app too old to switch from here: update it there, on Linux the command too", async () => {
     const card = () => document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
     await open();
-    expect(card().textContent).toContain(
-      "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.",
-    );
+    expect(card().textContent).toMatch(/Atualize o app do Ackwire AI no .+ para ligar daqui\./);
+    expect(card().textContent).not.toContain("Preferências");
     expect(card().querySelector(".machine-command__code")).toBeNull();
     cleanup();
     await open({ os: "linux", name: "Servidor", mode: "system" });
-    expect(card().textContent).toContain("Sem o app? No terminal do computador:");
+    expect(card().textContent).toContain("Prefiro no Terminal");
     expect(card().querySelector(".machine-command__code")?.textContent).toBe(
       "sudo agentes-runner tools enable browser",
     );
+  });
+
+  test("its owner turns the browser and a coding CLI on from here; someone else's computer offers to ask them", async () => {
+    const card = () => document.querySelector('[aria-labelledby="sec-machine-browser"]') as HTMLElement;
+    const allowCalls = (state: ReturnType<typeof seedState>) =>
+      state.calls.filter((c) => c.method === "machines.allowTool").map((c) => c.args);
+    const mine = await open({
+      pairedBy: { id: "u-walter", name: "Walter White" },
+      accessAllow: true,
+      access: { folders: [], tools: { claude: true, codex: false, commands: true, browser: false } },
+    });
+    await click(within(card()).getByRole("button", { name: "Ligar o navegador" }));
+    await settle(4);
+    expect(allowCalls(mine.state)).toEqual([[ORG_ID, mine.m.id, "browser"]]);
+    // An off coding CLI in the tools list gets its own Ligar.
+    const codex = document.querySelector('[data-tool="codex"]') as HTMLElement;
+    await click(within(codex).getByRole("button", { name: "Ligar Codex" }));
+    expect(allowCalls(mine.state).at(-1)).toEqual([ORG_ID, mine.m.id, "codex"]);
+    cleanup();
+    const theirs = await open({ pairedBy: { id: "u-rui", name: "Rui Tanaka" }, accessAllow: true });
+    expect(within(card()).queryByRole("button", { name: "Ligar o navegador" })).toBeNull();
+    await click(within(card()).getByRole("button", { name: "Pedir a Rui" }));
+    expect(theirs.state.calls.filter((c) => c.method === "machines.askTool").map((c) => c.args)).toEqual([
+      [ORG_ID, theirs.m.id, "browser"],
+    ]);
+    // Offline: the button waits for it, and one line says so.
+    cleanup();
+    await open({ pairedBy: { id: "u-walter", name: "Walter White" }, accessAllow: true, online: false });
+    expect(card().textContent).toContain("está offline. Assim que ele voltar, o botão liga o navegador.");
+    expect((within(card()).getByRole("button", { name: "Ligar o navegador" }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    // An app too old for it: update it there.
+    cleanup();
+    await open({ pairedBy: { id: "u-walter", name: "Walter White" }, accessAllow: false });
+    expect(within(card()).queryByRole("button", { name: "Ligar o navegador" })).toBeNull();
+    expect(card().textContent).toContain("para ligar daqui.");
   });
 
   test("to allow more: the app on a Mac or a PC, the computer's terminal on Linux", async () => {

@@ -1,7 +1,22 @@
-import { keys, useWikiTree, type WikiImportNote } from "@agenteschat/client";
+import { keys, useCatalog, useWikiTree, type WikiImportNote, type WikiImportSource } from "@agenteschat/client";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { joinNames } from "@agenteschat/client/lib/format";
-import { Button, Checkbox, Dialog, DialogBody, DialogFooter, Icon, Input, Segmented } from "@agenteschat/ui";
+import { can } from "@agenteschat/client/lib/permissions";
+import { hiddenRepoOf, hiddenRepoText } from "@agenteschat/client/lib/skills";
+import {
+  Alert,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogBody,
+  DialogFooter,
+  Field,
+  HintLine,
+  Icon,
+  Input,
+  OptionCard,
+  Segmented,
+} from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
@@ -9,12 +24,17 @@ import { type DragEvent, type ReactNode, useEffect, useRef, useState } from "rea
 import { useTranslation } from "react-i18next";
 import { useApi } from "@/api/context";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
+import { ConnectorIcon } from "@/components/ConnectorCatalog";
+import { GitHubMark } from "@/components/GitHubMark";
 import { useOrg } from "@/components/org-context";
 import { WikiSky } from "@/components/Sky";
 import { useDirectory } from "@/hooks/useDirectory";
+import { githubRoot, isGithubLink } from "@/lib/import-flow";
 import {
   filesFromDrop,
   filesFromList,
+  filesFromZip,
   fmtBytes,
   hasFiles,
   homeOf,
@@ -27,6 +47,7 @@ import {
 } from "@/lib/obsidian";
 import { useToast } from "@/lib/toast";
 import { ObsidianMark } from "./ObsidianMark";
+import "@/components/import-flow.css";
 import "./vault.css";
 
 /** Picking a vault: a .zip or .md files, or a whole folder. Both inputs stay hidden. */
@@ -74,14 +95,16 @@ export function VaultInputs({
   );
 }
 
-/** The dashed area: drop a vault here, or click to pick a .zip. */
+/** The dashed area: drop a vault here, or click to pick a .zip. `plain`: Markdown files of any app, without a mark. */
 export function VaultDropZone({
   onFiles,
   compact = false,
+  plain = false,
   children,
 }: {
   onFiles: (files: Promise<VaultFile[]>, name?: string) => void;
   compact?: boolean;
+  plain?: boolean;
   children?: ReactNode;
 }) {
   const { t } = useTranslation();
@@ -113,12 +136,12 @@ export function VaultDropZone({
       >
         {!compact && (
           <span className="vault-drop__icon">
-            <ObsidianMark size={30} />
+            {plain ? <Icon name="upload" size={20} /> : <ObsidianMark size={30} />}
           </span>
         )}
         {compact && <Icon name="upload" />}
-        <b>{t("wiki.import.dropTitle")}</b>
-        <span>{t("wiki.import.dropText")}</span>
+        <b>{t(plain ? "wiki.import.files.dropTitle" : "wiki.import.dropTitle")}</b>
+        <span>{t(plain ? "wiki.import.files.dropText" : "wiki.import.dropText")}</span>
       </button>
       {!compact && (
         <div className="vault-drop__alts">
@@ -246,6 +269,7 @@ type ImportDone = {
   retry: WikiImportNote[];
   importId: string;
   name: string;
+  source: WikiImportSource;
   folder?: string;
   onConflict: "keep_both" | "skip";
 };
@@ -311,13 +335,14 @@ export function useVaultReader(existing: { title: string }[]) {
     },
   );
   const [report, setReport] = useState<VaultReport | null>(null);
-  const read = async (files: Promise<VaultFile[]>, name?: string) => {
+  const read = async (files: Promise<VaultFile[]>, name?: string, source: WikiImportSource = "obsidian") => {
     setState({ step: "reading", done: 0, total: 0, path: "" });
     try {
       const started = Date.now();
       const r = await readVault(await files, {
         existing,
         name,
+        source,
         onProgress: (done, total, path) => setState({ step: "reading", done, total, path }),
       });
       // A beat on screen, so a small vault doesn't flash by.
@@ -362,10 +387,15 @@ export function VaultReading({
   );
 }
 
+const GITHUB_MARK = { iconUrl: "/connectors/github.svg", brandColor: null };
+const SOURCES: WikiImportSource[] = ["obsidian", "github", "files"];
+
 /**
- * "Importar do Obsidian": pick or drop a vault, review what it holds and how
- * it lands, then import (attachments to the Drive, notes as pages).
- * `files` starts it already reading (a vault dropped on the page).
+ * "Importar", in two steps: where the notes come from, as a grid of cards (an Obsidian vault, a GitHub link,
+ * Markdown files), then that source's own way in ("Voltar" picks another). From there the same for all: review what
+ * it holds and how it lands, then import (attachments to the Drive, notes as pages). A GitHub link is
+ * read on the server, a private repository through the workspace's GitHub; when none reaches it, the dialog offers
+ * to connect GitHub, as Instalar skill does. `files` starts it already reading (dropped on the page).
  */
 export function WikiImportDialog({
   files,
@@ -394,9 +424,41 @@ export function WikiImportDialog({
   const stop = useRef(false);
   const [stopping, setStopping] = useState(false);
 
-  const read = async (f: Promise<VaultFile[]>, n?: string) => {
-    const r = await reader.read(f, n);
+  /** The second step's source; null on the first, where it is picked. */
+  const [from, setFrom] = useState<WikiImportSource | null>(null);
+  const [url, setUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+  /** A link the workspace's GitHub couldn't read either. */
+  const [hidden, setHidden] = useState<ReturnType<typeof hiddenRepoOf>>(null);
+  const [flow, setFlow] = useState<FlowState | null>(null);
+  const catalog = useCatalog();
+  const github = catalog.data?.connectors.find((c) => c.id === "github");
+
+  const read = async (f: Promise<VaultFile[]>, n?: string, source?: WikiImportSource) => {
+    const r = await reader.read(f, n, source);
     if (r) setPick(new Set(r.folders.map((x) => x.name)));
+  };
+  const readLink = async () => {
+    const link = url.trim();
+    setHidden(null);
+    if (!isGithubLink(link)) {
+      setLinkError(t("wiki.import.github.error.notGithub"));
+      return;
+    }
+    setLinkError(null);
+    setFetching(true);
+    try {
+      const notes = await api.wiki.githubNotes(org.id, link);
+      setFetching(false);
+      await read(filesFromZip(new File([notes], "notes.zip")), githubRoot(link) ?? undefined, "github");
+    } catch (e) {
+      const missing = hiddenRepoOf(e);
+      if (missing) setHidden(missing);
+      else setLinkError(errorText(t, e, i18n.language));
+    } finally {
+      setFetching(false);
+    }
   };
   const started = useRef(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: only the vault it opened with
@@ -434,6 +496,7 @@ export function WikiImportDialog({
         retry: result.retry,
         importId: result.importId,
         name: report.name,
+        source: report.source,
         folder: dest === "folder" ? into.trim() || undefined : undefined,
         onConflict: conflict,
       });
@@ -460,6 +523,7 @@ export function WikiImportDialog({
         org.id,
         {
           name: done.name,
+          source: done.source,
           folder: done.folder,
           onConflict: done.onConflict,
           importId: done.importId,
@@ -475,6 +539,8 @@ export function WikiImportDialog({
         failures: [...done.failures.filter((f) => f.reason !== "batch" && f.reason !== "stopped"), ...again.failures],
         retry: again.retry,
       });
+    } catch (e) {
+      toast.show(errorText(t, e, i18n.language), "error");
     } finally {
       void qc.invalidateQueries({ queryKey: keys.wiki(org.id) });
       setImporting(null);
@@ -484,14 +550,18 @@ export function WikiImportDialog({
 
   const agents = dir.agents.slice(0, 2);
   const missing = done ? done.failures.length + done.skipped.length : 0;
-  const title = done
+  // A retry is an import again: its progress (and Stop) shows, not the report it started from with its buttons.
+  const shown = importing ? null : done;
+  const title = shown
     ? missing
       ? t("wiki.import.partialTitle")
       : t("wiki.import.doneTitle")
     : report && reader.state.step === "ready"
       ? report.name
-      : t("wiki.import.title");
-  const description = done
+      : from
+        ? t(`wiki.import.titleFrom.${from}`)
+        : t("wiki.import.title");
+  const description = shown
     ? undefined
     : importing
       ? t("wiki.import.importingText")
@@ -499,11 +569,13 @@ export function WikiImportDialog({
         ? t("wiki.import.readingText")
         : report
           ? t("wiki.import.reviewText")
-          : t("wiki.import.text");
+          : from
+            ? t(`wiki.import.textFrom.${from}`)
+            : t("wiki.import.text");
 
   let body: ReactNode;
   let footer: ReactNode;
-  if (done && missing > 0) {
+  if (!importing && done && missing > 0) {
     body = (
       <>
         <div className="vault-done vault-done--partial">
@@ -545,7 +617,7 @@ export function WikiImportDialog({
         )}
       </>
     );
-  } else if (done) {
+  } else if (!importing && done) {
     body = (
       <div className="vault-done">
         <WikiSky variant="glow" />
@@ -699,23 +771,118 @@ export function WikiImportDialog({
     footer = (
       <>
         <span className="small muted vault-foot-hint">{t("wiki.import.versionHint")}</span>
-        <Button onClick={reader.reset}>{t("wiki.import.another")}</Button>
+        <Button onClick={reader.reset}>
+          {t(report.source === "github" ? "wiki.import.anotherLink" : "wiki.import.another")}
+        </Button>
         <Button variant="primary" disabled={chosen === 0} onClick={() => void run()}>
           {t("wiki.import.go", { count: chosen })}
         </Button>
       </>
     );
   } else {
-    body = (
-      <>
-        <VaultDropZone onFiles={(f, n) => void read(f, n)} />
-        <p className="vault-notice ac-iconline">
-          <Icon name="info" size={16} />
-          <span>{t("wiki.import.howTo")}</span>
-        </p>
-      </>
-    );
-    footer = <span className="small muted vault-foot-hint">{t("wiki.import.nothingYet")}</span>;
+    const mayConnect = can(org, "manage_connectors") && Boolean(github);
+    const said = hidden ? hiddenRepoText(t, hidden, mayConnect) : null;
+    body =
+      from === null ? (
+        // biome-ignore lint/a11y/useSemanticElements: pressable cards, not a native fieldset
+        <div className="imp-sources" role="group" aria-label={t("wiki.import.from")}>
+          {SOURCES.map((source) => (
+            <OptionCard key={source} stacked pressed={false} className="imp-source" onClick={() => setFrom(source)}>
+              <span className="imp-mark" aria-hidden="true">
+                {source === "obsidian" ? (
+                  <ObsidianMark size={20} />
+                ) : source === "github" ? (
+                  <GitHubMark size={20} />
+                ) : (
+                  <Icon name="file" />
+                )}
+              </span>
+              <span className="ac-option__title">{t(`wiki.import.source.${source}`)}</span>
+            </OptionCard>
+          ))}
+        </div>
+      ) : from === "github" ? (
+        <form
+          id="wiki-import-link"
+          className="vault-dialog"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void readLink();
+          }}
+        >
+          <Field
+            label={t("wiki.import.github.label")}
+            id="wiki-import-url"
+            error={linkError ?? undefined}
+            hint={{
+              name: t("common.about", { label: t("wiki.import.github.label") }),
+              text: t("wiki.import.github.help"),
+            }}
+          >
+            <Input
+              value={url}
+              autoFocus
+              onChange={(e) => {
+                setUrl(e.target.value);
+                setLinkError(null);
+                setHidden(null);
+              }}
+              placeholder="https://github.com/…"
+              inputMode="url"
+            />
+          </Field>
+          {said && (
+            <div className="skill-hidden">
+              <Alert tone="neutral">{said.text}</Alert>
+              {said.connect && github && (
+                <div className="row">
+                  <Button size="sm" variant="primary" onClick={() => setFlow({ step: 0, def: github })}>
+                    <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
+                    {t("skills.hidden.connectButton")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </form>
+      ) : from === "obsidian" ? (
+        <>
+          <VaultDropZone onFiles={(f, n) => void read(f, n, "obsidian")} />
+          <p className="vault-notice">
+            <HintLine name={t("common.about", { label: t("wiki.import.howToLabel") })} hint={t("wiki.import.howTo")}>
+              {t("wiki.import.howToLabel")}
+            </HintLine>
+          </p>
+        </>
+      ) : (
+        <VaultDropZone plain onFiles={(f, n) => void read(f, n, "files")} />
+      );
+    footer =
+      from === null ? null : (
+        <>
+          <span className="small muted vault-foot-hint">{t("wiki.import.nothingYet")}</span>
+          <Button
+            onClick={() => {
+              setFrom(null);
+              setLinkError(null);
+              setHidden(null);
+            }}
+          >
+            {t("common.back")}
+          </Button>
+          {from === "github" && (
+            <Button
+              type="submit"
+              form="wiki-import-link"
+              variant="primary"
+              disabled={!url.trim() || fetching}
+              loading={fetching}
+            >
+              {t("wiki.import.github.read")}
+            </Button>
+          )}
+        </>
+      );
   }
 
   return (
@@ -731,6 +898,16 @@ export function WikiImportDialog({
         <div className="vault-dialog">{body}</div>
       </DialogBody>
       {footer && <DialogFooter>{footer}</DialogFooter>}
+      <ConnectFlow
+        flow={flow}
+        returnTo={`${window.location.pathname}${window.location.search}`}
+        onChange={(next) => {
+          // Connected without leaving the page (a token): the link again, behind the steps that follow.
+          if (flow?.step === 0) void readLink();
+          setFlow(next);
+        }}
+        onClose={() => setFlow(null)}
+      />
     </Dialog>
   );
 }

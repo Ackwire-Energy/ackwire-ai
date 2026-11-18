@@ -1,16 +1,25 @@
-import { type Me, type OrgSummary, useApi } from "@agenteschat/client";
+import { type Me, type OrgSummary, useApi, useMe } from "@agenteschat/client";
 import { workspaceNotes } from "@agenteschat/client/lib/deletion";
 import { CLOUD_SERVER, checkServer, normalizeServer, serverHost } from "@agenteschat/client/lib/server";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { openWorkspace, problemText } from "@/features/server";
+import { addAccount, openWorkspace, problemText } from "@/features/server";
 import { createApi } from "@/lib/api";
-import { askNewWorkspace } from "@/lib/new-workspace";
+import { askNewWorkspace, offersNewWorkspaceHere } from "@/lib/new-workspace";
 import { openOrgs } from "@/lib/org-choice";
-import { ALLOW_HTTP, serverUrl, signedInServers, useServer, useSignedInServers } from "@/lib/server";
+import {
+  ALLOW_HTTP,
+  serverUrl,
+  signedInServers,
+  usePlace,
+  usePlaceAccounts,
+  useServer,
+  useSignedInServers,
+} from "@/lib/server";
+import { serverOf } from "@/lib/server-choice";
 import { useOrg, useOrgMaybe } from "@/providers/org";
 import {
   GroupedFooter,
@@ -30,13 +39,15 @@ import { router } from "@/ui/navigation";
 import { Text } from "@/ui/Text";
 import { SheetHeader } from "../new/parts";
 import { OrgAvatar } from "../shared/OrgAvatar";
-import { goBack } from "../shared/parts";
+import { goBack, PushedHeader } from "../shared/parts";
 import { useMyFace } from "../shared/tabHeader";
 import { Page } from "./parts";
 import { orderedServers, type ServerWorkspaces, unreadElsewhere, workspacesOf } from "./workspaces-logic";
 
 /** How long a server's list stays fresh: each one is asked again after this when Workspaces opens. */
 const FRESH_MS = 30_000;
+/** Every server's list of workspaces (`useWorkspacesAcross`), read again together on Workspaces' pull. */
+const WORKSPACES_ACROSS = "workspaces-across";
 
 /**
  * Every workspace of every server this phone is signed in to (ADR 0154), grouped by server, each with its unread
@@ -44,14 +55,16 @@ const FRESH_MS = 30_000;
  * keeps its group, saying so.
  */
 export function useWorkspacesAcross(): { groups: ServerWorkspaces[]; elsewhere: number } {
-  const server = useServer();
+  // Each place is a server, or one of its accounts (ADR 0183): a group each.
+  const server = usePlace();
   const signedIn = useSignedInServers();
+  const known = usePlaceAccounts();
   const org = useOrgMaybe();
   const api = useApi();
   const servers = orderedServers(signedIn, server);
   const results = useQueries({
     queries: servers.map((s) => ({
-      queryKey: ["workspaces-across", s] as const,
+      queryKey: [WORKSPACES_ACROSS, s] as const,
       staleTime: FRESH_MS,
       queryFn: async (): Promise<{ me: Me | null; unread: { orgId: string; unread: number }[] }> => {
         const client = s === server ? api : createApi(s);
@@ -64,7 +77,10 @@ export function useWorkspacesAcross(): { groups: ServerWorkspaces[]; elsewhere: 
     const r = results[i];
     const me = s === server && org ? { organizations: org.orgs } : (r?.data?.me ?? null);
     return workspacesOf({
-      server: s,
+      server: serverOf(s),
+      place: s,
+      email: r?.data?.me?.user.email ?? known[s]?.email ?? null,
+      several: servers.filter((other) => serverOf(other) === serverOf(s)).length > 1,
       current: s === server,
       orgs: openOrgs(me?.organizations ?? []),
       unread: r?.data?.unread ?? [],
@@ -97,7 +113,7 @@ export function useOpenWorkspaceRow() {
       return;
     }
     toast({ title: t("mobile.auth.server.now", { host: o.name }) });
-    void openWorkspace(g.server, o.id);
+    void openWorkspace(g.place, o.id);
   };
 }
 
@@ -110,19 +126,20 @@ export function WorkspaceMark({
   server,
   size = 30,
 }: {
-  org: Pick<OrgSummary, "mode" | "role" | "logo">;
-  /** The server it is on, when it isn't the current one (ADR 0154). */
+  org: Pick<OrgSummary, "mode" | "role" | "logo" | "accent">;
+  /** The place it is read from (a server, or one of its accounts), when it isn't the current one. */
   server?: string;
   size?: number;
 }) {
   const face = useMyFace();
   if (isPersonal(org) && org.role === "owner")
     return <PersonAvatar name={face.name || "?"} size={size} photo={face.photo} />;
-  return <OrgAvatar logo={org.logo} size={size} {...(server ? { server } : {})} />;
+  // In its own accent: the engine's `sky` is the active workspace's.
+  return <OrgAvatar logo={org.logo} accent={org.accent ?? null} size={size} {...(server ? { server } : {})} />;
 }
 
 /**
- * The groups of workspaces, one per server (its host as the small header), each workspace with its own mark (logo,
+ * The groups of workspaces, one per server ("Cloud", or "Seu servidor" and its host, as the small header), each workspace with its own mark (logo,
  * or its initial), its role, the check on the current one and the unread count on the others; a server that didn't
  * answer this time keeps its workspaces in their place, faded ("Sem resposta agora" when none is known). Shared by the
  * page and the sheet. A personal workspace of yours (ADR 0159) is you: your face and your name, and whose it is
@@ -146,18 +163,35 @@ export function WorkspaceGroups({
         const notes = workspaceNotes(t, i18n.language, g.orgs);
         const several = g.orgs.filter(mine).length > 1;
         return (
-          <View key={g.server}>
-            <GroupedHeader>{g.host}</GroupedHeader>
+          <View key={g.place}>
+            {/* Where they live: the Cloud by its name, one's own server by its host; and whose account, where the
+                phone has several on that server (ADR 0183). */}
+            <GroupedHeader>
+              {[
+                g.server === CLOUD_SERVER ? t("hosting.badge.cloud") : `${t("hosting.badge.own")} · ${g.host}`,
+                g.several ? g.email : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </GroupedHeader>
             <GroupedList>
               {g.failed ? (
                 <GroupedRow icon="wifi" label={t("mobile.me.workspacesUnreachable")} faint />
+              ) : g.orgs.length === 0 && g.several && !g.current ? (
+                // An account with no workspace yet: its own row is the way to it.
+                <GroupedRow
+                  icon="person"
+                  label={g.email ?? g.host}
+                  sub={t("mobile.me.accountNoWorkspace")}
+                  onPress={() => void openWorkspace(g.place, null)}
+                />
               ) : (
                 g.orgs.map((o) => {
                   const here = g.current && o.id === org.orgId;
                   return (
                     <GroupedRow
                       key={o.id}
-                      leading={<WorkspaceMark org={o} server={g.server} />}
+                      leading={<WorkspaceMark org={o} server={g.place} />}
                       label={mine(o) && !several && face.name ? face.name : o.name}
                       sub={notes.get(o.id) ?? t(modeKey(o, `mobile.me.role.${o.role}`))}
                       checked={here}
@@ -179,10 +213,15 @@ export function WorkspaceGroups({
 /** Workspaces: every server's, under a header each; tapping one opens it, on its server, without signing out. */
 export function WorkspacesPage() {
   const { t } = useTranslation();
+  const qc = useQueryClient();
   const { groups } = useWorkspacesAcross();
   const open = useOpenWorkspaceRow();
   return (
-    <Page title={t("mobile.me.workspaces")}>
+    <Page
+      title={t("mobile.me.workspaces")}
+      // A pull asks every server again (one that didn't answer may now).
+      onRefresh={() => qc.refetchQueries({ queryKey: [WORKSPACES_ACROSS] })}
+    >
       <WorkspaceGroups groups={groups} onOpen={open} />
       <View style={styles.gap} />
       <GroupedList>
@@ -199,11 +238,13 @@ export function WorkspacesPage() {
 }
 
 /**
- * Adicionar workspace, a short sheet (the system's form sheet, sized to its two rows): a new one on Ackwire AI,
- * or the team's own server; one line under them says nothing is lost.
+ * Adicionar workspace, a short sheet (the system's form sheet, sized to its rows): on a server of one's own, a new one
+ * there first; a new one on Ackwire AI, or the team's own server; one line under them says nothing is lost.
  */
 export function AddWorkspacePage() {
   const { t } = useTranslation();
+  const server = useServer();
+  const me = useMe().data;
   const create = () => {
     askNewWorkspace(CLOUD_SERVER);
     // Signed in to Ackwire AI already: its first run opens over the app; otherwise its sign-in comes first.
@@ -212,15 +253,36 @@ export function AddWorkspacePage() {
   };
   return (
     <SheetScreen fit>
-      {/* The sheets' bar: back to the list it came from, the title centered (as Novo's). */}
-      <SheetHeader title={t("mobile.me.addWorkspace")} icon="back" />
+      {/* The sheets' bar: × closes it (over the list in Você, or with the workspaces' sheet already gone), the title
+          centered. */}
+      <SheetHeader title={t("mobile.me.addWorkspace")} />
       <GroupedList>
+        {offersNewWorkspaceHere(server, me) ? (
+          <GroupedRow
+            icon="plus"
+            label={t("shell.newWorkspace")}
+            sub={serverHost(server)}
+            chevron
+            onPress={() => {
+              // Signed in here already: the root layout opens the first run over the app for the ask.
+              askNewWorkspace(server);
+              router.dismissTo("/");
+            }}
+          />
+        ) : null}
         <GroupedRow
           icon="plus"
           label={t("mobile.me.addWorkspaceCreate")}
           sub={t("mobile.me.addWorkspaceCreateSub")}
           chevron
           onPress={create}
+        />
+        <GroupedRow
+          icon="person"
+          label={t("mobile.me.addAccount")}
+          sub={t("mobile.me.addAccountSub", { host: server === CLOUD_SERVER ? "Ackwire AI" : serverHost(server) })}
+          chevron
+          onPress={() => void addAccount(server)}
         />
         <GroupedRow
           icon="server"
@@ -239,10 +301,10 @@ export function AddWorkspacePage() {
 }
 
 /**
- * Servidor da equipe, while signed in, on the sign-in's ruler (a low sky, the question in two lines): the address with
- * the URL keyboard open and its return key as the action, Escanear QR code below it as the one button, and one quiet
- * line: nothing signs out (ADR 0154). The server is checked first;
- * then the app moves there: signed in there already, its workspaces; otherwise its sign-in.
+ * Servidor da equipe, while signed in, on the sign-in's ruler (a low sky, the question in two lines) under the native
+ * bar, clear over the sky with its back button: the address (the URL keyboard once the field is tapped, its return key
+ * as the action), Escanear QR code below it as the one button, and one quiet line: nothing signs out (ADR 0154). The
+ * server is checked first; then the app moves there: signed in there already, its workspaces; otherwise its sign-in.
  */
 export function TeamServerPage() {
   const { t } = useTranslation();
@@ -263,64 +325,67 @@ export function TeamServerPage() {
       setError(t(problemText(check.problem, check.server), { host: serverHost(check.server) }));
       return setBusy(false);
     }
-    if (signedInServers().includes(check.server))
+    if (signedInServers().some((place) => serverOf(place) === check.server))
       toast({ title: t("mobile.auth.server.now", { host: serverHost(check.server) }) });
     await openWorkspace(check.server, null);
   };
 
   return (
-    <AuthScaffold
-      sky="low"
-      title={t("mobile.me.teamServerQuestion")}
-      subtitle={t("mobile.me.teamServerLeadShort")}
-      onBack={goBack}
-      agentMode={busy ? "run" : "idle"}
-    >
-      <Locked when={busy} keepKeyboard>
-        <AuthField
-          value={address}
-          onChangeText={(value) => {
-            setAddress(value);
-            setError(null);
-          }}
-          placeholder={t("mobile.auth.server.placeholder")}
-          keyboardType="url"
-          autoCapitalize="none"
-          autoCorrect={false}
-          textContentType="URL"
-          // The keyboard's blue key ("ir") is the action, as on the sign-in; gray until an address is typed.
-          returnKeyType="go"
-          enablesReturnKeyAutomatically
-          onSubmitEditing={() => void submit()}
-          accessibilityLabel={t("mobile.auth.server.label")}
-          autoFocus
+    <>
+      {/* A pushed screen's own bar (`cover` in the stack's options): the system's back over the sky, no title. */}
+      <PushedHeader plate />
+      <AuthScaffold
+        sky="low"
+        title={t("mobile.me.teamServerQuestion")}
+        subtitle={t("mobile.me.teamServerLeadShort")}
+        agentMode={busy ? "run" : "idle"}
+      >
+        <Locked when={busy} keepKeyboard>
+          <AuthField
+            value={address}
+            onChangeText={(value) => {
+              setAddress(value);
+              setError(null);
+            }}
+            placeholder={t("mobile.auth.server.placeholder")}
+            keyboardType="url"
+            autoCapitalize="none"
+            autoCorrect={false}
+            textContentType="URL"
+            // The keyboard's blue key ("ir") is the action, as on the sign-in; gray until an address is typed.
+            returnKeyType="go"
+            enablesReturnKeyAutomatically
+            onSubmitEditing={() => void submit()}
+            accessibilityLabel={t("mobile.auth.server.label")}
+          />
+        </Locked>
+        {error ? (
+          <Text tone="danger" variant="small" style={styles.center} accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : busy ? (
+          <Text variant="footnote" tone="muted" style={styles.center} accessibilityLiveRegion="polite">
+            {t("mobile.auth.server.checking")}
+          </Text>
+        ) : null}
+        <Button
+          variant="secondary"
+          wide
+          label={t("mobile.auth.server.scan")}
+          disabled={busy}
+          onPress={() => router.push("/me/scan")}
         />
-      </Locked>
-      {error ? (
-        <Text tone="danger" variant="small" style={styles.center} accessibilityLiveRegion="polite">
-          {error}
+        <Text variant="footnote" tone="muted" style={[styles.center, styles.quiet]}>
+          {t("mobile.me.addWorkspaceFoot")}
         </Text>
-      ) : busy ? (
-        <Text variant="footnote" tone="muted" style={styles.center} accessibilityLiveRegion="polite">
-          {t("mobile.auth.server.checking")}
-        </Text>
-      ) : null}
-      <Button
-        variant="secondary"
-        wide
-        label={t("mobile.auth.server.scan")}
-        disabled={busy}
-        onPress={() => router.push("/me/scan")}
-      />
-      <Text variant="footnote" tone="muted" style={[styles.center, styles.quiet]}>
-        {t("mobile.me.addWorkspaceFoot")}
-      </Text>
-    </AuthScaffold>
+      </AuthScaffold>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  gap: { height: 22 },
+  // Between the workspaces and adding one: the room a group's header takes.
+  gap: { height: 20 },
   center: { textAlign: "center" },
   quiet: { paddingTop: 8 },
 });

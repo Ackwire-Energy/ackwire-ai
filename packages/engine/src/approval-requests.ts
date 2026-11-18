@@ -138,7 +138,7 @@ export function createApprovalRequestToolSource(): ToolSource {
   const tool: ToolDefinition = {
     name: REQUEST_APPROVAL_TOOL,
     description:
-      "Ask the people who decide to approve something before you do it, whenever your instructions, the workspace's rules or the person say it needs someone's approval (a query, a discount, a refund, a publication). Never ask the person who made the request with ask_user instead: they can't approve their own request. A card goes to the approvers (their Approvals and phone); your turn pauses until one decides, then you are told who decided and their note. Leave role and people out to ask the agent's owner and admins; name a role of the workspace (the board, a department) or people when your instructions say who approves. Tools that already ask a person by themselves (merges, deploys, connected apps' writes) don't need this.",
+      "Ask the people who decide to approve something before you do it, whenever your instructions, the workspace's rules or the person say it needs someone's approval (a query, a discount, a refund, a publication). Never ask the person who made the request with ask_user instead: they can't approve their own request. A card goes to the approvers (their Approvals and phone); your turn pauses until one decides, then you are told who decided and their note. Leave role and people out to ask the agent's owner and admins; name a role of the workspace (the board, a department) or people when your instructions say who approves. A tool that asks a person by itself doesn't need this.",
     scope: "",
     sensitive: true,
     inputSchema: {

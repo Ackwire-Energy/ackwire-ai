@@ -5,10 +5,15 @@ import { brainLine, engineOfBrain, engineOfExecutor, engineStateOfOption, thinks
 import {
   ADVANCED_DEFAULTS,
   advancedContents,
+  advancedDefaults,
   advancedParts,
+  effortLevelsOf,
+  effortOf,
+  effortTextOf,
   isAdvancedDefault,
   viewSpeedFits,
 } from "../src/lib/brain-advanced";
+import { autoContextLine } from "../src/lib/context-limits";
 
 describe("the engine an agent thinks with", () => {
   test("agents.brain maps to its engine; the API and anything unknown is the agent itself", () => {
@@ -122,15 +127,29 @@ describe("Velocidade (ADR 0149)", () => {
     expect(viewSpeedFits(view({ scope: "mine" }))).toBe(false);
   });
 
+  test("the advanced settings hold no API switch: nothing says it waits for the computer", () => {
+    expect(ADVANCED_DEFAULTS).not.toHaveProperty("fallback");
+    expect(advancedParts(t, "pt-BR", { kind: "claude_code", autoModel: false, now: ADVANCED_DEFAULTS })).toEqual([]);
+    expect(isAdvancedDefault("claude_code", ADVANCED_DEFAULTS)).toBe(true);
+  });
+
+  test("Só esta conta counts as a change from the defaults, and Voltar ao padrão turns it off", () => {
+    const pinned = { ...ADVANCED_DEFAULTS, accountPinned: true };
+    expect(advancedParts(t, "pt-BR", { kind: "claude_code", autoModel: false, now: pinned })).toEqual([
+      "agentPage.work.brain.pinned",
+    ]);
+    expect(isAdvancedDefault("claude_code", pinned)).toBe(false);
+    expect(advancedDefaults("claude_code", pinned)).toEqual({ ...ADVANCED_DEFAULTS, accountPinned: false });
+    expect(isAdvancedDefault("claude_code", { ...ADVANCED_DEFAULTS, accountPinned: false })).toBe(true);
+  });
+
   test("Rápida counts as a change from the defaults and is named wherever they are", () => {
     const now = { ...ADVANCED_DEFAULTS, speed: "fast" as const };
     expect(isAdvancedDefault("codex", now)).toBe(false);
-    expect(advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, apiKey: false, now })).toEqual([
+    expect(advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, now })).toEqual([
       "agentPage.work.brain.advanced.speed",
     ]);
-    expect(
-      advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, apiKey: false, now: ADVANCED_DEFAULTS }),
-    ).toEqual([]);
+    expect(advancedParts(t, "pt-BR", { kind: "codex", autoModel: false, now: ADVANCED_DEFAULTS })).toEqual([]);
     expect(advancedContents(t, { kind: "codex", autoModel: false, speed: true })).toBe(
       "agentPage.work.brain.advanced.contents.fixedSpeed",
     );
@@ -140,5 +159,61 @@ describe("Velocidade (ADR 0149)", () => {
     expect(advancedContents(t, { kind: "codex", autoModel: false })).toBe(
       "agentPage.work.brain.advanced.contents.fixed",
     );
+  });
+
+  test("an API key with a fixed model has an effort; on Automático only its context", () => {
+    const high = { ...ADVANCED_DEFAULTS, effort: "high" as const };
+    expect(advancedContents(t, { kind: "model", autoModel: false })).toBe(
+      "agentPage.work.brain.advanced.contents.modelFixed",
+    );
+    expect(advancedContents(t, { kind: "model", autoModel: true })).toBe(
+      "agentPage.work.brain.advanced.contents.model",
+    );
+    expect(advancedParts(t, "pt-BR", { kind: "model", autoModel: false, now: high })).toEqual([
+      "agentPage.work.brain.advanced.effort",
+    ]);
+    expect(advancedParts(t, "pt-BR", { kind: "model", autoModel: true, now: high })).toEqual([]);
+    expect(isAdvancedDefault("model", high)).toBe(false);
+    // "Voltar ao padrão" on a key: no effort, the provider's default; a chosen medium is a level there, said as one.
+    expect(advancedDefaults("model", high).effort).toBeNull();
+    expect(isAdvancedDefault("model", { ...ADVANCED_DEFAULTS, effort: null })).toBe(true);
+    const medium = { ...ADVANCED_DEFAULTS, effort: "medium" as const };
+    expect(advancedParts(t, "pt-BR", { kind: "model", autoModel: false, now: medium })).toEqual([
+      "agentPage.work.brain.advanced.effort",
+    ]);
+    expect(advancedParts(t, "pt-BR", { kind: "claude_code", autoModel: false, now: medium })).toEqual([]);
+  });
+
+  test("a key offers the levels the API takes: none is the provider's default, a stored max or xhigh is high", () => {
+    expect(effortLevelsOf("model")).toEqual(["low", "medium", "high"]);
+    expect(effortLevelsOf("claude_code")).toEqual(["low", "medium", "high", "max"]);
+    expect([null, "auto", "low", "medium", "high", "xhigh", "max"].map((e) => effortOf("model", e))).toEqual([
+      null,
+      null,
+      "low",
+      "medium",
+      "high",
+      "high",
+      "high",
+    ]);
+    expect([null, "auto", "max"].map((e) => effortOf("codex", e))).toEqual(["medium", "medium", "max"]);
+    expect(([null, "medium", "high"] as const).map((e) => effortTextOf("model", e))).toEqual([
+      "none",
+      "mediumKey",
+      "high",
+    ]);
+    expect(effortTextOf("codex", "medium")).toBe("medium");
+  });
+});
+
+describe("the line under Automático for the context", () => {
+  const t = ((key: string, o: Record<string, string> = {}) =>
+    o.size ? `${key} ${o.size}` : key) as unknown as TFunction;
+
+  test("Claude Code and Codex say they summarise at 200K; other programs and a key, the model's window", () => {
+    expect(autoContextLine(t, "claude_code")).toBe("agentPage.work.brain.contextText.autoSummarizes 200K");
+    expect(autoContextLine(t, "codex")).toBe("agentPage.work.brain.contextText.autoSummarizes 200K");
+    for (const kind of ["model", "cursor", "opencode", "antigravity", null])
+      expect(autoContextLine(t, kind)).toBe("agentPage.work.brain.contextText.auto");
   });
 });

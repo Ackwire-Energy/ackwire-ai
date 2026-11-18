@@ -9,11 +9,18 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
       "Aplikacja Ackwire AI może też uruchomić samo Ackwire AI, na Macu, PC albo komputerze z Linuksem, dla ciebie lub małego zespołu.",
     sections: [
       {
+        id: "download",
+        heading: "Pobierz aplikację",
+        blocks: [
+          "[Pobierz aplikację Ackwire AI](/download) na Maca, PC lub komputer z Linuksem i otwórz ją. Wybierz **Na własnym serwerze**, naciśnij **Kontynuuj na moim serwerze**, a potem **Uruchom Ackwire AI na tym urządzeniu (komputer)**.",
+        ],
+      },
+      {
         id: "how",
         heading: "Jak to działa",
         blocks: [
           "Działa wewnątrz aplikacji, z wbudowaną bazą danych, i trzyma wszystko w jednym folderze na tym komputerze: `.agentes` w twoim folderze domowym. Nie trzeba niczego więcej instalować: bez Dockera, bez konfigurowania bazy danych.",
-          "Uruchamia się razem z aplikacją i zatrzymuje, gdy ją zamkniesz. Przed zamknięciem aplikacja pyta, bo nikt nie skorzysta z Ackwire AI, dopóki znów jej nie otworzysz.",
+          "Uruchamia się razem z aplikacją i zatrzymuje, gdy ją zamkniesz. Przed zamknięciem aplikacja pyta, bo nikt nie skorzysta z Ackwire AI, dopóki znów jej nie otworzysz. Żeby zatrzymać go na chwilę bez zamykania aplikacji, kliknij ikonę Ackwire AI przy zegarze i wybierz **Zatrzymaj** w menu **⋯** jego karty.",
         ],
       },
       {
@@ -28,7 +35,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "keep-on",
         heading: "Niech zostaje włączony",
         blocks: [
-          "Na komputerze, z którego korzystają inni, ustaw to raz:",
+          "Na komputerze, z którego korzystają inni, ustaw to raz. **Utrzymuj działanie**, w **Preferencje\u00a0›\u00a0Serwery**, pokazuje, czego jeszcze brakuje, i otwiera właściwe ustawienia:",
           {
             list: [
               "**Otwieraj po zalogowaniu** włącza się samo po konfiguracji.",
@@ -51,8 +58,8 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "another-workspace",
         heading: "Udostępnij go też innej przestrzeni roboczej",
         blocks: [
-          "Przestrzenie robocze serwera, który tu uruchamiasz, korzystają z tego komputera same. Żeby mogła z niego korzystać także przestrzeń robocza gdzie indziej, na przykład w Ackwire AI Cloud, otwórz **Preferencje › Serwery**, naciśnij **Dodaj serwer…**, zaloguj się do tej przestrzeni roboczej i naciśnij **Zezwól**, gdy aplikacja zapyta.",
-          "Każda przestrzeń robocza ma tu własnych agentów i foldery. **Polecenia** są dla niej też domyślnie włączone. Wyłącz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**, albo później w **Preferencje\u00a0›\u00a0Narzędzia**, gdzie jeden przełącznik obowiązuje wszystkie przestrzenie robocze na tym komputerze.",
+          "Przestrzenie robocze serwera, który tu uruchamiasz, korzystają z tego komputera same. Żeby mogła z niego korzystać także przestrzeń robocza gdzie indziej, na przykład w Ackwire AI Cloud, naciśnij **Dodaj przestrzeń roboczą…** na dole pierwszej karty w **Preferencje\u00a0›\u00a0Ogólne** albo **Dodaj serwer…** w **Preferencje\u00a0›\u00a0Serwery**. Zaloguj się do tej przestrzeni roboczej i naciśnij **Zezwól**, gdy aplikacja zapyta.",
+          "Każda przestrzeń robocza ma tu własnych agentów i foldery. **Polecenia** są dla niej też domyślnie włączone. Wyłącz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**, albo później w **Preferencje\u00a0›\u00a0Narzędzia**, gdzie każda przestrzeń robocza ma własny przełącznik, a aplikacja pyta, zanim ponownie jakiś włączy.",
         ],
       },
       {
@@ -67,29 +74,49 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "password",
         heading: "Logowanie z innych urządzeń",
         blocks: [
-          "Właściciel zaczyna bez hasła: aplikacja loguje cię na tym komputerze. Żeby zalogować się w przeglądarce na innym komputerze, ustaw hasło w **Ustawienia › Twoje konto**. Aplikacja na telefon łączy się po zeskanowaniu kodu QR z sekcji **Na telefonie**, w **Preferencje › Serwery**. Musi być przy tym włączone **Dostęp z telefonu i dla zespołu**.",
+          "Właściciel zaczyna bez hasła: aplikacja loguje cię na tym komputerze. Żeby zalogować się w przeglądarce na innym komputerze, ustaw hasło w **Ustawienia\u00a0›\u00a0Twoje konto**. Dopóki tego nie zrobisz, **Preferencje\u00a0›\u00a0Serwery** o tym przypomina, a **Dodaj hasło** otwiera tę stronę. Aplikacja na telefon łączy się po zeskanowaniu kodu QR z sekcji **Na telefonie**, w **Preferencje\u00a0›\u00a0Serwery**. Musi być przy tym włączone **Dostęp z telefonu i dla zespołu**.",
+          "Gdy właściciel usunie swoje konto w **Ustawienia\u00a0›\u00a0Twoje konto**, znika ono na dobre 7 dni później, a przestrzenie robocze, w których był tylko on, znikają razem z nim. Do tego czasu zaloguj się i naciśnij **Przywróć konto**, żeby je odzyskać. Gdy już go nie ma i nie zostało żadne konto, aplikacja otwiera okno powitalne, żeby utworzyć nowego właściciela. Jeśli inni nadal mają konta, każdy loguje się własnym adresem e-mail.",
         ],
       },
       {
         id: "updates",
         heading: "Aktualizacje",
         blocks: [
-          "Aplikacja sama szuka aktualizacji i instaluje je, gdy naciśniesz **Zaktualizuj i otwórz ponownie** w **Preferencje › Aktualizacje**. Serwer i wszyscy agenci uruchamiają się wtedy ponownie. Najpierw powstaje kopia bazy danych, a jeśli nowa wersja nie odpowie w ciągu 3 minut, aplikacja sama wraca do poprzedniej wersji i jej danych.",
+          "Aplikacja sama szuka aktualizacji. Gdy **Instaluj aktualizacje samodzielnie, w nocy** jest włączone, w **Preferencje\u00a0›\u00a0Aktualizacje**, instaluje je między 3:00 a 5:00, kiedy aplikacja jest otwarta. Jest to włączone od początku, gdy serwer działa tutaj. W przeciwnym razie naciśnij **Zaktualizuj i otwórz ponownie**. Serwer i wszyscy agenci uruchamiają się wtedy ponownie. Najpierw powstaje kopia bazy danych, a jeśli nowa wersja nie odpowie w ciągu 3 minut, aplikacja sama wraca do poprzedniej wersji i jej danych.",
         ],
       },
       {
         id: "backups",
         heading: "Kopie zapasowe",
         blocks: [
-          "Na razie nic nie robi kopii samo. **Zrób kopię zapasową teraz**, w **Preferencje › Serwery**, zatrzymuje na chwilę serwer i zapisuje bazę danych, pliki i `.env` w `.agentes/backups`, w twoim folderze domowym. Zostają dwie najnowsze.",
-          "Co jakiś czas skopiuj je poza ten komputer, na dysk albo do chmury. Zawierają twoje klucze: trzymaj je w tajemnicy.",
+          "Gdy **Rób kopię co noc** jest włączone (aplikacja 0.8.1 i nowsze), w **Preferencje\u00a0›\u00a0Serwery**, aplikacja co noc o 3:00 zapisuje bazę danych, pliki i `.env` w `.agentes/backups`, w twoim folderze domowym. Komputer, który wtedy spał, robi kopię, gdy się obudzi. **Zrób kopię zapasową teraz** robi to samo od razu. Każda kopia na chwilę zatrzymuje serwer, a zostają dwie najnowsze.",
+          "**Kopiuj do** umieszcza też każdą nową kopię w wybranym folderze, na przykład na pendrivie albo w iCloud Drive, gdzie zostają dwie najnowsze. Zawierają twoje klucze: trzymaj je w tajemnicy. **Przywróć…** cofa Ackwire AI do kopii: wiadomości, plików i ustawień. Zatrzymuje się na minutę, a to, co było wcześniej, zostaje w folderze kopii.",
+        ],
+      },
+      {
+        id: "uninstall",
+        heading: "Zacznij od nowa lub odinstaluj",
+        blocks: [
+          "Wszystko, co Ackwire AI trzyma na tym komputerze, jest w folderach w twoim folderze domowym, nie w aplikacji. Dlatego przeniesienie aplikacji do Kosza niczego z tego nie usuwa i nie zatrzymuje Ackwire AI, jeśli działa.",
+          "Żeby zacząć od nowa, naciśnij **Wymaż i zacznij od nowa…** w **Preferencje\u00a0›\u00a0Serwery**. Ackwire AI zatrzymuje się tutaj, a wszystko, co zawiera, trafia do nowego folderu w twoim folderze domowym, nazwanego `Ackwire AI erased` z datą tego dnia, i zostaje tam, dopóki go nie usuniesz. To, co jego agenci trzymali na tym komputerze, na przykład ich przeglądarki i logowania, zostaje usunięte z `.agentes-runner`. Jego przestrzenie robocze znikają dla wszystkich, którzy z nich korzystają. Potem otwiera się okno powitalne i konfigurujesz go od nowa z nowym kontem właściciela. Pliki agentów, w `agentes` w twoim folderze domowym, zostają tam, gdzie są.",
+          "Żeby później go przywrócić, zakończ aplikację, odłóż na bok nowszy folder `.agentes`, jeśli jest, zmień nazwę folderu `Ackwire AI erased` na `.agentes`, otwórz aplikację i skonfiguruj go ponownie na tym komputerze. Wraca ze swoimi przestrzeniami roboczymi i właścicielem, tak jak były. To, co jego agenci trzymali na tym komputerze, nie wraca, więc muszą zalogować się ponownie.",
+          "Żeby całkowicie usunąć Ackwire AI z tego komputera:",
+          {
+            list: [
+              "Wyłącz **Otwieraj po zalogowaniu** w **Preferencje\u00a0›\u00a0Ogólne**.",
+              "Zakończ aplikację. Samo zamknięcie okna nie wystarczy. Na Macu kliknij jej ikonę w Docku i wybierz **Zakończ Ackwire AI** w menu Ackwire AI u góry ekranu albo naciśnij ⌘Q. Na Windowsie i Linuksie kliknij ikonę Ackwire AI przy zegarze i wybierz **Zakończ Ackwire AI**. Jeśli zapyta **Zakończyć Ackwire AI?**, naciśnij **Zakończ**.",
+              "Usuń aplikację. Na Macu przenieś ją do Kosza. Na Windowsie i Linuksie odinstaluj ją jak każdą inną aplikację.",
+              "Usuń te foldery ze swojego folderu domowego. Są w nich twoje dane, a po usunięciu nie da się ich odzyskać, więc najpierw zrób kopię w innym miejscu, jeśli możesz ich jeszcze potrzebować: `.agentes` (wiadomości, pliki, konta, ustawienia i kopie zapasowe), każdy folder `Ackwire AI erased`, `.agentes-runner` (to, co agenci trzymają na tym komputerze, na przykład ich przeglądarki i logowania) i `agentes` (pliki agentów). Foldery, których nazwa zaczyna się od kropki, są ukryte. Na Macu otwórz swój folder domowy w Finderze i naciśnij ⇧⌘. (Shift, Command i klawisz kropki), żeby je pokazać.",
+              "Usuń foldery samej aplikacji. Są w nich tylko jej ustawienia, logowania jej okna i logi. Na Macu: wszystko, czego nazwa zaczyna się od `chat.agentes.desktop`, w folderach Application Support, Caches, HTTPStorages, Logs, Preferences i WebKit w `~/Library`, oraz `Ackwire AI.plist` w `~/Library/LaunchAgents`. Na Windowsie: `%APPDATA%\\chat.agentes.desktop` i `%LOCALAPPDATA%\\chat.agentes.desktop`. Na Linuksie: `~/.config/chat.agentes.desktop` i `~/.local/share/chat.agentes.desktop`. Na Macu, żeby otworzyć jeden z tych folderów, naciśnij ⇧⌘G w Finderze i wpisz jego ścieżkę, na przykład `~/Library/Caches`.",
+            ],
+          },
         ],
       },
       {
         id: "ai-programs",
         heading: "Claude Code i Codex",
         blocks: [
-          "Aplikacja znajduje Claude Code i Codex przez `PATH` twojej powłoki logowania oraz w typowych folderach, takich jak `~/.local/bin`, `/opt/homebrew/bin` i `/usr/local/bin`. Jeśli **Preferencje › Narzędzia** pokazuje **Nie znaleziono**, sprawdź, czy `claude` albo `codex` działa w nowym oknie Terminala, a potem zamknij i otwórz aplikację ponownie.",
+          "Aplikacja znajduje Claude Code i Codex przez `PATH` twojej powłoki logowania oraz w typowych folderach, takich jak `~/.local/bin`, `/opt/homebrew/bin` i `/usr/local/bin`. Jeśli **Preferencje\u00a0›\u00a0Narzędzia** pokazuje **Nie znaleziono**, widać tam też wiersz, który go instaluje. Uruchom go w Terminalu, a potem naciśnij **Sprawdź ponownie**.",
         ],
       },
       {
@@ -161,7 +188,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Z aplikacji Ackwire AI",
         blocks: [
           "Zainstaluj aplikację na komputerze, otwórz ją i zaloguj się do swojej przestrzeni roboczej. Zapyta **Pozwolić agentom z <workspace> używać tego urządzenia (Mac)?** (PC na Windowsie, komputer na Linuksie). Wybierz, kto może z niego korzystać, i naciśnij **Zezwól**. To wszystko.",
-          "Jesteś już zalogowany? Włącz przestrzeń roboczą w **Preferencje › Ogólne**, na karcie **Agenci**.",
+          "Jesteś już zalogowany? Otwórz **Preferencje\u00a0›\u00a0Ogólne** i naciśnij **Zezwól** w wierszu przestrzeni roboczej na pierwszej karcie. Nie ma jej tam? Naciśnij **Dodaj przestrzeń roboczą…** na dole tej karty i zaloguj się.",
         ],
       },
       {
@@ -204,7 +231,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "pausing",
         heading: "Pauza i odłączanie",
         blocks: [
-          "Na komputerze ikona Ackwire AI przy zegarze wstrzymuje agentów wszystkich przestrzeni roboczych. W **Preferencje › Ogólne** przełącznik każdej przestrzeni roboczej wstrzymuje tylko ją, a **Odłącz** ją odłącza. Podczas pauzy nic nowego się nie zaczyna, a to, co już działało, kończy się. Po odłączeniu foldery agentów zostają na dysku.",
+          "Na komputerze ikona Ackwire AI przy zegarze wstrzymuje agentów wszystkich przestrzeni roboczych albo tylko jednej. W **Preferencje\u00a0›\u00a0Ogólne** przełącznik każdej przestrzeni roboczej wstrzymuje tylko ją, a **Odłącz** w jej menu **⋯** ją odłącza. Podczas pauzy nic nowego się nie zaczyna, a to, co już działało, kończy się. Po odłączeniu foldery agentów zostają na dysku.",
           "Na stronie internetowej urządzenie odłączysz przyciskiem **Usuń** na jego stronie.",
         ],
       },
@@ -215,6 +242,15 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
           "Zaloguj się do każdej przestrzeni roboczej w tej samej aplikacji i naciśnij **Zezwól** dla każdej z nich. Przestrzenie robocze w Ackwire AI Cloud i na twoich własnych serwerach mogą dzielić jeden komputer (aplikacja 0.6.1 i nowsze). Każda ma na nim własnych agentów i foldery, a odłączenie jednej nie zmienia nic w pozostałych.",
           "Serwer, który aplikacja uruchamia na tym komputerze, jest już podłączony i nic więcej nie trzeba. Żeby udostępnić ten komputer także przestrzeni roboczej gdzie indziej, zobacz [Udostępnij go też innej przestrzeni roboczej](/help/run-on-your-computer#another-workspace).",
           "Używasz aplikacji na laptopie tylko jako okna do swojej przestrzeni roboczej? Gdy zapyta, czy agenci mogą używać laptopa, **Nie teraz** zostawi ją zwykłym oknem.",
+          "Serwer połączony wierszem z terminala pracuje dla jednego workspace'u. Połączenie go z innego workspace'u przenosi serwer do tamtego, a pierwszy przestaje mieć do niego dostęp. Aby korzystać z kilku workspace'ów na jednym komputerze, użyj aplikacji.",
+        ],
+      },
+      {
+        id: "line",
+        heading: "Gdy agenci czekają w kolejce",
+        blocks: [
+          "Każda praca agenta zużywa pamięć komputera. Gdy wolnej pamięci zaczyna brakować, następna czeka w kolejce, aż inna się skończy. Ludzie mają pierwszeństwo. Liczba procesorów tego nie zmienia.",
+          "Komputer z 4 GB pamięci wykonuje dwie lub trzy prace naraz, z 8 GB około dziewięciu. Mac lub PC wykonuje do ośmiu. Przeglądarki i pulpity, które agenci zostawiają otwarte, też zużywają pamięć. Aby skrócić kolejkę, użyj komputera z większą pamięcią albo połącz kolejny i rozdziel agentów między oba. Workspace'y, które dzielą komputer, dzielą też jego pamięć.",
         ],
       },
       {
@@ -237,7 +273,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
               "na komputerze, który uruchamia też Ackwire AI, jego bazę danych i klucze w `.agentes`",
             ],
           },
-          "Ackwire AI odrzuca polecenia, które wskazują jego klucze, tokeny i dane logowania, ale to zasada, nie mur. **Polecenia** są domyślnie włączone. Wyłącz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**, albo później w **Preferencje\u00a0›\u00a0Narzędzia**, gdzie jeden przełącznik obowiązuje wszystkie przestrzenie robocze na komputerze. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad.",
+          "Ackwire AI odrzuca polecenia, które wskazują jego klucze, tokeny i dane logowania, ale to zasada, nie mur. **Polecenia** są domyślnie włączone. Wyłącz je w pytaniu aplikacji, zanim naciśniesz **Zezwól**, albo później w **Preferencje\u00a0›\u00a0Narzędzia**, gdzie każda przestrzeń robocza ma własny przełącznik (aplikacja 0.8.1 i nowsze), a aplikacja pyta, zanim ponownie jakiś włączy. Claude Code i Codex uruchamiają własne polecenia w folderze agenta, według własnych zasad, nawet przy wyłączonych poleceniach.",
           "Prawdziwy mur da ci serwer z Linuksem. Na Debianie 13, zainstalowanym z `--system`, każdy agent jest osobnym użytkownikiem. Na Ubuntu agenci dzielą jednego użytkownika, `agentes`: widzą nawzajem swoje foldery, ale nie twoje ani serwera. Możesz też dać agentom osobny komputer.",
         ],
       },
@@ -270,6 +306,21 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Klucze, hasła, loginy i historia czatów nigdy nie są przenoszone: agenci myślą dzięki AI przestrzeni roboczej. Niektóre rzeczy nie mają tu jeszcze odpowiednika albo nigdy nie powinny trafiać do pliku. Możesz je odtworzyć później.",
           "Pliki i foldery są odczytywane w twojej przeglądarce. Link do GitHub przechodzi przez serwer przestrzeni roboczej. Pliki z kluczami i loginami nigdy nie są otwierane, a nic się nie zmieni, dopóki nie potwierdzisz.",
+        ],
+      },
+      {
+        id: "mcp",
+        heading: "Połącz przez MCP",
+        blocks: [
+          "Dzięki MCP twoja aplikacja AI ma dostęp do tej przestrzeni roboczej i sama utworzy tu agentów, z ich instrukcjami, umiejętnościami i rutynami. Wybierz swoją aplikację, zaznacz **Połącz przez MCP**, a potem:",
+          {
+            list: [
+              "Połącz adres, który pokazuje krok, według kroków samej aplikacji. [Jak połączyć, aplikacja po aplikacji](/help/apps-de-ia#connect)",
+              "Na stronie logowania wybierz **Tworzenie i edycja agentów, rutyn i umiejętności**.",
+              "Wklej prośbę w aplikacji. Agenci pojawią się w kroku, gdy dotrą.",
+            ],
+          },
+          "Jeśli aplikacja nie może się połączyć, wybierz **Z pliku** lub **Tylko prośba**, zależnie od tego, co pokazuje krok. Prośbę opisuje [Z innej aplikacji](/help/import#other-apps).",
         ],
       },
       {
@@ -356,7 +407,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "permissions",
         heading: "Pamięć nie daje uprawnień",
         blocks: [
-          "Nic w pamięci nie pozwala agentowi zrobić więcej. To, co może robić, określają jego **Narzędzia i dostęp**, a działania wrażliwe zawsze wymagają zatwierdzenia.",
+          "Nic w pamięci nie pozwala agentowi zrobić więcej. To, co może robić, określają jego **Narzędzia i dostęp**.",
         ],
       },
       {
@@ -376,7 +427,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "what",
         heading: "Co wymaga zatwierdzenia",
         blocks: [
-          "Gdy agent chce scalić zmiany, wdrożyć, wycofać wdrożenie, wysłać coś na zewnątrz albo usunąć dane, najpierw pyta, bez względu na to, jaki ma dostęp. Prośba pojawia się w **Zatwierdzenia** i w rozmowie, z dokładnym działaniem i powodem.",
+          "Gdy agent chce scalić zmiany, wdrożyć, wycofać wdrożenie, wysłać coś na zewnątrz albo usunąć dane, najpierw pyta. To poziom **Tylko to, co ryzykowne**, od którego zaczyna każdy agent. Na stronie agenta, w sekcji **Zatwierdzenia**, **Zawsze pytaj** sprawia, że pyta przed każdą zmianą, a przy **Nigdy nie pytaj** nie pyta o nic, także przy scalaniu, wdrożeniach, płatnościach i rutynach. Prośba pojawia się w **Zatwierdzenia** i w rozmowie, z dokładnym działaniem i powodem.",
         ],
       },
       {
@@ -384,7 +435,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         heading: "Raz albo zawsze",
         blocks: [
           "Zatwierdzenie obejmuje jedno konkretne działanie, z jego wartościami. Jeśli agent cokolwiek zmieni, pyta ponownie.",
-          "**Zawsze zatwierdzaj** pozwala agentowi od teraz robić ten rodzaj działań z dowolnymi wartościami, bez pytania. Przy prośbie z rutyny **Zawsze w tej rutynie** robi to samo tylko dla tej rutyny. Żadna z tych opcji nie pojawia się przy scalaniu, wdrażaniu, wycofywaniu i podobnych. Aby to cofnąć, przejdź do **Narzędzia i dostęp** na stronie agenta albo do ustawień rutyny.",
+          "**Zawsze zatwierdzaj** pozwala agentowi od teraz robić ten rodzaj działań z dowolnymi wartościami, bez pytania. Przy prośbie z rutyny **Zawsze w tej rutynie** robi to samo tylko dla tej rutyny. **Zawsze zatwierdzaj** pojawia się przy każdym rodzaju działania, także przy scalaniu i wdrażaniu, dopóki agent jest na poziomie **Tylko to, co ryzykowne**. **Zawsze w tej rutynie** nie pojawia się przy scalaniu, wdrażaniu, wycofywaniu i podobnych. Aby to cofnąć, przejdź do **Narzędzia i dostęp** na stronie agenta albo do ustawień rutyny.",
         ],
       },
       {
@@ -439,7 +490,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "jev",
         heading: "Jev",
         blocks: [
-          "Gdy twoja przestrzeń robocza działa na Ackwire AI, Jev jest w cenie. Na serwerze, który prowadzisz samodzielnie, używa klucza TypeSafe właściciela, około 0,0001 USD za wiadomość: [Skonfiguruj Jeva](/help/jev#setup).",
+          "Gdy twoja przestrzeń robocza działa na Ackwire AI, Jev jest w cenie. Na serwerze, który prowadzisz samodzielnie, używa klucza TypeSafe lub OpenRouter właściciela, około 0,0001 USD za wiadomość: [Skonfiguruj Jeva](/help/jev#setup).",
         ],
       },
       {
@@ -499,6 +550,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
               "W Ackwire AI otwórz **Ustawienia › AI i zużycie** i wklej go w sekcji **Jev**. Widzi go tylko osoba, która skonfigurowała ten serwer.",
             ],
           },
+          "Płacisz już za OpenRouter? Wybierz **OpenRouter** w sekcji **Jev** i wklej klucz z https://openrouter.ai/keys albo włącz Jeva jednym kliknięciem kluczem OpenRouter przestrzeni roboczej. To ten sam Jev, rozliczany przez OpenRouter w tej samej cenie.",
           "Na serwerze uruchomionym przez Docker możesz zamiast tego wpisać klucz do `.env` jako `TYPESAFE_API_KEY`. Ten ma pierwszeństwo przed kluczem z Ustawień.",
         ],
       },
@@ -533,6 +585,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
           },
           "TypeSafe uruchamia Jeva w Stanach Zjednoczonych i nie trenuje swoich modeli na tym, co wysyłasz. Przechowuje dane tak długo, jak potrzebuje do świadczenia usługi. Zerowa retencja jest dostępna w planach dla firm.",
           "Polityka prywatności TypeSafe: https://typesafe.ai/legal/privacy-policy. Umowa powierzenia przetwarzania danych: https://typesafe.ai/legal/data-processing.",
+          "Z kluczem OpenRouter te same zapytania przechodzą przez OpenRouter w drodze do TypeSafe, na warunkach OpenRouter i według twoich ustawień prywatności w tym serwisie: https://openrouter.ai/privacy.",
         ],
       },
       {
@@ -687,13 +740,13 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Na serwerze uruchom:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh",
           },
           "Instaluje to, czego brakuje, a potem zadaje kilka pytań: jak ludzie się do niego dostaną, o e-mail, czy ten serwer ma być też komputerem twoich agentów i czy wysyłać anonimowe statystyki użycia. Enter wybiera proponowaną odpowiedź. Instaluje się w `/opt/agentes` (`~/agentes` dla użytkownika, który już może używać Dockera), a za pierwszym razem pobiera około 2 GB.",
           "Na końcu pokazuje adres twojego serwera i kod QR dla telefonu. Ponowne uruchomienie jest bezpieczne: zachowuje twoje ustawienia i uzupełnia tylko to, czego brakuje.",
           "Z Node.js 18 lub nowszym `npx @agenteschat/setup` w pustym folderze to ta sama konfiguracja. Bez Node uruchamia się z obrazu aplikacji, w bieżącym folderze, i kończy się poleceniami, które uruchamiają resztę:",
           {
-            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/agentes-chat/agentes:latest setup',
+            code: 'docker run --rm -it --user "$(id -u):$(id -g)" -v "$PWD":/work -w /work ghcr.io/ackwire-energy/agentes:latest setup',
           },
         ],
       },
@@ -724,7 +777,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         id: "email",
         heading: "E-mail",
         blocks: [
-          "Bez e-maila Ackwire AI zapisuje każdą wiadomość w swoim logu zamiast ją wysłać, więc link z zaproszeniem da się stamtąd skopiować. Resetowanie hasła pozostaje wyłączone.",
+          "Bez e-maila Ackwire AI zapisuje każdą wiadomość w swoim logu zamiast ją wysłać, więc link z zaproszeniem da się stamtąd skopiować. Resetowanie hasła pozostaje wyłączone, a nowy e-mail konta zmienia się od razu, bez kodu i linku.",
           {
             code: "docker compose logs agentes | grep 'email (not sent'",
           },
@@ -750,7 +803,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "Konfiguracja może zrobić z tego serwera także komputer twoich agentów, na którym uruchamiają polecenia, używają przeglądarki i trzymają swoje pliki. Pyta o to i proponuje tak, gdy serwer dobrze sobie z tym poradzi. Na Debianie 13 każdy agent dostaje własnego użytkownika, z ekranem. Na Ubuntu agenci dzielą jednego użytkownika, `agentes`. Jeśli odpowiedziałeś nie, uruchom instalację ponownie z `--computer yes`:",
           {
-            code: "curl -fsSL https://agentes.chat/install | sh -s -- --computer yes",
+            code: "curl -fsSL https://hub.ackwire.app/install | sh -s -- --computer yes",
           },
           "Kolejne komputery, na przykład Mac z aplikacją Ackwire AI albo inny serwer, łączysz w **Ustawienia\u00a0›\u00a0Urządzenia**, jak w [Twoje komputery i telefony](/help/computers). W Tailscale najpierw dołączają do twojego tailnetu.",
         ],
@@ -778,7 +831,7 @@ export const helpPl: Partial<Record<HelpSlug, HelpDocument>> = {
         blocks: [
           "W folderze instalacji uruchom:",
           {
-            code: "curl -fsSLO https://agentes.chat/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
+            code: "curl -fsSLO https://hub.ackwire.app/install/docker-compose.yml\ndocker compose pull\ndocker compose up -d",
           },
           "Baza aktualizuje się sama, gdy startuje nowa wersja. Trzymaj ustawienia w `.env` i nigdy nie edytuj `docker-compose.yml`, bo każda aktualizacja go zastępuje. Zrób kopię przed dużym skokiem: baza zaktualizowana przez nowszą wersję nie otworzy się w starszej.",
         ],

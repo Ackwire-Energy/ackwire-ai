@@ -72,6 +72,20 @@ export interface PushStrings {
   deviceInUseBody: string;
   deviceAccessTitle: (agent: string, person: string, device: string) => string;
   deviceAccessBody: string;
+  /** `device.tool_request`: someone needs a tool on the person's computer (`a` who, `d` the computer). */
+  deviceToolTitle: (a: string, d: string) => string;
+  deviceToolBody: string;
+  /** `device.cli_request`: someone needs a coding CLI installed on the person's computer. */
+  deviceCliTitle: (a: string, d: string) => string;
+  deviceCliBody: string;
+  /**
+   * `device.folder_request`: an agent waits for a folder on the person's computer (`f` the folder, `d` the computer).
+   * The person allows it on the computer itself, so the body sends them there.
+   */
+  deviceFolderTitle: (a: string, f: string, d: string) => string;
+  deviceFolderBody: string;
+  /** `admin_ask`: `a` asks who may do it (`what`: channel_agent, create_agents, webhook; `l` the channel or service). */
+  adminAskTitle: (a: string, what: string, l: string) => string;
   deviceWaitingTitle: (person: string, device: string) => string;
   deviceWaitingBody: string;
   teamWeekReady: string;
@@ -89,6 +103,8 @@ export interface PushStrings {
   joinRequestTitlePersonal: (name: string) => string;
   joinSuggestionTitlePersonal: (by: string, name: string) => string;
   teamWeekReadyPersonal: string;
+  /** A reminder of what the person left unread in "Esperando você": how many things, over the oldest one's own line. */
+  teamWatchStill: (count: number) => string;
 }
 
 export const en: PushStrings = {
@@ -171,6 +187,18 @@ export const en: PushStrings = {
   deviceInUseBody: "Tap to stop it.",
   deviceAccessTitle: (a, p, d) => (p ? `${a} (for ${p}) asks to use your ${d}` : `${a} asks to use your ${d}`),
   deviceAccessBody: "Tap to allow once, always, or say no.",
+  deviceToolTitle: (a, d) => `${a} asks you to turn on a tool on your ${d}`,
+  deviceToolBody: "Tap to turn it on in one click.",
+  deviceCliTitle: (a, d) => `${a} asks you to install a program on your ${d}`,
+  deviceCliBody: "Tap to install it in one click.",
+  deviceFolderTitle: (a, f, d) => (f ? `${a} asks for ${f} on your ${d}` : `${a} asks for a folder on your ${d}`),
+  deviceFolderBody: "Allow it in the app on that computer.",
+  adminAskTitle: (a, what, l) =>
+    what === "channel_agent"
+      ? `${a} asks you to add an agent to #${l}`
+      : what === "create_agents"
+        ? `${a} asks to be able to create agents`
+        : `${a} asks you to set up the ${l} webhook for routines`,
   deviceWaitingTitle: (p, d) => `${p}'s agent is waiting for your ${d}`,
   deviceWaitingBody: "It starts when it's back.",
   teamWeekReady: "Your team's week is ready",
@@ -182,4 +210,5 @@ export const en: PushStrings = {
   joinRequestTitlePersonal: (name) => `${name} asks to join your workspace`,
   joinSuggestionTitlePersonal: (by, name) => `${by} suggested inviting ${name}`,
   teamWeekReadyPersonal: "Your week is ready",
+  teamWatchStill: (n) => (n === 1 ? "1 thing still waits on you" : `${n} things still wait on you`),
 };

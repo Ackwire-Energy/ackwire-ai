@@ -84,9 +84,9 @@ describe("the sidebar on a phone (drawer)", () => {
     await go(`c/${GENERAL_ID}`);
     await click(menuButton());
     expect(nav().getAttribute("data-open")).toBe("true");
-    await click(screen().getByRole("button", { name: "Fechar menu" }));
+    await click(document.querySelector(".shell__scrim") as HTMLElement);
     expect(nav().getAttribute("data-open")).toBe("false");
-    expect(screen().queryByRole("button", { name: "Fechar menu" })).toBeNull();
+    expect(document.querySelector(".shell__scrim")).toBeNull();
   });
 
   test("following a link closes it, and the new page has the menu in its top bar", async () => {

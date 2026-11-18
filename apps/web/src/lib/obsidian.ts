@@ -1,11 +1,19 @@
-import type { ApiClient, WikiImportNote, WikiImportResult, WikiPageSummary } from "@agenteschat/client";
+import {
+  type ApiClient,
+  newClientId,
+  type WikiImportNote,
+  type WikiImportResult,
+  type WikiImportSource,
+  type WikiPageSummary,
+} from "@agenteschat/client";
 import { readZip } from "@agenteschat/client/lib/zip";
 
 /*
- * An Obsidian vault in the browser: a .zip, a folder (picked or dropped) or
- * loose .md files. Reading says what would become of it in the wiki (the
- * review); importing sends the embedded attachments to the Drive and the
- * notes to `POST …/wiki/import` in batches.
+ * Notes to import in the browser: an Obsidian vault or plain Markdown as a
+ * .zip, a folder (picked or dropped) or loose .md files, or the zip the
+ * server reads from a GitHub link. Reading says what would become of it in
+ * the wiki (the review); importing sends the embedded attachments to the
+ * Drive and the notes to `POST …/wiki/import` in batches.
  */
 
 export interface VaultFile {
@@ -33,6 +41,8 @@ export interface VaultNote {
 
 export interface VaultReport {
   name: string;
+  /** Where the notes came from: the pages keep it. */
+  source: WikiImportSource;
   notes: VaultNote[];
   attachments: { path: string; size: number; file: VaultFile }[];
   canvases: string[];
@@ -62,6 +72,9 @@ const isMd = (p: string) => /\.(md|markdown)$/i.test(p);
 const base = (p: string) => p.split("/").pop() ?? p;
 const lower = (s: string) => s.toLowerCase();
 const decoder = new TextDecoder();
+
+/** An import's name when what was read has none of its own. */
+const FALLBACK_NAME: Record<WikiImportSource, string> = { obsidian: "Obsidian", github: "GitHub", files: "Markdown" };
 
 export class VaultError extends Error {
   constructor(readonly code: "empty" | "too_big" | "unreadable") {
@@ -172,10 +185,36 @@ function frontmatter(text: string) {
 }
 
 const LINKS = /(!?)\[\[([^\]|#\n]+)(#[^\]|\n]*)?(\|[^\]\n]*)?\]\]/g;
+/** `![alt](images/chart.png)`: an image or file by a relative path, as plain Markdown writes an embed. */
+const MD_EMBED = /!\[[^\]\n]*\]\(<?(?![a-z][a-z0-9+.-]*:|\/\/|#)([^)\s>]+)>?(?:\s+"[^"\n]*")?\)/gi;
+
+/**
+ * Plain Markdown embeds of a file beside the notes as `![[path]]`, which the wiki draws from the Drive; code blocks
+ * and links to the web stay as written.
+ */
+function wikiEmbeds(body: string) {
+  return body
+    .split(/(```[\s\S]*?```)/)
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part.replace(MD_EMBED, (whole, target: string) => {
+            const path = target.split(/[?#]/)[0] ?? "";
+            if (!ATTACH.test(path)) return whole;
+            try {
+              return `![[${decodeURIComponent(path).replace(/^\.\//, "")}]]`;
+            } catch {
+              return whole;
+            }
+          }),
+    )
+    .join("");
+}
 const TAGS = /(?:^|\s)#([\p{L}\d_/-]*[\p{L}_/-][\p{L}\d_/-]*)/gu;
 
 export function parseNote(path: string, text: string): VaultNote {
-  const fm = frontmatter(text);
+  const read = frontmatter(text);
+  const fm = { ...read, body: wikiEmbeds(read.body) };
   const noCode = fm.body.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
   const links: string[] = [];
   const embeds: string[] = [];
@@ -215,6 +254,7 @@ export async function readVault(
   options: {
     existing?: Pick<WikiPageSummary, "title">[];
     name?: string;
+    source?: WikiImportSource;
     onProgress?: (done: number, total: number, path: string) => void;
   } = {},
 ): Promise<VaultReport> {
@@ -243,6 +283,8 @@ export async function readVault(
     else skipped.other++;
   }
   if (notes.length === 0) throw new VaultError("empty");
+  // Not said (dropped on the page): a vault when it carries Obsidian's own folder, else plain Markdown.
+  const source = options.source ?? (skipped.config > 0 ? "obsidian" : "files");
 
   const known = new Set(
     [...notes.flatMap((n) => [n.title, ...n.aliases]), ...(options.existing ?? []).map((p) => p.title)].map(lower),
@@ -265,7 +307,8 @@ export async function readVault(
     }
   const embeddedFiles = attachments.filter((a) => embedded.has(a.path));
   return {
-    name: options.name || root || "Obsidian",
+    name: options.name || root || FALLBACK_NAME[source],
+    source,
     notes,
     attachments,
     canvases,
@@ -377,7 +420,15 @@ const wait = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
 export async function sendVaultNotes(
   api: ApiClient,
   orgId: string,
-  input: { name: string; folder?: string; onConflict: "keep_both" | "skip"; importId: string; notes: WikiImportNote[] },
+  input: {
+    name: string;
+    /** An Obsidian vault when not said. */
+    source?: WikiImportSource;
+    folder?: string;
+    onConflict: "keep_both" | "skip";
+    importId: string;
+    notes: WikiImportNote[];
+  },
   onProgress?: (done: number, total: number) => void,
   stopped?: () => boolean,
 ) {
@@ -400,7 +451,7 @@ export async function sendVaultNotes(
     for (let attempt = 0; attempt <= RETRY_MS.length; attempt++) {
       try {
         const got = await api.wiki.import(orgId, {
-          source: { type: "obsidian", name: input.name },
+          source: { type: input.source ?? "obsidian", name: input.name },
           notes: batch,
           folder: input.folder,
           onConflict: input.onConflict,
@@ -471,12 +522,13 @@ export async function importVault(
     }
     return attachments;
   });
-  const importId = crypto.randomUUID();
+  const importId = newClientId();
   const sent = await sendVaultNotes(
     api,
     orgId,
     {
       name: report.name,
+      source: report.source,
       folder: options.into.trim() || undefined,
       onConflict: options.onConflict,
       importId,

@@ -108,7 +108,7 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
 }
 .thread-closed__actions {
   display: flex;
-  gap: 2px;
+  gap: var(--space-2);
 }
 
 /* ── "Threads (N)" ─────────────────────────────────────────────────────── */
@@ -138,8 +138,9 @@ html:not([data-pointer]) .thread-marker__open:focus-visible {
   margin: 0;
   padding: 8px;
 }
+/* The popover takes the window's height (`.ac-popover`): the list gives way under the head and scrolls past it. */
 .thread-pop__list {
-  max-height: min(420px, 60vh);
+  min-height: 0;
   overflow-y: auto;
 }
 /* A MediaRow: a face or a kind tile (32), the name with its time or state at the line's end, what it says under them,
@@ -201,6 +202,19 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
+/* "Retornos" (the bar's ⋯, ADR 0037 addendum): her words whole, however long (80 characters at most). A return whose
+   run posted nothing goes nowhere: its row doesn't light. */
+.returns-pop .returns-pop__about {
+  display: block;
+  -webkit-line-clamp: none;
+  overflow: visible;
+}
+.returns-pop__still {
+  cursor: default;
+}
+.pins-pop__item:has(> .returns-pop__still):hover {
+  background: transparent;
+}
 .thread-pop__foot {
   display: flex;
   justify-content: flex-end;
@@ -239,6 +253,19 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   margin-inline: 6px;
   color: var(--faint);
 }
+/* Two agents' conversation in its dialog: the list is the dialog's scroll area between its head and its read-only
+   foot, as tall as its messages up to the dialog's own cap. */
+.consult-dialog__list {
+  flex: 0 1 auto;
+  min-height: 120px;
+  padding-top: 4px;
+}
+/* A row of several asked agents: one choice each, between the dialog's head and the chosen exchange, on its sides. */
+.consult-dialog__choice {
+  flex: none;
+  width: auto;
+  margin: 0 var(--dialog-pad) var(--space-1);
+}
 /* The answer on its own, when the consulted agent's words in the DM are left out: under the messages, at their text. */
 .consult-answer {
   margin: 4px 12px 8px var(--thread-indent, calc(16px + var(--name-face) + var(--space-3)));
@@ -269,6 +296,11 @@ html:not([data-pointer]) .pins-pop__item:has(> .thread-pop__row:focus-visible) {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* What two agents' conversation is about: its own line over the meta, wrapped whole (the meta never wraps). */
+.thread-head__subject {
+  display: block;
+  overflow-wrap: anywhere;
 }
 /* A phone: the back and the actions keep the top row, and the faces, the title and its line take the row under it,
    whole. Beside the back and three actions the line had 42px at 320 and cut its replies and time. */
@@ -846,7 +878,8 @@ html:not([data-pointer]) .thread-line:focus-visible {
    the count, each ending in "…"; the faces and what it needs keep their width. */
 .thread-line > b,
 .thread-line__when,
-.thread-line__when > time {
+.thread-line__when > time,
+.thread-line__when > .thread-line__held {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -872,11 +905,39 @@ html:not([data-pointer]) .thread-line:focus-visible {
   gap: 4px;
   font-weight: 600;
 }
-.thread-line__state--needsYou {
+/* One state at a time (ADR 0084 addendum): amber when it waits on you, blue at work, quiet otherwise. */
+.thread-line__state--you {
   color: var(--warn);
 }
 .thread-line__state--working {
   color: var(--agent);
+}
+.thread-line__state--neutral {
+  color: var(--muted);
+}
+.thread-line__clock {
+  color: var(--faint);
+}
+.thread-line__held {
+  font-variant-numeric: tabular-nums;
+}
+/* A phone-wide window: the state keeps its mark and its time, its words go to screen readers, so the count stays
+   whole. */
+@media (max-width: 420px) {
+  .thread-line__state-words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+/* A return's time is in its words ("Retorno às 00:32"): it shows on its own only where they go to screen readers. */
+@media (min-width: 421px) {
+  .thread-line__later-at {
+    display: none;
+  }
 }
 .thread-line__dot {
   color: var(--faint);
@@ -1002,6 +1063,10 @@ html:not([data-pointer]) .thread-line:focus-visible {
 .thread-panel--wide .agp-tabs .ac-tabs {
   padding-right: 48px;
 }
+/* A page header's title (PageHeader) starts at the ×'s height: a long one wraps 8px before it, not under it. */
+.thread-panel--wide .ac-pagehead__title {
+  padding-inline-end: calc(var(--control-h-sm) + var(--space-2));
+}
 /* Under the panel the whole window dims like under a dialog (`--scrim`, so both read the same in each theme), the
    sidebar too, and a click there closes the panel. */
 .thread-panel__scrim {
@@ -1112,5 +1177,19 @@ html:not([data-pointer]) .thread-line:focus-visible {
 @media (max-width: 760px) {
   .pinbar {
     padding: 6px 12px;
+  }
+}
+
+/* In a narrow return list, the time follows the agent's name instead of squeezing it beside the cancel button. */
+@media (max-width: 480px) {
+  .returns-pop .thread-pop__row {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .returns-pop .pins-pop__time {
+    grid-area: 2 / 2;
+    height: auto;
+  }
+  .returns-pop .returns-pop__about {
+    grid-row: 3;
   }
 }

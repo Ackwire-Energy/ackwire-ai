@@ -17,7 +17,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 use tauri::window::Color;
-use tauri::{AppHandle, LogicalPosition, Manager, WebviewBuilder, WebviewUrl};
+use tauri::{AppHandle, LogicalPosition, LogicalSize, Manager, WebviewBuilder, WebviewUrl};
 
 use crate::main_window;
 
@@ -30,8 +30,10 @@ const FADE: Duration = Duration::from_millis(260);
 /// The sky's deepest tone (packages/ui sky SKY_TONES[0]), before the cover's page paints.
 const SKY: Color = Color(10, 63, 156, 255);
 /// Written when the window opens, removed when the site paints: still there at the next opening, the last one
-/// never painted.
-const PENDING_FILE: &str = "page-pending";
+/// never painted. It holds how that opening drew (graphics.rs `marker`), and whether its page arrived.
+pub const PENDING_FILE: &str = "page-pending";
+/// The marker is removed (`page_ready`) and moved on (`site_loaded`) from different threads.
+static MARKER: Mutex<()> = Mutex::new(());
 
 #[derive(Default)]
 pub struct Cover(Mutex<Shown>);
@@ -44,16 +46,32 @@ struct Shown {
     generation: u64,
 }
 
+/// On Linux, Tauri packs a child web view beside the site in the window's GtkBox, never over it (`add_child`'s
+/// position and size are ignored there): a cover would take half the window from the site, black where it hasn't
+/// painted. There the window's own backdrop covers the moment before the site's first paint, and the cover's
+/// bookkeeping still runs without its web view (the server here's late start, the next opening's cache step).
+const OVER_THE_SITE: bool = !cfg!(target_os = "linux");
+
+/// The window's inner size in points, for the cover's own. In points, never pixels: a web view's size, and the
+/// share of the window it keeps as the window resizes, are worked out in points with the window's scale at the
+/// moment it is made or resized. A size read in pixels is right only while that scale is the one it was read
+/// with; when it isn't, the cover is twice the window on a 2× screen, its message off in a corner.
+fn window_points(window: &tauri::Window) -> tauri::Result<LogicalSize<f64>> {
+    Ok(window.inner_size()?.to_logical(window.scale_factor()?))
+}
+
 /// Adds the cover to the freshly made main window, showing (the splash).
 pub fn attach(app: &AppHandle, window: &tauri::Window) -> tauri::Result<()> {
-    let size = window.inner_size()?;
-    let cover = WebviewBuilder::new(LABEL, WebviewUrl::App("cover.html".into()))
-        // Transparent only where the site shows through it as it fades: a transparent WebView2 shows black, not
-        // the web view under it, and drops the color.
-        .transparent(!cfg!(target_os = "windows"))
-        .background_color(SKY)
-        .auto_resize();
-    window.add_child(cover, LogicalPosition::new(0.0, 0.0), size)?;
+    if OVER_THE_SITE {
+        let size = window_points(window)?;
+        let cover = WebviewBuilder::new(LABEL, WebviewUrl::App("cover.html".into()))
+            // Transparent only where the site shows through it as it fades: a transparent WebView2 shows black, not
+            // the web view under it, and drops the color.
+            .transparent(!cfg!(target_os = "windows"))
+            .background_color(SKY)
+            .auto_resize();
+        window.add_child(cover, LogicalPosition::new(0.0, 0.0), size)?;
+    }
     let mut shown = lock(app);
     shown.since = Some((Instant::now(), OPENING));
     shown.generation += 1;
@@ -67,7 +85,6 @@ fn lock(app: &AppHandle) -> std::sync::MutexGuard<'_, Shown> {
 /// Covers the site now (it is loading a whole page again), for at least `min`. Already covering (the
 /// splash, when the first load starts), it keeps whatever minimum is left.
 pub fn show(app: &AppHandle, min: Duration) {
-    let Some(cover) = app.get_webview(LABEL) else { return };
     let was_shown = {
         let mut shown = lock(app);
         let now = Instant::now();
@@ -80,8 +97,13 @@ pub fn show(app: &AppHandle, min: Duration) {
         shown.since = Some((now, min.max(left)));
         was_shown
     };
+    let Some(cover) = app.get_webview(LABEL) else { return };
     if !was_shown {
         let _ = cover.eval("window.__coverShown?.()");
+    }
+    // Whatever became of its size while it was hidden, it shows as large as the window.
+    if let Some(Ok(size)) = app.get_window(main_window::LABEL).map(|w| window_points(&w)) {
+        let _ = cover.set_size(size);
     }
     let _ = cover.show();
     main_window::keep_lights(app);
@@ -109,12 +131,14 @@ pub fn hide(app: &AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(wait);
         let current = |app: &AppHandle| lock(app).generation == generation;
-        let Some(cover) = app.get_webview(LABEL) else { return };
+        let cover = app.get_webview(LABEL);
         if !current(&app) {
             return;
         }
-        let _ = cover.eval("window.__coverFade?.()");
-        std::thread::sleep(FADE);
+        if let Some(cover) = &cover {
+            let _ = cover.eval("window.__coverFade?.()");
+            std::thread::sleep(FADE);
+        }
         {
             let mut shown = lock(&app);
             if shown.generation != generation {
@@ -122,6 +146,7 @@ pub fn hide(app: &AppHandle) {
             }
             shown.since = None;
         }
+        let Some(cover) = cover else { return };
         let _ = cover.hide();
         // Hiding a web view lays the window out anew, the buttons back at the title bar's top.
         main_window::keep_lights(&app);
@@ -168,10 +193,50 @@ pub fn page_ready(app: AppHandle, webview: tauri::Webview) -> Result<(), String>
         return Err("only the site says it painted".into());
     }
     if let Some(path) = pending_path(&app).filter(|p| p.exists()) {
+        let _marker = MARKER.lock();
         let _ = std::fs::remove_file(path);
     }
     hide(&app);
     Ok(())
+}
+
+/// The site's page finished loading (on Linux, on the graphics card, before it painted): when WebKit's own answer for
+/// it is the page, the opening's marker says it arrived, so a window that then stays black falls back at the next
+/// opening (graphics.rs `decide`). A load that failed (offline, the server down, a proxy's error page) leaves it as it
+/// was.
+pub fn site_loaded(app: &AppHandle, page: &tauri::WebviewWindow) {
+    #[cfg(target_os = "linux")]
+    {
+        fn loading(path: &std::path::Path) -> bool {
+            std::fs::read_to_string(path).is_ok_and(|m| m == crate::graphics::GPU_LOADING)
+        }
+        let Some(path) = pending_path(app).filter(|p| loading(p)) else { return };
+        let _ = page.with_webview(move |view| {
+            use webkit2gtk::{URIResponseExt, WebResourceExt, WebViewExt};
+            let status = view.inner().main_resource().and_then(|r| r.response()).map(|r| r.status_code());
+            let _marker = MARKER.lock();
+            if arrived(status) && loading(&path) {
+                let _ = std::fs::write(&path, crate::graphics::GPU_LOADED);
+            }
+        });
+    }
+    #[cfg(not(target_os = "linux"))]
+    let _ = (app, page);
+}
+
+/// The page's HTTP status as WebKit received it says the site's page arrived: an error status is a page too (a
+/// proxy's 502 for a server that is down), but never the site's, so it never paints.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+fn arrived(status: Option<u32>) -> bool {
+    status.is_some_and(|s| (200..=399).contains(&s))
+}
+
+/// This opening's page arrived on the graphics card and never painted: its window may be black.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub fn unpainted_on_gpu(app: &AppHandle) -> bool {
+    pending_path(app)
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .is_some_and(|m| m == crate::graphics::GPU_LOADED)
 }
 
 fn pending_path(app: &AppHandle) -> Option<PathBuf> {
@@ -190,7 +255,7 @@ pub fn opening(app: &AppHandle) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
-    let _ = std::fs::write(&path, b"");
+    let _ = std::fs::write(&path, crate::graphics::marker());
 }
 
 /// The site, from its server again (a first load that never arrived leaves nothing to reload).
@@ -305,14 +370,14 @@ pub fn cover_details(app: AppHandle, webview: tauri::Webview) -> Result<String, 
         .ok()
         .and_then(|d| std::fs::read_to_string(d.join("window.log")).ok())
         .unwrap_or_default();
-    Ok(window_details(&app.package_info().version.to_string(), std::env::consts::OS, &server, &log))
+    Ok(window_details(&crate::graphics::details(&app), &server, &log))
 }
 
-/// What the window's Copy details says: versions, the server, the last lines of `window.log`.
-pub fn window_details(version: &str, os: &str, server: &str, log: &str) -> String {
+/// What the window's Copy details says: the system details line, the server, the last lines of `window.log`.
+pub fn window_details(details: &str, server: &str, log: &str) -> String {
     let lines: Vec<&str> = log.lines().collect();
     let tail = lines[lines.len().saturating_sub(40)..].join("\n");
-    format!("Ackwire AI {version} ({os})\nserver: {server}\n\nwindow.log:\n{tail}\n")
+    format!("{details}\nserver: {server}\n\nwindow.log:\n{tail}\n")
 }
 
 /// The cover: the person chose to see the page as it is ("Mostrar assim mesmo"), after it didn't open.
@@ -333,10 +398,20 @@ mod tests {
     #[test]
     fn the_windows_own_details() {
         let log: String = (1..=50).map(|n| format!("{n} 0.6.0 step {n}\n")).collect();
-        let text = window_details("0.6.0", "macos", "https://chat.example.com", &log);
-        assert!(text.starts_with("Ackwire AI 0.6.0 (macos)\nserver: https://chat.example.com\n"));
+        let text = window_details("Ackwire AI 0.6.0 · macOS 15.1", "https://chat.example.com", &log);
+        assert!(text.starts_with("Ackwire AI 0.6.0 · macOS 15.1\nserver: https://chat.example.com\n"));
         // The last 40 lines only.
         assert!(text.contains("11 0.6.0 step 11") && !text.contains("\n10 0.6.0 step 10"));
-        assert!(window_details("0.6.0", "macos", "", "").ends_with("window.log:\n\n"));
+        assert!(window_details("Ackwire AI 0.6.0 · macOS 15.1", "", "").ends_with("window.log:\n\n"));
+    }
+
+    #[test]
+    fn only_the_sites_own_answer_says_the_page_arrived() {
+        assert!(!arrived(None));
+        assert!(!arrived(Some(0)));
+        assert!(arrived(Some(200)));
+        assert!(arrived(Some(304)));
+        assert!(!arrived(Some(404)));
+        assert!(!arrived(Some(502)));
     }
 }

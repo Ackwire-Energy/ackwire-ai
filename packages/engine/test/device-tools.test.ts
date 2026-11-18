@@ -18,6 +18,7 @@ import {
   type MachineCaller,
   type MachineHub,
   MachineRequestError,
+  markThreadConfidential,
   pickDevice,
   postPersonMessage,
   receiveMachineUpload,
@@ -345,6 +346,27 @@ describe("phone tools", () => {
     const told = (await notificationsOf(w.sam.id)).filter((n) => n.kind === "device.in_use");
     expect(told).toHaveLength(1);
     expect(told[0]?.source).toMatchObject({ phoneId: w.phone.id, label: "Pixel 8", runId: ctx.runId });
+  });
+
+  test("from a confidential thread a phone read is said in the tool's own words: the run's label reaches neither the host nor the owner", async () => {
+    const w = await world();
+    await f.db
+      .update(schema.machinePhones)
+      .set({ audienceMode: "everyone" })
+      .where(eq(schema.machinePhones.id, w.phone.id));
+    w.answer((req) =>
+      req.op === "phone.logs" ? ({ text: "I/app: started" } satisfies MachineReplies["phone.logs"]) : {},
+    );
+    const ctx = await runCtx();
+    await f.db.transaction((tx) =>
+      markThreadConfidential(tx, { orgId: f.org.id, channelId: f.general.id, rootId: ctx.threadRootId }),
+    );
+    const out = await call(ctx, "phone_logs", { phone: "pixel 8", label: "what the record said" });
+    expect(out.isError).toBeFalsy();
+    const told = (await notificationsOf(w.sam.id)).filter((n) => n.kind === "device.in_use");
+    expect(w.asked).toMatchObject([{ op: "phone.logs", holder: { label: "Reading the log" } }]);
+    expect(told).toMatchObject([{ latest: { text: "Reading the log" } }]);
+    expect(JSON.stringify([w.asked, told])).not.toContain("the record said");
   });
 
   test("busy, missing and offline answers name the cause and point at wait_for_device", async () => {
@@ -694,5 +716,20 @@ describe("waiting for a device", () => {
     const [done] = await f.db.select().from(schema.agentRuns).where(eq(schema.agentRuns.id, run.id));
     expect(done?.status).toBe("done");
     expect((await cardOf()).state).toBe("allowed");
+  });
+
+  test("from a confidential thread the owner is asked with none of the run's note: not in the request, not in their notification", async () => {
+    const w = await world();
+    const ctx = await runCtx();
+    await f.db.transaction((tx) =>
+      markThreadConfidential(tx, { orgId: f.org.id, channelId: f.general.id, rootId: ctx.threadRootId }),
+    );
+    await call(ctx, "wait_for_device", { device: "Pixel 8", note: "film what the record said" });
+    const [request] = await f.db.select().from(schema.deviceAccessRequests);
+    const [told] = await notificationsOf(w.sam.id);
+    expect([request?.reason, told?.kind]).toEqual(["", "device.access_request"]);
+    expect(JSON.stringify([request, told])).not.toContain("the record said");
+    // The card in the thread itself keeps it: the people there read what the run reads.
+    expect((await cardOf()).note).toBe("film what the record said");
   });
 });

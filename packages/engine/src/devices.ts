@@ -1,4 +1,6 @@
 import {
+  IPHONE_DEV_MODE_PROTOCOL,
+  IPHONE_WIFI_PROTOCOL,
   PHONE_SCREEN_PROTOCOL,
   type PhoneHolder,
   type PhonePlatform,
@@ -10,7 +12,7 @@ import {
   STREAM_CLOSE,
   STREAM_LIMITS,
 } from "@agenteschat/adapters";
-import { and, type Database, type Executor, eq, gt, inArray, isNull, schema, sql } from "@agenteschat/db";
+import { and, type Database, type Executor, eq, gt, inArray, isNull, lt, schema, sql } from "@agenteschat/db";
 import { AUDIENCE_MODES, type AudienceMode } from "./audience";
 import { recordAudit } from "./audit";
 import { ForbiddenError, NotFoundError, ValidationError } from "./errors";
@@ -24,6 +26,7 @@ import {
   machineOnline,
   machinePause,
   publishMachineUpdated,
+  shownOnline,
 } from "./machines";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { closedRefusal, OrgDeletingError, orgStanding } from "./standing";
@@ -99,6 +102,11 @@ export interface ComputerDevice {
   memoryGb: number | null;
   ownerUserId: string | null;
   belongsToWorkspace: boolean;
+  /**
+   * Spill-over: while an agent's own computer is full, the replies people wait on may think here. `own`: replies to
+   * whoever connected it; `others`: replies to anyone else (`machines.spill_*`).
+   */
+  spill: { own: boolean; others: boolean };
   /** Each agent works as its own OS user there (a server install). */
   systemMode: boolean;
   audience: DeviceAudience;
@@ -106,6 +114,8 @@ export interface ComputerDevice {
   /** Background tasks it runs at once. */
   maxTasks: number | null;
   toolchains: Record<string, string>;
+  /** A Mac whose app opens Xcode and looks at its iPhone again for the iPhone guide (`IPHONE_DEV_MODE_PROTOCOL`). */
+  opensXcode: boolean;
   lastSeenAt: string | null;
   mayUse: boolean;
   mayManage: boolean;
@@ -283,11 +293,12 @@ export const phoneTargetOf = (
 ): PhoneTarget => ({ platform: row.platform, serial: runnerSerial(row), holder });
 
 /** A device only its owner may widen (admins only narrow it): one person's computer, not the workspace's. */
-const personalComputer = (m: Pick<MachineRow, "kind" | "pairedByUserId" | "executors" | "belongsToWorkspace">) =>
+export const personalComputer = (m: Pick<MachineRow, "kind" | "pairedByUserId" | "executors" | "belongsToWorkspace">) =>
   m.kind === "connected" && m.pairedByUserId !== null && m.executors?.mode !== "system" && !m.belongsToWorkspace;
 
 function computerStatus(m: MachineRow, running: number, now: Date): DeviceStatus {
-  if (!machineOnline(m, now)) return { kind: "offline", lastSeenAt: iso(m.lastSeenAt) };
+  // Asleep in standby and waking as it should, it reads ready (ADR 0161).
+  if (!shownOnline(m, now)) return { kind: "offline", lastSeenAt: iso(m.lastSeenAt) };
   const pause = machinePause(m, now);
   if (pause) return { kind: "paused", until: pause.until };
   if (running > 0) return { kind: "busy", running, max: DEFAULT_MAX_TASKS };
@@ -422,11 +433,13 @@ export async function listDevices(
       memoryGb: m.size?.memoryGb ?? null,
       ownerUserId: m.pairedByUserId,
       belongsToWorkspace: m.belongsToWorkspace,
+      spill: { own: m.spillOwn, others: m.spillOthers },
       systemMode: m.executors?.mode === "system",
       audience: rule.audience,
       status: computerStatus(m, busy.get(m.id) ?? 0, now),
       maxTasks: null,
       toolchains: m.executors?.toolchains ?? {},
+      opensXcode: !managed && m.os === "darwin" && m.protocol >= IPHONE_DEV_MODE_PROTOCOL,
       lastSeenAt: iso(m.lastSeenAt),
       mayUse,
       mayManage: !managed && mayManageDevice(membership, viewerUserId, m.pairedByUserId),
@@ -533,11 +546,13 @@ export interface ComputerDeviceInput {
   name?: string;
   audience?: DeviceAudience;
   belongsToWorkspace?: boolean;
+  spill?: { own?: boolean; others?: boolean };
 }
 
 /**
  * `PATCH …/devices/computers/{machineId}`: its owner changes anything; an admin renames it, marks it the workspace's,
- * and narrows its rule (widens it only on the workspace's own devices). Never the workspace's computer.
+ * and narrows its rule (widens it only on the workspace's own devices). Never the workspace's computer. Spill-over is
+ * its owner's to turn on (other people's agents would think on their plan's computer); an admin only turns it off.
  */
 export async function updateComputerDevice(
   deps: { db: Database; pubsub?: PubSub },
@@ -568,6 +583,15 @@ export async function updateComputerDevice(
     Object.assign(set, { audienceMode: next.mode, audienceUserIds: next.userIds, audienceRoleIds: next.roleIds });
   }
   if (input.belongsToWorkspace !== undefined) set.belongsToWorkspace = input.belongsToWorkspace;
+  for (const [key, column] of [
+    ["own", "spillOwn"],
+    ["others", "spillOthers"],
+  ] as const) {
+    const on = input.spill?.[key];
+    if (on === undefined) continue;
+    if (on && !owner) throw new ForbiddenError("Only the device's owner can turn this on", "device.spill_owner_only");
+    set[column] = on;
+  }
   if (Object.keys(set).length > 0) {
     await deps.db
       .update(machines)
@@ -656,17 +680,26 @@ export async function updatePhoneDevice(
   return device;
 }
 
-/** `DELETE …/devices/phones/{phoneId}` (its owner or an admin): gone from the list until its host reports it again. */
+/**
+ * `DELETE …/devices/phones/{phoneId}` (its owner or an admin): gone from the list until its host reports it again. An
+ * iPhone's Mac drops its pick to use it over Wi-Fi too (`phone.wifi` `forget`), so it comes back only if picked again
+ * or plugged in. One over Wi-Fi now is forgotten only once its Mac confirms: an offline Mac would go on using it.
+ */
 export async function forgetPhone(
-  deps: { db: Database; pubsub?: PubSub },
+  deps: { db: Database; pubsub?: PubSub; hub?: Pick<MachineCaller, "call"> },
   actorId: string,
   orgId: string,
   phoneId: string,
 ) {
   const membership = await requirePermission(deps.db, actorId, orgId, "read");
-  const { phone } = await phoneWithHost(deps.db, orgId, phoneId);
+  const { phone, host } = await phoneWithHost(deps.db, orgId, phoneId);
   if (phone.ownerUserId !== actorId && !can(membership, "configure")) {
     throw new ForbiddenError("Only the phone's owner or an admin can forget it", "device.forbidden");
+  }
+  if (phone.platform === "ios" && deps.hub && host.protocol >= IPHONE_WIFI_PROTOCOL) {
+    const told = deps.hub.call(host.id, { op: "phone.wifi", action: "forget", serial: phone.serial });
+    if (phone.facts?.transport === "wifi") await told;
+    else await told.catch(() => undefined);
   }
   await deps.db
     .update(machinePhones)
@@ -887,11 +920,13 @@ export async function syncMachinePhones(
       ownerUserId: machine.pairedByUserId,
       followsHost: p.platform === "ios",
       lastSeenAt: now,
+      stateSince: now,
       updatedAt: now,
     });
   }
   if (seen.size > 0) {
     const fresh = sql`(${machinePhones.deletedAt} is not null or ${machinePhones.ownerUserId} is distinct from excluded.owner_user_id)`;
+    const same = sql`(${machinePhones.state} = excluded.state and ${machinePhones.reason} is not distinct from excluded.reason)`;
     // ponytail: two people's computers both reporting one phone (a cable on one, adb over Wi-Fi on the other) pass it
     // back and forth, each time as a new phone; a phone that is two places at once would need a host per phone.
     await db
@@ -911,6 +946,8 @@ export async function syncMachinePhones(
           followsHost: sql`excluded.follows_host`,
           lastSeenAt: sql`excluded.last_seen_at`,
           updatedAt: sql`excluded.updated_at`,
+          stateSince: sql`case when ${same} then ${machinePhones.stateSince} else excluded.state_since end`,
+          stuckReportedAt: sql`case when ${same} then ${machinePhones.stuckReportedAt} else null end`,
           name: sql`case when ${fresh} then excluded.name else ${machinePhones.name} end`,
           audienceMode: sql`case when ${fresh} then 'owner' else ${machinePhones.audienceMode} end`,
           audienceUserIds: sql`case when ${fresh} then '{}'::text[] else ${machinePhones.audienceUserIds} end`,
@@ -935,7 +972,7 @@ export async function syncMachinePhones(
   if (gone.length === 0) return current;
   await db
     .update(machinePhones)
-    .set({ state: "offline", reason: null, holder: null, updatedAt: now })
+    .set({ state: "offline", reason: null, holder: null, stateSince: now, stuckReportedAt: null, updatedAt: now })
     .where(
       inArray(
         machinePhones.id,
@@ -944,8 +981,41 @@ export async function syncMachinePhones(
     );
   const off = new Set(gone.map((p) => p.id));
   return current.map((p) =>
-    off.has(p.id) ? { ...p, state: "offline", reason: null, holder: null, updatedAt: now } : p,
+    off.has(p.id)
+      ? { ...p, state: "offline", reason: null, holder: null, stateSince: now, stuckReportedAt: null, updatedAt: now }
+      : p,
   );
+}
+
+/** A phone's setup that sits on one step, the same reason, this long is reported (`claimStuckPhoneSetups`). */
+export const PHONE_SETUP_STUCK_MS = 10 * 60_000;
+
+/**
+ * Phones whose setup sits on one step (`needs_you` or `preparing`, its reason unchanged) for `PHONE_SETUP_STUCK_MS`,
+ * each marked reported by the same statement: a sweep on another replica never reports it again, and neither does
+ * this one until its state or reason moves (`syncMachinePhones` clears the mark).
+ */
+export async function claimStuckPhoneSetups(db: Executor, now = new Date()) {
+  return db
+    .update(machinePhones)
+    .set({ stuckReportedAt: now })
+    .where(
+      and(
+        isNull(machinePhones.deletedAt),
+        isNull(machinePhones.stuckReportedAt),
+        inArray(machinePhones.state, ["needs_you", "preparing"]),
+        lt(machinePhones.stateSince, new Date(now.getTime() - PHONE_SETUP_STUCK_MS)),
+      ),
+    )
+    .returning({
+      orgId: machinePhones.orgId,
+      machineId: machinePhones.machineId,
+      platform: machinePhones.platform,
+      state: machinePhones.state,
+      reason: machinePhones.reason,
+      osVersion: machinePhones.osVersion,
+      stateSince: machinePhones.stateSince,
+    });
 }
 
 /**

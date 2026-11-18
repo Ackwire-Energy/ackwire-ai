@@ -14,6 +14,8 @@ import {
   approvalAskLine,
   approvalDoing,
   approvalGroupWaitsFor,
+  approvalLetter,
+  approvalLetterTo,
   approvalRuleServer,
   approvalRuleWords,
   approvalSummary,
@@ -24,6 +26,7 @@ import {
   approveAlwaysLabel,
   approveAlwaysWords,
   askKindWords,
+  decisionOutcome,
   ownActionName,
   requesterDecidesLine,
 } from "../src/lib/approval-words";
@@ -375,7 +378,7 @@ describe('"Sempre nesta rotina" on a routine\'s card', () => {
 
   test("a routine's name that isn't known reads as this routine; any other card has none", async () => {
     const pt = await routine("pt-BR");
-    expect(alwaysRoutineName(pt, { ...card, origin: null })).toBe("esta rotina");
+    expect(alwaysRoutineName(pt, { ...card, origin: null })).toBe("Esta rotina");
     expect(alwaysRoutineName(pt, card)).toBe("Resumo da semana");
     expect(alwaysRoutineName(pt, { ...card, approveAlways: { tool: "t", actions: [] } })).toBeNull();
   });
@@ -384,8 +387,9 @@ describe('"Sempre nesta rotina" on a routine\'s card', () => {
     expect(approveAlwaysOffered(card)).toBe(true);
     expect(approveAlwaysOffered({ ...card, canDecide: false })).toBe(false);
     expect(approveAlwaysOffered({ ...card, status: "approved" })).toBe(false);
-    // Plain "Aprovar sempre" keeps its rule: what is high risk is never approved for good.
-    expect(approveAlwaysOffered({ ...card, approveAlways: { tool: "t", actions: [] } })).toBe(false);
+    // Plain "Aprovar sempre" shows wherever the server offers it, on a send too.
+    expect(approveAlwaysOffered({ ...card, approveAlways: { tool: "t", actions: [] } })).toBe(true);
+    expect(approveAlwaysOffered({ ...card, approveAlways: null })).toBe(false);
   });
 });
 
@@ -402,5 +406,71 @@ describe("a request as someone it isn't waiting on reads it", () => {
     expect(approvalAskLine(t, true)).toBe("Preciso do seu ok para seguir:");
     expect(approvalAskLine(t, false)).toBe("Preciso de um ok para seguir:");
     expect(approvalAskLine(t, false, 3)).toBe("Preciso de um ok para seguir com estes 3:");
+  });
+});
+
+describe("a request the agent asked for again, and a connector's message", () => {
+  const instance = i18next.createInstance();
+  void instance.init({ lng: "pt-BR", fallbackLng: "en", resources, initAsync: false });
+  const pt = instance.t;
+  const id = "3f2a9c1e-5b7d-4e8f-a1c2-d3e4f5a6b7c8";
+  const reply = {
+    tool: "reply_to_received_email",
+    connector: "mailservice",
+    email: null,
+    params: {
+      email_id: id,
+      inbox_id: id,
+      subject: "Re: Feedback",
+      text: `Oi, Rita.\n\n${"Obrigado pelo retorno. ".repeat(6)}`,
+    },
+  };
+
+  test("replaced: one line that says so, never 'Cancelado'", () => {
+    const replaced = { status: "canceled" as const, decidedByUserId: null, decidedForUserId: null };
+    expect(decisionOutcome(pt, { ...replaced, supersededById: "ap-2" }, null, () => undefined)).toBe(
+      "Substituída pela versão abaixo",
+    );
+    expect(decisionOutcome(pt, replaced, null, () => undefined)).toBe("Cancelado");
+  });
+
+  test("a send or a reply reads as its message: subject, to whom, its text; its ids only in the details", () => {
+    const letter = approvalLetter(reply);
+    expect(letter).toMatchObject({ subject: "Re: Feedback", to: "", reply: true });
+    expect(letter?.body.startsWith("Oi, Rita.\n\nObrigado")).toBe(true);
+    expect(approvalLetterTo(pt, letter as NonNullable<typeof letter>)).toBe("Para quem enviou a mensagem");
+    // The card's line: no ids, no subject, no text (the message shows them).
+    expect(approvalValues(reply)).toEqual([]);
+    expect(approvalValues(reply, { long: true }).map(([label]) => label)).toEqual([
+      "Email id",
+      "Inbox id",
+      "Subject",
+      "Text",
+    ]);
+    const send = {
+      ...reply,
+      tool: "send_email",
+      params: { to: ["ana@example.com"], subject: "Oi", html: "<p>Oi <b>Ana</b></p>" },
+    };
+    expect(approvalLetter(send)).toMatchObject({ to: "ana@example.com", body: "Oi Ana", reply: false });
+    // Its recipients are on the message, not again on the line.
+    expect(approvalValues(send)).toEqual([]);
+    // Through a tool that runs another by name.
+    const wrapped = {
+      ...reply,
+      tool: "execute",
+      params: { name: "GMAIL_SEND_EMAIL", arguments: { to: "bo@example.com", body: "Oi" } },
+    };
+    expect(approvalLetter(wrapped)).toMatchObject({ to: "bo@example.com", body: "Oi" });
+  });
+
+  test("anything else is no message: a comment, a call with no text, a built-in mailbox's", () => {
+    expect(approvalLetter({ ...reply, tool: "add_issue_comment", params: { body: "Pode revisar?" } })).toBeNull();
+    expect(approvalLetter({ ...reply, params: { email_id: id } })).toBeNull();
+    expect(approvalLetter({ ...reply, connector: null })).toBeNull();
+    // A lone id on any card's line says nothing either.
+    expect(approvalValues({ params: { issue_id: id, title: "Bug" }, connector: "linear", email: null })).toEqual([
+      ["Title", "Bug"],
+    ]);
   });
 });

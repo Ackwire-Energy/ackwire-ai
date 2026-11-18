@@ -356,6 +356,9 @@ html:not([data-pointer]) .ap-conn-mark:focus-visible {
   outline: none;
   box-shadow: inset 0 0 0 1.5px var(--ink);
 }
+.ap-refuse textarea[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1.5px var(--danger);
+}
 .ap-refuse textarea:disabled {
   background: var(--sunken);
   color: var(--muted);
@@ -717,6 +720,7 @@ html:not([data-pointer]) .ap-li:focus-visible {
   background: none;
 }
 .ap-li__where {
+  overflow-wrap: anywhere;
   flex: 1 1 calc(100% - 20px);
   min-width: 0;
 }
@@ -745,11 +749,13 @@ html:not([data-pointer]) .ap-li:focus-visible {
   flex-wrap: wrap;
   gap: 8px;
 }
-/* "Ver cada um" unfolds the run: on a line of its own under its buttons, its words on their start edge. */
-.ap-run__more {
-  align-self: flex-start;
-  margin-inline: calc(-1 * var(--ghost-plate));
-  padding-inline: var(--ghost-plate);
+/* "Ver cada um" unfolds the run and "Mudar quando perguntar" opens its agent's choices: one line under its buttons,
+   their words on its start edge. */
+.ap-run__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
 }
 .ap-run .ap-run__items {
   margin: 0 -12px;
@@ -828,22 +834,13 @@ html:not([data-pointer]) .ap-li:focus-visible {
   line-height: 1.6;
   color: var(--ink);
 }
-.ap-review__text {
-  position: relative;
-  overflow: hidden;
-}
+/* A long text to publish, folded until "Ver mais": a mask, not a plate, so the fade ends on whatever is behind it in
+   either theme. */
 .ap-review__text.is-folded {
   max-height: 120px;
-}
-.ap-review__text.is-folded::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 48px;
-  background: linear-gradient(to bottom, transparent, var(--surface-raised));
-  pointer-events: none;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(#000 60%, transparent);
+  mask-image: linear-gradient(#000 60%, transparent);
 }
 .ap-review__track {
   margin-top: 4px;
@@ -919,6 +916,10 @@ html:not([data-pointer]) .ap-li:focus-visible {
 .ap-bar--acts {
   justify-content: flex-end;
 }
+/* "Mudar quando perguntar" at the bar's start, its buttons at the end. */
+.ap-bar__when {
+  margin-inline-end: auto;
+}
 .ap-bar--acts.ap-bar--float {
   padding: 10px;
 }
@@ -981,4 +982,29 @@ html:not([data-pointer]) .ap-li:focus-visible {
   margin: 0;
   font-size: 13.5px;
   color: var(--muted);
+}
+/* A phone's burst heading keeps its full measure; the deadline follows it instead of taking half its row. */
+@media (max-width: 480px) {
+  .ap-run > .ac-mediarow {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .ap-run > .ac-mediarow > .ac-mediarow__end {
+    grid-area: 2 / 2;
+    height: auto;
+  }
+  /* The source mark hangs into the first line, leaving later path lines the full row width. */
+  .ap-li__meta {
+    display: block;
+  }
+  .ap-li__meta > :is(.connector-icon, .ap-conn__own) {
+    float: left;
+    margin: 1px 6px 0 0;
+  }
+  .ap-li__where {
+    display: inline;
+  }
+  .ap-li__when {
+    display: block;
+    margin-top: 2px;
+  }
 }

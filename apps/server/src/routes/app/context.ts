@@ -3,11 +3,17 @@ import { type Config, connectorOAuthApps } from "@agenteschat/config";
 import type { Database } from "@agenteschat/db";
 import {
   type AiStatusDeps,
+  baseUrlFor,
   type ConnectorTriggerDeps,
+  closedRefusal,
   composioConnectorsOf,
   connectOverHttp,
   ForbiddenError,
+  getMembership,
+  hostOrigin,
   MisconfiguredError,
+  OrgDeletingError,
+  orgStanding,
   type RoutineHookConfig,
   type RoutineHookDeps,
   requireAgentDetails,
@@ -64,10 +70,18 @@ export const routineConnectorDeps = (deps: AppDeps): ConnectorTriggerDeps => {
   };
 };
 
+/**
+ * Where a link for the person acting through this request points (ADR 0194): its registered host, else `PUBLIC_URL`.
+ * Without a trailing slash.
+ */
+export const requestBaseUrl = (deps: Pick<AppDeps, "db" | "config">, headers: Headers) =>
+  baseUrlFor(deps.db, deps.config.PUBLIC_URL, headers.get("host"));
+
 /** Allowed browser origins for state-changing requests and WebSocket upgrades. */
 export function allowedOrigins(config: Config): Set<string> {
   return new Set([
     new URL(config.PUBLIC_URL).origin,
+    ...(config.EXTRA_TRUSTED_ORIGINS ?? []),
     ...(config.NODE_ENV === "development" ? ["http://localhost:5173"] : []),
   ]);
 }
@@ -84,13 +98,12 @@ export const MOBILE_CLIENT = "mobile";
 
 /**
  * CSRF rule for state-changing requests and WebSocket upgrades: with an
- * `Origin`, it must be one of ours; without one, only the phone app
- * (`X-Agentes-Client: mobile`) gets through. Either way the session still
- * comes from the cookie.
+ * `Origin`, it must be one of ours (`origins`, or this request's registered host's, `hostOrigin`); without one, only
+ * the phone app (`X-Agentes-Client: mobile`) gets through. Either way the session still comes from the cookie.
  */
-export function requestOriginAllowed(origins: Set<string>, headers: Headers): boolean {
+export async function requestOriginAllowed(db: Database, origins: Set<string>, headers: Headers): Promise<boolean> {
   const origin = headers.get("origin");
-  if (origin) return origins.has(origin);
+  if (origin) return origins.has(origin) || origin === (await hostOrigin(db, headers));
   return headers.get(APP_CLIENT_HEADER) === MOBILE_CLIENT;
 }
 
@@ -121,7 +134,7 @@ export function createAppRouter(deps: AppDeps) {
   // `requestOriginAllowed`) and be JSON (a plain HTML form can't send it).
   app.use("*", async (c, next) => {
     if (c.req.method === "GET" || c.req.method === "HEAD") return next();
-    if (!requestOriginAllowed(origins, c.req.raw.headers)) {
+    if (!(await requestOriginAllowed(deps.db, origins, c.req.raw.headers))) {
       return apiError(c, 403, "bad_origin", "Cross-origin request refused");
     }
     const type = c.req.header("content-type") ?? "";
@@ -191,6 +204,36 @@ export function agentDetailsGate(deps: Pick<AppDeps, "auth" | "db">) {
   });
 }
 
+/**
+ * What a workspace being deleted still takes (ADR 0088 §7): restoring or deleting it, the person's own settings there,
+ * their inbox and what they read, opening a DM it already has (`openDm` starts none then) and the payer's way to its
+ * invoices and card (`billing-link`).
+ */
+const OPEN_WHILE_DELETING =
+  /\/organizations\/[^/]+\/(?:deletion(?:\/code)?|me(?:\/.*)?|notification-prefs|notifications\/.+|(?:channels|threads)\/[^/]+\/read|dms|billing-link)$/;
+
+/**
+ * Before every route under a workspace: one being deleted reads as ever but changes nothing, so any write but leaving it
+ * and those `OPEN_WHILE_DELETING` names answers `org.deleting`. Only its members hear why: anyone else gets what the
+ * route says to them. A suspended one is left to the routes, which refuse it everything.
+ */
+export function readOnlyWhileDeleting(deps: Pick<AppDeps, "auth" | "db">) {
+  const session = requireSession(deps.auth);
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const orgId = c.req.param("orgId");
+    if (c.req.method === "GET" || c.req.method === "HEAD" || !orgId || !z.uuid().safeParse(orgId).success)
+      return next();
+    const refusal = closedRefusal(await orgStanding(deps.db, orgId));
+    if (!(refusal instanceof OrgDeletingError) || OPEN_WHILE_DELETING.test(c.req.path)) return next();
+    return session(c, async () => {
+      const me = c.get("user").id;
+      const leaving = c.req.method === "DELETE" && c.req.path.endsWith(`/members/${me}`);
+      if (leaving || !(await getMembership(deps.db, me, orgId))) return next();
+      throw refusal;
+    });
+  });
+}
+
 /** The sign-in page, coming back to this request's address once signed in. */
 export function signInPage(publicUrl: string, requestUrl: string) {
   const { pathname, search } = new URL(requestUrl);
@@ -226,6 +269,8 @@ export function oauthFailure(error: unknown, refusals: readonly string[] = []): 
   if (code === "github_app.not_visible") return "not_visible";
   if (code === "github_app.other_workspace") return "other_workspace";
   if (code === "github_app.installed_outside") return "installed_outside";
+  if (code === "github_app.owner_required") return "owner_required";
+  if (code === "github_app.owner_unknown") return "owner_unknown";
   return error instanceof ForbiddenError ? "not_allowed" : "failed";
 }
 
@@ -266,9 +311,15 @@ export async function keyTester(deps: AppDeps, userId: string) {
   return (await deps.adapters.rateLimiter.consume(`key-test:${userId}`, KEY_TESTS)).allowed ? gateway : undefined;
 }
 
+/** What the AI status reads (`ai-status.ts`) besides the database; undefined while no gateway is configured. */
+export function aiCheckOf(deps: AppDeps): Omit<AiStatusDeps, "db"> | undefined {
+  const gateway = deps.extras?.context?.gateway;
+  return gateway ? { gateway, machines: deps.extras?.sandbox?.machines?.hub ?? null } : undefined;
+}
+
 /** What the AI status reads (`ai-status.ts`): the gateway's key check and the computers' status. */
 export function aiStatusDeps(deps: AppDeps): AiStatusDeps {
-  const gateway = deps.extras?.context?.gateway;
-  if (!gateway) throw new Error("The model gateway isn't configured on this server");
-  return { db: deps.db, gateway, machines: deps.extras?.sandbox?.machines?.hub ?? null };
+  const ai = aiCheckOf(deps);
+  if (!ai) throw new Error("The model gateway isn't configured on this server");
+  return { db: deps.db, ...ai };
 }

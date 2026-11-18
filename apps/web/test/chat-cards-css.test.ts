@@ -30,12 +30,10 @@ test("a message's words use the whole column; a code block or a table scrolls in
   expect(value(".code-card__code", "overflow-x")).toBe("auto");
 });
 
-test("the cards in a message share one width: the tools, a lone call's line, every receipt and the other cards", () => {
+test("the cards in a message share one width: the tools, a lone call's line and the other cards (receipts hug their words)", () => {
   expect(value(":root", "--msg-card-w")).toBe("640px");
   for (const selector of [
     ".ac-tools",
-    ".ag-rc",
-    ".ag-rcg",
     // A request, a memory change, a question to another agent, the older work line.
     ".ac-approval",
     ".consult-pair__detail",
@@ -47,10 +45,9 @@ test("the cards in a message share one width: the tools, a lone call's line, eve
     ".iw-card",
     // A request still waiting as a pill: connect an AI, a stretch, waiting for its computer.
     ".rq-open",
-    // A mission's link and its command to approve, the browser's request and where it browsed.
+    // A mission's link and its command to approve.
     ".mi-linkcard",
     ".mi-cmd",
-    ".brw-rq",
     // Open or not, the browser card; a request or its decided line; a mission's card.
     ".brw-ac",
     ".rq",
@@ -94,13 +91,32 @@ test("nothing in a message wears the hover plate's own gray: cards a step up, we
     expect([selector, value(selector, "background")]).toEqual([selector, undefined]);
 });
 
-test("a receipt's sentence and a tool's line wrap, whole: no ellipsis", () => {
-  for (const selector of [".ag-rc__sentence", ".ac-tools__label", ".ac-tools__label b", ".ac-tools__label small"]) {
+test("a row's sentence and a tool's line wrap, whole; what an agent changed too, on a card as wide as its words", () => {
+  for (const selector of [
+    ".ag-rc__sentence",
+    ".ag-rc__by",
+    ".ac-tools__label",
+    ".ac-tools__label b",
+    ".ac-tools__label small",
+  ]) {
     expect(value(selector, "text-overflow")).toBeUndefined();
     expect(value(selector, "white-space")).toBeUndefined();
   }
-  expect(value(".ag-rc__sentence", "overflow-wrap")).toBe("anywhere");
+  for (const selector of [".ag-rc__sentence", ".ag-rc__by"]) expect(value(selector, "overflow-wrap")).toBe("anywhere");
   expect(value(".ac-tools__label", "flex-wrap")).toBe("wrap");
+  // Nothing cuts a change's words with "…" any more.
+  expect(css).not.toContain(".ag-rc__line");
+  // A receipt is as wide as its words, up to 480px (its padding inside) and never past the column: a long routine's
+  // receipt wraps short of the members column, a short one never spans the conversation.
+  for (const selector of [".ag-rc", ".ag-rcg"]) {
+    expect([selector, value(selector, "width")]).toEqual([selector, "fit-content"]);
+    expect([selector, value(selector, "max-width")]).toEqual([selector, "min(100%,480px)"]);
+    expect([selector, value(selector, "box-sizing")]).toEqual([selector, "border-box"]);
+  }
+  // The report offer is the cards' width from the start, as a request is: its report opening inside never widens it,
+  // so Enviar and Agora não stay where they were.
+  expect(value(".ag-rc.ag-fb", "width")).toBe("auto");
+  expect(value(".ag-rc.ag-fb", "max-width")).toBe("var(--msg-card-w)");
 });
 
 test("a card's rows start under its title: a row's hover never covers it", () => {
@@ -110,19 +126,24 @@ test("a card's rows start under its title: a row's hover never covers it", () =>
 });
 
 test("two agents talking is one pair row; on a reach line it ends where the list's own line ends", () => {
-  // Long names wrap whole, never cut: the row is one centred sentence, each face kept with its name's first word, the
-  // faces and the ⇄ on the capitals of the words beside them.
-  expect(value(".consult-pair__name", "text-overflow")).toBeUndefined();
-  expect(value(".consult-pair__name", "overflow")).toBeUndefined();
-  expect(value(".consult-pair__row", "white-space")).toBeUndefined();
-  expect(value(".consult-pair__row", "display")).toBe("inline-block");
-  expect(value(".consult-pair__row", "text-align")).toBe("center");
+  // The pair stays one button; a narrow conversation gives identities and status their own lines.
+  expect(value(".consult-pair__row", "white-space")).toBe("nowrap");
+  expect(value(".consult-pair__row", "display")).toBe("grid");
   expect(value(".consult-pair__row", "line-height")).toBe("18px");
-  expect(value(".consult-pair__who", "white-space")).toBe("nowrap");
-  expect(value(".consult-pair__who>.consult-pair__name", "white-space")).toBe("normal");
+  expect(value(".consult-pair__row>*", "flex")).toBe("none");
+  expect(value(".consult-pair__row>.consult-pair__subject", "flex")).toBe("0 100000 auto");
+  expect(value(".consult-pair__row>.consult-pair__subject", "text-overflow")).toBe("ellipsis");
+  expect(value(".consult-pair__lead", "flex")).toMatch(/^0 (1 )?auto$/);
+  expect(value(".consult-pair__name", "text-overflow")).toBe("ellipsis");
+  expect(value(".consult-pair__lead", "display")).toBe("inline-flex");
+  expect(value(".consult-pair__who>.ac-avatar", "flex")).toBe("none");
+  // In a narrow conversation the subject leaves room; the status and time remain on the next line.
+  expect(value(".consult-pair", "container-type")).toBe("inline-size");
+  expect(value(".consult-pair__subject", "display")).toBe("none");
+  expect(value(".consult-pair__word", "flex")).toBeUndefined();
+  expect(value(".consult-pair__time", "flex")).toBeUndefined();
   expect(value(".consult-pair__faces", "vertical-align")).toContain("var(--cap-mid)");
   expect(value(".consult-pair__faces", "display")).toBe("inline-flex");
-  expect(value(".consult-pair__word", "white-space")).toBe("nowrap");
   expect(value(".consult-pair__swap", "vertical-align")).toContain("var(--cap-mid)");
   expect(value(".ag-rcs .ag-rc--talk>.consult-pair", "padding-inline")).toBe("calc(16px - var(--msg-inline))");
 });

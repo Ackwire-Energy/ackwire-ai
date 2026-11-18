@@ -1,8 +1,19 @@
 import type { TFunction } from "i18next";
 import type { ApiClient } from "../api/client";
-import type { Agent, AgentBrain, AgentStatus, BrainScope, Credential, DirectMessage, Me, Model } from "../api/types";
+import type {
+  Agent,
+  AgentBrain,
+  AgentStatus,
+  BrainScope,
+  Credential,
+  DirectMessage,
+  Me,
+  Message,
+  Model,
+} from "../api/types";
 import { agentGrammar } from "./grammar";
-import { modelForKey, providerLabel } from "./providers";
+import { keyName, keyThinks, modelOnKey, providerLabel, savedKeyReach } from "./providers";
+import { answerAfter } from "./team-plan";
 
 /** The workspace's right hand (ADR 0137): every surface that treats it apart asks here. */
 export const isRightHand = (agent: Pick<Agent, "builtin"> | null | undefined) => agent?.builtin === "right_hand";
@@ -83,21 +94,73 @@ export const thinksWithLine = (t: TFunction, scope: BrainScope | undefined, agen
     : t("aiAccounts.done.savedAgent", { agent, label });
 
 /**
- * The right hand on a workspace key, web and phone: the workspace's AI goes to its API key, the key is pinned, with
- * Automático where the model chosen before can't run on it, and the person's own DM goes back to that AI. In that
- * order: someone the workspace's AI refuses keeps their own as it was.
+ * The right hand on a workspace key, web and phone: the workspace's AI goes to its API key, the key is pinned, with one
+ * of the key's own models where the model chosen before can't run on it (`modelOnKey`: an endpoint's own, since
+ * Automático there fails every run as no AI), and the person's own DM goes back to that AI. In that order: someone the
+ * workspace's AI refuses keeps their own as it was.
  */
 export async function rightHandOnKey(
   api: ApiClient,
   orgId: string,
   agent: Pick<Agent, "id" | "model">,
-  key: Pick<Credential, "id" | "provider" | "endpoint">,
+  key: Pick<Credential, "id" | "provider"> & Partial<Pick<Credential, "endpoint">>,
   models: readonly Model[],
 ) {
-  const model = modelForKey(key, agent.model, models);
   await api.agents.setBrain(orgId, agent.id, { scope: "workspace", brain: "model" });
-  await api.agents.update(orgId, agent.id, { credentialId: key.id, model });
+  await api.agents.update(orgId, agent.id, { credentialId: key.id, ...modelOnKey(key, agent.model, models) });
   await api.agents.setBrain(orgId, agent.id, { brain: "model" });
+}
+
+/**
+ * One agent onto a workspace key, web and phone: the model brain, the key, and the agent's model where the key runs it,
+ * else one the key does (`modelOnKey`: an endpoint's own for an endpoint key, Automático for a catalog one).
+ */
+export async function agentOnKey(
+  api: ApiClient,
+  orgId: string,
+  agent: { id: string; model?: string | undefined; brain?: string | undefined },
+  key: Pick<Credential, "id" | "provider"> & Partial<Pick<Credential, "endpoint">>,
+  models: readonly Model[],
+) {
+  if (agent.brain !== "model") await api.agents.setBrain(orgId, agent.id, { brain: "model" });
+  await api.agents.update(orgId, agent.id, { credentialId: key.id, ...modelOnKey(key, agent.model, models) });
+}
+
+/**
+ * What saving a key came to. `agent`: it was put on the one agent the flow was for. `all`: the agents without an AI of
+ * their own think with it. `made`: it became the workspace's default instead of `other`, which couldn't think. `other`:
+ * they still think with `other` (a button may make this one the default).
+ */
+export type SavedKey = { kind: "agent"; agent: string } | { kind: "all" } | { kind: "made" | "other"; other: string };
+
+/**
+ * After a key is saved in a connect flow, web and phone: for one agent, the key goes on it; for every agent, it becomes
+ * the default by itself only where the default can't think and it can (`savedKeyReach`).
+ */
+export async function settleSavedKey(
+  api: ApiClient,
+  orgId: string,
+  key: Credential,
+  agent: { id: string; name: string; model?: string | undefined; brain?: string | undefined } | undefined,
+  models: readonly Model[],
+): Promise<SavedKey> {
+  if (agent) {
+    await agentOnKey(api, orgId, agent, key, models);
+    return { kind: "agent", agent: agent.name };
+  }
+  const [keys, settings] = await Promise.all([api.agents.credentials(orgId), api.orgs.settings(orgId)]);
+  const reach = savedKeyReach(key, keys, settings.defaultCredentialId);
+  if (reach.kind !== "make") return reach;
+  await api.agents.makeDefaultCredential(orgId, key.id);
+  return { kind: "made", other: reach.other };
+}
+
+/** The line a saved key's panel shows: whom it thinks for, or that none of an endpoint's models passed a test yet. */
+export function savedKeyLine(t: TFunction, saved: SavedKey, key: Credential) {
+  if (!keyThinks(key)) return t("connectAi.key.untested", { name: keyName(key) });
+  if (saved.kind === "agent") return t("connectAi.key.savedFor", { agent: saved.agent, label: key.label });
+  if (saved.kind === "all") return t("connectAi.key.savedAll");
+  return t(saved.kind === "made" ? "connectAi.key.savedMade" : "connectAi.key.savedOther", { other: saved.other });
 }
 
 /** Its one-time "Novo" is per person and workspace (`seenList` entries), gone once its DM opened. */
@@ -114,6 +177,17 @@ export function firstVisitOf(dms: readonly DirectMessage[] | undefined, agentId:
 
 /** The workspace's right hand among its agents, when this person may see it. */
 export const rightHandOf = <A extends Pick<Agent, "builtin">>(agents: readonly A[]) => agents.find(isRightHand);
+
+/** The right hand's name in a workspace, or null while its agents load or when it has none. */
+export const rightHandName = (agents: readonly Pick<Agent, "builtin" | "name">[] | undefined) =>
+  (agents && rightHandOf(agents)?.name) ?? null;
+
+/** The agents a scene of the team shows: the right hand in front (second in the row), then the others, four at most. */
+export function sceneTeam<A extends { id: string }>(agents: readonly A[], lead: A | undefined): A[] {
+  const rest = agents.filter((a) => a.id !== lead?.id).slice(0, lead ? 3 : 4);
+  if (!lead) return rest;
+  return rest.length > 1 ? [rest[0] as A, lead, ...rest.slice(1)] : [lead, ...rest];
+}
 
 /**
  * Its name and look before the workspace exists (the onboarding's first question): the server's
@@ -167,13 +241,35 @@ export const leadsWithPlan = (
 export const introLeadKey = (held: boolean, hasTeam: boolean) =>
   held && !hasTeam ? ("rightHand.intro.heldLead" as const) : ("rightHand.intro.lead" as const);
 
+/**
+ * The right hand's stored greeting of someone who joined the workspace (`meta.bodyCode`, worded by
+ * `chat.body.welcome_member`; the engine's `WELCOME_BODY`): it asks them one thing, so the top of its DM asks no other.
+ */
+export const welcomesMember = (meta: Record<string, unknown> | null | undefined) => meta?.bodyCode === "welcome_member";
+
+/**
+ * Whether that greeting is still the open question of this conversation: it is among `messages` and the person has
+ * not answered it. Older pages never change the answer: an unanswered greeting is in the newest page until a whole
+ * page of the right hand's own messages follows it, and by then it is far from the top of the DM. Once they answered,
+ * the top asks what it asks anyone. While the messages load, it counts as open for anyone it may have greeted (never
+ * an owner): a card that waits, not one that shows and leaves.
+ */
+export const welcomeOpen = (
+  messages: readonly Pick<Message, "id" | "createdAt" | "author" | "body" | "local" | "meta">[] | undefined,
+  owner: boolean,
+) => {
+  if (!messages) return !owner;
+  const greeting = messages.find((m) => welcomesMember(m.meta));
+  return greeting !== undefined && answerAfter(messages, greeting.id) === null;
+};
+
 /** Where the first-run checklist stands for this person (ADR 0155 §6): `none` when it isn't theirs. */
 export type FirstRunState = "none" | "open" | "complete";
 
 /**
  * Whether its greeting ends with the way to build the team again, for whoever may create agents once an AI is there:
- * only with a team, no card left under the greeting (`cards`) and no open checklist, which would offer the same or
- * ask something first.
+ * only with a team, no card left under the greeting (`cards`), no open checklist, which would offer the same or
+ * ask something first, and no unanswered greeting of a newcomer below, which already asks what to set up.
  */
 export const offersTeamSetup = (s: {
   noAi: boolean;
@@ -185,14 +281,25 @@ export const offersTeamSetup = (s: {
   /** A billing hold (`planHoldOf`): it can't answer, so its line would send a message that gets refused. */
   held?: boolean;
   checklist?: FirstRunState;
-}) => s.aiKnown && !s.noAi && !s.held && s.createsAgents && s.hasTeam && s.cards.length === 0 && s.checklist !== "open";
+  /** `welcomeOpen`. */
+  welcomed?: boolean;
+}) =>
+  s.aiKnown &&
+  !s.noAi &&
+  !s.held &&
+  !s.welcomed &&
+  s.createsAgents &&
+  s.hasTeam &&
+  s.cards.length === 0 &&
+  s.checklist !== "open";
 
 /**
  * The cards under the right hand's greeting at the top of its DM besides the first-run checklist (ADR 0137, ADR 0155
  * §6), one question at a time. The owner's checklist has the setup in its rows: while it is open nothing else asks,
  * and once complete, how the person wants agents to talk to them (ADR 0147) until they pick, asked only once the team
  * answered them (`answered`), so it never stands beside the first task. Anyone else: Connect AI while there is none,
- * then that question. On a billing hold neither: an AI comes after the plan.
+ * then that question. On a billing hold neither: an AI comes after the plan. Someone the right hand greeted when they
+ * joined gets Connect AI alone until they answer it (`welcomed`): its greeting below is the one question.
  */
 export function introCards(s: {
   noAi: boolean;
@@ -207,9 +314,12 @@ export function introCards(s: {
   checklist?: FirstRunState;
   /** `teamAnswered`; absent, nothing to wait for. */
   answered?: boolean;
+  /** `welcomeOpen`. */
+  welcomed?: boolean;
 }): ("connect" | "style")[] {
   if (s.checklist === "open") return [];
   if (s.noAi && !s.held && s.checklist !== "complete") return s.noAiCard ? [] : ["connect"];
+  if (s.welcomed) return [];
   if (s.askStyle && s.aiKnown && !s.held && s.answered !== false) return ["style"];
   return [];
 }
@@ -222,3 +332,30 @@ export const teamAnswered = (
   team: readonly Pick<Agent, "id">[],
   statuses: readonly Pick<AgentStatus, "agentId" | "activeAt">[] | undefined,
 ) => team.length === 0 || (statuses?.some((s) => s.activeAt !== null && team.some((a) => a.id === s.agentId)) ?? false);
+
+/**
+ * Why the right hand has no computer for anyone in this workspace, as its desktop's state says it (`reason`), by the
+ * line that tells it: the workspace has no computer of its own (on a self-hosted server, this server made the agents'
+ * computer, `selfHost`), or one where every agent is the same user. Null when it has one, or for any other state
+ * (offline, starting), which its computer's own view tells.
+ */
+export const rightHandNoComputer = (reason: string | null | undefined, selfHost = false) =>
+  reason === "no_home"
+    ? selfHost
+      ? ("rightHand.computerNoHomeServer" as const)
+      : ("rightHand.computerNoHome" as const)
+    : reason === "not_system"
+      ? ("rightHand.computerOneUser" as const)
+      : null;
+
+/**
+ * What only the right hand does, in the order its page lists them (`rightHand.powers.<id>`), each with the server's
+ * grants behind it (`RIGHT_HAND_GRANTS` in the engine's `right-hand.ts`). `mentions` is no grant: the server's
+ * `rightHandReaches`.
+ */
+export const RIGHT_HAND_POWERS = [
+  { id: "team", grants: ["setup:write"] },
+  { id: "routines", grants: ["schedule:write"] },
+  { id: "asYou", grants: ["drive:read", "wiki:read", "issues:read"] },
+  { id: "mentions", grants: [] },
+] as const;

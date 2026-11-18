@@ -310,7 +310,7 @@ export const SCENARIOS: Scenario[] = [
   },
 
   {
-    name: "9b. a routine: a connected app's write becomes a card where it reports, from the routine",
+    name: "9b. an always-ask agent's routine: a connected app's write becomes a card where it reports",
     runs: [
       {
         background: true,
@@ -325,6 +325,8 @@ export const SCENARIOS: Scenario[] = [
       },
     ],
     async start(h) {
+      // The default risky level permits reversible writes; this scenario exercises an agent set to always ask.
+      await h.f.db.update(schema.agents).set({ approvalsLevel: "always" }).where(eq(schema.agents.id, h.f.agent.id));
       await runRoutine(h, { access: "act" });
     },
     async end(h) {

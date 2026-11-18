@@ -20,8 +20,7 @@
     "down": "Omlaag",
     "position": "{{at}} van {{count}}.",
     "channelPosition": "{{at}} van {{count}}.",
-    "itsChannels": "Kanalen",
-    "seeAll": "Alles bekijken"
+    "itsChannels": "Kanalen"
   },
   "blocks": {
     "send": "Versturen",
@@ -54,7 +53,8 @@
     "closed": "{{title}} · gesloten",
     "reopen": "Opnieuw tonen",
     "answeredBy": "{{name}} koos",
-    "failed": "Je keuze is niet verstuurd. Probeer het opnieuw."
+    "failed": "Je keuze is niet verstuurd. Probeer het opnieuw.",
+    "tooLongFix": "Maak het antwoord korter."
   },
   "chart": {
     "table": "Tabel",
@@ -187,16 +187,9 @@
       "text": "Misschien is hij offline of buiten je netwerk. Je gesprekken verschijnen vanzelf zodra hij terug is.",
       "kept": "Je ziet wat al in de app stond."
     },
-    "section": {
-      "agents": "Agents",
-      "channels": "Kanalen",
-      "people": "Mensen"
-    },
-    "seeAll": {
-      "agents": "Alle agents bekijken",
-      "channels": "Alle kanalen bekijken",
-      "people": "Alle mensen bekijken"
-    },
+    "pinned": "Vastgezet",
+    "recent": "Recent",
+    "seeAll": "Alle gesprekken bekijken",
     "wait": {
       "verb": {
         "approval": "heeft je akkoord nodig",
@@ -250,8 +243,6 @@
       "mute": "Dempen",
       "unmute": "Ontdempen"
     },
-    "firstRunLine": "{{name}} zet het team op · {{done}} van {{total}}",
-    "firstRunLinePersonal": "{{name}} richt je agents in · {{done}} van {{total}}",
     "first": {
       "title": "Begin met je eerste agent",
       "subtitle": "Geef hem een naam en zeg wat hij doet. Hij verschijnt hier, als gesprek.",
@@ -302,7 +293,7 @@
   },
   "along": {
     "agent": "Een agent",
-    "waits": "{{name}} wacht op je akkoord",
+    "waits": "{{name}} · wacht op jou",
     "on": "{{name}} · {{what}}",
     "working": "{{name}} is aan het werk",
     "more": "+{{count}}"
@@ -358,8 +349,15 @@
     "profile": "Profiel",
     "here_one": "{{count}} hier",
     "here_other": "{{count}} hier",
+    "membersAdd": "Toevoegen",
+    "membersAdded_one": "{{count}} toegevoegd aan #{{channel}}",
+    "membersAdded_other": "{{count}} toegevoegd aan #{{channel}}",
+    "memberRemoved": "{{name}} zit niet meer in #{{channel}}",
+    "muted": "#{{channel}} gedempt",
+    "unmuted": "#{{channel}} niet meer gedempt",
     "headerAgent": "{{who}}. Open het profiel",
     "headerChannel": "{{who}}. Opties",
+    "headerMembers": "{{who}}. Bekijk wie er is",
     "switchHint": "Ingedrukt houden om van gesprek te wisselen",
     "switchTitle": "Van gesprek wisselen",
     "switchSearch": "Gesprekken zoeken",
@@ -370,8 +368,6 @@
     "switchWorking": "aan het werk",
     "join": "Lid worden van het kanaal",
     "sending": "Versturen…",
-    "failed": "Niet verstuurd · Probeer opnieuw",
-    "notSent": "Het bericht is niet verstuurd.",
     "toLatest": "Naar de nieuwste berichten",
     "toLatestNew": "Naar de nieuwste berichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
@@ -444,21 +440,15 @@
     "doubleTapHint": "Dubbeltik = 👍",
     "react": "Reageren",
     "attach": {
-      "more": "Nog een foto of bestand toevoegen",
       "remove": "{{name}} weghalen",
       "waiting": "{{name}}, wacht op versturen",
       "sending": "{{name}}, wordt verstuurd",
+      "failed": "{{name}}, niet verstuurd: verstuur om het opnieuw te proberen",
+      "preparing": "Bestanden voorbereiden…",
       "tooMany": "Maximaal {{count}} bestanden per bericht."
     },
     "swipeReply": "Veeg naar rechts om te antwoorden",
     "intent": {
-      "suggest": {
-        "merge": "Ga je gang en merge",
-        "review": "Vraag {{name}} om het eerst na te kijken",
-        "seeChange": "Laat me zien wat er veranderd is",
-        "summarize": "Vat het samen in 3 punten",
-        "nextStep": "Wat is de volgende stap?"
-      },
       "arrived": "{{name}} is bij het team gekomen",
       "meet": "Je eerste gesprek met {{name}}",
       "roleIntro": "{{role}} in je team. Vraag het in gewone woorden.",
@@ -604,7 +594,6 @@
     "minuteLess": "{{n}} minuten eerder",
     "minuteMore": "{{n}} minuten later",
     "submit": "Herinner me op dit tijdstip",
-    "quick": "Snelle tijden bekijken",
     "done": "Herinnering ingesteld",
     "error": {
       "noAgent": "Geen agent hier kan je herinneren",
@@ -662,6 +651,7 @@
     "title": "Nieuwe missie",
     "intro": "De agent maakt een plan en begint pas als jij het zegt.",
     "placeholder": "Wat moet er gebeuren?",
+    "who": "Wie het doet",
     "submit": "Om een plan vragen",
     "created": "{{name}} maakt het plan",
     "noAgents": "Nog geen agent kan missies uitvoeren. Verbind een computer via de website.",
@@ -794,7 +784,7 @@
     "teamSectionPersonal": "Je agents",
     "managerQuiet": "Er loopt niets",
     "state": {
-      "waitsYou": "wacht op je akkoord",
+      "waitsYou": "wacht op jou",
       "noAi": "Geen AI gekoppeld",
       "connect": "Koppelen",
       "archived": "Gearchiveerd",
@@ -819,9 +809,6 @@
     "keepEditing": "Verder bewerken"
   },
   "newAgent": {
-    "leaveTitle": "Weggaan zonder aan te maken?",
-    "leaveText": "De agent waarmee je begon, wordt niet aangemaakt.",
-    "keepGoing": "Verder met aanmaken",
     "identityQuestion": "Wie is de agent?",
     "identityLead": "Zijn naam, hoe je hem in het gesprek roept en zijn gezicht.",
     "handleMention": "Vermeld @{{handle}} om hem te roepen.",
@@ -847,7 +834,6 @@
       "archive": "De telefoon opent geen .zip- of .tar.gz-bestanden. Tik in de app Bestanden op de .zip om hem uit te pakken en kies de bestanden erin, of importeer op de computer.",
       "privacy": "Gelezen op deze telefoon. Bestanden met sleutels en inloggegevens worden nooit geopend.",
       "also": "Komt ook mee",
-      "change": "Wijzigen",
       "arrived_one": "{{name}} is aangekomen",
       "arrived_other": "{{count}} agents zijn aangekomen",
       "partial": "{{done}} van {{total}} aangekomen. Opnieuw importeren haalt de rest."
@@ -871,7 +857,11 @@
     "taskForM": "Taak voor {{name}}",
     "taskPlaceholder": "Wat moet er gebeuren?",
     "sendTask": "Taak versturen",
-    "taskSent": "Taak verstuurd"
+    "taskSent": "Taak verstuurd",
+    "brakes": {
+      "forgetTitle": "Deze antwoorden vergeten?",
+      "forgetText": "{{name}} vraagt het opnieuw vóór dit soort werk."
+    }
   },
   "activity": {
     "title": "Activiteit",
@@ -883,6 +873,8 @@
     },
     "doneToast": "Afgerond",
     "undo": "Ongedaan maken",
+    "doneAllToast_one": "{{count}} verplaatst naar Afgerond",
+    "doneAllToast_other": "{{count}} verplaatst naar Afgerond",
     "day": {
       "today": "Vandaag",
       "yesterday": "Gisteren",
@@ -920,6 +912,9 @@
       "routine_failed_other": "Routines mislukt",
       "run_failed_one": "Kon niet afronden",
       "run_failed_other": "Kon niet afronden",
+      "admin_ask_channel_agent": "{{names}} vraagt je {{agent}} toe te voegen aan #{{label}}",
+      "admin_ask_create_agents": "{{names}} vraagt om agents te mogen maken",
+      "admin_ask_webhook": "{{names}} vraagt je de {{service}}-webhook voor routines in te stellen",
       "routine_paused_one": "Routine gepauzeerd",
       "routine_paused_other": "Routines gepauzeerd",
       "routine_stalled_one": "Routine wacht op de computer",
@@ -980,6 +975,8 @@
       "plan_lent_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_lent_female_one": "{{names}} heeft je {{plan}}-abonnement aan {{agent}} gekoppeld",
       "plan_lent_female_other": "{{names}} hebben je {{plan}}-abonnement aan {{agent}} gekoppeld",
+      "plan_serves_one": "Je {{plan}} bedient nu de hele workspace",
+      "plan_serves_other": "Je {{plan}} bedient nu de hele workspace",
       "plan_model_dropped_one": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
       "plan_model_dropped_other": "{{model}} is uit {{plan}} gehaald. {{names}} gebruikt voorlopig {{runs}}",
       "computer_disk_full_one": "De schijf van een computer is bijna vol",
@@ -1135,6 +1132,9 @@
     "addWorkspaceTeamShort": "Naar de server van je team",
     "addWorkspaceTeamSubShort": "Adres of QR-code van de computer",
     "addWorkspaceFoot": "Je verlaat geen enkele werkruimte.",
+    "addAccount": "Inloggen bij een ander account",
+    "addAccountSub": "Op {{host}}, zonder dit te verlaten",
+    "accountNoWorkspace": "Nog geen werkruimte",
     "teamServerLeadShort": "Wat je team in de browser opent.",
     "teamServerQuestion": "Wat is het adres van je team?",
     "account": {
@@ -1152,6 +1152,8 @@
       "name": "Naam",
       "namePlaceholder": "Je naam",
       "email": "E-mail",
+      "emailWebLead": "Log opnieuw in op de website en wijzig het daar, zonder de code.",
+      "emailWeb": "Opnieuw inloggen op de website",
       "inWorkspace": "In deze werkruimte · {{org}}",
       "handle": "Je @",
       "timezone": "Tijdzone",
@@ -1184,6 +1186,7 @@
     "blocked": "Je bent de enige eigenaar van {{names}}. Maak op de website, bij Mensen, iemand anders eigenaar en kom dan terug.",
     "addPasswordFirst": "Voeg eerst op de website een wachtwoord toe aan je account en typ het dan hier.",
     "addPasswordWeb": "Een wachtwoord toevoegen op de website",
+    "onThisComputer": "Verwijder het in de Ackwire AI-app op de computer waarop deze server draait.",
     "otherAccount": "Je bent ingelogd op een ander account. Er is niets verwijderd.",
     "hold": "Ingedrukt houden om te verwijderen"
   },
@@ -1203,7 +1206,7 @@
       "file": "Bestand"
     },
     "more": "Meer opties",
-    "send": "Versturen",
+    "sendCopy": "Kopie versturen",
     "savePhotos": "Bewaren in Foto's",
     "drive": "Bekijken in Drive",
     "saved": "Bewaard in Foto's",
@@ -1217,6 +1220,7 @@
     "place": "{{index}} van {{count}}",
     "previous": "Vorige afbeelding",
     "next": "Volgende afbeelding",
+    "noPreviewTitle": "Geen voorbeeld",
     "noPreview": "Dit bestand opent niet in de app. Stuur het naar een andere app om het te openen.",
     "video": {
       "play": "Afspelen",
@@ -1226,7 +1230,8 @@
       "mute": "Geluid uit",
       "unmute": "Geluid aan",
       "fullscreen": "Volledig scherm",
-      "open": "Openen"
+      "open": "Openen",
+      "cantPlay": "Deze video kan niet op deze telefoon worden afgespeeld."
     }
   },
   "issues": {
@@ -1319,7 +1324,6 @@
   "drive": {
     "title": "Drive",
     "search": "Zoeken in Drive",
-    "types": "Bestandstypen",
     "type": {
       "all": "Alles",
       "documents": "Documenten",
@@ -1340,7 +1344,6 @@
     },
     "by": "{{name}} · {{when}}",
     "noResults": "Niets met deze filters.",
-    "loadFailed": "De Drive kon niet worden geladen.",
     "more": "Meer tonen"
   },
   "constellation": {
@@ -1364,7 +1367,6 @@
     "uses_one": "{{count}} keer gebruikt",
     "uses_other": "{{count}} keer gebruikt",
     "confirmed": "Bevestigd door een persoon",
-    "unconfirmed": "Nog niet bevestigd",
     "confirm": "Bevestigen",
     "confirmedToast": "Bevestigd",
     "details": "Technische details",
@@ -1406,8 +1408,6 @@
     "openExisting": "De pagina openen"
   },
   "routines": {
-    "loadFailed": "De routines konden niet worden geladen.",
-    "anyAgent": "Alle agents",
     "create": "Aanmaken",
     "when": {
       "custom": "Op jouw manier",
@@ -1437,7 +1437,7 @@
       "plain": "heeft een klus afgerond"
     },
     "rowWait": {
-      "approval": "wacht op je akkoord",
+      "approval": "wacht op jou",
       "question": "wacht op je antwoord",
       "mission": "wacht tot je het nakijkt"
     },
@@ -1475,13 +1475,13 @@
   },
   "intentAgents": {
     "waitingSection": "Wacht op jou",
-    "waitingLine": "{{title}} · heeft je akkoord nodig",
+    "waitingLine": "{{title}} · wacht op jou",
     "waitingMore_one": "{{title}} · en nog {{count}} die op je wacht",
     "waitingMore_other": "{{title}} · en nog {{count}} die op je wachten",
-    "waitingLabel": "{{name}}, heeft je akkoord nodig",
+    "waitingLabel": "{{name}}, wacht op jou",
     "owner": "Eigenaar: {{name}}",
     "ownerYou": "Eigenaar: jij",
-    "nowWaiting": "Heeft je akkoord nodig: {{title}}",
+    "nowWaiting": "Wacht op jou: {{title}}",
     "did": {
       "title": "Wat hij voor je deed",
       "title_female": "Wat zij voor je deed",
@@ -1500,7 +1500,7 @@
         "image": "Afbeelding",
         "file": "Bestand"
       },
-      "waitingOnYou": "Heeft je akkoord nodig",
+      "waitingOnYou": "Wacht op jou",
       "youApproved": "Je hebt goedgekeurd",
       "youRefused": "Je hebt geweigerd",
       "action": {
@@ -1577,9 +1577,9 @@
         "setup": "Werkruimte instellen",
         "desktop": "Scherm van de computer"
       },
-      "asksYou": "Mergen en publiceren vragen altijd om jouw goedkeuring, op elk niveau.",
-      "asksOwner": "Mergen en publiceren vragen altijd om goedkeuring van {{name}}, op elk niveau.",
-      "asksAdmins": "Mergen en publiceren vragen altijd om goedkeuring van een beheerder, op elk niveau.",
+      "asksYou": "Mergen en publiceren vragen om jouw goedkeuring, tenzij de agent nooit vraagt.",
+      "asksOwner": "Mergen en publiceren vragen om goedkeuring van {{name}}, tenzij de agent nooit vraagt.",
+      "asksAdmins": "Mergen en publiceren vragen om goedkeuring van een beheerder, tenzij de agent nooit vraagt.",
       "empty": "Voorlopig alleen gesprekken."
     }
   },
@@ -1665,32 +1665,16 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} heeft hulp nodig",
-      "needsFor": "{{name}} heeft hulp nodig · {{time}}",
-      "inControlAt": "Jij hebt de controle · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "De browser van {{name}} openen…",
-      "startingM": "De browser van {{name}} openen…",
       "stopAskF": "De browser van {{name}} sluiten?",
       "stopAskM": "De browser van {{name}} sluiten?",
-      "whereF": "In de browser van {{name}}",
-      "whereM": "In de browser van {{name}}",
       "open": "Openen",
-      "expandHint": "Tik om uit te vouwen",
       "stop": "Stoppen",
-      "giveUp": "Opgeven",
-      "done": "Klaar: {{title}}",
-      "failed": "Niet gelukt: {{title}}",
-      "failedNote": "Niet gelukt: {{note}}",
-      "expired": "Niemand heeft het op tijd geopend: {{title}}",
-      "cancelled": "Geannuleerd: {{title}}",
-      "withdrawn": "{{name}} heeft dit niet meer nodig: {{title}}"
+      "giveUp": "Opgeven"
     },
     "live": {
       "inControl": "Jij hebt de controle",
       "helping": "{{name}} heeft de controle",
       "watchOnly": "{{name}} heeft de controle. Jij kijkt alleen mee.",
-      "takeOver": "Overnemen",
       "done": "Klaar",
       "handBack": "Teruggeven",
       "couldnt": "Het lukte niet",
@@ -1711,7 +1695,6 @@
       "closedHelpM": "Logins blijven bewaard voor de volgende keer.",
       "stuckHelpF": "Opnieuw proberen start de browser opnieuw. Logins blijven bewaard.",
       "stuckHelpM": "Opnieuw proberen start de browser opnieuw. Logins blijven bewaard.",
-      "hidden": "{{name}} heeft de controle · scherm verborgen",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -1741,6 +1724,8 @@
         "offlineCloudM": "De computer van {{name}} reageert nu niet.",
         "stuckF": "De browser van {{name}} kon niet worden geopend.",
         "stuckM": "De browser van {{name}} kon niet worden geopend.",
+        "noAnswerF": "De browser van {{name}} reageerde niet.",
+        "noAnswerM": "De browser van {{name}} reageerde niet.",
         "tooManyF": "Te veel browsers tegelijk open. Deze verschijnt zodra er een andere sluit.",
         "tooManyM": "Te veel browsers tegelijk open. Deze verschijnt zodra er een andere sluit."
       }
@@ -1797,6 +1782,7 @@
       "ui_automation_off": "UI-automatisering staat uit",
       "xcode_missing": "De Mac heeft Xcode nodig",
       "xcode_too_old": "Xcode is te oud voor deze iPhone",
+      "ios_behind_xcode": "Werk de iOS van deze iPhone bij",
       "device_support": "De Mac maakt deze iPhone klaar",
       "helper_missing": "De testhelper is nog niet ingesteld",
       "helper_expired": "De testhelper moet worden vernieuwd",
@@ -1810,6 +1796,10 @@
       "no_driverLinux": "Linux heeft udev-regels voor deze telefoon nodig",
       "os_too_old": "Het systeem van deze telefoon is te oud",
       "adb_offline": "Haal de kabel eruit en sluit hem opnieuw aan",
+      "wifi_away": "Zet deze iPhone op de wifi van de Mac of sluit hem aan",
+      "wifi_asleep": "Maak deze iPhone wakker, ontgrendel hem en houd hem bij de Mac",
+      "tunnel_down": "De wifiverbinding viel weg. Houd deze iPhone bij de Mac of sluit hem aan",
+      "wifi_untrusted": "Sluit hem één keer aan en tik op Vertrouw",
       "other": "Nog niet klaar"
     },
     "os": {
@@ -1967,9 +1957,30 @@
       "teamMissing": "Xcode is ingelogd maar toont nog geen team. Maak in Xcode een willekeurige iOS-app, kies je team bij Signing & Capabilities en voer hem één keer uit op deze iPhone.",
       "uiRefused": "Deze iPhone weigerde de tikken van de testhelper. Ontgrendel hem en voer je toegangscode in als hij erom vraagt. Blijft het gebeuren, zet dan Instellingen › Ontwikkelaar › Schakel UI-automatisering in uit en weer aan.",
       "pluggedIn": "Hij is aangesloten",
+      "wifi": {
+        "also": "Ook op de wifi van {{host}}: {{name}}",
+        "use": "Via wifi gebruiken",
+        "hint": "Hier verschijnt alleen een iPhone die de Mac al eens via een kabel heeft vertrouwd. De Mac bereikt hem via de eigen versleutelde verbinding van Apple, dezelfde die Xcode gebruikt.",
+        "stop": "Niet meer via wifi gebruiken",
+        "stopTitle": "{{name}} niet meer via wifi gebruiken?",
+        "stopText": "Agents kunnen hem niet meer bereiken. Kies hem opnieuw met {{host}} om hem te gebruiken.",
+        "stopped": "{{name}} wordt niet meer via wifi gebruikt"
+      },
       "stall": {
-        "plug": "{{host}} ziet deze iPhone nog niet. Gebruik een kabel die data doorgeeft, niet alleen stroom, houd deze iPhone ontgrendeld en tik op Vertrouw als hij erom vraagt.",
-        "devmode": "Ontwikkelaarsmodus gaat pas aan nadat deze iPhone herstart. Tik op Herstart en daarna op Zet aan als hij terug is. Geen schakelaar? Koppel deze iPhone los en sluit hem weer aan."
+        "plug": "{{host}} ziet deze iPhone nog niet. Gebruik een kabel die data doorgeeft, niet alleen stroom, houd deze iPhone ontgrendeld en tik op Vertrouw als hij erom vraagt."
+      },
+      "devMode": {
+        "restarting": "{{host}} ziet deze iPhone na de herstart nog niet terug. Laat hem aangesloten.",
+        "back": "Tik op Zet aan in de melding op deze iPhone en voer je toegangscode in.",
+        "check": "Staat aan, opnieuw controleren",
+        "stillOff": "{{host}} ziet Ontwikkelaarsmodus nog uit staan.",
+        "missing": "Zie je de optie niet?",
+        "hidden": "Deze iPhone verbergt de optie tot Xcode vraagt om hem te tonen.",
+        "hiddenOpen": "Deze iPhone verbergt de optie tot Xcode vraagt om hem te tonen. Open Xcode op {{host}} met deze iPhone aangesloten.",
+        "openXcode": "Xcode openen",
+        "opened": "Xcode is geopend op {{host}}. Kijk opnieuw in Instellingen en sluit Xcode daar daarna.",
+        "unlock": "Aangezet en herstart? De melding met Zet aan verschijnt zodra deze iPhone ontgrendeld is.",
+        "outdated": "De Ackwire AI-app op {{host}} is verouderd. Werk hem bij op die Mac."
       }
     },
     "notice": {
@@ -1981,6 +1992,9 @@
       "access_requestFor": "{{names}} vraagt om {{device}} te gebruiken voor {{person}}",
       "waiting": "{{names}} wacht op {{device}}",
       "waitingFor": "{{names}} wacht op {{device}} voor {{person}}",
+      "tool_request": "{{names}} vraagt je {{tool}} aan te zetten op je {{device}}",
+      "cli_request": "{{names}} vraagt je {{tool}} te installeren op je {{device}}",
+      "folder_request": "{{names}} vraagt je om de map {{path}} op je {{device}}",
       "allowOnce": "Eén keer toestaan",
       "always": "{{name}} altijd toestaan",
       "no": "Nee",
@@ -1993,7 +2007,9 @@
       "other": "Ander apparaat gebruiken",
       "stop": "Stoppen met wachten",
       "useInstead": "Gebruik {{name}} in plaats daarvan",
-      "none": "Geen ander apparaat dat je kunt gebruiken is klaar."
+      "none": "Geen ander apparaat dat je kunt gebruiken is klaar.",
+      "tried": "{{device}} wordt opnieuw geprobeerd.",
+      "stopped": "Er wordt niet meer op {{device}} gewacht."
     }
   },
   "connectors": {
@@ -2042,7 +2058,8 @@
     "everyoneFailed": "De toegang van iedereen kon niet worden gewijzigd. Probeer het opnieuw.",
     "disconnectFailed": "{{name}} kon niet worden losgekoppeld. Probeer het opnieuw.",
     "needsReconnect": "Het account van {{name}} werkt niet meer. Agents kunnen het niet gebruiken tot iemand het opnieuw verbindt.",
-    "noTools": "De tools van {{name}} konden niet worden gelezen. Agents hebben ze pas weer als ze opnieuw worden gelezen, in Tools.",
+    "noTools": "De tools van {{name}} konden niet worden gelezen. Agents hebben ze pas weer als ze opnieuw worden gelezen.",
+    "readAgain": "Opnieuw lezen",
     "accountTitle": "Account",
     "renameFailed": "Naam wijzigen lukte niet. Probeer het opnieuw.",
     "whoTitle": "Wie het gebruikt",
@@ -2109,25 +2126,16 @@
     }
   },
   "joinRequests": {
-    "share": "De link delen",
-    "roles": "Rollen",
-    "rolesHint": "Ze komen erbij met de rollen die aan staan. Zonder rol mogen ze wat Iedereen mag."
+    "share": "De link delen"
   },
   "humanCheck": {
     "title": "Snelle controle",
     "blocked": "De controle is niet geladen. Probeer een ander netwerk."
   },
   "invitePeople": {
-    "emailsHelp": "Plak een lijst of typ. Iedereen krijgt een e-mail en komt er meteen bij.",
-    "here": "Is er al",
-    "invited": "Al uitgenodigd",
-    "fix": "Controleer dit",
-    "channels": "Kanalen",
     "optional": "Optioneel",
     "ok": "OK",
     "noteHelp": "Staat in de e-mail met je naam. Maximaal {{max}} tekens.",
-    "roleHelp": "Verandert wat de persoon krijgt bij het lid worden.",
-    "remove": "Van de lijst halen",
     "sendAgain": "Opnieuw versturen",
     "cancelTitle": "De uitnodiging aan {{email}} intrekken?",
     "cancelText": "De link ervan werkt dan niet meer.",
@@ -2201,7 +2209,6 @@
     "planRowSub": "Logt in op de computer van de agent, zonder sleutel",
     "keyRow": "Een sleutel",
     "keyRowSub": "Je betaalt per gebruik, rechtstreeks aan de aanbieder",
-    "already": "Al in {{org}}",
     "stepOf": "{{step}} van {{total}}"
   },
   "crash": {
@@ -2230,9 +2237,9 @@
     "ofOnline": "{{online}} van {{count}}",
     "deleteName": "{{name}} verwijderen",
     "deleteFoot": "Je hebt 7 dagen om van gedachten te veranderen.",
-    "deleteAlert": "Iedereen is er meteen uit. Herstellen kan 7 dagen lang.",
+    "deleteAlert": "Iedereen kan hem vanaf nu alleen nog lezen. Herstellen kan 7 dagen lang.",
     "deleteAction": "Verwijderen",
-    "deleteIntro": "{{name}} gaat meteen voor iedereen dicht en wordt over 7 dagen definitief verwijderd.",
+    "deleteIntro": "{{name}} wordt meteen voor iedereen alleen-lezen en wordt over 7 dagen definitief verwijderd.",
     "holdDelete": "Ingedrukt houden om te verwijderen",
     "deleteFailed": "De werkruimte kon niet worden verwijderd. Probeer het opnieuw.",
     "access": {
@@ -2243,16 +2250,166 @@
       "tooBig": "Die afbeelding is te groot. Probeer een andere."
     },
     "machine": {
-      "toolsHow": "Tik op een tool die aan staat om hem uit te zetten. Weer aanzetten kan alleen op de computer zelf."
-    },
-    "roles": {
-      "onComputer": "De volgorde van de rollen en het pictogram van elke rol wijzig je op de computer.",
-      "items": "Per onderdeel",
-      "create": "Maken"
+      "toolsHow": "Tik op een tool die aan staat om hem uit te zetten. Weer aanzetten: op de computer zelf, of hier door wie hem heeft gekoppeld.",
+      "toolsHowOwner": "Tik op een tool om hem aan of uit te zetten."
     },
     "import": {
       "preparing": "Het bestand voorbereiden…",
       "failed": "Het bestand kon niet worden gedownload. Probeer het opnieuw."
+    }
+  },
+  "roles": {
+    "create": "Maken",
+    "search": "Rol zoeken",
+    "baseHint": "Geldt voor iedereen in de werkruimte. Rollen komen hier bovenop.",
+    "orderHint": "Wie hoger staat, beheert de rollen en de mensen eronder. De kleur van ieders naam komt van zijn hoogste rol.",
+    "order": "Volgorde",
+    "orderDone": "Klaar",
+    "up": "{{name}} omhoog",
+    "down": "{{name}} omlaag",
+    "orderChanged": "De rollen zijn veranderd terwijl je ze verplaatste. Laad opnieuw en probeer het nog eens.",
+    "none": "Nog geen rollen. Maak er een om sommige mensen meer te geven.",
+    "noMatch": "Geen rol komt overeen met “{{q}}”.",
+    "tooMany": "Deze werkruimte heeft al 100 rollen. Verwijder er een om een nieuwe te maken.",
+    "loadFailed": "De rollen konden niet worden geladen. {{cause}}",
+    "nobody": "Niemand",
+    "reach": {
+      "permissions_one": "{{count}} recht",
+      "permissions_other": "{{count}} rechten",
+      "channels_one": "{{count}} kanaal",
+      "channels_other": "{{count}} kanalen",
+      "agents_one": "{{count}} agent",
+      "agents_other": "{{count}} agents",
+      "more": "+{{what}}",
+      "all": "Mag alles",
+      "owner": "Mag alles, altijd",
+      "none": "Alleen wat Iedereen mag",
+      "baseNone": "Alleen lezen"
+    },
+    "tabs": {
+      "permissions": "Rechten",
+      "channels": "Kanalen",
+      "agents": "Agents"
+    },
+    "addOwners": "Eigenaren toevoegen",
+    "icons": {
+      "shield": "Schild",
+      "code": "Broncode",
+      "wallet": "Portemonnee",
+      "mail": "E-mail",
+      "bolt": "Bliksem",
+      "flag": "Vlag",
+      "book": "Boek",
+      "chart": "Grafiek",
+      "bulb": "Gloeilamp",
+      "globe": "Wereldbol",
+      "pullRequest": "Pull-request",
+      "calendar": "Agenda",
+      "message": "Bericht",
+      "eye": "Oog",
+      "plug": "Stekker",
+      "person": "Persoon"
+    },
+    "inviteWith": "Uitnodigen met deze rol",
+    "searchPermission": "Recht zoeken",
+    "everyoneCan": "Iedereen mag het",
+    "only": "Alleen {{names}}",
+    "notHeld": "Je hebt dit recht niet.",
+    "noPermissionMatch": "Geen recht komt overeen met “{{q}}”.",
+    "advanced": "Geavanceerd",
+    "peopleOnly": "Rollen gelden voor mensen. Elke agent heeft eigen rechten, op zijn pagina.",
+    "nowAbove": "Deze rol staat nu boven de jouwe. Alleen iemand hoger kan hem wijzigen.",
+    "admin": {
+      "title": "Beheerder aanzetten voor {{name}}?",
+      "text": "Wie {{name}} heeft, mag dan alles behalve wat alleen de eigenaar mag.",
+      "count_one": "Dat is {{count}} persoon.",
+      "count_other": "Dat zijn {{count}} mensen.",
+      "on": "Beheerder aanzetten",
+      "note": "Met Beheerder mag {{name}} alles behalve wat alleen de eigenaar mag."
+    },
+    "computers": {
+      "title": "Computers van agents",
+      "hint": "Browser: de browser en de inlogverzoeken. Computer: ook het hele scherm en de terminal. Eigen agents: die waar de persoon verantwoordelijk voor is en de computers die die persoon heeft gekoppeld.",
+      "steps": {
+        "0": "Gebruikt geen",
+        "1": "Browser van eigen agents",
+        "2": "Computer van eigen agents",
+        "3": "Browser van elke agent",
+        "4": "Computer van elke agent"
+      },
+      "stepsIn": {
+        "1": "de browser van eigen agents",
+        "2": "de computer van eigen agents",
+        "3": "de browser van elke agent",
+        "4": "de computer van elke agent"
+      },
+      "everyoneTo": "Iedereen krijgt {{step}}.",
+      "everyoneNone": "Iedereen stopt met de computers van agents."
+    },
+    "whoCan": "Wie mag",
+    "everyoneSub": "Iedereen in de werkruimte",
+    "someRoles": "Alleen sommige rollen",
+    "losing": "Verliezen het: {{names}}.",
+    "nobodyLoses": "Niemand verliest iets.",
+    "everyoneGets": "Iedereen krijgt het.",
+    "ownersAlways": "Eigenaren mogen het altijd.",
+    "noOtherRoles": "Er zijn nog geen andere rollen.",
+    "channels": {
+      "header": "Wie {{name}} heeft, ziet",
+      "headerBase": "Iedereen ziet",
+      "hint": "Dit gaat over mensen. Een agent komt in een kanaal als iemand hem toevoegt.",
+      "search": "Kanaal zoeken",
+      "everyone": "Iedereen ziet het",
+      "private": "Privé",
+      "general": "Iedereen blijft in #general.",
+      "locked": "Alleen wie #{{channel}} heeft gemaakt of kanalen ordent, wijzigt wie het ziet.",
+      "leaveTitle": "#{{channel}} weghalen bij {{name}}?",
+      "leave_one": "{{names}} verlaat het kanaal.",
+      "leave_other": "{{names}} verlaten het kanaal.",
+      "leaveAction": "Weghalen",
+      "openTitle": "#{{channel}} openen voor {{name}}?",
+      "openText": "Wie {{name}} heeft, ziet het kanaal en de hele geschiedenis en kan meedoen.",
+      "openAction": "Openen",
+      "openAllTitle": "#{{channel}} openen voor iedereen?",
+      "openAllText": "De hele geschiedenis komt open voor de werkruimte.",
+      "admin": "Met Beheerder ziet wie {{name}} heeft alle kanalen.",
+      "onlyGeneral": "Er is voorlopig alleen #general.",
+      "noMatch": "Geen kanaal komt overeen met “{{q}}”.",
+      "ungrouped": "Kanalen",
+      "whoSees": "Wie ziet",
+      "allSub": "Iedereen in de werkruimte ziet het en kan meedoen.",
+      "invited": "Alleen wie wordt toegevoegd",
+      "invitedSub": "Niemand nieuw ziet het. Wie erin zit, blijft.",
+      "unsee": "Wie erin zit, blijft. Zien het niet meer: {{names}}."
+    },
+    "agents": {
+      "header": "Wie {{name}} heeft, praat met",
+      "headerBase": "Iedereen praat met",
+      "hint": "Dit gaat over mensen. Wat elke agent doet, staat op zijn pagina.",
+      "everyone": "Iedereen praat ermee",
+      "gate": "Wie alleen {{name}} heeft, praat niet met agents.",
+      "gateOn": "Met agents praten aanzetten",
+      "locked": "Alleen {{owner}}, verantwoordelijk voor {{name}}, of wie elke agent bewerkt, wijzigt dit.",
+      "locked_female": "Alleen {{owner}}, verantwoordelijk voor {{name}}, of wie elke agent bewerkt, wijzigt dit.",
+      "lockedNoOwner": "Alleen wie elke agent bewerkt, wijzigt dit.",
+      "none": "Nog geen agents.",
+      "some": "Alleen sommige rollen en mensen",
+      "addPerson": "Persoon toevoegen",
+      "losing": "Praten niet meer met {{agent}}: {{names}}."
+    },
+    "people": {
+      "removed": "{{person}} heeft {{name}} niet meer",
+      "selfTitle": "Jezelf uit {{name}} halen?",
+      "selfText": "Je verliest wat alleen {{name}} geeft. Alleen iemand boven je geeft het terug."
+    },
+    "mail": {
+      "title_one": "Een agent verliest een mailbox",
+      "title_other": "Agents verliezen {{count}} mailboxen",
+      "loses": "{{agent}} verliest {{address}}, de mailbox van {{owner}}.",
+      "losesAddress": "{{agent}} verliest de mailbox {{address}}.",
+      "only": "Alleen wie een mailbox gaf, geeft hem opnieuw.",
+      "addAnyway": "Toch toevoegen",
+      "giveAnyway": "Toch geven"
     }
   },
   "vault": {
@@ -2291,7 +2448,7 @@
     },
     "import": {
       "title": "Importeren vanaf een computer",
-      "text": "Om wachtwoorden uit een browser of wachtwoordmanager over te zetten, open je op het web Instellingen, Vault en kies je Importeren."
+      "text": "Om wachtwoorden uit een browser of wachtwoordmanager over te zetten, importeer je ze op het web."
     },
     "connections": {
       "text": "Koppel een wachtwoordmanager en je agenten gebruiken de logins die daar staan. Er wordt niets gekopieerd: een wachtwoord wordt pas gelezen als het nodig is.",
@@ -2491,7 +2648,6 @@
   },
   "dashboards": {
     "homeRow": "Alleen jij · je eigen widgets",
-    "loadFailed": "De dashboards konden niet worden geladen.",
     "create": "Maken",
     "routineTarget": "zijn widget",
     "pin": {
@@ -2529,7 +2685,6 @@
     },
     "formatAuto": "{{name}} kiest de beste",
     "newWidget": {
-      "titleHint": "Titel · {{name}} stelt er een voor bij het testen",
       "alerts": "Melding aan",
       "realData": "Echte gegevens",
       "editAsk": "Vraag wijzigen",
@@ -2704,5 +2859,11 @@
       "title": "Niets te controleren",
       "text": "Als een agent iets buiten het gesprek doet, verschijnt het hier."
     }
+  },
+  "surface": {
+    "on": "Aan",
+    "codeText": "Stuur het bericht dat daar opent en kom dan hier terug.",
+    "openFailed": "{{surface}} kon niet openen op deze telefoon. Stuur de code hieronder er zelf heen.",
+    "orType": "Of stuur deze code daar"
   }
 }

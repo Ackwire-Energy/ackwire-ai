@@ -26,6 +26,7 @@ import {
   Dialog,
   DialogFooter,
   DialogSearchList,
+  HintLine,
   Icon,
   type IconName,
   Locked,
@@ -100,7 +101,7 @@ function RepoEntry({
   );
 }
 
-/** Under the GitHub row: "Em quais repositórios", the chips, "Mudar". */
+/** Under the GitHub row, one line: "Em quais repositórios" (the rest behind its ⓘ), the chips, "Mudar". */
 export function ReposBlock() {
   const { t } = useTranslation();
   const { org } = useOrg();
@@ -113,18 +114,24 @@ export function ReposBlock() {
   const start = r.list.find(exists);
   return (
     <div className="agp-repos">
-      <span className="agp-repos__label">
-        {t("repos.label")}
-        {changeOf("repos") && <ChangedTag changeKey="repos" />}
-      </span>
-      <span className="agp-chips">
+      <span className="agp-repos__line">
+        <span className="agp-repos__label">
+          <HintLine
+            name={t("common.about", { label: t("repos.label") })}
+            hint={
+              <>
+                <b>{t("repos.realTitle")}</b> {t("repos.realText", g)}
+                {r.mode === "all" && ` ${t("repos.allHelp", g)}`}
+              </>
+            }
+          >
+            {t("repos.label")}
+          </HintLine>
+        </span>
         {r.mode === "all" ? (
-          <>
-            <Chip icon="globe">{t("repos.all")}</Chip>
-            <span className="small muted">{t("repos.allHelp", g)}</span>
-          </>
+          <Chip icon="globe">{t("repos.all")}</Chip>
         ) : r.list.length === 0 ? (
-          <span className="small muted">{t("repos.noneChosen")}</span>
+          <span className="muted">{t("repos.noneChosen")}</span>
         ) : (
           r.list.map((e, i) => (
             <RepoEntry
@@ -139,10 +146,11 @@ export function ReposBlock() {
           ))
         )}
         {editable && (
-          <Button size="sm" variant="ghost" icon="edit" onClick={() => pickRepos()}>
+          <Button variant="link" onClick={() => pickRepos()}>
             {r.mode === "all" ? t("repos.choose") : t("repos.change")}
           </Button>
         )}
+        {changeOf("repos") && <ChangedTag changeKey="repos" />}
       </span>
       {r.mode === "some" && r.list.length > 1 && start && (
         <span className="small muted agp-repos__start">
@@ -177,10 +185,14 @@ export function MergeReposBlock() {
   if (!merge.data || (list.length === 0 && !editable)) return null;
   return (
     <div className="agp-repos">
-      <span className="agp-repos__label">{t("repos.merge.label")}</span>
-      <span className="agp-chips">
+      <span className="agp-repos__line">
+        <span className="agp-repos__label">
+          <HintLine name={t("common.about", { label: t("repos.merge.label") })} hint={t("repos.merge.help")}>
+            {t("repos.merge.label")}
+          </HintLine>
+        </span>
         {list.length === 0 ? (
-          <span className="small muted">{t("repos.merge.none")}</span>
+          <span className="muted">{t("repos.none")}</span>
         ) : (
           list.map((repo) => (
             <Chip key={repo} icon="repo">
@@ -189,12 +201,11 @@ export function MergeReposBlock() {
           ))
         )}
         {editable && (
-          <Button size="sm" variant="ghost" icon="edit" onClick={() => setPicking(true)}>
+          <Button variant="link" onClick={() => setPicking(true)}>
             {list.length === 0 ? t("repos.choose") : t("repos.change")}
           </Button>
         )}
       </span>
-      <span className="small muted">{t("repos.merge.help")}</span>
       {picking && <MergeRepoDialog chosen={list} onClose={() => setPicking(false)} />}
     </div>
   );

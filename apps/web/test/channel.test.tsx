@@ -137,7 +137,8 @@ describe("Canal", () => {
     expect(screen().getByText("Os 401 no Sentry caíram de 312 para 4.")).toBeTruthy();
   });
 
-  test("a failed run explains why", async () => {
+  /** Atlas's run in #engenharia failing with `failure` (the stored error and what the server derives from it). */
+  const failRun = async (failure: Record<string, unknown>) => {
     const { socket } = await open();
     await act(async () =>
       socket.push({
@@ -150,12 +151,30 @@ describe("Canal", () => {
           runId: "r-x",
           agentId: ATLAS_ID,
           status: "failed",
-          error: "budget_exceeded",
+          ...failure,
         },
       }),
     );
     await settle();
-    expect(screen().getByRole("alert").textContent).toContain("Atlas não conseguiu responder: budget_exceeded");
+    return screen().getByRole("alert").textContent ?? "";
+  };
+
+  test("a failed run explains why", async () => {
+    // As the server sends it: the stored code and the stable one the app words.
+    expect(await failRun({ error: "budget_exceeded", errorCode: "run.budget_exceeded" })).toContain(
+      "Atlas não conseguiu responder: o orçamento do mês acabou",
+    );
+  });
+
+  test("a failed run whose reason is a bare code says it couldn't answer, never the code", async () => {
+    // What a code the server doesn't know becomes: a generic failure with the code as its detail.
+    const line = await failRun({
+      error: "unsupported",
+      errorCode: "run.failed",
+      errorParams: { detail: "unsupported" },
+    });
+    expect(line).toContain("Atlas não conseguiu responder. Tente de novo.");
+    expect(line).not.toContain("unsupported");
   });
 
   test("a connector's request says its values in words, waiting and decided, so two calls of one tool differ", async () => {
@@ -212,6 +231,8 @@ describe("Canal", () => {
     expect([...(card.querySelector(".rq__foot")?.querySelectorAll("button") ?? [])].map((b) => b.textContent)).toEqual([
       "Aprovar todos",
       "Agora não para todos",
+      // Under the decision, on its own line.
+      "Mudar quando perguntar",
     ]);
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Ver cada um" })));
     expect(card.querySelectorAll(".rq__item")).toHaveLength(3);
@@ -323,8 +344,8 @@ describe("Canal", () => {
       "Aprovar sempre",
       "Agora não para todos",
     ]);
-    // Only buttons: what it covers is the button's tip and description.
-    expect([...foot.children].every((el) => el.matches("button, .rq__end"))).toBe(true);
+    // Only buttons, and the quiet link under them: what it covers is the button's tip and description.
+    expect([...foot.children].every((el) => el.matches("button, .rq__end, .rq__under"))).toBe(true);
     expect(within(foot).getByRole("button", { name: "Aprovar sempre" }).getAttribute("aria-description")).toContain(
       "de agora em diante",
     );
@@ -379,7 +400,7 @@ describe("Canal", () => {
     expect(text).toContain("Month: 2026-12");
   });
 
-  test("a request in the conversation: approve calls the API, shrinks to one line; events update it", async () => {
+  test("a request in the conversation: approve calls the API, the card stays and says who approved; events update it", async () => {
     const r0 = await open();
     const { state, socket } = r0;
     // It lives on the agent message with meta.approvalId: the agent asking, the action in one line.
@@ -393,12 +414,24 @@ describe("Canal", () => {
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Aprovar merge" })));
     await settle(4);
     expect(state.calls.find((c) => c.method === "approvals.approve")?.args).toEqual([ORG_ID, "ap-merge", undefined]);
+    // The same card: what it asked and its action stay, and who approved, and when, stand where the buttons were.
     const done = screen().getByRole("group", { name: "Aprovação concluída" });
-    expect(done.textContent).toContain("Aprovado por você: Fazer um merge");
-    expect(done.querySelector(".rq-done__text b")?.textContent).toBe("Fazer um merge");
-    expect(done.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
-    // Nothing behind the line: no reason to show.
-    expect(within(done).queryByRole("button")).toBeNull();
+    expect(done.classList.contains("rq")).toBe(true);
+    expect(done.classList.contains("rq--ended")).toBe(true);
+    expect(done.querySelector(".rq__lead")?.textContent).toBe("Preciso de um ok para seguir:");
+    expect(done.querySelector(".rq__wt b")?.textContent).toBe("Fazer um merge");
+    const answer = done.querySelector(".rq__foot.rq__answer") as HTMLElement;
+    expect(answer.querySelector(".rq__answer-text")?.textContent).toBe("Aprovado por você");
+    expect(answer.querySelector(".rq__answer-time")?.textContent).toBe("agora");
+    expect(answer.querySelector(".rq-done__mark[data-done]")).not.toBeNull();
+    // Nothing left to decide: no button but the one that opens its details, and the bar never brings it back.
+    expect(
+      within(done)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Ver detalhes"]);
+    expect(done.hasAttribute("data-ask-id")).toBe(false);
+    expect(done.hasAttribute("data-ask-mine")).toBe(false);
     // Someone else refuses another approval: the event updates the card live.
     const deploy = {
       ...state.approvals[1],
@@ -435,14 +468,13 @@ describe("Canal", () => {
       expect(bar.textContent).toContain("Fazer um merge");
       await act(async () => fireEvent.click(within(bar).getByRole("button", { name: "Ver" })));
       expect(card.classList.contains("rq--flash")).toBe(true);
-      // Ada at work meanwhile: the line still says the request, and keeps her stop at its end.
+      // Ada at work meanwhile: the line still says the request (no stop in it), and the composer stops her.
       const run = { type: "agent.run", channelId: ENG_ID, threadId: null, runId: "r-live", agentId: ADA_ID };
       await act(async () => socket.push({ type: "event", channelId: ENG_ID, event: { ...run, status: "running" } }));
       await settle(2);
       expect(bar.textContent).toContain("Ada espera sua aprovação");
-      const stop = within(bar).getByRole("button", { name: "Parar" });
-      expect(bar.lastElementChild?.contains(stop)).toBe(true);
-      await act(async () => fireEvent.click(stop));
+      expect(within(bar).queryByRole("button", { name: "Parar" })).toBeNull();
+      await act(async () => fireEvent.click(screen().getByRole("button", { name: "Parar a Ada" })));
       await settle(2);
       expect(state.calls.some((c) => c.method === "agents.cancelRun")).toBe(true);
     } finally {
@@ -485,7 +517,7 @@ describe("Canal", () => {
     expect(expired.querySelector(".rq-done__mark[data-done]")).toBeNull();
   }, 15_000);
 
-  test("a refused request is one line: 'Ver detalhes' opens its reason under the line and closes it", async () => {
+  test("a refused request keeps its card: 'Ver detalhes' opens its reason with the action and closes it", async () => {
     const state = seedState();
     const merge = state.approvals.find((a) => a.id === "ap-merge");
     if (merge)
@@ -498,14 +530,15 @@ describe("Canal", () => {
     await open(state);
     await settle(2);
     const line = screen().getByRole("group", { name: "Pedido recusado" });
-    expect(line.textContent).toContain("Recusado por você: Fazer um merge");
+    expect(line.querySelector(".rq__wt b")?.textContent).toBe("Fazer um merge");
+    expect(line.querySelector(".rq__answer-text")?.textContent).toBe("Recusado por você");
     expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
     expect(line.textContent).not.toContain("Falta a revisão.");
     const see = within(line).getByRole("button", { name: "Ver detalhes" });
     expect(see.getAttribute("aria-expanded")).toBe("false");
     await act(async () => fireEvent.click(see));
     expect(see.getAttribute("aria-expanded")).toBe("true");
-    expect(line.querySelector(".rq__details")?.textContent).toBe("Motivo: Falta a revisão.");
+    expect(line.querySelector(".rq__details")?.textContent).toContain("Motivo: Falta a revisão.");
     await act(async () => fireEvent.click(see));
     expect(see.getAttribute("aria-expanded")).toBe("false");
     expect(line.querySelector(".rq__details")).toBeNull();
@@ -518,7 +551,8 @@ describe("Canal", () => {
     await open(state);
     await settle(2);
     const line = screen().getByRole("group", { name: "Pedido cancelado" });
-    expect(line.textContent).toContain("Cancelado: Fazer um merge");
+    expect(line.querySelector(".rq__wt b")?.textContent).toBe("Fazer um merge");
+    expect(line.querySelector(".rq__answer-text")?.textContent).toBe("Cancelado");
     expect(line.querySelector(".rq-done__mark[data-done]")).toBeNull();
   });
 

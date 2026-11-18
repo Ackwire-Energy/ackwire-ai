@@ -37,12 +37,6 @@
   overflow: hidden;
   color: inherit;
   text-decoration: none;
-  transition:
-    box-shadow 0.15s,
-    transform 0.15s;
-}
-.db-card:hover {
-  transform: translateY(-1px);
 }
 html:not([data-pointer]) .db-card:focus-visible {
   outline: none;
@@ -169,9 +163,20 @@ html:not([data-pointer]) .db-card:focus-visible {
 }
 .db-by {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   min-width: 0;
+}
+
+/* A creator's face follows the first line of a name that wraps. */
+.db-by > .ac-avatar {
+  line-height: inherit;
+  translate: 0 calc(11px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .db-by > .ac-avatar {
+    translate: 0 calc(0.5lh - var(--cap-mid) - 50%);
+  }
 }
 
 /* An agent's request to publish the board (ADR 0135 §11): a line in its tone above the grid. */
@@ -504,13 +509,15 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
 .nwc[data-size="s"] .nwc-building {
   display: none;
 }
-/* The title, written on the card: quiet text until the pointer or the keys reach it. */
+/* The title, written on the card: quiet text until the pointer or the keys reach it. Its box stands a step further
+   from the face and from what follows than the head's gap, so the focus ring drawn outside it still keeps that gap,
+   and grows only up and down past its line. */
 .nwc__title {
   flex: 1;
   min-width: 0;
   box-sizing: border-box;
-  margin: -3px -6px;
-  padding: 3px 6px;
+  margin: calc(-1 * var(--space-1)) var(--space-1);
+  padding: var(--space-1);
   border: 0;
   border-radius: 7px;
   background: none;
@@ -521,6 +528,10 @@ html:not([data-pointer]) .nw-quiet:focus-visible {
   color: var(--ink2);
   outline: none;
   text-overflow: ellipsis;
+}
+/* No face before it (a pin with no block picked yet): its words start on the card's text edge. */
+.nwc__title:first-child {
+  margin-inline-start: calc(-1 * var(--space-1));
 }
 .nwc__title:hover {
   box-shadow: inset 0 0 0 1px var(--line2);
@@ -1003,10 +1014,5 @@ html:not([data-pointer]) :is(.nw-sug, .nw-pick, .nw-alert__sugs button):focus-vi
   }
   .nw-build__still {
     transition: none;
-  }
-  .db-card,
-  .db-card:hover {
-    transition: none;
-    transform: none;
   }
 }

@@ -1,4 +1,5 @@
 import {
+  useAiStatusSince,
   useConfirmWidget,
   useDashboards,
   useHomeDashboard,
@@ -11,6 +12,8 @@ import {
   type WidgetFormat,
   type WidgetSchedule,
   type WidgetSuggestion,
+  widgetAiReady,
+  widgetNeedsAi,
   widgetStepWords,
 } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
@@ -25,7 +28,8 @@ import {
 } from "@agenteschat/ui/widgets/spec";
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -47,12 +51,12 @@ import {
 import { router } from "@/ui/navigation";
 import { boardHref } from "../links/logic";
 import { useFailed } from "../routines/hooks";
+import { useUnsavedGuard } from "../settings/parts";
 import { AgentFace } from "../shared/Face";
 import { useDirectory, useNow, useOrgId } from "../shared/hooks";
 import { goBack, PushedHeader, successHaptic, tapHaptic } from "../shared/parts";
-import { SheetHostProvider } from "../shared/SheetHost";
 import { closeAgentPick, openAgentPick } from "./agent-pick";
-import { useAgentLook, useWidgetWords } from "./hooks";
+import { useAgentLook, useWidgetAiWay, useWidgetWords } from "./hooks";
 import {
   asksInCard,
   confirmTitle,
@@ -66,12 +70,15 @@ import {
   testPhase,
 } from "./logic";
 import { type PickItem, usePickMenu } from "./menu";
+import { closeOptionPick, openOptionPick } from "./option-pick";
 import { KindGlyph } from "./parts";
 import { BuildingSweep, WidgetBody, WidgetCard } from "./WidgetView";
 
 /** The longest ask and alert condition the server takes (ADR 0135). */
 const PROMPT_MAX = 2000;
 const CONDITION_MAX = 200;
+/** Between a focused field and the keyboard when the page scrolls it into view (the settings' pages' room). */
+const FIELD_CLEARANCE = 24;
 
 /**
  * "New widget", pushed (never a sheet; ADR 0135). The card is the form: the ask is typed inside the card, with the
@@ -81,17 +88,11 @@ const CONDITION_MAX = 200;
  * ask folds into one line that opens it again, and "Create" confirms the draft. While it builds the card says the step
  * its agent is in and for how long, and Stop ends the build with the ask as it was typed. Changing the ask, the agent or the
  * format after a test marks it stale (Test again); a failed test says why, with Try again. Where it goes sits under the
- * card. Testing again or leaving deletes the draft. `dashboardId`: the board it starts on (`home` for My Home).
+ * card. Testing again or leaving deletes the draft; leaving with an ask typed asks first. The page scrolls a focused field
+ * clear of the keyboard on both systems, and no field takes the focus as it opens (the ask does when its folded line is
+ * tapped). `dashboardId`: the board it starts on (`home` for My Home).
  */
 export function NewWidgetScreen({ dashboardId }: { dashboardId: string }) {
-  return (
-    <SheetHostProvider>
-      <NewWidget dashboardId={dashboardId} />
-    </SheetHostProvider>
-  );
-}
-
-function NewWidget({ dashboardId }: { dashboardId: string }) {
   const { t } = useTranslation();
   const { colors: c } = useTheme();
   const insets = useSafeAreaInsets();
@@ -116,7 +117,6 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   const [alert, setAlert] = useState(false);
   const [condition, setCondition] = useState("");
   const [dest, setDest] = useState(dashboardId);
-  const [pickDest, setPickDest] = useState(false);
   // The test: the draft it made (as it came back, until its live view loads), and what it was asked with.
   const [tested, setTested] = useState<{ widget: Widget; key: string } | null>(null);
   // The person's title; null keeps the agent's (it names the draft when the test is done).
@@ -126,6 +126,8 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   // A test being sent, and when the build under way started.
   const [sending, setSending] = useState(false);
   const [since, setSince] = useState(0);
+  // An ask typed and not on a board yet: a back swipe asks before it (and its draft) go.
+  const leave = useUnsavedGuard(text.trim() !== "");
   // The first agent until the person picks one.
   useEffect(() => {
     const first = agents[0];
@@ -144,6 +146,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     return () => {
       live.current.gone = true;
       closeAgentPick();
+      closeOptionPick();
       const id = live.current.draftId;
       if (id && !live.current.confirmed) {
         live.current.draftId = null;
@@ -164,6 +167,12 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
   const draftQ = useWidgetDraft(orgId, tested?.widget.id ?? null);
   // A draft that is gone (swept, or removed elsewhere) is no test any more.
   const draft: Widget | null = tested && !draftQ.isError ? (draftQ.data ?? tested.widget) : null;
+  // Its agent has no AI: the test waits for one (no build started), and runs again once one is connected.
+  const needsAi = Boolean(draft && widgetNeedsAi(draft));
+  const aiWay = useWidgetAiWay(needsAi ? draft?.agentId : null, draft?.failure?.detail);
+  const aiStatus = useAiStatusSince(orgId, needsAi);
+  const aiBack = Boolean(draft && widgetAiReady(draft, aiStatus));
+  const retested = useRef(false);
   const currentKey = testKeyOf(text, agentId, format);
   const phase = testPhase({ pending: sending, draft, testedKey: tested?.key ?? null, currentKey });
   const barLabel = newWidgetBarLabel(phase);
@@ -241,6 +250,14 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
       });
   };
 
+  // Once per screen: a status the server still disagrees with can't test again and again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `runTest` changes each render; once its agent has an AI
+  useEffect(() => {
+    if (!aiBack || retested.current) return;
+    retested.current = true;
+    runTest();
+  }, [aiBack]);
+
   /** Stop: the build ends (its draft goes, and its run with it) and the ask is back as it was typed. */
   const stop = () => {
     live.current.run += 1;
@@ -269,6 +286,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
         onSuccess: () => {
           successHaptic();
           toast({ title: t("dashboards.newWidget.created", { where }), agentId: draft.agentId });
+          leave();
           // From the board it goes on: back to it; else to that board.
           if (destination && destination.id === dashboardId) goBack();
           else router.replace(boardHref(destination?.id));
@@ -281,6 +299,20 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
     );
   };
 
+  /** Where it goes: the boards, pushed (the choice comes back through `option-pick`). */
+  const openDestinations = () => {
+    openOptionPick({
+      title: t("dashboards.newWidget.destination"),
+      value: destination?.id ?? null,
+      options: destinations.map((d) => ({
+        key: d.id,
+        icon: d.home ? "home" : "chart",
+        label: d.home ? t("dashboards.home") : (d.title ?? ""),
+      })),
+      apply: setDest,
+    });
+    router.push("/option-pick");
+  };
   /** "Who looks after it": its own screen, pushed (the choice comes back through `agent-pick`). */
   const openAgents = () => {
     if (agents.length === 0) return;
@@ -346,11 +378,7 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
       <TextInput
         value={titleValue}
         onChangeText={setTitle}
-        placeholder={
-          draft
-            ? t("mobile.dashboards.widget.titlePlaceholder")
-            : t("mobile.dashboards.newWidget.titleHint", { name: look.name })
-        }
+        placeholder={t("dashboards.newWidget.titleField")}
         placeholderTextColor={c.faint}
         accessibilityLabel={t("mobile.dashboards.widget.title")}
         maxLength={WIDGET_LIMITS.title}
@@ -486,10 +514,37 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
       </Locked>
     );
   } else if (phase === "testing") {
+    // The test's run waits (its plan, its budget, its computer): what for, in place of the step it is in.
+    const waits = draft ? widgetWords.wait(draft) : "";
     body = (
       <View style={styles.gap10}>
-        <BuildingSweep color={look.color} text={widgetStepWords(t, draftQ.data?.step)} height={44} />
-        <BuildClock since={since} onStop={stop} />
+        <BuildingSweep
+          color={look.color}
+          text={waits || widgetStepWords(t, draftQ.data?.step)}
+          height={44}
+          still={Boolean(waits)}
+        />
+        <BuildClock since={since} onStop={stop} waiting={Boolean(waits)} />
+      </View>
+    );
+  } else if (phase === "failed" && draft && needsAi) {
+    body = (
+      <View style={styles.failed}>
+        {/* No icon before it: it wraps, and would start in from the lines under it. */}
+        <Text variant="footnote" style={{ color: c.warn }}>
+          {widgetWords.failure(draft)}
+        </Text>
+        <Text variant="footnote" tone="muted">
+          {t("widgets.needsAi.body", { name: look.name })}
+        </Text>
+        {aiWay && "locked" in aiWay ? (
+          <Text variant="footnote" tone="muted">
+            {aiWay.locked}
+          </Text>
+        ) : null}
+        {aiWay && "connect" in aiWay ? (
+          <Button size="sm" variant="secondary" label={t("noAi.action")} onPress={aiWay.connect} />
+        ) : null}
       </View>
     );
   } else if (phase === "failed" && draft) {
@@ -582,10 +637,12 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
             : { label: t(`dashboards.newWidget.${barLabel}`), disabled: !ready, onPress: runTest }
         }
       />
-      <ScrollView
+      <KeyboardAwareScrollView
+        style={styles.screen}
         contentInsetAdjustmentBehavior="automatic"
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+        bottomOffset={FIELD_CLEARANCE}
         contentContainerStyle={[styles.in, { paddingBottom: 24 + insets.bottom }]}
       >
         <WidgetCard
@@ -627,39 +684,26 @@ function NewWidget({ dashboardId }: { dashboardId: string }) {
                 label={t("dashboards.newWidget.destination")}
                 value={where}
                 chevron
-                onPress={() => setPickDest((v) => !v)}
+                onPress={openDestinations}
               />
-              {pickDest
-                ? destinations.map((d) => (
-                    <GroupedRow
-                      key={d.id}
-                      label={d.home ? t("dashboards.home") : (d.title ?? "")}
-                      checked={d.id === destination?.id}
-                      onPress={() => {
-                        setDest(d.id);
-                        setPickDest(false);
-                      }}
-                    />
-                  ))
-                : null}
             </GroupedList>
           </>
         ) : null}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
 
 /**
  * Under a build: how long it has taken, Stop at the row's end, and past a while one quiet line that it is still at
- * it. Its own component, so only it redraws each second.
+ * it (not while its run waits: the sweep says what for). Its own component, so only it redraws each second.
  */
-function BuildClock({ since, onStop }: { since: number; onStop: () => void }) {
+function BuildClock({ since, onStop, waiting }: { since: number; onStop: () => void; waiting: boolean }) {
   const { t } = useTranslation();
   const elapsed = Math.max(0, useNow(1000) - since);
   return (
     <View style={styles.gap8}>
-      {elapsed >= WIDGET_STILL_MS ? (
+      {!waiting && elapsed >= WIDGET_STILL_MS ? (
         <Animated.View entering={FadeIn.duration(200)}>
           <Text variant="caption" tone="faint">
             {t("dashboards.newWidget.stillWorking")}
@@ -685,7 +729,7 @@ const SIZES_PAD = 2;
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   in: { paddingHorizontal: 16, paddingTop: 8 },
-  head: { flexDirection: "row", alignItems: "center", gap: 6, minWidth: 0 },
+  head: { flexDirection: "row", alignItems: "center", gap: 8, minWidth: 0 },
   titleInput: { flex: 1, minWidth: 0, paddingVertical: 4, ...fieldText("footnote", "600") },
   okBadge: { width: 22, height: 22, borderRadius: 6, alignItems: "center", justifyContent: "center" },
   bell: {

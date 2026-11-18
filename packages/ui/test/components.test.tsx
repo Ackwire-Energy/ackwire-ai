@@ -14,6 +14,7 @@ import {
   CardFooter,
   CardHeader,
   Chip,
+  ColorDot,
   Composer,
   EventPill,
   FilterChip,
@@ -34,12 +35,56 @@ import {
   Meter,
   RunMark,
   Steps,
+  StepTrack,
+  type StepTrackStep,
   Textarea,
 } from "../src";
 
 const body = () => within(document.body);
 
 describe("Button", () => {
+  test("variant link: the words alone as a button, with none of a button's box classes", () => {
+    const { getByRole } = render(
+      <>
+        <Button variant="link" size="sm" block>
+          Editar
+        </Button>
+        <Button variant="link" className="ac-link--danger" disabled>
+          Remover a chave de um nome bem comprido
+        </Button>
+      </>,
+    );
+    const edit = getByRole("button", { name: "Editar" });
+    expect(edit.className).toBe("ac-link ac-link--action");
+    expect(edit.getAttribute("type")).toBe("button");
+    const remove = getByRole("button", { name: /^Remover/ }) as HTMLButtonElement;
+    expect(remove.className).toBe("ac-link ac-link--action ac-link--danger");
+    expect(remove.disabled).toBe(true);
+  });
+
+  test("its words are one label a narrow place can cut, its icon and keys beside it; an element child stays as written", () => {
+    render(
+      <>
+        <div>
+          <Button icon="message">Falar com o Assistente de Atendimento</Button>
+        </div>
+        <div>
+          <Button kbd={["⌘", "↵"]}>Enviar {2} itens</Button>
+        </div>
+        <div>
+          <Button>
+            <b>Negrito</b>
+          </Button>
+        </div>
+      </>,
+    );
+    const talk = body().getByRole("button", { name: "Falar com o Assistente de Atendimento" });
+    expect([...talk.children].map((c) => c.getAttribute("class"))).toEqual(["ac-icon", "ac-btn__label"]);
+    const send = body().getByRole("button", { name: /^Enviar 2 itens/ });
+    expect(send.querySelector(":scope > .ac-btn__label")?.textContent).toBe("Enviar 2 itens");
+    expect(body().getByRole("button", { name: "Negrito" }).querySelector(".ac-btn__label")).toBeNull();
+  });
+
   test("variants map to the design classes; default type is button", () => {
     render(
       <>
@@ -88,6 +133,19 @@ describe("Button", () => {
     );
     const link = body().getByRole("link", { name: "Entrar" });
     expect(link.className).toContain("ac-btn--primary");
+  });
+
+  test("asChild and disabled: the link takes no click and no Tab stop, as a button that is off", () => {
+    render(
+      <Button asChild disabled>
+        <a href="/x">Entrar</a>
+      </Button>,
+    );
+    const link = body().getByRole("link", { name: "Entrar" });
+    expect(link.getAttribute("aria-disabled")).toBe("true");
+    expect(link.tabIndex).toBe(-1);
+    // False: the click's own effect (following the link) was called off.
+    expect(fireEvent.click(link)).toBe(false);
   });
 });
 
@@ -394,7 +452,7 @@ describe("single-line controls", () => {
       ".ac-palette__q input",
       ".ac-seg__item",
       ".ac-filtertoggle",
-      ".ac-composer__pill,\n.ac-composer__agent",
+      ".ac-composer__pill",
       ".ac-recur__day",
       ".ac-react",
     ]) {
@@ -689,11 +747,13 @@ describe("Menu", () => {
     const menu = body().getByRole("menu");
     const box = within(menu).getByRole("menuitemcheckbox");
     expect(box.getAttribute("aria-checked")).toBe("false");
+    // A box that stays open is a multi-pick: the kit's checkbox at its end, ticked or not.
     expect([...box.children].map((c) => c.getAttribute("class"))).toEqual([
       "ac-menu__label",
       "ac-menu__hint",
-      "ac-menu__check",
+      "ac-check ac-menu__box",
     ]);
+    expect(box.querySelector(".ac-menu__box")?.getAttribute("data-state")).toBe("unchecked");
     const radios = within(menu).getAllByRole("menuitemradio");
     expect(radios.map((r) => r.getAttribute("aria-checked"))).toEqual(["true", "false"]);
     expect(radios.map((r) => [...r.children].map((c) => c.getAttribute("class")))).toEqual([
@@ -719,8 +779,9 @@ describe("Menu", () => {
     expect([...box.children].map((c) => c.getAttribute("class")?.split(" ")[0])).toEqual([
       "ac-icon",
       "ac-menu__label",
-      "ac-menu__check",
+      "ac-check",
     ]);
+    expect(box.querySelector(".ac-menu__box")?.getAttribute("data-state")).toBe("checked");
   });
 
   test("quick reactions end with a cell that opens every emoji", async () => {
@@ -866,6 +927,73 @@ describe("Logo, Icon, Meter", () => {
     expect((meter.firstElementChild as HTMLElement).style.width).toBe("31%");
   });
 
+  test("step track: nodes carry no words, one line tells one step whole (the waiting one, else the pointed or pressed)", () => {
+    const long = "Rodou: git log --oneline origin/main..HEAD -- packages/engine/src/context/memory.ts";
+    const steps: StepTrackStep[] = [
+      ...Array.from({ length: 12 }, (_, i) => ({
+        key: `s${i}`,
+        icon: "code" as IconName,
+        label: `Passo ${i}`,
+        title: i === 0 ? long : undefined,
+        state: "done" as const,
+      })),
+      { key: "asked", icon: "waiting", label: "Pediu aprovação", time: "09:18", state: "now" },
+    ];
+    const { container } = render(<StepTrack steps={steps} more={(n) => `${n} passos`} aria-label="Como chegou aqui" />);
+    const line = () => container.querySelector(".ac-track__line")?.textContent;
+    const nodes = within(body().getByRole("list", { name: "Como chegou aqui" })).getAllByRole("button");
+    // 13 steps on 8 nodes: two, the folded middle, the last five.
+    expect(nodes.map((n) => n.getAttribute("aria-label"))).toEqual([
+      long,
+      "Passo 1",
+      "6 passos",
+      "Passo 8",
+      "Passo 9",
+      "Passo 10",
+      "Passo 11",
+      "Pediu aprovação · 09:18",
+    ]);
+    expect(container.querySelectorAll(".ac-track__step .ac-track__label")).toHaveLength(0);
+    expect(line()).toBe("Pediu aprovação · 09:18");
+    const told = () => nodes.filter((n) => n.hasAttribute("data-told")).map((n) => n.getAttribute("aria-label"));
+    const current = () => nodes.filter((n) => n.getAttribute("aria-current")).map((n) => n.getAttribute("aria-label"));
+    expect(told()).toEqual(["Pediu aprovação · 09:18"]);
+    expect(current()).toEqual(["Pediu aprovação · 09:18"]);
+    // The pointer previews, a press keeps, the folded node says how many it holds.
+    fireEvent.mouseEnter(nodes[0] as HTMLElement);
+    expect(line()).toBe(long);
+    fireEvent.mouseLeave(nodes[0] as HTMLElement);
+    expect(line()).toBe("Pediu aprovação · 09:18");
+    fireEvent.click(nodes[2] as HTMLElement);
+    expect(line()).toBe("6 passos");
+    // The told node is marked for the eye only: the step that waits stays the current one for a screen reader.
+    expect(told()).toEqual(["6 passos"]);
+    expect(current()).toEqual(["Pediu aprovação · 09:18"]);
+    fireEvent.focus(nodes[1] as HTMLElement);
+    expect(line()).toBe("Passo 1");
+    fireEvent.blur(nodes[1] as HTMLElement);
+    expect(line()).toBe("6 passos");
+  });
+
+  test("step track: one step is one node and its line, 60 fold to eight, and a press on the folded node calls onMore", () => {
+    const step = (i: number): StepTrackStep => ({ key: `s${i}`, icon: "code", label: `Passo ${i}`, state: "done" });
+    const one = render(<StepTrack steps={[step(0)]} aria-label="Um" />);
+    expect(within(one.container).getAllByRole("button")).toHaveLength(1);
+    expect(one.container.querySelector(".ac-track__line")?.textContent).toBe("Passo 0");
+    one.unmount();
+    let opened = 0;
+    const { container } = render(
+      <StepTrack steps={Array.from({ length: 60 }, (_, i) => step(i))} onMore={() => opened++} aria-label="Muitos" />,
+    );
+    const nodes = within(container).getAllByRole("button");
+    expect(nodes.map((n) => n.textContent)).toEqual(["", "", "+53", "", "", "", "", ""]);
+    // Nobody waits: the line tells the last step.
+    expect(container.querySelector(".ac-track__line")?.textContent).toBe("Passo 59");
+    fireEvent.click(nodes[2] as HTMLElement);
+    expect(opened).toBe(1);
+    expect(container.querySelector(".ac-track__line")?.textContent).toBe("Passo 59");
+  });
+
   test("steps: the ones before the current are done; the current is under way, not done (on the last one too)", () => {
     const bars = (current: number) => {
       const { container, unmount } = render(<Steps current={current} total={4} label={`Passo ${current} de 4`} />);
@@ -954,8 +1082,11 @@ describe("Diff", () => {
       ["ac-diff__block ac-diff__block--add", "Adicionado: novo"],
     ]);
     const css = await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text();
-    expect(css).toContain("box-shadow: inset 3px 0 0 var(--ok);");
-    expect(css).toContain("box-shadow: inset 3px 0 0 var(--danger);");
+    // The tint alone says which: no bar on a block's edge.
+    const rule = (name: string) => css.slice(css.indexOf(`.ac-diff__block--${name} {`)).split("}")[0] ?? "";
+    expect(rule("add")).toContain("var(--ok) 12%");
+    expect(rule("del")).toContain("var(--danger) 10%");
+    expect(rule("add") + rule("del")).not.toContain("box-shadow");
   });
 
   test("renders lines with screen-reader labels", async () => {
@@ -979,7 +1110,7 @@ describe("Diff", () => {
 });
 
 describe("Message aside and foot", () => {
-  test("the aside ends the first line, the header's or a grouped message's text's; the foot is a line under both", () => {
+  test("the aside ends the header's line, or stands in a grouped message's gutter; the foot is a line under both", () => {
     const { container } = render(
       <>
         <Message author="João" time="10:42" aside={<span>✓</span>} foot={<span>Ninguém vai responder</span>}>
@@ -992,9 +1123,14 @@ describe("Message aside and foot", () => {
     );
     const [first, second] = Array.from(container.querySelectorAll("article"));
     expect(first?.querySelector(".ac-msg__head .ac-msg__aside")?.textContent).toBe("✓");
-    // Floated before the text, so the text's first line wraps before it.
-    expect(second?.querySelector(".ac-msg__aside--floating + .ac-msg__text")?.textContent).toBe("de novo");
-    expect(second?.querySelector(".ac-msg__aside--floating")?.textContent).toBe("✓✓");
+    // In the gutter, after its hover time, out of the text's line: the row's bar at the right end never covers it.
+    const gutter = second?.querySelector(".ac-msg__gutter.ac-msg__gutter--aside");
+    expect(gutter?.lastElementChild?.className).toBe("ac-msg__aside");
+    expect(gutter?.querySelector(".ac-msg__aside")?.textContent).toBe("✓✓");
+    // Its button stays reachable: only the time is hidden from screen readers (the hidden header says it).
+    expect(gutter?.getAttribute("aria-hidden")).toBeNull();
+    expect(gutter?.querySelector(".ac-msg__gutter-time")?.getAttribute("aria-hidden")).toBe("true");
+    expect(second?.querySelector(".ac-msg__body .ac-msg__aside")).toBeNull();
     // The same line under the text on both: the text follows the name, and words that come and go never move it.
     for (const row of [first, second]) {
       expect(row?.querySelector(".ac-msg__body > :last-child")?.className).toBe("ac-msg__foot");
@@ -1020,8 +1156,7 @@ describe("Message aside and foot", () => {
     expect(end?.querySelector(".ac-msg__own-foot > .ac-msg__aside")?.getAttribute("aria-hidden")).toBeNull();
     // A run's earlier row: no time, in the left column or under it.
     expect(start?.querySelector(".ac-msg__own-foot, .ac-msg__own-time")).toBeNull();
-    for (const row of [start, end])
-      expect(row?.querySelector(".ac-msg__gutter, .ac-msg__avatar, .ac-msg__aside--floating")).toBeNull();
+    for (const row of [start, end]) expect(row?.querySelector(".ac-msg__gutter, .ac-msg__avatar")).toBeNull();
   });
 
   test("every menu's rows share one dense height and side padding, as dense as the message's bar", async () => {
@@ -1123,22 +1258,38 @@ describe("Message aside and foot", () => {
         /(^|;)\s*(right|left|top|inset)\s*:/.test(body),
     );
     expect(byContent.map(([, selector = ""]) => selector.trim())).toEqual([]);
-    // So a grouped row's check at its line's end, under the bar, steps out of sight while the bar shows, keeping its
-    // room: nothing overlaps and nothing moves. On a touch screen only while the bar is open.
-    const hover = [...css.matchAll(/@media not \(hover: none\) \{([\s\S]*?)\n\}/g)].map((m) => m[1] ?? "").join("\n");
-    expect(
-      value(
-        ".ac-msg:hover:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating",
-        "visibility",
-        hover,
-      ),
-    ).toBe("hidden");
-    expect(css.replace(/\s+/g, " ")).toContain(
-      'html:not([data-pointer]) .ac-msg:focus-within:has(> .ac-msg__body > .ac-msg__actions) > .ac-msg__body > .ac-msg__aside--floating, .ac-msg:has(> .ac-msg__body > .ac-msg__actions:is([data-open="true"], :has([aria-expanded="true"]))) > .ac-msg__body > .ac-msg__aside--floating { visibility: hidden; }',
+    // A grouped row's check lives in the left gutter, never under the bar: nothing hides it while the bar shows.
+    expect(css).not.toContain("ac-msg__aside--floating");
+    expect(value(".ac-msg__gutter--aside", "justify-content")).toBe("flex-end");
+    expect(value(".ac-msg__gutter--aside > .ac-msg__aside", "visibility")).toBeUndefined();
+    expect(value(".ac-msg__gutter--aside > .ac-msg__gutter-time", "font-size")).toBe(
+      "min(12px, max(11px, calc(var(--msg-text) - 3px)))",
     );
     expect(value(".ac-msg--grouped > .ac-msg__body > .ac-msg__actions", "top")).toBe(value(bar, "top"));
     expect(value(".ac-receipt__check", "padding")).toBe("0 2px");
     expect(value(".ac-receipt__check .ac-icon", "width")).toBe("16px");
+  });
+
+  test("a grouped row's time in its gutter is the short clock, on one line in every gutter", async () => {
+    const { container } = render(
+      <Message author="João" time="11:43 PM" gutterTime="11:43" grouped aside={<span>✓✓</span>}>
+        <MessageText>de novo</MessageText>
+      </Message>,
+    );
+    expect(container.querySelector(".ac-msg__gutter-time")?.textContent).toBe("11:43");
+    // The hidden header, read by screen readers, keeps the whole time.
+    expect(container.querySelector(".ac-msg__body > .ac-visually-hidden")?.textContent).toContain("11:43 PM");
+    const css = (await Bun.file(new URL("../src/styles/components.css", import.meta.url).pathname).text()).replace(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    // A time allowed to wrap in a face-wide gutter broke where the browser found a break ("13:" over "32").
+    const gutterTimes = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].filter(([, s = ""]) => s.includes("gutter-time"));
+    expect(
+      gutterTimes.some(([, s = "", b = ""]) => s.trim() === ".ac-msg__gutter-time" && /white-space:\s*nowrap/.test(b)),
+    ).toBe(true);
+    for (const [, , body = ""] of gutterTimes)
+      expect(body).not.toMatch(/white-space:(?!\s*nowrap)|min-content|word-break/);
   });
 
   test("an aside or a foot with nothing in it takes no room, in a stacked body too", async () => {
@@ -1393,9 +1544,9 @@ describe("FilterChip", () => {
   test("each option starts with its face and name; the check sits at its end, kept empty when off", async () => {
     render(
       <FilterChip
-        label="Papel"
+        label="Cargo"
         icon="person"
-        clearLabel="Limpar Papel"
+        clearLabel="Limpar Cargo"
         multiple
         value={["admin"]}
         onChange={() => {}}
@@ -1405,8 +1556,8 @@ describe("FilterChip", () => {
         ]}
       />,
     );
-    await act(async () => fireEvent.click(body().getByRole("button", { name: "Papel: Admin" })));
-    const options = within(body().getByRole("listbox", { name: "Papel" })).getAllByRole("option");
+    await act(async () => fireEvent.click(body().getByRole("button", { name: "Cargo: Admin" })));
+    const options = within(body().getByRole("listbox", { name: "Cargo" })).getAllByRole("option");
     expect(options.map((o) => o.getAttribute("aria-selected"))).toEqual(["true", "false"]);
     expect(options.map((o) => [...o.children].map((c) => c.getAttribute("class")))).toEqual([
       ["face", "ac-filter__label", "ac-tz__check"],
@@ -1414,5 +1565,79 @@ describe("FilterChip", () => {
     ]);
     expect(options[0]?.querySelector(".ac-tz__check svg")).not.toBeNull();
     expect(options[1]?.querySelector(".ac-tz__check svg")).toBeNull();
+  });
+
+  test("an action row past a line makes a new one and closes the menu; a picked value's mark replaces the icon", async () => {
+    let made = 0;
+    const chip = (value: string[]) => (
+      <FilterChip
+        label="Projeto"
+        icon="layers"
+        clearLabel="Limpar Projeto"
+        value={value}
+        onChange={() => {}}
+        valueText={(o) => o.label}
+        valueLeading
+        action={{ label: "Novo projeto", icon: "plus", onSelect: () => made++ }}
+        options={[
+          { value: "a", label: "Acme", leading: <ColorDot color="teal" />, count: 3 },
+          { value: "none", label: "Sem projeto", leading: <ColorDot /> },
+        ]}
+      />
+    );
+    const { rerender } = render(chip([]));
+    const trigger = () => document.querySelector(".ac-filter__trigger") as HTMLElement;
+    // Nothing picked: the filter's own icon.
+    expect(trigger().querySelector("svg.ac-icon")).not.toBeNull();
+    expect(trigger().querySelector(".ac-colordot")).toBeNull();
+    await act(async () => fireEvent.click(trigger()));
+    const foot = document.querySelector(".ac-filter__foot") as HTMLElement;
+    expect([...foot.children].map((c) => c.getAttribute("class"))).toEqual(["ac-menu__separator", "ac-filter__option"]);
+    // Not an option of the list: it picks nothing.
+    expect(body().getAllByRole("option")).toHaveLength(2);
+    await act(async () => fireEvent.click(within(foot).getByRole("button", { name: "Novo projeto" })));
+    expect(made).toBe(1);
+    expect(document.querySelector(".ac-filter__menu")).toBeNull();
+
+    rerender(chip(["a"]));
+    expect(trigger().textContent).toBe("Acme");
+    expect(trigger().querySelector(".ac-colordot")?.getAttribute("style")).toContain("--dot: #");
+    expect(trigger().querySelector("svg.ac-icon")).toBeNull();
+    expect(body().getByRole("button", { name: "Limpar Projeto" })).toBeTruthy();
+  });
+
+  test("with an action and nothing to pick yet, the menu is that one row: no empty list, no line", async () => {
+    render(
+      <FilterChip
+        label="Projeto"
+        icon="layers"
+        clearLabel="Limpar Projeto"
+        value={[]}
+        onChange={() => {}}
+        action={{ label: "Novo projeto", icon: "plus", onSelect: () => {} }}
+        options={[]}
+      />,
+    );
+    await act(async () => fireEvent.click(document.querySelector(".ac-filter__trigger") as HTMLElement));
+    expect(document.querySelector(".ac-filter__list")?.hasAttribute("hidden")).toBe(true);
+    expect(document.querySelector(".ac-filter__foot .ac-menu__separator")).toBeNull();
+    expect(body().getByRole("button", { name: "Novo projeto" })).toBeTruthy();
+  });
+});
+
+describe("ColorDot", () => {
+  test("a color's middle tone as the dot; no color is a hollow ring", () => {
+    const { container } = render(
+      <>
+        <ColorDot color="amber" />
+        <ColorDot />
+      </>,
+    );
+    const [amber, none] = [...container.querySelectorAll(".ac-colordot")];
+    expect(amber?.getAttribute("style")).toMatch(/--dot: #[0-9a-f]{6}/i);
+    expect(amber?.hasAttribute("data-none")).toBe(false);
+    expect(none?.hasAttribute("data-none")).toBe(true);
+    expect(none?.getAttribute("style")).toBeNull();
+    expect(amber?.getAttribute("aria-hidden")).toBe("true");
   });
 });

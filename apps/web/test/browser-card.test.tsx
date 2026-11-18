@@ -103,7 +103,11 @@ describe("a help request opens the agent's browser in its card", () => {
     await act(() => new Promise((r) => setTimeout(r, Math.max(0, expiresAt - Date.now()) + 50)));
     await settle(2);
     expect(waitingRequest()).toBeNull();
-    expect(document.querySelector(".brw-rq--settled")?.textContent).toContain("pediu ajuda · expirou");
+    // The same card, the request still its words, how it ended where its button was.
+    const ended = document.querySelector('.rq--ended[data-ask-kind="browser"]') as HTMLElement;
+    expect(ended.textContent).toContain("Entrar no painel com a conta de teste");
+    expect(ended.querySelector(".rq__answer")?.textContent).toContain("Ninguém abriu a tempo. A Ada parou e avisou.");
+    expect(within(ended).queryByRole("button")).toBeNull();
   }, 15_000);
 
   test("Abrir aqui takes control in place: Pronto under the page, on touch the app's own text field, no page change", async () => {
@@ -154,7 +158,7 @@ describe("a help request opens the agent's browser in its card", () => {
     ]);
     expect(row.textContent).toContain("Devolver à Ada");
     expect(within(card).queryByRole("button", { name: "Não consegui" })).toBeNull();
-    expect(document.querySelector(".brw-rq")?.textContent).toContain("Você está ajudando · neste card");
+    expect(waitingRequest().textContent).toContain("Você está ajudando");
 
     // The typing bar: one field, Senha as a lock toggle, the keys behind a keyboard button.
     const lock = within(card).getByRole("button", { name: "Esconder o texto (senha)" });
@@ -173,7 +177,7 @@ describe("a help request opens the agent's browser in its card", () => {
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Desistir" })));
     expect(card.textContent).toContain("O que aconteceu?");
     const why = within(card).getByPlaceholderText("Conte com suas palavras") as HTMLTextAreaElement;
-    expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input brw-ac__note"]);
+    expect([why.getAttribute("rows"), why.className]).toEqual(["1", "ac-input ac-input--grow brw-ac__note"]);
     expect(card.querySelector(".brw-ac__back")).toBeNull();
     await act(async () => fireEvent.click(within(card).getByRole("button", { name: "Voltar" })));
 
@@ -194,7 +198,7 @@ describe("a help request opens the agent's browser in its card", () => {
     expect([note.tagName, note.getAttribute("rows"), note.className]).toEqual([
       "TEXTAREA",
       "1",
-      "ac-input brw-ac__note",
+      "ac-input ac-input--grow brw-ac__note",
     ]);
     await act(async () => fireEvent.change(note, { target: { value: "Entrei com a conta de teste" } }));
     // Shift+Enter adds a line, as in the chat; Enter sends the note, and adds no line to it.

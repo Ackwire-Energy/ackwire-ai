@@ -6,9 +6,11 @@ import {
   type BrainTurnRequest,
   brainTopic,
   CODEX_FOLDER_PROTOCOL,
+  CODEX_WINDOWS_PROTOCOL,
   CURSOR_PROTOCOL,
   GROK_PROTOCOL,
   LOCKED_BRAIN_PROTOCOL,
+  OPENCODE_ACP_PROTOCOL,
   OPENCODE_PROTOCOL,
   type PubSub,
   parseBrainEvent,
@@ -28,7 +30,15 @@ import {
   steerOnMachine,
 } from "./claude-code";
 import { computerPrompt, systemWithConversation } from "./prompt";
-import type { Brain, BrainEvent, BrainIO, BrainTurn, SteerMessage, SteerReply } from "./types";
+import {
+  askingPermissions,
+  type Brain,
+  type BrainEvent,
+  type BrainIO,
+  type BrainTurn,
+  type SteerMessage,
+  type SteerReply,
+} from "./types";
 
 /**
  * The Codex brain (ADR 0032, ADR 0029 "Codex"): one agent turn runs on the
@@ -67,6 +77,8 @@ export interface ComputerBrainLink {
     execAllowed: boolean;
     /** The runner's protocol (absent: not checked). */
     protocol?: number;
+    /** The computer's system (`hello.os`: `windows`, `darwin`, `linux`…). */
+    os?: string;
     executors: {
       codex?: { version: string };
       claude?: { version: string };
@@ -174,6 +186,8 @@ interface CliBrainSpec {
   name: string;
   /** The runner protocol it needs. */
   protocol: number;
+  /** The runner protocol it needs on Windows, where an older runner refuses its turns. */
+  windowsProtocol?: number;
   /** The CLI is installed (`hello.executors`) and new enough; else why not. */
   check(executors: {
     codex?: { version: string };
@@ -188,6 +202,7 @@ const CODEX_CLI: CliBrainSpec = {
   kind: "codex",
   name: "Codex",
   protocol: BRAIN_PROTOCOL,
+  windowsProtocol: CODEX_WINDOWS_PROTOCOL,
   check({ codex }) {
     if (!codex) {
       return {
@@ -228,6 +243,7 @@ const OPENCODE_CLI: CliBrainSpec = {
   kind: "opencode",
   name: "OpenCode",
   protocol: OPENCODE_PROTOCOL,
+  windowsProtocol: OPENCODE_ACP_PROTOCOL,
   check: ({ opencode }) =>
     opencode
       ? null
@@ -323,6 +339,17 @@ export class CodexBrain implements Brain {
       };
       return;
     }
+    // An older runner on Windows refuses every turn of this CLI there (an unknown protocol, too).
+    const windowsProtocol = this.cli.windowsProtocol;
+    if (status.os === "windows" && windowsProtocol !== undefined && (status.protocol ?? 0) < windowsProtocol) {
+      yield {
+        type: "error",
+        code: "runner_outdated",
+        message: `The runner on the computer is too old for agents that think with ${name} on Windows. ${runnerUpdateWay(status)}`,
+        retryable: true,
+      };
+      return;
+    }
     const missing = this.cli.check(status.executors);
     if (missing) {
       yield missing;
@@ -344,7 +371,8 @@ export class CodexBrain implements Brain {
       };
       return;
     }
-    const permissions = await this.deps.permissions?.(turn);
+    // No brain here sends each call of its own tools to our prompt: one that always asks reads only.
+    const permissions = askingPermissions(await this.deps.permissions?.(turn), false);
     // An older runner ignores the profile (no approvals, network on): never more power than asked for.
     if (permissions && status.protocol !== undefined && status.protocol < BRAIN_PROFILES_PROTOCOL) {
       yield {
@@ -389,7 +417,7 @@ export class CodexBrain implements Brain {
       mcp: { ...mcp, tools: toolNames.join(" ") },
       ...(agent ? { agent } : {}),
       ...accountFields(status.protocol, turn),
-      ...contextFields(status.protocol, turn),
+      ...contextFields(status.protocol, turn, this.kind),
       ...speedFields(status.protocol, turn),
       ...(permissions ? { permissions } : {}),
       ...(this.deps.keepAlive === false ? { keepAlive: false } : {}),
@@ -472,8 +500,9 @@ export class CursorBrain extends CodexBrain {
 
 /**
  * The OpenCode brain (ADR 0132): OpenCode's CLI on the agent's computer, on OpenCode's free tier or a person's OpenCode
- * key, through the same `brain.turn` as Codex (`kind: "opencode"`, runner protocol 39, `brain-opencode.ts` there). A
- * person's messages wait for the turn's end: the runner answers `brain.steer` with `unsupported`.
+ * key, through the same `brain.turn` as Codex (`kind: "opencode"`, runner protocol 39, `brain-opencode.ts` there; over
+ * ACP and on Windows since protocol 64). OpenCode 2 takes a person's messages mid-turn (`brain.steer`); with 1.x they
+ * wait for the turn's end (the runner answers `unsupported`).
  */
 export class OpencodeBrain extends CodexBrain {
   constructor(deps: CodexBrainDeps) {

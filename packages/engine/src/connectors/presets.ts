@@ -95,6 +95,18 @@ const COMPOSIO_TOOLKIT_URL = /^https:\/\/backend\.composio\.dev\/api\/v3\.1\/too
 export const composioToolkitOf = (serverUrl: string | null | undefined) =>
   COMPOSIO_TOOLKIT_URL.exec(serverUrl ?? "")?.[1]?.toLowerCase() ?? null;
 
+/**
+ * `composioToolkitOf` for an address a person typed, however it is spelled: its port written out, a query, a dot
+ * after the host, a character percent-encoded, slashes repeated or left at the end.
+ */
+export function composioToolkitTyped(url: URL) {
+  const host = `${url.hostname.replace(/\.$/, "")}${url.port ? `:${url.port}` : ""}`;
+  const path = url.pathname
+    .replace(/%[0-9a-f]{2}/gi, (hex) => String.fromCharCode(Number.parseInt(hex.slice(1), 16)))
+    .replace(/\/+/g, "/");
+  return composioToolkitOf(`${url.protocol}//${host}${path}`);
+}
+
 export const MCP_PRESETS: readonly McpPreset[] = [
   {
     id: "linear",
@@ -1280,3 +1292,12 @@ export function composioAction(way: ComposioWay, name: string): string | null {
   const action = `${actionPrefix(way)}${name.toUpperCase()}`;
   return way.actions.includes(action) ? action : null;
 }
+
+/**
+ * A server's address without what may be its secret: a path or a query can be the only credential of a server that
+ * asks for no sign-in. An address the catalog publishes (a preset's, a Composio toolkit's) stays whole.
+ */
+export const serverUrlShown = (serverUrl: string) =>
+  presetForServer(serverUrl) || composioToolkitOf(serverUrl) || !URL.canParse(serverUrl)
+    ? serverUrl
+    : new URL(serverUrl).origin;

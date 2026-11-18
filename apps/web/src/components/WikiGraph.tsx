@@ -1,6 +1,6 @@
 import type { WikiGraph } from "@agenteschat/client";
 import { useWikiGraph } from "@agenteschat/client";
-import { layoutGraph, type Placed } from "@agenteschat/client/lib/wiki";
+import { isImportedPage, layoutGraph, type Placed } from "@agenteschat/client/lib/wiki";
 import { appearanceStyle, PageHeader, Segmented } from "@agenteschat/ui";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
@@ -53,7 +53,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
           filter === "agent"
             ? Boolean(n.agentId)
             : filter === "obsidian"
-              ? n.sourceType === "obsidian"
+              ? isImportedPage(n.sourceType)
               : (n.folder.split("/")[0] || "") === filter.slice("folder:".length),
         )
         .map((n) => n.slug),
@@ -86,7 +86,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
     degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
   }
   const folders = [...new Set(data.nodes.map((n) => n.folder.split("/")[0] || ""))].filter(Boolean).sort();
-  const hasObsidian = data.nodes.some((n) => n.sourceType === "obsidian");
+  const hasObsidian = data.nodes.some((n) => isImportedPage(n.sourceType));
   const hasAgents = data.nodes.some((n) => n.agentId);
   const open = (slug: string) => {
     onOpen?.();
@@ -126,7 +126,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
         const lit = hover === node.slug || near?.has(node.slug);
         const agent = node.agentId ? dir.agentById.get(node.agentId) : undefined;
         const r = 5 + Math.sqrt(degree.get(node.slug) ?? 0) * 2.4;
-        const kind = node.sourceType === "obsidian" ? "obsidian" : agent ? "agent" : "person";
+        const kind = isImportedPage(node.sourceType) ? "obsidian" : agent ? "agent" : "person";
         const showLabel = !mini && ((degree.get(node.slug) ?? 0) >= 2 || lit || filtered.nodes.length <= 16);
         if (mini) {
           return (
@@ -179,7 +179,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
   const chips: [Filter, string][] = [
     ["all", t("wiki.allPages")],
     ...(hasAgents ? ([["agent", t("wiki.graphAgents")]] as [Filter, string][]) : []),
-    ...(hasObsidian ? ([["obsidian", t("wiki.fromObsidian")]] as [Filter, string][]) : []),
+    ...(hasObsidian ? ([["obsidian", t("wiki.legend.imported")]] as [Filter, string][]) : []),
     ...folders.map((f) => [`folder:${f}`, f] as [Filter, string]),
   ];
   return (
@@ -198,7 +198,7 @@ export function WikiGraphView({ onOpen, mini = false }: { onOpen?: () => void; m
         <p className="wiki-graph__legend" aria-hidden="true">
           <span data-kind="person">{t("wiki.legend.people")}</span>
           {hasAgents && <span data-kind="agent">{t("wiki.legend.agents")}</span>}
-          {hasObsidian && <span data-kind="obsidian">{t("wiki.legend.obsidian")}</span>}
+          {hasObsidian && <span data-kind="obsidian">{t("wiki.legend.imported")}</span>}
         </p>
       </div>
     </section>

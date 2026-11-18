@@ -19,16 +19,44 @@ describe("legal pages", () => {
   }
 });
 
-describe("the privacy policy names Cloudflare where Workspace Content goes and where it is handled", () => {
-  // agentes.chat Cloud is behind Cloudflare, which decrypts its traffic at the data center nearest to each device:
+describe("the privacy policy says where Workspace Content passes through our network provider", () => {
+  // agentes.chat Cloud is behind a network provider that decrypts its traffic at the data center nearest to each device:
   // the list of where Workspace Content leaves our servers ("and only in them") and the countries of §9 must say so.
-  for (const [locale, doc] of Object.entries(legalDocuments.privacy)) {
-    test(locale, () => {
-      const section = (id: string) => JSON.stringify(doc.sections.find((s) => s.id === id)?.blocks);
-      expect(section("agents")).toContain("Cloudflare");
-      expect(section("transfers")).toContain("Cloudflare");
-    });
-  }
+  // Product decision: the legal pages name no infrastructure provider (network, hosting), in any language.
+  test("en", () => {
+    const section = (id: string) => JSON.stringify(legalDocuments.privacy.en.sections.find((s) => s.id === id)?.blocks);
+    expect(section("agents")).toContain("our network provider");
+    expect(section("transfers")).toContain("our network provider");
+  });
+});
+
+describe("the privacy policy covers every model provider a workspace may choose, without naming one", () => {
+  // §9's US claim covers only the providers the policy names, so a provider a workspace picks (and the model's maker
+  // or host it passes calls on to) falls under the §9 exception, and a new provider in the product needs no edit here.
+  const section = (locale: "en" | "pt-BR", id: string) =>
+    JSON.stringify(legalDocuments.privacy[locale].sections.find((s) => s.id === id)?.blocks);
+  test("en", () => {
+    expect(section("en", "agents")).toContain("Some providers pass the call on to the company that makes or hosts");
+    expect(section("en", "transfers")).toContain(
+      "except the model providers and connected services a workspace chooses, and the companies they pass calls on to",
+    );
+  });
+  test("pt-BR", () => {
+    expect(section("pt-BR", "agents")).toContain("Alguns provedores repassam a chamada à empresa que faz ou hospeda");
+    expect(section("pt-BR", "transfers")).toContain(
+      "exceto os provedores de modelo e os serviços conectados que um workspace escolhe",
+    );
+  });
+  test("no language names a provider a workspace picks", () => {
+    for (const [code, doc] of Object.entries(legalDocuments.privacy))
+      expect({
+        code,
+        named: JSON.stringify(doc).match(/\b(?:OpenRouter|Command Code|DeepSeek|Kimi|MiniMax|Z\.ai)\b/g),
+      }).toEqual({
+        code,
+        named: null,
+      });
+  });
 });
 
 describe("agentes.chat Cloud's restriction lines cite the Terms this server serves", () => {

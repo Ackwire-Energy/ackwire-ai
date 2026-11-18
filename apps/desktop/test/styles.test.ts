@@ -5,11 +5,10 @@ describe("equal side padding", () => {
     const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
     const rule = (selector: string) => css.split(`\n${selector} {`)[1]?.split("}")[0];
     for (const selector of [
-      // First run: the server form, help card, found servers and problem line; Run here's form, ways, steps and bar.
+      // First run: the server form, found servers and problem line; the install's steps; Run here's form, steps and bar.
       ".dk-fr__form",
       ".dk-fr__problem",
       ".dk-fr__found",
-      ".dk-fr__none",
       ".dk-fr__ways",
       ".dk-fr__here",
       ".dk-fr__end[data-near]",
@@ -43,9 +42,9 @@ describe("Run here", () => {
     expect(rule(".dk-fr__here .dk-fr__end")).toMatch(/\n\s*margin: auto -48px -28px;/);
   });
 
-  test("Your own server's cards leave no word alone on a line", async () => {
+  test("the line beside the sleeping agent leaves no word alone on a line", async () => {
     const css = await Bun.file(new URL("../src/styles.css", import.meta.url).pathname).text();
-    expect(css.split("\n.dk-fr__card small {")[1]?.split("}")[0]).toContain("text-wrap: pretty;");
+    expect(css.split("\n.dk-fr__rest {")[1]?.split("}")[0]).toContain("text-wrap: pretty;");
   });
 });
 

@@ -67,11 +67,24 @@ people than asked.
    data stays on screen) or `failed` (a human reason and "Resolve", which runs it again, takes the routine over when its
    creator can no longer run it, and resumes it when it paused itself: failures, its creator gone or out of the board).
    A routine a person paused on purpose in Routines stays paused: "Update now", "Resolve" and "Ask for a change" run
-   once, and only Resume in Routines brings the schedule back. Each update or failure is kept with what it
-   showed (`dashboard_widget_updates`, the latest 20), shown in the widget's panel. When the alert is on and the agent
-   says its condition was met, the person who set the alert hears it in "Waiting on you" (`widget_alert`, waiting, one
-   row per widget merging while open); never in the chat. A widget that stops updating tells its creator once per
-   failure streak (`widget_failed`, inbox only), resolved by its next good update.
+   once, and only Resume in Routines brings the schedule back. While it is `building` or `updating`, a widget whose run
+   waits carries what for (`wait`: paused near its plan's or budget's limit, at that limit, a limit of its model alone
+   with that model's name, its computer away or, after 10 minutes in its line, out of room, or its AI provider down,
+   with when it picks up by itself or tries again), and the apps say it in place of the spinner ("Waiting for Theo's
+   plan to reset at 13:00", a model's own limit in the brain card's words), its data as it was. A budget held only by
+   the agent's other runs reads as a moment's wait, never as the month's. The run's event goes out when it parks, when
+   it goes on and when a long wait for room ends, never on each ask for room, and nothing polls a waiting widget.
+   "Update now" and "Resolve" on a waiting widget never do nothing: a pause near the limit goes on now, for Continuar
+   agora's people and by its rule (ADR 0118; anyone else sees Continue now greyed and is refused with
+   `run.continue_forbidden`, and `wait.canContinue` says which), and any other wait is refused with its cause and when
+   it picks up (`widget.waiting`, 409). Beside the cause, the one thing that ends it sooner, for who may do it: a higher
+   budget (admins), another model for a model's own limit (its owner and admins), or its computer opened. A refresh
+   isn't long work by kind, so it pauses near the limit only once it grew long (ADR 0118, addendum of 2026-11-11). Each
+   update or failure is kept with what it showed (`dashboard_widget_updates`, the latest 20), shown in the widget's
+   panel. When the alert is on and the agent says its condition was met, the person who set the alert hears it in
+   "Waiting on you" (`widget_alert`, waiting, one row per widget merging while open); never in the chat. A widget that
+   stops updating tells its creator once per failure streak (`widget_failed`, inbox only), resolved by its next good
+   update.
 7. **Schedules, the floor, the cap and the cost.** Every 30 minutes (`half`), every hour, every day at 08:00, every
    Monday at 08:00 (in the time zone of whoever set it up), or only when asked (`manual`): never more often than every
    30 minutes, so the 15-minute floor of routines never binds. A workspace keeps at most 60 widgets updating on a
@@ -143,8 +156,8 @@ people than asked.
 16. **Test before creating.** "+ Widget" asks the agent first and creates after: "Test" makes a draft
     (`dashboard_widgets.draft`) that its agent builds at once with real data, through the same refresh run as any
     widget (`update_widget`, a history row, failure reasons, its cost recorded); the card shows it building in place,
-    then the real result (the ask folds into one line that opens it again), or why it failed with "Try again". Only
-    when it worked
+    then the real result (the ask folds into one line that opens it again), or why it failed with "Try again". A test
+    whose run waits says what for and when it picks up, with Stop and the dialog's close (§6). Only when it worked
     does "Create widget" confirm it (`POST …/widgets/{id}/confirm`; `widget.not_tested`, 409, before that): it goes
     first on the board chosen then, with the size, schedule and alert chosen then, keeping the tested data and its
     history (no second build), and its routine gets its schedule. Changing the ask, the agent or the format makes the
@@ -152,8 +165,9 @@ people than asked.
     Routines, the agents' tools), raises no alert or notice, and is its creator's alone: anyone else gets
     `widget.not_found`, and its events go to the creator's own topic. Its routine never has a schedule. Testing again or
     closing the dialog deletes it with its routine and stops its run; a person keeps five at most (the oldest go), and
-    the server's workers delete those nobody confirmed within a day. Pinning a chart needs no test: its data is
-    already real. Agents' `create_widget` is unchanged.
+    the server's workers delete those nobody confirmed within a day. Its build is a person's work in the job lanes
+    (ADR 0053 §10): its routine's firing and its run take a person's slots, never the background ones, since its creator
+    watches the preview. Pinning a chart needs no test: its data is already real. Agents' `create_widget` is unchanged.
 17. **Who names a widget, and notes that fit.** The ask is never the title. The agent names the widget on its first
     build (a draft's test included): `update_widget` requires a short `title` then (at most 40 characters, sentence
     case, in the person's language, no period at the end) and refuses a longer one rather than cutting it; it may rename
@@ -176,6 +190,36 @@ people than asked.
     on Claude Code, whose ToolSearch holds our tools back by default, the bridge's list marks `update_widget`, the web
     and the connected apps' reads (60 at most) to be listed from the first round (`widgetUpFront`), and its prompt
     forbids arithmetic and waiting in a shell.
+20. **No build starts that is sure to fail.** A widget whose agent has no AI to think with for background work (no
+    key for its model, a computer brain signed out, missing or with no computer: `backgroundAiState`, never standing
+    in on the model brain) gets no run. The right hand's build thinks for a person, as its run will (`widgetAi`, ADR
+    0137 §11 as amended 2026-11-12): who asked the change it carries, then the widget's person, then its routine's
+    creator, the first still seeing the board whose AI can think, else the workspace's own AI for nobody. A plan
+    that serves only its owner takes no work of anyone else's (`plan_not_shared`, which its run calls
+    `plan_unattended` when nobody set the work up), and since it never waits for its plan (ADR 0137 §7), that plan's computer away or at
+    its limit is no AI either (its plan line: `computer_away`, `plan_limit`…), unless the computer is only asleep,
+    which its run wakes. On create, a test, Update now, Resolve, a change request or a scheduled slot, it waits for
+    one instead, `failed` with `missing_credential` and the reason as its detail (`no_key`, `not_signed_in`,
+    `no_computer`, `cli_missing`, `plan_not_shared`, a plan line), said once while it waits and again when the reason
+    changes (quietly while it never had data, with the one `widget_failed` of a streak once it had, the reason in its
+    `latest.detail`, apart from the `text` the island, the push and the phone show as it is). A run that finds no AI
+    after all keeps why the same way (its routine run's detail). A person who asked hears it (`widget.needs_ai`, 409,
+    whose words point to the widget, which says the cause); a slot is `skipped` (`no_ai`), never a failure, so the
+    routine doesn't tire and pause. The AI status says, per agent, what its background work thinks with where that
+    differs from what it shows (`background`: a computer brain ready only through the fallback, the right hand shown
+    with the viewer's own AI), and for the right hand's widgets, which of those waiting or stopped for the lack of
+    an AI can build now (`widgetsReady`), and the apps read both. One that stopped after failing in a row for the
+    lack of an AI starts by nobody's ask: it shows Connect while there is none, then Resolve. They show the widget as waiting for an AI with its real cause,
+    and Connect in place of Resolve for whoever may set the agent's AI (the workspace's, for the right hand, opening on
+    a key where its plan can't take a build); anyone else reads who can. They start the build by themselves once the
+    agent has one, by an AI status read after the widget started waiting (one read before may still call it ready),
+    each widget once per app session unless the server still finds no AI (`widget.needs_ai`), as nobody's ask
+    (`auto`): it only queues, never taking the routine over or resuming it, so a routine paused (by itself: its
+    reason; by a person: `stopped`) or whose creator no longer fits makes the widget say that instead, for a person's
+    Resolve. New widget's test does the same and tests again by itself once.
+    A widget's run that reaches its end without `update_widget` taking its data is told once, in the same run, that
+    only that call reaches the widget (ADR 0097's one extra turn of a routine); still without it, it fails as
+    `no_update`.
 
 ## Consequences
 

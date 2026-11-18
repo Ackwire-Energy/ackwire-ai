@@ -8,7 +8,9 @@ import {
   pagePoint,
   type ScreenKind,
 } from "@agenteschat/client";
+import { MAX_MESSAGE_LENGTH } from "@agenteschat/client/lib/message-length";
 import type { TFunction } from "i18next";
+import type { IconName } from "@/ui";
 
 /**
  * The agent's browser on the phone (ADR 0040): what only the app decides. The
@@ -43,31 +45,33 @@ export function stepText(
   return text === key ? t(`${words}.other`) : text;
 }
 
-/** "dashboard.stripe.com" from a frame's URL (or nothing). */
-export function hostOf(url: string | undefined | null): string {
-  if (!url) return "";
-  const m = /^[a-z][a-z0-9+.-]*:\/\/([^/?#:]+)/i.exec(url.trim());
-  return m?.[1]?.toLowerCase() ?? "";
-}
+/** Each browser step's icon in the card's history, as the web's (`STEP_ICON`), in the phone's own icons. */
+const STEP_ICON: Record<string, IconName> = {
+  browser_do: "bolt",
+  browser_open: "globe",
+  browser_back: "left",
+  browser_tabs: "swap",
+  browser_read: "doc",
+  browser_click: "right",
+  browser_fill: "pen",
+  browser_select: "list",
+  browser_check: "check",
+  browser_press: "right",
+  browser_scroll: "down",
+  browser_upload: "up",
+  browser_type_secret: "key",
+  browser_make_password: "key",
+  browser_wait: "clock",
+  browser_screenshot: "image",
+  browser_ask_person: "person",
+  browser_close: "x",
+};
 
-/** The site the card names: the live page's host, else the last page the agent opened ("loja.exemplo"). */
-export function siteOf(frameUrl: string | null | undefined, steps: { tool: string; detail: string | null }[]): string {
-  const live = hostOf(frameUrl);
-  if (live) return live;
-  for (let i = steps.length - 1; i >= 0; i--) {
-    const s = steps[i];
-    const tool = s?.tool.replace(/^mcp__agentes__/, "");
-    if ((tool !== "browser_open" && tool !== "browser_tabs") || !s?.detail) continue;
-    return hostOf(s.detail) || s.detail.trim().toLowerCase();
-  }
-  return "";
-}
-
-/** The site's letter tile ("L" for loja.exemplo, without "www."), or nothing. */
-export function siteLetter(host: string): string {
-  const name = host.replace(/^www\./, "");
-  return name ? name.charAt(0).toUpperCase() : "";
-}
+/** A step's icon in the card's history; one the list doesn't know is the browser's. */
+export const stepIcon = (tool: string): IconName => {
+  const plain = tool.replace(/^mcp__agentes__/, "");
+  return Object.hasOwn(STEP_ICON, plain) ? (STEP_ICON[plain] ?? "globe") : "globe";
+};
 
 /**
  * Where a finger on the page's box lands on the page (`createTouchInput`'s `toPage`): the picture is
@@ -96,8 +100,8 @@ export const keyPastDraft = (draft: string, key: string): LiveKey | null =>
 export const FAILED_REASONS = ["code", "password", "blocked"] as const;
 export type FailedReason = (typeof FAILED_REASONS)[number];
 
-/** The longest note the server takes on Pronto, Devolver or Não consegui. */
-export const NOTE_MAX = 1000;
+/** How much a note on Pronto, Devolver or Não consegui holds: the person's words to the agent, as a message's. */
+export const NOTE_LIMIT = { max: MAX_MESSAGE_LENGTH } as const;
 
 /** The agent may use its browser: `browser:use` granted to it ("all tools" doesn't cover it). */
 export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | undefined) =>
@@ -107,14 +111,14 @@ export const browserGranted = (access: Pick<AgentAccess, "builtins"> | null | un
 export type PageGap = BrowserLiveUnavailable | "ended" | "tooMany";
 
 /** The words for why the page shows nothing; the Cloud's computer is always on, so offline there isn't answering. */
-export const pageGapKey = (gap: PageGap | "stuck", gender: "F" | "M", cloud: boolean) =>
+export const pageGapKey = (gap: PageGap | "stuck" | "noAnswer", gender: "F" | "M", cloud: boolean) =>
   `mobile.browser.live.unavailable.${gap === "offline" && cloud ? "offlineCloud" : gap}${gender}` as const;
 
 /** No page yet, but waiting may bring it: opening, reconnecting, or not available for now (the client retries). */
 export const waitsForPage = (gap: PageGap | null) => gap === null || gap === "reconnecting" || gap === "unavailable";
 
 export interface PageNote {
-  say: PageGap | "starting" | "hidden" | "stuck";
+  say: PageGap | "starting" | "hidden" | "stuck" | "noAnswer";
   /** Only while the page may still come by itself. */
   spin: boolean;
   help: "grace" | "closedHelp" | "stuckHelp" | null;
@@ -125,9 +129,17 @@ export interface PageNote {
  * stays theirs), or why it can't be shown, with a line of help where waiting means something. A closed
  * or ended browser holds until a frame comes, and none comes to a hidden view: there, who holds it wins.
  * `stuck`: it waited too long for a page that waiting brings (`useBrowserStuck`): it says it couldn't open,
- * with Try again.
+ * with Try again. `noAnswer`: a profile's browser the computer says didn't answer (`browserNoAnswerMessage`): said at
+ * once, with Try again.
  */
-export function pageNoteOf(gap: PageGap | null, hidden: boolean, mine: boolean, stuck = false): PageNote {
+export function pageNoteOf(
+  gap: PageGap | null,
+  hidden: boolean,
+  mine: boolean,
+  stuck = false,
+  noAnswer = false,
+): PageNote {
+  if (noAnswer && !hidden) return { say: "noAnswer", spin: false, help: "stuckHelp" };
   if (stuck && !hidden && waitsForPage(gap)) return { say: "stuck", spin: false, help: "stuckHelp" };
   if (gap && !(hidden && (gap === "closed" || gap === "ended"))) {
     const help = gap === "closed" ? "closedHelp" : gap === "reconnecting" && mine ? "grace" : null;

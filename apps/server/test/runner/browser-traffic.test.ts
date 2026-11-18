@@ -47,19 +47,20 @@ function counter(onCrash?: (page: CrashedPage) => void) {
   return { c, cdp };
 }
 
-const AUTO_ATTACH = {
-  autoAttach: true,
-  waitForDebuggerOnStart: false,
-  flatten: true,
+/** At the browser's level: told of every target but Chrome's own UI and the tabs' wrappers. */
+const DISCOVER = {
+  discover: true,
   filter: [{ type: "browser_ui", exclude: true }, { type: "tab", exclude: true }, {}],
 };
 /** Under a target: never the service and shared workers the browser level already attached (counted once). */
 const RELATED = {
-  ...AUTO_ATTACH,
+  autoAttach: true,
+  waitForDebuggerOnStart: false,
+  flatten: true,
   filter: [{ type: "service_worker", exclude: true }, { type: "shared_worker", exclude: true }, {}],
 };
 
-test("one socket to the browser endpoint: auto-attach without pausing, then network events with no bodies on every session", async () => {
+test("one socket to the browser endpoint: each target attached as Chrome tells of it, never auto-attached there, then network events with no bodies on every session", async () => {
   const { c, cdp } = counter();
   expect(cdp.url).toBe("ws://127.0.0.1:9222/devtools/browser/abc");
   let attached = false;
@@ -67,11 +68,29 @@ test("one socket to the browser endpoint: auto-attach without pausing, then netw
     attached = true;
   });
   cdp.onopen?.();
-  expect(cdp.sent).toEqual([{ id: 1, method: "Target.setAutoAttach", params: AUTO_ATTACH }]);
+  expect(cdp.sent).toEqual([{ id: 1, method: "Target.setDiscoverTargets", params: DISCOVER }]);
+  // The targets Chrome has: a tab and a service worker are attached; a frame and a dedicated worker come under
+  // their page, and the browser itself is not a target of ours.
+  const created = (targetId: string, type: string) =>
+    cdp.event("Target.targetCreated", { targetInfo: { targetId, type, url: "" } });
+  created("tab-0", "page");
+  created("frame-0", "iframe");
+  created("worker-0", "worker");
+  created("browser-0", "browser");
+  created("sw-0", "service_worker");
+  expect(cdp.sent.slice(1)).toEqual([
+    { id: 2, method: "Target.attachToTarget", params: { targetId: "tab-0", flatten: true } },
+    { id: 3, method: "Target.attachToTarget", params: { targetId: "sw-0", flatten: true } },
+  ]);
+  // Not attached until Chrome answered for each of them: a first command's bytes are counted.
+  cdp.reply(1);
+  cdp.reply(2);
   await Bun.sleep(5);
   expect(attached).toBe(false);
-  cdp.reply(1);
+  // One that went away meanwhile answers with an error, and isn't waited for.
+  cdp.onmessage?.({ data: JSON.stringify({ id: 3, error: { message: "No target with given id found" } }) });
   await c.attached;
+  cdp.sent.splice(1, 2);
   // A page, then a frame and a worker inside it: each gets the same, on its own session.
   cdp.attach("page-1");
   cdp.event(
@@ -90,7 +109,11 @@ test("one socket to the browser endpoint: auto-attach without pausing, then netw
     { method: "Target.setAutoAttach", params: RELATED, sessionId: "worker-1" },
   ]);
   // It never resumes or pauses a target, and asks for nothing else.
-  expect(new Set(cdp.sent.map((m) => m.method))).toEqual(new Set(["Target.setAutoAttach", "Network.enable"]));
+  expect(new Set(cdp.sent.map((m) => m.method))).toEqual(
+    new Set(["Target.setDiscoverTargets", "Target.setAutoAttach", "Network.enable"]),
+  );
+  // Auto-attach only under a target: at the browser's level it holds the release of a press that opens a window.
+  expect(cdp.sent.every((m) => m.method !== "Target.setAutoAttach" || m.sessionId)).toBe(true);
   expect(cdp.sent.every((m) => m.method !== "Network.enable" || m.sessionId)).toBe(true);
 });
 

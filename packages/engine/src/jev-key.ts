@@ -8,9 +8,11 @@ import { monthStartUtc } from "./usage";
 const { instanceSecrets, usageRecords } = schema;
 
 /**
- * The installation's TypeSafe key for Jev (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in
- * Settings. Read on every call, so a saved key works without a restart. Live calls report how they went, and a
- * broken key is skipped for a while, so the next step decides at once instead of waiting on it.
+ * The installation's key for Jev (ADR 0073): `TYPESAFE_API_KEY`, else the one its owner adds in Settings. A
+ * TypeSafe key calls TypeSafe's API; an OpenRouter key calls the same Jev through OpenRouter's Decisions route,
+ * which takes TypeSafe's request as written (§9). Read on every call, so a saved key works without a restart. Live
+ * calls report how they went, and a broken key is skipped for a while, so the next step decides at once instead of
+ * waiting on it.
  */
 
 /** How a call with the key went. `unchecked`: a key nobody has called with yet. */
@@ -18,8 +20,27 @@ export type JevState = "off" | "unchecked" | "ok" | "invalid" | "no_credit" | "r
 /** What screens show: the two states the key's owner can fix. A limit, an outage or a slow answer reads `ok`. */
 export type JevShownState = "off" | "ok" | "invalid" | "no_credit";
 
+/** Where Jev is called and paid: TypeSafe's own API, or OpenRouter with an OpenRouter key (ADR 0073 §9). */
+export type JevVia = "typesafe" | "openrouter";
+
+/** OpenRouter's keys start with `sk-or-` (`sk-or-v1-…`); any other key is TypeSafe's. */
+export const jevViaOf = (key: string): JevVia => (key.startsWith("sk-or-") ? "openrouter" : "typesafe");
+
+/**
+ * Jev's name on OpenRouter: the aliases go to `~typesafe/jev-latest`, which also answers images and boxes there
+ * (OpenRouter has no preview alias); a release such as `jev-1.14` to `typesafe/jev-1.14`.
+ */
+export const openRouterJevModel = (model: string) =>
+  model === "jev-latest" || model === "jev-preview" ? "~typesafe/jev-latest" : `typesafe/${model}`;
+
+const OPENROUTER_URL = "https://openrouter.ai";
+/** OpenRouter's attribution: the product, never a self-hosted server's own address (as for its models, ADR 0087 §5). */
+const OPENROUTER_HEADERS = { "HTTP-Referer": "https://agentes.chat", "X-OpenRouter-Title": "agentes.chat" };
+
 export interface JevKeyView {
   source: "env" | "settings" | null;
+  /** Who the key is from. Null: no key, or a saved one this server can't open. */
+  via: JevVia | null;
   /** The key's last 4 characters. The key itself never leaves the server. */
   hint: string | null;
   state: JevShownState;
@@ -35,10 +56,11 @@ export interface JevKey {
   /** How a call went. `key`: the one it was made with, so an answer for a key replaced since is dropped. */
   report(state: JevState, retryAfterMs?: number, key?: string): void;
   view(): Promise<JevKeyView>;
-  /** Checked with TypeSafe first: a refused key is never stored (`jev_key_invalid`). */
-  save(apiKey: string, userId: string): Promise<JevKeyView>;
+  /** Checked with TypeSafe or OpenRouter first: a refused key is never stored (`jev_key_invalid`). */
+  /** `from`: a workspace's own key it was copied from (§9), named in the audit rows. */
+  save(apiKey: string, userId: string, from?: { orgId: string; credentialId: string }): Promise<JevKeyView>;
   remove(userId: string): Promise<JevKeyView>;
-  /** Asks TypeSafe again. An answer that says nothing about the key leaves its state as it was. */
+  /** Asks again. An answer that says nothing about the key leaves its state as it was. */
   check(): Promise<JevKeyView>;
 }
 
@@ -68,16 +90,30 @@ const CREDIT_WORDS = /credit|balance|billing|payment|funds/i;
 const KEY_SHAPE = /^[\x21-\x7E]+$/;
 
 /**
- * What a TypeSafe answer says about the key, first match first. Null: the request's own fault (400, 413, 415,
- * 422, such as an image outside 280 to 1568 px a side), which says nothing about the key. TypeSafe documents no
- * status for an account out of credit, so both 402 and credit words in the body count.
+ * What an answer says about the key, first match first. Null: the request's own fault (400, 404, 413, 415, 422,
+ * such as an image outside 280 to 1568 px a side), which says nothing about the key. TypeSafe documents no status
+ * for an account out of credit, so both 402 and credit words in the body count: TypeSafe's `detail`, OpenRouter's
+ * `error.message`. Through OpenRouter (`via`), a 403 is also a key past its own spending limit (out of credit) or input
+ * its moderation flagged (the request's fault), and a 404 an outage: its alpha route or Jev's name there moved, and
+ * every call would fail the same way.
  */
-export function jevStateOf(status: number, body?: unknown): JevState | null {
+export function jevStateOf(status: number, body?: unknown, via: JevVia = "typesafe"): JevState | null {
   if (status >= 200 && status < 300) return "ok";
-  const detail = (body as { detail?: { error_type?: unknown; message?: unknown } | string } | null | undefined)?.detail;
-  const words = typeof detail === "string" ? detail : `${detail?.error_type ?? ""} ${detail?.message ?? ""}`;
+  const b = body as
+    | { detail?: { error_type?: unknown; message?: unknown } | string; error?: { message?: unknown } }
+    | null
+    | undefined;
+  const detail = b?.detail;
+  const words = `${typeof detail === "string" ? detail : `${detail?.error_type ?? ""} ${detail?.message ?? ""}`} ${
+    typeof b?.error?.message === "string" ? b.error.message : ""
+  }`;
   if (status === 402 || CREDIT_WORDS.test(words)) return "no_credit";
-  // 403 is TypeSafe's answer to a request without a key (probed 2026-10-26).
+  if (via === "openrouter") {
+    if (status === 403 && /key limit/i.test(words)) return "no_credit";
+    if (status === 403 && /flagged|moderation/i.test(words)) return null;
+    if (status === 404) return "down";
+  }
+  // 403 is TypeSafe's answer to a request without a key (probed 2026-10-26), and OpenRouter's to a key it won't serve.
   if (status === 401 || status === 403) return "invalid";
   if (status === 429) return "rate_limited";
   if (status >= 500) return "down";
@@ -85,22 +121,33 @@ export function jevStateOf(status: number, body?: unknown): JevState | null {
 }
 
 export interface JevCall {
-  body: unknown;
+  /** TypeSafe's request: `model` is TypeSafe's name (`jev-latest`), renamed for OpenRouter. */
+  body: { model: string } & Record<string, unknown>;
   timeoutMs: number;
+  /** TypeSafe's own headers (`TypeSafe-Danger-Zone-Images`): OpenRouter sets what Jev needs itself. */
   headers?: Record<string, string>;
   fetch?: typeof fetch;
   baseURL?: string;
 }
 
-/** One `POST /v1/systemone`. `state` is null when our own deadline passed or the answer is the request's fault. */
+/**
+ * One `POST /v1/systemone` to TypeSafe, or `POST /api/alpha/decisions` to OpenRouter with an OpenRouter key: the
+ * same request and the same answer (`answers`, `usage`), with OpenRouter's model name. `state` is null when our own
+ * deadline passed or the answer is the request's fault.
+ */
 async function systemOne(apiKey: string, call: JevCall) {
-  const base = (call.baseURL ?? "https://api.typesafe.ai").replace(/\/$/, "");
+  const via = jevViaOf(apiKey);
+  const openRouter = via === "openrouter";
+  const url = openRouter
+    ? `${OPENROUTER_URL}/api/alpha/decisions`
+    : `${(call.baseURL ?? "https://api.typesafe.ai").replace(/\/$/, "")}/v1/systemone`;
+  const auth = { authorization: `Bearer ${apiKey}`, "content-type": "application/json" };
   let res: Response;
   try {
-    res = await (call.fetch ?? fetch)(`${base}/v1/systemone`, {
+    res = await (call.fetch ?? fetch)(url, {
       method: "POST",
-      headers: { authorization: `Bearer ${apiKey}`, "content-type": "application/json", ...call.headers },
-      body: JSON.stringify(call.body),
+      headers: openRouter ? { ...auth, ...OPENROUTER_HEADERS } : { ...auth, ...call.headers },
+      body: JSON.stringify(openRouter ? { ...call.body, model: openRouterJevModel(call.body.model) } : call.body),
       signal: AbortSignal.timeout(call.timeoutMs),
     });
   } catch (error) {
@@ -109,9 +156,12 @@ async function systemOne(apiKey: string, call: JevCall) {
     return { state: late ? null : ("down" as const), status: 0, body: null };
   }
   const body: unknown = await res.json().catch(() => null);
+  // Usage rows keep TypeSafe's name for the release that answered (`jev-1.14-…`), never OpenRouter's slash id.
+  const named = body as { model?: unknown } | null;
+  if (openRouter && typeof named?.model === "string") named.model = named.model.replace(/^~?typesafe\//, "");
   const seconds = Number(res.headers.get("retry-after"));
   return {
-    state: jevStateOf(res.status, body),
+    state: jevStateOf(res.status, body, via),
     status: res.status,
     body,
     retryAfterMs: seconds > 0 ? seconds * 1000 : undefined,
@@ -126,7 +176,8 @@ export async function callJev<T>(source: JevKeySource, call: JevCall): Promise<T
   const r = await systemOne(apiKey, call);
   if (r.state) jev.report(r.state, r.retryAfterMs, apiKey);
   if (r.state !== "ok" || r.body === null) {
-    throw new Error(r.status ? `TypeSafe answered ${r.status}` : "TypeSafe didn't answer");
+    const who = jevViaOf(apiKey) === "openrouter" ? "OpenRouter" : "TypeSafe";
+    throw new Error(r.status ? `${who} answered ${r.status}` : `${who} didn't answer`);
   }
   return r.body as T;
 }
@@ -149,7 +200,7 @@ export async function checkJevKey(
   return r.state ?? "unchecked";
 }
 
-/** Jev's calls this month (UTC), every workspace together: what the key's TypeSafe account pays for. */
+/** Jev's calls this month (UTC), every workspace together: what the key's account pays for. */
 export async function jevMonth(db: Database, now = new Date()) {
   // ponytail: scans the month's usage rows. Only a self-hosted server's owner asks (404 on the Cloud).
   const [row] = await db
@@ -170,7 +221,11 @@ export async function deleteJevKey(tx: Executor, actor: AuditEntry["actor"]) {
 
 const envError = () =>
   new ConflictError("The Jev key is set in this server's settings (TYPESAFE_API_KEY).", "jev_key_env");
-const invalidError = () => new ValidationError("TypeSafe didn't accept this key.", "jev_key_invalid");
+const invalidError = (key: string) =>
+  new ValidationError(
+    `${jevViaOf(key) === "openrouter" ? "OpenRouter" : "TypeSafe"} didn't accept this key.`,
+    "jev_key_invalid",
+  );
 
 /**
  * The key and how its calls went, in memory: the saved row is read when built and again every 60 s (a second
@@ -232,6 +287,7 @@ export function createJevKey(deps: {
 
   const snapshot = (): JevKeyView => ({
     source: env ? "env" : saved ? "settings" : null,
+    via: env ? jevViaOf(env) : saved?.key ? jevViaOf(saved.key) : null,
     hint: env ? env.slice(-4) : (saved?.hint ?? null),
     state: !env && !saved ? "off" : state === "invalid" || state === "no_credit" ? state : "ok",
   });
@@ -260,12 +316,12 @@ export function createJevKey(deps: {
       await refresh();
       return snapshot();
     },
-    async save(apiKey, userId) {
+    async save(apiKey, userId, from) {
       if (env) throw envError();
       const key = apiKey.trim();
-      if (!KEY_SHAPE.test(key)) throw invalidError();
+      if (!KEY_SHAPE.test(key)) throw invalidError(key);
       const checked = await checkJevKey(key, tsa);
-      if (checked === "invalid") throw invalidError();
+      if (checked === "invalid") throw invalidError(key);
       const values = {
         ...(await sealSecret(deps.keyWrapper, key, AAD)),
         keyHint: key.slice(-4),
@@ -277,7 +333,11 @@ export function createJevKey(deps: {
           .insert(instanceSecrets)
           .values({ name: NAME, ...values })
           .onConflictDoUpdate({ target: instanceSecrets.name, set: values });
-        await auditEveryOrg(tx, NAME, { type: "person", id: userId }, "jev.key_saved", { hint: values.keyHint });
+        await auditEveryOrg(tx, NAME, { type: "person", id: userId }, "jev.key_saved", {
+          hint: values.keyHint,
+          via: jevViaOf(key),
+          ...(from ? { fromOrgId: from.orgId, fromCredentialId: from.credentialId } : {}),
+        });
       });
       saved = { key, hint: values.keyHint, at: values.updatedAt.getTime() };
       readAt = now();

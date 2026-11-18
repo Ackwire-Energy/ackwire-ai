@@ -6,7 +6,7 @@ setupDom();
 import type { Message } from "@agenteschat/client";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { ADA_ID, createFakeApi, ENG_ID, NOW, ORG_ID, seedDm, seedState } from "./fake-api";
-import { renderApp, screen, settle } from "./render";
+import { headerSearchBox, renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
 
@@ -87,9 +87,7 @@ describe("the thread in the URL", () => {
     const state = seeded();
     const r = await renderApp(URL_OF("?thread=m-1"), { api: createFakeApi(state) });
     await settle(10);
-    const search = within(document.querySelector(".channel__header") as HTMLElement).getByRole("combobox", {
-      name: "Buscar",
-    });
+    const search = headerSearchBox();
     await act(async () => fireEvent.change(search, { target: { value: "token" } }));
     await act(() => new Promise((done) => setTimeout(done, 300)));
     await act(async () => fireEvent.keyDown(search, { key: "Enter" }));

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { schema } from "@agenteschat/db";
+import { eq, schema } from "@agenteschat/db";
 import { z } from "@hono/zod-openapi";
 import { issueParams } from "../src/http/errors";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
@@ -79,6 +79,7 @@ describe("sign-up policy (self-host)", () => {
         permissions: expect.arrayContaining(["read", "post", "talk_to_agents"]),
         rank: null,
         logo: null,
+        accent: null,
         standing: { state: "active", reason: null },
         start: { page: "home", channelId: null },
         showActivity: false,
@@ -165,21 +166,31 @@ describe("organizations, agents and credentials", () => {
     expect(JSON.stringify(rows)).not.toContain("sk-ant-api-secret");
   });
 
-  test("members can chat but can't manage agents or credentials", async () => {
+  test("a member creates an agent of their own on the default budget, but can't manage others' agents or credentials", async () => {
     await t.close();
     t = await createTestServer({ env: { ALLOW_SIGNUP: "true" } });
     const owner = browser(t);
     await signUp(owner, "owner@example.com");
-    const { orgId } = await seedOrg(owner);
+    const { orgId, agentId: devId } = await seedOrg(owner);
     const ana = browser(t);
     await signUp(ana, "ana@example.com");
     const { url } = (await (
       await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "ana@example.com", role: "member" } })
     ).json()) as { url: string };
     await ana(`/api/app/invitations/${url.split("/invite/")[1]}/accept`, { json: {} });
-    expect((await ana(`/api/app/organizations/${orgId}/agents`, { json: { name: "X", handle: "xx" } })).status).toBe(
-      403,
-    );
+    const agents = `/api/app/organizations/${orgId}/agents`;
+    const created = await ana(agents, { json: { name: "X", handle: "xx" } });
+    expect(created.status).toBe(201);
+    const [anaUser] = await t.db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .where(eq(schema.users.email, "ana@example.com"));
+    const [mine] = await t.db.select().from(schema.agents).where(eq(schema.agents.handle, "xx"));
+    expect(mine).toMatchObject({ ownerUserId: anaUser?.id, monthlyBudgetNanoUsd: null });
+    // Above the workspace's default ($50) is an admin's call.
+    expect((await ana(agents, { json: { name: "Y", handle: "yy", monthlyBudgetUsd: 51 } })).status).toBe(403);
+    expect((await ana(`${agents}/${devId}`, { method: "PATCH", json: { name: "Mine" } })).status).toBe(403);
+    expect((await ana(`${agents}/${devId}`, { method: "DELETE" })).status).toBe(403);
     expect((await ana(`/api/app/organizations/${orgId}/credentials`)).status).toBe(403);
     expect((await ana(`/api/app/organizations/${orgId}/usage`)).status).toBe(403);
     expect((await ana(`/api/app/organizations/${orgId}/agents`)).status).toBe(200);
@@ -222,6 +233,28 @@ describe("organizations, agents and credentials", () => {
 });
 
 describe("chat over HTTP", () => {
+  test("a long message goes whole and is listed whole; past the limit the refusal says both sizes", async () => {
+    const owner = browser(t);
+    await signUp(owner, "owner@example.com");
+    const { orgId, channelId } = await seedOrg(owner);
+    const url = `/api/app/organizations/${orgId}/channels/${channelId}/messages`;
+    // Distinct short words: the worst case for the search index.
+    const long = Array.from({ length: 15_000 }, (_, i) => `w${i}`).join(" ");
+    expect(long.length).toBeGreaterThan(45_000);
+    const posted = await owner(url, { json: { body: long } });
+    expect(posted.status).toBe(201);
+    await t.drain();
+    const listed = (await (await owner(url)).json()) as { messages: { body: string }[] };
+    expect(listed.messages.some((m) => m.body === long)).toBe(true);
+
+    const refused = await owner(url, { json: { body: "x".repeat(100_001) } });
+    expect(refused.status).toBe(400);
+    expect(((await refused.json()) as { error: unknown }).error).toMatchObject({
+      code: "message.too_long",
+      params: { length: 100_001, max: 100_000 },
+    });
+  });
+
   test("post a mention, workers run the agent, the reply appears in the channel, usage is billed", async () => {
     const owner = browser(t);
     await signUp(owner, "owner@example.com");

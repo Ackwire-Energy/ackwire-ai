@@ -80,13 +80,15 @@ describe("an admin on someone else's agent", () => {
     // Whose accounts these are, said on the first screen.
     expect(shownText(d)).toContain("Só contas de João");
     await toScreen(d, "Trocar de conta");
-    // The one in use; the workspace's key, the admin's to pick, picked; João's other account is his to give: shown
-    // under his name, not to be picked.
-    expect(brainRows(d).map((r) => [r.group, r.title, r.checked, r.off])).toEqual([
+    // The one in use; by AI, João's other account, his to give: saying whose it is, not to be picked; the workspace's
+    // key, the admin's to pick, picked.
+    const rows = brainRows(d);
+    expect(rows.map((r) => [r.group, r.title, r.checked, r.off])).toEqual([
       ["Em uso", "Claude Max", false, false],
-      ["Chave do workspace", "Chave padrão do workspace", true, false],
-      ["De João", "Claude Pro · Max", false, true],
+      ["Claude", "Claude Pro · Max", false, true],
+      ["Chaves de API", "Chave padrão do workspace", true, false],
     ]);
+    expect(rows[1]?.lines).toEqual(["De João"]);
     expect(mainButton(d)?.textContent).toBe("Trocar para Chave padrão do workspace");
     // No sign-in here and no other AI to connect: those are the owner's (ADR 0160, addendum).
     expect(within(d).queryByRole("button", { name: /^Conectar outra IA/ })).toBeNull();
@@ -114,8 +116,8 @@ describe("Todos nesta conta", () => {
     };
     const d = await brainDialog("Quem pensa pela Ada");
     await toScreen(d, "Trocar de conta");
-    await pickRow(d, "Claude Team");
-    await click(within(d).getByRole("button", { name: "Trocar para Claude Team" }));
+    await pickRow(d, "next@acme.com");
+    await click(within(d).getByRole("button", { name: "Trocar para next@acme.com" }));
     // The account thinks for both: whom the switch is for, everyone by default.
     expect(brainScreen(d)).toBe("Trocar a conta do time");
     const cards = within(d).getByRole("group", { name: "Para quem é" });
@@ -124,6 +126,18 @@ describe("Todos nesta conta", () => {
         .getByRole("button", { name: /^Todos nesta conta/ })
         .getAttribute("aria-pressed"),
     ).toBe("true");
+    // Whom each card covers is its description, behind an ⓘ: the role alone, or every agent on the account.
+    expect(cards.querySelectorAll(".ac-option__desc")).toHaveLength(0);
+    expect(
+      within(cards)
+        .getByRole("button", { name: /^Só a Ada/ })
+        .getAttribute("aria-description"),
+    ).toBe("Dev");
+    expect(
+      within(cards)
+        .getByRole("button", { name: /^Todos nesta conta/ })
+        .getAttribute("aria-description"),
+    ).toBe("Ada · Dev\nAtlas · Ops");
     await click(within(d).getByRole("button", { name: "Trocar os 2 agentes" }));
     await settle(6);
     // Ada moved; Atlas was asked for the account alone (the model it has stays its own) and refused.

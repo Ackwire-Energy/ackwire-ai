@@ -23,6 +23,7 @@ import { dashboardRights, dashboardSeerSql, viewerOf } from "./access";
 import { proposeDashboardAudience } from "./proposals";
 import { applyWidgetUpdate, UPDATE_WIDGET_TOOL } from "./refresh";
 import { WIDGET_KIND_MANUAL } from "./refresh-context";
+import { widgetNeedsAi } from "./refresh-ledger";
 import {
   ensureHomeBoard,
   insertDashboard,
@@ -208,6 +209,18 @@ const SCHEDULE_WORDS: Record<WidgetSchedule, string> = {
   week: "every Monday at 08:00",
   manual: "only when someone asks",
 };
+
+/** Why the agent can't build its widget (the hold's reason, `holdWidgetForAi`) and who fixes it, in its own words. */
+const noAiForBuild = (reason: string | null, person: string) =>
+  reason === "not_signed_in"
+    ? `your plan is signed out. Tell ${person} to sign it in again on your page`
+    : reason === "no_computer"
+      ? `your AI needs a computer and you have none. Tell ${person} to give you one on your page`
+      : reason === "cli_missing"
+        ? `your AI's program isn't installed on your computer. Tell ${person} to install it there`
+        : reason === "plan_not_shared" || reason === "plans_not_yours"
+          ? `your plan serves only its owner, and nobody asks for a widget's updates. Tell ${person} that an API key on your page builds it`
+          : `you have no AI to think with. Tell ${person} to connect one on your page`;
 
 export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
   const depsOf = (ctx: ToolContext): DashboardDeps => ({ ...deps, db: ctx.db });
@@ -433,14 +446,17 @@ export function createDashboardToolSource(deps: DashboardDeps): ToolSource {
           alert: { enabled: alertOn, condition: str(input.alert), userId: alertOn ? person.userId : null },
           spec,
           sources: strings(input.sources),
-          createdByUserId: null,
+          // The person behind the run, when one is: whose widget it is (an agent stays its author, `createdByRunId`).
+          createdByUserId: maker.personId,
           createdByRunId: ctx.runId,
           routineCreatorUserId: person.userId,
         });
         const where = board.kind === "home" ? `${person.name}'s Home` : `the dashboard «${board.title}»`;
         const shows = spec
           ? "It shows your data now."
-          : "Your first update builds it in the background shortly: don't build it here, and don't post its numbers in the chat.";
+          : widgetNeedsAi(row)
+            ? `It can't be built yet: its updates are background work, and there ${noAiForBuild(row.failureDetail, person.name)}, and it builds by itself then.`
+            : "Your first update builds it in the background shortly: don't build it here, and don't post its numbers in the chat.";
         const alertText = alertOn
           ? ` On each update you judge its alert (${str(input.alert).trim() || "when something is off"}); ${person.name} hears it in Waiting on you.`
           : "";

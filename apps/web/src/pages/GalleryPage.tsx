@@ -33,6 +33,8 @@ import {
   Meter,
   OptionCard,
   PageHeader,
+  PlanMeter,
+  type PlanMeterUsage,
   RadioCard,
   RadioGroup,
   SearchField,
@@ -46,6 +48,7 @@ import {
 import { type ReactNode, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { planMeterText } from "@/lib/plan-usage";
 import { useTheme } from "@/lib/theme";
 
 /*
@@ -53,6 +56,21 @@ import { useTheme } from "@/lib/theme";
  * the design's demo copy and is not shipped: the route is
  * unreachable in production builds.
  */
+
+/** An Antigravity plan as its CLI reported it on 2026-11-14 (`agy -p /usage`), its resets moved to now. */
+function antigravityUsage(): PlanMeterUsage {
+  const now = Date.now();
+  const at = (hours: number) => new Date(now + hours * 3_600_000).toISOString();
+  return {
+    windows: [
+      { kind: "seven_day", usedPercent: 2, resetsAt: at(7 * 24) },
+      { kind: "five_hour", usedPercent: 3, resetsAt: at(5) },
+      { kind: "other", label: "Claude and GPT models · 7d", usedPercent: 100, resetsAt: at(54) },
+      { kind: "other", label: "Gemini 4 Argon · 7d", usedPercent: 1, resetsAt: at(7 * 24) },
+    ],
+    at: at(0),
+  };
+}
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -64,7 +82,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function GalleryPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const [role, setRole] = useState("member");
   const [check, setCheck] = useState(true);
@@ -129,7 +147,7 @@ export function GalleryPage() {
           <Field label="Orçamento mensal (US$)" id="g-budget" error="Use um valor maior que zero.">
             <Input defaultValue="0" />
           </Field>
-          <Field label="Papel" id="g-role">
+          <Field label="Cargo" id="g-role">
             <Select
               value={role}
               onValueChange={setRole}
@@ -265,7 +283,7 @@ export function GalleryPage() {
           <Avatar name="Ana" size="sm" presence="away" />
           <Avatar name="Bruno" size="sm" presence="busy" />
           <Avatar name="Lia" size="lg" presence="offline" />
-          <AgentAvatar name="Ada" presence="busy" />
+          <AgentAvatar name="Ada" presence="working" />
           <AgentAvatar name="Atlas" initials="At" running />
           <AgentAvatar name="Lia" size="lg" />
           <AgentAvatar name="Theo" size="sm" />
@@ -414,6 +432,13 @@ export function GalleryPage() {
             </Button>
           </DialogFooter>
         </Dialog>
+      </Section>
+
+      <Section title="PlanMeter · Antigravity">
+        <div style={{ display: "grid", gap: 24, maxWidth: 360 }}>
+          <PlanMeter usage={antigravityUsage()} text={planMeterText(t, i18n.language)} />
+          <PlanMeter usage={antigravityUsage()} text={planMeterText(t, i18n.language)} compact label="maya.lin" />
+        </div>
       </Section>
 
       <Section title="Diff">

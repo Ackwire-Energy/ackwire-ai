@@ -1,9 +1,11 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema } from "@agenteschat/db";
+import { and, asc, type Database, type Executor, eq, inArray, isNotNull, isNull, schema, sql } from "@agenteschat/db";
+import { audienceSql, listsAllAgents } from "./audience";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishOrgEvent } from "./events";
 import { getMembership, requirePermission } from "./organizations";
 import { ROLE_COLORS, ROLE_ICONS } from "./permissions";
+import { forgetTeam } from "./team";
 
 const { agentGroups, agents } = schema;
 
@@ -83,6 +85,8 @@ export async function agentGroupViews(db: Executor, orgId: string): Promise<Agen
  * The event carries no list: it grows with the agents, and Postgres NOTIFY refuses payloads near 8000 bytes.
  */
 async function announce(deps: AgentGroupDeps, orgId: string) {
+  // Team rows carry their department's name (`loadTeam`): a move or a rename changes them too.
+  forgetTeam(orgId);
   await publishOrgEvent(deps.pubsub, { type: "org.broadcast", orgId, event: { type: "agent.groups" } });
   return agentGroupViews(deps.db, orgId);
 }
@@ -125,10 +129,25 @@ async function placeAgents(tx: Executor, orgId: string, groupId: string | null, 
   }
 }
 
-/** Anyone in the workspace reads them. */
+/**
+ * Anyone in the workspace reads them. Who doesn't list every agent (`listsAllAgents`) gets only the agents their
+ * lists name, and no group left without one: they don't arrange the groups.
+ */
 export async function listAgentGroups(db: Database, userId: string, orgId: string): Promise<AgentGroupView[]> {
-  await requirePermission(db, userId, orgId, "read");
-  return agentGroupViews(db, orgId);
+  const membership = await requirePermission(db, userId, orgId, "read");
+  const groups = await agentGroupViews(db, orgId);
+  if (listsAllAgents(membership)) return groups;
+  const listed = new Set(
+    (
+      await db
+        .select({ id: agents.id })
+        .from(agents)
+        .where(and(eq(agents.orgId, orgId), isNull(agents.archivedAt), audienceSql("agents", sql`${userId}::text`)))
+    ).map((r) => r.id),
+  );
+  return groups
+    .map((g) => ({ ...g, agentIds: g.agentIds.filter((id) => listed.has(id)) }))
+    .filter((g) => g.agentIds.length > 0);
 }
 
 /**

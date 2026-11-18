@@ -2,6 +2,7 @@ import type { PubSub } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
 import { runAuthority } from "./authority";
 import { cancelRun } from "./cancel";
+import { andList } from "./format";
 import { listsEveryTool } from "./tools/directory";
 import type { ToolContext, ToolDefinition, ToolOutput, ToolSource } from "./tools/types";
 import {
@@ -154,7 +155,7 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
   const steer: ToolDefinition = {
     name: STEER_WORK_TOOL,
     description:
-      'Pass the person\'s message on, unchanged, to your background work it is about (by its id in "# Your background work here"). That work reads it as their words at its next step and keeps going. Then tell them so in one short line, in their language.',
+      'Pass the person\'s message on, unchanged, to your background work it is about (by its id in "# Your background work here"). From who asked for the work, the work reads it as their words at its next step and keeps going; from anyone else, it runs once the work ends or is stopped, as them. Then tell them which in one short line, in their language.',
     scope: "",
     inputSchema: {
       type: "object",
@@ -167,7 +168,13 @@ export function createWorkToolSource(deps: { pubsub?: PubSub }): ToolSource {
       const run = await runOf(ctx);
       if (!run) return refused("Only a conversation's run can pass a message on.");
       const out = await steerWork({ db: ctx.db, pubsub: deps.pubsub }, run, str(input.work_id));
-      return out.ok ? { content: "Passed on: the work reads it now." } : refused(out.reason);
+      if (!out.ok) return refused(out.reason);
+      const kept = out.kept.length
+        ? `${andList(out.kept)} didn't ask for this work, so it doesn't take it: what they asked runs once it ends or is stopped, as them, with their own access, and a correction to it becomes their own step after it. Tell them so in one short line.`
+        : "";
+      return {
+        content: [out.delivered > 0 ? "Passed on: the work reads it now." : "", kept].filter(Boolean).join(" "),
+      };
     },
   };
   const stop: ToolDefinition = {

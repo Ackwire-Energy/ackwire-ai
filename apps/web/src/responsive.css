@@ -193,6 +193,14 @@
     --msg-inline: 12px;
     column-gap: 10px;
   }
+  /* No room left of a grouped row's receipt for its time here: the receipt's popover says when it went out. */
+  .channel__messages .ac-msg__gutter--aside > .ac-msg__gutter-time {
+    display: none;
+  }
+  /* Still 4px short of the words across this narrower gap. */
+  .channel__messages .ac-msg__gutter--aside > .ac-msg__aside {
+    margin-right: calc(var(--space-1) - 10px);
+  }
   .channel__composer {
     padding: 0 10px calc(env(safe-area-inset-bottom, 0px) + 10px);
   }
@@ -281,20 +289,6 @@
 @media (max-width: 760px) {
   .onb__rail {
     padding-top: calc(env(safe-area-inset-top, 0px) + 12px);
-  }
-}
-/* Phones: a long composer placeholder ends in "…" instead of wrapping into a half-hidden second line. */
-@media (max-width: 640px) {
-  .ac-composer textarea::placeholder {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  /* Chrome draws that "…" only when the field itself has it, on one line it doesn't wrap (empty, so nothing typed). */
-  .ac-composer textarea:placeholder-shown {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 /* Agent page: one column below the desktop (the public card's cards; the overview is one column already). */

@@ -1,4 +1,5 @@
 import { afterEach, expect, test } from "bun:test";
+import { schema } from "@agenteschat/db";
 import { grantScopes, notify, type ToolSource } from "@agenteschat/engine";
 import { browser, createTestServer, seedOrg, signUp, type TestServer } from "./harness";
 
@@ -197,6 +198,77 @@ test("notifications API: read, done and undo, snooze, read-all; session, CSRF an
   expect(
     (await other(`/api/app/organizations/${orgId}/notifications/${id}/done`, { json: { done: true } })).status,
   ).toBe(403);
+});
+
+test("done-all moves my inbox to Done but what waits on me; undo is each one's done false", async () => {
+  t = await createTestServer({ reply: () => ({ chunks: ["ok"] }) });
+  const { owner, api, orgId, userId, agentId, channelId } = await signedIn();
+  const deps = { db: t.db, pubsub: t.adapters.pubsub };
+  const actor = { type: "agent" as const, id: agentId };
+  for (const key of ["a", "b", "c"])
+    await notify(deps, { orgId, userIds: [userId], kind: "dm", groupKey: `dm:${key}`, actor, source: { label: key } });
+  const [approval] = await t.db
+    .insert(schema.approvals)
+    .values({
+      orgId,
+      agentId,
+      channelId,
+      threadRootId: crypto.randomUUID(),
+      toolUseId: "tool-1",
+      tool: "github_merge_pr",
+      scope: "github:pr.merge",
+      params: { pr: 7 },
+      actionHash: "hash",
+      title: "Merge PR #7",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })
+    .returning();
+  await notify(deps, {
+    orgId,
+    userIds: [userId],
+    kind: "approval",
+    groupKey: "approval:a1",
+    waiting: true,
+    actor,
+    source: { approvalId: approval?.id },
+  });
+  await notify(deps, {
+    orgId,
+    userIds: [userId],
+    kind: "agent_question",
+    groupKey: "question:q1",
+    waiting: true,
+    actor,
+    source: { label: "q1" },
+  });
+  expect(((await (await api("/notifications")).json()) as Page).counts).toMatchObject({ all: 5, waiting: 2 });
+
+  expect(await (await api("/notifications/done-all", { json: { filter: "waiting" } })).json()).toEqual({ ids: [] });
+  expect(await (await api("/notifications/done-all", { json: { filter: "done" } })).json()).toEqual({ ids: [] });
+  expect((await api("/notifications/done-all", { json: { filter: "everything" } })).status).toBe(400);
+  // Another origin is refused before anything changes; so is someone who is not a member.
+  expect((await api("/notifications/done-all", { json: {}, origin: "https://evil.example" })).status).toBe(403);
+  await owner(`/api/app/organizations/${orgId}/invitations`, { json: { email: "other@example.com", role: "member" } });
+  const other = browser(t);
+  await signUp(other, "other@example.com");
+  expect((await other(`/api/app/organizations/${orgId}/notifications/done-all`, { json: {} })).status).toBe(403);
+  expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(5);
+
+  const res = await api("/notifications/done-all", { json: {} });
+  expect(res.status).toBe(200);
+  const { ids } = (await res.json()) as { ids: string[] };
+  expect(ids).toHaveLength(3);
+  const left = (await (await api("/notifications")).json()) as Page;
+  expect(left.items.map((i) => i.kind).sort()).toEqual(["agent_question", "approval"]);
+  expect(await (await api("/notifications/count")).json()).toEqual({ unread: 2, waiting: 2 });
+  const done = (await (await api("/notifications?filter=done")).json()) as Page;
+  expect(done.items.map((i) => i.id).sort()).toEqual([...ids].sort());
+
+  for (const id of ids) {
+    const back = await api(`/notifications/${id}/done`, { json: { done: false } });
+    expect(((await back.json()) as Item).doneAt).toBeNull();
+  }
+  expect(((await (await api("/notifications")).json()) as Page).counts.all).toBe(5);
 });
 
 test("notification prefs: every category with its default, one switched per call, mine only", async () => {

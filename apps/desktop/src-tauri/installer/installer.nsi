@@ -1,6 +1,6 @@
-; The Windows installer of agentes.chat: Tauri's NSIS template (tauri-cli v2.12.3, tauri-bundler 2.10.3;
+; The Windows installer of Ackwire AI: Tauri's NSIS template (tauri-cli v2.12.3, tauri-bundler 2.10.3;
 ; Apache-2.0 OR MIT, Copyright (c) 2017 - Present Tauri Apps Contributors) with our changes, each marked
-; "agentes.chat:". A short flow: Welcome (Install) -> Installing -> Done, no folder to choose, an upgrade
+; "Ackwire AI:". A short flow: Welcome (Install) -> Installing -> Done, no folder to choose, an upgrade
 ; installs over the older version without asking, and our own words and pictures (scripts/installer-art.ts).
 ; The update (`/P /UPDATE`) still shows only the progress, as Tauri's. On a Tauri upgrade, compare with its
 ; template and carry the changes over.
@@ -85,9 +85,9 @@ Var WixMode
 Var OldMainBinaryName
 
 Name "${PRODUCTNAME}"
-; agentes.chat: the installing page shows a line and the bar, never the list of files.
+; Ackwire AI: the installing page shows a line and the bar, never the list of files.
 ShowInstDetails nevershow
-; agentes.chat: nothing at the bottom of the window.
+; Ackwire AI: nothing at the bottom of the window.
 BrandingText " "
 OutFile "${OUTFILE}"
 
@@ -158,11 +158,11 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 ; Installer header image
 !if "${HEADERIMAGE}" != ""
   !define MUI_HEADERIMAGE_BITMAP "${HEADERIMAGE}"
-  ; agentes.chat: the picture sits right of the page's title.
+  ; Ackwire AI: the picture sits right of the page's title.
   !define MUI_HEADERIMAGE_RIGHT
 !endif
 
-; agentes.chat: the finish page's side is the welcome's with the agent smiling, next to it (side-done.bmp).
+; Ackwire AI: the finish page's side is the welcome's with the agent smiling, next to it (side-done.bmp).
 !if "${SIDEBARIMAGE}" != ""
   !searchreplace SIDEBARDONEIMAGE "${SIDEBARIMAGE}" "side.bmp" "side-done.bmp"
 !endif
@@ -184,7 +184,7 @@ VIAddVersionKey "ProductVersion" "${VERSION}"
 
 ; Installer pages, must be ordered as they appear
 ; 1. Welcome Page
-; agentes.chat: our words, and "Install" on the button.
+; Ackwire AI: our words, and "Install" on the button.
 !define MUI_WELCOMEPAGE_TITLE "$(welcomeTitle)"
 !define MUI_WELCOMEPAGE_TEXT "$(welcomeText)"
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW WelcomeShow
@@ -290,7 +290,7 @@ Function PageReinstall
   ; of this function because we need to populate some variables
   ; related to current installed version if detected and whether
   ; we are downgrading or not.
-  ; agentes.chat: an upgrade goes on without asking, over the older version (the page's second choice).
+  ; Ackwire AI: an upgrade goes on without asking, over the older version (the page's second choice).
   ${If} $PassiveMode = 1
   ${OrIf} $R0 = 1
     Call PageLeaveReinstall
@@ -422,7 +422,7 @@ Function PageLeaveReinstall
 FunctionEnd
 
 ; 5. Choose install directory page
-; agentes.chat: never shown; it installs in the person's own app folder.
+; Ackwire AI: never shown; it installs in the person's own app folder.
 !define MUI_PAGE_CUSTOMFUNCTION_PRE Skip
 !insertmacro MUI_PAGE_DIRECTORY
 
@@ -437,7 +437,7 @@ Var AppStartMenuFolder
 !insertmacro MUI_PAGE_STARTMENU Application $AppStartMenuFolder
 
 ; 7. Installation page
-; agentes.chat: "Installing" or, from the app's update, "Updating"; it moves on to the finish page by itself.
+; Ackwire AI: "Installing" or, from the app's update, "Updating"; it moves on to the finish page by itself.
 !define MUI_PAGE_CUSTOMFUNCTION_SHOW InstFilesShow
 !insertmacro MUI_PAGE_INSTFILES
 Function InstFilesShow
@@ -450,7 +450,7 @@ FunctionEnd
 
 ; 8. Finish page
 ;
-; agentes.chat: the installing page moves on by itself (it shows no details to read), our words.
+; Ackwire AI: the installing page moves on by itself (it shows no details to read), our words.
 !define MUI_FINISHPAGE_TITLE "$(finishTitle)"
 !define MUI_FINISHPAGE_TEXT "$(finishText)"
 !define MUI_FINISHPAGE_RUN_TEXT "$(runApp)"
@@ -529,7 +529,7 @@ FunctionEnd
   !include "{{this}}"
 {{/each}}
 
-; agentes.chat: our words.
+; Ackwire AI: our words.
 LangString welcomeTitle ${LANG_ENGLISH} "Install ${PRODUCTNAME}"
 LangString welcomeText ${LANG_ENGLISH} "Your team and your AI agents, together, on this computer too.$\r$\n$\r$\nIt takes less than a minute and needs no administrator."
 LangString installButton ${LANG_ENGLISH} "Install"
@@ -554,8 +554,128 @@ LangString finishTitle ${LANG_PORTUGUESEBR} "Tudo pronto"
 LangString finishText ${LANG_PORTUGUESEBR} "O ${PRODUCTNAME} está instalado. Ele fica na bandeja, perto do relógio, para os seus agentes poderem usar este computador."
 LangString runApp ${LANG_PORTUGUESEBR} "Abrir o ${PRODUCTNAME}"
 
+LangString welcomeTitle ${LANG_SPANISH} "Instalar ${PRODUCTNAME}"
+LangString welcomeText ${LANG_SPANISH} "Tu equipo y tus agentes de IA, juntos, también en esta computadora.$\r$\n$\r$\nTarda menos de un minuto y no necesita administrador."
+LangString installButton ${LANG_SPANISH} "Instalar"
+LangString installingTitle ${LANG_SPANISH} "Instalando"
+LangString installingText ${LANG_SPANISH} "Esto tarda unos segundos."
+LangString updatingTitle ${LANG_SPANISH} "Actualizando ${PRODUCTNAME}"
+LangString updatingText ${LANG_SPANISH} "Se vuelve a abrir solo justo después."
+LangString copyingFiles ${LANG_SPANISH} "Copiando los archivos…"
+LangString finishTitle ${LANG_SPANISH} "Todo listo"
+LangString finishText ${LANG_SPANISH} "${PRODUCTNAME} está instalado. Se queda en la bandeja, junto al reloj, para que tus agentes puedan usar esta computadora."
+LangString runApp ${LANG_SPANISH} "Abrir ${PRODUCTNAME}"
+
+LangString welcomeTitle ${LANG_FRENCH} "Installer ${PRODUCTNAME}"
+LangString welcomeText ${LANG_FRENCH} "Votre équipe et vos agents IA, ensemble, sur cet ordinateur aussi.$\r$\n$\r$\nCela prend moins d'une minute et ne demande pas de droits d'administrateur."
+LangString installButton ${LANG_FRENCH} "Installer"
+LangString installingTitle ${LANG_FRENCH} "Installation"
+LangString installingText ${LANG_FRENCH} "Cela prend quelques secondes."
+LangString updatingTitle ${LANG_FRENCH} "Mise à jour de ${PRODUCTNAME}"
+LangString updatingText ${LANG_FRENCH} "Il se rouvre tout seul juste après."
+LangString copyingFiles ${LANG_FRENCH} "Copie des fichiers…"
+LangString finishTitle ${LANG_FRENCH} "Tout est prêt"
+LangString finishText ${LANG_FRENCH} "${PRODUCTNAME} est installé. Il reste dans la zone de notification, près de l'horloge, pour que vos agents puissent utiliser cet ordinateur."
+LangString runApp ${LANG_FRENCH} "Ouvrir ${PRODUCTNAME}"
+
+LangString welcomeTitle ${LANG_GERMAN} "${PRODUCTNAME} installieren"
+LangString welcomeText ${LANG_GERMAN} "Dein Team und deine KI-Agenten, zusammen, auch auf diesem Computer.$\r$\n$\r$\nDas dauert weniger als eine Minute und braucht keine Administratorrechte."
+LangString installButton ${LANG_GERMAN} "Installieren"
+LangString installingTitle ${LANG_GERMAN} "Wird installiert"
+LangString installingText ${LANG_GERMAN} "Das dauert ein paar Sekunden."
+LangString updatingTitle ${LANG_GERMAN} "${PRODUCTNAME} wird aktualisiert"
+LangString updatingText ${LANG_GERMAN} "Danach öffnet es sich gleich von selbst wieder."
+LangString copyingFiles ${LANG_GERMAN} "Dateien werden kopiert…"
+LangString finishTitle ${LANG_GERMAN} "Alles bereit"
+LangString finishText ${LANG_GERMAN} "${PRODUCTNAME} ist installiert. Es bleibt im Infobereich neben der Uhr, damit deine Agenten diesen Computer nutzen können."
+LangString runApp ${LANG_GERMAN} "${PRODUCTNAME} öffnen"
+
+LangString welcomeTitle ${LANG_ITALIAN} "Installa ${PRODUCTNAME}"
+LangString welcomeText ${LANG_ITALIAN} "Il tuo team e i tuoi agenti IA, insieme, anche su questo computer.$\r$\n$\r$\nRichiede meno di un minuto e non servono permessi di amministratore."
+LangString installButton ${LANG_ITALIAN} "Installa"
+LangString installingTitle ${LANG_ITALIAN} "Installazione in corso"
+LangString installingText ${LANG_ITALIAN} "Ci vuole qualche secondo."
+LangString updatingTitle ${LANG_ITALIAN} "Aggiornamento di ${PRODUCTNAME}"
+LangString updatingText ${LANG_ITALIAN} "Si riapre da solo subito dopo."
+LangString copyingFiles ${LANG_ITALIAN} "Copia dei file…"
+LangString finishTitle ${LANG_ITALIAN} "Tutto pronto"
+LangString finishText ${LANG_ITALIAN} "${PRODUCTNAME} è installato. Resta nell'area di notifica, vicino all'orologio, così i tuoi agenti possono usare questo computer."
+LangString runApp ${LANG_ITALIAN} "Apri ${PRODUCTNAME}"
+
+LangString welcomeTitle ${LANG_DUTCH} "${PRODUCTNAME} installeren"
+LangString welcomeText ${LANG_DUTCH} "Je team en je AI-agents, samen, ook op deze computer.$\r$\n$\r$\nHet duurt minder dan een minuut en je hebt geen beheerder nodig."
+LangString installButton ${LANG_DUTCH} "Installeren"
+LangString installingTitle ${LANG_DUTCH} "Bezig met installeren"
+LangString installingText ${LANG_DUTCH} "Dit duurt een paar seconden."
+LangString updatingTitle ${LANG_DUTCH} "${PRODUCTNAME} wordt bijgewerkt"
+LangString updatingText ${LANG_DUTCH} "Daarna opent het meteen vanzelf weer."
+LangString copyingFiles ${LANG_DUTCH} "Bestanden kopiëren…"
+LangString finishTitle ${LANG_DUTCH} "Klaar"
+LangString finishText ${LANG_DUTCH} "${PRODUCTNAME} is geïnstalleerd. Het blijft in het systeemvak, bij de klok, zodat je agents deze computer kunnen gebruiken."
+LangString runApp ${LANG_DUTCH} "${PRODUCTNAME} openen"
+
+LangString welcomeTitle ${LANG_JAPANESE} "${PRODUCTNAME}をインストール"
+LangString welcomeText ${LANG_JAPANESE} "チームとAIエージェントが、このコンピューターでも一緒に。$\r$\n$\r$\n1分もかからず、管理者権限も必要ありません。"
+LangString installButton ${LANG_JAPANESE} "インストール"
+LangString installingTitle ${LANG_JAPANESE} "インストール中"
+LangString installingText ${LANG_JAPANESE} "数秒で終わります。"
+LangString updatingTitle ${LANG_JAPANESE} "${PRODUCTNAME}を更新中"
+LangString updatingText ${LANG_JAPANESE} "終わるとすぐに自動で開きます。"
+LangString copyingFiles ${LANG_JAPANESE} "ファイルをコピー中…"
+LangString finishTitle ${LANG_JAPANESE} "準備完了"
+LangString finishText ${LANG_JAPANESE} "${PRODUCTNAME}をインストールしました。時計の横の通知領域にとどまり、エージェントがこのコンピューターを使えるようにします。"
+LangString runApp ${LANG_JAPANESE} "${PRODUCTNAME}を開く"
+
+LangString welcomeTitle ${LANG_KOREAN} "${PRODUCTNAME} 설치"
+LangString welcomeText ${LANG_KOREAN} "팀과 AI 에이전트가 이 컴퓨터에서도 함께해요.$\r$\n$\r$\n1분도 걸리지 않고 관리자 권한도 필요 없어요."
+LangString installButton ${LANG_KOREAN} "설치"
+LangString installingTitle ${LANG_KOREAN} "설치 중"
+LangString installingText ${LANG_KOREAN} "몇 초면 끝나요."
+LangString updatingTitle ${LANG_KOREAN} "${PRODUCTNAME} 업데이트 중"
+LangString updatingText ${LANG_KOREAN} "끝나면 바로 다시 열려요."
+LangString copyingFiles ${LANG_KOREAN} "파일 복사 중…"
+LangString finishTitle ${LANG_KOREAN} "모두 끝났어요"
+LangString finishText ${LANG_KOREAN} "${PRODUCTNAME}이 설치되었어요. 시계 옆 알림 영역에 머물러서 에이전트가 이 컴퓨터를 사용할 수 있어요."
+LangString runApp ${LANG_KOREAN} "${PRODUCTNAME} 열기"
+
+LangString welcomeTitle ${LANG_SIMPCHINESE} "安装 ${PRODUCTNAME}"
+LangString welcomeText ${LANG_SIMPCHINESE} "你的团队和 AI 智能体，在这台电脑上也能一起工作。$\r$\n$\r$\n不到一分钟即可完成，无需管理员权限。"
+LangString installButton ${LANG_SIMPCHINESE} "安装"
+LangString installingTitle ${LANG_SIMPCHINESE} "正在安装"
+LangString installingText ${LANG_SIMPCHINESE} "只需几秒钟。"
+LangString updatingTitle ${LANG_SIMPCHINESE} "正在更新 ${PRODUCTNAME}"
+LangString updatingText ${LANG_SIMPCHINESE} "更新完成后会自动重新打开。"
+LangString copyingFiles ${LANG_SIMPCHINESE} "正在复制文件…"
+LangString finishTitle ${LANG_SIMPCHINESE} "一切就绪"
+LangString finishText ${LANG_SIMPCHINESE} "${PRODUCTNAME} 已安装。它会留在时钟旁的通知区域，让你的智能体可以使用这台电脑。"
+LangString runApp ${LANG_SIMPCHINESE} "打开 ${PRODUCTNAME}"
+
+LangString welcomeTitle ${LANG_TURKISH} "${PRODUCTNAME}'i yükle"
+LangString welcomeText ${LANG_TURKISH} "Ekibiniz ve yapay zeka ajanlarınız, bu bilgisayarda da bir arada.$\r$\n$\r$\nBir dakikadan kısa sürer ve yönetici izni gerekmez."
+LangString installButton ${LANG_TURKISH} "Yükle"
+LangString installingTitle ${LANG_TURKISH} "Yükleniyor"
+LangString installingText ${LANG_TURKISH} "Bu birkaç saniye sürer."
+LangString updatingTitle ${LANG_TURKISH} "${PRODUCTNAME} güncelleniyor"
+LangString updatingText ${LANG_TURKISH} "Hemen ardından kendiliğinden yeniden açılır."
+LangString copyingFiles ${LANG_TURKISH} "Dosyalar kopyalanıyor…"
+LangString finishTitle ${LANG_TURKISH} "Her şey hazır"
+LangString finishText ${LANG_TURKISH} "${PRODUCTNAME} yüklendi. Ajanlarınız bu bilgisayarı kullanabilsin diye saatin yanındaki bildirim alanında kalır."
+LangString runApp ${LANG_TURKISH} "${PRODUCTNAME}'i aç"
+
+LangString welcomeTitle ${LANG_RUSSIAN} "Установить ${PRODUCTNAME}"
+LangString welcomeText ${LANG_RUSSIAN} "Ваша команда и ваши ИИ-агенты вместе, теперь и на этом компьютере.$\r$\n$\r$\nУстановка займёт меньше минуты и не требует прав администратора."
+LangString installButton ${LANG_RUSSIAN} "Установить"
+LangString installingTitle ${LANG_RUSSIAN} "Установка"
+LangString installingText ${LANG_RUSSIAN} "Это займёт несколько секунд."
+LangString updatingTitle ${LANG_RUSSIAN} "Обновление ${PRODUCTNAME}"
+LangString updatingText ${LANG_RUSSIAN} "Сразу после этого приложение откроется само."
+LangString copyingFiles ${LANG_RUSSIAN} "Копирование файлов…"
+LangString finishTitle ${LANG_RUSSIAN} "Всё готово"
+LangString finishText ${LANG_RUSSIAN} "${PRODUCTNAME} установлен. Он остаётся в области уведомлений рядом с часами, чтобы ваши агенты могли пользоваться этим компьютером."
+LangString runApp ${LANG_RUSSIAN} "Открыть ${PRODUCTNAME}"
+
 Function .onInit
-  ; agentes.chat: the finish page's picture, next to MUI's own.
+  ; Ackwire AI: the finish page's picture, next to MUI's own.
   !ifdef SIDEBARDONEIMAGE
     InitPluginsDir
     File "/oname=$PLUGINSDIR\side-done.bmp" "${SIDEBARDONEIMAGE}"
@@ -736,7 +856,7 @@ Section Install
 
   !insertmacro CheckIfAppIsRunning "$INSTDIR\${MAINBINARYNAME}.exe" "${PRODUCTNAME}"
 
-  ; agentes.chat: one line while the files are copied, not each file's name.
+  ; Ackwire AI: one line while the files are copied, not each file's name.
   SetDetailsPrint textonly
   DetailPrint "$(copyingFiles)"
   SetDetailsPrint none

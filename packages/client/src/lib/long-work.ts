@@ -1,7 +1,7 @@
 import type { TFunction } from "i18next";
 import type { AgentStatusLine, WorkView } from "../api/types";
 import { runErrorText } from "./errors";
-import { formatTime, lowerFirst } from "./format";
+import { formatTime, keepWhole, lowerFirst } from "./format";
 import { plainLines } from "./markdown";
 import { usageWhen } from "./plan-usage";
 
@@ -53,6 +53,8 @@ export interface WorkLineContext {
   agentName: string;
   /** Who stopped it, by id (null: unknown). */
   nameOf?: (userId: string) => string | null;
+  /** The right hand that stopped it at someone's word, by id. */
+  agentNameOf?: (agentId: string) => string | null | undefined;
   /** Who may stop it (`mayStopRun`: who asked, the agent's owner, an admin). */
   canStop: boolean;
   /** Shown inside the thread its updates go to: they are read there, so the line doesn't repeat the last one. */
@@ -90,7 +92,11 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
       result: w.resultMessageId ? { messageId: w.resultMessageId, label: say("work.whatHappened") } : null,
     };
   if (w.status === "canceled") {
-    const name = w.canceledByUserId ? c.nameOf?.(w.canceledByUserId) : null;
+    const name = w.canceledByAgentId
+      ? c.agentNameOf?.(w.canceledByAgentId)
+      : w.canceledByUserId
+        ? c.nameOf?.(w.canceledByUserId)
+        : null;
     return {
       ...base,
       tone: "stopped",
@@ -132,6 +138,44 @@ export function workLine(t: TFunction, w: WorkView, c: WorkLineContext): WorkLin
       next > 60_000 ? say("work.line.next", { minutes: Math.round(next / 60_000) }) : say("work.line.nextSoon"),
     );
   return { ...base, tone: "working", text: parts.join(" · "), result: null };
+}
+
+/**
+ * A handed work's line, under the reply of the agent that handed it ("Handed to Atlas · working on it · step 3 of 5 ·
+ * 2 min"): `state` is the coloured word, `facts` what follows it. No task label (the chip above links it) and no last
+ * update (the delegate's updates are the messages right below).
+ */
+export interface HandedLineView extends Pick<WorkLineView, "tone" | "stop" | "result" | "question"> {
+  state: string;
+  facts: string[];
+}
+
+export function handedLine(t: TFunction, w: WorkView, c: WorkLineContext): HandedLineView {
+  const say = loose(t);
+  const base = workLine(t, w, c);
+  const now = c.now ?? new Date();
+  // Each fact stays on one line ("2 min", "step 3 of 5"): the line wraps between them.
+  const took = keepWhole(
+    workDuration(t, (w.finishedAt ? Date.parse(w.finishedAt) : now.getTime()) - Date.parse(w.startedAt)),
+  );
+  const out = { tone: base.tone, stop: base.stop, result: base.result, question: base.question };
+  if (w.status === "done") return { ...out, state: say("work.handed.done", { duration: took }), facts: [] };
+  if (w.status === "failed") return { ...out, state: say("work.handed.failed"), facts: [] };
+  if (w.status === "canceled") return { ...out, state: say("work.handed.stopped"), facts: [took] };
+  if (base.tone === "queued") return { ...out, state: say("work.handed.queued"), facts: [] };
+  const mine = Boolean(c.meId && w.requestedByUserId === c.meId);
+  const asked = w.state === "waiting_input" ? w.question : null;
+  const forMe = asked?.requestedForUserId ? asked.requestedForUserId === c.meId : mine;
+  const waits: Partial<Record<NonNullable<WorkView["state"]>, string>> = {
+    waiting_input: forMe ? "work.handed.waitingYou" : "work.handed.waiting",
+    waiting_approval: mine ? "work.handed.waitingApprovalYou" : "work.handed.waitingApproval",
+    waiting_computer: "work.handed.waitingComputer",
+    paused: "work.handed.paused",
+  };
+  const wait = w.state ? waits[w.state] : undefined;
+  if (wait) return { ...out, state: say(wait), facts: [took] };
+  const step = w.planStep ? [keepWhole(say("work.handed.step", w.planStep))] : [];
+  return { ...out, state: say("work.handed.working"), facts: [...step, took] };
 }
 
 /** Held on a person's answer or approval, whose card is in its thread: its line opens the thread, whatever else does. */

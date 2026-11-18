@@ -96,7 +96,7 @@ html:not([data-pointer]) .members-side__add:focus-visible {
   flex: 1;
   min-width: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   min-height: 46px;
   padding: 5px 8px;
@@ -125,10 +125,18 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
   height: var(--name-face);
 }
 .members-side__text {
+  margin-block-start: calc(var(--cap-top) - 9.5px);
+  font-size: 14.5px;
+  line-height: 19px;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+@supports (top: 1lh) {
+  .members-side__text {
+    margin-block-start: calc(var(--cap-top) - 0.5lh);
+  }
 }
 .members-side__name {
   display: flex;
@@ -188,10 +196,11 @@ html:not([data-pointer]) .members-side__row.profile-trigger:focus-visible {
 .members-side__spin {
   flex: none;
 }
-.members-side__inner[data-presence="offline"] {
+/* Everyone under Offline (people, and agents out of office, held or with no AI) is faded alike, whatever its badge. */
+.members-side__group[data-off] .members-side__inner {
   opacity: 0.45;
 }
-.members-side__inner[data-presence="offline"] .members-side__name {
+.members-side__group[data-off] .members-side__name {
   font-weight: 500;
 }
 .members-side__crown {

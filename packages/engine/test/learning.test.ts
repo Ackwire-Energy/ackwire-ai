@@ -20,6 +20,7 @@ import {
   listAgentMemoryRows,
   memoriesFor,
   normalizeSubject,
+  openPersonAgentDm,
   postPersonMessage,
   recordContextUse,
   retrieveForRun,
@@ -348,6 +349,33 @@ describe("agents learn on their own (ADR 0120)", () => {
     expect((await receipts()).map((r) => r.kind)).toContain("skill.created");
   });
 
+  test("how-tos learned only in one person's DMs become that person's skill where the workspace has more", async () => {
+    f = await setup();
+    const member = await addMember(f.db, f.org.id, "member", "walter");
+    const dm = await openPersonAgentDm(f.db, f.org.id, member.id, f.agent.id);
+    const { run } = await personRun();
+    await invoke(run, "save_how_to", {
+      title: "List the Northwind models",
+      key: "List the Northwind models",
+      how: `GET ${MODELS_URL} with the key`,
+    });
+    const [note] = await items();
+    if (!note) throw new Error("no note");
+    await f.db
+      .update(schema.contextItems)
+      .set({ channelIds: [dm.id] })
+      .where(eq(schema.contextItems.id, note.id));
+    for (let i = 0; i < 3; i++) {
+      const { run: used } = await personRun("@dev the northwind models again");
+      await addRunStep(f.db, used, "context", { memoryItems: [note.id] });
+      await recordContextUse(f.db, f.org.id, used.id, [note.id]);
+      await afterTurnDone(f.context, used, { judged: true, signal: "none" });
+    }
+    await consolidateOrg(f.context, f.org.id);
+    const [skill] = await f.db.select().from(schema.skills).where(eq(schema.skills.orgId, f.org.id));
+    expect([skill?.slug, skill?.ownerUserId]).toEqual(["northwind-api", member.id]);
+  });
+
   test("a negative outcome on a run that used the how-to keeps it from becoming a skill", async () => {
     f = await setup();
     const { run } = await personRun();
@@ -513,6 +541,38 @@ describe("agents learn on their own (ADR 0120)", () => {
     await learnAccess("@dev is signed in to the Ads Console in its browser");
     const ads = (await items()).find((i) => i.content.includes("Ads Console"));
     expect([ads?.agentId, ads?.channelIds]).toEqual([null, [f.general.id]]);
+  });
+
+  test("a turn that sets up SSH keeps how to reach the server (host, port, user, key path), never the password", async () => {
+    f = await setup();
+    const { run } = await personRun("@dev configure o acesso SSH ao vps.example.com, porta 2222, usuário deploy");
+    await step(run, "computer_run", { command: "ssh-keygen -t ed25519 -f ~/.ssh/vps_example" }, "ok");
+    const ssh = "@dev reaches vps.example.com over SSH on port 2222 as deploy with the key at ~/.ssh/vps_example";
+    const access = (title: string, key: string, content: string) => ({
+      kind: "access",
+      scope: "own",
+      about_person: "",
+      title,
+      key,
+      content,
+      refs: ["m1", "s1"],
+    });
+    learnOutput = {
+      items: [
+        access(ssh, "@dev ssh vps.example.com", ssh),
+        access("deploy password", "@dev ssh password", "password: Fake-Pa55word-not-real"),
+      ],
+      skill_fixes: [],
+    };
+    const out = await learnRun(f.context, { orgId: f.org.id, runId: run.id });
+    const prompt = systemText(
+      f.provider.calls.find((c) => isLearn(systemText(c.request.system)))?.request.system ?? "",
+    );
+    expect(prompt).toContain("the path of a key file on the agent's own computer as an access");
+    expect(out.rejected.map((r) => r.reason)).toEqual(["secret"]);
+    const saved = await items();
+    expect(saved.map((i) => [i.kind, i.content])).toEqual([["fact", ssh]]);
+    for (const part of ["port 2222", "as deploy", "~/.ssh/vps_example"]) expect(saved[0]?.content).toContain(part);
   });
 
   test("guards: daily cap, a live run, credentials, a person's item, update_skill rules, a run that saved already", async () => {

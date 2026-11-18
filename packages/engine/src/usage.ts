@@ -1,7 +1,7 @@
 import { and, type Database, eq, gte, isNull, schema, sql } from "@agenteschat/db";
 import { caches } from "./cache";
 import { can, getMembership, requirePermission } from "./organizations";
-import { closedRefusal } from "./standing";
+import { readRefusal } from "./standing";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
 
 const { usageRecords, agents, organizationSettings } = schema;
@@ -15,7 +15,7 @@ export const DEFAULT_AGENT_BUDGET_NANO_USD = 50_000_000_000;
  */
 export async function canViewCost(db: Database, actorId: string, orgId: string) {
   const membership = await getMembership(db, actorId, orgId);
-  return membership !== null && !closedRefusal(membership.standing) && can(membership, "view_usage");
+  return membership !== null && !readRefusal(membership.standing) && can(membership, "view_usage");
 }
 
 /** The organization's default monthly budget per agent, in nano-USD (cached). */

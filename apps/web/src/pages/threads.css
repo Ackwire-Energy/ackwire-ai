@@ -162,10 +162,12 @@ html:not([data-pointer]) .thread-row__name:focus-visible {
   font-weight: 600;
   color: var(--ink2);
 }
+/* The tag column holds the longest state whole: what a thread's work waits on reaches 184px ("Esperando su
+   computadora"), and a state is a fact, never cut. */
 .thread-row__end {
   position: relative;
   display: grid;
-  grid-template-columns: 168px 76px 64px;
+  grid-template-columns: 192px 76px 64px;
   align-items: center;
   gap: 12px;
 }
@@ -279,7 +281,7 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
     margin-top: calc(var(--cap-top) - 10px);
   }
   .thread-row__end {
-    grid-template-columns: 168px 64px;
+    grid-template-columns: 192px 64px;
     translate: 0 calc(var(--cap-top) - 50%);
   }
   .thread-row__who {
@@ -292,16 +294,21 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
     align-items: start;
     padding: 10px 12px;
   }
-  /* Under the words now, on a line of its own. */
+  /* Under the words now, on a line of its own. A state too long to share it with the time stays whole: the time goes
+     under it, on the times' right edge. */
   .thread-row__end {
     grid-column: 2;
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: 8px;
+    gap: 4px 8px;
     translate: none;
   }
   .thread-row__state {
     justify-content: flex-start;
+  }
+  .thread-row__ago {
+    margin-left: auto;
   }
   .thread-row__state:empty {
     display: none;
@@ -311,120 +318,4 @@ html:not([data-pointer]) .thread-row__resolved:focus-visible {
     transform: none;
     margin-left: auto;
   }
-}
-
-/* ── Details (in the shared details dialog) ─────────────────────────────── */
-.thread-details__actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.thread-details__actions > .ac-btn {
-  flex: 1 1 auto;
-}
-.thread-banner {
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-lg);
-  background: var(--sunken);
-  font-size: 13px;
-  color: var(--ink2);
-}
-.thread-banner .ac-icon {
-  color: var(--muted);
-}
-.thread-banner b {
-  display: block;
-  font-weight: 650;
-  color: var(--ink);
-}
-.thread-banner small {
-  display: block;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-.thread-where {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  min-width: 0;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--sunken);
-  font: inherit;
-  font-size: 13.5px;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.thread-where:hover {
-  background: color-mix(in srgb, var(--ink) 7%, var(--sunken));
-}
-html:not([data-pointer]) .thread-where:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.thread-where__icon {
-  width: 28px;
-  height: 28px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--raised);
-  box-shadow: var(--e1);
-  color: var(--muted);
-}
-.thread-where__text {
-  flex: 1;
-  min-width: 0;
-}
-.thread-where__text b {
-  display: block;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.thread-where__text small {
-  display: block;
-  font-size: 12px;
-  color: var(--faint);
-}
-.thread-people {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.thread-people li {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 5px 4px;
-  font-size: 13.5px;
-  color: var(--ink2);
-}
-.thread-people small {
-  font-size: 12px;
-  color: var(--faint);
-}
-.thread-facts {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 14px;
-  margin: 0;
-  font-size: 13px;
-}
-.thread-facts dt {
-  color: var(--faint);
-}
-.thread-facts dd {
-  margin: 0;
-  color: var(--ink2);
 }

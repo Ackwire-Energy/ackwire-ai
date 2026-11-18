@@ -1,5 +1,5 @@
 import type { EventEmitter } from "node:events";
-import { statSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { connect, createServer, type Server } from "node:net";
 
 /**
@@ -70,6 +70,8 @@ export interface BindProbes {
   tmp(): string;
   sleep(ms: number): Promise<void>;
   now(): number;
+  /** This process's cgroup v2 path (`/proc/self/cgroup`), or null where there is none. */
+  cgroup?(): string | null;
 }
 
 const errorName = (error: NodeJS.ErrnoException) => error.code ?? "error";
@@ -124,6 +126,13 @@ export const kernelProbes: BindProbes = {
   },
   sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now: Date.now,
+  cgroup() {
+    try {
+      return /^0::(.*)$/m.exec(readFileSync("/proc/self/cgroup", "utf8"))?.[1] ?? null;
+    } catch {
+      return null;
+    }
+  },
 };
 
 /** The guard on a computer that hosts several organizations maps a new slice at its next scan (2 s). */
@@ -138,6 +147,14 @@ const refused = (result: string) => result === "EPERM" || result === "EACCES";
  * than the policy says (a refusal for a taken port is no proof either way). Returns this process's /tmp.
  */
 export async function verifyBrowserBindPolicy(c: BindCheck, probes: BindProbes = kernelProbes): Promise<string> {
+  // A PAM session (pam_systemd) moved it into someone's sessions: no slice policy holds there, and no re-execution
+  // brings it back, so say that instead of blaming an earlier policy. The launcher never opens one (`asAgent`).
+  const cgroup = probes.cgroup?.();
+  if (cgroup?.startsWith("/user.slice/")) {
+    throw new Error(
+      `The agent runs in ${cgroup}, outside its slice: a PAM session (pam_systemd) moved it there. Update the runner.`,
+    );
+  }
   for (const host of ["127.0.0.1", "::1"]) {
     for (const port of c.forbidden) {
       const { result } = await probes.bind(host, port);

@@ -20,8 +20,7 @@
     "down": "Nach unten",
     "position": "{{at}} von {{count}}.",
     "channelPosition": "{{at}} von {{count}}.",
-    "itsChannels": "Kanäle",
-    "seeAll": "Alle ansehen"
+    "itsChannels": "Kanäle"
   },
   "blocks": {
     "send": "Senden",
@@ -54,7 +53,8 @@
     "closed": "{{title}} · geschlossen",
     "reopen": "Wieder anzeigen",
     "answeredBy": "{{name}} hat gewählt",
-    "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal."
+    "failed": "Deine Auswahl wurde nicht gesendet. Versuch es noch einmal.",
+    "tooLongFix": "Kürze die Antwort."
   },
   "chart": {
     "table": "Tabelle",
@@ -187,16 +187,9 @@
       "text": "Er ist vielleicht offline oder außerhalb deines Netzwerks. Deine Chats erscheinen von selbst, sobald er wieder da ist.",
       "kept": "Du siehst, was schon in der App war."
     },
-    "section": {
-      "agents": "Agenten",
-      "channels": "Kanäle",
-      "people": "Personen"
-    },
-    "seeAll": {
-      "agents": "Alle Agenten ansehen",
-      "channels": "Alle Kanäle ansehen",
-      "people": "Alle Personen ansehen"
-    },
+    "pinned": "Angepinnt",
+    "recent": "Zuletzt",
+    "seeAll": "Alle Chats ansehen",
     "wait": {
       "verb": {
         "approval": "braucht dein Okay",
@@ -250,8 +243,6 @@
       "mute": "Stumm",
       "unmute": "Ton an"
     },
-    "firstRunLine": "{{name}} richtet das Team ein · {{done}} von {{total}}",
-    "firstRunLinePersonal": "{{name}} richtet deine Agenten ein · {{done}} von {{total}}",
     "first": {
       "title": "Starte mit deinem ersten Agenten",
       "subtitle": "Gib ihm einen Namen und sag, was er macht. Er erscheint hier als Chat.",
@@ -302,7 +293,7 @@
   },
   "along": {
     "agent": "Ein Agent",
-    "waits": "{{name}} wartet auf dein Okay",
+    "waits": "{{name}} · wartet auf dich",
     "on": "{{name}} · {{what}}",
     "working": "{{name}} arbeitet",
     "more": "+{{count}}"
@@ -358,8 +349,15 @@
     "profile": "Profil",
     "here_one": "{{count}} hier",
     "here_other": "{{count}} hier",
+    "membersAdd": "Hinzufügen",
+    "membersAdded_one": "{{count}} zu #{{channel}} hinzugefügt",
+    "membersAdded_other": "{{count}} zu #{{channel}} hinzugefügt",
+    "memberRemoved": "{{name}} ist nicht mehr in #{{channel}}",
+    "muted": "#{{channel}} stummgeschaltet",
+    "unmuted": "Stummschaltung für #{{channel}} aufgehoben",
     "headerAgent": "{{who}}. Profil öffnen",
     "headerChannel": "{{who}}. Optionen",
+    "headerMembers": "{{who}}. Sehen, wer hier ist",
     "switchHint": "Gedrückt halten, um die Unterhaltung zu wechseln",
     "switchTitle": "Unterhaltung wechseln",
     "switchSearch": "Unterhaltungen durchsuchen",
@@ -370,8 +368,6 @@
     "switchWorking": "arbeitet",
     "join": "Dem Kanal beitreten",
     "sending": "Wird gesendet…",
-    "failed": "Nicht gesendet · Erneut versuchen",
-    "notSent": "Die Nachricht wurde nicht gesendet.",
     "toLatest": "Zu den neuesten Nachrichten",
     "toLatestNew": "Zu den neuesten Nachrichten: {{text}}",
     "stopAgent": "{{name}} stoppen",
@@ -444,21 +440,15 @@
     "doubleTapHint": "Doppeltippen = 👍",
     "react": "Reagieren",
     "attach": {
-      "more": "Noch ein Foto oder eine Datei",
       "remove": "{{name}} entfernen",
       "waiting": "{{name}}, wartet auf das Senden",
       "sending": "{{name}}, wird gesendet",
+      "failed": "{{name}}, nicht gesendet: zum erneuten Versuch senden",
+      "preparing": "Dateien werden vorbereitet…",
       "tooMany": "Bis zu {{count}} Dateien pro Nachricht."
     },
     "swipeReply": "Zum Antworten nach rechts wischen",
     "intent": {
-      "suggest": {
-        "merge": "Mach den Merge",
-        "review": "Bitte {{name}}, es vorher zu prüfen",
-        "seeChange": "Zeig mir, was sich geändert hat",
-        "summarize": "Fass es in 3 Punkten zusammen",
-        "nextStep": "Was ist der nächste Schritt?"
-      },
       "arrived": "{{name}} ist jetzt im Team",
       "meet": "Deine erste Unterhaltung mit {{name}}",
       "roleIntro": "{{role}} in deinem Team. Frag einfach in deinen Worten.",
@@ -604,7 +594,6 @@
     "minuteLess": "{{n}} Minuten früher",
     "minuteMore": "{{n}} Minuten später",
     "submit": "Zu dieser Zeit erinnern",
-    "quick": "Schnelle Zeiten ansehen",
     "done": "Erinnerung eingestellt",
     "error": {
       "noAgent": "Kein Agent hier kann dich erinnern",
@@ -662,6 +651,7 @@
     "title": "Neue Mission",
     "intro": "Der Agent macht einen Plan und startet erst, wenn du es sagst.",
     "placeholder": "Was soll erledigt werden?",
+    "who": "Wer sie übernimmt",
     "submit": "Plan anfordern",
     "created": "{{name}} macht den Plan",
     "noAgents": "Noch kann kein Agent Missionen ausführen. Verbinde auf der Website einen Computer.",
@@ -794,7 +784,7 @@
     "teamSectionPersonal": "Deine Agenten",
     "managerQuiet": "Nichts in Arbeit",
     "state": {
-      "waitsYou": "wartet auf dein Okay",
+      "waitsYou": "wartet auf dich",
       "noAi": "Keine KI verbunden",
       "connect": "Verbinden",
       "archived": "Archiviert",
@@ -819,9 +809,6 @@
     "keepEditing": "Weiter bearbeiten"
   },
   "newAgent": {
-    "leaveTitle": "Ohne Erstellen verlassen?",
-    "leaveText": "Der angefangene Agent wird nicht erstellt.",
-    "keepGoing": "Weiter erstellen",
     "identityQuestion": "Wer ist der Agent?",
     "identityLead": "Sein Name, wie du ihn im Chat rufst, und sein Gesicht.",
     "handleMention": "Erwähne @{{handle}}, um ihn zu rufen.",
@@ -847,7 +834,6 @@
       "archive": "Das Handy öffnet keine .zip- oder .tar.gz-Dateien. Tippe in der Dateien-App auf die .zip, um sie zu entpacken, und wähle die Dateien darin, oder importiere am Computer.",
       "privacy": "Wird auf diesem Handy gelesen. Schlüssel- und Login-Dateien werden nie geöffnet.",
       "also": "Kommt auch mit",
-      "change": "Ändern",
       "arrived_one": "{{name}} ist da",
       "arrived_other": "{{count}} Agenten sind da",
       "partial": "{{done}} von {{total}} sind da. Ein erneuter Import holt den Rest."
@@ -871,7 +857,11 @@
     "taskForM": "Aufgabe für {{name}}",
     "taskPlaceholder": "Was soll erledigt werden?",
     "sendTask": "Aufgabe senden",
-    "taskSent": "Aufgabe gesendet"
+    "taskSent": "Aufgabe gesendet",
+    "brakes": {
+      "forgetTitle": "Diese Antworten vergessen?",
+      "forgetText": "{{name}} fragt vor dieser Art von Arbeit wieder nach."
+    }
   },
   "activity": {
     "title": "Aktivität",
@@ -883,6 +873,8 @@
     },
     "doneToast": "Erledigt",
     "undo": "Rückgängig",
+    "doneAllToast_one": "{{count}} nach Erledigt verschoben",
+    "doneAllToast_other": "{{count}} nach Erledigt verschoben",
     "day": {
       "today": "Heute",
       "yesterday": "Gestern",
@@ -920,6 +912,9 @@
       "routine_failed_other": "Routinen fehlgeschlagen",
       "run_failed_one": "Ließ sich nicht abschließen",
       "run_failed_other": "Ließen sich nicht abschließen",
+      "admin_ask_channel_agent": "{{names}} bittet dich, {{agent}} zu #{{label}} hinzuzufügen",
+      "admin_ask_create_agents": "{{names}} möchte Agenten erstellen dürfen",
+      "admin_ask_webhook": "{{names}} bittet dich, den {{service}}-Webhook für Routinen einzurichten",
       "routine_paused_one": "Routine pausiert",
       "routine_paused_other": "Routinen pausiert",
       "routine_stalled_one": "Routine wartet auf den Computer",
@@ -980,6 +975,8 @@
       "plan_lent_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
       "plan_lent_female_one": "{{names}} hat dein {{plan}}-Abo mit {{agent}} verbunden",
       "plan_lent_female_other": "{{names}} haben dein {{plan}}-Abo mit {{agent}} verbunden",
+      "plan_serves_one": "Dein {{plan}} dient jetzt dem ganzen Workspace",
+      "plan_serves_other": "Dein {{plan}} dient jetzt dem ganzen Workspace",
       "plan_model_dropped_one": "{{model}} ist nicht mehr bei {{plan}}. {{names}} nutzt vorerst {{runs}}",
       "plan_model_dropped_other": "{{model}} ist nicht mehr bei {{plan}}. {{names}} nutzt vorerst {{runs}}",
       "computer_disk_full_one": "Die Festplatte eines Computers ist fast voll",
@@ -1135,6 +1132,9 @@
     "addWorkspaceTeamShort": "Dem Server deines Teams beitreten",
     "addWorkspaceTeamSubShort": "Adresse oder QR-Code des Computers",
     "addWorkspaceFoot": "Du verlässt keinen Workspace.",
+    "addAccount": "Bei einem weiteren Konto anmelden",
+    "addAccountSub": "Auf {{host}}, ohne dieses zu verlassen",
+    "accountNoWorkspace": "Noch kein Workspace",
     "teamServerLeadShort": "Was dein Team im Browser öffnet.",
     "teamServerQuestion": "Wie lautet die Adresse deines Teams?",
     "account": {
@@ -1152,6 +1152,8 @@
       "name": "Name",
       "namePlaceholder": "Dein Name",
       "email": "E-Mail",
+      "emailWebLead": "Melde dich auf der Website erneut an und ändere sie dort, ohne den Code.",
+      "emailWeb": "Auf der Website erneut anmelden",
       "inWorkspace": "In diesem Workspace · {{org}}",
       "handle": "Dein @",
       "timezone": "Zeitzone",
@@ -1184,6 +1186,7 @@
     "blocked": "Du bist der einzige Inhaber von {{names}}. Mach auf der Website unter Personen jemand anderen zum Inhaber und komm dann zurück.",
     "addPasswordFirst": "Füge deinem Konto zuerst auf der Website ein Passwort hinzu und gib es dann hier ein.",
     "addPasswordWeb": "Passwort auf der Website hinzufügen",
+    "onThisComputer": "Lösche es in der Ackwire AI-App auf dem Computer, auf dem dieser Server läuft.",
     "otherAccount": "Du hast dich mit einem anderen Konto angemeldet. Es wurde nichts gelöscht.",
     "hold": "Zum Löschen gedrückt halten"
   },
@@ -1203,7 +1206,7 @@
       "file": "Datei"
     },
     "more": "Weitere Optionen",
-    "send": "Senden",
+    "sendCopy": "Kopie senden",
     "savePhotos": "In Fotos sichern",
     "drive": "Im Drive ansehen",
     "saved": "In Fotos gesichert",
@@ -1217,6 +1220,7 @@
     "place": "{{index}} von {{count}}",
     "previous": "Vorheriges Bild",
     "next": "Nächstes Bild",
+    "noPreviewTitle": "Keine Vorschau",
     "noPreview": "Diese Datei öffnet sich nicht in der App. Sende sie an eine andere App, um sie zu öffnen.",
     "video": {
       "play": "Abspielen",
@@ -1226,7 +1230,8 @@
       "mute": "Ton aus",
       "unmute": "Ton an",
       "fullscreen": "Vollbild",
-      "open": "Öffnen"
+      "open": "Öffnen",
+      "cantPlay": "Dieses Video kann auf diesem Handy nicht abgespielt werden."
     }
   },
   "issues": {
@@ -1319,7 +1324,6 @@
   "drive": {
     "title": "Drive",
     "search": "Im Drive suchen",
-    "types": "Dateitypen",
     "type": {
       "all": "Alle",
       "documents": "Dokumente",
@@ -1340,7 +1344,6 @@
     },
     "by": "{{name}} · {{when}}",
     "noResults": "Nichts mit diesen Filtern.",
-    "loadFailed": "Der Drive ließ sich nicht laden.",
     "more": "Mehr zeigen"
   },
   "constellation": {
@@ -1364,7 +1367,6 @@
     "uses_one": "{{count}}-mal genutzt",
     "uses_other": "{{count}}-mal genutzt",
     "confirmed": "Von einer Person bestätigt",
-    "unconfirmed": "Noch nicht bestätigt",
     "confirm": "Bestätigen",
     "confirmedToast": "Bestätigt",
     "details": "Technische Details",
@@ -1406,8 +1408,6 @@
     "openExisting": "Seite öffnen"
   },
   "routines": {
-    "loadFailed": "Die Routinen ließen sich nicht laden.",
-    "anyAgent": "Alle Agenten",
     "create": "Erstellen",
     "when": {
       "custom": "Auf deine Art",
@@ -1437,7 +1437,7 @@
       "plain": "hat eine Aufgabe abgeschlossen"
     },
     "rowWait": {
-      "approval": "wartet auf dein Okay",
+      "approval": "wartet auf dich",
       "question": "wartet auf deine Antwort",
       "mission": "wartet auf deine Prüfung"
     },
@@ -1475,13 +1475,13 @@
   },
   "intentAgents": {
     "waitingSection": "Wartet auf dich",
-    "waitingLine": "{{title}} · braucht dein Okay",
+    "waitingLine": "{{title}} · wartet auf dich",
     "waitingMore_one": "{{title}} · und {{count}} weitere wartet auf dich",
     "waitingMore_other": "{{title}} · und {{count}} weitere warten auf dich",
-    "waitingLabel": "{{name}}, braucht dein Okay",
+    "waitingLabel": "{{name}}, wartet auf dich",
     "owner": "Inhaber: {{name}}",
     "ownerYou": "Inhaber: du",
-    "nowWaiting": "Braucht dein Okay: {{title}}",
+    "nowWaiting": "Wartet auf dich: {{title}}",
     "did": {
       "title": "Was er für dich getan hat",
       "title_female": "Was sie für dich getan hat",
@@ -1500,7 +1500,7 @@
         "image": "Bild",
         "file": "Datei"
       },
-      "waitingOnYou": "Braucht dein Okay",
+      "waitingOnYou": "Wartet auf dich",
       "youApproved": "Du hast freigegeben",
       "youRefused": "Du hast abgelehnt",
       "action": {
@@ -1577,9 +1577,9 @@
         "setup": "Workspace-Einrichtung",
         "desktop": "Computerbildschirm"
       },
-      "asksYou": "Mergen und Veröffentlichen fragen immer nach deiner Freigabe, auf jeder Stufe.",
-      "asksOwner": "Mergen und Veröffentlichen fragen immer nach der Freigabe von {{name}}, auf jeder Stufe.",
-      "asksAdmins": "Mergen und Veröffentlichen fragen immer nach der Freigabe eines Admins, auf jeder Stufe.",
+      "asksYou": "Mergen und Veröffentlichen fragen nach deiner Freigabe, außer der Agent fragt nie.",
+      "asksOwner": "Mergen und Veröffentlichen fragen nach der Freigabe von {{name}}, außer der Agent fragt nie.",
+      "asksAdmins": "Mergen und Veröffentlichen fragen nach der Freigabe eines Admins, außer der Agent fragt nie.",
       "empty": "Vorerst nur Unterhaltung."
     }
   },
@@ -1665,32 +1665,16 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} braucht Hilfe",
-      "needsFor": "{{name}} braucht Hilfe · {{time}}",
-      "inControlAt": "Du hast die Steuerung · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "Browser von {{name}} wird geöffnet…",
-      "startingM": "Browser von {{name}} wird geöffnet…",
       "stopAskF": "Browser von {{name}} schließen?",
       "stopAskM": "Browser von {{name}} schließen?",
-      "whereF": "Im Browser von {{name}}",
-      "whereM": "Im Browser von {{name}}",
       "open": "Öffnen",
-      "expandHint": "Zum Vergrößern tippen",
       "stop": "Stoppen",
-      "giveUp": "Aufgeben",
-      "done": "Erledigt: {{title}}",
-      "failed": "Nicht geschafft: {{title}}",
-      "failedNote": "Nicht geschafft: {{note}}",
-      "expired": "Niemand hat es rechtzeitig geöffnet: {{title}}",
-      "cancelled": "Abgebrochen: {{title}}",
-      "withdrawn": "{{name}} braucht das nicht mehr: {{title}}"
+      "giveUp": "Aufgeben"
     },
     "live": {
       "inControl": "Du hast die Steuerung",
       "helping": "{{name}} hat die Steuerung",
       "watchOnly": "{{name}} hat die Steuerung. Du schaust nur zu.",
-      "takeOver": "Übernehmen",
       "done": "Fertig",
       "handBack": "Zurückgeben",
       "couldnt": "Hat nicht geklappt",
@@ -1711,7 +1695,6 @@
       "closedHelpM": "Anmeldungen bleiben fürs nächste Mal gespeichert.",
       "stuckHelpF": "Erneut versuchen startet den Browser neu. Anmeldungen bleiben gespeichert.",
       "stuckHelpM": "Erneut versuchen startet den Browser neu. Anmeldungen bleiben gespeichert.",
-      "hidden": "{{name}} hat die Steuerung · Bildschirm verborgen",
       "key": {
         "Tab": "Tab",
         "Enter": "Eingabe",
@@ -1741,6 +1724,8 @@
         "offlineCloudM": "Der Computer von {{name}} antwortet gerade nicht.",
         "stuckF": "Der Browser von {{name}} ließ sich nicht öffnen.",
         "stuckM": "Der Browser von {{name}} ließ sich nicht öffnen.",
+        "noAnswerF": "Der Browser von {{name}} hat nicht geantwortet.",
+        "noAnswerM": "Der Browser von {{name}} hat nicht geantwortet.",
         "tooManyF": "Zu viele Browser gleichzeitig offen. Dieser erscheint, sobald ein anderer schließt.",
         "tooManyM": "Zu viele Browser gleichzeitig offen. Dieser erscheint, sobald ein anderer schließt."
       }
@@ -1797,6 +1782,7 @@
       "ui_automation_off": "Die UI-Automatisierung ist aus",
       "xcode_missing": "Der Mac braucht Xcode",
       "xcode_too_old": "Xcode ist zu alt für dieses iPhone",
+      "ios_behind_xcode": "iOS dieses iPhones aktualisieren",
       "device_support": "Der Mac bereitet dieses iPhone vor",
       "helper_missing": "Die Test-App ist noch nicht eingerichtet",
       "helper_expired": "Die Test-App muss erneuert werden",
@@ -1810,6 +1796,10 @@
       "no_driverLinux": "Linux braucht udev-Regeln für dieses Handy",
       "os_too_old": "Das System dieses Handys ist zu alt",
       "adb_offline": "Zieh das Kabel ab und steck es wieder ein",
+      "wifi_away": "Verbinde dieses iPhone mit dem WLAN des Macs oder schließ es an",
+      "wifi_asleep": "Weck dieses iPhone auf, entsperr es und lass es nah am Mac",
+      "tunnel_down": "Die WLAN-Verbindung ist abgebrochen. Lass dieses iPhone nah am Mac oder schließ es an",
+      "wifi_untrusted": "Schließ es einmal an und tippe auf Vertrauen",
       "other": "Noch nicht bereit"
     },
     "os": {
@@ -1967,9 +1957,30 @@
       "teamMissing": "Xcode ist angemeldet, zeigt aber noch kein Team. Erstelle in Xcode eine beliebige iOS-App, wähle unter Signing & Capabilities dein Team und führe sie einmal auf diesem iPhone aus.",
       "uiRefused": "Dieses iPhone hat die Eingaben der Test-App abgelehnt. Entsperre es und gib deinen Code ein, wenn es danach fragt. Passiert es wieder, schalte Einstellungen › Entwickler › UI-Automatisierung aktivieren aus und wieder ein.",
       "pluggedIn": "Es ist angeschlossen",
+      "wifi": {
+        "also": "Auch im WLAN von {{host}}: {{name}}",
+        "use": "Über WLAN nutzen",
+        "hint": "Hier erscheint nur ein iPhone, das dem Mac schon einmal per Kabel vertraut hat. Der Mac erreicht es über Apples eigene verschlüsselte Verbindung, dieselbe, die Xcode nutzt.",
+        "stop": "Nicht mehr über WLAN nutzen",
+        "stopTitle": "{{name}} nicht mehr über WLAN nutzen?",
+        "stopText": "Agenten erreichen es nicht mehr. Wähl es mit {{host}} wieder aus, um es zu nutzen.",
+        "stopped": "{{name}} wird nicht mehr über WLAN genutzt"
+      },
       "stall": {
-        "plug": "{{host}} sieht dieses iPhone noch nicht. Nimm ein Kabel, das Daten überträgt und nicht nur lädt, lass dieses iPhone entsperrt und tippe auf Vertrauen, wenn es fragt.",
-        "devmode": "Der Entwicklermodus geht erst nach einem Neustart dieses iPhones an. Tippe auf Neustart und danach auf Aktivieren. Kein Schalter da? Zieh dieses iPhone ab und schließ es wieder an."
+        "plug": "{{host}} sieht dieses iPhone noch nicht. Nimm ein Kabel, das Daten überträgt und nicht nur lädt, lass dieses iPhone entsperrt und tippe auf Vertrauen, wenn es fragt."
+      },
+      "devMode": {
+        "restarting": "{{host}} sieht dieses iPhone nach dem Neustart noch nicht wieder. Lass es angeschlossen.",
+        "back": "Tippe in der Abfrage auf diesem iPhone auf Aktivieren und gib deinen Code ein.",
+        "check": "Ist eingeschaltet, erneut prüfen",
+        "stillOff": "{{host}} sieht den Entwicklermodus noch als aus.",
+        "missing": "Option nicht zu sehen?",
+        "hidden": "Dieses iPhone versteckt die Option, bis Xcode sie anzeigen lässt.",
+        "hiddenOpen": "Dieses iPhone versteckt die Option, bis Xcode sie anzeigen lässt. Öffne Xcode auf {{host}}, während dieses iPhone dort angeschlossen ist.",
+        "openXcode": "Xcode öffnen",
+        "opened": "Xcode ist auf {{host}} offen. Schau noch einmal in den Einstellungen und schließ Xcode dort danach.",
+        "unlock": "Eingeschaltet und neu gestartet? Die Abfrage mit Aktivieren erscheint, sobald dieses iPhone entsperrt ist.",
+        "outdated": "Die Ackwire AI-App auf {{host}} ist veraltet. Aktualisiere sie auf diesem Mac."
       }
     },
     "notice": {
@@ -1981,6 +1992,9 @@
       "access_requestFor": "{{names}} möchte {{device}} für {{person}} nutzen",
       "waiting": "{{names}} wartet auf {{device}}",
       "waitingFor": "{{names}} wartet für {{person}} auf {{device}}",
+      "tool_request": "{{names}} bittet dich, {{tool}} auf deinem {{device}} einzuschalten",
+      "cli_request": "{{names}} bittet dich, {{tool}} auf deinem {{device}} zu installieren",
+      "folder_request": "{{names}} bittet dich um den Ordner {{path}} auf deinem {{device}}",
       "allowOnce": "Einmal erlauben",
       "always": "{{name}} immer erlauben",
       "no": "Nein",
@@ -1993,7 +2007,9 @@
       "other": "Anderes Gerät nutzen",
       "stop": "Nicht mehr warten",
       "useInstead": "Stattdessen {{name}} nutzen",
-      "none": "Kein anderes Gerät, das du nutzen kannst, ist bereit."
+      "none": "Kein anderes Gerät, das du nutzen kannst, ist bereit.",
+      "tried": "{{device}} wird erneut versucht.",
+      "stopped": "Es wird nicht mehr auf {{device}} gewartet."
     }
   },
   "connectors": {
@@ -2042,7 +2058,8 @@
     "everyoneFailed": "Der Zugriff für alle ließ sich nicht ändern. Versuch es noch einmal.",
     "disconnectFailed": "{{name}} ließ sich nicht trennen. Versuch es noch einmal.",
     "needsReconnect": "Das Konto bei {{name}} funktioniert nicht mehr. Agenten können es erst nutzen, wenn jemand es neu verbindet.",
-    "noTools": "Die Tools von {{name}} ließen sich nicht lesen. Die Agenten haben sie erst wieder, wenn sie unter Tools neu gelesen werden.",
+    "noTools": "Die Tools von {{name}} ließen sich nicht lesen. Die Agenten haben sie erst wieder, wenn sie neu gelesen werden.",
+    "readAgain": "Erneut lesen",
     "accountTitle": "Konto",
     "renameFailed": "Umbenennen hat nicht geklappt. Versuch es noch einmal.",
     "whoTitle": "Wer es nutzt",
@@ -2109,25 +2126,16 @@
     }
   },
   "joinRequests": {
-    "share": "Link teilen",
-    "roles": "Rollen",
-    "rolesHint": "Sie treten mit den eingeschalteten Rollen bei. Ohne Rolle dürfen sie, was Alle dürfen."
+    "share": "Link teilen"
   },
   "humanCheck": {
     "title": "Kurze Prüfung",
     "blocked": "Die Prüfung wurde nicht geladen. Versuch ein anderes Netzwerk."
   },
   "invitePeople": {
-    "emailsHelp": "Füge eine Liste ein oder tippe. Jede Person bekommt eine E-Mail und tritt sofort bei.",
-    "here": "Schon dabei",
-    "invited": "Schon eingeladen",
-    "fix": "Prüf das",
-    "channels": "Kanäle",
     "optional": "Optional",
     "ok": "Fertig",
     "noteHelp": "Erscheint in der E-Mail mit deinem Namen. Bis zu {{max}} Zeichen.",
-    "roleHelp": "Ändert, was die Person beim Beitritt bekommt.",
-    "remove": "Von der Liste nehmen",
     "sendAgain": "Erneut senden",
     "cancelTitle": "Einladung an {{email}} zurückziehen?",
     "cancelText": "Der Link öffnet sich dann nicht mehr.",
@@ -2201,7 +2209,6 @@
     "planRowSub": "Meldet sich auf dem Computer des Agenten an, ohne Schlüssel",
     "keyRow": "Ein Schlüssel",
     "keyRowSub": "Du zahlst nach Nutzung, direkt an den Anbieter",
-    "already": "Schon bei {{org}}",
     "stepOf": "{{step}} von {{total}}"
   },
   "crash": {
@@ -2230,9 +2237,9 @@
     "ofOnline": "{{online}} von {{count}}",
     "deleteName": "{{name}} löschen",
     "deleteFoot": "Du hast 7 Tage Zeit, es dir anders zu überlegen.",
-    "deleteAlert": "Alle verlieren sofort den Zugriff. Wiederherstellen geht noch 7 Tage lang.",
+    "deleteAlert": "Alle können ihn ab sofort nur noch lesen. Wiederherstellen geht noch 7 Tage lang.",
     "deleteAction": "Löschen",
-    "deleteIntro": "{{name}} wird sofort für alle geschlossen und in 7 Tagen endgültig gelöscht.",
+    "deleteIntro": "{{name}} ist ab sofort für alle schreibgeschützt und wird in 7 Tagen endgültig gelöscht.",
     "holdDelete": "Zum Löschen gedrückt halten",
     "deleteFailed": "Der Workspace ließ sich nicht löschen. Versuch es noch einmal.",
     "access": {
@@ -2243,16 +2250,166 @@
       "tooBig": "Das Bild ist zu groß. Versuch ein anderes."
     },
     "machine": {
-      "toolsHow": "Tippe auf ein eingeschaltetes Tool, um es auszuschalten. Wieder einschalten geht nur am Computer selbst."
-    },
-    "roles": {
-      "onComputer": "Die Reihenfolge der Rollen und das Symbol jeder Rolle änderst du am Computer.",
-      "items": "Einzeln",
-      "create": "Erstellen"
+      "toolsHow": "Tippe auf ein eingeschaltetes Werkzeug, um es auszuschalten. Wieder einschalten: am Computer selbst, oder hier durch die Person, die ihn verbunden hat.",
+      "toolsHowOwner": "Tippe auf ein Werkzeug, um es ein- oder auszuschalten."
     },
     "import": {
       "preparing": "Datei wird vorbereitet…",
       "failed": "Die Datei ließ sich nicht herunterladen. Versuch es noch einmal."
+    }
+  },
+  "roles": {
+    "create": "Erstellen",
+    "search": "Rollen suchen",
+    "baseHint": "Gilt für jede Person im Workspace. Rollen kommen dazu.",
+    "orderHint": "Wer weiter oben steht, verwaltet die Rollen und die Personen darunter. Die Farbe eines Namens kommt von der höchsten Rolle der Person.",
+    "order": "Sortieren",
+    "orderDone": "Fertig",
+    "up": "{{name}} nach oben",
+    "down": "{{name}} nach unten",
+    "orderChanged": "Die Rollen haben sich geändert, während du sie verschoben hast. Lade neu und versuch es noch einmal.",
+    "none": "Noch keine Rollen. Erstelle eine, um manchen Personen mehr zu geben.",
+    "noMatch": "Keine Rolle passt zu „{{q}}“.",
+    "tooMany": "Dieser Workspace hat schon 100 Rollen. Lösche eine, um eine neue zu erstellen.",
+    "loadFailed": "Die Rollen konnten nicht geladen werden. {{cause}}",
+    "nobody": "Niemand",
+    "reach": {
+      "permissions_one": "{{count}} Berechtigung",
+      "permissions_other": "{{count}} Berechtigungen",
+      "channels_one": "{{count}} Kanal",
+      "channels_other": "{{count}} Kanäle",
+      "agents_one": "{{count}} Agent",
+      "agents_other": "{{count}} Agenten",
+      "more": "+{{what}}",
+      "all": "Darf alles",
+      "owner": "Darf alles, immer",
+      "none": "Nur, was Alle dürfen",
+      "baseNone": "Nur lesen"
+    },
+    "tabs": {
+      "permissions": "Berechtigungen",
+      "channels": "Kanäle",
+      "agents": "Agenten"
+    },
+    "addOwners": "Inhaber hinzufügen",
+    "icons": {
+      "shield": "Schild",
+      "code": "Quellcode",
+      "wallet": "Geldbörse",
+      "mail": "E-Mail",
+      "bolt": "Blitz",
+      "flag": "Flagge",
+      "book": "Buch",
+      "chart": "Diagramm",
+      "bulb": "Glühbirne",
+      "globe": "Globus",
+      "pullRequest": "Pull-Request",
+      "calendar": "Kalender",
+      "message": "Nachricht",
+      "eye": "Auge",
+      "plug": "Stecker",
+      "person": "Person"
+    },
+    "inviteWith": "Mit dieser Rolle einladen",
+    "searchPermission": "Berechtigung suchen",
+    "everyoneCan": "Alle dürfen das",
+    "only": "Nur {{names}}",
+    "notHeld": "Du hast diese Berechtigung nicht.",
+    "noPermissionMatch": "Keine Berechtigung passt zu „{{q}}“.",
+    "advanced": "Erweitert",
+    "peopleOnly": "Rollen gelten für Personen. Jeder Agent hat eigene Berechtigungen, auf seiner Seite.",
+    "nowAbove": "Diese Rolle steht jetzt über deiner. Nur jemand weiter oben kann sie ändern.",
+    "admin": {
+      "title": "Administrator für {{name}} einschalten?",
+      "text": "Wer {{name}} hat, darf dann alles außer dem, was nur der Inhaber darf.",
+      "count_one": "Das ist {{count}} Person.",
+      "count_other": "Das sind {{count}} Personen.",
+      "on": "Administrator einschalten",
+      "note": "Mit Administrator darf {{name}} alles außer dem, was nur der Inhaber darf."
+    },
+    "computers": {
+      "title": "Computer der Agenten",
+      "hint": "Browser: der Browser und die Anmeldeanfragen. Computer: dazu der ganze Bildschirm und das Terminal. Eigene Agenten: die, für die die Person zuständig ist, und die Computer, die sie verbunden hat.",
+      "steps": {
+        "0": "Nutzt keine",
+        "1": "Browser der eigenen Agenten",
+        "2": "Computer der eigenen Agenten",
+        "3": "Browser jedes Agenten",
+        "4": "Computer jedes Agenten"
+      },
+      "stepsIn": {
+        "1": "den Browser der eigenen Agenten",
+        "2": "den Computer der eigenen Agenten",
+        "3": "den Browser jedes Agenten",
+        "4": "den Computer jedes Agenten"
+      },
+      "everyoneTo": "Alle bekommen {{step}}.",
+      "everyoneNone": "Alle nutzen die Computer der Agenten nicht mehr."
+    },
+    "whoCan": "Wer darf",
+    "everyoneSub": "Jede Person im Workspace",
+    "someRoles": "Nur manche Rollen",
+    "losing": "Verlieren es: {{names}}.",
+    "nobodyLoses": "Niemand verliert etwas.",
+    "everyoneGets": "Alle bekommen es.",
+    "ownersAlways": "Inhaber dürfen es immer.",
+    "noOtherRoles": "Es gibt noch keine anderen Rollen.",
+    "channels": {
+      "header": "Wer {{name}} hat, sieht",
+      "headerBase": "Alle sehen",
+      "hint": "Das gilt für Personen. Ein Agent kommt in einen Kanal, wenn jemand ihn hinzufügt.",
+      "search": "Kanal suchen",
+      "everyone": "Alle sehen ihn",
+      "private": "Privat",
+      "general": "Alle bleiben in #general.",
+      "locked": "Nur wer #{{channel}} erstellt hat oder Kanäle ordnet, ändert, wer ihn sieht.",
+      "leaveTitle": "#{{channel}} von {{name}} entfernen?",
+      "leave_one": "{{names}} verlässt den Kanal.",
+      "leave_other": "{{names}} verlassen den Kanal.",
+      "leaveAction": "Entfernen",
+      "openTitle": "#{{channel}} für {{name}} öffnen?",
+      "openText": "Wer {{name}} hat, sieht den Kanal und den ganzen Verlauf und kann beitreten.",
+      "openAction": "Öffnen",
+      "openAllTitle": "#{{channel}} für alle öffnen?",
+      "openAllText": "Der ganze Verlauf wird für den Workspace sichtbar.",
+      "admin": "Mit Administrator sieht, wer {{name}} hat, alle Kanäle.",
+      "onlyGeneral": "Bisher gibt es nur #general.",
+      "noMatch": "Kein Kanal passt zu „{{q}}“.",
+      "ungrouped": "Kanäle",
+      "whoSees": "Wer sieht",
+      "allSub": "Jede Person im Workspace sieht ihn und kann beitreten.",
+      "invited": "Nur wer hinzugefügt wird",
+      "invitedSub": "Niemand Neues sieht ihn. Wer drin ist, bleibt.",
+      "unsee": "Wer drin ist, bleibt. Sehen ihn nicht mehr: {{names}}."
+    },
+    "agents": {
+      "header": "Wer {{name}} hat, spricht mit",
+      "headerBase": "Alle sprechen mit",
+      "hint": "Das gilt für Personen. Was jeder Agent tut, steht auf seiner Seite.",
+      "everyone": "Alle sprechen mit ihm",
+      "gate": "Wer nur {{name}} hat, spricht nicht mit Agenten.",
+      "gateOn": "Mit Agenten sprechen einschalten",
+      "locked": "Nur {{owner}}, zuständig für {{name}}, oder wer jeden Agenten bearbeitet, ändert das.",
+      "locked_female": "Nur {{owner}}, zuständig für {{name}}, oder wer jeden Agenten bearbeitet, ändert das.",
+      "lockedNoOwner": "Nur wer jeden Agenten bearbeitet, ändert das.",
+      "none": "Noch keine Agenten.",
+      "some": "Nur manche Rollen und Personen",
+      "addPerson": "Person hinzufügen",
+      "losing": "Sprechen nicht mehr mit {{agent}}: {{names}}."
+    },
+    "people": {
+      "removed": "{{person}} hat {{name}} nicht mehr",
+      "selfTitle": "Dich aus {{name}} entfernen?",
+      "selfText": "Du verlierst, was nur {{name}} gibt. Nur jemand über dir gibt es zurück."
+    },
+    "mail": {
+      "title_one": "Ein Agent verliert ein Postfach",
+      "title_other": "Agenten verlieren {{count}} Postfächer",
+      "loses": "{{agent}} verliert {{address}}, das Postfach von {{owner}}.",
+      "losesAddress": "{{agent}} verliert das Postfach {{address}}.",
+      "only": "Nur wer ein Postfach gegeben hat, gibt es wieder.",
+      "addAnyway": "Trotzdem hinzufügen",
+      "giveAnyway": "Trotzdem geben"
     }
   },
   "vault": {
@@ -2291,7 +2448,7 @@
     },
     "import": {
       "title": "Von einem Computer importieren",
-      "text": "Um Passwörter aus einem Browser oder Passwort-Manager zu übernehmen, öffne im Web Einstellungen, Vault und wähle Importieren."
+      "text": "Um Passwörter aus einem Browser oder Passwort-Manager zu übernehmen, importiere sie im Web."
     },
     "connections": {
       "text": "Verbinde einen Passwort-Manager, und deine Agenten verwenden die Logins, die dort liegen. Nichts wird kopiert: Ein Passwort wird erst gelesen, wenn es gebraucht wird.",
@@ -2491,7 +2648,6 @@
   },
   "dashboards": {
     "homeRow": "Nur du · deine eigenen Widgets",
-    "loadFailed": "Die Dashboards konnten nicht geladen werden.",
     "create": "Erstellen",
     "routineTarget": "sein Widget",
     "pin": {
@@ -2529,7 +2685,6 @@
     },
     "formatAuto": "{{name}} wählt die beste aus",
     "newWidget": {
-      "titleHint": "Titel · {{name}} schlägt beim Testen einen vor",
       "alerts": "Alarm an",
       "realData": "Echte Daten",
       "editAsk": "Anfrage ändern",
@@ -2704,5 +2859,11 @@
       "title": "Nichts zu prüfen",
       "text": "Wenn ein Agent außerhalb des Gesprächs etwas tut, erscheint es hier."
     }
+  },
+  "surface": {
+    "on": "An",
+    "codeText": "Sende die Nachricht, die sich dort öffnet, und komm dann hierher zurück.",
+    "openFailed": "{{surface}} ließ sich auf diesem Telefon nicht öffnen. Sende stattdessen den Code unten dorthin.",
+    "orType": "Oder sende diesen Code dort"
   }
 }

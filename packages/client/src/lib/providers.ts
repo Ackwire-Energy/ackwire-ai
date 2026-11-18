@@ -1,5 +1,8 @@
+import { customModelId, endpointModelId, parseCustomModel } from "@agenteschat/providers/catalog";
 import type { TFunction } from "i18next";
 import type { AiStatus, Credential, Model } from "../api/types";
+import { CUSTOM_PROVIDER } from "./endpoints";
+import { serverHost } from "./server";
 
 interface ProviderEntry {
   id: string;
@@ -18,7 +21,7 @@ interface ProviderEntry {
   masculine?: boolean;
   /** Its free tier lets the provider use what is sent: billing should be on. */
   billing?: boolean;
-  /** It passes what is sent on to other providers, as the account's privacy settings at it allow. */
+  /** It passes what is sent on to the company that makes or hosts the model, under its own privacy terms. */
   privacy?: boolean;
 }
 
@@ -94,6 +97,14 @@ export const PROVIDERS = [
     site: "platform.minimax.io/user-center/basic-information/interface-key",
     plans: true,
   },
+  {
+    id: "commandcode",
+    label: "Command Code",
+    placeholder: "user_…",
+    pattern: /^user_[A-Za-z0-9_-]{16,}$/,
+    site: "commandcode.ai/settings/keys",
+    privacy: true,
+  },
 ] as const satisfies readonly ProviderEntry[];
 
 export type ProviderId = (typeof PROVIDERS)[number]["id"];
@@ -105,14 +116,64 @@ export type ProviderId = (typeof PROVIDERS)[number]["id"];
 export const providerOf = (id: string): ProviderEntry | undefined =>
   PROVIDERS.find((p) => p.id === id || p.label === id);
 export const providerLabel = (id: string) => providerOf(id)?.label ?? id;
+
+type NamedKey = Pick<Credential, "label" | "provider"> & Partial<Pick<Credential, "endpoint">>;
+
+/** A saved key in a sentence: a workspace endpoint by its own name ("Gateway Sul"), any other by its provider's. */
+export const keyName = (key: NamedKey) => (key.provider === CUSTOM_PROVIDER ? key.label : providerLabel(key.provider));
+
+/** Where a saved key's calls go, in its line: an endpoint's host ("api.example.com"), else its provider's name. */
+export const keySource = (key: NamedKey) =>
+  key.endpoint ? serverHost(key.endpoint.baseURL) : providerLabel(key.provider);
+
 /**
- * A saved key's line under its name: "Claude · termina em 1a2b", or only "termina em 1a2b" when its name is already the
- * provider's (a key named after nothing else, as most are), never "Claude" over "Claude · …".
+ * A saved key's line under its name: "Claude · termina em 1a2b", "api.example.com · termina em 1a2b" for an endpoint,
+ * or only "termina em 1a2b" when its name is already the provider's (a key named after nothing else, as most are),
+ * never "Claude" over "Claude · …". A key-less endpoint (a local server) says only where it is.
  */
-export const keyLine = (t: TFunction, key: Pick<Credential, "label" | "provider" | "keyHint">) =>
-  keyNamedAfterProvider(key)
-    ? t("vault.item.endsIn", { hint: key.keyHint })
-    : t("newAgent.otherKeyDesc", { provider: providerLabel(key.provider), hint: key.keyHint });
+export const keyLine = (t: TFunction, key: NamedKey & Pick<Credential, "keyHint" | "copies">) =>
+  [
+    !key.keyHint && key.endpoint
+      ? keySource(key)
+      : keyNamedAfterProvider(key)
+        ? t("vault.item.endsIn", { hint: key.keyHint })
+        : t("newAgent.otherKeyDesc", { provider: keySource(key), hint: key.keyHint }),
+    keyCopiesLine(t, key),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+/** "4 cópias iguais" on the row that stands for a key saved more than once (`copies` others), else nothing. */
+export const keyCopiesLine = (t: TFunction, key: Pick<Credential, "copies">) =>
+  key.copies ? t("settings.keyCopies", { count: key.copies + 1 }) : "";
+
+/** The keys a list shows: live ones, a key saved more than once as its one row (`copyOf` rows left out). */
+export const shownKeys = <K extends Pick<Credential, "revokedAt" | "copyOf">>(keys: readonly K[]) =>
+  keys.filter((k) => !k.revokedAt && !k.copyOf);
+
+/**
+ * A saved key can think: a provider's once saved (the save tried it), an endpoint's once one of its models answered a
+ * test, with tools or without (ADR 0146).
+ */
+export const keyThinks = (key: Pick<Credential, "provider"> & Partial<Pick<Credential, "endpoint">>) =>
+  key.provider !== CUSTOM_PROVIDER ||
+  (key.endpoint?.models ?? []).some((m) => m.check === "ok" || m.check === "no_tools");
+
+/**
+ * Whom a key just saved for every agent reaches. Agents without an AI of their own think with the workspace's default
+ * key, or with the newest key while there is none. `all`: this one is that key now. `make`: the default can't think and
+ * this one can, so it should become the default. `other`: they still think with the default, named.
+ */
+export function savedKeyReach(
+  saved: Credential,
+  keys: readonly Credential[],
+  defaultId: string | null | undefined,
+): { kind: "all" } | { kind: "make"; other: string } | { kind: "other"; other: string } {
+  const current = keys.find((k) => k.id === defaultId && !k.revokedAt);
+  if (!current || current.id === saved.id) return { kind: "all" };
+  if (!keyThinks(current) && keyThinks(saved)) return { kind: "make", other: current.label };
+  return { kind: "other", other: current.label };
+}
 /** A key whose name is only its provider's ("Claude"): a line under it needn't say the provider again. */
 export const keyNamedAfterProvider = (key: Pick<Credential, "label" | "provider">) =>
   key.label.trim().toLocaleLowerCase() === providerLabel(key.provider).toLocaleLowerCase();
@@ -135,7 +196,8 @@ export function providerGuess(key: string | undefined, asked?: string): Provider
 
 /**
  * The ⓘ on the key panel's first step, web and phone: for a maker that also sells coding plans, where a plan's key
- * goes; for one whose free tier may use what is sent, to turn on billing; for a router, who may keep what is sent.
+ * goes; for one whose free tier may use what is sent, to turn on billing; for one that passes calls on, who it
+ * passes them to (that text takes `{ provider: label }`).
  */
 export const keyStepHint = (p: ProviderEntry) =>
   p.plans
@@ -147,7 +209,10 @@ export const keyStepHint = (p: ProviderEntry) =>
         : undefined;
 
 /** Live keys per provider. */
-export function providersWithKeys(credentials: Credential[]) {
+/** A workspace key as far as which models it makes usable goes (`AgentBrain.keys` has no `revokedAt`: live ones only). */
+type KeyLike = Pick<Credential, "id" | "provider"> & { revokedAt?: string | null };
+
+export function providersWithKeys(credentials: readonly KeyLike[]) {
   return new Set(credentials.filter((c) => !c.revokedAt).map((c) => c.provider as string));
 }
 
@@ -163,7 +228,7 @@ export interface ModelChoice {
  * platform key is on (the only one a server offers). A long list's models the
  * workspace can't use are left out: only its good picks show, to say a key opens them.
  */
-export function modelChoices(models: Model[], credentials: Credential[], platform: boolean) {
+export function modelChoices(models: Model[], credentials: readonly KeyLike[], platform: boolean) {
   const withKey = providersWithKeys(credentials);
   const live = new Set(credentials.filter((c) => !c.revokedAt).map((c) => c.id));
   const groups = new Map<string, ModelChoice[]>();
@@ -198,25 +263,35 @@ export const keyRuns = (
   model: string | undefined,
   models: readonly Model[],
 ) =>
-  (isAuto(model) && key.provider !== "custom") ||
+  (isAuto(model) ? key.provider !== "custom" : false) ||
   models.some(
     (m) => m.id === model && m.provider === key.provider && (!m.endpoint || m.endpoint.credentialId === key.id),
   );
 
-/** Custom endpoints need an explicit model; they do not participate in Automatic routing. */
-export function modelForKey(
-  key: Pick<Credential, "id" | "provider" | "endpoint">,
-  current: string | undefined,
-  models: readonly Model[],
-): string {
-  if (current && keyRuns(key, current, models)) return current;
-  if (key.provider !== "custom") return AUTO;
-  const configured = key.endpoint?.models ?? [];
-  const preferred = configured.find((m) => m.check === "ok") ?? configured[0];
-  if (preferred) return `custom:${key.id}:${preferred.id}`;
-  const listed = models.find((m) => m.endpoint?.credentialId === key.id);
-  if (listed) return listed.id;
-  throw new Error("This endpoint has no models configured.");
+/** A key as the connect flows hold it: its endpoint's models, each with the last test of it (`custom` only). */
+type KeyWithEndpoint = Pick<Credential, "id" | "provider"> & Partial<Pick<Credential, "endpoint">>;
+
+/**
+ * What a connect flow saves as the agent's model with this key: nothing while the key runs the model it had, Automático
+ * for a catalog key, and for a workspace endpoint one of its own models — an endpoint has no tiers (ADR 0146), and
+ * Automático on its key fails every run as no AI. A pinned model stays when the endpoint being connected offers it too,
+ * so switching between endpoints doesn't lose it; otherwise the server's own pick (`endpointModelId`).
+ */
+export function modelOnKey(key: KeyWithEndpoint, model: string | undefined, models: readonly Model[]) {
+  if (keyRuns(key, model, models)) return {};
+  if (key.provider !== "custom") return { model: AUTO };
+  const own =
+    key.endpoint?.models ??
+    models
+      .filter((m) => m.endpoint?.credentialId === key.id)
+      .flatMap((m) => {
+        const id = parseCustomModel(m.id)?.model;
+        return id ? [{ id }] : [];
+      });
+  const pinned = model ? parseCustomModel(model)?.model : undefined;
+  if (pinned && own.some((m) => m.id === pinned)) return { model: customModelId(key.id, pinned) };
+  // Nothing known of the endpoint's models: Automático, which the server pins to one of them on save.
+  return { model: endpointModelId(key.id, own) ?? AUTO };
 }
 
 /**

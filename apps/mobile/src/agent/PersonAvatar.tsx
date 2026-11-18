@@ -1,7 +1,8 @@
 import { initialsOf } from "@agenteschat/tokens/names";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useState } from "react";
-import { Image, Text as RNText, StyleSheet } from "react-native";
+import { Text as RNText, StyleSheet } from "react-native";
 import type { PhotoSource } from "@/lib/photo";
 import { useTheme } from "@/ui/theme";
 import { initialText } from "@/ui/type-scale";
@@ -11,13 +12,17 @@ export interface PersonAvatarProps {
   size: number;
   /** The person's photo; while it loads, or if it fails, the initial shows. */
   photo?: PhotoSource | null;
+  /** The tile's corner. Default 30% of the side; `size / 2` inside a fully round pill. */
+  radius?: number;
 }
 
 /**
  * A person: their photo, or a neutral tile with the first letter (agents are the ones with color). The web's tile
- * shape for everyone: a rounded square, radius 30% of the side, as the agents' own.
+ * shape for everyone: a rounded square, radius 30% of the side, as the agents' own. The photo is cached in memory and
+ * on disk (its address changes with its content) and drawn at once, with no fade: a face seen in every list must not
+ * flicker in each time a row comes back.
  */
-export function PersonAvatar({ name, size, photo }: PersonAvatarProps) {
+export function PersonAvatar({ name, size, photo, radius = size * 0.3 }: PersonAvatarProps) {
   const { scheme } = useTheme();
   const dark = scheme === "dark";
   // The first of the web's initials: an emoji before the name gives way to it, and no character is cut in half.
@@ -36,7 +41,7 @@ export function PersonAvatar({ name, size, photo }: PersonAvatarProps) {
       style={{
         width: size,
         height: size,
-        borderRadius: size * 0.3,
+        borderRadius: radius,
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
@@ -54,9 +59,12 @@ export function PersonAvatar({ name, size, photo }: PersonAvatarProps) {
       {photo && !failed ? (
         <Image
           source={photo}
+          cachePolicy="memory-disk"
+          recyclingKey={photo.uri}
+          transition={0}
+          contentFit="cover"
           onError={() => setFailed(true)}
-          resizeMode="cover"
-          style={[StyleSheet.absoluteFill, { borderRadius: size * 0.3 }]}
+          style={[StyleSheet.absoluteFill, { borderRadius: radius }]}
           accessibilityIgnoresInvertColors
         />
       ) : null}

@@ -240,3 +240,38 @@ test("past a person's hourly key tests a key saves unchecked: no one sorts stole
   expect(checks.at(0)).toBe("ok");
   expect(checks.at(-1)).toBe("unchecked");
 }, 20_000);
+
+test("the same key saved again comes back as the saved one; copies made before list as one and fold together", async () => {
+  t = await createTestServer();
+  const owner = browser(t);
+  await signUp(owner, "owner@example.com");
+  const { orgId } = await seedOrg(owner);
+  const api = (path: string, init?: Parameters<typeof owner>[1]) =>
+    owner(`/api/app/organizations/${orgId}${path}`, init);
+  const save = async (apiKey: string) =>
+    (await (await api("/credentials", { json: { provider: "openai", label: "OpenAI", apiKey } })).json()) as {
+      id: string;
+      reused?: boolean;
+    };
+  const first = await save("sk-proj-same-key-1111");
+  expect(first.reused).toBeUndefined();
+  expect(await save("sk-proj-same-key-1111")).toMatchObject({ id: first.id, reused: true });
+
+  // A copy as one was made before: another key given the same secret.
+  const other = await save("sk-proj-other-key-2222");
+  expect((await api(`/credentials/${other.id}/rotate`, { json: { apiKey: "sk-proj-same-key-1111" } })).status).toBe(
+    200,
+  );
+  type Listed = { id: string; provider: string; copies?: number; copyOf?: string };
+  const list = async () =>
+    ((await (await api("/credentials")).json()) as { credentials: Listed[] }).credentials.filter(
+      (k) => k.provider === "openai",
+    );
+  const listed = await list();
+  const kept = listed.find((k) => k.copies === 1);
+  expect(kept).toBeDefined();
+  expect(listed.filter((k) => k.copyOf === kept?.id)).toHaveLength(1);
+  const removed = await api(`/credentials/${kept?.id}/remove-copies`, { json: {} });
+  expect((await removed.json()) as object).toEqual({ removed: 1 });
+  expect((await list()).map((k) => k.id)).toEqual([kept?.id ?? ""]);
+});

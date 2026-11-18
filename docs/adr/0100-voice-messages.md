@@ -98,3 +98,79 @@ minutes at most. Models that don't load leave the service up, unhealthy and answ
 load the same files again on a machine it shares. A release whose speech image doesn't build publishes the app without
 it. Self-hosted servers turn on the same profile, with the image each release publishes (SELF_HOSTING.md, Voice
 messages).
+
+## Addendum (2026-11-13): "gravando áudio…" for the others
+
+**The decision.** People see when someone records a voice message, as they see typing: "Marina está gravando áudio…"
+in the line above the composer, on the web and the phone. It rides the typing frame: `{"type":"typing", channelId,
+threadId?, kind: "voice"}`, passed on as `user.typing` with the same `kind`, the same rate limit and the same 5 s
+(`TYPING_TTL_MS`). No `kind` is typing, and any other reads as typing, so older apps keep working. The latest frame per
+person wins. Agents never record.
+
+**How long it lasts.** From the first second recorded until the message shows:
+
+- The apps send it while the take records, held or hands free (web: `onRecording` from the kit's recorder each second;
+  phone: `useVoiceTake`'s tick), never while starting or paused, and while the take uploads. The typing throttle keeps
+  it to one frame every 3 s and sends a change of kind at once. The upload's frames (`keepAlive`) wait while the person
+  has written in the last 3 s: writing takes over. The recorder's never wait, so a take started right after a typed
+  message tells the agent asked in it at once.
+- The upload's 202 hands it to the server: `voice.transcribe` sends it every 3 s while the words are made out
+  (`keepRecording` in `voice.ts`), until the person's typing frame in that channel or the message. Its last frame is
+  out before the message, which clears the line at once in the apps (`applyTypingEvent`). A message too big for its
+  event still names its author (`authorUserId`), so a long take ends the line as fast.
+- Paused or deleted, the frames stop: gone within 5 s. A recording dropped as silent, or one waiting for the job's
+  retry, ends the same way.
+
+**The look.** Three 3 px bars in the voice wave's look rise and fall where the dots are for typing, ink, never red,
+still with reduced motion (`.ac-typing__bars`, the phone's `RecordingBars`). Who records comes last, as a group: the
+bars, their faces, their words, agents' words first as always (`barWords`, `peopleGroups`). Beside someone typing,
+each verb is a group with its own mark and faces ("Marina está digitando · Rui está gravando áudio…", `bothAtIt`), and
+the second takes a line of its own when the line is short: names give way, verbs never. Copy:
+`chat.activity.recordingVoice`.
+
+**Agents wait for it.** The quiet window counts a voice frame like typing (ADR 0112): a run started on a person's
+message waits its whole window while they record a follow-up.
+
+## Addendum (2026-11-15): typed text and files in the same message
+
+**The need.** While a take existed, the recorder took the composer's place: nobody could type, paste or attach, and a
+send carried the audio alone. A picture or a written line meant for the same message had to go as a second message.
+Files attached before the take stayed on screen and were lost when it went.
+
+**The decision.** One message carries the take, the text typed beside it and its files. The upload
+(`POST …/channels/{channelId}/voice`) takes two optional fields: `text`, with a typed message's limit
+(`message.too_long`), and `attachments`, a JSON array of file ids with a typed message's checks (this workspace's files
+the sender uploaded or of this channel, at most 10: `message.attachment_not_found`, `message.too_many_attachments`).
+Both are refused before anything is stored, and kept on `voice_clips` (`text`, `attachments`). `voice.transcribe`
+posts `body` as the typed text, a blank line, then the words (the typed text alone when nothing was said), the files as
+`meta.artifacts`, and the typed part again as `meta.voice.text`. A take with no words and nothing typed or attached is
+still dropped; with either, the message goes.
+
+**What reads what.** Agents get the body as before, typed part first, with no prompt change, so mentions, routing,
+context and search see both. The apps show `meta.voice.text` as text above the player and the rest of the body as the
+player's words (`voiceParts` in `@agenteschat/client`). Lists, notifications, push, thread titles and quotes show the
+typed part (`readableBody`, `listedText`), and name the message a voice message only when nothing was typed: such a
+message's preview carries no `voice` and no `mediaKind`, and its quote no `mediaKind`.
+
+**Older apps.** The upload only gains optional fields, so an older app sends takes as before. An app that doesn't know
+`meta.voice.text` shows the whole body in the player's transcript, typed text first: nothing is lost, only the typed
+part isn't set apart. Its lists show the typed text, since the server sends them no voice marker for such a message.
+A take with nothing said posts its audio with the typed text as its body, which an older app shows in the transcript.
+
+**The composer.** A take is a row in the composer's file strip, above the text, the strip's whole width: play or the
+red dot, the time, the wave, the keys line and delete at its end. The text field, attach, emoji, paste, drag and drop
+and the pills stay usable during a take, and a take may start with files already attached. Its keys (Space listens,
+Enter sends, Esc deletes) stay the recorder's except while the focus is in the field with text in it: there Enter sends
+everything and Space types a space. Esc never drops both: with nothing typed it deletes the take as before; with text,
+the take's row asks in place ("Delete the audio? Your text stays.", Delete, Keep, Enter keeps), never a dialog. The
+keys line shows only while the keys are the take's. Uploads still running hold the send, as for a typed message. A
+key an input method composes is never the take's. A pasted API key in the typed text stays in the box for the key
+check while the take goes with the files.
+
+**The phone.** The same model. Hands free or paused, the take's row (the time or play, the wave, pause, and delete at
+its end) sits above the field in the field's own capsule, and the field and the "+" stay usable under it. The mic shows
+whenever the field holds no words, also with files waiting, so a take can start with them. The field's send sends the
+take, the words and the files as one message: the phone uploads its files at send time, so they upload first, and when
+one fails the take stays, paused, with the words back in the field. The offline queue keeps the typed text and the
+uploaded files with the recording and sends them with it. Holding the mic and sliding to cancel are unchanged. The
+phone has no Esc question: delete in the row removes only the take, and the words stay in the field.

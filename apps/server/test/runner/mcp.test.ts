@@ -24,6 +24,7 @@ import {
   McpBridge,
   type McpTaskInfo,
   McpToolCache,
+  mcpImageContent,
   missionExecutorArgs,
   missionFolderRules,
   runMcpServer,
@@ -146,6 +147,41 @@ test("the bridge checks the task's token, needs a connection, relays the call an
   expect(resent[0]).toEqual(frames[1]);
   b.result({ type: "mcp.result", callId: (frames[1] as { callId: string }).callId, ok: true, text: "Reported." });
   expect(await second).toEqual({ ok: true, text: "Reported." });
+});
+
+test("pictures and PDFs a server tool returns reach the CLI as MCP image and resource content", async () => {
+  const { b, frames } = bridge({ token: "secret-token-1", missionId: "m1", running: true, serverToken: "srv-token-1" });
+  b.attach((f) => frames.push(f));
+  const png = { mediaType: "image/png", data: "iVBORw0KGgo=" };
+  const pdf = { mediaType: "application/pdf", data: "JVBERi0=", name: "relatório.pdf" };
+  const pending = b.handle({ taskId: TASK, token: "secret-token-1", tool: "read_artifact", args: {} });
+  await waitFor(() => frames.length === 1);
+  const sent = frames[0] as Extract<RunnerFrame, { type: "mcp.call" }>;
+  b.result({ type: "mcp.result", callId: sent.callId, ok: true, text: "File print.png.", images: [png, pdf] });
+  const reply = await pending;
+  expect(reply).toEqual({ ok: true, text: "File print.png.", images: [png, pdf] });
+  const answer = await handleMcpMessage(
+    { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "read_artifact", arguments: {} } },
+    async () => reply,
+    undefined,
+    async () => [{ name: "read_artifact", description: "Read", inputSchema: { type: "object" } }],
+  );
+  expect(answer).toEqual({
+    jsonrpc: "2.0",
+    id: 1,
+    result: {
+      content: [
+        { type: "text", text: "File print.png." },
+        { type: "image", data: png.data, mimeType: "image/png" },
+        {
+          type: "resource",
+          resource: { uri: "agentes://file/relat%C3%B3rio.pdf", mimeType: "application/pdf", blob: pdf.data },
+        },
+      ],
+      isError: false,
+    },
+  });
+  expect(mcpImageContent([])).toEqual([]);
 });
 
 test("a task's call cut by a drop goes again only to a server that runs it once, and says when it may have run", async () => {

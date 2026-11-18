@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { stepText } from "@/components/browser/BrowserCard";
 import { useAgentComputer } from "@/components/computer/facts";
+import { KeptRunningRow } from "@/components/computer/KeptRunning";
 import { useOpenComputer } from "@/components/computer/open";
 import { useOrg } from "@/components/org-context";
 import { useSetupWait, useWaitReader } from "@/components/WorkspaceComputer";
@@ -100,25 +101,29 @@ export function ComputerNow() {
       </Button>
     );
   return (
-    // A row of the fact sheet: its button is the way in for the keyboard; a click anywhere else on it opens the same.
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the row's own button does the same from the keyboard
-    <section
-      className="cmp-entry agp-frow"
-      data-tone={tone}
-      aria-label={t("agentComputer.title", g)}
-      onClick={(e) => {
-        if ((e.target as Element).closest("button")) return;
-        if (button === "help") help();
-        else if (button === "choose") openWork("computer");
-        else openComputer(agent.id);
-      }}
-    >
-      <span className="agp-cell__key">
-        <Icon name="computer" size={16} />
-      </span>
-      <small className="agp-frow__label">{t("agentPage.ficha.computer")}</small>
-      <span className="agp-frow__value">{status}</span>
-      <span className="agp-frow__tail">{action}</span>
-    </section>
+    <>
+      {/* A row of the fact sheet: its button is the way in for the keyboard; a click anywhere else on it opens the same. */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: the row's own button does the same from the keyboard */}
+      <section
+        className="cmp-entry agp-frow"
+        data-tone={tone}
+        aria-label={t("agentComputer.title", g)}
+        onClick={(e) => {
+          if ((e.target as Element).closest("button")) return;
+          if (button === "help") help();
+          else if (button === "choose") openWork("computer");
+          else openComputer(agent.id);
+        }}
+      >
+        <span className="agp-cell__key">
+          <Icon name="computer" size={16} />
+        </span>
+        <small className="agp-frow__label">{t("agentPage.ficha.computer")}</small>
+        <span className="agp-frow__value">{status}</span>
+        <span className="agp-frow__tail">{action}</span>
+      </section>
+      {/* What it keeps running there (ADR 0176), for the same people. */}
+      <KeptRunningRow agentId={agent.id} />
+    </>
   );
 }

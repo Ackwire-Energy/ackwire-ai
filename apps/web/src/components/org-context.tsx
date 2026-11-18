@@ -20,3 +20,6 @@ export function useOrg(): OrgContextValue {
   if (!value) throw new Error("useOrg must be used inside an organization route");
   return value;
 }
+
+/** The same, or null outside a workspace's context (the onboarding's first steps). */
+export const useOrgIfAny = () => useContext(OrgContext);

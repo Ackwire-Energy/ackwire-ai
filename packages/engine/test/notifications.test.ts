@@ -16,6 +16,7 @@ import {
   listMessages,
   listNotifications,
   type MachineTaskRow,
+  markAllNotificationsDone,
   markAllNotificationsRead,
   markChannelRead,
   markNotificationDone,
@@ -162,6 +163,89 @@ test("the realtime event says whether it reaches the person's devices, by their 
   await post(f.owner.id, "@bia e isso");
   const alerts = events.filter((e) => e.type === "notification.upserted").map((e) => e.alert);
   expect(alerts).toEqual([true, false]);
+});
+
+test("what the person brings back (Mover de volta, an undo) is no news: it comes with alert false", async () => {
+  f = await setup();
+  const { bia } = await people();
+  await post(f.owner.id, "@bia olha isso");
+  const id = (await inbox(bia.id)).items[0]?.id ?? "";
+  const events = hear(bia.id);
+  await markNotificationDone(deps(), bia.id, f.org.id, id, true);
+  await markNotificationDone(deps(), bia.id, f.org.id, id, false);
+  await markNotificationRead(deps(), bia.id, f.org.id, id, false);
+  await snoozeNotification(deps(), bia.id, f.org.id, id, new Date(Date.now() + 3_600_000));
+  await snoozeNotification(deps(), bia.id, f.org.id, id, null);
+  const upserted = events.filter((e) => e.type === "notification.upserted");
+  expect(upserted.length).toBe(3);
+  expect(upserted.map((e) => e.alert)).toEqual([false, false, false]);
+});
+
+test("Clear all moves the person's own rows in the filter to Done, never an approval or question waiting on them", async () => {
+  f = await setup();
+  const { bia, caio } = await people();
+  await makeAdmin(f.db, f.org.id, bia.id);
+  const [approval] = await f.db
+    .insert(schema.approvals)
+    .values({
+      orgId: f.org.id,
+      agentId: f.agent.id,
+      channelId: f.general.id,
+      threadRootId: crypto.randomUUID(),
+      toolUseId: "tool-1",
+      tool: "github_merge",
+      scope: "github:pr.merge",
+      params: { pr: 7 },
+      actionHash: "hash",
+      title: "Merge PR #7",
+      expiresAt: new Date(Date.now() + 3_600_000),
+    })
+    .returning();
+  const base = { orgId: f.org.id, actor: { type: "agent" as const, id: f.agent.id } };
+  await notify(deps(), {
+    ...base,
+    userIds: [bia.id],
+    kind: "approval",
+    groupKey: "approval:clear",
+    waiting: true,
+    source: { approvalId: approval?.id },
+  });
+  await notify(deps(), {
+    ...base,
+    userIds: [bia.id],
+    kind: "agent_question",
+    groupKey: "question:clear",
+    waiting: true,
+    source: {},
+  });
+  for (const key of ["a", "b"])
+    await notify(deps(), {
+      ...base,
+      userIds: [bia.id, caio.id],
+      kind: "mention",
+      groupKey: `mention:${key}`,
+      source: {},
+    });
+  await notify(deps(), { ...base, userIds: [bia.id], kind: "thread_reply", groupKey: "thread:x", source: {} });
+
+  expect((await markAllNotificationsDone(deps(), bia.id, f.org.id, "waiting")).ids).toEqual([]);
+  expect((await markAllNotificationsDone(deps(), bia.id, f.org.id, "done")).ids).toEqual([]);
+  await expect(markAllNotificationsDone(deps(), bia.id, f.org.id, "nope" as "all")).rejects.toBeInstanceOf(
+    ValidationError,
+  );
+
+  const events = hear(bia.id);
+  const mentions = await markAllNotificationsDone(deps(), bia.id, f.org.id, "mentions");
+  expect(mentions.ids).toHaveLength(2);
+  const { ids } = await markAllNotificationsDone(deps(), bia.id, f.org.id);
+  expect(ids).toHaveLength(1);
+  expect((await inbox(bia.id)).items.map((n) => n.kind).sort()).toEqual(["agent_question", "approval"]);
+  const done = await listNotifications(deps(), bia.id, f.org.id, { filter: "done" });
+  expect(done.items.map((n) => n.id).sort()).toEqual([...mentions.ids, ...ids].sort());
+  expect(events.filter((e) => e.type === "notification.removed")).toHaveLength(3);
+  expect(events.at(-1)?.type).toBe("notification.counts");
+  // Caio's copies of the same mentions are his own: untouched.
+  expect((await inbox(caio.id)).counts.all).toBe(2);
 });
 
 test("reactions to my message merge (also within 30 min after reading); my own reactions don't count", async () => {
@@ -452,7 +536,7 @@ test("issues: assigned (resolved when unassigned), status by others, comments me
   const owner = { type: "person" as const, userId: f.owner.id };
   const issue = await createIssue(deps(), owner, f.org.id, {
     title: "Export report as CSV",
-    assignee: { type: "person", id: bia.id },
+    assignees: [{ type: "person", id: bia.id }],
   });
   const [assigned] = (await inbox(bia.id)).items;
   expect(assigned).toMatchObject({
@@ -487,7 +571,7 @@ test("issues: assigned (resolved when unassigned), status by others, comments me
   expect(caioInbox.items.find((n) => n.kind === "issue_comment")?.count).toBe(1); // the agent's, not the mention
 
   // Unassigned: "assigned to you" leaves Bia's inbox.
-  await updateIssue(deps(), owner, f.org.id, issue.id, { assignee: null });
+  await updateIssue(deps(), owner, f.org.id, issue.id, { assignees: [] });
   const [row] = await f.db
     .select()
     .from(schema.notifications)

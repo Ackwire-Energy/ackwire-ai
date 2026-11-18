@@ -12,6 +12,7 @@ import {
   useSettings,
   useUpdateAgent,
 } from "@agenteschat/client";
+import { type WorkPlaceNames, workDetail } from "@agenteschat/client/lib/agent-work";
 import {
   audienceLines,
   audienceNotice,
@@ -25,19 +26,10 @@ import {
 } from "@agenteschat/client/lib/audience";
 import { brainLine, engineOfBrain } from "@agenteschat/client/lib/brain";
 import { errorText } from "@agenteschat/client/lib/errors";
-import {
-  clockHour,
-  firstName,
-  formatMonthYear,
-  formatPercent,
-  formatTime,
-  relativeTime,
-  shortModel,
-  whenAt,
-} from "@agenteschat/client/lib/format";
+import { clockHour, formatMonthYear, formatPercent, relativeTime, shortModel } from "@agenteschat/client/lib/format";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { can } from "@agenteschat/client/lib/permissions";
-import { isOutOfOffice, statusEndNote } from "@agenteschat/client/lib/presence";
+import { agentFaceWord, agentWhyKey, isOutOfOffice, statusEndNote } from "@agenteschat/client/lib/presence";
 import { apiModelName, autoMakerOf } from "@agenteschat/client/lib/providers";
 import { isRightHand, tellsNameStory } from "@agenteschat/client/lib/right-hand";
 import { rolesOf } from "@agenteschat/client/lib/roles";
@@ -64,6 +56,7 @@ import { type ReactNode, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AudienceChoice, audienceValid } from "@/components/AgentAudience";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { ModelPickerButton } from "@/components/ai/ModelPicker";
 import { useOpensComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
 import { MenuEntries } from "@/components/DesktopMenus";
@@ -256,6 +249,14 @@ function MessageBox({ target, label, onSent }: { target: DmTarget; label: string
       },
     );
   };
+  // Being deleted, the workspace takes no message (ADR 0088 §7): why, where the box would be.
+  if (org.deletion)
+    return (
+      <p className="small muted ac-iconline" role="status">
+        <Icon name="lock" size={16} />
+        <span>{t("deleting.composer")}</span>
+      </p>
+    );
   return (
     <div className="mcard__foot">
       <Locked when={send.isPending}>
@@ -320,6 +321,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   const handle = person?.handle ?? member?.handle;
   const joinedAt = person?.joinedAt ?? member?.joinedAt;
   const owner = (person?.role ?? member?.role) === "owner";
+  const outsideOf = person?.outsideOf ?? member?.outsideOf;
   // The roles they hold, top first (ADR 0085); who manages members gives and takes the ones below their own.
   const roleIds = person?.roleIds ?? member?.roleIds ?? [];
   const held = rolesOf({ roleIds }, roles);
@@ -419,6 +421,12 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
         </section>
       )}
       <dl className="profile-card__facts">
+        {outsideOf && (
+          <>
+            <dt>{t("members.outside.title")}</dt>
+            <dd>{outsideOf}</dd>
+          </>
+        )}
         {person && shown && (
           <>
             <dt>{t("profile.presence")}</dt>
@@ -569,7 +577,6 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
   const dir = useDirectory(org.id);
-  const models = useModels();
   const roles = useRoles(org.id).data?.roles ?? [];
   const channels = useChannels(org.id).data;
   const agentEntries = useAgentMenu();
@@ -579,17 +586,6 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
   const details = seesDetails(agent);
   const g = agentGrammar(agent.name);
   const owner = agent.ownerUserId ? dir.memberById.get(agent.ownerUserId)?.name : null;
-  const ai = useAiStatus(org.id).data;
-  const model = apiModelName(
-    t,
-    agent.model,
-    models.data?.models.find((m) => m.id === agent.model)?.label,
-    autoMakerOf(ai, agent.id),
-  );
-  const thinks =
-    agent.brain && agent.brain.kind !== "model"
-      ? brainLine(t, agent.brain, model, { owner: owner ? firstName(owner) : undefined, agents: dir.agents })
-      : null;
   // Its presence from its work and its line (ADR 0084): its own words or what it is doing now, and where.
   const shown = useAgentPresence(agent.id);
   const line = agentLine(t, shown?.line ?? null, i18n.language);
@@ -614,7 +610,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
             size="lg"
             name={agent.name}
             presence={shown?.presence ?? null}
-            presenceLabel={shown ? t(`presence.${shown.presence}`) : undefined}
+            presenceLabel={shown ? agentFaceWord(t, shown.presence) : undefined}
             asleep={isOutOfOffice(shown?.line)}
           />
         </OpensAgent>
@@ -702,7 +698,22 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
         {shown && (
           <>
             <dt>{t("profile.presence")}</dt>
-            <dd>{`${t(`presence.${shown.presence}`)} · ${agentWhy(t, i18n.language, shown)}`}</dd>
+            <dd>
+              {[
+                agentFaceWord(t, shown.presence),
+                agentWhy(
+                  t,
+                  shown,
+                  {
+                    agentName: (id) => dir.agentById.get(id)?.name,
+                    channelName: (id) => channels?.find((c) => c.id === id)?.name,
+                  },
+                  i18n.language,
+                ),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </dd>
           </>
         )}
         <dt>{t("profile.owner")}</dt>
@@ -711,14 +722,7 @@ function AgentCardBody({ agent, onDone }: { agent: Agent; onDone: () => void }) 
           <>
             <dt>{t("profile.model")}</dt>
             <dd>
-              {thinks ? (
-                <span className="profile-card__brain ac-iconline">
-                  {thinks.mark && <ProviderLogo id={thinks.mark} size="xs" />}
-                  {thinks.text}
-                </span>
-              ) : (
-                shortModel(model)
-              )}
+              <ModelPickerButton agent={agent} size="row" className="profile-card__brain" />
             </dd>
           </>
         )}
@@ -817,15 +821,16 @@ function AudienceEdit({ agent }: { agent: Agent }) {
   );
 }
 
-/** Why an agent reads as it does: "Ativo agora", "Num trabalho pesado", "Parado desde 14:20", "Sem IA conectada". */
-function agentWhy(t: TFunction, locale: string, shown: AgentShown) {
-  if (shown.noAi) return t("presence.agentWhy.noAi");
-  if (shown.presence !== "away") return t(`presence.agentWhy.${shown.presence}`);
-  if (!shown.activeAt) return t("presence.agentWhy.awayNever");
-  const today = new Date(shown.activeAt).toDateString() === new Date().toDateString();
-  return t("presence.agentWhy.away", {
-    when: today ? formatTime(locale, shown.activeAt) : whenAt(t, locale, shown.activeAt),
-  });
+/**
+ * What follows an agent's face word on its card (ADR 0084 addendum): whom it helps or where it works ("ajudando a
+ * Ada"), what it waits on you for ("sua aprovação"), why it is out or paused; free, only a return it set ("retorno às
+ * 00:32").
+ */
+function agentWhy(t: TFunction, shown: AgentShown, names: WorkPlaceNames, locale: string): string | null {
+  const key = agentWhyKey(shown.presence, shown.noAi);
+  if (key) return t(`presence.agentWhy.${key}`);
+  if (shown.presence === "online" && shown.work?.state !== "later") return null;
+  return workDetail(t, shown.work, names, locale);
 }
 
 function Spend({ agent, locale }: { agent: Agent; locale: string }) {

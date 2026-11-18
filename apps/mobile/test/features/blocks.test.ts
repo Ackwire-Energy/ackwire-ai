@@ -1,5 +1,12 @@
 import { describe, expect, test } from "bun:test";
-import { blockMayLoad, hostScript, MAX_LIVE_BLOCKS, themeScript, withLiveBlock } from "../../src/features/blocks/logic";
+import {
+  blockMayLoad,
+  faceOverlap,
+  hostScript,
+  MAX_LIVE_BLOCKS,
+  themeScript,
+  withLiveBlock,
+} from "../../src/features/blocks/logic";
 
 describe("live blocks on the phone", () => {
   test("a block never leaves its page", () => {
@@ -33,4 +40,9 @@ describe("live blocks on the phone", () => {
       'window.__agentesHost&&window.__agentesHost({"state":{"nome":"Bento"},"who":{}});true;',
     );
   });
+});
+
+test("a vote's voters stack as the web's do: 6 under a photo, past initials only the rings over each other", () => {
+  expect(faceOverlap(true)).toEqual({ marginLeft: -6 });
+  expect(faceOverlap(false)).toEqual({ marginLeft: -4 });
 });

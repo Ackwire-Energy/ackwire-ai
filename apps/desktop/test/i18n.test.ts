@@ -96,9 +96,42 @@ describe("desktop strings", () => {
     );
   });
 
+  test("the Mac's permission prompts in every language, each file in the bundle", async () => {
+    const tauri = join(import.meta.dir, "../src-tauri");
+    const plist = await Bun.file(join(tauri, "Info.plist")).text();
+    const prompts = [...plist.matchAll(/<key>(NS\w+UsageDescription)<\/key>/g)].map((m) => m[1]).sort();
+    expect(prompts.length).toBe(5);
+    const config = await Bun.file(join(tauri, "tauri.macos.conf.json")).json();
+    const files: Record<string, string> = config.bundle.macOS.files;
+    for (const { code } of LOCALES.filter((l) => l.ready && l.code !== "en")) {
+      const path = `locales/${code}.lproj/InfoPlist.strings`;
+      expect({ code, mapped: files[`Resources/${code}.lproj/InfoPlist.strings`] }).toEqual({ code, mapped: path });
+      const strings = [...(await Bun.file(join(tauri, path)).text()).matchAll(/^"(\w+)" = "([^"]+)";$/gm)];
+      expect({ code, keys: strings.map((m) => m[1]).sort() }).toEqual({ code, keys: prompts });
+    }
+  });
+
+  test("the Windows installer has our words in each language it lists", async () => {
+    const tauri = join(import.meta.dir, "../src-tauri");
+    const config = await Bun.file(join(tauri, "tauri.windows.conf.json")).json();
+    const nsi = await Bun.file(join(tauri, "installer/installer.nsi")).text();
+    const lines = [...nsi.matchAll(/^LangString (\w+) \$\{LANG_(\w+)\} "[^"]+"$/gm)];
+    const keysOf = (lang: string) =>
+      lines
+        .filter((m) => m[2] === lang)
+        .map((m) => m[1])
+        .sort();
+    const listed: string[] = config.bundle.windows.nsis.languages;
+    // A LangString for a language the config leaves out fails makensis (its LANG_ constant is undefined).
+    expect([...new Set(lines.map((m) => m[2]))].sort()).toEqual(listed.map((l) => l.toUpperCase()).sort());
+    const english = keysOf("ENGLISH");
+    expect(english.length).toBe(11);
+    for (const lang of listed) expect({ lang, keys: keysOf(lang.toUpperCase()) }).toEqual({ lang, keys: english });
+  });
+
   test("a window loads only its language and English, and the next one when picked", async () => {
     const i18n = await loadDesktopI18n("pt-BR", "windows");
-    expect(i18n.t("desktop.own.here")).toBe("Rodar o Ackwire AI neste PC");
+    expect(i18n.t("desktop.place.here")).toBe("Neste PC");
     expect(Object.keys(i18n.store.data).sort()).toEqual(["en", "pt-BR"]);
     switchDesktopLocale(i18n, "ja", "windows");
     await new Promise<void>((done) => i18n.on("languageChanged", () => done()));
@@ -110,7 +143,7 @@ describe("desktop strings", () => {
     expect(createDesktopI18n("pt-BR", "mac").t("desktop.tray.calmBody")).toBe(
       "Os agentes usam este Mac quando precisam.",
     );
-    expect(createDesktopI18n("pt-BR", "windows").t("desktop.own.here")).toBe("Rodar o Ackwire AI neste PC");
+    expect(createDesktopI18n("pt-BR", "windows").t("desktop.place.here")).toBe("Neste PC");
     expect(createDesktopI18n("pt-BR", "linux").t("desktop.link.chipHere")).toBe("Este computador");
     expect(createDesktopI18n("en", "linux").t("desktop.connect.httpRefused", { host: "192.168.1.20:3000" })).toBe(
       "192.168.1.20:3000 doesn't use a secure connection (https), and only servers on this computer may go without one. Use its https address or its Tailscale one.",
@@ -164,8 +197,6 @@ describe("desktop strings", () => {
       "prefs.general.launchTitle",
       "prefs.general.notifySiteTitle",
       "prefs.general.notifySiteDesc",
-      "prefs.general.dockTitle",
-      "prefs.general.dockDesc",
       "prefs.general.menuBarTitle",
       ...leaves(desktopEn.prefs.updates).map((k) => `prefs.updates.${k}`),
     ];

@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { CONNECTOR_CATALOG } from "@agenteschat/engine";
 import { en, ptBR } from "@agenteschat/i18n";
-import { TOOL_LABELS, toolKey } from "../../../packages/client/src/lib/tool-labels";
+import { toolKey } from "../../../packages/client/src/lib/tool-labels";
 
 type ScopeWords = Record<string, { label?: string; description?: string } | undefined>;
 
@@ -10,7 +10,7 @@ describe("the connector catalog and the words people read", () => {
     const missing = Object.values(CONNECTOR_CATALOG).flatMap((def) =>
       Object.entries(def.tools).flatMap(([name, tool]) => [
         ...(def.scopes[tool.scope] ? [] : [`${def.id}.${name}: no scope ${tool.scope}`]),
-        ...(TOOL_LABELS[toolKey(name).key] ? [] : [`${def.id}.${name}: no words`]),
+        ...(Object.hasOwn(en.toolNames.label, toolKey(name).key) ? [] : [`${def.id}.${name}: no words`]),
         ...(tool.sensitive && !tool.title ? [`${def.id}.${name}: asks a person with no title`] : []),
       ]),
     );

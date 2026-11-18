@@ -1,6 +1,21 @@
 import type { PubSub } from "@agenteschat/adapters";
-import { and, asc, type Database, type Executor, eq, gt, inArray, isNull, ne, or, schema, sql } from "@agenteschat/db";
+import {
+  and,
+  asc,
+  type Database,
+  type Executor,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNull,
+  ne,
+  or,
+  schema,
+  sql,
+} from "@agenteschat/db";
 import { scalarParams } from "./approvals";
+import { runAuthorityById } from "./authority";
 import { mayJoin, type RunTrigger, startOrJoinRun } from "./dispatch";
 import { isAgentOnlyDm } from "./dms";
 import { publishChannelEvent } from "./events";
@@ -11,7 +26,8 @@ import { holdsMessages } from "./run-hold";
 import { inChannelRun } from "./run-scope";
 import { type AgentRun, addRunStep, replyThreadOf } from "./runs";
 
-const { agentConsultations, agentRunSteps, agentRuns, agents, approvals, channels, messages, users } = schema;
+const { agentConsultations, agentRunSteps, agentRuns, agentWorks, agents, approvals, channels, messages, users } =
+  schema;
 
 /**
  * A run's inbox (`agent_runs.pending_message_ids`): messages sent to the agent's conversation while
@@ -27,7 +43,33 @@ export const ACTIVE_RUN_STATUSES = ["queued", "running", "waiting_approval", "wa
  * Why a run's unread messages were handed on (kept on the run's trail). `held`: the run waits on
  * something a message can't move (an approval, a secret, a mission's decision: `holdsMessages`).
  */
-export type ReleaseReason = "done" | "failed" | "canceled" | "interrupted" | "swept" | "held";
+export const RELEASE_REASONS = ["done", "failed", "canceled", "interrupted", "swept", "held"] as const;
+export type ReleaseReason = (typeof RELEASE_REASONS)[number];
+
+/**
+ * The message a person stopped this run to send ("Parar e mandar" to a computer brain, whose turn can't be cut
+ * halfway), or null when the run was stopped for itself (the stop button, a plain "stop"). Such a stop is no stop
+ * to the person: they sent a message and the agent goes on with it, so nothing in the conversation says "stopped".
+ * One message may stop several runs (every agent at work it was sent into): it lists them all.
+ */
+export async function stoppedToSend(
+  db: Executor,
+  run: Pick<AgentRun, "id" | "orgId" | "channelId" | "createdAt">,
+): Promise<{ id: string; createdAt: Date } | null> {
+  const [sent] = await db
+    .select({ id: messages.id, createdAt: messages.createdAt })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, run.orgId),
+        eq(messages.channelId, run.channelId),
+        gte(messages.createdAt, run.createdAt),
+        sql`${messages.meta}->'stoppedRunIds' @> to_jsonb(${run.id}::text)`,
+      ),
+    )
+    .limit(1);
+  return sent ?? null;
+}
 
 /**
  * Queues a message on a run, only while the run is still active (status-guarded: a run that ended
@@ -131,12 +173,36 @@ async function takeToHandOn(db: Database, run: Pick<AgentRun, "id" | "orgId">, o
 
 /**
  * The run just paused on something a message can't move (`holdsMessages`): what it hadn't read yet gets
- * a run of its own instead of waiting behind the decision. A no-op for any other pause.
+ * a run of its own instead of waiting behind the decision. A no-op for any other pause. What was passed on to its
+ * background work stays: the work reads it once the decision comes, or its end takes it (`endWork`).
  */
 export async function releaseHeldInbox(db: Database, pubsub: PubSub | undefined, runId: string) {
   const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId));
   if (!row || row.pendingMessageIds.length === 0 || !(await holdsMessages(db, row))) return null;
-  return releaseInbox(db, pubsub, row, { reason: "held" });
+  const kept = row.workId ? await passedOnTo(db, row.orgId, row.workId, row.pendingMessageIds) : [];
+  if (kept.length === 0) return releaseInbox(db, pubsub, row, { reason: "held" });
+  return handOnMessages(
+    db,
+    pubsub,
+    row,
+    row.pendingMessageIds.filter((id) => !kept.includes(id)),
+  );
+}
+
+/** Of these messages, the ones passed on to that background work with `steer_work` (`meta.steeredWorkIds`). */
+export async function passedOnTo(db: Executor, orgId: string, workId: string, ids: string[]) {
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select({ id: messages.id })
+    .from(messages)
+    .where(
+      and(
+        eq(messages.orgId, orgId),
+        inArray(messages.id, ids),
+        sql`${messages.meta}->'steeredWorkIds' ? ${workId}::text`,
+      ),
+    );
+  return rows.map((m) => m.id);
 }
 
 /**
@@ -152,7 +218,7 @@ export async function heldHere(
   run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
 ): Promise<string | null> {
   const rows = await db
-    .select({ title: approvals.title, params: approvals.params })
+    .select({ title: approvals.title, params: approvals.params, status: approvals.status })
     .from(approvals)
     .innerJoin(agentRuns, eq(agentRuns.id, approvals.runId))
     .where(
@@ -160,9 +226,13 @@ export async function heldHere(
         eq(approvals.orgId, run.orgId),
         eq(approvals.agentId, run.agentId),
         eq(approvals.channelId, run.channelId),
-        eq(approvals.status, "pending"),
+        // Waiting for a person, or approved and waiting its turn behind a request asked before it (ADR 0182).
+        or(
+          eq(approvals.status, "pending"),
+          and(eq(approvals.status, "approved"), isNull(approvals.result), isNull(approvals.runAt)),
+        ),
         ne(agentRuns.id, run.id),
-        eq(agentRuns.status, "waiting_approval"),
+        inArray(agentRuns.status, ["waiting_approval", "waiting_input"]),
         or(
           eq(agentRuns.threadRootId, run.threadRootId),
           replyThreadOf(run) ? undefined : inChannelRun(sql`${agentRuns}`),
@@ -176,7 +246,8 @@ export async function heldHere(
     const params = Object.entries(scalarParams(r.params))
       .map(([k, v]) => `${k}=${v}`)
       .join(", ");
-    return `- ${r.title}${params ? ` (${params})` : ""}`;
+    const turn = r.status === "approved" ? " [approved, runs once what was asked before it is done]" : "";
+    return `- ${r.title}${params ? ` (${params})` : ""}${turn}`;
   });
   return [
     "# Already waiting for approval here",
@@ -195,7 +266,7 @@ export async function heldHere(
  */
 export async function whileHeld(
   db: Executor,
-  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  run: Pick<AgentRun, "id" | "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId" | "workId">,
 ): Promise<string | null> {
   // The pause: its last step of its own. Handing its inbox on (`handOn`) writes a step after the run it
   // started, which would hide that run and its trigger.
@@ -207,7 +278,13 @@ export async function whileHeld(
   const since = new Date(paused.at);
   const threadId = replyThreadOf(run);
   const rows = await db
-    .select({ body: messages.body, person: users.name, agent: agents.name })
+    .select({
+      body: messages.body,
+      person: users.name,
+      userId: messages.authorUserId,
+      agent: agents.name,
+      runId: messages.agentRunId,
+    })
     .from(messages)
     .leftJoin(users, eq(users.id, messages.authorUserId))
     .leftJoin(agents, eq(agents.id, messages.authorAgentId))
@@ -230,7 +307,17 @@ export async function whileHeld(
     )
     .orderBy(asc(messages.createdAt))
     .limit(10);
+  // Background work reads only what was said for its asker: anyone else's ask runs after it, as them (`steerWork`), so
+  // neither their words nor the agent's answers to them reach it.
+  const [work] = run.workId
+    ? await db.select({ asker: agentWorks.requestedByUserId }).from(agentWorks).where(eq(agentWorks.id, run.workId))
+    : [];
+  const forAsker = new Map<string, boolean>();
+  for (const m of rows)
+    if (work && m.agent && m.runId && !forAsker.has(m.runId))
+      forAsker.set(m.runId, (await runAuthorityById(db, run.orgId, m.runId)).personId === work.asker);
   const lines = rows.flatMap((m) => {
+    if (work && (m.agent ? !m.runId || !forAsker.get(m.runId) : m.userId !== work.asker)) return [];
     const text = cutText(stripSentinel(m.body), 1500);
     if (!text) return [];
     return [m.agent ? `[You, in another run]: ${text}` : `[${m.person ?? "Someone"}]: ${text}`];

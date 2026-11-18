@@ -60,7 +60,8 @@ export async function exportBundle(db: Database, actorId: string, orgId: string)
     db
       .select()
       .from(skills)
-      .where(and(eq(skills.orgId, orgId), isNull(skills.deletedAt)))
+      // Personal skills are their people's: they stay, as private channels do.
+      .where(and(eq(skills.orgId, orgId), isNull(skills.deletedAt), isNull(skills.ownerUserId)))
       .orderBy(asc(skills.createdAt)),
     // Private channels stay: an import would make them public, with what they're about.
     db

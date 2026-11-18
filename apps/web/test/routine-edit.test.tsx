@@ -5,6 +5,7 @@ setupDom();
 
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { createFakeApi, ORG_ID, seedState } from "./fake-api";
+import { hintOf, shownText } from "./hint";
 import { renderApp, screen, settle } from "./render";
 
 afterEach(() => cleanup());
@@ -100,13 +101,17 @@ describe("Rotinas: editar, duplicar, apagar", () => {
     await menu("Resumo da semana", "Editar");
     const page = screen().getByRole("dialog", { name: "Resumo da semana" });
     expect(within(page).getByRole("list", { name: "Faz sozinha" }).textContent).toBe("Enviar mensagem (Slack)");
-    expect(page.textContent).toContain("Qualquer outra ação neles pede aprovação antes");
+    expect(shownText(page)).toContain("Cada execução faz isso sem pedir.");
+    expect(hintOf("Faz sozinha", page).text).toContain(
+      "Outros envios, exclusões, pagamentos e convites pedem aprovação antes",
+    );
     await click(within(page).getByRole("button", { name: "Fechar detalhes" }));
     await settle(3);
     await click(screen().getByRole("button", { name: "Nova rotina" }));
     await settle(3);
     const fresh = screen().getByRole("dialog", { name: "Nova rotina" });
-    expect(fresh.textContent).toContain("Nos apps conectados, ela pede aprovação antes de cada ação");
+    expect(shownText(fresh)).toContain("Só pede aprovação antes de apagar, enviar ou pagar.");
+    expect(hintOf("Faz sozinha", fresh).text).toContain("Nos apps conectados, ela faz as mudanças comuns sem pedir");
   });
 
   test("nothing changed: Salvar just closes", async () => {

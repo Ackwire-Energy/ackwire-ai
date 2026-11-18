@@ -140,6 +140,16 @@ describe("the phone in hand", () => {
     expect(reasonText(t, "apple_team_missing")).toBe("Xcode on the Mac shows no team yet");
     expect(reasonText(t, "ui_not_authorized")).toBe("This iPhone refused the test helper's taps");
   });
+  test("an iPhone over Wi-Fi: not reached is the first step, not trusted the second, each in its own words", async () => {
+    for (const reason of ["wifi_away", "wifi_asleep", "tunnel_down"])
+      expect(iphoneStep(phone({ id: "i", status: needs(reason) }))).toBe(0);
+    expect(iphoneStep(phone({ id: "i", status: needs("wifi_untrusted") }))).toBe(1);
+    const t = await translator("en");
+    expect(reasonText(t, "wifi_away")).toBe("Join the Mac's Wi-Fi on this iPhone, or plug it in");
+    expect(reasonText(t, "tunnel_down")).toBe("The Wi-Fi link dropped. Keep this iPhone near the Mac, or plug it in");
+    const pt = await translator("pt-BR");
+    expect(reasonText(pt, "wifi_untrusted")).toBe("Conecte uma vez e toque em Confiar");
+  });
   test("a phone waiting on someone is drawn dimmed, an offline one dark", () => {
     expect(phonePortrait(phone({ id: "i", platform: "ios", status: needs("locked") }))).toEqual({
       kind: "iphone",
@@ -166,6 +176,8 @@ describe("notices, waits and facts", async () => {
       device: "Pixel 8",
       forUserId: "rui",
       doing: "Recording a test video",
+      tool: null,
+      path: null,
     });
     expect(d ? deviceHref(d) : null).toBe("/settings/devices/phone/p1");
     expect(deviceHref({ phoneId: "../x", machineId: null })).toBe("/settings/devices");
@@ -178,6 +190,41 @@ describe("notices, waits and facts", async () => {
     expect(deviceNoticeTitle(en, { ...d, kind: "device.join_request", device: "build-box" }, "", "", "Acme")).toBe(
       "build-box wants to join Acme",
     );
+    // Someone asks the viewer to turn a tool on: the tool in words, from `latest.reason`.
+    const ask = deviceNoticeOf({
+      kind: "device.tool_request" as never,
+      source: { machineId: "k1", label: "Sam's MacBook" } as never,
+      latest: { reason: "browser" },
+    });
+    expect(ask).toMatchObject({ kind: "device.tool_request", machineId: "k1", tool: "browser" });
+    if (ask)
+      expect(deviceNoticeTitle(en, ask, "Rui", "", "")).toBe(
+        "Rui asks you to turn on the browser on your Sam's MacBook",
+      );
+    // Or to install a coding CLI there.
+    const install = deviceNoticeOf({
+      kind: "device.cli_request" as never,
+      source: { machineId: "k1", label: "Sam's PC" } as never,
+      latest: { reason: "claude" },
+    });
+    expect(install).toMatchObject({ kind: "device.cli_request", machineId: "k1", tool: "claude" });
+    if (install)
+      expect(deviceNoticeTitle(en, install, "Rui", "", "")).toBe(
+        "Rui asks you to install Claude Code on your Sam's PC",
+      );
+    // Or an agent waits for a folder there: the folder in the line, and the row opens the computer.
+    const folder = deviceNoticeOf({
+      kind: "device.folder_request" as never,
+      source: { machineId: "k1", label: "Sam's MacBook" } as never,
+      latest: { title: "/Users/sam/Music", text: "the playlist" },
+    });
+    expect(folder).toMatchObject({ kind: "device.folder_request", machineId: "k1", path: "/Users/sam/Music" });
+    if (folder) {
+      expect(deviceNoticeTitle(en, folder, "Rui", "", "")).toBe(
+        "Rui asks for the folder /Users/sam/Music on your Sam's MacBook",
+      );
+      expect(deviceHref(folder)).toBe("/settings/devices/k1");
+    }
   });
   test("an inbox row of a device's notice says only what the agent is doing under its title", () => {
     const n = {

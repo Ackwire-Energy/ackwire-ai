@@ -33,7 +33,8 @@ export function placeTip(
 /**
  * How far a popover moves over its trigger to show whole: a card taller than the room on its side (its height clamped to
  * that room, and still overflowing) gains what it lacks over `base`, the room it had before moving, up to the whole
- * window between the edges. 0 for one that fits, or that its own cap clamps (a menu's 280px scrolls where it is).
+ * window between the edges. 0 for one that fits, or that its own cap clamps (a search list's fixed height scrolls where it
+ * is).
  * Measured from `base`, not from the room now: one that already moved but isn't placed again yet asks the same, not more.
  */
 export function pullToFit(box: {
@@ -47,6 +48,25 @@ export function pullToFit(box: {
   if (box.scroll <= box.client || !(box.height >= box.room - 1)) return 0;
   const natural = box.scroll + box.height - box.client;
   return Math.max(0, Math.ceil(Math.min(natural - box.base, box.window - 2 * EDGE_ROOM - box.base)));
+}
+
+/**
+ * Where a list opened by typing goes when nothing places it for it (the wiki editor's "[[" and "/" lists): `gap` under
+ * the caret, or over it when its content doesn't fit under and over has more room. As tall as that side's room lets it
+ * (`EDGE_ROOM` from the window's edge), so it scrolls only past what the window holds. Its start on the caret's, moved
+ * along only as far as it takes to stay `EDGE_ROOM` inside the window.
+ */
+export function placeList(
+  caret: { left: number; top: number; bottom: number },
+  list: { width: number; height: number },
+  win: { width: number; height: number },
+  gap = TIP_GAP,
+) {
+  const left = Math.max(EDGE_ROOM, Math.min(caret.left, win.width - EDGE_ROOM - list.width));
+  const under = win.height - EDGE_ROOM - caret.bottom - gap;
+  const over = caret.top - gap - EDGE_ROOM;
+  if (list.height <= under || under >= over) return { left, top: caret.bottom + gap, maxHeight: under };
+  return { left, top: caret.top - gap - Math.min(list.height, over), maxHeight: over };
 }
 
 /**

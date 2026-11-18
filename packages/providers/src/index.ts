@@ -1,5 +1,6 @@
 import { createAnthropicProvider } from "./anthropic";
 import { PROVIDERS, type ProviderInfo } from "./catalog";
+import { createCommandCodeProvider } from "./commandcode";
 import { createCustomProvider } from "./custom";
 import { createGeminiProvider } from "./gemini";
 import { createOpenAIProvider } from "./openai";
@@ -8,6 +9,7 @@ import type { ModelProvider } from "./types";
 
 export * from "./anthropic";
 export * from "./catalog";
+export * from "./commandcode";
 export * from "./context-limits";
 export * from "./custom";
 export * from "./embeddings";
@@ -36,7 +38,9 @@ export function createModelProviders(
             ? createGeminiProvider()
             : p.protocol === "openrouter"
               ? createOpenRouterProvider()
-              : createAnthropicProvider({ id, baseURL: p.baseURL, compat: p.compat }),
+              : p.protocol === "commandcode"
+                ? createCommandCodeProvider()
+                : createAnthropicProvider({ id, baseURL: p.baseURL, compat: p.compat }),
     ]),
   );
 }

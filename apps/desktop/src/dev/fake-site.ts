@@ -1,9 +1,10 @@
 /**
  * The server's devices API as the fake host answers `siteFetch` (design work and tests): this computer in each fake
- * workspace, its phones (the Pixel an agent uses for Rui, the iPhone that needs Developer Mode), the people and
- * roles of "Specific people or roles", and confirming a runner's code. Writes change it; `calls` keeps every request.
+ * workspace, its phones (the Pixel an agent uses for Rui, the iPhone that needs Developer Mode), an iPhone on its
+ * Wi-Fi it could use, the people and roles of "Specific people or roles", and confirming a runner's code. Writes
+ * change it; `calls` keeps every request.
  */
-import type { ComputerDevice, DeviceAudience, PhoneDevice } from "@agenteschat/client";
+import type { ComputerDevice, DeviceAudience, PhoneDevice, WifiIphone } from "@agenteschat/client";
 import type { SiteAnswer } from "../host/types";
 
 const json = (status: number, body: unknown): SiteAnswer => ({ status, body: JSON.stringify(body) });
@@ -25,6 +26,10 @@ export function createFakeSite(
   confirm: (orgId: string, userCode: string) => FakeMachine | null = () => null,
 ): FakeSite {
   const computers = new Map<string, ComputerDevice>();
+  /** Every identifier made up. */
+  const nearby: WifiIphone[] = [
+    { serial: "00008120-000A1B2C3D4E5F60", model: "iPhone 14", name: "Ana's iPhone 14", osVersion: "27.0" },
+  ];
   const computer = (orgId: string) => {
     const known = computers.get(orgId);
     if (known) return known;
@@ -55,6 +60,7 @@ export function createFakeSite(
       memoryGb: 36,
       ownerUserId: "u_sam",
       belongsToWorkspace: false,
+      spill: { own: true, others: false },
       systemMode: false,
       audience: ONLY_ME,
       status: { kind: "ready" },
@@ -127,7 +133,30 @@ export function createFakeSite(
           icons: [],
         });
       if (!mine) return json(404, { error: { code: "not_found", message: "Not found" } });
-      const [kind, id, action] = rest.slice(1);
+      const [kind, id, action, serial] = rest.slice(1);
+      if (kind === "computers" && id === mine.id && action === "wifi-iphones") {
+        const picked = nearby.find((p) => p.serial === serial);
+        if (method === "PUT" && picked) {
+          nearby.splice(nearby.indexOf(picked), 1);
+          mine.phones.push({
+            id: `0b6c5a8e-0000-4000-8000-${picked.serial.slice(-12)}`,
+            platform: "ios",
+            phoneKind: "device",
+            name: picked.name ?? picked.model,
+            model: picked.model,
+            osVersion: picked.osVersion,
+            hostMachineId: mine.id,
+            ownerUserId: "u_sam",
+            audience: null,
+            status: { kind: "preparing", reason: "helper_missing" },
+            transport: "wifi",
+            lastSeenAt: minutesAgo(0),
+            mayUse: true,
+            mayManage: true,
+          });
+        }
+        if (method === "GET" || (method === "PUT" && picked)) return json(200, { available: nearby });
+      }
       if (method === "PATCH" && kind === "computers" && id === mine.id) {
         Object.assign(mine, parsed);
         return json(200, mine);
@@ -136,6 +165,10 @@ export function createFakeSite(
       if (method === "PATCH" && kind === "phones" && phone) {
         Object.assign(phone, parsed);
         return json(200, phone);
+      }
+      if (method === "DELETE" && kind === "phones" && phone) {
+        mine.phones = mine.phones.filter((p) => p !== phone);
+        return { status: 204, body: "" };
       }
       if (method === "POST" && kind === "phones" && phone && action === "stop") {
         phone.status = { kind: "ready" };

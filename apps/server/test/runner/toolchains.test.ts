@@ -57,6 +57,54 @@ test("what this computer builds with: each tool's version, the Android SDK's fol
   });
 });
 
+test("Xcode installed but blocked: the Command Line Tools still selected, or its license not agreed to", async () => {
+  const mac = (scripts: Record<string, string>) => {
+    const c = computer([]);
+    for (const [name, script] of Object.entries(scripts))
+      writeFileSync(path.join(c.root, "bin", name), `#!/bin/sh\n${script}\n`, { mode: 0o755 });
+    return c;
+  };
+  const look = (c: ReturnType<typeof computer>, apps: string) =>
+    appleToolchains({
+      env: c.env,
+      platform: "darwin",
+      home: c.root,
+      dirs: [],
+      apps,
+      teams: async () => ({ teams: [], account: "none" }),
+    });
+  // Command Line Tools installed before Xcode: xcode-select never moved, so xcodebuild refuses.
+  const cli = mac({
+    "xcode-select": "echo /Library/Developer/CommandLineTools",
+    xcodebuild:
+      "echo \"xcode-select: error: tool 'xcodebuild' requires Xcode, but active developer directory '/Library/Developer/CommandLineTools' is a command line tools instance\" >&2; exit 1",
+    xcrun: "exit 1",
+  });
+  const app = path.join(cli.root, "Applications");
+  mkdirSync(path.join(app, "Xcode.app"), { recursive: true });
+  expect(await look(cli, app)).toMatchObject({ xcode: undefined, xcodeBlocked: "command_line_tools" });
+  // Only a beta or a versioned Xcode: the same one the fix would select.
+  const beta = path.join(cli.root, "Beta");
+  mkdirSync(path.join(beta, "Xcode-beta.app"), { recursive: true });
+  expect((await look(cli, beta)).xcodeBlocked).toBe("command_line_tools");
+  const versioned = path.join(cli.root, "Versioned");
+  mkdirSync(path.join(versioned, "Xcode_27.2.app"), { recursive: true });
+  expect((await look(cli, versioned)).xcodeBlocked).toBe("command_line_tools");
+  // No Xcode at all: installing it is the step, nothing blocked.
+  expect((await look(cli, path.join(cli.root, "Nowhere"))).xcodeBlocked).toBeUndefined();
+  // Xcode selected, its license waiting.
+  const license = mac({
+    "xcode-select": "echo /Applications/Xcode.app/Contents/Developer",
+    xcodebuild:
+      "echo \"You have not agreed to the Xcode license agreements. Please run 'sudo xcodebuild -license' from within a Terminal window to review and agree to the Xcode and Apple SDKs license.\" >&2; exit 69",
+    xcrun: "exit 69",
+  });
+  expect(await look(license, app)).toMatchObject({ xcode: undefined, xcodeBlocked: "license" });
+  // Xcode answers: nothing blocked.
+  const ready = computer(["xcode-select", "xcodebuild", "xcrun"]);
+  expect(await look(ready, app)).toMatchObject({ xcode: "26.3", xcodeBlocked: undefined });
+});
+
 test("the cache: the last look at once, a fresh one written for the next hello", async () => {
   const c = computer([]);
   const file = path.join(c.root, "toolchains.json");
@@ -126,4 +174,23 @@ test("Xcode's part, looked at every minute: a team found, or Xcode updated, goes
   await late.lookApple();
   expect(sent).toEqual([whole]);
   late.stop();
+});
+
+test("the full look finds a tool the hello didn't carry: the whole list goes out then, off a Mac too", async () => {
+  const c = computer([]);
+  const file = path.join(c.root, "toolchains.json");
+  writeFileSync(file, JSON.stringify({ git: "2.40.0" }));
+  const sent: RunnerToolchains[] = [];
+  let found: RunnerToolchains = { git: "2.40.0" };
+  const cache = cachedToolchains(file, async () => found, { onChange: (t) => sent.push(t) });
+  expect(cache.get()).toEqual({ git: "2.40.0" });
+  await cache.look();
+  expect(sent).toEqual([]);
+  found = { git: "2.40.0", adb: "36.0.2" };
+  await cache.look();
+  expect(sent).toEqual([found]);
+  // No Xcode look without `look`: nothing runs each minute.
+  await cache.lookApple();
+  expect(sent).toHaveLength(1);
+  cache.stop();
 });

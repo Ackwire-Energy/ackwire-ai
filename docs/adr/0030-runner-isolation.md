@@ -80,8 +80,8 @@ observations clear the display. A country mark appears only when the response in
 
 A Linux system runner can optionally set `networkLauncher` in its root-owned `config.json` to an absolute
 executable path. The helper receives `<uid> -- <command> [arguments...]`, prepares or enters the network
-context synchronously, then executes the command. Root network diagnostics and the agent's `runuser` launch
-use the same helper. The executable and every parent must be root-owned, with no symlinks or group/other write
+context synchronously, then executes the command. Root network diagnostics and the agent's launch as its own
+user use the same helper. The executable and every parent must be root-owned, with no symlinks or group/other write
 permissions. A failed helper prevents the process from starting. No helper is configured by default. Apply
 changes through the root configuration; an existing process keeps its network context until it ends. The
 host loopback firewall remains active for existing processes. Helpers must preserve access to the runner's
@@ -97,7 +97,7 @@ The deployment must filter private destinations before marking packets and preve
 `CAP_NET_ADMIN` or `CAP_NET_RAW` (including through file capabilities). The mark never replaces those filters.
 Changes reconcile the local guard atomically. The shared guard for `managedBy: host` does not use per-runner marks.
 
-When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before `runuser`, after the optional network launcher.
+When `networkMark` is configured, `systemLauncher` runs `setpriv --no-new-privs --bounding-set=-net_admin,-net_raw` immediately before the step that becomes the agent, after the optional network launcher.
 This also covers deployments using marked routing without a namespace launcher. The kernel bind self-check
 uses the same restriction. Existing processes must be drained or restarted before relying on it.
 

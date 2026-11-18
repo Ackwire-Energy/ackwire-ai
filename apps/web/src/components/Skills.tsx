@@ -19,10 +19,17 @@ import {
   useSkills,
   useSkillUsage,
 } from "@agenteschat/client";
+import { cardInstallAgent, cardInstallOf } from "@agenteschat/client/lib/action-cards";
 import { fromConnection } from "@agenteschat/client/lib/connected";
 import { errorText } from "@agenteschat/client/lib/errors";
-import { SKILL_ASSET_MB } from "@agenteschat/client/lib/files";
-import { relativeTime } from "@agenteschat/client/lib/format";
+import {
+  formatBytes,
+  SKILL_ASSET_MB,
+  SKILL_TEXT_MB,
+  SKILL_ZIP_BYTES,
+  SKILL_ZIP_MB,
+} from "@agenteschat/client/lib/files";
+import { formatPercent, relativeTime } from "@agenteschat/client/lib/format";
 import { can } from "@agenteschat/client/lib/permissions";
 import {
   changedByText,
@@ -31,6 +38,7 @@ import {
   hiddenRepoOf,
   hiddenRepoText,
   pickSkills,
+  relightsSkillUpdate,
   SKILL_FILES_SHOWN,
   SKILL_UPDATE_TOAST,
   type SkillPendingView,
@@ -40,15 +48,19 @@ import {
   skillPickOf,
   skillRefusalText,
   skillRemovalText,
+  skillScopes,
   skillSourceViaText,
+  skillsSplit,
   skillUpdateErrorText,
   skillUpdateWords,
   skillViaText,
   skillWaitingChip,
   skippedSkillText,
 } from "@agenteschat/client/lib/skills";
+import { modeKey } from "@agenteschat/client/lib/workspace-mode";
 import {
   Alert,
+  Avatar,
   Button,
   Card,
   CardHeader,
@@ -71,7 +83,11 @@ import {
   List,
   ListRow,
   Locked,
+  Menu,
+  MenuItem,
   SearchField,
+  Segmented,
+  SettingNote,
   Switch,
   TabPanel,
   Tabs,
@@ -84,9 +100,11 @@ import { ConnectFlow, type FlowState } from "@/components/ConnectFlow";
 import { ConnectorIcon } from "@/components/ConnectorCatalog";
 import { LoadingLine, LoadingList, useStepText } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { useDirectory } from "@/hooks/useDirectory";
 import { useEdited } from "@/hooks/useEdited";
 import { useRightHandLook } from "@/hooks/useRightHandLook";
 import { inlineWords, Markdown } from "@/lib/markdown";
+import { STORAGE_KEYS, sessionStore } from "@/lib/storage";
 import { useToast } from "@/lib/toast";
 
 /** How many skills show without a search: past it, the settings card gets "Ver todas" and an agent's picker a search. */
@@ -143,6 +161,7 @@ function SkillRow({ skill, users, onOpen }: { skill: Skill; users: number | null
       </button>
       <span className="skill-row__meta">
         <SourceChip skill={skill} />
+        {skill.ownerUserId && <Chip icon="lock">{t("vault.tab.personal")}</Chip>}
         {skill.defaultForNewAgents && <Chip icon="check">{t("skills.defaultChip")}</Chip>}
         {skill.pendingUpdate && !skill.pendingUpdate.dismissed ? (
           <Chip icon="alert">{t(skillWaitingChip(skill.pendingUpdate))}</Chip>
@@ -169,49 +188,91 @@ function ViaLine({ children }: { children: string }) {
   );
 }
 
+type SkillScope = "team" | "personal";
+
 /**
- * Configurações → Skills: the org library (admins manage it). `install`: back from connecting GitHub in Instalar
- * skill, the link it couldn't read, which the dialog reads again (`connected`: the server's `?connected=github`).
+ * Configurações → Skills, for every member: the team's library (who manages agents changes it, everyone reads it) and,
+ * where the workspace has more than one person, "Equipe | Pessoal" as the Vault has (ADR 0144): a member's own
+ * skills, which only they see and their agents use only when they ask. Who manages agents also sees others' personal
+ * skills under the team's, name and person only, to remove. `install`: back from connecting GitHub in Instalar
+ * skill, the link it couldn't read, which the dialog reads again (`connected`: the server's `?connected=github`), and
+ * `agent`, the agent whose card opened it: only when this tab opened that card's install (`cardInstallAgent`).
  * `skill`: the skill to open (a notice of its update from its link).
  */
-export function SkillsSection({ install, connected, skill }: { install?: string; connected?: string; skill?: string }) {
+export function SkillsSection({
+  install,
+  connected,
+  skill,
+  agent,
+}: {
+  install?: string;
+  connected?: string;
+  skill?: string;
+  agent?: string;
+}) {
   const { t } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const admin = can(org, "manage_agents");
-  const skills = useSkills(org.id, admin);
+  const skills = useSkills(org.id);
+  const dir = useDirectory(org.id);
   const [installing, setInstalling] = useState(Boolean(install));
   const [returned, setReturned] = useState(install);
+  const [returnedFor] = useState(() =>
+    cardInstallAgent(cardInstallOf(sessionStore.get(STORAGE_KEYS.skillInstallFor)), install, agent),
+  );
   useEffect(() => {
     if (install || skill) window.history.replaceState(null, "", window.location.pathname);
+    if (install) sessionStore.remove(STORAGE_KEYS.skillInstallFor);
   }, [install, skill]);
   const [all, setAll] = useState(false);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<string | null>(skill ?? null);
-  const list = skills.data ?? [];
-  const usage = useSkillUsage(org.id, admin && list.length > 0);
+  const [picked, setPicked] = useState<SkillScope | null>(null);
+  const everything = skills.data ?? [];
+  const scopes = skillScopes(everything, me.user.id);
+  const split = skillsSplit(dir.members.length, everything);
+  const scope: SkillScope = !split ? "team" : (picked ?? (admin ? "team" : "personal"));
+  const list = scope === "team" ? scopes.team : scopes.mine;
+  const usage = useSkillUsage(org.id, admin && everything.length > 0);
   const settings = useSkillSettings(org.id, admin);
   const action = useSkillAction(org.id);
   const look = useRightHandLook();
-  if (!admin) return null;
   const unavailable = skills.isError && (skills.error as { status?: number }).status === 404;
   const noSkills = skills.isSuccess && list.length === 0;
+  const mayInstall = scope === "personal" || admin;
+  const installButton = (variant?: "primary") => (
+    <Button size={variant ? undefined : "sm"} variant={variant} icon="plus" onClick={() => setInstalling(true)}>
+      {t("skills.install")}
+    </Button>
+  );
   return (
     <Card aria-labelledby="sec-skills">
       <CardHeader
         id="sec-skills"
         icon="bulb"
         title={t("skills.title")}
-        action={
-          !unavailable &&
-          !noSkills && (
-            <Button size="sm" icon="plus" onClick={() => setInstalling(true)}>
-              {t("skills.install")}
-            </Button>
-          )
-        }
+        action={!unavailable && mayInstall && !noSkills && installButton()}
       />
       {unavailable && <p className="small muted">{t("skills.unavailable")}</p>}
-      {settings.data && (
+      {split && skills.isSuccess && (
+        <Segmented<SkillScope>
+          block
+          label={t("skills.title")}
+          value={scope}
+          onValueChange={setPicked}
+          options={[
+            { value: "team", label: t(modeKey(org, "vault.tab.team")), count: scopes.team.length },
+            { value: "personal", label: t("vault.tab.personal"), count: scopes.mine.length },
+          ]}
+        />
+      )}
+      {scope === "personal" && list.length > 0 && (
+        <p className="small muted ac-iconline">
+          <Icon name="lock" size={14} />
+          <span>{t("skills.personal.note")}</span>
+        </p>
+      )}
+      {scope === "team" && settings.data && (
         <span className="row" style={{ gap: 10, alignItems: "center" }}>
           <Switch
             id="skills-agents-improve"
@@ -232,14 +293,10 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         <EmptyState
           size="panel"
           agent={look}
-          title={t("skills.emptyTitle")}
-          actions={
-            <Button variant="primary" icon="plus" onClick={() => setInstalling(true)}>
-              {t("skills.install")}
-            </Button>
-          }
+          title={t(scope === "personal" ? "skills.personal.emptyTitle" : "skills.emptyTitle")}
+          actions={mayInstall && installButton("primary")}
         >
-          {t("skills.emptyText")}
+          {t(scope === "personal" ? "skills.personal.emptyText" : "skills.emptyText")}
         </EmptyState>
       )}
       {list.length > 0 && (
@@ -251,11 +308,12 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
       )}
       {list.length > INLINE && (
         <div className="row">
-          <Button size="sm" variant="ghost" onClick={() => setAll(true)}>
+          <Button variant="link" onClick={() => setAll(true)}>
             {t("skills.seeAll", { count: list.length })}
           </Button>
         </div>
       )}
+      {scope === "team" && scopes.others.length > 0 && <OthersPersonal skills={scopes.others} />}
       <Dialog open={all} onOpenChange={setAll} title={t("skills.title")} closeLabel={t("common.close")}>
         <DialogSearchList
           query={q}
@@ -287,15 +345,103 @@ export function SkillsSection({ install, connected, skill }: { install?: string;
         onInstalled={(id) => setOpen(id)}
         initialUrl={returned}
         connected={returned !== undefined && connected === "github"}
+        forAgentId={returned !== undefined ? returnedFor : undefined}
+        scope={split ? (admin ? scope : "personal") : undefined}
       />
       {open && <SkillSheet id={open} users={usage.get(open) ?? []} onClose={() => setOpen(null)} />}
     </Card>
   );
 }
 
+/** A personal skill's person: their face and name. */
+function OwnerName({ userId }: { userId: string }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const person = useDirectory(org.id).memberById.get(userId);
+  const name = person?.name ?? t("channel.unknownPerson");
+  return (
+    <span className="skill-owner ac-iconline small">
+      <Avatar name={name} imageUrl={person?.avatarUrl ?? undefined} size="xs" framed />
+      <span>{name}</span>
+    </span>
+  );
+}
+
+/**
+ * Other people's personal skills, for who manages agents: each with its person and how many agents use it, and only
+ * Remover, since their text is their person's alone.
+ */
+function OthersPersonal({ skills }: { skills: Skill[] }) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const toast = useToast();
+  const action = useSkillAction(org.id);
+  const [removing, setRemoving] = useState<Skill | null>(null);
+  return (
+    <section className="skill-others" aria-labelledby="skill-others">
+      <h3 id="skill-others" className="ac-eyebrow">
+        {t("skills.personal.others")} · <span className="tabular">{skills.length}</span>
+      </h3>
+      <List aria-labelledby="skill-others">
+        {skills.map((s) => (
+          <div key={s.id} className="ac-list__row skill-row">
+            <span className="skill-row__name skill-row__name--static">{s.name}</span>
+            <span className="skill-row__meta">
+              <Chip icon="lock">{t("vault.tab.personal")}</Chip>
+              <OwnerName userId={s.ownerUserId ?? ""} />
+              <span className="small muted tabular">{t("skills.usedBy", { count: s.agentsCount ?? 0 })}</span>
+              <Menu
+                align="end"
+                label={t("agent.moreActions")}
+                trigger={<Button size="sm" variant="ghost" iconOnly icon="more" aria-label={t("agent.moreActions")} />}
+              >
+                <MenuItem icon="trash" danger onSelect={() => setRemoving(s)}>
+                  {t("skills.remove")}
+                </MenuItem>
+              </Menu>
+            </span>
+          </div>
+        ))}
+      </List>
+      <Dialog
+        open={removing !== null}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        title={t("skills.removeTitle", { name: removing?.name ?? "" })}
+        description={skillRemovalText(t, [])}
+        closeLabel={t("common.close")}
+        width={440}
+      >
+        <DialogFooter>
+          <Button onClick={() => setRemoving(null)}>{t("common.cancel")}</Button>
+          <Button
+            variant="danger"
+            disabled={action.isPending}
+            loading={action.isPending}
+            onClick={() =>
+              removing &&
+              action.mutate(
+                { type: "remove", id: removing.id },
+                {
+                  onSuccess: () => {
+                    toast.show(t("skills.removed", { name: removing.name }));
+                    setRemoving(null);
+                  },
+                },
+              )
+            }
+          >
+            {t("skills.remove")}
+          </Button>
+        </DialogFooter>
+      </Dialog>
+    </section>
+  );
+}
+
 /**
  * An agent's skills (its page, Criar agente): the library as pills, with a search past INLINE. The search matches
- * names only, since a pill shows nothing else, and only hides pills: a skill switched on stays on while hidden.
+ * names only, since a pill shows nothing else, and only hides pills: a skill switched on stays on while hidden. A
+ * personal skill shows a lock; someone else's shows only while on, with its person, so who manages agents turns it off.
  */
 export function SkillPicker({
   skills,
@@ -309,9 +455,12 @@ export function SkillPicker({
   idPrefix: string;
 }) {
   const { t } = useTranslation();
+  const { org, me } = useOrg();
+  const dir = useDirectory(org.id);
   const [q, setQ] = useState("");
-  const searchable = skills.length > INLINE;
-  const shown = searchable ? searchSkills(skills, q, { nameOnly: true }) : skills;
+  const offered = skills.filter((s) => !s.ownerUserId || s.ownerUserId === me.user.id || selected.has(s.id));
+  const searchable = offered.length > INLINE;
+  const shown = searchable ? searchSkills(offered, q, { nameOnly: true }) : offered;
   const toggle = (id: string, on: boolean) => {
     const next = new Set(selected);
     if (on) next.add(id);
@@ -340,7 +489,24 @@ export function SkillPicker({
               checked={selected.has(s.id)}
               onCheckedChange={(on) => toggle(s.id, on)}
             >
-              {s.name}
+              {s.ownerUserId ? (
+                <span className="ac-iconline skill-pill">
+                  <Icon name="lock" size={14} />
+                  <span>
+                    {s.name}
+                    {s.ownerUserId !== me.user.id && (
+                      <span className="muted">
+                        {" · "}
+                        {t("skills.personal.of", {
+                          name: dir.memberById.get(s.ownerUserId)?.name ?? t("channel.unknownPerson"),
+                        })}
+                      </span>
+                    )}
+                  </span>
+                </span>
+              ) : (
+                s.name
+              )}
             </CheckboxPill>
           ))}
         </div>
@@ -357,9 +523,9 @@ type InstallTab = "github" | "zip" | "write";
  * Where connecting GitHub from Instalar skill comes back to: Skills, with the link to read again. A link too long
  * for the connect flow's `returnTo` (500 characters, a desktop window's `desktop:` before it) comes back to Skills.
  */
-const returnHere = (orgId: string, url: string) => {
+const returnHere = (orgId: string, url: string, forAgentId?: string) => {
   const skills = `/org/${orgId}/settings/skills`;
-  const back = `${skills}?install=${encodeURIComponent(url)}`;
+  const back = `${skills}?install=${encodeURIComponent(url)}${forAgentId ? `&agent=${encodeURIComponent(forAgentId)}` : ""}`;
   return back.length <= 490 ? back : skills;
 };
 
@@ -369,7 +535,11 @@ const returnHere = (orgId: string, url: string) => {
  * GitHub, and the dialog says which connection read it. When none can, it says the repository looks private or
  * missing and offers to connect GitHub (or to ask whoever manages connectors). Once GitHub is connected it reads the
  * link again while the connect flow goes on to what GitHub does and who uses it, as from Conectores (`initialUrl`
- * and `connected` when signing in on GitHub left the page).
+ * and `connected` when signing in on GitHub left the page). `forAgentId`: opened from that agent's card, a box (on by
+ * default) turns what installs on for it, and only from the card's own link (`initialUrl`): a link typed over it or a
+ * repository picked instead goes on for nobody. A pick named like an installed or a removed skill says it replaces it.
+ * `scope`: where skills split into the team's and each person's, "Para quem" starts there (Equipe only for who manages
+ * agents); absent, the team's library as before.
  */
 export function InstallSkillDialog({
   open,
@@ -377,28 +547,56 @@ export function InstallSkillDialog({
   onInstalled,
   initialUrl,
   connected = false,
+  returnTo,
+  forAgentId,
+  scope: startScope,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onInstalled: (id: string) => void;
   initialUrl?: string;
   connected?: boolean;
+  /** Where signing in on GitHub comes back to, for the link being read; Skills by default. */
+  returnTo?: (url: string) => string;
+  forAgentId?: string;
+  scope?: SkillScope;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { org } = useOrg();
+  const admin = can(org, "manage_agents");
+  const [scope, setScope] = useState<SkillScope>(startScope ?? "team");
+  const personal = startScope !== undefined && scope === "personal";
+  const mine = personal ? { personal } : {};
   const toast = useToast();
   const action = useSkillAction(org.id, { silent: true });
   const repos = useGitHubRepos(org.id, open);
   const catalog = useCatalog();
   const connections = useConnections(org.id, open && connected);
-  const installStep = useStepText(action.isPending, [
+  const dir = useDirectory(org.id);
+  // Only a live agent the server would turn it on for: not one archived or gone since its card.
+  const forName = forAgentId ? dir.agentById.get(forAgentId)?.name : undefined;
+  /** "Fica ligada para Ada": on by default, shown (and sent) only while the link is the card's own. */
+  const [turnOn, setTurnOn] = useState(true);
+  /** A .zip on its way: the share of it sent, from the moment it's read for sending until the server answers. */
+  const [sending, setSending] = useState<number | null>(null);
+  /** Stops the .zip on its way: Cancel, or the dialog closing. */
+  const stop = useRef<AbortController | null>(null);
+  const busy = action.isPending || sending !== null;
+  const timerStep = useStepText(action.isPending && sending === null, [
     t("skills.installStep.fetching"),
     t("skills.installStep.reading"),
     t("skills.installStep.saving"),
   ]);
+  const installStep =
+    sending === null
+      ? timerStep
+      : sending < 1
+        ? t("skills.zipSending", { percent: formatPercent(i18n.language, sending * 100) })
+        : t("skills.installStep.saving");
   const [tab, setTab] = useState<InstallTab>("github");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const tooBig = file !== null && file.size > SKILL_ZIP_BYTES;
   const [form, setForm] = useState({ name: "", description: "", body: "" });
   const unsaved = useEdited(open, form);
   const [error, setError] = useState<string | null>(null);
@@ -424,12 +622,23 @@ export function InstallSkillDialog({
     onInstalled(s.id);
   };
   const pick = (paths: string[], on: boolean) => setPicked(pickSkills(picked, paths, on));
+  const cardLink = forAgentId && forName ? initialUrl?.trim() : undefined;
+  const forCard = cardLink !== undefined && url.trim() === cardLink;
+  /** The agent what installs from `link` goes on for, when the box shows it and is checked. */
+  const sendFor = (link: string) =>
+    turnOn && cardLink !== undefined && link.trim() === cardLink ? forAgentId : undefined;
   /** Reads a GitHub link: one skill installs at once, unless `list`; several (or `list`) are listed to pick. */
   const read = (link: string, list = false) => {
     setError(null);
     setHidden(null);
+    const forAgent = sendFor(link);
     action.mutate(
-      { type: "import", input: list ? { url: link, list } : { url: link } },
+      {
+        type: "import",
+        input: list
+          ? { url: link, list, ...mine }
+          : { url: link, ...(forAgent ? { forAgentId: forAgent } : {}), ...mine },
+      },
       {
         onSuccess: (result) => {
           const found = skillPickOf(result);
@@ -448,23 +657,31 @@ export function InstallSkillDialog({
     );
   };
   // Opening starts afresh, on the link it couldn't read when back from connecting GitHub on its site, read once more
-  // to pick (once: development runs effects twice).
+  // to pick (once per opening: development runs effects twice).
   const readAgain = useRef<string | undefined>(undefined);
   // biome-ignore lint/correctness/useExhaustiveDependencies: on opening only
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      readAgain.current = undefined;
+      stop.current?.abort();
+      return;
+    }
     setUrl(initialUrl ?? "");
     setFile(null);
+    setSending(null);
     setForm({ name: "", description: "", body: "" });
     setError(null);
     setHidden(null);
     setChoices(null);
     setBrowsing(false);
+    setTurnOn(true);
+    setScope(startScope ?? "team");
     if (initialUrl && readAgain.current !== initialUrl) {
       readAgain.current = initialUrl;
       read(initialUrl, true);
     }
   }, [open]);
+  useEffect(() => () => stop.current?.abort(), []);
   // Signed in on GitHub: its confirmation, as Conectores shows after signing in.
   const resumed = useRef(false);
   useEffect(() => {
@@ -483,7 +700,13 @@ export function InstallSkillDialog({
       if (!choices) return read(url.trim());
       if (picked.size === 0) return setError(t("skills.pickMissing"));
       action.mutate(
-        { type: "importPicked", url: url.trim(), paths: choices.map((c) => c.path).filter((p) => picked.has(p)) },
+        {
+          type: "importPicked",
+          url: url.trim(),
+          paths: choices.map((c) => c.path).filter((p) => picked.has(p)),
+          forAgentId: sendFor(url),
+          ...mine,
+        },
         {
           onSuccess: (installed) => {
             const list = installed as SkillDetail[];
@@ -496,14 +719,34 @@ export function InstallSkillDialog({
       );
     } else if (tab === "zip") {
       if (!file) return setError(t("skills.zipMissing"));
-      const zipBase64 = await fileToBase64(file);
-      action.mutate({ type: "import", input: { zipBase64 } }, { onSuccess: done, onError });
+      if (tooBig) return;
+      const stopper = new AbortController();
+      stop.current = stopper;
+      setSending(0);
+      let zipBase64: string;
+      try {
+        zipBase64 = await fileToBase64(file);
+      } catch {
+        setSending(null);
+        return setError(t("common.unknownError"));
+      }
+      if (stopper.signal.aborted) return setSending(null);
+      action.mutate(
+        { type: "import", input: { zipBase64, ...mine }, upload: { signal: stopper.signal, onProgress: setSending } },
+        {
+          onSuccess: done,
+          onError: (e) => {
+            if (!stopper.signal.aborted) setError(errorText(t, e, i18n.language, { maxMb: SKILL_ZIP_MB }));
+          },
+          onSettled: () => setSending(null),
+        },
+      );
     } else {
       if (!writeOk) return setError(t("skills.writeMissing"));
       action.mutate(
         {
           type: "create",
-          input: { name: form.name.trim(), description: form.description.trim(), body: form.body },
+          input: { name: form.name.trim(), description: form.description.trim(), body: form.body, ...mine },
         },
         { onSuccess: done, onError },
       );
@@ -538,7 +781,7 @@ export function InstallSkillDialog({
             void submit();
           }}
         >
-          <Locked when={action.isPending}>
+          <Locked when={busy}>
             <DialogBody>
               <Tabs
                 value={tab}
@@ -571,7 +814,7 @@ export function InstallSkillDialog({
                       inputMode="url"
                     />
                   </Field>
-                  {repos.data?.connected && !choices && (
+                  {admin && repos.data?.connected && !choices && (
                     <div className="row">
                       <Button size="sm" onClick={() => setBrowsing(true)}>
                         <ConnectorIcon def={GITHUB_MARK} label="GitHub" />
@@ -620,6 +863,13 @@ export function InstallSkillDialog({
                           />
                           <span className="scope-row__text">
                             <span className="skill-pick__name">{c.name}</span>
+                            {c.replaces && (
+                              <span className="small muted skill-pick__about">
+                                {t(c.replaces === "removed" ? "skills.pickReplacesRemoved" : "skills.pickReplaces", {
+                                  name: c.name,
+                                })}
+                              </span>
+                            )}
                             <span className="small muted skill-pick__about">{c.description}</span>
                           </span>
                         </label>
@@ -635,9 +885,26 @@ export function InstallSkillDialog({
                       ))}
                     </fieldset>
                   )}
+                  {forCard && (
+                    <label htmlFor="skill-for-agent" className="scope-row">
+                      <Checkbox
+                        id="skill-for-agent"
+                        checked={turnOn}
+                        onCheckedChange={(on) => setTurnOn(on === true)}
+                      />
+                      <span className="scope-row__text">
+                        {t("skills.forAgent", { agent: forName, count: Math.max(picked.size, 1) })}
+                      </span>
+                    </label>
+                  )}
                 </TabPanel>
                 <TabPanel value="zip">
-                  <span className="small muted">{t("skills.zipHelp")}</span>
+                  <span className="ac-hintline small muted">
+                    {t("skills.zipHelp", { max: SKILL_ZIP_MB })}
+                    <InfoHint name={t("common.about", { label: t("skills.tab.zip") })}>
+                      {t("skills.zipAbout", { text: SKILL_TEXT_MB, assets: SKILL_ASSET_MB })}
+                    </InfoHint>
+                  </span>
                   {/* Our button over a hidden file input: never the native control look. */}
                   <input
                     ref={fileInput}
@@ -645,14 +912,35 @@ export function InstallSkillDialog({
                     accept=".zip,application/zip"
                     className="ac-visually-hidden"
                     aria-label={t("skills.zipPick")}
-                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    onChange={(e) => {
+                      setFile(e.target.files?.[0] ?? null);
+                      setError(null);
+                    }}
                   />
                   <div className="row" style={{ gap: 8, alignItems: "center" }}>
                     <Button type="button" icon="attach" onClick={() => fileInput.current?.click()}>
                       {t("skills.zipPick")}
                     </Button>
-                    <span className="small muted">{file ? file.name : t("skills.zipNone")}</span>
+                    <span className="small muted">
+                      {file ? `${file.name} · ${formatBytes(i18n.language, file.size)}` : t("skills.zipNone")}
+                    </span>
                   </div>
+                  {file && tooBig && (
+                    <div className="skill-hidden">
+                      <Alert>
+                        {t("skills.zipTooLarge", {
+                          name: file.name,
+                          size: formatBytes(i18n.language, file.size),
+                          max: SKILL_ZIP_MB,
+                        })}
+                      </Alert>
+                      <div className="row">
+                        <Button size="sm" icon="link" onClick={() => setTab("github")}>
+                          {t("skills.zipUseLink")}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </TabPanel>
                 <TabPanel value="write">
                   <Field label={t("skills.name")} id="skill-name">
@@ -684,6 +972,25 @@ export function InstallSkillDialog({
                   </Field>
                 </TabPanel>
               </Tabs>
+              {startScope !== undefined && (
+                <Field label={t("skills.personal.forWhom")} group>
+                  <Segmented<SkillScope>
+                    block
+                    label={t("skills.personal.forWhom")}
+                    value={scope}
+                    disabled={!admin}
+                    onValueChange={(next) => {
+                      setScope(next);
+                      setChoices(null);
+                    }}
+                    options={[
+                      { value: "personal", label: t("vault.tab.personal") },
+                      { value: "team", label: t(modeKey(org, "vault.tab.team")) },
+                    ]}
+                  />
+                  {!admin && <SettingNote icon="lock">{t("skills.personal.teamLocked")}</SettingNote>}
+                </Field>
+              )}
               {error && <Alert>{error}</Alert>}
             </DialogBody>
           </Locked>
@@ -691,7 +998,7 @@ export function InstallSkillDialog({
             <Button type="button" onClick={() => onOpenChange(false)}>
               {t("common.cancel")}
             </Button>
-            <Button type="submit" variant="primary" disabled={action.isPending} loading={action.isPending}>
+            <Button type="submit" variant="primary" disabled={busy || (tab === "zip" && tooBig)} loading={busy}>
               {t("skills.installSubmit")}
             </Button>
           </DialogFooter>
@@ -699,7 +1006,7 @@ export function InstallSkillDialog({
       )}
       <ConnectFlow
         flow={flow}
-        returnTo={returnHere(org.id, url.trim())}
+        returnTo={returnTo?.(url.trim()) ?? returnHere(org.id, url.trim(), sendFor(url))}
         onChange={(next) => {
           // Connected without leaving the page (a token): the link again, to pick, behind the steps that follow.
           if (flow?.step === 0) read(url.trim(), true);
@@ -956,7 +1263,23 @@ function SourceUpdate({ skill: s }: { skill: SkillDetail }) {
           </Button>
         </p>
       )}
-      {s.updateError && <Alert>{skillUpdateErrorText(t, s.updateError)}</Alert>}
+      {s.updateError &&
+        (relightsSkillUpdate(s.updateError) ? (
+          <div className="skill-line">
+            <Alert>{skillUpdateErrorText(t, s.updateError)}</Alert>
+            <Button
+              size="sm"
+              icon="refresh"
+              disabled={action.isPending}
+              loading={action.isPending && action.variables?.type === "update"}
+              onClick={() => action.mutate({ type: "update", id: s.id, patch: { autoUpdate: true } })}
+            >
+              {t("skills.updateFailed.relight")}
+            </Button>
+          </div>
+        ) : (
+          <Alert>{skillUpdateErrorText(t, s.updateError)}</Alert>
+        ))}
       {words.last && (
         <p className="small muted skill-line">
           <span>{words.last.line}</span>
@@ -1102,7 +1425,7 @@ export function SkillSheet({
   onClose: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const { org } = useOrg();
+  const { org, me } = useOrg();
   const toast = useToast();
   const skill = useSkill(org.id, id);
   const action = useSkillAction(org.id);
@@ -1112,6 +1435,8 @@ export function SkillSheet({
   const [removing, setRemoving] = useState(false);
   const s = skill.data;
   const via = s ? skillSourceViaText(t, s) : null;
+  // A personal skill is its person's to change; a team one, who manages agents'. Everyone else reads it.
+  const manages = s ? (s.ownerUserId ? s.ownerUserId === me.user.id : can(org, "manage_agents")) : false;
   return (
     <DetailsDialog
       open
@@ -1132,12 +1457,12 @@ export function SkillSheet({
           : undefined
       }
       actions={
-        s && (
+        s &&
+        manages && (
           <>
             {s.source === "url" && s.sourceUrl && (
               <Button
-                size="sm"
-                variant="ghost"
+                variant="link"
                 disabled={action.isPending || refresh.isPending}
                 loading={refresh.isPending}
                 onClick={() =>
@@ -1155,11 +1480,11 @@ export function SkillSheet({
               </Button>
             )}
             {!editing && (
-              <Button size="sm" variant="ghost" icon="edit" onClick={() => setEditing(true)}>
+              <Button variant="link" onClick={() => setEditing(true)}>
                 {t("skills.edit")}
               </Button>
             )}
-            <Button size="sm" variant="ghost" className="ac-btn--danger" onClick={() => setRemoving(true)}>
+            <Button variant="link" className="ac-link--danger" onClick={() => setRemoving(true)}>
               {t("skills.remove")}
             </Button>
           </>
@@ -1179,8 +1504,8 @@ export function SkillSheet({
           <div className="skill-sheet__main">
             <p className="muted">{s.description}</p>
             {via && <ViaLine>{via}</ViaLine>}
-            <SourceUpdate skill={s} />
-            <AgentImprove skill={s} />
+            {manages && <SourceUpdate skill={s} />}
+            {manages && <AgentImprove skill={s} />}
             {editing ? <EditSkill skill={s} onDone={() => setEditing(false)} /> : <Markdown source={s.body} />}
           </div>
           <nav className="skill-sheet__files" aria-label={t("skills.files")}>

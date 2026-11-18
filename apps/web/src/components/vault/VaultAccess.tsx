@@ -287,7 +287,7 @@ function AccessLine({
       </span>
       <b className="vlt-access__label">{label}</b>
       {onEdit && (
-        <Button size="sm" variant="ghost" className="vlt-access__edit" aria-label={editLabel} onClick={onEdit}>
+        <Button variant="link" className="vlt-access__edit" aria-label={editLabel} onClick={onEdit}>
           {t("vault.access.edit")}
         </Button>
       )}

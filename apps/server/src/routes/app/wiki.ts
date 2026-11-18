@@ -1,3 +1,4 @@
+import { connectorOAuthApps } from "@agenteschat/config";
 import {
   appendSourceToWiki,
   createPageFromSource,
@@ -14,6 +15,7 @@ import {
   moveWikiPage,
   parseWikiLinks,
   purgeWikiPages,
+  readGithubNotes,
   renameWikiPage,
   requirePermission,
   resolveWikiTargets,
@@ -30,6 +32,7 @@ import {
   updateWikiPage,
   WIKI_CONTEXT_MAX,
   WIKI_IMPORT_MAX_NOTES,
+  WIKI_IMPORT_SOURCES,
   WIKI_TRASH_DAYS,
   type WikiActor,
   type WikiDeps,
@@ -38,6 +41,7 @@ import {
 } from "@agenteschat/engine";
 import { createRoute, z } from "@hono/zod-openapi";
 import { errorResponse } from "../../http/errors";
+import { githubAppOf } from "../github-app";
 import {
   type AppDeps,
   body,
@@ -635,19 +639,51 @@ export function wikiRoutes(deps: AppDeps) {
     async (c) => c.json(await topWikiReads(db, person(c.get("user").id), c.req.valid("param").orgId), 200),
   );
 
+  // The Markdown notes behind a GitHub link (a repository, a folder or one file) and the files they may embed, as a
+  // zip the app reviews like a folder before importing: nothing is saved. A private repository is read with the
+  // workspace's GitHub (the GitHub App's token for it, else the connection's), for who edits any agent. Tokens stay
+  // here. `github.repo_missing` when none reads it, `wiki.github_no_notes`, `wiki.github_too_large`.
+  const github = {
+    connectors: {
+      db,
+      keyWrappers: [adapters.keyWrapper, ...adapters.legacyKeyWrappers],
+      oauthApps: connectorOAuthApps(deps.config),
+      publicUrl: deps.config.PUBLIC_URL,
+      http: deps.extras?.http,
+    },
+    get app() {
+      return githubAppOf(deps);
+    },
+  };
+  app.get("/organizations/:orgId/wiki/import/github", async (c) => {
+    const notes = await readGithubNotes(
+      { db, fetch: deps.extras?.http, resolveHost: deps.extras?.resolveHost, github },
+      c.get("user").id,
+      c.req.param("orgId"),
+      c.req.query("url") ?? "",
+    );
+    return new Response(notes, {
+      headers: {
+        "content-type": "application/zip",
+        "x-content-type-options": "nosniff",
+        "cache-control": "no-store",
+      },
+    });
+  });
+
   app.openapi(
     createRoute({
       method: "post",
       path: "/organizations/{orgId}/wiki/import",
       tags,
       security,
-      summary: "Import notes (an Obsidian vault read by the app) as pages",
+      summary: "Import notes (an Obsidian vault, a GitHub link or Markdown files, read by the app) as pages",
       description: `Up to ${WIKI_IMPORT_MAX_NOTES} notes per call; the app sends a big vault in batches with one \`importId\`. Attachments go to the Drive first (upload), and each note says which ones it embeds. A note that can't be a page comes back in \`failed\` and the others still go in; tags, aliases and attachment names past their limits are cut.`,
       request: {
         params: OrgParams,
         body: body(
           z.object({
-            source: z.object({ type: z.literal("obsidian"), name: z.string().max(200) }),
+            source: z.object({ type: z.enum(WIKI_IMPORT_SOURCES), name: z.string().max(200) }),
             notes: z
               .array(
                 z.object({

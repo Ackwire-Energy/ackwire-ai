@@ -6,7 +6,16 @@ import { createInterface } from "node:readline";
 import type { CommandProfile } from "@agenteschat/adapters/command-policy";
 import type { AgentScope, BrainEffort } from "@agenteschat/adapters/machine-protocol";
 import { isAccountId } from "@agenteschat/adapters/machine-protocol";
-import { ACCOUNT_MISSING_MESSAGE, accountEnv, withoutContainers, withoutSignIns } from "./accounts";
+import {
+  ACCOUNT_MISSING_MESSAGE,
+  ACCOUNT_SIGNED_OUT,
+  type AccountFolders,
+  type AccountGrant,
+  accountEnv,
+  accountSignIn,
+  withoutContainers,
+  withoutSignIns,
+} from "./accounts";
 import { ClaudeStreamParser, LIMIT_TEXT } from "./brain";
 import { type CodexBrainEvent, CodexThreads, chatFolder, codexProfileOf, codexThreadKey } from "./brain-codex";
 import { cursorPrompt } from "./brain-cursor";
@@ -482,7 +491,9 @@ export interface GrokBrainContext {
   chats?: CodexThreads;
   bin?: string;
   grants?: string[];
-  accounts?: { accountDir(kind: "grok", id: string): string | null };
+  accounts?: AccountFolders;
+  /** In a worker, a sign-in root keeps for all agents (protocol 67): the copy this turn gets (`AccountManager.grant`). */
+  grant?: AccountGrant;
   spawn?: Spawn;
 }
 
@@ -516,47 +527,67 @@ export async function handleGrokBrainTurn(
     return;
   }
   if (!isAccountId(accountId)) throw new RunnerError("bad_request", "Invalid account id");
-  const home = ctx.accounts?.accountDir("grok", accountId);
-  if (!home) {
+  let signIn: Awaited<ReturnType<typeof accountSignIn>>;
+  try {
+    signIn = await accountSignIn(ctx.accounts, "grok", accountId, ctx.grant);
+  } catch (err) {
+    scope.emit({
+      type: "error",
+      code: "grok_failed",
+      message: `This computer couldn't hand the agent its Grok sign-in (${(err as Error).message}). Try again.`,
+      retryable: true,
+    });
+    return;
+  }
+  if (signIn === "signed_out") {
+    scope.emit({ type: "error", code: "not_logged_in", message: ACCOUNT_SIGNED_OUT, retryable: true });
+    return;
+  }
+  if (signIn === "missing") {
     scope.emit({ type: "error", code: "account_missing", message: ACCOUNT_MISSING_MESSAGE.grok, retryable: false });
     return;
   }
-  // A `chat` turn starts in an empty folder of its own, whatever the request names.
-  const chat = req.permissions?.mode === "chat";
-  const folder = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : ctx.folder;
-  let cwd = folder;
-  if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
-    const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
-    if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
-    cwd = resolved.abs;
+  const home = signIn.home;
+  try {
+    // A `chat` turn starts in an empty folder of its own, whatever the request names.
+    const chat = req.permissions?.mode === "chat";
+    const folder = chat ? chatFolder(ctx.runnerHome, String(req.agent.id)) : ctx.folder;
+    let cwd = folder;
+    if (!chat && typeof req.cwd === "string" && req.cwd.trim() !== "") {
+      const resolved = await resolveForAgent(folder, ctx.grants, req.cwd);
+      if (!resolved.exists) throw new RunnerError("not_found", `The folder ${req.cwd} doesn't exist`);
+      cwd = resolved.abs;
+    }
+    const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
+    const file = grokChatsFile(ctx.runnerHome);
+    const chats = ctx.chats ?? chatStores.get(file) ?? new CodexThreads(file);
+    chatStores.set(file, chats);
+    await runGrokTurn(
+      {
+        runId: req.runId,
+        sessionId: req.session.id,
+        cwd,
+        ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
+        ...(req.effort ? { effort: req.effort } : {}),
+        system: typeof req.system === "string" ? req.system : "",
+        prompt: typeof req.prompt === "string" ? req.prompt : "",
+        mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
+        account: { id: accountId, home },
+        profile: codexProfileOf(req),
+        ...(chat ? { chat } : {}),
+      },
+      {
+        chats,
+        emit: scope.emit,
+        signal: scope.signal,
+        runnerHome: ctx.runnerHome,
+        ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
+        ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
+        ...(ctx.bin ? { bin: ctx.bin } : {}),
+        ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
+      },
+    );
+  } finally {
+    signIn.release?.();
   }
-  const secrets = chat ? null : await agentSecrets(ctx.secretsDir, req.agent);
-  const file = grokChatsFile(ctx.runnerHome);
-  const chats = ctx.chats ?? chatStores.get(file) ?? new CodexThreads(file);
-  chatStores.set(file, chats);
-  await runGrokTurn(
-    {
-      runId: req.runId,
-      sessionId: req.session.id,
-      cwd,
-      ...(typeof req.model === "string" && req.model ? { model: req.model } : {}),
-      ...(req.effort ? { effort: req.effort } : {}),
-      system: typeof req.system === "string" ? req.system : "",
-      prompt: typeof req.prompt === "string" ? req.prompt : "",
-      mcp: { token: req.mcp.token, ...(typeof req.mcp.url === "string" && req.mcp.url ? { url: req.mcp.url } : {}) },
-      account: { id: accountId, home },
-      profile: codexProfileOf(req),
-      ...(chat ? { chat } : {}),
-    },
-    {
-      chats,
-      emit: scope.emit,
-      signal: scope.signal,
-      runnerHome: ctx.runnerHome,
-      ...(ctx.mcp ? { mcpCommand: ctx.mcp.command, socketPath: ctx.mcp.socketPath } : {}),
-      ...(secrets ? { env: secrets.env, redact: secrets.redact, redactHold: secrets.hold } : {}),
-      ...(ctx.bin ? { bin: ctx.bin } : {}),
-      ...(ctx.spawn ? { spawn: ctx.spawn } : {}),
-    },
-  );
 }

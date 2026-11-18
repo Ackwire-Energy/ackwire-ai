@@ -11,6 +11,7 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { Meter, SettingNote, SettingRow } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useTranslation } from "react-i18next";
 import { BillingLinkButton, useOpenBilling } from "@/components/BillingLinkButton";
 import { useOrg } from "@/components/org-context";
@@ -58,6 +59,7 @@ export function useUploadFailed() {
   const qc = useQueryClient();
   const billing = useBillingAccess();
   const open = useOpenBilling(org.id, "upload_full");
+  const navigate = useNavigate();
   return (error: unknown) => {
     const text = errorText(t, error, i18n.language);
     if (errorCode(error) !== "storage.full") return toast.show(text, "error");
@@ -66,7 +68,22 @@ export function useUploadFailed() {
     toast.show(
       text,
       "error",
-      { label: t("billing.seeOptions"), run: () => open.mutate() },
+      [
+        { label: t("billing.seeOptions"), run: () => open.mutate() },
+        ...(can(org, "configure")
+          ? [
+              {
+                label: t("limits.storage.connectBucket"),
+                run: () =>
+                  void navigate({
+                    to: "/org/$orgId/settings/$section",
+                    params: { orgId: org.id, section: "storage" },
+                    search: {},
+                  }),
+              },
+            ]
+          : []),
+      ],
       t("limits.storage.fullAdmin"),
     );
   };

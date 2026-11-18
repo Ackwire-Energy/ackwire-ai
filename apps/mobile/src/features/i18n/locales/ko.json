@@ -19,8 +19,7 @@
     "down": "아래로 이동",
     "position": "{{count}}개 중 {{at}}번째.",
     "channelPosition": "{{count}}개 중 {{at}}번째.",
-    "itsChannels": "채널",
-    "seeAll": "모두 보기"
+    "itsChannels": "채널"
   },
   "blocks": {
     "send": "보내기",
@@ -52,7 +51,8 @@
     "closed": "{{title}} · 닫힘",
     "reopen": "다시 보기",
     "answeredBy": "{{name}}이(가) 선택함",
-    "failed": "선택이 전송되지 않았어요. 다시 시도해 주세요."
+    "failed": "선택이 전송되지 않았어요. 다시 시도해 주세요.",
+    "tooLongFix": "답변을 줄여 주세요."
   },
   "chart": {
     "table": "표",
@@ -181,16 +181,9 @@
       "text": "서버가 꺼져 있거나 네트워크 밖에 있을 수 있어요. 다시 켜지면 채팅이 알아서 나타나요.",
       "kept": "앱에 이미 있던 내용을 보여 드리고 있어요."
     },
-    "section": {
-      "agents": "에이전트",
-      "channels": "채널",
-      "people": "사람"
-    },
-    "seeAll": {
-      "agents": "모든 에이전트 보기",
-      "channels": "모든 채널 보기",
-      "people": "모든 사람 보기"
-    },
+    "pinned": "고정됨",
+    "recent": "최근",
+    "seeAll": "모든 채팅 보기",
     "wait": {
       "verb": {
         "approval": "승인을 기다려요",
@@ -241,8 +234,6 @@
       "mute": "알림 끄기",
       "unmute": "알림 켜기"
     },
-    "firstRunLine": "{{name}}이(가) 팀을 꾸리는 중 · {{done}}/{{total}}",
-    "firstRunLinePersonal": "{{name}}이(가) 에이전트를 준비하는 중 · {{done}}/{{total}}",
     "first": {
       "title": "첫 에이전트부터 시작해 보세요",
       "subtitle": "이름을 지어 주고 무슨 일을 할지 알려 주세요. 여기에 채팅으로 나타나요.",
@@ -293,7 +284,7 @@
   },
   "along": {
     "agent": "에이전트",
-    "waits": "{{name}}이(가) 승인을 기다려요",
+    "waits": "{{name}} · 내 확인 대기",
     "on": "{{name}} · {{what}}",
     "working": "{{name}}이(가) 작업 중이에요",
     "more": "+{{count}}"
@@ -344,8 +335,14 @@
     "options": "옵션",
     "profile": "프로필",
     "here_other": "{{count}}명 참여 중",
+    "membersAdd": "추가",
+    "membersAdded_other": "#{{channel}}에 {{count}}명을 추가했어요",
+    "memberRemoved": "{{name}}을(를) #{{channel}}에서 내보냈어요",
+    "muted": "#{{channel}} 알림을 껐어요",
+    "unmuted": "#{{channel}} 알림을 켰어요",
     "headerAgent": "{{who}}. 프로필 열기",
     "headerChannel": "{{who}}. 옵션",
+    "headerMembers": "{{who}}. 참여자 보기",
     "switchHint": "길게 눌러 대화 전환",
     "switchTitle": "대화 전환",
     "switchSearch": "대화 검색",
@@ -356,8 +353,6 @@
     "switchWorking": "작업 중",
     "join": "채널 참여",
     "sending": "보내는 중…",
-    "failed": "전송 안 됨 · 다시 시도",
-    "notSent": "메시지가 전송되지 않았어요.",
     "toLatest": "최신 메시지로 이동",
     "toLatestNew": "최신 메시지로 이동: {{text}}",
     "stopAgent": "{{name}} 중지",
@@ -429,21 +424,15 @@
     "doubleTapHint": "두 번 탭 = 👍",
     "react": "반응",
     "attach": {
-      "more": "사진이나 파일 추가",
       "remove": "{{name}} 제거",
       "waiting": "{{name}}, 전송 대기 중",
       "sending": "{{name}}, 보내는 중",
+      "failed": "{{name}}, 보내지 못함: 보내기를 눌러 다시 시도",
+      "preparing": "파일을 준비하는 중…",
       "tooMany": "메시지 하나에 파일은 최대 {{count}}개까지예요."
     },
     "swipeReply": "오른쪽으로 밀어서 답장",
     "intent": {
-      "suggest": {
-        "merge": "머지 진행해 줘",
-        "review": "{{name}}에게 먼저 검토 요청해 줘",
-        "seeChange": "무엇이 바뀌었는지 보여 줘",
-        "summarize": "3가지로 요약해 줘",
-        "nextStep": "다음 단계는 뭐야?"
-      },
       "arrived": "{{name}}이(가) 팀에 합류했어요",
       "meet": "{{name}}와(과)의 첫 대화",
       "roleIntro": "팀의 {{role}}이에요. 편하게 말로 요청하세요.",
@@ -589,7 +578,6 @@
     "minuteLess": "{{n}}분 앞으로",
     "minuteMore": "{{n}}분 뒤로",
     "submit": "이 시간에 알려 줘",
-    "quick": "빠른 시간 보기",
     "done": "리마인더 설정됨",
     "error": {
       "noAgent": "여기에는 알려 줄 에이전트가 없어요",
@@ -646,6 +634,7 @@
     "title": "새 미션",
     "intro": "에이전트가 계획을 세우고, 내가 시작하라고 해야 시작해요.",
     "placeholder": "무엇을 해야 하나요?",
+    "who": "담당",
     "submit": "계획 요청",
     "created": "{{name}}이(가) 계획을 세우고 있어요",
     "noAgents": "아직 미션을 실행할 수 있는 에이전트가 없어요. 웹사이트에서 컴퓨터를 연결해 주세요.",
@@ -771,7 +760,7 @@
     "teamSectionPersonal": "내 에이전트",
     "managerQuiet": "진행 중인 작업이 없어요",
     "state": {
-      "waitsYou": "승인을 기다려요",
+      "waitsYou": "내 확인 대기",
       "noAi": "연결된 AI 없음",
       "connect": "연결",
       "archived": "보관됨",
@@ -796,9 +785,6 @@
     "keepEditing": "계속 편집"
   },
   "newAgent": {
-    "leaveTitle": "만들지 않고 나갈까요?",
-    "leaveText": "만들던 에이전트는 생성되지 않아요.",
-    "keepGoing": "계속 만들기",
     "identityQuestion": "에이전트는 누구인가요?",
     "identityLead": "이름, 채팅에서 부르는 방법, 얼굴을 정해요.",
     "handleMention": "부르려면 @{{handle}}을(를) 멘션하세요.",
@@ -824,7 +810,6 @@
       "archive": "휴대폰에서는 .zip이나 .tar.gz 파일을 열 수 없어요. 파일 앱에서 .zip을 탭해 압축을 풀고 안에 있는 파일을 고르거나, 컴퓨터에서 가져오세요.",
       "privacy": "이 휴대폰에서 읽어요. 키와 로그인 파일은 절대 열지 않아요.",
       "also": "함께 가져와요",
-      "change": "변경",
       "arrived_other": "에이전트 {{count}}명이 도착했어요",
       "partial": "{{total}}명 중 {{done}}명이 도착했어요. 다시 가져오면 나머지도 가져와요."
     }
@@ -847,7 +832,11 @@
     "taskForM": "{{name}}에게 맡길 작업",
     "taskPlaceholder": "무엇을 해야 하나요?",
     "sendTask": "작업 보내기",
-    "taskSent": "작업을 보냈어요"
+    "taskSent": "작업을 보냈어요",
+    "brakes": {
+      "forgetTitle": "이 답변들을 잊을까요?",
+      "forgetText": "{{name}}이(가) 이런 작업 전에 다시 물어봐요."
+    }
   },
   "activity": {
     "title": "활동",
@@ -859,6 +848,7 @@
     },
     "doneToast": "완료",
     "undo": "실행 취소",
+    "doneAllToast_other": "{{count}}개를 완료로 옮겼어요",
     "day": {
       "today": "오늘",
       "yesterday": "어제",
@@ -881,6 +871,9 @@
       "routine_finished_other": "루틴 완료",
       "routine_failed_other": "루틴 실패",
       "run_failed_other": "마치지 못했어요",
+      "admin_ask_channel_agent": "{{names}} 님이 {{agent}}을(를) #{{label}}에 추가해 달라고 요청합니다",
+      "admin_ask_create_agents": "{{names}} 님이 에이전트를 만들 수 있게 해 달라고 요청합니다",
+      "admin_ask_webhook": "{{names}} 님이 루틴용 {{service}} 웹훅을 설정해 달라고 요청합니다",
       "routine_paused_other": "루틴 일시 중지됨",
       "routine_stalled_other": "루틴이 컴퓨터를 기다리는 중",
       "agent_unreached_other": "루틴이 에이전트를 부르지 못했어요",
@@ -914,6 +907,7 @@
       "desktop_taken_female_other": "{{names}} 님이 {{agent}}의 컴퓨터 화면 제어를 넘겨받았어요",
       "plan_lent_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
       "plan_lent_female_other": "{{names}} 님이 내 {{plan}} 플랜을 {{agent}}에 연결했어요",
+      "plan_serves_other": "내 {{plan}}이(가) 이제 workspace 전체를 지원해요",
       "plan_model_dropped_other": "{{model}} 모델이 {{plan}}에서 빠졌어요. {{names}}은(는) 당분간 {{runs}}을(를) 써요",
       "computer_disk_full_other": "컴퓨터 디스크가 거의 찼어요",
       "computer_no_chrome_other": "컴퓨터에 Google Chrome이 필요해요. google.com/chrome에서 받으세요",
@@ -1059,6 +1053,9 @@
     "addWorkspaceTeamShort": "팀 서버에 들어가기",
     "addWorkspaceTeamSubShort": "주소 또는 컴퓨터의 QR 코드",
     "addWorkspaceFoot": "어떤 워크스페이스에서도 나가지 않아요.",
+    "addAccount": "다른 계정으로 로그인",
+    "addAccountSub": "{{host}}에서, 이 계정을 유지한 채",
+    "accountNoWorkspace": "아직 워크스페이스가 없습니다",
     "teamServerLeadShort": "팀이 브라우저에서 여는 주소예요.",
     "teamServerQuestion": "팀 주소가 어떻게 되세요?",
     "account": {
@@ -1076,6 +1073,8 @@
       "name": "이름",
       "namePlaceholder": "내 이름",
       "email": "이메일",
+      "emailWebLead": "웹사이트에서 다시 로그인하고, 코드 없이 거기서 바꾸세요.",
+      "emailWeb": "웹사이트에서 다시 로그인",
       "inWorkspace": "이 워크스페이스에서 · {{org}}",
       "handle": "내 @",
       "timezone": "시간대",
@@ -1108,6 +1107,7 @@
     "blocked": "{{names}}의 유일한 소유자예요. 웹사이트의 사람 메뉴에서 다른 사람을 소유자로 지정한 다음 다시 오세요.",
     "addPasswordFirst": "먼저 웹사이트에서 계정에 비밀번호를 추가한 다음 여기에 입력하세요.",
     "addPasswordWeb": "웹사이트에서 비밀번호 추가",
+    "onThisComputer": "이 서버를 실행하는 컴퓨터의 Ackwire AI 앱에서 삭제하세요.",
     "otherAccount": "다른 계정으로 로그인했어요. 아무것도 삭제되지 않았어요.",
     "hold": "길게 눌러 삭제"
   },
@@ -1127,7 +1127,7 @@
       "file": "파일"
     },
     "more": "더 많은 옵션",
-    "send": "보내기",
+    "sendCopy": "사본 보내기",
     "savePhotos": "사진에 저장",
     "drive": "Drive에서 보기",
     "saved": "사진에 저장했어요",
@@ -1141,6 +1141,7 @@
     "place": "{{count}}개 중 {{index}}번째",
     "previous": "이전 사진",
     "next": "다음 사진",
+    "noPreviewTitle": "미리보기 없음",
     "noPreview": "이 파일은 앱에서 열리지 않아요. 다른 앱으로 보내서 여세요.",
     "video": {
       "play": "재생",
@@ -1150,7 +1151,8 @@
       "mute": "음소거",
       "unmute": "음소거 해제",
       "fullscreen": "전체 화면",
-      "open": "열기"
+      "open": "열기",
+      "cantPlay": "이 동영상은 이 휴대폰에서 재생할 수 없습니다."
     }
   },
   "issues": {
@@ -1242,7 +1244,6 @@
   "drive": {
     "title": "Drive",
     "search": "Drive 검색",
-    "types": "파일 형식",
     "type": {
       "all": "전체",
       "documents": "문서",
@@ -1263,7 +1264,6 @@
     },
     "by": "{{name}} · {{when}}",
     "noResults": "이 필터에 맞는 항목이 없어요.",
-    "loadFailed": "Drive를 불러오지 못했어요.",
     "more": "더 보기"
   },
   "constellation": {
@@ -1284,7 +1284,6 @@
     "agentLine_other": "메모리 {{count}}개",
     "uses_other": "{{count}}번 사용됨",
     "confirmed": "사람이 확인함",
-    "unconfirmed": "아직 확인되지 않음",
     "confirm": "확인",
     "confirmedToast": "확인됨",
     "details": "기술 세부 정보",
@@ -1323,8 +1322,6 @@
     "openExisting": "페이지 열기"
   },
   "routines": {
-    "loadFailed": "루틴을 불러오지 못했어요.",
-    "anyAgent": "모든 에이전트",
     "create": "만들기",
     "when": {
       "custom": "직접 설정",
@@ -1352,7 +1349,7 @@
       "plain": "작업을 마쳤어요"
     },
     "rowWait": {
-      "approval": "승인을 기다려요",
+      "approval": "내 확인 대기",
       "question": "답변을 기다려요",
       "mission": "검토를 기다려요"
     },
@@ -1390,12 +1387,12 @@
   },
   "intentAgents": {
     "waitingSection": "내 확인 대기",
-    "waitingLine": "{{title}} · 승인 필요",
+    "waitingLine": "{{title}} · 내 확인 대기",
     "waitingMore_other": "{{title}} · 외 {{count}}건이 나를 기다려요",
-    "waitingLabel": "{{name}}, 승인 필요",
+    "waitingLabel": "{{name}}, 내 확인 대기",
     "owner": "소유자: {{name}}",
     "ownerYou": "소유자: 나",
-    "nowWaiting": "승인 필요: {{title}}",
+    "nowWaiting": "내 확인 대기: {{title}}",
     "did": {
       "title": "나를 위해 한 일",
       "title_female": "나를 위해 한 일",
@@ -1413,7 +1410,7 @@
         "image": "이미지",
         "file": "파일"
       },
-      "waitingOnYou": "승인 필요",
+      "waitingOnYou": "내 확인 대기",
       "youApproved": "내가 승인함",
       "youRefused": "내가 거절함",
       "action": {
@@ -1490,9 +1487,9 @@
         "setup": "워크스페이스 설정",
         "desktop": "컴퓨터 화면"
       },
-      "asksYou": "머지와 게시는 어떤 수준에서든 항상 내 승인을 받아요.",
-      "asksOwner": "머지와 게시는 어떤 수준에서든 항상 {{name}}의 승인을 받아요.",
-      "asksAdmins": "머지와 게시는 어떤 수준에서든 항상 관리자의 승인을 받아요.",
+      "asksYou": "머지와 게시는 에이전트가 묻지 않기로 설정되어 있지 않다면 내 승인을 받아요.",
+      "asksOwner": "머지와 게시는 에이전트가 묻지 않기로 설정되어 있지 않다면 {{name}}의 승인을 받아요.",
+      "asksAdmins": "머지와 게시는 에이전트가 묻지 않기로 설정되어 있지 않다면 관리자의 승인을 받아요.",
       "empty": "지금은 대화만 할 수 있어요."
     }
   },
@@ -1569,32 +1566,16 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}}이(가) 도움이 필요해요",
-      "needsFor": "{{name}}이(가) 도움이 필요해요 · {{time}}",
-      "inControlAt": "내가 제어 중 · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "{{name}}의 브라우저를 여는 중…",
-      "startingM": "{{name}}의 브라우저를 여는 중…",
       "stopAskF": "{{name}}의 브라우저를 닫을까요?",
       "stopAskM": "{{name}}의 브라우저를 닫을까요?",
-      "whereF": "{{name}}의 브라우저에서",
-      "whereM": "{{name}}의 브라우저에서",
       "open": "열기",
-      "expandHint": "탭해서 펼치기",
       "stop": "중지",
-      "giveUp": "포기",
-      "done": "완료: {{title}}",
-      "failed": "하지 못함: {{title}}",
-      "failedNote": "하지 못함: {{note}}",
-      "expired": "아무도 제때 열지 않았어요: {{title}}",
-      "cancelled": "취소됨: {{title}}",
-      "withdrawn": "{{name}}에게 더 이상 필요하지 않아요: {{title}}"
+      "giveUp": "포기"
     },
     "live": {
       "inControl": "내가 제어 중",
       "helping": "{{name}}이(가) 제어 중",
       "watchOnly": "{{name}}이(가) 제어 중이에요. 나는 보기만 해요.",
-      "takeOver": "제어하기",
       "done": "완료",
       "handBack": "돌려주기",
       "couldnt": "하지 못했어요",
@@ -1615,7 +1596,6 @@
       "closedHelpM": "로그인 정보는 다음을 위해 저장돼요.",
       "stuckHelpF": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
       "stuckHelpM": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
-      "hidden": "{{name}}이(가) 제어 중 · 화면 숨김",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -1645,6 +1625,8 @@
         "offlineCloudM": "지금은 {{name}}의 컴퓨터가 응답하지 않아요.",
         "stuckF": "{{name}}의 브라우저를 열지 못했어요.",
         "stuckM": "{{name}}의 브라우저를 열지 못했어요.",
+        "noAnswerF": "{{name}}의 브라우저가 응답하지 않았어요.",
+        "noAnswerM": "{{name}}의 브라우저가 응답하지 않았어요.",
         "tooManyF": "한 번에 열린 브라우저가 너무 많아요. 다른 브라우저가 닫히면 이 브라우저가 나타나요.",
         "tooManyM": "한 번에 열린 브라우저가 너무 많아요. 다른 브라우저가 닫히면 이 브라우저가 나타나요."
       }
@@ -1701,6 +1683,7 @@
       "ui_automation_off": "UI 자동화가 꺼져 있어요",
       "xcode_missing": "Mac에 Xcode가 필요해요",
       "xcode_too_old": "Xcode가 이 iPhone을 지원하기에는 너무 오래됐어요",
+      "ios_behind_xcode": "이 iPhone의 iOS 업데이트",
       "device_support": "Mac이 이 iPhone을 준비하는 중이에요",
       "helper_missing": "테스트 도우미가 아직 설정되지 않았어요",
       "helper_expired": "테스트 도우미를 갱신해야 해요",
@@ -1714,6 +1697,10 @@
       "no_driverLinux": "Linux에 이 휴대폰용 udev 규칙이 필요해요",
       "os_too_old": "이 휴대폰의 시스템이 너무 오래됐어요",
       "adb_offline": "케이블을 뺐다가 다시 연결하세요",
+      "wifi_away": "이 iPhone을 Mac의 Wi-Fi에 연결하거나 케이블로 연결하세요",
+      "wifi_asleep": "이 iPhone을 깨우고 잠금 해제한 뒤 Mac 가까이에 두세요",
+      "tunnel_down": "Wi-Fi 연결이 끊겼어요. 이 iPhone을 Mac 가까이에 두거나 케이블로 연결하세요",
+      "wifi_untrusted": "한 번 케이블로 연결하고 신뢰를 탭하세요",
       "other": "아직 준비되지 않았어요"
     },
     "os": {
@@ -1870,9 +1857,30 @@
       "teamMissing": "Xcode에 로그인되어 있지만 아직 팀이 표시되지 않아요. Xcode에서 아무 iOS 앱이나 만들고 Signing & Capabilities에서 팀을 고른 다음 이 iPhone에서 한 번 실행하세요.",
       "uiRefused": "이 iPhone이 테스트 도우미의 탭을 거부했어요. 잠금을 해제하고 요청하면 암호를 입력하세요. 계속 그러면 설정 › 개발자 › UI 자동화 활성화를 껐다가 다시 켜세요.",
       "pluggedIn": "연결했어요",
+      "wifi": {
+        "also": "{{host}}의 Wi-Fi에도 있어요: {{name}}",
+        "use": "Wi-Fi로 사용",
+        "hint": "케이블로 Mac을 신뢰한 적이 있는 iPhone만 여기에 나타나요. Mac은 Xcode가 쓰는 것과 같은 Apple의 암호화된 연결로 iPhone에 닿아요.",
+        "stop": "Wi-Fi로 사용 중지",
+        "stopTitle": "{{name}}을(를) Wi-Fi로 사용하지 않을까요?",
+        "stopText": "에이전트가 더 이상 닿을 수 없어요. 다시 쓰려면 {{host}}에서 다시 고르세요.",
+        "stopped": "{{name}}을(를) 더 이상 Wi-Fi로 사용하지 않아요"
+      },
       "stall": {
-        "plug": "{{host}}이(가) 아직 이 iPhone을 인식하지 못해요. 충전 전용이 아닌 데이터 케이블을 쓰고, 이 iPhone 잠금을 해제해 둔 채 요청하면 신뢰를 탭하세요.",
-        "devmode": "개발자 모드는 이 iPhone을 재시동한 뒤에만 켜져요. 재시동을 탭하고 다시 켜지면 켜기를 탭하세요. 스위치가 없나요? 이 iPhone을 뽑았다가 다시 연결하세요."
+        "plug": "{{host}}이(가) 아직 이 iPhone을 인식하지 못해요. 충전 전용이 아닌 데이터 케이블을 쓰고, 이 iPhone 잠금을 해제해 둔 채 요청하면 신뢰를 탭하세요."
+      },
+      "devMode": {
+        "restarting": "재시동 후 {{host}}가 아직 이 iPhone을 다시 보지 못해요. 연결한 채로 두세요.",
+        "back": "이 iPhone의 알림에서 켜기를 탭하고 암호를 입력하세요.",
+        "check": "켰어요, 다시 확인",
+        "stillOff": "{{host}}에서는 아직 개발자 모드가 꺼져 있어요.",
+        "missing": "항목이 보이지 않나요?",
+        "hidden": "이 iPhone은 Xcode가 보여 달라고 할 때까지 이 항목을 숨겨요.",
+        "hiddenOpen": "이 iPhone은 Xcode가 보여 달라고 할 때까지 이 항목을 숨겨요. 이 iPhone을 연결한 채로 {{host}}에서 Xcode를 여세요.",
+        "openXcode": "Xcode 열기",
+        "opened": "{{host}}에서 Xcode가 열렸어요. 설정을 다시 확인하고 나중에 그 Mac의 Xcode를 닫으세요.",
+        "unlock": "켰고 재시동됐나요? 켜기 알림은 이 iPhone의 잠금을 해제하면 나타나요.",
+        "outdated": "{{host}}의 Ackwire AI 앱이 오래됐어요. 그 Mac에서 업데이트하세요."
       }
     },
     "notice": {
@@ -1884,6 +1892,9 @@
       "access_requestFor": "{{names}}이(가) {{person}} 님을 위해 {{device}} 사용을 요청해요",
       "waiting": "{{names}}이(가) {{device}}을(를) 기다리고 있어요",
       "waitingFor": "{{names}}이(가) {{person}} 님을 위해 {{device}}을(를) 기다리고 있어요",
+      "tool_request": "{{names}}님이 회원님의 {{device}}에서 {{tool}}을(를) 켜 달라고 요청합니다",
+      "cli_request": "{{names}} 님이 {{device}}에 {{tool}}을(를) 설치해 달라고 요청합니다",
+      "folder_request": "{{names}}님이 회원님의 {{device}}에서 {{path}} 폴더를 요청합니다",
       "allowOnce": "한 번 허용",
       "always": "{{name}} 항상 허용",
       "no": "아니요",
@@ -1896,7 +1907,9 @@
       "other": "다른 기기 사용",
       "stop": "그만 기다리기",
       "useInstead": "대신 {{name}} 사용",
-      "none": "사용할 수 있는 다른 기기 중 준비된 것이 없어요."
+      "none": "사용할 수 있는 다른 기기 중 준비된 것이 없어요.",
+      "tried": "{{device}}을(를) 다시 시도하고 있어요.",
+      "stopped": "{{device}}을(를) 더 이상 기다리지 않아요."
     }
   },
   "connectors": {
@@ -1943,7 +1956,8 @@
     "everyoneFailed": "모두의 접근 권한을 바꾸지 못했어요. 다시 시도해 주세요.",
     "disconnectFailed": "{{name}} 연결을 해제하지 못했어요. 다시 시도해 주세요.",
     "needsReconnect": "{{name}} 계정이 작동하지 않아요. 누군가 다시 연결할 때까지 에이전트가 쓸 수 없어요.",
-    "noTools": "{{name}}의 도구를 읽지 못했어요. 도구에서 다시 읽을 때까지 에이전트가 쓸 수 없어요.",
+    "noTools": "{{name}}의 도구를 읽지 못했어요. 다시 읽을 때까지 에이전트가 쓸 수 없어요.",
+    "readAgain": "다시 읽기",
     "accountTitle": "계정",
     "renameFailed": "이름을 바꾸지 못했어요. 다시 시도해 주세요.",
     "whoTitle": "누가 쓰는지",
@@ -2009,25 +2023,16 @@
     }
   },
   "joinRequests": {
-    "share": "링크 공유",
-    "roles": "역할",
-    "rolesHint": "켜진 역할로 참여해요. 아무것도 없으면 모든 사람이 할 수 있는 일만 할 수 있어요."
+    "share": "링크 공유"
   },
   "humanCheck": {
     "title": "간단한 확인",
     "blocked": "확인 화면이 열리지 않았어요. 다른 네트워크로 시도해 보세요."
   },
   "invitePeople": {
-    "emailsHelp": "목록을 붙여넣거나 입력하세요. 한 사람씩 이메일을 받고 바로 참여해요.",
-    "here": "이미 참여 중",
-    "invited": "이미 초대됨",
-    "fix": "확인 필요",
-    "channels": "채널",
     "optional": "선택 사항",
     "ok": "확인",
     "noteHelp": "내 이름과 함께 이메일에 표시돼요. 최대 {{max}}자예요.",
-    "roleHelp": "참여할 때 받는 권한이 달라져요.",
-    "remove": "목록에서 빼기",
     "sendAgain": "다시 보내기",
     "cancelTitle": "{{email}}에게 보낸 초대를 취소할까요?",
     "cancelText": "초대 링크가 더 이상 열리지 않아요.",
@@ -2098,7 +2103,6 @@
     "planRowSub": "키 없이 에이전트의 컴퓨터에서 로그인해요",
     "keyRow": "키",
     "keyRowSub": "사용한 만큼 제공사에 직접 결제해요",
-    "already": "{{org}}에 이미 있는 AI",
     "stepOf": "{{step}}/{{total}}"
   },
   "crash": {
@@ -2127,9 +2131,9 @@
     "ofOnline": "{{count}}대 중 {{online}}대",
     "deleteName": "{{name}} 삭제",
     "deleteFoot": "마음을 바꿀 수 있는 시간은 7일이에요.",
-    "deleteAlert": "모두가 바로 나가게 돼요. 7일 동안은 복원할 수 있어요.",
+    "deleteAlert": "모두가 지금부터 읽기만 할 수 있어요. 7일 동안은 복원할 수 있어요.",
     "deleteAction": "삭제",
-    "deleteIntro": "{{name}}은(는) 모두에게 바로 닫히고 7일 후 영구 삭제돼요.",
+    "deleteIntro": "{{name}}은(는) 모두에게 바로 읽기 전용이 되고 7일 후 영구 삭제돼요.",
     "holdDelete": "길게 눌러 삭제",
     "deleteFailed": "워크스페이스를 삭제하지 못했어요. 다시 시도해 주세요.",
     "access": {
@@ -2140,16 +2144,160 @@
       "tooBig": "이미지가 너무 커요. 다른 이미지를 골라 주세요."
     },
     "machine": {
-      "toolsHow": "켜진 도구를 탭하면 꺼져요. 다시 켜는 건 그 컴퓨터에서만 할 수 있어요."
-    },
-    "roles": {
-      "onComputer": "역할 순서와 각 역할의 아이콘은 컴퓨터에서 바꿔요.",
-      "items": "항목별",
-      "create": "만들기"
+      "toolsHow": "켜져 있는 도구를 탭하면 꺼집니다. 다시 켜려면 그 컴퓨터에서, 또는 연결한 사람이 여기서 켜세요.",
+      "toolsHowOwner": "도구를 탭해서 켜거나 끄세요."
     },
     "import": {
       "preparing": "파일을 준비하는 중…",
       "failed": "파일을 다운로드하지 못했어요. 다시 시도해 주세요."
+    }
+  },
+  "roles": {
+    "create": "만들기",
+    "search": "역할 검색",
+    "baseHint": "워크스페이스의 모든 사람에게 적용돼요. 역할은 여기에 더해져요.",
+    "orderHint": "위에 있는 사람이 아래의 역할과 사람을 관리해요. 각 사람의 이름 색은 그 사람의 가장 높은 역할에서 와요.",
+    "order": "순서 바꾸기",
+    "orderDone": "완료",
+    "up": "{{name}} 위로 이동",
+    "down": "{{name}} 아래로 이동",
+    "orderChanged": "옮기는 동안 역할 목록이 바뀌었어요. 새로고침하고 다시 시도하세요.",
+    "none": "아직 역할이 없어요. 일부 사람에게 더 주려면 역할을 만드세요.",
+    "noMatch": "“{{q}}”에 맞는 역할이 없어요.",
+    "tooMany": "이 워크스페이스에는 이미 역할이 100개 있어요. 새로 만들려면 하나를 삭제하세요.",
+    "loadFailed": "역할을 불러오지 못했어요. {{cause}}",
+    "nobody": "없음",
+    "reach": {
+      "permissions_other": "권한 {{count}}개",
+      "channels_other": "채널 {{count}}개",
+      "agents_other": "에이전트 {{count}}개",
+      "more": "+{{what}}",
+      "all": "모든 것을 할 수 있음",
+      "owner": "항상 모든 것을 할 수 있음",
+      "none": "모든 사람이 할 수 있는 것만",
+      "baseNone": "읽기만"
+    },
+    "tabs": {
+      "permissions": "권한",
+      "channels": "채널",
+      "agents": "에이전트"
+    },
+    "addOwners": "소유자 추가",
+    "icons": {
+      "shield": "방패",
+      "code": "코드",
+      "wallet": "지갑",
+      "mail": "이메일",
+      "bolt": "번개",
+      "flag": "깃발",
+      "book": "책",
+      "chart": "차트",
+      "bulb": "전구",
+      "globe": "지구본",
+      "pullRequest": "풀 리퀘스트",
+      "calendar": "캘린더",
+      "message": "메시지",
+      "eye": "눈",
+      "plug": "플러그",
+      "person": "사람"
+    },
+    "inviteWith": "이 역할로 초대",
+    "searchPermission": "권한 검색",
+    "everyoneCan": "모든 사람이 할 수 있음",
+    "only": "{{names}}만",
+    "notHeld": "이 권한이 없어요.",
+    "noPermissionMatch": "“{{q}}”에 맞는 권한이 없어요.",
+    "advanced": "고급",
+    "peopleOnly": "역할은 사람에게 적용돼요. 각 에이전트의 권한은 그 에이전트의 페이지에 있어요.",
+    "nowAbove": "이 역할이 이제 내 역할보다 위에 있어요. 더 높은 사람만 변경할 수 있어요.",
+    "admin": {
+      "title": "{{name}}에 관리자를 켤까요?",
+      "text": "{{name}} 역할을 가진 사람은 소유자만 할 수 있는 것을 빼고 모든 것을 할 수 있게 돼요.",
+      "count_other": "{{count}}명이에요.",
+      "on": "관리자 켜기",
+      "note": "관리자가 켜져 있으면 {{name}}은(는) 소유자만 할 수 있는 것을 빼고 모든 것을 할 수 있어요."
+    },
+    "computers": {
+      "title": "에이전트의 컴퓨터",
+      "hint": "브라우저: 브라우저와 로그인 요청. 컴퓨터: 전체 화면과 터미널까지. 자기 에이전트: 그 사람이 담당하는 에이전트와 그 사람이 연결한 컴퓨터.",
+      "steps": {
+        "0": "사용 안 함",
+        "1": "자기 에이전트의 브라우저",
+        "2": "자기 에이전트의 컴퓨터",
+        "3": "모든 에이전트의 브라우저",
+        "4": "모든 에이전트의 컴퓨터"
+      },
+      "stepsIn": {
+        "1": "자기 에이전트의 브라우저",
+        "2": "자기 에이전트의 컴퓨터",
+        "3": "모든 에이전트의 브라우저",
+        "4": "모든 에이전트의 컴퓨터"
+      },
+      "everyoneTo": "모든 사람이 {{step}}을(를) 갖게 돼요.",
+      "everyoneNone": "모든 사람이 에이전트의 컴퓨터를 더 이상 쓰지 않게 돼요."
+    },
+    "whoCan": "할 수 있는 사람",
+    "everyoneSub": "워크스페이스의 모든 사람",
+    "someRoles": "일부 역할만",
+    "losing": "더 이상 할 수 없는 사람: {{names}}.",
+    "nobodyLoses": "잃는 사람이 없어요.",
+    "everyoneGets": "모든 사람이 할 수 있게 돼요.",
+    "ownersAlways": "소유자는 항상 할 수 있어요.",
+    "noOtherRoles": "아직 다른 역할이 없어요.",
+    "channels": {
+      "header": "{{name}} 역할을 가진 사람이 보는 채널",
+      "headerBase": "모든 사람이 보는 채널",
+      "hint": "사람에 관한 설정이에요. 에이전트는 누군가 추가하면 채널에 들어가요.",
+      "search": "채널 검색",
+      "everyone": "모든 사람이 봐요",
+      "private": "비공개",
+      "general": "모든 사람이 #general에 있어요.",
+      "locked": "#{{channel}}을(를) 만든 사람이나 채널을 정리하는 사람만 볼 수 있는 사람을 바꿀 수 있어요.",
+      "leaveTitle": "{{name}}에서 #{{channel}}을(를) 뺄까요?",
+      "leave_other": "{{names}}이(가) 채널에서 나가요.",
+      "leaveAction": "빼기",
+      "openTitle": "#{{channel}}을(를) {{name}}에 열까요?",
+      "openText": "{{name}} 역할을 가진 사람은 채널과 모든 기록을 보고 참여할 수 있어요.",
+      "openAction": "열기",
+      "openAllTitle": "#{{channel}}을(를) 모든 사람에게 열까요?",
+      "openAllText": "모든 기록이 워크스페이스에 공개돼요.",
+      "admin": "관리자가 켜져 있으면 {{name}} 역할을 가진 사람은 모든 채널을 봐요.",
+      "onlyGeneral": "지금은 #general만 있어요.",
+      "noMatch": "“{{q}}”에 맞는 채널이 없어요.",
+      "ungrouped": "채널",
+      "whoSees": "볼 수 있는 사람",
+      "allSub": "워크스페이스의 누구나 보고 참여할 수 있어요.",
+      "invited": "추가된 사람만",
+      "invitedSub": "새로운 사람은 볼 수 없어요. 지금 있는 사람은 그대로예요.",
+      "unsee": "지금 있는 사람은 그대로예요. 더 이상 볼 수 없는 사람: {{names}}."
+    },
+    "agents": {
+      "header": "{{name}} 역할을 가진 사람이 대화하는 에이전트",
+      "headerBase": "모든 사람이 대화하는 에이전트",
+      "hint": "사람에 관한 설정이에요. 각 에이전트가 하는 일은 그 에이전트의 페이지에 있어요.",
+      "everyone": "모든 사람이 대화해요",
+      "gate": "{{name}} 역할만 가진 사람은 에이전트와 대화하지 않아요.",
+      "gateOn": "에이전트와 대화 켜기",
+      "locked": "{{name}} 담당자인 {{owner}} 님이나 모든 에이전트를 편집하는 사람만 바꿀 수 있어요.",
+      "locked_female": "{{name}} 담당자인 {{owner}} 님이나 모든 에이전트를 편집하는 사람만 바꿀 수 있어요.",
+      "lockedNoOwner": "모든 에이전트를 편집하는 사람만 바꿀 수 있어요.",
+      "none": "아직 에이전트가 없어요.",
+      "some": "일부 역할과 사람만",
+      "addPerson": "사람 추가",
+      "losing": "{{agent}}와(과) 더 이상 대화할 수 없는 사람: {{names}}."
+    },
+    "people": {
+      "removed": "{{person}} 님은 이제 {{name}} 역할이 없어요",
+      "selfTitle": "{{name}}에서 나를 뺄까요?",
+      "selfText": "{{name}}만 주는 것을 잃어요. 나보다 위에 있는 사람만 되돌려 줄 수 있어요."
+    },
+    "mail": {
+      "title_other": "에이전트가 메일함 {{count}}개를 잃어요",
+      "loses": "{{agent}}이(가) {{owner}} 님의 메일함 {{address}}을(를) 잃어요.",
+      "losesAddress": "{{agent}}이(가) 메일함 {{address}}을(를) 잃어요.",
+      "only": "메일함을 준 사람만 다시 줄 수 있어요.",
+      "addAnyway": "그래도 추가",
+      "giveAnyway": "그래도 주기"
     }
   },
   "vault": {
@@ -2188,7 +2336,7 @@
     },
     "import": {
       "title": "컴퓨터에서 가져오기",
-      "text": "브라우저나 비밀번호 관리자에서 비밀번호를 가져오려면 웹에서 “설정”, “Vault”를 열고 “가져오기”를 고르세요."
+      "text": "브라우저나 비밀번호 관리자에서 비밀번호를 가져오려면 웹에서 가져오세요."
     },
     "connections": {
       "text": "비밀번호 관리자를 연결하면 거기에 보관된 로그인을 에이전트가 사용해요. 아무것도 복사되지 않아요. 비밀번호는 쓸 때만 읽어요.",
@@ -2382,7 +2530,6 @@
   },
   "dashboards": {
     "homeRow": "나만 · 내 위젯",
-    "loadFailed": "대시보드를 불러오지 못했어요.",
     "create": "만들기",
     "routineTarget": "해당 위젯",
     "pin": {
@@ -2420,7 +2567,6 @@
     },
     "formatAuto": "{{name}}이(가) 가장 좋은 걸 골라요",
     "newWidget": {
-      "titleHint": "제목 · 테스트할 때 {{name}}이(가) 제안해요",
       "alerts": "알림 켜짐",
       "realData": "실제 데이터",
       "editAsk": "요청 바꾸기",
@@ -2592,5 +2738,11 @@
       "title": "확인할 것이 없어요",
       "text": "에이전트가 대화 밖에서 무언가를 하면 여기에 나타나요."
     }
+  },
+  "surface": {
+    "on": "켜짐",
+    "codeText": "그곳에서 열리는 메시지를 보낸 다음 여기로 돌아오세요.",
+    "openFailed": "이 휴대폰에서 {{surface}}을(를) 열 수 없어요. 대신 아래 코드를 보내세요.",
+    "orType": "또는 이 코드를 보내세요"
   }
 }

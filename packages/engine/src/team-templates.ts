@@ -13,7 +13,7 @@ import { getMessage, insertMessage, messageView } from "./messages";
 import { requirePermission } from "./organizations";
 import { enqueue } from "./outbox";
 import { personLocale } from "./requester";
-import { billingHold, TEAM_HELLO_JOB } from "./standing";
+import { billingHold, closedRefusal, orgStanding, TEAM_HELLO_JOB } from "./standing";
 import {
   channelPlaces,
   checkTeam,
@@ -367,6 +367,8 @@ export async function sayTeamHello(
   payload: Record<string, unknown>,
 ) {
   const { agents, channelMembers, channels, machineProvisioning, messages, organizationMembers, users } = schema;
+  // Suspended, or deleted before its lines went out: nothing to greet.
+  if (closedRefusal(await orgStanding(deps.db, orgId))) return;
   // A personal workspace's #general is out of sight while the person is alone in it (ADR 0159), and its template
   // agents have no hello lines: its agents live in their DMs with the person.
   if (await isPersonalWorkspace(deps.db, orgId)) return;

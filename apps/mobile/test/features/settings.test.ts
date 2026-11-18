@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { AuthConfig, ComputerSetup, Machine, StorageConfig } from "@agenteschat/client";
 import { showsAbout } from "@agenteschat/client/lib/about";
 import { type SetupView, setupView } from "@agenteschat/client/lib/computer";
+import { proofToSend } from "@agenteschat/client/lib/deletion";
 import { changedByText, changesSinceLink, skillPendingViews, skillUpdateWords } from "@agenteschat/client/lib/skills";
 import { storageUsageLine } from "@agenteschat/client/lib/storage";
 import {
@@ -40,9 +41,10 @@ import {
   visibleSections,
   withIdea,
 } from "../../src/features/settings/logic";
+import { pushedByDefault } from "../main-stack";
 import { translator } from "./fixtures";
 
-const APP = join(import.meta.dir, "..", "..", "app", "(app)");
+const APP = join(import.meta.dir, "..", "..", "app", "(app)", "(main)");
 const NOW = new Date(2026, 9, 28, 15, 0);
 
 const machine = (over: Partial<Machine> & { id: string }): Machine => ({
@@ -88,6 +90,7 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
       "org:general",
       "org:media",
       "people:members",
+      "people:invites",
       "people:roles",
       "ai:usage",
       "connectors:connectors",
@@ -127,8 +130,8 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
     expect(visibleSections(as("owner", all)).length).toBe(SETTINGS_SECTIONS.length);
     // No Geral (what the agents know of the workspace) or GIFs: those are the workspace's, for admins. Uso stays:
     // their own plans' meters, in percentages (ADR 0063).
-    // The Vault is every member's (ADR 0144): their own items, and the team's shared with them.
-    expect(ids(["read", "post"])).toEqual(["members", "usage", "connectors", "vault", "apps", "computers"]);
+    // The Vault and Skills are every member's (ADR 0144): their own items, and the team's shared with them.
+    expect(ids(["read", "post"])).toEqual(["members", "usage", "connectors", "skills", "vault", "apps", "computers"]);
     expect(ids(["read", "manage_agents"])).toEqual([
       "members",
       "usage",
@@ -153,13 +156,13 @@ describe("the workspace's settings on the phone: who opens what (the web's sub-n
   });
 
   test("every settings screen is in the stack, pushed", () => {
-    const layout = readFileSync(join(APP, "_layout.tsx"), "utf8");
     const routes = readdirSync(join(APP, "settings"), { recursive: true, encoding: "utf8" })
       .filter((f) => f.endsWith(".tsx"))
       .map((f) => `settings/${f.replace(/\\/g, "/").replace(/\.tsx$/, "")}`);
     expect(routes.length).toBeGreaterThan(10);
-    // The workspace's settings page sits on the grouped gray like the screens it opens: all scroll under the bar.
-    for (const route of routes) expect(layout).toContain(`name="${route}" options={{ ...pushed, ...scrollUnder }}`);
+    // The workspace's settings page sits on the grouped gray like the screens it opens: all scroll under the bar (the
+    // stack's default for every screen it doesn't list).
+    for (const route of routes) expect({ route, pushed: pushedByDefault(route) }).toEqual({ route, pushed: true });
   });
 });
 
@@ -181,6 +184,7 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
     expect(ids(advanced)).toEqual([
       "media",
       "members",
+      "invites",
       "roles",
       "skills",
       "access",
@@ -210,9 +214,9 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
   test("only where a section is listed changes: a family member opens the same sections as in a team's", () => {
     const member = { id: "o", name: "Pessoal", role: "member" as const, permissions: ["read", "post"] };
     const { main, advanced } = personalSections({ ...member, mode: "personal" }, 1);
-    // No About you (the workspace's context is who configures it), and Skills isn't theirs.
+    // No About you (the workspace's context is who configures it).
     expect(ids(main)).toEqual(["members", "usage", "connectors", "vault", "computers"]);
-    expect(ids(advanced)).toEqual(["apps"]);
+    expect(ids(advanced)).toEqual(["skills", "apps"]);
     expect(new Set([...ids(main), ...ids(advanced)])).toEqual(
       new Set(ids(visibleSections({ ...member, mode: "personal" }))),
     );
@@ -254,7 +258,7 @@ describe("a personal workspace's settings on the phone (ADR 0159 §3): one short
     expect(src("me/ApprovalsPage.tsx")).toContain("{solo && !cover ? null : (");
     // Answers other people on a plan: hidden while off, but on the agent's Advanced, where the switch always is.
     expect(src("ai/parts.tsx")).toContain("if (solo && !on && !keep) return null;");
-    expect(src("ai/AgentAdvancedScreen.tsx")).toMatch(/disabled=\{busy\}\s+keep\s+\/>/);
+    expect(src("ai/AgentAdvancedScreen.tsx")).toMatch(/coding=\{planOf\(current\?\.provider\)\}\s+keep\s+\/>/);
     // Delegated approvals move from You to Advanced in a personal workspace.
     expect(src("me/MeScreen.tsx")).toMatch(/\{personal \? null : \(\s+<GroupedRow\s+key="approvals"/);
   });
@@ -601,7 +605,7 @@ describe("Armazenamento", () => {
   test("VoiceOver reads the line with its option: it is part of the row's label", () => {
     const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
     expect(src("ui/Grouped.tsx")).toContain(
-      'accessibilityLabel={[label, belowText, said, value, valueNote].filter(Boolean).join(", ")}',
+      'accessibilityLabel={[leadingSaid, label, sub, belowText, said, value, valueNote].filter(Boolean).join(", ")}',
     );
     expect(src("features/settings/StorageScreen.tsx")).toContain("belowText: usage ?? undefined");
   });
@@ -652,23 +656,35 @@ test("Sobre o Ackwire AI in Você: on every self-hosted server, old ones too; ne
   // Nor before the server says which it is: the Cloud never shows it for a moment.
   expect(showsAbout(undefined)).toBe(false);
   const me = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", "MeScreen.tsx"), "utf8");
-  expect(me).toContain("const about = showsAbout(useAuthConfig().data);");
+  expect(me).toContain("const server = useAuthConfig().data;");
+  expect(me).toContain("const about = showsAbout(server);");
   expect(me).toContain("{about ? (");
   expect(me).toContain('onPress={() => open("/me/about")}');
 });
 
 test("Auditoria's row screen: the call's title in words, and what the tool said only in the technical group", () => {
   const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "settings", "AuditScreen.tsx"), "utf8");
-  expect(src).toContain("title={auditHint(t, row) ?? auditPhrase(t, row)}");
+  expect(src).toContain("title={auditHint(t, row) ?? auditPhrase(t, row, i18n.language)}");
   const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
   expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
+});
+
+test("Auditoria says an operator's read of the workspace in the words the web uses: the sentence, why under it and on the row's screen", () => {
+  const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "settings", "AuditScreen.tsx"), "utf8");
+  // The list's row: who read what, and under it at whose request or for which fault.
+  expect(src).toContain("const { name, text } = auditSentence(t, row, i18n.language);");
+  expect(src).toContain("const sub = auditSubLine(t, row);");
+  // The row's own screen says why in the reason's place.
+  expect(src).toContain("const reason = auditReason(t, row);");
+  expect(src).toContain("{reason ? (");
 });
 
 test("my photo on Você changes it with a tap, through Conta's own Alterar foto", () => {
   const read = (file: string) => readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", file), "utf8");
   const me = read("MeScreen.tsx");
-  // One button around the photo and its presence badge, named as Conta's link, off while a photo uploads.
-  const button = me.slice(me.indexOf("onPress={changePhoto}"), me.indexOf("</Pressable>"));
+  // One button around the photo and its presence badge (the design system's press), named as Conta's link, off while
+  // a photo uploads.
+  const button = me.slice(me.indexOf("onPress={changePhoto}"), me.indexOf("</PressScale>"));
   expect(button).toContain("disabled={uploading}");
   expect(button).toContain('accessibilityRole="button"');
   expect(button).toContain('accessibilityLabel={t("mobile.me.account.changePhoto")}');
@@ -680,7 +696,7 @@ test("my photo on Você changes it with a tap, through Conta's own Alterar foto"
   expect(button).toContain('<Icon name="image" size={PHOTO_BADGE_ICON} color={c.onAction} />');
   expect(me).toContain("const PHOTO_BADGE_AT = ((PHOTO + 6) / 2) * (1 - Math.SQRT1_2) - PHOTO_BADGE / 2;");
   // My name and the @ under it wrap whole, never cut to a line or two.
-  const cover = me.slice(me.indexOf("</Pressable>"), me.indexOf("<View style={styles.groups}>"));
+  const cover = me.slice(me.indexOf("</PressScale>"), me.indexOf("<View style={styles.groups}>"));
   expect(cover).toContain('<Text variant="display2" style={styles.center}>');
   expect(cover).not.toContain("numberOfLines");
   // One flow: the sheet, the upload and the refresh live in `useChangePhoto`, which Conta's link opens too.
@@ -690,5 +706,33 @@ test("my photo on Você changes it with a tap, through Conta's own Alterar foto"
   expect(account).not.toContain("ImagePicker");
   const parts = read("parts.tsx");
   expect(parts).toContain("export function useChangePhoto()");
-  expect(parts).toContain('...(hasPhoto ? [t("mobile.me.account.removePhoto")] : [])');
+  // Removing it is offered only with a photo, and the choices open in the app's sheet, never the system's.
+  expect(parts).toContain("...(hasPhoto");
+  expect(parts).toContain('label: t("mobile.me.account.removePhoto")');
+  expect(parts).toContain("chooseAction(");
+  expect(parts).not.toContain("ActionSheetIOS");
+});
+
+test("the desktop app's owner with no password deletes on that computer: one line, the hold stays off", () => {
+  const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
+  for (const file of ["features/settings/DeleteWorkspaceScreen.tsx", "features/me/DeleteAccountScreen.tsx"]) {
+    const screen = src(file);
+    // In place of adding a password on the website, which their server has no other way in for.
+    expect([file, screen.includes("me?.user.confirmsOnThisMac ? (")]).toEqual([file, true]);
+    expect([file, screen.includes('t("mobile.delete.onThisComputer")')]).toEqual([file, true]);
+    // The hold waits for a proof that's ready, which "addPassword" never is.
+    expect([file, /disabled=\{!(toSend\.)?ready \|\| busy\}/.test(screen)]).toEqual([file, true]);
+    expect([file, screen.includes("proofToSend(proof, { sent: sent !== null, code, password })")]).toEqual([
+      file,
+      true,
+    ]);
+  }
+  expect(proofToSend("addPassword", { sent: false, code: "", password: "" }).ready).toBe(false);
+  // Back from adding a password on the computer, the account screen asks again.
+  const account = src("features/me/DeleteAccountScreen.tsx");
+  const branch = account.slice(
+    account.indexOf('t("mobile.delete.onThisComputer")'),
+    account.indexOf('t("mobile.delete.addPasswordFirst")'),
+  );
+  expect(branch).toContain('t("mobile.common.retry")');
 });

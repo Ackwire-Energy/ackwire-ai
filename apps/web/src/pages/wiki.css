@@ -62,7 +62,8 @@
   align-items: center;
   gap: 8px;
 }
-/* "New page" shows only its +: it reaches out by its plate, so the + ends on the padding line the title starts on. */
+/* "New page" (+) and the "…" with what is done now and then show only their glyphs, 8 apart: the last reaches out by
+   its plate, so its glyph ends on the padding line the title starts on. */
 .wiki-nav__head > .ac-btn--ghost:last-child {
   margin-right: calc(-1 * var(--ghost-plate));
 }
@@ -284,6 +285,9 @@ button.wiki-folder-row__act:hover {
 }
 .wiki-trash__acts {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
   gap: var(--space-2);
   margin-left: auto;
 }
@@ -375,42 +379,6 @@ html:not([data-pointer]) .wiki-tag:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
 }
-/* An .ac-iconline: the mark on the title's line, however the text under it wraps. */
-.wiki-import-card {
-  gap: 10px;
-  margin-top: auto;
-  padding: 12px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--raised);
-  box-shadow: var(--e1), var(--top);
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition:
-    box-shadow 0.15s,
-    transform 0.18s var(--spring);
-}
-.wiki-import-card:hover {
-  box-shadow: var(--e2), var(--top);
-}
-.wiki-import-card:active {
-  transform: scale(0.98);
-}
-html:not([data-pointer]) .wiki-import-card:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.wiki-import-card b {
-  display: block;
-  font-size: 13px;
-}
-.wiki-import-card small {
-  display: block;
-  color: var(--muted);
-  font-size: 12px;
-}
 .obsidian-mark {
   flex: none;
 }
@@ -450,7 +418,6 @@ html:not([data-pointer]) .wiki-import-card:focus-visible {
 }
 .wiki-card:hover {
   box-shadow: var(--e2), var(--top);
-  transform: translateY(-2px);
 }
 html:not([data-pointer]) .wiki-card:focus-visible {
   outline: none;
@@ -1171,7 +1138,7 @@ a.wiki-embed:hover {
   min-width: 260px;
 }
 .wiki-uses-pop .wiki-label {
-  margin: 4px 4px 6px;
+  margin: var(--space-1) var(--space-1) var(--space-2);
 }
 .wiki-uses-pop .wiki-use,
 .wiki-uses-pop .wiki-about__note,
@@ -1389,11 +1356,12 @@ html:not([data-pointer]) .wiki-outline__item:focus-visible {
 .wiki-folders-pop {
   min-width: 260px;
 }
+/* The popover takes the window's height (`.ac-popover`): the list gives way under the search and scrolls past it. */
 .wiki-folders-pop__list {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  max-height: 260px;
+  min-height: 0;
   margin-top: 6px;
   overflow-y: auto;
 }
@@ -1435,7 +1403,7 @@ html:not([data-pointer]) .wiki-outline__item:focus-visible {
 .wiki-bar {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   margin: 0 0 18px;
 }
 .wiki-bar > * {
@@ -1518,10 +1486,7 @@ p.wiki-rich__raw {
 }
 .wiki-suggest--float {
   position: fixed;
-  z-index: var(--z-floating);
-  width: 300px;
-  max-height: 320px;
-  overflow-y: auto;
+  /* Its left, top and height: inside the window, the room on its side of the caret (`placeList`). */
 }
 .wiki-hintline {
   margin: 22px 0 0;

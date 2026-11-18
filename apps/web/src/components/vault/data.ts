@@ -6,6 +6,8 @@ import type {
   VaultItem,
   VaultItemInput,
   VaultItemPatch,
+  VaultKeysImportInput,
+  VaultKeysImportResult,
   VaultScope,
 } from "@agenteschat/client";
 import {
@@ -14,6 +16,8 @@ import {
   useDeleteVaultConnection,
   useDeleteVaultItem,
   useImportVault,
+  useImportVaultKeys,
+  useMoveVaultItem,
   useSyncVaultConnection,
   useUpdateVaultConnection,
   useUpdateVaultItem,
@@ -53,7 +57,11 @@ export function useVaultItemActions(orgId: string) {
   const create = useCreateVaultItem(orgId);
   const update = useUpdateVaultItem(orgId);
   const remove = useDeleteVaultItem(orgId);
+  const move = useMoveVaultItem(orgId);
   return {
+    move: (itemId: string, scope: VaultScope): Promise<VaultItem | null> =>
+      attempt(() => move.mutateAsync({ itemId, scope }), failed),
+    moving: move.isPending,
     create: (input: VaultItemInput): Promise<VaultItem | null> => attempt(() => create.mutateAsync(input), failed),
     update: (itemId: string, patch: VaultItemPatch): Promise<VaultItem | null> =>
       attempt(() => update.mutateAsync({ ...patch, itemId }), failed),
@@ -73,6 +81,16 @@ export function useVaultImport(orgId: string) {
   const run = useImportVault(orgId);
   return {
     run: (input: { csv: string; scope: VaultScope; dryRun: boolean }): Promise<VaultImportResult | null> =>
+      attempt(() => run.mutateAsync(input), failed),
+    busy: run.isPending,
+  };
+}
+
+export function useVaultKeysImport(orgId: string) {
+  const failed = useErrorToast();
+  const run = useImportVaultKeys(orgId);
+  return {
+    run: (input: VaultKeysImportInput): Promise<VaultKeysImportResult | null> =>
       attempt(() => run.mutateAsync(input), failed),
     busy: run.isPending,
   };

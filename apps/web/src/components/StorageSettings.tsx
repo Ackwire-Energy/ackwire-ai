@@ -1,4 +1,4 @@
-import type { S3Input, StorageConfig, StoragePlatform, StorageTestResult } from "@agenteschat/client";
+import type { StorageConfig, StoragePlatform, StorageProvider, StorageTestResult } from "@agenteschat/client";
 import {
   useSaveStorage,
   useStartMigration,
@@ -8,7 +8,19 @@ import {
   useWorkspaceLimits,
 } from "@agenteschat/client";
 import { can } from "@agenteschat/client/lib/permissions";
-import { storageUsageLine } from "@agenteschat/client/lib/storage";
+import {
+  AWS_REGIONS,
+  awsBucketPolicy,
+  emptyStorageForm,
+  missingFields,
+  STORAGE_PROVIDERS,
+  type StorageField,
+  type StorageForm,
+  stepErrorText,
+  storageFormOf,
+  storageUsageLine,
+  toS3Input,
+} from "@agenteschat/client/lib/storage";
 import {
   Alert,
   Button,
@@ -16,6 +28,7 @@ import {
   Checkbox,
   Chip,
   Dialog,
+  DialogBody,
   DialogFooter,
   Field,
   Icon,
@@ -27,65 +40,41 @@ import {
   Meter,
   RadioCard,
   RadioGroup,
+  Select,
+  SettingNote,
 } from "@agenteschat/ui";
-import { useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import { StorageMeter } from "@/components/Limits";
 import { LoadingCards } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
 import { useRevealsFiles } from "@/components/ThisMac";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
+import { copyText } from "@/lib/context-menu";
 import { thisMac } from "@/lib/desktop";
 import { softBreaks } from "@/lib/soft-breaks";
 import { useToast } from "@/lib/toast";
+import "./storage.css";
 
 type Choice = "agentes" | "s3";
+type BrandedProvider = Exclude<StorageProvider, "other">;
 
-interface Form {
-  endpoint: string;
-  region: string;
-  bucket: string;
-  prefix: string;
-  pathStyle: boolean;
-  accessKeyId: string;
-  secretAccessKey: string;
-}
-
-const emptyForm: Form = {
-  endpoint: "",
-  region: "",
-  bucket: "",
-  prefix: "",
-  pathStyle: false,
-  accessKeyId: "",
-  secretAccessKey: "",
+/** Each service's mark and color (`public/connectors`, see its README); "Other" has none. */
+const MARKS: Record<BrandedProvider, { iconUrl: string; brandColor: string }> = {
+  r2: { iconUrl: "/connectors/cloudflare.svg", brandColor: "#F38020" },
+  s3: { iconUrl: "/connectors/amazons3.svg", brandColor: "#569A31" },
+  b2: { iconUrl: "/connectors/backblaze.svg", brandColor: "#E21E29" },
 };
 
-const formFrom = (c: StorageConfig | undefined): Form =>
-  c?.s3
-    ? {
-        ...emptyForm,
-        endpoint: c.s3.endpoint,
-        region: c.s3.region,
-        bucket: c.s3.bucket,
-        prefix: c.s3.prefix ?? "",
-        pathStyle: c.s3.pathStyle,
-      }
-    : emptyForm;
+/** Where each service's steps start, in its own dashboard. */
+const LINKS = {
+  r2: "https://dash.cloudflare.com/?to=/:account/r2/overview",
+  s3: "https://console.aws.amazon.com/s3/home",
+  iam: "https://console.aws.amazon.com/iam/home#/users",
+  b2: "https://secure.backblaze.com/b2_buckets.htm",
+} as const;
 
-/** What the backend gets; blank keys mean "keep the saved ones". */
-export function toS3Input(f: Form): S3Input {
-  const input: S3Input = {
-    endpoint: f.endpoint.trim(),
-    region: f.region.trim(),
-    bucket: f.bucket.trim(),
-    prefix: f.prefix.trim() || null,
-    pathStyle: f.pathStyle,
-  };
-  if (f.accessKeyId.trim()) input.accessKeyId = f.accessKeyId.trim();
-  if (f.secretAccessKey.trim()) input.secretAccessKey = f.secretAccessKey.trim();
-  return input;
-}
+type StepText = `storage.connect.step.${"r2Bucket" | "r2Key" | "s3Bucket" | "s3User" | "s3Key" | "b2Bucket" | "b2Key"}`;
 
 const STEP_ICON: Record<"ok" | "failed" | "skipped", IconName> = { ok: "check", failed: "close", skipped: "info" };
 
@@ -102,9 +91,55 @@ function PathCode({ path }: { path: string }) {
 }
 
 /**
+ * A service's mark in its color, at an icon's size on the name's line (no tile: a tile beside a name and a line that
+ * wraps would own a column); "Other" our database icon.
+ */
+function ProviderMark({ provider, size = 20 }: { provider: StorageProvider; size?: 14 | 20 }) {
+  if (provider === "other") return <Icon name="database" size={size} className="storage-mark" />;
+  const mark = MARKS[provider];
+  return (
+    <span
+      className="storage-mark storage-mark--brand"
+      aria-hidden="true"
+      style={
+        {
+          "--connector-icon": `url("${mark.iconUrl}")`,
+          "--connector-color": mark.brandColor,
+          width: size,
+          height: size,
+        } as CSSProperties
+      }
+    />
+  );
+}
+
+/** The storage in use, said by its service and bucket ("Cloudflare R2 · acme-files"), or by its address when unknown. */
+function InUseLine({ config }: { config: StorageConfig }) {
+  const { t } = useTranslation();
+  const s3 = config.s3;
+  if (!s3) return null;
+  const provider = s3.provider && s3.provider !== "other" ? s3.provider : null;
+  if (!provider) {
+    let host = s3.endpoint;
+    try {
+      host = new URL(s3.endpoint).host;
+    } catch {
+      // A saved address that doesn't parse is shown as it was saved.
+    }
+    return <>{t("storage.connect.inUseAt", { bucket: s3.bucket, host })}</>;
+  }
+  return (
+    <span className="storage-inuse">
+      <ProviderMark provider={provider} size={14} />
+      {t("storage.connect.inUse", { provider: t(`storage.connect.provider.${provider}`), bucket: s3.bucket })}
+    </span>
+  );
+}
+
+/**
  * Settings → Armazenamento (admins only): where files stay unless the workspace brings its own S3-compatible
- * bucket. On the Cloud that is our storage; on a server people run, the server itself, said by where it keeps them.
- * The option in use also says what the files there take.
+ * storage. On the Cloud that is our storage; on a server people run, the server itself, said by where it keeps them.
+ * Picking "Your own storage" offers "Connect storage", whose dialog walks through the chosen service (ADR 0019).
  */
 export function StorageSection() {
   const { t, i18n } = useTranslation();
@@ -118,6 +153,7 @@ export function StorageSection() {
   const edition = useComputerEdition(org.id);
   const reveals = useRevealsFiles();
   const [choice, setChoice] = useState<Choice>("agentes");
+  const [connect, setConnect] = useState<"new" | "edit" | null>(null);
   useEffect(() => {
     if (storage.data) setChoice(storage.data.kind);
   }, [storage.data]);
@@ -148,7 +184,11 @@ export function StorageSection() {
                 title={t(k === "s3" ? "storage.s3" : cloud ? "storage.agentes" : "storage.server")}
                 description={
                   k === "s3" ? (
-                    t("storage.s3Text")
+                    config.kind === "s3" ? (
+                      <InUseLine config={config} />
+                    ) : (
+                      t("storage.s3Text")
+                    )
                   ) : cloud ? (
                     t("storage.agentesText")
                   ) : (
@@ -175,15 +215,34 @@ export function StorageSection() {
               </Button>
             </div>
           )}
-          {config.kind === "s3" && <InUse config={config} place={place} />}
-          {choice === "s3" && <BucketForm config={config} />}
+          {config.kind === "s3" ? (
+            <InUse config={config} place={place} onEdit={() => setConnect("edit")} />
+          ) : (
+            choice === "s3" && (
+              // `ac-acts` straight in the card: on a phone its lone button takes the card's width.
+              <div className="ac-acts">
+                <Button variant="primary" onClick={() => setConnect("new")}>
+                  {t("storage.connect.open")}
+                </Button>
+              </div>
+            )
+          )}
+          <ConnectDialog
+            open={connect !== null}
+            editing={connect === "edit"}
+            config={config}
+            onOpenChange={(open) => {
+              if (!open) setConnect(null);
+            }}
+          />
         </>
       )}
     </Card>
   );
 }
 
-function InUse({ config, place }: { config: StorageConfig; place: string }) {
+/** On the workspace's own storage: copying the files kept before, editing the connection, and the way back. */
+function InUse({ config, place, onEdit }: { config: StorageConfig; place: string; onEdit: () => void }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
@@ -191,12 +250,9 @@ function InUse({ config, place }: { config: StorageConfig; place: string }) {
   const [confirm, setConfirm] = useState(false);
   return (
     <div className="stack-4" style={{ gap: 12 }}>
-      <Alert tone="neutral">{t("storage.switchedNotice")}</Alert>
-      {config.s3 && (
-        <p className="small muted">{t("storage.inUse", { bucket: config.s3.bucket, endpoint: config.s3.endpoint })}</p>
-      )}
       <CopyFiles config={config} place={place} />
-      <div className="row">
+      <div className="row" style={{ gap: 8 }}>
+        <Button onClick={onEdit}>{t("storage.connect.edit")}</Button>
         <Button variant="ghost" onClick={() => setConfirm(true)}>
           {t("storage.back", { place })}
         </Button>
@@ -277,153 +333,374 @@ function CopyFiles({ config, place }: { config: StorageConfig; place: string }) 
   );
 }
 
-function BucketForm({ config }: { config: StorageConfig }) {
+/**
+ * "Connect storage" and "Edit connection": pick the service, follow its steps (each says where to click in that
+ * service and takes what the step gives), test, then activate. Editing opens on the saved service's steps, the keys
+ * blank (kept until replaced).
+ */
+function ConnectDialog({
+  open,
+  editing,
+  config,
+  onOpenChange,
+}: {
+  open: boolean;
+  editing: boolean;
+  config: StorageConfig;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  const [provider, setProvider] = useState<StorageProvider | null>(null);
+  // Each opening is a fresh form, even on the same service: a new connection starts at the list, an edit on the
+  // saved service with its saved settings.
+  const [opening, setOpening] = useState(0);
+  useEffect(() => {
+    if (!open) return;
+    setOpening((n) => n + 1);
+    setProvider(editing ? (config.s3?.provider ?? "other") : null);
+  }, [open, editing, config.s3?.provider]);
+  if (!provider) {
+    return (
+      <Dialog
+        open={open}
+        onOpenChange={onOpenChange}
+        title={t("storage.connect.pickTitle")}
+        description={t("storage.connect.pickText")}
+        closeLabel={t("common.close")}
+        width={560}
+      >
+        <DialogBody>
+          <List className="storage-pick">
+            {STORAGE_PROVIDERS.map((p) => (
+              <button key={p} type="button" className="ac-list__row storage-pick__row" onClick={() => setProvider(p)}>
+                <span className="ac-iconline storage-pick__main">
+                  <ProviderMark provider={p} />
+                  <span className="list-col">
+                    <span className="storage-pick__name">{t(`storage.connect.provider.${p}`)}</span>
+                    <span className="small muted">{t(`storage.connect.providerText.${p}`)}</span>
+                  </span>
+                </span>
+                <Icon name="chevronRight" size={16} className="storage-pick__go" />
+              </button>
+            ))}
+          </List>
+        </DialogBody>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)}>{t("common.cancel")}</Button>
+        </DialogFooter>
+      </Dialog>
+    );
+  }
+  return (
+    <ProviderSteps
+      // Another service or another opening is another form: nothing typed before carries over.
+      key={`${opening}:${provider}`}
+      open={open}
+      onOpenChange={onOpenChange}
+      provider={provider}
+      editing={editing}
+      config={config}
+      onBack={() => setProvider(null)}
+    />
+  );
+}
+
+/** One service's steps and fields, the test's result, and the footer that tests, then activates. */
+function ProviderSteps({
+  open,
+  onOpenChange,
+  provider,
+  editing,
+  config,
+  onBack,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  provider: StorageProvider;
+  editing: boolean;
+  config: StorageConfig;
+  onBack: () => void;
+}) {
   const { t } = useTranslation();
   const { org } = useOrg();
   const toast = useToast();
   const test = useTestStorage(org.id);
   const save = useSaveStorage(org.id);
-  const [form, setForm] = useState<Form>(() => formFrom(config));
+  const start = editing ? storageFormOf(config) : emptyStorageForm;
+  const [form, setForm] = useState<StorageForm>(start);
   const [touched, setTouched] = useState(false);
   // The settings the last test ran with, and its result.
   const [tested, setTested] = useState<{ sig: string; result: StorageTestResult } | null>(null);
-  const saved = config.s3;
-  const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => ({ ...f, [k]: v }));
-  const input = toS3Input(form);
+  const saved = editing ? config.s3 : null;
+  const input = toS3Input(provider, form);
   const sig = JSON.stringify(input);
-  const missing = (v: string) => touched && !v.trim();
-  const keysMissing = !saved && (!input.accessKeyId || !input.secretAccessKey);
-  const complete = input.endpoint && input.region && input.bucket && !keysMissing;
+  const missing = missingFields(provider, form, Boolean(saved));
   const current = tested?.sig === sig ? tested.result : null;
+  const failed = current && !current.ok ? current : null;
   const stale = tested !== null && tested.sig !== sig;
+  const dirty = JSON.stringify(form) !== JSON.stringify(start);
+  const busy = test.isPending || save.isPending;
+  const set = <K extends StorageField>(k: K, v: StorageForm[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const errorOf = (k: StorageField) => {
+    if (!touched || !missing.includes(k)) return undefined;
+    if (k !== "accessKeyId" && k !== "secretAccessKey") return t("storage.required");
+    // "Other" keeps today's field names (Access key, Secret); the services' steps say "both keys".
+    return provider === "other" ? t("storage.keysRequired") : t("storage.connect.stepError.keysRequired");
+  };
   const runTest = () => {
     setTouched(true);
-    if (!complete) return;
+    if (missing.length > 0) return;
     test.mutate(input, { onSuccess: (result) => setTested({ sig, result }) });
   };
+  const activate = () =>
+    save.mutate(
+      { kind: "s3", s3: input },
+      {
+        onSuccess: () => {
+          toast.show(t("storage.activated"));
+          onOpenChange(false);
+        },
+      },
+    );
+  /** A text field: its error once a test was tried, else the saved key's hint or what the service calls it. */
+  const text = (k: Exclude<StorageField, "pathStyle">, label: string, example?: ReactNode, secret = false) => {
+    const savedHint = !saved
+      ? null
+      : k === "accessKeyId"
+        ? saved.accessKeyIdHint
+        : k === "secretAccessKey"
+          ? saved.secretHint
+          : null;
+    return (
+      <Field
+        label={label}
+        id={`st-${k}`}
+        example={savedHint ? t("storage.savedHint", { hint: savedHint }) : example}
+        error={errorOf(k)}
+      >
+        <Input
+          type={secret ? "password" : "text"}
+          value={form[k]}
+          onChange={(e) => set(k, e.target.value)}
+          placeholder={k === "endpoint" && provider !== "b2" ? "https://" : undefined}
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Field>
+    );
+  };
+  const keys = (keyName: string, secretName: string) => (
+    <>
+      {text("accessKeyId", t("storage.connect.accessKeyId"), keyName, true)}
+      {text("secretAccessKey", t("storage.connect.secret"), secretName, true)}
+    </>
+  );
+  const bucket = text("bucket", t("storage.connect.bucketName"));
+  const permission = failed?.steps.some((s) => s.code === "storage.permission") ?? false;
   return (
-    <form
-      className="stack-4"
-      style={{ gap: 12 }}
-      aria-label={t("storage.s3")}
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!current?.ok) return;
-        save.mutate(
-          { kind: "s3", s3: input },
-          {
-            onSuccess: () => {
-              setForm((f) => ({ ...f, accessKeyId: "", secretAccessKey: "" }));
-              setTested(null);
-              setTouched(false);
-              toast.show(t("storage.activated"));
-            },
-          },
-        );
-      }}
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      title={t(`storage.connect.${editing ? "editTitle" : "title"}.${provider}`)}
+      description={editing ? t("storage.connect.editLede") : t(`storage.connect.lede.${provider}`)}
+      closeLabel={t("common.close")}
+      width={560}
+      unsaved={dirty}
     >
-      <Locked when={test.isPending || save.isPending}>
-        <div className="grid-fields grid-fields--wide">
-          <Field
-            label={t("storage.endpoint")}
-            id="st-endpoint"
-            example={t("storage.endpointHelp")}
-            error={missing(form.endpoint) ? t("storage.required") : undefined}
-          >
-            <Input
-              value={form.endpoint}
-              onChange={(e) => set("endpoint", e.target.value)}
-              placeholder="https://"
-              autoComplete="off"
+      <DialogBody>
+        <form
+          className="ac-form"
+          aria-label={t(`storage.connect.title.${provider}`)}
+          onSubmit={(e) => e.preventDefault()}
+        >
+          <Locked when={busy}>
+            {provider === "r2" && (
+              <ol className="storage-steps">
+                <Step n={1} title={t("storage.connect.step.bucketTitle")} text="storage.connect.step.r2Bucket">
+                  <OutLink href={LINKS.r2}>{t("storage.connect.openR2")}</OutLink>
+                  {bucket}
+                </Step>
+                <Step n={2} title={t("storage.connect.step.keyTitle")} text="storage.connect.step.r2Key">
+                  {keys(t("storage.connect.theirName.r2Key"), t("storage.connect.theirName.r2Secret"))}
+                  {text("endpoint", t("storage.connect.r2Endpoint"), t("storage.connect.theirName.r2Endpoint"))}
+                </Step>
+              </ol>
+            )}
+            {provider === "s3" && (
+              <ol className="storage-steps">
+                <Step n={1} title={t("storage.connect.step.bucketTitle")} text="storage.connect.step.s3Bucket">
+                  <OutLink href={LINKS.s3}>{t("storage.connect.openS3")}</OutLink>
+                  {bucket}
+                  <Field label={t("storage.connect.region")} id="st-region" error={errorOf("region")}>
+                    <Select
+                      value={form.region || undefined}
+                      onValueChange={(v) => set("region", v)}
+                      placeholder={t("storage.connect.regionPick")}
+                      options={AWS_REGIONS.map((code) => ({
+                        value: code,
+                        label: t("storage.connect.regionOption", {
+                          name: t(`storage.connect.awsRegion.${code}`),
+                          code,
+                        }),
+                      }))}
+                    />
+                  </Field>
+                </Step>
+                <Step n={2} title={t("storage.connect.step.userTitle")} text="storage.connect.step.s3User">
+                  <div className="row" style={{ gap: 8 }}>
+                    <Button
+                      size="sm"
+                      icon="copy"
+                      disabled={!form.bucket.trim()}
+                      onClick={() =>
+                        void copyText(awsBucketPolicy(form.bucket), () =>
+                          toast.show(t("storage.connect.policyCopied", { bucket: form.bucket.trim() })),
+                        )
+                      }
+                    >
+                      {t("storage.connect.copyPolicy")}
+                    </Button>
+                    <OutLink href={LINKS.iam} inline>
+                      {t("storage.connect.openIam")}
+                    </OutLink>
+                  </div>
+                </Step>
+                <Step n={3} title={t("storage.connect.step.keyTitle")} text="storage.connect.step.s3Key">
+                  {keys(t("storage.connect.theirName.s3Key"), t("storage.connect.theirName.s3Secret"))}
+                </Step>
+              </ol>
+            )}
+            {provider === "b2" && (
+              <ol className="storage-steps">
+                <Step n={1} title={t("storage.connect.step.bucketTitle")} text="storage.connect.step.b2Bucket">
+                  <OutLink href={LINKS.b2}>{t("storage.connect.openB2")}</OutLink>
+                  {bucket}
+                  {text("endpoint", t("storage.connect.b2Endpoint"), t("storage.connect.theirName.b2Endpoint"))}
+                </Step>
+                <Step n={2} title={t("storage.connect.step.keyTitle")} text="storage.connect.step.b2Key">
+                  {keys(t("storage.connect.theirName.b2Key"), t("storage.connect.theirName.b2Secret"))}
+                </Step>
+              </ol>
+            )}
+            {provider === "other" && (
+              <>
+                {text("endpoint", t("storage.endpoint"), t("storage.endpointHelp"))}
+                {text("region", t("storage.region"))}
+                {text("bucket", t("storage.bucket"))}
+                {text("prefix", t("storage.prefix"), t("storage.prefixHelp"))}
+                {text("accessKeyId", t("storage.accessKey"), undefined, true)}
+                {text("secretAccessKey", t("storage.secret"), undefined, true)}
+                <div className="row" style={{ alignItems: "center", gap: 8 }}>
+                  <Checkbox
+                    id="st-path"
+                    checked={form.pathStyle}
+                    onCheckedChange={(v) => set("pathStyle", v)}
+                    aria-describedby="st-path-hint"
+                  />
+                  <span className="ac-hintline">
+                    <label htmlFor="st-path">{t("storage.pathStyle")}</label>
+                    <InfoHint id="st-path-hint" name={t("common.about", { label: t("storage.pathStyle") })}>
+                      {t("storage.pathStyleHelp")}
+                    </InfoHint>
+                  </span>
+                </div>
+              </>
+            )}
+          </Locked>
+          {current?.ok && (
+            <section className="stack-4" style={{ gap: 8 }} aria-label={t("storage.steps")}>
+              <SettingNote icon="check" live>
+                {t("storage.connect.passed")}
+              </SettingNote>
+              <SettingNote icon="info" quiet>
+                {t("storage.switchedNotice")}
+              </SettingNote>
+            </section>
+          )}
+          {failed && (
+            <TestSteps
+              result={failed}
+              hint={
+                permission && provider !== "other" ? (
+                  <Trans
+                    i18nKey={`storage.connect.permissionHint.${provider}`}
+                    values={{ bucket: input.bucket }}
+                    components={{ b: <b /> }}
+                  />
+                ) : (
+                  t("storage.testFailed")
+                )
+              }
             />
-          </Field>
-          <Field
-            label={t("storage.region")}
-            id="st-region"
-            error={missing(form.region) ? t("storage.required") : undefined}
-          >
-            <Input value={form.region} onChange={(e) => set("region", e.target.value)} autoComplete="off" />
-          </Field>
-          <Field
-            label={t("storage.bucket")}
-            id="st-bucket"
-            error={missing(form.bucket) ? t("storage.required") : undefined}
-          >
-            <Input value={form.bucket} onChange={(e) => set("bucket", e.target.value)} autoComplete="off" />
-          </Field>
-          <Field label={t("storage.prefix")} id="st-prefix" example={t("storage.prefixHelp")}>
-            <Input value={form.prefix} onChange={(e) => set("prefix", e.target.value)} autoComplete="off" />
-          </Field>
-          <Field
-            label={t("storage.accessKey")}
-            id="st-access"
-            example={saved ? t("storage.savedHint", { hint: saved.accessKeyIdHint }) : undefined}
-            error={touched && keysMissing && !input.accessKeyId ? t("storage.keysRequired") : undefined}
-          >
-            <Input
-              type="password"
-              value={form.accessKeyId}
-              onChange={(e) => set("accessKeyId", e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-          <Field
-            label={t("storage.secret")}
-            id="st-secret"
-            example={saved ? t("storage.savedHint", { hint: saved.secretHint }) : undefined}
-            error={touched && keysMissing && !input.secretAccessKey ? t("storage.keysRequired") : undefined}
-          >
-            <Input
-              type="password"
-              value={form.secretAccessKey}
-              onChange={(e) => set("secretAccessKey", e.target.value)}
-              autoComplete="off"
-            />
-          </Field>
-        </div>
-        <div className="row" style={{ alignItems: "center", gap: 8 }}>
-          <Checkbox
-            id="st-path"
-            checked={form.pathStyle}
-            onCheckedChange={(v) => set("pathStyle", v)}
-            aria-describedby="st-path-hint"
-          />
-          <span className="ac-hintline">
-            <label htmlFor="st-path">{t("storage.pathStyle")}</label>
-            <InfoHint id="st-path-hint" name={t("common.about", { label: t("storage.pathStyle") })}>
-              {t("storage.pathStyleHelp")}
-            </InfoHint>
-          </span>
-        </div>
-      </Locked>
-      {current && <TestSteps result={current} />}
-      {stale && <p className="small muted">{t("storage.retestNeeded")}</p>}
-      <div className="row" style={{ justifyContent: "flex-end", gap: 8 }}>
-        <Button type="button" disabled={test.isPending} loading={test.isPending} onClick={runTest}>
-          {test.isPending ? t("storage.testing") : t("storage.test")}
+          )}
+          {stale && <p className="small muted">{t("storage.retestNeeded")}</p>}
+        </form>
+      </DialogBody>
+      <DialogFooter>
+        <Button onClick={editing ? () => onOpenChange(false) : onBack}>
+          {editing ? t("common.cancel") : t("storage.connect.back")}
         </Button>
-        <Button type="submit" variant="primary" disabled={!current?.ok || save.isPending} loading={save.isPending}>
-          {config.kind === "s3" ? t("storage.saveBucket") : t("storage.activate")}
-        </Button>
-      </div>
-    </form>
+        {current?.ok ? (
+          <Button variant="primary" disabled={save.isPending} loading={save.isPending} onClick={activate}>
+            {editing ? t("storage.saveBucket") : t("storage.activate")}
+          </Button>
+        ) : (
+          <Button variant="primary" disabled={test.isPending} loading={test.isPending} onClick={runTest}>
+            {test.isPending ? t("storage.testing") : failed ? t("storage.connect.testAgain") : t("storage.test")}
+          </Button>
+        )}
+      </DialogFooter>
+    </Dialog>
   );
 }
 
-function TestSteps({ result }: { result: StorageTestResult }) {
+/** A numbered step: the number, the title and what to do in the service, then the fields that step fills. */
+function Step({ n, title, text, children }: { n: number; title: string; text: StepText; children?: ReactNode }) {
+  return (
+    <li className="storage-step">
+      <span className="storage-step__n" aria-hidden="true">
+        {n}
+      </span>
+      <div className="storage-step__main">
+        <h3 className="storage-step__title">{title}</h3>
+        <p className="storage-step__text">
+          <Trans i18nKey={text} components={{ b: <b /> }} />
+        </p>
+        {children}
+      </div>
+    </li>
+  );
+}
+
+/** A button that opens the service's own page in a new tab, the external mark after its words. */
+function OutLink({ href, inline, children }: { href: string; inline?: boolean; children: ReactNode }) {
+  const link = (
+    <Button asChild size="sm">
+      <a href={href} target="_blank" rel="noreferrer" className="storage-out">
+        {children}
+        <Icon name="external" size={14} />
+      </a>
+    </Button>
+  );
+  return inline ? link : <div className="row">{link}</div>;
+}
+
+/** A failed test: each step, the reason by its code in the person's language, and what to check. */
+function TestSteps({ result, hint }: { result: StorageTestResult; hint: ReactNode }) {
   const { t } = useTranslation();
   return (
     <section className="stack-4" style={{ gap: 8 }} aria-label={t("storage.steps")}>
       <List>
         {result.steps.map((s) => {
           const state = s.ok ? "ok" : s.error ? "failed" : "skipped";
+          const reason = state === "failed" ? stepErrorText(t, s) : null;
           return (
             <div key={s.step} className="ac-list__row" data-step={s.step}>
-              <span className="row" style={{ gap: 8, flex: 1, alignItems: "flex-start" }}>
+              <span className="row" style={{ gap: 8, flex: 1, alignItems: "flex-start", flexWrap: "nowrap" }}>
                 <Icon name={STEP_ICON[state]} aria-hidden="true" />
                 <span className="list-col">
                   <span style={{ fontWeight: 600 }}>{t(`storage.step.${s.step}`)}</span>
-                  {s.error && <span className="small muted">{s.error}</span>}
+                  {reason && <span className="small muted">{reason}</span>}
                 </span>
               </span>
               <Chip icon={STEP_ICON[state]}>
@@ -435,7 +712,7 @@ function TestSteps({ result }: { result: StorageTestResult }) {
           );
         })}
       </List>
-      {result.ok ? <Alert tone="neutral">{t("storage.testPassed")}</Alert> : <Alert>{t("storage.testFailed")}</Alert>}
+      <Alert>{hint}</Alert>
     </section>
   );
 }

@@ -346,7 +346,9 @@ test("the computer's refusals in the agent's words", async () => {
   const d = await desktopSetup();
   await d.grant(DESKTOP_SCOPE, SANDBOX_SCOPE);
   d.s.error = new MachineRequestError("not_allowed", "desktop is off");
-  expect((await d.call("desktop_read", {})).content).toContain("turned off on the computer Box");
+  const off = await d.call("desktop_read", {});
+  expect(off.content).toContain("turned off on the computer Box");
+  expect(off.data).toMatchObject({ toolOff: { tool: "desktop" } });
   d.s.error = new MachineRequestError("desktop_unavailable", "The agent's desktop stopped. Try again.");
   const plan = await d.call("desktop_do", { steps: [{ do: "press", key: "ctrl+s" }] });
   expect(plan.isError).toBe(true);

@@ -305,7 +305,9 @@ describe("the DM header's Computador", () => {
     await open(`/org/${ORG_ID}/dm/agent/${ADA_ID}`, s);
     const button = screen().getByRole("button", { name: /^Computador/ });
     expect(button.dataset.state).toBe("waiting");
-    expect(button.textContent).toContain("Precisa de você · Entrar no Stripe");
+    expect(button.getAttribute("aria-description")).toContain("Precisa de você · Entrar no Stripe");
+    // Icon-only: the kit's tip names it and says the same line on hover and on the keys' focus.
+    expect(button.getAttribute("title")).toMatch(/^Computador\nPrecisa de você · Entrar no Stripe/);
   });
 
   test("full screen while watching; Esc leaves full screen only, keeping the dialog", async () => {

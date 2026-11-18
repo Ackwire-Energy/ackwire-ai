@@ -38,6 +38,7 @@ import {
   LAUNCH,
   LOGO,
   LOGO_LOOK,
+  launchesAtOnce,
   launchPose,
   launchSkyTones,
   SPRITE_BODY,
@@ -79,8 +80,9 @@ export interface LaunchSplashProps {
 /**
  * Opening the app. It starts exactly on the native launch image (the logo
  * agent centered, 120 pt image), then the pixel sky rises from the bottom with little agents going up in it,
- * the agent lifts and looks at them, and the name comes in. Once the app is ready (and at least 0.9 s have
- * played) the agent and the name go up and out, the sky sinks and the screen fades into the app. Slow: one
+ * the agent lifts and looks at them, and the name comes in. Once the app is ready (at once when it was within the
+ * splash's first frames, else after at least 0.9 s) the agent and the name go up and out, the sky sinks and the
+ * screen fades into the app. Slow: one
  * line says it's connecting; no network: one line says so. Waiting on the person (`waiting`: a server that
  * doesn't answer) the agent goes up and closes its eyes, the sprites keep above the panel that comes in at the
  * bottom, and the splash stays until the app is ready. Reduced motion: the logo still, a short fade.
@@ -105,6 +107,7 @@ export function LaunchSplash({
   // Its own timers (the agents' clock can start paused): the minimum, and when to say why it waits.
   const [played, setPlayed] = useState(reduced);
   const [late, setLate] = useState(false);
+  const [startedAt] = useState(() => Date.now());
   useEffect(() => {
     const min = setTimeout(() => setPlayed(true), LAUNCH.min * 1000);
     const why = setTimeout(() => setLate(true), LAUNCH.lineAfter * 1000);
@@ -113,11 +116,17 @@ export function LaunchSplash({
       clearTimeout(why);
     };
   }, []);
-  // Once it starts leaving it goes, whatever happens next.
+  // Once it starts leaving it goes, whatever happens next. Ready within its first frames (the session and the workspace
+  // kept from last time), it leaves at once; later, its rise is under way and plays its minimum.
   const [leaving, setLeaving] = useState(false);
+  // Where the agent's choreography stops while it leaves (its last pose, smiling).
+  const [heldAt, setHeldAt] = useState(0);
   useEffect(() => {
-    if (ready && played) setLeaving(true);
-  }, [ready, played]);
+    if (leaving || !ready) return;
+    if (!played && !launchesAtOnce(Date.now() - startedAt)) return;
+    setHeldAt(frameClock.time());
+    setLeaving(true);
+  }, [ready, played, leaving, startedAt]);
   const asking = Boolean(waiting) && !leaving;
   const line = leaving || asking ? null : waitLine(late, offline);
 
@@ -187,8 +196,9 @@ export function LaunchSplash({
     requestAnimationFrame(onShown);
   };
 
-  // The agent: drawn by the shared engine ~25 times a second, its pose from the choreography.
-  const now = useFrameTime(!reduced, 0);
+  // The agent: drawn by the shared engine ~25 times a second, its pose from the choreography. Leaving, it holds its
+  // last pose while it lifts away (that move is on the UI thread): the JS thread is the app's, arriving under it.
+  const now = useFrameTime(!reduced && !leaving, heldAt);
   const [t0] = useState(() => frameClock.time());
   const a = reduced ? 0 : Math.max(0, now - t0);
   const picture = useMemo(() => {

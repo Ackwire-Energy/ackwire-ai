@@ -211,3 +211,26 @@ on where it opens.
   a time, Continuar once one is picked, "Pular esta etapa" under it. It is stored per account in `users.work_area`
   (an id of `WORK_AREAS`, `@agenteschat/client/lib/work-area`, or `skipped`; migration 0250) through
   `PUT /me/work-area`, never waited for, and the operator API's account reads it (which kinds of people stay).
+
+## Amended 2026-11-12: the person's own step, "Sobre você"
+
+The rail asked about the workspace and its team, never about the person setting it up: their name stayed as typed at
+sign-up (often in lower case), with no photo, and their own area was a loose screen with no step on the rail. Amends
+the 2026-11-11 bullet on the person's own area.
+
+- **A step of its own.** On the web, "Sobre você" sits between "O que vocês fazem" and "Seu time" (a personal
+  workspace's right after "Para que vai usar"): "Agora, sobre você", their face large with "Criar um avatar" (the app's
+  avatar builder, ADR 0166) and "Enviar uma foto" (the profile photo's crop) beside it, "Seu nome" filled with the
+  account's, and "Você cuida de quê?", the area's chips, optional, one at a time, pressed again for none. The photo is
+  saved by its own dialog, as in Settings; Continuar saves the name (`updateName`, the account's in every workspace)
+  when it changed, a name refused staying on the step under its field, and the area, an area left unpicked as
+  `skipped`. The loose area screen and its "Pular esta etapa" are gone.
+- **What answers it.** The step is answered once per account by `users.work_area` (an area, or `skipped`), as the
+  question was: `railState`'s funnel reads it as `about`, and `railStepAt` asks it right after what the workspace does,
+  before its team, so a workspace left at any later step asks it first once. A person who answered it before finds it
+  answered on a new workspace's rail, with their name under it, and may go back to it. An area whose save fails never
+  holds the onboarding: it is asked again on another visit. No new column, route or stored step.
+- **Where it shows.** The rail and its preview read the person from `/me`: a photo or avatar saved on the step shows in
+  the rail's corner and the preview's account row at once, and the name once saved. The step needs the workspace's
+  context for its dialogs (`StepHost`).
+- **The phone** (`funnel: null`) has no such step and keeps its rail.

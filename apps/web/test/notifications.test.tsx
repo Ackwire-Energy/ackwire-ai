@@ -3,7 +3,8 @@ import { setupDom } from "@agenteschat/ui/testing/dom";
 
 setupDom();
 
-import type { AgentQuestion, AppNotification } from "@agenteschat/client";
+import { type AgentQuestion, ApiError, type AppNotification } from "@agenteschat/client";
+import { type SoundName, setSoundPlayer } from "@agenteschat/client/lib/sounds";
 import { act, cleanup, fireEvent, within } from "@testing-library/react";
 import { dispatchPushOpen, pushOpenPath } from "../src/lib/push-open";
 import { ADA_ID, ATLAS_ID, createFakeApi, ENG_ID, type FakeState, fakeMachinesOf, ORG_ID, seedState } from "./fake-api";
@@ -117,9 +118,10 @@ const go = async (state: FakeState = seedState({ notifications: inbox() })) => {
     meta: { question },
     createdAt: ago(25),
   });
-  const r = await renderApp(`/org/${ORG_ID}/notifications`, { api: createFakeApi(state) });
+  const api = createFakeApi(state);
+  const r = await renderApp(`/org/${ORG_ID}/notifications`, { api });
   await settle(8);
-  return { ...r, state };
+  return { ...r, state, api };
 };
 
 describe("Notificações", () => {
@@ -246,6 +248,8 @@ describe("Notificações", () => {
         .getAllByRole("button")
         .map((b) => b.getAttribute("aria-label")),
     ).toEqual(["Lembrar depois", "Feito"]);
+    // Who decides it and manages agents can change when Atlas asks, right on the item.
+    expect(within(card).getByRole("button", { name: "Mudar quando perguntar" })).toBeTruthy();
     await click(within(card).getByRole("button", { name: "Agora não" }));
     expect(card.querySelector("textarea")).toBeTruthy();
   });
@@ -297,6 +301,24 @@ describe("Notificações", () => {
     expect(post?.args[1]).toBe(ENG_ID);
     expect(post?.args[2]).toMatchObject({ body: "Sobe sim, às 17h.", threadId: "m-1" });
     expect(row.textContent).toContain("Você respondeu: Sobe sim, às 17h.");
+  });
+
+  test("in a workspace being deleted, an inline reply says why it takes nothing, and Cancelar closes it", async () => {
+    const state = seedState({ notifications: inbox() });
+    if (!state.me) throw new Error("signed in");
+    state.me.organizations = state.me.organizations.map((o) => ({
+      ...o,
+      deletion: { dueAt: new Date(Date.now() + 6 * 86_400_000).toISOString(), requestedAt: ago(60), requestedBy: null },
+    }));
+    await go(state);
+    const row = document.querySelector('[data-n="n-thread"]') as HTMLElement;
+    await click(within(row).getByRole("button", { name: "Responder" }));
+    expect(within(row).queryByRole("textbox")).toBeNull();
+    expect(within(row).getByRole("status").textContent).toBe(
+      "Você não pode enviar mensagens enquanto este workspace está sendo apagado",
+    );
+    await click(within(row).getByRole("button", { name: "Cancelar" }));
+    expect(within(row).queryByRole("status")).toBeNull();
   });
 
   test("grouped task comments expand from the task's conversation (ADR 0145)", async () => {
@@ -461,6 +483,130 @@ describe("Notificações", () => {
     const calls = state.calls.filter((c) => c.method === "notifications.snooze").map((c) => c.args[2]);
     expect(calls.at(-1)).toBeNull();
     expect(document.querySelector('[data-n="n-rx"]')).not.toBeNull();
+  });
+
+  test("Concluir todas keeps what waits on me, and Desfazer brings exactly the rest back", async () => {
+    const { state } = await go();
+    await click(screen().getByRole("button", { name: "Concluir todas" }));
+    await settle(4);
+    expect(state.calls.find((c) => c.method === "notifications.doneAll")?.args).toEqual([ORG_ID, "all"]);
+    expect([...document.querySelectorAll<HTMLElement>("[data-n]")].map((r) => r.dataset.n)).toEqual(["n-q"]);
+    expect(document.body.textContent).toContain("3 movidas para Concluídas");
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(6);
+    const undone = state.calls.filter((c) => c.method === "notifications.done");
+    expect(undone.map((c) => c.args[1]).sort()).toEqual(["n-routine", "n-rx", "n-thread"]);
+    expect(undone.every((c) => c.args[2] === false)).toBe(true);
+    expect(document.querySelector('[data-n="n-rx"]')).not.toBeNull();
+  });
+
+  test("Concluir todas stays off in Esperando, in Concluídas, and where only what waits on me is left", async () => {
+    // The question waits on me (a mention, unread); the reaction is read, so neither filter holds anything else.
+    const [q, , rx] = inbox();
+    if (!q || !rx) throw new Error("the sample inbox changed");
+    await go(seedState({ notifications: [q, { ...rx, readAt: ago(5) }] }));
+    const filters = screen().getByRole("radiogroup", { name: "Filtrar notificações" });
+    const button = () => screen().getByRole("button", { name: "Concluir todas" }) as HTMLButtonElement;
+    expect(button().disabled).toBe(false);
+    for (const name of [/Menções/, /Não lidas/, /Esperando/, /Concluídas/]) {
+      await click(within(filters).getByRole("radio", { name }));
+      await settle(4);
+      expect(button().disabled).toBe(true);
+    }
+  });
+
+  test("while Concluir todas runs, its button and the rows' own actions wait; a failure brings the rows back", async () => {
+    const { api } = await go();
+    let fail: (e: Error) => void = () => {};
+    api.notifications.doneAll = () =>
+      new Promise((_, reject) => {
+        fail = reject;
+      });
+    await click(screen().getByRole("button", { name: "Concluir todas" }));
+    await settle(2);
+    expect((screen().getByRole("button", { name: "Concluir todas" }) as HTMLButtonElement).disabled).toBe(true);
+    // The waiting card stays, with its own actions waiting too.
+    const card = document.querySelector('[data-n="n-q"]') as HTMLElement;
+    expect((within(card).getByRole("button", { name: "Feito" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('[data-n="n-rx"]')).toBeNull();
+    await act(async () => fail(new ApiError(502, "http_502", "Bad Gateway")));
+    await settle(4);
+    expect(document.querySelector('[data-n="n-rx"]')).not.toBeNull();
+    expect(document.querySelector(".ac-toast--error")).not.toBeNull();
+    const row = document.querySelector('[data-n="n-rx"]') as HTMLElement;
+    expect((within(row).getByRole("button", { name: "Feito" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  test("tapping a row while Concluir todas runs keeps its toast and Desfazer, and the button off until it ends", async () => {
+    // On a phone the first tap on a row marks it read, a second mutation while the clear is under way.
+    const matchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) =>
+      query === "(max-width: 720px)"
+        ? ({ matches: true, media: query } as MediaQueryList)
+        : matchMedia.call(window, query)) as typeof window.matchMedia;
+    try {
+      const { api, state } = await go();
+      const real = api.notifications.doneAll;
+      let finish: () => void = () => {};
+      api.notifications.doneAll = (orgId, filter) =>
+        new Promise((resolve) => {
+          finish = () => resolve(real(orgId, filter));
+        });
+      await click(screen().getByRole("button", { name: "Concluir todas" }));
+      await settle(2);
+      await click(document.querySelector('[data-n="n-q"]') as HTMLElement);
+      await settle(4);
+      expect(state.calls.some((c) => c.method === "notifications.read")).toBe(true);
+      expect((screen().getByRole("button", { name: "Concluir todas" }) as HTMLButtonElement).disabled).toBe(true);
+      await act(async () => finish());
+      await settle(4);
+      expect(document.body.textContent).toContain("3 movidas para Concluídas");
+      expect(screen().getByRole("button", { name: "Desfazer" })).toBeTruthy();
+    } finally {
+      window.matchMedia = matchMedia;
+    }
+  });
+
+  test("Desfazer brings back what it can: a row deleted meanwhile is just gone, with no error", async () => {
+    const { api } = await go();
+    await click(screen().getByRole("button", { name: "Concluir todas" }));
+    await settle(4);
+    const real = api.notifications.done;
+    api.notifications.done = (orgId, id, done) =>
+      id === "n-routine" ? Promise.reject(new ApiError(404, "not_found", "Not found")) : real(orgId, id, done);
+    await click(screen().getByRole("button", { name: "Desfazer" }));
+    await settle(6);
+    expect(document.querySelector(".ac-toast--error")).toBeNull();
+    expect(document.querySelector('[data-n="n-rx"]')).not.toBeNull();
+    expect(document.querySelector('[data-n="n-thread"]')).not.toBeNull();
+    expect(document.querySelector('[data-n="n-routine"]')).toBeNull();
+  });
+
+  test("what the person brings back (alert false) plays no sound; news does", async () => {
+    const { sockets } = await go();
+    const heard: SoundName[] = [];
+    setSoundPlayer((name) => heard.push(name));
+    const socket = sockets.last();
+    await act(async () => socket.open());
+    const mention = (id: string, alert?: boolean) =>
+      act(async () =>
+        socket.push({
+          type: "event",
+          scope: "user",
+          event: {
+            type: "notification.upserted",
+            notification: notification({ id, kind: "mention", actors: [{ type: "user", id: "u-joao" }] }),
+            ...(alert === undefined ? {} : { alert }),
+          },
+        }),
+      );
+    await mention("n-back", false);
+    await settle(2);
+    expect(heard).toEqual([]);
+    await mention("n-news");
+    await settle(2);
+    expect(heard).toEqual(["mention"]);
+    setSoundPlayer(null);
   });
 
   test("Marcar tudo como lido, then Desfazer marks the same ones unread", async () => {
@@ -938,7 +1084,7 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     expect(row().classList.contains("nt-wr")).toBe(true);
     // A card of the requests' shape: where it is from and when on top, the headline as its words.
     expect(row().querySelector(".nt-wr__main")?.classList.contains("rq")).toBe(true);
-    expect(row().querySelector(".rq__kind .nt-wr__src")?.textContent).toBe("Membros");
+    expect(row().querySelector(".rq__kind .nt-wr__src")?.textContent).toBe("Convites");
     expect(row().querySelector(".rq__kind .nt-wr__tm")?.textContent).toBe(" · agora");
     expect(row().querySelector(".rq__lead.nt-what")?.textContent).toBe("Felipe Ramos pede para entrar");
     const acts = row().querySelector(".rq__foot.nt-wr__acts") as HTMLElement;
@@ -964,7 +1110,7 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     const { state, router } = await go(seedState({ notifications: [asks()] }));
     await click(row().querySelector(".nt-what") as HTMLElement);
     await settle(4);
-    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/members`);
+    expect(router.state.location.pathname).toBe(`/org/${ORG_ID}/settings/invites`);
     expect(state.calls.find((c) => c.method === "notifications.read")?.args).toEqual([ORG_ID, "n-join", true]);
   });
 
@@ -1032,6 +1178,8 @@ describe("Esperando você: what only points somewhere is a card of the requests'
     // box, so a wrap never splits it, and its margin pushes it to the end. The kit spaces what is in it.
     expect(value(".ac-acts > .ac-acts", "display", kit)).toBe("contents");
     expect(value(".rq__end > .nt-tail.ac-acts", "display")).toBe("flex");
+    // The last button's plate keeps 8 from the card's edge: no pull past the footer's padding.
+    expect(value(".rq__end > .nt-tail.ac-acts", "margin-right")).toBeUndefined();
     expect(css).not.toMatch(/\.nt-tail(?:\.ac-acts)? > [^{]*\{[^}]*margin/);
     // What only points somewhere is a request card itself: no corners or padding of its own, its face on the kind's
     // line as every waiting item's.

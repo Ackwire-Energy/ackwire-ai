@@ -1,6 +1,9 @@
 import type { TFunction } from "i18next";
+import type { AiStatus } from "../api/types";
 import { activityVerb, toolActivity } from "../lib/activity";
 import { capitalize } from "../lib/format";
+import { modelLimitWords, usageWhen } from "../lib/plan-usage";
+import { waitFix } from "../lib/usage-pause";
 import type {
   DashboardAudience,
   DashboardEditPolicy,
@@ -10,14 +13,26 @@ import type {
   HomeTile,
   Widget,
   WidgetCostEstimate,
+  WidgetFailure,
   WidgetSchedule,
+  WidgetStatus,
   WidgetStep,
+  WidgetWait,
 } from "./types";
 
 /**
  * What the web and the phone share about boards (ADR 0135), without React: the list's groups, who has access in
- * Share, a board's order of widgets and tiles, Organize's moves, a failure's words and the cost line.
+ * Share, a board's order of widgets and tiles, Organize's moves, a failure's and a wait's words and the cost line.
  */
+
+/**
+ * A board as the person may change it: as its `canEdit` and `canManage` say, and not at all while the workspace is
+ * being deleted (ADR 0088 §7), so no way into a change shows.
+ */
+export const frozenBoard = <B extends Pick<DashboardSummary, "canEdit" | "canManage">>(
+  board: B,
+  org: { deletion?: unknown } | null | undefined,
+): B => (org?.deletion ? { ...board, canEdit: false, canManage: false } : board);
 
 const byOrder = (a: DashboardSummary, b: DashboardSummary) =>
   Number(b.pinned) - Number(a.pinned) || a.position - b.position || a.title.localeCompare(b.title);
@@ -218,10 +233,84 @@ export const WIDGET_FAILURE_CODES = [
 ] as const;
 export type WidgetFailureCode = (typeof WIDGET_FAILURE_CODES)[number];
 
-/** The `widgets.failure.*` key of a failure code. `agent_reported` shows the agent's own words instead. */
-export function widgetFailureKey(code: string): `widgets.failure.${WidgetFailureCode}` {
+/**
+ * Why a widget's agent has no AI for its build (`missing_credential`'s detail, `AgentAi.reason`) in words: a widget's
+ * own, else the right hand's plan line (that plan never waits, so its computer away or its limit is no AI either,
+ * ADR 0137 §7). `no_key`, and any other, keep the code's words.
+ */
+const NEEDS_AI_WORDS = {
+  not_signed_in: "widgets.needsAi.not_signed_in",
+  no_computer: "widgets.needsAi.no_computer",
+  cli_missing: "widgets.needsAi.cli_missing",
+  plan_not_shared: "widgets.needsAi.plan_not_shared",
+  // Its run's word for the same: no person is behind a build.
+  plan_unattended: "widgets.needsAi.plan_not_shared",
+  // Whoever set it up has no plan that serves them: for a build, the same plan kept to its owner.
+  plans_not_yours: "widgets.needsAi.plan_not_shared",
+  computer_away: "widgets.failure.waiting_computer",
+  plan_limit: "widgets.failure.waiting_plan",
+  model_limit: "widgets.failure.waiting_plan",
+  commands_off: "noAi.rightHand.commands_off",
+  runner_outdated: "noAi.rightHand.runner_outdated",
+  computer_failed: "noAi.rightHand.computer_failed",
+  cli_failed: "noAi.rightHand.cli_failed",
+  plan_tools: "noAi.rightHand.plan_tools",
+} as const;
+
+/**
+ * The key of a failure's words: `widgets.failure.*` by its code, or the reason a widget waits for an AI (`detail`,
+ * `NEEDS_AI_WORDS`). `agent_reported` shows the agent's own words instead.
+ */
+export function widgetFailureKey(code: string, detail?: string | null) {
+  if (code === "missing_credential" && detail && Object.hasOwn(NEEDS_AI_WORDS, detail))
+    return NEEDS_AI_WORDS[detail as keyof typeof NEEDS_AI_WORDS];
   const known = (WIDGET_FAILURE_CODES as readonly string[]).includes(code) ? (code as WidgetFailureCode) : "error";
-  return `widgets.failure.${known}`;
+  return `widgets.failure.${known}` as const;
+}
+
+/** What a failure is about: for a widget that stopped after failing in a row, the last of those failures. */
+export const widgetFailureCause = (f: WidgetFailure): WidgetFailure =>
+  f.code === "failing" && f.cause && f.cause !== "failing" ? { code: f.cause, detail: f.detail } : f;
+
+/**
+ * Why a widget stopped updating, in the reader's words (the agent's own when it said why). One that stopped after
+ * failing in a row says so, then the last failure's words.
+ */
+export function widgetFailureText(t: TFunction, failure: WidgetFailure | null, name: string): string {
+  if (!failure) return t("widgets.failure.error");
+  const last = widgetFailureCause(failure);
+  if (last !== failure) return t("widgets.failure.failingLast", { cause: widgetFailureText(t, last, name) });
+  if (failure.code === "agent_reported" && failure.detail) return failure.detail;
+  const key = widgetFailureKey(failure.code === "agent_reported" ? "error" : failure.code, failure.detail);
+  return t(key, { name, detail: failure.detail ?? "" });
+}
+
+/**
+ * The widget waits for its agent to have an AI (ADR 0135 §20): no build starts until then, so its way out is
+ * connecting one (it builds by itself after), never Resolve. The server's `widgetNeedsAi`.
+ */
+export const widgetNeedsAi = (w: Pick<Widget, "status" | "failure">) =>
+  w.status === "failed" && w.failure?.code === "missing_credential";
+
+/**
+ * The widget stopped after failing in a row for the lack of an AI: nothing starts it again by itself, so its way out
+ * is connecting one while there is none, then Resolve (`useWidgetLacksAi`).
+ */
+export const widgetStoppedForAi = (w: Pick<Widget, "status" | "failure">) =>
+  w.status === "failed" && w.failure?.code === "failing" && w.failure.cause === "missing_credential";
+
+/**
+ * A widget waiting for an AI, or stopped for the lack of one, whose build has one now: the server says so for the
+ * right hand's (the AI status's `widgetsReady`: whose AI its build thinks with is its own people's), and for any
+ * agent's its state for background work does (`background`, else `state`). Its computer away is no missing AI: the
+ * build waits for it as any run does.
+ */
+export function widgetAiReady(w: Pick<Widget, "id" | "status" | "failure" | "agentId">, status: AiStatus | undefined) {
+  if (!widgetNeedsAi(w) && !widgetStoppedForAi(w)) return false;
+  if (status?.widgetsReady?.includes(w.id)) return true;
+  const agent = status?.agents.find((a) => a.agentId === w.agentId);
+  const state = agent?.background ?? agent?.state;
+  return state !== undefined && state !== "no_ai";
 }
 
 /** The cost line of "New widget": a day, a week, only when asked, on a plan, or nothing known. */
@@ -244,9 +333,82 @@ export function widgetCostLine(
   return schedule === "week" ? { kind: "week", usd } : { kind: "day", usd };
 }
 
-/** The widgets of a board that are updating or being built (a sweep on each). */
-export const busyWidgets = (widgets: readonly Widget[]) =>
-  widgets.filter((w) => w.status === "updating" || w.status === "building");
+/** The widgets of a board at work: updating or being built (a sweep on each), and not standing still on a wait. */
+export const busyWidgets = (widgets: readonly Widget[], now = Date.now()) =>
+  widgets.filter((w) => (w.status === "updating" || w.status === "building") && !widgetWaiting(w, now));
+
+/** Waiting for room on its computer is said only past this long (the engine's `COMPUTER_QUEUE_NOTE_MS`). */
+export const WIDGET_LINE_NOTE_MS = 10 * 60_000;
+
+/**
+ * What holds a widget's refresh (`Widget.wait`) while it still does: its reset (an outage's next try) ahead, or not
+ * known. Past its reset it is about to go on, so the apps show it at work again, as they do for room on its computer
+ * until it waited `WIDGET_LINE_NOTE_MS`. Null: nothing waits.
+ */
+export function widgetWaiting(w: Pick<Widget, "status" | "wait">, now = Date.now()): WidgetWait | null {
+  const wait = w.wait;
+  if (!wait || (w.status !== "building" && w.status !== "updating")) return null;
+  if (wait.code === "busy") return wait.since && now - Date.parse(wait.since) >= WIDGET_LINE_NOTE_MS ? wait : null;
+  return wait.resetsAt && Date.parse(wait.resetsAt) <= now ? null : wait;
+}
+
+/** The status a widget's card draws: one whose refresh waits (`widgetWaiting`) stands still, its data as it was. */
+export const widgetCardStatus = (w: Pick<Widget, "status" | "wait">, now = Date.now()): WidgetStatus =>
+  widgetWaiting(w, now) ? "ok" : w.status;
+
+const WAIT_CODES: readonly string[] = ["usage_pause", "plan_limit", "budget", "computer", "busy", "outage"];
+const WAIT_SCOPES: readonly string[] = ["model", "region", "off", "inactive"];
+const textOf = (v: unknown) => (typeof v === "string" && v ? v : null);
+
+/** A wait as the server sends it (`Widget.wait`, the params of a `widget.waiting` refusal); null when it isn't one. */
+export function widgetWaitOf(raw: unknown): WidgetWait | null {
+  const w = raw as Partial<Record<keyof WidgetWait, unknown>> | null | undefined;
+  if (!w || typeof w.code !== "string" || !WAIT_CODES.includes(w.code)) return null;
+  return {
+    code: w.code as WidgetWait["code"],
+    source: w.source === "plan" || w.source === "budget" ? w.source : null,
+    resetsAt: textOf(w.resetsAt),
+    scope: typeof w.scope === "string" && WAIT_SCOPES.includes(w.scope) ? (w.scope as WidgetWait["scope"]) : null,
+    model: textOf(w.model),
+    since: textOf(w.since),
+    canContinue: w.canContinue === true,
+  };
+}
+
+/**
+ * A wait in the reader's words, on the widget and when Update now can't go sooner: "Waiting for Theo's plan to reset
+ * at 13:00", "Waiting for Theo's budget to renew on December 1", its model's own limit as the brain card says it,
+ * "Waiting for room on Theo's computer", "Waiting for Theo's AI provider, next try at 13:05".
+ */
+export function widgetWaitText(t: TFunction, locale: string, wait: WidgetWait, name: string, now = new Date()) {
+  const when = (iso: string) => usageWhen(t, locale, iso, now);
+  if (wait.code === "computer") return t("widgets.wait.computer", { name });
+  if (wait.code === "busy") return t("widgets.wait.busy", { name });
+  if (wait.code === "outage")
+    return wait.resetsAt
+      ? t("widgets.wait.provider", { name, when: when(wait.resetsAt) })
+      : t("presence.agent.provider_down");
+  if (wait.scope && wait.model) {
+    const { scope } = wait;
+    const until = wait.resetsAt ? Date.parse(wait.resetsAt) : null;
+    const limit = { until, region: scope === "region", off: scope === "off", inactive: scope === "inactive" };
+    return modelLimitWords(t, locale, limit, wait.model, now);
+  }
+  const budget = wait.source === "budget";
+  if (!wait.resetsAt) return t(budget ? "widgets.wait.budgetSoon" : "widgets.wait.planUnknown", { name });
+  return t(budget ? "widgets.wait.budget" : "widgets.wait.plan", { name, when: when(wait.resetsAt) });
+}
+
+/**
+ * The one thing that ends a widget's wait sooner, for who may do it (`waitFix`): a higher budget (admins), another model
+ * for one at a limit of its own (its owner, admins), or its computer opened. Null: only time ends it.
+ */
+export function widgetWaitFix(wait: WidgetWait, who: { admin: boolean; owner: boolean }) {
+  if (wait.code === "computer" || wait.code === "busy") return "openComputer" as const;
+  const on =
+    wait.code === "budget" && wait.resetsAt ? "budget" : wait.code === "plan_limit" && wait.scope ? "model" : null;
+  return waitFix(on, who);
+}
 
 /** A build that takes longer than this says it is still at it. */
 export const WIDGET_STILL_MS = 45_000;

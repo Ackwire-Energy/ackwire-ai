@@ -29,7 +29,7 @@ import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, Valida
 import { publishChannelEvent, publishMessageCreated, publishUserEvent } from "./events";
 import { cutText } from "./format";
 import type { Judge } from "./judge";
-import { type MachineCaller, MachineRequestError } from "./machine-hub";
+import { awakeForPerson, type MachineCaller, MachineRequestError } from "./machine-hub";
 import {
   formatDuration,
   isLiveTaskRow,
@@ -40,9 +40,10 @@ import {
   RECENT_LINES,
   startMachineTask,
   taskModeOf,
+  taskScope,
   taskSeconds,
 } from "./machine-tasks";
-import { MachineOfflineError, machineOnline } from "./machines";
+import { MachineOfflineError, type MachineRow, shownOnline } from "./machines";
 import { insertMessage, type Message, messageView } from "./messages";
 import { missionAllowRules, pendingCommandCounts, pendingCommandsSql } from "./mission-command-rules";
 import { MISSION_LIMITS } from "./mission-limits";
@@ -166,9 +167,12 @@ export function agentMissionApproval(agent: { missionCommandApproval?: string | 
  */
 export const CODEX_MIN_VERSION = "0.163.0";
 
-/** `codex-cli 0.163.0` → [0, 163, 0]; null when there is no version in it. */
+/**
+ * `codex-cli 0.163.0` → [0, 163, 0]; null when there is no version in it. Each part is up to nine digits: a runner
+ * reports the text, and unbounded digits would make a long run of them slow to read.
+ */
 export function versionOf(text: string | undefined): number[] | null {
-  const m = /(\d+)\.(\d+)\.(\d+)/.exec(text ?? "");
+  const m = /(\d{1,9})\.(\d{1,9})\.(\d{1,9})/.exec(text ?? "");
   return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : null;
 }
 const atLeast = (have: number[], want: number[]) => {
@@ -199,6 +203,28 @@ export function machineExecutors(machine: {
   available.push("agent");
   return { available, codexTooOld };
 }
+
+/**
+ * What a computer can run a mission's items with: `machineExecutors`, less Codex on Windows, where the runner doesn't
+ * run Codex background tasks yet (ADR 0053's addendum of 2026-11-12), though Codex brain turns run there. No update
+ * changes that, so a Codex too old there isn't worth saying.
+ */
+export function missionExecutors(
+  machine: Parameters<typeof machineExecutors>[0] & { os?: string | null },
+): ReturnType<typeof machineExecutors> {
+  const found = machineExecutors(machine);
+  return machine.os === "windows"
+    ? { available: found.available.filter((e) => e !== "codex"), codexTooOld: false }
+    : found;
+}
+
+/** Codex asked for a mission's items on a Windows computer (`missionExecutors`): no update makes it run there. */
+const codexWindowsRefusal = (computer: string) =>
+  new ConflictError(
+    `Codex can't run a mission's items on ${computer} yet (Windows): choose Claude Code, the agent itself or another computer`,
+    "mission.codex_windows",
+    { computer },
+  );
 
 /** The default: Claude Code when the computer has it, else our agent. */
 export const defaultExecutor = (available: MissionExecutor[]): MissionExecutor =>
@@ -682,11 +708,14 @@ export async function missionViews(
             online: machines.online,
             lastSeenAt: machines.lastSeenAt,
             kind: machines.kind,
+            standbyAt: machines.standbyAt,
+            wakeWantedAt: machines.wakeWantedAt,
             pairedBy: machines.pairedByUserId,
             deletedAt: machines.deletedAt,
             protocol: machines.protocol,
             execAllowed: machines.execAllowed,
             executors: machines.executors,
+            os: machines.os,
           })
           .from(machines)
           .where(inArray(machines.id, machineIds))
@@ -786,10 +815,10 @@ export async function missionViews(
         ? {
             id: m.id,
             name: m.name,
-            online: machineOnline(m),
+            online: shownOnline(m),
             lentBy: r.machineLentBy,
-            executors: machineExecutors(m).available,
-            codexTooOld: machineExecutors(m).codexTooOld,
+            executors: missionExecutors(m).available,
+            codexTooOld: missionExecutors(m).codexTooOld,
           }
         : null,
       needsComputer,
@@ -963,7 +992,9 @@ async function usableMachine(
       computer: status.name,
     });
   }
-  const { available, codexTooOld } = machineExecutors(status);
+  const { available, codexTooOld } = missionExecutors(status);
+  // Before any update it might ask for: none makes Codex run a mission's items there.
+  if (asked === "codex" && status.os === "windows") throw codexWindowsRefusal(status.name);
   // Every mission works in its own copy of the project (ADR 0044): runner protocol 14.
   if (
     available.length === 0 ||
@@ -981,7 +1012,8 @@ async function usableMachine(
       { computer: status.name, executor: asked, ...(asked === "codex" ? { minVersion: CODEX_MIN_VERSION } : {}) },
     );
   }
-  if (!status.online) {
+  // One in standby reads ready to people (ADR 0161): it is woken and waited for.
+  if (!(await awakeForPerson(hubOf(deps), status))) {
     throw new ConflictError(`The computer ${status.name} is offline`, "mission.computer_offline", {
       computer: status.name,
     });
@@ -2331,9 +2363,10 @@ export async function setMissionMachine(
   if (machine.kind === "connected" && machine.pairedByUserId !== actorId) {
     throw new ForbiddenError("Choose a computer you paired", "mission.not_your_computer");
   }
+  if (mission.executor === "codex" && machine.os === "windows") throw codexWindowsRefusal(machine.name);
   if (
     machine.protocol < MISSION_WORKTREE_PROTOCOL ||
-    !machineExecutors(machine).available.includes(mission.executor as MissionExecutor)
+    !missionExecutors(machine).available.includes(mission.executor as MissionExecutor)
   ) {
     throw missionUpdateRefusal(machine, "can't run this mission");
   }
@@ -3310,15 +3343,20 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
     machine_name: string | null;
     online: boolean | null;
     last_seen_at: Date | string | null;
+    kind: MachineRow["kind"] | null;
+    standby_at: Date | string | null;
+    wake_wanted_at: Date | string | null;
     protocol: number | null;
     exec_allowed: boolean | null;
     executors: schema.MachineExecutors | string | null;
+    os: string | null;
   }>(
     await deps.db.execute(sql`select agents.id, agents.handle, agents.name, agents.owner_user_id,
         agents.mission_command_approval,
         ${audienceSql("agents", sql`${userId}::text`)} as can_talk,
-        mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.protocol,
-        mc.exec_allowed, mc.executors
+        mc.id as machine_id, mc.name as machine_name, mc.online, mc.last_seen_at, mc.kind, mc.standby_at,
+        mc.wake_wanted_at, mc.protocol,
+        mc.exec_allowed, mc.executors, mc.os
       from ${schema.agents} agents
       left join ${machines} mc on mc.id = agents.machine_id and mc.org_id = agents.org_id and mc.deleted_at is null
       where agents.org_id = ${orgId}::uuid and agents.archived_at is null
@@ -3330,10 +3368,13 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
       ? {
           id: r.machine_id,
           name: r.machine_name ?? "",
-          online: machineOnline({
+          online: shownOnline({
             online: Boolean(r.online),
             lastSeenAt: r.last_seen_at ? new Date(r.last_seen_at) : null,
             deletedAt: null,
+            kind: r.kind ?? "connected",
+            standbyAt: r.standby_at ? new Date(r.standby_at) : null,
+            wakeWantedAt: r.wake_wanted_at ? new Date(r.wake_wanted_at) : null,
           }),
         }
       : null;
@@ -3367,7 +3408,7 @@ export async function eligibleMissionAgents(deps: Pick<MissionDeps, "db">, userI
       };
     }
     const found = typeof r.executors === "string" ? (JSON.parse(r.executors) as schema.MachineExecutors) : r.executors;
-    const { available, codexTooOld } = machineExecutors({ protocol, execAllowed: true, executors: found });
+    const { available, codexTooOld } = missionExecutors({ protocol, execAllowed: true, executors: found, os: r.os });
     return {
       ...base,
       eligible: true,
@@ -3413,7 +3454,7 @@ export async function getTaskOutput(
       const agent = await getAgentCached(deps.db, orgId, row.agentId);
       const out = await deps.hub.call<"task.output">(
         row.machineId,
-        { op: "task.output", taskId: row.id, tail, agent: { id: row.agentId, handle: agent?.handle ?? "agent" } },
+        { op: "task.output", taskId: row.id, tail, agent: taskScope(row, agent?.handle ?? "agent") },
         { timeoutMs: 15_000 },
       );
       const lines = (Array.isArray(out?.lines) ? out.lines : []).map((l) => String(l).slice(0, 500)).slice(-tail);

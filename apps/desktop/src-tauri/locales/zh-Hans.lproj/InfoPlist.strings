@@ -1,0 +1,5 @@
+"NSMicrophoneUsageDescription" = "Ackwire AI 使用麦克风录制语音消息。";
+"NSDesktopFolderUsageDescription" = "让在这台 Mac 上工作的智能体可以打开“桌面”上的文件。";
+"NSDocumentsFolderUsageDescription" = "让在这台 Mac 上工作的智能体可以打开“文稿”文件夹中的文件。";
+"NSDownloadsFolderUsageDescription" = "让在这台 Mac 上工作的智能体可以打开“下载”文件夹中的文件。";
+"NSLocalNetworkUsageDescription" = "让在这台 Mac 上工作的智能体可以在你的 Wi-Fi 网络中查找并连接 Android 手机。";

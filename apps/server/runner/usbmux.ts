@@ -176,12 +176,17 @@ export async function usbmuxConnect(deviceId: number, port: number, socketPath =
 export async function usbmuxForward(udid: string, port: number, socketPath = USBMUXD_SOCKET) {
   const deviceId = await usbmuxDeviceId(udid, socketPath);
   if (deviceId === null) throw new RunnerError("phone_missing", "The iPhone isn't plugged into this Mac.");
+  return loopbackForward(() => usbmuxConnect(deviceId, port, socketPath));
+}
+
+/** A port on this Mac's loopback whose every client is piped to a socket `connect` opens (closed if that fails). */
+export async function loopbackForward(connect: () => Promise<net.Socket>) {
   const open = new Set<net.Socket>();
   const server = net.createServer((client) => {
     open.add(client);
     client.on("close", () => open.delete(client));
     client.pause();
-    usbmuxConnect(deviceId, port, socketPath).then(
+    connect().then(
       (phone) => {
         client.pipe(phone).pipe(client);
         client.resume();

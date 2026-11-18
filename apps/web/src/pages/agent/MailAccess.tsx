@@ -1,6 +1,6 @@
 import type { AgentMailbox, MailAccount, MailPolicy } from "@agenteschat/client";
 import { ApiError, useAgentMail, useMailAccounts, useSetAgentMail } from "@agenteschat/client";
-import type { Level } from "@agenteschat/client/lib/access-levels";
+import { LEVELS, type Level } from "@agenteschat/client/lib/access-levels";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { forbiddenText, knownErrorText } from "@agenteschat/client/lib/errors";
 import {
@@ -10,13 +10,14 @@ import {
   MAIL_ACTIONS,
   mailAccessOf,
   normalizePolicy,
+  onlyForOwner,
   toMailLevel,
 } from "@agenteschat/client/lib/mail";
-import { Alert, Button, Card, Chip, CountChip, Icon, Switch } from "@agenteschat/ui";
+import { Alert, Button, Card, Chip, InfoHint, Switch } from "@agenteschat/ui";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { LevelRow } from "@/components/AccessLevels";
+import { LevelRow, RulesToggle } from "@/components/AccessLevels";
 import { MailIcon, mailChoiceName } from "@/components/MailConnect";
 import { MailRulesPanel, rulesCount } from "@/components/MailRules";
 import { useOrg } from "@/components/org-context";
@@ -27,11 +28,12 @@ import { CardHead, useAgentEdit } from "./context";
 /**
  * Ferramentas e acesso → Email (ADR 0038): one row per mailbox of the
  * organization, the same level as the other connectors (Sem acesso · Ler ·
- * Ler e escrever), "Pode apagar emails" and the rules. Each mailbox saves on
+ * Ler e escrever), "Pode apagar emails" (a level that writes) and the rules, opened from the name's line. Each mailbox saves on
  * its own ("Salvar"), outside the page's save bar. A mailbox still connecting
  * has no address and takes no access yet: its row says so and where to see it.
  * Only who connected a mailbox gives access to it; on anyone else's the row is
  * read-only, says who gives it, and admins and the agent's owner can remove it.
+ * A right hand uses its person's own mailboxes for that person alone: the card's ⓘ says so, once.
  */
 export function MailAccessCard() {
   const { t } = useTranslation();
@@ -43,13 +45,18 @@ export function MailAccessCard() {
   const list = accounts.data ?? [];
   // A server without email, or none connected: nothing to show here.
   if (list.length === 0) return null;
+  const title = t("mail.agent.title");
   return (
     <Card as="section" className="agp-card" aria-labelledby="ac-mail">
       <CardHead
         id="ac-mail"
         icon="mail"
-        title={t("mail.agent.title")}
-        action={<span className="small muted">{t("mail.agent.help", { org: org.name })}</span>}
+        title={title}
+        hint={
+          list.some((account) => onlyForOwner(account, agent, me.user.id))
+            ? { name: t("common.about", { label: title }), text: t("mail.agent.onlyYouAll", { name: agent.name }) }
+            : undefined
+        }
       />
       <ul className="level-list" aria-label={t("mail.agent.title")}>
         {list.map((account) => {
@@ -94,9 +101,13 @@ function SeeInConnectors({ text }: { text: string }) {
   const { t } = useTranslation();
   const { org } = useOrg();
   return (
-    <span className="small muted">
+    <span className="muted">
       {text}{" "}
-      <Link className="ac-link" to="/org/$orgId/settings/$section" params={{ orgId: org.id, section: "connectors" }}>
+      <Link
+        className="ac-link level-row__link"
+        to="/org/$orgId/settings/$section"
+        params={{ orgId: org.id, section: "connectors" }}
+      >
         {t("mail.routine.openConnectors")}
       </Link>
     </span>
@@ -137,6 +148,8 @@ function MailboxRow({
   const { org } = useOrg();
   const { agent } = useAgentEdit();
   const toast = useToast();
+  const rulesId = useId();
+  const [rulesOpen, setRulesOpen] = useState(false);
   const set = useSetAgentMail(org.id);
   const base = JSON.stringify(draftOf(saved));
   const [edit, setEdit] = useState<{ from: string; draft: Draft } | null>(null);
@@ -185,12 +198,11 @@ function MailboxRow({
       },
     );
   const count = rulesCount(draft.policy);
-  const ownerNote =
-    owner === null ? null : (
-      <span className="small muted">
-        {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
-      </span>
-    );
+  // The switch shows where the level writes, and wherever delete is on or was saved on: it never leaves under the
+  // pointer, and a grant still in force stays in sight to be turned off.
+  const showDelete = draft.level === "write" || draft.canDelete || Boolean(saved?.canDelete);
+  const on = draft.level !== "none";
+  const delId = `mail-del-${account.id}`;
   return (
     <LevelRow
       icon={<MailIcon choice={choiceOf(account)} />}
@@ -202,63 +214,77 @@ function MailboxRow({
           </Chip>
         ) : undefined
       }
-      description={draft.level === "none" ? t("access.noneText") : t(`mail.agent.levelText.${draft.level}`)}
-      extra={reconnect ? <SeeInConnectors text={t("mail.agent.needsReconnect")} /> : (ownerNote ?? undefined)}
-      asks={asks}
-      levels={["none", "read", "write"]}
-      value={draft.level}
-      onChange={editable && !loading ? (level) => change({ level }) : undefined}
-      changed={dirty}
-      below={
-        draft.level !== "none" || dirty ? (
-          <div className="mail-agent">
-            {draft.level !== "none" && (
-              <>
-                <label className="routine-active" htmlFor={`mail-del-${account.id}`}>
-                  <Switch
-                    id={`mail-del-${account.id}`}
-                    checked={draft.canDelete}
-                    disabled={!editable}
-                    onCheckedChange={(canDelete) => change({ canDelete })}
-                    aria-describedby={`mail-del-${account.id}-help`}
-                  />
-                  <span>
-                    {t("mail.agent.canDelete")}
-                    <span id={`mail-del-${account.id}-help`} className="small muted mail-agent__help">
-                      {t("mail.agent.canDeleteHelp")}
-                    </span>
-                  </span>
-                </label>
-                <details className="mail-rules">
-                  <summary aria-label={t("mail.agent.rulesOf", { address: name })}>
-                    <Icon name="filter" size={14} />
-                    <span>{t("mail.agent.rules")}</span>
-                    {count > 0 ? (
-                      <CountChip size="sm">{count}</CountChip>
-                    ) : (
-                      <span className="small muted">{t("mail.agent.noRules")}</span>
-                    )}
-                  </summary>
-                  <MailRulesPanel
-                    key={round}
-                    account={account}
-                    policy={draft.policy}
-                    onChange={(policy) => change({ policy })}
-                    disabled={!editable}
-                  />
-                </details>
-              </>
+      side={
+        on ? (
+          <RulesToggle
+            label={t("mail.agent.rulesOf", { address: name })}
+            count={count}
+            open={rulesOpen}
+            controls={rulesId}
+            onToggle={() => setRulesOpen((v) => !v)}
+          />
+        ) : undefined
+      }
+      extra={
+        reconnect || owner !== null || (on && showDelete) ? (
+          <>
+            {reconnect && <SeeInConnectors text={t("mail.agent.needsReconnect")} />}
+            {/* Why the level can't be changed here. */}
+            {owner !== null && (
+              <span className="muted">
+                {owner ? t("mail.agent.ownerOnly", { name: owner }) : t("mail.agent.ownerOnlyUnknown")}
+              </span>
+            )}
+            {on && showDelete && (
+              <span className="level-row__switch">
+                <Switch
+                  id={delId}
+                  checked={draft.canDelete}
+                  disabled={!editable}
+                  aria-describedby={`${delId}-help`}
+                  onCheckedChange={(canDelete) => change({ canDelete })}
+                />
+                <span className="ac-hintline">
+                  <label htmlFor={delId}>{t("mail.agent.canDelete")}</label>
+                  <InfoHint id={`${delId}-help`} name={t("common.about", { label: t("mail.agent.canDelete") })}>
+                    {t("mail.agent.canDeleteHelp")}
+                  </InfoHint>
+                </span>
+              </span>
             )}
             {!editable && removable && saved && saved.level !== "none" && (
-              <div className="mail-agent__save">
-                <Button
-                  size="sm"
-                  disabled={set.isPending}
-                  loading={set.isPending}
-                  onClick={() => save({ ...draftOf(saved), level: "none", canDelete: false })}
-                >
-                  {t("mail.agent.remove")}
-                </Button>
+              <Button
+                variant="link"
+                disabled={set.isPending}
+                loading={set.isPending}
+                onClick={() => save({ ...draftOf(saved), level: "none", canDelete: false })}
+              >
+                {t("mail.agent.remove")}
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
+      asks={asks}
+      levels={LEVELS}
+      value={draft.level}
+      onChange={editable && !loading ? (level) => change({ level }) : undefined}
+      locked
+      changed={dirty}
+      belowHidden={!(rulesOpen && on) && !dirty && !error}
+      below={
+        on || dirty || error ? (
+          <div className="mail-agent">
+            {/* Kept in the page while closed: what was typed in it stays, and the toggle's `aria-controls` resolves. */}
+            {on && (
+              <div id={rulesId} className="level-row__rulespanel" hidden={!rulesOpen}>
+                <MailRulesPanel
+                  key={round}
+                  account={account}
+                  policy={draft.policy}
+                  onChange={(policy) => change({ policy })}
+                  disabled={!editable}
+                />
               </div>
             )}
             {error && <Alert>{error}</Alert>}

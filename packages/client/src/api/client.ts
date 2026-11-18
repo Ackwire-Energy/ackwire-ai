@@ -3,7 +3,10 @@ import type { PlanModel } from "@agenteschat/providers/plans";
 import type { DashboardsApi } from "../dashboards/api";
 import type { ChatPrefs } from "../lib/chat-look";
 import type { OnboardingStepId } from "../lib/onboarding";
-import type { TeamWeekAct, TeamWeekPrefs } from "../lib/team-week";
+import type { LegacyPrefsPatch, LodiPrefs, LodiPrefsPatch } from "../lib/right-hand-prefs";
+import type { Seat } from "../lib/seat";
+import type { TeamWeekAct } from "../lib/team-week";
+import type { Wallpaper } from "../lib/wallpaper";
 import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type { WorkAreaAnswer } from "../lib/work-area";
@@ -17,15 +20,20 @@ import type {
   VaultItemDetail,
   VaultItemInput,
   VaultItemPatch,
+  VaultKeysImportInput,
+  VaultKeysImportResult,
   VaultOverview,
   VaultScope,
 } from "../vault/types";
+import type { UploadOptions } from "./http";
 import type {
   AccessInput,
   AccountDeletionPlan,
   AccountLoginStart,
   AccountLoginStatus,
+  AccountOrderGroup,
   ActiveRun,
+  AdminAsk,
   Agent,
   AgentAccess,
   AgentAction,
@@ -41,6 +49,7 @@ import type {
   AgentForYou,
   AgentGroup,
   AgentGroupPatch,
+  AgentHolds,
   AgentInput,
   AgentLineChange,
   AgentMailbox,
@@ -65,6 +74,7 @@ import type {
   ApprovalCoverInput,
   ApprovalCovers,
   ApprovalRule,
+  ApprovalsLevel,
   AppsList,
   ArchivedChannel,
   Artifact,
@@ -97,6 +107,7 @@ import type {
   ChannelMember,
   ChannelOverride,
   Choices,
+  CliInstall,
   CodeSent,
   CommandApproval,
   ComposioUsage,
@@ -124,12 +135,14 @@ import type {
   DesktopPictureView,
   DesktopRelease,
   DesktopStatus,
+  DeviceAccount,
   DeviceAudience,
   DeviceRequest,
   DevicesList,
   DirectMessage,
   DmRead,
   DmTarget,
+  EmailChange,
   EndpointCheck,
   EndpointModel,
   EndpointStyle,
@@ -154,6 +167,7 @@ import type {
   ImportFileInput,
   ImportInput,
   ImportPlan,
+  InstallableCli,
   Instance,
   Invitation,
   InvitationPreview,
@@ -161,15 +175,22 @@ import type {
   InvitationWithStatus,
   InviteBatch,
   InviteLink,
+  InviteLinkChanged,
+  InviteLinkChoices,
+  InviteLinkMade,
   Issue,
   IssueActivity,
   IssueColumn,
   IssueConversationRef,
   IssueInput,
   IssuePatch,
+  IssueProject,
+  IssueProjectRef,
+  IssueProjects,
   IssueStatus,
   IssuesView,
   JevKey,
+  JevKeyInput,
   JoinApproval,
   JoinClaim,
   JoinRequest,
@@ -180,7 +201,9 @@ import type {
   MachineAccount,
   MachineAccountKind,
   MachineOutages,
+  MachinePause,
   MachineTask,
+  MachineTool,
   MailAccount,
   MailAccountUpdate,
   MailFolder,
@@ -230,6 +253,7 @@ import type {
   OrgRoles,
   OrgSettings,
   PageTarget,
+  PendingReturn,
   PeopleUsage,
   Person,
   PersonalTokenInput,
@@ -238,6 +262,7 @@ import type {
   PhoneDevice,
   PhoneDeviceInput,
   PhoneSignIn,
+  PlanServes,
   Poll,
   PostMedia,
   Proposal,
@@ -247,16 +272,19 @@ import type {
   Reminder,
   ReminderInput,
   RemovalPreview,
+  RequestHeader,
   RightHandApprovals,
   RightHandApprovalsInput,
   Role,
   RoleInput,
+  RoleMailLoss,
   RosterMember,
   Routine,
   RoutineHook,
   RoutineInput,
   RoutinePatch,
   RoutineRun,
+  RowHolders,
   RuleInfo,
   Run,
   RunConsultation,
@@ -297,6 +325,9 @@ import type {
   StorageMigration,
   StorageTestResult,
   SuggestedAi,
+  SurfaceLink,
+  SurfaceLinkCode,
+  SurfaceLinks,
   TaskManagerView,
   TaskOutput,
   TaskSteps,
@@ -317,8 +348,10 @@ import type {
   UnreadTask,
   UsageQueue,
   UsageReport,
+  WaitingList,
   WebhookProvider,
   WebhookSetup,
+  WifiIphones,
   WifiPairing,
   WikiBulkFailed,
   WikiBulkTarget,
@@ -337,6 +370,7 @@ import type {
   WorkspaceActionCardView,
   WorkspaceLimits,
   WorkspaceMode,
+  XcodeFixView,
 } from "./types";
 
 /**
@@ -369,8 +403,11 @@ export interface ApiClient {
     decideFeedbackOffer(orgId: string, messageId: string, decision: "send" | "dismiss"): Promise<FeedbackOffer>;
     /** `null` unless I am the installation's owner on a self-hosted server. */
     jev(): Promise<JevKey | null>;
-    /** Checked with TypeSafe first: `jev_key_invalid` (422) when it refuses, `jev_key_env` (409) with an env key. */
-    saveJev(apiKey: string): Promise<JevKey>;
+    /**
+     * A pasted key (TypeSafe's, or OpenRouter's), or the workspace's own OpenRouter key. Checked first:
+     * `jev_key_invalid` (422) when it is refused, `jev_key_env` (409) with an env key.
+     */
+    saveJev(input: JevKeyInput): Promise<JevKey>;
     checkJev(): Promise<JevKey>;
     removeJev(): Promise<JevKey>;
     /** The GIPHY key (ADR 0091): `null` unless I am the installation's owner on a self-hosted server. */
@@ -400,11 +437,21 @@ export interface ApiClient {
         threadId?: string | null;
         replyTo?: string | null;
         language?: string | null;
+        /** Typed beside the take: one message carries both. */
+        text?: string | null;
+        /** Files (artifact ids) sent with the take. */
+        attachments?: string[];
       },
     ): Promise<{ clipId: string }>;
   };
   account: {
     authConfig(): Promise<AuthConfig>;
+    /**
+     * A signed link that opens the referral service as me (ADR 0192). Navigate to it at once and keep it nowhere else:
+     * it lasts 5 minutes and opens once. `referrals.off` 404 on a server without one. `returnTo`: the page it was
+     * opened from, where the service sends me back.
+     */
+    referralsLink(returnTo?: string): Promise<{ url: string; expiresAt: string }>;
     /**
      * Whether the e-mail has an account and how it signs in (rate limited: `rate_limited` 429). `access`: the
      * early-access link's token, when the page has one. `humanCheck`: the bot check's token, when the server has one
@@ -415,6 +462,18 @@ export interface ApiClient {
     me(): Promise<Me | null>;
     /** Unread and waiting in each workspace, in one call (`GET /me/unread`, ADR 0154); null signed out. */
     unread(): Promise<{ organizations: { orgId: string; unread: number; waiting: number }[] } | null>;
+    /**
+     * The accounts signed in on this browser, the current one first (`GET /device-accounts`, ADR 0183); empty on a
+     * server from before it and with nobody signed in.
+     */
+    deviceAccounts(): Promise<DeviceAccount[]>;
+    /** Moves this browser to another account signed in on it; every account stays signed in. */
+    switchDeviceAccount(userId: string): Promise<void>;
+    /**
+     * Signs one account out of this browser, the current one without `userId`; the others stay. `signedIn`: the
+     * browser still has an account, the next one when the current one left.
+     */
+    signOutDeviceAccount(userId?: string): Promise<{ signedIn: boolean }>;
     /** My app language (emails and pushes are written in it). */
     updateMe(input: { locale: AppLocale; auto?: boolean }): Promise<void>;
     /** My own area, asked once during the onboarding, or `skipped` (`PUT /me/work-area`). */
@@ -440,6 +499,34 @@ export interface ApiClient {
     delete(input?: DeletionProofInput): Promise<void>;
     /** Brings it back before its date. `account.not_restorable` (409) after. */
     restore(): Promise<void>;
+    /**
+     * My account under `newEmail` (ADR 0088 §2, addendum 2026-11-13): with the `code` emailed to my current address, or
+     * a sign-in in the last 10 minutes, a link goes to it; without either, the code goes first (`code`), or for an
+     * address I never confirmed `reauth.sign_in` (403). On a server that sends no email it changes at once.
+     * `email.same` (400), `email.held` (409), `reauth.code_*` as deleting's.
+     */
+    changeEmail(input: { newEmail: string; code?: string }): Promise<EmailChange>;
+    /**
+     * "This wasn't me", from the page the notice to my old address links to: that address comes back and every
+     * session ends. `email.undo_gone` (404), `email.undo_taken` (409).
+     */
+    undoEmailChange(token: string): Promise<{ email: string }>;
+  };
+  /** Linking an outside chat surface to my account (ADR 0187). Per person, not per organization. */
+  surfaces: {
+    /** The surface, whether I may link it, and my links; the "off" shape when the server bridges none. */
+    list(): Promise<SurfaceLinks>;
+    /**
+     * A code to type on the surface, answering in `orgId` once confirmed. `surface.off` (404), `surface.not_allowed`
+     * or `forbidden` (403), `surface.no_assistant` (409), `rate_limited` (429).
+     */
+    mintCode(orgId: string): Promise<SurfaceLinkCode>;
+    /** The pending link's sender is me. `surface.link_gone` (404), `surface.taken` and the workspace's refusals (409). */
+    confirm(linkId: string): Promise<SurfaceLink>;
+    /** Cancels a pending link or unlinks an active one. `surface.link_gone` (404). */
+    remove(linkId: string): Promise<void>;
+    /** "Not you? Unlink it" from the "linked" email: no session needed. `surface.undo_gone` (404), `rate_limited` (429). */
+    undo(token: string): Promise<{ unlinked: boolean; surface: string; display: string | null }>;
   };
   /** Where my pushes go: phones (ADR 0035) and browsers (ADR 0071). Per person, not per organization. */
   push: {
@@ -502,6 +589,10 @@ export interface ApiClient {
     /** How agents talk to me here (ADR 0147), for every agent. */
     setAgentStyle(orgId: string, style: AgentStyle): Promise<AgentStyle>;
     setChatPrefs(orgId: string, patch: ChatPrefs): Promise<ChatPrefs>;
+    /** A conversation's own background, for me (null: back to the channels' or DMs'); answers with all my choices. */
+    setConversationWallpaper(orgId: string, channelId: string, wallpaper: Wallpaper | null): Promise<ChatPrefs>;
+    /** A photo for a background, only mine (JSON only: base64), already shrunk; its address goes into a background. */
+    uploadWallpaperPhoto(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ url: string }>;
     /** Where I put the tools at the top of my sidebar here (only the ones I moved). */
     sidebarItems(orgId: string): Promise<SidebarItems>;
     /** Moves one tool (`null`: back on its default), my others as the server has them. Answers with every choice. */
@@ -534,6 +625,8 @@ export interface ApiClient {
     /** The workspace logo (admins): a square image (JSON only: base64), already cropped. */
     setLogo(orgId: string, input: { imageBase64: string; contentType: string }): Promise<{ logo: string }>;
     removeLogo(orgId: string): Promise<void>;
+    /** The workspace's accent color (admins, ADR 0193): a "#rrggbb", or null for the default. */
+    setAccent(orgId: string, accent: string | null): Promise<{ accent: string | null }>;
     /**
      * A signed link that opens the workspace's plan and billing on the billing service (owners and admins; ADR
      * 0079). Navigate to it at once and keep it nowhere else: it lasts 5 minutes and opens once. `billing.off` 404
@@ -582,6 +675,11 @@ export interface ApiClient {
         autoModels?: Partial<Record<string, Partial<Record<ModelTier, string | null>>>>;
       },
     ): Promise<OrgSettings>;
+    /** The workspace's approvals level; `everyAgent` also clears every agent's own choice. */
+    setApprovalsLevel(
+      orgId: string,
+      input: { level: ApprovalsLevel; everyAgent?: boolean },
+    ): Promise<{ level: ApprovalsLevel; ownAgents: number }>;
     overview(orgId: string): Promise<OrgOverview>;
     /** Members with presence. */
     people(orgId: string): Promise<Person[]>;
@@ -590,8 +688,15 @@ export interface ApiClient {
     inviteMany(orgId: string, input: InviteBatch): Promise<BatchInviteResult[]>;
     /** The same link (ADR 0090; a new one for an invitation sent before that), 7 more days. */
     resendInvitation(orgId: string, invitationId: string): Promise<{ url: string; expiresAt: string }>;
-    /** The roles a pending invitation gives (ADR 0090): the same link, nothing is sent. */
-    setInvitationRoles(orgId: string, invitationId: string, roleIds: string[]): Promise<{ roleIds: string[] }>;
+    /**
+     * What a pending invitation gives (ADR 0090, 0184): its cargos, channels and agents, an omitted one kept. The same
+     * link, nothing is sent.
+     */
+    updateInvitation(
+      orgId: string,
+      invitationId: string,
+      change: { roleIds?: string[]; channelIds?: string[]; agentIds?: string[] },
+    ): Promise<{ roleIds: string[]; channelIds: string[]; agentIds: string[] }>;
     usageReport(orgId: string, since?: string): Promise<UsageReport>;
     /** Every plan account by computer and the API per agent, this month (ADR 0063). */
     planUsage(orgId: string): Promise<OrgPlanUsage>;
@@ -608,8 +713,8 @@ export interface ApiClient {
     raisePersonLimit(orgId: string, userId: string, limitUsd: number): Promise<void>;
     refuseMoreUsage(orgId: string, userId: string): Promise<void>;
     /** Lodi's weekly card (ADR 0137 §9): when mine comes, or that it is off. */
-    teamWeek(orgId: string): Promise<TeamWeekPrefs>;
-    setTeamWeek(orgId: string, patch: Partial<Omit<TeamWeekPrefs, "timezone">>): Promise<TeamWeekPrefs>;
+    teamWeek(orgId: string): Promise<LodiPrefs>;
+    setTeamWeek(orgId: string, patch: LodiPrefsPatch | LegacyPrefsPatch): Promise<LodiPrefs>;
     /** A row of my weekly card applied as me (a routine, a message), or "Agora não". */
     actOnTeamWeek(orgId: string, messageId: string, act: TeamWeekAct): Promise<void>;
     /** The audit log, newest first (admins): agents' tool calls and people's changes. `before`: `next`. */
@@ -623,8 +728,21 @@ export interface ApiClient {
     remove(orgId: string, roleId: string): Promise<void>;
     /** Every role but `everyone`, top first. */
     reorder(orgId: string, ids: string[]): Promise<void>;
-    /** A person's roles, exactly these. */
-    setFor(orgId: string, userId: string, roleIds: string[], via?: string): Promise<{ roleIds: string[] }>;
+    /**
+     * A person's roles, exactly these. `mailLossSeen`: the mailboxes they were told agents lose (`mailLoss`); one
+     * given since refuses it (409 `agent.mail_loss_changed`).
+     */
+    setFor(
+      orgId: string,
+      userId: string,
+      roleIds: string[],
+      via?: string,
+      mailLossSeen?: string[],
+    ): Promise<{ roleIds: string[] }>;
+    /** "Quem pode…": who holds one row (a key, or `computers`), `everyone` and the roles at once; the roles after it. */
+    setRow(orgId: string, row: string, holders: RowHolders): Promise<OrgRoles>;
+    /** The mailboxes agents would lose if `userIds` got the role, taking nothing. */
+    mailLoss(orgId: string, roleId: string, userIds: string[]): Promise<RoleMailLoss[]>;
   };
   /** Groups of agents (ADR 0083): everyone reads them, owners and admins change them; each change answers with all. */
   agentGroups: {
@@ -760,6 +878,10 @@ export interface ApiClient {
      * says the person read what happens to them.
      */
     removeCredential(orgId: string, credentialId: string, purge?: boolean, release?: boolean): Promise<void>;
+    /** The key becomes the workspace's default and its provider's: agents without an AI of their own think with it. */
+    makeDefaultCredential(orgId: string, credentialId: string): Promise<Credential>;
+    /** The other saved copies of this key fold into it: their agents, defaults and spend move to it, then they go. */
+    removeCredentialCopies(orgId: string, credentialId: string): Promise<{ removed: number }>;
     /** One cheap real call with a stored key, before an agent is pointed at it. A refusal comes as on saving one. */
     checkCredential(orgId: string, credentialId: string): Promise<{ check: "ok" | "unchecked" }>;
     /** Whether this server offers the platform key (Cloud). */
@@ -928,7 +1050,12 @@ export interface ApiClient {
      * no-AI card or the person's message. 409 `ai.still_missing` while there's still no AI.
      */
     answerNow(orgId: string, messageId: string): Promise<{ runs: { agentId: string; runId: string }[] }>;
-    /** Cancels an agent's follow-up from its line (`messageId`); 409 `follow_up.not_pending` once it came. */
+    /** The returns agents set in a conversation, still to come, the soonest first (`[]` while the server lacks it). */
+    followUps(orgId: string, channelId: string): Promise<PendingReturn[]>;
+    /**
+     * Cancels a return (`messageId`, its line): the person it is for, the agent's owner or an admin (403
+     * `follow_up.not_yours` otherwise); 409 `follow_up.not_pending` once it came.
+     */
     cancelFollowUp(orgId: string, messageId: string): Promise<void>;
     /**
      * "Pedir resposta" on a GitHub notice of someone the agent doesn't answer (`messageId`): the agent answers them
@@ -949,10 +1076,13 @@ export interface ApiClient {
     refuse(orgId: string, approvalId: string, reason?: string, via?: string): Promise<Approval>;
     /** Withdraws an action approved ahead before its time: its routine's run won't do it. */
     cancel(orgId: string, approvalId: string): Promise<Approval>;
-    /** A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. */
+    /**
+     * A card's "Aprovar tudo" / "Agora não para todos": exactly these ids; `skipped` the ones not decided. With
+     * `only: "routine"` the server decides the ones it calls routine (`Approval.routine`) and skips the rest.
+     */
     decideMany(
       orgId: string,
-      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string; via?: string },
+      input: { ids: string[]; decision: "approve" | "refuse"; reason?: string; via?: string; only?: "routine" },
     ): Promise<{ approvals: Approval[]; skipped: string[] }>;
     /** What the agent runs without asking ("Aprovar sempre"), oldest first. */
     rules(orgId: string, agentId: string): Promise<ApprovalRule[]>;
@@ -1061,8 +1191,21 @@ export interface ApiClient {
     ): Promise<WifiPairing>;
     wifiPairing(orgId: string, machineId: string, pairingId: string): Promise<WifiPairing>;
     cancelWifiPairing(orgId: string, machineId: string, pairingId: string): Promise<void>;
-    /** Asks the computer to also look for a plugged phone it has no driver for, which adb never lists (Windows). */
+    /**
+     * Asks the computer to also look for a plugged phone it has no driver for, which adb never lists (Windows), or a
+     * Mac to read its iPhones again now (answered once the new list is in).
+     */
     lookForPhones(orgId: string, machineId: string): Promise<void>;
+    /** The iPhones on this Mac's Wi-Fi that trust it and aren't used yet (its owner or an admin). */
+    wifiIphones(orgId: string, machineId: string): Promise<WifiIphones>;
+    /** Uses that iPhone over Wi-Fi from now on; forgetting the phone stops it. */
+    pickIphoneOverWifi(orgId: string, machineId: string, serial: string): Promise<WifiIphones>;
+    /** Fixes the Mac's Xcode (its owner or an admin); `select` asks for the Mac's password on the Mac. */
+    startXcodeFix(orgId: string, machineId: string, kind: "select" | "update"): Promise<XcodeFixView>;
+    xcodeFix(orgId: string, machineId: string): Promise<XcodeFixView>;
+    cancelXcodeFix(orgId: string, machineId: string): Promise<XcodeFixView>;
+    /** Opens Xcode on the Mac (its owner or an admin): it shows Developer Mode on a plugged iPhone. */
+    openXcode(orgId: string, machineId: string): Promise<{ opened: boolean }>;
   };
   /** Connected computers (ADR 0025): machines running `agentes-runner`. */
   machines: {
@@ -1087,6 +1230,27 @@ export interface ApiClient {
     denyDevice(userCode: string): Promise<void>;
     /** ADR 0036 §8: the site only takes away (a folder, for everyone or one agent; a tool). The new access. */
     reduceAccess(orgId: string, machineId: string, input: MachineAccessReduce): Promise<MachineAccess>;
+    /** Only the person who paired it: turns `tool` on there (the computer says so, with Undo). The new access. */
+    allowTool(orgId: string, machineId: string, tool: MachineTool): Promise<MachineAccess>;
+    /** Anyone else: asks whoever paired it to turn `tool` on (an inbox row with the same button). */
+    askTool(orgId: string, machineId: string, tool: MachineTool): Promise<void>;
+    /** Its PATH read again and its coding CLIs looked for now ("Já instalei, verificar de novo"). */
+    checkClis(orgId: string, machineId: string): Promise<void>;
+    /** Only the person who paired it: installs `tool` there, or where that install stands, or stops it. */
+    cliInstall(
+      orgId: string,
+      machineId: string,
+      tool: InstallableCli,
+      action: "start" | "status" | "cancel",
+    ): Promise<{ install: CliInstall | null }>;
+    /** Anyone else: asks whoever paired it to install `tool` (an inbox row with the install button). */
+    askCliInstall(orgId: string, machineId: string, tool: InstallableCli): Promise<void>;
+    /** Pauses it (`until` null: until resumed) or resumes it (`resume`); the pause as it stands then. */
+    setPause(
+      orgId: string,
+      machineId: string,
+      input: { until: string | null } | "resume",
+    ): Promise<MachinePause | null>;
     /** ADR 0036 §9: the newest desktop app build; `null` when there is none (404). */
     desktopLatest(target: string, arch: string): Promise<DesktopRelease | null>;
     /** Offline computers that agents wait for, and where they could move. */
@@ -1119,6 +1283,16 @@ export interface ApiClient {
      * such agent.
      */
     takeBackPlan(orgId: string, accountId: string, agentId?: string): Promise<{ agentIds: string[] }>;
+    /** Who the viewer's plan thinks for (ADR 0059 §3): everyone in the workspace, or only them. */
+    setAccountServes(
+      orgId: string,
+      accountId: string,
+      serves: PlanServes,
+    ): Promise<{ serves: PlanServes; agentIds: string[] }>;
+    /** "Ordem de uso" (ADR 0041 §6): every computer's Claude and ChatGPT accounts in their order, by computer and kind. */
+    accountOrder(orgId: string): Promise<{ groups: AccountOrderGroup[] }>;
+    /** Moves the account to `index` (0 first) in its order: its owner or an admin (`account.order_forbidden`). */
+    moveAccountInOrder(orgId: string, accountId: string, index: number): Promise<AccountOrderGroup>;
     /** Its owner names it (1 to 40 characters). */
     renameAccount(orgId: string, machineId: string, accountId: string, label: string): Promise<MachineAccount>;
     /** Its owner (or whoever connected the computer) disconnects it; the computer signs it out and deletes it. */
@@ -1134,14 +1308,23 @@ export interface ApiClient {
      * A GitHub link (a skill's folder or a file in it) or the folder as a zip in base64 (writes are JSON only). A link
      * holding several skills (or any, with `list`) installs nothing and answers with them to pick from
      * (`importPicked`), those that can't be installed apart. A private repository is read through the workspace's
-     * GitHub, on the server.
+     * GitHub, on the server. `forAgentId`: the agent whose card opened the install, which gets what installs turned on
+     * when the installer may change its skills. `personal`: the person's own skill, which any member installs (from a
+     * public repository unless they manage agents). `upload`: a zip's Cancel and how much of it has been sent.
      */
     import(
       orgId: string,
-      input: { url: string; list?: boolean } | { zipBase64: string },
+      input: ({ url: string; list?: boolean; forAgentId?: string } | { zipBase64: string }) & { personal?: boolean },
+      upload?: UploadOptions,
     ): Promise<SkillDetail | SkillPick>;
-    /** Installs the skills picked among a link's choices (their `path`). */
-    importPicked(orgId: string, url: string, paths: string[]): Promise<SkillDetail[]>;
+    /** Installs the skills picked among a link's choices (their `path`), on for `forAgentId` as `import` does. */
+    importPicked(
+      orgId: string,
+      url: string,
+      paths: string[],
+      forAgentId?: string,
+      personal?: boolean,
+    ): Promise<SkillDetail[]>;
     update(orgId: string, id: string, patch: SkillPatch): Promise<SkillDetail>;
     /** Fetch the link again (`url` skills). */
     reimport(orgId: string, id: string): Promise<SkillDetail>;
@@ -1217,11 +1400,22 @@ export interface ApiClient {
      * Connects to an https MCP server: a new account, or with `connectionId` a new sign-in for that one
      * ("Reconectar"). Without `apiKey` the server tries OAuth (discovery + dynamic client registration); if the
      * MCP server doesn't support it, answers `needs_key` (`reason: "not_approved"` when it only registers apps it
-     * approved, with its refusal in `detail`).
+     * approved, with its refusal in `detail`). `headers` go with every request to the server (at most 10; a refused
+     * one is a 400 `connector.header_*` whose params name it, `header` and `index`). Without a key, a server that
+     * answers with them is connected by them alone; one that asks for a sign-in is refused
+     * (`connector.headers_with_sign_in`). With `connectionId`: absent keeps the account's (a 400
+     * `connector.headers_unreadable` when they can no longer be read), `[]` removes them, a list replaces them.
      */
     connect(
       orgId: string,
-      input: { serverUrl: string; apiKey?: string; label?: string; returnTo: string; connectionId?: string },
+      input: {
+        serverUrl: string;
+        apiKey?: string;
+        label?: string;
+        returnTo: string;
+        connectionId?: string;
+        headers?: RequestHeader[];
+      },
     ): Promise<CustomConnectStart>;
     /** Lists the server's tools again; new ones come back unclassified. */
     refresh(orgId: string, serverId: string): Promise<CustomServer>;
@@ -1269,7 +1463,8 @@ export interface ApiClient {
     saveToVault?(orgId: string, requestId: string, input: SecretToVaultInput): Promise<VaultItem>;
   };
   issues: {
-    list(orgId: string, filters?: { q?: string }): Promise<Issue[]>;
+    /** `projectId`: only that project's tasks, or `none` for the ones with no project. */
+    list(orgId: string, filters?: { q?: string; projectId?: string }): Promise<Issue[]>;
     get(orgId: string, number: number): Promise<Issue>;
     create(orgId: string, input: IssueInput): Promise<Issue>;
     update(orgId: string, id: string, patch: IssuePatch): Promise<Issue>;
@@ -1297,6 +1492,16 @@ export interface ApiClient {
     updateColumn(orgId: string, columnId: string, patch: { name?: string; index?: number }): Promise<IssueColumn[]>;
     /** Deletes a column; its tasks go to `moveTo`. A stage keeps at least one column. */
     deleteColumn(orgId: string, columnId: string, moveTo: string): Promise<IssueColumn[]>;
+    projects(orgId: string): Promise<IssueProjects>;
+    createProject(orgId: string, input: { name: string; color?: string }): Promise<IssueProject>;
+    /** Rename, recolour, archive or bring back. */
+    updateProject(
+      orgId: string,
+      projectId: string,
+      patch: { name?: string; color?: string; archived?: boolean },
+    ): Promise<IssueProjectRef>;
+    /** Its tasks stay, with no project. */
+    deleteProject(orgId: string, projectId: string): Promise<void>;
   };
   /** Threads (ADR 0029): the Threads page, a thread from a range, moving it, closing and archiving. */
   threads: {
@@ -1549,8 +1754,10 @@ export interface ApiClient {
     context(orgId: string, slug: string, on: boolean): Promise<WikiPage>;
     /** What the agents read most in the last 7 days. */
     reads(orgId: string): Promise<WikiTopRead[]>;
-    /** Notes of an Obsidian vault (≤ 500 per call; the app batches). */
+    /** Notes read by the app from a vault, a GitHub link or files (≤ 500 per call; the app batches). */
     import(orgId: string, input: WikiImportInput): Promise<WikiImportResult>;
+    /** The Markdown notes behind a GitHub link and the files they may embed, as a zip (nothing is saved). */
+    githubNotes(orgId: string, url: string): Promise<Blob>;
     /** Appends a block (e.g. a chat message) with a link back to where it came from. */
     append(
       orgId: string,
@@ -1570,6 +1777,8 @@ export interface ApiClient {
     ): Promise<NotificationPage>;
     /** The sidebar badge. */
     count(orgId: string): Promise<NotificationCount>;
+    /** "Esperando você": what waits on me, oldest first; `channelId` for one conversation's. */
+    waiting(orgId: string, channelId?: string): Promise<WaitingList>;
     read(orgId: string, id: string, read: boolean): Promise<AppNotification>;
     /** "Feito" (`false` undoes it). */
     done(orgId: string, id: string, done: boolean): Promise<AppNotification>;
@@ -1578,9 +1787,13 @@ export interface ApiClient {
     snooze(orgId: string, id: string, until: string | null): Promise<AppNotification>;
     /** "Marcar tudo como lido": the ids it changed (undo marks them unread again). */
     readAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
+    /** "Concluir todas" but what waits on me: the ids it changed (undo brings each back with `done(…, false)`). */
+    doneAll(orgId: string, filter?: NotificationFilter): Promise<{ ids: string[] }>;
     /** What reaches my devices as a notification in this workspace (ADR 0071 §8). */
     prefs(orgId: string): Promise<NoticePrefs>;
     setPref(orgId: string, category: NoticeCategory, on: boolean): Promise<NoticePrefs>;
+    /** "Pedir a um admin": an inbox row for whoever may do it (`admin_ask`); how many it reached. */
+    askAdmins(orgId: string, ask: AdminAsk): Promise<{ sent: number }>;
   };
   calendar: {
     /** Events, routine runs, reminders, issue deadlines and proposals between `from` and `to` (ISO). */
@@ -1688,10 +1901,13 @@ export interface ApiClient {
   };
   invites: {
     /**
-     * The workspace's invitation link (admins, ADR 0068): the active one, else a new one for 30 days. Whoever
-     * opens it can only ask to join.
+     * The workspace's invitation link (admins, ADR 0068): the active one, else a new one for 30 days. With `choices`
+     * (ADR 0184), a link of its own that starts an approval on them; at the defaults, the workspace's link renewed to
+     * 30 days. Whoever opens any of them can only ask to join.
      */
-    createLink(orgId: string): Promise<{ id: string; url: string; expiresAt: string }>;
+    createLink(orgId: string, choices?: InviteLinkChoices): Promise<InviteLinkMade>;
+    /** Changes what a link gives (ADR 0184): the same address. `expiresIn` counts from now. */
+    editLink(orgId: string, linkId: string, choices: InviteLinkChoices): Promise<InviteLinkChanged>;
     /** The links people can still ask with, earlier ones (no `url`) included. */
     links(orgId: string): Promise<InviteLink[]>;
     /** Nobody new can ask with it; the requests made through it close without emails. */
@@ -1722,8 +1938,16 @@ export interface ApiClient {
   joinRequests: {
     /** Waiting ones, oldest first. */
     list(orgId: string): Promise<JoinRequest[]>;
-    /** `join.answered` / `join.expired` (409) when someone answered first or it ran out. */
-    approve(orgId: string, requestId: string, roleIds?: string[]): Promise<JoinApproval>;
+    /**
+     * `join.answered` / `join.expired` (409) when someone answered first or it ran out. `start`: the channels and
+     * agents they start with (ADR 0184); absent, the link's, as far as the approver may give them.
+     */
+    approve(
+      orgId: string,
+      requestId: string,
+      roleIds?: string[],
+      start?: { channelIds?: string[]; agentIds?: string[] },
+    ): Promise<JoinApproval>;
     /** `reason` is told to the person by email. */
     deny(orgId: string, requestId: string, reason?: string): Promise<void>;
     /** A member suggests someone to the people who may invite (ADR 0090). */
@@ -1768,6 +1992,8 @@ export interface ApiClient {
       orgId: string,
       messageId: string,
       decision: "apply" | "dismiss" | "ask",
+      /** The card's action id, when this build words it. */
+      knows?: string,
     ): Promise<{ card: WorkspaceActionCard }>;
   };
   /** "O que fez por você": what an agent did that involves the viewer (agent profile). */
@@ -1792,7 +2018,7 @@ export interface ApiClient {
   working?: {
     list(orgId: string): Promise<WorkingRun[]>;
     /** The task manager (ADR 0128): tasks now, what each uses, each agent's last hour, what ended since `since`. */
-    taskManager?(orgId: string, since?: string): Promise<TaskManagerView>;
+    taskManager?(orgId: string, since?: string, doneToday?: boolean): Promise<TaskManagerView>;
     /** A task's steps for "Ver passos", to whoever sees it in the task manager (no inputs, no outputs). */
     taskSteps?(orgId: string, runId: string): Promise<TaskSteps>;
     /** Continuar agora on runs paused near a limit (`wait.canContinue`). */
@@ -1851,9 +2077,9 @@ export interface ApiClient {
     /** The sites (owner or admins); null or empty = any site. */
     setDomains(orgId: string, agentId: string, allowedDomains: string[] | null): Promise<AgentBrowserSettings>;
     /** The agent's open request or take over on that screen (the browser by default), if any. */
-    agentHandoff(orgId: string, agentId: string, screen?: ScreenKind): Promise<BrowserHandoff | null>;
+    agentHandoff(orgId: string, agentId: string, screen?: ScreenKind, seat?: Seat): Promise<BrowserHandoff | null>;
     /** Whether this person may drive that screen (take over, open a page, type); watching needs less (ADR 0040). */
-    agentControl(orgId: string, agentId: string, screen?: ScreenKind): Promise<boolean>;
+    agentControl(orgId: string, agentId: string, screen?: ScreenKind, seat?: Seat): Promise<boolean>;
     handoff(orgId: string, handoffId: string): Promise<BrowserHandoff>;
     /** Take control of a request (one person at a time; 409 when someone else has it). */
     takeControl(orgId: string, handoffId: string): Promise<BrowserHandoff>;
@@ -1869,7 +2095,7 @@ export interface ApiClient {
      * Take over while watching; the agent waits until handed back. `runId`: the run whose card it
      * was taken from (the take over is bound to it, so its card stays in that conversation).
      */
-    takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind): Promise<BrowserHandoff>;
+    takeover(orgId: string, agentId: string, runId?: string, screen?: ScreenKind, seat?: Seat): Promise<BrowserHandoff>;
     /**
      * The person in control opens a site (a bare host gets https://), or goes back, forward or reloads; a closed
      * browser opens. 409 `browser.not_in_control`, 403 `browser.not_allowed` (outside the agent's sites), 400
@@ -1877,7 +2103,7 @@ export interface ApiClient {
      */
     open(orgId: string, agentId: string, to: PageTarget): Promise<void>;
     /** "Parar": closes the agent's browser now (its logins stay). Its screen has no stop: it stays on. */
-    stop(orgId: string, agentId: string): Promise<void>;
+    stop(orgId: string, agentId: string, seat?: Seat): Promise<void>;
     /**
      * "Tentar de novo" on a page that never came: the browser closes and opens again where it was (its logins
      * stay), and every live view gets it again. Resolves once it closed. Only who may drive it (403 otherwise).
@@ -1920,6 +2146,13 @@ export interface ApiClient {
     remove(orgId: string, itemId: string): Promise<void>;
     /** A passwords file's text; `dryRun` only counts. 413 `vault.csv_too_large` past 2 MB. */
     importCsv(orgId: string, input: { csv: string; scope: VaultScope; dryRun: boolean }): Promise<VaultImportResult>;
+    /** Several keys in one save (an imported .env). 403 `vault.team_needs_permission` for the team's without it. */
+    importKeys(orgId: string, input: VaultKeysImportInput): Promise<VaultKeysImportResult>;
+    /**
+     * Moves an item kept here between Personal and Team. Either way takes `manage_credentials`; to Personal it
+     * becomes the mover's. 409 `vault.key_name_taken` when a key of that name is already there.
+     */
+    move(orgId: string, itemId: string, scope: VaultScope): Promise<VaultItem>;
     /** Checked with the password manager first: 400 `vault.source.<code>` when it refuses. */
     connect(orgId: string, input: VaultConnectInput): Promise<VaultConnection>;
     updateConnection(orgId: string, connectionId: string, patch: VaultConnectionPatch): Promise<VaultConnection>;
@@ -1931,9 +2164,13 @@ export interface ApiClient {
    * starts it when it isn't running; control and "Devolver" are the browser's screen routes with `desktop`.
    */
   desktop: {
-    status(orgId: string, agentId: string): Promise<DesktopStatus>;
+    status(orgId: string, agentId: string, seat?: Seat): Promise<DesktopStatus>;
     /** A recent picture of the agent's screen; never starts a stopped one. 403 for who may not watch it. */
-    picture(orgId: string, agentId: string): Promise<DesktopPictureView>;
+    picture(orgId: string, agentId: string, seat?: Seat): Promise<DesktopPictureView>;
+    /** What the agent keeps running there (ADR 0176); 403 for who may not watch its computer. */
+    holds(orgId: string, agentId: string): Promise<AgentHolds>;
+    /** Stop: the hold ends, and its program stops or its browser closes. 403 for who may not (`canStop`). */
+    stopHold(orgId: string, agentId: string, holdId: string): Promise<void>;
   };
   /**
    * GIF search (ADR 0091), through our server: the browser and the phone never talk to the provider. Every member;

@@ -174,4 +174,19 @@ describe("feedback about what was clicked", () => {
     const sent = state.calls.findLast((c) => c.method === "system.sendFeedback")?.args[0] as FeedbackInput;
     expect(sent.files).toHaveLength(1);
   });
+
+  test("where it goes to the agentes.chat team, the form says so and takes photos only", async () => {
+    const { state } = await open(seedState({ authConfig: { feedback: true, feedbackRelay: true } }));
+    await click(screen().getByRole("button", { name: "Enviar feedback" }));
+    const form = screen().getByRole("dialog", { name: "O que faltou, quebrou ou incomodou?" });
+    expect(within(form).getByText("O que você escrever vai por e-mail para o time do agentes.chat.")).toBeTruthy();
+    expect(within(form).getByRole("button", { name: "Anexar foto" })).toBeTruthy();
+    expect(within(form).getByText("Até 3 fotos de 5 MB.")).toBeTruthy();
+    const picker = form.querySelector('input[type="file"]') as HTMLInputElement;
+    expect(picker.accept).not.toContain("video");
+    await act(async () =>
+      fireEvent.change(picker, { target: { files: [new File(["x"], "tela.mp4", { type: "video/mp4" })] } }),
+    );
+    expect(state.calls.some((c) => c.method === "system.uploadFeedbackFile")).toBe(false);
+  });
 });

@@ -18,6 +18,7 @@ import { activeConnections } from "../connectors/connections";
 import type { MachineCaller, MachineCallOptions, MachineStatus } from "../machine-hub";
 import { MachineOfflineError, MachinePausedError, REMOVED_COMPUTER_MESSAGE } from "../machines";
 import { missionOfRun } from "../mission-context";
+import { toolMachineId } from "../right-hand-seats";
 import { runnerUpdateWay } from "../runner-update";
 import { standingRefusal } from "../standing";
 import { grantedScopeKeys } from "../tools/scopes";
@@ -25,7 +26,7 @@ import { agentCommitEmail, GIT_TOKEN_TTL_SECONDS, gitProxyBase, issueGitToken, m
 import { appTokenForRepo, botIdentity, boundInstallations, type GitHubAppConfig, type GitHubHttp } from "./github-app";
 import { gitAccess } from "./proxy";
 import { agentRepositoryList, type CodeCheckout, codePrompt, repoInList } from "./repos";
-import { runCoAuthor } from "./signature";
+import { runCoAuthors } from "./signature";
 
 /**
  * Git on a connected machine through our proxy (ADR 0024 addendum):
@@ -86,13 +87,16 @@ export async function machineGitSetup(
   orgId: string,
   agentId: string,
   machineId: string,
+  /** A tool's call: who the computer takes the agent for (`machineScope`), the right hand's seat included. */
+  scope?: AgentScope,
 ): Promise<(Pick<GitSyncRequest, "proxy" | "author"> & { agent: AgentScope }) | null> {
   const connection = (await activeConnections(deps.db, orgId)).find((c) => c.connector === "github");
   if (!connection) return null;
   const keys = await grantedScopeKeys(deps.db, orgId, agentId);
   if (!gitAccess(keys, connection.id).read) return null;
   const agent = await getAgentCached(deps.db, orgId, agentId);
-  if (!agent || agent.machineId !== machineId) return null;
+  // Without a scope (a brain's turn) the right hand has no checkout: its locked turn prepares none (ADR 0137 §4).
+  if (!agent || (scope ? await toolMachineId(deps.db, agent) : agent.machineId) !== machineId) return null;
   const [machine] = await deps.db
     .select({ tokenHash: schema.machines.tokenHash })
     .from(schema.machines)
@@ -115,7 +119,7 @@ export async function machineGitSetup(
     author: bot
       ? { name: `${agent.name} (Ackwire AI)`, email: bot.email }
       : { name: `${agent.name} (agentes)`, email: agentCommitEmail(deps.git.publicUrl, agent.handle) },
-    agent: { id: agent.id, handle: agent.handle, name: agent.name },
+    agent: scope ?? { id: agent.id, handle: agent.handle, name: agent.name },
   };
 }
 
@@ -195,13 +199,13 @@ async function checkoutsOnMachine(
 /** `git_clone` on a connected machine: clones (or, when it is there, updates) one repository in the agent's folder. */
 export async function cloneOnMachine(
   deps: MachineGitDeps,
-  target: { orgId: string; agentId: string; machineId: string },
+  target: { orgId: string; agentId: string; machineId: string; scope: AgentScope },
   input: { repo: string; dir?: string; signal?: AbortSignal; onOutput?: MachineCallOptions["onOutput"] },
 ): Promise<GitSyncRepo> {
   const status = await deps.hub.status(target.machineId);
   const unavailable = machineGitUnavailable(status, target.orgId);
   if (unavailable || !status) throw unavailable;
-  const setup = await machineGitSetup(deps, target.orgId, target.agentId, target.machineId);
+  const setup = await machineGitSetup(deps, target.orgId, target.agentId, target.machineId, target.scope);
   if (!setup)
     throw new Error("You have no git access to GitHub here (scope github:git.read), or GitHub isn't connected.");
   const { agent, ...rest } = setup;
@@ -284,14 +288,16 @@ export function codeStart(
 }
 
 /**
- * The turn's commits credit the person behind its run (ADR 0156), as the run's commits through GitHub's API do, when
- * they linked GitHub to sign in: the line that says so, next to where the turn starts.
+ * The turn's commits end with the agent's own `Co-authored-by` and the credit for the person behind its run, when they
+ * linked GitHub to sign in (ADR 0156), as the run's commits through GitHub's API do: the line that says so, next to
+ * where the turn starts. A runner on protocol 63 adds them by itself too (its `commit-msg` hook, never twice); this
+ * line covers an older one and a `--no-verify`.
  */
 async function creditLine(deps: MachineGitDeps, turn: CodeTurn) {
-  // ponytail: an instruction the agent follows; a `prepare-commit-msg` hook written by `git.sync` if it forgets.
   const http = deps.github?.http ?? { fetch, apiUrl: "https://api.github.com" };
-  const trailer = await runCoAuthor({ db: deps.db, http }, turn).catch(() => null);
-  return trailer ? `Commits you make this turn: end each commit message with the line ${trailer}` : "";
+  const lines = await runCoAuthors({ db: deps.db, http }, turn).catch(() => []);
+  if (lines.length === 0) return "";
+  return `Commits you make this turn: end each commit message with the line${lines.length > 1 ? "s" : ""} ${lines.join(" and ")}`;
 }
 
 /** What a chat turn needs from `prepareAgentCode`. */

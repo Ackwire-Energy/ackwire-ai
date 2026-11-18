@@ -2,6 +2,7 @@ import { speedFits } from "@agenteschat/providers/plans";
 import type { TFunction } from "i18next";
 import type { AgentBrain, BrainKind, BrainSpeed } from "../api/types";
 import { type ContextLimit, contextSize } from "./context-limits";
+import { isAuto } from "./providers";
 
 /*
  * "Configuração avançada" of an agent's AI (ADR 0086), the same on the web (a dialog over "Quem pensa") and the
@@ -13,6 +14,9 @@ import { type ContextLimit, contextSize } from "./context-limits";
 /** The effort levels the apps offer (a stored `xhigh` shows as high). */
 export type EffortLevel = "low" | "medium" | "high" | "max";
 export const EFFORT_LEVELS: readonly EffortLevel[] = ["low", "medium", "high", "max"];
+/** An API key's: the API takes low, medium and high (`apiEffort` sends a stored `xhigh` or `max` as high). */
+export const KEY_EFFORT_LEVELS: readonly EffortLevel[] = ["low", "medium", "high"];
+export const effortLevelsOf = (kind: BrainKind | undefined) => (kind === "model" ? KEY_EFFORT_LEVELS : EFFORT_LEVELS);
 
 /** Velocidade's choices (ADR 0149). */
 export const SPEEDS: readonly BrainSpeed[] = ["standard", "fast"];
@@ -27,31 +31,39 @@ export const viewSpeedFits = (view: Pick<AgentBrain, "brain" | "account" | "acco
   });
 
 export interface Advanced {
-  effort: EffortLevel;
+  /** Null only on an API key with none chosen: the provider's own default. */
+  effort: EffortLevel | null;
   /** Always `standard` where Velocidade doesn't show (`viewSpeedFits`). */
   speed: BrainSpeed;
   contextTokens: ContextLimit | null;
   /** "Atende outras pessoas" off. */
   onlyOwner: boolean;
-  fallback: boolean;
+  /** "Só esta conta" (ADR 0041 §6); absent where the agent's account never moves on. */
+  accountPinned?: boolean;
 }
 
-/** A new agent's: medium effort, its model's window, its owner only on a plan (ADR 0059 §5), the API when away. */
+/** A new agent's: medium effort, its model's window, its owner only on a plan (ADR 0059 §5). */
 export const ADVANCED_DEFAULTS: Advanced = {
   effort: "medium",
   speed: "standard",
   contextTokens: null,
   onlyOwner: true,
-  fallback: true,
 };
 
-/** "Voltar ao padrão": the API brain has only the context limit there, so the rest stays as it is. */
+/**
+ * "Voltar ao padrão": the API brain has only the effort and the context limit there, so the rest stays as it is; its
+ * effort goes back to none, the provider's default.
+ */
 export const advancedDefaults = (kind: BrainKind, now: Advanced): Advanced =>
-  kind === "model" ? { ...now, contextTokens: null } : ADVANCED_DEFAULTS;
+  kind === "model"
+    ? { ...now, effort: null, contextTokens: null }
+    : now.accountPinned === undefined
+      ? ADVANCED_DEFAULTS
+      : { ...ADVANCED_DEFAULTS, accountPinned: false };
 export const isAdvancedDefault = (kind: BrainKind, now: Advanced) =>
   JSON.stringify(advancedDefaults(kind, now)) === JSON.stringify(now);
 
-type AdvancedOf = { kind: BrainKind; autoModel: boolean; apiKey: boolean; now: Advanced };
+type AdvancedOf = { kind: BrainKind; autoModel: boolean; now: Advanced };
 
 /** The row's line: what the dialog holds ("Esforço, janela de contexto e quem atende"), the effort only with a fixed model. */
 export function advancedContents(
@@ -59,13 +71,14 @@ export function advancedContents(
   o: Pick<AdvancedOf, "kind" | "autoModel"> & { speed?: boolean },
 ): string {
   const line = o.autoModel ? "auto" : "fixed";
-  const which = o.kind === "model" ? "model" : o.speed ? (`${line}Speed` as const) : line;
+  const which =
+    o.kind === "model" ? (o.autoModel ? "model" : "modelFixed") : o.speed ? (`${line}Speed` as const) : line;
   return t(`agentPage.work.brain.advanced.contents.${which}`);
 }
 
 /**
  * After a save: "Tudo no padrão", or only what differs ("Esforço alto · Contexto de 400K"). The effort counts only
- * with a fixed model (an automatic one picks it), and the fallback only where answering through the API is possible.
+ * with a fixed model (an automatic one picks it).
  */
 export function advancedSummary(t: TFunction, language: string, o: AdvancedOf): string {
   const parts = advancedParts(t, language, o);
@@ -77,7 +90,7 @@ export function advancedParts(t: TFunction, _language: string, o: AdvancedOf): s
   const computer = o.kind !== "model";
   const { now } = o;
   return [
-    computer && !o.autoModel && now.effort !== ADVANCED_DEFAULTS.effort
+    !o.autoModel && now.effort && now.effort !== (computer ? ADVANCED_DEFAULTS.effort : null)
       ? t("agentPage.work.brain.advanced.effort", {
           level: t(`agentPage.work.brain.effortsLower.${now.effort}`),
         })
@@ -85,7 +98,7 @@ export function advancedParts(t: TFunction, _language: string, o: AdvancedOf): s
     computer && now.speed === "fast" ? t("agentPage.work.brain.advanced.speed") : null,
     now.contextTokens ? t("agentPage.work.brain.advanced.context", { size: contextSize(now.contextTokens) }) : null,
     computer && !now.onlyOwner ? t("agentPage.work.brain.advanced.sharing") : null,
-    computer && o.apiKey && !now.fallback ? t("agentPage.work.brain.advanced.waits") : null,
+    computer && now.accountPinned ? t("agentPage.work.brain.pinned") : null,
   ].filter((p): p is string => p !== null);
 }
 
@@ -100,3 +113,15 @@ export const effortLevel = (e: string | null | undefined): EffortLevel =>
     : (EFFORT_LEVELS as readonly (string | null | undefined)[]).includes(e)
       ? (e as EffortLevel)
       : "medium";
+
+/** An effort as stored, as the apps show it for `kind`: on an API key none (or `auto`) is null and `max` is high. */
+export const effortOf = (kind: BrainKind | undefined, e: string | null | undefined): EffortLevel | null => {
+  if (kind !== "model") return effortLevel(e);
+  if (!e || isAuto(e)) return null;
+  const level = effortLevel(e);
+  return level === "max" ? "high" : level;
+};
+
+/** The `agentPage.work.brain.effortText` line of a level: none says the model decides, and a key's medium is no default. */
+export const effortTextOf = (kind: BrainKind | undefined, e: EffortLevel | null) =>
+  e === null ? "none" : kind === "model" && e === "medium" ? "mediumKey" : e;

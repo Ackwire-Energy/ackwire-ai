@@ -14,6 +14,7 @@ const { organizationMembers } = schema;
  * defaults for every tool nobody moved.
  */
 export const SIDEBAR_ITEMS = [
+  "waiting",
   "approvals",
   "proposals",
   "threads",
@@ -32,6 +33,7 @@ export type SidebarItem = (typeof SIDEBAR_ITEMS)[number];
  * Drive, then what starts in More. Mirrors `PERSONAL_SIDEBAR_ITEMS` in packages/client/src/lib/sidebar-items.ts.
  */
 export const PERSONAL_SIDEBAR_ITEMS: readonly SidebarItem[] = [
+  "waiting",
   "approvals",
   "proposals",
   "routines",
@@ -49,7 +51,7 @@ export type SidebarPlace = (typeof SIDEBAR_PLACES)[number];
 export type SidebarItems = Partial<Record<SidebarItem, SidebarPlace>>;
 
 /** The items that show a count in the sidebar: only these can be `auto`. */
-export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["approvals", "proposals", "threads"];
+export const SIDEBAR_COUNTED: readonly SidebarItem[] = ["waiting", "approvals", "proposals", "threads"];
 
 const isItem = (value: string): value is SidebarItem => (SIDEBAR_ITEMS as readonly string[]).includes(value);
 const isPlace = (value: unknown): value is SidebarPlace =>

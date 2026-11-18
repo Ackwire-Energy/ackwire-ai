@@ -72,6 +72,7 @@ export function RenameDeviceDialog({
 export function RemoveDeviceDialog({
   name,
   phone,
+  wifi = false,
   host = false,
   open,
   onClose,
@@ -80,6 +81,8 @@ export function RemoveDeviceDialog({
 }: {
   name: string;
   phone: boolean;
+  /** An iPhone used over Wi-Fi: it stops being used over Wi-Fi, and comes back only if picked again. */
+  wifi?: boolean;
   /** This server's own computer: it stops being used in this workspace, and can be used again. */
   host?: boolean;
   open: boolean;
@@ -92,15 +95,31 @@ export function RemoveDeviceDialog({
     <Dialog
       open={open}
       onOpenChange={(o) => !o && onClose()}
-      title={host ? t("machines.host.stopTitle") : t(phone ? "devices.forgetTitle" : "devices.removeTitle", { name })}
-      description={host ? t("machines.host.stopText") : t(phone ? "devices.forgetText" : "devices.removeText")}
+      title={
+        host
+          ? t("machines.host.stopTitle")
+          : wifi
+            ? t("devices.iphone.wifi.stopTitle", { name })
+            : t(phone ? "devices.forgetTitle" : "devices.removeTitle", { name })
+      }
+      description={
+        host
+          ? t("machines.host.stopText")
+          : wifi
+            ? t("devices.iphone.wifi.stopText")
+            : t(phone ? "devices.forgetText" : "devices.removeText")
+      }
       closeLabel={t("common.close")}
       width={460}
     >
       <DialogFooter>
         <Button onClick={onClose}>{t("common.cancel")}</Button>
         <Button variant="danger" loading={removing} disabled={removing} onClick={onRemove}>
-          {host ? t("machines.host.stop") : t(phone ? "devices.forget" : "devices.remove")}
+          {host
+            ? t("machines.host.stop")
+            : wifi
+              ? t("devices.iphone.wifi.stop")
+              : t(phone ? "devices.forget" : "devices.remove")}
         </Button>
       </DialogFooter>
     </Dialog>

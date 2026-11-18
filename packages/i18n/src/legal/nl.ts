@@ -5,16 +5,16 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
   terms: {
     title: "Gebruiksvoorwaarden",
     summary:
-      "De overeenkomst voor het gebruik van Ackwire AI: uw werkruimte, uw agents en waarvoor elke partij verantwoordelijk is.",
+      "De overeenkomst voor het gebruik van agentes.chat: uw werkruimte, uw agents en waarvoor elke partij verantwoordelijk is.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "agreement",
         heading: "1. Overeenkomst",
         blocks: [
-          'Deze Gebruiksvoorwaarden (de "Voorwaarden") vormen een bindende overeenkomst tussen CODARI GLOBAL, LLC, een limited liability company naar het recht van Wyoming die handelt onder de naam Ackwire AI ("Ackwire AI", "wij", "ons"), en de persoon of entiteit die een account of een werkruimte aanmaakt ("u"). Door een account aan te maken, lid te worden van een werkruimte of Ackwire AI anderszins te gebruiken via het web, de Mac-app of de telefoonapp (de "Dienst"), aanvaardt u deze Voorwaarden en ons Privacybeleid. Indien u de Dienst gebruikt namens een bedrijf of andere entiteit, verklaart u bevoegd te zijn deze te binden.',
+          'Deze Gebruiksvoorwaarden (de "Voorwaarden") vormen een bindende overeenkomst tussen AGENTESCHAT, LLC, een limited liability company naar het recht van Delaware die handelt onder de naam agentes.chat ("agentes.chat", "wij", "ons"), en de persoon of entiteit die een account of een werkruimte aanmaakt ("u"). Door een account aan te maken, lid te worden van een werkruimte of agentes.chat anderszins te gebruiken via het web, de Mac-app of de telefoonapp (de "Dienst"), aanvaardt u deze Voorwaarden en ons Privacybeleid. Indien u de Dienst gebruikt namens een bedrijf of andere entiteit, verklaart u bevoegd te zijn deze te binden.',
           "Om de Dienst te gebruiken, moet u ten minste 18 jaar oud zijn en bevoegd zijn een overeenkomst aan te gaan.",
         ],
       },
@@ -150,7 +150,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "law",
         heading: "16. Toepasselijk recht",
         blocks: [
-          "Op deze Voorwaarden is het recht van de staat Wyoming, VS, van toepassing, met uitsluiting van de conflictregels daarvan, en de partijen onderwerpen zich aan de exclusieve bevoegdheid van de staats- en federale rechtbanken in Wyoming. Indien u een consument bent in een rechtsgebied waarvan het recht u rechten of een bevoegde rechter toekent waarvan niet kan worden afgeweken, zoals Brazilië, blijven die rechten onverlet.",
+          "Op deze Voorwaarden is het recht van de staat Delaware, VS, van toepassing, met uitsluiting van de conflictregels daarvan, en de partijen onderwerpen zich aan de exclusieve bevoegdheid van de staats- en federale rechtbanken in Delaware. Indien u een consument bent in een rechtsgebied waarvan het recht u rechten of een bevoegde rechter toekent waarvan niet kan worden afgeweken, zoals Brazilië, blijven die rechten onverlet.",
         ],
       },
       {
@@ -164,7 +164,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "18. Contact",
         blocks: [
-          "CODARI GLOBAL, LLC, handelend onder de naam agentes.chat. Kennisgevingen: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · legal@agentes.chat · Al het overige: hello@agentes.chat",
+          "AGENTESCHAT, LLC, handelend onder de naam agentes.chat. Kennisgevingen: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · legal@agentes.chat · Al het overige: hello@agentes.chat",
         ],
       },
     ],
@@ -174,13 +174,13 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
     summary: "Wat wij verzamelen, wat agents waarheen sturen, wie uw werkruimte kan zien en welke rechten u hebt.",
     courtesy:
       "Dit is een vertaling die uitsluitend ter informatie wordt verstrekt. Indien deze afwijkt van de Engelse versie, prevaleert de Engelse versie.",
-    updated: "2026-11-06",
+    updated: "2026-11-16",
     sections: [
       {
         id: "overview",
         heading: "1. Overzicht",
         blocks: [
-          'CODARI GLOBAL, LLC, een limited liability company naar het recht van Wyoming die handelt onder de naam Ackwire AI ("Ackwire AI", "wij"), exploiteert Ackwire AI: een werkruimte waarin mensen en AI-agents samenwerken, beschikbaar via het web, als Mac-app en als telefoonapp (de "Dienst"). Dit beleid onderscheidt twee rollen:',
+          'AGENTESCHAT, LLC, een limited liability company naar het recht van Delaware die handelt onder de naam agentes.chat ("agentes.chat", "wij"), exploiteert agentes.chat: een werkruimte waarin mensen en AI-agents samenwerken, beschikbaar via het web, als Mac-app en als telefoonapp (de "Dienst"). Dit beleid onderscheidt twee rollen:',
           {
             list: [
               "Voor **accountgegevens**, de informatie die personen ons verstrekken om een account aan te maken en te gebruiken, zijn wij de verwerkingsverantwoordelijke.",
@@ -200,8 +200,8 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
               "**Factuurgegevens:** voor een werkruimte met een agentes.chat-abonnement de naam, het e-mailadres, het factuuradres en het fiscaal identificatienummer van de persoon die betaalt, het abonnement en de bijbehorende facturen en betalingen. Betalingen worden verwerkt door Stripe, dat de kaartgegevens verwerkt: deze bereiken ons nooit.",
               "**Gebruiks- en loggegevens:** IP-adressen, browser en apparaat, aanmeldsessies, beveiligingsgebeurtenissen, API-verzoeken en de registratie van elke modelaanroep (model, tokens en kosten, met de werkruimte en de agent waartoe deze behoort), die wij bewaren om budgetten te handhaven en het gebruik te tonen. Wanneer er iets misgaat, registreren wij de fout, zonder berichtinhoud, om deze te verhelpen.",
               "**Apparaten:** voor de telefoonapp het pushmeldingstoken van elk apparaat waarop u zich aanmeldt. Voor gekoppelde computers en de Mac-app de naam, het besturingssysteem en de appversie van de computer.",
-              "**Wachtlijst:** het e-mailadres en de taal die u ons op Ackwire AI opgeeft, en of u het adres hebt bevestigd.",
-              "**Websiteanalyse:** op Ackwire AI (de openbare website, niet de werkruimte) de bekeken pagina's, de verwijzende website, het type apparaat en een bij benadering bepaalde locatie afgeleid van het IP-adres, verzameld met Himetrica.",
+              "**Wachtlijst:** het e-mailadres en de taal die u ons op agentes.chat opgeeft, en of u het adres hebt bevestigd.",
+              "**Websiteanalyse:** op agentes.chat (de openbare website, niet de werkruimte) de bekeken pagina's, de verwijzende website, het type apparaat en een bij benadering bepaalde locatie afgeleid van het IP-adres, verzameld met Himetrica.",
             ],
           },
         ],
@@ -229,15 +229,15 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
           "Agents zijn AI-modellen die binnen de werkruimte lezen en handelen. Werkruimte-inhoud verlaat onze servers in de volgende gevallen, en uitsluitend in die gevallen:",
           {
             list: [
-              "**Tussen apparaten en onze servers.** Alles wat tussen onze servers en de browsers, apps en computers die daarmee verbinding maken wordt verzonden, Werkruimte-inhoud inbegrepen, gaat via Cloudflare, dat de Dienst tegen aanvallen beschermt. Daartoe ontsleutelt Cloudflare dit verkeer in zijn datacenter dat het dichtst bij elk apparaat ligt, en verwerkt het dit namens ons.",
-              "**Antwoorden.** Wanneer een agent werkt, stuurt hij de context die hij nodig heeft (de context van de werkruimte, de instructies van de agent, het gesprek, relevant geheugen en de resultaten van zijn tools) naar de modelaanbieder die voor die agent is gekozen. Met een API-sleutel die de werkruimte heeft toegevoegd, wordt de aanroep gedaan onder het eigen account van de werkruimte en haar eigen overeenkomst met die aanbieder. Met een AI-abonnement, zoals Claude of ChatGPT, dat aan een agent is gekoppeld, werkt de agent onder het account van de persoon die het abonnement heeft gekoppeld en onder de voorwaarden van de aanbieder.",
+              "**Tussen apparaten en onze servers.** Alles wat tussen onze servers en de browsers, apps en computers die daarmee verbinding maken wordt verzonden, Werkruimte-inhoud inbegrepen, gaat via onze netwerkaanbieder, die de Dienst tegen aanvallen beschermt. Daartoe ontsleutelt de netwerkaanbieder dit verkeer in zijn datacenter dat het dichtst bij elk apparaat ligt, en verwerkt hij dit namens ons.",
+              "**Antwoorden.** Wanneer een agent werkt, stuurt hij de context die hij nodig heeft (de context van de werkruimte, de instructies van de agent, het gesprek, relevant geheugen en de resultaten van zijn tools) naar de modelaanbieder die voor die agent is gekozen. Met een API-sleutel die de werkruimte heeft toegevoegd, wordt de aanroep gedaan onder het eigen account van de werkruimte en haar eigen overeenkomst met die aanbieder. Sommige aanbieders sturen de aanroep door naar het bedrijf dat het model maakt of host, dat hem dan ook verwerkt onder de voorwaarden van die aanbieder. Met een AI-abonnement, zoals Claude of ChatGPT, dat aan een agent is gekoppeld, werkt de agent onder het account van de persoon die het abonnement heeft gekoppeld en onder de voorwaarden van de aanbieder.",
               "**Bepalen wie antwoordt.** Een routeringsmodel leest een nieuw bericht, de namen en rollen van de agents van de werkruimte en het recente gesprek om te bepalen welke agent, indien van toepassing, moet antwoorden. Het draait bij TypeSafe of, als terugvaloptie, bij de modelaanbieder van de werkruimte. Routering verleent een agent nooit enige machtiging.",
               "**Geheugen.** Agents bewaren geheugen uit gesprekken (samenvattingen, feiten en lessen) zodat zij in de loop van de tijd beter worden. Sommige oordelen over het geheugen (of iets het bewaren waard is, of strijdig is met wat een agent al weet) worden door TypeSafe gemaakt. Het geheugen kan op de pagina van de agent worden bekeken en verwijderd, en wordt samen met de werkruimte verwijderd.",
               "**Zoeken.** Om verwante berichten en documenten te vinden, kan tekst door Voyage AI worden omgezet in vectoren (embeddings).",
               "**Connectoren.** Wanneer de werkruimte een dienst koppelt (zoals GitHub, Google, Linear, Sentry, een e-mailinbox of een MCP-server), slaan wij de toegangstokens daarvan versleuteld op en lezen of schrijven wij in die dienst uitsluitend binnen de bereiken (scopes) die de werkruimte aan elke agent heeft gegeven. De gekoppelde dienst verwerkt die gegevens onder zijn eigen voorwaarden. Koppelingen met Gmail- en Outlook-inboxen, en met Google Drive, Google Calendar, Google Sheets, Google Docs, Slack, Microsoft Teams, OneDrive, HubSpot, Salesforce, Zendesk, Asana, Figma, Intercom, Dropbox, Square, Instagram, Facebook, LinkedIn, YouTube, Pinterest, Reddit en WhatsApp, lopen via Composio, dat verwerkt wat agents daar lezen en schrijven.",
               "**Databases.** Databaseverbindingen zijn alleen-lezen. Inloggegevens worden versleuteld opgeslagen en elke query wordt gecontroleerd voordat deze wordt uitgevoerd.",
-              "**Gekoppelde computers.** Wanneer iemand een computer koppelt, kunnen agents daar opdrachten uitvoeren en een browser gebruiken, binnen de mappen en machtigingen die op die computer zijn ingesteld. De live weergave van de browser van een agent gaat via Cloudflare en via het geheugen van onze servers, en wordt niet opgenomen. Een samenvatting van de stappen die de agent heeft gezet (zoals bezochte adressen en handelingen) wordt bij zijn werk bewaard, zodat het team kan zien wat hij heeft gedaan.",
-              "**De computer van de werkruimte.** Op Ackwire AI Cloud werken de agents van een werkruimte op een computer die wij voor die werkruimte beheren, gehost door Contabo in de Europese Unie. Wij meten per dag hoeveel gegevens de browser, de AI-tools en andere programma's van elke agent daar verzenden en ontvangen. De computer wordt gewist nadat het agentes.chat-abonnement van de werkruimte is beëindigd, zoals beschreven in de Gebruiksvoorwaarden.",
+              "**Gekoppelde computers.** Wanneer iemand een computer koppelt, kunnen agents daar opdrachten uitvoeren en een browser gebruiken, binnen de mappen en machtigingen die op die computer zijn ingesteld. De live weergave van de browser van een agent gaat via onze netwerkaanbieder en via het geheugen van onze servers, en wordt niet opgenomen. Een samenvatting van de stappen die de agent heeft gezet (zoals bezochte adressen en handelingen) wordt bij zijn werk bewaard, zodat het team kan zien wat hij heeft gedaan.",
+              "**De computer van de werkruimte.** Op agentes.chat Cloud werken de agents van een werkruimte op een computer die wij voor die werkruimte beheren, op onze servers of die van een hostingaanbieder, in de Europese Unie of de Verenigde Staten. Wij meten per dag hoeveel gegevens de browser, de AI-tools en andere programma's van elke agent daar verzenden en ontvangen. De computer wordt gewist nadat het agentes.chat-abonnement van de werkruimte is beëindigd, zoals beschreven in de Gebruiksvoorwaarden.",
             ],
           },
           "Handelingen die moeilijk ongedaan te maken zijn (zoals het samenvoegen van code, het uitrollen of het verzenden namens iemand), worden een goedkeuringsverzoek aan een persoon voordat zij plaatsvinden. Tekst die van buiten de werkruimte afkomstig is (webpagina's, e-mails, bestanden), wordt als onbetrouwbaar gemarkeerd voordat een agent deze leest.",
@@ -245,9 +245,9 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
       },
       {
         id: "staff-access",
-        heading: "6. Wanneer medewerkers van Ackwire AI Werkruimte-inhoud kunnen zien",
+        heading: "6. Wanneer medewerkers van agentes.chat Werkruimte-inhoud kunnen zien",
         blocks: [
-          "Wij kijken niet zomaar rond in werkruimten. Een persoon bij Ackwire AI kan Werkruimte-inhoud uitsluitend zien:",
+          "Wij kijken niet zomaar rond in werkruimten. Een persoon bij agentes.chat kan Werkruimte-inhoud uitsluitend zien:",
           {
             list: [
               "**Op uw verzoek,** om te helpen bij een ondersteuningsverzoek, en alleen voor zover het verzoek dat vereist.",
@@ -285,14 +285,14 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "transfers",
         heading: "9. Internationale doorgiften",
         blocks: [
-          "Onze applicatie en de bijbehorende database draaien in de Verenigde Staten, en de in dit beleid genoemde aanbieders verwerken gegevens in de Verenigde Staten, met uitzondering van de computers van de werkruimten, die Contabo in de Europese Unie host, en Cloudflare, dat verkeer verwerkt in zijn datacenter dat het dichtst bij elk apparaat ligt, in de Verenigde Staten of elders. Wanneer persoonsgegevens die onder de AVG of de UK GDPR vallen naar een derde land worden doorgegeven, baseren wij ons op de modelcontractbepalingen (Standard Contractual Clauses) van de Europese Commissie en het UK Addendum. Voor gegevens die onder de LGPD vallen, baseren wij ons op de contractuele waarborgen van artikel 33.",
+          "Onze applicatie en de bijbehorende database draaien in de Verenigde Staten, en de in dit beleid genoemde aanbieders verwerken gegevens in de Verenigde Staten, behalve de modelaanbieders en gekoppelde diensten die een werkruimte kiest, en de bedrijven waarnaar zij aanroepen doorsturen, die gegevens in andere landen kunnen verwerken onder hun eigen voorwaarden. De computers van de werkruimten draaien in de Europese Unie of de Verenigde Staten, en onze netwerkaanbieder verwerkt verkeer in zijn datacenter dat het dichtst bij elk apparaat ligt, in de Verenigde Staten of elders. Wanneer persoonsgegevens die onder de AVG of de UK GDPR vallen naar een derde land worden doorgegeven, baseren wij ons op de modelcontractbepalingen (Standard Contractual Clauses) van de Europese Commissie en het UK Addendum. Voor gegevens die onder de LGPD vallen, baseren wij ons op de contractuele waarborgen van artikel 33.",
         ],
       },
       {
         id: "apps",
         heading: "10. Telefoon- en Mac-apps",
         blocks: [
-          "De telefoonapp verstuurt meldingen via Expo, Apple en Google. Een melding kan de naam tonen van degene die heeft geschreven en het begin van het bericht, en u kiest welke meldingen u ontvangt. De Mac-app en gekoppelde computers bewaren hun aanmelding op het apparaat. Het verwijderen van uw account (ook mogelijk in de apps) meldt elk apparaat af.",
+          "De telefoonapp verstuurt meldingen via Apple en Google. Een melding kan de naam tonen van degene die heeft geschreven en het begin van het bericht, en u kiest welke meldingen u ontvangt. De Mac-app en gekoppelde computers bewaren hun aanmelding op het apparaat. Het verwijderen van uw account (ook mogelijk in de apps) meldt elk apparaat af.",
         ],
       },
       {
@@ -320,7 +320,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "cookies",
         heading: "14. Cookies en lokale opslag",
         blocks: [
-          "De werkruimte gebruikt uitsluitend de cookies en lokale opslag die nodig zijn om u aangemeld te houden, formulieren te beschermen en voorkeuren zoals thema en taal te onthouden. De openbare website Ackwire AI onthoudt de taal die u hebt gekozen en gebruikt Himetrica-analyse (artikel 2). Wij gebruiken geen advertentiecookies of cookies voor tracking over websites heen.",
+          "De werkruimte gebruikt uitsluitend de cookies en lokale opslag die nodig zijn om u aangemeld te houden, formulieren te beschermen en voorkeuren zoals thema en taal te onthouden. De openbare website agentes.chat onthoudt de taal die u hebt gekozen en gebruikt Himetrica-analyse (artikel 2). Wij gebruiken geen advertentiecookies of cookies voor tracking over websites heen.",
         ],
       },
       {
@@ -341,7 +341,7 @@ export const legalNl: Partial<Record<LegalKind, LegalDocument>> = {
         id: "contact",
         heading: "17. Contact",
         blocks: [
-          "CODARI GLOBAL, LLC, handelend onder de naam agentes.chat. Kennisgevingen: 7345 W Sand Lake Rd Ste 210, Office 4592, Orlando, FL 32819, USA · privacy@agentes.chat. Vragen over gegevensbescherming uit de EU, het Verenigd Koninkrijk en Brazilië bereiken ons privacyteam via hetzelfde adres. Voor al het overige kunt u schrijven naar hello@agentes.chat.",
+          "AGENTESCHAT, LLC, handelend onder de naam agentes.chat. Kennisgevingen: 2810 North Church Street, Ste 91038, Wilmington, DE 19802, USA · privacy@agentes.chat. Vragen over gegevensbescherming uit de EU, het Verenigd Koninkrijk en Brazilië bereiken ons privacyteam via hetzelfde adres. Voor al het overige kunt u schrijven naar hello@agentes.chat.",
         ],
       },
     ],

@@ -29,9 +29,10 @@ export interface ConnectorTool {
   ours?: boolean;
   /**
    * Where the agent's own words go on GitHub (ADR 0156): a `body` gets the agent's signature line when given
-   * (`always`: an empty one too), a commit `message` the person's credit.
+   * (`always`: an empty one too), a commit message (`message`, a merge's `commit_message`) the agent's own
+   * `Co-authored-by` and the person's credit when given.
    */
-  sign?: { field: "body" | "message"; always?: true };
+  sign?: { field: "body" | "message" | "commit_message"; always?: true };
 }
 
 /** Catalog groups (the app translates them, `connectors.category.*`): development, product, docs, data (analytics), payments, sales, support, marketing, automation, social. */
@@ -161,6 +162,8 @@ export const CONNECTOR_CATALOG: Record<string, ConnectorDefinition> = {
         sensitive: true,
         title: "Merge PR #{pullNumber} in {owner}/{repo}",
         onSuccess: { kind: "pr_merged", subject: "{owner}/{repo}#{pullNumber}" },
+        // Without one, GitHub's own message (a squash's lists the merged commits, their lines included).
+        sign: { field: "commit_message" },
       },
       issue_read: { scope: "issues.read" },
       list_issues: { scope: "issues.read" },

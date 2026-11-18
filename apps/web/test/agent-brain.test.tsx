@@ -202,8 +202,9 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     expect(wait.getAttribute("role")).toBe("status");
     expect(wait.firstElementChild?.classList.contains("ac-pixspin")).toBe(true);
     expect(wait.textContent).toBe("Esperando");
-    // The app's icon sits by the clock: at the top on a Mac, at the bottom on a PC.
-    expect(steps.textContent).toContain("Clique no ícone do Ackwire AI perto do relógio");
+    // An app too old to switch it from here: update it there. A Mac has the app, so no command.
+    expect(steps.textContent).toContain("Atualize o app do Ackwire AI no MacBook para ligar daqui.");
+    expect(steps.textContent).not.toContain("Preferências");
     expect(steps.querySelector(".machine-command__code")).toBeNull();
     await click(within(d).getByRole("button", { name: "Usar" }));
     await settle(6);
@@ -212,7 +213,7 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     expect(document.body.textContent).toContain("Falta 1 passo no MacBook.");
   });
 
-  test("on a Linux computer, maybe a server without the app, the step there is the command too", async () => {
+  test("on a Linux computer, maybe a server without the app, the command is the other way there", async () => {
     const state = seedState();
     const api = createFakeApi(state);
     fakeMachinesOf.get(api)?.pair({
@@ -227,9 +228,9 @@ describe("Onde trabalha and the browser (their dialogs)", () => {
     const d = await dialog("Mudar o navegador", "A Ada pode navegar em sites?");
     await click(within(d).getByRole("radio", { name: /^Qualquer site/ }));
     const steps = within(d).getByRole("region", { name: "Falta 1 passo, no próprio Servidor" });
-    expect(steps.textContent).toContain(
-      "Só quem está no computador liga, no app do Ackwire AI: Preferências → Ferramentas.Sem o app? No terminal do computador:",
-    );
+    expect(steps.textContent).toContain("Atualize o app do Ackwire AI no Servidor para ligar daqui.");
+    expect(steps.textContent).toContain("Prefiro no Terminal");
+    expect(steps.textContent).not.toContain("Preferências");
     expect(steps.querySelector(".machine-command__code")?.textContent).toBe("sudo agentes-runner tools enable browser");
     expect(steps.querySelector(".brw-steps__grid")).toBeNull();
   });
@@ -316,17 +317,14 @@ describe("Quem pensa: the draft", () => {
     model: "claude-sonnet-5-5",
     owner: "u-joao",
     audience: { mode: "everyone", userIds: [] },
-    brain: { brain: "model", model: null, fallback: true },
+    brain: { brain: "model", model: null },
   };
-  const api: BrainChoice = { brain: "model", model: null, fallback: true };
+  const api: BrainChoice = { brain: "model", model: null };
 
   test("only real differences count", () => {
     expect(changedKeys(saved, { brain: { ...api } })).toEqual([]);
     expect(sameBrain(api, { ...api, model: "opus" })).toBe(true);
-    expect(changedKeys(saved, { brain: { ...api, fallback: false } }).map((c) => c.key)).toEqual(["brain"]);
-    expect(
-      changedKeys(saved, { brain: { brain: "claude_code", model: null, fallback: true } }).map((c) => c.key),
-    ).toEqual(["brain"]);
+    expect(changedKeys(saved, { brain: { brain: "claude_code", model: null } }).map((c) => c.key)).toEqual(["brain"]);
   });
 });
 

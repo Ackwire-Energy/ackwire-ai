@@ -375,7 +375,7 @@ describe("IA e uso: a plan with a login per agent", () => {
       within(acts)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual(["Renomear", "Trocar a chave", "Desconectar"]);
+    ).toEqual(["Usar em todos os agentes", "Renomear", "Trocar a chave", "Desconectar"]);
   });
 
   test("one login signed out: whose, said under the facts", async () => {
@@ -502,5 +502,42 @@ describe("IA e uso: a plan with a login per agent", () => {
     await click(within(row).getByRole("button", { name: "Desconectar" }));
     const dialog = screen().getByRole("dialog");
     expect(dialog.textContent).toContain("Para encerrar também no Claude, revogue nas configurações do Claude.");
+  });
+});
+
+describe("Remover todos os logins do Grok (issue #319)", () => {
+  const grok = (id: string, over: Partial<AiAccounts["accounts"][number]> = {}) =>
+    ({
+      ...base,
+      id,
+      kind: "grok" as const,
+      label: "Grok",
+      email: "walt@acme.com",
+      usedBy: [],
+      ...over,
+    }) as AiAccounts["accounts"][number];
+
+  test("one confirmation takes every Grok login the viewer owns, on every computer, and never someone else's", async () => {
+    const { state } = await page([
+      grok("acct_g1"),
+      grok("acct_g2", { usedBy: ["Ada"] }),
+      grok("acct_ada", { ownerId: "u_ada", ownerName: "Ada", mine: false }),
+      WORK,
+    ]);
+    await click(screen().getByRole("button", { name: "Remover todos os logins do Grok" }));
+    const confirm = screen().getByRole("dialog", { name: "Remover todos os 2 logins do Grok?" });
+    expect(confirm.textContent).toContain("Eles deixam de pensar nos agentes deles em MacBook.");
+    await click(within(confirm).getByRole("button", { name: "Remover todos os logins do Grok" }));
+    await settle(4);
+    expect(state.calls.filter((c) => c.method === "machines.removeAccount").map((c) => c.args[2])).toEqual([
+      "acct_g1",
+      "acct_g2",
+    ]);
+    expect(document.body.textContent).toContain("2 logins do Grok removidos.");
+  });
+
+  test("with a single Grok login the row's own Desconectar is enough: no batch action", async () => {
+    await page([grok("acct_only"), WORK]);
+    expect(screen().queryByRole("button", { name: "Remover todos os logins do Grok" })).toBeNull();
   });
 });

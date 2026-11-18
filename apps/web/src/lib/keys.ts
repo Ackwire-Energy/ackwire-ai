@@ -1,13 +1,8 @@
+import { composes } from "@agenteschat/ui";
+
 /** The letter a shortcut names: the key's own letter, or on a layout without Latin letters its place on a US keyboard (as browsers do). */
 const letterOf = (e: KeyboardEvent) =>
   /^[a-z]$/i.test(e.key) ? e.key.toLowerCase() : /^Key[A-Z]$/.test(e.code) ? e.code.slice(3).toLowerCase() : "";
-
-/**
- * A key the browser turns into text itself: a dead key, an input method's, a phone keyboard's. Safari fires the key
- * that ends a composition after `compositionend`, still with keyCode 229.
- */
-export const composes = (e: KeyboardEvent) =>
-  e.isComposing || e.keyCode === 229 || e.key === "Dead" || e.key === "Process" || e.key === "Unidentified";
 
 /** The browser's paste keys: ⌘V on Apple, Ctrl+V elsewhere (with Shift too), and Shift+Insert. */
 export const pastes = (e: KeyboardEvent, apple: boolean) =>
@@ -55,9 +50,7 @@ const NOT_AIMED = /^(Tab|Escape|Shift|Control|Alt|AltGraph|Meta|Fn|CapsLock|NumL
 export const aimsAtScreen = (e: KeyboardEvent, apple: boolean) =>
   pastes(e, apple) || (!e.ctrlKey && !e.metaKey && !e.altKey && !composes(e) && !NOT_AIMED.test(e.key));
 
-/** Typing in a field (a text box, a select, an editable text): single-key shortcuts and Esc are the field's. */
-export const typingInField = (el: EventTarget | null) =>
-  el instanceof HTMLElement && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName));
+export { composes, typingInField } from "@agenteschat/ui";
 
 /** Whether the key landed in a text field that has something in it (not a checkbox or the like, which hold no text). */
 export const holdsText = (target: EventTarget | null) => {

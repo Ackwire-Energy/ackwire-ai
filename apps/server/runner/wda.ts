@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import type { PhoneKind, PhoneReason, RunnerToolchains } from "@agenteschat/adapters/machine-protocol";
+import { type AppleTunnels, type Tunnel, TunnelMissing, tunnelForward } from "./apple-tunnel";
 import { jpegSize } from "./browser";
 import { RunnerError } from "./errors";
 import { killTree } from "./exec";
@@ -21,13 +22,19 @@ import { parsePlist, USBMUXD_SOCKET, usbmuxForward } from "./usbmux";
  * UI-test runner that reads, taps and films an iPhone's screen. A simulator gets one unsigned build; a real iPhone
  * gets its own, signed by the person's own Apple Account in Xcode (its Personal Team, automatic signing), renewed a
  * day before its profile runs out (a free team's lasts 7 days). It runs (`xcodebuild test-without-building`) while
- * an op needs it and stops when the phone is let go; a real iPhone's ports are reached through usbmuxd.
+ * an op needs it and stops when the phone is let go. A plugged-in iPhone's ports are reached through usbmuxd, one over
+ * Wi-Fi's through CoreDevice's tunnel (`apple-tunnel.ts`).
  */
 
-export const WDA_VERSION = "16.15.3";
-/** SHA-256 of GitHub's source archive of the `v${WDA_VERSION}` tag. */
-export const WDA_SHA256 = "a232b9faaa47e33d5348dea362910a772ebf6f3b405d2a680ba9d488e30266e5";
-const WDA_URL = `https://github.com/appium/WebDriverAgent/archive/refs/tags/v${WDA_VERSION}.tar.gz`;
+export const WDA_VERSION = "16.18.5";
+/**
+ * SHA-256 of the `appium-webdriveragent` package of that version on npm: WDA moved into the appium-ios monorepo
+ * (16.16.0), which publishes it there with its Xcode project, and the old repository has no newer tags.
+ */
+export const WDA_SHA256 = "69157beda01f86c0539be8bb24578a54c40bd0fdfc2789c2b2dcb33d6db3e78f";
+const WDA_URL = `https://registry.npmjs.org/appium-webdriveragent/-/appium-webdriveragent-${WDA_VERSION}.tgz`;
+/** The folder the package unpacks to. */
+const WDA_PACKAGE_DIR = "package";
 
 /** ffmpeg (ffmpeg-static's macOS builds) for a real iPhone's recordings, fetched on first use when none is installed. */
 export const FFMPEG_RELEASE = "b6.1.1";
@@ -709,6 +716,8 @@ export type HelperNeed = { state: "preparing" | "needs_you"; reason: PhoneReason
 
 interface BuildMeta {
   xcode: string;
+  /** The WebDriverAgent it was built from: another version is built again, as another Xcode is. */
+  wda?: string;
   team?: string;
   builtAt: number;
   expiresAt?: number;
@@ -760,6 +769,37 @@ export interface IosHelperOptions {
   teams?: () => Promise<AppleTeam[] | AppleLook>;
   /** Tests: the Mac's screen is locked (default `macScreenLocked`). */
   screenLocked?: () => Promise<boolean>;
+  /** The phone is used over Wi-Fi now (its owner picked it): reached through its tunnel, not usbmuxd. */
+  wifi?: (udid: string) => boolean;
+  /** CoreDevice's tunnels to iPhones over Wi-Fi (shared with the phones' holds). */
+  tunnels?: AppleTunnels;
+  /** Tests: the ports the helper listens on on a real iPhone (default 8100 and 9100). */
+  devicePorts?: { http: number; mjpeg: number };
+}
+
+/** Reasons only Wi-Fi has: the phone comes back by itself, so the next try waits as long as a missing team's. */
+const WIFI_REASONS = new Set<PhoneReason>(["wifi_away", "wifi_asleep", "tunnel_down", "wifi_untrusted"]);
+
+/**
+ * The helper's environment: its ports and the one address it listens on. WDA has no authentication, so that address
+ * is this Mac's loopback (a simulator, or a plugged-in iPhone through usbmuxd) or the iPhone's end of CoreDevice's
+ * tunnel, checked by `tunnelOf`: never any address, nor the phone's Wi-Fi one, where anyone on that network could
+ * drive it.
+ */
+export function helperEnv(
+  base: NodeJS.ProcessEnv,
+  ports: { http: number; mjpeg: number },
+  listen: { loopback: true } | { tunnel: string },
+): NodeJS.ProcessEnv {
+  const ip = "tunnel" in listen ? listen.tunnel : "127.0.0.1";
+  if (!net.isIP(ip) || /^(0\.0\.0\.0|::)$/.test(ip))
+    throw new RunnerError("internal", "No address for the test helper.");
+  return {
+    ...base,
+    TEST_RUNNER_USE_PORT: String(ports.http),
+    TEST_RUNNER_MJPEG_SERVER_PORT: String(ports.mjpeg),
+    TEST_RUNNER_USE_IP: ip,
+  };
 }
 
 /** A helper used this recently answered then: older, it's asked whether it still runs before it's handed out. */
@@ -786,7 +826,7 @@ const retryOf = (f: Failure): keyof typeof RETRY_MS =>
 const retryWait = (f: Failure) =>
   f.reason === "locked" || f.reason === "device_support"
     ? RETRY_MS.check
-    : f.precheck
+    : f.precheck || WIFI_REASONS.has(f.reason)
       ? RETRY_MS.account
       : Math.min(RETRY_MS[retryOf(f)] * 2 ** (f.tries - 1), RETRY_MS.other);
 
@@ -827,7 +867,7 @@ export class IosHelper {
 
   /** Built for this Xcode, and its profile isn't about to run out. */
   private fresh(meta: BuildMeta | null) {
-    if (meta === null || (this.xcode && meta.xcode !== this.xcode)) return false;
+    if (meta === null || (this.xcode && meta.xcode !== this.xcode) || meta.wda !== WDA_VERSION) return false;
     const renewAt = this.ends(meta) - RENEW_BEFORE_MS;
     // Xcode keeps a profile until it runs out: a renewal that got the same one waits for that end, not a new build
     // every poll.
@@ -934,7 +974,7 @@ export class IosHelper {
         throw new RunnerError("internal", `Unpacking the iPhone test helper failed: ${r.stderr.trim()}`);
       await mkdir(path.dirname(root), { recursive: true });
       await rm(root, { recursive: true, force: true });
-      await rename(path.join(tmp, `WebDriverAgent-${WDA_VERSION}`), root);
+      await rename(path.join(tmp, WDA_PACKAGE_DIR), root);
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }
@@ -976,7 +1016,7 @@ export class IosHelper {
     if (r.code !== 0 || r.timedOut) {
       throw new HelperFailure(helperReason(said), r.timedOut ? "The build didn't finish in time." : failureLine(said));
     }
-    const meta: BuildMeta = { xcode, builtAt: this.now(), ...(team ? { team: team.id } : {}) };
+    const meta: BuildMeta = { xcode, wda: WDA_VERSION, builtAt: this.now(), ...(team ? { team: team.id } : {}) };
     if (team) {
       const app = path.join(derived, "Build", "Products", "Debug-iphoneos", "WebDriverAgentRunner-Runner.app");
       const decoded = await runTool(
@@ -1083,18 +1123,36 @@ export class IosHelper {
   private async startNow(key: string, xcrun: string, kind: PhoneKind, udid: string): Promise<WdaRun> {
     const xctestrun = await this.xctestrun(key, kind);
     const sim = kind === "simulator";
-    const [port, mjpeg] = sim ? await Promise.all([freePort(), freePort()]) : [DEVICE_PORT, DEVICE_MJPEG_PORT];
-    const env = {
-      ...this.opts.env,
-      TEST_RUNNER_USE_PORT: String(port),
-      TEST_RUNNER_MJPEG_SERVER_PORT: String(mjpeg),
-      // Loopback only: nobody on the Mac's or the iPhone's network can drive the phone; usbmuxd reaches it there.
-      TEST_RUNNER_USE_IP: "127.0.0.1",
-    };
+    const devicePorts = this.opts.devicePorts ?? { http: DEVICE_PORT, mjpeg: DEVICE_MJPEG_PORT };
+    const [port, mjpeg] = sim ? await Promise.all([freePort(), freePort()]) : [devicePorts.http, devicePorts.mjpeg];
+    const forwards: { close(): void }[] = [];
+    // Over Wi-Fi: the tunnel stays up while the helper runs, and the helper listens on the phone's end of it alone.
+    let tunnel: Tunnel | null = null;
+    if (!sim && this.opts.wifi?.(udid)) {
+      if (!this.opts.tunnels) throw new RunnerError("internal", "This runner can't reach iPhones over Wi-Fi.");
+      forwards.push({ close: this.opts.tunnels.hold(xcrun, udid) });
+      try {
+        tunnel = await this.opts.tunnels.address(xcrun, udid);
+      } catch (err) {
+        for (const f of forwards) f.close();
+        if (err instanceof TunnelMissing) {
+          this.fail(key, { reason: err.reason, detail: err.message, check: true, unknown: false });
+        }
+        throw err;
+      }
+    }
+    const env = helperEnv(
+      this.opts.env,
+      { http: port, mjpeg },
+      tunnel ? { tunnel: tunnel.address } : { loopback: true },
+    );
     const args = ["xcodebuild", "test-without-building", "-xctestrun", xctestrun, "-destination", `id=${udid}`];
     const started = startTool(xcrun, args, { env });
     const child = started.child;
-    if (!child) throw new RunnerError("internal", "The test helper couldn't start.");
+    if (!child) {
+      for (const f of forwards) f.close();
+      throw new RunnerError("internal", "The test helper couldn't start.");
+    }
     let said = "";
     // The tail: why it stopped comes last, after a long run's output.
     const hear = (chunk: Buffer) => {
@@ -1106,7 +1164,6 @@ export class IosHelper {
     void started.done.then(() => {
       gone = true;
     });
-    const forwards: { close(): void }[] = [];
     const fail = (err: RunnerError) => {
       killTree(child, "SIGTERM");
       for (const f of forwards) f.close();
@@ -1117,9 +1174,10 @@ export class IosHelper {
     if (!sim) {
       try {
         const socket = this.opts.usbmuxSocket ?? USBMUXD_SOCKET;
-        const a = await usbmuxForward(udid, DEVICE_PORT, socket);
+        const to = (p: number) => (tunnel ? tunnelForward(tunnel, p) : usbmuxForward(udid, p, socket));
+        const a = await to(port);
         forwards.push(a);
-        const b = await usbmuxForward(udid, DEVICE_MJPEG_PORT, socket);
+        const b = await to(mjpeg);
         forwards.push(b);
         http = a.port;
         frames = b.port;
@@ -1169,10 +1227,16 @@ export class IosHelper {
     for (const f of run.forwards) f.close();
   }
 
-  /** Stops the phone's helper (the phone was let go). */
+  /** Stops the phone's helper (the phone was let go), one still starting as soon as it's up. */
   stop(udid: string) {
     const run = this.running.get(udid);
     if (run) this.drop(udid, run);
+    this.starting.get(udid)?.then(
+      (up) => {
+        if (this.running.get(udid) === up) this.drop(udid, up);
+      },
+      () => undefined,
+    );
   }
 
   stopAll() {

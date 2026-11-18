@@ -1,6 +1,17 @@
 import type { Agent } from "@agenteschat/client";
 import { askKindWords } from "@agenteschat/client/lib/approval-words";
-import { EventPill, EventPillMore, ExpiryFuse, Icon, type IconName, Locked, Spinner } from "@agenteschat/ui";
+import {
+  cx,
+  EventPill,
+  EventPillMore,
+  ExpiryFuse,
+  Icon,
+  type IconName,
+  InfoHint,
+  Locked,
+  prefersReducedMotion,
+  Spinner,
+} from "@agenteschat/ui";
 import {
   createContext,
   type FormEvent,
@@ -9,6 +20,7 @@ import {
   type Ref,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -32,12 +44,15 @@ export type RequestKind =
   | "team"
   | "firstTask";
 
-/** A request waiting for the viewer, as its card registers it: the bar above the composer says it. */
-export type PendingAsk = { id: string; kind: RequestKind; agentId: string; what: string };
+/**
+ * A request waiting for the viewer, as its card registers it: the bar above the composer says it. `runId`: the run that
+ * asked, null when the card doesn't know it.
+ */
+export type PendingAsk = { id: string; kind: RequestKind; agentId: string; runId: string | null; what: string };
 
 /** The same request, said the same way: nothing for the bar to redraw. */
 export const sameAsk = (a: PendingAsk | undefined, b: PendingAsk | undefined) =>
-  a?.id === b?.id && a?.kind === b?.kind && a?.agentId === b?.agentId && a?.what === b?.what;
+  a?.id === b?.id && a?.kind === b?.kind && a?.agentId === b?.agentId && a?.runId === b?.runId && a?.what === b?.what;
 
 /**
  * The request cards waiting for the viewer in one conversation's scroller, by their root element. A card puts
@@ -79,6 +94,43 @@ const AskRegistryContext = createContext<AskRegistry | null>(null);
  */
 export const AskRegistryProvider = AskRegistryContext.Provider;
 
+const NO_ASKS: readonly PendingAsk[] = [];
+
+/**
+ * Every request card in this conversation waiting for the viewer, in view or not: the divider and the bar say "esperando
+ * sua aprovação" from them before the conversation's list hears the agent stopped. `registry`: one read from outside the
+ * scroller (the bar); without it, the scroller's own.
+ */
+export function usePendingAsks(registry?: AskRegistry): readonly PendingAsk[] {
+  const around = useContext(AskRegistryContext);
+  const source = registry ?? around;
+  const [asks, setAsks] = useState<readonly PendingAsk[]>(NO_ASKS);
+  useEffect(() => {
+    if (!source) return;
+    const read = () =>
+      setAsks((before) => {
+        const now = [...source.cards.values()];
+        return now.length === before.length && now.every((a, i) => sameAsk(a, before[i])) ? before : now;
+      });
+    read();
+    return source.subscribe(read);
+  }, [source]);
+  return asks;
+}
+
+/**
+ * What waits on the viewer from `agentId` here: an approval, or anything else to answer; null when nothing. With
+ * `runId` (a hand-off's run, as its list says), only a card of that run: another run of the agent's is not its wait.
+ */
+export function askOf(
+  asks: readonly PendingAsk[],
+  agentId: string,
+  runId?: string | null,
+): { ask: PendingAsk; on: "approval" | "answer" } | null {
+  const ask = asks.find((a) => a.agentId === agentId && (!runId || a.runId === runId));
+  return ask ? { ask, on: ask.kind === "approval" ? "approval" : "answer" } : null;
+}
+
 /** setTimeout's longest wait (about 24.8 days): a later deadline is waited for in steps. */
 const LONGEST_WAIT = 2_147_483_647;
 
@@ -105,12 +157,36 @@ export function useExpired(expiresAt: string | null | undefined) {
   return passed;
 }
 
+/** How a request ended, where its fields and buttons were: the card keeps its box, its words and its object. */
+export type RequestAnswer = {
+  /** It went through. */
+  done: boolean;
+  /** How it ended and who did it ("Você respondeu: X", "Aprovado por Ana"). */
+  text: ReactNode;
+  /** When. */
+  time?: string;
+  /** A quiet line under it (when one approved ahead runs, a save that failed). */
+  note?: ReactNode;
+  /** What can still be done about it (Desfazer, Cancelar): small ghost buttons. */
+  action?: ReactNode;
+};
+
+/**
+ * How tall each waiting card last stood, by request: the card that takes its place once answered (often another
+ * component instance, its caller's branches differ) grows or shrinks from there instead of jumping.
+ */
+const waitingHeights = new Map<string, number>();
+const SETTLE_MS = 220;
+
 /**
  * One card for every request an agent makes in the conversation, so each reads the same way and its decision
  * sits in the same place: a quiet header (what kind of request, and who else it waits for), the agent's own
  * words, what will happen drawn edge to edge (its preview, as an attachment's cover), the object on a line of its own between
  * hairlines with "Ver …" under its words opening it whole, anything to fill in, and the footer strip with the decision on
  * the left and the time left on the right. One surface: nothing inside has a background of its own.
+ *
+ * Decided (`answer`), it is the same card: the header, the words and the object stay where they were, and the footer
+ * strip says how it ended, who did it and when, in the buttons' place.
  *
  * While it waits for the viewer it registers with its conversation (`AskRegistryProvider`), so the bar above the
  * composer can say it waits while it is out of view; `data-ask-id` lets "Ver" find it and bring it back.
@@ -119,12 +195,15 @@ export function RequestCard({
   id,
   kind,
   agent,
+  runId = null,
   label,
-  mine,
+  mine: waitsOnMe,
   waitingFor,
   who,
+  asker,
   source,
   lead,
+  headless = false,
   preview,
   object,
   details,
@@ -133,14 +212,19 @@ export function RequestCard({
   body,
   actions,
   end,
+  under,
   what,
   onSubmit,
   muted = false,
   locked = false,
+  answer,
+  ended: over = false,
 }: {
   id: string;
   kind: RequestKind;
   agent: Agent | undefined;
+  /** The run that asked: a hand-off's bar and divider know their run's card by it. */
+  runId?: string | null;
   /** The group's accessible name. */
   label: string;
   /** The viewer can answer it: the header says it waits for you (and the bar may bring it back). */
@@ -149,10 +233,14 @@ export function RequestCard({
   waitingFor?: string;
   /** Who asks, before the kind ("Ada · Pergunta"), where the card stands away from its conversation. */
   who?: ReactNode;
+  /** Another agent than the conversation's own asks here (work handed to it): "Atlas asks you". */
+  asker?: string;
   /** Where it was asked, after the kind ("Thread · #eng"), where the card stands away from its conversation. */
   source?: ReactNode;
-  /** The agent's own words: what it asks. */
-  lead: ReactNode;
+  /** The agent's own words: what it asks. None on a card whose object says it all (one of a summary's). */
+  lead?: ReactNode;
+  /** One of several cards under a line that already says what they are: no header of its own. */
+  headless?: boolean;
   /**
    * What will happen, drawn edge to edge between hairlines above the object's line (an email as it will go out, an
    * action's values): its start, fading at the foot. "Ver …" replaces it with the whole thing.
@@ -171,6 +259,8 @@ export function RequestCard({
   actions?: ReactNode;
   /** The footer's right end: the fuse and its time left. */
   end?: ReactNode;
+  /** A quiet link on its own line under the footer's decision ("Mudar quando perguntar"). */
+  under?: ReactNode;
   /** The object's short title, for the bar ("Enviar e-mail"). */
   what: string;
   /** Its field and footer are a form (a secret): Enter sends it. */
@@ -179,16 +269,45 @@ export function RequestCard({
   muted?: boolean;
   /** Its decision is on its way or can't be made any more: what is filled in and clicked turns off, "Ver …" stays. */
   locked?: boolean;
+  /** Decided: the footer says how it ended in place of `actions` and `end`; `body` is then what stays to read. */
+  answer?: RequestAnswer;
+  /** Decided with nothing to say in the footer (a card of several requests: each row says how it ended). */
+  ended?: boolean;
 }) {
   const { t } = useTranslation();
   const registry = useContext(AskRegistryContext);
   const root = useRef<HTMLDivElement>(null);
   const agentId = agent?.id ?? "";
+  const ended = over || Boolean(answer);
+  // Nothing waits on the viewer once it is decided.
+  const mine = waitsOnMe && !ended;
+  // No dependency list: its height is read after every draw, so the answered card starts from the last one.
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const height = el.offsetHeight;
+    if (!ended) {
+      if (height) waitingHeights.set(id, height);
+      return;
+    }
+    const from = waitingHeights.get(id);
+    waitingHeights.delete(id);
+    if (!from || !height || from === height || prefersReducedMotion() || !el.animate) return;
+    el.animate(
+      [
+        { height: `${from}px`, overflow: "clip" },
+        { height: `${height}px`, overflow: "clip" },
+      ],
+      { duration: SETTLE_MS, easing: "ease-out" },
+    );
+  });
+  // A waiting card that left the screen for good (scrolled out of a long list) is no start for a later one.
+  useEffect(() => () => void waitingHeights.delete(id), [id]);
   // Waiting for the viewer: in the conversation's list, with what the bar says (kept current in place).
   useEffect(() => {
     const el = root.current;
-    if (registry && mine && el) registry.put(el, { id, kind, agentId, what });
-  }, [registry, mine, id, kind, agentId, what]);
+    if (registry && mine && el) registry.put(el, { id, kind, agentId, runId, what });
+  }, [registry, mine, id, kind, agentId, runId, what]);
   useEffect(() => {
     const el = root.current;
     if (!registry || !mine || !el) return;
@@ -201,12 +320,28 @@ export function RequestCard({
     if (openProp === undefined) setOpenSelf(next);
     onOpenChange?.(next);
   };
-  const foot = (actions || end) && (
-    <div className="rq__foot">
-      {actions}
-      {end && <span className="rq__end">{end}</span>}
+  const foot = answer ? (
+    <div className="rq__foot rq__answer">
+      <span className="rq-done__mark" data-done={answer.done || undefined} aria-hidden="true">
+        <span />
+      </span>
+      <span className="rq__answer-text">
+        {answer.text}
+        {answer.note && <small className="rq__answer-note">{answer.note}</small>}
+      </span>
+      {answer.action}
+      {answer.time && <time className="rq__answer-time">{answer.time}</time>}
     </div>
+  ) : (
+    (actions || end) && (
+      <div className="rq__foot">
+        {actions}
+        {end && <span className="rq__end">{end}</span>}
+        {under && <span className="rq__under">{under}</span>}
+      </div>
+    )
   );
+  const waitsOnOther = !mine && !ended && Boolean(waitingFor);
   const fill = (
     <Locked when={locked}>
       {body}
@@ -216,21 +351,25 @@ export function RequestCard({
   const inner = (
     <>
       <CardSky color={colorOf(agent)} />
-      <div className="rq__head">
-        <span className="rq__kind">
-          {who && (
-            <>
-              <span className="rq__who">{who}</span>
-              {" · "}
-            </>
+      {(!headless || waitsOnOther) && (
+        <div className="rq__head">
+          {!headless && (
+            <span className="rq__kind">
+              {who && (
+                <>
+                  <span className="rq__who">{who}</span>
+                  {" · "}
+                </>
+              )}
+              {asker && mine ? t("chat.request.asksYou", { name: asker }) : askKindWords(t, kind, Boolean(mine))}
+              {source && <span className="rq__source"> · {source}</span>}
+            </span>
           )}
-          {askKindWords(t, kind, Boolean(mine))}
-          {source && <span className="rq__source"> · {source}</span>}
-        </span>
-        {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
-        {!mine && waitingFor && <span className="rq__state rq__state--other">{waitingFor}</span>}
-      </div>
-      <p className="rq__lead">{inlineWords(lead, "rq")}</p>
+          {/* Who else it waits for; waiting for me needs no words (the buttons say it). */}
+          {waitsOnOther && <span className="rq__state rq__state--other">{waitingFor}</span>}
+        </div>
+      )}
+      {lead != null && lead !== "" && <p className="rq__lead">{inlineWords(lead, "rq")}</p>}
       {preview && !(open && details) && <div className="rq__preview">{preview}</div>}
       {object && (
         <div className="rq__well">
@@ -272,10 +411,10 @@ export function RequestCard({
     // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
     <div
       ref={root}
-      className={muted ? "rq rq--muted" : "rq"}
+      className={cx("rq", muted && "rq--muted", ended && "rq--ended")}
       role="group"
       aria-label={label}
-      data-ask-id={id}
+      data-ask-id={ended ? undefined : id}
       data-ask-kind={kind}
       data-ask-mine={mine ? "" : undefined}
     >
@@ -285,7 +424,7 @@ export function RequestCard({
 }
 
 /** "Ver …": opens what a request holds back; its arrow turns while it is open. */
-function RequestMore({ open, onClick, children }: { open: boolean; onClick: () => void; children: ReactNode }) {
+export function RequestMore({ open, onClick, children }: { open: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button type="button" className="rq__more" aria-expanded={open} onClick={onClick}>
       {children}
@@ -435,6 +574,44 @@ export function RequestOpen({
   );
 }
 
+/**
+ * A card that says one thing and offers its way out, with no request behind it (a plan to pick, an AI to connect): the
+ * request card's surface with a title, its detail behind the ⓘ beside it, one sentence, and the footer's buttons, the
+ * main one first.
+ */
+export function RequestNote({
+  agent,
+  title,
+  hint,
+  actions,
+  children,
+}: {
+  agent: Agent | undefined;
+  title: string;
+  /** Behind the ⓘ beside the title: plain sentences only. */
+  hint?: ReactNode;
+  /** The footer's kit buttons: one primary, the others ghosts. */
+  actions?: ReactNode;
+  /** The one sentence. */
+  children?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: a labelled group inside a message, not a fieldset
+    <div className="rq rq--note" role="group" aria-label={title}>
+      <CardSky color={colorOf(agent)} />
+      <p className="rq__title">
+        <span className="ac-hintline">
+          <b>{title}</b>
+          {hint && <InfoHint name={t("common.about", { label: title })}>{hint}</InfoHint>}
+        </span>
+      </p>
+      {children && <p className="rq__note">{children}</p>}
+      {actions && <div className="rq__foot">{actions}</div>}
+    </div>
+  );
+}
+
 /** The keys a request's answers take: one to nine. */
 const CHOICE_KEYS = 9;
 
@@ -523,10 +700,13 @@ export function RequestKeys({ count }: { count: number }) {
   return <span className="rq__keys">{t("question.keysHint", { count: Math.min(count, CHOICE_KEYS) })}</span>;
 }
 
-/** Waiting for you: a small pixel square outline that pulses (also in the bar above the composer). */
-export function WaitMark() {
+/**
+ * Waiting for you: a small pixel square outline that pulses inside the conversation (the bar above the composer, the
+ * divider, the cards); `still` in lists and chips.
+ */
+export function WaitMark({ still = false }: { still?: boolean }) {
   return (
-    <span className="rq-wait" aria-hidden="true">
+    <span className={still ? "rq-wait rq-wait--still" : "rq-wait"} aria-hidden="true">
       <span />
     </span>
   );

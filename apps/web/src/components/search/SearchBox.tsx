@@ -87,6 +87,8 @@ export function SearchBox({
   onClear,
   className,
   ops = SEARCH_OPS,
+  onEscape,
+  onLeave,
 }: {
   chips: SearchChip[];
   onChipsChange: (chips: SearchChip[]) => void;
@@ -112,6 +114,10 @@ export function SearchBox({
   className?: string;
   /** The operators it offers and turns into chips while typed (a DM's: no who or where). */
   ops?: readonly SearchOp[];
+  /** Escape with its menu already closed. */
+  onEscape?: () => void;
+  /** The focus left the box and its menu. */
+  onLeave?: () => void;
 }) {
   const { t, i18n } = useTranslation();
   const own = useRef<HTMLInputElement>(null);
@@ -301,6 +307,8 @@ export function SearchBox({
     } else if (e.key === "Escape" && shown) {
       e.preventDefault();
       setOpen(false);
+    } else if (e.key === "Escape") {
+      onEscape?.();
     } else if (e.key === "Backspace" && !text && chips.length) {
       onChipsChange(chips.slice(0, -1));
     }
@@ -312,7 +320,9 @@ export function SearchBox({
       className={cx("search-box", compact && "search-box--compact", className)}
       // Closes when the focus leaves the box and its menu (the date field inside the menu keeps it open).
       onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false);
+        if (e.currentTarget.contains(e.relatedTarget)) return;
+        setOpen(false);
+        onLeave?.();
       }}
     >
       {/* biome-ignore lint/a11y/noStaticElementInteractions: a click on the field's padding focuses its input. */}

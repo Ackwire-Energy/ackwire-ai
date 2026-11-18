@@ -53,6 +53,8 @@ export const outbox = pgTable(
     lockedUntil: timestamp({ withTimezone: true }),
     lockedBy: text(),
     lastError: text(),
+    /** The HTTP status the error behind `lastError` carried (a provider's refusal), when it carried one. */
+    lastErrorStatus: integer(),
     /** Optional idempotency key: enqueueing the same key twice is a no-op. */
     dedupeKey: text().unique(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
@@ -61,6 +63,17 @@ export const outbox = pgTable(
   (t) => [
     index("outbox_due_idx").on(t.nextAttemptAt).where(sql`${t.status} = 'pending'`),
     index("outbox_leased_idx").on(t.lockedUntil).where(sql`${t.status} = 'processing'`),
+    // The operator's job list, newest first. With the id: a transaction's jobs share one time, and a page's cursor
+    // has to land among them. Built concurrently, as any index of this table has to be: every job the server queues
+    // is a row, and a plain build keeps them all waiting until it ends.
+    index("outbox_created_idx").on(t.createdAt, t.id).concurrently(),
+    // A run's jobs, by how their name starts (only those rows are indexed). `text_pattern_ops` compares bytes, so a
+    // prefix is a range of this index whatever the database's collation; of the unique index on the name it is one
+    // only in the C collation.
+    index("outbox_run_jobs_idx")
+      .on(t.dedupeKey.op("text_pattern_ops"))
+      .where(sql`${t.kind} = 'agent_run.execute'`)
+      .concurrently(),
   ],
 );
 
@@ -144,7 +157,7 @@ export const agentRuns = pgTable(
     workingSince: timestamp({ withTimezone: true }),
     /**
      * The computer this run waits for (`waiting_input` with a computer brain
-     * and nothing to fall back on, ADR 0032 §5): queued again when it comes
+     * that can't answer now, ADR 0032 §5): queued again when it comes
      * back (`resumeRunsWaitingForMachine`). Null otherwise.
      */
     waitingMachineId: uuid(),
@@ -163,7 +176,7 @@ export const agentRuns = pgTable(
     background: boolean().notNull().default(false),
     /**
      * The brain this run actually thinks with (`model`, `claude_code`, `codex`): the agent's, a
-     * mission's override or a fallback. Null until its first turn. Shared code reads this, never
+     * mission's override, or the model brain an older release stood in with. Null until its first turn. Shared code reads this, never
      * the agent's stored brain.
      */
     brain: text(),
@@ -191,8 +204,13 @@ export const agentRuns = pgTable(
     index().on(t.issueId, t.createdAt),
     // A stretch's runs, counted before an agent starts another (`stretchStop`).
     index().on(t.orgId, t.stretchId).where(sql`${t.stretchId} is not null`),
+    // A computer brain's session's runs (`resolveBrain`, a cut tool call read back from an earlier run).
+    index().on(t.orgId, t.brainSessionId).where(sql`${t.brainSessionId} is not null`),
     // Runs waiting for a computer, found when it reconnects (only those rows are indexed).
     index("agent_runs_waiting_machine_idx").on(t.waitingMachineId).where(sql`${t.waitingMachineId} is not null`),
+    // The task manager's count of today's finished tasks, asked at every poll: only today's rows read, not every run
+    // the workspace ever finished. Built CONCURRENTLY (its migration), as agent_runs is large.
+    index("agent_runs_done_finished_idx").on(t.orgId, t.finishedAt).where(sql`${t.status} = 'done'`),
   ],
 );
 
@@ -223,8 +241,15 @@ export const agentWorks = pgTable(
     issueId: uuid().references(() => issues.id, { onDelete: "set null" }),
     /** `queued` | `live` | `done` | `failed` | `canceled`. */
     status: text().notNull(),
-    /** `agent` (it called work_in_background) | `auto` (the safety net moved it). */
+    /**
+     * `agent` (it called work_in_background) | `auto` (the safety net moved it) | `handed` (another agent handed it
+     * over for a person: it runs in the agents' DM or a task's conversation and reports in the person's, ADR 0121).
+     */
     how: text().notNull(),
+    /** A handed work: the hand-off (note) it came from. */
+    consultationId: uuid().references(() => agentConsultations.id, { onDelete: "set null" }),
+    /** A handed work: the thread of `channelId` its updates and report go to (null: the main timeline). */
+    handedThreadId: uuid(),
     /** The person behind it, for lists and notifications. */
     requestedByUserId: text(),
     updateSeq: integer().notNull().default(0),
@@ -243,6 +268,7 @@ export const agentWorks = pgTable(
     index().on(t.orgId, t.status).where(sql`${t.status} in ('queued', 'live')`),
     index().on(t.agentId, t.status).where(sql`${t.status} in ('queued', 'live')`),
     index().on(t.issueId).where(sql`${t.issueId} is not null`),
+    index().on(t.consultationId).where(sql`${t.consultationId} is not null`),
   ],
 );
 
@@ -312,6 +338,11 @@ export const agentRunSteps = pgTable(
     unique().on(t.runId, t.seq),
     // The operator's work analytics look up a run's waits for room among all its steps.
     index().on(t.runId).where(sql`${t.kind} = 'error' and ${t.data}->>'reason' = 'brain_unavailable'`),
+    // A workspace's tool calls in a range of dates, for the operator API (only those steps are indexed). Built
+    // concurrently: every step of every run is a row here, and a plain build keeps them all waiting until it ends.
+    index("agent_run_steps_tool_calls_idx").on(t.orgId, t.createdAt).where(sql`${t.kind} = 'tool_call'`).concurrently(),
+    // The task list's count of a run's tool calls and its latest one, without reading the run's other steps.
+    index("agent_run_steps_tool_call_run_idx").on(t.runId, t.seq).where(sql`${t.kind} = 'tool_call'`),
   ],
 );
 
@@ -380,6 +411,8 @@ export const usageRecords = pgTable(
     index().on(t.orgId, t.personId, t.createdAt),
     // The operator's work analytics read every workspace's usage in a range of dates.
     index().on(t.createdAt),
+    // Usage by run (the task list, routines, cost): read per run id, never by time.
+    index().on(t.runId),
   ],
 );
 
@@ -402,6 +435,8 @@ export const agentBudgetPeriods = pgTable(
   (t) => [
     primaryKey({ columns: [t.agentId, t.periodStart] }),
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    // A workspace's month (agents' statuses, the right hand's budget watch): the key starts with the agent.
+    index().on(t.orgId, t.periodStart),
   ],
 );
 
@@ -595,6 +630,8 @@ export const approvals = pgTable(
     highRisk: boolean().notNull().default(true),
     /** Decided by someone covering this person (`approval_covers`): "Aprovado por Bruno, cobrindo Ana". */
     decidedForUserId: text(),
+    /** Canceled because the agent asked the same action again in a later turn: the newer request. */
+    supersededById: uuid(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -801,6 +838,8 @@ export const agentScopes = pgTable(
   (t) => [
     foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
     unique().on(t.agentId, t.connectionId, t.scope).nullsNotDistinct(),
+    // A connection's grants across agents (a mailbox's or a database's people and agents).
+    index().on(t.connectionId).where(sql`${t.connectionId} is not null`),
   ],
 );
 
@@ -877,6 +916,8 @@ export const agentQuestions = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.channelId, t.status),
     index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
+    // What a workspace's agents asked, in a range of dates (the operator API).
+    index().on(t.orgId, t.createdAt),
   ],
 );
 
@@ -926,6 +967,17 @@ export const agentConsultations = pgTable(
     reportedAt: timestamp({ withTimezone: true }),
     expiresAt: timestamp({ withTimezone: true }).notNull(),
     createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The person behind the asking run when it was made (`runAuthorityById`), never changed; null with nobody behind
+     * it (a routine's work) and on rows made before the column.
+     */
+    forUserId: text(),
+    /**
+     * The asking run had read outside content when it made this (`runReadOutside`), never changed: its words relay
+     * that content. The question's own message carries the same mark for the agent that answers; a task's start line
+     * is the server's and carries none.
+     */
+    askerReadOutside: boolean().notNull().default(false),
   },
   (t) => [
     foreignKey({ columns: [t.orgId, t.askerAgentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
@@ -935,6 +987,10 @@ export const agentConsultations = pgTable(
     index().on(t.expiresAt).where(sql`${t.status} = 'open'`),
     index().on(t.targetRunId),
     index().on(t.orgId, t.askerAgentId, t.createdAt),
+    // The hand-over of a task, found by the task's conversation.
+    index().on(t.orgId, t.channelId),
+    // What other agents handed an agent for a person, newest first (`handedFor`).
+    index("agent_consultations_handed_for_idx").on(t.orgId, t.targetAgentId, t.forUserId, t.createdAt),
   ],
 );
 
@@ -1014,6 +1070,8 @@ export const secretRequests = pgTable(
     unique().on(t.runId, t.toolUseId),
     index().on(t.agentId, t.status),
     index().on(t.expiresAt).where(sql`${t.status} = 'pending'`),
+    // What a workspace's agents asked, in a range of dates (the operator API).
+    index().on(t.orgId, t.createdAt),
   ],
 );
 
@@ -1042,6 +1100,8 @@ export const machineTasks = pgTable(
       .$defaultFn(() => Bun.randomUUIDv7()),
     orgId: uuid().notNull(),
     agentId: uuid().notNull(),
+    /** The id its computer knows the agent by when it isn't the agent's own: a seat of the right hand (ADR 0175). */
+    scopeId: uuid(),
     machineId: uuid()
       .notNull()
       .references(() => machines.id, { onDelete: "cascade" }),
@@ -1127,6 +1187,44 @@ export const machineTasks = pgTable(
     uniqueIndex("machine_tasks_live_session")
       .on(t.missionId, t.sessionId)
       .where(sql`${t.missionId} is not null and ${t.sessionId} is not null and ${t.endedAt} is null`),
+  ],
+);
+
+/**
+ * What an agent keeps running on its computer (`keep_running`, ADR 0176): a hold the runner takes as the computer's
+ * standard "don't go idle" lock, bound to one of its programs (`pid`), its browser, or a time (`until`). The words
+ * people read are here only, never on the computer. Live while `ended_at` is null and `until` hasn't passed.
+ */
+export const machineHolds = pgTable(
+  "machine_holds",
+  {
+    /** Also the runner's hold id. */
+    id: uuid()
+      .primaryKey()
+      .$defaultFn(() => Bun.randomUUIDv7()),
+    orgId: uuid().notNull(),
+    agentId: uuid().notNull(),
+    machineId: uuid()
+      .notNull()
+      .references(() => machines.id, { onDelete: "cascade" }),
+    /** The run whose `keep_running` took or last changed it. */
+    runId: uuid().references(() => agentRuns.id, { onDelete: "set null" }),
+    /** What is kept, as people read it ("Telegram bot for the support group"). */
+    what: text().notNull(),
+    why: text().notNull(),
+    pid: integer(),
+    browser: boolean().notNull().default(false),
+    until: timestamp({ withTimezone: true }),
+    endedAt: timestamp({ withTimezone: true }),
+    endReason: text().$type<"exited" | "expired" | "stopped_by_person" | "ended_by_agent" | "restarted">(),
+    endedByUserId: text(),
+    createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    foreignKey({ columns: [t.orgId, t.agentId], foreignColumns: [agents.orgId, agents.id] }).onDelete("cascade"),
+    index().on(t.orgId, t.agentId, t.createdAt),
+    index().on(t.machineId).where(sql`${t.endedAt} is null`),
   ],
 );
 

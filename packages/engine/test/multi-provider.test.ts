@@ -74,7 +74,7 @@ describe("credentials per provider", () => {
   test("defaults per provider: make default in one call, 'Tornar padrão', can't remove a default", async () => {
     f = await setup();
     const a = await openaiKey(f, { makeDefault: true });
-    const b = await openaiKey(f, { label: "second" });
+    const b = await openaiKey(f, { label: "second", apiKey: "sk-proj-openai-8888" });
     let list = await listCredentials(f.db, f.owner.id, f.org.id);
     expect(list.filter((c) => c.isDefault).map((c) => c.id)).toEqual([a.id]);
     await expect(revokeCredential(f.db, f.owner.id, f.org.id, a.id)).rejects.toBeInstanceOf(ConflictError);

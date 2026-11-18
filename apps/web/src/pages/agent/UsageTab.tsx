@@ -12,6 +12,7 @@ import { apiProviderOf } from "@agenteschat/client/lib/providers";
 import {
   Card,
   CardFooter,
+  HintLine,
   Icon,
   InfoHint,
   Meter,
@@ -24,6 +25,7 @@ import { type CSSProperties, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ErrorState, LoadingList } from "@/components/Loading";
 import { useOrg } from "@/components/org-context";
+import { PlanModels } from "@/components/PlanModels";
 import { AccountHead } from "@/components/PlanUsage";
 import { useDirectory } from "@/hooks/useDirectory";
 import { brandOf, noWindowsText, partedUsage, planMeterText, usageSourceName, usageSourcePart } from "@/lib/plan-usage";
@@ -186,7 +188,15 @@ function Now({ data }: { data: AgentPlanUsage }) {
       ) : (
         <p className="plan-empty">{noWindowsText(t, current)}</p>
       )}
-      <CardFooter>{t("usageViews.agent.estimate", { ...g, brand: brandOf(current) })}</CardFooter>
+      <PlanModels usage={current.usage} provider={current.provider} />
+      <CardFooter icon={null}>
+        <HintLine
+          name={t("common.about", { label: t("usageViews.agent.now") })}
+          hint={t("usageViews.agent.estimate", { ...g, brand: brandOf(current) })}
+        >
+          {t("usageViews.agent.estimateShort")}
+        </HintLine>
+      </CardFooter>
     </Card>
   );
 }

@@ -13,6 +13,8 @@ test("what ships wraps a hold from its top, its lead and its button on the first
   // The bold line takes the whole width and wraps.
   expect(last(shipped, ".hold-banner .outage__text", "flex-wrap")).toBe("wrap");
   expect(last(shipped, ".hold-banner .outage__text b", "max-width")).toBe("none");
+  // A long name never leaves the end of the date alone on the last line.
+  expect(last(shipped, ".hold-banner .outage__text b", "text-wrap")).toBe("pretty");
   expect(last(phone, ".outage__text b", "max-width")).toBe("none");
 
   // From the top, 11px over the first line and under the last: one 22px line is the 44px strip, at every width.

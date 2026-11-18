@@ -18,6 +18,7 @@ import {
 import { can } from "@agenteschat/client/lib/permissions";
 import { isEveryone, sortRoles } from "@agenteschat/client/lib/roles";
 import {
+  HintLine,
   Icon,
   type IconName,
   Menu,
@@ -224,7 +225,9 @@ export function AudienceFields({
       <EditorsField value={value} onChange={onChange} roles={roles} />
       <p className="db-note ac-iconline">
         <Icon name="shield" size={16} />
-        <span>{t("widgets.exposure")}</span>
+        <HintLine name={t("common.about", { label: t("dashboards.audience.label") })} hint={t("widgets.exposure")}>
+          {t("widgets.exposureShort")}
+        </HintLine>
       </p>
     </>
   );

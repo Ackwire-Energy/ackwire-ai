@@ -115,7 +115,8 @@ export function topRowFits(bar: HTMLElement) {
   if (!search || !actions) return true;
   const gap = Number.parseFloat(getComputedStyle(bar).columnGap) || 0;
   const floor = Number.parseFloat(getComputedStyle(search).minWidth) || 0;
-  return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth + 0.5;
+  // The row wraps at the first fraction of a pixel over, and `clientWidth` rounds up to half of one: never count on it.
+  return floor + gap + actions.getBoundingClientRect().width <= bar.clientWidth - 0.5;
 }
 
 /**

@@ -118,9 +118,7 @@ export function AgentAsksLine({
         actions={
           canChange ? (
             <Button
-              size="sm"
-              variant="ghost"
-              icon="edit"
+              variant="link"
               onClick={() => {
                 setOpen(false);
                 onChange();
