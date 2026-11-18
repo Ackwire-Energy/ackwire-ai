@@ -137,17 +137,26 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
+  font-size: 16px;
+  line-height: 23px;
 }
+/* The face centres on the quote's first capitals, including its 1px top inset, even when the quote wraps. */
 .nac-review__from .ac-avatar {
   flex: none;
+  font-size: inherit;
+  line-height: inherit;
+  translate: 0 calc(12.5px - var(--cap-mid) - 50%);
+}
+@supports (top: 1lh) {
+  .nac-review__from .ac-avatar {
+    translate: 0 calc(0.5lh + 1px - var(--cap-mid) - 50%);
+  }
 }
 .nac-review__why {
   margin: 0;
   padding: 1px 0 1px 12px;
   box-shadow: inset 2px 0 0 var(--line2);
   color: var(--ink);
-  font-size: 16px;
-  line-height: 23px;
   text-wrap: pretty;
 }
 .nac-review__list {
