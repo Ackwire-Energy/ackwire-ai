@@ -51,20 +51,24 @@ export function whenWords(t: TFunction, locale: string, iso: string, now = new D
  * A request to join's chips, as on the web: "Not verified" only where nobody proved the address (a server without
  * email, or a request typed before codes), then when it was asked. A server from before codes sends only
  * `confirmed`, which meant the same there. A member's suggestion says who made it instead: nobody at that address
- * asked, and approving it sends the email invitation, so its address has nothing to prove here (ADR 0090 §7).
+ * asked, and approving it sends the email invitation, so its address has nothing to prove here (ADR 0090 §7). An
+ * outside collaborator's request says who they work for (ADR 0191).
  */
 export function requestChips(
   t: TFunction,
   locale: string,
-  r: Pick<JoinRequest, "createdAt" | "verified" | "confirmed" | "suggestedBy">,
+  r: Pick<JoinRequest, "createdAt" | "verified" | "confirmed" | "suggestedBy" | "outsideOf">,
   now = new Date(),
 ): { unverified: string | null; asked: string } {
   const by = r.suggestedBy ?? null;
+  const when = whenWords(t, locale, r.createdAt, now);
   return {
     unverified: by || (r.verified ?? r.confirmed) ? null : t("members.requests.unverified"),
-    asked: by
-      ? t("members.requests.suggested", { name: by, when: whenWords(t, locale, r.createdAt, now) })
-      : askedLabel(t, locale, r.createdAt, now),
+    asked: r.outsideOf
+      ? t("members.requests.outside", { outsideOf: r.outsideOf, when })
+      : by
+        ? t("members.requests.suggested", { name: by, when })
+        : askedLabel(t, locale, r.createdAt, now),
   };
 }
 
@@ -72,13 +76,15 @@ export function requestChips(
 export function waitingLine(
   t: TFunction,
   locale: string,
-  r: Pick<JoinRequest, "email" | "createdAt" | "verified" | "confirmed" | "suggestedBy">,
+  r: Pick<JoinRequest, "email" | "createdAt" | "verified" | "confirmed" | "suggestedBy" | "outsideOf">,
   now = new Date(),
 ) {
   const when = whenWords(t, locale, r.createdAt, now);
-  const how = r.suggestedBy
-    ? t("members.requests.suggested", { name: r.suggestedBy, when })
-    : t("members.requests.viaLink", { when });
+  const how = r.outsideOf
+    ? t("members.requests.outside", { outsideOf: r.outsideOf, when })
+    : r.suggestedBy
+      ? t("members.requests.suggested", { name: r.suggestedBy, when })
+      : t("members.requests.viaLink", { when });
   const { unverified } = requestChips(t, locale, r, now);
   return [how, r.email, unverified ? lowerFirst(unverified, locale) : null].filter(Boolean).join(" · ");
 }
@@ -122,6 +128,10 @@ export function memberLine(
       : t("members.joined", { when: formatShortDate(locale, person.joinedAt) });
   return `${handle}${roleLine(t, person, roles) ?? t("roles.member")} · ${lowerFirst(seen, locale)}`;
 }
+
+/** An outside collaborator's line on Membros (ADR 0191): "Outside · Northwind"; null for anyone else. */
+export const outsideLine = (t: TFunction, person: Pick<Person, "outsideOf">) =>
+  person.outsideOf ? `${t("members.outside.chip")} · ${person.outsideOf}` : null;
 
 /**
  * What a person's row offers in its menu, in order: a message to anyone but oneself, their cargos when the viewer may
@@ -617,16 +627,18 @@ export function agentLines(
 export function requestLine(
   t: TFunction,
   locale: string,
-  r: Pick<JoinRequest, "createdAt" | "suggestedBy" | "link">,
+  r: Pick<JoinRequest, "createdAt" | "suggestedBy" | "link" | "outsideOf">,
   gives: readonly string[],
   now = new Date(),
 ) {
   const when = whenWords(t, locale, r.createdAt, now);
-  const how = r.suggestedBy
-    ? t("members.requests.suggested", { name: r.suggestedBy, when })
-    : r.link?.createdBy
-      ? t("invites.viaLinkOf", { name: r.link.createdBy, when })
-      : t("members.requests.viaLink", { when });
+  const how = r.outsideOf
+    ? t("members.requests.outside", { outsideOf: r.outsideOf, when })
+    : r.suggestedBy
+      ? t("members.requests.suggested", { name: r.suggestedBy, when })
+      : r.link?.createdBy
+        ? t("invites.viaLinkOf", { name: r.link.createdBy, when })
+        : t("members.requests.viaLink", { when });
   return [how, ...gives].join(" · ");
 }
 

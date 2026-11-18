@@ -242,6 +242,16 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     url: `${APP}/org/${ORG}/settings/members?request=jr_7&do=approve`,
     denyUrl: `${APP}/org/${ORG}/settings/members?request=jr_7&do=deny`,
   },
+  "join_request-outside.en": {
+    kind: "join_request",
+    locale: "en",
+    orgName: "Alves Studio",
+    name: "Bruno Lima",
+    email: "bruno@example.com",
+    url: `${APP}/org/${ORG}/settings/members?request=jr_8&do=approve`,
+    denyUrl: `${APP}/org/${ORG}/settings/members?request=jr_8&do=deny`,
+    outsideOf: "Northwind Consulting",
+  },
   "join_answer-joined.en": {
     kind: "join_answer",
     locale: "en",
@@ -325,6 +335,38 @@ export const EMAIL_SAMPLES: Record<string, EmailTemplate> = {
     email: "ana@padariasouza.com.br",
     newEmail: "ana.souza@example.com",
     url: `${APP}/email-undo?token=Hk2dQ9xWm4Lp7Rt1Vb8Nc3Zs6Yf0Ja5Ue`,
+  },
+  /** An outside chat surface linked: "Not you? Unlink it". */
+  "surface_linked.en": {
+    kind: "surface_linked",
+    locale: "en",
+    surface: "Example Chat",
+    display: "+1 555 0100",
+    orgName: "Souza Bakery",
+    url: `${APP}/email-undo?kind=surface&token=Hk2dQ9xWm4Lp7Rt1Vb8Nc3Zs6Yf0Ja5Ue`,
+  },
+  "surface_linked.pt-BR": {
+    kind: "surface_linked",
+    locale: "pt-BR",
+    surface: "Example Chat",
+    display: "+1 555 0100",
+    orgName: "Padaria Souza",
+    url: `${APP}/email-undo?kind=surface&token=Hk2dQ9xWm4Lp7Rt1Vb8Nc3Zs6Yf0Ja5Ue`,
+  },
+  /** Unlinked because the sender's identity there changed. */
+  "surface_unlinked.en": {
+    kind: "surface_unlinked",
+    locale: "en",
+    surface: "Example Chat",
+    display: "+1 555 0100",
+    url: APP,
+  },
+  "surface_unlinked.pt-BR": {
+    kind: "surface_unlinked",
+    locale: "pt-BR",
+    surface: "Example Chat",
+    display: "+1 555 0100",
+    url: APP,
   },
   /** To an owner: a button to restore it. */
   "workspace_deleting-owner.en": {

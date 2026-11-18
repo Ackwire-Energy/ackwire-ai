@@ -188,6 +188,7 @@ export function ConnectAiPushed({ page }: { page: PushedPage["page"] }) {
 
 /** A page's title in the bar, past the first page's question. */
 function pageTitle(t: TFunction, view: PushedPage) {
+  if (view.page === "have") return t("connectAi.chat.allTitle");
   if (view.page === "plans") return t("connectAi.pick.placeholder");
   if (view.page === "key") return t("connectAi.key.title");
   if (view.page === "makers") return t("mobile.ai.whose");

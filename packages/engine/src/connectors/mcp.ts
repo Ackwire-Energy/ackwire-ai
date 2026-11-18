@@ -6,6 +6,7 @@ import type { jsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/t
 import { ARTIFACT_LIMITS, type ArtifactDeps, createFileArtifact, fileReach } from "../artifacts";
 import { recordAudit } from "../audit";
 import { runAuthorityById } from "../authority";
+import { CONFIDENTIAL_META_KEY } from "../confidential";
 import { connectorKeyOf } from "../connector-usage";
 import { signJwtHs256 } from "../crypto";
 import { cutText } from "../format";
@@ -60,6 +61,8 @@ export interface McpCallResult {
   isError: boolean;
   /** A Composio action's answer as Composio gave it (files and all), for `keepComposioFiles`. */
   data?: unknown;
+  /** The result's own `_meta`, as the server sent it: what it says of its answer beside the content. */
+  meta?: Record<string, unknown>;
 }
 
 /** An open MCP client session. Only the connector tool source uses it, behind the Tool Gateway. */
@@ -120,6 +123,7 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
         content?: { type: string; text?: string; resource?: { text?: unknown } }[];
         isError?: boolean;
         structuredContent?: unknown;
+        _meta?: Record<string, unknown>;
       };
       // GitHub's `get_file_contents` sends the file itself as an embedded resource next to a one-line text block.
       const parts = (res.content ?? []).map((c) =>
@@ -130,7 +134,7 @@ export async function mcpSessionOver(transport: Transport): Promise<McpSession> 
             : `[${c.type}]`,
       );
       if (parts.length === 0 && res.structuredContent !== undefined) parts.push(JSON.stringify(res.structuredContent));
-      return { content: parts.join("\n"), isError: res.isError === true };
+      return { content: parts.join("\n"), isError: res.isError === true, ...(res._meta ? { meta: res._meta } : {}) };
     },
     serverInfo: () => (client.getServerVersion() as McpServerInfo | undefined) ?? null,
     close: () => client.close(),
@@ -382,20 +386,29 @@ export function createConnectorToolSource(
     return lines.length > 0 ? { ...input, [sign.field]: creditedMessage(given, ...lines) } : input;
   }
 
-  /**
-   * What a tool call to a listed host carries in `params._meta` (ADR 0181): a JWT signed with that host's secret that
-   * says which workspace, agent, run and connection is calling, and the person the run acts for. Nothing for any other
-   * host, nor over http, where anyone on the way could read it and send it again within its life.
-   */
-  async function callerStatement(connection: ConnectorConnection, ctx: ToolContext) {
+  /** The secret of a server by address the operator listed (`MCP_CALLER_IDENTITY`): its host, over https alone. */
+  function listedSecret(connection: ConnectorConnection): string | undefined {
     if (!deps.callerIdentity?.size) return undefined;
     const url = new URL(connection.serverUrl);
     // `host` keeps a port that isn't https's own, and the list holds bare names: the audience is one origin.
-    const secret = url.protocol === "https:" ? deps.callerIdentity?.get(url.host) : undefined;
+    return url.protocol === "https:" ? deps.callerIdentity.get(url.host) : undefined;
+  }
+
+  /**
+   * What a tool call to a listed host carries in `params._meta` (ADR 0181): a JWT signed with that host's secret that
+   * says which workspace, agent, run and connection is calling, the person the run acts for, what thinks for the run
+   * and the conversation it answers in. Nothing for any other host, nor over http, where anyone on the way could read
+   * it and send it again within its life.
+   */
+  async function callerStatement(connection: ConnectorConnection, ctx: ToolContext) {
+    const secret = listedSecret(connection);
     if (!secret) return undefined;
+    const url = new URL(connection.serverUrl);
     // Who the audit log's `tool.call` row says is behind the run; a call with no run has nobody.
     const user = ctx.runId ? (await runAuthorityById(ctx.db, ctx.orgId, ctx.runId)).personId : null;
     const iat = Math.floor((deps.now?.() ?? new Date()).getTime() / 1000);
+    // `model:<provider>`, or the kind of a program on a computer (`ToolContext.thinksWith`).
+    const [brain, provider] = (ctx.thinksWith ?? "").split(":");
     const claims = {
       iss: new URL(deps.publicUrl).origin,
       aud: url.host,
@@ -404,6 +417,10 @@ export function createConnectorToolSource(
       ...(ctx.runId ? { run: ctx.runId } : {}),
       conn: connection.id,
       ...(user ? { user } : {}),
+      ...(brain ? { brain } : {}),
+      ...(provider ? { provider } : {}),
+      channel: ctx.channelId,
+      ...(ctx.threadRootId ? { thread: ctx.threadRootId } : {}),
       iat,
       exp: iat + CALLER_STATEMENT_SECONDS,
       jti: crypto.randomUUID(),
@@ -445,6 +462,8 @@ export function createConnectorToolSource(
     const preset = presetForServer(connection.serverUrl)?.id;
     const composio = composioServiceOf(connection.serverUrl);
     const prefix = toolPrefixOfConnection(connection);
+    // Never Composio's: no server at its address ever reads a request of ours, so none is the operator's own.
+    const vouched = !composio && listedSecret(connection) !== undefined;
     return classified.flatMap((row): ToolDefinition[] => {
       const tool = byName.get(row.name);
       const access = row.access as ToolAccess;
@@ -477,6 +496,7 @@ export function createConnectorToolSource(
           // Its exact call may be approved ahead, except a tool that runs whatever its input says.
           ahead: !COMPOSIO_ANY_ACTION.has(tool.name),
           external: true, // whatever the server returns is third-party text
+          ...(vouched ? { server: "vouched" as const } : {}),
           // The executor names what each call does. A Composio action, and a custom server's own tool, is one action.
           // "Aprovar sempre" keeps either by the server's own name.
           rememberAs: tool.name,
@@ -523,6 +543,8 @@ export function createConnectorToolSource(
               content: result.content,
               isError: result.isError,
               data: { connector: "custom", serverId: connection.id, tool: tool.name, isError: result.isError },
+              // Only a listed server's word counts: any other could lock a run by saying so.
+              ...(vouched && result.meta?.[CONFIDENTIAL_META_KEY] === true ? { confidential: true as const } : {}),
             };
           },
         },
@@ -565,6 +587,7 @@ export function createConnectorToolSource(
             sensitive: mapped.sensitive === true,
             ahead: true,
             external: true, // whatever the server returns is third-party text
+            server: "catalog",
             describe: (input) => ({
               title: mapped.title ? fillTitle(mapped.title, input) : `${def.label}: ${tool.name}`,
               detail: `${def.id}.${tool.name} · ${Object.entries(input)

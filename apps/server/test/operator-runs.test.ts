@@ -354,6 +354,7 @@ test("runs: newest first with what each waits for or failed with; filters, pages
     waitResetsAt: null,
     waitAccountId: null,
     waitAccountMachineId: null,
+    accountId: null,
     waitingMachineId: null,
     canceled: null,
     errorCode: null,
@@ -1141,6 +1142,13 @@ test("a run's status as people read it, and what it waits for, from the marks th
     waitCode: "plan_limit",
     waitResetsAt: "2026-12-01T00:00:00.000Z",
   });
+  // A run that went on with the next account at its plan's limit (ADR 0041 §6) names that account, not its agent's own.
+  const moved = "0193ffff-0000-4000-8000-0000000000aa";
+  await t.db
+    .update(schema.agentRuns)
+    .set({ transcript: { accountMove: { from: UNKNOWN, to: moved, tried: [UNKNOWN, moved] } } })
+    .where(eq(schema.agentRuns.id, run.id));
+  expect((await trace(sent.ship)).run.accountId).toBe(moved);
   expect(await waiting({ code: "usage_pause", source: "budget" })).toEqual({
     ...none,
     shown: "waiting_budget",

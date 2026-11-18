@@ -12,7 +12,8 @@ import { monthStartUtc } from "./usage";
  * A workspace's limits (ADR 0079): plain numbers a billing service sets through the operator API, enforced here
  * without knowing any plan. Null is no limit, all a self-hosted server ever has.
  *
- * - `members`: membership rows, blocked accounts included; agents, invitations and requests to join never count.
+ * - `members`: membership rows, blocked accounts included; agents, invitations, requests to join and outside
+ *   collaborators (rows with `outside_of`, ADR 0191) never count.
  * - `membersMax`: the most people the plan takes with seats added (`members` up to it); null: the service sets none.
  * - `payerUserId`: not a limit, the person who pays for the plan, the only one the billing service lets add seats or
  *   change plans; null: not said.
@@ -113,7 +114,12 @@ export async function setOrgLimits(
 }
 
 const memberCount = async (db: Executor, orgId: string) =>
-  (await db.select({ n: count() }).from(organizationMembers).where(eq(organizationMembers.orgId, orgId)))[0]?.n ?? 0;
+  (
+    await db
+      .select({ n: count() })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.orgId, orgId), isNull(organizationMembers.outsideOf)))
+  )[0]?.n ?? 0;
 
 /**
  * Refuses one more person in a full workspace (`org.members_full`, 409). Exact only under the workspace's

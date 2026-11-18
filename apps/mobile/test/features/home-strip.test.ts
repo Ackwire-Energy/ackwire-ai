@@ -116,11 +116,9 @@ describe("Conversas with the strip and one list", () => {
   const home = src("chats/ChatsScreen.tsx");
   const strip = src("chats/PinnedStrip.tsx");
 
-  test("the strip stands under Início's widgets and the first-run line, above Recentes", () => {
+  test("the strip stands under Início's widgets, above Recentes", () => {
     const loaded = home.slice(home.indexOf("<HomeWidgets"));
-    const order = ["<HomeWidgets", "<FirstRunLine />", "<PinnedStrip", 'title={t("mobile.chats.recent")}'].map((p) =>
-      loaded.indexOf(p),
-    );
+    const order = ["<HomeWidgets", "<PinnedStrip", 'title={t("mobile.chats.recent")}'].map((p) => loaded.indexOf(p));
     expect(order.every((pos, i) => pos >= 0 && (i === 0 || pos > (order[i - 1] ?? 0)))).toBe(true);
     expect(home).toContain("pinnedRows(pinned.rows, starters, pins.pins)");
     expect(home).toContain('holdLabel={t("sidebarPins.unpin")}');
@@ -156,7 +154,7 @@ describe("Conversas with the strip and one list", () => {
     expect(row).toContain("<OpensConversation");
     expect(strip).toContain("<OpensConversation");
     expect(strip).toContain('onStart={r.kind === "dm" && !r.channelId ? onStart : undefined}');
-    expect(strip).toContain("onPressIn={warm}");
+    expect(strip).toContain("onTouchStart={warm}");
     expect(strip).toContain("{...hold}");
   });
 

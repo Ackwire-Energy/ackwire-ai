@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { EmailError } from "@agenteschat/adapters";
 import { eq, schema, sql } from "@agenteschat/db";
-import { completeJob, failJob, type OutboxJob, rethrowEmailError } from "@agenteschat/engine";
+import { completeJob, failJob, markThreadConfidential, type OutboxJob, rethrowEmailError } from "@agenteschat/engine";
 import { createLogger } from "../src/logger";
 import { createOperatorApp } from "../src/operator/app";
 import { createTestServer, planOfLast, type TestServer } from "./harness";
@@ -833,4 +833,64 @@ test("a job that failed says the status its error carried, never its words; one 
   await t.db.update(schema.outbox).set({ lastErrorStatus: 503 }).where(eq(schema.outbox.id, J_WOKE));
   const trace = await ok<{ jobs: Job[] }>(await get(`/runs/${RUN}/trace`));
   expect(trace.jobs.find((j) => j.id === J_WOKE)).toMatchObject({ lastErrorStatus: 503 });
+});
+
+test("a job of a run of a confidential thread says no error: in the list, among the run's jobs and in its trace", async () => {
+  const [sealedRun, root] = [uid("44444444", 9), uid("77777777", 9)];
+  // What a database answers when a write fails: the statement, and the values it was given.
+  const words = 'insert into "messages" failed with the values: canary words the run was writing';
+  const [channel] = await t.db
+    .insert(schema.channels)
+    .values({ orgId: ADA, name: "sealed", kind: "channel", visibility: "private" })
+    .returning({ id: schema.channels.id });
+  const channelId = channel?.id ?? "";
+  await t.db.insert(schema.agentRuns).values({
+    id: sealedRun,
+    orgId: ADA,
+    agentId: DEV,
+    channelId,
+    threadRootId: root,
+    triggerMessageId: root,
+    trigger: "mention",
+    hop: 1,
+    status: "failed",
+  });
+  const failed = {
+    orgId: ADA,
+    kind: "agent_run.execute",
+    payload: {},
+    status: "failed" as const,
+    attempts: 4,
+    lastError: words,
+    lastErrorStatus: 500,
+    nextAttemptAt: day(13),
+    createdAt: day(13),
+  };
+  await t.db.insert(schema.outbox).values([
+    { ...failed, id: job(31), dedupeKey: `agent_run.execute:${sealedRun}:steer:1` },
+    // Named after no run: a job of none, with its error.
+    { ...failed, id: job(32), dedupeKey: "agent_run.execute:nope" },
+  ]);
+  const listed = async () => (await ok<JobPage>(await get("/jobs?kind=agent_run.execute"))).jobs;
+  const told = async () =>
+    [
+      await listed(),
+      (await ok<JobPage>(await get(`/jobs?runId=${sealedRun}`))).jobs,
+      (await ok<{ jobs: Job[] }>(await get(`/runs/${sealedRun}/trace`))).jobs,
+    ].map((list) => list.find((j) => j.id === job(31))?.lastError);
+  expect(await told()).toEqual([words, words, words]);
+
+  await markThreadConfidential(t.db, { orgId: ADA, channelId, rootId: root });
+  expect(await told()).toEqual([null, null, null]);
+  // Its facts stay, and every other job says its own error.
+  const page = await listed();
+  expect(page.find((j) => j.id === job(31))).toMatchObject({
+    status: "failed",
+    attempts: 4,
+    lastErrorStatus: 500,
+    runId: sealedRun,
+    cause: "steer",
+  });
+  expect(page.find((j) => j.id === job(32))).toMatchObject({ runId: null, lastError: words });
+  expect(page.find((j) => j.id === J_WOKE)).toMatchObject({ lastError: expect.stringMatching(/^connect failed/) });
 });

@@ -87,6 +87,7 @@ import {
   publishMachineAgentsChanged,
   publishMachineStatus,
   publishMachineUpdated,
+  shownStandby,
 } from "./machines";
 import {
   DISK_REARM_USE,
@@ -222,6 +223,7 @@ export async function computerBackSoon(
     justGone?: boolean;
     signal?: AbortSignal;
     canceled?: () => boolean | Promise<boolean>;
+    why?: WakeWhy;
   } = {},
 ): Promise<boolean | null> {
   let until = Date.now() + (options.waitMs ?? COMPUTER_BLIP_WAIT_MS);
@@ -232,7 +234,7 @@ export async function computerBackSoon(
     if (status?.standby && !waking) {
       waking = true;
       until = Date.now() + (options.wakeWaitMs ?? COMPUTER_WAKE_WAIT_MS);
-      void machines?.wake?.(machineId, "run").catch(() => {});
+      void machines?.wake?.(machineId, options.why ?? "run").catch(() => {});
     }
     const gone = status?.lastSeenAt ? Date.now() - Date.parse(status.lastSeenAt) : Number.POSITIVE_INFINITY;
     if (!waking && (options.justGone === false || gone >= TASK_OFFLINE_GRACE_MS)) return false;
@@ -260,6 +262,31 @@ export async function callWhenBack<T>(
     if (!back) throw error;
     return send();
   }
+}
+
+/**
+ * How long a person's request waits for a computer in standby to wake: well under the server's 120 s idle timeout
+ * (`start.ts`), leaving room for the request itself.
+ */
+export const PERSON_WAKE_WAIT_MS = 45_000;
+
+/**
+ * Whether a person's request may go to the computer now: online, or in standby and woken for it within
+ * `PERSON_WAKE_WAIT_MS` (people never see it sleep, ADR 0161). Once per request; jobs never wait.
+ */
+export async function awakeForPerson(
+  machines: Pick<MachineCaller, "status" | "wake">,
+  status: Pick<MachineStatus, "id" | "online" | "standby"> | null | undefined,
+): Promise<boolean> {
+  if (!status) return false;
+  if (status.online) return true;
+  if (!status.standby) return false;
+  const back = await computerBackSoon(machines, status.id, {
+    justGone: false,
+    wakeWaitMs: PERSON_WAKE_WAIT_MS,
+    why: "call",
+  });
+  return back === true;
 }
 
 interface Pending {
@@ -452,7 +479,7 @@ type McpOutcome =
 
 /** What an agent reads where its computer's app is too old to hand it a picture or a PDF the tool returned. */
 export const MCP_IMAGES_TOO_OLD =
-  "[The picture or PDF this tool returned can't reach you: the agentes.chat app on this computer is too old to pass it on. Tell the person exactly that: updating the app on that computer lets it through.]";
+  "[The picture or PDF this tool returned can't reach you: the Ackwire AI app on this computer is too old to pass it on. Tell the person exactly that: updating the app on that computer lets it through.]";
 const MCP_IMAGES_TOO_BIG =
   "[The pictures or PDF this tool returned are too big together to pass to this computer at once. Open them one at a time.]";
 
@@ -714,6 +741,7 @@ export function createMachineHub(deps: MachineHubDeps) {
         lastSeenAt: now,
         // Awake: whatever put it in standby is over (ADR 0161).
         standbyAt: null,
+        wakeWantedAt: null,
         hostname: frame.hostname,
         os: frame.os,
         arch: frame.arch,
@@ -1610,7 +1638,8 @@ export function createMachineHub(deps: MachineHubDeps) {
       const row = await getMachineById(db, machineId);
       if (!row || row.deletedAt) throw new MachineOfflineError(row?.name ?? "computer", row?.kind);
       if (!machineOnline(row) || !row.connectedReplica || row.connectedReplica === replicaId) {
-        // Asleep by design: whatever asks for it wakes it (`callWhenBack` waits for that).
+        // Asleep by design: whatever asks for it wakes it. Who waits for that does it once, outside: a run's tool
+        // (`callWhenBack`), a person's request (`awakeForPerson`); a job fails now.
         if (inStandby(row)) void wantMachine(db, machineId, "call").catch(() => {});
         throw new MachineOfflineError(row.name, row.kind);
       }
@@ -1643,7 +1672,8 @@ export function createMachineHub(deps: MachineHubDeps) {
         executors: row.executors ?? {},
         paused: pause ? { until: pause.until, timezone: await machineOwnerTimezone(db, row).catch(() => null) } : null,
         access: row.access ?? null,
-        standby: inStandby(row),
+        // Still starting after its standby ended counts too: what waits for it waits on (`shownStandby`).
+        standby: inStandby(row) || shownStandby(row),
         ...(row.executors?.mode === "system" ? { mode: "system" as const } : {}),
       };
     },

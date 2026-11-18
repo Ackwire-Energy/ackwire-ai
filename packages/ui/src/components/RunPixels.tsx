@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { AGENT_GRADIENTS, bodyTones, gradientOf, mixHex, spriteGrid } from "../agent/engine.js";
 import { cx } from "../cx";
+import { PAINT_ATTRS } from "../theme";
 import type { AgentColor, AgentEyes } from "./AgentLook";
 
 /**
@@ -128,7 +129,7 @@ export function useCanvas(
     const ctx = canvas?.getContext?.("2d");
     if (!canvas || !ctx || typeof MutationObserver === "undefined") return;
     const theme = new MutationObserver(() => fn.current(ctx, canvas, performance.now() / 1000));
-    theme.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    theme.observe(document.documentElement, { attributes: true, attributeFilter: PAINT_ATTRS });
     return () => theme.disconnect();
   }, []);
   return ref;

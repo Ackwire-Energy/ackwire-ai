@@ -1,5 +1,6 @@
 /**
- * Sizes a conversation's rows measured, kept in memory while the app runs (nothing is stored anywhere).
+ * Sizes a conversation's rows measured, kept in memory while the app runs. Only the heights of messages' words also
+ * outlive it, in a file of the app's cache (`ClippedMessage`, `keptWordHeights`): ids and numbers, no content.
  *
  * The list unmounts a row that leaves the screen and mounts it again when it comes back. A row that measures part of
  * itself to decide its size (how tall its words are before they are cut, how wide a table's columns are, how much room
@@ -58,6 +59,30 @@ export function keepOpen(key: string | undefined, open: boolean) {
   if (key === undefined) return;
   if (open) keep(key, true);
   else kept.delete(key);
+}
+
+/** The keys of messages' words' heights (`ClippedMessage`): the only sizes kept across launches. */
+export const WORDS_KEY = "words:";
+
+/**
+ * The latest `max` heights of messages' words, the oldest first, for the next launch (`ClippedMessage`): a message's
+ * id and how tall its words are, never what they say.
+ */
+export function keptWordHeights(max: number): Record<string, number> {
+  const words: [string, number][] = [];
+  for (const [key, value] of kept) {
+    if (key.startsWith(WORDS_KEY) && typeof value === "number") words.push([key, value]);
+  }
+  return Object.fromEntries(words.slice(-max));
+}
+
+/** Heights an earlier launch kept (`keptWordHeights`); one measured in this run wins. Anything else is left out. */
+export function restoreWordHeights(saved: unknown) {
+  if (!saved || typeof saved !== "object") return;
+  for (const [key, value] of Object.entries(saved)) {
+    if (!key.startsWith(WORDS_KEY) || typeof value !== "number" || !Number.isFinite(value) || value <= 0) continue;
+    if (!kept.has(key)) keep(key, value);
+  }
 }
 
 /** Everything kept, gone (tests). */

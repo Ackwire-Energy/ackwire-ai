@@ -11,7 +11,7 @@ import { modelLimitOf } from "@agenteschat/providers/plans";
 import { agentIdsWithDetails, canTalkTo, speakerFor } from "./audience";
 import { sha256 } from "./crypto";
 import { NotFoundError } from "./errors";
-import { LISTED_ACCOUNT_STATUSES, type PlanServes, servesOf } from "./machine-accounts";
+import { isDefaultAccountLabel, LISTED_ACCOUNT_STATUSES, type PlanServes, servesOf } from "./machine-accounts";
 import { requirePermission } from "./organizations";
 import { agentBudgetsThisMonth, budgetPercent, canViewCost, monthStartUtc } from "./usage";
 import { WEB_USAGE_PROVIDER } from "./web-tools";
@@ -63,6 +63,8 @@ export interface PlanAccountInfo {
   accountId: string | null;
   /** Null for the computer's own sign-in (the app names it). */
   label: string | null;
+  /** Its owner gave it its name (`isDefaultAccountLabel`); false for the computer's own sign-in. */
+  named: boolean;
   plan: string | null;
   /** A key account's coding plan (`zai`, `kimi`…). */
   provider: string | null;
@@ -366,6 +368,7 @@ function accountOf(ctx: Context, key: string, viewerId: string | null): FoundAcc
         kind,
         accountId: null,
         label: null,
+        named: false,
         plan: kind === "claude_code" ? machine.claudePlan : null,
         provider: null,
         ownerName: machine.pairerName,
@@ -390,6 +393,7 @@ function accountOf(ctx: Context, key: string, viewerId: string | null): FoundAcc
       kind,
       accountId: row.id,
       label: row.label,
+      named: !isDefaultAccountLabel(kind, row.label, row.provider),
       plan: row.plan,
       provider: row.provider,
       ownerName,

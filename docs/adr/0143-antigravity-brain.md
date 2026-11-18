@@ -45,3 +45,4 @@ What the CLI does, read in antigravity.google/docs (cli/headless, cli/reference,
 
 - A Gemini plan thinks for its owner's agents on a Linux computer whose runner is 44 or newer with the Antigravity CLI installed, and for Lodi locked to our server's tools, with Google's warning in plain sight wherever a personal plan is in play.
 - Everything Antigravity-specific is behind runner protocol 44 and `kind: "antigravity"`: older runners and servers never see it.
+- *2026-11-15:* a run at its plan's limit goes on with the next account of the workspace's order (ADR 0041 §6), never with a Gemini account: that is the account rotation Google's FAQ forbids (see Context).

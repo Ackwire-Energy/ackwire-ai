@@ -220,6 +220,11 @@ export const words: EmailWords = {
     preheader: "Setujui atau tolak di Anggota. Tidak ada yang terjadi sampai kamu menjawab.",
     headline: "Ada permintaan bergabung yang menunggu",
     body: (org) => ["Orang ini membuka tautan undangan ", { b: org }, " dan minta bergabung."],
+    outside: (by) => [
+      "Orang ini bekerja untuk ",
+      { b: by },
+      " dan minta bergabung sebagai kolaborator eksternal. Mereka tidak memakai kursi di paketmu, dan kamu bisa mengeluarkan mereka kapan saja.",
+    ],
     note: "Setujui hanya orang yang kamu kenal. Mereka bergabung sebagai anggota, kecuali kamu memilih peran lain di halaman itu.",
     approve: "Setujui",
     deny: "Tolak",
@@ -318,7 +323,7 @@ export const words: EmailWords = {
   emailChange: {
     code: {
       subject: (code) => `${code} adalah kodemu untuk mengganti emailmu`,
-      preheader: "Ketik di agentes.chat untuk mengonfirmasi. Kodenya berlaku 10 menit.",
+      preheader: "Ketik di Ackwire AI untuk mengonfirmasi. Kodenya berlaku 10 menit.",
       headline: "Kodemu",
       body: (email, newEmail) => [
         "Ketik kode ini untuk mengganti email akun ",
@@ -334,19 +339,19 @@ export const words: EmailWords = {
       ],
       noSupport:
         "Berlaku 10 menit, dan emailmu tidak berubah tanpa kode ini. Kalau ini bukan kamu, jangan bagikan kodenya dan beri tahu pengelola server ini.",
-      why: "Kamu menerima email ini karena akunmu meminta untuk mengganti email di agentes.chat.",
+      why: "Kamu menerima email ini karena akunmu meminta untuk mengganti email di Ackwire AI.",
     },
     link: {
-      subject: "Konfirmasi email barumu untuk agentes.chat",
+      subject: "Konfirmasi email barumu untuk Ackwire AI",
       preheader: "Sekali klik, mulai sekarang kamu masuk dengan alamat ini. Tautannya berlaku satu jam.",
       headline: "Konfirmasi email barumu",
       body: "Tinggal satu langkah: konfirmasi bahwa alamat ini milikmu. Setelah itu akunmu masuk dengan alamat ini.",
       button: "Konfirmasi email baru",
       small: "Tautannya berlaku satu jam. Kalau kamu tidak memintanya, abaikan saja email ini.",
-      why: "Kamu menerima email ini karena seseorang meminta alamat ini dipakai untuk akun agentes.chat.",
+      why: "Kamu menerima email ini karena seseorang meminta alamat ini dipakai untuk akun Ackwire AI.",
     },
     changed: {
-      subject: "Email akun agentes.chat kamu sudah berubah",
+      subject: "Email akun Ackwire AI kamu sudah berubah",
       preheader: "Kalau bukan kamu, alamat ini bisa dikembalikan selama 7 hari.",
       headline: "Emailmu sudah berubah",
       body: (email, newEmail) => ["Akun ", { b: email }, " sekarang masuk dengan ", { b: newEmail }, "."],
@@ -354,7 +359,7 @@ export const words: EmailWords = {
         "Bukan kamu? Tekan tombolnya dalam 7 hari. Alamat ini kembali, semua sesi dikeluarkan, aplikasi AI diputuskan, dan cara masuk yang ditambahkan sejak itu tidak berlaku lagi. Kata sandi juga dihapus, dan “Lupa kata sandi” membuat yang berikutnya.",
       button: "Ini bukan saya",
       small: "Kalau ini kamu, tidak perlu melakukan apa-apa.",
-      why: "Kamu menerima email ini karena alamat ini adalah email sebuah akun agentes.chat.",
+      why: "Kamu menerima email ini karena alamat ini adalah email sebuah akun Ackwire AI.",
     },
   },
   deleting: {
@@ -534,6 +539,31 @@ export const words: EmailWords = {
       },
       why: () =>
         "Kamu menerima email ini karena ruang kerja ini di Ackwire AI adalah milikmu. Kami hanya mengirim dua pemberitahuan seperti ini.",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface} ditautkan ke akun Ackwire AI kamu`,
+      preheader: "Asistenmu sekarang menjawabmu di sana. Kalau bukan kamu, putuskan tautannya.",
+      headline: (surface) => `${surface} ditautkan`,
+      body: (surface, display, org) => [
+        { b: display },
+        ` di ${surface} sekarang bicara dengan asistenmu di `,
+        { b: org },
+        ".",
+      ],
+      notYou: "Bukan kamu? Putuskan tautannya. Pesan dari sana langsung berhenti masuk ke akunmu.",
+      button: "Putuskan tautan",
+      small: "Kalau itu kamu, tidak perlu melakukan apa-apa. Kamu bisa memutuskannya kapan saja di Pengaturan.",
+      why: (surface) => `Kamu menerima email ini karena ${surface} ditautkan ke akun Ackwire AI kamu.`,
+    },
+    unlinked: {
+      subject: (surface) => `Tautan ${surface} ke akun Ackwire AI kamu diputus`,
+      preheader: "Identitasnya berubah. Tautkan lagi di Pengaturan kalau itu kamu.",
+      headline: (surface) => `Tautan ${surface} diputus`,
+      body: (surface, display) => [{ b: display }, ` di ${surface} diputus tautannya karena identitasnya berubah.`],
+      small: "Tautkan lagi di Pengaturan kalau itu kamu.",
+      why: (surface) => `Kamu menerima email ini karena ${surface} pernah ditautkan ke akun Ackwire AI kamu.`,
     },
   },
 };

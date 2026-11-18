@@ -129,6 +129,11 @@ export async function recordToolCall(
     /** A call that ran without the card its tool would open, because its agent never asks (ADR 0173). */
     unasked?: boolean;
     about?: ToolCallSubject | null;
+    /**
+     * A call of a run in a confidential thread (ADR 0190): the row says the tool and how it ended, never its
+     * arguments, title or reason. Those may repeat what the run read, and this log is kept for good.
+     */
+    confidential?: boolean;
   },
 ) {
   // A secret's variable-style name is the agent's own: people read its label (the call's title), never this.
@@ -136,8 +141,12 @@ export async function recordToolCall(
   const named = call.tool === REQUEST_SECRET_TOOL || call.tool === MAKE_KEY_TOOL;
   const asked = named && typeof secretName === "string" && secretName ? secretName : null;
   const unnamed = (text: string) => (asked ? text.replaceAll(asked, "the secret") : text);
-  const input = asked === null ? call.input : (JSON.parse(unnamed(JSON.stringify(rest))) as Record<string, unknown>);
-  const reason = call.reason && unnamed(call.reason);
+  const input = call.confidential
+    ? {}
+    : asked === null
+      ? call.input
+      : (JSON.parse(unnamed(JSON.stringify(rest))) as Record<string, unknown>);
+  const reason = call.confidential ? null : call.reason && unnamed(call.reason);
   await recordAudit(db, {
     orgId: call.orgId,
     actor: { type: "agent", id: call.agentId },
@@ -146,7 +155,8 @@ export async function recordToolCall(
     details: {
       kind: call.kind,
       ...(call.connector ? { connector: call.connector } : {}),
-      ...(call.title ? { title: cutText(masked(call.title), MAX_TITLE) } : {}),
+      ...(call.title && !call.confidential ? { title: cutText(masked(call.title), MAX_TITLE) } : {}),
+      ...(call.confidential ? { confidential: true } : {}),
       behind: call.authority?.kind ?? null,
       ...(call.authority?.kind === "routine" && call.authority.brief
         ? { routine: { id: call.authority.brief.routineId, name: call.authority.brief.name } }
@@ -158,7 +168,7 @@ export async function recordToolCall(
       ...(call.secretRequestId ? { secretRequestId: call.secretRequestId } : {}),
       ...(call.approvalRules?.length ? { approvalRules: call.approvalRules } : {}),
       ...(call.unasked ? { approvalsLevel: "never" } : {}),
-      ...(call.about ? { about: call.about } : {}),
+      ...(call.about && !call.confidential ? { about: call.about } : {}),
     },
     runId: call.runId,
     channelId: call.channelId,

@@ -138,6 +138,7 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         id: OLD_ACCOUNT,
         kind: "codex",
         label: "ChatGPT",
+        named: false,
         email: null,
         plan: null,
         status: "signed_out",
@@ -153,6 +154,10 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
         shared: false,
         providerOrgId: null,
         serves: "everyone",
+        useOrder: null,
+        sameAs: OLD_ACCOUNT,
+        // A login for one agent is never a next account.
+        movable: false,
       },
     ],
     canManage: true,
@@ -193,7 +198,10 @@ test("accounts on a computer: the runner's list, signing in with a sealed code, 
   // Rename; the agent thinks with it, at high effort.
   const renamed = await api(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "Trabalho" } });
   expect(renamed.status).toBe(200);
-  expect(((await renamed.json()) as Account).label).toBe("Trabalho");
+  const named = (await renamed.json()) as Account & { named?: boolean };
+  expect(named.label).toBe("Trabalho");
+  // A name its owner gave it: the apps title the account by it, not by its email.
+  expect(named.named).toBe(true);
   expect((await api(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "" } })).status).toBe(400);
   expect((await asAdmin(`${base}/accounts/${login.loginId}`, { method: "PATCH", json: { label: "Meu" } })).status).toBe(
     403,

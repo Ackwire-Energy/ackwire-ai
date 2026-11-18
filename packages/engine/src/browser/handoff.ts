@@ -958,7 +958,7 @@ export function createBrowserHandoffToolSource(
       }
       if (!servesDesktops(s)) {
         return {
-          unavailable: `The desktop isn't on or ready on the computer ${s.name}. Whoever connected it can turn it on from agentes.chat; tell the people.`,
+          unavailable: `The desktop isn't on or ready on the computer ${s.name}. Whoever connected it can turn it on from Ackwire AI; tell the people.`,
         };
       }
       return { machineId: s.id, name: s.name, online: s.online };

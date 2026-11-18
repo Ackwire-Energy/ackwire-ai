@@ -13,11 +13,12 @@ describe("a text's pieces", () => {
     expect(spansAt).toBeGreaterThan(-1);
     expect(mentionAt).toBeGreaterThan(spansAt);
     const plain = spans.slice(spansAt, mentionAt);
-    for (const hook of ["useDirectory()", "useMyHandle()", "useTranslation()", "useTheme()"])
+    for (const hook of ["useRowDirectory()", "useRowMyHandle()", "useTranslation()", "useTheme()"])
       expect({ hook, inEveryText: plain.includes(hook) }).toEqual({ hook, inEveryText: false });
     expect(plain).toContain("return <MentionText key={key} text={s.text} everyone={everyone} ink={ink} />;");
     const mention = spans.slice(mentionAt, spans.indexOf("type TableBlock"));
-    for (const hook of ["useDirectory()", "useMyHandle()", "useTranslation()", "useTheme()"])
+    // In a conversation, the directory and my handle are the ones its rows share (`row-data.tsx`).
+    for (const hook of ["useRowDirectory()", "useRowMyHandle()", "useTranslation()", "useTheme()"])
       expect({ hook, inMention: mention.includes(hook) }).toEqual({ hook, inMention: true });
   });
 

@@ -12,6 +12,7 @@ import type { MachineHub } from "./machine-hub";
 import { notifyAgentHold, notifyOrgStanding, resolveAgentHold } from "./notification-producers";
 import { enqueue } from "./outbox";
 import { RIGHT_HAND } from "./right-hand";
+import { unlinkAllFor } from "./surfaces/links";
 import { isAgentesCloud } from "./telemetry";
 
 const {
@@ -577,6 +578,7 @@ export async function setUserBlocked(
     if (!change.blocked) return { ...row, sessionsRevoked: 0, orgIds: [] };
     const revoked = await tx.delete(sessions).where(eq(sessions.userId, userId)).returning({ id: sessions.id });
     await tx.delete(pushDevices).where(eq(pushDevices.userId, userId));
+    await unlinkAllFor(tx, userId);
     const orgs = await tx
       .select({ orgId: organizationMembers.orgId })
       .from(organizationMembers)

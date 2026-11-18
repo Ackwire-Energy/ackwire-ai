@@ -60,7 +60,6 @@ export interface AgentSetupInput {
   effort?: unknown;
   speed?: unknown;
   contextTokens?: unknown;
-  fallback?: unknown;
   onlyOwner?: unknown;
   autonomy?: unknown;
 }
@@ -139,10 +138,8 @@ function readSetup(input: AgentSetupInput): Setup {
   if (input.speed !== undefined && !isBrainSpeed(input.speed)) {
     throw new ValidationError("Choose standard or fast", "brain.invalid_speed");
   }
-  for (const flag of [input.fallback, input.onlyOwner]) {
-    if (flag !== undefined && typeof flag !== "boolean")
-      throw new ValidationError("A switch is on or off", "setup.invalid");
-  }
+  if (input.onlyOwner !== undefined && typeof input.onlyOwner !== "boolean")
+    throw new ValidationError("A switch is on or off", "setup.invalid");
   return {
     brain: input.brain,
     model: normalizeBrainModel(input.brain, input.model),
@@ -151,7 +148,6 @@ function readSetup(input: AgentSetupInput): Setup {
     effort,
     ...(input.speed !== undefined ? { speed: input.speed } : {}),
     contextTokens,
-    fallback: (input.fallback as boolean | undefined) ?? true,
     ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner as boolean } : {}),
     ...autonomy,
   };
@@ -394,7 +390,6 @@ function planFor(
     effort: setup.effort ?? null,
     ...(setup.speed ? { speed: setup.speed } : {}),
     contextTokens: setup.contextTokens ?? null,
-    fallback: setup.fallback ?? true,
   };
   const thinksSo = (account: string | null, onlyOwner?: boolean) =>
     brainOf(t.brain) === kind &&
@@ -403,7 +398,6 @@ function planFor(
     t.brainEffort === how.effort &&
     (how.speed === undefined || t.brainSpeed === how.speed) &&
     t.contextTokens === how.contextTokens &&
-    t.brainFallback === how.fallback &&
     (onlyOwner === undefined || !answersOthers(audienceOf(t), t.ownerUserId) === onlyOwner);
   const takes = takesAccount(t, c);
   if (takes === true) {
@@ -478,6 +472,11 @@ export interface NewAgentSetup {
   account?: {
     id: string;
     label: string;
+    /** Its owner gave it its name (`isDefaultAccountLabel`); else the apps show it by its email. */
+    named: boolean;
+    /** The caller's own's only. */
+    email: string | null;
+    plan: string | null;
     provider: string | null;
     /** The caller's own: a plan thinks only for its owner's agents. */
     mine: boolean;
@@ -487,7 +486,6 @@ export interface NewAgentSetup {
   /** The computer's own sign-in thinks for the caller's agents there (they connected it). */
   ownSignIn?: boolean;
   effort?: BrainEffortSetting | null;
-  fallback?: boolean;
   /** Its Autonomia; null: the default. Set at creation only by an admin or the new agent's owner (`createAgent`). */
   autonomy: CommandApproval | null;
 }
@@ -538,6 +536,9 @@ export async function getNewAgentSetup(
       ? {
           id: listed.id,
           label: listed.label,
+          named: listed.named,
+          email: listed.email,
+          plan: listed.plan,
           provider: listed.provider,
           mine: listed.mine,
           free: listed.shared || listed.usedByIds.length === 0,
@@ -545,7 +546,6 @@ export async function getNewAgentSetup(
       : null,
     ownSignIn: machine.pairedByUserId === userId,
     effort: isBrainEffortSetting(s.effort) ? s.effort : null,
-    fallback: s.fallback ?? true,
     autonomy,
   };
 }

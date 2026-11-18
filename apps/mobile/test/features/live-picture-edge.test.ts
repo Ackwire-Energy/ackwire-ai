@@ -35,8 +35,10 @@ describe("the live picture's edge on the phone", () => {
       read("features/browser/HandoffCard.tsx"),
       read("features/browser/parts.tsx"),
     ]);
-    // The closed card's thumbnail keeps its own border: no picture runs under it.
-    expect(style(card, "thumb")).toContain(HAIRLINE);
+    // The conversation's page has no thumbnail any more: it is always in view, in the agent's frame, which clips it.
+    expect(card).not.toContain("styles.thumb");
+    expect(style(card, "framePage")).not.toContain("borderWidth");
+    expect(style(card, "framePage")).not.toContain("borderRadius");
     expect(style(card, "page")).not.toContain("borderWidth");
     expect(card).not.toMatch(/styles\.page,\s*\{ borderColor/);
     expect(card).toContain("edge={styles.page.borderRadius}");
@@ -66,8 +68,9 @@ describe("the live picture's edge on the phone", () => {
     expect(before(watch, "<ScreenPage", "<PictureEdge radius={radius} />")).toBe(true);
     expect(before(watch, "<PictureEdge radius={radius} />", "<DesktopAgentPointer")).toBe(true);
     expect(watch).toContain("{ backgroundColor: c.sunken, borderRadius: radius }");
-    expect(card).toContain("radius={CARD - PAGE_INSET}");
-    expect(style(card, "screen")).not.toContain("borderRadius");
+    // In the conversation's frame the inner box rounds and clips it: the screen has no corners of its own.
+    expect(card).toContain("radius={0}");
+    expect(style(card, "screenRoom")).not.toContain("borderRadius");
   });
 
   test("the computer's own view: the line while the screen is the rounded box, under the pointer and the covers", async () => {

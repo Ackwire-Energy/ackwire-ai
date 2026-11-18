@@ -3,9 +3,9 @@ import { everyoneSuggestion } from "@agenteschat/client/lib/everyone";
 import { useQueryClient } from "@tanstack/react-query";
 import { Fragment, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text as RNText, StyleSheet, View } from "react-native";
+import { Text as RNText, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { Icon, OPTION_ROW, PressScale, Text, useTheme, useToast } from "@/ui";
+import { Icon, OPTION_ROW, PressScale, RowPressable, Text, useTheme, useToast } from "@/ui";
 import { Face } from "../shared/Face";
 import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
 import { type MentionOption, mentionOptions, splitMatch } from "./mentions";
@@ -84,11 +84,11 @@ export function MentionPicker({
       ]}
     >
       {all ? (
-        <Pressable
+        <RowPressable
           onPress={() => pick(all)}
           accessibilityRole="button"
           accessibilityLabel={`@${all}, ${t("mentions.everyone")}`}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+          style={styles.row}
         >
           <View style={[styles.everyone, { backgroundColor: c.sunken }]}>
             <Icon name="members" size={14} color={c.ink2} />
@@ -102,7 +102,7 @@ export function MentionPicker({
               {t("mentions.everyone")}
             </Text>
           </Text>
-        </Pressable>
+        </RowPressable>
       ) : null}
       {options.map((o, i) => {
         const prev = options[i - 1];
@@ -118,11 +118,11 @@ export function MentionPicker({
                 {o.inChannel ? t("mobile.mention.inChannel") : t("mobile.mention.outside")}
               </Text>
             ) : null}
-            <Pressable
+            <RowPressable
               onPress={() => pick(o.handle)}
               accessibilityRole="button"
               accessibilityLabel={`${o.name}, @${o.handle}`}
-              style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+              style={styles.row}
             >
               {i > 0 && !heading ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
               <Face who={{ type: o.type, id: o.id }} size={FACE} />
@@ -154,7 +154,7 @@ export function MentionPicker({
                   </Text>
                 </PressScale>
               ) : null}
-            </Pressable>
+            </RowPressable>
           </Fragment>
         );
       })}

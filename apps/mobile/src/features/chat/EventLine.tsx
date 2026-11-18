@@ -7,12 +7,13 @@ import { memo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { EventPill, EventPillAction, EventPillText, ProviderLogo, useToast } from "@/ui";
-import { useDirectory, useOrgId, useWhen } from "../shared/hooks";
+import { useOrgId, useWhen } from "../shared/hooks";
 import { ConsultPairRow } from "./ConsultGroup";
 import { keepOpen, keptOpen } from "./kept-sizes";
 import { eventLineOf } from "./logic";
 import { useQuietInset } from "./look";
 import { MessageText } from "./MessageText";
+import { useRowDirectory } from "./row-data";
 import { StoppedLine } from "./StoppedLine";
 
 /**
@@ -36,7 +37,7 @@ export const EventLine = memo(function EventLine({
   gap: number;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const when = useWhen();
   const keep = `event:${message.id}`;
   const [open, setOpen] = useState(() => keptOpen(keep));

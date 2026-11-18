@@ -29,14 +29,14 @@ import { useOpenHandoffId } from "./open";
 import { FrameView, useLiveConnection } from "./parts";
 
 /**
- * An agent's request for help in its browser, in the conversation. While nobody has opened it, it is the
- * request card: what the agent needs, "Ver a tela" showing its page as it is now, Abrir (takes the control
- * right here: the card becomes the agent's browser card) and "Agora não" (tells the agent, with an optional
- * reason). A request on the agent's desktop is the same card, Abrir taking it into the computer's full view (the
- * screen needs its room, ADR 0098), and one line that opens that view once someone helps there. Once someone is
- * in control of the browser it is the agent's browser card; once
- * it ends, the request card again, saying how it ended where its buttons were. The state comes from the message (`meta.browserHandoff`) and is refreshed
- * from the server. A push or the inbox opens this card.
+ * An agent's request for help in its browser, in the conversation, as on the web (`BrowserHandoffCard`). While nobody
+ * has opened it, it is the request card: what the agent needs, "See the screen" showing its page as it is now, Open
+ * (takes the control right here) and "Not now" (tells the agent, with an optional reason). Once someone is in control
+ * the same card says who is helping, and the agent's browser in its frame stands under it: in the person's control
+ * when it is theirs, behind Watch when it is someone else's. A request on the agent's desktop is the same card, Open
+ * taking it into the computer's full view (the screen needs its room, ADR 0098), and one line that opens that view
+ * once someone helps there. Once it ends, the request card says how it ended where its buttons were. The state comes
+ * from the message (`meta.browserHandoff`) and is refreshed from the server. A push or the inbox opens this card.
  */
 export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff }) {
   const { t } = useTranslation();
@@ -56,8 +56,8 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
     enabled: !desktop && (state === "waiting" || state === "mine"),
   });
   const opensScreen = drivesOnDesktop(h, screenQ.data);
-  // Opened from here (Abrir, a push): the browser card that takes the request's place starts open.
-  const [open, setOpen] = useState(false);
+  // Someone else helps: their page shows here only once this person asks to watch (Watch), as on the web.
+  const [watching, setWatching] = useState(false);
 
   // Over: the same request card, what was asked still its words, and how it ended and who did it where its buttons were.
   if (state === "done" || state === "failed" || state === "expired" || state === "cancelled" || state === "withdrawn") {
@@ -120,11 +120,45 @@ export function HandoffCard({ handoff: fromMessage }: { handoff: BrowserHandoff 
     );
   }
   if (state === "waiting") {
-    return (
-      <HandoffAsk handoff={h} desktop={desktop} opensScreen={opensScreen} claim={openId === h.id} onOpened={setOpen} />
-    );
+    return <HandoffAsk handoff={h} desktop={desktop} opensScreen={opensScreen} claim={openId === h.id} />;
   }
-  return <BrowserCard agentId={h.agentId} handoff={h} claim={openId === h.id} open={open} onToggle={setOpen} />;
+  const name = dir.agentById.get(h.agentId)?.name ?? t("channel.unknownAgent");
+  const helper = h.controllerUserId ? dir.memberById.get(h.controllerUserId)?.name : undefined;
+  const mine = state === "mine";
+  return (
+    <>
+      <AskCard
+        id={h.id}
+        kind={desktop ? "desktop" : "browser"}
+        agentId={h.agentId}
+        waitsFor={
+          mine
+            ? t("browser.card.helpingYou")
+            : t("browser.card.helping", { name: helper ?? t("channel.unknownPerson") })
+        }
+        lead={h.instructions}
+        well={{ tile: <IconTile name={desktop ? "laptop" : "globe"} size={20} bare />, title: name, detail: null }}
+        foot={
+          mine || watching ? null : (
+            <AskFoot>
+              <AskButtons
+                primary={
+                  <Button
+                    variant="secondary"
+                    size="card"
+                    wide
+                    label={t("browser.card.watch")}
+                    onPress={() => setWatching(true)}
+                  />
+                }
+              />
+            </AskFoot>
+          )
+        }
+      />
+      {mine || watching ? <BrowserCard agentId={h.agentId} handoff={h} claim={openId === h.id} /> : null}
+    </>
+  );
 }
 
 /** The request while it waits: the request card. */
@@ -133,14 +167,12 @@ function HandoffAsk({
   desktop,
   opensScreen,
   claim,
-  onOpened,
 }: {
   handoff: BrowserHandoff;
   desktop: boolean;
-  /** Helped on the agent's whole screen (`drivesOnDesktop`): Abrir goes to the computer's full view. */
+  /** Helped on the agent's whole screen (`drivesOnDesktop`): Open goes to the computer's full view. */
   opensScreen: boolean;
   claim: boolean;
-  onOpened: (open: boolean) => void;
 }) {
   const { t } = useTranslation();
   const { orgId, org } = useOrg();
@@ -166,7 +198,6 @@ function HandoffAsk({
   const take = async () => {
     if (taking.current) return;
     taking.current = true;
-    onOpened(true);
     try {
       await actions.takeControl(h.id);
       asks?.settle(h.id);
@@ -183,7 +214,6 @@ function HandoffAsk({
   useEffect(() => {
     if (!claim || !mine || claimed.current || h.status !== "pending") return;
     claimed.current = true;
-    onOpened(true);
     actions.takeControl(h.id).then(
       () => {
         if (opensScreen) openComputer(h.agentId, h.seat);

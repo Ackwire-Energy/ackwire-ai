@@ -1,3 +1,4 @@
+import { workspaceSky } from "@agenteschat/ui/sky/accent";
 import { Image } from "expo-image";
 import { useMemo } from "react";
 import { appHeaders, lastCookie } from "@/lib/auth";
@@ -13,10 +14,13 @@ import { LogoMark } from "@/ui";
  */
 export function OrgAvatar({
   logo,
+  accent,
   size = 30,
   server,
 }: {
   logo?: string | null | undefined;
+  /** That workspace's own accent (null: none), for a list that shows several; absent, the active workspace's. */
+  accent?: string | null | undefined;
   size?: number;
   /** The place the logo is read from (another server or account signed in to, in Workspaces); the current one by default. */
   server?: string;
@@ -26,7 +30,7 @@ export function OrgAvatar({
     const on = server ?? placeKey();
     return photoSource(logo, serverOf(on), appHeaders(lastCookie(on)));
   }, [logo, server]);
-  if (!source) return <LogoMark size={size} />;
+  if (!source) return <LogoMark size={size} {...(accent !== undefined ? { sky: workspaceSky(accent) } : {})} />;
   const round = size * 0.3;
   return (
     <Image

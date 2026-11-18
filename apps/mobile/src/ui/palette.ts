@@ -6,6 +6,9 @@ import {
   type ThemeColors,
   shadows as tokenShadows,
 } from "@agenteschat/tokens";
+import { accentPalette, accentSky, isAccentHex } from "@agenteschat/tokens/accent";
+import { setSkyColors } from "@agenteschat/ui/agent/engine";
+import type { TileTint } from "./icons.sf";
 
 /**
  * The phone app's colors (pure: no React Native import, so it is unit-tested). The design system's tokens,
@@ -30,7 +33,37 @@ export interface AppColors extends ThemeColors {
   badge: string;
   /** A sheet's grabber where we draw it (Android; iOS draws its own), the system's tone for it. */
   grabber: string;
+  /** The hairline between a list's rows, the system's own (`separator`): a step darker than `line2`. */
+  separator: string;
+  /** The system's secondary words (`secondaryLabel`): a row's value, beside the label. */
+  label2: string;
+  /** The system's tertiary marks (`tertiaryLabel`): a row's chevron and its menu's up-down mark. */
+  label3: string;
+  /** A list row under the finger, the system's own (`systemGray4`). */
+  rowLit: string;
+  /** The Settings tiles' colors, one per subject (`TILE_TINTS`); the same in both themes, as the system's are. */
+  tiles: Record<TileTint, string>;
 }
+
+/**
+ * The system's Settings tiles: its named colors in their light values, kept in dark too (the system's own tiles don't
+ * change with the theme). The agent's tile is the brand's blue.
+ */
+const TILES: Record<TileTint, string> = {
+  red: "#ff3b30",
+  orange: "#ff9500",
+  yellow: "#ffcc00",
+  green: "#34c759",
+  teal: "#30b0c7",
+  cyan: "#32ade6",
+  blue: "#007aff",
+  indigo: "#5856d6",
+  purple: "#af52de",
+  pink: "#ff2d55",
+  brown: "#a2845e",
+  gray: "#8e8e93",
+  agent: lightTokens.agent,
+};
 
 /** Light, native: what changes from the tokens. */
 const NATIVE_LIGHT: Partial<ThemeColors> = {
@@ -69,6 +102,11 @@ export function appColors(scheme: Scheme): AppColors {
       chip: darkTokens.sunken,
       badge: "#ff453a",
       grabber: "rgba(235, 235, 245, 0.3)",
+      separator: "rgba(84, 84, 88, 0.65)",
+      label2: "rgba(235, 235, 245, 0.6)",
+      label3: "rgba(235, 235, 245, 0.3)",
+      rowLit: "#3a3a3c",
+      tiles: TILES,
     };
   }
   const base = { ...lightTokens, ...NATIVE_LIGHT };
@@ -82,7 +120,28 @@ export function appColors(scheme: Scheme): AppColors {
     chip: "rgba(120, 120, 128, 0.1)",
     badge: "#ff3b30",
     grabber: "rgba(60, 60, 67, 0.3)",
+    separator: "rgba(60, 60, 67, 0.29)",
+    label2: "rgba(60, 60, 67, 0.6)",
+    label3: "rgba(60, 60, 67, 0.3)",
+    rowLit: "#d1d1d6",
+    tiles: TILES,
   };
+}
+
+/** The workspace's accent (ADR 0193) in place of the agent colors; the theme's own without one. */
+export function withAccent(colors: AppColors, scheme: Scheme, accent: string | null | undefined): AppColors {
+  return isAccentHex(accent) ? { ...colors, ...accentPalette(accent)[scheme] } : colors;
+}
+
+let sky: string | null = null;
+
+/** Which accent the engine's `sky` is now (null: the default). */
+export const skyAccent = () => sky;
+
+/** Makes a workspace's accent the engine's `sky` (ADR 0193), or the default again with null. */
+export function paintSky(color: string | null) {
+  sky = color;
+  setSkyColors(color ? accentSky(color) : null);
 }
 
 /** A card inside a dark sheet: one step above the sheet, as the sheet is one above the screen. */

@@ -138,6 +138,85 @@ describe("Auditoria in words (web and phone)", () => {
     expect(auditDetailEntries(details).map(([k]) => k)).toEqual(["name", "paid"]);
   });
 
+  test("whoever runs the server read something: who and what, then at whose request or for which fault, never an id", () => {
+    const read = (details: Record<string, unknown>, over: Partial<AuditRow> = {}) =>
+      row({
+        actor: { type: "system", id: null, name: null },
+        action: "operator.content_read",
+        target: { type: "message", id: "m1" },
+        details: { field: "text", offset: 0, limit: 2000, ...details },
+        runId: null,
+        channelId: null,
+        channel: null,
+        onBehalfOf: null,
+        outcome: null,
+        ...over,
+      });
+    const bia = { onBehalfOf: { id: "u1", name: "Bia" } };
+    const asked = read({ purpose: "member_request", requestId: "q1", source: "form", assistedByAi: true }, bia);
+    expect(auditSentence(t, asked, "en")).toEqual({
+      name: null,
+      text: "audit.operatorRead.sentence(audit.operatorRead.who.server,audit.operatorRead.what.message)",
+    });
+    const why = "audit.operatorRead.request.app(Bia) · audit.operatorRead.ai";
+    expect([auditSubLine(t, asked), auditReason(t, asked)]).toEqual([why, why]);
+    expect(auditOutcome(t, asked)).toBeNull();
+
+    // How the request arrived, and who recorded one that came another way.
+    const how = (source: unknown, cloud?: true) =>
+      auditSubLine(t, read({ purpose: "member_request", source, ...(cloud ? { cloud } : {}) }, bia));
+    expect(how("offer")).toBe("audit.operatorRead.request.app(Bia)");
+    expect(how("email")).toBe("audit.operatorRead.request.email(Bia)");
+    expect(how("operator")).toBe("audit.operatorRead.request.operator(Bia)");
+    expect(how("operator", true)).toBe("audit.operatorRead.request.support(Bia)");
+    expect(how("pigeon")).toBe("audit.operatorRead.request.plain(Bia)");
+    expect(how(undefined)).toBe("audit.operatorRead.request.plain(Bia)");
+    // Their account is gone since.
+    expect(auditSubLine(t, read({ purpose: "member_request", source: "form" }))).toBe(
+      "audit.operatorRead.request.app(audit.removed)",
+    );
+
+    // A fault is nobody's request, even when a report named the run.
+    const fault = read({ purpose: "fault", runId: "r1", requestId: "q1", assistedByAi: false }, bia);
+    expect([auditSubLine(t, fault), auditReason(t, fault)]).toEqual([
+      "audit.operatorRead.fault",
+      "audit.operatorRead.fault",
+    ]);
+    // A purpose these apps don't know says nothing it can't.
+    expect([auditSubLine(t, read({ purpose: "later" })), auditReason(t, read({ purpose: "later" }))]).toEqual([
+      "",
+      null,
+    ]);
+
+    // What was read, by the entry's target. On agentes.chat's own servers, its support.
+    const what = (type: string, details: Record<string, unknown> = {}) =>
+      auditSentence(t, read({ purpose: "fault", ...details }, { target: { type, id: null } }), "en").text;
+    for (const kind of ["run_step", "agent", "routine", "task", "channel", "connection", "support_request"]) {
+      expect(what(kind)).toBe(
+        `audit.operatorRead.sentence(audit.operatorRead.who.server,audit.operatorRead.what.${kind})`,
+      );
+    }
+    expect(what("message", { direct: true })).toBe(
+      "audit.operatorRead.sentence(audit.operatorRead.who.server,audit.operatorRead.what.direct)",
+    );
+    expect(what("constructor")).toBe(
+      "audit.operatorRead.sentence(audit.operatorRead.who.server,audit.operatorRead.what.other)",
+    );
+    expect(what("message", { cloud: true })).toBe(
+      "audit.operatorRead.sentence(audit.operatorRead.who.cloud,audit.operatorRead.what.message)",
+    );
+    // The panel's details: what was read of it, never an id nor the server's own mark.
+    expect(auditDetailEntries({ ...asked.details, seq: 3, runId: "r1", cloud: true })).toEqual([
+      ["field", "text"],
+      ["offset", 0],
+      ["limit", 2000],
+      ["purpose", "member_request"],
+      ["source", "form"],
+      ["assistedByAi", true],
+      ["seq", 3],
+    ]);
+  });
+
   test("a merge done without asking says where", () => {
     const merged = row({
       action: "agent.merged_without_asking",
@@ -159,4 +238,19 @@ describe("Auditoria in words (web and phone)", () => {
     expect(auditOutcome(t, delivered)).toMatchObject({ mood: "neutral", text: "audit.outcome.delivered" });
     expect(auditOutcome(t, row({ action: "routine.created", outcome: null }))).toBeNull();
   });
+});
+
+test("an outside collaborator's approval, removal and leaving say who they work for (ADR 0191)", () => {
+  const person = { type: "person" as const, id: "u1", name: "Bia" };
+  const of = (action: string, details: Record<string, unknown>, actor: AuditRow["actor"] = person) =>
+    auditSentence(t, row({ actor, action, target: { type: "person", id: "u2" }, details }), "en");
+  expect(of("join_request.approved", { outsideOf: "Northwind" }).text).toBe("audit.change.outside.approved(Northwind)");
+  expect(of("member.removed", { outsideOf: "Northwind" }, { type: "system", id: null, name: null })).toEqual({
+    name: null,
+    text: "audit.change.outside.removed(Northwind)",
+  });
+  expect(of("member.left", { outsideOf: "Northwind" }).text).toBe("audit.change.outside.left(Northwind)");
+  // Without it, the sentences as before.
+  expect(of("member.left", {}).text).toBe("audit.change.member.left");
+  expect(of("join_request.approved", {}).text).not.toContain("outside");
 });

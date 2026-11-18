@@ -83,7 +83,7 @@ import { MachineToolButton } from "../devices/ToolOneClick";
 import { AgentFace } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { goBack, MONO, successHaptic } from "../shared/parts";
+import { FocusLive, goBack, MONO, successHaptic } from "../shared/parts";
 import { TextArea } from "../shared/TextArea";
 import { DESKTOP_TURN_ON, grantCommand, osOf, pauseText, type Reduce, reduceTexts, seenText } from "./logic";
 import {
@@ -101,9 +101,18 @@ import {
  * agents that use it (each opens its page; Abrir shows its computer to whoever may watch it); then what it allows:
  * the folders and who uses each, its tools, the agents' browser, apps on the agents' screens, and how to allow more
  * (only ever on the computer itself). Admins and whoever connected it take things away, rename or remove it;
- * everyone else reads. The workspace's own computer (ADR 0056 §10) shows its size and its help page instead.
+ * everyone else reads. The workspace's own computer (ADR 0056 §10) shows its size and its help page instead. Its
+ * portrait and the agents at work hold still while a screen it opened is over it.
  */
 export function MachineScreen({ machineId }: { machineId: string }) {
+  return (
+    <FocusLive>
+      <MachinePage machineId={machineId} />
+    </FocusLive>
+  );
+}
+
+function MachinePage({ machineId }: { machineId: string }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
   const api = useApi();

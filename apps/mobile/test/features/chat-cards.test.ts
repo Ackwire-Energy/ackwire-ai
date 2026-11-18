@@ -121,7 +121,7 @@ describe("agents it asked first: one pair row right before the reply, never insi
     expect(reach).not.toContain("reach.see");
     // One older than the conversation's list goes back is loaded on its own, never the "Entregue ao" text.
     expect(source("ConsultGroup.tsx")).toContain(
-      "useConsultationConversation(orgId, channelId, id && list.isSuccess && !listed ? id : null)",
+      "useConsultationConversation(orgId, channelId, id && list.loaded && !listed ? id : null)",
     );
     const row = source("MessageRow.tsx");
     expect(row).toContain("const reached = useMemo(() => reachHandoffs(m.meta), [m.meta]);");
@@ -131,7 +131,9 @@ describe("agents it asked first: one pair row right before the reply, never insi
 
 describe("an exchange between the same two agents", () => {
   test("is one row on its first asking run's reply, and one conversation when opened", () => {
-    expect(source("ConsultGroup.tsx")).toContain("groupsByRun(asExchanges(list.data ?? []))");
+    // Grouped once for the conversation (`RowConsults`), each reply's row reading its run's.
+    expect(source("row-data.tsx")).toContain("byRun: groupsByRun(asExchanges(list ?? []))");
+    expect(source("ConsultGroup.tsx")).toContain("const group = runId ? list.byRun.get(runId) : undefined;");
     expect(source("ConsultGroup.tsx")).toContain("consultPair(items, now, askerId,");
     expect(source("ChatScreen.tsx")).toContain("asExchanges(consultData)");
     expect(source("ConsultationScreen.tsx")).toContain("useExchangeConversation(");

@@ -22,7 +22,7 @@ describe("the flow's pages are routes of their own", () => {
   test("its first page and each page after it are pushed screens on the grouped gray", () => {
     expect(existsSync(join(MAIN, "connect-ai.tsx"))).toBe(false);
     const layout = mainLayout();
-    for (const page of ["index", "plans", "plan", "key", "makers"]) {
+    for (const page of ["index", "have", "plans", "plan", "key", "makers"]) {
       expect({ page, exists: existsSync(join(MAIN, "connect-ai", `${page}.tsx`)) }).toEqual({ page, exists: true });
       expect({ page, options: ownOptionsOf(`connect-ai/${page}`, layout) }).toEqual({ page, options: "connectAi," });
     }
@@ -115,5 +115,6 @@ describe("what the pages share", () => {
       "/connect-ai/plan?s=connect-3&d=3&choice=chatgpt",
     );
     expect(connectAiHref("connect-3", 2, { page: "key" })).toBe("/connect-ai/key?s=connect-3&d=2");
+    expect(connectAiHref("connect-3", 2, { page: "have" })).toBe("/connect-ai/have?s=connect-3&d=2");
   });
 });

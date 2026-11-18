@@ -62,6 +62,17 @@ test("on a phone a switch stays beside its words only while they keep 24 charact
   const line = ".settings-row--lead:has(>.settings-row__end>.ac-switch)>.settings-row__text>.settings-row__status";
   expect(last(phone, line, "flex-basis")).toBe("100%");
   expect(last(phone, line, "order")).toBe("1");
+  // With a status and any other control at its end (a button), the status goes under the name at the row's width and
+  // the control under the status, from the words' edge.
+  const button =
+    ".settings-row--lead:not(.settings-row--open,:has(>.settings-row__end>.ac-switch)):has(>.settings-row__end)";
+  expect(last(phone, `${button}>.settings-row__text:has(>.settings-row__status)`, "display")).toBe("contents");
+  expect(last(phone, `${button}>.settings-row__text:has(>.settings-row__status)>:first-child`, "flex")).toBe("24ch");
+  expect(last(phone, `${button}>.settings-row__text>.settings-row__status`, "flex-basis")).toBe("100%");
+  expect(last(phone, `${button}>.settings-row__text>.settings-row__status`, "order")).toBe("1");
+  const end =
+    ".settings-row--lead:not(.settings-row--open):has(>.settings-row__text>.settings-row__status)>.settings-row__end:not(:has(>.ac-switch))";
+  expect(last(phone, end, "order")).toBe("2");
   const grids = rules(phone).filter((r) => r.declarations.some(([p, v]) => p === "display" && v === "grid"));
   expect(grids.flatMap((r) => r.selectors).filter((s) => s.includes(".ac-switch"))).toEqual([]);
 });

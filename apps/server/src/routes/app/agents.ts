@@ -261,6 +261,13 @@ const AgentProposal = z
             description:
               "A routine of its own, created with it (its schedule read when proposed: `rule`, else `cron`). It reports where the card is (a DM: the creator's DM with it).",
           }),
+        hello: z.string().optional().openapi({
+          description: "How it introduces itself, in its own voice (ADR 0164): the speech bubble on its card.",
+        }),
+        later: z.array(z.string()).optional().openapi({
+          description:
+            "Catalog apps its job needs that aren't connected yet (preset ids): its chat asks to connect them.",
+        }),
         ai: z.discriminatedUnion("kind", [
           z.object({
             kind: z.literal("account"),
@@ -698,7 +705,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Whether each agent has an AI to think with, whether the organization has any, and who picks the agents",
       description:
-        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with, and no fallback; `own`: with `not_signed_in`, the CLI whose own sign-in isn't there on the computer, where the agent has no account); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
+        "Per agent: `ready`; `no_ai` with why (`no_key`, `not_signed_in`, `no_computer`, `cli_missing`: nothing to think with; `own`: with `not_signed_in`, the CLI whose own sign-in isn't there on the computer, where the agent has no account); `waiting` (its computer is away for now). `any`: an agent that isn't archived is ready or waiting. `routing` (ADR 0074): who picks the agents for a message nobody mentioned, for the workspace (`by`) and for the caller's own messages (`mine`): Jev, the organization's small model (`model`), people's own plans (only for their own messages), rules, or `off` (only mentions). `noSmallModel`: with `rules`, the default key's provider, which has no small model. `apiKey`: a key of its own, or the server's own Claude key. Computed on each request; no key is read.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -743,7 +750,7 @@ export function agentRoutes(deps: AppDeps) {
                 }),
                 background: z.enum(["ready", "no_ai", "waiting"]).optional().openapi({
                   description:
-                    "Its state for background work (a routine, a widget's build) where that differs from `state`: background work never falls back on the model brain, and the right hand's thinks with the workspace's own AI, nobody's.",
+                    "Its state for background work (a routine, a widget's build) where that differs from `state`: the right hand's thinks with the workspace's own AI, nobody's.",
                 }),
               }),
             ),
@@ -789,7 +796,7 @@ export function agentRoutes(deps: AppDeps) {
       security,
       summary: "Each agent's presence (online, busy, away, out of office, offline) and what it says it is doing",
       description:
-        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes (one never active, in the 30 minutes since it was made; the right hand always); `away` after that; `out` (out of office, §12) while its plan is at its limit with no model to fall back on or its monthly budget is spent, with an `out_of_plan`/`out_of_budget` line whose `until` says when it is back, and the router leaves it out of messages nobody mentioned it in; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
+        "From its work (ADR 0084): `busy` on a routine, a task, a run going for over 2 minutes or one rated heavy, or when it said so; `online` while answering, waiting on an answer or active in the last 30 minutes (one never active, in the 30 minutes since it was made; the right hand always); `away` after that; `out` (out of office, §12) while its plan is at its limit or its monthly budget is spent, with an `out_of_plan`/`out_of_budget` line whose `until` says when it is back, and the router leaves it out of messages nobody mentioned it in; `offline` when held. An agent with no AI is drawn offline by the apps (`ai-status`). `status`: its own words (`set_status`), a line picked for its run (`kind` + `subject`), or what its run waits on; gone when the run ends unless it set `until`. Refreshed on `agent.status` events and every 30 seconds while open.",
       request: { params: OrgParams },
       responses: {
         200: json(
@@ -891,15 +898,7 @@ export function agentRoutes(deps: AppDeps) {
     }),
     async (c) => {
       const { orgId } = c.req.valid("param");
-      const gateway = deps.extras?.context?.gateway;
-      // A plan at its limit still answers through a model with a key (ADR 0032 §5): not out of office then.
-      const hasModel = gateway
-        ? (agent: Parameters<typeof gateway.hasModelCredential>[0]) => gateway.hasModelCredential(agent)
-        : undefined;
-      return c.json(
-        { agents: await agentStatuses(db, c.get("user").id, orgId, new Date(), hasModel ? { hasModel } : {}) },
-        200,
-      );
+      return c.json({ agents: await agentStatuses(db, c.get("user").id, orgId) }, 200);
     },
   );
 
@@ -1467,6 +1466,14 @@ export function agentRoutes(deps: AppDeps) {
       reason: z.enum(["plan", "budget"]).nullable(),
       plan: z.string().nullable(),
       resetsAt: z.string().nullable(),
+      account: z.object({ id: z.uuid(), label: z.string() }).nullable().openapi({
+        description:
+          "A plan's line: the account it waits on, another than the agent's own when its run went on with the next account of the order (ADR 0041 §6); null: the computer's own sign-in, or a budget.",
+      }),
+      chain: z.number().int().nullable().openapi({
+        description:
+          "Every account of the order is at its limit: how many (`resetsAt` is when the first one resets); null otherwise.",
+      }),
       sharedWith: z.array(z.uuid()).openapi({ description: "Other agents waiting in the same plan's line." }),
       rows: z.array(UsageQueueRow),
       hidden: z.number().int().openapi({ description: "Waiting in conversations the viewer can't read." }),
@@ -1931,7 +1938,7 @@ export function agentRoutes(deps: AppDeps) {
       tags,
       security,
       summary:
-        "\"Quem pensa\" (ADR 0032): the model (API), Claude Code or Codex on its computer, the model and the fallback, with what its computer offers. An admin or the agent's owner; the team's right hand's `mine`, any member.",
+        "\"Quem pensa\" (ADR 0032): the model (API), Claude Code or Codex on its computer and the model, with what its computer offers. An admin or the agent's owner; the team's right hand's `mine`, any member.",
       request: { params: AgentParams, query: z.object({ scope: BrainScope.optional() }) },
       responses: { 200: json(AgentBrain), ...errors },
     }),
@@ -1960,10 +1967,13 @@ export function agentRoutes(deps: AppDeps) {
               description:
                 "Claude Code: `opus`, `sonnet`, `haiku`, a Claude model id or one of a coding plan's models by id (`@agenteschat/providers/plans`; another account runs `sonnet` for it); Codex: a model name; `auto` (each run picks the tier). Null = the brain's default; omitted = keep (reset when the brain changes).",
             }),
-            fallback: z.boolean().optional(),
+            fallback: z.boolean().optional().openapi({
+              deprecated: true,
+              description: "Ignored: the API never stands in for a computer that stops answering. Older apps send it.",
+            }),
             extraUsage: z.boolean().optional().openapi({
               description:
-                "Long work may go on into the plan's paid extra usage when the provider reports it on (ADR 0118; Claude's plans); false: it pauses at 95% of the plan like any other. Only the agent's owner changes it (`brain.extra_owner_only`): it bills their plan. Omitted = keep.",
+                "Allow paid extra usage on the agent owner's own plan (AW-003). Only its owner changes it; unavailable for borrowed plans and the right hand. Omitted = keep.",
             }),
             onlyOwner: z.boolean().optional().openapi({
               description:
@@ -1979,6 +1989,10 @@ export function agentRoutes(deps: AppDeps) {
             }),
             moveAccount: z.boolean().optional().openapi({
               description: "The account thinks for another agent (`account.in_use`): take it from that one (audited).",
+            }),
+            accountPinned: z.boolean().optional().openapi({
+              description:
+                "\"Só esta conta\" (ADR 0041 §6): true, at its plan's limit it waits for its own account; false, it goes on with the next account of the order. Omitted = keep. Ignored for the team's right hand's `mine`.",
             }),
             effort: BrainEffortSetting.nullable()
               .optional()

@@ -234,8 +234,6 @@
       "mute": "静音",
       "unmute": "取消静音"
     },
-    "firstRunLine": "{{name}} 正在组建团队 · {{done}}/{{total}}",
-    "firstRunLinePersonal": "{{name}} 正在准备你的智能体 · {{done}}/{{total}}",
     "first": {
       "title": "从你的第一个智能体开始",
       "subtitle": "给它起个名字，说明它做什么。它会以聊天的形式出现在这里。",
@@ -1568,18 +1566,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} 需要帮助",
-      "needsFor": "{{name}} 需要帮助 · {{time}}",
-      "inControlAt": "由你控制 · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "正在打开 {{name}} 的浏览器…",
-      "startingM": "正在打开 {{name}} 的浏览器…",
       "stopAskF": "关闭 {{name}} 的浏览器？",
       "stopAskM": "关闭 {{name}} 的浏览器？",
-      "whereF": "在 {{name}} 的浏览器中",
-      "whereM": "在 {{name}} 的浏览器中",
       "open": "打开",
-      "expandHint": "点按展开",
       "stop": "停止",
       "giveUp": "放弃"
     },
@@ -1587,7 +1576,6 @@
       "inControl": "由你控制",
       "helping": "由 {{name}} 控制",
       "watchOnly": "由 {{name}} 控制。你只能观看。",
-      "takeOver": "接管",
       "done": "完成",
       "handBack": "交还控制",
       "couldnt": "没能完成",
@@ -1608,7 +1596,6 @@
       "closedHelpM": "登录状态会保存，下次可直接使用。",
       "stuckHelpF": "重试会重启浏览器。登录状态会保留。",
       "stuckHelpM": "重试会重启浏览器。登录状态会保留。",
-      "hidden": "由 {{name}} 控制 · 屏幕已隐藏",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2116,7 +2103,6 @@
     "planRowSub": "在智能体的电脑上登录，无需密钥",
     "keyRow": "密钥",
     "keyRowSub": "按用量付费，直接付给提供方",
-    "already": "{{org}} 已有的",
     "stepOf": "{{step}}/{{total}}"
   },
   "crash": {
@@ -2752,5 +2738,11 @@
       "title": "没有需要查看的内容",
       "text": "智能体在对话之外做事时，会显示在这里。"
     }
+  },
+  "surface": {
+    "on": "已开启",
+    "codeText": "发送在那里打开的消息,然后回到这里。",
+    "openFailed": "无法在这台手机上打开 {{surface}}。请改为把下面的代码发过去。",
+    "orType": "或在那里发送此代码"
   }
 }

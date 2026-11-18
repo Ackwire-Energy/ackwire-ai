@@ -1,4 +1,4 @@
-import { ApiError, type StartChoice } from "@agenteschat/client";
+import { ApiError, type AuthConfig, type StartChoice } from "@agenteschat/client";
 import { startPlace } from "@agenteschat/client/lib/home";
 
 /**
@@ -161,3 +161,6 @@ export function workspacesBeyond(
   }
   return { others, servers };
 }
+
+/** Refer and earn shows only where the server has a referral service (ADR 0192). */
+export const offersReferrals = (server: AuthConfig | undefined) => Boolean(server?.referralsUrl);

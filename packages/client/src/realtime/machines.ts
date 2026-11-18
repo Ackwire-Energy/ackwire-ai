@@ -108,6 +108,7 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
     executors?: unknown;
     egress?: unknown;
     networkTransition?: unknown;
+    standby?: unknown;
   };
   if (typeof e.machineId !== "string") return true;
   const machineId = e.machineId;
@@ -142,11 +143,21 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
   if (accounts) void qc.invalidateQueries({ queryKey: keys.agents(orgId) });
   switch (e.type) {
     case "machine.status": {
-      const online = e.online === true;
+      // A computer gone into standby reads online still (ADR 0161); its hello ends the standby.
+      const asleep = e.online !== true && qc.getQueryData<Machine[]>(list)?.find((m) => m.id === machineId)?.standby;
+      const online = e.online === true || asleep === true;
       const now = new Date().toISOString();
       qc.setQueryData<Machine[]>(list, (old) =>
         old?.map((m) =>
-          m.id === machineId ? { ...m, online, egress: null, lastSeenAt: online ? now : m.lastSeenAt } : m,
+          m.id === machineId
+            ? {
+                ...m,
+                online,
+                egress: null,
+                lastSeenAt: e.online === true ? now : m.lastSeenAt,
+                ...(e.online === true && m.standby ? { standby: false } : {}),
+              }
+            : m,
         ),
       );
       patchTargets(qc, orgId, machineId, { online });
@@ -193,6 +204,9 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
         };
       }
       if (typeof e.name === "string") patch.name = e.name;
+      // Put in standby once it is asleep (ADR 0161): online again to people, its agents' computer too.
+      if (e.standby === true) Object.assign(patch, { standby: true, online: true });
+      else if (e.standby === false) patch.standby = false;
       const paused = pauseOf(e.paused);
       if (paused) patch.paused = paused;
       const access = accessOf(e.access);
@@ -206,9 +220,15 @@ export function applyMachineEvent(qc: QueryClient, orgId: string, event: { type:
           ),
         );
         if (patch.name) patchTargets(qc, orgId, machineId, { name: patch.name });
+        if (patch.online) patchTargets(qc, orgId, machineId, { online: true });
       }
       // Nothing to patch, or `access: true` (it changed, and who may see it differs per person): refetch.
       if (Object.keys(patch).length === 0 || e.access === true) void qc.invalidateQueries({ queryKey: list });
+      // Out of standby: whether it is online is the server's again.
+      if (e.standby === false) {
+        void qc.invalidateQueries({ queryKey: list });
+        void qc.invalidateQueries({ queryKey: keys.computers(orgId) });
+      }
       break;
     }
     case "machine.agents_moved":
@@ -497,6 +517,12 @@ export function applyWorkspaceEvent(qc: QueryClient, orgId: string, event: { typ
     });
     // The server's own record replaces this one.
     void qc.invalidateQueries({ queryKey: keys.me });
+    return true;
+  }
+  if (event.type === "org.look") {
+    // The workspace's logo or accent changed (ADR 0193): every member's apps repaint with it.
+    void qc.invalidateQueries({ queryKey: keys.me });
+    void qc.invalidateQueries({ queryKey: [...keys.org(orgId), "detail"], exact: true });
     return true;
   }
   if (event.type === "org.limits") {

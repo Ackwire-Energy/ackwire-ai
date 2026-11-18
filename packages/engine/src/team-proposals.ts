@@ -682,7 +682,9 @@ export async function createTeam(deps: TeamDeps, userId: string, orgId: string, 
     if (ai.kind === "none") noAi.push(agent.id);
     if (ai.kind !== "account") continue;
     try {
-      await setAgentComputerTarget({ db: deps.db, pubsub: deps.pubsub }, userId, orgId, agent.id, ai.machineId);
+      await setAgentComputerTarget({ db: deps.db, pubsub: deps.pubsub }, userId, orgId, agent.id, ai.machineId, {
+        wakeWaits: false,
+      });
       await setAgentBrain({ db: deps.db }, userId, orgId, agent.id, {
         brain: ai.brain,
         account: ai.accountId,

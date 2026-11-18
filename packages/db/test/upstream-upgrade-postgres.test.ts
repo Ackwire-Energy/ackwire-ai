@@ -1,16 +1,16 @@
 import { expect, test } from "bun:test";
-import { createDatabase, migrateInSteps, migrationsFolder } from "../src/client";
+import { createDatabase, migrationsFolder } from "../src/client";
 import { assertMigrationsMatch } from "../src/migration-guard";
 import {
-  seedUpgradeFixture,
+  prepareUpgradeFixture,
   type UpgradeFixtureDatabase,
   upgradeAndVerifyFixture,
-  upgradeBoundaries,
   verifyLegacyUpgradeFixture,
 } from "./upstream-upgrade-fixture";
 
 const url = process.env.UPGRADE_REHEARSAL_DATABASE_URL;
 const phase = process.env.UPGRADE_REHEARSAL_PHASE;
+const baseline = process.env.UPGRADE_REHEARSAL_BASELINE ?? "0251";
 
 function rehearsalTarget(url: string | undefined, phase: string | undefined, ci: string | undefined): string {
   if (!url || ci !== "true") throw new Error("The upgrade rehearsal requires its explicit CI-only URL");
@@ -49,12 +49,13 @@ test("the upgrade rehearsal refuses deployed databases and mismatched phases", (
 /**
  * Invoked only by CI's Compose job. Never takes DATABASE_URL or TEST_DATABASE_URL: these two disposable names on
  * that job's internal `postgres` service are the only permitted targets. The test never creates/drops a database.
- * Compose dumps the seeded 0251 database before `upgrade`, then restores it into the other name for `restored`.
+ * Compose dumps the selected synthetic baseline database before `upgrade`, then restores it into the other name for `restored`.
  */
 test.skipIf(!url && !phase)(
   "isolated PostgreSQL upgrade and pre-upgrade backup restoration",
   async () => {
     const target = rehearsalTarget(url, phase, process.env.CI);
+    if (baseline !== "0251" && baseline !== "0285") throw new Error("Unknown upgrade rehearsal baseline");
 
     const handle = createDatabase({ url: target, poolMax: 1 });
     const client = handle.client;
@@ -73,10 +74,9 @@ test.skipIf(!url && !phase)(
             )
           ).rows,
         ).toEqual([{ n: 0 }]);
-        await migrateInSteps(handle.db, migrationsFolder, upgradeBoundaries().before);
-        await seedUpgradeFixture(pg);
+        await prepareUpgradeFixture(handle.db, pg, baseline);
       }
-      await verifyLegacyUpgradeFixture(pg);
+      await verifyLegacyUpgradeFixture(pg, baseline);
       expect((await pg.query("select '[1,2,3]'::vector <-> '[1,2,4]'::vector as distance")).rows).toEqual([
         { distance: 1 },
       ]);
@@ -84,7 +84,7 @@ test.skipIf(!url && !phase)(
         await assertMigrationsMatch(handle.db, migrationsFolder);
         // The deployed stepped migrator handles concurrent index builds outside a transaction; the shared fixture
         // verifies the whole bounded upgrade, the intermediate nondefault approval, and a second no-op migration.
-        await upgradeAndVerifyFixture(handle.db, pg);
+        await upgradeAndVerifyFixture(handle.db, pg, baseline);
         await assertMigrationsMatch(handle.db, migrationsFolder);
       }
     } finally {

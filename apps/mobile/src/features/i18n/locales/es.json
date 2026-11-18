@@ -252,8 +252,6 @@
       "mute": "Silenciar",
       "unmute": "Reactivar"
     },
-    "firstRunLine": "{{name}} está preparando el equipo · {{done}} de {{total}}",
-    "firstRunLinePersonal": "{{name}} está preparando tus agentes · {{done}} de {{total}}",
     "first": {
       "title": "Empieza con tu primer agente",
       "subtitle": "Ponle un nombre y di qué hace. Aparece aquí, como un chat.",
@@ -1761,18 +1759,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} necesita ayuda",
-      "needsFor": "{{name}} necesita ayuda · {{time}}",
-      "inControlAt": "Tienes el control · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "Abriendo el navegador de {{name}}…",
-      "startingM": "Abriendo el navegador de {{name}}…",
       "stopAskF": "¿Cerrar el navegador de {{name}}?",
       "stopAskM": "¿Cerrar el navegador de {{name}}?",
-      "whereF": "En el navegador de {{name}}",
-      "whereM": "En el navegador de {{name}}",
       "open": "Abrir",
-      "expandHint": "Toca para expandir",
       "stop": "Detener",
       "giveUp": "Desistir"
     },
@@ -1780,7 +1769,6 @@
       "inControl": "Tienes el control",
       "helping": "{{name}} tiene el control",
       "watchOnly": "{{name}} tiene el control. Solo estás mirando.",
-      "takeOver": "Tomar el control",
       "done": "Listo",
       "handBack": "Devolver el control",
       "couldnt": "No pude hacerlo",
@@ -1801,7 +1789,6 @@
       "closedHelpM": "Los inicios de sesión quedan guardados para la próxima vez.",
       "stuckHelpF": "Reintentar reinicia el navegador. Los inicios de sesión quedan guardados.",
       "stuckHelpM": "Reintentar reinicia el navegador. Los inicios de sesión quedan guardados.",
-      "hidden": "{{name}} tiene el control · pantalla oculta",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2321,7 +2308,6 @@
     "planRowSub": "Inicia sesión en la computadora del agente, sin clave",
     "keyRow": "Una clave",
     "keyRowSub": "Pagas por uso, directo al proveedor",
-    "already": "Ya en {{org}}",
     "stepOf": "{{step}} de {{total}}"
   },
   "crash": {
@@ -2981,5 +2967,11 @@
       "title": "Nada que revisar",
       "text": "Cuando un agente haga algo fuera de la conversación, aparecerá aquí."
     }
+  },
+  "surface": {
+    "on": "Activado",
+    "codeText": "Envía el mensaje que se abre allí y vuelve aquí.",
+    "openFailed": "No se pudo abrir {{surface}} en este teléfono. Envíale el código de abajo.",
+    "orType": "O envía este código allí"
   }
 }

@@ -36,8 +36,8 @@ export function createFeedbackToolSource(deps: {
   /** The form's limiter, so both ways in count toward the same hour. */
   rateLimiter?: RateLimiter;
 }): ToolSource {
-  // Who reads it: the operator, or the people who make the app when it goes to their inbox (ADR 0160 §13).
-  const reader = isFeedbackRelay(deps.to) ? "the agentes.chat team, who make this app" : "whoever runs this server";
+  // Who reads it: the operator, or the upstream team when it goes to their inbox (ADR 0160 §13).
+  const reader = isFeedbackRelay(deps.to) ? "the upstream agentes.chat team" : "whoever runs this server";
   const tool: ToolDefinition = {
     name: SEND_FEEDBACK_TOOL,
     description: `Send the person's feedback about this app itself (a bug, something confusing, an idea) to ${reader}, by email in their name, only when they ask you to ('manda um feedback dizendo…', 'report this bug for me'). \`text\`: what they want said, in their words and language, plus what you saw yourself that helps whoever reads it (what was being done, the error as it appeared). Nothing from the conversation they didn't ask to send. They read it on a card and approve it before it goes.`,

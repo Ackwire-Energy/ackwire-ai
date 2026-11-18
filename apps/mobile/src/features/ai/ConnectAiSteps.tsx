@@ -13,12 +13,15 @@ import {
   useModels,
 } from "@agenteschat/client";
 import {
+  accountInLine,
   accountTitle,
   type ExistingAi,
   groupPlans,
   listsExisting,
   planWordOf,
   signInPlan,
+  unnamedAccount,
+  withSub,
 } from "@agenteschat/client/lib/ai-accounts";
 import { computerEdition, computerName, managedNamed, setupView } from "@agenteschat/client/lib/computer";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
@@ -71,7 +74,7 @@ import {
 import { agentOnKey, rightHandOnKey, savedKeyLine, thinksWithLine } from "@agenteschat/client/lib/right-hand";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useQueryClient } from "@tanstack/react-query";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
 import { paysHere } from "@/lib/store";
@@ -102,13 +105,23 @@ import { AddAccount } from "./AddAccount";
 import type { ConnectKey } from "./ConnectAi";
 import { type ConnectAiFlow, connectAiNow, type PushedPage, patchConnectAi } from "./connect-flow";
 import { EndpointForm } from "./EndpointForm";
-import { existingRows, type FlowView, offersKeyNow, PLAN_POLL_MS, pollsPlan, takenFrom } from "./logic";
+import {
+  existingNotes,
+  existingRows,
+  type FlowView,
+  haveLayout,
+  offersKeyNow,
+  PLAN_POLL_MS,
+  pollsPlan,
+  takenFrom,
+} from "./logic";
 import { useAiOrg } from "./org";
 import {
   AiRow,
   alertKeyRefused,
   Note,
   OpenPage,
+  openRenameAiAccount,
   PasteField,
   PlanHoldNote,
   PlanReplies,
@@ -308,15 +321,20 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
   // A plan's page signs in what a row of the first page asked for, as it was when the page was pushed.
   const [login] = useState(() => (view.page === "plan" && flow.login?.choice === view.choice ? flow.login : null));
   const [busy, setBusy] = useState(false);
-  const have =
+  const lists =
     forAgent &&
     gates.view?.agentId === forAgent.id &&
     listsExisting(
       agentRows.data?.find((a) => a.id === forAgent.id),
       !hasAi(forAgent.id),
     )
-      ? existingRows(t, gates.view, credentials.data ?? [], forAgent.name, i18n.language)
-      : [];
+      ? { view: gates.view, name: forAgent.name }
+      : null;
+  const have = lists ? existingRows(t, lists.view, credentials.data ?? [], lists.name, i18n.language) : [];
+  const haveNotes = lists ? existingNotes(t, lists.view, credentials.data ?? []) : [];
+  // "Todas as contas" keeps the list it was picked from, the pick checked: once saved the agent lists none, and the
+  // next agent with no AI must not take its place under "Pronto".
+  const [picked, setPicked] = useState<{ key: string; have: typeof have }>();
   const shownGate = gates.gateOf(view.page === "plan" ? view.choice : "claude");
   const shown = shownGate.state;
   const asksAgain = agentId !== undefined && pollsPlan(shownGate, gates.edition);
@@ -339,10 +357,12 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
     label: string,
     run: () => Promise<unknown>,
     scope?: BrainScope,
+    saved?: () => void,
   ) => {
     setBusy(true);
     try {
       await run();
+      saved?.();
       for (const key of [
         keys.agentBrain(orgId, to.id),
         keys.agents(orgId),
@@ -363,6 +383,8 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
   const pickHave = (row: ExistingAi) => {
     if (!forAgent || !gates.view) return;
     const brain = gates.view.brain;
+    const key = have.find((h) => h.row === row)?.key;
+    const saved = () => key !== undefined && setPicked({ key, have });
     if (row.kind === "key") {
       const k = row.key;
       // The workspace's model on that key: the agent's model where the key runs it, else one the key does (an endpoint's
@@ -390,6 +412,7 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
           );
         },
         rightHand ? "workspace" : undefined,
+        saved,
       );
     }
     const a = row.choice.login;
@@ -397,7 +420,7 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
     const take = (moveAccount: boolean) =>
       void save(
         forAgent,
-        a.label,
+        accountTitle(t, a),
         () =>
           api.agents.setBrain(orgId, forAgent.id, {
             brain: a.kind,
@@ -405,12 +428,13 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
             ...(moveAccount ? { moveAccount } : {}),
           }),
         gates.view?.scope,
+        saved,
       );
     if (row.act === "use") return take(false);
     if (row.act === "move") {
       // One account thinks for one agent: picking another agent's takes it from that one.
       return Alert.alert(
-        a.label,
+        accountTitle(t, a),
         t("agentPage.work.brain.accountMove", { agents: takenFrom(a, forAgent.name).join(", ") }),
         [
           { text: t("common.cancel"), style: "cancel" },
@@ -457,8 +481,20 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
           ) : null;
         }}
         have={have}
-        haveFor={startAgentId || theirs ? undefined : forAgent?.name}
+        haveNotes={haveNotes}
+        agentName={forAgent?.name ?? ""}
         busy={busy}
+        onHave={pickHave}
+      />
+    );
+  if (view.page === "have")
+    return (
+      <AllHave
+        have={picked?.have ?? have}
+        picked={picked?.key}
+        haveNotes={haveNotes}
+        dims={dims}
+        busy={busy || picked !== undefined}
         onHave={pickHave}
       />
     );
@@ -482,9 +518,11 @@ export function ConnectAiPage(props: ConnectAiFlowProps) {
 }
 
 /**
- * The first page: the two ways, one list ("Meu plano de IA", "Uma chave"), then what the workspace already has
- * (`have`), used in one tap. Neutral tiles: the makers' marks come on the pages that pick one. A plan that can't sign
- * in on the agent's computer says why under the rows, its rows of what they have dimmed too.
+ * The first page: what the workspace already has for the agent (`have`), used in one tap, under a line that says what a
+ * pick does, then the two ways, one list ("Meu plano de IA", "Uma chave"). What they have reads as the web's list
+ * (`haveLayout`): few rows by owner, many the three with most room and "Ver as N contas"; someone else's they can't
+ * pick, one line under that person's group. Neutral tiles: the makers' marks come on the pages that pick one. A plan
+ * that can't sign in on the agent's computer says why under the rows, its rows of what they have dimmed too.
  */
 function Home({
   onView,
@@ -492,7 +530,8 @@ function Home({
   dimmedWhy,
   dimmedOut,
   have,
-  haveFor,
+  haveNotes,
+  agentName,
   busy,
   onHave,
 }: {
@@ -504,49 +543,70 @@ function Home({
   /** Its way out where there is one (a program off there), under that line. */
   dimmedOut: (choice: PlanChoice) => ReactNode;
   have: ReturnType<typeof existingRows>;
-  /** The agent they are for, where the screen's title doesn't say it. */
-  haveFor?: string;
+  /** Someone else's accounts the person can't pick, a line per person (`existingNotes`). */
+  haveNotes: readonly { key: string; text: string }[];
+  agentName: string;
   busy: boolean;
   onHave: (row: ExistingAi) => void;
 }) {
   const { t } = useTranslation();
-  const { org } = useAiOrg();
   const dimmed = have.flatMap((r) =>
     r.row.kind === "account" && dims(planOfAccount(r.row.choice.login)) ? [planOfAccount(r.row.choice.login)] : [],
   )[0];
   const noPlan = PLAN_CHOICES.every(dims);
+  const layout = haveLayout(have, haveNotes);
+  const row = (r: (typeof have)[number]) => (
+    <AiRow
+      key={r.key}
+      row={r}
+      disabled={busy || (r.row.kind === "account" && dims(planOfAccount(r.row.choice.login)))}
+      onPress={() => onHave(r.row)}
+    />
+  );
+  const keysRow = have.some((r) => r.row.kind === "key") ? (
+    <GroupedRow
+      icon="key"
+      label={t("connectAi.have.manageKeys")}
+      chevron
+      onPress={() => router.push("/ai-accounts" as never)}
+    />
+  ) : null;
   return (
     <View>
-      {have.length > 0 ? (
+      {have.length > 0 || haveNotes.length > 0 ? (
         <>
-          <GroupedHeader>
-            {haveFor
-              ? t("connectAi.have.titleFor", agentGrammar(haveFor))
-              : org?.name
-                ? t("mobile.ai.already", { org: org.name })
-                : t("connectAi.have.title")}
-          </GroupedHeader>
-          <GroupedList>
-            {have.map((r) => (
-              <AiRow
-                key={r.key}
-                row={r}
-                disabled={
-                  busy ||
-                  (r.row.kind === "account" && (r.row.act === "locked" || dims(planOfAccount(r.row.choice.login))))
-                }
-                onPress={() => onHave(r.row)}
-              />
-            ))}
-            {have.some((r) => r.row.kind === "key") ? (
-              <GroupedRow
-                icon="key"
-                label={t("connectAi.have.manageKeys")}
-                chevron
-                onPress={() => router.push("/ai-accounts" as never)}
-              />
-            ) : null}
-          </GroupedList>
+          {agentName && have.length > 0 ? (
+            <GroupedFooter>{t("connectAi.have.pickLine", agentGrammar(agentName))}</GroupedFooter>
+          ) : null}
+          {layout.best ? (
+            <>
+              <GroupedHeader>{t("connectAi.chat.best")}</GroupedHeader>
+              <GroupedList>
+                {layout.best.map(row)}
+                <GroupedRow
+                  icon="list"
+                  label={t("connectAi.chat.seeAll", { count: have.length })}
+                  chevron
+                  onPress={() => onView({ page: "have" })}
+                />
+                {keysRow}
+              </GroupedList>
+            </>
+          ) : null}
+          {layout.groups.map((g) => (
+            <Fragment key={g.key}>
+              {g.rows.length > 0 ? (
+                <>
+                  <GroupedHeader>{g.label ?? ""}</GroupedHeader>
+                  <GroupedList>
+                    {g.rows.map(row)}
+                    {g.key === "keys" ? keysRow : null}
+                  </GroupedList>
+                </>
+              ) : null}
+              {g.note ? <GroupedFooter>{g.note}</GroupedFooter> : null}
+            </Fragment>
+          ))}
           {dimmed && !noPlan ? <GroupedFooter>{dimmedWhy(dimmed)}</GroupedFooter> : null}
           {dimmed && !noPlan ? dimmedOut(dimmed) : null}
           <GroupedHeader>{t("connectAi.have.other")}</GroupedHeader>
@@ -572,6 +632,54 @@ function Home({
       {noPlan ? <GroupedFooter>{dimmedWhy("claude")}</GroupedFooter> : null}
       {noPlan ? dimmedOut("claude") : null}
     </View>
+  );
+}
+
+/** Every account already connected for the agent ("Ver as N contas"), by whose it is, with a search: one tap uses it. */
+function AllHave({
+  have,
+  picked,
+  haveNotes,
+  dims,
+  busy,
+  onHave,
+}: {
+  have: ReturnType<typeof existingRows>;
+  picked: string | undefined;
+  haveNotes: readonly { key: string; text: string }[];
+  dims: (choice: PlanChoice) => boolean;
+  busy: boolean;
+  onHave: (row: ExistingAi) => void;
+}) {
+  const { t } = useTranslation();
+  const [tapped, setTapped] = useState<string>();
+  const layout = haveLayout(have, haveNotes, true);
+  const rows = layout.groups.flatMap((g) => g.rows);
+  return (
+    <PickList
+      options={rows.map((r) => ({
+        value: r.key,
+        label: r.label,
+        group: r.group.label,
+        groupKey: r.group.key,
+        mark: r.mark,
+        off: r.off,
+        ...(r.sub ? { description: r.sub } : {}),
+        ...(r.below ? { below: r.below } : {}),
+        keywords: `${r.label} ${r.group.label}`,
+        disabled: busy || (r.row.kind === "account" && dims(planOfAccount(r.row.choice.login))),
+      }))}
+      value={picked ?? (busy ? tapped : undefined)}
+      onPick={(o) => {
+        const r = have.find((x) => x.key === o.value);
+        setTapped(o.value);
+        if (r) onHave(r.row);
+      }}
+      placeholder={t("connectAi.chat.search")}
+      searchLabel={t("connectAi.chat.search")}
+      noResults={t("connectAi.chat.none")}
+      notes={layout.groups.flatMap((g) => (g.note ? [{ key: g.key, text: g.note }] : []))}
+    />
   );
 }
 
@@ -932,7 +1040,11 @@ function PlanPage(
             onDone={(account) => {
               // The flow stays on that agent; another plan moves on to the next one with no AI.
               onAgent(agent.id);
-              setDone({ agentId: agent.id, agent: agent.name, label: account?.label ?? planLabel(t, choice) });
+              setDone({
+                agentId: agent.id,
+                agent: agent.name,
+                label: account ? accountInLine(t, account) : planLabel(t, choice),
+              });
               props.onPlanDone(agent.id);
             }}
           />
@@ -1234,18 +1346,42 @@ function PlanSteps({
               onPress={() => void saveOwn()}
             />
           ) : null}
-          {existing.map((a) => (
-            <GroupedRow
-              key={a.id}
-              label={t("connectAi.use", { label: accountTitle(a) })}
-              {...(a.usedBy.length > 0
-                ? { sub: t("agentPage.work.brain.accountAlso", { agents: joinNames(a.usedBy, t) }) }
-                : {})}
-              onPress={() => void assign(a)}
-            />
-          ))}
+          {existing.map((a) => {
+            // Each by its email (or the name its owner gave it), its plan and who else uses it under it; the pencil
+            // opens its name.
+            const sub = withSub(
+              a,
+              a.usedBy.length > 0 ? t("agentPage.work.brain.accountAlso", { agents: joinNames(a.usedBy, t) }) : null,
+            );
+            const machineId = view?.computer?.machineId;
+            return (
+              <GroupedRow
+                key={a.id}
+                leading={<ProviderLogo id={a.provider ?? a.kind} size="sm" />}
+                label={accountTitle(t, a)}
+                faint={unnamedAccount(a)}
+                {...(sub ? { sub } : {})}
+                {...(machineId && a.mine
+                  ? {
+                      buttons: [
+                        {
+                          icon: "pen" as const,
+                          label: t("aiAccounts.rename.action", { label: accountTitle(t, a) }),
+                          onPress: () => openRenameAiAccount(machineId, a.id),
+                        },
+                      ],
+                    }
+                  : {})}
+                onPress={() => void assign(a)}
+              />
+            );
+          })}
           <GroupedRow
-            label={ownable ? t("connectAi.own.one", agentGrammar(agentName)) : t("connectAi.another")}
+            label={
+              ownable
+                ? t("connectAi.own.one", agentGrammar(agentName))
+                : t("connectAi.which.other", { brand: planLabel(t, choice) })
+            }
             checked={other}
             onPress={() => setOther(true)}
           />

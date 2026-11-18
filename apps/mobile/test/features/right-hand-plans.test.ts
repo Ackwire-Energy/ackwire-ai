@@ -127,10 +127,15 @@ test("another AI answered for its plan: a quiet pill with Change, and its dimmed
   const row = readFileSync(join(import.meta.dir, "../../src/features/chat/MessageRow.tsx"), "utf8");
   expect(row).toContain('isStandInLine(meta) ? ""');
   const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
-  expect(screen).toContain("rightHandUnusable(aiAccounts)");
+  expect(screen).toContain("rightHandUnusable(aiAccounts, view?.account)");
   expect(screen).toContain('t("rightHand.unusable.title", g)');
   expect(screen).toContain('t("rightHand.unusable.computerOnly"');
   // The way out is the workspace's computers, for who may connect one: no button of Lodi's own.
   expect(screen).toContain('can(org, "pair_computers") && edition !== "cloud" && cant.some((u) => u.why === "away")');
   expect(`${card}${screen}`).not.toContain("Give Lodi a computer");
+});
+
+test("the workspace's plan choice and its plans it can't think with now list each account once, as on the web", () => {
+  const screen = readFileSync(join(import.meta.dir, "../../src/features/right-hand/SettingsScreen.tsx"), "utf8");
+  expect(screen).toContain("const listed = accountChoices(");
 });

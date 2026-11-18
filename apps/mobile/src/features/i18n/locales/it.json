@@ -252,8 +252,6 @@
       "mute": "Silenzia",
       "unmute": "Riattiva"
     },
-    "firstRunLine": "{{name}} sta preparando il team · {{done}} di {{total}}",
-    "firstRunLinePersonal": "{{name}} sta preparando i tuoi agenti · {{done}} di {{total}}",
     "first": {
       "title": "Inizia con il tuo primo agente",
       "subtitle": "Dagli un nome e scrivi cosa fa. Compare qui, come una chat.",
@@ -1761,18 +1759,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} ha bisogno di aiuto",
-      "needsFor": "{{name}} ha bisogno di aiuto · {{time}}",
-      "inControlAt": "Hai il controllo · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "Apertura del browser di {{name}}…",
-      "startingM": "Apertura del browser di {{name}}…",
       "stopAskF": "Chiudere il browser di {{name}}?",
       "stopAskM": "Chiudere il browser di {{name}}?",
-      "whereF": "Nel browser di {{name}}",
-      "whereM": "Nel browser di {{name}}",
       "open": "Apri",
-      "expandHint": "Tocca per espandere",
       "stop": "Ferma",
       "giveUp": "Rinuncia"
     },
@@ -1780,7 +1769,6 @@
       "inControl": "Hai il controllo",
       "helping": "{{name}} ha il controllo",
       "watchOnly": "{{name}} ha il controllo. Stai solo guardando.",
-      "takeOver": "Prendi il controllo",
       "done": "Fatto",
       "handBack": "Restituisci il controllo",
       "couldnt": "Non ci sono riuscito",
@@ -1801,7 +1789,6 @@
       "closedHelpM": "Gli accessi restano salvati per la prossima volta.",
       "stuckHelpF": "Riprova riavvia il browser. Gli accessi restano salvati.",
       "stuckHelpM": "Riprova riavvia il browser. Gli accessi restano salvati.",
-      "hidden": "{{name}} ha il controllo · schermo nascosto",
       "key": {
         "Tab": "Tab",
         "Enter": "Invio",
@@ -2321,7 +2308,6 @@
     "planRowSub": "Accesso dal computer dell'agente, senza chiave",
     "keyRow": "Una chiave",
     "keyRowSub": "Paghi a consumo, direttamente al fornitore",
-    "already": "Già in {{org}}",
     "stepOf": "{{step}} di {{total}}"
   },
   "crash": {
@@ -2981,5 +2967,11 @@
       "title": "Niente da controllare",
       "text": "Quando un agente fa qualcosa fuori dalla conversazione, compare qui."
     }
+  },
+  "surface": {
+    "on": "Attivo",
+    "codeText": "Invia il messaggio che si apre lì, poi torna qui.",
+    "openFailed": "Impossibile aprire {{surface}} su questo telefono. Invia lì il codice qui sotto.",
+    "orType": "Oppure invia questo codice lì"
   }
 }

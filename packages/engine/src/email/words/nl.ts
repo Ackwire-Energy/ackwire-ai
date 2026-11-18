@@ -235,6 +235,11 @@ export const words: EmailWords = {
     preheader: "Keur het goed of weiger het in Leden. Er gebeurt niets tot je antwoordt.",
     headline: "Er wacht een verzoek om lid te worden",
     body: (org) => ["Diegene opende de uitnodigingslink van ", { b: org }, " en vraagt om lid te worden."],
+    outside: (by) => [
+      "Diegene werkt voor ",
+      { b: by },
+      " en vraagt om lid te worden als externe medewerker. Diegene neemt geen plek in je abonnement in, en je kunt diegene altijd verwijderen.",
+    ],
     note: "Keur alleen mensen goed die je verwacht. Ze worden lid, tenzij je op de pagina een andere rol kiest.",
     approve: "Goedkeuren",
     deny: "Weigeren",
@@ -339,7 +344,7 @@ export const words: EmailWords = {
   emailChange: {
     code: {
       subject: (code) => `${code} is je code om je e-mailadres te wijzigen`,
-      preheader: "Typ hem in agentes.chat om te bevestigen. Hij werkt 10 minuten.",
+      preheader: "Typ hem in Ackwire AI om te bevestigen. Hij werkt 10 minuten.",
       headline: "Je code",
       body: (email, newEmail) => [
         "Typ deze code om het e-mailadres van het account ",
@@ -355,19 +360,19 @@ export const words: EmailWords = {
       ],
       noSupport:
         "Hij werkt 10 minuten, en zonder deze code blijft je e-mailadres hetzelfde. Was jij het niet? Deel hem dan niet en laat het weten aan de mensen die deze server beheren.",
-      why: "Je krijgt deze e-mail omdat vanuit je account is gevraagd om het e-mailadres op agentes.chat te wijzigen.",
+      why: "Je krijgt deze e-mail omdat vanuit je account is gevraagd om het e-mailadres op Ackwire AI te wijzigen.",
     },
     link: {
-      subject: "Bevestig je nieuwe e-mailadres voor agentes.chat",
+      subject: "Bevestig je nieuwe e-mailadres voor Ackwire AI",
       preheader: "Eén klik en je logt voortaan in met dit adres. De link werkt een uur.",
       headline: "Bevestig je nieuwe e-mailadres",
       body: "Nog één stap: bevestig dat dit adres van jou is. Daarna logt je account ermee in.",
       button: "Nieuw e-mailadres bevestigen",
       small: "De link werkt een uur. Heb je hier niet om gevraagd? Dan kun je deze e-mail negeren.",
-      why: "Je krijgt deze e-mail omdat iemand dit adres wil gebruiken voor een agentes.chat-account.",
+      why: "Je krijgt deze e-mail omdat iemand dit adres wil gebruiken voor een Ackwire AI-account.",
     },
     changed: {
-      subject: "Het e-mailadres van je agentes.chat-account is gewijzigd",
+      subject: "Het e-mailadres van je Ackwire AI-account is gewijzigd",
       preheader: "Was jij het niet? Dan kun je dit adres 7 dagen lang terugzetten.",
       headline: "Je e-mailadres is gewijzigd",
       body: (email, newEmail) => ["Het account ", { b: email }, " logt nu in met ", { b: newEmail }, "."],
@@ -375,7 +380,7 @@ export const words: EmailWords = {
         "Was jij het niet? Druk binnen 7 dagen op de knop. Dit adres komt terug, alle sessies worden uitgelogd, de AI-apps worden ontkoppeld en inlogmethoden die sindsdien zijn toegevoegd, werken niet meer. Ook het wachtwoord wordt gewist, en met “Wachtwoord vergeten” stel je het volgende in.",
       button: "Dit was ik niet",
       small: "Was jij het wel? Dan hoef je niets te doen.",
-      why: "Je krijgt deze e-mail omdat dit adres het e-mailadres van een agentes.chat-account was.",
+      why: "Je krijgt deze e-mail omdat dit adres het e-mailadres van een Ackwire AI-account was.",
     },
   },
   deleting: {
@@ -562,6 +567,31 @@ export const words: EmailWords = {
       },
       why: () =>
         "Je krijgt deze e-mail omdat deze werkruimte op Ackwire AI van jou is. We sturen maar twee van deze berichten.",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface} is gekoppeld aan je Ackwire AI-account`,
+      preheader: "Je assistent antwoordt je daar nu. Was jij het niet? Ontkoppel het.",
+      headline: (surface) => `${surface} is gekoppeld`,
+      body: (surface, display, org) => [
+        { b: display },
+        ` op ${surface} praat nu met je assistent in `,
+        { b: org },
+        ".",
+      ],
+      notYou: "Was jij het niet? Ontkoppel het. Berichten van daar bereiken je account dan meteen niet meer.",
+      button: "Ontkoppelen",
+      small: "Was jij het wel? Dan hoef je niets te doen. Je kunt het altijd ontkoppelen in Instellingen.",
+      why: (surface) => `Je krijgt deze e-mail omdat ${surface} aan je Ackwire AI-account is gekoppeld.`,
+    },
+    unlinked: {
+      subject: (surface) => `${surface} is ontkoppeld van je Ackwire AI-account`,
+      preheader: "De identiteit is veranderd. Koppel het opnieuw in Instellingen als jij het was.",
+      headline: (surface) => `${surface} is ontkoppeld`,
+      body: (surface, display) => [{ b: display }, ` op ${surface} is ontkoppeld omdat de identiteit is veranderd.`],
+      small: "Koppel het opnieuw in Instellingen als jij het was.",
+      why: (surface) => `Je krijgt deze e-mail omdat ${surface} aan je Ackwire AI-account gekoppeld was.`,
     },
   },
 };

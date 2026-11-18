@@ -261,8 +261,6 @@
       "mute": "Wycisz",
       "unmute": "Włącz dźwięk"
     },
-    "firstRunLine": "{{name}} konfiguruje zespół · {{done}} z {{total}}",
-    "firstRunLinePersonal": "{{name}} konfiguruje twoich agentów · {{done}} z {{total}}",
     "first": {
       "title": "Zacznij od pierwszego agenta",
       "subtitle": "Nadaj mu nazwę i powiedz, czym się zajmuje. Pojawi się tutaj jako czat.",
@@ -1865,18 +1863,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} potrzebuje pomocy",
-      "needsFor": "{{name}} potrzebuje pomocy · {{time}}",
-      "inControlAt": "Masz kontrolę · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "Otwieranie przeglądarki agenta {{name}}…",
-      "startingM": "Otwieranie przeglądarki agenta {{name}}…",
       "stopAskF": "Zamknąć przeglądarkę agenta {{name}}?",
       "stopAskM": "Zamknąć przeglądarkę agenta {{name}}?",
-      "whereF": "W przeglądarce agenta {{name}}",
-      "whereM": "W przeglądarce agenta {{name}}",
       "open": "Otwórz",
-      "expandHint": "Stuknij, aby rozwinąć",
       "stop": "Zatrzymaj",
       "giveUp": "Zrezygnuj"
     },
@@ -1884,7 +1873,6 @@
       "inControl": "Masz kontrolę",
       "helping": "Kontrolę ma {{name}}",
       "watchOnly": "Kontrolę ma {{name}}. Ty tylko oglądasz.",
-      "takeOver": "Przejmij kontrolę",
       "done": "Gotowe",
       "handBack": "Oddaj kontrolę",
       "couldnt": "Nie udało się",
@@ -1905,7 +1893,6 @@
       "closedHelpM": "Dane logowania zostaną zapisane na następny raz.",
       "stuckHelpF": "Spróbuj ponownie uruchamia przeglądarkę od nowa. Dane logowania zostają zapisane.",
       "stuckHelpM": "Spróbuj ponownie uruchamia przeglądarkę od nowa. Dane logowania zostają zapisane.",
-      "hidden": "Kontrolę ma {{name}} · ekran ukryty",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2434,7 +2421,6 @@
     "planRowSub": "Logowanie na komputerze agenta, bez klucza",
     "keyRow": "Klucz",
     "keyRowSub": "Płacisz za użycie, bezpośrednio dostawcy",
-    "already": "Już w {{org}}",
     "stepOf": "{{step}} z {{total}}"
   },
   "crash": {
@@ -3115,5 +3101,11 @@
       "title": "Nic do sprawdzenia",
       "text": "Gdy agent zrobi coś poza rozmową, pojawi się to tutaj."
     }
+  },
+  "surface": {
+    "on": "Włączone",
+    "codeText": "Wyślij wiadomość, która się tam otworzy, a potem wróć tutaj.",
+    "openFailed": "Nie udało się otworzyć {{surface}} na tym telefonie. Zamiast tego wyślij tam kod poniżej.",
+    "orType": "Albo wyślij tam ten kod"
   }
 }

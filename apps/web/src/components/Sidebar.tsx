@@ -19,6 +19,7 @@ import {
   useAgentStatuses,
   useAiAccounts,
   useArchivedChannels,
+  useAuthConfig,
   useChannelCategories,
   useChannels,
   useConnections,
@@ -102,6 +103,7 @@ import {
   SkeletonGroup,
   selectionSkyUrl,
 } from "@agenteschat/ui";
+import { useMutation } from "@tanstack/react-query";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import type { TFunction } from "i18next";
 import {
@@ -132,6 +134,7 @@ import { requestChannelDetails } from "@/lib/channel-details";
 import type { MenuEntry } from "@/lib/context-menu";
 import { onPhoneAsk, takePhoneAsk, thisMac } from "@/lib/desktop";
 import { entityMenu } from "@/lib/entity-menu";
+import { navigateAway } from "@/lib/navigate";
 import { useOpenParam } from "@/lib/open-param";
 import { markOpen } from "@/lib/perf";
 import { ownPlanLines, planNearLimit, planWord } from "@/lib/plan-usage";
@@ -2123,6 +2126,20 @@ function UnreadCount({
  * opening down, also holds what the workspace menu held for one person: Your account, Settings and the person's
  * workspaces. Mounted once either way: the dialogs live here.
  */
+/** Mints the person's link to the referral service and leaves for it (ADR 0192), as `useOpenBilling` does. */
+function useOpenReferrals() {
+  const { t } = useTranslation();
+  const api = useApi();
+  const toast = useToast();
+  const here = useRouterState({ select: (s) => s.location.pathname });
+  return useMutation({
+    mutationFn: () => api.account.referralsLink(here),
+    onSuccess: ({ url }) => navigateAway(url),
+    onError: () => toast.show(t("referrals.failed"), "error"),
+    meta: { silent: true },
+  });
+}
+
 function AccountMenu({ personal = false }: { personal?: boolean }) {
   const { t, i18n } = useTranslation();
   const { org, me } = useOrg();
@@ -2163,6 +2180,8 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
   const under = Boolean(line || presenceWord);
 
   const { signOut } = useSignOut();
+  const referrals = useAuthConfig().data?.referralsUrl;
+  const openReferrals = useOpenReferrals();
   const openSettings = (section?: SettingsSection) =>
     void (section
       ? navigate({ to: "/org/$orgId/settings/$section", params: { orgId: org.id, section } })
@@ -2283,6 +2302,11 @@ function AccountMenu({ personal = false }: { personal?: boolean }) {
         <MenuItem icon="settings" onSelect={() => openSettings(personal ? undefined : "account")}>
           {t("shell.settings")}
         </MenuItem>
+        {referrals && (
+          <MenuItem icon="coin" disabled={openReferrals.isPending} onSelect={() => openReferrals.mutate()}>
+            {t("referrals.open")}
+          </MenuItem>
+        )}
         {import.meta.env.DEV && (
           <MenuItem icon="grid" onSelect={() => void navigate({ to: "/dev/gallery" })}>
             {t("shell.gallery")}
@@ -2323,7 +2347,11 @@ function useWorkspaceLook() {
     return o !== undefined && isPersonal(o) && o.role === "owner";
   };
   const several = me.organizations.filter((o) => mine(o.id)).length > 1;
-  return (o: { id: string; name: string; logo?: string | null }, face: "sm" | "md", mark: number) =>
+  return (
+    o: { id: string; name: string; logo?: string | null; accent?: string | null },
+    face: "sm" | "md",
+    mark: number,
+  ) =>
     mine(o.id)
       ? {
           leading: <Avatar kind="person" name={me.user.name} imageUrl={me.user.image} size={face} />,
@@ -2331,7 +2359,13 @@ function useWorkspaceLook() {
           sub: null,
           personal: true,
         }
-      : { leading: <OrgMark logo={o.logo} size={mark} />, name: o.name, sub: null, personal: false };
+      : {
+          // Each workspace in its own accent: the engine's `sky` is the active one's.
+          leading: <OrgMark logo={o.logo} accent={o.accent ?? null} size={mark} />,
+          name: o.name,
+          sub: null,
+          personal: false,
+        };
 }
 
 /**

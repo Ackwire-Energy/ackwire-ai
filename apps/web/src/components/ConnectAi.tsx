@@ -9,7 +9,7 @@ import {
   useMachines,
   useModels,
 } from "@agenteschat/client";
-import { accountTitle, listsExisting } from "@agenteschat/client/lib/ai-accounts";
+import { accountInLine, listsExisting } from "@agenteschat/client/lib/ai-accounts";
 import { CUSTOM_PROVIDER } from "@agenteschat/client/lib/endpoints";
 import { errorCode, errorText, keyRefusal } from "@agenteschat/client/lib/errors";
 import { namesText, rosterText } from "@agenteschat/client/lib/format";
@@ -96,6 +96,7 @@ import {
   PlanAudience,
   PlanHold,
   PlanPanel,
+  type PlanStage,
   PlanWithoutAgent,
   useExistingAi,
   useGatesWithoutAgent,
@@ -291,6 +292,19 @@ const PAIR_START: ConnectStart = { step: "choose" };
 /** A chosen plan's steps, named as its maker sells it; the key's, as the picker names it. */
 const stepTitle = (t: TFunction, choice: AiChoice) =>
   choice === "key" ? t("connectAi.title.api_key") : planTitle(t, choice);
+
+/**
+ * A plain plan panel's title where it is (`PlanStage`): which of the person's accounts the agent (`agent`; none: all of
+ * them) will use, or another account to sign in; else the plan's steps (`stepTitle`).
+ */
+const panelTitle = (t: TFunction, choice: AiChoice, stage: PlanStage | null, agent?: string) => {
+  if (choice === "key" || !stage) return stepTitle(t, choice);
+  const brand = planLabel(t, choice);
+  if (stage.kind === "other") return t("connectAi.which.other", { brand });
+  return agent
+    ? t("connectAi.which.title", { brand, ...agentGrammar(agent) })
+    : t("connectAi.which.titleAll", { brand });
+};
 
 /** A footer's note: its icon on the words' first line, the footer's buttons outside it, centred with the line. */
 const footNote = (icon: IconName, text: string) => (
@@ -642,6 +656,8 @@ function ConnectAiDialog({
     agents.length > 0 ? gates.gateOf(c) : bare ? bareGates.at(c).gate : { state: "loading" };
   const [used, setUsed] = useState<ExistingUsed | null>(null);
   const [login, setLogin] = useState<ExistingSignIn | null>(null);
+  // Where a plain plan panel is (its list of the person's accounts, or another sign-in): the title asks it.
+  const [planStage, setPlanStage] = useState<PlanStage | null>(null);
   const [picked, setPicked] = useState<AiChoice | null>(request.start ?? null);
   const choice =
     picked ??
@@ -896,6 +912,7 @@ function ConnectAiDialog({
         {...(use && planOfAccount(use) === choice ? { use } : {})}
         plain={band || team}
         actionsAt={footAt}
+        onStage={setPlanStage}
         onKey={() => {
           setPicked("key");
           setLogin(null);
@@ -1007,7 +1024,8 @@ function ConnectAiDialog({
     // A personal workspace has no team (ADR 0159): its agents, in its own words.
     const personal = isPersonal(org);
     // What they think with: the account signed in, else the plan's name.
-    const plan = choice === "key" ? "" : (thinksWith?.label ?? planLabel(t, choice));
+    // "o seu {{plan}}": the name its owner gave it, else the plan's.
+    const plan = choice === "key" ? "" : thinksWith?.named === true ? thinksWith.label : planLabel(t, choice);
     const screen = !ready
       ? "loading"
       : choosing
@@ -1031,7 +1049,7 @@ function ConnectAiDialog({
               ? t(personal ? "connectAi.team.wokeAllPersonal" : "connectAi.team.wokeAll")
               : t("connectAi.team.woke", { count: woke.length })
           : chosen
-            ? stepTitle(t, choice)
+            ? panelTitle(t, choice, planStage)
             : listing
               ? t("connectAi.chat.allTitle")
               : adding && rows.length > 0
@@ -1096,6 +1114,7 @@ function ConnectAiDialog({
           back
             ? () => {
                 if (choosing) setDraftPick(null);
+                else if (chosen && planStage?.back) planStage.back();
                 else if (chosen) {
                   setChosen(false);
                   setLogin(null);
@@ -1144,7 +1163,7 @@ function ConnectAiDialog({
           ) : picking && selected && account ? (
             <DialogFooter>
               <Button variant="primary" onClick={() => pick(planOfAccount(account), account)}>
-                {t("connectAi.use", { label: accountTitle(account) })}
+                {t("connectAi.use", { label: accountInLine(t, account) })}
               </Button>
             </DialogFooter>
           ) : (
@@ -1329,7 +1348,7 @@ function ConnectAiDialog({
     };
     const listing = picking && allOpen;
     const title = chosen
-      ? stepTitle(t, choice)
+      ? panelTitle(t, choice, planStage, wide ? undefined : asked.name)
       : listing
         ? t("connectAi.chat.allTitle")
         : adding && rows.length > 0
@@ -1360,7 +1379,8 @@ function ConnectAiDialog({
         onBack={
           back
             ? () => {
-                if (chosen) {
+                if (chosen && planStage?.back) planStage.back();
+                else if (chosen) {
                   setChosen(false);
                   setLogin(null);
                   setUse(undefined);
@@ -1397,7 +1417,7 @@ function ConnectAiDialog({
             >
               <Button variant="primary" loading={have.busy} disabled={have.busy} onClick={confirm}>
                 {t("connectAi.use", {
-                  label: account ? accountTitle(account) : selected.kind === "key" ? selected.key.label : "",
+                  label: account ? accountInLine(t, account) : selected.kind === "key" ? selected.key.label : "",
                 })}
               </Button>
             </DialogFooter>
@@ -1654,7 +1674,6 @@ function ConnectAiDialog({
                   gates={gates}
                   agent={forAgent}
                   credentials={credentials.data ?? []}
-                  named={!one}
                   signIn={login}
                   panel={held}
                   onSignIn={(next) => {

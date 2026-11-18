@@ -96,13 +96,12 @@ const option = (kind: "claude_code" | "codex", over: Partial<AgentBrain["options
 
 /** Ada on the MacBook, hers: every plan can sign in there. */
 const brain = (over: Partial<AgentBrain> = {}): AgentBrain => ({
+  extraUsage: true,
   agentId: "ada",
   speed: "standard",
   brain: "model",
   model: null,
   effectiveModel: null,
-  fallback: true,
-  extraUsage: true,
   computer: { machineId: "m1", name: "MacBook", online: true },
   options: [option("claude_code"), option("codex")],
   machines: [],
@@ -1138,5 +1137,14 @@ describe("the right hand's stand-in line (ADR 0137 §7, amended 2026-11-15)", ()
       ["on-lap", "away"],
     ]);
     expect(rightHandUnusable(undefined)).toEqual([]);
+  });
+
+  test("an account signed in once per agent is one row, and none while one of its logins is the one in use", () => {
+    const laptop = { machineId: "lap", name: "Laptop", online: false };
+    const login = (id: string) =>
+      ({ id, machineId: "lap", computer: "Laptop", status: "active", kind: "claude_code", sameAs: "a1" }) as never;
+    const view = { computers: [laptop] as AiComputer[], accounts: [login("a1"), login("a2"), login("a3")] };
+    expect(rightHandUnusable(view).map((u) => [u.id, u.ids])).toEqual([["a1", ["a1", "a2", "a3"]]]);
+    expect(rightHandUnusable(view, "a2")).toEqual([]);
   });
 });

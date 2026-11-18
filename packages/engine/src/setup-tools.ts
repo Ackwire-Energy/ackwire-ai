@@ -640,6 +640,19 @@ export function createSetupToolSource(deps: {
             required: ["schedule", "prompt"],
             additionalProperties: false,
           },
+          hello: {
+            type: "string",
+            maxLength: 300,
+            description:
+              "How it introduces itself on the card, in its own voice and the person's language, without its name: one or two short sentences on what it will do (e.g. 'Vou planejar as campanhas e acompanhar os resultados.').",
+          },
+          connect_later: {
+            type: "array",
+            items: { type: "string", minLength: 1, maxLength: 80 },
+            maxItems: 6,
+            description:
+              "Apps from the catalog its job needs that the workspace hasn't connected (catalog ids, e.g. hubspot): the card lists them for after it is created, and its chat asks to connect them. A connected app goes in `access` instead.",
+          },
           why: {
             type: "string",
             minLength: 1,

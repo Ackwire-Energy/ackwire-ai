@@ -37,7 +37,7 @@ import { useFailed } from "../routines/hooks";
 import { usePersonalView } from "../settings/hooks";
 import { Gap, NEXT_FIELD, SettingsPage, useUnsavedGuard } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { successHaptic } from "../shared/parts";
+import { FocusLive, successHaptic } from "../shared/parts";
 import { overLimit, TextArea } from "../shared/TextArea";
 import { BrakesSection } from "./BrakesSection";
 import { BudgetSection } from "./BudgetSection";
@@ -159,12 +159,15 @@ export function AgentEditScreen({ id }: { id: string }) {
         disabled: !changes || nameMissing || tooLong || Boolean(handleIssue),
       }}
     >
-      <View style={styles.hero}>
-        <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
-        <Text variant="footnote" tone="muted">
-          @{draft.handle}
-        </Text>
-      </View>
+      {/* The agent alive as it is edited; still while a screen opened from here is over it. */}
+      <FocusLive>
+        <View style={styles.hero}>
+          <AgentAvatar agent={{ ...draft.look, id }} size={96} name={draft.name} />
+          <Text variant="footnote" tone="muted">
+            @{draft.handle}
+          </Text>
+        </View>
+      </FocusLive>
 
       {fields.has("name") ? (
         <>

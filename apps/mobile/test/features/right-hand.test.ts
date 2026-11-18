@@ -190,13 +190,11 @@ test("its greeting of a newcomer is the one ask only until they answer it, whate
   expect(welcomeOpen(undefined, true)).toBe(false);
 });
 
-test("the phone's greeting draws the checklist and Conversas has one line back to it, not a second list", () => {
+test("the phone's greeting draws the checklist, and Conversas holds only conversations (no line back to it)", () => {
   const src = (f: string) => readFileSync(new URL(`../../src/features/${f}`, import.meta.url), "utf8");
   expect(src("right-hand/Intro.tsx")).toContain("<FirstRunCard agent={agent} channelId={channelId} />");
-  expect(src("chats/ChatsScreen.tsx")).toContain("<FirstRunLine />");
-  // One line that says who is setting up the team and how far ("Atlas is setting up the team · 1 of 3"); a personal
-  // workspace's says "your agents" (ADR 0159).
-  expect(src("chats/FirstRunLine.tsx")).toContain('t(modeKey(org, "mobile.chats.firstRunLine")');
+  // The checklist lives in the right hand's conversation only (ADR 0155, amendment of 2026-11-17).
+  expect(src("chats/ChatsScreen.tsx")).not.toContain("FirstRunLine");
   // The apps row names what it reads, as the web's does, never "Sem apps" with apps connected; an invitation waiting
   // finishes the people row, saying who; a personal workspace's rows read its own words (ADR 0159).
   const card = src("right-hand/FirstRun.tsx");

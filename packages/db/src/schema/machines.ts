@@ -253,6 +253,11 @@ export const machines = pgTable(
      */
     standbyAt: timestamp({ withTimezone: true }),
     /**
+     * In standby, when something first wanted it awake (`wantMachine`). People see it online only for a while after
+     * (`shownStandby`): one that never wakes shows its real state. Cleared with `standby_at`.
+     */
+    wakeWantedAt: timestamp({ withTimezone: true }),
+    /**
      * The operator says the workspace's own computer's agents wait for their way out (`PUT …/egress-waiting`): where
      * its network sends them only through a proxy, none works now, so their connections are refused for a while. The
      * apps show a line; null: they don't wait.
@@ -358,6 +363,11 @@ export const machineAccounts = pgTable(
      * `owner`'s. Only the person who connected it changes it, for every login of that account.
      */
     serves: text().notNull().default("everyone"),
+    /**
+     * Its place in the workspace's order of use (ADR 0041 §6): at a plan's limit a run goes on with the next account
+     * that serves its agent, lowest first; null after every numbered one, oldest first.
+     */
+    useOrder: integer(),
     /**
      * How it signs in (protocol 50): `cli_login`, `setup_token` or `api_key`. Set when its sign-in starts and from
      * what the runner reports, never cleared by a report that doesn't say; null: unknown.

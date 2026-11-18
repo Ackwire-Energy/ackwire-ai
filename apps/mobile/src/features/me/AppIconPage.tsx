@@ -14,7 +14,7 @@ import {
   type MadeIconLook,
   PHONE_APP_ICON,
 } from "@agenteschat/client/lib/app-icons";
-import { drawAccessory, drawAgent, gradientOf } from "@agenteschat/ui/agent/engine";
+import { drawAccessory, drawAgent, drawnKey, gradientOf } from "@agenteschat/ui/agent/engine";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ReactNode, useMemo, useState } from "react";
@@ -67,6 +67,9 @@ function agentOf(icon: MadeIcon) {
 /** A made icon as the home screen will show it: its sky's picture and the agent drawn over it by the agent engine. */
 function MadeIconPicture({ icon, size }: { icon: MadeIcon; size: number }) {
   const { color, look, pose } = icon;
+  // By the colors it resolves to: `sky` follows the workspace's accent.
+  const drawn = drawnKey(color);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `drawn` is what `color` draws as now
   const picture = useMemo(() => {
     const agent = agentOf({ sky: "night", color, look, pose });
     const leans = pose === "peek";
@@ -94,7 +97,7 @@ function MadeIconPicture({ icon, size }: { icon: MadeIcon; size: number }) {
     if (leans) rec.restore();
     const frame = compile(rec.commands);
     return createPicture((canvas) => replay(canvas, frame), { width: size, height: size });
-  }, [color, look, pose, size]);
+  }, [color, drawn, look, pose, size]);
   return (
     <View style={{ width: size, height: size, borderRadius: Math.round(size * CORNER), overflow: "hidden" }}>
       <Image

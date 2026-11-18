@@ -200,6 +200,8 @@ export const ICONS = {
   replyTo: [p("M9.6 6 4.8 10.8l4.8 4.8M4.8 10.8h8.4a6 6 0 0 1 6 6v1.8")],
   // The web's swap arrows on this grid: one agent asking another, between their faces.
   swap: [p("M4.8 8.4h13.8M15.6 5.4l3 3-3 3M19.2 15.6H5.4M8.4 12.6l-3 3 3 3")],
+  // A menu's mark after a row's value (the system's pop-up button): a chevron up over a chevron down.
+  updown: [p("m8 9.5 4-4 4 4M8 14.5l4 4 4-4")],
   // `down` turned over: Ordenar's ▲ on a cargo.
   up: [p("M12 19V5M6 11l6-6 6 6")],
   // The cargos' icons (ADR 0085 `ROLE_ICONS`) the phone didn't draw yet, the web's on this grid, and Todos' and the

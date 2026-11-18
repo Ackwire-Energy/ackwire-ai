@@ -15,6 +15,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentSetupIntro, useSetupSteps } from "@/components/AgentSetup";
 import { useAgentPanelShown, useOpenAgentPanel } from "@/components/agent-panel-context";
 import { ModelPickerButton } from "@/components/ai/ModelPicker";
+import { DmMoreMenu } from "@/components/ConversationMenu";
 import { ComputerButton } from "@/components/computer/ComputerDialog";
 import { ErrorState } from "@/components/Loading";
 import { NavToggle } from "@/components/NavDrawer";
@@ -130,6 +131,8 @@ export function DmPage({ target, focusMessageId }: { target: DmTarget; focusMess
           {agent && !rightHand && <ComputerButton agent={agent} queueOnly={side?.docked && seesDetails(agent)} />}
           {/* The same field as a channel's, held to this DM. */}
           <HeaderSearch channelId={dm.data.channelId} onOpen={onSearch} searching={searching} dm />
+          {/* Its own list, as its right click elsewhere, with this conversation's background. */}
+          <DmMoreMenu channelId={dm.data.channelId} name={name} agent={agent} person={person} />
           {side && (
             <Button
               size="sm"

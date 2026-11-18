@@ -20,10 +20,25 @@ export const REAUTH_PASSWORD = "reauth.password";
  * takes `untranslatedText`; a guard test (`error-words.test.ts`) fails on a new code that isn't here or on its list.
  */
 const KNOWN = {
+  // Linking an outside chat surface (ADR 0187). The lines name no surface: the server's errors carry no name.
+  "surface.off": "errors.surface.off",
+  "surface.not_allowed": "errors.surface.notAllowed",
+  "surface.no_assistant": "errors.surface.noAssistant",
+  "surface.no_workspace": "errors.surface.noWorkspace",
+  "surface.link_gone": "errors.surface.linkGone",
+  "surface.taken": "errors.surface.taken",
+  "surface.undo_gone": "errors.surface.undoGone",
+  "surface.code_gone": "errors.surface.codeGone",
   // A new-password link an owner can't make (ADR 0158).
   "password_link.email": "errors.passwordLink.email",
   "password_link.server_owner": "errors.passwordLink.serverOwner",
   "password_link.other_workspace": "errors.passwordLink.otherWorkspace",
+  "wallpaper.photo_not_yours": "errors.wallpaper.notYours",
+  "wallpaper.invalid": "errors.wallpaper.invalid",
+  "wallpaper.too_large": "errors.wallpaper.tooLarge",
+  "wallpaper.type": "errors.wallpaper.type",
+  "wallpaper.empty": "errors.wallpaper.type",
+  "wallpaper.not_base64": "errors.wallpaper.type",
   "webhook.github_no_access": "errors.webhook.githubNoAccess",
   "webhook.github_failed": "errors.webhook.githubFailed",
   "webhook.invalid_secret": "errors.webhook.invalidSecret",
@@ -39,9 +54,11 @@ const KNOWN = {
   "usage_queue.cancel_forbidden": "errors.agent.ownerOrAdmin",
   "agent.details_hidden": "errors.agent.detailsHidden",
   "brain.extra_owner_only": "errors.agent.extraOwnerOnly",
+  "brain.extra_unavailable": "errors.agent.extraUnavailable",
   "action.not_allowed": "errors.agent.undoForbidden",
   "action.skills_admins": "errors.agent.undoSkillsAdmins",
   "account.not_owner": "errors.account.notOwner",
+  "account.order_forbidden": "errors.account.orderForbidden",
   "channel.members_forbidden": "errors.channel.membersForbidden",
   "agent_proposal.not_requester": "errors.agentProposal.notRequester",
   "proposal.not_requester": "errors.agentProposal.notRequester",
@@ -179,6 +196,7 @@ const KNOWN = {
   "role.name_required": "errors.role.nameRequired",
   "role.name_long": "errors.role.nameLong",
   "role.too_many": "errors.role.tooMany",
+  "member.outside_owner": "errors.role.outsideOwner",
   "role.grant_forbidden": "errors.role.grantForbidden",
   "role.above_you": "errors.role.aboveYou",
   "role.base": "errors.role.base",
@@ -216,6 +234,7 @@ const KNOWN = {
   "join.denied": "errors.join.denied",
   "join.answered": "errors.join.answered",
   "join.expired": "errors.join.expired",
+  "outside_access.account_closed": "errors.join.outsideClosed",
   "join.code_wrong": "errors.code.wrong",
   "join.code_expired": "errors.code.expired",
   "join.code_tries": "errors.code.tries",
@@ -809,6 +828,8 @@ export function knownErrorText(t: TFunction, error: unknown, locale = "en"): str
   // The person who connected the mailbox is gone or unnamed: no blank name in the sentence.
   if (error.code === "mail.owner_only" && !error.params?.ownerName)
     return t("errors.mail.ownerOnlyUnknown", error.params);
+  // Everyone else in the workspaces that keep the account is an outside collaborator, who can't own one (ADR 0191).
+  if (error.code === "sole_owner" && error.params?.onlyOutside === true) return t("errors.said.soleOwnerOutside");
   if (error.code === "browser_profile.unavailable")
     return t("browser.profiles.notOpened", { machine: error.params?.machineName ?? "" });
   // `provider`: the provider whose key is missing, when the server could name it.

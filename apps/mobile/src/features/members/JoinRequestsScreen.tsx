@@ -16,7 +16,7 @@ import {
   inviteRefusalText,
   type RefusedPick,
 } from "@agenteschat/client/lib/invite-start";
-import { approvalNews, JOIN_REASON_MAX } from "@agenteschat/client/lib/join-requests";
+import { approvalNews, JOIN_REASON_MAX, waitsForRoom } from "@agenteschat/client/lib/join-requests";
 import { membersFull } from "@agenteschat/client/lib/limits";
 import { can } from "@agenteschat/client/lib/permissions";
 import { Fragment, type ReactNode, useState } from "react";
@@ -55,7 +55,7 @@ const REASON_LIMIT = { max: JOIN_REASON_MAX };
  * if need be, each on its pushed choice over this screen; a suggestion starts on nothing past Todos), or denied with a
  * reason the person reads in the email. On a server that sends no email, approving hands the approver the invitation's
  * link to share. `focus`: the request tapped on Convites, on top. With no room left nobody can be approved, as on the
- * web. A pull reads the requests again.
+ * web, but an outside collaborator, who takes no seat (ADR 0191). A pull reads the requests again.
  */
 export function JoinRequestsScreen({ focus }: { focus?: string | undefined }) {
   const { t } = useTranslation();
@@ -151,7 +151,7 @@ function RequestCard({
   request: JoinRequest;
   /** The workspace's cargos: the link's start on those the approver may give. */
   roles: readonly OrgRole[];
-  /** No one more fits: only denying is left. */
+  /** No one more fits: only denying is left, but for an outside collaborator, who takes no seat. */
   full: boolean;
   onSend: (url: string) => void;
 }) {
@@ -251,7 +251,7 @@ function RequestCard({
       </View>
       <View style={styles.chips}>
         {chips.unverified ? <Chip icon="mail" label={chips.unverified} /> : null}
-        <Chip icon={r.suggestedBy ? "person" : "clock"} label={chips.asked} />
+        <Chip icon={r.outsideOf ? "globe" : r.suggestedBy ? "person" : "clock"} label={chips.asked} />
       </View>
       {/* Their note, in their words. */}
       {r.note ? (
@@ -318,6 +318,7 @@ function RequestCard({
             <Note icon="lock">{t("invites.roleLeftOut", { count: leftOut.length, roles: joinNames(leftOut, t) })}</Note>
           ) : null}
           {linkFull ? <Note icon="x">{t("errors.join.linkFullApproval")}</Note> : null}
+          {r.outsideOf ? <Note icon="info">{t("members.requests.outsideSeat")}</Note> : null}
           <View style={styles.acts}>
             <View style={styles.grow}>
               <Button
@@ -326,7 +327,7 @@ function RequestCard({
                 icon="check"
                 label={t("members.requests.approve")}
                 loading={approve.isPending}
-                disabled={busy || full || linkFull || !draft}
+                disabled={busy || waitsForRoom(r, full) || linkFull || !draft}
                 onPress={() => void approveIt()}
               />
             </View>

@@ -76,10 +76,13 @@ import {
   resolveHostDns,
   retireHostTokens,
   retireMillionSendMailboxes,
+  SURFACE_PREFIX,
   setMessageLinkBase,
   setRestrictionNotices,
+  setSurface,
   setWorkspaceComputers,
   shareCacheInvalidations,
+  surfaceFromConfig,
   surfaceRoomFiles,
   vapidKeys,
   vapidSubject,
@@ -98,6 +101,7 @@ import { apnsKeyGaps, directPushSenders, phonePushMode, relayServeSender } from 
 import { createMachineSockets } from "./realtime/machines";
 import { createStreamSockets } from "./realtime/streams";
 import { createRealtime, type SocketData } from "./realtime/ws";
+import type { AppDeps } from "./routes/app/context";
 import { workerHealth } from "./routes/health";
 import { startTelemetry } from "./telemetry";
 import { releaseOf, version } from "./version";
@@ -136,6 +140,7 @@ export function applyBootSwitches(config: Config) {
   setMessageLinkBase(config.PUBLIC_URL);
   // The operator API's events feed records only while that API is on (ADR 0056).
   enableOperatorEvents(Boolean(config.OPERATOR_API_TOKEN));
+  setSurface(surfaceFromConfig(config));
   // Where each workspace gets its own computer, the computers people bring are targets, never agents' homes.
   setWorkspaceComputers(config.MACHINE_PROVISIONING === "external");
 }
@@ -523,37 +528,39 @@ async function boot(
     pubsub: adapters.pubsub,
   });
   let stopping = false;
+  const services: AppDeps = {
+    db: database.db,
+    auth,
+    config,
+    adapters,
+    wakeWorkers: workers.wakeAll,
+    extras: {
+      embed: engine.gateway.embed,
+      storage: engine.storage,
+      artifacts: engine.artifacts,
+      context: engine.context,
+      sandbox: engine.sandbox,
+      browserLive: engine.browserLive,
+      streams: engine.streams,
+      talker: engine.talker,
+      router: engine.router,
+      jevKey: engine.jevKey,
+      gifKey: gifKey ?? undefined,
+      githubApp: engine.githubApp,
+      speech: engine.speech,
+      voice: engine.voice,
+      gitProxy: engine.gitProxy,
+      pushRelaySender: relayServeSender(direct),
+    },
+    log,
+  };
   const app = createApp({
     edition,
     version,
     modules,
     draining: () => stopping,
     moduleContext: ctx,
-    services: {
-      db: database.db,
-      auth,
-      config,
-      adapters,
-      wakeWorkers: workers.wakeAll,
-      extras: {
-        embed: engine.gateway.embed,
-        storage: engine.storage,
-        artifacts: engine.artifacts,
-        context: engine.context,
-        sandbox: engine.sandbox,
-        browserLive: engine.browserLive,
-        streams: engine.streams,
-        talker: engine.talker,
-        router: engine.router,
-        jevKey: engine.jevKey,
-        gifKey: gifKey ?? undefined,
-        githubApp: engine.githubApp,
-        speech: engine.speech,
-        voice: engine.voice,
-        gitProxy: engine.gitProxy,
-        pushRelaySender: relayServeSender(direct),
-      },
-    },
+    services,
     log,
     pingDatabase: database.ping,
     webDir: existsSync(webDir) ? webDir : undefined,
@@ -624,13 +631,19 @@ async function boot(
         version: release,
         log,
         pubsub: adapters.pubsub,
+        blobs: adapters.platformBlobs,
         hub: engine.machineHub,
         emails: adapters.email.delivers,
         humanCheck: adapters.humanCheck,
+        rateLimiter: adapters.rateLimiter,
         sessions: engine.sessions,
+        surface: services,
       });
-  if (operator) {
+  if (operator && config.OPERATOR_API_TOKEN) {
     log.info("operator API listening", { url: `http://${config.HOST}:${operator.port}${OPERATOR_API_PREFIX}` });
+  }
+  if (operator && config.SURFACE_BRIDGE_TOKEN) {
+    log.info("chat surface bridge listening", { url: `http://${config.HOST}:${operator.port}${SURFACE_PREFIX}` });
   }
   if (engine.sessions) log.info("session screening on: screens are read while people are in control (ADR 0076)");
 

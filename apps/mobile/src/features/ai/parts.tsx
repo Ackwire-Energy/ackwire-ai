@@ -28,6 +28,7 @@ import {
   useTheme,
 } from "@/ui";
 import { BUTTON_SIZES } from "@/ui/Button";
+import { router } from "@/ui/navigation";
 import { usePersonalView } from "../settings/hooks";
 import { useColors } from "../shared/hooks";
 
@@ -67,24 +68,40 @@ export function AiRow({
   checked,
   disabled,
   onPress,
+  onRename,
 }: {
-  row: { label: string; sub?: string; below?: string; mark: string; off: boolean };
+  row: { label: string; sub?: string; below?: string; mark: string; off: boolean; unnamed?: boolean };
   checked?: boolean;
   disabled?: boolean;
   onPress: () => void;
+  /** The viewer's own account: the pencil at the row's end opens its name (`openRenameAiAccount`). */
+  onRename?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <GroupedRow
       leading={<ProviderLogo id={row.mark} size="sm" off={row.off} />}
       label={row.label}
+      faint={row.unnamed === true}
       {...(row.sub ? { sub: row.sub } : {})}
       {...(row.below ? { belowText: row.below } : {})}
       {...(checked !== undefined ? { checked } : {})}
+      {...(onRename
+        ? {
+            buttons: [
+              { icon: "pen" as const, label: t("aiAccounts.rename.action", { label: row.label }), onPress: onRename },
+            ],
+          }
+        : {})}
       disabled={disabled}
       onPress={onPress}
     />
   );
 }
+
+/** Opens the name of one of the person's AI accounts (its computer's and its own id), from any list that shows it. */
+export const openRenameAiAccount = (machineId: string, accountId: string) =>
+  router.push({ pathname: "/ai-account-rename", params: { machineId, accountId } });
 
 /**
  * A line with its icon (the web's `SettingNote`): why something waits, what is safe, what went wrong. `icon` may be

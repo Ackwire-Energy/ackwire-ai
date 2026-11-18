@@ -178,6 +178,10 @@ export function firstVisitOf(dms: readonly DirectMessage[] | undefined, agentId:
 /** The workspace's right hand among its agents, when this person may see it. */
 export const rightHandOf = <A extends Pick<Agent, "builtin">>(agents: readonly A[]) => agents.find(isRightHand);
 
+/** The right hand's name in a workspace, or null while its agents load or when it has none. */
+export const rightHandName = (agents: readonly Pick<Agent, "builtin" | "name">[] | undefined) =>
+  (agents && rightHandOf(agents)?.name) ?? null;
+
 /** The agents a scene of the team shows: the right hand in front (second in the row), then the others, four at most. */
 export function sceneTeam<A extends { id: string }>(agents: readonly A[], lead: A | undefined): A[] {
   const rest = agents.filter((a) => a.id !== lead?.id).slice(0, lead ? 3 : 4);

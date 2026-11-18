@@ -1,9 +1,9 @@
 import { useChannels } from "@agenteschat/client";
 import { channelOptions } from "@agenteschat/client/lib/channel-refs";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, FadeOut } from "react-native-reanimated";
-import { Icon, OPTION_ROW, Text, useTheme } from "@/ui";
+import { Icon, OPTION_ROW, RowPressable, Text, useTheme } from "@/ui";
 import { useOrgId } from "../shared/hooks";
 
 /**
@@ -30,12 +30,12 @@ export function ChannelPicker({ query, pick }: { query: string; pick: (name: str
       ]}
     >
       {options.map((o, i) => (
-        <Pressable
+        <RowPressable
           key={o.id}
           onPress={() => pick(o.name)}
           accessibilityRole="button"
           accessibilityLabel={t("mobile.channelRef.a11y", { name: o.name })}
-          style={({ pressed }) => [styles.row, pressed && { backgroundColor: c.sunken }]}
+          style={styles.row}
         >
           {i > 0 ? <View style={[styles.divider, { backgroundColor: c.line2 }]} /> : null}
           <Icon name={o.visibility === "private" ? "lock" : "hash"} size={MARK} color={c.muted} />
@@ -49,7 +49,7 @@ export function ChannelPicker({ query, pick }: { query: string; pick: (name: str
               </Text>
             ) : null}
           </View>
-        </Pressable>
+        </RowPressable>
       ))}
     </Animated.View>
   );

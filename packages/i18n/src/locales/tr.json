@@ -619,6 +619,7 @@
     "termsMiddle": " ve ",
     "privacy": "Gizlilik politikası",
     "termsAfter": ".",
+    "poweredBy": "Ackwire AI ile çalışır",
     "signOut": "Çıkış yap",
     "earlyAccess": {
       "otherEmail": "Bu davet başka bir adres için. Davetin gönderildiği adresle kaydolun.",
@@ -2410,6 +2411,56 @@
     "localOnlyHow": "O bilgisayardaki Ackwire AI uygulamasında Tercihler › Sunucular bölümünden Telefonunuzdan ve ekip arkadaşlarınızdan erişin seçeneğini açın. Sonra buraya dönün.",
     "localOnlyHere": "Telefonunuzdan ve ekip arkadaşlarınızdan erişin seçeneğini açın. Sonra buraya dönün."
   },
+  "surface": {
+    "link": {
+      "consent": "Ackwire AI'ten {{assistant}}, çalışma alanlarınız hakkında size {{surface}} üzerinden mesaj gönderebilir ve sizi yalnızca acil bir durum olduğunda ve siz izin verdiğinizde arar. Kapatmak için stop yazın.",
+      "title": "{{surface}} üzerinden {{assistant}} ile konuşun",
+      "qr": "Kodunuz yazılı olarak {{surface}} uygulamasını açan QR kod",
+      "making": "Kodunuz oluşturuluyor",
+      "code": "Kodunuz {{code}}",
+      "open": "{{surface}} uygulamasını açın",
+      "stepScan": "Kodu telefonunuzla tarayın veya uygulamayı açın",
+      "stepSend": "Mesajı olduğu gibi gönderin",
+      "stepSendText": "Mesajınız ulaşınca bu adım kendiliğinden ilerler.",
+      "stepConfirm": "Göndereni kontrol edin ve burada onaylayın",
+      "showCode": "Kodu yeniden göster",
+      "confirmTitle": "Bu sizin {{surface}} hesabınız mı?",
+      "sentBy": "Kodunuzu bu gönderen gönderdi",
+      "onlyYou": "Yalnızca bu sizseniz bağlayın.",
+      "workspace": "{{workspace}} içinde yanıtlar",
+      "confirm": "Evet, bağla",
+      "notMe": "Ben değilim",
+      "doneTitle": "{{surface}} bağlandı",
+      "doneText": "{{assistant}} artık size orada yanıt verir.",
+      "newCode": "Yeni kod oluştur",
+      "done": "Tamam"
+    },
+    "row": {
+      "hint": "{{assistant}} ile konuşun ve yanıtları {{surface}} üzerinden alın.",
+      "link": "Bağla",
+      "none": "{{assistant}} size oradan mesaj gönderebilir",
+      "pending": "Bir gönderen onaylamanızı bekliyor",
+      "unlink": "Bağlantıyı kaldır",
+      "unlinkTitle": "{{surface}} bağlantısı kaldırılsın mı?",
+      "unlinkText": "{{assistant}} size orada artık yanıt vermez. İstediğiniz zaman yeniden bağlayabilirsiniz.",
+      "unlinked": "{{surface}} bağlantısı kaldırıldı"
+    },
+    "undo": {
+      "title": "Sohbet uygulamasının bağlantısı kaldırılsın mı?",
+      "lead": "Hesabınız az önce bir sohbet uygulamasına bağlandı. Bunu siz yapmadıysanız bağlantıyı buradan kaldırın.",
+      "button": "Bağlantıyı kaldır",
+      "done": "{{surface}} bağlantısı kaldırıldı",
+      "doneLead": "{{display}} artık hesabınıza ulaşamaz.",
+      "ended": "Bağlantı zaten kaldırılmış",
+      "endedLead": "{{surface}} üzerindeki {{display}} bağlantısı daha önce kaldırılmış. Yapılacak başka bir şey yok.",
+      "gone": "Bu geri alma bağlantısı artık çalışmıyor",
+      "sender": "O gönderen"
+    },
+    "via": "{{surface}} aracılığıyla",
+    "viaTip": "{{person}} tarafından {{surface}} üzerinden gönderildi",
+    "forwarded": "{{surface}} üzerinden iletildi",
+    "forwardedTip": "{{person}} bunu {{surface}} üzerinden iletti. Bu sözler başka birine ait."
+  },
   "team": {
     "title": "Ekip",
     "people_one": "{{count}} kişi",
@@ -2630,7 +2681,8 @@
     "header": {
       "pins": "Sabitlenen mesajlar",
       "showMembers": "Üyeleri göster",
-      "hideMembers": "Üyeleri gizle"
+      "hideMembers": "Üyeleri gizle",
+      "more": "Diğer seçenekler"
     },
     "membersButton_one": "Kanal üyeleri ({{count}})",
     "membersButton_other": "Kanal üyeleri ({{count}})",
@@ -3393,9 +3445,14 @@
     "titleFor": "{{name}} için bir yapay zeka bağlayın",
     "have": {
       "title": "Zaten bağlı",
-      "titleFor": "Zaten bağlı, {{name}} için",
       "other": "Ya da başka birini bağlayın",
-      "manageKeys": "Anahtarları yönet veya sil"
+      "manageKeys": "Anahtarları yönet veya sil",
+      "pickLine": "Burada zaten bağlı bir hesap seçin. {{name}} onunla düşünür.",
+      "onlyOwner_one": "Yalnızca {{name}} tarafından verilebilecek {{count}} hesap daha var.",
+      "onlyOwner_other": "Yalnızca {{name}} tarafından verilebilecek {{count}} hesap daha var.",
+      "moreAgents_one": "ve {{count}} ajan daha",
+      "moreAgents_other": "ve {{count}} ajan daha",
+      "plenty": "Bolca yer var"
     },
     "chat": {
       "mine": "Sizinkiler",
@@ -3578,6 +3635,13 @@
     "onceHint": "Hepsi planınızın limitlerini paylaşır.",
     "use": "{{label}} kullan",
     "another": "Başka bir hesap",
+    "which": {
+      "title": "{{name}} hangi {{brand}} hesabını kullanacak?",
+      "title_female": "{{name}} hangi {{brand}} hesabını kullanacak?",
+      "titleAll": "Hangi {{brand}} hesabını kullanacaklar?",
+      "mine": "{{computer}} üzerindeki {{brand}} hesapların",
+      "other": "Başka bir {{brand}} hesabıyla giriş yap"
+    },
     "reuse": {
       "active": "{{label}} burada zaten var. Ona yeniden giriş yapın ya da başka bir hesap kullanın.",
       "signedOut": "{{label}} burada oturumu kapattı. Yeniden giriş yapın, ajanları onu kullanmaya devam eder."
@@ -3729,6 +3793,7 @@
     "shared_one": "{{agents}} da aynı {{plan}} planını kullanıyor. İkisinin konuşmaları aynı sıraya giriyor.",
     "shared_other": "{{agents}} da aynı {{plan}} planını kullanıyor. Hepsinin konuşmaları aynı sıraya giriyor.",
     "about": "Sıra hakkında",
+    "chain": "{{accounts}} {{plan}} hesabının hepsi sınırına ulaştı.",
     "lists": "Konuşmalar",
     "queuedTab": "Sırada",
     "skippedTab": "Atlananlar",
@@ -3804,7 +3869,6 @@
       "aiAccount": "{{account}} ile düşünür",
       "aiModel": "API üzerinden düşünür",
       "aiNone": "Henüz yapay zeka yok. Oluşturduktan sonra bir tane bağlayın",
-      "reviewTitle": "{{name}} ajanını inceleyin",
       "lines": "{{name}} neler alacak",
       "aChannel": "bir kanal",
       "anApp": "bir uygulama",
@@ -5229,6 +5293,7 @@
       "joinRequest_other": "{{name}} ve diğerleri katılmak istiyor",
       "joinRequestNames": "{{names}} katılmak istiyor",
       "joinSuggestion": "{{by}}, {{name}} kişisini önerdi",
+      "joinOutside": "{{name}}, {{outsideOf}} adına harici çalışan olarak katılmak istiyor ve yer kaplamıyor",
       "doing": {
         "merge": "birleştirme",
         "deploy": "dağıtım",
@@ -5291,6 +5356,7 @@
       "joinRequest": "<b>{{name}}</b> katılmak istiyor",
       "joinRequestMany": "<b>{{names}}</b> katılmak istiyor",
       "joinSuggestion": "<b>{{by}}</b>, <b>{{name}}</b> kişisini önerdi",
+      "joinOutside": "<b>{{name}}</b>, <b>{{outsideOf}}</b> adına harici çalışan olarak katılmak istiyor ve yer kaplamıyor",
       "changeRequest": "<b>{{name}}</b>, <b>{{agent}}</b> için bir değişiklik istiyor",
       "proposalWaiting": "<b>{{names}}</b> tarafından iyileştirme önerileri",
       "changeRequestAgent": "<b>{{name}}</b> yeni bir ajan istiyor: <b>{{agent}}</b>",
@@ -5713,11 +5779,12 @@
         "accountAlso": "{{agents}} da kullanıyor",
         "accountOf": "{{name}} hesabı",
         "accountOthers": "Tüm workspace'e hizmet eden planlar kime ait olduklarını gösterir.",
+        "movesOn": "Sınıra gelince bir sonraki hesapla devam eder",
+        "pinned": "Yalnızca bu hesap",
+        "pinnedHint": "Sınıra gelince bir sonraki hesaba geçmek yerine bu hesabın sıfırlanmasını bekler.",
         "addAccount": "Hesap ekle",
         "signInAgain": "Yeniden giriş yap",
         "connectPlan": "Başka bir plan bağla",
-        "fallbackTitle": "{{computer}} yanıt vermezse API üzerinden yanıtla",
-        "fallbackHint": "API üzerinden yanıt verir ve {{name}} ajanının bütçesinden düşer. Aksi halde {{name}} isteyen kişiye haber verir ve bilgisayarın geri gelmesini bekler.",
         "effort": "Çaba",
         "efforts": {
           "auto": "Otomatik",
@@ -5778,8 +5845,7 @@
           "effort": "Çaba: {{level}}",
           "speed": "Hız: hızlı",
           "context": "Bağlam: {{size}}",
-          "sharing": "Başka kişilere de yanıt verir",
-          "waits": "Bilgisayarı bekler"
+          "sharing": "Başka kişilere de yanıt verir"
         },
         "copy": {
           "row": "Diğer ajanlarda kullan",
@@ -5923,7 +5989,6 @@
           "wait": "Bekle",
           "modelTitle": "{{name}} için model",
           "moreTitle": "{{name}} için diğer seçenekler",
-          "fallback": "Plan durursa API anahtarını kullan",
           "computer": "Bilgisayar",
           "doneTitle": "Her şey hazır",
           "doneSub": "Devam eden işler yeni hesapla sürüyor.",
@@ -7114,7 +7179,6 @@
     "adminsOnlyPersonal": "Ajan oluşturmanıza izin vermesini burayı yöneten birinden isteyin.",
     "proposalClosed": "Bu öneri hakkında zaten karar verildi ya da süresi doldu.",
     "proposalNoAccess": "Bu öneriyi yalnızca sohbetindeki kişiler görebilir.",
-    "backToChat": "Sohbete dön",
     "and": " ve ",
     "routine": "Rutin",
     "routineKeep": "{{name}} rutinini oluştur",
@@ -7289,6 +7353,51 @@
     "otherSkill": "Başka beceri",
     "namesLead": "Şuna ne dersin",
     "namesRoll": "Başka adlar",
+    "proposal": {
+      "lead": "{{name}} adlı ajanın önerdiklerini düzenle. Her şeyi sonra değiştirebilirsin.",
+      "leadNarrow": "{{name}} önerisi: {{why}}",
+      "side": "Öneri",
+      "from": "Öneren: {{name}}",
+      "changed": "Değiştirdiklerin",
+      "changedNone": "Henüz bir şey yok. Kartta değiştirdiklerin burada, Geri al ile görünür.",
+      "undo": "Geri al",
+      "changes": {
+        "changed": "değişti",
+        "added": "eklendi",
+        "removed": "çıkarıldı",
+        "how": "Nasıl çalışır"
+      },
+      "firstTask": "İlk görev",
+      "firstTaskPlaceholder": "Önce ne istenecek (isteğe bağlı)",
+      "firstTaskHint": "{{name}} ile sohbetinde hazır olur. Sadece gönder.",
+      "firstTaskHintBlank": "Onunla sohbetinde hazır olur. Sadece gönder.",
+      "firstTaskNone": "Görev yoksa sohbet boş açılır.",
+      "after": "Oluşturduktan sonra",
+      "afterAi": "{{name}} düşünsün diye bir yapay zekâ bağla",
+      "afterAiBlank": "Düşünmesi için bir yapay zekâ bağla",
+      "afterApp": "{{app}} bağla",
+      "afterNone": "Hiçbir şey. {{name}} oluşturulur oluşturulmaz çalışmaya başlar.",
+      "afterNoneBlank": "Hiçbir şey. Oluşturulur oluşturulmaz çalışmaya başlar.",
+      "discard": "Öneriyi at",
+      "otherChannel": "Başka kanal",
+      "chooseChannels": "Kanal seç",
+      "channelsNone": "Yalnızca seninle sohbetinde.",
+      "channel": {
+        "lead": "{{name}} nerede çalışacak.",
+        "leadBlank": "Nerede çalışacak.",
+        "does": "{{name}}, {{channel}} içinde çağrıldığında yanıt verir ve orada olanları okur.",
+        "doesBlank": "{{channel}} içinde çağrıldığında yanıt verir ve orada olanları okur.",
+        "remove": "{{channel}} kanalından çıkar"
+      },
+      "routine": {
+        "label": "Rutin",
+        "lead": "{{when}}, {{channel}} içinde.",
+        "leadDm": "{{when}}, seninle sohbetinde.",
+        "starts": "{{name}} oluşturulunca başlar. Saati ve metni Rutinler'de değiştirirsin.",
+        "startsBlank": "Oluşturulunca başlar. Saati ve metni Rutinler'de değiştirirsin.",
+        "remove": "Rutini çıkar"
+      }
+    },
     "skill": {
       "opens": "{{name}}, konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
       "opensBlank": "Konu açıldığında bu kılavuzu açar. Beceriler'de düzenlersin.",
@@ -7327,6 +7436,10 @@
     "rolesAdd": "Rol ekle",
     "rolesChange": "Rolleri değiştir",
     "moreOf": "{{name}} için daha fazlası",
+    "outside": {
+      "chip": "Harici",
+      "title": "Harici çalışan"
+    },
     "passwordLink": {
       "item": "Yeni şifre bağlantısı oluştur",
       "hint": "Şifresini unuttuğunda",
@@ -7540,6 +7653,8 @@
       "viaLink": "Bağlantı üzerinden istedi: {{when}}",
       "suggested": "Öneren: {{name}}, {{when}}",
       "suggestedLabel": "{{by}}, {{name}} kişisini önerdi",
+      "outside": "{{outsideOf}} adına harici çalışan olarak katılmak istedi: {{when}}",
+      "outsideSeat": "Harici çalışanlar planınızdaki kişi sayısına dahil edilmez ve onları istediğiniz zaman çıkarabilirsiniz.",
       "asked": "İstek: {{ago}}",
       "askedNow": "Az önce istedi",
       "askedOn": "İstek tarihi: {{date}}",
@@ -8949,7 +9064,7 @@
       "canceledToast": "İptal edildi. Sınır sıfırlanınca çalışmayacak.",
       "continuedToast": "Çalıştırma devam ediyor.",
       "forbidden": "Şu anda yalnızca rutini oluşturan kişi, ajanın sahibi ya da bir yönetici devam ettirebilir",
-      "extra_off": "Bu planın kullanım aralığı doldu ve bu ajanın uzun işleri ücretli ek kullanımı kullanmıyor. Şimdi devam etmek için ajanın yapay zeka ayarlarından bunu açın, yoksa sıfırlamadan sonra devam eder",
+      "extra_off": "Bu planın kullanım aralığı doldu ve bu ajanın uzun işleri planın ücretli ek kullanımını kullanmıyor. Sıfırlamadan sonra devam eder",
       "extra_used_up": "Bu planın kullanım aralığı doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra devam eder"
     },
     "pausedRunningToast": "Rutin duraklatıldı. Süren çalıştırma da durdu.",
@@ -10442,6 +10557,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "Adsız hesap",
+    "rename": {
+      "action": "{{label}} adını değiştir",
+      "label": "Hesap adı",
+      "placeholder": "Örn. İş, Kişisel"
+    },
     "share": {
       "switch": "Başka kişilere de yanıt verir",
       "switchAll": "Başka kişilere de yanıt ver",
@@ -11149,6 +11270,17 @@
     "remove": "Logoyu kaldır",
     "saved": "Logo güncellendi.",
     "removed": "Logo kaldırıldı."
+  },
+  "orgAccent": {
+    "label": "Vurgu rengi",
+    "change": "Rengi değiştir",
+    "useDefault": "Varsayılanı kullan",
+    "suggested": "Önerilen renkler",
+    "sampleMention": "@Ajan",
+    "sampleLink": "Bir bağlantı",
+    "save": "Rengi kaydet",
+    "saved": "Vurgu rengi güncellendi.",
+    "reset": "Varsayılan renge dönüldü."
   },
   "look": {
     "previous": "Önceki",
@@ -11869,8 +12001,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}, API yedeği yok"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "Model",
@@ -14838,6 +14969,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "Sohbet uygulamalarını bağlama kapatıldı. Ayarlarınızın şu anki halini görmek için sayfayı yenileyin.",
+      "notAllowed": "Sohbet uygulaması bağlama hesabınıza henüz açık değil. Açılana kadar buradaki uygulamayı kullanmaya devam edin.",
+      "noAssistant": "Bu çalışma alanındaki asistan sizinle konuşacak şekilde ayarlı değil. Bağlamak için başka bir çalışma alanı seçin.",
+      "noWorkspace": "Artık bu çalışma alanında değilsiniz. Bağlamak için başka bir çalışma alanı seçin.",
+      "linkGone": "Bu bağlantı artık beklemiyor: 10 dakika sonra süresi doldu ya da iptal edildi. Yeniden başlamak için yeni bir kod oluşturun.",
+      "taken": "Bu gönderen başka bir Ackwire AI hesabına bağlı. Önce oradaki bağlantıyı kaldırın, sonra yeni bir kod gönderin.",
+      "undoGone": "Bu geri alma bağlantısı zaten kullanılmış ya da süresi dolmuş. Bunun yerine bildirim ayarlarınızdan bağlantıyı kaldırın.",
+      "codeGone": "Bu kod yanlış, kullanılmış ya da 10 dakika sonra süresi dolmuş. Yeni bir kod oluşturup tekrar gönderin."
+    },
+    "wallpaper": {
+      "notYours": "Bu fotoğraf sizin değil.",
+      "invalid": "Böyle bir arka plan yok.",
+      "tooLarge": "Fotoğraf en fazla 2 MB olabilir.",
+      "type": "JPEG, PNG veya WebP bir fotoğraf kullanın."
+    },
     "tooLarge": "Bu, sunucunun kabul ettiğinden büyük.",
     "tooLargeMax": "Bu, sunucunun kabul ettiğinden büyük: en fazla {{max}} MB.",
     "passwordLink": {
@@ -14868,7 +15015,7 @@
       "accountInUse": "Bu hesap zaten başka bir ajan için düşünüyor.",
       "noAiYet": "Henüz bağlı bir yapay zekâ yok.",
       "filePurged": "Bu dosya 30 günden uzun süre önce silindi ve geri gelemez.",
-      "looksSecret": "Bu bir parola veya anahtara benziyor ve buradaki herkes görür.",
+      "looksSecret": "Bu bir parola veya anahtara benziyor ve buradaki herkes görür. Bunun yerine ajandan özelden istemesini isteyin.",
       "blockSpec": "Bu bloğun parçalarında veya formüllerinde bir hata var, bu yüzden gösterilemiyor. Düzeltip tekrar deneyin.",
       "takeControl": "Önce profilin kontrolünü alın.",
       "profileBusy": "Bu profili başka biri kullanıyor.",
@@ -14888,6 +15035,7 @@
       "agentCantRead": "Önce ajanın erişim ayarlarından bunu okumasına izin verin.",
       "neverHappens": "Bu zamanlama hiç gerçekleşmiyor.",
       "soleOwner": "Başka üyeleri olan bir çalışma alanının tek sahibi sizsiniz. Önce başka birini sahip yapın veya çalışma alanını silin.",
+      "soleOwnerOutside": "Diğer kişileri harici çalışanlar olan bir çalışma alanının tek sahibi sizsiniz ve harici çalışanlar sahip olamaz. Önce bir üye davet edip onu sahip yapın veya çalışma alanını silin.",
       "testFirst": "Açmadan önce bağlantıyı bu ayarlarla test edin.",
       "voiceLength": "Kayıt çok uzun veya çok kısa.",
       "sendAgain": "Dosya tam olarak ulaşmadı. Yeniden gönderin.",
@@ -14964,7 +15112,8 @@
       "aboveYou": "Bu rolü yalnızca ondan üstteki biri değiştirir.",
       "base": "Her çalışma alanı Herkes rolünü korur.",
       "unknown": "O rol artık yok.",
-      "orderIncomplete": "Siz taşırken roller değişti. Yenileyip tekrar deneyin."
+      "orderIncomplete": "Siz taşırken roller değişti. Yenileyip tekrar deneyin.",
+      "outsideOwner": "Harici bir çalışan sahip olamaz."
     },
     "teamProposal": {
       "undoExpired": "Bu ekip oluşturulalı bir günden fazla oldu, bu yüzden burada geri alınamaz. Ajanları kendi sayfalarından arşivle."
@@ -14996,7 +15145,8 @@
       "denied": "İsteğiniz onaylanmadı. Oradan birinin sizi davet etmesini isteyin.",
       "answered": "Bu isteği zaten biri yanıtladı.",
       "expired": "Bu isteğin süresi doldu: 14 gün içinde kimse yanıtlamadı.",
-      "codeNeeded": "Önce e-postanızı doğrulayın."
+      "codeNeeded": "Önce e-postanızı doğrulayın.",
+      "outsideClosed": "Bu hesap engellendi ya da siliniyor, bu yüzden katılamaz. İstek kapatıldı."
     },
     "code": {
       "wrong": "Kod yanlış. Tekrar deneyin.",
@@ -15082,7 +15232,7 @@
       "takeOverNoAccess": "Rutini devralmadan önce onun konuşmasına katılın.",
       "agentNotInChannel": "Önce ajanı konuşmaya ekleyin.",
       "webhookPaused": "Test etmek için rutini açın.",
-      "continueExtraOff": "Bu planın kullanım dönemi doldu ve bu ajanın uzun işleri ücretli ek kullanımı kullanmıyor. Hemen devam etmek için bunu yapay zeka ayarlarından açın, yoksa sıfırlamadan sonra kaldığı yerden sürer.",
+      "continueExtraOff": "Bu planın kullanım dönemi doldu ve bu ajanın uzun işleri planın ücretli ek kullanımını kullanmıyor. Sıfırlamadan sonra kaldığı yerden sürer.",
       "continueExtraUsedUp": "Bu planın kullanım dönemi doldu ve ücretli ek kullanımı da bitti ya da kullanılamıyor. Sıfırlamadan sonra kaldığı yerden sürer.",
       "actionsNeedApprover": "Bir rutinin kendi başına hareket etmesine yalnızca ajanın sahibi veya eylemlerini onaylayan kişi izin verebilir.",
       "editorOnly": "Rutini yalnızca oluşturan kişi, ajanın sahibi veya bir yönetici değiştirebilir.",
@@ -15179,13 +15329,15 @@
     "agent": {
       "ownerOrAdmin": "Bunu yalnızca ajanın sahibi veya bir yönetici yapabilir.",
       "detailsHidden": "Nasıl çalıştığını yalnızca {{agentName}} ile konuşanlar görür.",
-      "extraOwnerOnly": "Planın ücretli ek kullanımını yalnızca ajanın sahibi açıp kapatabilir.",
       "undoForbidden": "Bunu yalnızca ajanın çalıştığı kişi, sahibi veya bir yönetici geri alabilir.",
-      "undoSkillsAdmins": "Bir ajanın becerilerindeki değişikliği yalnızca bir yönetici geri alabilir veya yineleyebilir."
+      "undoSkillsAdmins": "Bir ajanın becerilerindeki değişikliği yalnızca bir yönetici geri alabilir veya yineleyebilir.",
+      "extraOwnerOnly": "Planın ücretli ek kullanımını yalnızca ajanın sahibi açıp kapatabilir.",
+      "extraUnavailable": "Ücretli ek kullanım yalnızca temsilciden sorumlu kişinin kendi planında kullanılabilir. Sağ kol için kullanılamaz."
     },
     "account": {
       "notRestorable": "Bu hesap artık geri yüklenemez.",
-      "notOwner": "Bunu yalnızca bu hesabı veya planı bağlayan kişi yapabilir."
+      "notOwner": "Bunu yalnızca bu hesabı veya planı bağlayan kişi yapabilir.",
+      "orderForbidden": "Bu hesabın sıradaki yerini yalnızca onu bağlayan kişi veya bir yönetici değiştirebilir."
     },
     "channel": {
       "membersForbidden": "Kişi ekleyip çıkarmayı yalnızca kanalı oluşturan kişi veya bir yönetici yapabilir."
@@ -16478,8 +16630,37 @@
     },
     "system": "Sistem",
     "removed": "Kaldırıldı",
+    "operatorRead": {
+      "sentence": "{{who}} {{what}} okudu",
+      "who": {
+        "server": "Bu sunucuyu yöneten kişi",
+        "cloud": "Ackwire AI destek ekibi"
+      },
+      "what": {
+        "message": "bir mesajı",
+        "run_step": "bir ajanın çalışmasındaki bir adımı",
+        "agent": "bir ajanın talimatlarını",
+        "routine": "bir rutini",
+        "task": "arka plandaki bir görevi",
+        "channel": "bir kanalın adını",
+        "connection": "bir bağlantının bilgilerini",
+        "support_request": "bir destek talebini",
+        "direct": "özel bir sohbetteki bir içeriği",
+        "other": "çalışma alanındaki bir içeriği"
+      },
+      "request": {
+        "plain": "{{name}} adlı üyenin talebiyle",
+        "app": "{{name}} adlı üyenin uygulamadan gönderdiği taleple",
+        "email": "{{name}} adlı üyenin e-postayla gönderdiği taleple",
+        "operator": "{{name}} adlı üyenin, bu sunucuyu yöneten kişinin kaydettiği talebiyle",
+        "support": "{{name}} adlı üyenin, destek ekibinin kaydettiği talebiyle"
+      },
+      "fault": "başarısız olan veya takılan bir çalıştırmayı incelemek için",
+      "ai": "bir yapay zeka asistanıyla"
+    },
     "change": {
       "mergedWithoutAsking": "{{repo}} içinde sormadan birleştirdi",
+      "accentChanged": "Çalışma alanının vurgu rengini değiştirdi",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Bir isteği onayladı",
@@ -16491,6 +16672,11 @@
         "left": "Çalışma alanından ayrıldı",
         "role_changed": "Bir üyenin rolünü değiştirdi",
         "password_link": "Bir üye için yeni şifre bağlantısı oluşturdu"
+      },
+      "outside": {
+        "approved": "{{outsideOf}} adına bir harici çalışanı içeri aldı",
+        "removed": "{{outsideOf}} adına bir harici çalışanı çıkardı",
+        "left": "Çalışma alanından ayrıldı, {{outsideOf}} adına harici çalışan"
       },
       "role": {
         "permission_set": "{{short}} iznine kimin sahip olduğunu değiştirdi",
@@ -16754,6 +16940,51 @@
           "new3": "2 kaldı, yarın ararım.",
           "new4": "Rapor Drive'da güncellendi.",
           "newCount": "4 yeni"
+        },
+        "wallpaper": {
+          "title": "Arka plan",
+          "help": "Yalnızca sizin için değişir, tüm cihazlarınızda",
+          "rowHelp": "Tüm sohbetlerin arkasında, yalnızca sizin için. Bir sohbet, menüsünden kendi arka planını alabilir.",
+          "rowSub": "Yalnızca sizin için, tüm sohbetlerde",
+          "onlyHere": "Yalnızca {{name}} içinde, yalnızca sizin için",
+          "none": "Arka plan yok",
+          "sameAsOthers": "Diğer sohbetlerle aynı",
+          "sameShort": "Diğerleriyle aynı",
+          "sky": "Gökyüzü",
+          "drawings": "Çizimler",
+          "color": "Renk",
+          "photos": "Fotoğraflarınız",
+          "choosePhoto": "Fotoğraf seçin",
+          "skyAutoHelp": "İlki sohbete göre değişir: doğrudan mesajda ajanın renginde bir gökyüzü, kanallarda çalışma alanının gökyüzü.",
+          "skyAutoHelpDms": "İlki ajanın renginde bir gökyüzü.",
+          "skyAutoHelpChannels": "İlki çalışma alanının gökyüzü.",
+          "neutral": {
+            "paper": "Kâğıt",
+            "mist": "Sis",
+            "sand": "Kum"
+          },
+          "name": {
+            "skyAuto": "Sohbetin gökyüzü",
+            "skyAgent": "Ajanın gökyüzü",
+            "skyWorkspace": "Çalışma alanının gökyüzü",
+            "sky": "Gökyüzü · {{color}}",
+            "drawingsAuto": "Sohbetin çizimleri",
+            "drawingsAgent": "Ajanın çizimleri",
+            "drawingsWorkspace": "Çalışma alanının çizimleri",
+            "drawings": "Çizimler · {{color}}",
+            "crowd": "Ajanlar",
+            "color": "Renk · {{color}}",
+            "photo": "Fotoğrafınız"
+          },
+          "choose": "Seçin…",
+          "menu": "Sohbet arka planı…",
+          "preview": "Önizleme",
+          "usePhoto": "Bu fotoğrafı kullan",
+          "dragHint": "Görünen kısmı seçmek için fotoğrafı sürükleyin",
+          "dim": "Karanlık modda koyulaştır",
+          "sending": "Fotoğraf gönderiliyor…",
+          "failed": "Arka plan kaydedilemedi. Tekrar deneyin.",
+          "done": "Bitti"
         }
       },
       "agentStyle": "Ajanların sizinle nasıl konuştuğu",
@@ -17155,6 +17386,14 @@
   "usageViews": {
     "signedOut": "Oturum kapatıldı",
     "whose": "{{name}} hesabı",
+    "order": {
+      "title": "{{plan}} · Kullanım sırası",
+      "hint": "Bir sınıra gelindiğinde ajanlar boşluğu olan bir sonraki hesapla devam eder ve ilki sıfırlandığında ona döner.",
+      "terms": "Birden fazla {{plan}} hesabı kullanmak {{plan}} koşullarında gri bir alandır.",
+      "termsLabel": "{{plan}} koşulları",
+      "termsHint": "Bir plan tek kişi içindir, bu yüzden ajanlarınız birden fazla hesaba güvenmeden önce {{plan}} koşullarını kontrol edin.",
+      "move": "{{name}} hesabını taşı, sırada {{n}}"
+    },
     "serves": {
       "everyone": "Herkes kullanıyor",
       "onlyYou": "Yalnızca sen kullanıyorsun",
@@ -17217,7 +17456,7 @@
       "nowTag": "şimdi",
       "api": "API",
       "apiMain": "{{name}} API üzerinden düşünüyor",
-      "apiFallback": "Plan dışında: hızlı kararlar ve planın yanıt veremediği durumlar",
+      "apiFallback": "Plan dışında: hızlı kararlar",
       "removed": "Kaldırılmış hesap",
       "removedSub": "Artık hiçbir bilgisayarda değil",
       "old": "{{brand}}, hesaplardan önce",
@@ -17848,6 +18087,7 @@
       "provider_wait_said": "{{provider}} bir hatayla yanıt verdi ({{detail}}). Yeniden deneyip çalışır çalışmaz yanıt vereceğim.",
       "provider_wait_ours": "Hesabınız değil, bizim tarafımızdaki bir sorun yapay zekamı engelliyor. Çözülür çözülmez yanıt vereceğim.",
       "provider_back": "Yapay zekam geri döndü.",
+      "confidential_removed": "Kaldırıldı: gizli metin {{days}} gün saklanır.",
       "brain_busy": "Bilgisayarım şu anda başka görevlerle meşgul. Boşalır boşalmaz yanıt vereceğim.",
       "brain_queued": "Hâlâ bilgisayarın sırasındayım. Boş belleği olur olmaz yanıt veririm.",
       "brain_interrupted": "{{brain}} bitirmeden durdu. Zaten yapılanlar tekrarlanmadı: {{tools}}.",
@@ -17855,6 +18095,11 @@
       "plan_limit_cut_unknown": "{{plan}} planının sınırında durdum. Sıfırlanır sıfırlanmaz kaldığım yerden devam edeceğim.",
       "plan_limit_wait": "{{plan}} planı sınırına ulaştı. Sıfırlandığında, {{when}}, yanıt vereceğim. {{plan}} tarafında daha önce açılırsa fark eder ve hemen yanıt veririm.",
       "plan_limit_wait_unknown": "{{plan}} planı sınırına ulaştı. Sıfırlanır sıfırlanmaz yanıt vereceğim.",
+      "plan_account_moved": "{{from}} hesabı sınırına ulaştı. {{to}} hesabıyla devam ediyorum.",
+      "plan_account_moved_line": "{{from}} hesabı sınırına yaklaştı. {{to}} hesabıyla devam ediyorum.",
+      "plan_account_moved_extra": "{{from}} hesabı ücretli ek kullanıma geçecekti. {{to}} hesabıyla devam ediyorum.",
+      "plan_limit_all_wait": "{{accounts}} {{plan}} hesabının hepsi sınırına ulaştı. İlki sıfırlandığında, {{when}}, yanıt vereceğim.",
+      "plan_limit_all_wait_unknown": "{{accounts}} {{plan}} hesabının hepsi sınırına ulaştı. Biri sıfırlanır sıfırlanmaz yanıt vereceğim.",
       "plan_model_limit_wait": "{{model}}, {{plan}} üzerinde kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor: {{agent}} için modeli değiştirin veya sıfırlanmasını bekleyin ({{when}}).",
       "plan_model_limit_wait_unknown": "{{model}}, {{plan}} üzerinde kendi sınırına ulaştı. Planın diğer modelleri çalışmaya devam ediyor: {{agent}} için modeli değiştirin veya sıfırlanmasını bekleyin.",
       "plan_model_region_wait": "Bu model ({{model}}) için OpenCode'da Global bölgesinin açık olması gerekiyor (Settings › Privacy).",
@@ -17925,6 +18170,8 @@
       "file_saved": "Dosya kaydedildi.",
       "issue_work_start": "Lütfen #{{number}} görevini yap.",
       "issue_taken": "#{{number}} görevini aldım.",
+      "surfaceUnlinked": "{{surface}} kimliği değiştiği için ayrıldı. Sensen Ayarlar'dan yeniden bağla.",
+      "surfaceVoiceDropped": "O sesli mesajı anlayamadım. Tekrar gönderebilir ya da yazabilir misin?",
       "done": "Bitti.",
       "stretch_paused_runs_one": "{{agents}} devam etmeden önce size danışmak için durdu",
       "stretch_paused_runs_other": "{{agents}} devam etmeden önce size danışmak için durdu",
@@ -18794,6 +19041,7 @@
     "serverOwner": "Bu sunucuyu siz kurdunuz. Kendi ayarlarının burada sahibi olmayacak, yalnızca ortamında olacak.",
     "blockers": "Silebilmeniz için önce",
     "soleOwner": "{{name}} çalışma alanının tek sahibi sizsiniz. Başka birini sahip yapın ya da {{name}} çalışma alanını silin.",
+    "soleOwnerOutside": "{{name}} çalışma alanının tek sahibi sizsiniz ve oradaki diğer kişiler sahip olamayan harici çalışanlar. Bir üye davet edip onu sahip yapın ya da {{name}} çalışma alanını silin.",
     "soleOwnerSettingUp": "{{name}} çalışma alanının tek sahibi sizsiniz. Başka birini sahip yapmak için kurulumu tamamlayın ya da {{name}} çalışma alanını silin.",
     "openPeople": "Kişiler'i aç",
     "finishSetup": "Kurulumu tamamla",
@@ -18814,6 +19062,10 @@
     "seatsPaid_other": "{{count}} ücreti ödenmiş yer",
     "noLimit": "Sınırsız",
     "ownBucket": "Kendi depolama alanınızda, bizden bir sınır olmadan"
+  },
+  "referrals": {
+    "open": "Önerin ve kazanın",
+    "failed": "Şu anda açılamadı. Birazdan tekrar deneyin."
   },
   "limits": {
     "members": {

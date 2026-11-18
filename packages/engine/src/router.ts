@@ -27,6 +27,7 @@ import { audienceSql } from "./audience";
 import { TYPING_GRACE_MS, typesInApp, typingLogFor } from "./burst";
 import { caches } from "./cache";
 import { summarizeGrants } from "./capabilities";
+import { isConfidential } from "./confidential";
 import { quotedLine } from "./context";
 import { addAgentReaction, isValidReaction, normalizeReaction } from "./context/feedback";
 import { createAgentRuns, requesterOf } from "./dispatch";
@@ -963,7 +964,9 @@ export async function routeMessage(
           and r.trigger_message_id = ${messages.id} and ${inArray(sql`r.status`, [...ACTIVE_RUN_STATUSES])})`,
         threadId: messages.threadId,
         // As text, which every driver reads the same way.
-        replyTo: sql<string | null>`(${messages.meta}->'replyTo')::text`,
+        // The quote a message carries is a copy of the quoted words: none out of a confidential thread (ADR 0190).
+        replyTo: sql<string | null>`case when coalesce(${messages.meta}->>'confidential', '') = 'true' then null
+          else (${messages.meta}->'replyTo')::text end`,
         createdAt: messages.createdAt,
       })
       .from(messages)
@@ -1206,7 +1209,10 @@ export async function routeMessage(
   // What it decides on, one line per message, and everyone those name. Of the `ROUTER_MESSAGE_CHARS` a step
   // reads, the message takes what it needs; the lines before it, cut like the slice's, fill the rest, newest
   // first, a line break each.
-  const ownLine = { body: `${quotedLine(message.meta)}${message.body}`, names: namesOf(message).map((n) => n.label) };
+  const ownLine = {
+    body: `${isConfidential(message.meta) ? "" : quotedLine(message.meta)}${message.body}`,
+    names: namesOf(message).map((n) => n.label),
+  };
   const runLines = run.map(lineOf);
   const saidNames = [...new Set([...runLines, ownLine].flatMap((l) => l.names ?? []))];
   const said = [...sliced(null, runLines, ROUTER_MESSAGE_CHARS - ownLine.body.length - runLines.length), ownLine];

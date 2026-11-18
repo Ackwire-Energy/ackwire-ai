@@ -6,14 +6,24 @@ import {
   facesShown,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
+import {
+  hasWallpaper,
+  resolveWallpaper,
+  type Wallpaper,
+  wallpaperFor,
+  wallpaperHueOf,
+} from "@agenteschat/client/lib/wallpaper";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
+import { wallpaperStrength } from "@agenteschat/ui/sky/wallpaper";
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import { type LayoutChangeEvent, StyleSheet, useWindowDimensions } from "react-native";
+import { type LayoutChangeEvent, StyleSheet, useWindowDimensions, type ViewStyle } from "react-native";
 import { useOrg } from "@/providers/org";
 import { useTheme } from "@/ui";
+import { appShadows, type Scheme } from "@/ui/palette";
 import { keepSize, keptSize } from "./kept-sizes";
 import { BUBBLES_INSET, bubbleFill, CHAT_TEXT, quietInset } from "./logic";
+import { wallpaperKey } from "./wallpaper-logic";
 
 /** How this conversation's rows are drawn (`chatLookOf`, as on the web's `MessageLook`). */
 export interface RowLook {
@@ -27,6 +37,12 @@ export interface RowLook {
   faces: boolean;
   /** The words per the person's Tamanho do texto (`CHAT_TEXT`); null outside a conversation: the page's own body. */
   text: { fontSize: number; lineHeight: number } | null;
+  /**
+   * A background behind the rows (`ChatWallpaper`): someone else's bubble is lifted off it (`WALLPAPER_LIFT`) and
+   * every bubble takes the cards' light edge (`liftedEdge`), so none fades into it. Rows with no bubble stay as they
+   * are (the background is at half behind them).
+   */
+  wallpaper?: boolean;
 }
 
 export const ROW_LOOK_DEFAULT: RowLook = {
@@ -43,17 +59,39 @@ export const useRowLook = () => useContext(RowLookContext);
 /**
  * The conversation's look. My bubbles take the color of the agent I talk to, and the workspace's sky elsewhere. In a
  * personal workspace every conversation opens in bubbles, as a DM does (ADR 0159); the person's own choice wins.
+ * `channelId`: the conversation, whose background (its own, or the one behind every conversation) lifts its bubbles.
  */
-export function useConversationLook(dm: boolean, agentColor?: AgentColorName): RowLook {
+export function useConversationLook(dm: boolean, agentColor?: AgentColorName, channelId?: string | null): RowLook {
   const { org } = useOrg();
   const { colors, scheme } = useTheme();
   const { style, tone } = chatLookOf(org?.chatPrefs, dm, isPersonal(org));
   const text = CHAT_TEXT[textSizeOf(org?.chatPrefs)];
   const fill = bubbleFill(agentColor ?? "sky", tone, colors.bg, scheme === "dark");
+  const wallpaper = Boolean(channelId) && hasWallpaper(wallpaperFor(org?.chatPrefs, channelId));
   return useMemo(
-    () => ({ style, tone, fill, names: !dm, faces: facesShown(style, dm), text }),
-    [style, tone, fill, dm, text],
+    () => ({ style, tone, fill, names: !dm, faces: facesShown(style, dm), text, wallpaper }),
+    [style, tone, fill, dm, text, wallpaper],
   );
+}
+
+/**
+ * The background a conversation shows, mine alone (its own, else the one behind every conversation), "auto" made its color: the
+ * agent's in a DM with one, the workspace's sky elsewhere; and how strong, in its look (half where there are no
+ * bubbles). Stable while the choice stays the same, so what paints it never redraws for the conversation.
+ */
+export function useConversationWallpaper(
+  dm: boolean,
+  channelId: string | null | undefined,
+  agentColor?: AgentColorName,
+): { wallpaper: Wallpaper; strength: number } {
+  const { org } = useOrg();
+  const { style } = chatLookOf(org?.chatPrefs, dm, isPersonal(org));
+  const chosen = wallpaperFor(org?.chatPrefs, channelId);
+  const own = dm ? wallpaperHueOf(agentColor) : null;
+  const strength = wallpaperStrength(style === "bubbles");
+  const key = wallpaperKey(chosen);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new copy of the same choice paints the same thing
+  return useMemo(() => ({ wallpaper: resolveWallpaper(chosen, own), strength }), [key, own, strength]);
 }
 
 /** This conversation's rhythm: every row and line of its list takes its room from here. */
@@ -102,6 +140,25 @@ export const useCardTop = (marginTop = 0) => ({ marginTop: useContext(RowPartCon
 
 /** `quietInset` in this conversation's look. */
 export const useQuietInset = () => quietInset(useRowLook());
+
+/** `liftedEdge` per scheme, made once. */
+const liftedEdges = new Map<Scheme, ViewStyle | null>();
+
+/**
+ * A bubble's edge over a background (`RowLook.wallpaper`): the ring of the cards' light shadow (`e1`, its layer with no
+ * blur), drawn as an outline, outside the bubble as that ring is, so nothing in it moves. The shadow's blurred layer
+ * barely shows over a background, and as a `boxShadow` it cost each bubble two masked layers, drawn again on every
+ * frame of a scroll.
+ */
+export function liftedEdge(scheme: Scheme): ViewStyle | null {
+  let edge = liftedEdges.get(scheme);
+  if (edge === undefined) {
+    const ring = appShadows(scheme).e1.find((l) => l.blur === 0 && l.spread > 0);
+    edge = ring ? { outlineWidth: ring.spread, outlineColor: ring.color, outlineStyle: "solid" } : null;
+    liftedEdges.set(scheme, edge);
+  }
+  return edge;
+}
 
 /** The rows' frames per style. */
 export const lookRows = StyleSheet.create({

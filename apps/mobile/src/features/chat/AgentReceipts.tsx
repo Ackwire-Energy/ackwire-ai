@@ -36,7 +36,7 @@ import { openAgentAi, openAgentModel } from "../ai/AgentAiScreen";
 import { openConnectAi } from "../ai/NoAiCard";
 import { Note, OpenPage, usePlanHold } from "../ai/parts";
 import { AgentFace, Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { useSheet } from "../shared/SheetHost";
 import {
@@ -52,13 +52,14 @@ import {
 } from "./agent-receipts";
 import { requestComposerText } from "./composer-request";
 import { useQuietInset } from "./look";
+import { useRowDirectory, useRowMeId } from "./row-data";
 
 /** Under a reply whose picture or PDF reached its AI as text only: "Trocar modelo", for who may change the agent. */
 export function FilesTextOnlyFix({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const { org } = useOrg();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const agentId = m.author.id;
   const fix = agentId
     ? failedRunFix(filesTextOnlyOf(m.meta), {
@@ -97,8 +98,8 @@ export const AgentReceiptLine = memo(function AgentReceiptLine({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
   const sheet = useSheet();
@@ -247,7 +248,7 @@ export const EveryoneLine = memo(function EveryoneLine({
   mine: boolean;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const inset = useQuietInset();
   const name = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
   const line = everyoneLineOf(t, m.meta, receiptView(receipt), { agent: name });
@@ -313,7 +314,7 @@ export const ReceiptMark = memo(function ReceiptMark({
 }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const c = useColors();
   const tint = ink ?? c.muted;
   const reduced = useReducedMotion();
@@ -399,7 +400,7 @@ function ReceiptsSheet({
 }) {
   const { t, i18n } = useTranslation();
   const { orgId, org } = useOrg();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const sheet = useSheet();
   const held = usePlanHold(orgId, org) !== null;
   const reactions = useReactions(orgId, m.id, false).data ?? m.reactions;

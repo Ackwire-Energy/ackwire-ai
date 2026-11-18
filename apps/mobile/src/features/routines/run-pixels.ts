@@ -1,5 +1,12 @@
 import type { RunStatus } from "@agenteschat/client/lib/calendar";
-import { AGENT_GRADIENTS, type AgentColorName, bodyTones, mixHex, spriteGrid } from "@agenteschat/ui/agent/engine";
+import {
+  AGENT_GRADIENTS,
+  type AgentColorName,
+  bodyTones,
+  mixHex,
+  type SkyPair,
+  spriteGrid,
+} from "@agenteschat/ui/agent/engine";
 import { CellGrid, type CellRun, column } from "../browser/trail-pixels";
 
 /**
@@ -178,7 +185,12 @@ export function spritePose(
 }
 
 /** The agent as a 9×9 sprite: its body dithered in its tones, its eyes (writing while it runs, or blinking). */
-export function spriteCells(color: AgentColorName, eyes: string, running: boolean, blink: boolean): CellRun[] {
+export function spriteCells(
+  color: AgentColorName | SkyPair,
+  eyes: string,
+  running: boolean,
+  blink: boolean,
+): CellRun[] {
   const tones = bodyTones(color);
   const out = new CellGrid();
   spriteGrid(SPRITE, eyes).forEach((row, y) => {

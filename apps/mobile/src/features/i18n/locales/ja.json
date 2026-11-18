@@ -234,8 +234,6 @@
       "mute": "ミュート",
       "unmute": "ミュート解除"
     },
-    "firstRunLine": "{{name}}がチームを準備中 · {{done}}/{{total}}",
-    "firstRunLinePersonal": "{{name}}がエージェントを準備中 · {{done}}/{{total}}",
     "first": {
       "title": "最初のエージェントから始めましょう",
       "subtitle": "名前を付けて、何をするかを伝えてください。ここにチャットとして表示されます。",
@@ -1568,18 +1566,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}}が助けを求めています",
-      "needsFor": "{{name}}が助けを求めています · {{time}}",
-      "inControlAt": "あなたが操作中 · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "{{name}}のブラウザを開いています…",
-      "startingM": "{{name}}のブラウザを開いています…",
       "stopAskF": "{{name}}のブラウザを閉じますか？",
       "stopAskM": "{{name}}のブラウザを閉じますか？",
-      "whereF": "{{name}}のブラウザ内",
-      "whereM": "{{name}}のブラウザ内",
       "open": "開く",
-      "expandHint": "タップして展開",
       "stop": "停止",
       "giveUp": "あきらめる"
     },
@@ -1587,7 +1576,6 @@
       "inControl": "あなたが操作中",
       "helping": "{{name}}が操作中",
       "watchOnly": "{{name}}が操作中です。あなたは見ているだけです。",
-      "takeOver": "操作を代わる",
       "done": "完了",
       "handBack": "操作を戻す",
       "couldnt": "できなかった",
@@ -1608,7 +1596,6 @@
       "closedHelpM": "ログイン情報は次回のために保存されます。",
       "stuckHelpF": "もう一度試すとブラウザが再起動します。ログイン情報は保存されたままです。",
       "stuckHelpM": "もう一度試すとブラウザが再起動します。ログイン情報は保存されたままです。",
-      "hidden": "{{name}}が操作中 · 画面は非表示",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2116,7 +2103,6 @@
     "planRowSub": "エージェントのコンピューターでログイン、キー不要",
     "keyRow": "キー",
     "keyRowSub": "使った分だけ、提供元に直接支払います",
-    "already": "{{org}}にすでにあるもの",
     "stepOf": "{{step}}/{{total}}"
   },
   "crash": {
@@ -2752,5 +2738,11 @@
       "title": "確認するものはありません",
       "text": "エージェントが会話の外で何かを行うと、ここに表示されます。"
     }
+  },
+  "surface": {
+    "on": "オン",
+    "codeText": "そこで開くメッセージを送信して、ここに戻ってください。",
+    "openFailed": "この端末で{{surface}}を開けませんでした。下のコードを送信してください。",
+    "orType": "またはこのコードを送信"
   }
 }

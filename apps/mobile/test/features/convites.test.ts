@@ -594,7 +594,7 @@ describe("Configurações › Pessoas: Membros · Convites · Cargos", () => {
   test("a request's review starts on its link's choices, and a full link waits for a bigger maximum", () => {
     const sheet = src("features/members/JoinRequestsScreen.tsx");
     expect(sheet).toContain("const { given, leftOut } = approvalCargos(roles, r.link?.roleIds ?? []);");
-    expect(sheet).toContain("disabled={busy || full || linkFull || !draft}");
+    expect(sheet).toContain("disabled={busy || waitsForRoom(r, full) || linkFull || !draft}");
     expect(sheet).toContain('t("errors.join.linkFullApproval")');
     // A link's cargo the approver can't give stays out, and the card says which, as the web's row.
     expect(sheet).toContain(

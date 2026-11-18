@@ -151,7 +151,7 @@ describe("one line a row", () => {
     // Every row opens what says it whole (a task's screen, its agent's tasks, a computer's line): a chevron, never a
     // stop button squeezing the title.
     expect(screen).not.toContain("end={stop}");
-    expect(screen).toContain('<Icon name="right" size={15} color={c.faint} />');
+    expect(screen).toContain("<Disclosure />");
     for (const row of ["computer.name", "title"]) expect(screen).toContain(`<OneLine title={${row}}`);
   });
 

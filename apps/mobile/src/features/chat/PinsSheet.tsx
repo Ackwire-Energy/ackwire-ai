@@ -7,7 +7,19 @@ import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Count, EmptyState, GroupedList, GroupedRow, Icon, SkeletonList, Text, TOUCH, useToast, weights } from "@/ui";
+import {
+  Count,
+  EmptyState,
+  GroupedList,
+  GroupedRow,
+  Icon,
+  RowPressable,
+  SkeletonList,
+  Text,
+  TOUCH,
+  useToast,
+  weights,
+} from "@/ui";
 import { Face } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useDirectory, useOrgId, useWhen } from "../shared/hooks";
@@ -62,18 +74,18 @@ export function PinnedLines({
         <Count value={list.length} size={15} />
       </Pressable>
       {list.slice(0, PEEK_ROWS).map((pin) => (
-        <Pressable
+        <RowPressable
           key={pin.message.id}
           onPress={() => onPick(pin)}
           accessibilityRole="button"
-          style={({ pressed }) => [styles.peekRow, pressed && { backgroundColor: c.sunken }]}
+          style={styles.peekRow}
         >
           <Face who={pin.message.author} size={24} live={false} />
           <Text variant="subhead" tone="ink2" numberOfLines={1} style={styles.grow}>
             {previewOf(textOrMedia(t, pin.message.body, pin.message.meta)) || t("mobile.chat.approvalPreview")}
           </Text>
           <Icon name="pin" size={13} color={c.faint} />
-        </Pressable>
+        </RowPressable>
       ))}
       <View style={[styles.peekRule, { backgroundColor: c.line2 }]} />
     </View>

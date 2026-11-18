@@ -58,10 +58,12 @@ export {
   type SFSymbolName,
   useHeaderActionOptions,
 } from "./headerActions";
-export { Icon, type IconName, type IconProps } from "./Icon";
+export { Icon, type IconName, type IconProps, type IconWeight } from "./Icon";
 export { ICON_BUTTON_SIZE, IconButton, type IconButtonProps, usePlateEdge } from "./IconButton";
+export { IconTile } from "./IconTile";
 export { InfoHint, type InfoHintOptions } from "./InfoHint";
 export { ICON_NAMES } from "./icons.data";
+export { SF_SYMBOLS, sfSymbolOf, TILE_TINTS, type TileTint } from "./icons.sf";
 export { LargeTitleHead, useLargeTitleScroll } from "./LargeTitleHead";
 export { LargeTitleScreen, type LargeTitleScreenProps, TabFoot } from "./LargeTitleScreen";
 export { LineIcon, type LineIconProps } from "./LineIcon";
@@ -93,6 +95,8 @@ export { type BadgePresence, badgeCell } from "./presence-badge";
 export { RoleMark } from "./RoleMark";
 export { Row, type RowProps } from "./Row";
 export { ROW_CARD_INSET, RowAction } from "./RowAction";
+export { CheckMark, Disclosure, MenuMark, ROW_MARK } from "./RowMarks";
+export { ROW_OUT_MS, RowPressable, type RowPressableProps } from "./RowPressable";
 export { CARD_PAD, GROUPED_ROW, SCREEN_X, SHEET_BAR, SHEET_GAP, SHEET_X, TOOL_H, TOUCH } from "./rhythm";
 export { roleMarkFit, roleMarkIcon } from "./role-mark";
 export { SearchField, type SearchFieldProps } from "./SearchField";

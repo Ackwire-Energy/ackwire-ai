@@ -637,7 +637,7 @@ export async function channelMembersDetail(db: Database, orgId: string, channelI
 // ── Runs and usage ───────────────────────────────────────────────────────────
 
 /** Who may see runs and usage: admins (`view_usage`), or the agent's owner for that agent. */
-async function requireUsageAccess(db: Database, actorId: string, orgId: string, agentId?: string) {
+export async function requireUsageAccess(db: Database, actorId: string, orgId: string, agentId?: string) {
   const membership = await requirePermission(db, actorId, orgId, "read");
   if (can(membership, "view_usage")) return;
   if (agentId) {

@@ -40,8 +40,16 @@ export interface HumanCheckStatus {
 export interface HumanCheck {
   /** The widget's site key, for pages. */
   readonly siteKey: string;
-  /** Null when the request may go on. */
-  verify(token: string | null | undefined, action: HumanAction, ip: string): Promise<HumanCheckRefusal | null>;
+  /**
+   * Null when the request may go on. `host`: the request's own registered host (ADR 0194), where a token made there
+   * also counts, except for `waitlist`; the caller has checked it is registered.
+   */
+  verify(
+    token: string | null | undefined,
+    action: HumanAction,
+    ip: string,
+    host?: string | null,
+  ): Promise<HumanCheckRefusal | null>;
   /** Whether Cloudflare answers and takes the secret: at boot, and again when a page couldn't make a token. */
   probe(): Promise<HumanCheckState>;
   status(): HumanCheckStatus;
@@ -86,7 +94,7 @@ type Log = (message: string, data?: Record<string, unknown>) => void;
 export function createTurnstileCheck(options: {
   siteKey: string;
   secretKey: string;
-  /** Where our pages run the widget: `PUBLIC_URL`'s host. */
+  /** Where our pages run the widget: `PUBLIC_URL`'s host, and each request's own registered host (`verify`'s `host`). */
   hostnames: string[];
   /**
    * Where the landing page, a site of its own (`LANDING_URL`), runs the widget. Its tokens count only for `waitlist`,
@@ -210,7 +218,7 @@ export function createTurnstileCheck(options: {
 
   return {
     siteKey: options.siteKey,
-    async verify(token, action, ip) {
+    async verify(token, action, ip, host) {
       if (token === HUMAN_CHECK_UNAVAILABLE || token?.startsWith(`${HUMAN_CHECK_UNAVAILABLE}:`)) {
         return unavailable(token, action, ip);
       }
@@ -222,7 +230,8 @@ export function createTurnstileCheck(options: {
         return null;
       }
       if (!answer.success) return "human_check";
-      const hostnames = action === "waitlist" ? waitlistHostnames : options.hostnames;
+      const hostnames =
+        action === "waitlist" ? waitlistHostnames : host ? [...options.hostnames, host] : options.hostnames;
       const ours = answer.action === action && hostnames.includes(answer.hostname ?? "");
       if (!ours && answer.metadata?.result_with_testing_key !== true) return "human_check";
       prune();

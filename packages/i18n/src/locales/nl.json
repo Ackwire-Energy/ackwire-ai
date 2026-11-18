@@ -619,6 +619,7 @@
     "termsMiddle": " en het ",
     "privacy": "Privacybeleid",
     "termsAfter": ".",
+    "poweredBy": "Mogelijk gemaakt door Ackwire AI",
     "signOut": "Uitloggen",
     "earlyAccess": {
       "otherEmail": "Deze uitnodiging is voor een ander adres. Meld je aan met het adres waarnaar ze is gestuurd.",
@@ -2410,6 +2411,56 @@
     "localOnlyHow": "Zet in de Ackwire AI-app op die computer Bereik het vanaf je telefoon en je teamgenoten aan bij Voorkeuren › Servers. Kom daarna hier terug.",
     "localOnlyHere": "Zet Bereik het vanaf je telefoon en je teamgenoten aan. Kom daarna hier terug."
   },
+  "surface": {
+    "link": {
+      "consent": "{{assistant}} van Ackwire AI mag je via {{surface}} berichten sturen over je werkruimtes, en je alleen bellen als iets dringend is en jij dat toestaat. Schrijf stop om dit uit te zetten.",
+      "title": "Praat met {{assistant}} op {{surface}}",
+      "qr": "QR-code die {{surface}} opent met je code al ingevuld",
+      "making": "Je code wordt gemaakt",
+      "code": "Je code {{code}}",
+      "open": "{{surface}} openen",
+      "stepScan": "Scan de code met je telefoon, of open de app",
+      "stepSend": "Stuur het bericht zoals het is",
+      "stepSendText": "Dit gaat vanzelf verder zodra je bericht binnenkomt.",
+      "stepConfirm": "Controleer de afzender en bevestig hier",
+      "showCode": "Code opnieuw tonen",
+      "confirmTitle": "Is dit jouw {{surface}}?",
+      "sentBy": "Deze afzender stuurde je code",
+      "onlyYou": "Koppel het alleen als jij dit bent.",
+      "workspace": "Antwoordt in {{workspace}}",
+      "confirm": "Ja, koppelen",
+      "notMe": "Niet ik",
+      "doneTitle": "{{surface}} is gekoppeld",
+      "doneText": "{{assistant}} antwoordt je vanaf nu daar.",
+      "newCode": "Nieuwe code maken",
+      "done": "Klaar"
+    },
+    "row": {
+      "hint": "Praat met {{assistant}} en krijg de antwoorden op {{surface}}.",
+      "link": "Koppelen",
+      "none": "{{assistant}} kan je daar berichten sturen",
+      "pending": "Een afzender wacht tot je bevestigt",
+      "unlink": "Ontkoppelen",
+      "unlinkTitle": "{{surface}} ontkoppelen?",
+      "unlinkText": "{{assistant}} antwoordt je daar niet meer. Je kunt het altijd opnieuw koppelen.",
+      "unlinked": "{{surface}} ontkoppeld"
+    },
+    "undo": {
+      "title": "De chatapp ontkoppelen?",
+      "lead": "Je account is net gekoppeld aan een chatapp. Was jij dat niet, ontkoppel hem dan hier.",
+      "button": "Ontkoppelen",
+      "done": "{{surface}} ontkoppeld",
+      "doneLead": "{{display}} kan je account niet meer bereiken.",
+      "ended": "Al ontkoppeld",
+      "endedLead": "{{display}} op {{surface}} was al ontkoppeld. Je hoeft niets meer te doen.",
+      "gone": "Deze link om ongedaan te maken werkt niet meer",
+      "sender": "Die afzender"
+    },
+    "via": "via {{surface}}",
+    "viaTip": "Verstuurd door {{person}} via {{surface}}",
+    "forwarded": "doorgestuurd via {{surface}}",
+    "forwardedTip": "{{person}} heeft dit doorgestuurd vanuit {{surface}}. Het zijn de woorden van iemand anders."
+  },
   "team": {
     "title": "Team",
     "people_one": "{{count}} persoon",
@@ -2630,7 +2681,8 @@
     "header": {
       "pins": "Vastgezette berichten",
       "showMembers": "Leden tonen",
-      "hideMembers": "Leden verbergen"
+      "hideMembers": "Leden verbergen",
+      "more": "Meer opties"
     },
     "membersButton_one": "Kanaalleden ({{count}})",
     "membersButton_other": "Kanaalleden ({{count}})",
@@ -3403,10 +3455,14 @@
     "titleFor_female": "Een AI koppelen voor {{name}}",
     "have": {
       "title": "Al gekoppeld",
-      "titleFor": "Al gekoppeld, voor {{name}}",
-      "titleFor_female": "Al gekoppeld, voor {{name}}",
       "other": "Of koppel een ander",
-      "manageKeys": "Sleutels beheren of verwijderen"
+      "manageKeys": "Sleutels beheren of verwijderen",
+      "pickLine": "Kies een account dat hier al verbonden is. {{name}} denkt ermee.",
+      "onlyOwner_one": "Nog {{count}} account dat alleen {{name}} kan geven.",
+      "onlyOwner_other": "Nog {{count}} accounts die alleen {{name}} kan geven.",
+      "moreAgents_one": "en nog {{count}} agent",
+      "moreAgents_other": "en nog {{count}} agents",
+      "plenty": "Ruim genoeg"
     },
     "chat": {
       "mine": "Van jou",
@@ -3591,6 +3647,13 @@
     "onceHint": "Ze delen allemaal de limieten van je abonnement.",
     "use": "{{label}} gebruiken",
     "another": "Een ander account",
+    "which": {
+      "title": "Welk {{brand}}-account gebruikt {{name}}?",
+      "title_female": "Welk {{brand}}-account gebruikt {{name}}?",
+      "titleAll": "Welk {{brand}}-account gebruiken ze?",
+      "mine": "Je {{brand}}-accounts op {{computer}}",
+      "other": "Inloggen met een ander {{brand}}-account"
+    },
     "reuse": {
       "active": "Je hebt {{label}} hier al. Log er opnieuw op in, of gebruik een ander account.",
       "signedOut": "{{label}} is hier uitgelogd. Log opnieuw in en de agents ervan houden het."
@@ -3743,6 +3806,7 @@
     "shared_one": "{{agents}} gebruikt hetzelfde {{plan}}-abonnement. De gesprekken van allebei komen in dezelfde rij.",
     "shared_other": "{{agents}} gebruiken hetzelfde {{plan}}-abonnement. Al hun gesprekken komen in dezelfde rij.",
     "about": "Over de rij",
+    "chain": "Alle {{accounts}} {{plan}}-accounts hebben de limiet bereikt.",
     "lists": "Gesprekken",
     "queuedTab": "In de rij",
     "skippedTab": "Overgeslagen",
@@ -3818,7 +3882,6 @@
       "aiAccount": "Denkt met {{account}}",
       "aiModel": "Denkt via de API",
       "aiNone": "Nog geen AI. Koppel er een na het aanmaken",
-      "reviewTitle": "{{name}} bekijken",
       "lines": "Wat {{name}} krijgt",
       "aChannel": "een kanaal",
       "anApp": "een app",
@@ -5247,6 +5310,7 @@
       "joinRequest_other": "{{name}} en anderen vragen om mee te doen",
       "joinRequestNames": "{{names}} vragen om mee te doen",
       "joinSuggestion": "{{by}} stelde {{name}} voor",
+      "joinOutside": "{{name}} vraagt om lid te worden als externe medewerker voor {{outsideOf}}, zonder een plek in te nemen",
       "doing": {
         "merge": "mergen",
         "deploy": "deployen",
@@ -5310,6 +5374,7 @@
       "joinRequest": "<b>{{name}}</b> vraagt om mee te doen",
       "joinRequestMany": "<b>{{names}}</b> vragen om mee te doen",
       "joinSuggestion": "<b>{{by}}</b> stelde <b>{{name}}</b> voor",
+      "joinOutside": "<b>{{name}}</b> vraagt om lid te worden als externe medewerker voor <b>{{outsideOf}}</b>, zonder een plek in te nemen",
       "changeRequest": "<b>{{name}}</b> vraagt een wijziging voor <b>{{agent}}</b>",
       "proposalWaiting": "Verbetervoorstellen van <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> vraagt een nieuwe agent: <b>{{agent}}</b>",
@@ -5752,12 +5817,12 @@
         "accountAlso": "Ook gebruikt door {{agents}}",
         "accountOf": "Van {{name}}",
         "accountOthers": "Abonnementen voor de hele workspace laten zien van wie ze zijn.",
+        "movesOn": "Gaat bij een limiet verder met het volgende account",
+        "pinned": "Alleen dit account",
+        "pinnedHint": "Wacht bij een limiet tot dit account is gereset, in plaats van naar het volgende te gaan.",
         "addAccount": "Account toevoegen",
         "signInAgain": "Opnieuw inloggen",
         "connectPlan": "Ander abonnement koppelen",
-        "fallbackTitle": "Als {{computer}} niet meer reageert, antwoord via de API",
-        "fallbackHint": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
-        "fallbackHint_female": "Antwoordt dan via de API en telt mee voor het budget van {{name}}. Anders laat {{name}} het weten aan wie het vroeg en wacht tot de computer terug is.",
         "effort": "Inspanning",
         "efforts": {
           "auto": "Automatisch",
@@ -5818,8 +5883,7 @@
           "effort": "Inspanning: {{level}}",
           "speed": "Snelheid: snel",
           "context": "Context: {{size}}",
-          "sharing": "Antwoordt andere mensen",
-          "waits": "Wacht op de computer"
+          "sharing": "Antwoordt andere mensen"
         },
         "copy": {
           "row": "Gebruiken bij andere agents",
@@ -5963,7 +6027,6 @@
           "wait": "Wachten",
           "modelTitle": "Model van {{name}}",
           "moreTitle": "Meer opties voor {{name}}",
-          "fallback": "De API-sleutel gebruiken als het abonnement stopt",
           "computer": "Computer",
           "doneTitle": "Alles geregeld",
           "doneSub": "Wat bezig was, gaat verder met het nieuwe account.",
@@ -7193,7 +7256,6 @@
     "adminsOnlyPersonal": "Vraag iemand die deze ruimte beheert of je agents mag maken.",
     "proposalClosed": "Over dit voorstel is al beslist of het is verlopen.",
     "proposalNoAccess": "Alleen mensen in het gesprek ervan kunnen dit voorstel zien.",
-    "backToChat": "Terug naar het gesprek",
     "and": " en ",
     "routine": "Routine",
     "routineKeep": "De routine {{name}} maken",
@@ -7368,6 +7430,51 @@
     "otherSkill": "Andere skill",
     "namesLead": "Wat dacht je van",
     "namesRoll": "Andere namen",
+    "proposal": {
+      "lead": "Pas aan wat {{name}} voorstelde. Je kunt later alles wijzigen.",
+      "leadNarrow": "Voorstel van {{name}}: {{why}}",
+      "side": "Het voorstel",
+      "from": "Voorgesteld door {{name}}",
+      "changed": "Wat je hebt gewijzigd",
+      "changedNone": "Nog niets. Wat je op de kaart wijzigt, verschijnt hier, met Ongedaan maken.",
+      "undo": "Ongedaan maken",
+      "changes": {
+        "changed": "gewijzigd",
+        "added": "toegevoegd",
+        "removed": "verwijderd",
+        "how": "Hoe het werkt"
+      },
+      "firstTask": "Eerste taak",
+      "firstTaskPlaceholder": "Wat je eerst vraagt (optioneel)",
+      "firstTaskHint": "Staat klaar in je chat met {{name}}. Gewoon versturen.",
+      "firstTaskHintBlank": "Staat klaar in je chat ermee. Gewoon versturen.",
+      "firstTaskNone": "Zonder taak opent de chat leeg.",
+      "after": "Na het aanmaken",
+      "afterAi": "Een AI koppelen waarmee {{name}} denkt",
+      "afterAiBlank": "Een AI koppelen waarmee het denkt",
+      "afterApp": "{{app}} koppelen",
+      "afterNone": "Niets. {{name}} gaat aan de slag zodra het is aangemaakt.",
+      "afterNoneBlank": "Niets. Het gaat aan de slag zodra het is aangemaakt.",
+      "discard": "Voorstel verwerpen",
+      "otherChannel": "Ander kanaal",
+      "chooseChannels": "Kanalen kiezen",
+      "channelsNone": "Alleen in de chat met jou.",
+      "channel": {
+        "lead": "Waar {{name}} gaat werken.",
+        "leadBlank": "Waar het gaat werken.",
+        "does": "{{name}} antwoordt als het in {{channel}} wordt geroepen en leest wat daar gebeurt.",
+        "doesBlank": "Het antwoordt als het in {{channel}} wordt geroepen en leest wat daar gebeurt.",
+        "remove": "Uit {{channel}} halen"
+      },
+      "routine": {
+        "label": "Routine",
+        "lead": "{{when}}, in {{channel}}.",
+        "leadDm": "{{when}}, in de chat met jou.",
+        "starts": "Start zodra {{name}} is aangemaakt. Tijd en tekst wijzig je bij Routines.",
+        "startsBlank": "Start zodra het is aangemaakt. Tijd en tekst wijzig je bij Routines.",
+        "remove": "Routine verwijderen"
+      }
+    },
     "skill": {
       "opens": "{{name}} opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
       "opensBlank": "Hij opent deze handleiding als het onderwerp opduikt. Je bewerkt hem bij Skills.",
@@ -7406,6 +7513,10 @@
     "rolesAdd": "Rol toevoegen",
     "rolesChange": "Rollen wijzigen",
     "moreOf": "Meer voor {{name}}",
+    "outside": {
+      "chip": "Extern",
+      "title": "Externe medewerker"
+    },
     "passwordLink": {
       "item": "Link voor nieuw wachtwoord maken",
       "hint": "Voor als iemand het wachtwoord vergat",
@@ -7619,6 +7730,8 @@
       "viaLink": "Aangevraagd via de link {{when}}",
       "suggested": "Voorgesteld door {{name}} {{when}}",
       "suggestedLabel": "{{by}} stelde {{name}} voor",
+      "outside": "Vroeg {{when}} om lid te worden als externe medewerker voor {{outsideOf}}",
+      "outsideSeat": "Externe medewerkers tellen niet mee voor de mensen in je abonnement, en je kunt ze altijd verwijderen.",
       "asked": "Aangevraagd {{ago}}",
       "askedNow": "Zojuist aangevraagd",
       "askedOn": "Aangevraagd op {{date}}",
@@ -9038,7 +9151,7 @@
       "canceledToast": "Geannuleerd. Het draait niet als de limiet opnieuw begint.",
       "continuedToast": "Run gaat verder.",
       "forbidden": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem nu laten doorgaan",
-      "extra_off": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, of hij gaat verder na de reset",
+      "extra_off": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik van het abonnement. Hij gaat verder na de reset",
       "extra_used_up": "Het venster van dit abonnement is op en het betaalde extra gebruik is op of niet beschikbaar. Hij gaat verder na de reset"
     },
     "pausedRunningToast": "Routine gepauzeerd. De lopende run is ook gestopt.",
@@ -10543,6 +10656,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "Account zonder naam",
+    "rename": {
+      "action": "{{label}} hernoemen",
+      "label": "Accountnaam",
+      "placeholder": "Bijv. Werk, Privé"
+    },
     "share": {
       "switch": "Antwoordt andere mensen",
       "switchAll": "Andere mensen antwoorden",
@@ -11274,6 +11393,17 @@
     "saved": "Logo bijgewerkt.",
     "removed": "Logo verwijderd."
   },
+  "orgAccent": {
+    "label": "Accentkleur",
+    "change": "Kleur wijzigen",
+    "useDefault": "Standaard gebruiken",
+    "suggested": "Voorgestelde kleuren",
+    "sampleMention": "@Agent",
+    "sampleLink": "Een link",
+    "save": "Kleur opslaan",
+    "saved": "Accentkleur bijgewerkt.",
+    "reset": "Terug naar de standaardkleur."
+  },
   "look": {
     "previous": "Vorige",
     "next": "Volgende",
@@ -11995,8 +12125,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}, zonder terugval op de API"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "Model",
@@ -14965,6 +15094,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "Het koppelen van chat-apps is uitgezet. Laad opnieuw om je instellingen te zien zoals ze nu zijn.",
+      "notAllowed": "Een chat-app koppelen is nog niet open voor je account. Gebruik de app hier tot het opengaat.",
+      "noAssistant": "De assistent in deze werkruimte mag niet met je praten. Kies een andere werkruimte om te koppelen.",
+      "noWorkspace": "Je zit niet meer in deze werkruimte. Kies een andere werkruimte om te koppelen.",
+      "linkGone": "Deze koppeling wacht niet meer: hij is na 10 minuten verlopen of geannuleerd. Maak een nieuwe code om opnieuw te beginnen.",
+      "taken": "Die afzender is gekoppeld aan een ander Ackwire AI-account. Ontkoppel hem daar en stuur dan een nieuwe code.",
+      "undoGone": "Deze ongedaan-maken-link is al gebruikt of verlopen. Ontkoppel in plaats daarvan in je meldingsinstellingen.",
+      "codeGone": "Deze code is fout, al gebruikt of na 10 minuten verlopen. Maak een nieuwe code en stuur hem opnieuw."
+    },
+    "wallpaper": {
+      "notYours": "Die foto is niet van jou.",
+      "invalid": "Die achtergrond bestaat niet.",
+      "tooLarge": "De foto mag maximaal 2 MB zijn.",
+      "type": "Gebruik een JPEG-, PNG- of WebP-foto."
+    },
     "tooLarge": "Dit is groter dan de server aanneemt.",
     "tooLargeMax": "Dit is groter dan de server aanneemt: tot {{max}} MB.",
     "passwordLink": {
@@ -14995,7 +15140,7 @@
       "accountInUse": "Dat account denkt al voor een andere agent.",
       "noAiYet": "Er is nog geen AI verbonden.",
       "filePurged": "Dit bestand is meer dan 30 dagen geleden verwijderd en kan niet terugkomen.",
-      "looksSecret": "Dat lijkt op een wachtwoord of sleutel, en iedereen hier zou het zien.",
+      "looksSecret": "Dat lijkt op een wachtwoord of sleutel, en iedereen hier zou het zien. Laat de agent er liever privé om vragen.",
       "blockSpec": "Dit blok bevat een fout in de onderdelen of formules, dus het kan niet worden getoond. Verbeter het en probeer het opnieuw.",
       "takeControl": "Neem eerst de controle over het profiel.",
       "profileBusy": "Iemand anders gebruikt dit profiel.",
@@ -15015,6 +15160,7 @@
       "agentCantRead": "Laat de agent dit eerst lezen, bij de toegang van de agent.",
       "neverHappens": "Deze planning komt nooit voor.",
       "soleOwner": "Je bent de enige eigenaar van een werkruimte met andere leden. Maak eerst iemand anders eigenaar of verwijder de werkruimte.",
+      "soleOwnerOutside": "Je bent de enige eigenaar van een werkruimte waarvan de andere mensen externe medewerkers zijn, die geen eigenaar kunnen zijn. Nodig eerst een lid uit en maak die eigenaar, of verwijder de werkruimte.",
       "testFirst": "Test de verbinding met deze gegevens voordat je hem aanzet.",
       "voiceLength": "De opname is te lang of te kort.",
       "sendAgain": "Het bestand is niet heel aangekomen. Stuur het opnieuw.",
@@ -15091,7 +15237,8 @@
       "aboveYou": "Alleen iemand boven deze rol kan hem wijzigen.",
       "base": "Elke werkruimte houdt de rol Iedereen.",
       "unknown": "Die rol bestaat niet meer.",
-      "orderIncomplete": "De rollen zijn veranderd terwijl je ze verplaatste. Laad opnieuw en probeer het nog eens."
+      "orderIncomplete": "De rollen zijn veranderd terwijl je ze verplaatste. Laad opnieuw en probeer het nog eens.",
+      "outsideOwner": "Een externe medewerker kan geen eigenaar zijn."
     },
     "teamProposal": {
       "undoExpired": "Er is meer dan een dag verstreken sinds dit team is gemaakt, dus het kan hier niet ongedaan worden gemaakt. Archiveer de agents op hun pagina's."
@@ -15123,7 +15270,8 @@
       "denied": "Je verzoek is niet goedgekeurd. Vraag iemand daar om je uit te nodigen.",
       "answered": "Iemand heeft dit verzoek al beantwoord.",
       "expired": "Dit verzoek is verlopen: niemand heeft het binnen 14 dagen beantwoord.",
-      "codeNeeded": "Bevestig eerst je e-mailadres."
+      "codeNeeded": "Bevestig eerst je e-mailadres.",
+      "outsideClosed": "Dit account is geblokkeerd of wordt verwijderd, dus het kan niet meedoen. Het verzoek is gesloten."
     },
     "code": {
       "wrong": "Verkeerde code. Probeer het opnieuw.",
@@ -15209,7 +15357,7 @@
       "takeOverNoAccess": "Ga in het gesprek van de routine zitten voordat je hem overneemt.",
       "agentNotInChannel": "Voeg de agent eerst toe aan het gesprek.",
       "webhookPaused": "Zet de routine aan om hem te testen.",
-      "continueExtraOff": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik. Zet dat aan in de AI-instellingen om nu door te gaan, anders gaat hij verder na de reset.",
+      "continueExtraOff": "Het venster van dit abonnement is op en het lange werk van deze agent gebruikt geen betaald extra gebruik van het abonnement. Hij gaat verder na de reset.",
       "continueExtraUsedUp": "Het venster van dit abonnement is op en het betaalde extra gebruik is ook op of niet beschikbaar. Hij gaat verder na de reset.",
       "actionsNeedApprover": "Alleen de eigenaar van de agent of wie zijn acties goedkeurt, kan een routine zelfstandig laten handelen.",
       "editorOnly": "Alleen wie de routine maakte, de eigenaar van de agent of een beheerder kan hem wijzigen.",
@@ -15306,13 +15454,15 @@
     "agent": {
       "ownerOrAdmin": "Alleen de eigenaar van de agent of een beheerder kan dit doen.",
       "detailsHidden": "Alleen wie met {{agentName}} praat, ziet hoe het werkt.",
-      "extraOwnerOnly": "Alleen de eigenaar van de agent zet het betaalde extra gebruik van het abonnement aan of uit.",
       "undoForbidden": "Alleen de persoon voor wie de agent werkte, zijn eigenaar of een beheerder kan dit ongedaan maken.",
-      "undoSkillsAdmins": "Alleen een beheerder kan een wijziging in de skills van een agent ongedaan maken of opnieuw doen."
+      "undoSkillsAdmins": "Alleen een beheerder kan een wijziging in de skills van een agent ongedaan maken of opnieuw doen.",
+      "extraOwnerOnly": "Alleen de eigenaar van de agent zet het betaalde extra gebruik van het abonnement aan of uit.",
+      "extraUnavailable": "Betaald extra gebruik is alleen beschikbaar met het eigen abonnement van de verantwoordelijke van de agent, niet voor de rechterhand."
     },
     "account": {
       "notRestorable": "Dit account kan niet meer hersteld worden.",
-      "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen."
+      "notOwner": "Alleen wie dit account of abonnement heeft gekoppeld, kan dit doen.",
+      "orderForbidden": "Alleen wie dit account heeft gekoppeld of een beheerder kan de plek in de volgorde wijzigen."
     },
     "channel": {
       "membersForbidden": "Alleen wie het kanaal maakte of een beheerder kan mensen toevoegen of verwijderen."
@@ -16605,8 +16755,37 @@
     },
     "system": "Systeem",
     "removed": "Verwijderd",
+    "operatorRead": {
+      "sentence": "{{who}} las {{what}}",
+      "who": {
+        "server": "Wie deze server beheert,",
+        "cloud": "De support van Ackwire AI"
+      },
+      "what": {
+        "message": "een bericht",
+        "run_step": "een stap uit het werk van een agent",
+        "agent": "de instructies van een agent",
+        "routine": "een routine",
+        "task": "een taak op de achtergrond",
+        "channel": "de naam van een kanaal",
+        "connection": "de gegevens van een verbinding",
+        "support_request": "een supportverzoek",
+        "direct": "iets uit een privégesprek",
+        "other": "iets uit de werkruimte"
+      },
+      "request": {
+        "plain": "op verzoek van {{name}}",
+        "app": "op verzoek van {{name}}, verstuurd vanuit de app",
+        "email": "op verzoek van {{name}}, verstuurd per e-mail",
+        "operator": "op verzoek van {{name}}, vastgelegd door wie deze server beheert",
+        "support": "op verzoek van {{name}}, vastgelegd door support"
+      },
+      "fault": "om een mislukte of vastgelopen run te onderzoeken",
+      "ai": "met een AI-assistent"
+    },
     "change": {
       "mergedWithoutAsking": "Gemerged in {{repo}} zonder te vragen",
+      "accentChanged": "Heeft de accentkleur van de werkruimte gewijzigd",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Een verzoek goedgekeurd",
@@ -16618,6 +16797,11 @@
         "left": "De werkruimte verlaten",
         "role_changed": "De rol van een lid gewijzigd",
         "password_link": "Maakte een link voor een nieuw wachtwoord voor een lid"
+      },
+      "outside": {
+        "approved": "Een externe medewerker voor {{outsideOf}} toegelaten",
+        "removed": "Een externe medewerker voor {{outsideOf}} verwijderd",
+        "left": "De werkruimte verlaten, externe medewerker voor {{outsideOf}}"
       },
       "role": {
         "permission_set": "Gewijzigd wie {{short}} mag",
@@ -16881,6 +17065,51 @@
           "new3": "Nog 2, ik bel morgen.",
           "new4": "Rapport bijgewerkt in de Drive.",
           "newCount": "4 nieuwe"
+        },
+        "wallpaper": {
+          "title": "Achtergrond",
+          "help": "Verandert alleen voor jou, op al je apparaten",
+          "rowHelp": "Achter elk gesprek, alleen voor jou. Een gesprek kan via zijn menu een eigen achtergrond hebben.",
+          "rowSub": "Alleen voor jou, in elk gesprek",
+          "onlyHere": "Alleen in {{name}}, alleen voor jou",
+          "none": "Geen achtergrond",
+          "sameAsOthers": "Zoals de andere gesprekken",
+          "sameShort": "Zoals de andere",
+          "sky": "Lucht",
+          "drawings": "Tekeningen",
+          "color": "Kleur",
+          "photos": "Je foto's",
+          "choosePhoto": "Kies een foto",
+          "skyAutoHelp": "De eerste volgt het gesprek: in een direct bericht een lucht in de kleur van de agent, in kanalen de lucht van de werkruimte.",
+          "skyAutoHelpDms": "De eerste is een lucht in de kleur van de agent.",
+          "skyAutoHelpChannels": "De eerste is de lucht van de werkruimte.",
+          "neutral": {
+            "paper": "Papier",
+            "mist": "Nevel",
+            "sand": "Zand"
+          },
+          "name": {
+            "skyAuto": "Lucht van het gesprek",
+            "skyAgent": "Lucht van de agent",
+            "skyWorkspace": "Lucht van de werkruimte",
+            "sky": "Lucht · {{color}}",
+            "drawingsAuto": "Tekeningen van het gesprek",
+            "drawingsAgent": "Tekeningen van de agent",
+            "drawingsWorkspace": "Tekeningen van de werkruimte",
+            "drawings": "Tekeningen · {{color}}",
+            "crowd": "Agents",
+            "color": "Kleur · {{color}}",
+            "photo": "Je foto"
+          },
+          "choose": "Kiezen…",
+          "menu": "Achtergrond van het gesprek…",
+          "preview": "Voorbeeld",
+          "usePhoto": "Deze foto gebruiken",
+          "dragHint": "Sleep de foto om te kiezen welk deel je ziet",
+          "dim": "Donkerder maken in donkere modus",
+          "sending": "Foto versturen…",
+          "failed": "Kon de achtergrond niet opslaan. Probeer het opnieuw.",
+          "done": "Klaar"
         }
       },
       "agentStyle": "Hoe agents met je praten",
@@ -17282,6 +17511,14 @@
   "usageViews": {
     "signedOut": "Uitgelogd",
     "whose": "Van {{name}}",
+    "order": {
+      "title": "{{plan}} · Gebruiksvolgorde",
+      "hint": "Bij een limiet gaan agents verder met het volgende account dat nog ruimte heeft en keren ze terug naar het eerste zodra dat is gereset.",
+      "terms": "Meerdere {{plan}}-accounts gebruiken is een grijs gebied in de voorwaarden van {{plan}}.",
+      "termsLabel": "de voorwaarden van {{plan}}",
+      "termsHint": "Een abonnement is voor één persoon bedoeld, dus controleer de voorwaarden van {{plan}} voordat je agents op meerdere accounts rekenen.",
+      "move": "{{name}} verplaatsen, nummer {{n}} in de volgorde"
+    },
     "serves": {
       "everyone": "Iedereen gebruikt het",
       "onlyYou": "Alleen jij gebruikt het",
@@ -17344,7 +17581,7 @@
       "nowTag": "nu",
       "api": "API",
       "apiMain": "{{name}} denkt via de API",
-      "apiFallback": "Buiten het abonnement: snelle beslissingen, en als het abonnement niet kon antwoorden",
+      "apiFallback": "Buiten het abonnement: snelle beslissingen",
       "removed": "Verwijderd account",
       "removedSub": "Niet meer op een computer",
       "old": "{{brand}}, van voor de accounts",
@@ -17987,6 +18224,7 @@
       "provider_wait_said": "{{provider}} antwoordde met een fout ({{detail}}). Ik probeer het opnieuw en antwoord zodra het werkt.",
       "provider_wait_ours": "Iets aan onze kant blokkeert mijn AI, niet jouw account. Ik antwoord zodra het is opgelost.",
       "provider_back": "Mijn AI is terug.",
+      "confidential_removed": "Verwijderd: vertrouwelijke tekst wordt {{days}} dagen bewaard.",
       "brain_busy": "Mijn computer is nu bezig met andere taken. Ik antwoord zodra hij vrij is.",
       "brain_queued": "Ik sta nog in de wachtrij van de computer. Ik antwoord zodra hij vrij geheugen heeft.",
       "brain_interrupted": "{{brain}} stopte voordat het klaar was. Al gedaan, niet herhaald: {{tools}}.",
@@ -17994,6 +18232,11 @@
       "plan_limit_cut_unknown": "Ik ben gestopt bij de limiet van het {{plan}}-abonnement. Ik ga verder waar ik was zodra de limiet reset.",
       "plan_limit_wait": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord {{when}}, als de limiet is gereset. Wordt het eerder vrijgegeven in {{plan}}, dan merk ik dat en antwoord ik meteen.",
       "plan_limit_wait_unknown": "Het {{plan}}-abonnement heeft de limiet bereikt. Ik antwoord zodra de limiet reset.",
+      "plan_account_moved": "Het account {{from}} heeft de limiet bereikt. Ik ga verder met het account {{to}}.",
+      "plan_account_moved_line": "Het account {{from}} zit bijna aan zijn limiet. Ik ga verder met het account {{to}}.",
+      "plan_account_moved_extra": "Het account {{from}} zou betaald extra gebruik aanspreken. Ik ga verder met het account {{to}}.",
+      "plan_limit_all_wait": "Alle {{accounts}} {{plan}}-accounts hebben de limiet bereikt. Ik antwoord {{when}}, als de eerste is gereset.",
+      "plan_limit_all_wait_unknown": "Alle {{accounts}} {{plan}}-accounts hebben de limiet bereikt. Ik antwoord zodra er een is gereset.",
       "plan_model_limit_wait": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het {{when}} wordt gereset.",
       "plan_model_limit_wait_unknown": "{{model}} heeft zijn eigen limiet bij {{plan}} bereikt. De andere modellen van het abonnement blijven werken: kies een ander model voor {{agent}} of wacht tot het wordt gereset.",
       "plan_model_region_wait": "Dit model ({{model}}) heeft de regio Global nodig in OpenCode (Settings › Privacy).",
@@ -18064,6 +18307,8 @@
       "file_saved": "Bestand opgeslagen.",
       "issue_work_start": "Wil je taak #{{number}} doen?",
       "issue_taken": "Taak #{{number}} opgepakt.",
+      "surfaceUnlinked": "{{surface}} is ontkoppeld omdat de identiteit is veranderd. Koppel het opnieuw in Instellingen als jij het was.",
+      "surfaceVoiceDropped": "Ik kon dat spraakbericht niet verstaan. Kun je het opnieuw sturen of typen?",
       "done": "Klaar.",
       "stretch_paused_runs_one": "{{agents}} stopte even om met je te overleggen voordat het verdergaat",
       "stretch_paused_runs_other": "{{agents}} stopten even om met je te overleggen voordat ze verdergaan",
@@ -18980,6 +19225,7 @@
     "serverOwner": "Jij hebt deze server opgezet. De eigen instellingen ervan hebben hier geen eigenaar meer, alleen in de omgeving van de server.",
     "blockers": "Voordat je het kunt verwijderen",
     "soleOwner": "Je bent de enige eigenaar van {{name}}. Maak iemand anders eigenaar, of verwijder {{name}}.",
+    "soleOwnerOutside": "Je bent de enige eigenaar van {{name}}, en de andere mensen daar zijn externe medewerkers, die geen eigenaar kunnen zijn. Nodig een lid uit en maak die eigenaar, of verwijder {{name}}.",
     "soleOwnerSettingUp": "Je bent de enige eigenaar van {{name}}. Rond de inrichting af om iemand anders eigenaar te maken, of verwijder {{name}}.",
     "openPeople": "Mensen openen",
     "finishSetup": "Inrichting afronden",
@@ -19000,6 +19246,10 @@
     "seatsPaid_other": "{{count}} betaalde plekken",
     "noLimit": "Geen limiet",
     "ownBucket": "Op je eigen bucket, zonder limiet van ons"
+  },
+  "referrals": {
+    "open": "Aanbevelen en verdienen",
+    "failed": "Kon het nu niet openen. Probeer het zo opnieuw."
   },
   "limits": {
     "members": {

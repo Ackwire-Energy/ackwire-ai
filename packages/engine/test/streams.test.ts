@@ -834,6 +834,10 @@ describe("who may open which stream, and where", () => {
     const id = machine.machineId;
     local.delete(id);
     expect(await check(f.owner.id, WATCH)).toEqual(refused(4503, "offline"));
+    // The workspace's own computer asleep in standby: coming back, never offline (ADR 0161).
+    await setMachine(id, { kind: "managed", standbyAt: new Date() });
+    expect(await check(f.owner.id, WATCH)).toEqual(refused(4503, "other_server"));
+    await setMachine(id, { kind: "connected", standbyAt: null });
     await setMachine(id, { online: true, connectedReplica: "replica-b", lastSeenAt: new Date() });
     expect(await check(f.owner.id, WATCH)).toEqual(refused(4503, "other_server"));
     local.add(id);

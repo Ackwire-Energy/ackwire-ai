@@ -1169,8 +1169,10 @@ describe("no orphans", () => {
           }
         }
       }
-      // Kept on purpose: the operator's feed (ADR 0056 §5), and the join codes' counts, gone after a day (ADR 0072).
-      const kept = ["operator_events", "organization_join_code_events"];
+      // Kept on purpose: the operator's feed (ADR 0056 §5), the join codes' counts, gone after a day (ADR 0072), an
+      // account's link to an outside chat surface, which only loses the workspace that answered, and the bridge's call
+      // records, gone after 90 days (ADR 0187).
+      const kept = ["operator_events", "organization_join_code_events", "surface_calls", "surface_links"];
       expect(tables.filter((t) => !gone.has(t)).sort()).toEqual([...PURGED_BY_HAND, ...kept].sort());
     } finally {
       await close();

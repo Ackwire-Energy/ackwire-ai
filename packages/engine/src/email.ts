@@ -21,6 +21,7 @@ import { nanoUsdToUsd } from "@agenteschat/providers";
 import { z } from "zod";
 import { notifiedIds } from "./approvals";
 import { isComputerBrain, planName } from "./brains/types";
+import { confidentialRoots } from "./confidential";
 import { invitationMailProof } from "./crypto";
 import { inertText } from "./email/inert";
 import {
@@ -124,6 +125,8 @@ export type EmailTemplate =
       email: string;
       url: string;
       denyUrl: string;
+      /** An outside collaborator's request (ADR 0191): who they work for, said in place of the link they came by. */
+      outsideOf?: string;
       personal?: true;
     }
   /**
@@ -188,6 +191,13 @@ export type EmailTemplate =
    * `email` back for 7 days (`EMAIL_UNDO_DAYS`).
    */
   | { kind: "email_changed"; locale: EmailLocale; email: string; newEmail: string; url: string }
+  /**
+   * An outside chat surface was linked to the account (ADR 0187): `display` is how the surface shows the sender, `url`
+   * the undo page that unlinks it, for 7 days.
+   */
+  | { kind: "surface_linked"; locale: EmailLocale; surface: string; display: string; orgName: string; url: string }
+  /** The surface unlinked the account because the sender's identity there changed. `url`: the server, for the pictures. */
+  | { kind: "surface_unlinked"; locale: EmailLocale; surface: string; display: string; url: string }
   /**
    * Double opt-in for the landing page's waiting list, in the language they
    * joined in. `email` is the address being confirmed (absent in jobs queued
@@ -436,6 +446,8 @@ const INVITE_NOTE_SHOWN = 300;
 const INVITE_NAMES_SHOWN = 5;
 /** A name typed on an invitation link's page, as the admins' email shows it (ADR 0068). */
 const JOIN_NAME_SHOWN = 60;
+/** Who an outside collaborator works for, shown whole: the server keeps at most 80 characters (`OUTSIDE_OF_MAX`). */
+const OUTSIDE_OF_SHOWN = 80;
 /** An admin's reason for denying a request to join, as long as it is kept. */
 const JOIN_REASON_SHOWN = 300;
 
@@ -667,7 +679,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
             people: shown.map((i) => ({
               name: inertText(i.agentName) || w.anAgent,
               agent: i.agentColor ?? "sky",
-              detail: `${inertText(i.title, 120)} · ${c.age(Math.max(1, Math.round(i.ageHours)))}`,
+              detail: [inertText(i.title, 120), c.age(Math.max(1, Math.round(i.ageHours)))].filter(Boolean).join(" · "),
             })),
           },
           ...(n > shown.length ? [{ small: c.more(n - shown.length) }] : []),
@@ -728,7 +740,7 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
         c.headline,
         [
           { people: [{ name: inertText(t.name, JOIN_NAME_SHOWN), detail: address }] },
-          { p: c.body(org) },
+          { p: t.outsideOf ? c.outside(inertText(t.outsideOf, OUTSIDE_OF_SHOWN)) : c.body(org) },
           { note: c.note },
           { button: c.approve, url: t.url, also: { label: c.deny, url: t.denyUrl, danger: true } },
           { small: c.more },
@@ -841,6 +853,32 @@ function docOf(t: EmailTemplate, sender: string | null): EmailDoc {
           fallback(t.url),
         ],
         c.why,
+      );
+    }
+    case "surface_linked": {
+      const c = w.surface.linked;
+      return doc(
+        c.subject(t.surface),
+        c.preheader,
+        c.headline(t.surface),
+        [
+          { p: c.body(t.surface, inertText(t.display), inertText(t.orgName)) },
+          { note: c.notYou },
+          { button: c.button, url: t.url },
+          { small: c.small },
+          fallback(t.url),
+        ],
+        c.why(t.surface),
+      );
+    }
+    case "surface_unlinked": {
+      const c = w.surface.unlinked;
+      return doc(
+        c.subject(t.surface),
+        c.preheader,
+        c.headline(t.surface),
+        [{ p: c.body(t.surface, inertText(t.display)) }, { small: c.small }],
+        c.why(t.surface),
       );
     }
     case "autonomy_report": {
@@ -1451,6 +1489,8 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
     .from(agents)
     .where(inArray(agents.id, [...new Set(due.map((a) => a.agentId))]));
   const agentOf = new Map(agentRows.map((a) => [a.id, a]));
+  // A request made in a confidential thread (ADR 0190) is counted and never quoted: its title is the agent's words.
+  const sealed = await confidentialRoots(db, [...new Set(due.map((a) => a.threadRootId))]);
   let queued = 0;
   for (const orgId of new Set(due.map((a) => a.orgId))) {
     const mine = due.filter((a) => a.orgId === orgId);
@@ -1486,7 +1526,7 @@ export async function queueApprovalDigests(db: Database, publicUrl: string, afte
             items: items.map((i) => ({
               agentName: agentOf.get(i.agentId)?.name ?? "",
               agentColor: agentOf.get(i.agentId)?.appearance?.color,
-              title: i.title,
+              title: sealed.has(i.threadRootId) ? "" : i.title,
               ageHours: (now.getTime() - i.createdAt.getTime()) / 3600_000,
             })),
             // One request: the button opens it.

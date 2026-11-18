@@ -34,7 +34,7 @@ The same tools everywhere (`work_in_background`, `post_update`, `steer_work`, `s
 
 - `sessionFor`: a conversation run never takes a session that a work run or an active run shares, through any row that carries it (an earlier finished run included).
 - A work's turn end drops the check-ins it never read (agent-only `work_check_in` notices, `dropWorkNotices`): the turn's text is the report. A work still in line at a turn's end parks there (`workStartsNote` when its turn comes), never ends `done`.
-- `mayFallBack`: a work waits for its computer instead of switching brains.
+- `mayFallBack`: a work waits for its computer instead of switching brains. (Removed since: no run switches brains, ADR 0032's 2026-11-15 addendum.)
 - No runner change and no protocol bump.
 - An API-model work yields its job after `WORK_JOB_YIELD_MS` (1 h) at the loop top: it saves its transcript and queues its own `agent_run.execute` 10 s later. A single computer turn longer than the outbox's 6 h lease stays the known ceiling.
 

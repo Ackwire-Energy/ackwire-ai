@@ -1,5 +1,5 @@
 import type { AgentBrain, AgentBrainInput, BrainSpeed } from "@agenteschat/client";
-import { useAgentBrain, useAiAccounts, useAiStatus, useModels } from "@agenteschat/client";
+import { useAgentBrain, useAiAccounts, useModels } from "@agenteschat/client";
 import { signInPlan } from "@agenteschat/client/lib/ai-accounts";
 import { EVERYONE_AUDIENCE } from "@agenteschat/client/lib/audience";
 import {
@@ -10,7 +10,6 @@ import {
   SPEEDS,
   viewSpeedFits,
 } from "@agenteschat/client/lib/brain-advanced";
-import { computerNameOf } from "@agenteschat/client/lib/computer";
 import {
   autoContextLine,
   type ContextLimit,
@@ -21,7 +20,6 @@ import {
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
 import { planOf } from "@agenteschat/client/lib/plans";
 import { isAuto } from "@agenteschat/client/lib/providers";
-import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -35,7 +33,7 @@ import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { PushedHeader } from "../shared/parts";
 import { EffortRamp, useBrainChoice, useEffortChoice } from "./EffortRamp";
-import { accountKindOf, advancedResetInput, agentAccounts } from "./logic";
+import { accountKindOf, advancedResetInput, agentAccounts, agentChain } from "./logic";
 import { PlanReplies } from "./parts";
 import { useSaveBrain } from "./useSaveBrain";
 
@@ -43,9 +41,8 @@ import { useSaveBrain } from "./useSaveBrain";
  * An agent's "Configuração avançada" on the phone (ADR 0086), the web's dialog over "Quem pensa" as a screen of its
  * own, opened from "Pensa com" by its owner or an admin: how it thinks (effort on its computer, a ramp with a fixed
  * model and a row that says "Automático" picks it otherwise; Velocidade where it applies; the context window, any
- * brain) and who it answers
- * ("Atende outras pessoas", answering through the API while its
- * computer is away). Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
+ * brain), who it answers ("Atende outras pessoas") and "Só esta conta" where its account could move on at a limit.
+ * Each choice saves at once, like the rest of "Pensa com"; "Voltar ao padrão" puts them all back.
  */
 
 /** Opens an agent's advanced settings. */
@@ -59,7 +56,6 @@ export const advancedOf = (view: AgentBrain, options?: readonly ContextLimit[]):
     speed: viewSpeedFits(view) ? view.speed : "standard",
     contextTokens: tokens !== null && (!options || options.includes(tokens)) ? tokens : null,
     onlyOwner: view.onlyOwner,
-    fallback: view.fallback,
   };
 };
 
@@ -74,12 +70,12 @@ const withPending = (view: AgentBrain, now: Advanced, pending: AgentBrainInput):
         ? pending.contextTokens
         : null,
   onlyOwner: pending.onlyOwner ?? now.onlyOwner,
-  fallback: pending.fallback ?? now.fallback,
+  ...(now.accountPinned === undefined ? {} : { accountPinned: pending.accountPinned ?? now.accountPinned }),
 });
 
 export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const { t, i18n } = useTranslation();
-  const { orgId, org } = useOrg();
+  const { orgId } = useOrg();
   const c = useColors();
   const insets = useSafeAreaInsets();
   const dir = useDirectory();
@@ -90,7 +86,6 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const g = agentGrammar(name);
   const brain = useAgentBrain(orgId, agentId);
   const models = useModels();
-  const apiKey = useAiStatus(orgId).data?.apiKey !== false;
   const { pending, save: send } = useSaveBrain(agentId);
   const view = brain.data;
   const kind = accountKindOf(view?.brain);
@@ -111,14 +106,20 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
             ? undefined
             : view.options.find((o) => o.kind === view.brain)?.models.find((m) => m.value === view.effectiveModel),
         );
-  const now = view ? advancedOf(view, options) : null;
+  // "Só esta conta" where its account could move on, or where it is on: a right hand's own plan never moves.
+  const pinShown =
+    view !== undefined &&
+    !view.scope &&
+    (agentChain(view, agentId, agent?.ownerUserId).moves || view.accountPinned === true);
+  const advancedNow = (v: AgentBrain) => ({
+    ...advancedOf(v, options),
+    ...(pinShown ? { accountPinned: v.accountPinned === true } : {}),
+  });
+  const now = view ? advancedNow(view) : null;
   const shown = view && now ? withPending(view, now, pending) : null;
   const may = view?.canEdit === true;
   const effort = useEffortChoice(agentId, shown?.effort);
   const speed = useBrainChoice<BrainSpeed>(agentId, shown?.speed ?? "standard", (value) => ({ speed: value }));
-  const fallbackLabel = t("agentPage.work.brain.fallbackTitle", {
-    computer: computerNameOf(t, org?.name ?? "", view?.computer?.name ?? "", isPersonal(org)),
-  });
 
   /**
    * Saves at once and says what the row on "Pensa com" will say now (or `done`). The row shows its pick on the tap and
@@ -127,9 +128,7 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
   const save = (input: AgentBrainInput, done?: string) =>
     send(
       input,
-      (next) =>
-        done ??
-        advancedSummary(t, i18n.language, { kind: next.brain, autoModel, apiKey, now: advancedOf(next, options) }),
+      (next) => done ?? advancedSummary(t, i18n.language, { kind: next.brain, autoModel, now: advancedNow(next) }),
     );
   const putBack = () => {
     if (!view || !now) return;
@@ -249,24 +248,25 @@ export function AgentAdvancedScreen({ agentId }: { agentId: string }) {
                     keep
                   />
                 ) : null}
-                {apiKey ? (
-                  <>
-                    <Gap />
-                    <GroupedList>
-                      <GroupedRow
-                        label={fallbackLabel}
-                        labelLines={2}
-                        hint={{
-                          name: t("common.about", { label: fallbackLabel }),
-                          text: t("agentPage.work.brain.fallbackHint", g),
-                        }}
-                        toggle={shown.fallback}
-                        disabled={!may}
-                        onPress={() => pending.fallback === undefined && void save({ fallback: !shown.fallback })}
-                      />
-                    </GroupedList>
-                  </>
-                ) : null}
+              </>
+            ) : null}
+            {shown.accountPinned !== undefined ? (
+              <>
+                <Gap />
+                <GroupedList>
+                  <GroupedRow
+                    label={t("agentPage.work.brain.pinned")}
+                    hint={{
+                      name: t("common.about", { label: t("agentPage.work.brain.pinned") }),
+                      text: t("agentPage.work.brain.pinnedHint"),
+                    }}
+                    toggle={shown.accountPinned}
+                    disabled={!may}
+                    onPress={() =>
+                      pending.accountPinned === undefined && void save({ accountPinned: !shown.accountPinned })
+                    }
+                  />
+                </GroupedList>
               </>
             ) : null}
             <Gap />

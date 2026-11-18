@@ -16,7 +16,7 @@ import { and, eq, inArray, schema } from "@agenteschat/db";
 import { getAgentCached } from "../agents";
 import { ForbiddenError, NotFoundError, ValidationError } from "../errors";
 import { type MachineHub, MachineRequestError } from "../machine-hub";
-import { getMachineById, machineOnline } from "../machines";
+import { getMachineById, shownOnline } from "../machines";
 import { isRightHand } from "../right-hand";
 import type { ClaimedStream, StreamSocket } from "../streams";
 import {
@@ -973,7 +973,7 @@ export function createBrowserLive(deps: BrowserLiveDeps) {
       if (!deps.hub.isLocal(machineId)) {
         // Held by another replica (or not connected): frames only flow where the socket is.
         const machine = await getMachineById(deps.db, machineId);
-        const online = machine && !machine.deletedAt && machineOnline(machine);
+        const online = machine && shownOnline(machine);
         viewer.send({ type: "browser.unavailable", agentId, reason: online ? "reconnecting" : "offline" });
         return { stop: () => {}, streaming: false };
       }

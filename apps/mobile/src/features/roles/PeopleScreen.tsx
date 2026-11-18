@@ -2,7 +2,14 @@ import type { OrgRole, Person } from "@agenteschat/client";
 import { useChangeRole, useSetMemberRoles } from "@agenteschat/client";
 import { firstName } from "@agenteschat/client/lib/format";
 import { useHeldWhile } from "@agenteschat/client/lib/hold";
-import { giveRole, isBelow, PEOPLE_SEARCH_FROM, peopleWith, roleName } from "@agenteschat/client/lib/roles";
+import {
+  giveRole,
+  isBelow,
+  ownerCandidates,
+  PEOPLE_SEARCH_FROM,
+  peopleWith,
+  roleName,
+} from "@agenteschat/client/lib/roles";
 import { matchesWords } from "@agenteschat/ui/search";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -148,7 +155,7 @@ export function AddToRoleScreen({ roleId }: { roleId: string }) {
   if (!owner && !role) return <Gone title={title} />;
   const candidates = (
     owner
-      ? people.filter((p) => p.role !== "owner")
+      ? ownerCandidates(people)
       : people.filter((p) => !(p.roleIds ?? []).includes(roleId) && isBelow(viewer, p, data.roles))
   ).sort(byName);
   const shown = candidates.filter((p) => matchesWords(`${p.name} ${p.email}`, query));

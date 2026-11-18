@@ -574,21 +574,26 @@ jobs:
           trap cleanup_upgrade EXIT
           rehearse() {
             docker compose run --rm -T --no-deps --entrypoint bun \
-              -e CI=true -e UPGRADE_REHEARSAL_PHASE="$1" \
+              -e CI=true -e UPGRADE_REHEARSAL_PHASE="$1" -e UPGRADE_REHEARSAL_BASELINE="$baseline" \
               -e UPGRADE_REHEARSAL_DATABASE_URL="postgres://agentes:$password@postgres:5432/$2" \
               agentes test packages/db/test/upstream-upgrade-postgres.test.ts
           }
-          docker compose exec -T postgres createdb -U agentes ackwire_upgrade_ci
-          made_upgrade=true
-          rehearse prepare ackwire_upgrade_ci
-          docker compose exec -T postgres pg_dump -U agentes -Fc ackwire_upgrade_ci > ci-upgrade-before.dump
-          test -s ci-upgrade-before.dump
-          rehearse upgrade ackwire_upgrade_ci
-          docker compose exec -T postgres createdb -U agentes ackwire_upgrade_restored_ci
-          made_restored=true
-          docker compose exec -T postgres pg_restore -U agentes -d ackwire_upgrade_restored_ci --exit-on-error < ci-upgrade-before.dump
-          # Check restored 0251 data/schema, then prove the restored database upgrades and repeats safely too.
-          rehearse restored ackwire_upgrade_restored_ci
+          for baseline in 0251 0285; do
+            docker compose exec -T postgres createdb -U agentes ackwire_upgrade_ci
+            made_upgrade=true
+            rehearse prepare ackwire_upgrade_ci
+            docker compose exec -T postgres pg_dump -U agentes -Fc ackwire_upgrade_ci > ci-upgrade-before.dump
+            test -s ci-upgrade-before.dump
+            rehearse upgrade ackwire_upgrade_ci
+            docker compose exec -T postgres createdb -U agentes ackwire_upgrade_restored_ci
+            made_restored=true
+            docker compose exec -T postgres pg_restore -U agentes -d ackwire_upgrade_restored_ci --exit-on-error < ci-upgrade-before.dump
+            # Verify the chosen baseline after restore, then upgrade and repeat its migrations.
+            rehearse restored ackwire_upgrade_restored_ci
+            cleanup_upgrade
+            made_upgrade=false
+            made_restored=false
+          done
       # The bucket is rclone serving a folder over the S3 API, on the compose network. Its access key
       # id has at least 3 characters: rclone serve s3 answers a shorter one with 403 InvalidAccessKeyId.
       - name: Back up and restore

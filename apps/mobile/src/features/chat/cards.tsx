@@ -56,6 +56,7 @@ import {
   ACT_LINE,
   Button,
   Count,
+  Disclosure,
   HoldButton,
   Icon,
   PixelOrbit,
@@ -89,7 +90,7 @@ import {
 import { WhenAsksLink } from "../approvals/when-asks";
 import { chatHref } from "../links/logic";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
+import { useColors, useNow, useOrgId, useWhen } from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { PromptForm } from "../shared/PromptForm";
 import { successHaptic, tapHaptic, useSurface } from "../shared/parts";
@@ -97,6 +98,7 @@ import { useSheet } from "../shared/SheetHost";
 import { type AskAnswer, AskCard, AskFoot, ExpiryLine, useAskStore } from "./asks";
 import { markName, parseInline, threadFaces } from "./logic";
 import { Spans } from "./MessageSpans";
+import { useRowDirectory, useRowMeId } from "./row-data";
 import { WaitMark } from "./WaitMark";
 
 /**
@@ -149,8 +151,8 @@ function celebrationFor(a: Approval, meId: string | null, color: string): string
  */
 function useApprovalAnswer(a: Approval): AskAnswer | null {
   const { t, i18n } = useTranslation();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const when = useWhen();
   const cancelAhead = useCancelAhead();
   // Approved by me a moment ago (the card answered on screen): the check bursts once in the agent's tones.
@@ -192,7 +194,7 @@ function useApprovalAnswer(a: Approval): AskAnswer | null {
 function ApprovalGroupAsk({ items }: { items: Approval[] }) {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const c = useColors();
   const toast = useToast();
   const asks = useAskStore();
@@ -464,8 +466,8 @@ function ApprovalGroupItem({
   onAlways: () => void;
 }) {
   const { t, i18n } = useTranslation();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const c = useColors();
   const reduced = useReducedMotion();
   const cancelAhead = useCancelAhead();
@@ -624,7 +626,7 @@ function ApprovalGroupItem({
  */
 function ApprovalAsk({ approval: a }: { approval: Approval }) {
   const { t, i18n } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const asks = useAskStore();
   const origin = useOriginShort(a);
   const { org } = useOrg();
@@ -738,8 +740,8 @@ export function QuestionCard({ question, asker }: { question: AgentQuestion; ask
   const { t, i18n } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const c = useColors();
   const toast = useToast();
   const sheet = useSheet();
@@ -911,7 +913,7 @@ export function QuestionCard({ question, asker }: { question: AgentQuestion; ask
 export function ThreadLink({ thread }: { thread: ThreadInfo }) {
   const { t, i18n } = useTranslation();
   const c = useColors();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const surface = useSurface();
   const when = useWhen();
   const now = useNow(WORK_TICK_MS);
@@ -979,7 +981,7 @@ export function ThreadLink({ thread }: { thread: ThreadInfo }) {
               : ""
             : ` · ${when.short(thread.lastActivityAt)}`}
       </Text>
-      <Icon name="right" size={15} color={c.faint} />
+      <Disclosure />
     </PressScale>
   );
 }

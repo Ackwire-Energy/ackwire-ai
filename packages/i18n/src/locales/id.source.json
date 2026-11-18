@@ -1478,6 +1478,9 @@
   "auth.termsAfter": {
     "value": "."
   },
+  "auth.poweredBy": {
+    "value": "Powered by Ackwire AI"
+  },
   "auth.signOut": {
     "value": "Sign out"
   },
@@ -5987,6 +5990,132 @@
   "openOnPhone.localOnlyHere": {
     "value": "Turn on Reach it from your phone and teammates. Then come back here."
   },
+  "surface.link.consent": {
+    "value": "{{assistant}} by Ackwire AI may message you on {{surface}} about your workspaces, and call you only when something is urgent and you allow it. Write stop to turn this off."
+  },
+  "surface.link.title": {
+    "value": "Talk to {{assistant}} on {{surface}}"
+  },
+  "surface.link.qr": {
+    "value": "QR code that opens {{surface}} with your code typed in"
+  },
+  "surface.link.making": {
+    "value": "Making your code"
+  },
+  "surface.link.code": {
+    "value": "Your code {{code}}"
+  },
+  "surface.link.open": {
+    "value": "Open {{surface}}"
+  },
+  "surface.link.stepScan": {
+    "value": "Scan the code with your phone, or open the app"
+  },
+  "surface.link.stepSend": {
+    "value": "Send the message as it is"
+  },
+  "surface.link.stepSendText": {
+    "value": "This moves on by itself once your message arrives."
+  },
+  "surface.link.stepConfirm": {
+    "value": "Check the sender and confirm here"
+  },
+  "surface.link.showCode": {
+    "value": "Show the code again"
+  },
+  "surface.link.confirmTitle": {
+    "value": "Is this your {{surface}}?"
+  },
+  "surface.link.sentBy": {
+    "value": "This sender sent your code"
+  },
+  "surface.link.onlyYou": {
+    "value": "Link it only if this is you."
+  },
+  "surface.link.workspace": {
+    "value": "Answers in {{workspace}}"
+  },
+  "surface.link.confirm": {
+    "value": "Yes, link it"
+  },
+  "surface.link.notMe": {
+    "value": "Not me"
+  },
+  "surface.link.doneTitle": {
+    "value": "{{surface}} is linked"
+  },
+  "surface.link.doneText": {
+    "value": "{{assistant}} answers you there from now on."
+  },
+  "surface.link.newCode": {
+    "value": "Make a new code"
+  },
+  "surface.link.done": {
+    "value": "Done"
+  },
+  "surface.row.hint": {
+    "value": "Talk with {{assistant}} and get its replies on {{surface}}."
+  },
+  "surface.row.link": {
+    "value": "Link"
+  },
+  "surface.row.none": {
+    "value": "{{assistant}} can message you there"
+  },
+  "surface.row.pending": {
+    "value": "A sender is waiting for you to confirm"
+  },
+  "surface.row.unlink": {
+    "value": "Unlink"
+  },
+  "surface.row.unlinkTitle": {
+    "value": "Unlink {{surface}}?"
+  },
+  "surface.row.unlinkText": {
+    "value": "{{assistant}} stops answering you there. You can link it again any time."
+  },
+  "surface.row.unlinked": {
+    "value": "{{surface}} unlinked"
+  },
+  "surface.undo.title": {
+    "value": "Unlink the chat app?"
+  },
+  "surface.undo.lead": {
+    "value": "Your account was just linked to a chat app. If that wasn't you, unlink it here."
+  },
+  "surface.undo.button": {
+    "value": "Unlink"
+  },
+  "surface.undo.done": {
+    "value": "{{surface}} unlinked"
+  },
+  "surface.undo.doneLead": {
+    "value": "{{display}} can't reach your account anymore."
+  },
+  "surface.undo.ended": {
+    "value": "Already unlinked"
+  },
+  "surface.undo.endedLead": {
+    "value": "{{display}} on {{surface}} was unlinked before. Nothing else to do."
+  },
+  "surface.undo.gone": {
+    "value": "This undo link no longer works"
+  },
+  "surface.undo.sender": {
+    "value": "That sender"
+  },
+  "surface.via": {
+    "value": "via {{surface}}"
+  },
+  "surface.viaTip": {
+    "value": "Sent by {{person}} on {{surface}}"
+  },
+  "surface.forwarded": {
+    "value": "forwarded via {{surface}}"
+  },
+  "surface.forwardedTip": {
+    "value": "{{person}} forwarded this from {{surface}}. The words are someone else's."
+  },
   "team.title": {
     "value": "Team"
   },
@@ -6499,6 +6628,9 @@
   },
   "channel.header.hideMembers": {
     "value": "Hide members"
+  },
+  "channel.header.more": {
+    "value": "More options"
   },
   "channel.membersButton": {
     "value": {
@@ -8392,14 +8524,29 @@
   "connectAi.have.title": {
     "value": "Already connected"
   },
-  "connectAi.have.titleFor": {
-    "value": "Already connected, for {{name}}"
-  },
   "connectAi.have.other": {
     "value": "Or connect another"
   },
   "connectAi.have.manageKeys": {
     "value": "Manage or delete keys"
+  },
+  "connectAi.have.pickLine": {
+    "value": "Pick an account already connected here. {{name}} thinks with it."
+  },
+  "connectAi.have.onlyOwner": {
+    "value": {
+      "one": "{{count}} more of {{name}}'s accounts only {{name}} can give.",
+      "other": "{{count}} more of {{name}}'s accounts only {{name}} can give."
+    }
+  },
+  "connectAi.have.moreAgents": {
+    "value": {
+      "one": "and {{count}} more agent",
+      "other": "and {{count}} more agents"
+    }
+  },
+  "connectAi.have.plenty": {
+    "value": "Plenty left"
   },
   "connectAi.chat.mine": {
     "value": "Yours"
@@ -8800,6 +8947,19 @@
   "connectAi.another": {
     "value": "Another account"
   },
+  "connectAi.which.title": {
+    "value": "Which {{brand}} account will {{name}} use?",
+    "female": "Which {{brand}} account will {{name}} use?"
+  },
+  "connectAi.which.titleAll": {
+    "value": "Which {{brand}} account will they use?"
+  },
+  "connectAi.which.mine": {
+    "value": "Your {{brand}} accounts on {{computer}}"
+  },
+  "connectAi.which.other": {
+    "value": "Sign in with another {{brand}} account"
+  },
   "connectAi.reuse.active": {
     "value": "You already have {{label}} here. Sign in to it again, or use another account."
   },
@@ -9136,12 +9296,6 @@
   "usageCard.answerAnywayForbidden": {
     "value": "Only who asked, the agent's owner or an admin can ask for this"
   },
-  "usageCard.extraTitle": {
-    "value": "Long work may use paid extra usage"
-  },
-  "usageCard.extraHint": {
-    "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
-  },
   "usageQueue.back": {
     "value": "{{agent}} is back {{when}}"
   },
@@ -9162,6 +9316,9 @@
   },
   "usageQueue.about": {
     "value": "About the line"
+  },
+  "usageQueue.chain": {
+    "value": "All {{accounts}} {{plan}} accounts hit their limit."
   },
   "usageQueue.lists": {
     "value": "Conversations"
@@ -9348,9 +9505,6 @@
   },
   "actionCard.agentProposal.aiNone": {
     "value": "No AI yet. Connect one after creating it"
-  },
-  "actionCard.agentProposal.reviewTitle": {
-    "value": "Review {{name}}"
   },
   "actionCard.agentProposal.lines": {
     "value": "What {{name}} gets"
@@ -12804,6 +12958,9 @@
   "notifications.wait.joinSuggestion": {
     "value": "{{by}} suggested {{name}}"
   },
+  "notifications.wait.joinOutside": {
+    "value": "{{name}} asks to join as an outside collaborator for {{outsideOf}}, taking no seat"
+  },
   "notifications.wait.doing.merge": {
     "value": "merge"
   },
@@ -12977,6 +13134,9 @@
   },
   "notifications.what.joinSuggestion": {
     "value": "<b>{{by}}</b> suggested <b>{{name}}</b>"
+  },
+  "notifications.what.joinOutside": {
+    "value": "<b>{{name}}</b> asks to join as an outside collaborator for <b>{{outsideOf}}</b>, taking no seat"
   },
   "notifications.what.changeRequest": {
     "value": "<b>{{name}}</b> asks for a change to <b>{{agent}}</b>"
@@ -14085,6 +14245,15 @@
   "agentPage.work.brain.accountOthers": {
     "value": "Plans that serve the whole workspace show whose they are."
   },
+  "agentPage.work.brain.movesOn": {
+    "value": "Goes on with the next account at a limit"
+  },
+  "agentPage.work.brain.pinned": {
+    "value": "This account only"
+  },
+  "agentPage.work.brain.pinnedHint": {
+    "value": "At a limit, waits for this account to reset instead of moving to the next."
+  },
   "agentPage.work.brain.addAccount": {
     "value": "Add account"
   },
@@ -14093,12 +14262,6 @@
   },
   "agentPage.work.brain.connectPlan": {
     "value": "Connect another plan"
-  },
-  "agentPage.work.brain.fallbackTitle": {
-    "value": "If {{computer}} stops answering, answer through the API"
-  },
-  "agentPage.work.brain.fallbackHint": {
-    "value": "It answers through the API and counts against {{name}}'s budget. Otherwise {{name}} tells whoever asked and waits for the computer to come back."
   },
   "agentPage.work.brain.effort": {
     "value": "Effort"
@@ -14237,9 +14400,6 @@
   },
   "agentPage.work.brain.advanced.sharing": {
     "value": "Answers other people"
-  },
-  "agentPage.work.brain.advanced.waits": {
-    "value": "Waits for the computer"
   },
   "agentPage.work.brain.copy.row": {
     "value": "Use on other agents"
@@ -14615,9 +14775,6 @@
   },
   "agentPage.work.brain.v2.moreTitle": {
     "value": "More options for {{name}}"
-  },
-  "agentPage.work.brain.v2.fallback": {
-    "value": "Use the API key if the plan stops"
   },
   "agentPage.work.brain.v2.computer": {
     "value": "Computer"
@@ -17509,9 +17666,6 @@
   "newAgent.proposalNoAccess": {
     "value": "Only people in its conversation can see this proposal."
   },
-  "newAgent.backToChat": {
-    "value": "Back to the conversation"
-  },
   "newAgent.and": {
     "value": " and "
   },
@@ -17884,6 +18038,117 @@
   "newAgentCard.namesRoll": {
     "value": "Other names"
   },
+  "newAgentCard.proposal.lead": {
+    "value": "Adjust what {{name}} proposed. You can change everything later."
+  },
+  "newAgentCard.proposal.leadNarrow": {
+    "value": "{{name}}'s proposal: {{why}}"
+  },
+  "newAgentCard.proposal.side": {
+    "value": "The proposal"
+  },
+  "newAgentCard.proposal.from": {
+    "value": "Proposed by {{name}}"
+  },
+  "newAgentCard.proposal.changed": {
+    "value": "What you changed"
+  },
+  "newAgentCard.proposal.changedNone": {
+    "value": "Nothing yet. What you change on the card shows here, with Undo."
+  },
+  "newAgentCard.proposal.undo": {
+    "value": "Undo"
+  },
+  "newAgentCard.proposal.changes.changed": {
+    "value": "changed"
+  },
+  "newAgentCard.proposal.changes.added": {
+    "value": "added"
+  },
+  "newAgentCard.proposal.changes.removed": {
+    "value": "removed"
+  },
+  "newAgentCard.proposal.changes.how": {
+    "value": "How it works"
+  },
+  "newAgentCard.proposal.firstTask": {
+    "value": "First task"
+  },
+  "newAgentCard.proposal.firstTaskPlaceholder": {
+    "value": "What to ask first (optional)"
+  },
+  "newAgentCard.proposal.firstTaskHint": {
+    "value": "Ready in your chat with {{name}}. Just send it."
+  },
+  "newAgentCard.proposal.firstTaskHintBlank": {
+    "value": "Ready in your chat with it. Just send it."
+  },
+  "newAgentCard.proposal.firstTaskNone": {
+    "value": "With no task, the chat opens empty."
+  },
+  "newAgentCard.proposal.after": {
+    "value": "After it's created"
+  },
+  "newAgentCard.proposal.afterAi": {
+    "value": "Connect an AI for {{name}} to think with"
+  },
+  "newAgentCard.proposal.afterAiBlank": {
+    "value": "Connect an AI for it to think with"
+  },
+  "newAgentCard.proposal.afterApp": {
+    "value": "Connect {{app}}"
+  },
+  "newAgentCard.proposal.afterNone": {
+    "value": "Nothing. {{name}} starts working as soon as it's created."
+  },
+  "newAgentCard.proposal.afterNoneBlank": {
+    "value": "Nothing. It starts working as soon as it's created."
+  },
+  "newAgentCard.proposal.discard": {
+    "value": "Discard proposal"
+  },
+  "newAgentCard.proposal.otherChannel": {
+    "value": "Another channel"
+  },
+  "newAgentCard.proposal.chooseChannels": {
+    "value": "Choose channels"
+  },
+  "newAgentCard.proposal.channelsNone": {
+    "value": "Only in its chat with you."
+  },
+  "newAgentCard.proposal.channel.lead": {
+    "value": "Where {{name}} will work."
+  },
+  "newAgentCard.proposal.channel.leadBlank": {
+    "value": "Where it will work."
+  },
+  "newAgentCard.proposal.channel.does": {
+    "value": "{{name}} answers when called in {{channel}} and reads what goes on there."
+  },
+  "newAgentCard.proposal.channel.doesBlank": {
+    "value": "It answers when called in {{channel}} and reads what goes on there."
+  },
+  "newAgentCard.proposal.channel.remove": {
+    "value": "Remove from {{channel}}"
+  },
+  "newAgentCard.proposal.routine.label": {
+    "value": "Routine"
+  },
+  "newAgentCard.proposal.routine.lead": {
+    "value": "{{when}}, in {{channel}}."
+  },
+  "newAgentCard.proposal.routine.leadDm": {
+    "value": "{{when}}, in its chat with you."
+  },
+  "newAgentCard.proposal.routine.starts": {
+    "value": "Starts once {{name}} is created. Change its time and text in Routines."
+  },
+  "newAgentCard.proposal.routine.startsBlank": {
+    "value": "Starts once it's created. Change its time and text in Routines."
+  },
+  "newAgentCard.proposal.routine.remove": {
+    "value": "Remove the routine"
+  },
   "newAgentCard.skill.opens": {
     "value": "{{name}} opens this manual when the topic comes up. You edit it in Skills."
   },
@@ -17973,6 +18238,12 @@
   },
   "members.moreOf": {
     "value": "More for {{name}}"
+  },
+  "members.outside.chip": {
+    "value": "Outside"
+  },
+  "members.outside.title": {
+    "value": "Outside collaborator"
   },
   "members.passwordLink.item": {
     "value": "Make a new-password link"
@@ -18525,6 +18796,12 @@
   },
   "members.requests.suggestedLabel": {
     "value": "{{by}} suggested {{name}}"
+  },
+  "members.requests.outside": {
+    "value": "Asked {{when}} to join as an outside collaborator for {{outsideOf}}"
+  },
+  "members.requests.outsideSeat": {
+    "value": "Outside collaborators don't count toward your plan's people, and you can remove them at any time."
   },
   "members.requests.asked": {
     "value": "Asked {{ago}}"
@@ -21823,7 +22100,7 @@
     "value": "Only who created the routine, the agent's owner or an admin can continue it now"
   },
   "routines.usagePause.extra_off": {
-    "value": "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset"
+    "value": "This plan's window is used up and this agent's long work doesn't use the plan's paid extra usage. It picks up after the reset"
   },
   "routines.usagePause.extra_used_up": {
     "value": "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset"
@@ -25549,6 +25826,18 @@
   "jev.remove.text": {
     "value": "Agents keep working without it."
   },
+  "aiAccounts.unnamed": {
+    "value": "Unnamed account"
+  },
+  "aiAccounts.rename.action": {
+    "value": "Rename {{label}}"
+  },
+  "aiAccounts.rename.label": {
+    "value": "Account name"
+  },
+  "aiAccounts.rename.placeholder": {
+    "value": "E.g. Work, Personal"
+  },
   "aiAccounts.share.switch": {
     "value": "Answers other people"
   },
@@ -27306,6 +27595,33 @@
   },
   "orgLogo.removed": {
     "value": "Logo removed."
+  },
+  "orgAccent.label": {
+    "value": "Accent color"
+  },
+  "orgAccent.change": {
+    "value": "Change color"
+  },
+  "orgAccent.useDefault": {
+    "value": "Use the default"
+  },
+  "orgAccent.suggested": {
+    "value": "Suggested colors"
+  },
+  "orgAccent.sampleMention": {
+    "value": "@Agent"
+  },
+  "orgAccent.sampleLink": {
+    "value": "A link"
+  },
+  "orgAccent.save": {
+    "value": "Save color"
+  },
+  "orgAccent.saved": {
+    "value": "Accent color updated."
+  },
+  "orgAccent.reset": {
+    "value": "Back to the default color."
   },
   "look.previous": {
     "value": "Previous"
@@ -29178,9 +29494,6 @@
   },
   "brain.summary.opencode": {
     "value": "OpenCode · {{model}}"
-  },
-  "brain.summary.noFallback": {
-    "value": "{{brain}}, no API fallback"
   },
   "brain.mission.modelLabel": {
     "value": "Model"
@@ -36608,6 +36921,42 @@
   "files.nav.place": {
     "value": "{{index}} of {{count}}"
   },
+  "errors.surface.off": {
+    "value": "Linking chat apps was turned off. Reload to see your settings as they are now."
+  },
+  "errors.surface.notAllowed": {
+    "value": "Linking a chat app isn't open to your account yet. Keep using the app here until it opens."
+  },
+  "errors.surface.noAssistant": {
+    "value": "The assistant in this workspace isn't set to talk with you. Pick another workspace to link."
+  },
+  "errors.surface.noWorkspace": {
+    "value": "You're no longer in this workspace. Pick another workspace to link."
+  },
+  "errors.surface.linkGone": {
+    "value": "This link isn't waiting anymore: it ran out after 10 minutes or was canceled. Make a new code to start again."
+  },
+  "errors.surface.taken": {
+    "value": "That sender is linked to another Ackwire AI account. Unlink it there, then send a new code."
+  },
+  "errors.surface.undoGone": {
+    "value": "This undo link was already used or ran out. Unlink in your notification settings instead."
+  },
+  "errors.surface.codeGone": {
+    "value": "This code is wrong, used or ran out after 10 minutes. Make a new code and send it again."
+  },
+  "errors.wallpaper.notYours": {
+    "value": "That photo isn't yours."
+  },
+  "errors.wallpaper.invalid": {
+    "value": "That background doesn't exist."
+  },
+  "errors.wallpaper.tooLarge": {
+    "value": "The photo can be up to 2 MB."
+  },
+  "errors.wallpaper.type": {
+    "value": "Use a JPEG, PNG or WebP photo."
+  },
   "errors.tooLarge": {
     "value": "This is bigger than the server takes."
   },
@@ -36690,7 +37039,7 @@
     "value": "This file was deleted more than 30 days ago and can't come back."
   },
   "errors.said.looksSecret": {
-    "value": "That looks like a password or a key, and everyone here would see it."
+    "value": "That looks like a password or a key, and everyone here would see it. Ask the agent to request it privately instead."
   },
   "errors.said.blockSpec": {
     "value": "This block has a mistake in its parts or formulas, so it can't be shown. Fix it and try again."
@@ -36748,6 +37097,9 @@
   },
   "errors.said.soleOwner": {
     "value": "You're the only owner of a workspace with other members. Make someone else an owner, or delete the workspace, first."
+  },
+  "errors.said.soleOwnerOutside": {
+    "value": "You're the only owner of a workspace whose other people are outside collaborators, who can't be owners. Invite a member and make them an owner, or delete the workspace, first."
   },
   "errors.said.testFirst": {
     "value": "Test the connection with these settings before turning it on."
@@ -36938,6 +37290,9 @@
   "errors.role.orderIncomplete": {
     "value": "The roles changed while you were moving them. Reload and try again."
   },
+  "errors.role.outsideOwner": {
+    "value": "An outside collaborator can't be an owner."
+  },
   "errors.teamProposal.undoExpired": {
     "value": "It is more than a day since this team was created, so it can't be undone here. Archive its agents on their pages."
   },
@@ -37003,6 +37358,9 @@
   },
   "errors.join.codeNeeded": {
     "value": "Verify your email first."
+  },
+  "errors.join.outsideClosed": {
+    "value": "This account was blocked or is being deleted, so it can't join. The request is closed."
   },
   "errors.code.wrong": {
     "value": "Wrong code. Try again."
@@ -37212,7 +37570,7 @@
     "value": "Turn the routine on to test it."
   },
   "errors.routine.continueExtraOff": {
-    "value": "This plan's window is used up and this agent's long work doesn't use paid extra usage. Turn that on in its AI settings to continue now, or it picks up after the reset."
+    "value": "This plan's window is used up and this agent's long work doesn't use the plan's paid extra usage. It picks up after the reset."
   },
   "errors.routine.continueExtraUsedUp": {
     "value": "This plan's window is used up and its paid extra usage is used up or unavailable. It picks up after the reset."
@@ -37448,9 +37806,6 @@
   "errors.agent.detailsHidden": {
     "value": "Only who talks to {{agentName}} sees how it works."
   },
-  "errors.agent.extraOwnerOnly": {
-    "value": "Only the agent's owner turns its plan's paid extra usage on or off."
-  },
   "errors.agent.undoForbidden": {
     "value": "Only the person the agent worked for, its owner or an admin can undo this."
   },
@@ -37462,6 +37817,9 @@
   },
   "errors.account.notOwner": {
     "value": "Only the person who connected this account or plan can do this."
+  },
+  "errors.account.orderForbidden": {
+    "value": "Only the person who connected this account or an admin can change its place in the order."
   },
   "errors.channel.membersForbidden": {
     "value": "Only the channel's creator or an admin can add or remove people."
@@ -40708,8 +41066,71 @@
   "audit.removed": {
     "value": "Removed"
   },
+  "audit.operatorRead.sentence": {
+    "value": "{{who}} read {{what}}"
+  },
+  "audit.operatorRead.who.server": {
+    "value": "Whoever runs this server"
+  },
+  "audit.operatorRead.who.cloud": {
+    "value": "Ackwire AI support"
+  },
+  "audit.operatorRead.what.message": {
+    "value": "a message"
+  },
+  "audit.operatorRead.what.run_step": {
+    "value": "a step of an agent's work"
+  },
+  "audit.operatorRead.what.agent": {
+    "value": "an agent's instructions"
+  },
+  "audit.operatorRead.what.routine": {
+    "value": "a routine"
+  },
+  "audit.operatorRead.what.task": {
+    "value": "a background task"
+  },
+  "audit.operatorRead.what.channel": {
+    "value": "a channel's name"
+  },
+  "audit.operatorRead.what.connection": {
+    "value": "a connection's details"
+  },
+  "audit.operatorRead.what.support_request": {
+    "value": "a support request"
+  },
+  "audit.operatorRead.what.direct": {
+    "value": "something in a private conversation"
+  },
+  "audit.operatorRead.what.other": {
+    "value": "something in the workspace"
+  },
+  "audit.operatorRead.request.plain": {
+    "value": "at {{name}}'s request"
+  },
+  "audit.operatorRead.request.app": {
+    "value": "at {{name}}'s request, sent from the app"
+  },
+  "audit.operatorRead.request.email": {
+    "value": "at {{name}}'s request, sent by email"
+  },
+  "audit.operatorRead.request.operator": {
+    "value": "at {{name}}'s request, recorded by whoever runs this server"
+  },
+  "audit.operatorRead.request.support": {
+    "value": "at {{name}}'s request, recorded by support"
+  },
+  "audit.operatorRead.fault": {
+    "value": "to diagnose a failed or stuck run"
+  },
+  "audit.operatorRead.ai": {
+    "value": "with an AI assistant"
+  },
   "audit.change.mergedWithoutAsking": {
     "value": "Merged in {{repo}} without asking"
+  },
+  "audit.change.accentChanged": {
+    "value": "Changed the workspace's accent color"
   },
   "audit.change.pattern": {
     "value": "{{verb}} {{area}}"
@@ -40734,6 +41155,15 @@
   },
   "audit.change.member.password_link": {
     "value": "Made a new-password link for a member"
+  },
+  "audit.change.outside.approved": {
+    "value": "Let in an outside collaborator for {{outsideOf}}"
+  },
+  "audit.change.outside.removed": {
+    "value": "Removed an outside collaborator for {{outsideOf}}"
+  },
+  "audit.change.outside.left": {
+    "value": "Left the workspace, an outside collaborator for {{outsideOf}}"
   },
   "audit.change.role.permission_set": {
     "value": "Changed who can {{short}}"
@@ -41430,6 +41860,123 @@
   },
   "settings.account.chat.sample.newCount": {
     "value": "4 new"
+  },
+  "settings.account.chat.wallpaper.title": {
+    "value": "Background"
+  },
+  "settings.account.chat.wallpaper.help": {
+    "value": "Changes only for you, on all your devices"
+  },
+  "settings.account.chat.wallpaper.rowHelp": {
+    "value": "Behind every conversation, only for you. A conversation can have its own from its menu."
+  },
+  "settings.account.chat.wallpaper.rowSub": {
+    "value": "Only for you, in every conversation"
+  },
+  "settings.account.chat.wallpaper.onlyHere": {
+    "value": "Only in {{name}}, only for you"
+  },
+  "settings.account.chat.wallpaper.none": {
+    "value": "No background"
+  },
+  "settings.account.chat.wallpaper.sameAsOthers": {
+    "value": "Same as other conversations"
+  },
+  "settings.account.chat.wallpaper.sameShort": {
+    "value": "Same as others"
+  },
+  "settings.account.chat.wallpaper.sky": {
+    "value": "Sky"
+  },
+  "settings.account.chat.wallpaper.drawings": {
+    "value": "Drawings"
+  },
+  "settings.account.chat.wallpaper.color": {
+    "value": "Color"
+  },
+  "settings.account.chat.wallpaper.photos": {
+    "value": "Your photos"
+  },
+  "settings.account.chat.wallpaper.choosePhoto": {
+    "value": "Choose a photo"
+  },
+  "settings.account.chat.wallpaper.skyAutoHelp": {
+    "value": "The first one follows the conversation: a sky of the agent's color in a DM, the workspace's sky in channels."
+  },
+  "settings.account.chat.wallpaper.skyAutoHelpDms": {
+    "value": "The first one is a sky of the agent's color."
+  },
+  "settings.account.chat.wallpaper.skyAutoHelpChannels": {
+    "value": "The first one is the workspace's sky."
+  },
+  "settings.account.chat.wallpaper.neutral.paper": {
+    "value": "Paper"
+  },
+  "settings.account.chat.wallpaper.neutral.mist": {
+    "value": "Mist"
+  },
+  "settings.account.chat.wallpaper.neutral.sand": {
+    "value": "Sand"
+  },
+  "settings.account.chat.wallpaper.name.skyAuto": {
+    "value": "The conversation's sky"
+  },
+  "settings.account.chat.wallpaper.name.skyAgent": {
+    "value": "Agent's sky"
+  },
+  "settings.account.chat.wallpaper.name.skyWorkspace": {
+    "value": "Workspace's sky"
+  },
+  "settings.account.chat.wallpaper.name.sky": {
+    "value": "Sky · {{color}}"
+  },
+  "settings.account.chat.wallpaper.name.drawingsAuto": {
+    "value": "The conversation's drawings"
+  },
+  "settings.account.chat.wallpaper.name.drawingsAgent": {
+    "value": "Agent's drawings"
+  },
+  "settings.account.chat.wallpaper.name.drawingsWorkspace": {
+    "value": "Workspace's drawings"
+  },
+  "settings.account.chat.wallpaper.name.drawings": {
+    "value": "Drawings · {{color}}"
+  },
+  "settings.account.chat.wallpaper.name.crowd": {
+    "value": "Agents"
+  },
+  "settings.account.chat.wallpaper.name.color": {
+    "value": "Color · {{color}}"
+  },
+  "settings.account.chat.wallpaper.name.photo": {
+    "value": "Your photo"
+  },
+  "settings.account.chat.wallpaper.choose": {
+    "value": "Choose…"
+  },
+  "settings.account.chat.wallpaper.menu": {
+    "value": "Conversation background…"
+  },
+  "settings.account.chat.wallpaper.preview": {
+    "value": "Preview"
+  },
+  "settings.account.chat.wallpaper.usePhoto": {
+    "value": "Use this photo"
+  },
+  "settings.account.chat.wallpaper.dragHint": {
+    "value": "Drag the photo to choose the part that shows"
+  },
+  "settings.account.chat.wallpaper.dim": {
+    "value": "Darken in dark mode"
+  },
+  "settings.account.chat.wallpaper.sending": {
+    "value": "Sending the photo…"
+  },
+  "settings.account.chat.wallpaper.failed": {
+    "value": "Couldn't save the background. Try again."
+  },
+  "settings.account.chat.wallpaper.done": {
+    "value": "Done"
   },
   "settings.account.agentStyle": {
     "value": "How agents talk to you"
@@ -42391,6 +42938,24 @@
   "usageViews.whose": {
     "value": "{{name}}'s"
   },
+  "usageViews.order.title": {
+    "value": "{{plan}} · Order of use"
+  },
+  "usageViews.order.hint": {
+    "value": "At a limit, agents go on with the next account that has room and go back to the first when it resets."
+  },
+  "usageViews.order.terms": {
+    "value": "Using several {{plan}} accounts is a gray area in {{plan}}'s terms."
+  },
+  "usageViews.order.termsLabel": {
+    "value": "{{plan}}'s terms"
+  },
+  "usageViews.order.termsHint": {
+    "value": "A plan is meant for one person, so check {{plan}}'s terms before your agents rely on several."
+  },
+  "usageViews.order.move": {
+    "value": "Move {{name}}, number {{n}} in the order"
+  },
   "usageViews.serves.everyone": {
     "value": "Everyone uses it"
   },
@@ -42551,7 +43116,7 @@
     "value": "{{name}} thinks through the API"
   },
   "usageViews.agent.apiFallback": {
-    "value": "Outside the plan: quick decisions, and when the plan couldn't answer"
+    "value": "Outside the plan: quick decisions"
   },
   "usageViews.agent.removed": {
     "value": "Removed account"
@@ -44241,6 +44806,9 @@
   "chat.body.provider_back": {
     "value": "My AI is back."
   },
+  "chat.body.confidential_removed": {
+    "value": "Removed: confidential text is kept for {{days}} days."
+  },
   "chat.body.brain_busy": {
     "value": "My computer is busy with other tasks right now. I'll answer as soon as it's free."
   },
@@ -44261,6 +44829,21 @@
   },
   "chat.body.plan_limit_wait_unknown": {
     "value": "The {{plan}} plan hit its limit. I'll answer as soon as it resets."
+  },
+  "chat.body.plan_account_moved": {
+    "value": "The {{from}} account hit its limit. I'm going on with the {{to}} account."
+  },
+  "chat.body.plan_account_moved_line": {
+    "value": "The {{from}} account is near its limit. I'm going on with the {{to}} account."
+  },
+  "chat.body.plan_account_moved_extra": {
+    "value": "The {{from}} account would go into paid extra usage. I'm going on with the {{to}} account."
+  },
+  "chat.body.plan_limit_all_wait": {
+    "value": "All {{accounts}} {{plan}} accounts hit their limit. I'll answer {{when}}, when the first one resets."
+  },
+  "chat.body.plan_limit_all_wait_unknown": {
+    "value": "All {{accounts}} {{plan}} accounts hit their limit. I'll answer as soon as one resets."
   },
   "chat.body.plan_model_limit_wait": {
     "value": "{{model}} hit its own limit on {{plan}}. The plan's other models keep working: change {{agent}}'s model or wait for it to reset {{when}}."
@@ -44471,6 +45054,12 @@
   },
   "chat.body.issue_taken": {
     "value": "Took task #{{number}}."
+  },
+  "chat.body.surfaceUnlinked": {
+    "value": "{{surface}} was unlinked because its identity changed. Link it again in Settings if it was you."
+  },
+  "chat.body.surfaceVoiceDropped": {
+    "value": "I couldn't make out that voice note. Could you send it again, or type it?"
   },
   "chat.body.done": {
     "value": "Done."
@@ -46330,6 +46919,9 @@
   "deleteAccount.soleOwner": {
     "value": "You're the only owner of {{name}}. Make someone else an owner, or delete {{name}}."
   },
+  "deleteAccount.soleOwnerOutside": {
+    "value": "You're the only owner of {{name}}, and its other people are outside collaborators, who can't be owners. Invite a member and make them an owner, or delete {{name}}."
+  },
   "deleteAccount.soleOwnerSettingUp": {
     "value": "You're the only owner of {{name}}. Finish setting it up to make someone else an owner, or delete {{name}}."
   },
@@ -46383,6 +46975,12 @@
   },
   "billing.ownBucket": {
     "value": "On your own bucket, with no limit from us"
+  },
+  "referrals.open": {
+    "value": "Refer and earn"
+  },
+  "referrals.failed": {
+    "value": "Couldn't open it now. Try again in a moment."
   },
   "limits.members.full": {
     "value": "This workspace has {{members}} of {{limit}} people."
@@ -49912,5 +50510,17 @@
   },
   "rightHand.settings.connectWorkspace.chatgpt": {
     "value": "Connect Codex"
+  },
+  "usageCard.extraTitle": {
+    "value": "Long work may use paid extra usage"
+  },
+  "usageCard.extraHint": {
+    "value": "With extra usage on in the plan, long work goes on past 95%. Off, it pauses at 95% and picks up when the plan resets."
+  },
+  "errors.agent.extraOwnerOnly": {
+    "value": "Only the agent's owner turns its plan's paid extra usage on or off."
+  },
+  "errors.agent.extraUnavailable": {
+    "value": "Paid extra usage is only available on the agent owner’s own plan, outside the right hand."
   }
 }

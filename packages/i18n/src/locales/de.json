@@ -619,6 +619,7 @@
     "termsMiddle": " und die ",
     "privacy": "Datenschutzerklärung",
     "termsAfter": ".",
+    "poweredBy": "Läuft mit Ackwire AI",
     "signOut": "Abmelden",
     "earlyAccess": {
       "otherEmail": "Diese Einladung gilt für eine andere Adresse. Registriere dich mit der Adresse, an die sie gesendet wurde.",
@@ -2410,6 +2411,56 @@
     "localOnlyHow": "Schalte in der Ackwire AI-App auf diesem Computer unter Einstellungen › Server die Option Von deinem Handy und deinem Team erreichbar ein. Komm dann hierher zurück.",
     "localOnlyHere": "Schalte Von deinem Handy und deinem Team erreichbar ein. Komm dann hierher zurück."
   },
+  "surface": {
+    "link": {
+      "consent": "{{assistant}} von Ackwire AI darf dir auf {{surface}} zu deinen Workspaces schreiben und dich nur anrufen, wenn etwas dringend ist und du es erlaubst. Schreib stop, um das auszuschalten.",
+      "title": "Sprich mit {{assistant}} auf {{surface}}",
+      "qr": "QR-Code, der {{surface}} mit deinem Code öffnet",
+      "making": "Dein Code wird erstellt",
+      "code": "Dein Code {{code}}",
+      "open": "{{surface}} öffnen",
+      "stepScan": "Scanne den Code mit deinem Handy oder öffne die App",
+      "stepSend": "Sende die Nachricht so, wie sie ist",
+      "stepSendText": "Das geht von selbst weiter, sobald deine Nachricht ankommt.",
+      "stepConfirm": "Prüfe den Absender und bestätige hier",
+      "showCode": "Code noch einmal zeigen",
+      "confirmTitle": "Ist das dein {{surface}}?",
+      "sentBy": "Dieser Absender hat deinen Code gesendet",
+      "onlyYou": "Verknüpfe ihn nur, wenn du das bist.",
+      "workspace": "Antwortet in {{workspace}}",
+      "confirm": "Ja, verknüpfen",
+      "notMe": "Nicht ich",
+      "doneTitle": "{{surface}} ist verknüpft",
+      "doneText": "{{assistant}} antwortet dir ab jetzt dort.",
+      "newCode": "Neuen Code erstellen",
+      "done": "Fertig"
+    },
+    "row": {
+      "hint": "Sprich mit {{assistant}} und bekomm die Antworten auf {{surface}}.",
+      "link": "Verknüpfen",
+      "none": "{{assistant}} kann dir dort schreiben",
+      "pending": "Ein Absender wartet darauf, dass du bestätigst",
+      "unlink": "Trennen",
+      "unlinkTitle": "{{surface}} trennen?",
+      "unlinkText": "{{assistant}} antwortet dir dort nicht mehr. Du kannst es jederzeit wieder verknüpfen.",
+      "unlinked": "{{surface}} getrennt"
+    },
+    "undo": {
+      "title": "Die Chat-App trennen?",
+      "lead": "Dein Konto wurde gerade mit einer Chat-App verknüpft. Wenn du das nicht warst, trenne sie hier.",
+      "button": "Trennen",
+      "done": "{{surface}} getrennt",
+      "doneLead": "{{display}} erreicht dein Konto nicht mehr.",
+      "ended": "Schon getrennt",
+      "endedLead": "{{display}} auf {{surface}} war schon getrennt. Sonst ist nichts zu tun.",
+      "gone": "Dieser Link zum Rückgängigmachen funktioniert nicht mehr",
+      "sender": "Dieser Absender"
+    },
+    "via": "via {{surface}}",
+    "viaTip": "Gesendet von {{person}} über {{surface}}",
+    "forwarded": "weitergeleitet über {{surface}}",
+    "forwardedTip": "{{person}} hat das aus {{surface}} weitergeleitet. Die Worte stammen von jemand anderem."
+  },
   "team": {
     "title": "Team",
     "people_one": "{{count}} Person",
@@ -2630,7 +2681,8 @@
     "header": {
       "pins": "Angeheftete Nachrichten",
       "showMembers": "Mitglieder zeigen",
-      "hideMembers": "Mitglieder ausblenden"
+      "hideMembers": "Mitglieder ausblenden",
+      "more": "Weitere Optionen"
     },
     "membersButton_one": "Mitglieder des Kanals ({{count}})",
     "membersButton_other": "Mitglieder des Kanals ({{count}})",
@@ -3403,9 +3455,14 @@
     "titleFor": "Eine KI für {{name}} verbinden",
     "have": {
       "title": "Bereits verbunden",
-      "titleFor": "Bereits verbunden, für {{name}}",
       "other": "Oder eine andere verbinden",
-      "manageKeys": "Schlüssel verwalten oder löschen"
+      "manageKeys": "Schlüssel verwalten oder löschen",
+      "pickLine": "Wähle ein Konto, das hier schon verbunden ist. {{name}} denkt damit.",
+      "onlyOwner_one": "Noch {{count}} Konto, das nur {{name}} vergeben kann.",
+      "onlyOwner_other": "Noch {{count}} Konten, die nur {{name}} vergeben kann.",
+      "moreAgents_one": "und {{count}} weiterer Agent",
+      "moreAgents_other": "und {{count}} weitere Agenten",
+      "plenty": "Noch viel Luft"
     },
     "chat": {
       "mine": "Deine",
@@ -3589,6 +3646,13 @@
     "onceHint": "Alle teilen sich die Limits deines Abos.",
     "use": "{{label}} nutzen",
     "another": "Anderes Konto",
+    "which": {
+      "title": "Welches {{brand}}-Konto nutzt {{name}}?",
+      "title_female": "Welches {{brand}}-Konto nutzt {{name}}?",
+      "titleAll": "Welches {{brand}}-Konto nutzen sie?",
+      "mine": "Deine {{brand}}-Konten auf {{computer}}",
+      "other": "Mit einem anderen {{brand}}-Konto anmelden"
+    },
     "reuse": {
       "active": "Du hast {{label}} hier schon. Melde dich erneut an oder nimm ein anderes Konto.",
       "signedOut": "{{label}} ist hier abgemeldet. Melde dich erneut an, und seine Agenten behalten es."
@@ -3740,6 +3804,7 @@
     "shared_one": "{{agents}} nutzt dasselbe {{plan}}-Abo. Die Unterhaltungen beider kommen in dieselbe Warteschlange.",
     "shared_other": "{{agents}} nutzen dasselbe {{plan}}-Abo. Alle ihre Unterhaltungen kommen in dieselbe Warteschlange.",
     "about": "Über die Warteschlange",
+    "chain": "Alle {{accounts}} {{plan}}-Konten haben ihr Limit erreicht.",
     "lists": "Unterhaltungen",
     "queuedTab": "In der Warteschlange",
     "skippedTab": "Übersprungen",
@@ -3815,7 +3880,6 @@
       "aiAccount": "Denkt mit {{account}}",
       "aiModel": "Denkt über die API",
       "aiNone": "Noch keine KI. Verbinde eine, nachdem du ihn erstellt hast",
-      "reviewTitle": "{{name}} prüfen",
       "lines": "Was {{name}} bekommt",
       "aChannel": "ein Kanal",
       "anApp": "eine App",
@@ -5244,6 +5308,7 @@
       "joinRequest_other": "{{name}} und andere möchten beitreten",
       "joinRequestNames": "{{names}} möchten beitreten",
       "joinSuggestion": "{{by}} hat {{name}} vorgeschlagen",
+      "joinOutside": "{{name}} möchte als externe Person für {{outsideOf}} beitreten, ohne einen Platz zu belegen",
       "doing": {
         "merge": "mergen",
         "deploy": "deployen",
@@ -5307,6 +5372,7 @@
       "joinRequest": "<b>{{name}}</b> möchte beitreten",
       "joinRequestMany": "<b>{{names}}</b> möchten beitreten",
       "joinSuggestion": "<b>{{by}}</b> hat <b>{{name}}</b> vorgeschlagen",
+      "joinOutside": "<b>{{name}}</b> möchte als externe Person für <b>{{outsideOf}}</b> beitreten, ohne einen Platz zu belegen",
       "changeRequest": "<b>{{name}}</b> bittet um eine Änderung an <b>{{agent}}</b>",
       "proposalWaiting": "Verbesserungsvorschläge von <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> bittet um einen neuen Agenten: <b>{{agent}}</b>",
@@ -5730,11 +5796,12 @@
         "accountAlso": "Auch genutzt von {{agents}}",
         "accountOf": "Von {{name}}",
         "accountOthers": "Abos, die dem ganzen Workspace dienen, zeigen, wem sie gehören.",
+        "movesOn": "Macht am Limit mit dem nächsten Konto weiter",
+        "pinned": "Nur dieses Konto",
+        "pinnedHint": "Wartet am Limit, bis sich dieses Konto zurücksetzt, statt zum nächsten zu wechseln.",
         "addAccount": "Konto hinzufügen",
         "signInAgain": "Erneut anmelden",
         "connectPlan": "Weiteres Abo verbinden",
-        "fallbackTitle": "Wenn {{computer}} nicht mehr antwortet, über die API antworten",
-        "fallbackHint": "Die Antwort kommt dann über die API und zählt zum Budget von {{name}}. Sonst sagt {{name}} der Person, die gefragt hat, Bescheid und wartet, bis der Computer zurück ist.",
         "effort": "Aufwand",
         "efforts": {
           "auto": "Automatisch",
@@ -5795,8 +5862,7 @@
           "effort": "Aufwand: {{level}}",
           "speed": "Geschwindigkeit: schnell",
           "context": "Kontext: {{size}}",
-          "sharing": "Antwortet anderen Personen",
-          "waits": "Wartet auf den Computer"
+          "sharing": "Antwortet anderen Personen"
         },
         "copy": {
           "row": "Für andere Agenten verwenden",
@@ -5940,7 +6006,6 @@
           "wait": "Warten",
           "modelTitle": "Modell von {{name}}",
           "moreTitle": "Weitere Optionen für {{name}}",
-          "fallback": "Den API-Schlüssel nutzen, wenn das Abo stoppt",
           "computer": "Computer",
           "doneTitle": "Alles erledigt",
           "doneSub": "Was gerade lief, geht mit dem neuen Konto weiter.",
@@ -7153,7 +7218,6 @@
     "adminsOnlyPersonal": "Bitte jemanden, der hier alles verwaltet, dich Agenten erstellen zu lassen.",
     "proposalClosed": "Über diesen Vorschlag wurde schon entschieden, oder er ist abgelaufen.",
     "proposalNoAccess": "Nur Personen aus der zugehörigen Unterhaltung sehen diesen Vorschlag.",
-    "backToChat": "Zurück zur Unterhaltung",
     "and": " und ",
     "routine": "Routine",
     "routineKeep": "Routine {{name}} erstellen",
@@ -7328,6 +7392,51 @@
     "otherSkill": "Anderer Skill",
     "namesLead": "Wie wäre es mit",
     "namesRoll": "Andere Namen",
+    "proposal": {
+      "lead": "Passe an, was {{name}} vorgeschlagen hat. Du kannst später alles ändern.",
+      "leadNarrow": "Vorschlag von {{name}}: {{why}}",
+      "side": "Der Vorschlag",
+      "from": "Vorgeschlagen von {{name}}",
+      "changed": "Was du geändert hast",
+      "changedNone": "Noch nichts. Was du auf der Karte änderst, erscheint hier, mit Rückgängig.",
+      "undo": "Rückgängig",
+      "changes": {
+        "changed": "geändert",
+        "added": "hinzugefügt",
+        "removed": "entfernt",
+        "how": "So arbeitet es"
+      },
+      "firstTask": "Erste Aufgabe",
+      "firstTaskPlaceholder": "Was zuerst fragen (optional)",
+      "firstTaskHint": "Liegt bereit im Chat mit {{name}}. Einfach senden.",
+      "firstTaskHintBlank": "Liegt bereit im Chat mit ihm. Einfach senden.",
+      "firstTaskNone": "Ohne Aufgabe öffnet sich der Chat leer.",
+      "after": "Nach dem Erstellen",
+      "afterAi": "Eine KI verbinden, mit der {{name}} denkt",
+      "afterAiBlank": "Eine KI verbinden, mit der es denkt",
+      "afterApp": "{{app}} verbinden",
+      "afterNone": "Nichts. {{name}} legt los, sobald es erstellt ist.",
+      "afterNoneBlank": "Nichts. Es legt los, sobald es erstellt ist.",
+      "discard": "Vorschlag verwerfen",
+      "otherChannel": "Weiterer Kanal",
+      "chooseChannels": "Kanäle wählen",
+      "channelsNone": "Nur im Chat mit dir.",
+      "channel": {
+        "lead": "Wo {{name}} arbeiten wird.",
+        "leadBlank": "Wo es arbeiten wird.",
+        "does": "{{name}} antwortet, wenn es in {{channel}} gerufen wird, und liest mit, was dort passiert.",
+        "doesBlank": "Es antwortet, wenn es in {{channel}} gerufen wird, und liest mit, was dort passiert.",
+        "remove": "Aus {{channel}} entfernen"
+      },
+      "routine": {
+        "label": "Routine",
+        "lead": "{{when}}, in {{channel}}.",
+        "leadDm": "{{when}}, im Chat mit dir.",
+        "starts": "Startet, sobald {{name}} erstellt ist. Zeit und Text änderst du unter Routinen.",
+        "startsBlank": "Startet, sobald es erstellt ist. Zeit und Text änderst du unter Routinen.",
+        "remove": "Routine entfernen"
+      }
+    },
     "skill": {
       "opens": "{{name}} öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
       "opensBlank": "Er öffnet diese Anleitung, wenn das Thema aufkommt. Du bearbeitest sie unter Skills.",
@@ -7366,6 +7475,10 @@
     "rolesAdd": "Rolle hinzufügen",
     "rolesChange": "Rollen ändern",
     "moreOf": "Mehr zu {{name}}",
+    "outside": {
+      "chip": "Extern",
+      "title": "Externe Person"
+    },
     "passwordLink": {
       "item": "Link für neues Passwort erstellen",
       "hint": "Wenn die Person ihr Passwort vergessen hat",
@@ -7579,6 +7692,8 @@
       "viaLink": "Über den Link angefragt {{when}}",
       "suggested": "Vorgeschlagen von {{name}} {{when}}",
       "suggestedLabel": "{{by}} hat {{name}} vorgeschlagen",
+      "outside": "Hat {{when}} angefragt, als externe Person für {{outsideOf}} beizutreten",
+      "outsideSeat": "Externe Personen zählen nicht zu den Personen deines Tarifs, und du kannst sie jederzeit entfernen.",
       "asked": "Angefragt {{ago}}",
       "askedNow": "Gerade eben angefragt",
       "askedOn": "Angefragt am {{date}}",
@@ -8992,7 +9107,7 @@
       "canceledToast": "Abgebrochen. Es läuft nicht, wenn das Limit zurückgesetzt ist.",
       "continuedToast": "Ausführung geht weiter.",
       "forbidden": "Nur wer die Routine erstellt hat, der Inhaber des Agenten oder ein Admin kann sie jetzt fortsetzen",
-      "extra_off": "Das Zeitfenster dieses Abos ist aufgebraucht und die längere Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung. Schalte sie in seinen KI-Einstellungen ein, um jetzt weiterzumachen, sonst geht es nach dem Zurücksetzen weiter",
+      "extra_off": "Das Zeitfenster dieses Abos ist aufgebraucht und die längere Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung des Abos. Sie geht nach dem Zurücksetzen weiter",
       "extra_used_up": "Das Zeitfenster dieses Abos ist aufgebraucht und seine bezahlte Zusatznutzung ist verbraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter"
     },
     "pausedRunningToast": "Routine pausiert. Die laufende Ausführung wurde auch gestoppt.",
@@ -10497,6 +10612,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "Konto ohne Namen",
+    "rename": {
+      "action": "{{label}} umbenennen",
+      "label": "Kontoname",
+      "placeholder": "z. B. Arbeit, Privat"
+    },
     "share": {
       "switch": "Antwortet anderen Personen",
       "switchAll": "Anderen Personen antworten",
@@ -11206,6 +11327,17 @@
     "remove": "Logo entfernen",
     "saved": "Logo aktualisiert.",
     "removed": "Logo entfernt."
+  },
+  "orgAccent": {
+    "label": "Akzentfarbe",
+    "change": "Farbe ändern",
+    "useDefault": "Standard verwenden",
+    "suggested": "Vorgeschlagene Farben",
+    "sampleMention": "@Agent",
+    "sampleLink": "Ein Link",
+    "save": "Farbe speichern",
+    "saved": "Akzentfarbe aktualisiert.",
+    "reset": "Wieder die Standardfarbe."
   },
   "look": {
     "previous": "Zurück",
@@ -11928,8 +12060,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}, ohne API als Ersatz"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "Modell",
@@ -14901,6 +15032,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "Das Verknüpfen von Chat-Apps wurde ausgeschaltet. Lade neu, um deine Einstellungen im aktuellen Stand zu sehen.",
+      "notAllowed": "Das Verknüpfen einer Chat-App ist für dein Konto noch nicht freigegeben. Nutze bis dahin die App hier.",
+      "noAssistant": "Der Assistent in diesem Workspace darf nicht mit dir sprechen. Wähl einen anderen Workspace zum Verknüpfen.",
+      "noWorkspace": "Du bist nicht mehr in diesem Workspace. Wähl einen anderen Workspace zum Verknüpfen.",
+      "linkGone": "Diese Verknüpfung wartet nicht mehr: Sie ist nach 10 Minuten abgelaufen oder wurde abgebrochen. Erstelle einen neuen Code, um neu anzufangen.",
+      "taken": "Dieser Absender ist mit einem anderen Ackwire AI-Konto verknüpft. Heb die Verknüpfung dort auf und sende dann einen neuen Code.",
+      "undoGone": "Dieser Rückgängig-Link wurde schon benutzt oder ist abgelaufen. Heb die Verknüpfung stattdessen in deinen Benachrichtigungseinstellungen auf.",
+      "codeGone": "Dieser Code ist falsch, schon benutzt oder nach 10 Minuten abgelaufen. Erstelle einen neuen Code und sende ihn noch einmal."
+    },
+    "wallpaper": {
+      "notYours": "Dieses Foto gehört nicht dir.",
+      "invalid": "Diesen Hintergrund gibt es nicht.",
+      "tooLarge": "Das Foto darf höchstens 2 MB groß sein.",
+      "type": "Verwende ein JPEG-, PNG- oder WebP-Foto."
+    },
     "tooLarge": "Das ist größer, als der Server annimmt.",
     "tooLargeMax": "Das ist größer, als der Server annimmt: bis zu {{max}} MB.",
     "passwordLink": {
@@ -14931,7 +15078,7 @@
       "accountInUse": "Dieses Konto denkt schon für einen anderen Agenten.",
       "noAiYet": "Es ist noch keine KI verbunden.",
       "filePurged": "Diese Datei wurde vor mehr als 30 Tagen gelöscht und kann nicht zurückkommen.",
-      "looksSecret": "Das sieht nach einem Passwort oder Schlüssel aus, und alle hier würden es sehen.",
+      "looksSecret": "Das sieht nach einem Passwort oder Schlüssel aus, und alle hier würden es sehen. Sag dem Agenten lieber, er soll dich privat darum bitten.",
       "blockSpec": "Dieser Block hat einen Fehler in seinen Teilen oder Formeln und kann daher nicht angezeigt werden. Korrigiere ihn und versuche es erneut.",
       "takeControl": "Übernimm zuerst die Kontrolle über das Profil.",
       "profileBusy": "Jemand anderes nutzt dieses Profil.",
@@ -14951,6 +15098,7 @@
       "agentCantRead": "Lass den Agenten das zuerst lesen, in seinen Zugriffen.",
       "neverHappens": "Dieser Zeitplan tritt nie ein.",
       "soleOwner": "Du bist die einzige Person mit Inhaberrechten in einem Workspace mit weiteren Mitgliedern. Mach zuerst jemand anderen zum Inhaber oder lösch den Workspace.",
+      "soleOwnerOutside": "Du bist die einzige Person mit Inhaberrechten in einem Workspace, in dem alle anderen externe Personen sind, die nicht Inhaber sein können. Lad zuerst ein Mitglied ein und mach es zum Inhaber oder lösch den Workspace.",
       "testFirst": "Teste die Verbindung mit diesen Einstellungen, bevor du sie einschaltest.",
       "voiceLength": "Die Aufnahme ist zu lang oder zu kurz.",
       "sendAgain": "Die Datei kam nicht vollständig an. Schick sie noch einmal.",
@@ -15027,7 +15175,8 @@
       "aboveYou": "Nur jemand über dieser Rolle kann sie ändern.",
       "base": "Jeder Workspace behält die Rolle „Alle“.",
       "unknown": "Diese Rolle gibt es nicht mehr.",
-      "orderIncomplete": "Die Rollen haben sich geändert, während du sie verschoben hast. Lad neu und versuch es noch einmal."
+      "orderIncomplete": "Die Rollen haben sich geändert, während du sie verschoben hast. Lad neu und versuch es noch einmal.",
+      "outsideOwner": "Eine externe Person kann nicht Inhaber sein."
     },
     "teamProposal": {
       "undoExpired": "Seit der Erstellung dieses Teams ist mehr als ein Tag vergangen, daher lässt es sich hier nicht rückgängig machen. Archiviere die Agenten auf ihren Seiten."
@@ -15059,7 +15208,8 @@
       "denied": "Deine Anfrage wurde nicht angenommen. Bitte jemanden dort, dich einzuladen.",
       "answered": "Auf diese Anfrage hat schon jemand geantwortet.",
       "expired": "Diese Anfrage ist abgelaufen: Niemand hat innerhalb von 14 Tagen geantwortet.",
-      "codeNeeded": "Bestätige zuerst deine E-Mail-Adresse."
+      "codeNeeded": "Bestätige zuerst deine E-Mail-Adresse.",
+      "outsideClosed": "Dieses Konto wurde gesperrt oder wird gerade gelöscht und kann deshalb nicht beitreten. Die Anfrage ist geschlossen."
     },
     "code": {
       "wrong": "Falscher Code. Versuch es noch einmal.",
@@ -15145,7 +15295,7 @@
       "takeOverNoAccess": "Tritt der Unterhaltung der Routine bei, bevor du sie übernimmst.",
       "agentNotInChannel": "Füg den Agent zuerst zur Unterhaltung hinzu.",
       "webhookPaused": "Schalte die Routine ein, um sie zu testen.",
-      "continueExtraOff": "Das Zeitfenster dieses Abos ist aufgebraucht, und die lange Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung. Schalte sie in seinen KI-Einstellungen ein, um jetzt weiterzumachen, sonst geht es nach dem Zurücksetzen weiter.",
+      "continueExtraOff": "Das Zeitfenster dieses Abos ist aufgebraucht, und die lange Arbeit dieses Agenten nutzt keine bezahlte Zusatznutzung des Abos. Sie geht nach dem Zurücksetzen weiter.",
       "continueExtraUsedUp": "Das Zeitfenster dieses Abos ist aufgebraucht, und seine bezahlte Zusatznutzung ist aufgebraucht oder nicht verfügbar. Es geht nach dem Zurücksetzen weiter.",
       "actionsNeedApprover": "Nur der Inhaber des Agenten oder wer seine Aktionen genehmigt, kann eine Routine selbstständig handeln lassen.",
       "editorOnly": "Nur wer die Routine erstellt hat, der Inhaber des Agenten oder ein Admin kann sie ändern.",
@@ -15242,13 +15392,15 @@
     "agent": {
       "ownerOrAdmin": "Nur der Inhaber des Agenten oder ein Admin kann das tun.",
       "detailsHidden": "Nur wer mit {{agentName}} spricht, sieht, wie es funktioniert.",
-      "extraOwnerOnly": "Nur der Inhaber des Agenten schaltet die bezahlte Zusatznutzung des Abos ein oder aus.",
       "undoForbidden": "Nur die Person, für die der Agent gearbeitet hat, sein Inhaber oder ein Admin kann das rückgängig machen.",
-      "undoSkillsAdmins": "Nur ein Admin kann eine Änderung an den Skills eines Agenten rückgängig machen oder wiederholen."
+      "undoSkillsAdmins": "Nur ein Admin kann eine Änderung an den Skills eines Agenten rückgängig machen oder wiederholen.",
+      "extraOwnerOnly": "Nur der Inhaber des Agenten schaltet die bezahlte Zusatznutzung des Abos ein oder aus.",
+      "extraUnavailable": "Kostenpflichtige Zusatznutzung ist nur im eigenen Tarif der für den Agenten verantwortlichen Person verfügbar, nicht bei der rechten Hand."
     },
     "account": {
       "notRestorable": "Dieses Konto kann nicht mehr wiederhergestellt werden.",
-      "notOwner": "Nur wer dieses Konto oder Abo verbunden hat, kann das tun."
+      "notOwner": "Nur wer dieses Konto oder Abo verbunden hat, kann das tun.",
+      "orderForbidden": "Nur wer dieses Konto verbunden hat oder ein Admin kann seinen Platz in der Reihenfolge ändern."
     },
     "channel": {
       "membersForbidden": "Nur wer den Kanal erstellt hat oder ein Admin kann Personen hinzufügen oder entfernen."
@@ -16541,8 +16693,37 @@
     },
     "system": "System",
     "removed": "Entfernt",
+    "operatorRead": {
+      "sentence": "{{who}} hat {{what}} gelesen",
+      "who": {
+        "server": "Die Person, die diesen Server betreibt,",
+        "cloud": "Der Support von Ackwire AI"
+      },
+      "what": {
+        "message": "eine Nachricht",
+        "run_step": "einen Schritt aus der Arbeit eines Agenten",
+        "agent": "die Anweisungen eines Agenten",
+        "routine": "eine Routine",
+        "task": "eine Aufgabe im Hintergrund",
+        "channel": "den Namen eines Kanals",
+        "connection": "die Angaben einer Verbindung",
+        "support_request": "eine Support-Anfrage",
+        "direct": "etwas aus einer privaten Unterhaltung",
+        "other": "etwas aus dem Workspace"
+      },
+      "request": {
+        "plain": "auf Anfrage von {{name}}",
+        "app": "auf Anfrage von {{name}}, gesendet aus der App",
+        "email": "auf Anfrage von {{name}}, gesendet per E-Mail",
+        "operator": "auf Anfrage von {{name}}, erfasst von der Person, die diesen Server betreibt",
+        "support": "auf Anfrage von {{name}}, erfasst vom Support"
+      },
+      "fault": "zur Diagnose eines fehlgeschlagenen oder hängenden Laufs",
+      "ai": "mit einem KI-Assistenten"
+    },
     "change": {
       "mergedWithoutAsking": "In {{repo}} ohne Nachfrage gemergt",
+      "accentChanged": "Hat die Akzentfarbe des Workspace geändert",
       "pattern": "{{verb}}: {{area}}",
       "approval": {
         "approved": "Hat eine Anfrage freigegeben",
@@ -16554,6 +16735,11 @@
         "left": "Hat den Workspace verlassen",
         "role_changed": "Hat die Rolle eines Mitglieds geändert",
         "password_link": "Hat einen Link für ein neues Passwort für ein Mitglied erstellt"
+      },
+      "outside": {
+        "approved": "Hat eine externe Person für {{outsideOf}} hereingelassen",
+        "removed": "Hat eine externe Person für {{outsideOf}} entfernt",
+        "left": "Hat den Workspace verlassen, als externe Person für {{outsideOf}}"
       },
       "role": {
         "permission_set": "Hat geändert, wer {{short}} darf",
@@ -16817,6 +17003,51 @@
           "new3": "Noch 2, ich rufe morgen an.",
           "new4": "Bericht im Drive aktualisiert.",
           "newCount": "4 neu"
+        },
+        "wallpaper": {
+          "title": "Hintergrund",
+          "help": "Ändert sich nur für dich, auf all deinen Geräten",
+          "rowHelp": "Hinter jeder Unterhaltung, nur für dich. Eine Unterhaltung kann über ihr Menü einen eigenen haben.",
+          "rowSub": "Nur für dich, in jeder Unterhaltung",
+          "onlyHere": "Nur in {{name}}, nur für dich",
+          "none": "Kein Hintergrund",
+          "sameAsOthers": "Wie die anderen Unterhaltungen",
+          "sameShort": "Wie die anderen",
+          "sky": "Himmel",
+          "drawings": "Zeichnungen",
+          "color": "Farbe",
+          "photos": "Deine Fotos",
+          "choosePhoto": "Foto auswählen",
+          "skyAutoHelp": "Der erste richtet sich nach der Unterhaltung: in einer Direktnachricht ein Himmel in der Farbe des Agenten, in Kanälen der Himmel des Workspace.",
+          "skyAutoHelpDms": "Der erste ist ein Himmel in der Farbe des Agenten.",
+          "skyAutoHelpChannels": "Der erste ist der Himmel des Workspace.",
+          "neutral": {
+            "paper": "Papier",
+            "mist": "Nebel",
+            "sand": "Sand"
+          },
+          "name": {
+            "skyAuto": "Himmel der Unterhaltung",
+            "skyAgent": "Himmel des Agenten",
+            "skyWorkspace": "Himmel des Workspace",
+            "sky": "Himmel · {{color}}",
+            "drawingsAuto": "Zeichnungen der Unterhaltung",
+            "drawingsAgent": "Zeichnungen des Agenten",
+            "drawingsWorkspace": "Zeichnungen des Workspace",
+            "drawings": "Zeichnungen · {{color}}",
+            "crowd": "Agenten",
+            "color": "Farbe · {{color}}",
+            "photo": "Dein Foto"
+          },
+          "choose": "Auswählen…",
+          "menu": "Hintergrund der Unterhaltung…",
+          "preview": "Vorschau",
+          "usePhoto": "Dieses Foto verwenden",
+          "dragHint": "Ziehe das Foto, um den sichtbaren Ausschnitt zu wählen",
+          "dim": "Im dunklen Modus abdunkeln",
+          "sending": "Foto wird gesendet…",
+          "failed": "Der Hintergrund konnte nicht gespeichert werden. Versuch es noch einmal.",
+          "done": "Fertig"
         }
       },
       "agentStyle": "Wie die Agenten mit dir sprechen",
@@ -17218,6 +17449,14 @@
   "usageViews": {
     "signedOut": "Abgemeldet",
     "whose": "von {{name}}",
+    "order": {
+      "title": "{{plan}} · Nutzungsreihenfolge",
+      "hint": "Am Limit machen die Agenten mit dem nächsten Konto weiter, das noch Spielraum hat, und kehren zum ersten zurück, wenn es sich zurücksetzt.",
+      "terms": "Mehrere {{plan}}-Konten zu nutzen ist in den Bedingungen von {{plan}} eine Grauzone.",
+      "termsLabel": "die Bedingungen von {{plan}}",
+      "termsHint": "Ein Abo ist für eine Person gedacht, also prüfe die Bedingungen von {{plan}}, bevor sich deine Agenten auf mehrere verlassen.",
+      "move": "{{name}} verschieben, Nummer {{n}} in der Reihenfolge"
+    },
     "serves": {
       "everyone": "Alle nutzen es",
       "onlyYou": "Nur du nutzt es",
@@ -17286,7 +17525,7 @@
       "api": "API",
       "apiMain": "{{name}} denkt über die API",
       "apiMain_female": "{{name}} denkt über die API",
-      "apiFallback": "Außerhalb des Abos: schnelle Entscheidungen und wenn das Abo nicht antworten konnte",
+      "apiFallback": "Außerhalb des Abos: schnelle Entscheidungen",
       "removed": "Entferntes Konto",
       "removedSub": "Auf keinem Computer mehr",
       "old": "{{brand}}, aus der Zeit vor den Konten",
@@ -17917,6 +18156,7 @@
       "provider_wait_said": "{{provider}} hat mit einem Fehler geantwortet ({{detail}}). Ich versuche es erneut und antworte, sobald es klappt.",
       "provider_wait_ours": "Etwas auf unserer Seite blockiert meine KI, nicht dein Konto. Ich antworte, sobald es behoben ist.",
       "provider_back": "Meine KI ist wieder da.",
+      "confidential_removed": "Entfernt: Vertraulicher Text wird {{days}} Tage aufbewahrt.",
       "brain_busy": "Mein Computer ist gerade mit anderen Aufgaben beschäftigt. Ich antworte, sobald er frei ist.",
       "brain_queued": "Ich stehe noch in der Warteschlange des Computers. Ich antworte, sobald er freien Speicher hat.",
       "brain_interrupted": "{{brain}} hat aufgehört, bevor es fertig war. Schon erledigt, wird nicht wiederholt: {{tools}}.",
@@ -17924,6 +18164,11 @@
       "plan_limit_cut_unknown": "Ich habe am Limit des {{plan}}-Abos aufgehört. Ich mache dort weiter, wo ich war, sobald es sich zurücksetzt.",
       "plan_limit_wait": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte {{when}}, wenn es sich zurücksetzt. Wird es in {{plan}} früher freigegeben, merke ich das und antworte sofort.",
       "plan_limit_wait_unknown": "Das {{plan}}-Abo hat sein Limit erreicht. Ich antworte, sobald es sich zurücksetzt.",
+      "plan_account_moved": "Das Konto {{from}} hat sein Limit erreicht. Ich mache mit dem Konto {{to}} weiter.",
+      "plan_account_moved_line": "Das Konto {{from}} ist fast am Limit. Ich mache mit dem Konto {{to}} weiter.",
+      "plan_account_moved_extra": "Das Konto {{from}} würde bezahlte Zusatznutzung verbrauchen. Ich mache mit dem Konto {{to}} weiter.",
+      "plan_limit_all_wait": "Alle {{accounts}} {{plan}}-Konten haben ihr Limit erreicht. Ich antworte {{when}}, wenn sich das erste zurücksetzt.",
+      "plan_limit_all_wait_unknown": "Alle {{accounts}} {{plan}}-Konten haben ihr Limit erreicht. Ich antworte, sobald sich eines zurücksetzt.",
       "plan_model_limit_wait": "{{model}} hat sein eigenes Limit bei {{plan}} erreicht. Die anderen Modelle des Abos funktionieren weiter: Wechsle das Modell von {{agent}} oder warte, bis es sich {{when}} zurücksetzt.",
       "plan_model_limit_wait_unknown": "{{model}} hat sein eigenes Limit bei {{plan}} erreicht. Die anderen Modelle des Abos funktionieren weiter: Wechsle das Modell von {{agent}} oder warte, bis es sich zurücksetzt.",
       "plan_model_region_wait": "Dieses Modell ({{model}}) braucht die Global-Region in OpenCode (Settings › Privacy).",
@@ -17994,6 +18239,8 @@
       "file_saved": "Datei gespeichert.",
       "issue_work_start": "Bitte erledige Aufgabe #{{number}}.",
       "issue_taken": "Aufgabe #{{number}} übernommen.",
+      "surfaceUnlinked": "{{surface}} wurde getrennt, weil sich die Identität geändert hat. Verknüpfe es in den Einstellungen neu, wenn du das warst.",
+      "surfaceVoiceDropped": "Ich konnte die Sprachnachricht nicht verstehen. Kannst du sie noch mal schicken oder es schreiben?",
       "done": "Fertig.",
       "stretch_paused_runs_one": "{{agents}} hat kurz angehalten, um sich mit dir abzustimmen, bevor es weitergeht",
       "stretch_paused_runs_other": "{{agents}} haben kurz angehalten, um sich mit dir abzustimmen, bevor es weitergeht",
@@ -18863,6 +19110,7 @@
     "serverOwner": "Du hast diesen Server eingerichtet. Seine eigenen Einstellungen haben hier dann keinen Inhaber mehr, nur noch in seiner Umgebung.",
     "blockers": "Bevor du es löschen kannst",
     "soleOwner": "Du bist der einzige Inhaber von {{name}}. Mach jemand anderen zum Inhaber oder lösch {{name}}.",
+    "soleOwnerOutside": "Du bist der einzige Inhaber von {{name}}, und alle anderen dort sind externe Personen, die nicht Inhaber sein können. Lad ein Mitglied ein und mach es zum Inhaber oder lösch {{name}}.",
     "soleOwnerSettingUp": "Du bist der einzige Inhaber von {{name}}. Schließ die Einrichtung ab, um jemand anderen zum Inhaber zu machen, oder lösch {{name}}.",
     "openPeople": "Personen öffnen",
     "finishSetup": "Einrichtung abschließen",
@@ -18883,6 +19131,10 @@
     "seatsPaid_other": "{{count}} bezahlte Plätze",
     "noLimit": "Kein Limit",
     "ownBucket": "In deinem eigenen Bucket, ohne Limit von uns"
+  },
+  "referrals": {
+    "open": "Empfehlen und verdienen",
+    "failed": "Konnte gerade nicht geöffnet werden. Versuch es gleich noch einmal."
   },
   "limits": {
     "members": {

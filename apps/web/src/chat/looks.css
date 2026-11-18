@@ -66,6 +66,17 @@
 .ac-msg[data-look="bubbles"]:has(.ac-msg__stamp .ac-msg__aside) {
   --stamp-room: 38px;
 }
+/* A source glyph before the time (`.ac-msg__mark`) adds its 14px and the stamp's 4px gap. */
+.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark) {
+  --stamp-room: 38px;
+}
+.ac-msg--own[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark),
+.ac-msg[data-look="bubbles"]:has(.ac-msg__stamp > .ac-msg__mark):has(.ac-msg__stamp .ac-msg__aside) {
+  --stamp-room: 56px;
+}
+.ac-msg__stamp > .ac-msg__mark {
+  color: inherit;
+}
 /* The bubble is the plate: it lights on hover, the row doesn't. */
 .ac-msg[data-look="bubbles"]:is(:hover, [data-menu-open="true"]) {
   background: none;

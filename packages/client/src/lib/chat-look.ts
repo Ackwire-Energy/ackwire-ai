@@ -1,5 +1,6 @@
 import type { Message, ThreadInfo } from "../api/types";
 import { landedAfter } from "./timeline";
+import type { Wallpaper } from "./wallpaper";
 
 /**
  * How a person's conversations look (`chatPrefs` on their membership, on every device). `comfortable` is the original
@@ -33,6 +34,10 @@ export interface ChatPrefs {
   fullMessages?: boolean;
   /** "Always send": a report an agent offers about the app goes with its reply, without asking me. */
   feedbackAuto?: boolean;
+  /** The background behind every conversation (`./wallpaper.ts`); absent: none. */
+  wallpaper?: Wallpaper;
+  /** A conversation's own background, by channel id, over the two above; absent: as the others. */
+  wallpapers?: Record<string, Wallpaper>;
 }
 
 /** Owner's decision: a channel reads as one log, and in a DM right and left already say who spoke. */
@@ -42,10 +47,10 @@ export const DEFAULT_CHAT_TONE: ChatTone = "light";
 /** Owner's decision: smaller words than before the setting existed, which `lg` comes close to. */
 export const DEFAULT_TEXT_SIZE: ChatTextSize = "md";
 /**
- * Owner's decision: a conversation opens where the person stopped reading. Only an explicit `openAt` is stored, so
- * whoever picked "latest" keeps it.
+ * Owner's decision: a conversation opens at its latest message, at once, with no wait for the fresh page and no
+ * scroll up to a "New" line. Only an explicit `openAt` is stored, so whoever picked "read" keeps it.
  */
-export const DEFAULT_OPEN_AT: ChatOpenAt = "read";
+export const DEFAULT_OPEN_AT: ChatOpenAt = "latest";
 
 export const textSizeOf = (prefs: ChatPrefs | undefined): ChatTextSize => prefs?.textSize ?? DEFAULT_TEXT_SIZE;
 export const openAtOf = (prefs: ChatPrefs | undefined): ChatOpenAt => prefs?.openAt ?? DEFAULT_OPEN_AT;

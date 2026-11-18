@@ -1,17 +1,51 @@
 import { clippedHeight, LONG_MESSAGE } from "@agenteschat/client/lib/message-length";
+import { File, Paths } from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
 import { type ComponentRef, createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { AccessibilityInfo, Pressable, StyleSheet, View } from "react-native";
+import { AccessibilityInfo, AppState, Pressable, StyleSheet, View } from "react-native";
 import Animated, { Easing, LinearTransition } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
 import { motion, Text, useReducedMotion } from "@/ui";
-import { keepSize, keptHeightAfter, keptSize, PAST_RULE } from "./kept-sizes";
+import { keepSize, keptHeightAfter, keptSize, keptWordHeights, PAST_RULE, restoreWordHeights } from "./kept-sizes";
 import { useLayoutKey } from "./look";
 import { withOpacity } from "./turn";
 
 /** How much of the clipped words fades out at their end. */
 const FADE = 96;
+
+/** How many of the words' heights outlive the app (`readSavedHeights`): the latest measured. */
+const HEIGHTS_SAVED = 1000;
+/** The language the words show in; null until a message's words first show (and the file is read). */
+let heightsLang: string | null = null;
+const heightsFile = (lang: string) => new File(Paths.cache, `chat-word-heights-${lang}.json`);
+
+/**
+ * The words' heights an earlier launch measured, read the first time a message's words show, and kept for the next
+ * launch each time the app goes to the background: after a launch a conversation draws its long messages cut from their
+ * first frame, and its short ones without a second layout. In the app's cache folder (the system may clear it: then
+ * they are measured again), a file per language (a server's line reads longer in some): ids and heights, no content.
+ */
+function readSavedHeights(lang: string) {
+  const first = heightsLang === null;
+  heightsLang = lang;
+  if (!first) return;
+  try {
+    const file = heightsFile(lang);
+    if (file.exists) restoreWordHeights(JSON.parse(file.textSync()));
+  } catch {
+    // Unreadable: the heights are measured again.
+  }
+  AppState.addEventListener("change", (state) => {
+    if (state !== "background" || heightsLang === null) return;
+    try {
+      const file = heightsFile(heightsLang);
+      file.write(JSON.stringify(keptWordHeights(HEIGHTS_SAVED))).catch(() => {});
+    } catch {
+      // Not saved: the next launch measures them again.
+    }
+  });
+}
 
 /** Folded words growing down to their whole height once "Ver mais" opens them: what is above them stays still. */
 export const REVEAL = LinearTransition.duration(motion.base).easing(Easing.bezier(...motion.out));
@@ -50,9 +84,10 @@ export function ClippedMessage({
   lead?: ReactNode;
   children: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const reduced = useReducedMotion();
   const screen = useContext(OpenedMessagesContext);
+  readSavedHeights(i18n.language);
   // Opened from this row: it grows. One the screen kept open comes back open, still.
   const [tapped, setTapped] = useState(false);
   const fullMessages = useOrg().org?.chatPrefs?.fullMessages === true;
@@ -95,6 +130,9 @@ export function ClippedMessage({
             const next = keptHeightAfter(height, e.nativeEvent.layout.height, folded);
             if (next === null) return;
             keepSize(sizeKey, next);
+            // Under the fold before and after, the words look the same at either height (the first frame's cap stands
+            // past the rule, so it cuts nothing): no second render for them, which is most messages.
+            if (cut === null && clippedHeight(next) === null) return;
             setHeight(next);
           }}
         >

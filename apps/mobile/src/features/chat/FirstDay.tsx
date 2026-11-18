@@ -2,6 +2,7 @@ import { type Agent, useMe } from "@agenteschat/client";
 import { firstName } from "@agenteschat/client/lib/format";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { modeKey } from "@agenteschat/client/lib/workspace-mode";
+import { WALLPAPER_LIFT } from "@agenteschat/ui/sky/wallpaper";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ScrollView, StyleSheet, View } from "react-native";
@@ -14,7 +15,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { Button, Text, useReducedMotion } from "@/ui";
+import { Button, Text, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace } from "../shared/Face";
 import { useColors } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
@@ -65,6 +66,7 @@ export function FirstDay({
   bottomInset,
   keyboardLift,
   onAsk,
+  channelId,
 }: {
   agent: Agent;
   /** Room for the clear bar over the top: a greeting taller than the room above the keys scrolls out from under it. */
@@ -74,13 +76,16 @@ export function FirstDay({
   /** How much of the composer's bottom padding hides behind the open keyboard. */
   keyboardLift: number;
   onAsk: (text: string) => void;
+  /** The conversation: over its background the greeting's bubble is lifted off it, as a message's. */
+  channelId?: string;
 }) {
   const { t } = useTranslation();
   const c = useColors();
+  const { scheme, shadows } = useTheme();
   const me = useMe();
   const { org } = useOrg();
   const reduced = useReducedMotion();
-  const look = useConversationLook(true, agentLook(agent).color);
+  const look = useConversationLook(true, agentLook(agent).color, channelId);
   const text = look.text ?? undefined;
   const nameSize = look.text ? chatNameOf(look.text) : undefined;
   const timeSize = look.text ? chatTimeOf(look.text) : undefined;
@@ -198,7 +203,20 @@ export function FirstDay({
                   {t("mobile.chat.intent.now")}
                 </Text>
               </View>
-              {bubbled ? <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>{body}</View> : body}
+              {bubbled ? (
+                <View
+                  style={[
+                    lookRows.bubble,
+                    look.wallpaper
+                      ? { backgroundColor: WALLPAPER_LIFT[scheme], boxShadow: shadows.e1 }
+                      : { backgroundColor: c.bubble },
+                  ]}
+                >
+                  {body}
+                </View>
+              ) : (
+                body
+              )}
             </Animated.View>
             <View style={styles.starts}>
               {asks.map((a, i) => {

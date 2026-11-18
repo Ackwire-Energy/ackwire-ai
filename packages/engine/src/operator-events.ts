@@ -38,9 +38,14 @@ export type OperatorEventType =
   | "task.finished"
   | "desktop_control.ended"
   | "content.viewed"
+  | "support.requested"
   | "platform_ai.threshold"
   | "account.failure"
-  | "machine.wake_wanted";
+  | "machine.wake_wanted"
+  | "surface.cap_reached"
+  | "outside_access.granted"
+  | "outside_access.denied"
+  | "outside_access.ended";
 
 export interface OperatorEvent {
   type: OperatorEventType;
@@ -67,10 +72,13 @@ export async function recordOperatorEvent(db: Executor, ...events: OperatorEvent
   if (enabled && events.length > 0) await insertEvents(db, events);
 }
 
-/** `content.viewed`, whether events are on or not: content never leaves through the operator API without it. */
+/**
+ * `content.viewed`, whether events are on or not: content never leaves through the operator API without it. Beside
+ * what was read, why and by whom, a read may say more of itself in facts (a purpose, the ids of what proves it).
+ */
 export async function recordContentViewed(
   db: Executor,
-  view: { orgId: string; ref: string; reason: string; operator: string },
+  view: { orgId: string; ref: string; reason: string; operator: string; [fact: string]: unknown },
 ) {
   const { orgId, ...data } = view;
   await insertEvents(db, [{ type: "content.viewed", orgId, data }]);

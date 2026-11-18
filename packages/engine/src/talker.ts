@@ -3,6 +3,7 @@ import { and, type Database, desc, type Executor, eq, gt, schema, sql } from "@a
 import { type Agent, getAgentCached } from "./agents";
 import { runBrainOf } from "./brains/select";
 import { endsAsking } from "./brakes";
+import { threadIsConfidential } from "./confidential";
 import { publishMessageCreated } from "./events";
 import type { ModelGateway } from "./gateway";
 import { landedAfterSql } from "./message-place";
@@ -52,7 +53,8 @@ export type TalkerSkip =
   | "ended"
   | "held"
   | "answered"
-  | "no_agent";
+  | "no_agent"
+  | "confidential";
 
 /**
  * Whether the conversation layer is worth a model call at all (code decides;
@@ -232,7 +234,7 @@ export function createTalker(deps: TalkerDeps): Talker {
       ]);
       const skip = talkerPolicy({
         run: landed,
-        // The brain this run thinks with, not the agent's stored one (a fallback runs on the model).
+        // The brain this run thinks with, not the agent's stored one (a mission's may differ).
         brain: runBrainOf(landed, agent),
         message,
         waited,
@@ -244,6 +246,9 @@ export function createTalker(deps: TalkerDeps): Talker {
       // The run as it is now (a wait may have moved it); the policy judged it as the message found it.
       const [run] = await deps.db.select().from(agentRuns).where(eq(agentRuns.id, landed.id));
       if (!run || isTerminal(run.status)) return decide("ended");
+      // The snapshot is made of the run's own steps and words: in a confidential thread (ADR 0190) those go to the
+      // run's model and to no other, so nobody answers for it meanwhile.
+      if (await threadIsConfidential(deps.db, run.orgId, run.threadRootId)) return decide("confidential");
       // No model call for a reply that can't be posted (checked again before posting: it may pause meanwhile).
       if (await heldOrHandedOn(deps.db, run, message.id)) return decide("held");
       try {

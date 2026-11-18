@@ -14,7 +14,7 @@ import type {
   MachineAccountKind,
   OrgStanding,
 } from "../api/types";
-import { type OwnSignInRow, ownSignInReady, ownSignIns, planWordOf } from "./ai-accounts";
+import { groupPlans, type OwnSignInRow, ownSignInReady, ownSignIns, planWordOf } from "./ai-accounts";
 import { answersOthers, audienceOf } from "./audience";
 import { type BillingHold, billingHoldOf } from "./billing";
 import { type SetupView, setupPending } from "./computer";
@@ -909,19 +909,26 @@ export const teamThinks = (agentIds: readonly string[], status: AiStatus | undef
 /**
  * Plans the right hand can't think with now, for the dialog that picks its AI (dimmed, each with why): a computer's own
  * sign-in, which names no account (it thinks only with a plan signed in as one), and an account whose computer is
- * away. Nothing to press there: it stands in on what can think meanwhile (ADR 0137 §7, amended 2026-11-15).
+ * away. Nothing to press there: it stands in on what can think meanwhile (ADR 0137 §7, amended 2026-11-15). One
+ * entry per account (`groupPlans`), `ids` its logins, none for the one holding `inUse`.
  */
-export type UnusablePlan =
-  | { id: string; why: "computerOnly"; own: OwnSignInRow }
-  | { id: string; why: "away"; account: AiAccounts["accounts"][number] };
+export type UnusablePlan = { id: string; ids: string[] } & (
+  | { why: "computerOnly"; own: OwnSignInRow }
+  | { why: "away"; account: AiAccounts["accounts"][number] }
+);
 
-export function rightHandUnusable(view: AiAccounts | null | undefined): UnusablePlan[] {
+export function rightHandUnusable(view: AiAccounts | null | undefined, inUse?: string | null): UnusablePlan[] {
   if (!view) return [];
   const away = new Set(view.computers.filter((c) => !c.online).map((c) => c.machineId));
   return [
-    ...ownSignIns(view).map((own): UnusablePlan => ({ id: own.key, why: "computerOnly", own })),
-    ...view.accounts
-      .filter((a) => a.status === "active" && away.has(a.machineId))
-      .map((account): UnusablePlan => ({ id: account.id, why: "away", account })),
+    ...ownSignIns(view)
+      .filter((own) => own.key !== inUse)
+      .map((own): UnusablePlan => ({ id: own.key, ids: [own.key], why: "computerOnly", own })),
+    ...groupPlans(view.accounts.filter((a) => a.status === "active" && away.has(a.machineId)))
+      .filter((p) => !p.logins.some((l) => l.id === inUse))
+      .flatMap(({ logins }): UnusablePlan[] => {
+        const account = logins[0];
+        return account ? [{ id: account.id, ids: logins.map((l) => l.id), why: "away", account }] : [];
+      }),
   ];
 }

@@ -6,9 +6,9 @@ import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
 import { LineIcon, ROW_CARD_INSET, RowAction, Text, useTheme, useToast } from "@/ui";
-import { useMeId } from "../shared/hooks";
 import { boldRuns } from "./actions";
 import { useCardTop } from "./look";
+import { useRowMeId } from "./row-data";
 
 /**
  * A report about the app the agent offered on its own (`meta.feedbackOffer`, ADR 0160 §12) on the phone: under its
@@ -21,7 +21,7 @@ export function FeedbackOfferRow({ message: m }: { message: Message }) {
   const { t } = useTranslation();
   const { colors } = useTheme();
   const { orgId, org } = useOrg();
-  const meId = useMeId();
+  const meId = useRowMeId();
   const auth = useAuthConfig().data;
   // Read by the agentes.chat team: on its own servers, and from one whose operator gave no address.
   const cloud = auth?.cloud === true || auth?.feedbackRelay === true;

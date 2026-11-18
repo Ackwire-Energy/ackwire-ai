@@ -633,6 +633,7 @@
     "termsMiddle": " et la",
     "privacy": "Politique de confidentialité",
     "termsAfter": ".",
+    "poweredBy": "Propulsé par Ackwire AI",
     "signOut": "Se déconnecter",
     "earlyAccess": {
       "otherEmail": "Cette invitation est pour une autre adresse. Inscrivez-vous avec l'adresse à laquelle elle a été envoyée.",
@@ -2495,6 +2496,56 @@
     "localOnlyHow": "Dans l'app Ackwire AI de cet ordinateur, activez Y accéder depuis votre téléphone et vos collègues dans Préférences › Serveurs. Puis revenez ici.",
     "localOnlyHere": "Activez Y accéder depuis votre téléphone et vos collègues. Puis revenez ici."
   },
+  "surface": {
+    "link": {
+      "consent": "{{assistant}} d'Ackwire AI peut vous écrire sur {{surface}} à propos de vos espaces de travail, et vous appeler seulement en cas d'urgence si vous l'autorisez. Écrivez stop pour désactiver.",
+      "title": "Parlez à {{assistant}} sur {{surface}}",
+      "qr": "QR code qui ouvre {{surface}} avec votre code déjà saisi",
+      "making": "Création de votre code",
+      "code": "Votre code {{code}}",
+      "open": "Ouvrir {{surface}}",
+      "stepScan": "Scannez le code avec votre téléphone, ou ouvrez l'app",
+      "stepSend": "Envoyez le message tel quel",
+      "stepSendText": "Cela avance tout seul dès que votre message arrive.",
+      "stepConfirm": "Vérifiez l'expéditeur et confirmez ici",
+      "showCode": "Afficher le code à nouveau",
+      "confirmTitle": "Est-ce bien votre {{surface}} ?",
+      "sentBy": "Cet expéditeur a envoyé votre code",
+      "onlyYou": "Liez-le uniquement si c'est vous.",
+      "workspace": "Répond dans {{workspace}}",
+      "confirm": "Oui, lier",
+      "notMe": "Ce n'est pas moi",
+      "doneTitle": "{{surface}} est lié",
+      "doneText": "{{assistant}} vous répond là-bas à partir de maintenant.",
+      "newCode": "Créer un nouveau code",
+      "done": "Terminé"
+    },
+    "row": {
+      "hint": "Parlez à {{assistant}} et recevez ses réponses sur {{surface}}.",
+      "link": "Lier",
+      "none": "{{assistant}} peut vous écrire là-bas",
+      "pending": "Un expéditeur attend que vous confirmiez",
+      "unlink": "Délier",
+      "unlinkTitle": "Délier {{surface}} ?",
+      "unlinkText": "{{assistant}} ne vous répondra plus là-bas. Vous pouvez le lier à nouveau quand vous voulez.",
+      "unlinked": "{{surface}} délié"
+    },
+    "undo": {
+      "title": "Délier l'app de chat ?",
+      "lead": "Votre compte vient d'être lié à une app de chat. Si ce n'était pas vous, déliez-la ici.",
+      "button": "Délier",
+      "done": "{{surface}} délié",
+      "doneLead": "{{display}} ne peut plus atteindre votre compte.",
+      "ended": "Déjà délié",
+      "endedLead": "{{display}} sur {{surface}} avait déjà été délié. Rien d'autre à faire.",
+      "gone": "Ce lien d'annulation ne fonctionne plus",
+      "sender": "Cet expéditeur"
+    },
+    "via": "via {{surface}}",
+    "viaTip": "Envoyé par {{person}} sur {{surface}}",
+    "forwarded": "transféré via {{surface}}",
+    "forwardedTip": "{{person}} a transféré ceci depuis {{surface}}. Ce sont les mots de quelqu'un d'autre."
+  },
   "team": {
     "title": "Équipe",
     "people_one": "{{count}} personne",
@@ -2729,7 +2780,8 @@
     "header": {
       "pins": "Messages épinglés",
       "showMembers": "Afficher les membres",
-      "hideMembers": "Masquer les membres"
+      "hideMembers": "Masquer les membres",
+      "more": "Plus d'options"
     },
     "membersButton_one": "Membres du canal ({{count}})",
     "membersButton_many": "Membres du canal ({{count}})",
@@ -3539,10 +3591,16 @@
     "titleFor_female": "Connecter une IA pour {{name}}",
     "have": {
       "title": "Déjà connecté",
-      "titleFor": "Déjà connecté, pour {{name}}",
-      "titleFor_female": "Déjà connecté, pour {{name}}",
       "other": "Ou en connecter un autre",
-      "manageKeys": "Gérer ou supprimer les clés"
+      "manageKeys": "Gérer ou supprimer les clés",
+      "pickLine": "Choisissez un compte déjà connecté ici. {{name}} réfléchit avec.",
+      "onlyOwner_one": "Encore {{count}} compte, à donner par {{name}} uniquement.",
+      "onlyOwner_many": "Encore {{count}} comptes, à donner par {{name}} uniquement.",
+      "onlyOwner_other": "Encore {{count}} comptes, à donner par {{name}} uniquement.",
+      "moreAgents_one": "et {{count}} autre agent",
+      "moreAgents_many": "et {{count}} autres agents",
+      "moreAgents_other": "et {{count}} autres agents",
+      "plenty": "Bonne marge"
     },
     "chat": {
       "mine": "Les vôtres",
@@ -3729,6 +3787,13 @@
     "onceHint": "Ils partagent tous les limites de votre abonnement.",
     "use": "Utiliser {{label}}",
     "another": "Un autre compte",
+    "which": {
+      "title": "Quel compte {{brand}} pour {{name}} ?",
+      "title_female": "Quel compte {{brand}} pour {{name}} ?",
+      "titleAll": "Quel compte {{brand}} vont-ils utiliser ?",
+      "mine": "Vos comptes {{brand}} sur {{computer}}",
+      "other": "Se connecter avec un autre compte {{brand}}"
+    },
     "reuse": {
       "active": "Vous avez déjà {{label}} ici. Reconnectez-vous à ce compte, ou utilisez-en un autre.",
       "signedOut": "{{label}} est déconnecté ici. Reconnectez-vous, et ses agents le gardent."
@@ -3883,6 +3948,7 @@
     "shared_many": "{{agents}} utilisent le même forfait {{plan}}. Toutes leurs conversations vont dans la même file.",
     "shared_other": "{{agents}} utilisent le même forfait {{plan}}. Toutes leurs conversations vont dans la même file.",
     "about": "À propos de la file",
+    "chain": "Les {{accounts}} comptes {{plan}} ont atteint leur limite.",
     "lists": "Liste des conversations",
     "queuedTab": "Dans la file",
     "skippedTab": "Ignorées",
@@ -3964,7 +4030,6 @@
       "aiAccount": "Réfléchit avec {{account}}",
       "aiModel": "Réfléchit via l'API",
       "aiNone": "Pas encore d'IA. Connectez-en une après la création",
-      "reviewTitle": "Examiner {{name}}",
       "lines": "Ce que {{name}} reçoit",
       "aChannel": "un canal",
       "anApp": "une app",
@@ -5420,6 +5485,7 @@
       "joinRequest_other": "{{name}} et d'autres demandent à rejoindre",
       "joinRequestNames": "{{names}} demandent à rejoindre",
       "joinSuggestion": "{{by}} a suggéré {{name}}",
+      "joinOutside": "{{name}} demande à rejoindre en tant que collaborateur externe pour {{outsideOf}}, sans occuper de place",
       "doing": {
         "merge": "merger",
         "deploy": "déployer",
@@ -5488,6 +5554,7 @@
       "joinRequest": "<b>{{name}}</b> demande à rejoindre",
       "joinRequestMany": "<b>{{names}}</b> demandent à rejoindre",
       "joinSuggestion": "<b>{{by}}</b> a suggéré <b>{{name}}</b>",
+      "joinOutside": "<b>{{name}}</b> demande à rejoindre en tant que collaborateur externe pour <b>{{outsideOf}}</b>, sans occuper de place",
       "changeRequest": "<b>{{name}}</b> demande un changement pour <b>{{agent}}</b>",
       "proposalWaiting": "Propositions d’amélioration de <b>{{names}}</b>",
       "changeRequestAgent": "<b>{{name}}</b> demande un nouvel agent : <b>{{agent}}</b>",
@@ -5941,12 +6008,12 @@
         "accountAlso": "Aussi utilisé par {{agents}}",
         "accountOf": "De {{name}}",
         "accountOthers": "Les forfaits qui servent tout le workspace indiquent à qui ils sont.",
+        "movesOn": "Continue avec le compte suivant à la limite",
+        "pinned": "Ce compte uniquement",
+        "pinnedHint": "À la limite, attend que ce compte se réinitialise au lieu de passer au suivant.",
         "addAccount": "Ajouter un compte",
         "signInAgain": "Se reconnecter",
         "connectPlan": "Connecter un autre abonnement",
-        "fallbackTitle": "Si {{computer}} ne répond plus, répondre via l'API",
-        "fallbackHint": "Il répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",
-        "fallbackHint_female": "Elle répond via l'API et cela compte dans le budget de {{name}}. Sinon, {{name}} prévient la personne qui a demandé et attend le retour de l'ordinateur.",
         "effort": "Effort",
         "efforts": {
           "auto": "Automatique",
@@ -6007,8 +6074,7 @@
           "effort": "Effort : {{level}}",
           "speed": "Vitesse : rapide",
           "context": "Contexte : {{size}}",
-          "sharing": "Répond aux autres personnes",
-          "waits": "Attend l'ordinateur"
+          "sharing": "Répond aux autres personnes"
         },
         "copy": {
           "row": "Utiliser sur d'autres agents",
@@ -6158,7 +6224,6 @@
           "wait": "Attendre",
           "modelTitle": "Modèle de {{name}}",
           "moreTitle": "Plus d'options pour {{name}}",
-          "fallback": "Utiliser la clé API si l'abonnement s'arrête",
           "computer": "Ordinateur",
           "doneTitle": "C'est fait",
           "doneSub": "Ce qui était en cours continue avec le nouveau compte.",
@@ -7418,7 +7483,6 @@
     "adminsOnlyPersonal": "Demandez à une personne qui gère cet espace de vous laisser créer des agents.",
     "proposalClosed": "Cette proposition a déjà été tranchée ou a expiré.",
     "proposalNoAccess": "Seules les personnes de sa conversation peuvent voir cette proposition.",
-    "backToChat": "Retour à la conversation",
     "and": " et ",
     "routine": "Routine",
     "routineKeep": "Créer la routine {{name}}",
@@ -7595,6 +7659,52 @@
     "otherSkill": "Autre skill",
     "namesLead": "Et si c'était",
     "namesRoll": "Autres noms",
+    "proposal": {
+      "lead": "Ajustez ce que {{name}} a proposé. Vous pourrez tout changer plus tard.",
+      "leadNarrow": "Proposition de {{name}} : {{why}}",
+      "side": "La proposition",
+      "from": "Proposé par {{name}}",
+      "changed": "Ce que vous avez changé",
+      "changedNone": "Rien pour l’instant. Ce que vous changez sur la carte s’affiche ici, avec Annuler.",
+      "undo": "Annuler",
+      "changes": {
+        "changed": "modifié",
+        "added": "ajouté",
+        "removed": "retiré",
+        "how": "Sa façon de travailler"
+      },
+      "firstTask": "Première tâche",
+      "firstTaskPlaceholder": "Quoi demander en premier (facultatif)",
+      "firstTaskHint": "Prête dans votre discussion avec {{name}}. Il suffit de l’envoyer.",
+      "firstTaskHintBlank": "Prête dans votre discussion avec lui. Il suffit de l’envoyer.",
+      "firstTaskNone": "Sans tâche, la discussion s’ouvre vide.",
+      "after": "Après la création",
+      "afterAi": "Connecter une IA pour que {{name}} réfléchisse",
+      "afterAiBlank": "Connecter une IA pour qu’il réfléchisse",
+      "afterApp": "Connecter {{app}}",
+      "afterNone": "Rien. {{name}} se met au travail dès sa création.",
+      "afterNoneBlank": "Rien. Il se met au travail dès sa création.",
+      "discard": "Rejeter la proposition",
+      "otherChannel": "Autre canal",
+      "chooseChannels": "Choisir des canaux",
+      "channelsNone": "Seulement dans sa discussion avec vous.",
+      "channel": {
+        "lead": "Où {{name}} va travailler.",
+        "leadBlank": "Où il va travailler.",
+        "does": "{{name}} répond quand on l’appelle dans {{channel}} et lit ce qui s’y passe.",
+        "doesBlank": "Il répond quand on l’appelle dans {{channel}} et lit ce qui s’y passe.",
+        "remove": "Retirer de {{channel}}"
+      },
+      "routine": {
+        "label": "Routine",
+        "lead": "{{when}}, dans {{channel}}.",
+        "leadDm": "{{when}}, dans sa discussion avec vous.",
+        "starts": "Démarre dès que {{name}} est créé. L’heure et le texte se changent dans Routines.",
+        "starts_female": "Démarre dès que {{name}} est créée. L’heure et le texte se changent dans Routines.",
+        "startsBlank": "Démarre dès qu’il est créé. L’heure et le texte se changent dans Routines.",
+        "remove": "Retirer la routine"
+      }
+    },
     "skill": {
       "opens": "{{name}} ouvre ce manuel quand le sujet se présente. Tu le modifies dans Skills.",
       "opensBlank": "Il ouvre ce manuel quand le sujet se présente. Tu le modifies dans Skills.",
@@ -7633,6 +7743,10 @@
     "rolesAdd": "Ajouter un rôle",
     "rolesChange": "Modifier les rôles",
     "moreOf": "Plus pour {{name}}",
+    "outside": {
+      "chip": "Externe",
+      "title": "Collaborateur externe"
+    },
     "passwordLink": {
       "item": "Créer un lien de nouveau mot de passe",
       "hint": "Quand la personne a oublié son mot de passe",
@@ -7862,6 +7976,8 @@
       "viaLink": "A demandé via le lien {{when}}",
       "suggested": "Suggéré par {{name}} {{when}}",
       "suggestedLabel": "{{by}} a suggéré {{name}}",
+      "outside": "A demandé {{when}} à rejoindre en tant que collaborateur externe pour {{outsideOf}}",
+      "outsideSeat": "Les collaborateurs externes ne comptent pas parmi les personnes de votre offre, et vous pouvez les retirer à tout moment.",
       "asked": "A demandé {{ago}}",
       "askedNow": "A demandé à l'instant",
       "askedOn": "A demandé le {{date}}",
@@ -9316,7 +9432,7 @@
       "canceledToast": "Annulé. Ça ne s'exécutera pas quand la limite se renouvellera.",
       "continuedToast": "L'exécution continue.",
       "forbidden": "Seuls la personne qui a créé la routine, le propriétaire de l'agent ou un admin peuvent la poursuivre maintenant",
-      "extra_off": "La fenêtre de cet abonnement est épuisée et le long travail de cet agent n'utilise pas l'usage supplémentaire payant. Activez-le dans ses paramètres d'IA pour continuer maintenant, sinon il reprendra après le renouvellement",
+      "extra_off": "La fenêtre de cet abonnement est épuisée et le long travail de cet agent n'utilise pas l'usage supplémentaire payant de l'abonnement. Il reprendra après le renouvellement",
       "extra_used_up": "La fenêtre de cet abonnement est épuisée et son usage supplémentaire payant est épuisé ou indisponible. Il reprendra après le renouvellement"
     },
     "pausedRunningToast": "Routine en pause. L'exécution en cours s'est aussi arrêtée.",
@@ -10898,6 +11014,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "Compte sans nom",
+    "rename": {
+      "action": "Renommer {{label}}",
+      "label": "Nom du compte",
+      "placeholder": "Ex. : Travail, Perso"
+    },
     "share": {
       "switch": "Répond aux autres personnes",
       "switchAll": "Répondre aux autres personnes",
@@ -11640,6 +11762,17 @@
     "remove": "Retirer le logo",
     "saved": "Logo mis à jour.",
     "removed": "Logo retiré."
+  },
+  "orgAccent": {
+    "label": "Couleur d’accent",
+    "change": "Changer la couleur",
+    "useDefault": "Utiliser la couleur par défaut",
+    "suggested": "Couleurs suggérées",
+    "sampleMention": "@Agent",
+    "sampleLink": "Un lien",
+    "save": "Enregistrer la couleur",
+    "saved": "Couleur d’accent mise à jour.",
+    "reset": "Retour à la couleur par défaut."
   },
   "look": {
     "previous": "Précédent",
@@ -12387,8 +12520,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}, sans repli sur l'API"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "Modèle",
@@ -15424,6 +15556,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "La liaison des apps de chat a été désactivée. Rechargez pour voir vos paramètres tels qu'ils sont maintenant.",
+      "notAllowed": "Relier une app de chat n'est pas encore ouvert à votre compte. Continuez à utiliser l'app ici en attendant.",
+      "noAssistant": "L'assistant de cet espace de travail n'est pas autorisé à vous parler. Choisissez un autre espace de travail à relier.",
+      "noWorkspace": "Vous n'êtes plus dans cet espace de travail. Choisissez un autre espace de travail à relier.",
+      "linkGone": "Cette liaison n'attend plus : elle a expiré après 10 minutes ou a été annulée. Créez un nouveau code pour recommencer.",
+      "taken": "Cet expéditeur est relié à un autre compte Ackwire AI. Supprimez la liaison là-bas, puis envoyez un nouveau code.",
+      "undoGone": "Ce lien d'annulation a déjà servi ou a expiré. Supprimez plutôt la liaison dans vos paramètres de notifications.",
+      "codeGone": "Ce code est erroné, déjà utilisé ou expiré après 10 minutes. Créez un nouveau code et renvoyez-le."
+    },
+    "wallpaper": {
+      "notYours": "Cette photo n'est pas à vous.",
+      "invalid": "Ce fond n'existe pas.",
+      "tooLarge": "La photo peut peser jusqu'à 2 Mo.",
+      "type": "Utilisez une photo JPEG, PNG ou WebP."
+    },
     "tooLarge": "C'est plus que ce que le serveur accepte.",
     "tooLargeMax": "C'est plus que ce que le serveur accepte : jusqu'à {{max}} Mo.",
     "passwordLink": {
@@ -15454,7 +15602,7 @@
       "accountInUse": "Ce compte pense déjà pour un autre agent.",
       "noAiYet": "Aucune IA n'est encore connectée.",
       "filePurged": "Ce fichier a été supprimé il y a plus de 30 jours et ne peut pas revenir.",
-      "looksSecret": "Cela ressemble à un mot de passe ou à une clé, et tout le monde ici le verrait.",
+      "looksSecret": "Cela ressemble à un mot de passe ou à une clé, et tout le monde ici le verrait. Demandez plutôt à l'agent de vous le demander en privé.",
       "blockSpec": "Ce bloc contient une erreur dans ses éléments ou ses formules, il ne peut donc pas être affiché. Corrigez-le et réessayez.",
       "takeControl": "Prenez d'abord le contrôle du profil.",
       "profileBusy": "Quelqu'un d'autre utilise ce profil.",
@@ -15474,6 +15622,7 @@
       "agentCantRead": "Laissez d'abord l'agent lire ceci, dans ses accès.",
       "neverHappens": "Cette planification n'arrive jamais.",
       "soleOwner": "Vous êtes le seul propriétaire d'un espace de travail avec d'autres membres. Nommez un autre propriétaire ou supprimez l'espace de travail d'abord.",
+      "soleOwnerOutside": "Vous êtes le seul propriétaire d'un espace de travail dont les autres personnes sont des collaborateurs externes, qui ne peuvent pas être propriétaires. Invitez d'abord un membre et nommez-le propriétaire, ou supprimez l'espace de travail.",
       "testFirst": "Testez la connexion avec ces réglages avant de l'activer.",
       "voiceLength": "L'enregistrement est trop long ou trop court.",
       "sendAgain": "Le fichier n'est pas arrivé entier. Renvoyez-le.",
@@ -15550,7 +15699,8 @@
       "aboveYou": "Seule une personne au-dessus de ce rôle peut le modifier.",
       "base": "Chaque espace de travail garde le rôle Tout le monde.",
       "unknown": "Ce rôle n'existe plus.",
-      "orderIncomplete": "Les rôles ont changé pendant que vous les déplaciez. Rechargez et réessayez."
+      "orderIncomplete": "Les rôles ont changé pendant que vous les déplaciez. Rechargez et réessayez.",
+      "outsideOwner": "Un collaborateur externe ne peut pas être propriétaire."
     },
     "teamProposal": {
       "undoExpired": "Plus d'un jour s'est écoulé depuis la création de cette équipe, elle ne peut donc plus être annulée ici. Archive ses agents sur leurs pages."
@@ -15582,7 +15732,8 @@
       "denied": "Votre demande n'a pas été approuvée. Demandez à quelqu'un sur place de vous inviter.",
       "answered": "Quelqu'un a déjà répondu à cette demande.",
       "expired": "Cette demande a expiré : personne n'y a répondu en 14 jours.",
-      "codeNeeded": "Vérifiez d'abord votre e-mail."
+      "codeNeeded": "Vérifiez d'abord votre e-mail.",
+      "outsideClosed": "Ce compte a été bloqué ou est en cours de suppression : il ne peut pas rejoindre. La demande est fermée."
     },
     "code": {
       "wrong": "Code incorrect. Réessayez.",
@@ -15668,7 +15819,7 @@
       "takeOverNoAccess": "Rejoignez la conversation de la routine avant de la reprendre.",
       "agentNotInChannel": "Ajoutez d'abord l'agent à la conversation.",
       "webhookPaused": "Activez la routine pour la tester.",
-      "continueExtraOff": "La fenêtre de cet abonnement est épuisée et le travail long de cet agent n'utilise pas l'usage supplémentaire payant. Activez-le dans ses paramètres IA pour continuer maintenant, sinon il reprendra après la réinitialisation.",
+      "continueExtraOff": "La fenêtre de cet abonnement est épuisée et le travail long de cet agent n'utilise pas l'usage supplémentaire payant de l'abonnement. Il reprendra après la réinitialisation.",
       "continueExtraUsedUp": "La fenêtre de cet abonnement est épuisée et son usage supplémentaire payant est épuisé ou indisponible. Il reprendra après la réinitialisation.",
       "actionsNeedApprover": "Seuls le responsable de l'agent ou une personne qui approuve ses actions peuvent laisser une routine agir seule.",
       "editorOnly": "Seuls la personne qui a créé la routine, le responsable de l'agent ou un admin peuvent la modifier.",
@@ -15766,13 +15917,15 @@
     "agent": {
       "ownerOrAdmin": "Seuls le responsable de l'agent ou un admin peuvent faire cela.",
       "detailsHidden": "Seules les personnes qui parlent à {{agentName}} voient comment cela fonctionne.",
-      "extraOwnerOnly": "Seul le responsable de l'agent active ou désactive l'usage supplémentaire payant de l'abonnement.",
       "undoForbidden": "Seuls la personne pour qui l'agent a travaillé, son responsable ou un admin peuvent annuler cela.",
-      "undoSkillsAdmins": "Seul un admin peut annuler ou rétablir une modification des compétences d’un agent."
+      "undoSkillsAdmins": "Seul un admin peut annuler ou rétablir une modification des compétences d’un agent.",
+      "extraOwnerOnly": "Seul le responsable de l'agent active ou désactive l'usage supplémentaire payant de l'abonnement.",
+      "extraUnavailable": "L’utilisation supplémentaire payante est réservée au forfait personnel du responsable de l’agent, hors bras droit."
     },
     "account": {
       "notRestorable": "Ce compte ne peut plus être restauré.",
-      "notOwner": "Seule la personne qui a connecté ce compte ou cet abonnement peut faire cela."
+      "notOwner": "Seule la personne qui a connecté ce compte ou cet abonnement peut faire cela.",
+      "orderForbidden": "Seuls la personne qui a connecté ce compte ou un admin peuvent changer sa place dans l'ordre."
     },
     "channel": {
       "membersForbidden": "Seuls la personne qui a créé le canal ou un admin peuvent ajouter ou retirer des personnes."
@@ -17083,8 +17236,37 @@
     },
     "system": "Système",
     "removed": "Retiré",
+    "operatorRead": {
+      "sentence": "{{who}} a lu {{what}}",
+      "who": {
+        "server": "La personne qui gère ce serveur",
+        "cloud": "Le support Ackwire AI"
+      },
+      "what": {
+        "message": "un message",
+        "run_step": "une étape du travail d'un agent",
+        "agent": "les instructions d'un agent",
+        "routine": "une routine",
+        "task": "une tâche en arrière-plan",
+        "channel": "le nom d'un canal",
+        "connection": "les détails d'une connexion",
+        "support_request": "une demande d'assistance",
+        "direct": "un élément d'une conversation privée",
+        "other": "un élément de l'espace de travail"
+      },
+      "request": {
+        "plain": "à la demande de {{name}}",
+        "app": "à la demande de {{name}}, envoyée depuis l'app",
+        "email": "à la demande de {{name}}, envoyée par e-mail",
+        "operator": "à la demande de {{name}}, enregistrée par la personne qui gère ce serveur",
+        "support": "à la demande de {{name}}, enregistrée par le support"
+      },
+      "fault": "pour diagnostiquer une exécution en échec ou bloquée",
+      "ai": "avec un assistant IA"
+    },
     "change": {
       "mergedWithoutAsking": "A mergé dans {{repo}} sans demander",
+      "accentChanged": "A changé la couleur d’accent de l’espace de travail",
       "pattern": "{{verb}} {{area}}",
       "approval": {
         "approved": "A approuvé une demande",
@@ -17096,6 +17278,11 @@
         "left": "A quitté l'espace de travail",
         "role_changed": "A changé le rôle d'un membre",
         "password_link": "A créé un lien de nouveau mot de passe pour un membre"
+      },
+      "outside": {
+        "approved": "A fait entrer un collaborateur externe pour {{outsideOf}}",
+        "removed": "A retiré un collaborateur externe pour {{outsideOf}}",
+        "left": "A quitté l'espace de travail, collaborateur externe pour {{outsideOf}}"
       },
       "role": {
         "permission_set": "A modifié qui peut {{short}}",
@@ -17359,6 +17546,51 @@
           "new3": "Il en reste 2, j'appelle demain.",
           "new4": "Rapport mis à jour dans le Drive.",
           "newCount": "4 nouveaux"
+        },
+        "wallpaper": {
+          "title": "Fond",
+          "help": "Ne change que pour vous, sur tous vos appareils",
+          "rowHelp": "Derrière toutes les conversations, pour vous seul. Une conversation peut avoir le sien depuis son menu.",
+          "rowSub": "Pour vous seul, dans toutes les conversations",
+          "onlyHere": "Seulement dans {{name}}, pour vous seul",
+          "none": "Aucun fond",
+          "sameAsOthers": "Comme les autres conversations",
+          "sameShort": "Comme les autres",
+          "sky": "Ciel",
+          "drawings": "Dessins",
+          "color": "Couleur",
+          "photos": "Vos photos",
+          "choosePhoto": "Choisir une photo",
+          "skyAutoHelp": "Le premier suit la conversation : un ciel de la couleur de l'agent dans un message direct et celui de l'espace de travail dans les canaux.",
+          "skyAutoHelpDms": "Le premier est un ciel de la couleur de l'agent.",
+          "skyAutoHelpChannels": "Le premier est le ciel de l'espace de travail.",
+          "neutral": {
+            "paper": "Papier",
+            "mist": "Brume",
+            "sand": "Sable"
+          },
+          "name": {
+            "skyAuto": "Ciel de la conversation",
+            "skyAgent": "Ciel de l'agent",
+            "skyWorkspace": "Ciel de l'espace de travail",
+            "sky": "Ciel · {{color}}",
+            "drawingsAuto": "Dessins de la conversation",
+            "drawingsAgent": "Dessins de l'agent",
+            "drawingsWorkspace": "Dessins de l'espace de travail",
+            "drawings": "Dessins · {{color}}",
+            "crowd": "Agents",
+            "color": "Couleur · {{color}}",
+            "photo": "Votre photo"
+          },
+          "choose": "Choisir…",
+          "menu": "Fond de la conversation…",
+          "preview": "Aperçu",
+          "usePhoto": "Utiliser cette photo",
+          "dragHint": "Faites glisser la photo pour choisir la partie visible",
+          "dim": "Assombrir en mode sombre",
+          "sending": "Envoi de la photo…",
+          "failed": "Impossible d'enregistrer le fond. Réessayez.",
+          "done": "Terminé"
         }
       },
       "agentStyle": "Comment les agents vous parlent",
@@ -17770,6 +18002,14 @@
   "usageViews": {
     "signedOut": "Déconnecté",
     "whose": "De {{name}}",
+    "order": {
+      "title": "{{plan}} · Ordre d'utilisation",
+      "hint": "À la limite, les agents continuent avec le compte suivant qui a de la marge et reviennent au premier quand il se réinitialise.",
+      "terms": "Utiliser plusieurs comptes {{plan}} est une zone grise dans les conditions de {{plan}}.",
+      "termsLabel": "conditions de {{plan}}",
+      "termsHint": "Un abonnement est prévu pour une personne, alors vérifiez les conditions de {{plan}} avant que vos agents comptent sur plusieurs comptes.",
+      "move": "Déplacer {{name}}, numéro {{n}} dans l'ordre"
+    },
     "serves": {
       "everyone": "Tout le monde l'utilise",
       "onlyYou": "Vous seul l'utilisez",
@@ -17840,7 +18080,7 @@
       "api": "API",
       "apiMain": "{{name}} réfléchit via l'API",
       "apiMain_female": "{{name}} réfléchit via l'API",
-      "apiFallback": "Hors abonnement : décisions rapides, et quand l'abonnement n'a pas pu répondre",
+      "apiFallback": "Hors abonnement : décisions rapides",
       "removed": "Compte retiré",
       "removedSub": "N'est plus sur aucun ordinateur",
       "old": "{{brand}}, d'avant les comptes",
@@ -18492,6 +18732,7 @@
       "provider_wait_said": "{{provider}} a répondu par une erreur ({{detail}}). Je réessaie et je répondrai dès que cela fonctionnera.",
       "provider_wait_ours": "Un problème de notre côté bloque mon IA, pas votre compte. Je répondrai dès qu'il sera résolu.",
       "provider_back": "Mon IA est de retour.",
+      "confidential_removed": "Supprimé : le texte confidentiel est conservé pendant {{days}} jours.",
       "brain_busy": "Mon ordinateur est occupé par d'autres tâches pour le moment. Je répondrai dès qu'il sera libre.",
       "brain_queued": "Je suis encore dans la file de l'ordinateur. Je réponds dès qu'il a de la mémoire libre.",
       "brain_interrupted": "{{brain}} s'est arrêté avant de terminer. Déjà fait, non répété : {{tools}}.",
@@ -18499,6 +18740,11 @@
       "plan_limit_cut_unknown": "Je me suis arrêté à la limite de l'abonnement {{plan}}. Je reprendrai là où j'en étais dès qu'elle se réinitialisera.",
       "plan_limit_wait": "L'abonnement {{plan}} a atteint sa limite. Je répondrai {{when}}, quand elle se réinitialisera. S'il est libéré plus tôt dans {{plan}}, je le verrai et répondrai aussitôt.",
       "plan_limit_wait_unknown": "L'abonnement {{plan}} a atteint sa limite. Je répondrai dès qu'elle se réinitialisera.",
+      "plan_account_moved": "Le compte {{from}} a atteint sa limite. Je continue avec le compte {{to}}.",
+      "plan_account_moved_line": "Le compte {{from}} approche de sa limite. Je continue avec le compte {{to}}.",
+      "plan_account_moved_extra": "Le compte {{from}} passerait en utilisation supplémentaire payante. Je continue avec le compte {{to}}.",
+      "plan_limit_all_wait": "Les {{accounts}} comptes {{plan}} ont atteint leur limite. Je répondrai {{when}}, quand le premier se réinitialisera.",
+      "plan_limit_all_wait_unknown": "Les {{accounts}} comptes {{plan}} ont atteint leur limite. Je répondrai dès que l'un d'eux se réinitialisera.",
       "plan_model_limit_wait": "{{model}} a atteint sa propre limite sur {{plan}}. Les autres modèles de l'abonnement fonctionnent toujours : changez le modèle de {{agent}} ou attendez qu'il se réinitialise {{when}}.",
       "plan_model_limit_wait_unknown": "{{model}} a atteint sa propre limite sur {{plan}}. Les autres modèles de l'abonnement fonctionnent toujours : changez le modèle de {{agent}} ou attendez qu'il se réinitialise.",
       "plan_model_region_wait": "Ce modèle ({{model}}) a besoin de la région Global activée dans OpenCode (Settings › Privacy).",
@@ -18569,6 +18815,8 @@
       "file_saved": "Fichier enregistré.",
       "issue_work_start": "Merci de faire la tâche #{{number}}.",
       "issue_taken": "A pris la tâche #{{number}}.",
+      "surfaceUnlinked": "{{surface}} a été délié parce que son identité a changé. Lie-le à nouveau dans les Paramètres si c'était toi.",
+      "surfaceVoiceDropped": "Je n'ai pas compris ce message vocal. Tu peux le renvoyer ou l'écrire ?",
       "done": "C'est fait.",
       "stretch_paused_runs_one": "{{agents}} s'est arrêté pour faire le point avec vous avant de continuer",
       "stretch_paused_runs_many": "{{agents}} se sont arrêtés pour faire le point avec vous avant de continuer",
@@ -19495,6 +19743,7 @@
     "serverOwner": "Vous avez installé ce serveur. Ses propres paramètres n'auront plus de propriétaire ici, seulement dans son environnement.",
     "blockers": "Avant de pouvoir le supprimer",
     "soleOwner": "Vous êtes l'unique propriétaire de {{name}}. Nommez quelqu'un d'autre propriétaire, ou supprimez {{name}}.",
+    "soleOwnerOutside": "Vous êtes l'unique propriétaire de {{name}}, et les autres personnes y sont des collaborateurs externes, qui ne peuvent pas être propriétaires. Invitez un membre et nommez-le propriétaire, ou supprimez {{name}}.",
     "soleOwnerSettingUp": "Vous êtes l'unique propriétaire de {{name}}. Terminez sa configuration pour nommer quelqu'un d'autre propriétaire, ou supprimez {{name}}.",
     "openPeople": "Ouvrir Personnes",
     "finishSetup": "Terminer la configuration",
@@ -19516,6 +19765,10 @@
     "seatsPaid_other": "{{count}} places payées",
     "noLimit": "Sans limite",
     "ownBucket": "Sur votre propre bucket, sans limite de notre part"
+  },
+  "referrals": {
+    "open": "Parrainer et gagner",
+    "failed": "Impossible de l'ouvrir pour le moment. Réessayez dans un instant."
   },
   "limits": {
     "members": {

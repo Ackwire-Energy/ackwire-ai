@@ -37,6 +37,7 @@ import { inDesktopApp } from "@/lib/desktop";
 import { notePlace } from "@/lib/return-to";
 import { rememberPlace, showWorkspace } from "@/lib/start";
 import { STORAGE_KEYS, storage } from "@/lib/storage";
+import { useWorkspaceAccent } from "@/lib/theme";
 import { RealtimeProvider } from "@/realtime/context";
 
 /** The workspace shell of an organization: sidebar + page, and its WebSocket. */
@@ -70,6 +71,7 @@ function OrgLayout() {
   // …and the ones it still shows for what was already read elsewhere close.
   useWebPushClear();
   usePageTextSize(membership?.chatPrefs);
+  useWorkspaceAccent(membership?.accent);
   // An agent picked as the app icon follows its name and look in its workspace (ADR 0179).
   useFollowPickedAgent(orgId);
   useEffect(() => {

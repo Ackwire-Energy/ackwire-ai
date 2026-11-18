@@ -3,9 +3,9 @@ import { textOrMedia } from "@agenteschat/client/lib/media";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
-import { Button, Card, Filters, Icon, IconButton, type IconName, Locked, Text, useToast } from "@/ui";
+import { Button, Card, Disclosure, Filters, IconButton, type IconName, Locked, Text, useToast } from "@/ui";
 import { Face } from "../shared/Face";
-import { useColors, useOrgId, useWhen } from "../shared/hooks";
+import { useOrgId, useWhen } from "../shared/hooks";
 import { previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, successHaptic, Tile, useSurface } from "../shared/parts";
@@ -110,7 +110,6 @@ export function RemindSheet({
   initialText?: string;
 }) {
   const { t } = useTranslation();
-  const c = useColors();
   const sheet = useSheet();
   const surface = useSurface();
   const whenLabel = useWhenLabel();
@@ -160,7 +159,7 @@ export function RemindSheet({
             key: "custom",
             icon: "pen" as const,
             label: t("mobile.remind.custom"),
-            trailing: <Icon name="right" size={18} color={c.faint} />,
+            trailing: <Disclosure />,
             disabled: !ready,
             onPress: () =>
               sheet.push(

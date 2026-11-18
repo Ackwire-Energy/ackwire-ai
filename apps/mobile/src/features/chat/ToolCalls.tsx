@@ -148,11 +148,14 @@ const KIND_ICON: Partial<Record<ActivityKind, IconName>> = {
 /** How many logos the closed line stacks (a phone has no room for more). */
 const LOGOS_MAX = 4;
 
+/** Draws a call's logo (`useCallLogo`). */
+export type CallLogo = (a: Activity, size?: number) => ReactNode;
+
 /**
  * A call's logo: its service's mark as the connectors screens draw it (`callLogo`), or the icon of one of our tools.
  * The task manager draws what a task uses now with it too (ADR 0128).
  */
-export function useCallLogo() {
+export function useCallLogo(): CallLogo {
   const catalog = useCatalog();
   return (a: Activity, size = 20): ReactNode => {
     const logo = callLogo(a, catalog.data?.connectors ?? []);
@@ -611,12 +614,11 @@ function blockLine(t: TFunction, locale: string, l: ToolLine, logo: ReactNode): 
   };
 }
 
-function useBlockItems(items: ToolItem[]): BlockItem[] {
-  const { t, i18n } = useTranslation();
-  const logo = useCallLogo();
+/** A turn's items as its block's lines, each with its logo (the caller's `useCallLogo`, read once per block). */
+function blockItemsOf(items: ToolItem[], t: TFunction, locale: string, logo: CallLogo): BlockItem[] {
   return items.flatMap((item): BlockItem[] =>
     item.kind === "call"
-      ? [{ kind: "line", line: blockLine(t, i18n.language, item.line, logo(item.line)) }]
+      ? [{ kind: "line", line: blockLine(t, locale, item.line, logo(item.line)) }]
       : item.kind === "say"
         ? [
             {
@@ -663,8 +665,8 @@ export function TurnTools({
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
-  const blockItems = useBlockItems(items);
   const logo = useCallLogo();
+  const blockItems = blockItemsOf(items, t, i18n.language, logo);
   // A lone quick read that only fed the answer: no card, as if it called nothing. Done, its tools are the summary
   // the person chose not to see (`showActivity`) unless they turned it on.
   const now = quietWork(items) || (done && !showsActivity(org)) ? null : toolNow(items);
@@ -761,7 +763,7 @@ export function SavedTools({
       )
     : null;
   const items = work ? toolItemsSaved(work) : [];
-  const blockItems = useBlockItems(items);
+  const blockItems = blockItemsOf(items, t, i18n.language, logo);
   // Nothing more to show than the message does: no tools (lookups and reactions aren't counted), or only the ones
   // its own cards show (where it browsed).
   const shown = compact ? workSteps(compact, onCard) : 0;
@@ -840,9 +842,10 @@ export function RunSteps({
   calls: number;
   live: boolean;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const c = useColors();
   const orgId = useOrgId();
+  const logo = useCallLogo();
   // The task manager's own read (ADR 0128): whoever sees the task sees its steps, without usage access.
   const run = useTaskSteps(orgId, runId);
   const { refetch } = run;
@@ -860,7 +863,7 @@ export function RunSteps({
       ? { ...item, line: { ...item.line, state: "run" as const } }
       : item,
   );
-  const blockItems = useBlockItems(items);
+  const blockItems = blockItemsOf(items, t, i18n.language, logo);
   if (!work)
     return run.isError ? (
       <Text variant="footnote" tone="muted">

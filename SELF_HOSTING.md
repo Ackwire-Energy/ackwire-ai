@@ -928,6 +928,9 @@ carries, in the request's `params._meta["chat.agentes/caller"]`, a JWT signed wi
 | `org`, `agent`, `conn` | The ids of the workspace, the agent and the connection |
 | `run` | The run's id (absent for the rare call made outside a run) |
 | `user` | The id of the person the run acts for; absent when nobody is behind it, as in a routine's run |
+| `brain` | What thinks for the run: `model` for a model this server calls, else the kind of the program on a computer (`claude_code`, `codex`, …) |
+| `provider` | With `brain: "model"`, the provider that model is at (`anthropic`, `openai`, …; `custom` for a workspace's own endpoint) |
+| `channel`, `thread` | The ids of the conversation the run answers in and of the root message of its thread |
 | `iat`, `exp`, `jti` | When it was made, 60 seconds later, and an id that is new for every call |
 
 In your server: check the signature with the algorithm pinned to HS256, that `aud` is your host and `iss`
@@ -937,6 +940,19 @@ needing to be reconnected. Listing the tools carries no statement, since no agen
 the tools' names and descriptions free of anything private. A host that isn't listed gets nothing, and
 neither does a server over http or on a port other than 443. [ADR 0181](docs/adr/0181-mcp-caller-identity.md)
 has the rest.
+
+**A listed server can mark an answer as confidential (optional).** When a tool of such a server answers
+with somebody's private text (a secret, a person's record), it can add
+`"_meta": { "chat.agentes/confidential": true }` to that result. The run that read it goes on reading and
+answers in a thread under the message that asked it, and sends nothing elsewhere: no message, mail or
+post in another place, no file, task or memory, no command, browser or web. Outside that thread no agent
+is given the thread's text, and neither is a person's connected AI app or a review through the operator
+API. It is in no search, summary or notification, and it is removed 60 days later.
+A program on a computer (Claude Code, Codex) can't be held to that, so it gets a placeholder in place of
+the answer: check `brain` in the statement above before you hand such text out. The thread's text also
+stays with the `provider` that first read it: an agent named there that thinks with another one stops
+before it reads anything, and says so. A routine's own run that read such an answer delivers no report.
+The same key from a server you did not list changes nothing. [ADR 0190](docs/adr/0190-confidential-results.md) has the rest.
 
 **Deleting workspaces and accounts.** An owner deletes a workspace in **Settings → General**, with a
 code emailed to them (with no email set up, their password instead): it turns read-only for everyone at
@@ -1006,6 +1022,28 @@ far each one is, and asks for a single-use code that the computer connects with
 (`POST /orgs/{orgId}/machines`): write it to a file only the runner's user can read and run
 `agentes-runner pair --server <url> --enroll-file <file>` there (or pass `--enroll-file` to the installer),
 which removes the file as soon as it is read. Leave it `off` and people connect their own computers.
+
+**Reading what a workspace wrote (optional, off).** The operator API never returns what anyone wrote,
+with one exception you have to switch on: `OPERATOR_API_REVEAL_TOKEN` (a third value, different from
+the other two). Leave it unset unless a tool of yours needs it. Set, `POST /reveal/orgs/{orgId}` reads
+one field of one record at a time (a message, a step of a run, an agent's instructions, a routine, a
+task, a connection's error, what a member wrote to you), at most 2,000 characters a call, with a
+reason in one line, for one of two purposes the server checks for itself. For a member who asked for
+help (`member_request` with the id of their support request, 30 days at most): only what that member
+reads in the app. To diagnose a run that failed or got stuck (`fault` with the run's id, 14 days at
+most): only what hangs on that run. Never a file or a credential, and of a direct conversation only
+for a member who is in it. Every read is recorded before any text leaves, in the events feed with
+your reason and in that workspace's own audit log (**Settings → Audit log**: who read what, at whose
+request or for which failed run, never your reason), credentials are masked, and the door takes 30
+calls a minute and 100 reads of one workspace a day. `GET /orgs/{orgId}/support-requests` lists who
+asked for help and when, and `POST` there records a request that reached you another way (a mail, a
+call), which the audit log then shows as recorded by you. Setting the token makes you a reader of
+your workspaces' content: tell them before the first read, and say whether an AI assistant reads
+with you (`assistedByAi`). It also makes the server keep what members write in the feedback form,
+and what the thing they reported says, for 90 days beside their request. Unset, every path under
+`/reveal` answers 403 and the server keeps neither: of a member's feedback it keeps only that they
+asked (who, when, and which message), for a year. If you set the token and later take it away, the
+door closes at once and no new words are kept; the ones already kept stay until their 90 days are up.
 
 **Stall-and-noise report (optional).** With `OPS_REPORT_EMAIL` set (one address, or several separated by
 commas) and email set up, the server emails the previous UTC day's report every day at about 01:00 UTC: for

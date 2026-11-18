@@ -208,12 +208,12 @@ export const agents = pgTable(
     brain: text().notNull().default("model"),
     /** The computer brain's model (`opus`, `sonnet`, `haiku`, a Codex model); null = the brain's default. */
     brainModel: text(),
-    /** When the computer brain can't answer, answer through the API (counts against the budget). */
-    brainFallback: boolean().notNull().default(true),
     /**
-     * Long work may go on into the plan's paid extra usage, where the provider reports it on (ADR 0118); off, it
-     * pauses at 95% of the plan like any other.
+     * Unused (ADR 0032's 2026-11-15 addendum: the API never stands in for a computer brain). Kept while the previous
+     * release still reads it during a deploy and on rollback; a migration of a later release drops it.
      */
+    brainFallback: boolean().notNull().default(true),
+    /** Saved permission for paid extra usage on the owner's own plan (AW-003). */
     brainExtraUsage: boolean().notNull().default(true),
     /**
      * The account its computer brain runs with (ADR 0041), on its machine and
@@ -231,6 +231,11 @@ export const agents = pgTable(
      * the plan stays lent if that person leaves.
      */
     brainAccountLentBy: text(),
+    /**
+     * "Só esta conta" (ADR 0041 §6): at its plan's limit a run waits for this account to reset instead of going on
+     * with the next account in the workspace's order (`nextAccountPlan`).
+     */
+    brainAccountPinned: boolean().notNull().default(false),
     /** How hard its computer brain thinks (`low`…`max`, ADR 0041); null = the CLI's default. */
     brainEffort: text(),
     /**
@@ -432,7 +437,6 @@ export interface AgentSetup {
   account?: string | null;
   effort?: string | null;
   contextTokens?: number | null;
-  fallback?: boolean;
   /** Its Autonomia (`agents.mission_command_approval`); null: the default. */
   autonomy?: string | null;
 }

@@ -16,7 +16,13 @@ import {
   useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { selfHosted } from "@agenteschat/client/lib/about";
-import { accountAbout, accountChoices, accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
+import {
+  accountAbout,
+  accountChoices,
+  accountTitle,
+  ownSignInTitle,
+  unnamedAccount,
+} from "@agenteschat/client/lib/ai-accounts";
 import { audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { modelInput, modelRows } from "@agenteschat/client/lib/brain-picker";
 import { errorText } from "@agenteschat/client/lib/errors";
@@ -60,7 +66,7 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { LookRows, modelOptions } from "@/components/AgentFields";
 import { RightHandApprovalsCard } from "@/components/ApprovalCover";
 import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
-import type { HaveItem } from "@/components/arrival/ConnectHave";
+import { type HaveItem, renameOf } from "@/components/arrival/ConnectHave";
 import { useConnectAi } from "@/components/ConnectAi";
 import { useAgentComputer } from "@/components/computer/facts";
 import { useOpenComputer } from "@/components/computer/open";
@@ -73,6 +79,7 @@ import { TeamWeekSchedule } from "@/components/TeamWeekSchedule";
 import { useComputerEdition } from "@/components/WorkspaceComputer";
 import { useDirectory } from "@/hooks/useDirectory";
 import { usePersonalView } from "@/hooks/usePersonalView";
+import { useRenameAccount } from "@/hooks/useRenameAccount";
 import { fullLook, lookOf } from "@/lib/look";
 import { useToast } from "@/lib/toast";
 
@@ -392,6 +399,7 @@ export function useRightHandMineHint(agent: Agent) {
 
 function RightHandForm({ agent }: { agent: Agent }) {
   const { t, i18n } = useTranslation();
+  const renameAccount = useRenameAccount();
   const { org, me } = useOrg();
   const toast = useToast();
   const update = useUpdateAgent(org.id, agent.id);
@@ -484,7 +492,10 @@ function RightHandForm({ agent }: { agent: Agent }) {
     const whose = owner ? t("agentPage.work.brain.accountOf", { name: owner }) : t("connectAi.chat.yours");
     return {
       id: a.id,
-      title: accountTitle(a),
+      title: accountTitle(t, a),
+      unnamed: unnamedAccount(a),
+      // The accounts listed here are on the right hand's computer.
+      rename: renameOf(t, a, view?.computer?.machineId, renameAccount),
       about: accountAbout(t, c, agent.name),
       whose,
       group: owner ? { key: `owner:${a.ownerId}`, label: whose } : mineGroup,
@@ -494,8 +505,8 @@ function RightHandForm({ agent }: { agent: Agent }) {
   });
   const current = kind ? (planItems.find((i) => i.id === view?.account) ?? null) : keyItem;
   // Plans it can't think with now, dimmed under the others with why: it stands in on what can meanwhile.
-  const cant = rightHandUnusable(aiAccounts).filter((u) => u.id !== current?.id);
-  const away = new Set(cant.map((u) => u.id));
+  const cant = rightHandUnusable(aiAccounts, current?.id);
+  const away = new Set(cant.flatMap((u) => u.ids));
   const others = [...planItems.filter((i) => i.id !== current?.id && !away.has(i.id)), ...(kind ? [keyItem] : [])];
   // Connecting one is self-host's way out: Cloud's own computer is always on, and its way out is the plan.
   const pairs = can(org, "pair_computers") && edition !== "cloud";
@@ -510,7 +521,7 @@ function RightHandForm({ agent }: { agent: Agent }) {
     const owner = theirs(a.ownerId);
     return {
       id: u.id,
-      item: { title: accountTitle(a), mark: <ProviderLogo id={a.provider ?? a.kind} size="xs" /> },
+      item: { title: accountTitle(t, a), mark: <ProviderLogo id={a.provider ?? a.kind} size="xs" /> },
       why: (
         <>
           {owner
@@ -612,7 +623,12 @@ function RightHandForm({ agent }: { agent: Agent }) {
             label={t("rightHand.settings.workspace")}
             status={
               kind ? (
-                <PlanLine kind={kind} label={signIn?.label} owner={theirs(ownerId)} model={planModel} />
+                <PlanLine
+                  kind={kind}
+                  label={signIn ? accountTitle(t, signIn) : undefined}
+                  owner={theirs(ownerId)}
+                  model={planModel}
+                />
               ) : (
                 <span className="rh-value ac-iconline">
                   {key ? <ProviderLogo id={key.provider} size="xs" /> : <Icon name="key" size={14} />}

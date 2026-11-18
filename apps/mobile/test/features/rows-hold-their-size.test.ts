@@ -70,7 +70,10 @@ describe("rows that measure themselves come back at their size", () => {
     expect(clip).toContain("const [height, setHeight] = useState(() => keptSize(sizeKey) ?? 0);");
     expect(clip).toContain("const unmeasured = height === 0 && !open && lead == null;");
     expect(clip).toContain('unmeasured: { maxHeight: LONG_MESSAGE.over + PAST_RULE, overflow: "hidden" },');
-    expect(clip).toMatch(/keepSize\(sizeKey, next\);\s*setHeight\(next\);/);
+    // Words under the fold before and after a measure look the same at either height: only a fold draws again.
+    expect(clip).toMatch(
+      /keepSize\(sizeKey, next\);[\s\S]*?if \(cut === null && clippedHeight\(next\) === null\) return;\s*setHeight\(next\);/,
+    );
   });
 
   test("a table lays out at its measured columns when it comes back", () => {
@@ -113,8 +116,10 @@ describe("rows that measure themselves come back at their size", () => {
     );
   });
 
-  test("the conversation draws a screen past each edge, so rows mount and measure out of sight", () => {
+  test("the conversation draws a screen past each edge once placed, so rows mount and measure out of sight", () => {
     const chat = src("features/chat/ChatScreen.tsx");
-    expect(chat).toContain("drawDistance={Math.round(windowHeight)}");
+    // While it opens at its end, a short reach: the list takes its whole reach at once there, two screens of rows.
+    expect(chat).toContain("drawDistance={placed ? Math.round(windowHeight) : OPEN_DRAW_DISTANCE}");
+    expect(chat).toContain("const OPEN_DRAW_DISTANCE = 250;");
   });
 });

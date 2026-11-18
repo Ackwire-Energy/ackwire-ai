@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next";
 import { Pressable, StyleSheet, View } from "react-native";
 import { Icon, Text, TOUCH } from "@/ui";
 import { Face } from "../shared/Face";
-import { useColors, useDirectory } from "../shared/hooks";
+import { useColors } from "../shared/hooks";
 import { rowBodyInset } from "./logic";
 import type { RowLook } from "./look";
+import { useRowDirectory } from "./row-data";
 
 /** The quote's line (`styles.line`), and the reply bar's × glyph. */
 const LINE = 20;
@@ -24,7 +25,7 @@ export function QuoteLine({
   ink?: string;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const color = ink ? { color: ink } : undefined;
   if (reply.deleted) {
     return (

@@ -51,6 +51,7 @@ const TYPED = [
   "reason",
   "byName",
   "appName",
+  "display",
 ];
 const SENTINEL = "Zq9 evil.com";
 const withoutUrls = (s: string) => s.replace(/https?:\/\/\S+/g, "");
@@ -133,6 +134,8 @@ describe("every email, in both languages", () => {
       email_change_code: true,
       email_change_link: true,
       email_changed: true,
+      surface_linked: true,
+      surface_unlinked: true,
       workspace_deleting: true,
       workspace_restored: true,
       account_deleted: true,

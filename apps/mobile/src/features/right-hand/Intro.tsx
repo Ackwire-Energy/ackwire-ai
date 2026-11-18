@@ -36,6 +36,7 @@ import { AgentFace, OpensAgent } from "../shared/Face";
 import { useColors, useDirectory } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { useSurface } from "../shared/parts";
+import { usePresenceOf } from "../status/hooks";
 import { FirstRunCard, useFirstRun } from "./FirstRun";
 import { useSendAnswer } from "./TeamCard";
 
@@ -80,6 +81,8 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
     welcomed,
   });
   const send = useSendAnswer(channelId);
+  // Its face at the top of the conversation lives only while it works: a still one costs nothing as the list moves.
+  const working = usePresenceOf().agent(agent.id)?.presence === "working";
   return (
     <View style={styles.intro}>
       {/* The first visit: the sign-in's sky goes on at the top of the conversation and the right hand wakes on its
@@ -107,7 +110,7 @@ export function RightHandIntro({ agent, channelId, waveFrom }: { agent: Agent; c
       ) : null}
       <View style={styles.head}>
         <OpensAgent agentId={agent.id}>
-          <AgentFace agentId={agent.id} size={36} />
+          <AgentFace agentId={agent.id} size={36} live={working} />
         </OpensAgent>
         <Text variant="body" style={[styles.bold, styles.shrink]}>
           {agent.name}

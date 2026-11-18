@@ -300,7 +300,7 @@ export async function restartAfterStopAndSend(
   const candidates = [...(stopped?.pendingMessageIds ?? []), ...(reply.read ? [reply.read] : [])];
   if (!stopped || !by || candidates.length === 0) return null;
   // A model brain reads a "Parar e mandar" mid-task (its call is cut); only a computer brain is restarted.
-  // The brain the stopped run thought with (a fallback ran on the model brain), the agent's before its first turn.
+  // The brain the stopped run thought with (a mission's may differ), the agent's before its first turn.
   const [agent] = await db.select({ brain: agents.brain }).from(agents).where(eq(agents.id, stopped.agentId));
   if (!agent || runBrainOf(stopped, agent) === "model") return null;
   const [said] = await db

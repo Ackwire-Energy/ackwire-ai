@@ -184,7 +184,7 @@ export async function personUpgrade(
   req: Request,
   orgId: string,
 ): Promise<(SessionUser & { sessionToken: string }) | Response> {
-  if (!requestOriginAllowed(origins, req.headers)) {
+  if (!(await requestOriginAllowed(deps.db, origins, req.headers))) {
     return new Response("Cross-origin WebSocket refused", { status: 403 });
   }
   if (!UUID.test(orgId)) return new Response("orgId is required", { status: 400 });

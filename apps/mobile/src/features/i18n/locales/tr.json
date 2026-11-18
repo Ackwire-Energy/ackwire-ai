@@ -243,8 +243,6 @@
       "mute": "Sessize al",
       "unmute": "Sesi aç"
     },
-    "firstRunLine": "{{name}} ekibi kuruyor · {{done}} / {{total}}",
-    "firstRunLinePersonal": "{{name}} ajanlarını hazırlıyor · {{done}} / {{total}}",
     "first": {
       "title": "İlk ajanınızla başlayın",
       "subtitle": "Ona bir ad verin ve ne yaptığını söyleyin. Burada bir sohbet olarak görünür.",
@@ -1667,18 +1665,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} yardım istiyor",
-      "needsFor": "{{name}} yardım istiyor · {{time}}",
-      "inControlAt": "Kontrol sizde · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "{{name}} ajanının tarayıcısı açılıyor…",
-      "startingM": "{{name}} ajanının tarayıcısı açılıyor…",
       "stopAskF": "{{name}} ajanının tarayıcısı kapatılsın mı?",
       "stopAskM": "{{name}} ajanının tarayıcısı kapatılsın mı?",
-      "whereF": "{{name}} ajanının tarayıcısında",
-      "whereM": "{{name}} ajanının tarayıcısında",
       "open": "Aç",
-      "expandHint": "Genişletmek için dokunun",
       "stop": "Durdur",
       "giveUp": "Vazgeç"
     },
@@ -1686,7 +1675,6 @@
       "inControl": "Kontrol sizde",
       "helping": "Kontrol {{name}} ajanında",
       "watchOnly": "Kontrol {{name}} ajanında. Siz yalnızca izliyorsunuz.",
-      "takeOver": "Kontrolü al",
       "done": "Tamam",
       "handBack": "Kontrolü geri ver",
       "couldnt": "Yapamadım",
@@ -1707,7 +1695,6 @@
       "closedHelpM": "Girişler bir dahaki sefer için kayıtlı kalır.",
       "stuckHelpF": "Tekrar dene, tarayıcıyı yeniden başlatır. Girişler kayıtlı kalır.",
       "stuckHelpM": "Tekrar dene, tarayıcıyı yeniden başlatır. Girişler kayıtlı kalır.",
-      "hidden": "Kontrol {{name}} ajanında · ekran gizli",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2222,7 +2209,6 @@
     "planRowSub": "Ajanın bilgisayarında oturum açar, anahtar gerekmez",
     "keyRow": "Bir anahtar",
     "keyRowSub": "Kullandıkça doğrudan sağlayıcıya ödersiniz",
-    "already": "{{org}} çalışma alanında zaten var",
     "stepOf": "{{step}} / {{total}}"
   },
   "crash": {
@@ -2873,5 +2859,11 @@
       "title": "İncelenecek bir şey yok",
       "text": "Bir ajan sohbet dışında bir şey yaptığında burada görünür."
     }
+  },
+  "surface": {
+    "on": "Açık",
+    "codeText": "Orada açılan mesajı gönderin, sonra buraya dönün.",
+    "openFailed": "{{surface}} bu telefonda açılamadı. Bunun yerine aşağıdaki kodu oraya gönderin.",
+    "orType": "Ya da bu kodu oraya gönderin"
   }
 }

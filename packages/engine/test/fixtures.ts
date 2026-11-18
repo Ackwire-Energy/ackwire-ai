@@ -253,6 +253,8 @@ export async function setup(
     workTools?: boolean;
     /** Long work's safety net (ADR 0121 §1). None: off (no test moves by accident). */
     workAuto?: { afterMs?: number; afterCalls?: number; minMs?: number; tickMs?: number };
+    /** Brains the jobs think with besides the model brain (computer brains). None: a computer brain's turn waits. */
+    brains?: RunExecutorDeps["brains"];
   } = {},
 ) {
   const { db, close } = await createTestDatabase();
@@ -431,6 +433,7 @@ export async function setup(
     workAutoAfterCalls: options.workAuto?.afterCalls ?? 100_000,
     workAutoMinMs: options.workAuto?.minMs,
     workTickMs: options.workAuto?.tickMs ?? 60_000,
+    ...(options.brains ? { brains: options.brains } : {}),
   };
   const handlers = createJobHandlers(jobDeps);
 

@@ -1,4 +1,4 @@
-import { type AgentColorName, mixHex } from "@agenteschat/ui/agent/engine";
+import { type AgentColorName, gradientOf, mixHex } from "@agenteschat/ui/agent/engine";
 import { memo, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useFrameTime, useLivePaused } from "@/agent/live";
@@ -131,9 +131,11 @@ function LaneSprite({
   const reduced = useReducedMotion();
   const t = useTicker(!reduced, 125);
   const { hop, blink } = spritePose(t, look, running, reduced);
+  // By the colors it resolves to: `sky` follows the workspace's accent.
+  const [top, bottom] = gradientOf(look.color);
   const cells = useMemo(
-    () => spriteCells(look.color, look.eyes, running, blink),
-    [look.color, look.eyes, running, blink],
+    () => spriteCells([top, bottom], look.eyes, running, blink),
+    [top, bottom, look.eyes, running, blink],
   );
   return (
     <View style={[styles.sprite, { left: (x - 4) * cx, top: (LANE_BASE - 8 - hop) * RUN_CELL }]}>

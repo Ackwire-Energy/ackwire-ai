@@ -127,7 +127,9 @@ test("a row's ⓘ sits right after its label, and a short fact about its value g
   const grouped = source("Grouped.tsx");
   expect(grouped).toContain("<Row {...props} said={hint.text} labelAfter={info.button} />");
   expect(grouped).toMatch(/<View style=\{styles\.labelLine\}>\s*<Text variant="body"/);
-  expect(grouped).toMatch(/\{valueNote \? \(\s*<Text variant="footnote" tone="faint" numberOfLines=\{1\}>/);
+  expect(grouped).toMatch(
+    /\{valueNote \? \(\s*<Text variant="footnote" numberOfLines=\{1\} style=\{\{ color: c\.label2 \}\}>/,
+  );
 });
 
 test("no screen keeps a grouped row of its own at the old 50: its rows and fields read GROUPED_ROW", () => {

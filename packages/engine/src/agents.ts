@@ -46,7 +46,7 @@ import {
   PERSONAL_AGENT_SCOPES,
 } from "./tools/scopes";
 import { orgDefaultAgentBudget, resyncBudgetCounter } from "./usage";
-import { resumeBudgetWaits } from "./usage-pause";
+import { resumeBudgetWaits, wakeAgentsBrainWaits } from "./usage-pause";
 import { workspaceApprovalsLevel } from "./workspace-approvals";
 import { isPersonalWorkspace } from "./workspace-mode";
 
@@ -207,7 +207,6 @@ export function setupOfAgent(a: Agent): schema.AgentSetup {
     account: a.brainAccountId,
     effort: a.brainEffort,
     contextTokens: a.contextTokens,
-    fallback: a.brainFallback,
     autonomy,
   };
 }
@@ -611,6 +610,7 @@ export async function updateAgent(
         reason: "owner_changed",
       },
     });
+    await wakeAgentsBrainWaits({ db, pubsub: options.pubsub }, orgId, [agentId]);
   }
   // Which fields changed, not the instructions' text (they can be long and say anything); the rest as set.
   const changed = Object.keys(input).filter((k) => input[k as keyof typeof input] !== undefined);

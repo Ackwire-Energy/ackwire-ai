@@ -534,7 +534,7 @@ function ComputerStage({
           )}
         </>
       );
-  } else if ((!machine && f.edition === "cloud") || (machine?.standby && !machine.online)) {
+  } else if ((!machine && f.edition === "cloud") || machine?.standby) {
     // The workspace's computer is ready and this agent gets it at its first hello, or it wakes: a moment more.
     body = (
       <>

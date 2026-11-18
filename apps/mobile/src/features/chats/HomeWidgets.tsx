@@ -2,7 +2,7 @@ import { frozenBoard, useHomeBoard, type Widget } from "@agenteschat/client";
 import { useTranslation } from "react-i18next";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { useOrg } from "@/providers/org";
-import { Icon, ROW_PRESS_DELAY, Text, useTheme } from "@/ui";
+import { Icon, RowPressable, Text, useTheme } from "@/ui";
 import { router } from "@/ui/navigation";
 import { newWidgetHref } from "../dashboards/BoardScreen";
 import { HOME, widgetsInOrder } from "../dashboards/logic";
@@ -72,22 +72,18 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
           </Pressable>
         </ScrollView>
       ) : canAdd ? (
-        <Pressable
+        <RowPressable
           // A full-width row: it lights a beat after the finger lands, as the list's rows do.
-          unstable_pressDelay={ROW_PRESS_DELAY}
           onPress={add}
           accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.empty,
-            { borderColor: c.line2 ?? c.line },
-            pressed && { backgroundColor: c.sunken },
-          ]}
+          radius={EMPTY_RADIUS}
+          style={[styles.empty, { borderColor: c.line2 ?? c.line }]}
         >
           <Icon name="plus" size={18} color={c.muted} />
           <Text variant="subhead" tone="muted" style={styles.medium}>
             {t("widgets.add.label")}
           </Text>
-        </Pressable>
+        </RowPressable>
       ) : null}
     </CollapsibleSection>
   );
@@ -95,6 +91,9 @@ export function HomeWidgets({ collapsed, onToggle }: { collapsed: boolean; onTog
 
 /** Between the cards: the lists' 12. */
 const GAP = 12;
+
+/** The "add a widget" box's corner; its press light keeps it. */
+const EMPTY_RADIUS = 20;
 
 const styles = StyleSheet.create({
   medium: { fontWeight: "500" },
@@ -111,7 +110,7 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: 16,
     paddingVertical: 20,
-    borderRadius: 20,
+    borderRadius: EMPTY_RADIUS,
     borderWidth: 1.5,
     borderStyle: "dashed",
   },

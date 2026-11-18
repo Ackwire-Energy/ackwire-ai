@@ -109,7 +109,7 @@ export async function afterSteered(deps: SteeringDeps, input: SteeredInput) {
     // stops the turn and starts the next one with it: `live-steer.ts`); else
     // the task stops for real, and stopping it starts it again from this message
     // (`restartAfterStopAndSend`). Who may not stop it just leaves the message for its next step.
-    // The brain this run thinks with (a conversation run may have fallen back to the model brain). A model-brain run
+    // The brain this run thinks with (its own, which may differ from the agent's current one). A model-brain run
     // reads its inbox at every step: asking it live would only hold the send while its executor is still starting.
     const computer =
       active.status === "running" &&

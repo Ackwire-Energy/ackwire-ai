@@ -21,6 +21,7 @@ import {
   CHROME_MAX_SCALE,
   Chip,
   Count,
+  Disclosure,
   Icon,
   LineIcon,
   PixelOrbit,
@@ -125,7 +126,7 @@ export function MissionCardView({ mission: m, pinned = false }: { mission: Missi
           </Text>
         ) : null}
         <View style={styles.grow} />
-        <Icon name="right" size={16} color={c.faint} />
+        <Disclosure />
       </View>
     </Pressable>
   );

@@ -14,9 +14,9 @@ import { createBetterAuthClient } from "./auth/better-auth";
 import { copyPillAddresses } from "./chat/link-pill-copy";
 import { ErrorScreen } from "./components/ErrorScreen";
 import { withComposerDraftsSignOut } from "./hooks/useComposerDraft";
-import { loadI18n, savedLocale, translateTabTitle } from "./i18n";
+import { brandTabTitle, loadI18n, savedLocale, translateTabTitle } from "./i18n";
 import { accountInLink, followAccountChanges, takeAccountMove, watchAccount, withoutAccount } from "./lib/accounts";
-import { startAppIcon } from "./lib/app-icon";
+import { showHostIcon, startAppIcon } from "./lib/app-icon";
 import {
   checkAppVersion,
   createVersionWatch,
@@ -63,6 +63,15 @@ const i18n = await loadI18n(savedLocale()).catch((error: unknown) => {
 });
 document.documentElement.lang = i18n.language;
 translateTabTitle(i18n);
+// A registered host (ADR 0194): its name in the tabs' titles and its logo as their icon, on every page of it.
+void authConfig.then(
+  ({ host }) => {
+    if (!host) return;
+    brandTabTitle(host.name);
+    if (host.logoUrl) showHostIcon(host.logoUrl);
+  },
+  () => undefined,
+);
 // In the desktop app (ADR 0036): the site draws the window's title bar (desktop.css), with room for a Mac's
 // buttons only there; and "this Mac" is this computer's own name.
 const platform = desktopPlatform();

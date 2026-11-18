@@ -101,6 +101,30 @@ describe("message Markdown", () => {
     expect(el.querySelector("strong")?.textContent).toBe("<iframe src=//evil.example>");
   });
 
+  test("a confidential thread's message as the server stores it (`inertLinks`, ADR 0190) holds no link", () => {
+    const links = (text: string) => body(text).querySelectorAll("a").length;
+    // A fence in the middle of a line is no code block here, and the first two lone backticks pair: the link after
+    // them is live as typed.
+    const typed = [
+      "Summary ``` a ` b [open the report](https://example.com/?q=WORDS) ```",
+      "Summary ``` a ` b https://example.com/?q=WORDS ```",
+      "a ` b https://example.com/?q=WORDS",
+      "<https://example.com/?q=WORDS>",
+      "[the report][r]\n\n[r]: https://example.com/?q=WORDS",
+    ];
+    expect(typed.map(links)).toEqual([1, 1, 1, 1, 1]);
+    const stored = [
+      "Summary ``` a ` b [open the report] (example.com/?q=WORDS) ```",
+      "Summary ``` a ` b example.com/?q=WORDS ```",
+      "a ` b example.com/?q=WORDS",
+      "<example.com/?q=WORDS>",
+      "[the report][r]\n\n[r]: example.com/?q=WORDS",
+      "https:// example.com/?q=WORDS",
+      "[open] (mailto:ana@example.com?subject=WORDS)",
+    ];
+    expect(stored.map(links)).toEqual(stored.map(() => 0));
+  });
+
   test("a table scrolls inside its box, which says which side has more columns (that side fades)", () => {
     const el = body(["| Destino | Hoje | 7 dias |", "| --- | ---: | ---: |", "| Paris | 14 | 129 |"].join("\n"));
     const box = el.querySelector(".md--message > .md__table") as HTMLElement;

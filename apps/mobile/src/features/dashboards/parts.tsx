@@ -12,10 +12,11 @@ import { WIDGET_SCHEDULES, WIDGET_SIZES, type WidgetSize } from "@agenteschat/ui
 import { Canvas } from "@shopify/react-native-skia";
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import {
   Button,
+  Disclosure,
   EmptyState,
   GROUPED_ROW,
   GroupedFooter,
@@ -26,8 +27,8 @@ import {
   type IconName,
   MEDIA_ROW,
   MediaRow,
-  ROW_PRESS_DELAY,
   RoleMark,
+  RowPressable,
   Segmented,
   SkeletonList,
   Text,
@@ -169,12 +170,12 @@ export function BoardRow({
 }) {
   const { colors: c } = useTheme();
   return (
-    <Pressable
+    <RowPressable
+      hold
       onPress={onPress}
-      unstable_pressDelay={ROW_PRESS_DELAY}
       accessibilityRole="button"
       accessibilityLabel={[title, sub].join(", ")}
-      style={({ pressed }) => [styles.boardRow, pressed ? { backgroundColor: c.sunken } : null]}
+      style={styles.boardRow}
     >
       <BoardThumb thumbs={board.thumbs} />
       <View style={styles.grow}>
@@ -188,8 +189,8 @@ export function BoardRow({
           {sub}
         </Text>
       </View>
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
+      <Disclosure />
+    </RowPressable>
   );
 }
 

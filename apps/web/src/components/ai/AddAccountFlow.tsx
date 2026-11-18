@@ -1,6 +1,6 @@
 import type { AccountLoginStart, AccountLoginStatus, MachineAccount, MachineAccountKind } from "@agenteschat/client";
 import { keys, useAccountLogin, useAiAccounts, useApi } from "@agenteschat/client";
-import { accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
+import { accountInLine, accountTitle, reusableAccount, signInOf } from "@agenteschat/client/lib/ai-accounts";
 import { knownErrorText } from "@agenteschat/client/lib/errors";
 import {
   beginLogin,
@@ -142,7 +142,7 @@ export function AddAccount(props: AddAccountProps) {
   }, [reuse, offers, ai.isPending, ai.data, props.machineId, props.kind, props.provider]);
   if (reuse === undefined) return <Icon name="spinner" size={14} />;
   const chosen = reuse ? (pick ?? (signInOf(reuse) === "signed_out" ? "again" : undefined)) : "new";
-  const label = reuse ? accountTitle(reuse) : "";
+  const label = reuse ? accountInLine(t, reuse) : "";
   const another = (
     <Button size="sm" onClick={() => setPick("new")}>
       {t("connectAi.another")}
@@ -660,7 +660,7 @@ function AddAccountFlow({
           ? plan
             ? t("aiAccounts.add.duplicateKey", { account: shown.duplicate.label })
             : t(`agentPage.work.brain.add.duplicate.${kind}`, {
-                account: shown.duplicate.account?.email ?? shown.duplicate.label,
+                account: shown.duplicate.account ? accountInLine(t, shown.duplicate.account) : shown.duplicate.label,
               })
           : notShared
             ? t("agentPage.work.brain.add.geminiNotShared", { computer })
@@ -985,7 +985,7 @@ function AddAccountFlow({
             {instead && (
               <Button onClick={instead.use}>
                 <span className="ai-panel__use">
-                  {t("connectAi.useAnyway", { email: instead.account.email ?? instead.account.label })}
+                  {t("connectAi.useAnyway", { email: accountTitle(t, instead.account) })}
                 </span>
               </Button>
             )}
@@ -1016,7 +1016,7 @@ function AddAccountFlow({
               {retry}
               <Button size="sm" onClick={instead.use}>
                 <span className="ai-panel__use">
-                  {t("connectAi.useAnyway", { email: instead.account.email ?? instead.account.label })}
+                  {t("connectAi.useAnyway", { email: accountTitle(t, instead.account) })}
                 </span>
               </Button>
             </span>

@@ -48,6 +48,7 @@ import { createLogger } from "../src/logger";
 import { createMachineSockets } from "../src/realtime/machines";
 import { createStreamSockets } from "../src/realtime/streams";
 import { createRealtime, type SocketData } from "../src/realtime/ws";
+import type { AppDeps } from "../src/routes/app/context";
 
 export const ORIGIN = "http://localhost:3000";
 
@@ -204,6 +205,33 @@ export async function createTestServer(
     humanCheck: adapters.humanCheck,
     pubsub: adapters.pubsub,
   });
+  const services: AppDeps = {
+    db,
+    auth,
+    config,
+    adapters,
+    extras: {
+      http: options.http,
+      mcpConnect: options.mcpConnect,
+      resolveHost: options.resolveHost,
+      embed: engine.gateway.embed,
+      storage: engine.storage,
+      artifacts: engine.artifacts,
+      context: engine.context,
+      sandbox: engine.sandbox,
+      gitProxy: engine.gitProxy,
+      desktopFetch: options.desktopFetch,
+      browserLive: engine.browserLive,
+      router: engine.router,
+      streams: engine.streams,
+      jevKey: engine.jevKey,
+      gifKey,
+      githubApp: engine.githubApp,
+      speech: engine.speech,
+      voice: engine.voice,
+    },
+    log,
+  };
   const app = createApp({
     edition: "selfhost",
     version: "test",
@@ -214,32 +242,7 @@ export async function createTestServer(
       (async () => {
         throw new Error("no network in tests");
       }),
-    services: {
-      db,
-      auth,
-      config,
-      adapters,
-      extras: {
-        http: options.http,
-        mcpConnect: options.mcpConnect,
-        resolveHost: options.resolveHost,
-        embed: engine.gateway.embed,
-        storage: engine.storage,
-        artifacts: engine.artifacts,
-        context: engine.context,
-        sandbox: engine.sandbox,
-        gitProxy: engine.gitProxy,
-        desktopFetch: options.desktopFetch,
-        browserLive: engine.browserLive,
-        router: engine.router,
-        streams: engine.streams,
-        jevKey: engine.jevKey,
-        gifKey,
-        githubApp: engine.githubApp,
-        speech: engine.speech,
-        voice: engine.voice,
-      },
-    },
+    services,
     log,
   });
   const realtime = createRealtime({
@@ -272,6 +275,8 @@ export async function createTestServer(
     gifKey,
     app,
     auth,
+    /** What the routes get, for an app served apart (the chat surface bridge). */
+    services,
     realtime,
     drain: () => drainOutbox(db, handlers),
   };

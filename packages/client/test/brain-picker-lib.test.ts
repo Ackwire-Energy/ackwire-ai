@@ -510,3 +510,20 @@ describe("the model picker: the agent's AI changed in place", () => {
     });
   });
 });
+
+describe("pickGroups", () => {
+  test("two groups of the same heading stay two where their keys differ (two owners of one first name)", () => {
+    const groups = pickGroups([
+      { group: "De João", groupKey: "owner:u1" },
+      { group: "De João", groupKey: "owner:u2" },
+      { group: "De João", groupKey: "owner:u2" },
+      { group: "Claude" },
+      { group: "Claude" },
+    ]);
+    expect(groups.map((g) => [g.key, g.group, g.options.length])).toEqual([
+      ["owner:u1", "De João", 1],
+      ["owner:u2", "De João", 2],
+      ["Claude", "Claude", 2],
+    ]);
+  });
+});

@@ -38,11 +38,19 @@ export function ColorSheet({
   value,
   onChange,
   onClose,
+  title,
+  done: doneLabel,
+  onDone,
 }: {
   open: boolean;
   value: string;
   onChange: (hex: `#${string}`) => void;
   onClose: () => void;
+  /** Its title and button; the agent's custom color's by default. */
+  title?: string;
+  done?: string;
+  /** Called with the color on the button instead of `onChange`: for a color only kept when it is pressed. */
+  onDone?: (hex: `#${string}`) => void;
 }) {
   const { t } = useTranslation();
   const c = useColors();
@@ -142,14 +150,14 @@ export function ColorSheet({
 
   // Applied even untouched: the color shown is the color chosen.
   const done = () => {
-    onChange(hex as `#${string}`);
+    (onDone ?? onChange)(hex as `#${string}`);
     onClose();
   };
 
   return (
     <Sheet open={open} onClose={onClose}>
       <View style={styles.wrap}>
-        <SheetTitle title={t("look.customColor")} />
+        <SheetTitle title={title ?? t("look.customColor")} />
         <GestureDetector gesture={area}>
           <View
             onLayout={(e) => {
@@ -230,7 +238,7 @@ export function ColorSheet({
             style={[styles.hex, fieldText("body"), { backgroundColor: c.raised, color: c.ink, borderColor: c.line }]}
           />
         </View>
-        <Button variant="primary" wide label={t("look.useColor")} onPress={done} />
+        <Button variant="primary" wide label={doneLabel ?? t("look.useColor")} onPress={done} />
       </View>
     </Sheet>
   );

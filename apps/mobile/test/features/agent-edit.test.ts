@@ -296,8 +296,10 @@ describe("creating an agent on the phone", () => {
     // The sheet is a component the tests can't render: what it wires in, as text.
     const sheet = await Bun.file(new URL("../../src/features/agents/ColorSheet.tsx", import.meta.url).pathname).text();
     expect(sheet).toContain("hexToHsv(pickerStart(value))");
-    expect(sheet).toMatch(/const done = \(\) => \{\s*onChange\(hex as `#\$\{string\}`\);\s*onClose\(\);/);
-    expect(sheet).toContain('label={t("look.useColor")} onPress={done}');
+    expect(sheet).toMatch(
+      /const done = \(\) => \{\s*\(onDone \?\? onChange\)\(hex as `#\$\{string\}`\);\s*onClose\(\);/,
+    );
+    expect(sheet).toContain('label={doneLabel ?? t("look.useColor")} onPress={done}');
     expect(sheet).toContain("onSubmitEditing={done}");
   });
 

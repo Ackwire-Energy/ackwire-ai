@@ -48,12 +48,20 @@ describe("the floating date while the conversation scrolls", () => {
 
   test("it shows while the person drags or flings the list and fades a moment after it stops", () => {
     const screen = src("features/chat/ChatScreen.tsx");
-    expect(screen).toMatch(/const onDragStart = useCallback\(\(\) => \{\s*dragging\.current = true;\s*showDay\(\);/);
+    // The faces hold still while it moves (`useStillWhileScrolling`): a drag or a glide holds them, the end lets go.
+    expect(screen).toMatch(
+      /const onDragStart = useCallback\(\(\) => \{\s*dragging\.current = true;\s*still\.hold\(\);\s*showDay\(\);/,
+    );
     expect(screen).toContain("onScrollBeginDrag={onDragStart}");
-    expect(screen).toContain("onMomentumScrollBegin={showDay}");
-    expect(screen).toMatch(/const onScrollSettled = useCallback\(\(\) => \{\s*releaseAtEnd\(\);\s*hideDay\(\);/);
+    expect(screen).toMatch(/const onGlide = useCallback\(\(\) => \{\s*still\.hold\(\);\s*showDay\(\);/);
+    expect(screen).toContain("onMomentumScrollBegin={onGlide}");
+    expect(screen).toMatch(
+      /const onScrollSettled = useCallback\(\(\) => \{\s*still\.settle\(\);\s*releaseAtEnd\(\);\s*hideDay\(\);/,
+    );
     expect(screen).toContain("onMomentumScrollEnd={onScrollSettled}");
-    expect(screen).toContain("setTopDay((prev) => dayInView(viewableItems, prev))");
+    // Kept outside the screen's state: the pill alone redraws as a day reaches the top.
+    expect(screen).toContain("topDay.set(dayInView(viewableItems, topDay.get()));");
+    expect(screen).toContain("<DayPill day={topDay} shown={dayShown} top={hasPin ? 8 : headerHeight + 8} />");
     // The person's locale: the shared day words ("Hoje", "Ontem", a weekday this week, else a date).
     expect(src("features/chat/DatePill.tsx")).toContain('dayLabel(t, i18n.language || "en", day)');
   });

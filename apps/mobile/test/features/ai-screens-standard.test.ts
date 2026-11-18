@@ -44,6 +44,12 @@ describe("headers: the native bar's, never one drawn in the content", () => {
     expect(screen).toContain('<GroupedHeader>{t("settings.keysTitle")}</GroupedHeader>');
     expect(screen).toContain('<GroupedRow icon="plus" label={t("aiAccounts.page.connect")}');
     expect(screen).toContain('<GroupedRow icon="plus" label={t("settings.addKey")}');
+    // VoiceOver hears an account's place in its order, which only its leading mark shows.
+    expect(screen.match(/leadingSaid=\{n\?\.toString\(\)\}/g)).toHaveLength(2);
+    // The way to one more account comes after every account, also after the accounts each order of use holds.
+    expect(screen.indexOf("<GroupedList>{connect}</GroupedList>")).toBeGreaterThan(
+      screen.lastIndexOf("</OrderSection>"),
+    );
     // No small button floating under a list.
     expect(screen).not.toContain('size="sm"\n              variant={rows.length');
     // Making a key the default says why when it fails.

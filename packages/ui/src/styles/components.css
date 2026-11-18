@@ -2230,7 +2230,7 @@ html:not([data-pointer]) .ac-chip--button:focus-visible {
   width: calc(28em / 24);
   height: calc(28em / 24);
   flex: none;
-  fill: var(--agent);
+  fill: var(--logo-accent, var(--agent));
 }
 .ac-logo--mono .ac-logo__mark {
   fill: currentColor;
@@ -6916,6 +6916,25 @@ html:not([data-pointer]) .ac-msg:focus-within .ac-msg__actions,
   display: flex;
   align-items: flex-end;
   justify-content: flex-end;
+}
+/* A source glyph before the time: on the line's middle, then up by --cap-mid in its own type, which is the time's
+   type under my own rows and in the bubble's stamp. */
+.ac-msg__mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  align-self: center;
+  color: var(--faint);
+  translate: 0 calc(-1 * var(--cap-mid));
+}
+/* What fills it (a glyph in a span of its own) is a box, never a line of text whose baseline would lift the glyph. */
+.ac-msg__mark > * {
+  display: flex;
+}
+.ac-msg__own-foot > .ac-msg__mark {
+  height: 16px;
+  margin-right: var(--space-1);
+  font-size: 11px;
 }
 .ac-msg__own-foot > .ac-msg__aside {
   gap: 0;

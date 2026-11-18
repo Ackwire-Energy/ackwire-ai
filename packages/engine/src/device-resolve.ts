@@ -210,7 +210,14 @@ export async function checkDeviceUse(
       message: `${name} is ${ruleText}, not for ${forWhom}. Nobody can be asked for it: an admin can change who uses it under Settings › Devices. Use another device.`,
     };
   }
-  const requestId = await askDeviceOwner(deps, ctx, target, { owner, requester, why, requesterName: forWhom });
+  // From a confidential thread (ADR 0190) the owner is asked with none of the run's words: they may not be in the
+  // conversation, and neither the request nor its notification goes with the thread's prune.
+  const requestId = await askDeviceOwner(deps, ctx, target, {
+    owner,
+    requester,
+    why: ctx.confidential ? "" : why,
+    requesterName: forWhom,
+  });
   return {
     ok: false,
     requester,

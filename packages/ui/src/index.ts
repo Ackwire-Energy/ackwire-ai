@@ -7,6 +7,15 @@
  */
 
 export {
+  type AccentPalette,
+  type AccentTokens,
+  accentPalette,
+  accentSky,
+  contrastRatio,
+  DEFAULT_ACCENT,
+  isAccentHex,
+} from "@agenteschat/tokens/accent";
+export {
   ACCESSORIES,
   ACCESSORY_REACH,
   AGENT_GRADIENTS,
@@ -19,6 +28,7 @@ export {
   drawAccessory,
   drawAgent,
   drawEyes,
+  drawnKey,
   EXPRESSIONS,
   type Expression,
   EYE_STYLES,
@@ -504,6 +514,7 @@ export {
   zonedInstant,
 } from "./recurrence";
 export { fold, matchesWords } from "./search";
+export { workspaceSky } from "./sky/accent";
 export { pixelBurst, pixelConfetti } from "./sky/burst";
 export { ditherCells, ditherSvg, ditherTones, ditherUrl } from "./sky/dither";
 export {
@@ -544,7 +555,14 @@ export {
   workspaceInk,
   workspaceTones,
 } from "./sky/workspace";
-export { onThemeChange, switchTheme, THEME_SWITCHING_ATTR, type Theme } from "./theme";
+export {
+  ACCENT_ATTR,
+  onThemeChange,
+  PAINT_ATTRS,
+  switchTheme,
+  THEME_SWITCHING_ATTR,
+  type Theme,
+} from "./theme";
 export {
   allZones,
   cityOf,

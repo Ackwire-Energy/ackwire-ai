@@ -14,7 +14,6 @@ export interface ToggleProps {
 
 /** A custom switch (never the native one) in a row with its label. */
 export function Toggle({ value, onChange, label }: ToggleProps) {
-  const { colors } = useTheme();
   return (
     <Pressable
       onPress={() => {
@@ -24,7 +23,8 @@ export function Toggle({ value, onChange, label }: ToggleProps) {
       accessibilityRole="switch"
       accessibilityLabel={label}
       accessibilityState={{ checked: value }}
-      style={({ pressed }) => [styles.row, pressed ? { backgroundColor: colors.sunken } : null]}
+      // The switch answers on its own (its flip and a tick), as the system's: the row doesn't light.
+      style={styles.row}
     >
       <Text variant="body" style={{ flex: 1 }}>
         {label}

@@ -19,11 +19,12 @@ import type { ContentBlock, ModelMessage } from "@agenteschat/providers";
 import { resolveApps } from "../access";
 import { recordAgentActions } from "../agent-actions";
 import { agentsByHandle, handleOf } from "../agents";
-import { type AgentsDmReads, agentsDmReads, readerOfRun } from "../agents-dm-reads";
+import { type AgentsDmReads, agentsDmReads, readerOfMessage, readerOfRun } from "../agents-dm-reads";
 import { runAuthorityById, UUID } from "../authority";
 import { caches } from "../cache";
 import { isChannelMember, peopleAllIn, personReach } from "../channels";
-import { consultationOrigin } from "../consultations";
+import { CONFIDENTIAL_STUB, confidentialThreadSql, isConfidential } from "../confidential";
+import { agentsDmsOf, consultationOrigin } from "../consultations";
 import { personAgentDmKey } from "../dms";
 import type { MemoryUpdate } from "../events";
 import { cutText } from "../format";
@@ -208,23 +209,37 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
         const dm = await agentsDmReads(ctx.db, ctx.orgId, ctx.channelId, () => readerOfCall(ctx));
         // Only where no person reads the answer: a channel never gets what someone said in their DM.
         const theirDm = dm ? await dmWithRunPerson(ctx) : null;
+        const handed = !reader && !dm && person ? await handedReach(ctx, person) : [];
         const kinds = Array.isArray(input.kinds) ? (input.kinds as never[]) : undefined;
         const limit = typeof input.limit === "number" ? input.limit : 8;
-        const [found, steps] = await Promise.all([
+        const wordsOnly = ctx.confidential === true;
+        const [usual, steps, handedHits] = await Promise.all([
           (reader
-            ? searchForUser(deps, reader, ctx.orgId, { text: str(input.query), kinds, limit, reach: channels })
+            ? searchForUser(deps, reader, ctx.orgId, {
+                text: str(input.query),
+                kinds,
+                limit,
+                reach: channels,
+                wordsOnly,
+              })
             : searchVisible(deps, {
                 orgId: ctx.orgId,
                 text: str(input.query),
                 visibleChannelIds: theirDm && !channels.includes(theirDm) ? [...channels, theirDm] : channels,
                 kinds,
                 limit,
+                wordsOnly,
               })
           ).then(async (found) => wikiHitsForAgent(ctx.db, await wikiActorOfCall(ctx), found)),
           kinds
             ? []
             : ownPastSteps(ctx.db, ctx.orgId, ctx.agentId, ctx.runId, ownScope ?? channels, str(input.query), dm),
+          handed.length > 0 && person && (!kinds || kinds.includes("message" as never))
+            ? searchHandedFor(deps, ctx, handed, person, { text: str(input.query), limit, wordsOnly })
+            : [],
         ]);
+        const usualIds = new Set(usual.map((h) => h.sourceId));
+        const found = [...usual, ...handedHits.filter((h) => !usualIds.has(h.sourceId))];
         if (found.length === 0 && steps.length === 0) return { content: "No results." };
         const items = new Map(
           (
@@ -282,12 +297,15 @@ export function createContextToolSource(deps: ContextDeps): ToolSource {
             const m = said.get(h.sourceId);
             const theirs = asker && h.channelIds.includes(asker.channelId) ? privateFrom(asker.name) : null;
             const by = m ? ` ${m.who} in ${theirs ?? m.where} ${m.link}` : theirs ? ` from ${theirs}` : "";
-            const text = `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)})${by} ${h.snippet.replace(/\s+/g, " ")}`;
+            // The index's own copy of a message may be older than its thread's mark (ADR 0190).
+            const snippet = isConfidential(m?.meta) ? CONFIDENTIAL_STUB : h.snippet.replace(/\s+/g, " ");
+            const text = `${label} id=${h.sourceId} (${h.createdAt.toISOString().slice(0, 10)})${by} ${snippet}`;
             // Only what came from outside stays in the envelope (ADR 0167): the team's trusted memory, its messages
             // that relay nothing from outside and the wiki read as the team's.
             const inside = item ? item.trust === "low" : m ? m.meta?.readOutside === true : h.kind !== "wiki";
             return { text, inside };
           });
+        if (shown.length === 0 && steps.length === 0) return { content: "No results." };
         const own = shown.filter((l) => !l.inside).map((l) => neutralizeUntrusted(l.text));
         const outside = [...shown.filter((l) => l.inside).map((l) => l.text), ...steps];
         return {
@@ -1083,6 +1101,58 @@ async function dmWithRunPerson(ctx: ToolContext): Promise<string | null> {
   return !asked || (await peopleAllIn(ctx.db, ctx.orgId, asked.channelId, row.id)) ? row.id : null;
 }
 
+/** How many hits of the agents' DMs are read before keeping this person's: every person's exchanges share them. */
+const HANDED_SEARCH_POOL = 20;
+
+/**
+ * Messages of the agents' DMs `handed` made for `person`, at most `limit`, searched apart from the usual reach so
+ * other people's exchanges there never take its places.
+ */
+async function searchHandedFor(
+  deps: ContextDeps,
+  ctx: ToolContext,
+  handed: string[],
+  person: string,
+  { text, limit, wordsOnly }: { text: string; limit: number; wordsOnly: boolean },
+) {
+  // ponytail: a person's hit behind HANDED_SEARCH_POOL better ones of other people is missed; filter in SQL if it bites.
+  const pool = await searchVisible(deps, {
+    orgId: ctx.orgId,
+    text,
+    visibleChannelIds: handed,
+    kinds: ["message"],
+    limit: HANDED_SEARCH_POOL,
+    wordsOnly,
+  });
+  const theirs = await Promise.all(
+    pool.map((h) =>
+      readerOfMessage(ctx.db, ctx.orgId, h.sourceId).then(
+        (r) => r === person,
+        () => false,
+      ),
+    ),
+  );
+  return pool.filter((_, i) => theirs[i]).slice(0, limit);
+}
+
+/**
+ * In this agent's 1:1 DM with `person`, its DMs with other agents, where they asked or handed it work for that person
+ * (`handedFor`): its search there reads them too, keeping only what was made for that person. Empty anywhere else.
+ */
+async function handedReach(ctx: ToolContext, person: string): Promise<string[]> {
+  const [here] = await ctx.db
+    .select({ id: schema.channels.id })
+    .from(schema.channels)
+    .where(
+      and(
+        eq(schema.channels.orgId, ctx.orgId),
+        eq(schema.channels.id, ctx.channelId),
+        eq(schema.channels.dmKey, personAgentDmKey(person, ctx.agentId)),
+      ),
+    );
+  return here ? (await agentsDmsOf(ctx.db, ctx.agentId)).map((c) => c.id) : [];
+}
+
 /**
  * The 1:1 DM between this agent and the person whose own message started the run, which its recall tools read from
  * anywhere else that person talks to it: to them it is one agent, not one per conversation. Only for that person's
@@ -1790,6 +1860,8 @@ async function ownPastSteps(
           sql`, `,
         )})
         and r.created_at > now() - make_interval(days => ${STEP_DAYS})
+        -- What a run of a confidential thread called may repeat what it read there (ADR 0190).
+        and not ${confidentialThreadSql(sql`r.org_id`, sql`r.thread_root_id`)}
         and s.kind = 'tool_call'
         and coalesce(s.data->>'name', '') not in (${sql.join(
           STEP_NOISE.map((n) => sql`${n}`),

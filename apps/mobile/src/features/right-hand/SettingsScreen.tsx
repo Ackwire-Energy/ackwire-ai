@@ -18,7 +18,7 @@ import {
   useWorkspaceUsesApi,
 } from "@agenteschat/client";
 import { selfHosted } from "@agenteschat/client/lib/about";
-import { accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
+import { accountChoices, accountTitle, ownSignInTitle } from "@agenteschat/client/lib/ai-accounts";
 import { agentsReach, audienceOf, audiencePatch } from "@agenteschat/client/lib/audience";
 import { modelRows } from "@agenteschat/client/lib/brain-picker";
 import { agentGrammar } from "@agenteschat/client/lib/grammar";
@@ -337,12 +337,14 @@ function WorkspaceAi({ agent, dir }: { agent: Agent; dir: Directory }) {
     id && id !== meId ? dir.memberById.get(id)?.name.split(" ")[0] : undefined;
   const plans = (view?.accounts ?? []).filter((a) => a.status === "active");
   // Plans it can't think with now, under the choice with why, as on the web: it stands in on what can meanwhile.
-  const cant = rightHandUnusable(aiAccounts).filter((u) => u.id !== view?.account);
-  const away = new Set(cant.map((u) => u.id));
-  // A plan in use that is no longer active stays listed, so the choice never opens with nothing checked.
-  const listed = (signIn && !plans.some((p) => p.id === signIn.id) ? [signIn, ...plans] : plans).filter(
-    (p) => !away.has(p.id),
-  );
+  const cant = rightHandUnusable(aiAccounts, view?.account);
+  const away = new Set(cant.flatMap((u) => u.ids));
+  // A plan in use that is no longer active stays listed, so the choice never opens with nothing checked. Each plan
+  // once, its logins grouped, as on the web.
+  const listed = accountChoices(
+    (signIn && !plans.some((p) => p.id === signIn.id) ? [signIn, ...plans] : plans).filter((p) => !away.has(p.id)),
+    [view?.account],
+  ).map((c) => c.login);
   const choose = async () => {
     const picked = await pickOne({
       title: t("rightHand.settings.workspace"),
@@ -447,7 +449,7 @@ function WorkspaceAi({ agent, dir }: { agent: Agent; dir: Directory }) {
                 <GroupedRow
                   key={u.id}
                   leading={<ProviderLogo id={u.account.provider ?? u.account.kind} size="sm" />}
-                  label={accountTitle(u.account)}
+                  label={accountTitle(t, u.account)}
                   sub={
                     owner
                       ? t("rightHand.unusable.away", { owner, computer: u.account.computer })

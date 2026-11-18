@@ -14,6 +14,9 @@ const PlanAccountInfo = z.object({
   kind: AccountKind,
   accountId: z.uuid().nullable().openapi({ description: "Null: the computer's own sign-in." }),
   label: z.string().nullable().openapi({ description: "Null for the computer's own sign-in." }),
+  named: z
+    .boolean()
+    .openapi({ description: "Its owner gave it its name; false: the automatic one, shown by its email." }),
   plan: z.string().nullable(),
   provider: z.string().nullable().openapi({ description: "A key account's coding plan (`zai`, `kimi`…)." }),
   ownerName: z.string().nullable().openapi({

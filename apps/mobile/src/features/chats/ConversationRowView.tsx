@@ -1,4 +1,4 @@
-import { usePrefetchMessages } from "@agenteschat/client";
+import { usePrefetchConversation } from "@agenteschat/client";
 import { Link } from "expo-router";
 import { memo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -169,7 +169,7 @@ export const ConversationItem = memo(function ConversationItem({
       {({ press, warm, hold }) => (
         <ListRow
           onPress={press}
-          onPressIn={warm}
+          onTouchStart={warm}
           {...hold}
           accessibilityRole="button"
           accessibilityLabel={a11y}
@@ -229,9 +229,11 @@ export interface HoldProps {
 
 /**
  * How a conversation opens from a list, for its row and for its face on Conversas' pinned strip: a tap opens it (an
- * agent with no conversation yet starts one, `onStart`), and a finger that stays already asks for its messages (`warm`:
- * they are on their way, or here, by the time its screen slides in; the press calls it only after its press delay, so a
- * finger that starts a scroll asks for nothing, and a thread loads its own replies). iOS's own long press shows the
+ * agent with no conversation yet starts one, `onStart`), and the finger landing on it already asks for what its screen
+ * shows first (`warm`, `prefetchConversation`: its messages, or a thread's replies, and the threads' links and agents'
+ * questions its rows wait for), so they are on their way, or here, by the time its screen slides in. On touch-down, not
+ * after the press delay, which left the read only a few milliseconds ahead of the screen; a finger that only starts a
+ * scroll asks for one conversation once, and what is fresh isn't read again. iOS's own long press shows the
  * conversation itself in the system preview (tapping it opens it), with the row's actions (Pin to the top, a channel's
  * Move to…) in the system menu under it; an agent with no conversation yet peeks at its profile instead, with Talk
  * first, while a tap still starts the conversation. Elsewhere the long press is `onHold`'s sheet (`hold`).
@@ -265,9 +267,9 @@ export function OpensConversation({
     if (onStart && r.kind === "dm") onStart(r.with.id);
     else if (href) router.push(href);
   };
-  const prefetch = usePrefetchMessages(orgId);
+  const prefetch = usePrefetchConversation(orgId);
   const warm = () => {
-    if (r.channelId && r.kind !== "thread" && r.kind !== "mission") prefetch(r.channelId);
+    if (r.channelId) prefetch(r.channelId, r.kind === "thread" || r.kind === "mission" ? r.threadId : null);
   };
   const peekHref = starts && r.kind === "dm" ? (`/agent/${r.with.id}` as const) : href;
   const peeks = Platform.OS === "ios" && peekHref !== null;

@@ -1,5 +1,6 @@
 import { type ErrorBoundaryProps, type NativeStackNavigationOptions, Stack } from "expo-router";
 import { useMemo } from "react";
+import { slideListeners } from "@/agent/live";
 import { isStill } from "@/features/links/landing";
 import { ScreenError } from "@/features/shared/ScreenError";
 import { coverBarOptions, usePushedOptions, useScrollUnderPushedOptions, useTheme } from "@/ui";
@@ -67,6 +68,8 @@ export default function MainStack() {
       // On the sign-in's ruler, its own sky (the scanner: the camera): a clear bar, the system's back over it.
       "me/team-server": cover,
       "me/scan": cover,
+      // A background photo's preview: the photo fills the screen, a clear bar and the back button over it.
+      "me/chat-wallpaper-photo": cover,
       "connectors/oauth": bare,
       // A bare link to a browser request: finds its conversation and replaces itself with it.
       "handoff/[id]": bare,
@@ -74,6 +77,7 @@ export default function MainStack() {
       link: { ...solid, animation: "none" },
       // Connect an AI: one pushed screen per question, on the grouped gray (its bar counts the steps).
       "connect-ai/index": connectAi,
+      "connect-ai/have": connectAi,
       "connect-ai/plans": connectAi,
       "connect-ai/plan": connectAi,
       "connect-ai/key": connectAi,
@@ -100,7 +104,7 @@ export default function MainStack() {
     };
   }, [colors, pushed, scrollUnder]);
   return (
-    <Stack screenOptions={screenOptions}>
+    <Stack screenOptions={screenOptions} screenListeners={slideListeners}>
       <Stack.Screen name="(tabs)" />
     </Stack>
   );

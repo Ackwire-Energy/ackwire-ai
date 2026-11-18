@@ -226,7 +226,6 @@ function ComputerView({ agentId, onLeave }: { agentId: string; onLeave: (held: B
         <BrowserCard
           agentId={agentId}
           run={run}
-          busy={f.working}
           handoff={f.handoff && handoffScreen(f.handoff) === "browser" ? f.handoff : null}
           canTakeOver={!f.held && !pausedUntil}
           surface

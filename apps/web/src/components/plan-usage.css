@@ -133,6 +133,107 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
 .plan-row__alert[data-level="limited"] {
   --meter-fill: var(--danger);
 }
+/* An order of use (ADR 0041 §6): its heading, then its rows, each with its place before its line. */
+.plan-rows > .plan-order + *,
+.plan-rows > * + .plan-order {
+  border-top: 1px solid var(--line);
+}
+.plan-order__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4) 0;
+}
+.plan-order__title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.plan-order__terms {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--muted);
+}
+/* A placed row: its place in the mark's column (the heading holds the mark), on its name's 24px line, so the row's
+   room above and below its words stays the head's own. */
+.plan-row--placed {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+.plan-row--placed > .plan-row__place {
+  grid-area: 1 / 1;
+  margin: var(--space-3) 0 0 var(--space-2);
+}
+.plan-row--placed > .plan-row__head {
+  grid-area: 1 / 2;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 180px) auto;
+  padding-left: var(--space-2);
+}
+.plan-row--placed > .plan-row__head > .plan-acct__name {
+  grid-column: 1;
+}
+.plan-row--placed > .plan-row__head > .plan-row__meter {
+  grid-column: 2;
+}
+.plan-row--placed > .plan-row__head > .plan-row__chevron {
+  grid-column: 3;
+}
+.plan-row--placed > .plan-row__fold {
+  grid-column: 1 / -1;
+}
+/* One width for every place, a grip or not and up to two digits, so every row's name starts on one edge. */
+.plan-row__place {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: calc(var(--control-h-sm) + var(--space-3));
+  height: calc(var(--control-h-sm) - var(--space-2));
+  padding: 0 var(--space-1);
+  border: 0;
+  border-radius: var(--control-r-sm);
+  background: none;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.plan-row__place--grip {
+  cursor: grab;
+}
+.plan-row__place--grip > .ac-icon {
+  color: var(--faint);
+}
+.plan-row__place--grip:hover {
+  background: var(--plate-soft);
+  color: var(--ink);
+}
+html:not([data-pointer]) .plan-row__place--grip:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-inset);
+}
+.plan-row[data-drop] {
+  position: relative;
+}
+.plan-row[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-4);
+  right: var(--space-4);
+  height: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--agent) 60%, transparent);
+  pointer-events: none;
+}
+.plan-row[data-drop="before"]::after {
+  top: -1px;
+}
+.plan-row[data-drop="after"]::after {
+  bottom: -1px;
+}
 /* Closed, the fold is a grid row of no height, so opening and closing grow and shrink to what it holds. */
 .plan-row__fold {
   display: grid;
@@ -239,6 +340,33 @@ html:not([data-pointer]) .plan-row__head:focus-visible {
   .plan-row__head > .plan-row__meter {
     grid-column: 1 / -1;
     min-height: 0;
+  }
+  /* A placed row: the head keeps the mark's column empty and the place stands in it, on the name's line, so the facts
+     and the meter start on the row's edge as on any other row. */
+  .plan-row--placed {
+    display: block;
+    position: relative;
+  }
+  .plan-row--placed > .plan-row__place {
+    position: absolute;
+    z-index: 1;
+    top: var(--space-3);
+    left: var(--space-4);
+    margin: 0;
+  }
+  .plan-row--placed > .plan-row__head {
+    grid-template-columns: calc(var(--control-h-sm) + var(--space-3)) minmax(0, 1fr) auto;
+    padding-left: var(--space-4);
+  }
+  .plan-row--placed .plan-row__title {
+    grid-area: 1 / 2;
+  }
+  .plan-row--placed > .plan-row__head > .plan-row__chevron {
+    grid-column: 3;
+  }
+  .plan-row--placed .plan-row__facts,
+  .plan-row--placed > .plan-row__head > .plan-row__meter {
+    grid-column: 1 / -1;
   }
 }
 .plan-block__month {

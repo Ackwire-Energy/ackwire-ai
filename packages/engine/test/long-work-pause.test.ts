@@ -1,7 +1,7 @@
 import { afterEach, expect, test } from "bun:test";
 import { MACHINE_PROTOCOL_VERSION, userTopic } from "@agenteschat/adapters";
 import { and, eq, schema } from "@agenteschat/db";
-import { extraUsageLeft, extraUsageOn, planBinding } from "@agenteschat/ui/plan-state";
+import { extraUsageLeft, planBinding } from "@agenteschat/ui/plan-state";
 import {
   addChannelMember,
   answerNow,
@@ -32,9 +32,11 @@ import {
   storeOwnUsage as reportOwnUsage,
   routineRunRefreshesWidget,
   runRoutineNow,
+  setAgentBrain,
   testWidget,
 } from "../src";
 import { monthStartUtc } from "../src/usage";
+import { paysExtraUsage } from "../src/usage-pause";
 import { addMember, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -79,9 +81,7 @@ test("the window that binds long work: live, of this model, never extra usage", 
   expect(planBinding(old, { now })).toBeNull();
   expect(planBinding(reading([{ kind: "five_hour", usedPercent: 96 }]), { now })?.used).toBe(96);
   expect(planBinding(null)).toBeNull();
-  expect(extraUsageOn(u)).toBe(true);
-  expect(extraUsageOn(reading([{ kind: "five_hour", usedPercent: 1 }]))).toBe(false);
-  // Extra usage whose own cap is spent leaves long work nothing to go on into; the switch still shows.
+  // Extra usage whose own cap is spent leaves long work nothing to go on into.
   expect(extraUsageLeft(u)).toBe(false);
   expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 140 }]))).toBe(false);
   expect(extraUsageLeft(reading([{ kind: "other", label: "Extra usage", usedPercent: 10 }]))).toBe(true);
@@ -288,7 +288,7 @@ async function computerAgent(fx: Fixture, over: Partial<typeof schema.agents.$in
   const paired = await pairMachine(deps, fx.owner.id, fx.org.id, { name: "MacBook", ...RUNNER, exec: true });
   await fx.db
     .update(schema.agents)
-    .set({ machineId: paired.machineId, brain: "claude_code", brainFallback: false, ...over })
+    .set({ machineId: paired.machineId, brain: "claude_code", ...over })
     .where(eq(schema.agents.id, fx.agent.id));
   return paired.machineId;
 }
@@ -393,7 +393,7 @@ test("a paused slot goes on once a newer reading puts its plan back under the pa
   expect((await runs(f))[0]?.status).toBe("done");
 });
 
-test("the plan's paid extra usage lets long work go on, unless its switch is off", async () => {
+test("the plan's paid extra usage lets long work go on, never on someone else's plan lent to the agent", async () => {
   f = await setup();
   const machineId = await computerAgent(f);
   await storeOwnUsage(
@@ -410,7 +410,7 @@ test("the plan's paid extra usage lets long work go on, unless its switch is off
   await drainOutbox(f.db, handlers);
   expect(seen).toHaveLength(1);
 
-  await f.db.update(schema.agents).set({ brainExtraUsage: false }).where(eq(schema.agents.id, f.agent.id));
+  await f.db.update(schema.agents).set({ brainAccountLentBy: f.owner.id }).where(eq(schema.agents.id, f.agent.id));
   await scheduledSlot(f);
   await drainOutbox(f.db, handlers);
   expect(seen).toHaveLength(1);
@@ -768,8 +768,9 @@ test("Rotinas shows a routine's paused slot until its reset; Continuar agora for
 });
 
 /**
- * A slot of a routine paused at `percent` of its plan, on an agent whose long work keeps off paid extra usage (or,
- * with `extraUsage`, may use it but the plan's extra usage window is at `extraUsed`; null: the plan reports none).
+ * A slot of a routine paused at `percent` of its plan, on an agent whose long work keeps off paid extra usage, as on
+ * someone else's plan lent to it (or, with `extraUsage`, its owner's own plan, whose extra usage window is at
+ * `extraUsed`; null: the plan reports none).
  */
 async function pausedExtraOff(
   percent: number,
@@ -801,7 +802,7 @@ test("with extra usage off, Continuar agora goes on up to the plan's own allowan
   expect(seen).toHaveLength(0);
   expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).usagePause?.extraOff).toBe(false);
 
-  // The plan's window is used up meanwhile: going on would be paid extra usage, which this agent's switch keeps off.
+  // The plan's window is used up meanwhile: going on would be paid extra usage, which a lent plan never pays.
   await setUsage(100);
   expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).usagePause?.extraOff).toBe(true);
   const refused = await continueRoutineUsagePause({ db: f.db }, f.owner.id, f.org.id, id).catch((e) => e);
@@ -843,7 +844,7 @@ test("with extra usage off, Continuar agora goes on up to the plan's own allowan
   expect(seen).toHaveLength(1);
 });
 
-test("with the extra-usage switch on but no extra usage left, Continuar agora past the plan is refused for that reason, not the switch", async () => {
+test("on the owner's own plan with no extra usage left, Continuar agora past the plan is refused for that reason", async () => {
   f = await setup();
   const { id, setUsage } = await pausedExtraOff(97, { extraUsage: true, extraUsed: null });
   expect((await getRoutineView(f.db, f.owner.id, f.org.id, id)).state).toBe("usage_paused");
@@ -897,4 +898,45 @@ test("a run continued with extra usage off stops again at the plan's own allowan
   await drainOutbox(f.db, handlers);
   expect(seen).toHaveLength(0);
   expect((await runs(f)).at(-1)?.status).toBe("waiting_input");
+});
+
+test("paid extra usage requires an explicit saved permission even for legacy caller shapes", () => {
+  for (const brainExtraUsage of [undefined, null, false, true]) {
+    for (const brainAccountLentBy of [undefined, null, "lender"]) {
+      for (const builtin of [undefined, null, "right_hand"]) {
+        expect(paysExtraUsage({ brainExtraUsage, brainAccountLentBy, builtin })).toBe(
+          brainExtraUsage === true && !brainAccountLentBy && builtin !== "right_hand",
+        );
+      }
+    }
+  }
+  expect(paysExtraUsage({})).toBe(false);
+});
+
+test("a fresh paid-window reading keeps an owner opt-out paused until the owner enables it", async () => {
+  f = await setup();
+  const machineId = await computerAgent(f, { brainExtraUsage: false });
+  const usage = {
+    windows: [
+      { kind: "seven_day" as const, usedPercent: 97, resetsAt: iso(26 * 3600_000) },
+      { kind: "other" as const, label: "Extra usage", usedPercent: 10 },
+    ],
+    source: "turn" as const,
+    at: iso(60_000),
+  };
+  await storeOwnUsage(f, machineId, usage);
+  const { brain, seen } = scripted(() => [{ type: "done", text: "Deploys ok." }]);
+  const handlers = handlersWith(f, brain);
+  await scheduledSlot(f);
+  await drainOutbox(f.db, handlers);
+  expect(seen).toHaveLength(0);
+  const deps = { db: f.db, pubsub: f.pubsub };
+  await reportOwnUsage(deps, f.org.id, machineId, { claude_code: usage });
+  await drainOutbox(f.db, handlers, { now: later(5 * 60_000) });
+  expect(seen).toHaveLength(0);
+  expect((await runs(f))[0]?.status).toBe("waiting_input");
+  await setAgentBrain(deps, f.owner.id, f.org.id, f.agent.id, { extraUsage: true });
+  await drainOutbox(f.db, handlers, { now: later(5 * 60_000) });
+  expect(seen).toHaveLength(1);
+  expect((await runs(f))[0]?.status).toBe("done");
 });

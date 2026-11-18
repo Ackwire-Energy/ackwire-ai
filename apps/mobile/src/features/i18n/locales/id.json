@@ -234,8 +234,6 @@
       "mute": "Bisukan",
       "unmute": "Bunyikan"
     },
-    "firstRunLine": "{{name}} sedang menyiapkan tim · {{done}} dari {{total}}",
-    "firstRunLinePersonal": "{{name}} sedang menyiapkan agenmu · {{done}} dari {{total}}",
     "first": {
       "title": "Mulai dengan agen pertamamu",
       "subtitle": "Beri nama dan jelaskan tugasnya. Agen akan muncul di sini, sebagai obrolan.",
@@ -1568,18 +1566,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} butuh bantuan",
-      "needsFor": "{{name}} butuh bantuan · {{time}}",
-      "inControlAt": "Kamu yang mengendalikan · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "Membuka browser {{name}}…",
-      "startingM": "Membuka browser {{name}}…",
       "stopAskF": "Tutup browser {{name}}?",
       "stopAskM": "Tutup browser {{name}}?",
-      "whereF": "Di browser {{name}}",
-      "whereM": "Di browser {{name}}",
       "open": "Buka",
-      "expandHint": "Ketuk untuk memperbesar",
       "stop": "Hentikan",
       "giveUp": "Menyerah"
     },
@@ -1587,7 +1576,6 @@
       "inControl": "Kamu yang mengendalikan",
       "helping": "{{name}} yang mengendalikan",
       "watchOnly": "{{name}} yang mengendalikan. Kamu hanya menonton.",
-      "takeOver": "Ambil alih",
       "done": "Selesai",
       "handBack": "Kembalikan",
       "couldnt": "Tidak berhasil",
@@ -1608,7 +1596,6 @@
       "closedHelpM": "Login tetap tersimpan untuk lain kali.",
       "stuckHelpF": "Coba lagi akan memulai ulang browser. Login tetap tersimpan.",
       "stuckHelpM": "Coba lagi akan memulai ulang browser. Login tetap tersimpan.",
-      "hidden": "{{name}} yang mengendalikan · layar disembunyikan",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2116,7 +2103,6 @@
     "planRowSub": "Masuk di komputer agen, tanpa kunci",
     "keyRow": "Kunci API",
     "keyRowSub": "Kamu bayar per pemakaian, langsung ke penyedia",
-    "already": "Sudah ada di {{org}}",
     "stepOf": "{{step}} dari {{total}}"
   },
   "crash": {
@@ -2752,5 +2738,11 @@
       "title": "Tidak ada yang perlu ditinjau",
       "text": "Saat agen melakukan sesuatu di luar percakapan, itu muncul di sini."
     }
+  },
+  "surface": {
+    "on": "Aktif",
+    "codeText": "Kirim pesan yang terbuka di sana, lalu kembali ke sini.",
+    "openFailed": "Tidak bisa membuka {{surface}} di ponsel ini. Kirim kode di bawah ke sana.",
+    "orType": "Atau kirim kode ini di sana"
   }
 }

@@ -25,13 +25,14 @@ import { File } from "expo-file-system";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import {
   ACT_LINE,
   AgentAvatar,
   Button,
   CARD_PAD,
   Card,
+  Disclosure,
   GroupedFooter,
   GroupedHeader,
   GroupedList,
@@ -39,6 +40,7 @@ import {
   Icon,
   Locked,
   LogoMark,
+  RowPressable,
   Segmented,
   Text,
   useTheme,
@@ -427,19 +429,21 @@ function Arrivals({ imp }: { imp: AgentImport }) {
         {t("onboarding.import.aiApp.arrived", { count: arrived.length })}
       </Text>
       {arrived.map((a) => (
-        <Pressable
+        <RowPressable
+          radius={8}
+          hold
           key={a.id}
           onPress={() => router.push(`/agent/${a.id}`)}
           accessibilityRole="link"
           accessibilityLabel={a.name}
-          style={({ pressed }) => [styles.arrived, pressed && { backgroundColor: c.sunken }]}
+          style={styles.arrived}
         >
           <AgentAvatar agent={fullLook(a.appearance)} size={32} name={a.name} live={false} />
           <Text variant="body" style={styles.fill}>
             {a.name}
           </Text>
-          <Icon name="right" size={16} color={c.faint} />
-        </Pressable>
+          <Disclosure />
+        </RowPressable>
       ))}
     </View>
   );

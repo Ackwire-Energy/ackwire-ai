@@ -45,6 +45,7 @@ import { OrgAvatar } from "../shared/OrgAvatar";
 import { errorHaptic, goBack, MONO, successHaptic } from "../shared/parts";
 import { SheetHostProvider, useSheet } from "../shared/SheetHost";
 import { overLimit, TextArea } from "../shared/TextArea";
+import { AccentRow } from "./AccentRow";
 import { missingIdeas, nameOnLeave, withIdea, zoneLabel } from "./logic";
 import { chooseAction, Gap, SettingsPage, Uploading } from "./parts";
 
@@ -452,6 +453,8 @@ export function GeneralScreen() {
       ) : (
         <>
           {logo}
+          <AccentRow editable={editable} />
+          <Gap />
           <GroupedList>
             {nameField}
             {zoneField}

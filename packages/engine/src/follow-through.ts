@@ -150,7 +150,9 @@ const isFollowUpLine = (m: Pick<Message, "meta">) =>
  */
 async function pendingFollowUps(
   db: Executor,
-  run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId">,
+  run: Pick<AgentRun, "orgId" | "agentId" | "channelId" | "threadRootId" | "triggerMessageId"> & {
+    confidential?: boolean;
+  },
   personId: string | null,
 ) {
   const threadId = replyThreadOf(run);
@@ -305,14 +307,17 @@ const publishLine = async (pubsub: PubSub | undefined, line: Message) => {
   if (pubsub) await publishMessageCreated(pubsub, messageView(line));
 };
 
-/** The run a tool call belongs to: a conversation's run, never a routine's background work or a mission task. */
+/**
+ * The run a tool call belongs to: a conversation's run, never a routine's background work or a mission task.
+ * `confidential`: its lines live where it answers, under its thread's root (`replyThreadOf`, ADR 0190).
+ */
 async function conversationRun(ctx: ToolContext) {
   if (!ctx.runId || ctx.background || ctx.bridge?.taskId) return null;
   const [run] = await ctx.db
     .select()
     .from(agentRuns)
     .where(and(eq(agentRuns.id, ctx.runId), eq(agentRuns.orgId, ctx.orgId), eq(agentRuns.agentId, ctx.agentId)));
-  return run && !run.background ? run : null;
+  return run && !run.background ? { ...run, confidential: ctx.confidential === true } : null;
 }
 
 /**
@@ -376,7 +381,14 @@ export function createFollowUpToolSource(deps: { pubsub?: PubSub }): ToolSource 
             orgId: run.orgId,
             channelId: run.channelId,
             threadId: replyThreadOf(run),
-            author: { type: "agent", agentId: run.agentId, runId: null, hop: run.hop, stretchId: runStretchOf(run) },
+            author: {
+              type: "agent",
+              agentId: run.agentId,
+              runId: null,
+              hop: run.hop,
+              stretchId: runStretchOf(run),
+              forRunId: run.id,
+            },
             body: note,
             meta: {
               notice: {

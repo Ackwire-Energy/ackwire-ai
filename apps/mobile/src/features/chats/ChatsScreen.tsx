@@ -1,4 +1,4 @@
-import { keys, useArchivedChannels, useChannels, useMuteChannel } from "@agenteschat/client";
+import { keys, useChannels, useMuteChannel } from "@agenteschat/client";
 import { canTalk } from "@agenteschat/client/lib/audience";
 import { waitingComputerByAgent } from "@agenteschat/client/lib/machine-outages";
 import { isRightHand, rightHandOf } from "@agenteschat/client/lib/right-hand";
@@ -8,7 +8,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { StyleSheet } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { useOrg } from "@/providers/org";
 import { LargeTitleScreen, LIST_AVATAR, ListRow, SkeletonList } from "@/ui";
 import { router } from "@/ui/navigation";
@@ -27,8 +27,9 @@ import { Tile } from "../shared/parts";
 import { useActiveWork, useHiddenAgents, useWorkingNow } from "../shared/queries";
 import { SheetHostProvider } from "../shared/SheetHost";
 import { useTabHeader } from "../shared/tabHeader";
+import { alongInAccessory } from "../work-along/logic";
+import { useHasWorkAlong } from "../work-along/WorkAlong";
 import { DeletingNotice } from "./DeletingNotice";
-import { FirstRunLine } from "./FirstRunLine";
 import { FirstAgentEmpty, Greeting, GreetingSky } from "./Greeting";
 import { Arrive, useHomeEntrance, useWake } from "./HomeEntrance";
 import { HomeRow } from "./HomeRow";
@@ -47,6 +48,8 @@ import {
 } from "./logic";
 import { type PinnedItem, PinnedStrip } from "./PinnedStrip";
 import { usePins } from "./pins";
+import { TeamPeek } from "./TeamPeek";
+import { teamPeekers } from "./team-peek";
 import { useAgentRowStates, useFinished } from "./useHomeNow";
 import { useConversationRows, useRowFacts } from "./useRows";
 import { useWaitingItems } from "./useWaitingItems";
@@ -55,6 +58,13 @@ import { useWaitingItems } from "./useWaitingItems";
 const LIVE_ROWS = 6;
 /** The home's sky fading in after the launch splash. */
 const SKY_ARRIVE_MS = 300;
+/**
+ * The team peeking past the list's end (`TeamPeek`) where the list reports a pull there: iOS bounces past its end;
+ * Android's list stops at it (as in a conversation, `ChatPeek`).
+ */
+const PEEK = Platform.OS === "ios";
+/** iOS 26 holds the work-along line in the tab bar's accessory, over the bar: the faces would rise behind it. */
+const ACCESSORY = alongInAccessory(Platform.OS, Platform.Version);
 
 /** A section's "See all", pushed: Recentes in full. */
 export const openKindList = (kind: ListKind) => router.push(`/conversations/${kind}`);
@@ -82,7 +92,8 @@ export function useHidesQuietGeneral(): boolean {
  * first agent. Nothing opens over it on its own: the offer to turn on notifications comes as a line in the right
  * hand's conversation. When the server doesn't answer it says so (`HomeServerError`), over the kept rows as a card,
  * and tries again on its own. A personal workspace (ADR 0159), while its person is alone in it, leaves a quiet #general
- * out.
+ * out. Pulled past its last row, the team peeks up from behind the tab bar (iOS, `TeamPeek`); archived channels are in
+ * You › Work.
  */
 export function ChatsScreen() {
   return (
@@ -114,7 +125,6 @@ function Home() {
   const { collapsed, toggle } = useCollapsedSections();
   // An administrator reads every channel (ADR 0151): the ones they aren't in wait at the end of the home.
   const others = (useChannels(orgId).data ?? []).filter((c) => c.seenAsAdmin);
-  const archived = useArchivedChannels(orgId).data?.length ?? 0;
   const menus = useRowMenus();
   const { mutate: muteChannel } = useMuteChannel(orgId);
   const muteRow = useCallback(
@@ -164,6 +174,13 @@ function Home() {
   // A list that failed to load isn't an empty workspace: it says the server didn't answer. A #general left out of
   // sight still counts: the home keeps its greeting and the right hand's field.
   const failed = list.failed && list.rows.length === 0;
+  // Who peeks past the end: the right hand in the middle, then the agents of the latest conversations (none hidden);
+  // nobody while the line of work along stands over the bar, or while the list isn't there.
+  const along = useHasWorkAlong();
+  const peekers =
+    PEEK && !(ACCESSORY && along) && !list.loading && !failed
+      ? teamPeekers(rightHand && canTalk(rightHand) ? rightHand.id : null, recent, hidden).join(" ")
+      : "";
   // Agents already in the team (in Agentes, a pinned one on the strip) leave out the invitation to make the first one.
   const empty = !list.loading && !failed && pinned.rows.length === 0 && starters.length === 0;
 
@@ -217,6 +234,7 @@ function Home() {
         )
       }
       pull={pull}
+      {...(peekers ? { pastEnd: (scroll) => <TeamPeek scroll={scroll} agents={peekers} /> } : {})}
     >
       {/* Being deleted, its line comes first and alone: its work stopped, nothing else is news (ADR 0088 §7). */}
       {org?.deletion ? (
@@ -246,7 +264,6 @@ function Home() {
         <>
           {/* Início's widgets, and the way to Dashboards ("See all"), not a tab (ADR 0135 §15). */}
           <HomeWidgets collapsed={collapsed.includes("widgets")} onToggle={() => toggle("widgets")} />
-          <FirstRunLine />
           <PinnedStrip
             items={strip}
             collapsed={collapsed.includes("pinned")}
@@ -316,12 +333,6 @@ function Home() {
             />
           ))}
         </CollapsibleSection>
-      ) : null}
-      {archived > 0 && !failed && !list.loading ? (
-        <SeeAllRow
-          label={t("channel.archivedCount", { count: archived })}
-          onPress={() => router.push("/archived-channels")}
-        />
       ) : null}
     </LargeTitleScreen>
   );

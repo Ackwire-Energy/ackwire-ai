@@ -4,6 +4,7 @@ import { serverText } from "@agenteschat/i18n";
 import type { AppLocale } from "@agenteschat/i18n/locale";
 import { plainLines } from "@agenteschat/ui/markdown";
 import { runAuthority } from "./authority";
+import { confidentialThreadSql, threadIsConfidential } from "./confidential";
 import { answersHandOffs, consultationOrigin } from "./consultations";
 import { getChannelCached } from "./context";
 import type { ContextDeps } from "./context/summaries";
@@ -495,6 +496,9 @@ export async function moveToBackground(
   const moved = await db.transaction(async (tx) => {
     const [run] = await tx.select().from(agentRuns).where(eq(agentRuns.id, runId)).for("update");
     if (!run || run.workId || isTerminal(run.status)) return null;
+    // A run of a confidential thread (ADR 0190) answers there and nowhere else: an anchor of its own would be a
+    // second place for what it read.
+    if (await threadIsConfidential(tx, run.orgId, run.threadRootId)) return null;
     await lockWorkCaps(tx, run.orgId);
     const home = replyThreadOf(run);
     const ownThread = home === null;
@@ -1519,7 +1523,15 @@ export async function workBrief(db: Executor, run: Pick<AgentRun, "orgId" | "age
           .select({ kind: agentRunSteps.kind, data: agentRunSteps.data, createdAt: agentRunSteps.createdAt })
           .from(agentRunSteps)
           .innerJoin(agentRuns, eq(agentRuns.id, agentRunSteps.runId))
-          .where(and(eq(agentRuns.workId, w.id), eq(agentRuns.orgId, w.orgId)))
+          .where(
+            and(
+              eq(agentRuns.workId, w.id),
+              eq(agentRuns.orgId, w.orgId),
+              // What a run of a confidential thread said between its calls may repeat what it read (ADR 0190), and
+              // this is handed to the agent's other runs in the conversation.
+              sql`not ${confidentialThreadSql(sql`${agentRuns.orgId}`, sql`${agentRuns.threadRootId}`)}`,
+            ),
+          )
           .orderBy(desc(agentRunSteps.createdAt))
           .limit(BRIEF_STEPS),
       ]);

@@ -120,8 +120,6 @@ const CLOUD_EXTRA = [
   "computers.about",
   "agentPage.work.cell.computer",
   "agentPage.work.offlineCloud",
-  "agentPage.work.brain.fallbackTitle",
-  "agentPage.work.brain.fallbackHint",
   "agentPage.work.brain.add.stepOneHint",
   "aiAccounts.page.hint",
   "agentPage.work.brain.offCloud",

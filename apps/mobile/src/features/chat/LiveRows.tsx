@@ -42,7 +42,7 @@ import { useLivePaused } from "@/agent/live";
 import { loopStyle } from "@/agent/loop";
 import { CHROME_MAX_SCALE, haptics, Icon, PixelStop, Text, TOUCH, useReducedMotion, useTheme } from "@/ui";
 import { AgentFace, AgentWho, Face } from "../shared/Face";
-import { useDirectory, useNow } from "../shared/hooks";
+import { useNow } from "../shared/hooks";
 import {
   awayRun,
   type LineDrawn,
@@ -57,6 +57,7 @@ import {
   turnPhrase,
   workingEntries,
 } from "./logic";
+import { useRowDirectory } from "./row-data";
 import { WaitMark } from "./WaitMark";
 
 /** The runs at work in their browser, one per agent: each gets its browser card. */
@@ -108,7 +109,7 @@ export function WorkingLine({
   rest?: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const { colors: c } = useTheme();
   const reduced = useReducedMotion();
   const agentName = (id: string) => dir.agentById.get(id)?.name ?? t("channel.unknownAgent");
@@ -352,7 +353,7 @@ export function LineStop({
   place?: "line" | "word";
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const c = useTheme().colors;
   if (runs.length === 0) return null;
   const nameOf = (run: LiveRun) => dir.agentById.get(run.agentId)?.name ?? t("channel.unknownAgent");

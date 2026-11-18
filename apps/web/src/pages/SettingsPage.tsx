@@ -109,6 +109,7 @@ import { TeamMemoryCard } from "@/components/TeamMemory";
 import { OpenPrefsButton, useLocalServerHere } from "@/components/ThisMac";
 import { VoiceSettingsSection } from "@/components/VoiceSettings";
 import { VaultSection } from "@/components/vault/VaultSection";
+import { AccentRow } from "@/components/WorkspaceAccent";
 import { WorkspaceModeDialog } from "@/components/WorkspaceModeDialog";
 import { ZoneSelect } from "@/components/ZoneSelect";
 import { useCentreCurrent } from "@/hooks/useCentreCurrent";
@@ -601,6 +602,7 @@ function GeneralSection() {
     <Card aria-label={t(modeKey(org, "settings.orgTitle"))}>
       <div className="settings-rows">
         {personal ? zoneRow : logoRow}
+        {!personal && <AccentRow />}
         {nameRow}
         {!personal && zoneRow}
         {checkRow}

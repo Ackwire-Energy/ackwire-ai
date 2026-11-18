@@ -51,6 +51,7 @@ import {
   GroupedRow,
   Icon,
   type IconName,
+  LivePause,
   Locked,
   PixelOrbit,
   ProviderLogo,
@@ -78,7 +79,16 @@ import { openRightHandSettings, RightHandMine } from "../right-hand/SettingsScre
 import { useConnectedById } from "../settings/hooks";
 import { agentBadgeInset } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
-import { useColors, useDirectory, useErrorToast, useMeId, useNow, useOrgId, useWhen } from "../shared/hooks";
+import {
+  useColors,
+  useDirectory,
+  useErrorToast,
+  useMeId,
+  useNow,
+  useOrgId,
+  usePushEnded,
+  useWhen,
+} from "../shared/hooks";
 import { agentLook, genderOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { PushedHeader } from "../shared/parts";
@@ -196,8 +206,10 @@ function Profile({ id }: { id: string }) {
     setTabState(next);
     void writeValue(STORED.agentProfileTab, next === "today" ? null : next);
   };
+  // The cover's sky and the face come alive once the push has ended: the slide has the threads to itself.
+  const arrived = usePushEnded();
   // A hello when its profile opens (a rare, small moment): it smiles once, unless it is at work.
-  const hello = useHello();
+  const hello = useHello(arrived);
   const modelLabel = useModelLabel();
   const detail = useAgentDetail(orgId, id);
   const access = useAgentAccess(orgId, id, details);
@@ -745,20 +757,25 @@ function Profile({ id }: { id: string }) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
         <View style={styles.cover}>
-          <CoverParallax y={y} style={StyleSheet.absoluteFill}>
-            <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
-          </CoverParallax>
-          {/* Its presence is the badge; a screen reader hears it in words, with why. */}
-          <Animated.View style={avatarFade} {...(status ? { accessible: true, accessibilityLabel: status.line } : {})}>
-            <WithPresence size={FACE} presence={status?.presence} inset={agentBadgeInset(look, FACE)}>
-              <AgentAvatar
-                agent={look}
-                size={FACE}
-                mode={busy ? "run" : "idle"}
-                {...(hello && !busy ? { expression: "happy" as const } : {})}
-              />
-            </WithPresence>
-          </Animated.View>
+          <LivePause paused={!arrived}>
+            <CoverParallax y={y} style={StyleSheet.absoluteFill}>
+              <Sky color={look.color} depth={1} style={StyleSheet.absoluteFill} />
+            </CoverParallax>
+            {/* Its presence is the badge; a screen reader hears it in words, with why. */}
+            <Animated.View
+              style={avatarFade}
+              {...(status ? { accessible: true, accessibilityLabel: status.line } : {})}
+            >
+              <WithPresence size={FACE} presence={status?.presence} inset={agentBadgeInset(look, FACE)}>
+                <AgentAvatar
+                  agent={look}
+                  size={FACE}
+                  mode={busy ? "run" : "idle"}
+                  {...(hello && !busy ? { expression: "happy" as const } : {})}
+                />
+              </WithPresence>
+            </Animated.View>
+          </LivePause>
         </View>
         <View style={styles.prof}>
           <Text variant="display2" style={styles.center}>
@@ -1113,13 +1130,14 @@ const profileTabOf = (v: string | null): ProfileTab => (v === "access" || v === 
 /** How long the face holds its smile when the profile opens. */
 const HELLO_MS = 900;
 
-/** True for a moment after the profile opens: the face's hello. */
-function useHello() {
+/** True for a moment after the profile has come in (`arrived`): the face's hello. */
+function useHello(arrived: boolean) {
   const [on, setOn] = useState(true);
   useEffect(() => {
+    if (!arrived) return;
     const off = setTimeout(() => setOn(false), HELLO_MS);
     return () => clearTimeout(off);
-  }, []);
+  }, [arrived]);
   return on;
 }
 

@@ -321,6 +321,7 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
   const handle = person?.handle ?? member?.handle;
   const joinedAt = person?.joinedAt ?? member?.joinedAt;
   const owner = (person?.role ?? member?.role) === "owner";
+  const outsideOf = person?.outsideOf ?? member?.outsideOf;
   // The roles they hold, top first (ADR 0085); who manages members gives and takes the ones below their own.
   const roleIds = person?.roleIds ?? member?.roleIds ?? [];
   const held = rolesOf({ roleIds }, roles);
@@ -420,6 +421,12 @@ function PersonCard({ userId, onDone }: { userId: string; onDone: () => void }) 
         </section>
       )}
       <dl className="profile-card__facts">
+        {outsideOf && (
+          <>
+            <dt>{t("members.outside.title")}</dt>
+            <dd>{outsideOf}</dd>
+          </>
+        )}
         {person && shown && (
           <>
             <dt>{t("profile.presence")}</dt>

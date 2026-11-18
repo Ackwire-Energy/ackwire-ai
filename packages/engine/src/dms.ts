@@ -3,6 +3,7 @@ import { and, type Database, desc, type Executor, eq, inArray, isNull, ne, schem
 import type { Agent } from "./agents";
 import { audienceError, canTalkTo, speakerOf } from "./audience";
 import { caches } from "./cache";
+import { wordsOf } from "./confidential";
 import { sha256 } from "./crypto";
 import { NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishUserEvent } from "./events";
@@ -409,7 +410,10 @@ export async function listDms(db: Database, actorId: string, orgId: string, only
           lastMessage: m
             ? {
                 id: m.id,
-                body: readableBody(m.body, m.meta as Record<string, unknown> | null).slice(0, 200),
+                body: readableBody(
+                  wordsOf(m.body, m.meta as Record<string, unknown> | null),
+                  m.meta as Record<string, unknown> | null,
+                ).slice(0, 200),
                 meta: previewMeta(m.meta as Record<string, unknown> | null),
                 mediaKind: previewMediaKind(m.body, m.meta as Record<string, unknown> | null),
                 createdAt: m.createdAt,

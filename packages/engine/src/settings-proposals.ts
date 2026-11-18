@@ -286,7 +286,7 @@ async function setValue(
       if (!account) throw new NotFoundError("That AI account is gone", "account.not_found");
       const agent = await getAgent(db, orgId, agentId);
       if (agent?.machineId !== account.machineId)
-        await setAgentComputerTarget(deps, actorId, orgId, agentId, account.machineId);
+        await setAgentComputerTarget(deps, actorId, orgId, agentId, account.machineId, { wakeWaits: false });
       return void (await setAgentBrain(deps, actorId, orgId, agentId, { brain: to.brain, account: to.accountId }));
     }
     case "skill":

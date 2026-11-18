@@ -1,3 +1,4 @@
+import { drawnKey } from "@agenteschat/ui/agent/engine";
 import { STICKER_STILL_T, type StickerLook, type StickerMood, stickerSeed } from "@agenteschat/ui/agent/stickers";
 import { Canvas, createPicture, Picture } from "@shopify/react-native-skia";
 import { createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -53,12 +54,15 @@ function StickerCanvasView({
   }, [playFor, start]);
   const t = useFrameTime(live && !reduced && !done, STOPPED, STICKER_FPS);
   const { color, eyes, accessory } = look;
+  // By the colors it resolves to: `sky` follows the workspace's accent.
+  const drawn = drawnKey(color);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `drawn` is what `color` draws as now
   const picture = useMemo(() => {
     const once = playFor === undefined ? undefined : Math.min(Math.max(0, t - start), playFor);
     const at = t === STOPPED ? STICKER_STILL_T : (once ?? t + stickerSeed(seed));
     const ops = stickerFrame({ color, eyes, accessory }, mood, size, at);
     return createPicture((canvas) => replay(canvas, ops), { width: size, height: size });
-  }, [color, eyes, accessory, mood, size, seed, t, start, playFor]);
+  }, [color, drawn, eyes, accessory, mood, size, seed, t, start, playFor]);
   return (
     <Canvas style={{ width: size, height: size }}>
       <Picture picture={picture} />

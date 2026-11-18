@@ -15,12 +15,17 @@ import {
   accountSaved,
   advancedResetInput,
   agentAccounts,
+  agentChain,
+  existingNotes,
   existingRows,
   flowStep,
+  haveLayout,
   modelInput,
   modelRows,
   modelSections,
   newAgentAi,
+  orderMoves,
+  ownAccountRows,
   pickedAi,
   setupWords,
   takenFrom,
@@ -101,13 +106,18 @@ describe("the agent's AI", () => {
     expect(agentAccounts({ ...view, canUseOthersPlans: false }, "claude_code", "u1", "Ada").map((a) => a.id)).toEqual([
       "owners",
     ]);
-    // Connect an AI's first rows: Bia's in one tap, whose it is under it; one another agent has stays locked.
+    // Connect an AI's first rows: Bia's in one tap, its plan in its title and whose it is under it; the two only their
+    // owner can give leave the list, one line under that person's group.
     const rows = existingRows(t, view, [], "Ada", "pt-BR").map((r) => [
       r.row.kind === "key" ? "key" : r.row.act,
+      r.label,
       r.sub,
     ]);
-    expect(rows).toContainEqual(["use", "De Bia"]);
-    expect(rows.filter(([act]) => act === "locked")).toHaveLength(2);
+    expect(rows).toContainEqual(["use", "bias · Max", "De Bia"]);
+    expect(rows.filter(([act]) => act === "locked")).toHaveLength(0);
+    expect(existingNotes(t, view, [])).toEqual([
+      { key: "owner:u3", text: "Mais 2 contas de Walter que só Walter pode dar." },
+    ]);
   });
 
   test("the usage shown is its account's, or the computer's own sign-in's only where that thinks for it", () => {
@@ -372,7 +382,9 @@ describe("the agent's AI", () => {
     expect(settings).not.toMatch(/Alert\.prompt|Platform\.OS/);
     // Renaming is pushed (screens, not sheets), its field waiting for a tap and Save in the bar.
     expect(settings).not.toContain("<PromptForm");
-    expect(settings).toContain('router.push({ pathname: "/ai-account-rename", params: { machineId, accountId } });');
+    // Its opener is shared: every list that shows an account (its pencil) pushes the same screen.
+    const parts = await Bun.file(new URL("../../src/features/ai/parts.tsx", import.meta.url).pathname).text();
+    expect(parts).toContain('router.push({ pathname: "/ai-account-rename", params: { machineId, accountId } });');
     expect(settings).toContain('action={{ label: t("common.save"), disabled: !ready, onPress: () => void save() }}');
     expect(settings).not.toContain("autoFocus");
     expect(settings).toMatch(/sheet\.open\(\s*<KeyPrompt\s+title=\{t\("settings\.rotateTitle"/);
@@ -477,7 +489,7 @@ describe("the agent's AI", () => {
     const t = await translator("pt-BR");
     const theo = account("t", { usedBy: ["Theo"] });
     expect(accountRow(t, { login: theo, usedBy: ["Theo", "Lia"], also: true }, "Ada", "pt-BR").sub).toBe(
-      "Também usada por Theo e Lia",
+      "Max · Também usada por Theo e Lia",
     );
   });
 
@@ -508,7 +520,7 @@ describe("the agent's AI", () => {
     const view = {
       account: "ada",
       accounts: [
-        account("pessoal", { label: "Claude Pessoal", email: "walter@acme.com.br", usedBy: ["Atlas"] }),
+        account("pessoal", { label: "Claude Pessoal", named: true, email: "walter@acme.com.br", usedBy: ["Atlas"] }),
         account("plus", {
           kind: "codex",
           label: "ChatGPT Plus",
@@ -526,20 +538,37 @@ describe("the agent's AI", () => {
     expect(
       rows.map((r) => [r.row.kind === "key" ? "key" : r.row.act, r.label, r.sub, "below" in r ? r.below : null]),
     ).toEqual([
-      ["use", "Claude Team", "team@example.com", null],
-      ["also", "Claude Pessoal · Max", "Também usada por Atlas", null],
-      ["also", "ChatGPT Plus", "Também usada por Atlas", null],
+      // Each by the name its owner gave it, else its email; the email under a given name, then the plan.
+      ["use", "team@example.com", "Team", null],
+      ["also", "Claude Pessoal", "walter@acme.com.br · Max · Também usada por Atlas", null],
+      ["also", "walt@gmail.com", "Plus · Também usada por Atlas", null],
       ["key", "Claude da Acme", "Claude · termina em 7f2a", "Pago por uso. Conta no orçamento da Ada."],
-      ["locked", "Claude Max", "De João", null],
+    ]);
+    expect(existingNotes(t, view, [])).toEqual([
+      { key: "owner:u2", text: "Mais 1 conta de João que só João pode dar." },
     ]);
     // The first page lists them before the plans, drawn as the agent's AI draws its accounts.
     const connect = await Bun.file(
       new URL("../../src/features/ai/ConnectAiSteps.tsx", import.meta.url).pathname,
     ).text();
     const home = connect.slice(connect.indexOf("function Home("));
-    expect(home.indexOf('t("connectAi.have.title")')).toBeGreaterThan(-1);
-    expect(home.indexOf('t("connectAi.have.title")')).toBeLessThan(home.indexOf('t("mobile.ai.planRow")'));
+    expect(home.indexOf('t("connectAi.have.pickLine"')).toBeGreaterThan(-1);
+    expect(home.indexOf('t("connectAi.have.pickLine"')).toBeLessThan(home.indexOf('t("mobile.ai.planRow")'));
     expect(home).toContain("<AiRow");
+    // "Ver as N contas" opens every row, not the three, and the line over the list only when there is one to pick.
+    expect(connect).toContain("haveLayout(have, haveNotes, true)");
+    // "Todas as contas" draws each row as the first page does: what tells it apart on its line, the room word under it,
+    // grouped by owner (never by a first name two owners share), each owner's line of accounts they can't give under it.
+    const all = connect.slice(connect.indexOf("function AllHave("), connect.indexOf("function Plans("));
+    expect(all).toContain("...(r.sub ? { description: r.sub } : {}),");
+    expect(all).toContain("...(r.below ? { below: r.below } : {}),");
+    expect(all).toContain("groupKey: r.group.key,");
+    expect(all).not.toContain('join(" · ")');
+    expect(connect).toContain("haveNotes={haveNotes}\n        dims={dims}");
+    const pick = await Bun.file(new URL("../../src/features/shared/PickList.tsx", import.meta.url).pathname).text();
+    expect(pick).toContain("{...(o.below ? { belowText: o.below } : {})}");
+    expect(pick).toContain("<GroupedFooter key={n.key}>{n.text}</GroupedFooter>");
+    expect(home).toContain("agentName && have.length > 0 ?");
     // A plan or a key, one row each; whose is one searched list, the plan's page and the key's steps as before.
     expect(home).toContain('onView({ page: "plans" })');
     expect(home).toContain('onView({ page: "key" })');
@@ -551,7 +580,12 @@ describe("the agent's AI", () => {
     expect(makers).toContain("<PickList");
     expect(makers).toContain("...PROVIDERS.map(");
     expect(connect.slice(connect.indexOf("function KeyPage("))).toContain("onPress={onMakers}");
-    expect(connect).toContain("existingRows(t, gates.view, credentials.data ?? [], forAgent.name, i18n.language)");
+    expect(connect).toContain("existingRows(t, lists.view, credentials.data ?? [], lists.name, i18n.language)");
+    // An agent that already has an AI lists nothing there: no rows, and no line counting someone else's accounts.
+    expect(connect).toContain("const haveNotes = lists ? existingNotes(");
+    // "Todas as contas" after a pick: the list it was picked from with the pick checked, not the next agent's.
+    expect(connect).toContain("have={picked?.have ?? have}");
+    expect(connect).toContain("value={picked ?? (busy ? tapped : undefined)}");
     // The workspace's keys, for who may add them, on the flow's one screen: no sheet or inline variant is left.
     expect(connect).toContain("useCredentials(orgId, mayAddKey && forAgent !== undefined)");
     expect(connect).not.toContain("sheetTitle");
@@ -682,19 +716,23 @@ describe("the agent's AI", () => {
     }
   });
 
-  test("an account says its plan once, after its name, and Claude's plans go by Anthropic's names", async () => {
-    expect(accountTitle(account("Claude", { plan: "ultra" }))).toBe("Claude · Ultra");
-    expect(accountTitle(account("Claude 2"))).toBe("Claude 2 · Max");
-    expect(accountTitle(account("GLM Coding", { plan: null, provider: "zai" }))).toBe("GLM Coding");
+  test("an account reads by its email or the name its owner gave it, and a computer's own sign-in by its maker", async () => {
+    const pt = await translator("pt-BR");
+    expect(accountTitle(pt, account("Claude 2", { email: "ana@acme.com" }))).toBe("ana@acme.com");
+    expect(accountTitle(pt, account("Trabalho", { named: true, email: "ana@acme.com" }))).toBe("Trabalho");
+    expect(accountTitle(pt, account("Claude"))).toBe("Conta sem nome");
+    expect(accountTitle(pt, account("GLM Coding", { plan: null, provider: "zai", keyHint: "MnOp" }))).toBe(
+      "GLM Coding",
+    );
     // The agent's AI and Connect an AI (their rows), Contas de IA and Você name accounts so, and a computer's own
     // sign-in by its maker the same way ("Claude · Max").
     expect(ownSignInTitle(await translator("pt-BR"), { kind: "claude_code", plan: "max" })).toBe("Claude · Max");
     const read = (file: string) => Bun.file(new URL(`../../src/features/${file}`, import.meta.url).pathname).text();
-    expect(await read("ai/logic.ts")).toContain("label: accountTitle(choice.login),");
+    expect(await read("ai/logic.ts")).toContain("label: accountTitle(t, choice.login),");
     // AI accounts' grouped rows take a `label`, the Me page's rows a `title`.
     for (const [screen, row, prop] of [["ai/AiAccountsScreen.tsx", "a", "label"]]) {
       const source = await read(screen);
-      expect(source).toContain(`${prop}={accountTitle(${row})}`);
+      expect(source).toContain(`${prop}={accountTitle(t, ${row})}`);
       expect(source).toContain(`${prop}={ownSignInTitle(t, o)}`);
       expect(source).not.toContain("planWordOf(o.plan)");
     }
@@ -867,7 +905,7 @@ describe("the agent's AI", () => {
       },
     ];
     const opencode = account("oc", { provider: "opencode", label: "Plano", keyHint: "Ex2b" });
-    const work = account("cl2", { label: "Trabalho" });
+    const work = account("cl2", { label: "Trabalho", named: true });
     const opus = {
       brain: "claude_code" as const,
       effectiveModel: "opus",
@@ -919,12 +957,13 @@ describe("the agent's AI", () => {
     }
     expect(screen).toContain("const account = pending.account !== undefined ? pending.account : view?.account;");
     expect(screen).toContain("checked={c.login.id === account}");
-    expect(screen).toContain("if (pending.extraUsage !== undefined) return;");
     expect(screen).toContain("const checked = picked !== null ? r.value === picked : r.checked;");
     expect(advanced).toContain("const shown = view && now ? withPending(view, now, pending) : null;");
     expect(advanced).toContain("checked={shown.contextTokens === n}");
     expect(advanced).toContain("if (pending.onlyOwner !== undefined) return;");
-    expect(advanced).toContain("pending.fallback === undefined && void save({ fallback: !shown.fallback })");
+    expect(advanced).toContain(
+      "pending.accountPinned === undefined && void save({ accountPinned: !shown.accountPinned })",
+    );
   });
 
   test("an AI that didn't load asks again, and the dock and the effort settle on the drawer's spring", async () => {
@@ -1047,19 +1086,16 @@ describe("the agent's AI", () => {
       speed: "standard" as const,
       contextTokens: null,
       onlyOwner: true,
-      fallback: true,
     };
-    expect(setupWords(t, "pt-BR", view, { apiKey: true, now })).toBe("Opus pelo plano do Claude · Esforço alto");
-    expect(setupWords(t, "pt-BR", view, { apiKey: true, now: { ...now, speed: "fast" } })).toBe(
+    expect(setupWords(t, "pt-BR", view, { now })).toBe("Opus pelo plano do Claude · Esforço alto");
+    expect(setupWords(t, "pt-BR", view, { now: { ...now, speed: "fast" } })).toBe(
       "Opus pelo plano do Claude · Esforço alto · Velocidade rápida",
     );
     // On a coding plan, its own model; everything at its default says nothing more.
     const glm = { ...view, effectiveModel: "sonnet", accounts: [account("glm", { provider: "zai" })], account: "glm" };
-    expect(setupWords(t, "pt-BR", glm, { apiKey: true, now: { ...now, effort: "medium" } })).toBe(
-      "GLM-5.3 pelo GLM Coding",
-    );
+    expect(setupWords(t, "pt-BR", glm, { now: { ...now, effort: "medium" } })).toBe("GLM-5.3 pelo GLM Coding");
     // Its Autonomia last, as on the web; one that changes only it can take it, and the toast says so.
-    expect(setupWords(t, "pt-BR", { ...view, autonomy: "never" }, { apiKey: true, now })).toBe(
+    expect(setupWords(t, "pt-BR", { ...view, autonomy: "never" }, { now })).toBe(
       "Opus pelo plano do Claude · Esforço alto · Autonomia: Não pergunta",
     );
     const advanced = await Bun.file(
@@ -1070,6 +1106,8 @@ describe("the agent's AI", () => {
     expect(advanced).toContain('t("agentPage.work.brain.speedText")');
     expect(advanced).toContain("disabled={!view.canEdit}");
     expect(advanced).toContain('speed: viewSpeedFits(view) ? view.speed : "standard"');
+    // The former API fallback is gone. Paid extra usage remains a separate explicit choice.
+    expect(advanced).not.toContain("fallback");
     const setup = await Bun.file(
       new URL("../../src/features/ai/AgentSetupScreen.tsx", import.meta.url).pathname,
     ).text();
@@ -1083,6 +1121,9 @@ describe("the agent's AI", () => {
     );
     const screen = await Bun.file(new URL("../../src/features/ai/AgentAiScreen.tsx", import.meta.url).pathname).text();
     expect(screen).toContain("onPress={() => openAgentSetup(agentId)}");
+    expect(screen).toContain("if (pending.extraUsage !== undefined) return;");
+    expect(screen).toContain("!view.scope && extraUsageOn(usage)");
+    expect(screen).toContain("disabled={!(current ? current.mine : view.canUsePlans)}");
     const route = await Bun.file(
       new URL("../../app/(app)/(main)/agent-setup/[id].tsx", import.meta.url).pathname,
     ).text();
@@ -1090,7 +1131,7 @@ describe("the agent's AI", () => {
   });
 
   test("Voltar ao padrão on an API key gives the effort back to the model, Automático too; nothing chosen saves none", () => {
-    const base = { effort: null, speed: "standard" as const, contextTokens: null, onlyOwner: true, fallback: true };
+    const base = { effort: null, speed: "standard" as const, contextTokens: null, onlyOwner: true };
     const key = { brain: "model" as const, onlyOwner: true };
     expect(advancedResetInput(key, { ...base, effort: "high", contextTokens: 400_000 }, false)).toEqual({
       contextTokens: null,
@@ -1103,12 +1144,15 @@ describe("the agent's AI", () => {
     expect(advancedResetInput(plan, { ...base, effort: "high" }, false)).toEqual({
       contextTokens: null,
       effort: "medium",
-      fallback: true,
     });
-    expect(advancedResetInput(plan, { ...base, effort: "high" }, true)).toEqual({
+    expect(advancedResetInput(plan, { ...base, effort: "high" }, true)).toEqual({ contextTokens: null });
+
+    // "Só esta conta" on goes back off; off, or not shown, it is left out.
+    expect(advancedResetInput(plan, { ...base, accountPinned: true }, true)).toEqual({
       contextTokens: null,
-      fallback: true,
+      accountPinned: false,
     });
+    expect(advancedResetInput(plan, { ...base, accountPinned: false }, true)).toEqual({ contextTokens: null });
   });
 
   test("Usar em outros agentes on other people's plans asks once before saving, naming every owner", async () => {
@@ -1302,5 +1346,154 @@ describe("Outro provedor on the phone", () => {
     );
     expect(form).toContain('<IconButton icon="plus" label={t("endpoint.add")}');
     expect(form).toContain("withoutModel(d, m.id)");
+  });
+});
+
+describe("the order of use at a limit (ADR 0041 §6)", () => {
+  const limited = usage(100);
+  const view = (over: Partial<Pick<AgentBrain, "accounts" | "account" | "accountPinned" | "scope">> = {}) => ({
+    accounts: [
+      account("own", { usage: limited, shared: true, useOrder: 0 }),
+      account("next", { usage: usage(20), shared: true, useOrder: 1 }),
+    ],
+    account: "own" as string | null,
+    accountPinned: false,
+    ...over,
+  });
+
+  test("it moves on while another account of its order has room, and waits only when none has or it is pinned", () => {
+    expect(agentChain(view(), "ag_ada", "u1")).toEqual({ moves: true, waits: false });
+    const full = view({
+      accounts: [account("own", { usage: limited, shared: true }), account("next", { usage: limited, shared: true })],
+    });
+    expect(agentChain(full, "ag_ada", "u1")).toEqual({ moves: true, waits: true });
+    expect(agentChain(view({ accountPinned: true }), "ag_ada", "u1")).toEqual({ moves: false, waits: true });
+    // An older server has no rotation support: absence keeps this account, explicit false moves on.
+    expect(agentChain(view({ accountPinned: undefined }), "ag_ada", "u1")).toEqual({ moves: false, waits: true });
+    expect(agentChain(view({ account: null }), "ag_ada", "u1")).toEqual({ moves: false, waits: false });
+  });
+
+  test("the right hand: its person's own AI goes on with that person's accounts only, the workspace's waits", () => {
+    const theirs = view({
+      scope: "mine",
+      accounts: [
+        account("own", { usage: limited, shared: true, mine: true }),
+        account("next", { usage: usage(20), shared: true, mine: false, ownerId: "u2" }),
+      ],
+    });
+    expect(agentChain(theirs, "lodi", "u1")).toEqual({ moves: false, waits: true });
+    expect(agentChain(view({ scope: "mine" }), "lodi", "u1")).toEqual({ moves: true, waits: false });
+    expect(agentChain(view({ scope: "workspace" }), "lodi", "u1")).toEqual({ moves: false, waits: true });
+  });
+
+  test("Move up and Move down: none up for the first, none down for the last, nothing for who may not move it", () => {
+    const order = [{ id: "a" }, { id: "b" }, { id: "c" }];
+    expect(orderMoves(order, { id: "a", canMove: true })).toEqual([{ step: 1, index: 1 }]);
+    expect(orderMoves(order, { id: "b", canMove: true })).toEqual([
+      { step: -1, index: 0 },
+      { step: 1, index: 2 },
+    ]);
+    expect(orderMoves(order, { id: "c", canMove: true })).toEqual([{ step: -1, index: 1 }]);
+    expect(orderMoves(order, { id: "b", canMove: false })).toEqual([]);
+  });
+
+  test("an account signed in once per agent is one row in Contas de IA and one place in the order", () => {
+    const team = (id: string, over: Partial<MachineAccount> = {}) =>
+      ({
+        ...account(id, { email: "walter@example.com", sameAs: "t1", ...over }),
+        machineId: "m1",
+      }) as MachineAccount & {
+        machineId: string;
+      };
+    const rows = ownAccountRows([
+      team("t1", { usedBy: ["Ada"], status: "signed_out" }),
+      team("t2", { usedBy: ["Theo"] }),
+      team("t3", { usedBy: [] }),
+      { ...account("p", { email: "pessoal@example.com", sameAs: "p" }), machineId: "m1" },
+    ]);
+    expect(rows.map((r) => [r.account.id, r.account.usedBy, r.logins.map((l) => l.id)])).toEqual([
+      ["t2", ["Ada", "Theo"], ["t1", "t2", "t3"]],
+      ["p", [], ["p"]],
+    ]);
+    // The row reads every login of it: Ada's ended though the row goes by Theo's.
+    expect(rows.map((r) => r.signedOut.map((l) => l.id))).toEqual([["t1"], []]);
+    const order = [
+      { id: "t1", sameAs: "t1" },
+      { id: "p", sameAs: "p" },
+      { id: "t2", sameAs: "t1" },
+    ];
+    expect(orderMoves(order, { id: "t2", canMove: true })).toEqual([{ step: 1, index: 1 }]);
+    expect(orderMoves(order, { id: "p", canMove: true })).toEqual([{ step: -1, index: 0 }]);
+  });
+
+  test("Connect an AI's first page as the web's list: few rows by owner, many the three with most room and the rest a row away", () => {
+    const r = (key: string, group: string, used: number | null) => ({
+      key,
+      group: { key: group, label: group },
+      usage: used === null ? null : usage(used),
+    });
+    const few = haveLayout(
+      [r("w", "owner:u2", 10), r("k", "keys", null), r("m", "mine", 50)],
+      [
+        { key: "owner:u2", text: "Mais 2" },
+        { key: "owner:u3", text: "Mais 1" },
+      ],
+    );
+    expect(few.best).toBeNull();
+    expect(few.groups.map((g) => [g.key, g.rows.map((x) => x.key), g.note])).toEqual([
+      ["mine", ["m"], null],
+      ["keys", ["k"], null],
+      ["owner:u2", ["w"], "Mais 2"],
+      ["owner:u3", [], "Mais 1"],
+    ]);
+    const many = haveLayout(
+      [r("a", "mine", 90), r("b", "mine", 10), r("c", "owner:u2", 40), r("d", "owner:u2", 20)],
+      [{ key: "owner:u2", text: "Mais 1" }],
+    );
+    expect(many.best?.map((x) => x.key)).toEqual(["b", "d", "c"]);
+    expect(many.groups.map((g) => g.note)).toEqual(["Mais 1"]);
+    // "Todas as contas": every row, by owner, however many.
+    const every = haveLayout(
+      [r("a", "mine", 90), r("b", "mine", 10), r("c", "owner:u2", 40), r("d", "owner:u2", 20)],
+      [],
+      true,
+    );
+    expect(every.best).toBeNull();
+    expect(every.groups.flatMap((g) => g.rows.map((x) => x.key))).toEqual(["a", "b", "c", "d"]);
+    // "Todas as contas" is still the first step: the person picks a way there.
+    expect(flowStep({ page: "have" }, false)).toBe(1);
+  });
+
+  test("an account a run never moves to has no Move up or Move down, and the others step over it", () => {
+    const order = [{ id: "a" }, { id: "solo", movable: false }, { id: "b" }];
+    expect(orderMoves(order, { id: "solo", canMove: true })).toEqual([]);
+    expect(orderMoves(order, { id: "b", canMove: true })).toEqual([{ step: -1, index: 0 }]);
+  });
+
+  test("the screens: the order with Move up and Move down, the pin switch, the limit's way out only when it waits", async () => {
+    const read = (file: string) => Bun.file(new URL(`../../src/features/ai/${file}`, import.meta.url).pathname).text();
+    const [accounts, ai, advanced] = await Promise.all([
+      read("AiAccountsScreen.tsx"),
+      read("AgentAiScreen.tsx"),
+      read("AgentAdvancedScreen.tsx"),
+    ]);
+    // The order numbers the account rows themselves: each account once, never a second list.
+    expect(accounts).toContain("rows.filter((a) => !placed.has(a.id)).map((a) => accountRow(a))");
+    expect(accounts).toContain("if (mine) return accountRow(mine, g, n);");
+    expect(accounts).toContain("...(g && placedAs ? moves(g, placedAs) : []),");
+    expect(accounts).toContain("filter((g) => orderAccounts(g.accounts).length > 1)");
+    expect(accounts).toContain("{orderAccounts(g.accounts).map((block, i) => {");
+    expect(accounts).toContain("const owned = ownAccountRows(ai.data?.accounts ?? []);");
+    // The note and "Entrar de novo" of a row come from every login of its account, as the web's.
+    expect(accounts).toContain("const note = signInNote(t, ownOf(a), Boolean(plan));");
+    expect(accounts).toContain("onPress: () => signInAgain(againLogin(ownOf(a)) ?? a),");
+    expect(accounts).toContain("loginsOf(a).some(offersSignInAgain)");
+    // Someone else's account in an order reads its newest usage, as the viewer's own rows do.
+    expect(accounts).toContain("const usage = newestUsage(block);");
+    expect(accounts).toContain("disabled={g !== undefined && move.isPending}");
+    expect(ai).toContain("const offers = waits && kind && view ?");
+    expect(ai).toContain('chain.moves && !waits ? t("agentPage.work.brain.movesOn") : null');
+    expect(advanced).toContain("toggle={shown.accountPinned}");
+    expect(advanced).toContain("accountPinned: pending.accountPinned ?? now.accountPinned");
   });
 });

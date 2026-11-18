@@ -14,8 +14,16 @@ import {
   openAtOf,
   textSizeOf,
 } from "@agenteschat/client/lib/chat-look";
+import {
+  defaultWallpaperOf,
+  hasWallpaper,
+  resolveWallpaper,
+  type Wallpaper,
+  type WallpaperHue,
+} from "@agenteschat/client/lib/wallpaper";
 import { isPersonal, modeKey } from "@agenteschat/client/lib/workspace-mode";
 import type { AgentColorName } from "@agenteschat/ui/agent/engine";
+import { WALLPAPER_LIFT, wallpaperStrength } from "@agenteschat/ui/sky/wallpaper";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
@@ -36,6 +44,8 @@ import {
   useTheme,
   useToast,
 } from "@/ui";
+import { router } from "@/ui/navigation";
+import { ChatWallpaper, useWallpaperName, WallpaperThumb } from "../chat/ChatWallpaper";
 import {
   bubbleFill,
   CHAT_TEXT,
@@ -47,15 +57,16 @@ import {
   MSG_INSET,
   nameInk,
 } from "../chat/logic";
-import { lookRows, RowLookContext, useRowLook } from "../chat/look";
+import { liftedEdge, lookRows, RowLookContext, useRowLook } from "../chat/look";
 import { MessageText } from "../chat/MessageText";
+import { wallpaperHrefs, wallpaperKey } from "../chat/wallpaper-logic";
 import { Face } from "../shared/Face";
 import { useColors, useDirectory, useMeId } from "../shared/hooks";
 import { Page } from "./parts";
 
-/** The agent of the preview: the pixel face a DM has. */
-const SAMPLE_COLOR: AgentColorName = "green";
-const SAMPLE_AGENT = { color: SAMPLE_COLOR, eyes: "round", accessory: "none" } as const;
+/** The agent of the preview: the pixel face a DM has, and the color "auto" takes in the DMs' preview. */
+export const SAMPLE_HUE: WallpaperHue = "green";
+const SAMPLE_COLOR: AgentColorName = SAMPLE_HUE;
 const SAMPLE_NAME = "Ada";
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -73,13 +84,16 @@ interface Line {
  * time sizes per Tamanho do texto, bubbles and fills, and the words drawn by the conversation's own `MessageText`
  * (which reads the size from the look this page provides).
  */
-function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boolean }) {
+function PreviewRow({ line, first, dm, color }: { line: Line; first: boolean; dm: boolean; color: AgentColorName }) {
   const c = useColors();
   const { scheme } = useTheme();
   const dir = useDirectory();
   const meId = useMeId();
   const look = useRowLook();
   const { style, tone } = look;
+  // Over a background, as the conversation draws it (`MessageRow`): the other side lifted, both with its light edge.
+  const lifted = look.wallpaper === true;
+  const bubbleShadow = lifted ? liftedEdge(scheme) : null;
   const text = look.text ?? CHAT_TEXT[DEFAULT_TEXT_SIZE];
   const rhythm = CHAT_RHYTHM[style];
   const name = line.mine ? dir.nameOf({ type: "person", id: meId }) : SAMPLE_NAME;
@@ -102,7 +116,11 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
     return (
       <View style={[styles.me, { marginTop: top }]}>
         <View
-          style={[bubbled ? lookRows.bubble : styles.bubble, { backgroundColor: (bubbled && look.fill) || c.bubble }]}
+          style={[
+            bubbled ? lookRows.bubble : styles.bubble,
+            { backgroundColor: (bubbled && look.fill) || c.bubble },
+            bubbleShadow,
+          ]}
         >
           <View style={bubbled ? styles.bubbleLine : undefined}>
             {words}
@@ -122,17 +140,13 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
   const face = line.mine ? (
     <Face who={{ type: "person", id: meId }} size={faceSize} live={false} />
   ) : (
-    <AgentAvatar agent={SAMPLE_AGENT} size={faceSize} live={false} name={SAMPLE_NAME} />
+    <AgentAvatar agent={{ color, eyes: "round", accessory: "none" }} size={faceSize} live={false} name={SAMPLE_NAME} />
   );
   const nameText = (
     <Text
       variant="footnote"
       tone="ink2"
-      style={[
-        styles.name,
-        nameSize,
-        bubbled && !line.mine ? { color: nameInk(SAMPLE_COLOR, scheme === "dark") } : null,
-      ]}
+      style={[styles.name, nameSize, bubbled && !line.mine ? { color: nameInk(color, scheme === "dark") } : null]}
       maxFontSizeMultiplier={CHAT_TEXT_MAX_SCALE}
       numberOfLines={1}
     >
@@ -151,7 +165,9 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
       ) : null}
       <View style={styles.body}>
         {bubbled ? (
-          <View style={[lookRows.bubble, { backgroundColor: c.bubble }]}>
+          <View
+            style={[lookRows.bubble, { backgroundColor: lifted ? WALLPAPER_LIFT[scheme] : c.bubble }, bubbleShadow]}
+          >
             {dm ? null : nameText}
             <View style={styles.bubbleLine}>
               {words}
@@ -184,19 +200,40 @@ function PreviewRow({ line, first, dm }: { line: Line; first: boolean; dm: boole
  * style, tone and text size. A change dips it and brings it back (opacity only, under 200 ms), so the eye catches
  * what changed without anything sliding.
  */
-function ChatPreview({ style, tone, size, dm }: { style: ChatStyle; tone: ChatTone; size: ChatTextSize; dm: boolean }) {
+export function ChatPreview({
+  style,
+  tone,
+  size,
+  dm,
+  wallpaper,
+  color = SAMPLE_COLOR,
+  bare = false,
+}: {
+  style: ChatStyle;
+  tone: ChatTone;
+  size: ChatTextSize;
+  dm: boolean;
+  /** The background behind it ("auto" already made a color), at the look's strength. */
+  wallpaper?: Wallpaper;
+  /** The DM's agent: my bubbles in its color (the sample's by default). */
+  color?: AgentColorName;
+  /** Only the rows, on whatever is behind them (a photo's full-screen preview paints its own background). */
+  bare?: boolean;
+}) {
   const { t } = useTranslation();
   const c = useColors();
   const { colors, scheme, reducedMotion } = useTheme();
-  const fill = bubbleFill(dm ? SAMPLE_COLOR : "sky", tone, colors.bg, scheme === "dark");
-  const look = { style, tone, fill, names: !dm, faces: facesShown(style, dm), text: CHAT_TEXT[size] };
+  const fill = bubbleFill(dm ? color : "sky", tone, colors.bg, scheme === "dark");
+  const walled = bare || hasWallpaper(wallpaper);
+  const faces = facesShown(style, dm);
+  const look = { style, tone, fill, names: !dm, faces, text: CHAT_TEXT[size], wallpaper: walled };
   const lines: Line[] = [
     { mine: true, text: t("settings.account.chat.sample.ask"), time: "14:30" },
     { mine: false, text: t("settings.account.chat.sample.answer"), time: "14:31" },
     { mine: true, text: t("settings.account.chat.sample.go"), time: "14:32" },
   ];
   const shown = useSharedValue(1);
-  const key = `${style}-${tone}-${size}-${dm}`;
+  const key = `${style}-${tone}-${size}-${dm}-${color}-${wallpaper ? wallpaperKey(wallpaper) : "none"}`;
   // biome-ignore lint/correctness/useExhaustiveDependencies: the look's key is what changed
   useEffect(() => {
     if (reducedMotion) return;
@@ -207,13 +244,24 @@ function ChatPreview({ style, tone, size, dm }: { style: ChatStyle; tone: ChatTo
   return (
     <RowLookContext.Provider value={look}>
       <Animated.View
-        style={[styles.preview, { backgroundColor: c.bg, borderColor: c.line2 }, fade]}
+        style={[bare ? null : [styles.preview, { backgroundColor: c.bg, borderColor: c.line2 }], fade]}
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
       >
+        {wallpaper && walled && !bare ? (
+          <ChatWallpaper
+            wallpaper={wallpaper}
+            strength={wallpaperStrength(style === "bubbles")}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
         {lines.map((line, i) => (
-          <PreviewRow key={line.time} line={line} first={i === 0} dm={dm} />
+          <PreviewRow key={line.time} line={line} first={i === 0} dm={dm} color={color} />
         ))}
+        {/* The hairline over the background (the frame's own border can draw under what fills it). */}
+        {wallpaper && walled && !bare ? (
+          <View pointerEvents="none" style={[styles.previewEdge, { borderColor: c.line2 }]} />
+        ) : null}
       </Animated.View>
     </RowLookContext.Provider>
   );
@@ -489,8 +537,8 @@ function SizeSlider({
 
 /**
  * Conversa, as Sua conta has it on the web: how conversations look to me on every device. One preview on top shows
- * exactly what a conversation will look like; under it the style (Canais and DMs each have their own, Bolhas its Clara
- * or Forte), the size of the words, and where a conversation opens.
+ * exactly what a conversation will look like; under it the background (its own screen, Background), the style (Channels
+ * and DMs each have their own, Bolhas its Clara or Forte), the size of the words, and where a conversation opens.
  */
 export function ChatLookPage() {
   const { t } = useTranslation();
@@ -510,6 +558,10 @@ export function ChatLookPage() {
   }, [sizeDraft, textSize]);
   const shownSize = sizeDraft ?? textSize;
   const openAt = openAtOf(prefs);
+  // The background behind every conversation, "auto" shown as the preview's agent in the DMs and the sky in the channels.
+  const wallpaper = defaultWallpaperOf(prefs);
+  const shownWallpaper = resolveWallpaper(wallpaper, dm ? SAMPLE_HUE : null);
+  const nameOf = useWallpaperName();
   const save = (patch: ChatPrefs) =>
     set.mutate(patch, {
       onError: () => {
@@ -557,7 +609,18 @@ export function ChatLookPage() {
         onChange={(k) => setKind(k as "channels" | "dms")}
       />
       <View style={styles.previewGap} />
-      <ChatPreview style={style} tone={tone} size={shownSize} dm={dm} />
+      <ChatPreview style={style} tone={tone} size={shownSize} dm={dm} wallpaper={shownWallpaper} />
+      <View style={styles.previewGap} />
+      <GroupedList>
+        <GroupedRow
+          label={t("settings.account.chat.wallpaper.title")}
+          sub={t("settings.account.chat.wallpaper.rowSub")}
+          value={nameOf(wallpaper, null)}
+          {...(hasWallpaper(wallpaper) ? { valueLeading: <WallpaperThumb wallpaper={shownWallpaper} /> } : {})}
+          chevron
+          onPress={() => router.push(wallpaperHrefs.choose({ all: true }))}
+        />
+      </GroupedList>
       <GroupedHeader
         hint={{
           name: t("common.about", { label: t("settings.account.chat.density") }),
@@ -643,6 +706,15 @@ const styles = StyleSheet.create({
   previewGap: { height: 16 },
   // The preview: the conversation's own page color on the grouped gray, a hairline round it.
   preview: { paddingVertical: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+  previewEdge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   row: { flexDirection: "row", gap: MSG_GAP, paddingLeft: MSG_INSET, paddingRight: 16 },
   slot: { width: MSG_AVATAR, alignItems: "center", paddingTop: 2 },
   body: { flex: 1, minWidth: 0 },

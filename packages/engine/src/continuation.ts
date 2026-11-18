@@ -6,6 +6,7 @@ import { answersOthers, audienceOf } from "./audience";
 import { accountablePerson, runAuthority } from "./authority";
 import { isComputerBrain } from "./brains/types";
 import { endsAsking } from "./brakes";
+import { CONFIDENTIAL_NOT_SHOWN, CONFIDENTIAL_OUTBOUND } from "./confidential";
 import { getChannelCached } from "./context";
 import { publishDelivery } from "./delivery";
 import { isAgentOnlyDm } from "./dms";
@@ -128,6 +129,7 @@ const SAFETY_CODES = new Set([
   "outbound.private_text",
   "outbound.credential",
   "outbound.long",
+  CONFIDENTIAL_OUTBOUND,
 ]);
 
 const isSafetyCode = (code: unknown) => typeof code === "string" && SAFETY_CODES.has(code);
@@ -513,13 +515,15 @@ export async function runCalls(db: Database, run: { id: string; orgId: string })
     if (kind === "tool_call") calls.set(id, { name, input: data.input });
     else {
       const call = calls.get(id) ?? { name, input: undefined };
+      const read = data.data as { outside?: unknown; confidential?: unknown; code?: unknown } | undefined;
       call.result = {
-        content: String(data.content ?? ""),
+        // A confidential result's words (ADR 0190) go to the run's own model and to no other reader of its calls.
+        content: read?.confidential === true ? CONFIDENTIAL_NOT_SHOWN : String(data.content ?? ""),
         isError: data.isError === true,
         // `data.data.outside`: the gateway's mark for any outside read, which survives `shown` dropping the envelope.
-        external: data.external === true || (data.data as { outside?: unknown } | undefined)?.outside === true,
+        external: data.external === true || read?.outside === true,
       };
-      call.safety = data.isError === true && isSafetyCode((data.data as { code?: unknown } | undefined)?.code);
+      call.safety = data.isError === true && isSafetyCode(read?.code);
       calls.set(id, call);
     }
   }

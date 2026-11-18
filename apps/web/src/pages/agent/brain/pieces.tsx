@@ -373,3 +373,20 @@ export function useGlide<T extends HTMLElement>(key: unknown) {
   }, []);
   return ref;
 }
+
+/** "Só esta conta" (ADR 0041 §6): at a limit the agent waits for its own account instead of going on with the next. */
+export function PinAccount({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  const { t } = useTranslation();
+  const id = useId();
+  return (
+    <div className="plan-replies">
+      <span className="ac-hintline">
+        <label htmlFor={id}>{t("agentPage.work.brain.pinned")}</label>
+        <InfoHint name={t("common.about", { label: t("agentPage.work.brain.pinned") })}>
+          {t("agentPage.work.brain.pinnedHint")}
+        </InfoHint>
+      </span>
+      <Switch id={id} checked={on} onCheckedChange={onChange} />
+    </div>
+  );
+}

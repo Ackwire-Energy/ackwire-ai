@@ -39,6 +39,7 @@ import Animated, { FadeIn, LayoutAnimationConfig, LinearTransition } from "react
 import { useOrg } from "@/providers/org";
 import {
   Button,
+  Disclosure,
   EmptyState,
   GroupedHeader,
   type HeaderMenuItem,
@@ -48,6 +49,7 @@ import {
   Locked,
   PixelOrbit,
   PressScale,
+  RowPressable,
   SCREEN_X,
   SkeletonList,
   Text,
@@ -251,7 +253,7 @@ function ConversationRow({ issue, onOpen }: { issue: Issue; onOpen: () => void }
         </Text>
       ) : null}
       <MentionCount count={mentions} />
-      <Icon name="right" size={16} color={c.faint} />
+      <Disclosure />
     </PressScale>
   );
 }
@@ -619,7 +621,7 @@ function Criteria({ issue: i }: { issue: Issue }) {
     >
       <View style={[styles.card, surface]}>
         {criteria.map((x, k) => (
-          <Pressable
+          <RowPressable
             key={x.id}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: x.done }}
@@ -643,7 +645,7 @@ function Criteria({ issue: i }: { issue: Issue }) {
                 },
               );
             }}
-            style={({ pressed }) => [styles.crit, pressed && { backgroundColor: c.sunken }]}
+            style={styles.crit}
           >
             {k > 0 ? <View style={[styles.critLine, { backgroundColor: c.line }]} /> : null}
             <View
@@ -655,7 +657,7 @@ function Criteria({ issue: i }: { issue: Issue }) {
               {x.text}
             </Text>
             {x.done && x.doneBy?.type === "agent" ? <Face who={x.doneBy} size={18} live={false} /> : null}
-          </Pressable>
+          </RowPressable>
         ))}
       </View>
     </Group>
@@ -675,11 +677,7 @@ function LinkRow({
 }) {
   const c = useColors();
   return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="link"
-      style={({ pressed }) => [styles.link, pressed && { backgroundColor: c.sunken }]}
-    >
+    <RowPressable hold onPress={onPress} accessibilityRole="link" style={styles.link}>
       {!first ? <View style={[styles.linkLine, { backgroundColor: c.line }]} /> : null}
       <View style={[styles.tile, { backgroundColor: c.sunken }]}>
         <Icon name={icon} size={16} color={c.muted} />
@@ -687,8 +685,8 @@ function LinkRow({
       <Text variant="body" numberOfLines={1} style={styles.grow}>
         {label}
       </Text>
-      <Icon name="right" size={15} color={c.faint} />
-    </Pressable>
+      <Disclosure />
+    </RowPressable>
   );
 }
 

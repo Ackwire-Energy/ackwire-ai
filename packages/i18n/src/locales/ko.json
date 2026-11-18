@@ -605,6 +605,7 @@
     "termsMiddle": " 및 ",
     "privacy": "개인정보 처리방침",
     "termsAfter": "에 동의하게 돼요.",
+    "poweredBy": "Ackwire AI 기반",
     "signOut": "로그아웃",
     "earlyAccess": {
       "otherEmail": "이 초대는 다른 주소로 보낸 거예요. 초대를 받은 주소로 가입하세요.",
@@ -2327,6 +2328,56 @@
     "localOnlyHow": "그 컴퓨터의 Ackwire AI 앱에서 환경설정 › 서버의 휴대폰과 팀원이 접속할 수 있게 하기를 켠 다음 여기로 돌아오세요.",
     "localOnlyHere": "휴대폰과 팀원이 접속할 수 있게 하기를 켠 다음 여기로 돌아오세요."
   },
+  "surface": {
+    "link": {
+      "consent": "Ackwire AI의 {{assistant}}이(가) {{surface}}에서 워크스페이스에 관한 메시지를 보낼 수 있고, 급한 일이 있고 허락했을 때만 전화해요. 끄려면 stop이라고 보내세요.",
+      "title": "{{surface}}에서 {{assistant}}와 대화하기",
+      "qr": "코드가 입력된 채로 {{surface}}를 여는 QR 코드",
+      "making": "코드를 만드는 중",
+      "code": "내 코드 {{code}}",
+      "open": "{{surface}} 열기",
+      "stepScan": "휴대폰으로 코드를 스캔하거나 앱을 여세요",
+      "stepSend": "메시지를 그대로 보내세요",
+      "stepSendText": "메시지가 도착하면 자동으로 다음 단계로 넘어가요.",
+      "stepConfirm": "보낸 사람을 확인하고 여기서 확인하세요",
+      "showCode": "코드 다시 보기",
+      "confirmTitle": "이 {{surface}}가 맞나요?",
+      "sentBy": "이 보낸 사람이 코드를 보냈어요",
+      "onlyYou": "본인일 때만 연결하세요.",
+      "workspace": "{{workspace}}에서 응답해요",
+      "confirm": "네, 연결할게요",
+      "notMe": "제가 아니에요",
+      "doneTitle": "{{surface}}가 연결됐어요",
+      "doneText": "이제 {{assistant}}가 그곳에서 답해요.",
+      "newCode": "새 코드 만들기",
+      "done": "완료"
+    },
+    "row": {
+      "hint": "{{assistant}}와 대화하고 답장을 {{surface}}에서 받아요.",
+      "link": "연결",
+      "none": "{{assistant}}가 그곳에서 메시지를 보낼 수 있어요",
+      "pending": "보낸 사람이 확인을 기다리고 있어요",
+      "unlink": "연결 해제",
+      "unlinkTitle": "{{surface}} 연결을 해제할까요?",
+      "unlinkText": "{{assistant}}가 그곳에서 더 이상 답하지 않아요. 언제든 다시 연결할 수 있어요.",
+      "unlinked": "{{surface}} 연결을 해제했어요"
+    },
+    "undo": {
+      "title": "채팅 앱 연결을 해제할까요?",
+      "lead": "방금 계정이 채팅 앱에 연결됐어요. 본인이 아니라면 여기서 해제하세요.",
+      "button": "연결 해제",
+      "done": "{{surface}} 연결을 해제했어요",
+      "doneLead": "{{display}}는 이제 계정에 닿을 수 없어요.",
+      "ended": "이미 해제됐어요",
+      "endedLead": "{{surface}}의 {{display}}는 이미 해제됐어요. 더 할 일은 없어요.",
+      "gone": "이 취소 링크는 더 이상 작동하지 않아요",
+      "sender": "그 보낸 사람"
+    },
+    "via": "{{surface}} 경유",
+    "viaTip": "{{person}}님이 {{surface}}에서 보냄",
+    "forwarded": "{{surface}}에서 전달됨",
+    "forwardedTip": "{{person}}님이 {{surface}}에서 전달했어요. 다른 사람이 쓴 글이에요."
+  },
   "team": {
     "title": "팀",
     "people_other": "{{count}}명",
@@ -2534,7 +2585,8 @@
     "header": {
       "pins": "고정된 메시지",
       "showMembers": "멤버 보기",
-      "hideMembers": "멤버 숨기기"
+      "hideMembers": "멤버 숨기기",
+      "more": "옵션 더보기"
     },
     "membersButton_other": "채널 멤버({{count}})",
     "membersAgents": "에이전트",
@@ -3258,9 +3310,12 @@
     "titleFor": "{{name}}의 AI 연결",
     "have": {
       "title": "이미 연결됨",
-      "titleFor": "{{name}}에 이미 연결됨",
       "other": "또는 다른 것 연결",
-      "manageKeys": "키 관리 또는 삭제"
+      "manageKeys": "키 관리 또는 삭제",
+      "pickLine": "여기에 이미 연결된 계정을 고르세요. {{name}}은(는) 그 계정으로 생각해요.",
+      "onlyOwner_other": "{{name}}님만 줄 수 있는 계정이 {{count}}개 더 있어요.",
+      "moreAgents_other": "외 에이전트 {{count}}개",
+      "plenty": "여유 있음"
     },
     "chat": {
       "mine": "내 계정",
@@ -3440,6 +3495,13 @@
     "onceHint": "모두 요금제 한도를 함께 써요.",
     "use": "{{label}} 사용",
     "another": "다른 계정",
+    "which": {
+      "title": "{{name}}이(가) 사용할 {{brand}} 계정은?",
+      "title_female": "{{name}}이(가) 사용할 {{brand}} 계정은?",
+      "titleAll": "사용할 {{brand}} 계정은?",
+      "mine": "{{computer}}의 내 {{brand}} 계정",
+      "other": "다른 {{brand}} 계정으로 로그인"
+    },
     "reuse": {
       "active": "여기에 이미 {{label}}이(가) 있어요. 그 계정에 다시 로그인하거나 다른 계정을 쓰세요.",
       "signedOut": "여기서 {{label}}이(가) 로그아웃됐어요. 다시 로그인하면 에이전트가 계속 써요."
@@ -3589,6 +3651,7 @@
     "resuming": "{{agent}}이(가) 이어서 하는 중이에요",
     "shared_other": "{{agents}}도 같은 {{plan}} 요금제를 써요. 대화는 모두 같은 대기열에 들어가요.",
     "about": "대기열 안내",
+    "chain": "{{plan}} 계정 {{accounts}}개가 모두 한도에 도달했어요.",
     "lists": "대화",
     "queuedTab": "대기 중",
     "skippedTab": "건너뜀",
@@ -3658,7 +3721,6 @@
       "aiAccount": "{{account}}(으)로 생각해요",
       "aiModel": "API로 생각해요",
       "aiNone": "아직 AI가 없어요. 만든 다음 연결하세요",
-      "reviewTitle": "{{name}} 검토",
       "lines": "{{name}}이(가) 받는 것",
       "aChannel": "채널",
       "anApp": "앱",
@@ -5043,6 +5105,7 @@
       "joinRequest_other": "{{name}} 님 외 여러 명이 참여를 요청해요",
       "joinRequestNames": "{{names}} 님이 참여를 요청해요",
       "joinSuggestion": "{{by}} 님이 {{name}} 님을 제안했어요",
+      "joinOutside": "{{name}} 님이 {{outsideOf}}의 외부 협력자로 참여를 요청했어요. 자리를 차지하지 않아요",
       "doing": {
         "merge": "머지",
         "deploy": "배포",
@@ -5099,6 +5162,7 @@
       "joinRequest": "<b>{{name}}</b> 님이 참여를 요청해요",
       "joinRequestMany": "<b>{{names}}</b> 님이 참여를 요청해요",
       "joinSuggestion": "<b>{{by}}</b> 님이 <b>{{name}}</b> 님을 제안했어요",
+      "joinOutside": "<b>{{name}}</b> 님이 <b>{{outsideOf}}</b>의 외부 협력자로 참여를 요청했어요. 자리를 차지하지 않아요",
       "changeRequest": "<b>{{name}}</b>님이 <b>{{agent}}</b> 변경을 요청해요",
       "proposalWaiting": "<b>{{names}}</b>의 개선 제안",
       "changeRequestAgent": "<b>{{name}}</b>님이 새 에이전트를 요청해요: <b>{{agent}}</b>",
@@ -5509,11 +5573,12 @@
         "accountAlso": "{{agents}}도 사용 중",
         "accountOf": "{{name}}님의 계정",
         "accountOthers": "workspace 전체를 지원하는 플랜에는 소유자가 표시돼요.",
+        "movesOn": "한도에 도달하면 다음 계정으로 이어서 해요",
+        "pinned": "이 계정만",
+        "pinnedHint": "한도에 도달하면 다음 계정으로 넘어가지 않고 이 계정이 초기화될 때까지 기다려요.",
         "addAccount": "계정 추가",
         "signInAgain": "다시 로그인",
         "connectPlan": "다른 요금제 연결",
-        "fallbackTitle": "{{computer}}이(가) 응답하지 않으면 API로 답하기",
-        "fallbackHint": "API로 답하고 {{name}}의 예산에서 차감돼요. 끄면 {{name}}은(는) 요청한 사람에게 알리고 컴퓨터가 돌아오기를 기다려요.",
         "effort": "사고 수준",
         "efforts": {
           "auto": "자동",
@@ -5574,8 +5639,7 @@
           "effort": "사고 수준: {{level}}",
           "speed": "속도: 빠름",
           "context": "컨텍스트: {{size}}",
-          "sharing": "다른 사람에게도 답해요",
-          "waits": "컴퓨터를 기다려요"
+          "sharing": "다른 사람에게도 답해요"
         },
         "copy": {
           "row": "다른 에이전트에도 사용",
@@ -5713,7 +5777,6 @@
           "wait": "기다리기",
           "modelTitle": "{{name}}의 모델",
           "moreTitle": "{{name}}의 추가 옵션",
-          "fallback": "요금제가 멈추면 API 키 사용",
           "computer": "컴퓨터",
           "doneTitle": "다 됐어요",
           "doneSub": "진행 중이던 일은 새 계정으로 이어져요.",
@@ -6875,7 +6938,6 @@
     "adminsOnlyPersonal": "에이전트를 만들 수 있게 해 달라고 여기를 관리하는 사람에게 요청하세요.",
     "proposalClosed": "이 제안은 이미 결정됐거나 만료됐어요.",
     "proposalNoAccess": "이 제안은 해당 대화에 있는 사람만 볼 수 있어요.",
-    "backToChat": "대화로 돌아가기",
     "and": " 및 ",
     "routine": "루틴",
     "routineKeep": "{{name}} 루틴 만들기",
@@ -7050,6 +7112,51 @@
     "otherSkill": "다른 스킬",
     "namesLead": "이건 어때요",
     "namesRoll": "다른 이름",
+    "proposal": {
+      "lead": "{{name}}이(가) 제안한 내용을 조정하세요. 나중에 모두 바꿀 수 있어요.",
+      "leadNarrow": "{{name}}의 제안: {{why}}",
+      "side": "제안",
+      "from": "{{name}}의 제안",
+      "changed": "바꾼 내용",
+      "changedNone": "아직 없어요. 카드에서 바꾼 내용이 여기에 실행 취소와 함께 표시돼요.",
+      "undo": "실행 취소",
+      "changes": {
+        "changed": "변경됨",
+        "added": "추가됨",
+        "removed": "제거됨",
+        "how": "일하는 방식"
+      },
+      "firstTask": "첫 작업",
+      "firstTaskPlaceholder": "먼저 요청할 일 (선택)",
+      "firstTaskHint": "{{name}}와(과)의 채팅에 준비돼요. 보내기만 하면 돼요.",
+      "firstTaskHintBlank": "이 에이전트와의 채팅에 준비돼요. 보내기만 하면 돼요.",
+      "firstTaskNone": "작업이 없으면 채팅이 비어 있는 상태로 열려요.",
+      "after": "만든 후",
+      "afterAi": "{{name}}이(가) 생각할 AI 연결",
+      "afterAiBlank": "생각할 AI 연결",
+      "afterApp": "{{app}} 연결",
+      "afterNone": "없음. {{name}}은(는) 만들어지면 바로 일을 시작해요.",
+      "afterNoneBlank": "없음. 만들어지면 바로 일을 시작해요.",
+      "discard": "제안 버리기",
+      "otherChannel": "다른 채널",
+      "chooseChannels": "채널 선택",
+      "channelsNone": "나와의 채팅에서만.",
+      "channel": {
+        "lead": "{{name}}이(가) 일할 곳.",
+        "leadBlank": "일할 곳.",
+        "does": "{{name}}은(는) {{channel}}에서 부르면 답하고 그곳의 대화를 읽어요.",
+        "doesBlank": "{{channel}}에서 부르면 답하고 그곳의 대화를 읽어요.",
+        "remove": "{{channel}}에서 빼기"
+      },
+      "routine": {
+        "label": "루틴",
+        "lead": "{{when}}, {{channel}}에서.",
+        "leadDm": "{{when}}, 나와의 채팅에서.",
+        "starts": "{{name}}이(가) 만들어지면 시작해요. 시간과 내용은 루틴에서 바꿀 수 있어요.",
+        "startsBlank": "만들어지면 시작해요. 시간과 내용은 루틴에서 바꿀 수 있어요.",
+        "remove": "루틴 빼기"
+      }
+    },
     "skill": {
       "opens": "{{name}}은(는) 그 주제가 나오면 이 안내서를 펼쳐요. 수정은 스킬에서 해요.",
       "opensBlank": "그 주제가 나오면 이 안내서를 펼쳐요. 수정은 스킬에서 해요.",
@@ -7088,6 +7195,10 @@
     "rolesAdd": "역할 추가",
     "rolesChange": "역할 변경",
     "moreOf": "{{name}} 더 보기",
+    "outside": {
+      "chip": "외부",
+      "title": "외부 협력자"
+    },
     "passwordLink": {
       "item": "새 비밀번호 링크 만들기",
       "hint": "비밀번호를 잊었을 때",
@@ -7285,6 +7396,8 @@
       "viaLink": "{{when}} 링크로 요청함",
       "suggested": "{{when}} {{name}} 님이 제안함",
       "suggestedLabel": "{{by}} 님이 {{name}} 님을 제안함",
+      "outside": "{{when}} {{outsideOf}}의 외부 협력자로 참여 요청함",
+      "outsideSeat": "외부 협력자는 요금제 인원에 포함되지 않으며, 언제든지 내보낼 수 있어요.",
       "asked": "{{ago}} 요청함",
       "askedNow": "방금 요청함",
       "askedOn": "{{date}}에 요청함",
@@ -8664,7 +8777,7 @@
       "canceledToast": "취소했어요. 한도가 초기화돼도 실행되지 않아요.",
       "continuedToast": "실행을 계속해요.",
       "forbidden": "지금 계속하려면 루틴을 만든 사람, 에이전트 소유자 또는 관리자여야 해요",
-      "extra_off": "이 요금제의 사용 한도를 다 썼고, 이 에이전트의 긴 작업에는 유료 추가 사용량이 꺼져 있어요. 지금 계속하려면 AI 설정에서 켜세요. 아니면 초기화 후 이어서 해요",
+      "extra_off": "이 요금제의 사용 한도를 다 썼고, 이 에이전트의 긴 작업은 요금제의 유료 추가 사용량을 쓰지 않아요. 초기화 후 이어서 해요",
       "extra_used_up": "이 요금제의 사용 한도를 다 썼고, 유료 추가 사용량도 소진됐거나 사용할 수 없어요. 초기화 후 이어서 해요"
     },
     "pausedRunningToast": "루틴을 일시 중지했어요. 진행 중이던 실행도 중지됐어요.",
@@ -10064,6 +10177,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "이름 없는 계정",
+    "rename": {
+      "action": "{{label}} 이름 바꾸기",
+      "label": "계정 이름",
+      "placeholder": "예: 업무, 개인"
+    },
     "share": {
       "switch": "다른 사람에게도 답해요",
       "switchAll": "다른 사람에게도 답하기",
@@ -10758,6 +10877,17 @@
     "saved": "로고를 업데이트했어요.",
     "removed": "로고를 삭제했어요."
   },
+  "orgAccent": {
+    "label": "강조 색상",
+    "change": "색상 변경",
+    "useDefault": "기본값 사용",
+    "suggested": "추천 색상",
+    "sampleMention": "@에이전트",
+    "sampleLink": "링크",
+    "save": "색상 저장",
+    "saved": "강조 색상을 업데이트했어요.",
+    "reset": "기본 색상으로 되돌렸어요."
+  },
   "look": {
     "previous": "이전",
     "next": "다음",
@@ -11433,8 +11563,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}, API 대체 없음"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "모델",
@@ -14335,6 +14464,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "채팅 앱 연결이 꺼졌어요. 새로고침해서 지금 설정을 확인하세요.",
+      "notAllowed": "채팅 앱 연결은 아직 내 계정에 열리지 않았어요. 열릴 때까지 여기 앱을 계속 사용하세요.",
+      "noAssistant": "이 워크스페이스의 어시스턴트는 나와 대화하도록 설정되어 있지 않아요. 연결할 다른 워크스페이스를 고르세요.",
+      "noWorkspace": "이제 이 워크스페이스의 멤버가 아니에요. 연결할 다른 워크스페이스를 고르세요.",
+      "linkGone": "이 연결은 더 이상 대기 중이 아니에요. 10분이 지나 만료됐거나 취소됐어요. 새 코드를 만들어 다시 시작하세요.",
+      "taken": "그 발신자는 다른 Ackwire AI 계정에 연결되어 있어요. 거기서 연결을 해제한 다음 새 코드를 보내세요.",
+      "undoGone": "이 실행 취소 링크는 이미 사용됐거나 만료됐어요. 대신 알림 설정에서 연결을 해제하세요.",
+      "codeGone": "이 코드는 틀렸거나, 이미 사용됐거나, 10분이 지나 만료됐어요. 새 코드를 만들어 다시 보내세요."
+    },
+    "wallpaper": {
+      "notYours": "내 사진이 아니에요.",
+      "invalid": "없는 배경이에요.",
+      "tooLarge": "사진은 최대 2MB까지 가능해요.",
+      "type": "JPEG, PNG 또는 WebP 사진을 사용하세요."
+    },
     "tooLarge": "서버가 받을 수 있는 크기보다 커요.",
     "tooLargeMax": "서버가 받을 수 있는 크기보다 커요. 최대 {{max}}MB예요.",
     "passwordLink": {
@@ -14365,7 +14510,7 @@
       "accountInUse": "그 계정은 이미 다른 에이전트를 위해 생각하고 있어요.",
       "noAiYet": "아직 연결된 AI가 없어요.",
       "filePurged": "이 파일은 30일도 더 전에 삭제되어 되돌릴 수 없어요.",
-      "looksSecret": "비밀번호나 키처럼 보여요. 여기 있는 모두가 보게 돼요.",
+      "looksSecret": "비밀번호나 키처럼 보여요. 여기 있는 모두가 보게 돼요. 대신 에이전트에게 비공개로 요청해 달라고 하세요.",
       "blockSpec": "이 블록의 구성 요소나 수식에 오류가 있어 표시할 수 없어요. 고친 뒤 다시 시도해 주세요.",
       "takeControl": "먼저 프로필의 제어권을 가져오세요.",
       "profileBusy": "다른 사람이 이 프로필을 쓰고 있어요.",
@@ -14385,6 +14530,7 @@
       "agentCantRead": "먼저 에이전트의 접근 설정에서 이것을 읽게 해 주세요.",
       "neverHappens": "이 일정은 실행되지 않아요.",
       "soleOwner": "다른 멤버가 있는 워크스페이스의 유일한 소유자예요. 먼저 다른 사람을 소유자로 지정하거나 워크스페이스를 삭제해 주세요.",
+      "soleOwnerOutside": "다른 사람이 모두 외부 협력자인 워크스페이스의 유일한 소유자예요. 외부 협력자는 소유자가 될 수 없어요. 먼저 멤버를 초대해 소유자로 지정하거나 워크스페이스를 삭제해 주세요.",
       "testFirst": "켜기 전에 이 설정으로 연결을 테스트해 주세요.",
       "voiceLength": "녹음이 너무 길거나 너무 짧아요.",
       "sendAgain": "파일이 온전히 도착하지 않았어요. 다시 보내 주세요.",
@@ -14461,7 +14607,8 @@
       "aboveYou": "이 역할보다 위에 있는 사람만 변경할 수 있어요.",
       "base": "모든 워크스페이스에는 ‘모두’ 역할이 항상 있어요.",
       "unknown": "그 역할은 더 이상 없어요.",
-      "orderIncomplete": "옮기는 동안 역할이 바뀌었어요. 새로고침하고 다시 시도하세요."
+      "orderIncomplete": "옮기는 동안 역할이 바뀌었어요. 새로고침하고 다시 시도하세요.",
+      "outsideOwner": "외부 협력자는 소유자가 될 수 없어요."
     },
     "teamProposal": {
       "undoExpired": "이 팀을 만든 지 하루가 넘어서 여기서는 되돌릴 수 없어요. 각 에이전트 페이지에서 보관하세요."
@@ -14493,7 +14640,8 @@
       "denied": "요청이 승인되지 않았어요. 그곳 사람에게 초대를 요청하세요.",
       "answered": "이미 누군가 이 요청에 답했어요.",
       "expired": "이 요청은 만료됐어요. 14일 동안 아무도 답하지 않았어요.",
-      "codeNeeded": "먼저 이메일을 인증하세요."
+      "codeNeeded": "먼저 이메일을 인증하세요.",
+      "outsideClosed": "이 계정은 차단됐거나 삭제 중이라 참여할 수 없어요. 요청은 닫혔어요."
     },
     "code": {
       "wrong": "코드가 틀렸어요. 다시 시도하세요.",
@@ -14579,7 +14727,7 @@
       "takeOverNoAccess": "루틴을 넘겨받으려면 먼저 루틴의 대화에 참여하세요.",
       "agentNotInChannel": "먼저 에이전트를 대화에 추가하세요.",
       "webhookPaused": "테스트하려면 루틴을 켜세요.",
-      "continueExtraOff": "이 요금제의 사용 기간 한도를 다 썼고, 이 에이전트의 긴 작업은 유료 추가 사용량을 쓰지 않아요. 지금 계속하려면 AI 설정에서 켜세요. 아니면 초기화 후에 이어서 해요.",
+      "continueExtraOff": "이 요금제의 사용 기간 한도를 다 썼고, 이 에이전트의 긴 작업은 요금제의 유료 추가 사용량을 쓰지 않아요. 초기화 후에 이어서 해요.",
       "continueExtraUsedUp": "이 요금제의 사용 기간 한도를 다 썼고 유료 추가 사용량도 다 썼거나 쓸 수 없어요. 초기화 후에 이어서 해요.",
       "actionsNeedApprover": "에이전트 소유자나 그 작업을 승인하는 사람만 루틴이 스스로 실행하게 할 수 있어요.",
       "editorOnly": "루틴을 만든 사람, 에이전트 소유자 또는 관리자만 바꿀 수 있어요.",
@@ -14675,13 +14823,15 @@
     "agent": {
       "ownerOrAdmin": "에이전트 소유자나 관리자만 할 수 있어요.",
       "detailsHidden": "{{agentName}}에게 말할 수 있는 사람만 작동 방식을 볼 수 있어요.",
-      "extraOwnerOnly": "에이전트 소유자만 요금제의 유료 추가 사용량을 켜거나 끌 수 있어요.",
       "undoForbidden": "에이전트가 도와준 사람, 에이전트 소유자 또는 관리자만 되돌릴 수 있어요.",
-      "undoSkillsAdmins": "에이전트의 스킬 변경은 관리자만 되돌리거나 다시 할 수 있어요."
+      "undoSkillsAdmins": "에이전트의 스킬 변경은 관리자만 되돌리거나 다시 할 수 있어요.",
+      "extraOwnerOnly": "에이전트 소유자만 요금제의 유료 추가 사용량을 켜거나 끌 수 있어요.",
+      "extraUnavailable": "유료 추가 사용은 에이전트 담당자 본인의 요금제에서만 사용할 수 있으며 오른팔에서는 사용할 수 없습니다."
     },
     "account": {
       "notRestorable": "이 계정은 더 이상 복원할 수 없어요.",
-      "notOwner": "이 계정이나 요금제를 연결한 사람만 할 수 있어요."
+      "notOwner": "이 계정이나 요금제를 연결한 사람만 할 수 있어요.",
+      "orderForbidden": "이 계정을 연결한 사람이나 관리자만 순서에서 위치를 바꿀 수 있어요."
     },
     "channel": {
       "membersForbidden": "채널을 만든 사람이나 관리자만 사람을 추가하거나 제거할 수 있어요."
@@ -15954,8 +16104,37 @@
     },
     "system": "시스템",
     "removed": "삭제됨",
+    "operatorRead": {
+      "sentence": "{{who}}이 {{what}} 읽었어요",
+      "who": {
+        "server": "이 서버를 운영하는 사람",
+        "cloud": "Ackwire AI 지원팀"
+      },
+      "what": {
+        "message": "메시지 한 건을",
+        "run_step": "에이전트 작업의 한 단계를",
+        "agent": "에이전트의 지침을",
+        "routine": "루틴 하나를",
+        "task": "백그라운드 작업 하나를",
+        "channel": "채널 이름을",
+        "connection": "연결 정보를",
+        "support_request": "지원 요청 한 건을",
+        "direct": "비공개 대화의 내용을",
+        "other": "워크스페이스의 내용을"
+      },
+      "request": {
+        "plain": "{{name}}님의 요청",
+        "app": "{{name}}님의 요청, 앱에서 보냄",
+        "email": "{{name}}님의 요청, 이메일로 보냄",
+        "operator": "{{name}}님의 요청, 이 서버를 운영하는 사람이 기록",
+        "support": "{{name}}님의 요청, 지원팀이 기록"
+      },
+      "fault": "실패했거나 멈춘 실행을 진단하기 위해",
+      "ai": "AI 어시스턴트 사용"
+    },
     "change": {
       "mergedWithoutAsking": "{{repo}}에서 묻지 않고 병합했어요",
+      "accentChanged": "워크스페이스의 강조 색상을 변경했어요",
       "pattern": "{{area}} {{verb}}",
       "approval": {
         "approved": "요청을 승인했어요",
@@ -15967,6 +16146,11 @@
         "left": "워크스페이스를 떠났어요",
         "role_changed": "멤버의 역할을 변경했어요",
         "password_link": "멤버의 새 비밀번호 링크를 만들었어요"
+      },
+      "outside": {
+        "approved": "{{outsideOf}}의 외부 협력자를 들였어요",
+        "removed": "{{outsideOf}}의 외부 협력자를 내보냈어요",
+        "left": "{{outsideOf}}의 외부 협력자로서 워크스페이스를 떠났어요"
       },
       "role": {
         "permission_set": "{{short}} 권한을 가진 사람을 변경했어요",
@@ -16230,6 +16414,51 @@
           "new3": "2곳 남았어요, 내일 전화할게요.",
           "new4": "Drive의 보고서를 업데이트했어요.",
           "newCount": "새 메시지 4개"
+        },
+        "wallpaper": {
+          "title": "배경",
+          "help": "나에게만 바뀌고, 모든 기기에 적용돼요",
+          "rowHelp": "모든 대화 뒤에 나에게만 보여요. 대화마다 메뉴에서 따로 고를 수도 있어요.",
+          "rowSub": "나에게만, 모든 대화에서",
+          "onlyHere": "{{name}}에서만, 나에게만",
+          "none": "배경 없음",
+          "sameAsOthers": "다른 대화와 같게",
+          "sameShort": "다른 대화와 같음",
+          "sky": "하늘",
+          "drawings": "그림",
+          "color": "색상",
+          "photos": "내 사진",
+          "choosePhoto": "사진 선택",
+          "skyAutoHelp": "첫 번째는 대화에 따라 바뀌어요. 다이렉트 메시지에서는 에이전트 색의 하늘, 채널에서는 워크스페이스의 하늘이에요.",
+          "skyAutoHelpDms": "첫 번째는 에이전트 색의 하늘이에요.",
+          "skyAutoHelpChannels": "첫 번째는 워크스페이스의 하늘이에요.",
+          "neutral": {
+            "paper": "종이",
+            "mist": "안개",
+            "sand": "모래"
+          },
+          "name": {
+            "skyAuto": "대화의 하늘",
+            "skyAgent": "에이전트의 하늘",
+            "skyWorkspace": "워크스페이스의 하늘",
+            "sky": "하늘 · {{color}}",
+            "drawingsAuto": "대화의 그림",
+            "drawingsAgent": "에이전트의 그림",
+            "drawingsWorkspace": "워크스페이스의 그림",
+            "drawings": "그림 · {{color}}",
+            "crowd": "에이전트",
+            "color": "색상 · {{color}}",
+            "photo": "내 사진"
+          },
+          "choose": "선택…",
+          "menu": "대화 배경…",
+          "preview": "미리보기",
+          "usePhoto": "이 사진 사용",
+          "dragHint": "사진을 끌어서 보이는 부분을 고르세요",
+          "dim": "다크 모드에서 어둡게",
+          "sending": "사진 보내는 중…",
+          "failed": "배경을 저장하지 못했어요. 다시 시도하세요.",
+          "done": "완료"
         }
       },
       "agentStyle": "에이전트가 말하는 방식",
@@ -16621,6 +16850,14 @@
   "usageViews": {
     "signedOut": "로그아웃됨",
     "whose": "{{name}}의 계정",
+    "order": {
+      "title": "{{plan}} · 사용 순서",
+      "hint": "한도에 도달하면 에이전트는 여유가 있는 다음 계정으로 이어서 하고, 첫 계정이 초기화되면 돌아와요.",
+      "terms": "{{plan}} 계정을 여러 개 쓰는 건 {{plan}} 약관에서 회색 지대예요.",
+      "termsLabel": "{{plan}} 약관",
+      "termsHint": "플랜은 한 사람용이라서, 에이전트가 여러 계정에 기대기 전에 {{plan}} 약관을 확인하세요.",
+      "move": "{{name}} 이동, 순서 {{n}}번"
+    },
     "serves": {
       "everyone": "모두 사용",
       "onlyYou": "나만 사용",
@@ -16687,7 +16924,7 @@
       "api": "API",
       "apiMain": "{{name}}은(는) API로 생각해요",
       "apiMain_female": "{{name}}은(는) API로 생각해요",
-      "apiFallback": "요금제 외: 빠른 결정, 그리고 요금제가 응답하지 못했을 때",
+      "apiFallback": "요금제 외: 빠른 결정",
       "removed": "삭제된 계정",
       "removedSub": "더 이상 어떤 컴퓨터에도 없어요",
       "old": "계정 도입 이전 {{brand}}",
@@ -17309,6 +17546,7 @@
       "provider_wait_said": "{{provider}}이(가) 오류로 응답했어요({{detail}}). 다시 시도하고 되는 대로 답할게요.",
       "provider_wait_ours": "계정 문제가 아니라 저희 쪽 문제로 AI가 막혀 있어요. 해결되는 대로 답할게요.",
       "provider_back": "AI가 돌아왔어요.",
+      "confidential_removed": "삭제됨: 기밀 텍스트는 {{days}}일 동안 보관됩니다.",
       "brain_busy": "지금 컴퓨터가 다른 작업으로 바빠요. 여유가 생기는 대로 답할게요.",
       "brain_queued": "아직 컴퓨터 대기열에 있어요. 남은 메모리가 생기면 바로 답할게요.",
       "brain_interrupted": "{{brain}}이(가) 끝내기 전에 멈췄어요. 이미 완료되어 반복하지 않은 것: {{tools}}.",
@@ -17316,6 +17554,11 @@
       "plan_limit_cut_unknown": "{{plan}} 요금제 한도에서 멈췄어요. 초기화되는 대로 멈춘 곳부터 이어 갈게요.",
       "plan_limit_wait": "{{plan}} 요금제가 한도에 도달했어요. 초기화되는 {{when}}에 답할게요. {{plan}}에서 더 일찍 풀리면 바로 알아채고 답할게요.",
       "plan_limit_wait_unknown": "{{plan}} 요금제가 한도에 도달했어요. 초기화되는 대로 답할게요.",
+      "plan_account_moved": "{{from}} 계정이 한도에 도달했어요. {{to}} 계정으로 이어갈게요.",
+      "plan_account_moved_line": "{{from}} 계정이 한도에 가까워졌어요. {{to}} 계정으로 계속할게요.",
+      "plan_account_moved_extra": "{{from}} 계정은 유료 추가 사용량으로 넘어가요. {{to}} 계정으로 계속할게요.",
+      "plan_limit_all_wait": "{{plan}} 계정 {{accounts}}개가 모두 한도에 도달했어요. 첫 계정이 초기화되는 {{when}}에 답할게요.",
+      "plan_limit_all_wait_unknown": "{{plan}} 계정 {{accounts}}개가 모두 한도에 도달했어요. 하나라도 초기화되는 대로 답할게요.",
       "plan_model_limit_wait": "{{model}} 모델이 {{plan}}에서 자체 한도에 도달했어요. 요금제의 다른 모델은 계속 쓸 수 있어요. {{agent}}의 모델을 바꾸거나 {{when}}에 초기화될 때까지 기다리세요.",
       "plan_model_limit_wait_unknown": "{{model}} 모델이 {{plan}}에서 자체 한도에 도달했어요. 요금제의 다른 모델은 계속 쓸 수 있어요. {{agent}}의 모델을 바꾸거나 초기화될 때까지 기다리세요.",
       "plan_model_region_wait": "이 모델({{model}})을 쓰려면 OpenCode의 설정 › 개인정보에서 Global 리전을 켜야 해요.",
@@ -17386,6 +17629,8 @@
       "file_saved": "파일을 저장했어요.",
       "issue_work_start": "작업 #{{number}}을(를) 진행해 주세요.",
       "issue_taken": "작업 #{{number}}을(를) 맡았어요.",
+      "surfaceUnlinked": "{{surface}}은(는) 신원이 바뀌어 연결이 해제되었습니다. 본인이라면 설정에서 다시 연결하세요.",
+      "surfaceVoiceDropped": "그 음성 메시지를 알아듣지 못했어요. 다시 보내거나 글로 써 주실래요?",
       "done": "완료했어요.",
       "stretch_paused_runs_other": "{{agents}}이(가) 계속하기 전에 확인하려고 멈췄어요",
       "stretch_paused_spend_other": "{{agents}}이(가) 확인하려고 멈췄어요 · 각자 이번 달 예산의 {{percent}}%를 사용",
@@ -18245,6 +18490,7 @@
     "serverOwner": "이 서버는 내가 설정했어요. 서버 자체 설정은 여기서 소유자가 없어지고 환경 변수에만 남아요.",
     "blockers": "삭제하기 전에",
     "soleOwner": "{{name}}의 소유자는 나뿐이에요. 다른 사람을 소유자로 지정하거나 {{name}}을(를) 삭제하세요.",
+    "soleOwnerOutside": "{{name}}의 소유자는 나뿐이고, 다른 사람은 모두 소유자가 될 수 없는 외부 협력자예요. 멤버를 초대해 소유자로 지정하거나 {{name}}을(를) 삭제하세요.",
     "soleOwnerSettingUp": "{{name}}의 소유자는 나뿐이에요. 설정을 마치고 다른 사람을 소유자로 지정하거나 {{name}}을(를) 삭제하세요.",
     "openPeople": "사람 열기",
     "finishSetup": "설정 마치기",
@@ -18264,6 +18510,10 @@
     "seatsPaid_other": "결제한 자리 {{count}}개",
     "noLimit": "제한 없음",
     "ownBucket": "자체 버킷 사용, 저희 쪽 제한 없음"
+  },
+  "referrals": {
+    "open": "추천하고 혜택 받기",
+    "failed": "지금은 열 수 없어요. 잠시 후 다시 시도하세요."
   },
   "limits": {
     "members": {

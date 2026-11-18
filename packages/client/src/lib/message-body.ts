@@ -19,6 +19,8 @@ const USAGE_NOTES = new Set([
   "plan_limit_cut_unknown",
   "plan_limit_wait",
   "plan_limit_wait_unknown",
+  "plan_limit_all_wait",
+  "plan_limit_all_wait_unknown",
   "plan_model_limit_wait",
   "plan_model_limit_wait_unknown",
   "plan_model_region_wait",

@@ -235,6 +235,11 @@ export const words: EmailWords = {
     preheader: "Üyeler sayfasında onaylayın ya da reddedin. Siz yanıt verene kadar hiçbir şey olmaz.",
     headline: "Bir katılma isteği bekliyor",
     body: (org) => ["Biri ", { b: org }, " davet bağlantısını açıp katılmak istedi."],
+    outside: (by) => [
+      "Bu kişi ",
+      { b: by },
+      " için çalışıyor ve harici çalışan olarak katılmak istiyor. Planınızda yer kaplamaz ve istediğiniz zaman çıkarabilirsiniz.",
+    ],
     note: "Yalnızca beklediğiniz kişileri onaylayın. Sayfada başka bir rol seçmezseniz üye olarak katılırlar.",
     approve: "Onayla",
     deny: "Reddet",
@@ -337,7 +342,7 @@ export const words: EmailWords = {
   emailChange: {
     code: {
       subject: (code) => `E-posta adresinizi değiştirme kodunuz: ${code}`,
-      preheader: "Onaylamak için agentes.chat'e yazın. 10 dakika geçerli.",
+      preheader: "Onaylamak için Ackwire AI'e yazın. 10 dakika geçerli.",
       headline: "Kodunuz",
       body: (email, newEmail) => [
         { b: email },
@@ -352,19 +357,19 @@ export const words: EmailWords = {
       ],
       noSupport:
         "10 dakika geçerli ve bu kod olmadan e-posta adresiniz değişmez. Bu siz değilseniz kodu kimseyle paylaşmayın ve bu sunucuyu yönetenlere haber verin.",
-      why: "Bu e-postayı, hesabınızdan agentes.chat'te e-posta adresinin değiştirilmesi istendiği için aldınız.",
+      why: "Bu e-postayı, hesabınızdan Ackwire AI'te e-posta adresinin değiştirilmesi istendiği için aldınız.",
     },
     link: {
-      subject: "agentes.chat için yeni e-postanızı onaylayın",
+      subject: "Ackwire AI için yeni e-postanızı onaylayın",
       preheader: "Tek tıkla bundan sonra bu adresle giriş yaparsınız. Bağlantı bir saat geçerli.",
       headline: "Yeni e-postanızı onaylayın",
       body: "Bir adım kaldı: bu adresin size ait olduğunu onaylayın. Bundan sonra hesabınız bu adresle giriş yapar.",
       button: "Yeni e-postayı onayla",
       small: "Bağlantı bir saat geçerli. Bunu siz istemediyseniz bu e-postayı yok sayabilirsiniz.",
-      why: "Bu e-postayı, biri bu adresi bir agentes.chat hesabında kullanmak istediği için aldınız.",
+      why: "Bu e-postayı, biri bu adresi bir Ackwire AI hesabında kullanmak istediği için aldınız.",
     },
     changed: {
-      subject: "agentes.chat hesabınızın e-posta adresi değişti",
+      subject: "Ackwire AI hesabınızın e-posta adresi değişti",
       preheader: "Bu siz değilseniz bu adresi 7 gün içinde geri alabilirsiniz.",
       headline: "E-posta adresiniz değişti",
       body: (email, newEmail) => [{ b: email }, " hesabı artık ", { b: newEmail }, " ile giriş yapıyor."],
@@ -372,7 +377,7 @@ export const words: EmailWords = {
         "Siz değil miydiniz? 7 gün içinde düğmeye basın. Bu adres geri gelir, tüm oturumlar kapatılır, yapay zekâ uygulamalarının bağlantısı kesilir ve o zamandan beri eklenen giriş yolları artık çalışmaz. Şifre de silinir, sonrakini “Şifremi unuttum” ile belirlersiniz.",
       button: "Bu ben değildim",
       small: "Bunu siz yaptıysanız bir şey yapmanıza gerek yok.",
-      why: "Bu e-postayı, bu adres bir agentes.chat hesabının e-posta adresi olduğu için aldınız.",
+      why: "Bu e-postayı, bu adres bir Ackwire AI hesabının e-posta adresi olduğu için aldınız.",
     },
   },
   deleting: {
@@ -558,6 +563,31 @@ export const words: EmailWords = {
       },
       why: () =>
         "Bu e-postayı, Ackwire AI'teki bu çalışma alanı sana ait olduğu için aldın. Bu bildirimden yalnızca iki tane gönderiyoruz.",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface} Ackwire AI hesabına bağlandı`,
+      preheader: "Asistanın artık sana orada yanıt veriyor. Sen değilsen bağlantıyı kaldır.",
+      headline: (surface) => `${surface} bağlandı`,
+      body: (surface, display, org) => [
+        { b: display },
+        ` (${surface}) artık `,
+        { b: org },
+        " içinde asistanınla konuşuyor.",
+      ],
+      notYou: "Sen değil misin? Bağlantıyı kaldır. Oradan gelen mesajlar hesabına hemen ulaşmaz olur.",
+      button: "Bağlantıyı kaldır",
+      small: "Sensen yapman gereken bir şey yok. Bağlantıyı istediğin zaman Ayarlar'dan kaldırabilirsin.",
+      why: (surface) => `Bu e-postayı ${surface} Ackwire AI hesabına bağlandığı için aldın.`,
+    },
+    unlinked: {
+      subject: (surface) => `${surface} Ackwire AI hesabından ayrıldı`,
+      preheader: "Kimliği değişti. Sensen Ayarlar'dan yeniden bağla.",
+      headline: (surface) => `${surface} ayrıldı`,
+      body: (surface, display) => [{ b: display }, ` (${surface}) kimliği değiştiği için ayrıldı.`],
+      small: "Sensen Ayarlar'dan yeniden bağla.",
+      why: (surface) => `Bu e-postayı ${surface} Ackwire AI hesabına bağlı olduğu için aldın.`,
     },
   },
 };

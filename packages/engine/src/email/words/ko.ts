@@ -219,6 +219,10 @@ export const words: EmailWords = {
     preheader: "멤버 페이지에서 승인하거나 거절하세요. 답하기 전에는 아무 일도 일어나지 않아요.",
     headline: "참여 요청이 기다리고 있어요",
     body: (org) => [{ b: org }, "의 초대 링크를 열고 참여를 요청했어요."],
+    outside: (by) => [
+      { b: by },
+      "의 외부 협력자로 참여를 요청했어요. 요금제 자리를 차지하지 않으며, 언제든지 내보낼 수 있어요.",
+    ],
     note: "아는 사람만 승인하세요. 페이지에서 다른 역할을 고르지 않으면 멤버로 참여해요.",
     approve: "승인",
     deny: "거절",
@@ -314,7 +318,7 @@ export const words: EmailWords = {
   emailChange: {
     code: {
       subject: (code) => `이메일 변경 코드: ${code}`,
-      preheader: "agentes.chat에 입력해서 확인하세요. 10분 동안 유효해요.",
+      preheader: "Ackwire AI에 입력해서 확인하세요. 10분 동안 유효해요.",
       headline: "인증 코드",
       body: (email, newEmail) => [
         "이 코드를 입력하면 계정 ",
@@ -330,19 +334,19 @@ export const words: EmailWords = {
       ],
       noSupport:
         "10분 동안 유효하고, 이 코드 없이는 이메일이 바뀌지 않아요. 본인이 아니라면 공유하지 말고 이 서버 운영자에게 알려 주세요.",
-      why: "내 계정에서 agentes.chat 이메일 변경을 요청해서 이 메일을 보내 드렸어요.",
+      why: "내 계정에서 Ackwire AI 이메일 변경을 요청해서 이 메일을 보내 드렸어요.",
     },
     link: {
-      subject: "agentes.chat 새 이메일을 인증해 주세요",
+      subject: "Ackwire AI 새 이메일을 인증해 주세요",
       preheader: "한 번만 누르면 앞으로 이 주소로 로그인해요. 링크는 1시간 동안 유효해요.",
       headline: "새 이메일을 인증해 주세요",
       body: "한 단계만 남았어요. 이 주소가 내 것인지 확인해 주세요. 그다음부터 계정은 이 주소로 로그인해요.",
       button: "새 이메일 인증",
       small: "링크는 1시간 동안 유효해요. 요청한 적이 없다면 이 메일은 무시해도 돼요.",
-      why: "누군가 agentes.chat 계정에 이 주소를 쓰겠다고 요청해서 이 메일을 보내 드렸어요.",
+      why: "누군가 Ackwire AI 계정에 이 주소를 쓰겠다고 요청해서 이 메일을 보내 드렸어요.",
     },
     changed: {
-      subject: "agentes.chat 계정의 이메일이 바뀌었어요",
+      subject: "Ackwire AI 계정의 이메일이 바뀌었어요",
       preheader: "본인이 아니라면 7일 안에 이 주소를 되돌릴 수 있어요.",
       headline: "이메일이 바뀌었어요",
       body: (email, newEmail) => ["계정 ", { b: email }, "은(는) 이제 ", { b: newEmail }, "(으)로 로그인해요."],
@@ -350,7 +354,7 @@ export const words: EmailWords = {
         "본인이 아닌가요? 7일 안에 버튼을 누르세요. 이 주소로 되돌리고, 모든 세션에서 로그아웃하고, AI 앱 연결을 끊고, 그 후에 추가된 로그인 방법을 쓸 수 없게 해요. 비밀번호도 지워지고, 다음 비밀번호는 “비밀번호를 잊었어요”에서 정해요.",
       button: "제가 아니에요",
       small: "본인이 바꿨다면 아무것도 하지 않아도 돼요.",
-      why: "이 주소가 agentes.chat 계정의 이메일이었기 때문에 이 메일을 보내 드렸어요.",
+      why: "이 주소가 Ackwire AI 계정의 이메일이었기 때문에 이 메일을 보내 드렸어요.",
     },
   },
   deleting: {
@@ -519,6 +523,31 @@ export const words: EmailWords = {
         return `${routines > 0 ? `${a}와 ${r}` : a}가 준비됐어요. 이제 Ackwire AI 요금제만 있으면 돼요.`;
       },
       why: () => "Ackwire AI의 이 워크스페이스가 내 것이어서 이 메일을 보내 드렸어요. 이런 알림은 두 번만 보내요.",
+    },
+  },
+  surface: {
+    linked: {
+      subject: (surface) => `${surface}이(가) Ackwire AI 계정에 연결되었습니다`,
+      preheader: "이제 어시스턴트가 그곳에서 답합니다. 본인이 아니라면 연결을 해제하세요.",
+      headline: (surface) => `${surface} 연결됨`,
+      body: (surface, display, org) => [
+        { b: display },
+        `(${surface})이(가) 이제 `,
+        { b: org },
+        "의 어시스턴트와 대화합니다.",
+      ],
+      notYou: "본인이 아닌가요? 연결을 해제하세요. 그곳에서 보낸 메시지가 바로 계정에 닿지 않게 됩니다.",
+      button: "연결 해제",
+      small: "본인이라면 아무것도 하지 않아도 됩니다. 언제든 설정에서 연결을 해제할 수 있습니다.",
+      why: (surface) => `${surface}이(가) Ackwire AI 계정에 연결되어 이 이메일을 보내드립니다.`,
+    },
+    unlinked: {
+      subject: (surface) => `${surface}이(가) Ackwire AI 계정에서 연결 해제되었습니다`,
+      preheader: "신원이 바뀌었습니다. 본인이라면 설정에서 다시 연결하세요.",
+      headline: (surface) => `${surface} 연결 해제됨`,
+      body: (surface, display) => [{ b: display }, `(${surface})은(는) 신원이 바뀌어 연결이 해제되었습니다.`],
+      small: "본인이라면 설정에서 다시 연결하세요.",
+      why: (surface) => `${surface}이(가) Ackwire AI 계정에 연결되어 있었기 때문에 이 이메일을 보내드립니다.`,
     },
   },
 };

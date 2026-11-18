@@ -590,12 +590,6 @@
   "chats.swipe.unmute": {
     "value": "Unmute"
   },
-  "chats.firstRunLine": {
-    "value": "{{name}} is setting up the team · {{done}} of {{total}}"
-  },
-  "chats.firstRunLinePersonal": {
-    "value": "{{name}} is setting up your agents · {{done}} of {{total}}"
-  },
   "chats.first.title": {
     "value": "Start with your first agent"
   },
@@ -4092,41 +4086,14 @@
   "outage.cloudSub": {
     "value": "We're on it"
   },
-  "browser.card.needs": {
-    "value": "{{name}} needs help"
-  },
-  "browser.card.needsFor": {
-    "value": "{{name}} needs help · {{time}}"
-  },
-  "browser.card.inControlAt": {
-    "value": "You're in control · {{host}}"
-  },
-  "browser.card.doing": {
-    "value": "{{name}} · {{doing}}"
-  },
-  "browser.card.startingF": {
-    "value": "Opening {{name}}'s browser…"
-  },
-  "browser.card.startingM": {
-    "value": "Opening {{name}}'s browser…"
-  },
   "browser.card.stopAskF": {
     "value": "Close {{name}}'s browser?"
   },
   "browser.card.stopAskM": {
     "value": "Close {{name}}'s browser?"
   },
-  "browser.card.whereF": {
-    "value": "In {{name}}'s browser"
-  },
-  "browser.card.whereM": {
-    "value": "In {{name}}'s browser"
-  },
   "browser.card.open": {
     "value": "Open"
-  },
-  "browser.card.expandHint": {
-    "value": "Tap to expand"
   },
   "browser.card.stop": {
     "value": "Stop"
@@ -4142,9 +4109,6 @@
   },
   "browser.live.watchOnly": {
     "value": "{{name}} is in control. You're only watching."
-  },
-  "browser.live.takeOver": {
-    "value": "Take over"
   },
   "browser.live.done": {
     "value": "Done"
@@ -4205,9 +4169,6 @@
   },
   "browser.live.stuckHelpM": {
     "value": "Try again restarts the browser. Logins stay saved."
-  },
-  "browser.live.hidden": {
-    "value": "{{name}} is in control · screen hidden"
   },
   "browser.live.key.Tab": {
     "value": "Tab"
@@ -5489,9 +5450,6 @@
   },
   "ai.keyRowSub": {
     "value": "You pay per use, straight to the maker"
-  },
-  "ai.already": {
-    "value": "Already at {{org}}"
   },
   "ai.stepOf": {
     "value": "{{step}} of {{total}}"
@@ -6984,5 +6942,17 @@
   },
   "empty.audit.text": {
     "value": "When an agent does something outside the conversation, it shows up here."
+  },
+  "surface.on": {
+    "value": "On"
+  },
+  "surface.codeText": {
+    "value": "Send the message that opens there, then come back here."
+  },
+  "surface.openFailed": {
+    "value": "Couldn't open {{surface}} on this phone. Send it the code below instead."
+  },
+  "surface.orType": {
+    "value": "Or send this code there"
   }
 }

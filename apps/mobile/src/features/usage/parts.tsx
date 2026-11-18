@@ -1,7 +1,7 @@
 import type { PlanAccountInfo, PlanUsage } from "@agenteschat/client";
 import {
   accountName,
-  accountOwner,
+  accountWhose,
   brandOf,
   type MeterSegment,
   type MeterWindow,
@@ -227,7 +227,7 @@ export function PlanModels({ usage, provider }: { usage: Pick<PlanUsage, "models
 export function AccountHead({ account, extra }: { account: PlanAccountInfo; extra?: string | null }) {
   const { t } = useTranslation();
   const c = useColors();
-  const whose = account.email ?? accountOwner(t, account);
+  const whose = accountWhose(t, account);
   // The maker's logo, the account and its plan on one line, whose it is under them at the row's width.
   return (
     <View style={styles.acctBox}>

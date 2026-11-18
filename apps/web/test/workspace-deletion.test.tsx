@@ -535,6 +535,25 @@ describe("deleting your account (Configurações › Sua conta)", () => {
     expect(within(dialog).queryByRole("button", { name: "Apagar conta" })).toBeNull();
   });
 
+  test("a workspace whose others are all outside collaborators: invite a member to make them an owner", async () => {
+    const state = seedState({
+      deletionPlan: {
+        closes: [],
+        leaves: [{ id: BETA_ID, name: "Beta", role: "owner" }],
+        soleOwner: [{ id: BETA_ID, name: "Beta", onlyOutside: true }],
+        computers: [],
+        staysBehind: [],
+        serverOwner: false,
+      },
+    });
+    await open(`/org/${ORG_ID}/issues?account=delete`, { state });
+    const dialog = screen().getByRole("dialog", { name: "Apagar a sua conta inteira?" });
+    expect(dialog.textContent).toContain(
+      "Você é a única pessoa dona de Beta, e as outras pessoas lá são colaboradores externos, que não podem ser donos. Convide um membro e torne essa pessoa dona, ou apague Beta.",
+    );
+    expect(within(dialog).getByRole("link", { name: "Abrir Pessoas" })).toBeTruthy();
+  });
+
   test("the account menu doesn't offer it beside Sair", async () => {
     await open(`/org/${ORG_ID}/issues`);
     // A Radix menu opens from the keyboard here (a pointer press, not a click, opens it with a mouse).

@@ -15,17 +15,18 @@ import { useTranslation } from "react-i18next";
 import { type GestureResponderEvent, Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig } from "react-native-reanimated";
 import { useOrg } from "@/providers/org";
-import { GroupedFooter, Icon, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
+import { Disclosure, GroupedFooter, LineIcon, Text, useReducedMotion, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { agoOf } from "../agents/logic";
 import { agoText } from "../agents/work";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { SheetTitle } from "../shared/PromptForm";
 import { ActionList, copyText, tapHaptic } from "../shared/parts";
 import { useSheetIfAny } from "../shared/SheetHost";
 import { groupStart, receiptIcon, receiptLayout, targetHref } from "./actions";
 import { DOUBLE_TAP_MS } from "./logic";
 import { useCardTop } from "./look";
+import { useRowDirectory, useRowMeId } from "./row-data";
 
 /**
  * What the agent changed with this reply (ADR 0037 round 2), on the card of the reply's tools (a hairline, the cut
@@ -47,8 +48,8 @@ export function Receipts({
 }) {
   const { t } = useTranslation();
   const c = useColors();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const sheet = useSheetIfAny();
   // A task the right hand handed on is its chip (`HandedTaskChips`): its agent is at work on it already.
   const handed = new Set(handedTasksOf(m.meta).map((h) => h.issueId));
@@ -155,7 +156,7 @@ function Sentence({
   onLongPress?: () => void;
 }) {
   const { t } = useTranslation();
-  const meId = useMeId();
+  const meId = useRowMeId();
   const waiting = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
     () => () => {
@@ -231,8 +232,7 @@ function ChangesSheet({
   close: (then?: unknown) => void;
 }) {
   const { t } = useTranslation();
-  const meId = useMeId();
-  const c = useColors();
+  const meId = useRowMeId();
   return (
     <>
       <SheetTitle title={title} />
@@ -247,7 +247,7 @@ function ChangesSheet({
             // A change that opens its own thing says so with the chevron; one with nowhere to go is only read.
             ...(href
               ? {
-                  trailing: <Icon name="right" size={15} color={c.faint} />,
+                  trailing: <Disclosure />,
                   onPress: () => close(() => router.push(href)),
                 }
               : {}),
@@ -269,7 +269,7 @@ function CopyHook({ action: a }: { action: AgentAction }) {
   const { t } = useTranslation();
   const api = useApi();
   const orgId = useOrgId();
-  const meId = useMeId();
+  const meId = useRowMeId();
   const manages = can(useOrg().org, "manage_routines");
   const toast = useToast();
   const [busy, setBusy] = useState(false);

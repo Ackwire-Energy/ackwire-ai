@@ -1,10 +1,17 @@
-import type { AiAccounts, PlanAccountInfo, PlanAccountUsage, PlanServes, PlanUseKind } from "@agenteschat/client";
-import { keys, useAiAccounts, useApi, useModels, usePlanUsage } from "@agenteschat/client";
+import type {
+  AccountOrderGroup,
+  AiAccounts,
+  PlanAccountInfo,
+  PlanAccountUsage,
+  PlanServes,
+  PlanUseKind,
+} from "@agenteschat/client";
+import { keys, useAccountOrder, useAiAccounts, useApi, useModels, usePlanUsage } from "@agenteschat/client";
 import { removableLogins } from "@agenteschat/client/lib/ai-accounts";
 import { computerNameOf } from "@agenteschat/client/lib/computer";
 import { errorText } from "@agenteschat/client/lib/errors";
 import { formatPercent, formatTokensShort, formatUsd, joinNames } from "@agenteschat/client/lib/format";
-import { accountKinds, kindFacts } from "@agenteschat/client/lib/plan-usage";
+import { accountKinds, kindFacts, usageOrderSections } from "@agenteschat/client/lib/plan-usage";
 import { planName } from "@agenteschat/client/lib/plans";
 import { AUTO, apiProviderOf } from "@agenteschat/client/lib/providers";
 import { isPersonal } from "@agenteschat/client/lib/workspace-mode";
@@ -31,9 +38,10 @@ import {
 } from "@agenteschat/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Fragment, useEffect, useId, useState } from "react";
+import { Fragment, type HTMLAttributes, type ReactNode, useEffect, useId, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { AgentAvatar } from "@/components/AgentAvatar";
+import { OrderHead, useOrderMoves } from "@/components/ai/AccountOrder";
 import { AccountActions } from "@/components/ai/AiAccounts";
 import { PlanHold, usePlanHold } from "@/components/ai/ConnectAiSteps";
 import { useConnectAi, useMayConnectAi } from "@/components/ConnectAi";
@@ -46,6 +54,7 @@ import {
   accountName,
   accountOwner,
   accountShares,
+  accountWhose,
   brandOf,
   groupUsageAccounts,
   loginsText,
@@ -73,7 +82,7 @@ const WIDE_SPACE = "\u2002";
 /** An account's head: the maker's mark, its name and plan, its maker and whose it is. */
 export function AccountHead({ account, extra }: { account: PlanAccountInfo; extra?: string | null }) {
   const { t } = useTranslation();
-  const whose = account.email ?? accountOwner(t, account);
+  const whose = accountWhose(t, account);
   return (
     <div className="plan-acct ac-mediarow ac-mediarow--row">
       <span className="ac-mediarow__face">
@@ -105,6 +114,7 @@ export function PlanUsageCards() {
   const api = useApi();
   const usage = usePlanUsage(org.id);
   const mine = useAiAccounts(org.id);
+  const order = useAccountOrder(org.id);
   const look = useRightHandLook();
   const connectAi = useConnectAi();
   const mayConnect = useMayConnectAi();
@@ -169,18 +179,63 @@ export function PlanUsageCards() {
       )}
       {accounts.length > 0 && (
         <List className="plan-rows">
-          {accounts.map((a) => (
-            <AccountRow
-              key={a.key}
-              account={a}
-              money={money}
-              computer={several ? computerNameOf(t, org.name, a.machineName, isPersonal(org)) : null}
-            />
-          ))}
+          {usageOrderSections(accounts, order.data?.groups).map((s) =>
+            s.group ? (
+              <OrderRows
+                key={`${s.group.machineId}:${s.group.kind}`}
+                group={s.group}
+                rows={s.rows}
+                money={money}
+                several={several}
+              />
+            ) : (
+              s.rows.map((a) => (
+                <AccountRow
+                  key={a.key}
+                  account={a}
+                  money={money}
+                  computer={several ? computerNameOf(t, org.name, a.machineName, isPersonal(org)) : null}
+                />
+              ))
+            ),
+          )}
         </List>
       )}
       {grokLogins.length > 1 && <RemoveGrokLogins logins={grokLogins} />}
     </Card>
+  );
+}
+
+/** An order of use's rows (ADR 0041 §6) under its heading, each starting with its place. */
+function OrderRows({
+  group,
+  rows,
+  money,
+  several,
+}: {
+  group: AccountOrderGroup;
+  rows: PlanAccountUsage[];
+  money: boolean;
+  several: boolean;
+}) {
+  const { t } = useTranslation();
+  const { org } = useOrg();
+  const { place, drop } = useOrderMoves(org.id, group);
+  const computer = several ? computerNameOf(t, org.name, group.computer, isPersonal(org)) : null;
+  return (
+    <div className="plan-order">
+      <OrderHead group={group} computer={computer} />
+      {rows.map((a) => (
+        <AccountRow
+          key={a.key}
+          account={a}
+          money={money}
+          computer={computer}
+          place={a.accountId ? place(a.accountId, accountName(t, a)) : undefined}
+          drop={a.accountId ? drop(a.accountId) : undefined}
+        />
+      ))}
+    </div>
   );
 }
 
@@ -195,10 +250,15 @@ function AccountRow({
   account,
   money,
   computer,
+  place,
+  drop,
 }: {
   account: PlanAccountUsage;
   money: boolean;
   computer: string | null;
+  /** Its place in an order of use, before the row's line. */
+  place?: ReactNode;
+  drop?: HTMLAttributes<HTMLDivElement>;
 }) {
   const { t, i18n } = useTranslation();
   const { org } = useOrg();
@@ -224,7 +284,8 @@ function AccountRow({
   const owner = facts.length > 0;
   const chips = Boolean(account.plan) || Boolean(account.signedOut);
   return (
-    <div className="plan-row" data-open={open || undefined}>
+    <div className={place ? "plan-row plan-row--placed" : "plan-row"} data-open={open || undefined} {...drop}>
+      {place}
       <button
         type="button"
         // The kit's line of a row that opens under it: the row's room is above the line and below what it unfolds.
@@ -236,7 +297,7 @@ function AccountRow({
           setOpen(!open);
         }}
       >
-        <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />
+        {!place && <ProviderLogo id={account.provider ?? account.kind} size="sm" off={account.signedOut} />}
         {/* Two parts: one line of words on a wide row, and on a phone the name beside the mark with the plan and
             whose it is under both. The space that parts them ends the name, so neither starts with it. */}
         <span className="plan-acct__name">

@@ -56,6 +56,7 @@ import {
   syncMachineAccounts,
   ValidationError,
 } from "../src";
+import { isDefaultAccountLabel } from "../src/machine-accounts";
 import { addMember, addUser, type Fixture, setup } from "./fixtures";
 import { pairMachine } from "./machine-fixtures";
 
@@ -462,6 +463,7 @@ test("signing in: the person who connected the computer; the code is sealed to i
       id: login.loginId,
       kind: "claude_code",
       label: "Claude",
+      named: false,
       email: "ana@example.com",
       plan: "max",
       status: "active",
@@ -477,6 +479,10 @@ test("signing in: the person who connected the computer; the code is sealed to i
       shared: false,
       providerOrgId: null,
       serves: "everyone",
+      useOrder: null,
+      sameAs: login.loginId,
+      // A login for one agent is never a next account.
+      movable: false,
     },
   });
   // Polled again: the same account, added once.
@@ -735,6 +741,27 @@ test("a sign-in needs the computer online, a runner that knows accounts and a pr
   const old = await beginAccountLogin(codex.deps, f.owner.id, f.org.id, machineId, "codex").catch((e) => e);
   expect(old).toBeInstanceOf(ConflictError);
   expect(old.code).toBe("account.runner_old");
+});
+
+test("a sign-in on a computer asleep in standby wakes it once and goes on when it is back (ADR 0161)", async () => {
+  f = await setup();
+  const { machineId } = await ownedMachine();
+  const codex = fakeHub(machineId, () => ({ url: "https://auth.openai.com/codex/device", userCode: "ABCD-1234" }));
+  let awake = false;
+  const woke: string[] = [];
+  const hub = {
+    ...codex.deps.hub,
+    status: async () => ({ ...(await codex.deps.hub.status()), online: awake, standby: !awake }),
+    wake: async (_id: string, why: string) => {
+      woke.push(why);
+      awake = true;
+    },
+  };
+  expect(await beginAccountLogin({ ...codex.deps, hub }, f.owner.id, f.org.id, machineId, "codex")).toMatchObject({
+    kind: "codex",
+    url: "https://auth.openai.com/codex/device",
+  });
+  expect(woke).toEqual(["call"]);
 });
 
 test("the email that names the account: a plain address only, never one a shell would read", async () => {
@@ -2276,4 +2303,17 @@ test("hello keeps what a new Claude sign-in for all agents can use on the comput
   // An older runner says nothing: nothing of a newer one's stays.
   await runner.hello([], CLAUDE_AUTH_PROTOCOL - 1, { executors: { claude: { version: "2.1.304" } } });
   expect((await executors())?.claudeLoginMethods).toBeUndefined();
+});
+
+test("a name is the automatic one only as the server gives it; any other is its owner's", () => {
+  expect(isDefaultAccountLabel("claude_code", "Claude")).toBe(true);
+  expect(isDefaultAccountLabel("claude_code", "Claude 2")).toBe(true);
+  // Servers before ADR 0059's 2026-10-30 amendment put the plan in it.
+  expect(isDefaultAccountLabel("claude_code", "Claude Max 2")).toBe(true);
+  expect(isDefaultAccountLabel("codex", "ChatGPT 3")).toBe(true);
+  expect(isDefaultAccountLabel("claude_code", "GLM Coding 2", "zai")).toBe(true);
+  expect(isDefaultAccountLabel("claude_code", "Trabalho")).toBe(false);
+  expect(isDefaultAccountLabel("claude_code", "Claude pessoal")).toBe(false);
+  expect(isDefaultAccountLabel("claude_code", "Claudette")).toBe(false);
+  expect(isDefaultAccountLabel("claude_code", "ana@acme.com")).toBe(false);
 });

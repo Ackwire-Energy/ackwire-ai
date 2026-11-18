@@ -126,7 +126,7 @@ export function WorkspaceMark({
   server,
   size = 30,
 }: {
-  org: Pick<OrgSummary, "mode" | "role" | "logo">;
+  org: Pick<OrgSummary, "mode" | "role" | "logo" | "accent">;
   /** The place it is read from (a server, or one of its accounts), when it isn't the current one. */
   server?: string;
   size?: number;
@@ -134,7 +134,8 @@ export function WorkspaceMark({
   const face = useMyFace();
   if (isPersonal(org) && org.role === "owner")
     return <PersonAvatar name={face.name || "?"} size={size} photo={face.photo} />;
-  return <OrgAvatar logo={org.logo} size={size} {...(server ? { server } : {})} />;
+  // In its own accent: the engine's `sky` is the active workspace's.
+  return <OrgAvatar logo={org.logo} accent={org.accent ?? null} size={size} {...(server ? { server } : {})} />;
 }
 
 /**

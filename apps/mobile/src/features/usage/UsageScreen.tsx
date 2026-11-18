@@ -32,8 +32,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useOrg } from "@/providers/org";
 import {
   Button,
+  Disclosure,
   fieldText,
-  Icon,
   MEDIA_ROW,
   MediaRow,
   ProviderLogo,
@@ -257,7 +257,7 @@ function AccountRow({ account }: { account: PlanAccountUsage }) {
           ) : null}
         </View>
         <View style={styles.chevron}>
-          <Icon name="right" size={14} color={c.faint} />
+          <Disclosure />
         </View>
       </View>
       {line?.top ? (

@@ -748,7 +748,9 @@ export function createReleaseAsksToolSource(deps: { pubsub?: PubSub } = {}): Too
         };
       const caller = await getAgentCached(ctx.db, ctx.orgId, ctx.agentId);
       const who = { name: caller?.name ?? "Another agent", agentId: ctx.agentId };
-      const reason = cutText(String(input.reason ?? "").trim(), 300);
+      // From a confidential thread (ADR 0190) no reason goes with it: the step it is written in is the other
+      // agent's run's, which may belong to another thread.
+      const reason = ctx.confidential ? "" : cutText(String(input.reason ?? "").trim(), 300);
       let released = 0;
       for (const p of found) {
         const held = [p.run.triggerMessageId, ...p.run.pendingMessageIds].filter((id) => handled.includes(id));

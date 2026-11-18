@@ -154,6 +154,8 @@
       @keyframes boot-in { to { opacity: 1; } }
       @keyframes boot-breathe { 50% { transform: translateY(-3px); } }
       @media (prefers-reduced-motion: reduce) { .boot { animation-duration: 0s; } .boot img { animation: none; } }
+      /* A registered host (ADR 0194; the server sets data-host): not the product's mark before the app knows the host. */
+      [data-host] .boot img { display: none; }
       /* A boot that failed (the script above): white on the sky, the primary button in white. */
       .boot__box { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 420px;
         padding: 0 24px; color: #fff; text-align: center; font: 15px/1.5 Onest, "Segoe UI", system-ui, sans-serif; }

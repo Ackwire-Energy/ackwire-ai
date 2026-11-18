@@ -26,7 +26,7 @@ import { computerIcon } from "../outages/logic";
 import { AgentFace } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
 import { useMeId } from "../shared/hooks";
-import { goBack, successHaptic } from "../shared/parts";
+import { FocusLive, goBack, successHaptic } from "../shared/parts";
 import { type AgentComputerPick, agentComputerPick, NO_COMPUTER, noComputerKey } from "./logic";
 import { Gap, SettingsPage } from "./parts";
 
@@ -48,7 +48,8 @@ function choiceName(t: TFunction, org: OrgSummary | null, pick: AgentComputerPic
 
 /**
  * This server's computer (`HOST_COMPUTER_TOKEN`) when it isn't in the devices list: an admin who stopped it here can
- * use it again; with none, admins read how to make it one, but only while sign-up is closed.
+ * use it again; with none, admins read how to make it one, but only while sign-up is closed. Its portrait holds still
+ * while a screen opened from the list is over it.
  */
 export function HostComputerOff() {
   const { t, i18n } = useTranslation();
@@ -65,7 +66,7 @@ export function HostComputerOff() {
   const missing = host.isSuccess && host.data === null && admin && auth.data?.signupOpen === false;
   if (m || (!off && !missing)) return null;
   return (
-    <>
+    <FocusLive>
       <GroupedHeader>{label}</GroupedHeader>
       {off ? (
         <GroupedList>
@@ -111,7 +112,7 @@ export function HostComputerOff() {
           />
         </GroupedFooter>
       )}
-    </>
+    </FocusLive>
   );
 }
 

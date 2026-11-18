@@ -242,7 +242,14 @@ export function DeleteAccountScreen() {
                 return (
                   <View key={o.id} style={styles.line}>
                     <Text variant="small" tone="ink2">
-                      {t(setup ? "deleteAccount.soleOwnerSettingUp" : "deleteAccount.soleOwner", { name: named(o) })}
+                      {t(
+                        setup
+                          ? "deleteAccount.soleOwnerSettingUp"
+                          : o.onlyOutside
+                            ? "deleteAccount.soleOwnerOutside"
+                            : "deleteAccount.soleOwner",
+                        { name: named(o) },
+                      )}
                     </Text>
                     <View style={styles.acts}>
                       <Button

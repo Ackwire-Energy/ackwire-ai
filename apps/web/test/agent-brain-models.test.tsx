@@ -115,6 +115,8 @@ function follow(api: ReturnType<typeof createFakeApi>, first: AgentBrain) {
       ...(input.effort !== undefined ? { effort: input.effort } : {}),
       ...(input.speed !== undefined ? { speed: input.speed } : {}),
       ...(input.onlyOwner !== undefined ? { onlyOwner: input.onlyOwner } : {}),
+      ...(input.extraUsage !== undefined ? { extraUsage: input.extraUsage } : {}),
+      ...(input.accountPinned !== undefined ? { accountPinned: input.accountPinned } : {}),
     };
     return next;
   };
@@ -147,7 +149,7 @@ describe("Quem pensa: a coding plan's models", () => {
   });
   /** Ada thinks with Claude Code on the MacBook, with Walter's key account of `provider`. */
   async function onPlan(
-    provider: string,
+    provider: string | null,
     patch: Partial<AgentBrain> = {},
     over: Partial<MachineAccount> = {},
     planModels?: FakeState["planModels"],
@@ -189,6 +191,42 @@ describe("Quem pensa: a coding plan's models", () => {
     const d = await brainDialog();
     expect(d.textContent).toContain("O DeepSeek V4.1 Flash chegou ao limite dele neste plano e renova ");
     expect(d.textContent).toContain("Os outros modelos do plano seguem funcionando.");
+  });
+
+  test("paid extra usage keeps its opt-out through defaults and changes only with its own switch", async () => {
+    const usage = {
+      windows: [{ kind: "other" as const, label: "Extra usage", usedPercent: 10 }],
+      source: "probe" as const,
+      at: new Date().toISOString(),
+    };
+    const { state } = await onPlan(null, { extraUsage: false, accountPinned: true }, { usage });
+    const d = await brainDialog();
+    await toScreen(d, "Mais opções");
+    const label = "Trabalho longo pode usar o uso extra pago";
+    expect(within(d).getByRole("switch", { name: label }).getAttribute("aria-checked")).toBe("false");
+    await click(within(d).getByRole("button", { name: "Voltar ao padrão" }));
+    await confirmScreen(d);
+    expect(brainCalls(state).every((c) => !("extraUsage" in (c as object)))).toBe(true);
+    await toScreen(d, "Mais opções");
+    const toggle = within(d).getByRole("switch", { name: label });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    await click(toggle);
+    await confirmScreen(d);
+    expect(brainCalls(state).at(-1)).toEqual({ brain: "claude_code", extraUsage: true });
+  });
+
+  test("a borrowed plan cannot enable paid extra usage", async () => {
+    const usage = {
+      windows: [{ kind: "other" as const, label: "Extra usage", usedPercent: 10 }],
+      source: "probe" as const,
+      at: new Date().toISOString(),
+    };
+    await onPlan(null, { extraUsage: false, canUsePlans: false }, { mine: false, usage });
+    const d = await brainDialog();
+    await toScreen(d, "Mais opções");
+    expect(
+      within(d).getByRole("switch", { name: "Trabalho longo pode usar o uso extra pago" }).hasAttribute("disabled"),
+    ).toBe(true);
   });
 
   test("the plan's models at a limit of their own: one line each with what remains, an exhausted one said so", async () => {
@@ -359,7 +397,8 @@ describe("Quem pensa: a coding plan's models", () => {
     expect(rows.map((r) => [r.group, r.title, r.lines[0] ?? null, r.mark])).toEqual([
       ["Em uso", "Plano", "chave …4f2a", "opencode"],
       ["OpenCode Go", "Plano 2", "chave …9f3c", "opencode"],
-      ["Claude", "Pessoal · Max", "Sua", "claude"],
+      // A name its owner gave it, its plan on the line under it.
+      ["Claude", "Pessoal", "Max", "claude"],
       ["Chaves de API", "Chave padrão do workspace", "Claude · termina em 7f2a", "claude"],
     ]);
     // One more key of the same plan: the model it has stays.

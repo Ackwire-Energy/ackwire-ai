@@ -42,6 +42,7 @@ import {
   openConversation,
   type ReactionCount,
   type ReceiptsState,
+  readConversationListsOncePerBurst,
   reconcileConsults,
   reconcileRuns,
   refreshRepliedThread,
@@ -66,7 +67,7 @@ import { deviceWaitEventOf } from "@agenteschat/client/lib/devices";
 import { isReturnLine } from "@agenteschat/client/lib/notices";
 import { playSound } from "@agenteschat/client/lib/sounds";
 import { type QueryClient, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useConnection, useMeId } from "../shared/hooks";
 import { withContinued } from "./turn";
 
@@ -184,16 +185,15 @@ function reduce(state: LiveState, action: Action): LiveState {
       const receipts = seedReceipts(state.receipts, action.messages, action.before);
       return receipts === state.receipts ? state : { ...state, receipts };
     }
-    case "reconcile":
-      return {
-        ...state,
-        streams: reconcileRuns(state.streams, action.channelId, action.active, action.at, action.askedAt),
-      };
-    case "consults":
-      return {
-        ...state,
-        consults: reconcileConsults(state.consults, action.channelId, action.open, action.askedAt, action.at),
-      };
+    // The server's list said what we knew already (no run here, the usual): nothing to draw again.
+    case "reconcile": {
+      const streams = reconcileRuns(state.streams, action.channelId, action.active, action.at, action.askedAt);
+      return streams === state.streams ? state : { ...state, streams };
+    }
+    case "consults": {
+      const consults = reconcileConsults(state.consults, action.channelId, action.open, action.askedAt, action.at);
+      return consults === state.consults ? state : { ...state, consults };
+    }
     case "expect": {
       let streams = state.streams;
       for (const agentId of action.agentIds)
@@ -297,9 +297,8 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
       // A reply: its root's "2 respostas" link and the thread's header.
       const threadId = repliedThread(event);
       if (threadId) refreshRepliedThread(qc, orgId, threadId);
-      // The conversation list's last line and unread.
-      void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
-      void qc.invalidateQueries({ queryKey: keys.channels(orgId) });
+      // The conversation list's last line and unread: once per burst, with my topic's own `channel.activity` read.
+      readConversationListsOncePerBurst(qc, orgId);
       break;
     }
     // A DM between people: the other one read it ("Visto" moves).
@@ -410,6 +409,80 @@ function applyToCache(qc: QueryClient, orgId: string, channelId: string, event: 
   }
 }
 
+/**
+ * The conversation's live state, kept outside React: each part is read where it is drawn (`useSyncExternalStore`), so
+ * a change redraws who reads that part only. Someone typing redraws the working line, never the conversation.
+ * `stateRef.current` is always the latest state.
+ */
+interface LiveStore {
+  current: LiveState;
+  dispatch: (action: Action) => void;
+  subscribe: (listener: () => void) => () => void;
+  /**
+   * The screen out of view (another one pushed over it): the state keeps up with every event, and nothing is drawn
+   * again until it is back, then once if anything changed.
+   */
+  hold: (held: boolean) => void;
+}
+
+function createLiveStore(): LiveStore {
+  const listeners = new Set<() => void>();
+  let held = false;
+  let missed = false;
+  const tell = () => {
+    for (const listener of [...listeners]) listener();
+  };
+  const store: LiveStore = {
+    current: { streams: emptyStreams, consults: {}, receipts: {}, typing: {}, notices: [] },
+    dispatch(action) {
+      const next = reduce(store.current, action);
+      // An event that changes nothing doesn't re-render.
+      if (next === store.current) return;
+      store.current = next;
+      if (held) missed = true;
+      else tell();
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+    hold(on) {
+      held = on;
+      if (on || !missed) return;
+      missed = false;
+      tell();
+    },
+  };
+  return store;
+}
+
+/** Who is typing or recording here, read only where the line that says it is drawn (`useLiveTyping`). */
+export interface LiveTyping {
+  channelId: string;
+  get: () => TypingState;
+  subscribe: (listener: () => void) => () => void;
+  /** Someone's last frame ran out: they leave the line. */
+  expire: (at: number) => void;
+}
+
+/**
+ * Who is typing in the conversation, for the line that says it: it redraws alone when someone starts or stops, and
+ * someone who stops typing without sending leaves the line when their last frame runs out.
+ */
+export function useLiveTyping(typing: LiveTyping): TypingState {
+  const state = useSyncExternalStore(typing.subscribe, typing.get, typing.get);
+  const typingEnds = Math.min(...Object.values(state[typing.channelId] ?? {}).map((x) => x.until));
+  useEffect(() => {
+    if (!Number.isFinite(typingEnds)) return;
+    // A beat past the end, so the sweep never runs a hair early and finds it still on.
+    const timer = setTimeout(() => typing.expire(Date.now()), Math.max(0, typingEnds - Date.now()) + 50);
+    return () => clearTimeout(timer);
+  }, [typingEnds, typing]);
+  return state;
+}
+
 export interface ChatLive {
   /** Runs in this channel, oldest first. */
   runs: LiveRun[];
@@ -432,8 +505,11 @@ export interface ChatLive {
   picking: (messageId: string) => void;
   /** "Parar" (as on the web): "Parando…" until the run's event; a run that already ended just leaves. */
   stop: (runId: string, byUserId: string) => void;
-  /** Who is typing or recording now (`typingIn` reads it for the conversation or one of its threads). */
-  typing: TypingState;
+  /**
+   * Who is typing or recording now, read with `useLiveTyping` where the line is drawn (`typingIn` reads it for the
+   * conversation or one of its threads).
+   */
+  typing: LiveTyping;
   /**
    * "I'm typing" (or `voice`: recording, with `keepAlive` while it uploads) here or in a thread, throttled (at most one
    * frame every 3 s, `typingThrottle`).
@@ -443,22 +519,35 @@ export interface ChatLive {
   notices: AgentUnavailableEvent[];
 }
 
-export function useChatLive(orgId: string, channelId: string, enabled: boolean): ChatLive {
+/**
+ * How many of the latest messages the catch-up after a subscription reads first: the page was read a moment before,
+ * and what it may lack is the little said meanwhile (`catchUpChannel` reads the whole page when this doesn't reach it).
+ */
+const CATCH_UP_RECENT = 30;
+
+/**
+ * `inView`: the screen shows (not under a pushed one). Out of view it keeps listening and keeping the caches current,
+ * and draws nothing until it is back (`LiveStore.hold`): a conversation left under another screen redrew with every
+ * step of every agent in it.
+ */
+export function useChatLive(orgId: string, channelId: string, enabled: boolean, inView = true): ChatLive {
   const connection = useConnection();
   const qc = useQueryClient();
   const api = useApi();
-  const [state, dispatch] = useReducer(reduce, {
-    streams: emptyStreams,
-    consults: {},
-    receipts: {},
-    typing: {},
-    notices: [],
-  });
-  const stateRef = useRef(state);
-  stateRef.current = state;
+  const [store] = useState(createLiveStore);
+  const stateRef = store;
+  const { dispatch } = store;
+  const streams = useSyncExternalStore(store.subscribe, () => store.current.streams);
+  const consultsState = useSyncExternalStore(store.subscribe, () => store.current.consults);
+  const receipts = useSyncExternalStore(store.subscribe, () => store.current.receipts);
+  const notices = useSyncExternalStore(store.subscribe, () => store.current.notices);
+  // Before anything else is drawn with it: events heard while it was away are drawn once, in the first frame back.
+  useLayoutEffect(() => store.hold(!inView), [store, inView]);
   const meId = useMeId();
   const meRef = useRef(meId);
   meRef.current = meId;
+  // The messages heard live since the server last confirmed the subscription: no proof of what came before them.
+  const heard = useRef(new Set<string>());
 
   // Questions agents asked from here still out (the "asking…" line), listed with the active runs.
   useEffect(
@@ -466,12 +555,13 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       consultSeeds.subscribe((id, open, askedAt) => {
         if (id === channelId) dispatch({ type: "consults", channelId, open, at: Date.now(), askedAt });
       }),
-    [channelId],
+    [channelId, dispatch],
   );
 
   // On open and after every reconnect: the server's active runs replace what we guessed. The channel's events reach
   // us only once the server confirms its subscription (the first, and after every reconnect): then the runs are
-  // checked again and what the lists missed before then (an answer posted while the conversation opened) is added.
+  // checked again and what the lists missed before then (an answer posted while the conversation opened) is added,
+  // from a short read of the latest messages when that reaches what the lists already hold.
   useEffect(() => {
     if (!enabled) return;
     let alive = true;
@@ -492,8 +582,9 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     const offSubscribed = connection?.onSubscribed((id) => {
       if (id !== channelId) return;
       check();
+      heard.current = new Set();
       const before = stateRef.current.receipts;
-      void catchUpChannel(api, qc, orgId, channelId).then((read) => {
+      void catchUpChannel(api, qc, orgId, channelId, { recent: CATCH_UP_RECENT, heard: heard.current }).then((read) => {
         if (!alive) return;
         dispatch({ type: "seed", messages: read, before });
         cacheReceipts(qc, orgId, channelId, read);
@@ -506,7 +597,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       off?.();
       offSubscribed?.();
     };
-  }, [api, connection, enabled, orgId, channelId, qc]);
+  }, [api, connection, enabled, orgId, channelId, qc, dispatch, stateRef]);
 
   // On my own topic, as on the web: an agent my message here named won't answer me.
   useEffect(() => {
@@ -514,7 +605,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     return connection.onUserEvent((event) => {
       if (isAgentUnavailable(event) && event.channelId === channelId) dispatch({ type: "unavailable", event });
     });
-  }, [connection, enabled, channelId]);
+  }, [connection, enabled, channelId, dispatch]);
 
   useEffect(() => {
     if (!connection || !enabled) return;
@@ -522,6 +613,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     const off = connection.subscribe(channelId, (event) => {
       // The server sends my own typing back to me too: never shown, so it never redraws.
       if (event.type === "user.typing" && event.userId === meRef.current) return;
+      if (event.type === "message.created") heard.current.add(event.messageId);
       dispatch({ type: "event", event, at: Date.now() });
       applyToCache(qc, orgId, channelId, event);
       applyMembershipEvent(qc, orgId, event);
@@ -533,11 +625,11 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       off();
       close();
     };
-  }, [connection, enabled, orgId, channelId, qc]);
+  }, [connection, enabled, orgId, channelId, qc, dispatch]);
 
   // Safety net, as on the web: a "pensando…" the server never confirmed doesn't spin forever; the
   // conversation resyncs instead (checked every 5 s while there is one).
-  const hasProvisional = Object.values(state.streams.runs).some((r) => r.provisional && r.channelId === channelId);
+  const hasProvisional = Object.values(streams.runs).some((r) => r.provisional && r.channelId === channelId);
   useEffect(() => {
     if (!hasProvisional) return;
     const timer = setInterval(() => {
@@ -547,19 +639,17 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
       void qc.invalidateQueries({ queryKey: ["org", orgId, "channel", channelId] });
     }, 5000);
     return () => clearInterval(timer);
-  }, [hasProvisional, qc, orgId, channelId]);
+  }, [hasProvisional, qc, orgId, channelId, dispatch, stateRef]);
 
-  // Someone who stops typing without sending leaves the line when their last frame runs out.
-  const typingEnds = Math.min(...Object.values(state.typing[channelId] ?? {}).map((x) => x.until));
-  useEffect(() => {
-    if (!Number.isFinite(typingEnds)) return;
-    // A beat past the end, so the sweep never runs a hair early and finds it still on.
-    const timer = setTimeout(
-      () => dispatch({ type: "typed", at: Date.now() }),
-      Math.max(0, typingEnds - Date.now()) + 50,
-    );
-    return () => clearTimeout(timer);
-  }, [typingEnds]);
+  const typing = useMemo<LiveTyping>(
+    () => ({
+      channelId,
+      get: () => store.current.typing,
+      subscribe: store.subscribe,
+      expire: (at) => dispatch({ type: "typed", at }),
+    }),
+    [channelId, store, dispatch],
+  );
   const throttle = useMemo(() => typingThrottle(), []);
   const sendTyping = useCallback(
     (threadId: string | null, text?: string, kind?: TypingKind, keepAlive?: boolean) => {
@@ -572,18 +662,21 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
     (threadId: string, agentIds: string[], messageId: string = threadId) => {
       if (agentIds.length > 0) dispatch({ type: "expect", channelId, threadId, messageId, agentIds, at: Date.now() });
     },
-    [channelId],
+    [channelId, dispatch],
   );
   // Only a read that brings what the receipts don't know yet: a dispatch draws the whole conversation again, even one
   // that changes nothing, and every message that lands is such a read.
-  const seed = useCallback((messages: readonly Message[]) => {
-    if (seedReceipts(stateRef.current.receipts, messages) === stateRef.current.receipts) return;
-    dispatch({ type: "seed", messages });
-  }, []);
-  const retarget = useCallback((from: string, to: string) => dispatch({ type: "retarget", from, to }), []);
+  const seed = useCallback(
+    (messages: readonly Message[]) => {
+      if (seedReceipts(stateRef.current.receipts, messages) === stateRef.current.receipts) return;
+      dispatch({ type: "seed", messages });
+    },
+    [stateRef, dispatch],
+  );
+  const retarget = useCallback((from: string, to: string) => dispatch({ type: "retarget", from, to }), [dispatch]);
   const forget = useCallback(
     (messageId: string, receipt: boolean) => dispatch({ type: "forget", messageId, receipt }),
-    [],
+    [dispatch],
   );
   // My message just sent where agents may pick it up: the clock at once, as the router's own `message.routing` says.
   const picking = useCallback(
@@ -593,7 +686,7 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
         event: { type: "message.routing", channelId, messageId, step: "plan" },
         at: Date.now(),
       }),
-    [channelId],
+    [channelId, dispatch],
   );
 
   const stop = useCallback(
@@ -608,40 +701,27 @@ export function useChatLive(orgId: string, channelId: string, enabled: boolean):
         } else dispatch({ type: "unstopping", runId });
       });
     },
-    [api, orgId, channelId, qc],
+    [api, orgId, channelId, qc, dispatch],
   );
 
   // Each list keeps its identity until its own part changes: someone typing redraws the line, not the timeline.
-  const runs = useMemo(() => runsInChannel(state.streams, channelId), [state.streams, channelId]);
-  const consults = useMemo(() => consultsIn(state.consults, channelId), [state.consults, channelId]);
+  const runs = useMemo(() => runsInChannel(streams, channelId), [streams, channelId]);
+  const consults = useMemo(() => consultsIn(consultsState, channelId), [consultsState, channelId]);
   return useMemo(
     () => ({
       runs,
       consults,
-      receipts: state.receipts,
+      receipts,
       expect,
       retarget,
       forget,
       seed,
       picking,
       stop,
-      typing: state.typing,
+      typing,
       sendTyping,
-      notices: state.notices,
+      notices,
     }),
-    [
-      runs,
-      consults,
-      state.receipts,
-      state.typing,
-      expect,
-      retarget,
-      forget,
-      seed,
-      picking,
-      stop,
-      sendTyping,
-      state.notices,
-    ],
+    [runs, consults, receipts, typing, expect, retarget, forget, seed, picking, stop, sendTyping, notices],
   );
 }

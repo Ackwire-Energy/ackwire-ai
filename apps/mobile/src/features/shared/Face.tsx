@@ -10,8 +10,8 @@ import type { AgentLookInput } from "@/agent/looks";
 import { type AgentMode, agentLayout, framedByDefault } from "@/agent/poses";
 import { AgentAvatar, PersonAvatar, WithPresence } from "@/ui";
 import { router } from "@/ui/navigation";
+import { useRowDirectory } from "../chat/row-data";
 import { usePresenceOf } from "../status/hooks";
-import { useDirectory } from "./hooks";
 import { agentLook } from "./logic";
 import { usePersonPhoto } from "./photo";
 import { useSheetIfAny } from "./SheetHost";
@@ -19,7 +19,7 @@ import { useSheetIfAny } from "./SheetHost";
 /**
  * A person's or an agent's face. Agents are living bodies; long lists pass
  * `live={false}` (a still frame). `presence`: its badge on the corner (ADR 0084), ringed in `ring` (the surface
- * behind; default the page's color).
+ * behind; default the page's color). In a conversation the directory is the one its rows share (`useRowDirectory`).
  */
 export function Face({
   who,
@@ -42,7 +42,7 @@ export function Face({
   /** The tile's corner (default 30% of the side, see AgentAvatar). */
   radius?: number | undefined;
 }) {
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const member = who?.type !== "agent" && who?.id ? dir.memberById.get(who.id) : undefined;
   const photo = usePersonPhoto(member ? (member.avatarUrl ?? member.image) : null);
   if (who?.type === "agent")
@@ -73,7 +73,7 @@ export function Face({
  */
 export function OpensAgent({ agentId, children }: { agentId: string; children: ReactNode }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const sheet = useSheetIfAny();
   const agent = dir.anyAgent(agentId);
   if (!agent || !opensDetails(agent)) return <>{children}</>;
@@ -126,7 +126,7 @@ export function AgentFace({
   /** The tile's corner (default 30% of the side, see AgentAvatar). */
   radius?: number | undefined;
 }) {
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const look = agentLook(agentId ? dir.anyAgent(agentId) : undefined);
   const moment = { gaze, expression, bodyless, radius };
   if (presence && agentId)

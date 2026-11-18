@@ -398,6 +398,8 @@ export interface NotificationLatest {
   names?: string[];
   /** `join_request` from a member's suggestion (ADR 0090): who suggested, so a row of one says so. */
   suggestedBy?: string;
+  /** `join_request` for an outside collaborator (ADR 0191): who they work for, so a row of one says so. */
+  outsideOf?: string;
   /** `composio_limit`: the calls a month allows. */
   calls?: number;
   /** `computer_disk_full`: the share of the disk in use (0 to 1) and the GB left. */

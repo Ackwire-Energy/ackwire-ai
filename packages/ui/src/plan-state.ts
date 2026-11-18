@@ -243,6 +243,10 @@ export interface OfferAccount {
   usage: PlanMeterUsage | null;
   /** It thinks for every agent its owner gives it on that computer. */
   shared?: boolean;
+  /** Its place in the workspace's order of use; null: after the placed ones. */
+  useOrder?: number | null;
+  /** The oldest login of the same account (one account may be signed in once per agent); absent: an older server. */
+  sameAs?: string;
 }
 
 /**
@@ -250,9 +254,11 @@ export interface OfferAccount {
  * same kind and plan maker (another maker's models would think instead),
  * signed in, not at their own limit, and free or made for all of the owner's
  * agents there. A login another agent thinks with is never offered (it serves
- * one agent; moving plans between agents to dodge a limit isn't). Most
- * headroom first, unknown usage last. Shared by the web's and the phone's
- * agent settings.
+ * one agent; moving plans between agents to dodge a limit isn't). Another
+ * login of the account in use shares its limit and is never offered; an
+ * account signed in once per agent is offered once. In the order of use, then
+ * most headroom first, unknown usage last. Shared by the web's and the
+ * phone's agent settings.
  */
 export function limitOffers<A extends OfferAccount>(
   accounts: readonly A[],
@@ -260,11 +266,14 @@ export function limitOffers<A extends OfferAccount>(
   current: string | null,
   now = Date.now(),
 ): { account: A; used: number | null }[] {
-  const provider = accounts.find((a) => a.id === current)?.provider ?? null;
+  const inUse = accounts.find((a) => a.id === current);
+  const provider = inUse?.provider ?? null;
+  const accountOf = (a: A) => a.sameAs ?? a.id;
   return accounts
     .filter(
       (a) =>
         a.mine &&
+        (!inUse || accountOf(a) !== accountOf(inUse)) &&
         a.kind === kind &&
         (a.provider ?? null) === provider &&
         a.id !== current &&
@@ -274,7 +283,12 @@ export function limitOffers<A extends OfferAccount>(
     .map((account) => ({ account, plan: account.usage ? planState(account.usage, now) : null }))
     .filter((o) => o.plan?.state !== "limited")
     .map((o) => ({ account: o.account, used: o.plan?.used ?? null }))
-    .sort((a, b) => (a.used ?? 101) - (b.used ?? 101));
+    .sort(
+      (a, b) =>
+        (a.account.useOrder ?? Number.POSITIVE_INFINITY) - (b.account.useOrder ?? Number.POSITIVE_INFINITY) ||
+        (a.used ?? 101) - (b.used ?? 101),
+    )
+    .filter((o, i, all) => all.findIndex((x) => accountOf(x.account) === accountOf(o.account)) === i);
 }
 
 /** From here long work pauses until the window resets (ADR 0118); replies to people go on until the limit. */
@@ -293,7 +307,7 @@ const WINDOW_MS: Partial<Record<string, number>> = {
   other: 7 * 86_400_000,
 };
 
-/** The paid extra usage the account has turned on with the provider (only Claude's plans report it). */
+/** Whether the provider reports paid extra usage as enabled, even when its allowance is spent. */
 export const extraUsageOn = (usage: { windows: readonly PlanMeterWindow[] } | null | undefined) =>
   usage?.windows.some((w) => w.kind === "other" && w.label === EXTRA_USAGE_LABEL) ?? false;
 
@@ -337,4 +351,35 @@ export function renewals(rows: readonly PlanMeterWindow[], text: PlanMeterText, 
   const due = rows.flatMap((w) => (w.resetsAt && !passed(w.resetsAt, now) ? [{ w, at: w.resetsAt }] : []));
   if (due.length <= 1) return due[0] ? text.resets(due[0].at) : null;
   return due.map(({ w, at }) => `${text.short(w)} ${text.resets(at)}`).join(" · ");
+}
+
+/** What ranks a row of accounts to pick from (`sortHave`). */
+export interface HaveRank {
+  /** Its plan's limits; null where nothing says (a key). */
+  usage: PlanMeterUsage | null;
+  /** It can't be picked. */
+  off?: boolean;
+  /** Picking it asks for a sign-in. */
+  signIn?: boolean;
+  /** A workspace key. */
+  isKey?: boolean;
+}
+
+/**
+ * Accounts to pick from, web and phone: a plan used in one click first, the one with most room on top (one that
+ * doesn't say counts as half used); then one that asks for a sign-in, the workspace's keys, a plan at its limit, and
+ * last what can't be picked.
+ */
+export function sortHave<T extends HaveRank>(items: readonly T[], now = Date.now()): T[] {
+  const rank = (i: HaveRank) => {
+    const s = i.usage ? planState(i.usage, now) : null;
+    return (
+      (i.off ? 8000 : 0) +
+      (s?.state === "limited" ? 4000 : 0) +
+      (i.isKey ? 2000 : 0) +
+      (i.signIn ? 1000 : 0) +
+      (s?.used ?? 50)
+    );
+  };
+  return [...items].sort((a, b) => rank(a) - rank(b));
 }

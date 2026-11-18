@@ -17,6 +17,7 @@ import {
 import { resolveChannelAgentAsks } from "./admin-asks";
 import { caches } from "./cache";
 import { endOfCategory, requireCategoryInOrg } from "./channel-categories";
+import { wordsOf } from "./confidential";
 import { ConflictError, ForbiddenError, isUniqueViolation, NotFoundError, ValidationError } from "./errors";
 import { publishChannelEvent, publishChannelsChanged, publishOrgEvent, publishUserEvent } from "./events";
 import { followsThreadSql, threadReadAtSql } from "./follows";
@@ -404,7 +405,10 @@ export async function listChannels(db: Database, userId: string, orgId: string):
               authorType: r.last_author_type,
               authorId: r.last_author_type === "person" ? r.last_user_id : r.last_agent_id,
               authorName: r.last_author_name,
-              preview: notificationSnippet(readableBody(r.last_body ?? "", lastMeta), CHANNEL_PREVIEW_LENGTH),
+              preview: notificationSnippet(
+                readableBody(wordsOf(r.last_body ?? "", lastMeta), lastMeta),
+                CHANNEL_PREVIEW_LENGTH,
+              ),
               meta: previewMeta(lastMeta),
               mediaKind: previewMediaKind(r.last_body, lastMeta),
               createdAt: asDate(r.last_at),

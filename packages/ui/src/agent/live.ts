@@ -8,6 +8,7 @@
  * toward it.
  */
 import { avatarSky } from "../sky/avatar";
+import { PAINT_ATTRS } from "../theme";
 import {
   ACCESSORY_REACH,
   bodyTones,
@@ -296,7 +297,7 @@ function watchTheme() {
   if (themeWatch || typeof MutationObserver === "undefined" || typeof document === "undefined") return;
   themeWatch = new MutationObserver(redrawAll);
   // Subtree: a page can theme its own part (the landing's `data-theme`).
-  themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: ["data-theme"] });
+  themeWatch.observe(document.documentElement, { attributes: true, subtree: true, attributeFilter: PAINT_ATTRS });
 }
 
 /** Working, waiting on someone, making a face or following the gaze: drawn at the full rate (asleep: at rest's). */

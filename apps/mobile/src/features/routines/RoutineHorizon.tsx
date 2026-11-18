@@ -2,8 +2,8 @@ import { type Routine, useCalendar } from "@agenteschat/client";
 import { clockHour, whenAt } from "@agenteschat/client/lib/format";
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, StyleSheet, View } from "react-native";
-import { Button, ROW_PRESS_DELAY, Text } from "@/ui";
+import { StyleSheet, View } from "react-native";
+import { Button, RowPressable, Text } from "@/ui";
 import { CellCanvas } from "../browser/TrailPixels";
 import { AgentFace } from "../shared/Face";
 import { useColors, useDirectory, useOrgId } from "../shared/hooks";
@@ -207,12 +207,13 @@ function Lane({
     ? `${t("routines.horizon.lane", { name, when: whenAt(t, i18n.language, next.at) })}, ${what}`
     : t("routines.horizon.laneNone", { name });
   return (
-    <Pressable
+    <RowPressable
+      radius={6}
+      hold
       onPress={target ? () => open(target) : undefined}
-      unstable_pressDelay={ROW_PRESS_DELAY}
       accessibilityRole="button"
       accessibilityLabel={label}
-      style={({ pressed }) => [styles.lane, pressed && { backgroundColor: c.sunken }]}
+      style={styles.lane}
     >
       <View style={styles.label}>
         <AgentFace agentId={a.agentId} size={24} live={false} />
@@ -242,7 +243,7 @@ function Lane({
           </Text>
         ) : null}
       </View>
-    </Pressable>
+    </RowPressable>
   );
 }
 

@@ -8,6 +8,7 @@ export {
   accountName,
   accountOwner,
   accountShares,
+  accountWhose,
   brandOf,
   groupUsageAccounts,
   loginsText,

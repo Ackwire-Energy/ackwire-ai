@@ -40,6 +40,7 @@ import { requestComposerText } from "./composer-request";
 import { RowLookContext, useConversationLook } from "./look";
 import { MessageRow } from "./MessageRow";
 import { MessageText } from "./MessageText";
+import { ConversationRowData } from "./row-data";
 
 /**
  * A question an agent asked another from a conversation, in a sheet over it (the web opens it in a dialog, as a
@@ -61,14 +62,17 @@ export function ConsultationScreen({
   group?: readonly string[];
 }) {
   // The cards drawn here open their sheets (a question answered "do meu jeito") as in the conversation.
+  // Its rows read the conversation's questions once, as the conversation's own (`ConversationRowData`).
   return (
-    <SheetHostProvider>
-      <FocusLive>
-        <SheetSurface>
-          <Consultation consultationId={consultationId} channelId={channelId} group={group} />
-        </SheetSurface>
-      </FocusLive>
-    </SheetHostProvider>
+    <ConversationRowData channelId={channelId}>
+      <SheetHostProvider>
+        <FocusLive>
+          <SheetSurface>
+            <Consultation consultationId={consultationId} channelId={channelId} group={group} />
+          </SheetSurface>
+        </FocusLive>
+      </SheetHostProvider>
+    </ConversationRowData>
   );
 }
 

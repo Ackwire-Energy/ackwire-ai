@@ -67,6 +67,7 @@ import type { TeamWeekAct } from "../lib/team-week";
 import { threadStartOf } from "../lib/threads";
 import { upsertMessage, withLocalCopies } from "../lib/timeline";
 import { listedText } from "../lib/voice";
+import type { Wallpaper } from "../lib/wallpaper";
 import type { AudienceChoice } from "../lib/who-sees";
 import type { WikiAccess } from "../lib/wiki";
 import type { RealtimeConnection } from "../realtime/connection";
@@ -77,6 +78,7 @@ import { ApiError, type UploadOptions } from "./http";
 import { keys, ME_HASH } from "./keys";
 import { keepSending, outbox } from "./outbox";
 import type {
+  AccountOrderGroup,
   Actor,
   AdminAsk,
   Agent,
@@ -322,6 +324,50 @@ function onQueryEvent(cache: QueryCache, hash: string, types: readonly QueryEven
   };
 }
 export const useAuthConfig = () => useQuery(authConfigQuery(useApi()));
+
+/**
+ * My outside chat surface and links (ADR 0187), asked only where the server bridges one. Live through
+ * `surface_link.changed` (`applyUnreadEvent`). `surfaceRowOf` (lib/surface-links) turns it into what the row shows.
+ */
+export function useSurfaceLinks() {
+  const api = useApi();
+  const bridged = useAuthConfig().data?.surface === true;
+  return useQuery({ queryKey: keys.surfaceLinks, queryFn: () => api.surfaces.list(), enabled: bridged });
+}
+
+/** A code to type on the surface, answering in `orgId` once confirmed. Changes no link, so nothing reads again. */
+export function useMintSurfaceCode() {
+  const api = useApi();
+  return useMutation({ mutationFn: (orgId: string) => api.surfaces.mintCode(orgId), meta: { silent: true } });
+}
+
+/** A refusal often means the link changed elsewhere, so the list reads again whatever the answer. */
+function useSurfaceLinkMutation<T, R>(run: (input: T) => Promise<R>) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: run,
+    meta: { silent: true },
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.surfaceLinks }),
+  });
+}
+
+/** "This is me": the pending link becomes active. */
+export function useConfirmSurfaceLink() {
+  const api = useApi();
+  return useSurfaceLinkMutation((linkId: string) => api.surfaces.confirm(linkId));
+}
+
+/** Cancels a pending link or unlinks an active one. */
+export function useRemoveSurfaceLink() {
+  const api = useApi();
+  return useSurfaceLinkMutation((linkId: string) => api.surfaces.remove(linkId));
+}
+
+/** The "linked" email's undo, by its token; works signed out. */
+export function useUndoSurfaceLink() {
+  const api = useApi();
+  return useSurfaceLinkMutation((token: string) => api.surfaces.undo(token));
+}
 export const useHealth = () => {
   const api = useApi();
   return useQuery({ queryKey: keys.health, queryFn: () => api.system.health(), staleTime: 5 * 60_000 });
@@ -520,6 +566,21 @@ export function useUpdateOrganization(orgId: string) {
 }
 
 // ── Organization ────────────────────────────────────────────────────────────
+
+/** The workspace's accent color (admins, ADR 0193): `GET /me` carries it to every app, this one at once. */
+export function useSetOrgAccent(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (accent: string | null) => api.orgs.setAccent(orgId, accent),
+    onSuccess: ({ accent }) => {
+      qc.setQueryData<Me>(keys.me, (me) =>
+        me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, accent } : o)) } : me,
+      );
+      void qc.invalidateQueries({ queryKey: keys.me });
+    },
+  });
+}
 
 export const useOrganization = (orgId: string) => {
   const api = useApi();
@@ -1420,14 +1481,45 @@ export function usePrefetchMessages(orgId: string) {
   );
 }
 
+/**
+ * A conversation's first screen, loaded ahead of its opening: its latest messages (a thread's, for a thread) and what
+ * its rows wait for before they show (the threads' links under their roots, the questions agents asked there). Each
+ * only when what is kept isn't fresh, so asking twice costs nothing.
+ */
+export function prefetchConversation(
+  qc: QueryClient,
+  api: ApiClient,
+  orgId: string,
+  channelId: string,
+  threadId?: string | null,
+) {
+  if (threadId) void qc.prefetchQuery(threadMessagesQuery(api, orgId, channelId, threadId));
+  else {
+    void qc.prefetchQuery(messagesQuery(api, orgId, channelId));
+    void qc.prefetchQuery(channelThreadsQuery(api, orgId, channelId, "all"));
+  }
+  void qc.prefetchQuery(consultationsQuery(api, orgId, channelId));
+}
+
+/** `prefetchConversation` for a list's rows: one function that keeps its identity. */
+export function usePrefetchConversation(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useCallback(
+    (channelId: string, threadId?: string | null) => prefetchConversation(qc, api, orgId, channelId, threadId),
+    [api, qc, orgId],
+  );
+}
+
 /** Conversations loaded when the workspace opens (no hover on a phone, nor before the first click). */
 export const RECENT_PREFETCH = 5;
 
 /**
  * Once the lists arrive, loads the unread and most recent conversations while
- * the app is idle, once per organization: opening them is then instant.
+ * the app is idle, once per organization: opening them is then instant. `whole`: each with what its rows wait for
+ * too (`prefetchConversation`), for a screen that holds the conversation until they are in (the phone's).
  */
-export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
+export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH, { whole = false }: { whole?: boolean } = {}) {
   const api = useApi();
   const qc = useQueryClient();
   const channels = useChannels(orgId);
@@ -1438,7 +1530,10 @@ export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
     if (!ready) return;
     const ids = recentConversations(channels.data ?? [], dms.data ?? [], count);
     const run = () => {
-      for (const id of ids) void qc.prefetchQuery(messagesQuery(api, orgId, id));
+      for (const id of ids) {
+        if (whole) prefetchConversation(qc, api, orgId, id);
+        else void qc.prefetchQuery(messagesQuery(api, orgId, id));
+      }
     };
     const idle = globalThis as {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
@@ -1450,7 +1545,7 @@ export function usePrefetchRecent(orgId: string, count = RECENT_PREFETCH) {
     }
     const timer = setTimeout(run, 300);
     return () => clearTimeout(timer);
-  }, [ready, orgId, count, api, qc]);
+  }, [ready, orgId, count, whole, api, qc]);
 }
 
 /** A `#channel` link's card, when it opens (or when the link names a channel the list doesn't have). */
@@ -1608,28 +1703,55 @@ export function useSendDm(orgId: string) {
 
 const isMessageList = (key: readonly unknown[]) => key[4] === "messages" || key[4] === "thread";
 
+/** The ids of every message a channel's lists hold (its latest page and its threads'). */
+const idsInLists = (qc: QueryClient, prefix: readonly unknown[]) =>
+  new Set(
+    qc
+      .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
+      .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
+  );
+
 /**
  * Reads a channel's open lists again once its events reach us (`subscribed`: what happened there before was
  * never sent to us) and adds what they lack, taking nothing away: a message heard live while this read was on
  * its way stays. A read already on its way lands first, so it can't put an older list back over what this one
  * adds. Returns what it read.
+ *
+ * `recent`: each list reads only its latest `recent` messages first (a page of the conversation was just read; what
+ * it may lack is the little said since). That read covers the gap when its oldest message is one the list already
+ * held from before the subscription (`heard`: the ids heard live since, which prove nothing about what came before
+ * them); otherwise the whole page is read, as without it.
  */
 export async function catchUpChannel(
   api: ApiClient,
   qc: ReturnType<typeof useQueryClient>,
   orgId: string,
   channelId: string,
+  { recent, heard }: { recent?: number; heard?: ReadonlySet<string> } = {},
 ): Promise<Message[]> {
   const prefix = ["org", orgId, "channel", channelId];
   await qc.refetchQueries({ queryKey: prefix, fetchStatus: "fetching" }, { cancelRefetch: false });
+  const held = recent ? idsInLists(qc, prefix) : null;
+  const read = (rootId: string | null, page: number) => {
+    const ask = (limit: number) =>
+      api.chat.messages(orgId, channelId, rootId ? { threadId: rootId, limit } : { limit });
+    if (!recent || !held) return ask(page);
+    return ask(recent).then((latest) => {
+      // A thread's read starts with its root whatever the limit: only its replies tell how far back it reached.
+      const said = rootId ? latest.filter((m) => m.id !== rootId) : latest;
+      const oldest = said[0];
+      const reached = said.length < recent || (oldest !== undefined && held.has(oldest.id) && !heard?.has(oldest.id));
+      return reached ? latest : ask(page);
+    });
+  };
   const reads = qc
     .getQueryCache()
     .findAll({ queryKey: prefix, type: "active" })
     .flatMap(({ queryKey: [, , , , list, rootId] }) =>
       list === "messages"
-        ? [api.chat.messages(orgId, channelId, { limit: MESSAGES_PAGE })]
+        ? [read(null, MESSAGES_PAGE)]
         : list === "thread" && typeof rootId === "string"
-          ? [api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE })]
+          ? [read(rootId, THREAD_PAGE)]
           : [],
     );
   const settled = await Promise.allSettled(reads);
@@ -1637,17 +1759,13 @@ export async function catchUpChannel(
   // reload: the lists read again through the query client, which tries again.
   if (settled.some((r) => r.status === "rejected"))
     void qc.invalidateQueries({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) });
-  const read = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
-  const known = new Set(
-    qc
-      .getQueriesData<Message[]>({ queryKey: prefix, predicate: (q) => isMessageList(q.queryKey) })
-      .flatMap(([, data]) => (Array.isArray(data) ? data.map((m) => m.id) : [])),
-  );
-  const added = read.filter((m) => !known.has(m.id));
+  const got = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const known = idsInLists(qc, prefix);
+  const added = got.filter((m) => !known.has(m.id));
   for (const m of added) cacheMessage(qc, orgId, m);
   // Only what it added: this runs on every channel opened, and a reconnect reads the thread lists on its own.
   for (const threadId of new Set(added.flatMap((m) => m.threadId ?? []))) refreshRepliedThread(qc, orgId, threadId);
-  return read;
+  return got;
 }
 
 /** The screens open on each conversation (a thread beside its channel is a second one), per query client. */
@@ -3009,6 +3127,46 @@ export function useSetChatPrefs(orgId: string) {
   });
 }
 
+/** My choices here as the server answered them (another device's change, or a conversation's background). */
+function putChatPrefs(qc: QueryClient, orgId: string, chatPrefs: ChatPrefs) {
+  qc.setQueryData<Me | null>(keys.me, (me) =>
+    me ? { ...me, organizations: me.organizations.map((o) => (o.id === orgId ? { ...o, chatPrefs } : o)) } : me,
+  );
+}
+
+/**
+ * A conversation's own background, for me (null: it follows the channels' or DMs' again). Shown at once; on a
+ * failure the choice before comes back.
+ */
+export function useSetConversationWallpaper(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ channelId, wallpaper }: { channelId: string; wallpaper: Wallpaper | null }) =>
+      api.orgs.setConversationWallpaper(orgId, channelId, wallpaper),
+    onMutate: async ({ channelId, wallpaper }) => {
+      await qc.cancelQueries({ queryKey: keys.me });
+      const before = qc.getQueryData<Me | null>(keys.me);
+      const prefs = before?.organizations.find((o) => o.id === orgId)?.chatPrefs ?? {};
+      const { [channelId]: _old, ...rest } = prefs.wallpapers ?? {};
+      putChatPrefs(qc, orgId, { ...prefs, wallpapers: wallpaper ? { ...rest, [channelId]: wallpaper } : rest });
+      return { before };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.before !== undefined) qc.setQueryData(keys.me, ctx.before);
+    },
+    onSuccess: (prefs) => putChatPrefs(qc, orgId, prefs),
+  });
+}
+
+/** Sends a photo for a background (already shrunk); its address goes into a background with one of the two above. */
+export function useUploadWallpaperPhoto(orgId: string) {
+  const api = useApi();
+  return useMutation({
+    mutationFn: (input: { imageBase64: string; contentType: string }) => api.orgs.uploadWallpaperPhoto(orgId, input),
+  });
+}
+
 /** Your own row with a status change applied, as the server will answer it. */
 function withStatus(p: Person, input: StatusInput): Person {
   const presence = input.availability === undefined ? p.presence : AVAILABILITY_PRESENCE[input.availability];
@@ -3532,16 +3690,21 @@ export const useRun = (orgId: string, runId: string | null) => {
  * reply that asked. The page reloads it on `agent.consulting`, `agent.consulted` and `agent.consultation`; while a
  * question is out it also reloads every `CONSULT_GROUP_POLL_MS`.
  */
-export const useConsultations = (orgId: string, channelId: string, enabled = true) => {
-  const api = useApi();
-  return useQuery({
+export const consultationsQuery = (api: ApiClient, orgId: string, channelId: string) =>
+  queryOptions({
     queryKey: keys.consultations(orgId, channelId),
     queryFn: () => api.agents.consultations(orgId, channelId),
-    enabled,
     staleTime: 10_000,
     // Kept as long as the conversation's messages (`messagesQuery`): they change its rows, so a conversation shown
     // again at once from memory has them too.
     gcTime: 30 * 60_000,
+  });
+
+export const useConsultations = (orgId: string, channelId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    ...consultationsQuery(api, orgId, channelId),
+    enabled,
     refetchInterval: (q) => (q.state.data?.some((c) => c.status === "open") ? CONSULT_GROUP_POLL_MS : false),
   });
 };
@@ -3724,15 +3887,15 @@ export function useDeleteChannel(orgId: string) {
 
 // ── Direct messages ─────────────────────────────────────────────────────────
 
-export const useDms = (orgId: string) => {
-  const api = useApi();
-  return useQuery({
+export const dmsQuery = (api: ApiClient, orgId: string) =>
+  queryOptions({
     queryKey: keys.dms(orgId),
     queryFn: () => api.dms.list(orgId),
     staleTime: 30_000,
     ...BACK_TO_TAB,
   });
-};
+
+export const useDms = (orgId: string) => useQuery(dmsQuery(useApi(), orgId));
 
 /** "Visto" in a DM between people: where the others stopped reading (live: `channel.read`). */
 export function useDmReads(orgId: string, channelId: string, enabled: boolean) {
@@ -5259,6 +5422,39 @@ export const useAiAccounts = (orgId: string, enabled = true, pollMs: number | fa
   });
 };
 
+/** "Ordem de uso" (ADR 0041 §6): every computer's Claude and ChatGPT accounts in their order, by computer and kind. */
+export const useAccountOrder = (orgId: string, enabled = true) => {
+  const api = useApi();
+  return useQuery({
+    queryKey: keys.accountOrder(orgId),
+    queryFn: () => api.machines.accountOrder(orgId),
+    enabled,
+  });
+};
+
+/**
+ * Moves an account in its order ("Subir", "Descer", a drag): the group the server answers replaces the old one at once.
+ * Every agent's "Quem pensa" lists the accounts with their place, so those refetch too.
+ */
+export function useMoveAccountInOrder(orgId: string) {
+  const api = useApi();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountId, index }: { accountId: string; index: number }) =>
+      api.machines.moveAccountInOrder(orgId, accountId, index),
+    onSuccess: (group) => {
+      qc.setQueryData<{ groups: AccountOrderGroup[] }>(keys.accountOrder(orgId), (old) =>
+        old
+          ? {
+              groups: old.groups.map((g) => (g.machineId === group.machineId && g.kind === group.kind ? group : g)),
+            }
+          : old,
+      );
+      void qc.invalidateQueries({ queryKey: keys.agentPages(orgId) });
+    },
+  });
+}
+
 /**
  * ADR 0041 §2: a sign-in on the computer, asked every 2 s until it ends (done, failed or expired), through failed
  * reads too (`loginRead` says how long they may last).
@@ -5904,22 +6100,27 @@ export function useThreadInfo(orgId: string, threadId: string | null | undefined
  * A thread's root and replies (the same cache the channel uses for agent replies). Until they are read, the root
  * the channel already holds stands in (`isPlaceholderData`): only the replies are still unknown.
  */
+export const threadMessagesQuery = (api: ApiClient, orgId: string, channelId: string, rootId: string) =>
+  queryOptions({
+    queryKey: keys.thread(orgId, channelId, rootId),
+    queryFn: async ({ client, queryKey }) => {
+      const start = client.getQueryData<Message[]>(queryKey);
+      const read = await api.chat.messages(orgId, channelId, { threadId: rootId, limit: THREAD_PAGE });
+      return withLocalCopies(read, client.getQueryData<Message[]>(queryKey), outbox.has, start);
+    },
+    staleTime: 30_000,
+  });
+
 export function useThreadMessages(orgId: string, channelId: string | undefined, rootId: string) {
   const api = useApi();
   const qc = useQueryClient();
   return useQuery({
+    ...threadMessagesQuery(api, orgId, channelId ?? "", rootId),
     placeholderData: () => {
       const root = channelId ? cachedTopLevel(qc, orgId, rootId, channelId) : undefined;
       return root ? [root] : undefined;
     },
-    queryKey: keys.thread(orgId, channelId ?? "", rootId),
-    queryFn: async ({ client, queryKey }) => {
-      const start = client.getQueryData<Message[]>(queryKey);
-      const read = await api.chat.messages(orgId, channelId ?? "", { threadId: rootId, limit: THREAD_PAGE });
-      return withLocalCopies(read, client.getQueryData<Message[]>(queryKey), outbox.has, start);
-    },
     enabled: Boolean(channelId),
-    staleTime: 30_000,
     // Every opening reads it: a reply heard live keeps the list looking fresh while it may lack what was said when
     // this channel wasn't listened to.
     refetchOnMount: "always",
@@ -6624,11 +6825,19 @@ export function useMarkChannelRead(orgId: string) {
  * any device, has no wave.
  */
 export function useRightHandWave(orgId: string, agentId: string): boolean {
-  const dms = useDms(orgId);
+  // Only its own DM's row: a message anywhere reads the DM list again, and the screen asking redrew with each.
+  const pick = useCallback(
+    (list: DirectMessage[]) => ({
+      first: firstVisitOf(list, agentId),
+      channelId: list.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId,
+    }),
+    [agentId],
+  );
+  const dms = useQuery({ ...dmsQuery(useApi(), orgId), select: pick });
   const markRead = useMarkChannelRead(orgId).mutate;
-  const first = firstVisitOf(dms.data, agentId);
+  const first = dms.data?.first;
   const [wave, setWave] = useState(first);
-  const channelId = dms.data?.find((d) => d.with.type === "agent" && d.with.id === agentId)?.channelId;
+  const channelId = dms.data?.channelId;
   useEffect(() => {
     if (first === undefined) return;
     setWave((w) => w ?? first);
@@ -6772,6 +6981,16 @@ function readOncePerBurst(key: string, read: () => void) {
   );
 }
 
+/**
+ * The conversation lists (their last lines and unread counts) read again once per burst, joined with the reads my own
+ * topic's `channel.activity` asks for (`applyUnreadEvent`): an open conversation read both lists at once for each of
+ * its messages, and everything drawn from them (the tab bar, the home, every conversation open) drew again each time.
+ */
+export function readConversationListsOncePerBurst(qc: QueryClient, orgId: string) {
+  readOncePerBurst(`${orgId}:dms`, () => void qc.invalidateQueries({ queryKey: keys.dms(orgId) }));
+  readOncePerBurst(`${orgId}:channels`, () => void qc.invalidateQueries({ queryKey: keys.channels(orgId) }));
+}
+
 /** A task changed, a reply in its conversation too (ADR 0145): the boards on screen read again, once per burst. */
 export function applyIssueEvent(qc: QueryClient, orgId: string, event: { type: string }) {
   if (
@@ -6819,10 +7038,11 @@ export function applyUnreadEvent(qc: QueryClient, orgId: string, event: { type: 
     void qc.invalidateQueries({ queryKey: keys.dms(orgId) });
     void qc.invalidateQueries({ queryKey: keys.unreadThreads(orgId) });
   } else if (e.type === "channel.muted") setMuted(qc, orgId, e.channelId, e.muted);
+  else if (e.type === "chat.prefs") putChatPrefs(qc, orgId, e.chatPrefs);
   else if (e.type === "thread.read") {
     clearThreadUnread(qc, orgId, e.threadId);
     refreshThreadUnread(qc, orgId);
-  }
+  } else if (e.type === "surface_link.changed") void qc.invalidateQueries({ queryKey: keys.surfaceLinks });
 }
 
 /**

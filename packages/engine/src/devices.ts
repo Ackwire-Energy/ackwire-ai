@@ -26,6 +26,7 @@ import {
   machineOnline,
   machinePause,
   publishMachineUpdated,
+  shownOnline,
 } from "./machines";
 import { can, getMembership, type Membership, requirePermission } from "./organizations";
 import { closedRefusal, OrgDeletingError, orgStanding } from "./standing";
@@ -296,7 +297,8 @@ export const personalComputer = (m: Pick<MachineRow, "kind" | "pairedByUserId" |
   m.kind === "connected" && m.pairedByUserId !== null && m.executors?.mode !== "system" && !m.belongsToWorkspace;
 
 function computerStatus(m: MachineRow, running: number, now: Date): DeviceStatus {
-  if (!machineOnline(m, now)) return { kind: "offline", lastSeenAt: iso(m.lastSeenAt) };
+  // Asleep in standby and waking as it should, it reads ready (ADR 0161).
+  if (!shownOnline(m, now)) return { kind: "offline", lastSeenAt: iso(m.lastSeenAt) };
   const pause = machinePause(m, now);
   if (pause) return { kind: "paused", until: pause.until };
   if (running > 0) return { kind: "busy", running, max: DEFAULT_MAX_TASKS };

@@ -125,7 +125,7 @@ const PinnedFace = memo(function PinnedFace({
           haptic={false}
           fill={false}
           onPress={press}
-          onPressIn={warm}
+          onTouchStart={warm}
           {...hold}
           accessibilityRole="button"
           accessibilityLabel={a11y}

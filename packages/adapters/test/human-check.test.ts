@@ -71,6 +71,20 @@ test("Cloudflare's test keys pass on any host; a real answer passes only for its
   expect(check.status()).toMatchObject({ state: "ok", passed: 3, testing: false });
 });
 
+test("a token made on the request's own registered host counts there, never for the waiting list", async () => {
+  const host = "app.northwind.example";
+  let answer: Record<string, unknown> = { success: true, hostname: host, action: "sign-in" };
+  const { check } = setup(() => json(answer));
+  expect(await check.verify(TOKEN, "sign-in", "203.0.113.7")).toBe("human_check");
+  expect(await check.verify(TOKEN, "sign-in", "203.0.113.7", "app.contoso.example")).toBe("human_check");
+  expect(await check.verify(TOKEN, "sign-in", "203.0.113.7", host)).toBeNull();
+  // Our own host still counts on a request for a registered one.
+  answer = { success: true, hostname: "agentes.chat", action: "sign-in" };
+  expect(await check.verify(TOKEN, "sign-in", "203.0.113.7", host)).toBeNull();
+  answer = { success: true, hostname: host, action: "waitlist" };
+  expect(await check.verify(TOKEN, "waitlist", "203.0.113.7", host)).toBe("human_check");
+});
+
 test("a token Cloudflare refuses (wrong, expired or already spent): human_check", async () => {
   for (const code of ["invalid-input-response", "timeout-or-duplicate", "missing-input-response", "bad-request"]) {
     const { check, logs } = setup(() => json({ success: false, "error-codes": [code] }));

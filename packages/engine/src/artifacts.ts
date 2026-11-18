@@ -26,6 +26,7 @@ import { type AgentsDmReads, agentsDmReads, readerOfRun } from "./agents-dm-read
 import { recordAudit } from "./audit";
 import { runAuthorityById, runPerson, UUID } from "./authority";
 import { routineBriefOfRun } from "./background";
+import { threadIsConfidential } from "./confidential";
 import { answersAgentsOnly, peopleSee } from "./consultations";
 import { isAgentOnlyDm, openDm } from "./dms";
 import { markdownToDocx } from "./docx";
@@ -2718,6 +2719,8 @@ registerDocumentBuilder("file", async (db, orgId, id) => {
     .from(artifacts)
     .where(and(eq(artifacts.id, id), eq(artifacts.orgId, orgId)));
   if (!a || a.deletedAt) return null;
+  // A block or a poll a run showed in a confidential thread (ADR 0190): what its agent typed stays in that thread.
+  if (a.threadId && (await threadIsConfidential(db, orgId, a.threadId))) return null;
   return {
     orgId,
     kind: "file",

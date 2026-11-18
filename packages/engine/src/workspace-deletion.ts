@@ -520,7 +520,7 @@ export async function purgeWorkspace(deps: PurgeDeps, orgId: string, options: { 
   if (!org || keptFromDeletion(org)) return false;
 
   const released = await db.transaction((tx) => releaseOrgAccounts(tx, orgId));
-  await announceReleasedAccounts(deps.pubsub, released);
+  await announceReleasedAccounts(deps, released, { wakeWaits: false });
   await accountsSignedOut(db, orgId, released);
 
   const left = await revokeGrants(deps, orgId);
@@ -868,8 +868,11 @@ export interface AccountDeletionPlan {
   closes: { id: string; name: string; dueAt: Date | null }[];
   /** Others are in it: they leave it. */
   leaves: { id: string; name: string; role: MemberRole }[];
-  /** They are its only owner, others are in it, and it isn't being deleted: the account can't go yet. */
-  soleOwner: { id: string; name: string }[];
+  /**
+   * They are its only owner, others are in it, and it isn't being deleted: the account can't go yet. `onlyOutside`:
+   * those others are all outside collaborators (ADR 0191), who can't be owners, so someone else has to join first.
+   */
+  soleOwner: { id: string; name: string; onlyOutside: boolean }[];
   /** The computers they connected in the workspaces they leave (`personalMachines`): they go with the account. */
   computers: { orgId: string; id: string; name: string }[];
   /** Keys, connections and mailboxes they added to the workspaces they leave: those are the workspace's, and stay. */
@@ -899,6 +902,7 @@ export async function accountDeletionPlan(db: Executor, userId: string): Promise
       orgId: organizationMembers.orgId,
       others: sql<number>`count(*)::int`,
       owners: sql<number>`(count(*) filter (where ${organizationMembers.role} = 'owner'))::int`,
+      ordinary: sql<number>`(count(*) filter (where ${organizationMembers.outsideOf} is null))::int`,
     })
     .from(organizationMembers)
     .innerJoin(users, eq(users.id, organizationMembers.userId))
@@ -922,7 +926,7 @@ export async function accountDeletionPlan(db: Executor, userId: string): Promise
     }
     plan.leaves.push({ id: org.id, name: org.name, role: org.role });
     if (org.role === "owner" && Number(count?.owners ?? 0) === 0 && org.dueAt === null) {
-      plan.soleOwner.push({ id: org.id, name: org.name });
+      plan.soleOwner.push({ id: org.id, name: org.name, onlyOutside: Number(count?.ordinary ?? 0) === 0 });
     }
   }
   const left = plan.leaves.map((o) => o.id);
@@ -975,13 +979,19 @@ export async function accountDeletionPlan(db: Executor, userId: string): Promise
   return plan;
 }
 
-/** `sole_owner`, with the names and ids of the workspaces that keep the account from going; null when none does. */
+/**
+ * `sole_owner`, with the names and ids of the workspaces that keep the account from going; null when none does.
+ * `onlyOutside`: in every one of them the others are outside collaborators, who can't be owners (ADR 0191).
+ */
 export function soleOwnerRefusal(plan: Pick<AccountDeletionPlan, "soleOwner">) {
   if (plan.soleOwner.length === 0) return null;
+  const onlyOutside = plan.soleOwner.every((o) => o.onlyOutside);
   return new ConflictError(
-    "You are the only owner of a workspace that has other members. Make someone else an owner, or delete the workspace, first.",
+    onlyOutside
+      ? "You are the only owner of a workspace whose other people are outside collaborators, who can't be owners. Invite a member and make them an owner, or delete the workspace, first."
+      : "You are the only owner of a workspace that has other members. Make someone else an owner, or delete the workspace, first.",
     "sole_owner",
-    { organizations: plan.soleOwner.map((o) => o.name), orgIds: plan.soleOwner.map((o) => o.id) },
+    { organizations: plan.soleOwner.map((o) => o.name), orgIds: plan.soleOwner.map((o) => o.id), onlyOutside },
   );
 }
 

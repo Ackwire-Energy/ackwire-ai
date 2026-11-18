@@ -24,6 +24,7 @@ import { usePush } from "@/providers/push";
 import { GroupedFooter, GroupedHeader, GroupedList, GroupedRow, type IconName, SkeletonList, useToast } from "@/ui";
 import { LoadFailed } from "../shared/FirstUse";
 import { Page } from "./parts";
+import { SurfaceLinkRow } from "./SurfaceLink";
 
 /**
  * Você's smaller screens, each pushed from its row: Notificações, Ao abrir o app, Respostas dos agentes, Como os
@@ -118,6 +119,7 @@ export function NotificationsPage() {
           onPress={() => void push.set(!on)}
         />
       </GroupedList>
+      <SurfaceLinkRow />
       {prefs.isLoading ? (
         <>
           <View style={styles.gap} />

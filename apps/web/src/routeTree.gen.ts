@@ -21,6 +21,7 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as OwnerRouteImport } from './routes/owner'
 import { Route as PrivacidadeRouteImport } from './routes/privacidade'
 import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ReferRouteImport } from './routes/refer'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as TermosRouteImport } from './routes/termos'
@@ -127,6 +128,11 @@ const PrivacidadeRoute = PrivacidadeRouteImport.update({
 const PrivacyRoute = PrivacyRouteImport.update({
   id: '/privacy',
   path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReferRoute = ReferRouteImport.update({
+  id: '/refer',
+  path: '/refer',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
@@ -387,6 +393,7 @@ export interface FileRoutesByFullPath {
   '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/refer': typeof ReferRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
@@ -448,6 +455,7 @@ export interface FileRoutesByTo {
   '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/refer': typeof ReferRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
@@ -509,6 +517,7 @@ export interface FileRoutesById {
   '/owner': typeof OwnerRoute
   '/privacidade': typeof PrivacidadeRoute
   '/privacy': typeof PrivacyRoute
+  '/refer': typeof ReferRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
   '/termos': typeof TermosRoute
@@ -572,6 +581,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/privacidade'
     | '/privacy'
+    | '/refer'
     | '/reset-password'
     | '/signup'
     | '/termos'
@@ -633,6 +643,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/privacidade'
     | '/privacy'
+    | '/refer'
     | '/reset-password'
     | '/signup'
     | '/termos'
@@ -693,6 +704,7 @@ export interface FileRouteTypes {
     | '/owner'
     | '/privacidade'
     | '/privacy'
+    | '/refer'
     | '/reset-password'
     | '/signup'
     | '/termos'
@@ -755,6 +767,7 @@ export interface RootRouteChildren {
   OwnerRoute: typeof OwnerRoute
   PrivacidadeRoute: typeof PrivacidadeRoute
   PrivacyRoute: typeof PrivacyRoute
+  ReferRoute: typeof ReferRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
   TermosRoute: typeof TermosRoute
@@ -852,6 +865,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy'
       fullPath: '/privacy'
       preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refer': {
+      id: '/refer'
+      path: '/refer'
+      fullPath: '/refer'
+      preLoaderRoute: typeof ReferRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reset-password': {
@@ -1285,6 +1305,7 @@ const rootRouteChildren: RootRouteChildren = {
   OwnerRoute: OwnerRoute,
   PrivacidadeRoute: PrivacidadeRoute,
   PrivacyRoute: PrivacyRoute,
+  ReferRoute: ReferRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
   TermosRoute: TermosRoute,

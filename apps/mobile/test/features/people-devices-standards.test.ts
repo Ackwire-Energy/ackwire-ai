@@ -120,7 +120,8 @@ describe("every button does something the person sees", () => {
     expect(card).not.toContain("pressedWord");
     const gallery = read("connectors/ConnectorsScreen.tsx");
     expect(gallery).not.toContain("styles.pressed");
-    expect(gallery).toContain("unstable_pressDelay={ROW_PRESS_DELAY}");
+    // A list row of the kit, which lights a beat late so a scroll never flashes it.
+    expect(gallery).toContain("<RowPressable");
     const sheet = read("connectors/ConnectSheet.tsx");
     expect(sheet).toMatch(/<Button\s+variant="secondary"\s+size="sm"\s+label=\{t\("mobile\.connectors\.paste"\)\}/);
     expect(sheet).not.toContain("styles.paste");

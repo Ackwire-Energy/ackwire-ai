@@ -19,7 +19,9 @@ import {
   type DeletionDeps,
   deriveSecret,
   getOrganization,
+  HOST_LOGO_PATH,
   hasPassword,
+  hostLook,
   INVITE_CHOICES_MAX,
   invitationLogoFile,
   invitationState,
@@ -59,10 +61,13 @@ import {
   setAvatar,
   setMyLocale,
   setMyWorkArea,
+  setOrgAccent,
   setOrgLogo,
   settleJoinRequests,
+  setWallpaperPhoto,
   signInOptions,
   soleOwnerRefusal,
+  surfaceOn,
   toldReason,
   USER_LOCALES,
   undoEmailChange,
@@ -72,6 +77,7 @@ import {
   updateOrganization,
   updateOrgSettings,
   WORKSPACE_MODES,
+  wallpaperPhotoFile,
   workspaceContents,
   workspaceDeletions,
   workspaceMode,
@@ -109,10 +115,11 @@ import {
   json,
   noContent,
   OrgParams,
+  requestBaseUrl,
   requireSession,
   security,
 } from "./context";
-import { Invitation, Member, Organization, Role } from "./schemas";
+import { AccentColor, Invitation, Member, Organization, Role } from "./schemas";
 
 const tags = ["Account"];
 /** E-mail lookups on the sign-in screen: enough for typos and a few accounts, not for listing who has one. */
@@ -263,6 +270,7 @@ export function accountRoutes(deps: AppDeps) {
           permissions: [...m.permissions],
           rank: m.rank,
           logo: m.orgLogo ?? null,
+          accent: m.orgAccent ?? null,
           ...(m.orgCreatedAt ? { createdAt: m.orgCreatedAt.toISOString() } : {}),
           ...(m.start ? { start: m.start } : {}),
           showActivity: m.showActivity ?? false,
@@ -318,6 +326,7 @@ export function accountRoutes(deps: AppDeps) {
     "/account",
     "/account/*",
     "/avatars/*",
+    "/wallpapers/*",
     "/org-logos/*",
     "/organizations",
     "/organizations/*",
@@ -371,6 +380,10 @@ export function accountRoutes(deps: AppDeps) {
               description:
                 "The billing service (BILLING_URL, ADR 0079): owners and admins open a workspace's plan and billing there through `POST …/billing-link`. Null: no billing.",
             }),
+            referralsUrl: z.string().nullable().openapi({
+              description:
+                "The referral service (REFERRALS_URL, ADR 0192): a signed-in person opens it through `POST /api/app/referrals-link`. Null: no referrals.",
+            }),
             cloud: z.boolean().openapi({
               description:
                 "One of agentes.chat's own servers (`cloud` in `GET /api/instance`): the apps show no About screen there, which every other server shows.",
@@ -393,6 +406,24 @@ export function accountRoutes(deps: AppDeps) {
                 description:
                   "The same for the phone app (`SENTRY_MOBILE_DSN`, else `SENTRY_WEB_DSN`); `release` is the server's, the app files its reports under its own.",
               }),
+            surface: z.boolean().openapi({
+              description:
+                "An outside chat surface is bridged (`SURFACE_BRIDGE_TOKEN`, ADR 0187). Whether this account may link it is `GET /api/app/me/surface-links`'s `allowed`.",
+            }),
+            host: z
+              .object({
+                name: z.string(),
+                accent: z.string().nullable().openapi({ description: "`#rrggbb`; null: the default." }),
+                logoUrl: z
+                  .string()
+                  .nullable()
+                  .openapi({ description: "Its logo (`GET /api/host-look/logo`); null: none." }),
+              })
+              .nullable()
+              .openapi({
+                description:
+                  "This request's host is one the server's operator registered (ADR 0194): the pages before sign-in show its look, and sign-in is by email alone (`socialProviders` all off). Null on any other host.",
+              }),
           }),
         ),
       },
@@ -403,19 +434,27 @@ export function accountRoutes(deps: AppDeps) {
       const ownerWaits = users === 0 && signupPolicy(config).ownerByLink;
       const reportsTo = (dsn: string | undefined) =>
         dsn ? { dsn, environment: config.SENTRY_ENVIRONMENT, release: releaseOf(config) } : null;
+      const look = await hostLook(db, c.req.header("host"));
       return c.json(
         {
-          ...authUiConfig(config),
+          ...authUiConfig(config, Boolean(look)),
           signupOpen: await signupOpen(db, config, users),
           firstRun: users === 0 && !ownerWaits,
           ownerClaim: users === 0 && Boolean(config.OWNER_CLAIM_SHA256),
           passwordReset: deps.adapters.email.delivers === true,
           workspaceComputer: config.MACHINE_PROVISIONING === "external",
           billingUrl: config.BILLING_URL ?? null,
+          referralsUrl: config.REFERRALS_URL ?? null,
           cloud: isAgentesCloud(config.PUBLIC_URL),
           turnstileSiteKey: deps.adapters.humanCheck?.siteKey ?? null,
           errorReports: reportsTo(config.SENTRY_WEB_DSN),
           mobileErrorReports: reportsTo(config.SENTRY_MOBILE_DSN ?? config.SENTRY_WEB_DSN),
+          surface: surfaceOn() !== null,
+          host: look && {
+            name: look.name,
+            accent: look.accent,
+            logoUrl: look.logo ? `${HOST_LOGO_PATH}?v=${look.logo.split("/").pop()}` : null,
+          },
         },
         200,
       );
@@ -471,6 +510,7 @@ export function accountRoutes(deps: AppDeps) {
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many requests. Try again later.");
       const refused = await humanCheckRefusal(
         deps.adapters.humanCheck,
+        db,
         c.req.raw.headers,
         "email-lookup",
         config.TRUSTED_PROXIES,
@@ -957,10 +997,21 @@ export function accountRoutes(deps: AppDeps) {
             leaves: z
               .array(z.object({ id: z.uuid(), name: z.string(), role: Role }))
               .openapi({ description: "Workspaces with others in them, which they leave." }),
-            soleOwner: z.array(z.object({ id: z.uuid(), name: z.string() })).openapi({
-              description:
-                "Workspaces they are the only owner of, with others in them and not being deleted: make someone else an owner, or delete the workspace, first (`sole_owner`).",
-            }),
+            soleOwner: z
+              .array(
+                z.object({
+                  id: z.uuid(),
+                  name: z.string(),
+                  onlyOutside: z.boolean().openapi({
+                    description:
+                      "Everyone else in it is an outside collaborator, who can't be an owner: invite a member and make them an owner first.",
+                  }),
+                }),
+              )
+              .openapi({
+                description:
+                  "Workspaces they are the only owner of, with others in them and not being deleted: make someone else an owner, or delete the workspace, first (`sole_owner`, with `params.onlyOutside` when every one has only outside collaborators besides them).",
+              }),
             computers: z.array(z.object({ orgId: z.uuid(), id: z.uuid(), name: z.string() })).openapi({
               description:
                 "Computers they connected in the workspaces they leave, not in system mode: removed with the account.",
@@ -1234,6 +1285,46 @@ export function accountRoutes(deps: AppDeps) {
     },
   );
 
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/me/wallpaper-photo",
+      tags,
+      security,
+      summary: "Send a photo for a conversation's background (JPEG, PNG or WebP up to 2 MB; metadata is removed)",
+      description:
+        'Only you see it. The answer\'s `url` goes into a background (`{ kind: "photo", url, dim, x, y }`) with `PUT …/me/chat` or `PUT …/channels/{channelId}/wallpaper`; photos none of your backgrounds shows any more are removed when you send one. The apps shrink it first.',
+      request: {
+        params: OrgParams,
+        body: body(
+          z.object({
+            imageBase64: z
+              .string()
+              .min(1)
+              .max(3_000_000)
+              .openapi({ description: "The image bytes in base64 (a data: URL prefix is accepted)." }),
+            contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+          }),
+        ),
+      },
+      responses: {
+        200: json(z.object({ url: z.string() })),
+        429: errorResponse("Too many photos"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      await requirePermission(db, user.id, c.req.valid("param").orgId, "read");
+      const limit = await deps.adapters.rateLimiter.consume(`wallpaper:${user.id}`, { limit: 20, windowMs: 3600_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many photos. Try again later.");
+      return c.json(
+        await setWallpaperPhoto({ db, blobs: deps.adapters.platformBlobs }, user.id, c.req.valid("json")),
+        200,
+      );
+    },
+  );
+
   // The workspace logo: an admin uploads it; every member sees it.
   app.openapi(
     createRoute({
@@ -1268,7 +1359,12 @@ export function accountRoutes(deps: AppDeps) {
       const limit = await deps.adapters.rateLimiter.consume(`org-logo:${orgId}`, { limit: 20, windowMs: 3600_000 });
       if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many logo changes. Try again later.");
       return c.json(
-        await setOrgLogo({ db, blobs: deps.adapters.platformBlobs }, user.id, orgId, c.req.valid("json")),
+        await setOrgLogo(
+          { db, blobs: deps.adapters.platformBlobs, pubsub: deps.adapters.pubsub },
+          user.id,
+          orgId,
+          c.req.valid("json"),
+        ),
         200,
       );
     },
@@ -1285,8 +1381,39 @@ export function accountRoutes(deps: AppDeps) {
       responses: { 204: noContent[204], ...errors },
     }),
     async (c) => {
-      await removeOrgLogo({ db, blobs: deps.adapters.platformBlobs }, c.get("user").id, c.req.valid("param").orgId);
+      await removeOrgLogo(
+        { db, blobs: deps.adapters.platformBlobs, pubsub: deps.adapters.pubsub },
+        c.get("user").id,
+        c.req.valid("param").orgId,
+      );
       return c.body(null, 204);
+    },
+  );
+
+  // The workspace's accent (ADR 0193): an admin picks it; every member's apps paint with it.
+  app.openapi(
+    createRoute({
+      method: "put",
+      path: "/organizations/{orgId}/accent",
+      tags,
+      security,
+      summary: "Set the workspace's accent color, or null for the default. Admins.",
+      request: { params: OrgParams, body: body(z.object({ accent: AccentColor.nullable() })) },
+      responses: {
+        200: json(z.object({ accent: AccentColor.nullable() })),
+        429: errorResponse("Too many accent changes (`rate_limited`)"),
+        ...errors,
+      },
+    }),
+    async (c) => {
+      const user = c.get("user");
+      const { orgId } = c.req.valid("param");
+      const { accent } = c.req.valid("json");
+      await requirePermission(db, user.id, orgId, "configure");
+      // Each change makes every member's open apps refetch.
+      const limit = await deps.adapters.rateLimiter.consume(`org-accent:${orgId}`, { limit: 20, windowMs: 3600_000 });
+      if (!limit.allowed) return apiError(c, 429, "rate_limited", "Too many color changes. Try again later.");
+      return c.json(await setOrgAccent({ db, pubsub: deps.adapters.pubsub }, user.id, orgId, accent), 200);
     },
   );
 
@@ -1297,6 +1424,18 @@ export function accountRoutes(deps: AppDeps) {
         { db, blobs: deps.adapters.platformBlobs },
         c.get("user").id,
         c.req.param("orgId"),
+        c.req.param("file"),
+      ),
+    ),
+  );
+
+  // A background's photo, for its owner only.
+  app.get("/wallpapers/:userId/:file", async (c) =>
+    imageFile(
+      await wallpaperPhotoFile(
+        { db, blobs: deps.adapters.platformBlobs },
+        c.get("user").id,
+        c.req.param("userId"),
         c.req.param("file"),
       ),
     ),
@@ -1449,6 +1588,7 @@ export function accountRoutes(deps: AppDeps) {
           // What the agents know of the workspace: only for who configures it.
           context: can(membership, "configure") ? (org?.context ?? "") : "",
           logo: org?.logo ?? null,
+          accent: org?.accent ?? null,
           mode: await workspaceMode(db, orgId),
         },
         200,
@@ -1765,7 +1905,7 @@ export function accountRoutes(deps: AppDeps) {
         ...c.req.valid("json"),
         secret: config.AGENTES_SECRET,
       });
-      const url = `${config.PUBLIC_URL.replace(/\/$/, "")}/invite/${token}`;
+      const url = `${await requestBaseUrl(deps, c.req.raw.headers)}/invite/${token}`;
       await queueInvitationEmail(db, {
         orgId: invitation.orgId,
         invitationId: invitation.id,

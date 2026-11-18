@@ -4,16 +4,17 @@ import {
   keys,
   type Message,
   type Mission,
+  type ReactionCount,
   type ThreadInfo,
   useApi,
   useChannelCategories,
   useChannels,
   useCloseMission,
+  useDms,
   useFollowThread,
   useMissionControl,
   usePinMessage,
   usePins,
-  useReactions,
   useThreadInfo,
   useThreadMutation,
   useToggleReaction,
@@ -22,12 +23,15 @@ import { textOrMedia } from "@agenteschat/client/lib/media";
 import { messagePath } from "@agenteschat/client/lib/message-links";
 import { summaryParts } from "@agenteschat/client/lib/missions";
 import { listedText } from "@agenteschat/client/lib/voice";
+import { conversationWallpaperOf } from "@agenteschat/client/lib/wallpaper";
 import { chartBlocksOf } from "@agenteschat/ui/widgets/spec";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { type QueryClient, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { TFunction } from "i18next";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { StyleSheet, View } from "react-native";
 import { serverUrl } from "@/lib/server";
+import { useOrg } from "@/providers/org";
 import { CHROME_MAX_SCALE, Count, GroupedList, GroupedRow, Icon, PressScale, SkeletonList, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { useMovesChannel } from "../categories/CategoryScreens";
@@ -36,13 +40,16 @@ import { setPinDraft } from "../dashboards/logic";
 import { chatHref } from "../links/logic";
 import { AgentFace, Face } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
-import { useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { type Directory, useDirectory, useOrgId } from "../shared/hooks";
 import { genderOf, previewOf } from "../shared/logic";
 import { SheetTitle } from "../shared/PromptForm";
 import { type ActionItem, ActionList, copyText, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
 import { useSheet } from "../shared/SheetHost";
+import { useWallpaperName } from "./ChatWallpaper";
 import { QUICK_REACTIONS, reactionName, reactionPills } from "./logic";
 import type { MenuSymbol } from "./MessageMenu";
+import { useRowDirectory, useRowMeId } from "./row-data";
+import { wallpaperHrefs } from "./wallpaper-logic";
 
 // ── Long press on a message ──────────────────────────────────────────────────
 
@@ -66,6 +73,20 @@ export interface MessageAction extends ActionItem {
   symbol?: MenuSymbol;
 }
 
+/** What a message's actions do their work with (`messageActionsOf`). */
+export interface MessageActionHands {
+  t: TFunction;
+  orgId: string;
+  meId: string | null;
+  dir: Pick<Directory, "nameOf">;
+  toast: ReturnType<typeof useToast>;
+  qc: QueryClient;
+  /** Adds or takes back a reaction of mine (`useToggleReaction`). */
+  toggle: ReturnType<typeof useToggleReaction>["mutate"];
+  /** Pins or unpins (`usePinMessage`). */
+  pin: ReturnType<typeof usePinMessage>["mutate"];
+}
+
 /**
  * A message's actions, one list for the system's menu (iOS, on hold) and the app's sheet (Android): the quick
  * reactions, then the actions in groups, as the hand expects them: answer (here, in a thread), keep (copy, pin,
@@ -73,23 +94,31 @@ export interface MessageAction extends ActionItem {
  * an action that opens something else (the sheet closes; the system's menu closes itself).
  */
 export function useMessageActions(context: MessageActionsContext, close: () => void) {
-  const { message: m, canMission, inThread, thread, onMission, onRemind, onReply } = context;
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const toast = useToast();
   const qc = useQueryClient();
-  const cached = useReactions(orgId, m.id, false);
-  const toggle = useToggleReaction(orgId, m.id);
-  const pin = usePinMessage(orgId);
+  const toggle = useToggleReaction(orgId, context.message.id).mutate;
+  const pin = usePinMessage(orgId).mutate;
+  return messageActionsOf(context, close, { t, orgId, meId, dir, toast, qc, toggle, pin });
+}
+
+/**
+ * `useMessageActions` without its hooks, for the system's menu, which builds its actions only once a finger is on the
+ * row (`MessageMenuFor`). A reaction reads the message's reactions as they are when it is picked.
+ */
+export function messageActionsOf(context: MessageActionsContext, close: () => void, hands: MessageActionHands) {
+  const { message: m, canMission, inThread, thread, onMission, onRemind, onReply } = context;
+  const { t, orgId, meId, dir, toast, qc, toggle, pin } = hands;
   const pinned = Boolean(m.pinned);
   const togglePin = () => {
     close();
     const next = !pinned;
     // The mark shows at once; the server's answer (or its event) confirms it.
     cachePinned(qc, orgId, m.channelId, m.id, next);
-    pin.mutate(
+    pin(
       { channelId: m.channelId, messageId: m.id, pinned: next },
       {
         onSuccess: () => toast({ title: t(next ? "mobile.pins.pinned" : "mobile.pins.unpinned"), icon: "pin" }),
@@ -101,7 +130,6 @@ export function useMessageActions(context: MessageActionsContext, close: () => v
       },
     );
   };
-  const pills = reactionPills(cached.data ?? m.reactions, meId);
   const agentName = m.author.type === "agent" ? dir.nameOf(m.author) : "";
   const rootId = m.threadId ?? m.id;
   // Of a voice message only what was typed beside it: its words are the audio's.
@@ -116,8 +144,9 @@ export function useMessageActions(context: MessageActionsContext, close: () => v
   const react = (emoji: string) => {
     tapHaptic();
     const reaction = reactionName(emoji);
-    const mine = pills.find((p) => p.reaction === reaction)?.mine ?? false;
-    toggle.mutate({ reaction, on: !mine });
+    const now = qc.getQueryData<ReactionCount[]>(keys.reactions(orgId, m.id)) ?? m.reactions;
+    const mine = reactionPills(now, meId).find((p) => p.reaction === reaction)?.mine ?? false;
+    toggle({ reaction, on: !mine });
     close();
   };
   const copied = (ok: boolean, title: string) =>
@@ -617,6 +646,11 @@ export function ChannelOptions({
   const categoryName = channel?.categoryId
     ? categories.data?.find((c) => c.id === channel.categoryId)?.name
     : undefined;
+  // This conversation's own background, mine alone; none of its own: it follows the others.
+  const { org } = useOrg();
+  const dm = Boolean(useDms(orgId).data?.some((d) => d.channelId === channelId));
+  const ownWallpaper = conversationWallpaperOf(org?.chatPrefs, channelId);
+  const nameOf = useWallpaperName();
   return (
     <>
       <SheetTitle leading={leading} title={title} {...(subtitle ? { subtitle } : {})} />
@@ -651,6 +685,16 @@ export function ChannelOptions({
                 },
               ]
             : []),
+          {
+            key: "wallpaper",
+            icon: "image",
+            label: t("settings.account.chat.wallpaper.title"),
+            hint: ownWallpaper ? nameOf(ownWallpaper, dm) : t("settings.account.chat.wallpaper.sameShort"),
+            onPress: () => {
+              sheet.close();
+              router.push(wallpaperHrefs.choose({ channelId }));
+            },
+          },
           ...(agentId
             ? [
                 {

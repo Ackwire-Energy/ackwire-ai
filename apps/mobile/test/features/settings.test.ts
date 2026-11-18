@@ -605,7 +605,7 @@ describe("Armazenamento", () => {
   test("VoiceOver reads the line with its option: it is part of the row's label", () => {
     const src = (path: string) => readFileSync(join(import.meta.dir, "..", "..", "src", path), "utf8");
     expect(src("ui/Grouped.tsx")).toContain(
-      'accessibilityLabel={[label, sub, belowText, said, value, valueNote].filter(Boolean).join(", ")}',
+      'accessibilityLabel={[leadingSaid, label, sub, belowText, said, value, valueNote].filter(Boolean).join(", ")}',
     );
     expect(src("features/settings/StorageScreen.tsx")).toContain("belowText: usage ?? undefined");
   });
@@ -656,7 +656,8 @@ test("Sobre o Ackwire AI in Você: on every self-hosted server, old ones too; ne
   // Nor before the server says which it is: the Cloud never shows it for a moment.
   expect(showsAbout(undefined)).toBe(false);
   const me = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "me", "MeScreen.tsx"), "utf8");
-  expect(me).toContain("const about = showsAbout(useAuthConfig().data);");
+  expect(me).toContain("const server = useAuthConfig().data;");
+  expect(me).toContain("const about = showsAbout(server);");
   expect(me).toContain("{about ? (");
   expect(me).toContain('onPress={() => open("/me/about")}');
 });
@@ -666,6 +667,16 @@ test("Auditoria's row screen: the call's title in words, and what the tool said 
   expect(src).toContain("title={auditHint(t, row) ?? auditPhrase(t, row, i18n.language)}");
   const tech = src.slice(src.indexOf('t("audit.panel.tech")'));
   expect(tech).toContain('label={t("audit.panel.techSaid")} sub={said}');
+});
+
+test("Auditoria says an operator's read of the workspace in the words the web uses: the sentence, why under it and on the row's screen", () => {
+  const src = readFileSync(join(import.meta.dir, "..", "..", "src", "features", "settings", "AuditScreen.tsx"), "utf8");
+  // The list's row: who read what, and under it at whose request or for which fault.
+  expect(src).toContain("const { name, text } = auditSentence(t, row, i18n.language);");
+  expect(src).toContain("const sub = auditSubLine(t, row);");
+  // The row's own screen says why in the reason's place.
+  expect(src).toContain("const reason = auditReason(t, row);");
+  expect(src).toContain("{reason ? (");
 });
 
 test("my photo on Você changes it with a tap, through Conta's own Alterar foto", () => {

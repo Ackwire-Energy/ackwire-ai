@@ -25,7 +25,18 @@ import { AccessibilityInfo, StyleSheet, View } from "react-native";
 import Animated, { Easing, FadeIn } from "react-native-reanimated";
 import { paysHere } from "@/lib/store";
 import { useOrg } from "@/providers/org";
-import { CARD_PAD, Card, GROUPED_ROW, GroupedRow, Icon, type IconName, PressScale, Text, useReducedMotion } from "@/ui";
+import {
+  CARD_PAD,
+  Card,
+  Disclosure,
+  GROUPED_ROW,
+  GroupedRow,
+  Icon,
+  type IconName,
+  PressScale,
+  Text,
+  useReducedMotion,
+} from "@/ui";
 import { openConnectAi } from "../../ai/NoAiCard";
 import { usePlanHold } from "../../ai/parts";
 import { requestComposerText } from "../../chat/composer-request";
@@ -406,7 +417,7 @@ export function SetupAsks({ lead, asks }: { lead: string; asks: { label: string;
           <Text variant="small" style={styles.fill}>
             {a.label}
           </Text>
-          <Icon name="right" size={16} color={c.faint} />
+          <Disclosure />
         </PressScale>
       ))}
     </View>

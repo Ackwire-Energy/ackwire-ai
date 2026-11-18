@@ -346,7 +346,7 @@ export const operatorAccountColumns = {
  */
 export async function operatorAgent(db: Database, agentId: string) {
   const [agent] = await db
-    .select({ ...agentColumns, previousHandles: agents.previousHandles, fallback: agents.brainFallback })
+    .select({ ...agentColumns, previousHandles: agents.previousHandles })
     .from(agents)
     .where(eq(agents.id, agentId));
   if (!agent) return null;

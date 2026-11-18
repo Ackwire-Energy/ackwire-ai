@@ -311,9 +311,9 @@ export interface RoutineView {
   waitingFor: { machineId: string; machineName: string; since: string } | null;
   /**
    * Its run waits on its plan or budget (`usage_paused`): paused near the limit (ADR 0118) or stopped at it (`limit`).
-   * It picks up at `resetsAt` (null: not known yet). `extraOff`: a plan pause whose window is used up, on an agent whose switch keeps long work
-   * off paid extra usage, so Continuar agora is refused (`pauseContinuesPastPlan`); `extraUsedUp`: the same with the
-   * switch on but no extra usage left. Who may press it: `canManage`.
+   * It picks up at `resetsAt` (null: not known yet). `extraOff`: a plan pause whose window is used up, on an agent
+   * whose long work never uses paid extra usage (`paysExtraUsage`), so Continuar agora is refused
+   * (`pauseContinuesPastPlan`); `extraUsedUp`: the same with no extra usage left. Who may press it: `canManage`.
    */
   usagePause: {
     source: "plan" | "budget";

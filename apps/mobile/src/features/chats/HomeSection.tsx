@@ -3,7 +3,19 @@ import { useCallback, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import Animated, { FadeIn, LayoutAnimationConfig, useAnimatedStyle, withTiming } from "react-native-reanimated";
 import { readValueSync, STORED, writeValue } from "@/lib/storage";
-import { Count, Icon, IconButton, LIST_INSET, ROW_PRESS_DELAY, SCREEN_X, Text, useReducedMotion, weights } from "@/ui";
+import {
+  Count,
+  Disclosure,
+  Icon,
+  IconButton,
+  LIST_INSET,
+  ROW_PRESS_DELAY,
+  RowPressable,
+  SCREEN_X,
+  Text,
+  useReducedMotion,
+  weights,
+} from "@/ui";
 import { useColors } from "../shared/hooks";
 import { HOME_SECTIONS, type HomeSection, parseCollapsed, toggleCollapsed } from "./logic";
 
@@ -111,17 +123,12 @@ export function CollapsibleSection({
 export function SeeAllRow({ label, onPress }: { label: string; onPress: () => void }) {
   const c = useColors();
   return (
-    <Pressable
-      unstable_pressDelay={ROW_PRESS_DELAY}
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [styles.more, pressed && { backgroundColor: c.sunken }]}
-    >
+    <RowPressable onPress={onPress} hold accessibilityRole="button" style={styles.more}>
       <Text variant="small" tone="muted" style={styles.medium}>
         {label}
       </Text>
-      <Icon name="right" size={15} color={c.muted} />
-    </Pressable>
+      <Disclosure color={c.muted} />
+    </RowPressable>
   );
 }
 

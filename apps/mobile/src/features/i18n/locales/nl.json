@@ -243,8 +243,6 @@
       "mute": "Dempen",
       "unmute": "Ontdempen"
     },
-    "firstRunLine": "{{name}} zet het team op · {{done}} van {{total}}",
-    "firstRunLinePersonal": "{{name}} richt je agents in · {{done}} van {{total}}",
     "first": {
       "title": "Begin met je eerste agent",
       "subtitle": "Geef hem een naam en zeg wat hij doet. Hij verschijnt hier, als gesprek.",
@@ -1667,18 +1665,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}} heeft hulp nodig",
-      "needsFor": "{{name}} heeft hulp nodig · {{time}}",
-      "inControlAt": "Jij hebt de controle · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "De browser van {{name}} openen…",
-      "startingM": "De browser van {{name}} openen…",
       "stopAskF": "De browser van {{name}} sluiten?",
       "stopAskM": "De browser van {{name}} sluiten?",
-      "whereF": "In de browser van {{name}}",
-      "whereM": "In de browser van {{name}}",
       "open": "Openen",
-      "expandHint": "Tik om uit te vouwen",
       "stop": "Stoppen",
       "giveUp": "Opgeven"
     },
@@ -1686,7 +1675,6 @@
       "inControl": "Jij hebt de controle",
       "helping": "{{name}} heeft de controle",
       "watchOnly": "{{name}} heeft de controle. Jij kijkt alleen mee.",
-      "takeOver": "Overnemen",
       "done": "Klaar",
       "handBack": "Teruggeven",
       "couldnt": "Het lukte niet",
@@ -1707,7 +1695,6 @@
       "closedHelpM": "Logins blijven bewaard voor de volgende keer.",
       "stuckHelpF": "Opnieuw proberen start de browser opnieuw. Logins blijven bewaard.",
       "stuckHelpM": "Opnieuw proberen start de browser opnieuw. Logins blijven bewaard.",
-      "hidden": "{{name}} heeft de controle · scherm verborgen",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2222,7 +2209,6 @@
     "planRowSub": "Logt in op de computer van de agent, zonder sleutel",
     "keyRow": "Een sleutel",
     "keyRowSub": "Je betaalt per gebruik, rechtstreeks aan de aanbieder",
-    "already": "Al in {{org}}",
     "stepOf": "{{step}} van {{total}}"
   },
   "crash": {
@@ -2873,5 +2859,11 @@
       "title": "Niets te controleren",
       "text": "Als een agent iets buiten het gesprek doet, verschijnt het hier."
     }
+  },
+  "surface": {
+    "on": "Aan",
+    "codeText": "Stuur het bericht dat daar opent en kom dan hier terug.",
+    "openFailed": "{{surface}} kon niet openen op deze telefoon. Stuur de code hieronder er zelf heen.",
+    "orType": "Of stuur deze code daar"
   }
 }

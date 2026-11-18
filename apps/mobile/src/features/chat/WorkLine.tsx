@@ -18,9 +18,10 @@ import { useOrg } from "@/providers/org";
 import { Button, haptics, LineIcon, PixelOrbit, Text, useToast } from "@/ui";
 import { router } from "@/ui/navigation";
 import { chatHref } from "../links/logic";
-import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { tapHaptic, useSurface } from "../shared/parts";
 import { RowPartContext, useCardTop } from "./look";
+import { useRowDirectory, useRowMeId } from "./row-data";
 
 /** The conversation's list scrolls to one of its messages (false: it doesn't show it). */
 export const JumpToMessageContext = createContext<((messageId: string) => boolean) | null>(null);
@@ -40,8 +41,8 @@ function useNow(live: boolean) {
 function useLine(work: WorkView, inUpdatesThread = false) {
   const { t, i18n } = useTranslation();
   const orgId = useOrgId();
-  const meId = useMeId();
-  const dir = useDirectory();
+  const meId = useRowMeId();
+  const dir = useRowDirectory();
   const manage = can(useOrg().org, "manage_agents");
   const api = useApi();
   const qc = useQueryClient();
@@ -334,7 +335,7 @@ export function IssueWorkLine({ issue, style }: { issue: Issue; style?: StylePro
  */
 function HandedWork({ work, style }: { work: WorkView; style?: StyleProp<ViewStyle> }) {
   const { t, i18n } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const surface = useSurface();
   if (work.status === "done") {
     const name = dir.anyAgent(work.agentId)?.name ?? t("channel.unknownAgent");
@@ -384,7 +385,7 @@ function HandedWork({ work, style }: { work: WorkView; style?: StyleProp<ViewSty
 export function useShareWork(issue: Issue): { share: () => void; pending: boolean } | null {
   const { t } = useTranslation();
   const orgId = useOrgId();
-  const meId = useMeId();
+  const meId = useRowMeId();
   const admin = can(useOrg().org, "manage_agents");
   const api = useApi();
   const qc = useQueryClient();

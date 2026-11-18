@@ -91,7 +91,16 @@ import { useFailed } from "../routines/hooks";
 import { proposedRoutineWhen } from "../routines/rule";
 import { chooseAction, SettingsPage, useUnsavedGuard } from "../settings/parts";
 import { useColors, useDirectory, useMeId, useOrgId } from "../shared/hooks";
-import { BottomBar, goBack, PushedHeader, successHaptic, Tile, tapHaptic, useSurface } from "../shared/parts";
+import {
+  BottomBar,
+  FocusLive,
+  goBack,
+  PushedHeader,
+  successHaptic,
+  Tile,
+  tapHaptic,
+  useSurface,
+} from "../shared/parts";
 import { overLimit, TextArea } from "../shared/TextArea";
 import { markArrived } from "./arrival";
 import { closeBrainPick, openBrainPick } from "./brain-pick";
@@ -254,7 +263,16 @@ interface StepProps {
   tried?: boolean;
 }
 
-function Step({ step, ...props }: StepProps & { step: PhoneStep }) {
+/** A step's page: what lives on it (the agent in its sky, on "who it is") holds still while a step is over it. */
+function Step(props: StepProps & { step: PhoneStep }) {
+  return (
+    <FocusLive>
+      <StepBody {...props} />
+    </FocusLive>
+  );
+}
+
+function StepBody({ step, ...props }: StepProps & { step: PhoneStep }) {
   if (step === "role") return <RoleStep {...props} />;
   if (step === "identity") return <IdentityStep {...props} />;
   if (step === "instructions") return <InstructionsStep {...props} />;

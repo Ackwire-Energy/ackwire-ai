@@ -2,7 +2,7 @@ import { type AgentBrainInput, type BrainKind, type BrainScope, keys, useApi } f
 import { type EffortLevel, effortLevelsOf, effortTextOf } from "@agenteschat/client/lib/brain-advanced";
 import { AUTO } from "@agenteschat/client/lib/providers";
 import { bodyTones } from "@agenteschat/ui/agent/engine";
-import { Canvas, Fill, Shader, Skia, useClock } from "@shopify/react-native-skia";
+import { Canvas, Fill, Shader, Skia } from "@shopify/react-native-skia";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -12,6 +12,7 @@ import Animated, { useDerivedValue, useSharedValue, withSpring } from "react-nat
 import { scheduleOnRN } from "react-native-worklets";
 import { useLivePaused } from "@/agent/live";
 import { useOrg } from "@/providers/org";
+import { useDrawingClock } from "@/sky/clock";
 import { rgba } from "@/sky/math";
 import { EFFORT_SHADER } from "@/sky/shaders";
 import { haptics, Text, useReducedMotion, useTheme, useToast } from "@/ui";
@@ -134,7 +135,8 @@ export function EffortRamp({
 
   const source = effortEffect();
   const moving = !reduced && !paused && !disabled;
-  const clock = useClock();
+  // Only while it moves: a still ramp (paused, reduced motion, off) has no frame callback.
+  const clock = useDrawingClock(moving);
   const tones = bodyTones(color);
   const base = {
     size: [width, HEIGHT],

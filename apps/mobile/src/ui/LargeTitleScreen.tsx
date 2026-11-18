@@ -2,7 +2,7 @@ import { type NativeStackNavigationOptions, Stack, useIsFocused } from "expo-rou
 import { useHeaderHeight } from "expo-router/react-navigation";
 import { createContext, type ReactNode, useContext, useMemo } from "react";
 import { Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, { type AnimatedRef } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LivePause } from "@/agent/live";
 import { CoverBarBackdrop, CoverParallax, FadingHeaderTitle } from "./cover";
@@ -56,6 +56,12 @@ export interface LargeTitleScreenProps {
   bottomInset?: number;
   /** The person starts scrolling the list (Conversas closes its open "Esperando você" card). */
   onScrollBeginDrag?: () => void;
+  /**
+   * Drawn fixed over the screen's foot, under the bar's band and the tab foot, never scrolling: what shows as the list
+   * is pulled past its end (Conversas: the team peeking up from behind the tab bar), handed the list's scroll view to
+   * read the pull from on the UI thread. With `drawnTitle`.
+   */
+  pastEnd?: (scroll: AnimatedRef<Animated.ScrollView>) => ReactNode;
   /**
    * The grouped gray background (settings-like screens) with white cards on it; the tabs, lists and chat
    * stay on the plain (white, in light) background.
@@ -165,6 +171,7 @@ function DrawnTitleScreen({
   onScrollBeginDrag,
   grouped = false,
   collapsed = false,
+  pastEnd,
 }: LargeTitleScreenProps) {
   const { colors } = useTheme();
   const focused = useIsFocused();
@@ -244,6 +251,7 @@ function DrawnTitleScreen({
           ) : null}
         </Animated.ScrollView>
       </LivePause>
+      {pastEnd?.(scroll.ref)}
       <CoverBarBackdrop y={y} from={0} to={12} height={headerHeight} tone={grouped ? colors.grouped : colors.bg} />
       {foot?.node}
     </View>

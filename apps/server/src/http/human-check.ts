@@ -1,5 +1,7 @@
 import { createTurnstileCheck, type HumanAction, type HumanCheck, type HumanCheckRefusal } from "@agenteschat/adapters";
 import { type Config, ConfigError } from "@agenteschat/config";
+import type { Database } from "@agenteschat/db";
+import { hostLook } from "@agenteschat/engine";
 import type { Logger } from "../logger";
 import { requestIp, requestLimitIp } from "./client-ip";
 import { HUMAN_PASS_PREFIX, type HumanPasses } from "./human-pass";
@@ -9,7 +11,8 @@ export const HUMAN_CHECK_HEADER = "x-captcha-response";
 
 /**
  * agentes.chat Cloud's bot check (ADR 0075), only with both keys: without them nothing reaches Cloudflare. Tokens
- * count when made on `PUBLIC_URL`'s host, and for the waiting lists also on `LANDING_URL`'s.
+ * count when made on `PUBLIC_URL`'s host or on the request's own registered host (`humanCheckRefusal`, ADR 0194), and
+ * for the waiting lists also on `LANDING_URL`'s.
  */
 export function createHumanCheck(
   config: Pick<Config, "PUBLIC_URL" | "LANDING_URL" | "TURNSTILE_SITE_KEY" | "TURNSTILE_SECRET_KEY">,
@@ -37,6 +40,7 @@ const REFUSALS: Record<HumanCheckRefusal, string> = {
  */
 export async function humanCheckRefusal(
   check: HumanCheck | null | undefined,
+  db: Database,
   headers: { get(name: string): string | null | undefined },
   action: HumanAction,
   trustedProxies: readonly string[] | undefined,
@@ -49,7 +53,8 @@ export async function humanCheckRefusal(
     if (pass?.passes.accepts(sent, { action, email: pass.email, network })) return null;
     return { code: "human_check", message: REFUSALS.human_check };
   }
-  const code = await check.verify(sent, action, requestIp(headers, trustedProxies));
+  const host = (await hostLook(db, headers.get("host")))?.host;
+  const code = await check.verify(sent, action, requestIp(headers, trustedProxies), host);
   return code ? { code, message: REFUSALS[code] } : null;
 }
 

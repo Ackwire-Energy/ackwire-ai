@@ -605,6 +605,7 @@
     "termsMiddle": "和",
     "privacy": "隐私政策",
     "termsAfter": "。",
+    "poweredBy": "由 Ackwire AI 提供支持",
     "signOut": "退出登录",
     "earlyAccess": {
       "otherEmail": "这个邀请是发给另一个地址的。请使用收到邀请的地址注册。",
@@ -2327,6 +2328,56 @@
     "localOnlyHow": "在那台电脑的 Ackwire AI 应用中，打开偏好设置 › 服务器里的“从你的手机和队友那里访问”，然后回到这里。",
     "localOnlyHere": "打开“从你的手机和队友那里访问”，然后回到这里。"
   },
+  "surface": {
+    "link": {
+      "consent": "Ackwire AI 的 {{assistant}} 可能会在 {{surface}} 上给你发关于你的工作区的消息，只有在事情紧急且你允许时才会给你打电话。发送 stop 即可关闭。",
+      "title": "在{{surface}}上和{{assistant}}聊天",
+      "qr": "打开{{surface}}并填好你的代码的二维码",
+      "making": "正在生成你的代码",
+      "code": "你的代码 {{code}}",
+      "open": "打开{{surface}}",
+      "stepScan": "用手机扫描代码，或打开应用",
+      "stepSend": "按原样发送这条消息",
+      "stepSendText": "你的消息一到，就会自动进入下一步。",
+      "stepConfirm": "核对发送者并在这里确认",
+      "showCode": "再次显示代码",
+      "confirmTitle": "这是你的{{surface}}吗？",
+      "sentBy": "这个发送者发来了你的代码",
+      "onlyYou": "只有这是你本人时才关联。",
+      "workspace": "在{{workspace}}中回复",
+      "confirm": "是，关联",
+      "notMe": "不是我",
+      "doneTitle": "{{surface}}已关联",
+      "doneText": "从现在起，{{assistant}}会在那里回复你。",
+      "newCode": "生成新代码",
+      "done": "完成"
+    },
+    "row": {
+      "hint": "和{{assistant}}聊天，并在{{surface}}上收到回复。",
+      "link": "关联",
+      "none": "{{assistant}}可以在那里给你发消息",
+      "pending": "有发送者在等你确认",
+      "unlink": "取消关联",
+      "unlinkTitle": "要取消关联{{surface}}吗？",
+      "unlinkText": "{{assistant}}将不再在那里回复你。你随时可以重新关联。",
+      "unlinked": "已取消关联{{surface}}"
+    },
+    "undo": {
+      "title": "要取消关联聊天应用吗？",
+      "lead": "你的账号刚刚关联了一个聊天应用。如果不是你，请在这里取消关联。",
+      "button": "取消关联",
+      "done": "已取消关联{{surface}}",
+      "doneLead": "{{display}}再也无法联系到你的账号。",
+      "ended": "已经取消关联",
+      "endedLead": "{{surface}}上的{{display}}之前已取消关联。无需再做什么。",
+      "gone": "这个撤销链接已失效",
+      "sender": "该发送者"
+    },
+    "via": "通过 {{surface}}",
+    "viaTip": "由 {{person}} 通过 {{surface}} 发送",
+    "forwarded": "通过 {{surface}} 转发",
+    "forwardedTip": "{{person}} 从 {{surface}} 转发了这条消息。这是别人的话。"
+  },
   "team": {
     "title": "团队",
     "people_other": "{{count}} 人",
@@ -2534,7 +2585,8 @@
     "header": {
       "pins": "置顶消息",
       "showMembers": "显示成员",
-      "hideMembers": "隐藏成员"
+      "hideMembers": "隐藏成员",
+      "more": "更多选项"
     },
     "membersButton_other": "频道成员（{{count}}）",
     "membersAgents": "智能体",
@@ -3260,10 +3312,12 @@
     "titleFor_female": "为 {{name}} 连接 AI",
     "have": {
       "title": "已连接",
-      "titleFor": "已为 {{name}} 连接",
-      "titleFor_female": "已为 {{name}} 连接",
       "other": "或连接其他",
-      "manageKeys": "管理或删除密钥"
+      "manageKeys": "管理或删除密钥",
+      "pickLine": "选择一个已在这里连接的账号。{{name}} 会用它思考。",
+      "onlyOwner_other": "还有 {{count}} 个账号，只有 {{name}} 能提供。",
+      "moreAgents_other": "以及另外 {{count}} 个智能体",
+      "plenty": "余量充足"
     },
     "chat": {
       "mine": "你的账号",
@@ -3444,6 +3498,13 @@
     "onceHint": "它们共享你套餐的用量上限。",
     "use": "使用 {{label}}",
     "another": "其他账号",
+    "which": {
+      "title": "{{name}} 要用哪个 {{brand}} 账号？",
+      "title_female": "{{name}} 要用哪个 {{brand}} 账号？",
+      "titleAll": "他们要用哪个 {{brand}} 账号？",
+      "mine": "你在 {{computer}} 上的 {{brand}} 账号",
+      "other": "用另一个 {{brand}} 账号登录"
+    },
     "reuse": {
       "active": "你在这里已经有 {{label}}。重新登录它，或使用其他账号。",
       "signedOut": "{{label}} 在这里已退出登录。重新登录后，它的智能体会继续使用它。"
@@ -3594,6 +3655,7 @@
     "resuming": "{{agent}} 正在继续",
     "shared_other": "{{agents}} 也在用同一个 {{plan}} 套餐。所有对话都进入同一个队列。",
     "about": "关于队列",
+    "chain": "{{plan}} 的 {{accounts}} 个账号都已达限额。",
     "lists": "对话",
     "queuedTab": "排队中",
     "skippedTab": "已跳过",
@@ -3663,7 +3725,6 @@
       "aiAccount": "使用 {{account}} 思考",
       "aiModel": "通过 API 思考",
       "aiNone": "还没有 AI。创建后再连接一个",
-      "reviewTitle": "查看 {{name}}",
       "lines": "{{name}} 将获得",
       "aChannel": "一个频道",
       "anApp": "一个应用",
@@ -5048,6 +5109,7 @@
       "joinRequest_other": "{{name}} 等人申请加入",
       "joinRequestNames": "{{names}} 申请加入",
       "joinSuggestion": "{{by}} 推荐了 {{name}}",
+      "joinOutside": "{{name}} 申请以 {{outsideOf}} 外部协作者身份加入，不占用席位",
       "doing": {
         "merge": "合并",
         "deploy": "部署",
@@ -5104,6 +5166,7 @@
       "joinRequest": "<b>{{name}}</b> 申请加入",
       "joinRequestMany": "<b>{{names}}</b> 申请加入",
       "joinSuggestion": "<b>{{by}}</b> 推荐了 <b>{{name}}</b>",
+      "joinOutside": "<b>{{name}}</b> 申请以 <b>{{outsideOf}}</b> 外部协作者身份加入，不占用席位",
       "changeRequest": "<b>{{name}}</b> 请求更改 <b>{{agent}}</b>",
       "proposalWaiting": "来自 <b>{{names}}</b> 的改进提议",
       "changeRequestAgent": "<b>{{name}}</b> 请求新的智能体：<b>{{agent}}</b>",
@@ -5533,12 +5596,12 @@
         "accountAlso": "{{agents}} 也在使用",
         "accountOf": "{{name}} 的",
         "accountOthers": "服务整个 workspace 的套餐会显示属于谁。",
+        "movesOn": "达到限额时改用下一个账号",
+        "pinned": "仅此账号",
+        "pinnedHint": "达到限额时，等这个账号重置，而不是改用下一个。",
         "addAccount": "添加账号",
         "signInAgain": "重新登录",
         "connectPlan": "连接其他套餐",
-        "fallbackTitle": "{{computer}} 无响应时，通过 API 回复",
-        "fallbackHint": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
-        "fallbackHint_female": "将通过 API 回复，并计入 {{name}} 的预算。否则 {{name}} 会告知提出请求的人，并等待电脑恢复。",
         "effort": "投入程度",
         "efforts": {
           "auto": "自动",
@@ -5599,8 +5662,7 @@
           "effort": "投入程度：{{level}}",
           "speed": "速度：快速",
           "context": "上下文：{{size}}",
-          "sharing": "回复其他成员",
-          "waits": "等待电脑"
+          "sharing": "回复其他成员"
         },
         "copy": {
           "row": "用于其他智能体",
@@ -5738,7 +5800,6 @@
           "wait": "等待",
           "modelTitle": "{{name}} 的模型",
           "moreTitle": "{{name}} 的更多选项",
-          "fallback": "套餐停止时使用 API 密钥",
           "computer": "电脑",
           "doneTitle": "都好了",
           "doneSub": "进行中的工作会用新账号继续。",
@@ -6917,7 +6978,6 @@
     "adminsOnlyPersonal": "请管理这里的人允许你创建智能体。",
     "proposalClosed": "这个提议已经有了决定或已过期。",
     "proposalNoAccess": "只有所在对话中的人能看到这个提议。",
-    "backToChat": "返回对话",
     "and": "和",
     "routine": "例行工作",
     "routineKeep": "创建例行工作 {{name}}",
@@ -7092,6 +7152,51 @@
     "otherSkill": "其他技能",
     "namesLead": "试试",
     "namesRoll": "换一批名字",
+    "proposal": {
+      "lead": "调整 {{name}} 的提议。之后都可以修改。",
+      "leadNarrow": "{{name}} 的提议：{{why}}",
+      "side": "提议",
+      "from": "{{name}} 提议",
+      "changed": "你改了什么",
+      "changedNone": "还没有。你在卡片上的修改会显示在这里，可以撤销。",
+      "undo": "撤销",
+      "changes": {
+        "changed": "已修改",
+        "added": "已添加",
+        "removed": "已移除",
+        "how": "工作方式"
+      },
+      "firstTask": "第一个任务",
+      "firstTaskPlaceholder": "先让它做什么（可选）",
+      "firstTaskHint": "会在你和 {{name}} 的对话里备好，直接发送即可。",
+      "firstTaskHintBlank": "会在你和它的对话里备好，直接发送即可。",
+      "firstTaskNone": "没有任务时，对话打开是空的。",
+      "after": "创建之后",
+      "afterAi": "连接一个 AI，让 {{name}} 能思考",
+      "afterAiBlank": "连接一个 AI，让它能思考",
+      "afterApp": "连接 {{app}}",
+      "afterNone": "没有。{{name}} 创建后马上开始工作。",
+      "afterNoneBlank": "没有。创建后马上开始工作。",
+      "discard": "放弃提议",
+      "otherChannel": "其他频道",
+      "chooseChannels": "选择频道",
+      "channelsNone": "只在它和你的对话里。",
+      "channel": {
+        "lead": "{{name}} 工作的地方。",
+        "leadBlank": "它工作的地方。",
+        "does": "在 {{channel}} 里被叫到时，{{name}} 会回答，并阅读那里的内容。",
+        "doesBlank": "在 {{channel}} 里被叫到时，它会回答，并阅读那里的内容。",
+        "remove": "从 {{channel}} 移出"
+      },
+      "routine": {
+        "label": "例行任务",
+        "lead": "{{when}}，在 {{channel}}。",
+        "leadDm": "{{when}}，在它和你的对话里。",
+        "starts": "{{name}} 创建后开始。时间和内容可在“例行任务”里修改。",
+        "startsBlank": "创建后开始。时间和内容可在“例行任务”里修改。",
+        "remove": "移除例行任务"
+      }
+    },
     "skill": {
       "opens": "话题出现时，{{name}} 会打开这份指南。可在“技能”里编辑。",
       "opensBlank": "话题出现时，它会打开这份指南。可在“技能”里编辑。",
@@ -7130,6 +7235,10 @@
     "rolesAdd": "添加角色",
     "rolesChange": "更改角色",
     "moreOf": "{{name}} 的更多操作",
+    "outside": {
+      "chip": "外部",
+      "title": "外部协作者"
+    },
     "passwordLink": {
       "item": "生成新密码链接",
       "hint": "在对方忘记密码时使用",
@@ -7327,6 +7436,8 @@
       "viaLink": "{{when}}通过链接申请",
       "suggested": "由 {{name}} 于{{when}}推荐",
       "suggestedLabel": "{{by}} 推荐了 {{name}}",
+      "outside": "{{when}}申请以 {{outsideOf}} 外部协作者身份加入",
+      "outsideSeat": "外部协作者不计入你套餐的人数，你可以随时移除他们。",
       "asked": "{{ago}}申请",
       "askedNow": "刚刚申请",
       "askedOn": "于 {{date}} 申请",
@@ -8712,7 +8823,7 @@
       "canceledToast": "已取消。限额重置后不会运行。",
       "continuedToast": "运行继续中。",
       "forbidden": "现在只有例行工作的创建者、智能体的负责人或管理员可以让它继续",
-      "extra_off": "这个套餐的时段额度已用完，而这个智能体的长时间工作不使用付费的额外用量。在它的 AI 设置中开启后即可立即继续，否则会在重置后继续",
+      "extra_off": "这个套餐的时段额度已用完，而这个智能体的长时间工作不使用套餐的付费额外用量。会在重置后继续",
       "extra_used_up": "这个套餐的时段额度已用完，付费的额外用量也已用完或不可用。会在重置后继续"
     },
     "pausedRunningToast": "例行工作已暂停。正在进行的运行也已停止。",
@@ -10115,6 +10226,12 @@
     }
   },
   "aiAccounts": {
+    "unnamed": "未命名账号",
+    "rename": {
+      "action": "重命名 {{label}}",
+      "label": "账号名称",
+      "placeholder": "例如：工作、个人"
+    },
     "share": {
       "switch": "回复其他成员",
       "switchAll": "回复其他成员",
@@ -10831,6 +10948,17 @@
     "saved": "徽标已更新。",
     "removed": "徽标已移除。"
   },
+  "orgAccent": {
+    "label": "强调色",
+    "change": "更改颜色",
+    "useDefault": "使用默认颜色",
+    "suggested": "推荐颜色",
+    "sampleMention": "@智能体",
+    "sampleLink": "一个链接",
+    "save": "保存颜色",
+    "saved": "强调色已更新。",
+    "reset": "已恢复默认颜色。"
+  },
   "look": {
     "previous": "上一个",
     "next": "下一个",
@@ -11506,8 +11634,7 @@
       "cursor": "Cursor · {{model}}",
       "grok": "Grok Build · {{model}}",
       "antigravity": "Antigravity CLI · {{model}}",
-      "opencode": "OpenCode · {{model}}",
-      "noFallback": "{{brain}}，不回退到 API"
+      "opencode": "OpenCode · {{model}}"
     },
     "mission": {
       "modelLabel": "模型",
@@ -14405,6 +14532,22 @@
     }
   },
   "errors": {
+    "surface": {
+      "off": "聊天应用关联已关闭。刷新页面即可查看当前设置。",
+      "notAllowed": "你的账号暂时还不能关联聊天应用。在开放之前，请继续在这里使用应用。",
+      "noAssistant": "此工作区的助手未设置为与你交谈。请选择另一个工作区进行关联。",
+      "noWorkspace": "你已不在此工作区。请选择另一个工作区进行关联。",
+      "linkGone": "此关联已不再等待：它在 10 分钟后过期或已被取消。请生成新代码重新开始。",
+      "taken": "该发送者已关联到另一个 Ackwire AI 账号。请先在那里取消关联，再发送新代码。",
+      "undoGone": "此撤销链接已被使用或已过期。请改在通知设置中取消关联。",
+      "codeGone": "此代码错误、已被使用或已在 10 分钟后过期。请生成新代码并重新发送。"
+    },
+    "wallpaper": {
+      "notYours": "这张照片不是你的。",
+      "invalid": "该背景不存在。",
+      "tooLarge": "照片最大 2 MB。",
+      "type": "请使用 JPEG、PNG 或 WebP 照片。"
+    },
     "tooLarge": "超出了服务器接受的大小。",
     "tooLargeMax": "超出了服务器接受的大小：最大 {{max}} MB。",
     "passwordLink": {
@@ -14435,7 +14578,7 @@
       "accountInUse": "这个账号已在为另一个智能体思考。",
       "noAiYet": "还没有连接 AI。",
       "filePurged": "这个文件已删除超过 30 天，无法恢复。",
-      "looksSecret": "这看起来像密码或密钥，这里的所有人都会看到。",
+      "looksSecret": "这看起来像密码或密钥，这里的所有人都会看到。请让智能体改为私下向你请求。",
       "blockSpec": "此区块的组成部分或公式有误，因此无法显示。请修正后重试。",
       "takeControl": "请先接管这个配置文件。",
       "profileBusy": "其他人正在使用这个配置文件。",
@@ -14455,6 +14598,7 @@
       "agentCantRead": "请先在智能体的访问设置中允许它读取这项内容。",
       "neverHappens": "这个日程永远不会触发。",
       "soleOwner": "你是这个有其他成员的工作区的唯一所有者。请先将其他人设为所有者，或删除工作区。",
+      "soleOwnerOutside": "你是这个工作区的唯一所有者，其他人都是外部协作者，不能成为所有者。请先邀请一位成员并设为所有者，或删除工作区。",
       "testFirst": "开启之前，请先用这些设置测试连接。",
       "voiceLength": "录音太长或太短。",
       "sendAgain": "文件没有完整送达。请重新发送。",
@@ -14531,7 +14675,8 @@
       "aboveYou": "只有比这个角色级别更高的人才能修改它。",
       "base": "每个工作区都保留“所有人”角色。",
       "unknown": "这个角色已不存在。",
-      "orderIncomplete": "你移动时角色发生了变化。请刷新后重试。"
+      "orderIncomplete": "你移动时角色发生了变化。请刷新后重试。",
+      "outsideOwner": "外部协作者不能成为所有者。"
     },
     "teamProposal": {
       "undoExpired": "这个团队创建已超过一天，无法在这里撤销。请在各智能体的页面上归档它们。"
@@ -14563,7 +14708,8 @@
       "denied": "你的申请没有获批，请让那里的人邀请你。",
       "answered": "已经有人处理了这个申请。",
       "expired": "这个申请已过期：14 天内无人处理。",
-      "codeNeeded": "请先验证你的邮箱。"
+      "codeNeeded": "请先验证你的邮箱。",
+      "outsideClosed": "这个账号已被封禁或正在删除，因此无法加入。这个申请已关闭。"
     },
     "code": {
       "wrong": "验证码错误，请重试。",
@@ -14649,7 +14795,7 @@
       "takeOverNoAccess": "接手例行工作之前，请先加入它所在的对话。",
       "agentNotInChannel": "请先把智能体添加到对话中。",
       "webhookPaused": "请开启例行工作后再测试。",
-      "continueExtraOff": "这个套餐的时间窗口额度已用完，而这个智能体的长时间工作没有启用付费额外用量。在它的 AI 设置中开启后即可立即继续，否则会在额度重置后继续。",
+      "continueExtraOff": "这个套餐的时间窗口额度已用完，而这个智能体的长时间工作不使用套餐的付费额外用量。会在额度重置后继续。",
       "continueExtraUsedUp": "这个套餐的时间窗口额度已用完，付费额外用量也已用完或不可用。它会在额度重置后继续。",
       "actionsNeedApprover": "只有智能体负责人或批准其操作的人可以让例行工作自行执行。",
       "editorOnly": "只有例行工作的创建者、智能体负责人或管理员可以修改它。",
@@ -14745,13 +14891,15 @@
     "agent": {
       "ownerOrAdmin": "只有智能体负责人或管理员可以执行此操作。",
       "detailsHidden": "只有与 {{agentName}} 对话的人可以看到它的工作方式。",
-      "extraOwnerOnly": "只有智能体负责人可以开启或关闭套餐的付费额外用量。",
       "undoForbidden": "只有智能体为其工作的人、智能体负责人或管理员可以撤销此操作。",
-      "undoSkillsAdmins": "只有管理员能撤销或重做对智能体技能的更改。"
+      "undoSkillsAdmins": "只有管理员能撤销或重做对智能体技能的更改。",
+      "extraOwnerOnly": "只有智能体负责人可以开启或关闭套餐的付费额外用量。",
+      "extraUnavailable": "付费额外用量仅适用于智能体负责人自己的套餐，不适用于得力助手。"
     },
     "account": {
       "notRestorable": "这个账号已无法恢复。",
-      "notOwner": "只有连接此账号或套餐的人可以执行此操作。"
+      "notOwner": "只有连接此账号或套餐的人可以执行此操作。",
+      "orderForbidden": "只有连接此账号的人或管理员可以调整它在顺序中的位置。"
     },
     "channel": {
       "membersForbidden": "只有频道创建者或管理员可以添加或移除成员。"
@@ -16026,8 +16174,37 @@
     },
     "system": "系统",
     "removed": "已移除",
+    "operatorRead": {
+      "sentence": "{{who}}查看了{{what}}",
+      "who": {
+        "server": "运行此服务器的人",
+        "cloud": "Ackwire AI 支持团队"
+      },
+      "what": {
+        "message": "一条消息",
+        "run_step": "智能体工作中的一个步骤",
+        "agent": "一个智能体的指令",
+        "routine": "一项例行工作",
+        "task": "一个后台任务",
+        "channel": "一个频道的名称",
+        "connection": "一个连接的信息",
+        "support_request": "一条支持请求",
+        "direct": "私密对话中的内容",
+        "other": "工作区中的内容"
+      },
+      "request": {
+        "plain": "应 {{name}} 的请求",
+        "app": "应 {{name}} 的请求（从应用发送）",
+        "email": "应 {{name}} 的请求（通过邮件发送）",
+        "operator": "应 {{name}} 的请求（由运行此服务器的人记录）",
+        "support": "应 {{name}} 的请求（由支持团队记录）"
+      },
+      "fault": "为诊断一次失败或卡住的运行",
+      "ai": "使用了 AI 助手"
+    },
     "change": {
       "mergedWithoutAsking": "未经询问在 {{repo}} 中合并",
+      "accentChanged": "更改了工作区的强调色",
       "pattern": "{{verb}}{{area}}",
       "approval": {
         "approved": "批准了一个请求",
@@ -16039,6 +16216,11 @@
         "left": "离开了工作区",
         "role_changed": "更改了一位成员的角色",
         "password_link": "为成员生成了新密码链接"
+      },
+      "outside": {
+        "approved": "让 {{outsideOf}} 的外部协作者加入了",
+        "removed": "移除了 {{outsideOf}} 的外部协作者",
+        "left": "以 {{outsideOf}} 外部协作者身份离开了工作区"
       },
       "role": {
         "permission_set": "更改了谁可以{{short}}",
@@ -16302,6 +16484,51 @@
           "new3": "还剩 2 家，我明天打电话。",
           "new4": "Drive 中的报告已更新。",
           "newCount": "4 条新消息"
+        },
+        "wallpaper": {
+          "title": "背景",
+          "help": "只对你生效，并同步到你的所有设备",
+          "rowHelp": "显示在所有对话后面，只有你能看到。单个对话可以在它的菜单里设置自己的背景。",
+          "rowSub": "只对你，所有对话",
+          "onlyHere": "仅在 {{name}}，只对你",
+          "none": "无背景",
+          "sameAsOthers": "与其他对话相同",
+          "sameShort": "与其他相同",
+          "sky": "天空",
+          "drawings": "图案",
+          "color": "颜色",
+          "photos": "你的照片",
+          "choosePhoto": "选择照片",
+          "skyAutoHelp": "第一个随对话变化：在私信中是智能体颜色的天空，在频道中是工作区的天空。",
+          "skyAutoHelpDms": "第一个是智能体颜色的天空。",
+          "skyAutoHelpChannels": "第一个是工作区的天空。",
+          "neutral": {
+            "paper": "纸",
+            "mist": "雾",
+            "sand": "沙"
+          },
+          "name": {
+            "skyAuto": "对话的天空",
+            "skyAgent": "智能体的天空",
+            "skyWorkspace": "工作区的天空",
+            "sky": "天空 · {{color}}",
+            "drawingsAuto": "对话的图案",
+            "drawingsAgent": "智能体的图案",
+            "drawingsWorkspace": "工作区的图案",
+            "drawings": "图案 · {{color}}",
+            "crowd": "智能体",
+            "color": "颜色 · {{color}}",
+            "photo": "你的照片"
+          },
+          "choose": "选择…",
+          "menu": "对话背景…",
+          "preview": "预览",
+          "usePhoto": "使用这张照片",
+          "dragHint": "拖动照片，选择显示的部分",
+          "dim": "在深色模式下调暗",
+          "sending": "正在发送照片…",
+          "failed": "无法保存背景，请重试。",
+          "done": "完成"
         }
       },
       "agentStyle": "智能体如何跟你说话",
@@ -16693,6 +16920,14 @@
   "usageViews": {
     "signedOut": "已退出登录",
     "whose": "{{name}} 的",
+    "order": {
+      "title": "{{plan}} · 使用顺序",
+      "hint": "达到限额时，智能体会改用下一个还有余量的账号，第一个账号重置后再换回来。",
+      "terms": "在 {{plan}} 的条款中，使用多个 {{plan}} 账号属于灰色地带。",
+      "termsLabel": "{{plan}} 的条款",
+      "termsHint": "一个套餐只供一个人使用，所以在让智能体依赖多个账号之前，请先查看 {{plan}} 的条款。",
+      "move": "移动 {{name}}，顺序第 {{n}} 位"
+    },
     "serves": {
       "everyone": "所有人可用",
       "onlyYou": "仅你可用",
@@ -16753,7 +16988,7 @@
       "nowTag": "现在",
       "api": "API",
       "apiMain": "{{name}} 通过 API 思考",
-      "apiFallback": "套餐之外：快速决策，以及套餐无法回答的时候",
+      "apiFallback": "套餐之外：快速决策",
       "removed": "已移除的账号",
       "removedSub": "已不在任何电脑上",
       "old": "{{brand}}，在启用账号之前",
@@ -17387,6 +17622,7 @@
       "provider_wait_said": "{{provider}} 返回了错误（{{detail}}）。我会重试，成功后尽快回复。",
       "provider_wait_ours": "问题在我们这边，不是你的账户，它挡住了我的 AI。解决后我会尽快回复。",
       "provider_back": "我的 AI 已恢复。",
+      "confidential_removed": "已移除：机密文本保留 {{days}} 天。",
       "brain_busy": "我的电脑正忙于其他任务。空闲后我会尽快回复。",
       "brain_queued": "我还在电脑的队列里。它一有空闲内存我就回复。",
       "brain_interrupted": "{{brain}} 在完成前停止了。已完成的不会重复：{{tools}}。",
@@ -17394,6 +17630,11 @@
       "plan_limit_cut_unknown": "我在 {{plan}} 套餐的限额处停了下来。重置后我会立即从停下的地方继续。",
       "plan_limit_wait": "{{plan}} 套餐已达限额。{{when}}重置后我会回复。如果在 {{plan}} 中提前解除，我会察觉并立即回复。",
       "plan_limit_wait_unknown": "{{plan}} 套餐已达限额。重置后我会立即回复。",
+      "plan_account_moved": "{{from}} 账号已达限额。我改用 {{to}} 账号继续。",
+      "plan_account_moved_line": "{{from}} 账号快到上限了。我改用 {{to}} 账号继续。",
+      "plan_account_moved_extra": "{{from}} 账号会进入付费额外用量。我改用 {{to}} 账号继续。",
+      "plan_limit_all_wait": "{{plan}} 的 {{accounts}} 个账号都已达限额。{{when}}第一个重置后我会回复。",
+      "plan_limit_all_wait_unknown": "{{plan}} 的 {{accounts}} 个账号都已达限额。任意一个重置后我会立即回复。",
       "plan_model_limit_wait": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它{{when}}重置。",
       "plan_model_limit_wait_unknown": "{{model}} 在 {{plan}} 中达到了自身的限额。套餐里的其他模型仍可正常使用：更换 {{agent}} 的模型，或等它重置。",
       "plan_model_region_wait": "这个模型（{{model}}）需要在 OpenCode 的 设置 › 隐私 中开启 Global 区域。",
@@ -17464,6 +17705,8 @@
       "file_saved": "文件已保存。",
       "issue_work_start": "请完成任务 #{{number}}。",
       "issue_taken": "接手了任务 #{{number}}。",
+      "surfaceUnlinked": "{{surface}} 因身份变更已解除关联。如果是你，请在设置中重新关联。",
+      "surfaceVoiceDropped": "我没听清那条语音消息。可以再发一次，或者打字告诉我吗？",
       "done": "完成。",
       "stretch_paused_runs_other": "{{agents}} 暂停下来，先向你确认再继续",
       "stretch_paused_spend_other": "{{agents}} 暂停下来向你确认 · 每个已用掉本月预算的 {{percent}}%",
@@ -18370,6 +18613,7 @@
     "serverOwner": "这台服务器是你搭建的。它的设置在这里将没有所有者，只保留在服务器的环境配置中。",
     "blockers": "删除之前需要先处理",
     "soleOwner": "你是 {{name}} 唯一的所有者。请把其他人设为所有者，或删除 {{name}}。",
+    "soleOwnerOutside": "你是 {{name}} 唯一的所有者，其他人都是不能成为所有者的外部协作者。请邀请一位成员并设为所有者，或删除 {{name}}。",
     "soleOwnerSettingUp": "你是 {{name}} 唯一的所有者。请先完成设置，再把其他人设为所有者，或删除 {{name}}。",
     "openPeople": "打开成员页面",
     "finishSetup": "完成设置",
@@ -18389,6 +18633,10 @@
     "seatsPaid_other": "已付费 {{count}} 个席位",
     "noLimit": "无限制",
     "ownBucket": "在你自己的存储桶上，我们不设限制"
+  },
+  "referrals": {
+    "open": "推荐有奖",
+    "failed": "暂时无法打开，请稍后再试。"
   },
   "limits": {
     "members": {

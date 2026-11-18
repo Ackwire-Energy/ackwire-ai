@@ -553,6 +553,12 @@ export const SHARED_SIGN_INS: Readonly<Record<"claude_code" | "codex" | "antigra
   key: true,
 };
 
+/**
+ * The kinds whose subscriptions a run may go on with at a plan's limit, each within its own kind (ADR 0041 §6). Never
+ * Antigravity: Google forbids automating account rotation (ADR 0143). Not Grok, Cursor or OpenCode.
+ */
+export const NEXT_ACCOUNT_KINDS: readonly string[] = ["claude_code", "codex"];
+
 /** Whether a new sign-in of an account (its CLI's kind, and a coding plan's `provider`) is made for all agents. */
 export const sharedSignIn = (kind: string, provider?: string | null) =>
   isPlanId(provider)

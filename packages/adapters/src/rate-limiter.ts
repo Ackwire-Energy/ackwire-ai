@@ -15,6 +15,9 @@ export interface RateLimiter {
   consume(key: string, rule: { limit: number; windowMs: number }): Promise<RateLimitResult>;
 }
 
+/** Seconds until a rate limit's window opens again, at least 1. */
+export const retryInSeconds = (resetAt: Date) => Math.max(1, Math.ceil((resetAt.getTime() - Date.now()) / 1000));
+
 export function createMemoryRateLimiter(now: () => number = Date.now): RateLimiter {
   const windows = new Map<string, { count: number; resetAt: number }>();
   return {

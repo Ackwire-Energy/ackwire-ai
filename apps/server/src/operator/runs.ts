@@ -84,7 +84,10 @@ const Run = z
         "What it last waited on that isn't a person: `busy`, `machine_offline`, `plan_limit`, `budget`, `usage_pause`, `work_queue`, `provider_outage`… On an ended run: what it waited on when it ended. Ignore values you don't know.",
     }),
     waitSource: z.string().nullable().openapi({ description: "A long-work pause's: `plan` or `budget`." }),
-    waitResetsAt: Time.nullable().openapi({ description: "When the limit it waits on resets, when known." }),
+    waitResetsAt: Time.nullable().openapi({
+      description:
+        "When the limit it waits on resets, when known. With every account of the order at its limit, the first of them.",
+    }),
     waitAccountId: z.uuid().nullable().openapi({
       description:
         "The AI sign-in whose plan it waits on (`plan_limit`, or a long-work pause on a plan). Null: the plan is its computer's own sign-in, or it waits on a budget or on no plan.",
@@ -92,6 +95,10 @@ const Run = z
     waitAccountMachineId: z.uuid().nullable().openapi({
       description:
         "The computer that sign-in is on. With `waitAccountId` null and this set: that computer's own sign-in is the plan it waits on.",
+    }),
+    accountId: z.uuid().nullable().openapi({
+      description:
+        "The AI account it went on with at its plan's limit (ADR 0041 §6): its plan waits and usage are that account's. Null: its agent's own (`accountId` on the agent).",
     }),
     waitingMachineId: z.uuid().nullable().openapi({ description: "The computer it waits for." }),
     canceled: z
@@ -203,7 +210,7 @@ export const Job = z
       .string()
       .nullable()
       .openapi({
-        description: `Its first ${OPERATOR_JOB_ERROR_MAX} characters; cleared 30 days after the job ended.`,
+        description: `Its first ${OPERATOR_JOB_ERROR_MAX} characters; cleared 30 days after the job ended. Null for a job of a run of a confidential thread.`,
       }),
     lastErrorStatus: z.number().int().nullable().openapi({
       description:

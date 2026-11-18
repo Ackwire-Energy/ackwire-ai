@@ -16,6 +16,7 @@ import {
 import { modelInfo } from "@agenteschat/providers";
 import { recordAgentActions } from "../agent-actions";
 import { steeredByOthers } from "../authority";
+import { isConfidentialRun, threadIsConfidential } from "../confidential";
 import { callLine, type LearnSignal, type RunCall, runCalls } from "../continuation";
 import { cutText, cutTextEnd } from "../format";
 import { agentBudgetState } from "../gateway";
@@ -214,6 +215,8 @@ export async function afterTurnDone(
 ) {
   try {
     const { db } = deps;
+    // Nothing is learned from a run of a confidential thread (ADR 0190): the job's model would read what it read.
+    if (isConfidentialRun(run.id)) return false;
     const cfg = learnConfig(deps);
     const [calls, { ids: usedHowTos, counted }] = await Promise.all([runCalls(db, run), injectedHowTos(db, run)]);
     // Once per run, however many turns it ends: a run that took more messages is still one reuse.
@@ -401,7 +404,16 @@ function parseLearnOutput(text: string): { items: LearnedItem[]; skillFixes: { s
 
 export interface LearnResult {
   /** `running`: the run took more messages after the turn that queued this; the job retries (`jobs.ts`). */
-  skipped?: "missing" | "cap_reached" | "busy" | "running" | "budget" | "no_model" | "model_failed" | "right_hand";
+  skipped?:
+    | "missing"
+    | "cap_reached"
+    | "busy"
+    | "running"
+    | "budget"
+    | "no_model"
+    | "model_failed"
+    | "right_hand"
+    | "confidential";
   saved: { id: string; action: string; trust: string; scopeType: string }[];
   rejected: { content: string; reason: "no_sources" | "secret" | "refused" }[];
   skills: { slug: string; action: string }[];
@@ -449,6 +461,8 @@ export async function learnRun(deps: ContextDeps, input: { orgId: string; runId:
     )
     .limit(1);
   if (busy) return { ...out, skipped: "busy" };
+  // Queued by a turn that ended before the thread turned confidential (ADR 0190): the job reads the whole run.
+  if (await threadIsConfidential(db, run.orgId, run.threadRootId)) return { ...out, skipped: "confidential" };
   const [agent] = await db.select().from(agents).where(eq(agents.id, run.agentId));
   if (!agent || agent.archivedAt) return { ...out, skipped: "missing" };
   // Nothing is learned from its runs for the team (ADR 0137): it keeps only what it saves for the person it answers.

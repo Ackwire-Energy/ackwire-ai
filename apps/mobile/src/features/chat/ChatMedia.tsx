@@ -9,10 +9,11 @@ import { appHeaders, lastCookie } from "@/lib/auth";
 import { serverUrl } from "@/lib/server";
 import { CHROME_MAX_SCALE, Text } from "@/ui";
 import { useReducedMotion } from "@/ui/theme";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { agentLook } from "../shared/logic";
 import { useKeptWidth } from "./look";
 import { gifBox, MESSAGE_STICKER } from "./media";
+import { useRowDirectory } from "./row-data";
 
 /**
  * A message's GIF or sticker (ADR 0091). `align="end"`: my own message, on the right. `liveId`: the name a sticker
@@ -44,10 +45,30 @@ export const gifImageSource = (orgId: string, id: string, size: GifSize) => ({
   cacheKey: `gif:${orgId}:${id}:${size}`,
 });
 
+/** How long a GIF fades in the first time it shows. */
+const GIF_FADE_MS = 120;
+/** How many GIFs are remembered as shown (`shownGifs`): the newest, past it the one shown longest ago goes. */
+const SHOWN_GIFS_MAX = 300;
+/**
+ * The GIFs already shown in this run of the app, by cache key: the list mounts a row again each time it scrolls back
+ * into view, and one shown before comes back at once from memory, with no fade.
+ */
+const shownGifs = new Set<string>();
+
+function markShown(key: string) {
+  shownGifs.delete(key);
+  shownGifs.add(key);
+  if (shownGifs.size > SHOWN_GIFS_MAX) {
+    const oldest = shownGifs.values().next();
+    if (!oldest.done) shownGifs.delete(oldest.value);
+  }
+}
+
 /**
  * A GIF (`gifImageSource`), at its own proportions up to 260pt in the app's cut-corner frame, a small "GIF" mark on its corner; with reduced motion, its still frame. A file
  * that no longer loads (an admin turned GIFs off, the GIF gone) leaves a quiet card of its size with its title and
- * the mark, never a broken picture.
+ * the mark, never a broken picture. Kept decoded in memory as well as on disk (`memory-disk`): scrolled back into view
+ * it shows at once, never decoded again, and fades in only the first time.
  */
 function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) {
   const { t } = useTranslation();
@@ -62,6 +83,8 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
   const source = useMemo(() => gifImageSource(orgId, media.id, size), [orgId, media.id, size]);
   const [failed, setFailed] = useState<string | null>(null);
   const off = failed === source.uri;
+  // Shown before: no fade this time (read once, at mount, so a load doesn't change it under the picture).
+  const [seen] = useState(() => shownGifs.has(source.cacheKey));
   const box = gifBox(media.width, media.height, room);
   const title = media.title.trim();
   return (
@@ -86,8 +109,10 @@ function ChatGif({ media, align }: { media: GifMedia; align: "start" | "end" }) 
             recyclingKey={source.cacheKey}
             contentFit="cover"
             autoplay={!reduced}
-            transition={120}
+            cachePolicy="memory-disk"
+            transition={seen ? 0 : GIF_FADE_MS}
             style={StyleSheet.absoluteFill}
+            onLoad={() => markShown(source.cacheKey)}
             onError={() => setFailed(source.uri)}
             accessible={false}
           />
@@ -121,7 +146,7 @@ function ChatSticker({
   liveId: string | undefined;
 }) {
   const { t } = useTranslation();
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const agent = dir.anyAgent(media.agentId);
   const live = useStickerLive(liveId);
   return (

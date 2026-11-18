@@ -4,17 +4,14 @@ import {
   type MessageConsultation,
   type RunConsultation,
   useConsultationConversation,
-  useConsultations,
 } from "@agenteschat/client";
 import { handoffAsk } from "@agenteschat/client/lib/agent-work";
 import {
-  asExchanges,
   type ConsultLineState,
   type ConsultPairItem,
   consultLineKey,
   consultPair,
   firstOfRun,
-  groupsByRun,
   openableConsultation,
   pairItemOf,
 } from "@agenteschat/client/lib/consult-group";
@@ -30,10 +27,11 @@ import { Icon, Text } from "@/ui";
 import { router } from "@/ui/navigation";
 import { consultationHref } from "../links/logic";
 import { AgentFace } from "../shared/Face";
-import { useColors, useDirectory, useOrgId } from "../shared/hooks";
+import { useColors, useOrgId } from "../shared/hooks";
 import { usePresenceOf } from "../status/hooks";
 import { rowBodyInset } from "./logic";
 import { useRhythm, useRowLook } from "./look";
+import { useRowConsults, useRowDirectory } from "./row-data";
 import { WaitMark } from "./WaitMark";
 
 /** A question's state in words, on the conversation's screen ("A Iris espera uma aprovação"). */
@@ -76,12 +74,10 @@ export function useRunConsults(
 ): ConsultPairItem[] {
   const orgId = useOrgId();
   const qc = useQueryClient();
-  const list = useConsultations(orgId, where.channelId, Boolean(runId));
-  const group = useMemo(
-    () => (runId ? groupsByRun(asExchanges(list.data ?? [])).get(runId) : undefined),
-    [list.data, runId],
-  );
-  const listed = useMemo(() => new Set((list.data ?? []).map((c) => c.id)), [list.data]);
+  // Grouped once for the conversation (`RowConsults.byRun`, `groupsByRun(asExchanges(…))`), not again in every row.
+  const list = useRowConsults(where.channelId);
+  const group = runId ? list.byRun.get(runId) : undefined;
+  const listed = list.byId;
   const loaded =
     group && runId
       ? [
@@ -106,9 +102,9 @@ export function useRunConsults(
  */
 export function useConsultById(channelId: string, id: string | undefined): RunConsultation | null {
   const orgId = useOrgId();
-  const list = useConsultations(orgId, channelId, Boolean(id));
-  const listed = useMemo(() => (id && list.data?.find((c) => c.id === id)) || null, [list.data, id]);
-  const alone = useConsultationConversation(orgId, channelId, id && list.isSuccess && !listed ? id : null);
+  const list = useRowConsults(channelId);
+  const listed = (id && list.byId.get(id)) || null;
+  const alone = useConsultationConversation(orgId, channelId, id && list.loaded && !listed ? id : null);
   return listed ?? alone.data?.consultation ?? null;
 }
 
@@ -138,7 +134,7 @@ export function ConsultPairRow({
   const { t, i18n } = useTranslation();
   const rhythm = useRhythm();
   const inset = rowBodyInset(useRowLook());
-  const dir = useDirectory();
+  const dir = useRowDirectory();
   const c = useColors();
   const live = items.some((x) => x.status === "open");
   const now = useTick(live);

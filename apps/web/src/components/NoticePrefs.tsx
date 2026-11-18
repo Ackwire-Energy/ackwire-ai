@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next";
 import { LoadingLine } from "@/components/Loading";
 import { OpenOnPhoneDialog } from "@/components/OpenOnPhone";
 import { useOrg } from "@/components/org-context";
+import { SurfacePrefRow } from "@/components/SurfaceLink";
 import { useBrowserNotices } from "@/components/WebPush";
 import { inDesktopApp } from "@/lib/desktop";
 import { useToast } from "@/lib/toast";
@@ -77,6 +78,7 @@ export function NoticePrefsSection() {
             }
           />
           <PrefRow id="notice-mac" icon="computerMac" label={t("noticePrefs.mac")} hint={t("noticePrefs.macHelp")} />
+          <SurfacePrefRow />
         </div>
         <OpenOnPhoneDialog open={phoneCode} onClose={() => setPhoneCode(false)} />
       </Card>

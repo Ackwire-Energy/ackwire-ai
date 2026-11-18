@@ -234,8 +234,6 @@
       "mute": "알림 끄기",
       "unmute": "알림 켜기"
     },
-    "firstRunLine": "{{name}}이(가) 팀을 꾸리는 중 · {{done}}/{{total}}",
-    "firstRunLinePersonal": "{{name}}이(가) 에이전트를 준비하는 중 · {{done}}/{{total}}",
     "first": {
       "title": "첫 에이전트부터 시작해 보세요",
       "subtitle": "이름을 지어 주고 무슨 일을 할지 알려 주세요. 여기에 채팅으로 나타나요.",
@@ -1568,18 +1566,9 @@
   },
   "browser": {
     "card": {
-      "needs": "{{name}}이(가) 도움이 필요해요",
-      "needsFor": "{{name}}이(가) 도움이 필요해요 · {{time}}",
-      "inControlAt": "내가 제어 중 · {{host}}",
-      "doing": "{{name}} · {{doing}}",
-      "startingF": "{{name}}의 브라우저를 여는 중…",
-      "startingM": "{{name}}의 브라우저를 여는 중…",
       "stopAskF": "{{name}}의 브라우저를 닫을까요?",
       "stopAskM": "{{name}}의 브라우저를 닫을까요?",
-      "whereF": "{{name}}의 브라우저에서",
-      "whereM": "{{name}}의 브라우저에서",
       "open": "열기",
-      "expandHint": "탭해서 펼치기",
       "stop": "중지",
       "giveUp": "포기"
     },
@@ -1587,7 +1576,6 @@
       "inControl": "내가 제어 중",
       "helping": "{{name}}이(가) 제어 중",
       "watchOnly": "{{name}}이(가) 제어 중이에요. 나는 보기만 해요.",
-      "takeOver": "제어하기",
       "done": "완료",
       "handBack": "돌려주기",
       "couldnt": "하지 못했어요",
@@ -1608,7 +1596,6 @@
       "closedHelpM": "로그인 정보는 다음을 위해 저장돼요.",
       "stuckHelpF": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
       "stuckHelpM": "다시 시도하면 브라우저가 다시 시작돼요. 로그인 정보는 저장돼요.",
-      "hidden": "{{name}}이(가) 제어 중 · 화면 숨김",
       "key": {
         "Tab": "Tab",
         "Enter": "Enter",
@@ -2116,7 +2103,6 @@
     "planRowSub": "키 없이 에이전트의 컴퓨터에서 로그인해요",
     "keyRow": "키",
     "keyRowSub": "사용한 만큼 제공사에 직접 결제해요",
-    "already": "{{org}}에 이미 있는 AI",
     "stepOf": "{{step}}/{{total}}"
   },
   "crash": {
@@ -2752,5 +2738,11 @@
       "title": "확인할 것이 없어요",
       "text": "에이전트가 대화 밖에서 무언가를 하면 여기에 나타나요."
     }
+  },
+  "surface": {
+    "on": "켜짐",
+    "codeText": "그곳에서 열리는 메시지를 보낸 다음 여기로 돌아오세요.",
+    "openFailed": "이 휴대폰에서 {{surface}}을(를) 열 수 없어요. 대신 아래 코드를 보내세요.",
+    "orType": "또는 이 코드를 보내세요"
   }
 }

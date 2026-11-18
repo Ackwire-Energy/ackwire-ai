@@ -30,7 +30,7 @@ import { Face } from "../shared/Face";
 import { LoadFailed } from "../shared/FirstUse";
 import { useColors, useMeId } from "../shared/hooks";
 import { errorHaptic, Loaded, successHaptic } from "../shared/parts";
-import { invitersOf, memberActions, memberLine, membersByName, whenWords } from "./logic";
+import { invitersOf, memberActions, memberLine, membersByName, outsideLine, whenWords } from "./logic";
 
 /** What leads each of a person's actions in their row's menu. */
 const ACT_ICON = { dm: "chat", roles: "shield", leave: "out", remove: "trash" } as const;
@@ -111,6 +111,7 @@ export function MembersPage() {
                 remove: () => void remove(m),
               };
               const removes = acts.includes("remove") || acts.includes("leave");
+              const outside = outsideLine(t, m);
               return (
                 <GroupedRow
                   key={m.userId}
@@ -119,6 +120,7 @@ export function MembersPage() {
                   }
                   label={m.userId === meId ? `${m.name}${t("common.youSuffix")}` : m.name}
                   sub={memberLine(t, i18n.language, m, roles)}
+                  {...(outside ? { belowText: outside } : {})}
                   {...(acts.length > 0
                     ? {
                         more: true,
