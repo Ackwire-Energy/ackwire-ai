@@ -135,7 +135,7 @@ describe("on a server that sends email", () => {
     expect(right.status).toBe(200);
     expect(await right.json()).toEqual({ status: "sent", email: "ana.nova@example.com" });
     await t.drain();
-    expect(mailTo("ana.nova@example.com").at(-1)?.subject).toBe("Confirme seu novo e-mail no agentes.chat");
+    expect(mailTo("ana.nova@example.com").at(-1)?.subject).toBe("Confirme seu novo e-mail no Ackwire AI");
     expect((await userOf("ana@example.com"))?.id).toBeTruthy();
     // Spent: it proves one change.
     const reused = await change(ana, { newEmail: "ana.nova@example.com", code });
@@ -149,7 +149,7 @@ describe("on a server that sends email", () => {
     expect(after?.emailVerified).toBe(true);
     await t.drain();
     const notice = mailTo("ana@example.com").at(-1);
-    expect(notice?.subject).toBe("O e-mail da sua conta do agentes.chat mudou");
+    expect(notice?.subject).toBe("O e-mail da sua conta do Ackwire AI mudou");
     expect(notice?.text).toContain("Não fui eu");
     expect(notice?.text).toMatch(/\/email-undo\?token=[\w-]{40,}/);
   });
